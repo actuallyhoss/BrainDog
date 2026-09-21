@@ -14,8 +14,24 @@
  * scheme you happen to be developing in. Two widths, because the phone layout swaps the table for
  * cards and the rail for a tab bar: different markup, different names, different failures.
  *
- * It serves `build/` itself for the same reason the screenshot script does, and reports and exits 0
+ * AND IT SAYS WHAT IT AUDITED, PER SURFACE, BECAUSE ITS TOTAL WAS QUOTED FOR A PAGE IT BARELY
+ * TOUCHED. This gate used to end on one line: `244 page-runs, 0 rule(s) with findings`. That line was
+ * copied into `apps/site/DESIGN-NOTES.md` as the accessibility evidence for a marketing home-page
+ * redesign, under a heading about what was measured on the finished page. Twelve of the 244 were the
+ * marketing site and four of those were its home page; the other 232 were the record app and its
+ * three variant records, none of which the redesign touched. The number was exactly right and the
+ * sentence it was standing in was not, and nobody was being careless: a single total is the only
+ * thing the gate gave them to quote. `surfaces` and `per` are the two halves of the fix, and the
+ * breakdown printed under the total is what it buys.
+ *
+ * It serves `build/` itself for the same reason the screenshot script does, and reports and exits 3
  * when there is no build, so `pnpm gates` stays useful on a fresh checkout.
+ *
+ * THAT SENTENCE READ `EXITS 0` UNTIL TODAY, AND THE CODE HAS NOT AGREED WITH IT FOR SOME TIME.
+ * `self-test`'s `silent-pass` grep exists because two gates reported an unbuilt tree and then exited 0,
+ * which `run.mjs` counts as a gate that passed; the bottom of this file returns 3 and spells out why.
+ * The header was the last line in it still promising the defect, which is the same failure as the one
+ * the paragraph above is about: a true-sounding sentence nobody had reason to re-read.
  *
  * `color-contrast` is included but reported separately. The theme's own proof already guarantees
  * the token PAIRS clear their floors; what axe adds is the composition: a token used against a
@@ -38,8 +54,8 @@ import { routesOf } from './routes.mjs';
 /**
  * AND WHY THIS GATE DECLARES NO `needs`, WHICH IS THE QUESTION A READER OF `layout.mjs` ARRIVES
  * WITH. `52 §5.1` step 2 lets a gate name a prerequisite the runner checks, and `layout` names
- * `web-build` because it skips on `apps/web/build` alone. This gate does not: `APPS` below holds
- * two builds, each skipped by name on its own, and a tree with the marketing site built and the
+ * `web-build` because it skips on `apps/web/build` alone. This gate does not: `surfaces` below names
+ * five builds, each skipped by name on its own, and a tree with the marketing site built and the
  * record app not still gets a real contrast audit of the shop window. A declaration of `web-build`
  * here would be the runner refusing a run that had something to measure, which is a worse failure
  * than the one step 2 exists to fix, because it is silent in the direction of measuring less.
@@ -48,6 +64,126 @@ import { routesOf } from './routes.mjs';
  * the gate, which is the same answer it reached by finding no `export const needs` in the text. The
  * absence is the declaration here, and the paragraph above is the whole of its argument.
  */
+
+/**
+ * Addresses a surface names by hand that the derivation for its app does not yield.
+ *
+ * A HAND-WRITTEN LIST NAMING A ROUTE THAT NO LONGER EXISTS IS THE SAME DECAY AS A LIST THAT NEVER
+ * GREW, and it is the quieter of the two. `spa: true` serves the shell for any address that matches
+ * no file, so the gate would load a not-found screen, audit it, count it as a page-run and print a
+ * green line. The three variant records are the only surfaces that still name routes by hand, and
+ * this is what keeps their two or three addresses honest.
+ *
+ * A QUERY STRING IS A SECOND ADDRESS OF A ROUTE AND NOT A ROUTE. `busy` drives `/search?q=renewal`
+ * because the point of that pass is a list with something in it, and the route is `/search`. Written
+ * without the split, this check went red on the day it was written, naming a route the app has.
+ *
+ * `routes: null` IS A SURFACE WITH NO LIST TO BE WRONG, so it contributes nothing here: its addresses
+ * came out of the derivation this is comparing against.
+ *
+ * AND WHAT IT COMPARES AGAINST IS THE SAMPLED ADDRESSES, WHICH IS WHY THE SENTENCE SAYS ADDRESS AND
+ * NOT ROUTE. `routes.mjs` samples `/r/[register]` once, as `obligations`, so the derived list holds
+ * `/r/obligations` and nothing else under it. Measured: `stray` on a variant naming `/r/invoices`
+ * reports it, and `/r/invoices` is a route the app certainly has. The first wording of this line said
+ * `has no such route`, which is a false sentence in exactly that case, and a check whose red reads as
+ * a lie about the app is a check somebody deletes rather than answers. The finding is still right,
+ * because an address outside the derivation is an address this gate cannot reach through
+ * `routes.mjs`, and the fix for a variant that wants a second register is a second sample there.
+ */
+export const stray = (apps, derived) =>
+  apps.flatMap((a) =>
+    (a.routes ?? [])
+      .filter((r) => !derived[a.tree].routes.includes(r.split('?')[0]))
+      .map((r) => `${a.name} names ${r}, which is not an address ${a.tree}'s derivation yields`),
+  );
+
+/**
+ * EVERY SURFACE THIS GATE AUDITS, AND WHICH ROUTES OF IT.
+ *
+ * IT IS OUT HERE AND EXPORTED because the only way to ask this gate what it covers used to be to read
+ * it, and for two routes the answer a reader got was wrong. `test/a11y-coverage.test.mjs` imports this
+ * and compares it against the route directories in ten milliseconds, measured, which is a question
+ * worth being able to put without the six minutes and five builds the gate itself needs.
+ *
+ * THE SITE'S LIST WAS TYPED OUT AND IT WAS THREE OF FIVE. It read `['/', '/pricing', '/changelog']`,
+ * so `/legal` and `/404` had never been audited by this gate at all, and those are the two routes
+ * `164ad664` rebuilt. It rebuilt them on an argument this file should have heard first:
+ * `apps/site/scripts/shot.mjs` says "a page nobody looks at is a page nobody notices has stopped
+ * matching the rest of the site", and taught itself to photograph five routes instead of three. The
+ * gate stayed at three, so the two pages a stranger meets by accident were photographed and measured
+ * never. Derived from the tree now, which is the repair the record app's list already had: the two
+ * browser gates each held a hand-written list, the lists disagreed, one was missing `/s/[token]`, and
+ * neither had ever been compared to the route directory.
+ *
+ * AND THE RECORD APP WAS CHECKED FOR THE SAME HOLE RATHER THAN ASSUMED CLEAN. It has none. `web` is
+ * `routes: null`, so all 27 of its route files are covered, as 38 addresses (the settings route is
+ * sampled twelve times) plus the three extras, which is the 41 that a reader of this gate's total can
+ * now see accounted for. What the variants carry is a list each, and `stray` above is why those are
+ * still trustworthy: all five of their addresses are routes the app has.
+ *
+ * THE EXTRAS ARE SECOND ADDRESSES OF ROUTES ALREADY IN THE LIST (a different page, a different
+ * track), because one sample proves the route renders and a second proves the DECLARATION does.
+ * `/nowhere` is in `MAY_REFUSE`: it is the not-found screen, audited on purpose rather than by
+ * accident.
+ *
+ * `tree` IS WHICH APP'S ROUTES A SURFACE IS A PASS OVER, and it is not `name`: four of the five
+ * surfaces are builds of `apps/web`, three of them variant records of it, and a check that confused
+ * the surface with the tree would look for `/settings/billing` in the marketing site.
+ */
+export async function surfaces(root = join(import.meta.dirname, '..', '..')) {
+  const derived = {
+    web: await routesOf(join(root, 'apps', 'web'), ['/p/kiln', '/t/3', '/nowhere']),
+    site: await routesOf(join(root, 'apps', 'site')),
+  };
+
+  /**
+   * BOTH APPS. The record app is where the interesting failures are, but the marketing site is the
+   * first page anybody ever sees and the only one they meet before deciding whether to trust the
+   * rest. A contrast failure there is a contrast failure in the shop window. It is prerendered
+   * rather than a shell, so it needs no fallback and has no states to drive.
+   */
+  const APPS = [
+    { name: 'web', tree: 'web', root: join(root, 'apps', 'web', 'build'), routes: null, spa: true, states: true },
+    /**
+     * THE OTHER RECORD, for the half of every host branch the shipped seed cannot draw.
+     *
+     * `BRAINDOG_VARIANT=cloud` writes `build-cloud/`, and only the two routes that branch are worth
+     * running: the point is that the Cloud side is drawn at all and passes the same rules, not a second
+     * sweep of a build that differs by one constant. Skipped with a line when it is not built, because
+     * "we did not check this" must not look like "there was nothing here".
+     */
+    /* `states` IS NOT `spa`, AND THEY WERE ONE FLAG. `spa` says *serve the shell for a route with no
+       file*, which every variant needs; running the state scenarios is a different question, and
+       every variant answered yes to it because the two facts shared a boolean.
+
+       EVERY SCENARIO STANDS ON `/r/obligations`, `/`, `/p/kiln` OR `/r/nope`, routes no variant
+       changes. A variant differs in `DEPLOYMENT`, `DEVICES`, `TOKENS` and `DECIDED`, which is why each
+       one names the two or three routes where that shows. So the three variants contributed
+       **156 audits of 156 identical pages**: 13 scenarios x 4 passes x 3 variants, 44% of this
+       gate's run, spent proving that opening the palette on a record with no machines connected draws
+       the same palette.
+
+       THOSE SENTENCES SAID `THIRTEEN` AND `STATES` HOLDS FOURTEEN, counted off the list below. The 156
+       is left as it was measured, because it records a run that happened rather than arithmetic to
+       redo, and `toast`'s own comment says it arrived after: it is the scenario the list did not have.
+       The summary this gate prints now names the count it actually drove, which is a number no comment
+       can fall behind.
+
+       A variant earns `states: true` the day a scenario lands on a route it changes. */
+    { name: 'cloud', tree: 'web', root: join(root, 'apps', 'web', 'build-cloud'), routes: ['/settings/backups', '/settings/billing'], spa: true, optional: true },
+    { name: 'quiet', tree: 'web', root: join(root, 'apps', 'web', 'build-quiet'), routes: ['/settings/agents'], spa: true, optional: true },
+    { name: 'busy', tree: 'web', root: join(root, 'apps', 'web', 'build-busy'), routes: ['/search?q=renewal', '/decide'], spa: true, optional: true },
+    { name: 'site', tree: 'site', root: join(root, 'apps', 'site', 'build'), routes: null, spa: false },
+  ];
+
+  return {
+    apps: APPS.map((a) => ({ ...a, routes: a.routes ?? derived[a.tree].routes })),
+    /* A ROUTE WITH NO SAMPLE IS A FAILURE AND NEVER A SKIP, which is `routes.mjs`'s own rule, and the
+       tree it came from is named because two trees are derived here now. */
+    unsampled: Object.entries(derived).flatMap(([tree, d]) => d.unsampled.map((u) => `${tree}: ${u}`)),
+    strays: stray(APPS, derived),
+  };
+}
 
 /**
  * EVERY SURFACE, AUDITED, AS A FUNCTION THE RUNNER CALLS. `52 §5.1` step 3.
@@ -69,39 +205,7 @@ import { routesOf } from './routes.mjs';
  * rests on: a pass is the end of the function and never a statement inside it.
  */
 export default async function a11y(root = join(import.meta.dirname, '..', '..')) {
-  /**
-   * BOTH APPS. The record app is where the interesting failures are, but the marketing site is the
-   * first page anybody ever sees and the only one they meet before deciding whether to trust the
-   * rest. A contrast failure there is a contrast failure in the shop window. It is prerendered
-   * rather than a shell, so it needs no fallback and has no states to drive.
-   */
-  const APPS = [
-    { name: 'web', root: join(root, 'apps', 'web', 'build'), routes: null, spa: true, states: true },
-    /**
-     * THE OTHER RECORD, for the half of every host branch the shipped seed cannot draw.
-     *
-     * `BRAINDOG_VARIANT=cloud` writes `build-cloud/`, and only the two routes that branch are worth
-     * running: the point is that the Cloud side is drawn at all and passes the same rules, not a second
-     * sweep of a build that differs by one constant. Skipped with a line when it is not built, because
-     * "we did not check this" must not look like "there was nothing here".
-     */
-    /* `states` IS NOT `spa`, AND THEY WERE ONE FLAG. `spa` says *serve the shell for a route with no
-       file*, which every variant needs; running the thirteen state scenarios is a different question,
-       and every variant answered yes to it because the two facts shared a boolean.
-
-       ALL THIRTEEN SCENARIOS STAND ON `/r/obligations`, `/`, `/p/kiln` AND `/r/nope`, routes no
-       variant changes. A variant differs in `DEPLOYMENT`, `DEVICES`, `TOKENS` and `DECIDED`, which is
-       why each one names the two or three routes where that shows. So the three variants contributed
-       **156 audits of 156 identical pages**: 13 scenarios x 4 passes x 3 variants, 44% of this
-       gate's run, spent proving that opening the palette on a record with no machines connected draws
-       the same palette.
-
-       A variant earns `states: true` the day a scenario lands on a route it changes. */
-    { name: 'cloud', root: join(root, 'apps', 'web', 'build-cloud'), routes: ['/settings/backups', '/settings/billing'], spa: true, optional: true },
-    { name: 'quiet', root: join(root, 'apps', 'web', 'build-quiet'), routes: ['/settings/agents'], spa: true, optional: true },
-    { name: 'busy', root: join(root, 'apps', 'web', 'build-busy'), routes: ['/search?q=renewal', '/decide'], spa: true, optional: true },
-    { name: 'site', root: join(root, 'apps', 'site', 'build'), routes: ['/', '/pricing', '/changelog'], spa: false },
-  ];
+  const { apps: APPS, unsampled, strays } = await surfaces(root);
   const AXE = join(root, 'node_modules', 'axe-core', 'axe.min.js');
   const A = budget('a11y');
   const PORT = A.port;
@@ -122,21 +226,17 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
    */
   const ready = readiness('a11y', budget('ready').settleTimeoutMs, APPS[0].root);
 
-  /* Every surface at rest. */
-  /**
-   * Every route the app has, derived from the tree, plus a few extra addresses of the same routes.
-   *
-   * IT WAS TYPED OUT, AND THE TWO GATES DISAGREED. `a11y` was missing `/s/[token]` (the shared page,
-   * the only surface a non-user ever sees), and neither list was compared to the route directory, so
-   * a route added tomorrow was audited by neither and nothing noticed. The derivation also found
-   * `/[id]`, the spoken-id resolver, which neither list had ever covered.
-   *
-   * THE EXTRAS ARE SECOND ADDRESSES OF ROUTES ALREADY IN THE LIST (a different page, a different
-   * track), because one sample proves the route renders and a second proves the DECLARATION does.
-   */
-  const { routes: ROUTES, unsampled } = await routesOf(join(root, 'apps', 'web'), ['/p/kiln', '/t/3', '/nowhere']);
+  /* BOTH DERIVATIONS ANSWERED FOR BEFORE A PORT IS BOUND OR A BROWSER LAUNCHED. A coverage hole is a
+     fact about the tree, and two full runs of this gate on this machine took 380s and 340s, so a
+     tree that has one should not first spend them measuring what it does cover. */
   if (unsampled.length) {
     for (const u of unsampled) console.error(`  a route with no sample address: ${u}`);
+    return 1;
+  }
+  /* AND A SURFACE THAT NAMES AN ADDRESS THE DERIVATION DOES NOT YIELD IS RED HERE rather than a
+     page-run that audited the not-found screen and counted. See `stray`. */
+  if (strays.length) {
+    for (const s of strays) console.error(`  a surface names an address this gate cannot derive: ${s}`);
     return 1;
   }
 
@@ -269,6 +369,44 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
   /** `element[intent] -> Set<'route scheme@width'>`: a meaning carried by colour and nothing else. */
   const mute = new Map();
 
+  /**
+   * WHAT EACH SURFACE CONTRIBUTED, because this gate's total was once quoted as evidence for a page
+   * inside it.
+   *
+   * `244 page-runs, 0 rule(s) with findings` was the whole of what the old summary said, and that line
+   * went into `apps/site/DESIGN-NOTES.md` as the accessibility evidence for a marketing home-page
+   * redesign. Twelve of the 244 were the marketing site and four of those were the home page; the
+   * other 232 were the record app and its three variant records, which the redesign never touched.
+   * Every digit of it was true. Sitting under a heading that read "What was measured on the finished
+   * page, a third time", it said 244 measurements of that page, and nothing this gate printed let a
+   * reader tell the two readings apart.
+   *
+   * SO A RUN IS COUNTED AGAINST THE SURFACE IT WAS ON, and the total is printed with the breakdown
+   * under it. `the site: 20 page-runs over 5 route(s)` cannot be quoted for the record app, and 244
+   * could be quoted for anything.
+   *
+   * A SURFACE THAT WAS NOT BUILT KEEPS ITS ROW AND PRINTS A ZERO. Dropping it would leave the reader
+   * exactly where the 244 left them: holding a total with no way to see which surfaces are inside it,
+   * and a missing surface is the reading that costs the most.
+   */
+  const per = new Map(APPS.map((a) => [a.name, { runs: 0, routes: new Set(), states: new Set(), built: true }]));
+
+  /**
+   * A SEEDED RUN IS A NEGATIVE, AND A NEGATIVE NEEDS ONE PAGE. The same argument as `layout.mjs`'s:
+   * `self-test` runs this gate again with `BRAINDOG_GATE_SEED=intent` to prove it goes red on an
+   * intent with no glyph, and it was proving that over 356 page-runs. The seeded anchor is prepended
+   * to every page, so one scheme at one width says it. Only when the seed is set.
+   *
+   * THE THREE OF THEM ARE OUT HERE NOW, AND THAT IS THE SUMMARY'S DOING. `SEEDED` was declared inside
+   * the per-app loop and the two matrices were spelt inline in the `for` headers, so the only place
+   * that knew how many schemes and widths a run covered was the loop running them. The breakdown below
+   * has to say `dark and light, at 1440 and 390`, and a summary that recomputed those from the budget
+   * would print the full matrix for a seeded run that drove a quarter of it.
+   */
+  const SEEDED = Boolean(process.env.BRAINDOG_GATE_SEED);
+  const SCHEMES = SEEDED ? ['dark'] : ['dark', 'light'];
+  const WIDTHS = SEEDED ? A.widths.slice(0, 1) : A.widths;
+
   for (const app of APPS) {
     if (!(await stat(app.root).catch(() => null))) {
       /* NOT A PASS. Skipping one app silently dropped the marketing site from every run that did not
@@ -283,20 +421,13 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
           : `  a11y: no ${app.name} build to check. \`pnpm build\` first, and CI does.`,
       );
       if (!app.optional) skipped.push(app.name);
+      per.get(app.name).built = false;
       continue;
     }
     current = app;
 
-    /**
-     * A SEEDED RUN IS A NEGATIVE, AND A NEGATIVE NEEDS ONE PAGE. The same argument as `layout.mjs`'s:
-     * `self-test` runs this gate again with `BRAINDOG_GATE_SEED=intent` to prove it goes red on an
-     * intent with no glyph, and it was proving that over 356 page-runs. The seeded anchor is prepended
-     * to every page, so one scheme at one width says it. Only when the seed is set.
-     */
-    const SEEDED = Boolean(process.env.BRAINDOG_GATE_SEED);
-
-    for (const scheme of SEEDED ? ['dark'] : ['dark', 'light']) {
-      for (const width of SEEDED ? A.widths.slice(0, 1) : A.widths) {
+    for (const scheme of SCHEMES) {
+      for (const width of WIDTHS) {
         const context = await browser.newContext({
           viewport: { width, height: 900 },
           colorScheme: scheme,
@@ -411,6 +542,12 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
           }
 
           checked++;
+          /* THE SAME RUN, COUNTED TWICE ON PURPOSE: once for the total and once against the surface it
+             was on. `where` is an address for a page at rest and a scenario's name otherwise, which is
+             the distinction the node labels below already rest on. */
+          const p = per.get(app.name);
+          p.runs++;
+          (where.startsWith('/') ? p.routes : p.states).add(where);
           process.stdout.write(result.violations.length || unnamed.length ? '!' : '.');
           for (const v of result.violations) {
             const entry = found.get(v.id) ?? { help: v.help, impact: v.impact, nodes: new Set() };
@@ -420,7 +557,7 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
         };
 
         process.stdout.write(`    ${(app.name + '     ').slice(0, 5)} ${(scheme + '@' + width + '   ').slice(0, 11)} `);
-        for (const route of app.routes ?? ROUTES) {
+        for (const route of app.routes) {
           const where = `${app.name} ${route} ${scheme}@${width}`;
           const unmeasured = ready.check(where, route, await open(route));
           /* AUDITING AN UNSETTLED PAGE IS THE FAILURE, NOT THE FALLBACK. Axe over a document with no
@@ -435,7 +572,7 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
           await audit(route);
         }
 
-        /* States are the record app's. The site is three prerendered pages with nothing to drive, and a
+        /* States are the record app's. The site is five prerendered pages with nothing to drive, and a
            variant's record changes none of the routes the scenarios stand on. */
         if (!app.states) {
           process.stdout.write('\n');
@@ -461,8 +598,10 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
           // Focus the grid first: bare letters act only inside one, which is the point of the rule.
           /* SHORT timeouts, and they matter. Both of these clicks are speculative (a page surface has
              no `[role="row"]` at all), and Playwright's default is to wait thirty seconds before
-             admitting it. Nine scenarios times four passes times thirty seconds is the difference
-             between a gate that runs and a gate nobody waits for. */
+             admitting it. Fourteen scenarios times four passes times thirty seconds is twenty-eight
+             minutes, against the six the whole gate takes today: the difference between a gate that
+             runs and a gate nobody waits for. `Nine` was the count when this was written, and `STATES`
+             holds fourteen. */
           await page.locator('[role="row"]').first().click({ timeout: 1200 }).catch(() => {});
           if (st.click) await page.locator(st.click).first().click({ timeout: 1200 }).catch(() => {});
           for (const k of st.keys ?? []) {
@@ -490,9 +629,42 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
   const contrast = found.get(CONTRAST);
   found.delete(CONTRAST);
 
+  /* `n OF m SURFACES` AND NOT `m`, because a run on a tree with no marketing site built would otherwise
+     claim five surfaces in the same breath as the five lines below saying it looked at four. */
+  const audited = [...per.values()].filter((p) => p.built).length;
   console.log(
-    `  a11y: ${checked} page-runs, ${found.size + (contrast ? 1 : 0) + (mute.size ? 1 : 0)} rule(s) with findings`,
+    `  a11y: ${checked} page-runs over ${audited} of ${APPS.length} surface(s), ` +
+      `${found.size + (contrast ? 1 : 0) + (mute.size ? 1 : 0)} rule(s) with findings`,
   );
+  /**
+   * AND WHAT EACH SURFACE WAS. See `per`: the total above is quotable about anything, and these lines
+   * are quotable only about themselves, which is the whole of the repair.
+   *
+   * THE COUNTS ARE MEASURED AND NOT THE MATRIX MULTIPLIED OUT. A page that never settled is not a
+   * page-run, so a surface whose routes half failed to draw reports the smaller number here and the
+   * arithmetic stops agreeing with the schemes and widths beside it. That disagreement is the point:
+   * it is the same run reported twice, and `page(s) were never in a state to audit` below says why.
+   *
+   * AND IT DOES NOT MULTIPLY OUT ON A CLEAN RUN EITHER, WHICH THE PARAGRAPH ABOVE ON ITS OWN WOULD
+   * HAVE A READER BLAME ON A PAGE THAT DID NOT DRAW. The record app's row reads `212 page-runs over 41
+   * route(s) and 14 state scenario(s), dark and light, at 1440 and 390`, and 41 x 4 plus 14 x 4 is 220.
+   * The eight are four scenarios the widths exclude: `grid: selection` and `page: arrange mode` are
+   * `desktop`, `grid: filter menu` is `wide` and `grid: filter sheet` is `narrow`, so they run twice
+   * each and not four times, and the state runs are 10 x 4 plus 4 x 2, which is 48. The scenario counts
+   * here are a UNION over the four passes, because a scenario that only makes sense on a phone is still
+   * a scenario this run drove, and dropping it from the row would understate the coverage to make the
+   * multiplication come out.
+   */
+  for (const app of APPS) {
+    const p = per.get(app.name);
+    console.log(
+      p.built
+        ? `      ${app.name}: ${p.runs} page-runs over ${p.routes.size} route(s)` +
+            `${p.states.size ? ` and ${p.states.size} state scenario(s)` : ''}, ` +
+            `${SCHEMES.join(' and ')}, at ${WIDTHS.join(' and ')}`
+        : `      ${app.name}: 0 page-runs. Not built, so nothing on it was audited.`,
+    );
+  }
 
   if (mute.size) {
     /* ONE LINE, AND IT USED TO BE TWO. Three sentences in this file opened with a bare newline inside a
