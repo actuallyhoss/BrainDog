@@ -39,6 +39,8 @@
   /* THE APPROVAL `/vault` SENDS TOO, from one module, so the two screens cannot drift apart. */
   import { answerLine as lineOf, approve, planOf, reprove, revoke, words as vaultWords, type Plan } from '$lib/record/vault.ts';
   import { callsOutOf, words as actionWords, type CallOut } from '$lib/record/actions.ts';
+  /* THE FORWARDING ADDRESS, which the Worker minted and nothing in this app asked for. See the Ingest area. */
+  import { mailUrl, mintInbound, revokeInbound, words as mailWords, type Said as MailSaid } from '$lib/record/inbound-write.ts';
   /* THE WRITES THIS SCREEN MAKES, and the one reading of what the record answered to each. */
   import {
     addException, dropException, exportFile, moveLevel, readPeople, removeAccess, wrote,
@@ -303,6 +305,103 @@
   }
 
   const lines = $derived(connectLines(origin));
+
+  /* ── ingest: where this record takes forwarded mail ────────────────────── */
+
+  /**
+   * THE MINT WAS BUILT AND NO OWNER COULD REACH IT.
+   *
+   * `apps/worker/src/inbound.ts` mints a forwarding address, writes only its SHA-256 into the
+   * Directory's `dir_inbound` and answers the token once. Measured on 2026-09-21 by grepping
+   * `apps/web` for `api/inbound`: nothing in this app called either door. So the Cloud would take a
+   * bank's forwarded statement at an address no person had any way to obtain, with both halves of the
+   * surface finished and green. `loop/research-batch-three-audit.md` finding 1.
+   *
+   * THE TOKEN LIVES IN `mailSaid` AND NOWHERE ELSE, the way the agents area holds a bearer: leaving
+   * the area empties it, and nothing writes it to a store, a query string or a toast. The address is
+   * built from it for the screen and is never kept separately, because two spellings of one secret
+   * are two things to keep out of a log.
+   */
+  let mailSaid = $state<MailSaid | null>(null);
+  let mailBusy = $state(false);
+  /**
+   * WHICH PRESS THE SIGN-IN IS FOR, so proving it again sends the same one.
+   *
+   * The door wants an owner whose last sign-in is under fifteen minutes old and refuses BOTH presses
+   * without it, revoking included, because revoking is the worse of the two losses: a bank's mail
+   * silently not arriving. Forgetting which press was refused would send the person back to the
+   * buttons to guess, and mint is the one they would guess.
+   */
+  let mailPending = $state<'mint' | 'revoke' | null>(null);
+  let mailReproving = $state(false);
+
+  $effect(() => {
+    if (area !== 'ingest') {
+      mailSaid = null;
+      mailPending = null;
+      return;
+    }
+    /* THE ADDRESS NAMES THIS ORIGIN, and `readAgents` is the only other place that reads it: a person
+       who lands straight on `/settings/ingest` has never been through that function. */
+    origin = location.origin;
+  });
+
+  const mailAddress = $derived(mailSaid?.kind === 'minted' ? mailUrl(origin, mailSaid.token) : '');
+
+  /**
+   * The line under the two buttons, and the tone it carries.
+   *
+   * EVERY ARM IS A SENTENCE. `sample` is the demo, which has no account to mint on; `unrouted` is a
+   * host whose forwarding address is a file rather than a door, which today is every self-host; the
+   * rest is the door's own `fix` rendered verbatim (`13 §6`).
+   */
+  const mailLine = $derived(
+    mailSaid === null
+      ? ''
+      : mailSaid.kind === 'minted'
+        ? mailWords.lost
+        : mailSaid.kind === 'revoked'
+          ? mailWords.revoked
+          : mailSaid.kind === 'sample'
+            ? copy.notOnDemo
+            : mailSaid.kind === 'unrouted'
+              ? mailWords.unrouted
+              : mailSaid.fix,
+  );
+  const mailTone = $derived(mailSaid === null || mailSaid.kind === 'minted' || mailSaid.kind === 'revoked' ? undefined : 'bad');
+
+  /**
+   * One press at one of the two doors.
+   *
+   * NOTHING IS READ BACK AFTERWARDS, because there is nothing to read: `servesInbound` answers `mint`
+   * or `revoke` and has no third branch, on purpose, since a route that said "what is my address"
+   * would have to keep the token to answer with. The screen says that out loud instead of drawing a
+   * list that would always be empty.
+   */
+  async function askMail(which: 'mint' | 'revoke') {
+    if (mailBusy) return;
+    mailBusy = true;
+    mailPending = which;
+    const at = opened();
+    const said = which === 'mint' ? await mintInbound(location.origin) : await revokeInbound(location.origin);
+    closed(true, at);
+    mailBusy = false;
+    mailSaid = said;
+    /* The pending press is kept only while a sign-in would send it again. */
+    if (said.kind !== 'signin') mailPending = null;
+  }
+
+  /* SIGNING IN AGAIN WITHOUT LEAVING, where a passkey can do it: `reprove` is the agents area's, from
+     one module, so the two screens cannot come to disagree about what a fresh sign-in is. */
+  async function mailSignInAgain() {
+    const which = mailPending;
+    if (mailReproving || which === null) return;
+    mailReproving = true;
+    const back = await reprove({ support, methods, passkeySignIn }, (href) => location.assign(href));
+    mailReproving = false;
+    if (back) await askMail(which);
+  }
+
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
   import SparkDaily from '$lib/ui/SparkDaily.svelte';
@@ -2251,6 +2350,61 @@
              declaration does (`04 §1`: `ingest` is one of the kinds an add-on carries). So the screen
              says where a new one comes from and links there. -->
         <p class="hint sources-add">{copy.sourcesAdd} <a class="tap" href="/packs">{copy.sourcesAddGo}</a></p>
+      </Section>
+
+      <!--
+        WHERE FORWARDED MAIL ARRIVES, AND UNTIL NOW NO OWNER COULD ASK FOR AN ADDRESS.
+        `apps/worker/src/inbound.ts` mints one, keeps only its digest and answers the token once; grepped on
+        2026-09-21, nothing in `apps/web` called `/api/inbound/mint` or `/api/inbound/revoke`, so a forwarded
+        bank statement could only reach a record whose address nobody had a way to obtain.
+
+        SECOND ON THE SCREEN AND NOT FIRST. `25 §9` draws this area as the connector list, and it stays the
+        subject a person came to Ingest for. Mail is the other way in and it is a different act: a source is a
+        declaration that arrives with an add-on, and this is a credential minted on a press.
+
+        AND IT IS AN OWNER'S SCREEN WHEREVER IT IS DRAWN. Whoever can change where a record takes its mail can
+        redirect its statements, so the door wants an owner and a sign-in from the last fifteen minutes; the
+        screen states that before either button rather than after a refusal.
+      -->
+      <Section title={mailWords.title}>
+        <p class="hint">{mailWords.how}</p>
+        <!-- THE FACT THE SCREEN CANNOT HIDE: there is no route that reads an address back, so this says so
+             rather than leaving a blank where a value would go and letting it read as "you have none". -->
+        <p class="hint">{mailWords.unknown}</p>
+        {#if mailSaid?.kind === 'minted'}
+          <!-- SHOWN ONCE, from `mailSaid` alone, which leaving the area empties. -->
+          <div class="code-form" role="status">
+            <p class="code-label">{mailWords.once}</p>
+            <p class="mono wrap">{mailAddress}</p>
+            <div class="row-actions">
+              <!-- THE LABEL IS PASSED, because `clipboard.put(text)` quotes the text in its own toast, and
+                   the text here is a live credential. -->
+              <Button weight="primary" onclick={() => void clipboard.put(mailAddress, mailWords.addressCopied)}>{mailWords.copyAddress}</Button>
+            </div>
+            <p class="hint">{mailWords.forwardHow}</p>
+          </div>
+        {/if}
+        <div class="row-actions">
+          <Button weight="primary" disabled={mailBusy} onclick={() => void askMail('mint')}>
+            {mailBusy && mailPending === 'mint' ? mailWords.minting : mailWords.mint}
+          </Button>
+          <!-- THE QUIETER ACTION, AND THE MORE DAMAGING ONE. It writes `null` and answers no value; a bank
+               posting to the old address is refused from that moment, with nothing to show for it. -->
+          <Button weight="bare" tone="bad" disabled={mailBusy} onclick={() => void askMail('revoke')}>
+            {mailBusy && mailPending === 'revoke' ? mailWords.revoking : mailWords.revoke}
+          </Button>
+        </div>
+        <!-- Always in the document, for the reason the agents field gives: a live region inserted with its
+             first sentence is not reliably announced. -->
+        <p class="code-said" role="status" data-intent={mailTone}>{mailLine}</p>
+        {#if mailSaid?.kind === 'signin'}
+          <!-- A STALE SIGN-IN IS A STATE WITH A WAY FORWARD, not an error. The same passkey re-proof the
+               agents area offers, and then the same press again rather than a press the person has to find. -->
+          <div class="row-actions">
+            <Button weight="quiet" disabled={mailReproving} onclick={() => void mailSignInAgain()}>{copy.signInAgain}</Button>
+          </div>
+        {/if}
+        <p class="hint">{mailWords.freshWhy}</p>
       </Section>
     {:else if area === 'notifications'}
       <!--
