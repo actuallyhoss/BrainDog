@@ -492,10 +492,11 @@ export const site = {
            * has a model behind it. A visitor can still do nothing with it, which is this column's
            * own definition.
            *
-           * THE THIRD THING IS NOT ON THE PAGE BECAUSE IT IS NOT A PROMISE ANYBODY MADE: what the
-           * door answers today is empty, on a record holding rows. That is a defect rather than a
-           * limit, it is written up in `loop/BACKLOG.md`, and a marketing page is not where a
-           * project reports its open bugs.
+           * WHAT THE DOOR ANSWERS IS A ROW, which was checked before this sentence was written and
+           * then checked again after a first reading of it was wrong: a record holding a row named
+           * Kiln, asked `Kiln`, answers that row. The page says nothing about that either way,
+           * because a door no screen reaches is not a feature a visitor can use, and this column is
+           * about what they can use.
            */
           'Asking your record a question in words. Nothing on a screen asks it, and no host here has a model behind it.',
           /* THE SECOND HALF IS NEW AND IT IS THERE TO STOP A CONTRADICTION. Both hosts opened an

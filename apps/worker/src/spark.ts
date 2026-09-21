@@ -120,11 +120,13 @@ export async function workerSparkEngine(env: SparkEnv, api: () => RecordApi, dep
  * method called spark/read." at `POST /api/spark/read`, because `serveApi` was the only thing behind `/api` on
  * either host.
  *
- * WHAT IT MEETS NOW, on the self-host, driven over a real socket on 21 September: 200 on one model call, with an
- * EMPTY read. A record holding three rows in `things` asked the name of one of them answers `rows: []` while its
- * fold claims `{"register":"things","rows":0,"predicate":"all"}`. This Worker's mount is the same door over the
- * same builder and has not been driven against a deployed object, so it is not claimed here. Both sentences and
- * the drive are in `loop/BACKLOG.md`.
+ * WHAT IT MEETS NOW, on the self-host, driven over a real socket on 21 September: 200 on one model call, and the
+ * row it asked about. A record holding three rows in `things` asked the name of one of them answers that row,
+ * with `{"register":"things","rows":1,"predicate":"all"}` in the fold. The first writing of this paragraph said
+ * the read came back empty; the drive's own register declared no field with `search: true`, so nothing about
+ * those rows was indexed and both the record and the ask were answering correctly. This Worker's mount is the
+ * same door over the same builder and has not been driven against a deployed object, so it is not claimed here.
+ * The drive and the correction are in `loop/BACKLOG.md`.
  *
  * IT IS BUILT INSIDE THE OBJECT AND NOT IN THE ROUTER, unlike `/api/keys/*`, and the difference is what each
  * door needs: the key doors need the `KEK` binding alone, so the Worker answers them without waking the record,
