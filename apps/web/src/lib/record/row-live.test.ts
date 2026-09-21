@@ -2,11 +2,18 @@
  * One row against the record: the live row drawn with its refs as numbers, the sample when there is
  * no record, the record's sentence for any other refusal, a row the record does not hold as no row,
  * and nothing sent for a pending one.
+ *
+ * AND WHAT A ROW THAT IS NOT THERE COSTS, counted against a real kernel at the bottom of this file,
+ * because a count taken against a host written in the same file as its own assertion is a count of
+ * what this file expects rather than of what the record does.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
+
+import { openRecord, type Kernel } from '@braindog/kernel';
 
 import { copy } from '../copy.ts';
 import { REGISTERS, ROWS } from './api.ts';
@@ -164,7 +171,14 @@ for (const seq of [390, 1440])
        with the sentence above it instead of denying it. */
     assert.equal(REGISTERS[register]?.name, 'Courses');
     /* NO REF WALK FOR A ROW THAT IS NOT THERE: there are no fields to draw, so the 400-row list is
-       not paged through to name refs nobody will read. Only the row and the declaration are asked. */
+       not paged through to name refs nobody will read. Only the row and the declaration are asked.
+
+       THIS ASSERTION WAS REPORTED AS ONE THAT CANNOT FAIL, AND IT FAILS. Moving the missing-row
+       return in `row-live.ts` below the ref loop turns the list below into
+       `['/api/get', '/api/schema', '/api/schema', '/api/list']` and both runs of this test go red;
+       the report was reading the paragraph above, which says a version that never shipped proved
+       nothing. What made it bite is the `teacher` field, and the real-record count at the foot of
+       this file is the same claim measured rather than mocked. */
     assert.deepEqual(
       sent.map((u) => u.pathname),
       ['/api/get', '/api/schema'],
@@ -243,4 +257,123 @@ test("a row on a list this build does not ship draws its link by the linked row'
   assert.equal(out.names.get('rl_books#2'), 'The Remains of the Day');
   const { display } = await import('./api.ts');
   assert.equal(display('rl_meetings', 'book', 2, Date.now(), out.names), 'The Remains of the Day');
+});
+
+/**
+ * THE COST OF AN ABSENT ROW, COUNTED AGAINST A REAL KERNEL RATHER THAN AGAINST THIS FILE'S OWN HOST.
+ *
+ * Everything above answers out of `host`, which is thirty lines of this file returning what this
+ * file expects, so a count taken there proves the reader agrees with the fixture. The record below
+ * is the real one: `openRecord` over `node:sqlite`, the two declarations put in through `install`,
+ * and 400 teacher rows written one at a time through `create`, which is the shape the usability
+ * survey ran on.
+ *
+ * ONLY THE HTTP ENVELOPE IS LOCAL, and it is not a mock of an answer: `@braindog/host` is not a
+ * dependency of this app and making it one is not this change's to make, so `served` below calls the
+ * same three kernel methods `packages/record/src/index.ts` calls for these routes. `schema` is
+ * `kernel.register`, `get` is `kernel.get` wrapped in the `{ ok, value }` every route shares, and
+ * `list` is `kernel.list` passed through untouched, cursor and all.
+ */
+function openSqlite(): Parameters<typeof openRecord>[0] {
+  const db = new DatabaseSync(':memory:');
+  let depth = 0;
+  const sql = {
+    exec: (text: string, ...params: unknown[]) => {
+      if (params.length === 0) db.exec(text);
+      else db.prepare(text).run(...(params as never[]));
+    },
+    all: (text: string, ...params: unknown[]) => db.prepare(text).all(...(params as never[])),
+    one: (text: string, ...params: unknown[]) => db.prepare(text).get(...(params as never[])),
+    transactionSync<T>(fn: () => T): T {
+      if (depth > 0) return fn();
+      db.exec('BEGIN');
+      depth++;
+      try {
+        const value = fn();
+        db.exec('COMMIT');
+        return value;
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      } finally {
+        depth--;
+      }
+    },
+  };
+  return sql as unknown as Parameters<typeof openRecord>[0];
+}
+
+/** The record's three read routes over a real kernel, with what was asked and how many rows came back. */
+function served(k: Kernel): { io: Fetch; asked: URL[]; carried: number[] } {
+  const asked: URL[] = [];
+  const carried: number[] = [];
+  const io = (async (url: string | URL | Request) => {
+    const at = new URL(String(url));
+    asked.push(at);
+    const register = at.searchParams.get('register') ?? '';
+    const cursor = at.searchParams.get('cursor');
+    if (at.pathname === '/api/schema') {
+      const decl = k.register(register);
+      return decl ? json(200, { ok: true, value: decl }) : json(404, { ok: false, refusal: { code: 'REGISTER_UNKNOWN', fix: `There is no register called ${register}.` } });
+    }
+    if (at.pathname === '/api/get') return json(200, { ok: true, value: k.get({ register, seq: Number(at.searchParams.get('seq')) }) });
+    if (at.pathname === '/api/list') {
+      const out = k.list({ register, limit: Number(at.searchParams.get('limit') ?? 50), ...(cursor === null ? {} : { cursor }) } as never) as { ok: boolean; value: { rows: unknown[] } };
+      if (out.ok) carried.push(out.value.rows.length);
+      return json(out.ok ? 200 : 404, out);
+    }
+    return json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'There is no such method.' } });
+  }) as Fetch;
+  return { io, asked, carried };
+}
+
+const CLOCK = Date.UTC(2026, 8, 21, 9);
+
+/**
+ * A record holding `Courses` with one ref field and `Teachers` with 400 rows in it.
+ *
+ * ONE RECORD PER CASE, AND THAT IS NOT TIDINESS. `REGISTERS` is one table for the whole process and
+ * `learn` fills it on the first read, so asking a second register name of the same pair skips the
+ * `schema` call the count is about: with both cases on one pair the absent row asked once, not twice,
+ * and the difference the test is measuring was hidden by the test's own first line.
+ */
+async function shaped(tag: string): Promise<{ k: Kernel; courses: string; teachers: string }> {
+  const courses = `mx_${tag}_courses`;
+  const teachers = `mx_${tag}_teachers`;
+  const k = await openRecord(openSqlite(), { now: () => CLOCK });
+  const decls = [
+    { id: `register.${teachers}`, kind: 'register', body: { id: teachers, name: 'Teachers', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] } },
+    { id: `register.${courses}`, kind: 'register', body: { id: courses, name: 'Courses', title: 'name', fields: [{ id: 'name', type: 'text', required: true }, { id: 'teacher', type: 'ref', to: teachers }] } },
+  ];
+  for (const decl of decls) assert.ok((await k.install([decl as never])).ok, `${decl.id} would not install`);
+  const made: string[] = [];
+  for (let n = 0; n < 400; n++) {
+    const out = k.create(teachers, { name: `Teacher ${n + 1}` }, { actor: 'p_1' }) as { ok: boolean; value?: { id: string } };
+    assert.ok(out.ok, JSON.stringify(out));
+    made.push(out.value!.id);
+  }
+  assert.ok(k.create(courses, { name: 'Ceramics', teacher: made[0] }, { actor: 'p_1' }).ok);
+  return { k, courses, teachers };
+}
+
+/** Each call as `<route> <courses|teachers>`, so the list below reads without the per-case tag in it. */
+const route = (u: URL): string => `${u.pathname.slice('/api/'.length)} ${u.searchParams.get('register')!.endsWith('_teachers') ? 'teachers' : 'courses'}`;
+
+test('a row that is not there costs the row and the declaration, where a row that is there also pages 400 names back', async () => {
+  const absent = await shaped('absent');
+  const cold = served(absent.k);
+  assert.deepEqual(await rowReader(BASE, cold.io).read(absent.courses, 9999), { from: 'live', entry: null, names: new Map() });
+  assert.deepEqual(cold.carried, [], 'an absent row paged a target register it has no field to draw');
+  assert.deepEqual(cold.asked.map(route), ['get courses', 'schema courses']);
+
+  const present = await shaped('present');
+  const warm = served(present.k);
+  const out = await rowReader(BASE, warm.io).read(present.courses, 1);
+  assert.ok(out.from === 'live' && out.entry, 'the present row did not come back live');
+  assert.equal(out.names.get(`${present.teachers}#1`), 'Teacher 1');
+  /* THE WALK IS REAL AND THE PRESENT ROW PAYS FOR IT: two more calls than the absent row, and 400
+     rows over the wire to name the one ref the row holds. That is what the early return saves, and
+     it is why the return is worth an assertion rather than a shrug. */
+  assert.deepEqual(warm.asked.map(route), ['get courses', 'schema courses', 'schema teachers', 'list teachers']);
+  assert.deepEqual(warm.carried, [400]);
 });

@@ -86,7 +86,17 @@ export function rowReader(base: string, io?: Fetch): RowReader {
          pays for it in the same place, and a pending row pays for neither. */
       await learn(client.schema, register, asked);
       /* NO REF WALK FOR A ROW THAT IS NOT THERE: there are no fields to draw, so paging a 400-row target register would
-         name refs nobody is going to read. */
+         name refs nobody is going to read.
+
+         COUNTED AGAINST A REAL KERNEL over `node:sqlite`, on the survey's shape (a `Courses` list with one `ref` field,
+         a `Teachers` list holding 400 rows), at the foot of `row-live.test.ts`:
+
+             a row that is there     get, schema courses, schema teachers, list teachers    400 rows back
+             a row that is not       get, schema courses                                      0 rows back
+
+         So this line is worth two of the four calls and the whole 400-row page, on the one read where every one of them
+         is spent naming refs the screen has already decided not to draw. Removing it was measured, not assumed: the
+         absent row then makes all four calls and carries the 400 rows. */
       if (got.value === null) return { from: 'live', entry: null, names: new Map() };
       /* Each target walked before the row is turned into an `Entry`, so a ref is drawn as the row's name, not `courses#1`. */
       const refs = new Map<string, RefMap>();
