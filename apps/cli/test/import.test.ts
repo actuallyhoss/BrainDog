@@ -13,6 +13,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer, type Server } from 'node:http';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -800,7 +801,10 @@ test('the dry run lists each date, domain and service; a re-run changes none; a 
 });
 
 /* THE SHADOW WEEK (`loop/research-switch-matrix.md`, what to build next, item 4). The importer is run each night against a
-   fresh export, and the morning question is what moved in the old tool since the night before and whether it arrived. */
+   fresh export, and the morning question is what moved in the old tool since the night before and whether it arrived.
+   EVERY `--since` HERE IS READ AT A ZONE IT NAMES, because the day a run falls on is the machine's local day and this
+   machine is at +03:00: a test that left the zone to the machine would pass here and fail on a runner at UTC. */
+const UTC = () => 0;
 
 test('A RUN IS REMEMBERED AS WHAT IT CARRIED, and --since last says the newest run by name: created, updated with the fields, refused, and newly left out', async () => {
   const mem = memoryRecord(ALL);
@@ -815,7 +819,7 @@ test('A RUN IS REMEMBERED AS WHAT IT CARRIED, and --since last says the newest r
   later.skipped.push({ reason: 'A thing BrainDog has no place for', items: ['New widget'] });
   const two = runOf(await applyPlan(later, mem.door, { dryRun: false }), { at: '2026-09-21T03:05:00.000Z', host: 'app.brain.dog', file: 'export.json' });
 
-  const got = sinceSaid([one, two], 'last');
+  const got = sinceSaid([one, two], 'last', UTC);
   assert.equal(got.found, 1);
   assert.deepEqual(got.lines, [
     '2026-09-21 03:05 UTC into app.brain.dog, export of 2026-09-15:',
@@ -833,7 +837,7 @@ test('--since a date says every run from that day on, oldest first; a run that m
   const one = runOf(await applyPlan(plan(), mem.door, { dryRun: false }), { at: '2026-09-19T03:00:00.000Z', host: 'h', file: 'e.json' });
   const two = runOf(await applyPlan(plan(), mem.door, { dryRun: false }), { at: '2026-09-20T03:00:00.000Z', host: 'h', file: 'e.json' });
   const three = runOf(await applyPlan(plan(), mem.door, { dryRun: false }), { at: '2026-09-21T03:00:00.000Z', host: 'h', file: 'e.json' });
-  const got = sinceSaid([one, two, three], '2026-09-20');
+  const got = sinceSaid([one, two, three], '2026-09-20', UTC);
   assert.equal(got.found, 2);
   assert.deepEqual(got.lines, [
     '2026-09-20 03:00 UTC into h, export of 2026-09-15:',
@@ -843,9 +847,9 @@ test('--since a date says every run from that day on, oldest first; a run that m
     '- Nothing moved in the old tool since the run before.',
   ]);
   /* WHAT WAS LEFT OUT ON BOTH NIGHTS IS NOT NEWS, so only the first run remembered says the whole of it. */
-  assert.ok(sinceSaid([one], 'last').lines.some((l) => l.startsWith('- Newly left out:')));
-  assert.deepEqual(sinceSaid([one, two, three], '2026-09-22'), { found: 0, lines: ['No import run is remembered on this machine since 2026-09-22.'] });
-  assert.deepEqual(sinceSaid([], 'last'), { found: 0, lines: ['No import run is remembered on this machine yet.'] });
+  assert.ok(sinceSaid([one], 'last', UTC).lines.some((l) => l.startsWith('- Newly left out:')));
+  assert.deepEqual(sinceSaid([one, two, three], '2026-09-22', UTC), { found: 0, lines: ['No import run is remembered on this machine since 2026-09-22.'] });
+  assert.deepEqual(sinceSaid([], 'last', UTC), { found: 0, lines: ['No import run is remembered on this machine yet.'] });
 });
 
 test('the command remembers each run it writes in, not a dry run, and --since reads them back with no export and no host', async (t) => {
@@ -874,7 +878,7 @@ test('the command remembers each run it writes in, not a dry run, and --since re
   assert.equal(await importCommand(['legacy', 'export.json'], io, TODAY, at('2026-09-20T03:00:00.000Z')), 0);
   assert.equal(await importCommand(['legacy', 'export.json', '--dry-run'], io, TODAY, at('2026-09-21T03:00:00.000Z')), 0);
   out.length = 0;
-  assert.equal(await importCommand(['legacy', '--since', '2026-09-01'], io, TODAY), 0);
+  assert.equal(await importCommand(['legacy', '--since', '2026-09-01'], io, TODAY, undefined, UTC), 0);
   assert.equal(out.filter((l) => / UTC into /u.test(l)).length, 1, 'a dry run wrote nothing, so it is not a run to report');
   assert.ok(out[0]!.startsWith('2026-09-20 03:00 UTC into http://127.0.0.1:'), out[0]);
   assert.ok(out.some((l) => l.startsWith('- Created in Tasks: ')));
@@ -894,12 +898,12 @@ test('an update the record turned down is said once, as not carried; a clash is 
   const report = await applyPlan(later, door, { dryRun: false });
   const run = runOf({ ...report, clashes: [{ label: 'Client work', rows: 1, fix: 'Rename it.' }] }, { at: '2026-09-21T03:00:00.000Z', host: 'a', file: 'e.json' });
   assert.deepEqual(run.updated, [], 'the change was recorded before the write, and the write was refused');
-  assert.deepEqual(sinceSaid([run], 'last').lines.filter((l) => l.startsWith('- Not carried')), ['- Not carried, Tasks: #101. Not today. (OUT_OF_BOUNDS)', '- Not carried, Categories: Client work. Rename it.']);
+  assert.deepEqual(sinceSaid([run], 'last', UTC).lines.filter((l) => l.startsWith('- Not carried')), ['- Not carried, Tasks: #101. Not today. (OUT_OF_BOUNDS)', '- Not carried, Categories: Client work. Rename it.']);
 
   /* A NIGHT INTO ANOTHER HOST IS NOT "THE RUN BEFORE": the first run into `b` says the whole of what it left out. */
   const onA = runOf(report, { at: '2026-09-20T03:00:00.000Z', host: 'a', file: 'e.json' });
   const onB = runOf(report, { at: '2026-09-21T03:00:00.000Z', host: 'b', file: 'e.json' });
-  assert.ok(sinceSaid([onA, onB], 'last').lines.some((l) => l.startsWith('- Newly left out:')));
+  assert.ok(sinceSaid([onA, onB], 'last', UTC).lines.some((l) => l.startsWith('- Newly left out:')));
 });
 
 test('the runs file keeps the newest sixty, and a line it cannot read, or one missing a list, is passed over and not fatal', async (t) => {
@@ -925,11 +929,70 @@ test('the runs file keeps the newest sixty, and a line it cannot read, or one mi
   const say: string[] = [];
   const io: AgentIo = { env: { BRAINDOG_HOST: `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`, BRAINDOG_HOSTS: join(dir, 'hosts.json') } as never, cwd: dir, home: dir, out: (l) => out.push(l), say: (l) => say.push(l), headers: async () => ({}) };
 
-  assert.equal(await importCommand(['legacy', '--since', '2026-07-01'], io, TODAY), 0, say.join(' '));
+  assert.equal(await importCommand(['legacy', '--since', '2026-07-01'], io, TODAY, undefined, UTC), 0, say.join(' '));
   assert.equal(out.filter((l) => / UTC into /u.test(l)).length, 60);
+  const file = join(dir, '.braindog', 'imports.jsonl');
+  assert.deepEqual(say, [31, 32].map((n) => `Line ${String(n)} of ${file} is not a run as this command writes one, so it was passed over.`));
+  say.length = 0;
   assert.equal(await importCommand(['legacy', 'export.json'], io, TODAY, () => new Date('2026-09-20T03:00:00.000Z')), 0);
+  assert.deepEqual(say, [31, 32].map((n) => `Line ${String(n)} of ${file} was not a run as this command writes one, and was let go when this run was remembered.`));
   const kept = readFileSync(join(dir, '.braindog', 'imports.jsonl'), 'utf8').trim().split('\n');
   assert.equal(kept.length, 60);
   assert.ok(kept.at(-1)!.startsWith('{"at":"2026-09-20T03:00:00.000Z"'));
   assert.equal(kept[0], old(2), 'the oldest run is the one let go');
+});
+
+/* THE DAY `--since` TAKES IS THE OWNER'S DAY, not the UTC date of the run (`loop/research-batch-twenty-four-audit.md`
+   §6). Measured before the fix: a run at 02:30 on the 22nd at +03:00 is 23:30 UTC on the 21st, and `--since
+   2026-09-22`, typed that morning, answered that no run was remembered since the 22nd. */
+test('--SINCE A DAY IS THE LOCAL DAY: a run at 02:30 on the 22nd at +03:00 is found by --since 2026-09-22, and said at its own clock', async () => {
+  const mem = memoryRecord(ALL);
+  const night = runOf(await applyPlan(plan(), mem.door, { dryRun: false }), { at: '2026-09-21T23:30:00.000Z', host: 'h', file: 'e.json' });
+  const east = sinceSaid([night], '2026-09-22', () => 180);
+  assert.equal(east.found, 1, east.lines.join(' '));
+  assert.equal(east.lines[0], '2026-09-22 02:30 +03:00 into h, export of 2026-09-15:');
+  /* AND THE EDGE MOVES THE OTHER WAY WEST OF UTC: 03:00 UTC on the 22nd is still the evening of the 21st at -05:00. */
+  const early = runOf(await applyPlan(plan(), mem.door, { dryRun: false }), { at: '2026-09-22T03:00:00.000Z', host: 'h', file: 'e.json' });
+  assert.equal(sinceSaid([early], '2026-09-22', () => -300).found, 0);
+  assert.equal(sinceSaid([early], '2026-09-21', () => -300).lines[0], '2026-09-21 22:00 -05:00 into h, export of 2026-09-15:');
+  assert.equal(sinceSaid([night], '2026-09-21', UTC).lines[0], '2026-09-21 23:30 UTC into h, export of 2026-09-15:');
+});
+
+test('--SINCE WITH NO ZONE GIVEN READS THE ZONE THE MACHINE IS SET TO, measured in a child told TZ=Asia/Tokyo', () => {
+  /* A CHILD, BECAUSE THE DEFAULT IS THE THING UNDER TEST and this process's own zone is whatever the machine is. Tokyo
+     keeps no summer time, so +09:00 holds on every date: 18:30 UTC on the 21st is 03:30 on the 22nd there. */
+  const run = { at: '2026-09-21T18:30:00.000Z', host: 'h', file: 'e.json', taken: null, created: [{ register: 'tasks', label: '#1' }], updated: [], refused: [], skipped: [] };
+  const script = `import { sinceSaid } from ${JSON.stringify(new URL('../src/import.ts', import.meta.url).href)}; console.log(JSON.stringify(sinceSaid([${JSON.stringify(run)}], '2026-09-22')));`;
+  const got = JSON.parse(execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', '--input-type=module', '-e', script], { env: { ...process.env, TZ: 'Asia/Tokyo' }, encoding: 'utf8', windowsHide: true })) as { found: number; lines: string[] };
+  assert.deepEqual(got, { found: 1, lines: ['2026-09-22 03:30 +09:00 into h:', '- Created in Tasks: #1.'] });
+});
+
+/* ONE BAD LINE IS ONE NIGHT LOST, NOT EVERY NIGHT (`loop/research-batch-twenty-four-audit.md` §7). Measured before the
+   fix: a good night on the 19th, then a line whose `updated` item had no `fields`, and `--since` threw "Cannot read
+   properties of undefined (reading 'join')" with nothing said. The lists were checked and their items were not. */
+test('A REMEMBERED LINE WHOSE ITEMS ARE THE WRONG SHAPE IS PASSED OVER WITH A NOTE NAMING IT, and the good nights are still read', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'bd-import-shape-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const night = (at: string, o: Record<string, unknown> = {}) => JSON.stringify({ at, host: 'h', file: 'e.json', taken: null, created: [{ register: 'tasks', label: '#1' }], updated: [], refused: [], skipped: [], ...o });
+  mkdirSync(join(dir, '.braindog'));
+  const file = join(dir, '.braindog', 'imports.jsonl');
+  const lines = [
+    night('2026-09-19T03:00:00.000Z'),
+    night('2026-09-20T03:00:00.000Z', { updated: [{ register: 'tasks', label: '#1' }] }),
+    night('2026-09-20T04:00:00.000Z', { skipped: [{ reason: 'No place', items: 'Widget' }] }),
+    night('2026-09-20T05:00:00.000Z', { refused: [{ register: 'tasks', label: 7, fix: 'No.' }] }),
+    night('2026-09-20T06:00:00.000Z', { taken: 20260915 }),
+    night('not a time'),
+    night('2026-09-21T03:00:00.000Z'),
+  ];
+  writeFileSync(file, `${lines.join('\n')}\n`);
+  const out: string[] = [];
+  const say: string[] = [];
+  const io: AgentIo = { env: {} as never, cwd: dir, home: dir, out: (l) => out.push(l), say: (l) => say.push(l), headers: async () => ({}) };
+  assert.equal(await importCommand(['legacy', '--since', '2026-09-01'], io, TODAY, undefined, UTC), 0, say.join(' '));
+  assert.deepEqual(out.filter((l) => / into /u.test(l)), ['2026-09-19 03:00 UTC into h:', '2026-09-21 03:00 UTC into h:']);
+  assert.deepEqual(
+    say,
+    [2, 3, 4, 5, 6].map((n) => `Line ${String(n)} of ${file} is not a run as this command writes one, so it was passed over.`),
+  );
 });

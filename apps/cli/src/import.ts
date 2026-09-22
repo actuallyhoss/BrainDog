@@ -771,6 +771,28 @@ export function runOf(report: Report, o: { at: string; host: string; file: strin
   };
 }
 
+/** Minutes east of UTC on this machine at that instant, so a night in summer time is read at its summer offset. */
+const localOffset = (at: Date): number => -at.getTimezoneOffset();
+
+/**
+ * A run's instant as the owner's clock showed it: the day, the time and the zone, `UTC` when the offset is nothing.
+ *
+ * THE DAY `--since` TAKES IS THE MACHINE'S LOCAL DAY, NOT THE UTC DATE OF THE RUN
+ * (`loop/research-batch-twenty-four-audit.md` §6). It was the UTC date, and at +03:00 a run at 02:30 on the 22nd is 23:30 UTC on the 21st, so `--since
+ * 2026-09-22` read that morning said no run was remembered. The machine's zone and not the record's, because the morning
+ * read is made with no host (it is what this machine remembers, and the host may be what failed in the night), and this
+ * file knows no zone for the record anyway: the machine that ran the night is the machine being asked about it. The
+ * offset is taken at the run's own instant, so a night before a change to or from summer time keeps the offset it had.
+ */
+function localClock(at: string, offsetOf: (at: Date) => number): { day: string; time: string; zone: string } {
+  const instant = new Date(at);
+  const offset = offsetOf(instant);
+  const shifted = new Date(instant.getTime() + offset * 60_000).toISOString();
+  const size = Math.abs(offset);
+  const zone = offset === 0 ? 'UTC' : `${offset < 0 ? '-' : '+'}${String(Math.floor(size / 60)).padStart(2, '0')}:${String(size % 60).padStart(2, '0')}`;
+  return { day: shifted.slice(0, 10), time: shifted.slice(11, 16), zone };
+}
+
 /**
  * The lines `--since` says: every run from `since` on (a day, `2026-09-21`) or the newest one (`last`), oldest first.
  *
@@ -779,9 +801,10 @@ export function runOf(report: Report, o: { at: string; host: string; file: strin
  * that is new. So a run says only
  * what it left out that the run before it, into the same host, did not; the first run remembered says all of it.
  */
-export function sinceSaid(runs: Run[], since: string): { found: number; lines: string[] } {
+export function sinceSaid(runs: Run[], since: string, offsetOf: (at: Date) => number = localOffset): { found: number; lines: string[] } {
   if (runs.length === 0) return { found: 0, lines: ['No import run is remembered on this machine yet.'] };
-  const shown = since === 'last' ? [runs.length - 1] : runs.flatMap((r, i) => (r.at.slice(0, 10) >= since ? [i] : []));
+  const local = runs.map((r) => localClock(r.at, offsetOf));
+  const shown = since === 'last' ? [runs.length - 1] : runs.flatMap((_, i) => (local[i]!.day >= since ? [i] : []));
   if (shown.length === 0) return { found: 0, lines: [`No import run is remembered on this machine since ${since}.`] };
   const lines: string[] = [];
   for (const i of shown) {
@@ -789,7 +812,7 @@ export function sinceSaid(runs: Run[], since: string): { found: number; lines: s
     const before = runs.slice(0, i).findLast((r) => r.host === run.host);
     const had = new Set((before?.skipped ?? []).flatMap((s) => s.items.map((item) => `${s.reason}\n${item}`)));
     if (lines.length > 0) lines.push('');
-    lines.push(`${run.at.slice(0, 10)} ${run.at.slice(11, 16)} UTC into ${run.host}${run.taken ? `, export of ${run.taken.slice(0, 10)}` : ''}:`);
+    lines.push(`${local[i]!.day} ${local[i]!.time} ${local[i]!.zone} into ${run.host}${run.taken ? `, export of ${run.taken.slice(0, 10)}` : ''}:`);
     const start = lines.length;
     const byList = <T extends { register: string }>(rows: T[], say: (row: T) => string, head: string) => {
       const lists = new Map<string, string[]>();
@@ -808,7 +831,7 @@ export function sinceSaid(runs: Run[], since: string): { found: number; lines: s
   return { found: shown.length, lines };
 }
 
-/** A day as `--since` takes one. Compared as text against a run's ISO time, which is why nothing looser is let in. */
+/** A day as `--since` takes one. Compared as text against a run's local day, which is why nothing looser is let in. */
 const DAY = /^\d{4}-\d{2}-\d{2}$/u;
 
 /** Where the runs are remembered: beside the other state this command line keeps for itself. */
@@ -820,37 +843,75 @@ const runsFile = (home: string) => join(home, '.braindog', 'imports.jsonl');
  */
 const RUNS_KEPT = 60;
 
-function readRuns(home: string): Run[] {
+const isText = (v: unknown): v is string => typeof v === 'string';
+const isTexts = (v: unknown): boolean => Array.isArray(v) && v.every(isText);
+/** Every item of a list is an object whose named keys are text, or lists of text for the keys in `many`. */
+const itemsHold = (v: unknown, one: string[], many: string[] = []): boolean =>
+  Array.isArray(v) && v.every((item) => isObj(item) && one.every((k) => isText(item[k])) && many.every((k) => isTexts(item[k])));
+
+/**
+ * A remembered line is a run only when every value `sinceSaid` reads off it has the shape `runOf` gives it.
+ *
+ * THE ITEMS ARE CHECKED AS WELL AS THE LISTS (`loop/research-batch-twenty-four-audit.md` §7). The lists alone were
+ * checked, after a line with no `updated` had stopped `--since` on "rows is not iterable"; then a line whose `updated`
+ * item had no `fields` stopped it again on "Cannot read properties of undefined (reading 'join')", with a good night on
+ * the 19th before it unread. Only this code writes the file, so the trigger is a hand edit or a later version's shape,
+ * and either one is one night the reader cannot trust, not a reason to read none of them.
+ */
+function isRun(run: unknown): run is Run {
+  return (
+    isObj(run) &&
+    isText(run.at) &&
+    !Number.isNaN(Date.parse(run.at)) &&
+    isText(run.host) &&
+    (run.taken === null || run.taken === undefined || isText(run.taken)) &&
+    itemsHold(run.created, ['register', 'label']) &&
+    itemsHold(run.updated, ['register', 'label'], ['fields']) &&
+    itemsHold(run.refused, ['register', 'label', 'fix']) &&
+    itemsHold(run.skipped, ['reason'], ['items'])
+  );
+}
+
+/** The runs remembered, and the number in the file of each line that was passed over. */
+function readRuns(home: string): { runs: Run[]; passed: number[] } {
   let text: string;
   try {
     text = readFileSync(runsFile(home), 'utf8');
   } catch {
-    return [];
+    return { runs: [], passed: [] };
   }
-  /* A LINE THAT DOES NOT PARSE IS PASSED OVER, not fatal: a run cut off mid-write should not cost the week before it.
-     EVERY LIST `sinceSaid` WALKS IS CHECKED, not only `created`: a line that parsed but had no `updated` got through a
-     check on `created` alone, and `--since` then stopped on "rows is not iterable" with every good night unread. */
-  const lists = (run: Record<string, unknown>) => ['created', 'updated', 'refused', 'skipped'].every((k) => Array.isArray(run[k]));
-  return text.split('\n').flatMap((line) => {
+  /* A LINE THAT DOES NOT PARSE OR IS NOT A RUN IS PASSED OVER, not fatal: one bad line should not cost the week before
+     it. It is NAMED rather than dropped in silence, because a night missing from the morning with no word about why
+     reads as a night that never ran. */
+  const runs: Run[] = [];
+  const passed: number[] = [];
+  text.split('\n').forEach((line, i) => {
+    if (line.trim() === '') return;
+    let run: unknown;
     try {
-      const run: unknown = JSON.parse(line);
-      return isObj(run) && typeof run.at === 'string' && typeof run.host === 'string' && lists(run) ? [run as Run] : [];
+      run = JSON.parse(line);
     } catch {
-      return [];
+      run = undefined;
     }
+    if (isRun(run)) runs.push(run);
+    else passed.push(i + 1);
   });
+  return { runs, passed };
 }
 
-function rememberRun(home: string, run: Run): void {
+/** Adds a run to the file, and answers the number of each line the rewrite let go because it could not be read as one. */
+function rememberRun(home: string, run: Run): number[] {
   const file = runsFile(home);
   mkdirSync(join(home, '.braindog'), { recursive: true });
-  const kept = [...readRuns(home), run].slice(-RUNS_KEPT);
+  const read = readRuns(home);
+  const kept = [...read.runs, run].slice(-RUNS_KEPT);
   writeFileSync(`${file}.tmp`, `${kept.map((r) => JSON.stringify(r)).join('\n')}\n`);
   renameSync(`${file}.tmp`, file);
+  return read.passed;
 }
 
 /** `braindog import legacy <file>`, and the exit code: 0 done, 1 refused or partly refused, 3 the host did not answer. */
-export async function importCommand(args: string[], io: AgentIo, today: string = new Date().toISOString().slice(0, 10), now: () => Date = () => new Date()): Promise<number> {
+export async function importCommand(args: string[], io: AgentIo, today: string = new Date().toISOString().slice(0, 10), now: () => Date = () => new Date(), offsetOf: (at: Date) => number = localOffset): Promise<number> {
   let values: { host?: string | undefined; 'dry-run'?: boolean | undefined; setup?: string | undefined; 'draft-setup'?: boolean | undefined; since?: string | undefined };
   let positionals: string[];
   try {
@@ -867,7 +928,9 @@ export async function importCommand(args: string[], io: AgentIo, today: string =
       io.say('--since takes a day as 2026-09-21, or last.');
       return 1;
     }
-    const got = sinceSaid(readRuns(io.home), values.since);
+    const read = readRuns(io.home);
+    for (const n of read.passed) io.say(`Line ${String(n)} of ${runsFile(io.home)} is not a run as this command writes one, so it was passed over.`);
+    const got = sinceSaid(read.runs, values.since, offsetOf);
     if (got.found === 0) {
       io.say(got.lines.join(' '));
       return 1;
@@ -967,12 +1030,17 @@ export async function importCommand(args: string[], io: AgentIo, today: string =
   /* A DRY RUN AND A RECORD SHORT OF ITS LISTS WROTE NOTHING, so neither is a night `--since` should report as carried.
      A run the host stopped answering part way returned above, and is not remembered either: what it wrote is found
      again and said as unchanged by the next one, which is the one sentence about it worth reading. */
-  if (values['dry-run'] !== true && report.missing.length === 0)
+  if (values['dry-run'] !== true && report.missing.length === 0) {
+    let letGo: number[] = [];
     try {
-      rememberRun(io.home, runOf(report, { at: now().toISOString(), host: to.key, file }));
+      letGo = rememberRun(io.home, runOf(report, { at: now().toISOString(), host: to.key, file }));
     } catch {
       io.say(`This run was imported but could not be remembered in ${runsFile(io.home)}, so --since will not show it.`);
     }
+    /* THE REWRITE KEEPS ONLY WHAT READS AS A RUN, so a line passed over each morning is gone after the next night. It is
+       said here too, or a hand-edited line would vanish with nobody told. */
+    for (const n of letGo) io.say(`Line ${String(n)} of ${runsFile(io.home)} was not a run as this command writes one, and was let go when this run was remembered.`);
+  }
   /* A CLASHING CATEGORY IS AN EXIT 1 LIKE A REFUSAL IS, because something he asked for is not in the record and the
      run's next step is his: clear the examples, or rename, and import again. */
   return report.missing.length > 0 || report.refused.length > 0 || report.clashes.length > 0 ? 1 : 0;
