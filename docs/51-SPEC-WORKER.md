@@ -290,7 +290,7 @@ The skeleton in 33 §7 lacked `send_email`, `analytics_engine_datasets`, `rateli
    `FORBIDDEN`, as on `/api`.
 4. `inward(request, ctx)` to the record's object, whose `fetch` answers `/mcp` with `serveMcp(request, api, ctx)`:
    **413** above 1 MB, the body parsed, the mirrored headers held to it, then the core's `handle`. The JSON-RPC
-   parse, the fourteen tools, resources and `instructions` are 44's; the Worker never sees a tool name.
+   parse, the sixteen tools, resources and `instructions` are 44's; the Worker never sees a tool name.
 5. Not built yet: the rate limit keyed on the token hash (§5.1 step 5), `Mcp-Name` in the telemetry blob, and
    `_meta.session`.
 

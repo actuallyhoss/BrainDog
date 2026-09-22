@@ -156,7 +156,7 @@ the record had to have. Recounted September 16th 2026, when the sentence still c
 | ADMIN | `person` with level `owner`, or a `person` whose `op` names the method (an operation grant, 48 §13 D1); `createToken` `listTokens` `revokeToken` admit any `person`. `deviceApprove` admits only the owner, from a sign-in proved in the last 15 minutes: an approval hands out a 90-day bearer that works from anywhere, so it asks what VAULT asks. An earlier draft admitted any `person` | `auth.ts` |
 | INTERNAL | `system` — no route exists (33 §4); any other principal is `FORBIDDEN`; `export` also admits `system` for the nightly backup | `auth.ts` |
 
-`RecordApi` is what both hosts serve, one route per method, and what `packages/mcp` reaches through its fourteen tools
+`RecordApi` is what both hosts serve, one route per method, and what `packages/mcp` reaches through its sixteen tools
 and its resources (10 §3, §6); 44 §2's `McpSurface<C>` names the subset the tools call, structurally.
 
 ---
