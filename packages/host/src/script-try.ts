@@ -29,6 +29,12 @@
  * first, a held trial starts nothing, and what it spent is counted on the script's own line of the ledger, `channel:
  * 'script'`, under an event id minted for it, since a trial writes no event of its own for the Directory to key on.
  *
+ * AND COUNTED AS IN FLIGHT FROM BEFORE IT ASKS UNTIL IT IS METERED. The allowance was asked with no count of the
+ * trials still in their sandboxes, so five started together with one run left all ran and the month closed at 15,004
+ * of 15,000 (audit thirty-seven finding 2, `test/script-try-spend.test.ts`). A trial now takes a place in `inFlight`
+ * before the question, asks with the places taken before it as `pending`, and gives its place back once the ledger has
+ * been told, whichever way it ended.
+ *
  * NO `node:` IMPORT, and only types from `@braindog/script`, for `script.ts`'s reason: the Worker builds its trial here
  * too, and QuickJS is the self-host's sandbox, handed in as `run`, never imported by this file.
  */
@@ -36,7 +42,7 @@
 import type { OutboxRow, ScriptAnswer, Scripted } from '@braindog/kernel';
 import type { Json, ScriptDecl } from '@braindog/script';
 
-import type { Ledger, Metered } from './actions.ts';
+import { IN_FLIGHT, type InFlight, type Ledger, type Metered } from './actions.ts';
 import { scriptRunner, type GrantOf, type ScriptReads, type ScriptRunnerOptions } from './script.ts';
 
 /**
@@ -114,6 +120,11 @@ export type ScriptTrialOptions = {
    * a random one, which is all the Directory's dedupe needs.
    */
   mint?: (() => string) | undefined;
+  /**
+   * The runs let through and not yet metered, shared with the host's scheduled pass when it hands the same one to
+   * `pass(flight)`. Absent is `IN_FLIGHT`, the runtime's own, so a host that builds a trial per request still shares one.
+   */
+  inFlight?: InFlight | undefined;
 };
 
 /**
@@ -132,11 +143,24 @@ export function scriptTrial(options: ScriptTrialOptions): (draft: ScriptDraft) =
     await options.ledger.meter(record, { event, at: new Date(now()).toISOString(), ingest: script, channel: 'script', scope: 'global', outcome, usage });
   };
 
+  const flight = options.inFlight ?? IN_FLIGHT;
+
   return async (draft) => {
+    /* THE PLACE IS TAKEN BEFORE THE FIRST AWAIT, so a trial asked while this one waits on the ledger counts it, and it
+       is given back in the `finally`, after `count` has told the ledger, so there is no moment neither holds the run. */
+    const place = options.ledger === null ? null : flight.take(draft.record.id);
+    try {
+      return await attempt(draft, place?.pending ?? 0);
+    } finally {
+      place?.release();
+    }
+  };
+
+  async function attempt(draft: ScriptDraft, pending: number): Promise<TriedScript> {
     const { record, body } = draft;
     /* ONE ID FOR THE TRIAL: the job its fetches are sent for, and the event the ledger counts it under. */
     const id = mint();
-    const hold = options.ledger === null ? null : await options.ledger.mayRun(record.id, body.script);
+    const hold = options.ledger === null ? null : await options.ledger.mayRun(record.id, body.script, pending);
     if (hold) {
       await count(id, record.id, body.script, 'held', { runs: 0, requests: 0, bytes: 0, ms: 0, failures: 0, held: 1 });
       return { held: hold };
@@ -191,5 +215,5 @@ export function scriptTrial(options: ScriptTrialOptions): (draft: ScriptDraft) =
       held: 0,
     });
     return answer;
-  };
+  }
 }

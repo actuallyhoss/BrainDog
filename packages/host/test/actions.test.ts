@@ -122,6 +122,83 @@ test('THE TWO SPELLINGS NOTHING ELSE CATCHES ARE SCRUBBED: URL-encoded with lowe
   }
 });
 
+/** Quoted-printable as RFC 2045 writes a body: `=XX` for `=` and every byte outside printable ASCII, soft breaks at 76. */
+function quotedPrintable(text: string): string {
+  let out = '';
+  let line = 0;
+  for (const byte of new TextEncoder().encode(text)) {
+    const token = byte === 0x3d || byte < 0x20 || byte > 0x7e ? `=${byte.toString(16).toUpperCase().padStart(2, '0')}` : String.fromCharCode(byte);
+    /* THE `=` OF A SOFT BREAK COUNTS TOWARDS THE 76, and a token is never split across one. */
+    if (line + token.length > 75) {
+      out += '=\r\n';
+      line = 0;
+    }
+    out += token;
+    line += token.length;
+  }
+  return out;
+}
+
+/** Base64 as MIME writes it: standard alphabet, a CRLF after every 76 characters. */
+const mimeBase64 = (text: string): string => (btoa(text).match(/.{1,76}/g) ?? []).join('\r\n');
+
+/** UTF-16 in either byte order, as the bytes a provider sends. */
+function utf16(text: string, order: 'le' | 'be'): Uint8Array {
+  const out = new Uint8Array(text.length * 2);
+  for (let i = 0; i < text.length; i++) {
+    const unit = text.charCodeAt(i);
+    out[2 * i + (order === 'le' ? 0 : 1)] = unit & 0xff;
+    out[2 * i + (order === 'le' ? 1 : 0)] = unit >> 8;
+  }
+  return out;
+}
+
+test('THE KEY IS SCRUBBED FROM THREE ECHOES THE BYTES DO NOT MATCH: MIME base64 wrapped at 76, quoted-printable with soft breaks, and UTF-16 either way round', async () => {
+  /* MEASURED BY AUDIT THIRTY-SEVEN (finding 5) WITH `sendAction` AND A 64-CHARACTER KEY: each of these reached the
+     script with no spelling of the key intact, and one line of the script's own put it back together. Each case below
+     is that line. A `=` in the key makes quoted-printable differ from the bytes, a `/` and a `+` put both of base64's
+     odd characters in play, and the JSON around it is long enough that every wrap at 76 lands inside the key. */
+  const key = 'bd_live_Zq8=Xk2/Rm9+Tn4=Vp7/Wa1+Yc5=Hd3/Je6+Kf0=Lg8/Mh2+Ni5=Oj7Q';
+  assert.equal(key.length, 64);
+  const opened: OpenKey = async () => key;
+  const said = `{"error":"invalid_token","authorization":"Bearer ${key}"}`;
+  const at = said.indexOf(key);
+
+  /* THE KEY'S OWN SPAN OF THE BASE64, which is what `spellingsOf` strikes: the characters every bit of which is the key's. */
+  const span = btoa(said).slice(Math.ceil((8 * at) / 6), Math.floor((8 * (at + key.length)) / 6));
+  const cases: [string, ConstructorParameters<typeof Response>[0], (body: string) => boolean][] = [
+    ['MIME base64 wrapped at 76', mimeBase64(said), (body) => body.replaceAll('\r\n', '').includes(span)],
+    [
+      'quoted-printable with soft breaks',
+      quotedPrintable(said),
+      (body) => body.replace(/=\r?\n/g, '').replace(/=([0-9A-F]{2})/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16))).includes(key),
+    ],
+    ['UTF-16LE', utf16(said, 'le'), (body) => body.replaceAll('\u0000', '').includes(key)],
+    ['UTF-16BE', utf16(said, 'be'), (body) => body.replaceAll('\u0000', '').includes(key)],
+    /* THE KEY ALONE, WITH NOTHING BESIDE IT. Inside a longer echo either byte order's spelling is found in the other's,
+       since the NUL a character carries on one side is also the NUL of its neighbour, so taking out either line of
+       `spellingsOf` left the two cases above green. At the edge of a body there is no neighbour, and each is needed. */
+    ['UTF-16LE, the key alone', utf16(key, 'le'), (body) => body.replaceAll('\u0000', '').includes(key)],
+    ['UTF-16BE, the key alone', utf16(key, 'be'), (body) => body.replaceAll('\u0000', '').includes(key)],
+  ];
+  assert.ok(mimeBase64(said).includes('\r\n') && !mimeBase64(said).includes(span), 'the wrap did not land inside the key');
+  assert.ok(quotedPrintable(said).includes('=\r\n') && !quotedPrintable(said).includes(key), 'the soft break did not land inside the key');
+
+  /* EVERY CASE IS RUN BEFORE ANYTHING IS ASSERTED, so a red run names each spelling that got through, not the first. */
+  const recovered: string[] = [];
+  const unscrubbed: string[] = [];
+  for (const [how, echoed, recovers] of cases) {
+    const echo = wire(async () => new Response(echoed));
+    const answer = await sendAction({ origins: declaring(ORIGIN), openKey: opened, send: echo.send })(request());
+    assert.equal(codeOf(answer), 200);
+    const body = 'body' in answer ? answer.body : '';
+    if (recovers(body)) recovered.push(how);
+    if (!body.includes(REDACTED)) unscrubbed.push(how);
+  }
+  assert.deepEqual(recovered, [], 'the script put the key back together from these echoes');
+  assert.deepEqual(unscrubbed, [], 'nothing was scrubbed from these echoes');
+});
+
 test('AN UNDECLARED ORIGIN, PLAIN HTTP AND A HOST WRITTEN AS A PRIVATE OR LOCAL ADDRESS ARE REFUSED before the key is opened', async () => {
   let opened = 0;
   const counting: OpenKey = async () => (opened++, FAKE);

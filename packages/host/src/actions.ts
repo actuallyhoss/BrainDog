@@ -65,8 +65,18 @@ export const NO_KEY_STORE = 'This host holds no key store yet, so the key';
 /** A derived spelling shorter than this is not scrubbed: see `spellingsOf`. */
 const SHORTEST_SPELLING = 8;
 
+/** One spelling of a key: its exact text, or a pattern for a spelling a line break may fall anywhere inside. */
+export type Spelling = string | RegExp;
+
+/** A pattern source for `text` exactly, every character a regular expression gives a meaning taken literally. */
+const literally = (text: string): string => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+
+/** The tokens in order with `gap` allowed, and not required, between any two: a spelling a wrap can fall inside. */
+const wrappable = (tokens: readonly string[], gap: string): RegExp => new RegExp(tokens.map(literally).join(`(?:${gap})?`), 'g');
+
 /**
- * Every spelling of an opened key that `sendAction` takes out of what it returns, longest first.
+ * The spellings of an opened key that `sendAction` takes out of what it returns: the patterns first, then the exact
+ * texts longest first, so no shorter spelling is struck out of a longer one before the longer is found.
  *
  * THE EXACT BYTES WERE THE ONLY SPELLING, AND A PROVIDER THAT ECHOES THE HEADER NEED NOT ECHO THOSE. Measured by the
  * audit of wave thirty-five in workerd, through the real gateway, with a key holding a `/`: a provider that answered the
@@ -81,17 +91,31 @@ const SHORTEST_SPELLING = 8;
  *   · URL-encoded as `encodeURIComponent` writes it, and the same with lower-case hex (`%2f`), which other encoders write;
  *   · base64, standard and URL-safe, at each of the three byte offsets the key can start at inside a longer encoded
  *     run, so `btoa('Bearer ' + key)` is caught as well as `btoa(key)`. Only the characters every bit of which is the
- *     key's are replaced; the one or two at either end also carry the bytes beside the key, which differ echo to echo.
+ *     key's are replaced; the one or two at either end also carry the bytes beside the key, which differ echo to echo;
+ *   · that standard base64 again with a line break (`\n` or `\r\n`) allowed between any two characters, which is MIME
+ *     base64 wrapped at 76 columns, or at any other width;
+ *   · quoted-printable as RFC 2045 writes it (`=XX` in upper-case hex for `=` and every byte outside printable ASCII,
+ *     every other byte as itself) with a soft break (`=\n` or `=\r\n`) allowed between any two tokens;
+ *   · UTF-16 in both byte orders, as the scrub sees it, which is those bytes read as UTF-8: every character of the key
+ *     with a NUL after it (little-endian) or before it (big-endian). Only for a key that is all ASCII, whose code units
+ *     each read back as one character and a NUL; a key with any other character is not caught in UTF-16.
  *
- * NOT CAUGHT, AND SAID SO: a key re-encoded any other way (hex, `\u` escapes of ordinary characters, a hash of it), and
- * any derived spelling shorter than eight characters, which only a key of five bytes or fewer has and which would
- * otherwise be struck out of ordinary text by chance. The bytes as sent are always scrubbed, however short.
+ * THE LAST THREE WERE MEASURED GETTING THROUGH by audit thirty-seven (finding 5) with a 64-character key and a provider
+ * that echoed the authorization header: each reached the script with no other spelling intact, and one line of the
+ * script's own put the key back together (removing the breaks, or the NULs). `test/actions.test.ts` holds all four.
+ *
+ * NOT CAUGHT, AND SAID SO: a key re-encoded any other way (hex, `\u` escapes of ordinary characters, a hash of it, URL-
+ * safe base64 with line breaks in it, any of the spellings above inside another, such as base64 of the JSON-escaped
+ * key), and any derived spelling shorter than eight characters, which only a key of five bytes or fewer has and which
+ * would otherwise be struck out of ordinary text by chance. The bytes as sent are always scrubbed, however short. No
+ * list is every spelling: a provider that reverses the string defeats any of them.
  */
-export function spellingsOf(secret: string): string[] {
+export function spellingsOf(secret: string): Spelling[] {
   const json = JSON.stringify(secret).slice(1, -1);
   const url = encodeURIComponent(secret);
   const derived = new Set<string>([json, json.replaceAll('/', '\\/'), url, url.replace(/%[0-9A-F]{2}/g, (hex) => hex.toLowerCase())]);
   const bytes = new TextEncoder().encode(secret);
+  const patterns: RegExp[] = [];
   for (const lead of [0, 1, 2]) {
     const padded = new Uint8Array(lead + bytes.length);
     padded.set(bytes, lead);
@@ -102,9 +126,18 @@ export function spellingsOf(secret: string): string[] {
     const core = btoa(binary).slice(Math.ceil((8 * lead) / 6), Math.floor((8 * (lead + bytes.length)) / 6));
     derived.add(core);
     derived.add(core.replaceAll('+', '-').replaceAll('/', '_'));
+    if (core.length >= SHORTEST_SPELLING) patterns.push(wrappable([...core], '\\r?\\n'));
   }
-  const out = [secret, ...[...derived].filter((s) => s !== secret && s.length >= SHORTEST_SPELLING)];
-  return out.sort((a, b) => b.length - a.length);
+  const printable = (byte: number): boolean => byte >= 0x20 && byte <= 0x7e && byte !== 0x3d;
+  const qp = [...bytes].map((byte) => (printable(byte) ? String.fromCharCode(byte) : `=${byte.toString(16).toUpperCase().padStart(2, '0')}`));
+  if (qp.join('').length >= SHORTEST_SPELLING) patterns.push(wrappable(qp, '=\\r?\\n'));
+  /* ALL ASCII, or the key has a code unit whose two bytes do not read back as one character and a NUL. */
+  if ([...secret].every((c) => c.charCodeAt(0) < 0x80)) {
+    derived.add([...secret].map((c) => `${c}\u0000`).join(''));
+    derived.add([...secret].map((c) => `\u0000${c}`).join(''));
+  }
+  const texts = [secret, ...[...derived].filter((s) => s !== secret && s.length >= SHORTEST_SPELLING)];
+  return [...patterns, ...texts.sort((a, b) => b.length - a.length)];
 }
 
 /* ── the ledger ─────────────────────────────────────────────────────────── */
@@ -163,16 +196,90 @@ export function holdingPaged(page: PagedRun, record: string, mayRun: Ledger['may
  */
 export type Admissions = { ask: (record: string, action: string, mayRun: Ledger['mayRun']) => Promise<Hold> };
 
-/** A fresh admission count. One per pass; passed to both wrappers so they share it. */
-export function pass(): Admissions {
+/**
+ * The runs let through on a record and not yet metered, across every pass and trial that shares it.
+ *
+ * `take` reserves one place and answers how many were reserved before it, which is the `pending` to ask the ledger
+ * with; `release` gives the place back, once, and a second call does nothing. `count` reads without reserving.
+ *
+ * A PASS'S OWN COUNT DIES WITH THE PASS, AND A TRIAL HAS NO PASS. `pass()` holds its admissions in a closure, which is
+ * right for the runs of one pass and blind to anything else spending the same month. Measured by audit thirty-seven
+ * over a real Directory: five trials at once with one run left all ran, and the month closed at 15,004 of 15,000
+ * (`test/script-try-spend.test.ts`). This is the count that outlives one pass, keyed by record, so the trials a host
+ * runs between passes, and a pass running beside them, ask the ledger with each other's runs in hand.
+ */
+export type InFlight = {
+  take: (record: string) => { pending: number; release: () => void };
+  count: (record: string) => number;
+};
+
+/** A fresh in-flight count, for a host to build once beside its ledger and hand every pass and every trial. */
+export function inFlight(): InFlight {
+  const held = new Map<string, number>();
+  return {
+    count: (record) => held.get(record) ?? 0,
+    take: (record) => {
+      const pending = held.get(record) ?? 0;
+      held.set(record, pending + 1);
+      let given = false;
+      return {
+        pending,
+        release: () => {
+          if (given) return;
+          given = true;
+          const left = (held.get(record) ?? 1) - 1;
+          if (left > 0) held.set(record, left);
+          else held.delete(record);
+        },
+      };
+    },
+  };
+}
+
+/**
+ * The count every trial on this runtime shares when its host hands `scriptTrial` none.
+ *
+ * ONE PER RUNTIME AND NOT ONE PER CALL, because both hosts build a `scriptTrial` per request: a count made inside it
+ * would start at zero every time and be the hole it closes. The self-host serves its records from one process, and a
+ * Durable Object is one instance per record, so keying by record id is what makes a module's count the record's count.
+ */
+export const IN_FLIGHT: InFlight = inFlight();
+
+/**
+ * A fresh admission count. One per pass; passed to both wrappers so they share it.
+ *
+ * WITH `flight`, THE PASS ALSO RESERVES EACH RUN IT LETS THROUGH THERE, and sees what trials hold, so a trial and a pass
+ * cannot each spend the last run. Those places are held until `settle`, which the host calls once the pass is metered,
+ * in a `finally`: a pass that never settles holds its record's runs for the life of the runtime. Without `flight`,
+ * `settle` does nothing and the pass counts only itself, as it always has.
+ */
+export function pass(flight?: InFlight): Admissions & { settle: () => void } {
   let admitted = 0;
+  const places: (() => void)[] = [];
   return {
     /* TAKEN BEFORE THE AWAIT, so two runs asked at once cannot both be told there is room for one. */
     ask: async (record, action, mayRun) => {
-      const pending = admitted++;
-      const hold = await mayRun(record, action, pending);
-      if (hold) admitted--;
+      const place = flight?.take(record);
+      /* THE SHARED COUNT ALREADY HOLDS THIS PASS'S OWN PLACES, so it replaces `admitted` rather than adding to it. */
+      const own = admitted++;
+      /* A QUESTION THAT THROWS GIVES THE PLACE BACK. Neither released nor handed to `settle`, it stayed in the shared
+         count after the pass had gone, one run short on the record for the life of the runtime per failed RPC. */
+      let hold: Hold;
+      try {
+        hold = await mayRun(record, action, place === undefined ? own : place.pending);
+      } catch (error) {
+        admitted--;
+        place?.release();
+        throw error;
+      }
+      if (hold) {
+        admitted--;
+        place?.release();
+      } else if (place) places.push(place.release);
       return hold;
+    },
+    settle: () => {
+      for (const release of places.splice(0)) release();
     },
   };
 }
@@ -367,8 +474,9 @@ export function sendAction<P extends object | undefined = undefined>(options: Se
     let requests = 0;
     let bytes = 0;
     /* EVERY SPELLING OF THE KEY, NOT ONLY ITS BYTES (`spellingsOf` says which). Empty until a key is opened. */
-    let secret: string[] = [];
-    const scrub = (text: string): string => secret.reduce((out, spelling) => out.split(spelling).join(REDACTED), text);
+    let secret: Spelling[] = [];
+    const scrub = (text: string): string =>
+      secret.reduce<string>((out, spelling) => (typeof spelling === 'string' ? out.split(spelling).join(REDACTED) : out.replace(spelling, REDACTED)), text);
     const refuse = (code: RefusedCode, fix: string): ActionAnswer => ({
       refused: { code, fix: scrub(fix) },
       bytes,
