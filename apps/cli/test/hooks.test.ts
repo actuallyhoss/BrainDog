@@ -17,7 +17,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { HOOK_MS, hookBudget, notSignedIn, readSession, sessionPath, writeSession } from '../src/hooks.ts';
-import { hookCommand, installInto, serversFileOf } from '../src/install.ts';
+import { REPLACE_BY_HAND, hookCommand, installInto, serversFileOf } from '../src/install.ts';
 import { sessionHeaders } from '../src/position.ts';
 
 const APP = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -536,6 +536,129 @@ test('INSTALL --REPLACE --APPLY copies each file beside itself, removes only the
   assert.ok(readFileSync(kept.settings, 'utf8').includes('session-start.ps1'));
   assert.equal(readFileSync(join(plain, '.claude.json'), 'utf8'), kept.mcpBefore);
   assert.ok(!existsSync(join(plain, '.claude.json.bak')));
+});
+
+/* ── install --replace --mcp-json, the one file the cut-over used to leave ── */
+
+/*
+ * `loop/research-switch-matrix.md` "What to build next" item 3. Step 9 of the cut-over records a the old tool server
+ * in `C:\Repos\.mcp.json`, a file in no repository, and install never opened a `.mcp.json`, so the cut-over was one
+ * sitting plus a hand edit. MEASURED BEFORE `--mcp-json` EXISTED: the flag was refused by the option parse with
+ * exit 1, and the same run without it left the file byte for byte as it was and never named it.
+ * Every file here is a scratch copy; no real profile or `.mcp.json` is read.
+ */
+function mcpJsonFile(dir: string): { file: string; before: string } {
+  mkdirSync(dir, { recursive: true });
+  const file = join(dir, '.mcp.json');
+  const before = `${JSON.stringify(
+    {
+      mcpServers: {
+        brain: { command: 'node', args: ['C:\\Tools\\legacy\\mcp\\brain-mcp.mjs'], env: { MCP_TOKEN: HB_SECRET } },
+        proxied: { command: 'npx', args: ['-y', 'mcp-remote', 'https://brain.example.com/mcp'] },
+        figma: { type: 'http', url: 'https://mcp.figma.com/mcp' },
+        brainy: { command: 'node', args: ['C:\\Repos\\brainy\\server.mjs'] },
+      },
+      note: 'kept as it was',
+    },
+    null,
+    2,
+  )}\n`;
+  writeFileSync(file, before);
+  return { file, before };
+}
+
+test('INSTALL --REPLACE --MCP-JSON names the the old tool servers in a .mcp.json outside any repository, is a dry run first, and with --apply copies it and removes only those', async () => {
+  const outside = folder('repos');
+  const { file, before } = mcpJsonFile(outside);
+  const profile = folder('profile');
+  const env = envFor(folder('config'), {});
+
+  const dry = await run(['install', '--replace', '--config-dir', profile, '--mcp-json', file], env, '');
+  assert.equal(dry.code, 0, dry.stderr);
+  assert.ok(dry.stdout.includes(`braindog install --replace would change ${file}:`), dry.stdout);
+  assert.ok(dry.stdout.includes("  - mcpServers.brain, the old tool's: node C:\\Tools\\legacy\\mcp\\brain-mcp.mjs"), dry.stdout);
+  assert.ok(dry.stdout.includes("  - mcpServers.proxied, the old tool's: npx -y mcp-remote https://brain.example.com/mcp"), dry.stdout);
+  assert.ok(!dry.stdout.includes('figma') && !dry.stdout.includes('brainy') && !dry.stdout.includes(HB_SECRET), dry.stdout);
+  /*
+   * Named, it is no longer a file to edit by hand, so the sentence saying so is not printed. CHECKED AGAINST THE
+   * SENTENCE ITSELF: this first looked for "removed by hand", words the sentence no longer holds, and it stayed green
+   * with main.ts printing the sentence on every --replace.
+   */
+  assert.ok(!dry.stdout.includes(REPLACE_BY_HAND), dry.stdout);
+  const unnamed = await run(['install', '--replace', '--config-dir', profile], env, '');
+  assert.ok(unnamed.stdout.includes(REPLACE_BY_HAND), unnamed.stdout);
+  assert.equal(readFileSync(file, 'utf8'), before, 'the dry run changed the .mcp.json');
+  assert.deepEqual(readdirSync(outside), ['.mcp.json']);
+
+  const applied = await run(['install', '--replace', '--apply', '--config-dir', profile, '--mcp-json', file], env, '');
+  assert.equal(applied.code, 0, applied.stderr);
+  assert.ok(applied.stdout.includes(`The file as it was is kept at ${file}.bak.`), applied.stdout);
+  assert.equal(readFileSync(`${file}.bak`, 'utf8'), before);
+  const now = JSON.parse(readFileSync(file, 'utf8')) as { mcpServers: Record<string, unknown>; note: string };
+  assert.deepEqual(Object.keys(now.mcpServers), ['figma', 'brainy']);
+  assert.equal(now.note, 'kept as it was');
+  /* The same run wrote the profile's hooks: one change, not two. */
+  assert.ok(existsSync(join(profile, 'settings.json')));
+
+  const again = await run(['install', '--replace', '--apply', '--config-dir', profile, '--mcp-json', file], env, '');
+  assert.ok(again.stdout.includes(`${file} registers no the old tool MCP server. Nothing to change.`), again.stdout);
+  assert.deepEqual(readdirSync(outside).sort(), ['.mcp.json', '.mcp.json.bak']);
+});
+
+test('INSTALL --MCP-JSON IS REFUSED inside a git working tree, without --replace, and for a missing file, and each refusal changes no other file', async () => {
+  const profile = folder('profile');
+  const env = envFor(folder('config'), {});
+  const repo = repository();
+  const nested = join(repo.dir, 'tools');
+  const shared = mcpJsonFile(nested);
+
+  const refused = await run(['install', '--replace', '--apply', '--config-dir', profile, '--mcp-json', shared.file], env, '');
+  assert.equal(refused.code, 1);
+  assert.match(refused.stderr, /is inside the git working tree at .+, so braindog install leaves it alone/);
+  assert.equal(readFileSync(shared.file, 'utf8'), shared.before);
+  /* All or none: the profile's settings, which the same run would have written, were not. */
+  assert.deepEqual(readdirSync(profile), []);
+
+  const outside = mcpJsonFile(folder('repos'));
+  const plain = await run(['install', '--apply', '--config-dir', profile, '--mcp-json', outside.file], env, '');
+  assert.equal(plain.code, 1);
+  assert.match(plain.stderr, /--mcp-json is read only with --replace/);
+  assert.equal(readFileSync(outside.file, 'utf8'), outside.before);
+  assert.deepEqual(readdirSync(profile), []);
+
+  const missing = await run(['install', '--replace', '--config-dir', profile, '--mcp-json', join(folder('repos'), '.mcp.json')], env, '');
+  assert.equal(missing.code, 1);
+  assert.match(missing.stderr, /There is no .+\.mcp\.json/);
+});
+
+/*
+ * BATCH TWENTY-SEVEN'S TWO FINDINGS ON WHAT A SERVER IS AND WHAT IS SHOWN OF IT. Measured before the fix:
+ * `--url=https://brain.example.com/mcp` as one word was not known as the old tool's, so the entry was kept and not named,
+ * and `-t shortpw` printed `shortpw`, which is too short to look like a token and follows a flag too short to say
+ * it takes one.
+ */
+test('a the old tool URL joined to its flag with = is known, and a short secret after a one-letter flag is not printed', () => {
+  const home = folder('home');
+  const dir = join(home, '.claude-joined');
+  mkdirSync(dir, { recursive: true });
+  const claudeJson = join(dir, '.claude.json');
+  writeFileSync(
+    claudeJson,
+    JSON.stringify({
+      mcpServers: {
+        joined: { command: 'npx', args: ['-y', 'mcp-remote', '--url=https://brain.example.com/mcp'] },
+        'joined-query': { command: 'npx', args: ['-y', 'mcp-remote', '--url=https://brain.example.com/mcp?t=qpw12'] },
+        'short-flag': { command: 'node', args: ['C:\\Tools\\legacy\\mcp\\brain-mcp.mjs', '-t', 'shortpw', '-v', '--quiet'] },
+        near: { command: 'npx', args: ['-y', 'mcp-remote', '--url=https://notbrain.example.com.example.com/mcp'] },
+      },
+    }),
+  );
+  const text = installInto(dir, { apply: false, replace: true, scripts: join(APP, 'hooks'), home }).join('\n');
+  assert.ok(text.includes("  - mcpServers.joined, the old tool's: npx -y mcp-remote --url=https://brain.example.com/mcp"), text);
+  assert.ok(text.includes("  - mcpServers.joined-query, the old tool's: npx -y mcp-remote --url=https://brain.example.com/mcp"), text);
+  assert.ok(text.includes("  - mcpServers.short-flag, the old tool's: node C:\\Tools\\legacy\\mcp\\brain-mcp.mjs -t [hidden] -v --quiet"), text);
+  assert.ok(!text.includes('shortpw') && !text.includes('qpw12'), text);
+  assert.ok(!text.includes('mcpServers.near'), text);
 });
 
 test('NO CHILD EVER PRINTED THE TOKEN', () => {

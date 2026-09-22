@@ -13,8 +13,11 @@
  * names each one first, and is a dry run until `--apply` exactly as install is. An entry it cannot identify is
  * left, because a false match deletes somebody else's tool and a miss is only a line to remove by hand.
  *
- * NEVER A `.mcp.json`. A project's `.mcp.json` is shared through its repository, so this never opens one
- * (`loop/research-agent-path.md` question 5). A project's settings file is changed only when it is named.
+ * A `.mcp.json` ONLY WHEN IT IS NAMED, AND NEVER ONE IN A REPOSITORY. A project's `.mcp.json` is shared through its
+ * repository (`loop/research-agent-path.md` question 5), so one inside a git working tree is refused. But the one the
+ * cut-over needs, `C:\Repos\.mcp.json`, is in no repository, and leaving it to a hand edit made step 9 one sitting
+ * plus a line that, missed, leaves a session on the old record. `--replace --mcp-json <file>` opens it, in the same
+ * dry run and the same all-or-none write as the profiles. A project's settings file is changed only when it is named.
  */
 
 import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
@@ -37,16 +40,16 @@ const EVENTS = [
  */
 const SAM_HOOK = /[\\/]brain[\\/]hooks[\\/]session-(?:start|end)\.(?:ps1|sh)(?![\w.])/i;
 /** Its MCP server is one file, `brain-mcp.mjs` (`loop/research-switch.md` §1), however the entry is named. */
-const SAM_MCP = /(?:^|[\\/\s"'])brain-mcp\.mjs(?![\w.])/i;
+const SAM_MCP = /(?:^|[\\/\s"'=])brain-mcp\.mjs(?![\w.])/i;
 /** Or the host it was served from, for an entry registered over HTTP. */
 const SAM_HOST = 'brain.example.com';
 
 /**
- * Printed once after a `--replace`, because this command cannot do that part: a `.mcp.json` is never opened, and
- * `loop/research-switch.md` §4 step 9 records a the old tool server registered in `C:\Repos\.mcp.json`.
+ * Printed once after a `--replace` that names no `--mcp-json`, because `loop/research-switch.md` §4 step 9 records a
+ * the old tool server registered in `C:\Repos\.mcp.json`, and a `.mcp.json` nobody named is never opened.
  */
 export const REPLACE_BY_HAND =
-  "A project's .mcp.json is never opened, so a the old tool server registered in one (C:\\Repos\\.mcp.json had one) is removed by hand.";
+  'A .mcp.json is opened only when it is named, so a the old tool server registered in one (C:\\Repos\\.mcp.json had one) stays until you run this again with --mcp-json <file>.';
 
 /** The profile folders to change: each `--config-dir`, else `CLAUDE_CONFIG_DIR`, else `~/.claude`. */
 export const profilesOf = (named: string[], env: Env): string[] => (named.length > 0 ? named : [env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')]);
@@ -199,12 +202,14 @@ const dryTail = (options: Options) => `Nothing was changed. Run braindog install
 
 /**
  * What installing into every profile and every named file does, as one change: each profile's `settings.json`,
- * with `replace` its MCP servers too, then each named settings file. ALL ARE READ BEFORE ANY IS WRITTEN. Measured
+ * with `replace` its MCP servers too, then each named settings file, then each named `.mcp.json`. ALL ARE READ BEFORE ANY IS WRITTEN. Measured
  * before this existed, one call per profile cut over two profiles and then refused a malformed third, and the
  * refusal was the only line printed. A file reached twice, a profile's own `settings.json` also named with
  * `--settings`, is planned once, since a second plan from the same reading would overwrite the first.
  */
-export function installEvery(profiles: string[], files: string[], options: Options): string[] {
+export function installEvery(profiles: string[], files: string[], options: Options, mcpFiles: string[] = []): string[] {
+  /* Removing servers is the cut-over's, so a `.mcp.json` named without `--replace` would have nothing to do. */
+  if (mcpFiles.length > 0 && !options.replace) throw new Error('--mcp-json is read only with --replace, so braindog install changed nothing.');
   const seen = new Set<string>();
   const plans: Plan[] = [];
   const add = (file: string, plan: (file: string, options: Options) => Plan) => {
@@ -218,6 +223,7 @@ export function installEvery(profiles: string[], files: string[], options: Optio
     if (options.replace) add(serversFileOf(dir, options.home), planServers);
   }
   for (const file of files) add(file, planSettings);
+  for (const file of mcpFiles) add(file, planMcpJson);
   return commit(plans);
 }
 
@@ -323,7 +329,12 @@ function hideWord(word: string): string {
   const eq = bare.search(/[=:]/);
   if (eq > 0) {
     const name = bare.slice(0, eq);
-    return `${name}${bare[eq]}${NAMES_SECRET.test(name) ? HIDDEN : hidePieces(bare.slice(eq + 1))}`;
+    const value = bare.slice(eq + 1);
+    /*
+     * A URL AFTER `=` IS STILL A URL. Split into path pieces instead, `--url=https://brain.example.com/mcp?t=qpw12`
+     * printed `mcp?t=qpw12`, because the query was one piece and too short to look like a token.
+     */
+    return `${name}${bare[eq]}${NAMES_SECRET.test(name) ? HIDDEN : isUrl(value) ? hideUrl(value) : hidePieces(value)}`;
   }
   return hidePieces(bare);
 }
@@ -340,15 +351,28 @@ function describe(server: Record<string, unknown>): string {
   const words = typeof server.url === 'string' ? [server.url] : wordsOf(server);
   const shown: string[] = [];
   let hideNext = false;
+  let unsure = false;
   for (const word of words) {
+    const bare = word.replace(/^["']+|["']+$/g, '');
     /* `Bearer` hidden after `Authorization:` still names a secret, so the key after it is hidden too. */
-    const next = namesSecret(word.replace(/^["']+|["']+$/g, ''));
-    const text = hideNext ? HIDDEN : hideWord(word);
+    const next = namesSecret(bare);
+    const short = !next && isShortFlag(bare);
+    /* After a one-letter flag, a word that is itself a flag is no value, and a URL is shown as `hideUrl` shows one. */
+    const text = hideNext && !(unsure && (/^-/.test(bare) || isUrl(bare))) ? HIDDEN : hideWord(word);
     if (!(text === HIDDEN && shown.at(-1) === HIDDEN)) shown.push(text);
-    hideNext = next;
+    hideNext = next || short;
+    unsure = short;
   }
   return shown.join(' ');
 }
+
+/**
+ * A FLAG TOO SHORT TO SAY WHAT IT TAKES, `-t` or `-p`, so the word after it is treated as a secret. Measured before
+ * this (batch twenty-seven's finding): `-t shortpw` printed `shortpw`, which follows no word naming a secret and is
+ * too short to look like a token. `-y` is left out because it is npx's `--yes`, which takes nothing, and every proxied
+ * registration starts with it: hiding the package after it would hide the one word that says the entry is a proxy.
+ */
+const isShortFlag = (word: string) => /^-[a-z]{1,2}$/i.test(word) && word !== '-y';
 
 /* The command and its arguments split into words, since an entry may give the whole command as one string. */
 const wordsOf = (server: Record<string, unknown>): string[] =>
@@ -374,7 +398,56 @@ function isSamServer(server: unknown): server is Record<string, unknown> {
   if (!isObject(server)) return false;
   if (typeof server.url === 'string' && isSamUrl(server.url)) return true;
   const strings = [server.command, ...(Array.isArray(server.args) ? server.args : [])].filter((s): s is string => typeof s === 'string');
-  return strings.some((s) => SAM_MCP.test(s)) || wordsOf(server).some(isSamUrl);
+  /*
+   * THE WORD, AND WHAT FOLLOWS ITS FIRST `=`. Measured before (batch twenty-seven's finding), `--url=https://brain.example.com/mcp`
+   * as one word is no URL to `new URL`, so the entry was kept and never named. Both halves are tried because a URL
+   * may carry an `=` of its own in its query.
+   */
+  return strings.some((s) => SAM_MCP.test(s)) || wordsOf(server).some((word) => isSamUrl(word) || isSamUrl(word.slice(word.indexOf('=') + 1)));
+}
+
+/** An `mcpServers` object without the old tool's entries, each one named in `removed` as it is taken out. */
+function withoutSam(servers: unknown, where: string, removed: string[]): unknown {
+  if (!isObject(servers)) return servers;
+  const kept: Record<string, unknown> = {};
+  for (const [name, server] of Object.entries(servers)) {
+    if (isSamServer(server)) removed.push(`  - ${where}mcpServers.${name}, the old tool's: ${describe(server)}`);
+    else kept[name] = server;
+  }
+  return kept;
+}
+
+/**
+ * The git working tree a path sits in, found as git finds one, by a `.git` folder or file in it or any folder above
+ * it. A FILE AS WELL AS A FOLDER, because a worktree or a submodule keeps a `.git` file that points elsewhere.
+ */
+function workingTreeOf(file: string): string | null {
+  for (let dir = dirname(file); ; dir = dirname(dir)) {
+    if (existsSync(join(dir, '.git'))) return dir;
+    if (dirname(dir) === dir) return null;
+  }
+}
+
+/**
+ * A `.mcp.json` the person named with `--mcp-json`, its top-level `mcpServers` without the old tool's. REFUSED INSIDE A
+ * GIT WORKING TREE, because there it is shared through the repository and removing an entry removes it for everyone
+ * who pulls; refused when it is missing, because a name that finds nothing is a typo, and a cut-over that reports
+ * "nothing to change" for a typo leaves the server in. Either refusal is thrown before anything is written.
+ */
+function planMcpJson(named: string, options: Options): Plan {
+  const file = resolve(named);
+  if (!basename(file).toLowerCase().endsWith('.json')) throw new Error(`${file} is not a .json file, so braindog install leaves it alone.`);
+  const tree = workingTreeOf(file);
+  if (tree) throw new Error(`${file} is inside the git working tree at ${tree}, so braindog install leaves it alone: a .mcp.json there is shared through the repository.`);
+  if (!existsSync(file)) throw new Error(`There is no ${file}, so braindog install changed nothing. Name the .mcp.json that registers the server.`);
+  const config = readObject(file, 'an MCP configuration object');
+  const removed: string[] = [];
+  const next: Record<string, unknown> = { ...config };
+  if ('mcpServers' in config) next.mcpServers = withoutSam(config.mcpServers, '', removed);
+  if (removed.length === 0) return { lines: [`${file} registers no the old tool MCP server. Nothing to change.`], write: null };
+  const lines = [`${options.apply ? 'Changed' : 'braindog install --replace would change'} ${file}:`, ...removed];
+  if (!options.apply) return { lines: [...lines, dryTail(options)], write: null };
+  return { lines, write: { file, had: true, value: next } };
 }
 
 /**
@@ -386,15 +459,7 @@ function planServers(file: string, options: Options): Plan {
   if (!existsSync(file)) return { lines: [`There is no ${file}, so it registers no the old tool MCP server. Nothing to change.`], write: null };
   const config = readObject(file, 'a Claude Code configuration object');
   const removed: string[] = [];
-  const without = (servers: unknown, where: string): unknown => {
-    if (!isObject(servers)) return servers;
-    const kept: Record<string, unknown> = {};
-    for (const [name, server] of Object.entries(servers)) {
-      if (isSamServer(server)) removed.push(`  - ${where}mcpServers.${name}, the old tool's: ${describe(server)}`);
-      else kept[name] = server;
-    }
-    return kept;
-  };
+  const without = (servers: unknown, where: string): unknown => withoutSam(servers, where, removed);
   const next: Record<string, unknown> = { ...config };
   if ('mcpServers' in config) next.mcpServers = without(config.mcpServers, '');
   if (isObject(config.projects)) {

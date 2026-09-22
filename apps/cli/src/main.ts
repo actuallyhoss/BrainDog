@@ -143,8 +143,8 @@ const usage = () =>
     '  Serve BrainDog to an agent over standard input and output. The agent starts it.',
     'braindog hook start|end',
     '  What Claude Code runs when a session starts and ends, with its event on standard input.',
-    'braindog install [--apply] [--replace] [--config-dir <folder>] [--settings <file>]',
-    "  Show the two hooks it would add to Claude Code's settings (a profile folder, or one settings file such as a project's .claude/settings.local.json), and write them only with --apply. With --replace it also takes out the old tool's hooks and MCP servers, and says which.",
+    'braindog install [--apply] [--replace] [--config-dir <folder>] [--settings <file>] [--mcp-json <file>]',
+    "  Show the two hooks it would add to Claude Code's settings (a profile folder, or one settings file such as a project's .claude/settings.local.json), and write them only with --apply. With --replace it also takes out the old tool's hooks and MCP servers, and says which, and from a .mcp.json only when it is named with --mcp-json and is outside any repository.",
     'braindog init <slug> --owner <email>',
     'braindog serve [<record file>]',
     '  Create or serve a record on this machine, through the self-host.',
@@ -324,27 +324,29 @@ async function hook(args: string[]): Promise<void> {
 }
 
 function install(args: string[]): void {
-  let values: { apply?: boolean | undefined; replace?: boolean | undefined; 'config-dir'?: string[] | undefined; settings?: string[] | undefined };
+  let values: { apply?: boolean | undefined; replace?: boolean | undefined; 'config-dir'?: string[] | undefined; settings?: string[] | undefined; 'mcp-json'?: string[] | undefined };
   try {
     ({ values } = parseArgs({
       args,
-      options: { apply: { type: 'boolean' }, replace: { type: 'boolean' }, 'config-dir': { type: 'string', multiple: true }, settings: { type: 'string', multiple: true } },
+      options: { apply: { type: 'boolean' }, replace: { type: 'boolean' }, 'config-dir': { type: 'string', multiple: true }, settings: { type: 'string', multiple: true }, 'mcp-json': { type: 'string', multiple: true } },
       strict: true,
     }));
   } catch {
-    return stop('braindog install takes --apply, --replace, --config-dir <folder> and --settings <file>, and nothing else.');
+    return stop('braindog install takes --apply, --replace, --config-dir <folder>, --settings <file> and --mcp-json <file>, and nothing else.');
   }
   const scripts = fileURLToPath(new URL('../hooks/', import.meta.url));
   const options = { apply: values.apply === true, replace: values.replace === true, scripts };
   const dirs = values['config-dir'] ?? [];
   const files = values.settings ?? [];
+  const mcpFiles = values['mcp-json'] ?? [];
   const lines: string[] = [];
   /* A NAMED FILE OR FOLDER IS THE WHOLE LIST: the user profile is changed only when nothing else is named. */
   /* ONE CHANGE ACROSS EVERY PROFILE AND FILE. Looping `installInto` per profile made each profile's two files
      all-or-nothing and nothing more, so a malformed third profile left the first two cut over (audit twenty-four,
      finding 1). */
-  lines.push(...installEvery(files.length > 0 && dirs.length === 0 ? [] : profilesOf(dirs, process.env), files, options));
-  if (options.replace) lines.push('', REPLACE_BY_HAND);
+  lines.push(...installEvery(files.length > 0 && dirs.length === 0 ? [] : profilesOf(dirs, process.env), files, options, mcpFiles));
+  /* Named, the .mcp.json is in the run above, and telling the person to do it by hand would be wrong. */
+  if (options.replace && mcpFiles.length === 0) lines.push('', REPLACE_BY_HAND);
   const cli = fileURLToPath(new URL('./main.ts', import.meta.url)).replaceAll('\\', '/');
   lines.push(
     '',
