@@ -65,14 +65,34 @@ export const NO_KEY_STORE = 'This host holds no key store yet, so the key';
 /** A derived spelling shorter than this is not scrubbed: see `spellingsOf`. */
 const SHORTEST_SPELLING = 8;
 
-/** One spelling of a key: its exact text, or a pattern for a spelling a line break may fall anywhere inside. */
+/** One spelling of a key: its exact text, or a pattern for a spelling that may be written more than one way, such as one a line break may fall anywhere inside. */
 export type Spelling = string | RegExp;
 
 /** A pattern source for `text` exactly, every character a regular expression gives a meaning taken literally. */
 const literally = (text: string): string => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
-/** The tokens in order with `gap` allowed, and not required, between any two: a spelling a wrap can fall inside. */
-const wrappable = (tokens: readonly string[], gap: string): RegExp => new RegExp(tokens.map(literally).join(`(?:${gap})?`), 'g');
+/** The tokens, each a pattern source, in order with `gap` allowed, and not required, between any two: a spelling a wrap can fall inside. */
+const wrappable = (tokens: readonly string[], gap: string): RegExp => new RegExp(tokens.join(`(?:${gap})?`), 'g');
+
+/** A pattern source for hex digits in either case, `3d` or `3D`, and not a flag: the key's own letters keep their case. */
+const eitherCase = (hex: string): string => hex.replace(/[a-f]/gi, (d) => `[${d.toLowerCase()}${d.toUpperCase()}]`);
+
+/** Every byte as two hex digits, lower-case. */
+const hexOf = (bytes: Uint8Array): string => [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+
+/**
+ * A pattern source for one character of a key as a JSON string or an HTML page may write it: itself, as `JSON.stringify`
+ * writes it, as `\/`, as `\uXXXX` (a pair of them past the BMP), as `&#NN;` or as `&#xNN;`, the hex in either case and
+ * leading zeros allowed in a reference. A character in `[A-Za-z0-9_-]` is only itself, which no encoder the audits measured escapes by default.
+ */
+function escapable(char: string): string {
+  if (/^[A-Za-z0-9_-]$/.test(char)) return char;
+  const point = char.codePointAt(0) ?? 0;
+  const units = [...Array(char.length).keys()].map((i) => `\\\\u${eitherCase(char.charCodeAt(i).toString(16).padStart(4, '0'))}`).join('');
+  const ways = new Set([literally(char), literally(JSON.stringify(char).slice(1, -1)), units, `&#0*${point};`, `&#[xX]0*${eitherCase(point.toString(16))};`]);
+  if (char === '/') ways.add('\\\\/');
+  return `(?:${[...ways].join('|')})`;
+}
 
 /**
  * The spellings of an opened key that `sendAction` takes out of what it returns: the patterns first, then the exact
@@ -88,34 +108,75 @@ const wrappable = (tokens: readonly string[], gap: string): RegExp => new RegExp
  *   · the bytes as sent;
  *   · JSON-escaped, both as `JSON.stringify` writes a string (a `"`, a `\` or a control character escaped) and with every
  *     `/` escaped as well, which is PHP's `json_encode` default;
+ *   · each character outside `[A-Za-z0-9_-]` written as itself or escaped, each independently of the others: as
+ *     `JSON.stringify` writes it, as `\/`, as `\uXXXX`, as `&#NN;` or as `&#xNN;`, the hex in either case. That is
+ *     System.Text.Json's default (`+` as `+`), Go's `html/template` (`+` as `&#43;`), and an encoder that escapes
+ *     every such character, in JSON or in HTML;
  *   · URL-encoded as `encodeURIComponent` writes it, and the same with lower-case hex (`%2f`), which other encoders write;
+ *     each of those URL-encoded a second time (`%252F`), which is a URL carried inside another's query; and every byte
+ *     percent-encoded, the letters and digits too, in either case of hex;
+ *   · hex, every byte as two digits, in either case;
  *   · base64, standard and URL-safe, at each of the three byte offsets the key can start at inside a longer encoded
  *     run, so `btoa('Bearer ' + key)` is caught as well as `btoa(key)`. Only the characters every bit of which is the
  *     key's are replaced; the one or two at either end also carry the bytes beside the key, which differ echo to echo;
- *   · that standard base64 again with a line break (`\n` or `\r\n`) allowed between any two characters, which is MIME
- *     base64 wrapped at 76 columns, or at any other width;
- *   · quoted-printable as RFC 2045 writes it (`=XX` in upper-case hex for `=` and every byte outside printable ASCII,
- *     every other byte as itself) with a soft break (`=\n` or `=\r\n`) allowed between any two tokens;
+ *   · that standard base64 again with a line break (`\n` or `\r\n`, and then a space or a tab or neither) allowed
+ *     between any two characters, which is MIME base64 wrapped at 76 columns or at any other width, and a long header
+ *     folded as RFC 5322 folds one;
+ *   · quoted-printable as RFC 2045 writes it (`=XX` for `=` and every byte outside printable ASCII, the hex in either
+ *     case, every other byte as itself) with a soft break (`=\n` or `=\r\n`) allowed between any two tokens;
  *   · UTF-16 in both byte orders, as the scrub sees it, which is those bytes read as UTF-8: every character of the key
  *     with a NUL after it (little-endian) or before it (big-endian). Only for a key that is all ASCII, whose code units
  *     each read back as one character and a NUL; a key with any other character is not caught in UTF-16.
  *
- * THE LAST THREE WERE MEASURED GETTING THROUGH by audit thirty-seven (finding 5) with a 64-character key and a provider
- * that echoed the authorization header: each reached the script with no other spelling intact, and one line of the
- * script's own put the key back together (removing the breaks, or the NULs). `test/actions.test.ts` holds all four.
+ * WRAPPED BASE64, QUOTED-PRINTABLE AND UTF-16 WERE MEASURED GETTING THROUGH by audit thirty-seven (finding 5) with a
+ * 64-character key and a provider that echoed the authorization header: each reached the script with no other spelling
+ * intact, and one line of the script's own put the key back together (removing the breaks, or the NULs). Audit
+ * thirty-nine (finding 7) measured nine more the same way, with the same key: hex in either case, every byte percent-
+ * encoded, URL-encoded twice, quoted-printable in lower-case hex, System.Text.Json's `+`, Go's `&#43;`, hex
+ * character references for `=`, `/` and `+`, and base64 folded with a CRLF and a space. `test/actions.test.ts` holds
+ * every one, and each spelling above that was added for them turns a case red when it is taken out.
  *
- * NOT CAUGHT, AND SAID SO: a key re-encoded any other way (hex, `\u` escapes of ordinary characters, a hash of it, URL-
- * safe base64 with line breaks in it, any of the spellings above inside another, such as base64 of the JSON-escaped
- * key), and any derived spelling shorter than eight characters, which only a key of five bytes or fewer has and which
- * would otherwise be struck out of ordinary text by chance. The bytes as sent are always scrubbed, however short. No
- * list is every spelling: a provider that reverses the string defeats any of them.
+ * WHAT IT COSTS: every pattern and every text is one pass over the body, and none of them backtracks further than the
+ * key's own length from any position, so the scrub is linear in the body. Measured on 2026-09-23 over the scrub alone
+ * with that key, before these nine and after: 1 MB of JSON rows holding the key once took 0.75 ms and then 1.06 ms; the
+ * worst body tried, the key's folded base64 less its last character repeated to 1 MB, took 0.57 ms and then 6.39 ms,
+ * and 3.07 ms at 512 KB. Through the whole `sendAction`, reading the body included, 1 MB went from 2.6 ms to 2.9 ms.
+ *
+ * NOT CAUGHT, AND SAID SO: a key re-encoded any other way, and these by name. Base32, which no HTTP stack writes by
+ * default and which would need its own five offsets as base64 needs three. RFC 2047 encoded-words (`=?utf-8?B?...?=`),
+ * which cut the key into separately encoded chunks at whatever width the writer picks, so no one spelling spans the
+ * cut. UTF-32, which the WHATWG Encoding Standard does not define, so no web stack labels a body with it and
+ * `new TextDecoder('utf-32')` throws in Node; it would be two more texts beside UTF-16's (each character and three NULs)
+ * and is left out only because nothing that answers HTTP was found writing it. Beside those: a `\u` escape or a character reference of a letter, digit,
+ * `_` or `-`; a named HTML entity (`&plus;`, `&amp;`); a hash of the key; URL-safe base64 with line breaks in it; any of
+ * the spellings above inside another, such as base64 of the JSON-escaped key; and any derived spelling shorter than
+ * eight characters, which only a key of five bytes or fewer has and which would otherwise be struck out of ordinary
+ * text by chance. The bytes as sent are always scrubbed, however short. No list is every spelling: a provider that
+ * reverses the string defeats any of them.
  */
 export function spellingsOf(secret: string): Spelling[] {
   const json = JSON.stringify(secret).slice(1, -1);
   const url = encodeURIComponent(secret);
-  const derived = new Set<string>([json, json.replaceAll('/', '\\/'), url, url.replace(/%[0-9A-F]{2}/g, (hex) => hex.toLowerCase())]);
+  const urlLower = url.replace(/%[0-9A-F]{2}/g, (hex) => hex.toLowerCase());
   const bytes = new TextEncoder().encode(secret);
+  const hex = hexOf(bytes);
+  const everyByte = hex.replace(/../g, '%$&');
+  const derived = new Set<string>([
+    json,
+    json.replaceAll('/', '\\/'),
+    url,
+    urlLower,
+    encodeURIComponent(url),
+    encodeURIComponent(urlLower),
+    hex,
+    hex.toUpperCase(),
+    everyByte,
+    everyByte.toUpperCase(),
+  ]);
   const patterns: RegExp[] = [];
+  /* ONE PATTERN FOR THE JSON AND THE HTML ESCAPES, since a character may be escaped or not independently of its
+     neighbours: System.Text.Json escapes this `+` and not this `=`. The shortest thing it matches is the key itself. */
+  if (secret.length >= SHORTEST_SPELLING) patterns.push(new RegExp([...secret].map(escapable).join(''), 'g'));
   for (const lead of [0, 1, 2]) {
     const padded = new Uint8Array(lead + bytes.length);
     padded.set(bytes, lead);
@@ -126,11 +187,13 @@ export function spellingsOf(secret: string): Spelling[] {
     const core = btoa(binary).slice(Math.ceil((8 * lead) / 6), Math.floor((8 * (lead + bytes.length)) / 6));
     derived.add(core);
     derived.add(core.replaceAll('+', '-').replaceAll('/', '_'));
-    if (core.length >= SHORTEST_SPELLING) patterns.push(wrappable([...core], '\\r?\\n'));
+    if (core.length >= SHORTEST_SPELLING) patterns.push(wrappable([...core].map(literally), '\\r?\\n[ \\t]?'));
   }
   const printable = (byte: number): boolean => byte >= 0x20 && byte <= 0x7e && byte !== 0x3d;
-  const qp = [...bytes].map((byte) => (printable(byte) ? String.fromCharCode(byte) : `=${byte.toString(16).toUpperCase().padStart(2, '0')}`));
-  if (qp.join('').length >= SHORTEST_SPELLING) patterns.push(wrappable(qp, '=\\r?\\n'));
+  const qp = [...bytes].map((byte) => (printable(byte) ? literally(String.fromCharCode(byte)) : `=${eitherCase(byte.toString(16).padStart(2, '0'))}`));
+  /* THE LENGTH OF THE SPELLING, not of the pattern: an `=XX` token is three characters however its hex is written. */
+  const qpLength = [...bytes].reduce((n, byte) => n + (printable(byte) ? 1 : 3), 0);
+  if (qpLength >= SHORTEST_SPELLING) patterns.push(wrappable(qp, '=\\r?\\n'));
   /* ALL ASCII, or the key has a code unit whose two bytes do not read back as one character and a NUL. */
   if ([...secret].every((c) => c.charCodeAt(0) < 0x80)) {
     derived.add([...secret].map((c) => `${c}\u0000`).join(''));

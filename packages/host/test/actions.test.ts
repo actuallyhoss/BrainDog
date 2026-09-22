@@ -199,6 +199,62 @@ test('THE KEY IS SCRUBBED FROM THREE ECHOES THE BYTES DO NOT MATCH: MIME base64 
   assert.deepEqual(unscrubbed, [], 'nothing was scrubbed from these echoes');
 });
 
+/** Every byte of `text` as two hex digits. */
+const hexOf = (text: string): string => [...new TextEncoder().encode(text)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+
+test('THE KEY IS SCRUBBED FROM NINE MORE ECHOES: hex, every byte percent-encoded, URL-encoded twice, lower-case quoted-printable, JSON and HTML escapes, and base64 folded as a header', async () => {
+  /* MEASURED BY AUDIT THIRTY-NINE (finding 7) WITH `sendAction`, THIS KEY AND A PROVIDER ECHOING IT IN ONE ENCODING PER
+     CASE: each of the nine it names reached the script whole, and each case below is the one line of the script's own
+     that gave it back. Two are the defaults of widespread stacks: ASP.NET Core's System.Text.Json writes every `+` as
+     `+`, and a Go error page through `html/template` writes it as `&#43;`. Neither escapes the `=` or the `/`, so a
+     spelling with every such character escaped would not have caught them: each character may be escaped or not. */
+  const key = 'bd_live_Zq8=Xk2/Rm9+Tn4=Vp7/Wa1+Yc5=Hd3/Je6+Kf0=Lg8/Mh2+Ni5=Oj7Q';
+  const opened: OpenKey = async () => key;
+  const said = `{"error":"invalid_token","authorization":"Bearer ${key}"}`;
+  const at = said.indexOf(key);
+  const span = btoa(said).slice(Math.ceil((8 * at) / 6), Math.floor((8 * (at + key.length)) / 6));
+  const bytes = [...new TextEncoder().encode(said)];
+  const entities = (body: string): string => body.replace(/&#(x?)([0-9a-f]+);/gi, (_, x: string, n: string) => String.fromCodePoint(parseInt(n, x ? 16 : 10)));
+  /* HEADER FOLDING, as a provider writes a long header back in a MIME part: a CRLF and one space before each line after the first. */
+  const folded = (btoa(said).match(/.{1,76}/g) ?? []).join('\r\n ');
+  const qpLower = quotedPrintable(said).replace(/=([0-9A-F]{2})/g, (_, hex: string) => `=${hex.toLowerCase()}`);
+
+  const cases: [string, string, (body: string) => boolean][] = [
+    ['hex, lower', hexOf(said), (body) => Buffer.from(body, 'hex').toString().includes(key)],
+    ['hex, upper', hexOf(said).toUpperCase(), (body) => Buffer.from(body, 'hex').toString().includes(key)],
+    ['every byte percent-encoded', bytes.map((b) => `%${b.toString(16).toUpperCase().padStart(2, '0')}`).join(''), (body) => decodeURIComponent(body).includes(key)],
+    ['every byte percent-encoded, lower-case hex', bytes.map((b) => `%${b.toString(16).padStart(2, '0')}`).join(''), (body) => decodeURIComponent(body).includes(key)],
+    ['URL-encoded twice', encodeURIComponent(encodeURIComponent(said)), (body) => decodeURIComponent(decodeURIComponent(body)).includes(key)],
+    ['quoted-printable, lower-case hex', qpLower, (body) => body.replace(/=\r?\n/g, '').replace(/=([0-9a-fA-F]{2})/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16))).includes(key)],
+    ['JSON with + as \\u002B (System.Text.Json default)', said.replaceAll('+', '\\u002B'), (body) => String(JSON.parse(body).authorization).includes(key)],
+    [
+      'JSON with every character outside [A-Za-z0-9_-] as \\u, lower-case hex',
+      said.replace(/[^A-Za-z0-9_\-"{}:,]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`),
+      (body) => String(JSON.parse(body).authorization).includes(key),
+    ],
+    ['HTML, + as &#43; (Go html/template)', `<p>${said.replaceAll('+', '&#43;')}</p>`, (body) => entities(body).includes(key)],
+    ['HTML hex entities for = / +', `<p>${said.replace(/[=/+]/g, (c) => `&#x${c.charCodeAt(0).toString(16).toUpperCase()};`)}</p>`, (body) => entities(body).includes(key)],
+    ['base64 folded with CRLF and a space (header folding)', folded, (body) => body.replaceAll('\r\n ', '').includes(span)],
+  ];
+  /* EACH ECHO IS ONE THE SPELLINGS BEFORE THIS TEST DID NOT HOLD: the fold lands inside the key, and no case holds the key's bytes. */
+  assert.ok(folded.replaceAll('\r\n ', '').includes(span), 'the fold did not land inside the key');
+  for (const [how, echoed] of cases) assert.ok(!echoed.includes(key) && !echoed.includes(span), `${how} holds the key as sent`);
+
+  /* EVERY CASE IS RUN BEFORE ANYTHING IS ASSERTED, so a red run names each spelling that got through, not the first. */
+  const recovered: string[] = [];
+  const unscrubbed: string[] = [];
+  for (const [how, echoed, recovers] of cases) {
+    const echo = wire(async () => new Response(echoed));
+    const answer = await sendAction({ origins: declaring(ORIGIN), openKey: opened, send: echo.send })(request());
+    assert.equal(codeOf(answer), 200);
+    const body = 'body' in answer ? answer.body : '';
+    if (recovers(body)) recovered.push(how);
+    if (!body.includes(REDACTED)) unscrubbed.push(how);
+  }
+  assert.deepEqual(recovered, [], 'the script put the key back together from these echoes');
+  assert.deepEqual(unscrubbed, [], 'nothing was scrubbed from these echoes');
+});
+
 test('AN UNDECLARED ORIGIN, PLAIN HTTP AND A HOST WRITTEN AS A PRIVATE OR LOCAL ADDRESS ARE REFUSED before the key is opened', async () => {
   let opened = 0;
   const counting: OpenKey = async () => (opened++, FAKE);
