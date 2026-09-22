@@ -209,3 +209,96 @@ test('A PROPOSER WHO PUTS A RUN ON HER OWN QUESTION DOES NOT FILE IT UNDER THAT 
   assert.equal(run(), 'waiting');
   sql.close();
 });
+
+/* WAVE THIRTY-NINE'S CHECKER, ON f7c88f98. `answersNot` walked every step of the rule, so a step the run took before it
+   asked held the answer too: `[set note, ask_person, if yes then notify]` refused a member at `read` on Money whose
+   answer leads only to a notify, because of the `set` the run had already made. Only the steps a run can still reach
+   from the one it waits on are what the answer lets it do. */
+const rule = (name: string, steps: unknown[]) => ({
+  id: `rule.${name}`,
+  kind: 'rule' as const,
+  body: { rule: name, on: { written: { register: 'money', op: ['create'] } }, once_per: ['entry'], steps } as never,
+});
+const ASK = { ask_person: { question: 'Go on with {{what}}?', options: ['yes', 'no'], as: 'answer', wait: '1d' } };
+
+async function waiting(name: string, steps: unknown[]) {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const put = await api.kernel.install([MONEY, rule(name, steps)]);
+  assert.ok(put.ok, JSON.stringify(put));
+  assert.ok(api.kernel.create('money', { what: 'Salary: Omar', amount: 91000 }, { actor: 'p_owner' }).ok);
+  await api.kernel.drain();
+  const state = () => sql.one<{ state: string }>(`SELECT state FROM automation_run WHERE rule = '${name}'`)?.state;
+  assert.equal(state(), 'waiting');
+  const sg = sql.one<{ id: string; body: string }>(`SELECT id, body FROM suggestion WHERE opened_by = 'rule:${name}' AND status = 'open'`)!;
+  const yes = (JSON.parse(sg.body) as { options: { id: string; label: string }[] }).options.find((o) => o.label === 'yes')!.id;
+  const answer = async (ctx: CallContext) => (await api.decide({ id: sg.id, decide: { option: yes, reason: 'Go.' } }, ctx)) as Out;
+  return { sql, api, state, answer };
+}
+
+test('A STEP THE RUN TOOK BEFORE IT ASKED DOES NOT HOLD THE ANSWER: only the steps after the wait count', async () => {
+  const { sql, api, state, answer } = await waiting('before', [
+    { set: { field: 'note', to: 'pending' } },
+    ASK,
+    { if: 'answer is yes', then: [{ notify: { say: 'Go on with {{trigger.row.what}}.' } }], else: [] },
+  ]);
+  const d = await answer(reader);
+  assert.ok(d.ok, `a member at read was refused for a set the run made before it asked: ${JSON.stringify(d)}`);
+  await api.kernel.drain();
+  assert.equal(state(), 'done');
+  sql.close();
+});
+
+test('A STEP ON AN ARM THE RUN HAS LEFT DOES NOT HOLD IT EITHER, and one it can still reach does', async () => {
+  /* The ask sits in the `then` arm, so the `else` arm's `set` is behind it for good; the `note` after the branch is not. */
+  const branch = (after: unknown[]) => [
+    { if: 'what is set', then: [ASK], else: [{ set: { field: 'note', to: 'small' } }] },
+    ...after,
+  ];
+  {
+    const { sql, answer } = await waiting('armleft', branch([]));
+    const d = await answer(reader);
+    assert.ok(d.ok, `refused for a set on the arm the run did not take: ${JSON.stringify(d)}`);
+    sql.close();
+  }
+  {
+    const { sql, answer } = await waiting('armafter', branch([{ note: 'asked' }]));
+    const d = await answer(reader);
+    assert.equal(d.ok, false, `a note after the branch was let through: ${JSON.stringify(d)}`);
+    assert.equal(d.refusal?.code, 'LEVEL_REQUIRED');
+    sql.close();
+  }
+});
+
+/* THE ARM HER ANSWER DOES NOT CHOOSE IS STILL AHEAD OF THE RUN. The plan walk follows an `if` both ways, and dropping
+   the `else` target (`todo.push(i + 1)` alone) kept every other case in this file green, because each write they hold
+   sits in a `then`. The `if` is evaluated when the run wakes, against the row as it is then, so a write on either arm
+   is one her answer may lead to. */
+test('A WRITE ON THE else ARM AFTER THE ASK HOLDS THE ANSWER as one on the then arm does', async () => {
+  const { sql, answer } = await waiting('otherarm', [
+    ASK,
+    { if: 'answer is yes', then: [{ notify: { say: 'Go on.' } }], else: [{ set: { field: 'note', to: 'refused' } }] },
+  ]);
+  const d = await answer(reader);
+  assert.equal(d.ok, false, `a set on the else arm was left out of what the answer lets the run do: ${JSON.stringify(d)}`);
+  assert.equal(d.refusal?.code, 'LEVEL_REQUIRED');
+  const took = await answer(writer);
+  assert.ok(took.ok, JSON.stringify(took));
+  sql.close();
+});
+
+/* `schedule` WAS HELD TO NOTHING. It arms the rule's own reminder, and when that is due the kernel writes a `note` event
+   on the row signed by the rule (`index.ts`, the `rule` schedule kind): a note on the row, later. A member at `read` on
+   Money may not add one by hand, and before this answered a run whose only later step is a `schedule`. */
+test('A schedule AFTER THE ASK NEEDS WHAT A NOTE NEEDS: append on the row\'s list', async () => {
+  const { sql, api, state, answer } = await waiting('later', [ASK, { if: 'answer is yes', then: [{ schedule: { in: '14d', note: 'Check {{what}} again.' } }], else: [] }]);
+  const d = await answer(reader);
+  assert.equal(d.ok, false, `a member at read set off a reminder on a Money row: ${JSON.stringify(d)}`);
+  assert.equal(d.refusal?.code, 'LEVEL_REQUIRED');
+  assert.match(d.refusal?.fix ?? '', /Money/u);
+  const took = await answer(writer);
+  assert.ok(took.ok, JSON.stringify(took));
+  await api.kernel.drain();
+  assert.equal(state(), 'done');
+  sql.close();
+});

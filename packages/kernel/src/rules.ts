@@ -702,8 +702,15 @@ export type DryRun = {
  *
  * NO WRITES, and not merely that they are skipped: nothing here calls the write path at all, so
  * there is no path by which a preview becomes a change.
+ *
+ * `reads` IS WHO IS ASKING, AS `list` TAKES IT, AND IT NARROWS THE CANDIDATE ALONE. A `ref` value in the candidate's
+ * `when` is a title the compiler looks up in the list the ref points at, and with the plain context it looked there
+ * whoever asked: `loop/research-batch-thirty-eight-audit.md` finding 1 had a member held to `append` on Clients preview
+ * `client is Acme Holdings` over Money as `matches 1 of 1` and `client is Bolt Ltd` as `0 of 1`, one guess per call at
+ * which client her rows belong to, while `list` answered 0 rows for both. The rules it is ranked against are installed
+ * ones the owner approved, which run on every write whoever makes it, so they keep the context the pass gives them.
  */
-export function dryRun(deps: RulesDeps, candidate: RuleDecl, limit = PREVIEW): Result<DryRun> {
+export function dryRun(deps: RulesDeps, candidate: RuleDecl, limit = PREVIEW, reads?: (register: string) => boolean): Result<DryRun> {
   const schema = deps.schemaOf(candidate.register);
   if (!schema)
     return {
@@ -711,7 +718,8 @@ export function dryRun(deps: RulesDeps, candidate: RuleDecl, limit = PREVIEW): R
       refusal: { code: 'REGISTER_UNKNOWN', fix: `There is no register called ${candidate.register}.`, at: 'register' },
     };
 
-  const said = predicateOf(candidate.when, schema, deps.ctx);
+  const asker: RulesDeps = reads === undefined ? deps : { ...deps, ctx: { ...deps.ctx, reads } };
+  const said = predicateOf(candidate.when, schema, asker.ctx);
   if (said.bad.length) return { ok: false, refusal: said.bad[0]! };
 
   /* The candidate takes its place among the others by the same ordering the pass uses — replacing a
@@ -745,7 +753,7 @@ export function dryRun(deps: RulesDeps, candidate: RuleDecl, limit = PREVIEW): R
     const entry = deps.entry(id);
     if (!entry) continue;
     out.rows++;
-    if (!matches(deps, schema, candidate, entry)) continue;
+    if (!matches(asker, schema, candidate, entry)) continue;
     out.matches++;
 
     /* WHO GOT THERE FIRST. Walking the rules ahead of the candidate with the same precedence the

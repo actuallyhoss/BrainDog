@@ -118,3 +118,37 @@ test('scripts IS HELD TO THE LISTS THE CALLER READS, answers a token, and takes 
   assert.deepEqual([stray.ok, stray.refusal?.code, stray.refusal?.at], [false, 'FIELD_UNKNOWN', 'script']);
   sql.close();
 });
+
+/* `loop/BACKLOG.md`, left by wave thirty-eight: "`scripts` shows a script with no reads or writes to any reader (not
+   'as automations is')". `automations` shows a rule with no row only to a caller who reads every list, and `scripts`
+   showed a script that names no list to everybody, the member held to `append` on Money included: its title, the hosts
+   it calls and the label of the key it opens, which are about the record as a whole and not about any list she reads. */
+test('A SCRIPT THAT TOUCHES NO LIST IS SHOWN WHERE A RULE WITH NO ROW IS: to a caller who reads every list', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const PING = {
+    id: 'script.ping',
+    kind: 'script' as const,
+    body: { script: 'ping', runs: { every: '1h' }, egress: ['https://status.example.test'], keys: ['statuspage'], reads: [], writes: [], source: 'export default async function run(ctx) {}' } as never,
+  };
+  const installed = await api.kernel.install([GOLD_EGP, MONEY, GOLD, PING]);
+  assert.ok(installed.ok, JSON.stringify(installed));
+  const oneList: CallContext = { principal: { kind: 'person', id: 'p_3', level: null }, registers: ['gold_egp'], levels: { gold_egp: 'write' } };
+  const whole: CallContext = { principal: { kind: 'person', id: 'p_4', level: 'read' } };
+
+  assert.deepEqual((await listed(api, owner)).map((s) => s.script), ['gold-rate', 'ping']);
+  assert.deepEqual((await listed(api, token)).map((s) => s.script), ['gold-rate', 'ping']);
+  assert.deepEqual((await listed(api, whole)).map((s) => s.script), ['gold-rate', 'ping']);
+  assert.deepEqual((await listed(api, member)).map((s) => s.script), ['gold-rate'], 'a member held apart from Money was shown a script about no list');
+  assert.deepEqual((await listed(api, oneList)).map((s) => s.script), ['gold-rate'], 'a member invited to one list was shown a script about no list');
+
+  /* And the automation beside it answers the same two callers the same way, which is the rule this follows. */
+  const NIGHTLY = { id: 'rule.nightly', kind: 'rule' as const, body: { rule: 'nightly', on: { every: '1d' }, steps: [{ notify: { say: 'Night.' } }] } as never };
+  assert.ok((await api.kernel.install([NIGHTLY])).ok);
+  for (const [who, ctx, sees] of [['member', member, false], ['oneList', oneList, false], ['whole', whole, true]] as const) {
+    const a = (await api.automations(undefined, ctx)) as Out;
+    assert.ok(a.ok, JSON.stringify(a));
+    assert.equal((a.value as { id: string }[]).some((r) => r.id === 'rule.nightly'), sees, who);
+  }
+  sql.close();
+});

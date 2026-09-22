@@ -234,6 +234,10 @@ export type { FieldDecl, FieldType, Json } from './coerce.ts';
 export { misread, sentencesOver, widens, type TypeShape } from './widen.ts';
 /* FOR `declare`'s PLAN, which asks a widening's readers as `stranded` does and has to place an arrival's rule the same way. */
 export { rowRegisterOf } from './flow-lint.ts';
+/* FOR THE RECORD'S `answersNot`, which has to know which steps a run waiting on a question can still take. A run keeps
+   its place as an index into this flat plan (`automation_run.step`), so reading the declared tree instead counted steps
+   the run had already taken and arms it had already left (wave thirty-nine's checker, on f7c88f98). */
+export { plan as runPlan, type Op as RunOp } from './flow.ts';
 export { isUlid, ulids, ulidTime } from './ids.ts';
 export { digest, indexesFor, indexName, jcs, registerOfIndex, validate as validateDeclaration, KINDS } from './declare.ts';
 export { ftsQuery, projectedText } from './fts.ts';
@@ -4926,8 +4930,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * way to introduce one is to say "this matches 38 rows, wins on 31, loses 7 to `chase-late`"
      * BEFORE it is turned on. Every product that ships rules without this ships a feature people are
      * afraid of.
+     *
+     * `reads` IS `list`'s, AND FOR THE SAME DOOR. The record guards the list a rule is about and the lists its steps
+     * reach, and a `ref` title in the candidate's `when` is looked up in a third list neither names, so the caller that
+     * knows who is asking passes it here as it does to `list` (`rules.ts` `dryRun` says what it closed).
      */
-    dryRun: (candidate: RuleDecl, limit?: number): Result<DryRun> => dryRun(rulesDeps(), candidate, limit),
+    dryRun: (candidate: RuleDecl, limit?: number, o?: { reads?: (register: string) => boolean }): Result<DryRun> =>
+      dryRun(rulesDeps(), candidate, limit, o?.reads),
 
     /**
      * Run one installed rule over the rows that are already there.

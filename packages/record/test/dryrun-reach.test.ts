@@ -74,3 +74,40 @@ test('THE SAME REACH IS REFUSED WHEREVER THE STEP SITS: inside a branch, as a cr
   assert.equal(own.ok, true, read(own));
   sql.close();
 });
+
+/* AUDIT THIRTY-EIGHT, FINDING 1: THE `when` LOOKS UP A TITLE TOO. A `ref` field's value in a sentence is the title of a row
+   in the list the ref points at, and the kernel resolved it against that list whoever was asking. Measured before the
+   fix, with a member who reads Money and is held to `append` on Clients, so she sees a Money row's `client` only as a
+   row id and `get` of that id answers null: the dry run of `client is Acme Holdings` answered `matches 1 of 1`, and of
+   `Bolt Ltd`, a client that exists and that no Money row names, `0 of 1`. `list` with the same sentence answered 0 rows
+   for both, because it passes `reads` and the dry run did not. */
+test('D1: THE DRY RUN OF A when OVER A REF ANSWERS THE SAME FOR EVERY TITLE IN A LIST ITS CALLER CANNOT READ', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const CLIENTS = { id: 'register.clients', kind: 'register', body: { id: 'clients', name: 'Clients', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] } };
+  const BILLED = { id: 'register.billed', kind: 'register', body: { id: 'billed', name: 'Billed', title: 'what', fields: [{ id: 'what', type: 'text', required: true }, { id: 'client', type: 'ref', to: 'clients' }] } };
+  assert.ok((await api.kernel.install([CLIENTS, BILLED] as never)).ok);
+  const acme = api.kernel.create('clients', { name: 'Acme Holdings' }, { actor: 'p_owner' });
+  assert.ok(acme.ok, JSON.stringify(acme));
+  assert.ok(api.kernel.create('clients', { name: 'Bolt Ltd' }, { actor: 'p_owner' }).ok);
+  assert.ok(api.kernel.create('billed', { what: 'Invoice 7', client: acme.value.id }, { actor: 'p_owner' }).ok);
+  const reader: CallContext = { principal: { kind: 'person', id: 'p_m', level: 'write' }, levels: { clients: 'append' } };
+  assert.equal((await api.list({ register: 'clients' }, reader)).ok, false, 'the member reads Clients, so this is not the case');
+
+  const said = async (ctx: CallContext, name: string): Promise<string> => {
+    const out = (await api.dryRun({ rule: { rule: 'probe', register: 'billed', when: `client is ${name}`, then: [{ tag: 'x' }] } }, ctx)) as
+      | { ok: true; value: { matches: number; rows: number } }
+      | { ok: false; refusal: { code: string } };
+    return out.ok ? `matches ${String(out.value.matches)} of ${String(out.value.rows)}` : out.refusal.code;
+  };
+  const hers = [await said(reader, 'Acme Holdings'), await said(reader, 'Bolt Ltd')];
+  assert.equal(hers[0], hers[1], `the dry run told a Clients title that a Billed row names from one that no row names: ${JSON.stringify(hers)}`);
+  /* And it answers what `list` answers her with the same sentence. */
+  const listed = await api.list({ register: 'billed', where: 'client is Acme Holdings' } as never, reader);
+  assert.ok(listed.ok, JSON.stringify(listed));
+  assert.equal(hers[0], `matches ${String(listed.value.rows.length)} of 1`);
+
+  /* The owner, who reads Clients, still gets the difference. */
+  assert.deepEqual([await said(owner, 'Acme Holdings'), await said(owner, 'Bolt Ltd')], ['matches 1 of 1', 'matches 0 of 1']);
+  sql.close();
+});

@@ -84,6 +84,7 @@ import {
   SPARK,
   looksLikeCredential,
   rowRegisterOf,
+  runPlan,
   scriptBody,
 } from '@braindog/kernel';
 import { parseWhere, type Predicate } from '@braindog/where';
@@ -1713,33 +1714,64 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * at `append` on Money picked `pay`, and the run's next step set `note` on the Money row, signed by the rule: a change
    * her own level refuses her by hand. So the answerer is held to every write the rule's steps can make: a field, a tag,
    * a move or a link on the run's row needs `write` on its list, a note on it and a new row anywhere need `append`. Every
-   * branch is counted, the one her answer would not take included: which arm an answer takes is the `if`'s to evaluate
-   * once the run wakes, against the row as it is then, and this does not guess it ahead. Closing the question or putting
-   * it off is not held to this, because neither lets the run write.
+   * branch still ahead is counted, the one her answer would not take included: which arm an answer takes is the `if`'s to
+   * evaluate once the run wakes, against the row as it is then, and this does not guess it ahead. Closing the question or
+   * putting it off is not held to this, because neither lets the run write.
+   *
+   * ONLY THE STEPS STILL AHEAD OF THE RUN, AND IT WAS EVERY STEP OF THE RULE. Walking the declared tree counted a `set`
+   * the run had made before it asked, so `[set note, ask_person, if yes then notify]` refused a member at `read` on Money
+   * whose answer leads only to a notify (wave thirty-nine's checker, on f7c88f98), and a `set` on an arm the run had
+   * already left refused her the same way. A waiting run keeps its place as an index into the kernel's flat plan of the
+   * version it started under, so the steps are read off that plan from the one after the wait, following each `if` both
+   * ways and each `jump` where it goes, which is every step the runner can still take.
+   *
+   * `schedule` IS A NOTE ON THE ROW, LATER, and is held as one. The kernel arms the rule's own reminder, and when it is
+   * due writes a `note` event on the row signed by the rule; a member at `read` answered a run whose only later step
+   * was one, and may not add a note by hand.
+   *
+   * `run` IS HELD TO NO LEVEL, AND ON PURPOSE. It queues one run of a declared call with the fields of the run's row that
+   * the call's `sends:` names, and writes nothing in the record. Measured: no member can set a call off by hand at any
+   * level of any list, because every route that starts one (`automationRun`, `resumeAction`, `ruleApply`) is an owner's
+   * in a browser, so the level "she could do it herself" would name is the owner's, and holding the answer there would
+   * turn every question an owner put in front of a call into one only the owner may answer. What the call sends, where
+   * and with which key the owner approved when the call and the rule were installed; the lint keeps its `sends:` on the
+   * rule's own list, and `holds` has already required the answerer to read that list, so she reads every field it
+   * sends before she is shown the question.
    */
   const answersNot = (ctx: CallContext, asked: { rule: string; run: { id: string; version: number } | null; list: string | null }): Refusal | null => {
     if (asked.run === null) return null;
     const found = sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND version = ? AND kind = 'rule'", `rule.${asked.rule}`, asked.run.version)?.body;
     if (found === undefined) return null;
+    const at = sql.one<{ step: number }>('SELECT step FROM automation_run WHERE id = ?', asked.run.id)?.step;
+    if (at === undefined) return null;
     const decl = JSON.parse(found) as Record<string, unknown>;
-    const needs: { need: Need; list: string; does: string }[] = [];
-    const walk = (steps: unknown, depth: number): void => {
-      if (!Array.isArray(steps) || depth > SAID_DEPTH) return;
-      for (const step of steps) {
-        if (step === null || typeof step !== 'object' || Array.isArray(step)) continue;
-        const s = step as Record<string, unknown>;
-        walk(s.then, depth + 1);
-        walk(s.else, depth + 1);
-        if (asked.list !== null) {
-          for (const verb of ['set', 'tag', 'untag', 'move', 'link'])
-            if (verb in s) needs.push({ need: 'write', list: asked.list, does: `change a row of ${listName(asked.list)}` });
-          if ('note' in s) needs.push({ need: 'append', list: asked.list, does: `add a note to a row of ${listName(asked.list)}` });
-        }
-        const into = (s.create as { register?: unknown } | undefined)?.register;
-        if (typeof into === 'string') needs.push({ need: 'append', list: into, does: `add a row to ${listName(into)}` });
+    const ops = runPlan(decl.steps ?? decl.then);
+    const ahead: Record<string, unknown>[] = [];
+    const seen = new Set<number>();
+    const todo = [at + 1];
+    while (todo.length > 0) {
+      const i = todo.pop()!;
+      if (i < 0 || i >= ops.length || seen.has(i)) continue;
+      seen.add(i);
+      const op = ops[i]!;
+      if (op.verb === 'jump') todo.push(op.to);
+      else if (op.verb === 'if') todo.push(i + 1, op.to);
+      else if (op.verb !== 'stop') {
+        ahead.push(op.step);
+        todo.push(i + 1);
       }
-    };
-    walk(decl.steps ?? decl.then, 0);
+    }
+    const needs: { need: Need; list: string; does: string }[] = [];
+    for (const s of ahead) {
+      if (asked.list !== null) {
+        for (const verb of ['set', 'tag', 'untag', 'move', 'link'])
+          if (verb in s) needs.push({ need: 'write', list: asked.list, does: `change a row of ${listName(asked.list)}` });
+        if ('note' in s) needs.push({ need: 'append', list: asked.list, does: `add a note to a row of ${listName(asked.list)}` });
+        if ('schedule' in s) needs.push({ need: 'append', list: asked.list, does: `leave a note on a row of ${listName(asked.list)} later` });
+      }
+      const into = (s.create as { register?: unknown } | undefined)?.register;
+      if (typeof into === 'string') needs.push({ need: 'append', list: into, does: `add a row to ${listName(into)}` });
+    }
     for (const n of needs) {
       const stop = guard(ctx, n.need, n.list);
       if (stop) return { ...stop, fix: `Answering this lets rule.${asked.rule} ${n.does}, which you may not do yourself. ${stop.fix}`, at: 'id' };
@@ -1826,9 +1858,67 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        its answer and the owner's reason (*The auditor must not see his salary line*) reached a member invited to
        Obligations through `governance`, `whatsNew` and `recentHistory` (§5), and so did the question a missed prediction
        files, whose body carries only its two options (§3). A `pack` or `settings` proposal is about what the record is,
-       and a `change` to a page or a rule is about no one list, so each takes the same rule. */
+       and a `change` to a page is about no one list, so each takes the same rule. A `change` to a rule or a script names
+       the lists its declarations touch, through `changeTouches` (audit thirty-eight, finding 3). */
+    if (row.body_kind === 'change' && named === undefined) {
+      const touched = changeTouches(body);
+      if (touched !== null)
+        return (
+          (touched.whole && !wholeRecord(ctx)) ||
+          (touched.every && !readsEveryList(ctx)) ||
+          [...touched.lists].some((list) => readable(ctx, list) !== null)
+        );
+    }
     if (typeof named !== 'string' || named === '') return !wholeRecord(ctx);
     return readable(ctx, named) !== null;
+  };
+
+  /**
+   * The lists a `change` filed under a name that is not a list's touches, read off its declarations as `automations` and
+   * `scripts` read them, or `null` when none of them names one.
+   *
+   * A CHANGE UNDER A RULE'S OR A SCRIPT'S NAME WAS ABOUT NO LIST, SO IT WENT TO EVERY WHOLE-RECORD READER.
+   * `loop/research-batch-thirty-eight-audit.md` finding 3 filed Inbox's new field, `rule.omar-pay` on Money's creates and
+   * `script.peek` reading Money under `rule.omar-pay`, and a member held to `append` on Money, whom `automations` and
+   * `scripts` both refused the rule and the script, was handed the proposal, from which Decide now draws the rule's
+   * condition and the script's whole source. So each declaration names what the read of its kind would ask: a list its
+   * own id, a rule the list of its row (`rowRegisterOf`, which places an arrival's row too) and every list its steps
+   * `link` into or `create` in (`listsReached`), a script its `reads` and `writes`. A rule with no row and a script that
+   * touches no list are shown by those reads to a caller who reads every list, and are held to that here (`every`); a
+   * declaration of any other kind is about the record as a whole, as it was before (`whole`).
+   *
+   * AND THE LIVE COPY OF EACH, because accepting a change to a rule on Money changes what Money's rows set off, whatever
+   * list the new body names. The filing check asks the replaced declaration the same question (`govern.ts`
+   * `replacedAbout`).
+   */
+  const changeTouches = (body: Record<string, unknown> | undefined): { lists: Set<string>; every: boolean; whole: boolean } | null => {
+    const to = body?.to as { declarations?: unknown } | undefined;
+    const bundle = (Array.isArray(to?.declarations) ? to.declarations : [to]).filter(
+      (d): d is { id: string; body?: unknown } => d !== null && typeof d === 'object' && typeof (d as { id?: unknown }).id === 'string',
+    );
+    const live = (id: string): unknown => {
+      const found = sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1', id)?.body;
+      return found === undefined ? undefined : JSON.parse(found);
+    };
+    const doorOf = (door: string): unknown => bundle.find((d) => d.id === `ingest.${door}`)?.body ?? live(`ingest.${door}`);
+    const out = { lists: new Set<string>(), every: false, whole: false };
+    for (const d of bundle)
+      for (const b of [d.body, live(d.id)]) {
+        if (b === null || typeof b !== 'object' || Array.isArray(b)) continue;
+        const decl = b as Record<string, unknown>;
+        if (d.id.startsWith('register.')) out.lists.add(d.id.slice('register.'.length));
+        else if (d.id.startsWith('rule.')) {
+          const list = rowRegisterOf(decl as Parameters<typeof rowRegisterOf>[0], doorOf);
+          if (list === null) out.every = true;
+          else out.lists.add(list);
+          for (const reached of listsReached(decl)) out.lists.add(reached.register);
+        } else if (d.id.startsWith('script.')) {
+          const lists = [decl.reads, decl.writes].flatMap((l) => (Array.isArray(l) ? l.filter((x): x is string => typeof x === 'string') : []));
+          if (lists.length === 0) out.every = true;
+          for (const list of lists) out.lists.add(list);
+        } else out.whole = true;
+      }
+    return out.lists.size === 0 && !out.every ? null : out;
   };
 
   /**
@@ -3447,7 +3537,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }
       if (!body.register || !Array.isArray(body.then))
         return no('VALUE_MALFORMED', 'A rule names a register and what it would then do.', { at: 'rule' });
-      const rows = kernel.dryRun(body as RuleDecl, args.limit);
+      /* AND A TITLE IN ITS `when` IS LOOKED UP ONLY IN A LIST THE CALLER READS, the line `list` has (audit thirty-eight,
+         finding 1). The guard above cannot see the list a `ref` points at, and the kernel resolved `client is Acme
+         Holdings` in Clients for a member refused Clients: `matches 1 of 1`, where a client no row names said `0 of 1`. */
+      const rows = kernel.dryRun(body as RuleDecl, args.limit, { reads: (register) => readable(ctx, register) === null });
       return rows.ok ? ok({ ...rows.value, ...saidOf(body) }) : rows;
     },
 
@@ -4227,14 +4320,25 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      *
      * HELD TO WHAT THE CALLER MAY READ, ONE SCRIPT AT A TIME, as `automations` is. A script is shown to a caller who reads
      * every list it reads and writes, the lists its run's log may quote (`keepLog` in the kernel), so which scripts
-     * touch Money is not told to somebody held to `append` there. A script that touches no list is shown to any reader.
+     * touch Money is not told to somebody held to `append` there.
+     *
+     * A SCRIPT THAT TOUCHES NO LIST IS SHOWN WHERE A RULE WITH NO ROW IS, to a caller who reads every list, and it was
+     * shown to any reader (`loop/BACKLOG.md`, left by wave thirty-eight). `[].every` is true, so a clock script's title,
+     * the hosts it calls and the label of the key it opens reached the member held to `append` on Money and a member
+     * invited to one list, both of whom `automations` refuses the clock rule beside it. What a script about no list says
+     * is about the record as a whole, which is the rule `holds` keeps for a question about no list.
      */
     async scripts(args: Record<string, never> | undefined, ctx: CallContext) {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       const extra = Object.keys(args ?? {})[0];
       if (extra !== undefined) return no('FIELD_UNKNOWN', `${extra} is not something this call takes. It takes nothing, and answers every script you can read.`, { at: extra });
-      return ok(listScripts(sql, clock.now()).filter((s) => [...s.reads, ...s.writes].every((list) => readable(ctx, list) === null)));
+      return ok(
+        listScripts(sql, clock.now()).filter((s) => {
+          const lists = [...s.reads, ...s.writes];
+          return lists.length === 0 ? readsEveryList(ctx) : lists.every((list) => readable(ctx, list) === null);
+        }),
+      );
     },
 
     /**
