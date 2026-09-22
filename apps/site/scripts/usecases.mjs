@@ -316,6 +316,14 @@ try {
             await page.goto(`${host.base}${view.route}`, { waitUntil: 'networkidle' });
             await page.waitForSelector('main#main[data-screen]', { timeout: 10000 }).catch(() => {});
             await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
+            /* THE HEADER'S TWO CONTROLS ARE HIDDEN IN A SHIPPED CAPTURE, AND KEPT IN ITS LAYOUT. The
+               site's 0002 card lies on the picture's top strip across the reading column only, so
+               `How this is built` and `Edit layout` stood out to its right, cut by the card's edge,
+               in the shots of 22 September: a stranger reads a button sliced in half as a broken
+               page. `visibility` rather than `display` so nothing moves and the source rows the
+               page's overlap is measured against (`+page.svelte`, row 202) stay where they were. */
+            if (SHIPPED.has(base(c, view)))
+              await page.addStyleTag({ content: '.source-slot,.arrange-slot{visibility:hidden !important}' });
             await page.waitForTimeout(400);
             const png = await page.screenshot();
             const name = `${base(c, view)}${size.suffix}-${scheme}`;
