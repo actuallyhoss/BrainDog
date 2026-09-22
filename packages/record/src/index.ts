@@ -1838,6 +1838,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const NEWS = 60;
 
   /**
+   * The writes to a row that leave every older line as `lineOf` found it, which is what lets `versionFor` keep an answer
+   * across them: a row's list never changes, and a deleted row's lines are still shown. `purge` is not one, because the
+   * row behind every line about it is gone afterwards and those lines stop being shown.
+   */
+  const ROW_WRITES: ReadonlySet<string> = new Set(['create', 'edit', 'state', 'link', 'tag', 'untag', 'delete', 'restore', 'note']);
+  /** `versionFor`'s answer per caller, with the top of the log and that event's id when it was taken. */
+  const versions = new Map<string, { top: number; id: string | null; answer: number }>();
+  const VERSIONS = 512;
+
+  /**
    * Walk the log down from `before`, no lower than `floor`, keeping what the caller may see, until `want` are kept.
    * `next` is where a further walk would start, and `null` once nothing is left above the floor.
    */
@@ -2065,17 +2075,64 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * anybody `holdsRowids` refuses, so "a range scan from here" was never hers to make. A poller asks whether it changed.
    *
    * THE WALK IS NOT CAPPED AT `WALK`, because a cap that gave up would answer 0 once her newest line sank past it, and the
-   * number would change with nothing she can see changing. It stops at her newest line, which is usually near the top.
+   * number would change with nothing she can see changing. It stops at her newest line.
+   *
+   * AND IT IS REMEMBERED, BECAUSE HER NEWEST LINE IS NOT USUALLY NEAR THE TOP. A member at `read` with Diary held to
+   * `append` was walked down every Diary row to her own line on every call, and `+layout.ts` awaits this on a tab's
+   * first navigation: 2,650.4 ms at 100,000 Diary rows where the owner paid 0.2 ms
+   * (`loop/research-batch-twenty-eight-audit.md` finding 2), and 1,205 rows read for one Diary row written since she
+   * last asked (`version-scoped-cost.test.ts` (1)). So each caller's answer is kept with the top of the log it was taken
+   * at, and the next ask reads only the lines above that. One she is shown is her new answer, as a cold walk would find
+   * it first. When none is, the old answer stands only if every line above was a plain write to a row: those cannot
+   * change what `lineOf` says of an older line, and anything else (a purge, an erasure, a pack going off, an access
+   * change) might, so she is walked on down as before. The event at the remembered top is read back by id, so a log
+   * that was replaced underneath (a restore) is walked cold rather than trusted.
    */
   const versionFor = (ctx: CallContext): number => {
     if (holdsRowids(ctx)) return kernel.version();
+    const top = kernel.version();
+    /* THE CALLER IS WHAT `lineOf` ASKS ABOUT, and it asks about nothing else of hers: the principal, the ceiling and the
+       levels. The same person with one list raised is another key, so she is never handed what she was held to. */
+    const key = JSON.stringify([ctx.principal, ctx.registers ?? null, ctx.levels ?? null]);
+    const was = versions.get(key);
     let before: number | null = null;
-    for (;;) {
-      const { lines, next } = walk(ctx, before, 0, 1);
-      if (lines[0]) return idNumber(lines[0].id);
-      if (next === null) return 0;
-      before = next;
+    let answer: number | null = null;
+    if (was !== undefined && top >= was.top && (kernel.eventsBefore(was.top + 1, 1)[0]?.id ?? null) === was.id) {
+      let trusted = true;
+      /* NOT `walk`, WHICH READS A BATCH OF `BATCH` whatever the floor, so one new row cost five hundred off the log.
+         Rowids only grow, so no more than `at - was.top - 1` lines lie between here and the remembered top. */
+      let at = top + 1;
+      let above = true;
+      while (above && answer === null && at - was.top > 1) {
+        const batch = kernel.eventsBefore(at, Math.min(BATCH, at - was.top - 1));
+        if (batch.length === 0) break;
+        for (const e of batch) {
+          if (e.rowid <= was.top) {
+            above = false;
+            break;
+          }
+          at = e.rowid;
+          if (lineOf(ctx, e) !== null) {
+            answer = idNumber(e.id);
+            break;
+          }
+          if (!ROW_WRITES.has(e.kind) || e.target_kind !== 'entry') trusted = false;
+        }
+      }
+      before = at;
+      if (answer === null && trusted) answer = was.answer;
     }
+    while (answer === null) {
+      const { lines, next } = walk(ctx, before, 0, 1);
+      if (lines[0]) answer = idNumber(lines[0].id);
+      else if (next === null) answer = 0;
+      else before = next;
+    }
+    /* A MAP IN INSERTION ORDER, so the oldest caller goes first. One entry per person and grant, a few hundred bytes. */
+    versions.delete(key);
+    versions.set(key, { top, id: kernel.eventsBefore(top + 1, 1)[0]?.id ?? null, answer });
+    if (versions.size > VERSIONS) versions.delete(versions.keys().next().value!);
+    return answer;
   };
 
   /** What changed since `cursor`, or since the caller's read mark. A token reads its person's mark. */
