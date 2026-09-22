@@ -13,15 +13,16 @@
  * IT NEEDS money-core 1.8.0 AND NOT JUST money-core, because the order matters. At 1.7.0 the twelve ids are
  * money-core's, and this pack installed beside it was measured refused `PROVIDES_CONFLICT` on all twelve, a sentence
  * that says two packs cannot own one declaration and not what to do about it. With `^1.8.0` the same plan also carries
- * `money-core ^1.8.0, installed 1.7.0`, which is the step that is missing. The update retires the twelve (an ingest has
- * no rows, so nothing is orphaned) and this pack then adds them back under its own name; `test/bank-pack.test.ts`
- * drives both steps on a record installed at 1.7.0.
+ * `money-core ^1.8.0, installed 1.7.0`, which is the step that is missing, and the refusal now says so: update
+ * money-core first, then install this. The update hands the twelve to this pack (`MONEY_CORE_HANDS` below) and this
+ * pack then takes them over; `test/bank-pack.test.ts` drives both steps on a record installed at 1.7.0.
  *
- * TWO THINGS DO NOT SURVIVE THAT ROAD, both measured through `@braindog/record` on 22 September. A path token minted
- * for a twin before the update is gone after it: the twin is retired and declared again, and `ingestVerify` then answers
- * a door with no digest, so the owner mints again. And a pattern the owner changed (an accepted `pattern` proposal is
- * one) is kept as the owner's by the update, which then makes this pack's install `PROVIDES_CONFLICT` on that id until
- * the owner retires their copy.
+ * A PATH TOKEN MINTED BEFORE THE UPDATE WAS LOST ON THAT ROAD, measured through `@braindog/record` on 22 September:
+ * the update retired the twelve and this pack declared them again, so `ingestVerify` answered `null` in between and a
+ * door with no digest after. Handed rather than retired, the twin is never retired, and the token minted on 1.7.0
+ * opens the door after both steps (`packages/declare/test/door-hold.test.ts`). What still does not survive is a pattern
+ * the owner changed (an accepted `pattern` proposal is one): it is the owner's and not money-core's, so it is not
+ * handed, and this pack's install is `PROVIDES_CONFLICT` on that id until the owner retires their copy.
  *
  * THE FALLBACK CURRENCY IS STILL money-core's `HOME_CURRENCY`, sterling, and that was left as it stood on purpose. Every
  * one of these wordings prints its code beside the figure, so `scanMoney` takes the bank's code and the fallback is
@@ -332,6 +333,27 @@ export const HSBC_EG_INGESTS: Record<string, SeedIngest> = {
 
 /** The same six as webhook twins `<id>-sms`, built the way money-core builds its own (`smsTwins`), so the two cannot drift. */
 export const HSBC_EG_SMS_INGESTS: Record<string, SmsIngest> = smsTwins(HSBC_EG_INGESTS);
+
+/**
+ * What money-core hands to this pack, as `hands:` in money-core's own document from 1.8.0: each of the twelve ids,
+ * mapped to `bank-hsbc-eg`.
+ *
+ * WITHOUT IT THE SHORTCUT'S DOOR WAS SHUT BETWEEN THE TWO STEPS. Measured through `@braindog/record` on 22 September
+ * (`loop/research-batch-thirty-two-audit.md` §3, and `packages/declare/test/door-hold.test.ts`, which drives it): a
+ * record on 1.7.0 with a path token minted for `bank-from-out-sms` answered `ingestVerify` with the digest, the
+ * update retired the twelve, and the door then answered `null`, which is a 404 that stores nothing, until this pack
+ * was installed, and `{ kind: 'none' }` after it, so the owner had to mint again. The plan he approved said only that
+ * twelve ingests retire and never named this pack.
+ *
+ * HANDED, NOT RETIRED. `declare`'s plan lists each of the twelve as a retire with `to: 'bank-hsbc-eg'`, and its
+ * install stages them under this pack's name instead of retiring them, so the declarations never stop being live,
+ * the digest's version walk sees no retire, and installing this pack afterwards takes over what is already its own.
+ *
+ * HERE AND NOT IN money-core's FILE, because the ids are this pack's keys, and a list written out twice drifts.
+ */
+export const MONEY_CORE_HANDS: Readonly<Record<string, string>> = Object.fromEntries(
+  [...Object.values(HSBC_EG_INGESTS), ...Object.values(HSBC_EG_SMS_INGESTS)].map((i) => [`ingest.${i.ingest}`, 'bank-hsbc-eg']),
+);
 
 /** The pack document: twelve ingests, no list, no page, and money-core 1.8.0 or later underneath. */
 export function bankHsbcEgPack(): Record<string, unknown> {

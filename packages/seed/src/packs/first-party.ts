@@ -24,6 +24,7 @@
 import { packDocument } from '../index.ts';
 import { MONEY_HOME_SETTING, targetConfigOf } from '../modules/money.ts';
 import type { PackManifest } from './agents.ts';
+import { MONEY_CORE_HANDS } from './bank-hsbc-eg.ts';
 
 export type FirstPartyId = 'portfolio' | 'people' | 'money-core' | 'estate' | 'work';
 
@@ -90,10 +91,12 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   Six mail patterns and their six `-sms` twins read one bank in one country, and every record set up as Personal,
  *   Founder or Small business carried them (`loop/DIRECTION.md` section 22). The two generic card wordings stay. Twelve
  *   ingests taken away and no list and no field, so by the rule above the step is a minor one, as 1.4.0's two figures
- *   were. A record on 1.7.0 that updates LOSES the twelve until it installs `bank-hsbc-eg`, which needs `^1.8.0` so that
- *   it cannot be installed first and collide with money-core's own ids. Any path token minted for one of the six twins
- *   does not survive the move: the update retires the twin, and `heldDigest` in `packages/record/src/index.ts` answers
- *   nothing for a declaration retired since its mint, so the owner mints again after installing the pack.
+ *   were. A record on 1.7.0 that updates keeps the twelve: the update hands them to `bank-hsbc-eg` (`hands`, from
+ *   `MONEY_CORE_HANDS`) rather than retiring them, and that pack takes them over when it installs. It needs `^1.8.0` so
+ *   that it cannot be installed first and collide with money-core's own ids. A path token minted for one of the six twins
+ *   survives the move, because a handed twin is never retired and `heldDigest` in `packages/record/src/index.ts` keeps
+ *   a digest while every version since the mint is live (`packages/declare/test/door-hold.test.ts`). A record already
+ *   updated to 1.8.0 before the handover existed lost the twelve, and there the owner installs the pack and mints again.
  * - estate 1.2.0: a service carries a note. the old tool's domains carry the reason each name is held and what is
  *   unresolved about it, and Services had no field that holds prose, so the import left every note in the export. One
  *   field added and nothing taken away, so the step is a minor one. It moves the version rather than riding on 1.1.0
@@ -303,6 +306,8 @@ export function firstPartyDocument(id: string, options: DocumentOptions = {}): R
     /* THE SETTINGS ITS FIGURES' TARGETS ARE HELD TO (`MONEY_TARGET_SETTINGS`), which a person changes later, and Money's
        home currency. */
     ...(Object.keys(configOf(id, pack.declarations)).length > 0 ? { config: configOf(id, pack.declarations) } : {}),
+    /* THE TWELVE HSBC EGYPT DOORS ARE HANDED, NOT RETIRED, so a token minted for one survives the move (`bank-hsbc-eg.ts`). */
+    ...(id === 'money-core' ? { hands: { ...MONEY_CORE_HANDS } } : {}),
   };
 }
 

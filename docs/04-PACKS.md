@@ -20,7 +20,7 @@ prefers, and hosted is never required.*
 
 ---
 
-## 1 · The eight kinds, and the list is CLOSED
+## 1 · The nine kinds, and the list is CLOSED
 
 | Kind | Is | Declares |
 |---|---|---|
@@ -32,19 +32,21 @@ prefers, and hosted is never required.*
 | `metric` | a derived number | source, predicate, aggregation, format, **target**, window |
 | `theme` | token values only | colour roles, scales, density — never CSS |
 | `digest` | scheduled output | schedule, sections (each `as:` a kind, `omit_when_empty:` to drop an empty one), channel |
+| `script` | a person's or an agent's code, never run by the record | `runs:` (a clock, a door, a rule), `egress:` origins, vault `keys:`, the registers it `reads:` and `writes:`, `limits:`, `source:`. A fire writes one `script.run` outbox row and a host runs it in a sandbox (`packages/kernel/src/script.ts`) |
 
-A ninth kind means a ninth schema, a ninth validator and a ninth way to be insecure. **If it does
-not fit these eight, it is an agent, or a person's or an agent's script, attached to a door or a
+The kernel holds itself to this list in `KINDS` (`packages/kernel/src/declare.ts`), and kernel migration 12
+rebuilt the database's `CHECK` to the same nine. A tenth kind means a tenth schema, a tenth validator and a
+tenth way to be insecure. **If it does not fit these nine, it is an agent, or a person's or an agent's script, attached to a door or a
 schedule, run in a metered sandbox BrainDog hosts or anywhere outside, and writing through the
 same API anything else uses.**
 
 *An earlier revision stopped at "it is an agent". DIRECTION §22 (September 22nd 2026) makes
 scripts record content and asks for an automations layer (trigger, steps, action) that a person
-draws and an agent edits through MCP. The first piece is built as a composition, not a ninth kind:
-a `rule` can carry a trigger and steps, linted at install (`packages/kernel/src/flow-lint.ts`,
-[07-INGEST-AND-RULES](07-INGEST-AND-RULES.md)). Whether a script is itself a declared kind is
-[research-shell-scripts.md](../loop/research-shell-scripts.md) §0, and it has to be settled here,
-because the closed list is the security argument in §7.*
+draws and an agent edits through MCP. The automations are built as a composition, not a kind of
+their own: a `rule` can carry a trigger and steps, linted at install (`packages/kernel/src/flow-lint.ts`,
+[07-INGEST-AND-RULES](07-INGEST-AND-RULES.md)). A script was settled the other way
+([research-shell-scripts.md](../loop/research-shell-scripts.md) §0): it is the ninth kind, added in
+the same commit as the automations runner, which is why this heading said eight until then.*
 
 The closure is load-bearing rather than tidy: the security argument in §7 is an *enumeration*,
 and an enumeration only works over a finite list.
@@ -105,7 +107,7 @@ key that is not here is refused by name.
 | `summary` | string, ≤ 140 characters | required |
 | `author` | string | required |
 | `license` | an SPDX identifier | required |
-| `declarations` | a list of one or more, each one of the eight kinds | required |
+| `declarations` | a list of one or more, each one of the nine kinds | required |
 | `requires` | `{ format: <int>, primitives: <int>, packs: { <pack id>: <semver range> } }` — the `.brain` format revision and the `PRIMITIVES_VERSION` the declarations need, and the packs they depend on. **Never an app version: the app has no semver** ([31-STACK](31-STACK.md) §6) | optional |
 | `seeds` | `[{ register, fields, note? }]` — the example rows: at most eight per register, own registers only, no `ref`/`secret`/`file` values; marked by the value `example` in the register's declared `tags` field, applied through the write path with `cascade = false`, and counted on their own line in the diff (§3) — [42-SPEC-DECLARE](42-SPEC-DECLARE.md) §5.5 | optional |
 | `provides` | **derived** — the `kind.id` of every declaration. It may be written out for a reader, and if it is, it must equal the derived list — `PROVIDES_MISMATCH` otherwise | derived |
@@ -280,7 +282,7 @@ was expected — the failure mode to avoid is a valid-looking pack that half-loa
 
 | Code | Check | Refusal |
 |---|---|---|
-| `KIND_UNKNOWN` | Unknown kind | `declarations[3]: kind 'widget' is not one of the eight` |
+| `KIND_UNKNOWN` | Unknown kind | `widget is not one of the 9 kinds of declaration: register, page, block, ingest, rule, metric, theme, digest, script.` |
 | `FIELD_TYPE_UNKNOWN` | Unknown field type | `register.invoices.fields[4].type 'currency' — did you mean 'money'?` |
 | `FIELDS_OVER_CAP` | Fields per register > 64 | `register.wide: 71 fields. The ceiling is 64 — a register with more than that is a database, not a register.` |
 | `INDEXES_OVER_CAP` | Fields with `index` or `unique` > 8 — `key:` is one index and is not counted | `register.invoices: 11 indexed fields; the ceiling is 8` |
@@ -383,7 +385,7 @@ first-party pack goes through the same pack API as anyone else's.
 The measurable form of this rule, which belongs in CI rather than in a code review:
 
 ```
-test: the kernel contains no declaration of any of the eight kinds
+test: the kernel contains no declaration of any of the nine kinds
       — except register.session, the one named exception (02-DATA-MODEL §1), whose rows are the agents
 test: uninstalling every pack leaves a record with a working nav and zero active declarations (retired rows stay — §4)
 test: every shipped pack round-trips through export → import → export to an identical canonical logical dump (33-CONTRACTS §9)

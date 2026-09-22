@@ -50,6 +50,8 @@
 
 import { refused, type Result } from '@braindog/ports';
 
+import { SCRIPT_GRAMMAR } from '../grammars/script.ts';
+
 type Answer<T = unknown> = Promise<Result<T>>;
 type Args = Record<string, unknown>;
 /** A row as `list` returns it. Only what the skill listing reads is named. */
@@ -198,7 +200,9 @@ export const TOOLS: readonly Tool[] = [
     input: obj(
       {
         register: str('A register id.'),
-        where: { type: 'object', description: 'A predicate tree. Omit for everything.' },
+        /* "A PREDICATE TREE" WAS SAID HERE AND IN THE DESCRIPTION ABOVE, which a client shows in the same breath. The
+           five tokens it cost went to `propose`'s `from_version`. */
+        where: { type: 'object', description: 'Omit for everything.' },
         /* THE RECORD'S OWN TWO NUMBERS, AND THEY WERE "1 to 200. Default 25.", which is neither.
            `kernel.list` is `Math.min(Math.max(1, Math.floor(Number(q.limit)) || 50), 500)`
            (`packages/kernel/src/index.ts:1608`) and this tool forwards `limit` untouched, so nothing
@@ -221,7 +225,8 @@ export const TOOLS: readonly Tool[] = [
        `Math.min(Math.max(1, opts.limit ?? 20), 100)` (`packages/kernel/src/fts.ts:116`). Measured over
        130 rows all matching one word: `limit: 80` answered 80 hits, which an agent reading this was
        told it could not ask for. The default of 20 was right and is unchanged. */
-    input: obj({ q: str('What to look for. Plain words; the operators are not read.'), limit: int('1 to 100. Default 20.') }, ['q']),
+    /* "WHAT TO LOOK FOR" IS WHAT `q` BESIDE "ROWS WHOSE TEXT MATCHES" ALREADY SAYS, and its five tokens went to `propose`. */
+    input: obj({ q: str('Plain words; the operators are not read.'), limit: int('1 to 100. Default 20.') }, ['q']),
     writes: false,
   },
   {
@@ -273,11 +278,15 @@ export const TOOLS: readonly Tool[] = [
            field of the list and racing any other agent doing the same (`loop/research-shell-schema.md` blockers 6 and 7).
            `record/test/schema-add.test.ts` files the addition below against a real record. The rowset example lacked its
            `register`, which `checkBody` also requires. The fix cost 33 tokens of the 35 the ceiling had left (2,565 to
-           2,598), which is why the addition names no `register` of its own: the record reads it from `declaration_id`. */
+           2,598), which is why the addition names no `register` of its own: the record reads it from `declaration_id`.
+           AND A WHOLE BODY NAMES THE VERSION IT WAS READ AT. Stamped by the record at filing, a body read at v1 and filed
+           after another change reached v2 installed over that change (`record/test/change-drawn.test.ts`). The record now
+           takes `from_version` from the proposer, and an agent that is never told to send it is stamped as before. Nine
+           tokens, paid for by `list`'s `where` and `search`'s `q`, which were each repeating their own description. */
         body: {
           type: 'object',
           description:
-            'options: {"options":[...]}, two or more, each with id, label and because. rowset: {"register":"skills","rows":[{"at":"skills#3","version":1,"patch":{...}}]}. change adds fields: {"declaration_id":"register.things","to":{"add":{"fields":[{"id":"domain","type":"url"}]}}}, or to is a whole declaration of that id. pack, settings and arrange: read braindog:arrangement and braindog:grammar/proposals first.',
+            'options: {"options":[...]}, two or more, each with id, label and because. rowset: {"register":"skills","rows":[{"at":"skills#3","version":1,"patch":{...}}]}. change adds fields: {"declaration_id":"register.things","to":{"add":{"fields":[{"id":"domain","type":"url"}]}}}, or to is a whole declaration of that id; send the from_version you read. pack, settings and arrange: read braindog:arrangement and braindog:grammar/proposals first.',
         },
       },
       ['question', 'body_kind', 'body'],
@@ -681,6 +690,7 @@ const FIXED: readonly Resource[] = [
   resource('arrangement', 'How this BrainDog is arranged: its packs, what else is on offer, its voice and settings, its pages, and what waits.'),
   resource('grammar/page', 'What a page declaration may contain, with one that installs.'),
   resource('grammar/proposals', 'The bodies that change what this BrainDog is: pack, settings and arrange.'),
+  resource('grammar/script', 'What a script declaration may contain, what its ctx can reach, its limits, and two that install.'),
 ];
 
 /** The addresses a client fills in itself. A template is a grammar, so it names nothing a caller cannot see. */
@@ -1019,6 +1029,13 @@ export function tools<C>(surface: McpSurface<C>) {
     if (head === 'actions' && !rest)
       return surface.actions ? surface.actions(ctx) : unbuilt('actions', 'Nothing else lists scheduled actions yet.');
     if (head === 'digest' && rest === 'today') return surface.digestToday({}, ctx);
+    /* THE SCRIPT GRAMMAR IS THIS PACKAGE'S OWN TEXT (`grammars/script.ts` says why it is not the record's), and it is
+       still asked of the record before it is answered. `version` is `guard(ctx, 'read')`, the rung `arrangement` puts
+       the other two grammars on, and unlike `arrangement` every surface has it, so the command line serves this too. */
+    if (head === 'grammar' && rest === 'script') {
+      const may = await surface.version(ctx);
+      return may.ok ? { ok: true, value: SCRIPT_GRAMMAR } : may;
+    }
     if (head === 'arrangement' || head === 'grammar' || head === 'declaration') {
       const arranged = surface.arrangement;
       if (!arranged) return unbuilt(uri, 'Read braindog:boot instead.');

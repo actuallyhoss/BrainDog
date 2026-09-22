@@ -17,7 +17,7 @@ import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
 import { FIRST_PARTY, FIRST_PARTY_VERSIONS, NOW, firstPartyDocument } from '../src/index.ts';
-import { BANK_HSBC_EG_VERSION, HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS, bankHsbcEgPack } from '../src/packs/bank-hsbc-eg.ts';
+import { BANK_HSBC_EG_VERSION, HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS, MONEY_CORE_HANDS, bankHsbcEgPack } from '../src/packs/bank-hsbc-eg.ts';
 import { USE_CASES, useCaseDocument } from '../src/usecases/index.ts';
 
 type Body = Record<string, unknown>;
@@ -89,6 +89,8 @@ async function put(k: Kernel, doc: unknown): Promise<Diff> {
 const v170 = (): Doc => {
   const d = structuredClone(firstPartyDocument('money-core')) as unknown as Doc;
   d.version = '1.7.0';
+  /* 1.7.0 handed nothing: the twelve were its own. */
+  delete (d as { hands?: unknown }).hands;
   const hsbc = [...Object.values(HSBC_EG_INGESTS), ...Object.values(HSBC_EG_SMS_INGESTS)].map((i) => ({ ...structuredClone(i), pack: 'money-core' }));
   d.declarations = [...d.declarations.filter((x) => !HSBC.includes(`ingest.${String(x.ingest)}`)), ...(hsbc as unknown as Body[])];
   return d;
@@ -99,6 +101,8 @@ test('MONEY-CORE DECLARES ONLY THE TWO GENERIC CARD WORDINGS, a minor step above
   /* MINOR BY `first-party.ts`'s OWN RULE, which asks a major step for a list or a field taken away. No list and no field
      moves: every register the patterns write stays, and 1.4.0 already took two figures away as a minor step. */
   assert.equal(FIRST_PARTY_VERSIONS['money-core'], '1.8.0');
+  /* AND IT HANDS THE TWELVE TO THE BANK PACK rather than retiring them, so a token minted for one survives the move. */
+  assert.deepEqual(firstPartyDocument('money-core')!.hands, MONEY_CORE_HANDS);
 });
 
 test('THE PACK DECLARES EXACTLY THE TWELVE, needs money-core 1.8.0, and is not a first-party module', async () => {
@@ -133,10 +137,11 @@ test('A RECORD ON 1.7.0 UPDATES WITHOUT A REFUSAL, then takes the pack, and ends
   assert.deepEqual(early.conflicts.map((c) => c.id).sort(), HSBC);
   assert.deepEqual(early.requires.packs, [{ id: 'money-core', range: '^1.8.0', installed: '1.7.0', ok: false }]);
 
-  /* THE UPDATE RETIRES THE TWELVE AND IS NOT REFUSED. An ingest has no rows, so nothing is orphaned. */
+  /* THE UPDATE HANDS THE TWELVE TO THE BANK PACK AND IS NOT REFUSED. An ingest has no rows, so nothing is orphaned. */
   const update = await put(k, firstPartyDocument('money-core'));
   assert.deepEqual(update.conflicts, []);
   assert.deepEqual(update.retires.map((r) => r.id).sort(), HSBC);
+  for (const r of update.retires) assert.equal(r.to, 'bank-hsbc-eg', `${r.id} is handed, not retired`);
   assert.equal(update.orphans, 0);
 
   const bank = await put(k, bankHsbcEgPack());

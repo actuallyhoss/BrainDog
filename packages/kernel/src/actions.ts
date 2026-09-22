@@ -33,6 +33,8 @@ import type { Ack, OutboxRow } from './outbox.ts';
 import { FLOOR_MS, intervalMs, jitterMs } from './pull.ts';
 import type { Drained } from './schedule.ts';
 import type { LeasedSeal } from './vault.ts';
+/* TYPES ONLY, so there is no cycle at run time: `script-run.ts` imports `meter` and `pause` from this file. */
+import type { ScriptAnswer, ScriptRunner, ScriptUnrun, Scripted } from './script-run.ts';
 
 /** The three kinds this runner claims. */
 export const ACTION_KINDS = ['pull', 'call', 'poll'] as const;
@@ -277,14 +279,24 @@ export const keyReady = (sql: Sql, name: string | undefined, paged = false): Key
   return cannot === null ? null : { code: 'OUT_OF_BOUNDS', fix: cannot };
 };
 
-/** Pause the row an action runs from, and say so once through the notification path. */
-function pause(deps: ActionDeps, kind: string, ingest: string, say: string): void {
-  deps.sql.exec("UPDATE schedule SET state = 'paused' WHERE kind = ? AND key = ?", kind, ingest);
-  deps.notify({
+/**
+ * Pause the row an action runs from, and say so once through the notification path.
+ *
+ * `who` IS FOR A SCRIPT, which pauses for a different reason (three refused runs, `script-run.ts`) and is not an
+ * ingest. Without it the owner was told an ingest called `gold-rate` had a key refused, which is neither.
+ */
+export function pause(
+  deps: Pick<ActionDeps, 'sql' | 'notify'>,
+  kind: string,
+  ingest: string,
+  say: string,
+  who: { actor: string; because: string } = {
     actor: `ingest:${ingest}`,
-    say,
     because: 'A scheduled action whose key is refused or gone is never retried. It runs again when somebody resumes it.',
-  });
+  },
+): void {
+  deps.sql.exec("UPDATE schedule SET state = 'paused' WHERE kind = ? AND key = ?", kind, ingest);
+  deps.notify({ actor: who.actor, say, because: who.because });
 }
 
 /**
@@ -594,6 +606,8 @@ type Usage = {
   bytes: number;
   ms: number;
   failures: number;
+  /** Who the event names. Absent is `ingest:<ingest>`; a script's run names the version that ran, `script:<id>@v<n>`. */
+  actor?: string;
 };
 
 /**
@@ -627,12 +641,15 @@ export function meter(deps: Pick<ActionDeps, 'sql' | 'mint' | 'nowMs'>, usage: U
     failures: usage.failures,
     held: usage.outcome === 'held' ? 1 : 0,
   };
+  /* A SCRIPT'S RUN IS ON THE SCRIPT'S DECLARATION. The channel alone decides it, so the Directory's ledger, which keys
+     on the name, needs nothing new, and the run history of `script.gold-rate` is not filed under an ingest that
+     does not exist. */
   deps.sql.exec(
     "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note) VALUES (?, ?, ?, 'pull', ?, 'declaration', ?, ?)",
     event,
     at,
-    `ingest:${usage.ingest}`,
-    `declaration:ingest.${usage.ingest}`,
+    usage.actor ?? `ingest:${usage.ingest}`,
+    `declaration:${usage.channel === 'script' ? 'script' : 'ingest'}.${usage.ingest}`,
     JSON.stringify({ channel: usage.channel, host: usage.host, status: usage.status, outcome: usage.outcome, scope, usage: counted }),
     say.slice(0, 280),
   );
@@ -760,7 +777,14 @@ export function finishAction(deps: ActionDeps, ready: Ready, answer: ActionAnswe
 export type RunnerSteps = {
   drain: () => Drained;
   lease: (n: number) => OutboxRow[];
-  prepare: (job: OutboxRow) => Ready | Paged | Metered;
+  prepare: (job: OutboxRow) => Ready | Paged | Scripted | Metered;
+  /**
+   * Apply what a script's run handed back, or say why no sandbox answered (`script-run.ts`'s `finishScript`).
+   *
+   * OPTIONAL BECAUSE THE WIRING IS ANOTHER FILE'S. A pass whose steps cannot finish a script hands the row back
+   * unrun, and a step list written before scripts existed still compiles.
+   */
+  finishScript?: (scripted: Scripted, answer: ScriptAnswer | ScriptUnrun) => Metered;
   finish: (ready: Ready, answer: ActionAnswer, hash: string) => Metered;
   /** Finish a connector job this host cannot run, so the schedule can offer it to one that can. */
   release: (paged: Paged) => void;
@@ -799,14 +823,21 @@ export type Budget = {
  * meter. Anything else is one request and the same tail.
  */
 const PAGES_UNSAID = 40;
+/* A SCRIPT THAT NAMES NO `fetches` IS RESERVED FOR THE MOST ANY SCRIPT MAY ASK, design section 5's ceiling of 20, and
+   not for the sandbox's default of 5. Both numbers live in `@braindog/script`, which the kernel may not import, so this
+   is a copy either way; copying the ceiling means that if the default is raised this over-reserves, where copying the
+   default would under-reserve, and an under-reservation is the one that takes a Cloudflare invocation down. */
+const FETCHES_UNSAID = 20;
 const TAIL = 6;
-export const reserveFor = (ready: Ready | Paged | Metered): number =>
+export const reserveFor = (ready: Ready | Paged | Scripted | Metered): number =>
   'paged' in ready
     ? 2 * (ready.decl.limits?.max_pages ?? PAGES_UNSAID) + TAIL
-    : /* A JOB WHOSE DECLARATION HAD GONE COSTS NOTHING: it is already finished and sends nothing. */
-      'request' in ready
-      ? TAIL
-      : 0;
+    : 'scripted' in ready
+      ? (ready.scripted.decl.limits?.fetches ?? FETCHES_UNSAID) + TAIL
+      : /* A JOB WHOSE DECLARATION HAD GONE COSTS NOTHING: it is already finished and sends nothing. */
+        'request' in ready
+        ? TAIL
+        : 0;
 
 /**
  * The connector runner, wired by the host because it is the host that has the network and the KEK.
@@ -858,7 +889,14 @@ export async function answerHash(body: string): Promise<string> {
  * AN EXECUTOR THAT THROWS IS THE NETWORK. It is caught, and the run is a transient failure with a sentence
  * that names nothing the executor was holding.
  */
-export async function runActions(steps: RunnerSteps, execute: Execute, n = 5, page?: PagedRun, budget?: Budget): Promise<ActionsRun> {
+export async function runActions(
+  steps: RunnerSteps,
+  execute: Execute,
+  n = 5,
+  page?: PagedRun,
+  budget?: Budget,
+  script?: ScriptRunner,
+): Promise<ActionsRun> {
   const drained = steps.drain();
   const out: ActionsRun = { fired: drained.done, ran: 0, ok: 0, changed: 0, paused: 0, failed: 0, refused: 0, dropped: 0, held: 0, usage: [], more: false };
 
@@ -888,6 +926,43 @@ export async function runActions(steps: RunnerSteps, execute: Execute, n = 5, pa
       break;
     }
     if (budget !== undefined) budget.left -= reserveFor(ready);
+
+    /* ── a script goes to the host's sandbox, leased by the same one leaser ─────────────────────
+       THE SANDBOX RUNS OUTSIDE EVERY TRANSACTION, for the executor's reason: a script may take its
+       whole `wall_ms`, and a write lock held across somebody's code is a record nobody can write to
+       for that long. What it hands back is applied afterwards, in `finishScript`'s one transaction. */
+    if ('scripted' in ready) {
+      if (!steps.finishScript) {
+        /* NOBODY HERE CAN FINISH IT, so it goes back on the shelf untouched rather than being acked
+           as run. A pass wired before scripts existed must not quietly swallow their runs. */
+        steps.releaseJob(ready.job);
+        continue;
+      }
+      const started = Date.now();
+      let answer: ScriptAnswer | ScriptUnrun;
+      if (!script)
+        answer = { unrun: 'dropped', say: `${ready.scripted.script} is a script, and this host has no sandbox to run it in, so it did not run.`, ms: 0 };
+      else
+        try {
+          answer = await script(ready);
+        } catch {
+          /* A HOST ADAPTER THAT THROWS IS NOT THE SCRIPT FAILING. It walks the ladder as the network does, and it is
+             not one of the three refused runs that pause a script, because the owner cannot fix our host. */
+          answer = { unrun: 'failed', say: `${ready.scripted.script} could not be started on this host, and will be tried again.`, ms: Date.now() - started };
+        }
+      const metered = steps.finishScript(ready, answer);
+      out.usage.push(metered);
+      if (metered.outcome === 'held') out.held++;
+      else if (metered.outcome === 'dropped') out.dropped++;
+      else {
+        out.ran++;
+        if (metered.outcome === 'ok') out.ok++;
+        else if (metered.outcome === 'paused') out.paused++;
+        else if (metered.outcome === 'failed') out.failed++;
+        else out.refused++;
+      }
+      continue;
+    }
 
     /* ── a connector goes to the other runner, and one pass still leases every row ──────────────
        THE LEASE IS TAKEN IN ONE PLACE, which is the only reason this is safe. A second runner with

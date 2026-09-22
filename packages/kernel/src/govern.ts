@@ -313,15 +313,26 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
      of the declarations is stored in its place. */
   let body: Record<string, unknown> = p.body ?? {};
   if (p.body_kind === 'change') {
-    const { egress: _theirs, approve: _theirLines, from_version: _theirVersion, ...rest } = body;
+    const { egress: _theirs, approve: _theirLines, from_version: theirVersion, ...rest } = body;
     body = rest;
-    /* AND THE VERSION IT WAS DRAWN FROM, FOR THE SAME REASON. Accepted with no version to land against, the second of two
-       changes drawn from one reading replaced the first whole: `domain` went with a value still under it, and both
-       decisions read "accept" (`loop/research-shell-schema.md` blocker 1, `record/test/schema-add.test.ts`). Taken from
-       the proposer, the stamp is whatever it says, and one that names the version it guesses will be live at acceptance
-       lands over whatever came in between. An `add` needs none: it is merged onto
-       whatever is live when the owner presses. */
-    if (!isAdd(body.to)) body = { ...body, from_version: liveVersion(deps.sql, String(body.declaration_id)) };
+    /* AND THE VERSION IT WAS DRAWN FROM, WHICH ONLY THE PROPOSER KNOWS AND ONLY THE RECORD MAY BOUND. Accepted with no
+       version to land against, the second of two changes drawn from one reading replaced the first whole: `domain` went
+       with a value still under it, and both decisions read "accept" (`loop/research-shell-schema.md` blocker 1,
+       `record/test/schema-add.test.ts`). Stamped with the version live AT FILING, that race closed and the wider one
+       stayed open: a body read at v1 and filed after another change reached v2 was stamped v2, accepted, and erased the
+       other change's fields (`loop/research-batch-thirty-two-audit.md` section 2, `record/test/change-drawn.test.ts`).
+       So the proposer's version is kept when it names one that has been live, and the live one stands in when it is
+       absent. One ABOVE the live version is a guess at what will be live when the owner presses, which is the race B1
+       closed, so it is the live one too. An `add` needs none: it is merged onto whatever is live at the press. */
+    if (!isAdd(body.to)) {
+      const live = liveVersion(deps.sql, String(body.declaration_id));
+      if (theirVersion !== undefined && theirVersion !== null && !(Number.isInteger(theirVersion) && (theirVersion as number) >= 0))
+        return no<{ id: string }>('VALUE_MALFORMED', `from_version is the version of ${String(body.declaration_id)} you read before writing this body, a whole number, or leave it out.`, {
+          at: 'body.from_version',
+        });
+      const drawn = typeof theirVersion === 'number' && theirVersion <= live ? theirVersion : live;
+      body = { ...body, from_version: drawn };
+    }
     const to = resolveTo(deps.sql, body);
     if (deps.review && to.ok) {
       const read = deps.review(to.value.to);

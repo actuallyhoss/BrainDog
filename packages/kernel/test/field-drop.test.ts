@@ -70,16 +70,18 @@ test('RETIRING THE SAME FIELD OVER THE SAME ROWS IS TAKEN, and the value stays i
   assert.match(sql.one<{ f: string }>("SELECT fields AS f FROM entry WHERE register = 'things'")!.f, /kiln\.example/);
 });
 
-test('A FIELD NO LIVE ROW HOLDS MAY STILL BE LEFT OUT', async () => {
+test('A FIELD ONLY A DELETED ROW HOLDS IS STILL REFUSED WHEN LEFT OUT, because a restore brings the value back', async () => {
   const { k, sql } = await record();
-  /* One row never had it, and the one that did is deleted: neither is a value this change would hide. */
+  /* One row never had it, and the one that did is deleted. A restore within the thirty days would bring back a value the
+     schema no longer names (audit thirty-two section 7), so the deleted row counts and the change is refused. */
   assert.ok(k.create('things', { name: 'Anvil' }, { actor: 'p_1' }).ok);
   const gone = k.create('things', { name: 'Kiln', domain: 'https://kiln.example/' }, { actor: 'p_1' });
   assert.ok(gone.ok);
   assert.ok(k.update('things', (gone.value as { id: string }).id, { deleted_at: 'now' } as never, { actor: 'p_1' }).ok);
   const out = await k.install([projects([NAME, LANE])]);
-  assert.ok(out.ok, fixOf(out));
-  assert.equal(version(sql), 2);
+  assert.equal(codeOf(out), 'WOULD_ORPHAN');
+  assert.equal(fixOf(out), '1 row holds domain, a deleted one a restore brings back. Mark it retired rather than leaving it out.');
+  assert.equal(version(sql), 1);
 });
 
 test('A FIELD ALREADY RETIRED MAY BE LEFT OUT AFTERWARDS, because its values were already put away on purpose', async () => {

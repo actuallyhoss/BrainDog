@@ -87,7 +87,7 @@ test('B1: THE SECOND OF TWO WHOLE-BODY CHANGES DRAWN FROM ONE READING REOPENS, a
   sql.close();
 });
 
-test('B1: THE VERSION IS STAMPED BY THE RECORD, never taken from the proposer', async () => {
+test('B1: A VERSION ABOVE THE LIVE ONE IS STAMPED WITH THE LIVE ONE, and one at or below it is kept', async () => {
   const { sql, file, stored } = await record();
   const id = idOf(await file({ declaration_id: 'register.things', from_version: 99, to: plus({ id: 'domain', type: 'url' }) }));
   assert.equal(stored(id).from_version, 1);

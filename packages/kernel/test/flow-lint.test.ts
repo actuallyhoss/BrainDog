@@ -127,7 +127,7 @@ test('A ROW VERB ON A TRIGGER WITH NO ROW IS REFUSED, since it would reach for a
 
 test('A METRIC TRIGGER NAMES A METRIC THAT IS THERE', async () => {
   const crossing = rule({ rule: 'crossing', on: { metric: { id: 'cash_now', crosses: { lte: 0 } } }, then: [{ stop: true }] });
-  assert.equal(code(crossing), null);
+  assert.equal(code(crossing), 'NOT_IN_THIS_BUILD');
   const done = await install(crossing);
   assert.equal(done.ok, false);
   assert.equal(refusedAs(done), 'DECLARATION_UNKNOWN');

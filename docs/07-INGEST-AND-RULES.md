@@ -26,7 +26,7 @@ hosted tier has value even though the code is free.
 *(Amended September 15th 2026 for `DIRECTION.md` §0b: `channel:` gains two more values beside
 `pull`, `call` (an outbound POST fired by a schedule or a rule) and `poll` (watch an endpoint, act
 through a rule on a change), declared inside this same `ingest` kind rather than a new one, so the
-eight-kind list in [04-PACKS](04-PACKS.md) §1 stays closed. Both are safe by the same rules as `pull`
+closed list of kinds in [04-PACKS](04-PACKS.md) §1 did not grow for them. Both are safe by the same rules as `pull`
 in [25-CONNECTORS](25-CONNECTORS.md) §4 and §7: a literal origin, one preflight, the install diff
 naming every host. `loop/research-modular.md` §3.2 has the detail and the runner it still needs.)*
 
@@ -511,14 +511,15 @@ predicate against the real rows and writes nothing.
 that wait on somebody else, a call, a script, Spark or a person, are later work, and the section says where a run
 meets one.)*
 
-**Not a ninth kind.** [04-PACKS](04-PACKS.md) closes the list at eight, so an automation is a `rule` body that has
+**Not a kind of its own.** [04-PACKS](04-PACKS.md) closes the list of kinds, nine since `script` joined it on
+September 22nd (`KINDS` in `packages/kernel/src/declare.ts`), so an automation is a `rule` body that has
 grown two keys: `on:`, what starts it, and `steps:`, what it does. A rule with neither is an automation whose trigger
 is a write to its register, which is every rule installed before this section was written. The canvas can open all
 of them.
 
 ```yaml
 rule: gold_rate
-on: { every: 1h }                         # or written, arrival, metric, manual
+on: { every: 1h }                         # or written, arrival, manual
 steps:
   - call: { ingest: gold_price, as: price }
   - if: { field: price, gt: 3000 }       # a condition over the run's answers
@@ -531,7 +532,7 @@ steps:
 
 - **inline** is this section's rules as they have always run, inside the write's transaction: a write trigger with
   no filter, and a `then:` list.
-- **run** is everything else: a clock, an arrival, a metric, a button, a write trigger that filters by `op:` or
+- **run** is everything else: a clock, an arrival, a button, a write trigger that filters by `op:` or
   `fields:` or accepts writes made by rules (`from_rules:`), or any `steps:` list. The inline pass cannot read any of
   these. It fires on every write of the register, it has no idea which fields changed, and it walks `then:` alone.
 
@@ -544,6 +545,8 @@ steps:
 | `every:` under `15m`, or a clock it cannot read | fifteen minutes is the shortest clock the record keeps, as it is for a connector; `at:` belongs to `every: 1d` or `every: 1w` with a `day:` |
 | two triggers in one `on:` | a run has to say which one started it |
 | `decided:` | reserved: a run's own questions resume it without a trigger |
+| `metric:`, once its id and its `crosses:` are right | nothing in this build watches a metric for a crossing, so it would install and never start: `NOT_IN_THIS_BUILD` until the start lands in the `snapshot` handler |
+| a run-path `written` rule with `once_per` whose `when:` names a day relative to today (`today`, `-7d`) | the hourly re-read that makes such a rule fire as days pass reads inline rules only: `NOT_IN_THIS_BUILD`. Written with `register:` and `then:` it is swept |
 | a top-level `register:` on the run path | the inline pass would also run the body inside every write of that register |
 | `on: { written: { register } }` inline without `register:` beside it | the inline pass reads the top-level key and nothing else |
 | a row verb (`tag`, `set`, `move`, `note`, `run` and the rest) or a `when:` on `every`, `metric` or `manual` | those triggers have no row to act on |
@@ -551,6 +554,7 @@ steps:
 | `then:` and `steps:` together | one list of things |
 | more than 50 steps, counting both arms of every branch; a branch nested past 3; more than 64 answer names | the kernel's ceilings, which `limits:` may lower and never raise (`runs_per_day` at most 1,000) |
 | a `call` step naming an address, or a call that is not declared with `trigger: rule` or `both` | a step names a declared call, whose host, key and fields were approved at install, exactly as `run:` does |
+| a `call` step or `run:` whose call `sends:` fields of a register, on a trigger that brings no row of that register: a clock, a button, or an arrival whose `ingest:` does not write it | the call would post a row nobody handed it. A call that sends nothing, such as the price in the example above, needs no row and runs on a clock |
 | an answer name (`as:`) that is not an identifier, or is `trigger` or `vars` | it is read back as `{{vars.<name>}}`, and those two are the run context's own keys |
 | a step that notifies, creates, suggests, runs, calls or asks about a written row with no `once_per` | the same reason `notify` has always needed it |
 
@@ -586,7 +590,12 @@ the transaction of whatever started it, and the next drain takes its steps.
 | `every` | a `rule` schedule row keyed `flow.every:<id>`, armed at install one interval out, or at the next `at:` | taken at once when the row fires; the next turn counts from when this one was due, so an hourly rule stays on its hour |
 | `manual` | `automationRun(rule, actor)` on the kernel | only a rule that says `on: { manual: true }` |
 
-`metric` is linted and not yet noticed anywhere; it belongs with the steps that wait.
+`metric` is noticed nowhere yet, and the lint refuses it until it is.
+
+**A run started by a delete reads the deleted row.** A deleted row is hidden from every read, so the run is marked as
+started by a delete and reads the row from the record past that filter: its `if` conditions and its `{{trigger.row.…}}`
+read the row, and a step that would write to it fails the run with a sentence saying the row was deleted, rather than
+bringing it back. The run holds no copy of the row, so an erasure that tombstones the row reaches what the run reads.
 
 **A write made by a rule starts nothing,** unless the trigger says `from_rules: true`. Then the run carries the
 writer's depth plus one, and a fourth level is not started. Rules have never chained; a chain is a thing somebody asks

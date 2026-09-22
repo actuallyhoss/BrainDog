@@ -26,7 +26,7 @@
 import type { Conflict, Refusal, Result } from '@braindog/ports';
 import { no, ok, refused } from '@braindog/ports';
 import { credentialKey as credential, credentialValue, NESTED_MOST, nestedPast } from './credentials.ts';
-import { KINDS, approvalLines, configReads, configValue, digest, egressChanged, egressOf as egressOfBody, fillConfig, jcs, readConfig, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
+import { KINDS, approvalLines, configReads, configValue, digest, egressChanged, egressOf as egressOfBody, fillConfig, jcs, readConfig, widens, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
 
 /**
  * What one declaration sends out of the record, or `null` when it sends nothing: every host, how often, the key by label
@@ -92,6 +92,20 @@ export type Manifest = {
    * declaration when the pack is planned and installed. `readConfig` in the kernel checks the map.
    */
   config?: Record<string, ConfigDecl>;
+  /**
+   * The declarations this version stops declaring and gives to another pack, by id: `{ 'register.holdings': 'holdings' }`.
+   * Absent when it hands nothing.
+   *
+   * WITHOUT IT A LIST WITH ROWS COULD NEVER LEAVE A PACK (`loop/research-shell-seed-next.md` N1). The owner's update
+   * dropping it was `WOULD_ORPHAN`, and the pack declaring it was `PROVIDES_CONFLICT` for as long as the owner held it,
+   * so both orders were refused and "move them first" had nowhere to move them to.
+   *
+   * `hands` AND NOT `moves`, `to` OR A KEY ON THE RECEIVING PACK. Only the pack that owns a declaration can let it go,
+   * so the word belongs in the old pack's file and reads there as the sentence it is: money-core hands holdings to
+   * holdings. A receiving pack that could claim a declaration would be any stranger's file claiming anybody's list, and
+   * `moves` reads as though the rows move, when they are the one thing that stays exactly where it was.
+   */
+  hands?: Record<string, string>;
 };
 
 export type Pack = {
@@ -143,9 +157,19 @@ export type Diff = {
     primitives: { wanted: number; has: number; ok: boolean };
     packs: { id: string; range: string; installed: string | null; ok: boolean }[];
   };
-  adds: { id: string; summary: string }[];
+  /**
+   * `handed` IS A DECLARATION ANOTHER PACK HANDED THIS ONE, which is live already, under this pack's name, while this
+   * pack is not installed. It is new to the pack and not to the record, so it plants no example rows, and its rows and
+   * their history stay as they are.
+   */
+  adds: { id: string; summary: string; handed?: true }[];
   changes: { id: string; from_version: number; summary: string }[];
-  retires: { id: string; rows: number }[];
+  /**
+   * What this version stops declaring. `to` IS THE PACK IT HANDS THE DECLARATION TO (the manifest's `hands`): it is not
+   * retired and orphans nothing, it is staged again under `to` with `body`, the live body as JCS text with `pack` set to
+   * `to`, and it stays live until and after that pack is installed.
+   */
+  retires: { id: string; rows: number; to?: string; body?: string }[];
   /**
    * Declarations the record will hold and this plan will not stage, each named once for `conflictFault`.
    *
@@ -272,7 +296,8 @@ export type Diff = {
   planHash: string;
 };
 
-export type Applied = { pack: string; version: string; declarations: number; seeds: number; retired: number };
+/** `handed` is how many declarations this install gave to another pack, and is absent when it gave none. */
+export type Applied = { pack: string; version: string; declarations: number; seeds: number; retired: number; handed?: number };
 export type Retired = { pack: string; declarations: number; rows_kept: Record<string, number> };
 
 /**
@@ -297,7 +322,11 @@ export type Host = {
   transaction: <T>(fn: () => T) => T;
   /** Rebuild whatever the host caches from the declarations, once the transaction has committed. */
   reload: () => void;
-  retire: (ids: readonly string[]) => Result<unknown>;
+  /**
+   * Retire declarations. `by` is who, when the caller knows better than the host's own bound caller; a host writes the
+   * `declare` line under it, or under its bound caller when it is left out (`loop/research-batch-thirty-two-audit.md` §8).
+   */
+  retire: (ids: readonly string[], by?: { actor: string; suggestion?: string }) => Result<unknown>;
   seed: (register: string, fields: Record<string, Json>, note: string | undefined) => Result<unknown>;
   /**
    * The `pack` row, and the ids it claims — read on uninstall. `approved` is the calls-out lines the owner approved
@@ -512,6 +541,29 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     const canonical = canonicalise(stored);
     if (canonical === null) return malformed(`${declId} holds something this record cannot write down.`, declId);
     declarations.push({ kind, id: declId, body: stored, canonical });
+  }
+
+  /* WHAT IT HANDS IS READ ONCE WHAT IT DECLARES IS KNOWN, because a pack that still declares an id cannot also give it
+     away: the plan would stage it under two owners in one batch. Kept in the manifest and so in the checksum, since two
+     files that hand differently install differently. */
+  if (doc.hands !== undefined) {
+    if (!isObject(doc.hands))
+      return malformed('`hands` maps a declaration id to the pack that takes it over, like register.holdings: holdings.', 'hands');
+    const hands: Record<string, string> = {};
+    for (const [handed, to] of Object.entries(doc.hands)) {
+      const at = `hands.${handed}`;
+      const dot = handed.indexOf('.');
+      const kind = KINDS.find((k) => k === handed.slice(0, dot));
+      if (dot < 0 || !kind || !(kind === 'register' ? REGISTER_NAME : NAME).test(handed.slice(dot + 1)))
+        return malformed(`${handed} is not a declaration id: its kind, a full stop and its name, like register.holdings.`, at);
+      if (typeof to !== 'string' || !PACK_ID.test(to))
+        return malformed(`${id} hands ${handed} to ${String(to)}, which is not a pack id.`, at);
+      if (to === id) return malformed(`${id} hands ${handed} to itself.`, at);
+      if (seen.has(handed))
+        return malformed(`${id} declares ${handed} and hands it to ${to}. A pack hands over only what it has stopped declaring.`, at);
+      hands[handed] = to;
+    }
+    if (Object.keys(hands).length > 0) manifest.hands = hands;
   }
 
   /**
@@ -884,6 +936,22 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
       added.push(decl);
       continue;
     }
+    /* A DECLARATION HANDED TO THIS PACK BEFORE IT WAS INSTALLED is live under its name already (the handing install
+       staged it so), and this install takes it over. Nothing else puts a live row under a pack with no `pack` row: an
+       uninstall retires what it claimed and a disable keeps the row. Planned as an add, because it is new to this pack
+       and the owner reads it that way, and not asked about as a change of the pack's own body. */
+    if (already.pack_id === mine && was === null) {
+      adds.push({ id: decl.id, summary: summarise(decl), handed: true });
+      if (decl.kind !== 'register') continue;
+      /* WHAT THE RECORD'S LIST HOLDS AND THIS BODY LACKS STAYS, as the record's own addition, exactly as a rebase keeps
+         `lane.sold` (`plan-additive.test.ts`): the pack that takes `holdings` may ship without `gold`, and a row written
+         under `gold` must still read. The pack cannot see a row, so everything the list had is kept, used or not. */
+      const over = carried(already.body, decl.body);
+      if (over !== null) kept.push({ id: decl.id, adds: over.adds, rebased: over.body });
+      const rows = installed.rows[decl.id.slice('register.'.length)] ?? 0;
+      if (rows > 0) unreadable(over === null ? decl : { ...decl, body: JSON.parse(over.body) as Record<string, Json> }, already.body, rows, retypes, newlyRequired);
+      continue;
+    }
     /* BUT ONE THIS PACK WROTE AND THE OWNER THEN CHANGED IS KEPT, and left out of what is staged. Both were `null` to the
        test below, so an owner who had moved one block on Money was refused every later money-core update, and the
        refusal told them to retire their own Money page (`loop/research-pack-update-edited.md`). The superseded row says
@@ -944,13 +1012,33 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
   const keeping = new Set(pack.declarations.map((d) => d.id));
   const retires: Diff['retires'] = [];
   let orphans = 0;
+  const hands = pack.manifest.hands ?? {};
   for (const decl of installed.declarations) {
     if (decl.pack_id !== mine || keeping.has(decl.id)) continue;
     const register = decl.id.startsWith('register.') ? decl.id.slice('register.'.length) : null;
     const rows = register ? (installed.rows[register] ?? 0) : 0;
+    /* A DECLARATION THIS VERSION HANDS ON IS NOT RETIRED, SO IT ORPHANS NOTHING. It is staged again under the pack it
+       goes to, and `pack` in its body says the same thing, because the kernel reads the same bytes as the same version
+       and keeps the owner it had: a restage of the unchanged body left money-core owning the list. The line still sits
+       among the retires, since this pack no longer declares it, and names where it went, which is what the owner reads:
+       the plan he approved for money-core 1.8.0 said twelve ingests retire and never which pack to install for them
+       (`loop/research-batch-thirty-two-audit.md` §3). */
+    /* BUT ONLY TO A PACK THE RECORD DOES NOT HAVE YET. Handed to an installed pack whose file does not declare it, the
+       list sat under that pack's name and every later update of it, a reinstall of the same file included, was
+       `WOULD_ORPHAN` (`handover.test.ts`), so one pack's `hands` could stop another from ever updating. Taking over
+       is what a pack's first install does, so a handover to one already installed is the retire it would otherwise be. */
+    const to = Object.hasOwn(hands, decl.id) && !installed.packs.some((p) => p.id === hands[decl.id]) ? hands[decl.id] : undefined;
+    const body = to === undefined ? null : handedBody(decl.body, to);
+    if (to !== undefined && body !== null) {
+      retires.push({ id: decl.id, rows, to, body });
+      continue;
+    }
     retires.push({ id: decl.id, rows });
     orphans += rows;
   }
+  /* WHAT IS HANDED STAYS LIVE, so nothing below may treat it as gone: not a figure that reads it, not a list a field
+     points at, and not half of a rename. */
+  const handed = new Set(retires.filter((r) => r.to !== undefined).map((r) => r.id));
 
   /* A RETIRE AND AN ADD OF ONE BODY ARE ONE DECLARATION UNDER TWO IDS. Both lists were built in this
      function from one `Installed` and never compared, so a rename was planned as two unrelated moves;
@@ -961,7 +1049,7 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
     const now = unnamed(decl.kind, decl.body);
     if (now === null) continue;
     for (const gone of installed.declarations) {
-      if (gone.pack_id !== mine || keeping.has(gone.id) || gone.kind !== decl.kind) continue;
+      if (gone.pack_id !== mine || keeping.has(gone.id) || handed.has(gone.id) || gone.kind !== decl.kind) continue;
       if (renames.some((r) => r.from === gone.id)) continue;
       let was: unknown;
       try {
@@ -999,7 +1087,7 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
     const found = movedFields(was, JSON.parse(k.rebased));
     if (found !== null && found.moved.length > 0) moved.set(k.id, found);
   }
-  const gone = new Set(retires.map((r) => r.id));
+  const gone = new Set(retires.filter((r) => r.to === undefined).map((r) => r.id));
   for (const [id, edited] of Object.entries(installed.detached ?? {})) {
     if (edited.was !== mine || conflicts.some((c) => c.id === id)) continue;
     const body = live.get(id)?.body;
@@ -1119,10 +1207,11 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
  *
  * AN UPDATE DID NOT ASK WHETHER THE LIST WAS ALREADY THERE, so every newer version of a pack wrote its examples again
  * beside the ones the first install wrote, and a use case updated twice held three copies of each example. A list the
- * record already holds has had its examples, and a person may have deleted them on purpose.
+ * record already holds has had its examples, and a person may have deleted them on purpose. A list handed to this pack
+ * is one of those, so it is left out as well.
  */
-function seedsFor(pack: Pack, adds: readonly { id: string }[]): Seed[] {
-  const added = new Set(adds.map((a) => a.id));
+function seedsFor(pack: Pack, adds: readonly { id: string; handed?: true }[]): Seed[] {
+  const added = new Set(adds.filter((a) => a.handed === undefined).map((a) => a.id));
   return pack.seeds.filter((s) => added.has(`register.${s.register}`));
 }
 
@@ -1235,7 +1324,7 @@ function pointsAt(decl: PackDeclaration): { register: string; at: string }[] {
  * declaration is retired while it is off.
  */
 function unresolvedOf(pack: Pack, installed: Installed, retires: Diff['retires']): Diff['unresolved'] {
-  const dropped = new Set(retires.map((r) => r.id));
+  const dropped = new Set(retires.filter((r) => r.to === undefined).map((r) => r.id));
   const held = new Set(KERNEL_LISTS);
   for (const d of installed.declarations)
     if (d.kind === 'register' && !dropped.has(d.id)) held.add(d.id.slice('register.'.length));
@@ -1470,6 +1559,60 @@ function rebased(from: string, mine: string, now: Record<string, Json>): { body:
   return { body, adds: [...added.map((f) => f.id as string), ...[...values].flatMap(([id, v]) => v.values.map((x) => `${id}.${x}`))] };
 }
 
+/** A live body as JCS text with `pack` set to `to`, which is what a handover stages; `null` for one that will not parse. */
+function handedBody(live: string, to: string): string | null {
+  try {
+    const body = JSON.parse(live) as unknown;
+    return isObject(body as Json) ? canonicalise({ ...(body as Record<string, Json>), pack: to }) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The receiving pack's list body with what the record's list holds and it lacks laid over it: each field it does not
+ * declare, after its own, and each enum value a field of the same id does not list, after its own values with the
+ * label the record had for it. `null` when there is nothing to carry, or a body will not parse.
+ *
+ * `rebased` ABOVE ASKS MORE, and cannot be used here. It holds the owner's list to the body the edit started from, in
+ * its order and its shape, because a pack's next version is a new body of the same list. A handover is a different
+ * pack's body of that list, which may order, label or describe it differently, and whatever it says wins; the one
+ * thing it may not do is take away a field or a value rows were written under, because it never saw those rows.
+ */
+function carried(live: string, now: Record<string, Json>): { body: string; adds: string[] } | null {
+  let was: unknown;
+  try {
+    was = JSON.parse(live);
+  } catch {
+    return null;
+  }
+  const next = Array.isArray(now.fields) ? (structuredClone(now.fields) as Record<string, unknown>[]) : null;
+  if (next === null) return null;
+  const at = new Map(next.filter((f) => isObject(f as Json)).map((f) => [f.id, f]));
+  const fields: Record<string, unknown>[] = [];
+  const adds: string[] = [];
+  for (const [id, f] of fieldsOf(was)) {
+    const theirs = at.get(id);
+    if (theirs === undefined) {
+      fields.push(structuredClone(f));
+      adds.push(id);
+      continue;
+    }
+    if (!Array.isArray(f.values) || !Array.isArray(theirs.values)) continue;
+    const more = f.values.filter((v): v is string => typeof v === 'string' && !(theirs.values as unknown[]).includes(v));
+    if (more.length === 0) continue;
+    theirs.values = [...theirs.values, ...more];
+    const said = isObject(f.labels as Json) ? (f.labels as Record<string, unknown>) : {};
+    const labels = isObject(theirs.labels as Json) ? (theirs.labels as Record<string, unknown>) : {};
+    const extra = Object.fromEntries(more.filter((v) => v in said && !(v in labels)).map((v) => [v, said[v]]));
+    if (Object.keys(extra).length > 0) theirs.labels = { ...labels, ...extra };
+    adds.push(...more.map((v) => `${id}.${v}`));
+  }
+  if (adds.length === 0) return null;
+  const body = canonicalise({ ...now, fields: [...next, ...fields] } as Json);
+  return body === null ? null : { body, adds };
+}
+
 /**
  * The declared value a written word means on an enum field, as `@braindog/where`'s `resolve` reads it: a value's label
  * first, then the value in the words a screen shows. `null` for a word the field does not declare, or a field with no
@@ -1644,7 +1787,8 @@ function unreadable(
   const before = fieldsOf(old);
   for (const [id, now] of fieldsOf(decl.body)) {
     const then = before.get(id);
-    if (then !== undefined && typeSaid(then) !== typeSaid(now)) retypes.push({ id: decl.id, field: id, from: typeSaid(then), to: typeSaid(now), rows });
+    /* A WIDENING IS NOT A RETYPE: every stored value reads back unchanged, and the kernel answers the same (`widen.ts`). */
+    if (then !== undefined && typeSaid(then) !== typeSaid(now) && !widens(then, now)) retypes.push({ id: decl.id, field: id, from: typeSaid(then), to: typeSaid(now), rows });
 
     /* A `default` IS THE ANSWER FOR THE ROWS THAT HAVE NONE, which is why `04 §5`'s sentence names
        it as the repair: *"Ship a default or a fill rule."* */
@@ -1834,11 +1978,19 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
     /* AND THE REMEDY IS NOT THE SAME FOR THE TWO OWNERS. A declaration another pack owns is freed by
        uninstalling that pack; one somebody wrote in the app is freed by retiring it, and telling
        them to uninstall a pack that does not exist would send them looking for it. */
+    /* AND A PACK THAT ASKS FOR A LATER VERSION OF THE OWNER IS TOLD TO INSTALL THAT FIRST. A list or an ingest moves
+       from one pack to another by the owner's update handing it over, so the pack that takes it is refused until that
+       update has landed, and "two packs cannot own one declaration" read as a dead end: measured on `bank-hsbc-eg`
+       beside money-core 1.7.0 and on a `holdings` pack beside money-core 1.8.0, both with the step they needed sitting
+       unread in `requires`. */
+    const step = first.pack === OWN ? undefined : diff.requires.packs.find((p) => p.id === first.pack && !p.ok);
     return no<Applied>(
       'PROVIDES_CONFLICT',
       first.pack === OWN
         ? `${first.id} was written in this record, and installing ${diff.pack.id} would take it over. Retire it first if you want the pack to own it.`
-        : `${first.id} belongs to ${first.pack}, and two packs cannot own one declaration.`,
+        : step !== undefined
+          ? `${first.id} belongs to ${first.pack}${step.installed === null ? '' : ` ${step.installed}`}, and ${diff.pack.id} needs ${first.pack} ${step.range}. Update ${first.pack} first, then install ${diff.pack.id}.`
+          : `${first.id} belongs to ${first.pack}, and two packs cannot own one declaration.`,
       { at: first.id },
     );
   }
@@ -2006,9 +2158,17 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
      'launched' }`, because the edit still started from the older body and the first update's own `launched` read as
      the owner's addition. */
   const over = diff.kept.flatMap((k) => (k.rebased === undefined ? [] : [{ id: k.id, kind: 'register', body: JSON.parse(k.rebased) as Json }]));
+  /* WHAT THIS VERSION HANDS ON IS STAGED UNDER ITS NEW OWNER IN THE SAME BATCH, so the declaration is never retired: its
+     rows stay readable, and a webhook's path token outlives the move, because `heldDigest` keeps a digest while every
+     version since the mint is live. Retired and declared again, as money-core 1.8.0 first did, the Shortcut's door
+     answered 404 from the update until the new pack was installed, and `none` after it. */
+  const handing = diff.retires.flatMap((r) =>
+    r.to === undefined || r.body === undefined ? [] : [{ id: r.id, kind: r.id.slice(0, r.id.indexOf('.')), body: JSON.parse(r.body) as Json, pack: r.to }],
+  );
   const staged = await host.stage([
     ...filled.declarations.filter((d) => !keep.has(d.id)).map((d) => ({ id: d.id, kind: d.kind, body: d.body, pack: pack.manifest.pack })),
     ...over,
+    ...handing,
   ]);
   if (!staged.ok) return staged;
 
@@ -2032,8 +2192,9 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
          any other, and the write path refuses a register it has not been told about yet. */
       host.reload();
 
-      if (diff.retires.length) {
-        const gone = host.retire(diff.retires.map((r) => r.id));
+      const retiring = diff.retires.filter((r) => r.to === undefined);
+      if (retiring.length) {
+        const gone = host.retire(retiring.map((r) => r.id));
         if (!gone.ok) throw new Rolled(gone);
       }
 
@@ -2060,7 +2221,8 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
         version: pack.manifest.version,
         declarations: pack.declarations.length - keep.size,
         seeds: planted.length,
-        retired: diff.retires.length,
+        retired: retiring.length,
+        ...(handing.length > 0 ? { handed: handing.length } : {}),
       });
     });
   } catch (e) {

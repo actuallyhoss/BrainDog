@@ -21,6 +21,7 @@ import { clash, fixOf, no, ok, refused } from '@braindog/ports';
 
 import { coerce, isAbsent, instant, measure, parseSpoken, range, type FieldDecl, type Json } from './coerce.ts';
 import { attempt } from './tx.ts';
+import { widens } from './widen.ts';
 import { ulids, type Mint } from './ids.ts';
 import { FORMAT_VERSION, applyMigrations, schemaRefusal, type SchemaState } from './migrate.ts';
 import { jsonPath, compile, fieldSqlIn, addressable, isColumn, type Predicate, type Schema } from '@braindog/where';
@@ -147,6 +148,7 @@ import { arrive, day, exponentOf, propose, shapeOf, type Arrival, type Arrived, 
 import { analyse, observe, type Analysis, type Observation } from './observe.ts';
 import { applyPull, firePull, type PullDecl, type PullDeps } from './pull.ts';
 import { activeScript, egressChanged, fireScript, firstDueMs, scriptDeps } from './script.ts';
+import { finishScript, prepareScript, resumeScript, type ScriptRunDeps, type ScriptRunner } from './script-run.ts';
 import { applyPage, writePoints, type MetricPoint, type PageWrote, type PulledPage } from './fetched.ts';
 import { extractPull, type ExtractDecl, type ExtractDeps, type Extraction } from './extract.ts';
 import {
@@ -226,6 +228,7 @@ export type { SessionHints } from './session.ts';
 export type { Resolved, ScopeDecl, ScopesDecl, Whereabouts } from './scope.ts';
 export { coerce, FIELD_TYPES, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, looksLikeCredential, parseSpoken, spoken } from './coerce.ts';
 export type { FieldDecl, FieldType, Json } from './coerce.ts';
+export { widens, type TypeShape } from './widen.ts';
 export { isUlid, ulids, ulidTime } from './ids.ts';
 export { digest, indexesFor, indexName, jcs, registerOfIndex, validate as validateDeclaration, KINDS } from './declare.ts';
 export { ftsQuery, projectedText } from './fts.ts';
@@ -300,6 +303,7 @@ export type { ExtractDecl, ExtractDeps } from './extract.ts';
 export type { MetricPoint, PageWrote, PulledPage, PulledRow } from './fetched.ts';
 export type { Fired as PullFired, PullDecl, PullDeps } from './pull.ts';
 export { egressChanged } from './script.ts';
+export { finishScript, prepareScript, resumeScript, REFUSED_IN_A_ROW, type ScriptAnswer, type ScriptRunner, type ScriptRunDeps, type ScriptUnrun, type Scripted } from './script-run.ts';
 export { ACTION_KINDS, ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, KEYS_REACH_ALL, RULE_CALLS_PER_DAY, actionJitterMs, answerHash, approvalLines, egressOf, originsOf, reserveFor } from './actions.ts';
 export type {
   ActionAnswer, ActionDecl, ActionKind, ActionRequest, ActionRow, ActionsRun, CallQueued, Egress, Execute,
@@ -573,6 +577,28 @@ export type WriteContext = {
 };
 
 const RESERVED = new Set(['id', 'seq', 'register', 'created_at', 'updated_at', 'version', 'spoken', 'title']);
+
+/**
+ * `tags`, which every list takes whether or not it declared it.
+ *
+ * THE RECORD'S OWN MARKER FIELD, AND IT DEPENDED ON A SEED. The `example` marker, `formed`, the `tag` and `untag` rule
+ * actions and Spark's "not an example" count all read or write `tags` and name no field, and the field existed only
+ * because `packages/seed` appends it to its own lists. `loop/research-shell-seed-next.md` N3 drove a list `jobs` declared
+ * without it and a rule `then: [{ tag: late }, { note: 'late one' }]`: the rule installed and fired, its patch was
+ * refused `FIELD_UNKNOWN`, the note in the same rule went with it, and the only trace was a `write.refused` counter.
+ *
+ * ADDED WHERE A VALUE IS WRITTEN AND WHERE A PREDICATE IS READ, AND NOWHERE ELSE. `register(id)` and `registers()` still
+ * hand back the body somebody declared, because an agent reading a list's fields to learn what it holds should not find
+ * one nobody wrote down, and `declare` diffs that body against the next version. `schemaOf` does carry it: it is the
+ * vocabulary a `where:` compiles against, the value sits in `fields` exactly as a declared `list<text>` does, and
+ * `tags has late` on a list that never declared it has to read.
+ *
+ * A LIST THAT DECLARES ITS OWN `tags` KEEPS IT, retired or of another shape, since that is a choice somebody made.
+ */
+type DeclaredField = RegisterDecl['fields'][number];
+const TAGS: DeclaredField = { id: 'tags', type: 'list', of: 'text' };
+const withTags = (fields: readonly DeclaredField[]): readonly DeclaredField[] =>
+  fields.some((f) => f.id === 'tags') ? fields : [...fields, TAGS];
 
 /** One line of the log as the record-wide reads scan it: the event, with its values parsed. */
 export type EventLine = {
@@ -1118,6 +1144,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * seven consumers of that grammar and two renderings of it, so the fallback belongs to `where`
    * and `38 §4.3` item 13 puts it there. What this function knows is what the REGISTER declares;
    * what the RECORD keeps for itself is not a register's business to say.
+   *
+   * WITH ONE ADDITION, `tags` (`withTags`), which is not a column: it sits in `fields` as any declared
+   * `list<text>` does, so the compiler and the evaluator already read it the one way, and it is here
+   * rather than in `where` because this is the only place that knows whether the list declared its own.
    */
   const schemaOf = (register: string): Schema => ({
     register,
@@ -1133,7 +1163,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
        that keeps the rule was never told which registers it was about. */
     ...(registers.get(register)?.series === true ? { series: true } : {}),
     fields: Object.fromEntries(
-      (registers.get(register)?.fields ?? [])
+      (registers.has(register) ? withTags(registers.get(register)!.fields) : [])
         .filter((f) => !f.retired)
         /* THE LABEL TRAVELS WITH THE FIELD, because a page prints its own `where:` back to the
            reader using it: `direction is owed_to_me` is shown as `which way is owed to me`. Without
@@ -1304,7 +1334,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     const shape = (register: string): Schema | null => {
       const arriving = batch.find((d) => d.kind === 'register' && (d.body as { id?: unknown }).id === register);
       if (arriving) {
-        const fields = ((arriving.body as { fields?: unknown }).fields ?? []) as (FieldDecl & { retired?: boolean })[];
+        /* WITH `tags` for `schemaOf`'s reason, so a rule over `tags has late` installs beside the list it reads. */
+        const fields = withTags(((arriving.body as { fields?: unknown }).fields ?? []) as DeclaredField[]);
         return {
           register,
           /* A register arriving in this batch is a series by its own body, for `schemaOf`'s reason. */
@@ -1412,6 +1443,29 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           if (bad) return bad;
         }
 
+      /* A COLUMN'S `sign:` IS READ HERE TOO, for the `where`'s reason: the page layer refused it on every open
+         (`pages.ts`, "a sign is read from an enum and one of its values") while the page installed clean. And it is
+         what lets `stranded` ask a page whose sign reads an enum that a change opens to free text. */
+      if (decl.kind === 'page' && Array.isArray(body.blocks))
+        for (const [i, raw] of body.blocks.entries()) {
+          const block = raw as { source?: unknown; columns?: unknown } | null;
+          if (!block || typeof block.source !== 'string' || !block.source.startsWith('register.') || !Array.isArray(block.columns)) continue;
+          const list = block.source.slice('register.'.length);
+          const schema = shape(list);
+          if (!schema) continue;
+          for (const column of block.columns as { sign?: { field?: unknown; minus?: unknown } }[]) {
+            const sign = column?.sign;
+            if (sign === undefined) continue;
+            const field = typeof sign?.field === 'string' && Object.hasOwn(schema.fields, sign.field) ? schema.fields[sign.field] : undefined;
+            if (field?.type === 'enum' && typeof sign?.minus === 'string' && (field.values ?? []).includes(sign.minus)) continue;
+            return {
+              code: 'DECLARATION_INVALID',
+              fix: `${decl.id}.blocks[${i}]: sign: names an enum field on ${list} and the value that makes the amount go out, such as { field: direction, minus: owed_by_me }.`,
+              at: `blocks[${i}].columns`,
+            };
+          }
+        }
+
       const source = typeof body.source === 'string' ? body.source : '';
       const register =
         decl.kind === 'rule'
@@ -1499,7 +1553,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * the write path's own `ENUM_VALUE_UNKNOWN`, which is the refusal those rows would otherwise meet on every edit.
    * A `default` is the answer for rows that have none, so a required field that ships one is not refused; a type
    * change over a field no row holds breaks nothing, so it is not refused either. Live rows only, as the unique check
-   * in `applyDeclarations` counts them.
+   * in `applyDeclarations` counts them, except a field left out, where a deleted row counts too (its comment says why).
    */
   function contradicted(batch: readonly Declaration[]): Refusal | null {
     const rows = (n: number) => (n === 1 ? '1 row' : `${n} rows`);
@@ -1521,21 +1575,40 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          one. Every check below walks the ARRIVING fields, so a field that was simply absent was never asked about: it
          installed, the value stayed in the row's JSON through every later edit, and no reader could see it. Retiring is
          the removal that keeps the value and says so, and it stays legal; a field already retired may then go, since
-         its values were put away on purpose. */
+         its values were put away on purpose.
+
+         A DELETED ROW IS COUNTED TOO, alone of the checks here. `loop/research-batch-thirty-two-audit.md` §7 dropped
+         `domain` while a row was live (refused), deleted the row, dropped it again (installed), and restored the row:
+         its JSON held `"domain":"kiln.example"` under a list with no `domain`, the state this check exists to prevent.
+         The other checks ask what a reader meets on the next edit, which a deleted row never has; this one asks what
+         the rows hold, and a deleted row holds its values until the thirty-day purge, which is exactly as long as a
+         restore can bring them back. Refusing the restore instead would leave the person who deleted by mistake
+         unable to undo it over a schema change somebody else made, and retiring is one word in the declaration. */
       const named = new Set((fields as Field[]).map((f) => f?.id).filter((id): id is string => typeof id === 'string'));
       for (const [id, was] of before) {
         if (named.has(id) || was.retired === true) continue;
+        /* NOR IS A DECLARED `tags` LEFT OUT when the one every list takes (`withTags`) reads what it held: a `list<text>`,
+           or a `list<enum>` that widens to one. Refused here, its fix sent the list to retire `tags`, and a retired `tags`
+           is a choice the list made, so the next `tag` on that list was `FIELD_UNKNOWN`. */
+        if (id === 'tags' && (typeOf(was) === typeOf(TAGS) || widens(was, TAGS))) continue;
         let path: string;
         try {
           path = jsonPath(id);
         } catch {
           continue;
         }
-        const n = count(`json_extract(fields, '${path}') IS NOT NULL`);
+        const held = sql.one<{ n: number; gone: number }>(
+          `SELECT count(*) AS n, count(deleted_at) AS gone FROM entry WHERE register = ? AND json_extract(fields, '${path}') IS NOT NULL`,
+          register,
+        );
+        const n = Number(held?.n ?? 0);
+        const gone = Number(held?.gone ?? 0);
         if (n > 0)
           return {
             code: 'WOULD_ORPHAN',
-            fix: `${rows(n)} ${n === 1 ? 'holds' : 'hold'} ${id}. Mark it retired rather than leaving it out.`,
+            fix: `${rows(n)} ${n === 1 ? 'holds' : 'hold'} ${id}${
+              gone === 0 ? '' : n === 1 ? ', a deleted one a restore brings back' : `, ${gone} of them ${gone === 1 ? 'a deleted one' : 'deleted ones'} a restore brings back`
+            }. Mark it retired rather than leaving it out.`,
             at: `${decl.id}.fields`,
           };
       }
@@ -1562,7 +1635,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         const held = `json_extract(fields, '${path}') IS NOT NULL`;
         const was = before.get(f.id);
 
-        if (was !== undefined && was.retired !== true && typeOf(was) !== typeOf(f)) {
+        /* A WIDENING IS NOT A RETYPE (`widen.ts`): `enum` to `text` over held values was refused here with "retire the
+           field and add a new one" (`loop/research-shell-seed-next.md` N2), though every stored value was already valid
+           text and the fix would have split one column into two. */
+        if (was !== undefined && was.retired !== true && typeOf(was) !== typeOf(f) && !widens(was, f)) {
           const n = count(held);
           if (n > 0)
             return {
@@ -1639,19 +1715,25 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    *
    * ONLY WHAT THIS CHANGE BREAKS. A reader that already fails against the list as it stands is passed over: refusing
    * every later edit to a list because of a figure an earlier path let through would blame the wrong change, and the
-   * figure is already saying so on every read. And only a change that takes a field away is looked at, which is the
-   * case that was measured; a type change over held rows is `contradicted`'s.
+   * figure is already saying so on every read. And only a change that takes a field away or widens one is looked at; any
+   * other type change over held rows is `contradicted`'s.
+   *
+   * A WIDENING IS ASKED ABOUT TOO. `contradicted` lets `enum` to `text` through without asking any reader (`widen.ts`),
+   * and the checker of wave thirty-three measured what that left: a rule with `each: [season]` survived `season` opening
+   * to text, though the same rule declared fresh is refused, and at run time it crossed the whole free text as one item.
+   * A page column whose `sign:` reads the enum is the same kind of reader. Every stored value still reads back; what a
+   * widening takes away is the closed list, and these are the readers that needed it.
    *
    * A reader changed in the same batch is the batch's, and was checked with it.
    */
   function stranded(batch: readonly Declaration[]): Refusal | null {
     const arriving = new Set(batch.map((d) => d.id));
-    type Field = { id?: unknown; retired?: unknown };
-    const live = (fields: unknown): Set<string> =>
-      new Set(
+    type Field = { id?: unknown; retired?: unknown; type?: unknown; of?: unknown };
+    const live = (fields: unknown): Map<string, Field> =>
+      new Map(
         (Array.isArray(fields) ? (fields as Field[]) : [])
           .filter((f) => f?.retired !== true && typeof f?.id === 'string')
-          .map((f) => f.id as string),
+          .map((f) => [f.id as string, f]),
       );
     let readers: Declaration[] | null = null;
 
@@ -1660,15 +1742,16 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const register = ownId(decl);
       const was = sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0', decl.id);
       if (!was) continue;
-      let before: Set<string>;
+      let before: Map<string, Field>;
       try {
         before = live((JSON.parse(was.body) as { fields?: unknown }).fields);
       } catch {
         continue;
       }
       const after = live((decl.body as { fields?: unknown }).fields);
-      const gone = [...before].filter((f) => !after.has(f));
-      if (gone.length === 0) continue;
+      const gone = [...before.keys()].filter((f) => !after.has(f));
+      const opened = [...before].filter(([id, f]) => after.has(id) && widens(f, after.get(id)!)).map(([id]) => id);
+      if (gone.length === 0 && opened.length === 0) continue;
 
       readers ??= sql
         .all<{ id: string; kind: string; body: string; pack_id: string | null }>(
@@ -1702,10 +1785,19 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         /* THE FIELD THE REFUSAL NAMES, by the words both checks use for it. A bare substring match named `what` and
            `kind` out of any sentence that happened to hold them. */
         const named = gone.filter((f) => new RegExp(`\\b(field called|reads|groups by) ${f}\\b`).test(then.fix));
-        const fields = (named.length > 0 ? named : gone).join(' and ');
+        if (gone.length > 0) {
+          const fields = (named.length > 0 ? named : gone).join(' and ');
+          return {
+            code: then.code,
+            fix: `Taking ${fields} out of ${list} would leave ${what} ${called} (${reader.id}) unable to read it: ${then.fix} Change or retire ${reader.id} first, or keep ${fields}.`,
+            at: reader.id,
+          };
+        }
+        const widened = opened.filter((f) => then.fix.includes(f));
+        const fields = (widened.length > 0 ? widened : opened).join(' and ');
         return {
           code: then.code,
-          fix: `Taking ${fields} out of ${list} would leave ${what} ${called} (${reader.id}) unable to read it: ${then.fix} Change or retire ${reader.id} first, or keep ${fields}.`,
+          fix: `Opening ${fields} on ${list} to free text would leave ${what} ${called} (${reader.id}) reading a closed list that is no longer there: ${then.fix} Change or retire ${reader.id} first, or keep ${fields} as it is.`,
           at: reader.id,
         };
       }
@@ -2501,7 +2593,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       /* Read before the checks, because uniqueness on a restore depends on it. */
       const deleting = patch.deleted_at !== undefined;
 
-      const known = new Map(decl.fields.filter((f) => !f.retired).map((f) => [f.id, f]));
+      /* `tags` IS WRITABLE ON EVERY LIST (`withTags`), so a rule's `tag:` on a list that never declared it lands, and
+         the history below writes it as `tag` and `untag` rows because it reads the type off this map. */
+      const known = new Map(withTags(decl.fields).filter((f) => !f.retired).map((f) => [f.id, f]));
       const merged: Record<string, Json> = { ...(current?.fields ?? {}) };
       const touched: string[] = [];
 
@@ -3795,6 +3889,14 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     tz: recordIdentity(sql)?.tz ?? 'UTC',
   });
 
+  /** What a script's run needs on top of an action's: the savepoint's transaction, the write path, and a spoken id's register. */
+  const scriptRunDeps = (): ScriptRunDeps => ({
+    ...actionDeps(),
+    transaction,
+    write: (register, ref, patch, w) => write(register, ref, patch as Patch, w),
+    registerOf: (spoken) => get(spoken)?.register ?? null,
+  });
+
   /**
    * What the gate needs: the counters, and the write path for the rows an accepted `rowset` writes.
    *
@@ -4657,7 +4759,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       raw: { ts: string; body: string },
       /* `rows` COMES THROUGH THE CONTEXT BECAUSE IT CANNOT COME THROUGH AN IMPORT. `42 §4.7`'s four
          non-JSON formats are read by `@braindog/extract`, rank 9 to this package's 7; the host is
-         rank 15 and can reach both, so it hands the reader down beside the currency table. A host
+         rank 16 and can reach both, so it hands the reader down beside the currency table. A host
          that does not is answered per page rather than silently. */
       ctx: { maxRows?: number; rows?: ExtractDeps['rows'] } = {},
     ): Extraction =>
@@ -4689,13 +4791,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * THE EXECUTOR IS AN ARGUMENT, so there is no network in the kernel. Every step is its own transaction and
      * the executor runs between them, outside all of them.
      */
-    async runActions(execute: Execute, opts: { limit?: number; scheduler?: Scheduler; page?: PagedRun; budget?: Budget } = {}): Promise<ActionsRun> {
+    async runActions(execute: Execute, opts: { limit?: number; scheduler?: Scheduler; page?: PagedRun; budget?: Budget; script?: ScriptRunner } = {}): Promise<ActionsRun> {
       try {
         return await runScheduledActions(
           {
-            drain: () => transaction(() => drainSchedule(sql, ackDeps(), HANDLERS, 100, ACTION_KINDS)),
-            lease: (n) => transaction(() => lease(sql, ackDeps(), ['pull.fetch'], n)),
-            prepare: (job) => transaction(() => prepareAction(actionDeps(), job)),
+            /* A DUE SCRIPT FIRES IN THIS PASS TOO, so the pass that fires it is the pass that can run it. */
+            drain: () => transaction(() => drainSchedule(sql, ackDeps(), HANDLERS, 100, [...ACTION_KINDS, 'script'])),
+            lease: (n) => transaction(() => lease(sql, ackDeps(), ['pull.fetch', 'script.run'], n)),
+            prepare: (job) => transaction(() => (job.kind === 'script.run' ? prepareScript(scriptRunDeps(), job) : prepareAction(actionDeps(), job))),
+            finishScript: (s, a) => transaction(() => finishScript(scriptRunDeps(), s, a)),
             finish: (ready, answer, hash) => transaction(() => finishAction(actionDeps(), ready, answer, hash)),
             release: (paged) =>
               void transaction(() => ack(sql, ackDeps(), { id: paged.job.id, state: 'done', leasedUntil: paged.job.leasedUntil })),
@@ -4737,6 +4841,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           opts.limit ?? 5,
           opts.page,
           opts.budget,
+          opts.script,
         );
       } finally {
         if (opts.scheduler) await tail(opts.scheduler);
@@ -4746,6 +4851,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /** Start a paused scheduled action again, now. A refused key pauses one, and nothing else restarts it. */
     resumeAction: (ingest: string, actor: string) =>
       transaction(() => resumeScheduledAction({ sql, mint, nowMs: clock.now() }, ingest, actor)),
+
+    /** Start a script paused by three refused runs again, now. Nothing else restarts it. */
+    resumeScript: (script: string, actor: string) => transaction(() => resumeScript({ sql, mint, nowMs: clock.now() }, script, actor)),
 
     /** Every active scheduled action: its schedule, its key by label, its last run and this month's counts. A read. */
     actions: () => listActions(sql, clock.now()),
@@ -5674,10 +5782,44 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       return unreadable(batch) ?? lintBatch(sql, batch);
     },
 
-    retire(ids: readonly string[]) {
+    /**
+     * Retire declarations, and with `by` write one `declare` line for each that was live.
+     *
+     * A RETIRE WROTE NO HISTORY. `loop/research-batch-thirty-two-audit.md` §8: `setDeclaration` wrote `Added name.` by
+     * `p_1`, `retireDeclaration` then retired Projects, and the `declare` lines were unchanged, so "who took Projects
+     * off" had no answer. The line names the version that was retired as both `from_v` and `to_v`, because a retire makes
+     * no new version: a `from_v` of null is what `declared` writes for a declaration's first version, and a reader of the
+     * feed would have read the retire as an arrival. Unsigned, it writes nothing, for `declared`'s reason: that is setup.
+     *
+     * THE LIVE VERSIONS ARE READ INSIDE THE SAME TRANSACTION AS THE RETIRE, so a line is written only for what this call
+     * actually took off, and a refused retire rolls back with no line.
+     */
+    retire(ids: readonly string[], by?: DeclaredBy) {
       const refused = schemaRefusal(state);
       if (refused) return refused;
-      const out = retireDeclarations(sql, ids, transaction);
+      const out = transaction(() => {
+        const live = [...new Set(ids)].flatMap((id) => {
+          const hit = sql.one<{ version: number }>('SELECT version FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0', id);
+          return hit ? [{ id, version: hit.version }] : [];
+        });
+        const done = retireDeclarations(sql, ids, transaction);
+        /* UNDER A SUGGESTION IT NAMES WHO PROPOSED IT, as `declared` does for an install. */
+        const proposer = by?.suggestion === undefined ? undefined : sql.one<{ by: string }>('SELECT opened_by AS by FROM suggestion WHERE id = ?', by.suggestion)?.by;
+        const note = proposer === undefined ? 'Retired.' : `Retired. Proposed by ${proposer} in ${by!.suggestion}.`.slice(0, 280);
+        if (done.ok && by?.actor !== undefined)
+          for (const one of live)
+            sql.exec(
+              "INSERT INTO event (id, ts, actor, kind, target, target_kind, from_v, to_v, note) VALUES (?, ?, ?, 'declare', ?, 'declaration', ?, ?, ?)",
+              mint(),
+              instant(clock.now()),
+              by.actor,
+              `declaration:${one.id}`,
+              String(one.version),
+              String(one.version),
+              note,
+            );
+        return done;
+      });
       if (out.ok) reload();
       return out;
     },

@@ -72,6 +72,13 @@ export type RunTrigger = {
   arrival?: string;
   channel?: string;
   ingest?: string | null;
+  /**
+   * A delete started the run. A deleted row is hidden from `deps.entry`, so without this a run about a delete had
+   * nothing to read: its `if` failed and its `{{trigger.row.…}}` was a hole. A FLAG AND NOT A COPY: the first form of
+   * this kept the whole row here, and `eraseSubjects` does not read `automation_run`, so an erased name stayed in a
+   * finished run for the ninety days one is kept. `deletedRow` reads the row from `entry`, where an erasure reaches it.
+   */
+  deleted?: true;
 };
 
 type RunRow = {
@@ -94,17 +101,45 @@ const isObject = (x: unknown): x is Record<string, unknown> => x !== null && typ
 /* ── what is installed ──────────────────────────────────────────────── */
 
 /**
+ * What `installed` has already parsed, per record, keyed by declaration id, version and checksum. `null` is an inline
+ * rule, remembered so that it is not parsed again only to be left out.
+ */
+const parsed = new WeakMap<Sql, Map<string, Installed | null>>();
+
+/**
  * Every active rule that runs as a run, with its version.
  *
  * `pathOf` DECIDES, AS IT DOES AT INSTALL. An inline rule is `runRules`'s inside the write and is never started here,
  * so a rule is run by exactly one of the two, and a rule installed before `on:` existed is never started twice.
+ *
+ * A BODY IS PARSED ONCE PER VERSION. This is read on every write of every register, and it ran `JSON.parse` and
+ * `pathOf` over every active rule each time: measured on 22 September with sixty rules of twenty steps, 0.55 ms a call,
+ * paid by writes that no automation is about, and 0.18 ms with this cache, which is the select of sixty short rows.
+ * The key carries the checksum as well as the version because a version number can be reused: an install that rolls
+ * back leaves the next install the same number for different bytes. The bodies handed back are shared between calls,
+ * so nothing here or in a caller writes to one.
  */
 export function installed(sql: Sql): Installed[] {
-  return sql
-    .all<{ body: string; version: number }>("SELECT body, version FROM declaration WHERE kind = 'rule' AND superseded_at IS NULL AND retired = 0")
-    .map((r) => ({ body: JSON.parse(r.body) as FlowDecl, version: r.version }))
-    .filter((r) => typeof r.body.rule === 'string' && pathOf(r.body) === 'run')
-    .map((r) => ({ id: r.body.rule, version: r.version, body: r.body }));
+  const was = parsed.get(sql);
+  const now = new Map<string, Installed | null>();
+  const out: Installed[] = [];
+  for (const r of sql.all<{ id: string; version: number; checksum: string }>(
+    "SELECT id, version, checksum FROM declaration WHERE kind = 'rule' AND superseded_at IS NULL AND retired = 0",
+  )) {
+    const key = `${r.id}@${r.version}:${r.checksum}`;
+    let hit = was?.get(key);
+    if (hit === undefined) {
+      const text = sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND version = ?', r.id, r.version)?.body;
+      const body = text === undefined ? null : (JSON.parse(text) as FlowDecl);
+      hit = body !== null && typeof body.rule === 'string' && pathOf(body) === 'run' ? { id: body.rule, version: r.version, body } : null;
+    }
+    now.set(key, hit);
+    if (hit) out.push(hit);
+  }
+  /* THE MAP IS REPLACED, NOT ADDED TO, so a superseded or retired version leaves it on the next read and a record that
+     installs all day does not grow one entry per edit for the life of the process. */
+  parsed.set(sql, now);
+  return out;
 }
 
 /** The body a run started under. A run keeps its version for its life, whatever is installed since. */
@@ -243,7 +278,8 @@ export function onWritten(
     /* A REFUSAL HERE IS THE DAY'S CEILING OR A SWITCHED-OFF RULE, and neither is the writer's fault: the write stands.
        The marker goes back, as the inline pass gives one back for a rule that did nothing, or the row would be
        counted as run for ever by a run that never started. */
-    const started = startRun(deps, rule, { kind: 'written', entry: w.entry.id, register: w.register, op: w.op }, { actor: w.actor, depth: w.depth });
+    const trigger: RunTrigger = { kind: 'written', entry: w.entry.id, register: w.register, op: w.op, ...(w.op === 'delete' ? { deleted: true as const } : {}) };
+    const started = startRun(deps, rule, trigger, { actor: w.actor, depth: w.depth });
     if (!started.ok && key !== null) deps.sql.exec("DELETE FROM schedule WHERE kind = 'rule' AND key = ?", key);
   }
 }
@@ -335,8 +371,13 @@ export function advance(deps: FlowDeps, id: string): number | null {
   const trigger = JSON.parse(run.trigger) as RunTrigger;
   const vars = JSON.parse(run.vars) as Vars;
   let subject = trigger.entry ? deps.entry(trigger.entry) : null;
+  /* WHAT A STEP READS AND WHAT IT WRITES ARE TWO ROWS WHEN A DELETE STARTED THE RUN. Its conditions and templates read
+     the row as it was deleted, which is what the rule was written about; its writes get `subject`, which is `null`,
+     so a `set` on a deleted row fails with a sentence rather than bringing the row back. */
+  const last = subject === null && trigger.deleted === true && trigger.entry ? deletedRow(deps.sql, trigger.entry) : null;
+  const read = (): Entry | null => subject ?? last;
   const actor = `rule:${run.rule}`;
-  const scope = () => ({ vars, trigger: context(deps, trigger, subject) });
+  const scope = () => ({ vars, trigger: context(deps, trigger, read()) });
   deps.sql.exec("UPDATE automation_run SET state = 'running' WHERE id = ?", id);
 
   const fail = (n: number, kind: string, say: string): null => {
@@ -356,7 +397,7 @@ export function advance(deps: FlowDeps, id: string): number | null {
     }
 
     if (op.verb === 'if') {
-      const said = test(deps, fill(step.if, scope()) as Predicate | string, subject, vars);
+      const said = test(deps, fill(step.if, scope()) as Predicate | string, read(), vars);
       if (said.bad) return fail(i, 'if', `rule.${run.rule} could not read its condition at step ${i + 1}: ${said.bad}`);
       record(deps, id, i, 'if', 'done', said.yes ? 'then' : 'else');
       i = said.yes ? i + 1 : op.to;
@@ -396,7 +437,7 @@ export function advance(deps: FlowDeps, id: string): number | null {
         `rule.${run.rule} reached a ${op.verb} step, and a step that waits on ${op.verb === 'call' ? 'a call' : op.verb === 'script' ? 'a script' : op.verb === 'ask_spark' ? 'Spark' : 'a person'} is not in this build (NOT_IN_THIS_BUILD). The steps before it were taken.`,
       );
 
-    const acted = act(deps, run.rule, op.verb, fill(step, scope()) as RuleAction, subject, id, actor);
+    const acted = act(deps, run.rule, op.verb, fill(step, scope()) as RuleAction, subject, id, actor, subject === null ? last : null);
     if (!acted.ok) return fail(i, op.verb, acted.say);
     record(deps, id, i, op.verb, 'done', acted.answer);
     if (subject) subject = deps.entry(subject.id);
@@ -425,6 +466,7 @@ function act(
   subject: Entry | null,
   batch: string,
   actor: string,
+  gone: Entry | null,
 ): { ok: true; stop: boolean; answer: string | null } | { ok: false; say: string } {
   const r = deps.rules();
   if (verb === 'stop') return { ok: true, stop: true, answer: null };
@@ -442,6 +484,11 @@ function act(
       if (opened.ok) return { ok: true, stop: false, answer: opened.value.id };
       return { ok: false, say: refused(opened) ? opened.refusal.fix : `rule.${rule}'s question clashed with one already open.` };
     }
+    if (gone)
+      return {
+        ok: false,
+        say: `rule.${rule}'s ${verb} step acts on ${gone.seq === null ? gone.id : `${gone.register}#${gone.seq}`}, which was deleted, and a step does not write to a deleted row.`,
+      };
     return { ok: false, say: `rule.${rule}'s ${verb} step acts on a row, and this run has none to act on.` };
   }
 
@@ -529,6 +576,20 @@ export function pruneRuns(sql: Sql, nowMs: number): number {
 }
 
 /* ── reading the run's context ──────────────────────────────────────── */
+
+/**
+ * The row a delete started the run about, read from `entry` as it stands, or `null` once it is gone for good.
+ *
+ * AS IT STANDS, NOT AS IT WAS COPIED. An erasure tombstones the fields of a deleted row in place, so a run that reads
+ * it afterwards reads the tombstone, which is what every other reader of that row sees.
+ */
+function deletedRow(sql: Sql, id: string): Entry | null {
+  const r = sql.one<{ id: string; register: string; seq: number | null; fields: string; state: string | null; version: number; created_at: string; updated_at: string; deleted_at: string | null }>(
+    'SELECT id, register, seq, fields, state, version, created_at, updated_at, deleted_at FROM entry WHERE id = ? AND deleted_at IS NOT NULL',
+    id,
+  );
+  return r ? { ...r, fields: JSON.parse(r.fields) as Entry['fields'] } : null;
+}
 
 /** `{{trigger.…}}`: what started the run, the row's fields, and an arrival's JSON body where it has one. */
 function context(deps: FlowDeps, trigger: RunTrigger, subject: Entry | null): Record<string, unknown> {

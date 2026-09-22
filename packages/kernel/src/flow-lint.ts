@@ -1,8 +1,8 @@
 /**
  * The lint of an automation: a rule that has grown a trigger and steps (`loop/research-shell-automations.md` §2 to §4).
  *
- * AN AUTOMATION IS NOT A NINTH KIND. `04 §1` closes the list at eight and enforces it in three places, so a `rule` body
- * grows `on:` and `steps:` instead, and every rule installed before either existed is already an automation whose
+ * AN AUTOMATION IS NOT A KIND OF ITS OWN. `04 §1` closes the list (nine since `script` joined it, `declare.ts`'s
+ * `KINDS`) and enforces it in three places, so a `rule` body grows `on:` and `steps:` instead, and every rule installed before either existed is already an automation whose
  * trigger is `written`. This file is the half of that promise that can be checked before anything runs: what a body may
  * say, and which of the two paths it takes.
  *
@@ -54,7 +54,8 @@ const VERBS: readonly string[] = [...ACTIONS, ...FLOW];
 
 /**
  * THE VERBS THAT ARE ABOUT A ROW. `tag` on a clock tick has nothing to tag: `runRules` hands each of these the entry that
- * was written, and a run started by `every`, `metric` or `manual` has none. Installing one would be a step that reaches
+ * was written, and a run started by `every`, `metric` or `manual` has none. `call` is not listed because a call that
+ * sends no fields needs no row; the walk in `flowFault` holds a call that does send them to the same rule as `run`. Installing one would be a step that reaches
  * for a row that is not there, on every fire, for ever.
  */
 const ROW_VERBS: readonly string[] = ['tag', 'untag', 'set', 'move', 'link', 'note', 'schedule', 'run'];
@@ -68,6 +69,13 @@ const ONCE: readonly string[] = ['notify', 'create', 'suggest', 'run', 'call', '
 const NAME = /^[a-z][a-z0-9_]{0,31}$/;
 /** `trigger` and `vars` are the run context's own two keys, so a var called either would shadow the path to itself. */
 const RESERVED: readonly string[] = ['trigger', 'vars'];
+
+/**
+ * A `when:` that names a day relative to today. A copy of the test `rulesAboutTime` in `index.ts` uses to pick the rules
+ * it re-reads each hour, exported so that function can import it: until it does, the two are held together by hand, and
+ * an edit to one that misses the other lets the lint and the sweep disagree about which rules are about time.
+ */
+export const RELATIVE_DAY = /\b(?:today|yesterday|tomorrow)\b|[+-]\d+[dwmy]\b/u;
 
 const DAY_MS = 86_400_000;
 const WEEK_MS = 7 * DAY_MS;
@@ -154,10 +162,32 @@ export function callFault(id: string, name: unknown, at: string, register: strin
   if (call === undefined) return bad('DECLARATION_UNKNOWN', `${id} runs ${name}, and there is no action called ${name}.`, at);
   if (call.channel !== 'call' || (call.trigger !== 'rule' && call.trigger !== 'both'))
     return bad('DECLARATION_INVALID', `${id} runs ${name}, which is not a call a rule may start. Give ${name} trigger: rule or trigger: both.`, at);
-  const from = Array.isArray(call.sends) && typeof call.sends[0] === 'string' ? call.sends[0].split('.')[0] : null;
+  const from = sendsFrom(call);
   if (from !== null && register !== null && from !== register)
     return bad('DECLARATION_INVALID', `${id} is about ${register}, and ${name} sends fields of ${from}.`, at);
   return null;
+}
+
+/** The register whose fields a call sends, or `null` for a call that sends none, such as the GET of a price. */
+function sendsFrom(call: { sends?: unknown } | undefined): string | null {
+  const sends = call?.sends;
+  return Array.isArray(sends) && typeof sends[0] === 'string' ? (sends[0].split('.')[0] ?? null) : null;
+}
+
+/**
+ * The register of the row a run has in hand when it starts, or `null` when it has none.
+ *
+ * AN ARRIVAL'S ROW IS THE ONE ITS DOOR WRITES, and only a named door says which register that is. `onArrival` hands a
+ * run the first row the arrival wrote, so `on: { arrival: { ingest: invoices } }` brings an invoice row and
+ * `on: { arrival: {} }` brings a row of whatever register the door that matched writes, which no lint can know.
+ */
+function rowOf(decl: FlowDecl, trigger: string, installed: Known): string | null {
+  if (trigger === 'written') return subjectOf(decl);
+  if (trigger !== 'arrival') return null;
+  const door = (decl.on as { arrival?: { ingest?: unknown } }).arrival?.ingest;
+  if (typeof door !== 'string') return null;
+  const writes = (installed.get(`ingest.${door}`) as { writes?: { register?: unknown } } | undefined)?.writes?.register;
+  return typeof writes === 'string' ? writes : null;
 }
 
 /**
@@ -236,11 +266,23 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
      arrival its `ingest`, `channel` and `state` admit. Refused rather than installed as a filter that filters nothing. */
   if (trigger === 'arrival' && body.when !== undefined)
     return bad('NOT_IN_THIS_BUILD', `${id} is started by an arrival, and the runner does not read when: on one yet. Narrow it with ingest:, channel: or state:, or test the row in an if step.`, 'when');
+  /* A RULE ABOUT TIME IS RE-READ EACH HOUR ONLY ON THE INLINE PATH. `rulesAboutTime` hands every such rule to
+     `applyRule`, which finds its rows by the top-level `register:`, and a run-path rule has none: measured on 22
+     September, a rule saying `due before today` with `once_per` installed here, its row went past due, and a sweep
+     by hand started nothing. Refused until the sweep starts runs; without `once_per` the sweep skips an inline rule
+     too, so that body reads on writes alone on either path and is let through. */
+  if (trigger === 'written' && Array.isArray(body.once_per) && body.once_per.length > 0 && RELATIVE_DAY.test(JSON.stringify(body.when ?? '')))
+    return bad(
+      'NOT_IN_THIS_BUILD',
+      `${id} names a day relative to today in when:, and only a rule that runs inside the write is read again as the days pass. Write it with register: and then:, and no op:, fields:, from_rules: or steps:.`,
+      'when',
+    );
 
   /* THE WALK: shape, verbs, depth, count and names, over `then` or `steps` alike, since on this path `then` is a flat
      list of steps. */
   const names = new Set<string>();
   let count = 0;
+  const row = installed === undefined ? null : rowOf(decl, trigger, installed);
   const walk = (list: unknown, at: string, depth: number): Refusal | null => {
     if (!Array.isArray(list)) return bad('DECLARATION_INVALID', `${id}'s ${at} is a list of steps.`, at);
     for (const [i, step] of list.entries()) {
@@ -257,6 +299,21 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
         return bad('DECLARATION_INVALID', `${id} is started by ${trigger}, which has no row, and ${here} is ${verb}, which acts on one.`, here);
       const fault = stepFault(id, verb, step, here, subjectOf(decl), installed, names);
       if (fault) return fault;
+      /* A CALL THAT SENDS A ROW NEEDS ONE, AS A STEP OR AS `run:`. `run:` was refused on a clock by `ROW_VERBS` and the
+         same call as a step installed on a clock, a button and any arrival (audit thirty-two, section 4): an hourly
+         post of a row nobody handed it, and a pattern of sending the owner approved as once per row and never saw.
+         A call that sends nothing, the price GET of `07 §6.2`, needs no row and installs on a clock. `written` is
+         `callFault`'s to check, against the register the rule is about. */
+      if (installed !== undefined && trigger !== 'written' && (verb === 'call' || verb === 'run')) {
+        const name = verb === 'call' ? (step.call as { ingest?: unknown }).ingest : step.run;
+        const from = sendsFrom(installed.get(`ingest.${String(name)}`) as { sends?: unknown } | undefined);
+        if (from !== null && from !== row)
+          return bad(
+            'DECLARATION_INVALID',
+            `${id} is started by ${trigger}, which brings ${row === null ? `no ${from} row` : `a ${row} row`}, and ${here} ${verb === 'call' ? 'calls' : 'runs'} ${String(name)}, which sends fields of ${from}. Start it from writes to ${from}${trigger === 'arrival' ? `, or from arrivals at an ingest that writes ${from}` : ''}.`,
+            here,
+          );
+      }
       if (verb === 'if') {
         if (depth >= DEPTH_CEILING)
           return bad('OUT_OF_BOUNDS', `${id} nests a branch ${depth + 1} deep at ${here}, and ${DEPTH_CEILING} is the most. Lift the inner branch into its own step.`, here);
@@ -405,7 +462,15 @@ function triggerFault(id: string, on: unknown, installed?: Known): Refusal | nul
         return bad('DECLARATION_INVALID', `${id}'s crosses: is target, { lte: n } or { gte: n }.`, `${at}.crosses`);
       if (installed !== undefined && !installed.has(`metric.${value.id}`))
         return bad('DECLARATION_UNKNOWN', `${id} watches ${value.id}, and there is no metric called ${value.id}.`, `${at}.id`);
-      return null;
+      /* NOTHING STARTS IT YET. The four starts are `onWritten`, `onArrival`, `onClock` and the button, and each skips
+         every trigger but its own: this body linted clean and was read by nothing. The start belongs where a metric
+         is read on a clock, the `snapshot` handler in `index.ts`, and until it lands the rule is refused here. The
+         checks above stay first, so a wrong id or a wrong bound is still told what is wrong with it. */
+      return bad(
+        'NOT_IN_THIS_BUILD',
+        `${id} is started by metric ${value.id} crossing a line, and nothing in this build watches a metric for that, so it would install and never start.`,
+        at,
+      );
     }
     case 'decided':
       return bad('NOT_IN_THIS_BUILD', `${id} is started by a decision, which §4.1 reserves: a run's own asks resume it without this trigger.`, at);

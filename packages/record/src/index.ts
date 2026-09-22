@@ -1358,7 +1358,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     stage: (batch) => kernel.stageInstall(batch as never),
     transaction: (fn) => kernel.transaction(fn),
     reload: () => kernel.reload(),
-    retire: (ids) => kernel.retire(ids),
+    retire: (ids, by) => kernel.retire(ids, by ?? { actor: actorOf(ctx) }),
     seed: (register, fields, note) =>
       kernel.create(register, { ...fields, tags: exampleTag(fields) }, {
         actor: actorOf(ctx),
@@ -3868,6 +3868,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /**
+     * Start a script paused by three refused runs again, now (`loop/DIRECTION.md` §22).
+     *
+     * GUARDED EXACTLY AS `resumeAction` IS, for its reason: a script refused three times in a row fails the same
+     * way on every run, so running it again is a decision a person makes, in a browser, after reading why.
+     */
+    async resumeScript(args: { script: string }, ctx: CallContext) {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['script']);
+      if (extra) return { ok: false as const, refusal: extra };
+      if (typeof args?.script !== 'string' || !args.script) return no('REQUIRED_MISSING', 'Which script?', { at: 'script' });
+      return tail(kernel.resumeScript(args.script, actorOf(ctx)));
+    },
+
+    /**
      * Every scheduled action: what it calls and how often, its state, its last run, its next run, and this month's
      * counts from its own `pull` events (`loop/research-scheduled-actions.md` §4.6). READ+.
      *
@@ -4089,7 +4104,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       if (!args?.id) return no('REQUIRED_MISSING', 'Which declaration?', { at: 'id' });
-      return tail(kernel.retire([args.id]));
+      return tail(kernel.retire([args.id], { actor: actorOf(ctx) }));
     },
 
     /**
