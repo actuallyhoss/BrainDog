@@ -129,9 +129,6 @@ export default async function queue(root = join(import.meta.dirname, '..', '..')
     '.json': 'application/json',
   };
 
-  /* THE RECORD FIRST, the seed's own `governance.open` rows and nothing invented here. */
-  const record = await startRecord();
-
   /**
    * AND FROM HERE EVERY HANDLE IS GIVEN BACK EVEN WHEN THE SETUP THROWS, which is the half the
    * `try`/`finally` around the drive never covered.
@@ -147,12 +144,23 @@ export default async function queue(root = join(import.meta.dirname, '..', '..')
    * to 21. This gate takes an EPHEMERAL port, so the leak was never a collision here, which is why it
    * was never noticed: it leaked a Chromium and a record per failed run instead.
    *
-   * THE TWO `let`s ARE FOR THE FINALLY, which has to hand back whatever exists at the moment of the
+   * THE THREE `let`s ARE FOR THE FINALLY, which has to hand back whatever exists at the moment of the
    * throw; a `const` inside the block is out of scope there.
+   *
+   * THE RECORD IS ONE OF THEM AND IS TAKEN INSIDE THE `try`, as `passkey.mjs` already took it. It used
+   * to be awaited on the line above these declarations, which held only while nothing that can throw
+   * stood between it and the `try`. On 22 September one such line was added there in a scratch copy,
+   * and `test/handles.test.mjs` named the record as opened outside the `try` whose `finally` closes it.
+   * A `startRecord()` that throws has already closed what it built (`record.mjs`), so `record` stays
+   * `null` and the `finally` does not close it a second time.
    */
+  let record = null;
   let server = null;
   let browser = null;
   try {
+    /* THE RECORD FIRST, the seed's own `governance.open` rows and nothing invented here. */
+    record = await startRecord();
+
     server = createServer(async (req, res) => {
       const url = new URL(req.url ?? '/', 'http://x');
       if (forwards(url.pathname)) return forward(req, res, record.base);
@@ -377,7 +385,7 @@ export default async function queue(root = join(import.meta.dirname, '..', '..')
      */
     await browser?.close().catch(() => {});
     if (server !== null) await new Promise((r) => server.close(() => r()));
-    await record.close().catch(() => {});
+    await record?.close().catch(() => {});
   }
 }
 

@@ -412,9 +412,6 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
     return drift.length ? 1 : 3;
   }
 
-  /* THE RECORD THE REGISTER LIST READS, forwarded to from this gate's own port. See `record.mjs`. */
-  const record = await startRecord();
-
   /**
    * AND FROM HERE EVERY HANDLE IS GIVEN BACK EVEN WHEN THE RUN THROWS, which it was not.
    *
@@ -429,10 +426,21 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
    *
    * `let`, BECAUSE THE FINALLY HAS TO SEE THEM HALF-BUILT: the run that dies before the browser exists
    * is the run this is for, and a `const` inside the block is out of scope for the hand-back.
+   *
+   * THE RECORD IS ONE OF THEM AND IS TAKEN INSIDE THE `try`, as `passkey.mjs` already took it. It used
+   * to be awaited on the line above these declarations, which held only while nothing that can throw
+   * stood between it and the `try`. On 22 September one such line was added there in a scratch copy,
+   * and `test/handles.test.mjs` named the record as opened outside the `try` whose `finally` closes it.
+   * A `startRecord()` that throws has already closed what it built (`record.mjs`), so `record` stays
+   * `null` and the `finally` does not close it a second time.
    */
+  let record = null;
   let server = null;
   let browser = null;
   try {
+    /* THE RECORD THE REGISTER LIST READS, forwarded to from this gate's own port. See `record.mjs`. */
+    record = await startRecord();
+
     server = createServer(async (req, res) => {
       if (forwards(new URL(req.url ?? '/', 'http://x').pathname)) return forward(req, res, record.base);
       const rel = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname).slice(1);
@@ -571,7 +579,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
        socket is actually gone. The port is ephemeral, so no later gate is waiting on this number, but a
        socket still listening is a handle that keeps the runner from exiting. */
     if (server !== null) await new Promise((r) => server.close(() => r()));
-    await record.close().catch(() => {});
+    await record?.close().catch(() => {});
   }
 }
 
