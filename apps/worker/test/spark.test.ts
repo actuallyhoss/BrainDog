@@ -7,8 +7,12 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { createRecordApi } from '@braindog/record';
 
@@ -268,4 +272,197 @@ test('NEITHER BUILDER LOADS THE PACKAGE BEFORE IT HAS DECIDED IT NEEDS IT', () =
     assert.ok(loaded !== -1, `${file}: the package is not loaded dynamically at all`);
     assert.ok(loaded > refused, `${file}: the package is loaded at line ${src.slice(0, loaded).split('\n').length}, before the refusal`);
   }
+});
+
+/* ── the ask's door on the Cloud, through the Worker's own router ────────────────────────────────────────────────────── */
+
+/**
+ * A TOKEN AT `/api/spark/read`, DRIVEN THROUGH THE ROUTER AND THE OBJECT AS THEY SHIP.
+ *
+ * `serveSpark` refuses any `authorization` header with 403 `NEEDS_BROWSER_SESSION`, and on its own it does. But on this host
+ * the router resolves the bearer to a context and `inward()` then deletes the header, so the door's first check never sees
+ * one, and what was left standing was the `Origin` check, which any client that is not a browser sets to whatever it likes.
+ * `loop/research-spark-question.md` §2.3 measured `inward()` into `serveSpark` answering 200 with the TOKEN's context. These
+ * two tests drive the same hole one level further out: `export default`'s own `fetch`, a real `Record$` holding a real
+ * record, a bearer that record minted through `createToken`, and the app's own origin sent by hand. Before the refusals
+ * existed both answered 200 with a Reading and the model endpoint was called once each, which on a live host is one opening
+ * of the person's own vault key and one ask off `ask_cap`, spent by an MCP token or a CLI login (`46 §5.2`). With the two
+ * locks in, each one disabled on its own turns exactly one of the two red, which is why there are two tests and not one.
+ *
+ * `src/index.ts` IMPORTS `cloudflare:workers`, which `node --test` cannot load, and the other tests here read it as text for
+ * that reason. Text cannot tell a refusal that runs from one written after the `return` that forwards, so the file is
+ * bundled by `wrangler`'s own esbuild with that one import answered by a two-line base class, which is all `Record$` takes
+ * from it. The object's storage is `node:sqlite` behind the calls the Worker makes of a Durable Object's `storage`, and the
+ * one outbound call, the model, is `globalThis.fetch` answered here. Bundling takes about 150 ms.
+ */
+
+type Handler = { fetch(request: Request, env: object, ctx: object): Promise<Response> };
+type RecordObject = { fetch(request: Request): Promise<Response>; create(args: object): Promise<unknown> };
+type Bundle = { default: Handler; Record$: new (ctx: object, env: object) => RecordObject };
+
+const HOST = 'app.example.test';
+const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
+
+/** `src/index.ts` as one module, bundled the way `wrangler` would bundle it, with `cloudflare:workers` a bare base class. */
+const bundled = async (): Promise<Bundle> => {
+  const fromWrangler = createRequire(createRequire(import.meta.url).resolve('wrangler/package.json'));
+  const esbuild = fromWrangler('esbuild') as { build(o: object): Promise<{ outputFiles: { text: string }[] }> };
+  const built = await esbuild.build({
+    entryPoints: [fileURLToPath(new URL('../src/index.ts', import.meta.url))],
+    bundle: true,
+    write: false,
+    format: 'esm',
+    platform: 'neutral',
+    conditions: ['workerd', 'worker', 'browser'],
+    mainFields: ['module', 'main'],
+    logLevel: 'silent',
+    plugins: [
+      {
+        name: 'cloudflare-workers',
+        setup(b: { onResolve: Function; onLoad: Function }) {
+          b.onResolve({ filter: /^cloudflare:workers$/ }, () => ({ path: 'cf', namespace: 'cf' }));
+          b.onLoad({ filter: /.*/, namespace: 'cf' }, () => ({
+            contents: 'export class DurableObject { constructor(ctx, env) { this.ctx = ctx; this.env = env; } }',
+            loader: 'js',
+          }));
+        },
+      },
+    ],
+  });
+  /* OUTSIDE THE TREE AND GONE AGAIN before the tests run: a bundle left beside the source is a second copy of the Worker. */
+  const dir = mkdtempSync(join(tmpdir(), 'braindog-worker-'));
+  try {
+    const file = join(dir, 'index.mjs');
+    writeFileSync(file, built.outputFiles[0]!.text);
+    return (await import(pathToFileURL(file).href)) as Bundle;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+};
+
+/**
+ * A Durable Object's `storage` over `node:sqlite`: `sql.exec`, `transactionSync` and the alarm, which is all `Record$` calls.
+ *
+ * `prepare` ON A SCRIPT RUNS ITS FIRST STATEMENT AND DROPS THE REST without a word, measured on Node 24.13, so a statement
+ * that reads nothing and takes no parameters goes through `exec`, which runs all of it. A nested `transactionSync` is a
+ * savepoint, as it is on workerd (`kernel-in-do.test.ts`).
+ */
+const objectStorage = () => {
+  const db = new DatabaseSync(':memory:');
+  let depth = 0;
+  let alarm: number | null = null;
+  const cursor = (rows: unknown[]) => ({ toArray: () => rows, one: () => rows[0], [Symbol.iterator]: () => rows[Symbol.iterator]() });
+  return {
+    sql: {
+      exec(text: string, ...params: never[]) {
+        const statement = db.prepare(text);
+        if (statement.columns().length > 0) return cursor(statement.all(...params));
+        if (params.length === 0) db.exec(text);
+        else statement.run(...params);
+        return cursor([]);
+      },
+    },
+    transactionSync<T>(fn: () => T): T {
+      const point = `sp${depth++}`;
+      db.exec(`SAVEPOINT ${point}`);
+      try {
+        const value = fn();
+        db.exec(`RELEASE ${point}`);
+        return value;
+      } catch (e) {
+        db.exec(`ROLLBACK TO ${point}`);
+        db.exec(`RELEASE ${point}`);
+        throw e;
+      } finally {
+        depth--;
+      }
+    },
+    getAlarm: async () => alarm,
+    setAlarm: async (at: number | Date) => void (alarm = Number(at)),
+    deleteAlarm: async () => void (alarm = null),
+  };
+};
+
+/** One hosted record with a model configured and a read token of its own, and the Worker routing to it. */
+const hostedRecord = async () => {
+  const { default: worker, Record$ } = await bundled();
+  const env: Record<string, unknown> = { PUBLIC_HOST: HOST, SPARK_ENDPOINT: URL_, KEK: FAKE_KEK, INGRESS: { send: async () => {} } };
+  const state = { storage: objectStorage(), id: { toString: () => REC }, blockConcurrencyWhile: (f: () => unknown) => f(), waitUntil: () => {} };
+  const object = new Record$(state, env);
+  /* WHAT THE ROUTER FORWARDS IS COUNTED, so a refusal at the router is told apart from the object's own below it. */
+  const forwarded: string[] = [];
+  const stub = new Proxy(object, {
+    get: (target, key) =>
+      key === 'fetch' ? (r: Request) => (forwarded.push(new URL(r.url).pathname), target.fetch(r)) : (target as never as Record<PropertyKey, Function>)[key]!.bind(target),
+  });
+  env['RECORD'] = { idFromName: (n: string) => n, get: () => stub };
+  env['DIRECTORY'] = { idFromName: (n: string) => n, get: () => ({ knows: async (id: string) => id === REC }) };
+  const made = await object.create({ id: REC, slug: 'studio', name: 'Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_owner', email: 'ada@example.test', name: 'Ada' } });
+  assert.equal(made, null, `the record was not made: ${JSON.stringify(made)}`);
+
+  /* THE TOKEN IS THE RECORD'S OWN, minted by the owner through the method a session reaches, so `bearerOf` resolves it
+     through the object's real `verify` and `access` rather than through a double that answers yes. */
+  const owner = { principal: { kind: 'person', id: 'p_owner', level: 'owner' }, credentialed: true };
+  const mint = new Request(`https://${HOST}/api/createToken`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-braindog-ctx': JSON.stringify(owner) },
+    body: JSON.stringify({ scope: 'read', label: 'cli' }),
+  });
+  const minted = (await (await object.fetch(mint)).json()) as { ok: boolean; value: { id: string; bearer: string } };
+  assert.ok(minted.ok, `the record minted no token: ${JSON.stringify(minted)}`);
+  return { worker, object, env, token: minted.value, owner, forwarded };
+};
+
+/** A POST to the ask carrying the app's own origin, which is the one header a client that is not a browser writes freely. */
+const ask = (headers: Record<string, string>) =>
+  new Request(`https://${HOST}/api/spark/read`, {
+    method: 'POST',
+    headers: { origin: `https://${HOST}`, 'content-type': 'application/json', ...headers },
+    body: JSON.stringify({ question: 'Which tasks are open?' }),
+  });
+
+/** The model, answered here and counted, so a test can say that nothing was spent as well as what came back. */
+const withModel = async (run: () => Promise<Response>): Promise<{ status: number; body: Record<string, unknown>; calls: number }> => {
+  const real = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls++;
+    const content = '{"registers":[],"where":null,"q":"open"}';
+    return new Response(JSON.stringify({ choices: [{ message: { role: 'assistant', content } }], usage: { prompt_tokens: 1, completion_tokens: 1 } }), { status: 200 });
+  }) as typeof fetch;
+  try {
+    const out = await run();
+    return { status: out.status, body: (await out.json()) as Record<string, unknown>, calls };
+  } finally {
+    globalThis.fetch = real;
+  }
+};
+
+test("A TOKEN THE RECORD KNOWS, WITH THE APP'S ORIGIN WRITTEN BY HAND, IS REFUSED AT THE ROUTER and the model is not called", async () => {
+  const { worker, env, token, forwarded } = await hostedRecord();
+  const out = await withModel(() => worker.fetch(ask({ authorization: `Bearer ${token.bearer}` }), env, { waitUntil: () => {} }));
+  assert.equal(out.status, 403, `a token asked Spark and was answered ${out.status}: ${JSON.stringify(out.body)}`);
+  const refusal = out.body['refusal'] as { code: string; at: string };
+  assert.equal(refusal.code, 'NEEDS_BROWSER_SESSION');
+  assert.equal(refusal.at, 'principal');
+  assert.equal(out.calls, 0, 'the model was called for a token');
+  /* THE BEARER WAS RESOLVED, SO THE TOKEN IS ONE THE RECORD KNOWS, and the ask itself never reached the object. */
+  assert.deepEqual(forwarded, [], 'the router forwarded a token to the ask and left the refusal to the object');
+});
+
+test('AND THE OBJECT REFUSES A TOKEN CONTEXT ITSELF, for a router that forwards one anyway, while a person still gets through', async () => {
+  const { object, token, owner } = await hostedRecord();
+  /* WHAT `inward()` HANDS THE OBJECT for a bearer: the context in its header and no `authorization` at all, so the door's own
+     check has nothing to find. The object is where the record decides who is asking, so it answers for itself. */
+  const ctx = { principal: { kind: 'token', id: token.id, scope: 'read', person: 'p_owner', level: 'owner' } };
+  const refused = await withModel(() => object.fetch(ask({ 'x-braindog-ctx': JSON.stringify(ctx) })));
+  assert.equal(refused.status, 403, `a token context was answered ${refused.status}: ${JSON.stringify(refused.body)}`);
+  assert.equal((refused.body['refusal'] as { code: string }).code, 'NEEDS_BROWSER_SESSION');
+  assert.equal(refused.calls, 0, 'the model was called for a token');
+
+  /* A PERSON STILL GETS THROUGH, or the refusal above would be a door shut on everybody, and the fold ends on the vault. */
+  const asked = await withModel(() => object.fetch(ask({ 'x-braindog-ctx': JSON.stringify(owner) })));
+  assert.equal(asked.status, 200, JSON.stringify(asked.body));
+  assert.equal(asked.calls, 1);
+  assert.deepEqual((asked.body['value'] as { read: unknown[] }).read.at(-1), { register: 'grant', rows: 0, predicate: 'refused' });
 });

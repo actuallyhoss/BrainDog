@@ -69,6 +69,7 @@
   import type { Hits, Reader } from '../record/palette-live.ts';
   import type { Metric } from '../record/api.ts';
   import { latest } from './latest.ts';
+  import { drawReading, offersSpark, type Drawn } from './spark.ts';
 
   let { open = $bindable(false), nav }: { open?: boolean; nav: NavEntry[] } = $props();
 
@@ -101,6 +102,8 @@
      * losing a half-typed query as the failure it is copied to avoid.
      */
     complete?: string | undefined;
+    /** The question Spark's row asks. Only that row carries it, and running it keeps the panel open. */
+    ask?: string | undefined;
   };
 
   let el = $state<HTMLDialogElement>();
@@ -115,8 +118,37 @@
    * does not carry, the record's search, the rows changed last and the figures, is asked of the record through
    * `record/palette-live.ts`, loaded the first time a live palette needs it. The sample's palette never loads it.
    */
-  const shell = $derived(page.data as { live?: boolean; now?: number; index?: { registers?: List[] }; questions?: { id: string; title: string }[] });
+  const shell = $derived(page.data as { live?: boolean; now?: number; index?: { registers?: List[] }; questions?: { id: string; title: string }[]; spark?: boolean });
   const isLive = $derived(shell.live === true);
+  /** Whether a model is behind Spark on this host, which the shell asked `/api/version` once. The sample's is never `true`. */
+  const sparkHere = $derived(isLive && shell.spark === true);
+
+  /**
+   * SPARK'S MODE: the question asked, for the text that was in the box when it was asked, and what came back.
+   *
+   * KEYED ON THE TEXT, SO NOTHING ACCUMULATES (`50 §5.5` step 5). Typing anything else puts the palette back to its list at
+   * once, with no effect to clear it, and `latest` drops an answer to a question the box has moved on from, so a slow read
+   * cannot land over the next one. `Esc` in the mode goes back to the list and keeps the text; a second `Esc` closes.
+   */
+  let spark = $state<{ q: string; question: string; drawn: Drawn | null; fix: string | null } | null>(null);
+  const sparkShown = $derived(spark !== null && spark.q === q ? spark : null);
+  const sparkAsk = latest((question: string) =>
+    import('@braindog/client')
+      .then(({ createClient }) => createClient({ base: page.url.origin }).sparkRead(question))
+      .catch((e: unknown) => ({ ok: false as const, refusal: { code: 'UNREACHABLE', fix: e instanceof Error ? e.message : String(e) } })),
+  );
+
+  function askSpark(question: string) {
+    const asked = q;
+    spark = { q: asked, question, drawn: null, fix: null };
+    cursor = 0;
+    sparkAsk.ask(question, (out) => {
+      if (spark?.q !== asked) return;
+      spark = out.ok
+        ? { q: asked, question, drawn: drawReading(out.value), fix: null }
+        : { q: asked, question, drawn: null, fix: 'refusal' in out ? out.refusal.fix : copy.sparkNothing };
+    });
+  }
   const lists = $derived(listsOf(isLive, shell.index?.registers ?? []));
   const listNamed = $derived(new Map(lists.map((l) => [l.id, l])));
 
@@ -313,6 +345,18 @@
     const { prefix, text } = parsed;
     total = 0;
     drawn = 0;
+    /* IN SPARK'S MODE THE LIST IS WHAT SPARK FOUND, AND NOTHING ELSE. They are rows like any other here, so the arrow keys,
+       `↵` and the pointer walk them with no second mechanism, and each one is an address on the record. */
+    if (sparkShown)
+      return (sparkShown.drawn?.rows ?? []).map((r) => ({
+        id: `s-${r.id}`,
+        title: r.title,
+        detail: listNamed.get(r.register)?.name ?? REGISTERS[r.register]?.name ?? r.register,
+        href: r.href,
+        group: copy.sparkFound,
+        spoken: r.spoken,
+        icon: listNamed.get(r.register)?.icon ?? 'rows',
+      }));
     const needle = text.toLowerCase();
     /**
      * ONE QUERY MEANS ONE THING IN THIS PANEL, and four groups still disagreed.
@@ -606,7 +650,17 @@
         });
     }
 
-    return out.slice(0, CAP);
+    /**
+     * AND SPARK'S ROW, LAST, WHEN NOTHING ELSE WAS A PLACE (`50 §5.5` step 5).
+     *
+     * A place is anything but an action: a page, a list, a figure, a row. With a model behind Spark and none of those
+     * matched, the last row asks the record in words. Without a model `offersSpark` answers `null` and the row does not
+     * exist, which is `23 §8`'s absent rather than disabled, and the only way the word Spark reaches this panel.
+     */
+    const kept = out.slice(0, CAP);
+    const question = offersSpark({ spark: sparkHere, prefix, text, pending, places: kept.filter((r) => r.group !== copy.commands).length });
+    if (question !== null) kept.push({ id: 'spark', title: copy.askSpark(question), href: null, group: '', icon: 'search', ask: question });
+    return kept;
   });
 
   /**
@@ -643,17 +697,19 @@
   });
 
   /**
-   * The overflow row is held out of the groups, so it can be drawn last and headingless.
+   * The overflow row is held out of the groups, so it can be drawn last and headingless, and so is Spark's row, for the
+   * same reason: it is not one more result but the door out of the list. The two never meet, because the overflow needs
+   * hits and Spark's row needs none.
    *
    * It stays in `flat`, which is what the arrow keys and Enter walk, so holding it out of the
    * headings costs it nothing a reader can feel.
    */
-  const overflow = $derived(rows.find((r) => r.id === 'all'));
+  const overflow = $derived(rows.find((r) => r.id === 'all' || r.id === 'spark'));
 
   const groups = $derived.by(() => {
     const out = new Map<string, Row[]>();
     for (const r of rows) {
-      if (r.id === 'all') continue;
+      if (r.id === 'all' || r.id === 'spark') continue;
       if (!out.has(r.group)) out.set(r.group, []);
       out.get(r.group)!.push(r);
     }
@@ -730,6 +786,7 @@
       overlays.open();
       q = '';
       cursor = 0;
+      spark = null;
       queueMicrotask(() => input?.focus());
     } else if (!open && el.open) {
       el.close();
@@ -752,6 +809,8 @@
 
   function run(row: Row | undefined) {
     if (!row) return;
+    /* SPARK'S ROW ANSWERS IN THE PANEL, so it is the one row that leaves it open. */
+    if (row.ask !== undefined) return askSpark(row.ask);
     open = false;
     /* THE ONE ROW THAT DOES SOMETHING RATHER THAN GO SOMEWHERE. It is checked on the act rather
        than on a flag, so no row's behaviour is described in two places. The standing rule means it
@@ -823,7 +882,7 @@
   }
 </script>
 
-<dialog bind:this={el} class="palette" onclick={onbackdrop} oncancel={(e) => (e.preventDefault(), (open = false))} onclose={() => (open = false)}>
+<dialog bind:this={el} class="palette" onclick={onbackdrop} oncancel={(e) => (e.preventDefault(), sparkShown ? (spark = null) : (open = false))} onclose={() => (open = false)}>
   <div class="p-head">
     <Icon name="search" size="m" />
     <input
@@ -880,7 +939,14 @@
     reader who heard both would hear every heading twice.
   -->
   <div class="p-body">
-    <div id="palette-list" role="listbox" aria-label={copy.paletteLabel} aria-busy={pending}>
+    <!-- WHAT SPARK LOOKED FOR, BEFORE WHAT IT FOUND (`50 §5.5` step 5), so the rows are read against the question the record
+         was actually asked. A draft that did not fit is a keyword search, and the line says that instead. -->
+    {#if sparkShown?.drawn}
+      <p class="p-spark-where">
+        {#if sparkShown.drawn.where !== null}<span class="p-spark-label">{copy.sparkWhere}</span> {sparkShown.drawn.where}{:else if sparkShown.drawn.q !== null}{copy.sparkSearched(sparkShown.drawn.q)}{/if}
+      </p>
+    {/if}
+    <div id="palette-list" role="listbox" aria-label={copy.paletteLabel} aria-busy={pending || (sparkShown !== null && sparkShown.drawn === null && sparkShown.fix === null)}>
       {#each groups as [group, items]}
         <div role="group" aria-label={group}>
           <p class="p-group" aria-hidden="true">{group}</p>
@@ -891,7 +957,22 @@
       {/each}
       {#if overflow}{@render result(overflow)}{/if}
     </div>
-    {#if flat.length === 0 && !pending}
+    {#if sparkShown}
+      <!-- OUTSIDE THE LISTBOX, like the sentence below: the state of the ask and the fold are prose about the list. -->
+      {#if sparkShown.fix !== null}
+        <p class="p-none">{sparkShown.fix}</p>
+      {:else if sparkShown.drawn === null}
+        <p class="p-none" role="status">{copy.sparkAsking}</p>
+      {:else}
+        {#if sparkShown.drawn.rows.length === 0}<p class="p-none">{copy.sparkNothing}</p>{/if}
+        <details class="p-spark-fold">
+          <summary>{copy.sparkFold}</summary>
+          <ul>
+            {#each sparkShown.drawn.fold as line}<li>{line}</li>{/each}
+          </ul>
+        </details>
+      {/if}
+    {:else if flat.length === 0 && !pending}
       <!-- A query matching nothing falls through to a fallback row when a model is configured.
            Without one the row, the status call and every "Ask BrainDog" button do not exist: ABSENT,
            not disabled (23 §8). This record has no model, so this is what you get.
@@ -1260,6 +1341,31 @@
   .p-none {
     padding: var(--sp-5) var(--sp-3);
     color: var(--dim);
+  }
+
+  .p-spark-where {
+    margin: 0;
+    padding: var(--sp-3) var(--sp-4) 0;
+    color: var(--ink2);
+  }
+
+  .p-spark-label {
+    color: var(--dim);
+  }
+
+  /* THE FOLD IS FOLDED, AND IT IS THERE ON EVERY ASK. `23 §6`: its last line is the vault, refused, drawn every time. */
+  .p-spark-fold {
+    padding: var(--sp-2) var(--sp-4) var(--sp-3);
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .p-spark-fold ul {
+    margin: var(--sp-2) 0 0;
+    padding: 0;
+    list-style: none;
+    font-family: var(--font-id);
+    font-size: var(--t-xs);
   }
 
   .p-foot {

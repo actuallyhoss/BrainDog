@@ -421,8 +421,8 @@ const unreachable = (why: string): Refusal => ({
  * `null` IS A VALUE AND ABSENT IS NOT, which is why this is `Object.hasOwn` and not a truth test.
  * `revokeGrant` answers `Result<null>`, and refusing that would refuse the record's own answer.
  *
- * AND IT IS ONE FUNCTION BECAUSE THERE ARE TWO DOORS. `call` and `keyDoor` had these checks written
- * out twice, so the first three were repaired twice or they were not repaired at all.
+ * AND IT IS ONE FUNCTION BECAUSE THERE ARE TWO DOORS. `call` and `hostDoor` (then `keyDoor`) had these checks
+ * written out twice, so the first three were repaired twice or they were not repaired at all.
  */
 const answered = <T>(status: number, body: unknown): Result<T> => {
   if (body === null || typeof body !== 'object' || !('ok' in body) || typeof (body as { ok: unknown }).ok !== 'boolean')
@@ -446,6 +446,27 @@ export type KeyPut = { credential: string; label: string; version: number; rotat
 
 /** `openKey`: one key, read back once. The answer is `no-store`, and reading it is counted as a `grant.read`. */
 export type KeyOpened = { credential: string; label: string; value: string };
+
+/**
+ * `sparkRead`'s answer, WRITTEN OUT HERE BECAUSE THIS PACKAGE MAY NOT IMPORT `@braindog/spark`. It is `Reading` in
+ * `packages/spark/src/types.ts`, key for key, and NOT the `46 §5.4` step 8 shape, which carries a `version` the built engine
+ * never sends: a client written to the specification would read `undefined` there. `predicate` is `34 §1`'s `where` tree,
+ * or `null` when the model's draft did not fit and `q` is the keyword search Spark ran instead.
+ */
+export type SparkWhere =
+  | { all: SparkWhere[] }
+  | { any: SparkWhere[] }
+  | { none: SparkWhere[] }
+  | ({ field: string; via?: string } & Record<string, unknown>)
+  | { matches: string };
+
+/** One line of the fold, *What Spark read*: a register, how many rows, and the predicate as JSON or `all`. Never a value. */
+export type SparkTrace = { register: string; rows: number; predicate: string };
+
+/** One row Spark found, with the spoken id `tasks#3` a link is built from. */
+export type SparkRow = { id: string; register: string; seq: number; spoken: string; summary: string; fields: Record<string, unknown> };
+
+export type Reading = { ask_id: string; predicate: SparkWhere | null; q: string | null; read: SparkTrace[]; rows: SparkRow[] };
 
 /**
  * Call one method.
@@ -520,20 +541,22 @@ export function createClient(options: ClientOptions) {
   }
 
   /**
-   * The app's own key doors, `POST /api/keys/put` and `POST /api/keys/open`.
+   * The host's own doors: the app's key doors, `POST /api/keys/put` and `POST /api/keys/open`, and Spark's ask,
+   * `POST /api/spark/read`.
    *
    * NOT THROUGH `call`, BECAUSE THEY ARE NOT METHODS. `ROUTES` is the record's surface; these are a host step in
-   * front of it at a fixed path, and a name in `NAMES` would be a name `handlersFor` had to route. The value is
-   * sealed by the host and the record is handed sealed bytes, which is why a browser may send one at all.
+   * front of it at a fixed path, and a name in `NAMES` would be a name `handlersFor` had to route. The key doors
+   * hand the record sealed bytes, which is why a browser may send a value at all, and the ask is answered by an
+   * engine the host builds and `packages/record` cannot import (`packages/host/test/spark-ask.test.ts` holds it out).
    *
    * AND NO BEARER IS SENT, EVER, even where this client holds one. A bearer is the thing these doors refuse, so
    * sending the caller's would turn every call into `NEEDS_BROWSER_SESSION`. The cookie and the `Origin` are the
    * browser's own and it sends both by itself.
    */
-  async function keyDoor<T>(which: 'put' | 'open', args: Record<string, unknown>): Promise<Result<T>> {
+  async function hostDoor<T>(path: 'keys/put' | 'keys/open' | 'spark/read', args: Record<string, unknown>): Promise<Result<T>> {
     let res: Response;
     try {
-      res = await doFetch(`${base}/api/keys/${which}`, {
+      res = await doFetch(`${base}/api/${path}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(args),
@@ -556,9 +579,15 @@ export function createClient(options: ClientOptions) {
        fifteen minutes old, which the record decides. `12 §6` rules 2, 3 and 9. */
     /** Put a key in, or replace the value of one named by `credential`. The host seals it; the record never sees it. */
     putKey: (args: { label: string; value: string; opens?: string; kind?: string; project?: string; credential?: string }) =>
-      keyDoor<KeyPut>('put', args as unknown as Record<string, unknown>),
+      hostDoor<KeyPut>('keys/put', args as unknown as Record<string, unknown>),
     /** Read one key back, once, by its label or by its spoken id. */
-    openKey: (args: { label?: string; credential?: string }) => keyDoor<KeyOpened>('open', args as unknown as Record<string, unknown>),
+    openKey: (args: { label?: string; credential?: string }) => hostDoor<KeyOpened>('keys/open', args as unknown as Record<string, unknown>),
+    /**
+     * Ask Spark one question, pass 1 of `46 §5.4`: the predicate it drafted, the rows that answered it, and what it read.
+     * A browser session and this origin, like the key doors. 501 `NOT_IN_THIS_BUILD` on a host with no model behind it,
+     * which `version().spark` already says as `false`, and 422 `SPARK_BUDGET_SPENT` once the month's asks are used.
+     */
+    sparkRead: (question: string) => hostDoor<Reading>('spark/read', { question }),
     boot: () => call<Boot>('boot'),
     version: () => call<Version>('version'),
     schema: (register: string) => call<unknown>('schema', { register }),

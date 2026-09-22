@@ -23,7 +23,31 @@ export const prerender = false;
    is about this moment and not about which records exist. */
 let reach: Promise<Answer<SwitcherRow[]>> | null = null;
 
-export async function load({ url, fetch }): Promise<Shell> {
+/**
+ * WHETHER A MODEL IS BEHIND SPARK ON THIS HOST, asked of `/api/version` once for the tab.
+ *
+ * THE PALETTE'S SPARK ROW HANGS ON THIS AND ON NOTHING ELSE (`50 §5.5` step 5). The only place the app read the flag was
+ * `/start`, asked at the moment of making a record, so a person on a host with a model had no way to ask it a question: the
+ * palette had no `spark` to read. The flag is a fact about the deployment rather than about the screen, so it is kept for the
+ * tab like the switcher, and a refusal is forgotten rather than kept, so the next navigation asks again.
+ *
+ * `@braindog/client` IS LOADED HERE, NOT IMPORTED, for the budget reason at the top of this file: `boot-live.ts` already
+ * pulls it into its own chunk, and a static import would put it back in the entry.
+ */
+let modelHere: Promise<boolean> | null = null;
+
+const askModel = (origin: string, fetch: typeof globalThis.fetch): Promise<boolean> =>
+  import('@braindog/client')
+    .then(({ createClient }) => createClient({ base: origin, fetch }).version())
+    .then(
+      (v) => {
+        if (!v.ok) modelHere = null;
+        return v.ok && v.value.spark === true;
+      },
+      () => ((modelHere = null), false),
+    );
+
+export async function load({ url, fetch }): Promise<Shell & { spark: boolean }> {
   const [{ boot, INBOX }, live, { readRecordsForSwitcher }, voice] = await Promise.all([
     import('$lib/record/api.ts'),
     import('$lib/record/boot-live.ts'),
@@ -99,5 +123,9 @@ export async function load({ url, fetch }): Promise<Shell> {
     } else if (listed.value.length > 0) shell.me = { ...shell.me, records: listed.value };
   }
 
-  return shell;
+  /* A SAMPLE RECORD IS NEVER `true`, and neither is a refused one. The sample has no host behind it to ask, so a palette
+     over the sample never offers Spark, whatever the host serving the shell has configured. */
+  const spark = booted.from === 'live' ? await (modelHere ??= askModel(url.origin, fetch)) : false;
+
+  return { ...shell, spark };
 }

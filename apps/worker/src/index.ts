@@ -630,6 +630,10 @@ export class Record$ extends DurableObject<Env> {
      * request runs `createSpark`'s two `CREATE TABLE IF NOT EXISTS` and its settings insert on every question.
      */
     if (servesSpark(new URL(request.url).pathname)) {
+      /* A PERSON AND NOBODY ELSE, AS THE SECOND LOCK. The router refuses a bearer at this path, but the context is
+         the only thing this object is told about the caller, and `inward()` has already taken the header the door
+         would look for, so a token context forwarded here by any other branch would be answered as a person. */
+      if (ctx.principal.kind !== 'person') return json({ ok: false, refusal: NO_SPARK_TOKEN }, 403);
       this.#spark ??= workerSparkDoor(
         this.env,
         () => api,
@@ -1212,6 +1216,13 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     /* AND WHAT IS LEFT AT `/api/keys/*` IS A BEARER OR NOTHING, which is the one thing those doors do not take. */
     if (keysAsked) return noSession();
 
+    /* NOR SPARK'S ASK, FOR THE SAME REASON AND BECAUSE THE DOOR CANNOT SAY IT HERE. `serveSpark` refuses any
+       `authorization` header, but `inward()` below deletes that header, so on this host the door never saw one and
+       the `Origin` check was all that stood: a read token sending the app's own origin by hand was answered 200 with a
+       Reading, and each ask opened the person's own vault key and spent the month's `ask_cap` (`46 §5.2`, measured
+       in `test/spark.test.ts`). A cookie reaches it above; a bearer is refused here, in the door's own words. */
+    if (servesSpark(url.pathname) !== null) return json({ ok: false, refusal: NO_SPARK_TOKEN }, 403);
+
     /* NOR MAY AN AGENT MOVE A RECORD'S MAIL. A bearer works from anywhere for thirty days, so a token that could
        rotate the forwarding address could take over a record's incoming statements without anybody signing in,
        and a token that could revoke one could stop them arriving silently. `serveInbound` refuses the header
@@ -1312,6 +1323,9 @@ const recordKeyHalf = (env: Env) => ({
 /** The one sentence every caller that is not a browser session gets at `/api/keys/*`. It is the record's own. */
 const noSession = (): Response =>
   json({ ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; a token cannot reach the vault.', at: 'principal' } }, 403);
+
+/** What a token gets at `/api/spark/read`, from the router and from the object. The sentence is `serveSpark`'s own. */
+const NO_SPARK_TOKEN: Refusal = { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this in the app; a token cannot ask Spark about this record.', at: 'principal' };
 
 /**
  * `/api/keys/*`: the app's own key doors, for the browser session `doorOf` has already resolved.
