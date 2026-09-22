@@ -170,7 +170,7 @@
         if (spark?.q !== asked || spark.second === null) return;
         spark.second = said.ok
           ? { drawn: drawProposal(said.value), refused: null }
-          : { drawn: null, refused: pass2Refused('refusal' in said ? said.refusal : { code: 'CONFLICT', fix: copy.sparkNothing }) };
+          : { drawn: null, refused: pass2Refused('refusal' in said ? said.refusal : { code: 'VALUE_MALFORMED', fix: copy.sparkNothing }) };
       });
     });
   }

@@ -62,7 +62,7 @@ export function saidOf(out: Answered, base: string): Said {
     return { kind: 'minted', token: v.token, url: rec === null ? null : shortcutUrl(base, rec, v.token) };
   }
   /* A conflict cannot come back from a mint, which reads no row; it is here so the type is whole. */
-  const refusal: Refusal = 'refusal' in out ? out.refusal : { code: 'CONFLICT', fix: copy.shortcutNoToken };
+  const refusal: Refusal = 'refusal' in out ? out.refusal : { code: 'VALUE_MALFORMED', fix: copy.shortcutNoToken };
   /* NO RECORD BEHIND THE PAGE, the demo and a static host's SPA fallback, is the sample and not a failure. */
   if (noRecord(refusal.code)) return { kind: 'sample' };
   /* THE RECORD'S OWN SENTENCE, VERBATIM (`13 §6`). It says whether the sign-in is stale or the host was started without
