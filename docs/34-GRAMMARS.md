@@ -290,7 +290,7 @@ after splitting**, and a substituted value is never re-parsed — so a value con
 | `comparison` | header row, then rows | the header fixes the column count |
 | `table` | **page-only** | rows come from `source:` with declared `columns:`; a `table` fence in a write-up degrades |
 
-Under-arity leaves the trailing cells absent. Over-arity, or a kind not in the twenty, degrades the block to its
+Under-arity leaves the trailing cells absent. Over-arity, or a kind this build does not draw, degrades the block to its
 visible fence with one line above it naming the kind and the row (`DIALECT_ARITY`, `DIALECT_KIND_UNKNOWN`). **A
 document is never refused for its dialect** — the fence is the feedback channel, at render, never at write. The
 per-kind markup — element and class names — is 36 §5.9's, mirrored in 05 §7.7; this table is the row shape under it.
@@ -333,7 +333,7 @@ sits in one cell. Any other `{word}` is text; to write a literal tag, put it in 
 
 ### 2.4 · Kinds are data
 
-A kind is a named composition of primitives plus a query. The twenty ship as one `as const` TypeScript table,
+A kind is a named composition of primitives plus a query. The first-party kinds ship as one `as const` TypeScript table,
 `packages/render/src/kinds.ts` — `render`'s `KINDS`, beside `PRIMITIVES`, `parse`, `toHTML` and `render` at the root, and
 no `expand`: kinds expansion is `declare`'s — so a first-party kind and a pack's kind take one code path. The closed key
 list per primitive (`parts children rows columns{field,label,width,align} empty value accepts`) is `declare`'s schema;

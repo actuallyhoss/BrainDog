@@ -139,6 +139,11 @@ export type PageBlock = {
    * column, set against the part whose key is that row.
    */
   toward?: string;
+  /**
+   * A `capture`'s: the register a new row is added to. Its own key rather than `source:`, because a capture reads no
+   * row, and the equalities its `where:` pins are what the new row is filled with (`fills` on the answer).
+   */
+  register?: string;
   /** Whether the condition was satisfied. Absent on a block with no `when:`, which always draws. */
   drawn?: boolean;
 };
@@ -183,6 +188,8 @@ const READS = new Set([
   /* A `note` whose body is a whole document, a row's own plan with its blocks in it; and the rates a bar or a split
      answers with. */
   'document', 'fx',
+  /* A `capture`'s list, and what a new row in it is filled with. */
+  'register', 'fills',
 ]);
 
 export type PageDecl = {
@@ -226,6 +233,11 @@ export type BlockResult = PageBlock & {
   feed?: FeedRow[];
   /** A `queue` block's questions, in the record's own order, cut to `limit`. `matched` is how many are open. */
   queue?: QueueQuestion[];
+  /**
+   * A `capture` block's: what a row added through it is filled with, by field, in the stored form. Each is an
+   * equality its `where:` pinned (`captureFills`), so a line under "Later" adds a task that is kept for later.
+   */
+  fills?: Record<string, string>;
   /** On a feed with `since: seen`: the reader's read mark, or `null` when they have none yet. */
   seen?: string | null;
   /** A `diff` block's versions of its field, newest first, at most `versions` of them. */
@@ -760,6 +772,9 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
     const got = barsOf(block.series, block.back, block.ahead, deps.metric, deps.read);
     return 'refusal' in got ? { ...base, refusals: also(got.refusal) } : { ...base, bars: got.bars, matched: got.bars.keys.length };
   }
+
+  /* A CAPTURE READS NO ROWS, and it is answered before the source checks because it has no source. */
+  if (block.kind === 'capture') return captureBlock(deps, block, base, also);
 
   /* A BLOCK WITH NO SOURCE IS A WRITTEN BLOCK, and the record has nothing to add to it. `05` §1 makes
      `table` the page-only kind that takes `source:` and `columns:`; every other kind draws the rows
@@ -1457,6 +1472,62 @@ function activityBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also
     matched: kept.length,
     ...(block.since === 'seen' ? { seen: read.seen } : {}),
   };
+}
+
+/* ── the one-line add ────────────────────────────────────────────────────── */
+
+/**
+ * A `capture` over `register:`: the list a new row goes into, and what its `where:` fills that row with.
+ *
+ * NO ROW IS READ AND NONE IS WRITTEN. The write is the host's, through `oncapture`, at the moment somebody
+ * presses Add; what the record answers here is only what the host would otherwise have to work out for
+ * itself from a sentence, and two hosts working it out would be two answers. The `where:` is still read
+ * against the register, so a filter naming a field the list lacks is refused on the block rather than
+ * quietly filling nothing.
+ */
+function captureBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
+  const register = block.register;
+  if (typeof register !== 'string' || register === '')
+    return { ...base, refusals: also({ code: 'REQUIRED_MISSING', fix: 'A capture names the list it adds to, as register: tasks.', at: 'register' }) };
+  const schema = deps.schemaOf(register);
+  if (!schema) return { ...base, refusals: also({ code: 'REGISTER_UNKNOWN', fix: `There is no register called ${register}, so a capture has nowhere to add to.`, at: 'register' }) };
+  const said = predicateOf(block.where, schema, deps.ctx);
+  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
+  return { ...base, fills: captureFills(said.predicate, schema, deps.titleOf(register)) };
+}
+
+/**
+ * The equalities a predicate pins, which a row added under it inherits: `apps/web`'s `inheritedFrom`, read off the
+ * record's own parse of the sentence rather than off the browser's.
+ *
+ * AS NARROW AS THE GRID'S ADD, and each exclusion is a value nobody chose written in silence:
+ *
+ *   `is` WITH ONE VALUE, at the top of the predicate or inside a top-level `all`. `state is open or doing` names a
+ *   set, and picking one member for somebody is a guess stored as if they had said it. Anything under `any` or
+ *   `none` is the same guess one level down.
+ *
+ *   ENUM AND TEXT ONLY. A day filter is usually a moving word (`by before today`), and a link is resolved from a
+ *   title to a row id here but not by the sample engine, which reads the reader's prose; filling one on this side
+ *   alone would make the two engines draw different rows for one line typed on one page.
+ *
+ *   NEVER THE TITLE, because the title is what the person is typing.
+ *
+ * THE VALUE IS THE STORED ONE. The parse has already turned `Later` into `backlog`, so the host writes what the
+ * record keeps rather than what the page prints.
+ */
+function captureFills(predicate: Predicate | undefined, schema: Schema, title: string | null): Record<string, string> {
+  if (predicate === undefined) return {};
+  const leaves: Predicate[] = 'all' in predicate && Array.isArray(predicate.all) ? predicate.all : [predicate];
+  const out: Record<string, string> = {};
+  for (const leaf of leaves) {
+    if (!('field' in leaf) || typeof leaf.field !== 'string' || leaf.via !== undefined) continue;
+    const said = (leaf as Leaf).is;
+    if (typeof said !== 'string' || Object.keys(leaf).length !== 2) continue;
+    const type = Object.hasOwn(schema.fields, leaf.field) ? schema.fields[leaf.field]?.type : undefined;
+    if (leaf.field === title || (type !== 'enum' && type !== 'text')) continue;
+    out[leaf.field] = said;
+  }
+  return out;
 }
 
 /* ── the open questions ──────────────────────────────────────────────────── */

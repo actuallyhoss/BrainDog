@@ -18,6 +18,16 @@ import { type Column, type TableRow } from '../src/table.ts';
 export { ariaSort, chunkRows, comparisonPlan, glyphColumn, intrinsicRows, TABLE_CHUNK, TABLE_ROWS_LABEL, type Column, type TableRow } from '../src/table.ts';
 
 /**
+ * What a host hands `Block` to make a `capture` real: the register, the line as typed and trimmed, and
+ * what the new row inherits from the block's `where:`, by field, in the form the record stores.
+ *
+ * ONE SIGNATURE, WRITTEN HERE, because three components pass it down (`Block`, `Panel`, `Capture`) and a
+ * host builds one, and a callback type copied into four places is four places to change the day the
+ * line learns to carry a date.
+ */
+export type OnCapture = (register: string, text: string, inherited: Record<string, string>) => void;
+
+/**
  * Every column of a row, paired with the value the phone card draws for it.
  *
  * THE CARD DROPPED A CELL WHOSE VALUE WAS EMPTY. `{#if row.cells[i + 1]}` guarded each label-and-

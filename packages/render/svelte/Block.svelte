@@ -18,6 +18,7 @@
   import Table from './p/Table.svelte';
   import { comparisonPlan } from '../src/table.ts';
   import Media from './p/Media.svelte';
+  import type { OnCapture } from './types.ts';
 
   let {
     block,
@@ -25,12 +26,13 @@
     onmove,
     ontick,
     onact,
+    oncapture,
   }: {
     block: Block;
     opts?: RenderOptions;
     /**
-     * TWO PRIMITIVES CAN BE CHANGED AND THE OTHER SIX CANNOT, so these callbacks cross this component
-     * and reach exactly the ones that take them: one for `grid`, two for `list`.
+     * THREE PRIMITIVES CAN BE CHANGED AND THE OTHER FIVE CANNOT, so these callbacks cross this component
+     * and reach exactly the ones that take them: one for `grid`, two for `list` and one for `panel`.
      *
      * THEY ARE NOT ON `RenderOptions`. Every member of that type is a READ: a resolver, a link
      * builder, a clock. Putting a write callback on it would give `toHTML` a key it can never
@@ -45,6 +47,11 @@
     ontick?: ((row: Row, done: boolean) => void) | undefined;
     /** The list primitive's other write: answering one of a queue's questions. */
     onact?: ((row: Row, option: string) => void) | undefined;
+    /**
+     * The panel's one write: a `capture`'s line. The register, the text as typed and trimmed, and what the
+     * new row inherits from the block's `where:`, which the host writes as the row's fields beside the title.
+     */
+    oncapture?: OnCapture | undefined;
   } = $props();
 
   const PRIMITIVE = { panel: Panel, grid: Grid, rows: Rows, proportional: Proportional, inline: InlineRun, list: List, media: Media };
@@ -91,6 +98,8 @@
     <Grid {block} {opts} {onmove} />
   {:else if spec.primitive === 'list'}
     <List {block} {opts} {ontick} {onact} />
+  {:else if spec.primitive === 'panel'}
+    <Panel {block} {opts} {oncapture} />
   {:else if Draw}
     <Draw {block} {opts} />
   {:else}

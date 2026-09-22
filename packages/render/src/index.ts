@@ -45,6 +45,18 @@ export {
   type QueueOption,
   type QueueRowKind,
 } from './queue.ts';
+export {
+  CAPTURE_ADD,
+  CAPTURE_ROWS,
+  captureFault,
+  captureNowhere,
+  capturePlan,
+  capturePrompt,
+  capturePromptFor,
+  captureSubmit,
+  type CapturePlan,
+  type CaptureRowKind,
+} from './capture.ts';
 export { takeWorking, workingCell, WORKING_GLYPH, WORKING_LABEL, WORKING_MARK } from './working.ts';
 export {
   TABLE_CHUNK,

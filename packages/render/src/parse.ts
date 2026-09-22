@@ -20,6 +20,7 @@ import { BAR_HOLE, KINDS, TONE_ALIAS, TONES, isKind, type DegradeCode, type Kind
 import { cardFault } from './cards.ts';
 import { feedFault } from './feed.ts';
 import { queueFault } from './queue.ts';
+import { captureFault } from './capture.ts';
 import { diffFault } from './diff.ts';
 
 /**
@@ -277,7 +278,7 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
         type: 'degraded',
         code: 'DIALECT_KIND_UNKNOWN',
         fix: written
-          ? `"${written}" is not one of the twenty-nine kinds. The block is shown as you wrote it.`
+          ? `"${written}" is not one of the thirty kinds. The block is shown as you wrote it.`
           : 'A fence with no kind is shown as you wrote it.',
         raw,
         info,
@@ -332,7 +333,10 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
             ? `"section" is a heading on a page, so it has no place in a fence. Write a "##" heading. The block is shown as you wrote it.`
             : kind === 'feed' || kind === 'agents'
               ? `"${kind}" draws what happened in the record, on a page, so it has no rows in a fence. Use "timeline". The block is shown as you wrote it.`
-              : `"${kind}" draws a register on a page, so it has no rows in a fence. Use "comparison". The block is shown as you wrote it.`,
+              : kind === 'capture'
+                ? /* A WRITE-UP HAS NO HOST TO ADD WITH, and "use comparison" would send the author to draw a table of a line nobody can type into. */
+                  `"capture" adds a row to a list from a page, so a write-up cannot carry one. Link to the list instead. The block is shown as you wrote it.`
+                : `"${kind}" draws a register on a page, so it has no rows in a fence. Use "comparison". The block is shown as you wrote it.`,
         raw,
         info,
         start,
@@ -393,6 +397,9 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
     /* A QUEUE ROW IS A QUESTION OR ONE OF ITS OPTIONS, and an option under no question would be dropped
        from the drawing, which is a way to answer quietly disappearing. Same code, same reason as a feed. */
     const queue = kind === 'queue' ? queueFault(rows.map((r) => r.cells)) : null;
+    /* A CAPTURE ROW IS THE LIST OR A VALUE A NEW ROW IS FILLED WITH, and a stray one is a line that adds to
+       the wrong list or as the wrong state, which is a write the person did not make. */
+    const capture = kind === 'capture' ? captureFault(rows.map((r) => r.cells)) : null;
     /* A STAT'S FOURTH CELL IS A TREND, and a word there is a note in the wrong column rather than a
        line with no points: before the trend it was a fifth cell and degraded, and it still does. */
     const trend = kind === 'stat' ? rows.find((r) => (r.cells[3] ?? '').trim() !== '' && !/\d/u.test(r.cells[3]!)) : undefined;
@@ -404,9 +411,11 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
         ? `A feed block has ${feed}.`
         : queue
           ? `A queue block has ${queue}.`
-          : diff !== null
-            ? `A diff row starts with "- ", "+ " or two spaces, and "${diff}" does not.`
-            : null;
+          : capture
+            ? `A capture block has ${capture}.`
+            : diff !== null
+              ? `A diff row starts with "- ", "+ " or two spaces, and "${diff}" does not.`
+              : null;
     if (fault) {
       out.push({
         type: 'degraded',

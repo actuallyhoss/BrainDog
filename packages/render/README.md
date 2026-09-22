@@ -57,16 +57,19 @@ a theme swap can never break a page, and an agent can never make a page ugly.
 
 ---
 
-## Twenty-nine kinds over eight primitives
+## Thirty kinds over eight primitives
 
 Kinds are declarations over primitives, so primitives compose and kinds do not have to. `cards`,
 `section` and `feed` are page-only: a page's evaluator writes their rows and passes
 `parse(src, { page: true })`. A `diff` is verbatim rows marked `- `, `+ ` or two spaces, and
-`diffRows(before, after)` writes them.
+`diffRows(before, after)` writes them. A `capture` is the one-line add, page-only too: an `into` row naming the
+list and a `set` row for each value a new row inherits. Its field and its Add exist only where the host passes
+`oncapture` to `Block`; without one it draws the list's name, as a link where the row gives it an address,
+and never a disabled field.
 
 | Primitive | Is | Kinds |
 |---|---|---|
-| `panel` | a bounded region with a tone and a nested document | `note` `quote` `section` |
+| `panel` | a bounded region with a tone and a nested document | `note` `quote` `section` `capture` |
 | `grid` | *n* cells of label and figure | `stat` `board` `cards` |
 | `rows` | label · value · note, one per line | `spec` `params` |
 | `proportional` | rows whose number drives a drawn magnitude | `bar` `gauge` `sparkline` `split` `bridge` `series` `lines` `progress` `forecast` |
@@ -80,7 +83,7 @@ inlines**. Which is why a third party can add a kind without asking a designer: 
 it is a named composition of primitives shipped as data, and `PRIMITIVES_VERSION` is the integer a
 consumer checks.
 
-**The primitive set is the real API surface.** Eight is reviewable; twenty-nine kinds plus unbounded
+**The primitive set is the real API surface.** Eight is reviewable; thirty kinds plus unbounded
 third-party kinds is not. Adding a primitive is easy; renaming or removing one breaks every pack ever
 written, so ship fewer than you think you need.
 
@@ -115,6 +118,10 @@ platforms, which paints an intent in a colour no theme chose and no validator me
 They are not two implementations of a guess. The Svelte components emit the same `<figure>` skeleton,
 the same classes and the same data attributes as `toHTML`, so **their accessibility trees are equal by
 construction** rather than by a promise a gate has to police afterwards.
+
+The Svelte `Block` takes four write callbacks and `toHTML` takes none: `onmove` for a board, `ontick` and
+`onact` for a list, and `oncapture(register, text, inherited)` for a capture. A block drawn without them is
+the tree `toHTML` draws, so a read-only embed is the default rather than a mode.
 
 The subpath ships **no stylesheet**. The markup contract is the whole of what a host draws against:
 

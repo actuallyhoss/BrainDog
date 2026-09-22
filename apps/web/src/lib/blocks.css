@@ -1230,6 +1230,89 @@
     color: var(--ink);
   }
 
+  /* ── capture: the one-line add ───────────────────────────────────────────
+     The register's own add line, as a block: one rounded field on the first raised surface, the Add
+     inside its edge once there is text. The same box, border and height the grid's line draws in
+     `/r/[register]`, so a person who has added a row there recognises this one, and the focus ring is
+     `controls.css`'s `.capture-field:focus-within`, on the box and not the input, because the button
+     is inside the box and a ring round the text alone would cut the field off from its own Add. */
+
+  .capture {
+    margin: 0;
+  }
+
+  .capture-field {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-block-size: var(--ctl-h);
+    padding-inline: var(--sp-3) var(--sp-1);
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    transition: border-color var(--d-state) var(--ease-out);
+  }
+
+  .capture-field:hover {
+    border-color: var(--edge);
+  }
+
+  .capture-input {
+    flex: 1;
+    align-self: stretch;
+    margin-block: -1px;
+    min-inline-size: 0;
+    padding-block: 0;
+    background: none;
+    border: 0;
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-ui);
+  }
+
+  .capture-input:focus-visible {
+    /* focus-ok: `.capture-field:focus-within` in `controls.css` draws the ring on the box the reader sees. */
+    outline: none;
+    box-shadow: none;
+  }
+
+  .capture-add {
+    min-block-size: var(--ctl-h-sm);
+    padding: 0 var(--sp-3);
+    background: var(--ink);
+    border: 1px solid var(--ink);
+    border-radius: var(--r-sm);
+    color: var(--bg);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  /* The register's line was measured at 48 by 24 at 390 and taken to `--tap` for a thumb; this is that line. */
+  @media (pointer: coarse) {
+    .capture-add {
+      min-block-size: var(--tap);
+    }
+  }
+
+  /* WHERE NOTHING CAN WRITE, ONE DIM LINE naming the list, as the queue's count is drawn: a door
+     underlined where it leads somewhere, words where it does not. */
+  .capture-elsewhere {
+    max-inline-size: var(--measure);
+    margin: 0;
+    color: var(--dim);
+  }
+
+  a.capture-where {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  a.capture-where:hover,
+  a.capture-where:focus-visible {
+    color: var(--ink);
+  }
+
   /* ── diff: before and after ──────────────────────────────────────────────
      Track changes rather than a patch: a skill is prose, so its lines are in the UI face and wrap
      inside the box, and a phone never scrolls one sideways. What was taken out keeps its words,

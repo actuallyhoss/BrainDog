@@ -1,5 +1,5 @@
 /**
- * `braindog-render/svelte` — the same twenty-nine kinds, drawn as components.
+ * `braindog-render/svelte` — the same thirty kinds, drawn as components.
  *
  * This subpath ships NO stylesheet. The markup contract is the whole of what a host draws against:
  * every block is one `<figure>` carrying its kind, its primitive and its tone as data attributes,
@@ -15,7 +15,7 @@ export { default as Markdown } from './Markdown.svelte';
 export { default as Degraded } from './Degraded.svelte';
 export { default as Text } from './Text.svelte';
 
-export type { Column, TableRow } from './types.ts';
+export type { Column, OnCapture, TableRow } from './types.ts';
 
 export { default as Panel } from './p/Panel.svelte';
 export { default as Grid } from './p/Grid.svelte';
@@ -36,6 +36,7 @@ export { default as Series } from './Series.svelte';
 export { default as Lines } from './Lines.svelte';
 export { default as Progress } from './Progress.svelte';
 export { default as Forecast } from './Forecast.svelte';
+export { default as Capture } from './Capture.svelte';
 
 /* Which body a list draws, as a fact both layers read — `Table` chooses between its own two, and a
    host chooses between this component and its own card list. Two subscriptions could disagree for a

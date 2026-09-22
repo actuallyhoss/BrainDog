@@ -20,6 +20,7 @@ import { MISSING, day, figureChars, leadingCode, symbolFigure, symbolText, value
 import { CARDS_NONE, FOLD_HIDE, FOLD_SHOW, TREND, cardLayout, counted, initialOf, isQuiet, markOf, ringDash, ringOf, trendOf } from './cards.ts';
 import { FEED_EARLIER, feedNew, feedPlan } from './feed.ts';
 import { QUEUE_RECOMMENDED, queueMore, queuePlan } from './queue.ts';
+import { captureNowhere, capturePlan, capturePromptFor } from './capture.ts';
 import { takeWorking, WORKING_GLYPH, WORKING_LABEL } from './working.ts';
 import { TABLE_CHUNK, TABLE_ROWS_LABEL, ariaSort, chunkRows, comparisonPlan, glyphColumn, intrinsicRows, tableCellBody } from './table.ts';
 import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
@@ -174,6 +175,7 @@ const toneGlyph = (tone?: string): string => {
 
 function panel(b: Block, o: RenderOptions): string {
   if (b.kind === 'section') return section(b, o);
+  if (b.kind === 'capture') return capture(b);
   if (b.kind === 'quote') {
     const r = b.rows[0] ?? { cells: [] };
     return `<blockquote class="panel">${cell('quote-text', r.cells[0], o)}${r.cells[1] ? `<cite class="quote-by">${escape(r.cells[1])}</cite>` : ''}</blockquote>`;
@@ -669,6 +671,24 @@ function section(b: Block, o: RenderOptions): string {
 }
 
 /**
+ * `capture`: the one-line add (`src/capture.ts`), as it is drawn where nothing can write.
+ *
+ * NO FIELD, NO BUTTON AND NO FORM, EVER, because `toHTML` has no callbacks and a field here would be a
+ * field that swallows what is typed into it. What is drawn instead is the list, named, and a door to it
+ * where the evaluator gave it an address: the list's own page is where the row can be added. The Svelte
+ * drawer draws this same tree when its host passes no `oncapture`, so the two are equal by construction.
+ * A block whose rows name no list draws an empty panel, which the parser never lets a fence reach.
+ */
+function capture(b: Block): string {
+  const plan = capturePlan(b.rows);
+  if (!plan) return '<div class="capture"></div>';
+  const said = plan.href
+    ? `<a class="capture-where" href="${escape(plan.href)}">${escape(capturePromptFor(plan.label))}</a>`
+    : escape(captureNowhere(plan.label));
+  return `<div class="capture"><p class="capture-elsewhere">${said}</p></div>`;
+}
+
+/**
  * `feed`: what agents, rules and you did, one group each, a burst on one row (`src/feed.ts`).
  *
  * The count leads the row. A new row's count takes the accent, and the words say it too: the head
@@ -945,10 +965,10 @@ const PRIMITIVE_RENDERERS ={ panel, grid, rows, proportional, inline: inlinePrim
  * Whether a block's heading becomes its figcaption.
  *
  * `code`'s heading is its language, and a `section`'s heading is the section, drawn by its drawer as
- * a real heading. Neither is a caption. One function, read by both renderers, so the two trees
- * cannot disagree about it.
+ * a real heading. A `capture`'s heading is its field's prompt (`src/capture.ts`). None is a caption.
+ * One function, read by both renderers, so the two trees cannot disagree about it.
  */
-export const captioned = (b: Block): boolean => Boolean(b.heading) && b.kind !== 'code' && b.kind !== 'section';
+export const captioned = (b: Block): boolean => Boolean(b.heading) && b.kind !== 'code' && b.kind !== 'section' && b.kind !== 'capture';
 
 function block(b: Block, o: RenderOptions): string {
   const spec = KINDS[b.kind];

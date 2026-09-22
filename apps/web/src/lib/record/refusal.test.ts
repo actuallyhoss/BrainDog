@@ -77,6 +77,10 @@ test('a source AND authored rows is refused out loud, not resolved quietly', () 
 test('EVERY KIND GETS THE SURFACE, which is the whole defect', () => {
   // `table` had it. The other fifteen drew a heading and a blank rectangle.
   for (const kind of Object.keys(KINDS)) {
+    /* A CAPTURE READS NO ROWS, so there is no empty answer for it to report: it draws its field, or
+       the one line naming its list when the host cannot write (`packages/render/src/capture.ts`).
+       A "Nothing matched." under an input would be a claim about rows it never asked for. */
+    if (kind === 'capture') continue;
     const { refusal } = draw(
       bound({ kind, rows: [], entries: [], matched: [], refusals: [], empty: 'Nothing matched.' }, ['authored', 'body', 'metrics']),
     );

@@ -63,7 +63,7 @@ const ms = (run: () => void): number => {
  * as a discriminator, or names its columns in the heading, or takes exactly one row.
  *
  * WHY THIS TABLE IS HERE AND NOT A COMMENT SAYING "close enough". Without it, EIGHT of the
- * twenty-nine kinds degraded under the generic row, and a degraded block draws the author's own
+ * kinds then registered degraded under the generic row, and a degraded block draws the author's own
  * fence back at them, escaped, inside a `<pre>`. That echo still contains the word `onmouseover`,
  * so the "did it draw the cell" guard below passed on a block that had never reached its drawer at
  * all. Measured: 21 kinds drew and `quote`, `gauge`, `section`, `cards`, `feed`, `diff` and `queue`
@@ -78,6 +78,9 @@ const ms = (run: () => void): number => {
  * somewhere that parses as a path or the block degrades before the anchor exists.
  */
 const SHAPES: Readonly<Record<string, { rows: string[][] }>> = {
+  /* A CAPTURE NAMES ITS LIST IN AN `into` ROW AND WHAT IT FILLS IN `set` ROWS, and a generic row is
+     neither, so it degrades rather than drawing the line that names the list. */
+  capture: { rows: [['into', 'tasks', HOSTILE, '/' + HOSTILE.replace(/ /gu, '')], ['set', 'state', HOSTILE]] },
   quote: { rows: [[HOSTILE, HOSTILE]] },
   gauge: { rows: [[HOSTILE, HOSTILE]] },
   section: { rows: [[HOSTILE, HOSTILE]] },
@@ -133,7 +136,7 @@ test('NO CELL BECOMES MARKUP, on any of the kinds there are', () => {
   /* The count is the guard on the guard: a kind quietly dropped from the loop is a kind nobody
      sweeps, and the number in the comment above would go on reading as though it had been. */
   assert.equal(drew, Object.keys(KINDS).length - NO_FENCE.size);
-  assert.equal(drew, 28);
+  assert.equal(drew, 29);
 });
 
 /** A resolved `{{path}}` is a value the host handed back, and a value is never markup either. */

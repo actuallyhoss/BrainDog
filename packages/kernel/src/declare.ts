@@ -527,7 +527,7 @@ function metricFieldFault(id: string, source: unknown, value: unknown, groupBy: 
 }
 
 /**
- * The twenty-eight drawn kinds, WRITTEN OUT here rather than imported, and the dependency graph is why.
+ * The drawn kinds, WRITTEN OUT here rather than imported, and the dependency graph is why.
  *
  * `packages/render` owns `KINDS` and is the authority (`05 §2`), but the
  * kernel depends on `ports` and `where` and on nothing else — `31 §2` puts the renderer above it, so
@@ -544,13 +544,16 @@ function metricFieldFault(id: string, source: unknown, value: unknown, groupBy: 
  * and the test walks the array rather than a list typed out beside it. A PACK'S OWN KIND NEEDS NO EDIT
  * HERE: `05 §2` says it arrives as a `block.<id>` declaration, which this list admits by prefix and
  * checks as a document of its own. A kind added to the renderer's table does, which is how `cards`,
- * `section`, `feed`, `diff` and `queue` arrived.
+ * `section`, `feed`, `diff`, `queue` and `capture` arrived.
  */
 const BLOCK_KINDS = [
   'note', 'quote', 'stat', 'bar', 'gauge', 'chips', 'spec', 'params',
   'todo', 'steps', 'timeline', 'board', 'code', 'tree', 'comparison', 'table', 'cards', 'section', 'feed', 'diff',
-  'sparkline', 'split', 'bridge', 'series', 'forecast', 'agents', 'lines', 'progress', 'queue',
+  'sparkline', 'split', 'bridge', 'series', 'forecast', 'agents', 'lines', 'progress', 'queue', 'capture',
 ] as const;
+
+/** A register id as a block names one on its own, with no `register.` in front: the half `SOURCE` checks after the dot. */
+const REGISTER_ID = /^[a-z][a-z0-9_-]{0,31}$/u;
 
 /**
  * What a column is on a card, `packages/render/src/cards.ts`'s `CARD_ROLES`, copied for the reason
@@ -755,6 +758,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       target?: unknown;
       authored?: unknown;
       where?: unknown;
+      register?: unknown;
     };
     const at = `blocks[${i}]`;
     if (block === null || typeof block !== 'object')
@@ -889,6 +893,34 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       return bad('DECLARATION_INVALID', `${id}.${at}'s fold is true or false: whether the section starts shut.`, at);
     if (block.icon !== undefined && (typeof block.icon !== 'string' || !GLYPH.test(block.icon)))
       return bad('DECLARATION_INVALID', `${id}.${at}'s icon is a glyph name: lower-case letters, digits and dashes.`, at);
+
+    /**
+     * A `capture` IS BOUND BY `register:`, WHICH IS WHERE A NEW ROW GOES, and it reads nothing.
+     *
+     * The key is the list's own id rather than a `source:`, because a source is something a block
+     * reads and a capture reads no row: a `source:` on one is a second block somebody meant to declare,
+     * and admitting both would leave the page deciding which of the two the author meant. A register
+     * the page does not require is the same outlived page `source:` is checked for below: a capture
+     * line into a list that was uninstalled from under it.
+     *
+     * A CAPTURE WITH NO `register:` INSTALLS, AND ITS READ REFUSES IT (`pages.ts` `captureBlock`), which
+     * is where a `diff` with no `row:` is refused too. Whether a key is required per kind is not decided
+     * in this function, for the reason the three texts below give, and `declare.test.ts` holds that by
+     * installing every kind bare: refusing it here went red there on the first run.
+     */
+    if (kind === 'capture' && block.source !== undefined)
+      return bad('DECLARATION_INVALID', `${id}.${at} is a capture and reads ${String(block.source)} as well. A capture writes into register: and reads nothing, so take the source off.`, at);
+    if (kind === 'capture' && block.register !== undefined) {
+      if (typeof block.register !== 'string' || !REGISTER_ID.test(block.register))
+        return bad('DECLARATION_INVALID', `${id}.${at}'s register is ${JSON.stringify(block.register)}; it is a register's id, such as tasks.`, at);
+      if (declared.size > 0 && !declared.has(`register.${block.register}`))
+        return bad(
+          'DEPENDENCY_UNRESOLVED',
+          `${id}.${at} adds rows to ${block.register}, and ${id} does not require register.${block.register}. Every register a block writes to is named in requires, or the page outlives its list.`,
+          at,
+          [...declared],
+        );
+    }
 
     if (block.source !== undefined) {
       const source = block.source;

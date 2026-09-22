@@ -20,7 +20,7 @@ const NOW = Date.UTC(2026, 8, 3, 12); // 2026-09-03
    always has: the number below moves when a kind lands, and the words beside it do not. So the count
    lives in one place now, and the title says what the test is for rather than how many there are. */
 test('every kind sits on a primitive that exists, and a new one is a deliberate edit here', () => {
-  assert.equal(Object.keys(KINDS).length, 29);
+  assert.equal(Object.keys(KINDS).length, 30);
   assert.equal(PRIMITIVES.length, 8);
   assert.equal(PRIMITIVES_VERSION, 1);
   for (const [kind, spec] of Object.entries(KINDS))
@@ -292,7 +292,7 @@ test('A CAPITALISED KIND IS TOLD ABOUT ITS CAPITAL, NOT TOLD IT WROTE NO KIND', 
 
   // And the three sentences that were already right stay right: a word that is not a kind in any
   // case, a fence with no kind at all, and a kind that is spelled correctly and page-bound.
-  assert.match(fixFor('```Reactor | H\nA\n```'), /is not one of the twenty-nine kinds/u);
+  assert.match(fixFor('```Reactor | H\nA\n```'), /is not one of the thirty kinds/u);
   assert.equal(fixFor('```\nA\n```'), 'A fence with no kind is shown as you wrote it.');
   assert.match(fixFor('```table | Open\n```'), /draws a register on a page/u);
 });

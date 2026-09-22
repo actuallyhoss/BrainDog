@@ -1,6 +1,6 @@
 /**
  * The two renderers, compared as trees: the Svelte drawers compiled and rendered on the server,
- * against `toHTML`, for every shape a `cards`, `section`, `feed`, `queue` and `diff` block can take,
+ * against `toHTML`, for every shape a `cards`, `section`, `feed`, `queue`, `capture` and `diff` block can take,
  * and the figures that keep their numbers in a fold.
  *
  * "EQUAL BY CONSTRUCTION" WAS A PROMISE AND NOTHING KEPT IT. The rest of this package asserts the
@@ -122,6 +122,11 @@ const SHAPES: Record<string, string> = {
     '```queue\nq | s1 | Claude | 3h ago | Raise the retainer? | \nopt | s1 | raise | Raise it |  | true\n' +
     'opt | s1 | leave | Leave it |  | \nmore | 5 | /decide\n```',
   'a queue with nothing waiting': '```queue\n```',
+  /* A CAPTURE WITH NO HOST, which is the only capture `toHTML` can draw: the list, as a door where it has
+     an address and as words where it has none. The field is the Svelte drawer's alone, tested below. */
+  'a capture with nowhere to write and a door to its list':
+    '```capture | What needs doing?\ninto | tasks | Tasks | /r/tasks?f=state:is:backlog\nset | state | backlog\n```',
+  'a capture with nowhere to write and no door': '```capture\ninto | tasks\n```',
   /* THE FOUR BANDS, all four in one shape, because the chip is drawn per card and a shape carrying
      one proves the branch and not the table. */
   'a queue ranked by what each question would cost to get wrong':
@@ -235,6 +240,19 @@ test('a forecast draws its knobs only where the host asks, and the rest of the t
   assert.match(knobs, /type="range"/u);
   assert.match(knobs, /aria-pressed/u);
   assert.doesNotMatch(render(Block, { props: { block } }).body, /type="range"/u);
+});
+
+test('a capture draws its field only where the host can write, prompted by its heading, and no Add until there is text', () => {
+  const block = page(SHAPES['a capture with nowhere to write and a door to its list']!);
+  const Writable = Block as unknown as Component<{ block: BlockSegment; oncapture: (register: string, text: string, inherited: Record<string, string>) => void }>;
+  const field = tree(render(Writable, { props: { block, oncapture: () => {} } }).body);
+  const input = /<input [^>]*>/u.exec(field)?.[0] ?? '';
+  for (const said of ['class="capture-input"', 'type="text"', 'placeholder="What needs doing?"', 'aria-label="What needs doing?"'])
+    assert.ok(input.includes(said), `${said} is not on ${input || 'any input'}`);
+  assert.doesNotMatch(field, /<button/u, 'an empty field has no Add beside it');
+  assert.doesNotMatch(field, /disabled|capture-elsewhere|figcaption/u);
+  const without = tree(render(Block, { props: { block } }).body);
+  assert.doesNotMatch(without, /<input|<button|<form/u, 'with nowhere to write, nothing takes a key');
 });
 
 test('a figure longer than a tile holds says its longest amount, as drawn, and a short one says nothing', async () => {

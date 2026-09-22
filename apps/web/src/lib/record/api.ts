@@ -712,7 +712,12 @@ export function inheritedFrom(register: string, filters: readonly Filter[]): Fie
     const field = decl.fields.find((x) => x.id === f.field);
     if (!field || field.id === decl.title) continue;
     if (field.type !== 'enum' && field.type !== 'text') continue;
-    const said = declaredValue(register, f.field, f.values[0]!);
+    /* AND AN ENUM'S LABEL IS ITS VALUE, as the record's parse reads it. `declaredValue` matches the value's own
+       words and not the register's label for it, so `state is Later` came back as `Later`, which tasks do not
+       declare, and was dropped here while the kernel filled the same line as `backlog`. `capture-block.test.ts`
+       found it on its first run: one `where:`, a task kept for later on a record and an ordinary one on the demo. */
+    const labelled = field.type === 'enum' ? Object.entries(field.labels ?? {}).find(([, label]) => label.toLowerCase() === f.values[0]!.trim().toLowerCase())?.[0] : undefined;
+    const said = labelled ?? declaredValue(register, f.field, f.values[0]!);
     if (field.type === 'enum' && !field.values?.includes(said)) continue;
     out[f.field] = said;
   }
@@ -1889,6 +1894,11 @@ export type BlockResult = PageBlock & {
    * left out.
    */
   queue?: QueueQuestion[];
+  /**
+   * A `capture` block's: what a row added through it is filled with, by field, in the stored form. The kernel's `fills`,
+   * which this engine answers from `inheritedFrom`, the register grid's own add.
+   */
+  fills?: Record<string, string>;
   /** A `feed` block's rows before they are words, newest first, a burst being one row. */
   feed?: FeedRow[];
   /** On a feed with `since: seen`: the reader's read mark, or `null` when they have none yet. */
@@ -2311,6 +2321,8 @@ const READS = new Set([
   'document',
   /* Whether each row says an agent is on it right now, and the answer that asking produces. */
   'working', 'working_now',
+  /* A capture's list, and what a new row in it is filled with. */
+  'register', 'fills',
 ]);
 
 export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; values: Record<string, string> } | null {
@@ -2390,6 +2402,8 @@ export function readBlock(b: PageBlock): BlockResult {
     if (b.source === 'activity') return activityBlock(b);
     /* WHAT IS WAITING ON A PERSON, which is the decide queue read onto a page. */
     if (b.source === 'governance.open') return openBlock(b);
+    /* THE ONE-LINE ADD reads no rows, only what its `where:` fills a new one with. */
+    if (b.kind === 'capture') return captureBlock(b);
     if (b.kind === 'diff') return diffBlock(b);
     /* THE RUNS WORKING NOW are `session`'s rows in the order the kernel's `sessionsLive` gives them,
        so a declared order would be a second answer to a question the source settles. */
@@ -2706,6 +2720,31 @@ const computed = (b: PageBlock, refusals: string[]): BlockResult => ({
   stale_at: new Date(NOW).toISOString(),
   metrics: undefined,
 });
+
+/**
+ * A `capture` over `register:`, as the sample answers it: the list a new row goes into, and what its `where:` fills
+ * that row with.
+ *
+ * `inheritedFrom` AND NOT A SECOND COPY OF IT. The register grid's add already decides what a line typed under a
+ * filter inherits, and each of its exclusions is written out there; a page's capture is the same line under the same
+ * filter, so it asks the same function. The kernel's `captureBlock` answers from its own parse of the sentence, and
+ * `capture-block.test.ts` holds the two to one answer over the seed.
+ *
+ * THE FILTER IS STILL READ, so a `where:` naming a field the list lacks is refused on the block, as the record
+ * refuses it, rather than quietly filling nothing.
+ */
+function captureBlock(b: PageBlock): BlockResult {
+  const register = (b as PageBlock & { register?: unknown }).register;
+  if (typeof register !== 'string' || register === '') return computed(b, ['register: a capture names the list it adds to, as register: tasks']);
+  if (!REGISTERS[register]) return computed(b, [`register: there is no register called ${register}, so a capture has nowhere to add to`]);
+  const where = compile(register, b.where);
+  const said = explain(where);
+  if (said.length) return { ...computed(b, said), register };
+  const filters: Filter[] = where.clauses.flatMap((c) => (c.op === 'is' && 'values' in c ? [{ field: c.field, op: c.op, values: c.values }] : []));
+  /* EVERY VALUE `inheritedFrom` WRITES IS A STRING, an enum's or a text's, and `Fields` is the wider type of a whole row. */
+  const fills = Object.fromEntries(Object.entries(inheritedFrom(register, filters)).map(([field, value]) => [field, String(value)]));
+  return { ...computed(b, []), register, fills };
+}
 
 /**
  * The questions still open, as a `queue` block reads them: the sample's own decide queue, which is the

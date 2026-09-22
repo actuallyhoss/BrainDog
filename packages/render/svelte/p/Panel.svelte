@@ -1,6 +1,6 @@
 <!--
   `panel` — a bounded region with a tone, an optional glyph, and a nested document. Kinds: `note`,
-  `quote`.
+  `quote`, `section` and `capture`, the last two drawn by their own components.
 
   `note` is the ONLY drawn kind in the `measure` class, because it is the only one that may contain
   a paragraph. That rule was learned expensively: a callout carrying a comparison was capped near a
@@ -11,8 +11,19 @@
   import { TONES, inline, type Block, type RenderOptions } from '../../src/index.ts';
   import Text from '../Text.svelte';
   import Section from '../Section.svelte';
+  import Capture from '../Capture.svelte';
+  import type { OnCapture } from '../types.ts';
 
-  let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
+  let {
+    block,
+    opts = {},
+    oncapture,
+  }: {
+    block: Block;
+    opts?: RenderOptions;
+    /** The panel's one write: a `capture`'s line, handed to the host. The other panel kinds take nothing. */
+    oncapture?: OnCapture | undefined;
+  } = $props();
 
   /**
    * THE GLYPH THIS FILE'S OWN HEADER HAS PROMISED SINCE IT WAS WRITTEN — "a bounded region with a
@@ -43,6 +54,8 @@
 
 {#if block.kind === 'section'}
   <Section {block} {opts} />
+{:else if block.kind === 'capture'}
+  <Capture {block} {opts} {oncapture} />
 {:else if block.kind === 'quote'}
   {@const row = block.rows[0] ?? { cells: [] }}
   <blockquote class="panel">

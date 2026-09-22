@@ -67,7 +67,7 @@ an agent gets it right first time because there is nothing to nest. The row shap
 strong, em, code spans and links; a blockquote, a table, an image or raw HTML is text
 ([36-SPEC-RENDER](36-SPEC-RENDER.md) §13 D12).
 
-### Kinds, twenty-nine
+### Kinds, thirty
 
 | Group | Kinds |
 |---|---|
@@ -77,11 +77,11 @@ strong, em, code spans and links; a blockquote, a table, an image or raw HTML is
 | Work | `todo` · `steps` · `timeline` · `board` |
 | Technical | `code` (annotated) · `tree` · `comparison` · `diff`, how a text changed from one version to the next, before and after |
 | Register-bound | `table` — rows from a `source:` register with declared `columns:`; bound to a register rather than to authored rows, and **page-only** |
-| Page-bound | `cards` — one card per row of a `source:` register, each column given a role by `as:`; `section` — a heading for the blocks after it, with a count and `fold:`; `feed`, what agents, rules and you did since you last looked, grouped by who did it; `agents`, what each agent did, one group per agent; `queue`, what is waiting on you — one card per open question, who opened it, why, what it would cost to get wrong, and the ways to answer it, dearest to get wrong first, the recommendation a label beside its option and never a selection. All five **page-only** |
+| Page-bound | `cards` — one card per row of a `source:` register, each column given a role by `as:`; `section` — a heading for the blocks after it, with a count and `fold:`; `feed`, what agents, rules and you did since you last looked, grouped by who did it; `agents`, what each agent did, one group per agent; `queue`, what is waiting on you — one card per open question, who opened it, why, what it would cost to get wrong, and the ways to answer it, dearest to get wrong first, the recommendation a label beside its option and never a selection; `capture`, the one-line add, a field whose Add appears inside its edge once there is text, writing into `register:` with what its `where:` pins, and drawn only where the host can write. All six **page-only** |
 
-Twenty-nine, counted: the sixteen of v1, the four kinds of the agent path
+Thirty, counted: the sixteen of v1, the four kinds of the agent path
 (`loop/research-agent-path.md` steps 20 and 21), `sparkline`, `split` and `bridge` (`loop/research-modules.md` S9 and S10), `series` and `forecast` (S13 and S11), `agents` (`loop/research-spark.md`, Team board's Agent work page), `lines` (the Solo founder's dashboards), `progress` (the Personal use case's savings goals, goals and budget), and `queue` (`loop/research-modules.md` S21, the
-Decide shape as a block any page may carry), which sit on existing primitives so
+Decide shape as a block any page may carry) and `capture` (S16, the add line Work leads with), which sit on existing primitives so
 `PRIMITIVES_VERSION` does not move. *An earlier draft counted fifteen and left `table` out while every declared page in the
 corpus used it.* `diagram` — a **constrained shape set** of boxes, arrows and lanes, never
 arbitrary SVG — is **post-v1**, and everything after it
@@ -95,7 +95,7 @@ The EBNF is [34-GRAMMARS](34-GRAMMARS.md) §2. This is what an author needs of i
 - A row is split on `|` **after** unescaping — `\|` is a literal pipe, `\\` a literal backslash.
 - A trailing cell that is a tone word — `good` `warn` `bad` `info`, an alias from §7.4, or `hole` on a `bar` — is the tone. Anything else in that position is a cell.
 - `{{path}}` is substituted **per cell, after splitting**, and a substituted value is never re-parsed, so a value containing `|` cannot add a column.
-- More cells than the kind takes degrades the block to its fence with one line above it naming the kind and the row — `DIALECT_ARITY`; a kind outside the twenty is `DIALECT_KIND_UNKNOWN`. Fewer cells leaves the trailing ones absent. Both happen at render; nothing is refused at write (§3).
+- More cells than the kind takes degrades the block to its fence with one line above it naming the kind and the row — `DIALECT_ARITY`; a kind this build does not draw is `DIALECT_KIND_UNKNOWN`. Fewer cells leaves the trailing ones absent. Both happen at render; nothing is refused at write (§3).
 
 | Kind | Cells, in order |
 |---|---|
@@ -124,6 +124,7 @@ The EBNF is [34-GRAMMARS](34-GRAMMARS.md) §2. This is what an author needs of i
 | `section` | **page-only**: the heading is the section, drawn as a heading and never as a caption; one row, glyph \| count \| `fold`. A count of zero is not drawn. `fold` starts it shut, and the host hides the blocks after it up to the next section |
 | `feed` | **page-only**: the page's evaluator writes the rows from `activity`, newest first. A row is by \| who \| count \| what \| when \| *tone*, where *by* is `agent`, `rule` or `you` and names the row's group, so a machine's work is never folded into the person's. A burst is one row: `agent \| Claude \| 14 \| saves on Variable axis QA \| 3h ago`. One row `seen \| when` sits where the reader last looked: the rows above it are new, their count in the accent and their group headed "N new", and a line reading "Before you last looked" parts them from the rest; an empty *when* is no mark yet. Any other first word, or a second `seen` row, degrades under `DIALECT_ARITY`. Empty, it says "Nothing new." or, with no mark, "Nothing to catch up on yet." |
 | `diff` | rows verbatim, each marked `- ` (taken out), `+ ` (put in) or two spaces (in both); a unified diff's `-line` and ` line` read the same. A row with any other first character degrades under `DIALECT_ARITY`. `diffRows(before, after)` writes the rows for two versions. A removed line is a `del` with a minus whose name is the word "removed", an added one an `ins` with a plus named "added"; lines wrap in their box; a run of shared lines that would hide four or more, keeping three beside each change, folds into "N lines unchanged" |
+| `capture` | **page-only**: the page's evaluator writes the rows from the block's `register:` and `where:` ([06-PAGES](06-PAGES.md) §1.1). One row `into \| register \| label \| where`, first: the list a new row goes into, what it is called, and optionally a path to it; then one `set \| field \| value` per value a new row inherits, in the stored form. A second `into`, a `set` before it, a field set twice or a `where` that is not a path of this record degrades under `DIALECT_ARITY`. The heading is the field's placeholder and accessible name, never a caption. The field, with its Add inside its edge once there is text, is drawn only where the host passes `oncapture`; without it the block draws one line naming the list, a link where `where` is given, and never a disabled field |
 
 ---
 
