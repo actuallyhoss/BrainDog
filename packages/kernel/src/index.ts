@@ -26,7 +26,6 @@ import { FORMAT_VERSION, applyMigrations, schemaRefusal, type SchemaState } from
 import { jsonPath, compile, fieldSqlIn, addressable, isColumn, type Predicate, type Schema } from '@braindog/where';
 import {
   disablePack as disableDeclaredPack,
-  disabledPackFault,
   enablePack as enableDeclaredPack,
   installDeclarations,
   jcs,
@@ -1529,6 +1528,91 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
               at: `${at}.required`,
             };
         }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * A list change that takes away a field a live figure, rule, page or ingest reads, as a refusal naming what reads it.
+   *
+   * THE FIELD CHECK RAN WHEN THE READER ARRIVED AND NEVER WHEN THE LIST CHANGED UNDER IT. `loop/research-batch-twenty-audit.md`
+   * §3 retired `category` on Transactions through the owner's `setDeclaration` and it was taken, and the seed's
+   * `txn-uncategorised` then answered `FIELD_UNKNOWN` on every read; retiring or dropping a field a figure sums, groups by
+   * or filters on did the same on a bare kernel. So each live declaration that names the list is asked again, the same
+   * questions `unreadable` and `lintBatch` put to it at install, against the list as the change would leave it.
+   *
+   * ONLY WHAT THIS CHANGE BREAKS. A reader that already fails against the list as it stands is passed over: refusing
+   * every later edit to a list because of a figure an earlier path let through would blame the wrong change, and the
+   * figure is already saying so on every read. And only a change that takes a field away is looked at, which is the
+   * case that was measured; a type change over held rows is `contradicted`'s.
+   *
+   * A reader changed in the same batch is the batch's, and was checked with it.
+   */
+  function stranded(batch: readonly Declaration[]): Refusal | null {
+    const arriving = new Set(batch.map((d) => d.id));
+    type Field = { id?: unknown; retired?: unknown };
+    const live = (fields: unknown): Set<string> =>
+      new Set(
+        (Array.isArray(fields) ? (fields as Field[]) : [])
+          .filter((f) => f?.retired !== true && typeof f?.id === 'string')
+          .map((f) => f.id as string),
+      );
+    let readers: Declaration[] | null = null;
+
+    for (const decl of batch) {
+      if (decl.kind !== 'register') continue;
+      const register = ownId(decl);
+      const was = sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0', decl.id);
+      if (!was) continue;
+      let before: Set<string>;
+      try {
+        before = live((JSON.parse(was.body) as { fields?: unknown }).fields);
+      } catch {
+        continue;
+      }
+      const after = live((decl.body as { fields?: unknown }).fields);
+      const gone = [...before].filter((f) => !after.has(f));
+      if (gone.length === 0) continue;
+
+      readers ??= sql
+        .all<{ id: string; kind: string; body: string; pack_id: string | null }>(
+          "SELECT id, kind, body, pack_id FROM declaration WHERE superseded_at IS NULL AND retired = 0 AND kind IN ('metric', 'rule', 'page', 'ingest')",
+        )
+        .filter((row) => !arriving.has(row.id))
+        .flatMap((row) => {
+          try {
+            return [{ id: row.id, kind: row.kind as Declaration['kind'], body: JSON.parse(row.body) as Record<string, Json>, pack: row.pack_id ?? undefined }];
+          } catch {
+            return [];
+          }
+        });
+
+      /* A CHEAP NARROWING FIRST: a reader that never names the list cannot read its fields. The before-and-after
+         question below is what decides; this only keeps it from being asked of every page in the record. */
+      const names = new RegExp(`"(register\\.)?${register}"`);
+      for (const reader of readers) {
+        if (!names.test(JSON.stringify(reader.body))) continue;
+        const now = unreadable([reader]) ?? lintBatch(sql, [reader]);
+        if (now) continue;
+        /* THIS LIST ALONE BESIDE THE READER, not the whole batch. A page over two lists that both change in one batch
+           was first blamed on whichever came first in it, and the sentence named the wrong list and every field it
+           lost; asked one list at a time, the refusal is about the list that took the field away. */
+        const then = unreadable([decl, reader]) ?? lintBatch(sql, [decl, reader]);
+        if (!then) continue;
+        const body = reader.body as { name?: unknown; title?: unknown };
+        const called = typeof body.name === 'string' ? body.name : typeof body.title === 'string' ? body.title : reader.id;
+        const what = reader.kind === 'metric' ? 'the figure' : reader.kind === 'page' ? 'the page' : `the ${reader.kind}`;
+        const list = typeof (decl.body as { name?: unknown }).name === 'string' ? String((decl.body as { name: string }).name) : register;
+        /* THE FIELD THE REFUSAL NAMES, by the words both checks use for it. A bare substring match named `what` and
+           `kind` out of any sentence that happened to hold them. */
+        const named = gone.filter((f) => new RegExp(`\\b(field called|reads|groups by) ${f}\\b`).test(then.fix));
+        const fields = (named.length > 0 ? named : gone).join(' and ');
+        return {
+          code: then.code,
+          fix: `Taking ${fields} out of ${list} would leave ${what} ${called} (${reader.id}) unable to read it: ${then.fix} Change or retire ${reader.id} first, or keep ${fields}.`,
+          at: reader.id,
+        };
       }
     }
     return null;
@@ -3438,7 +3522,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (batch.length === 0 || batch.length !== listed.length) return ok(null);
       /* EVERY CHANGE IS LINTED WHEN IT IS FILED, with the checks the install runs on acceptance, and not only one that
          sends something out: a page proposed with no blocks was found by the owner who pressed accept. */
-      const fault = unreadable(batch) ?? lintBatch(sql, batch) ?? contradicted(batch);
+      const fault = unreadable(batch) ?? lintBatch(sql, batch) ?? contradicted(batch) ?? stranded(batch);
       if (fault) return { ok: false as const, refusal: fault };
       const egress = batch.flatMap((d) => {
         const out = d.kind === 'ingest' ? egressOf(d.body, titleOfRow) : null;
@@ -5193,7 +5277,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (refused) return refused;
       /* THE ROWS LAST, after every check about the declarations alone, so a declaration that is wrong in itself is told that
          first rather than how many rows it would also break. */
-      const cannot = unreadable(batch) ?? lintBatch(sql, batch) ?? contradicted(batch);
+      const cannot = unreadable(batch) ?? lintBatch(sql, batch) ?? contradicted(batch) ?? stranded(batch);
       if (cannot) return { ok: false as const, refusal: cannot };
       const out = await installDeclarations(sql, clock.now(), batch, transaction, expect);
       if (out.ok) {
@@ -5225,12 +5309,16 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     async stageInstall(batch: readonly Declaration[]) {
       const refused = schemaRefusal(state);
       if (refused) return refused as Result<() => Result<unknown>>;
-      const cannot = unreadable(batch);
-      if (cannot) return { ok: false as const, refusal: cannot };
       /* THE PACK PATH IS WHERE AN UPGRADE ARRIVES, so a disabled pack is refused here as well as in
-         `installDeclarations`. */
-      const off = disabledPackFault(sql, batch);
-      if (off) return { ok: false as const, refusal: off };
+         `installDeclarations`; `lintBatch` asks that first.
+
+         AND THE BATCH IS VALIDATED AGAINST THE RECORD, which `stageDeclarations(batch)` alone never did: with no
+         `known`, `metricFieldFault` returns before it looks, and `loop/research-batch-twenty-audit.md` §1 measured a
+         third party's pack whose figure summed `nosuch` plan ok, install ok and read `FIELD_UNKNOWN` on every page,
+         while the same figure through `install` was refused. Every `installPack` and every accepted pack proposal
+         comes through here, so a check that only `install` ran was a check a pack never met. */
+      const cannot = unreadable(batch) ?? lintBatch(sql, batch);
+      if (cannot) return { ok: false as const, refusal: cannot };
       const staged = await stageDeclarations(batch);
       if (!staged.ok) return staged;
       return ok(() => {

@@ -73,6 +73,8 @@ const KEYS: Declaration = {
       { id: 'opens', type: 'text', required: true },
       { id: 'project', type: 'ref', to: 'things', scope: { widen: 'person' } },
       { id: 'value', type: 'secret' },
+      /* The seed's Agents page filters Keys on `state`, and a list that takes it away is refused at install. */
+      { id: 'state', type: 'enum', values: ['live', 'stale', 'invalid', 'missing', 'retired'], default: 'live' },
     ],
   } as never,
 };
@@ -89,6 +91,7 @@ const LEARNINGS: Declaration = {
       { id: 'lesson', type: 'text', required: true },
       { id: 'project', type: 'ref', to: 'things', scope: { widen: 'person' } },
       { id: 'confirmed_on', type: 'day' },
+      { id: 'state', type: 'enum', values: ['active', 'superseded', 'reverted'], default: 'active' },
     ],
   } as never,
 };
