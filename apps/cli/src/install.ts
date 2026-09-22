@@ -17,7 +17,7 @@
  * (`loop/research-agent-path.md` question 5). A project's settings file is changed only when it is named.
  */
 
-import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 
@@ -51,6 +51,9 @@ export const REPLACE_BY_HAND =
 /** The profile folders to change: each `--config-dir`, else `CLAUDE_CONFIG_DIR`, else `~/.claude`. */
 export const profilesOf = (named: string[], env: Env): string[] => (named.length > 0 ? named : [env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')]);
 
+/* Paths compared as the file system compares them: without case on Windows. */
+const fold = (path: string) => (process.platform === 'win32' ? path.toLowerCase() : path);
+
 /**
  * Where a profile's MCP servers are kept. CLAUDE CODE KEEPS THE DEFAULT PROFILE'S BESIDE ITS FOLDER, in
  * `~/.claude.json`, and a `CLAUDE_CONFIG_DIR` profile's inside it, which is why `research-switch.md` names
@@ -60,7 +63,6 @@ export const profilesOf = (named: string[], env: Env): string[] => (named.length
  * exact comparison sent the lookup inside the folder, found no file, and reported no the old tool server to remove.
  */
 export function serversFileOf(dir: string, home: string = homedir()): string {
-  const fold = (path: string) => (process.platform === 'win32' ? path.toLowerCase() : path);
   return fold(resolve(dir)) === fold(resolve(home, '.claude')) ? join(home, '.claude.json') : join(resolve(dir), '.claude.json');
 }
 
@@ -82,8 +84,105 @@ const backupOf = (file: string): string => {
 
 type Options = { apply: boolean; scripts: string; platform?: string; replace?: boolean; home?: string };
 
-/** One file's change, read and decided before anything is written, so a refusal in the second writes neither. */
-type Plan = { lines: string[]; write: (() => string[]) | null };
+/** One file's change, read and decided before anything is written: the lines to print, and what to write. */
+type Write = { file: string; had: boolean; value: unknown };
+type Plan = { lines: string[]; write: Write | null };
+
+/**
+ * Removes a file this command made, `.tmp` or `.bak`. BOTH TAKE THE ORIGINAL'S MODE, so both can be read-only, and
+ * Windows will not unlink a read-only file: the audit's `.claude.json.tmp`, left read-only by a failed rename,
+ * made every later run fail at `open` until it was removed by hand.
+ */
+const discard = (path: string): void => {
+  if (!existsSync(path)) return;
+  chmodSync(path, 0o600);
+  unlinkSync(path);
+};
+
+/**
+ * EVERY FILE OR NONE. Each file is copied and its new text written to `<file>.tmp` before any is renamed into place,
+ * so a failure while preparing changes nothing, and a failed rename puts back every file already renamed, from the
+ * copy made for it a moment before, and takes away every `.tmp`, `.bak` and folder this run made.
+ *
+ * MEASURED BEFORE THIS EXISTED (`loop/research-batch-twenty-four-audit.md` §1): each file was written on its own,
+ * so a read-only `.claude.json` left `settings.json` cut over and the MCP server in, the split brain `--replace`
+ * exists to prevent, and printed only the `EPERM`. The thrown sentence now names every file and what became of it.
+ */
+function commit(plans: Plan[]): string[] {
+  type Step = Write & { tmp: string; kept: string | null; made: string | undefined; renamed: boolean };
+  const steps: Step[] = [];
+  let failing = '';
+  try {
+    for (const write of plans.flatMap((plan) => (plan.write ? [plan.write] : []))) {
+      failing = write.file;
+      const step: Step = { ...write, tmp: `${write.file}.tmp`, kept: null, made: undefined, renamed: false };
+      steps.push(step);
+      /* A `.tmp` still here is an earlier run's, which failed, and it holds nothing the file does not. */
+      discard(step.tmp);
+      if (write.had) {
+        step.kept = backupOf(write.file);
+        copyFileSync(write.file, step.kept);
+      } else step.made = mkdirSync(dirname(write.file), { recursive: true });
+      /* The mode is carried over because `.claude.json` holds the account's sign-in, and a fresh file would be made readable by the umask. */
+      writeFileSync(step.tmp, `${JSON.stringify(write.value, null, 2)}\n`, write.had ? { mode: statSync(write.file).mode & 0o777 } : {});
+    }
+    for (const step of steps) {
+      failing = step.file;
+      renameSync(step.tmp, step.file);
+      step.renamed = true;
+    }
+  } catch (e) {
+    throw new Error(undo(steps, plans, failing, e));
+  }
+  const kept = new Map(steps.map((step) => [step.file, step.kept]));
+  return plans.flatMap((plan) => {
+    if (!plan.write) return plan.lines;
+    const copy = kept.get(plan.write.file);
+    return [...plan.lines, copy ? `The file as it was is kept at ${copy}.` : 'There was no file before, so there is nothing to keep a copy of.'];
+  });
+}
+
+/** Puts back what `commit` changed, newest first, and says exactly which files are as they were and which are not. */
+function undo(steps: { file: string; tmp: string; kept: string | null; made: string | undefined; renamed: boolean }[], plans: Plan[], failing: string, cause: unknown): string {
+  const stuck = new Map<string, string>();
+  const left: string[] = [];
+  for (const step of [...steps].reverse()) {
+    if (step.renamed) {
+      try {
+        /* Through a fresh `.tmp` and a rename, not a copy over the file, because the file may be read-only. */
+        if (step.kept) {
+          copyFileSync(step.kept, step.tmp);
+          renameSync(step.tmp, step.file);
+        } else discard(step.file);
+      } catch {
+        stuck.set(step.file, step.kept ? `  ${step.file}, and the file as it was is kept at ${step.kept}` : `  ${step.file}, which is new`);
+        continue;
+      }
+    }
+    for (const path of [step.tmp, ...(step.kept ? [step.kept] : [])]) {
+      try {
+        discard(path);
+      } catch {
+        left.push(`  ${path}`);
+      }
+    }
+    /* Only the folders this run made, and only while empty, so nothing another program put there is taken. */
+    try {
+      for (let dir = dirname(step.file); step.made && fold(resolve(dir)).startsWith(fold(resolve(step.made))); dir = dirname(dir)) rmdirSync(dir);
+    } catch {
+      /* A folder left behind is empty and harmless, and saying so would bury the line that matters. */
+    }
+  }
+  const files = plans.flatMap((plan) => (plan.write ? [plan.write.file] : []));
+  const asWas = files.filter((file) => !stuck.has(file)).map((file) => `  ${file}`);
+  const why = `Writing ${failing} failed: ${cause instanceof Error ? cause.message : String(cause)}`;
+  const lines =
+    stuck.size === 0
+      ? [`braindog install changed nothing. ${why}`, 'Each of these is as it was before the run:', ...asWas]
+      : [`braindog install stopped part way and could not put everything back. ${why}`, 'Changed, and not put back:', ...stuck.values(), ...(asWas.length > 0 ? ['As it was before the run:', ...asWas] : [])];
+  if (left.length > 0) lines.push('Left beside them, and safe to remove by hand:', ...left);
+  return lines.join('\n');
+}
 
 const readObject = (file: string, what: string): Record<string, unknown> => {
   let parsed: unknown;
@@ -96,32 +195,34 @@ const readObject = (file: string, what: string): Record<string, unknown> => {
   return parsed;
 };
 
-/**
- * Copy, then write whole and rename into place, so a failed write never leaves half a file. The mode is carried
- * over because `.claude.json` holds the account's sign-in, and a fresh file would be made readable by the umask.
- */
-function writeKept(file: string, had: boolean, value: unknown): string {
-  if (!had) {
-    mkdirSync(dirname(file), { recursive: true });
-    writeFileSync(`${file}.tmp`, `${JSON.stringify(value, null, 2)}\n`);
-    renameSync(`${file}.tmp`, file);
-    return 'There was no file before, so there is nothing to keep a copy of.';
-  }
-  const kept = backupOf(file);
-  copyFileSync(file, kept);
-  writeFileSync(`${file}.tmp`, `${JSON.stringify(value, null, 2)}\n`, { mode: statSync(file).mode & 0o777 });
-  renameSync(`${file}.tmp`, file);
-  return `The file as it was is kept at ${kept}.`;
-}
-
 const dryTail = (options: Options) => `Nothing was changed. Run braindog install ${options.replace ? '--replace --apply' : '--apply'} to write it.`;
 
-/** What installing into one profile does: its `settings.json`, and with `replace` its MCP servers too. */
-export function installInto(dir: string, options: Options): string[] {
-  const plans = [planSettings(join(dir, 'settings.json'), options)];
-  if (options.replace) plans.push(planServers(serversFileOf(dir, options.home), options));
-  return plans.flatMap((plan) => [...plan.lines, ...(plan.write ? plan.write() : [])]);
+/**
+ * What installing into every profile and every named file does, as one change: each profile's `settings.json`,
+ * with `replace` its MCP servers too, then each named settings file. ALL ARE READ BEFORE ANY IS WRITTEN. Measured
+ * before this existed, one call per profile cut over two profiles and then refused a malformed third, and the
+ * refusal was the only line printed. A file reached twice, a profile's own `settings.json` also named with
+ * `--settings`, is planned once, since a second plan from the same reading would overwrite the first.
+ */
+export function installEvery(profiles: string[], files: string[], options: Options): string[] {
+  const seen = new Set<string>();
+  const plans: Plan[] = [];
+  const add = (file: string, plan: (file: string, options: Options) => Plan) => {
+    const key = fold(resolve(file));
+    if (seen.has(key)) return;
+    seen.add(key);
+    plans.push(plan(file, options));
+  };
+  for (const dir of profiles) {
+    add(join(dir, 'settings.json'), planSettings);
+    if (options.replace) add(serversFileOf(dir, options.home), planServers);
+  }
+  for (const file of files) add(file, planSettings);
+  return commit(plans);
 }
+
+/** What installing into one profile does: its `settings.json`, and with `replace` its MCP servers too. */
+export const installInto = (dir: string, options: Options): string[] => installEvery([dir], [], options);
 
 /**
  * What installing into one settings file does, as the lines to print. Throws one sentence when the file cannot
@@ -131,10 +232,7 @@ export function installInto(dir: string, options: Options): string[] {
  * repository and nowhere else. Its folder is made on `--apply` when it is missing, because a repository without a
  * `.claude` folder is the usual case. A name that is not a `.json` file is refused before anything is read.
  */
-export function installAt(named: string, options: Options): string[] {
-  const plan = planSettings(named, options);
-  return [...plan.lines, ...(plan.write ? plan.write() : [])];
-}
+export const installAt = (named: string, options: Options): string[] => installEvery([], [named], options);
 
 function planSettings(named: string, options: Options): Plan {
   const file = resolve(named);
@@ -184,37 +282,99 @@ function planSettings(named: string, options: Options): Plan {
   if (!options.apply) return { lines: [...lines, dryTail(options)], write: null };
 
   for (const { event, entry } of added) next[event] = [...((next[event] as unknown[] | undefined) ?? []), entry];
-  return { lines, write: () => [writeKept(file, had, { ...settings, hooks: next })] };
+  return { lines, write: { file, had, value: { ...settings, hooks: next } } };
+}
+
+const HIDDEN = '[hidden]';
+/**
+ * A word naming a secret, so the word after it is one: `--token`, `--api-key`, `--header`, `Authorization:`,
+ * `Bearer`. Loose on purpose, since a word hidden in error costs a reader nothing and one shown costs a key.
+ */
+const NAMES_SECRET = /token|key|secret|pass|auth|bearer|basic|credential|cookie|session|sig|header|jwt|pat\b/i;
+const isUrl = (word: string) => /^[a-z][a-z0-9+.-]*:\/\//i.test(word);
+/*
+ * A colon anywhere, not only at the end: `Authorization:Bearer` is one word when it is written without the space. A
+ * URL is never a name, or the `key=` in its query (which is dropped anyway) hid the `--header` after it.
+ */
+const namesSecret = (word: string) => !isUrl(word) && (/^-/.test(word) || /:/.test(word) || /^(?:bearer|basic|token)$/i.test(word)) && NAMES_SECRET.test(word);
+/**
+ * A piece of a word that may itself be a token: a known key prefix, or sixteen characters or more that mix letters
+ * and digits. `brain-mcp.mjs` and `mcp-remote` pass; `hb_live_SECRET_77`, the audit's, and a UUID do not.
+ */
+const looksLikeToken = (piece: string) =>
+  /^(?:hb|sk|pk|rk|ghp|gho|ghs|ghu|github_pat|glpat|xox[a-z]|rec|AKIA)[_-]/i.test(piece) || piece.length >= 32 || (piece.length >= 16 && /\d/.test(piece) && /[a-z]/i.test(piece));
+/* Each path segment on its own, so a folder is still named while a token between two slashes is not. */
+const hidePieces = (text: string) => text.split(/([\\/])/).map((piece) => (piece === '/' || piece === '\\' || !looksLikeToken(piece) ? piece : HIDDEN)).join('');
+
+/** A URL as its origin and path, with no query, fragment or sign-in, and every token-like segment hidden. */
+function hideUrl(text: string): string {
+  try {
+    const url = new URL(text);
+    return `${url.origin}${hidePieces(url.pathname)}`;
+  } catch {
+    return HIDDEN;
+  }
+}
+
+function hideWord(word: string): string {
+  const bare = word.replace(/^["']+|["']+$/g, '');
+  if (isUrl(bare)) return hideUrl(bare);
+  /* `name=value` and `Name:value` alike, so `Authorization:<key>` hides the key as `--api-key=<key>` does. */
+  const eq = bare.search(/[=:]/);
+  if (eq > 0) {
+    const name = bare.slice(0, eq);
+    return `${name}${bare[eq]}${NAMES_SECRET.test(name) ? HIDDEN : hidePieces(bare.slice(eq + 1))}`;
+  }
+  return hidePieces(bare);
 }
 
 /**
- * What a server entry runs, to name it by: the command and its arguments, or the URL without its query. NEVER
- * `env` OR `headers`, which is where a registration keeps its token.
+ * What a server entry runs, to name it by: the command and its arguments, or the URL. NEVER `env` OR `headers`,
+ * which is where a registration keeps its token, and NEVER A TOKEN IN WHAT IS SHOWN. Measured before this
+ * (`loop/research-batch-twenty-four-audit.md` §4): `--token hb_live_SECRET_77` in the arguments and
+ * `/mcp/hb_live_SECRET_88` in the path were printed whole on the dry run and under `--json`. A word after one that
+ * names a secret is hidden, and so is every word or path segment shaped like a token, and a run of hidden words
+ * is shown once.
  */
 function describe(server: Record<string, unknown>): string {
-  if (typeof server.url === 'string') {
-    try {
-      const url = new URL(server.url);
-      return `${url.origin}${url.pathname}`;
-    } catch {
-      return 'a server whose url does not parse';
-    }
+  const words = typeof server.url === 'string' ? [server.url] : wordsOf(server);
+  const shown: string[] = [];
+  let hideNext = false;
+  for (const word of words) {
+    /* `Bearer` hidden after `Authorization:` still names a secret, so the key after it is hidden too. */
+    const next = namesSecret(word.replace(/^["']+|["']+$/g, ''));
+    const text = hideNext ? HIDDEN : hideWord(word);
+    if (!(text === HIDDEN && shown.at(-1) === HIDDEN)) shown.push(text);
+    hideNext = next;
   }
-  const args = Array.isArray(server.args) ? server.args.filter((a): a is string => typeof a === 'string') : [];
-  return [typeof server.command === 'string' ? server.command : '', ...args].filter(Boolean).join(' ');
+  return shown.join(' ');
 }
 
+/* The command and its arguments split into words, since an entry may give the whole command as one string. */
+const wordsOf = (server: Record<string, unknown>): string[] =>
+  [server.command, ...(Array.isArray(server.args) ? server.args : [])].filter((s): s is string => typeof s === 'string').flatMap((s) => s.split(/\s+/).filter(Boolean));
+
+/* the old tool's host, with or without the trailing dot a fully qualified name may carry. */
+function isSamUrl(text: string): boolean {
+  try {
+    const url = new URL(text.replace(/^["']+|["']+$/g, ''));
+    return (url.protocol === 'https:' || url.protocol === 'http:') && url.hostname.toLowerCase().replace(/\.$/, '') === SAM_HOST;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A the old tool server: its own `url` on the old tool's host, `brain-mcp.mjs` among what it runs, or that host among
+ * its arguments. THE LAST IS A PROXY, `npx -y mcp-remote https://brain.example.com/mcp`, the usual way to reach an HTTP
+ * server from a client older than the HTTP transport. Measured before it was looked for (the audit's §5), a profile
+ * whose only the old tool entry was proxied was reported as registering none, and kept it.
+ */
 function isSamServer(server: unknown): server is Record<string, unknown> {
   if (!isObject(server)) return false;
-  if (typeof server.url === 'string') {
-    try {
-      return new URL(server.url).hostname.toLowerCase() === SAM_HOST;
-    } catch {
-      return false;
-    }
-  }
+  if (typeof server.url === 'string' && isSamUrl(server.url)) return true;
   const strings = [server.command, ...(Array.isArray(server.args) ? server.args : [])].filter((s): s is string => typeof s === 'string');
-  return strings.some((s) => SAM_MCP.test(s));
+  return strings.some((s) => SAM_MCP.test(s)) || wordsOf(server).some(isSamUrl);
 }
 
 /**
@@ -251,5 +411,5 @@ function planServers(file: string, options: Options): Plan {
    * fixture's `numStartups` is one such field), so a session left open may write back the copy it read.
    */
   if (!options.apply) return { lines: [...lines, 'Close every Claude Code session on this profile before --apply, since each one rewrites this file.', dryTail(options)], write: null };
-  return { lines, write: () => [writeKept(file, true, next)] };
+  return { lines, write: { file, had: true, value: next } };
 }

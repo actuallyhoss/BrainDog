@@ -27,7 +27,7 @@ import { PRIMITIVES_VERSION } from 'braindog-render';
 import { hookEnd, hookStart, readSession, sessionPath } from './hooks.ts';
 import { budgetOf, clientFor, hostsPath, target } from './http.ts';
 import { importCommand } from './import.ts';
-import { REPLACE_BY_HAND, installAt, installInto, profilesOf } from './install.ts';
+import { REPLACE_BY_HAND, installEvery, profilesOf } from './install.ts';
 import { machine, takeJson, type Machine } from './json.ts';
 import { keys, spawnInherit } from './keys.ts';
 import { login } from './login.ts';
@@ -340,8 +340,10 @@ function install(args: string[]): void {
   const files = values.settings ?? [];
   const lines: string[] = [];
   /* A NAMED FILE OR FOLDER IS THE WHOLE LIST: the user profile is changed only when nothing else is named. */
-  for (const dir of files.length > 0 && dirs.length === 0 ? [] : profilesOf(dirs, process.env)) lines.push(...installInto(dir, options));
-  for (const file of files) lines.push(...installAt(file, options));
+  /* ONE CHANGE ACROSS EVERY PROFILE AND FILE. Looping `installInto` per profile made each profile's two files
+     all-or-nothing and nothing more, so a malformed third profile left the first two cut over (audit twenty-four,
+     finding 1). */
+  lines.push(...installEvery(files.length > 0 && dirs.length === 0 ? [] : profilesOf(dirs, process.env), files, options));
   if (options.replace) lines.push('', REPLACE_BY_HAND);
   const cli = fileURLToPath(new URL('./main.ts', import.meta.url)).replaceAll('\\', '/');
   lines.push(
