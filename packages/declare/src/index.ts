@@ -27,14 +27,17 @@ import type { Conflict, Refusal, Result } from '@braindog/ports';
 import { no, ok, refused } from '@braindog/ports';
 import { credentialKey as credential, credentialValue, NESTED_MOST, nestedPast } from './credentials.ts';
 import { FIRST_PARTY_LISTS } from './usecase.ts';
-import { KINDS, approvalLines, configReads, configValue, digest, egressChanged, egressOf as egressOfBody, fillConfig, jcs, misread, readConfig, sentencesOver, widens, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
+import { KINDS, approvalLines, configReads, configValue, digest, egressChanged, egressOf as egressOfBody, fillConfig, jcs, misread, readConfig, rowRegisterOf, sentencesOver, widens, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
 
 /**
  * What one declaration sends out of the record, or `null` when it sends nothing: every host, how often, the key by label
  * and the fields. The same reading the record stores on a proposal, so a plan and a proposal print the same lines.
  */
-export const egressOf = (decl: { kind: string; body: unknown }, nameOf?: (project: string) => string | null): Egress | null =>
-  decl.kind === 'ingest' || decl.kind === 'script' ? egressOfBody(decl.body, nameOf) : null;
+export const egressOf = (
+  decl: { kind: string; body: unknown },
+  nameOf?: (project: string) => string | null,
+  opensOf?: (label: string) => string | null,
+): Egress | null => (decl.kind === 'ingest' || decl.kind === 'script' ? egressOfBody(decl.body, nameOf, opensOf) : null);
 export type { Egress };
 
 /* A use case: a pack with a front, its modules, signals and voice (`loop/research-spark.md` §2.1). */
@@ -147,6 +150,13 @@ export type Installed = {
    * OPTIONAL: without it the id is said as the declaration wrote it.
    */
   nameOf?: (ref: string) => string | null;
+  /**
+   * What the record's live vault entry for a label says it opens, so a script's line names the host each key goes to
+   * (`scriptEgress` in the kernel), as a proposal's line does when the kernel reads its own vault.
+   *
+   * OPTIONAL, as `nameOf` is: without it the line says "to the host its vault entry opens", which is where the answer is.
+   */
+  opensOf?: (label: string) => string | null;
   /**
    * The declarations this record has put to work in a way `rows` cannot show, by id: an ingest that has filed a row
    * (`ingest_receipt`), and a webhook door that holds a token (`heldDigest` in `@braindog/record`).
@@ -1883,15 +1893,25 @@ function sentenceSchema(register: string, body: unknown, fields: ReadonlyMap<str
  * `install` below refuses it, so the pack path is held to what `install` is.
  *
  * WHAT THE KERNEL ASKS, IN ITS ORDER: every list this install stages over a live one, every live metric, rule and page
- * this install does not rewrite, and the first sentence of each that moves. A reader this version sends with other
- * bytes is the update's own, compiled with it, and a reader it retires reads nothing afterwards. One the owner changed
- * and this install keeps is live as the owner left it, and is asked.
+ * this install keeps or rewrites, and the first sentence of each that moves. A reader this version sends with other
+ * bytes is asked in the words it sends, and a reader it retires reads nothing afterwards. One the owner changed and
+ * this install keeps is live as the owner left it, and is asked.
  */
 function misreadsOf(pack: Pack, installed: Installed, unstaged: ReadonlySet<string>, gone: ReadonlySet<string>): Diff['misreads'] {
   const read = installed.sentence;
   if (read === undefined) return [];
   const live = new Map(installed.declarations.map((d) => [d.id, d]));
   const sent = new Map(pack.declarations.map((d) => [d.id, d]));
+  const doorOf = (id: string): unknown => {
+    const mine = sent.get(id);
+    if (mine !== undefined && !unstaged.has(id)) return mine.body;
+    const held = live.get(id);
+    try {
+      return held === undefined ? undefined : (JSON.parse(held.body) as unknown);
+    } catch {
+      return undefined;
+    }
+  };
   const out: Diff['misreads'] = [];
   for (const decl of pack.declarations) {
     const was = live.get(decl.id);
@@ -1918,17 +1938,21 @@ function misreadsOf(pack: Pack, installed: Installed, unstaged: ReadonlySet<stri
     for (const reader of installed.declarations) {
       if (!SENTENCE_KINDS.has(reader.kind) || gone.has(reader.id)) continue;
       const theirs = sent.get(reader.id);
-      if (theirs !== undefined && !unstaged.has(reader.id) && theirs.canonical !== reader.body) continue;
+      /* A READER THIS VERSION REWRITES IS ASKED IN THE WORDS IT SENDS, as `stranded` now asks it. Skipped as "the
+         update's own", a figure renamed with its words kept planned clean and the kernel refused it at staging
+         (`loop/research-batch-thirty-six-audit.md` §1), so the owner met the refusal after the press. */
       let body: Record<string, unknown>;
-      try {
-        body = JSON.parse(reader.body) as Record<string, unknown>;
-      } catch {
-        continue;
-      }
-      /* A RULE'S LIST, as the kernel's `subjectOf` reads it: `register`, or the list an `on: written` trigger names. */
-      const on = (body.on as { written?: { register?: unknown } } | undefined)?.written?.register;
-      const subject = typeof body.register === 'string' ? body.register : typeof on === 'string' ? on : null;
-      for (const { at, where } of sentencesOver(reader.kind, body, register, reader.kind === 'rule' ? subject : null)) {
+      if (theirs !== undefined && !unstaged.has(reader.id) && theirs.canonical !== reader.body) body = theirs.body;
+      else
+        try {
+          body = JSON.parse(reader.body) as Record<string, unknown>;
+        } catch {
+          continue;
+        }
+      /* A RULE'S LIST, as the kernel's `rowRegisterOf` reads it: `register`, the list an `on: written` trigger names, or
+         the list the door an `on: arrival` waits at writes, as this version leaves that door. */
+      const subject = reader.kind === 'rule' ? rowRegisterOf(body as never, (door) => doorOf(`ingest.${door}`)) : null;
+      for (const { at, where } of sentencesOver(reader.kind, body, register, subject)) {
         const then = read(where, closed);
         const now = read(where, open);
         if (then == null || now == null) continue;
@@ -2024,7 +2048,7 @@ const hostOf = (address: unknown): string | null => {
 
 const callsOf = (pack: Pack, installed: Installed): Diff['calls_out'] =>
   pack.declarations.flatMap((d) => {
-    const e = egressOf(d, installed.nameOf);
+    const e = egressOf(d, installed.nameOf, installed.opensOf);
     if (e === null) return [];
     const body = d.body as { ingest?: string; url?: unknown; fetch?: { base?: unknown } };
     /* EVERY HOST, STATICALLY. A `call` and a `poll` say `url:`, and a `pull` says `url:` or `fetch.base`. */
@@ -2036,7 +2060,9 @@ const callsOf = (pack: Pack, installed: Installed): Diff['calls_out'] =>
     let before: Egress | null = null;
     if (was !== undefined)
       try {
-        before = egressOf({ kind: was.kind, body: JSON.parse(was.body) as unknown });
+        /* WITH THE SAME VAULT, since a script is compared by its whole line (`egressChanged`) and a line read without it
+           says "the host its vault entry opens" where the new one names the host: every update would ask again. */
+        before = egressOf({ kind: was.kind, body: JSON.parse(was.body) as unknown }, undefined, installed.opensOf);
       } catch {
         before = null;
       }

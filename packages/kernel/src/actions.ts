@@ -223,6 +223,21 @@ export function keyNamed(sql: Sql, name: string | undefined): Key | null {
 }
 
 /**
+ * What the live vault entry a label names says it opens, found as `keyNamed` finds the key, or `null` when none is live.
+ * The words as the entry holds them: the host reads a host out of them at run time, and this is what a person reads.
+ */
+export function opensNamed(sql: Sql, name: string): string | null {
+  if (name === '') return null;
+  return (
+    sql.one<{ opens: string }>(
+      'SELECT opens FROM grant WHERE (label = ? OR id = ?) AND revoked_at IS NULL ORDER BY created_at DESC, id DESC LIMIT 1',
+      name,
+      name,
+    )?.opens ?? null
+  );
+}
+
+/**
  * Whether a scheduled run could ever open this key, said at the moment somebody approves it.
  *
  * THE CHECK BELONGS BEFORE THE PRESS AND NOT AT THE FIRST RUN. `sealedGrant` refuses a key sealed
@@ -1256,10 +1271,12 @@ const joinedList = (items: readonly string[]): string =>
  * rule says so, or both. Nothing here reads the record, so a pack's plan and a proposal print the same lines. The one
  * exception is a project's name: `nameOf` turns the row id a declaration holds into the words its owner gave it, so the
  * key line says "the project Lanternly", not a row id. Without one, or for a row it cannot find, the id is said as written.
+ * The other is `opensOf`, what a vault label's live entry opens, which a script's line names beside each key
+ * (`scriptEgress`); an action has one host and says it already.
  */
-export function egressOf(body: unknown, nameOf?: (project: string) => string | null): Egress | null {
+export function egressOf(body: unknown, nameOf?: (project: string) => string | null, opensOf?: (label: string) => string | null): Egress | null {
   if (body === null || typeof body !== 'object' || Array.isArray(body)) return null;
-  if (typeof (body as { script?: unknown }).script === 'string') return scriptEgress(body as ScriptHeader);
+  if (typeof (body as { script?: unknown }).script === 'string') return scriptEgress(body as ScriptHeader, opensOf);
   const d = body as Partial<ActionDecl> & { ingest?: unknown; channel?: unknown; every?: unknown; project?: unknown };
   const channel = d.channel;
   if (typeof channel !== 'string' || !(ACTION_KINDS as readonly string[]).includes(channel)) return null;
@@ -1312,8 +1329,14 @@ type ScriptHeader = { script: string; runs?: { every?: unknown; door?: unknown; 
  *
  * `trigger` HAS NO WORD FOR A DOOR. It is the plan diff's closed union, owned by `@braindog/declare`, and a door-started
  * script is reported as rule-started there. The line says `when <door> receives an arrival`, which is the truth.
+ *
+ * EACH KEY IS SAID WITH THE HOST IT GOES TO, because the host sends a key only where its vault entry opens (`keyRefused`
+ * in `@braindog/host`) and the line named the origins and the keys as two lists. A script with two origins and one key
+ * was approved without anybody being told which origin gets the key, which is the pairing the audit of wave thirty-five
+ * found broken at run time. `opensOf` reads the vault by label, as the host resolves it; a caller that cannot reach the
+ * vault, or a label it holds no live entry for, says "to the host its vault entry opens", which is where the answer is.
  */
-function scriptEgress(d: ScriptHeader): Egress | null {
+function scriptEgress(d: ScriptHeader, opensOf?: (label: string) => string | null): Egress | null {
   const origins = Array.isArray(d.egress) ? d.egress.filter((o): o is string => typeof o === 'string') : [];
   if (origins.length === 0) return null;
   const hosts = origins.map((o) => hostOf(o) ?? o);
@@ -1328,7 +1351,11 @@ function scriptEgress(d: ScriptHeader): Egress | null {
     ...(door === null ? [] : [`when ${door} receives an arrival`]),
     ...(rule ? [`when a rule runs it, at most ${RULE_CALLS_PER_DAY} a day`] : []),
   ];
-  const line = `CALLS OUT ${joinedList(hosts)} · ${when.join(' and ') || 'never'} · ${keys.length === 0 ? 'no key' : `key ${keys.map((k) => `"${k}"`).join(', ')}`}`;
+  const to = (label: string): string => {
+    const opens = opensOf?.(label)?.trim();
+    return opens ? opens : 'the host its vault entry opens';
+  };
+  const line = `CALLS OUT ${joinedList(hosts)} · ${when.join(' and ') || 'never'} · ${keys.length === 0 ? 'no key' : `key ${joinedList(keys.map((k) => `"${k}" to ${to(k)}`))}`}`;
   const key_line = reads.length > 0 ? `${d.script} reads ${joinedList(reads)} and may send what it reads to ${joinedList(hosts)}.` : null;
 
   return {

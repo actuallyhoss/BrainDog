@@ -69,3 +69,49 @@ test("WITH NO ROW HOLDING A TAG, a tags of another shape is still the list's own
   assert.ok(out.ok, fixOf(out));
   assert.equal(k.register('jobs')?.fields.find((f) => f.id === 'tags')?.type, 'text');
 });
+
+/* BUT NOT WHERE A RULE TAGS THE LIST. `loop/research-batch-thirty-six-audit.md` §5: Bills with a Water row, no tag on any
+   row, and `rule.late` tagging each Rent. `tags: int` installed by the decision above, and the next Rent write went in
+   without its tag, with no refusal and no event, one `write.refused` observation the only trace. The first write after
+   the change is where the rule would have started tagging, so a rule that tags is a reader the decision did not count. */
+const LATE: Declaration = {
+  id: 'rule.late',
+  kind: 'rule',
+  body: { rule: 'late', register: 'jobs', when: 'what is Rent', then: [{ tag: 'late' }] } as never,
+};
+
+test('WITH NO ROW HOLDING A TAG AND A RULE THAT TAGS THE LIST, a tags of another shape is refused, naming the rule', async () => {
+  const k = await openRecord(openSqlite(), fixedClock(NOW));
+  assert.ok((await k.install([jobs(), LATE])).ok);
+  assert.ok(k.create('jobs', { what: 'Water' }, { actor: 'p_1' }).ok);
+  const out = await k.install([jobs({ id: 'tags', type: 'int' })]);
+  assert.equal(out.ok, false, 'tags: int installed under a rule that tags jobs, and its next tag was dropped');
+  assert.equal(codeOf(out), 'FIELD_TYPE_CHANGED');
+  assert.match(fixOf(out), /rule\.late/);
+  assert.equal((out as { refusal?: { at?: string } }).refusal?.at, 'register.jobs.fields.tags.type');
+  assert.ok(!fixOf(out).includes(String.fromCharCode(0x2014)), 'no em dash in a sentence a stranger reads');
+
+  /* AND THE RULE STILL TAGS, which is what the refusal kept. */
+  const rent = k.create('jobs', { what: 'Rent' }, { actor: 'p_1' }) as { ok: boolean; value: { id: string } };
+  assert.ok(rent.ok);
+  assert.deepEqual(k.get(rent.value.id)?.fields.tags, ['late']);
+});
+
+test("AN untag INSIDE EITHER ARM OF A RUN-PATH if IS A RULE THAT TAGS TOO, and list<text> still installs beside it", async () => {
+  const untagging: Declaration = {
+    id: 'rule.clear',
+    kind: 'rule',
+    body: {
+      rule: 'clear',
+      on: { written: { register: 'jobs', op: ['update'] } },
+      steps: [{ if: 'what is Rent', then: [{ note: 'rent' }], else: [{ untag: 'late' }] }],
+    } as never,
+  };
+  const k = await openRecord(openSqlite(), fixedClock(NOW));
+  assert.ok((await k.install([jobs(), untagging])).ok);
+  const out = await k.install([jobs({ id: 'tags', type: 'text' })]);
+  assert.equal(out.ok, false, 'tags: text installed under a rule that untags jobs');
+  assert.match(fixOf(out), /rule\.clear/);
+  const kept = await k.install([jobs({ id: 'tags', type: 'list', of: 'text' })]);
+  assert.ok(kept.ok, fixOf(kept));
+});

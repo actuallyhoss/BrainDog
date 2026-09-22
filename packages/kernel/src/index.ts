@@ -144,7 +144,7 @@ import {
   startRun,
   type FlowDeps,
 } from './flow.ts';
-import { pathOf, subjectOf, triggerOf } from './flow-lint.ts';
+import { actionsOf, pathOf, rowRegisterOf, subjectOf, triggerOf } from './flow-lint.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
 import { arrive, day, exponentOf, propose, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps, type NumberReaders } from './ingest.ts';
 import { analyse, observe, type Analysis, type Observation } from './observe.ts';
@@ -160,6 +160,7 @@ import {
   finishAction,
   approvalLines,
   keyNamed,
+  opensNamed,
   keyReady,
   listActions,
   originsOf,
@@ -231,6 +232,8 @@ export type { Resolved, ScopeDecl, ScopesDecl, Whereabouts } from './scope.ts';
 export { coerce, FIELD_TYPES, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, looksLikeCredential, parseSpoken, spoken } from './coerce.ts';
 export type { FieldDecl, FieldType, Json } from './coerce.ts';
 export { misread, sentencesOver, widens, type TypeShape } from './widen.ts';
+/* FOR `declare`'s PLAN, which asks a widening's readers as `stranded` does and has to place an arrival's rule the same way. */
+export { rowRegisterOf } from './flow-lint.ts';
 export { isUlid, ulids, ulidTime } from './ids.ts';
 export { digest, indexesFor, indexName, jcs, registerOfIndex, validate as validateDeclaration, KINDS } from './declare.ts';
 export { ftsQuery, projectedText } from './fts.ts';
@@ -1025,6 +1028,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     return typeof said === 'string' && said.trim() !== '' ? said.trim() : null;
   }
 
+  /** What a vault label's live entry says it opens, for a script's line to name beside the key (`scriptEgress`). */
+  function opensOf(label: string): string | null {
+    return opensNamed(sql, label);
+  }
+
   /**
    * THE EXAMPLES NOBODY HAS TOUCHED, read from the log rather than from a flag a write could forget to clear.
    *
@@ -1555,6 +1563,54 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   }
 
   /**
+   * A door's body by its ingest id, as the batch would leave the record: the batch's own where it sends one, otherwise
+   * the live declaration. What `rowRegisterOf` needs to place an arrival's run on a list.
+   */
+  function doorsOf(batch: readonly Declaration[]): (door: string) => unknown {
+    return (door) => {
+      const id = `ingest.${door}`;
+      const mine = batch.find((d) => d.id === id);
+      if (mine !== undefined) return mine.body;
+      const row = sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0', id);
+      try {
+        return row ? (JSON.parse(row.body) as unknown) : undefined;
+      } catch {
+        return undefined;
+      }
+    };
+  }
+
+  /**
+   * The first rule, as the batch would leave the record, whose run tags or untags a row of `register`: its id, which of
+   * the two it does and where. `null` when nothing tags the list.
+   *
+   * EVERY ACTION `actionsOf` FINDS, so `then:` and `steps:` and both arms of every `if` are read, and an arrival's rule
+   * counts for the list its door writes, whose row is the one its run is handed.
+   */
+  function taggerOf(batch: readonly Declaration[], register: string): { rule: string; verb: 'tag' | 'untag'; at: string } | null {
+    const sent = new Map(batch.filter((d) => d.kind === 'rule').map((d) => [d.id, d.body as unknown]));
+    const stored = sql
+      .all<{ id: string; body: string }>("SELECT id, body FROM declaration WHERE kind = 'rule' AND superseded_at IS NULL AND retired = 0 ORDER BY id")
+      .filter((row) => !sent.has(row.id))
+      .flatMap((row) => {
+        try {
+          return [[row.id, JSON.parse(row.body) as unknown] as const];
+        } catch {
+          return [];
+        }
+      });
+    const doorOf = doorsOf(batch);
+    for (const [id, body] of [...stored, ...sent]) {
+      if (body === null || typeof body !== 'object') continue;
+      const rule = body as FlowDecl;
+      if (rowRegisterOf(rule, doorOf) !== register) continue;
+      for (const { action, at } of actionsOf(rule))
+        if ('tag' in action || 'untag' in action) return { rule: id, verb: 'tag' in action ? 'tag' : 'untag', at };
+    }
+    return null;
+  }
+
+  /**
    * A register in the batch that the rows already in it contradict, or a `ref` it points at no list, as a refusal.
    *
    * A CHANGE REACHED `install` WITHOUT THE CHECKS A PACK MEETS. `packages/declare`'s `plan` refuses a type change and a new
@@ -1682,6 +1738,22 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
             };
         }
 
+        /* AND NOT OVER A LIST A RULE TAGS, THOUGH NO ROW HOLDS A TAG YET. The choice above is the list's own where nothing
+           is stored, and `loop/research-batch-thirty-six-audit.md` §5 found the reader it did not count: Bills with no tag
+           on any row and `rule.late` tagging each Rent took `tags: int`, and the next Rent went in without its tag, with
+           no refusal and no event, one `write.refused` observation the only trace. A rule's `tag` or `untag`, on either
+           path and in either arm, is a reader of the list's tags, so it is asked here as the rows are above. Only a change
+           of shape is asked: a list that already declared another shape under such a rule is not this change's fault. */
+        if (f.id === 'tags' && typeOf(f) !== typeOf(TAGS) && (was === undefined || typeOf(was) !== typeOf(f))) {
+          const tagging = taggerOf(batch, register);
+          if (tagging !== null)
+            return {
+              code: 'FIELD_TYPE_CHANGED',
+              fix: `${decl.id}.tags: every list takes tags as list<text>, and ${tagging.rule} ${tagging.verb}s ${register} at ${tagging.at}, so ${typeOf(f)} would refuse every tag it writes. Leave tags out, or declare it as list<text>.`,
+              at: `${at}.type`,
+            };
+        }
+
         if ((f.type === 'enum' || (f.type === 'list' && f.of === 'enum')) && Array.isArray(f.values)) {
           const values = f.values.map(String);
           const kept = values.map(() => '?').join(', ') || "''";
@@ -1771,7 +1843,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * old words back over a text field and bring the wrong answer back with no refusal at all; and it re-prints a sentence
    * somebody wrote. The refusal costs the owner one edit they can see, and the reader's new words then say what it counts.
    *
-   * A reader changed in the same batch is the batch's, and was checked with it. One sent again unchanged is not.
+   * A reader changed in the same batch compiled with the batch, so what it is asked here is its words alone, as sent. One
+   * sent again unchanged is the record's, and is asked everything.
    */
   function stranded(batch: readonly Declaration[]): Refusal | null {
     /* A READER RESENT WITH THE SAME BYTES IS NOT THE BATCH'S. A pack update sends every declaration it holds, so its own
@@ -1795,7 +1868,14 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           .filter((f) => f?.retired !== true && typeof f?.id === 'string')
           .map((f) => [f.id as string, f]),
       );
-    let readers: Declaration[] | null = null;
+    /* `rebatched` IS AN INSTALLED READER THE BATCH SENDS WITH OTHER BYTES, carried with the body as sent. */
+    let readers: (Declaration & { rebatched: boolean })[] | null = null;
+
+    /* THE LIST A RULE'S RUN READS ITS `if` AGAINST, an arrival's included: the door it waits at, as this batch leaves
+       it. `loop/research-batch-thirty-six-audit.md` §1 measured an automation on arrivals at a door writing Projects
+       answer "then" under the enum and "else" under text, installed, because `subjectOf` gives an arrival no list. */
+    const doorOf = doorsOf(batch);
+    const listOf = (reader: Declaration): string | null => (reader.kind === 'rule' ? rowRegisterOf(reader.body as unknown as FlowDecl, doorOf) : null);
 
     /* THE LIST AS IT STANDS AND THE SAME LIST WITH ONLY THE OPENED FIELDS CHANGED, so a word in a reader's sentence that
        moves between the two moved because of the widening and nothing else in the change. */
@@ -1807,10 +1887,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         open.fields[id] = { type: String(f.type), ...(typeof f.of === 'string' ? { of: f.of } : {}), ...(typeof f.label === 'string' ? { label: f.label } : {}) };
       }
       const ctx = evalContext();
-      const subject = reader.kind === 'rule' ? subjectOf(reader.body as unknown as FlowDecl) : null;
       /* `REF_UNKNOWN` IS PASSED OVER as `unreadWhere` passes it: a title no row holds yet is the same either way. */
       const reads = (said: ReturnType<typeof predicateOf>) => said.bad.every((b) => b.code === 'REF_UNKNOWN');
-      for (const { at, where } of sentencesOver(reader.kind, reader.body as Record<string, unknown>, register, subject)) {
+      for (const { at, where } of sentencesOver(reader.kind, reader.body as Record<string, unknown>, register, listOf(reader))) {
         const was = predicateOf(where, closed, ctx);
         const now = predicateOf(where, open, ctx);
         if (!reads(was) || !reads(now)) continue;
@@ -1818,6 +1897,24 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         if (word) return { at, where, ...word };
       }
       return null;
+    };
+
+    /* How a refusal names the reader and the list: its own words where it has them, and the list by its name. */
+    const spoken = (decl: Declaration, register: string, reader: Declaration) => {
+      const body = reader.body as { name?: unknown; title?: unknown };
+      const called = typeof body.name === 'string' ? body.name : typeof body.title === 'string' ? body.title : reader.id;
+      const what = reader.kind === 'metric' ? 'the figure' : reader.kind === 'page' ? 'the page' : `the ${reader.kind}`;
+      const list = typeof (decl.body as { name?: unknown }).name === 'string' ? String((decl.body as { name: string }).name) : register;
+      return { called, what, list };
+    };
+    const wordMoved = (decl: Declaration, register: string, reader: Declaration, moved: NonNullable<ReturnType<typeof movedWord>>): Refusal => {
+      const { called, what, list } = spoken(decl, register, reader);
+      const says = moved.written === '' ? 'reads it differently' : `says ${moved.written}`;
+      return {
+        code: 'FIELD_TYPE_CHANGED',
+        fix: `Opening ${moved.field} on ${list} to free text would quietly change which rows ${what} ${called === reader.id ? reader.id : `${called} (${reader.id})`} reads: its ${moved.at} "${moved.where}" ${says}, which only the closed list read as ${moved.stored}, and free text compares the word as written. Write ${moved.stored} there first, then open ${moved.field}.`,
+        at: reader.id,
+      };
     };
 
     for (const decl of batch) {
@@ -1840,39 +1937,48 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         .all<{ id: string; kind: string; body: string; pack_id: string | null }>(
           "SELECT id, kind, body, pack_id FROM declaration WHERE superseded_at IS NULL AND retired = 0 AND kind IN ('metric', 'rule', 'page', 'ingest')",
         )
-        .filter((row) => !arriving(row.id, row.body))
-        .flatMap((row) => {
+        .flatMap((row): (Declaration & { rebatched: boolean })[] => {
+          /* A READER THE BATCH REWRITES IS ASKED IN THE WORDS THE BATCH SENDS. Passed over as "the batch's, and checked
+             with it", a figure resent with only its `name` changed kept `lane is earning money` and went from 1 to 0
+             (`loop/research-batch-thirty-six-audit.md` §1): what checked it was `lintBatch`, which asks only whether it
+             compiles, and a widening leaves that true. Read off the body as sent, one whose words the batch rewrote to
+             the stored value still installs, and one that kept them does not. */
+          if (arriving(row.id, row.body)) {
+            const mine = sent.get(row.id)!;
+            return [{ ...mine, rebatched: true }];
+          }
           try {
-            return [{ id: row.id, kind: row.kind as Declaration['kind'], body: JSON.parse(row.body) as Record<string, Json>, pack: row.pack_id ?? undefined }];
+            return [{ id: row.id, kind: row.kind as Declaration['kind'], body: JSON.parse(row.body) as Record<string, Json>, pack: row.pack_id ?? undefined, rebatched: false }];
           } catch {
             return [];
           }
         });
 
       /* A CHEAP NARROWING FIRST: a reader that never names the list cannot read its fields. The before-and-after
-         question below is what decides; this only keeps it from being asked of every page in the record. */
+         question below is what decides; this only keeps it from being asked of every page in the record. An arrival's
+         automation names its door and not the list, so the list its run reads is asked of it by name. */
       const names = new RegExp(`"(register\\.)?${register}"`);
       for (const reader of readers) {
-        if (!names.test(JSON.stringify(reader.body))) continue;
+        if (!names.test(JSON.stringify(reader.body)) && listOf(reader) !== register) continue;
+        /* ONLY THE WORDS OF A REWRITTEN READER, since whether it compiles against the batch was `lintBatch`'s, over the
+           whole batch it arrived in. Asked here alone beside this list, one that also reads a list the batch adds would
+           be refused for a list it was right to name. */
+        if (reader.rebatched) {
+          const moved = opened.length === 0 ? null : movedWord(reader, register, opened, after);
+          if (moved) return wordMoved(decl, register, reader, moved);
+          continue;
+        }
         const now = unreadable([reader]) ?? lintBatch(sql, [reader]);
         if (now) continue;
         /* THIS LIST ALONE BESIDE THE READER, not the whole batch. A page over two lists that both change in one batch
            was first blamed on whichever came first in it, and the sentence named the wrong list and every field it
            lost; asked one list at a time, the refusal is about the list that took the field away. */
         const then = unreadable([decl, reader]) ?? lintBatch(sql, [decl, reader]);
-        const body = reader.body as { name?: unknown; title?: unknown };
-        const called = typeof body.name === 'string' ? body.name : typeof body.title === 'string' ? body.title : reader.id;
-        const what = reader.kind === 'metric' ? 'the figure' : reader.kind === 'page' ? 'the page' : `the ${reader.kind}`;
-        const list = typeof (decl.body as { name?: unknown }).name === 'string' ? String((decl.body as { name: string }).name) : register;
+        const { called, what, list } = spoken(decl, register, reader);
         if (!then) {
           const moved = opened.length === 0 ? null : movedWord(reader, register, opened, after);
           if (!moved) continue;
-          const says = moved.written === '' ? 'reads it differently' : `says ${moved.written}`;
-          return {
-            code: 'FIELD_TYPE_CHANGED',
-            fix: `Opening ${moved.field} on ${list} to free text would quietly change which rows ${what} ${called === reader.id ? reader.id : `${called} (${reader.id})`} reads: its ${moved.at} "${moved.where}" ${says}, which only the closed list read as ${moved.stored}, and free text compares the word as written. Write ${moved.stored} there first, then open ${moved.field}.`,
-            at: reader.id,
-          };
+          return wordMoved(decl, register, reader, moved);
         }
         /* THE FIELD THE REFUSAL NAMES, by the words both checks use for it. A bare substring match named `what` and
            `kind` out of any sentence that happened to hold them. */
@@ -4054,13 +4160,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (fault) return { ok: false as const, refusal: fault };
       const egress = batch.flatMap((d) => {
         /* A SCRIPT CALLS OUT AS AN ACTION DOES, and its line is how the owner sees where it fetches and with which key. */
-        const out = d.kind === 'ingest' || d.kind === 'script' ? egressOf(d.body, titleOfRow) : null;
+        const out = d.kind === 'ingest' || d.kind === 'script' ? egressOf(d.body, titleOfRow, opensOf) : null;
         return out === null ? [] : [out];
       });
       if (egress.length === 0) return ok(null);
       const changed = egress.filter((e) => {
         const was = e.channel === 'script' ? scriptDecl(e.ingest) : (actionDecl(e.ingest)?.decl ?? null);
-        const before = was === null ? null : egressOf(was);
+        const before = was === null ? null : egressOf(was, undefined, opensOf);
         return before === null || egressChanged(before, e);
       });
       if (changed.length === 0) return ok(null);
@@ -5001,6 +5107,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /** A row by its title, for a row id or spoken id: how a plan names the project an action runs for. */
     titleOfRow: (ref: string): string | null => titleOfRow(ref),
 
+    /**
+     * What the live vault entry a label names says it opens, or `null`: the host a script's install line names beside
+     * that key. A plan built outside the kernel hands this to `declare` as `Installed.opensOf`, so a pack's line and a
+     * proposal's say the same thing.
+     */
+    opensOf: (label: string): string | null => opensOf(label),
+
     /** The example rows a use case planted that nobody has touched, and how many examples somebody has (`untouchedExamples`). */
     examples: (): { untouched: number; touched: number; registers: Record<string, number>; others: number } => {
       const { untouched, touched } = untouchedExamples();
@@ -5053,7 +5166,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           )
           .flatMap((r) => {
             const body = JSON.parse(r.body) as { fetch?: { base?: unknown } };
-            const e = egressOf(body, titleOfRow);
+            const e = egressOf(body, titleOfRow, opensOf);
             if (e === null) return [];
             const base = e.host === null && typeof body.fetch?.base === 'string' ? body.fetch.base : null;
             let host: string | null = null;

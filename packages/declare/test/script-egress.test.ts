@@ -28,7 +28,7 @@ test('A SCRIPT THAT FETCHES HAS EGRESS THROUGH THE WRAPPER, with its origin and 
   const e = egressOf({ kind: 'script', body: GOLD });
   assert.ok(e, 'the wrapper dropped a script that calls out');
   assert.equal(e.channel, 'script');
-  assert.equal(e.line, 'CALLS OUT api.goldapi.io · every 1h · key "goldapi"');
+  assert.equal(e.line, 'CALLS OUT api.goldapi.io · every 1h · key "goldapi" to the host its vault entry opens');
   assert.equal(egressOf({ kind: 'script', body: { ...GOLD, egress: [] } }), null);
   assert.equal(egressOf({ kind: 'register', body: GOLD }), null, 'only an ingest or a script calls out');
 });
@@ -49,6 +49,6 @@ test('AND A PACK CARRYING ONE PLANS WITH ITS CALLS OUT LINE', async () => {
   const diff = await plan(pack.value as Pack, EMPTY);
   assert.deepEqual(
     diff.calls_out.map((c) => [c.ingest, c.channel, c.line, c.change]),
-    [['gold-rate', 'script', 'CALLS OUT api.goldapi.io · every 1h · key "goldapi"', 'new']],
+    [['gold-rate', 'script', 'CALLS OUT api.goldapi.io · every 1h · key "goldapi" to the host its vault entry opens', 'new']],
   );
 });

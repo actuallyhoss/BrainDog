@@ -169,3 +169,63 @@ test('AND ONE WHOSE WORDS ARE CHANGED IN THE SAME BATCH BELONGS TO THE BATCH, an
   assert.ok(out.ok, fixOf(out));
   assert.equal(count(k, { ...BY_WORDS, where: 'lane is earning_money' } as MetricDecl), 1);
 });
+
+/* THREE READERS `loop/research-batch-thirty-six-audit.md` §1 FOUND THE REFUSAL NEVER ASKED, each measured changing its
+   answer with the widening installed. A pack version that also renames its figure sent it with different bytes, and a
+   reader with any change at all was passed over as "the batch's", though the batch's lint asks only whether it compiles.
+   A run-path rule may carry its steps as `then:`, and `sentencesOver` walked `steps` alone. And a rule started by an
+   arrival has no subject, though its run is handed the row the door wrote and its `if` is read against that list. */
+test('A FIGURE RESENT BESIDE THE WIDENING WITH ONLY ITS NAME CHANGED IS STILL ASKED, since its words were kept', async () => {
+  const k = await record(metric(BY_WORDS));
+  const renamed = { ...BY_WORDS, name: 'Earning projects' } as MetricDecl;
+  const out = await k.install([projects(LANE_TEXT), metric(renamed)]);
+  assert.equal(out.ok, false, 'the renamed figure changed its answer and the widening installed');
+  assert.equal(codeOf(out), 'FIELD_TYPE_CHANGED');
+  assert.match(fixOf(out), /metric\.by-words/);
+  assert.match(fixOf(out), /lane is earning money/);
+  assert.equal(count(k, BY_WORDS), 1);
+});
+
+test("A RUN-PATH RULE WHOSE STEPS ARE WRITTEN AS then: IS ASKED ABOUT ITS if:, as the same rule with steps: is", async () => {
+  const k = await record({
+    id: 'rule.parked',
+    kind: 'rule',
+    body: {
+      rule: 'parked',
+      on: { written: { register: 'projects', op: ['update'] } },
+      once_per: ['name'],
+      then: [{ if: 'lane is Parked', then: [{ note: 'parked' }] }],
+    } as never,
+  });
+  const out = await k.install([projects(LANE_TEXT)]);
+  assert.equal(out.ok, false, 'the Shed run answered then under the enum and else under text, and the widening installed');
+  assert.equal(codeOf(out), 'FIELD_TYPE_CHANGED');
+  assert.match(fixOf(out), /rule\.parked/);
+  assert.match(fixOf(out), /lane is Parked/);
+});
+
+test('AN AUTOMATION STARTED BY AN ARRIVAL AT A DOOR THAT WRITES THE LIST IS ASKED, though it names no list itself', async () => {
+  const door: Declaration = {
+    id: 'ingest.intake',
+    kind: 'ingest',
+    body: {
+      ingest: 'intake',
+      channel: 'webhook',
+      match: { all: [{ field: 'body', contains: 'project' }] },
+      extract: { name: { text: { after: 'project ' } }, lane: { enum: { map: { parked: 'parked' }, after: 'lane ' } } },
+      writes: { register: 'projects', confidence: 'exact' },
+      on_conflict: 'skip',
+    } as never,
+  };
+  const onIntake: Declaration = {
+    id: 'rule.on-intake',
+    kind: 'rule',
+    body: { rule: 'on-intake', on: { arrival: { ingest: 'intake' } }, steps: [{ if: 'lane is Parked', then: [{ note: 'parked' }] }] } as never,
+  };
+  const k = await record(door, onIntake);
+  const out = await k.install([projects(LANE_TEXT)]);
+  assert.equal(out.ok, false, 'an arrival of a parked project answered then under the enum and else under text, and the widening installed');
+  assert.equal(codeOf(out), 'FIELD_TYPE_CHANGED');
+  assert.match(fixOf(out), /rule\.on-intake/);
+  assert.match(fixOf(out), /lane is Parked/);
+});

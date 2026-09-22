@@ -46,6 +46,9 @@ export function widens(from: TypeShape, to: TypeShape): boolean {
  * A `where` HOLDING `{{...}}` IS LEFT OUT, for `unreadable`'s reason: it is a template's, and becomes a sentence only when a
  * row fills it. The tree form is left out too: it is compiled against stored values, so an enum refuses a label written
  * in it at install and there is nothing for a widening to change.
+ *
+ * `subject` IS THE LIST A RULE'S ROW COMES FROM, which the caller works out: `subjectOf` for a write, and the list the
+ * door writes for an arrival (`rowRegisterOf` in `flow-lint.ts`). This file holds no declarations to look a door up in.
  */
 export function sentencesOver(kind: string, body: Record<string, unknown>, register: string, subject: string | null): { at: string; where: string }[] {
   const out: { at: string; where: string }[] = [];
@@ -63,7 +66,11 @@ export function sentencesOver(kind: string, body: Record<string, unknown>, regis
           else walk(v, `${at}.${key}`);
         }
     };
-    walk(body.steps, 'steps');
+    /* `then` TOO, WHEN THERE ARE NO `steps`: on the run path `then` is a flat list of steps (`flow-lint.ts`), and a rule
+       written that way kept its `if` out of sight. `loop/research-batch-thirty-six-audit.md` §1 measured one answer
+       "then" under the enum and "else" under text, installed, while the same body with `steps:` was refused. */
+    if (body.steps !== undefined) walk(body.steps, 'steps');
+    else walk(body.then, 'then');
   }
   if (kind === 'page' && Array.isArray(body.blocks))
     body.blocks.forEach((raw, i) => {

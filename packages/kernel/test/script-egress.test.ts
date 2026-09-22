@@ -40,7 +40,7 @@ const GOLD = (over: Record<string, unknown> = {}): Declaration =>
     },
   }) as unknown as Declaration;
 
-const LINE = 'CALLS OUT api.goldapi.io · every 1h · key "goldapi"';
+const LINE = 'CALLS OUT api.goldapi.io · every 1h · key "goldapi" to the host its vault entry opens';
 
 async function record(): Promise<{ k: Kernel; sql: NodeSql }> {
   const sql = openSqlite();

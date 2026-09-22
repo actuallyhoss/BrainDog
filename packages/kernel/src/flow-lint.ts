@@ -190,11 +190,25 @@ function sendsFrom(call: { sends?: unknown } | undefined): string | null {
  * `on: { arrival: {} }` brings a row of whatever register the door that matched writes, which no lint can know.
  */
 function rowOf(decl: FlowDecl, trigger: string, installed: Known): string | null {
+  if (trigger !== 'written' && trigger !== 'arrival') return null;
+  return rowRegisterOf(decl, (door) => installed.get(`ingest.${door}`));
+}
+
+/**
+ * `rowOf` for a caller that holds the doors some other way: the register of the row a run of this rule acts on and
+ * reads its `if` against, given a lookup from a door's id to its body.
+ *
+ * EXPORTED FOR THE READERS OF A LIST, which `subjectOf` alone undercounted. `loop/research-batch-thirty-six-audit.md` §1
+ * opened `lane` to text under an automation started by arrivals at a door writing Projects: its `if: lane is Parked`
+ * answered "then" before and "else" after, and the widening refusal never asked it, because its subject is `null`.
+ */
+export function rowRegisterOf(decl: FlowDecl, doorOf: (door: string) => unknown): string | null {
+  const trigger = triggerOf(decl);
   if (trigger === 'written') return subjectOf(decl);
   if (trigger !== 'arrival') return null;
   const door = (decl.on as { arrival?: { ingest?: unknown } }).arrival?.ingest;
   if (typeof door !== 'string') return null;
-  const writes = (installed.get(`ingest.${door}`) as { writes?: { register?: unknown } } | undefined)?.writes?.register;
+  const writes = (doorOf(door) as { writes?: { register?: unknown } } | undefined)?.writes?.register;
   return typeof writes === 'string' ? writes : null;
 }
 

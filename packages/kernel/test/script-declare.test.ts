@@ -123,9 +123,45 @@ test('THE EGRESS IS PRINTED FROM THE SCRIPT BODY, with every origin and every ke
   assert.equal(e.channel, 'script');
   assert.equal(e.host, 'api.goldapi.io');
   assert.equal(e.key, 'goldapi');
-  assert.equal(e.line, 'CALLS OUT api.goldapi.io · every 1h · key "goldapi"');
+  assert.equal(e.line, 'CALLS OUT api.goldapi.io · every 1h · key "goldapi" to the host its vault entry opens');
   assert.equal(e.key_line, 'gold-rate reads obligations and may send what it reads to api.goldapi.io.');
   assert.equal(egressOf(GOLD({ egress: [] }).body), null, 'a script that fetches nothing calls nothing out');
+});
+
+/* WHICH HOST EACH KEY GOES TO WAS NOT ON THE LINE. The host sends a key only where its vault entry opens (`keyRefused`,
+   `loop/research-batch-thirty-five-audit.md`), and the line the owner approves named the origins and the keys as two
+   lists, so a script with two origins and one key never said which of the two would get it. The vault holds the answer
+   by label; a caller that cannot read it says where the answer is instead. */
+test('THE LINE SAYS WHICH HOST EACH KEY GOES TO, from what its vault entry opens, and where to look when it cannot', () => {
+  const two = GOLD({ egress: ['https://api.goldapi.io', 'https://metals.example.org'], keys: ['goldapi', 'metals'] }).body;
+  const opens = (label: string) => (label === 'goldapi' ? 'api.goldapi.io' : null);
+  assert.equal(
+    egressOf(two, undefined, opens)?.line,
+    'CALLS OUT api.goldapi.io and metals.example.org · every 1h · key "goldapi" to api.goldapi.io and "metals" to the host its vault entry opens',
+  );
+  assert.equal(egressOf(GOLD({ keys: [] }).body, undefined, opens)?.line, 'CALLS OUT api.goldapi.io · every 1h · no key');
+});
+
+test("A PROPOSED SCRIPT'S APPROVAL LINE NAMES THE HOST ITS KEY'S LIVE VAULT ENTRY OPENS, and a key re-read gives the same line", async () => {
+  const { k, sql } = await record();
+  const made = k.bindGrant(
+    { label: 'goldapi', opens: 'api.goldapi.io', kind: 'api_token', ciphertext: new Uint8Array([1]), nonce: new Uint8Array([9]), kdf: 'hkdf', wrapped_by: 'kek', kek_id: 'kek_2f' },
+    'p_1',
+  );
+  assert.ok(made.ok, fixOf(made));
+  const filed = k.propose({ question: 'Fetch the gold price?', body_kind: 'change', body: { declaration_id: 'script.gold-rate', to: GOLD() } }, 'p_1');
+  assert.ok(filed.ok, fixOf(filed));
+  const approve = (id: string) => (JSON.parse(sql.one<{ body: string }>('SELECT body FROM suggestion WHERE id = ?', id)!.body) as { approve?: string[] }).approve;
+  assert.ok(approve((filed.value as { id: string }).id)?.includes('CALLS OUT api.goldapi.io · every 1h · key "goldapi" to api.goldapi.io'));
+
+  /* AND THE INSTALLED ONE IS READ WITH THE SAME VAULT, so resending it unchanged asks nothing again. */
+  assert.ok((await k.install([GOLD()])).ok);
+  const again = k.propose({ question: 'Retitle it?', body_kind: 'change', body: { declaration_id: 'script.gold-rate', to: GOLD({ title: 'Gold, 24k' }) } }, 'p_1');
+  assert.ok(again.ok, fixOf(again));
+  assert.equal(approve((again.value as { id: string }).id), undefined);
+  assert.equal(k.opensOf('goldapi'), 'api.goldapi.io');
+  assert.equal(k.opensOf('nobody'), null);
+  sql.close();
 });
 
 test('A DUE SCRIPT ROW WRITES ONE script.run OUTBOX ROW AND NOTHING ELSE, and re-arms an hour on', async () => {
