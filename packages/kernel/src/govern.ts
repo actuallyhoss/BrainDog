@@ -396,6 +396,20 @@ function checkBody(deps: GovernDeps, kind: BodyKind, body: Record<string, unknow
   }
   if (typeof body.declaration_id !== 'string') return missing('declaration_id');
   if (!body.to || typeof body.to !== 'object') return missing('to');
+  /* AND `to` IS WHAT `install` TAKES: a declaration, or `{ declarations: [...] }` of them. Asked only to be an
+     object, `{ values: [...] }` was filed; accepting it committed the decision and resolved SG1 in the gate's
+     transaction, and then `install([to])` threw `Cannot read properties of undefined (reading 'writes')` out of the
+     record's `decide` before `reopen` could run. A decision that resolved with nothing installed behind it, from one
+     malformed body any `propose` token can send. `review` below cannot catch it: it answers `null` for a batch it
+     cannot read, which is right for egress and says nothing about whether the batch installs. */
+  const bundle = (body.to as { declarations?: unknown }).declarations;
+  const listed = Array.isArray(bundle) ? bundle : [body.to];
+  if (Array.isArray(body.to) || listed.length === 0 || !listed.every((d) => isMap(d) && typeof d.id === 'string' && typeof d.kind === 'string' && isMap(d.body)))
+    return {
+      code: 'VALUE_MALFORMED',
+      fix: 'A change is to a whole declaration, {"id":"register.<id>","kind":"register","body":{...}}, or to {"declarations":[...]} of them.',
+      at: 'body.to',
+    };
 
   /* AND ITS PREDICTION, IF IT CARRIES ONE — checked here rather than at acceptance, for the reason
      every other body is checked here: the person answering should not be the one who finds out it

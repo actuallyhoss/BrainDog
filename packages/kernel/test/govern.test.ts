@@ -461,7 +461,7 @@ const change = (prediction?: unknown) => ({
   body: {
     declaration_id: 'register.obligations',
     from: { values: ['owed_to_me', 'owed_by_me'] },
-    to: { values: ['owed_to_me', 'owed_by_me', 'part'] },
+    to: { ...OBLIGATIONS, body: { ...(OBLIGATIONS.body as object), name: 'Obligations owed' } },
     ...(prediction === undefined ? {} : { prediction }),
   },
 });
