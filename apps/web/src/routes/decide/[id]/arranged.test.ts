@@ -317,3 +317,37 @@ test('A PLAN OF ROWS reads list by list, each row with the row it belongs with, 
   assert.equal(out.summary, '4 new rows');
   assert.deepEqual(appliedLines({ rows: ['milestones#1', 'milestones#2', 'steps#1', 'choices#1'] }, body), ['Added 4 rows']);
 });
+
+/*
+ * A DECLARATION AN UPDATE HANDS TO ANOTHER PACK IS NOT TAKEN AWAY. The record files it with `to` (`arrange.ts`), and this
+ * read every retire alike, so the HSBC door money-core hands to `bank-hsbc-eg`, still live and answering the owner's
+ * Shortcut, was listed under "Takes away" (`loop/research-batch-thirty-four-audit.md` §8, the presenter's last half).
+ */
+test('A DECLARATION HANDED TO ANOTHER PACK GETS ITS OWN LINE, naming the pack, and is not said as taken away', () => {
+  const body = {
+    install: 'money-core',
+    packs: { install: ['money-core'] },
+    plan: [
+      {
+        pack: 'money-core',
+        from: '1.7.0',
+        version: '1.8.0',
+        adds: [],
+        retires: [
+          { id: 'ingest.bank-ipn-in-sms', rows: 0, to: 'bank-hsbc-eg', to_name: 'HSBC Egypt' },
+          { id: 'ingest.bank-hsbc-eg-card', rows: 0 },
+        ],
+      },
+    ],
+    approve: [],
+  };
+  const appears = arrangedOf('pack', body)?.parts.find((p) => p.part === 'appears');
+  assert.ok(appears?.part === 'appears');
+  const lines = appears.appears.map((a) => `${a.kind}: ${a.title}${a.lines.map((l) => ` | ${l.label}: ${l.value}`).join('')}`);
+  assert.equal(lines.filter((l) => l.includes('HSBC Egypt')).length, 1, lines.join('\n'));
+  assert.match(lines.find((l) => l.includes('HSBC Egypt'))!, /moves to HSBC Egypt, which is not installed; it keeps working until you remove it/u);
+  const away = lines.find((l) => l.startsWith('Takes away'));
+  assert.ok(away, lines.join('\n'));
+  assert.doesNotMatch(away, /ipn in sms/iu, 'the handed door was said as taken away');
+  assert.match(away, /card/iu);
+});

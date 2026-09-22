@@ -70,14 +70,14 @@ const accept = (id: string) => ({ id, decide: { option: 'accept', reason: 'yes' 
 test('DECIDE IS FILED THE HANDED DOOR WITH THE PACK IT GOES TO, and the doors that retire without one', async () => {
   const { sql, api } = await recordAt170();
   const filed = value<{ id: string }>(await api.propose({ question: 'Newer Money?', body_kind: 'pack', body: { install: 'money-core' } } as never, agent));
-  const row = value<{ body: { plan: { pack: string; retires?: { id: string; rows: number; to?: string }[] }[] } }>(await api.governance({ id: filed.id }, owner));
+  const row = value<{ body: { plan: { pack: string; retires?: { id: string; rows: number; to?: string; to_name?: string }[] }[] } }>(await api.governance({ id: filed.id }, owner));
   const money = row.body.plan.find((p) => p.pack === 'money-core');
   assert.ok(money, JSON.stringify(row.body.plan));
   const hsbc = (money.retires ?? []).filter((r) => HSBC.includes(r.id));
   assert.equal(hsbc.length, 12, JSON.stringify(money.retires));
   assert.deepEqual(
     hsbc.filter((r) => r.to !== undefined),
-    [{ id: 'ingest.bank-ipn-in-sms', rows: 0, to: 'bank-hsbc-eg' }],
+    [{ id: 'ingest.bank-ipn-in-sms', rows: 0, to: 'bank-hsbc-eg', to_name: 'HSBC Egypt' }],
     'the handed door was filed as a retire',
   );
   assert.equal(hsbc.filter((r) => r.to === undefined).length, 11, 'a door nobody used was filed as handed');
@@ -96,6 +96,9 @@ test('A PACK HANDED A DOOR AND NEVER INSTALLED IS SAID AS HANDED, OFFERED, AND I
   const update = value<{ id: string }>(await api.propose({ question: 'Newer Money?', body_kind: 'pack', body: { install: 'money-core' } } as never, agent));
   value(await api.decide(accept(update.id), owner));
 
+  /* THE KERNEL SAYS SO ITSELF, so no reader of `packStates` has to work it out from the declarations again. */
+  const handedIn = () => api.kernel.packStates().filter((p) => p.handed === true).map((p) => p.id);
+  assert.deepEqual(handedIn(), ['bank-hsbc-eg']);
   const seen = value<{ packs: { id: string; handed?: true }[]; offer: { id: string }[] }>(await api.arrangement({}, agent));
   assert.deepEqual(seen.packs.find((p) => p.id === 'bank-hsbc-eg'), { id: 'bank-hsbc-eg', handed: true });
   assert.ok(seen.offer.some((e) => e.id === 'bank-hsbc-eg'), 'a pack never installed was not offered');
@@ -106,6 +109,7 @@ test('A PACK HANDED A DOOR AND NEVER INSTALLED IS SAID AS HANDED, OFFERED, AND I
   assert.ok(hsbc && hsbc.from === undefined && hsbc.adds.includes('ingest.bank-ipn-in-sms'), JSON.stringify(row.body.plan));
   value(await api.decide(accept(filed.id), owner));
   assert.equal(api.kernel.packs().find((p) => p.id === 'bank-hsbc-eg')?.version !== undefined, true, 'the pack has no row after its install');
+  assert.deepEqual(handedIn(), []);
   const after = value<{ packs: { id: string; handed?: true }[] }>(await api.arrangement({}, agent));
   assert.equal(after.packs.find((p) => p.id === 'bank-hsbc-eg')?.handed, undefined);
   sql.close();
@@ -126,5 +130,24 @@ test('A HANDED PACK CAN STILL BE TURNED OFF through Decide, which stops the door
   value(await api.decide(accept(off.id), owner));
   assert.notEqual(api.kernel.packStates().find((p) => p.id === 'bank-hsbc-eg')?.disabled_at ?? null, null, 'the handed door is still on');
   assert.equal(api.kernel.declarations().some((x) => x.id === 'ingest.bank-ipn-in-sms'), false, 'the handed door is still live');
+  sql.close();
+});
+
+/*
+ * AND THE USE-CASE PLANNER SAID THE SAME DOOR AS RETIRED. `usecase.ts` copied `diff.retires` as ids, dropping `to`, so a
+ * use case built on money-core, planned on this record, listed the door his Shortcut posts to among what the update takes
+ * away. Measured red first: `retires` held `ingest.bank-ipn-in-sms` and nothing said where it went.
+ */
+test('A USE CASE PLANNED OVER THE UPDATE NAMES THE HANDED DOOR APART, with the pack it goes to', async () => {
+  const { sql, api } = await recordAt170();
+  const file = { usecase: 'money-look', version: '1.0.0', title: 'Money look', summary: 's', author: 'a', license: 'MIT', audience: 'other', tone: 't', modules: ['money-core'] };
+  const planned = value<{ packs: { id: string; retires: string[]; hands?: { id: string; to: string }[] }[] }>(
+    await api.planUseCase({ doc: file, modules: { 'money-core': firstPartyDocument('money-core') } }, owner),
+  );
+  const money = planned.packs.find((p) => p.id === 'money-core');
+  assert.ok(money, JSON.stringify(planned.packs.map((p) => p.id)));
+  assert.deepEqual(money.hands, [{ id: 'ingest.bank-ipn-in-sms', to: 'bank-hsbc-eg' }]);
+  assert.equal(money.retires.includes('ingest.bank-ipn-in-sms'), false, 'the handed door was said as retired');
+  assert.equal(money.retires.filter((r) => HSBC.includes(r)).length, 11);
   sql.close();
 });

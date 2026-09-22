@@ -2448,6 +2448,10 @@ export const copy = {
   arrangeKept: 'Kept',
   arrangeKeeps: (name: string) => `Keeps ${name} as you changed it. This update's version of it is not taken.`,
   arrangeKeepsPage: (name: string) => `Keeps your ${name} page as you arranged it. This update's version of it is not taken.`,
+  /* WHAT AN UPDATE HANDS TO ANOTHER PACK, which stays live: said apart from what it takes away, because a door the owner's
+     Shortcut posts to goes on answering (`loop/research-batch-thirty-four-audit.md` §8). */
+  arrangeMoving: 'Moves',
+  arrangeMovesTo: (name: string, pack: string) => `${name} moves to ${pack}, which is not installed; it keeps working until you remove it.`,
   arrangeMany: (kind: string): string =>
     ({ page: 'Pages', register: 'Lists', ingest: 'Rules for what comes in', theme: 'Looks', metric: 'Measures', digest: 'Summaries', rule: 'Rules', block: 'Blocks' })[kind] ??
     kind.charAt(0).toUpperCase() + kind.slice(1),

@@ -142,6 +142,7 @@ function planned(plan: unknown, doc: unknown, ctx: Context): { appears: Appears[
   const named = new Map<string, string[]>();
   const changed = new Map<string, string[]>();
   const retired = new Map<string, string[]>();
+  const moving: Appears[] = [];
   const kept: Appears[] = [];
   const out = { examples: 0, pages: 0, lists: 0, more: 0 };
   for (const step of Array.isArray(plan) ? plan.filter(isRow) : []) {
@@ -151,6 +152,12 @@ function planned(plan: unknown, doc: unknown, ctx: Context): { appears: Appears[
       const id = text(gone.id);
       const kind = id.split('.')[0] ?? '';
       const title = kind === 'register' ? listName(id, ctx) : (ctx.names?.[id] ?? (kind === 'rule' ? ruleName(id) : null) ?? words(id));
+      /* BUT ONE HANDED TO ANOTHER PACK IS NOT TAKEN AWAY: it stays live under that pack's name, which the record filed
+         beside `to` from its catalogue, until the owner installs that pack or turns it off. */
+      if (text(gone.to) !== '') {
+        moving.push({ kind: copy.arrangeMoving, title: copy.arrangeMovesTo(title, text(gone.to_name) || moduleName(text(gone.to))), lines: [] });
+        continue;
+      }
       const rows = typeof gone.rows === 'number' && gone.rows > 0 ? copy.arrangeRetiredRows(title, gone.rows) : title;
       const label = copy.arrangeMany(kind);
       retired.set(label, [...(retired.get(label) ?? []), rows]);
@@ -195,7 +202,7 @@ function planned(plan: unknown, doc: unknown, ctx: Context): { appears: Appears[
   if (named.size) appears.push({ kind: appears.length ? copy.arrangeAlso : copy.arrangeAdds, title: '', lines: lines(named) });
   if (changed.size) appears.push({ kind: copy.arrangeChanges, title: '', lines: lines(changed) });
   if (retired.size) appears.push({ kind: copy.arrangeRetires, title: '', lines: lines(retired) });
-  appears.push(...kept);
+  appears.push(...moving, ...kept);
   return { appears, ...out };
 }
 

@@ -166,20 +166,13 @@ export function arranger(d: ArrangeDeps) {
    * THE PACKS ANOTHER PACK HANDED DECLARATIONS TO, WHICH WERE NEVER INSTALLED: live declarations under the id and no `pack`
    * row. `packStates` reads a pack by what is live under it, so after money-core 1.8.0 handed an HSBC door on, `bank-hsbc-eg`
    * read as on at no version; the overview listed it and did not offer it, and a proposal to install it was refused
-   * `TRANSITION_ILLEGAL` "already installed and on" (`declare`'s `test/plan-handover-shown.test.ts`). The seed's own packs
-   * have no `pack` row either, but they own their declarations through the body's `pack:` and leave `pack_id` null; only
-   * the pack path writes `pack_id`, and a handover is the one way it names a pack that has no row.
+   * `TRANSITION_ILLEGAL` "already installed and on" (`declare`'s `test/plan-handover-shown.test.ts`). `packStates` marks
+   * such a pack `handed` now, by the check this file first made for itself: a live `pack_id` naming a pack with no row.
    */
-  const handedPacks = (): Set<string> => {
-    const rows = new Set(kernel.packs().map((p) => p.id));
-    return new Set(kernel.declarations().flatMap((x) => (x.pack_id === null || x.pack_id === 'kernel' || rows.has(x.pack_id) ? [] : [x.pack_id])));
-  };
+  const handedPacks = (): Set<string> => new Set(kernel.packStates().flatMap((s) => (s.handed === true ? [s.id] : [])));
   /* WHAT IS INSTALLED, which a handed pack is not: it is planned as an install, and its first install takes the handed
      declarations over (`declare` `plan`). */
-  const states = () => {
-    const handed = handedPacks();
-    return kernel.packStates().filter((s) => !handed.has(s.id));
-  };
+  const states = () => kernel.packStates().filter((s) => s.handed !== true);
   const stateOf = (id: string) => states().find((s) => s.id === id);
   const on = (id: string) => stateOf(id)?.disabled_at === null;
   /* WHAT TURNING A PACK OFF STOPS, which a handed pack has: its door is live and answering. Read through `stateOf`, a handed
@@ -396,8 +389,16 @@ export function arranger(d: ArrangeDeps) {
         /* WHAT AN UPDATE TAKES AWAY, with the rows it keeps, so Decide says it beside what it adds. AND `to` FOR WHAT IT
            HANDS ON INSTEAD: copied as `{ id, rows }`, the HSBC door money-core hands to `bank-hsbc-eg` and keeps live was
            filed exactly as one it retires (`loop/research-batch-thirty-four-audit.md` §8, `declare`'s
-           `test/plan-handover-shown.test.ts`). */
-        ...(diff.retires.length === 0 ? {} : { retires: diff.retires.map((x) => ({ id: x.id, rows: x.rows, ...(x.to === undefined ? {} : { to: x.to }) })) }),
+           `test/plan-handover-shown.test.ts`). `to_name` IS THAT PACK AS THE CATALOGUE CALLS IT, since it is not installed and
+           Decide has nothing else to name it by: "Bank hsbc eg", from its id, is not what the owner would look for. */
+        ...(diff.retires.length === 0
+          ? {}
+          : {
+              retires: diff.retires.map((x) => {
+                const to = x.to === undefined ? undefined : entryOf(x.to)?.title;
+                return { id: x.id, rows: x.rows, ...(x.to === undefined ? {} : { to: x.to }), ...(to === undefined ? {} : { to_name: to }) };
+              }),
+            }),
         /* WHAT IT LEAVES AS THE OWNER CHANGED IT, so Decide says the update's version of it is not taken. */
         ...(kept.size === 0 ? {} : { keeps: [...kept] }),
         ...(diff.seeds.count === 0 ? {} : { examples: diff.seeds.count }),

@@ -105,6 +105,12 @@ export type PlannedPack = {
   adds: string[];
   changes: string[];
   retires: string[];
+  /**
+   * What the update hands to another pack instead of retiring: still live, under that pack's name. Apart from `retires`
+   * so a door somebody's Shortcut posts to is not said as taken away, and absent when nothing is handed, so a reader of
+   * `retires` as strings reads what it always did.
+   */
+  hands?: { id: string; to: string }[];
   conflicts: { id: string; pack: string }[];
   unresolved: string[];
   examples: number;
@@ -294,7 +300,8 @@ export function useCases(d: UseCaseDeps) {
         direction: diff.direction,
         adds: diff.adds.map((a) => a.id),
         changes: diff.changes.map((c) => c.id),
-        retires: diff.retires.map((r) => r.id),
+        retires: diff.retires.filter((r) => r.to === undefined).map((r) => r.id),
+        ...(diff.retires.some((r) => r.to !== undefined) ? { hands: diff.retires.flatMap((r) => (r.to === undefined ? [] : [{ id: r.id, to: r.to }])) } : {}),
         conflicts: diff.conflicts,
         unresolved: diff.unresolved.map((x) => x.register),
         examples: diff.seeds.count,
