@@ -213,8 +213,12 @@ test('THE SAME SCRIPT AIMED AT A LOCAL ADDRESS IS REFUSED BEFORE ANY SOCKET OPEN
       ['gold-inside', /inside\.gold\.test resolves to 127\.0\.0\.1, which is a loopback address, so nothing was sent to it\./],
     ] as const) {
       const [run] = s.events(name);
-      assert.equal((JSON.parse(run?.to_v ?? '{}') as { outcome?: string }).outcome, 'refused', `${name}: ${run?.note ?? 'no run event'}`);
-      assert.match(run?.note ?? '', why);
+      const said = JSON.parse(run?.to_v ?? '{}') as { outcome?: string; log?: string };
+      assert.equal(said.outcome, 'refused', `${name}: ${run?.note ?? 'no run event'}`);
+      /* THE REASON IS IN THE LOG, NOT THE NOTE: a refusal can quote words the script chose, and the note is read by
+         every whole-record reader while the log is read only by whoever may read the lists it touched. */
+      assert.match(said.log ?? '', why);
+      assert.match(run?.note ?? '', /did not finish, so it wrote nothing; its log says why\./);
     }
 
     /* A REFUSED RUN IS A RUN, and the ledger says so: two runs, two failures, nothing held. */
