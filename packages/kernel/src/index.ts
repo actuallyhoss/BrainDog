@@ -448,6 +448,8 @@ export type RegisterDecl = {
     by?: 'decide';
     /** On an enum: the moves out of each value, what a move needs filled, and `by` for one only a proposal makes. */
     transitions?: Readonly<Record<string, { to: readonly string[]; requires?: readonly string[]; by?: 'decide' }>>;
+    /** On a day: the day a row is due by rather than the day something happened (`isDeadline` in `metrics.ts`). */
+    deadline?: boolean;
   })[];
   /** The enum field mirrored onto `entry.state`, when the register has one. */
   state?: string;
@@ -1124,6 +1126,12 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
             ...(f.label ? { label: f.label } : {}),
             /* AND AN ENUM'S VALUE LABELS, so `direction is money in` reads as the screen says it. */
             ...(f.labels ? { labels: f.labels } : {}),
+            /* AND WHETHER A DAY IS A DEADLINE, which decides whether a window read as of a past day
+               may count rows dated after it. `isDeadline` in `metrics.ts` reads it, and until this
+               line sent it no read through the record ever reached it: over the audit's bills due
+               2 days before and 3 and 12 after the as-of day, `due after -7d` backfilled 50,000
+               where the live read on that day was 350,000 (`test/metrics-asof-forward.test.ts`). */
+            ...(f.deadline === true ? { deadline: true } : {}),
           },
         ]),
     ),
@@ -3052,6 +3060,12 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    */
   const evalContext = (staged: readonly Declaration[] = []): EvalContext => ({
     nowMs: clock.now(),
+    /* THE RECORD'S ZONE, SO A LIVE READ NAMES THE DAY THE NIGHT POINT WILL BE STORED UNDER. Without it
+       `metric`, `list` and every page block dated `today` by UTC while `snapshot` dated it locally:
+       in `Asia/Tokyo` at 00:05 on the 6th, `created_at is today` read 1100 live and 110 in the point
+       (`loop/research-batch-twenty-eight-audit.md` §4, `test/metrics-live-local-day.test.ts`). A
+       record with no identity yet has no zone and reads UTC, as it did. */
+    tz: recordIdentity(sql)?.tz,
     schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null),
     /* A ref is written by NAME in a sentence — `thing is Kiln` — because that is what a person says.
        The title field is the register's own, so the lookup is one indexed read per name.

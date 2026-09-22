@@ -72,6 +72,13 @@ export type FieldSpec = {
   values?: readonly string[];
   label?: string;
   labels?: Readonly<Record<string, string>>;
+  /**
+   * On a `day`: the day a row is due by, which the row carries from the moment it is written, rather
+   * than the day something happened. The grammar does not read it; the kernel's as-of window does,
+   * because a bill due on the 10th was already owed on the 5th and a payment on the 10th had not
+   * happened yet.
+   */
+  deadline?: boolean;
 };
 
 export type Schema = {

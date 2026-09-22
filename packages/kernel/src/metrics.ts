@@ -434,6 +434,15 @@ const typeOf = (schema: Schema, field: string): string | undefined =>
       ? KERNEL_FIELDS[field]
       : undefined;
 
+/**
+ * Whether the register declares this field a deadline: a day a row is due by, which a row carries
+ * from the moment it is written, rather than the day something happened.
+ *
+ * `=== true` AND NOT TRUTHY, because the flag arrives from a declaration a person or an agent wrote,
+ * and `deadline: false` is a register saying the opposite (`test/metrics-asof-forward.test.ts`).
+ */
+const isDeadline = (schema: Schema, field: string): boolean => Object.hasOwn(schema.fields, field) && schema.fields[field]!.deadline === true;
+
 const dayAfter = (iso: string): string => new Date(Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) + DAY).toISOString().slice(0, 10);
 
 function endedAt(shifted: Predicate | undefined, current: Predicate | undefined | null, schema: Schema, thenMs: number): Predicate | undefined {
@@ -461,12 +470,21 @@ function endedAt(shifted: Predicate | undefined, current: Predicate | undefined 
      ahead at 300,000 live on the day and 0 as of that day, and the same for `due after -1d`. A
      window whose first day is the as-of day or later is a question about what is coming, and the
      rows it counts were there to be counted on that day; only one that begins before the day has
-     rows from after it that had not happened yet. `test/metrics-asof-forward.test.ts` holds both. */
+     rows from after it that had not happened yet. `test/metrics-asof-forward.test.ts` holds both.
+
+     AND NEVER ON A FIELD THE REGISTER DECLARES A DEADLINE, WHEREVER THE WINDOW BEGINS. The first day
+     was a guess at the real question, which is whether a row dated after the as-of day could have
+     been there on it: a payment `on` the 10th had not happened on the 5th, and a bill `due` the 10th
+     was already owed. `due after -7d` over bills due 2 days before and 3 and 12 after read 350,000
+     live on the day and 50,000 as of it, `due after -2d` 300,000 and 0 (the audit,
+     `loop/research-batch-twenty-one-audit.md` §6). `deadline: true` is the register saying which
+     kind a field is; `test/metrics-past-window.test.ts` holds both, and that a field without it
+     still ends at the day. */
   if (current === null) {
     const asOfDay = new Date(thenMs).toISOString().slice(0, 10);
     for (const field of [...started]) {
       const begins = startOf(clauses, field);
-      if (begins === undefined || begins >= asOfDay) started.delete(field);
+      if (begins === undefined || begins >= asOfDay || isDeadline(schema, field)) started.delete(field);
     }
   }
   if (started.size === 0) return shifted;
@@ -591,10 +609,13 @@ export type EvalContext = {
   /**
    * The record's zone, which dates an `instant` on its local day (`localInstants`).
    *
-   * ONLY `snapshot` SETS IT, because only `snapshot` resolves its days locally: it asks at noon UTC
-   * of the local date, so `today` and `-30d` are local days. A live read still resolves them from
-   * the UTC date of `nowMs`, and giving it a zone without also moving that clock would compare a
-   * UTC day's name against a local day's instants, which is a third answer and not the right one.
+   * `snapshot` SET IT AND THE KERNEL'S LIVE READS DID NOT, so a night point and the tile above it
+   * answered different days. `snapshot` asks at noon UTC of the local date, which makes `today` and
+   * `-30d` local days; a live read named them from the UTC date of `nowMs`. In `Asia/Tokyo` at 00:05
+   * on the 6th, `created_at is today` read 1100 live and in the list, and 110 in the point stored
+   * for the 5th (`loop/research-batch-twenty-eight-audit.md` §4). Now the kernel's `evalContext`
+   * carries the record's zone, and a live read with one names its days from noon UTC of the local
+   * date (`clockOf`), so the day's name and the instants it holds are the same local day.
    */
   tz?: string | undefined;
   /** The register's declared fields, so a predicate and a field expression check against one shape. */
@@ -638,7 +659,41 @@ export function predicateOf(
   schema: Schema,
   ctx: EvalContext,
 ): { predicate: Predicate | undefined; bad: Refusal[] } {
-  const nowMs = ctx.asOfMs ?? ctx.nowMs;
+  const said = resolvedOf(where, schema, ctx);
+  return { ...said, predicate: localInstants(said.predicate, schema, ctx.tz) };
+}
+
+/**
+ * The clock a predicate's days are named from: the as-of instant, or on a live read in a zone, noon
+ * UTC of the local date.
+ *
+ * NOON UTC OF THE LOCAL DATE IS HOW `snapshot` ALREADY ASKS. Its UTC date is the local date by
+ * construction, so `resolveDay`, which reads only the UTC date, names local days without a zone of
+ * its own. A live read used the UTC
+ * date of `nowMs`: in `Asia/Tokyo` at 00:05 on the 6th, `today` was the 5th
+ * (`test/metrics-live-local-day.test.ts`).
+ */
+function clockOf(ctx: EvalContext): number {
+  if (ctx.asOfMs !== undefined) return ctx.asOfMs;
+  return ctx.tz === undefined ? ctx.nowMs : Date.parse(`${localDate(ctx.nowMs, ctx.tz)}T12:00:00Z`);
+}
+
+/**
+ * `predicateOf` without the local instants, for `evaluateMetric`, which needs the bare days.
+ *
+ * `endedAt` finds a window's first day with `startOf`, which takes the first ten characters of a
+ * bound. Handed the instants `localInstants` writes, that is the UTC date of local midnight, the day
+ * before east of UTC: in `Asia/Tokyo`, `created_at after -1d` as of the 4th read as a window beginning
+ * on the 3rd, took an as-of end it should not have, and gave 1 where the bare days give 1111
+ * (`test/metrics-live-local-day.test.ts`). So the metric resolves here, writes its ends, and dates the
+ * instants last, which is the order `snapshot` has always read in.
+ */
+function resolvedOf(
+  where: Predicate | string | undefined,
+  schema: Schema,
+  ctx: EvalContext,
+): { predicate: Predicate | undefined; bad: Refusal[] } {
+  const nowMs = clockOf(ctx);
   if (typeof where !== 'string') {
     const dated = resolveRelative(where, schema, nowMs);
     const refs = resolveRefs(dated.predicate, schema, ctx);
@@ -917,7 +972,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
       if (said) at('VALUE_MALFORMED', said, 'value');
     }
 
-  const said = schema ? predicateOf(decl.where, schema, ctx) : { predicate: undefined, bad: [] };
+  const said = schema ? resolvedOf(decl.where, schema, ctx) : { predicate: undefined, bad: [] };
   refusals.push(...said.bad);
   if (schema && said.predicate) refusals.push(...compile(said.predicate, schema).bad);
 
@@ -925,7 +980,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
      subset of it and a subset read by a second grammar would be a second answer. Anything wrong
      with them is already wrong with `where`, so this adds no refusal a reader has not been given;
      it is here so that a `within` some future reader builds by hand cannot reach SQL unchecked. */
-  const scope = schema && decl.within !== undefined ? predicateOf(decl.within, schema, ctx) : { predicate: undefined, bad: [] };
+  const scope = schema && decl.within !== undefined ? resolvedOf(decl.within, schema, ctx) : { predicate: undefined, bad: [] };
   refusals.push(...scope.bad);
   if (schema && scope.predicate) refusals.push(...compile(scope.predicate, schema).bad);
 
@@ -966,7 +1021,8 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
     into: held.home,
     home: held.home,
     rates: held.rates,
-    today: new Date(ctx.asOfMs ?? ctx.nowMs).toISOString().slice(0, 10),
+    /* The local day on a live read in a zone, as the predicate's `today` is (`clockOf`). */
+    today: new Date(clockOf(ctx)).toISOString().slice(0, 10),
     day: dayFieldOf(schema.fields),
   };
   /**
@@ -1052,9 +1108,9 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
        back `delta: null`, "the predicate does not mention time", where the same rows read live on
        that day say `delta: 1` (`test/metrics-asof.test.ts`). The moved clock goes in as `asOfMs`,
        the one field `predicateOf` reads first, so it is honoured whether or not the caller set one. */
-    const anchor = ctx.asOfMs ?? ctx.nowMs;
+    const anchor = clockOf(ctx);
     const moveTo = decl.compare === 'year_ago' ? yearBefore(anchor) : anchor - shift;
-    const shifted = predicateOf(decl.where, schema, { ...ctx, asOfMs: moveTo });
+    const shifted = resolvedOf(decl.where, schema, { ...ctx, asOfMs: moveTo });
     const moved = JSON.stringify(shifted.predicate) !== JSON.stringify(said.predicate);
     /* AND THE WINDOW BEFORE ENDS WHERE ITS CLOCK IS. `moved` above is asked of the predicate as
        written, because a clause this adds is not a sign the declaration mentions time; `endedAt`
@@ -1186,7 +1242,10 @@ function groupsOf(
     const bucket = decl.bucket;
     const day = `substr(${field}, 1, 10)`;
     const days = sql.all<{ d: string }>(`SELECT DISTINCT ${day} AS d FROM entry WHERE ${where} AND ${field} IS NOT NULL ORDER BY d`, ...params);
-    const current = bucketOf(new Date(ctx.asOfMs ?? ctx.nowMs).toISOString(), bucket)!;
+    /* FROM `clockOf`, THE CLOCK THE WORDS WERE NAMED FROM. This read `asOfMs ?? nowMs`, so in
+       `Asia/Tokyo` at 00:05 on the 6th a live `on after -3d` named `today` the 6th and marked the
+       5th as the bucket the clock is in (`test/metrics-live-local-day.test.ts`). */
+    const current = bucketOf(new Date(clockOf(ctx)).toISOString(), bucket)!;
     const keys = [...new Set(days.map((r) => bucketOf(String(r.d), bucket)).filter((k): k is string => k !== null))].sort();
     if (keys.length === 0) return ok({ groups: [], current, more: 0 });
     /* TO THE BUCKET THE CLOCK IS IN AT LEAST, so a month since the last row reads as the gap it is. */
