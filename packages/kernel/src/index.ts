@@ -21,7 +21,7 @@ import { clash, fixOf, no, ok, refused } from '@braindog/ports';
 
 import { coerce, isAbsent, instant, measure, parseSpoken, range, type FieldDecl, type Json } from './coerce.ts';
 import { attempt } from './tx.ts';
-import { widens } from './widen.ts';
+import { misread, sentencesOver, widens } from './widen.ts';
 import { ulids, type Mint } from './ids.ts';
 import { FORMAT_VERSION, applyMigrations, schemaRefusal, type SchemaState } from './migrate.ts';
 import { jsonPath, compile, fieldSqlIn, addressable, isColumn, type Predicate, type Schema } from '@braindog/where';
@@ -229,7 +229,7 @@ export type { SessionHints } from './session.ts';
 export type { Resolved, ScopeDecl, ScopesDecl, Whereabouts } from './scope.ts';
 export { coerce, FIELD_TYPES, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, looksLikeCredential, parseSpoken, spoken } from './coerce.ts';
 export type { FieldDecl, FieldType, Json } from './coerce.ts';
-export { widens, type TypeShape } from './widen.ts';
+export { misread, sentencesOver, widens, type TypeShape } from './widen.ts';
 export { isUlid, ulids, ulidTime } from './ids.ts';
 export { digest, indexesFor, indexName, jcs, registerOfIndex, validate as validateDeclaration, KINDS } from './declare.ts';
 export { ftsQuery, projectedText } from './fts.ts';
@@ -1357,6 +1357,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
                   ...(f.values ? { values: f.values } : {}),
                   ...(f.to ? { to: f.to } : {}),
                   ...(f.label ? { label: f.label } : {}),
+                  /* AND AN ENUM'S VALUE LABELS, for `schemaOf`'s reason. Left out, a page filtering `lane is Earning`
+                     was refused "has no value Earning" beside the list that labels it, and taken once the list was
+                     already installed: one sentence, two answers, by the order two declarations arrived in. */
+                  ...(f.labels ? { labels: f.labels } : {}),
                 },
               ]),
           ),
@@ -1567,7 +1571,14 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const register = ownId(decl);
       const fields = (decl.body as { fields?: unknown }).fields;
       if (!Array.isArray(fields)) continue;
-      const before = new Map<string, Field>((registers.get(register)?.fields ?? []).map((f) => [f.id, f as Field]));
+      /* WITH THE `tags` EVERY LIST TAKES (`withTags`), as the `list<text>` its rows hold. Read from the declared body alone,
+         a list that never declared `tags` had no `was` for one arriving, so `loop/research-batch-thirty-four-audit.md` §4
+         declared `tags` as `text`, `int` and `bool` over a row holding `["late","example"]` and each installed; every
+         `tag` and `untag` on that list was `VALUE_MALFORMED` from then on. A list the record does not hold yet has no
+         rows to contradict, and nothing is added for it. */
+      const before = new Map<string, Field>(
+        (registers.has(register) ? withTags(registers.get(register)!.fields) : []).map((f) => [f.id, f as Field]),
+      );
       const count = (where: string, ...params: (string | number)[]) =>
         Number(sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND ${where}`, register, ...params)?.n ?? 0);
 
@@ -1641,10 +1652,18 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
            text and the fix would have split one column into two. */
         if (was !== undefined && was.retired !== true && typeOf(was) !== typeOf(f) && !widens(was, f)) {
           const n = count(held);
+          /* NOT "RETIRE IT" FOR `tags`, whose retiring the check above calls a choice that turns every later `tag` on
+             the list into `FIELD_UNKNOWN`. The list's tags are a `list<text>` whether or not it wrote one down. */
+          if (n > 0 && f.id === 'tags' && typeOf(was) === typeOf(TAGS))
+            return {
+              code: 'FIELD_TYPE_CHANGED',
+              fix: `${decl.id}.tags: every list takes tags as list<text>, and ${rows(n)} ${n === 1 ? 'holds' : 'hold'} some, so ${typeOf(f)} would change the type under them. Leave tags out, or declare it as list<text>.`,
+              at: `${at}.type`,
+            };
           if (n > 0)
             return {
               code: 'FIELD_TYPE_CHANGED',
-              fix: `${decl.id}.${f.id}: ${typeOf(was)} → ${typeOf(f)} changes a type, and ${rows(n)} hold a value written under the old one. Retire the field and add a new one.`,
+              fix: `${decl.id}.${f.id}: ${typeOf(was)} → ${typeOf(f)} changes a type, and ${rows(n)} ${n === 1 ? 'holds' : 'hold'} a value written under the old one. Retire the field and add a new one.`,
               at: `${at}.type`,
             };
         }
@@ -1725,10 +1744,36 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * A page column whose `sign:` reads the enum is the same kind of reader. Every stored value still reads back; what a
    * widening takes away is the closed list, and these are the readers that needed it.
    *
-   * A reader changed in the same batch is the batch's, and was checked with it.
+   * AND A READER THAT STILL COMPILES IS ASKED WHAT IT WOULD NOW MEAN. `loop/research-batch-thirty-four-audit.md` §1 opened
+   * `lane` to text under four figures that all compiled either way, and three changed their answer with nothing refused:
+   * `lane is earning money` from 1 to 0, `lane is Building` from 1 to 0, `lane is not Parked` from 2 to 3. `where` reads an
+   * enum's word by label, by spaces for underscores and without case, and a text's word exactly as written, so a word that
+   * only the closed list turned into a stored value now asks for something no row holds. Each such sentence is parsed
+   * against the list as it stands and again with only the opened fields changed (`misread`), and a word that moves is
+   * refused with the reader, the word and the stored value it has to be written as.
+   *
+   * REFUSED RATHER THAN REWRITTEN TO THE STORED VALUE, though the rewrite would have let the widening through in one step.
+   * It edits a declaration nobody in this change asked to edit, most often a pack's, whose next update would put the
+   * old words back over a text field and bring the wrong answer back with no refusal at all; and it re-prints a sentence
+   * somebody wrote. The refusal costs the owner one edit they can see, and the reader's new words then say what it counts.
+   *
+   * A reader changed in the same batch is the batch's, and was checked with it. One sent again unchanged is not.
    */
   function stranded(batch: readonly Declaration[]): Refusal | null {
-    const arriving = new Set(batch.map((d) => d.id));
+    /* A READER RESENT WITH THE SAME BYTES IS NOT THE BATCH'S. A pack update sends every declaration it holds, so its own
+       figure arrived beside the widening unchanged, was passed over as "checked with the batch", and `lane is earning
+       money` went from 1 to 0 with nothing refused (`test/widen-figures.test.ts`). Compiling it against the arriving list
+       says only that it still reads, which is exactly what a widening leaves true. */
+    const sent = new Map(batch.map((d) => [d.id, d]));
+    const arriving = (id: string, stored: string): boolean => {
+      const d = sent.get(id);
+      if (d === undefined) return false;
+      try {
+        return jcs(d.body as unknown as Json) !== jcs(JSON.parse(stored) as Json);
+      } catch {
+        return true;
+      }
+    };
     type Field = { id?: unknown; retired?: unknown; type?: unknown; of?: unknown };
     const live = (fields: unknown): Map<string, Field> =>
       new Map(
@@ -1737,6 +1782,29 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           .map((f) => [f.id as string, f]),
       );
     let readers: Declaration[] | null = null;
+
+    /* THE LIST AS IT STANDS AND THE SAME LIST WITH ONLY THE OPENED FIELDS CHANGED, so a word in a reader's sentence that
+       moves between the two moved because of the widening and nothing else in the change. */
+    const movedWord = (reader: Declaration, register: string, opened: readonly string[], after: ReadonlyMap<string, Field>) => {
+      const closed = schemaOf(register);
+      const open: Schema = { ...closed, fields: { ...closed.fields } };
+      for (const id of opened) {
+        const f = after.get(id) as Field & { label?: unknown };
+        open.fields[id] = { type: String(f.type), ...(typeof f.of === 'string' ? { of: f.of } : {}), ...(typeof f.label === 'string' ? { label: f.label } : {}) };
+      }
+      const ctx = evalContext();
+      const subject = reader.kind === 'rule' ? subjectOf(reader.body as unknown as FlowDecl) : null;
+      /* `REF_UNKNOWN` IS PASSED OVER as `unreadWhere` passes it: a title no row holds yet is the same either way. */
+      const reads = (said: ReturnType<typeof predicateOf>) => said.bad.every((b) => b.code === 'REF_UNKNOWN');
+      for (const { at, where } of sentencesOver(reader.kind, reader.body as Record<string, unknown>, register, subject)) {
+        const was = predicateOf(where, closed, ctx);
+        const now = predicateOf(where, open, ctx);
+        if (!reads(was) || !reads(now)) continue;
+        const word = misread(was.predicate, now.predicate, new Set(opened));
+        if (word) return { at, where, ...word };
+      }
+      return null;
+    };
 
     for (const decl of batch) {
       if (decl.kind !== 'register') continue;
@@ -1758,7 +1826,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         .all<{ id: string; kind: string; body: string; pack_id: string | null }>(
           "SELECT id, kind, body, pack_id FROM declaration WHERE superseded_at IS NULL AND retired = 0 AND kind IN ('metric', 'rule', 'page', 'ingest')",
         )
-        .filter((row) => !arriving.has(row.id))
+        .filter((row) => !arriving(row.id, row.body))
         .flatMap((row) => {
           try {
             return [{ id: row.id, kind: row.kind as Declaration['kind'], body: JSON.parse(row.body) as Record<string, Json>, pack: row.pack_id ?? undefined }];
@@ -1778,11 +1846,20 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
            was first blamed on whichever came first in it, and the sentence named the wrong list and every field it
            lost; asked one list at a time, the refusal is about the list that took the field away. */
         const then = unreadable([decl, reader]) ?? lintBatch(sql, [decl, reader]);
-        if (!then) continue;
         const body = reader.body as { name?: unknown; title?: unknown };
         const called = typeof body.name === 'string' ? body.name : typeof body.title === 'string' ? body.title : reader.id;
         const what = reader.kind === 'metric' ? 'the figure' : reader.kind === 'page' ? 'the page' : `the ${reader.kind}`;
         const list = typeof (decl.body as { name?: unknown }).name === 'string' ? String((decl.body as { name: string }).name) : register;
+        if (!then) {
+          const moved = opened.length === 0 ? null : movedWord(reader, register, opened, after);
+          if (!moved) continue;
+          const says = moved.written === '' ? 'reads it differently' : `says ${moved.written}`;
+          return {
+            code: 'FIELD_TYPE_CHANGED',
+            fix: `Opening ${moved.field} on ${list} to free text would quietly change which rows ${what} ${called === reader.id ? reader.id : `${called} (${reader.id})`} reads: its ${moved.at} "${moved.where}" ${says}, which only the closed list read as ${moved.stored}, and free text compares the word as written. Write ${moved.stored} there first, then open ${moved.field}.`,
+            at: reader.id,
+          };
+        }
         /* THE FIELD THE REFUSAL NAMES, by the words both checks use for it. A bare substring match named `what` and
            `kind` out of any sentence that happened to hold them. */
         const named = gone.filter((f) => new RegExp(`\\b(field called|reads|groups by) ${f}\\b`).test(then.fix));
@@ -5704,7 +5781,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * reloaded is a register the write path still refuses — a failure that looks like the install
      * silently not working.
      */
-    async install(given: readonly (Declaration | DeclarationBundle)[], expect?: Expected, by?: DeclaredBy) {
+    async install(given: readonly (Declaration | DeclarationBundle)[], expect?: Expected | Expected[], by?: DeclaredBy) {
       /* A BUNDLE IS ITS DECLARATIONS, so an accepted change carrying several installs and arms them in one go. */
       const batch: Declaration[] = given.flatMap((d) =>
         Array.isArray((d as DeclarationBundle).declarations) ? (d as DeclarationBundle).declarations : [d as Declaration],

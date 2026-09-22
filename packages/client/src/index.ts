@@ -294,6 +294,58 @@ export type ActionResumed = { ingest: string; kind: 'pull' | 'call' | 'poll' };
 /** `resumeScript`: the script that runs again now. */
 export type ScriptResumed = { script: string };
 
+/** Where one run of an automation stands. */
+export type RunState = 'pending' | 'running' | 'waiting' | 'done' | 'failed' | 'cancelled';
+
+/**
+ * `automations`: one automation, which is a rule. See `AutomationRow` in `@braindog/record`.
+ *
+ * `path` IS WHICH OF THE TWO WAYS IT RUNS, and nobody declares it: `inline` inside the write that started it, `run` after
+ * it, step by step, one row per step. `register` is `null` for a clock, a button or an arrival, which have no row.
+ */
+export type AutomationRow = {
+  id: string;
+  rule: string;
+  name: string;
+  version: number;
+  trigger: 'written' | 'arrival' | 'every' | 'metric' | 'decided' | 'manual';
+  path: 'inline' | 'run';
+  register: string | null;
+  project: string | null;
+  enabled: boolean;
+  pack: string | null;
+  /** When a clock next starts it. */
+  next: string | null;
+  /** Runs not finished: due, being taken, or parked on a wait. */
+  open: number;
+  last: { run: string; state: RunState; at: string; say: string | null } | null;
+  /** This calendar month so far, UTC. An inline rule's firings are events and are not counted here. */
+  month: { runs: number; done: number; failed: number; cancelled: number };
+};
+
+/** One run, as `automations({ rule })` shows it: what started it, how it ended, and each step it took. */
+export type AutomationRun = {
+  id: string;
+  version: number;
+  state: RunState;
+  trigger: string;
+  actor: string;
+  started_at: string;
+  finished_at: string | null;
+  /** The sentence it ended with: why it failed, or who cancelled it. */
+  say: string | null;
+  steps: { n: number; kind: string; state: 'done' | 'waiting' | 'failed' | 'skipped'; answer: string | null; at: string }[];
+};
+
+/** `automations({ rule })`: one automation with its body and its last ten runs, newest first. */
+export type Automation = AutomationRow & { body: Record<string, unknown>; runs: AutomationRun[] };
+
+/** `automationRun`: the run it started, which the next drain takes. */
+export type AutomationStarted = { run: string };
+
+/** `cancelRun`: the run that stopped. */
+export type RunCancelled = { run: string; state: 'cancelled' };
+
 /**
  * One saved view, as `views` and `view` send it. See `ViewRow` in `@braindog/kernel`.
  *
@@ -850,6 +902,14 @@ export function createClient(options: ClientOptions) {
     resumeAction: (ingest: string) => call<ActionResumed>('resumeAction', { ingest }),
     /** A script paused by three refused runs in a row, started again now. ADMIN, and the only thing that restarts one. */
     resumeScript: (script: string) => call<ScriptResumed>('resumeScript', { script }),
+
+    /* THE AUTOMATIONS. `automations` is READ+, held to the lists the caller reads, and is one method for the list and for
+       one automation with its runs, which is why it has two names here. `automationRun` and `cancelRun` are ADMIN, so a
+       browser session: Run now is a person's decision. */
+    automations: () => call<AutomationRow[]>('automations'),
+    automation: (rule: string) => call<Automation>('automations', { rule }),
+    automationRun: (rule: string) => call<AutomationStarted>('automationRun', { rule }),
+    cancelRun: (run: string) => call<RunCancelled>('cancelRun', { run }),
 
     /* THE SAVED VIEWS. `views` and `view` are READ+, held to the list they belong to; `saveView` and
        `retireView` are ADMIN, so a browser session, because a saved view goes on the list for

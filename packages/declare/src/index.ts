@@ -147,6 +147,18 @@ export type Installed = {
    * OPTIONAL: without it the id is said as the declaration wrote it.
    */
   nameOf?: (ref: string) => string | null;
+  /**
+   * The declarations this record has put to work in a way `rows` cannot show, by id: an ingest that has filed a row
+   * (`ingest_receipt`), and a webhook door that holds a token (`heldDigest` in `@braindog/record`).
+   *
+   * WHAT DECIDES WHETHER A `hands` ENTRY IS HANDED OR RETIRED. money-core 1.8.0 handed all twelve HSBC Egypt doors on
+   * every record that updated, so a record that had never seen an Egyptian bank ended with twelve live patterns under
+   * `bank-hsbc-eg`, a pack it never installed, reported as on (`loop/research-batch-thirty-four-audit.md` §8). A handover
+   * keeps what somebody relies on, a list's rows or the address his Shortcut posts to, and a door nobody used has none.
+   *
+   * OPTIONAL, as `detached` is: a caller that cannot say gets every entry handed, which is what `plan` did before it asked.
+   */
+  used?: readonly string[];
 };
 
 export type Diff = {
@@ -194,6 +206,11 @@ export type Diff = {
    * `changed` WITH `field` AND NOTHING ELSE is a list the owner added `field` to, and this version brings a field of its
    * own under the same id. Two fields cannot share an id, and the rows already written under the owner's would be read
    * as the pack's, so it stays refused where every other addition is rebased.
+   *
+   * `handed` IS A DECLARATION ANOTHER PACK HANDED THIS ONE THAT THIS PACK'S FILE DOES NOT DECLARE, on its first install;
+   * `pack` is this pack, which holds it already. Planned as this pack's own retire, it orphaned the rows of the list a
+   * stranger's `hands` had put under its name, or dropped an empty one without a word
+   * (`loop/research-batch-thirty-four-audit.md` §7, `handover-guards.test.ts`).
    */
   conflicts: {
     id: string;
@@ -205,6 +222,7 @@ export type Diff = {
     value?: string;
     by?: string;
     changed?: true;
+    handed?: true;
   }[];
   /**
    * The pack's own declarations somebody changed in the app, which this install leaves as they are and does not stage.
@@ -1016,6 +1034,16 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
   const hands = pack.manifest.hands ?? {};
   for (const decl of installed.declarations) {
     if (decl.pack_id !== mine || keeping.has(decl.id)) continue;
+    /* ON A FIRST INSTALL, WHAT IS UNDER THIS PACK'S NAME AND NOT IN ITS FILE WAS HANDED TO IT, and is not its own to
+       retire. Nothing else puts a live row under a pack with no `pack` row (the takeover in the loop above says why).
+       Retired here, it measured `WOULD_ORPHAN` "notes-pack installs away register.holdings" for a list with a row in it,
+       and a silent retire for an empty one, on a pack that had never heard of the list. The giver's plan cannot catch it
+       earlier: the receiver is not installed, so nothing in `Installed` says what its file declares. So it is refused
+       here, and `install` says the two ways out. */
+    if (was === null) {
+      conflicts.push({ id: decl.id, pack: mine, handed: true });
+      continue;
+    }
     const register = decl.id.startsWith('register.') ? decl.id.slice('register.'.length) : null;
     const rows = register ? (installed.rows[register] ?? 0) : 0;
     /* A DECLARATION THIS VERSION HANDS ON IS NOT RETIRED, SO IT ORPHANS NOTHING. It is staged again under the pack it
@@ -1028,7 +1056,12 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
        list sat under that pack's name and every later update of it, a reinstall of the same file included, was
        `WOULD_ORPHAN` (`handover.test.ts`), so one pack's `hands` could stop another from ever updating. Taking over
        is what a pack's first install does, so a handover to one already installed is the retire it would otherwise be. */
-    const to = Object.hasOwn(hands, decl.id) && !installed.packs.some((p) => p.id === hands[decl.id]) ? hands[decl.id] : undefined;
+    /* AND ONLY WHAT THE RECORD USES: a list with rows, or anything `used` names (a door with a token, a pattern that has
+       filed a row). The rest is retired like any declaration this version stops declaring, so the record holds no pack
+       it never chose, and the receiver, installed later, declares it afresh. A caller that passes no `used` cannot say,
+       and gets everything handed as before. */
+    const inUse = installed.used === undefined || rows > 0 || installed.used.includes(decl.id);
+    const to = Object.hasOwn(hands, decl.id) && inUse && !installed.packs.some((p) => p.id === hands[decl.id]) ? hands[decl.id] : undefined;
     const body = to === undefined ? null : handedBody(decl.body, to);
     if (to !== undefined && body !== null) {
       retires.push({ id: decl.id, rows, to, body });
@@ -1960,6 +1993,20 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
        update has landed, and "two packs cannot own one declaration" read as a dead end: measured on `bank-hsbc-eg`
        beside money-core 1.7.0 and on a `holdings` pack beside money-core 1.8.0, both with the step they needed sitting
        unread in `requires`. */
+    /* A HANDED DECLARATION THIS PACK DOES NOT DECLARE (`plan`'s `handed`), and a declaration still sitting under a pack
+       that was handed it and never installed, each say the way out. Before, the first read `WOULD_ORPHAN` and the second
+       "belongs to notes-pack", a pack the owner had never installed, and the one exit that worked, removing that pack,
+       was named by neither (`handover-guards.test.ts`). */
+    if (first.handed)
+      return no<Applied>(
+        'PROVIDES_CONFLICT',
+        `${first.id} was handed to ${first.pack} by the update of the pack that declared it, and ${first.pack} ${diff.pack.version} does not declare it, so installing it would drop ${
+          first.id.startsWith('register.') ? 'the list' : 'it'
+        }. Install a version of ${first.pack} that declares ${first.id}, or remove ${first.pack} to let the pack that handed it declare it again.`,
+        { at: first.id },
+      );
+    /* `kernel` HOLDS ITS OWN DECLARATIONS WITH NO `pack` ROW, so it is the one other owner that is not installed. */
+    const unheld = first.pack !== OWN && first.pack !== 'kernel' && !diff.base.packs.some(([id]) => id === first.pack);
     const step = first.pack === OWN ? undefined : diff.requires.packs.find((p) => p.id === first.pack && !p.ok);
     return no<Applied>(
       'PROVIDES_CONFLICT',
@@ -1967,7 +2014,11 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
         ? `${first.id} was written in this record, and installing ${diff.pack.id} would take it over. Retire it first if you want the pack to own it.`
         : step !== undefined
           ? `${first.id} belongs to ${first.pack}${step.installed === null ? '' : ` ${step.installed}`}, and ${diff.pack.id} needs ${first.pack} ${step.range}. Update ${first.pack} first, then install ${diff.pack.id}.`
-          : `${first.id} belongs to ${first.pack}, and two packs cannot own one declaration.`,
+          : `${first.id} belongs to ${first.pack}, and two packs cannot own one declaration.${
+              unheld
+                ? ` ${first.pack} is not installed: another pack's update handed ${first.id} to it. Install ${first.pack} to take it over, or remove ${first.pack} to retire it, then install ${diff.pack.id}.`
+                : ''
+            }`,
       { at: first.id },
     );
   }

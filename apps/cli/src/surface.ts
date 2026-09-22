@@ -38,7 +38,7 @@ const reachable = <T>(r: Result<T>): Result<T> =>
  * transport is what found it (`test/stdio.test.ts`), after reading the list found nothing: the name is in the client's
  * own table and in the record's routes, and only this line was short.
  */
-const LATER = ['context', 'handoff', 'meet', 'sessionsLive', 'arrangement', 'recentHistory'] as const;
+const LATER = ['context', 'handoff', 'meet', 'sessionsLive', 'arrangement', 'recentHistory', 'automations', 'dryRun'] as const;
 
 export async function surfaceOver(clientFor: (ctx: Ctx) => Client): Promise<McpSurface<Ctx>> {
   const ask = async <T>(ctx: Ctx, name: string, args: unknown = {}): Promise<Result<T>> =>

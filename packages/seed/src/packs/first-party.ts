@@ -91,10 +91,13 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   Six mail patterns and their six `-sms` twins read one bank in one country, and every record set up as Personal,
  *   Founder or Small business carried them (`loop/DIRECTION.md` section 22). The two generic card wordings stay. Twelve
  *   ingests taken away and no list and no field, so by the rule above the step is a minor one, as 1.4.0's two figures
- *   were. A record on 1.7.0 that updates keeps the twelve: the update hands them to `bank-hsbc-eg` (`hands`, from
- *   `MONEY_CORE_HANDS`) rather than retiring them, and that pack takes them over when it installs. It needs `^1.8.0` so
- *   that it cannot be installed first and collide with money-core's own ids. A path token minted for one of the six twins
- *   survives the move, because a handed twin is never retired and `heldDigest` in `packages/record/src/index.ts` keeps
+ *   were. A record on 1.7.0 that updates keeps those of the twelve it uses: the update hands them to `bank-hsbc-eg`
+ *   (`hands`, from `MONEY_CORE_HANDS`) rather than retiring them, and that pack takes them over when it installs. One it
+ *   never used, no token minted and no row filed, is retired, which `declare`'s plan decides from the record's `used`
+ *   (`test/bank-pack.test.ts`); handing all twelve left every updated record holding a pack it never chose. Until the
+ *   record fills `used`, the plan cannot tell and still hands all twelve. The bank pack needs `^1.8.0` so that it cannot
+ *   be installed first and collide with money-core's own ids. A path token minted for one of the six twins survives the
+ *   move, because a handed twin is never retired and `heldDigest` in `packages/record/src/index.ts` keeps
  *   a digest while every version since the mint is live (`packages/declare/test/door-hold.test.ts`). A record already
  *   updated to 1.8.0 before the handover existed lost the twelve, and there the owner installs the pack and mints again.
  * - estate 1.2.0: a service carries a note. the old tool's domains carry the reason each name is held and what is

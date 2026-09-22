@@ -38,6 +38,11 @@
  * after the word cursor.
  * The list measured 2,565 before, 2,656 with the tool, and 2,565 again after.
  *
+ * AND AUTOMATIONS COST IT NOTHING (`loop/research-shell-automations.md` §5). `dry_run` went above because only a person
+ * installed a rule; an agent now writes automations, so what one would do came back as `dry_run` on `propose`'s answer
+ * for a rule change rather than as a tool, and the definitions, one automation with its runs, and the grammar are
+ * resources. The list measured 2,597 tokens before and 2,597 after.
+ *
  * AND THE RESOURCES ARE NOT TOOLS, which is the other half of the same argument. A resource list is
  * fetched when it is wanted, so the per-register variability, one `schema/<register>` each, costs
  * nothing in a turn that does not ask for it.
@@ -51,6 +56,7 @@
 import { refused, type Result } from '@braindog/ports';
 
 import { SCRIPT_GRAMMAR } from '../grammars/script.ts';
+import { AUTOMATION_GRAMMAR } from './automations.ts';
 
 type Answer<T = unknown> = Promise<Result<T>>;
 type Args = Record<string, unknown>;
@@ -67,7 +73,7 @@ type Row = { state?: string | null; fields: Record<string, unknown> };
  * command line it is nothing the tools look at, because the bearer travels in the request. The tools
  * hand it on and never read it, which is what keeps authorisation in one place: the record.
  *
- * THE LAST SEVEN ARE OPTIONAL, BECAUSE A HOST MAY NOT ANSWER THEM. The record answers the first four
+ * THE LAST NINE ARE OPTIONAL, BECAUSE A HOST MAY NOT ANSWER THEM. The record answers the first four
  * of them since build step 16, and a host older than that does not. The command line offers only
  * the routes its client knows, so it still works against an older host. Without one, its tool
  * refuses with what to do instead, and its resource is not listed.
@@ -107,6 +113,14 @@ export type McpSurface<C> = {
   actions?(ctx: C): Answer;
   /** How the record is arranged, one page's declaration, or a grammar (`loop/research-spark.md` S12). READ+, optional likewise. */
   arrangement?(args: { page?: string; grammar?: string }, ctx: C): Answer;
+  /** Every automation, or one with its last ten runs (`loop/research-shell-automations.md` §5). READ+, optional likewise. */
+  automations?(args: { rule?: string }, ctx: C): Answer;
+  /**
+   * What a rule body would do, writing nothing. READ+, and optional for one more reason than the others: it backs no
+   * tool and no resource, only the `dry_run` on `propose`'s answer for a rule change, so a surface without it files the
+   * change exactly as before and says nothing about what it would do.
+   */
+  dryRun?(args: { rule: Record<string, unknown>; limit?: number }, ctx: C): Answer;
 };
 
 /**
@@ -658,6 +672,8 @@ const TTL = new Map([
   ['digest', MINUTE],
   ['decisions', MINUTE],
   ['actions', MINUTE],
+  ['automations', MINUTE],
+  ['automation', MINUTE],
   ['arrangement', MINUTE],
   ['declaration', MINUTE],
   ['grammar', HOUR],
@@ -687,10 +703,12 @@ const FIXED: readonly Resource[] = [
   resource('digest/today', 'What the digest would say if it went now.'),
   resource('decisions', 'What has been proposed and not yet answered.'),
   resource('actions', 'Every scheduled action: what it calls, how often, whether it is paused and why, and this month so far. Keys by name only.'),
+  resource('automations', 'Every automation: what starts it, when it runs next, and how its runs went this month.'),
   resource('arrangement', 'How this BrainDog is arranged: its packs, what else is on offer, its voice and settings, its pages, and what waits.'),
   resource('grammar/page', 'What a page declaration may contain, with one that installs.'),
   resource('grammar/proposals', 'The bodies that change what this BrainDog is: pack, settings and arrange.'),
   resource('grammar/script', 'What a script declaration may contain, what its ctx can reach, its limits, and two that install.'),
+  resource('grammar/automations', 'What an automation may say: its triggers, its steps, its limits, what does not run yet, and two that install.'),
 ];
 
 /** The addresses a client fills in itself. A template is a grammar, so it names nothing a caller cannot see. */
@@ -700,6 +718,7 @@ export const TEMPLATES = [
   { uriTemplate: 'braindog:metric/{id}', name: 'metric', description: 'One figure, with its target and how it compares.' },
   { uriTemplate: 'braindog:skill/{name}', name: 'skill', description: 'The text of one skill, and when to reach for it.' },
   { uriTemplate: 'braindog:declaration/{slug}', name: 'declaration', description: 'One page as declared, to change and propose back.' },
+  { uriTemplate: 'braindog:automation/{id}', name: 'automation', description: 'One automation as declared, with its last ten runs, each step with its outcome.' },
 ] as const;
 
 /**
@@ -792,6 +811,14 @@ export function tools<C>(surface: McpSurface<C>) {
    */
   const change = (body: Record<string, unknown>): Record<string, unknown> =>
     body.declaration_id === undefined && isObject(body.to) && typeof body.to.id === 'string' ? { ...body, declaration_id: body.to.id } : body;
+
+  /** The rule body a change installs, or `null` for a change to anything else, an addition of fields among them. */
+  const ruleIn = (body: Record<string, unknown>): Record<string, unknown> | null => {
+    const to = body.to;
+    if (!isObject(to) || !isObject(to.body)) return null;
+    const id = typeof to.id === 'string' ? to.id : typeof body.declaration_id === 'string' ? body.declaration_id : '';
+    return to.kind === 'rule' || (to.kind === undefined && id.startsWith('rule.')) ? to.body : null;
+  };
 
   const run: Record<string, (args: Args, ctx: C) => Answer> = {
     /**
@@ -949,6 +976,13 @@ export function tools<C>(surface: McpSurface<C>) {
      * a tool for it could only ever refuse, and a tool that always refuses is a tool an agent spends
      * its turns discovering.
      */
+    /**
+     * AND A RULE CHANGE COMES BACK WITH ITS DRY RUN (`loop/research-shell-automations.md` §5). `dry_run` was taken off
+     * the tool list because only a person installed a rule; an agent now writes automations, so what one would do is
+     * said here, on the answer to the call that filed it, which costs the list nothing. It is the record's own `dryRun`,
+     * the one Decide reads, so the agent and the owner read one account of it. Asked after the filing, so a body the
+     * record refuses is refused in the record's words and never previewed.
+     */
     propose: async (args, ctx) => {
       const body = !isObject(args.body)
         ? args.body
@@ -957,7 +991,11 @@ export function tools<C>(surface: McpSurface<C>) {
           : args.body_kind === 'change'
             ? change(args.body)
             : args.body;
-      return surface.propose({ ...args, ...(body === undefined ? {} : { body }) } as never, ctx);
+      const filed = await surface.propose({ ...args, ...(body === undefined ? {} : { body }) } as never, ctx);
+      const rule = args.body_kind === 'change' && isObject(body) ? ruleIn(body) : null;
+      if (!filed.ok || rule === null || !surface.dryRun || !isObject(filed.value)) return filed;
+      const dry = await surface.dryRun({ rule }, ctx);
+      return { ok: true, value: { ...filed.value, dry_run: dry.ok ? dry.value : { refused: 'refusal' in dry ? dry.refusal : dry } } };
     },
 
     create: (args, ctx) =>
@@ -1036,6 +1074,16 @@ export function tools<C>(surface: McpSurface<C>) {
       const may = await surface.version(ctx);
       return may.ok ? { ok: true, value: SCRIPT_GRAMMAR } : may;
     }
+    /* THE AUTOMATION GRAMMAR IS THIS PACKAGE'S TOO, FOR THE SAME REASON (`automations.ts`), and asked of `version` the same
+       way, so every surface serves it. The list and one automation are the record's `automations`, one method for both. */
+    if (head === 'grammar' && rest === 'automations') {
+      const may = await surface.version(ctx);
+      return may.ok ? { ok: true, value: AUTOMATION_GRAMMAR } : may;
+    }
+    if ((head === 'automations' && !rest) || (head === 'automation' && NAMED.test(rest)))
+      return surface.automations
+        ? surface.automations(rest ? { rule: rest } : {}, ctx)
+        : unbuilt(uri, 'Read braindog:actions for what runs on a clock, or governance for the rule changes waiting on a person.');
     if (head === 'arrangement' || head === 'grammar' || head === 'declaration') {
       const arranged = surface.arrangement;
       if (!arranged) return unbuilt(uri, 'Read braindog:boot instead.');

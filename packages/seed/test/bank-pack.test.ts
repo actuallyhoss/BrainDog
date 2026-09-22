@@ -61,22 +61,24 @@ const hostFor = (k: Kernel): Host => ({
   claimed: (pack) => k.packClaims(pack),
 });
 
-const stateOf = (k: Kernel): Installed => ({
+/** `used` is what the record says it has put to work; absent, as from a caller that cannot say, the plan hands everything. */
+const stateOf = (k: Kernel, used?: readonly string[]): Installed => ({
   format: 1,
   primitives: 1,
   record_version: k.version(),
   packs: k.packs(),
   declarations: k.declarations() as Installed['declarations'],
   rows: k.census(),
+  ...(used === undefined ? {} : { used }),
 });
 
-async function planOf(k: Kernel, doc: unknown): Promise<{ pack: Pack; diff: Diff }> {
+async function planOf(k: Kernel, doc: unknown, used?: readonly string[]): Promise<{ pack: Pack; diff: Diff }> {
   const pack = value<Pack>(await normalise(doc, { kind: 'local' }));
-  return { pack, diff: await plan(pack, stateOf(k)) };
+  return { pack, diff: await plan(pack, stateOf(k, used)) };
 }
 
-async function put(k: Kernel, doc: unknown): Promise<Diff> {
-  const { pack, diff } = await planOf(k, doc);
+async function put(k: Kernel, doc: unknown, used?: readonly string[]): Promise<Diff> {
+  const { pack, diff } = await planOf(k, doc, used);
   value(await install(pack, diff, hostFor(k), diff.planHash));
   return diff;
 }
@@ -158,4 +160,90 @@ test('A RECORD ON 1.7.0 UPDATES WITHOUT A REFUSAL, then takes the pack, and ends
   );
   assert.equal(out.ingest, 'bank-from-out');
   sql.close();
+});
+
+/**
+ * WHICH OF THE TWELVE THE RECORD HAS PUT TO WORK, as the record would say it: every ingest that has filed an arrival
+ * (`ingest_receipt`), and whichever doors hold a token, which live in the record's own store and are named here.
+ */
+const usedOf = (sql: NodeSql, tokens: readonly string[] = []): string[] =>
+  [...new Set([...sql.all<{ ingest_id: string }>('SELECT DISTINCT ingest_id FROM ingest_receipt').map((r) => `ingest.${r.ingest_id}`), ...tokens])].sort();
+
+/**
+ * money-core 1.8.0 HANDED ALL TWELVE ON EVERY RECORD THAT UPDATED, used or not (`loop/research-batch-thirty-four-audit.md`
+ * §8). Measured by the audit's `hands.mts phantom`: after the update all twelve were live under `bank-hsbc-eg`, a pack
+ * the owner never installed, `packStates` listed it as on at version `null`, a token minted for one of its doors, and a
+ * fresh record on the same version had none of them. What the handover is for is a door somebody uses: a token his
+ * Shortcut already posts to, or a pattern that has filed his money. A door nobody used has nothing to keep.
+ */
+test('A RECORD THAT NEVER USED THE TWELVE RETIRES THEM ON THE UPDATE, and holds no pack it never chose', async () => {
+  const { k, sql } = await record();
+  for (const id of FIRST_PARTY) await put(k, id === 'money-core' ? v170() : firstPartyDocument(id));
+  assert.deepEqual(usedOf(sql), []);
+
+  const update = await put(k, firstPartyDocument('money-core'), usedOf(sql));
+  assert.deepEqual(update.retires.map((r) => [r.id, r.to]).sort(), HSBC.map((id) => [id, undefined]));
+  assert.equal(update.orphans, 0);
+  assert.deepEqual(k.declarations().filter((d) => HSBC.includes(d.id)), [], 'a door nobody used is still live');
+  assert.deepEqual(k.packStates().filter((s) => s.id === 'bank-hsbc-eg'), [], 'the record reports a pack nobody installed');
+
+  /* AND THE PACK STILL INSTALLS LATER, as twelve new doors rather than twelve taken over. */
+  const bank = await put(k, bankHsbcEgPack(), usedOf(sql));
+  assert.deepEqual(bank.conflicts, []);
+  assert.deepEqual(bank.adds.map((a) => [a.id, a.handed ?? false]).sort(), HSBC.map((id) => [id, false]));
+  sql.close();
+});
+
+test('A DOOR THE RECORD USES IS HANDED, AND ONLY THAT ONE: a pattern that filed a row, and a twin with a token', async () => {
+  const { k, sql } = await record();
+  for (const id of FIRST_PARTY) await put(k, id === 'money-core' ? v170() : firstPartyDocument(id));
+  /* THE ACCOUNT THE LINE NAMES, so the arrival files a row. Without it the line waits in review and has filed nothing. */
+  value(k.create('accounts', { name: 'Cairo credit card', kind: 'card', balance: { amount: 0, currency: 'EGP' }, as_of: '2026-08-01', liquid: false, last4: '6180' }, { actor: 'p_seed' }));
+  const out = value<{ ingest: string | null; state: string; reason?: string }>(
+    k.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example', Subject: 'HSBC' }, body: 'Your Credit Card ending with *** 6180 has been used for EGP 1,284.50 on 14/08/2026 at CEDAR LANE BAKERY. Your available limit is EGP 23,715.50', sha256: 'bank-pack-used-1' }),
+  );
+  assert.deepEqual([out.ingest, out.state], ['bank-card-used', 'matched'], out.reason);
+  const used = usedOf(sql, ['ingest.bank-ipn-in-sms']);
+  assert.deepEqual(used, ['ingest.bank-card-used', 'ingest.bank-ipn-in-sms']);
+
+  const update = await put(k, firstPartyDocument('money-core'), used);
+  assert.deepEqual(
+    update.retires.filter((r) => r.to !== undefined).map((r) => [r.id, r.to]),
+    used.map((id) => [id, 'bank-hsbc-eg']),
+  );
+  assert.equal(update.retires.filter((r) => r.to === undefined).length, 10);
+  assert.deepEqual(k.declarations().filter((d) => HSBC.includes(d.id)).map((d) => [d.id, d.pack_id]), used.map((id) => [id, 'bank-hsbc-eg']));
+
+  const bank = await put(k, bankHsbcEgPack(), usedOf(sql, ['ingest.bank-ipn-in-sms']));
+  assert.deepEqual(bank.conflicts, []);
+  assert.deepEqual(bank.adds.filter((a) => a.handed).map((a) => a.id).sort(), used);
+  assert.deepEqual([...new Set(k.declarations().filter((d) => HSBC.includes(d.id)).map((d) => d.pack_id))], ['bank-hsbc-eg']);
+  sql.close();
+});
+
+/**
+ * A HANDED LIST IS USED WHEN IT HAS ROWS, WHATEVER `used` NAMES, since `used` names doors and patterns and a list is put
+ * to work by what is written in it. The two tests above hand only ingests, so the plan's `rows > 0` could be taken out
+ * with every test in `declare` and `seed` still green, and a record whose `used` was empty then planned its gold as an
+ * orphan of the giver's update. Built on money-core because it is the pack with a list that can be handed.
+ */
+test('A HANDED LIST WITH ROWS IS HANDED THOUGH `used` NAMES NOTHING, and an empty one is retired', async () => {
+  const handing = (): Doc => {
+    const d = structuredClone(firstPartyDocument('money-core')) as unknown as Doc & { hands?: Record<string, string> };
+    d.version = '2.0.0';
+    d.declarations = d.declarations.filter((x) => x.register !== 'holdings');
+    d.hands = { ...(d.hands ?? {}), 'register.holdings': 'holdings-pack' };
+    return d;
+  };
+  for (const rows of [0, 1]) {
+    const { k, sql } = await record();
+    for (const id of FIRST_PARTY) await put(k, firstPartyDocument(id));
+    for (let i = 0; i < rows; i++)
+      value(k.create('holdings', { label: 'Gold', kind: 'gold', qty: 1, unit_cost: { amount: 480000, currency: 'EGP' } }, { actor: 'p_seed' }));
+    const { diff } = await planOf(k, handing(), []);
+    const retire = diff.retires.find((r) => r.id === 'register.holdings');
+    assert.deepEqual([retire?.rows, retire?.to], [rows, rows === 0 ? undefined : 'holdings-pack'], `${rows} rows`);
+    assert.equal(diff.orphans, 0, `${rows} rows`);
+    sql.close();
+  }
 });

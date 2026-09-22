@@ -91,6 +91,7 @@ import { arranger, carryUpdate, speakingNow, writeVoice, type CatalogueEntry } f
 import { useCases, type ExportArgs } from './usecase.ts';
 import { catalogueDrafts, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, noticeUsage, pageShowsAgents, readUsage, SPARK_OPEN_CAP, stableKey, type CatalogueOffer, type Offered, type SparkDraft, type SparkModel } from './spark.ts';
 import { grammarOf } from './grammar.ts';
+import { SAID_DEPTH, automation as oneAutomation, automations as listAutomations, nestedPast, pathOf as flowPath, said as saidOf, subjectOf as flowSubject } from './automations.ts';
 import { historyCursors, type HistoryCursors } from './history-cursor.ts';
 import { handleOf, isHandle, spokenOf } from './question-handles.ts';
 import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
@@ -98,6 +99,7 @@ import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, 
 export type { CatalogueEntry, FigureTest, Grows, RowIo } from './arrange.ts';
 export { formedRows, fromModel, growsDrafts, noticeUsage, readUsage, FORM_SAID_MOST, SPARK_OPEN_CAP, type CatalogueOffer, type FormField, type FormList, type FormSpec, type NextSpec, type Noticed, type SparkDraft, type SparkFormInput, type SparkModel, type SparkModelInput, type Usage } from './spark.ts';
 export type { ExportArgs, PlannedPack } from './usecase.ts';
+export type { Automation, AutomationRow, AutomationRun, Said as AutomationSaid } from './automations.ts';
 export { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 
 /**
@@ -1344,6 +1346,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        than refusing the whole update as somebody else's (`declare` `plan`). */
     detached: Object.fromEntries(kernel.detached().map((d) => [d.id, { was: d.was, body: d.body }])),
     nameOf: (ref) => kernel.titleOfRow(ref),
+    /* WHICH DOORS THIS RECORD HAS PUT TO WORK, so a pack's `hands` passes on only those (`declare` `plan`): every ingest
+       that has filed an arrival, and every webhook door holding a token. Without it money-core handed all twelve HSBC
+       Egypt doors on every record (`test/handover-used.test.ts`). */
+    used: [
+      ...new Set([
+        ...sql.all<{ ingest_id: string }>('SELECT DISTINCT ingest_id FROM ingest_receipt').map((r) => `ingest.${r.ingest_id}`),
+        ...kernel
+          .declarations()
+          .filter((d) => d.kind === 'ingest' && heldDigest(d.id.slice('ingest.'.length)) !== undefined)
+          .map((d) => d.id),
+      ]),
+    ],
   });
 
   /**
@@ -2071,7 +2085,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* AGAINST THE VERSION THE GATE NAMES, as `setDeclaration` has always installed. Without it the second of two
          changes drawn from one reading replaced the first whole, and `domain` went with a value still under it
          (`test/schema-add.test.ts`). A conflict reopens the question below, like any install that will not land. */
-      put = await kernel.install([decl as never], decided.expect, { actor, suggestion: decided.suggestion });
+      put = await kernel.install([decl as never], decided.expects ?? decided.expect, { actor, suggestion: decided.suggestion });
     } catch (thrown) {
       if (!(thrown instanceof TypeError)) {
         kernel.reopen(decided.suggestion);
@@ -2088,7 +2102,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const why =
         'refusal' in put
           ? put.refusal.fix
-          : `${String(decl.id)} changed after this was proposed and is at version ${String(put.conflict.version)} now. Propose it again against the list as it is.`;
+          : `${String((put.conflict.current as { id?: string } | null)?.id ?? decl.id)} changed after this was proposed and is at version ${String(put.conflict.version)} now. Propose it again against the list as it is.`;
       kernel.reopen(decided.suggestion, why);
     }
     return put;
@@ -3226,12 +3240,27 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * the register cannot preview a rule against it. Nothing in it calls the write path — which is
      * what makes it safe to hand to whoever is writing the rule rather than only to an owner.
      */
-    async dryRun(args: { rule: RuleDecl; limit?: number }, ctx: CallContext) {
-      const stop = guard(ctx, 'read', args?.rule?.register);
+    /* AND A BODY THAT RUNS AS A RUN IS SAID, NOT WALKED (`automations.ts` `said`). Every body with steps was refused here
+       as "A rule names a register and what it would then do", so an agent writing an automation, and the owner reading
+       it on Decide, had no account of it at all. An inline body keeps the kernel's walk over its rows, with the two
+       sentences beside it, so both paths answer `path`, `trigger` and `steps`. */
+    async dryRun(args: { rule: RuleDecl | Record<string, unknown>; limit?: number }, ctx: CallContext) {
+      const body = args?.rule as Record<string, unknown> | undefined;
+      const subject = body !== null && typeof body === 'object' && !Array.isArray(body) ? flowSubject(body) : null;
+      const stop = guard(ctx, 'read', subject ?? undefined);
       if (stop) return { ok: false as const, refusal: stop };
-      if (!args?.rule?.register || !Array.isArray(args.rule.then))
+      if (body === null || typeof body !== 'object' || Array.isArray(body))
         return no('VALUE_MALFORMED', 'A rule names a register and what it would then do.', { at: 'rule' });
-      return kernel.dryRun(args.rule, args.limit);
+      if (nestedPast(body.steps ?? body.then))
+        return no('OUT_OF_BOUNDS', `This nests a branch more than ${SAID_DEPTH} deep, and 3 is the most a rule may. Lift the inner branch into its own step.`, { at: 'rule.steps' });
+      if (flowPath(body) === 'run') {
+        if (!Array.isArray(body.steps ?? body.then)) return no('REQUIRED_MISSING', 'An automation says what starts it and the steps it then takes.', { at: 'rule.steps' });
+        return ok(saidOf(body));
+      }
+      if (!body.register || !Array.isArray(body.then))
+        return no('VALUE_MALFORMED', 'A rule names a register and what it would then do.', { at: 'rule' });
+      const rows = kernel.dryRun(body as RuleDecl, args.limit);
+      return rows.ok ? ok({ ...rows.value, ...saidOf(body) }) : rows;
     },
 
     /**
@@ -3906,6 +3935,60 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const stop = guard(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       return ok(kernel.actions());
+    },
+
+    /**
+     * Every automation, or one with its last ten runs and each step's outcome (`loop/research-shell-automations.md` §5).
+     * READ+, and what the canvas and `braindog:automation/<id>` both draw from.
+     *
+     * HELD TO WHAT THE CALLER MAY READ, ONE AUTOMATION AT A TIME. A rule about a list is shown to whoever may read that
+     * list, because its body names the list's fields and its runs carry what its steps wrote. A rule with no row, a
+     * clock, a button or an arrival, may write to any list, so it is shown to a caller who reads every one. One out of
+     * reach is left out of the list and named as missing when asked for, as `views` leaves out a list the caller cannot
+     * see: which automations exist is itself something a caller may not know.
+     */
+    async automations(args: { rule?: string } | undefined, ctx: CallContext) {
+      const stop = scoped(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['rule']);
+      if (extra) return { ok: false as const, refusal: extra };
+      const sees = (register: string | null): boolean => (register === null ? readsEveryList(ctx) : readable(ctx, register) === null);
+      const named = args?.rule;
+      if (named === undefined) return ok(listAutomations(sql, clock.now()).filter((a) => sees(a.register)));
+      if (typeof named !== 'string' || named === '') return no('VALUE_MALFORMED', 'An automation is named by its id, such as chase or rule.chase.', { at: 'rule' });
+      const found = oneAutomation(sql, named, clock.now());
+      if (found === null || !sees(found.register)) {
+        const id = named.startsWith('rule.') ? named : `rule.${named}`;
+        return no('DECLARATION_UNKNOWN', `There is no automation called ${id}${id.endsWith('.') ? '' : '.'}`, { at: 'rule' });
+      }
+      return ok(found);
+    },
+
+    /**
+     * Run an automation now: the canvas's Run now, and the `manual` trigger's only door.
+     *
+     * AN OWNER'S, IN A BROWSER, AS `installPack` IS. A run writes rows as the rule, notifies and, once Brief C lands,
+     * calls out, so pressing it is a decision a person makes. An agent that wants one run proposes the rule and waits for
+     * the owner, or writes the row a write trigger listens for. Which rules have a button is the kernel's to say: only
+     * one that declares `on: { manual: true }`.
+     */
+    async automationRun(args: { rule: string }, ctx: CallContext) {
+      const stop = admin(ctx, 'start an automation');
+      if (stop) return { ok: false as const, refusal: stop };
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['rule']);
+      if (extra) return { ok: false as const, refusal: extra };
+      if (typeof args?.rule !== 'string' || !args.rule) return no('REQUIRED_MISSING', 'Which automation? Name it by its id, such as chase.', { at: 'rule' });
+      return tail(kernel.automationRun(args.rule, actorOf(ctx)));
+    },
+
+    /** Stop a run that has not finished. Its wake goes with it, so a run cancelled while it waits never resumes. ADMIN. */
+    async cancelRun(args: { run: string }, ctx: CallContext) {
+      const stop = admin(ctx, 'stop a run');
+      if (stop) return { ok: false as const, refusal: stop };
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['run']);
+      if (extra) return { ok: false as const, refusal: extra };
+      if (typeof args?.run !== 'string' || !args.run) return no('REQUIRED_MISSING', 'Which run? Its id is on the automation, under runs.', { at: 'run' });
+      return tail(kernel.cancelRun(args.run, actorOf(ctx)));
     },
 
     /**

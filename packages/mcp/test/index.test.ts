@@ -160,6 +160,7 @@ test('AND THE RESOURCES GO THE SAME WAY, more quietly, which is the half of this
     'braindog:context',
     'braindog:sessions/live',
     'braindog:actions',
+    'braindog:automations',
     'braindog:arrangement',
     'braindog:grammar/page',
     'braindog:grammar/proposals',

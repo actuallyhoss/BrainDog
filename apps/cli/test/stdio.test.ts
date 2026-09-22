@@ -279,6 +279,7 @@ const ANSWERS: Record<string, unknown> = {
   sessionsLive: { runs: [] },
   digestToday: { lines: [] },
   actions: [],
+  automations: [],
   arrangement: { packs: [] },
   pages: [],
 };

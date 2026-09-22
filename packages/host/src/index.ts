@@ -165,6 +165,10 @@ export const ROUTES: readonly Route[] = [
   { name: 'exportUseCase', group: 'READ+', writes: false, what: "This BrainDog's arrangement as a use-case file: modules, its own lists and pages, voice and labels, and only the example rows named.",
     takes: { usecase: 'text', title: 'text', summary: 'text', version: 'text', audience: 'text', author: 'text', examples: 'json', step: 'text', nav: 'json', signals: 'json', skills: 'json' } },
   { name: 'actions', group: 'READ+', writes: false, what: "Every scheduled action: what it calls, how often, whether it is paused and why, and this month's runs." },
+  /* THE AUTOMATIONS, READ BY THE CANVAS AND BY AN AGENT THROUGH ONE METHOD (`loop/research-shell-automations.md` §5). With
+     no `rule` it is the list; with one it is that automation with its last ten runs, each step's outcome beside it. */
+  { name: 'automations', group: 'READ+', writes: false, what: 'Every automation: what starts it, when it runs next and how its runs went; or one, with its last ten runs step by step.',
+    takes: { rule: 'text' } },
   { name: 'planPack', group: 'ADMIN', writes: false, what: 'What installing a pack would do to this record. It writes nothing.',
     takes: { doc: 'json', source: 'json' } },
   { name: 'spark', group: 'ADMIN', writes: false, what: 'What Spark noticed about how this BrainDog is used, and the arrangement proposals it would file. It writes nothing.' },
@@ -182,6 +186,10 @@ export const ROUTES: readonly Route[] = [
   { name: 'enablePack', group: 'ADMIN', writes: true, what: 'Turn a pack back on, over the rows it kept.' },
   { name: 'resumeAction', group: 'ADMIN', writes: true, what: 'Start a paused scheduled action again, now. A refused key pauses one, and nothing else restarts it.' },
   { name: 'resumeScript', group: 'ADMIN', writes: true, what: 'Start a script paused by three refused runs in a row again, now. Nothing else restarts it, and three more refused runs pause it again.' },
+  /* A BROWSER SESSION ONLY, as `installPack` is: a run writes rows as the rule and notifies, so pressing Run now is a
+     person's decision, and an agent's way to one is `propose`. */
+  { name: 'automationRun', group: 'ADMIN', writes: true, what: 'Run an automation now, one that declares a Run now button. A browser session only.' },
+  { name: 'cancelRun', group: 'ADMIN', writes: true, what: 'Stop a run that has not finished. A run stopped while it waits never resumes.' },
   { name: 'fileArrival', group: 'ADMIN', writes: true, what: 'File one arrival from the inbox as a row in a list. The row is written like any other, and the arrival leaves the inbox.' },
   { name: 'archiveArrival', group: 'ADMIN', writes: true, what: 'Take one arrival out of the inbox without filing it. Its bytes are kept, and asking twice is the same answer.' },
   { name: 'setPackConfig', group: 'ADMIN', writes: true, what: "Change a pack's settings. They are read the next time the pack is planned and installed." },
@@ -426,6 +434,9 @@ export type RecordSurface = {
   sparkDaily(args: never, ctx: never): Promise<Result<unknown>>;
   sparkForm(args: never, ctx: never): Promise<Result<unknown>>;
   actions(ctx: never): Promise<Result<unknown>>;
+  automations(args: never, ctx: never): Promise<Result<unknown>>;
+  automationRun(args: never, ctx: never): Promise<Result<unknown>>;
+  cancelRun(args: never, ctx: never): Promise<Result<unknown>>;
   setPackConfig(args: never, ctx: never): Promise<Result<unknown>>;
   setDeclaration(args: never, ctx: never): Promise<Result<unknown>>;
   retireDeclaration(args: never, ctx: never): Promise<Result<unknown>>;
@@ -515,6 +526,9 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     sparkDaily: (a, ctx) => api.sparkDaily(a as never, ctx as never),
     sparkForm: (a, ctx) => api.sparkForm(a as never, ctx as never),
     actions: (_a, ctx) => api.actions(ctx as never),
+    automations: (a, ctx) => api.automations(a as never, ctx as never),
+    automationRun: (a, ctx) => api.automationRun(a as never, ctx as never),
+    cancelRun: (a, ctx) => api.cancelRun(a as never, ctx as never),
     setPackConfig: (a, ctx) => api.setPackConfig(a as never, ctx as never),
     setDeclaration: (a, ctx) => api.setDeclaration(a as never, ctx as never),
     retireDeclaration: (a, ctx) => api.retireDeclaration(a as never, ctx as never),

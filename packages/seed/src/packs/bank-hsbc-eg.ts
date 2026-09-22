@@ -349,6 +349,12 @@ export const HSBC_EG_SMS_INGESTS: Record<string, SmsIngest> = smsTwins(HSBC_EG_I
  * install stages them under this pack's name instead of retiring them, so the declarations never stop being live,
  * the digest's version walk sees no retire, and installing this pack afterwards takes over what is already its own.
  *
+ * BUT ONLY THE ONES THE RECORD USES. Handed on every record, a record that had never seen an Egyptian bank kept twelve
+ * live patterns under this pack's name and reported the pack as on, installed by nobody
+ * (`loop/research-batch-thirty-four-audit.md` §8). The plan hands a door that holds a token or has filed a row, which
+ * the record says in `Installed.used`, and retires the rest (`test/bank-pack.test.ts`). A record that does not fill
+ * `used` yet gets all twelve handed, as before.
+ *
  * HERE AND NOT IN money-core's FILE, because the ids are this pack's keys, and a list written out twice drifts.
  */
 export const MONEY_CORE_HANDS: Readonly<Record<string, string>> = Object.fromEntries(

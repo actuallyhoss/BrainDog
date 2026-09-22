@@ -83,7 +83,10 @@ test('A TOKEN MINTED ON 1.7.0 OPENS THE DOOR AFTER THE UPDATE AND AFTER THE PACK
   assert.deepEqual(update.conflicts, []);
   assert.equal(update.orphans, 0);
   assert.deepEqual(update.retires.map((r) => r.id).sort(), HSBC);
-  for (const r of update.retires) assert.equal(r.to, 'bank-hsbc-eg', `${r.id} retires without saying where it goes`);
+  /* ONLY THE DOOR WITH A TOKEN IS HANDED: the record names what it uses (`installedState`'s `used`), and the other eleven,
+     which nothing here used, retire and come back fresh with the pack. */
+  for (const r of update.retires)
+    assert.equal(r.to, r.id === 'ingest.bank-from-out-sms' ? 'bank-hsbc-eg' : undefined, `${r.id} retires to the wrong place`);
 
   const bank = await put(api, bankHsbcEgPack());
   assert.deepEqual(bank.conflicts, []);

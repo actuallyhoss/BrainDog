@@ -3793,7 +3793,7 @@ export async function installDeclarations(
   now: number,
   batch: readonly Declaration[],
   transaction: <T>(fn: () => T) => T,
-  expect?: Expected,
+  expect?: Expected | Expected[],
 ): Promise<Result<Installed[]>> {
   const off = disabledPackFault(sql, batch);
   if (off) return { ok: false, refusal: off };
@@ -3877,7 +3877,7 @@ export async function stageDeclarations(
   batch: readonly Declaration[],
   known?: Known,
   owners?: Owners,
-): Promise<Result<(sql: Sql, now: number, transaction: <T>(fn: () => T) => T, expect?: Expected) => Result<Installed[]>>> {
+): Promise<Result<(sql: Sql, now: number, transaction: <T>(fn: () => T) => T, expect?: Expected | Expected[]) => Result<Installed[]>>> {
   for (const decl of batch) {
     const wrong = validate(decl, known, owners);
     if (wrong) return { ok: false, refusal: wrong };
@@ -3892,7 +3892,7 @@ function applyDeclarations(
   batch: readonly Declaration[],
   sums: readonly string[],
   transaction: <T>(fn: () => T) => T,
-  expect?: Expected,
+  expect?: Expected | Expected[],
 ): Result<Installed[]> {
   const at = instant(now);
 
@@ -3910,13 +3910,15 @@ function applyDeclarations(
 
     /* ASKED INSIDE THE TRANSACTION THAT WRITES, so a second write read at the same version cannot pass the check while
        the first is still hashing. A retired declaration is not live, so it reads as 0. */
-    if (expect) {
+    /* EVERY MEMBER OF A BUNDLE, not only the one it is filed under: `decide` asks them all, but an install can land
+       between it and this transaction while this one hashes. */
+    for (const want of expect === undefined ? [] : Array.isArray(expect) ? expect : [expect]) {
       const held = sql.one<{ version: number; body: string; pack_id: string | null }>(
         'SELECT version, body, pack_id FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1',
-        expect.id,
+        want.id,
       );
-      if ((held?.version ?? 0) !== expect.version)
-        return clash<Installed[]>(held?.version ?? 0, held ? { id: expect.id, body: JSON.parse(held.body) } : null, held?.pack_id ?? 'in-app');
+      if ((held?.version ?? 0) !== want.version)
+        return clash<Installed[]>(held?.version ?? 0, held ? { id: want.id, body: JSON.parse(held.body) } : null, held?.pack_id ?? 'in-app');
     }
 
     for (const [i, decl] of batch.entries()) {

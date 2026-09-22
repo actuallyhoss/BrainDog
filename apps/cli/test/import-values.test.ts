@@ -232,6 +232,50 @@ test('A DRY RUN proposes nothing and says what it would propose', async () => {
   sql.close();
 });
 
+/**
+ * A WORD THE OLD MAPPING TRANSLATED ON PURPOSE IS STILL TRANSLATED, AND ONLY A WORD IT HAD NO ANSWER FOR IS PROPOSED.
+ *
+ * The first cut of the proposal compared the export's word with the fallback and proposed any difference, so the
+ * translations the importer had always made became questions: `dns` proposed `dns` beside the `domain` it already
+ * meant, `account` proposed `account` beside `saas`, and a service with no kind at all proposed `other`, a word that
+ * says nothing to a closed list. On the owner's own token each of those lands at once, so a Services list would have
+ * grown three values that name what it already holds. Measured on this export before the repair: all five services
+ * below planned a proposal, where only the registrar should.
+ */
+test('A DELIBERATE TRANSLATION IS NOT PROPOSED: dns is a domain, account is saas, and no kind is the fallback', async () => {
+  const exp = exportOf();
+  exp.services = [
+    { id: 'dns-1', name: 'DNS zone', kind: 'dns' },
+    { id: 'acc-1', name: 'Billing account', kind: 'Account' },
+    { id: 'none-1', name: 'Something unnamed' },
+    { id: 'oth-1', name: 'Something else', kind: 'other' },
+    { id: 'reg-1', name: 'Registrar account', kind: 'registrar' },
+  ];
+  const p = planLegacyTool(exp, TODAY);
+  const planned = Object.fromEntries(
+    p.rows.filter((r) => r.key.startsWith(`${KEY_PREFIX}service:`)).map((r) => [r.key.slice(`${KEY_PREFIX}service:`.length), [r.fields.kind, r.own ?? null]]),
+  );
+  assert.deepEqual(planned, {
+    'dns-1': ['domain', null],
+    'acc-1': ['saas', null],
+    'none-1': ['saas', null],
+    'oth-1': ['saas', null],
+    'reg-1': ['hosting', { kind: 'registrar' }],
+  });
+
+  /* AND THE RECORD IS ASKED FOR THE ONE WORD, filed in person so nothing lands by rule and every question stays visible. */
+  const { sql, api, changes } = await record();
+  const report = await applyPlan(p, doorOf(api, owner), { dryRun: false });
+  assert.deepEqual(report.refused, []);
+  assert.deepEqual(
+    changes()
+      .filter((c) => c.body.declaration_id === 'register.services')
+      .map((c) => c.body.to.add.values),
+    [{ kind: ['registrar'] }],
+  );
+  sql.close();
+});
+
 /* ── the domains paragraph ─────────────────────────────────────────────── */
 
 const noteOf = (p: Plan): string => String(p.rows.find((r) => r.key === `${KEY_PREFIX}project:fern`)!.fields.note ?? '');

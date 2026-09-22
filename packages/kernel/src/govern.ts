@@ -20,7 +20,7 @@
  */
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
-import { no, ok } from '@braindog/ports';
+import { clash, no, ok } from '@braindog/ports';
 
 import { keyNamed, runnerCannotOpen, type Egress } from './actions.ts';
 import { instant } from './migrate.ts';
@@ -323,15 +323,40 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
        other change's fields (`loop/research-batch-thirty-two-audit.md` section 2, `record/test/change-drawn.test.ts`).
        So the proposer's version is kept when it names one that has been live, and the live one stands in when it is
        absent. One ABOVE the live version is a guess at what will be live when the owner presses, which is the race B1
-       closed, so it is the live one too. An `add` needs none: it is merged onto whatever is live at the press. */
+       closed, so it is the live one too. An `add` needs none: it is merged onto whatever is live at the press.
+
+       AND EVERY MEMBER OF A BUNDLE GETS ONE, stored as `{ "<id>": n }`. Stamped for `declaration_id` alone, the rest of
+       `{ declarations: [...] }` installed with no version at all: a change filed under a metric carrying Projects as read
+       at v1 erased the `domain` another change had added at v2, and one filed under Projects at its live version carried a
+       stale metric over somebody else's edit to it (`loop/research-batch-thirty-four-audit.md` finding 2,
+       `govern-bundle-version.test.ts`). The proposer may send the map, and a plain number still means the member the
+       change is filed under; every member it says nothing about is stamped live, as an absent number is. */
     if (!isAdd(body.to)) {
-      const live = liveVersion(deps.sql, String(body.declaration_id));
-      if (theirVersion !== undefined && theirVersion !== null && !(Number.isInteger(theirVersion) && (theirVersion as number) >= 0))
-        return no<{ id: string }>('VALUE_MALFORMED', `from_version is the version of ${String(body.declaration_id)} you read before writing this body, a whole number, or leave it out.`, {
+      const named = String(body.declaration_id);
+      const members = membersOf(body.to);
+      const stamp = (id: string, theirs: unknown): number => {
+        const live = liveVersion(deps.sql, id);
+        return typeof theirs === 'number' && theirs <= live ? theirs : live;
+      };
+      const given: Record<string, unknown> = members !== null && isMap(theirVersion) ? theirVersion : { [named]: theirVersion };
+      const unknown = Object.keys(given).find((id) => members !== null && !members.includes(id));
+      if (unknown !== undefined)
+        return no<{ id: string }>('VALUE_MALFORMED', `from_version names ${unknown}, and this change does not install it (${(members ?? []).join(', ')}).`, {
           at: 'body.from_version',
         });
-      const drawn = typeof theirVersion === 'number' && theirVersion <= live ? theirVersion : live;
-      body = { ...body, from_version: drawn };
+      const wrong = Object.keys(given).find((id) => !isDrawn(given[id]));
+      if (wrong !== undefined)
+        return no<{ id: string }>(
+          'VALUE_MALFORMED',
+          members === null
+            ? `from_version is the version of ${named} you read before writing this body, a whole number, or leave it out.`
+            : `from_version is the version of each declaration this installs as you read it, {"${named}":1}, a whole number for each, or leave it out.`,
+          { at: 'body.from_version' },
+        );
+      body = {
+        ...body,
+        from_version: members === null ? stamp(named, given[named]) : Object.fromEntries(members.map((id) => [id, stamp(id, given[id])])),
+      };
     }
     const to = resolveTo(deps.sql, body);
     if (deps.review && to.ok) {
@@ -463,12 +488,36 @@ function shapeFault(to: unknown): Refusal | null {
 /** Whether a change's `to` is a field-level addition, `{ add: {...} }`, rather than a whole declaration. */
 const isAdd = (to: unknown): to is { add: unknown } => isMap(to) && 'add' in to;
 
+/** The ids a bundle installs, in its order, or `null` when `to` is one declaration. */
+const membersOf = (to: unknown): string[] | null => {
+  const listed = (to as { declarations?: unknown } | null)?.declarations;
+  return Array.isArray(listed) ? [...new Set(listed.map((d) => String((d as { id?: unknown } | null)?.id)))] : null;
+};
+
+/** Whether a proposer's `from_version` for one declaration is a version, or says nothing. */
+const isDrawn = (x: unknown): boolean => x === undefined || x === null || (Number.isInteger(x) && (x as number) >= 0);
+
 /** The version of `id` live now, and 0 when none is, which is how `install`'s `expect` spells "drawn from nothing". */
 function liveVersion(sql: Sql, id: string): number {
   return sql.one<{ version: number }>(
     'SELECT version FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1',
     id,
   )?.version ?? 0;
+}
+
+/**
+ * The conflict `install`'s `expect` would answer for `id`, if it is no longer at `version`, and `null` while it is.
+ *
+ * THE SAME ANSWER IN THE SAME SHAPE, the row as it stands and the pack that owns it, so a bundle member that moved reads
+ * exactly as the declaration it was filed under does when that one moved, and the caller recovers both the same way.
+ */
+function movedFrom<T>(sql: Sql, id: string, version: number): Result<T> | null {
+  const held = sql.one<{ version: number; body: string; pack_id: string | null }>(
+    'SELECT version, body, pack_id FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1',
+    id,
+  );
+  if ((held?.version ?? 0) === version) return null;
+  return clash<T>(held?.version ?? 0, held ? { id, body: parse(held.body) } : null, held?.pack_id ?? 'in-app');
 }
 
 /**
@@ -1143,6 +1192,12 @@ export type Decided = {
    */
   expect?: { id: string; version: number };
   /**
+   * Every member of an accepted bundle with the version it was drawn from, `expect` among them. `decide` has already
+   * found each at its version; this is for a caller whose install can ask them all again in the transaction that writes,
+   * which `install`'s single `expect` cannot yet.
+   */
+  expects?: { id: string; version: number }[];
+  /**
    * An accepted `pack`, `settings` or `arrange`, for the caller to apply. Installing a pack is asynchronous,
    * like a `change`, so the gate hands the body back, and the caller reopens the question if it will not land.
    */
@@ -1288,6 +1343,7 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
   const wrote: string[] = [];
   let install: Record<string, unknown> | undefined;
   let expect: Decided['expect'];
+  let expects: Decided['expects'];
   let apply: Decided['apply'];
 
   if (option === 'accept') {
@@ -1328,7 +1384,22 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
         /* A WHOLE BODY IS HELD TO THE VERSION IT WAS FILED AGAINST. A change filed before the stamp existed carries none,
            and is installed as it always was rather than refused for a number nobody wrote. */
         const from = resolved.value.version ?? body.from_version;
-        if (typeof from === 'number') expect = { id: String(isAdd(body.to) ? install.id : body.declaration_id), version: from };
+        const named = String(isAdd(body.to) ? install.id : body.declaration_id);
+        if (typeof from === 'number') expect = { id: named, version: from };
+        /* A BUNDLE IS HELD MEMBER BY MEMBER, and every member but the named one is asked HERE, at the press. `install`
+           takes one `expect`, so handed only that, the rest of the bundle installed over whatever had moved them
+           (`govern-bundle-version.test.ts`). The named one is still asked by `install`, inside the transaction that
+           writes, so a single change reads exactly as it did and `record`'s reopen still carries its sentence. A bundle
+           filed before the map carries a number, and its other members install as they always did. */
+        if (isMap(from)) {
+          expects = Object.entries(from).flatMap(([id, version]) => (typeof version === 'number' ? [{ id, version }] : []));
+          expect = expects.find((e) => e.id === named);
+          for (const e of expects) {
+            if (e.id === named) continue;
+            const moved = movedFrom<Decided>(deps.sql, e.id, e.version);
+            if (moved) return moved;
+          }
+        }
       }
       /* EVERY KEY IT SENDS IS IN THE VAULT BEFORE ANYTHING IS ARMED. Accepting a call whose key is missing would arm
          it and pause it on its first run, which reads as approved and does nothing. Nothing is written until all are there. */
@@ -1396,6 +1467,7 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
     wrote,
     ...(install === undefined ? {} : { install }),
     ...(expect === undefined ? {} : { expect }),
+    ...(expects === undefined ? {} : { expects }),
     ...(apply === undefined ? {} : { apply }),
   });
 }

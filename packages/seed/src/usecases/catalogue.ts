@@ -67,14 +67,22 @@ const NEXT: Readonly<Record<string, NonNullable<SeedCatalogueEntry['next']>>> = 
 
 const today = (): string => new Date().toISOString().slice(0, 10);
 
-/** The first-party packs that must be in before a pack needing `requires`, every one they need too, in install order. */
-function before(requires: readonly string[]): string[] {
+/**
+ * The first-party packs that must be in before a pack needing `requires`, every one they need too, in install order.
+ *
+ * AGENTS IS ASKED ITS OWN MANIFEST. `FIRST_PARTY_LISTS` answers `agents` for `skills`, `credentials`, `learnings` and
+ * `tools`, and `firstPartyManifest` knows only the five modules split from the starter, so the cast below used to hand
+ * it `agents` and it threw `Cannot read properties of undefined (reading 'declarations')`
+ * (`test/catalogue-before.test.ts`). Nothing pointed at an agents list yet, which is all that kept the catalogue up.
+ */
+export function before(requires: readonly string[]): string[] {
   const wanted = new Set<string>();
   const visit = (register: string) => {
     const pack = FIRST_PARTY_LISTS.get(register.replace(/^register\./u, ''));
     if (!pack || wanted.has(pack)) return;
     wanted.add(pack);
-    for (const r of firstPartyManifest(pack as FirstPartyId).requires) visit(r);
+    const needs = pack === 'agents' ? AGENTS_PACK.manifest.requires : firstPartyManifest(pack as FirstPartyId).requires;
+    for (const r of needs) visit(r);
   };
   for (const r of requires) visit(r);
   return MODULE_ORDER.filter((id) => wanted.has(id));

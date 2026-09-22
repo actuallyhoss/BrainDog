@@ -1,0 +1,70 @@
+/**
+ * The record says which doors it has put to work, so money-core's update hands on only those
+ * (`loop/research-batch-thirty-four-audit.md` §8, the record's half).
+ *
+ * `plan` learned to hand a `hands` entry only when the record uses it (`Installed.used`), and a caller that says nothing
+ * gets everything handed as before. The record said nothing, so on every real record money-core 1.8.0 still handed all
+ * twelve HSBC Egypt doors to `bank-hsbc-eg`, a pack the owner never chose. `installedState` now names every ingest that
+ * has filed an arrival (`ingest_receipt`) and every webhook door that holds a token (`heldDigest`).
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { createRecordApi, type CallContext } from '../src/index.ts';
+import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
+import { FIRST_PARTY, NOW, firstPartyDocument } from '../../seed/src/index.ts';
+import { HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS } from '../../seed/src/packs/bank-hsbc-eg.ts';
+
+const owner: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 'owner' } };
+
+type Body = Record<string, unknown>;
+type Doc = { pack: string; version: string; declarations: Body[] };
+type Retire = { id: string; to?: string };
+
+const value = <T>(r: unknown): T => {
+  const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string; at?: string } };
+  assert.ok(x.ok, x.ok ? '' : `${x.refusal?.code} at ${x.refusal?.at}: ${x.refusal?.fix}`);
+  return x.value;
+};
+
+const HSBC = [...Object.values(HSBC_EG_INGESTS), ...Object.values(HSBC_EG_SMS_INGESTS)].map((i) => `ingest.${(i as { ingest: string }).ingest}`);
+
+/** money-core as 1.7.0 shipped it, the twelve its own, as `seed/test/bank-pack.test.ts` builds it. */
+const v170 = (): Doc => {
+  const d = structuredClone(firstPartyDocument('money-core')) as unknown as Doc;
+  d.version = '1.7.0';
+  delete (d as { hands?: unknown }).hands;
+  const hsbc = [...Object.values(HSBC_EG_INGESTS), ...Object.values(HSBC_EG_SMS_INGESTS)].map((i) => ({ ...structuredClone(i), pack: 'money-core' }));
+  d.declarations = [...d.declarations.filter((x) => !HSBC.includes(`ingest.${String(x.ingest)}`)), ...(hsbc as unknown as Body[])];
+  return d;
+};
+
+test('THE RECORD NAMES WHAT IT USES, SO THE UPDATE HANDS A DOOR THAT FILED A ROW AND A DOOR WITH A TOKEN, and retires the other ten', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  type Planned = { diff: { planHash: string; approve?: string[]; retires: Retire[] } };
+  const put = async (doc: unknown) => {
+    const { diff } = value<Planned>(await api.planPack({ doc }, owner));
+    value(await api.installPack({ doc, planHash: diff.planHash, approve: diff.approve } as never, owner));
+  };
+  for (const id of FIRST_PARTY) await put(id === 'money-core' ? v170() : firstPartyDocument(id));
+
+  /* A PATTERN THAT FILED A ROW: the account the line names, so the arrival files one rather than waiting in review. */
+  value(api.kernel.create('accounts', { name: 'Cairo credit card', kind: 'card', balance: { amount: 0, currency: 'EGP' }, as_of: '2026-08-01', liquid: false, last4: '6180' }, { actor: 'p_seed' }));
+  const out = value<{ ingest: string | null; state: string; reason?: string }>(
+    api.kernel.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example', Subject: 'HSBC' }, body: 'Your Credit Card ending with *** 6180 has been used for EGP 1,284.50 on 14/08/2026 at CEDAR LANE BAKERY. Your available limit is EGP 23,715.50', sha256: 'handover-used-1' }),
+  );
+  assert.deepEqual([out.ingest, out.state], ['bank-card-used', 'matched'], out.reason);
+  /* AND A DOOR HIS SHORTCUT POSTS TO: a webhook twin with a token minted for it. */
+  value(await api.ingestMint({ ingest: 'bank-ipn-in-sms' }, owner));
+
+  const { diff } = value<Planned>(await api.planPack({ doc: firstPartyDocument('money-core') }, owner));
+  const hsbc = diff.retires.filter((r) => HSBC.includes(r.id));
+  assert.deepEqual(hsbc.filter((r) => r.to !== undefined).map((r) => [r.id, r.to]).sort(), [
+    ['ingest.bank-card-used', 'bank-hsbc-eg'],
+    ['ingest.bank-ipn-in-sms', 'bank-hsbc-eg'],
+  ]);
+  assert.equal(hsbc.filter((r) => r.to === undefined).length, 10, 'a door nobody used was handed');
+  sql.close();
+});
