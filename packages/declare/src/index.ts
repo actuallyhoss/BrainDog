@@ -157,8 +157,26 @@ export type Diff = {
    * `field` IS ONE FIELD OF THE LIST `reads` NAMES that this version takes off, or gives another type when `retyped` is
    * there, and the owner's declaration reads it. The list itself stays, so `reads` alone would say it was gone. The two
    * types travel in `retyped` because `conflictFault` sees only the conflicts, and its sentence names both.
+   *
+   * `relabelled` IS A LABEL THE UPDATE CHANGES on a field the owner's `where` names by that label, and `value` an enum
+   * value the update takes out of a field the owner's declaration asks for or writes. Both leave the field on the list,
+   * and both fail at read time all the same, because `parseWhere` matches a label and a value when the sentence is read.
+   *
+   * `by` IS THE MIRROR: `id` is a list the owner changed and kept, and `by` is a declaration this version stages that
+   * reads `field` as the pack's list has it and the owner's does not (taken off, `retyped`, `relabelled`, or without
+   * `value`). The audit of batch twenty measured it on `fx.source`: a plan with no conflicts, then `FIELD_UNKNOWN`.
    */
-  conflicts: { id: string; pack: string; reads?: string; field?: string; retyped?: { from: string; to: string }; changed?: true }[];
+  conflicts: {
+    id: string;
+    pack: string;
+    reads?: string;
+    field?: string;
+    retyped?: { from: string; to: string };
+    relabelled?: { from: string; to: string };
+    value?: string;
+    by?: string;
+    changed?: true;
+  }[];
   /**
    * The pack's own declarations somebody changed in the app, which this install leaves as they are and does not stage.
    *
@@ -961,7 +979,36 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
     for (const [list, { fields, moved: these }] of moved) {
       const hit = readsField(body, list, fields, these);
       if (hit === undefined) continue;
-      conflicts.push({ id, pack: OWN, reads: list, field: hit.field, ...(hit.retyped === undefined ? {} : { retyped: hit.retyped }) });
+      conflicts.push({ id, pack: OWN, reads: list, ...hit });
+      break;
+    }
+  }
+
+  /* AND THE MIRROR: A LIST THE OWNER CHANGED AND THIS VERSION KEEPS, read by something this version stages. The loop above
+     asks the owner's declarations about the pack's lists and never the pack's declarations about the owner's list. The
+     audit of batch twenty measured the gap on a real record: the owner retired `fx.source`, the update added a figure
+     counting it, the plan said no conflicts, and the figure answered `FIELD_UNKNOWN` on every read. A kept list's pack
+     body is the one the edit started from (a changed one is the conflict above), so the difference between the two is
+     exactly what the owner did, and only what this version stages is asked: a pack declaration it leaves as it was was
+     already reading the owner's list before this update. */
+  const staged = new Set([...adds, ...changes].map((c) => c.id));
+  for (const { id } of kept) {
+    const decl = pack.declarations.find((d) => d.id === id);
+    const theirs = live.get(id)?.body;
+    if (decl?.kind !== 'register' || theirs === undefined || conflicts.some((c) => c.id === id)) continue;
+    let owner: unknown;
+    try {
+      owner = JSON.parse(theirs);
+    } catch {
+      continue;
+    }
+    const found = movedFields(decl.canonical, owner);
+    if (found === null || found.moved.length === 0) continue;
+    for (const d of pack.declarations) {
+      if (!staged.has(d.id) || d.kind === 'register') continue;
+      const hit = readsField(d.canonical, id, found.fields, found.moved);
+      if (hit === undefined) continue;
+      conflicts.push({ id, pack: OWN, ...hit, by: d.id });
       break;
     }
   }
@@ -1175,16 +1222,38 @@ function unresolvedOf(pack: Pack, installed: Installed, retires: Diff['retires']
  */
 export function conflictFault(diff: Pick<Diff, 'pack' | 'installed_version' | 'conflicts'>, names: (id: string) => string = (id) => id): Refusal | null {
   const first = diff.conflicts[0];
-  if (!first || (first.reads === undefined && !first.changed)) return null;
+  if (!first || (first.reads === undefined && !first.changed && first.by === undefined)) return null;
   const pack = names(diff.pack.id);
   const stay = diff.installed_version === null ? `leave ${pack} as it is` : `leave ${pack} at ${diff.installed_version}`;
   const who = names(first.id);
+  /* AN INGEST WRITES WHAT IT NAMES, and a sentence that said it reads the field would send the owner looking for a filter
+     their pattern does not have. */
+  const does = first.id.startsWith('ingest.') ? 'writes' : 'reads';
+  /* AND IN THE MIRROR THE ONE THAT READS OR WRITES IS `by`, not the list: an update's ingest over a field the owner took
+     off was told as "reads note", the sentence the line above exists to avoid. */
+  const writer = first.by?.startsWith('ingest.') === true;
   const fix =
-    first.reads !== undefined && first.field !== undefined
+    first.by !== undefined && first.field !== undefined
+      ? `You changed ${who}, and ${pack} ${diff.pack.version}’s ${names(first.by)} ${
+          first.retyped !== undefined
+            ? `${writer ? 'writes' : 'reads'} ${first.field} as ${an(first.retyped.from)}, which your list now has as ${an(first.retyped.to)}. Make ${first.field} ${an(first.retyped.from)} again on ${who} first`
+            : first.relabelled !== undefined
+              ? `calls ${first.field} "${first.relabelled.from}", which your list now calls "${first.relabelled.to}". Name ${first.field} "${first.relabelled.from}" again on ${who} first`
+              : first.value !== undefined
+                ? `${writer ? `writes ${first.value} to ${first.field}` : `asks ${first.field} for ${first.value}`}, which your list no longer allows. Put ${first.value} back on ${first.field} in ${who} first`
+                : `${writer ? 'writes' : 'reads'} ${first.field}, which your list no longer has. Put ${first.field} back on ${who} first`
+        }, or ${stay}.`
+      : first.reads !== undefined && first.field !== undefined && first.relabelled !== undefined
+      ? `${pack} ${diff.pack.version} renames ${first.field} on ${names(first.reads)} from "${first.relabelled.from}" to "${first.relabelled.to}", and ${who}, which you changed, calls it "${first.relabelled.from}". Write ${first.field} in ${who} by its id or its new name first, or ${stay}.`
+      : first.reads !== undefined && first.field !== undefined && first.value !== undefined
+      ? `${pack} ${diff.pack.version} takes ${first.value} off the values of ${first.field} on ${names(first.reads)}, and ${who}, which you changed, ${
+          does === 'writes' ? 'writes it' : 'asks for it'
+        }. Change what ${who} ${does === 'writes' ? 'writes to' : 'asks of'} ${first.field} first, or ${stay}.`
+      : first.reads !== undefined && first.field !== undefined
       ? `${pack} ${diff.pack.version} ${
           first.retyped === undefined
-            ? `takes ${first.field} off ${names(first.reads)}, and ${who}, which you changed, reads it.`
-            : `makes ${first.field} on ${names(first.reads)} ${an(first.retyped.to)}, and ${who}, which you changed, reads it as ${an(first.retyped.from)}.`
+            ? `takes ${first.field} off ${names(first.reads)}, and ${who}, which you changed, ${does} it.`
+            : `makes ${first.field} on ${names(first.reads)} ${an(first.retyped.to)}, and ${who}, which you changed, ${does} it as ${an(first.retyped.from)}.`
         } Take ${first.field} off ${who} first, or ${stay}.`
       : first.reads !== undefined
       ? `${pack} ${diff.pack.version} no longer has ${first.reads}, and ${names(first.id)}, which you changed, reads it. Take ${first.reads} off ${names(first.id)} first, or ${stay}.`
@@ -1243,13 +1312,20 @@ const typeSaid = (f: Record<string, unknown>): string => `${String(f.type ?? '')
 /** A type said with its article, as the refusal reads it: `a text`, `an enum`. */
 const an = (type: string): string => `${/^[aeiou]/iu.test(type) ? 'an' : 'a'} ${type}`;
 
-/** A field an update takes off a list, or gives another type when `retyped` is there. */
-type Moved = { field: string; retyped?: { from: string; to: string } };
+/**
+ * A field an update takes off a list, or gives another type when `retyped` is there, or another label when `relabelled`
+ * is, or one whose values lose `value`. The last two leave the field on the list and matter only to a declaration that
+ * names the field by that label or asks for that value.
+ */
+type Moved = { field: string; retyped?: { from: string; to: string }; relabelled?: { from: string; to: string }; value?: string };
+
+/** Words as `parseWhere` compares them: spaces and underscores one space, case folded. */
+const fold = (t: string): string => t.replace(/[\s_]+/gu, ' ').trim().toLowerCase();
 
 /**
- * What an update does to one list's fields: each it takes off or retypes, in the order the installed list declares them,
- * with the installed fields the owner's declarations were written against. `null` for a stored body that will not parse,
- * for `unreadable`'s reason.
+ * What an update does to one list's fields: each it takes off, retypes, relabels or takes a value from, in the order the
+ * installed list declares them, with the installed fields the owner's declarations were written against. `null` for a
+ * stored body that will not parse, for `unreadable`'s reason.
  */
 function movedFields(was: string, now: unknown): { fields: Map<string, Record<string, unknown>>; moved: Moved[] } | null {
   let old: unknown;
@@ -1263,10 +1339,41 @@ function movedFields(was: string, now: unknown): { fields: Map<string, Record<st
   const moved: Moved[] = [];
   for (const [id, then] of fields) {
     const next = after.get(id);
-    if (next === undefined) moved.push({ field: id });
-    else if (typeSaid(then) !== typeSaid(next)) moved.push({ field: id, retyped: { from: typeSaid(then), to: typeSaid(next) } });
+    if (next === undefined) {
+      moved.push({ field: id });
+      continue;
+    }
+    if (typeSaid(then) !== typeSaid(next)) {
+      moved.push({ field: id, retyped: { from: typeSaid(then), to: typeSaid(next) } });
+      continue;
+    }
+    /* A LABEL IS A NAME `parseWhere` ANSWERS TO, and only while the list still says it. `between your own accounts is
+       false` resolves to `transfer` by the label, and under a list that calls the field `Internal` it is FIELD_UNKNOWN. */
+    const label = typeof then.label === 'string' ? then.label : '';
+    const renamed = typeof next.label === 'string' && next.label !== '' ? next.label : id;
+    if (label !== '' && fold(label) !== fold(renamed)) moved.push({ field: id, relabelled: { from: label, to: renamed } });
+    /* AND A VALUE IS A WORD `resolve` ANSWERS TO: `direction is out` over values that no longer hold `out` is
+       ENUM_VALUE_UNKNOWN on every read. */
+    const kept = new Set(Array.isArray(next.values) ? next.values : []);
+    if (Array.isArray(then.values))
+      for (const v of then.values) if (typeof v === 'string' && !kept.has(v)) moved.push({ field: id, value: v });
   }
   return { fields, moved };
+}
+
+/**
+ * The declared value a written word means on an enum field, as `@braindog/where`'s `resolve` reads it: a value's label
+ * first, then the value in the words a screen shows. `null` for a word the field does not declare, or a field with no
+ * values, which is `resolve`'s refusal and none of this check's business.
+ */
+function valueSaid(f: Record<string, unknown>, said: string): string | null {
+  const values = Array.isArray(f.values) ? f.values.filter((v): v is string => typeof v === 'string') : [];
+  if (values.length === 0) return null;
+  const labels = isObject(f.labels as Json) ? (f.labels as Record<string, unknown>) : {};
+  const labelled = Object.entries(labels).find(([, l]) => typeof l === 'string' && fold(l) === fold(said));
+  if (labelled && values.includes(labelled[0])) return labelled[0];
+  const wanted = said.replace(/\s+/gu, '_').toLowerCase();
+  return values.find((v) => v.toLowerCase() === wanted || v.replace(/_/gu, ' ').toLowerCase() === said.toLowerCase()) ?? null;
 }
 
 /** Keys whose text is for a person or names the declaration itself, and is never a field it reads. */
@@ -1285,36 +1392,65 @@ const SENTENCES = new Set(['where', 'when', 'filter']);
  * THE CLAUSE RULE IS COPIED AND NOT IMPORTED. `declare` depends on `kernel` and `ports` only, and the graph gate refuses
  * an undeclared import; the rule is small (split on the comma, the id exactly, else the longest label the clause starts
  * with) and a false yes here costs a refusal naming both, where a false no costs a figure that fails on every read.
+ *
+ * AND WHAT THE CLAUSE SAYS AFTER THE FIELD, because two of the ways a kept `where` fails are not about the field being
+ * there: the label it was named by may change (`relabelled` counts only for a field named by its label), and the value
+ * after `is`, `has` or `lacks` may leave the field's values (`value` counts only for a value somebody asks for).
+ *
+ * AN INGEST READS NO FIELD AND WRITES SEVERAL, and they are the keys of its `extract` or its `map`, never a value in
+ * them: `extract: { note: { after: 'ref ' } }` writes `note`. A kept pattern that writes a field the update takes off
+ * refuses every message it matches; one whose `enum.map` writes a value the field no longer has refuses the same way.
  */
 function readsField(body: string, list: string, fields: Map<string, Record<string, unknown>>, moved: readonly Moved[]): Moved | undefined {
   const name = list.slice(list.indexOf('.') + 1);
-  const fold = (t: string): string => t.replace(/[\s_]+/gu, ' ').trim().toLowerCase();
-  const clause = (said: string): string | null => {
-    const first = said.trim().split(/\s+/u)[0] ?? '';
-    if (fields.has(first)) return first;
-    const folded = fold(said);
-    let best = '';
-    let found: string | null = null;
-    for (const [id, f] of fields)
-      for (const n of [typeof f.label === 'string' ? f.label : '', id]) {
-        const key = fold(n);
-        if (!key || key.length <= best.length) continue;
-        if (folded === key || folded.startsWith(`${key} `)) {
-          best = key;
-          found = id;
-        }
-      }
-    return found;
-  };
   const read = new Set<string>();
+  const byLabel = new Set<string>();
+  const asked = new Map<string, Set<string>>();
+  const ask = (field: string, value: string | null): void => {
+    if (value === null) return;
+    const had = asked.get(field) ?? new Set<string>();
+    had.add(value);
+    asked.set(field, had);
+  };
+  const clause = (said: string): void => {
+    const words = said.trim().split(/\s+/u);
+    let field: string | null = fields.has(words[0] ?? '') ? (words[0] ?? null) : null;
+    let after = 1;
+    if (field === null) {
+      const folded = fold(said);
+      let best = '';
+      let label = false;
+      for (const [id, f] of fields)
+        for (const n of [typeof f.label === 'string' ? f.label : '', id]) {
+          const key = fold(n);
+          if (!key || key.length <= best.length) continue;
+          if (folded === key || folded.startsWith(`${key} `)) {
+            best = key;
+            field = id;
+            /* A LABEL THAT FOLDS TO THE ID NAMES THE FIELD BY ITS ID: `which way is out` finds `which_way` by the id
+               whatever the label becomes, and counting it as a label refused a relabel nothing was hurt by. */
+            label = key !== fold(id);
+          }
+        }
+      if (field === null) return;
+      if (label) byLabel.add(field);
+      after = best.split(' ').length;
+    }
+    read.add(field);
+    const verb = words[after] ?? '';
+    const rest = words.slice(after + 1).join(' ');
+    if (verb !== 'is' && verb !== 'has' && verb !== 'lacks') return;
+    const negated = rest === 'not' || rest.startsWith('not ');
+    const wanted = (negated ? rest.slice(3) : rest).trim();
+    const f = fields.get(field)!;
+    for (const one of verb === 'is' ? wanted.split(/ or /iu) : [wanted]) ask(field, valueSaid(f, one.trim()));
+  };
+  /* A STRUCTURED LEAF NAMES ITS VALUE UNDER THE OPERATOR, as the sentence names it after the verb. */
+  const LEAF_VALUES = ['is', 'not', 'in', 'not_in', 'has', 'lacks'];
   const walk = (v: unknown, key: string | null, on: string | null): void => {
     if (typeof v === 'string') {
       if (on !== name || key === null || NOT_A_FIELD.has(key)) return;
-      if (SENTENCES.has(key))
-        for (const c of v.split(',')) {
-          const f = clause(c);
-          if (f !== null) read.add(f);
-        }
+      if (SENTENCES.has(key)) for (const c of v.split(',')) clause(c);
       else if (fields.has(v)) read.add(v);
       return;
     }
@@ -1326,14 +1462,33 @@ function readsField(body: string, list: string, fields: Map<string, Record<strin
     const o = v as Record<string, unknown>;
     const at = typeof o.source === 'string' && o.source.startsWith('register.') ? o.source : typeof o.register === 'string' ? o.register : null;
     const here = at === null ? on : at.startsWith('register.') ? at.slice('register.'.length) : at;
+    if (here === name && typeof o.field === 'string' && fields.has(o.field))
+      for (const op of LEAF_VALUES)
+        for (const said of [o[op]].flat()) if (typeof said === 'string') ask(o.field, said);
     for (const [k, x] of Object.entries(o)) walk(x, k, here);
   };
+  let parsed: unknown;
   try {
-    walk(JSON.parse(body), null, null);
+    parsed = JSON.parse(body);
   } catch {
     return undefined;
   }
-  return moved.find((m) => read.has(m.field));
+  const ingest = isObject(parsed as Json) ? (parsed as Record<string, unknown>) : {};
+  const writes = isObject(ingest.writes as Json) ? (ingest.writes as Record<string, unknown>).register : undefined;
+  if (typeof writes === 'string' && writes.replace(/^register\./u, '') === name)
+    for (const form of [ingest.extract, ingest.map])
+      if (isObject(form as Json))
+        for (const [field, how] of Object.entries(form as Record<string, unknown>)) {
+          if (!fields.has(field)) continue;
+          read.add(field);
+          const map = (how as { enum?: { map?: unknown } } | null)?.enum?.map;
+          if (isObject(map as Json)) for (const out of Object.values(map as Record<string, unknown>)) if (typeof out === 'string') ask(field, out);
+        }
+  walk(parsed, null, null);
+  const hit = moved.find((m) =>
+    m.value !== undefined ? asked.get(m.field)?.has(m.value) === true : m.relabelled !== undefined ? byLabel.has(m.field) : read.has(m.field),
+  );
+  return hit === undefined ? undefined : { ...hit };
 }
 
 /**
