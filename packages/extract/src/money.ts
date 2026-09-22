@@ -259,6 +259,31 @@ function codeBefore(text: string, pos: number, table: CurrencyTable): { code: st
   return Object.hasOwn(table, code) ? { code, at: pos - 3 } : null;
 }
 
+/**
+ * May the three capitals glued to the digit at `at` be read as that figure's currency?
+ *
+ * THE TABLE `@braindog/record` WIRES IS EVERY CODE `Intl` KNOWS, AND MANY OF THEM ARE ORDINARY CAPITALS.
+ * `loop/research-batch-twenty-audit.md` section 6 measured what asking the table alone did, with EGP declared:
+ * `Flight MAD2031` read as MAD 2,031.00, `voucher TOP20` as TOP 20.00, `Promo ALL2026` as ALL 2,026,
+ * `at CAD1 PETROL` as CAD 1.00, `Seat BAM12.` as BAM 12.00 and `Ref PEN15` as PEN 15.00. Each is a flight,
+ * a voucher, a seat or a reference, and each became an amount in a currency nobody spent.
+ *
+ * TWO THINGS A BANK'S GLUED FIGURE HAS AND AN IDENTIFIER DOES NOT. The figure carries its decimal point or its
+ * grouping (`EGP2500.00`, `EGP1,284.50`, `KWD1.250`), where an identifier is a bare run of digits; a glued
+ * code with a bare run stays refused, and refused whole. And nothing alphanumeric touches the code on its
+ * left: `codeBefore` already refuses a letter there, and a digit there means the three capitals sit inside a
+ * reference like `9CAD17F2B0`, which read CAD 17.00 from its middle. A space, a sign, a bracket, a colon or
+ * the start of the string may stand there. A letter touching the figure's far end makes it a reference too:
+ * `Ref PEN15.00X` has a point and still read PEN 15.00 until that was checked. Every glued line
+ * `money-glued.test.ts` and the record's `money-ipn.test.ts` hold still reads.
+ */
+function gluedFigure(text: string, at: number, table: CurrencyTable): boolean {
+  if (codeBefore(text, at, table) === null || isDigit(text[at - 4])) return false;
+  let i = at;
+  while (isDigit(text[i])) i += 1;
+  return isSep(text[i]) && !isSpace(text[i]) && isDigit(text[i + 1]) && !isLetter(text[runEnd(text, at)]);
+}
+
 /** A three-letter code starting at `pos`. */
 function codeAfter(text: string, pos: number, table: CurrencyTable): { code: string; at: number } | null {
   if (pos + 3 > text.length) return null;
@@ -301,8 +326,9 @@ export function scanMoney(text: string, table: CurrencyTable, declared?: string)
 
   /* A LETTER TOUCHING THE FIRST DIGIT IS ALLOWED ONLY WHEN IT ENDS A CODE THE TABLE HOLDS, so `EGP2500.00` is
      EGP 2,500.00 and `INV1250` is still an identifier. `codeBefore` is the same test the backward walk below
-     makes, so the code that let the number start is the code it is read in. */
-  for (const token of numberTokens(text, (at) => codeBefore(text, at, table) !== null)) {
+     makes, so the code that let the number start is the code it is read in. `gluedFigure` narrows it to the
+     glued codes that cannot be a word or a reference. */
+  for (const token of numberTokens(text, (at) => gluedFigure(text, at, table))) {
     /* Backwards: spaces, a currency, a sign and an opening parenthesis, each at most once and in whichever
        order they come — `-EGP 5` and `EGP -5` are the same amount and both are written. */
     let before: string | null = null;
