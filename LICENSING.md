@@ -22,6 +22,11 @@ Nothing under `packages/render` may import from any other package in this reposi
 `tools/gates/graph.mjs` asserts it: `render` has in-degree 0 in the package graph, so any dependency
 it acquires is a finding.
 
+**Third-party path data.** `packages/render/src/glyphs/core.ts` and `set.ts` carry icon path data from
+Lucide (https://lucide.dev), ISC License, Copyright (c) 2026 Lucide Icons and Contributors, including a
+few glyphs from Feather, MIT, Copyright (c) 2013-present Cole Bemis. The full notices are in
+`packages/render/src/glyphs/NOTICE`.
+
 ## Applying the notice
 
 Source files under `packages/render` carry `// SPDX-License-Identifier: MIT`. Everything else is
