@@ -29,7 +29,8 @@
 
 import { fixOf, type Result } from '@braindog/ports';
 
-import { recipientOf, sealTo } from './seal.ts';
+import { recipientOf } from './seal.ts';
+import { sealStreamTo, type Sealed } from './seal-stream.ts';
 
 /** How many dated copies are kept. Thirty, because `apps/selfhost/src/snapshots.ts` keeps thirty (`53 §5.4`). */
 export const KEEP = 30;
@@ -74,9 +75,23 @@ const DATED = /^nightly-(\d{4}-\d{2}-\d{2})\.brainl(?:\.age)?$/u;
  */
 export type Blobs = {
   put(key: string, value: string | Uint8Array, options?: { customMetadata?: Record<string, string> }): Promise<unknown>;
-  get(key: string): Promise<{ size: number; text(): Promise<string> } | null>;
+  /* `body` IS OPTIONAL SO A TEST'S BUCKET NEED NOT HAVE ONE. R2's always does, and it is read only
+     where a `Fixed` exists, which is to say in the Worker and in `test/snapshots-stream.test.ts`. */
+  get(key: string): Promise<{ size: number; text(): Promise<string>; body?: ReadableStream<Uint8Array> } | null>;
   list(options?: { prefix?: string; cursor?: string }): Promise<{ objects: { key: string; size: number }[]; truncated: boolean; cursor?: string }>;
   delete(keys: string | string[]): Promise<void>;
+};
+
+/**
+ * A bucket that also takes a stream, which R2 is.
+ *
+ * A SECOND TYPE AND NOT A WIDER `put` ON `Blobs`. Widening `Blobs.put` was tried first, and
+ * `test/snapshots.test.ts` stopped typechecking: its bucket reads `value` as bytes, which is right
+ * for a Node bucket that is never handed a stream. A stream is put only where a `Fixed` exists,
+ * which is workerd, where the bucket is R2, or a test that hands in both.
+ */
+export type StreamBlobs = Omit<Blobs, 'put'> & {
+  put(key: string, value: string | Uint8Array | ReadableStream<Uint8Array>, options?: { customMetadata?: Record<string, string> }): Promise<unknown>;
 };
 
 /** What the kernel dumped, ready to be written. `rows` is counted here so the metadata is not a second count. */
@@ -92,6 +107,35 @@ export type Copy = { id: string; at: string; bytes: number };
 export type Seal = (file: Uint8Array) => Promise<Uint8Array>;
 
 /**
+ * Makes a stream R2 will take: the same bytes, with the length promised up front.
+ *
+ * WHY THIS IS NEEDED AT ALL. R2's `put` refuses a `ReadableStream` whose length it cannot know,
+ * and a stream made in the Worker has none. workerd's `FixedLengthStream` is the platform's answer,
+ * and it exists only in workerd, so it is found on `globalThis` and a test hands in its own.
+ */
+export type Fixed = (stream: ReadableStream<Uint8Array>, length: number) => ReadableStream<Uint8Array>;
+
+type Pair = { readable: ReadableStream<Uint8Array>; writable: WritableStream<Uint8Array> };
+
+/** workerd's `FixedLengthStream`, or `undefined` under Node, where `take` falls back to one buffer. */
+function platformFixed(): Fixed | undefined {
+  const FixedLengthStream = (globalThis as { FixedLengthStream?: new (length: number) => Pair }).FixedLengthStream;
+  return FixedLengthStream ? (stream, length) => stream.pipeThrough(new FixedLengthStream(length)) : undefined;
+}
+
+/** A sealed stream read into the one buffer it describes, for a bucket that cannot take a stream. */
+async function drain(sealed: Sealed): Promise<Uint8Array> {
+  const out = new Uint8Array(sealed.length);
+  let at = 0;
+  for await (const chunk of sealed.stream) {
+    out.set(chunk, at);
+    at += chunk.length;
+  }
+  if (at !== sealed.length) throw new Error(`the sealer wrote ${String(at)} of the ${String(sealed.length)} bytes it promised`);
+  return out;
+}
+
+/**
  * The sealer a deployment's `AGE_RECIPIENT` names, `undefined` when it names none, and a throw when
  * it names something that is not a recipient.
  *
@@ -100,11 +144,11 @@ export type Seal = (file: Uint8Array) => Promise<Uint8Array>;
  * know about. `age1<alpha-recipient>` is not that decision, it is a decision nobody has made yet,
  * and treating it as empty would be the quiet plaintext this file exists to refuse.
  */
-function sealerOf(recipient: string | undefined): Seal | undefined {
+function sealerOf(recipient: string | undefined): ((file: Uint8Array) => Promise<Sealed>) | undefined {
   if (!recipient) return undefined;
   const key = recipientOf(recipient);
   if (typeof key === 'string') throw new Error(`The nightly copy did not run: ${key}`);
-  return sealTo(key);
+  return sealStreamTo(key);
 }
 
 /**
@@ -147,11 +191,17 @@ export async function dumpOf(
  * AND BUILDING IT THROWS when `recipient` is named and is not an `age1` X25519 recipient. That is
  * the one failure that is the deployment's and not a record's, so it is said once, before the walk,
  * and the cron invocation is red with a sentence naming `AGE_RECIPIENT`. `seal` is for a test that
- * needs a transform of its own; the Worker passes the recipient and nothing else.
+ * needs a transform of its own; the Worker passes the recipient and nothing else. `fixed` is for a
+ * test that stands in for workerd's `FixedLengthStream`, and without either `take` writes buffers.
  */
-export function r2Snapshots(blobs: Blobs, o: { recipient?: string | undefined; seal?: Seal | undefined } = {}) {
-  const seal = o.seal ?? sealerOf(o.recipient);
-  const ext = seal ? SEALED : PLAIN;
+export function r2Snapshots(
+  blobs: Blobs | StreamBlobs,
+  o: { recipient?: string | undefined; seal?: Seal | undefined; fixed?: Fixed | undefined } = {},
+) {
+  const seal = o.seal;
+  const stream = seal ? undefined : sealerOf(o.recipient);
+  const fixed = o.fixed ?? platformFixed();
+  const ext = seal || stream ? SEALED : PLAIN;
   const latest = `latest${ext}`;
 
   /**
@@ -217,7 +267,6 @@ export function r2Snapshots(blobs: Blobs, o: { recipient?: string | undefined; s
           `snapshot over 40 MiB: this record dumped ${String(file.length)} bytes and the Worker signs the whole file in memory. Raise the ceiling or stream it (51 §10).`,
         );
 
-      const body = seal ? await seal(file) : file;
       const key = snapshotKey(record, dump.at, ext);
       const meta = {
         rows: String(dump.rows),
@@ -225,11 +274,33 @@ export function r2Snapshots(blobs: Blobs, o: { recipient?: string | undefined; s
         at: dump.at,
         ...(dump.bookmark === undefined ? {} : { bookmark: dump.bookmark }),
       };
+      const pointer = `${prefixOf(record)}${latest}`;
 
       /* THE DATED KEY FIRST AND `latest` SECOND. If the second put fails, `latest` still points at a
          copy that opens; the other order leaves the pointer naming an object nobody finished. */
-      await blobs.put(key, body, { customMetadata: meta });
-      await blobs.put(`${prefixOf(record)}${latest}`, body, { customMetadata: meta });
+      if (stream && fixed) {
+        /* SEALED AS R2 READS IT, so the sealed file is never whole in this isolate. Measured by
+           `test/snapshots-stream.test.ts` at the 40 MiB ceiling: holding the sealed buffer for both
+           puts was 80 MiB live while the bucket read, 40 above the plaintext; streamed it is 2 above
+           it, which is a chunk and the queue behind it.
+
+           AND `latest` IS READ BACK FROM THE DATED COPY, NOT SEALED A SECOND TIME. A stream reads
+           once, and the binding has no server-side copy. Sealing again would cost the whole cipher
+           over again, 1.8 s of CPU at the ceiling by `seal.ts`'s own measure, and would leave a
+           pointer whose bytes differ from the copy it points at. One GET streams the same bytes
+           through, and a dated copy that R2 did not keep is a throw here and not a pointer at nothing. */
+        const sealed = await stream(file);
+        const r2 = blobs as StreamBlobs;
+        await r2.put(key, fixed(sealed.stream, sealed.length), { customMetadata: meta });
+        const copy = await r2.get(key);
+        if (!copy?.body) throw new Error(`the copy just written to ${key} could not be read back to point latest at it`);
+        await r2.put(pointer, fixed(copy.body, copy.size), { customMetadata: meta });
+      } else {
+        /* NO `FixedLengthStream`, which is Node: one buffer, put twice, as before streaming. */
+        const body = stream ? await drain(await stream(file)) : seal ? await seal(file) : file;
+        await blobs.put(key, body, { customMetadata: meta });
+        await blobs.put(pointer, body, { customMetadata: meta });
+      }
       await prune(record);
       return { key, bytes: file.length, rows: dump.rows, at: dump.at };
     },
