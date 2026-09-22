@@ -52,6 +52,7 @@
   import { everyGovernance, plainOf, readOne, words as governed, type One } from '$lib/record/governance.ts';
   import { answerQuestion, parkQuestion, type Written } from '$lib/record/decide-write.ts';
   import { mayAnswer, whyNotAnswering } from '../answering.ts';
+  import { nextOpen, stillWaiting, words as onwardWords } from './onward.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { goto, invalidateAll } from '$app/navigation';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
@@ -101,10 +102,18 @@
    * decision, so the one just decided keeps its place and the next is the one after it.
    */
   let queue = $state<string[]>([]);
-  const openIds = $derived(from === 'live' ? queue : QUEUE.map((q) => q.id));
+  /* THE SAMPLE'S QUEUE ONLY ON THE SAMPLE. It was every state but `live`, so a record that refused this
+     one question offered `Next question` to a sample id it never held, once the refused state drew the
+     way on. A refusal keeps the record's own queue, and an empty one when that read was refused too. */
+  const openIds = $derived(from === 'sample' ? QUEUE.map((q) => q.id) : queue);
   const here = $derived(openIds.indexOf(String(page.params.id)));
   const nextId = $derived(here >= 0 ? openIds[here + 1] : openIds[0]);
   const prevId = $derived(here > 0 ? openIds[here - 1] : undefined);
+  /* AND THE WAY ON ONCE THIS QUESTION IS NO LONGER OPEN, which is not `nextId`: that one stops at the
+     end of the queue for `j`, and a screen that has just settled a question must not stop anywhere.
+     See `onward.ts` for the two cases `nextId` got wrong. */
+  const onwardTo = $derived(nextOpen(openIds, String(page.params.id)));
+  const waiting = $derived(stillWaiting(openIds, String(page.params.id)));
 
   /** The clock a band is read against: the reader's on a live record, the sample's own otherwise. */
   const now = $derived(from === 'live' ? Date.now() : NOW);
@@ -350,7 +359,7 @@
     if (from !== 'live' || !client) {
       committed = said;
       toasts.push(copy.notWritten(wouldRecord(said)), { intent: 'warn' });
-      setTimeout(() => document.getElementById('next-question')?.focus());
+      setTimeout(() => document.getElementById('way-on')?.focus());
       return;
     }
     /* ON A LIVE RECORD IT IS SENT, with the reason `decide` requires, and only a yes settles it. */
@@ -382,7 +391,7 @@
       const added = [...sidebarNow()].filter(([href]) => !had.has(href)).map(([, title]) => title);
       if (added.length) applied = appliedLines(out.applied ?? {}, accepting.body, added);
     } else void invalidateAll();
-    setTimeout(() => document.getElementById('next-question')?.focus());
+    setTimeout(() => document.getElementById('way-on')?.focus());
   }
 
   /**
@@ -406,7 +415,7 @@
          `2026-09-17`, the storage spelling, in a sentence about when somebody will next look at a
          decision. `day()` is the one formatter and it was one call away. */
       toasts.push(copy.deferred(day(wake)), { intent: 'warn' });
-      if (nextId && nextId !== page.params.id) void goto(`/decide/${nextId}`);
+      void goto(onwardTo ? `/decide/${onwardTo}` : '/decide');
       return;
     }
     if (!question || sending) return;
@@ -418,8 +427,10 @@
     deferring = false;
     toasts.push(copy.parkedUntil(day(wake)), { intent: 'good' });
     void invalidateAll();
-    /* PARKED, SO IT HAS LEFT THE QUEUE: the next question, as a decision takes you to it. */
-    if (nextId && nextId !== page.params.id) void goto(`/decide/${nextId}`);
+    /* PARKED, SO IT HAS LEFT THE QUEUE: the next question, as a decision takes you to it, and the
+       queue when there is none. Staying put was the dead end: the read is not taken again here, so
+       the question it had just parked was drawn open underneath the toast that said it was parked. */
+    void goto(onwardTo ? `/decide/${onwardTo}` : '/decide');
   }
 
   /**
@@ -493,13 +504,26 @@
 
 <svelte:window {onkeydown} />
 
+<!-- THE WAY ON, ONE SNIPPET FOR EVERY STATE THAT IS NOT AN OPEN QUESTION: settled, closed, refused and
+     not found. The settled block drew `Next question` only for a press made in this session and only
+     when the question was not last in the queue, so a decision reached from the Decided list, or the
+     last one answered, ended the page with nothing to press. The queue is offered whatever else is,
+     and the inbox when something waits there, which is what `/decide` offers when it is clear. -->
+{#snippet onward()}
+  <div class="onward">
+    {#if onwardTo}<Button weight="primary" href="/decide/{onwardTo}" id="way-on">{copy.decideNext}</Button>{/if}
+    <Button weight={onwardTo ? 'quiet' : 'primary'} href="/decide" id={onwardTo ? undefined : 'way-on'}>{onwardWords.back}</Button>
+    {#if !onwardTo && Number(page.data.inbox ?? 0) > 0}<Button href="/inbox">{copy.decideOpenInbox}</Button>{/if}
+  </div>
+{/snippet}
+
 {#if from === 'reading'}
   <!-- Bars, and after 300ms, until the read answers. -->
   <Waiting head />
 {:else if from === 'refused'}
   <div class="page">
     <Empty kind="error" heading title={refusal}>
-      {#snippet actions()}<Button href="/decide">Back to Decide</Button>{/snippet}
+      {#snippet actions()}{@render onward()}{/snippet}
     </Empty>
   </div>
 {:else if !question}
@@ -509,8 +533,8 @@
          no filter ran, so "nothing matched" is about something that did not happen. It names the
          thing, says it is not here, and lists what is — `10 §7`'s fourth rule: the refusal is the
          teacher. -->
-    <Empty kind="error" heading title={copy.noSuch('question', String(page.params.id))}>
-      {#snippet actions()}<Button href="/decide">Back to Decide</Button>{/snippet}
+    <Empty kind="error" heading title={copy.noSuch('question', String(page.params.id))} body={onwardWords.left(waiting)}>
+      {#snippet actions()}{@render onward()}{/snippet}
     </Empty>
   </div>
 {:else}
@@ -608,15 +632,15 @@
             </Button>
           </div>
         {/if}
-        {#if committed && nextId && nextId !== question.id}
-          <div class="settled-next">
-            <Button weight="primary" href="/decide/{nextId}" id="next-question">{copy.decideNext}</Button>
-          </div>
-        {/if}
+        <!-- WHERE IT WENT, AND ONLY WHEN IT WENT THERE: a press on the sample wrote nothing, and the chip
+             above already says so. What still waits is said either way. -->
+        <p class="settled-where">{#if !committed || saved}{onwardWords.where} {/if}{onwardWords.left(waiting)}</p>
+        <div class="settled-next">{@render onward()}</div>
       </div>
     {:else if from === 'live' && live?.closed}
       <!-- SETTLED, AND ITS DECISION IS NOT AMONG THE ONES READ. Nothing here can answer it again. -->
-      <p class="cost-age">{governed.closed(question.id)}</p>
+      <p class="cost-age">{governed.closed(question.id)} {onwardWords.left(waiting)}</p>
+      {@render onward()}
     {:else}
       <section class="cost">
         {#if question.context}
@@ -1109,6 +1133,20 @@
   /* The chip and the way back, on one line, under the receipt they belong to. */
   .settled-next {
     margin-block-start: var(--sp-4);
+  }
+
+  .settled-where {
+    margin-block-start: var(--sp-3);
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /* THE WAY ON WRAPS, because on a phone the next question, the queue and the inbox are three
+     buttons that do not fit one line at 44px each. */
+  .onward {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
   }
 
   .settled-mock {
