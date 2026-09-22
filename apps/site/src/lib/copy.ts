@@ -133,15 +133,18 @@ export const site = {
      * `Open the app` AND NOT `Open the demo`, WHICH IS THE VERB THIS SITE ALREADY USES for the same
      * address in the nav and on the pricing page.
      *
-     * There is no demo to open. `apps/worker/wrangler.jsonc:270` and `:360` both set
-     * `DEMO_RECORD: ""`, and `apps/worker/src/route.ts:139` answers `null` for an unset one, so the
-     * anonymous door never opens in either environment. A primary button naming a verb the product
-     * cannot perform is the exact defect `test/content.test.ts` says this app keeps shipping, and
-     * it was in the one filled button on the page.
+     * The server has no demo record to serve: `apps/worker/wrangler.jsonc` sets `DEMO_RECORD: ""` in
+     * both environments, so its anonymous door never opens. The label stays `Open the app` because
+     * the app is what opens, and what it opens on is said in the note under the button.
      *
-     * The note under it is the state rather than a reassurance. It used to read `No sign-up.`,
-     * which was meant as *nothing is asked of you* and reads, once there is no demo behind the
-     * button, as *there is no way in*. That second reading is the true one, so it is said plainly.
+     * THE NOTE SAID ONLY `Neither plan is open yet.`, AND THAT HID THE ONE THING A STRANGER GETS.
+     * The comment above it argued there was nothing behind the button, from `DEMO_RECORD` alone, and
+     * that is true of the server and false of the browser. Measured on 22 September:
+     * `https://app.brain.dog/api/boot` answers 401 `UNAUTHORIZED`, `apps/web/src/lib/record/device.ts:143`
+     * counts that as no record, and the app draws its built-in sample under a bar that says `This is
+     * a sample record.` The live bundle carries that sentence. So the note now says what the button
+     * opens first and what is closed second, and `test/promises.test.mjs` fails if it stops naming
+     * the sample.
      */
     primary: 'Open the app',
     /**
@@ -158,7 +161,7 @@ export const site = {
      * repetition `closing.title` refuses in the paragraph above it for the same reason.
      */
     secondary: 'See what it costs',
-    note: 'Neither plan is open yet.',
+    note: 'The app opens on a sample record. Neither plan is open yet.',
     /**
      * THE CAPTION AND THE ALT BELONG TO THE HERO NOW, because the picture does.
      *
@@ -418,11 +421,17 @@ export const site = {
      *
      * The hosted MCP door IS written (`apps/worker/src/index.ts:1020-1032`, routed at
      * `apps/worker/src/route.ts:70`, with `apps/worker/test/mcp.test.ts` over it). What nobody can
-     * open yet is a hosted RECORD, so self-hosting is the only place an agent can reach one today.
+     * open yet is a hosted RECORD, so a self-host is the only place an agent can reach one.
      * A buyer who reads specifications works that out in about four minutes, so better it comes
      * from us.
+     *
+     * AND IT SAID `Agents reach a self-hosted record today.`, WHICH NO READER COULD ACT ON. A
+     * self-host needs the code, and the code is in a private repository that answers 404 to anybody
+     * signed out; `npm view` answers E404 for every name this repository could publish under. The
+     * door is real and a self-host built from this tree does answer it, so the sentence keeps the
+     * door and says when a stranger gets a record to point it at.
      */
-    note: 'Agents reach a self-hosted record today.',
+    note: 'Both hosts answer agents over MCP. Your agent reaches a record of yours once the code is published or hosted sign-up opens.',
     columns: [
       {
         head: 'Yours to keep',
@@ -446,9 +455,14 @@ export const site = {
          * as silly, and the same thirty was one of the four numbers deleted from under the hero. A
          * strength coming off the page costs the page nothing it is owed; a LIMIT coming off would
          * have, which is why the middle column below still has three lines.
+         *
+         * `Open source.` AS A SENTENCE OF ITS OWN WAS A PRESENT-TENSE LABEL ON A PRIVATE REPOSITORY.
+         * The clause after it was careful and the label in front of it was not, and a label is what a
+         * reader checks first: `https://github.com/actuallyhoss/BrainDog` answered 404 signed out on
+         * 22 September. `from launch` puts the timing inside the claim instead of after it.
          */
         lines: [
-          'Open source. The code opens on GitHub when the product launches.',
+          'Open source from launch. The code is published on GitHub when the product launches.',
           'Your record is one file. Leaving is a copy, not a migration.',
         ],
       },
@@ -506,8 +520,14 @@ export const site = {
              an inbox, and what does land has to be forwarded there by a person. */
           'Mail does not arrive by itself. Nothing reaches into your inbox, and a message has to be forwarded in.',
           /* THE DEMO BELONGS IN THIS COLUMN and was in none of them, which is how the page came
-             to point its one filled button at it. `DEMO_RECORD` is empty in both environments. */
-          'Neither plan is open, and there is no demo to open yet.',
+             to point its one filled button at it. `DEMO_RECORD` is empty in both environments.
+
+             BUT `there is no demo to open yet` WAS FALSE OF THE SCREEN, which is the thing a reader
+             opens. With no session the app draws its own sample record (`/api/boot` answers 401 and
+             `apps/web/src/lib/record/device.ts:143` reads that as no record), under a bar saying
+             nothing done there is saved. What is not built is a record of one's own, so that is
+             what this line says is missing, and the sample is named as what there is instead. */
+          'A record of your own. Neither plan is open yet, so the app shows a made-up sample, and nothing typed into it is saved.',
         ],
       },
       {
@@ -550,8 +570,13 @@ export const site = {
     title: 'What would you keep in it?',
     /* IT SAID `The demo is a made-up business`, and there is no demo. What is true and is the
        better sentence anyway: making a record is two answers long. `/start` asks who you are and
-       what the record is for, and arranges the rest from those (`packages/seed/src/usecases`). */
-    body: 'A record of your own starts with two answers: who you are, and what it is for.',
+       what the record is for, and arranges the rest from those (`packages/seed/src/usecases`).
+
+       AND IT SAID SO IN THE PRESENT TENSE, under a button that opens a sample. Nobody can make a
+       record yet: `loop/STATUS.md` §7.A.2 records `POST /auth/provision` answering 404 on both
+       hosts while `PROVISION_KEY` is unset and `KEK` unbound. The two answers are still the
+       argument; the sentence now says what the button opens today and when the rest applies. */
+    body: 'Open the app to walk around a sample record. Once sign-up opens, yours starts with two answers: who you are, and what it is for.',
     primary: 'Open the app',
     secondary: 'See the pricing',
   },
@@ -565,7 +590,12 @@ export const site = {
      * plain words, is what lets the rest of the page describe the plans in the present tense.
      */
     statusTitle: 'Not open yet',
-    status: 'Neither plan is open. No sign-up and no billing yet.',
+    /* `No sign-up and no billing yet` WAS ONLY EVER ABOUT THE HOSTED PLAN. The self-hosted plan has
+       no sign-up to open: what it lacks is the code, which is private, and a package, which `npm view`
+       answers E404 for under every name this repository could publish. So each plan gets its own
+       reason, and the sample is named because it is the one thing on this page a reader can open. */
+    status:
+      'Neither plan is open yet. The code to self-host is published when the product launches, and hosted sign-up and billing are not switched on. Until then the app shows a sample record.',
     self: {
       name: 'Self-hosted',
       price: 'Free',
@@ -657,8 +687,11 @@ export const site = {
     title: 'Legal',
     licence: {
       title: 'Licence',
+      /* `BrainDog is open source.` WAS A STATE, AND THE REPOSITORY IS PRIVATE. The licence is decided
+         and in `LICENSING.md`, so the terms are stated as they are; what waits for launch is the
+         publishing, and the note under the links already says when. */
       body: [
-        'BrainDog is open source. The software is licensed under the Apache License 2.0, and the renderer in packages/render is licensed under the MIT License.',
+        'BrainDog is published as open source when the product launches. The software is licensed under the Apache License 2.0, and the renderer in packages/render is licensed under the MIT License.',
         'It is provided as is, without warranty of any kind, express or implied. The licence texts set out the full terms.',
       ],
       links: [

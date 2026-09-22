@@ -83,10 +83,17 @@
      * It says the state instead, which is also the more interesting sentence: signing in works on
      * both hosts and there is nothing behind it yet (the 2026-09-16 entry below says so in its own
      * words), which is a real thing to know about a product that ships in slices.
+     *
+     * AND `no record to look at yet` WAS THE SAME MISTAKE MADE THE OTHER WAY ROUND. `DEMO_RECORD`
+     * governs the server's anonymous door and nothing else. The browser draws a sample of its own
+     * when the record refuses it, and measured on 22 September `https://app.brain.dog/api/boot`
+     * answers 401 to a stranger, `apps/web/src/lib/record/device.ts:143` reads that as no record,
+     * and the live bundle carries `This is a sample record.` There is something to look at; what
+     * there is not is a record of one's own.
      */
     body:
       'The record app deploys from this repository on every green build, and you can open it. ' +
-      'Signing in works; there is no sign-up, no billing, and no record to look at yet.',
+      'It shows a made-up sample record; signing in works, and sign-up and billing are not open yet.',
   };
 
   const LABEL = { shipped: 'shipped', changed: 'changed', fixed: 'fixed' } as const;

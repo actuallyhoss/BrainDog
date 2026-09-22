@@ -36,9 +36,9 @@
    *
    * WHAT DID NOT COME OUT, AND THIS IS THE RULE WITH TEETH. `loop/DIRECTION.md` is explicit that a
    * shorter page must not become a truer-sounding one. Every stated limit is still on the page: the
-   * three lines of `Not built yet`, the three refusals of `It will not do`, the note that agents
-   * reach a self-hosted record today, and the note that rules draft the arrangement unless a model
-   * is configured. The only sentence deleted for length rather than for mechanism is the thirty
+   * three lines of `Not built yet`, the three refusals of `It will not do`, the note that says when
+   * a reader's agent gets a record to reach, and the note that rules draft the arrangement unless a
+   * model is configured. The only sentence deleted for length rather than for mechanism is the thirty
    * nightly backups, and that is a strength, not a limit, and it is a counted figure of the kind he
    * named. Length came out of bands and pictures.
    *
