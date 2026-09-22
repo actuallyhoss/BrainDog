@@ -474,6 +474,46 @@ const unbuilt = (name: string, instead: string): Result<never> => ({
 });
 
 /**
+ * The sentences `context` adds to the record's briefing, for an agent arriving from the old tool.
+ *
+ * TWO HABITS HAD A PATH HERE AND NO SENTENCE ANYWHERE AN AGENT READS (`loop/research-mcp-parity.md`
+ * §4). His agents called `brain_log` 49 times with no entity, and the home for that here is `log` on
+ * the agent's own session row; 166 of his 167 `brain_task_add` calls set a lane, and the lane here is
+ * the `agent` field, empty for his own. The third sentence is the question his agents asked 80 times
+ * after the log, one project's tasks, in the form commit 5fde092b made work: the tree with the
+ * project's spoken id. The literal `null` is not taught because `{"field":"agent","is":null}` is
+ * refused VALUE_MALFORMED, measured on the seed; `agent is empty` answered 19 of 27 tasks.
+ *
+ * ON THE ANSWER AND NOT IN THE TOOL LIST, because the list is paid in every turn of every session and
+ * measured 2,565 tokens of a 2,600 ceiling (`budget.test.ts`), while `context` is read once a session.
+ * The lane and project sentences are only said when `tasks` is a register the caller may read.
+ */
+const teaching = (briefing: Record<string, unknown>): string[] => {
+  const spoken = (at: unknown): string | null =>
+    isObject(at) && typeof at.spoken === 'string' && at.spoken !== '' ? at.spoken : null;
+  const session = spoken(briefing.session);
+  const project = spoken(briefing.project);
+  const tasks = Array.isArray(briefing.registers) && briefing.registers.some((r) => isObject(r) && r.id === 'tasks');
+  return [
+    session
+      ? `A note about nothing in particular goes on your own session: log on ${session}.`
+      : 'A note about nothing in particular goes on your own session: your first write, or handoff, opens it, then log on its S id.',
+    ...(tasks
+      ? [
+          `A task's lane is its agent field, and the person's own lane is where it is empty: list tasks where "agent is empty".`,
+          /* NO EXAMPLE ID WHEN THE CALLER IS IN NO PROJECT: `things#1` was taught here once, and on the
+             seed it is Kiln, so a copied sentence read 14 of Kiln's tasks as the project asked about. */
+          `One project's tasks: list tasks where {"field":"thing","is":"${project ?? "<the project's spoken id>"}"}.`,
+        ]
+      : []),
+  ];
+};
+
+/** The record's briefing with the teaching on it. A refusal, or an answer that is not an object, passes through. */
+const taught = (answer: Result<unknown>): Result<unknown> =>
+  answer.ok && isObject(answer.value) ? { ok: true, value: { ...answer.value, teach: teaching(answer.value) } } : answer;
+
+/**
  * The money figures the `money` tool relays, in the order an answer reads in.
  *
  * EVERY ONE IS A FIGURE THE MONEY PACK ALREADY DECLARES (`packages/seed/src/modules/money.ts`), so
@@ -762,7 +802,7 @@ export function tools<C>(surface: McpSurface<C>) {
     },
 
     context: async (_args, ctx) =>
-      surface.context ? surface.context({}, ctx) : unbuilt('context', 'Call record_index for the registers, then list what is open.'),
+      surface.context ? taught(await surface.context({}, ctx)) : unbuilt('context', 'Call record_index for the registers, then list what is open.'),
 
     schema: (args, ctx) => surface.schema({ register: String(args.register) }, ctx),
 
@@ -964,7 +1004,7 @@ export function tools<C>(surface: McpSurface<C>) {
     if (head === 'whoami' && !rest) return surface.whoami(ctx);
     if (head === 'boot' && !rest) return surface.boot(ctx);
     if (head === 'context' && !rest)
-      return surface.context ? surface.context({}, ctx) : unbuilt('context', 'Read braindog:boot instead.');
+      return surface.context ? taught(await surface.context({}, ctx)) : unbuilt('context', 'Read braindog:boot instead.');
     if (head === 'sessions' && rest === 'live')
       return surface.sessionsLive ? surface.sessionsLive({}, ctx) : unbuilt('sessions/live', 'Nothing else lists live sessions yet.');
     if (head === 'decisions' && !rest) return surface.governance({ register: 'suggestion' } as never, ctx);
