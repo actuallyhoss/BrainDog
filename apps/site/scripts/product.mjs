@@ -3,7 +3,7 @@
  *
  *   node scripts/product.mjs        # writes static/shots/<name>[-phone]-<scheme>.webp
  *
- * THESE ARE SHIPPED ASSETS, not review artefacts — `scripts/shot.mjs` beside this one photographs
+ * THESE ARE SHIPPED ASSETS, not review artefacts: `scripts/shot.mjs` beside this one photographs
  * the SITE for a person to look at, and those go to `shots/`. These go to `static/shots/` and get
  * served to the public, which is why they need a script at all: they were made by hand once, and a
  * hand-made screenshot of a product that is still changing is a marketing page that quietly starts
@@ -45,50 +45,34 @@ const OUT = join(import.meta.dirname, '..', 'static', 'shots');
 const PORT = 5188;
 
 /**
- * SIX SHOTS, BECAUSE THE PAGE'S ARGUMENT IS NOW THE PICTURES (`loop/DIRECTION.md` §19).
+ * ONE SHOT, BECAUSE ONE IS WHAT THE PAGE DRAWS.
  *
- * This list was one, and before that five. The five went because they were painted below full size
- * in a bento, so nobody could read them; the one that stayed was `home`, and a page arguing its case
- * with a single screenshot and six paragraphs is the page he has just called long, boring and all
- * text. So the list grows again, and this time on a rule rather than on a layout: EVERY ENTRY IS A
- * SCREEN THAT SHOWS WHAT A PERSON GETS, never one that shows how the thing is built. No register
- * grid, no pack page, no audit trail. Those are reasons to stay, not reasons to look.
+ * This list was one, then five, then one, then six. The six were chosen on a rule that still holds,
+ * EVERY ENTRY IS A SCREEN THAT SHOWS WHAT A PERSON GETS, never one that shows how the thing is built,
+ * and measured by opening sixteen of the seeded record's routes at 1440 by 900 (`/inbox` and `/spark`
+ * photograph as empty states, `/p/ledger` leads with a warning panel, `/r/*` are the mechanism).
  *
- * WHY THESE SIX AND NOT OTHERS, measured by opening sixteen of the seeded record's routes at 1440 by
- * 900 and looking at every one:
- *   - `/inbox` photographs as an empty state ("Nothing waits in the inbox"), because the seed files
- *     everything it receives. One picture, no content.
- *   - `/spark` photographs as "Nothing to suggest yet": Spark waits two weeks before it proposes,
- *     and the screen's own words are "This BrainDog started today".
- *   - `/p/ledger` leads with a warning panel about nine uncategorised rows. True, and not the first
- *     thing a stranger should meet.
- *   - `/r/*` are the register grids. That is the mechanism, and §19 puts mechanism after value.
+ * BUT FIVE OF THE SIX HAD NO READER. On 22 September every `/shots/` token in the built site was
+ * extracted and there were nine: this script's `home` in four captures and its og:image PNG, and
+ * the founder dashboard `usecases.mjs` takes. `money`, `board`, `projects`, `project` and `decide`
+ * were twenty WebPs, 2,774,922 bytes, deployed on every push and fetched by nobody: the page had
+ * stopped drawing them and this list had not been told. A capture no page names is not free: it
+ * ships, it goes stale in the next palette change, and nothing says so. They were deleted and
+ * their entries with them, so a run cannot put them back. `scripts/shots.test.mjs` fails if this
+ * list names a capture `apps/site/src` does not, and it is the check to read before adding one: add
+ * the page's `<img>` first.
  *
  * `png` IS THE EXCEPTION AND NOT THE RULE. `app.html` names `home-light.png` as the `og:image`, and
  * a link preview fetcher is somebody else's server: not every one of them decodes WebP. That is one
- * file. Every other capture ships as WebP alone — see the shutter below for what the old `path:`
+ * file. Every other capture ships as WebP alone; see the shutter below for what the old `path:`
  * argument cost.
  *
  * `act` runs after load and before the shutter, and is skipped at phone width (the layout differs).
  */
 const SHOTS = [
   /* The day: what you are owed, what is due, what needs your call, and what the agents did while you
-     were away. It is the only screen that holds all four at once, which is why it is still first. */
+     were away. It is the only screen that holds all four at once, which is why it is the one. */
   { name: 'home', route: '/', png: true },
-  /* Cash now and cash ahead, with the date the line crosses zero called out and two scrubbers under
-     it. The most graphical screen the product has and the one that answers "what is this worth". */
-  { name: 'money', route: '/p/money' },
-  /* Six columns of real cards across the full width. The picture that answers "is this an exciting
-     tool", because it is the one that looks like something being used rather than read. */
-  { name: 'board', route: '/p/work-board' },
-  /* Three progress rings, a health band and what each project earns: the portfolio at a glance. */
-  { name: 'projects', route: '/p/portfolio' },
-  /* One project, which §5 calls the flagship: its ring, its open work, and the agents at work on it
-     with what each is doing right now. */
-  { name: 'project', route: '/p/kiln' },
-  /* Eight questions with their answers as buttons, which is the whole agent argument in one frame:
-     the agent drafted the change, and pressing a word is how it happens. */
-  { name: 'decide', route: '/decide' },
 ];
 
 const TYPES = {

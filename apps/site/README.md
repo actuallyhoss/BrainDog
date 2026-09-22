@@ -75,14 +75,14 @@ not offer yet is skipped and said.
 Of those, **the page serves one**: the founder's Dashboard, in the reporting band. The five
 arrangements are drawn by `Arrange.svelte` now, because five photographs of five arrangements of
 the same application, each painted below full size, were five pictures a reader could not read and
-could not tell apart. The script still takes all of them, since it is the cheapest way to see what
-a stranger actually gets out of `/start`, and that is worth keeping whether or not a page serves
-the result. **Do not commit the ones no page asks for**: `static/` is deployed whole, and the
-twenty-four that nobody requested were 3 MB of it.
+could not tell apart. **So the script writes into `static/shots/` only what a page serves** (its
+`SHIPPED` list), because `static/` is deployed whole and the twenty-four that nobody requested were
+3 MB of it until 22 September. `--png=<dir>` still takes every use case, into a directory of your
+choosing, since that is the cheapest way to see what a stranger actually gets out of `/start`.
 
 `scripts/product.mjs` writes `static/shots/` from the app's build, or from a running app with
-`--from=http://localhost:5317` while the build lags the source. It takes one shot, `home`, for the
-same reason: it used to take five, and the other four existed for sections the redesign deleted.
+`--from=http://localhost:5317` while the build lags the source. Its `SHOTS` list holds only the
+shots a page serves, for the same reason.
 The page serves the `home` WebPs; `home-light.png` is the `og:image` in `src/app.html`, because not
 every preview fetcher decodes WebP.
 
