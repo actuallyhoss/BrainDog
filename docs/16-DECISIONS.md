@@ -125,13 +125,15 @@ agent — and the product is already about agents.
 **Would reverse it:** a class of pack customers demonstrably need that no declaration plus an agent
 can express — and the answer would still be a ninth kind before a sandbox.
 
-**Under review (September 22nd 2026).** DIRECTION §22 makes scripts user content: a person, Claude
-or Spark writes one and attaches it to a schedule or a door. Whether that script runs where the
-person runs it (this ADR survives, with "an agent" widened to "an agent or the person's own code")
-or in a sandbox BrainDog hosts (this ADR is reversed) is the owner's open decision under
-[DIRECTION §22](../loop/DIRECTION.md), set out in
-[research-shell-scripts.md](../loop/research-shell-scripts.md). It needs a superseding ADR once
-decided, and until then nothing here changes.
+**Amended September 22nd 2026, by the owner's answer "both" ([DIRECTION §22](../loop/DIRECTION.md)).**
+Never a script in the core; a person's or an agent's script is record content, run in a sandbox
+BrainDog hosts (metered, per account) or anywhere outside that pushes in through a door or the
+API. A person, Claude or Spark writes one and attaches it to a schedule or a door, and its writes
+arrive through the same API anything else uses, under its own actor. What survives of this ADR is
+the part that was load-bearing: a pack is data, nothing a pack declares executes inside the record,
+and no user code runs in the record's own object. What it no longer says is "no sandbox": the
+hosted sandbox is a convenience, never required, and its ceilings, metering and key handling are
+[research-shell-scripts.md](../loop/research-shell-scripts.md).
 
 ---
 

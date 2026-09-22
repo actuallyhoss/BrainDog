@@ -480,6 +480,14 @@ invoice is to somebody), and its example rows arrive marked `example`. A list wh
 refused is said in one sentence, "Money was not added: ...", and nothing is made in it. The demo holds
 every first-party list already, so it is unchanged.)*
 
+> **Where this goes (September 22nd 2026, [DIRECTION §22](../loop/DIRECTION.md)).** Onboarding
+> proposes lists and fields from the person's own words, with no fixed kinds: the sentence goes to
+> Spark, or to a rule set a pack brings, and what comes back is a proposed list with the fields it
+> heard, which the person accepts. The three notes above describe the build as it stands and are
+> the thing to replace, not the design. Measured at `da9326d6`, `apps/web/src/lib/shape.ts:65` is a
+> `LEXICON` of fixed word lists mapped to the first-party packs (domains and subscriptions turn on
+> `estate`, invoices and VAT turn on `money-core`), which is a list of use cases living in the app.
+
 **Screen 1 — one row, typed by hand.** Not pack selection, not a capture box, not a dashboard.
 
 ```
@@ -493,6 +501,11 @@ every first-party list already, so it is unchanged.)*
    A record holds typed rows. Pick one kind and add a real one —
    you can add the rest later, and delete this one.
 ```
+
+> **Corrected September 22nd 2026 ([DIRECTION §22](../loop/DIRECTION.md)).** The three kinds above
+> are the screen as first drawn, and two of them are one owner's use cases. Screen 1 asks for one
+> thing the person wants to keep, in their own words, and proposes a list with the fields it heard;
+> no kind is fixed in advance. The rest of this section holds for whatever list that proposal makes.
 
 One choice installs **one** register, and lands the user in **the row form for it**, focused, with a
 real due date pre-filled to a plausible value they can overwrite. **Their first act is typing one

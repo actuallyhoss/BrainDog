@@ -25,7 +25,7 @@ BrainDog mechanism produces it. **Where none did, this document adds the mechani
 | Brain features traced | **~190** | routes, tools, screens, derivations, rules, harnesses |
 | Already obtainable in BrainDog as designed | ~105 | a register, a page, a rule, a metric, or a kernel table already covers it |
 | Obtainable **after additions made in this pass** | ~60 | fourteen data-model additions, nine kernel tables added across the trace and this review — `member`, `device_grant`, `person`, `token`, `auth_fail`, `counter`, `vault_key`, `job`, `job_event` — one kernel register, a dialect extension. *(An earlier draft said "two kernel tables" and named neither.)* |
-| Stays **native code** in a first-party pack | ~18 | parsers, crypto, the forecast simulation, the runner, provider adapters |
+| Stays **native code** | ~18 | crypto, the runner and the auth kinds are primitives and stay in the core. Bank SMS parsing, Mercury and Stripe sync and a merchant logo proxy are use cases: they become scripts or shared packs a person installs, never code in `packages/` ([DIRECTION §22](../loop/DIRECTION.md); §6 below) |
 | **Not carried, deliberately** | 7 | §7 — each with the reason |
 
 > **The shape of the gaps was the finding.** They were not scattered. Nearly every one was a case
@@ -391,9 +391,15 @@ marked so nobody re-runs them — *"Settled by research, do not run it again."*
 
 ## 5 · The first-party packs that carry the brain
 
-Six first-party packs in all — `agents · work · portfolio · money-core · estate · people`. Five carry
+Six first-party packs in all: `agents · work · portfolio · money-core · estate · people`. Five carry
 brain features; `people` is the counterparty register the money packs refer to, and it is listed so
 the count is stated once and does not drift.
+
+> **What these six are (September 22nd 2026, [DIRECTION §22](../loop/DIRECTION.md)).** The core
+> ships as packs, and these six are examples in a shared catalogue, not a set the product is defined
+> by. Money, estate and portfolio are one person's use cases, and a use case not everyone needs is
+> not shipped with the code: a person installs one of these, or builds the same lists at run time
+> with an agent. "Installed when" below is a trigger for a proposal, never an install nobody accepted.
 
 | Pack | Registers | Installed when |
 |---|---|---|
@@ -502,7 +508,13 @@ rule: a `ref` to a row that itself has a parent is rewritten at write, not refus
 ## 6 · What stays native, and why each one does
 
 [04-PACKS](04-PACKS.md) §6 allows a native tier where craft beats configuration. These are the
-brain's features that land there, each with the reason it is not a declaration:
+brain's features that land there, each with the reason it is not a declaration.
+
+> **Corrected September 22nd 2026 ([DIRECTION §22](../loop/DIRECTION.md)).** Vault crypto, passkeys,
+> the doors, the runner and screenshot mode are primitives and stay native. The SMS parser's bank
+> formats, Company sync (Mercury, Stripe) and the logo proxy are use cases: each becomes a script or
+> a shared pack a person installs, never code in `packages/`. Their rows are kept for what they
+> measured, which is what that script or pack has to do.
 
 | Native | Why not data |
 |---|---|
@@ -542,7 +554,7 @@ them**, and the design already has the mechanism — [29-EMERGENT-PAGES](29-EMER
 | Registers | none. **Zero.** The first row in a register proposes its page |
 | Packs | none installed. Pack selection is the *second* screen, optional forever |
 | Sessions | the register exists in the kernel and has **no page and no nav entry until an agent connects** |
-| The `agents` pack | **installs itself when the first agent token is minted** — learnings, skills and credentials appear the moment there is an agent to use them, and not before |
+| The `agents` pack | **is proposed when the first agent token is minted**, and installs when the person accepts. Learnings, skills and keys are one way of using agents, and an install nobody accepted contradicts "the person accepts" ([DIRECTION](../loop/DIRECTION.md) §11, §5c, §22). *(An earlier revision had it install itself.)* |
 | Money, estate, portfolio | each one screen when its pack is installed, and its emergent pages after that |
 | Themes | one. The picker appears at the second theme |
 | Spark | absent without a model; present as a palette row with one line otherwise |

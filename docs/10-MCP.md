@@ -67,7 +67,8 @@ without one gets `403 NEEDS_BROWSER_SESSION`; over MCP every token is refused (�
 
 ## 3 · The tool surface is DYNAMIC and per-customer
 
-A customer's registers come from *their* installed packs. A freelancer with `money-core` and `freelancer-uk` has
+A customer's registers come from *their* installed packs and from what they and their agents added
+at run time ([DIRECTION §22](../loop/DIRECTION.md)). A freelancer with `money-core` and `freelancer-uk` has
 different registers from a studio with `products` and `people`, and the same fourteen tools reach all of them.
 
 ### The generation rule

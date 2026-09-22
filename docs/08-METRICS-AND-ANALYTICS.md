@@ -254,6 +254,15 @@ figure is. The conversion is not declared per figure with `{ lookup: fx, as_of }
 because a person who holds money in two currencies means every figure when they choose a home one. The arithmetic
 is one module, `packages/kernel/src/fx.ts`, which the browser's reader imports.
 
+> **Which half is the kernel's (September 22nd 2026, [DIRECTION §22](../loop/DIRECTION.md)).** The
+> kernel owns money and never adds two currencies: an amount is an integer in minor units with its
+> own currency, and a sum over several is parts, not a number. The rates register and the home
+> currency are a pack's: which list holds rates and which setting names a home currency are brought
+> by `money-core` or whichever pack a person installs, and passed in, not named by the kernel.
+> Measured at `da9326d6`, the kernel still names both: `packages/kernel/src/fx.ts:242` exports
+> `HOME_CURRENCY_SETTING = 'home_currency'`, which `declare.ts` reads, and `packages/kernel/src/index.ts`
+> looks up a list called `fx` by name for rates. That is the gap to close, not the design.
+
 | | |
 |---|---|
 | **The currency a figure is added up in** | the home currency when one is set, else the currency its `format` declares |

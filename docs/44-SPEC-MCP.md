@@ -641,6 +641,15 @@ the call.
 `ROUTE_UNKNOWN`, with the fourteen in `allowed` (§5.3), and the record refuses a token at those groups in any case
 (30 §10). The table below is an earlier revision's design, kept as that.
 
+> **The ADMIN row is about a direct write, not about metadata (September 22nd 2026,
+> [DIRECTION §22](../loop/DIRECTION.md)).** An agent never calls `setDeclaration`, and it does not need to: it adds a
+> field, or a value to a closed list, by `propose` with `body_kind: 'change'` and `to: { add: { register, fields, values } }`,
+> which is merged onto whatever is live when it lands, so two additions never race (`packages/kernel/src/govern.ts`,
+> `addTo`). A new list is not an addition: `addTo` refuses one with `REGISTER_UNKNOWN`, and it is proposed whole. The owner's answer of September 22nd: an additive, optional one lands at once and is logged in history
+> ("Claude added domain to Projects"); removing, retyping or narrowing a field still waits for the owner's Accept in
+> Decide. Measured at `da9326d6`, the landing without a press is not built yet, and an `add` still waits for Accept
+> like any change.
+
 | Code | Group | Methods (`tools/call` by name) | The `fix` an agent reads |
 |---|---|---|---|
 | `NEEDS_BROWSER_SESSION` | VAULT | `listGrants` `openGrant` `bindGrant` `revokeGrant` | *A credential is the highest-value thing prompt injection could ask for. The vault answers a browser session only; no token reaches it.* |

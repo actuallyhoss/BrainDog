@@ -46,7 +46,7 @@ export type SparkDeps = {
 
 export interface Spark {
   // ── tier A jobs (11 §3). Every one returns a VALUE the host writes back through ackOutbox; none writes a row ──
-  triage(raw: RawPayload): Promise<Result<Triage>>;
+  triage(raw: RawPayload, ctx: CallContext): Promise<Result<Triage>>;                  // ctx: the record whose lists %INDEX% prints
   proposePattern(samples: RawPayload[], ctx: CallContext): Promise<Result<Proposal>>;   // files body_kind 'pattern'
   digestProse(sections: DigestSection[]): Promise<Result<Prose>>;
   embed(texts: string[]): Promise<Result<Embedding>>;
@@ -256,7 +256,7 @@ type ChangeBody = { declaration_id: string; from: object; to: object;           
 
 ```ts
 type RawPayload    = { id: string; channel: 'email'|'webhook'|'pull'|'paste'|'api'; ts: string; from: string | null; subject: string | null; body: string };
-type Triage        = { shape: string; kind: 'money'|'renewal'|'invoice'|'receipt'|'alert'|'newsletter'|'other'; actionable: boolean; model: string };
+type Triage        = { shape: string; register: string | null; actionable: boolean; model: string };   // one of the record's own lists, or none
 type DigestSection = { heading: string; rows: { path: string; value: string }[] };   // only sections that are present (09 §6)
 type Prose         = { prose: string | null; model: string };                         // null: the digest ships without it
 type Embedding     = { model: string; dims: number; vectors: Int8Array[] };
@@ -356,8 +356,16 @@ Write at most two sentences of context for the reader. A figure is its path, {{l
 One message arrived that no declared pattern matched. It is inside an <untrusted> fence, JSON-encoded.
 %SAMPLE%
 
-Classify it. kind: money · renewal · invoice · receipt · alert · newsletter · other. actionable: true when a person would want it in their business record.
+The lists this record keeps:
+%INDEX%
+
+Which of these lists does it belong to? register: that list's id, or null when it belongs to none. actionable: true when a person would want it in their business record.
 ```
+
+*(Corrected September 22nd 2026, [DIRECTION §22](../loop/DIRECTION.md). An earlier revision classified every arrival
+into a closed `kind`: money, renewal, invoice, receipt, alert, newsletter, other. Those are one owner's business kinds;
+triage classifies against the record's own lists, whatever they are. Triage has no caller in this tree yet
+(`packages/spark/src/index.ts`, the header), so nothing built changes.)*
 
 **`change`** — 24 §4.4:
 
@@ -388,7 +396,7 @@ draft:    Draft a write-up for %SUBJECT% in the block dialect (read the dialect 
 
 | id | Required keys |
 |---|---|
-| `triage` | `kind` (the seven), `actionable` boolean, `flagged` boolean |
+| `triage` | `register` (an id `%INDEX%` printed, or null), `actionable` boolean, `flagged` boolean |
 | `predicate` | `registers` string[] (1–3), `where` object \| null, `q` string \| null |
 | `propose` | `text`, `body_kind` (`query options rowset`), `body`, `flagged` |
 | `pattern` | `ingest` (the `declare` ingest body), `flagged` |
@@ -483,8 +491,12 @@ read from the standard's text and not measured in a browser.
 **What is mounted is four of the five cookie rows**, on both hosts: `read`, `status`, `settings` and `propose`.
 `servesSpark` matches those four paths and both hosts dispatch on it alone. `POST /api/spark/pattern` has no door,
 because `proposePattern` is neither metered nor capped (§5.3, F4) and a door in front of it would be an unmetered model
-call behind a button. Neither host builds `byok` yet, so the settings door refuses `tier: 'b'` with `501
-NOT_IN_THIS_BUILD` at `tier` rather than store a tier no `propose` could serve. The JOBS rows and `/ws/runner` wait on
+call behind a button. Both hosts build `byok` (`sparkByokOf`, `packages/host/src/spark.ts`) wherever a key can be
+opened: the self-host when it has a key store (`sparkDoor`, `apps/selfhost/src/spark.ts`), the Worker when its wire
+has an `openKey` (`workerSparkDoor`, `apps/worker/src/spark.ts`), and `apps/selfhost/test/spark-named.test.ts` saves tier `b` with 200. A host
+that can open no key hands the door no `byok`, and there the settings door refuses `tier: 'b'` with `501
+NOT_IN_THIS_BUILD` at `tier` rather than store a tier no `propose` could serve. *(Until September 22nd this said
+neither host built `byok`; `bd8add33` built it on both, `loop/research-batch-thirty-one-audit.md` finding 6.)* The JOBS rows and `/ws/runner` wait on
 the record's six JOBS methods, which do not exist (`packages/spark/src/index.ts`, the header).
 
 ### 5.3 · Tier A jobs
@@ -501,8 +513,9 @@ Common steps, then the differences. Every job:
 
 **`triage(raw)`** — 11 §3, 07 §7 step 3′:
 5a. `shape = shapeOf(raw)` (§4.4) — computed before the model and independent of it.
-5b. On a parse or schema failure the verdict is `{ kind: 'other', actionable: true }`: a wrong skip is the silent failure (07 §2), so failure lands in front of a person.
-Returns `{ shape, kind, actionable, model }`. The ingest Workflow writes `inbox_raw.state` and `reason`; this package does not.
+5a′. `%INDEX%` is `Projection.index` from `record.project` for `ctx`, as the predicate's is. Classifying against the record's own lists needs those lists, so `triage` takes a `ctx` that the closed `kind` of an earlier revision did not.
+5b. On a parse or schema failure, or a `register` the record does not hold, the verdict is `{ register: null, actionable: true }`: a wrong skip is the silent failure (07 §2), so failure lands in front of a person.
+Returns `{ shape, register, actionable, model }`. The ingest Workflow writes `inbox_raw.state` and `reason`; this package does not.
 
 **`proposePattern(samples, ctx)`** — 07 §4, 23 §4. The intent is three or more `RawPayload`s of one `shape` (24 §4.3's n_min 3). **The code does not keep either half.** `jobs.ts` refuses only an empty list (`VALUE_MALFORMED` at `samples`, no model call) and compares no `shape`: measured on 22 September, one sample reached the model and was accounted as a `pattern` row. The gap is open; the three-of-one-shape rule is today the caller's to keep, and no caller exists. Two more gaps sit beside it (`loop/research-spark-routes.md` F4): the job is not metered, because `asksUsed` does not count `kind = 'pattern'` and `proposePattern` never checks the cap, so `ask_cap: 0` does not stop it; and it always calls `deps.inference`, never a tier `b` adapter.
 5a. `declare.validate('ingest', out.ingest)` — a refusal (e.g. `KIND_UNKNOWN`, `MATCH_FIELD_UNKNOWN`, `CONTAINS_TOO_LONG`) is returned as-is.
@@ -723,8 +736,8 @@ What is not claimed: no classifier detects injection. The `flagged` bit is a hig
 
 | Case | Expected |
 |---|---|
-| `triage` golden valid | `{ shape: 'email|hsbc.com.eg|HSBC: You have received EGP #.# from …', kind: 'money', actionable: true }` — `shape` equal for three fixtures differing only in digits. The printed example said `#,#.#` until 2026-09-20, which the clause after it makes impossible: a thousands separator that survives the mask puts `1,200.50` and `99.00` in two shapes, so two receipts from one bank never reach the three a pattern needs. One number is one `#`. |
-| `triage` malformed JSON | `{ kind: 'other', actionable: true }`, `call.status = 'error'`, `code = 'PROPOSAL_SCHEMA'` |
+| `triage` golden valid | `{ shape: 'email|hsbc.com.eg|HSBC: You have received EGP #.# from …', register: 'transactions', actionable: true }` on a record that keeps a `transactions` list; `shape` equal for three fixtures differing only in digits. The printed example said `#,#.#` until 2026-09-20, which the clause after it makes impossible: a thousands separator that survives the mask puts `1,200.50` and `99.00` in two shapes, so two receipts from one bank never reach the three a pattern needs. One number is one `#`. |
+| `triage` malformed JSON | `{ register: null, actionable: true }`, `call.status = 'error'`, `code = 'PROPOSAL_SCHEMA'` |
 | `pattern` golden valid, three HSBC fixtures | `record.propose` called once with `body_kind 'pattern'`, `confidence 'needs-review'`, `samples` = the three ids; `citations.length = 3` |
 | `pattern` with `between: ["at ", " - "]` when no sample contains `" - "` | `PROPOSAL_UNCITED` at `extract.merchant.between[1]`; `propose` not called |
 | `pattern` golden with `confidence: 'exact'` | filed with `needs-review` |
@@ -848,7 +861,7 @@ Position: eleventh of fifteen (31 §2); Phase B7 for the palette, Phase A for `t
 | 12 | **The palette is two calls**, `read` then `propose`, so pass 1 renders without a stream and Escape between them is a free cancellation: pass 2 is never called and never spent. Pass 1 has already spent its one ask by then (§4.1, one per model call) | 23 §7 |
 | 13 | **Lost jobs are re-claimed once** inside the claim statement; expiry is applied by `claimJob`; `preferred` is not built | 26 §2.4, 33 §11 *Lost* and *Expire* |
 | 14 | **A Spark-derived `pattern` always files `confidence: needs-review`**; a person raises it at review | 07 §4, 23 §4 |
-| 15 | **`Triage.shape` is deterministic** — channel, sender domain, digit-blanked subject; the model contributes `kind` and `actionable` only | 11 §3 *Triage*, 24 §4.3 *Unmatched ingest shape* |
+| 15 | **`Triage.shape` is deterministic**: channel, sender domain, digit-blanked subject; the model contributes `register` (one of the record's own lists, or null) and `actionable` only | 11 §3 *Triage*, 24 §4.3 *Unmatched ingest shape* |
 | 16 | **`fetch` is lint-banned under `packages/spark/**`** as it is under `packages/record/**` | 31 §3 layer 4 |
 
 Sixteen, counted.

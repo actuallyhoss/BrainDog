@@ -151,17 +151,21 @@ across [05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) and [13-UI](13-UI.md). It
 
 ## The one rule the whole platform rests on
 
-> **Extensions are DATA. Where data is not enough, the extension is an AGENT — never a script.**
+> **Extensions are DATA. Where data is not enough, the extension is an AGENT, or a script, and
+> never a script in the core. A person's or an agent's script is record content, run in a sandbox
+> BrainDog hosts (metered) or anywhere outside that pushes in through a door or the API.**
 
-A table survives a shared Worker; an `eval` does not. So there is no sandbox to secure, every
-variant is a readable diffable file, and everything modular in this design follows from it.
+A table survives a shared Worker; an `eval` does not. So no user code runs inside the record's own
+object, every declaration is a readable diffable file, and everything modular in this design
+follows from it. A script is not a declaration: it is a row the record stores, attached to a door or
+a schedule, and whatever it writes arrives through the same API anything else uses, under its own
+actor. Hosted is a convenience and never required; a Claude routine, a server or a cron that pushes
+in is the same thing to the record. The design is
+[research-shell-scripts.md](../loop/research-shell-scripts.md).
 
-> **Open question, not settled here (September 22nd 2026).** DIRECTION §22 makes scripts user
-> content, and whether that means a script the person runs with their own tools or one BrainDog runs
-> in a sandbox it hosts is the owner's open decision under [DIRECTION §22](../loop/DIRECTION.md);
-> the two readings and what each reverses are laid out in
-> [research-shell-scripts.md](../loop/research-shell-scripts.md). Until it is decided, this rule
-> stands as written.
+*An earlier revision ended this rule "never a script". The owner answered "both" on September 22nd
+2026 ([DIRECTION §22](../loop/DIRECTION.md)): BrainDog hosts small sandboxed scripts for
+convenience, and anything can run outside and push in.*
 
 ---
 
@@ -171,7 +175,7 @@ variant is a readable diffable file, and everything modular in this design follo
 |---|---|
 | Real-time co-editing | ~15–20d plus permanent maintenance, and it is where Nimbalyst and AFFiNE already sit. Tier 4, not this year |
 | A double-entry accounting rewrite | 25–40d to reach parity with what Actual Budget and Firefly III give away free |
-| A plugin system that runs user code | See the rule above. This is not a limit on the platform — it is what makes it possible. Whatever is decided about scripts, user code never runs inside the record's own object; whether a person's script may run in a sandbox BrainDog hosts is open under DIRECTION §22 ([research-shell-scripts.md](../loop/research-shell-scripts.md)) |
+| A plugin system that runs user code inside the record | See the rule above. User code never runs inside the record's own object, and that is what makes the platform possible rather than a limit on it. A person's or an agent's script is record content, run in a metered sandbox BrainDog hosts or outside it, pushing in through a door or the API ([research-shell-scripts.md](../loop/research-shell-scripts.md)) |
 | Paid packs in v1 | Tax, VAT, refunds, chargebacks and moderation are a company, not a feature |
 | A shared vector index | Breaks self-host parity and the isolation proof. See [ADR-006](16-DECISIONS.md) |
 | Event tracking, funnels, sessions on customer data | This is a record, not an analytics product |

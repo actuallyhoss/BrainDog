@@ -273,9 +273,12 @@ guidelines.
 that fires nightly until you act is a reminder you filter to a folder.
 
 **2 · Batch by default; interrupt by exception.** Everything lands in the daily or weekly digest
-unless it is explicitly `urgent`. Only three things are urgent by default: a payment failing, a
-credential expiring inside 48 hours, and a domain expiring inside 7 days. Anything else a pack
-marks urgent shows in the install diff as `interrupts you`.
+unless it is explicitly `urgent`. The core knows only a row a rule marks `urgent`, and its one
+default is the vault's own: a credential expiring inside 48 hours. Which other rows are urgent (a
+payment failing, a domain expiring inside 7 days) is declared by whoever built that list, a person,
+an agent or a pack, and anything a pack marks urgent shows in the install diff as `interrupts you`.
+*(An earlier revision made a failed payment and an expiring domain core defaults. Those are one
+owner's use cases, and [DIRECTION §22](../loop/DIRECTION.md) keeps use cases out of the core.)*
 
 **3 · Quiet hours, per record, on by default.** 22:00–08:00 in the record's timezone. A
 non-urgent notification due inside quiet hours moves to the next opening. This is why the record

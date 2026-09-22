@@ -5,9 +5,11 @@ This document is what that buys, and why it is not "multiplayer".
 
 The strategic frame is settled and not re-litigated here: **real-time co-editing is not the pitch
 and is not built this year.** Competitors collaborate on *code* artefacts — sessions, diffs,
-plans, bugs. None of them has a money ledger, a domain register or a credential index. The
-differentiated thing is a shared typed **business** record, and the differentiated *feature* is
-the shared **decision**.
+plans, bugs. None of them is a typed record with doors in and out, schedules, pages and a vault
+that a team and its agents shape to whatever the business runs; a money ledger, a domain register
+and a credential index are examples of what a team builds on it, not the pitch
+([DIRECTION §22](../loop/DIRECTION.md)). The differentiated thing is that shared typed
+**business** record, and the differentiated *feature* is the shared **decision**.
 
 ---
 

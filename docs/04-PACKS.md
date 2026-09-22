@@ -3,16 +3,20 @@
 The spine. Everything modular in BrainDog is an instance of this one format, including the parts
 we ship ourselves.
 
-> **Extensions are DATA. Where data is not enough, the extension is an AGENT — never a script.**
+> **Extensions are DATA. Where data is not enough, the extension is an AGENT, or a script, and
+> never a script in the core. A person's or an agent's script is record content, run in a sandbox
+> BrainDog hosts (metered) or anywhere outside that pushes in through a door or the API.**
 
-A table survives a shared Worker; an `eval` does not. So nothing a user or a pack author writes
-is ever executed. Anything needing real computation is an agent with a skill and a schedule —
-which is what this product is already about.
+A table survives a shared Worker; an `eval` does not. So nothing a pack author writes is executed
+by the record, and no user code runs inside the record's own object. Anything needing real
+computation is an agent with a skill and a schedule, or a script: a row attached to a door or a
+schedule, run in a metered sandbox BrainDog hosts or anywhere outside, whose writes arrive through
+the same API anything else uses. The design is
+[research-shell-scripts.md](../loop/research-shell-scripts.md).
 
-> **Open question (September 22nd 2026).** Whether a script a person or an agent writes may run in
-> a sandbox BrainDog hosts, or only where the person runs it, is the owner's open decision under
-> [DIRECTION §22](../loop/DIRECTION.md); see
-> [research-shell-scripts.md](../loop/research-shell-scripts.md). This page does not settle it.
+*An earlier revision ended this rule "never a script". The owner answered "both" on September 22nd
+2026 ([DIRECTION §22](../loop/DIRECTION.md)): hosted for convenience, outside whenever the person
+prefers, and hosted is never required.*
 
 ---
 
@@ -30,14 +34,17 @@ which is what this product is already about.
 | `digest` | scheduled output | schedule, sections (each `as:` a kind, `omit_when_empty:` to drop an empty one), channel |
 
 A ninth kind means a ninth schema, a ninth validator and a ninth way to be insecure. **If it does
-not fit these eight, it is an agent, or the person's own script, attached to a door or a
-schedule and writing through the same API anything else uses.**
+not fit these eight, it is an agent, or a person's or an agent's script, attached to a door or a
+schedule, run in a metered sandbox BrainDog hosts or anywhere outside, and writing through the
+same API anything else uses.**
 
 *An earlier revision stopped at "it is an agent". DIRECTION §22 (September 22nd 2026) makes
-scripts user content and asks for an automations layer (trigger, steps, action) that a person
-draws and an agent edits through MCP. Whether an automation is a ninth kind or a composition of
-`ingest`, `rule` and schedules is not yet specified; it has to be decided here, because the closed
-list is the security argument in §7.*
+scripts record content and asks for an automations layer (trigger, steps, action) that a person
+draws and an agent edits through MCP. The first piece is built as a composition, not a ninth kind:
+a `rule` can carry a trigger and steps, linted at install (`packages/kernel/src/flow-lint.ts`,
+[07-INGEST-AND-RULES](07-INGEST-AND-RULES.md)). Whether a script is itself a declared kind is
+[research-shell-scripts.md](../loop/research-shell-scripts.md) §0, and it has to be settled here,
+because the closed list is the security argument in §7.*
 
 The closure is load-bearing rather than tidy: the security argument in §7 is an *enumeration*,
 and an enumeration only works over a finite list.
