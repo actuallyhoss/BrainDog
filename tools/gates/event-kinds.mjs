@@ -30,8 +30,6 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
-
 /**
  * A SOURCE THAT IS NOT THERE IS A FINDING AND NOT A SKIP, which is the opposite of the answer
  * `bundle` gives to the same question and is right for the opposite reason.
@@ -50,7 +48,7 @@ const root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', i
  * permission error or a bad encoding is this gate failing to read a file that is there, which is
  * not the same fact and must not be dressed up as one.
  */
-const read = (...parts) => {
+const read = (root, ...parts) => {
   try {
     return readFileSync(join(root, ...parts), 'utf8');
   } catch (err) {
@@ -81,109 +79,132 @@ function eventCheck(text, what) {
   return checkMembers(text.slice(at, text.indexOf('\n);', at)), what);
 }
 
-const sources = [];
-const findings = [];
+/**
+ * THE CHECK IS A FUNCTION, imported by `run.mjs` rather than spawned: `52 §5.1` step 3, argued in
+ * the runner's `IMPORTED OR SPAWNED` header. Nothing in this file happens on import, and everything
+ * above this line is a declaration.
+ *
+ * THE ROOT IS AN ARGUMENT, defaulting to `BRAINDOG_GATE_ROOT`, which is the handle `self-test` aims
+ * this gate at a seeded tree with, and then to the repository this file sits in. `run.mjs` passes
+ * the root it derived from its own location, because an imported gate shares the runner's working
+ * directory and that is wherever the operator was standing. `read` takes it rather than closing
+ * over a module constant, because a module constant is the root of whoever imported this first.
+ *
+ * IT RETURNS 1 AND FALLS OFF THE END FOR A PASS, which is what `self-test`'s `silent-pass` grep
+ * rests on: a pass is the end of the function and never a statement inside it.
+ */
+export default function eventKinds(
+  root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..'),
+) {
+  const sources = [];
+  const findings = [];
 
-/* 1 · The DDL that actually runs. If any source is right, it is this one: the database refuses a
-   forty-first kind, and everything else is a description of that. */
-const migration = read(MIGRATION);
-sources.push(
-  migration === null ? { name: 'migration 0001', error: absent(MIGRATION) } : { name: 'migration 0001', ...eventCheck(migration, 'migration 0001') },
-);
-
-/* 2 · `30 §1`'s SQL block, which is the same DDL written down. The two are edited separately and
-   that is exactly the problem. */
-const blueprint = read(BLUEPRINT);
-sources.push(blueprint === null ? { name: '30 §1 SQL', error: absent(BLUEPRINT) } : { name: '30 §1 SQL', ...eventCheck(blueprint, '30 §1') });
-
-/* 3 · `30 §2`'s table: seven rows of backticked words, one per group. This is the source a person
-   reads, and the one most likely to gain a kind nothing else knows about. */
-const GROUPS = ['Rows', 'Governance', 'Declarations', 'Credentials', 'Ingest', 'Access', 'Lifecycle'];
-const table = [];
-const groupSizes = [];
-/* THE ABSENT DOCUMENT IS NAMED ONCE, NOT EIGHT TIMES. This section and the counting sentence below
-   both read the same file, and running them against nothing would turn one deletion into seven
-   missing rows plus a missing sentence, burying the one fact a person can act on. */
-if (blueprint !== null) {
-  for (const group of GROUPS) {
-    const row = new RegExp(`^\\|\\s*${group}\\s*\\|([^|]*)\\|`, 'm').exec(blueprint);
-    if (!row) {
-      findings.push(`30 §2's table has no ${group} row`);
-      continue;
-    }
-    const kinds = [...row[1].matchAll(/`([^`]+)`/g)].map((m) => m[1]);
-    groupSizes.push(kinds.length);
-    table.push(...kinds);
-  }
-  sources.push({ name: '30 §2 table', members: table });
-}
-
-/* 4 · `EVENT_KINDS`, which is what the code compares against. */
-const array = read(EVENTS);
-sources.push(
-  array === null
-    ? { name: 'EVENT_KINDS', error: absent(EVENTS) }
-    : {
-        name: 'EVENT_KINDS',
-        members: [...array.matchAll(/^const [A-Z]+ = \[([^\]]*)\] as const;/gm)].flatMap((m) =>
-          [...m[1].matchAll(/'([^']+)'/g)].map((k) => k[1]),
-        ),
-      },
-);
-
-for (const s of sources) if (s.error) findings.push(s.error);
-
-/* Every pair, both ways: a kind in one and not the other is a finding with a direction, because
-   "the migration is missing `score`" and "the table invented `score`" are different repairs. */
-const ok = sources.filter((s) => s.members);
-for (const a of ok)
-  for (const b of ok) {
-    if (a === b) continue;
-    for (const kind of a.members) if (!b.members.includes(kind)) findings.push(`${a.name} has \`${kind}\` and ${b.name} does not`);
-  }
-
-/* 5 · The sentence that counts. A count in prose is a claim, and this one is made twice, once as a
-   total and once as seven group sizes. */
-const counted =
-  blueprint === null
-    ? null
-    : /\*\*(\w+), counted\s*\S\s*(\d+) row · (\d+) governance · (\d+) declaration · (\d+) credential · (\d+) ingest · (\d+) access · (\d+) lifecycle/.exec(
-        blueprint,
-      );
-if (blueprint === null) {
-  /* Already a finding, named as the file it is. */
-} else if (!counted) findings.push("30 §2's counting sentence is not where this gate looks for it");
-else {
-  const WORDS = { Thirty: 30, Forty: 40, Fifty: 50 };
-  const said = WORDS[counted[1]];
-  const total = ok[0]?.members.length ?? 0;
-  if (said === undefined) findings.push(`30 §2 counts them as "${counted[1]}", which this gate cannot read as a number`);
-  else if (said !== total) findings.push(`30 §2 says ${counted[1]} (${said}) and there are ${total}`);
-  const sizes = counted.slice(2).map(Number);
-  sizes.forEach((n, i) => {
-    if (groupSizes[i] !== undefined && n !== groupSizes[i])
-      findings.push(`30 §2 counts ${n} ${GROUPS[i]?.toLowerCase()} and its own table lists ${groupSizes[i]}`);
-  });
-}
-
-/* AND NO DUPLICATES, in any of them. A list that says `edit` twice has thirty-nine kinds and a count
-   that agrees with nothing, and every comparison above would still pass. */
-for (const s of ok) {
-  const seen = new Set();
-  for (const kind of s.members) {
-    if (seen.has(kind)) findings.push(`${s.name} lists \`${kind}\` twice`);
-    seen.add(kind);
-  }
-}
-
-if (findings.length === 0) {
-  console.log(`  event-kinds: ${ok[0]?.members.length ?? 0} kinds, and ${ok.length} sources say the same`);
-} else {
-  console.error(`\n  event-kinds: ${findings.length} finding(s) (30 §2)\n`);
-  for (const f of [...new Set(findings)]) console.error(`    ${f}`);
-  console.error(
-    '\n  A new kind is a migration, and five places say what the vocabulary is: the migration,\n' +
-      "  30 §1's SQL, 30 §2's table, 30 §2's counting sentence, and EVENT_KINDS.\n",
+  /* 1 · The DDL that actually runs. If any source is right, it is this one: the database refuses a
+     forty-first kind, and everything else is a description of that. */
+  const migration = read(root, MIGRATION);
+  sources.push(
+    migration === null ? { name: 'migration 0001', error: absent(MIGRATION) } : { name: 'migration 0001', ...eventCheck(migration, 'migration 0001') },
   );
-  process.exitCode = 1;
+
+  /* 2 · `30 §1`'s SQL block, which is the same DDL written down. The two are edited separately and
+     that is exactly the problem. */
+  const blueprint = read(root, BLUEPRINT);
+  sources.push(blueprint === null ? { name: '30 §1 SQL', error: absent(BLUEPRINT) } : { name: '30 §1 SQL', ...eventCheck(blueprint, '30 §1') });
+
+  /* 3 · `30 §2`'s table: seven rows of backticked words, one per group. This is the source a person
+     reads, and the one most likely to gain a kind nothing else knows about. */
+  const GROUPS = ['Rows', 'Governance', 'Declarations', 'Credentials', 'Ingest', 'Access', 'Lifecycle'];
+  const table = [];
+  const groupSizes = [];
+  /* THE ABSENT DOCUMENT IS NAMED ONCE, NOT EIGHT TIMES. This section and the counting sentence below
+     both read the same file, and running them against nothing would turn one deletion into seven
+     missing rows plus a missing sentence, burying the one fact a person can act on. */
+  if (blueprint !== null) {
+    for (const group of GROUPS) {
+      const row = new RegExp(`^\\|\\s*${group}\\s*\\|([^|]*)\\|`, 'm').exec(blueprint);
+      if (!row) {
+        findings.push(`30 §2's table has no ${group} row`);
+        continue;
+      }
+      const kinds = [...row[1].matchAll(/`([^`]+)`/g)].map((m) => m[1]);
+      groupSizes.push(kinds.length);
+      table.push(...kinds);
+    }
+    sources.push({ name: '30 §2 table', members: table });
+  }
+
+  /* 4 · `EVENT_KINDS`, which is what the code compares against. */
+  const array = read(root, EVENTS);
+  sources.push(
+    array === null
+      ? { name: 'EVENT_KINDS', error: absent(EVENTS) }
+      : {
+          name: 'EVENT_KINDS',
+          members: [...array.matchAll(/^const [A-Z]+ = \[([^\]]*)\] as const;/gm)].flatMap((m) =>
+            [...m[1].matchAll(/'([^']+)'/g)].map((k) => k[1]),
+          ),
+        },
+  );
+
+  for (const s of sources) if (s.error) findings.push(s.error);
+
+  /* Every pair, both ways: a kind in one and not the other is a finding with a direction, because
+     "the migration is missing `score`" and "the table invented `score`" are different repairs. */
+  const ok = sources.filter((s) => s.members);
+  for (const a of ok)
+    for (const b of ok) {
+      if (a === b) continue;
+      for (const kind of a.members) if (!b.members.includes(kind)) findings.push(`${a.name} has \`${kind}\` and ${b.name} does not`);
+    }
+
+  /* 5 · The sentence that counts. A count in prose is a claim, and this one is made twice, once as a
+     total and once as seven group sizes. */
+  const counted =
+    blueprint === null
+      ? null
+      : /\*\*(\w+), counted\s*\S\s*(\d+) row · (\d+) governance · (\d+) declaration · (\d+) credential · (\d+) ingest · (\d+) access · (\d+) lifecycle/.exec(
+          blueprint,
+        );
+  if (blueprint === null) {
+    /* Already a finding, named as the file it is. */
+  } else if (!counted) findings.push("30 §2's counting sentence is not where this gate looks for it");
+  else {
+    const WORDS = { Thirty: 30, Forty: 40, Fifty: 50 };
+    const said = WORDS[counted[1]];
+    const total = ok[0]?.members.length ?? 0;
+    if (said === undefined) findings.push(`30 §2 counts them as "${counted[1]}", which this gate cannot read as a number`);
+    else if (said !== total) findings.push(`30 §2 says ${counted[1]} (${said}) and there are ${total}`);
+    const sizes = counted.slice(2).map(Number);
+    sizes.forEach((n, i) => {
+      if (groupSizes[i] !== undefined && n !== groupSizes[i])
+        findings.push(`30 §2 counts ${n} ${GROUPS[i]?.toLowerCase()} and its own table lists ${groupSizes[i]}`);
+    });
+  }
+
+  /* AND NO DUPLICATES, in any of them. A list that says `edit` twice has thirty-nine kinds and a count
+     that agrees with nothing, and every comparison above would still pass. */
+  for (const s of ok) {
+    const seen = new Set();
+    for (const kind of s.members) {
+      if (seen.has(kind)) findings.push(`${s.name} lists \`${kind}\` twice`);
+      seen.add(kind);
+    }
+  }
+
+  if (findings.length === 0) {
+    console.log(`  event-kinds: ${ok[0]?.members.length ?? 0} kinds, and ${ok.length} sources say the same`);
+  } else {
+    console.error(`\n  event-kinds: ${findings.length} finding(s) (30 §2)\n`);
+    for (const f of [...new Set(findings)]) console.error(`    ${f}`);
+    console.error(
+      '\n  A new kind is a migration, and five places say what the vocabulary is: the migration,\n' +
+        "  30 §1's SQL, 30 §2's table, 30 §2's counting sentence, and EVENT_KINDS.\n",
+    );
+    return 1;
+  }
 }
+
+/* AND IT IS STILL A SCRIPT, because `self-test` spawns it at its seeded trees with
+   `BRAINDOG_GATE_ROOT`, and the header documents the command line. `?? 0` because a pass returns
+   nothing. */
+if (import.meta.main) process.exitCode = eventKinds() ?? 0;

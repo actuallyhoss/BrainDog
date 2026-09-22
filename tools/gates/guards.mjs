@@ -55,8 +55,6 @@ import { fileURLToPath } from 'node:url';
 
 import { budget } from './lib.mjs';
 
-const root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
-
 /**
  * A FILE THAT IS NOT THERE IS A FINDING, AND IT IS THE SAME FINDING AS AN EMPTY ROUTE TABLE.
  *
@@ -72,7 +70,7 @@ const root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', i
  *
  * Only ENOENT. A file that is there and cannot be read is a different fact and stays a throw.
  */
-const read = (...parts) => {
+const read = (root, ...parts) => {
   try {
     return readFileSync(join(root, ...parts), 'utf8');
   } catch (err) {
@@ -131,129 +129,152 @@ const IMPLIES = {
  * a diff a reviewer sees, rather than a mechanism that was already there asserting nothing.
  */
 
-const findings = [];
-
-/* ── the route table, as data ────────────────────────────────────────────── */
-const host = read('packages', 'host', 'src', 'index.ts');
-const routes =
-  host === null
-    ? []
-    : [...host.matchAll(/\{ name: '([a-zA-Z]+)', group: '([A-Z+]+)',/g)].map((m) => ({
-        name: m[1],
-        group: m[2],
-      }));
-
 /**
- * NO ROUTE TABLE IS A FINDING ON PURPOSE, AND THIS IS THE PLACE TO SAY WHY, because the line reads
- * like an unhandled absence and it is a decision.
+ * THE CHECK IS A FUNCTION, imported by `run.mjs` rather than spawned: `52 §5.1` step 3, argued in
+ * the runner's `IMPORTED OR SPAWNED` header. Nothing in this file happens on import, and everything
+ * above this line is a declaration.
  *
- * The two ways to get here are both defects and neither is a missing prerequisite. Either the table
- * really is empty, which means nothing is routed and the product has no surface; or the table is
- * there and the regex above no longer matches its shape, which means THIS GATE HAS GONE BLIND while
- * still printing a line. The second is the one that happens, it is the failure `self-test.mjs`
- * exists for, and a skip would make a gate that can no longer see look exactly like a tree that has
- * nothing to look at. `bundle` answers the identical question the identical way about a workspace
- * with no `app.html`: a gate that found nothing to read must not report that it read everything.
- */
-if (host === null) findings.push('packages/host/src/index.ts is not there, so this gate read no route table at all');
-else if (routes.length === 0) findings.push('packages/host/src/index.ts has no route table this gate can read');
-
-/* ── the record's surface, as data ───────────────────────────────────────── */
-const surface = read('packages', 'record', 'src', 'index.ts');
-if (surface === null) findings.push('packages/record/src/index.ts is not there, so this gate read no authorisation check for any route');
-
-/* FOUR SPACES AND THEN A NAME, which is the indentation of the returned object's own methods and of
-   nothing else in the file: the guard helpers sit at two, and everything inside a body at six or
-   more. Anchoring on the shape rather than on a list is what makes a method added tomorrow visible
-   to this gate without anybody remembering to add it. */
-const starts =
-  surface === null
-    ? []
-    : [...surface.matchAll(/^ {4}(?:async )?([a-zA-Z]+)\(/gm)].map((m) => ({
-        name: m[1],
-        at: m.index,
-      }));
-
-const bodies = new Map();
-starts.forEach((m, i) => {
-  const end = i + 1 < starts.length ? starts[i + 1].at : surface.length;
-  bodies.set(m.name, surface.slice(m.at, end));
-});
-
-/** The first authorisation call in a body, ignoring the comments that explain why it is that one. */
-const guardOf = (body) => {
-  const stripped = body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
-  return /\b(admin|vault|guard|scoped)\(\s*ctx\b/.exec(stripped)?.[1] ?? null;
-};
-
-/* ONE SENTENCE FOR AN ABSENT SURFACE, NOT EIGHTY-TWO. Without the file every route would land on
-   "the surface has no method by that name", which is true of each and useless as a report: the one
-   fact a person can act on would be spread across eighty-two lines that all say it. */
-for (const route of surface === null ? [] : routes) {
-  const body = bodies.get(route.name);
-  if (body === undefined) {
-    findings.push(
-      `${route.name} is routed and packages/record's surface has no method by that name, so this gate read no check for it`,
-    );
-    continue;
-  }
-
-  const called = guardOf(body);
-  if (called === null) {
-    findings.push(`${route.name} is routed as ${route.group} and its body calls no guard at all`);
-    continue;
-  }
-
-  const allowed = IMPLIES[route.group];
-  if (allowed === undefined) {
-    findings.push(`${route.name} claims the group ${route.group}, which this gate has no guard for`);
-  } else if (!allowed.includes(called)) {
-    findings.push(
-      `${route.name} is routed as ${route.group} and is guarded by ${called}(), where ${route.group} means ${allowed
-        .map((g) => `${g}()`)
-        .join(' or ')}`,
-    );
-  }
-}
-
-/**
- * AND THE ONE ROUTE A KEY KEPT OUTSIDE ANY BROWSER CALLS AS OFTEN AS IT LIKES IS BUDGETED, as `budgets.json` says.
+ * THE ROOT IS AN ARGUMENT, defaulting to `BRAINDOG_GATE_ROOT`, which is the handle `self-test` aims
+ * this gate at a seeded tree with, and then to the repository this file sits in. `run.mjs` passes
+ * the root it derived from its own location, because an imported gate shares the runner's working
+ * directory and that is wherever the operator was standing. `read` takes it rather than closing
+ * over a module constant, because a module constant is the root of whoever imported this first.
  *
- * A report key lives in a project's environment, where a credential is most likely to leak, and `report` wrote a hundred
- * rows a call with no limit on the calls. `REPORT_ROWS_PER_MINUTE` in `packages/record/src/report.ts` is what the record
- * enforces, the Worker cannot read a file under `tools`, so the number lives in both places and this holds them equal,
- * and holds `report`'s body to spending it. Read only when `report` is routed, so a tree without one has nothing to hold.
+ * IT RETURNS 1 AND FALLS OFF THE END FOR A PASS, which is what `self-test`'s `silent-pass` grep
+ * rests on: a pass is the end of the function and never a statement inside it.
  */
-if (routes.some((r) => r.name === 'report')) {
-  const R = budget('report');
-  /* `report` IS ROUTED AND ITS LIMIT IS NOT THERE, which is the worst of the three states this
-     block can be in: the route exists, the key that reaches it exists, and the number that stops it
-     writing without end does not. Named as the file rather than left to fall through as
-     "REPORT_ROWS_PER_MINUTE at nothing", which reads as a typo in a file somebody could open. */
-  const code = read('packages', 'record', 'src', 'report.ts');
-  if (code === null) findings.push('report is routed and packages/record/src/report.ts is not there, so nothing holds its rows-per-minute limit');
-  const said = code === null ? undefined : /export const REPORT_ROWS_PER_MINUTE = ([\d_]+);/.exec(code)?.[1];
-  const enforced = said === undefined ? null : Number(said.split('_').join(''));
-  if (code !== null && enforced !== R.rowsPerMinute)
-    findings.push(`packages/record/src/report.ts holds REPORT_ROWS_PER_MINUTE at ${enforced ?? 'nothing'}, and budgets.json's report.rowsPerMinute is ${R.rowsPerMinute}`);
-  const body = (bodies.get('report') ?? '').replace(/\/\*[\s\S]*?\*\//g, '');
-  if (!/\breportBudget\(/.test(body)) findings.push('report is routed and its body spends no reportBudget(), so a report key has no limit');
+export default function guards(
+  root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..'),
+) {
+  const findings = [];
+
+  /* ── the route table, as data ────────────────────────────────────────────── */
+  const host = read(root, 'packages', 'host', 'src', 'index.ts');
+  const routes =
+    host === null
+      ? []
+      : [...host.matchAll(/\{ name: '([a-zA-Z]+)', group: '([A-Z+]+)',/g)].map((m) => ({
+          name: m[1],
+          group: m[2],
+        }));
+
+  /**
+   * NO ROUTE TABLE IS A FINDING ON PURPOSE, AND THIS IS THE PLACE TO SAY WHY, because the line reads
+   * like an unhandled absence and it is a decision.
+   *
+   * The two ways to get here are both defects and neither is a missing prerequisite. Either the table
+   * really is empty, which means nothing is routed and the product has no surface; or the table is
+   * there and the regex above no longer matches its shape, which means THIS GATE HAS GONE BLIND while
+   * still printing a line. The second is the one that happens, it is the failure `self-test.mjs`
+   * exists for, and a skip would make a gate that can no longer see look exactly like a tree that has
+   * nothing to look at. `bundle` answers the identical question the identical way about a workspace
+   * with no `app.html`: a gate that found nothing to read must not report that it read everything.
+   */
+  if (host === null) findings.push('packages/host/src/index.ts is not there, so this gate read no route table at all');
+  else if (routes.length === 0) findings.push('packages/host/src/index.ts has no route table this gate can read');
+
+  /* ── the record's surface, as data ───────────────────────────────────────── */
+  const surface = read(root, 'packages', 'record', 'src', 'index.ts');
+  if (surface === null) findings.push('packages/record/src/index.ts is not there, so this gate read no authorisation check for any route');
+
+  /* FOUR SPACES AND THEN A NAME, which is the indentation of the returned object's own methods and of
+     nothing else in the file: the guard helpers sit at two, and everything inside a body at six or
+     more. Anchoring on the shape rather than on a list is what makes a method added tomorrow visible
+     to this gate without anybody remembering to add it. */
+  const starts =
+    surface === null
+      ? []
+      : [...surface.matchAll(/^ {4}(?:async )?([a-zA-Z]+)\(/gm)].map((m) => ({
+          name: m[1],
+          at: m.index,
+        }));
+
+  const bodies = new Map();
+  starts.forEach((m, i) => {
+    const end = i + 1 < starts.length ? starts[i + 1].at : surface.length;
+    bodies.set(m.name, surface.slice(m.at, end));
+  });
+
+  /** The first authorisation call in a body, ignoring the comments that explain why it is that one. */
+  const guardOf = (body) => {
+    const stripped = body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    return /\b(admin|vault|guard|scoped)\(\s*ctx\b/.exec(stripped)?.[1] ?? null;
+  };
+
+  /* ONE SENTENCE FOR AN ABSENT SURFACE, NOT EIGHTY-TWO. Without the file every route would land on
+     "the surface has no method by that name", which is true of each and useless as a report: the one
+     fact a person can act on would be spread across eighty-two lines that all say it. */
+  for (const route of surface === null ? [] : routes) {
+    const body = bodies.get(route.name);
+    if (body === undefined) {
+      findings.push(
+        `${route.name} is routed and packages/record's surface has no method by that name, so this gate read no check for it`,
+      );
+      continue;
+    }
+
+    const called = guardOf(body);
+    if (called === null) {
+      findings.push(`${route.name} is routed as ${route.group} and its body calls no guard at all`);
+      continue;
+    }
+
+    const allowed = IMPLIES[route.group];
+    if (allowed === undefined) {
+      findings.push(`${route.name} claims the group ${route.group}, which this gate has no guard for`);
+    } else if (!allowed.includes(called)) {
+      findings.push(
+        `${route.name} is routed as ${route.group} and is guarded by ${called}(), where ${route.group} means ${allowed
+          .map((g) => `${g}()`)
+          .join(' or ')}`,
+      );
+    }
+  }
+
+  /**
+   * AND THE ONE ROUTE A KEY KEPT OUTSIDE ANY BROWSER CALLS AS OFTEN AS IT LIKES IS BUDGETED, as `budgets.json` says.
+   *
+   * A report key lives in a project's environment, where a credential is most likely to leak, and `report` wrote a hundred
+   * rows a call with no limit on the calls. `REPORT_ROWS_PER_MINUTE` in `packages/record/src/report.ts` is what the record
+   * enforces, the Worker cannot read a file under `tools`, so the number lives in both places and this holds them equal,
+   * and holds `report`'s body to spending it. Read only when `report` is routed, so a tree without one has nothing to hold.
+   */
+  if (routes.some((r) => r.name === 'report')) {
+    const R = budget('report');
+    /* `report` IS ROUTED AND ITS LIMIT IS NOT THERE, which is the worst of the three states this
+       block can be in: the route exists, the key that reaches it exists, and the number that stops it
+       writing without end does not. Named as the file rather than left to fall through as
+       "REPORT_ROWS_PER_MINUTE at nothing", which reads as a typo in a file somebody could open. */
+    const code = read(root, 'packages', 'record', 'src', 'report.ts');
+    if (code === null) findings.push('report is routed and packages/record/src/report.ts is not there, so nothing holds its rows-per-minute limit');
+    const said = code === null ? undefined : /export const REPORT_ROWS_PER_MINUTE = ([\d_]+);/.exec(code)?.[1];
+    const enforced = said === undefined ? null : Number(said.split('_').join(''));
+    if (code !== null && enforced !== R.rowsPerMinute)
+      findings.push(`packages/record/src/report.ts holds REPORT_ROWS_PER_MINUTE at ${enforced ?? 'nothing'}, and budgets.json's report.rowsPerMinute is ${R.rowsPerMinute}`);
+    const body = (bodies.get('report') ?? '').replace(/\/\*[\s\S]*?\*\//g, '');
+    if (!/\breportBudget\(/.test(body)) findings.push('report is routed and its body spends no reportBudget(), so a report key has no limit');
+  }
+
+  if (findings.length === 0) {
+    const shape = Object.keys(IMPLIES)
+      .map((g) => [g, routes.filter((r) => r.group === g).length])
+      .filter(([, n]) => n > 0)
+      .map(([g, n]) => `${n} ${g}`)
+      .join(' · ');
+    console.log(`  guards: ${routes.length} routes, every one guarded as its group says: ${shape}`);
+  } else {
+    console.error(`\n  guards: ${findings.length} finding(s) (30 §10)\n`);
+    for (const f of [...new Set(findings)]) console.error(`    ${f}`);
+    console.error(
+      '\n  The group in ROUTES gates nothing at runtime: authorisation is in the record, in one\n' +
+        '  place, so the CLI answers the same ladder as the browser. A group the record does not\n' +
+        '  apply is a ceiling published to everybody and enforced on nobody.\n',
+    );
+    return 1;
+  }
 }
 
-if (findings.length === 0) {
-  const shape = Object.keys(IMPLIES)
-    .map((g) => [g, routes.filter((r) => r.group === g).length])
-    .filter(([, n]) => n > 0)
-    .map(([g, n]) => `${n} ${g}`)
-    .join(' · ');
-  console.log(`  guards: ${routes.length} routes, every one guarded as its group says: ${shape}`);
-} else {
-  console.error(`\n  guards: ${findings.length} finding(s) (30 §10)\n`);
-  for (const f of [...new Set(findings)]) console.error(`    ${f}`);
-  console.error(
-    '\n  The group in ROUTES gates nothing at runtime: authorisation is in the record, in one\n' +
-      '  place, so the CLI answers the same ladder as the browser. A group the record does not\n' +
-      '  apply is a ceiling published to everybody and enforced on nobody.\n',
-  );
-  process.exitCode = 1;
-}
+/* AND IT IS STILL A SCRIPT, because `self-test` spawns it at its seeded trees with
+   `BRAINDOG_GATE_ROOT`, and the header documents the command line. `?? 0` because a pass returns
+   nothing. */
+if (import.meta.main) process.exitCode = guards() ?? 0;

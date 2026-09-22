@@ -48,8 +48,6 @@ import { fileURLToPath } from 'node:url';
 
 import { skipDir } from './lib.mjs';
 
-const root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
-
 /**
  * TAB, NEWLINE AND CARRIAGE RETURN ARE THE ONLY CONTROLS A SOURCE FILE HAS ANY BUSINESS HOLDING.
  * Vertical tab and form feed are not exceptions: they are legal whitespace to a compiler and
@@ -131,36 +129,58 @@ function excerptAround(buf, offset, radius = 30) {
 
 const lineOf = (buf, offset) => buf.slice(0, offset).toString('latin1').split('\n').length;
 
-const findings = [];
-let scanned = 0;
+/**
+ * THE CHECK IS A FUNCTION, imported by `run.mjs` rather than spawned: `52 §5.1` step 3, argued in
+ * the runner's `IMPORTED OR SPAWNED` header. Nothing in this file happens on import, and everything
+ * above this line is a declaration.
+ *
+ * THE ROOT IS AN ARGUMENT, defaulting to `BRAINDOG_GATE_ROOT`, which is the handle `self-test` aims
+ * this gate at its seeded fixture with, and then to the repository this file sits in. `run.mjs`
+ * passes the root it derived from its own location, because an imported gate shares the runner's
+ * working directory and that is wherever the operator was standing.
+ *
+ * IT RETURNS 1 AND FALLS OFF THE END FOR A PASS, which is what `self-test`'s `silent-pass` grep
+ * rests on: a pass is the end of the function and never a statement inside it.
+ */
+export default function nulBytes(
+  root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..'),
+) {
+  const findings = [];
+  let scanned = 0;
 
-for (const file of walk(root)) {
-  const ext = extname(file).slice(1).toLowerCase();
-  if (BINARY_EXT.has(ext)) continue;
+  for (const file of walk(root)) {
+    const ext = extname(file).slice(1).toLowerCase();
+    if (BINARY_EXT.has(ext)) continue;
 
-  scanned++;
-  const buf = readFileSync(file);
-  const rel = relative(root, file).replace(/\\/g, '/');
+    scanned++;
+    const buf = readFileSync(file);
+    const rel = relative(root, file).replace(/\\/g, '/');
 
-  /* EVERY OCCURRENCE, NOT THE FIRST. A file with two stray control bytes reported as having one
-     would cost a second run to find the other, which is the same argument `stack.mjs` makes for
-     itself. Three of the five real findings were in one class and two files, so a gate that stopped
-     at the first would have taken three runs to say what one said. */
-  for (let at = 0; at < buf.length; at++) {
-    if (!forbidden(buf[at])) continue;
-    findings.push({
-      where: `${rel}:${lineOf(buf, at)}`,
-      offset: at,
-      what: nameOf(buf[at]),
-      excerpt: excerptAround(buf, at),
-    });
+    /* EVERY OCCURRENCE, NOT THE FIRST. A file with two stray control bytes reported as having one
+       would cost a second run to find the other, which is the same argument `stack.mjs` makes for
+       itself. Three of the five real findings were in one class and two files, so a gate that
+       stopped at the first would have taken three runs to say what one said. */
+    for (let at = 0; at < buf.length; at++) {
+      if (!forbidden(buf[at])) continue;
+      findings.push({
+        where: `${rel}:${lineOf(buf, at)}`,
+        offset: at,
+        what: nameOf(buf[at]),
+        excerpt: excerptAround(buf, at),
+      });
+    }
   }
+
+  if (findings.length) {
+    console.log('');
+    for (const f of findings)
+      console.log(`  ${f.where}  a raw ${f.what} at offset ${f.offset}\n      …${f.excerpt}…\n`);
+  }
+  console.log(`  nul-bytes: ${scanned} file(s), ${findings.length} finding(s)`);
+  if (findings.length) return 1;
 }
 
-if (findings.length) {
-  console.log('');
-  for (const f of findings)
-    console.log(`  ${f.where}  a raw ${f.what} at offset ${f.offset}\n      …${f.excerpt}…\n`);
-}
-console.log(`  nul-bytes: ${scanned} file(s), ${findings.length} finding(s)`);
-if (findings.length) process.exitCode = 1;
+/* AND IT IS STILL A SCRIPT, because `self-test` spawns it at its seeded fixture with
+   `BRAINDOG_GATE_ROOT`, and the header documents the command line. `?? 0` because a pass returns
+   nothing. */
+if (import.meta.main) process.exitCode = nulBytes() ?? 0;

@@ -11,8 +11,8 @@
  * cannot run without, this file reads every declaration before it spawns anything, and a gate whose
  * prerequisite is unmet is refused here rather than asked. See `NEEDS` below for what that fixes.
  *
- * AND SIXTEEN OF THEM ARE NOW FUNCTIONS THIS FILE CALLS RATHER THAN SCRIPTS IT SPAWNS. `52 §5.1`
- * step 3: see `IMPORTED OR SPAWNED` below for what it buys, what it costs, and why the other fourteen
+ * AND TWENTY-TWO OF THEM ARE NOW FUNCTIONS THIS FILE CALLS RATHER THAN SCRIPTS IT SPAWNS. `52 §5.1`
+ * step 3: see `IMPORTED OR SPAWNED` below for what it buys, what it costs, and why the other eight
  * keep the dialect they have. Which of the two a gate is in is DECLARED by its entry here, with
  * `call(...)`, and never guessed from the gate's text, which is the trap the first half of that step
  * left behind.
@@ -75,7 +75,7 @@ const GATES = [
      sat inside a regex character class where `\x00` was meant. A NUL also makes git call the file
      binary, so it silently stops diffing and stops merging. This is a scan of bytes rather than of
      syntax, because the defect is in the byte and not in the shape of the code around it. */
-  ['nul-bytes', ['node', [join(here, 'nul-bytes.mjs')]]],
+  ['nul-bytes', call(join(here, 'nul-bytes.mjs'))],
   /* THE OTHER HALF OF `31 §3`. `stack` is layer 4: the runtime surface a package may not name.
      This is layers 3 and 5: the seventeen-row order, acyclicity, and the relative import that
      climbs out of its own package, which pnpm resolves happily and which nothing else can see. */
@@ -85,17 +85,17 @@ const GATES = [
   ['secret-grep', call(join(here, 'secret-grep.mjs'))],
   /* THE ONE LIST LARGE ENOUGH TO HAVE DRIFTED THREE TIMES (52 §5.2). Four of its five sources are
      not code, so nothing but a gate can notice that a document gained a kind the database refuses. */
-  ['event-kinds', ['node', [join(here, 'event-kinds.mjs')]]],
+  ['event-kinds', call(join(here, 'event-kinds.mjs'))],
   /* THE SURFACE IS SPLIT BY WHO MAY REACH IT (30 §5), and sixteen INTERNAL methods are each one line
      from being routable. `createRecord` makes somebody the owner of a record. */
-  ['router-groups', ['node', [join(here, 'router-groups.mjs')]]],
+  ['router-groups', call(join(here, 'router-groups.mjs'))],
   /* AND WHETHER THE RECORD APPLIES THE GROUP THE TABLE PUBLISHES. `30 §10` puts authorisation in
      the record, so the group in `ROUTES` gates nothing at runtime; it was ADMIN on a method guarded
      `read`, and the answer to that method carries every colleague's email. */
-  ['guards', ['node', [join(here, 'guards.mjs')]]],
+  ['guards', call(join(here, 'guards.mjs'))],
   /* AND THE OTHER TWENTY-TWO CLOSED LISTS. 30 §2: a list enforced only by a validator is a list one
      code path forgets, which holds only while the CHECK and the document agree about what it is. */
-  ['closed-lists', ['node', [join(here, 'closed-lists.mjs')]]],
+  ['closed-lists', call(join(here, 'closed-lists.mjs'))],
   /* THE NINETY-NINE REFUSAL CODES, which had no `RefusalCode` type and so no list at all. A code is
      the one part of a refusal a caller can branch on, and `10 §7` builds the agent contract on it:
      the refusal teaches, and it teaches from a code stable across versions. Beside `event-kinds`
@@ -133,7 +133,7 @@ const GATES = [
      branching. This asks six questions of the list, of which the load-bearing one is whether the
      flag is read at all. `dead-copy`'s own hole is that a statically-false `{#if}` counts as
      rendered, and every flag is that `{#if}`. */
-  ['flags', ['node', [join(here, 'flags.mjs')]]],
+  ['flags', call(join(here, 'flags.mjs'))],
   /* THE RULE THE WHOLE ADDITIVE STORY RESTS ON (02 §1). A register the kernel ships is a name no
      pack can own, and breaking it is always the shortest path. */
   ['no-declarations-in-kernel', ['node', [join(here, 'no-declarations-in-kernel.mjs')]]],
@@ -303,10 +303,10 @@ const omitted = NAMES.filter((n) => !SELECTED.some(([name]) => name === n));
  * `em-dash: 0 em dashes used as punctuation, over 415 files` and then `undefined`. A gate that does
  * its work at module top level RUNS when it is imported, which is precisely what asking before
  * running is for; and reading `needs` off the namespace would mean reading it after the gate had
- * finished, which is not a prerequisite check but an epilogue. That is still true of fourteen of
- * the thirty gates below, and this reader is for those. The sixteen registered with `call(...)` are
- * asked by `importedNeeds` instead, off the module, and none of the fourteen this reader covers
- * declares anything today: every gate that has a prerequisite is one of the sixteen, so this reader
+ * finished, which is not a prerequisite check but an epilogue. That is still true of eight of
+ * the thirty gates below, and this reader is for those. The twenty-two registered with `call(...)`
+ * are asked by `importedNeeds` instead, off the module, and none of the eight this reader covers
+ * declares anything today: every gate that has a prerequisite is one of the twenty-two, so this reader
  * now guards the next script gate that grows one rather than any gate in the table. It stays for that
  * reason, and because a gate may be registered as a script for as long as its author likes:
  * see `IMPORTED OR SPAWNED`. Either way the property step 2
@@ -403,8 +403,8 @@ function declaredNeeds(name, file) {
 }
 
 /**
- * IMPORTED OR SPAWNED, one gate at a time. `52 §5.1` step 3, on the sixteen registered with
- * `call(...)`; the other fourteen are spawned exactly as they were.
+ * IMPORTED OR SPAWNED, one gate at a time. `52 §5.1` step 3, on the twenty-two registered with
+ * `call(...)`; the other eight are spawned exactly as they were.
  *
  * THE SECOND HALF OF STEP 3 IS THE GATES THAT NEED A BUILD OR A BROWSER, AND THEY ARE THE HALF THAT
  * MAKES STEP 2 WORTH ANYTHING. Every prerequisite in `NEEDS` belongs to one of them: `passkey` and
@@ -464,13 +464,20 @@ function declaredNeeds(name, file) {
  * runner that never exits. So each of those gates closes what it opened on every path out of itself,
  * including its early returns, and each one's header says so where somebody editing it will read it.
  *
- * THE FOURTEEN LEFT SPAWNED ARE NOT A DESIGN, WITH THREE EXCEPTIONS. `typecheck` is `pnpm -r` through
+ * THE EIGHT LEFT SPAWNED ARE NOT A DESIGN, WITH FOUR EXCEPTIONS. `typecheck` is `pnpm -r` through
  * a shell, `self-test` spawns every gate itself and would be this runner's work done twice in one
  * process, and `theme` passes `--check` to a script outside this directory, which a call cannot carry.
- * Of the other eleven, nine are greps over source that nobody has migrated yet, and `spark-actor` and
- * `import` are the two that build a record, which their own entries above say plainly, so calling
- * them "greps" here would be this file disagreeing with itself two hundred lines apart. Nothing goes
- * red for any of the eleven: a script gate is a supported dialect, not a gate waiting to be fixed.
+ * `stack` is the fourth, and it stays a script ON PURPOSE: `test/dialect.test.mjs`,
+ * `test/durations.test.mjs` and `test/needs.test.mjs` each overwrite `stack.mjs` with a stub in a
+ * copied tree and rely on `GATES` registering it as a spawn, because they need one real entry that
+ * is spawned. Calling it would turn their script-shaped stubs into refusals, and the three would be
+ * testing the refusal rather than the spawned path. It moves the day those tests pick another
+ * stand-in, and not before.
+ * Of the other four, `clean-room` and `no-declarations-in-kernel` are greps over source that nobody
+ * has migrated yet, and `spark-actor` and `import` are the two that build a record, which their own
+ * entries above say plainly, so calling them "greps" here would be this file disagreeing with itself
+ * two hundred lines apart. Nothing goes red for any of the eight: a script gate is a supported
+ * dialect, not a gate waiting to be fixed.
  *
  * THE OTHER THING THE PROCESS BOUNDARY WAS DOING IS CONTAINING `process.exit`, and that one is
  * caught below rather than argued away: see `inside` at the run loop.
@@ -745,7 +752,7 @@ const aside = skipped.length === 0 ? '' : ', and ' + skipped.length + ' could no
 /* AND A RUN THAT WAS ASKED FOR LESS SAYS SO. "14 of 14 gates passed" beside a nineteen-gate corpus
    is the sentence a subset would otherwise print, and it reads as the whole thing. */
 const unasked = omitted.length === 0 ? '' : '\n  ' + omitted.length + ' were not asked for: ' + omitted.join(', ') + '.';
-/* AND THE SPLIT BETWEEN THE TWO DIALECTS, once, at the bottom. Fourteen gates are still scripts, so
+/* AND THE SPLIT BETWEEN THE TWO DIALECTS, once, at the bottom. Eight gates are still scripts, so
    the number that says how many were called is worth printing rather than counting by eye up the
    screen: it is how anybody notices a gate that quietly changed dialect, in either direction. */
 const byImport = SELECTED.filter(([name]) => dialects.get(name).how === 'imported').map(([name]) => name);
