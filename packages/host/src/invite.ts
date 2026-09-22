@@ -78,8 +78,11 @@ const INVISIBLE_INSIDE = new RegExp(String.raw`[[\p{Default_Ignorable_Code_Point
    stored `Bob\u200cSmith` and `a`, 98 joiners and `b` (`loop/research-batch-sixteen-audit.md` finding 6). A joiner is
    kept after a letter or mark of a script that writes with one (Script_Extensions, so an Arabic vowel mark counts as
    Arabic), or as ZWJ between two emoji, which is how a family or the rainbow flag is written. Each joiner must follow
-   one of those itself, so a second joiner in a row follows a joiner and is refused: no script needs a run of them. */
-const JOINS_WITH = String.raw`[\p{scx=Arabic}\p{scx=Syriac}\p{scx=Nko}\p{scx=Mongolian}\p{scx=Devanagari}\p{scx=Bengali}\p{scx=Gurmukhi}\p{scx=Gujarati}\p{scx=Oriya}\p{scx=Tamil}\p{scx=Telugu}\p{scx=Kannada}\p{scx=Malayalam}\p{scx=Sinhala}\p{scx=Khmer}\p{scx=Myanmar}]`;
+   one of those itself, so a second joiner in a row follows a joiner and is refused: no script needs a run of them.
+   ADLAM AND HANIFI ROHINGYA ARE ON IT TOO. Both are cursive scripts with living users (Fula, Rohingya), a joiner is
+   spelling there as it is in Arabic, and leaving them off newly refused `\u{1E900}\u200d\u{1E901}`
+   (`loop/research-batch-eighteen-audit.md` finding 8). */
+const JOINS_WITH = String.raw`[\p{scx=Arabic}\p{scx=Syriac}\p{scx=Nko}\p{scx=Adlam}\p{scx=Hanifi_Rohingya}\p{scx=Mongolian}\p{scx=Devanagari}\p{scx=Bengali}\p{scx=Gurmukhi}\p{scx=Gujarati}\p{scx=Oriya}\p{scx=Tamil}\p{scx=Telugu}\p{scx=Kannada}\p{scx=Malayalam}\p{scx=Sinhala}\p{scx=Khmer}\p{scx=Myanmar}]`;
 const JOINER_SPELLING = new RegExp(
   String.raw`(?<=${JOINS_WITH})[\u200c\u200d]|(?<=[\p{Extended_Pictographic}\p{Emoji_Modifier}\ufe0f])\u200d(?=\p{Extended_Pictographic})`,
   'gv',
@@ -89,9 +92,17 @@ const JOINER_SPELLING = new RegExp(
    selector is a mark too, so the same run refuses 90 of those. The longest run in the names
    `invite-names-drawn.test.ts` keeps is three, a Tibetan stack, but a Burmese syllable such as `ချွှေး` carries five
    (every sign after the first letter is a mark), so six is the tightest bound that keeps it. Private use draws
-   whatever one font chose, or a box. A noncharacter is not text at all. */
+   whatever one font chose, or a box. A noncharacter is not text at all.
+   THE RUN IS COUNTED THROUGH A JOINER. `\p{M}{7}` alone ended the run at a joiner, and a joiner is kept after any mark
+   of a joining script, so a ZWJ after every sixth candrabindu stored one Devanagari letter carrying 84 of them, 99
+   code points, and a ZWNJ every sixth haraka did the same in Arabic (`loop/research-batch-eighteen-audit.md` finding
+   1). A joiner between two marks now counts as nothing, so the bound is marks per letter. One joiner is enough to
+   step over, because a second in a row is already refused above. */
 const MARKS_MAX = 6;
-const NOISE = new RegExp(String.raw`(?:^|\p{White_Space})\p{M}|\p{M}{${MARKS_MAX + 1}}|[\p{Co}\p{Noncharacter_Code_Point}]`, 'u');
+const NOISE = new RegExp(
+  String.raw`(?:^|\p{White_Space})\p{M}|\p{M}(?:[\u200c\u200d]?\p{M}){${MARKS_MAX}}|[\p{Co}\p{Noncharacter_Code_Point}]`,
+  'u',
+);
 /* A RUN OF WHITE SPACE IS ONE, AND THE FIRST OF THE RUN IS THE ONE KEPT, so a Japanese name keeps its ideographic
    space. Run after the controls are refused, because a tab and a line feed are white space too. */
 const SPACE_RUN = /(\p{White_Space})\p{White_Space}+/gu;
