@@ -240,8 +240,20 @@ const RUN_FILLED = /\{\{\s*(?:vars|trigger)\.[A-Za-z0-9_.]+\s*\}\}/;
  *     braces there are the literal word and are judged like any other.
  *
  * ANY OTHER SHAPE REFUSES EVERY ONE, `untag` included, because the pass always writes an array.
+ *
+ * AND SO DOES A RETIRED `tags`, WHATEVER ITS SHAPE. Both callers passed over a retired one ("not a shape this check
+ * reads"), and the write path answers `FIELD_UNKNOWN` for a field put away, so the pass's one patch went whole: the
+ * audit of wave thirty-nine (finding 3) retired a `list<text>` under `rule.late` doing `[{ tag: late }, { set: note }]`,
+ * and the Rent went in holding `what` alone. It was let through where `tags: int` under the same rule is refused.
  */
-export function tagsRefusing(decl: FlowDecl, tags: { type?: unknown; of?: unknown; values?: unknown }): { verb: 'tag' | 'untag'; at: string; word?: string }[] {
+export function tagsRefusing(
+  decl: FlowDecl,
+  tags: { type?: unknown; of?: unknown; values?: unknown; retired?: unknown },
+): { verb: 'tag' | 'untag'; at: string; word?: string }[] {
+  if (tags.retired === true)
+    return actionsOf(decl).flatMap(({ action, at }): { verb: 'tag' | 'untag'; at: string }[] =>
+      'tag' in action ? [{ verb: 'tag', at }] : 'untag' in action ? [{ verb: 'untag', at }] : [],
+    );
   if (tags.type === 'list' && tags.of === 'text') return [];
   const out: { verb: 'tag' | 'untag'; at: string; word?: string }[] = [];
   const enumOf = tags.type === 'list' && tags.of === 'enum';
@@ -260,6 +272,10 @@ export function tagsRefusing(decl: FlowDecl, tags: { type?: unknown; of?: unknow
   }
   return out;
 }
+
+/** The words `tagsRefusal` names a declared `tags` by: its type, or "a retired tags", which has no type a write can meet. */
+export const tagsShape = (tags: { type?: unknown; of?: unknown; retired?: unknown }): string =>
+  tags.retired === true ? 'a retired tags' : `${String(tags.type)}${tags.of === undefined ? '' : `<${String(tags.of)}>`}`;
 
 /**
  * The refusal of a list's `tags` under a rule that tags it, ONE SENTENCE WHICHEVER ARRIVED SECOND. The list narrowed
@@ -515,7 +531,22 @@ function fillSites(action: Record<string, unknown>, at: string): { where: string
 }
 
 function fillFault(id: string, decl: FlowDecl): Refusal | null {
-  for (const { action, at } of actionsOf(decl))
+  for (const { action, at } of actionsOf(decl)) {
+    /* AND A TAG'S WORD, WHICH NO `fill` READS BUT WHICH FAILS THE SAME WAY. `tagsRefusing` passed over a word that was
+       not a string and nothing else asked (`loop/research-batch-thirty-nine-audit.md` finding 10), so `tag: 5`
+       installed; the pass put the 5 into the row's tags as it was, `coerce` refused a number in a `list<enum>` and in
+       the `list<text>` every list takes, and the rule's whole patch went, a `set` beside it included. AN `untag` DOES NOT
+       FAIL THAT WAY, and is refused for another reason: it untags nothing. Measured by this wave's checker, `untag: 5` and
+       `untag: ["late"]` beside a `set` over a Rent tagged `late` kept the note and the `late` alike, in silence. */
+    for (const verb of ['tag', 'untag'] as const) {
+      if (!(verb in action)) continue;
+      const word = action[verb];
+      if (typeof word === 'string') continue;
+      const where = `${at}.${verb}`;
+      return typeof word === 'number' || typeof word === 'boolean'
+        ? bad('DECLARATION_INVALID', `${id}'s ${where} is ${String(word)}, and a tag is a word. Write "${String(word)}".`, where)
+        : bad('DECLARATION_INVALID', `${id}'s ${where} is ${word === undefined ? 'missing' : JSON.stringify(word)}, and a tag is one word. Write it as text.`, where);
+    }
     for (const { where, value, field, into } of fillSites(action, at)) {
       if (typeof value === 'string') continue;
       const quotable = typeof value === 'number' || typeof value === 'boolean';
@@ -527,6 +558,7 @@ function fillFault(id: string, decl: FlowDecl): Refusal | null {
         ? bad('DECLARATION_INVALID', `${id}'s ${where} is ${String(value)}, and a rule fills every value it writes from text. Write "${String(value)}".`, where)
         : bad('DECLARATION_INVALID', `${id}'s ${where} is ${value === undefined ? 'missing' : JSON.stringify(value)}, and a rule fills every value it writes from text, so it would fail the rule each time it fired. Write it as text.`, where);
     }
+  }
   return null;
 }
 

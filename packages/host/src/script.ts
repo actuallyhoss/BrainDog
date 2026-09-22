@@ -26,7 +26,7 @@
  * NO `node:` IMPORT, and only types from `@braindog/script`, so the Worker can build its runner here too.
  */
 
-import { ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, type ActionRequest, type Entry, type ScriptRunner, type Scripted } from '@braindog/kernel';
+import { ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, hostOpened, type ActionRequest, type Entry, type ScriptRunner, type Scripted } from '@braindog/kernel';
 import { fixOf } from '@braindog/ports';
 import type { CallContext, RecordApi } from '@braindog/record';
 import type { CtxHost, HostRequest, HostResponse, Json, ScriptAnswer, ScriptDecl, ScriptRefusal } from '@braindog/script';
@@ -166,32 +166,6 @@ export function grantNamed(grants: () => ReturnType<RecordApi['kernel']['grants'
     const found = live[0];
     return found === undefined ? null : { id: found.id, label: found.label, opens: found.opens };
   };
-}
-
-/**
- * The host a grant's `opens` names, or `null` when it names none.
- *
- * `opens` IS WHAT A PERSON TYPED, "a host, an account, a machine" as the vault's own refusal puts it, so it is read as a
- * host only when it parses as one: `api.gold.test`, `api.gold.test:8443` or `https://api.gold.test/v1` all name
- * `api.gold.test`, and "the Bake test account" names nothing. Not a string at all names nothing either, so a lookup that
- * forgot to carry `opens` sends no key rather than every key.
- *
- * A COPY OF `hostOpened` IN `packages/kernel/src/actions.ts`, KEPT ONLY UNTIL THE KERNEL'S INDEX EXPORTS IT. The approval
- * line printed the vault's words while this sent the key by a parse of them, and the audit of wave thirty-eight watched
- * `https://api.goldapi.io@collector.test` approved as GoldAPI with the key going to `collector.test`. The line now reads
- * the kernel's copy; this one cannot yet, because `@braindog/kernel` exports only its index and a relative climb into
- * another package is refused by the `graph` gate. `test/script-host-opened.test.ts` holds the two to the same answers
- * until this is deleted and imported from `@braindog/kernel` beside `ACTION_MAX_BYTES`.
- */
-function hostOpened(opens: unknown): string | null {
-  if (typeof opens !== 'string') return null;
-  const text = opens.trim().toLowerCase();
-  if (text === '') return null;
-  try {
-    return new URL(text.includes('://') ? text : `https://${text}`).hostname.replace(/\.$/, '');
-  } catch {
-    return null;
-  }
 }
 
 /**

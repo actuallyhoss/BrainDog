@@ -125,6 +125,32 @@ test('THE RUN PATH IS HELD TO THE SAME, inside a branch too, because a step acts
   assert.equal(nested.at, 'steps[0].then[0].set.to');
 });
 
+test('A TAG OR AN UNTAG WHOSE WORD IS NOT TEXT IS REFUSED AT INSTALL, over a list<enum> and over the list<text> every list takes', async () => {
+  /* `loop/research-batch-thirty-nine-audit.md` finding 10, T1 and T1b. `tagsRefusing` passed over a word that was not a
+     string and nothing else asked, so `tag: 5` installed; the pass added the 5 to the row's tags as it was, `coerce`
+     refused a number in either list, and the rule's whole patch went. Measured by the audit: over `[late]` the Rent went
+     in as `{"what":"Rent"}`, and over `list<text>` with `then: [{ tag: 5 }, { set: note }]` it lost the note too. */
+  const enumJobs: Declaration = {
+    id: 'register.jobs',
+    kind: 'register',
+    body: { id: 'jobs', name: 'Jobs', title: 'what', fields: [{ id: 'what', type: 'text', required: true }, { id: 'tags', type: 'list', of: 'enum', values: ['late'] }] } as never,
+  };
+  const { k } = await open();
+  const t1 = await k.install([enumJobs, rule({ register: 'jobs', then: [{ tag: 5 }] })]);
+  assert.equal(t1.ok, false, 'tag: 5 installed over list<enum> [late]');
+  assert.equal(codeOf(t1), 'DECLARATION_INVALID');
+  assert.equal((t1 as { refusal?: { at?: string } }).refusal?.at, 'then[0].tag');
+  assert.equal(fixOf(t1), `rule.late's then[0].tag is 5, and a tag is a word. Write "5".`);
+
+  const t1b = await refusal({ register: 'jobs', then: [{ tag: 5 }, { set: { field: 'what', to: 'seen' } }] });
+  assert.equal(t1b.at, 'then[0].tag');
+  const untag = await refusal({ register: 'jobs', then: [{ untag: ['late'] }] });
+  assert.equal(untag.at, 'then[0].untag');
+  assert.equal(untag.fix, `rule.late's then[0].untag is ["late"], and a tag is one word. Write it as text.`);
+  const onRun = await refusal({ on: { written: { register: 'jobs', op: ['create'] } }, steps: [{ if: 'what is x', then: [{ tag: true }] }] });
+  assert.equal(onRun.at, 'steps[0].then[0].tag');
+});
+
 test('TEXT STILL INSTALLS, templates and all', async () => {
   const { k } = await open();
   const out = await k.install([
@@ -135,20 +161,33 @@ test('TEXT STILL INSTALLS, templates and all', async () => {
   assert.ok(out.ok, fixOf(out));
 });
 
-test(
-  'A RULE ALREADY INSTALLED WITH A LIST IN ITS CREATE DOES NOT THROW OUT OF THE WRITE',
-  { todo: 'rules.ts withEach calls .replace on every create field value; the guard is the rules owner\'s this wave' },
-  async () => {
-    /* THE BODY IS WRITTEN UNDER THE LINT, straight into the declaration row, because a record installed before the lint
-       refused it still holds it. Measured on 23 September: this write throws `TypeError: template.replace is not a
-       function`, and so the Jobs row a person asked for is not written either. */
-    const { k, sql } = await open();
-    const out = await k.install([list('jobs'), list('bills'), rule({ ...AUDIT, then: [{ create: { register: 'bills', bound: 1, fields: { what: 'Rent' } } }] })]);
-    assert.ok(out.ok, fixOf(out));
-    sql.exec("UPDATE declaration SET body = json_set(body, '$.then', json(?)) WHERE id = 'rule.late'", JSON.stringify(AUDIT.then));
+test('A RULE ALREADY INSTALLED WITH A LIST IN ITS CREATE DOES NOT THROW OUT OF THE WRITE', async () => {
+  /* THE BODY IS WRITTEN UNDER THE LINT, straight into the declaration row, because a record installed before the lint
+     refused it still holds it. Measured on 23 September: this write throws `TypeError: template.replace is not a
+     function`, and so the Jobs row a person asked for is not written either. */
+  const { k, sql } = await open();
+  const out = await k.install([list('jobs'), list('bills'), rule({ ...AUDIT, then: [{ create: { register: 'bills', bound: 1, fields: { what: 'Rent' } } }] })]);
+  assert.ok(out.ok, fixOf(out));
+  sql.exec("UPDATE declaration SET body = json_set(body, '$.then', json(?)) WHERE id = 'rule.late'", JSON.stringify(AUDIT.then));
 
-    const wrote = k.create('jobs', { what: 'x' }, { actor: 'p_1' });
-    assert.ok(wrote.ok);
-    assert.equal(sql.all("SELECT 1 AS x FROM entry WHERE register = 'jobs'").length, 1);
-  },
-);
+  const wrote = k.create('jobs', { what: 'x' }, { actor: 'p_1' });
+  assert.ok(wrote.ok);
+  assert.equal(sql.all("SELECT 1 AS x FROM entry WHERE register = 'jobs'").length, 1);
+  /* PASSED THROUGH AS IT WAS WRITTEN. The list reads `["late"]` as its own type, so the row the rule meant is made. */
+  assert.deepEqual(bills(sql).map(({ what, tags }) => ({ what, tags })), [{ what: 'Rent', tags: ['late'] }]);
+});
+
+test('A RULE ALREADY INSTALLED WITH A NUMBER IN A set OR A note DOES NOT THROW OUT OF THE WRITE EITHER', async () => {
+  /* EVERY OTHER SITE REACHES `fill` DIRECTLY, not through `withEach`, and `fill`'s first line was `template.replace`. Measured
+     on 23 September before the guard: this body, written under the lint, threw `template.replace is not a function` out
+     of the Jobs write, the same as the create above. */
+  const { k, sql } = await open();
+  const out = await k.install([list('jobs'), list('bills'), rule({ register: 'jobs', once_per: ['entry'], then: [{ set: { field: 'n', to: '1' } }] })]);
+  assert.ok(out.ok, fixOf(out));
+  sql.exec("UPDATE declaration SET body = json_set(body, '$.then', json(?)) WHERE id = 'rule.late'", JSON.stringify([{ set: { field: 'n', to: 5 } }, { note: 7 }]));
+
+  const wrote = k.create('jobs', { what: 'x' }, { actor: 'p_1' });
+  assert.ok(wrote.ok, fixOf(wrote));
+  const jobs = sql.all<{ fields: string }>("SELECT fields FROM entry WHERE register = 'jobs'").map((r) => JSON.parse(r.fields) as Record<string, unknown>);
+  assert.deepEqual(jobs.map(({ what, n }) => ({ what, n })), [{ what: 'x', n: 5 }]);
+});

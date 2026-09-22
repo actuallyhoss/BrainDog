@@ -144,7 +144,7 @@ import {
   startRun,
   type FlowDeps,
 } from './flow.ts';
-import { pathOf, rowRegisterOf, subjectOf, tagsRefusal, tagsRefusing, triggerOf } from './flow-lint.ts';
+import { pathOf, rowRegisterOf, subjectOf, tagsRefusal, tagsRefusing, tagsShape, triggerOf } from './flow-lint.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
 import { arrive, day, exponentOf, propose, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps, type NumberReaders } from './ingest.ts';
 import { analyse, observe, type Analysis, type Observation } from './observe.ts';
@@ -315,7 +315,7 @@ export type { Fired as PullFired, PullDecl, PullDeps } from './pull.ts';
    what an install would and never runs a body the record could not hold. */
 export { egressChanged, scriptBody } from './script.ts';
 export { finishScript, prepareScript, resumeScript, REFUSED_IN_A_ROW, type ScriptAnswer, type ScriptRunner, type ScriptRunDeps, type ScriptUnrun, type Scripted } from './script-run.ts';
-export { ACTION_KINDS, ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, KEYS_REACH_ALL, RULE_CALLS_PER_DAY, actionJitterMs, answerHash, approvalLines, egressOf, originsOf, reserveFor } from './actions.ts';
+export { ACTION_KINDS, ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, KEYS_REACH_ALL, RULE_CALLS_PER_DAY, actionJitterMs, answerHash, approvalLines, egressOf, hostOpened, originsOf, reserveFor } from './actions.ts';
 export type {
   ActionAnswer, ActionDecl, ActionKind, ActionRequest, ActionRow, ActionsRun, CallQueued, Egress, Execute,
   /* The connector runner's half: what a paging job looks like, and what a host wires to run one. */
@@ -1519,6 +1519,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           if (bad) return bad;
         }
       }
+
+      if (decl.kind === 'rule' && Array.isArray(body.steps)) {
+        const bad = unreadIf(decl.id, body as FlowDecl, shape, batch);
+        if (bad) return bad;
+      }
       if (typeof register !== 'string') continue;
 
       const schema = shape(register);
@@ -1596,7 +1601,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * ONLY WHAT THIS CHANGE STARTS REFUSING. Wave thirty-eight asked a change of shape and nothing else, which let a
    * `list<enum>` drop the word a rule tags from its values, one shape to the same shape, and every later write that
    * tagged it was `ENUM_VALUE_UNKNOWN`. Asked against `was` as well, the narrowing is refused and a list that already
-   * refused a rule's tag before this change is still not blamed for it.
+   * refused a rule's tag before this change is still not blamed for it. A `was` already retired is read the same way,
+   * as refusing every tag (`tagsRefusing`), so a list resent with the retired `tags` it held is not blamed either.
    */
   function taggerOf(
     batch: readonly Declaration[],
@@ -1620,7 +1626,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (body === null || typeof body !== 'object') continue;
       const rule = body as FlowDecl;
       if (rowRegisterOf(rule, doorOf) !== register) continue;
-      const before = new Set(was === undefined || was.retired === true ? [] : tagsRefusing(rule, was).map((r) => r.at));
+      const before = new Set(was === undefined ? [] : tagsRefusing(rule, was).map((r) => r.at));
       const found = tagsRefusing(rule, tags).find((r) => !before.has(r.at));
       if (found !== undefined) return { rule: id, ...found };
     }
@@ -1640,33 +1646,103 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * A RULE RESENT WITH THE SAME BYTES IS NOT ASKED. A pack update sends every declaration it holds, and a rule that
    * installed over the list before this check existed would otherwise block every update of its pack, for a fault
    * that change did not make. A rule sent with any other bytes is new to the record and is asked everything.
+   *
+   * AND EVERY RULE WHOSE DOOR THE BATCH RE-POINTS, SENT OR NOT. An arrival rule's list is its door's `writes.register`,
+   * so a batch holding only the door moved the rule to another list and neither half asked: the audit of wave
+   * thirty-nine (finding 9) re-pointed `jobs_in` at a Bills whose `tags` was `list<enum>` of `[chase]` under
+   * `rule.arrived` tagging `fresh`, alone and beside the rule resent unchanged, and the next arrival's run failed at its
+   * `tag` step. The same-bytes skip is for the rule's own bytes, and here the door moved, so such a rule is asked as a
+   * new one, with `at` on the door, which is what the change sent. A door resent writing the list it wrote is no move.
    */
   function taggingRefused(batch: readonly Declaration[]): Refusal | null {
     const doorOf = doorsOf(batch);
-    for (const decl of batch) {
-      if (decl.kind !== 'rule' || decl.body === null || typeof decl.body !== 'object') continue;
-      const stored = sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0', decl.id);
-      if (stored !== undefined && stored !== null) {
-        try {
-          if (jcs(decl.body as unknown as Json) === jcs(JSON.parse(stored.body) as Json)) continue;
-        } catch {
-          /* AN UNREADABLE STORED BODY IS NOT THE SAME BYTES, so the rule is asked as a new one. */
+    const held = (id: string): unknown => {
+      const row = sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0', id);
+      if (row === undefined || row === null) return undefined;
+      try {
+        return JSON.parse(row.body) as unknown;
+      } catch {
+        /* AN UNREADABLE STORED BODY IS NOT THE SAME BYTES, so what it held is read as nothing. */
+        return null;
+      }
+    };
+    const writesOf = (body: unknown) => (body as { writes?: { register?: unknown } } | null | undefined)?.writes?.register;
+    const moved = new Map(
+      batch
+        .filter((d) => d.kind === 'ingest' && d.id.startsWith('ingest.') && writesOf(d.body) !== writesOf(held(d.id)))
+        .map((d) => [d.id.slice('ingest.'.length), d.id] as const),
+    );
+    const doorMoved = (rule: FlowDecl): string | undefined => {
+      const door = triggerOf(rule) === 'arrival' ? (rule.on as { arrival?: { ingest?: unknown } } | undefined)?.arrival?.ingest : undefined;
+      return typeof door === 'string' ? moved.get(door) : undefined;
+    };
+    const sent = new Set(batch.filter((d) => d.kind === 'rule').map((d) => d.id));
+    const asked: { id: string; body: unknown }[] = [
+      ...batch.filter((d) => d.kind === 'rule').map((d) => ({ id: d.id, body: d.body as unknown })),
+      ...(moved.size === 0
+        ? []
+        : sql
+            .all<{ id: string; body: string }>("SELECT id, body FROM declaration WHERE kind = 'rule' AND superseded_at IS NULL AND retired = 0 ORDER BY id")
+            .filter((row) => !sent.has(row.id))
+            .flatMap((row) => {
+              try {
+                return [{ id: row.id, body: JSON.parse(row.body) as unknown }];
+              } catch {
+                return [];
+              }
+            })),
+    ];
+    for (const { id, body } of asked) {
+      if (body === null || typeof body !== 'object') continue;
+      const rule = body as FlowDecl;
+      const door = doorMoved(rule);
+      if (door === undefined) {
+        if (!sent.has(id)) continue;
+        const stored = held(id);
+        if (stored !== undefined && stored !== null) {
+          try {
+            if (jcs(body as Json) === jcs(stored as Json)) continue;
+          } catch {
+            /* A BODY `jcs` CANNOT CANONICALISE IS NOT THE SAME BYTES, so the rule is asked as a new one. */
+          }
         }
       }
-      const rule = decl.body as unknown as FlowDecl;
       const register = rowRegisterOf(rule, doorOf);
       if (register === null) continue;
       /* THE LIST AS THE BATCH LEAVES IT: its fields as sent, or as held. A list with no declared `tags` takes the
-         `list<text>` every list takes (`withTags`), and a retired one is not a shape this check reads. */
+         `list<text>` every list takes (`withTags`). A retired one is asked too, and refuses every tag. */
       const arriving = batch.find((d) => d.kind === 'register' && ownId(d) === register);
       const fields = arriving !== undefined ? (arriving.body as { fields?: unknown }).fields : registers.get(register)?.fields;
       if (!Array.isArray(fields)) continue;
       const tags = (fields as { id?: unknown; type?: unknown; of?: unknown; values?: unknown; retired?: unknown }[]).find((f) => f?.id === 'tags');
-      if (tags === undefined || tags.retired === true) continue;
+      if (tags === undefined) continue;
       const found = tagsRefusing(rule, tags).at(0);
       if (found === undefined) continue;
-      const shape = `${String(tags.type)}${tags.of === undefined ? '' : `<${String(tags.of)}>`}`;
-      return tagsRefusal(register, decl.id, found, shape, `${decl.id}.${found.at}`);
+      return tagsRefusal(register, id, found, tagsShape(tags), door !== undefined && !sent.has(id) ? `${door}.writes.register` : `${id}.${found.at}`);
+    }
+    return null;
+  }
+
+  /**
+   * A list in the batch whose `tags` would start refusing what a rule tags it with, as the refusal, or `null`.
+   *
+   * LIFTED OUT OF `contradicted` SO THAT `stageInstall` ASKS IT TOO. The pack path asked `taggingRefused` (a rule in the
+   * batch) and never this (a list in the batch), and `plan`'s own `FIELD_TYPE_CHANGED` asks only about rows written
+   * under the old type. The audit of wave thirty-nine (finding 5) staged a pack's Jobs with `tags` as `list<enum>` of
+   * `[chase]`, and as `int`, under an installed `rule.late`: each staged, applied, and left the next Rent untagged. A
+   * retired `tags` is asked here as well, since the field loop in `contradicted` passes over every retired field.
+   */
+  function tagsNarrowed(batch: readonly Declaration[]): Refusal | null {
+    for (const decl of batch) {
+      if (decl.kind !== 'register') continue;
+      const fields = (decl.body as { fields?: unknown }).fields;
+      if (!Array.isArray(fields)) continue;
+      const tags = (fields as { id?: unknown; type?: unknown; of?: unknown; values?: unknown; retired?: unknown }[]).find((f) => f?.id === 'tags');
+      if (tags === undefined) continue;
+      const register = ownId(decl);
+      const was = registers.has(register) ? withTags(registers.get(register)!.fields).find((f) => f.id === 'tags') : undefined;
+      const tagging = taggerOf(batch, register, tags, was as { type?: unknown; of?: unknown; values?: unknown; retired?: unknown } | undefined);
+      if (tagging !== null) return tagsRefusal(register, tagging.rule, tagging, tagsShape(tags), `${decl.id}.fields.tags.${tags.retired === true ? 'retired' : 'type'}`);
     }
     return null;
   }
@@ -1799,17 +1875,6 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
             };
         }
 
-        /* AND NOT OVER A LIST A RULE TAGS, THOUGH NO ROW HOLDS A TAG YET. The choice above is the list's own where nothing
-           is stored, and `loop/research-batch-thirty-six-audit.md` §5 found the reader it did not count: Bills with no tag
-           on any row and `rule.late` tagging each Rent took `tags: int`, and the next Rent went in without its tag, with
-           no refusal and no event, one `write.refused` observation the only trace. A rule's `tag` or `untag`, on either
-           path and in either arm, is a reader of the list's tags, so it is asked here as the rows are above. Only what the
-           change starts refusing is asked: a list that already refused a rule's tag before it is not this change's fault. */
-        if (f.id === 'tags') {
-          const tagging = taggerOf(batch, register, f, was);
-          if (tagging !== null) return tagsRefusal(register, tagging.rule, tagging, typeOf(f), `${at}.type`);
-        }
-
         if ((f.type === 'enum' || (f.type === 'list' && f.of === 'enum')) && Array.isArray(f.values)) {
           const values = f.values.map(String);
           const kept = values.map(() => '?').join(', ') || "''";
@@ -1863,7 +1928,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         }
       }
     }
-    return taggingRefused(batch);
+    /* AND NOT OVER A LIST A RULE TAGS, THOUGH NO ROW HOLDS A TAG YET. The choice above is the list's own where nothing is
+       stored, and `loop/research-batch-thirty-six-audit.md` §5 found the reader it did not count: Bills with no tag on
+       any row and `rule.late` tagging each Rent took `tags: int`, and the next Rent went in without its tag, with no
+       refusal and no event, one `write.refused` observation the only trace. A rule's `tag` or `untag`, on either path
+       and in either arm, is a reader of the list's tags, so it is asked after the rows are. Only what the change starts
+       refusing is asked: a list that already refused a rule's tag before it is not this change's fault. */
+    return tagsNarrowed(batch) ?? taggingRefused(batch);
   }
 
   /**
@@ -2124,6 +2195,65 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         note === '' ? null : note.slice(0, 280),
       );
     }
+  }
+
+  /**
+   * A run-path `if` the run could not read, whatever its answers held, as the refusal the run would have failed with.
+   *
+   * THE LINT ASKED ONLY THAT AN `if` WAS A STRING OR A TREE, and this check read a rule's `when:` and not its steps. The
+   * checker of the record-reach wave installed `if: 'amount more than 1000'` over a Bills with a decimal `amount`, and
+   * every run failed at that step: "could not read its condition at step 1: amount more than 1000: more is not something
+   * a filter can say". The run reads the sentence against the row's schema with each answer typed by its value
+   * (`flow.ts`'s `test`), and the value is not known here, so each answer the rule gives is tried as text, as a decimal
+   * and as a bool, which are the three the run can type one as. Only a refusal all three meet, word for word, is the
+   * run's certain answer and refused; one that depends on the type is left to the run.
+   *
+   * A CONDITION HOLDING `{{...}}` IS NOT READ, since the run fills it before reading it, and nor is a tree, which the run
+   * evaluates without compiling. A rule whose row is on a list no lint can name (an arrival at no named door) is not
+   * read either: a field of that row would be refused by a schema that is not the one the run holds.
+   */
+  function unreadIf(id: string, rule: FlowDecl, shape: (register: string) => Schema | null, batch: readonly Declaration[]): Refusal | null {
+    const conditions: { cond: string; at: string }[] = [];
+    const answers = new Set<string>();
+    const walk = (list: unknown, at: string) => {
+      if (!Array.isArray(list)) return;
+      for (const [i, step] of list.entries()) {
+        if (step === null || typeof step !== 'object') continue;
+        const here = `${at}[${i}]`;
+        const s = step as Record<string, unknown>;
+        for (const verb of ['set_var', 'ask_spark', 'ask_person', 'call', 'script']) {
+          const spec = s[verb] as { name?: unknown; as?: unknown } | undefined;
+          const named = verb === 'set_var' ? spec?.name : spec?.as;
+          if (typeof named === 'string') answers.add(named);
+        }
+        if ('if' in s) {
+          if (typeof s.if === 'string' && !s.if.includes('{{')) conditions.push({ cond: s.if, at: here });
+          walk(s.then, `${here}.then`);
+          walk(s.else, `${here}.else`);
+        }
+      }
+    };
+    walk(rule.steps, 'steps');
+    if (conditions.length === 0) return null;
+
+    const trigger = triggerOf(rule);
+    const register = rowRegisterOf(rule, doorsOf(batch));
+    if ((trigger === 'written' || trigger === 'arrival') && register === null) return null;
+    const own = register === null ? null : shape(register);
+    if (register !== null && own === null) return null;
+    const ctx = evalContext(batch);
+    const typed = (type: 'text' | 'decimal' | 'bool'): Schema => ({
+      ...(own ?? { register: 'vars' }),
+      fields: { ...Object.fromEntries([...answers].map((a) => [a, { type }])), ...(own?.fields ?? {}) } as Schema['fields'],
+    });
+    const schemas = [typed('text'), typed('decimal'), typed('bool')];
+    for (const { cond, at } of conditions) {
+      const [first, ...rest] = schemas.map((schema) => predicateOf(cond, schema, ctx).bad.filter((b) => b.code !== 'REF_UNKNOWN'));
+      const same = (a: Refusal, b: Refusal) => a.code === b.code && a.fix === b.fix && a.at === b.at;
+      const certain = first!.find((b) => rest.every((other) => other.some((o) => same(b, o))));
+      if (certain) return { ...certain, fix: `${id} cannot read its condition at ${at}: ${certain.fix}`, at: `${at}.if` };
+    }
+    return null;
   }
 
   /** A `where` read against the register it filters: `null` when it can be read, the refusal when not. */
@@ -6084,8 +6214,12 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          AND A RULE THAT TAGS A LIST WHOSE `tags` REFUSES IT (`taggingRefused`), which `contradicted` asks on the other paths
          and this one never ran. A pack's `rule.late` staged here over a Jobs whose `tags` was `int` installed, and the
          next Rent went in untagged with nothing refused (`test/tags-rule-order.test.ts`). Only that half of
-         `contradicted`: the rows are `packages/declare`'s `plan` to count on this path. */
-      const cannot = unreadable(batch) ?? lintBatch(sql, batch) ?? stranded(batch) ?? taggingRefused(batch);
+         `contradicted`: the rows are `packages/declare`'s `plan` to count on this path.
+
+         AND ITS LIST HALF (`tagsNarrowed`), which counts rules and not rows, so it is not `plan`'s to ask. Asked by rule
+         alone, a pack that narrowed Jobs' `tags` to `list<enum>` of `[chase]`, or to `int`, under an installed `rule.late`
+         staged, applied and left the next Rent untagged (`loop/research-batch-thirty-nine-audit.md` finding 5). */
+      const cannot = unreadable(batch) ?? lintBatch(sql, batch) ?? stranded(batch) ?? tagsNarrowed(batch) ?? taggingRefused(batch);
       if (cannot) return { ok: false as const, refusal: cannot };
       const staged = await stageDeclarations(batch);
       if (!staged.ok) return staged;

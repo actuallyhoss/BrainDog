@@ -492,8 +492,14 @@ const DAY_MS = 86_400_000;
  * locale; this writes the line somebody reads in six weeks, and it is deliberately the same words
  * whoever reads it. A missing value is an em dash rather than the empty string, because a sentence
  * with a hole in it reads as a bug and one with a dash reads as a fact.
+ *
+ * A TEMPLATE THAT IS NOT TEXT IS WRITTEN AS ITS WORDS, NOT THROWN. The lint refuses one at install (`fillFault` in
+ * `flow-lint.ts`), but a rule installed before that lint, or written straight into the declaration row, still holds
+ * `set: { to: 5 }` or `note: 7`, and this line was `template.replace`: measured on 23 September, such a rule threw
+ * `template.replace is not a function` out of every write to its list, and the row a person asked for was lost with it.
  */
 export function fill(template: string, row: Entry, nowMs = Date.now()): string {
+  if (typeof template !== 'string') return wordsOf(template);
   return template.replace(/\{\{(\w+)(?::(\w+))?\}\}/g, (_whole, head: string, tail?: string) => {
     if (head === 'id') return row.seq === null ? row.id : `${row.register}#${row.seq}`;
     const field = tail ?? head;
@@ -518,6 +524,16 @@ export function fill(template: string, row: Entry, nowMs = Date.now()): string {
     return String(value);
   });
 }
+
+/** A value that is not text, as `fill` would write it had it been a field: a dash for nothing, a list by its items. */
+const wordsOf = (value: unknown): string =>
+  value === null || value === undefined
+    ? '—'
+    : Array.isArray(value)
+      ? value.map(String).join(', ')
+      : typeof value === 'object'
+        ? JSON.stringify(value)
+        : String(value);
 
 const isMoney = (v: unknown): v is { amount: number; currency: string } =>
   typeof v === 'object' && v !== null && 'amount' in v && 'currency' in v;
@@ -604,9 +620,13 @@ function expand(
     )
       continue;
 
+    /* A VALUE THAT IS NOT TEXT GOES THROUGH AS IT WAS WRITTEN. `withEach` called `.replace` on each one, so a create
+       holding `tags: ["late"]`, installed before the lint refused it, threw out of every write to the parent's list
+       (measured on 23 September). Passed through, the list reads it as its own type, or refuses it as it would any
+       other value. */
     const fields: Record<string, unknown> = {};
     for (const [id, template] of Object.entries(spec.fields))
-      fields[id] = fill(withEach(template, tuple), fired.entry, deps.nowMs);
+      fields[id] = typeof template === 'string' ? fill(withEach(template, tuple), fired.entry, deps.nowMs) : template;
 
     const made = deps.generate(spec.register, fields, `rule:${rule.rule}`, fired.batch, {
       _rule: rule.rule,

@@ -248,9 +248,8 @@ export function opensNamed(sql: Sql, name: string): string | null {
  * IT LIVES HERE, BESIDE `opensNamed`, AND NOT IN `@braindog/host`, because two readers of `opens` disagreed. The host sent
  * a key where this parse said and the approval line printed the words raw, so the audit of wave thirty-eight watched
  * `https://api.goldapi.io@collector.test` printed as the key's destination while the key went to `collector.test`, the
- * host after the user-info. The line (`scriptEgress`) asks this now. `keyRefused` still holds a copy, because this
- * package exports only its index and the index does not name this yet; `packages/host/test/script-host-opened.test.ts`
- * holds that copy to this one's answers until the host imports it.
+ * host after the user-info. The line (`scriptEgress`) asks this now, and so does `keyRefused` in `packages/host`, which
+ * imports it from the index and holds no copy of its own.
  */
 export function hostOpened(opens: unknown): string | null {
   if (typeof opens !== 'string') return null;

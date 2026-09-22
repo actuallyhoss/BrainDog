@@ -243,6 +243,115 @@ test("A PACK'S RULE STAGED OVER A NARROWED tags IS REFUSED TOO, since every pack
   assert.match(fixOf(staged), /rule\.late tags jobs at then\[0\], so int would refuse every tag it writes/);
 });
 
+/* ─── (3) THE ORDERS WAVE THIRTY-NINE LEFT (`loop/research-batch-thirty-nine-audit.md` findings 3, 5 and 9) ─── */
+
+const RETIRED = { id: 'tags', type: 'list', of: 'text', retired: true };
+const NOTING: Declaration = {
+  id: 'rule.late',
+  kind: 'rule',
+  body: { rule: 'late', register: 'jobs', when: 'what is Rent', then: [{ tag: 'late' }, { set: { field: 'note', to: 'seen' } }] } as never,
+};
+const NOTE = { id: 'note', type: 'text' };
+
+test('RETIRING tags UNDER A RULE THAT TAGS IS REFUSED, in either order, as tags: int is', async () => {
+  /* FINDING 3. Both halves skipped a retired `tags` on purpose, and the write path then answers `FIELD_UNKNOWN` for it,
+     so the pass's one patch went whole. Measured by the audit's `tags3.mts` before this: retired under `rule.late`
+     installed, and the Rent went in as `{"what":"Rent"}`, without its tag and without the `set` of `note` beside it. */
+  const k = await openRecord(openSqlite(), fixedClock(NOW));
+  assert.ok((await k.install([jobs(NOTE), NOTING])).ok);
+  const out = await k.install([jobs(NOTE, RETIRED)]);
+  assert.equal(out.ok, false, 'tags retired under rule.late');
+  assert.equal(codeOf(out), 'FIELD_TYPE_CHANGED');
+  assert.equal(
+    fixOf(out),
+    'register.jobs.tags: every list takes tags as list<text>, and rule.late tags jobs at then[0], so a retired tags would refuse every tag it writes. Leave tags out, or declare it as list<text>.',
+  );
+  assert.deepEqual(rent(k), ['late'], 'the refusal kept the rule tagging');
+
+  const other = await openRecord(openSqlite(), fixedClock(NOW));
+  assert.ok((await other.install([jobs(NOTE, RETIRED)])).ok, 'no rule tags jobs yet, so retiring tags is the list’s own choice');
+  const after = await other.install([NOTING]);
+  assert.equal(after.ok, false, 'rule.late installed over a retired tags');
+  assert.equal(codeOf(after), 'FIELD_TYPE_CHANGED');
+  assert.match(fixOf(after), /rule\.late tags jobs at then\[0\], so a retired tags would refuse every tag it writes/);
+  assert.equal((after as { refusal?: { at?: string } }).refusal?.at, 'rule.late.then[0]');
+});
+
+test('A LIST RESENT WITH THE tags IT ALREADY HAD RETIRED UNDER A RULE is not blamed for it', async () => {
+  const sql = openSqlite();
+  const first = await openRecord(sql, fixedClock(NOW));
+  assert.ok((await first.install([jobs(NOTE), NOTING])).ok);
+  sql.exec("UPDATE declaration SET body = ? WHERE id = 'register.jobs' AND superseded_at IS NULL", JSON.stringify(jobs(NOTE, RETIRED).body));
+  const k = await openRecord(sql, fixedClock(NOW));
+  const same = await k.install([jobs(NOTE, RETIRED, { id: 'more', type: 'text' })]);
+  assert.ok(same.ok, `Jobs resent with the retired tags it already held was refused: ${fixOf(same)}`);
+});
+
+test("A PACK THAT NARROWS tags UNDER AN INSTALLED RULE IS REFUSED BY stageInstall, which asked only the rule half", async () => {
+  /* FINDING 5, T3 and T3b. `stageInstall` asked `taggingRefused` (a rule in the batch) and never `taggerOf` (a list in
+     the batch), and `plan`'s own FIELD_TYPE_CHANGED asks only about rows. Measured by the audit before this: both staged,
+     applied, and the next Rent held no tag. */
+  for (const tags of [enumTags('chase'), { id: 'tags', type: 'int' }, RETIRED]) {
+    const k = await open(LATE);
+    const staged = await k.stageInstall([{ ...jobs(tags), pack: 'third' }]);
+    assert.equal(staged.ok, false, `a pack staged jobs with ${JSON.stringify(tags)} under rule.late`);
+    assert.equal(codeOf(staged), 'FIELD_TYPE_CHANGED');
+    assert.match(fixOf(staged), /rule\.late/);
+    assert.equal((staged as { refusal?: { at?: string } }).refusal?.at, `register.jobs.fields.tags.${'retired' in tags ? 'retired' : 'type'}`);
+  }
+});
+
+test('RE-POINTING A DOOR UNDER AN ARRIVAL RULE THAT TAGS IS ASKED, alone and beside the rule resent unchanged', async () => {
+  /* FINDING 9. An arrival rule's list is its door's `writes.register`, so a batch holding only the door moved the rule
+     to Bills and neither half asked. Measured by the audit before this: both installed, and the next arrival's run
+     failed at its `tag` step and took no step after it. */
+  const door = (register: string): Declaration => ({
+    id: 'ingest.jobs_in',
+    kind: 'ingest',
+    body: {
+      ingest: 'jobs_in',
+      channel: 'webhook',
+      match: { all: [{ field: 'body', contains: 'job' }] },
+      extract: { what: { text: { after: 'job ' } } },
+      writes: { register, confidence: 'exact' },
+    } as never,
+  });
+  const arrived: Declaration = {
+    id: 'rule.arrived',
+    kind: 'rule',
+    body: { rule: 'arrived', on: { arrival: { ingest: 'jobs_in' } }, steps: [{ tag: 'fresh' }] } as never,
+  };
+  const bills: Declaration = {
+    id: 'register.bills',
+    kind: 'register',
+    body: { id: 'bills', name: 'Bills', title: 'what', fields: [WHAT, enumTags('chase')] } as never,
+  };
+  for (const batch of [[door('bills')], [door('bills'), arrived]]) {
+    const k = await open(bills, door('jobs'), arrived);
+    const out = await k.install(batch);
+    assert.equal(out.ok, false, `the door re-pointed at bills under rule.arrived (${batch.length} sent)`);
+    assert.equal(codeOf(out), 'FIELD_TYPE_CHANGED');
+    assert.match(fixOf(out), /^register\.bills\.tags: .*rule\.arrived tags bills fresh at steps\[0\]/);
+  }
+
+  /* THE SAME DOOR RESENT WITH THE SAME LIST IS NOT A MOVE, so a pack update that resends it is not asked again. */
+  const k = await open(bills, door('jobs'), arrived);
+  const same = await k.install([door('jobs')]);
+  assert.ok(same.ok, fixOf(same));
+
+  /* AND OVER A LIST THAT ALREADY REFUSES THE TAG, which is the case the resend above cannot tell apart: Jobs takes every
+     tag, so a check that read every door in the batch as moved answered the same there. The door is written straight into
+     the table at Bills, as an earlier build let it install, and resent as it stands; the checker of this wave mutated
+     the move to "every door sent" and the three cases above still passed. */
+  const sql = openSqlite();
+  const before = await openRecord(sql, fixedClock(NOW));
+  assert.ok((await before.install([jobs(), bills, door('jobs'), arrived])).ok);
+  sql.exec("UPDATE declaration SET body = ? WHERE id = 'ingest.jobs_in' AND superseded_at IS NULL", JSON.stringify(door('bills').body));
+  const held = await openRecord(sql, fixedClock(NOW));
+  const resent = await held.install([door('bills')]);
+  assert.ok(resent.ok, `the door resent at the Bills it already wrote was blamed for rule.arrived: ${fixOf(resent)}`);
+});
+
 test('A RULE RESENT WITH THE SAME BYTES OVER A LIST THAT ALREADY REFUSES ITS TAG IS NOT BLAMED; ANY EDIT TO IT IS', async () => {
   /* A RECORD AN EARLIER BUILD LEFT: `rule.late` installed, and then `tags: int` under it, which the build before wave
      thirty-eight let through. Written into the table as that build left it, and read by a record opened over it. */

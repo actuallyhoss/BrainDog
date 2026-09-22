@@ -327,16 +327,17 @@ test('A STEP THAT THROWS FAILS THE RUN WITH A SENTENCE, and nothing it already d
      every two hours for as long as the probe ran; without one, eight notifies and a run that never ended.
 
      THE BODY IS WRITTEN UNDER THE LINT, straight into the declaration row, because what is under test is a throw from
-     any step (a driver error, a full disk, a bug) and not the one malformed shape the audit happened to find. At HEAD
-     `{ note: { text } }` also installed through the front door, and a lint that refuses it would not change this. */
+     any step (a driver error, a full disk, a bug) and not the one malformed shape the audit happened to find. It was
+     `{ note: { text } }` until the fill guard (wave forty-one) made a non-text note harmless; a `link` whose `to` is
+     null still throws inside the step (`action.link.to.by`), which is all this needs. */
   const on = { written: { register: 'paid', op: ['create'] } };
   const { k, sql, clock } = await record(
     rule({ rule: 'chase', on, once_per: ['entry'], steps: [{ wait: '1h' }, { notify: { say: 'Chase {{merchant}}' } }, { note: 'x' }] }),
     rule({ rule: 'nag', on, once_per: ['entry'], steps: [{ notify: { say: 'Nag {{merchant}}' } }, { note: 'x' }] }),
   );
   for (const [id, list] of [
-    ['rule.chase', [{ wait: '1h' }, { notify: { say: 'Chase {{merchant}}' } }, { note: { text: 'x' } }]],
-    ['rule.nag', [{ notify: { say: 'Nag {{merchant}}' } }, { note: { text: 'x' } }]],
+    ['rule.chase', [{ wait: '1h' }, { notify: { say: 'Chase {{merchant}}' } }, { link: { field: 'merchant', to: null } }]],
+    ['rule.nag', [{ notify: { say: 'Nag {{merchant}}' } }, { link: { field: 'merchant', to: null } }]],
   ] as const)
     sql.exec("UPDATE declaration SET body = json_set(body, '$.steps', json(?)) WHERE id = ?", JSON.stringify(list), id);
 
