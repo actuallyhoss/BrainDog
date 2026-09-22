@@ -47,6 +47,19 @@
  * `{ wrote: 0, kept: 1 }`, so a ledger connector would look like a working connector for ever.
  */
 
+/**
+ * The version of every Mercury pack this file writes, which moves by `first-party.ts`'s rule.
+ *
+ * 1.0.1: money-core `>=1.0.0 <3.0.0` in place of `^1.0.0`. money-core 2.0.0 took `holdings` away, and no caret on 1.x
+ * admits it: `satisfies('2.0.0', '^1.0.0')` is false (`packages/declare/test/pack.test.ts`), so beside the new Money the
+ * install is refused on its range (`loop/research-seed-roles.md` R5). The pull writes `accounts`, which did not move,
+ * so the range is widened and the declaration is not: a patch step. Nothing in the tree calls `mercuryPack` outside its
+ * tests, so nothing offers 1.0.1 to a record holding 1.0.0; the step lets a pack list tell the two apart. Below 3.0.0
+ * because the next major is a list or a field taken away, and whether `accounts` is still what this writes into is that
+ * step's question (`test/money-core-major.test.ts`).
+ */
+export const MERCURY_VERSION = '1.0.1';
+
 /** Mercury's own host. Overridable so a test can point at a host that is not a bank. */
 export const MERCURY_BASE = 'https://api.mercury.com';
 
@@ -100,11 +113,11 @@ export function mercuryPack(spec: MercurySpec): Record<string, unknown> {
   const ingest = `mercury_${ident(spec.id)}`.slice(0, 32).replace(/_+$/u, '');
   return {
     pack: `mercury-${spec.id}`,
-    version: '1.0.0',
+    version: MERCURY_VERSION,
     summary: `Reads the balance of every Mercury account from ${hostOf(base)} every ${every}, into Money's accounts.`,
     author: 'BrainDog',
     license: 'MIT',
-    requires: { format: 1, primitives: 1, packs: { 'money-core': '^1.0.0' } },
+    requires: { format: 1, primitives: 1, packs: { 'money-core': '>=1.0.0 <3.0.0' } },
     declarations: [
       {
         ingest,

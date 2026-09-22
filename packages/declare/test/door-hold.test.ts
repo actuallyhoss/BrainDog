@@ -22,7 +22,8 @@ import type { Diff } from '../src/index.ts';
 import { createRecordApi, type CallContext } from '../../record/src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { FIRST_PARTY, NOW, firstPartyDocument } from '../../seed/src/index.ts';
-import { HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS, MONEY_CORE_HANDS, bankHsbcEgPack } from '../../seed/src/packs/bank-hsbc-eg.ts';
+import { BANK_HSBC_EG_VERSION, HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS, MONEY_CORE_HANDS, bankHsbcEgPack } from '../../seed/src/packs/bank-hsbc-eg.ts';
+import { asMoneyCore180 } from '../../seed/test/money-core-earlier.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 'owner' } };
 
@@ -46,9 +47,15 @@ const HSBC = [
   'ingest.bank-ipn-in', 'ingest.bank-ipn-in-sms', 'ingest.bank-ipn-out', 'ingest.bank-ipn-out-sms',
 ];
 
-/** money-core as 1.7.0 shipped it, built the way `bank-pack.test.ts` builds it: today's document with the twelve put back. */
+/**
+ * money-core as 1.7.0 shipped it, built the way `bank-pack.test.ts` builds it: 1.8.0's document with the twelve put back.
+ *
+ * FROM 1.8.0 AND NOT FROM TODAY'S FILE, because today's is 2.0.0 and has no `holdings`, which 1.7.0 carried. Built from
+ * today's, both steps below would have been a record without the list, and the plan of the update would have been a
+ * plan 1.7.0 never met.
+ */
 const v170 = (): Doc => {
-  const d = structuredClone(firstPartyDocument('money-core')) as unknown as Doc;
+  const d = asMoneyCore180(firstPartyDocument('money-core')) as unknown as Doc;
   d.version = '1.7.0';
   delete d.hands;
   const hsbc = [...Object.values(HSBC_EG_INGESTS), ...Object.values(HSBC_EG_SMS_INGESTS)].map((i) => ({ ...structuredClone(i), pack: 'money-core' }));
@@ -56,8 +63,17 @@ const v170 = (): Doc => {
   return d;
 };
 
-/** money-core 1.8.0 handing the twelve to `bank-hsbc-eg`. */
-const v180 = (): Doc => ({ ...(structuredClone(firstPartyDocument('money-core')) as unknown as Doc), hands: { ...MONEY_CORE_HANDS } });
+/**
+ * money-core 1.8.0 handing the twelve to `bank-hsbc-eg`, and nothing else.
+ *
+ * `asMoneyCore180`, SINCE TODAY'S FILE IS 2.0.0: it hands `holdings` too, and spread over the shipped document the old
+ * one-liner here installed 2.0.0 and called it 1.8.0. The step this file holds is 1.7.0 to 1.8.0.
+ */
+const v180 = (): Doc => {
+  const d = asMoneyCore180(firstPartyDocument('money-core')) as unknown as Doc;
+  assert.deepEqual(d.hands, { ...MONEY_CORE_HANDS }, '1.8.0 hands something other than the twelve');
+  return d;
+};
 
 async function put(api: Api, doc: unknown): Promise<Diff> {
   const diff = said<{ diff: Diff }>(await api.planPack({ doc, source: { kind: 'local' } } as never, owner)).diff;
@@ -96,7 +112,10 @@ test('A TOKEN MINTED ON 1.7.0 OPENS THE DOOR AFTER THE UPDATE AND AFTER THE PACK
   const owners = api.kernel.declarations().filter((d) => HSBC.includes(d.id)).map((d) => d.pack_id);
   assert.deepEqual([...new Set(owners)], ['bank-hsbc-eg']);
   assert.equal(owners.length, 12);
-  assert.ok(api.kernel.packs().some((p) => p.id === 'bank-hsbc-eg' && p.version === '1.0.0'));
+  /* THE VERSION IT SHIPS, 1.0.1 since its range was widened past money-core 2.0.0 (`bank-hsbc-eg.ts`). Read off the
+     constant because this line holds that the pack arrived, and the range step is `seed/test/bank-pack.test.ts`'s. */
+  assert.ok(api.kernel.packs().some((p) => p.id === 'bank-hsbc-eg' && p.version === BANK_HSBC_EG_VERSION));
+  assert.equal(api.kernel.packs().find((p) => p.id === 'money-core')?.version, '1.8.0');
   sql.close();
 });
 

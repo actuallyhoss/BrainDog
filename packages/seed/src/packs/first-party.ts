@@ -25,6 +25,7 @@ import { packDocument } from '../index.ts';
 import { MONEY_HOME_SETTING, targetConfigOf } from '../modules/money.ts';
 import type { PackManifest } from './agents.ts';
 import { MONEY_CORE_HANDS } from './bank-hsbc-eg.ts';
+import { MONEY_CORE_HOLDINGS_HANDS } from './holdings.ts';
 
 export type FirstPartyId = 'portfolio' | 'people' | 'money-core' | 'estate' | 'work';
 
@@ -100,6 +101,16 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   move, because a handed twin is never retired and `heldDigest` in `packages/record/src/index.ts` keeps
  *   a digest while every version since the mint is live (`packages/declare/test/door-hold.test.ts`). A record already
  *   updated to 1.8.0 before the handover existed lost the twelve, and there the owner installs the pack and mints again.
+ * - money-core 2.0.0: `holdings` leaves for a pack of its own, `holdings` (`packs/holdings.ts`), and `gold` leaves with it.
+ *   What one person holds is not what everybody's Money is for, and gold among the list's kinds was the use case
+ *   `loop/DIRECTION.md` section 22 named by name. A list taken away, so by the rule above the step is major, the first
+ *   this pack has taken. The list is HANDED, not retired (`MONEY_CORE_HOLDINGS_HANDS`), so a record holding rows in it
+ *   keeps every row, its id and its history, and the holdings pack takes it over when it installs, keeping `gold` as the
+ *   record's own kind where rows were written under it (`test/holdings-pack.test.ts`). An empty list on a record that
+ *   says what it uses is retired instead, and the pack declares it afresh. The two packs that require money-core had
+ *   caret ranges on 1.x, which no 2.0.0 satisfies and which the range grammar cannot widen with `||`
+ *   (`loop/research-seed-roles.md` R5), so `bank-hsbc-eg` and every Mercury pack widen to `<3.0.0` in the same change,
+ *   each with a version step of its own (`test/money-core-major.test.ts`).
  * - estate 1.2.0: a service carries a note. the old tool's domains carry the reason each name is held and what is
  *   unresolved about it, and Services had no field that holds prose, so the import left every note in the export. One
  *   field added and nothing taken away, so the step is a minor one. It moves the version rather than riding on 1.1.0
@@ -126,7 +137,7 @@ const SUMMARIES: Record<FirstPartyId, string> = {
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.4.0',
   people: '1.0.0',
-  'money-core': '1.8.0',
+  'money-core': '2.0.0',
   estate: '1.2.0',
   work: '1.6.0',
 };
@@ -309,8 +320,10 @@ export function firstPartyDocument(id: string, options: DocumentOptions = {}): R
     /* THE SETTINGS ITS FIGURES' TARGETS ARE HELD TO (`MONEY_TARGET_SETTINGS`), which a person changes later, and Money's
        home currency. */
     ...(Object.keys(configOf(id, pack.declarations)).length > 0 ? { config: configOf(id, pack.declarations) } : {}),
-    /* THE TWELVE HSBC EGYPT DOORS ARE HANDED, NOT RETIRED, so a token minted for one survives the move (`bank-hsbc-eg.ts`). */
-    ...(id === 'money-core' ? { hands: { ...MONEY_CORE_HANDS } } : {}),
+    /* THE TWELVE HSBC EGYPT DOORS ARE HANDED, NOT RETIRED, so a token minted for one survives the move (`bank-hsbc-eg.ts`),
+       and so is `holdings`, so its rows do (`holdings.ts`). The twelve are still handed at 2.0.0, because a record on
+       1.7.0 may take this update without ever having taken 1.8.0. */
+    ...(id === 'money-core' ? { hands: { ...MONEY_CORE_HANDS, ...MONEY_CORE_HOLDINGS_HANDS } } : {}),
   };
 }
 

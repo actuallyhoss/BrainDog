@@ -34,7 +34,7 @@ import { coerce, type FieldDecl } from '@braindog/kernel';
 import { no, ok, refused, type Result } from '@braindog/ports';
 
 import { budgetOf, hostsPath, target, type Target } from './http.ts';
-import { bankHsbcEgPack } from '@braindog/seed';
+import { bankHsbcEgPack, holdingsPack } from '@braindog/seed';
 import { pollPack } from '@braindog/seed/usecases/founder-poll';
 
 import { KEY_PREFIX, OPTIONAL, ORDER, draftSetup, holdsKey, PROVIDED_BY, isRef, planLegacyTool, readLegacyTool, readSetup, type Plan, type PlannedRow, type Setup } from './legacy.ts';
@@ -59,7 +59,7 @@ export type Door = {
   governance: (args: { register?: string; status?: string; limit?: number; cursor?: string }) => Promise<Result<unknown>>;
   propose: (args: { question: string; body_kind: 'options' | 'pack' | 'change'; body: Record<string, unknown> }) => Promise<Result<unknown>>;
   /**
-   * The packs this record holds and at which version: read only when a bank pack is to be offered (see `banksOf`).
+   * The packs this record holds and at which version: read only when a pack is to be offered (see `banksOf`).
    * OPTIONAL BECAUSE A DOOR WITHOUT IT STILL WORKS. The pack is then proposed unchecked, and a record that cannot take
    * it answers with its own refusal, which lands under "Refused by the record" like any other.
    */
@@ -67,12 +67,14 @@ export type Door = {
 };
 
 /**
- * A pack his export shows he uses, to be offered on Decide with its document: see `banksOf`.
+ * A pack his export shows he uses, to be offered on Decide with its document: see `banksOf` and `holdingsOf`.
  *
  * THE DOCUMENT TRAVELS WITH THE ID because the pack is in no catalogue a record resolves an install id against.
- * `bank-hsbc-eg` is deliberately not in `seedCatalogue`: a pack in the catalogue is a pack every record is offered.
+ * `bank-hsbc-eg` and `holdings` are deliberately not in `seedCatalogue`: a pack in the catalogue is a pack every record
+ * is offered. `says` is what the pack is for, in the words that open the line saying why it was held back.
  */
-export type PlannedBank = { install: string; name: string; question: string; doc: Record<string, unknown> };
+export type PlannedPack = { install: string; name: string; question: string; doc: Record<string, unknown>; says: string };
+export type PlannedBank = PlannedPack;
 
 export type Tally = { added: number; updated: number; unchanged: number };
 
@@ -88,6 +90,8 @@ export type Report = {
    * too old to take it. Absent when the run was handed no bank to offer.
    */
   banks?: { filed: number; before: number; waiting: string[] };
+  /** The same for every other pack the export shows he needs (`holdingsOf`), counted apart so Banks stays about banks. */
+  packs?: { filed: number; before: number; waiting: string[] };
   /**
    * The words the old tool used that a closed list here did not hold (`PlannedRow.own`), each said as `crypto as a kind in
    * Holdings`: added to its list by this run, filed on Decide and waiting, or asked about before. Absent when there were
@@ -140,8 +144,8 @@ const NAMES: Readonly<Record<string, string>> = {
   accounts: 'Accounts',
   /* AND THE THIRD TIME THIS FILE HAS BEEN THE ONE A NEW REGISTER FORGOT, which the paragraph above predicted in so many
      words: `ORDER` gained `holdings` in `legacy.ts`, an agent's own file, and this map is a file away and was another
-     agent's. `Holdings` is what money-core puts over the list (`packages/seed/src/modules/money.ts:533`), so a person
-     reading the report has the same word over the page the import filled. */
+     agent's. `Holdings` is what the holdings pack puts over the list (`packages/seed/src/packs/holdings.ts`, `name`), so
+     a person reading the report has the same word over the page the import filled. */
   holdings: 'Holdings',
   categories: 'Categories',
   obligations: 'Money in and out',
@@ -316,14 +320,44 @@ export function banksOf(exp: Record<string, unknown>): PlannedBank[] {
   const ledger = money.ledger;
   const rows: unknown[] = Array.isArray(ledger) ? ledger : isObj(ledger) ? [ledger.txns, ledger.transactions, ledger.rows].find(Array.isArray) ?? [] : [];
   const read = rows.some((t) => isObj(t) && typeof t.source === 'string' && READ_FROM_A_MESSAGE.has(t.source.toLowerCase()) && hsbc.has(String(t.account_id ?? t.account).toLowerCase()));
-  return read ? [{ install: 'bank-hsbc-eg', name: 'HSBC Egypt', question: 'Read HSBC Egypt texts and mails into Money?', doc: bankHsbcEgPack() }] : [];
+  return read ? [{ install: 'bank-hsbc-eg', name: 'HSBC Egypt', question: 'Read HSBC Egypt texts and mails into Money?', doc: bankHsbcEgPack(), says: 'Reading HSBC Egypt texts and mails' }] : [];
 }
+
+/**
+ * THE HOLDINGS PACK, WHEN HIS EXPORT HOLDS ANYTHING HE OWNS.
+ *
+ * money-core 2.0.0 gave `holdings` to a pack of its own (`packages/seed/src/packs/holdings.ts`), which no use case
+ * installs, so a record set up after the move has nowhere to put his gold, his certificate or his policies until
+ * somebody installs it, and the import is the one moment that knows he needs it. What counts is a row in
+ * `money.assets`, the route that answered all fourteen on 22 September; one the plan will skip for having no cost still
+ * says he holds things. On a record that already has the list from an older money-core the offer waits, with the
+ * reason, because the pack asks for money-core 2.0.0 and beside 1.8.0 it is refused: see `applyPlan`.
+ */
+export function holdingsOf(exp: Record<string, unknown>): PlannedPack[] {
+  const money = isObj(exp.money) ? exp.money : null;
+  const assets = money && Array.isArray(money.assets) ? money.assets : [];
+  return assets.some(isObj)
+    ? [{ install: 'holdings', name: 'Holdings', question: 'Keep what you hold in a Holdings list?', doc: holdingsPack(), says: 'A list for what you hold' }]
+    : [];
+}
+
+/**
+ * A range as a sentence says it: `>=2.0.0` is "2.0.0 or later" and `>=1.8.0 <3.0.0` is "1.8.0 or later, before 3.0.0".
+ * A person reads these lines, and `>=1.8.0 <3.0.0` is the grammar's spelling and not an English one. Any other range is
+ * printed as it is written, which is at least exact.
+ */
+const rangeWords = (range: string): string => {
+  const both = /^>=\s*(\S+)\s+<\s*(\S+)$/u.exec(range.trim());
+  if (both) return `${both[1]!} or later, before ${both[2]!}`;
+  const floor = /^>=\s*(\S+)$/u.exec(range.trim());
+  return floor ? `${floor[1]!} or later` : range;
+};
 
 /**
  * Apply a plan through a door. Refs are resolved to the id of the row they name once it is written; a ref to a row in
  * the same list written later is set in a second pass.
  */
-export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; banks?: PlannedBank[] }): Promise<Report> {
+export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; banks?: PlannedBank[]; packs?: PlannedPack[] }): Promise<Report> {
   let plan = given;
   const report: Report = { missing: [], tally: {}, asked: 0, alreadyAsked: 0, polls: { filed: 0, before: 0 }, changes: [], refused: [], retired: [], clashes: [], examples: 0, outcomes: {}, plan };
   let registers = ORDER.filter((r) => plan.rows.some((row) => row.register === r));
@@ -406,8 +440,9 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
     /**
      * UPDATE WHEN THE PACK IS THERE AT AN OLDER VERSION, INSTALL WHEN IT IS NOT, AND THE SENTENCE SAID INSTALL TO BOTH.
      *
-     * `PROVIDED_BY.holdings` names `Money 1.5.0`, and a record on Money 1.4.0 was told "Install Money 1.5.0 beside Solo
-     * founder": a pack the catalogue shows it as already holding, where the thing to press is the update. The record
+     * `PROVIDED_BY.holdings` named `Money 1.5.0` then, and a record on Money 1.4.0 was told "Install Money 1.5.0 beside
+     * Solo founder": a pack the catalogue shows it as already holding, where the thing to press is the update. (Since
+     * money-core 2.0.0 that line names the Holdings pack, with no version, so it takes the install branch.) The record
      * does not answer which version it holds, so the question asked is the one it can answer: does it hold any other
      * list the same pack provides. If it does, the pack is installed and older. Only a provider with a version in it
      * is asked about, because "Update Estate" names no version to update to and is not a sentence anybody can act on.
@@ -801,7 +836,8 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
    */
   let decide: Decide | null = { asked: new Set(), installs: new Set(), values: new Set() };
   const banks = o.banks ?? [];
-  if (plan.asks.length > 0 || plan.polls.length > 0 || banks.length > 0) decide = await readDecideOnce();
+  const packs = o.packs ?? [];
+  if (plan.asks.length > 0 || plan.polls.length > 0 || banks.length > 0 || packs.length > 0) decide = await readDecideOnce();
   const asked = decide?.asked ?? new Set<string>();
   const installs = decide?.installs ?? new Set<string>();
   if (decide !== null && plan.asks.length > 0) {
@@ -858,50 +894,57 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
   }
 
   /**
-   * A BANK PACK HIS DATA SHOWS HE USES, FILED ONCE, THE WAY A POLL IS, AND NOT FILED AT ALL ON A MONEY TOO OLD TO TAKE IT.
+   * A PACK HIS DATA SHOWS HE USES, FILED ONCE, THE WAY A POLL IS, AND NOT FILED AT ALL ON A MONEY TOO OLD TO TAKE IT.
    *
-   * `bank-hsbc-eg` requires money-core ^1.8.0, and on 1.7.0 the same twelve ids are still money-core's: the pack's own
-   * header records that install being refused `PROVIDES_CONFLICT` on all twelve, a sentence about two packs owning one
-   * declaration that does not say the step he is missing is Money's update. Filed anyway, it would sit on Decide as a
-   * proposal that refuses the moment he presses it. So the version is read first and the report names the update.
-   * A door that cannot say which packs it holds files unchecked, and the record's own refusal is then what he reads.
+   * `bank-hsbc-eg` requires money-core 1.8.0 or later, and on 1.7.0 the same twelve ids are still money-core's: the pack's
+   * own header records that install being refused `PROVIDES_CONFLICT` on all twelve, a sentence about two packs owning
+   * one declaration that does not say the step he is missing is Money's update. `holdings` is the same shape a major
+   * later: up to 1.8.0 the list is money-core's, and the pack asks for 2.0.0. Filed anyway, either would sit on Decide as
+   * a proposal that refuses the moment he presses it. So the version is read first and the report names the update. A
+   * door that cannot say which packs it holds files unchecked, and the record's own refusal is then what he reads.
+   *
+   * ONE LOOP FOR BOTH, COUNTED APART. The bank's line in the report reads `Banks:`, and a list for what he holds is not a
+   * bank, so each kind keeps its own tally and its own line.
    */
-  if (banks.length > 0 && decide !== null) {
-    report.banks = { filed: 0, before: 0, waiting: [] };
-    const held = door.packs ? await door.packs() : null;
-    if (held !== null && !held.ok && unreachable(held)) throw new Unreachable();
-    const money = held?.ok ? (held.value.find((p) => p.id === 'money-core') ?? null) : undefined;
-    for (const bank of banks) {
-      /* HELD IS AS GOOD AS OFFERED. The pack's header says whoever banks with HSBC Egypt may install it by hand, which
-         leaves nothing on Decide, and `propose` does not refuse a pack the record already holds: reading Decide alone
-         filed a second offer of a pack that was already reading his texts (`test/import-bank-pack.test.ts`). */
-      if (installs.has(bank.install) || (held?.ok === true && held.value.some((p) => p.id === bank.install))) {
-        report.banks.before++;
+  const holding = (banks.length > 0 || packs.length > 0) && decide !== null && door.packs ? await door.packs() : null;
+  if (holding !== null && !holding.ok && unreachable(holding)) throw new Unreachable();
+  const money = holding?.ok ? (holding.value.find((p) => p.id === 'money-core') ?? null) : undefined;
+  const offer = async (list: readonly PlannedPack[]): Promise<{ filed: number; before: number; waiting: string[] }> => {
+    const tally = { filed: 0, before: 0, waiting: [] as string[] };
+    for (const pack of list) {
+      /* HELD IS AS GOOD AS OFFERED. The bank pack's header says whoever banks with HSBC Egypt may install it by hand,
+         which leaves nothing on Decide, and `propose` does not refuse a pack the record already holds: reading Decide
+         alone filed a second offer of a pack that was already reading his texts (`test/import-bank-pack.test.ts`). */
+      if (installs.has(pack.install) || (holding?.ok === true && holding.value.some((p) => p.id === pack.install))) {
+        tally.before++;
         continue;
       }
-      const requires = isObj(bank.doc.requires) && isObj(bank.doc.requires.packs) ? bank.doc.requires.packs['money-core'] : undefined;
+      const requires = isObj(pack.doc.requires) && isObj(pack.doc.requires.packs) ? pack.doc.requires.packs['money-core'] : undefined;
       if (typeof requires === 'string' && money !== undefined && !satisfies(money?.version ?? null, requires)) {
-        report.banks.waiting.push(
+        tally.waiting.push(
           money === null
-            ? `Reading ${bank.name} texts and mails (the ${bank.install} pack) was not filed on Decide: it reads messages into Money, and this BrainDog has no Money. Install Money, then run the import again.`
-            : `Reading ${bank.name} texts and mails (the ${bank.install} pack) was not filed on Decide: it needs Money ${requires} and this BrainDog has Money ${money.version ?? 'at no version'}. Take the Money update, then run the import again.`,
+            ? `${pack.says} (the ${pack.install} pack) was not filed on Decide: it needs Money ${rangeWords(requires)}, and this BrainDog has no Money. Install Money, then run the import again.`
+            : `${pack.says} (the ${pack.install} pack) was not filed on Decide: it needs Money ${rangeWords(requires)}, and this BrainDog has Money ${money.version ?? 'at no version'}. Take the Money update, then run the import again.`,
         );
         continue;
       }
       if (o.dryRun) {
-        report.banks.filed++;
+        tally.filed++;
         continue;
       }
-      const done = await door.propose({ question: bank.question, body_kind: 'pack', body: { install: bank.install, doc: bank.doc } });
+      const done = await door.propose({ question: pack.question, body_kind: 'pack', body: { install: pack.install, doc: pack.doc } });
       if (!done.ok) {
         if (unreachable(done)) throw new Unreachable();
-        if (refused(done) && done.refusal.code === 'TRANSITION_ILLEGAL') report.banks.before++;
-        else report.refused.push({ label: bank.question, register: 'Decide', fix: fixOf(done) });
+        if (refused(done) && done.refusal.code === 'TRANSITION_ILLEGAL') tally.before++;
+        else report.refused.push({ label: pack.question, register: 'Decide', fix: fixOf(done) });
         continue;
       }
-      report.banks.filed++;
+      tally.filed++;
     }
-  }
+    return tally;
+  };
+  if (banks.length > 0 && decide !== null) report.banks = await offer(banks);
+  if (packs.length > 0 && decide !== null) report.packs = await offer(packs);
   return report;
 }
 
@@ -940,6 +983,10 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
   if (report.banks) {
     lines.push(`Banks: ${String(report.banks.filed)} ${o.dryRun ? 'would be filed' : 'filed'} on Decide for you to approve, ${String(report.banks.before)} filed before.`);
     for (const w of report.banks.waiting) lines.push(`- ${w}`);
+  }
+  if (report.packs) {
+    lines.push(`Packs: ${String(report.packs.filed)} ${o.dryRun ? 'would be filed' : 'filed'} on Decide for you to approve, ${String(report.packs.before)} filed before.`);
+    for (const w of report.packs.waiting) lines.push(`- ${w}`);
   }
   if (report.values) {
     const { added, filed, before } = report.values;
@@ -1298,7 +1345,7 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
   };
   let report: Report;
   try {
-    report = await applyPlan(plan, door, { dryRun: values['dry-run'] === true, banks: banksOf(read.value) });
+    report = await applyPlan(plan, door, { dryRun: values['dry-run'] === true, banks: banksOf(read.value), packs: holdingsOf(read.value) });
   } catch (e) {
     if (e instanceof Unreachable) {
       io.say(`${to.key} stopped answering part way. Run the import again: rows already written are found and not added twice.`);

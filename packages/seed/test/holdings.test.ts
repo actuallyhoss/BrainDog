@@ -14,6 +14,11 @@
  * EGP 100,000.00 certificate maturing 2028-11-05, and two policies of USD 202.10 and USD 101.05 a
  * month maturing in 2052 and 2062. A total across the fourteen is therefore two totals or it is
  * nothing, which is the last test here.
+ *
+ * A GOLD LOT IS WRITTEN HERE AS A `commodity`, AND THAT IS THE LIST'S WORD, NOT A GUESS. Since money-core 2.0.0 the
+ * list is the `holdings` pack's (`packs/holdings.ts`), which ships no `gold`: a lot is read as a count and a cost each,
+ * which is what `commodity` says. A record that held gold before the move keeps the word as its own, and
+ * `holdings-pack.test.ts` drives that; the sample opened here never held it.
  */
 
 import { test } from 'node:test';
@@ -24,8 +29,9 @@ import { openRecord, type Entry, type Kernel } from '@braindog/kernel';
 import type { Param, Row, Sql } from '@braindog/ports';
 import { sayOf } from '@braindog/ports';
 
-import { METRICS, NOW, installSeed } from '../src/index.ts';
+import { HOLDINGS, METRICS, NOW, holdingsDeclarations, installSeed } from '../src/index.ts';
 import { MONEY_REGISTERS } from '../src/modules/money.ts';
+import { HELD_AT_1_8_0, type Held } from './money-core-earlier.ts';
 
 function openSqlite(): Sql {
   const db = new DatabaseSync(':memory:');
@@ -55,45 +61,24 @@ function openSqlite(): Sql {
   };
 }
 
+/** The sample record, and the `holdings` pack's list beside it: since money-core 2.0.0 the sample does not carry it. */
 async function seeded(): Promise<Kernel> {
   const k = await openRecord(openSqlite(), { now: () => NOW });
   const out = await installSeed(k);
   assert.ok(out.ok, sayOf(out));
+  assert.equal(k.register('holdings'), undefined, 'the sample carries holdings again, so this file measures the sample and not the pack');
+  const put = await k.install(holdingsDeclarations());
+  assert.ok(put.ok, sayOf(put));
   return k;
 }
 
 const egp = (minor: number): { amount: number; currency: string } => ({ amount: minor, currency: 'EGP' });
-const usd = (minor: number): { amount: number; currency: string } => ({ amount: minor, currency: 'USD' });
 
 const amountOf = (v: unknown): number => (v as { amount: number }).amount;
 const currencyOf = (v: unknown): string => (v as { currency: string }).currency;
 
-type Held = { kind: string; label: string; qty: number; unit_cost: { amount: number; currency: string }; acquired_on: string; matures_on?: string; note?: string };
-
-/**
- * The fourteen rows as the live export holds them, in its own order.
- *
- * ONE ROW A LOT AND NOT ONE ROW A METAL, because that is what the source says and because the lots
- * were bought at nine different prices between May 2025 and July 2026: EGP 5,373.00 a unit on the
- * first and EGP 8,336.00 on the dearest. Adding them into "80 units of gold" loses the only thing
- * that makes a cost a cost, which is the day it was paid.
- */
-const HELD: readonly Held[] = [
-  { kind: 'certificate', label: 'Saving Certificate', qty: 1, unit_cost: egp(10_000_000), acquired_on: '2025-11-05', matures_on: '2028-11-05', note: 'Three years.' },
-  { kind: 'gold', label: 'Gold 24c', qty: 5, unit_cost: egp(537_300), acquired_on: '2025-05-02' },
-  { kind: 'gold', label: 'Gold 24c', qty: 5, unit_cost: egp(529_000), acquired_on: '2025-05-14' },
-  { kind: 'gold', label: 'Gold 24c', qty: 5, unit_cost: egp(558_000), acquired_on: '2025-06-18' },
-  { kind: 'gold', label: 'Gold 24c', qty: 10, unit_cost: egp(558_500), acquired_on: '2025-06-18' },
-  { kind: 'gold', label: 'Gold 24c', qty: 10, unit_cost: egp(794_800), acquired_on: '2026-03-27' },
-  { kind: 'gold', label: 'Gold 24c', qty: 10, unit_cost: egp(827_800), acquired_on: '2026-04-02' },
-  { kind: 'gold', label: 'Gold 24c', qty: 10, unit_cost: egp(833_600), acquired_on: '2026-04-08' },
-  { kind: 'gold', label: 'Gold 24c', qty: 10, unit_cost: egp(691_000), acquired_on: '2026-07-30' },
-  { kind: 'gold', label: 'Gold 24c', qty: 5, unit_cost: egp(691_000), acquired_on: '2026-07-30' },
-  { kind: 'gold', label: 'Gold 24c', qty: 5, unit_cost: egp(691_000), acquired_on: '2026-07-30' },
-  { kind: 'gold', label: 'Gold 24c', qty: 5, unit_cost: egp(691_000), acquired_on: '2026-07-30' },
-  { kind: 'policy', label: 'Northwind 5820614', qty: 1, unit_cost: usd(20_210), acquired_on: '2025-11-25', matures_on: '2052-11-25', note: 'Your Way For Protection Investment. USD 48,000.00 sum assured.' },
-  { kind: 'policy', label: 'Northwind 5836271', qty: 1, unit_cost: usd(10_105), acquired_on: '2025-12-07', matures_on: '2062-12-07', note: 'Your Way For Protection Investment. USD 24,000.00 sum assured.' },
-];
+/** The fourteen rows of the export (`HELD_AT_1_8_0`), with every gold lot under the list's own word for it. */
+const HELD: readonly Held[] = HELD_AT_1_8_0.map((row) => (row.kind === 'gold' ? { ...row, kind: 'commodity' } : row));
 
 const write = (k: Kernel, row: Held): Entry => {
   const out = k.create('holdings', row as never, { actor: 'p_test' });
@@ -123,9 +108,8 @@ test('THE REGISTER INSTALLS, and a holding is found by the words on it rather th
   assert.ok(decl, 'holdings did not install');
   assert.equal(decl.title, 'label', 'the title is not the words a person reads on the row');
 
-  /* IT ARRIVES EMPTY, and that is not an oversight. The sample record is a London studio and holds no
-     gold; the rows that fill this list are an import's, so the register is a place for them and the
-     demonstration data stays what it was. */
+  /* IT ARRIVES EMPTY, and that is not an oversight. The pack ships no example row, and a London studio
+     holds no gold; the rows that fill this list are an import's, so the register is a place for them. */
   assert.equal(k.count('holdings'), 0);
 
   for (const row of HELD) write(k, row);
@@ -151,7 +135,7 @@ test('A GOLD LOT IS A DATED COST FOR A NUMBER OF UNITS, and the cost keeps its o
   const k = await seeded();
   const lot = write(k, HELD[5]!);
 
-  assert.equal(lot.fields.kind, 'gold');
+  assert.equal(lot.fields.kind, 'commodity');
   assert.equal(lot.fields.qty, 10);
   assert.equal(amountOf(lot.fields.unit_cost), 794_800);
   assert.equal(currencyOf(lot.fields.unit_cost), 'EGP');
@@ -225,7 +209,7 @@ test('A TOTAL IS PER CURRENCY AND NEVER SUMMED ACROSS, and qty times unit cost i
 
   /* THE EXPORT'S OWN NUMBERS, typed out so that a change in the rows above cannot quietly agree with
      itself: 80 units of gold at EGP 555,435.00 of cost, plus the EGP 100,000.00 certificate. */
-  const gold = rowsWhere(k, 'kind is gold');
+  const gold = rowsWhere(k, 'kind is commodity');
   assert.equal(gold.length, 11);
   assert.equal(gold.reduce((n, r) => n + Number(r.fields.qty), 0), 80);
   assert.equal(gold.reduce((n, r) => n + Number(r.fields.qty) * amountOf(r.fields.unit_cost), 0), 55_543_500);
@@ -266,10 +250,10 @@ test('A TOTAL IS PER CURRENCY AND NEVER SUMMED ACROSS, and qty times unit cost i
 
 /* ── the declaration is the same shape as the rest of Money ──────────────── */
 
-test('HOLDINGS IS DECLARED THE WAY THE OTHER MONEY REGISTERS ARE, down to the pack it belongs to', () => {
-  const decl = MONEY_REGISTERS.holdings;
-  assert.ok(decl, 'MONEY_REGISTERS has no holdings');
-  assert.equal(decl.pack, 'money-core');
+test('HOLDINGS IS DECLARED BY ITS OWN PACK AND NOT BY MONEY, and its kinds are four with no gold among them', () => {
+  assert.equal(MONEY_REGISTERS.holdings, undefined, 'money-core still declares holdings');
+  const decl = HOLDINGS;
+  assert.equal(decl.pack, 'holdings');
   assert.equal(decl.title, 'label');
   /* THE THREE FIELDS AND NOT THEIR COUNT. `mobile.length === 3` was what this line said, and
      `SeedRegister.mobile` is typed `readonly [string, string, string]`, so the compiler had already
@@ -284,7 +268,7 @@ test('HOLDINGS IS DECLARED THE WAY THE OTHER MONEY REGISTERS ARE, down to the pa
      it was declared for is a register somebody has to change again before the first import. */
   assert.deepEqual([...fields.keys()], ['label', 'kind', 'qty', 'unit_cost', 'acquired_on', 'matures_on', 'note']);
   assert.equal(fields.get('unit_cost')!.type, 'money');
-  assert.deepEqual(fields.get('kind')!.values, ['gold', 'certificate', 'policy', 'other']);
+  assert.deepEqual(fields.get('kind')!.values, ['certificate', 'policy', 'commodity', 'other']);
   /* `qualifies` IS THE DECLARATION SAYING A COST EACH IS UNREADABLE ALONE: EGP 7,948.00 beside
      EGP 8,336.00 says nothing until one of them is ten units and the other is five. */
   assert.equal(fields.get('qty')!.qualifies, 'unit_cost');
@@ -300,12 +284,12 @@ test('HALF A UNIT IS A HOLDING AND A NEGATIVE COUNT IS NOT, which is what `decim
 
   /* GOLD IS WEIGHED AND NOT COUNTED, so a fraction has to go in. `int` refuses this row, and every
      other test in this file passes against `int`, which is how the gap was found. */
-  const half = write(k, { kind: 'gold', label: 'Gold 24c', qty: 0.5, unit_cost: egp(691_000), acquired_on: '2026-07-30' });
+  const half = write(k, { kind: 'commodity', label: 'Gold 24c', qty: 0.5, unit_cost: egp(691_000), acquired_on: '2026-07-30' });
   assert.equal(half.fields.qty, 0.5, 'a half unit was rounded away');
 
   /* AND BELOW NOTHING IS NOT A HOLDING. Written without `min: 0` the register took -3 units of gold
      happily, and a negative count times a positive cost each is a total that reads as money owed. */
-  const owed = k.create('holdings', { kind: 'gold', label: 'Gold 24c', qty: -3, unit_cost: egp(691_000) } as never, { actor: 'p_test' });
+  const owed = k.create('holdings', { kind: 'commodity', label: 'Gold 24c', qty: -3, unit_cost: egp(691_000) } as never, { actor: 'p_test' });
   assert.equal(owed.ok, false, 'the register took a negative number of units');
   assert.match(sayOf(owed), /at least 0/);
 });

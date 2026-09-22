@@ -103,6 +103,10 @@ export const AGENTS_REGISTERS: Record<string, SeedRegister> = {
       /* For a key that is not in the vault: where a person finds it. */
       { id: 'where', label: 'Kept at', type: 'text', max: 280 },
       { id: 'origin', label: 'Came from', type: 'text', max: 280 },
+      /* WHAT A PERSON WROTE ABOUT THE KEY, AND NEVER THE KEY. Added in 1.2.0 because the old tool's key register carries a
+         note on 83 of his 91 rows and Keys had nowhere to put one, so the import left every one of them behind. A text
+         field goes through the kernel's credential check like `opens` does, so a note shaped like a key is refused. */
+      { id: 'note', label: 'Note', type: 'text' },
       { id: 'verified', label: 'Last known to work', type: 'day' },
       { id: 'expires', label: 'Expires', type: 'day', deadline: true, remind: ['-14d', '-2d'] },
       { id: 'state', label: 'Status', type: 'enum', values: ['live', 'stale', 'invalid', 'missing', 'retired'], default: 'live', required: true, index: true },
@@ -357,7 +361,9 @@ export const RUNS_ON: { requires: readonly string[]; blocks: readonly Record<str
 };
 
 export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, SeedRegister>; pages: typeof AGENTS_PAGES } = {
-  manifest: { id: 'agents', version: '1.1.1', requires: ['register.things'] },
+  /* 1.2.0 ADDS ONE OPTIONAL FIELD, `credentials.note`, so a record on 1.1.1 is offered the update and loses no key by
+     waiting: the import sends each key without its note to a list that has no such field, and names the update. */
+  manifest: { id: 'agents', version: '1.2.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
 };

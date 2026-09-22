@@ -118,7 +118,10 @@ test('on money-core 1.7.0 nothing is filed, and the report says which update com
   const line = said(report, { dryRun: false, file: 'export.json' }).find((l) => l.includes('HSBC Egypt'));
   assert.ok(line, 'the report is silent about the pack it did not file');
   assert.match(line, /Money 1\.7\.0/u);
-  assert.match(line, /\^1\.8\.0/u);
+  /* THE RANGE AS A SENTENCE, not as `>=1.8.0 <3.0.0`: since bank-hsbc-eg 1.0.1 the range has two ends, and read as
+     written a person meets two operators where a caret was one. The floor is still the update that has to come first. */
+  assert.match(line, /needs Money 1\.8\.0 or later, before 3\.0\.0/u);
+  assert.match(line, /Take the Money update/u);
 });
 
 test('a record with no money-core at all is told so rather than offered a pack that needs it', async () => {

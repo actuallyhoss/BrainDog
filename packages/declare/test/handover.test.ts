@@ -24,7 +24,8 @@ import assert from 'node:assert/strict';
 import { normalise, type Diff } from '../src/index.ts';
 import { createRecordApi, type CallContext } from '../../record/src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
-import { FIRST_PARTY, firstPartyDocument } from '../../seed/src/index.ts';
+import { FIRST_PARTY, firstPartyDocument, holdingsPack as shippedHoldings } from '../../seed/src/index.ts';
+import { asMoneyCore180 } from '../../seed/test/money-core-earlier.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
 
@@ -40,34 +41,38 @@ type Field = { id: string; type: string; values?: string[]; [k: string]: unknown
 type Doc = { pack: string; version: string; declarations: Body[]; hands?: Record<string, string>; [k: string]: unknown };
 type Api = Awaited<ReturnType<typeof createRecordApi>>;
 
-const holdingsOf = (doc: Doc): Body => doc.declarations.find((d) => d.register === 'holdings')!;
-
-/** money-core one major step up, without `holdings`, and handing it to `to` when there is one. */
+/**
+ * money-core as it ships (2.0.0, without `holdings`), handing the list to `to` when there is one and to nobody when not.
+ *
+ * FROM THE SHIPPED DOCUMENT AND NOT A RE-VERSIONED COPY OF IT. Until 23 September this took money-core 1.8.0, dropped the
+ * list and called the result 2.0.0; since then the shipped 2.0.0 is that document, handing `register.holdings` to
+ * `holdings` beside the twelve HSBC Egypt doors. Only the one entry this file varies is touched, so the doors' handover
+ * rides along as it does in every real update.
+ */
 const moneyCore = (to: string | null): Doc => {
   const d = structuredClone(firstPartyDocument('money-core')) as unknown as Doc;
-  d.version = '2.0.0';
-  d.declarations = d.declarations.filter((x) => x.register !== 'holdings');
-  if (to !== null) d.hands = { 'register.holdings': to };
+  assert.equal(d.version, '2.0.0');
+  assert.ok(!d.declarations.some((x) => x.register === 'holdings'), 'money-core declares holdings again, so nothing here is a handover');
+  const { 'register.holdings': _shipped, ...rest } = d.hands ?? {};
+  d.hands = to === null ? rest : { ...rest, 'register.holdings': to };
   return d;
 };
 
 /**
- * A pack of its own for what somebody holds: money-core's list under a new owner, and WITHOUT `gold` in its kinds,
- * which is the case `loop/research-shell-seed-next.md` §3A walks (§22 takes gold out of the shipped values).
+ * The shipped `holdings` pack (`packages/seed/src/packs/holdings.ts`), under another id or with other `requires` when a
+ * guard below needs one. Its kinds carry no `gold`, which is the case `loop/research-shell-seed-next.md` §3A walks (§22
+ * takes gold out of the shipped values), and `commodity` in its place.
+ *
+ * THE PACK THAT SHIPS, NOT A BODY CUT OUT OF money-core. This used to clone money-core's list and strip `gold` by hand,
+ * which proved the handover for a pack nobody ships. Built from `shippedHoldings()`, the first two tests below are the
+ * update a record on money-core 1.8.0 actually takes.
  */
-const holdingsPack = (id = 'holdings', requires: Record<string, string> = { 'money-core': '^2.0.0' }): Doc => {
-  const body = structuredClone(holdingsOf(firstPartyDocument('money-core') as unknown as Doc)) as Body & { fields: Field[] };
-  body.pack = id;
-  body.fields = body.fields.map((f) => (f.id === 'kind' ? { ...f, values: (f.values ?? []).filter((v) => v !== 'gold') } : f));
-  return {
-    pack: id,
-    version: '1.0.0',
-    summary: 'What you hold rather than spend.',
-    author: 'BrainDog',
-    license: 'MIT',
-    requires: { format: 1, primitives: 1, packs: requires },
-    declarations: [body],
-  };
+const holdingsPack = (id = 'holdings', requires?: Record<string, string>): Doc => {
+  const d = structuredClone(shippedHoldings()) as unknown as Doc & { requires: { packs: Record<string, string> } };
+  d.pack = id;
+  for (const body of d.declarations) body.pack = id;
+  if (requires !== undefined) d.requires = { ...d.requires, packs: requires };
+  return d;
 };
 
 async function planned(api: Api, doc: unknown): Promise<Diff> {
@@ -80,11 +85,18 @@ async function put(api: Api, doc: unknown): Promise<{ diff: Diff; out: Out }> {
   return { diff, out };
 }
 
-/** Every first-party pack installed through the record, and one row of gold in `holdings`. */
+/**
+ * Every first-party pack installed through the record, money-core AS 1.8.0, and one row of gold in `holdings`.
+ *
+ * 1.8.0 BECAUSE IT IS THE LAST money-core THAT DECLARES THE LIST. With today's documents the record has no `holdings` at
+ * all, the `create` below is refused, and every test in this file went red at that line on 23 September, before any
+ * handover was tried. `asMoneyCore180` rebuilds 1.8.0 byte for byte (`seed/test/money-core-major.test.ts` holds its
+ * fingerprint to the recorded one).
+ */
 async function record() {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 22, 12)) });
-  for (const id of FIRST_PARTY) said((await put(api, firstPartyDocument(id))).out);
+  for (const id of FIRST_PARTY) said((await put(api, id === 'money-core' ? asMoneyCore180(firstPartyDocument(id)) : firstPartyDocument(id))).out);
   const k = api.kernel;
   const row = said<{ id: string }>(k.create('holdings', { label: 'Gold 24c', kind: 'gold', qty: 10, unit_cost: { amount: 5554350, currency: 'EGP' } }, { actor: 'p_1' }));
   return { sql, api, k, row };
@@ -114,7 +126,7 @@ test('money-core HANDS holdings to a pack of its own, which takes it with the ro
   assert.deepEqual(take.diff.kept.map((x) => [x.id, x.adds]), [['register.holdings', ['kind.gold']]]);
   said(take.out);
 
-  assert.deepEqual(kinds(k), ['certificate', 'policy', 'other', 'gold']);
+  assert.deepEqual(kinds(k), ['certificate', 'policy', 'commodity', 'other', 'gold']);
   assert.equal(live(k, 'register.holdings')?.pack_id, null, 'the additions are the record’s own, as plan-additive keeps them');
   assert.deepEqual(k.detached().filter((d) => d.id === 'register.holdings').map((d) => d.was), ['holdings']);
   assert.deepEqual(
@@ -132,12 +144,12 @@ test('THE OTHER ORDER IS REFUSED, and the refusal names the update that has to c
   const early = await put(api, holdingsPack());
   assert.deepEqual(early.diff.conflicts, [{ id: 'register.holdings', pack: 'money-core' }]);
   assert.equal(early.out.refusal?.code, 'PROVIDES_CONFLICT');
-  assert.match(early.out.refusal?.fix ?? '', /money-core \^2\.0\.0/u);
+  assert.match(early.out.refusal?.fix ?? '', /money-core 1\.8\.0, and holdings needs money-core >=2\.0\.0/u);
   assert.match(early.out.refusal?.fix ?? '', /Update money-core first/u);
 
   said((await put(api, moneyCore('holdings'))).out);
   said((await put(api, holdingsPack())).out);
-  assert.deepEqual(kinds(k), ['certificate', 'policy', 'other', 'gold']);
+  assert.deepEqual(kinds(k), ['certificate', 'policy', 'commodity', 'other', 'gold']);
   assert.deepEqual(k.detached().filter((d) => d.id === 'register.holdings').map((d) => d.was), ['holdings']);
   sql.close();
 });

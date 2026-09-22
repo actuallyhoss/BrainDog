@@ -22,7 +22,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { declarations } from '@braindog/seed';
+import { declarations, holdingsDeclarations } from '@braindog/seed';
 import { useCase } from '@braindog/seed/usecases';
 
 import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
@@ -64,7 +64,15 @@ function exportOf(): Record<string, unknown> {
 const plan = (): Plan => planLegacyTool(exportOf(), TODAY);
 const HOLDING = `${KEY_PREFIX}holding:other:bitcoin:2026-01-02:5000000:1`;
 
-/** Every list the seed declares plus Solo founder's, as `test/legacy.test.ts` opens a record. */
+/**
+ * Every list the seed declares plus Solo founder's, as `test/legacy.test.ts` opens a record, and the `holdings` pack's.
+ *
+ * HOLDINGS BY NAME, because `declarations()` stopped carrying it when money-core 2.0.0 handed the list to a pack of its
+ * own, and Solo founder does not install that pack. Without it the record has no Holdings list, the Bitcoin row is left
+ * out named, and the four tests below that read `holdings` went red on 23 September: the first could not read the list's
+ * kinds at all, the second could not list its rows, the third counted two filed values where there are three, and the dry
+ * run never mentioned crypto.
+ */
 async function record() {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
@@ -78,7 +86,7 @@ async function record() {
       const held = fields.some((f) => f.id === 'tags') ? fields : [...fields, { id: 'tags', type: 'list', of: 'text' }];
       return { id: `register.${String(register)}`, kind: 'register' as const, body: { id: register, ...rest, fields: held } as never };
     });
-  const put = await api.kernel.install([...declarations(), ...founder]);
+  const put = await api.kernel.install([...declarations(), ...holdingsDeclarations(), ...founder]);
   assert.ok(put.ok, put.ok ? '' : `the lists would not install: ${JSON.stringify(put)}`);
   const values = (register: string, field: string): string[] => {
     const decl = api.kernel.declarations().find((d) => d.id === `register.${register}`)!;

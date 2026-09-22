@@ -19,6 +19,7 @@ import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.t
 import { FIRST_PARTY, FIRST_PARTY_VERSIONS, NOW, firstPartyDocument } from '../src/index.ts';
 import { BANK_HSBC_EG_VERSION, HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS, MONEY_CORE_HANDS, bankHsbcEgPack } from '../src/packs/bank-hsbc-eg.ts';
 import { USE_CASES, useCaseDocument } from '../src/usecases/index.ts';
+import { asMoneyCore180 } from './money-core-earlier.ts';
 
 type Body = Record<string, unknown>;
 type Doc = { pack: string; version: string; requires: { packs: Record<string, string> }; declarations: Body[] };
@@ -84,12 +85,16 @@ async function put(k: Kernel, doc: unknown, used?: readonly string[]): Promise<D
 }
 
 /**
- * money-core AS 1.7.0 SHIPPED IT: today's document with the twelve wordings put back under `pack: 'money-core'`. Built
+ * money-core AS 1.7.0 SHIPPED IT: 1.8.0's document with the twelve wordings put back under `pack: 'money-core'`. Built
  * rather than read from a fixture because the only thing the two versions differ by is those twelve, and
  * `pack-versions.test.ts` holds 1.7.0's own fingerprint.
+ *
+ * FROM 1.8.0 (`asMoneyCore180`) AND NOT FROM TODAY'S FILE, because today's is 2.0.0 and has no `holdings`, which every
+ * money-core from 1.5.0 carried. Built from today's, the record below was a 1.7.0 nobody ever had, and the update to
+ * 2.0.0 never met the list it hands away.
  */
 const v170 = (): Doc => {
-  const d = structuredClone(firstPartyDocument('money-core')) as unknown as Doc;
+  const d = asMoneyCore180(firstPartyDocument('money-core')) as unknown as Doc;
   d.version = '1.7.0';
   /* 1.7.0 handed nothing: the twelve were its own. */
   delete (d as { hands?: unknown }).hands;
@@ -98,21 +103,26 @@ const v170 = (): Doc => {
   return d;
 };
 
-test('MONEY-CORE DECLARES ONLY THE TWO GENERIC CARD WORDINGS, a minor step above 1.7.0', () => {
+test('MONEY-CORE DECLARES ONLY THE TWO GENERIC CARD WORDINGS, and still hands the twelve at 2.0.0', () => {
   assert.deepEqual(ingestsOf(firstPartyDocument('money-core')), GENERIC);
-  /* MINOR BY `first-party.ts`'s OWN RULE, which asks a major step for a list or a field taken away. No list and no field
-     moves: every register the patterns write stays, and 1.4.0 already took two figures away as a minor step. */
-  assert.equal(FIRST_PARTY_VERSIONS['money-core'], '1.8.0');
-  /* AND IT HANDS THE TWELVE TO THE BANK PACK rather than retiring them, so a token minted for one survives the move. */
-  assert.deepEqual(firstPartyDocument('money-core')!.hands, MONEY_CORE_HANDS);
+  /* THE TWELVE LEFT AT 1.8.0, a minor step by `first-party.ts`'s own rule, since no list and no field moved;
+     `pack-versions.test.ts` holds that version's fingerprint. 2.0.0 is the major step `holdings` leaving took, which is
+     `holdings-pack.test.ts`'s to hold. */
+  assert.equal(FIRST_PARTY_VERSIONS['money-core'], '2.0.0');
+  /* AND IT STILL HANDS THE TWELVE TO THE BANK PACK rather than retiring them, so a token minted for one survives the move
+     even on a record that goes from 1.7.0 to 2.0.0 in one step. Beside them it hands one list, and nothing else. */
+  const hands = firstPartyDocument('money-core')!.hands as Record<string, string>;
+  assert.deepEqual(Object.fromEntries(Object.entries(hands).filter(([id]) => id.startsWith('ingest.'))), MONEY_CORE_HANDS);
+  assert.deepEqual(Object.fromEntries(Object.entries(hands).filter(([id]) => !id.startsWith('ingest.'))), { 'register.holdings': 'holdings' });
 });
 
-test('THE PACK DECLARES EXACTLY THE TWELVE, needs money-core 1.8.0, and is not a first-party module', async () => {
+test('THE PACK DECLARES EXACTLY THE TWELVE, needs money-core 1.8.0 or later before 3.0.0, and is not a first-party module', async () => {
   const doc = bankHsbcEgPack() as unknown as Doc;
   assert.equal(doc.pack, 'bank-hsbc-eg');
   assert.equal(doc.version, BANK_HSBC_EG_VERSION);
   assert.deepEqual(ingestsOf(doc), HSBC);
-  assert.deepEqual(doc.requires.packs, { 'money-core': '^1.8.0' });
+  /* `>=1.8.0 <3.0.0` SINCE 1.0.1: the caret it had at 1.0.0 admits no 2.0.0 (`bank-hsbc-eg.ts`). The floor is unmoved. */
+  assert.deepEqual(doc.requires.packs, { 'money-core': '>=1.8.0 <3.0.0' });
   for (const d of doc.declarations) assert.equal(d.pack, 'bank-hsbc-eg', `${String(d.ingest)} still says it is money-core's`);
   const pack = value<Pack>(await normalise(doc, { kind: 'local' }));
   assert.deepEqual([...pack.manifest.provides].sort(), HSBC);
@@ -134,16 +144,18 @@ test('A RECORD ON 1.7.0 UPDATES WITHOUT A REFUSAL, then takes the pack, and ends
   assert.deepEqual(before, [...GENERIC, ...HSBC].sort());
 
   /* THE PACK FIRST IS REFUSED: beside 1.7.0 its twelve ids are money-core's. The conflict alone does not say what to do,
-     so the plan also has to carry the missing step, which is what `^1.8.0` is for. */
+     so the plan also has to carry the missing step, which is what the floor of 1.8.0 is for. */
   const early = (await planOf(k, bankHsbcEgPack())).diff;
   assert.deepEqual(early.conflicts.map((c) => c.id).sort(), HSBC);
-  assert.deepEqual(early.requires.packs, [{ id: 'money-core', range: '^1.8.0', installed: '1.7.0', ok: false }]);
+  assert.deepEqual(early.requires.packs, [{ id: 'money-core', range: '>=1.8.0 <3.0.0', installed: '1.7.0', ok: false }]);
 
-  /* THE UPDATE HANDS THE TWELVE TO THE BANK PACK AND IS NOT REFUSED. An ingest has no rows, so nothing is orphaned. */
+  /* THE UPDATE HANDS THE TWELVE TO THE BANK PACK AND IS NOT REFUSED. An ingest has no rows, so nothing is orphaned. The
+     update is today's 2.0.0, straight from 1.7.0, so it also hands `holdings` on: this plan names no `used`, and a plan
+     that cannot say what is used hands everything, the empty list with it. */
   const update = await put(k, firstPartyDocument('money-core'));
   assert.deepEqual(update.conflicts, []);
-  assert.deepEqual(update.retires.map((r) => r.id).sort(), HSBC);
-  for (const r of update.retires) assert.equal(r.to, 'bank-hsbc-eg', `${r.id} is handed, not retired`);
+  assert.deepEqual(update.retires.map((r) => r.id).sort(), [...HSBC, 'register.holdings'].sort());
+  for (const r of update.retires) assert.equal(r.to, r.id === 'register.holdings' ? 'holdings' : 'bank-hsbc-eg', `${r.id} is handed, not retired`);
   assert.equal(update.orphans, 0);
 
   const bank = await put(k, bankHsbcEgPack());
@@ -181,8 +193,9 @@ test('A RECORD THAT NEVER USED THE TWELVE RETIRES THEM ON THE UPDATE, and holds 
   for (const id of FIRST_PARTY) await put(k, id === 'money-core' ? v170() : firstPartyDocument(id));
   assert.deepEqual(usedOf(sql), []);
 
+  /* AND THE EMPTY `holdings` WITH THEM: 2.0.0 hands the list, but nothing is written in it and `used` does not name it. */
   const update = await put(k, firstPartyDocument('money-core'), usedOf(sql));
-  assert.deepEqual(update.retires.map((r) => [r.id, r.to]).sort(), HSBC.map((id) => [id, undefined]));
+  assert.deepEqual(update.retires.map((r) => [r.id, r.to]).sort(), [...HSBC, 'register.holdings'].sort().map((id) => [id, undefined]));
   assert.equal(update.orphans, 0);
   assert.deepEqual(k.declarations().filter((d) => HSBC.includes(d.id)), [], 'a door nobody used is still live');
   assert.deepEqual(k.packStates().filter((s) => s.id === 'bank-hsbc-eg'), [], 'the record reports a pack nobody installed');
@@ -211,7 +224,8 @@ test('A DOOR THE RECORD USES IS HANDED, AND ONLY THAT ONE: a pattern that filed 
     update.retires.filter((r) => r.to !== undefined).map((r) => [r.id, r.to]),
     used.map((id) => [id, 'bank-hsbc-eg']),
   );
-  assert.equal(update.retires.filter((r) => r.to === undefined).length, 10);
+  /* THE OTHER TEN RETIRE, and so does the empty `holdings` 2.0.0 hands, for the test above's reason. */
+  assert.deepEqual(update.retires.filter((r) => r.to === undefined).map((r) => r.id).sort(), [...HSBC.filter((id) => !used.includes(id)), 'register.holdings'].sort());
   assert.deepEqual(k.declarations().filter((d) => HSBC.includes(d.id)).map((d) => [d.id, d.pack_id]), used.map((id) => [id, 'bank-hsbc-eg']));
 
   const bank = await put(k, bankHsbcEgPack(), usedOf(sql, ['ingest.bank-ipn-in-sms']));
@@ -237,7 +251,9 @@ test('A HANDED LIST WITH ROWS IS HANDED THOUGH `used` NAMES NOTHING, and an empt
   };
   for (const rows of [0, 1]) {
     const { k, sql } = await record();
-    for (const id of FIRST_PARTY) await put(k, firstPartyDocument(id));
+    /* ON 1.8.0, THE LAST money-core THAT DECLARES THE LIST. On today's the record has no `holdings`, and the 0-row case
+       read `[undefined, undefined]` on 23 September because there was no retire to read. */
+    for (const id of FIRST_PARTY) await put(k, id === 'money-core' ? asMoneyCore180(firstPartyDocument(id)) : firstPartyDocument(id));
     for (let i = 0; i < rows; i++)
       value(k.create('holdings', { label: 'Gold', kind: 'gold', qty: 1, unit_cost: { amount: 480000, currency: 'EGP' } }, { actor: 'p_seed' }));
     const { diff } = await planOf(k, handing(), []);

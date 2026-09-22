@@ -37,9 +37,15 @@ test('AN ADD-ON DECLARING AN AGENTS LIST IS REFUSED, naming the Agents module', 
     assert.equal(`${r.refusal?.code} at ${r.refusal?.at}`, `PROVIDES_CONFLICT at register.${list}`);
     assert.match(r.refusal!.fix, /belongs to BrainDog's Agents module/u);
   }
-  const holdings = (await readPackFile(addOn('holdings'))) as Out;
-  assert.match(holdings.refusal?.fix ?? '', /belongs to BrainDog's Money module/u);
-  assert.equal(((await readPackFile(addOn('gold_lots'))) as Out).ok, true, 'a list no module owns is the add-on’s to declare');
+  /* `holdings` WAS THE ONE THE PROBE FOUND REFUSED, as Money's. Since money-core 2.0.0 it is a pack of its own and in no
+     module (`MODULE_LISTS` in `usecase.ts`), so an add-on declaring it is read as its own list, exactly as `gold_lots`
+     is; the collision with the holdings pack, on a record that has it, is the install's `PROVIDES_CONFLICT`. */
+  for (const list of ['holdings', 'gold_lots'])
+    assert.equal(((await readPackFile(addOn(list))) as Out).ok, true, `an add-on declaring ${list}, which no module owns, was refused`);
+  assert.equal(FIRST_PARTY_LISTS.get('holdings'), undefined, 'holdings is back in a module');
+  /* AND MONEY'S OWN LISTS ARE STILL MONEY'S, so turning `holdings` round did not turn the refusal off for the module. */
+  const accounts = (await readPackFile(addOn('accounts'))) as Out;
+  assert.match(accounts.refusal?.fix ?? '', /belongs to BrainDog's Money module/u);
 });
 
 test('FIRST_PARTY_LISTS IS MODULE_LISTS READ BY LIST, every module and every list, the Agents module among them', () => {

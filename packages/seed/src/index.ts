@@ -28,6 +28,8 @@ export { AGENTS_PACK, AGENTS_PAGES, AGENTS_REGISTERS, RUNS_ON, agentsPackDocumen
 export { FIRST_PARTY, FIRST_PARTY_VERSIONS, crossPack, firstPartyDocument, firstPartyManifest, type DocumentOptions, type FirstPartyId } from './packs/first-party.ts';
 export { BANK_HSBC_EG_VERSION, HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS, bankHsbcEgPack } from './packs/bank-hsbc-eg.ts';
 import { HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS } from './packs/bank-hsbc-eg.ts';
+export { HOLDINGS, HOLDINGS_VERSION, MONEY_CORE_HOLDINGS_HANDS, holdingsPack } from './packs/holdings.ts';
+import { HOLDINGS } from './packs/holdings.ts';
 export * from './modules/base.ts';
 export { ACCOUNTS, CATEGORIES, INSTALLMENTS, MONEY_INGESTS, MONEY_SMS_INGESTS, OBLIGATIONS, RECURRING_ITEMS, SNAPSHOTS, TRANSACTIONS, cashSeries, nightOf, snapshotRows, type SeedIngest } from './modules/money.ts';
 export { SERVICES } from './modules/estate.ts';
@@ -182,6 +184,17 @@ export const PAGES: Record<string, SeedPage> = { ...MONEY_PAGES, ...ESTATE_PAGES
  */
 export const declarations = (): Declaration[] =>
   Object.values(REGISTERS).map((body) => ({ id: `register.${body.id}`, kind: 'register' as const, body: withTags(body) as never }));
+
+/**
+ * The `holdings` pack's one list as a kernel declaration, for a record opened the way `declarations()` opens one.
+ *
+ * NOT AMONG `declarations()`, AND SO NOT IN THE SAMPLE. money-core carried the list from 1.5.0 to 1.8.0, so every record
+ * the seed opened held it, empty; since 2.0.0 it is a pack of its own (`packs/holdings.ts`), and the sample is a London
+ * studio that holds nothing of the kind. Left in, `declarations()` stops being what `packDocument()` installs, which
+ * `test/pack.test.ts` holds the two to: measured on 23 September, three of its tests went red with it left in. A test
+ * that writes holdings into a sample record adds this beside it.
+ */
+export const holdingsDeclarations = (): Declaration[] => [{ id: `register.${HOLDINGS.id}`, kind: 'register' as const, body: withTags(HOLDINGS) as never }];
 
 /**
  * The pages and the metrics, as declarations.

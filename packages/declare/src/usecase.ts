@@ -54,13 +54,18 @@ export type ModuleId = (typeof MODULES)[number];
  * hand in `index.ts` as `FIRST_PARTY_LISTS`, and it had left Agents out: an add-on declaring `skills` or `credentials` was
  * read as fine by `readPackFile` while a use case declaring the same list was refused by `readShared`, and the add-on then
  * collided at install on any record with Agents. Moving a list between modules is an edit here and nowhere else.
+ *
+ * `holdings` IS NOT MONEY'S SINCE money-core 2.0.0, and it is in no module here, because the pack that declares it now
+ * (`packages/seed/src/packs/holdings.ts`) is not a module a use case names. So an add-on or a shared use case declaring a
+ * list called `holdings` is read as its own list, as `gold_lots` always was, and meets the holdings pack, if the record
+ * has it, as the `PROVIDES_CONFLICT` two packs owning one declaration always get at install.
  */
 export const MODULE_LISTS: Readonly<Record<ModuleId, { name: string; lists: readonly string[] }>> = {
   portfolio: { name: 'Portfolio', lists: ['things'] },
   people: { name: 'People', lists: ['people'] },
   'money-core': {
     name: 'Money',
-    lists: ['accounts', 'categories', 'fx', 'holdings', 'installments', 'obligations', 'recurring', 'snapshots', 'transactions'],
+    lists: ['accounts', 'categories', 'fx', 'installments', 'obligations', 'recurring', 'snapshots', 'transactions'],
   },
   estate: { name: 'Estate', lists: ['services'] },
   work: { name: 'Work', lists: ['tasks', 'tracks', 'updates'] },

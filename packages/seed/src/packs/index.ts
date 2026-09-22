@@ -13,10 +13,15 @@
  * `../index.ts`, which is where a record's own packs belong; adding them would be a third place to
  * find `AGENTS_PACK` rather than a second.
  *
+ * NOR ARE `bank-hsbc-eg.ts` AND `holdings.ts`, for a reason of reach rather than of kind. Both are
+ * packs a person installs and not use cases, so by the paragraph above they belong here, but the
+ * command line's import proposes both and can reach only `@braindog/seed` itself (the note below), so
+ * they are re-exported from `../index.ts`, and listing them here too would be two places for one name.
+ *
  * THIS FILE IS NOT REACHABLE AS `@braindog/seed/packs` YET, because that needs a row in the
  * package's `exports` map, and that file is not this run's to edit. Until it is, the import is the
  * relative one, and nothing else changes when the row lands.
  */
 
-export { MERCURY_BASE, MERCURY_CURRENCY, mercuryPack, type MercurySpec } from './mercury.ts';
+export { MERCURY_BASE, MERCURY_CURRENCY, MERCURY_VERSION, mercuryPack, type MercurySpec } from './mercury.ts';
 export { ratesPollPack, type RatesSpec } from './rates-poll.ts';

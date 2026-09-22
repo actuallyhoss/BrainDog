@@ -12,10 +12,17 @@
  *
  * IT NEEDS money-core 1.8.0 AND NOT JUST money-core, because the order matters. At 1.7.0 the twelve ids are
  * money-core's, and this pack installed beside it was measured refused `PROVIDES_CONFLICT` on all twelve, a sentence
- * that says two packs cannot own one declaration and not what to do about it. With `^1.8.0` the same plan also carries
- * `money-core ^1.8.0, installed 1.7.0`, which is the step that is missing, and the refusal now says so: update
- * money-core first, then install this. The update hands the twelve to this pack (`MONEY_CORE_HANDS` below) and this
- * pack then takes them over; `test/bank-pack.test.ts` drives both steps on a record installed at 1.7.0.
+ * that says two packs cannot own one declaration and not what to do about it. With a floor of 1.8.0 the same plan also
+ * carries `money-core >=1.8.0 <3.0.0, installed 1.7.0`, which is the step that is missing, and the refusal now says so:
+ * update money-core first, then install this. The update hands the twelve to this pack (`MONEY_CORE_HANDS` below) and
+ * this pack then takes them over; `test/bank-pack.test.ts` drives both steps on a record installed at 1.7.0.
+ *
+ * AND BELOW 3.0.0, NOT BELOW 2.0.0, SINCE 1.0.1. It was `^1.8.0` at 1.0.0, and money-core 2.0.0 took `holdings` away,
+ * which no caret on 1.x admits: planned beside 2.0.0 this pack was measured `money-core ^1.8.0, installed 2.0.0, ok:
+ * false`, and the owner's own import proposes it (`loop/research-seed-roles.md` R5). Nothing this pack writes into
+ * moved at 2.0.0, so the range is widened and the declarations are not touched. It stops short of 3.0.0 because a major
+ * step is a list or a field taken away, and whether `transactions` and `accounts` are still what these twelve write into
+ * is the question that step has to ask.
  *
  * A PATH TOKEN MINTED BEFORE THE UPDATE WAS LOST ON THAT ROAD, measured through `@braindog/record` on 22 September:
  * the update retired the twelve and this pack declared them again, so `ingestVerify` answered `null` in between and a
@@ -31,8 +38,16 @@
 
 import { HOME_CURRENCY, NOT_A_MOVEMENT, SAME_MOVEMENT, smsTwins, type SeedIngest, type SmsIngest } from '../modules/money.ts';
 
-/** The version of this pack, which moves by `first-party.ts`'s rule: a new wording is minor, one taken away major. */
-export const BANK_HSBC_EG_VERSION = '1.0.0';
+/**
+ * The version of this pack, which moves by `first-party.ts`'s rule: a new wording is minor, one taken away major.
+ *
+ * 1.0.1: money-core `<3.0.0` in place of `^1.8.0`, so it installs beside money-core 2.0.0. A patch step, because not one
+ * of the twelve declarations moved and a record that updates stages the bytes it already holds. NOTHING OFFERS THAT
+ * UPDATE YET: this pack is in no catalogue, and the import counts a pack the record holds as already offered, so a record
+ * that installed 1.0.0 keeps `^1.8.0` beside money-core 2.0.0 and nothing says so (`test/money-core-major.test.ts`, the
+ * last test, drives exactly that). The step lets a record's pack list tell the two ranges apart; it does not reach one.
+ */
+export const BANK_HSBC_EG_VERSION = '1.0.1';
 
 /* ── the `From HSBC:` line, shared by the pattern that writes it and the one that holds it ── */
 
@@ -361,7 +376,7 @@ export const MONEY_CORE_HANDS: Readonly<Record<string, string>> = Object.fromEnt
   [...Object.values(HSBC_EG_INGESTS), ...Object.values(HSBC_EG_SMS_INGESTS)].map((i) => [`ingest.${i.ingest}`, 'bank-hsbc-eg']),
 );
 
-/** The pack document: twelve ingests, no list, no page, and money-core 1.8.0 or later underneath. */
+/** The pack document: twelve ingests, no list, no page, and money-core 1.8.0 or later, before 3.0.0, underneath. */
 export function bankHsbcEgPack(): Record<string, unknown> {
   return {
     pack: 'bank-hsbc-eg',
@@ -369,7 +384,7 @@ export function bankHsbcEgPack(): Record<string, unknown> {
     summary: 'Reads HSBC Egypt alert mails and text messages into Money as transactions.',
     author: 'BrainDog',
     license: 'MIT',
-    requires: { format: 1, primitives: 1, packs: { 'money-core': '^1.8.0' } },
+    requires: { format: 1, primitives: 1, packs: { 'money-core': '>=1.8.0 <3.0.0' } },
     declarations: [...Object.values(HSBC_EG_INGESTS), ...Object.values(HSBC_EG_SMS_INGESTS)],
   };
 }

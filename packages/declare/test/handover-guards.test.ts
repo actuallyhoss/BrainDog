@@ -28,6 +28,7 @@ import type { Diff } from '../src/index.ts';
 import { createRecordApi, type CallContext } from '../../record/src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { FIRST_PARTY, firstPartyDocument } from '../../seed/src/index.ts';
+import { HOLDINGS_1_8_0, asMoneyCore180 } from '../../seed/test/money-core-earlier.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
 
@@ -42,9 +43,15 @@ type Body = Record<string, unknown>;
 type Doc = { pack: string; version: string; declarations: Body[]; hands?: Record<string, string>; [k: string]: unknown };
 type Api = Awaited<ReturnType<typeof createRecordApi>>;
 
-/** money-core at `version`, without `holdings` and handing it to `to`, or as it ships when `to` is null. */
+/**
+ * money-core at `version`, without `holdings` and handing it to `to`, or DECLARING it again when `to` is null.
+ *
+ * THE DECLARING ONE IS 1.8.0's DOCUMENT UNDER A LATER NUMBER, which until 23 September was simply the shipped file. Since
+ * money-core 2.0.0 the shipped file has no `holdings`, so "the giver declaring it again" has to be built: `asMoneyCore180`
+ * puts back the body 1.8.0 carried, byte for byte, and drops the handover of that one list.
+ */
 const moneyCore = (version: string, to: string | null): Doc => {
-  const d = structuredClone(firstPartyDocument('money-core')) as unknown as Doc;
+  const d = (to === null ? asMoneyCore180(firstPartyDocument('money-core')) : structuredClone(firstPartyDocument('money-core'))) as unknown as Doc;
   d.version = version;
   if (to === null) return d;
   d.declarations = d.declarations.filter((x) => x.register !== 'holdings');
@@ -69,11 +76,17 @@ async function put(api: Api, doc: unknown): Promise<{ diff: Diff; out: Out }> {
   return { diff, out };
 }
 
-/** Every first-party pack installed, `rows` gold holdings written, and money-core 2.0.0 handing the list to notes-pack. */
+/**
+ * Every first-party pack installed with money-core AS 1.8.0, `rows` gold holdings written, and money-core 2.0.0 handing
+ * the list to notes-pack.
+ *
+ * 1.8.0 FIRST BECAUSE IT IS THE LAST THAT DECLARES THE LIST: on today's money-core the record has no `holdings`, and all
+ * four tests here went red at the `create` below on 23 September, before notes-pack was ever planned.
+ */
 async function handed(rows: number) {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 22, 12)) });
-  for (const id of FIRST_PARTY) said((await put(api, firstPartyDocument(id))).out);
+  for (const id of FIRST_PARTY) said((await put(api, id === 'money-core' ? asMoneyCore180(firstPartyDocument(id)) : firstPartyDocument(id))).out);
   const k = api.kernel;
   const ids: string[] = [];
   for (let i = 0; i < rows; i++) ids.push(said<{ id: string }>(k.create('holdings', { label: `Gold ${i}`, kind: 'gold', qty: 1, unit_cost: { amount: 480000, currency: 'EGP' } }, { actor: 'p_1' })).id);
@@ -138,9 +151,12 @@ test('THE GIVER DECLARING IT AGAIN IS TOLD THE HOLDER IS NOT INSTALLED, and remo
 
 test('A RECEIVER THAT DOES DECLARE IT still takes it over, and a pack already installed still retires what it stops declaring', async () => {
   const { sql, api, k } = await handed(1);
+  /* THE BODY AS IT WAS HANDED, 1.8.0's, and not the shipped holdings pack's. That one has no `gold`, the row here is gold,
+     and a take-over that keeps a value the body lacks leaves the list the record's own (`handover.test.ts`), so the
+     `pack_id` read below is null and says nothing about whether notes-pack took it. Measured with the shipped body in
+     place on 23 September: `actual: null, expected: 'notes-pack'`. */
   const doc = notesPack();
-  const holdings = structuredClone((firstPartyDocument('money-core') as unknown as Doc).declarations.find((d) => d.register === 'holdings')!);
-  doc.declarations.push({ ...holdings, pack: 'notes-pack' });
+  doc.declarations.push({ ...structuredClone(HOLDINGS_1_8_0), pack: 'notes-pack' });
   const took = await put(api, doc);
   assert.deepEqual(took.diff.conflicts, []);
   assert.deepEqual(took.diff.adds.map((a) => [a.id, a.handed ?? false]), [['register.jots', false], ['register.holdings', true]]);
