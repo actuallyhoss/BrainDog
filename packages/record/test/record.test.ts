@@ -1277,7 +1277,9 @@ test('A METHOD THAT NAMES NO REGISTER IS ABOUT THE RECORD, and a scoped member h
 
   /* AND A SCOPED READER MAY MARK WHAT THEY HAVE READ. `whatsNew` answers them, so refusing this left
      their first screen showing the same "since you were away" lines for ever, with a button under
-     them that refused every press. */
+     them that refused every press. The row comes first because a mark only reaches an event they can
+     see: before it, the newest event was the owner's grant line, and answering its time was the leak. */
+  value(await api.create({ register: 'obligations', fields: { what: 'Invoice 41' } }, owner));
   const own = value<{ seen_at: string | null }>(await api.markRead(undefined, they));
   assert.ok(own.seen_at, 'a scoped reader could not say they had read');
 

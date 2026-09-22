@@ -1437,6 +1437,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * two hundred of them, with every field value in the body.
    */
   const holds = (ctx: CallContext, row: Record<string, unknown>): boolean => {
+    /* A DECISION IS HELD BACK EXACTLY WHEN THE QUESTION IT SETTLED IS. It has no `body_kind`, so every branch below
+       answered `false` and a member invited to one list read the question and the reason of every decision on the
+       record: batch fourteen's audit listed a diary decision to a colleague who could see only Obligations. It names no
+       register itself, and the register it is about is the one its suggestion's body named, so the rule is the
+       suggestion's rule, asked of the suggestion (`SETTLED` in the kernel pairs them by adjacent log lines). A decision
+       whose question cannot be found is about nothing this caller can be shown to reach, so only somebody who reads the
+       whole record sees it, which is the rule `lineOf` keeps for a line about nothing in particular. */
+    if (typeof row.decided_by === 'string' && 'answer' in row) {
+      const settled = typeof row.suggestion === 'string' ? kernel.governanceRow('suggestion', row.suggestion) : null;
+      return settled === null ? !wholeRecord(ctx) : holds(ctx, settled);
+    }
     const body = row.body as Record<string, unknown> | undefined;
     /* EVERY BODY THAT NAMES A REGISTER, not only a `rowset`. A `pattern` carries a whole ingest
        declaration with `writes.register` on it and a `change` carries a `declaration_id`; both name
@@ -1645,11 +1656,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return done(at);
   };
 
+  /** Where this person last read, or `null` when they never have. `members()` already folds their rows to the furthest. */
+  const markOf = (person: string | null): string | null => kernel.members().find((m) => m.person_id === person)?.seen_at ?? null;
+
+  /** Whose read mark a caller reads: a person's own, and a token's person's, the one `whatsNew` answers from. */
+  const readerOf = (ctx: CallContext): string | null =>
+    ctx.principal.kind === 'person' ? ctx.principal.id : ctx.principal.kind === 'token' ? ctx.principal.person : null;
+
   /** What changed since `cursor`, or since the caller's read mark. A token reads its person's mark. */
   const newsFor = (ctx: CallContext, cursor?: number): WhatsNew => {
-    const p = ctx.principal;
-    const person = p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : null;
-    const { lines, next } = walk(ctx, null, cursor ?? kernel.unreadFrom(person), NEWS + 1, true);
+    const { lines, next } = walk(ctx, null, cursor ?? kernel.unreadFrom(readerOf(ctx)), NEWS + 1, true);
     const events = lines.slice(0, NEWS);
     return { events, upTo: events[0]?.rowid ?? null, sinceCapped: next !== null };
   };
@@ -1705,9 +1721,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       counts: {
         decide: open.ok ? open.value.filter((row) => !holds(ctx, row)).length : 0,
         inbox: allows(ctx, 'owner') === null ? kernel.inboxWaiting() : null,
-        /* EVERY DECISION, for a screen that reads them a page at a time. A decision carries no body, so none is held
-           back from a reader of the record, and the count is the table's. */
-        decided: kernel.governanceCount('decision'),
+        /* EVERY DECISION THIS CALLER MAY READ, for a screen that reads them a page at a time. Somebody who reads the whole
+           record is held back from none, so theirs is the table's count. A member invited to named lists is held back from
+           the decisions `holds` holds, and the table's count told them 2 where the list showed them 1: a number the
+           Decisions screen draws, and a count of what was decided about lists they were never shown. */
+        decided: wholeRecord(ctx)
+          ? kernel.governanceCount('decision')
+          : ((all) => (all.ok ? all.value.filter((row) => !holds(ctx, row)).length : 0))(kernel.governance('decision', { every: true })),
       },
       whatsNew: newsFor(ctx),
       ...((names) => (names === null ? {} : { names }))(namesFor(ctx)),
@@ -2515,9 +2535,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               .map((register) => readable(ctx, register))
               .find((said) => said !== null);
           /* WHERE THIS READER LAST LOOKED. The kernel does not know who is reading, so a feed that marks what is new came back
-             with `seen: null` and drew every line as unread; it is the caller's own read mark, the one Home's list moves. */
-          if (!beyond && b.source === 'activity' && 'seen' in b)
-            return { ...b, seen: kernel.members().find((m) => m.person_id === ctx.principal.id)?.seen_at ?? null };
+             with `seen: null` and drew every line as unread; it is the caller's own read mark, the one Home's list moves.
+             AND A TOKEN'S IS ITS PERSON'S. This looked the mark up by `principal.id`, which for a token is the token's
+             own id and no member row has it, so a person's agent drew every line as unread however far the person had
+             read, while `whatsNew` for the same token read the person's mark. Both now ask `readerOf`. */
+          if (!beyond && b.source === 'activity' && 'seen' in b) return { ...b, seen: markOf(readerOf(ctx)) };
           return beyond ? { ...b, rows: [], matched: 0, ...(b.readings ? { readings: [] } : {}), ...(b.measures ? { measures: [] } : {}), ...(b.values ? { values: {} } : {}), ...(b.feed ? { feed: [] } : {}), refusals: [beyond] } : b;
         }),
       });
@@ -2652,8 +2674,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (ctx.principal.kind !== 'person')
         /* `FORBIDDEN` with the sentence carrying the reason — the same move as `allows` above. */
         return no('FORBIDDEN', 'A read mark belongs to a person, and a token is not one.', { at: 'principal' });
-      const upTo = args?.upTo ?? kernel.newestEvent();
-      return ok({ upTo, seen_at: kernel.markRead(ctx.principal.id, upTo) });
+      /* CHECKED AS `whatsNew` CHECKS ITS CURSOR, because the route hands the body straight through: `{ "upTo": true }`
+         reached the SQL binding, which threw, and the caller got a 500 for the mistake `whatsNew` answers with a 422. */
+      const asked = args?.upTo;
+      if (asked !== undefined && !(Number.isSafeInteger(asked) && asked >= 1))
+        return no('VALUE_MALFORMED', 'upTo is the number of an event, a whole number from 1.', { at: 'upTo' });
+      /* AND THE MARK LANDS ON AN EVENT THE CALLER MAY SEE. The answer is that event's own `ts`, so marking a hidden
+         event handed a member invited to one list the exact time the owner wrote in another, one rowid per call; the
+         audit read a diary write's instant this way. So `upTo` is walked down to the newest event at or below it that
+         `lineOf` shows this caller, which is the same sight `whatsNew` answers with, and a caller who can see nothing
+         there keeps the mark they had. For an owner the first event walked is the one asked for, so nothing moves. */
+      const seen = walk(ctx, (asked ?? kernel.newestEvent()) + 1, 1, 1).lines[0]?.rowid ?? null;
+      const person = ctx.principal.id;
+      if (seen === null) return ok({ upTo: null, seen_at: markOf(person) });
+      return ok({ upTo: seen, seen_at: kernel.markRead(person, seen) });
     },
 
     /**
