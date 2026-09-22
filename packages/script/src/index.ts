@@ -1,0 +1,201 @@
+/**
+ * `@braindog/script`: a person's script, run in a sandbox that holds nothing but `ctx`.
+ *
+ * `loop/research-shell-scripts.md` is the design and this package is its Brief 1: the contract
+ * types, the ceilings, the prelude that builds `ctx` inside the sandbox, and the QuickJS runner the
+ * self-host will bind. It knows no kernel, no host and no network. Everything a script can reach is
+ * a function the caller hands in as a `CtxHost`, and every rule in section 5 of that design is
+ * enforced on THIS side of the boundary, before the host function is called, so a script that
+ * rewrites its own `ctx` has rewritten nothing that decides anything.
+ *
+ * NOTHING ELSE IMPORTS THIS YET, AND THAT IS DELIBERATE. Whether scripts run hosted at all is still
+ * a question in front of the owner (`loop/research-shell-docs.md`, first finding), so the package is
+ * built so it can be deleted in one directory if the answer is no.
+ *
+ * NO NEW REFUSAL CODE. Section 5 of the design says the existing ones cover a script, and for every
+ * rule this package enforces one does. A script that throws its own error is not a rule of ours
+ * being broken, so it carries `code: null` rather than a code invented for it, which is the same line
+ * `packages/ports` draws around `INTERNAL`: a crash report is not a refusal.
+ */
+
+/* ── The ceilings ─────────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * What a declaration may ask for at most, section 5 of the design. A declaration over one is
+ * refused before anything runs rather than clamped, because a clamped limit is a script that
+ * behaves differently from what its author read in the install diff.
+ */
+export const CEILINGS = {
+  cpu_ms: 1_000,
+  fetches: 20,
+  wall_ms: 30_000,
+  writes: 1_000,
+} as const;
+
+/** What a declaration gets when it names no limit, section 5's defaults. */
+export const DEFAULT_LIMITS = {
+  cpu_ms: 200,
+  fetches: 5,
+  wall_ms: 15_000,
+  writes: 200,
+} as const;
+
+/** 64 KB of source. A script is a few lines that fetch and reshape; a bundle is not one. */
+export const SOURCE_BYTES = 64 * 1024;
+
+/**
+ * THE SANDBOX'S WHOLE MEMORY, AND IT IS A WASM MAXIMUM BECAUSE THE QUICKJS LIMIT IS NOT A CAP.
+ *
+ * The design read `runtime.setMemoryLimit` as hard. Measured on quickjs-ng 0.32.0 on September 22nd:
+ * a single 100 MB `Uint8Array` or string is refused under a 32 MB limit, and a hundred 1 MB strings
+ * or arrays pushed one at a time are not. `computeMemoryUsage` reported 104,956,678 bytes used
+ * against a `malloc_limit` of 33,554,432, and the run finished. So the QuickJS limit is kept for the
+ * fast refusal it does give, and the real bound is the `WebAssembly.Memory` each run is instantiated
+ * into, whose `maximum` the engine cannot grow past whatever it allocates through.
+ */
+export const HEAP_BYTES = 32 * 1024 * 1024;
+
+/** 8 KB of `ctx.log` per run, kept on the run's event. Past it the text is cut, never the run. */
+export const LOG_BYTES = 8 * 1024;
+
+export type ScriptLimits = {
+  cpu_ms: number;
+  fetches: number;
+  wall_ms: number;
+  writes: number;
+};
+
+/* ── The declaration ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * The part of a `script` declaration the sandbox enforces. `runs:` (the trigger) is Brief 2's and is
+ * not here, because a sandbox that knew why it was started could start behaving differently for it.
+ */
+export type ScriptDecl = {
+  id: string;
+  version: number;
+  /** Literal `https://` origins. Compared with `URL.origin`, never as a prefix. */
+  egress: readonly string[];
+  /** Vault labels. The sandbox sees the label only; the host opens the key outside it. */
+  keys: readonly string[];
+  /** Registers `ctx.record.list/get` may read. Empty is none. */
+  reads: readonly string[];
+  /** Registers `ctx.write` and `ctx.update` may queue for. */
+  writes: readonly string[];
+  limits?: Partial<ScriptLimits>;
+  source: string;
+};
+
+/* ── What crosses the boundary ────────────────────────────────────────────────────────────────── */
+
+export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
+
+/** A request as the host function receives it, after this package has checked it. */
+export type HostRequest = {
+  url: string;
+  method: string;
+  headers: Record<string, string>;
+  body: string | null;
+  /** A vault label from `keys`, or `null`. The host opens it; the sandbox never holds its bytes. */
+  key: string | null;
+};
+
+export type HostResponse = {
+  status: number;
+  headers: Record<string, string>;
+  body: string;
+};
+
+/**
+ * The host functions `ctx` is built from. On the self-host `fetch` is `sendAction` behind `pin`;
+ * in a test it is a double. `list` and `get` are only ever called for a register in `reads`.
+ */
+export interface CtxHost {
+  fetch(request: HostRequest): Promise<HostResponse>;
+  list?(register: string, where: Json): Promise<Json[]>;
+  /**
+   * THE HOST CHECKS `reads` FOR A `get`, AND IT IS HANDED THE LIST SO IT CANNOT FORGET TO. A spoken
+   * id (`S42`) names its register through a prefix only the record can resolve, so this package
+   * cannot tell which register a `get` is for. It refuses a `get` from a script that reads nothing.
+   */
+  get?(spoken: string, reads: readonly string[]): Promise<Json>;
+  /** The run's instant, from the host clock. The sandbox's own `Date` is not what a row is stamped with. */
+  now(): string;
+  tz: string;
+  /** A door's body and headers, a rule's copied fields, or `null` on a schedule. */
+  input: Json;
+}
+
+/** A write the run asked for. Nothing is applied here; Brief 3 applies them after the run, together. */
+export type ScriptWrite =
+  | { op: 'create'; register: string; fields: Json }
+  | { op: 'update'; spoken: string; patch: Json; version: number };
+
+export type ScriptUsage = {
+  fetches: number;
+  /** Response body bytes, as UTF-8. */
+  bytes: number;
+  wall_ms: number;
+  /** Time spent inside the interpreter, which is the CPU the script itself spent. */
+  cpu_ms: number;
+};
+
+/** The existing codes this package can answer, section 5 of the design. */
+export type ScriptRefusalCode =
+  | 'DECLARATION_INVALID'
+  | 'OUT_OF_BOUNDS'
+  | 'PULL_ORIGIN_REFUSED'
+  | 'FORBIDDEN';
+
+export type ScriptRefusal = {
+  /** `null` when the script threw its own error rather than breaking a rule of ours. */
+  code: ScriptRefusalCode | null;
+  why: string;
+};
+
+/**
+ * WHAT A RUN ANSWERS. A refused run carries its usage and log as well, which is wider than the
+ * brief's `{ refused }`: section 2 of the design meters a refused run as a run, because it did spend
+ * the sandbox's time, and a refusal with no usage would leave Brief 3 nothing to meter it by.
+ * It carries NO writes, ever. A half-run that left half a ledger is the thing this shape prevents.
+ */
+export type ScriptAnswer =
+  | { writes: ScriptWrite[]; log: string; usage: ScriptUsage }
+  | { refused: ScriptRefusal; log: string; usage: ScriptUsage };
+
+/* ── The header, checked before the sandbox starts ────────────────────────────────────────────── */
+
+/**
+ * The limits a run will hold, or the refusal that stops it before it starts. Over a ceiling is
+ * `OUT_OF_BOUNDS`; an egress that is not a bare `https://` origin is `DECLARATION_INVALID`, the code
+ * the kernel already answers for a malformed declaration.
+ */
+export function checkDecl(decl: ScriptDecl): ScriptLimits | ScriptRefusal {
+  const limits: ScriptLimits = { ...DEFAULT_LIMITS, ...decl.limits };
+  for (const name of Object.keys(CEILINGS) as (keyof ScriptLimits)[]) {
+    const value = limits[name];
+    if (!Number.isInteger(value) || value < 1)
+      return { code: 'DECLARATION_INVALID', why: `${decl.id}'s limits.${name} must be a whole number above zero.` };
+    if (value > CEILINGS[name])
+      return { code: 'OUT_OF_BOUNDS', why: `${decl.id}'s limits.${name} is ${value}; the most a script may ask for is ${CEILINGS[name]}.` };
+  }
+  if (new TextEncoder().encode(decl.source).length > SOURCE_BYTES)
+    return { code: 'OUT_OF_BOUNDS', why: `${decl.id}'s source is over ${SOURCE_BYTES / 1024} KB.` };
+  for (const origin of decl.egress) {
+    let parsed: URL | null = null;
+    try {
+      parsed = new URL(origin);
+    } catch {
+      /* answered below */
+    }
+    /* THE ORIGIN AND NOTHING ELSE. `https://api.example.com/v1` as an egress line would read, in the
+       install diff, like a promise about a path that the origin comparison never keeps. */
+    if (parsed === null || parsed.protocol !== 'https:' || parsed.origin !== origin)
+      return { code: 'DECLARATION_INVALID', why: `${decl.id}'s egress ${JSON.stringify(origin)} is not a bare https:// origin.` };
+  }
+  return limits;
+}
+
+export const isRefusal = (x: ScriptLimits | ScriptRefusal): x is ScriptRefusal => 'why' in x;
+
+export { PRELUDE } from './prelude.ts';

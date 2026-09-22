@@ -95,6 +95,7 @@ devDependency is an edge — a build-time import is an import.
 | 20 | `cli` | 1, 2, 3, 7, 8, 12, 13, 16. The manifest holds 2, 12 and 16 today: `braindog mcp` runs the MCP core (`12`) over stdio and reaches the record through the typed client (`16`). The others arrive with the commands that need them, and `13` is for `@braindog/spark/prompts` and nothing else of it. Every edge is a devDependency, because what ships is one bundled file |
 | 21 | `worker` | 2, 7, 10, 11, 12, 15. `10` is the catalogue, so an update carries progress forward as it does on the self-host. `12` serves `POST /mcp` from the same core the command line runs over stdio; `web`'s `build/` is the asset directory, never an import |
 | 22 | `selfhost` | 2, 7, 8, 10, 11, 12, 15, 16. `12` serves `POST /mcp`, as on the Worker. `16` is a devDependency: the client's integration test runs against this server, because the test needs a runtime and only an app may name one |
+| 23 | `script` | none, and nothing imports it yet: the sandbox a person's or an agent's script runs in (`loop/research-shell-scripts.md` Brief 1, DIRECTION 22), `quickjs-emscripten` (quickjs-ng) only |
 
 **Eighteen workspaces in the tree today, twenty-two at platform.** The
 order is also the build order, so `pnpm -r run build` reproduces it for free. *(An earlier draft had
