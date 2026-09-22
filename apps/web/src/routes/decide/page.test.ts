@@ -124,3 +124,26 @@ test('both handlers refuse before they act, not only the controls that call them
   const inBatch = page.slice(batchAt, sentAt).search(guard);
   assert.ok(inBatch >= 0, 'the batch sends its answers before anybody checks whether it may');
 });
+
+/**
+ * A COLLEAGUE ON ONE LIST IS NOT A READER OF THE RECORD, AND THE HINT MUST NOT SAY THEY ARE.
+ *
+ * `loop/research-invite-landing.md` finding 3: the shell has no level for a member who holds lists
+ * and not the record, so `layoutOf` falls back to `read`, and this hint told a bookkeeper given
+ * `write` on Expenses "This needs decide, and you have read access." Neither half is theirs. The
+ * record's own refusal for them talks about a "record-wide token", which they were never offered and
+ * cannot ask for by that name, so the hint does not borrow that sentence either.
+ */
+test('a colleague on some lists is told who answers, not a level they do not hold', () => {
+  for (const lists of [['expenses'], ['tasks', 'expenses']]) {
+    const said = whyNotAnswering('read', lists);
+    assert.doesNotMatch(said, /you have read access/u, 'the hint claims a level the colleague does not hold');
+    assert.doesNotMatch(said, /token/iu, 'the hint talks about a token nobody gave them');
+    assert.match(said, /whole record/u);
+    assert.match(said, /stays open to you\.$/u);
+  }
+  assert.match(whyNotAnswering('read', ['expenses']), /your list\b/u);
+  assert.match(whyNotAnswering('read', ['tasks', 'expenses']), /your lists\b/u);
+  /* AND A RECORD-WIDE READER STILL HEARS THE RECORD'S OWN SENTENCE, word for word. */
+  assert.ok(whyNotAnswering('read', null).startsWith(RECORD_SAID));
+});

@@ -46,8 +46,23 @@ export const mayAnswer = (level: string, owner: boolean): boolean => owner || le
  *
  * The first two sentences are `allows`'s own `LEVEL_REQUIRED` string for this need, which is what a
  * press used to earn after the typing. The third is what stays.
+ *
+ * A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD (`lists`, from the shell's `me.lists`) HAS NO LEVEL
+ * TO BE TOLD. The shell's `read` is a fallback for them, and measured through the real seed
+ * (`loop/research-invite-landing.md` finding 3) this hint told a bookkeeper given `write` on one list
+ * "you have read access", which is neither their level nor their situation. The record's own refusal
+ * for them asks for "a record-wide token", which they were never offered and cannot ask for by that
+ * name. So they are told who answers here, and that the questions they see are the ones about what
+ * they hold. The lists are counted and not named: the ids are all this function is handed, and an id
+ * is the word finding 6 measured a colleague being told instead of a name.
  */
-export const whyNotAnswering = (level: string): string =>
-  `${
+export const whyNotAnswering = (level: string, lists: readonly string[] | null = null): string =>
+  lists && lists.length > 0
+    ? `Answering a question here belongs to somebody who holds the whole record, and you hold ${
+        lists.length === 1 ? 'one list' : `${lists.length} lists`
+      } on it. Ask an owner if you should be answering. Reading is not affected: the questions here are the ones about ${
+        lists.length === 1 ? 'your list' : 'your lists'
+      }, and each of them, with the reason behind every decision, stays open to you.`
+    : `${
     LADDER.includes(level) ? `This needs decide, and you have ${level} access.` : 'This needs decide, and your access does not reach it.'
   } Ask an owner to raise your access. Reading is not affected: every question here, and the reason behind every decision, stays open to you.`;

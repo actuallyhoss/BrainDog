@@ -21,6 +21,7 @@
   import { homeCurrency, identityFor, NOW, ROWS, actorOf, metric, type Metric } from '$lib/record/api.ts';
   import type { News } from '$lib/record/news-live.ts';
   import type { LiveBlock } from '$lib/record/page-live.ts';
+  import { landing } from '$lib/record/landing.ts';
   import { amountOf, currencyOf, drawn, symbolText } from '$lib/record/money.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
@@ -157,6 +158,9 @@
 
   const cells = $derived(data.live ? (tiles ?? []) : ['owed-to-you', 'due-30d', 'overdue'].map((id) => metric(id)));
 
+  /* WHERE A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD LANDS (`landing.ts`), and `null` for everybody else. */
+  const lands = $derived(data.live ? landing(data) : null);
+
   /**
    * A QUALIFIER'S STATE PHRASE, and only that phrase, takes the metric's tone.
    *
@@ -259,7 +263,28 @@
     <!-- A DECLARED HOME SAYS WHAT IS DUE ITSELF, so this is only the questions waiting, and only when there are some. -->
     {#if !asking && (!declared || data.questions.length > 0)}
     <Section title={said('needs_you')} count={needCount}>
-      {#if data.questions.length === 0 && shown.length === 0 && lapsing.length === 0}
+      {#if data.questions.length === 0 && shown.length === 0 && lapsing.length === 0 && lands}
+        <!--
+          A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD IS TOLD WHICH LIST IS THEIRS, and is never told the
+          record is empty. Measured through the real seed (`loop/research-invite-landing.md` finding 1): a
+          bookkeeper invited to one empty list took the arm below at `anything === 0` and read "Nothing in
+          the record yet." with `Start here` over a record of 230 rows, and every tile `/start` then offered
+          was refused by the record. Their list answered the whole time, and nothing pointed at it.
+        -->
+        <Empty
+          kind="cleared"
+          title={lands.kind === 'list' ? copy.yourList(lands.name) : copy.yourLists(new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(lands.lists.map((l) => l.name)))}
+          body={copy.yourListBody}
+        >
+          {#snippet actions()}
+            {#if lands.kind === 'list'}
+              <Button weight="primary" href={lands.href}>{copy.openList(lands.name)}</Button>
+            {:else}
+              {#each lands.lists as l (l.href)}<Button weight="quiet" href={l.href}>{copy.openList(l.name)}</Button>{/each}
+            {/if}
+          {/snippet}
+        </Empty>
+      {:else if data.questions.length === 0 && shown.length === 0 && lapsing.length === 0}
         {@const anything =
           (data.live
             ? data.index.registers.reduce((n, r) => n + r.count, 0)

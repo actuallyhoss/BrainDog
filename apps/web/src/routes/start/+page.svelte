@@ -52,6 +52,8 @@
   import { page } from '$app/state';
   import { drew } from '../../lib/ui/screen.svelte.ts';
   import * as pending from '$lib/record/pending.svelte.ts';
+  import { landing } from '$lib/record/landing.ts';
+  import type { Shell } from '$lib/record/boot-live.ts';
   import type { Fields } from '$lib/record/schema.ts';
 
   /* The five live in `copy.ts` with every other sentence in the product, so the scope this screen
@@ -88,6 +90,18 @@
   const keptWhy = $derived(cause === null ? firstRun.keptNothingWhy : firstRun.keptNothingFor[cause]);
 
   /**
+   * AND A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD IS NEVER ASKED TO SET ONE UP.
+   *
+   * Measured through the real seed (`loop/research-invite-landing.md` finding 1): a bookkeeper invited
+   * to one empty list had a rail of nothing, so `alreadyMade` below was false for them and this screen
+   * drew the blank "Who are you?" with every tile. Each tile plans a pack, and `planPack` refused every
+   * one of them, because a record's shape is its owner's. The tiles are not drawn to them at all; the
+   * screen says whose this is and opens the list they came for (`landing.ts`).
+   */
+  const colleague = $derived(Boolean(page.data.live) && (page.data as unknown as Shell).me.lists != null);
+  const notTheirs = $derived(colleague ? landing(page.data as unknown as Shell) : null);
+
+  /**
    * WHETHER THE RECORD BEHIND THIS SCREEN IS ALREADY MADE, and it is asked because this screen is
    * reachable when it is.
    *
@@ -100,7 +114,9 @@
    * the record holds and `index.registers` is the rail's lists, which are the ones holding rows. A record
    * this screen has never been through has neither.
    */
-  const alreadyMade = $derived(Boolean(page.data.live) && (page.data.pages.length > 0 || page.data.index.registers.length > 0));
+  const alreadyMade = $derived(
+    Boolean(page.data.live) && (page.data.pages.length > 0 || page.data.index.registers.length > 0 || colleague),
+  );
 
   let picked = $state<string | null>(null);
   /* What the generated form would refuse, bound out of it so the button can be dead while it is
@@ -957,7 +973,19 @@
          and no tab bar at either width, so on an arranged record it was a blank question with the browser's
          own Back as the only way out. It is said before the question, because it is what decides whether
          somebody wants to answer it again. -->
-    {#if alreadyMade}
+    {#if colleague}
+      <section class="again" aria-labelledby="again-h">
+        <p class="again-h" id="again-h">{copy.startNotYours}</p>
+        <p class="again-why">{copy.startNotYoursWhy}</p>
+        <div class="actions">
+          {#if notTheirs?.kind === 'list'}
+            <Button weight="primary" href={notTheirs.href}>{copy.openList(notTheirs.name)}</Button>
+          {:else if notTheirs}
+            {#each notTheirs.lists as l (l.href)}<Button weight="quiet" href={l.href}>{copy.openList(l.name)}</Button>{/each}
+          {/if}
+        </div>
+      </section>
+    {:else if alreadyMade}
       <section class="again" aria-labelledby="again-h">
         <p class="again-h" id="again-h">{firstRun.againMade}</p>
         <p class="again-why">{firstRun.againMore}</p>
@@ -967,7 +995,8 @@
       </section>
     {/if}
 
-    {#if !choice}
+    <!-- NOTHING BELOW IS FOR A COLLEAGUE: every tile and every sentence here makes or reshapes a record. -->
+    {#if !colleague && !choice}
       <div class="who" role="group" aria-labelledby="who-h" onfocusout={leave}>
         <h1 class="question step" id="who-h">{firstRun.whoQuestion}</h1>
         {#if settled && heard}
@@ -1173,7 +1202,7 @@
       </section>
       </div>
       {/if}
-    {:else}
+    {:else if !colleague && choice}
       <h1 class="question step">{choice.field}</h1>
 
       <!--

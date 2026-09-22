@@ -794,6 +794,22 @@ export const copy = {
   feedPack: (id: string) => `the ${id} add-on`,
   recordEmptyBody: 'A record holds what a business is made of: what you owe and are owed, what it runs on, who is involved, and the decisions behind them.',
   startHere: 'Start here',
+  /**
+   * HOME FOR A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD, in place of the two nothings above.
+   *
+   * Measured through the real seed (`loop/research-invite-landing.md` finding 1): a bookkeeper invited
+   * to one empty list was told "Nothing in the record yet." and offered `Start here` over 230 rows, and
+   * no screen named the list they had been invited to. The first thing they are told is which list is
+   * theirs, and the one control goes there.
+   */
+  yourList: (name: string) => `Nothing needs you. Your list here is ${name}.`,
+  yourLists: (names: string) => `Nothing needs you. Your lists here are ${names}.`,
+  yourListBody: 'The rest of this record belongs to its owner, who can see everything you add.',
+  openList: (name: string) => `Open ${name}`,
+  /* AND `/start` FOR THE SAME COLLEAGUE, which offered them the tiles that set up a record and which the
+     record refused, tile by tile. Setting a record up is its owner's to do. */
+  startNotYours: 'This BrainDog is already made, and setting it up is for its owner.',
+  startNotYoursWhy: 'You were invited to part of it by its owner.',
   noPacksYet: 'No add-ons installed.',
   noPacksBody: 'An add-on brings ready-made lists and pages. The ones below are ready to install.',
   matching: 'matching',

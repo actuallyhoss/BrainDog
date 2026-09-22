@@ -81,7 +81,7 @@ test("the record's boot is drawn in the shell's shape, with nothing of the sampl
     'an empty list could not be filed into or given an exception on',
   );
   assert.deepEqual(shell.nav.map((n) => [n.href, n.section, n.icon]), [['/p/money', 'Work', 'doc']]);
-  assert.deepEqual(shell.me, { person: 'p_1', level: 'write', owner: false, records: [{ slug: 'the-studio', name: 'The Studio', level: 'write' }] });
+  assert.deepEqual(shell.me, { person: 'p_1', level: 'write', owner: false, records: [{ slug: 'the-studio', name: 'The Studio', level: 'write' }], lists: null });
   assert.deepEqual(shell.questions.map((q) => [q.id, q.title]), [['SG4', 'Renew the domain?']]);
   assert.equal(shell.inbox, 0, 'a count the record withheld became a number');
   assert.equal(shell.open, 30, 'the rail counted the list boot caps, not the questions the record has open');
@@ -463,4 +463,35 @@ test('and a shell over a record that answered, or over no record at all, carries
   assert.equal((await readBoot(BASE, none.io)).from, 'sample');
   assert.equal(refusedShell().refused, undefined, 'a refusal from another host was still being carried');
   forget();
+});
+
+/**
+ * A COLLEAGUE INVITED TO ONE LIST KEEPS THAT LIST, AND THE SHELL KEEPS THE FACT THAT IT IS ONE.
+ *
+ * MEASURED BY `loop/research-invite-landing.md`, through the real seed and the record's own `boot`:
+ * a bookkeeper given `write` on an Expenses list made for them, and empty on the day they arrive,
+ * gets `boot.registers` of exactly `[Expenses 0]` and `boot.me.level` of `null`. The shell turned the
+ * `null` into `read` and dropped the list for having no rows, so the rail was empty and Home said
+ * "Nothing in the record yet." with `Start here` over a record of 230 rows. Both facts were in the
+ * answer and both were thrown away here.
+ */
+test('A ONE-LIST COLLEAGUE KEEPS THEIR LIST IN THE RAIL AT ZERO ROWS, and the shell says which lists they hold', () => {
+  const shell = layoutOf({
+    registers: [{ id: 'expenses', name: 'Expenses', count: 0 }],
+    me: { kind: 'person', person: 'p_9', name: null, level: null },
+    now: '2026-09-22T09:00:00.000Z',
+  } as never);
+  assert.deepEqual(shell.index.registers.map((r) => [r.id, r.count]), [['expenses', 0]], 'the one list they came for is not in the rail');
+  assert.deepEqual(shell.me.lists, ['expenses']);
+  /* THE FALLBACK STAYS FOR EVERY OTHER CALLER, so nothing reading `level` sees a word it does not know. */
+  assert.equal(shell.me.level, 'read');
+  assert.equal(shell.me.owner, false);
+
+  /* AND A RECORD-WIDE MEMBER, A TOKEN AND AN OWNER HOLD THE RECORD, NOT A LIST OF LISTS. */
+  assert.equal(layoutOf(BOOT as never).me.lists, null);
+  assert.equal(layoutOf({ ...BOOT, me: { kind: 'token', person: null, name: null, level: null } } as never).me.lists, null);
+  assert.equal(layoutOf({ ...BOOT, me: { kind: 'person', person: 'p_1', name: 'Ada', level: 'owner' } } as never).me.lists, null);
+  assert.equal(refusedShell(null).me.lists, null);
+  /* An owner's empty list still leaves the rail, which is the owner's rule and not this one. */
+  assert.deepEqual(layoutOf(BOOT as never).index.registers.map((r) => r.id), ['obligations']);
 });

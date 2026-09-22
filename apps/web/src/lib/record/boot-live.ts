@@ -42,6 +42,16 @@ export type Shell = Omit<Sample, 'me'> & {
     level: string;
     owner: boolean;
     records: { slug: string; name: string; level: string }[];
+    /**
+     * THE LISTS A COLLEAGUE HOLDS WHEN THEY HOLD LISTS AND NOT THE RECORD, by id; `null` for everybody else.
+     *
+     * `level` CANNOT SAY IT. The record answers `level: null` for a person invited to one list, and the
+     * shell falls back to `read` so nothing downstream meets a word it does not know. Measured through the
+     * real seed (`loop/research-invite-landing.md`), that fallback is the whole of what a bookkeeper given
+     * `write` on Expenses was: "Can read, cannot change", "you have read access", and a Home that took
+     * them for the owner of an empty record. This is the fact the fallback threw away.
+     */
+    lists: string[] | null;
     /** A person's own rail on this record (`nav-prefs.svelte.ts`). Absent on the sample and for a token. */
     prefs?: { 'nav.order'?: string[]; 'nav.hidden'?: string[] };
   };
@@ -435,6 +445,10 @@ export function layoutOf(b: Boot): Shell {
   const record = b.record ?? null;
   const person = b.me?.person ?? null;
   const level = b.me?.level ?? 'read';
+  /* A PERSON WITH NO RECORD LEVEL WHOM THE RECORD STILL ANSWERED holds exactly the lists `boot` sent. A token
+     with no level is not a colleague, and is left to the fallback as before. */
+  const held = b.me?.kind === 'person' && b.me.level === null && person !== null ? b.registers.map((r) => r.id) : null;
+  const theirs = new Set(held ?? []);
   /* A SAVED VIEW IS A PAGE UNDER VIEWS OVER ONE LIST, and the rail draws it under that list, as the sample draws its own. */
   const views = new Map<string, { key: string; name: string; href: string }[]>();
   for (const p of b.pages ?? [])
@@ -472,9 +486,12 @@ export function layoutOf(b: Boot): Shell {
       locale: record?.locale ?? 'en',
       /* THE LISTS THAT HOLD SOMETHING, the sample's rule, and an icon from the declaration this build knows.
          A LIST WITH A SAVED VIEW STAYS EVEN AT ZERO ROWS: the rail nests a view under its list and drops it from
-         Views by matching against these, so dropping the list here strands the view under the generic heading. */
+         Views by matching against these, so dropping the list here strands the view under the generic heading.
+         AND A COLLEAGUE'S OWN LIST STAYS AT ZERO ROWS: a list made for somebody is empty on the day they are sent
+         the link, and "the lists that hold something" is a rule about an owner's rail. Dropped, it left the
+         bookkeeper with a rail of nothing and the list reachable only by typing `/r/expenses`. */
       registers: b.registers
-        .filter((r) => r.count > 0 || views.has(r.id))
+        .filter((r) => r.count > 0 || views.has(r.id) || theirs.has(r.id))
         .map((r) => ({ id: r.id, name: r.name, count: r.count, icon: iconFor(REGISTERS[r.id]?.icon, 'rows'), views: views.get(r.id) ?? [] })),
     },
     lists: b.registers.map((r) => ({ id: r.id, name: r.name })),
@@ -487,6 +504,7 @@ export function layoutOf(b: Boot): Shell {
       level,
       owner: level === 'owner',
       records: record ? [{ slug: record.slug, name: record.name, level }] : [],
+      lists: held,
       ...(b.me?.prefs ? { prefs: b.me.prefs } : {}),
     },
     people: [],
@@ -521,6 +539,8 @@ export const refusedShell = (said: { code: string; fix: string } | null = refusa
 /** The sample's shell, with what only a shell carries. */
 export const sampleShell = (sample: Sample, inbox: number): Shell => ({
   ...sample,
+  /* THE SAMPLE IS AN OWNER'S RECORD, so nobody reading it holds lists instead of the record. */
+  me: { ...sample.me, lists: null },
   lists: Object.entries(REGISTERS).map(([id, r]) => ({ id, name: r.name })),
   pages: [],
   names: {},
