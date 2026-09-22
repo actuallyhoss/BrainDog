@@ -12,6 +12,11 @@
  * that matters is a colleague whose last proof is fifty minutes old and the server key's sign-in cannot make one. Each
  * cookie still goes through the directory's own session flow, so `provedAt` is what this host reads off `authed_at`.
  *
+ * IT LIVES IN THIS APP AND NOT IN `packages/host/test`, where it was written first. Every case drives this app's `start`
+ * and this app's key store, so as a test of `packages/host` it imported two layers up (`../../../apps/selfhost/src`),
+ * the one edge the package graph forbids in `src` and that nothing but habit forbade here. Its subject is the join
+ * between the two, and the side of the join that owns a socket is this one.
+ *
  * NO KEY IS PRINTED. Every assertion that touches the key compares it with `assert.ok(x === y)` and a message that names
  * no value, because `assert.equal` puts both sides in its failure text and a red run is exactly when that text is read.
  */
@@ -24,8 +29,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
-import { openKeyStore, recordKeys } from '../../../apps/selfhost/src/keys.ts';
-import { start } from '../../../apps/selfhost/src/server.ts';
+import { keyOpener } from '../src/actions.ts';
+import { openKeyStore, recordKeys } from '../src/keys.ts';
+import { start } from '../src/server.ts';
 
 const MINUTE = 60_000;
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
@@ -174,6 +180,7 @@ async function stack() {
 
   return {
     running,
+    store,
     owner,
     sent,
     plant,
@@ -238,6 +245,21 @@ test("§1: THE OWNER'S OWN FRESH PROPOSE GOES OUT ON HER KEY, and the one grant.
     /* AND THE KEY IS IN NO RESPONSE AND NO ROW THE ASK WROTE. */
     assert.ok(!out.raw.includes(value), 'the key came back in the answer');
     assert.ok(!JSON.stringify(s.running.sql.all('SELECT * FROM event')).includes(value), 'the key is in the event table');
+  } finally {
+    await s.close();
+  }
+});
+
+test('keyOpener SIGNS THE grant.read WITH THE ACTOR IT IS GIVEN, and with system only when it is given none', async () => {
+  const s = await stack();
+  try {
+    const ada = s.plant(s.owner);
+    const { value, grant } = await s.tierB(ada);
+    /* THE SCHEDULED PATH FIRST, which names nobody and must go on reading `system`, then the asker's. */
+    const scheduled = await keyOpener(s.running.api, s.store)({ id: grant, label: 'OpenAI' });
+    const asked = await keyOpener(s.running.api, s.store, s.owner)({ id: grant, label: 'OpenAI' });
+    assert.ok(scheduled === value && asked === value, 'the opener did not open the key it was handed');
+    assert.deepEqual(s.reads(), ['system', s.owner], 'the grant.read events were not signed by the actor each opener was given');
   } finally {
     await s.close();
   }
@@ -315,6 +337,56 @@ test('§5: TIER b NAMING A GRANT THE VAULT HAS NOT GOT IS 422 AT grant_id, and t
     assert.equal((await s.call('/api/spark/status', ada)).body?.value?.['tier'], 'a', 'the refused tier was written anyway');
     const out = await s.call('/api/spark/propose', ada, { question: 'Which tasks are open?' });
     assert.equal(out.status, 200, `the propose after a refused save was ${out.status} ${out.body?.refusal?.code ?? ''}`);
+  } finally {
+    await s.close();
+  }
+});
+
+test('§3: ON TIER byo AT ask_cap 1, THE SECOND READ IS SPARK_BUDGET_SPENT, because byo drafts on this host and its key as b does', async () => {
+  const s = await stack();
+  try {
+    const ada = s.plant(s.owner);
+    /* NO GRANT AND NO VAULT: tier `byo` is "your own endpoint", and on this host that endpoint is `SPARK_ENDPOINT` with
+       `SPARK_KEY`, the operator's. `46 §4.1` calls the tier unmetered, which is only true of an endpoint the owner pays for. */
+    const set = await s.call('/api/spark/settings', ada, { tier: 'byo', model: OWNER_MODEL, ask_cap: 1 });
+    assert.equal(set.status, 200, set.raw);
+
+    const first = await s.call('/api/spark/read', ada, { question: 'Which tasks are open?' });
+    assert.equal(first.status, 200, first.raw);
+    const statuses: number[] = [];
+    for (let i = 0; i < 4; i++) statuses.push((await s.call('/api/spark/read', ada, { question: 'Which tasks are open?' })).status);
+    const drafting = await s.call('/api/spark/propose', ada, { question: 'Which tasks are open?' });
+
+    assert.deepEqual(statuses, [422, 422, 422, 422], `tier byo reads past the cap: ${statuses.join(' ')}`);
+    assert.equal(drafting.body?.refusal?.code, 'SPARK_BUDGET_SPENT', `a tier byo propose that drafts went past the cap: ${drafting.status}`);
+    assert.equal(s.sent.length, 1, `${s.sent.length} model calls at ask_cap 1`);
+    const status = await s.call('/api/spark/status', ada);
+    assert.deepEqual(status.body?.value?.['asks'] && { used: (status.body.value['asks'] as { used: number }).used }, { used: 1 });
+  } finally {
+    await s.close();
+  }
+});
+
+test('§5: TIER b NAMING A LIVE GRANT THAT IS NOT AN api_token IS 422 AT grant_id, because 46 §5.9 names that kind alone', async () => {
+  const s = await stack();
+  try {
+    const ada = s.plant(s.owner);
+    /* A PASSWORD IS A LIVE KEY IN THE VAULT AND WOULD OPEN, so the existence check passes it: measured before this case,
+       the save answered 200 and the next propose went out as `Bearer <the password>` to `SPARK_ENDPOINT`. */
+    const value = ['bd_fake_password_', randomBytes(12).toString('hex')].join('');
+    const put = await s.call('/api/keys/put', ada, { label: 'Bank login', opens: 'the bank', kind: 'password', value });
+    assert.equal(put.status, 200, put.raw);
+    const row = s.running.api.kernel.get(String(put.body?.value?.['credential'])) ?? assert.fail('the key row is not there');
+    const grant = String(row.fields['value']);
+    assert.equal(s.running.api.kernel.grants().find((g) => g.id === grant)?.kind, 'password', 'the premise: the grant is a password');
+
+    const set = await s.call('/api/spark/settings', ada, { tier: 'b', grant_id: grant, model: OWNER_MODEL });
+    assert.equal(set.status, 422, `a password grant was saved as Spark's key: ${set.status}`);
+    assert.equal(set.body?.refusal?.code, 'VALUE_MALFORMED');
+    assert.equal(set.body?.refusal?.at, 'grant_id');
+    assert.ok(!set.raw.includes(value), 'the refusal carried the value');
+    assert.equal((await s.call('/api/spark/status', ada)).body?.value?.['tier'], 'a', 'the refused tier was written anyway');
+    assert.deepEqual(s.reads(), [], 'the refusal opened the grant');
   } finally {
     await s.close();
   }

@@ -58,8 +58,14 @@ export const ALARM_RUNS = 5;
  * with the grant id, AES-256-GCM with the AAD the record names. `openGrant` writes the `grant.read` event, so a run
  * that read a key is on the record. A bound value that is not a key, a record made before the store was bound, or
  * bytes that do not open, are all `null`, and the run sends nothing.
+ *
+ * `actor` SIGNS THE `grant.read`, AND `system` IS RIGHT ONLY WHERE NOBODY ASKED. The alarm's actions have no asker, so the
+ * default stands. Spark's tier `b` does have one, and with `system` written into this line an owner reading the vault's
+ * log could not tell her own asks from a colleague's (`loop/research-batch-thirty-one-audit.md` §1). That path is the one
+ * to pass the asker's id here; until `spark.ts`'s `wireOf` does, `sparkByokFor` hands this opener a view of the record
+ * whose `openGrant` signs as the asker whatever it is told.
  */
-export function keyOpener(api: Pick<RecordApi, 'kernel'>, bound: KekBinding | undefined): OpenKey | null {
+export function keyOpener(api: Pick<RecordApi, 'kernel'>, bound: KekBinding | undefined, actor = 'system'): OpenKey | null {
   if (!isBound(bound)) return null;
   return async (grant) => {
     let store: Awaited<ReturnType<typeof keyStoreOf>>;
@@ -72,7 +78,7 @@ export function keyOpener(api: Pick<RecordApi, 'kernel'>, bound: KekBinding | un
     const record = api.kernel.identity()?.id;
     if (!record) return null;
     const { kekId } = await store.current();
-    const sealed = api.kernel.openGrant({ id: grant.id, kek_id: kekId }, 'system');
+    const sealed = api.kernel.openGrant({ id: grant.id, kek_id: kekId }, actor);
     if (!sealed.ok) return null;
     return openSealed(store, record, sealed.value);
   };

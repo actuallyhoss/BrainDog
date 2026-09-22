@@ -48,18 +48,30 @@ import { isBound, type KekBinding } from './keys.ts';
 
 export type SparkEnv = { SPARK_ENDPOINT?: string | undefined; SPARK_MODEL?: string | undefined; KEK?: KekBinding | undefined };
 
-/** How a request leaves this Worker and how a sealed key is opened. Both are injected so a test needs no network and no KEK. */
+/**
+ * How a request leaves this Worker and how a sealed key is opened. Both are injected so a test needs no network and no KEK.
+ *
+ * `open` TAKES THE ASKER'S ID SO A TEST-INJECTED OPENER STILL SIGNS AS THEM: `wireOf` passes its own `actor` through to
+ * whichever opener is in play, the real one or a test's stand-in, so `keyOpener`'s default of `system` is only ever what a
+ * caller with nobody asking gets.
+ */
 export type SparkWire = {
   send?: ((input: URL, init: RequestInit) => Promise<Response>) | undefined;
-  open?: ((api: Pick<RecordApi, 'kernel'>) => OpenKey | null) | undefined;
+  open?: ((api: Pick<RecordApi, 'kernel'>, actor?: string) => OpenKey | null) | undefined;
 };
 
-/** The endpoint deps both ports are built from. Written once because the key discipline is the part that must not be copied. */
-const wireOf = (env: SparkEnv, api: () => Pick<RecordApi, 'kernel'>, options: SparkWire): SparkHostDeps => {
-  const opener = options.open ?? ((a: Pick<RecordApi, 'kernel'>) => keyOpener(a, env.KEK));
+/**
+ * The endpoint deps both ports are built from. Written once because the key discipline is the part that must not be copied.
+ *
+ * `actor` SIGNS EVERY `grant.read` THIS WIRE OPENS, AND `system` IS RIGHT ONLY WHERE NOBODY ASKED: the record's own model and
+ * `@braindog/spark`'s engine both run with nobody at the keyboard, so their callers pass none and `keyOpener`'s own default
+ * stands. `sparkByokFor` is the caller that has an asker, and passes their id.
+ */
+const wireOf = (env: SparkEnv, api: () => Pick<RecordApi, 'kernel'>, options: SparkWire, actor?: string): SparkHostDeps => {
+  const opener = options.open ?? ((a: Pick<RecordApi, 'kernel'>, who?: string) => keyOpener(a, env.KEK, who));
   return {
     grants: () => api().kernel.grants(),
-    openKey: isBound(env.KEK) ? async (grant) => (opener(api()) ?? (async () => null))(grant) : null,
+    openKey: isBound(env.KEK) ? async (grant) => (opener(api(), actor) ?? (async () => null))(grant) : null,
     send: options.send ?? ((input, init) => fetch(input, init)),
   };
 };
@@ -179,7 +191,7 @@ export function workerSparkDoor(
   const byok =
     config === undefined || wire.openKey === null
       ? undefined
-      : async (ctx: CallContext) => sparkByokFor(config, sparkGrantIdOf(deps.sql), api(), ctx, (asker) => wireOf(env, () => asker, deps));
+      : async (ctx: CallContext) => sparkByokFor(config, sparkGrantIdOf(deps.sql), api(), ctx, (_asker, actor) => wireOf(env, api, deps, actor));
   return sparkAskDoor(origins, () => workerSparkEngine(env, api, deps), byok);
 }
 

@@ -63,14 +63,20 @@ const utf8 = (text: string): Uint8Array => new TextEncoder().encode(text);
  * THE SAME BYTES AS THE VAULT DOOR'S (`47 §4.6`): the record's key unwrapped under the KEK, HKDF-SHA-256 over
  * it with the grant id as info, and AES-256-GCM with the AAD the record names. No key store, a record key
  * this store does not open, or bytes that do not open, are all `null`, and the run sends nothing.
+ *
+ * `actor` SIGNS THE `grant.read`, AND `system` IS RIGHT ONLY WHERE NOBODY ASKED. A scheduled action has no asker, so the
+ * default stands. Spark's tier `b` does have one, and with `system` written into this line the owner's vault log showed
+ * `system` for her own asks and for a colleague's alike (`loop/research-batch-thirty-one-audit.md` §1). That path is
+ * the one to pass the asker's id here; until `spark.ts`'s `wireOf` does, `sparkByokFor` hands this opener a view of the
+ * record whose `openGrant` signs as the asker whatever it is told. The Worker's `keyOpener` takes the same parameter.
  */
-export function keyOpener(api: RecordApi, store: KeyStore | undefined): OpenKey {
+export function keyOpener(api: Pick<RecordApi, 'kernel'>, store: KeyStore | undefined, actor = 'system'): OpenKey {
   return async (grant) => {
     if (!store) return null;
     const record = api.kernel.identity()?.id;
     if (!record) return null;
     const { kekId } = await store.current();
-    const sealed = api.kernel.openGrant({ id: grant.id, kek_id: kekId }, 'system');
+    const sealed = api.kernel.openGrant({ id: grant.id, kek_id: kekId }, actor);
     if (!sealed.ok) return null;
     const held = sealed.value;
     if (held.key.kek_id === null) return null;

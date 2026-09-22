@@ -172,7 +172,15 @@ export type Palette = {
 };
 
 export const palette = (core: Core, record: RecordApi, fallback: Inference): Palette => {
-  /** Tier `a` is metered and the other two are not: on `b` and `byo` the asker is paying. */
+  /**
+   * Tier `a` is metered here and the other two are not, AND THE REASON THIS LINE ONCE GAVE, "on `b` and `byo` the asker
+   * is paying", IS FALSE. Pass one drafts on `fallback`, the host's endpoint and key, on every tier (`look` below), and on
+   * `byo` the proposal does too, since the settings hold no address of the owner's. Only tier `b`'s proposal is on the
+   * asker's key. Measured at `ask_cap: 1`: five reads on `b` made five calls on the operator's key
+   * (`loop/research-batch-thirty-one-audit.md` §3), and on `byo` the four reads after the first all answered 200
+   * (`apps/selfhost/test/spark-byok-guard.test.ts`, red before the host counted `byo`). The host meters those drafts, in
+   * `packages/host/src/spark.ts` `sparkGuardedEngine`, because the count is of money this package never sees spent.
+   */
   const spent = (): Refusal | null => {
     const s = core.settings();
     if (s.tier !== 'a' || core.asksUsed() < s.ask_cap) return null;

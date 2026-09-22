@@ -51,10 +51,16 @@ export type SparkConfig = SparkHostConfig & {
 /** `SPARK_ENDPOINT`, `SPARK_MODEL`, `SPARK_KEY`, or nothing. */
 export const sparkFromEnv = (env: Record<string, string | undefined>): SparkConfig | undefined => fromEnv(env);
 
-/** The endpoint deps both ports are built from. Written once because the key discipline is the part that must not be copied. */
-const wireOf = (config: SparkConfig, api: () => RecordApi, store: KeyStore | undefined) => ({
+/**
+ * The endpoint deps both ports are built from. Written once because the key discipline is the part that must not be copied.
+ *
+ * `actor` SIGNS EVERY `grant.read` THIS WIRE OPENS, AND `system` IS RIGHT ONLY WHERE NOBODY ASKED: the record's own model and
+ * `@braindog/spark`'s engine both run with nobody at the keyboard, so their callers pass none and `keyOpener`'s own default
+ * stands. `sparkByokFor` is the caller that has an asker, and passes their id.
+ */
+const wireOf = (config: SparkConfig, api: () => RecordApi, store: KeyStore | undefined, actor?: string) => ({
   grants: () => api().kernel.grants(),
-  openKey: (grant: { id: string; label: string }) => keyOpener(api(), store)(grant),
+  openKey: (grant: { id: string; label: string }) => keyOpener(api(), store, actor)(grant),
   send: config.send ?? ((input: URL, init: RequestInit) => fetch(input, init)),
 });
 
@@ -180,6 +186,6 @@ export function sparkDoor(
   const byok =
     config === undefined || store === undefined
       ? undefined
-      : async (ctx: CallContext) => sparkByokFor(config, sparkGrantIdOf(deps.sql), api(), ctx, (asker) => wireOf(config, () => asker, store));
+      : async (ctx: CallContext) => sparkByokFor(config, sparkGrantIdOf(deps.sql), api(), ctx, (_asker, actor) => wireOf(config, api, store, actor));
   return sparkAskDoor(origins, () => sparkEngineFor(config, api, store, deps), byok);
 }
