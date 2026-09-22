@@ -21,10 +21,12 @@
  * THE OWNER'S SETUP COMES BESIDE THE EXPORT (`--setup`): the organisations he runs and the numbers to poll, which the old tool
  * never kept. Organisations are rows like any other; a poll is filed on Decide as a pack to install, because it sends
  * requests to another server and only the owner approves that. `--draft-setup` prints a first one from the export.
+ *
+ * AND IT REMEMBERS WHAT EACH RUN CARRIED, so `--since` can say it the next morning. See `Run`.
  */
 
-import { readFileSync, statSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { no, ok, refused, type Result } from '@braindog/ports';
@@ -37,7 +39,8 @@ import type { AgentIo } from './skills.ts';
 
 import { createClient } from '@braindog/client';
 
-const USAGE = 'braindog import takes legacy <export.json> [--setup <setup.json>] [--host <host>] [--dry-run], or legacy <export.json> --draft-setup.';
+const USAGE =
+  'braindog import takes legacy <export.json> [--setup <setup.json>] [--host <host>] [--dry-run], or legacy <export.json> --draft-setup, or legacy --since <day or last>.';
 
 /** The largest export this reads: the old tool's is about 108 KB of document and an audit of up to 100,000 lines. */
 export const IMPORT_MOST_BYTES = 64 * 1024 * 1024;
@@ -725,18 +728,154 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
   return lines;
 }
 
+/**
+ * WHAT ONE RUN CARRIED, BY NAME, remembered on the machine that ran it so the next morning can be told.
+ *
+ * THE SHADOW WEEK IS THE REASON (`loop/research-switch.md` §3): the importer runs every night against a fresh export,
+ * the old tool stays the one he works in, and the question each morning is what moved there and whether it arrived.
+ * Until this, every answer to that was printed once at three in the morning to a terminal nobody was reading.
+ *
+ * WHY THIS FILE AND NOT THE RECORD'S OWN LOG, which does hold every write this import makes with its note on it
+ * ("Imported from the old tool."). Two things the morning needs are not in it. A log line carries the one write it came
+ * from (`batch`) and nothing groups the hundreds of writes of one run, so "since last night" has no edge to stop at.
+ * And a row left out or refused was never written, so the log has no line for it at all, while "and was it carried"
+ * is half of the question. So the report keeps what it already worked out, and nothing it did not: the rows added,
+ * the rows updated with the fields that changed, each refusal with the record's sentence, and what was left out.
+ * No value is kept, only names, so the file says nothing a stranger could not read off the report itself.
+ */
+export type Run = {
+  at: string;
+  host: string;
+  file: string;
+  taken: string | null;
+  created: { register: string; label: string }[];
+  updated: { register: string; label: string; fields: string[] }[];
+  refused: { register: string; label: string; fix: string }[];
+  skipped: { reason: string; items: string[] }[];
+};
+
+/** The run a report describes, as `--since` reads it back. */
+export function runOf(report: Report, o: { at: string; host: string; file: string }): Run {
+  /* A CHANGE IS RECORDED BEFORE ITS WRITE IS SENT, so an update the record then refused is in `changes` too. It is said
+     once, as refused, and not also as carried. */
+  const turnedDown = new Set(report.refused.map((r) => `${r.register}\n${r.label}`));
+  return {
+    at: o.at,
+    host: o.host,
+    file: o.file,
+    taken: report.plan.taken,
+    created: report.plan.rows.filter((r) => report.outcomes[r.key] === 'added').map((r) => ({ register: r.register, label: r.label })),
+    updated: report.changes.filter((c) => !turnedDown.has(`${c.register}\n${c.label}`)).map((c) => ({ register: c.register, label: c.label, fields: c.fields })),
+    refused: [...report.refused, ...report.clashes.map((c) => ({ register: 'categories', label: c.label, fix: c.fix }))],
+    skipped: report.plan.skipped,
+  };
+}
+
+/**
+ * The lines `--since` says: every run from `since` on (a day, `2026-09-21`) or the newest one (`last`), oldest first.
+ *
+ * WHAT WAS LEFT OUT ON THE NIGHT BEFORE AS WELL IS NOT SAID AGAIN. The synthetic export alone leaves out 29 things
+ * under 23 reasons every night (measured on `test/legacy-export.ts`), and a morning that repeats them hides the one
+ * that is new. So a run says only
+ * what it left out that the run before it, into the same host, did not; the first run remembered says all of it.
+ */
+export function sinceSaid(runs: Run[], since: string): { found: number; lines: string[] } {
+  if (runs.length === 0) return { found: 0, lines: ['No import run is remembered on this machine yet.'] };
+  const shown = since === 'last' ? [runs.length - 1] : runs.flatMap((r, i) => (r.at.slice(0, 10) >= since ? [i] : []));
+  if (shown.length === 0) return { found: 0, lines: [`No import run is remembered on this machine since ${since}.`] };
+  const lines: string[] = [];
+  for (const i of shown) {
+    const run = runs[i]!;
+    const before = runs.slice(0, i).findLast((r) => r.host === run.host);
+    const had = new Set((before?.skipped ?? []).flatMap((s) => s.items.map((item) => `${s.reason}\n${item}`)));
+    if (lines.length > 0) lines.push('');
+    lines.push(`${run.at.slice(0, 10)} ${run.at.slice(11, 16)} UTC into ${run.host}${run.taken ? `, export of ${run.taken.slice(0, 10)}` : ''}:`);
+    const start = lines.length;
+    const byList = <T extends { register: string }>(rows: T[], say: (row: T) => string, head: string) => {
+      const lists = new Map<string, string[]>();
+      for (const row of rows) lists.set(row.register, [...(lists.get(row.register) ?? []), say(row)]);
+      for (const [register, items] of lists) lines.push(`- ${head} ${NAMES[register] ?? register}: ${few(items)}.`);
+    };
+    byList(run.created, (r) => r.label, 'Created in');
+    byList(run.updated, (r) => `${r.label} (${r.fields.join(', ')})`, 'Updated in');
+    for (const r of run.refused) lines.push(`- Not carried, ${NAMES[r.register] ?? r.register}: ${r.label}. ${r.fix}`);
+    for (const s of run.skipped) {
+      const fresh = s.items.filter((item) => !had.has(`${s.reason}\n${item}`));
+      if (fresh.length > 0) lines.push(`- Newly left out: ${few(fresh)}. ${s.reason}.`);
+    }
+    if (lines.length === start) lines.push('- Nothing moved in the old tool since the run before.');
+  }
+  return { found: shown.length, lines };
+}
+
+/** A day as `--since` takes one. Compared as text against a run's ISO time, which is why nothing looser is let in. */
+const DAY = /^\d{4}-\d{2}-\d{2}$/u;
+
+/** Where the runs are remembered: beside the other state this command line keeps for itself. */
+const runsFile = (home: string) => join(home, '.braindog', 'imports.jsonl');
+
+/**
+ * THE LAST SIXTY RUNS AND NO MORE: two months of nights is the shadow week several times over, and a file that grew
+ * by a run a night for as long as the importer was scheduled would be read whole every morning for no reason.
+ */
+const RUNS_KEPT = 60;
+
+function readRuns(home: string): Run[] {
+  let text: string;
+  try {
+    text = readFileSync(runsFile(home), 'utf8');
+  } catch {
+    return [];
+  }
+  /* A LINE THAT DOES NOT PARSE IS PASSED OVER, not fatal: a run cut off mid-write should not cost the week before it.
+     EVERY LIST `sinceSaid` WALKS IS CHECKED, not only `created`: a line that parsed but had no `updated` got through a
+     check on `created` alone, and `--since` then stopped on "rows is not iterable" with every good night unread. */
+  const lists = (run: Record<string, unknown>) => ['created', 'updated', 'refused', 'skipped'].every((k) => Array.isArray(run[k]));
+  return text.split('\n').flatMap((line) => {
+    try {
+      const run: unknown = JSON.parse(line);
+      return isObj(run) && typeof run.at === 'string' && typeof run.host === 'string' && lists(run) ? [run as Run] : [];
+    } catch {
+      return [];
+    }
+  });
+}
+
+function rememberRun(home: string, run: Run): void {
+  const file = runsFile(home);
+  mkdirSync(join(home, '.braindog'), { recursive: true });
+  const kept = [...readRuns(home), run].slice(-RUNS_KEPT);
+  writeFileSync(`${file}.tmp`, `${kept.map((r) => JSON.stringify(r)).join('\n')}\n`);
+  renameSync(`${file}.tmp`, file);
+}
+
 /** `braindog import legacy <file>`, and the exit code: 0 done, 1 refused or partly refused, 3 the host did not answer. */
-export async function importCommand(args: string[], io: AgentIo, today: string = new Date().toISOString().slice(0, 10)): Promise<number> {
-  let values: { host?: string | undefined; 'dry-run'?: boolean | undefined; setup?: string | undefined; 'draft-setup'?: boolean | undefined };
+export async function importCommand(args: string[], io: AgentIo, today: string = new Date().toISOString().slice(0, 10), now: () => Date = () => new Date()): Promise<number> {
+  let values: { host?: string | undefined; 'dry-run'?: boolean | undefined; setup?: string | undefined; 'draft-setup'?: boolean | undefined; since?: string | undefined };
   let positionals: string[];
   try {
-    ({ values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { host: { type: 'string' }, 'dry-run': { type: 'boolean' }, setup: { type: 'string' }, 'draft-setup': { type: 'boolean' } } }));
+    ({ values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { host: { type: 'string' }, 'dry-run': { type: 'boolean' }, setup: { type: 'string' }, 'draft-setup': { type: 'boolean' }, since: { type: 'string' } } }));
   } catch {
     io.say(USAGE);
     return 1;
   }
   const [source, file, ...more] = positionals;
-  if (source !== 'legacy' || !file || more.length > 0) {
+  /* THE MORNING READ NEEDS NO EXPORT AND NO HOST: it is what this machine remembers of the nights before, and the
+     host may be the very thing that did not answer at three in the morning. */
+  if (source === 'legacy' && values.since !== undefined && !file) {
+    if (values.since !== 'last' && !DAY.test(values.since)) {
+      io.say('--since takes a day as 2026-09-21, or last.');
+      return 1;
+    }
+    const got = sinceSaid(readRuns(io.home), values.since);
+    if (got.found === 0) {
+      io.say(got.lines.join(' '));
+      return 1;
+    }
+    for (const line of got.lines) io.out(line);
+    return 0;
+  }
+  if (source !== 'legacy' || !file || more.length > 0 || values.since !== undefined) {
     io.say(USAGE);
     return 1;
   }
@@ -825,6 +964,15 @@ export async function importCommand(args: string[], io: AgentIo, today: string =
     throw e;
   }
   for (const line of said(report, { dryRun: values['dry-run'] === true, file })) io.out(line);
+  /* A DRY RUN AND A RECORD SHORT OF ITS LISTS WROTE NOTHING, so neither is a night `--since` should report as carried.
+     A run the host stopped answering part way returned above, and is not remembered either: what it wrote is found
+     again and said as unchanged by the next one, which is the one sentence about it worth reading. */
+  if (values['dry-run'] !== true && report.missing.length === 0)
+    try {
+      rememberRun(io.home, runOf(report, { at: now().toISOString(), host: to.key, file }));
+    } catch {
+      io.say(`This run was imported but could not be remembered in ${runsFile(io.home)}, so --since will not show it.`);
+    }
   /* A CLASHING CATEGORY IS AN EXIT 1 LIKE A REFUSAL IS, because something he asked for is not in the record and the
      run's next step is his: clear the examples, or rename, and import again. */
   return report.missing.length > 0 || report.refused.length > 0 || report.clashes.length > 0 ? 1 : 0;

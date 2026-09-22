@@ -13,17 +13,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer, type Server } from 'node:http';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { draftSetup, KEY_PREFIX, ORDER, planLegacyTool, readLegacyTool, readSetup, spoken, type Plan, type Setup } from '../src/legacy.ts';
-import { applyPlan, importCommand, said, type Door, type Report } from '../src/import.ts';
+import { applyPlan, importCommand, runOf, said, sinceSaid, type Door, type Report } from '../src/import.ts';
 import type { AgentIo } from '../src/skills.ts';
 import { syntheticExport, syntheticSetup } from './legacy-export.ts';
 
 const TODAY = '2026-09-17';
+const USAGE_SAID =
+  'braindog import takes legacy <export.json> [--setup <setup.json>] [--host <host>] [--dry-run], or legacy <export.json> --draft-setup, or legacy --since <day or last>.';
 const plan = (o?: Parameters<typeof syntheticExport>[0]): Plan => planLegacyTool(syntheticExport(o), TODAY);
 const row = (p: Plan, key: string) => p.rows.find((r) => r.key === key);
 const skippedItems = (p: Plan, reason: RegExp) => p.skipped.filter((s) => reason.test(s.reason)).flatMap((s) => s.items);
@@ -734,7 +736,7 @@ test('the command reads the file, talks to the host over the API, and exits 0; a
   assert.equal(await importCommand(['legacy', 'nope.json'], io, TODAY), 1);
   assert.equal(say.at(-1), 'nope.json could not be read.');
   assert.equal(await importCommand(['notion', 'export.json'], io, TODAY), 1);
-  assert.equal(say.at(-1), 'braindog import takes legacy <export.json> [--setup <setup.json>] [--host <host>] [--dry-run], or legacy <export.json> --draft-setup.');
+  assert.equal(say.at(-1), USAGE_SAID);
 });
 
 test('example rows setting up planted, found beside the import, are said with where to clear them; none, and nothing is said', async () => {
@@ -795,4 +797,139 @@ test('the dry run lists each date, domain and service; a re-run changes none; a 
   const lines = said(report, { dryRun: false, file: 'export.json' });
   assert.ok(lines.includes('- This BrainDog has no Services list. Install Estate beside Solo founder, then run the import again to bring these in: lanternly.example renewing 2027-01-01, Game server.'));
   assert.ok(!lines.join(' ').includes('—'));
+});
+
+/* THE SHADOW WEEK (`loop/research-switch-matrix.md`, what to build next, item 4). The importer is run each night against a
+   fresh export, and the morning question is what moved in the old tool since the night before and whether it arrived. */
+
+test('A RUN IS REMEMBERED AS WHAT IT CARRIED, and --since last says the newest run by name: created, updated with the fields, refused, and newly left out', async () => {
+  const mem = memoryRecord(ALL);
+  const first = plan();
+  const one = runOf(await applyPlan(first, mem.door, { dryRun: false }), { at: '2026-09-20T03:00:00.000Z', host: 'app.brain.dog', file: 'export.json' });
+  assert.equal(one.updated.length, 0);
+  assert.ok(one.created.length > 20, 'the first night carries everything');
+
+  const later = planLegacyTool(syntheticExport({ mrr: 2100 }), TODAY);
+  later.rows.find((r) => r.key === 'legacy:task:101')!.fields.state = 'done';
+  later.rows.push({ register: 'learnings', key: 'legacy:learning:99', label: 'L99', fields: { lesson: 'Too short' } });
+  later.skipped.push({ reason: 'A thing BrainDog has no place for', items: ['New widget'] });
+  const two = runOf(await applyPlan(later, mem.door, { dryRun: false }), { at: '2026-09-21T03:05:00.000Z', host: 'app.brain.dog', file: 'export.json' });
+
+  const got = sinceSaid([one, two], 'last');
+  assert.equal(got.found, 1);
+  assert.deepEqual(got.lines, [
+    '2026-09-21 03:05 UTC into app.brain.dog, export of 2026-09-15:',
+    '- Updated in Tasks: #101 (state).',
+    '- Updated in Datapoints: lanternly Monthly revenue (value).',
+    '- Not carried, Learnings: L99. Too short. (OUT_OF_BOUNDS)',
+    '- Newly left out: New widget. A thing BrainDog has no place for.',
+  ]);
+  for (const line of got.lines) assert.ok(line.length <= 100, `a line a phone shows whole: ${line}`);
+  assert.ok(!got.lines.join(' ').includes('—'));
+});
+
+test('--since a date says every run from that day on, oldest first; a run that moved nothing says so; none in range is one sentence', async () => {
+  const mem = memoryRecord(ALL);
+  const one = runOf(await applyPlan(plan(), mem.door, { dryRun: false }), { at: '2026-09-19T03:00:00.000Z', host: 'h', file: 'e.json' });
+  const two = runOf(await applyPlan(plan(), mem.door, { dryRun: false }), { at: '2026-09-20T03:00:00.000Z', host: 'h', file: 'e.json' });
+  const three = runOf(await applyPlan(plan(), mem.door, { dryRun: false }), { at: '2026-09-21T03:00:00.000Z', host: 'h', file: 'e.json' });
+  const got = sinceSaid([one, two, three], '2026-09-20');
+  assert.equal(got.found, 2);
+  assert.deepEqual(got.lines, [
+    '2026-09-20 03:00 UTC into h, export of 2026-09-15:',
+    '- Nothing moved in the old tool since the run before.',
+    '',
+    '2026-09-21 03:00 UTC into h, export of 2026-09-15:',
+    '- Nothing moved in the old tool since the run before.',
+  ]);
+  /* WHAT WAS LEFT OUT ON BOTH NIGHTS IS NOT NEWS, so only the first run remembered says the whole of it. */
+  assert.ok(sinceSaid([one], 'last').lines.some((l) => l.startsWith('- Newly left out:')));
+  assert.deepEqual(sinceSaid([one, two, three], '2026-09-22'), { found: 0, lines: ['No import run is remembered on this machine since 2026-09-22.'] });
+  assert.deepEqual(sinceSaid([], 'last'), { found: 0, lines: ['No import run is remembered on this machine yet.'] });
+});
+
+test('the command remembers each run it writes in, not a dry run, and --since reads them back with no export and no host', async (t) => {
+  const server: Server = createServer((req, res) => {
+    const method = new URL(req.url ?? '/', 'http://stub').pathname.replace(/^\/api\//u, '');
+    req.resume();
+    req.on('end', () => {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      const value = method === 'list' ? { rows: [], cursor: null } : method === 'governance' ? [] : method === 'create' ? { id: 'e_1', seq: 1, version: 1, fields: {} } : method === 'propose' ? { id: 'SG1' } : {};
+      res.end(JSON.stringify({ ok: true, value }));
+    });
+  });
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => new Promise<void>((r) => server.close(() => r())));
+  const dir = mkdtempSync(join(tmpdir(), 'bd-import-since-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  writeFileSync(join(dir, 'export.json'), JSON.stringify(syntheticExport()));
+  const out: string[] = [];
+  const say: string[] = [];
+  const io: AgentIo = { env: { BRAINDOG_HOST: `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`, BRAINDOG_HOSTS: join(dir, 'hosts.json') } as never, cwd: dir, home: dir, out: (l) => out.push(l), say: (l) => say.push(l), headers: async () => ({}) };
+  const at = (iso: string) => () => new Date(iso);
+
+  assert.equal(await importCommand(['legacy', '--since', 'last'], io, TODAY), 1, 'nothing remembered yet');
+  assert.equal(say.at(-1), 'No import run is remembered on this machine yet.');
+
+  assert.equal(await importCommand(['legacy', 'export.json'], io, TODAY, at('2026-09-20T03:00:00.000Z')), 0);
+  assert.equal(await importCommand(['legacy', 'export.json', '--dry-run'], io, TODAY, at('2026-09-21T03:00:00.000Z')), 0);
+  out.length = 0;
+  assert.equal(await importCommand(['legacy', '--since', '2026-09-01'], io, TODAY), 0);
+  assert.equal(out.filter((l) => / UTC into /u.test(l)).length, 1, 'a dry run wrote nothing, so it is not a run to report');
+  assert.ok(out[0]!.startsWith('2026-09-20 03:00 UTC into http://127.0.0.1:'), out[0]);
+  assert.ok(out.some((l) => l.startsWith('- Created in Tasks: ')));
+
+  assert.equal(await importCommand(['legacy', '--since', 'yesterday'], io, TODAY), 1);
+  assert.equal(say.at(-1), '--since takes a day as 2026-09-21, or last.');
+  assert.equal(await importCommand(['legacy', 'export.json', '--since', 'last'], io, TODAY), 1);
+  assert.equal(say.at(-1), USAGE_SAID);
+});
+
+test('an update the record turned down is said once, as not carried; a clash is said; what was left out is compared with the same host only', async () => {
+  const mem = memoryRecord(ALL);
+  await applyPlan(plan(), mem.door, { dryRun: false });
+  const later = plan();
+  later.rows.find((r) => r.key === 'legacy:task:101')!.fields.state = 'done';
+  const door: Door = { ...mem.door, update: async (a) => (a.register === 'tasks' ? { ok: false, refusal: { code: 'OUT_OF_BOUNDS', fix: 'Not today.' } } : mem.door.update(a)) };
+  const report = await applyPlan(later, door, { dryRun: false });
+  const run = runOf({ ...report, clashes: [{ label: 'Client work', rows: 1, fix: 'Rename it.' }] }, { at: '2026-09-21T03:00:00.000Z', host: 'a', file: 'e.json' });
+  assert.deepEqual(run.updated, [], 'the change was recorded before the write, and the write was refused');
+  assert.deepEqual(sinceSaid([run], 'last').lines.filter((l) => l.startsWith('- Not carried')), ['- Not carried, Tasks: #101. Not today. (OUT_OF_BOUNDS)', '- Not carried, Categories: Client work. Rename it.']);
+
+  /* A NIGHT INTO ANOTHER HOST IS NOT "THE RUN BEFORE": the first run into `b` says the whole of what it left out. */
+  const onA = runOf(report, { at: '2026-09-20T03:00:00.000Z', host: 'a', file: 'e.json' });
+  const onB = runOf(report, { at: '2026-09-21T03:00:00.000Z', host: 'b', file: 'e.json' });
+  assert.ok(sinceSaid([onA, onB], 'last').lines.some((l) => l.startsWith('- Newly left out:')));
+});
+
+test('the runs file keeps the newest sixty, and a line it cannot read, or one missing a list, is passed over and not fatal', async (t) => {
+  const server: Server = createServer((req, res) => {
+    const method = new URL(req.url ?? '/', 'http://stub').pathname.replace(/^\/api\//u, '');
+    req.resume();
+    req.on('end', () => {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      const value = method === 'list' ? { rows: [], cursor: null } : method === 'governance' ? [] : method === 'create' ? { id: 'e_1', seq: 1, version: 1, fields: {} } : method === 'propose' ? { id: 'SG1' } : {};
+      res.end(JSON.stringify({ ok: true, value }));
+    });
+  });
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => new Promise<void>((r) => server.close(() => r())));
+  const dir = mkdtempSync(join(tmpdir(), 'bd-import-runs-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  writeFileSync(join(dir, 'export.json'), JSON.stringify(syntheticExport()));
+  const old = (d: number) => JSON.stringify({ at: `2026-07-${String(d).padStart(2, '0')}T03:00:00.000Z`, host: 'h', file: 'e.json', taken: null, created: [], updated: [], refused: [], skipped: [] });
+  mkdirSync(join(dir, '.braindog'));
+  const lines = [...Array.from({ length: 30 }, (_, i) => old(i + 1)), 'cut off {"at', '{"at":"2026-08-01T03:00:00.000Z","host":"h","created":[]}', ...Array.from({ length: 30 }, (_, i) => old(i + 1))];
+  writeFileSync(join(dir, '.braindog', 'imports.jsonl'), `${lines.join('\n')}\n`);
+  const out: string[] = [];
+  const say: string[] = [];
+  const io: AgentIo = { env: { BRAINDOG_HOST: `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`, BRAINDOG_HOSTS: join(dir, 'hosts.json') } as never, cwd: dir, home: dir, out: (l) => out.push(l), say: (l) => say.push(l), headers: async () => ({}) };
+
+  assert.equal(await importCommand(['legacy', '--since', '2026-07-01'], io, TODAY), 0, say.join(' '));
+  assert.equal(out.filter((l) => / UTC into /u.test(l)).length, 60);
+  assert.equal(await importCommand(['legacy', 'export.json'], io, TODAY, () => new Date('2026-09-20T03:00:00.000Z')), 0);
+  const kept = readFileSync(join(dir, '.braindog', 'imports.jsonl'), 'utf8').trim().split('\n');
+  assert.equal(kept.length, 60);
+  assert.ok(kept.at(-1)!.startsWith('{"at":"2026-09-20T03:00:00.000Z"'));
+  assert.equal(kept[0], old(2), 'the oldest run is the one let go');
 });
