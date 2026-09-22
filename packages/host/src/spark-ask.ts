@@ -116,7 +116,9 @@ export type SparkAskEngine<C> = {
  * key store is (`bd8add33`), and handed the asker's context so the vault's own gate runs on it
  * (`sparkByokFor` in `spark.ts`). The door reads nothing about tiers: it hands `propose` whatever
  * `byok` answers for this session, and when that answer is a refusal it is the answer, before the
- * engine is called, so a caller the vault turns away costs no model call. Where `byok` is absent the
+ * engine is called, so a caller the vault turns away costs no model call. A read asks it too and acts only on a
+ * refusal marked `hostKey`, which `sparkByokFor` writes when this host's own model is keyed from the vault, so the
+ * included model is held to the vault's gate wherever it would open a vault key. Where `byok` is absent the
  * settings door refuses tier `b` outright, because a stored tier `b` that no host can serve would make
  * every later `propose` answer `FORBIDDEN`.
  */
@@ -312,23 +314,29 @@ export async function serveSpark<C>(request: Request, door: SparkAskDoor<C>, ctx
 
   const engine = await built(door.engine);
   if (engine instanceof Response) return engine;
-  if (route === 'read') return answer(() => engine.read(question, ctx));
 
+  /* `byok` IS ASKED ON A READ TOO, AFTER THE ENGINE IS BUILT, because a read drafts on this host's model and that model can
+     be keyed from the vault. Before this a read never asked, and a read colleague with a fifty-minute-old proof read on
+     the owner's `spark` key with 200 and three `grant.read` rows signed `system` (`loop/research-batch-thirty-three-audit.md`
+     §2). A read acts only on a refusal marked `hostKey` and drops any adapter, since the proposal is not a read's to make.
+     After the build and not before, because the settings row `sparkGrantIdOf` reads is created by the build. */
   let byok: unknown;
   try {
     byok = door.byok ? await door.byok(ctx) : undefined;
   } catch (e) {
     return refusal(500, { code: 'INTERNAL', fix: `Your key could not be opened for Spark: ${e instanceof Error ? e.message : String(e)}.` });
   }
+  if (route === 'read') return refusedKey(byok) && byok.hostKey === true ? sparkReply({ ok: false, refusal: byok.refusal }) : answer(() => engine.read(question, ctx));
+
   /* A REFUSED OPENING IS THE ANSWER, AND THE ENGINE IS NOT ASKED. Handing the package `undefined` instead would reach
      its own `FORBIDDEN` only after pass one had drafted on this host's model, so a caller the vault refuses would
-     still have spent a call. */
-  if (refusedKey(byok)) return sparkReply(byok);
+     still have spent a call. Only `ok` and `refusal` go back: `hostKey` is this door's to read and not a caller's. */
+  if (refusedKey(byok)) return sparkReply({ ok: false, refusal: byok.refusal });
   return answer(() => engine.propose(question, ctx, byok, askId as string | undefined));
 }
 
 /** A `byok` answer that is the host refusing to open the key, as `sparkByokFor` writes one, and not an adapter. */
-const refusedKey = (value: unknown): value is { ok: false; refusal: Refusal } =>
+const refusedKey = (value: unknown): value is { ok: false; refusal: Refusal; hostKey?: unknown } =>
   typeof value === 'object' && value !== null && (value as { ok?: unknown }).ok === false && typeof (value as { refusal?: unknown }).refusal === 'object';
 
 const shown = (value: unknown): string => JSON.stringify(value) ?? String(value);

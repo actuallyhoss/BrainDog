@@ -400,8 +400,37 @@ export const SPARK_KEY_CLOSED: Refusal = {
   fix: 'Your key is not open in this session. Open the vault, or switch Spark to the included model.',
 };
 
+/**
+ * The sentence for an asker the vault refuses when the INCLUDED model is keyed from the vault, on any tier.
+ *
+ * NOT `SPARK_KEY_CLOSED`, whose advice is to switch to the included model: here the included model is the key that is
+ * closed, so that advice would send a colleague round in a circle. What opens it is the owner, recently signed in.
+ */
+export const SPARK_HOST_KEY_CLOSED: Refusal = {
+  code: 'FORBIDDEN',
+  fix: "Spark answers here on a key kept in this record's vault, which opens only for the owner signed in within the last fifteen minutes. Sign in again, or ask the owner.",
+};
+
+/**
+ * A refusal from `sparkByokFor` that stands in front of this host's own drafting as well as the proposal.
+ *
+ * `hostKey` IS WHAT TELLS THE DOOR TO REFUSE A READ WITH IT. A read never uses `byok`, so a refusal about tier `b`'s own
+ * grant is nothing to a read, and a colleague's read on an operator's `SPARK_KEY` must still answer. Only when the key
+ * this host drafts on is the vault's does the same refusal stop a read, and this flag is the one bit that says which.
+ */
+export type SparkKeyRefused = { ok: false; refusal: Refusal; hostKey?: true };
+
 /** What `sparkByokFor` needs of the record: the vault gate, asked through a read that writes no event, and the kernel. */
 export type SparkVaultApi = Pick<RecordApi, 'kernel' | 'listGrants'>;
+
+/**
+ * Whether this host's included model is keyed from the vault: no operator key, and a live grant labelled `spark`.
+ *
+ * THE SAME TEST `endpointOptionsOf`'s `own` makes, on the same rows, so the gate stands exactly where that path would open a
+ * grant and nowhere else. With no such grant the included model is called keyless, which opens nothing to gate.
+ */
+const hostKeyedFromVault = (config: SparkHostConfig, grants: () => readonly { label: string; revoked_at: string | null }[]): boolean =>
+  config.key === undefined && grants().some((g) => g.label === SPARK_KEY_LABEL && g.revoked_at === null);
 
 /**
  * Tier `b`'s adapter FOR THIS ASKER: the vault's own check on their session first, and every `grant.read` signed by them.
@@ -430,7 +459,22 @@ export type SparkVaultApi = Pick<RecordApi, 'kernel' | 'listGrants'>;
  * them, and `apps/selfhost/test/spark-byok-guard.test.ts` ("signed by her and not by system") is the case that would go
  * red if `actor` stopped reaching `wire`.
  *
- * `undefined` ON EVERY TIER BUT `b`, from `sparkGrantIdOf`, so nothing here stands in front of the included model.
+ * AND THE SAME GATE STANDS IN FRONT OF THE INCLUDED MODEL WHEN THAT MODEL IS KEYED FROM THE VAULT, on every tier. This
+ * function used to answer `undefined` on tier `a` without asking anything, and `endpointOptionsOf` keys the included model
+ * with the grant labelled `spark` whenever there is no `SPARK_KEY`, through an opener that signs `system`. Measured in
+ * `apps/selfhost/test/spark-included-guard.test.ts` before this line: Bo, at `read` with a proof fifty minutes old, answered
+ * `read=200 propose=200; 3 model calls; grant.read ["system","system","system"]`, every call on the owner's key
+ * (`loop/research-batch-thirty-three-audit.md` §2). So the gate now runs there too, and its refusal carries `hostKey`, which
+ * `serveSpark` reads to refuse a READ as well as a propose. A refusal about tier `b`'s own grant alone does not carry it,
+ * because a read on an operator's key opens nothing of the owner's and a colleague may ask it.
+ *
+ * WHAT THIS DOES NOT DO IS SIGN THE INCLUDED MODEL'S `grant.read` WITH THE ASKER. That engine is built once per host with no
+ * asker, and `@braindog/spark` calls `complete` with no context to carry one, so the owner's own fresh read is still logged
+ * `system`. The gate is what keeps anybody else from reaching the key; the log line needs the app to build that inference
+ * per asker, and the test file above keeps the case as a `todo` until it does.
+ *
+ * `undefined` WHERE NOTHING OF THE OWNER'S WOULD BE OPENED: tier `a` (from `sparkGrantIdOf`) on an operator key or a keyless
+ * endpoint, and tier `a` on the vault's key once the gate has let the asker through.
  */
 export async function sparkByokFor<A extends SparkVaultApi>(
   config: SparkHostConfig | undefined,
@@ -438,10 +482,13 @@ export async function sparkByokFor<A extends SparkVaultApi>(
   api: A,
   ctx: CallContext,
   wire: (api: A, actor: string) => SparkHostDeps,
-): Promise<SparkInference | { ok: false; refusal: Refusal } | undefined> {
-  if (!config || grantId === null) return undefined;
+): Promise<SparkInference | SparkKeyRefused | undefined> {
+  if (!config) return undefined;
+  const hostKey = hostKeyedFromVault(config, () => api.kernel.grants());
+  if (grantId === null && !hostKey) return undefined;
   const gate = await api.listGrants(ctx);
-  if (!gate.ok) return { ok: false, refusal: SPARK_KEY_CLOSED };
+  if (!gate.ok) return hostKey ? { ok: false, refusal: SPARK_HOST_KEY_CLOSED, hostKey: true } : { ok: false, refusal: SPARK_KEY_CLOSED };
+  if (grantId === null) return undefined;
   const actor = ctx.principal.kind === 'token' ? ctx.principal.person : ctx.principal.id;
   return sparkByokOf(config, wire(api, actor), grantId);
 }
@@ -459,7 +506,7 @@ export type SparkGuardDeps = {
   sql: Sql;
   clock: { now(): number };
   /** The record's vault rows, read on each settings save so a grant revoked a second ago counts, with the kind each holds. */
-  grants: () => readonly { id: string; kind: string; revoked_at: string | null }[];
+  grants: () => readonly { id: string; kind: string; label: string; revoked_at: string | null }[];
 };
 
 /**
@@ -579,6 +626,21 @@ export function sparkGuardedEngine<E extends Guarded>(engine: E, deps: SparkGuar
         refusal: {
           code: 'VALUE_MALFORMED',
           fix: 'That grant is not an API token, so Spark cannot answer with it. Choose the key your model provider gave you.',
+          at: 'grant_id',
+        },
+      };
+    /* AND IT MUST NOT BE THE KEY LABELLED `spark`, which is the included model's key on a host with no `SPARK_KEY`
+       (`endpointOptionsOf`). Measured in `apps/selfhost/test/spark-included-guard.test.ts`: the save answered 200, and
+       tier `b`'s promise that the owner's key opens only for the owner then held for the proposal and not for the draft
+       before it, which went out on the same key for anybody (`loop/research-batch-thirty-three-audit.md` §2). Refused
+       whatever this host's operator key is, because the guard is not told it, and the label is the included model's
+       either way: an operator who unsets `SPARK_KEY` would otherwise turn a tier `b` key into everybody's. */
+    if (held.label === SPARK_KEY_LABEL)
+      return {
+        ok: false,
+        refusal: {
+          code: 'VALUE_MALFORMED',
+          fix: 'That key is the one this host answers everybody with. Put your own key in the vault under another label, then choose it here.',
           at: 'grant_id',
         },
       };
