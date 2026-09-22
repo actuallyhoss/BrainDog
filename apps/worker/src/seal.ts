@@ -227,7 +227,45 @@ export function recipientOf(value: string): Uint8Array | string {
   }
   if (bits >= 5 || (acc & ((1 << bits) - 1)) !== 0 || bytes.length !== 32)
     return `AGE_RECIPIENT is not an age X25519 recipient: it decodes to ${String(bytes.length)} bytes and an X25519 key is 32. ${FIX}`;
-  return new Uint8Array(bytes);
+  const key = new Uint8Array(bytes);
+  if (lowOrder(key)) return `${LOW_ORDER} ${FIX}`;
+  return key;
+}
+
+/** The sentence for a recipient no secret can be agreed with. Said by `recipientOf`, and by `sealTo` as the backstop. */
+const LOW_ORDER = 'AGE_RECIPIENT is a low-order X25519 point, and nothing sealed to it would be secret.';
+
+/**
+ * Whether X25519 with `u` gives the all-zero secret for every private key, which is what the spec
+ * tells a sender to refuse.
+ *
+ * HERE AND NOT ONLY IN `sealTo`, BECAUSE THERE IT WAS SAID ONCE PER RECORD AND NEVER IN ITS OWN
+ * WORDS. The batch-sixteen audit (finding 8) built the nightly copier with the all-zero point and
+ * every `take()` threw; on Node, WebCrypto's `deriveBits` refused the all-zero secret itself, with
+ * "The operation failed for an operation-specific reason", before `sealTo`'s sentence was reached.
+ * `recipientOf` is synchronous and runs where the copier is built, so the check cannot ask WebCrypto.
+ *
+ * THREE DOUBLINGS AND NOT A LIST OF BAD KEYS. A clamped private key is 8 times a number smaller than
+ * either large prime subgroup order, of the curve or of its twist, so the secret is zero exactly
+ * when 8u is the point at infinity, which is Z = 0 after three x-only doublings. That covers every
+ * encoding at once, the non-canonical ones at and above p and the ones with bit 255 set included,
+ * and `test/seal-recipient.test.ts` holds it against Node's WebCrypto on all fourteen and on random keys.
+ */
+function lowOrder(key: Uint8Array): boolean {
+  const p = (1n << 255n) - 19n;
+  let u = 0n;
+  for (let i = 31; i >= 0; i--) u = (u << 8n) + BigInt(key[i] ?? 0);
+  /* RFC 7748 §5: the receiver masks bit 255 and reads the rest modulo p. */
+  u = (u & ((1n << 255n) - 1n)) % p;
+  let x = u;
+  let z = 1n;
+  for (let i = 0; i < 3; i++) {
+    const xx = (x * x) % p;
+    const zz = (z * z) % p;
+    const xz = (x * z) % p;
+    [x, z] = [(xx - zz) ** 2n % p, (4n * xz * ((xx + 486662n * xz + zz) % p)) % p];
+  }
+  return z === 0n;
 }
 
 /* ════════ The file ════════ */
@@ -269,8 +307,10 @@ export function sealTo(recipient: Uint8Array): (file: Uint8Array) => Promise<Uin
     const share = new Uint8Array(await subtle().exportKey('raw', pair.publicKey));
     const them = await subtle().importKey('raw', recipient, { name: 'X25519' }, true, []);
     const shared = new Uint8Array(await subtle().deriveBits({ name: 'X25519', public: them }, pair.privateKey, 256));
-    /* AN ALL-ZERO SECRET MEANS A LOW-ORDER RECIPIENT, and the spec says to refuse it rather than wrap to it. */
-    if (shared.every((b) => b === 0)) throw new Error('AGE_RECIPIENT is a low-order X25519 point, and nothing sealed to it would be secret.');
+    /* AN ALL-ZERO SECRET MEANS A LOW-ORDER RECIPIENT, and the spec says to refuse it rather than wrap
+       to it. `recipientOf` refuses one before a sealer exists, so this is for a caller that hands
+       `sealTo` raw bytes, and for a runtime whose WebCrypto returns the zeros instead of throwing. */
+    if (shared.every((b) => b === 0)) throw new Error(LOW_ORDER);
     const wrapKey = await hkdf(shared, concat(share, recipient), 'age-encryption.org/v1/X25519');
     const body = chacha20poly1305(wrapKey, new Uint8Array(12), fileKey);
 
