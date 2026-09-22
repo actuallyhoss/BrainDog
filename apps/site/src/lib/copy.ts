@@ -511,8 +511,19 @@ export const site = {
            * Kiln, asked `Kiln`, answers that row. The page says nothing about that either way,
            * because a door no screen reaches is not a feature a visitor can use, and this column is
            * about what they can use.
+           *
+           * AND A SCREEN ASKS IT NOW, SO THE SENTENCE MOVED AGAIN AND THE COLUMN STILL DID NOT.
+           * Since a331fe8c the palette offers a Spark row for a plain query of two characters or
+           * more that matched no place (`apps/web/src/lib/palette/spark.ts`, `offersSpark`), and
+           * asks through the client's `sparkRead` (`Palette.svelte`), which is why the grep above
+           * stopped measuring the screen: the address lives in `packages/client`, not in
+           * `apps/web`. The row appears only when `/api/version` reports a model and the record is
+           * live (`apps/web/src/routes/+layout.ts`); the sample is never live, and `SPARK_ENDPOINT`
+           * is still `""` in both environments. So a stranger still cannot ask, and the line says
+           * why in terms that stay true the day a model is configured somewhere.
+           * `src/lib/claims.test.ts` fails if the palette asks and this line says no screen does.
            */
-          'Asking your record a question in words. Nothing on a screen asks it, and no host here has a model behind it.',
+          'Asking your record a question in words. The app asks it where a model is configured, and no host here has one.',
           /* THE SECOND HALF IS NEW AND IT IS THERE TO STOP A CONTRADICTION. Both hosts opened an
              arrival door on 2026-09-20 and the changelog says so, so `Mail does not arrive by
              itself` on its own now reads as the page disagreeing with its own history page. The
@@ -639,6 +650,15 @@ export const site = {
      * with thirty kept on self-host (`apps/selfhost/src/backup.ts:4-15`,
      * `snapshots.ts:30`), and export as a live host-independent call
      * (`apps/web/src/lib/record/settings-write.ts:154-159`).
+     *
+     * THE HOSTED BACKUP CELL IS THE ONE THAT WAITS ON A SETTING, NOT ON CODE. The Worker keeps
+     * thirty nightly copies, each sealed to `AGE_RECIPIENT` (`apps/worker/src/snapshots.ts`,
+     * `seal.ts`). Both environments in `apps/worker/wrangler.jsonc` still hold the placeholder
+     * `age1<...-recipient>`, and `sealerOf` refuses a placeholder before the walk starts, so on
+     * 22 September no hosted copy was being written at all. `Nightly, thirty kept` was true of the
+     * code and of no copy. The cell says what a hosted record would get today, and
+     * `src/lib/claims.test.ts` fails if it stops saying so while the placeholder is there. When the
+     * owner sets the recipient, the `None yet.` half goes and the test's condition goes false.
      */
     compareTitle: 'What actually differs',
     compare: {
@@ -647,7 +667,7 @@ export const site = {
         ['The software', 'The same build', 'The same build'],
         ['Runs on', 'Your machine, one process, one port', 'Cloudflare, run by us'],
         ['Your record lives in', 'One file on your disk', 'A database of its own, never shared'],
-        ['Backups', 'Nightly, thirty kept', 'Nightly, thirty kept'],
+        ['Backups', 'Nightly, thirty kept', 'None yet. Nightly, thirty kept, once we set the key that seals them'],
         ['Leaving', 'Copy the file', 'Export the file, whenever you like'],
         ['Price', 'Free', '$12 a month, per record'],
       ],
@@ -665,6 +685,11 @@ export const site = {
   /**
    * THE PAGE A MISTYPED ADDRESS LANDS ON. Cloudflare serves it with a 404 for any path the build has
    * no file for (`not_found_handling` in `wrangler.jsonc`), in place of a blank white page.
+   *
+   * THE LEDE SAYS THIS IS EVERY PAGE, SO THE LIST HAS TO BE. `/agents` arrived on 6ef2193e, went
+   * into the header and the footer, and was missing here for a day: the one page claiming to list
+   * all of them was the one that did not. `src/lib/claims.test.ts` now reads the route directories
+   * and fails on a page this list or `static/sitemap.xml` leaves out.
    */
   notFound: {
     title: 'There is no page here',
@@ -672,6 +697,7 @@ export const site = {
     links: [
       { label: 'Home', href: '/' },
       { label: 'Pricing', href: '/pricing' },
+      { label: 'For agents', href: '/agents' },
       { label: 'Changelog', href: '/changelog' },
       { label: 'Legal', href: '/legal' },
     ],

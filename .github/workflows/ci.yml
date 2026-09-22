@@ -1,7 +1,7 @@
 name: ci
 
 # 52 §2's `ci.yml`, less most of the browser: install, typecheck, the whole suite and every gate
-# that reads source in `check`, and in `build` the app and the site built, plus the three gates that
+# that reads source in `check`, and in `build` the app and the site built, plus the gates that
 # read that build and are quick enough to wait for (`self-test`, `bundle`, `prefs`, `keys`, `passkey`,
 # `queue`). `layout` and `a11y` are `gates.yml`'s, and the reason for the split is at the top of that
 # file and beside the `--only` list below. The counts this line used to carry (fourteen and five) were
@@ -93,13 +93,12 @@ jobs:
       # `self-test` is excluded for the same reason at one remove. Five of its sixty-six seeded
       # negatives are browser gates, so without a build it catches sixty-one and says so, and its own
       # exit code is the failure rather than the runner's skip. The other sixty-one are worth having
-      # on every push, so the honest home for it is `build` below, the job that builds. It is not
-      # there yet because it seeds the fixed-port gates (see the comment on `build`'s last step), so
-      # until then `gates.yml` is where all sixty-six are driven.
+      # on every push, so its home is `build` below, the job that builds, and it has run there since
+      # `36cb6645`, once no gate it seeds held a fixed port (see the comment on `build`'s last step).
       #
       # NOT BUILDING IS DELIBERATE. `bundle`'s staleness guard makes the build a PREREQUISITE
       # rather than a step, so a job that builds must build everything the gates it runs measure,
-      # and that is `build` below for the three it can afford and `gates.yml` for the rest. Building
+      # and that is `build` below for the six it can afford and `gates.yml` for the rest. Building
       # here as well would pay for the same Vite builds twice in one push on a single runner.
       #
       # `deploy-parity` joins the excluded list for a different reason than the other eight: they
@@ -117,7 +116,7 @@ jobs:
     runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
     # Four Vite builds for the app (the shipped record plus the cloud, quiet and busy variants), one
     # for the site, and six gates that read them. The job took 2 min 39 s on studio-pc on 21
-    # September before the gates were added, and the three measured 6.4 s in `gates.yml` run
+    # September before the gates were added, and the first three (`bundle`, `passkey`, `queue`) measured 6.4 s in `gates.yml` run
     # 35587734418. `self-test`, `prefs` and `keys` add about 4.5 minutes (measured once), which is
     # why the ceiling moved from 15 to 20: a ceiling for a hang, not a budget.
     timeout-minutes: 20
