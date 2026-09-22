@@ -1844,7 +1844,32 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (/^(?:grant|access|share)\./u.test(e.kind) || ['grant', 'vault_key', 'device_grant', 'member', 'person'].includes(kind ?? ''))
       return allows(ctx, 'owner') === null ? bare : null;
     if (id.startsWith('register.')) return readable(ctx, id.slice('register.'.length)) ? null : bare;
-    return wholeRecord(ctx) ? bare : null;
+    return wholeRecord(ctx) ? logOf(ctx, bare) : null;
+  };
+
+  /**
+   * A script run's line with what the script logged, for whoever may read it, and with the log as `--redacted--` for
+   * everybody else, who is still shown that it ran, its outcome, its counts and its 280-character sentence.
+   *
+   * THE OWNER WHO ADMINISTERS THE SCRIPT, AND WHO READS EVERY LIST IT TOUCHED. The run line is about a declaration, and
+   * `lineOf` hands those to every whole-record reader, so a member at `write` held to `append` on Money, refused
+   * `list money`, read "Salary: Omar 91000" off it in `recentHistory` and `whatsNew`, while the row the same run wrote
+   * showed its money field as `--redacted--` (`loop/research-batch-thirty-five-audit.md` §1, `script-log-visibility.test.ts`).
+   * The log is free text, so no field redaction reaches into it: the only redaction there is is to whom it is shown.
+   * `admin` is the door that resumes the script, so a token, even the owner's, never reads it; an owner another owner
+   * held to `append` on Money is not shown it either, and one held lower on a list the script never touched is.
+   *
+   * `--redacted--` AND NOT AN ABSENT FIELD, for the ledger's reason: "recorded and withheld" is not "nothing was said".
+   *
+   * A RUN FROM BEFORE `to_v.lists` WAS KEPT names no lists, and is read as touching all of them, so it goes to an owner
+   * who reads every list and to nobody else.
+   */
+  const logOf = (ctx: CallContext, line: Walked): Walked => {
+    const to = line.to;
+    if (to === null || typeof to !== 'object' || Array.isArray(to) || !('log' in to)) return line;
+    const lists = Array.isArray(to.lists) ? to.lists.filter((l): l is string => typeof l === 'string') : null;
+    const reads = lists === null ? readsEveryList(ctx) : lists.every((list) => readable(ctx, list) === null);
+    return admin(ctx) === null && reads ? line : { ...line, to: { ...to, log: '--redacted--' } };
   };
 
   /* A BATCH IS WHAT ONE STATEMENT READS, AND THE CAP IS WHAT ONE CALL WILL WALK. A caller who may see one register of a
@@ -1984,6 +2009,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * owner. Reading the list's level INSTEAD of the record's was tried first and was wrong the other way: `members.ts`
    * also accepts a member at `append` invited as `owner` of Projects alone, and her key landed `colour` at version 2,
    * while `decide` refuses her for want of the whole record.
+   *
+   * AND EVERY LIST AN ADDED FIELD POINTS AT, THE KEY READS. A `ref` (or a `list` of them) names a second list in its
+   * `to`, and this asked only about the first. `loop/research-batch-thirty-five-audit.md` §5 measured an owner's key held
+   * to Projects adding `paid_by: ref to money` with no press, and then writing `money#1` into it (answered `ok`) and
+   * `money#99` (answered "there is no such row"): which Money rows exist, learned through the write path's own check by
+   * a key that `list money` refuses. So a field whose `to` names a list the key cannot read is filed and waits, and the
+   * owner who presses it is the one deciding that Projects may point into Money. `add-ref-probe.test.ts` is the probe.
    */
   const byRule = (args: Proposal, ctx: CallContext): boolean => {
     if (ctx.principal.kind !== 'token' || args?.body_kind !== 'change') return false;
@@ -1995,6 +2027,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const list = said.startsWith('register.') ? said.slice('register.'.length) : said;
     const there = Object.hasOwn(ctx.levels ?? {}, list) ? ctx.levels?.[list] : 'owner';
     if (ctx.principal.level !== 'owner' || there !== 'owner') return false;
+    /* ANY `to` ON AN ADDED FIELD, WHATEVER ITS TYPE. The install's lint decides which types may carry one, and a `to`
+       this let through because its type looked harmless would be the same oracle under another name. The id is asked
+       as written: `to: 'register.money'` is refused `REGISTER_UNRESOLVED` at filing, before this is reached. */
+    const fields = (add as { fields?: unknown }).fields;
+    const into = (Array.isArray(fields) ? fields : []).map((f) => (f !== null && typeof f === 'object' ? (f as { to?: unknown }).to : undefined));
+    if (into.some((target) => typeof target === 'string' && readable(ctx, target) !== null)) return false;
     return guard(ctx, 'propose', list) === null;
   };
 

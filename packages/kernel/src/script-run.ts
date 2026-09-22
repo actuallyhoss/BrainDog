@@ -131,11 +131,22 @@ function cutLog(log: string): string {
  * else. The owner reads it where every run is read, `recentHistory`, whose `to` is this `to_v`: that is where a refused
  * run's "why" was already one 280-character sentence, and the log is what explains the sentence.
  *
+ * AND THE LISTS THE VERSION READ AND WROTE GO BESIDE IT, as `to_v.lists`, because the log quotes them and nobody else
+ * should read it. A run line is about a declaration, and the record hands a line about a declaration to every
+ * whole-record reader, so a member at `write` held to `append` on Money, refused `list money`, read "Salary: Omar 91000"
+ * off the run line in `recentHistory` and `whatsNew` (`loop/research-batch-thirty-five-audit.md` §1). `lineOf` in
+ * `@braindog/record` now hands the log only to an owner who reads every one of these lists, and `--redacted--` to
+ * everybody else, as the ledger hands a money field. They are kept here rather than looked up there because the run
+ * outlives its version: the list a retired version read is the one its log quotes. The writes count too, because a
+ * log can quote what a fetch brought back before it was written into a list the reader is refused.
+ *
  * AN EMPTY LOG ADDS NOTHING, so a script that says nothing leaves the event exactly as a `call`'s.
  */
-function keepLog(deps: Pick<ScriptRunDeps, 'sql'>, metered: Metered, log: string): Metered {
-  if (typeof log === 'string' && log !== '')
-    deps.sql.exec("UPDATE event SET to_v = json_set(to_v, '$.log', ?) WHERE id = ?", cutLog(log), metered.event);
+function keepLog(deps: Pick<ScriptRunDeps, 'sql'>, metered: Metered, log: string, decl: Pick<ScriptBody, 'reads' | 'writes'>): Metered {
+  if (typeof log === 'string' && log !== '') {
+    const lists = [...new Set([...decl.reads, ...decl.writes])].sort();
+    deps.sql.exec("UPDATE event SET to_v = json_set(to_v, '$.log', ?, '$.lists', json(?)) WHERE id = ?", cutLog(log), JSON.stringify(lists), metered.event);
+  }
   return metered;
 }
 
@@ -239,7 +250,7 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
 
   const spent = { requests: answer.usage.fetches, bytes: answer.usage.bytes, ms: answer.usage.wall_ms };
   const refuse = (say: string): Metered => {
-    const metered = keepLog(deps, meter(deps, { ...base, ...spent, outcome: 'refused', failures: 1 }, say), answer.log);
+    const metered = keepLog(deps, meter(deps, { ...base, ...spent, outcome: 'refused', failures: 1 }, say), answer.log, decl);
     pauseAfterRefusals(deps, script);
     return metered;
   };
@@ -320,6 +331,7 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
       deps,
       meter(deps, { ...base, ...spent, outcome: 'dropped', failures: 0 }, `${script} ran, and another host holds its job now, so what it wrote was not applied here.`),
       answer.log,
+      decl,
     );
   if (!applied.ok) {
     /* THE ACK WAS ROLLED BACK WITH THE WRITES, so it is made again on its own. */
@@ -332,6 +344,7 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
     deps,
     meter(deps, { ...base, ...spent, outcome: 'ok', failures: 0 }, `${script} ran and wrote ${n === 0 ? 'nothing' : n === 1 ? 'one row' : `${n} rows`}.`),
     answer.log,
+    decl,
   );
 }
 
