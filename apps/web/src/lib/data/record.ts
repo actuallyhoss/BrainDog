@@ -172,15 +172,22 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
     async schema(register) {
       const kept = declared.get(register);
       if (kept) return { ok: true, value: relabel(kept, labels()) };
-      const out = said(await schemaOf(register));
-      if (!out.ok) return out;
-      const decl = declOf(out.value as RegisterDecl);
-      declared.set(register, decl);
       /* AND KEPT IN `REGISTERS` THROUGH `learn`, because every cell is formatted through `display` and RowForm draws
          `readableFields`, and both read the list from there. A use case's list drew a datapoint's When as the raw instant,
          and this once skipped any list the build ships, so a list screen opened first in a tab drew the bundle's RowForm
-         with no field added at run time on it (`field-added.test.ts`). */
-      await learn(schemaOf, register, asked);
+         with no field added at run time on it (`field-added.test.ts`).
+
+         `learn` IS WHAT SENDS THE QUESTION, BEFORE ANYTHING IS AWAITED, so its ticket is taken when the question goes out.
+         This awaited the answer first and called `learn` after, which handed it the cached, older promise under a newer
+         ticket: a question sent before an add and answered after it outranked the add's own and put Projects back without
+         the added field, and the next boot kept that (`loop/research-batch-thirty-three-audit.md` §7). `schemaOf` then
+         hands back the promise `learn` just sent, so the list is still asked once. */
+      const learnt = learn(schemaOf, register, asked);
+      const out = said(await schemaOf(register));
+      await learnt;
+      if (!out.ok) return out;
+      const decl = declOf(out.value as RegisterDecl);
+      declared.set(register, decl);
       return { ok: true, value: relabel(decl, labels()) };
     },
     page: (register, a, cursor) => ask(register, a, cursor, PAGE),

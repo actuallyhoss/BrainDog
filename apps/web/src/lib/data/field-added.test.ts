@@ -107,3 +107,57 @@ test('A LIST SCREEN OPENED FIRST IN A TAB HAS THE FIELD, and asks the record abo
   assert.ok(ids().includes('launched'), 'the next boot lost it');
   REGISTERS.things = BUNDLED;
 });
+
+/*
+ * THE LIST SCREEN'S QUESTION SENT BEFORE THE ADD AND ANSWERED AFTER IT (`loop/research-batch-thirty-three-audit.md` §7).
+ * `learn` keeps the newest ticket per list, but the Source sent its `schema` first and took the ticket only once the
+ * answer was back, so the slow, older answer carried a newer ticket than the add's and put Projects back without
+ * `launched`: measured true after the add, false once the slow answer landed, false after the next boot.
+ */
+test('A LIST SCREEN WHOSE QUESTION WAS OUT BEFORE AN ADD DOES NOT PUT THE LIST BACK when its answer lands after it', async () => {
+  REGISTERS.things = BUNDLED;
+  relabelAll(REGISTERS, {});
+  forget();
+  let added = false;
+  let release: () => void = () => {};
+  const slow = new Promise<void>((resolve) => (release = resolve));
+  let first = true;
+  const io = (async (url: string | URL | Request, init?: RequestInit) => {
+    const at = new URL(String(url));
+    const name = at.pathname.replace(/^\/api\//u, '');
+    const args = (init?.body ? JSON.parse(String(init.body)) : Object.fromEntries(at.searchParams)) as Record<string, unknown>;
+    if (name === 'boot') return json(200, { ok: true, value: { registers: [{ id: 'things', name: 'Projects', count: 0 }], now: '2026-09-22T09:00:00.000Z' } });
+    if (name === 'schema' && args.register === 'things') {
+      /* THE SCREEN'S QUESTION goes out while Projects is still as it was, and its answer is held until after the add. */
+      if (first) {
+        first = false;
+        const before = added ? LIVE : BUNDLED;
+        await slow;
+        return json(200, { ok: true, value: before });
+      }
+      return json(200, { ok: true, value: added ? LIVE : BUNDLED });
+    }
+    if (name === 'schema') return json(200, { ok: true, value: REGISTERS[String(args.register)] });
+    if (name === 'propose') return json(200, { ok: true, value: { id: 's_1' } });
+    if (name === 'decide') {
+      added = true;
+      return json(200, { ok: true, value: {} });
+    }
+    return json(200, { ok: true, value: { rows: [], matched: 0, cursor: null } });
+  }) as Fetch;
+  globalThis.fetch = io as typeof fetch;
+
+  const source = await open();
+  const screen = source.schema('things');
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.deepEqual(await addField(BASE, 'things', { id: 'launched', label: 'Launched', type: 'day' }, true, io), { from: 'added' });
+  assert.ok(ids().includes('launched'), 'the add did not reach this tab');
+
+  release();
+  await screen;
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.ok(ids().includes('launched'), `the screen's older answer put the bundle's Projects back: ${ids().join(', ')}`);
+  relabelAll(REGISTERS, {});
+  assert.ok(ids().includes('launched'), 'the next boot kept the list from before the add');
+  REGISTERS.things = BUNDLED;
+});
