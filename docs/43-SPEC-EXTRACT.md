@@ -273,10 +273,23 @@ meaning one thousand two hundred and fifty dinars reads as 1.250.
 The number is never a float. `Number()` is applied to a digit string once, after padding the fraction to `e`.
 
 **Date format.** Tokens `YYYY` (4 digits) · `YY` (2, read as 20YY) · `MM` · `DD` (exactly 2) · `M` · `D` (1 or 2,
-greedy). Every other character is a literal matching itself. A format must hold one year, one month and one
-day token, and a variable-width token must be followed by a literal or the end; otherwise `DATE_FORMAT_INVALID`.
-A match is bounded: the character before the first token and after the last is not a digit. The day must exist
-in the Gregorian calendar (leap years included). Output `YYYY-MM-DD`.
+greedy) · `MON` (a month as an English three-letter name, `JAN` to `DEC`, in any case). Every other character is
+a literal matching itself. A format must hold one year, one month (`MM`, `M` or `MON`) and one day token, and a
+variable-width token must be followed by a literal or the end, `MON` included; otherwise `DATE_FORMAT_INVALID`.
+A match is bounded: the character before the first token and after the last is not a digit, and where that
+token is `MON`, not a letter either. The day must exist in the Gregorian calendar (leap years included). Output
+`YYYY-MM-DD`.
+
+**`MON`, not `MMM`.** HSBC Egypt's general account line dates itself `16AUG26`, and before this token that
+wording could not be declared: `DDMMMYY` is `DD`, `MM`, `M`, `YY`, two month tokens, refused at install. `MMM
+DD YYYY` is §9.3's worked refusal for exactly that, held by `test/date.test.ts` and by the kernel's own lint
+(`declare.ts`'s `dateFormatFault`), so giving `MMM` a meaning would reverse a refusal three places hold. `MON` is
+the spelling Oracle's `TO_DATE` uses, and no format that installed before it could have held it as a literal,
+because `M` was already a token. The kernel's lint does not know `MON` by name: it reads it as `M` then the
+literal `ON`, which counts one month and refuses `DMON` for the same reason this package does, so the two
+readers agree on every format and a `DDMONYY` pattern installs (measured, `packages/seed/test/money-bank.test.ts`).
+Only three-letter English names: `SEPT` and `JUNE` are not months here, and a longer table is a guess about which
+language a message is written in.
 
 ### 4.4 · The JSON path subset
 
@@ -429,8 +442,10 @@ fraction; `decimal` treats `sep` as the point (at most once) and the rest as gro
 significant digits; the value is `Number(digits + '.' + fraction)`.
 
 **Date.** Compile `format` once per call into tokens (cached per string in a `Map` of ≤ 64 entries). At each
-index whose predecessor is not a digit, match tokens in order — fixed widths exactly, `D`/`M` greedily to two —
-and literals by equality; require a non-digit after the last token; validate month 1–12 and day 1–days-in-month;
+index whose predecessor is not a digit, match tokens in order (fixed widths exactly, `D`/`M` greedily to two,
+`MON` as three ASCII letters folded and looked up in the twelve names)
+and literals by equality; require a non-digit after the last token (and a non-letter beside a `MON` at either
+edge); validate month 1–12 and day 1–days-in-month;
 emit `YYYY-MM-DD`; continue at the next index.
 
 **Enum / lookup.** For each literal (or each `value` from `ctx.lookup(register, by)`), `indexOf` its fold in the
@@ -655,6 +670,18 @@ every test is `{ EGP: {2}, USD: {2, '$'}, CAD: {2, '$'}, EUR: {2, '€'}, JPY: {
 | any | `DD/MM` · `MMM DD YYYY` · `DMYYYY` | throws `DATE_FORMAT_INVALID` (no year · two month tokens · variable width before a digit token) |
 | `29082026` | `DDMMYYYY` | `2026-08-29` — fixed widths need no separator |
 
+Month names, `test/date-month-names.test.ts`:
+
+| Input | Format | → |
+|---|---|---|
+| `16AUG26` · `16Aug26` · `16aug26` | `DDMONYY` | `2026-08-16`, in any case |
+| `Aug 16 2026` | `MON DD YYYY` | `2026-08-16` |
+| `16-Sep-2026` | `DD-MON-YYYY` | `2026-09-16` |
+| `29FEB24` · `29FEB26` | `DDMONYY` | `2024-02-29` · undefined |
+| `16AUX26` · `16SEPT26` | `DDMONYY` | undefined, not one of the twelve names |
+| `XAug 16 2026` | `MON DD YYYY` | undefined, a letter touches the name |
+| any | `DDMONMMYY` · `DMONYY` | throws `DATE_FORMAT_INVALID` (two month tokens · variable width before a token) |
+
 ### 9.4 · Formats — `test/formats.test.ts`
 
 | Case | Input | → |
@@ -724,7 +751,7 @@ package: `graph` (imports `where` only), `closed-lists` (`EXTRACTORS` + `COMBINA
 
 - `ponytail: no Unicode normalisation; a decomposed payload misses a composed anchor — add String.normalize('NFC') on text and literals when a real message needs it.`
 - `ponytail: YY is always 20YY — add a pivot key to the date form when a pre-2000 date is ever extracted.`
-- `ponytail: no month names (MMM); add the token when the 50-message test of 21 §13 needs it — never regex.`
+- `ponytail: month names are English and three letters (MON, §4.3), added on September 22nd 2026 for HSBC Egypt's 16AUG26; a full name (August) or another language waits for a bank that prints one, and never by regex.`
 - `ponytail: exponent-3 currencies read a lone separator + 3 digits as the decimal point; KWD 1,250 meaning 1,250 dinars is misread — add decimal: "." | "," to the money form when a real ledger hits it. This key would name the DECIMAL POINT, the same thing §4.3's decimal.sep names, and not the thousands character: the kernel's money form carried a sep that meant the other one and it was removed on September 19th 2026 because the digit rule above already answers every text it was added for. A money form that gets this key gets §4.3's meaning or it gets neither.`
 - `ponytail: trailing minus (1,250.00-) and DR/CR suffixes are not read; add when a statement uses them — the sign rule is one branch.`
 - `ponytail: a symbol two table rows share resolves to none; declare currency: — a locale hint is not worth a key until a second currency table exists. The record's own table, built from Intl.supportedValuesOf('currency') on September 20th 2026, carries codes and NO symbols, so an unambiguous symbol reads nothing there rather than being guessed — the answer an ambiguous one gets. Adding symbols is a data decision; reading an unambiguous code is not.`

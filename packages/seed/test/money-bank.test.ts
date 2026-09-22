@@ -19,6 +19,11 @@
  * through `@braindog/record`'s `createRecordApi` over `installSeed`, outside this file: the card and
  * all three transfers came back `matched` at `exact` in EGP (128450, 325000, 1240000 and 61575
  * minor units), each on the account its digits name, and the two `From HSBC:` lines `untriaged`.
+ *
+ * THAT RECORD-LEVEL RUN IS NOW A TEST, `packages/record/test/money-ipn.test.ts`, because a run outside
+ * the tree checks nothing the next day: the checker of `aeef01c5` flipped `bank-ipn-in`'s direction
+ * and this file stayed green, since a bare kernel never writes a transfer's row. What each pattern
+ * WRITES is asserted there; what each pattern CLAIMS is asserted here.
  */
 
 import { test } from 'node:test';
@@ -157,35 +162,41 @@ test('AN INSTAPAY TRANSFER IS CLAIMED BY ITS OWN PATTERN IN EACH DIRECTION, and 
   assert.equal(k.count('transactions'), before, 'a transfer with no date wrote a row');
 });
 
-test('THE GENERAL `From HSBC:` LINE IS STORED AND CLAIMED BY NOTHING, because two of its fields cannot be said in the closed vocabulary', async () => {
+test('THE GENERAL `From HSBC:` DEBIT IS CLAIMED BY ITS OWN PATTERN, and the credit, whose only sign is a missing hyphen, by nothing', async () => {
   const { k } = await bank();
   const before = k.count('transactions');
 
-  for (const [body, sha] of [
-    [FROM_OUT, 'from-out'],
-    [FROM_IN, 'from-in'],
-  ] as const) {
-    const out = forward(k, body, sha);
-    assert.equal(out.state, 'untriaged', `${sha} was claimed by ${out.ingest}: ${out.reason}`);
-    assert.equal(out.ingest, null);
-  }
-  assert.equal(k.count('transactions'), before, 'a line nothing can read wrote a row');
+  /**
+   * CLAIMED SINCE `43 §4.3` GREW `MON`. Before it the wording could not be declared at all: `DDMMMYY`
+   * is two month tokens and was refused at install as DATE_FORMAT_INVALID, which this test asserted
+   * until the token landed. `DDMONYY` installs, because `installSeed` installed it above.
+   *
+   * A BARE KERNEL NAMES `amount` AND `on` AS UNREAD, and both are about this package having no reader
+   * wired rather than about the pattern. The kernel's own date reader holds four named formats and
+   * `DDMONYY` is not one; its own money reader finds no second figure in the slice `327 EGP 2500.00`
+   * (measured: the reason names `amount`), where `@braindog/extract`'s finds the account digits and
+   * then the figure, which is why the form counts to the second. What the row says is asserted where the readers are:
+   * `packages/record/test/money-ipn.test.ts`.
+   */
+  const out = forward(k, FROM_OUT, 'from-out');
+  assert.equal(out.ingest, 'bank-from-out', `from-out was claimed by ${out.ingest}`);
+  assert.equal(out.state, 'review', out.reason ?? '');
+  assert.match(out.reason ?? '', /^bank-from-out could not read amount, on /u, `from-out named something else: ${out.reason}`);
 
   /**
-   * THE DAY IS A MONTH NAME, AND `43 §4.3` HAS NO TOKEN FOR ONE. `16AUG26` needs a three-letter
-   * month, and the grammar reads `MMM` as `MM` then `M`: two month tokens, which is its own worked
-   * failure. Measured at the door rather than read off `declare.ts`: a pattern over this wording is
-   * refused at install, so it cannot be written.
-   *
-   * AND THE SIGN IS PUNCTUATION. A debit is `2500.00-` and a credit is `418.62` with nothing after
-   * it, so there is no word for `enum` to map and nothing to write in `none:`. A pattern that read
-   * this line would have to state its direction with `default:`, which files at `proposed`.
-   *
-   * AND `balance is` IS ON THE SKIP LIST, because the other alerts that say it are positions and not
-   * movements, so this wording would be skipped even by a pattern that matched it. Untriaged is the
-   * right place for it until the grammar can say both: stored, on a screen a person reads.
+   * THE CREDIT HAS NO PATTERN. Its sign is the hyphen being absent, and a `match:` that reads absence
+   * as money in would take a debit whose hyphen arrived touching the next word (`2500.00-Your`) and file it IN at
+   * `exact`. `money.ts` has the argument at length above `bank-from-out`.
    */
-  const monthName = await k.install([
+  const credit = forward(k, FROM_IN, 'from-in');
+  assert.equal(credit.state, 'untriaged', `from-in was claimed by ${credit.ingest}: ${credit.reason}`);
+  assert.equal(credit.ingest, null);
+  assert.equal(k.count('transactions'), before, 'a bare kernel wrote a row it could not read');
+
+  /* AND `MMM` STILL MEANS `MM` THEN `M`. The month name is `MON`, and `43 §9.3`'s worked refusal for
+     two month tokens is unchanged, so a pattern written the obvious way is still turned away at the
+     door with the code that says why. */
+  const mmm = await k.install([
     {
       id: 'ingest.hsbc-from',
       kind: 'ingest',
@@ -199,8 +210,8 @@ test('THE GENERAL `From HSBC:` LINE IS STORED AND CLAIMED BY NOTHING, because tw
       } as never,
     },
   ]);
-  assert.equal(monthName.ok, false, 'a date format with a month name installed');
-  assert.equal((monthName as { refusal?: { code: string } }).refusal?.code, 'DATE_FORMAT_INVALID');
+  assert.equal(mmm.ok, false, 'DDMMMYY installed, so MMM has quietly become a token');
+  assert.equal((mmm as { refusal?: { code: string } }).refusal?.code, 'DATE_FORMAT_INVALID');
 });
 
 test('NO WORDING IS CLAIMED BY TWO PATTERNS, so the order they are declared in decides nothing', async () => {

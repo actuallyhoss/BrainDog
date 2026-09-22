@@ -11,8 +11,11 @@
  * one index that only advances, so there is nothing to backtrack and nothing for a payload to make expensive.
  */
 
-/** A compiled format: fixed-width and variable-width field tokens, and literal runs that match themselves. */
-type Token = { kind: 'Y4' | 'Y2' | 'M2' | 'D2' | 'M1' | 'D1' } | { kind: 'lit'; text: string };
+/**
+ * A compiled format: fixed-width and variable-width field tokens, a month written as a name (`MN`), and
+ * literal runs that match themselves.
+ */
+type Token = { kind: 'Y4' | 'Y2' | 'M2' | 'D2' | 'M1' | 'D1' | 'MN' } | { kind: 'lit'; text: string };
 
 export type DateFormatInvalid = { code: 'DATE_FORMAT_INVALID'; at: string; fix: string };
 
@@ -51,6 +54,7 @@ function compile(format: string): readonly Token[] {
 
   for (let i = 0; i < format.length; ) {
     const four = format.slice(i, i + 4);
+    const three = format.slice(i, i + 3);
     const two = format.slice(i, i + 2);
     if (four === 'YYYY') {
       flush();
@@ -60,6 +64,12 @@ function compile(format: string): readonly Token[] {
       flush();
       tokens.push({ kind: 'Y2' });
       i += 2;
+    } else if (three === 'MON') {
+      /* CHECKED BEFORE `MM` AND `M`, which cannot start it anyway: `MON` begins with one `M` and then a
+         letter no token uses, so `MMON` is still `MM` and a literal `ON`, exactly as it read before. */
+      flush();
+      tokens.push({ kind: 'MN' });
+      i += 3;
     } else if (two === 'MM') {
       flush();
       tokens.push({ kind: 'M2' });
@@ -84,16 +94,20 @@ function compile(format: string): readonly Token[] {
   flush();
 
   const count = (kinds: readonly Token['kind'][]) => tokens.filter((t) => kinds.includes(t.kind)).length;
-  if (count(['Y4', 'Y2']) !== 1 || count(['M2', 'M1']) !== 1 || count(['D2', 'D1']) !== 1)
+  if (count(['Y4', 'Y2']) !== 1 || count(['M2', 'M1', 'MN']) !== 1 || count(['D2', 'D1']) !== 1)
     throw invalid(
       'date.format',
-      'A format holds exactly one year token (YYYY or YY), one month token (MM or M) and one day token (DD or D).',
+      'A format holds exactly one year token (YYYY or YY), one month token (MM, M or MON) and one day token (DD or D).',
     );
 
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i]!;
     if (t.kind !== 'M1' && t.kind !== 'D1') continue;
     const next = tokens[i + 1];
+    /* `D` RUN INTO `MON` IS REFUSED TOO, although a digit and a letter can always be told apart. The
+       kernel's `declare` lints a format before this ever sees one, and it reads `DMON` as `D` then `M`,
+       which it refuses; a format this package accepted and the door refused would be a rule nobody can
+       reach. `DDMON` costs one character and reads everywhere. */
     if (next !== undefined && next.kind !== 'lit')
       throw invalid(
         'date.format',
@@ -134,6 +148,27 @@ function greedy(text: string, at: number): { value: number; next: number } | nul
   return { value: Number(text.slice(at, at + width)), next: at + width };
 }
 
+/**
+ * English three-letter month names, in calendar order.
+ *
+ * ENGLISH ONLY, AND ONLY THREE LETTERS, because that is what the bank this was written for prints
+ * (`16AUG26`) and a longer list is a list of guesses: `SEPT`, `JUNE` and a French `AOÛT` are each somebody's
+ * month, and a table that held them would have to decide which language a message is in before it could
+ * read a day out of it. A four-letter name is not a month here; it is a date that is reviewed.
+ */
+const MONTH_NAMES = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'] as const;
+
+const isLetter = (ch: string | undefined): boolean => ch !== undefined && ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z'));
+
+/** Read three letters that name a month, in any case, or nothing. */
+function monthName(text: string, at: number): { value: number; next: number } | null {
+  if (at + 3 > text.length) return null;
+  const three = text.slice(at, at + 3);
+  for (let i = 0; i < 3; i++) if (!isLetter(three[i])) return null;
+  const index = (MONTH_NAMES as readonly string[]).indexOf(three.toLowerCase());
+  return index === -1 ? null : { value: index + 1, next: at + 3 };
+}
+
 /** One attempt, starting at `at`. Returns the day and where it ended, or null. */
 function matchAt(text: string, at: number, tokens: readonly Token[]): { day: string; end: number } | null {
   let i = at;
@@ -141,6 +176,8 @@ function matchAt(text: string, at: number, tokens: readonly Token[]): { day: str
   let month: number | null = null;
   let day: number | null = null;
   let firstToken = -1;
+  let firstKind: Token['kind'] | null = null;
+  let lastKind: Token['kind'] | null = null;
   let lastEnd = -1;
 
   for (const t of tokens) {
@@ -149,20 +186,26 @@ function matchAt(text: string, at: number, tokens: readonly Token[]): { day: str
       i += t.text.length;
       continue;
     }
-    if (firstToken === -1) firstToken = i;
+    if (firstToken === -1) {
+      firstToken = i;
+      firstKind = t.kind;
+    }
     const got =
       t.kind === 'Y4'
         ? fixed(text, i, 4)
         : t.kind === 'Y2' || t.kind === 'M2' || t.kind === 'D2'
           ? fixed(text, i, 2)
-          : greedy(text, i);
+          : t.kind === 'MN'
+            ? monthName(text, i)
+            : greedy(text, i);
     if (got === null) return null;
     if (t.kind === 'Y4') year = got.value;
     else if (t.kind === 'Y2') year = 2000 + got.value;
-    else if (t.kind === 'M2' || t.kind === 'M1') month = got.value;
+    else if (t.kind === 'M2' || t.kind === 'M1' || t.kind === 'MN') month = got.value;
     else day = got.value;
     i = got.next;
     lastEnd = i;
+    lastKind = t.kind;
   }
 
   /* BOUNDED AT BOTH ENDS. `129/08/26` is not the 29th and `29/08/261` is not 2026: a digit touching the number
@@ -170,6 +213,11 @@ function matchAt(text: string, at: number, tokens: readonly Token[]): { day: str
      middle of a reference number. */
   if (firstToken > 0 && isDigit(text[firstToken - 1])) return null;
   if (isDigit(text[lastEnd])) return null;
+  /* AND A NAME IS BOUNDED BY LETTERS, for the same reason a number is bounded by digits: `XAug 16 2026`
+     is a word that ends in `aug`, and `Augusta 16 2026` is a place. Only where the name sits at an edge
+     of the format, because inside one (`16AUG26`) the tokens either side already fix where it starts. */
+  if (firstKind === 'MN' && isLetter(text[firstToken - 1])) return null;
+  if (lastKind === 'MN' && isLetter(text[lastEnd])) return null;
   if (year === null || month === null || day === null) return null;
   if (!realDay(year, month, day)) return null;
   return { day: `${pad(year, 4)}-${pad(month, 2)}-${pad(day, 2)}`, end: lastEnd };

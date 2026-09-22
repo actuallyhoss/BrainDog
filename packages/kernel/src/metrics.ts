@@ -390,7 +390,9 @@ const yearBefore = (nowMs: number): number => {
  * predicate names and nothing it leaves unsaid. `on after -31d` names a start; its end is "up to now".
  * Resolved thirty days back it became `on after -61d`, still up to now, so the window before was
  * sixty-one days CONTAINING the thirty-one it was compared with. Both figures in the tree that declare
- * `compare: previous` (`spent-30d`, `received-30d`) are written this way. Measured in
+ * `compare: previous` (`spent-30d`, `received-30d`) were written that way when this was measured; the
+ * seed has said `on after -30d` since `aeef01c5`, and a start with no end still ends at the clock, so
+ * the rule below is about every such window and not about that one spelling. Measured in
  * `test/metrics-window.test.ts`, 150,000 spent in each of two consecutive months read `delta: -0.5`,
  * a doubled month read `-0.33`, and the Ledger's lead tile could not say "up" for any spending at all.
  * `year_ago` did the same over thirteen months and read `-0.875` against an identical month.
@@ -429,10 +431,13 @@ function endedAt(shifted: Predicate | undefined, current: Predicate | undefined,
   const clock = dayAfter(new Date(thenMs).toISOString());
   const ends = [...started].map((field) => {
     /* AND NEVER PAST THE DAY THE CURRENT WINDOW STARTS, so no row is in both. The two coincide when a
-       declaration's span is its window, and the seed's are not: `on after -31d` is thirty-one days
-       and `window: 30d` moves the clock thirty, so the moved clock's own day is the current window's
-       first. Ending there counted that day's rows on both sides of the comparison. The window before
-       is cut at the day before instead: thirty days, labelled "the 30 days before", which it is. */
+       declaration's span is its window, which the seed's now are: `on after -30d` under `window: 30d`
+       starts the current window the day after the moved clock's, so this cut changes nothing for
+       them. It was written when they said `on after -31d`, thirty-one days under a clock moved thirty,
+       where the moved clock's own day was the current window's first and ending there counted that
+       day's rows on both sides of the comparison. It stays for any declaration whose span is longer
+       than its window: the window before is cut at the day before, and holds only days the current
+       one does not. */
     const starts = conjuncts(current)
       .filter((c) => c.field === field)
       .flatMap((c) => LOWER.filter((op) => typeof c[op] === 'string').map((op) => (op === 'gte' ? (c[op] as string).slice(0, 10) : dayAfter(c[op] as string))))

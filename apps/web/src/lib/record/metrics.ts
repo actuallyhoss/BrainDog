@@ -658,7 +658,8 @@ const dayAfter = (iso: string): string => new Date(Date.parse(`${iso.slice(0, 10
  * A WINDOW THAT WRITES ONLY ITS START ENDS AT THE CLOCK, AND THE CLOCK WAS THE ONE THING THAT DID NOT
  * MOVE. `matches` at the moved clock moves every day a clause names and nothing the predicate leaves
  * unsaid, so `on after -31d` thirty days back was `on after -61d` up to today: sixty-one days holding
- * the thirty-one it was compared with. `spent-30d` and `received-30d` are written that way, and in
+ * the thirty-one it was compared with. `spent-30d` and `received-30d` were written that way when it was
+ * measured (the seed has said `on after -30d` since `aeef01c5`), and in
  * `metrics-window.test.ts` equal money in two consecutive months read `delta: -0.5` under "on the 30
  * days before", a doubled month `-0.33`, and `year_ago` `-0.875` against an identical month. The
  * Ledger's lead tile could not say "up" for any spending at all.
@@ -666,8 +667,10 @@ const dayAfter = (iso: string): string => new Date(Date.parse(`${iso.slice(0, 10
  * SO THE END MOVES WITH THE CLOCK AS THE START DOES, and a `before` clause saying so is added to each
  * dated field with an `after` and no `before` or `on`: the moved clock's day is the last day of the
  * window before, which is `08 §2.4`'s "last month to the 14th". AND NEVER PAST THE DAY BEFORE THE
- * CURRENT WINDOW STARTS, because the seed's `-31d` is thirty-one days and `window: 30d` moves thirty,
- * so the moved clock's own day is this window's first and its rows would be counted on both sides.
+ * CURRENT WINDOW STARTS, for a declaration whose span is longer than its window. The seed's said
+ * `-31d` under a `window: 30d` that moves thirty, so the moved clock's own day was that window's first
+ * and its rows were counted on both sides; at `-30d` the two days coincide and the cut changes nothing,
+ * and it stays for the next declaration spelled the longer way.
  *
  * A field with a written end is left alone, because that end already moved, and so is a field with no
  * start: `due before today` is a balance at a moment. `packages/kernel/src/metrics.ts` `endedAt` is the

@@ -1749,7 +1749,7 @@ export const MONEY_INGESTS: Record<string, SeedIngest> = {
    * anchor. `debited ` is nowhere in this wording, and every literal the two do share (`ending `,
    * ` on `) has the card digits or the date between it and the figure. Arms would also cost the
    * confidence: `first:` over two wordings that both happen to yield files at `chosen`, which writes
-   * nothing. Five patterns whose `match:` exclude each other keep every field a straight read.
+   * nothing. Patterns whose `match:` exclude each other keep every field a straight read.
    *
    * THE AMOUNT IS ANCHORED ON `used for ` AND THE ACCOUNT IS BOXED BETWEEN THE STARS AND ` has been`,
    * and both are about the two other numbers in this sentence. The available limit after the figure
@@ -1839,12 +1839,64 @@ export const MONEY_INGESTS: Record<string, SeedIngest> = {
     on_conflict: 'skip',
   },
 
-  /* THE THIRD WORDING HAS NO PATTERN, ON PURPOSE. *"From HSBC: 16AUG26 ATM Cash Withdrawal from
-     042-118***-327 EGP 2500.00- Your available balance is ..."* dates itself with a month NAME, which
-     `43 §4.3` has no token for (`DDMMMYY` is refused at install as DATE_FORMAT_INVALID, measured),
-     and marks a debit with a trailing hyphen and a credit with nothing, so there is no word for
-     `enum` to read the sign from. It lands `untriaged` with its bytes, which is where a wording
-     nothing can read belongs until the grammar can say both. */
+  /**
+   * THE THIRD WORDING, AND ONLY ITS DEBIT. *"From HSBC: 16AUG26 ATM Cash Withdrawal from
+   * 042-118***-327 EGP 2500.00- Your available balance is EGP 31,040.25"*. It had no pattern until
+   * `43 §4.3` grew `MON`: `DDMMMYY` was two month tokens and refused at install, measured.
+   *
+   * THE SIGN IS A HYPHEN GLUED TO THE FIGURE, AND THE HYPHEN IS IN `match:` AND NOT IN `enum`. `enum`
+   * reads a literal as a whole token, and the character before `-` is a digit, so no literal holding the
+   * hyphen is ever a whole token here. `contains` is a plain substring, so `- your available balance`
+   * is what tells this debit from the credit (*"EGP 418.62 Your available balance"*). The enum then
+   * states `out` off a phrase the match has already guaranteed, as `bank-card-used` does with `used`.
+   *
+   * THE CREDIT HALF HAS NO PATTERN, and that is the choice this comment exists to record. A credit is
+   * marked by the hyphen being ABSENT, so its `match:` would be `none: [- your available balance]`, and
+   * a debit whose hyphen arrived touching the next word (`2500.00-Your`, measured: nothing claims it
+   * today) would satisfy it and be written as money IN at `exact`: the wrong sign at the confidence nothing downstream questions, which `bank-card-out`
+   * above spends a paragraph on. Interest and deposits land `untriaged` with their bytes instead.
+   *
+   * THE AMOUNT IS THE SECOND FIGURE AFTER THE STARS, and it has to be counted. Between `***-` and the
+   * hyphen sit the account's own digits and the code: `scanMoney` over `327 EGP 2500.00` answers EGP
+   * 3.27 and then EGP 2,500.00, because `327 EGP` is a figure with a code after it. No literal separates
+   * the digits from the code except the code itself, and anchoring on `EGP` is the defect `movement`
+   * above was written to remove. The slice ends BEFORE the hyphen so the record's reader, which takes a
+   * trailing minus as a sign (measured: `-250000`), reads the figure as the size of a debit.
+   *
+   * `balance is` IS IN `NOT_A_MOVEMENT` AND IN EVERY ONE OF THESE LINES, so this pattern carries a skip
+   * list without it. Measured with the shared one: the line was claimed and then skipped as *"A balance
+   * alert is a position, not a movement"*, and no row was written.
+   *
+   * THE DESCRIPTION KEEPS THE DATE AT ITS FRONT (`16AUG26 ATM Cash Withdrawal`). The closed vocabulary
+   * anchors on literals and the date is the only thing between `From HSBC: ` and the words, so there is
+   * nothing to start the slice after. It is still what the bank said the movement was.
+   */
+  'bank-from-out': {
+    ingest: 'bank-from-out',
+    pack: 'money-core',
+    channel: 'email',
+    match: {
+      all: [
+        { field: 'body', contains: 'from hsbc:' },
+        { field: 'body', contains: '- your available balance' },
+        { none: [{ field: 'body', contains: 'debited' }, { field: 'body', contains: 'credited' }] },
+      ],
+    },
+    skip: [
+      { when: { field: 'body', contains: 'refund' }, reason: 'A refund is money coming back, and this pattern reads a charge.' },
+      { when: { field: 'body', contains: 'your pin' }, reason: 'A PIN reminder carries the card digits and moves no money.' },
+    ],
+    extract: {
+      what: { text: { between: ['From HSBC: ', ' from '] } },
+      direction: { enum: { map: { 'your available balance': 'out' } } },
+      on: { date: { format: 'DDMONYY', after: 'From HSBC: ' } },
+      amount: { nth: { n: 2, of: { money: { between: ['***-', '- Your available balance'], currency: HOME_CURRENCY } } } },
+      account: { lookup: { register: 'accounts', by: 'last4', between: ['***-', ' '] } },
+    },
+    writes: { register: 'transactions', confidence: 'exact' },
+    dedupe: SAME_MOVEMENT,
+    on_conflict: 'skip',
+  },
 };
 
 /**

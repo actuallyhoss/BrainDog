@@ -171,7 +171,7 @@ const DECLARED: Record<string, Version> = {
   },
   'money-core@1.6.0': {
     holds: `
-      ingest.bank-card-in ingest.bank-card-out ingest.bank-card-used ingest.bank-ipn-in ingest.bank-ipn-out
+      ingest.bank-card-in ingest.bank-card-out ingest.bank-card-used ingest.bank-from-out ingest.bank-ipn-in ingest.bank-ipn-out
       metric.cash-accounts metric.cash-as-of metric.cash-now metric.days-late-in metric.due-30d metric.every-month-by-category
       metric.every-month-in metric.every-month-out metric.in-30d metric.in-by-month metric.in-due-by-month metric.installments-due-30d
       metric.installments-left metric.late-in metric.out-30d metric.out-by-month metric.out-due-by-month metric.overdue
@@ -183,8 +183,11 @@ const DECLARED: Record<string, Version> = {
       setting.home_currency setting.most_days_late setting.most_due_30d setting.most_on_one_category setting.most_out_30d
       setting.most_out_every_month setting.most_owed_to_you
     `,
-    declares: '54bd8171345118f2',
-    history: ['Raised for three HSBC wordings, `ingest.bank-card-used`, `ingest.bank-ipn-out` and `ingest.bank-ipn-in`, and for `metric.spent-30d` and `metric.received-30d` counting thirty days rather than thirty-one -> 54bd8171345118f2'],
+    declares: 'c1e04509fe953ee1',
+    history: [
+      'Raised for three HSBC wordings, `ingest.bank-card-used`, `ingest.bank-ipn-out` and `ingest.bank-ipn-in`, and for `metric.spent-30d` and `metric.received-30d` counting thirty days rather than thirty-one -> 54bd8171345118f2',
+      'Before any release, `ingest.bank-from-out` for the debit half of the `From HSBC:` line, which the `MON` token of `43 §4.3` made declarable -> c1e04509fe953ee1',
+    ],
   },
   'work@1.1.0': { declares: 'b49e051fe7c26ac5' },
   'work@1.2.0': { declares: '49a30d2ef8c1d672' },
