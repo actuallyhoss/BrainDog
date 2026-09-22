@@ -162,9 +162,30 @@ const listed = (items: readonly string[]): string => (items.length === 0 ? 'none
 
 export function arranger(d: ArrangeDeps) {
   const { kernel, catalogue } = d;
-  const states = () => kernel.packStates();
+  /**
+   * THE PACKS ANOTHER PACK HANDED DECLARATIONS TO, WHICH WERE NEVER INSTALLED: live declarations under the id and no `pack`
+   * row. `packStates` reads a pack by what is live under it, so after money-core 1.8.0 handed an HSBC door on, `bank-hsbc-eg`
+   * read as on at no version; the overview listed it and did not offer it, and a proposal to install it was refused
+   * `TRANSITION_ILLEGAL` "already installed and on" (`declare`'s `test/plan-handover-shown.test.ts`). The seed's own packs
+   * have no `pack` row either, but they own their declarations through the body's `pack:` and leave `pack_id` null; only
+   * the pack path writes `pack_id`, and a handover is the one way it names a pack that has no row.
+   */
+  const handedPacks = (): Set<string> => {
+    const rows = new Set(kernel.packs().map((p) => p.id));
+    return new Set(kernel.declarations().flatMap((x) => (x.pack_id === null || x.pack_id === 'kernel' || rows.has(x.pack_id) ? [] : [x.pack_id])));
+  };
+  /* WHAT IS INSTALLED, which a handed pack is not: it is planned as an install, and its first install takes the handed
+     declarations over (`declare` `plan`). */
+  const states = () => {
+    const handed = handedPacks();
+    return kernel.packStates().filter((s) => !handed.has(s.id));
+  };
   const stateOf = (id: string) => states().find((s) => s.id === id);
   const on = (id: string) => stateOf(id)?.disabled_at === null;
+  /* WHAT TURNING A PACK OFF STOPS, which a handed pack has: its door is live and answering. Read through `stateOf`, a handed
+     pack was "not installed here, so it cannot be turned off", and the one way Decide had to stop a door money-core handed
+     to `bank-hsbc-eg` was gone; before the arranger read handovers, the same proposal was filed and the door went off. */
+  const running = (id: string) => kernel.packStates().find((s) => s.id === id);
   const entryOf = (id: string): CatalogueEntry | undefined =>
     catalogue.find((e) => e.id === id) ?? catalogue.find((e) => e.kind === 'usecase' && e.id === packIdOf(id));
   /** The version on offer for a pack, from the catalogue or the document sent with the proposal. */
@@ -252,8 +273,11 @@ export function arranger(d: ArrangeDeps) {
         }
     }
     const held = new Set(packs.map((p) => p.id));
+    /* A HANDED PACK IS LISTED AS ONE, so an agent reading this says "holds a door money-core handed it, not installed" and
+       offers the install or turning it off, rather than naming it among the packs the owner chose. */
+    const handed = [...handedPacks()].sort().map((id) => ({ id, handed: true }));
     return {
-      packs: packs.map((p) => ({ id: p.id, ...(p.version === null ? {} : { version: p.version }), ...(p.disabled_at === null ? {} : { off: true }) })),
+      packs: [...packs.map((p) => ({ id: p.id, ...(p.version === null ? {} : { version: p.version }), ...(p.disabled_at === null ? {} : { off: true }) })), ...handed],
       offer: catalogue
         .filter((e) => !held.has(e.id))
         /* A PACK IS ITS ID AND ONE LINE; a use case says so, and its title, because that is what a person is offered. */
@@ -369,8 +393,11 @@ export function arranger(d: ArrangeDeps) {
         version: pack.manifest.version,
         adds: diff.adds.map((a) => a.id),
         ...(diff.changes.length === 0 ? {} : { changes: diff.changes.map((c) => c.id) }),
-        /* WHAT AN UPDATE TAKES AWAY, with the rows it keeps, so Decide says it beside what it adds. */
-        ...(diff.retires.length === 0 ? {} : { retires: diff.retires.map((x) => ({ id: x.id, rows: x.rows })) }),
+        /* WHAT AN UPDATE TAKES AWAY, with the rows it keeps, so Decide says it beside what it adds. AND `to` FOR WHAT IT
+           HANDS ON INSTEAD: copied as `{ id, rows }`, the HSBC door money-core hands to `bank-hsbc-eg` and keeps live was
+           filed exactly as one it retires (`loop/research-batch-thirty-four-audit.md` §8, `declare`'s
+           `test/plan-handover-shown.test.ts`). */
+        ...(diff.retires.length === 0 ? {} : { retires: diff.retires.map((x) => ({ id: x.id, rows: x.rows, ...(x.to === undefined ? {} : { to: x.to }) })) }),
         /* WHAT IT LEAVES AS THE OWNER CHANGED IT, so Decide says the update's version of it is not taken. */
         ...(kept.size === 0 ? {} : { keeps: [...kept] }),
         ...(diff.seeds.count === 0 ? {} : { examples: diff.seeds.count }),
@@ -539,7 +566,7 @@ export function arranger(d: ArrangeDeps) {
       if (typeof body.enable === 'string' || typeof body.disable === 'string') {
         const verb = typeof body.enable === 'string' ? 'enable' : 'disable';
         const id = String(body[verb]);
-        const state = stateOf(id);
+        const state = verb === 'enable' ? stateOf(id) : running(id);
         if (!state) return refuse('DECLARATION_UNKNOWN', `${id} is not installed here, so it cannot be turned ${verb === 'enable' ? 'on' : 'off'}. Propose install instead.`, `body.${verb}`);
         if ((state.disabled_at === null) === (verb === 'enable'))
           return refuse('TRANSITION_ILLEGAL', `${id} is already ${verb === 'enable' ? 'on' : 'off'}.`, `body.${verb}`);
@@ -638,7 +665,7 @@ export function arranger(d: ArrangeDeps) {
     }
     const disable: string[] = [];
     for (const [i, id] of (Array.isArray(packs.disable) ? packs.disable.map(String) : []).entries()) {
-      if (!on(id)) return refuse('TRANSITION_ILLEGAL', `${id} is not on, so there is nothing to turn off.`, `body.packs.disable[${i}]`);
+      if (running(id)?.disabled_at !== null) return refuse('TRANSITION_ILLEGAL', `${id} is not on, so there is nothing to turn off.`, `body.packs.disable[${i}]`);
       disable.push(id);
     }
     const planned = await planAll(order.value.install, new Map());
@@ -803,7 +830,7 @@ export function arranger(d: ArrangeDeps) {
       done.enabled.push(id);
     }
     for (const id of disable) {
-      if (!on(id)) continue;
+      if (running(id)?.disabled_at !== null) continue;
       const off = kernel.disablePack(id, { actor });
       if (!off.ok) return stopped(off);
       done.disabled.push(id);

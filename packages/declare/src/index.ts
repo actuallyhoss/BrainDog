@@ -27,7 +27,7 @@ import type { Conflict, Refusal, Result } from '@braindog/ports';
 import { no, ok, refused } from '@braindog/ports';
 import { credentialKey as credential, credentialValue, NESTED_MOST, nestedPast } from './credentials.ts';
 import { FIRST_PARTY_LISTS } from './usecase.ts';
-import { KINDS, approvalLines, configReads, configValue, digest, egressChanged, egressOf as egressOfBody, fillConfig, jcs, readConfig, widens, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
+import { KINDS, approvalLines, configReads, configValue, digest, egressChanged, egressOf as egressOfBody, fillConfig, jcs, misread, readConfig, sentencesOver, widens, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
 
 /**
  * What one declaration sends out of the record, or `null` when it sends nothing: every host, how often, the key by label
@@ -159,6 +159,29 @@ export type Installed = {
    * OPTIONAL, as `detached` is: a caller that cannot say gets every entry handed, which is what `plan` did before it asked.
    */
   used?: readonly string[];
+  /**
+   * A `where` sentence read against a list, as the kernel reads it: the compiled predicate, or `null` when it does not
+   * read (a title no row holds yet still reads, as the kernel's `stranded` lets it). `@braindog/where`'s `parseWhere`
+   * is the answer; the record hands it in.
+   *
+   * WHAT `misreads` IS ASKED WITH. `declare` depends on the kernel and the ports and on nothing else, and the kernel does
+   * not export its compiler, so a plan cannot parse a figure's words by itself. It needs to, because a widening that
+   * turns `lane is earning money` from 1 into 0 compiles either way and is only seen by parsing the sentence twice.
+   *
+   * OPTIONAL, as `nameOf` is: a caller that cannot parse gets a plan that names no misread, which is what it said before.
+   */
+  sentence?: (where: string, schema: SentenceSchema) => unknown;
+};
+
+/**
+ * A list's fields as `where` reads a sentence against them. `@braindog/where`'s `Schema`, as far as a pack's body can say
+ * it, written out because `declare` does not depend on `where`; one of these is assignable to the other.
+ */
+export type SentenceSchema = {
+  register: string;
+  state?: string;
+  series?: boolean;
+  fields: Record<string, { type: string; of?: string; to?: string; values?: readonly string[]; label?: string; labels?: Readonly<Record<string, string>> }>;
 };
 
 export type Diff = {
@@ -289,6 +312,17 @@ export type Diff = {
    */
   retypes: { id: string; field: string; from: string; to: string; rows: number }[];
   newly_required: { id: string; field: string; rows: number }[];
+  /**
+   * A reader whose words change meaning when this version opens a closed list to text. Reported here, refused by
+   * `install`, whether or not the list holds rows yet, as the kernel's `stranded` refuses it.
+   *
+   * `id` and `field` are the list and the field it opens; `reader` is a live declaration this install does not rewrite,
+   * `name` what the owner calls it, and `at` and `where` the sentence. `written` is the word as the sentence has it,
+   * which free text will compare as it is, and `stored` the value only the closed list read it as. Measured on `lane`:
+   * `lane is earning money` counted 1 row under the enum and 0 after the update, with nothing refused on the pack path
+   * (`test/plan-widen.test.ts`).
+   */
+  misreads: { id: string; field: string; reader: string; name: string; at: string; where: string; written: string; stored: string }[];
   /**
    * A retire and an add that are one declaration under two ids. Reported here, refused by `install`.
    *
@@ -1172,6 +1206,7 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
     }
   }
 
+  const misreads = misreadsOf(pack, installed, new Set(kept.filter((k) => k.rebased === undefined).map((k) => k.id)), gone);
   const unresolved = unresolvedOf(pack, installed, retires);
 
   const format = { wanted: pack.manifest.requires.format, has: installed.format, ok: installed.format >= pack.manifest.requires.format };
@@ -1222,6 +1257,7 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
     orphans,
     retypes,
     newly_required: newlyRequired,
+    misreads,
     renames,
     warnings: warningsOf(pack),
     config,
@@ -1807,6 +1843,106 @@ function unreadable(
   }
 }
 
+/** The kinds a reader's sentences sit in, as `sentencesOver` reads them. */
+const SENTENCE_KINDS: ReadonlySet<string> = new Set(['metric', 'rule', 'page']);
+
+/** A list's fields that are not retired, by id. */
+const liveFields = (body: unknown): Map<string, Record<string, unknown>> => new Map([...fieldsOf(body)].filter(([, f]) => f.retired !== true));
+
+/** A list's fields as `where` reads them, with the keys the kernel's `schemaOf` sends. */
+function sentenceSchema(register: string, body: unknown, fields: ReadonlyMap<string, Record<string, unknown>>): SentenceSchema {
+  const b = (isObject(body as Json) ? body : {}) as { state?: unknown; series?: unknown };
+  const spec = (f: Record<string, unknown>): SentenceSchema['fields'][string] => ({
+    type: String(f.type),
+    ...(typeof f.of === 'string' ? { of: f.of } : {}),
+    ...(Array.isArray(f.values) ? { values: f.values.filter((v): v is string => typeof v === 'string') } : {}),
+    ...(typeof f.to === 'string' ? { to: f.to } : {}),
+    ...(typeof f.label === 'string' ? { label: f.label } : {}),
+    ...(isObject(f.labels as Json) ? { labels: f.labels as Record<string, string> } : {}),
+  });
+  /* AND `tags` WHERE THE LIST DID NOT DECLARE ITS OWN, as the kernel's `withTags` adds it. Left out, `tags has late, lane is
+     earning money` did not parse here, was passed over as unreadable, and the plan named nothing for a figure the kernel's
+     `install` refuses (`test/plan-widen.test.ts`). */
+  const tags = fieldsOf(body).has('tags') ? {} : { tags: { type: 'list', of: 'text' } };
+  return {
+    register,
+    ...(typeof b.state === 'string' ? { state: b.state } : {}),
+    ...(b.series === true ? { series: true } : {}),
+    fields: { ...Object.fromEntries([...fields].map(([id, f]) => [id, spec(f)])), ...tags },
+  };
+}
+
+/**
+ * The readers whose words this version's widening would make count something else: `Diff['misreads']`.
+ *
+ * THE KERNEL'S QUESTION, ASKED BEFORE THE OWNER APPROVES. `stranded` parses each reader's sentence against the list as it
+ * stands and again with only the opened fields changed, and a word that moves is refused (`widen.ts`, `misread`). Only
+ * `install` and a filed change ask it: the pack path stages through `stageInstall`, which runs `unreadable` and
+ * `lintBatch` and not `stranded`, so `mini` 1.1.0 opening `lane` installed through `installPack` and `lane is earning
+ * money` went from 1 to 0 with nothing refused (`test/plan-widen.test.ts`). The plan is where the owner reads it, and
+ * `install` below refuses it, so the pack path is held to what `install` is.
+ *
+ * WHAT THE KERNEL ASKS, IN ITS ORDER: every list this install stages over a live one, every live metric, rule and page
+ * this install does not rewrite, and the first sentence of each that moves. A reader this version sends with other
+ * bytes is the update's own, compiled with it, and a reader it retires reads nothing afterwards. One the owner changed
+ * and this install keeps is live as the owner left it, and is asked.
+ */
+function misreadsOf(pack: Pack, installed: Installed, unstaged: ReadonlySet<string>, gone: ReadonlySet<string>): Diff['misreads'] {
+  const read = installed.sentence;
+  if (read === undefined) return [];
+  const live = new Map(installed.declarations.map((d) => [d.id, d]));
+  const sent = new Map(pack.declarations.map((d) => [d.id, d]));
+  const out: Diff['misreads'] = [];
+  for (const decl of pack.declarations) {
+    const was = live.get(decl.id);
+    if (decl.kind !== 'register' || unstaged.has(decl.id) || was === undefined) continue;
+    let old: unknown;
+    try {
+      old = JSON.parse(was.body);
+    } catch {
+      continue;
+    }
+    const before = liveFields(old);
+    const after = liveFields(decl.body);
+    const opened = [...before].filter(([id, f]) => after.has(id) && widens(f, after.get(id)!)).map(([id]) => id);
+    if (opened.length === 0) continue;
+    const register = decl.id.slice('register.'.length);
+    const closed = sentenceSchema(register, old, before);
+    /* ONLY THE OPENED FIELDS CHANGE, and only to the type the update gives them, as `stranded` builds its second schema,
+       so a word that moves moved because of the widening and nothing else in the update. */
+    const open: SentenceSchema = { ...closed, fields: { ...closed.fields } };
+    for (const id of opened) {
+      const f = after.get(id)!;
+      open.fields[id] = { type: String(f.type), ...(typeof f.of === 'string' ? { of: f.of } : {}), ...(typeof f.label === 'string' ? { label: f.label } : {}) };
+    }
+    for (const reader of installed.declarations) {
+      if (!SENTENCE_KINDS.has(reader.kind) || gone.has(reader.id)) continue;
+      const theirs = sent.get(reader.id);
+      if (theirs !== undefined && !unstaged.has(reader.id) && theirs.canonical !== reader.body) continue;
+      let body: Record<string, unknown>;
+      try {
+        body = JSON.parse(reader.body) as Record<string, unknown>;
+      } catch {
+        continue;
+      }
+      /* A RULE'S LIST, as the kernel's `subjectOf` reads it: `register`, or the list an `on: written` trigger names. */
+      const on = (body.on as { written?: { register?: unknown } } | undefined)?.written?.register;
+      const subject = typeof body.register === 'string' ? body.register : typeof on === 'string' ? on : null;
+      for (const { at, where } of sentencesOver(reader.kind, body, register, reader.kind === 'rule' ? subject : null)) {
+        const then = read(where, closed);
+        const now = read(where, open);
+        if (then == null || now == null) continue;
+        const word = misread(then, now, new Set(opened));
+        if (word === null) continue;
+        const name = typeof body.name === 'string' ? body.name : typeof body.title === 'string' ? body.title : reader.id;
+        out.push({ id: decl.id, field: word.field, reader: reader.id, name, at, where, written: word.written, stored: word.stored });
+        break;
+      }
+    }
+  }
+  return out;
+}
+
 /**
  * Whether a stored body reads the declaration `id` names: the id written whole (`register.fx`, as a metric's `source`), or
  * its bare name under its own kind's key (`"metric": "cash-now"`, as a page's tile), or a list's bare name as a field's
@@ -2126,6 +2262,22 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
       `${retyped.id}.${retyped.field}: ${retyped.from} → ${retyped.to} changes a type, and ${retyped.rows} rows were written under the old one. Retire the field and add a new one.`,
       { at: `${retyped.id}.fields.${retyped.field}.type` },
     );
+
+  /* AND A LIST OPENED TO TEXT UNDER A READER WHOSE WORDS ONLY THE CLOSED LIST COULD READ, in the kernel's own sentence
+     (`stranded`), because the pack path's `stageInstall` does not ask it and the figure would change its answer with
+     nothing refused (`misreadsOf`). */
+  const moved = diff.misreads[0];
+  if (moved) {
+    const what = moved.reader.startsWith('metric.') ? 'the figure' : moved.reader.startsWith('page.') ? 'the page' : `the ${moved.reader.slice(0, moved.reader.indexOf('.'))}`;
+    const listed = pack.declarations.find((d) => d.id === moved.id)?.body as { name?: unknown } | undefined;
+    const list = typeof listed?.name === 'string' ? listed.name : moved.id.slice('register.'.length);
+    const says = moved.written === '' ? 'reads it differently' : `says ${moved.written}`;
+    return no<Applied>(
+      'FIELD_TYPE_CHANGED',
+      `Opening ${moved.field} on ${list} to free text would quietly change which rows ${what} ${moved.name === moved.reader ? moved.reader : `${moved.name} (${moved.reader})`} reads: its ${moved.at} "${moved.where}" ${says}, which only the closed list read as ${moved.stored}, and free text compares the word as written. Write ${moved.stored} there first, then open ${moved.field}.`,
+      { at: moved.reader },
+    );
+  }
 
   const demanded = diff.newly_required[0];
   if (demanded)
