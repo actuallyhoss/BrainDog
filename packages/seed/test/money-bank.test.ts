@@ -115,6 +115,13 @@ const IPN_BUY = 'Your HSBC Account ***327 was debited with IPN purchase for EGP 
 /** Shape three: the general account line. A day like 16AUG26, and a debit marked only by a trailing hyphen. */
 const FROM_OUT = 'From HSBC: 16AUG26 ATM Cash Withdrawal from 042-118***-327 EGP 2500.00- Your available balance is EGP 31,040.25';
 const FROM_IN = 'From HSBC: 01AUG26 Deposit Interest to 042-118***-327 EGP 418.62 Your available balance is EGP 33,540.25';
+/**
+ * THE CREDIT AS THE BANK ACTUALLY PRINTS IT, and `FROM_IN` above is not that. `loop/research-bank-real.md` (*The three
+ * that did not read*, item 2) measured the one real credit in a hundred arrivals: a `+` glued to the figure where the
+ * debit glues its `-`, and no preposition before the account. `FROM_IN` has neither, which is why it was ever possible to
+ * argue the credit had no sign to read. Values invented, the shape his.
+ */
+const FROM_PLUS = 'From HSBC: 01AUG26 Deposit Interest 042-118***-327 EGP 418.62+ Your available balance is EGP 33,540.25';
 /** The audit's line (`loop/research-batch-eighteen-audit.md` section 3): a hyphen with a space either side, on a transfer in. */
 const FROM_SPACED = 'From HSBC: 01AUG26 Transfer from NADIA FARID to 042-118***-327 EGP 418.62 - Your available balance is EGP 33,540.25';
 
@@ -166,7 +173,7 @@ test('AN INSTAPAY TRANSFER IS CLAIMED BY ITS OWN PATTERN IN EACH DIRECTION, and 
   assert.equal(k.count('transactions'), before, 'a transfer with no date wrote a row');
 });
 
-test('THE GENERAL `From HSBC:` DEBIT IS CLAIMED BY ITS OWN PATTERN, and the credit, whose only sign is a missing hyphen, by nothing', async () => {
+test('THE GENERAL `From HSBC:` DEBIT IS CLAIMED BY ITS OWN PATTERN, and a line with no sign at all by nothing', async () => {
   const { k } = await bank();
   const before = k.count('transactions');
 
@@ -188,9 +195,10 @@ test('THE GENERAL `From HSBC:` DEBIT IS CLAIMED BY ITS OWN PATTERN, and the cred
   assert.match(out.reason ?? '', /^bank-from-out could not read amount, on /u, `from-out named something else: ${out.reason}`);
 
   /**
-   * THE CREDIT HAS NO PATTERN. Its sign is the hyphen being absent, and a `match:` that reads absence
-   * as money in would take a debit whose hyphen arrived touching the next word (`2500.00-Your`) and file it IN at
-   * `exact`. `money.ts` has the argument at length above `bank-from-out`.
+   * A LINE WITH NO SIGN HAS NO PATTERN. This was the credit, on the belief that a credit's only sign is the hyphen being
+   * absent, and a `match:` that reads absence as money in would take a debit whose hyphen arrived touching the next word
+   * (`2500.00-Your`) and file it IN at `exact`. The real credit carries a `+` and is `bank-from-in`'s, in the next test;
+   * an unsigned line still says nothing about its direction, so it still goes to a person.
    */
   const credit = forward(k, FROM_IN, 'from-in');
   assert.equal(credit.state, 'untriaged', `from-in was claimed by ${credit.ingest}: ${credit.reason}`);
@@ -228,6 +236,26 @@ test('THE GENERAL `From HSBC:` DEBIT IS CLAIMED BY ITS OWN PATTERN, and the cred
   assert.equal((mmm as { refusal?: { code: string } }).refusal?.code, 'DATE_FORMAT_INVALID');
 });
 
+test('THE `From HSBC:` CREDIT IS CLAIMED BY ITS OWN PATTERN, off the `+` the bank glues to the figure', async () => {
+  const { k } = await bank();
+  const before = k.count('transactions');
+
+  /**
+   * MEASURED RED FIRST: this line landed `untriaged` with `ingest: null`, because `bank-from-out` wants a `-` against a
+   * digit and `bank-from-unsure` wants a spaced one, and nothing asked for a `+` at all. The one real credit in the
+   * window was interest, which is money in and was never going to reach the ledger however often he forwarded it.
+   *
+   * A BARE KERNEL NAMES `amount` AND `on` AND NOTHING ELSE, for the reason the debit's test gives above: those are this
+   * package having no reader wired. A pattern that could not read the description or the account, or that claimed the
+   * line and read no direction, would name more than those two here.
+   */
+  const out = forward(k, FROM_PLUS, 'from-plus');
+  assert.equal(out.ingest, 'bank-from-in', `from-plus was claimed by ${out.ingest}: ${out.reason}`);
+  assert.equal(out.state, 'review', out.reason ?? '');
+  assert.match(out.reason ?? '', /^bank-from-in could not read amount, on /u, `from-plus named something else: ${out.reason}`);
+  assert.equal(k.count('transactions'), before, 'a bare kernel wrote a row it could not read');
+});
+
 test('NO WORDING IS CLAIMED BY TWO PATTERNS, so the order they are declared in decides nothing', async () => {
   /* EACH PATTERN ON A RECORD OF ITS OWN, because `arrive` takes the first pattern that matches and
      so can only ever report one. Asking every pattern separately is the only way to see a second
@@ -244,11 +272,26 @@ test('NO WORDING IS CLAIMED BY TWO PATTERNS, so the order they are declared in d
   /* The two sentences `money.test.ts` forwards, copied, so the older patterns are held to it too. */
   const CHARGE = 'HSBC: Your card ending 4471 was debited GBP 42.99 at FENWICK CLOUD on 18/09/26. If this was not you, call us.';
   const CREDIT = 'HSBC: Your card ending 4471 was credited GBP 5,005.00 from NILE REALTY on 29/08/26.';
-  for (const body of [CARD, IPN_OUT, IPN_IN, IPN_BUY, FROM_OUT, FROM_IN, FROM_SPACED, CHARGE, CREDIT]) {
+  for (const body of [CARD, IPN_OUT, IPN_IN, IPN_BUY, FROM_OUT, FROM_IN, FROM_PLUS, FROM_SPACED, CHARGE, CREDIT]) {
     const claims: string[] = [];
     for (const ingest of Object.keys(MONEY_INGESTS)) if (await claimedBy(ingest, body)) claims.push(ingest);
     assert.ok(claims.length <= 1, `${body.slice(0, 40)} is claimed by ${claims.join(' and ')}`);
   }
+
+  /* A LINE CARRYING BOTH GLUED SIGNS IS CLAIMED BY NONE, and `<= 1` above cannot say so. Measured by the checker:
+     with `SIGNED_DEBIT` taken out of `bank-from-in`'s `none:`, this line was claimed by `bank-from-in` alone, which is
+     one claim, and every test in this file stayed green. One line that names two directions is a person's.
+     A GLUED `+` BESIDE A SPACED HYPHEN IS THE CREDIT'S, as `bank-from-unsure`'s comment says a real glued sign wins over
+     a stray hyphen. With `SIGNED_CREDIT` taken out of `bank-from-unsure`'s `none:`, the second line was claimed twice. */
+  const claimsOf = async (body: string): Promise<string[]> => {
+    const claims: string[] = [];
+    for (const ingest of Object.keys(MONEY_INGESTS)) if (await claimedBy(ingest, body)) claims.push(ingest);
+    return claims;
+  };
+  const BOTH = 'From HSBC: 01AUG26 Deposit Interest 042-118***-327 EGP 418.62+ Your available balance is EGP 2500.00- Your available balance is EGP 1.00';
+  const PLUS_AND_SPACED = 'From HSBC: 01AUG26 Deposit Interest 042-118***-327 EGP 418.62+ Your available balance is EGP 2500.00 - Your available balance is EGP 1.00';
+  assert.deepEqual(await claimsOf(BOTH), [], 'a line with both glued signs was claimed');
+  assert.deepEqual(await claimsOf(PLUS_AND_SPACED), ['bank-from-in'], 'a glued `+` beside a spaced hyphen was not the credit\'s alone');
 });
 
 /* ── what `Spent, 30 days` counts ───────────────────────────────────────── */

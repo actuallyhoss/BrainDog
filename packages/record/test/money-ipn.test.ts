@@ -126,6 +126,13 @@ const WORDINGS: Want[] = [
     body: 'From HSBC: 16AUG26 ATM Cash Withdrawal from 042-118***-327 EGP2500.00- Your available balance is EGP 31,040.25',
     direction: 'out', amount: 250_000, currency: 'EGP', what: '16AUG26 ATM Cash Withdrawal', on: '2026-08-16', account: 'current',
   },
+  /* THE CREDIT HAS ITS OWN PATTERN, claimed off the `+` the bank glues to the figure. Until `bank-from-in` existed
+     this line was nobody's, so a deposit printed this way never reached the ledger at all. */
+  {
+    ingest: 'bank-from-in',
+    body: 'From HSBC: 01AUG26 Deposit Interest 042-118***-327 EGP 418.62+ Your available balance is EGP 33,540.25',
+    direction: 'in', amount: 41_862, currency: 'EGP', what: '01AUG26 Deposit Interest 042-118', on: '2026-08-01', account: 'current',
+  },
 ];
 
 type Held = Omit<Want, 'direction'> & { why: string };

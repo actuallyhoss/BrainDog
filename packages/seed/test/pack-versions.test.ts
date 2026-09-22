@@ -171,8 +171,8 @@ const DECLARED: Record<string, Version> = {
   },
   'money-core@1.6.0': {
     holds: `
-      ingest.bank-card-in ingest.bank-card-out ingest.bank-card-used ingest.bank-from-out ingest.bank-from-unsure ingest.bank-ipn-in
-      ingest.bank-ipn-out
+      ingest.bank-card-in ingest.bank-card-out ingest.bank-card-used ingest.bank-from-in ingest.bank-from-out ingest.bank-from-unsure
+      ingest.bank-ipn-in ingest.bank-ipn-out
       metric.cash-accounts metric.cash-as-of metric.cash-now metric.days-late-in metric.due-30d metric.every-month-by-category
       metric.every-month-in metric.every-month-out metric.in-30d metric.in-by-month metric.in-due-by-month metric.installments-due-30d
       metric.installments-left metric.late-in metric.out-30d metric.out-by-month metric.out-due-by-month metric.overdue
@@ -184,11 +184,18 @@ const DECLARED: Record<string, Version> = {
       setting.home_currency setting.most_days_late setting.most_due_30d setting.most_on_one_category setting.most_out_30d
       setting.most_out_every_month setting.most_owed_to_you
     `,
-    declares: 'f8aab69dc2a8d7b0',
+    declares: '03f76621c84239df',
     history: [
       'Raised for three HSBC wordings, `ingest.bank-card-used`, `ingest.bank-ipn-out` and `ingest.bank-ipn-in`, and for `metric.spent-30d` and `metric.received-30d` counting thirty days rather than thirty-one -> 54bd8171345118f2',
       'Before any release, `ingest.bank-from-out` for the debit half of the `From HSBC:` line, which the `MON` token of `43 §4.3` made declarable -> c1e04509fe953ee1',
       'Still before any release, and CI had not run: `ingest.bank-from-out` asks for its hyphen against a digit, because a spaced one filed a transfer in as OUT at exact, the new `ingest.bank-from-unsure` holds that line for a person with no direction, and `ingest.bank-ipn-out` reads a purchase payee after `from` as well as `to` -> f8aab69dc2a8d7b0',
+      /* AN ID GAINED UNDER A LABEL, which the guard answers with "raise the version", and it was not raised. Measured on
+         22 September before writing this: `gh run list --workflow deploy.yml` showed every deploy since `aeef01c5`
+         introduced 1.6.0 as `skipped`, because no `ci` run on master had completed, so no record anywhere has been
+         offered 1.6.0 and there is no record on it to strand. Raising to 1.7.0 would also have put a version nobody
+         shipped between 1.5.0 and this one. If a deploy has succeeded by the time this is read, this line is wrong and
+         the id belongs to 1.7.0. */
+      'Still before any release, since every deploy since 1.6.0 was skipped: `ingest.bank-from-in` reads the `From HSBC:` credit off the `+` glued to its figure, and `ingest.bank-from-out` and `ingest.bank-from-unsure` refuse that sign so no line is claimed twice -> 03f76621c84239df',
     ],
   },
   'work@1.1.0': { declares: 'b49e051fe7c26ac5' },

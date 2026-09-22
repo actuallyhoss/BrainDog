@@ -1678,6 +1678,9 @@ const SAME_MOVEMENT: SeedIngest['dedupe'] = { near: { on: ['amount', 'account'],
 /** The debit's sign: a hyphen against the last digit of the figure, then the balance. */
 const SIGNED_DEBIT = [...'0123456789'].map((digit) => ({ field: 'body', contains: `${digit}- your available balance` }));
 
+/** The credit's sign, in the same place: a `+` against the last digit of the figure (`bank-from-in`). */
+const SIGNED_CREDIT = [...'0123456789'].map((digit) => ({ field: 'body', contains: `${digit}+ your available balance` }));
+
 /** `NOT_A_MOVEMENT` without `balance is`, which every one of these lines prints (see `bank-from-out`). */
 const FROM_HSBC_SKIP: SeedIngest['skip'] = [
   { when: { field: 'body', contains: 'refund' }, reason: 'A refund is money coming back, and this pattern reads a charge.' },
@@ -1892,11 +1895,13 @@ export const MONEY_INGESTS: Record<string, SeedIngest> = {
    * available balance"* as money OUT at `exact`. A spaced hyphen may be the bank's sign or a separator,
    * and one line cannot say which, so that line is `bank-from-unsure`'s below, and a person's.
    *
-   * THE CREDIT HALF HAS NO PATTERN, and that is the choice this comment exists to record. A credit is
-   * marked by the hyphen being ABSENT, so its `match:` would be `none: [- your available balance]`, and
-   * a debit whose hyphen arrived touching the next word (`2500.00-Your`, measured: nothing claims it
-   * today) would satisfy it and be written as money IN at `exact`: the wrong sign at the confidence nothing downstream questions, which `bank-card-out`
-   * above spends a paragraph on. Interest and deposits land `untriaged` with their bytes instead.
+   * THE CREDIT HALF IS `bank-from-in` BELOW, and this paragraph said it could not exist. It argued that a
+   * credit is marked by the hyphen being ABSENT, so a credit `match:` could only be `none: [- your
+   * available balance]`, which a debit whose hyphen arrived touching the next word (`2500.00-Your`)
+   * would satisfy as money IN at `exact`. The argument was sound and its premise was not measured:
+   * `loop/research-bank-real.md` (*The three that did not read*, item 2) found the one real credit in a
+   * hundred arrivals carrying a `+` glued to the figure where the debit glues its `-`. A credit is marked
+   * by a sign of its own, so its `match:` asks for that sign and never for an absence.
    *
    * THE AMOUNT IS THE SECOND FIGURE AFTER THE STARS, and it has to be counted. Between `***-` and the
    * hyphen sit the account's own digits and the code: `scanMoney` over `327 EGP 2500.00` answers EGP
@@ -1921,7 +1926,11 @@ export const MONEY_INGESTS: Record<string, SeedIngest> = {
     pack: 'money-core',
     channel: 'email',
     match: {
-      all: [{ field: 'body', contains: 'from hsbc:' }, { any: SIGNED_DEBIT }, { none: [{ field: 'body', contains: 'debited' }, { field: 'body', contains: 'credited' }] }],
+      all: [
+        { field: 'body', contains: 'from hsbc:' },
+        { any: SIGNED_DEBIT },
+        { none: [...SIGNED_CREDIT, { field: 'body', contains: 'debited' }, { field: 'body', contains: 'credited' }] },
+      ],
     },
     skip: FROM_HSBC_SKIP,
     extract: {
@@ -1929,6 +1938,51 @@ export const MONEY_INGESTS: Record<string, SeedIngest> = {
       direction: { enum: { map: { 'your available balance': 'out' } } },
       on: FROM_HSBC_DAY,
       amount: { nth: { n: 2, of: { money: { between: ['***-', '- Your available balance'], currency: HOME_CURRENCY } } } },
+      account: FROM_HSBC_ACCOUNT,
+    },
+    writes: { register: 'transactions', confidence: 'exact' },
+    dedupe: SAME_MOVEMENT,
+    on_conflict: 'skip',
+  },
+
+  /**
+   * THE CREDIT HALF OF THE SAME LINE, OFF THE `+` THE BANK GLUES TO THE FIGURE. *"From HSBC: 01AUG26 Deposit
+   * Interest 042-118***-327 EGP 418.62+ Your available balance is EGP 33,540.25"*, invented values in the shape
+   * `loop/research-bank-real.md` measured. Before this pattern it landed `untriaged` with nothing claiming it,
+   * so interest and deposits never reached the ledger however often he forwarded them.
+   *
+   * EXCLUSIVE BY A SIGN, NOT BY AN ABSENCE. `match:` asks for `SIGNED_CREDIT`, a `+` against a digit, and
+   * refuses `SIGNED_DEBIT`, and `bank-from-out` refuses `SIGNED_CREDIT` back, so a line with both signs is
+   * claimed by neither and goes to a person as `untriaged`. A debit whose hyphen drifted (`2500.00-Your`)
+   * carries no `+` and cannot land here, which was the whole of the old argument against a credit pattern.
+   *
+   * THE DESCRIPTION ENDS AT THE STARS, AND KEEPS THE BRANCH CODE. The real credit has no `from` or `to` before
+   * the account, so `FROM_HSBC_WHAT`'s closing ` from ` is not there and `what` would be unread. Nothing but
+   * digits sits between the words and the account, so `***-` is the first literal after them and the value is
+   * `01AUG26 Deposit Interest 042-118`: the date at the front as the debit has it, and the account's public
+   * half at the back. Both are what the bank printed, and a person reading the row can still tell what it was.
+   *
+   * THE SKIP LIST HOLDS ONLY THE PIN REMINDER. `FROM_HSBC_SKIP`'s refund line says *"this pattern reads a
+   * charge"*, which is false here: a refund on this line is money coming back, and money in is what this
+   * pattern writes. The amount is counted to the second figure for the reason `bank-from-out` gives.
+   */
+  'bank-from-in': {
+    ingest: 'bank-from-in',
+    pack: 'money-core',
+    channel: 'email',
+    match: {
+      all: [
+        { field: 'body', contains: 'from hsbc:' },
+        { any: SIGNED_CREDIT },
+        { none: [...SIGNED_DEBIT, { field: 'body', contains: 'debited' }, { field: 'body', contains: 'credited' }] },
+      ],
+    },
+    skip: [{ when: { field: 'body', contains: 'your pin' }, reason: 'A PIN reminder carries the card digits and moves no money.' }],
+    extract: {
+      what: { text: { between: ['From HSBC: ', '***-'] } },
+      direction: { enum: { map: { 'your available balance': 'in' } } },
+      on: FROM_HSBC_DAY,
+      amount: { nth: { n: 2, of: { money: { between: ['***-', '+ Your available balance'], currency: HOME_CURRENCY } } } },
       account: FROM_HSBC_ACCOUNT,
     },
     writes: { register: 'transactions', confidence: 'exact' },
@@ -1953,8 +2007,8 @@ export const MONEY_INGESTS: Record<string, SeedIngest> = {
    * slice ends with is a space and perhaps a hyphen after it, and `scanMoney` reads a minus as a sign only
    * when it touches the digits, so the figure is read as a size and never as a signed amount.
    *
-   * `none:` HOLDS `SIGNED_DEBIT`, so a line carrying the real glued sign as well as a stray hyphen belongs to
-   * the debit and never to both. `test/money-bank.test.ts` asks every pattern of every wording.
+   * `none:` HOLDS `SIGNED_DEBIT` AND `SIGNED_CREDIT`, so a line carrying a real glued sign as well as a stray
+   * hyphen belongs to that sign's pattern and never to two. `test/money-bank.test.ts` asks every pattern of every wording.
    */
   'bank-from-unsure': {
     ingest: 'bank-from-unsure',
@@ -1964,7 +2018,7 @@ export const MONEY_INGESTS: Record<string, SeedIngest> = {
       all: [
         { field: 'body', contains: 'from hsbc:' },
         { any: [{ field: 'body', contains: ' - your available balance' }, { field: 'body', contains: ' -your available balance' }] },
-        { none: [...SIGNED_DEBIT, { field: 'body', contains: 'debited' }, { field: 'body', contains: 'credited' }] },
+        { none: [...SIGNED_DEBIT, ...SIGNED_CREDIT, { field: 'body', contains: 'debited' }, { field: 'body', contains: 'credited' }] },
       ],
     },
     skip: FROM_HSBC_SKIP,
