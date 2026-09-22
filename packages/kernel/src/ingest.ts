@@ -876,11 +876,29 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
           ? `${matched.ingest} found ${invalid.join(', ')} in this one and could not make sense of ${invalid.length === 1 ? 'it' : 'them'}, so the format may have changed.`
           : '',
       ].filter((clause) => clause !== '');
+      /**
+       * AN ARRIVAL HELD FOR A PERSON WAS TOLD IT HAD BEEN PROPOSED. Both sentences below ended *"so
+       * what it read is proposed rather than written"* whatever the state, and under a `needs-review`
+       * ceiling the state is `review`, not `proposed`. The seed's `bank-from-unsure`, which files every
+       * bank line whose sign is unclear at `needs-review` so a person says which way the money went,
+       * read cleanly and put *"bank-from-unsure files at needs-review, so what it read is proposed
+       * rather than written"* in front of that person: a level name as the cause and a state it was
+       * not in as the effect (`test/ingest-review-reason.test.ts`).
+       *
+       * SO A HELD ARRIVAL SAYS WHAT HAPPENS TO IT, which is that nothing is written until somebody
+       * accepts the suggestion opened below. Where the state really is `proposed` the sentence is word
+       * for word what it was, so no receipt already in a record changes meaning.
+       */
+      const held = state === 'review' ? 'waits for a person on everything it reads, so nothing from this one is written until somebody accepts it.' : '';
       const reason = missed.length
         ? clauses.join(' ')
         : soft.length
-          ? `${matched.ingest} chose or defaulted ${soft.join(', ')} rather than reading them, so what it read is proposed rather than written.`
-          : `${matched.ingest} files at ${ceiling}, so what it read is proposed rather than written.`;
+          ? held
+            ? `${matched.ingest} chose or defaulted ${soft.join(', ')} rather than reading them, and it ${held}`
+            : `${matched.ingest} chose or defaulted ${soft.join(', ')} rather than reading them, so what it read is proposed rather than written.`
+          : held
+            ? `${matched.ingest} ${held}`
+            : `${matched.ingest} files at ${ceiling}, so what it read is proposed rather than written.`;
       store(state, reason);
       note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', confidence);
 
