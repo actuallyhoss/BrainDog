@@ -263,7 +263,7 @@
       "vars": {
         "PUBLIC_HOST": "app.alpha.brain.dog",
         "AI_GATEWAY": "braindog-alpha",
-        "AGE_RECIPIENT": "age1<alpha-recipient>",
+        "AGE_RECIPIENT": "age1f6rykmshc4zf5y3lf0ecuyzyqr8a4ek29wlmp688gydyxckwjq3s75n58r",
         "SPARK_ENDPOINT": "",
         "BRAINDOG_BUILD": "",
         /* THE RECORD AN ANONYMOUS GET READS, for the public demo, and empty is none. `demoRecord` in
@@ -273,7 +273,7 @@
         "DEMO_RECORD": "",
         /* EMPTY IS NO SIGN-IN LINKS. The sender, on a domain Email Service sends for, switches them on
            with the `EMAIL` binding below (51 §5.8). */
-        "AUTH_MAIL_FROM": "",
+        "AUTH_MAIL_FROM": "hello@brain.dog",
         /* AND THE ONE WORD THAT LETS A KEYLESS RECORD BE MADE ON PURPOSE. Empty is the default and
            the default is a refusal: with no `KEK` bound, `/auth/provision` answers
            `NOT_IN_THIS_BUILD` rather than making a record that can never seal a grant, because a
@@ -386,13 +386,13 @@
       "vars": {
         "PUBLIC_HOST": "app.brain.dog",
         "AI_GATEWAY": "braindog",
-        "AGE_RECIPIENT": "age1<production-recipient>",
+        "AGE_RECIPIENT": "age1av0654ll7t2ghrzr7ekervs5hjc9sm0he0569z45cvu92dd43aqql9gm3t",
         "SPARK_ENDPOINT": "",
         "BRAINDOG_BUILD": "",
         "DEMO_RECORD": "",
         /* EMPTY IS NO SIGN-IN LINKS. The sender, on a domain Email Service sends for, switches them on
            with the `EMAIL` binding below (51 §5.8). */
-        "AUTH_MAIL_FROM": "",
+        "AUTH_MAIL_FROM": "hello@brain.dog",
         /* AND THE ONE WORD THAT LETS A KEYLESS RECORD BE MADE ON PURPOSE. Empty is the default and
            the default is a refusal: with no `KEK` bound, `/auth/provision` answers
            `NOT_IN_THIS_BUILD` rather than making a record that can never seal a grant, because a
