@@ -29,6 +29,8 @@
   let failed = $state<string | null>(null);
   let joined = $state(false);
   let keyAdded = $state(false);
+  /** What they typed for themselves. Only somebody new here is asked, because only a new person is made with it. */
+  let name = $state('');
 
   /** The host's own sentence where it gave one, and a calm general one where it did not. */
   const sentence = (out: Said<unknown>): string => (!out.ok && 'fix' in out && typeof out.fix === 'string' && out.fix ? out.fix : copy.inviteFailed);
@@ -49,7 +51,7 @@
     busy = 'accept';
     failed = null;
     const at = opened();
-    const out = await acceptInvite(token);
+    const out = await acceptInvite(token, seen?.ok && !seen.value.signedInAs ? name : undefined);
     closed(true, at);
     busy = null;
     if (out.ok) joined = true;
@@ -104,6 +106,16 @@
           {#if seen.value.signedInAs}<p class="calm-body">{copy.inviteSignedInAs(seen.value.signedInAs)}</p>{/if}
         </div>
         <div class="doors">
+          <!-- ONE OPTIONAL FIELD, AND ONLY FOR SOMEBODY NOBODY HAS SIGNED IN. The host takes a name only where it
+               makes the person, so asking somebody already signed in would be a box whose answer goes nowhere.
+               Without it People drew their address where their name goes. THE TWO WORDS ARE TYPED HERE because
+               `copy.ts` was held by another change when this landed; they belong there as `inviteNameLabel`. -->
+          {#if !seen.value.signedInAs}
+            <label class="lbl" for="in-name">Your name (optional)</label>
+            <span class="field field-lg">
+              <input id="in-name" class="field-input" type="text" autocomplete="name" bind:value={name} />
+            </span>
+          {/if}
           <Button weight="primary" onclick={accept} aria-busy={busy === 'accept'}>
             {busy === 'accept' ? copy.inviteAccepting : copy.inviteAccept}
           </Button>
@@ -197,6 +209,12 @@
        the default would have doubled this line the moment it became a heading. */
     margin: 0;
     font-size: var(--t-lg);
+    font-weight: 600;
+  }
+
+  .lbl {
+    color: var(--dim);
+    font-size: var(--t-sm);
     font-weight: 600;
   }
 

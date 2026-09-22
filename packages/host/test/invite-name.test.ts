@@ -7,10 +7,10 @@
  * name typed at the moment the person is made is the name the row is made with.
  *
  * THE DIRECTORY HERE IS THE REAL ONE, and `person` is wired straight to `person$`, so what these tests watch
- * is a row in `dir_person` and not a spy's argument list. THE LIVE HOSTS DO NOT CARRY THE NAME THAT FAR YET:
- * `Directory$.invitee` (`apps/worker/src/index.ts:843`) calls `person$(email)` with one argument and the
- * self-host's adapter (`apps/selfhost/src/server.ts:1189`) does the same, so this suite pins the host's half
- * of the seam and the two adapters are still to be forwarded. `known` runs the Worker's own `KNOWN_ADDRESS`
+ * is a row in `dir_person` and not a spy's argument list. THE LIVE HOSTS DID NOT CARRY THE NAME THAT FAR when
+ * this suite was written: `Directory$.invitee` (`apps/worker/src/index.ts`) called `person$(email)` with one
+ * argument and the self-host's adapter (`apps/selfhost/src/server.ts`) did the same. Both now forward it; this
+ * suite still pins only the host's half of the seam. `known` runs the Worker's own `KNOWN_ADDRESS`
  * query for the same fidelity: a person who has named themselves but has neither a passkey nor a record is
  * not "known", which is the only way a second invitation for a named person reaches `person$` at all.
  *
@@ -25,6 +25,7 @@ import assert from 'node:assert/strict';
 
 import type { AuthResult, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
+import { createRecordApi, type CallContext } from '@braindog/record';
 import { createDirectory, type AuthConfig } from '@braindog/record/directory';
 
 import { serveInvite, type InviteDoor } from '../src/invite.ts';
@@ -127,5 +128,44 @@ test('A SECOND INVITATION DOES NOT RENAME ANYBODY who has since named themselves
     assert.equal(s.nameOf('fi@example.com'), 'Fi Okonjo', 'a second invitation blanked a name');
   } finally {
     s.close();
+  }
+});
+
+/* ── the record's own mirror, which is what People draws ─────────────────────────────────────────── */
+
+/**
+ * THE DIRECTORY ROW WAS NOT THE ROW THE SCREEN READS. People draws `m.name ?? m.email` from the record's own `person`
+ * table (`apps/web/src/lib/record/settings-write.ts:49`, fed by `members()`), and `serveInvite` handed `accept` only
+ * `{ id, email }`, so the three tests above were green while People still drew `bo@example.com`. The audit measured
+ * it with a real record behind the door (`loop/research-batch-fourteen-audit.md` finding 1), and so does this.
+ */
+test('THE NAME REACHES THE RECORD, so People draws it and not the address', async () => {
+  const sql = openSqlite();
+  const d = createDirectory(sql, fixedClock(NOW), CONFIG);
+  const api = await createRecordApi({ sql: openSqlite(), clock: fixedClock(NOW), invitations: () => null });
+  try {
+    assert.ok((await api.kernel.install([])).ok);
+    const owner: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 'owner' } };
+    assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_owner', email: 'ada@example.com' } }).ok);
+    const minted = await api.invite({ email: 'bo@example.com', level: 'write' }, owner);
+    assert.ok(minted.ok, JSON.stringify(minted));
+    const token = (minted.value as { token: string }).token;
+
+    const invite: InviteDoor = {
+      look: (t) => api.acceptInvite({ token: t }) as Promise<Result<{ email: string; expires_at: string }>>,
+      accept: (t, person) => api.acceptInvite({ token: t, person }),
+      known: (email) => Promise.resolve(Boolean(sql.one(KNOWN_ADDRESS, email))),
+      person: (email, name) => Promise.resolve(d.person$(email, name)),
+    };
+    const door = { on: 'worker' as const, ip: '203.0.113.9', auth: d.auth, invite };
+    const finish = (out: AuthResult) => new Response(JSON.stringify('body' in out ? out.body : null), { status: out.status });
+
+    const out = await serveInvite({ inviteToken: token, accept: true, name: 'Bo Tanner' }, undefined, door, finish);
+    assert.equal(out.status, 200, await out.text());
+    const bo = api.kernel.members().find((m) => m.email === 'bo@example.com');
+    assert.ok(bo, 'the invitation did not put anybody on the record');
+    assert.equal(bo.name, 'Bo Tanner', "the record's member row has no name, so People draws the address");
+  } finally {
+    sql.close();
   }
 });

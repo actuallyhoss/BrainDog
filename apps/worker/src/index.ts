@@ -148,12 +148,15 @@ function storageSql(storage: DurableObjectStorage): Sql {
     one: <T = Row>(text: string, ...params: Param[]) =>
       (sql.exec(text, ...(params as never[])).toArray() as T[])[0],
     /**
-     * `transactionSync`, and the nesting guard is here for the same reason it is in the Node
-     * adapter: a rule writing a row from inside a write shares its caller's transaction, and a
-     * second BEGIN is an error rather than a savepoint (`33-CONTRACTS` §1).
+     * `transactionSync`, and a NESTED call goes to the storage's own `transactionSync` too, because
+     * on a Durable Object that IS a savepoint: measured on workerd 1.20260903.1, an inner throw undid
+     * only the inner row. The kernel flattens its own nesting before it gets here, so the one caller
+     * that nests is `attempt()` in `packages/kernel/src/tx.ts`, which cannot issue a raw SAVEPOINT
+     * on this host and needs its refusal to roll back its own writes and nothing else. Answering it
+     * with `fn()` kept those writes (`test/kernel-in-do.test.ts`, the delegating case).
      */
     transactionSync<T>(fn: () => T): T {
-      if (depth > 0) return fn();
+      if (depth > 0) return storage.transactionSync(fn);
       depth++;
       try {
         return storage.transactionSync(fn);
@@ -518,7 +521,7 @@ export class Record$ extends DurableObject<Env> {
    *
    * AN RPC AND NEVER A ROUTE, like `create`: whoever calls it with a person puts that person on this record.
    */
-  async acceptInvite(args: { token: string; person?: { id: string; email: string } }): Promise<Result<unknown>> {
+  async acceptInvite(args: { token: string; person?: { id: string; email: string; name?: string } }): Promise<Result<unknown>> {
     const api = await this.#record();
     return api.acceptInvite(args);
   }
@@ -839,10 +842,16 @@ export class Directory$ extends DurableObject<Env> {
     return Boolean(storageSql(this.ctx.storage).one(KNOWN_ADDRESS, email));
   }
 
-  /** The person an invitation makes, found or made by address. */
-  invitee(email: string): Result<{ id: string; email: string }> {
-    const made = this.#directory().person$(email);
-    return made.ok ? { ok: true, value: { id: made.value.id, email: made.value.email } } : made;
+  /**
+   * The person an invitation makes, found or made by address, under the name the page sent if the row is new.
+   *
+   * THE NAME GOES IN AND COMES BACK OUT. This called `person$(email)` with one argument and answered `{ id, email }`,
+   * so a name typed on the invitation page never reached the Directory and could not reach the record's mirror,
+   * which is the row People draws. `serveInvite` has already refused or cleared a hostile name before this runs.
+   */
+  invitee(email: string, name?: string): Result<{ id: string; email: string; name: string | null }> {
+    const made = this.#directory().person$(email, name);
+    return made.ok ? { ok: true, value: { id: made.value.id, email: made.value.email, name: made.value.name } } : made;
   }
 
   /** The record an accepted invitation names, reachable by its new member. */
@@ -1438,7 +1447,7 @@ function invites(env: Env): InviteDoor {
       return out.ok ? ((await directory.joinRecord(found.id, person.id)) as unknown as Result<null>) : out;
     },
     known: async (email) => Boolean(await directory.inviteKnown(email)),
-    person: async (email) => (await directory.invitee(email)) as unknown as Result<{ id: string; email: string }>,
+    person: async (email, name) => (await directory.invitee(email, name)) as unknown as Result<{ id: string; email: string; name: string | null }>,
   };
 }
 

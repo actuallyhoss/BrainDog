@@ -1179,14 +1179,16 @@ export async function start(options: {
         ? {
             invite: {
               look: (inviteToken: string) => api.acceptInvite({ token: inviteToken }) as never,
-              accept: async (inviteToken: string, person: { id: string; email: string }) => {
+              accept: async (inviteToken: string, person: { id: string; email: string; name?: string }) => {
                 const out = await api.acceptInvite({ token: inviteToken, person });
                 if (!out.ok) return out;
                 const record = inviteToken.slice(0, inviteToken.indexOf('.'));
                 return directory.knows(record) ? directory.join(record, person.id) : out;
               },
               known: async (email: string) => Boolean(dirSql.one(KNOWN, email)),
-              person: async (email: string) => directory.person$(email),
+              /* THE NAME IS FORWARDED. This passed the address alone, so the name the invitation page sent stopped
+                 here and neither the Directory nor the record's mirror, which People draws, ever heard it. */
+              person: async (email: string, name?: string) => directory.person$(email, name),
             },
           }
         : {}),

@@ -32,7 +32,7 @@
 import type { AssertionJSON, Auth, AuthCall, AuthFlow, AuthResult, Mail, Methods, RegistrationJSON, Refusal, Result, Who } from '@braindog/ports';
 
 import { DEVICE_ROUTES, serveDevice, type DeviceDoor, type DeviceFlow } from './device.ts';
-import { INVITE_ROUTES, serveInvite, type InviteDoor, type InviteFlow } from './invite.ts';
+import { INVITE_ROUTES, personName, serveInvite, type InviteDoor, type InviteFlow } from './invite.ts';
 import { httpStatus } from './index.ts';
 
 export { DEVICE_ROUTES, type DeviceAsk, type DeviceDoor, type DeviceFlow, type DeviceStarted } from './device.ts';
@@ -603,7 +603,11 @@ async function operated(request: Request, route: AuthRoute, door: AuthDoor): Pro
   const email = text(body.email).trim().toLowerCase();
   let made: Provisioned | null = null;
   if (route.flow === 'provision') {
-    const name = text(body.name).trim();
+    /* THE SAME RULE AS AN INVITATION'S, because it is the same column and the same passkey `displayName`. This
+       trimmed and capped nothing, so the operator's typing could store every name `/auth/invite` now refuses. */
+    const named = personName(body.name);
+    if (!named.ok) return reply(httpStatus(named), named);
+    const name = named.value;
     const out = await operator.provision({ slug: text(body.slug).trim(), email, ...(name ? { name } : {}) });
     if (!out.ok) return reply(httpStatus(out), out);
     made = out.value;

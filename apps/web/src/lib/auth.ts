@@ -306,9 +306,15 @@ export async function lookInvite(token: string, io: Io = live()): Promise<Said<I
   };
 }
 
-/** Accept it: the person signed in, or a new person made and signed in, is put on the record. */
-export async function acceptInvite(token: string, io: Io = live()): Promise<Said<Who>> {
-  return signedIn(call(io, '/auth/invite', { inviteToken: token, accept: true }));
+/**
+ * Accept it: the person signed in, or a new person made and signed in, is put on the record.
+ *
+ * `name` IS WHAT THEY TYPED FOR THEMSELVES, and a blank box sends no field. This posted the token alone, so the name
+ * the host, the Directory and the record's mirror were all ready to take was never sent by anything. What a name may
+ * be is the host's to decide (`packages/host/src/invite.ts`, `personName`), and its refusal comes back as a sentence.
+ */
+export async function acceptInvite(token: string, name?: string, io: Io = live()): Promise<Said<Who>> {
+  return signedIn(call(io, '/auth/invite', { inviteToken: token, accept: true, ...(name?.trim() ? { name } : {}) }));
 }
 
 /* ── the browser half of WebAuthn ────────────────────────────────────────────────────────────────

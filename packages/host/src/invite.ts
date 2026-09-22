@@ -35,7 +35,7 @@ export type InviteDoor = {
   /** The live invitation behind a token: the address it is for, and when it runs out. */
   look(token: string): Promise<Result<{ email: string; expires_at: string }>>;
   /** Spend it for a verified person, and give them the record in the Directory. */
-  accept(token: string, person: { id: string; email: string }): Promise<Result<unknown>>;
+  accept(token: string, person: { id: string; email: string; name?: string }): Promise<Result<unknown>>;
   /** Whether this address can already sign in here, and so must, before a link is spent for it. */
   known(email: string): Promise<boolean>;
   /**
@@ -48,8 +48,57 @@ export type InviteDoor = {
    * whatever a second invitation typed. An invitation is somebody else's typing about a person, so a name that
    * arrives after the row exists is not written here at all.
    */
-  person(email: string, name?: string): Promise<Result<{ id: string; email: string }>>;
+  person(email: string, name?: string): Promise<Result<{ id: string; email: string; name?: string | null }>>;
 };
+
+/** The longest name `personName` takes, in code points. */
+export const NAME_MAX = 100;
+
+/* WHAT DRAWS NOTHING: white space, every Default_Ignorable_Code_Point (the zero-width space, the word joiner, both
+   Hangul fillers, the soft hyphen, the byte order mark), every format character, and the braille blank, which is a
+   symbol by category but a blank cell on every screen. The audit stored five of these as names. */
+const DRAWS_NOTHING = String.raw`[\p{White_Space}\p{Default_Ignorable_Code_Point}\p{Cf}\u2800]`;
+/* LESS WHAT A SCRIPT SPELLS WITH: ZWNJ and ZWJ, which are spelling in Persian and the Indic scripts, and the
+   variation selectors, which choose a glyph. Trimmed off the edges, these would cut the last letter off a
+   Malayalam chillu. */
+const SPELLS_WITH = String.raw`[\u200C\u200D\uFE00-\uFE0F\u{E0100}-\u{E01EF}]`;
+const INVISIBLE = new RegExp(DRAWS_NOTHING, 'gv');
+const EDGE = `[${DRAWS_NOTHING}--${SPELLS_WITH}]`;
+const INVISIBLE_EDGE = new RegExp(`^${EDGE}+|${EDGE}+$`, 'gv');
+/* AND WHAT MAY NOT SIT INSIDE A NAME. White space between words is a name; a zero-width space or a filler between
+   them is two names drawn as one, or a gap nobody can see is there. */
+const INVISIBLE_INSIDE = new RegExp(String.raw`[[\p{Default_Ignorable_Code_Point}\p{Cf}\u2800]--${SPELLS_WITH}]`, 'v');
+
+/**
+ * The name a person typed for themselves: `null` for none, or refused with `VALUE_MALFORMED` at `name`.
+ *
+ * NOTHING VISIBLE IS NO NAME, as spaces already were: the column is NULL for everybody invited by address alone, a
+ * screen asks it "is there a name" before it draws one, and `String.prototype.trim` left `\u200B`, `\u2060`,
+ * `\u3164` and `\u2800` in place, so five invisible names answered yes and drew nothing. Anything that is not a
+ * string is a page sending the wrong shape, which is not a name either.
+ *
+ * SOMETHING VISIBLE AND SOMETHING DANGEROUS IS REFUSED, NOT CLEANED. `node:sqlite` stored `Bo\u0000Tanner` as `Bo`
+ * at the bind, and nobody was told; cleaning here would be the same silence one layer up. Refused: a control
+ * character (NUL, CR, LF, BEL, ESC, tab, DEL, C1), a bidi control (an override makes the stored `Bo nimda` draw as `Bo admin`), an
+ * invisible character between two visible ones, a lone surrogate (stored as U+FFFD), and more than `NAME_MAX`.
+ *
+ * `NAME_MAX` IS 100 CODE POINTS. A person's name needs far less, and the audit's 60,000-character name would have
+ * been the passkey chooser's `displayName` (`packages/record/src/identity.ts:413`). Code points and not UTF-16
+ * units, so a name in an astral script is not refused at half the length of one in Latin.
+ */
+export function personName(raw: unknown): Result<string | null> {
+  if (typeof raw !== 'string') return { ok: true, value: null };
+  const malformed = (fix: string): Result<string | null> => ({ ok: false, refusal: { code: 'VALUE_MALFORMED', fix, at: 'name' } });
+  if (!raw.isWellFormed()) return malformed('That name has a broken character in it. Type it again.');
+  const name = raw.replace(INVISIBLE_EDGE, '');
+  if (name.replace(INVISIBLE, '') === '') return { ok: true, value: null };
+  if ([...name].length > NAME_MAX) return malformed(`A name is at most ${NAME_MAX} characters.`);
+  /* `\p{Zl}` AND `\p{Zp}` BESIDE THE CONTROLS: U+2028 and U+2029 are white space, not controls, and a check for
+     `\p{Cc}` alone stored `Bo Tanner` as a name drawn on two lines. */
+  if (/[\p{Cc}\p{Zl}\p{Zp}\p{Bidi_Control}]/u.test(name) || INVISIBLE_INSIDE.test(name))
+    return malformed('That name has a hidden character in it, such as a line break or a direction mark. Type it again without it.');
+  return { ok: true, value: name };
+}
 
 /** The part of a host's `AuthDoor` this route reads. */
 type Door = { on: 'selfhost' | 'worker'; ip: string; auth: Auth; invite?: InviteDoor | undefined };
@@ -130,13 +179,20 @@ export async function serveInvite(
       at: 'passkey',
     });
 
-  /* TRIMMED, AND AN EMPTY ONE IS NO NAME AT ALL. The column is NULL for everybody invited by address alone, and a
-     screen asks it "is there a name" before it draws one, so a name of spaces would answer yes and draw nothing.
-     Anything that is not a string is a page sending the wrong shape, which is not a name either. */
-  const asked = typeof body.name === 'string' ? body.name.trim() : '';
-  const made = await invite.person(email, asked || undefined);
+  /* THE NAME IS READ HERE AND NOWHERE EARLIER, because path 3 is the only one that makes a person, and it is refused
+     before the person is made and before the link is spent, so a refused name costs the person a retry and nothing
+     else. */
+  const asked = personName(body.name);
+  if (!asked.ok) return reply(httpStatus(asked), asked);
+  const made = await invite.person(email, asked.value ?? undefined);
   if (!made.ok) return reply(httpStatus(made), made);
-  const out = await invite.accept(token, { id: made.value.id, email: made.value.email });
+  /* THE NAME GOES ON TO THE RECORD TOO, because the record's own `person` mirror is what People draws
+     (`apps/web/src/lib/record/settings-write.ts:49`), and the Directory's row is one table short of it. This handed
+     `accept` only `{ id, email }`, so a name reached `dir_person` and People still drew the address; a real record
+     behind the door measured `name: null` on the member row. It is the ROW's name and not the one just typed, so a
+     second invitation for somebody who has named themselves carries their name and not a stranger's. */
+  const named = made.value.name ?? null;
+  const out = await invite.accept(token, { id: made.value.id, email: made.value.email, ...(named ? { name: named } : {}) });
   if (!out.ok) return reply(httpStatus(out), out);
 
   /* THE SESSION IS A CLAIM LINK SPENT AT ONCE, in the Directory, by the same two calls a provisioned owner's first
