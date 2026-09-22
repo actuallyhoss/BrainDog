@@ -1783,7 +1783,18 @@ export function snapshot(
     if (!overwrite && sql.one("SELECT 1 AS x FROM metric_point WHERE series = ? AND grain = 'day' AND at = ?", decl.metric, day))
       return 'kept';
 
-    const read = evaluateMetric(sql, decl, { ...ctx, asOfMs: endOf(dayMs) });
+    /**
+     * AND THE QUESTION IS ASKED OF THAT DAY'S DATE, NOT OF AN INSTANT IN IT.
+     *
+     * This passed `endOf(dayMs)`, the last instant of the LOCAL day, and every reader of `asOfMs`
+     * takes the UTC date of what it is given: `resolveDay` for the window's start, `endedAt` for its
+     * end, the fx day. West of UTC the end of a local day is the next UTC day, so in
+     * `America/New_York` the point stored under 4 September was the thirty days to the 5th, 1100
+     * where the rows to the 4th hold 110 (`test/metrics-asof-tz.test.ts`). Noon UTC of the local
+     * date has that date as its UTC date in every zone, which is what a live read made at noon UTC
+     * on the same day resolves against.
+     */
+    const read = evaluateMetric(sql, decl, { ...ctx, asOfMs: Date.parse(`${day}T12:00:00Z`) });
     /* A NULL VALUE IS NO ROW. A series with a zero on every day nothing happened is a series that
        cannot tell "nothing" from "no answer", and the difference is the whole of a trend. */
     if (!read.ok || read.value.value === null) return 'missing';
