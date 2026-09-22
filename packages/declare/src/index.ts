@@ -153,8 +153,12 @@ export type Diff = {
    * that this version changes too. Both are the owner's own rows, so `pack` is `(this record)`, and both would install
    * without a word if they were not here: the probes measured a page drawing a tile for a retired figure, and a metric
    * summing a field its list did not have.
+   *
+   * `field` IS ONE FIELD OF THE LIST `reads` NAMES that this version takes off, or gives another type when `retyped` is
+   * there, and the owner's declaration reads it. The list itself stays, so `reads` alone would say it was gone. The two
+   * types travel in `retyped` because `conflictFault` sees only the conflicts, and its sentence names both.
    */
-  conflicts: { id: string; pack: string; reads?: string; changed?: true }[];
+  conflicts: { id: string; pack: string; reads?: string; field?: string; retyped?: { from: string; to: string }; changed?: true }[];
   /**
    * The pack's own declarations somebody changed in the app, which this install leaves as they are and does not stage.
    *
@@ -931,12 +935,35 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
      edited Money page, dropped `metric.cash-now`, which its first tile reads, and the install answered `ok` with the page
      still drawing that tile. The conflict above hid it until now. Every edit of this pack's declarations is asked, kept
      or not shipped any more, because the owner's page reads the figure either way. */
+  /* AND ONE THAT READS A FIELD THIS VERSION TAKES OFF A LIST THAT STAYS, which the loop above could not see because the
+     list is not gone. The checker of `9b0d8184` measured it: an edited `spent-30d`, a money-core without `transfer`, a
+     plan with no conflicts, and then `FIELD_UNKNOWN` on every read of the figure, because its `where` still says
+     `transfer is false`. A retyped field is the same failure one step later: a sum over a field that is now text. */
+  const moved = new Map<string, { fields: Map<string, Record<string, unknown>>; moved: Moved[] }>();
+  for (const change of changes) {
+    const decl = pack.declarations.find((d) => d.id === change.id);
+    const was = live.get(change.id)?.body;
+    if (decl?.kind !== 'register' || was === undefined) continue;
+    const found = movedFields(was, decl.body);
+    if (found !== null && found.moved.length > 0) moved.set(change.id, found);
+  }
   const gone = new Set(retires.map((r) => r.id));
   for (const [id, edited] of Object.entries(installed.detached ?? {})) {
     if (edited.was !== mine || conflicts.some((c) => c.id === id)) continue;
     const body = live.get(id)?.body;
-    const reads = body === undefined ? undefined : [...gone].find((r) => readsId(body, r));
-    if (reads !== undefined) conflicts.push({ id, pack: OWN, reads });
+    if (body === undefined) continue;
+    const reads = [...gone].find((r) => readsId(body, r));
+    if (reads !== undefined) {
+      conflicts.push({ id, pack: OWN, reads });
+      continue;
+    }
+    if (live.get(id)?.kind === 'register') continue;
+    for (const [list, { fields, moved: these }] of moved) {
+      const hit = readsField(body, list, fields, these);
+      if (hit === undefined) continue;
+      conflicts.push({ id, pack: OWN, reads: list, field: hit.field, ...(hit.retyped === undefined ? {} : { retyped: hit.retyped }) });
+      break;
+    }
   }
 
   const unresolved = unresolvedOf(pack, installed, retires);
@@ -1151,8 +1178,15 @@ export function conflictFault(diff: Pick<Diff, 'pack' | 'installed_version' | 'c
   if (!first || (first.reads === undefined && !first.changed)) return null;
   const pack = names(diff.pack.id);
   const stay = diff.installed_version === null ? `leave ${pack} as it is` : `leave ${pack} at ${diff.installed_version}`;
+  const who = names(first.id);
   const fix =
-    first.reads !== undefined
+    first.reads !== undefined && first.field !== undefined
+      ? `${pack} ${diff.pack.version} ${
+          first.retyped === undefined
+            ? `takes ${first.field} off ${names(first.reads)}, and ${who}, which you changed, reads it.`
+            : `makes ${first.field} on ${names(first.reads)} ${an(first.retyped.to)}, and ${who}, which you changed, reads it as ${an(first.retyped.from)}.`
+        } Take ${first.field} off ${who} first, or ${stay}.`
+      : first.reads !== undefined
       ? `${pack} ${diff.pack.version} no longer has ${first.reads}, and ${names(first.id)}, which you changed, reads it. Take ${first.reads} off ${names(first.id)} first, or ${stay}.`
       : `${pack} ${diff.pack.version} changes ${names(first.id)}, which you changed: kept as you left it, it would lack what the update adds to it. For now, ${stay}.`;
   return { code: 'PROVIDES_CONFLICT', fix, at: first.id };
@@ -1188,6 +1222,118 @@ export function unresolvedFault(diff: Pick<Diff, 'pack' | 'unresolved'>): Refusa
     at: first.at,
     allowed: lists,
   };
+}
+
+/** A list body's fields by id, in the order it declares them. Anything that is not a list body has none. */
+function fieldsOf(body: unknown): Map<string, Record<string, unknown>> {
+  const list = (body as { fields?: unknown } | null)?.fields;
+  const out = new Map<string, Record<string, unknown>>();
+  if (!Array.isArray(list)) return out;
+  for (const raw of list) {
+    const f = raw as { id?: unknown };
+    if (isObject(raw as Json) && typeof f.id === 'string') out.set(f.id, f as Record<string, unknown>);
+  }
+  return out;
+}
+
+/* THE ELEMENT TYPE COUNTS AS THE TYPE. `42 §5.3·31` says *"a different `type` (or `of.type`)"*, and a `list<text>` that
+   becomes a `list<int>` reads every row it holds as the wrong thing exactly as `text → money` does. */
+const typeSaid = (f: Record<string, unknown>): string => `${String(f.type ?? '')}${f.of === undefined ? '' : `<${JSON.stringify(f.of)}>`}`;
+
+/** A type said with its article, as the refusal reads it: `a text`, `an enum`. */
+const an = (type: string): string => `${/^[aeiou]/iu.test(type) ? 'an' : 'a'} ${type}`;
+
+/** A field an update takes off a list, or gives another type when `retyped` is there. */
+type Moved = { field: string; retyped?: { from: string; to: string } };
+
+/**
+ * What an update does to one list's fields: each it takes off or retypes, in the order the installed list declares them,
+ * with the installed fields the owner's declarations were written against. `null` for a stored body that will not parse,
+ * for `unreadable`'s reason.
+ */
+function movedFields(was: string, now: unknown): { fields: Map<string, Record<string, unknown>>; moved: Moved[] } | null {
+  let old: unknown;
+  try {
+    old = JSON.parse(was);
+  } catch {
+    return null;
+  }
+  const fields = fieldsOf(old);
+  const after = fieldsOf(now);
+  const moved: Moved[] = [];
+  for (const [id, then] of fields) {
+    const next = after.get(id);
+    if (next === undefined) moved.push({ field: id });
+    else if (typeSaid(then) !== typeSaid(next)) moved.push({ field: id, retyped: { from: typeSaid(then), to: typeSaid(next) } });
+  }
+  return { fields, moved };
+}
+
+/** Keys whose text is for a person or names the declaration itself, and is never a field it reads. */
+const NOT_A_FIELD = new Set(['name', 'title', 'heading', 'label', 'summary', 'description', 'note', 'say', 'kind', 'format', 'source', 'register', 'metric', 'page', 'rule']);
+/** Keys whose text is a `where` sentence, read clause by clause. */
+const SENTENCES = new Set(['where', 'when', 'filter']);
+
+/**
+ * The first of `moved` that a stored body reads on the list `list` names: a field written whole as a value (a metric's
+ * `sum`, a column's `field`, a structured predicate's leaf), or the field a clause of a `where` or `when` sentence
+ * begins with, by id or by label as `@braindog/where`'s `parseWhere` finds it.
+ *
+ * SCOPED BY LIST, because a field is a field of one list. A metric's `source`, a block's `source` and a rule's `register`
+ * set the list for everything under them, and `note` on another list is not `note` on this one.
+ *
+ * THE CLAUSE RULE IS COPIED AND NOT IMPORTED. `declare` depends on `kernel` and `ports` only, and the graph gate refuses
+ * an undeclared import; the rule is small (split on the comma, the id exactly, else the longest label the clause starts
+ * with) and a false yes here costs a refusal naming both, where a false no costs a figure that fails on every read.
+ */
+function readsField(body: string, list: string, fields: Map<string, Record<string, unknown>>, moved: readonly Moved[]): Moved | undefined {
+  const name = list.slice(list.indexOf('.') + 1);
+  const fold = (t: string): string => t.replace(/[\s_]+/gu, ' ').trim().toLowerCase();
+  const clause = (said: string): string | null => {
+    const first = said.trim().split(/\s+/u)[0] ?? '';
+    if (fields.has(first)) return first;
+    const folded = fold(said);
+    let best = '';
+    let found: string | null = null;
+    for (const [id, f] of fields)
+      for (const n of [typeof f.label === 'string' ? f.label : '', id]) {
+        const key = fold(n);
+        if (!key || key.length <= best.length) continue;
+        if (folded === key || folded.startsWith(`${key} `)) {
+          best = key;
+          found = id;
+        }
+      }
+    return found;
+  };
+  const read = new Set<string>();
+  const walk = (v: unknown, key: string | null, on: string | null): void => {
+    if (typeof v === 'string') {
+      if (on !== name || key === null || NOT_A_FIELD.has(key)) return;
+      if (SENTENCES.has(key))
+        for (const c of v.split(',')) {
+          const f = clause(c);
+          if (f !== null) read.add(f);
+        }
+      else if (fields.has(v)) read.add(v);
+      return;
+    }
+    if (Array.isArray(v)) {
+      for (const x of v) walk(x, key, on);
+      return;
+    }
+    if (!isObject(v as Json)) return;
+    const o = v as Record<string, unknown>;
+    const at = typeof o.source === 'string' && o.source.startsWith('register.') ? o.source : typeof o.register === 'string' ? o.register : null;
+    const here = at === null ? on : at.startsWith('register.') ? at.slice('register.'.length) : at;
+    for (const [k, x] of Object.entries(o)) walk(x, k, here);
+  };
+  try {
+    walk(JSON.parse(body), null, null);
+  } catch {
+    return undefined;
+  }
+  return moved.find((m) => read.has(m.field));
 }
 
 /**
@@ -1231,27 +1377,10 @@ function unreadable(
   } catch {
     return;
   }
-  const fieldsOf = (body: unknown): Map<string, Record<string, unknown>> => {
-    const list = (body as { fields?: unknown })?.fields;
-    const out = new Map<string, Record<string, unknown>>();
-    if (!Array.isArray(list)) return out;
-    for (const raw of list) {
-      const f = raw as { id?: unknown };
-      if (isObject(raw as Json) && typeof f.id === 'string') out.set(f.id, f as Record<string, unknown>);
-    }
-    return out;
-  };
-
   const before = fieldsOf(old);
   for (const [id, now] of fieldsOf(decl.body)) {
     const then = before.get(id);
-
-    /* THE ELEMENT TYPE COUNTS AS THE TYPE. `42 §5.3·31` says *"a different `type` (or `of.type`)"*,
-       and a `list<text>` that becomes a `list<int>` reads every row it holds as the wrong thing
-       exactly as `text → money` does. */
-    const said = (f: Record<string, unknown> | undefined): string =>
-      f === undefined ? '' : `${String(f.type ?? '')}${f.of === undefined ? '' : `<${JSON.stringify(f.of)}>`}`;
-    if (then !== undefined && said(then) !== said(now)) retypes.push({ id: decl.id, field: id, from: said(then), to: said(now), rows });
+    if (then !== undefined && typeSaid(then) !== typeSaid(now)) retypes.push({ id: decl.id, field: id, from: typeSaid(then), to: typeSaid(now), rows });
 
     /* A `default` IS THE ANSWER FOR THE ROWS THAT HAVE NONE, which is why `04 §5`'s sentence names
        it as the repair: *"Ship a default or a fill rule."* */
