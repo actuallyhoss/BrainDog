@@ -388,15 +388,28 @@ export function allows(ctx: CallContext, need: Need): Refusal | null {
      `allowed: []` — so an agent an owner had set up ten minutes earlier could not tell whether to
      retry, to ask for something else, or to stop. Naming the registers it DOES hold is the whole of
      the answer: either the call belongs to one of them, or it belongs to the record and this caller
-     was never given the record. */
-  if (p.level === null)
+     was never given the record.
+
+     AND A PERSON IS TOLD ABOUT THEIR INVITATION, NOT ABOUT A TOKEN. The sentence was written for an agent, and
+     `loop/research-invite-landing.md` finding 6 measured nine methods (`inbox`, `packs`, `planPack`, `decide`
+     among them) saying it to a colleague invited to one list, who signed in from a link, holds no token and was
+     never offered one. It was the sentence on `/inbox`, `/spark`, `/packs` and every `/start` tile. The token's
+     wording stays, because a wider token is exactly what its owner can mint. */
+  if (p.level === null) {
+    const lists = ctx.registers && ctx.registers !== '*' && ctx.registers.length > 0 ? [...ctx.registers].join(', ') : null;
+    const person = p.kind === 'person';
     return {
       code: 'FORBIDDEN',
-      fix: ctx.registers && ctx.registers !== '*' && ctx.registers.length > 0
-        ? `This call is about the record itself, and you hold ${[...ctx.registers].join(', ')} and nothing else. Name one of those, or ask the owner for a record-wide token.`
-        : 'This call is about the record itself, and you hold no access to it. Ask the owner for a token.',
+      fix: lists
+        ? person
+          ? `This belongs to the whole record, and you were invited to ${lists} and nothing else. Open one of those, or ask the owner to invite you to the whole record.`
+          : `This call is about the record itself, and you hold ${lists} and nothing else. Name one of those, or ask the owner for a record-wide token.`
+        : person
+          ? 'This belongs to the whole record, and you have no access to it. Ask the owner to invite you.'
+          : 'This call is about the record itself, and you hold no access to it. Ask the owner for a token.',
       allowed: ctx.registers && ctx.registers !== '*' ? [...ctx.registers] : [],
     };
+  }
 
   const level: Level = p.level;
   const reach =
@@ -3214,9 +3227,23 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          transaction has already committed — so the suggestion is reopened rather than left resolved
          with nothing behind it. */
       const decl = out.value.install as { id?: string; kind?: string; body?: unknown };
-      const put = await kernel.install([decl as never]);
+      /* AND A `to` THAT IS NOT A DECLARATION THROWS RATHER THAN REFUSES. d15066d2 stopped one being filed, but a
+         change already in the queue from before it still holds `{ values: [...] }`, and accepting it threw
+         `Cannot read properties of undefined (reading 'writes')` out of `install` before the `reopen` below ran:
+         the owner saw a crash and the record kept the suggestion resolved with nothing installed
+         (`test/decide-install.test.ts`). A throw here is the same answer as a refusal, in the record's words. */
+      let put: Awaited<ReturnType<typeof kernel.install>>;
+      try {
+        put = await kernel.install([decl as never]);
+      } catch {
+        put = no(
+          'VALUE_MALFORMED',
+          'What this change would install is not a declaration, so nothing was changed and the question is open again. Propose it again as {"id":"register.<id>","kind":"register","body":{...}}.',
+          { at: 'body.to' },
+        );
+      }
       if (!put.ok) {
-        kernel.reopen(out.value.suggestion);
+        kernel.reopen(out.value.suggestion, 'refusal' in put ? put.refusal.fix : undefined);
         return tail(put);
       }
       return tail(out);
