@@ -320,13 +320,26 @@ const CHUNK = 64 * 1024;
 export type Sealed = { length: number; stream: ReadableStream<Uint8Array> };
 
 /**
+ * A plaintext the stream reads front to back and never holds whole: its length, known before the
+ * first byte, and `read`, which fills `out` with exactly the next `out.length` bytes.
+ *
+ * WHY THE SEALER TAKES THIS AND NOT ONLY BYTES. The nightly dump reaches the Worker as a string, and
+ * encoding it to one buffer before sealing held the string and a file as long as the dump at once:
+ * 120.8 MiB of a 122 MiB isolate at the ceiling once the string held one character outside Latin-1
+ * (batch-twenty audit, finding 4). `snapshots.ts` hands a reader over the string instead, and each
+ * pull encodes one chunk's worth.
+ */
+export type Plain = { length: number; read(out: Uint8Array): void };
+
+/**
  * The sealer to one X25519 recipient, as a stream that seals one 64 KiB chunk per pull. The
  * recipient must already have passed `recipientOf`. This is the one implementation of age here:
  * the Worker streams it to R2 through `snapshots.ts`, and `sealTo` below reads it into a buffer.
  *
  * EVERY CALL IS A FRESH FILE KEY AND A FRESH EPHEMERAL SHARE, as the spec requires: two nights of
  * one record share nothing a reader of the bucket could line up. The stream reads `file` as it is
- * pulled and never copies it, so the caller must not change `file` until the stream ends.
+ * pulled and never copies it, so the caller must not change `file` until the stream ends. A `Plain`
+ * is read one chunk per pull into one 64 KiB scratch buffer, which the chunk is sealed out of.
  *
  * WHY A STREAM AND NOT ONE BUFFER. `take` used to hold the sealed file beside the plaintext for
  * both puts: measured by `test/snapshots-stream.test.ts` at the 40 MiB ceiling, 80 MiB live while
@@ -337,9 +350,16 @@ export type Sealed = { length: number; stream: ReadableStream<Uint8Array> };
  * `seal.test.ts` and `seal-memory.test.ts` tested the original. Breaking the copy's final-chunk
  * flag left both of those files green; only the streaming test saw it.
  */
-export function sealStreamTo(recipient: Uint8Array): (file: Uint8Array) => Promise<Sealed> {
+export function sealStreamTo(recipient: Uint8Array): (file: Uint8Array | Plain) => Promise<Sealed> {
   return async (file) => {
-    const { first, count, length, chunk } = await begin(recipient, file);
+    const { first, count, length, chunk } = await begin(recipient, file.length);
+    const scratch = file instanceof Uint8Array ? undefined : new Uint8Array(Math.min(CHUNK, file.length));
+    const next = (i: number, size: number): Uint8Array => {
+      if (!scratch) return (file as Uint8Array).subarray(i * CHUNK, i * CHUNK + size);
+      const part = scratch.subarray(0, size);
+      (file as Plain).read(part);
+      return part;
+    };
 
     /* THE HEADER AND THE PAYLOAD NONCE ARE THE FIRST PULL, then one sealed chunk per pull. */
     let i = -1;
@@ -348,9 +368,9 @@ export function sealStreamTo(recipient: Uint8Array): (file: Uint8Array) => Promi
         if (i === -1) {
           out.enqueue(first);
         } else if (i < count) {
-          const plain = i === count - 1 ? file.length - i * CHUNK : CHUNK;
-          const sealed = new Uint8Array(plain + 16);
-          chunk(i, sealed, 0);
+          const size = i === count - 1 ? file.length - i * CHUNK : CHUNK;
+          const sealed = new Uint8Array(size + 16);
+          chunk(i, next(i, size), sealed, 0);
           out.enqueue(sealed);
         } else {
           out.close();
@@ -364,13 +384,15 @@ export function sealStreamTo(recipient: Uint8Array): (file: Uint8Array) => Promi
 
 /**
  * Everything about one sealed file but its payload bytes: the header and payload nonce that open it,
- * its chunk count and length, and `chunk`, which seals chunk `i` into `out` at `at`. The one place
- * the header, the HKDF salts, the low-order refusal and the STREAM nonce rules are written.
+ * its chunk count and length, and `chunk`, which seals `plain`, chunk `i` of a `size`-byte file,
+ * into `out` at `at`. The one place the header, the HKDF salts, the low-order refusal and the STREAM
+ * nonce rules are written. It is given the length and not the file, so the stream can seal a
+ * plaintext that is never a buffer.
  */
 async function begin(
   recipient: Uint8Array,
-  file: Uint8Array,
-): Promise<{ first: Uint8Array; count: number; length: number; chunk: (i: number, out: Uint8Array, at: number) => void }> {
+  size: number,
+): Promise<{ first: Uint8Array; count: number; length: number; chunk: (i: number, plain: Uint8Array, out: Uint8Array, at: number) => void }> {
   const fileKey = crypto.getRandomValues(new Uint8Array(16));
 
   /* THE X25519 STANZA. The wrap key's salt is the ephemeral share then the recipient, in that order. */
@@ -399,13 +421,13 @@ async function begin(
   const nonce = crypto.getRandomValues(new Uint8Array(16));
   const payloadKey = await hkdf(fileKey, nonce, 'payload');
   const first = concat(new TextEncoder().encode(`${header} ${b64(mac)}\n`), nonce);
-  const count = Math.max(1, Math.ceil(file.length / CHUNK));
-  const length = first.length + file.length + 16 * count;
-  const chunk = (i: number, out: Uint8Array, at: number): void => {
+  const count = Math.max(1, Math.ceil(size / CHUNK));
+  const length = first.length + size + 16 * count;
+  const chunk = (i: number, plain: Uint8Array, out: Uint8Array, at: number): void => {
     const n = new Uint8Array(12);
     new DataView(n.buffer).setUint32(7, i, false);
     if (i === count - 1) n[11] = 1;
-    sealInto(payloadKey, n, file.subarray(i * CHUNK, (i + 1) * CHUNK), out, at);
+    sealInto(payloadKey, n, plain, out, at);
   };
   return { first, count, length, chunk };
 }
@@ -421,11 +443,11 @@ async function begin(
  */
 export function sealTo(recipient: Uint8Array): (file: Uint8Array) => Promise<Uint8Array> {
   return async (file) => {
-    const { first, count, length, chunk } = await begin(recipient, file);
+    const { first, count, length, chunk } = await begin(recipient, file.length);
     const out = new Uint8Array(length);
     out.set(first, 0);
     for (let i = 0, at = first.length; i < count; i++) {
-      chunk(i, out, at);
+      chunk(i, file.subarray(i * CHUNK, (i + 1) * CHUNK), out, at);
       at += Math.min(CHUNK, file.length - i * CHUNK) + 16;
     }
     return out;

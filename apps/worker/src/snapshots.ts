@@ -29,7 +29,7 @@
 
 import { fixOf, type Result } from '@braindog/ports';
 
-import { recipientOf, sealStreamTo, type Sealed } from './seal.ts';
+import { recipientOf, sealStreamTo, type Plain, type Sealed } from './seal.ts';
 
 /** How many dated copies are kept. Thirty, because `apps/selfhost/src/snapshots.ts` keeps thirty (`53 §5.4`). */
 export const KEEP = 30;
@@ -42,9 +42,17 @@ export const KEEP = 30;
  *
  * AND IT IS CHECKED LATER THAN IT SOUNDS, WHICH IS WORTH KNOWING BEFORE ANYBODY RELIES ON IT. The
  * kernel signs inside `export`, so by the time `take` measures, the Durable Object has already
- * built and signed the whole file and shipped it over RPC. What this stops is the Worker adding
- * the encode and the put body on top of a string it is already holding; it does NOT stop an
- * out-of-memory inside the object, and nothing here can until the dump streams (`51 §10`).
+ * built and signed the whole file and shipped it over RPC. It does NOT stop an out-of-memory inside
+ * the object, and nothing here can until the dump streams (`51 §10`).
+ *
+ * WHAT IT BOUNDS IN THE WORKER IS THE STRING, and that is twice what the name says. The ceiling is
+ * bytes of UTF-8, and V8 holds a string at two bytes a character as soon as one character is outside
+ * Latin-1, so a dump at the ceiling can be an 80 MiB string. `take` never makes the file beside it on
+ * workerd: it encodes one 64 KiB chunk per pull. A two-byte dump at the ceiling, counted from before
+ * the string existed, held 120.8 MiB live of the isolate's 122 when the whole file was encoded first
+ * (batch-twenty audit, finding 4), and `test/snapshots-peak.test.ts` read 133 MiB peak resident for
+ * that code against 93 streamed, 13 above the string. Raising this raises the string first, at up to
+ * two bytes of string per byte of file.
  */
 export const CEILING = 40 * 1024 * 1024;
 
@@ -122,6 +130,90 @@ function platformFixed(): Fixed | undefined {
   return FixedLengthStream ? (stream, length) => stream.pipeThrough(new FixedLengthStream(length)) : undefined;
 }
 
+/** How much of the dump each pull encodes: one age chunk, so a sealed pull reads exactly one. */
+const PIECE = 64 * 1024;
+
+const high = (unit: number): boolean => unit >= 0xd800 && unit <= 0xdbff;
+const low = (unit: number): boolean => unit >= 0xdc00 && unit <= 0xdfff;
+
+/**
+ * Fills `out` with the next bytes of `text`'s UTF-8, front to back, and says how many it wrote,
+ * which is fewer than `out.length` only at the end of the text.
+ *
+ * THE BYTES ARE `TextEncoder.encode(text)`'S, and the two ways a piece at a time could differ from it
+ * are handled here. A character whose bytes do not fit what is left of `out` is encoded on its own
+ * and split, the rest carried to the next call, because every age chunk but the last must be exactly
+ * 64 KiB. And a slice of the text never ends between the two halves of a surrogate pair, because
+ * `encodeInto` would write each half as U+FFFD. `test/snapshots-peak.test.ts` holds both against
+ * `TextEncoder` at every offset around a chunk boundary.
+ */
+function utf8Reader(text: string): (out: Uint8Array) => number {
+  const encoder = new TextEncoder();
+  let at = 0;
+  let carry: Uint8Array = new Uint8Array(0);
+  return (out) => {
+    let n = Math.min(carry.length, out.length);
+    out.set(carry.subarray(0, n));
+    carry = carry.subarray(n);
+    while (n < out.length && at < text.length) {
+      /* ONE UNIT PER BYTE OF ROOM IS ENOUGH, because no character is less than one byte of UTF-8. */
+      let end = Math.min(text.length, at + (out.length - n));
+      if (end < text.length && high(text.charCodeAt(end - 1))) end--;
+      const done = end > at ? encoder.encodeInto(text.slice(at, end), out.subarray(n)) : { read: 0, written: 0 };
+      at += done.read;
+      n += done.written;
+      if (done.read === 0) {
+        const width = high(text.charCodeAt(at)) && low(text.charCodeAt(at + 1)) ? 2 : 1;
+        const whole = encoder.encode(text.slice(at, at + width));
+        const room = out.length - n;
+        out.set(whole.subarray(0, room), n);
+        carry = whole.subarray(room);
+        at += width;
+        n = out.length;
+      }
+    }
+    return n;
+  };
+}
+
+/**
+ * The dump as a `Plain`: its UTF-8 length, counted by encoding it once into one scratch piece, and a
+ * reader that encodes it again as it is pulled.
+ *
+ * COUNTED BY THE SAME READER AND NOT BY A SECOND RULE, so the length R2 is promised and the bytes it
+ * is sent cannot disagree about a lone surrogate. The count is a second pass over the text for CPU
+ * and costs 64 KiB of memory, where `TextEncoder.encode` costs a file as long as the dump.
+ */
+function plainOf(text: string): Plain {
+  const count = utf8Reader(text);
+  const scratch = new Uint8Array(PIECE);
+  let length = 0;
+  for (let n = count(scratch); n > 0; n = count(scratch)) length += n;
+  const read = utf8Reader(text);
+  return {
+    length,
+    read(out) {
+      const n = read(out);
+      if (n !== out.length) throw new Error(`the dump ended ${String(out.length - n)} bytes short of the ${String(length)} it counted`);
+    },
+  };
+}
+
+/** The unsealed dump as a stream of known length, one piece per pull. */
+function streamOf(plain: Plain): Sealed {
+  let left = plain.length;
+  const stream = new ReadableStream<Uint8Array>({
+    pull(out) {
+      if (left === 0) return out.close();
+      const piece = new Uint8Array(Math.min(PIECE, left));
+      plain.read(piece);
+      left -= piece.length;
+      out.enqueue(piece);
+    },
+  });
+  return { length: plain.length, stream };
+}
+
 /** A sealed stream read into the one buffer it describes, for a bucket that cannot take a stream. */
 async function drain(sealed: Sealed): Promise<Uint8Array> {
   const out = new Uint8Array(sealed.length);
@@ -143,7 +235,7 @@ async function drain(sealed: Sealed): Promise<Uint8Array> {
  * know about. `age1<alpha-recipient>` is not that decision, it is a decision nobody has made yet,
  * and treating it as empty would be the quiet plaintext this file exists to refuse.
  */
-function sealerOf(recipient: string | undefined): ((file: Uint8Array) => Promise<Sealed>) | undefined {
+function sealerOf(recipient: string | undefined): ((file: Uint8Array | Plain) => Promise<Sealed>) | undefined {
   if (!recipient) return undefined;
   const key = recipientOf(recipient);
   if (typeof key === 'string') throw new Error(`The nightly copy did not run: ${key}`);
@@ -260,16 +352,20 @@ export function r2Snapshots(
     prune,
 
     async take(record: string, dump: Dump): Promise<Kept> {
-      const file = new TextEncoder().encode(dump.text);
-      if (file.length > CEILING)
+      /* THE STRING IS NEVER ENCODED WHOLE ON WORKERD. It stays live for all of `take` whatever is
+         done with it: the audit's probe dropped the caller's reference before `take` ran and the
+         suspended frame still held the parameter, 120.8 MiB either way. So what can be cut is only
+         what is made beside it, and here that is a count and then one 64 KiB piece per pull. */
+      const utf8 = plainOf(dump.text);
+      if (utf8.length > CEILING)
         throw new Error(
-          `snapshot over 40 MiB: this record dumped ${String(file.length)} bytes and the Worker signs the whole file in memory. Raise the ceiling or stream it (51 §10).`,
+          `snapshot over 40 MiB: this record dumped ${String(utf8.length)} bytes and the Worker signs the whole file in memory. Raise the ceiling or stream it (51 §10).`,
         );
 
       const key = snapshotKey(record, dump.at, ext);
       const meta = {
         rows: String(dump.rows),
-        bytes: String(file.length),
+        bytes: String(utf8.length),
         at: dump.at,
         ...(dump.bookmark === undefined ? {} : { bookmark: dump.bookmark }),
       };
@@ -277,7 +373,7 @@ export function r2Snapshots(
 
       /* THE DATED KEY FIRST AND `latest` SECOND. If the second put fails, `latest` still points at a
          copy that opens; the other order leaves the pointer naming an object nobody finished. */
-      if (stream && fixed) {
+      if (fixed && !seal) {
         /* SEALED AS R2 READS IT, so the sealed file is never whole in this isolate. Measured by
            `test/snapshots-stream.test.ts` at the 40 MiB ceiling: holding the sealed buffer for both
            puts was 80 MiB live while the bucket read, 40 above the plaintext; streamed it is 2 above
@@ -287,21 +383,27 @@ export function r2Snapshots(
            once, and the binding has no server-side copy. Sealing again would cost the whole cipher
            over again, 1.8 s of CPU at the ceiling by `seal.ts`'s own measure, and would leave a
            pointer whose bytes differ from the copy it points at. One GET streams the same bytes
-           through, and a dated copy that R2 did not keep is a throw here and not a pointer at nothing. */
-        const sealed = await stream(file);
+           through, and a dated copy that R2 did not keep is a throw here and not a pointer at nothing.
+
+           AN UNSEALED COPY STREAMS THE SAME WAY, because it is the same string: putting it as one
+           buffer would be the encoded file beside the string, which is the peak this path exists
+           to avoid, on the deployments that chose not to seal. */
+        const body = stream ? await stream(utf8) : streamOf(utf8);
         const r2 = blobs as StreamBlobs;
-        await r2.put(key, fixed(sealed.stream, sealed.length), { customMetadata: meta });
+        await r2.put(key, fixed(body.stream, body.length), { customMetadata: meta });
         const copy = await r2.get(key);
         if (!copy?.body) throw new Error(`the copy just written to ${key} could not be read back to point latest at it`);
         await r2.put(pointer, fixed(copy.body, copy.size), { customMetadata: meta });
       } else {
-        /* NO `FixedLengthStream`, which is Node: one buffer, put twice, as before streaming. */
+        /* NO `FixedLengthStream`, which is Node, or a test's own `seal`: one buffer, put twice, as
+           before streaming. */
+        const file = new TextEncoder().encode(dump.text);
         const body = stream ? await drain(await stream(file)) : seal ? await seal(file) : file;
         await blobs.put(key, body, { customMetadata: meta });
         await blobs.put(pointer, body, { customMetadata: meta });
       }
       await prune(record);
-      return { key, bytes: file.length, rows: dump.rows, at: dump.at };
+      return { key, bytes: utf8.length, rows: dump.rows, at: dump.at };
     },
   };
 }
