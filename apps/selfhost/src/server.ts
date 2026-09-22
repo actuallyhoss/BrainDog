@@ -776,6 +776,9 @@ export async function start(options: {
     if (sparkTicker) clearInterval(sparkTicker);
     const record = sql.one<{ id: string }>('SELECT id FROM record WHERE singleton = 1')?.id;
     sql.close();
+    /* SPARK'S FILE IS CLOSED BEFORE ITS DIRECTORY GOES. On Windows an open SQLite handle holds the file, and
+       `rmSync` with `force` then leaves the directory behind without a word. */
+    sparkSql.close();
     if (record && ledger) ledger.close(record);
     const at = dirOf(options.file);
     /* EITHER NAME IS THE RECORD'S OWN. `record.dog` is what an installation made before the
@@ -787,7 +790,9 @@ export async function start(options: {
       !present(joinPath(at, 'directory.sqlite')) &&
       !present(joinPath(at, 'kek'));
     if (own) removeTree(at, { recursive: true, force: true });
-    else for (const p of [options.file, `${options.file}-wal`, `${options.file}-shm`, joinPath(at, 'snapshots')]) removeTree(p, { recursive: true, force: true });
+    else
+      for (const p of [options.file, `${options.file}-wal`, `${options.file}-shm`, joinPath(at, 'snapshots'), ...(sparkFile ? [sparkFile, `${sparkFile}-wal`, `${sparkFile}-shm`] : [])])
+        removeTree(p, { recursive: true, force: true });
   };
 
   /* The alarm and the record refer to each other: the record arms the alarm after every write, and
@@ -802,11 +807,17 @@ export async function start(options: {
   const sparkModel = sparkModelFor(sparkConfig, () => api, options.keys);
   /* SPARK'S OWN SQLITE AND NOT THE RECORD'S (`46 §2`): the engine writes its `settings` and `call` tables into
      its own database, beside the record's rather than inside it. */
-  /* IN MEMORY AND NOT BESIDE THE RECORD FILE, until somebody decides where it belongs: the engine's tables are
-     a cache of what it has been asked and what it drafted, `46 §4.1`, and a process that forgets them asks the
-     model again rather than answering wrongly. A file for it is a decision about backups and about what a copy
-     of a record carries, which is not this mount's to take. */
-  const sparkSql = openSqlite(':memory:');
+  /* BESIDE THE RECORD FILE, `<dir>/spark.sqlite`, AS `inbound.token` IS, AND IN MEMORY ONLY WHERE THE RECORD IS.
+     This was `:memory:` everywhere, under a comment calling the tables a cache, and they are not one: `call` is
+     the only account of what Spark was asked, and `asksUsed` counts the month's meter out of it (`46 §4.1`).
+     `loop/research-spark-seam.md` measured the cost: every restart began the month again, so the tier `a` cap was
+     a cap per uptime, and the `settings` row an owner chose went back to the defaults. `test/spark-meter-persists`
+     asks twice across a restart and reads both rows back.
+     THE SNAPSHOTS DO NOT CARRY IT, and that is deliberate: `VACUUM INTO` copies the record, and a restored record
+     with no ledger beside it meters from zero, which is the old behaviour on the one path that already loses
+     time. `destroy` removes it with the record. */
+  const sparkFile = options.file === ':memory:' ? null : joinPath(dirOf(options.file), 'spark.sqlite');
+  const sparkSql = openSqlite(sparkFile ?? ':memory:');
 
   /**
    * Drain everything due, then re-arm.
@@ -1230,7 +1241,7 @@ export async function start(options: {
         scheduler.stop();
         if (ticker) clearInterval(ticker);
         if (sparkTicker) clearInterval(sparkTicker);
-        server.close(() => (gone || sql.close(), dirSql.close(), r()));
+        server.close(() => (gone || (sql.close(), sparkSql.close()), dirSql.close(), r()));
       }),
   };
 }
