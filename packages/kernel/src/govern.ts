@@ -483,8 +483,120 @@ function namesFault(body: Record<string, unknown>): Refusal | null {
         fix: `This change is filed as a change to ${named} and also installs ${other}, so whoever reads ${named} would read ${other} in it. Propose ${other} as a change of its own.`,
         at: 'body.to',
       };
+    return aboutOthers(named, bundle);
   }
   return null;
+}
+
+/**
+ * A declaration in a bundle filed under a list's name that reads, writes or mails another list.
+ *
+ * A SECOND REGISTER WAS THE ONLY THING KEPT OUT, and `loop/research-batch-nineteen-audit.md` §4 filed a rule over Diary
+ * under `register.obligations` from the owner's `propose` token: the member invited to Obligations alone read the rule
+ * whole in the queue, and accepting it installed it. A metric over Diary, a page with a table of it, an ingest that
+ * writes it and a digest that mails its rows rode in the same way, one declaration each (`govern-bundle-scope.test.ts`
+ * filed all eight before this). So each declaration is asked which lists it NAMES, not only which it declares.
+ *
+ * A FIGURE IS READ THROUGH ITS METRIC, and only a metric the bundle carries can be read here: this runs on the body
+ * alone, when it is filed and again when it is accepted. A page of figures names no list itself, which is how the Money
+ * page leaked to a one-list reader once (`pages.ts` `registersOf`), so a figure this cannot resolve is refused rather
+ * than taken as harmless. Propose that page under its own name.
+ */
+function aboutOthers(named: string, bundle: { id?: unknown; kind?: unknown; body?: unknown }[]): Refusal | null {
+  const list = named.slice('register.'.length);
+  const metrics = new Map<string, unknown>();
+  for (const d of bundle) if (d?.kind === 'metric' && isMap(d.body) && typeof d.body.metric === 'string') metrics.set(d.body.metric, d.body);
+  /* A TEMPLATE PAGE'S `{{what}}` IS ITS ROW'S FIELD, not a figure, and the bundle always carries the list it is named for. */
+  const own = bundle.find((d) => d?.id === named)?.body;
+  const fields = new Set(isMap(own) && Array.isArray(own.fields) ? own.fields.map((f) => (isMap(f) ? f.id : undefined)).filter((f) => typeof f === 'string') : []);
+  for (const d of bundle) {
+    if (d?.id === named || d?.kind === 'register') continue;
+    const page = d.kind === 'page' ? { template: isMap(d.body) && d.body.for !== undefined, fields } : null;
+    const { lists, unknown } = listsNamed(d.body, page, metrics);
+    const other = [...lists].find((l) => l !== list);
+    if (other !== undefined)
+      return {
+        code: 'VALUE_MALFORMED',
+        fix:
+          other === '*'
+            ? `This change is filed as a change to ${named}, and ${String(d.id)} in it reads across the whole record, so whoever reads ${named} would read all of it. Propose ${String(d.id)} as a change of its own.`
+            : `This change is filed as a change to ${named}, and ${String(d.id)} in it reads register.${other}, so whoever reads ${named} would read about ${other}. Propose ${String(d.id)} as a change of its own.`,
+        at: 'body.to',
+      };
+    const figure = [...unknown][0];
+    if (figure !== undefined)
+      return {
+        code: 'VALUE_MALFORMED',
+        fix: `This change is filed as a change to ${named}, and ${String(d.id)} in it reads the figure ${figure}, which it does not carry, so nothing here can say whose list that figure counts. Add metric.${figure} to the bundle, or propose ${String(d.id)} as a change of its own.`,
+        at: 'body.to',
+      };
+  }
+  return null;
+}
+
+/** A register named in full, as a metric's `source`, a table's and a digest section's are. */
+const LIST_REF = /^register\.([a-z][a-z0-9_]*)$/;
+/** A page block's sources that are not a list and not a figure, and read no list outside what its legs name. */
+const PAGE_SOURCES = new Set(['forecast.runway']);
+
+/**
+ * Every list a declaration body names, and every figure it reads that `metrics` cannot resolve.
+ *
+ * WALKED RATHER THAN READ KIND BY KIND, because a list is named in a dozen places: a rule's `register`, a `create` or a
+ * `link` inside its `then`, an ingest's `writes.register` or each leg of its route, a `lookup`, a cash walk's legs, a
+ * page's `for`. A `register` key or a `register.<id>` string anywhere is a list. On a page, a source that is neither
+ * (`activity`, `actions`, `governance.open`, `sessions.live`) reads across the record or the runs, and is named `*` or
+ * `session` as `pages.ts` names it. That walk is not imported: `pages.ts` reads `BODY_KINDS` from here as it loads.
+ */
+function listsNamed(
+  body: unknown,
+  page: { template: boolean; fields: ReadonlySet<string> } | null,
+  metrics: ReadonlyMap<string, unknown>,
+): { lists: Set<string>; unknown: Set<string> } {
+  const lists = new Set<string>();
+  const unknown = new Set<string>();
+  const seen = new Set<string>();
+  const figure = (said: string) => {
+    /* THE FIRST COLON SEPARATES, as `pages.ts` reads a cell: `project-owed:C:\Repos` is one project's figure. */
+    const at = said.indexOf(':');
+    const id = at < 0 ? said : said.slice(0, at);
+    if (seen.has(id)) return;
+    seen.add(id);
+    if (metrics.has(id)) visit(metrics.get(id), undefined);
+    else unknown.add(id);
+  };
+  const visit = (node: unknown, key: string | undefined): void => {
+    if (typeof node === 'string') {
+      const ref = LIST_REF.exec(node);
+      if (ref) lists.add(ref[1]!);
+      else if (node.startsWith('metric.')) figure(node.slice('metric.'.length));
+      else if (key === 'register') lists.add(node);
+      else if (key === 'metric') figure(node);
+      /* A FORECAST'S `late:` AND A SERIES LINE'S `then:` AND `each:` ARE FIGURES TOO, which a check reading only `metric`
+         keys let through: a forecast whose late mark counted Diary was filed under `register.obligations`. */
+      else if (page && (key === 'late' || key === 'then' || key === 'each')) figure(node);
+      else if (page && key === 'source' && !PAGE_SOURCES.has(node)) lists.add(node === 'sessions.live' ? 'session' : '*');
+      /* AND A `{{list.count}}` OR `{{list#3.field}}` IN PROSE READS THAT LIST, as the page answer fills it. */
+      for (const m of node.matchAll(/\{\{\s*(?:[a-z]+:)?\s*([a-z][a-z0-9_]*)(?:#\d+)?\.[A-Za-z]/g)) lists.add(m[1]!);
+      /* A BARE `{{diary-count}}` IN A PAGE'S PROSE IS A FIGURE, as `pathOf` reads one, and it named no list here: a note
+         reading an installed Diary figure was filed under `register.obligations`. A code span is text and is skipped, as
+         `pathsOf` skips it, and in a template a field of the row is the row's. */
+      if (page)
+        for (const m of node.replace(/`[^`]*`/g, ' ').matchAll(/\{\{\s*(?:[a-z]+:\s*)?([a-z][a-z0-9_-]*)\s*\}\}/g))
+          if (!(page.template && page.fields.has(m[1]!))) figure(m[1]!);
+      return;
+    }
+    if (Array.isArray(node)) {
+      for (const n of node) visit(n, undefined);
+      return;
+    }
+    if (!isMap(node)) return;
+    /* A BLOCK THAT MARKS WHICH ROW HAS AN AGENT ON IT READS THE RUNS, as `registersOf` says. */
+    if (page && node.working === true) lists.add('session');
+    for (const [k, v] of Object.entries(node)) visit(v, k);
+  };
+  visit(body, undefined);
+  return { lists, unknown };
 }
 
 /**
