@@ -41,6 +41,9 @@ export type HistoryCursors = {
 
 const NONCE = 12;
 
+/** The digits of `Number.MAX_SAFE_INTEGER`, which every sealed rowid is padded to. */
+const ROWID_WIDTH = 16;
+
 const toBase64url = (bytes: Uint8Array): string => {
   let bin = '';
   for (const b of bytes) bin += String.fromCharCode(b);
@@ -72,7 +75,12 @@ export async function historyCursors(): Promise<HistoryCursors> {
     mint: (id) => `e.${id}`,
     async seal(rowid) {
       const iv = crypto.getRandomValues(new Uint8Array(NONCE));
-      const sealed = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(String(rowid))));
+      /* SIXTEEN DIGITS, WHATEVER THE ROWID. AES-GCM keeps the plaintext's length, and `String(rowid)` made the cursor 41
+         characters for rowid 7, 45 for 1000 and 48 for 100000 (`loop/research-batch-nineteen-audit.md`, finding 6), so
+         the cursor she is handed past the walk cap told her the log's size to a power of ten. Sixteen is the width of
+         `Number.MAX_SAFE_INTEGER`, so no rowid this file will open is wider; every cursor is now 61 characters. */
+      const plain = String(rowid).padStart(ROWID_WIDTH, '0');
+      const sealed = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plain)));
       const out = new Uint8Array(NONCE + sealed.length);
       out.set(iv);
       out.set(sealed, NONCE);
@@ -89,8 +97,8 @@ export async function historyCursors(): Promise<HistoryCursors> {
       if (raw === null || raw.length <= NONCE + 16) return null;
       try {
         const plain = new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: raw.subarray(0, NONCE) }, key, raw.subarray(NONCE)));
-        const rowid = /^[1-9]\d*$/u.test(plain) ? Number(plain) : Number.NaN;
-        return Number.isSafeInteger(rowid) ? { rowid } : null;
+        const rowid = /^\d{16}$/u.test(plain) ? Number(plain) : Number.NaN;
+        return Number.isSafeInteger(rowid) && rowid > 0 ? { rowid } : null;
       } catch {
         /* A TAG THAT DOES NOT MATCH: another instance's key, a key lost to a restart, or a byte changed in flight. */
         return null;

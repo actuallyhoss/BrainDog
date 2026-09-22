@@ -1,7 +1,7 @@
 /**
  * Ids, and the two kinds a record has.
  *
- * A ROW HAS TWO. `id` is a 26-character ULID and is never spoken — it is what a `ref` stores and
+ * A ROW HAS TWO. `id` is a 26-character ULID and is never spoken: it is what a `ref` stores and
  * what an export keys on, and it must survive a rename, a merge and a restore. `seq` is the number
  * a person says out loud, allocated per register from 1, and it is the reason a customer's record is
  * its own database at all: in a shared one the second customer's first task is #4,732.
@@ -23,44 +23,40 @@ export type Mint = () => string;
 /**
  * A ULID minter over a clock, monotonic within a millisecond.
  *
- * The randomness is incremented rather than redrawn when the millisecond has not moved: redrawing
- * gives two ids that sort by luck, and the whole point of the format is that they sort by time.
+ * INSIDE A MILLISECOND THE TAIL STEPS UP BY A RANDOM AMOUNT, from 1 to 2^32. Redrawing it gives two ids that sort by
+ * luck, and the whole point of the format is that they sort by time; but adding one made the tail a counter, and a
+ * member invited to one list read the exact number of hidden writes between two of her lines off their tails
+ * (`loop/research-batch-nineteen-audit.md`, finding 2: 2, 4, 8 and 22 apart for 0, 1, 3 and 10 hidden diary writes).
+ * A random step keeps the order and makes one gap answer many counts. What it cannot hide is that the gap grows with
+ * the count: every step averages 2^31 and none passes 2^32, so a gap over 2^34 held at least four other ids and most
+ * likely about seven. That is a bound and an estimate with a spread of its own, where the counter was the exact figure,
+ * and `ids-tail.test.ts` holds the part that is closed: no difference names the count it came from.
+ *
+ * A FRESH TAIL HAS ITS TOP BIT CLEAR, so it starts in the lower half of the 80 bits and the steps have 2^79 of headroom:
+ * 2^47 ids in one millisecond at the largest step before the tail could run past 80 bits and sort below the last id.
  */
 export function ulids(now: () => number): Mint {
   let lastMs = -1;
-  let last = new Uint8Array(10);
+  let tail = 0n;
 
   return () => {
     const ms = now();
     if (ms === lastMs) {
-      // Increment the 80-bit tail. The carry runs out only after 2^80 ids in one millisecond.
-      for (let i = 9; i >= 0; i--) {
-        if (last[i]! < 255) {
-          last[i]!++;
-          break;
-        }
-        last[i] = 0;
-      }
+      tail += 1n + BigInt(crypto.getRandomValues(new Uint32Array(1))[0]!);
     } else {
       lastMs = ms;
-      last = crypto.getRandomValues(new Uint8Array(10));
+      const fresh = crypto.getRandomValues(new Uint8Array(10));
+      fresh[0] = fresh[0]! & 0x7f;
+      tail = 0n;
+      for (const byte of fresh) tail = (tail << 8n) | BigInt(byte);
     }
 
     let out = '';
     // The timestamp: 48 bits, ten characters, most significant first.
     for (let shift = 45; shift >= 0; shift -= 5) out += ALPHABET[Math.floor(ms / 2 ** shift) % 32];
     // The tail: 80 bits, sixteen characters.
-    let bits = 0;
-    let acc = 0;
-    for (const byte of last) {
-      acc = (acc << 8) | byte;
-      bits += 8;
-      while (bits >= 5) {
-        bits -= 5;
-        out += ALPHABET[(acc >> bits) & 31];
-      }
-    }
-    return out.slice(0, 26);
+    for (let shift = 75n; shift >= 0n; shift -= 5n) out += ALPHABET[Number((tail >> shift) & 31n)];
+    return out;
   };
 }
 
