@@ -17,7 +17,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { HOOK_MS, hookBudget, notSignedIn, readSession, sessionPath, writeSession } from '../src/hooks.ts';
-import { hookCommand } from '../src/install.ts';
+import { hookCommand, installInto, serversFileOf } from '../src/install.ts';
 import { sessionHeaders } from '../src/position.ts';
 
 const APP = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -395,6 +395,147 @@ test('INSTALL INTO A SETTINGS FILE THE PERSON NAMES: a project settings.local.js
   assert.equal(wrong.code, 1);
   assert.match(wrong.stderr, /is not a \.json settings file, so braindog install leaves it alone/);
   assert.ok(!existsSync(join(repo, 'settings.yaml')));
+});
+
+/* ── install --replace, the cut-over ───────────────────────────────────── */
+
+/*
+ * THE OLD TOOL'S ENTRIES AS `loop/research-switch.md` §1 and step 9 of §3 record them: two PowerShell hooks under
+ * `C:\Tools\legacy\hooks\` in `settings.json`, and a stdio server running `C:\Tools\legacy\mcp\brain-mcp.mjs` in
+ * each profile's `.claude.json`. The real files were not read to write these; the paths are the recorded ones.
+ */
+const HB_START = 'powershell -NoProfile -ExecutionPolicy Bypass -File "C:\\Tools\\legacy\\hooks\\session-start.ps1"';
+const HB_END = 'powershell -NoProfile -ExecutionPolicy Bypass -File C:\\Tools\\legacy\\hooks\\session-end.ps1';
+/*
+ * Near misses that must survive: BrainDog's own first shim, and a folder whose name only ends with brain. A
+ * lookalike that only BEGAN with brain was tried first and stayed green with the separator before `brain` taken
+ * out of the pattern, so it proved nothing about the "named exactly" half.
+ */
+const OLD_SHIM = 'powershell -NoProfile -File C:\\Repos\\braindog\\apps\\cli\\hooks\\session-start.ps1';
+const LOOKALIKE = 'node C:\\Repos\\notbrain\\hooks\\session-end.ps1';
+const HB_SECRET = 'hb-token-never-printed-77e1';
+
+function cutOverProfile(dir: string, claudeJson: string): { settings: string; before: string; mcpBefore: string } {
+  mkdirSync(dir, { recursive: true });
+  const settings = join(dir, 'settings.json');
+  const before = `${JSON.stringify(
+    {
+      model: 'opus',
+      hooks: {
+        SessionStart: [{ hooks: [{ type: 'command', command: HB_START, timeout: 15 }] }, { matcher: 'startup', hooks: [{ type: 'command', command: OLD_SHIM }] }],
+        SessionEnd: [{ hooks: [{ type: 'command', command: HB_END }, { type: 'command', command: LOOKALIKE }] }],
+        Stop: [{ hooks: [{ type: 'command', command: 'echo stop' }] }],
+      },
+    },
+    null,
+    2,
+  )}\n`;
+  writeFileSync(settings, before);
+  const mcpBefore = `${JSON.stringify(
+    {
+      numStartups: 41,
+      mcpServers: {
+        brain: { type: 'stdio', command: 'node', args: ['C:\\Tools\\legacy\\mcp\\brain-mcp.mjs'], env: { BRAIN_TOKEN: HB_SECRET } },
+        /* No record says the old tool was ever registered over HTTP; this is here so the URL branch is driven. */
+        'brain-http': { type: 'http', url: `https://brain.example.com/mcp?token=${HB_SECRET}`, headers: { Authorization: `Bearer ${HB_SECRET}` } },
+        figma: { type: 'http', url: 'https://mcp.figma.com/mcp' },
+        brainy: { type: 'stdio', command: 'node', args: ['C:\\Repos\\brainy\\server.mjs'] },
+      },
+      projects: { 'C:/Repos/acme': { allowedTools: [], mcpServers: { brain: { command: 'node', args: ['C:/Tools/legacy/mcp/brain-mcp.mjs'] } } } },
+    },
+    null,
+    2,
+  )}\n`;
+  writeFileSync(claudeJson, mcpBefore);
+  return { settings, before, mcpBefore };
+}
+
+test('INSTALL --REPLACE IS A DRY RUN THAT NAMES EVERY THE OLD TOOL HOOK AND MCP ENTRY, per profile, and changes nothing', () => {
+  const home = folder('home');
+  const main = cutOverProfile(join(home, '.claude'), join(home, '.claude.json'));
+  const acme = cutOverProfile(join(home, '.claude-acme'), join(home, '.claude-acme', '.claude.json'));
+  const scripts = join(APP, 'hooks');
+  const options = { apply: false, replace: true, scripts, home };
+
+  const lines = [...installInto(join(home, '.claude'), options), ...installInto(join(home, '.claude-acme'), options)];
+  const text = lines.join('\n');
+  for (const file of [main.settings, acme.settings]) {
+    assert.ok(text.includes(`braindog install would change ${file}:`), text);
+  }
+  /* The default profile keeps its servers in the home folder, a named one inside itself: Claude Code's layout. */
+  for (const file of [join(home, '.claude.json'), join(home, '.claude-acme', '.claude.json')]) {
+    assert.ok(text.includes(`braindog install --replace would change ${file}:`), text);
+  }
+  assert.equal(lines.filter((l) => l === `  - hooks.SessionStart, the old tool's: ${HB_START}`).length, 2, text);
+  assert.equal(lines.filter((l) => l === `  - hooks.SessionEnd, the old tool's: ${HB_END}`).length, 2, text);
+  assert.equal(lines.filter((l) => l === "  - mcpServers.brain, the old tool's: node C:\\Tools\\legacy\\mcp\\brain-mcp.mjs").length, 2, text);
+  assert.equal(lines.filter((l) => l === "  - mcpServers.brain-http, the old tool's: https://brain.example.com/mcp").length, 2, text);
+  assert.equal(lines.filter((l) => l === "  - projects[\"C:/Repos/acme\"].mcpServers.brain, the old tool's: node C:/Tools/legacy/mcp/brain-mcp.mjs").length, 2, text);
+  assert.ok(!text.includes(OLD_SHIM) && !text.includes(LOOKALIKE) && !text.includes('brainy') && !text.includes('figma'), text);
+  assert.ok(!text.includes(HB_SECRET), 'the dry run printed the env of a server it would remove');
+  assert.ok(text.includes('Nothing was changed. Run braindog install --replace --apply to write it.'), text);
+
+  assert.equal(readFileSync(main.settings, 'utf8'), main.before);
+  assert.equal(readFileSync(join(home, '.claude.json'), 'utf8'), main.mcpBefore);
+  assert.deepEqual(readdirSync(home).sort(), ['.claude', '.claude-acme', '.claude.json']);
+  assert.deepEqual(readdirSync(join(home, '.claude-acme')).sort(), ['.claude.json', 'settings.json']);
+});
+
+/*
+ * WINDOWS PATHS ARE NOT CASE SENSITIVE, AND THE DEFAULT PROFILE NAMED IN ANOTHER CASE WAS MISSED. Measured before
+ * the fix: `--config-dir C:\USERS\...\.claude` looked for `.claude.json` inside the folder, found none, and printed
+ * "registers no the old tool MCP server. Nothing to change." while the real one in the home folder kept its server.
+ */
+test('the default profile is known in any letter case on Windows, so its .claude.json is not silently skipped', { skip: process.platform !== 'win32' }, () => {
+  const home = 'C:\\Users\\Someone';
+  assert.equal(serversFileOf('c:\\users\\someone\\.CLAUDE', home), join(home, '.claude.json'));
+  assert.equal(serversFileOf('C:\\Users\\Someone\\.claude-acme', home), join('C:\\Users\\Someone\\.claude-acme', '.claude.json'));
+});
+
+test('INSTALL --REPLACE --APPLY copies each file beside itself, removes only the old tool’s entries, adds BrainDog’s hooks, and is not repeated', () => {
+  const home = folder('home');
+  const dir = join(home, '.claude-client');
+  const claudeJson = join(dir, '.claude.json');
+  const { settings, before, mcpBefore } = cutOverProfile(dir, claudeJson);
+  const scripts = join(APP, 'hooks');
+  const start = hookCommand('start', scripts);
+  const end = hookCommand('end', scripts);
+
+  const lines = installInto(dir, { apply: true, replace: true, scripts, home });
+  const text = lines.join('\n');
+  assert.ok(text.includes(`The file as it was is kept at ${settings}.bak.`), text);
+  assert.ok(text.includes(`The file as it was is kept at ${claudeJson}.bak.`), text);
+  assert.equal(readFileSync(`${settings}.bak`, 'utf8'), before);
+  assert.equal(readFileSync(`${claudeJson}.bak`, 'utf8'), mcpBefore);
+
+  type Group = { matcher?: string; hooks: { command: string }[] };
+  const now = JSON.parse(readFileSync(settings, 'utf8')) as { model: string; hooks: Record<string, Group[]> };
+  assert.equal(now.model, 'opus');
+  /* The group the old tool's hook sat alone in is gone; a group it shared keeps the other hook. */
+  assert.deepEqual(now.hooks.SessionStart!.map((g) => g.hooks.map((h) => h.command)), [[OLD_SHIM], [start]]);
+  assert.equal(now.hooks.SessionStart![0]!.matcher, 'startup');
+  assert.deepEqual(now.hooks.SessionEnd!.map((g) => g.hooks.map((h) => h.command)), [[LOOKALIKE], [end]]);
+  assert.deepEqual(now.hooks.Stop!.map((g) => g.hooks.map((h) => h.command)), [['echo stop']]);
+
+  const mcp = JSON.parse(readFileSync(claudeJson, 'utf8')) as { numStartups: number; mcpServers: Record<string, unknown>; projects: Record<string, { allowedTools: unknown[]; mcpServers: Record<string, unknown> }> };
+  assert.equal(mcp.numStartups, 41);
+  assert.deepEqual(Object.keys(mcp.mcpServers), ['figma', 'brainy']);
+  assert.deepEqual(mcp.projects['C:/Repos/acme'], { allowedTools: [], mcpServers: {} });
+
+  const again = installInto(dir, { apply: true, replace: true, scripts, home });
+  assert.deepEqual(again, [
+    `${settings} already runs both BrainDog hooks and no the old tool hook. Nothing to change.`,
+    `${claudeJson} registers no the old tool MCP server. Nothing to change.`,
+  ]);
+  assert.deepEqual(readdirSync(dir).sort(), ['.claude.json', '.claude.json.bak', 'settings.json', 'settings.json.bak']);
+
+  /* Without --replace, install leaves the old tool's entries where they are, as it always has. */
+  const plain = folder('home');
+  const kept = cutOverProfile(join(plain, '.claude'), join(plain, '.claude.json'));
+  installInto(join(plain, '.claude'), { apply: true, scripts, home: plain });
+  assert.ok(readFileSync(kept.settings, 'utf8').includes('session-start.ps1'));
+  assert.equal(readFileSync(join(plain, '.claude.json'), 'utf8'), kept.mcpBefore);
+  assert.ok(!existsSync(join(plain, '.claude.json.bak')));
 });
 
 test('NO CHILD EVER PRINTED THE TOKEN', () => {

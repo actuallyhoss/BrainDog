@@ -27,7 +27,7 @@ import { PRIMITIVES_VERSION } from 'braindog-render';
 import { hookEnd, hookStart, readSession, sessionPath } from './hooks.ts';
 import { budgetOf, clientFor, hostsPath, target } from './http.ts';
 import { importCommand } from './import.ts';
-import { installAt, installInto, profilesOf } from './install.ts';
+import { REPLACE_BY_HAND, installAt, installInto, profilesOf } from './install.ts';
 import { machine, takeJson, type Machine } from './json.ts';
 import { keys, spawnInherit } from './keys.ts';
 import { login } from './login.ts';
@@ -143,8 +143,8 @@ const usage = () =>
     '  Serve BrainDog to an agent over standard input and output. The agent starts it.',
     'braindog hook start|end',
     '  What Claude Code runs when a session starts and ends, with its event on standard input.',
-    'braindog install [--apply] [--config-dir <folder>] [--settings <file>]',
-    "  Show the two hooks it would add to Claude Code's settings (a profile folder, or one settings file such as a project's .claude/settings.local.json), and write them only with --apply.",
+    'braindog install [--apply] [--replace] [--config-dir <folder>] [--settings <file>]',
+    "  Show the two hooks it would add to Claude Code's settings (a profile folder, or one settings file such as a project's .claude/settings.local.json), and write them only with --apply. With --replace it also takes out the old tool's hooks and MCP servers, and says which.",
     'braindog init <slug> --owner <email>',
     'braindog serve [<record file>]',
     '  Create or serve a record on this machine, through the self-host.',
@@ -324,24 +324,25 @@ async function hook(args: string[]): Promise<void> {
 }
 
 function install(args: string[]): void {
-  let values: { apply?: boolean | undefined; 'config-dir'?: string[] | undefined; settings?: string[] | undefined };
+  let values: { apply?: boolean | undefined; replace?: boolean | undefined; 'config-dir'?: string[] | undefined; settings?: string[] | undefined };
   try {
     ({ values } = parseArgs({
       args,
-      options: { apply: { type: 'boolean' }, 'config-dir': { type: 'string', multiple: true }, settings: { type: 'string', multiple: true } },
+      options: { apply: { type: 'boolean' }, replace: { type: 'boolean' }, 'config-dir': { type: 'string', multiple: true }, settings: { type: 'string', multiple: true } },
       strict: true,
     }));
   } catch {
-    return stop('braindog install takes --apply, --config-dir <folder> and --settings <file>, and nothing else.');
+    return stop('braindog install takes --apply, --replace, --config-dir <folder> and --settings <file>, and nothing else.');
   }
   const scripts = fileURLToPath(new URL('../hooks/', import.meta.url));
-  const options = { apply: values.apply === true, scripts };
+  const options = { apply: values.apply === true, replace: values.replace === true, scripts };
   const dirs = values['config-dir'] ?? [];
   const files = values.settings ?? [];
   const lines: string[] = [];
   /* A NAMED FILE OR FOLDER IS THE WHOLE LIST: the user profile is changed only when nothing else is named. */
   for (const dir of files.length > 0 && dirs.length === 0 ? [] : profilesOf(dirs, process.env)) lines.push(...installInto(dir, options));
   for (const file of files) lines.push(...installAt(file, options));
+  if (options.replace) lines.push('', REPLACE_BY_HAND);
   const cli = fileURLToPath(new URL('./main.ts', import.meta.url)).replaceAll('\\', '/');
   lines.push(
     '',
