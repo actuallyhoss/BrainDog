@@ -196,8 +196,18 @@ const dropped = wanted.filter((id) => CASES.some((c) => c.id === id) && !cases.s
 if (dropped.length) console.log(`  ${dropped.join(', ')}: nothing of theirs ships, so nothing is taken without --png=<dir>`);
 if (!cases.length) process.exit(0);
 
+/**
+ * `--port=<n>` PINS THE SELF-HOST'S PORT, for a run beside the browser gates. An OS-assigned port
+ * cannot land on a gate's fixed one on this machine (Windows hands out 49152 and up), but a caller
+ * that has been given a port range to stay inside cannot prove that from a random number in a log,
+ * and a pinned port that is taken fails at `serve` with the port in the message rather than
+ * silently moving. Each use case is served and stopped before the next, so one port is enough.
+ */
+const PINNED = Number(process.argv.find((a) => a.startsWith('--port='))?.slice('--port='.length)) || null;
+
 /** A port the OS says is free, and never one the gates or the dev server hold. */
 async function freePort() {
+  if (PINNED) return PINNED;
   for (;;) {
     const port = await new Promise((resolve, reject) => {
       const s = createServer();

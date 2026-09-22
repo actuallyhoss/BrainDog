@@ -42,7 +42,10 @@ const FROM = process.argv.find((a) => a.startsWith('--from='))?.slice('--from='.
 
 const ROOT = join(import.meta.dirname, '..', '..', 'web', 'build');
 const OUT = join(import.meta.dirname, '..', 'static', 'shots');
-const PORT = 5188;
+/* 5390 AND NOT 5188, which sat inside the block the site's dev server and the browser gates hold
+   (5184 for the site, 5186 for a11y, 5189 for the record): a capture run beside a gate run is what a
+   re-shoot usually is, and a collision there fails one of them for a reason neither names. */
+const PORT = 5390;
 
 /**
  * ONE SHOT, BECAUSE ONE IS WHAT THE PAGE DRAWS.
@@ -70,9 +73,26 @@ const PORT = 5188;
  * `act` runs after load and before the shutter, and is skipped at phone width (the layout differs).
  */
 const SHOTS = [
-  /* The day: what you are owed, what is due, what needs your call, and what the agents did while you
-     were away. It is the only screen that holds all four at once, which is why it is the one. */
-  { name: 'home', route: '/', png: true },
+  /**
+   * THE WORK BOARD, UNDER THE NAME `home` BECAUSE THAT IS THE NAME THE PAGE ASKS FOR.
+   *
+   * It was `/`, the sample's day, and that screen is a money grid: `loop/research-site-now.md`
+   * (change 4) found both pictures on the home page were tables of GBP, the hero's `Due this week`
+   * and the founder dashboard in band 0002. On 22 September the home of every use case /start
+   * offers was photographed fresh (`usecases.mjs --png`) to find a visual one, and none is: the
+   * student, team and new project homes are two or three short tables each, the founder's home is
+   * four GBP tiles over a table of datapoints, and the personal home is four GBP tiles over six GBP
+   * budget bars. Of sixteen routes in this record, the board is the one screen with no money figure
+   * on it and nothing in common with the dashboard below it: six status columns of cards, each
+   * card naming its project.
+   *
+   * IT STAYS IN THIS RECORD AND NOT A FRESH ONE because the button under the headline opens the app
+   * on this same sample (`hero.note`), so the first picture is of the thing the first click shows.
+   *
+   * `home` rather than `board` because `+page.svelte` and `app.html` name `/shots/home-*` and this
+   * script does not own either; the file name is not something a stranger reads.
+   */
+  { name: 'home', route: '/p/work-board', png: true },
 ];
 
 const TYPES = {

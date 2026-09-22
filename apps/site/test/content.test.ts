@@ -296,9 +296,15 @@ test('the home page names no row by its address', when(NO_BUILD), async () => {
 
   type Copy = { site: { decide?: unknown } };
   const { site } = (await import(new URL('../src/lib/copy.ts', import.meta.url).href)) as Copy;
+  /* THE KEY IS ASKED FOR BY NAME, OR THE CHECK IS OF NOTHING. `strings(undefined)` is `[]`, so with
+     `decide` renamed to `decideRenamed` in `copy.ts` this test passed while reading no scene at all
+     (measured on 2026-09-22). An absent scene is a failure here, and so is one with no words in it. */
+  assert.ok(site.decide && typeof site.decide === 'object', '`site.decide` is gone from copy.ts, so this test would read nothing: point it at the scene the home page draws now');
   const strings = (v: unknown): string[] =>
     typeof v === 'string' ? [v] : v && typeof v === 'object' ? Object.values(v).flatMap(strings) : [];
-  const scripted = strings(site.decide).flatMap((line) => [...line.matchAll(rowRef)].map((m) => m[0]));
+  const lines = strings(site.decide);
+  assert.ok(lines.length > 0, '`site.decide` holds no words, so the address check below would pass over nothing');
+  const scripted = lines.flatMap((line) => [...line.matchAll(rowRef)].map((m) => m[0]));
   assert.deepEqual(scripted, [], `site.decide names rows by address, and the scene shows them after load: ${scripted.join(', ')}`);
 });
 

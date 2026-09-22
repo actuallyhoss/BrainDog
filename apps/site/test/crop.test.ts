@@ -313,6 +313,70 @@ test('neither cut falls through ink, in either scheme', async () => {
 });
 
 /**
+ * THE CARD'S BOTTOM EDGE IS A THIRD CUT, AND UNTIL 22 SEPTEMBER NOTHING READ IT.
+ *
+ * `.report-card` lies on the picture and ends at `margin-block-end: calc(-100% * 202 / 2556)`,
+ * which is source row 202 at every width for the same cancelling reason the right cut is 2556.
+ * Its predecessor, a `clamp` that came to source row 127.8, cut the page title `Dashboard` in half
+ * in both schemes, and it was found in a review screenshot, not by this file: the two tests above
+ * read the frame's right and bottom edges and never the card's. So a re-capture that moved the
+ * title or the first section heading down by thirty rows would have passed here while the card
+ * sliced through it. Driven against row 128 before this test was accepted, it failed on the first
+ * capture it read, at source row 127 on 219 columns starting at 548, which is the title's `D`; at
+ * 202 it passes on both captures of 22 September.
+ *
+ * The card's edge is a rendered pixel, not a source row, so the row either side is held too.
+ *
+ * ONLY OVER THE COLUMNS THE CARD CAN COVER, because the rail beside it is not under it. Profiled
+ * on both captures, row 201 carries ink at columns 37 to 58 and nowhere else: the `Overview` icon
+ * in the navigation rail, which the card never reaches. The card is
+ * `min(100% - 2 * var(--sp-6), var(--site-max))`, 32px and 1200px, centred on the band, so its
+ * left edge in source columns is `32 * C / V` up to a 1,264px viewport and `(V - 1200) / 2 * C / V`
+ * above it. That is smallest at exactly 1,264, where it is column 64.7 of 2556, so columns 64 to
+ * `C - 64` are every column the card's edge has lain across at any width the overlap exists at
+ * (below 900px the narrow treatment stacks the two and there is no overlap).
+ */
+const CARD_GUTTER = 32;
+const CARD_MAX = 1200;
+
+function overlap(): { column: number; row: number; left: number } {
+  const source = readFileSync(PAGE, 'utf8');
+  const at = source.indexOf('.report-card {');
+  assert.notEqual(at, -1, 'there is no `.report-card` rule any more, so nothing lies on the picture');
+  const rule = source.slice(at, source.indexOf('}', at));
+  const found = rule.match(/margin-block-end:\s*calc\(-100%\s*\*\s*(\d+)\s*\/\s*(\d+)\)/);
+  assert.ok(found, 'the card no longer overlaps the picture by `calc(-100% * R / C)`, so its edge is not a source row any more');
+  assert.ok(
+    /inline-size:\s*min\(100%\s*-\s*2\s*\*\s*var\(--sp-6\),\s*var\(--site-max\)\)/.test(rule),
+    'the card is no longer `min(100% - 2 * var(--sp-6), var(--site-max))` wide, so the columns its edge covers are not the ones this test reads',
+  );
+  const column = Number(found[2]);
+  return { row: Number(found[1]), column, left: Math.floor((CARD_GUTTER * column) / (CARD_MAX + 2 * CARD_GUTTER)) };
+}
+
+test('the card lying on the picture ends on a clear row, in either scheme', async () => {
+  const { column, row, files } = crop();
+  const card = overlap();
+  assert.equal(
+    card.column,
+    column,
+    `the card's overlap is a fraction of ${card.column} and the picture's right cut is ${column}, so the card's edge is not at source row ${card.row}`,
+  );
+  for (const file of files) {
+    const grid = await decode(file, column + 1, row + EDGE_REACH + 1);
+    const median = medians(grid);
+    for (let y = card.row - 1; y <= card.row + 1; y += 1) {
+      const hits = inkAlongRow(grid, median, y).filter((x) => x >= card.left && x <= column - card.left);
+      assert.deepEqual(
+        hits,
+        [],
+        `${file}: the card's bottom edge cuts through ink at source row ${y}, on ${hits.length} column(s) starting ${hits.slice(0, 8).join(', ')}`,
+      );
+    }
+  }
+});
+
+/**
  * A CLEAR CUT ACROSS A BLANK PICTURE IS CLEAR, which is the one way the test above could pass while
  * the band showed nothing at all. It is not a hypothetical: the first version of `send-shot.mjs`
  * photographed five of the seven bands as bare ground and both product shots as empty frames,

@@ -190,11 +190,10 @@ export const site = {
      * So it names the day. `src/lib/claims.test.ts` fails if the caption credits the build while the
      * build script runs no capture, and the date here moves the day somebody re-shoots.
      */
-    caption: 'One record, photographed from the app on 21 September',
+    caption: 'One record, photographed from the app on 22 September',
     alt:
-      'The home screen of a record: what it is owed and what is due, the money falling due this ' +
-      'week, the questions waiting on a decision, and what its agents and rules did while you ' +
-      'were away.',
+      'The work board of the sample record: six columns from Later to Done, each card a task and ' +
+      'the project it belongs to.',
   },
 
   /**
@@ -240,9 +239,13 @@ export const site = {
          rows it was quoting are `seq 4160` at `stamp(-31)` and `seq 4188` at `stamp(-9)`, and
          `stamp` counts hours (`packages/seed/src/modules/base.ts:104`). Named, never numbered. */
       { who: 'Codex', what: 'Opened a question about the Kiln licensing model', when: '1d ago' },
-      /* A rule that exists, under the name `packages/seed/src/usecases/names.ts:45` gives it. The
-         note it added reads *Chased twice. 45-day terms expired 3 August.* */
-      { who: 'Chase late payments', what: 'Added a note to an invoice that is late', when: '9h ago' },
+      /* `seq 4188` in `data.ts`, at `stamp(-9)`, and it is `by: 'rule.reply'`, not the late-invoice
+         rule. This row credited it to *Chase late payments*, the name `names.ts` gives
+         `invoice-late`, which wrote no row in the sample's ledger at all. `reply` is in no
+         `RULE_NAMES` entry, so the app draws it through `actorOf`'s fallback as `reply rule`, and
+         that is the name a reader who opens the sample sees on this row. The note it added reads
+         *Chased twice. 45-day terms expired 3 August.* on `obligations#1`. */
+      { who: 'reply rule', what: 'Added a note to an invoice that is late', when: '9h ago' },
       /* `seq 4192` and `4191` in `data.ts`, both at `stamp(-3)`: Object storage and the Workers
          plan, each `from the Fenwick invoice`. */
       { who: 'Claude', what: 'Added Object storage and the Workers plan, from the Fenwick invoice', when: '3h ago' },
@@ -807,7 +810,8 @@ export const site = {
    * the page written for the reader who checks.
    */
   agents: {
-    tag: 'For agents',
+    /* NO `tag`. /agents dropped its eyebrow on 27a3cf59 and `tag: 'For agents'` stayed here read by
+       nothing. `dead-copy.mjs` could not say so, because it reads `apps/web` and never this file. */
     title: 'What an agent or a service does with a record.',
     lead: 'The same record and the same rules, whether a model reaches it over MCP or a project posts its own numbers to one address. Every limit below is a value in the code.',
 

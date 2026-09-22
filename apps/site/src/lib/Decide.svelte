@@ -19,10 +19,12 @@
   the script arrives, it is left finished: rewinding something a reader is looking at would blank
   a card under their eyes and replay it, which is worse than no motion at all.
 
-  THE MOTION IS GUARDED IN THE SCRIPT, not in CSS, for the reason `Ledger.svelte` gives: a
-  `prefers-reduced-motion` rule can stop a transition and cannot stop a timer. Under that preference
-  the scene is never rewound and no timer is made, and turning the preference on mid-play finishes
-  the scene there and then. The CSS transitions sit inside `no-preference` as a second guard.
+  THE MOTION IS GUARDED IN THE SCRIPT, not in CSS: a `prefers-reduced-motion` rule can stop a
+  transition and cannot stop a timer. Under that preference the scene is never rewound and no timer
+  is made. The query is listened to as well as read, because reading it once at mount leaves the
+  timers running for somebody who turns motion off with the page already open, which is exactly when
+  a person reaches for that switch; so turning the preference on mid-play finishes the scene there
+  and then. The CSS transitions sit inside `no-preference` as a second guard.
 
   THE WHOLE PLAY IS UNDER FIVE SECONDS, and that number is the WCAG 2.2.2 one. This is moving
   content that starts by itself, and the criterion exempts motion that lasts five seconds or less.
@@ -434,9 +436,14 @@
     white-space: nowrap;
   }
 
-  /* THE LANDING ROW, washed, and its quiet cell stepped up to `--ink2`. `Ledger.svelte` measured why:
-     `--dim` on `--s1` under the 6 per cent wash is 4.19:1 on the dark scheme's flipped band, under the
-     4.5 floor, and `--ink2` there is 6.18:1. This row sits on the same two surfaces. */
+  /* THE LANDING ROW, washed, and its quiet cell stepped up to `--ink2`, because `--dim` runs out of
+     contrast three surfaces down. `--flip-dim` is solved against the flipped band's ground, 5.73:1
+     in the dark scheme; this row is on `--s1`, 4.74:1, and the 6 per cent wash under it takes `--dim`
+     to 4.19:1, under the 4.5 body floor. The `a11y` gate found exactly that on the old home-page
+     ledger's newest row, in dark at 1440 and at 390; light lands at 4.94:1 and clears. `--ink2`
+     there measures 6.18:1. Raising `--flip-dim` instead needs 68 per cent against `--flip-ink2`'s 76,
+     and two roles eight points apart read as one colour, so the call site that stacks the surfaces
+     pays for it. This row sits on the same two surfaces. */
   .landing {
     background: var(--hover-wash);
     box-shadow: inset 3px 0 0 var(--info);
@@ -543,8 +550,10 @@
 
   /* ── The phone: the proposal over the history ─────────────────────── */
 
-  /* RANGE SYNTAX, TO MATCH THE PAGE. `+page.svelte` breaks its grid at `width < 640px`, and
-     `Ledger.svelte` found that `max-width: 640px` disagreed with it at exactly 640. */
+  /* RANGE SYNTAX, TO MATCH THE PAGE. `+page.svelte` breaks its grid at `width < 640px`, which
+     excludes exactly 640; `max-width: 640px` includes it. The old home-page ledger used the second
+     and, at a viewport of exactly 640, dropped to its phone rows while the page kept its desk grid.
+     The page owns the number, so this file follows it. */
   @media (width < 640px) {
     .stage {
       grid-template-columns: minmax(0, 1fr);
