@@ -12,7 +12,7 @@
  */
 
 import type { Clock, Refusal, Result, Sql } from '@braindog/ports';
-import { no, ok } from '@braindog/ports';
+import { ok } from '@braindog/ports';
 
 import kernel0001 from './migrations/0001_kernel.ts';
 import session0002 from './migrations/0002_session.ts';
@@ -239,5 +239,10 @@ export function statements(script: string): string[] {
     .filter(Boolean);
 }
 
+/**
+ * The sticky schema refusal, WHOLE. It was rebuilt from `code` and `fix` alone, so `applyMigrations`' `at:
+ * migration[<n>]` never reached a caller: `kernel.import` and every other method answer through here, and the import
+ * runner's `schema-mismatch` and `schema-newer` fixtures could not see the address `migrate.test.ts` checks.
+ */
 export const schemaRefusal = (state: SchemaState): Result<never> | null =>
-  state.refusal ? no(state.refusal.code, state.refusal.fix) : null;
+  state.refusal ? { ok: false, refusal: state.refusal } : null;
