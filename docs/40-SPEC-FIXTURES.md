@@ -382,15 +382,15 @@ found: currency                   # optional; asserted when present
 
 | `via` | Codes | Input keys | `at` is a path into | Runner |
 |---|---|---|---|---|
-| `lint` | 27 | `pack:` — a whole manifest | the manifest | `declare/test` — the pack alone, offline |
-| `install` | 20 | `pack:` · `installed:` (active declaration bodies) · `facts:` (`rows`, `distinct` values per field, `format`, `primitives` — the numbers the code's message cites) | the manifest | `record/test`, composing `declare`'s plan and `theme`'s checks exactly as `planPack` does |
-| `where` | 7 | `register:` · `subject:` (`entry` \| `inbox_raw`) · `predicate:` | the predicate | `record/test` via `where/sql` |
-| `write` | 15 | `declare:` (one register) · `rows:` (prior rows, owner-written) · `write:` (`register` `seq?` `patch` `version?`) · `principal:` | `<id>` · `<id>[<i>]` · `version` · `register` · `state` | `record/test` via the kernel's `write` on a fresh materialised record |
-| `rpc` | 30 | `record:` (a seed record) · `call:` (`method` `args`) or `calls:` (a sequence, for `PLAN_STALE`) · `principal:` | `principal` · `<k>` · `authorization` | `record/test` |
-| `import` | 7 | `record:` · `tamper:` — `sig` · `row` · `format` · `not-empty` · `migration-text` · `migration-ahead`, one per code | `dog_sig.sig` · `dog_manifest.<table>` · `dog_meta.format` · `record` · `migration[<n>]` | `record/test` — export the record, apply the verb, import |
+| `lint` | 31 | `pack:` — a whole manifest | the manifest | `tools/refusals/run-via.mjs lint`: `normalise`, then `validate` per declaration, the pack alone, offline |
+| `install` | 16 | `pack:` · `installed:` (active declaration bodies) · `facts:` (`rows`, `distinct` values per field, `format`, `primitives` — the numbers the code's message cites) | the manifest | `packages/record/test/refusals-install.test.ts`: `declare`'s `plan` and `install` for the eight raised there, a real record through `planPack` and `installPack` for the five the kernel raises, and the three `theme` codes skipped by name because nothing on the install path calls `theme`'s checks yet |
+| `where` | 7 | `register:` · `subject:` (`entry` \| `inbox_raw`) · `predicate:` | the predicate | `tools/refusals/run-via.mjs where`, through `compile` in `packages/where` |
+| `write` | 15 | `declare:` (one register) · `rows:` (prior rows, owner-written) · `write:` (`register` `seq?` `patch` `version?`) · `principal:` | `<id>` · `<id>[<i>]` · `version` · `register` · `state` | `packages/kernel/test/refusals-write.test.ts`, the kernel's `write` on a fresh materialised record |
+| `rpc` | 30 | `record:` (a seed record) · `call:` (`method` `args`) or `calls:` (a sequence, for `PLAN_STALE`) · `principal:` | `principal` · `<k>` · `authorization` | 5 of 30, each beside the file its `raises:` names: `packages/host/test`, `apps/selfhost/test` and `packages/client/test`, all three `refusals-rpc.test.ts`. The other 25 need a seed record of §4, which is not built |
+| `import` | 7 | `record:` · `tamper:` — `sig` · `row` · `format` · `not-brainl` · `not-empty` · `migration-text` · `migration-ahead`, one per code | `dog_sig.sig` · `dog_manifest.<table>` · `dogl` · `migration[<n>]`, and none for `IMPORT_NOT_EMPTY` | `packages/kernel/test/refusals-import.test.ts`: export a record the test builds, apply the verb, import |
 | `render` | 2 | `document:` | none, and that is measured: `packages/render/src/parse.ts`’s `Degraded` is `{ type, code, fix, raw, info, start, end }` and has no `at` at all. This column promised `blocks[<i>].rows[<j>]` and `blocks[<i>].kind`, and the row index is out of reach twice over, because a degraded fence never becomes a block. The address the surface does carry is `start` and `end`, a span of source bytes. Growing an `at` is a change to a published MIT package’s envelope, so it is a decision rather than a repair | `apps/web/test`, through `braindog-render` |
-| `pull` | 7 | `declare:` (one connector) · `grant:` (the stored credential, or none) · `answers:` (the provider’s replies, one per request the run makes) | the connector declaration, or the run’s lease: `fetch.auth.token_url` · `fetch.page[<n>]` · `fetch.page.from` · `object` · `lease` | `connect/test`, driving the scheduled run the way the Worker’s alarm does |
-| `ask` | 4 | `record:` (a seed record) · `ask:` (the question, trimmed and capped at 400 bytes) · `replies:` (the model’s answers, one per call the ask makes, verbatim) · `settings:` (`tier`, `model`, `ask_cap`, and the month’s asks, which is the meter) · `principal:` | the model’s reply: a span of its own text (`{{pct:-46.3}}`, `about 40%`), a path into the JSON the call pinned (`body_kind`, `schema`), or a path into a proposed `ingest` body; none for the meter, which refuses before any model is called | `spark/test`, driving the palette’s two passes against the inference double of `packages/spark/test/double.ts` |
+| `pull` | 7 | `declare:` (one connector) · `grant:` (the stored credential, or none) · `answers:` (the provider’s replies, one per request the run makes) | the connector declaration, or the run’s lease: `fetch.auth.token_url` · `fetch.page[<n>]` · `fetch.page.from` · `object` · `lease` | in two halves, by the file each fixture’s `raises:` names: `packages/connect/test/refusals-pull.test.ts` drives the five raised in `packages/connect` through `runPull`, the way the Worker’s alarm does, and `packages/host/test/refusals-pull.test.ts` the two raised in `packages/host/src/actions.ts` through `sendAction`, which answers the same two codes with no `at` |
+| `ask` | 4 | `record:` (a seed record) · `ask:` (the question, trimmed and capped at 400 bytes) · `replies:` (the model’s answers, one per call the ask makes, verbatim) · `settings:` (`tier`, `model`, `ask_cap`, and the month’s asks, which is the meter) · `principal:` | the model’s reply: a span of its own text (`{{pct:-46.3}}`, `about 40%`), a path into the JSON the call pinned (`body_kind`, `schema`), or a path into a proposed `ingest` body; none for the meter, which refuses before any model is called | `packages/spark/test/refusals-ask.test.ts`, driving the palette’s two passes against the inference double of `packages/spark/test/double.ts` |
 
 **`ask` is the ninth `via`, minted on September 21st 2026 for the four codes `packages/spark` arrived with.**
 Nothing above it could carry one. A spark refusal happens when a model ANSWERS: the input is a projection plus the
@@ -400,12 +400,16 @@ document or a scheduled connector run. `refusal-fixtures.mjs` reported it as fou
 §6 with no file on disk. The alternative was to enumerate those four somewhere else, and there is nowhere else: 30 §6 is
 the registry’s home, and this table is the one place a registered code’s input shape is written down.
 
-**A `via` with no runner is the normal state on this page rather than a concession made for this one.** None of the
-eight runners above exists either, which `loop/STATUS.md` §5 records of all of them: until one does, a fixture is an enumeration entry
-with a sentence attached, and the gate that reads this table owns the enumeration and not the behaviour. So the ninth
-row costs one row, and not adding it cost four codes a caller can already be handed and nothing enumerated. This gate
-needed no edit for it, which is the second time the table has grown a row without one; `pull` was the first, the day
-before.
+**Every `via` has a runner as of September 22nd 2026, and the Runner column names each one.** This paragraph said
+none of the eight before `ask` existed, which was a day stale when it was written: `e74a563b` had built the `write` and
+`render` runners on September 20th. The last four, `rpc`, `import`, `pull` and `ask`, landed on the 22nd, and none of
+them where this table first put it (`record/test` for `rpc` and `import`, `connect/test` for all of `pull`). Each is
+beside the file its fixtures name in `raises:`, because a runner one layer above the raiser goes green the day the
+layer between them starts answering for itself, and that is also why `rpc` and `pull` are split across packages. Two
+families are driven in part, and their rows say which part: `install` 13 of 16 and `rpc` 5 of 30. `lint` and `where`
+are driven by `tools/refusals/run-via.mjs` itself, and for the other seven it prints where their runner is and how to
+run it. Adding `ask` cost one row, and `refusal-fixtures.mjs` needed no edit for it, the second time the table has
+grown a row without one; `pull` was the first, the day before.
 
 `SPARK_BUDGET_SPENT` refuses before any model is called and is still an `ask`, because the surface is the palette and
 the meter is its first step (46 §5.4-1). The `via` names the surface a runner drives, not the moment inside it where
@@ -416,7 +420,7 @@ The `at` column was wrong for the `write` and `rpc` rows until 2026-09-20, and i
 appended for a position in a list, and the rpc path emits the bare argument name. Twelve fixtures were
 written to this column and carried a prefix no refusal has ever contained. Nothing caught them, because
 `refusal-fixtures.mjs` owns the enumeration and not the behaviour, and the `via: write` runner that would
-have driven them does not exist yet. A specification that nothing executes is a specification that can be
+have driven them did not exist until `e74a563b`, the same day. A specification that nothing executes is a specification that can be
 wrong for months, which is the argument for building the runners in §6 rather than for writing this
 paragraph.
 
@@ -431,6 +435,13 @@ here rather than quietly deleted, the same way `52 §5.1` is. Until a runner exi
 with a sentence attached, and `refusal-fixtures.mjs` says so about itself: it owns the enumeration and not the
 behaviour.
 
+**Most of it is built now.** Counted on September 22nd 2026, after the runners landed: 65 of the 119 fixtures carry
+input, and the 54 left bare are the 25 `rpc` fixtures waiting on a seed and the 26 `lint` fixtures whose `pack:` is
+still lent from `tools/refusals/lint-inputs.json`, plus the three `theme` fixtures the `install` runner skips by name.
+Three keys of the column are still held by nothing: `record:`, `calls:` and `subject:`.
+`record:` names a seed of §4, and every runner that could have read one builds its own record instead, because no seed
+exists.
+
 **`at` is optional.** `41 §6` always said so, the gate required it anyway, and nine fixtures invented an address
 because the format left no way to say there is none. Eight of the 119 are blank today, counted on September 21st 2026:
 `IMPORT_NOT_EMPTY`, which is about several tables at once and says so in `fix`; `VERSION_STALE`, derived from a
@@ -438,7 +449,9 @@ conflict envelope with no slot for an address; the two `DIALECT_` codes, whose s
 instead; `PULL_ORIGIN_REFUSED` and `PULL_REQUEST_REFUSED`; and the two `ask` codes that refuse the whole answer rather
 than a place in it, `PROPOSAL_NO_ROWS` and `SPARK_BUDGET_SPENT`. `REGISTER_UNKNOWN` was named here as one of the three
 and is not blank any more: the kernel’s write path now answers `at: register`, which is where the caller wrote it, and
-the fixture carries that.
+the fixture carries that. Eleven are blank on September 22nd 2026, and the three new ones were invented addresses a
+runner found: `BODY_MALFORMED`, `ROUTE_UNKNOWN` and `UNREACHABLE` claimed `body`, `method` and `base` from September
+9th until `389fbc15` drove them, and the router and the client answer all three with no `at`.
 
 **`derived:` says the code is read off an envelope rather than built.** Every fixture names in `raises:` the file
 that raises its code, and `refusal-fixtures` opens that file and looks for the code written in it. That question is
@@ -468,43 +481,65 @@ rather than picking whichever it walked into first. The value is one identifier;
 derives from an answer that does not carry one will need it, and the alternative is a fixture that points at the
 registry and proves nothing.
 
-119, counted: 27 + 20 + 7 + 15 + 30 + 7 + 2 + 7 + 4, against a registry of 126. The seven without a fixture are the seven
-no line of source names, which is the rule `refusal-fixtures` enforces and prints on every run. Do not hand-copy
-these numbers anywhere: the figures in this section were 75 against 112 for months after both had moved, and twelve
-fixtures were written wrong from the column beside them. The `lint`/`install` split follows each code's own message:
-a code that cites rows, installed packs or the record's versions needs a record and is `install`
-(`REQUIRED_ON_POPULATED` `ID_RENAMED` `DEPENDENCY_UNRESOLVED` `FORMAT_OUT_OF_RANGE` `FIELD_TYPE_CHANGED`
-`SEQ_PREFIX_TAKEN` `MIXED_CURRENCY` `GROUP_BY_CARDINALITY` `QUANTITY_MIXED_UNIT` `CONTRAST_FLOOR`); the other
-twenty-two of 04 §5's thirty-three lint offline; `PLAN_STALE` is `rpc`. The seven `PULL_` codes are `pull`, added on
-September 20th 2026: they are raised inside a scheduled connector run and written onto that run’s ack, and
-nothing a `call:` can express reaches one, so `rpc` was never true of them. Two examples:
+The total and the per-`via` counts are not written out here as a sum, and that is on purpose. This paragraph opened
+with one, *“119, counted: 27 + 20 + 7 + 15 + 30 + 7 + 2 + 7 + 4”*, and two of its nine terms were wrong the day after it was
+written: on September 22nd 2026 the five `ACTION_` fixtures moved from `install` to `lint` and `create-foreign-register` moved
+back, which made the first two terms 31 and 16 while the total stayed 119 and so looked right. `refusal-fixtures`
+prints the total against the registry on every run, `tools/refusals/run-via.mjs <via>` prints each family's size, and
+the Codes column of the table above is the one hand-kept copy, checked against `fixtures/refusals` on that date. The
+seven registered codes without a fixture are the seven no line of source names, which is the rule `refusal-fixtures`
+enforces. Do not hand-copy these numbers anywhere else: the figures in this section were 75 against 112 for months after
+both had moved, and twelve fixtures were written wrong from the column beside them.
+
+The `lint`/`install` split follows each code's own message: a code that cites rows, installed packs or the record's
+versions needs a record and is `install`. That is sixteen today: `REQUIRED_ON_POPULATED` `ID_RENAMED`
+`DEPENDENCY_UNRESOLVED` `FORMAT_OUT_OF_RANGE` `FIELD_TYPE_CHANGED` `SEQ_PREFIX_TAKEN` `GROUP_BY_CARDINALITY`
+`PRIMITIVES_OUT_OF_RANGE` `PROVIDES_CONFLICT` `REGISTER_UNRESOLVED` `PACK_DISABLED` `WOULD_ORPHAN`
+`CREATE_FOREIGN_REGISTER`, and the three `theme` codes the install path is meant to check, `CONTRAST_FLOOR`
+`INTENT_INSEPARABLE` `THEME_LADDER_ORDER`. The other thirty-one lint offline. `PLAN_STALE` is `rpc`, and so are
+`MIXED_CURRENCY` and `QUANTITY_MIXED_UNIT`: this list named both as `install` from the day their fixtures were written
+on September 9th 2026, and both fixtures have said `via: rpc` from that day, because `packages/kernel/src/metrics.ts`
+raises them when a figure is read, not when a pack is installed. The seven `PULL_` codes are `pull`, added on September
+20th 2026: they are raised inside a scheduled connector run and written onto that run’s ack, and nothing a `call:`
+can express reaches one, so `rpc` was never true of them.
+
+Two examples, both copied from `fixtures/refusals` and both driven. The first replaces one this page carried until
+September 22nd 2026, a `ROW_LOCKED` fixture that has never existed, whose `at: fields.lesson` was the prefix the `at`
+paragraph above says no refusal has ever contained.
 
 ```yaml
-# refusals/row-locked.yaml
-code: ROW_LOCKED
-via: write
-at: fields.lesson
-declare:
-  register: learnings
-  name: Learnings
-  fields:
-    - { id: lesson, type: text, required: true }
-    - { id: state,  type: enum, values: [proposed, active, reverted], default: proposed }
-  immutable_when: { field: state, in: [reverted] }
-rows:
-  - { lesson: "A lesson invented for this fixture, long enough to pass min.", state: reverted }
-write: { register: learnings, seq: 1, patch: { lesson: "changed" }, version: 1 }
-principal: { kind: person, level: owner }
+# fixtures/refusals/immutable-field.yaml
+code:   IMMUTABLE_FIELD
+via:    write
+raises: packages/kernel/src/index.ts
+at:     ref
+fix:    Add a new field instead of changing this one.
+declare: {
+    "id": "obligations", "name": "Obligations", "title": "what",
+    "fields": [
+      { "id": "what", "type": "text", "required": true },
+      { "id": "ref", "type": "text", "immutable": true }
+    ]
+  }
+rows: [
+    { "what": "Invoice 41", "ref": "INV-41" }
+  ]
+write: { "register": "obligations", "seq": 1, "patch": { "ref": "INV-42" } }
 ```
 
 ```yaml
-# refusals/checksum-mismatch.yaml
-code: CHECKSUM_MISMATCH
-via: import
-at: dog_manifest.entry
-record: twelve
-tamper: row            # append one byte to the first `entry` line of the exported .brainl; the signature still verifies the manifest
+# fixtures/refusals/checksum-mismatch.yaml
+code:   CHECKSUM_MISMATCH
+via:    import
+raises: packages/kernel/src/brainl.ts
+at:     dog_manifest.entry
+fix:    Re-export it from the record it came from.
+tamper: row
 ```
+
+`tamper: row` edits one `entry` line of the exported `.brainl` (`Invoice 42` becomes `Invoice 24`) and imports it into
+an empty record; the signature still verifies the manifest, so the row is what is refused. There is no `record:` line,
+because the seed it would name is not built and the runner makes its own.
 
 ---
 

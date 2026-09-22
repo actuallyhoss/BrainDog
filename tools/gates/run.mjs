@@ -479,6 +479,15 @@ function declaredNeeds(name, file) {
  * two hundred lines apart. Nothing goes red for any of the eight: a script gate is a supported
  * dialect, not a gate waiting to be fixed.
  *
+ * AND THOSE FOUR MOVE BY EDITING THE GATE, NEVER BY A WRAPPER HERE OR IN A LIBRARY. Measured on 22
+ * September by importing each one from a stand-in for this file: `clean-room` reads its root from
+ * `process.argv[2]`, which in this process is this runner's first flag, so `--only clean-room` made it
+ * scan `C:\Repos\braindog\--only` and throw `ENOENT`; `no-declarations-in-kernel` ran on the first
+ * import and printed nothing on the second, because the module is cached; and `spark-actor` and
+ * `import` each call `process.exit` at top level, which would end this run. A wrapper that imports a
+ * script is the trap described above with an extra file around it. `52 §5.1` has the exact shape each
+ * one takes, which is the one `em-dash` took.
+ *
  * THE OTHER THING THE PROCESS BOUNDARY WAS DOING IS CONTAINING `process.exit`, and that one is
  * caught below rather than argued away: see `inside` at the run loop.
  *

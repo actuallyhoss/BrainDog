@@ -125,7 +125,7 @@ The fewest that hold. One gate per file; a shared `lib.mjs`; one budgets file; o
 ```
 tools/
 ├── gates/
-│   ├── run.mjs                 the runner: an ordered array, `spawnSync` per gate, the exit code read (§5.1)
+│   ├── run.mjs                 the runner: an ordered array; 22 gates called, 8 spawned, the answer read (§5.1)
 │   ├── self-test.mjs           runs each grep gate against tools/gates/negative/<gate> (§9)
 │   ├── lib.mjs                 budgets() · budget() · keyPaths() · skipDir · MAY_REFUSE · readiness()
 │   ├── record.mjs              NOT a gate: the self-host in memory with the seed installed, served on
@@ -365,9 +365,9 @@ prose is now uniform. Whoever wants the machine-readable stream back should add 
 
 ### 5.1 · The runner — `tools/gates/run.mjs`
 
-**Specified, and not built.** The algorithm below describes a runner that imports each gate and checks its
-declared prerequisites itself. `tools/gates/run.mjs` does not do this and never has. Read it as the design to
-move towards, not as a description of the tree.
+**Built in part, and the part is named gate by gate below.** The algorithm is the design. Steps 2 and 5 are
+what the tree does; steps 1, 3 and 4 hold for twenty-two of the thirty gates and in a narrower shape than
+written. Read the list for the intent and the paragraphs after it for the tree.
 
 1. List `tools/gates/*.mjs` minus `run.mjs`, `lib.mjs`, `self-test.mjs`; apply `--only`.
 2. For each file, in name order: `import()` it; read `export const needs: string[]` (`'web-build'`, `'pack-build'`,
@@ -377,16 +377,67 @@ move towards, not as a description of the tree.
 5. Exit `0` if nothing is red and every skip is allowed (locally: all; under `CI=true`: only `--allow-skip`);
    `1` if any gate is red; `2` if a gate crashed or a skip is disallowed (§6).
 
-**What the runner does instead.** It holds a hard-coded ordered array of gates, `spawnSync`s each one as a
-subprocess with `stdio: 'inherit'`, and reads the EXIT CODE: `3` is a skip, anything else non-zero is red. It
-never imports a gate, so no gate exports `needs`, so every gate checks its own prerequisites and is trusted to
-report an unmet one honestly. That trust is the weakness step 2 removes, and it has been broken twice: `passkey`
-and `queue` each found no build and exited `0`, which is a pass. `self-test.mjs` now greps this directory for an
-explicit `process.exit(0)` because the runner cannot see what a gate said, only what it returned.
+**Step 1, as built.** The list is a hard-coded ordered array, `GATES`, and it stays: it carries the ORDER,
+which is load-bearing (`typecheck` first, `self-test` second, the browser gates last), and entries that are
+not files in this directory, like `theme`. The directory scan step 1 describes runs as a CHECK on the array
+instead of as its source: a `.mjs` file here that no entry names and no other file imports is exit 1 before
+any gate runs. Two gates were written and left unregistered in one week before that check existed.
 
-The array is not the fiction. It carries the ORDER, which is load-bearing, and entries that are not files in
-this directory, like `theme`. What is missing is step 2. Whoever builds it should keep the array and add the
-prerequisite declaration to it, and should rewrite this section when they do.
+**Step 2, as built.** Every prerequisite is the runner's question. A gate whose declared `needs` is unmet is
+never started, and the skip line is the runner's, naming the command that meets it. `web-build` also asks
+whether the build is newer than the source, because a stale build gave `layout` and `a11y` nineteen findings
+about an app that no longer existed. `pack-build` is declared by nothing, because its one gate,
+`licence-closure`, has never been written. This closed a defect that shipped twice: `passkey` and `queue` each
+found no build and exited `0`, which is a pass.
+
+**Step 3, as built: twenty-two gates are called and eight are spawned.** The dialect is declared per entry,
+with `call(file)`, and never guessed from the file's text; the text is read only to REFUSE a disagreement
+(a call with no `export default` or no `if (import.meta.main)` guard, or a spawned script that names
+`export default`). A called gate is `export default async (root) => 1 | 3 | undefined`, handed the root and
+nothing else rather than `ctx`; a throw is that gate's red and not the run's, and a `process.exit` inside
+one is named by the runner on the way out. `mod.needs` is read off the module before the function is
+called, so the declaration and the code are one account. Every gate still runs on its own, because each ends
+with `if (import.meta.main)`, which is also how `self-test` spawns it against a seeded tree.
+
+The twenty-two called: `nul-bytes` `graph` `secret-grep` `event-kinds` `router-groups` `guards` `closed-lists`
+`refusals` `refusal-fixtures` `flags` `css-rules` `colour-grep` `dead-copy` `em-dash` `bundle` `prefs` `keys`
+`layout` `a11y` `passkey` `queue` `deploy-parity`. The eight spawned, and why:
+
+| Gate | Why it is spawned |
+|---|---|
+| `typecheck` | `pnpm -r run typecheck` through a shell. There is no module to import. |
+| `self-test` | spawns every gate itself; called, it would be this runner's work done twice in one process. |
+| `theme` | `packages/skin/scripts/theme.mjs --check`: a flag, and a file outside this directory. A call takes the root and nothing else. |
+| `stack` | on purpose. `test/dialect.test.mjs`, `test/durations.test.mjs` and `test/needs.test.mjs` overwrite it with a script-shaped stub and rely on one real spawned entry. It moves when they pick another stand-in. |
+| `clean-room` | a script: its whole body runs at module top level and it exports nothing. |
+| `no-declarations-in-kernel` | the same. |
+| `spark-actor` | the same, and it calls `process.exit(3)` and `process.exit(process.exitCode ?? 0)` at top level. |
+| `import` | the same, and it calls `process.exit(3)` at top level. |
+
+**The last four cannot be called without editing the gate file, and a wrapper is not a way round that.**
+Measured on 22 September by importing each from a stand-in for `run.mjs`, which is what an adapter in
+`tools/gates/lib/` would have to do: `clean-room` reads its root from `process.argv[2]`, and in the runner's
+process that is the runner's own first flag, so `run.mjs --only clean-room` made it `scandir
+'C:\Repos\braindog\--only'` and throw `ENOENT`. `no-declarations-in-kernel` ran and printed its line, and a
+second import in the same process printed nothing, because the module is cached: an adapter only works once
+per process, and only by treating the importing as the call, which is the exact trap `run.mjs`'s `IMPORTED OR
+SPAWNED` paragraph refuses. `spark-actor` and `import` would end the runner at their `process.exit`. Each of
+the four moves to `call(...)` the way `em-dash` did: the body inside `export default async function
+gate(root = process.env.BRAINDOG_GATE_ROOT ?? <its current default>)`, where the default is kept as it
+is (`process.cwd()` for `clean-room`, the repository root two directories up for the other three, so that
+running one by hand from another directory still scans this tree), `return 3` and `return 1` for the exits, and
+`if (import.meta.main) process.exitCode = (await gate(process.argv[2])) ?? 0;` at the foot. That is an edit to
+the gate, which is the gate owner's to make.
+
+**Step 4, as built.** Not a `Result` object. Each gate prints its own two-space-indented prose line (§4 says
+why the JSON line was dropped), and the runner adds `▸ <name> · imported|spawned` above it and `◂ <name> ·
+<seconds> s` below it.
+
+**Step 5, as built,** with one difference. `0` when nothing is red and every skip is allowed; `1` when a gate
+is red. A gate that throws, returns a number outside `1`, `3` and nothing, or has a disallowed skip under `CI`
+is RED, exit `1`, rather than `2`: the run still asks every gate after it. Exit `2` is kept for what stops the
+run before any gate is asked: an unknown gate name, an empty selection, an unreadable `needs`, and a
+registration that disagrees with its file.
 
 ### 5.2 · Source and artefact gates — one script each
 

@@ -6,11 +6,13 @@
  * this file is a dispatcher rather than a third runner. `e74a563b` (September 20th 2026) added
  * `packages/kernel/test/refusals-write.test.ts` for `via: write` and
  * `apps/web/test/refusals-render.test.ts` for `via: render`, and both drive their surface for real.
- * `loop/STATUS.md` §5 and `docs/40-SPEC-FIXTURES.md` §6 still say none of the eight exists; both are
- * one day stale. So the gap is not "no runner drives a fixture", it is "seven of nine vias have no
+ * `loop/STATUS.md` §5 and `docs/40-SPEC-FIXTURES.md` §6 said none of the eight existed, a day after
+ * two did, and `40 §6` went on saying it until September 22nd 2026. So the gap is not "no runner drives a fixture", it is "seven of nine vias have no
  * driver and there is no one place that says which". Five of nine as of the `where` driver below:
  * `install`, `rpc`, `import`, `pull` and `ask`, which is what `DRIVERS` says in sentences. Four since
- * `packages/record/test/refusals-install.test.ts` began driving `install` on September 22nd 2026.
+ * `packages/record/test/refusals-install.test.ts` began driving `install` on September 22nd 2026, and
+ * none later the same day: `rpc`, `import`, `pull` and `ask` each have a runner beside the file their
+ * fixtures' `raises:` names, and `DRIVERS` says where. `rpc`'s covers 5 of its 30.
  *
  * WHAT A DRIVER IS. One async function per `via`, `(input, fixture) => Envelope`, where `Envelope`
  * is `{ kind, code?, at?, fix?, extra? }` and `kind` is `refusal`, `conflict` or `accepted`. Nothing else in
@@ -311,9 +313,10 @@ async function driveWhere(input) {
  * Every `via` and what drives it. A `string` in place of a function is the reason there is none, and
  * it is printed rather than treated as an absence.
  *
- * THE SEVEN REASONS ARE NOT THE SAME REASON, which is why they are written out. `write`, `render`
- * and `install` are not missing a driver, they have one somewhere else and a second copy here would be two answers
- * about one corpus. The rest are missing a driver AND the input it would read.
+ * THE SEVEN SENTENCES ARE ALL THE SAME REASON NOW, and they are still written out because each names
+ * where its family is driven. None of the seven is missing a driver: each has one somewhere else, and
+ * a second copy here would be two answers about one corpus. `rpc` is the one family whose driver
+ * covers only part of it, and its sentence says which part.
  */
 const DRIVERS = {
   lint: driveLint,
@@ -327,10 +330,16 @@ const DRIVERS = {
      path. A `record/test` file and not a function here, for the reason `write` has one: `40 §6` puts
      the family there, and five of the thirteen need a SQLite record this file has no business opening. */
   install: 'driven by `packages/record/test/refusals-install.test.ts`: 13 of 16, and the three theme codes skipped by name. Run: node --test --experimental-strip-types "packages/record/test/refusals-install.test.ts"',
-  rpc: 'no driver. Needs `record:`, `call:` or `calls:`, and `principal:`, and a seeded record with a principal behind it. 30 fixtures, the largest family, and the most expensive harness.',
-  import: 'no driver. Needs `record:` and `tamper:`, and an export-tamper-import round trip. Cheapest of the six left: `tamper:` is one word per code and `record:` is a seed name.',
-  pull: 'no driver. Needs `declare:`, `grant:` and `answers:`, and the scheduled connector run driven the way the Worker\'s alarm drives it.',
-  ask: 'no driver. Needs `record:`, `ask:`, `replies:` and `settings:`, and `packages/spark/test/double.ts` standing in for the model.',
+  /* THE LAST FOUR READ "no driver" UNTIL SEPTEMBER 22ND 2026, a day after each had one. `389fbc15`,
+     `cd5c0a86` and `9c62122f` put the runners in the packages whose files the fixtures name in
+     `raises:`, one file per raiser, so `rpc` and `pull` are split across packages and none of the four
+     is in the `record/test` or `connect/test` alone that `40 §6` first gave them. Run on that day:
+     `rpc` 5 of 30 driven (3 + 3 + 4 tests, one of them a todo), `import` 9 of 9 tests, `pull` 6 + 3,
+     `ask` 5. The 25 undriven `rpc` fixtures wait on `40 §4`'s seed records, which do not exist. */
+  rpc: 'driven for 5 of 30, each by a test beside the file its `raises:` names: `packages/host/test/refusals-rpc.test.ts` (BODY_MALFORMED, ROUTE_UNKNOWN), `apps/selfhost/test/refusals-rpc.test.ts` (UNAUTHORIZED, RECORD_UNAVAILABLE) and `packages/client/test/refusals-rpc.test.ts` (UNREACHABLE). The other 25 need a seeded record with a principal behind it, and `40 §4`\'s seeds are not built. Run: node --test --experimental-strip-types "packages/host/test/refusals-rpc.test.ts" "apps/selfhost/test/refusals-rpc.test.ts" "packages/client/test/refusals-rpc.test.ts"',
+  import: 'driven by `packages/kernel/test/refusals-import.test.ts`: all 7, one `tamper:` verb each, against a record the test builds because `40 §4`\'s seeds are not built. Run: node --test --experimental-strip-types "packages/kernel/test/refusals-import.test.ts"',
+  pull: 'driven in two halves by the file each fixture\'s `raises:` names: the five raised in `packages/connect` by `packages/connect/test/refusals-pull.test.ts` through `runPull`, and the two raised in `packages/host/src/actions.ts` by `packages/host/test/refusals-pull.test.ts` through `sendAction`. Run: node --test --experimental-strip-types "packages/connect/test/refusals-pull.test.ts" "packages/host/test/refusals-pull.test.ts"',
+  ask: 'driven by `packages/spark/test/refusals-ask.test.ts`: all 4, through the palette\'s two passes against `packages/spark/test/double.ts`. Run: node --test --experimental-strip-types "packages/spark/test/refusals-ask.test.ts"',
 };
 
 /* ── comparing a claim to an answer ─────────────────────────────────────────────────────────── */

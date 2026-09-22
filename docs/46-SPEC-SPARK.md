@@ -181,7 +181,7 @@ The intent is the first instant of the month in the record's time zone. The code
 meter resets a few hours after local midnight on the first, and west of it a few hours before.
 
 **One ask is one model call, on pass 1 or pass 2.** The count was `kind = 'propose'` alone, which fitted a palette whose
-pass 1 was free; the only door built is `POST /api/spark/read`, which writes `kind = 'read'`, so an owner who set
+pass 1 was free; the only door built then was `POST /api/spark/read`, which writes `kind = 'read'`, so an owner who set
 `ask_cap` to 2 was answered on five asks out of five and `status()` read 0 of 2 throughout
 (`packages/spark/test/read-meter.test.ts`, `1d4d6cb3`). So a `read` that drafted a predicate spends one, a `propose`
 given an `ask_id` spends one (its draft was spent on pass 1), and a `propose` with no `ask_id` spends two, because it
