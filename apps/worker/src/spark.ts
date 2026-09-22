@@ -26,7 +26,9 @@
  */
 
 import {
+  sparkByokOf,
   sparkFromEnv,
+  sparkGrantIdOf,
   sparkInferenceOf,
   sparkModelNameOf,
   sparkModelOf,
@@ -161,7 +163,14 @@ export function workerSparkDoor(
   deps: SparkEngineDeps,
   origins: ReadonlySet<string>,
 ): SparkAskDoor<CallContext> {
-  return sparkAskDoor(origins, () => workerSparkEngine(env, api, deps));
+  /* TIER `b` IS OFFERED ONLY WHERE A KEY CAN BE OPENED. With no `KEK` there is no engine either, but the door is built
+     before the engine, and a `byok` handed in here is what lets the settings door store tier `b`: offering it on a Worker
+     that can open nothing would save a setting every later propose refuses. `api` is not called until a propose, by which
+     time the engine is built and its `settings` table exists for `sparkGrantIdOf` to read. */
+  const config = sparkFromEnv(env, { operatorKey: false });
+  const wire = wireOf(env, api, deps);
+  const byok = config === undefined || wire.openKey === null ? undefined : async () => sparkByokOf(config, wire, sparkGrantIdOf(deps.sql));
+  return sparkAskDoor(origins, () => workerSparkEngine(env, api, deps), byok);
 }
 
 /** Spark's daily look, asked on an alarm and after a request: the record decides whether it is due. It never throws. */

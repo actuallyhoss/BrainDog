@@ -23,7 +23,9 @@
 
 import {
   SPARK_KEY_LABEL,
+  sparkByokOf,
   sparkFromEnv as fromEnv,
+  sparkGrantIdOf,
   sparkInferenceOf,
   sparkModelNameOf,
   sparkModelOf,
@@ -163,5 +165,12 @@ export function sparkDoor(
   deps: SparkEngineDeps,
   origins: ReadonlySet<string>,
 ): SparkAskDoor<CallContext> {
-  return sparkAskDoor(origins, () => sparkEngineFor(config, api, store, deps));
+  /* TIER `b` IS OFFERED ONLY WHERE A KEY CAN BE OPENED, which on this host is a key store: without one `keyOpener`
+     answers `null` for every grant, and a `byok` handed in here is what lets the settings door store tier `b`, so
+     offering it would save a setting every later propose refuses. `SPARK_KEY` does not make a host able to open the
+     owner's key and so does not count. The grant id is read on each propose, after the engine that made the `settings`
+     table has been built, so a grant the owner names or revokes counts on the next ask. */
+  const byok =
+    config === undefined || store === undefined ? undefined : async () => sparkByokOf(config, wireOf(config, api, store), sparkGrantIdOf(deps.sql));
+  return sparkAskDoor(origins, () => sparkEngineFor(config, api, store, deps), byok);
 }

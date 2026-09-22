@@ -46,7 +46,7 @@
  * `RecordApi` and `Inference`, and `createSpark` is called by the app with what this file builds.
  */
 
-import { ok, type Result } from '@braindog/ports';
+import { ok, type Result, type Sql } from '@braindog/ports';
 import type { Entry, RegisterDecl } from '@braindog/kernel';
 import type { CallContext, RecordApi, SparkFormInput, SparkModel, SparkModelInput } from '@braindog/record';
 
@@ -326,6 +326,59 @@ export function sparkInferenceOf(config: SparkHostConfig | undefined, deps: Spar
   const options = endpointOptionsOf(config, deps);
   return options === undefined ? undefined : endpointInference(options);
 }
+
+/**
+ * Tier `b`'s adapter: this host's endpoint, asked with the key in the grant the owner's setting names, for one propose.
+ *
+ * `46 §5.9` HAS THE HOST OPEN THE OWNER'S GRANT AND HAND THE PACKAGE AN ADAPTER, and the package never sees the key
+ * (`propose.ts` uses `byok` for the proposal and nothing else). The setting names a grant by id and never holds a key, so
+ * this is where the id becomes a key, on the call and through the same `post` every other Spark request takes.
+ *
+ * THREE THINGS DIFFER FROM THE HOST'S OWN PATH, AND EACH IS A WAY THE OWNER'S CHOICE WOULD OTHERWISE BE OVERRULED:
+ *
+ * - THE GRANT IS THE ONE NAMED, NOT THE ONE LABELLED `spark`, and an operator's `SPARK_KEY` does not stand in for it. With
+ *   the host's `endpointOptionsOf` handed in, measured in `test/spark.test.ts`, the proposal went out as
+ *   `Bearer fake-key-of-g_...HAD`, the `spark`-labelled key, on a record whose setting named `g_...HAE`.
+ * - `SPARK_MODEL` IS NOT CONSULTED. It maps the package's routing names to what this host's tier `a` runs; on the owner's
+ *   key and the owner's bill the name the owner typed is sent as typed, a short one included.
+ * - A KEY THAT CANNOT BE OPENED IS A THROW, NOT A CALL WITH NO `authorization`. The host's path sends keyless when the vault
+ *   has no `spark` grant, which is right for an endpoint on the owner's own machine; here it would be an anonymous call
+ *   against the owner's provider account, so nothing is sent and `core.run` records `UNREACHABLE`.
+ *
+ * `undefined` WHEN NO KEY COULD BE HAD: no endpoint, a host that cannot open keys (a Worker with no `KEK`), no grant named,
+ * or a named grant that is revoked or was never in the vault. The package then answers its own `FORBIDDEN`, "Your key is
+ * not open in this session", which is the sentence for each of those. Nothing is opened here: the key is asked for on the
+ * call, so a propose that finds no rows is no `grant.read` on the record.
+ */
+export function sparkByokOf(config: SparkHostConfig | undefined, deps: SparkHostDeps, grantId: string | null): SparkInference | undefined {
+  const open = deps.openKey;
+  if (!config || open === null || grantId === null) return undefined;
+  const live = () => deps.grants().find((g) => g.id === grantId && g.revoked_at === null);
+  if (live() === undefined) return undefined;
+  return endpointInference({
+    url: config.url,
+    key: async () => {
+      const grant = live();
+      const key = grant ? await open(grant) : null;
+      if (!key) throw new Error('Your key for Spark could not be opened.');
+      return key;
+    },
+    send: deps.send,
+    name: 'your key',
+  });
+}
+
+/**
+ * The grant tier `b` names, read straight from the package's own `settings` row in the SQLite the app handed `createSpark`.
+ *
+ * A HOST READING A TABLE `46 §4.1` DEFINES, said out loud because it is the cost of this line. The package's `Status` carries
+ * no `grant_id` and its engine exposes no `settings()`, and adding either is an edit to `packages/spark`; the host already
+ * owns this handle, so one `SELECT` answers it without that edge (`loop/research-spark-routes.md` K1 chose this over a
+ * package edit). If the package renames the column this answers `null` for nobody and throws for everybody, which the door
+ * turns into a 500 on the first tier `b` propose rather than a silent fall to the included model.
+ */
+export const sparkGrantIdOf = (sql: Sql): string | null =>
+  sql.one<{ grant_id: string | null }>('SELECT grant_id FROM settings WHERE singleton = 1')?.grant_id ?? null;
 
 /** The model this host's endpoint answers with when the package asks by short name: `SPARK_MODEL`, or nothing when unset. */
 export const sparkModelNameOf = (config: SparkHostConfig | undefined): string | undefined => config?.model;

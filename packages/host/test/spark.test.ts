@@ -18,7 +18,9 @@ import {
   answerOf,
   endpointInference,
   endpointModel,
+  sparkByokOf,
   sparkFromEnv,
+  sparkGrantIdOf,
   sparkInferenceOf,
   sparkModelNameOf,
   sparkModelOf,
@@ -317,6 +319,102 @@ test('A PREDICATE THE GRAMMAR REFUSES FALLS BACK ON THE RECORD\'S OWN SEARCH, wh
   assert.deepEqual(out.value.verbs, ['edit', 'save', 'open']);
   const waiting = (await api.boot(owner)) as { ok: boolean; value: { waiting: unknown[] } };
   assert.deepEqual(waiting.value.waiting, []);
+  sql.close();
+  own.close();
+});
+
+/* ── tier `b`: the owner's own key, named by the setting, and the owner's own model name (research-spark-routes K1) ─── */
+
+/** Two live grants and a revoked one. `g_...HAD` is the host's `spark`-labelled key and `g_...HAE` is the one the owner names. */
+const SPARK_GRANT = 'g_01JZ8QK3F7R2M9V4XN6TCB5HAD';
+const OWN_GRANT = 'g_01JZ8QK3F7R2M9V4XN6TCB5HAE';
+const GONE_GRANT = 'g_01JZ8QK3F7R2M9V4XN6TCB5HAF';
+const VAULT = [
+  { id: SPARK_GRANT, label: 'spark', revoked_at: null },
+  { id: OWN_GRANT, label: 'openai', revoked_at: null },
+  { id: GONE_GRANT, label: 'anthropic', revoked_at: '2026-09-01T00:00:00.000Z' },
+];
+const keyOf = (id: string) => `fake-key-of-${id}`;
+const bearer = (net: { sent: { init: RequestInit }[] }, i: number) => (net.sent[i]!.init.headers as Record<string, string>).authorization;
+
+test('TIER b ASKS WITH THE KEY ITS SETTING NAMES AND THE MODEL ITS OWNER TYPED, and not the spark-labelled key or SPARK_MODEL', async () => {
+  const sql = openSqlite();
+  const own = openSqlite();
+  const clock = fixedClock(Date.UTC(2026, 8, 22, 9));
+  const api = await createRecordApi({ sql, clock });
+  assert.ok((await api.kernel.install([TASKS])).ok);
+  for (const what of ['Invoice Acme', 'Invoice Beta']) assert.ok((await api.create({ register: 'tasks', fields: { what, state: 'open' } }, owner)).ok);
+  const answers = [
+    '{"registers":["tasks"],"where":{"field":"state","is":"open"},"q":null}',
+    '{"text":"Two tasks are open and {{ref:tasks#1}} is first.","body_kind":"rowset","body":{"register":"tasks","rows":[{"what":"Chase {{ref:tasks#1}}"}]},"flagged":false}',
+  ];
+  const net = endpoint(() => usedCompletion(answers.shift() ?? '{}', { prompt_tokens: 700, completion_tokens: 60 }));
+  const opened: string[] = [];
+  const deps = { grants: () => VAULT, openKey: async (g: { id: string }) => (opened.push(g.id), keyOf(g.id)), send: net.send };
+  const config = sparkFromEnv({ SPARK_ENDPOINT: 'http://localhost:11434/v1/chat/completions', SPARK_MODEL: 'llama3' }, { operatorKey: false });
+  const spark = createSpark({ sql: own, clock, inference: sparkInferenceOf(config, deps)!, record: sparkRecord(api) });
+
+  /* NOTHING TO OPEN BEFORE THE OWNER NAMES A GRANT: the settings row starts with none, and `propose` then says so. */
+  assert.equal(sparkGrantIdOf(own), null);
+  assert.equal(sparkByokOf(config, deps, sparkGrantIdOf(own)), undefined);
+
+  assert.ok(spark.configure({ tier: 'b', model: 'gpt-4o-mini', grant_id: OWN_GRANT }, owner).ok);
+  assert.equal(sparkGrantIdOf(own), OWN_GRANT);
+  const byok = sparkByokOf(config, deps, sparkGrantIdOf(own));
+  assert.ok(byok, 'a named, live grant built no adapter');
+  /* BUILDING IT OPENS NOTHING. The key is opened on the call, as the host's own path opens it, so a propose that finds no
+     rows and calls no model is not a `grant.read` on the record. */
+  assert.deepEqual(opened, []);
+
+  const out = await spark.propose('Which tasks are open?', owner, byok);
+  assert.ok(out.ok, `refused: ${JSON.stringify(out)}`);
+  assert.equal(out.value.body_kind, 'rowset');
+  assert.equal(net.sent.length, 2);
+  /* THE DRAFTING CALL IS THE HOST'S, because the package drafts the predicate on its own inference on every tier
+     (`propose.ts` hands `byok` to the proposal alone), so it goes with the `spark` key and `SPARK_MODEL`. */
+  assert.equal(bearer(net, 0), `Bearer ${keyOf(SPARK_GRANT)}`);
+  assert.equal(sentModel(net, 0), 'llama3');
+  /* THE PROPOSAL IS THE OWNER'S: the grant the setting names, and the model name as the owner typed it. */
+  assert.equal(bearer(net, 1), `Bearer ${keyOf(OWN_GRANT)}`);
+  assert.equal(sentModel(net, 1), 'gpt-4o-mini');
+  assert.deepEqual(opened, [SPARK_GRANT, OWN_GRANT]);
+  assert.ok(!String(net.sent[1]!.init.body).includes(keyOf(OWN_GRANT)), 'the key went into what the model reads');
+
+  /* A SHORT NAME THE OWNER TYPED IS STILL THE OWNER'S. `SPARK_MODEL` is the host's answer to its own tier `a` routing, and
+     on the owner's key and bill it has no say: `glm-5.3` goes out as `glm-5.3`, where the host's path would send `llama3`. */
+  await byok.complete(ask('glm-5.3'));
+  assert.equal(sentModel(net, 2), 'glm-5.3');
+
+  /* AN OPERATOR'S KEY DOES NOT STAND IN FOR THE OWNER'S: a self-host with `SPARK_KEY` set still sends the named grant. */
+  const operated = sparkByokOf({ ...config!, key: 'fake-operator-key' }, deps, OWN_GRANT)!;
+  await operated.complete(ask('gpt-4o-mini'));
+  assert.equal(bearer(net, 3), `Bearer ${keyOf(OWN_GRANT)}`);
+
+  /* NO ADAPTER, AND SO THE PACKAGE'S OWN FORBIDDEN, for a grant that is revoked, one the vault never held, a host that
+     cannot open keys, and a host with no endpoint. */
+  assert.equal(sparkByokOf(config, deps, GONE_GRANT), undefined);
+  assert.equal(sparkByokOf(config, deps, 'g_01JZ8QK3F7R2M9V4XN6TCB5HAG'), undefined);
+  assert.equal(sparkByokOf(config, { ...deps, openKey: null }, OWN_GRANT), undefined);
+  assert.equal(sparkByokOf(undefined, deps, OWN_GRANT), undefined);
+  /* THE DRAFT IS QUEUED AGAIN BECAUSE THE REFUSAL COMES AFTER THE ROWS. The first writing of this line asked with the
+     queue empty, the draft came back `{}`, the rules found no rows, and the package answered `ok` with `model: '-'`
+     before it ever looked for a key (`propose.ts`: zero rows, zero inference). That was the package being right. */
+  answers.push('{"registers":["tasks"],"where":{"field":"state","is":"open"},"q":null}');
+  const refused = await spark.propose('Which tasks are open?', owner, sparkByokOf(config, deps, GONE_GRANT));
+  assert.ok(!refused.ok && 'refusal' in refused, `answered: ${JSON.stringify(refused)}`);
+  assert.equal(refused.refusal.code, 'FORBIDDEN');
+
+  /* A GRANT REVOKED BETWEEN THE ADAPTER AND THE CALL, OR ONE THE HOST COULD NOT OPEN, SENDS NOTHING. The host's own path
+     would go out with no `authorization` at all, which to a provider is an anonymous call on the owner's account. */
+  const sent = net.sent.length;
+  const shut = sparkByokOf(config, { ...deps, openKey: async () => null }, OWN_GRANT)!;
+  await assert.rejects(shut.complete(ask('gpt-4o-mini')), /could not be opened/u);
+  let vault = VAULT;
+  const revoking = sparkByokOf(config, { ...deps, grants: () => vault }, OWN_GRANT)!;
+  vault = VAULT.map((g) => (g.id === OWN_GRANT ? { ...g, revoked_at: '2026-09-22T09:00:00.000Z' } : g));
+  await assert.rejects(revoking.complete(ask('gpt-4o-mini')), /could not be opened/u);
+  assert.equal(net.sent.length, sent);
+
   sql.close();
   own.close();
 });
