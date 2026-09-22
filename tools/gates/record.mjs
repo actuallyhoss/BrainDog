@@ -19,8 +19,10 @@
  * is random, held in this module and never printed, and `forward` puts it on every `/api/*` request, so
  * the screens read the record as its owner exactly as they did when it was open.
  *
- * IN MEMORY AND ON PORT 0, so two gates never share a file or fight for a socket, and `unref`ed, so
- * a gate that exits early is not held open by its record.
+ * IN MEMORY AND ON PORT 0, so two gates never share a file or fight for a socket. NOT `unref`ED, though
+ * this paragraph said so until 22 September: `start` never calls `unref`, and a process whose record
+ * leaked stayed alive on it until it was killed (`test/record-throws.test.mjs`). So a record is handed
+ * back by `close()`, which every gate calls from its `finally` and `startRecord` calls on any throw.
  *
  * AND A GATE THAT FORGETS TO FORWARD IS RED, NOT QUIETLY GREEN. The register screen falls back to the
  * in-browser sample when there is no record to read, which is right for the public demo and would be
@@ -62,19 +64,26 @@ export async function startRecord(port = 0, { open = false, origin } = {}) {
     ...(key === undefined ? {} : { token: key }),
     ...(origin === undefined ? {} : { origin }),
   });
-  const seeded = await installSeed(running.api.kernel);
-  if (!seeded.ok) {
-    await running.close();
-    throw new Error(`the gate's record could not take the seed: ${seeded.refusal?.fix ?? 'no reason given'}`);
-  }
-  /* ONE PERSON, SO THE KEY IS A WAY IN. Sign-in offers the server key only where the Directory holds exactly one
-     person, so without an owner /signin would draw a self-host nobody ran `init --owner` on. */
-  if (key !== undefined) {
-    const owner = running.directory.person$('owner@the-studio.example', 'Owner');
-    if (!owner.ok) {
-      await running.close();
-      throw new Error(`the gate's record could not name its owner: ${owner.refusal?.fix ?? 'no reason given'}`);
+  /* FROM HERE ANY THROW CLOSES WHAT `start` OPENED, and the gates rely on it: each one leaves `record` `null` when
+     this throws, so a server still listening after the throw is a server nobody holds a handle to. Until 22 September
+     only the two refusals below closed it, each by hand, and an exception out of `installSeed` or `person$` left the
+     port bound: `test/record-throws.test.mjs` rebound it after a stubbed seed threw and got EADDRINUSE, and the child
+     stayed alive on the leaked server until it was killed. The refusals now throw into the same `catch` rather than
+     closing first, because closing twice takes `sql.close()` through a database already closed. The `.catch` only
+     drops a rejection, so the caller sees why the record did not start and not why it did not stop; `close()` as
+     `start` writes it never rejects, and a throw inside its `server.close` callback is uncaught rather than dropped. */
+  try {
+    const seeded = await installSeed(running.api.kernel);
+    if (!seeded.ok) throw new Error(`the gate's record could not take the seed: ${seeded.refusal?.fix ?? 'no reason given'}`);
+    /* ONE PERSON, SO THE KEY IS A WAY IN. Sign-in offers the server key only where the Directory holds exactly one
+       person, so without an owner /signin would draw a self-host nobody ran `init --owner` on. */
+    if (key !== undefined) {
+      const owner = running.directory.person$('owner@the-studio.example', 'Owner');
+      if (!owner.ok) throw new Error(`the gate's record could not name its owner: ${owner.refusal?.fix ?? 'no reason given'}`);
     }
+  } catch (e) {
+    await running.close().catch(() => {});
+    throw e;
   }
   const { port: at } = running.server.address();
   const base = `http://127.0.0.1:${at}`;
