@@ -148,7 +148,10 @@ test('a question is found by its whole id, and nothing of the sample is mixed in
   assert.deepEqual(othersOf({ ok: false }, { ok: false }), { pages: [], questions: [] });
 });
 
-test("a pack's own list is grouped under the name and icon the record declares, and a sample list is never asked about", async () => {
+/* THE BUILD'S OWN OBLIGATIONS, held before any test here learns over it. */
+const OBLIGATIONS = JSON.parse(JSON.stringify(REGISTERS.obligations));
+
+test("a pack's own list is grouped under the name and icon the record declares, and every list is asked about once for the tab", async () => {
   assert.equal(REGISTERS.study_courses, undefined, 'the build ships this list, so this proves nothing');
   const sent: URL[] = [];
   const io = (async (url: string | URL | Request) => {
@@ -162,8 +165,15 @@ test("a pack's own list is grouped under the name and icon the record declares, 
           { register: 'obligations', seq: 1, title: 'Linear invoice', rank: -2 },
         ],
       });
-    if (at.pathname === '/api/schema')
-      return json(200, { ok: true, value: { id: 'study_courses', name: 'Courses', one: 'course', icon: 'doc', title: 'name', fields: [{ id: 'name', label: 'Course', type: 'text', search: true }] } });
+    /* EACH LIST ITS OWN DECLARATION: Courses as the pack declares it, and the build's own Obligations as the record
+       holds it, which here is the bundle's copy word for word. */
+    if (at.pathname === '/api/schema') {
+      const register = at.searchParams.get('register');
+      if (register === 'study_courses')
+        return json(200, { ok: true, value: { id: 'study_courses', name: 'Courses', one: 'course', icon: 'doc', title: 'name', fields: [{ id: 'name', label: 'Course', type: 'text', search: true }] } });
+      if (register === 'obligations') return json(200, { ok: true, value: OBLIGATIONS });
+      return json(404, { ok: false, refusal: { code: 'REGISTER_UNKNOWN', fix: 'No such list.' } });
+    }
     return json(200, { ok: true, value: at.pathname === '/api/boot' ? {} : [] });
   }) as Fetch;
   const find = searcher(BASE, io);
@@ -176,10 +186,12 @@ test("a pack's own list is grouped under the name and icon the record declares, 
       [REGISTERS.obligations!.name, iconFor(REGISTERS.obligations!.icon, 'rows')],
     ],
   );
-  const schemas = sent.filter((u) => u.pathname === '/api/schema');
-  assert.equal(schemas.length, 1, 'only the list the build does not ship is asked about');
+  /* A LIST THE BUILD SHIPS IS ASKED ABOUT TOO (DIRECTION §22), since a field added at run time is on the record alone. */
+  const schemas = () => sent.filter((u) => u.pathname === '/api/schema').map((u) => u.searchParams.get('register')).sort();
+  assert.deepEqual(schemas(), ['obligations', 'study_courses']);
   await find.find('linear');
-  assert.equal(sent.filter((u) => u.pathname === '/api/schema').length, 1, 'and it is asked once for the tab');
+  assert.deepEqual(schemas(), ['obligations', 'study_courses'], 'and each is asked once for the tab');
+  assert.equal(REGISTERS.obligations!.name, OBLIGATIONS.name, 'one list was answered with another list');
 });
 
 test('SEARCH REACHES EVERY OPEN QUESTION AND EVERY DECISION, past boot’s twenty and past a page of two hundred', async () => {

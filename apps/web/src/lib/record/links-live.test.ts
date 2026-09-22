@@ -173,8 +173,17 @@ test("a pack's own list that points here is drawn under its declared name and la
   assert.ok(sent.some((u) => u.pathname === '/api/list' && u.searchParams.get('register') === 'study_courses'), 'its refs are walked');
 });
 
-test('a sample list that points here asks the record for no declaration', async () => {
+/* A LIST THE BUILD SHIPS IS ASKED ABOUT TOO (DIRECTION §22): a field added to Projects at run time is on the record and
+   in no file here, so the reader asks the record for every list it draws, once each for the tab. */
+test('a sample list that points here is asked about once for the tab, and one the record will not declare keeps its words', async () => {
   const { io, sent } = host(record);
-  await linkReader(BASE, io).read('things', 4);
-  assert.ok(!sent.some((u) => u.pathname === '/api/schema'));
+  const reader = linkReader(BASE, io);
+  await reader.read('things', 4);
+  await reader.read('things', 4);
+  const schemas = sent.filter((u) => u.pathname === '/api/schema').map((u) => u.searchParams.get('register'));
+  assert.equal(schemas.filter((r) => r === 'things').length, 1, `Projects was not asked about once: ${schemas.join(', ')}`);
+  assert.equal(schemas.filter((r) => r === 'services').length, 1);
+  assert.equal(new Set(schemas).size, schemas.length, `a list was asked about twice: ${schemas.join(', ')}`);
+  /* THIS MOCK DECLARES NOTHING, so the build's own lists are where they were. */
+  assert.equal(REGISTERS.services!.name, 'Services');
 });

@@ -101,6 +101,13 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
   const declared = new Map<string, RegisterDecl>();
   const maps = new Map<string, RefMap>();
   const asked = new Map<string, Promise<void>>();
+  /* ONE `schema` PER LIST FOR THE LIFE OF THIS SOURCE, whichever of the screen and the ref walk asks first. */
+  const answers = new Map<string, ReturnType<typeof client.schema>>();
+  const schemaOf = (register: string): ReturnType<typeof client.schema> => {
+    let out = answers.get(register);
+    if (!out) answers.set(register, (out = client.schema(register)));
+    return out;
+  };
 
   /** One register's rows by ULID, walked to the end of its cursor. Kept once whole. */
   async function refMap(register: string): Promise<Said<RefMap>> {
@@ -108,7 +115,7 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
     if (kept) return { ok: true, value: kept };
     /* A LIST THIS BUILD DOES NOT SHIP IS DECLARED FIRST, or `refMapOf` finds no title to name its rows by and every ref
        into it is drawn as `club_books#2`. */
-    await learn(client.schema, register, asked);
+    await learn(schemaOf, register, asked);
     const rows: RecordRow[] = [];
     let cursor: string | null = null;
     do {
@@ -165,13 +172,15 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
     async schema(register) {
       const kept = declared.get(register);
       if (kept) return { ok: true, value: relabel(kept, labels()) };
-      const out = said(await client.schema(register));
+      const out = said(await schemaOf(register));
       if (!out.ok) return out;
       const decl = declOf(out.value as RegisterDecl);
       declared.set(register, decl);
-      /* AND KEPT BESIDE THE BUILD'S OWN LISTS, as `remote.ts` `learn` keeps one, because every cell is formatted through
-         `display`, which reads the field's type from there. A use case's list drew a datapoint's When as the raw instant. */
-      if (!REGISTERS[register]) REGISTERS[register] = relabel({ ...decl, id: register }, labels());
+      /* AND KEPT IN `REGISTERS` THROUGH `learn`, because every cell is formatted through `display` and RowForm draws
+         `readableFields`, and both read the list from there. A use case's list drew a datapoint's When as the raw instant,
+         and this once skipped any list the build ships, so a list screen opened first in a tab drew the bundle's RowForm
+         with no field added at run time on it (`field-added.test.ts`). */
+      await learn(schemaOf, register, asked);
       return { ok: true, value: relabel(decl, labels()) };
     },
     page: (register, a, cursor) => ask(register, a, cursor, PAGE),

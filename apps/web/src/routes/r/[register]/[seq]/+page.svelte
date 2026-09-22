@@ -33,6 +33,8 @@
   import Money from '$lib/ui/Money.svelte';
   import Chip from '$lib/ui/Chip.svelte';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
+  import AddField from '$lib/ui/AddField.svelte';
+  import { ownsRecord, type Me } from '../../../settings/levels.ts';
   import { Table } from 'braindog-render/svelte';
   import { readHistory, readNames, type Told } from '$lib/record/history-live.ts';
   import { rowReader, type Got, type RowReader } from '$lib/record/row-live.ts';
@@ -58,9 +60,13 @@
    * answered from both, the record wins.
    */
   let got = $state<Got | null>(null);
-  /* READ AGAIN ONCE THE ROW IS: a use case's own list is declared by the record, and `rowReader` learns it on the way
+  /* READ AGAIN ONCE THE ROW IS: every list is declared by the record, and `rowReader` learns it on the way
      (`remote.ts` `learn`), which a plain read of `REGISTERS` would not notice. */
   const decl = $derived.by(() => (void got, REGISTERS[id]));
+  /* THE FIELDS THIS PAGE DRAWS, read again when the declaration is. A field added from this page is in `REGISTERS`
+     once `addField` returns, and `REGISTERS` is a plain table, so the press hands `got` back as a new object and both
+     of these read again: the field is on the row with no second read of the row. */
+  const readable = $derived.by(() => (void got, readableFields(id)));
   const live = $derived(got?.from === 'live');
   /* WHAT THIS RECORD CALLS THE ROWS THIS ONE POINTS AT. Undefined on the sample, where `display`
      names a ref out of the sample's own rows as it always has; on a record it is the only source,
@@ -397,6 +403,8 @@
   /* WHO, BY NAME: the reader is You, and the record's members are asked for once, only when somebody else is in the
      history, so a row only you have touched costs no read. */
   const me = $derived(String(page.data.me?.person ?? ''));
+  /* WHETHER A FIELD ADDED HERE LANDS AT ONCE OR WAITS ON DECIDE: the settings screen's one predicate for owning. */
+  const owner = $derived(page.data.me ? ownsRecord(page.data.me as Me) : false);
   let people = $state<ReadonlyMap<string, string>>(new Map());
   let namesAsked = false;
   $effect(() => {
@@ -416,8 +424,8 @@
   /* `readableFields` and not `decl.fields`: a register's identity mark and its frozen hue are
      machinery, and listing them here printed "Mark  ▲" and "Hue  271" as though they were facts
      about the project rather than the reason it has a triangle beside its name. */
-  const documents = $derived(readableFields(id).filter((f) => f.type === 'document'));
-  const shortFields = $derived(readableFields(id).filter((f) => f.type !== 'document'));
+  const documents = $derived(readable.filter((f) => f.type === 'document'));
+  const shortFields = $derived(readable.filter((f) => f.type !== 'document'));
 
   /**
    * WHAT THE ROW IS, BEFORE WHAT IT HOLDS.
@@ -716,6 +724,11 @@
             <span class="unset-lead">{copy.editNotSet}</span>
             <span class="unset-names">{#each unsetFields as f, i (f.id)}{#if live && editable(f)}<button type="button" class="unset-name tap" aria-label={copy.editValue(labelOf(f))} onclick={() => startEdit(f)}>{labelOf(f)}</button>{:else}<span class="unset-name">{labelOf(f)}</span>{/if}{#if i < unsetFields.length - 1}<span class="unset-sep" aria-hidden="true">·</span>{/if}{/each}</span>
           </p>
+        {/if}
+        <!-- A FIELD THIS LIST DOES NOT HAVE YET, added to every row of it. Not on a row the record has not got: the
+             press changes the list, and a row only this tab holds is not yet on it. -->
+        {#if !unwritten}
+          <AddField register={id} {live} {owner} onadded={() => (got = got && { ...got })} />
         {/if}
 
         <!-- A `document` field is the dialect, drawn by the same interpreter a declared page uses.

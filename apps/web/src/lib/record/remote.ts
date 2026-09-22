@@ -7,10 +7,10 @@
  * is here, with no network and no runes, so `remote.test.ts` can hold it against the mock and
  * against the kernel itself over `node:sqlite`.
  *
- * THE DECLARATION IS READ FROM THE SEED'S COPY, not from the answer to `schema`. Every helper this
- * screen already calls reads that copy, and `packages/seed/test/declarations.test.ts` pins it equal
- * to what the record returns for the seed. Two sources for one declaration on one screen is the
- * known cost of moving one screen at a time (`loop/research-phase1-steps5-6.md`, risk 9).
+ * THE DECLARATION IS READ FROM `REGISTERS`, which `learn` below fills from the record's answer to
+ * `schema`, for the lists this build ships as well as for the ones it does not. The seed's copy was
+ * the source here, pinned equal to the record's by `packages/seed/test/declarations.test.ts`, and
+ * that pin holds for a fresh seed and for no record in which somebody has added a field since.
  */
 
 import { identityOfRow, type Identity } from './api.ts';
@@ -18,6 +18,7 @@ import { REGISTERS, ROWS } from './data.ts';
 import { searchable, terms } from './find.ts';
 import type { Entry, Fields, Filter, RegisterDecl } from './schema.ts';
 import { declaredValue } from './where.ts';
+import { labels, relabelInto } from '../voice.ts';
 
 /** One register's rows, by the ULID the record stores a ref as, and back again. */
 export type RefMap = {
@@ -329,23 +330,43 @@ export function declOf(raw: RegisterDecl): RegisterDecl {
 export type SchemaCall = (register: string) => Promise<{ ok: boolean; value?: unknown }>;
 
 /**
- * A list's declaration, asked of the record when this build does not ship it, and kept beside the ones it does.
+ * A list's declaration, as the record declares it now, kept where every helper reads one.
  *
  * A USE CASE'S OWN LISTS ARE DECLARED BY THE RECORD AND BY NO FILE HERE, so every helper that reads `REGISTERS` (a
  * group's name and icon, a column's label, a ref's target, a row's title) knew only the sample's lists. Search named a
- * course by its id and a row's page dropped what pointed at it from one. `page-live.ts` asks the same way. The sample's
- * own lists are never asked about and never replaced.
+ * course by its id and a row's page dropped what pointed at it from one. `page-live.ts` asks through here too.
  *
- * `asked` IS THE READER'S, so a list the record will not declare is asked once per tab rather than on every read.
+ * AND A LIST THE BUILD SHIPS IS ASKED ABOUT AS WELL, AND REPLACED BY THE ANSWER. This returned early for any list in the
+ * bundle, on the reading that the seed's copy and the record's were pinned equal. They are equal only until somebody
+ * adds a field, which DIRECTION §22 makes the ordinary case: an owner added `launched` to Projects on a real kernel, and
+ * the row page, `RowForm` (both draw `readableFields`) and a page block over Projects went on drawing the bundle's
+ * fifteen fields, the new one on no screen and `display` formatting its day as raw text (`field-write.test.ts`, three
+ * red before this). The bundle is now what a tab draws before the record has answered, and what it keeps when there is
+ * no record or the record will not say.
+ *
+ * RELABELLED AS IT IS KEPT, because the bundle's copies are relabelled in place at boot (`voice.ts` `relabelAll`) and the
+ * record's answer carries the declaration's own words: kept bare, a team whose Projects are Clients read Projects again
+ * on every screen after the first read. It goes in through `relabelInto`, which keeps the bare answer as the list's own
+ * words, so the next boot relabels the learnt list and not the bundle's (`data/field-added.test.ts`).
+ *
+ * THE LAST ONE ASKED WINS, whenever the answers land. An add asks again with a fresh `asked` while a reader's older
+ * question may still be out, and that older answer landing second put the list back as it was before the add.
+ *
+ * `asked` IS THE READER'S, so a list is asked once per tab rather than on every read. That costs one `schema` per list a
+ * reader touches, where a bundled list used to cost none; a reader that has already asked answers from what it kept.
  */
+const newest = new Map<string, number>();
+let questions = 0;
 export function learn(schema: SchemaCall, register: string, asked: Map<string, Promise<void>>): Promise<void> {
-  if (REGISTERS[register]) return Promise.resolve();
   let held = asked.get(register);
   if (!held) {
+    const mine = ++questions;
+    newest.set(register, mine);
     held = schema(register).then(
       (out) => {
+        if (newest.get(register) !== mine) return;
         const body = out.ok ? (out.value as { fields?: unknown } | null) : null;
-        if (!REGISTERS[register] && body && Array.isArray(body.fields)) REGISTERS[register] = declOf({ ...(body as RegisterDecl), id: register });
+        if (body && Array.isArray(body.fields)) relabelInto(REGISTERS, register, declOf({ ...(body as RegisterDecl), id: register }), labels());
       },
       () => undefined,
     );

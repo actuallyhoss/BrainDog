@@ -233,15 +233,33 @@ export function relabel<T extends Relabellable>(decl: T, labels: Labels): T {
  * the declarations this build ships, which no label reached, so a team's People list was "Teammates" on the rail and
  * "People" on its Board. Each list is drawn from the words it had before any label, so a label taken away puts the
  * declaration's word back.
+ *
+ * A LIST PUT IN THE TABLE SINCE IS THE NEW BARE ONE. This kept each list's first body for good, which for a list the
+ * build ships is the bundle's, so a field added at run time (`remote.ts` `learn`) was drawn over by the bundle on the
+ * next boot, and every navigation after an add is one (`data/field-added.test.ts`). An entry that is not the object
+ * this last wrote is taken as the list's own words; `relabelInto` hands over the bare copy with the relabelled one.
  */
-const unlabelled = new WeakMap<object, Map<string, Relabellable>>();
+type Kept = { bare: Relabellable; wrote: Relabellable };
+const unlabelled = new WeakMap<object, Map<string, Kept>>();
+const keptFor = (table: object): Map<string, Kept> => {
+  let kept = unlabelled.get(table);
+  if (!kept) unlabelled.set(table, (kept = new Map()));
+  return kept;
+};
 export function relabelAll<T extends Relabellable>(table: Record<string, T>, labels: Labels): void {
-  let before = unlabelled.get(table);
-  if (!before) unlabelled.set(table, (before = new Map()));
+  const kept = keptFor(table);
   for (const [id, decl] of Object.entries(table)) {
-    if (!before.has(id)) before.set(id, decl);
-    table[id] = relabel(before.get(id) as T, labels);
+    const was = kept.get(id);
+    const bare = was && was.wrote === decl ? (was.bare as T) : decl;
+    table[id] = relabel(bare, labels);
+    kept.set(id, { bare, wrote: table[id] });
   }
+}
+
+/** One list put in the table as the record now declares it, bare, and drawn over with the labels; later boots redraw it. */
+export function relabelInto<T extends Relabellable>(table: Record<string, T>, id: string, bare: T, labels: Labels): void {
+  table[id] = relabel(bare, labels);
+  keptFor(table).set(id, { bare, wrote: table[id] });
 }
 
 /* THE LABELS THIS TAB'S RECORD HOLDS, set once per `boot` by `voice.svelte.ts` and read by the list reader and the
