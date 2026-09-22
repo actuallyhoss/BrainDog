@@ -5314,6 +5314,30 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         'SELECT id, version, kind, pack_id, body, checksum FROM declaration WHERE superseded_at IS NULL AND retired = 0 ORDER BY id',
       ),
 
+    /**
+     * The live declarations somebody changed in the app that a pack wrote first: `was` is that pack, and `body` is the
+     * pack's last version of it, the one the edit started from.
+     *
+     * THE RECORD KNEW AND NOTHING ASKED IT. `setDeclaration` writes the edit with `pack_id` null and stamps the pack's row
+     * `superseded_at`, and that row still says whose it was. `declarations()` reads live rows only, so a plan saw an owner
+     * who had moved one block on Money as somebody who had written a page called `money` from nothing, and refused every
+     * later money-core update as `PROVIDES_CONFLICT` (`loop/research-pack-update-edited.md`).
+     *
+     * THE PACK'S LAST ROW, NOT THE ROW JUST BEFORE. An owner who arranges a page twice has two rows with `pack_id` null
+     * above the pack's, and "the latest earlier version" is then their own first edit. A retire between the two means the
+     * pack went away and somebody wrote the id again, which is not an edit of the pack's declaration, so it is not counted.
+     */
+    detached: (): { id: string; was: string; body: string }[] =>
+      sql.all<{ id: string; was: string; body: string }>(
+        `SELECT d.id AS id, p.pack_id AS was, p.body AS body
+           FROM declaration d
+           JOIN declaration p ON p.id = d.id
+            AND p.version = (SELECT MAX(e.version) FROM declaration e WHERE e.id = d.id AND e.version < d.version AND e.pack_id IS NOT NULL)
+          WHERE d.superseded_at IS NULL AND d.retired = 0 AND d.pack_id IS NULL
+            AND NOT EXISTS (SELECT 1 FROM declaration r WHERE r.id = d.id AND r.retired = 1 AND r.version >= p.version AND r.version < d.version)
+          ORDER BY d.id`,
+      ),
+
     /** The `pack` rows: what is installed, and at which version. */
     packs: () => sql.all<{ id: string; version: string }>('SELECT id, version FROM pack ORDER BY id'),
 

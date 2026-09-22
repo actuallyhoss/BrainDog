@@ -2435,6 +2435,11 @@ export const copy = {
   arrangeChanges: 'Changes',
   arrangeRetires: 'Takes away',
   arrangeRetiredRows: (name: string, rows: number) => `${name}, whose ${rows} ${rows === 1 ? 'row stays' : 'rows stay'}`,
+  /* WHAT AN UPDATE LEAVES AS THE OWNER CHANGED IT, said because the update does not rewrite it: an edit that carried the
+     older version's window keeps that window (`loop/research-pack-update-edited.md`). */
+  arrangeKept: 'Kept',
+  arrangeKeeps: (name: string) => `Keeps ${name} as you changed it. This update's version of it is not taken.`,
+  arrangeKeepsPage: (name: string) => `Keeps your ${name} page as you arranged it. This update's version of it is not taken.`,
   arrangeMany: (kind: string): string =>
     ({ page: 'Pages', register: 'Lists', ingest: 'Rules for what comes in', theme: 'Looks', metric: 'Measures', digest: 'Summaries', rule: 'Rules', block: 'Blocks' })[kind] ??
     kind.charAt(0).toUpperCase() + kind.slice(1),

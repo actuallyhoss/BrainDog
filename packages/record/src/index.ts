@@ -1243,6 +1243,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     declarations: kernel.declarations() as Installed['declarations'],
     rows: kernel.census(),
     config: kernel.packSettings(),
+    /* WHICH OF THE OWNER'S DECLARATIONS A PACK WROTE FIRST, so a plan keeps an edit of the pack's own declaration rather
+       than refusing the whole update as somebody else's (`declare` `plan`). */
+    detached: Object.fromEntries(kernel.detached().map((d) => [d.id, { was: d.was, body: d.body }])),
     nameOf: (ref) => kernel.titleOfRow(ref),
   });
 

@@ -120,6 +120,14 @@ export type Installed = {
    */
   config?: Record<string, Record<string, Json>>;
   /**
+   * The live declarations somebody changed in the app that a pack wrote first, by id: `was` is that pack and `body` its
+   * last version, the one the edit started from (the kernel's `detached()`).
+   *
+   * OPTIONAL, as `config` is, so every caller that builds an `Installed` keeps compiling. Without it every live row with
+   * `pack_id` null is somebody's own, which is what `plan` believed before it could ask.
+   */
+  detached?: Record<string, { was: string; body: string }>;
+  /**
    * The title of the row an id names, so an action's key line says the project by name and not by a row id.
    * OPTIONAL: without it the id is said as the declaration wrote it.
    */
@@ -138,7 +146,22 @@ export type Diff = {
   adds: { id: string; summary: string }[];
   changes: { id: string; from_version: number; summary: string }[];
   retires: { id: string; rows: number }[];
-  conflicts: { id: string; pack: string }[];
+  /**
+   * Declarations the record will hold and this plan will not stage, each named once for `conflictFault`.
+   *
+   * `reads` IS A DECLARATION THE OWNER CHANGED THAT READS ONE THIS PLAN RETIRES, and `changed` is a list the owner changed
+   * that this version changes too. Both are the owner's own rows, so `pack` is `(this record)`, and both would install
+   * without a word if they were not here: the probes measured a page drawing a tile for a retired figure, and a metric
+   * summing a field its list did not have.
+   */
+  conflicts: { id: string; pack: string; reads?: string; changed?: true }[];
+  /**
+   * The pack's own declarations somebody changed in the app, which this install leaves as they are and does not stage.
+   *
+   * NAMED AND NOT HIDDEN, because the update does not rewrite what the owner wrote, and an edit that carried the old
+   * version's window keeps it: on the probe, `spent-30d` stayed at `-31d` while `received-30d` moved to `-30d`.
+   */
+  kept: { id: string }[];
   seeds: { count: number; registers: { register: string; rows: number }[] };
   /** Every rule that would generate rows, with the ceiling it declares. */
   spawns: { rule: string; register: string; bound: number; when: string }[];
@@ -819,6 +842,7 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
   const adds: Diff['adds'] = [];
   const changes: Diff['changes'] = [];
   const conflicts: Diff['conflicts'] = [];
+  const kept: Diff['kept'] = [];
   const retypes: Diff['retypes'] = [];
   const newlyRequired: Diff['newly_required'] = [];
   const added: PackDeclaration[] = [];
@@ -827,6 +851,21 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
     if (!already) {
       adds.push({ id: decl.id, summary: summarise(decl) });
       added.push(decl);
+      continue;
+    }
+    /* BUT ONE THIS PACK WROTE AND THE OWNER THEN CHANGED IS KEPT, and left out of what is staged. Both were `null` to the
+       test below, so an owner who had moved one block on Money was refused every later money-core update, and the
+       refusal told them to retire their own Money page (`loop/research-pack-update-edited.md`). The superseded row says
+       whose the declaration was; a row somebody wrote from nothing has no such row and stays a conflict, because the
+       pack's pages would then read a stranger's figure under their own name. */
+    const edited = already.pack_id === null ? installed.detached?.[decl.id] : undefined;
+    if (edited?.was === mine) {
+      /* EXCEPT A LIST THIS VERSION CHANGES. Kept, it lacks whatever the update adds to it, and nothing else notices: the
+         checker's probe kept an edited `register.fx` under a version adding a `spread` field and a metric summing it, and
+         the install went through with the metric summing a field the list did not have. The kernel took `sum: 'nosuch'`
+         as well. One comparison with the body the edit started from closes it. */
+      if (decl.kind === 'register' && edited.body !== decl.canonical) conflicts.push({ id: decl.id, pack: OWN, changed: true });
+      else kept.push({ id: decl.id });
       continue;
     }
     /* ANOTHER PACK'S DECLARATION IS NOT YOURS TO CHANGE. Two packs owning one register is two
@@ -888,6 +927,18 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
     }
   }
 
+  /* A DECLARATION THE OWNER CHANGED MAY READ ONE THIS VERSION DROPS, and the install used to say nothing: `p2` kept an
+     edited Money page, dropped `metric.cash-now`, which its first tile reads, and the install answered `ok` with the page
+     still drawing that tile. The conflict above hid it until now. Every edit of this pack's declarations is asked, kept
+     or not shipped any more, because the owner's page reads the figure either way. */
+  const gone = new Set(retires.map((r) => r.id));
+  for (const [id, edited] of Object.entries(installed.detached ?? {})) {
+    if (edited.was !== mine || conflicts.some((c) => c.id === id)) continue;
+    const body = live.get(id)?.body;
+    const reads = body === undefined ? undefined : [...gone].find((r) => readsId(body, r));
+    if (reads !== undefined) conflicts.push({ id, pack: OWN, reads });
+  }
+
   const unresolved = unresolvedOf(pack, installed, retires);
 
   const format = { wanted: pack.manifest.requires.format, has: installed.format, ok: installed.format >= pack.manifest.requires.format };
@@ -928,6 +979,7 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
     changes,
     retires,
     conflicts,
+    kept,
     seeds: { count: seedsFor(pack, adds).length, registers: seedRows(seedsFor(pack, adds)) },
     spawns: spawnsOf(pack),
     calls_out: calls,
@@ -1086,6 +1138,26 @@ function unresolvedOf(pack: Pack, installed: Installed, retires: Diff['retires']
   return out;
 }
 
+/**
+ * `PROVIDES_CONFLICT` for a plan whose first conflict is a declaration the owner changed, or `null` for any other plan.
+ *
+ * THE SENTENCE KEEPS THE EDIT. The one sentence there was told the owner to retire what they wrote, which for an arranged
+ * Money page is their Money page; these name what the update would break and offer staying on the version they have.
+ * `names` says an id the way the caller's reader knows it (a pack by its title, a page by the owner's own title), and
+ * says the id itself without it.
+ */
+export function conflictFault(diff: Pick<Diff, 'pack' | 'installed_version' | 'conflicts'>, names: (id: string) => string = (id) => id): Refusal | null {
+  const first = diff.conflicts[0];
+  if (!first || (first.reads === undefined && !first.changed)) return null;
+  const pack = names(diff.pack.id);
+  const stay = diff.installed_version === null ? `leave ${pack} as it is` : `leave ${pack} at ${diff.installed_version}`;
+  const fix =
+    first.reads !== undefined
+      ? `${pack} ${diff.pack.version} no longer has ${first.reads}, and ${names(first.id)}, which you changed, reads it. Take ${first.reads} off ${names(first.id)} first, or ${stay}.`
+      : `${pack} ${diff.pack.version} changes ${names(first.id)}, which you changed: kept as you left it, it would lack what the update adds to it. For now, ${stay}.`;
+  return { code: 'PROVIDES_CONFLICT', fix, at: first.id };
+}
+
 const joined = (items: readonly string[]): string =>
   items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 
@@ -1185,6 +1257,31 @@ function unreadable(
        it as the repair: *"Ship a default or a fill rule."* */
     const demanded = now.required === true && now.default === undefined;
     if (demanded && then?.required !== true) newlyRequired.push({ id: decl.id, field: id, rows });
+  }
+}
+
+/**
+ * Whether a stored body reads the declaration `id` names: the id written whole (`register.fx`, as a metric's `source`), or
+ * its bare name under its own kind's key (`"metric": "cash-now"`, as a page's tile), or a list's bare name as a field's
+ * `to` or a block's `register`.
+ *
+ * WIDE ON PURPOSE. It decides whether an update may go ahead over a declaration the owner changed, and a false yes costs
+ * a refusal that names both ids, where a false no costs a page drawing a figure that no longer exists.
+ */
+function readsId(body: string, id: string): boolean {
+  const at = id.indexOf('.');
+  const kind = id.slice(0, at);
+  const name = id.slice(at + 1);
+  const walk = (v: unknown, key: string | null): boolean => {
+    if (typeof v === 'string')
+      return v === id || (v === name && (key === kind || (kind === 'register' && (key === 'to' || key === 'register'))));
+    if (Array.isArray(v)) return v.some((x) => walk(x, key));
+    return isObject(v) && Object.entries(v).some(([k, x]) => walk(x, k));
+  };
+  try {
+    return walk(JSON.parse(body), null);
+  } catch {
+    return false;
   }
 }
 
@@ -1339,6 +1436,8 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
 
   if (diff.conflicts.length) {
     const first = diff.conflicts[0]!;
+    const edited = conflictFault(diff);
+    if (edited) return { ok: false, refusal: edited };
     /* AND THE REMEDY IS NOT THE SAME FOR THE TWO OWNERS. A declaration another pack owns is freed by
        uninstalling that pack; one somebody wrote in the app is freed by retiring it, and telling
        them to uninstall a pack that does not exist would send them looking for it. */
@@ -1504,8 +1603,11 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
         { at: `${d.id}.${painted.at}` },
       );
   }
+  /* WHAT THE OWNER CHANGED IS NOT STAGED, so it stands at its own version with `pack_id` null, and a later uninstall of
+     this pack still cannot take it. */
+  const keep = new Set(diff.kept.map((k) => k.id));
   const staged = await host.stage(
-    filled.declarations.map((d) => ({ id: d.id, kind: d.kind, body: d.body, pack: pack.manifest.pack })),
+    filled.declarations.filter((d) => !keep.has(d.id)).map((d) => ({ id: d.id, kind: d.kind, body: d.body, pack: pack.manifest.pack })),
   );
   if (!staged.ok) return staged;
 
@@ -1555,7 +1657,7 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
       return ok({
         pack: pack.manifest.pack,
         version: pack.manifest.version,
-        declarations: pack.declarations.length,
+        declarations: pack.declarations.length - keep.size,
         seeds: planted.length,
         retired: diff.retires.length,
       });

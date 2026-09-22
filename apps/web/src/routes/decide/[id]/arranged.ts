@@ -142,6 +142,7 @@ function planned(plan: unknown, doc: unknown, ctx: Context): { appears: Appears[
   const named = new Map<string, string[]>();
   const changed = new Map<string, string[]>();
   const retired = new Map<string, string[]>();
+  const kept: Appears[] = [];
   const out = { examples: 0, pages: 0, lists: 0, more: 0 };
   for (const step of Array.isArray(plan) ? plan.filter(isRow) : []) {
     out.examples += typeof step.examples === 'number' ? step.examples : 0;
@@ -153,6 +154,12 @@ function planned(plan: unknown, doc: unknown, ctx: Context): { appears: Appears[
       const rows = typeof gone.rows === 'number' && gone.rows > 0 ? copy.arrangeRetiredRows(title, gone.rows) : title;
       const label = copy.arrangeMany(kind);
       retired.set(label, [...(retired.get(label) ?? []), rows]);
+    }
+    /* WHAT AN UPDATE LEAVES AS THE OWNER CHANGED IT, by the name the record filed for it, which is the owner's. */
+    for (const id of strings(step.keeps)) {
+      const kind = id.split('.')[0] ?? '';
+      const title = kind === 'register' ? listName(id, ctx) : (ctx.names?.[id] ?? words(id));
+      kept.push({ kind: copy.arrangeKept, title: kind === 'page' ? copy.arrangeKeepsPage(title) : copy.arrangeKeeps(title), lines: [] });
     }
     for (const [ids, fresh] of [
       [strings(step.adds), true],
@@ -188,6 +195,7 @@ function planned(plan: unknown, doc: unknown, ctx: Context): { appears: Appears[
   if (named.size) appears.push({ kind: appears.length ? copy.arrangeAlso : copy.arrangeAdds, title: '', lines: lines(named) });
   if (changed.size) appears.push({ kind: copy.arrangeChanges, title: '', lines: lines(changed) });
   if (retired.size) appears.push({ kind: copy.arrangeRetires, title: '', lines: lines(retired) });
+  appears.push(...kept);
   return { appears, ...out };
 }
 

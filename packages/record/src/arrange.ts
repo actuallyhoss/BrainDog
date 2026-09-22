@@ -19,7 +19,7 @@
 
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
-import { labelsOf, laterVersion, normalise, packIdOf, plan, readShared, install, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
+import { conflictFault, labelsOf, laterVersion, normalise, packIdOf, plan, readShared, install, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
 import { configValue, ulids, type ConfigDecl, type Declaration, type Kernel } from '@braindog/kernel';
 import type { FormSpec, NextSpec } from './spark.ts';
 
@@ -244,9 +244,15 @@ export function arranger(d: ArrangeDeps) {
         })),
       /* A PACK ON AT AN OLDER VERSION THAN THE ONE OFFERED, which a `pack` install proposal updates. */
       ...(() => {
+        const detached = kernel.detached();
         const updates = packs.flatMap((p) => {
           const version = p.disabled_at === null && p.version !== null ? entryOf(p.id)?.version : undefined;
-          return version !== undefined && version !== p.version && laterVersion(version, p.version) === version ? [{ id: p.id, from: p.version, to: version }] : [];
+          if (version === undefined || version === p.version || laterVersion(version, p.version) !== version) return [];
+          /* WHAT THE UPDATE WOULD LEAVE AS THE OWNER CHANGED IT, said before an agent files the question, from the record's
+             own history and without building a document. A kept list the update changes is refused at `propose`, which
+             plans; this cannot see that without the document, and says only what was changed. */
+          const keeps = detached.filter((x) => x.was === p.id).map((x) => x.id);
+          return [{ id: p.id, from: p.version, to: version, ...(keeps.length === 0 ? {} : { keeps }) }];
         });
         return updates.length === 0 ? {} : { updates };
       })(),
@@ -303,13 +309,35 @@ export function arranger(d: ArrangeDeps) {
     return ok({ install, enable });
   }
 
-  type Planned = { plan: Body[]; approve: string[]; batch: Declaration[]; config: Map<string, Record<string, ConfigDecl>>; packs: Map<string, Pack> };
+  /** `kept` is each declaration an update leaves as the owner changed it, with the name the owner gave it. */
+  type Planned = { plan: Body[]; approve: string[]; batch: Declaration[]; config: Map<string, Record<string, ConfigDecl>>; packs: Map<string, Pack>; kept: Map<string, string> };
+
+  /**
+   * A declaration by the name the record holds for it now, which for one the owner changed is theirs and not the pack's.
+   * `owned` says a page and a list as the owner's ("your My money page"), for a sentence addressed to them.
+   */
+  const spokenOf = (id: string, owned = true): string => {
+    const row = kernel.declarations().find((r) => r.id === id);
+    let body: Body = {};
+    try {
+      body = row ? (JSON.parse(row.body) as Body) : {};
+    } catch {
+      /* A body that will not parse is said by its id. */
+    }
+    /* A LIST'S `title` IS THE FIELD ITS ROWS ARE TITLED BY, so a list is said by `name`: measured, `register.fx` came out
+       as "your currency list". A page's `title` is its name. */
+    const said = id.startsWith('page.') ? body.title : body.name;
+    const name = typeof said === 'string' && said !== '' ? said : null;
+    if (name === null) return id;
+    if (!owned) return name;
+    return id.startsWith('page.') ? `your ${name} page` : id.startsWith('register.') ? `your ${name} list` : name;
+  };
 
   /** Each pack planned in order, each against the record as the ones before it would leave it. Nothing is written. */
   async function planAll(ids: readonly string[], docs: ReadonlyMap<string, Body>): Promise<Result<Planned>> {
     const base = d.installed();
     let state: Installed = { ...base, packs: [...base.packs], declarations: [...base.declarations] };
-    const out: Planned = { plan: [], approve: [], batch: [], config: new Map(), packs: new Map() };
+    const out: Planned = { plan: [], approve: [], batch: [], config: new Map(), packs: new Map(), kept: new Map() };
     for (const id of ids) {
       const read = await packOf(id, docs, heldBy(state), useCaseFor(ids, id));
       if (!read.ok) return read;
@@ -318,8 +346,14 @@ export function arranger(d: ArrangeDeps) {
       const unheld = unresolvedFault(diff);
       if (unheld) return { ok: false, refusal: unheld };
       const clash = diff.conflicts[0];
+      /* AN EDIT THE UPDATE WOULD BREAK IS SAID AS ONE, by the names the owner reads: "retire page.money first" told them
+         to throw away their own Money page. */
+      const edited = conflictFault(diff, (x) => (x === id ? (entryOf(id)?.title ?? id) : spokenOf(x)));
+      if (edited) return { ok: false, refusal: { ...edited, at: 'body.packs' } };
       if (clash)
         return refuse('PROVIDES_CONFLICT', `${id} would take over ${clash.id}, which ${clash.pack} holds. Leave ${id} out, or retire ${clash.id} first.`, 'body.packs');
+      const kept = new Set(diff.kept.map((k) => k.id));
+      for (const k of kept) out.kept.set(k, spokenOf(k, false));
       const from = state.packs.find((p) => p.id === id)?.version ?? null;
       out.plan.push({
         pack: id,
@@ -329,18 +363,23 @@ export function arranger(d: ArrangeDeps) {
         ...(diff.changes.length === 0 ? {} : { changes: diff.changes.map((c) => c.id) }),
         /* WHAT AN UPDATE TAKES AWAY, with the rows it keeps, so Decide says it beside what it adds. */
         ...(diff.retires.length === 0 ? {} : { retires: diff.retires.map((x) => ({ id: x.id, rows: x.rows })) }),
+        /* WHAT IT LEAVES AS THE OWNER CHANGED IT, so Decide says the update's version of it is not taken. */
+        ...(kept.size === 0 ? {} : { keeps: [...kept] }),
         ...(diff.seeds.count === 0 ? {} : { examples: diff.seeds.count }),
       });
       out.approve.push(...diff.approve.filter((line) => !out.approve.includes(line)));
       out.config.set(id, pack.manifest.config ?? {});
       out.packs.set(id, pack);
-      for (const decl of pack.declarations) out.batch.push({ id: decl.id, kind: decl.kind, body: decl.body, pack: id });
+      const staged = pack.declarations.filter((decl) => !kept.has(decl.id));
+      for (const decl of staged) out.batch.push({ id: decl.id, kind: decl.kind, body: decl.body, pack: id });
+      /* THE OWNER'S ROW STAYS IN THE STATE CARRIED FORWARD, as the install leaves it: its `pack_id` is null, so the filter
+         keeps it, and the pack's version of the same id is not added beside it. */
       state = {
         ...state,
         packs: [...state.packs.filter((p) => p.id !== id), { id, version: pack.manifest.version }],
         declarations: [
           ...state.declarations.filter((decl) => decl.pack_id !== id),
-          ...pack.declarations.map((decl) => ({ id: decl.id, version: 1, kind: decl.kind, pack_id: id, body: decl.canonical, checksum: '' })),
+          ...staged.map((decl) => ({ id: decl.id, version: 1, kind: decl.kind, pack_id: id, body: decl.canonical, checksum: '' })),
         ],
       };
     }
@@ -385,6 +424,9 @@ export function arranger(d: ArrangeDeps) {
         }
       }
     }
+    /* A DECLARATION THE UPDATE KEEPS IS NAMED AS THE OWNER NAMED IT, over the pack's title above: the pack's "Money" for a
+       page the owner retitled "My money" would name a page this update does not install. */
+    for (const [id, name] of planned.kept) out[id] = name;
     return out;
   }
 
