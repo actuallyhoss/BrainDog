@@ -24,6 +24,7 @@ import { parseArgs } from 'node:util';
 import { FORMAT_VERSION, KERNEL_MIGRATION } from '@braindog/kernel';
 import { PRIMITIVES_VERSION } from 'braindog-render';
 
+import { automations, scripts } from './automations.ts';
 import { hookEnd, hookStart, readSession, sessionPath } from './hooks.ts';
 import { budgetOf, clientFor, hostsPath, target } from './http.ts';
 import { importCommand } from './import.ts';
@@ -137,6 +138,12 @@ const usage = () =>
     '  Name a new key as the successor of the old one in a catalogue, signed by the old key, so readers who trusted it trust the new one.',
     'braindog pack key revoke <key file> --to <folder> --reason <why> [--successor <key id>]',
     '  Mark a key as untrusted in a catalogue, signed by that key. Versions it signed are said as untrusted and not offered.',
+    'braindog automations list|show <id> [--host <host>]',
+    '  Say every automation you can read, what starts it and how its runs went; or one, with its last ten runs step by step.',
+    'braindog automations run <id>|cancel <run> [--host <host>]',
+    '  Start an automation now, or stop a run that has not finished. The record lets only a browser session do either, so a token is told so.',
+    'braindog scripts resume <id> [--host <host>]',
+    '  Start a script paused by three refused runs in a row again. A browser session only, as run and cancel are.',
     'braindog import legacy <export.json> [--setup <setup.json>] [--host <host>] [--dry-run] | --draft-setup',
     '  Move a the old tool export into this BrainDog. Running it again updates what it added, and no key value is ever read.',
     'braindog mcp [--agent claude|codex|cursor|other] [--host <host>]',
@@ -249,14 +256,14 @@ async function keysCommand(args: string[]): Promise<void> {
 }
 
 /**
- * `braindog skills|tools|page|usecase|import|context|session`, over the real terminal, and the exit
+ * `braindog skills|tools|page|usecase|pack|import|context|session|automations|scripts`, over the real terminal, and the exit
  * code the command decides.
  *
- * `--json` IS DECIDED HERE AND NOWHERE ELSE (`48 §4.5`, `json.ts`). The eight commands below all take
+ * `--json` IS DECIDED HERE AND NOWHERE ELSE (`48 §4.5`, `json.ts`). The ten commands below all take
  * the same `AgentIo`, so swapping where `out` goes is the whole of the flag: not one line in a command
  * body asks whether it was given.
  */
-async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'pack' | 'import' | 'context' | 'session', args: string[]): Promise<void> {
+async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'pack' | 'import' | 'context' | 'session' | 'automations' | 'scripts', args: string[]): Promise<void> {
   const cwd = process.cwd();
   const io = {
     env: process.env,
@@ -273,7 +280,7 @@ async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'pa
   };
   const cli = fileURLToPath(new URL('./main.ts', import.meta.url)).replaceAll('\\', '/');
   const code =
-    which === 'context' ? await context(args, io) : which === 'session' ? await session(args, io) : which === 'import' ? await importCommand(args, io) : which === 'skills' ? await skills(args, io) : which === 'tools' ? await tools(args, { ...io, cli }) : which === 'usecase' ? await usecase(args, io) : which === 'pack' ? await pack(args, io) : await pageCommand(args, io);
+    which === 'context' ? await context(args, io) : which === 'session' ? await session(args, io) : which === 'import' ? await importCommand(args, io) : which === 'skills' ? await skills(args, io) : which === 'tools' ? await tools(args, { ...io, cli }) : which === 'usecase' ? await usecase(args, io) : which === 'pack' ? await pack(args, io) : which === 'automations' ? await automations(args, io) : which === 'scripts' ? await scripts(args, io) : await pageCommand(args, io);
   if (json) emit(json.envelope(code));
   /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
   process.exitCode = code;
@@ -372,7 +379,7 @@ function install(args: string[]): void {
  * left to refuse the flag in its own words, which is the answer a caller deserves rather than an
  * empty document.
  */
-const JSON_COMMANDS = new Set(['--version', '-v', 'help', '--help', '-h', 'login', 'logout', 'skills', 'tools', 'page', 'usecase', 'pack', 'import', 'context', 'session', 'install']);
+const JSON_COMMANDS = new Set(['--version', '-v', 'help', '--help', '-h', 'login', 'logout', 'skills', 'tools', 'page', 'usecase', 'pack', 'import', 'context', 'session', 'automations', 'scripts', 'install']);
 
 const [command, ...rest] = process.argv.slice(2);
 /* ONE DECISION, TAKEN BEFORE DISPATCH (`48 §4.5`, `json.ts`): the flag is answered here and removed,
@@ -410,7 +417,7 @@ try {
   /* `run` IS `keys exec` UNDER ITS SHORTER NAME (`48 §2`), not a second door: one command opens a key
      into one environment variable, and adding a way to print one would undo the reason it exists. */
   else if (command === 'run') await keysCommand(['exec', ...rest]);
-  else if (command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase' || command === 'pack' || command === 'import' || command === 'context' || command === 'session') await agentCommand(command, args);
+  else if (command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase' || command === 'pack' || command === 'import' || command === 'context' || command === 'session' || command === 'automations' || command === 'scripts') await agentCommand(command, args);
   else if (command === 'hook') await hook(rest);
   else if (command === 'install') install(args);
   else if (command === 'init' || command === 'serve') selfhost(command, rest);
