@@ -36,6 +36,7 @@ export {
   REDIRECT_HOPS,
   holding,
   holdingPaged,
+  IN_FLIGHT,
   idempotentCalls,
   meterPass,
   pass,

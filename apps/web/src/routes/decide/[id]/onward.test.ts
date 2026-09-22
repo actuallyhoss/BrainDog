@@ -80,7 +80,7 @@ test('the way on always offers somewhere, and the next question only when one wa
 });
 
 test('a defer with nothing after it leaves for the queue instead of redrawing what it parked', () => {
-  const guard = /void goto\(onwardTo \? `\/decide\/\$\{onwardTo\}` : '\/decide'\);/gu;
+  const guard = /void goto\(at\(onwardTo \? `\/decide\/\$\{onwardTo\}` : '\/decide'\)\);/gu;
   assert.equal([...page.matchAll(guard)].length, 2, 'a defer still stays on a page that draws the parked question open');
 });
 

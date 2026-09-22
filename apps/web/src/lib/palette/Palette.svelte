@@ -50,6 +50,7 @@
   complete. Losing a half-typed query to a chat is a real cost.
 -->
 <script lang="ts">
+  import { at } from '../at.ts';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { TONES, since } from 'braindog-render';
@@ -884,7 +885,7 @@
       if (!toasts.undoLast()) toasts.push(copy.nothingToUndo);
       return;
     }
-    if (row.href !== null) goto(row.href);
+    if (row.href !== null) goto(at(row.href));
   }
 
   function onkeydown(e: KeyboardEvent) {
@@ -1039,7 +1040,7 @@
             {:else if sparkShown.second.drawn}
               {#if sparkShown.second.drawn.text}<p class="p-spark-text">{sparkShown.second.drawn.text}</p>{/if}
               {#if sparkShown.second.drawn.decide}
-                <a class="p-spark-decide" href={sparkShown.second.drawn.decide} onclick={() => (open = false)}
+                <a class="p-spark-decide" href={at(sparkShown.second.drawn.decide)} onclick={() => (open = false)}
                   >{sparkWords.decide(sparkShown.second.drawn.decide.slice('/decide/'.length))}</a
                 >
               {/if}

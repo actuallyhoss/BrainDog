@@ -112,6 +112,32 @@ test('which origins may hold a cookie, and which may run a passkey', () => {
   assert.equal(relyingParty('http://studio.lan'), null);
 });
 
+test('AN RP ID THE HOST NAMES MUST BE THE HOST OR A DOT-SUFFIX OF IT, and anything else is no passkeys at all', () => {
+  /* THE MOVE TO ONE DOMAIN IS WHY THIS EXISTS (`loop/research-one-domain.md` §3.0). A passkey made at
+     `app.brain.dog` under the exact host is never offered at `brain.dog`, and production has no magic links, so the
+     owner's only passkey would lock him out the day the app moves. Under `brain.dog` it is offered on both names. */
+  assert.deepEqual(relyingParty('https://app.brain.dog', 'brain.dog'), { id: 'brain.dog', origin: 'https://app.brain.dog' });
+  assert.deepEqual(relyingParty('https://brain.dog', 'brain.dog'), { id: 'brain.dog', origin: 'https://brain.dog' });
+  assert.deepEqual(relyingParty('https://app.alpha.brain.dog', 'alpha.brain.dog'), { id: 'alpha.brain.dog', origin: 'https://app.alpha.brain.dog' });
+  /* A name the origin is not under is one a browser refuses at the ceremony; saying so here keeps the refusal on the
+     server's side of the wire, where an operator's typo in `RP_ID` is a switched-off passkey and not a broken one. */
+  assert.equal(relyingParty('https://app.brain.dog', 'evil.dog'), null);
+  /* AND A SUFFIX WITHOUT THE DOT IS NOT A PARENT: `rain.dog` ends `app.brain.dog` as text and is somebody else's domain. */
+  assert.equal(relyingParty('https://app.brain.dog', 'rain.dog'), null);
+  assert.equal(relyingParty('https://app.brain.dog', 'app.brain.dog.evil'), null);
+  assert.equal(relyingParty('https://app.brain.dog', '.brain.dog'), null);
+  /* A BARE TOP-LEVEL NAME IS A DOT-SUFFIX TOO, and it is a public suffix every browser refuses as an RP ID, so a
+     passkey offered under it would be one no ceremony completes. Only the exact host may be a single label. */
+  assert.equal(relyingParty('https://app.brain.dog', 'dog'), null);
+  assert.deepEqual(relyingParty('http://localhost:8080', 'localhost'), { id: 'localhost', origin: 'http://localhost:8080' });
+  /* EMPTY IS UNSET, so a var declared `""` in `wrangler.jsonc` is the exact host, which is what the Worker was. */
+  assert.deepEqual(relyingParty('https://app.brain.dog', ''), { id: 'app.brain.dog', origin: 'https://app.brain.dog' });
+  assert.deepEqual(relyingParty('https://app.brain.dog', undefined), { id: 'app.brain.dog', origin: 'https://app.brain.dog' });
+  /* Case is not a different name, and the origin's refusals still come first. */
+  assert.deepEqual(relyingParty('https://app.brain.dog', 'Brain.Dog'), { id: 'brain.dog', origin: 'https://app.brain.dog' });
+  assert.equal(relyingParty('http://studio.lan', 'studio.lan'), null);
+});
+
 test('readSid reads the one cookie by the name its origin uses, and says nothing about validity', () => {
   const at = (cookie: string) => new Request('https://x/', { headers: { cookie } });
   assert.equal(readSid(at(`a=1; bd_s=${SID}; b=2`), 'local'), SID);
@@ -336,7 +362,7 @@ test('THE LINK IS MAILED AS A FRAGMENT, NEVER ANSWERED, and an unknown address l
   assert.deepEqual([known.status, known.raw], [unknown.status, unknown.raw]);
   assert.equal(sent.length, 1);
   assert.equal(sent[0]?.to, 'ada@example.com');
-  const token = /^https:\/\/studio\.example\/signin#magic=([A-Za-z0-9_-]{43})$/.exec(sent[0]?.link ?? '')?.[1];
+  const token = /^https:\/\/studio\.example\/app\/signin#magic=([A-Za-z0-9_-]{43})$/.exec(sent[0]?.link ?? '')?.[1];
   assert.ok(token, `the link is ${sent[0]?.link}`);
 
   const redeemed = await call('/auth/magic/redeem', { body: { linkToken: token } });
@@ -379,7 +405,7 @@ test('THE OPERATOR: no key is no route, a wrong key is 401, and the claim link c
   const out = await call('/auth/provision', { body: { slug: 'the-studio', email: 'Ada@Example.com' }, headers: { authorization: `Bearer ${KEY}` } });
   assert.equal(out.status, 200);
   assert.deepEqual(made, [{ slug: 'the-studio', email: 'ada@example.com' }]);
-  assert.match(String(out.body.value?.claim), /^https:\/\/studio\.example\/signin#claim=[A-Za-z0-9_-]{43}$/);
+  assert.match(String(out.body.value?.claim), /^https:\/\/studio\.example\/app\/signin#claim=[A-Za-z0-9_-]{43}$/);
   assert.equal(out.body.value?.expires, NOW + 24 * 3_600_000);
   assert.equal(sent.length, 0, 'the operator route mailed the claim');
 

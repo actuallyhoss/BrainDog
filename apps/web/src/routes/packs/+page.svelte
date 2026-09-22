@@ -10,6 +10,7 @@
   approve four schema reviews before they have seen one of their own rows is worse than a tour.
 -->
 <script lang="ts">
+  import { apiBase } from '$lib/at.ts';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
@@ -173,7 +174,7 @@
       if (got.ok) catalogueNames = await catalogueTitles(got.index);
     });
     void read(async () => {
-      client = createClient({ base: location.origin });
+      client = createClient({ base: apiBase() });
       /* WHICH RECORD THIS IS IS THE SHELL'S ANSWER TO `boot`, not a second reading of this screen's
          own first call. See `choose`. */
       const chosen = await choose(client, !page.data.live);

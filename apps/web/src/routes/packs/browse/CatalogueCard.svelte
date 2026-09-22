@@ -8,6 +8,7 @@
 -->
 <script lang="ts">
   import type { CatalogueEntry } from '@braindog/declare/catalogue';
+  import { at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -18,7 +19,7 @@
   const latest = $derived(entry.versions[0]);
   const hosts = $derived([...new Set((latest?.reach.calls_out ?? []).map((c) => c.host ?? '').filter((h) => h !== ''))]);
   /* A USE CASE KEEPS ITS LINK; an add-on says its kind, so one sharing an id with a use case is still reachable. */
-  const href = $derived(`/packs/browse/${entry.id}?from=catalogue${entry.kind === 'pack' ? '&kind=pack' : ''}`);
+  const href = $derived(at(`/packs/browse/${entry.id}?from=catalogue${entry.kind === 'pack' ? '&kind=pack' : ''}`));
   const audience = $derived(entry.kind === 'pack' ? copy.catalogueAddon : ((copy.shareAudiences as Record<string, string>)[entry.audience] ?? copy.shareAudiences.other));
 </script>
 

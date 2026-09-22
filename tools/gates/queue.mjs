@@ -74,7 +74,7 @@ import { pathToFileURL } from 'node:url';
 
 import { chromium } from '@playwright/test';
 
-import { budget, readiness } from './lib.mjs';
+import { APP_BASE, appShell, budget, readiness } from './lib.mjs';
 import { answers, forward, forwards, startRecord } from './record.mjs';
 
 /* THE PREREQUISITE, AND THIS IS THE OTHER GATE THAT PROVED IT HAD TO LEAVE THIS FILE. It exited 0
@@ -175,7 +175,8 @@ export default async function queue(root = join(import.meta.dirname, '..', '..')
       }
       /* THE SPA FALLBACK the deployed host serves, for the same reason `a11y.mjs` serves it: without it
          `/decide/<id>` and `/p/agents` 404 on a direct load instead of letting the router decide. */
-      const shell = join(ROOT, 'index.html');
+      /* The app's shell, which is under `/app` in the build as it is on the host (`lib.mjs`). */
+      const shell = appShell(ROOT);
       const asset = Object.hasOwn(TYPES, extname(rel));
       if (!asset && (await stat(shell).catch(() => null))?.isFile()) {
         res.writeHead(200, { 'content-type': TYPES['.html'] });
@@ -205,7 +206,7 @@ export default async function queue(root = join(import.meta.dirname, '..', '..')
 
     /** Load a route by address and report what it settled into. */
     async function open(route) {
-      await page.goto(`${ORIGIN}${route}`, { waitUntil: 'networkidle' });
+      await page.goto(`${ORIGIN}${APP_BASE}${route}`, { waitUntil: 'networkidle' });
       return ready.settled(page);
     }
 
@@ -346,9 +347,9 @@ export default async function queue(root = join(import.meta.dirname, '..', '..')
           const href = await more.getAttribute('href');
           const label = (await more.innerText()).trim();
           await more.click();
-          await page.waitForURL('**/decide', { timeout: budget('ready').settleTimeoutMs });
+          await page.waitForURL(`**${APP_BASE}/decide`, { timeout: budget('ready').settleTimeoutMs });
           const path = new URL(page.url()).pathname;
-          if (path !== '/decide') findings.push(`pressing the queue's "${label}" link (href="${href}") landed on ${path}, not /decide.`);
+          if (path !== `${APP_BASE}/decide`) findings.push(`pressing the queue's "${label}" link (href="${href}") landed on ${path}, not ${APP_BASE}/decide.`);
           const decideState = await ready.settled(page);
           const unmeasuredDecide = ready.check('queue more-link decide', '/decide', decideState);
           if (unmeasuredDecide) findings.push(unmeasuredDecide);

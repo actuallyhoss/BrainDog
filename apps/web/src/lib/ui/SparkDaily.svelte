@@ -8,6 +8,7 @@
   `daily` is handed in where the page has already read Spark; otherwise it is read here.
 -->
 <script lang="ts">
+  import { apiBase, at } from '../at.ts';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
@@ -24,7 +25,7 @@
 
   onMount(() => {
     if (!page.data.live) return;
-    client = createClient({ base: location.origin }) as unknown as SparkClient;
+    client = createClient({ base: apiBase() }) as unknown as SparkClient;
     if (daily === null)
       void readSpark(client).then((out) => {
         if (out.ok && out.reading.daily) read = out.reading.daily;
@@ -63,7 +64,7 @@
         onclick={flip}><span class="switch-track"></span></button
       >
     </div>
-    {#if link}<a class="spark-daily-link tap" href="/spark">{words.dailyMore}</a>{/if}
+    {#if link}<a class="spark-daily-link tap" href={at('/spark')}>{words.dailyMore}</a>{/if}
   </Section>
 {/if}
 

@@ -244,6 +244,24 @@ for (const [what, answer] of [
   });
 }
 
+test('UNDER A SLUG A 401 ASKS FOR SIGN-IN AND IS NEVER THE SAMPLE, which would be drawn dressed as that record', async () => {
+  forget();
+  const { io, sent } = host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } }));
+  assert.deepEqual(await readBoot(`${BASE}/app/acme`, io), { from: 'refused', code: 'UNAUTHORIZED', fix: 'Sign in again.' });
+  assert.equal(new URL(sent[0]!).pathname, '/app/acme/api/boot');
+  forget();
+});
+
+test('A KEPT BOOT IS KEPT FOR ITS OWN RECORD, so a tab that moves to another slug asks that one', async () => {
+  forget();
+  const { io, sent } = host(() => json(200, { ok: true, value: BOOT }));
+  await readBoot(`${BASE}/app/acme`, io);
+  await readBoot(`${BASE}/app/acme`, io);
+  await readBoot(`${BASE}/app/kiln`, io);
+  assert.deepEqual(sent.map((u) => new URL(u).pathname), ['/app/acme/api/boot', '/app/kiln/api/boot']);
+  forget();
+});
+
 test("any other refusal is the record's sentence, and is asked again", async () => {
   forget();
   const { io, sent } = host(() => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Ask the owner.' } }));

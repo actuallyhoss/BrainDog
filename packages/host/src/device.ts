@@ -46,7 +46,7 @@ export type DeviceDoor = {
 export type DeviceStarted = { device_code: string; user_code: string; verification_uri: string; expires_in: number; expires: string; interval: number };
 
 /** The part of a host's `AuthDoor` these routes read. */
-type Door = { origin: string; ip: string; reached?: string | undefined; device?: DeviceDoor | undefined };
+type Door = { origin: string; on: 'selfhost' | 'worker'; ip: string; reached?: string | undefined; device?: DeviceDoor | undefined };
 
 type Header = readonly [string, string];
 
@@ -79,6 +79,12 @@ async function objectOf(request: Request): Promise<Record<string, unknown> | nul
     return null;
   }
 }
+
+/**
+ * A record's name as the Directory writes one (`packages/record/src/directory.ts`, `SLUG`). A copy, because that
+ * package keeps its own private; `device.test.ts` holds this one to the slugs a record can and cannot have.
+ */
+const SLUG = /^[a-z][a-z0-9-]{0,30}[a-z0-9]$/;
 
 const text = (x: unknown): string => (typeof x === 'string' ? x : '');
 const slugOf = (body: Record<string, unknown>): { slug?: string } => (typeof body.slug === 'string' && body.slug ? { slug: body.slug } : {});
@@ -128,10 +134,20 @@ export async function serveDevice(request: Request, route: AuthRoute, door: Door
   });
   if ('retryAfter' in out) return reply(429, { ok: false, retryAfter: out.retryAfter }, [['retry-after', String(out.retryAfter)]]);
   if (!out.ok) return reply(httpStatus(out), out);
+  /* THE APP IS UNDER `/app` (`loop/research-one-domain.md` Brief D). `${origin}/settings/agents` is a marketing
+     page's address once the site and the app share `brain.dog`, so the six digits would be sent to a 404. With a
+     slug the page is that record's, because under `/app/<slug>` the app reads that record and no other; without
+     one it is `/app/settings/agents`, the record the session is on.
+     ONLY THE WORKER PUTS THE SLUG IN THE PATH. The self-host holds one record, never reads the slug, and serves no
+     `/app/<slug>/api/*`, so a page there under a slug would ask its shell for its own data and get `index.html`.
+     AND ONLY A SLUG OF THE DIRECTORY'S GRAMMAR. The Worker refuses one the Directory does not hold before this line,
+     so this is the second lock and not the first; it is a grammar and not `encodeURIComponent` because a URL parser
+     reads an encoded `%2e%2e` as `..`, and a slug of `..` would turn the address into the site's `/settings/agents`. */
+  const at = door.on === 'worker' && typeof body.slug === 'string' && SLUG.test(body.slug) ? `/app/${body.slug}` : '/app';
   const started: DeviceStarted = {
     device_code: out.value.device_code,
     user_code: out.value.user_code,
-    verification_uri: `${door.origin}/settings/agents`,
+    verification_uri: `${door.origin}${at}/settings/agents`,
     expires_in: CODE_SECONDS,
     expires: out.value.expires,
     interval: out.value.interval,

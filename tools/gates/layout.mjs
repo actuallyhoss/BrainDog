@@ -32,7 +32,7 @@ import { extname, join } from 'node:path';
 
 import { chromium } from '@playwright/test';
 
-import { budget, readiness, skipDir } from './lib.mjs';
+import { APP_BASE, appShell, budget, readiness, skipDir } from './lib.mjs';
 import { answers, forward, forwards, recordFor, startRecord } from './record.mjs';
 import { routesOf } from './routes.mjs';
 
@@ -271,6 +271,11 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
     /* WHICH BUILD IS ON THE PORT. One server, pointed at the record under measurement. A second server
        would be a second port, and this file already knows what a port collision costs. */
     let serving = ROOT;
+    /* AND THE ADDRESS IT IS OPENED UNDER. The record app is `/app` (`svelte.config.js`), so its routes are opened as
+       `/app<route>` and its fallback is `build/app/index.html`; the marketing site is prerendered at the root. The
+       route itself stays as the tree names it, because `recordFor` and `MAY_REFUSE` are written in those words. */
+    let base = APP_BASE;
+    const shellOf = () => (base === APP_BASE ? appShell(serving) : join(serving, 'index.html'));
 
     server = createServer(async (req, res) => {
       const url = new URL(req.url ?? '/', 'http://x');
@@ -287,7 +292,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
       // The same SPA fallback the app is deployed behind, keyed on extensions we actually serve.
       if (!Object.hasOwn(TYPES, extname(rel))) {
         res.writeHead(200, { 'content-type': TYPES['.html'] });
-        return createReadStream(join(serving, 'index.html')).pipe(res);
+        return createReadStream(shellOf()).pipe(res);
       }
       res.writeHead(404).end();
     });
@@ -489,7 +494,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
 
       for (const route of ROUTES) {
         await recordFor(page, route);
-        await page.goto(`http://localhost:${PORT}${route}`, { waitUntil: 'domcontentloaded' });
+        await page.goto(`http://localhost:${PORT}${base}${route}`, { waitUntil: 'domcontentloaded' });
         /* `domcontentloaded` IS WORTH NOTHING ON ITS OWN HERE and never was: `ssr = false`, so the shell
            served off disk is a script tag that imports the client, and `#main` does not exist until it
            has run. This wait is the only thing between the gate and an empty document, which is why its
@@ -540,7 +545,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
             for (const o of after) findings.push(`${route} @${width} (${act.name})  ${o}`);
             /* BACK TO REST, because the acts share one page and the next one must not open its sheet
                over the last one's. A reload is cheaper to reason about than an undo per act. */
-            await page.goto(`http://localhost:${PORT}${route}`, { waitUntil: 'domcontentloaded' });
+            await page.goto(`http://localhost:${PORT}${base}${route}`, { waitUntil: 'domcontentloaded' });
             await ready.settled(page);
             await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
           }
@@ -565,6 +570,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
 
     for (const v of present) {
       serving = v.root;
+      base = v.prerendered ? '' : APP_BASE;
       for (const width of variantWidths) {
         const context = await browser.newContext({
           viewport: { width, height: L.viewportHeightPx },
@@ -575,7 +581,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
         const page = await context.newPage();
         process.stdout.write(`    ${v.name} @${String(width).padStart(4)} `);
         for (const route of v.routes) {
-          await page.goto(`http://localhost:${PORT}${route}`, { waitUntil: 'domcontentloaded' });
+          await page.goto(`http://localhost:${PORT}${base}${route}`, { waitUntil: 'domcontentloaded' });
           /* THE SAME READINESS, or the variant pass is the half of this gate that can still go green
              over nothing. The site is prerendered and says so in `VARIANTS`. */
           const unmeasured = ready.check(`${v.name}${route} @${width}`, route, await ready.settled(page, v.prerendered));

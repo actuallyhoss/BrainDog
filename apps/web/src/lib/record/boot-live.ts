@@ -111,6 +111,10 @@ export type Shell = Omit<Sample, 'me'> & {
 
 let kept: Promise<Booted> | null = null;
 
+/* WHICH RECORD `kept` IS. Since the record is in the address (`/app/<slug>/api/boot`), one tab can ask two records, and
+   an answer kept for acme handed to a screen on kiln is kiln's rail drawn from acme's lists. */
+let keptFor = '';
+
 /**
  * THE LAST REFUSAL THIS MODULE READ, kept beside the answer it keeps.
  *
@@ -121,14 +125,27 @@ let kept: Promise<Booted> | null = null;
  */
 let refusal: { code: string; fix: string } | null = null;
 
+/** The path of a base, `https://brain.dog/app/acme` read as `/app/acme`; a base with no origin is taken as a path. */
+const pathOf = (base: string): string => {
+  try {
+    return new URL(base).pathname;
+  } catch {
+    return base;
+  }
+};
+
 export function readBoot(base: string, io?: Fetch): Promise<Booted> {
+  if (keptFor !== base) kept = null;
+  keptFor = base;
   kept ??= (async (): Promise<Booted> => {
     const client = createClient({ base, ...(io ? { fetch: io } : {}) });
     const out = await client.boot();
     refusal = null;
     if (out.ok) return { from: 'live', boot: out.value };
     const said = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'The record changed while it was being read.' };
-    if (noRecord(said.code)) return { from: 'sample' };
+    /* UNDER A SLUG NEITHER REFUSAL IS THE SAMPLE (`noRecord`), so a 401 there is handed to the layout, which asks for
+       sign-in rather than drawing the sample business dressed as the record in the address. */
+    if (noRecord(said.code, pathOf(base))) return { from: 'sample' };
     kept = null;
     refusal = { code: said.code, fix: said.fix };
     return { from: 'refused', code: said.code, fix: said.fix };

@@ -12,6 +12,7 @@
   revocable.
 -->
 <script lang="ts">
+  import { at } from '$lib/at.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import { titleOf } from '$lib/title.ts';
   import { Block, Degraded, Markdown, Table } from 'braindog-render/svelte';
@@ -72,7 +73,7 @@
 
 <div class="shared">
   <header class="bar">
-    <a class="brand" href="/">
+    <a class="brand" href={at('/')}>
       <Mark height={22} />
       <span class="wordmark">{copy.product}</span>
     </a>

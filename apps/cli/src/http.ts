@@ -104,6 +104,15 @@ export const inTheClear = (url: URL): boolean => url.protocol === 'http:' && !LO
  *
  * NO SENTENCE HERE REPEATS WHAT WAS TYPED. Somebody who pasted a token into the address would find it
  * in the log of every agent session.
+ *
+ * `/app/<slug>` IS KEPT AS `/<slug>` (`loop/research-one-domain.md` Brief D). The app moved to
+ * `brain.dog/app/<slug>` and its connect screen prints that address, so it is what people paste; before
+ * this line the whole of `app/acme` went to the Directory as the slug and the sign-in was refused. `app`
+ * is a reserved slug (`packages/record/src/directory.ts`), so a first segment of `app` is always the
+ * prefix and never a record. It is done here and not in `login` because `logout` and `target` key by
+ * this same function: a login kept under `/acme` has to be the entry a `logout .../app/acme` removes,
+ * or the logout says there was nothing to remove over a live bearer. Keys kept before the move are
+ * `/<slug>` already, so none of them changes.
  */
 export function hostKey(raw: string): string {
   const text = raw.trim();
@@ -111,13 +120,13 @@ export function hostKey(raw: string): string {
   try {
     url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(text) ? text : `https://${text}`);
   } catch {
-    throw new Error('The BrainDog host is not an address. Write it as https://app.brain.dog.');
+    throw new Error('The BrainDog host is not an address. Write it as https://brain.dog/app/<slug>.');
   }
   if (url.protocol !== 'https:' && url.protocol !== 'http:')
-    throw new Error('The BrainDog host is not an https address. Write it as https://app.brain.dog.');
+    throw new Error('The BrainDog host is not an https address. Write it as https://brain.dog/app/<slug>.');
   if (url.username || url.password)
     throw new Error('The BrainDog host address carries a name or a password. A token goes in the hosts file or BRAINDOG_TOKEN, never in an address.');
-  return `${url.origin}${url.pathname.replace(/\/+$/, '')}`;
+  return `${url.origin}${url.pathname.replace(/\/+$/, '').replace(/^\/app(?=\/|$)/, '')}`;
 }
 
 /**

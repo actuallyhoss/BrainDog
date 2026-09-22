@@ -47,7 +47,7 @@ import { extname, join, normalize } from 'node:path';
 
 import { chromium } from '@playwright/test';
 
-import { budget, readiness } from './lib.mjs';
+import { APP_BASE, appShell, budget, readiness } from './lib.mjs';
 import { answers, forward, forwards, recordFor, startRecord } from './record.mjs';
 import { routesOf } from './routes.mjs';
 
@@ -378,7 +378,8 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
          a genuinely broken asset still fails loudly, and everything else gets the shell. Worth knowing
          when this is deployed, because an SPA fallback that excludes dotted paths (several hosts
          default to exactly that) would 404 every view in production. */
-      const shell = join(current.root, 'index.html');
+      /* THE RECORD APP'S SHELL IS `build/app/index.html`, because the app is served under `/app` (`lib.mjs`). */
+      const shell = current.spa ? appShell(current.root) : join(current.root, 'index.html');
       const asset = Object.hasOwn(TYPES, extname(rel));
       if (current.spa && !asset && (await stat(shell).catch(() => null))?.isFile()) {
         res.writeHead(200, { 'content-type': TYPES['.html'] });
@@ -490,7 +491,9 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
           /** Loads a route, waits for it to be real, injects axe, and RETURNS what the screen settled into. */
           const open = async (route) => {
             await recordFor(page, route);
-            await page.goto(`http://localhost:${PORT}${route}`, { waitUntil: 'networkidle' });
+            /* UNDER `/app` FOR THE RECORD APP, and the route itself as the tree names it, because `recordFor` and
+               `MAY_REFUSE` are written in those words. The site is prerendered at the root. */
+            await page.goto(`http://localhost:${PORT}${app.spa ? APP_BASE : ''}${route}`, { waitUntil: 'networkidle' });
             /* The one readiness site in this gate, because every load goes through here. The `5000` that
                used to be written on this line was a bare literal in a directory whose shared file opens by
                forbidding them; the number is `ready.settleTimeoutMs` now, and its expiry is a value. */

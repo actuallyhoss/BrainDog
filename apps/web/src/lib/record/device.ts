@@ -15,6 +15,7 @@
 
 import type { DeviceApproved, DeviceRow } from '@braindog/client';
 
+import { BASE, slugOf } from '../at.ts';
 import type { Device, Token } from './schema.ts';
 
 export type { DeviceRow };
@@ -139,8 +140,12 @@ export const standing = (rows: readonly TokenRow[]): TokenRow[] => rows.filter((
 /**
  * The two refusals that mean there is no record here to read, as `lib/data/record.ts` decides it: a
  * static host's SPA fallback, or a Worker with no record behind it. The screen then draws the sample.
+ *
+ * NEVER UNDER A SLUG. `/app/acme/…` names a record, so a 401 there is a person who must sign in and an unreachable host
+ * is a host that did not answer; the sample drawn in either case would be dressed as acme (`research-one-domain.md` §2.4).
  */
-export const noRecord = (code: string): boolean => code === 'UNREACHABLE' || code === 'UNAUTHORIZED';
+export const noRecord = (code: string, pathname: string = globalThis.location?.pathname ?? ''): boolean =>
+  (code === 'UNREACHABLE' || code === 'UNAUTHORIZED') && slugOf(pathname) === null;
 
 /** A handle for a sample row, derived from its id the way the kernel derives one, and never printed. */
 function handleOf(id: string): string {
@@ -196,11 +201,14 @@ export const sampleTokens = (tokens: readonly Token[]): TokenRow[] =>
  * The two lines a person copies after connecting an agent. NEITHER CARRIES THE BEARER: `braindog login`
  * starts its own device flow, and the MCP registration reads its bearer from the hosts file or
  * `BRAINDOG_TOKEN`, so no token lands in a shell history or in Claude Code's config (`48 §2`).
+ *
+ * THE LOGIN LINE NAMES THE RECORD when the screen knows it. The Cloud device flow is refused without a slug, and the line
+ * printed the bare origin, so the one command this screen exists to hand over did not work where most people would paste it.
  */
-export function connectLines(origin: string): { login: string; mcp: string } {
+export function connectLines(origin: string, slug?: string | null): { login: string; mcp: string } {
   const server = { type: 'stdio', command: 'braindog', args: ['mcp', '--agent', 'claude'] };
   return {
-    login: `braindog login ${origin}`,
+    login: `braindog login ${slug ? `${origin}${BASE}/${slug}` : origin}`,
     mcp: `claude mcp add-json braindog '${JSON.stringify(server)}' --scope user`,
   };
 }

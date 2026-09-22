@@ -19,6 +19,7 @@
   break their phone. The shell hides this slot rather than this component reasoning about width.
 -->
 <script lang="ts">
+  import { at, here as inside } from '../at.ts';
   import { page } from '$app/state';
   import { copy } from '../copy.ts';
   import { said } from '../voice.svelte.ts';
@@ -56,23 +57,25 @@
   const shown = $derived(entries.slice(0, SHOWN));
   const hidden = $derived(Math.max(0, entries.length - SHOWN));
 
-  const here = (href: string) => page.url.pathname === href;
-  const under = (href: string) => page.url.pathname === href || page.url.pathname.startsWith(`${href}/`);
+  /* COMPARED INSIDE THE RECORD. `page.url` is the address as it came, `/app/acme/decide`, and these links are written
+     `/decide`, so the comparison reads the address with the base and the slug taken off (`lib/at.ts`). */
+  const here = (href: string) => inside(page.url.pathname) === href;
+  const under = (href: string) => inside(page.url.pathname) === href || inside(page.url.pathname).startsWith(`${href}/`);
 </script>
 
 <nav class="topbar" aria-label="Record">
   <!-- The spine. Home, Decide and Inbox are the three surfaces whose absence would make this a
        different product, so they are first and no pack may add to them, reorder them or badge them. -->
-  <a class="bar-item spine tap" href="/" aria-current={here('/') ? 'page' : undefined}>
+  <a class="bar-item spine tap" href={at('/')} aria-current={here('/') ? 'page' : undefined}>
     <Icon name="home" size="m" /><span class="bar-name">{said('home')}</span>
   </a>
-  <a class="bar-item spine tap" href="/decide" aria-current={under('/decide') ? 'page' : undefined}>
+  <a class="bar-item spine tap" href={at('/decide')} aria-current={under('/decide') ? 'page' : undefined}>
     <Icon name="decide" size="m" /><span class="bar-name">{copy.decide}</span>
     <!-- NAMED, NOT ONLY COLOURED (13 §5.1), the same fix as the rail's: `--tone` alone left this
          the one element in the bar whose meaning was carried by colour and nothing else. -->
     {#if open}<span class="tally num" data-intent="warn">{open}<Icon name="decide" size="s" title={copy.openQuestions} /></span>{/if}
   </a>
-  <a class="bar-item spine tap" href="/inbox" aria-current={under('/inbox') ? 'page' : undefined}>
+  <a class="bar-item spine tap" href={at('/inbox')} aria-current={under('/inbox') ? 'page' : undefined}>
     <Icon name="inbox" size="m" /><span class="bar-name">{copy.inbox}</span>
     {#if inbox}<span class="tally num">{inbox}</span>{/if}
   </a>
@@ -82,7 +85,7 @@
   <!-- Declared. The order is the reader's, the same arrangement the rail and the sheet both draw,
        and the section headings are the thing a single strip cannot carry: they are in the sheet. -->
   {#each shown as entry}
-    <a class="bar-item tap" href={entry.href} aria-current={here(entry.href) ? 'page' : undefined}>
+    <a class="bar-item tap" href={at(entry.href)} aria-current={here(entry.href) ? 'page' : undefined}>
       <span class="bar-name">{entry.title}</span>
     </a>
   {/each}

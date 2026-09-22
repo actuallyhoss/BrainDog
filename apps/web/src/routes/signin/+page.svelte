@@ -33,6 +33,7 @@
     type Said,
     type Who,
   } from '$lib/auth.ts';
+  import { BASE, onward } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { stateOf, type How, type Step, type Ways } from '$lib/signin.ts';
   import { actable, firstDoor, noDoorYet } from './first-door.ts';
@@ -298,7 +299,7 @@
           <p class="calm-title">{copy.openTitle}</p>
           <p class="calm-body">{copy.openWhy}</p>
         </div>
-        <div class="doors"><Button weight="primary" href="/">{copy.openYourRecord}</Button></div>
+        <div class="doors"><Button weight="primary" href={onward()}>{copy.openYourRecord}</Button></div>
       {:else if view.name === 'not-configured'}
         <div class="said"><Empty kind="no-permission" title={copy.notConfiguredTitle} body={copy.notConfiguredWhy} /></div>
       {:else if view.name === 'insecure'}
@@ -347,7 +348,7 @@
             {@render addDoor(true)}
             <p class="small">{copy.addPasskeyWhy}</p>
           {/if}
-          <Button weight={view.lead === 'open' ? 'primary' : 'quiet'} href="/">{copy.openBrainDog}</Button>
+          <Button weight={view.lead === 'open' ? 'primary' : 'quiet'} href={onward()}>{copy.openBrainDog}</Button>
           {#if view.lead === 'open'}{@render addDoor(false)}{/if}
           <Button weight="bare" onclick={leave} aria-busy={view.out === 'asking'}>
             {view.out === 'asking' ? copy.signingOut : copy.signOut}
@@ -440,7 +441,9 @@
            most people who reach this screen want. Filled only where nothing else can be pressed. -->
       {#if demo}
         <footer class="demo">
-          <Button weight={demoLeads ? 'primary' : 'quiet'} href="/">{copy.openTheDemo}</Button>
+          <!-- THE DEMO IS THE APP WITH NO RECORD NAMED, `/app/`, whatever `next` says: under a slug a stranger is
+               asked to sign in and never drawn the sample, so sending the demo there would bring them straight back. -->
+          <Button weight={demoLeads ? 'primary' : 'quiet'} href={`${BASE}/`}>{copy.openTheDemo}</Button>
           <p class="small">{copy.demoNeedsNothing}</p>
         </footer>
       {/if}

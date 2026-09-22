@@ -86,6 +86,8 @@ export async function login(raw: string, io: LoginIo): Promise<number> {
     io.say(`${key} is http, not https. BrainDog signs in only over https, except on this machine.`);
     return REFUSED;
   }
+  /* THE KEY'S PATH IS THE SLUG, and `hostKey` has already taken `/app` off the front of it, so the address the app
+     prints, `brain.dog/app/acme`, posts `acme` and not `app/acme`. */
   const slug = url.pathname.replace(/^\/+/, '');
   const where = slug ? { slug } : {};
   const vault = io.vault;

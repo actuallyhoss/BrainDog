@@ -62,7 +62,7 @@ const { toasts } = await import('./ui/toast.svelte.ts');
 const DEADLINE = 1_000;
 
 /** `location` exists only for `putLink`, and only the one property it reads. */
-Object.defineProperty(globalThis, 'location', { value: { origin: 'https://brain.example' }, configurable: true, writable: true });
+Object.defineProperty(globalThis, 'location', { value: { origin: 'https://brain.example', pathname: '/app/r/obligations' }, configurable: true, writable: true });
 
 /**
  * A clipboard that behaves in one of the four ways a real one does, and a record of what reached it.
@@ -211,5 +211,18 @@ test('and the link is absolute, so it survives being pasted anywhere', async () 
 
   await putLink('obligations', 41);
 
-  assert.deepEqual(wrote, ['https://brain.example/r/obligations/41'], 'the copied link is relative, so it only works on the page it came from');
+  assert.deepEqual(wrote, ['https://brain.example/app/r/obligations/41'], 'the copied link is relative, so it only works on the page it came from');
+});
+
+test('A LINK COPIED UNDER A SLUG NAMES ITS RECORD, so whoever opens it reads the record it was copied from', async () => {
+  /* Before the record was in the path, a pasted link opened whichever record the READER's session was on. */
+  const was = globalThis.location;
+  Object.defineProperty(globalThis, 'location', { value: { origin: 'https://brain.dog', pathname: '/app/acme/r/obligations' }, configurable: true, writable: true });
+  try {
+    const wrote = clipboard('writes');
+    await putLink('obligations', 41);
+    assert.deepEqual(wrote, ['https://brain.dog/app/acme/r/obligations/41']);
+  } finally {
+    Object.defineProperty(globalThis, 'location', { value: was, configurable: true, writable: true });
+  }
 });

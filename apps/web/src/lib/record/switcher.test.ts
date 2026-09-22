@@ -28,9 +28,10 @@ test('every open record the person can reach, exactly as the host answered it', 
     { slug: 'kiln', name: 'Kiln', level: 'write' },
   ];
   const { io, sent } = host(() => json(200, { ok: true, value: rows }));
-  const out = await readRecordsForSwitcher(io, 'https://app.brain.dog');
+  /* THE ACCOUNT IS AT THE ROOT on `brain.dog`, under no slug: it is the person's list, not one record's. */
+  const out = await readRecordsForSwitcher(io, 'https://brain.dog');
   assert.deepEqual(out, { ok: true, value: rows });
-  assert.equal(sent[0]?.url, 'https://app.brain.dog/account/records');
+  assert.equal(sent[0]?.url, 'https://brain.dog/account/records');
   assert.equal(sent[0]?.init?.credentials, 'same-origin');
 });
 
@@ -60,8 +61,10 @@ test('any other refusal is passed through as the host said it', async () => {
 
 test('OPENING ANOTHER RECORD posts its name from this page, and a host that holds one record is not a refusal', async () => {
   const opened = host(() => json(200, { ok: true, value: { person: 'p_1', record: 'rec_2' } }));
-  assert.deepEqual(await openRecord(opened.io, 'kiln', 'https://app.brain.dog'), { from: 'opened' });
-  assert.equal(opened.sent[0]?.url, 'https://app.brain.dog/auth/switch');
+  /* AND THE ANSWER SAYS WHERE TO GO. The switch used to reload the same address, and the address named no record, so a
+     second tab on the first record silently started reading the second. Now the tab goes to the record it opened. */
+  assert.deepEqual(await openRecord(opened.io, 'kiln', 'https://brain.dog'), { from: 'opened', to: '/app/kiln/' });
+  assert.equal(opened.sent[0]?.url, 'https://brain.dog/auth/switch');
   assert.equal(opened.sent[0]?.init?.method, 'POST');
   assert.equal(opened.sent[0]?.init?.body, JSON.stringify({ slug: 'kiln' }));
 

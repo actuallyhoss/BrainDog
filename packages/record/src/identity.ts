@@ -23,7 +23,7 @@
  * "fifteen minutes since the first strike".
  */
 
-import type { AssertionOptions, Auth, AuthCall, AuthResult, Clock, Methods, PasskeyInfo, RegistrationOptions, Sql, Who } from '@braindog/ports';
+import type { AssertionOptions, AuthBodies, AuthCall, AuthResult, Clock, Methods, PasskeyInfo, RegistrationOptions, Sql, Who } from '@braindog/ports';
 
 import { assertion, b64url, clientData, registration, same, unb64url, type Alg, type PublicJwk, type Why } from './webauthn.ts';
 
@@ -128,6 +128,38 @@ const LIVE = `SELECT s.id_hash AS id_hash, s.person AS person, s.record AS recor
   FROM dir_session s JOIN dir_person p ON p.id = s.person AND p.suspended_at IS NULL
  WHERE (s.id_hash = ?1 OR (s.prev_hash = ?1 AND s.prev_until > ?2)) AND s.expires > ?2`;
 
+/**
+ * The record a live name means for this person: `?1` the person, `?2` the slug. A name that is not a live slug, a
+ * closed record and a record they are not on are all no row.
+ *
+ * ONE STATEMENT FOR `switch` AND FOR A NAMED `session`, so moving the row and reading through the path cannot come
+ * to disagree about who is on what. `switch`'s update puts the same text inside its own `WHERE`.
+ */
+const ON_RECORD = `SELECT s.record FROM dir_slug s
+     JOIN dir_record r ON r.id = s.record AND r.closed_at IS NULL
+     JOIN dir_member m ON m.record = s.record AND m.person = ?1
+    WHERE s.slug = ?2 AND s.released_at IS NULL`;
+
+/**
+ * A typed name as the slug it could be, lower-cased, or `null` when no slug is spelt that way.
+ *
+ * ASCII BEFORE IT IS LOWERED. `toLowerCase` folds the Kelvin sign to `k` and more besides, so a name no slug can be
+ * spelt with would otherwise open the record whose name it folds to.
+ */
+const slugTyped = (x: unknown): string | null => {
+  const typed = text(x).trim();
+  return /^[A-Za-z][A-Za-z0-9-]{1,31}$/.test(typed) ? typed.toLowerCase() : null;
+};
+
+/**
+ * `session` with the record the request's path names. `AuthCall`'s own arm has no `slug`, and this is the one flow
+ * that takes one without writing; `@braindog/ports` is where it belongs the day that file is next opened.
+ */
+export type SessionAsk = { flow: 'session'; sid: string; slug?: string };
+
+/** `Auth`, and the named `session` beside it. Assignable to `Auth`, so every host that holds one is unchanged. */
+export type DirectoryAuth = <C extends AuthCall | SessionAsk>(call: C) => Promise<AuthResult<AuthBodies[C['flow']]>>;
+
 type Row = { id_hash: string; person: string; record: string | null; rotated_at: number; authed_at: number; email: string; is_current: number };
 type Found = { row: Row; rotated: { sid: string } | null };
 type Minted = { sid: string; hash: string };
@@ -146,7 +178,7 @@ const credentialId = (x: unknown): string | null => (typeof x === 'string' && x.
  * `auth(call)`, or with no config, a Directory that answers `methods` with "not configured" and every other flow
  * with 404. That is the Worker without `SESSION_SECRET`: it says why sign-in is off rather than failing.
  */
-export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Auth {
+export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): DirectoryAuth {
   const encoder = new TextEncoder();
 
   if (config && config.mac.length < 32) throw new Error('The sign-in MAC key must be at least 32 bytes.');
@@ -333,7 +365,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Auth {
     return { id, clientDataJSON, authenticatorData, signature, userHandle };
   };
 
-  const auth = async (call: AuthCall): Promise<AuthResult> => {
+  const auth = async (call: AuthCall | SessionAsk): Promise<AuthResult> => {
     const flow = call.flow;
     if (!config) {
       if (flow !== 'methods') return off();
@@ -361,10 +393,26 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Auth {
         return { status: 200, body, ...cookie };
       }
 
+      /**
+       * Who a cookie is, and with a slug, which record that request is for.
+       *
+       * THE SLUG IS THE PATH'S (`/app/<slug>/api/…`, `loop/research-one-domain.md` §2.4), AND THIS IS THE CHECK THAT
+       * RUNS BEFORE THE WORKER ADDRESSES ANYTHING. It is `switch`'s own question, a live name on an open record this
+       * person is on, answered with the record and never written: the session row's record stays where the last
+       * switch put it, so bare `/app` still goes back there, and a read in one tab does not move another tab's.
+       *
+       * ONE 403 FOR EVERY NAME THAT IS NOT THEIRS, word for word the record's own "You are not on this record.". A
+       * name nobody holds, a released one, a closed record and somebody else's are the same answer, so asking says
+       * nothing about which names exist. Whether they may still read inside it is the record's `access`, asked next.
+       */
       case 'session': {
         const found = await current(call.sid, now);
         if (!found) return rejected(flow, 'session', { session: 'clear' });
-        return { status: 200, body: whoOf(found.row), ...carry(found) };
+        if (!('slug' in call) || call.slug === undefined) return { status: 200, body: whoOf(found.row), ...carry(found) };
+        const slug = slugTyped(call.slug);
+        const on = slug === null ? undefined : sql.one<{ record: string }>(ON_RECORD, found.row.person, slug);
+        if (!on) return { status: 403, refusal: { code: 'FORBIDDEN', fix: 'You are not on this record.' }, ...carry(found) };
+        return { status: 200, body: { ...whoOf(found.row), record: on.record }, ...carry(found) };
       }
 
       /**
@@ -622,15 +670,9 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Auth {
         if (!found) return rejected(flow, 'session', { session: 'clear' });
         const keep = carry(found);
         const refused: AuthResult = { status: 403, refusal: { code: 'FORBIDDEN', fix: 'You are on no open record by that name.', at: 'slug' }, ...keep };
-        /* ASCII BEFORE IT IS LOWERED. `toLowerCase` folds the Kelvin sign to `k` and more besides, so a name no slug can
-           be spelt with would otherwise open the record whose name it folds to. */
-        const typed = text(call.slug).trim();
-        if (!/^[A-Za-z][A-Za-z0-9-]{1,31}$/.test(typed)) return refused;
-        const slug = typed.toLowerCase();
-        const live = `SELECT s.record FROM dir_slug s
-             JOIN dir_record r ON r.id = s.record AND r.closed_at IS NULL
-             JOIN dir_member m ON m.record = s.record AND m.person = ?1
-            WHERE s.slug = ?2 AND s.released_at IS NULL`;
+        const slug = slugTyped(call.slug);
+        if (slug === null) return refused;
+        const live = ON_RECORD;
         const to = sql.one<{ record: string }>(live, found.row.person, slug);
         if (!to) return refused;
         /* AND THE RECORD ITSELF SAYS THEY ARE ON IT, or the browser would be moved somewhere every read refuses. */
@@ -679,5 +721,5 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Auth {
     }
   };
 
-  return auth as Auth;
+  return auth as DirectoryAuth;
 }

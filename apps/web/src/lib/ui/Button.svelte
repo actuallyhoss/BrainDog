@@ -11,6 +11,8 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
 
+  import { at } from '../at.ts';
+
   let {
     weight = 'quiet',
     href,
@@ -30,6 +32,11 @@
     children: Snippet;
     [key: string]: unknown;
   } = $props();
+
+  /* THE ONE PLACE A BUTTON'S ADDRESS IS PUT UNDER THE APP. About forty screens hand this `href="/decide"` or a row's
+     `/r/<list>/<seq>`, which since the move to `brain.dog/app` is outside the app and would load the marketing site.
+     `at` leaves an address it has already rendered, a query and another origin as they came. */
+  const to = $derived(href ? at(href) : href);
 </script>
 
 <svelte:element
@@ -37,7 +44,7 @@
   class="btn tap"
   data-weight={weight}
   data-intent={tone}
-  {href}
+  href={to}
   type={href ? undefined : type}
   disabled={href ? undefined : disabled}
   {onclick}

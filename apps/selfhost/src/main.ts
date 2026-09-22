@@ -76,8 +76,15 @@ function refuse(said: string): never {
 
 const dataDir = (): string => env.BRAINDOG_DATA ?? '/data';
 
-/** The app `apps/web` builds, served for every path that is not `/api` or `/auth` when it is there. */
-const BUILT = fileURLToPath(new URL('../../web/build', import.meta.url));
+/**
+ * The app `apps/web` builds, served for every path that is not `/api` or `/auth` when it is there.
+ *
+ * `build/app` AND NOT `build/`, BECAUSE THAT IS WHERE THE WEB BUILD WRITES NOW. `apps/web/svelte.config.js` has
+ * `paths.base: '/app'` and empties the build root, so `build/index.html` is never written and this looked for it: a
+ * self-host started with no `BRAINDOG_SHELL` served no app and no bundled catalogue, and said nothing about either
+ * (`test/app-path.test.ts`). The bundled catalogue is under it too, at `build/app/catalogue` (`catalogueFolder`).
+ */
+const BUILT = fileURLToPath(new URL('../../web/build/app', import.meta.url));
 
 type SignIn = { origin: string; ways: string[]; off: 'open' | 'directory' | 'insecure' | 'key' | null };
 

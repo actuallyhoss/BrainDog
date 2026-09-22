@@ -9,6 +9,7 @@
   currency. Imported by this route only, so nothing here reaches the entry chunk.
 -->
 <script lang="ts">
+  import { apiBase, at } from '$lib/at.ts';
   import { createClient } from '@braindog/client';
   import { copy } from '$lib/copy.ts';
   import Button from '$lib/ui/Button.svelte';
@@ -33,7 +34,7 @@
   const wanted = (): string[] => [...held, ...(home ? [home] : [])];
 
   $effect(() => {
-    const client = createClient({ base: location.origin });
+    const client = createClient({ base: apiBase() });
     void Promise.all(LISTS.map((register) => client.list({ register, limit: 500 }))).then((reads) => {
       const found = reads.flatMap((r) => (r.ok && r.value && Array.isArray((r.value as { rows?: unknown }).rows) ? ((r.value as { rows: { fields: Record<string, unknown> }[] }).rows) : []));
       held = currenciesIn(found);
@@ -60,7 +61,7 @@
     fault = ratesFault(draft);
     if (fault) return;
     busy = true;
-    const out = await createClient({ base: location.origin }).call<{ id?: unknown }>('propose', ratesProposal(draft));
+    const out = await createClient({ base: apiBase() }).call<{ id?: unknown }>('propose', ratesProposal(draft));
     busy = false;
     if (!out.ok) {
       fault = { at: 'file', fix: 'refusal' in out ? out.refusal.fix : copy.reportUnread };
@@ -75,7 +76,7 @@
 
   {#if filed !== null}
     <p class="rates-said" role="status">
-      {copy.pollFiled}{#if filed}{' '}<a class="tap" href="/decide/{filed}">{copy.pollOpenDecide}</a>{/if}
+      {copy.pollFiled}{#if filed}{' '}<a class="tap" href={at(`/decide/${filed}`)}>{copy.pollOpenDecide}</a>{/if}
     </p>
   {/if}
 

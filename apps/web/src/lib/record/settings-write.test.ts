@@ -213,7 +213,8 @@ test('an invitation is minted for one address, handed back once as a link, liste
   ]);
 
   /* THE LINK IS THIS ORIGIN AND THE TOKEN IN THE FRAGMENT, whatever trailing slashes the origin arrived with. */
-  assert.equal(inviteLink('http://record.test/', made.token), 'http://record.test/invite#rec_1.thesecret');
+  /* UNDER THE APP, AND WITH NO SLUG: the token names its record, and the person opening it may be on no record yet. */
+  assert.equal(inviteLink('http://record.test/', made.token), 'http://record.test/app/invite#rec_1.thesecret');
 
   /* A HOST OLDER THAN INVITATIONS, AND ONE WITH NO RECORD BEHIND IT, BOTH LIST NONE rather than draw a refusal. */
   const old = host(() => json(422, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'This record has no such method.' } })).io;

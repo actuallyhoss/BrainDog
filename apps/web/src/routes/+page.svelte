@@ -12,6 +12,7 @@
   money and the count of what is waiting to be decided.
 -->
 <script lang="ts">
+  import { apiBase, at } from '$lib/at.ts';
   import { titleOf } from '$lib/title.ts';
   import { MISSING, relative, since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
@@ -107,13 +108,13 @@
     const at = untrack(opened);
     let ok = false;
     asking = slug !== null;
-    const page = slug === null ? Promise.resolve(null) : import('$lib/record/page-live.ts').then((m) => m.pageReader(location.origin).read(slug)).catch(() => null);
+    const page = slug === null ? Promise.resolve(null) : import('$lib/record/page-live.ts').then((m) => m.pageReader(apiBase()).read(slug)).catch(() => null);
     void page
       .then((got) => {
         declared = got?.from === 'live' ? { blocks: got.page.blocks, now: got.now } : null;
         asking = false;
         /* THE FIGURES ARE ASKED FOR ONLY WHEN NO PAGE SAYS WHAT LEADS, so a record without Money's `home` is not asked twice. */
-        return import('$lib/record/news-live.ts').then((m) => m.readHome(location.origin, me, undefined, m.homeFigures(lists, declared !== null)));
+        return import('$lib/record/news-live.ts').then((m) => m.readHome(apiBase(), me, undefined, m.homeFigures(lists, declared !== null)));
       })
       .then((out) => {
         if (out.from !== 'live') return;
@@ -130,7 +131,7 @@
          lines come back on the next visit rather than being lost. */
       const upTo = news.upTo;
       feed = { items: [], upTo, sinceCapped: false };
-      void import('$lib/record/news-live.ts').then((m) => m.markAll(location.origin, upTo));
+      void import('$lib/record/news-live.ts').then((m) => m.markAll(apiBase(), upTo));
       return;
     }
     /* The newest item's own instant, not the wall clock, so an arrival written a second later is
@@ -199,7 +200,7 @@
       <!-- NOTHING AT ALL WHEN THERE IS NOTHING TO DECIDE: a count of nothing, as a link to a page
            whose empty state is the same answer, is noise. `/decide` stays in the rail and on `g d`. -->
       {#if data.open > 0}
-        <a class="to-decide tap" href="/decide">
+        <a class="to-decide tap" href={at('/decide')}>
           <span class="to-decide-n num">{data.open}</span>
           <span>{copy.toDecide}</span>
         </a>
@@ -242,7 +243,7 @@
             {@const parts = drawn(m.value, homeCurrency())}
             {@const q = qualifier(m.note)}
             {@const toned = m.tone === 'bad' || m.tone === 'warn' || m.tone === 'good'}
-            <svelte:element this={m.href ? 'a' : 'div'} class="stat" href={m.href} data-intent={m.tone}>
+            <svelte:element this={m.href ? 'a' : 'div'} class="stat" href={m.href ? at(m.href) : undefined} data-intent={m.tone}>
               <span class="stat-label">{m.label}</span>
               <span class="stat-figure num">
                 {#if !m.value}{MISSING}{:else if parts}{parts.lead}{parts.whole}<span class="stat-minor"
@@ -310,7 +311,7 @@
           {#each data.questions as q}
             {@const pick = q.options?.find((o) => o.recommended)}
             <li>
-              <a class="line need" href="/decide/{q.id}">
+              <a class="line need" href={at(`/decide/${q.id}`)}>
                 <span class="need-kind"><Icon name="decide" size="m" /></span>
                 <span class="line-title">{q.title}</span>
                 <span class="need-amount"></span>
@@ -324,7 +325,7 @@
 
           {#each lapsing as s}
             <li>
-              <a class="line need" href="/r/services/{s.seq}">
+              <a class="line need" href={at(`/r/services/${s.seq}`)}>
                 <span class="need-kind"><Icon name="service" size="m" /></span>
                 <span class="line-title">{s.fields.name} is lapsing</span>
                 <span class="need-amount"><Money minor={amountOf(s.fields.cost) ?? 0} currency={currencyOf(s.fields.cost) ?? ''} /></span>
@@ -342,7 +343,7 @@
             {@const late = days(e.fields.due) < 0}
             {@const owed = e.fields.direction === 'owed_to_me'}
             <li>
-              <a class="line need" href="/r/obligations/{e.seq}">
+              <a class="line need" href={at(`/r/obligations/${e.seq}`)}>
                 <span class="need-kind"><Icon name="obligation" size="m" /></span>
                 <span class="line-title">{e.fields.what}</span>
                 <span class="need-amount">
@@ -360,7 +361,7 @@
         </ul>
 
         {#if hidden > 0}
-          <a class="more tap" href="/r/obligations?f=state:in:open,part&f=due:before:today">
+          <a class="more tap" href={at('/r/obligations?f=state:in:open,part&f=due:before:today')}>
             {hidden} more past their date
             <Icon name="arrow" size="s" />
           </a>
@@ -389,7 +390,7 @@
           {#each fresh.slice(0, NEWS_CAP) as item}
             {@const who = actorOf(item.by)}
             <li>
-              <a class="event" href={item.href}>
+              <a class="event" href={at(item.href)}>
                 <!-- The agent that wrote it, named. Never a sparkle badge: disclosed AI use costs
                      trust without buying anything (19 §6). -->
                 <span class="avatar"><Face name={who} you={who === 'you'} size="s" /></span>
@@ -401,7 +402,7 @@
           {/each}
         </ul>
         {#if capped || fresh.length > NEWS_CAP}
-          <a class="more tap" href="/audit">
+          <a class="more tap" href={at('/audit')}>
             {capped ? copy.andMore : copy.moreInTheLog(fresh.length - NEWS_CAP)}
             <Icon name="arrow" size="s" />
           </a>

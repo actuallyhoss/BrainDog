@@ -21,6 +21,7 @@
   needs only `propose`, which every record has. So a record that cannot list says so and keeps the button.
 -->
 <script lang="ts">
+  import { apiBase, at } from '$lib/at.ts';
   import { untrack } from 'svelte';
   import { titleOf } from '$lib/title.ts';
   import { NOW } from '$lib/record/api.ts';
@@ -38,7 +39,7 @@
 
   async function load() {
     const at = opened();
-    const out = await openAutomations((url, init) => fetch(url, init), '', () => NOW);
+    const out = await openAutomations((url, init) => fetch(url, init), apiBase(), () => NOW);
     closed(out.first.ok || out.absent, at);
     sample = out.source.sample;
     if (out.first.ok) {
@@ -93,7 +94,7 @@
         {#each rows as r (r.id)}
           {@const dot = dotOf(r)}
           <li>
-            <a class="row tap" href="/automations/{encodeURIComponent(r.id)}">
+            <a class="row tap" href={at(`/automations/${encodeURIComponent(r.id)}`)}>
               <span class="name">{r.name}</span>
               <span class="detail">
                 <span class="what">{rowTrigger(r)}</span>

@@ -12,6 +12,7 @@
   then who sent it and the first words of what they said, then when (rule 7).
 -->
 <script lang="ts">
+  import { apiBase } from '$lib/at.ts';
   import { tick, untrack } from 'svelte';
   import { page as route } from '$app/state';
   import { invalidateAll } from '$app/navigation';
@@ -59,7 +60,7 @@
     const at = untrack(opened);
     let ok = false;
     void import('$lib/record/inbox-live.ts')
-      .then((m) => m.readInbox(location.origin))
+      .then((m) => m.readInbox(apiBase()))
       .then((out) => {
         if (out.from === 'live') {
           live = { items: out.items, cursor: out.cursor };
@@ -90,7 +91,7 @@
     olderFix = null;
     try {
       const m = await import('$lib/record/inbox-live.ts');
-      const out = await m.readInbox(location.origin, undefined, had.cursor);
+      const out = await m.readInbox(apiBase(), undefined, had.cursor);
       if (out.from === 'live') live = { items: [...had.items, ...out.items], cursor: out.cursor };
       else if (out.from === 'refused') olderFix = out.fix;
     } finally {
@@ -138,7 +139,7 @@
   async function write(item: InboxItem, gesture: 'file' | 'archive'): Promise<{ ok: boolean; row?: string }> {
     const m = await import('$lib/record/inbox-write.ts');
     const out =
-      gesture === 'file' ? await m.fileArrival(location.origin, item.id, target) : await m.archiveArrival(location.origin, item.id);
+      gesture === 'file' ? await m.fileArrival(apiBase(), item.id, target) : await m.archiveArrival(apiBase(), item.id);
     if (out.from !== 'written') {
       toasts.push(out.fix, { intent: 'warn' });
       return { ok: false };

@@ -42,7 +42,7 @@ import { extname, join } from 'node:path';
 
 import { chromium } from '@playwright/test';
 
-import { budget, readiness } from './lib.mjs';
+import { APP_BASE, appShell, budget, readiness } from './lib.mjs';
 import { answers, forward, forwards, startRecord } from './record.mjs';
 
 /* THE PREREQUISITE, FOR THE RUNNER TO CHECK RATHER THAN THIS FILE (`52 §5.1` step 2). Every
@@ -353,9 +353,10 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
           return createReadStream(file).pipe(res);
         }
       }
+      /* The SPA fallback is the app's shell, which is under `/app` in the build as it is on the host (`lib.mjs`). */
       if (!Object.hasOwn(TYPES, extname(rel))) {
         res.writeHead(200, { 'content-type': TYPES['.html'] });
-        return createReadStream(join(ROOT, 'index.html')).pipe(res);
+        return createReadStream(appShell(ROOT)).pipe(res);
       }
       res.writeHead(404).end();
     });
@@ -431,7 +432,7 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
       const runs = recipe.runs ?? [recipe];
       let alive = 0;
       for (const run of runs) {
-        await page.goto(`http://localhost:${PORT}${run.route}`, { waitUntil: 'networkidle' });
+        await page.goto(`http://localhost:${PORT}${APP_BASE}${run.route}`, { waitUntil: 'networkidle' });
         const unmeasured = ready.check(`${row.id} on ${run.route}`, run.route, await ready.settled(page));
         if (unmeasured) {
           unsettled.push(unmeasured);

@@ -261,7 +261,7 @@ test('a value is read from what the record sent, and nothing it did not', () => 
 
 test('the page route reads the record, waits for it, and draws what it cannot say plainly', () => {
   const route = readFileSync(new URL('../../routes/p/[slug]/+page.svelte', import.meta.url), 'utf8');
-  assert.match(route, /pageReader\(location\.origin\)/);
+  assert.match(route, /pageReader\(apiBase\(\)\)/);
   /* THE ROUTE KEEPS THE READ; WHAT IT DRAWS IS `PageView`, moved out whole (`loop/research-modules-next.md`, Brief 5). */
   const view = readFileSync(new URL('../page/PageView.svelte', import.meta.url), 'utf8');
   assert.match(route, /<PageView /);

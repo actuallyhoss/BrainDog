@@ -9,6 +9,7 @@
   through `installPack`.
 -->
 <script lang="ts">
+  import { apiBase } from '$lib/at.ts';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
@@ -62,7 +63,7 @@
       looked = true;
     });
     void read(async () => {
-      client = createClient({ base: location.origin });
+      client = createClient({ base: apiBase() });
       const chosen = await choose(client, !page.data.live);
       source = chosen.source;
       live = !chosen.source.sample;

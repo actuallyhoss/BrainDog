@@ -9,6 +9,7 @@
   Safe-area insets are paid exactly once, on the fixed elements only. Paying twice is a real, easy bug.
 -->
 <script lang="ts">
+  import { at, here as inside } from '../at.ts';
   import { page } from '$app/state';
   import { copy } from '../copy.ts';
   import { said } from '../voice.svelte.ts';
@@ -16,21 +17,23 @@
 
   let { open = 0, inbox = 0, onmore }: { open?: number; inbox?: number; onmore?: () => void } = $props();
 
-  const here = (href: string) => page.url.pathname === href;
+  /* COMPARED INSIDE THE RECORD. `page.url` is the address as it came, `/app/acme/decide`, and these links are written
+     `/decide`, so the comparison reads the address with the base and the slug taken off (`lib/at.ts`). */
+  const here = (href: string) => inside(page.url.pathname) === href;
 </script>
 
 <nav class="tabs" aria-label="Record">
-  <a class="tab tap" href="/" aria-current={here('/') ? 'page' : undefined}>
+  <a class="tab tap" href={at('/')} aria-current={here('/') ? 'page' : undefined}>
     <Icon name="home" size="l" /><span>{said('home')}</span>
   </a>
-  <a class="tab tap" href="/decide" aria-current={here('/decide') ? 'page' : undefined}>
+  <a class="tab tap" href={at('/decide')} aria-current={here('/decide') ? 'page' : undefined}>
     <span class="badge-slot">
       <Icon name="decide" size="l" />
       {#if open}<span class="badge" data-intent="warn">{open}</span>{/if}
     </span>
     <span>{said('decide')}</span>
   </a>
-  <a class="tab tap" href="/inbox" aria-current={here('/inbox') ? 'page' : undefined}>
+  <a class="tab tap" href={at('/inbox')} aria-current={here('/inbox') ? 'page' : undefined}>
     <span class="badge-slot">
       <Icon name="inbox" size="l" />
       {#if inbox}<span class="badge">{inbox}</span>{/if}

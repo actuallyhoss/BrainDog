@@ -22,6 +22,8 @@
   simultaneous assertive announcements is a denial of service on a screen-reader user (19 §6).
 -->
 <script lang="ts">
+  /* `at` IS THE BLOCK INDEX IN THIS FILE'S EACH BLOCKS, so the address helper goes by another name here. */
+  import { apiBase, at as inApp } from '../at.ts';
   import { titleOf } from '$lib/title.ts';
   import { KINDS, holeLabel, isKind, type Row, type RowRef } from 'braindog-render';
   import { Block, Degraded, Markdown, Table } from 'braindog-render/svelte';
@@ -85,9 +87,9 @@
     if (!ref) return void toasts.push(copy.pageRowUnknown, { intent: 'warn' });
     const m = await import('$lib/record/page-write.ts');
     /* THE REGISTER AS THE RECORD DECLARES IT, so a list a pack brought is ticked and moved by its own states. */
-    const patch = change(m, ref, await m.schemaOf(location.origin, ref.register));
+    const patch = change(m, ref, await m.schemaOf(apiBase(), ref.register));
     if (!patch) return void toasts.push(copy.pageRowNoState, { intent: 'warn' });
-    const out = await m.updateRow(location.origin, ref, patch, title);
+    const out = await m.updateRow(apiBase(), ref, patch, title);
     if (out.from !== 'written') toasts.push(out.fix, { intent: 'warn' });
     if (out.from === 'written' || out.from === 'conflict') await reread();
   }
@@ -109,7 +111,7 @@
   function askGate(row: Row, option: string) {
     const id = row.cells[1] ?? '';
     if (id === '') return;
-    void goto(`/decide/${encodeURIComponent(id)}?option=${encodeURIComponent(option)}`);
+    void goto(inApp(`/decide/${encodeURIComponent(id)}?option=${encodeURIComponent(option)}`));
   }
 
   /**
@@ -138,7 +140,7 @@
     const [{ captureRow }, { rowWriter }] = await Promise.all([import('./capture.ts'), import('$lib/record/rows-write.ts')]);
     const row = captureRow(register, text, inherited, now);
     if (!row) return void toasts.push(copy.notWritten(text), { intent: 'warn' });
-    const out = await rowWriter(location.origin).create(register, row.fields);
+    const out = await rowWriter(apiBase()).create(register, row.fields);
     if (!out.ok) return void toasts.push(out.fix, { intent: 'warn' });
     toasts.push(row.filled.length > 0 ? copy.markAddedFilled(row.filled) : copy.writeMarkAdded, { intent: 'good' });
     await reread();
@@ -308,7 +310,7 @@
       const title = result?.page.title ?? slug;
       const m = await import('$lib/record/page-write.ts');
       const placed = arrangement.body.map((b) => ({ i: b.block, span: b.span }));
-      const out = await m.saveArrangement(location.origin, slug, result?.blocks.length ?? 0, placed, extra, undefined, result?.page.declared_version);
+      const out = await m.saveArrangement(apiBase(), slug, result?.blocks.length ?? 0, placed, extra, undefined, result?.page.declared_version);
       saving = false;
       if (out.from !== 'written') return void toasts.push(out.fix, { intent: 'warn' });
       arrangement.commit();
@@ -318,7 +320,7 @@
       const before = out.before;
       toasts.push(copy.arranged(title), {
         undo: () =>
-          void m.setBody(location.origin, before, undefined, out.version).then(async (back) => {
+          void m.setBody(apiBase(), before, undefined, out.version).then(async (back) => {
             if (back.from !== 'written') toasts.push(back.fix, { intent: 'warn' });
             await reread();
           }),
@@ -412,7 +414,7 @@
       const to = held ? openHref(held) : null;
       if (to) {
         e.preventDefault();
-        void goto(to);
+        void goto(inApp(to));
       }
     } else if (e.key === 'y') {
       const slotIndex = blocks[cursor]?.slot.i;
@@ -753,7 +755,7 @@
                      filtered and may take a block of four rows for the whole register. But the
                      clause that names the page you are already on is dropped: "thing is Kiln" under
                      a heading on the Kiln page is the one fact the reader cannot be missing. -->
-                <a class="block-source tap" href={openHref(block) ?? `/r/${block.register}`} title={whereOf(block) || undefined}>
+                <a class="block-source tap" href={inApp(openHref(block) ?? `/r/${block.register}`)} title={whereOf(block) || undefined}>
                   {REGISTERS[block.register]?.name ?? block.register}
                   <!-- AND IT SAYS THAT IT IS A FILTER. `/v/<view>` labels the identical string
                        `FILTER`, so the word existed and the page blocks did not use it — leaving an
@@ -868,7 +870,7 @@
                 {block.source === 'forecast.runway'
                   ? copy.ofWhichWalked(block.shown, block.total, block.horizon ?? 180)
                   : copy.ofWhichDrawn(block.shown, block.total)}.{#if to}{' '}
-                  <a class="tap" href={to}>{copy.openTheRest(REGISTERS[block.register!]?.name ?? block.register!)}</a>
+                  <a class="tap" href={inApp(to)}>{copy.openTheRest(REGISTERS[block.register!]?.name ?? block.register!)}</a>
                 {/if}
               </p>
             {/if}

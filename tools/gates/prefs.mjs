@@ -70,7 +70,7 @@ import { extname, join } from 'node:path';
 
 import { chromium } from '@playwright/test';
 
-import { budget, readiness } from './lib.mjs';
+import { APP_BASE, appShell, budget, readiness } from './lib.mjs';
 import { answers, forward, forwards, startRecord } from './record.mjs';
 
 /* AND WHY THIS GATE DECLARES NO `needs`, although it drives a browser like the four that do.
@@ -452,9 +452,10 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
           return createReadStream(file).pipe(res);
         }
       }
+      /* The SPA fallback is the app's shell, which is under `/app` in the build as it is on the host (`lib.mjs`). */
       if (!Object.hasOwn(TYPES, extname(rel))) {
         res.writeHead(200, { 'content-type': TYPES['.html'] });
-        return createReadStream(join(ROOT, 'index.html')).pipe(res);
+        return createReadStream(appShell(ROOT)).pipe(res);
       }
       res.writeHead(404).end();
     });
@@ -491,7 +492,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
         ]);
         if (test.sample) await context.route(/\/(?:api|auth)(?:\/|$)/, (route) => route.abort());
         const page = await context.newPage();
-        await page.goto(`http://localhost:${PORT}${test.route}`, { waitUntil: 'networkidle' });
+        await page.goto(`http://localhost:${PORT}${APP_BASE}${test.route}`, { waitUntil: 'networkidle' });
         const unmeasured = ready.check(`${test.name} ${JSON.stringify(value)}`, test.route, await ready.settled(page));
         if (unmeasured) {
           unsettled.push(unmeasured);

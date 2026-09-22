@@ -17,6 +17,7 @@
 
 import type { DeviceApproved, DeviceRow } from '@braindog/client';
 
+import { BASE, signinFor } from '../at.ts';
 import { copy } from '../copy.ts';
 import { answerOf, codeOf, reachKey, type Answer, type Refusal } from './device.ts';
 
@@ -138,12 +139,15 @@ export type Auth = {
 /**
  * Signing in again without leaving, where a passkey can do it, so the typed code can be sent again.
  * Anywhere else the person is sent to `/signin` and this answers false.
+ *
+ * UNDER THE APP, AND ASKED TO COME BACK. A bare `/signin` on `brain.dog` is the marketing site's, and sign-in with no
+ * `next` lands on the app's front door, which is not the screen whose step this was.
  */
 export async function reprove(auth: Auth, go: (href: string) => void): Promise<boolean> {
   const here = auth.support();
   const offered = await auth.methods();
   if (!(offered.ok && offered.value.passkey && here.webauthn && here.secure)) {
-    go('/signin');
+    go(globalThis.location ? signinFor(globalThis.location) : `${BASE}/signin`);
     return false;
   }
   return (await auth.passkeySignIn()).ok;

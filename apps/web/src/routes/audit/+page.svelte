@@ -10,6 +10,7 @@
   history you can edit is a history, and a history you cannot is a record.
 -->
 <script lang="ts">
+  import { apiBase, at } from '$lib/at.ts';
   import { titleOf } from '$lib/title.ts';
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
@@ -151,7 +152,7 @@
     const at = untrack(opened);
     let ok = false;
     void import('$lib/record/news-live.ts')
-      .then((m) => m.readLog(location.origin, me))
+      .then((m) => m.readLog(apiBase(), me))
       .then((out) => {
         if (out.from === 'live') {
           live = out;
@@ -175,7 +176,7 @@
     olderFix = null;
     try {
       const m = await import('$lib/record/news-live.ts');
-      const out = await m.readLog(location.origin, me, undefined, had.cursor);
+      const out = await m.readLog(apiBase(), me, undefined, had.cursor);
       if (out.from === 'live') live = { events: [...had.events, ...out.events], names: new Map([...had.names, ...out.names]), cursor: out.cursor };
       else if (out.from === 'refused') olderFix = out.fix;
     } finally {
@@ -474,7 +475,7 @@
             <span class="line-title"><span class="kind"><Icon name={kindOf(e.kind).icon} size="s" />{kindOf(e.kind).word}</span>
               {#if e.target}{@const person = targetSaid(e.target, me, names)}{@const name = nameOf(e.target)}{#if person}<bdi
                   class="target-name">{person.name}</bdi
-                >{:else}<a class="target tap" href={href(e.target)}
+                >{:else}<a class="target tap" href={at(href(e.target))}
                   >{#if name}<bdi class="target-name">{name}</bdi> <span class="target-id">{targetOf(e.target)}</span
                     >{:else}{targetOf(e.target)}{/if}</a
                 >{/if}{/if}</span>

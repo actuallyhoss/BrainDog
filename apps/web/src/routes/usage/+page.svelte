@@ -11,6 +11,7 @@
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
+  import { apiBase } from '$lib/at.ts';
   import type { Block as Drawn } from 'braindog-render';
   import { Block } from 'braindog-render/svelte';
   import '$lib/blocks-charts.css';
@@ -28,7 +29,7 @@
 
   async function load() {
     const at = opened();
-    const out = await readUsage((url, init) => fetch(url, init), Date.now(), '', NOW);
+    const out = await readUsage((url, init) => fetch(url, init), Date.now(), '', NOW, apiBase());
     closed(out.ok !== false, at);
     if (out.ok === true) {
       view = out.view;

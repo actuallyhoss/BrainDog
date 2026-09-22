@@ -24,6 +24,7 @@
   is how the table ended up on a phone in the first place.
 -->
 <script lang="ts">
+  import { apiBase, at } from '../at.ts';
   import type { Snippet } from 'svelte';
   import { leadingCode, symbolFigure, TONES } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
@@ -74,7 +75,7 @@
     const asked = register;
     if (REGISTERS[asked]) return;
     void Promise.all([import('@braindog/client'), import('$lib/record/remote.ts')])
-      .then(([{ createClient }, remote]) => remote.learn((id) => createClient({ base: location.origin }).schema(id), asked, new Map()))
+      .then(([{ createClient }, remote]) => remote.learn((id) => createClient({ base: apiBase() }).schema(id), asked, new Map()))
       .then(() => {
         if (REGISTERS[asked]) learnt += 1;
       })
@@ -146,7 +147,7 @@
     {#each entries as e (e.seq)}
       {@const title = display(register, decl.mobile[0], e.fields[decl.mobile[0]], now, names)}
       <li class="card-line" data-picked={picked?.has(e.seq) ? '' : undefined}>
-        <a class="card" href={to(e)} data-intent={toneFor(e) ?? undefined}>
+        <a class="card" href={at(to(e))} data-intent={toneFor(e) ?? undefined}>
           <!-- THE TITLE FIRST, in the document as well as on the screen, so a screen reader hears
                what the row is before its number. ONE THING LEADS IT, the project's mark, in a slot
                every card keeps when any card in the list has one, so the titles share an edge. The

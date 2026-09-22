@@ -17,6 +17,7 @@
   the reason the register's search box does: seven characters is not seven places you have been.
 -->
 <script lang="ts">
+  import { apiBase, at } from '$lib/at.ts';
   import { onDestroy, untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
@@ -49,7 +50,7 @@
   async function ask(want: string) {
     const mine = ++asked;
     const at = opened();
-    finder ??= searcher(location.origin);
+    finder ??= searcher(apiBase());
     const out = await finder.find(want);
     closed(mine !== asked || out.from !== 'refused', at);
     if (mine === asked) {
@@ -177,7 +178,7 @@
         {#snippet aside()}
           {#if group.total > PER_LIST}
             {#if group.href}
-              <a class="all" href={group.href}>{copy.allIn(group.total, group.kind)}<Icon name="arrow" size="s" /></a>
+              <a class="all" href={at(group.href)}>{copy.allIn(group.total, group.kind)}<Icon name="arrow" size="s" /></a>
             {:else}
               <span class="all all-noway">{copy.showingOf(PER_LIST, group.total)}</span>
             {/if}
@@ -186,7 +187,7 @@
         <ul class="ledger">
           {#each group.hits.slice(0, PER_LIST) as hit (hit.href)}
             <li>
-              <a class="line hit" href={hit.href}>
+              <a class="line hit" href={at(hit.href)}>
                 <span class="line-main">
                   <span class="line-title">{hit.title}</span>
                 </span>

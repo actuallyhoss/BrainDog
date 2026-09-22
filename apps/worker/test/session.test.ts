@@ -10,8 +10,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { AuthResult, Who } from '@braindog/ports';
+import { createDirectory } from '@braindog/record/directory';
 
-import { doorOf, withCookie, type Deps, type Held } from '../src/session.ts';
+import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
+import { bearerOf, doorOf, withCookie, type BearerDeps, type Deps, type Held } from '../src/session.ts';
 
 const ORIGIN = 'https://app.brain.dog';
 const PINNED = 'rec_01J8ZC0000000000000000000A';
@@ -100,6 +102,96 @@ test('NOTHING PRESENTED: the demo for a read, and the ordinary 401 for anything 
   assert.deepEqual(await doorOf(at('/api/create', { method: 'POST', body: '{}' }), d), { door: 'refused', status: 401 });
   assert.deepEqual(await doorOf(at('/api/boot'), { ...d, demo: undefined }), { door: 'refused', status: 401 });
   assert.deepEqual(asked, [], 'the Directory was asked about a request with no cookie');
+});
+
+/* ── a request that names its record: /app/<slug>/api/… ─────────────── */
+
+const DIR_NOW = Date.UTC(2026, 8, 23, 9);
+const serverKey = 'a-throwaway-server-key-for-these-tests-only';
+
+/**
+ * A real Directory, because the check under test is its SQL: a live slug, an open record, a `dir_member` row. A fake
+ * `session` here would test that the fake refuses what it was told to refuse.
+ */
+async function named() {
+  const d = createDirectory(openSqlite(), fixedClock(DIR_NOW), { mac: new Uint8Array(32).fill(7), magic: false, key: { serverKey } });
+  const ada = d.person$('ada@example.com', 'Ada');
+  assert.ok(ada.ok);
+  const acme = d.provision({ slug: 'acme', email: 'ada@example.com' });
+  const home = d.provision({ slug: 'ada-at-home', email: 'ada@example.com' });
+  assert.ok(acme.ok && home.ok);
+  const signed = await d.auth({ flow: 'key.exchange', serverKey, ip: '203.0.113.9' });
+  assert.ok(signed.status === 200 && signed.session && signed.session !== 'clear');
+  const bob = d.person$('bob@example.com', 'Bob');
+  assert.ok(bob.ok);
+  const bobs = d.provision({ slug: 'bobs-books', email: 'bob@example.com' });
+  assert.ok(bobs.ok);
+  const accessed: string[] = [];
+  const deps: Deps = {
+    origin: ORIGIN,
+    demo: PINNED,
+    session: (sid, slug) => d.auth({ flow: 'session', sid, ...(slug === undefined ? {} : { slug }) }) as Promise<AuthResult<Who>>,
+    access: async (record) => (accessed.push(record), OWNER),
+  };
+  return { deps, accessed, sid: signed.session.sid, acme: acme.value.record, home: home.value.record, bobs: bobs.value.record };
+}
+
+test('A COOKIE UNDER A SLUG IS THAT RECORD FOR A MEMBER, whichever record the session row was left on', async () => {
+  const { deps, accessed, sid, home } = await named();
+  const door = await doorOf(at('/api/boot', { headers: { cookie: `__Host-bd_s=${sid}` } }), deps, 'ada-at-home');
+  assert.equal(door.door, 'session');
+  assert.equal(door.door === 'session' ? door.record : '', home);
+  /* AND THE RECORD STILL HAS THE LAST WORD on what they may do inside it. */
+  assert.deepEqual(accessed, [home]);
+});
+
+test('A SLUG THAT IS NOT THEIRS AND ONE NOBODY HOLDS ARE THE SAME 403, AND THE RECORD IS NEVER ADDRESSED', async () => {
+  const { deps, accessed, sid } = await named();
+  const NOT_ON = { code: 'FORBIDDEN', fix: 'You are not on this record.' };
+  const bodies: unknown[] = [];
+  for (const slug of ['bobs-books', 'nobody-has-this', 'd41']) {
+    const door = await doorOf(at('/api/boot', { headers: { cookie: `__Host-bd_s=${sid}` } }), deps, slug);
+    assert.equal(door.door === 'refused' ? door.status : 0, 403, slug);
+    bodies.push(door.door === 'refused' ? door.refusal : null);
+  }
+  assert.deepEqual(bodies, [NOT_ON, NOT_ON, NOT_ON], 'a name that exists answered differently from one that does not');
+  /* `idFromName` ON A NAME NOBODY HAS CREATES THE OBJECT, so a refused slug that still reached `access` would be a
+     signed-in stranger minting empty records, or waking somebody else's. */
+  assert.deepEqual(accessed, [], 'a record was addressed for a slug the Directory refused');
+});
+
+test('UNDER A SLUG THE DEMO NEVER ANSWERS, because the sample dressed as acme is somebody else’s numbers as acme’s', async () => {
+  const { d, asked } = deps();
+  assert.deepEqual(await doorOf(at('/api/boot'), d, 'acme'), { door: 'refused', status: 401 });
+  assert.deepEqual(asked, [], 'the Directory was asked about a request with no cookie');
+  /* AND WITHOUT A SLUG IT STILL DOES, which is `brain.dog/app` for a stranger. */
+  assert.equal((await doorOf(at('/api/boot'), d, null)).door, 'demo');
+});
+
+test('A BEARER FOR ONE RECORD UNDER ANOTHER RECORD’S SLUG IS 403, AND NOTHING IS PICKED FOR IT', async () => {
+  const X = 'rec_01J8ZC0000000000000000000X';
+  const Y = 'rec_01J8ZC0000000000000000000Y';
+  const accessed: string[] = [];
+  const bearer: BearerDeps = {
+    knows: async () => true,
+    verify: async () => ({ id: 'tok_1', person_id: 'p_1', scope: 'read' }),
+    access: async (record) => (accessed.push(record), OWNER),
+    named: async (slug) => ({ 'x-studio': X, 'y-studio': Y })[slug] ?? null,
+  };
+  const request = at('/api/boot', { headers: { authorization: `Bearer ${X}.secret` } });
+  const crossed = await bearerOf(request, 'api', bearer, 'y-studio');
+  assert.deepEqual(crossed, { status: 403, refusal: { code: 'FORBIDDEN', fix: 'This token is for a different record than the one this address names.', at: 'slug' } });
+  const nameless = await bearerOf(request, 'api', bearer, 'nobody-has-this');
+  assert.equal('status' in nameless ? nameless.status : 0, 403);
+  assert.deepEqual(accessed, [], 'a record was asked about a bearer whose path named another');
+  /* ITS OWN SLUG IS ITS OWN RECORD, and no slug is the bearer's record as it always was. */
+  const own = await bearerOf(request, 'api', bearer, 'x-studio');
+  assert.equal('record' in own ? own.record : '', X);
+  const root = await bearerOf(request, 'api', bearer);
+  assert.equal('record' in root ? root.record : '', X);
+  /* AND A BEARER NOBODY ISSUED IS THE SAME 401 WHATEVER SLUG IT CAME UNDER, so the slug says nothing to a stranger. */
+  const forged = await bearerOf(request, 'api', { ...bearer, verify: async () => null }, 'y-studio');
+  assert.deepEqual(forged, { status: 401 });
 });
 
 test('withCookie adds the cookie and changes nothing else', async () => {

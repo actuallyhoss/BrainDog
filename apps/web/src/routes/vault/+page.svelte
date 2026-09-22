@@ -22,6 +22,7 @@
   browser history and in URL-bar autocomplete (19 §5).
 -->
 <script lang="ts">
+  import { apiBase } from '$lib/at.ts';
   import { onDestroy, onMount } from 'svelte';
   import { createClient } from '@braindog/client';
   import { since, relative } from 'braindog-render';
@@ -95,7 +96,7 @@
 
   onMount(() => {
     void read(async () => {
-      client = createClient({ base: location.origin });
+      client = createClient({ base: apiBase() });
       const listed = await client.listDevices();
       /* NO RECORD BEHIND THE SCREEN AT ALL is the one answer that replaces the page, because there is
          nothing else to ask. Every other refusal is about one half of this screen and is said there. */

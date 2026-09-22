@@ -29,6 +29,7 @@
   typed as braces. The record's own declaration is asked first now, and `fieldsOf` is the sample's path.
 -->
 <script lang="ts">
+  import { apiBase } from '../at.ts';
   import { tick } from 'svelte';
   import { page } from '$app/state';
   import Sheet from '$lib/ui/Sheet.svelte';
@@ -105,7 +106,7 @@
   $effect(() => {
     const r = register;
     if (!open || !live || r === '' || r in declaredFields) return;
-    void schemaOf(location.origin, r).then((d) => {
+    void schemaOf(apiBase(), r).then((d) => {
       if (d) declaredFields = { ...declaredFields, [r]: d.fields.map((f) => f.id) };
     });
   });
@@ -117,7 +118,7 @@
   $effect(() => {
     if (!open || calls !== null || (verb !== 'call' && verb !== 'run')) return;
     calls = [];
-    void openActions((url, init) => fetch(url, init), '', () => NOW).then((out) => {
+    void openActions((url, init) => fetch(url, init), apiBase(), () => NOW).then((out) => {
       calls = out.first.ok ? out.first.value.filter((a) => a.channel === 'call') : [];
     });
   });
@@ -129,7 +130,7 @@
   $effect(() => {
     if (!open || !live || doors !== null || !('arrival' in t)) return;
     doors = [];
-    void listDoors(callerAt(location.origin)).then((l) => {
+    void listDoors(callerAt(apiBase())).then((l) => {
       doors = l.kind === 'doors' ? l.doors : [];
     });
   });

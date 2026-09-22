@@ -12,6 +12,7 @@
  */
 import { redirect } from '@sveltejs/kit';
 
+import { apiBase, at, here, signInFirst } from '$lib/at.ts';
 import type { Shell } from '$lib/record/boot-live.ts';
 import type { Answer, SwitcherRow } from '$lib/record/switcher.ts';
 
@@ -54,10 +55,22 @@ export async function load({ url, fetch }): Promise<Shell & { spark: boolean }> 
     import('$lib/record/switcher.ts'),
     import('$lib/voice.svelte.ts'),
   ]);
-  const booted = await live.readBoot(url.origin);
+  /* THE RECORD THE ADDRESS NAMES. `url` and not `location`: a load runs for the address being opened, and `location`
+     is the page being left until the navigation lands, so a move from acme to kiln would read acme's `boot`. */
+  const api = apiBase(url);
+  /* Read inside the record: the address is `/app/acme/start` and every rule below is written about `/start`. */
+  const inner = here(url.pathname);
+  const spared = inner === '/start' || inner === '/signin' || inner === '/invite' || inner.startsWith('/s/');
+  const booted = await live.readBoot(api);
+
+  /* A SLUG THAT WILL NOT OPEN FOR A STRANGER ASKS FOR SIGN-IN, and never draws the sample (`signInFirst`). `readBoot`
+     answers the sample only where the address names no record (`research-one-domain.md` §2.4). */
+  const signIn = booted.from === 'refused' ? signInFirst(booted.code, url) : null;
+  if (signIn) redirect(307, signIn);
+
   /* THE VOICE THE RECORD SPEAKS IN, from its use-case pack's settings (`loop/research-spark.md` §2.2). Asked once per
      `boot` answer and never awaited past a refusal: a record that cannot say speaks in the house voice. */
-  await voice.listen(booted.from === 'live' ? booted.boot : null, url.origin).catch(() => undefined);
+  await voice.listen(booted.from === 'live' ? booted.boot : null, api).catch(() => undefined);
 
   /* NO RECORD HERE, AND THE SAMPLE IS DRAWN EXACTLY AS BEFORE. A refusal of any other kind is the
      record's answer, so the shell draws nothing of the sample and the screen says what it said. */
@@ -97,8 +110,7 @@ export async function load({ url, fetch }): Promise<Shell & { spark: boolean }> 
      control that could have fixed it. */
   const declared =
     booted.from === 'live' ? booted.boot.registers.length : booted.from === 'sample' ? shell.index.registers.length : null;
-  const spared = url.pathname === '/start' || url.pathname === '/signin' || url.pathname === '/invite' || url.pathname.startsWith('/s/');
-  if (declared === 0 && !spared) redirect(307, '/start');
+  if (declared === 0 && !spared) redirect(307, at('/start', url.pathname));
 
   /* AND THE RECORDS THIS PERSON CAN REACH, WHICH `boot` CANNOT ANSWER: it names the record you are
      in and no other, so the account is the only thing with the list. Asked on a live record only.
@@ -113,7 +125,9 @@ export async function load({ url, fetch }): Promise<Shell & { spark: boolean }> 
      with no rows in it would be the rail contradicting the screen beside it.
 
      AND NOT WHERE NOBODY SIGNS IN. A self-host started without a key answers this 401 on every load,
-     and the switcher then said "Sign in again" on a host with no sign-in. `boot` says which host this is. */
+     and the switcher then said "Sign in again" on a host with no sign-in. `boot` says which host this is.
+
+     AT THE ROOT, UNDER NO SLUG: the list is the person's, not the record's in the address. */
   if (booted.from === 'live' && live.signsIn(booted.boot)) {
     reach ??= readRecordsForSwitcher(fetch, url.origin);
     const listed = await reach;
@@ -125,7 +139,7 @@ export async function load({ url, fetch }): Promise<Shell & { spark: boolean }> 
 
   /* A SAMPLE RECORD IS NEVER `true`, and neither is a refused one. The sample has no host behind it to ask, so a palette
      over the sample never offers Spark, whatever the host serving the shell has configured. */
-  const spark = booted.from === 'live' ? await (modelHere ??= askModel(url.origin, fetch)) : false;
+  const spark = booted.from === 'live' ? await (modelHere ??= askModel(api, fetch)) : false;
 
   return { ...shell, spark };
 }

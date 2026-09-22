@@ -18,12 +18,15 @@
 
 import type { CatalogueEntry, CatalogueFile, CatalogueIndex, CatalogueUpdate, CatalogueVersion, Changes, KeyStatements, KnownKeys, Signature, Trust } from '@braindog/declare/catalogue';
 
+import { BASE } from '../../../lib/at.ts';
 import { copy } from '../../../lib/copy.ts';
 import type { PackState } from '../../../lib/record/packs.ts';
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
 
-export const CATALOGUE_BASE = '/catalogue/';
+/* UNDER THE APP'S BASE. `/catalogue/` on `brain.dog` is the marketing site's, which serves a 404 page there, and a 404
+   reads as a host with no catalogue, so the move would have emptied Browse without a sentence. */
+export const CATALOGUE_BASE = `${BASE}/catalogue/`;
 
 /** The index this host serves, `null` when it serves none, or the sentence to say when one is there and does not read. */
 export async function readHostCatalogue(fetcher: Fetcher): Promise<{ ok: true; index: CatalogueIndex | null } | { ok: false; fix: string }> {

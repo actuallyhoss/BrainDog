@@ -8,6 +8,7 @@
   nothing, are all questions about the URL, and the URL is the route's.
 -->
 <script lang="ts">
+  import { apiBase } from '$lib/at.ts';
   import { page as route } from '$app/state';
   import { untrack } from 'svelte';
   import PageView from '$lib/page/PageView.svelte';
@@ -27,7 +28,7 @@
   async function readLive(asked: string) {
     const at = opened();
     got = null;
-    reader ??= pageReader(location.origin);
+    reader ??= pageReader(apiBase());
     const out = await reader.read(asked);
     /* An answer for a page somebody has already left draws nothing. */
     if ((route.params.slug ?? '') !== asked) return closed(true, at);

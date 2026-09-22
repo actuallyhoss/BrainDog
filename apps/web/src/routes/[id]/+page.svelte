@@ -16,6 +16,7 @@
   spoken id, and `UNREACHABLE` or `UNAUTHORIZED` is what sends it to the sample.
 -->
 <script lang="ts">
+  import { apiBase, at } from '$lib/at.ts';
   import { titleOf } from '$lib/title.ts';
   import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
@@ -57,7 +58,7 @@
 
   /** Where an id goes on the record behind this host. */
   async function resolved(said: string): Promise<{ to: string | null; fix: string }> {
-    const client = createClient({ base: location.origin });
+    const client = createClient({ base: apiBase() });
     if (/^(?:SG|D)\d+$/iu.test(said)) {
       const id = said.toUpperCase();
       const out = await client.governance({ register: id.startsWith('D') ? 'decision' : 'suggestion', id });
@@ -82,12 +83,12 @@
       done = true;
       return;
     }
-    const at = opened();
+    const began = opened();
     const out = await resolved(said);
-    if (decodeURIComponent(page.params.id ?? '') !== said) return closed(true, at);
-    closed(out.fix === '', at);
+    if (decodeURIComponent(page.params.id ?? '') !== said) return closed(true, began);
+    closed(out.fix === '', began);
     if (out.to) {
-      await goto(out.to, { replaceState: true });
+      await goto(at(out.to), { replaceState: true });
       return;
     }
     fix = out.fix;

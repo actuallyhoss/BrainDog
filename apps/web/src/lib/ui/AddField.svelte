@@ -12,6 +12,7 @@
   ON THE SAMPLE IT SAYS WHAT WOULD HAPPEN, as every write on the row page does, and sends nothing.
 -->
 <script lang="ts">
+  import { apiBase } from '../at.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { ADDABLE, addField, fieldOf, type Addable } from '$lib/record/field-write.ts';
@@ -53,7 +54,7 @@
     }
     busy = true;
     problem = null;
-    const out = await addField(location.origin, register, asked.field, owner);
+    const out = await addField(apiBase(), register, asked.field, owner);
     busy = false;
     /* A REFUSAL KEEPS WHAT WAS TYPED, under the record's own sentence. An owner's accept that did not land is still on
        Decide, which is said in the record's words too, so the form closes: pressing again would file it twice. */

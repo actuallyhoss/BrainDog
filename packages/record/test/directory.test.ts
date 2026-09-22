@@ -128,6 +128,44 @@ test('and a name that is not a name, or is the platform’s, is refused before i
   sql.close();
 });
 
+test('A NAME IS A PATH SEGMENT UNDER /app, SO EVERY WORD THE APP ROUTES AND EVERY SPOKEN ID IS REFUSED', async () => {
+  /* `brain.dog/app/<first segment>/…` is either one of the app's own pages or a record's name (`loop/research-one-domain.md`
+     §2.4), and the Worker tells them apart by this set alone. A record called `settings` would make
+     `/app/settings/agents` two pages at once, and the name is permanent, so the refusal has to exist before the first
+     customer claims one. */
+  const { d, sql } = directory();
+  value<Person>(d.person$('ada@example.com'));
+  for (const slug of ['settings', 'signin', 'start', 'invite', 'catalogue', 'automations', 'decide', 'packs', 'vault', 'fonts'])
+    assert.match(refusal(d.provision({ slug, email: 'ada@example.com' })).fix, /the platform uses/, `${slug} was allowed`);
+
+  /* AND READ FROM THE APP ITSELF, because a list typed here is a list that falls behind the day a route is added. Every
+     folder under `apps/web/src/routes` and `apps/web/static` whose name could be spelt as a slug is refused. */
+  const { readdirSync } = await import('node:fs');
+  const web = new URL('../../../apps/web/', import.meta.url);
+  const words = [
+    ...readdirSync(new URL('src/routes/', web), { withFileTypes: true }),
+    ...readdirSync(new URL('static/', web), { withFileTypes: true }),
+  ]
+    .filter((e) => e.isDirectory())
+    .map((e) => e.name)
+    .filter((name) => /^[a-z][a-z0-9-]*$/.test(name));
+  assert.ok(words.includes('settings') && words.includes('catalogue'), `the app's folders were not read: ${words.join(' ')}`);
+  for (const slug of words) assert.ok(d.bad(slug) !== null, `/app/${slug} is an app route and ${slug} is a legal record name`);
+
+  /* A SPOKEN ID IS `/app/d41`, the same shape the app opens (`apps/web/src/routes/[id]/+page.svelte`), so a record
+     named `d41` would be a name the app can never be asked for. One to three letters and then only digits. */
+  for (const slug of ['d41', 'sg31', 'abc123', 'q2'])
+    assert.match(refusal(d.provision({ slug, email: 'ada@example.com' })).fix, /spoken id/, `${slug} was allowed`);
+  /* And the names beside that shape are still names. */
+  for (const slug of ['abcd1', 'd41x', 'd-41', 'studio2026']) assert.equal(d.bad(slug), null, `${slug} was refused`);
+  assert.equal(sql.all('SELECT 1 FROM dir_record').length, 0, 'a refused provision left a record behind');
+
+  /* AND RENAMING INTO ONE IS THE SAME REFUSAL, because a rename is a claim too. */
+  value(d.provision({ slug: 'the-studio', email: 'ada@example.com' }));
+  for (const to of ['settings', 'd41']) assert.equal(refusal(d.rename('the-studio', to)).at, 'slug', `renamed into ${to}`);
+  sql.close();
+});
+
 /* ── who somebody is ─────────────────────────────────────────────────────── */
 
 test('ONE HUMAN IS ONE PERSON, however they typed their address', async () => {

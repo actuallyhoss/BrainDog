@@ -8,6 +8,7 @@
   THE SAMPLE HAS NO USE TO READ, so it says what Spark would do on a real record rather than inventing a reading.
 -->
 <script lang="ts">
+  import { apiBase, at } from '$lib/at.ts';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
@@ -49,7 +50,7 @@
       phase = 'sample';
       return;
     }
-    client = createClient({ base: location.origin }) as unknown as SparkClient;
+    client = createClient({ base: apiBase() }) as unknown as SparkClient;
     void read(load);
   });
 
@@ -117,7 +118,7 @@
             <li class="spark-suggestion" data-state={s.state}>
               <span class="spark-question">{s.question}</span>
               {#if s.href}
-                <a class="spark-link" href={s.href}>{s.said}. {words.open}</a>
+                <a class="spark-link" href={at(s.href)}>{s.said}. {words.open}</a>
               {:else}
                 <span class="spark-state">{s.said}</span>
               {/if}

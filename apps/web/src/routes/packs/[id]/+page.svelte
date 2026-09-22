@@ -11,6 +11,7 @@
   draws no settings section.
 -->
 <script lang="ts">
+  import { apiBase, at } from '$lib/at.ts';
   import { untrack } from 'svelte';
   import { page } from '$app/state';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
@@ -92,7 +93,7 @@
     signin = false;
     drafts = {};
     const at = opened();
-    const chosen = await openSettings(createClient({ base: location.origin }), want, !page.data.live);
+    const chosen = await openSettings(createClient({ base: apiBase() }), want, !page.data.live);
     /* An answer for an add-on somebody has already navigated away from draws nothing. */
     if (String(page.params.id) !== want) return closed(true, at);
     source = chosen.source;
@@ -374,7 +375,7 @@
         <ul class="ledger ledger-glyph">
           {#each pack.registers as r (r)}
             <li>
-              <a class="line" href="/r/{r}">
+              <a class="line" href={at(`/r/${r}`)}>
                 <span class="seq"><Icon name="rows" size="s" /></span>
                 <span class="line-main"><span class="line-title">{REGISTERS[r]?.name ?? ((page.data.lists ?? []) as { id: string; name: string }[]).find((l) => l.id === r)?.name ?? r}</span></span>
                 <span class="line-amount"></span>
@@ -384,7 +385,7 @@
           {/each}
           {#each pack.pages as p (p)}
             <li>
-              <a class="line" href="/p/{p}">
+              <a class="line" href={at(`/p/${p}`)}>
                 <span class="seq"><Icon name="doc" size="s" /></span>
                 <span class="line-main"><span class="line-title">{pages()[p]?.title ?? PAGES[p]?.title ?? p}</span></span>
                 <span class="line-amount"></span>

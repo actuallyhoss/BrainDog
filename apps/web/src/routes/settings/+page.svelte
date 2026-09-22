@@ -22,13 +22,14 @@
   slow first load is a real state and not a hypothetical.
 -->
 <script lang="ts">
+  import { at } from '$lib/at.ts';
   import { goto } from '$app/navigation';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { drew } from '../../lib/ui/screen.svelte.ts';
 
   $effect(() => {
-    void goto('/settings/appearance', { replaceState: true });
+    void goto(at('/settings/appearance'), { replaceState: true });
   });
 
   /**

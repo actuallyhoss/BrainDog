@@ -262,7 +262,7 @@ test("the columns a view kept are the ones it kept, in its order, with the spoke
 test('the view page draws the record’s view, its refusal and the view it does not hold', () => {
   const page = readFileSync(new URL('../../routes/v/[view]/+page.svelte', import.meta.url), 'utf8');
   assert.match(page, /from '\$lib\/record\/views-live\.ts'/u);
-  assert.match(page, /viewReader\(location\.origin\)/u);
+  assert.match(page, /viewReader\(apiBase\(\)\)/u);
   /* THE THREE ANSWERS THE SAMPLE NEVER HAD: bars while it is in flight, the record's sentence when
      it refuses, and the record's own addresses for a view it does not hold. */
   assert.match(page, /<Waiting head/u);

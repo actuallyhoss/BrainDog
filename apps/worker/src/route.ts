@@ -22,6 +22,7 @@
 import { ROUTES, sessionOf, withSession, type IngestArrival, type IngestDoor, type IngestVerify } from '@braindog/host';
 import type { Result, Snapshot } from '@braindog/ports';
 import type { CallContext } from '@braindog/record';
+import { badSlug } from '@braindog/record/directory';
 
 /** The address half of a bearer. Checked as a shape, never as a credential — that is the record's. */
 const REC_ID = /^rec_[0-9A-HJKMNP-TV-Z]{26}$/;
@@ -119,6 +120,82 @@ export async function copyRefusal(id: string, list: () => Promise<Result<Snapsho
   const listed = await list();
   if (!listed.ok) return listed;
   return { ok: false, refusal: { code: 'OUT_OF_BOUNDS', fix: `${id} is not one of the copies this record keeps.`, at: 'id' } };
+}
+
+/**
+ * A path under `/app`: the record it names, if any, and the path the app or the record reads once `/app/<slug>` is gone.
+ *
+ * THE FIRST SEGMENT IS A PAGE OR A RECORD'S NAME, AND THE DIRECTORY'S `badSlug` ALONE SAYS WHICH (`loop/research-one-domain.md`
+ * §2.4). A string it would accept as a name is a slug; a word the app routes (`settings`, `signin`, `catalogue`), a
+ * spoken id (`d41`) and a file (`mark.svg`) are all refused as names there, so here they are the app's own paths with no
+ * record named, which means the record the session is on. A zone route takes a wildcard only at the end of its path,
+ * so no route can pick out the API under a slug, which is why the Worker takes all of `/app` and strips the slug itself.
+ *
+ * WHAT COMES BACK AS `slug` IS A CLAIM AND NOT A RECORD. `doorOf` has the Directory say whether it is this person's
+ * before anything is addressed. `/app/_app/*` is the build's chunks, which the static assets serve and
+ * `run_worker_first` keeps away from this Worker, so it is not an app path at all.
+ */
+export type AppPath = { slug: string | null; rest: string };
+
+export function appPath(pathname: string): AppPath | null {
+  const m = /^\/+app(?:\/+([^/]*)(.*))?$/.exec(pathname);
+  if (!m) return null;
+  const segment = m[1] ?? '';
+  const tail = m[2] ?? '';
+  if (segment === '') return { slug: null, rest: tail === '' ? '/' : tail };
+  if (segment.startsWith('_')) return null;
+  /* `/app/api/*` NAMES NO RECORD AND NO PAGE, SO IT IS NOT AN APP PATH, and the router's own `ROUTE_UNKNOWN` answers it.
+     `api` is a word the Directory never hands out, so it fell to the line below as a page, the rest was `/api/boot`,
+     and the Worker served a second copy of the root `/api`. Measured through the bundle in `test/slug-api.test.ts`: a
+     GET with no credential answered 200 from the demo record, a cookie reached its session's record, and
+     `/app/api/vault/deposit` with a grant went past the key doors' own check, which reads the slug and saw none, into
+     `doorOf` and the record's `verify`. The web never renders the address (`apiBase` is the bare origin with no slug). */
+  if (segment === 'api') return null;
+  if (badSlug(segment) === null) return { slug: segment, rest: tail === '' ? '/' : tail };
+  return { slug: null, rest: `/${segment}${tail}` };
+}
+
+/**
+ * The same request at the root path the record reads: `/app/acme/api/create` becomes `/api/create`, query and all.
+ *
+ * BECAUSE THE RECORD ROUTES ON ITS OWN URL. `Record$.fetch` reads `/mcp`, `/api/snapshots/<id>` and `/api/spark/*` from
+ * the pathname and `serveApi` takes the method from it, so a request forwarded with the slug still in front answered
+ * `ROUTE_UNKNOWN` for every method. The slug has done its work by then: `doorOf` has turned it into a record id.
+ */
+export function atRoot(request: Request, rest: string): Request {
+  const url = new URL(request.url);
+  return new Request(new URL(`${rest}${url.search}`, url.origin), request);
+}
+
+/**
+ * A page load on a host the app used to live at: a 308 to the same page under `https://<PUBLIC_HOST>/app`, or `null`.
+ *
+ * `LEGACY_HOSTS` IS A LIST OF NAMES THIS WORKER STILL ANSWERS FOR (`loop/research-one-domain.md` §2.5): `app.brain.dog`,
+ * for at least the ninety days a token lives. Unset or empty and nothing is legacy, which is the Worker before the move;
+ * a public host that is also listed is never redirected, because that would be a redirect to itself for ever.
+ *
+ * ONLY A GET OR A HEAD, AND NEVER A PATH THIS WORKER ANSWERS ITSELF. `/api/*`, `/mcp`, `/in/*`, `/auth/*`, `/account/*`
+ * and the build id are served where they stand: the CLI refuses every redirect, a webhook sender does not follow a 3xx, a
+ * 301 or 302 turns a POST into a GET, and a stale tab's fetch does not follow a redirect to another origin. A token is
+ * record-scoped and not host-scoped, so an agent keeps working on the old name until its hosts file is edited.
+ *
+ * `/` BECOMES `/app/`, AND `/r/tasks` BECOMES `/app/r/tasks`, which is the record the session is on, so no lookup is
+ * needed to send somebody on. A path already under `/app` is not prefixed twice. The fragment of an already-mailed
+ * `…/signin#magic=` survives, because a browser keeps it across a redirect whose `Location` has none. 308 and not 301,
+ * because a HEAD stays a HEAD and nothing caches a guess about it.
+ */
+export function legacyRedirect(request: Request, legacy: string | undefined, publicHost: string | undefined): Response | null {
+  const home = (publicHost ?? '').trim().toLowerCase();
+  if (home === '' || (request.method !== 'GET' && request.method !== 'HEAD')) return null;
+  const url = new URL(request.url);
+  const host = url.host.toLowerCase();
+  if (host === home) return null;
+  const hosts = (legacy ?? '').split(',').map((h) => h.trim().toLowerCase()).filter((h) => h !== '');
+  if (!hosts.includes(host)) return null;
+  const path = url.pathname;
+  if (servesApi(path) || servesMcp(path) || servesIn(path) || servesAuth(path) || servesAccount(path) || servesBuild(path)) return null;
+  const under = /^\/+app(?:\/|$)/.test(path) ? path : `/app${path}`;
+  return new Response(null, { status: 308, headers: { location: `https://${home}${under}${url.search}`, 'cache-control': 'no-store' } });
 }
 
 /** Whether a string has the shape of a record id. A shape and not a record: nothing is asked. */

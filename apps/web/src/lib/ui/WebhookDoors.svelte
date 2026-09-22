@@ -15,6 +15,8 @@
   `webhook-doors.ts`, which the tests hold.
 -->
 <script lang="ts">
+  import { untrack } from 'svelte';
+  import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import { asksFirst, callerAt, listDoors, mintDoor, type Door, type Listed, type Said } from '$lib/ui/webhook-doors.ts';
@@ -49,7 +51,8 @@
   const toneOf = (s: Said | Listed | null | undefined): 'bad' | undefined =>
     !s || s.kind === 'minted' || s.kind === 'doors' ? undefined : 'bad';
 
-  const call = () => callerAt(location.origin);
+  /* THE RECORD'S METHODS UNDER ITS SLUG; the door they mint is `/in/…` on the bare host, which a stranger posts to. */
+  const call = () => callerAt(apiBase());
 
   async function read() {
     const at = opened();
@@ -59,8 +62,13 @@
 
   /* READ ONCE, WHEN AN OWNER SEES THE SECTION. Nobody else may, and a list read for somebody who cannot mint would be
      an ADMIN refusal drawn under the sentence that already says so. */
+  /* THE READ IS UNTRACKED, and without that this effect asked for ever. `read` calls `opened()` on its first line, which
+     increments the screen's `$state` counter, so the effect depended on what it wrote and ran again before `listed` was
+     set: measured on `/settings/ingest` over the gates' record on 23 September, `/api/doors` was requested more than
+     thirty times in three seconds and the screen never settled, which `a11y` reported on all four of its passes. The
+     mail door above this section is called the same way for the same reason. */
   $effect(() => {
-    if (owner && listed === null) void read();
+    if (owner && listed === null) untrack(() => void read());
   });
 
   function press(door: Door) {

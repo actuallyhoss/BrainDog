@@ -14,6 +14,7 @@
   what can come back here is the engine's own `VALUE_MALFORMED` or `FORBIDDEN`, and those are drawn word for word.
 -->
 <script lang="ts">
+  import { apiBase } from '../at.ts';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
@@ -40,7 +41,7 @@
 
   onMount(() => {
     if (!page.data.live || page.data.spark !== true || !owner) return;
-    client = createClient({ base: location.origin });
+    client = createClient({ base: apiBase() });
     /* A STATUS REFUSAL IS `SparkAsks`'s TO SHOW, under its heading, and it asks the same door. Drawing it here too would put
        one refusal on the screen twice; this row just stays away. */
     void client.sparkStatus().then((out) => {

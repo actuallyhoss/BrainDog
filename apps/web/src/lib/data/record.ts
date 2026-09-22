@@ -19,6 +19,7 @@ import { declOf, entryOf, learn, namesOf, orderOf, refMapOf, targetsOf, treeOf, 
 import type { Entry, Filter, RegisterDecl } from '../record/schema.ts';
 import { closed, opened } from '../ui/screen.svelte.ts';
 import { labels, relabel } from '../voice.ts';
+import { apiBase } from '../at.ts';
 
 export type { Boot };
 
@@ -281,13 +282,13 @@ let chosen: { from: Promise<Booted>; source: Promise<Source> } | null = null;
 export function open(): Promise<Source> {
   /* THE SHELL'S OWN ANSWER, not a second probe. The layout asked `boot` before this screen drew, and
      `boot-live.ts` kept it for the tab under the same two refusals that mean there is no record. */
-  const from = readBoot(location.origin);
+  const from = readBoot(apiBase());
   if (chosen?.from !== from) {
     chosen = {
       from,
       source: (async (): Promise<Source> => {
         const booted = await from;
-        if (booted.from === 'live') return remote(createClient({ base: location.origin }), booted.boot);
+        if (booted.from === 'live') return remote(createClient({ base: apiBase() }), booted.boot);
         if (booted.from === 'sample') return SAMPLE;
         /* A refusal is not kept by `readBoot` either, so the next screen asks the record again and
            lands here with a different promise in hand. */

@@ -11,6 +11,7 @@
   already holds is switched to, by turning its pack on and the one speaking now off.
 -->
 <script lang="ts">
+  import { apiBase, at } from '$lib/at.ts';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
@@ -52,7 +53,7 @@
       else catalogueRefused = got.fix;
     });
     void read(async () => {
-      client = createClient({ base: location.origin });
+      client = createClient({ base: apiBase() });
       const chosen = await choose(client, !page.data.live);
       source = chosen.source;
       live = !chosen.source.sample;
@@ -80,7 +81,7 @@
     {#each cards as { u, preview } (u.usecase)}
       <li class="card">
         <header class="card-head">
-          <h2 class="card-title"><a class="card-link tap" href="/packs/browse/{u.usecase}">{u.title}</a></h2>
+          <h2 class="card-title"><a class="card-link tap" href={at(`/packs/browse/${u.usecase}`)}>{u.title}</a></h2>
           <span class="card-for">{copy.shareAudiences[u.audience]}</span>
         </header>
         <p class="card-summary">{u.summary}</p>

@@ -7,6 +7,7 @@
   nothing is drawn.
 -->
 <script lang="ts">
+  import { apiBase } from '../at.ts';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { invalidateAll } from '$app/navigation';
@@ -24,7 +25,7 @@
 
   onMount(() => {
     if (!page.data.live || !page.data.me?.owner) return;
-    client = createClient({ base: location.origin }) as unknown as ExamplesClient;
+    client = createClient({ base: apiBase() }) as unknown as ExamplesClient;
     void readExamples(client).then((e) => (read = e));
   });
 

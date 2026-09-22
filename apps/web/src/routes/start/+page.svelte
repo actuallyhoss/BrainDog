@@ -24,6 +24,7 @@
   is still here, one press away, for somebody who would rather choose (§9 ruling 11).
 -->
 <script lang="ts">
+  import { apiBase, at } from '$lib/at.ts';
   import { onDestroy, tick, untrack } from 'svelte';
   import { createClient } from '@braindog/client';
   import { SPEAKS, voiceBatch, voiceWrites, withSpeaks, type SpeakingState } from '$lib/voice.ts';
@@ -397,7 +398,7 @@
     if (!now || making || (now.declined !== null && !(u && now.declined === 'unread'))) return;
     making = true;
     try {
-      const client = createClient({ base: location.origin });
+      const client = createClient({ base: apiBase() });
       const chosen = await recordOrSample(client, sampled);
       const installed = chosen.first.ok ? chosen.first.value : [];
       const out: Outcome = { made: [], onward: null, on: [], added: [], absent: [], refused: [], waiting: chosen.source.sample, plan: null };
@@ -693,7 +694,7 @@
   async function remember() {
     const now = heard;
     if (!now?.name) return;
-    const client = createClient({ base: location.origin });
+    const client = createClient({ base: apiBase() });
     const chosen = await recordOrSample(client, sampled);
     const packs = chosen.first.ok ? chosen.first.value : null;
     if (chosen.source.sample) {
@@ -736,7 +737,7 @@
    * caret, the typed values and the validation stay where they are, because those are about the
    * moment rather than the place.
    */
-  const choose = (key: string) => void goto(`/start?add=${key}`, { keepFocus: true });
+  const choose = (key: string) => void goto(at(`/start?add=${key}`), { keepFocus: true });
 
   /**
    * `/start?add=<register>` LANDS ON THAT REGISTER'S FORM.
@@ -854,7 +855,7 @@
     if (writing) return;
     writing = true;
     try {
-      const client = createClient({ base: location.origin });
+      const client = createClient({ base: apiBase() });
       const chosen = await recordOrSample(client, sampled);
       if (chosen.source.sample) {
         /**
@@ -1115,7 +1116,7 @@
 
         <div class="actions shape-actions">
           <Button weight={outcome?.onward ? 'quiet' : 'primary'} disabled={!read || (read.declined !== null && !(read.declined === 'unread' && proposal)) || making} onclick={() => void make()}>{firstRun.shapeMake}</Button>
-          <Button weight="bare" onclick={() => void goto('/start?list', { keepFocus: true, noScroll: true })}>{firstRun.shapeFromList}</Button>
+          <Button weight="bare" onclick={() => void goto(at('/start?list'), { keepFocus: true, noScroll: true })}>{firstRun.shapeFromList}</Button>
         </div>
 
         {#if outcome}
@@ -1186,7 +1187,7 @@
       <p class="hint">{firstRun.firstRowIs} <Define noun="row" /> {firstRun.firstHint}</p>
 
       <div class="actions">
-        <Button weight="bare" onclick={() => void goto('/start', { keepFocus: true, noScroll: true })}>{firstRun.shapeDescribe}</Button>
+        <Button weight="bare" onclick={() => void goto(at('/start'), { keepFocus: true, noScroll: true })}>{firstRun.shapeDescribe}</Button>
       </div>
 
       <section class="agent" aria-labelledby="agent-h">
@@ -1259,7 +1260,7 @@
           >
           <!-- BACK IS A NAVIGATION TOO, so the browser's own Back and this button end up in the
                same place instead of disagreeing about where "back" is. -->
-          <Button weight="bare" onclick={() => void goto('/start?list')}>{copy.goBack}</Button>
+          <Button weight="bare" onclick={() => void goto(at('/start?list'))}>{copy.goBack}</Button>
         </div>
 
         <!--

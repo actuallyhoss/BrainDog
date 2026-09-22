@@ -14,6 +14,7 @@
   putting the runs or the tasks above it would separate the claim from its evidence by a screen.
 -->
 <script lang="ts">
+  import { apiBase, at } from '$lib/at.ts';
   import { untrack } from 'svelte';
   import { since } from 'braindog-render';
   import { CapLine } from 'braindog-render/svelte';
@@ -121,7 +122,7 @@
     const at = untrack(opened);
     let ok = false;
     void import('$lib/record/track-live.ts')
-      .then((m) => m.trackReader(location.origin).read())
+      .then((m) => m.trackReader(apiBase()).read())
       .then((out) => {
         got = out;
         ok = out.from !== 'refused';
@@ -170,7 +171,7 @@
     const on = seq;
     posting = true;
     const m = await import('$lib/record/rows-write.ts');
-    writer ??= m.rowWriter(location.origin);
+    writer ??= m.rowWriter(apiBase());
     const out = await writer.create('updates', {
       body: words,
       health: draftHealth,
@@ -325,7 +326,7 @@
                  than opening somebody else's worked example under this record's run. -->
             {@const job = fromRecord ? null : jobOf(s)}
             <li>
-              <a class="row" href="/r/session/{s.seq}">
+              <a class="row" href={at(`/r/session/${s.seq}`)}>
                 <span class="dot" data-live={workingAt(s, clock)}></span>
                 <span class="row-main">
                   <span class="row-title" dir="auto">{s.fields.doing}</span>
@@ -336,7 +337,7 @@
                    order with what each one answered. This link is the job screen's door. Only on a run
                    a job names. -->
               {#if job}
-                <a class="row-run tap" href="/jobs/{job.id}">{copy.watchRun}</a>
+                <a class="row-run tap" href={at(`/jobs/${job.id}`)}>{copy.watchRun}</a>
               {/if}
             </li>
           {/each}
@@ -356,7 +357,7 @@
         <ul class="rows">
           {#each tasks as t (t.seq)}
             <li>
-              <a class="row" href="/r/tasks/{t.seq}">
+              <a class="row" href={at(`/r/tasks/${t.seq}`)}>
                 <span class="row-main">
                   <span class="row-title" dir="auto">{t.fields.what}</span>
                   <span class="row-sub">{display('tasks', 'by', t.fields.by) ?? 'no date'}</span>

@@ -423,8 +423,11 @@ export type UsageRead = { ok: true; view: UsageView } | { ok: false; refusal: Re
  * A 404 FROM THE LEDGER IS A HOST WITHOUT ONE, and so is no host at all; a 401 is a person not signed in
  * to one, and the record read after it decides whether there is a record here at all. Any other refusal
  * from either is the record's own sentence.
+ *
+ * TWO BASES SINCE THE RECORD IS IN THE ADDRESS. `base` is the bare host, where `/account/usage` and `/auth/methods` are the
+ * person's; `api` is where the record answers, `/app/<slug>` under a slug, so the events counted are the record on screen.
  */
-export async function readUsage(io: Fetch, now: number, base = '', sampleNow: number = now): Promise<UsageRead> {
+export async function readUsage(io: Fetch, now: number, base = '', sampleNow: number = now, api: string = base): Promise<UsageRead> {
   const range = monthRange(now);
   /* NOBODY SIGNED IN IS NO LEDGER TO ASK. An open self-host, or a browser with no session, would only be told 401, and
      the browser logs that as an error; `/auth/methods` says so without one. A host that cannot say is asked as before. */
@@ -434,7 +437,7 @@ export async function readUsage(io: Fetch, now: number, base = '', sampleNow: nu
     if (!ledger.notFound && !SAMPLE_WHEN.has(ledger.refusal.code)) return { ok: false, refusal: ledger.refusal };
   }
 
-  const events = await live(io, base).actions();
+  const events = await live(io, api).actions();
   if (events.ok) return { ok: true, view: usageFromActions(events.value, range.month, 'events', range.to) };
   if (events.refusal.code === 'ROUTE_UNKNOWN') return { ok: 'none' };
   if (!SAMPLE_WHEN.has(events.refusal.code)) return { ok: false, refusal: events.refusal };

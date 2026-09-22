@@ -19,6 +19,7 @@
   a state to get wrong; an invariant is none of those.
 -->
 <script lang="ts">
+  import { at } from '../at.ts';
   import { copy } from '$lib/copy.ts';
   import { firstRun } from '$lib/first-run.ts';
   import Button from '$lib/ui/Button.svelte';
@@ -63,7 +64,7 @@
     <ul class="rest">
       {#each rest.slice(0, 3) as c (c.key)}
         <li>
-          <button type="button" class="one" onclick={() => void goto(`/start?add=${c.key}`)}>
+          <button type="button" class="one" onclick={() => void goto(at(`/start?add=${c.key}`))}>
             <Icon name={c.icon as IconName} />
             <span class="label">{c.label}</span>
             <span class="what">{c.body}</span>

@@ -203,7 +203,7 @@ async function mcp(args: string[]): Promise<void> {
 
 /** `braindog login <host> [--vault <scope>]`: one host, and the exit code `login` decides. */
 async function signIn(args: string[]): Promise<void> {
-  const wrong = 'braindog login takes one host, as in braindog login https://app.brain.dog/<slug>, and --vault <project>, and nothing else.';
+  const wrong = 'braindog login takes one host, as in braindog login https://brain.dog/app/<slug>, and --vault <project>, and nothing else.';
   let parsed: { values: { vault?: string | undefined }; positionals: string[] };
   try {
     parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { vault: { type: 'string' } } });

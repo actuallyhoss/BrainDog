@@ -75,7 +75,18 @@ test('signing in again uses a passkey where one works, and goes to /signin where
   assert.equal(await reprove(auth(true, true), go), true);
   assert.deepEqual(went, []);
   assert.equal(await reprove(auth(false, true), go), false);
-  assert.deepEqual(went, ['/signin']);
+  /* UNDER THE APP: a bare `/signin` on `brain.dog` is the marketing site's 404 page. */
+  assert.deepEqual(went, ['/app/signin']);
+
+  /* AND BACK TO THE SCREEN THAT ASKED, which is the step the person was half way through. */
+  const was = globalThis.location;
+  Object.defineProperty(globalThis, 'location', { value: { pathname: '/app/acme/vault', search: '?reconnect=k' }, configurable: true, writable: true });
+  try {
+    await reprove(auth(false, true), go);
+    assert.equal(went.at(-1), '/app/signin?next=%2Fapp%2Facme%2Fvault%3Freconnect%3Dk');
+  } finally {
+    Object.defineProperty(globalThis, 'location', { value: was, configurable: true, writable: true });
+  }
 });
 
 test('a revoke replaces the one row, or says why not', async () => {

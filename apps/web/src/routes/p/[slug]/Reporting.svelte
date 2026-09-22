@@ -17,6 +17,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { createClient, type ReportKeyRow } from '@braindog/client';
+  import { apiBase } from '$lib/at.ts';
   import { since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import * as clipboard from '$lib/clipboard.ts';
@@ -42,7 +43,7 @@
 
   async function load() {
     origin = location.origin;
-    const client = createClient({ base: origin });
+    const client = createClient({ base: apiBase() });
     const schema = await client.schema(READINGS);
     const fields = schema.ok ? ((schema.value as { fields?: unknown }).fields ?? []) : [];
     const bound = Array.isArray(fields) ? bindable(fields, register) : null;
@@ -64,7 +65,7 @@
     from = 'ready';
   }
 
-  async function list(client = createClient({ base: origin })) {
+  async function list(client = createClient({ base: apiBase() })) {
     const out = await client.reportKeys();
     if (out.ok) {
       keys = out.value.filter((k) => !k.revoked_at && keyFor(k.fixed, field, spoken));
@@ -97,7 +98,7 @@
   async function make() {
     if (!binding || busy) return;
     busy = true;
-    const out = await createClient({ base: origin }).createReportKey({ register: READINGS, fixed: binding.fixed, stamp: binding.stamp, name: title });
+    const out = await createClient({ base: apiBase() }).createReportKey({ register: READINGS, fixed: binding.fixed, stamp: binding.stamp, name: title });
     busy = false;
     if (!out.ok) {
       toasts.push('refusal' in out ? out.refusal.fix : copy.reportUnread, { intent: 'warn' });
@@ -110,7 +111,7 @@
   async function revoke(key: ReportKeyRow) {
     if (busy) return;
     busy = true;
-    const out = await createClient({ base: origin }).revokeToken({ id: key.id });
+    const out = await createClient({ base: apiBase() }).revokeToken({ id: key.id });
     busy = false;
     if (!out.ok) {
       toasts.push('refusal' in out ? out.refusal.fix : copy.reportUnread, { intent: 'warn' });

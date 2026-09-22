@@ -28,10 +28,10 @@ import { createRecordApi, type CallContext, type Deposited, type IngestVerificat
 import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Sql, Who } from '@braindog/ports';
 
-import { createDirectory, switcherAsk, type AccountUsage, type Directory as Dir, type RunUsage, type SwitcherAsk, type SwitcherRow } from '@braindog/record/directory';
+import { createDirectory, switcherAsk, type AccountUsage, type Directory as Dir, type RunUsage, type SessionAsk, type SwitcherAsk, type SwitcherRow } from '@braindog/record/directory';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 
-import { ALARM_RUNS, actionExecutor, holding, holdingPaged, invocation, keyOpener, meterPass, pass, sharedReader, type Admissions, type Ledger, type OpenKey } from './actions.ts';
+import { ALARM_RUNS, IN_FLIGHT, actionExecutor, holding, holdingPaged, invocation, keyOpener, meterPass, pass, sharedReader, type Admissions, type Ledger, type OpenKey } from './actions.ts';
 import { runScript, ScriptRuns, type ScriptCall, type ScriptExports, type ScriptReply } from './script.ts';
 import { grantNamed, holdingScript, scriptReads } from '@braindog/host/script';
 import { askerOf, scriptTrial } from '@braindog/host/script-try';
@@ -43,9 +43,9 @@ import { workerCatalogueOffers } from './catalogue.ts';
 import { DELETED, destroyRecord } from './destroy.ts';
 import { DELIVERS, makeDeliver } from './deliver.ts';
 import { consume, pump } from './pump.ts';
-import { cloudIngest, copyAsked, copyRefusal, drained, ingestBudget, inward, isRecordId, servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesMcp, type CloudIngestDeps } from './route.ts';
+import { appPath, atRoot, cloudIngest, copyAsked, copyRefusal, drained, ingestBudget, inward, isRecordId, legacyRedirect, servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesMcp, type AppPath, type CloudIngestDeps } from './route.ts';
 import { NO_MINT_SESSION, serveInbound, servesInbound } from './inbound.ts';
-import { bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
+import { appEntry, bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
 import { httpFor } from './http.ts';
 import { isBound, keyStoreOf, recordKeys, type KekBinding } from './keys.ts';
 import { keylessRefusal } from './keyless.ts';
@@ -121,6 +121,20 @@ type Env = {
   AUTH_MAIL_FROM?: string;
   /** The app's host name: the cookie's origin, the passkeys' relying party, and what a cookie write must come from. */
   PUBLIC_HOST?: string;
+  /**
+   * The passkeys' relying party, when it is a parent of `PUBLIC_HOST` rather than the host itself: `brain.dog` in
+   * production and `alpha.brain.dog` in alpha. Unset or empty, and it is `PUBLIC_HOST`. A name `PUBLIC_HOST` is not
+   * under switches passkeys off (`relyingParty`), which is a refusal an operator can read and not a broken button.
+   */
+  RP_ID?: string;
+  /**
+   * The names this Worker answered as before the app moved to `PUBLIC_HOST`, comma-separated: `app.brain.dog`.
+   *
+   * A PAGE LOAD ON ONE IS A 308 TO `https://<PUBLIC_HOST>/app<path>`, and `/api/*`, `/mcp` and `/in/*` on it are served
+   * where they stand and never redirected (`legacyRedirect` in `route.ts`). Unset or empty, and nothing is a legacy
+   * host, which is exactly the Worker before the move.
+   */
+  LEGACY_HOSTS?: string;
   /** The built web shell, `wrangler.jsonc`'s `assets`, which holds the bundled catalogue Spark reads (`catalogue.ts`). */
   ASSETS?: Fetcher;
   /**
@@ -308,7 +322,7 @@ export class Record$ extends DurableObject<Env> {
                 s,
               ),
             ledger: { mayRun: (r, a, p) => directory.mayRun(r, a, p), meter: (r, run) => directory.meter(r, run) },
-          })({ record: d.record, body: d.body as never, input: d.input as never, reads: d.reads as never, grantOf: d.owner ? grantNamed(() => api.kernel.grants()) : null });
+          })({ record: d.record, body: d.body as never, input: d.input as never, reads: d.reads as never, grantOf: d.owner ? grantNamed(() => api.kernel.grants()) : null, stale: d.stale });
         },
         /* WHAT AN AGENT MAY PROPOSE INSTALLING, and the carry step an update from an older use case runs. The same list the
            self-host hands in (`@braindog/seed/usecases/catalogue`): without it a hosted Personal 1.0.0 record updated and
@@ -389,8 +403,9 @@ export class Record$ extends DurableObject<Env> {
       /* ONE OPENER FOR THE ALARM, handed to the scripts' sends below as well, so KEK has one reader here and not two. */
       const openKey = this.#openKey(api);
       const inner = actionExecutor(() => api.kernel.actionOrigins(), { openKey });
-      /* ONE ADMISSION COUNT FOR BOTH, so a record with one run left cannot spend it twice. */
-      const admissions = pass();
+      /* ONE ADMISSION COUNT FOR BOTH, so a record with one run left cannot spend it twice, and it is the runtime's
+         count, so a trial in its sandbox and this pass cannot each spend the last run either. */
+      const admissions = pass(IN_FLIGHT);
       const execute = holding(inner, record, (r, action, pending) => ledger.mayRun(r, action, pending), admissions);
       /* A CONNECTOR PAGES AND THE EXECUTOR ABOVE CANNOT. Without a runner the kernel finishes the
          row and meters it `dropped`, which is honest and means the hosted runtime never runs one.
@@ -409,14 +424,20 @@ export class Record$ extends DurableObject<Env> {
       const budget = invocation();
       /* A SCRIPT ASKS THE SAME LEDGER ON THE SAME ADMISSION COUNT, so a record with one run left spends it once. */
       const script = this.#scriptRunner(api, record, openKey, (r, action, pending) => ledger.mayRun(r, action, pending), admissions);
-      const out = await api.kernel.runActions(execute, {
-        limit: ALARM_RUNS,
-        scheduler: this.#alarm,
-        page: holdingPaged(page, record, (r, action, pending) => ledger.mayRun(r, action, pending), admissions),
-        budget,
-        ...(script === undefined ? {} : { script }),
-      });
-      await meterPass((r, run) => ledger.meter(r, run), record, out.usage);
+      let out;
+      try {
+        out = await api.kernel.runActions(execute, {
+          limit: ALARM_RUNS,
+          scheduler: this.#alarm,
+          page: holdingPaged(page, record, (r, action, pending) => ledger.mayRun(r, action, pending), admissions),
+          budget,
+          ...(script === undefined ? {} : { script }),
+        });
+        await meterPass((r, run) => ledger.meter(r, run), record, out.usage);
+      } finally {
+        /* A PASS THAT NEVER SETTLES HOLDS ITS RECORD'S RUNS FOR THE LIFE OF THE RUNTIME, so this is in a finally. */
+        admissions.settle();
+      }
       /* ROWS LEFT BECAUSE THE BUDGET RAN OUT, NOT BECAUSE THEY ARE NOT DUE. They are `pending` again
          and their schedule has not moved, so nothing re-arms them: this alarm has to. Now, because
          the work was due before the budget was the reason it did not happen. */
@@ -804,7 +825,10 @@ export class Directory$ extends DurableObject<Env> {
     if (this.#dir) return this.#dir;
     const mac = this.#mac;
     const host = this.env.PUBLIC_HOST ?? '';
-    const rp = host ? relyingParty(`https://${host}`) : null;
+    /* `RP_ID` NAMES A PARENT OF THE HOST, so a passkey made at `app.brain.dog` is still offered at `brain.dog` once the
+       app moves there (`loop/research-one-domain.md` §3.0). A name the host is not under is no passkeys at all rather
+       than a ceremony every browser fails, and unset is the exact host, which is what this was. */
+    const rp = host ? relyingParty(`https://${host}`, this.env.RP_ID) : null;
     this.#dir = createDirectory(
       storageSql(this.ctx.storage),
       { now: () => Date.now() },
@@ -828,9 +852,17 @@ export class Directory$ extends DurableObject<Env> {
     return this.#dir;
   }
 
-  /** Sign-in, whole: `/auth/*` arrives as an `AuthCall` and leaves as an `AuthResult`. */
-  auth(call: AuthCall): Promise<AuthResult> {
+  /**
+   * Sign-in, whole: `/auth/*` arrives as an `AuthCall` and leaves as an `AuthResult`. And `session` with a `slug`, which
+   * is how a request under `/app/<slug>` learns whether that name is this person's before any record is addressed.
+   */
+  auth(call: AuthCall | SessionAsk): Promise<AuthResult> {
     return this.#directory().auth(call);
+  }
+
+  /** The live name of a record, or `null` for one with none: where `GET /app` sends a session back to. */
+  slugOf(record: string): string | null {
+    return this.#directory().slugOf(record);
   }
 
   /**
@@ -1084,6 +1116,8 @@ function bearerDeps(env: Env): BearerDeps {
     knows: (id) => directory.knows(id),
     verify: (id, bearer, surface) => record(id).verify(bearer, surface),
     access: (id, person) => record(id).access(person),
+    /* ASKED ONLY UNDER `/app/<slug>`, to hold the path to the record the bearer names. */
+    named: async (slug) => (await directory.resolve(slug))?.record ?? null,
   };
 }
 
@@ -1263,6 +1297,11 @@ async function nightly(env: Env): Promise<void> {
 
 async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    /* THE OLD HOST FIRST, AND ONLY FOR A PAGE LOAD (`loop/research-one-domain.md` §2.5). `legacyRedirect` answers
+       `null` for every path this Worker serves itself, the build id and sign-in included, so an agent, a webhook
+       sender and a stale tab on `app.brain.dog` are served where they stand. Unset `LEGACY_HOSTS` is no host at all. */
+    const moved = legacyRedirect(request, env.LEGACY_HOSTS, env.PUBLIC_HOST);
+    if (moved) return moved;
     /* THE DEPLOYMENT'S OWN BUILD ID, BEFORE ANYTHING ELSE, because it asks nothing of the Directory,
        of a record or of whoever is calling. */
     if (servesBuild(url.pathname)) return buildId(env);
@@ -1282,8 +1321,31 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     /* THE KEY DOORS, before any door is asked: their bearer is a vault grant, and neither a cookie nor a login
        token may reach them. */
     if (servesVault(url.pathname)) return keyDoor(request, env);
+    /* `/app` IS THE APP, AND `/app/<slug>/api/*` IS THAT RECORD'S API (§2.4). The slug is stripped here, because no
+       route pattern can pick it out, and handed to the door, which has the Directory check it before anything is
+       addressed. AFTER THE ROOT'S OWN DOORS, which none of its paths can reach: every one of them is a prefix that
+       `/app` is not. Nothing routes `/app` to this Worker until `wrangler.jsonc` lists it, so this is dark until then. */
+    const app = appPath(url.pathname);
+    if (app !== null) return servesApi(app.rest) ? recordApi(atRoot(request, app.rest), env, app.slug) : appPage(request, env, app);
     if (!servesApi(url.pathname))
       return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record method is at /api/<method>.' } }, 404);
+    return recordApi(request, env, null);
+}
+
+/**
+ * A record method, at `/api/<method>` with `slug` null, or at `/app/<slug>/api/<method>` with the request already moved
+ * to the root path by `atRoot`.
+ *
+ * ONE BODY FOR BOTH ADDRESSES, so the slug is one more argument to the same doors rather than a second router that
+ * could drift from the first. Under a slug a cookie means that record once the Directory says it is theirs, a bearer
+ * must name the same record, and the demo never answers.
+ */
+async function recordApi(request: Request, env: Env, slug: string | null): Promise<Response> {
+    const url = new URL(request.url);
+    /* THE KEY DOORS NAME THEIR RECORD BY THE GRANT, AND ONLY AT THE ROOT. A grant under a slug would be a second way to
+       say which record, and the vault is the last place to accept two answers to that. */
+    if (slug !== null && servesVault(url.pathname))
+      return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'The key doors are at /api/vault/, and a grant names its own record.' } }, 404);
 
     const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
 
@@ -1292,9 +1354,9 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     const door = await doorOf(request, {
       origin: `https://${env.PUBLIC_HOST ?? ''}`,
       demo: env.DEMO_RECORD,
-      session: (sid) => directory.auth({ flow: 'session', sid }) as unknown as Promise<AuthResult<Who>>,
+      session: (sid, slug) => directory.auth({ flow: 'session', sid, ...(slug === undefined ? {} : { slug }) }) as unknown as Promise<AuthResult<Who>>,
       access: (record, person) => env.RECORD.get(env.RECORD.idFromName(record)).access(person),
-    });
+    }, slug);
 
     /* THE APP'S OWN KEY DOORS ARE A BROWSER SESSION'S AND NOBODY ELSE'S. `/api/keys/*` is not a record method, so
        it is answered here rather than forwarded; every other door reaching it is refused with the record's own
@@ -1356,13 +1418,46 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
 
     /* A BEARER. This Worker serves MANY records, and a request that says who it is by nothing but the
        header it carries says so here, or not at all. `session.ts` holds the path, and `/mcp` takes the same one. */
-    const found = await bearerOf(request, 'api', bearerDeps(env));
+    const found = await bearerOf(request, 'api', bearerDeps(env), slug);
     if ('status' in found) return found.status === 403 ? json({ ok: false, refusal: found.refusal }, 403) : unauthorized(env);
 
     /* THE WORKER AUTHENTICATES AND THE RECORD AUTHORISES, and neither does the other's half. Every check about
        what a caller may do is inside `createRecordApi`, so the CLI and the MCP server answer to the same ladder
        as the browser. `inward` writes the context over whatever the caller sent and drops the bearer. */
     return env.RECORD.get(env.RECORD.idFromName(found.record)).fetch(inward(request, found.ctx));
+}
+
+/**
+ * A page of the app under `/app`: bare `/app` goes back to the last record, a file beside the pages is that file, and
+ * everything else is the shell, which reads the path itself.
+ *
+ * THE WORKER DRAWS THE SHELL BECAUSE THE ASSETS NO LONGER DO. With `/app/*` in `run_worker_first` and
+ * `not_found_handling: none` (`loop/research-one-domain.md` §2.2), an app navigation reaches this function and not a
+ * fallback, so `/app/acme/r/tasks` has to be answered with `/app/`'s bytes here. Under a slug no file is looked for:
+ * a record's page is always the shell, and the shell's `boot` under that slug is where a stranger meets sign-in.
+ *
+ * A FILE MISSING IS A 404, AND ONLY A PAGE IS THE SHELL. A path whose last segment has an extension is a file, and
+ * answering a missing one with `index.html` and a 200 is the fault the self-host already refuses for `/_app/`.
+ */
+async function appPage(request: Request, env: Env, app: AppPath): Promise<Response> {
+  if (request.method !== 'GET' && request.method !== 'HEAD')
+    return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A page of the app is read; a record method is at /app/<slug>/api/<method>.' } }, 405, [['allow', 'GET, HEAD']]);
+  const assets = env.ASSETS;
+  if (!assets) return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'This deployment serves no app, only its API.' } }, 404);
+  const shell = () => assets.fetch(new Request(new URL('/app/', request.url), { method: request.method }));
+  if (app.slug === null && app.rest === '/') {
+    const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+    return appEntry(request, {
+      session: (sid) => directory.auth({ flow: 'session', sid }) as unknown as Promise<AuthResult<Who>>,
+      slugOf: async (record) => directory.slugOf(record),
+      shell,
+    });
+  }
+  if (app.slug === null) {
+    const file = await assets.fetch(request);
+    if (file.status !== 404 || /\.[A-Za-z0-9]+$/.test(app.rest)) return file;
+  }
+  return shell();
 }
 
 /**

@@ -105,6 +105,39 @@ test('APPROVED: pending twice, then the token kept in the hosts file, the defaul
   assert.equal(host.seen[1]?.body.device_code, POLL_ID);
 });
 
+test('THE APP\'S ADDRESS FOR A RECORD, <host>/app/<slug>, POSTS THE SLUG AND KEEPS THE LOGIN UNDER <host>/<slug>', async (t) => {
+  /* `loop/research-one-domain.md` Brief D. The whole pathname used to be the slug, so the address the app now prints
+     sent `app/acme`, which no Directory holds, and the sign-in failed with "Name a record this BrainDog holds". */
+  const host = await stub(t, () => granted);
+  const out = await run(t, `${host.base}/app/acme`);
+
+  assert.equal(out.code, 0, out.stderr);
+  assert.deepEqual(host.seen.map((s) => [s.path, s.body.slug]), [['/auth/device', 'acme'], ['/auth/device/token', 'acme']]);
+  const hosts = readHosts(out.file);
+  assert.equal(hosts.default, `${host.base}/acme`);
+  assert.equal(hosts.hosts[`${host.base}/acme`]?.token?.value, TOKEN);
+  hidden(out);
+});
+
+test('THE OLD SHAPE, <host>/<slug>, STILL POSTS THE SLUG', async (t) => {
+  const host = await stub(t, () => granted);
+  const out = await run(t, `${host.base}/acme/`);
+
+  assert.equal(out.code, 0, out.stderr);
+  assert.deepEqual(host.seen.map((s) => [s.path, s.body.slug]), [['/auth/device', 'acme'], ['/auth/device/token', 'acme']]);
+  assert.equal(readHosts(out.file).default, `${host.base}/acme`);
+});
+
+test('A USAGE MISTAKE NAMES THE ADDRESS THE APP LIVES AT NOW', async (t) => {
+  const config = mkdtempSync(join(tmpdir(), 'braindog-login-'));
+  t.after(() => rmSync(config, { recursive: true, force: true }));
+  const child = spawn(process.execPath, [MAIN, 'login'], { env: { ...process.env, XDG_CONFIG_HOME: config, APPDATA: config }, stdio: ['ignore', 'pipe', 'pipe'] });
+  let stderr = '';
+  child.stderr.on('data', (chunk: Buffer) => (stderr += chunk.toString('utf8')));
+  assert.equal(await new Promise<number | null>((done) => child.on('close', done)), 1);
+  assert.equal(stderr.trim(), 'braindog login takes one host, as in braindog login https://brain.dog/app/<slug>, and --vault <project>, and nothing else.');
+});
+
 test(
   'the hosts file is written 0600',
   { skip: process.platform === 'win32' ? 'Windows keeps no POSIX mode on a file, so 0600 cannot be checked here' : false },

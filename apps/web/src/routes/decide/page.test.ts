@@ -119,7 +119,7 @@ test('both handlers refuse before they act, not only the controls that call them
   assert.ok(inTake >= 0, 'a keyboard answer records before anybody checks whether it may');
 
   const batchAt = page.indexOf('async function answerPicked() {');
-  const sentAt = page.indexOf('const out = await answerQuestion(location.origin, q.id, a.option, reason);');
+  const sentAt = page.indexOf('const out = await answerQuestion(apiBase(), q.id, a.option, reason);');
   assert.ok(batchAt >= 0 && sentAt > batchAt, 'answerPicked no longer reads the way this test assumes');
   const inBatch = page.slice(batchAt, sentAt).search(guard);
   assert.ok(inBatch >= 0, 'the batch sends its answers before anybody checks whether it may');

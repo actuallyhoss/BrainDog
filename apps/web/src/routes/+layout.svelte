@@ -15,6 +15,8 @@
   never the browser's guess. Once it IS detected, it is shown as what it is — writes will fail.
 -->
 <script lang="ts">
+  import { apiBase, at, here } from '$lib/at.ts';
+  import { addressed } from '$lib/addressed.ts';
   /* The shared skin first: `tokens.css` opens with the `@layer` statement, so the layer ORDER — and
      with it the rule that no installed theme can reach the a11y layer — is established before any
      other stylesheet is parsed. */
@@ -83,9 +85,11 @@
      with no nav and no palette, and must not imply there is a record behind it (50 §5.13 step 6),
      and `/signin` because a rail listing somebody else's registers behind a sign-in form is the
      screen claiming you are already in. */
-  const bare = $derived(
-    page.url.pathname === '/start' || page.url.pathname === '/signin' || page.url.pathname === '/invite' || page.url.pathname.startsWith('/s/'),
-  );
+  const bare = $derived.by(() => {
+    /* Read inside the record: the address is `/app/acme/start` and the rule is about `/start`. */
+    const at = here(page.url.pathname);
+    return at === '/start' || at === '/signin' || at === '/invite' || at.startsWith('/s/');
+  });
 
   /* THE SHELL'S, AND A PAGE'S. It was local, so a page could not open the palette — which is why
      `/[id]`'s `Search` button navigated Home instead of searching. */
@@ -100,7 +104,7 @@
     return placed.size ? data.nav.filter((n) => !placed.has(n.href)) : data.nav;
   });
   /* THE PERSON'S OWN RAIL, as `boot` answered it, before anything draws it (`nav-prefs.svelte.ts`). */
-  $effect.pre(() => navPrefs.adopt(data.me.prefs, location.origin));
+  $effect.pre(() => navPrefs.adopt(data.me.prefs, apiBase()));
   /* A PAGE HIDDEN FROM THE RAIL IS HIDDEN FROM THE TOP BAR AND THE MORE SHEET TOO: one nav, not two. */
   const grouped = $derived(arrange(railNav.filter((e) => !navPrefs.hidden.includes(e.href)), navPrefs.order));
   /* THE PHONE'S LISTS IN THE RAIL'S ORDER, from the same preference (`orderLists`). */
@@ -343,10 +347,10 @@
       go.disarm();
       if (target) {
         e.preventDefault();
-        goto(target);
+        goto(at(target));
       } else if (digit >= 1 && digit <= 9 && numbered[digit - 1]) {
         e.preventDefault();
-        goto(numbered[digit - 1]!.href);
+        goto(at(numbered[digit - 1]!.href));
       }
       return;
     }
@@ -384,7 +388,8 @@
        the window simply had two thirds of itself below a fold that could not be crossed: `/s/<token>`
        is 2,628px of projected page in a 993px window, and the only part anybody could read was the
        first third. That is the artefact somebody hands an accountant. -->
-  <main id="main" class="bare" data-screen={settled()}>{@render children()}</main>
+  <!-- `addressed`: the block renderer's own links, put under `/app` after they are drawn (`lib/addressed.ts`). -->
+  <main id="main" class="bare" data-screen={settled()} {@attach addressed}>{@render children()}</main>
 {:else}
   <div class="shell" data-rail={railIcons ? 'icons' : undefined} data-shape={shape}>
     {#if shape === 'rail'}
@@ -440,7 +445,7 @@
       that carried meaning by moving would have to say it another way as well.
     -->
     {#key page.url.pathname}
-    <main id="main" class="body" data-screen={settled()}>
+    <main id="main" class="body" data-screen={settled()} {@attach addressed}>
       <!-- ABOVE THE SCREEN AND INSIDE THE SCROLLER, so it is the first thing read and the first
            thing to leave when the reader scrolls. A fixed strip across the top of every screen is a
            permanent tax on the height of every screen, and this is a sentence somebody reads once. -->
@@ -451,7 +456,7 @@
             <span class="sample-why">{copy.sampleWhy}</span>
           </p>
           <span class="sample-acts">
-            <a class="sample-go" href="/start">{copy.sampleStart}</a>
+            <a class="sample-go" href={at('/start')}>{copy.sampleStart}</a>
             <button type="button" class="sample-away" aria-label={copy.samplePutAway} title={copy.samplePutAway} onclick={putSampleAway}>
               <span class="sample-away-word">{copy.samplePutAway}</span>
               <span class="sample-away-glyph"><Icon name="close" size="m" /></span>
@@ -547,7 +552,7 @@
   <nav class="more-nav">
     {#each grouped as [section, entries]}
       <h2 class="more-section">{section}</h2>
-      {#each entries as entry}<a href={entry.href} onclick={() => (moreOpen = false)}>{entry.title}</a>{/each}
+      {#each entries as entry}<a href={at(entry.href)} onclick={() => (moreOpen = false)}>{entry.title}</a>{/each}
     {/each}
 
     <!-- AND THE HEADING GOES WITH THEM. `index.registers` holds only the lists that have something
@@ -556,20 +561,20 @@
       <h2 class="more-section">{copy.lists}</h2>
     {/if}
     {#each moreLists as r}
-      <a href="/r/{r.id}" onclick={() => (moreOpen = false)}>
+      <a href={at(`/r/${r.id}`)} onclick={() => (moreOpen = false)}>
         {r.name}<span class="more-tally num">{r.count}</span>
       </a>
       <!-- And its saved views, which are the same list with a predicate. -->
       {#each r.views ?? [] as v}
-        <a class="more-view" href={v.href} onclick={() => (moreOpen = false)}>{v.name}</a>
+        <a class="more-view" href={at(v.href)} onclick={() => (moreOpen = false)}>{v.name}</a>
       {/each}
     {/each}
 
     <hr />
-    <a href="/packs" onclick={() => (moreOpen = false)}>{copy.packs}</a>
-    <a href="/vault" onclick={() => (moreOpen = false)}>{copy.vault}</a>
-    <a href="/settings/appearance" onclick={() => (moreOpen = false)}>{copy.settings}</a>
-    <a href="/audit" onclick={() => (moreOpen = false)}>{copy.audit}</a>
+    <a href={at('/packs')} onclick={() => (moreOpen = false)}>{copy.packs}</a>
+    <a href={at('/vault')} onclick={() => (moreOpen = false)}>{copy.vault}</a>
+    <a href={at('/settings/appearance')} onclick={() => (moreOpen = false)}>{copy.settings}</a>
+    <a href={at('/audit')} onclick={() => (moreOpen = false)}>{copy.audit}</a>
   </nav>
 </Sheet>
 

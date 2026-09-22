@@ -19,6 +19,7 @@
   and a written reason and cannot be edited afterwards.
 -->
 <script lang="ts">
+  import { apiBase, at } from '$lib/at.ts';
   import { titleOf } from '$lib/title.ts';
   import { tick, untrack } from 'svelte';
   import { page as route } from '$app/state';
@@ -71,7 +72,7 @@
 
   async function readLive() {
     const at = opened();
-    client ??= createClient({ base: location.origin });
+    client ??= createClient({ base: apiBase() });
     const out = await readQueue(client);
     /* A RE-READ AFTER A CONFLICT KEEPS THE OLDER DECISIONS ALREADY ASKED FOR, which a fresh read answers without. */
     if (out.from === 'live') live = keepDecided(live, out.value);
@@ -241,7 +242,7 @@
     const about = aboutFor(q);
     const accepting = a.option === 'accept' && about !== undefined && isArranging(about.kind);
     const had = accepting ? sidebarNow() : null;
-    const out = await answerQuestion(location.origin, q.id, a.option, a.reason);
+    const out = await answerQuestion(apiBase(), q.id, a.option, a.reason);
     sending = null;
     const next = new Map(fixes);
     if (out.from !== 'written') {
@@ -426,7 +427,7 @@
       /* ENTER ON A CONTROL IS THAT CONTROL'S. */
       if ((e.target as Element | null)?.closest?.('button, a, summary, input, [role^="menuitem"]')) return;
       e.preventDefault();
-      void goto(`/decide/${q.id}`);
+      void goto(at(`/decide/${q.id}`));
       return;
     }
     if (e.key === 'x') {
@@ -436,7 +437,7 @@
     }
     if (e.key === 'd') {
       e.preventDefault();
-      void goto(`/decide/${q.id}?defer`);
+      void goto(at(`/decide/${q.id}?defer`));
       return;
     }
     if (answers.has(q.id)) return;
@@ -515,7 +516,7 @@
     for (const q of approvable) {
       const a = answerFor(q, approveKey(q)!, at);
       if (!a) continue;
-      const out = await answerQuestion(location.origin, q.id, a.option, reason);
+      const out = await answerQuestion(apiBase(), q.id, a.option, reason);
       if (out.from === 'written') {
         settled.set(q.id, a.title);
         refused.delete(q.id);
@@ -565,7 +566,7 @@
   >
     {#if decidedHere !== undefined}
       <!-- DECIDED HERE: one line in the question's place, and the way to the decision it became. -->
-      <a class="q-receipt" href="/decide/{q.id}">
+      <a class="q-receipt" href={at(`/decide/${q.id}`)}>
         <span class="q-tick"><Icon name="check" size="s" /></span>
         <span class="q-receipt-text"><span class="q-title" id="q-{q.id}-title">{q.title}</span> <span class="q-said">{copy.decideDecided(decidedHere)}</span></span>
       </a>
@@ -573,7 +574,7 @@
       {#if did}<div class="q-applied"><Applied lines={did} /></div>{/if}
     {:else}
       <div class="q-top">
-        <a class="q-open" href="/decide/{q.id}">
+        <a class="q-open" href={at(`/decide/${q.id}`)}>
           <span class="q-body">
             <!-- WHAT IT IS ABOUT LEADS, AND THE ID ENDS THE LINE. -->
             <span class="q-title" id="q-{q.id}-title">{q.title}</span>
@@ -823,7 +824,7 @@
           {@const choseTitle = q.options.find((o) => o.key === q.decided?.option)?.title}
           <li>
             <!-- A TICK LEADS AND THE ID ENDS THE LINE, the order the queue above keeps. -->
-            <a class="line" href="/decide/{q.id}">
+            <a class="line" href={at(`/decide/${q.id}`)}>
               <span class="seq"><Icon name="check" size="s" /></span>
               <span class="line-main">
                 <span class="line-title">{q.title}</span>

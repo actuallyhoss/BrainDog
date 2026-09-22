@@ -64,6 +64,10 @@ export const noDoorYet = (it: Methods, ways: Ways | null, note: Note): boolean =
  * narrower fact than the button: it says the host PINNED a public record for anonymous reads, and
  * the sample needs no host at all. Gating the pill on it would have deleted a working way forward
  * from the one screen that has no other.
+ *
+ * ONLY WHERE THE ADDRESS NAMES NO RECORD, since the app moved under `brain.dog/app`. `/app` with no one signed in is
+ * the sample, as above; `/app/acme/…` answering 401 is sent here with `?next=`, because the sample drawn there would be
+ * dressed as acme (`noRecord` in `lib/record/device.ts`, and the root layout's redirect). So the pill opens `/app/`.
  */
 
 /** The two sentences for `noDoorYet`. See the header: these belong in `lib/copy.ts`. */

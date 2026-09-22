@@ -19,7 +19,7 @@
  *   503      `{ ok: false }`: the lockout's store failed, and a lockout that cannot count refuses.
  *   Cookie   `__Host-bd_s` on https, `bd_s` on http at a loopback name, and none on any other http
  *            origin, where `/auth/methods` says `why: 'insecure'`. One opaque id; the record is on the row.
- *   Links    `${origin}/signin#magic=<token>` and `#claim=<token>`, redeemed by `POST /auth/magic/redeem`.
+ *   Links    `${origin}/app/signin#magic=<token>` and `#claim=<token>`, redeemed by `POST /auth/magic/redeem`.
  *            A fragment never reaches a server, a log or a link pre-fetcher, and a press is what spends it.
  *
  * STANDARD `Request`, `Response` AND WEBCRYPTO, like the rest of this package, so the Worker and the
@@ -190,14 +190,28 @@ export function cookieMode(origin: string): CookieMode | null {
 /**
  * The WebAuthn relying party for an origin, or `null` where a browser will not run a ceremony.
  *
- * THE EXACT HOST, NEVER THE APEX: a passkey made for `app.brain.dog` answers nothing at any other name.
+ * THE EXACT HOST UNLESS THE HOST NAMES A PARENT. A passkey made for `app.brain.dog` answers nothing at any other
+ * name, which was the whole rule until the app moved to `brain.dog` (`loop/research-one-domain.md` §3.0):
+ * production has no magic links, so the owner's first passkey, made at `app.brain.dog`, would have been his only
+ * way in and would have stopped working on the day of the move. `rpId` is the Worker's `RP_ID`, and a passkey
+ * made under `brain.dog` is offered at `app.brain.dog` and `brain.dog` alike.
+ *
+ * THE PARENT MUST BE THE HOST OR END IN `.` AND IT, AND HOLD A DOT OF ITS OWN. WebAuthn allows a registrable
+ * suffix of the origin's host and a browser refuses anything else at the ceremony, so a name outside that is
+ * answered here as no passkeys rather than as a button that fails in the browser: `rain.dog` ends
+ * `app.brain.dog` as text and is somebody else's domain, and `dog` is a public suffix no browser accepts. Empty
+ * is unset, because `wrangler.jsonc` declares a var as `""` before an environment fills it.
+ *
  * An IP literal is not a valid RP ID, and an http origin that is not loopback is not a secure context.
  */
-export function relyingParty(origin: string): { id: string; origin: string } | null {
+export function relyingParty(origin: string, rpId?: string): { id: string; origin: string } | null {
   if (cookieMode(origin) === null) return null;
   const url = new URL(origin);
   if (/^\d+\.\d+\.\d+\.\d+$/.test(url.hostname) || url.hostname.startsWith('[')) return null;
-  return { id: url.hostname, origin: url.origin };
+  const id = (rpId ?? '').trim().toLowerCase() || url.hostname;
+  if (id === url.hostname) return { id, origin: url.origin };
+  if (!id.includes('.') || id.startsWith('.') || !url.hostname.endsWith(`.${id}`)) return null;
+  return { id, origin: url.origin };
 }
 
 /** The `Set-Cookie` value that carries a session id. Exact, because a test pins every attribute. */
@@ -390,9 +404,16 @@ const refusal = (status: number, refused: Refusal, extra: readonly Header[] = []
 /** A route this host does not serve, or a way in it has switched off. The screen already knows from `methods`. */
 const off = (): Response => refusal(404, { code: 'ROUTE_UNKNOWN', fix: 'This BrainDog does not offer that way to sign in.' });
 
-/** The link a person is sent or handed. The fragment is the whole of the design: see the header. */
+/**
+ * The link a person is sent or handed. The fragment is the whole of the design: see the header.
+ *
+ * UNDER `/app`, BECAUSE THAT IS WHERE THE APP IS NOW SERVED (`loop/research-one-domain.md` §3.4). On `brain.dog`
+ * the root is the marketing site, so `https://brain.dog/signin` is the site's 404 page and a link to it signs
+ * nobody in. A link already mailed at `app.brain.dog/signin#…` still works: that host 308s a page load to
+ * `/app/signin`, and a browser keeps the fragment across a redirect whose `Location` carries none.
+ */
 const linkOf = (origin: string, mail: Mail): string =>
-  'linkToken' in mail ? `${origin}/signin#magic=${mail.linkToken}` : `${origin}/signin#claim=${mail.claimToken}`;
+  'linkToken' in mail ? `${origin}/app/signin#magic=${mail.linkToken}` : `${origin}/app/signin#claim=${mail.claimToken}`;
 
 const isJson = (request: Request): boolean =>
   (request.headers.get('content-type') ?? '').split(';')[0]?.trim().toLowerCase() === 'application/json';

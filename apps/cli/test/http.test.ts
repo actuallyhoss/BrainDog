@@ -108,6 +108,27 @@ test('the host is --host, then BRAINDOG_HOST, then the default; the token is BRA
   assert.deepEqual(target('https://brain.dog/acme', { BRAINDOG_TOKEN: 'x' }, file), { key: 'https://brain.dog/acme', base: 'https://brain.dog', token: 'x' });
 });
 
+test('THE APP\'S OWN ADDRESS FOR A RECORD, /app/<slug>, IS THE SAME HOST AS /<slug>', (t) => {
+  /* `loop/research-one-domain.md` Brief D. `app` is a reserved slug (`packages/record/src/directory.ts`), so a first
+     segment of `app` is never a record and always the app's prefix. Only that whole segment goes: `/apple` is a slug. */
+  assert.equal(hostKey('https://brain.dog/app/acme'), 'https://brain.dog/acme');
+  assert.equal(hostKey('brain.dog/app/acme/'), 'https://brain.dog/acme');
+  assert.equal(hostKey('https://brain.dog/app'), 'https://brain.dog');
+  assert.equal(hostKey('https://brain.dog/app/'), 'https://brain.dog');
+  assert.equal(hostKey('https://brain.dog/apple'), 'https://brain.dog/apple');
+  assert.equal(hostKey('https://app.brain.dog/acme'), 'https://app.brain.dog/acme', 'a key a login kept before the move changes nothing');
+
+  /* The token a login kept under `/acme` is the one a command pointed at `/app/acme` sends, and the slug never reaches the address. */
+  const file = scratch(t);
+  saveHosts(file, { hosts: { 'https://brain.dog/acme': { token: { value: TOKEN, expires: LATER, label: 'a' } } } });
+  assert.deepEqual(target('https://brain.dog/app/acme', {}, file), { key: 'https://brain.dog/acme', base: 'https://brain.dog', token: TOKEN });
+});
+
+test('THE EXAMPLE IN A REFUSAL IS THE ADDRESS THE APP LIVES AT NOW, brain.dog/app/<slug>', () => {
+  assert.throws(() => hostKey('not a host'), { message: 'The BrainDog host is not an address. Write it as https://brain.dog/app/<slug>.' });
+  assert.throws(() => hostKey('ftp://a.example'), { message: 'The BrainDog host is not an https address. Write it as https://brain.dog/app/<slug>.' });
+});
+
 test('nothing to reach is one sentence, and none of them carries a token', (t) => {
   const file = scratch(t);
   saveHosts(file, { default: 'https://a.example', hosts: { 'https://a.example': { token: { value: TOKEN, expires: '2020-01-01T00:00:00Z', label: 'a' } } } });

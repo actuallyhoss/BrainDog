@@ -13,6 +13,7 @@
   found across eleven precedents (19 §4).
 -->
 <script lang="ts">
+  import { apiBase, at } from '$lib/at.ts';
   import { titleOf } from '$lib/title.ts';
   import { page } from '$app/state';
   import { invalidateAll } from '$app/navigation';
@@ -165,7 +166,7 @@
   async function readAgents() {
     const at = opened();
     origin = location.origin;
-    agentClient ??= createClient({ base: origin });
+    agentClient ??= createClient({ base: apiBase() });
     const listed = await agentClient.listDevices();
     if (!listed.ok) {
       const refusal = 'refusal' in listed ? listed.refusal : { code: 'VERSION_STALE', fix: '' };
@@ -330,7 +331,8 @@
     } else offerSaid = out.fix;
   }
 
-  const lines = $derived(connectLines(origin));
+  /* THE LOGIN LINE NAMES THIS RECORD, which the Cloud device flow needs; the sample names none, because it has no host. */
+  const lines = $derived(connectLines(origin, shell.live ? SLUG : null));
 
   /* ── ingest: where this record takes forwarded mail ────────────────────── */
 
@@ -388,7 +390,8 @@
       return;
     }
     /* THE ADDRESS NAMES THIS ORIGIN, and `readAgents` is the only other place that reads it: a person
-       who lands straight on `/settings/ingest` has never been through that function. */
+       who lands straight on `/settings/ingest` has never been through that function. The bare origin, because a mail
+       door is `/in/email/<token>` at the root, under no slug, which a mail provider posts to. */
     origin = location.origin;
     /**
      * AND THE HOST IS ASKED WHAT IT SERVES BEFORE ANYTHING IS OFFERED, once.
@@ -417,7 +420,7 @@
    */
   async function askMailDoor() {
     const at = opened();
-    mintsHere = await mintsMail(location.origin);
+    mintsHere = await mintsMail(apiBase());
     closed(true, at);
   }
 
@@ -461,7 +464,7 @@
     mailBusy = true;
     mailPending = which;
     const at = opened();
-    const said = which === 'mint' ? await mintInbound(location.origin) : await revokeInbound(location.origin);
+    const said = which === 'mint' ? await mintInbound(apiBase()) : await revokeInbound(apiBase());
     closed(true, at);
     mailBusy = false;
     if (said.kind === 'unrouted') {
@@ -770,7 +773,7 @@
      */
     if (to === who.level) return;
     if (peopleFrom === 'live') {
-      void settle(() => moveLevel(location.origin, who, to), copy.levelMoved(who.name, levelSaid(to)));
+      void settle(() => moveLevel(apiBase(), who, to), copy.levelMoved(who.name, levelSaid(to)));
       return;
     }
     /**
@@ -818,7 +821,7 @@
 
   async function readPeopleNow() {
     const at = opened();
-    const out = await readPeople(location.origin);
+    const out = await readPeople(apiBase());
     if (out.from === 'live') people = out.people;
     else if (out.from === 'sample') people = [...PEOPLE_ACCESS];
     else people = [];
@@ -902,19 +905,19 @@
     e.preventDefault();
     if (!pickList) return;
     const name = lists.find((l) => l.id === pickList)?.name ?? pickList;
-    const ok = await settle(() => addException(location.origin, p, pickList, pickLevel), copy.exceptionAdded(p.name, name, levelSaid(pickLevel)));
+    const ok = await settle(() => addException(apiBase(), p, pickList, pickLevel), copy.exceptionAdded(p.name, name, levelSaid(pickLevel)));
     if (ok) picking = null;
   }
 
   function takeAway(p: Person) {
     if (peopleFrom !== 'live') cannotWrite(copy.accessWouldGo(p.name));
-    else void settle(() => removeAccess(location.origin, p), copy.accessRemoved(p.name));
+    else void settle(() => removeAccess(apiBase(), p), copy.accessRemoved(p.name));
   }
 
   function backToLevel(p: Person, register: string) {
     const list = REGISTERS[register]?.name ?? lists.find((l) => l.id === register)?.name ?? register;
     if (peopleFrom !== 'live') cannotWrite(copy.exceptionWouldGo(list, levelSaid(p.level)));
-    else void settle(() => dropException(location.origin, p, register), copy.exceptionRemoved(list, levelSaid(p.level)));
+    else void settle(() => dropException(apiBase(), p, register), copy.exceptionRemoved(list, levelSaid(p.level)));
   }
 
   /* ── inviting somebody: the link the owner sends, and the ones still waiting ── */
@@ -937,7 +940,7 @@
 
   /** Every invitation still waiting. A host older than invitations, or one with no record, lists none. */
   async function readInvitesNow() {
-    const out = await readInvites(location.origin);
+    const out = await readInvites(apiBase());
     waitingInvites = out.from === 'live' ? out.invites : [];
   }
 
@@ -952,7 +955,7 @@
     }
     inviting = true;
     const at = opened();
-    const out = await inviteEmail(location.origin, email, inviteLevel);
+    const out = await inviteEmail(apiBase(), email, inviteLevel);
     closed(true, at);
     inviting = false;
     if (!out.ok) {
@@ -975,7 +978,7 @@
       cannotWrite(copy.inviteWithdrawn(inv.email));
       return;
     }
-    const done = await settle(() => withdrawInvite(location.origin, inv.id), copy.inviteWithdrawn(inv.email));
+    const done = await settle(() => withdrawInvite(apiBase(), inv.id), copy.inviteWithdrawn(inv.email));
     if (done) await readInvitesNow();
   }
 
@@ -987,7 +990,7 @@
     if (exporting) return;
     exporting = kind;
     const at = opened();
-    const out = await exportFile(location.origin, kind, SLUG);
+    const out = await exportFile(apiBase(), kind, SLUG);
     closed(true, at);
     exporting = null;
     if (!out.ok) {
@@ -1068,7 +1071,7 @@
 
   async function readCopies() {
     const at = opened();
-    const out = await readSnapshots(location.origin);
+    const out = await readSnapshots(apiBase());
     if (out.from === 'live') liveCopies = out.snapshots;
     copiesSaid = out.from === 'refused' ? out.fix : '';
     copiesFrom = out.from;
@@ -1079,7 +1082,7 @@
     if (backingUp) return;
     backingUp = true;
     const at = opened();
-    const out = await backUpNow(location.origin);
+    const out = await backUpNow(apiBase());
     closed(true, at);
     backingUp = false;
     if (out.ok) {
@@ -1092,7 +1095,7 @@
 
   async function downloadCopy(id: string) {
     const at = opened();
-    const out = await downloadSnapshot(location.origin, id);
+    const out = await downloadSnapshot(apiBase(), id);
     closed(true, at);
     if (!out.ok) {
       if (out.from === 'sample') toasts.push(copy.notWritten(`${id} would be downloaded exactly as it sits on disk, signed`), { intent: 'warn' });
@@ -1113,7 +1116,7 @@
     if (!restoring || restoreBusy) return;
     restoreBusy = true;
     const at = opened();
-    const out = await restoreSnapshot(location.origin, restoring);
+    const out = await restoreSnapshot(apiBase(), restoring);
     closed(true, at);
     restoreBusy = false;
     if (out.ok) {
@@ -1126,7 +1129,7 @@
   /** Cloud's "restore to a time": the sample's toast, or the record's own answer, which on Cloud today says it cannot yet. */
   async function restoreToTime() {
     const at = opened();
-    const out = await restoreSnapshot(location.origin, '');
+    const out = await restoreSnapshot(apiBase(), '');
     closed(true, at);
     if (out.ok) await readCopies();
     else if (out.from === 'sample')
@@ -1154,7 +1157,7 @@
     eraseBusy = true;
     const at = opened();
     const who = eraseWho.trim();
-    const out = await erasePerson(location.origin, { subjects: who ? [who] : [], ...(erasePersonId ? { personId: erasePersonId } : {}), basis: eraseBasis.trim() });
+    const out = await erasePerson(apiBase(), { subjects: who ? [who] : [], ...(erasePersonId ? { personId: erasePersonId } : {}), basis: eraseBasis.trim() });
     closed(true, at);
     eraseBusy = false;
     if (out.ok) {
@@ -1172,7 +1175,7 @@
     if (deleting) return;
     deleting = true;
     const at = opened();
-    const out = await deleteRecordNow(location.origin, typedSlug.trim());
+    const out = await deleteRecordNow(apiBase(), typedSlug.trim());
     closed(true, at);
     deleting = false;
     if (out.ok) {
@@ -1335,7 +1338,7 @@
     placing = decl.page;
     const at = opened();
     const [write, read] = await Promise.all([import('$lib/record/page-write.ts'), import('$lib/record/pages-live.ts')]);
-    const got = await read.pagesReader(location.origin).readOne(decl.page);
+    const got = await read.pagesReader(apiBase()).readOne(decl.page);
     if (got.from !== 'live') {
       placing = null;
       closed(true, at);
@@ -1343,7 +1346,7 @@
       toasts.push(got.from === 'refused' ? got.fix : got.from === 'expanded' ? got.expanded.why : copy.recordNotReached, { intent: 'warn' });
       return;
     }
-    const out = await write.setBody(location.origin, { ...got.page.body, placed: true, nav }, undefined, got.page.version);
+    const out = await write.setBody(apiBase(), { ...got.page.body, placed: true, nav }, undefined, got.page.version);
     placing = null;
     closed(true, at);
     if (out.from !== 'written') {
@@ -1391,7 +1394,7 @@
 <div class="shell">
   <nav class="areas" bind:this={rail} aria-label={copy.settings}>
     {#each AREAS as a}
-      <a class="area" href="/settings/{a.id}" aria-current={a.id === area ? 'page' : undefined}>
+      <a class="area" href={at(`/settings/${a.id}`)} aria-current={a.id === area ? 'page' : undefined}>
         <Icon name={a.icon} size="s" />
         {a.label}
       </a>
@@ -2204,7 +2207,7 @@
               <svelte:element
                 this={here ? 'div' : 'a'}
                 class="line"
-                href={here ? undefined : '/'}
+                href={here ? undefined : at('/')}
                 role={here ? undefined : 'link'}
                 onclick={here
                   ? undefined
@@ -2520,7 +2523,7 @@
              screen without one, because a source is a declaration and arrives the way every
              declaration does (`04 §1`: `ingest` is one of the kinds an add-on carries). So the screen
              says where a new one comes from and links there. -->
-        <p class="hint sources-add">{copy.sourcesAdd} <a class="tap" href="/packs">{copy.sourcesAddGo}</a></p>
+        <p class="hint sources-add">{copy.sourcesAdd} <a class="tap" href={at('/packs')}>{copy.sourcesAddGo}</a></p>
       </Section>
 
       <!--

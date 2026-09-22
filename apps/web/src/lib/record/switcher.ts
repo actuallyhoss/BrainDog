@@ -17,6 +17,7 @@
  * is handed in so a test hands in something that is not a socket.
  */
 
+import { BASE } from '../at.ts';
 import { copy } from '../copy.ts';
 
 export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
@@ -67,12 +68,17 @@ export async function readRecordsForSwitcher(io: Fetch, base = ''): Promise<Answ
 }
 
 /** What pressing another record's row came to: it is open now, this host has no second record to open, or the host's sentence. */
-export type Opened = { from: 'opened' } | { from: 'absent' } | { from: 'refused'; fix: string };
+export type Opened = { from: 'opened'; to: string } | { from: 'absent' } | { from: 'refused'; fix: string };
 
 /**
  * `POST /auth/switch`: open another record this person is on, in this browser.
  *
- * THE SESSION ROW MOVES AND THE COOKIE DOES NOT, so the caller reloads and every read after names the record opened.
+ * THE SESSION ROW MOVES AND THE COOKIE DOES NOT, and the answer says where to go: `/app/<slug>/`, which names the record
+ * opened in the address. The caller used to reload the page it was on, whose address named no record, so a second tab
+ * on the first record silently began reading and writing the second one (`research-one-domain.md` §2.4). The switch
+ * still happens, because it is what `/app` with no slug opens next time.
+ *
+ * `/auth/switch` AND `/account/records` ARE AT THE ROOT, under no slug: they are the person's, not a record's.
  *
  * `absent` IS A HOST WITH NO SUCH DOOR: the sample on a static host answers its 404 page, and a host where nobody signs in
  * answers `ROUTE_UNKNOWN`. Neither holds a second record, so the switcher says what would have opened, as it always did.
@@ -92,7 +98,7 @@ export async function openRecord(io: Fetch, slug: string, base = ''): Promise<Op
   }
   const said: unknown = await res.json().catch(() => undefined);
   if (!isAnswer(said)) return { from: 'absent' };
-  if (said.ok) return { from: 'opened' };
+  if (said.ok) return { from: 'opened', to: `${BASE}/${slug}/` };
   if (said.refusal.code === 'ROUTE_UNKNOWN') return { from: 'absent' };
   if (res.status === 401) return { from: 'refused', fix: copy.recordOpenSignIn };
   return { from: 'refused', fix: said.refusal.fix };

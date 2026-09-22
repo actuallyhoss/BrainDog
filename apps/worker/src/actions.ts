@@ -24,6 +24,7 @@ import { openSealed } from './vault.ts';
 
 export {
   IDEMPOTENCY_KEY,
+  IN_FLIGHT,
   MAY_HAVE_LANDED,
   NO_KEY_STORE,
   REDIRECT_HOPS,

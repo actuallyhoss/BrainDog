@@ -28,7 +28,7 @@ import { ulids } from '@braindog/kernel';
 
 import { createAuth, type AuthConfig } from './identity.ts';
 
-export type { AuthConfig, Reason } from './identity.ts';
+export type { AuthConfig, DirectoryAuth, Reason, SessionAsk } from './identity.ts';
 
 /** The five a person can hold on a record. The record's own ladder, mirrored where membership lives. */
 export const LEVELS = ['read', 'append', 'write', 'decide', 'owner'] as const;
@@ -73,7 +73,39 @@ const RESERVED = new Set([
   'api', 'auth', 'mcp', 'a', 'p', 's', 'in', 'r', 'ws',
   /* And the words a name would read as the platform's rather than somebody's. */
   'admin', 'app', 'assets', 'static', 'www', 'new',
+  /* AND EVERY TOP-LEVEL WORD THE APP ROUTES, because the app now lives at `brain.dog/app/<slug>/…` and the first
+     segment after `/app/` is a page or a record's name by this set alone (`loop/research-one-domain.md` §2.4). A
+     record called `settings` would make `/app/settings/agents` two pages at once, for ever. `fonts` and `catalogue`
+     are the static folders served under `/app` beside the pages. `test/directory.test.ts` reads the app's route and
+     static folders and fails for any this set does not hold, so a route added later cannot fall behind it. */
+  'audit', 'automations', 'catalogue', 'decide', 'fonts', 'inbox', 'invite', 'jobs', 'packs', 'search', 'settings',
+  'signin', 'spark', 'start', 't', 'usage', 'v', 'vault',
 ]);
+
+/**
+ * A spoken id: one to three letters and then only digits, as `D41` or `SG31` (`19 §5`).
+ *
+ * `/app/d41` IS THE APP OPENING DECISION 41, the same shape `apps/web/src/routes/[id]/+page.svelte` matches, so a
+ * record named `d41` is a name nobody could ever reach by it. Refused as a name the day it would be claimed, which
+ * costs nothing while no record holds one and is permanent afterwards.
+ */
+const SPOKEN = /^[a-z]{1,3}[0-9]+$/;
+
+/**
+ * Whether a string could be a record's name, and the sentence when it cannot: the grammar, the platform's words and
+ * the spoken-id shape. `null` is a name.
+ *
+ * AT MODULE SCOPE AND EXPORTED, because the Worker asks the same question of every path under `/app/` before any
+ * Directory is open: a first segment this calls a name is a record's slug, and anything else is one of the app's own
+ * pages (`apps/worker/src/route.ts`, `appPath`). Two copies of the set would be two answers to which one a path is.
+ */
+export function badSlug(slug: string): string | null {
+  if (!SLUG.test(slug))
+    return `${slug} is not a name: it starts with a letter, is two to thirty-two characters of lower-case letters, digits and hyphens, and does not end with one.`;
+  if (RESERVED.has(slug)) return `${slug} is a name the platform uses for something else.`;
+  if (SPOKEN.test(slug)) return `${slug} reads as a spoken id, like D41, and brain.dog/app/${slug} opens that item rather than a record.`;
+  return null;
+}
 
 export const SCHEMA = `
 CREATE TABLE IF NOT EXISTS dir_person (
@@ -506,12 +538,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
   const mint = ulids(() => clock.now());
   const at = (): string => new Date(clock.now()).toISOString();
 
-  const bad = (slug: string): string | null => {
-    if (!SLUG.test(slug))
-      return `${slug} is not a name: it starts with a letter, is two to thirty-two characters of lower-case letters, digits and hyphens, and does not end with one.`;
-    if (RESERVED.has(slug)) return `${slug} is a name the platform uses for something else.`;
-    return null;
-  };
+  const bad = badSlug;
 
   /**
    * A name, resolved to the record it addresses.

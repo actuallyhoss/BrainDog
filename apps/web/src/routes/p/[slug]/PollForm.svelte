@@ -8,6 +8,7 @@
   Imported by the page route only, so nothing here reaches the entry chunk.
 -->
 <script lang="ts">
+  import { apiBase, at } from '$lib/at.ts';
   import { createClient } from '@braindog/client';
   import { copy } from '$lib/copy.ts';
   import Button from '$lib/ui/Button.svelte';
@@ -34,7 +35,7 @@
     fault = pollFault(draft);
     if (fault) return;
     busy = true;
-    const out = await createClient({ base: location.origin }).call<{ id?: unknown }>('propose', pollProposal(draft, { title, seq }));
+    const out = await createClient({ base: apiBase() }).call<{ id?: unknown }>('propose', pollProposal(draft, { title, seq }));
     busy = false;
     if (!out.ok) {
       fault = { at: 'file', fix: 'refusal' in out ? out.refusal.fix : copy.reportUnread };
@@ -53,7 +54,7 @@
 
   {#if filed !== null}
     <p class="poll-said" role="status">
-      {copy.pollFiled}{#if filed}{' '}<a class="tap" href="/decide/{filed}">{copy.pollOpenDecide}</a>{/if}
+      {copy.pollFiled}{#if filed}{' '}<a class="tap" href={at(`/decide/${filed}`)}>{copy.pollOpenDecide}</a>{/if}
     </p>
   {/if}
 

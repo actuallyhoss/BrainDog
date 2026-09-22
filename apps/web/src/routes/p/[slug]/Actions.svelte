@@ -14,6 +14,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { TONES } from 'braindog-render';
+  import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { NOW } from '$lib/record/api.ts';
   import { afterResume, forProject, openActions, stateOf, whatOf, words, type ActionRow, type Source } from '$lib/record/actions.ts';
@@ -45,7 +46,7 @@
 
   async function load() {
     const at = opened();
-    const out = await openActions((url, init) => fetch(url, init), '', () => NOW);
+    const out = await openActions((url, init) => fetch(url, init), apiBase(), () => NOW);
     closed(out.first.ok || out.absent, at);
     source = out.source;
     sample = Boolean(source?.sample);

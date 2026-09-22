@@ -29,6 +29,7 @@
   and a register with nothing declared gets the glyph for "a register" rather than a hole.
 -->
 <script lang="ts">
+  import { at, here as inside } from '../at.ts';
   import { page } from '$app/state';
   import { copy } from '../copy.ts';
   import { said } from '../voice.svelte.ts';
@@ -81,7 +82,9 @@
     opening = true;
     const out = await openRecord((url, init) => fetch(url, init), r.slug, location.origin);
     opening = false;
-    if (out.from === 'opened') return location.assign('/');
+    /* A WHOLE NAVIGATION AND NOT `goto`. Every answer this tab kept (the record's `boot`, its voice, the rail's prefs) was
+       read from the record being left, and a load is the one thing that forgets all of them at once. */
+    if (out.from === 'opened') return location.assign(out.to);
     toasts.push(out.from === 'absent' ? copy.notWritten(copy.otherRecord(r.name)) : out.fix, out.from === 'absent' ? {} : { intent: 'warn' });
   }
 
@@ -239,8 +242,10 @@
     }
   }
 
-  const here = (href: string) => page.url.pathname === href;
-  const under = (href: string) => page.url.pathname.startsWith(href);
+  /* COMPARED INSIDE THE RECORD. `page.url` is the address as it came, `/app/acme/decide`, and these links are written
+     `/decide`, so the comparison reads the address with the base and the slug taken off (`lib/at.ts`). */
+  const here = (href: string) => inside(page.url.pathname) === href;
+  const under = (href: string) => inside(page.url.pathname).startsWith(href);
   /**
    * WHICH SECTIONS THIS PERSON HAS PUT AWAY.
    *
@@ -387,8 +392,8 @@
       -->
       {#if refused}<p class="mi-note">{refused}</p>{/if}
       <hr class="mi-rule" />
-      <a class="mi" role="menuitem" href="/settings/identity"><Icon name="settings" size="s" />{copy.recordSettings}</a>
-      <a class="mi" role="menuitem" href="/start"><Icon name="plus" size="s" />{copy.newRecord}</a>
+      <a class="mi" role="menuitem" href={at('/settings/identity')}><Icon name="settings" size="s" />{copy.recordSettings}</a>
+      <a class="mi" role="menuitem" href={at('/start')}><Icon name="plus" size="s" />{copy.newRecord}</a>
     </Menu>
   {/snippet}
 
@@ -423,12 +428,12 @@
        different product, so no pack may add to it, reorder it or badge it. -->
   <ul class="group spine">
     <li>
-      <a class="item tap" href="/" data-label={said('home')} aria-current={here('/') ? 'page' : undefined}>
+      <a class="item tap" href={at('/')} data-label={said('home')} aria-current={here('/') ? 'page' : undefined}>
         <Icon name="home" size="m" /><span class="item-name">{said('home')}</span>
       </a>
     </li>
     <li>
-      <a class="item tap" href="/decide" data-label={said('decide')} aria-current={under('/decide') ? 'page' : undefined}>
+      <a class="item tap" href={at('/decide')} data-label={said('decide')} aria-current={under('/decide') ? 'page' : undefined}>
         <Icon name="decide" size="m" /><span class="item-name">{said('decide')}</span>
         <!-- ONE TREATMENT FOR EVERY NUMBER IN THIS RAIL. These two were bordered pills and the
              registers' were bare tabular figures, so the same fact — how many rows are behind this
@@ -444,7 +449,7 @@
       </a>
     </li>
     <li>
-      <a class="item tap" href="/inbox" data-label={said('inbox')} aria-current={under('/inbox') ? 'page' : undefined}>
+      <a class="item tap" href={at('/inbox')} data-label={said('inbox')} aria-current={under('/inbox') ? 'page' : undefined}>
         <Icon name="inbox" size="m" /><span class="item-name">{said('inbox')}</span>
         {#if inbox}<span class="tally num">{inbox}</span>{/if}
       </a>
@@ -461,7 +466,7 @@
                  you are looking for is the one you already recognise. -->
             <a
               class="item tap"
-              href={entry.href}
+              href={at(entry.href)}
               data-nav={entry.href}
               data-label={label}
               aria-current={here(entry.href) ? 'page' : undefined}
@@ -558,7 +563,7 @@
            list and the two must not be able to disagree. -->
       {#each lists as r}
         <li>
-          <a class="item tap" href="/r/{r.id}" data-label={r.name} aria-current={under(`/r/${r.id}`) ? 'page' : undefined}>
+          <a class="item tap" href={at(`/r/${r.id}`)} data-label={r.name} aria-current={under(`/r/${r.id}`) ? 'page' : undefined}>
             <Icon name={r.icon} size="m" />
             <span class="item-name">{r.name}</span>
             <span class="tally num">{r.count}</span>
@@ -571,7 +576,7 @@
                NO GLYPH, AND INDENTED. It is not a sibling of the list; it is a way of looking at it,
                and the indent is what says so without a second section to read. -->
           {#each r.views ?? [] as v}
-            <a class="item view tap" href={v.href} aria-current={under(v.href) ? 'page' : undefined}>
+            <a class="item view tap" href={at(v.href)} aria-current={under(v.href) ? 'page' : undefined}>
               <span class="item-name">{v.name}</span>
             </a>
           {/each}
@@ -582,7 +587,7 @@
 
     {#if hiddenHere > 0}
       <!-- THE WAY BACK, WHERE THE PAGE WAS. A page hidden from the rail is findable from the rail. -->
-      <a class="pen tap" href="/settings/navigation#hidden" data-label={copy.hiddenCount(hiddenHere)} data-hidden-row>
+      <a class="pen tap" href={at('/settings/navigation#hidden')} data-label={copy.hiddenCount(hiddenHere)} data-hidden-row>
         <Icon name="eye" size="m" />
         <span class="pen-text">{copy.hiddenCount(hiddenHere)}</span>
         <span class="pen-action">{copy.showHidden}</span>
@@ -594,7 +599,7 @@
            returns it to its stored order, never to the end of the list (19 §3). -->
       <!-- The one row in this rail that had no glyph, sitting between groups that all have one.
            This file's own header argues against exactly that. -->
-      <a class="pen tap" href="/settings/navigation" data-label={copy.suggested}>
+      <a class="pen tap" href={at('/settings/navigation')} data-label={copy.suggested}>
         <Icon name="alert" size="m" />
         <span class="pen-text">{pen.length === 1 ? copy.suggestedPage : `${pen.length} suggested pages.`}</span>
         <span class="pen-action">{copy.review}</span>
@@ -634,8 +639,8 @@
     <div class="utils">
       <!-- SPARK SITS WITH THE TOOLS THAT SHAPE THE RECORD, beside Packs. Its label is its name, and its tooltip and spoken
            name say what it is, since Spark is not a word a person uses about their business. -->
-      {#each [['/audit', copy.audit, 'clock', '/audit', copy.audit], ['/spark', 'Spark', 'star', '/spark', copy.sparkRail], ['/packs', copy.packs, 'packs', '/packs', copy.packs], ['/automations', copy.automations, 'refresh', '/automations', copy.automations], ['/vault', copy.vault, 'vault', '/vault', copy.vault], ['/settings/appearance', copy.settings, 'settings', '/settings', copy.settings]] as const as [href, label, glyph, at, said]}
-        <a class="util tap" {href} data-label={label} aria-label={said} title={said} aria-current={under(at) ? 'page' : undefined}>
+      {#each [['/audit', copy.audit, 'clock', '/audit', copy.audit], ['/spark', 'Spark', 'star', '/spark', copy.sparkRail], ['/packs', copy.packs, 'packs', '/packs', copy.packs], ['/automations', copy.automations, 'refresh', '/automations', copy.automations], ['/vault', copy.vault, 'vault', '/vault', copy.vault], ['/settings/appearance', copy.settings, 'settings', '/settings', copy.settings]] as const as [href, label, glyph, area, said]}
+        <a class="util tap" href={at(href)} data-label={label} aria-label={said} title={said} aria-current={under(area) ? 'page' : undefined}>
           <Icon name={glyph} size="m" />
         </a>
       {/each}

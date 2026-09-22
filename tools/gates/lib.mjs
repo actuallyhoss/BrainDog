@@ -201,6 +201,16 @@ export function buildVariants(root) {
 }
 
 /**
+ * WHERE THE APP IS SERVED, AND WHERE ITS SHELL IS ON DISK (`loop/research-one-domain.md` §3.2).
+ *
+ * The app is `brain.dog/app`, so `svelte.config.js` writes it to `build/app` and the Worker serves `build/` as it did.
+ * Every browser gate serves `build/` at the root the same way and opens `/app<route>`; its SPA fallback is this shell,
+ * because `build/index.html` no longer exists and a fallback to it would answer every route with a 404.
+ */
+export const APP_BASE = '/app';
+export const appShell = (buildRoot) => join(buildRoot, 'app', 'index.html');
+
+/**
  * When a build directory was written: the later of the directory and its `index.html`.
  *
  * THE DIRECTORY BECAUSE `adapter-static` EMPTIES AND REFILLS IT, so its time moves with every build,
@@ -209,9 +219,10 @@ export function buildVariants(root) {
  * tenth of a microsecond on `build/` and on each of the three variants.
  */
 function builtAt(dir) {
-  const shell = join(dir, 'index.html');
-  const own = statSync(dir).mtimeMs;
-  return existsSync(shell) ? Math.max(own, statSync(shell).mtimeMs) : own;
+  /* `app/index.html` SINCE THE APP MOVED UNDER `/app`, and the old place too, so a tree built before the move is still
+     read by the same rule rather than by its directory's time alone. */
+  const shells = [appShell(dir), join(dir, 'index.html')].filter((f) => existsSync(f));
+  return Math.max(statSync(dir).mtimeMs, ...shells.map((f) => statSync(f).mtimeMs));
 }
 
 /**

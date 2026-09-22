@@ -10,6 +10,7 @@
   stop resolving. Change the display name instead; it is free.
 -->
 <script lang="ts">
+  import { apiBase, at } from '$lib/at.ts';
   import { untrack } from 'svelte';
   import { titleOf } from '$lib/title.ts';
   import { listFromDraft, listLine } from '$lib/record/tags.ts';
@@ -120,14 +121,14 @@
     archived = false;
     stopEdit();
     const at = opened();
-    reader ??= rowReader(location.origin);
-    links ??= linkReader(location.origin);
+    reader ??= rowReader(apiBase());
+    links ??= linkReader(apiBase());
     /* THREE READS IN ONE BRACKET, for the reason the two were: `data-screen` must not appear between
        them, and what points at a row is part of the row's screen rather than a thing that arrives
        after it. */
     const [r, h, l] = await Promise.all([
       reader.read(register, n),
-      readHistory(location.origin, register, n),
+      readHistory(apiBase(), register, n),
       links.read(register, n),
     ]);
     const current = askedFor === key;
@@ -168,7 +169,7 @@
     const n = seq;
     const key = `${register}#${n}`;
     noting = true;
-    writer ??= rowWriter(location.origin);
+    writer ??= rowWriter(apiBase());
     const out = await writer.note(register, n, said);
     noting = false;
     if (!out.ok) {
@@ -178,7 +179,7 @@
     if (askedFor !== key) return;
     if (noteText.trim() === said) noteText = '';
     const at = opened();
-    const h = await readHistory(location.origin, register, n);
+    const h = await readHistory(apiBase(), register, n);
     const current = askedFor === key;
     closed(!current || h.from !== 'refused', at);
     if (current) told = h;
@@ -316,7 +317,7 @@
   async function refreshHistory(register: string, n: number) {
     const key = `${register}#${n}`;
     const at = opened();
-    const h = await readHistory(location.origin, register, n);
+    const h = await readHistory(apiBase(), register, n);
     const current = askedFor === key;
     closed(!current || h.from !== 'refused', at);
     if (current) told = h;
@@ -341,7 +342,7 @@
     const key = `${register}#${n}`;
     saving = true;
     problem = null;
-    writer ??= rowWriter(location.origin);
+    writer ??= rowWriter(apiBase());
     const out = await writer.update(register, n, patchOf(f), row.version);
     saving = false;
     if (askedFor !== key) return;
@@ -378,7 +379,7 @@
     const n = seq;
     const key = `${register}#${n}`;
     saving = true;
-    writer ??= rowWriter(location.origin);
+    writer ??= rowWriter(apiBase());
     const out = to ? await writer.archive(register, n, row.version) : await writer.restore(register, n, row.version);
     saving = false;
     if (askedFor !== key) return;
@@ -411,7 +412,7 @@
     if (!live || namesAsked) return;
     if (!history.some((e) => /^p_/u.test(e.by) && e.by !== me)) return;
     namesAsked = true;
-    void readNames(location.origin).then((m) => (people = m));
+    void readNames(apiBase()).then((m) => (people = m));
   });
   const addedWho = $derived(addedBy ? whoDid(addedBy, me || null, people) : null);
 
@@ -579,7 +580,7 @@
                `goto` takes, which draws "There is no obligation #-1" over the top of the press that
                was working: the error this whole change exists to remove, flashed on the way out. */
             const named = String(row.fields[decl.title] ?? decl.one.toLowerCase());
-            void goto(`/r/${id}`).then(() => {
+            void goto(at(`/r/${id}`)).then(() => {
               pending.drop(id, seq);
               toasts.push(copy.undoneRow(named));
             });
@@ -703,7 +704,7 @@
                     <span class="rel">{relative(String(value), clock)}</span>
                   {:else if id === 'session' && f.id === 'project' && spokenRow(value, names)}
                     <!-- A RUN'S PROJECT IS HELD AS A SPOKEN ID. It reads as the project, and opens it. -->
-                    <a href={spokenRow(value, names)!.href}>{spokenRow(value, names)!.label}</a>
+                    <a href={at(spokenRow(value, names)!.href)}>{spokenRow(value, names)!.label}</a>
                   {:else if f.type === 'enum'}
                     <span class="enum-word">{copy.valueWord(display(id, f.id, value, clock, names) ?? '')}</span>
                   {:else}
@@ -795,7 +796,7 @@
             </h2>
             <Table columns={rel.columns} rows={rel.rows} total={rel.total} label="{rel.name} · {rel.label}" />
             {#if rel.total > rel.rows.length}
-              <a class="incoming-more" href={rel.href}>
+              <a class="incoming-more" href={at(rel.href)}>
                 All {rel.total} <Icon name="chevron" size="s" />
               </a>
             {/if}

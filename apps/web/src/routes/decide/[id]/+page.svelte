@@ -31,6 +31,7 @@
   about one act.
 -->
 <script lang="ts">
+  import { apiBase, at } from '$lib/at.ts';
   import { titleOf } from '$lib/title.ts';
   import { day, queueCost, since, symbolText } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
@@ -80,7 +81,7 @@
 
   async function readLive(id: string) {
     const at = opened();
-    client ??= createClient({ base: location.origin });
+    client ??= createClient({ base: apiBase() });
     const [out, opens] = await Promise.all([readOne(client, id), everyGovernance(client, { status: 'open' })]);
     queue = opens.ok ? opens.value.map((r) => String(r.id)) : [];
     /* An answer for a question somebody has already navigated away from draws nothing. */
@@ -264,7 +265,7 @@
       const to = e.key === 'j' ? nextId : prevId;
       if (to && to !== page.params.id) {
         e.preventDefault();
-        void goto(`/decide/${to}`);
+        void goto(at(`/decide/${to}`));
       }
       return;
     }
@@ -368,7 +369,7 @@
     sending = true;
     const accepting = a.option === 'accept' && about !== undefined && isArranging(about.kind) ? about : null;
     const had = accepting ? sidebarNow() : null;
-    const out = await answerQuestion(location.origin, a.question, a.option, reason, undefined, a.option === 'accept' && picked ? picked : undefined);
+    const out = await answerQuestion(apiBase(), a.question, a.option, reason, undefined, a.option === 'accept' && picked ? picked : undefined);
     sending = false;
     /* AN ARRANGEMENT THAT DID NOT ALL LAND. The record reopened the question, so the options come back under what was
        done and what was not, and the rail reads again for what did land. */
@@ -416,12 +417,12 @@
          `2026-09-17`, the storage spelling, in a sentence about when somebody will next look at a
          decision. `day()` is the one formatter and it was one call away. */
       toasts.push(copy.deferred(day(wake)), { intent: 'warn' });
-      void goto(onwardTo ? `/decide/${onwardTo}` : '/decide');
+      void goto(at(onwardTo ? `/decide/${onwardTo}` : '/decide'));
       return;
     }
     if (!question || sending) return;
     sending = true;
-    const out = await parkQuestion(location.origin, question.id, wake, reason);
+    const out = await parkQuestion(apiBase(), question.id, wake, reason);
     sending = false;
     if (await unsent(out, question.id)) return;
     fix = '';
@@ -431,7 +432,7 @@
     /* PARKED, SO IT HAS LEFT THE QUEUE: the next question, as a decision takes you to it, and the
        queue when there is none. Staying put was the dead end: the read is not taken again here, so
        the question it had just parked was drawn open underneath the toast that said it was parked. */
-    void goto(onwardTo ? `/decide/${onwardTo}` : '/decide');
+    void goto(at(onwardTo ? `/decide/${onwardTo}` : '/decide'));
   }
 
   /**

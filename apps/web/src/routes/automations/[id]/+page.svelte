@@ -21,6 +21,7 @@
   way to see it (21 §3.1's text lens).
 -->
 <script lang="ts">
+  import { apiBase, at } from '$lib/at.ts';
   import { untrack } from 'svelte';
   import { page } from '$app/state';
   import { since } from 'braindog-render';
@@ -77,7 +78,7 @@
 
   async function load(want: string) {
     const at = opened();
-    const out = await openAutomations((url, init) => fetch(url, init), '', () => NOW);
+    const out = await openAutomations((url, init) => fetch(url, init), apiBase(), () => NOW);
     source = out.source;
     const rows = out.first.ok ? out.first.value : [];
     taken = rows.map((r) => r.id);
@@ -111,7 +112,7 @@
   }
 
   async function readDeclared() {
-    const out = await openActions((url, init) => fetch(url, init), '', () => NOW);
+    const out = await openActions((url, init) => fetch(url, init), apiBase(), () => NOW);
     declared = out.first.ok ? out.first.value : [];
   }
 
@@ -278,7 +279,7 @@
         {#if filed && !flow.dirty}
           <p class="said" role="status">
             {sample ? words.notFiled : words.filed}
-            {#if filed.id}<a class="tap" href="/decide/{filed.id}">{words.openDecide}</a>{/if}
+            {#if filed.id}<a class="tap" href={at(`/decide/${filed.id}`)}>{words.openDecide}</a>{/if}
           </p>
         {:else if refusal}
           <p class="said" data-intent="warn" role="status">{refusal}</p>

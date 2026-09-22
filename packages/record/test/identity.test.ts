@@ -781,6 +781,68 @@ test('A SWITCH ASKS THE RECORD ITSELF, and a name that only folds to a slug open
   }
 });
 
+/* ── a request that names its record ──────────────────────────────────── */
+
+test('A SESSION ASKED WITH A SLUG ANSWERS THAT RECORD FOR A MEMBER, the same 403 for everybody else, and writes no row', async () => {
+  /* THE BROWSER NOW NAMES ITS RECORD IN THE PATH (`/app/<slug>/api/…`, `loop/research-one-domain.md` §2.4), and this is
+     the check that runs before the Worker addresses anything. It is `switch`'s own question without `switch`'s write:
+     it runs on every request, and the Directory is the one writer the whole installation signs in through. */
+  const raw = openSqlite();
+  const writes: string[] = [];
+  const note = (text: string) => {
+    if (/^\s*(INSERT|UPDATE|DELETE)\b[\s\S]*\bdir_session\b/i.test(text)) writes.push(text.trim().split(/\s+/).slice(0, 3).join(' '));
+  };
+  const sql: typeof raw = {
+    ...raw,
+    exec: (text, ...params) => (note(text), raw.exec(text, ...params)),
+    all: (text, ...params) => (note(text), raw.all(text, ...params)),
+    one: (text, ...params) => (note(text), raw.one(text, ...params)),
+    transactionSync: (fn) => raw.transactionSync(fn),
+  };
+  const d = createDirectory(sql, fixedClock(NOW), { mac: new Uint8Array(32).fill(7), magic: true, key: { serverKey } });
+  const ada = value<{ id: string }>(d.person$('ada@example.com', 'Ada')).id;
+  const studio = value<{ record: string }>(d.provision({ slug: 'the-studio', email: 'ada@example.com' })).record;
+  const shop = value<{ record: string }>(d.provision({ slug: 'the-shop', email: 'ada@example.com' })).record;
+  const gone = value<{ record: string }>(d.provision({ slug: 'the-old-shop', email: 'ada@example.com' })).record;
+  value(d.close(gone));
+  /* SIGNED IN BEFORE BOB EXISTS, because the server key refuses a Directory with two people in it. */
+  const sid = sidOf(await keyIn(d));
+  value(d.person$('bob@example.com', 'Bob'));
+  value(d.provision({ slug: 'bobs-books', email: 'bob@example.com' }));
+  writes.length = 0;
+
+  const named = ok(await d.auth({ flow: 'session', sid, slug: 'the-shop' }));
+  assert.deepEqual(named.body, { person: ada, email: 'ada@example.com', record: shop, provedAt: NOW });
+  assert.equal(named.session, undefined, 'a named read minted a cookie');
+  assert.deepEqual(writes, [], 'asking which record a slug names wrote the session row');
+  /* THE ROW STILL SAYS WHERE THE SESSION WAS OPENED, so bare `/app` goes back there and not to the last tab read. */
+  assert.equal(ok(await d.auth({ flow: 'session', sid })).body.record, studio);
+
+  /* SOMEBODY ELSE'S RECORD, A CLOSED ONE, A NAME NOBODY HOLDS, A SPOKEN ID AND GARBAGE: ONE ANSWER, WORD FOR WORD. A
+     different sentence for "no such name" would be an oracle for which names exist, readable by anybody signed in. */
+  const NOT_ON = { code: 'FORBIDDEN', fix: 'You are not on this record.' };
+  for (const slug of ['bobs-books', 'the-old-shop', 'nobody-here', 'd41', '', 'the-ſhop', 'x'.repeat(40)]) {
+    const refused = await d.auth({ flow: 'session', sid, slug });
+    assert.equal(refused.status, 403, JSON.stringify(slug));
+    assert.deepEqual('refusal' in refused && refused.refusal, NOT_ON, JSON.stringify(slug));
+  }
+  assert.deepEqual(writes, [], 'a refused slug wrote the session row');
+
+  /* AND A DEAD COOKIE IS STILL THE ONE 401 THAT CLEARS IT, whatever the slug: the slug is asked only of a live session. */
+  notYou(await d.auth({ flow: 'session', sid: 'C'.repeat(43), slug: 'the-shop' }), true);
+});
+
+test('A NAMED SESSION ON A DAY-OLD COOKIE CARRIES THE ROTATION, on the 200 and on the 403 alike', async () => {
+  const { d, clock } = setup();
+  const sid = sidOf(await keyIn(d));
+  clock.set(NOW + DAY + 1);
+  const refused = await d.auth({ flow: 'session', sid, slug: 'somebody-elses' });
+  assert.equal(refused.status, 403);
+  const next = refused.session;
+  if (!next || next === 'clear') return assert.fail('a refused named read dropped the rotation, and the browser keeps an id about to die');
+  assert.equal(ok(await d.auth({ flow: 'session', sid: next.sid, slug: 'the-studio' })).session, undefined);
+});
+
 /* ── the migration ────────────────────────────────────────────────────── */
 
 test('A DIRECTORY WRITTEN BY VERSION 2 IS BROUGHT FORWARD, and signs its person in', async () => {

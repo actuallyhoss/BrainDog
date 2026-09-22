@@ -38,6 +38,7 @@
   addresses. `views.ts` still exports `viewMovedTo` with nobody left to call it.
 -->
 <script lang="ts">
+  import { apiBase, at } from '$lib/at.ts';
   import { untrack } from 'svelte';
   import { titleOf } from '$lib/title.ts';
   import { goto } from '$app/navigation';
@@ -119,7 +120,7 @@
     askedFor = asked;
     got = null;
     const at = opened();
-    reader ??= viewReader(location.origin);
+    reader ??= viewReader(apiBase());
     const out = await reader.read(address, filters, query);
     const current = askedFor === asked;
     closed(!current || out.from !== 'refused', at);
@@ -212,7 +213,7 @@
     if (silenced(e) || e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.key === 'o' && register) {
       e.preventDefault();
-      void goto(`/r/${register}`);
+      void goto(at(`/r/${register}`));
     }
   }
 
@@ -373,7 +374,7 @@
         cap={DOM_CAP}
         label={name}
         bind:focus
-        onactivate={(row) => goto(`/r/${register}/${row.key.split('#')[1]}`)}
+        onactivate={(row) => goto(at(`/r/${register}/${row.key.split('#')[1]}`))}
       />
     </div>
     {/if}

@@ -45,13 +45,14 @@ import { catalogueAnswer, catalogueFolder, catalogueOffersFrom } from './catalog
 import { certificateNames, originFor } from './reach.ts';
 import { fileSnapshots, type FileSnapshots } from './snapshots.ts';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
-import { createDirectory, switcherAsk, type Directory } from '@braindog/record/directory';
+import { badSlug, createDirectory, switcherAsk, type Directory } from '@braindog/record/directory';
 import type { Auth, Param, Refusal, Row, Scheduler, Sql } from '@braindog/ports';
 
 import {
   actionExecutor,
   holding,
   holdingPaged,
+  IN_FLIGHT,
   keyOpener,
   meterPass,
   pass,
@@ -163,6 +164,25 @@ const NOT_YOU: Refusal = { code: 'UNAUTHORIZED', fix: 'That did not sign you in.
 
 /** A write that a page somewhere else sent, riding on this process's ambient authority. */
 const CROSS: Refusal = { code: 'FORBIDDEN', fix: 'A change here is accepted only from a page this BrainDog served.', at: 'origin' };
+
+/**
+ * A slug in the path that is not this host's record. Word for word the Directory's sentence for a name that is not the
+ * caller's (`packages/record/src/identity.ts`), which the Worker answers too, so one record says one thing on both hosts.
+ */
+const NOT_ON: Refusal = { code: 'FORBIDDEN', fix: 'You are not on this record.' };
+
+/**
+ * `/app/<slug>/api/<method>`: the slug a path names and the `/api/…` path the record reads, or `null`.
+ *
+ * THE DIRECTORY'S `badSlug` SAYS WHAT A NAME IS, as the Worker's `appPath` asks it. So `/app/settings/api/x` and
+ * `/app/api/boot` name no record and are left to the shell, and nothing here keeps a second list of the app's words.
+ */
+function slugApi(pathname: string): { slug: string; rest: string } | null {
+  const m = /^\/+app\/+([^/]+)(\/+api(?:\/.*)?)$/.exec(pathname);
+  if (!m || badSlug(m[1]!) !== null) return null;
+  /* ONE LEADING SLASH, because `//api/boot` resolved against an origin is a URL whose host is `api`. */
+  return { slug: m[1]!, rest: m[2]!.replace(/^\/+/, '/') };
+}
 
 /** Why an owner cannot invite anybody here: nobody but the owner can sign in, so the link would lead nowhere. */
 const INVITES_OFF = 'Nobody else can sign in to this BrainDog yet, so an invitation link would lead nowhere. Start it with BRAINDOG_TOKEN, a session key and a directory first.';
@@ -709,7 +729,7 @@ export async function start(options: {
   tls?: { cert: string; key: string } | undefined;
   /** The built app to serve for every path that is not `/api`, `/auth` or `/mcp`. Absent: those paths are 404. */
   shell?: string | undefined;
-  /** A folder of published use cases served read-only under `/catalogue/` (`catalogue.ts`), or none. */
+  /** A folder of published use cases served read-only under `/app/catalogue/` (`catalogue.ts`), or none. */
   catalogue?: string | undefined;
   /** 32 bytes for the Directory's MACs, derived from the KEK or `BRAINDOG_SESSION_SECRET`. Absent: no sessions. */
   sessionKey?: Uint8Array | undefined;
@@ -936,12 +956,19 @@ export async function start(options: {
         keys: options.keys,
       });
       /* ONE ADMISSION COUNT FOR ALL THREE, so a record with one run left cannot spend it twice. */
-      const admissions = pass();
-      const out = await api.kernel.runActions(holding(execute, record, ledger.mayRun, admissions), {
-        page: holdingPaged(paged, record, ledger.mayRun, admissions),
-        script: holdingScript(script, record, ledger.mayRun, admissions),
-      });
-      await meterPass(ledger.meter, record, out.usage);
+      /* AND IT IS THE RUNTIME'S COUNT, so a trial in its sandbox and this pass cannot each spend the last run. */
+      const admissions = pass(IN_FLIGHT);
+      let out;
+      try {
+        out = await api.kernel.runActions(holding(execute, record, ledger.mayRun, admissions), {
+          page: holdingPaged(paged, record, ledger.mayRun, admissions),
+          script: holdingScript(script, record, ledger.mayRun, admissions),
+        });
+        await meterPass(ledger.meter, record, out.usage);
+      } finally {
+        /* A PASS THAT NEVER SETTLES HOLDS ITS RECORD'S RUNS FOR THE LIFE OF THE RUNTIME, so this is in a finally. */
+        admissions.settle();
+      }
       if (out.fired > 0 || out.ran > 0 || out.dropped > 0) await api.kernel.tail(scheduler);
     } catch (e) {
       console.error('actions:', e instanceof Error ? e.message : String(e));
@@ -1056,7 +1083,17 @@ export async function start(options: {
               }),
               ledger: { mayRun: (r, a, p) => (ledger ? ledger.mayRun(r, a, p) : null), meter: (r, run) => ledger?.meter(r, run) },
               now: clock.now,
-            })({ record: d.record, body: d.body as never, input: d.input as never, reads: d.reads as never, grantOf: d.owner ? grantNamed(() => api.kernel.grants()) : null });
+            })({
+              record: d.record,
+              body: d.body as never,
+              input: d.input as never,
+              reads: d.reads as never,
+              grantOf: d.owner ? grantNamed(() => api.kernel.grants()) : null,
+              /* AN OWNER WHOSE PROOF IS OLD IS TOLD TO SIGN IN AGAIN, not that the record holds no key (`script-try.ts`
+                 `STALE`). The record works it out from the vault's own gate; left off here, the key stayed shut and the
+                 run was told the record holds none, which sent her looking for a key that was there. */
+              stale: d.stale,
+            });
           },
     /* SPARK'S MODEL, when this host points at one; the record files what it drafts through the proposal door or not at all. */
     sparkModel,
@@ -1401,10 +1438,20 @@ async function answer(
   shell: ((request: Request) => Response) | null,
   trustProxy: boolean,
 ): Promise<void> {
-  const url = `http://localhost${req.url ?? '/'}`;
+  const asked = new URL(`http://localhost${req.url ?? '/'}`);
   const method = req.method ?? 'GET';
   const headers = Object.entries(req.headers).map(([k, v]): [string, string] => [k, Array.isArray(v) ? v.join(', ') : (v ?? '')]);
   if (!site) return write(res, json(503, { ok: false }));
+
+  /* `/app/<slug>/api/<method>` IS `/api/<method>`, READ AT THE ROOT (`loop/research-one-domain.md` §2.4). The web sends
+     every record call under a slug there (`apps/web/src/lib/at.ts` `apiBase`), and this handed the path to the shell,
+     which answered `index.html` and a 200 to a tab that then read a page as its record (`test/app-path.test.ts`). The
+     path is moved before anything else reads it, because `serveApi` takes the method from the path, as the Worker's
+     `atRoot` does for the same reason. A slug that is not this record's is `foreign`, and is refused below once the
+     caller is known, so a request with no credential gets the root's own 401 and learns nothing about which name is here. */
+  const named = slugApi(asked.pathname);
+  const url = named === null ? asked.href : new URL(`${named.rest}${asked.search}`, asked.origin).href;
+  const foreign = named !== null && named.slug !== site.api.kernel.identity()?.slug;
 
   /* FOUR DOORS, AND THEY ARE `33 §4`'S: sign-in, an agent's MCP client, the record, and the app for everything
      else. The app is what makes `/signin` the same origin as the cookie it asks for. `/mcp` is taken before a
@@ -1445,10 +1492,22 @@ async function answer(
     return write(res, shell ? shell(request) : json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record method is at /api/<method>.' } }));
 
   /* THE KEY DOORS, BEFORE ANY OTHER CREDENTIAL IS READ: their bearer is a vault grant, which `contextFor` would
-     not know, and a cookie or a login token must not reach them at all. */
-  if (servesVault(path)) return write(res, await serveVault(request, site.vault));
+     not know, and a cookie or a login token must not reach them at all. AND ONLY AT THE ROOT: a grant names its own
+     record, so a slug in front of it would be a second answer to which record, and the Worker refuses the same path in
+     the same words (`apps/worker/src/index.ts` `recordApi`). */
+  if (servesVault(path))
+    return write(
+      res,
+      named === null
+        ? await serveVault(request, site.vault)
+        : json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'The key doors are at /api/vault/, and a grant names its own record.' } }),
+    );
 
   const seen = await contextFor(request, req.headers.host ?? '', site);
+  /* A NAME THAT IS NOT THIS RECORD'S, TO A CALLER THIS HOST KNOWS. One record is served here, so no credential reaches
+     another, and the sentence is the Directory's for a name that is not yours, whether or not it names anything. A
+     caller it does not know falls through to the root's own refusal below, which never reaches the record. */
+  if (foreign && 'ctx' in seen) return write(res, json(403, { ok: false, refusal: NOT_ON }), seen.cookie);
   /* THE SESSION HEADERS ON EVERY DOOR, checked: the record reads a token's and ignores anybody else's. */
   /* A KEPT COPY AS THE FILE IT IS (`49 §5.13`): `GET /api/snapshots/<id>`, for whoever `snapshots` answers. */
   const copyAsked = /^\/+api\/+snapshots\/+([^/]+)\/*$/.exec(path);

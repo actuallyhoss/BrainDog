@@ -14,6 +14,7 @@
 
 import { createClient, type EraseReport, type Invitation, type Invited, type Level, type Member, type Restored, type Snapshot } from '@braindog/client';
 
+import { BASE } from '../at.ts';
 import { copy } from '../copy.ts';
 import type { Fetch } from './boot-live.ts';
 import { noRecord } from './device.ts';
@@ -124,8 +125,10 @@ export async function removeAccess(base: string, p: Person, io?: Fetch): Promise
 /**
  * The link an invitation is opened at. The token rides in the fragment, so it never reaches a server log, a proxy or a
  * `Referer`: `/invite` reads it and clears it before anything else.
+ *
+ * `/app/invite` AND NO SLUG. The token names its record, and the person opening it is on no record yet, or on another.
  */
-export const inviteLink = (origin: string, token: string): string => `${origin.replace(/\/+$/, '')}/invite#${token}`;
+export const inviteLink = (origin: string, token: string): string => `${origin.replace(/\/+$/, '')}${BASE}/invite#${token}`;
 
 /** Mint one for an address. The answer holds the only copy of the link, to show once and keep nowhere. */
 export async function inviteEmail(base: string, email: string, level: Level, io?: Fetch): Promise<Wrote<Invited>> {

@@ -94,6 +94,10 @@ test('no-record refusals draw the sample, and a record that refuses for a reason
   assert.equal(noRecord('UNAUTHORIZED'), true);
   assert.equal(noRecord('FORBIDDEN'), false);
   assert.equal(noRecord('NEEDS_BROWSER_SESSION'), false);
+  /* UNDER A SLUG THERE IS ALWAYS A RECORD MEANT, so neither refusal is the sample: it would be drawn dressed as acme. */
+  assert.equal(noRecord('UNAUTHORIZED', '/app/acme/r/tasks'), false);
+  assert.equal(noRecord('UNREACHABLE', '/app/acme/'), false);
+  assert.equal(noRecord('UNAUTHORIZED', '/app/r/tasks'), true);
 });
 
 /* ── what a grant reaches ── */
@@ -191,6 +195,8 @@ test('a revoked token is not listed as standing', () => {
 test('the two lines to copy name the origin and carry no token', () => {
   const lines = connectLines('https://record.example');
   assert.equal(lines.login, 'braindog login https://record.example');
+  /* THE CLOUD DEVICE FLOW NEEDS A SLUG, and the line had none: `braindog login https://brain.dog` was refused there. */
+  assert.equal(connectLines('https://brain.dog', 'acme').login, 'braindog login https://brain.dog/app/acme');
   const json = /^claude mcp add-json braindog '(.+)' --scope user$/.exec(lines.mcp)?.[1];
   assert.ok(json, lines.mcp);
   assert.deepEqual(JSON.parse(json), { type: 'stdio', command: 'braindog', args: ['mcp', '--agent', 'claude'] });

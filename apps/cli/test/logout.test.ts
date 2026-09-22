@@ -163,6 +163,20 @@ test('A BARE NAME NAMES THE SAME HOST AS ITS https ADDRESS', async (t) => {
   assert.deepEqual(readBack(file), { hosts: {} });
 });
 
+test('THE ADDRESS THE APP PRINTS, brain.dog/app/<slug>, IS THE SAME HOST AS THE KEY A LOGIN KEPT', async (t) => {
+  /* `loop/research-one-domain.md` Brief D. The connect screen prints `/app/<slug>` and a login keeps `/<slug>`,
+     so a logout typed from the screen that left the entry behind would say "nothing to remove" over a live bearer. */
+  const kept = 'https://brain.dog/acme';
+  const { file } = config(t, { default: kept, hosts: { [kept]: { token: held(TOKEN) }, [OTHER]: { token: held(OTHER_TOKEN) } } });
+
+  const out = await call(['https://brain.dog/app/acme/'], file);
+
+  assert.equal(out.code, 0, out.stderr);
+  assert.deepEqual(out.lines, [`signed out of ${kept} · a token removed · no default host is set now`]);
+  hidden(out);
+  assert.deepEqual(readBack(file), { hosts: { [OTHER]: { token: held(OTHER_TOKEN) } } });
+});
+
 test('NO HOST NAMED ANYWHERE IS REFUSED, AND THE FILE IS UNCHANGED', async (t) => {
   const shape = { hosts: { [HOST]: { token: held(TOKEN) } } };
   const { file } = config(t, shape);
@@ -284,7 +298,7 @@ test('AN ADDRESS THAT IS NOT ONE IS REFUSED WITHOUT BEING ECHOED', async (t) => 
   const out = await call(['not a host'], file);
 
   assert.equal(out.code, 1);
-  assert.deepEqual(out.lines, ['The BrainDog host is not an address. Write it as https://app.brain.dog.']);
+  assert.deepEqual(out.lines, ['The BrainDog host is not an address. Write it as https://brain.dog/app/<slug>.']);
   assert.ok(!out.stderr.includes('not a host'), 'it echoed what was typed');
   assert.equal(readFileSync(file, 'utf8'), before);
 });
@@ -297,7 +311,7 @@ test('A FLAG IT DOES NOT TAKE IS ONE SENTENCE THAT DOES NOT ECHO WHAT WAS TYPED'
   const out = await call(['--all'], file);
 
   assert.equal(out.code, 1);
-  assert.deepEqual(out.lines, ['braindog logout takes one host, as in braindog logout https://app.brain.dog/<slug>, or --host <host>, and nothing else.']);
+  assert.deepEqual(out.lines, ['braindog logout takes one host, as in braindog logout https://brain.dog/app/<slug>, or --host <host>, and nothing else.']);
   assert.ok(!out.stderr.includes('--all'), 'it echoed what was typed');
   assert.equal(readFileSync(file, 'utf8'), before);
 });
@@ -310,7 +324,7 @@ test('TWO HOSTS AS ARGUMENTS ARE REFUSED', async (t) => {
   const out = await call([HOST, OTHER], file);
 
   assert.equal(out.code, 1);
-  assert.deepEqual(out.lines, ['braindog logout takes one host, as in braindog logout https://app.brain.dog/<slug>, or --host <host>, and nothing else.']);
+  assert.deepEqual(out.lines, ['braindog logout takes one host, as in braindog logout https://brain.dog/app/<slug>, or --host <host>, and nothing else.']);
   assert.equal(readFileSync(file, 'utf8'), before);
 });
 

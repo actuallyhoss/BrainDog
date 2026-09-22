@@ -7,6 +7,7 @@
   the rest. Nothing here is arranged: Home is read, and the page itself is where it is arranged.
 -->
 <script lang="ts">
+  import { at } from '../at.ts';
   import { Block, Degraded, Markdown, Table } from 'braindog-render/svelte';
   import '$lib/blocks-charts.css';
   import { copy } from '$lib/copy.ts';
@@ -44,7 +45,7 @@
     <Section title={block.heading ?? copy.kindNames[block.kind] ?? block.kind}>
       {#snippet aside()}
         {#if to && block.register}
-          <a class="source tap" href={to}>{REGISTERS[block.register]?.name ?? block.register}<Icon name="arrow" size="s" /></a>
+          <a class="source tap" href={at(to)}>{REGISTERS[block.register]?.name ?? block.register}<Icon name="arrow" size="s" /></a>
         {/if}
       {/snippet}
       {#if block.cannot}
@@ -65,7 +66,7 @@
       {/if}
       {#if !drawn.refusal && !block.cannot && block.total > block.shown}
         <p class="note" role="status">
-          {copy.ofWhichDrawn(block.shown, block.total)}.{#if to}{' '}<a class="tap" href={to}>{copy.openTheRest(REGISTERS[block.register!]?.name ?? block.register!)}</a>{/if}
+          {copy.ofWhichDrawn(block.shown, block.total)}.{#if to}{' '}<a class="tap" href={at(to)}>{copy.openTheRest(REGISTERS[block.register!]?.name ?? block.register!)}</a>{/if}
         </p>
       {/if}
     </Section>

@@ -10,6 +10,7 @@
   catalogue's comparison of the two files, with what it takes away and every host newly called out to said loudly.
 -->
 <script lang="ts">
+  import { at } from '$lib/at.ts';
   import type { createClient } from '@braindog/client';
   import type { CatalogueUpdate, Trust } from '@braindog/declare/catalogue';
   import { copy } from '$lib/copy.ts';
@@ -95,7 +96,7 @@
             {/if}
             <footer class="foot">
               {#if o.filed !== null}
-                <p class="said" role="status">{copy.catalogueAsked}{#if o.filed}{' '}<a class="tap" href="/decide/{o.filed}">{copy.pollOpenDecide}</a>{/if}</p>
+                <p class="said" role="status">{copy.catalogueAsked}{#if o.filed}{' '}<a class="tap" href={at(`/decide/${o.filed}`)}>{copy.pollOpenDecide}</a>{/if}</p>
               {:else}
                 <Button weight="primary" disabled={busy !== null || !client} onclick={() => void ask(o)}>{copy.catalogueAsk}</Button>
               {/if}

@@ -9,6 +9,10 @@
  * person, and one that names no session is a 401 that clears it, NEVER THE DEMO: somebody who believes they
  * are signed in and is shown the sample instead is being shown somebody else's numbers as their own. Only a
  * request carrying no credential at all may be the demo, and only for a read.
+ *
+ * AND A REQUEST MAY NOW NAME ITS RECORD IN THE PATH, `/app/<slug>/api/…` (`loop/research-one-domain.md` §2.4).
+ * The slug is a claim like a bearer's record id: the Directory says whether it is this person's before anything
+ * is addressed, one 403 answers every name that is not, and the demo never answers under one.
  */
 
 import { clearCookie, readSid, sameOrigin, sessionContext, sessionCookie } from '@braindog/host/auth';
@@ -25,7 +29,8 @@ export type Deps = {
   origin: string;
   /** `DEMO_RECORD`, or nothing. */
   demo: string | undefined;
-  session: (sid: string) => Promise<AuthResult<Who>>;
+  /** The Directory's `session` flow, with the path's slug when the request named one. */
+  session: (sid: string, slug?: string) => Promise<AuthResult<Who>>;
   access: (record: string, person: string) => Promise<Held | null>;
 };
 
@@ -40,7 +45,8 @@ const NOT_YOU: Refusal = { code: 'UNAUTHORIZED', fix: 'That did not sign you in.
 const CROSS: Refusal = { code: 'FORBIDDEN', fix: 'A change here is accepted only from a page on this BrainDog.', at: 'origin' };
 const SAFE = new Set(['GET', 'HEAD']);
 
-export async function doorOf(request: Request, deps: Deps): Promise<Door> {
+/** Which door, and with `slug`, for the record the path names. `null` is the bare `/api/<method>` it always was. */
+export async function doorOf(request: Request, deps: Deps, slug: string | null = null): Promise<Door> {
   /* ANY `Authorization` HEADER IS THE BEARER'S DOOR, an empty one included: the self-host learnt what reading
      `''` as "nothing" costs, and the bearer path answers 401 for what it does not know. */
   if (request.headers.get('authorization') !== null) return { door: 'bearer' };
@@ -49,14 +55,18 @@ export async function doorOf(request: Request, deps: Deps): Promise<Door> {
   const sid = readSid(request, 'secure');
   if (sid !== undefined) {
     const clear = clearCookie('secure');
-    const out = await deps.session(sid);
+    const out = await deps.session(sid, slug ?? undefined);
     if (out.status === 429) return { door: 'refused', status: 429, retryAfter: out.retryAfter };
     if (out.status === 503) return { door: 'refused', status: 503 };
+    /* A rotation reaches the cookie whatever the answer is. */
+    const carried = out.session === undefined ? {} : { cookie: out.session === 'clear' ? clear : sessionCookie(out.session.sid, 'secure') };
+    /* A SLUG THAT IS NOT THEIRS, IN THE DIRECTORY'S OWN WORDS, AND NO RECORD IS ASKED ANYTHING. The Directory answers
+       one 403 for somebody else's name, a released one and one nobody holds, so the three cannot be told apart; and
+       `idFromName` on a name nobody has creates the object, so `access` below must never run for a refused slug. */
+    if (out.status === 403) return { door: 'refused', status: 403, refusal: out.refusal, ...carried };
     /* Expired, signed out, or sign-in switched off: the same 401, and the cookie goes. */
     if (out.status !== 200) return { door: 'refused', status: 401, refusal: NOT_YOU, cookie: clear };
 
-    /* A rotation reaches the cookie whatever the answer is. */
-    const carried = out.session === undefined ? {} : { cookie: out.session === 'clear' ? clear : sessionCookie(out.session.sid, 'secure') };
     const record = out.body.record;
     if (record === null) return { door: 'refused', status: 403, refusal: { code: 'FORBIDDEN', fix: 'You are signed in and on no record yet.' }, ...carried };
     /* THE RECORD SAYS WHAT SOMEBODY MAY DO INSIDE IT, as on the bearer path: the Directory said which record. */
@@ -67,7 +77,9 @@ export async function doorOf(request: Request, deps: Deps): Promise<Door> {
     return { door: 'session', record, ctx: sessionContext(out.body, held) as CallContext, ...carried };
   }
 
-  const pinned = demoRecord(request, deps.demo);
+  /* NEVER UNDER A SLUG. The sample at `/app/acme/…` would be the demo's numbers drawn as acme's, which is the thing
+     this whole order exists to prevent; a stranger there is a 401, and the app sends a 401 under a slug to sign-in. */
+  const pinned = slug === null ? demoRecord(request, deps.demo) : null;
   if (pinned) return { door: 'demo', record: pinned, ctx: DEMO_CONTEXT };
   return { door: 'refused', status: 401 };
 }
@@ -90,6 +102,8 @@ export type BearerDeps = {
   knows: (record: string) => Promise<boolean>;
   verify: (record: string, bearer: string, surface: 'api' | 'mcp') => Promise<{ id: string; person_id: string; scope: string } | null>;
   access: (record: string, person: string) => Promise<Held | null>;
+  /** The record a live name means, the Directory's `resolve`. Asked only for a bearer that came under `/app/<slug>`. */
+  named?: (slug: string) => Promise<string | null>;
 };
 
 export type Bearer = { record: string; ctx: CallContext } | { status: 401 } | { status: 403; refusal: Refusal };
@@ -108,13 +122,19 @@ type TokenPrincipal = Extract<CallContext['principal'], { kind: 'token' }>;
  * THEN THE RECORD CHECKS THE SECRET AGAINST ITS OWN TABLE, and says what the person may do inside it. A level
  * read from the Directory is one `invite` and `remove` never write, so removing somebody would not stop them.
  */
-export async function bearerOf(request: Request, surface: 'api' | 'mcp', deps: BearerDeps): Promise<Bearer> {
+export async function bearerOf(request: Request, surface: 'api' | 'mcp', deps: BearerDeps, slug: string | null = null): Promise<Bearer> {
   const authorization = request.headers.get('authorization');
   const record = recordOf(authorization);
   if (!record || !(await deps.knows(record))) return { status: 401 };
   const bearer = /^Bearer\s+(.+)$/i.exec(authorization ?? '')?.[1];
   const seen = bearer ? await deps.verify(record, bearer, surface) : null;
   if (!seen) return { status: 401 };
+  /* UNDER `/app/<slug>` THE PATH HAS TO AGREE WITH THE BEARER, OR NOTHING IS ANSWERED. The bearer names the record,
+     and a URL that says it reads another one is the failure this boundary exists to prevent, so neither is picked.
+     AFTER THE SECRET IS CHECKED, so a bearer nobody issued is the same 401 under any slug and a stranger cannot ask
+     which record a name belongs to. A name nobody holds is the same 403 as another record's. */
+  if (slug !== null && (deps.named === undefined || (await deps.named(slug)) !== record))
+    return { status: 403, refusal: { code: 'FORBIDDEN', fix: 'This token is for a different record than the one this address names.', at: 'slug' } };
   const held = await deps.access(record, seen.person_id);
   if (!held) return { status: 403, refusal: { code: 'FORBIDDEN', fix: 'You are not on this record.' } };
   /* BOTH HALVES GO OVER, the token's scope and the person's level, and the record computes where they meet: a
@@ -127,4 +147,37 @@ export async function bearerOf(request: Request, surface: 'api' | 'mcp', deps: B
       ...(Object.keys(held.levels).length === 0 ? {} : { levels: held.levels as CallContext['levels'] }),
     },
   };
+}
+
+/** What `GET /app` needs: the Directory's `session` and `slugOf`, and the shell the static assets hold. */
+export type EntryDeps = {
+  session: (sid: string) => Promise<AuthResult<Who>>;
+  slugOf: (record: string) => Promise<string | null>;
+  shell: () => Promise<Response>;
+};
+
+/**
+ * `GET /app`: the record this browser was last on, or the shell.
+ *
+ * ONE DIRECTORY READ AND NO PICKER (`loop/research-one-domain.md` §2.4). A session holding a record is a 302 to
+ * `/app/<slug>/`, a session on no record yet is sent to `/app/start`, and no cookie is the shell, which draws the
+ * sample for a stranger exactly as `app.brain.dog` did. The last record is the session row's, which only
+ * `/auth/switch` moves, and the switcher is the picker.
+ *
+ * A DEAD COOKIE IS THE SHELL WITH THE COOKIE CLEARED, NEVER A REDIRECT INTO A RECORD, so the next load is a stranger's
+ * and the shell does not spend a round trip finding out. A lockout or a failed store is the shell with the cookie
+ * kept: neither says the session is over. The redirect carries `no-store` because it is this cookie's answer.
+ */
+export async function appEntry(request: Request, deps: EntryDeps): Promise<Response> {
+  const sid = readSid(request, 'secure');
+  if (sid === undefined) return deps.shell();
+  const out = await deps.session(sid);
+  if (out.status === 401 || out.status === 403 || out.status === 404) return withCookie(await deps.shell(), clearCookie('secure'));
+  if (out.status !== 200) return deps.shell();
+  const cookie = out.session === undefined ? undefined : out.session === 'clear' ? clearCookie('secure') : sessionCookie(out.session.sid, 'secure');
+  const record = out.body.record;
+  const slug = record === null ? null : await deps.slugOf(record);
+  if (record !== null && slug === null) return withCookie(await deps.shell(), cookie);
+  const to = slug === null ? '/app/start' : `/app/${slug}/`;
+  return withCookie(new Response(null, { status: 302, headers: { location: to, 'cache-control': 'no-store' } }), cookie);
 }

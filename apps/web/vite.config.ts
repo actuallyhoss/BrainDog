@@ -131,7 +131,10 @@ export default defineConfig({
   plugins: [sveltekit(), entryGraphPlugin],
   define: { __BRAINDOG_VARIANT__: JSON.stringify(VARIANT), __BRAINDOG_ENV__: JSON.stringify(ENV) },
   resolve: { alias: [{ find: '@braindog/skin/house.css', replacement: PALETTE }] },
-  server: { port: 5183, strictPort: true, proxy: { '/api': API, '/auth': API, '/account': API, '/catalogue': API } },
-  preview: { port: 5183, strictPort: true, proxy: { '/api': API, '/auth': API, '/account': API, '/catalogue': API } },
+  /* `/app/catalogue` AND NOT `/catalogue`: the app is served under `/app` (`svelte.config.js`) and asks for the catalogue
+     there (`routes/packs/browse/catalogue.ts`), so a proxy on the old path forwarded nothing. The record, the sign-in
+     and the account stay at the root, where the app still sends them. */
+  server: { port: 5183, strictPort: true, proxy: { '/api': API, '/auth': API, '/account': API, '/app/catalogue': API } },
+  preview: { port: 5183, strictPort: true, proxy: { '/api': API, '/auth': API, '/account': API, '/app/catalogue': API } },
   build: { target: 'es2022', cssMinify: 'lightningcss', modulePreload: { resolveDependencies } },
 });

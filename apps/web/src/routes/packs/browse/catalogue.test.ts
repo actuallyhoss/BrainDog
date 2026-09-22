@@ -45,8 +45,11 @@ async function served(): Promise<{ index: CatalogueIndex; fetcher: (input: strin
     index = out.value.index;
     files.set(out.value.path, text);
   }
+  /* UNDER THE APP'S BASE, since the app moved to `brain.dog/app`: `/catalogue/` on that hostname is the marketing
+     site's, which has none, so a read there is a 404 page and the catalogue would quietly read as absent. */
   const fetcher = async (input: string) => {
-    const path = input.replace(/^\/catalogue\//u, '');
+    if (!input.startsWith('/app/catalogue/')) return new Response('<!doctype html>', { status: 404, headers: { 'content-type': 'text/html' } });
+    const path = input.slice('/app/catalogue/'.length);
     if (path === 'index.json') return new Response(JSON.stringify(index), { headers: { 'content-type': 'application/json' } });
     const text = files.get(path);
     return text === undefined ? new Response('{}', { status: 404, headers: { 'content-type': 'application/json' } }) : new Response(text, { headers: { 'content-type': 'application/json' } });
@@ -103,7 +106,7 @@ async function servedAddon(key: AuthorKey) {
     files.set(out.value.path, text);
   }
   const fetcher = async (input: string) => {
-    const text = files.get(input.replace(/^\/catalogue\//u, ''));
+    const text = input.startsWith('/app/catalogue/') ? files.get(input.slice('/app/catalogue/'.length)) : undefined;
     return text === undefined ? new Response('', { status: 404 }) : new Response(text, { headers: { 'content-type': 'application/json' } });
   };
   return { index, fetcher, entry: index.entries[0]! };

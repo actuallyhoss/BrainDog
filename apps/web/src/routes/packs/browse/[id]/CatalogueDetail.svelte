@@ -17,6 +17,7 @@
   says what it adds and every line it calls out with. The sample says what it would ask and files nothing.
 -->
 <script lang="ts">
+  import { at } from '$lib/at.ts';
   import type { createClient } from '@braindog/client';
   import type { CatalogueEntry, Changes, KeyStatements, Trust } from '@braindog/declare/catalogue';
   import { copy } from '$lib/copy.ts';
@@ -118,7 +119,7 @@
       <p class="said">{copy.catalogueOff}</p>
     {:else if standing && checked?.ok && trust?.kind !== 'revoked' && trust?.kind !== 'stripped'}
       {#if filed !== null}
-        <p class="said" role="status">{copy.catalogueAsked}{#if filed}{' '}<a class="tap" href="/decide/{filed}">{copy.pollOpenDecide}</a>{/if}</p>
+        <p class="said" role="status">{copy.catalogueAsked}{#if filed}{' '}<a class="tap" href={at(`/decide/${filed}`)}>{copy.pollOpenDecide}</a>{/if}</p>
       {:else}
         <Button weight="primary" disabled={busy} onclick={() => void ask()}>
           {standing.kind === 'update' ? copy.catalogueAskUpdate(entry.latest) : copy.catalogueAsk}

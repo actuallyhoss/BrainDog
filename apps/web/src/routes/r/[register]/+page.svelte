@@ -13,6 +13,7 @@
   DOM construction (13 §4.3).
 -->
 <script lang="ts">
+  import { apiBase, at } from '$lib/at.ts';
   import { titleOf } from '$lib/title.ts';
   import { onDestroy, tick, untrack } from 'svelte';
   import { goto } from '$app/navigation';
@@ -908,7 +909,7 @@
    * An answer for a question the screen has left is not drawn, and a refusal is still said.
    */
   let writer: RowWriter | null = null;
-  const writes = (): RowWriter => (writer ??= rowWriter(location.origin));
+  const writes = (): RowWriter => (writer ??= rowWriter(apiBase()));
   /** The sheet's add is out, so a second press does not send a second row. */
   let writing = $state(false);
 
@@ -1729,7 +1730,7 @@
          screen that had already gone. */
       if ((e.target as Element | null)?.closest?.('button, a, [role^="menuitem"]')) return;
       const row = result.entries[focus.row];
-      if (row) goto(`/r/${id}/${row.seq}`);
+      if (row) goto(at(`/r/${id}/${row.seq}`));
     } else if (e.key === 'v') {
       e.preventDefault();
       displayOpen = true;
@@ -1771,7 +1772,7 @@
       const to = field ? decl?.fields.find((f) => f.id === field)?.to : undefined;
       if (to) {
         e.preventDefault();
-        void goto(`/r/${to}`);
+        void goto(at(`/r/${to}`));
       }
     } else if ((e.key === 'x' || e.key === 'X') && siftable) {
       /* `X` and not `x` when shift is down — `e.key` carries the SHIFTED character, so a check for
@@ -1980,13 +1981,13 @@
       toasts.push(out.fix, { intent: 'warn' });
       return;
     }
-    await goto(`/p/${out.slug}`);
+    await goto(at(`/p/${out.slug}`));
     toasts.push(copy.viewSaved(title), {
       undo: () =>
         void writes()
           .dropView(out.id)
           .then((gone) => {
-            if (gone.ok) void goto(back);
+            if (gone.ok) void goto(at(back));
             else toasts.push(gone.fix, { intent: 'warn' });
           }),
     });
@@ -2547,7 +2548,7 @@
           {sort}
           selected={selectedKeys}
           bind:focus
-          onactivate={(row) => goto(`/r/${id}/${row.key.split('#')[1]}`)}
+          onactivate={(row) => goto(at(`/r/${id}/${row.key.split('#')[1]}`))}
           {...result.entries.length < 2
             ? {}
             : {
@@ -3077,7 +3078,7 @@
       <!-- A glyph per verb. The rail's menu has always had them and this one never did, so four
            rows of identical grey text carried the whole distinction between opening a row and
            throwing it away. -->
-      <a class="mi" role="menuitem" href="/r/{id}/{seq}">
+      <a class="mi" role="menuitem" href={at(`/r/${id}/${seq}`)}>
         <Icon name="external" size="s" />
         <span class="mi-name">{copy.openRow}</span><Kbd keys="↵" />
       </a>

@@ -12,6 +12,7 @@
   A REFUSAL IS SHOWN AS IT CAME (`13 §6`): the status door's under the heading, the settings door's under the field.
 -->
 <script lang="ts">
+  import { apiBase } from '../at.ts';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { createClient, type SparkStatus } from '@braindog/client';
@@ -42,7 +43,7 @@
 
   onMount(() => {
     if (!page.data.live || !modelHere) return;
-    client = createClient({ base: location.origin });
+    client = createClient({ base: apiBase() });
     void client.sparkStatus().then((out) => {
       if (!out.ok) {
         refused = fixOf(out);

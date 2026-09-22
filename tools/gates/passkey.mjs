@@ -47,6 +47,7 @@ import { chromium } from '@playwright/test';
 
 import { copy } from '../../apps/web/src/lib/copy.ts';
 
+import { APP_BASE, appShell } from './lib.mjs';
 import { forward, forwards, serverKeyFor, startRecord } from './record.mjs';
 
 /* THE PREREQUISITE, AND THIS IS ONE OF THE TWO GATES THAT PROVED IT HAD TO LEAVE THIS FILE. This
@@ -154,10 +155,10 @@ export default async function passkey(root = join(import.meta.dirname, '..', '..
         res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' });
         return createReadStream(file).pipe(res);
       }
-      /* The SPA fallback the deployed host serves, for the same reason `a11y` serves it. */
-      if (!Object.hasOwn(TYPES, extname(rel)) && (await stat(join(ROOT, 'index.html')).catch(() => null))?.isFile()) {
+      /* The SPA fallback the deployed host serves, for the same reason `a11y` serves it: the app's shell, under `/app`. */
+      if (!Object.hasOwn(TYPES, extname(rel)) && (await stat(appShell(ROOT)).catch(() => null))?.isFile()) {
         res.writeHead(200, { 'content-type': TYPES['.html'] });
-        return createReadStream(join(ROOT, 'index.html')).pipe(res);
+        return createReadStream(appShell(ROOT)).pipe(res);
       }
       res.writeHead(404).end();
     });
@@ -209,7 +210,7 @@ export default async function passkey(root = join(import.meta.dirname, '..', '..
     try {
       /* ONE · ARRIVES SIGNED OUT, AND IS NOT OFFERED WHAT DOES NOT EXIST. A door that offers a passkey on a
          record that holds none sends the first person to a sheet that can only fail. */
-      await page.goto(`${ORIGIN}/signin`, { waitUntil: 'networkidle' });
+      await page.goto(`${ORIGIN}${APP_BASE}/signin`, { waitUntil: 'networkidle' });
       await page.locator('#in-key').waitFor({ state: 'attached' });
       if ((await button(copy.withPasskey).count()) > 0) findings.push(`${copy.withPasskey} is offered on a record that holds no passkey, so the first person meets a sheet that can only fail.`);
 

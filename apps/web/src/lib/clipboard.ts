@@ -11,6 +11,7 @@
  * copy of ten lines or this file.
  */
 
+import { at } from './at.ts';
 import { copy } from './copy.ts';
 import { toasts } from './ui/toast.svelte.ts';
 
@@ -49,6 +50,11 @@ export async function put(text: string, label = text, said?: string): Promise<vo
 /** The spoken id of a row — `obligations#41`. What somebody pastes into a message to a colleague. */
 export const putSpoken = (register: string, seq: number): Promise<void> => put(`${register}#${seq}`);
 
-/** The row's address, absolute, so it survives being pasted anywhere. */
+/**
+ * The row's address, absolute, so it survives being pasted anywhere.
+ *
+ * AND UNDER THE SLUG IT WAS COPIED FROM, so it names its record. Pasted to a colleague, the old link opened whichever
+ * record THEIR session was on, which was the right row number in the wrong business.
+ */
 export const putLink = (register: string, seq: number): Promise<void> =>
-  put(`${location.origin}/r/${register}/${seq}`);
+  put(`${location.origin}${at(`/r/${register}/${seq}`)}`);
