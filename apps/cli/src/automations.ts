@@ -19,14 +19,30 @@
  * PLAIN SENTENCES FOR A PERSON, THE RECORD'S OWN OBJECTS FOR AN AGENT. Under `--json` the value is exactly what the
  * record answered, handed over with `io.answer`, so an agent branches on `state` and `last.state` rather than splitting
  * the lines below back apart.
+ *
+ * EVERY LINE IS BUILT FROM A SCRUBBED COPY. Almost every string these lines print was written by somebody other than the
+ * person running the command: a step's answer is what a row's field filled it with, and the row belongs to whoever may
+ * append to the list. Audit thirty-seven finding 3 measured an OSC 52, an OSC 0 and a CR plus CSI 2K reaching the owner's
+ * terminal byte for byte through `show`. Each verb now passes the record's answer through `printable` once, before any
+ * line is built, and a refusal's sentence through it as well; the value `io.answer` hands an agent is the one the record
+ * sent, untouched.
  */
 
 import { parseArgs } from 'node:util';
 
 import type { Automation, AutomationRow, AutomationRun, ScriptRow } from '@braindog/client';
+import { fixOf, type Result } from '@braindog/ports';
 
-import { refuse } from './json.ts';
+import { printable } from './clip.ts';
+import { refuse as refuseAll } from './json.ts';
 import { connect, type AgentIo } from './skills.ts';
+
+/* A REFUSAL'S SENTENCE QUOTES WHAT IT WAS HANDED: `DECLARATION_UNKNOWN` names the rule back, and the record, not this
+   command, decides what else a `fix` carries. So the sentence goes to the terminal as one clean line, and the refusal
+   itself to an agent whole, exactly as `json.ts` sends it. `printable` AND NOT `oneLine`, because `fixOf` is typed
+   string but hands back whatever the host put in `fix`: a `fix` of 7 made `oneLine` throw, and the refusal's code never
+   reached the `--json` envelope. `printable` scrubs a string and passes anything else through, as before the scrub. */
+const refuse = (io: AgentIo, r: Result<unknown>): number => refuseAll(io, r, printable(fixOf(r)));
 
 /** `2026-09-21 14:02 UTC` from the record's ISO instant, which a person reads faster than the milliseconds and the `Z`. */
 const when = (iso: string): string => (/^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(iso) ? `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC` : iso);
@@ -90,14 +106,14 @@ const began = (trigger: string): string =>
 
 /* A STEP'S ANSWER IS WHATEVER THE STEP KEPT, a call's body among them, so it is cut to one readable line. The whole of
    it is in the `--json` value. ONE LINE MEANS THE NEWLINES GO FIRST: a `set_var` keeps up to 4 KB of what a row's
-   field filled it with, and printed as kept, a note's line breaks split the step list into lines that named no step. */
+   field filled it with, and printed as kept, a note's line breaks split the step list into lines that named no step.
+   `printable` has already made it one line, control characters and all, by the time it reaches here. */
 const ANSWER_SHOWN = 120;
 
 function runLines(r: AutomationRun): string[] {
   const lines = [`  ${r.id}  ${r.state}  ${when(r.started_at)}, by ${r.actor} ${began(r.trigger)}.${r.say ? ` ${closed(r.say)}` : ''}`];
   for (const s of r.steps) {
-    const flat = s.answer?.replace(/\s+/g, ' ').trim() ?? null;
-    const answer = flat === null ? '' : ` (${flat.length > ANSWER_SHOWN ? `${flat.slice(0, ANSWER_SHOWN)}...` : flat})`;
+    const answer = typeof s.answer !== 'string' ? '' : ` (${s.answer.length > ANSWER_SHOWN ? `${s.answer.slice(0, ANSWER_SHOWN)}...` : s.answer})`;
     lines.push(`    ${String(s.n)} ${s.kind}: ${s.state}${answer}`);
   }
   return lines;
@@ -156,7 +172,7 @@ async function list(args: string[], io: AgentIo): Promise<number> {
   if (answer.value.length === 0) io.out('No automation you can read is set up on this BrainDog.');
   else {
     io.out('Automations on this BrainDog:');
-    for (const a of answer.value) io.out(listLine(a));
+    for (const a of printable(answer.value)) io.out(listLine(a));
   }
   io.answer?.({ value: answer.value });
   return 0;
@@ -169,11 +185,12 @@ async function show(args: string[], io: AgentIo): Promise<number> {
   if (typeof at === 'number') return at;
   const answer = await at.client.automation(got.name);
   if (!answer.ok) return refuse(io, answer);
-  const a: Automation = answer.value;
-  if (typeof a?.id !== 'string' || !Array.isArray(a.runs)) {
+  const kept: Automation = answer.value;
+  if (typeof kept?.id !== 'string' || !Array.isArray(kept.runs)) {
     io.say(`${got.name} came back in a shape this build does not recognise as an automation.`);
     return 1;
   }
+  const a = printable(kept);
   io.out(`${a.id}  ${a.name}, version ${String(a.version)}.`);
   io.out([starts(a), a.enabled ? 'On.' : 'Turned off.', origin(a), a.next === null ? null : `Next ${when(a.next)}.`].filter((s): s is string => s !== null).join(' '));
   io.out([month(a.month) ?? 'No run this month.', a.open > 0 ? `${plural(a.open, 'run', 'runs')} open.` : null].filter((s): s is string => s !== null).join(' '));
@@ -182,7 +199,7 @@ async function show(args: string[], io: AgentIo): Promise<number> {
     io.out('Recent runs, newest first:');
     for (const r of a.runs) for (const line of runLines(r)) io.out(line);
   }
-  io.answer?.({ value: a });
+  io.answer?.({ value: kept });
   return 0;
 }
 
@@ -277,7 +294,7 @@ async function scriptList(args: string[], io: AgentIo): Promise<number> {
   if (answer.value.length === 0) io.out('No script you can read is installed on this BrainDog.');
   else {
     io.out('Scripts on this BrainDog:');
-    for (const s of answer.value) io.out(scriptLine(s));
+    for (const s of printable(answer.value)) io.out(scriptLine(s));
   }
   io.answer?.({ value: answer.value });
   return 0;

