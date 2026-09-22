@@ -2,15 +2,21 @@
  * Solo founder: one or several organisations, the money across them, and the numbers each project
  * reports or is polled for (`loop/research-spark.md` §4; the owner's own case, brain.example.com).
  *
- * IT BUILDS ON FOUR FIRST-PARTY MODULES. Projects, People, Money and Work are installed first, and this
- * pack adds what they do not hold: the organisations a founder runs, and datapoints, one number from one
- * project at one moment, written by the project itself over the API or by a poll the record runs.
+ * IT BUILDS ON FIVE FIRST-PARTY MODULES. Projects, People, Money, Estate and Work are installed first, and
+ * this pack adds what they do not hold: the organisations a founder runs, and datapoints, one number from
+ * one project at one moment, written by the project itself over the API or by a poll the record runs.
+ *
+ * ESTATE IS ONE OF THEM SINCE 1.4.0, AND IT WAS NOT BEFORE. A founder running several companies holds
+ * domains, hosting and subscriptions, which is what Estate's services are. Without it the owner's own
+ * import (23 domains and the hosting behind them) had no list to land in, and the importer left all of
+ * them out in one skip line, read once, with the fix a second install from Add-ons that nothing asked for
+ * (`loop/research-switch.md` section 3, ranked gap 5).
  */
 
 import { projectTemplate } from '../modules/portfolio.ts';
 
-/** The lists a founder's record holds once its four modules and this pack are in: no Estate, so no services. */
-const HOLDS = ['things', 'people', 'accounts', 'obligations', 'tasks', 'tracks', 'runs', 'updates', 'organisations', 'datapoints'];
+/** The lists a founder's record holds once its five modules and this pack are in, services among them. */
+const HOLDS = ['things', 'people', 'accounts', 'obligations', 'services', 'tasks', 'tracks', 'runs', 'updates', 'organisations', 'datapoints'];
 
 /**
  * THE NUMBERS BLOCKS, ONCE, for the dashboard, an organisation and a project: which field is which, the example left
@@ -31,8 +37,12 @@ export const FOUNDER = {
   /* 1.3.2 BECAUSE THE TWO THIRTY-DAY TILES ON BOTH DASHBOARDS ARE RENAMED, and a record is offered a
      use case's change only when its version goes up: 1.3.1 was itself the wording of these same tiles
      (`fbf260e6`), so leaving the number alone would mean every record that took that one keeps the
-     words it corrected. Nothing here declares a field or a register, so there is nothing to refuse. */
-  version: '1.3.2',
+     words it corrected. Nothing here declares a field or a register, so there is nothing to refuse.
+
+     1.4.0 BECAUSE ESTATE IS ONE OF THE MODULES, which is more than a reworded tile: the project page draws
+     each project's services and what they cost a year, so it requires a list 1.3.2 never asked for. A
+     minor step and not a patch, because a record taking it gains a module and a list. */
+  version: '1.4.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',
@@ -45,7 +55,7 @@ export const FOUNDER = {
     'dashboard', 'dashboards', 'analytics', 'metrics', 'kpis', 'datapoints', 'mrr', 'arr', 'revenue', 'users',
     'signups', 'churn', 'runway', 'balances', 'my apps', 'my products', 'launch', 'launched', 'shipping',
   ],
-  modules: ['portfolio', 'people', 'money-core', 'work'],
+  modules: ['portfolio', 'people', 'money-core', 'estate', 'work'],
   voice: {
     home: 'Overview',
     right_now: 'The numbers',
@@ -306,10 +316,16 @@ export const FOUNDER = {
         ],
       },
       {
-        /* A PROJECT'S PAGE, WITHOUT ESTATE. Portfolio's template reads what a project runs on from Estate's services,
-           which a founder does not install, so it is taken without them (`projectTemplate`), and the numbers the
-           project reports and where it sends them are added under it. Same id as the template, so a record never has
-           two pages at one project's address. */
+        /* A PROJECT'S PAGE, WITH ITS SERVICES SINCE 1.4.0. Portfolio's template reads what a project runs on and what
+           that costs a year from Estate's services, and a founder installs Estate now, so the template is taken with
+           them (`projectTemplate`) and the numbers the project reports and where it sends them are added under it.
+           Same id as the template, so a record never has two pages at one project's address.
+
+           THIS PAGE NOW REQUIRES `register.services`, so the pack alone does not plan on a record made on 1.3.2, which
+           holds no services: its plan there comes back with `services` unresolved. The update is not the pack alone. The plan for a use
+           case installs each module it names that the record lacks before the use case's own pack (`planFile` in
+           `record/src/usecase.ts`), so a 1.3.2 record is offered Estate and then this, and `founder-estate.test.ts`
+           drives that order over a record rebuilt as 1.3.2 made it. */
         ...projectTemplate(HOLDS),
         requires: [...(projectTemplate(HOLDS).requires as string[]), 'register.datapoints'],
         blocks: [

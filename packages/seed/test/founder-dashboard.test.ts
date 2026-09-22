@@ -96,9 +96,9 @@ test('THE DASHBOARD AND AN ORGANISATION PAGE read every block, and the numbers a
   assert.equal(own[1]!.matched, 40, 'only its own numbers, the example one left out');
 });
 
-test('A FOUNDER’S PROJECT HAS A PAGE without Estate: what is open, its money, the numbers it reports and where it sends them', async () => {
+test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is open, its money, the numbers it reports and where it sends them', async () => {
   const k = await founder();
-  assert.ok(!held(k).includes('services'), 'a founder keeps no services');
+  assert.ok(held(k).includes('services'), 'a founder keeps services since Estate joined Solo founder');
   const project = value<{ id: string }>(k.create('things', { name: 'Harbour app', lane: 'building' }, OWNER));
   value(k.create('datapoints', { name: 'Installs', value: 7, thing: project.id, source: 'reported', at: new Date(NOW).toISOString() }, OWNER));
   const pages = k.pages() as unknown as { slug: string; title: string }[];
@@ -112,6 +112,7 @@ test('A FOUNDER’S PROJECT HAS A PAGE without Estate: what is open, its money, 
     'What is open',
     'Agents',
     'Money',
+    'Keeping it alive',
     'Notes',
     'Work on this from an agent',
     'The numbers',
@@ -119,9 +120,8 @@ test('A FOUNDER’S PROJECT HAS A PAGE without Estate: what is open, its money, 
     'Send numbers here',
   ]);
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
-  assert.deepEqual((blocks[0] as unknown as { cells: { label: string }[] }).cells.map((c) => c.label), ['Open', 'Owed to you', 'Due soon', 'In review'], 'what it costs a year needs Estate, so its place goes to a figure from the tasks');
-  assert.equal((blocks[5] as unknown as { span: number }).span, 12, 'the money table takes the width the services list had');
+  assert.deepEqual((blocks[0] as unknown as { cells: { label: string }[] }).cells.map((c) => c.label), ['Open', 'Owed to you', 'Costs a year'], 'with Estate present, what it costs a year takes the place the task figures held');
   /* THE PROJECT'S NOTE, which is where an imported plan and its decisions are written, and which this example has none of. */
-  assert.equal((blocks[6] as unknown as { document?: boolean }).document, true);
-  assert.deepEqual(blocks[8]!.measures?.map((m) => [m.name, m.latest?.value]), [['Installs', 7]]);
+  assert.equal((blocks[7] as unknown as { document?: boolean }).document, true);
+  assert.deepEqual(blocks[9]!.measures?.map((m) => [m.name, m.latest?.value]), [['Installs', 7]]);
 });

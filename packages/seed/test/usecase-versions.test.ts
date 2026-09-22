@@ -157,6 +157,23 @@ const DECLARED: Record<string, Version> = {
     declares: '3e4927061f959b6d',
     history: ['Raised to 1.3.2 in `df458964`, which renamed the two thirty-day tiles on `page.dashboard` and `page.organisation` after the money page moved its headings -> 3e4927061f959b6d'],
   },
+  /**
+   * THE SAME IDS AS 1.3.2, AND A NEW VERSION ALL THE SAME. Estate is a module the use case names, not a declaration of
+   * its own pack, so `services` is not in this list and `holds` could not see the change. What moved is inside
+   * `page.project`: it is taken from Portfolio's template with services held, so it draws Keeping it alive and the
+   * Costs a year tile, and it requires `register.services`, which a record on 1.3.2 does not hold until Estate is in.
+   */
+  'founder@1.4.0': {
+    holds: `
+      metric.datapoints-30d page.dashboard page.home-founder page.organisation page.project
+      register.datapoints register.organisations
+      setting.shared_version setting.speaks
+      setting.voice_home setting.voice_lists setting.voice_needs_you setting.voice_nothing_needs_you
+      setting.voice_right_now setting.voice_since_away
+    `,
+    declares: '15c1f37be2561258',
+    history: ["Raised to 1.4.0 because Solo founder installs Estate, so `page.project` draws a project's services and what they cost a year, and requires the services list -> 15c1f37be2561258"],
+  },
   'team@2.3.0': {
     holds: `
       page.agent-work page.cycles page.home-team page.project register.cycle_plan register.cycles
