@@ -16,7 +16,7 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import { brotliCompressSync, constants } from 'node:zlib';
 import { join, relative } from 'node:path';
 
-import { budget, skipDir } from './lib.mjs';
+import { budget, newestSource } from './lib.mjs';
 
 /**
  * THE PREREQUISITE, FOR THE RUNNER TO CHECK RATHER THAN THIS FILE (`52 §5.1` step 2). `run.mjs`
@@ -150,69 +150,18 @@ export default async function bundle(root = process.env.BRAINDOG_GATE_ROOT ?? pr
    * IT IS A SKIP AND NOT A FAILURE, because "you have not built" is not "you have broken something",
    * and the runner is red on a skip under CI either way.
    */
-  /* `apps/web/src` IS NOT ALL OF THE SOURCE. The app imports eight workspace packages and compiles
-     them into its own chunks, so a change to `packages/kernel/src` makes the build exactly as stale as
-     a change to a route. The first version of this check walked only the app, so the first kernel
-     commit after it went straight through a green bundle row again. */
-  const dirs = [join(APP, 'src')];
-  /* AND IT IS ALLOWED NOT TO BE THERE, which the sibling walk over `apps/` has said since it was
-     written and this one did not: a bare `readdir` of a directory that does not exist throws ENOENT
-     out of the gate, and a gate that dies is a gate whose other twelve rows nobody sees. It is the
-     same fault `3eb5fdcd` fixed one function down, left in the line above it.
-
-     SILENCE IS HONEST HERE AND IT IS NOT HONEST THERE, which is why this is a `catch` and the
-     shells list is a finding. This list feeds a STALENESS comparison: no packages means no package
-     source that could be newer than the build, and an empty list says exactly that. The shells list
-     feeds a CONTENT check, where finding nothing to read and reporting that everything read clean
-     are the same green row. */
-  for (const pkg of await readdir(join(root, 'packages'), { withFileTypes: true }).catch(() => []))
-    if (pkg.isDirectory()) dirs.push(join(root, 'packages', pkg.name, 'src'));
-
-  /* `src` AND NOT THE PACKAGE. A package's `test/` is not compiled into anything the browser
-     downloads, so counting it would demand a rebuild for a change that cannot move a byte of the
-     bundle, and a gate that cries stale on work it does not measure is a gate people learn to
-     re-run blind. */
-  const newest = (await Promise.all(dirs.map((d) => newestSource(d)))).reduce((a, b) => (a.when >= b.when ? a : b));
+  /* THE WALK IS `newestSource` IN `lib.mjs` NOW, because the runner asks the same question of the
+     `web-build` prerequisite before it lets any browser gate near the build, and two copies of which
+     files count as source would drift the way the seven skip lists did. What it covers, and why a
+     package's `src` counts and a test does not, is argued there. This gate compares it against the
+     manifest rather than against `build/`, and an ordinary build writes the manifest before `build/`,
+     so on the main build this is the stricter of the two comparisons. */
+  const newest = await newestSource(root);
   if (newest.when > built) {
     console.log(
       `  bundle: the build is older than ${relative(APP, newest.at)}, so it is not this code. Run \`pnpm --filter @braindog/web build\` first.`,
     );
     return 3;
-  }
-
-  /**
-   * The most recently touched source file under a directory, and which one it was.
-   *
-   * The name comes back with the time because a gate that says "the build is stale" and not WHICH file
-   * made it stale is a gate somebody re-runs blind.
-   */
-  async function newestSource(dir) {
-    let when = 0;
-    let at = dir;
-    let entries;
-    try {
-      entries = await readdir(dir, { withFileTypes: true, recursive: true });
-    } catch {
-      /* A package with no `src` is a package that compiles into nothing. */
-      return { when, at };
-    }
-    for (const e of entries) {
-      /* `node_modules` under a workspace package is a symlink farm the size of the registry, and its
-         mtimes are about an install rather than about this code. */
-      if (!e.isFile() || (e.parentPath ?? e.path).split(/[\\/]/).some(skipDir)) continue;
-      /* AND A TEST IS NOT SOURCE EITHER. The app's tests sit beside the code they test rather than in
-         a `test/` directory, so the rule one comment up did not reach them: writing a test for a page
-         block declared the bundle stale and demanded a rebuild that could not move a byte. Same
-         argument, colocated. */
-      if (/\.test\.[cm]?[jt]sx?$/.test(e.name)) continue;
-      const full = join(e.parentPath ?? e.path, e.name);
-      const t = (await stat(full)).mtimeMs;
-      if (t > when) {
-        when = t;
-        at = full;
-      }
-    }
-    return { when, at };
   }
 
   /** Everything statically reachable from an entry. A dynamic import is a separate chunk by design. */

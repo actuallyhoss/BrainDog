@@ -16,9 +16,10 @@
  * gate never sees one and `self-test`'s "every key is read" check never asks for one.
  */
 
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdir, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -105,6 +106,137 @@ const BUILT = new Set(['node_modules', 'build', 'dist', 'shots']);
  * that name only tokens. A built directory is built whatever the record inside it is.
  */
 export const skipDir = (name) => name.startsWith('.') || BUILT.has(name) || name.startsWith('build-');
+
+/**
+ * THE SOURCE A WEB BUILD IS MADE OF, AND THE NEWEST FILE IN IT. Lifted out of `bundle.mjs`, which
+ * wrote it first and still uses it unchanged, because the runner needs the same answer before it
+ * lets any browser gate near `apps/web/build`.
+ *
+ * THE RUNNER DID NOT HAVE IT, AND IT COST AN HOUR ON 22 SEPTEMBER. `web-build` was
+ * `existsSync(apps/web/build)`, so `layout` and `a11y` measured whatever that directory held and
+ * reported nineteen findings about a version of the app that was no longer the source. `bundle`
+ * already refused a build older than the code; the six gates beside it were never asked.
+ *
+ * `apps/web/src` IS NOT ALL OF THE SOURCE. The app imports eight workspace packages and compiles
+ * them into its own chunks, so a change to `packages/kernel/src` makes the build exactly as stale as
+ * a change to a route. The first version of this walk covered only the app, so the first kernel
+ * commit after it went straight through a green bundle row again.
+ *
+ * `src` AND NOT THE PACKAGE. A package's `test/` is not compiled into anything the browser
+ * downloads, so counting it would demand a rebuild for a change that cannot move a byte of the
+ * bundle, and a gate that cries stale on work it does not measure is a gate people learn to re-run
+ * blind.
+ *
+ * THE NAME COMES BACK WITH THE TIME because a verdict of "the build is stale" that does not say WHICH
+ * file made it stale is a verdict somebody re-runs blind.
+ *
+ * @returns {Promise<{ when: number, at: string }>} `when` is 0 when there is no source at all.
+ */
+export async function newestSource(root) {
+  const dirs = [join(root, 'apps', 'web', 'src')];
+  /* AND `packages/` IS ALLOWED NOT TO BE THERE. A bare `readdir` of a directory that does not exist
+     throws ENOENT out of the gate, and a gate that dies is a gate whose other rows nobody sees.
+     Silence is honest here because this list feeds a STALENESS comparison: no packages means no
+     package source that could be newer than the build, and an empty list says exactly that. */
+  for (const pkg of await readdir(join(root, 'packages'), { withFileTypes: true }).catch(() => []))
+    if (pkg.isDirectory()) dirs.push(join(root, 'packages', pkg.name, 'src'));
+  return (await Promise.all(dirs.map(newestUnder))).reduce((a, b) => (a.when >= b.when ? a : b));
+}
+
+async function newestUnder(dir) {
+  let when = 0;
+  let at = dir;
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true, recursive: true });
+  } catch {
+    /* A package with no `src` is a package that compiles into nothing. */
+    return { when, at };
+  }
+  for (const e of entries) {
+    /* `node_modules` under a workspace package is a symlink farm the size of the registry, and its
+       mtimes are about an install rather than about this code. */
+    if (!e.isFile() || (e.parentPath ?? e.path).split(/[\\/]/).some(skipDir)) continue;
+    /* AND A TEST IS NOT SOURCE EITHER. The app's tests sit beside the code they test rather than in
+       a `test/` directory, so the rule about `src` did not reach them: writing a test for a page
+       block declared the bundle stale and demanded a rebuild that could not move a byte. */
+    if (/\.test\.[cm]?[jt]sx?$/.test(e.name)) continue;
+    const full = join(e.parentPath ?? e.path, e.name);
+    const t = (await stat(full)).mtimeMs;
+    if (t > when) {
+      when = t;
+      at = full;
+    }
+  }
+  return { when, at };
+}
+
+/**
+ * The variant builds `pnpm --filter @braindog/web build` writes, read from the script that writes them.
+ *
+ * READ AND NOT LISTED, because `34 §6` says a count is read from the enumeration that owns it, and the
+ * owner here is `build:variants` in `apps/web/package.json`. A fourth variant added there is checked
+ * for freshness the day it is added rather than the day somebody remembers this file.
+ *
+ * `build-alpha/` AND ITS KIN ARE DELIBERATELY NOT HERE. They are `BRAINDOG_ENV=alpha`, which the
+ * `build` script never writes, so holding them against the prerequisite would refuse a gate and then
+ * name a command that cannot fix the refusal. In this tree on 22 September they were five days older
+ * than the main build, and no gate that declares `web-build` reads them.
+ *
+ * A SCRIPT THAT IS THERE AND CANNOT BE READ THROWS, rather than answering "no variants". An empty
+ * answer would wave a stale `build-cloud/` past `layout`, which is the exact fault this exists for.
+ */
+export function buildVariants(root) {
+  const at = join(root, 'apps', 'web', 'package.json');
+  if (!existsSync(at)) return [];
+  const script = JSON.parse(readFileSync(at, 'utf8')).scripts?.['build:variants'];
+  if (script === undefined) return [];
+  const list = /for \(const v of \[([^\]]*)\]\)/u.exec(script);
+  if (list === null)
+    throw new Error(
+      `apps/web/package.json has a build:variants this file cannot read the variant names out of, so ` +
+        `it cannot tell which build-* directories the build writes. It expected \`for (const v of ['a','b'])\``,
+    );
+  return [...list[1].matchAll(/'([a-z][a-z-]*)'/gu)].map((m) => m[1]);
+}
+
+/**
+ * When a build directory was written: the later of the directory and its `index.html`.
+ *
+ * THE DIRECTORY BECAUSE `adapter-static` EMPTIES AND REFILLS IT, so its time moves with every build,
+ * and `index.html` because it is the fallback shell the adapter writes after the chunks, which is
+ * the file every browser gate actually loads first. Measured in this tree: the two agree to the
+ * tenth of a microsecond on `build/` and on each of the three variants.
+ */
+function builtAt(dir) {
+  const shell = join(dir, 'index.html');
+  const own = statSync(dir).mtimeMs;
+  return existsSync(shell) ? Math.max(own, statSync(shell).mtimeMs) : own;
+}
+
+/**
+ * WHY THE WEB BUILD CANNOT BE MEASURED, OR `null` WHEN IT CAN. The `web-build` prerequisite.
+ *
+ * A SENTENCE AND NOT A BOOLEAN, because the runner prints it, and "needs a built web app" beside a
+ * build that is plainly there reads as the runner being wrong. It names the file that is newer.
+ *
+ * THE VARIANTS ARE HELD TO THE SAME RULE WHEN THEY ARE THERE, and only then. `layout` reads
+ * `build-cloud/`, `build-quiet/` and `build-busy/` when they exist and says so when they do not, so
+ * an absent variant is coverage that gate reports losing, and a stale one is the nineteen findings
+ * again, one directory over. `vite build` alone refreshes `build/` and leaves them where they were,
+ * which is the ordinary way to get one fresh and three stale.
+ */
+export async function webBuildUnmet(root) {
+  const web = join(root, 'apps', 'web');
+  if (!existsSync(join(web, 'build'))) return 'there is no apps/web/build';
+  const newest = await newestSource(root);
+  const shown = relative(root, newest.at).split(/[\\/]/).join('/');
+  const stale = ['build', ...buildVariants(root).map((v) => `build-${v}`)].filter(
+    (name) => existsSync(join(web, name)) && builtAt(join(web, name)) < newest.when,
+  );
+  if (stale.length === 0) return null;
+  return `${stale.map((name) => `apps/web/${name}`).join(', ')} ${stale.length === 1 ? 'is' : 'are'} older than ${shown}, so ${stale.length === 1 ? 'it is' : 'they are'} not this code`;
+}
 
 /**
  * THE READINESS CONTRACT, AND WHY IT IS IN THE FILE THAT IMPORTS NO PLAYWRIGHT.

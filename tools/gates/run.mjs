@@ -23,6 +23,8 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { basename, dirname, join } from 'node:path';
 
+import { webBuildUnmet } from './lib.mjs';
+
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..', '..');
 
@@ -322,15 +324,25 @@ const omitted = NAMES.filter((n) => !SELECTED.some(([name]) => name === n));
  * find unmet.
  */
 const NEEDS = {
+  /* A BUILD THAT IS THERE IS NOT A BUILD OF THIS CODE, and this line asked only the first question
+     until 22 September. `existsSync(apps/web/build)` let `layout` and `a11y` measure a build older
+     than the source, and they reported nineteen findings about an app that no longer existed, every
+     one of which was chased before anybody looked at the build's date. `bundle` already knew how to
+     prove a build stale; its walk is in `lib.mjs` now and this asks it too, so a stale build is
+     the same refusal as a missing one: the gate is not run, the line names the file that is newer,
+     and the command below is the fix. The runner does not build on its own, because a gate run that
+     silently builds is a run whose timing and output nobody asked for. A variant list this cannot
+     read is a refusal in the same voice rather than a stack trace, for the reason this file opens
+     with: one unreadable fact must not end the run before a single gate has been asked. */
   'web-build': {
-    met: () => existsSync(join(root, 'apps', 'web', 'build')),
-    what: 'a built web app at apps/web/build',
+    unmet: () => webBuildUnmet(root).catch((cause) => cause.message),
+    what: 'a built web app at apps/web/build that is newer than its source',
     how: 'pnpm --filter @braindog/web build',
   },
   /* THE ONE PREREQUISITE THAT IS NOT A FILE. `deploy-parity` asks whether the internet is serving
      this tree, and nothing on a developer's machine can answer that. */
   host: {
-    met: () => Boolean(process.env.DEPLOY_HOST),
+    unmet: () => (process.env.DEPLOY_HOST ? null : 'DEPLOY_HOST is not set'),
     what: 'DEPLOY_HOST naming the host to compare against',
     how: 'DEPLOY_HOST=<host> node tools/gates/run.mjs --only deploy-parity',
   },
@@ -588,12 +600,16 @@ for (const [name, [cmd, argv]] of SELECTED) {
 
 /* ASKED ONCE FOR THE WHOLE RUN, not once per gate. A build that appears halfway through must not
    give two gates with the same declaration two different verdicts. */
-const met = new Map(Object.entries(NEEDS).map(([need, spec]) => [need, spec.met()]));
+/* EACH ANSWER IS `null` FOR MET OR A SENTENCE SAYING WHY NOT, and it is awaited because the
+   freshness walk stats every source file in the app and the packages. It is asked even when no
+   selected gate declares it: measured at 31 ms on this tree on 22 September, which is less than
+   deciding which gates need it would be worth. */
+const why = new Map(await Promise.all(Object.entries(NEEDS).map(async ([need, spec]) => [need, await spec.unmet()])));
 const unmetOf = new Map();
 for (const [name, [, argv]] of SELECTED) {
   const d = dialects.get(name);
   const declared = d.how === 'imported' ? importedNeeds(name, d.needs) : declaredNeeds(name, scriptOf(argv));
-  const unmet = declared.filter((need) => !met.get(need));
+  const unmet = declared.filter((need) => why.get(need) !== null);
   if (unmet.length > 0) unmetOf.set(name, unmet);
 }
 
@@ -657,7 +673,8 @@ for (const [name, [cmd, args, opts]] of SELECTED) {
      it unchanged: CI builds first, so a refusal there says the build did not happen. */
   const unmet = unmetOf.get(name);
   if (unmet) {
-    for (const need of unmet) console.log(`  ${name} was not run: it needs ${NEEDS[need].what}. \`${NEEDS[need].how}\``);
+    for (const need of unmet)
+      console.log(`  ${name} was not run: it needs ${NEEDS[need].what}, and ${why.get(need)}. \`${NEEDS[need].how}\``);
     skipped.push(name);
     continue;
   }
