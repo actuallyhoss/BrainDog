@@ -19,13 +19,17 @@
  * the way `deliver.ts` does the outbox's I/O. And nothing here imports `cloudflare:`: R2 arrives as
  * the five methods below and not one more, so every rule worth testing runs in a bare Node process.
  *
- * SEALING IS A SEAM AND NOT A DEFAULT. `53 §5.4` wants the cloud copy sealed to `AGE_RECIPIENT`
- * with `age-encryption`, which this build does not have and cannot add here. So the rule is the one
- * that cannot go quietly wrong: a deployment that names a recipient and hands no sealer gets a
- * refusal, never a plaintext object under a name ending `.age`.
+ * A NAMED RECIPIENT SEALS, AND A RECIPIENT THAT WILL NOT DO STOPS THE WALK BEFORE IT STARTS.
+ * `53 §5.4` wants the cloud copy sealed to `AGE_RECIPIENT`, and `seal.ts` writes age v1 to it. Until
+ * that file existed the Worker passed the recipient and no sealer, and every record was refused in
+ * turn with the same sentence. Now the recipient is read once, where the copier is built: a real
+ * one seals every copy, and the placeholder `wrangler.jsonc` ships with is one refusal naming the
+ * variable. Neither is ever a plaintext object in a bucket the operator believes is sealed.
  */
 
 import { fixOf, type Result } from '@braindog/ports';
+
+import { recipientOf, sealTo } from './seal.ts';
 
 /** How many dated copies are kept. Thirty, because `apps/selfhost/src/snapshots.ts` keeps thirty (`53 §5.4`). */
 export const KEEP = 30;
@@ -44,7 +48,7 @@ export const KEEP = 30;
  */
 export const CEILING = 40 * 1024 * 1024;
 
-/** Unsealed, which is all this build can write. The sealed copy is `.brainl.age` (`03 §5`). */
+/** Unsealed, for a deployment with no `AGE_RECIPIENT`. The sealed copy is `.brainl.age` (`03 §5`). */
 const PLAIN = '.brainl';
 const SEALED = '.brainl.age';
 
@@ -88,6 +92,22 @@ export type Copy = { id: string; at: string; bytes: number };
 export type Seal = (file: Uint8Array) => Promise<Uint8Array>;
 
 /**
+ * The sealer a deployment's `AGE_RECIPIENT` names, `undefined` when it names none, and a throw when
+ * it names something that is not a recipient.
+ *
+ * EMPTY IS UNSEALED ON PURPOSE AND A PLACEHOLDER IS NOT. The Worker passes `env.AGE_RECIPIENT ?? ''`,
+ * so an operator who has decided against sealing clears the var and gets plaintext copies they
+ * know about. `age1<alpha-recipient>` is not that decision, it is a decision nobody has made yet,
+ * and treating it as empty would be the quiet plaintext this file exists to refuse.
+ */
+function sealerOf(recipient: string | undefined): Seal | undefined {
+  if (!recipient) return undefined;
+  const key = recipientOf(recipient);
+  if (typeof key === 'string') throw new Error(`The nightly copy did not run: ${key}`);
+  return sealTo(key);
+}
+
+/**
  * A record's dump, exported and counted.
  *
  * `redactGrants: false` BECAUSE THIS IS A BACKUP AND NOT A HANDOVER. A redacted export drops the
@@ -123,9 +143,15 @@ export async function dumpOf(
  * check reads. A `take` that returned quietly after a refused put would leave yesterday's `latest`
  * in place and a list that looks healthy, which is the one bug in this file nobody would notice
  * until they needed the copy.
+ *
+ * AND BUILDING IT THROWS when `recipient` is named and is not an `age1` X25519 recipient. That is
+ * the one failure that is the deployment's and not a record's, so it is said once, before the walk,
+ * and the cron invocation is red with a sentence naming `AGE_RECIPIENT`. `seal` is for a test that
+ * needs a transform of its own; the Worker passes the recipient and nothing else.
  */
 export function r2Snapshots(blobs: Blobs, o: { recipient?: string | undefined; seal?: Seal | undefined } = {}) {
-  const ext = o.seal ? SEALED : PLAIN;
+  const seal = o.seal ?? sealerOf(o.recipient);
+  const ext = seal ? SEALED : PLAIN;
   const latest = `latest${ext}`;
 
   /**
@@ -191,15 +217,7 @@ export function r2Snapshots(blobs: Blobs, o: { recipient?: string | undefined; s
           `snapshot over 40 MiB: this record dumped ${String(file.length)} bytes and the Worker signs the whole file in memory. Raise the ceiling or stream it (51 §10).`,
         );
 
-      /* A NAMED RECIPIENT AND NO SEALER IS A REFUSAL. The alternative is a plaintext copy of every
-         row a record holds, vault ciphertext included, sitting in a bucket the operator believed
-         was sealed to a key they keep outside Cloudflare. */
-      if (o.recipient && !o.seal)
-        throw new Error(
-          `${record} was not copied: this build names an age recipient and cannot seal to it, and an unsealed copy of a whole record is not the fallback. Add the sealer or clear AGE_RECIPIENT.`,
-        );
-
-      const body = o.seal ? await o.seal(file) : file;
+      const body = seal ? await seal(file) : file;
       const key = snapshotKey(record, dump.at, ext);
       const meta = {
         rows: String(dump.rows),

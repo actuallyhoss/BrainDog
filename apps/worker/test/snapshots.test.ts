@@ -3,9 +3,9 @@
  *
  * WHAT IS ASSERTED HERE IS THE THING THAT GOES WRONG SILENTLY. A backup subsystem has one failure
  * mode that matters, and it is not a crash: it is a night where nothing was written and nothing
- * said so. So the four tests below are the four ways that happens — a bucket that refused the put,
- * a dump over the ceiling, a deployment that names an age recipient this build cannot seal to, and
- * a copy that was written but cannot be read back.
+ * said so. So the tests below are the ways that happens: a bucket that refused the put, a dump over
+ * the ceiling, a deployment whose age recipient is still a placeholder, and a copy that was written
+ * but cannot be read back, sealed or not.
  *
  * THE ROUND TRIP IS AGAINST A REAL RECORD, not a fixture string: `createRecordApi` over
  * `node:sqlite`, the same SQLite a Durable Object runs, with the three wrapped keys the Worker
@@ -25,6 +25,7 @@ import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts'
 import { keyStoreOf, recordKeys, type KeyStore } from '../src/keys.ts';
 import { workerSigner } from '../src/sign.ts';
 import { CEILING, KEEP, LATEST, dumpOf, r2Snapshots, snapshotKey, type Blobs } from '../src/snapshots.ts';
+import { ageOpen, identity } from './age-open.ts';
 
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
 const OWNER = 'p_01JZ8QK3F7R2M9V4XN6TCB5HAO';
@@ -39,14 +40,18 @@ const testStore = async (): Promise<KeyStore> =>
 
 /** The five methods `snapshots.ts` asks of R2, over a Map, with a log of what was actually put. */
 function bucket(fail?: (key: string) => string | null) {
-  const held = new Map<string, { body: string; size: number; meta: Record<string, string> }>();
+  /* `bytes` IS KEPT BESIDE `body` BECAUSE A SEALED COPY IS NOT TEXT. Decoding one to a string and
+     back replaces every invalid UTF-8 sequence with U+FFFD, and the copy the test then tries to
+     open is not the copy that was put. */
+  const held = new Map<string, { body: string; bytes: Uint8Array; size: number; meta: Record<string, string> }>();
   const blobs: Blobs & { held: typeof held } = {
     held,
     put(key, value, options) {
       const why = fail?.(key);
       if (why) return Promise.reject(new Error(why));
-      const body = typeof value === 'string' ? value : new TextDecoder().decode(value as Uint8Array);
-      held.set(key, { body, size: body.length, meta: options?.customMetadata ?? {} });
+      const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : new Uint8Array(value);
+      const body = new TextDecoder().decode(bytes);
+      held.set(key, { body, bytes, size: body.length, meta: options?.customMetadata ?? {} });
       return Promise.resolve(null);
     },
     get(key) {
@@ -132,16 +137,39 @@ test('A DUMP OVER THE CEILING IS REFUSED BEFORE IT IS BUFFERED TWICE', async () 
   assert.equal(blobs.held.size, 0, 'the refusal still wrote something');
 });
 
-test('A DEPLOYMENT THAT NAMES AN AGE RECIPIENT NEVER GETS A PLAINTEXT COPY', async () => {
-  // `53 §5.4`: a cloud copy is sealed to exactly one recipient, and the identity lives outside
-  // Cloudflare. This build cannot seal, so the only two honest answers are a loud refusal or no
-  // recipient at all. Writing the plaintext under a name that ends `.age` is the third answer, and
-  // it is the one that gets a record's whole vault read by whoever can list a bucket.
+test('A DEPLOYMENT THAT NAMES A REAL RECIPIENT GETS A SEALED COPY, AND THE IDENTITY OPENS IT TO A FILE THAT IMPORTS', async () => {
+  // `53 §5.4`: the cloud copy is sealed to `AGE_RECIPIENT` and the identity lives outside Cloudflare.
+  // BEFORE THIS CHANGE THIS THREW FOR EVERY RECORD: the Worker passes the recipient and no sealer,
+  // and `take` refused each record in turn with "cannot seal to it". The call below is the Worker's
+  // own call, recipient only, so what it proves is the wiring and not a sealer handed in by a test.
+  const { api } = await record();
+  const id = identity();
   const blobs = bucket();
-  await assert.rejects(
-    () => r2Snapshots(blobs, { recipient: 'age1qqqqqq' }).take(REC, { text: 'x', rows: 1, at: AT }),
-    /seal/u,
+  const kept = await r2Snapshots(blobs, { recipient: id.recipient }).take(REC, await dumpOf(api, AT));
+
+  assert.equal(kept.key, snapshotKey(REC, AT, '.brainl.age'));
+  assert.deepEqual(
+    [...blobs.held.keys()].sort(),
+    [`${REC}/snapshots/latest.brainl.age`, kept.key].sort(),
+    'a plaintext object was written beside the sealed ones',
   );
+  const stored = blobs.held.get(kept.key)?.bytes ?? new Uint8Array(0);
+  assert.equal(Buffer.from(stored.subarray(0, 22)).toString(), 'age-encryption.org/v1\n');
+  assert.equal(blobs.held.get(kept.key)?.meta.bytes, String(kept.bytes), 'the metadata counts the plaintext it describes');
+
+  const opened = ageOpen(stored, id).toString('utf8');
+  const sound = await checkBrainl(opened.split('\n'));
+  assert.ok(sound.ok, JSON.stringify(sound));
+});
+
+test('A PLACEHOLDER RECIPIENT IS REFUSED ONCE, BY NAME, BEFORE ANY RECORD IS WALKED', () => {
+  // `wrangler.jsonc` ships `age1<alpha-recipient>` until the owner pastes a key. Refusing it inside
+  // `take` would print the same sentence once per record and leave the cron to count them as a
+  // fleet of failures; refusing it where the Worker builds the copier is one line that names the
+  // variable to fix, and nothing is written. A plaintext copy is never the fallback.
+  const blobs = bucket();
+  for (const recipient of ['age1<alpha-recipient>', 'age1<production-recipient>', 'age1qqqqqq'])
+    assert.throws(() => r2Snapshots(blobs, { recipient }), /AGE_RECIPIENT/u);
   assert.equal(blobs.held.size, 0);
 });
 
@@ -184,8 +212,9 @@ test('THE DAY THE SEALER ARRIVES, RETENTION IS STILL THIRTY AND THE PLAINTEXT DR
   for (let n = 0; n < KEEP; n++) await plain.take(REC, { text: `#dogl 1\n["${night(n)}"]`, rows: 1, at: night(n) });
   assert.equal((await plain.list(REC)).length, KEEP, 'thirty plaintext nights');
 
-  /* The sealer this build cannot build, stood in for by the one transform that proves the seam:
-     the extension changes, the bytes go through it, and nothing else about the night does. */
+  /* AN IDENTITY TRANSFORM IN PLACE OF THE REAL SEALER, because what is under test is retention and
+     not cryptography: the extension changes, the bytes go through it, and nothing else about the
+     night does. Handing `seal` in is also why the made-up recipient is not read here. */
   const sealed = r2Snapshots(blobs, { recipient: 'age1qqqqqq', seal: (f) => Promise.resolve(f) });
   for (let n = KEEP; n < KEEP + 8; n++) await sealed.take(REC, { text: `#dogl 1\n["${night(n)}"]`, rows: 1, at: night(n) });
 
