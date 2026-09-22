@@ -192,3 +192,101 @@ test("A PACK'S OWN LIST TAKES THE FIELD BY RULE, and the pack's next version sti
   assert.ok(ids.includes('domain') && ids.includes('launched'), `things holds ${ids.join(', ')}`);
   sql.close();
 });
+
+test("A MEMBER'S KEY ASKS: an addition from a key of anybody but the owner files and waits, whatever her level", async () => {
+  /* MEASURED BEFORE THE FIX (`loop/research-batch-thirty-three-audit.md` §3): a key of a person at `append` landed
+     `colour` on Projects with no press, while the same person proposing in her own name waited. `byRule` asked for a
+     token and for `propose` on the list, and never whose token it was. DIRECTION §22 answered for the owner's own
+     agents; `field-write.ts` holds the web to "a field on everybody's rows is the owner's call", and a member's key is
+     that member. So `append`, `write` and `decide` all file, and none of them lands. */
+  for (const level of ['append', 'write', 'decide'] as const) {
+    const { sql, add, live, suggestion, declared } = await record();
+    const member: CallContext = { ...agent, principal: { kind: 'token', id: 'tok_2', scope: 'propose', person: 'p_2', level } };
+    const out = await add({ fields: [{ id: 'colour', type: 'text' }] }, member);
+    const id = idOf(out);
+    assert.equal(out.value!.landed, undefined, `a ${level} key landed the field`);
+    assert.equal(suggestion(id).status, 'open', `a ${level} key answered its own question`);
+    assert.deepEqual(live().fields.map((f) => f.id), ['name', 'lane']);
+    assert.equal(declared().length, 0);
+    sql.close();
+  }
+});
+
+test("AND THE OWNER'S OWN KEY STILL LANDS, which is the case DIRECTION §22 answered", async () => {
+  const { sql, add, live } = await record();
+  const out = await add({ fields: [{ id: 'colour', type: 'text' }] }, agent);
+  assert.deepEqual(out.value!.landed, { declaration: 'register.things', version: 2 }, JSON.stringify(out));
+  assert.deepEqual(live().fields.map((f) => f.id), ['name', 'lane', 'colour']);
+  sql.close();
+});
+
+test('AN OWNER HELD TO append ON PROJECTS is not its owner there, and her key asks like a member', async () => {
+  /* `members.ts` lets one owner hold another to a level on one list, and `guard` answers from that list's own level. A
+     key whose record level is `owner` but whose Projects level is `append` is the member of Projects the rule is not
+     for, so the rule reads the list's level before the record's. */
+  const { sql, add, live } = await record();
+  const out = await add({ fields: [{ id: 'colour', type: 'text' }] }, { ...agent, levels: { things: 'append' } });
+  if (out.ok) assert.equal(out.value!.landed, undefined);
+  assert.equal(live().version, 1);
+  sql.close();
+});
+
+test('AND A MEMBER INVITED AS OWNER OF PROJECTS ALONE is not the owner, and her key asks too', async () => {
+  /* THE OTHER DIRECTION OF THE SAME OVERRIDE, found checking the fix above: `members.ts` accepts
+     `invite({ level: 'append', registers: { things: 'owner' } })`, and reading the list's level first made her key the
+     owner here. Measured with the list's level alone: her key at `append` and at `decide` each landed `colour` on
+     Projects at version 2, while `decide` refuses her for want of the whole record and the web's `ownsRecord` says she
+     is not an owner. So the record's own level must be `owner`, and the list's may only keep it there. */
+  for (const level of ['append', 'decide'] as const) {
+    const { sql, add, live, suggestion } = await record();
+    const member: CallContext = { principal: { kind: 'token', id: 'tok_2', scope: 'propose', person: 'p_2', level }, levels: { things: 'owner' } };
+    const out = await add({ fields: [{ id: 'colour', type: 'text' }] }, member);
+    const id = idOf(out);
+    assert.equal(out.value!.landed, undefined, `a ${level} key held to owner on Projects landed the field`);
+    assert.equal(suggestion(id).status, 'open');
+    assert.equal(live().version, 1);
+    sql.close();
+  }
+});
+
+test("A SCOPE FIELD WAITS, and every agent's context is what it was before the question", async () => {
+  /* MEASURED BEFORE THE FIX (`loop/research-batch-thirty-three-audit.md` §6): an agent added `project` with a `scope`
+     to Money, it landed by rule, and a second agent's `context` went from no registers to Money's three row titles.
+     `context` sends every readable list with a scope field into the brief, and `scopeFault` holds a key's writes to
+     its project by it, so a scope is where rows apply and not an optional field. */
+  const { sql, api, suggestion } = await record();
+  const MONEY = {
+    id: 'register.money',
+    kind: 'register' as const,
+    body: { id: 'money', name: 'Money', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] } as never,
+  };
+  /* A SCOPE NAMES THE LIST OF PROJECTS, so Projects says it is one (`scopes:`), as the seed's does. */
+  const PROJECTS = {
+    ...THINGS,
+    body: { ...(THINGS.body as object), fields: [...(THINGS.body as { fields: unknown[] }).fields, { id: 'repos', type: 'list', of: 'text' }], scopes: { repos: 'repos' } } as never,
+  };
+  const installed = await api.kernel.install([PROJECTS, MONEY]);
+  assert.ok(installed.ok, JSON.stringify(installed));
+  for (const name of ['Loan to Omar', 'Salary', 'Rent']) assert.ok(api.kernel.create('money', { name }, { actor: 'p_1' }).ok);
+  const told = async () => {
+    const out = (await api.context({}, { ...agent, principal: { ...agent.principal, id: 'tok_9' } } as CallContext)) as Out;
+    assert.ok(out.ok, JSON.stringify(out));
+    return JSON.stringify((out.value as { registers: unknown }).registers);
+  };
+  const before = await told();
+
+  const out = (await api.propose(
+    {
+      question: 'Add project to Money?',
+      body_kind: 'change',
+      body: { declaration_id: 'register.money', to: { add: { fields: [{ id: 'project', type: 'ref', to: 'things', scope: {} }] } } },
+    } as never,
+    agent,
+  )) as Out;
+  const id = idOf(out);
+  assert.equal(out.value!.landed, undefined, JSON.stringify(out));
+  assert.equal(suggestion(id).status, 'open');
+  assert.equal(api.kernel.declarations().find((d) => d.id === 'register.money')!.version, 1);
+  assert.equal(await told(), before);
+  sql.close();
+});

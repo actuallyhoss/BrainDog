@@ -554,8 +554,23 @@ export const ADDITIVE_RULE = 'rule:additive';
 /**
  * The keys that make an added field something other than loose metadata: it asks every writer for a value, it refuses
  * a value another row holds, or it builds an index. `search` is the full-text index, so it counts as one.
+ *
+ * AND `scope`, WHICH SAYS WHERE ROWS APPLY. It was not here, and `loop/research-batch-thirty-three-audit.md` §6 added
+ * `project` with a scope to Money from an agent's key: it landed by rule, and a second agent's `context` went from no
+ * registers to Money's three row titles, because `context` sends every readable list with a scope field into the brief.
+ * From then on `scopeFault` also holds a key's writes to Money to its project. Neither is an optional field.
  */
-const HELD_KEYS = ['required', 'required_when', 'unique', 'index', 'search'] as const;
+const HELD_KEYS = ['required', 'required_when', 'unique', 'index', 'search', 'scope'] as const;
+
+/** How the owner reads each held key, after the field's id: "domain is unique, and that waits for the owner." */
+const HELD_AS: Record<(typeof HELD_KEYS)[number], string> = {
+  required: 'required',
+  required_when: 'required sometimes',
+  unique: 'unique',
+  index: 'indexed',
+  search: 'searched',
+  scope: 'where rows apply',
+};
 
 /**
  * Why a change cannot land by the additive rule, or `null` when it can.
@@ -577,7 +592,7 @@ export function additiveFault(body: Record<string, unknown> | null): string | nu
   if (Array.isArray(body.egress) && body.egress.length > 0) return 'It sends something out, and that waits for the owner.';
   for (const f of (Array.isArray(add.fields) ? add.fields : []) as Record<string, unknown>[]) {
     const held = HELD_KEYS.find((k) => isMap(f) && f[k] !== undefined && f[k] !== false);
-    if (held !== undefined) return `${String(f?.id)} is ${held === 'required_when' ? 'required sometimes' : held === 'search' ? 'searched' : held}, and that waits for the owner.`;
+    if (held !== undefined) return `${String(f?.id)} is ${HELD_AS[held]}, and that waits for the owner.`;
   }
   return null;
 }

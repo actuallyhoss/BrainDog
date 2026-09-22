@@ -1960,6 +1960,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    *
    * AND A LIST THE KEY REACHES. Filing names no register to `guard`, so a key held to Diary may ask about Projects; it
    * may not change Projects on its own, and its question waits for the owner as it did before.
+   *
+   * AND THE OWNER'S KEY, NOT ANY MEMBER'S. This asked for a token and for `propose` on the list, and never whose token:
+   * `loop/research-batch-thirty-three-audit.md` §3 measured a key of a person at `append`, at `write` and at `decide`
+   * each landing `colour` on Projects with no press, while the same person proposing in her own name waited. A member's
+   * key is that member, and `field-write.ts` holds her app to "a field on everybody's rows is the owner's call". So the
+   * record's own level must be `owner`, which is what `ownsRecord` asks in the web, AND the list's level must not hold
+   * it lower, because `members.ts` lets one owner hold another to `append` on a list, and on that list he is not its
+   * owner. Reading the list's level INSTEAD of the record's was tried first and was wrong the other way: `members.ts`
+   * also accepts a member at `append` invited as `owner` of Projects alone, and her key landed `colour` at version 2,
+   * while `decide` refuses her for want of the whole record.
    */
   const byRule = (args: Proposal, ctx: CallContext): boolean => {
     if (ctx.principal.kind !== 'token' || args?.body_kind !== 'change') return false;
@@ -1968,7 +1978,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (add === null || typeof add !== 'object') return false;
     const said = (add as { register?: unknown }).register ?? (args.body as { declaration_id?: unknown }).declaration_id;
     if (typeof said !== 'string') return false;
-    return guard(ctx, 'propose', said.startsWith('register.') ? said.slice('register.'.length) : said) === null;
+    const list = said.startsWith('register.') ? said.slice('register.'.length) : said;
+    const there = Object.hasOwn(ctx.levels ?? {}, list) ? ctx.levels?.[list] : 'owner';
+    if (ctx.principal.level !== 'owner' || there !== 'owner') return false;
+    return guard(ctx, 'propose', list) === null;
   };
 
   /**
