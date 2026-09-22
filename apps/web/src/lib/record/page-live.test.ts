@@ -262,10 +262,13 @@ test('a value is read from what the record sent, and nothing it did not', () => 
 test('the page route reads the record, waits for it, and draws what it cannot say plainly', () => {
   const route = readFileSync(new URL('../../routes/p/[slug]/+page.svelte', import.meta.url), 'utf8');
   assert.match(route, /pageReader\(location\.origin\)/);
-  assert.match(route, /\{#if got === null\}/);
-  assert.match(route, /block\.cannot/);
-  assert.match(route, /<ActionRows /);
-  assert.match(route, /<Actions project=\{param\.title\} \/>/, 'Runs on went missing from the project pages');
+  /* THE ROUTE KEEPS THE READ; WHAT IT DRAWS IS `PageView`, moved out whole (`loop/research-modules-next.md`, Brief 5). */
+  const view = readFileSync(new URL('../page/PageView.svelte', import.meta.url), 'utf8');
+  assert.match(route, /<PageView /);
+  assert.match(view, /\{#if got === null\}/);
+  assert.match(view, /block\.cannot/);
+  assert.match(view, /<ActionRows /);
+  assert.match(view, /<Actions project=\{param\.title\} \/>/, 'Runs on went missing from the project pages');
   assert.doesNotMatch(route, /\$effect\(\(\) => drew\('ready'\)\)/, 'the page says it drew before the record answered');
 });
 

@@ -52,7 +52,7 @@
 
 import { display, labelOf } from './api.ts';
 import { REGISTERS, ROWS } from './data.ts';
-import type { Entry } from './schema.ts';
+import type { Entry, FieldDecl } from './schema.ts';
 
 export type Clause =
   | { field: string; op: 'is' | 'is not'; values: string[] }
@@ -380,12 +380,40 @@ const COMPOUND = ['money', 'quantity', 'file', 'json'];
  *
  * A URL IS MACHINE-FACING, so it carries the declared value. The dialect keeps its sentence, `display`
  * keeps the spaces on screen, and there is one string in between.
+ *
+ * AND THE LABEL THE REGISTER GIVES A VALUE IS A THIRD SPELLING OF IT, tried first, as the record's
+ * `resolve` tries it. This matched the value's own words and never the label, so
+ * `declaredValue('tasks', 'state', 'Later')` came back `Later` while the kernel's sentence read the
+ * same word as `backlog`, and the one caller that knew, `inheritedFrom`, looked the label up itself
+ * with a fold that was not the kernel's. `labels-parity.test.ts` measured ten spellings over the
+ * seed's tasks: all eight labels came back unchanged here and as a declared value there.
  */
 export const declaredValue = (register: string, field: string, value: string): string => {
+  const f = REGISTERS[register]?.fields.find((x) => x.id === field);
+  const labelled = labelledValue(f, value);
+  if (labelled) return labelled;
   const want = norm(value);
-  const values = REGISTERS[register]?.fields.find((f) => f.id === field)?.values;
-  return values?.find((v) => norm(v) === want) ?? value;
+  return f?.values?.find((v) => norm(v) === want) ?? value;
 };
+
+/**
+ * A label as the record folds it before comparing: every run of spaces and underscores is one space, then case.
+ *
+ * COPIED FROM `resolve` IN `packages/where/src/sentence.ts` AND NOT IMPORTED, because it is not exported: the kernel
+ * writes it inline on both sides of the comparison, and `@braindog/where` is not a dependency of this app either. It is
+ * NOT `norm`, and the difference was measured: `norm` folds one underscore at a time and collapses nothing, so
+ * `state is To  check` and `state is to__check` were refused here as *"state has no value"* while the kernel filled
+ * `review` for both. `norm` stays as it is for a value's own words, because the kernel does not collapse runs there
+ * either: `direction is owed  to me` is a refusal on both engines, and folding it here would open the other side.
+ */
+export const foldLabel = (v: string): string => v.replace(/[\s_]+/g, ' ').trim().toLowerCase();
+
+/** The declared value whose label the reader said, or `undefined`, and only a value the field still declares. */
+function labelledValue(f: FieldDecl | undefined, said: string): string | undefined {
+  const want = foldLabel(said);
+  const hit = Object.entries(f?.labels ?? {}).find(([, label]) => foldLabel(label) === want)?.[0];
+  return hit && (f?.values ?? []).includes(hit) ? hit : undefined;
+}
 
 /**
  * The declared field a clause names, matched without regard to case, or `null`.
@@ -578,9 +606,7 @@ function elementValue(register: string, field: string, of: string, said: string,
      register gives it — the same three spellings `declaredValue` and `allowed` accept on a scalar. */
   if (of === 'enum') {
     const want = norm(said);
-    const labelled = Object.entries(decl?.labels ?? {}).find(([, label]) => norm(label) === want)?.[0];
-    if (labelled && (decl?.values ?? []).includes(labelled)) return labelled;
-    return (decl?.values ?? []).find((v) => norm(v) === want) ?? null;
+    return labelledValue(decl, said) ?? (decl?.values ?? []).find((v) => norm(v) === want) ?? null;
   }
 
   if (of === 'ref') {
@@ -881,7 +907,14 @@ export function compile(register: string, where: string | undefined): Where {
     }
 
     /* ` or ` and not `|`, because the person reading this is reading a sentence. */
-    const values = rest.split(/\s+or\s+/i).map((v) => v.trim()).filter(Boolean);
+    /* AN ENUM'S LABEL IS TURNED INTO ITS VALUE HERE, before `allowed` and `formsOf` compare it through `norm`, which
+       folds one underscore at a time and collapses no run: `state is To  check` was refused as a value tasks do not
+       hold, and the kernel answered it with the two tasks in review. */
+    const values = rest
+      .split(/\s+or\s+/i)
+      .map((v) => v.trim())
+      .filter(Boolean)
+      .map((v) => (decl?.type === 'enum' ? (labelledValue(decl, v) ?? v) : v));
 
     /**
      * A TYPE WITH NO DECLARED SET IS STILL NOT AN OPEN ONE, and it was being treated as one.

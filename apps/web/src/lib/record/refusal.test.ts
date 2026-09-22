@@ -79,8 +79,21 @@ test('EVERY KIND GETS THE SURFACE, which is the whole defect', () => {
   for (const kind of Object.keys(KINDS)) {
     /* A CAPTURE READS NO ROWS, so there is no empty answer for it to report: it draws its field, or
        the one line naming its list when the host cannot write (`packages/render/src/capture.ts`).
-       A "Nothing matched." under an input would be a claim about rows it never asked for. */
-    if (kind === 'capture') continue;
+       A "Nothing matched." under an input would be a claim about rows it never asked for.
+
+       SO IT IS HELD TO ITS OWN ANSWER HERE RATHER THAN SKIPPED. The skip was right while `draw()` had
+       no capture branch, and it hid what `draw()` gave it then: a fence with no rows, which the parser
+       degraded with "no into row" on every page that declared one (`capture-wire.test.ts`). Now the
+       answer is the list the block names and no refusal, and this says so. */
+    if (kind === 'capture') {
+      const { refusal, segments } = draw(bound({ kind, rows: [], entries: [], matched: [], refusals: [], empty: 'Nothing matched.' }, ['authored', 'body', 'metrics']));
+      assert.equal(refusal, null, 'a capture reported an empty answer about rows it never read');
+      assert.deepEqual(
+        segments.map((s) => (s.type === 'block' ? [s.kind, s.rows[0]?.cells[0], s.rows[0]?.cells[1]] : s.type)),
+        [['capture', 'into', 'obligations']],
+      );
+      continue;
+    }
     const { refusal } = draw(
       bound({ kind, rows: [], entries: [], matched: [], refusals: [], empty: 'Nothing matched.' }, ['authored', 'body', 'metrics']),
     );

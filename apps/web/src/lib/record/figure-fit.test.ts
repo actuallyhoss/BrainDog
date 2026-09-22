@@ -146,7 +146,7 @@ function componentCss(path: string): string {
   return unglobal(src.slice(open + '<style>'.length, close));
 }
 
-const ROUTE = 'apps/web/src/routes/p/[slug]/+page.svelte';
+const ROUTE = 'apps/web/src/lib/page/PageView.svelte';
 const routeCss = componentCss(ROUTE);
 const shellCss = componentCss('apps/web/src/routes/+layout.svelte');
 const blocksCss = read('apps/web/src/lib/blocks.css');

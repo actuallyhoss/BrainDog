@@ -694,6 +694,27 @@ function queueRows(block: BlockResult): string[] {
 }
 
 /**
+ * A capture's rows: `into` the list, then `set` for each value a new row is filled with (`render/src/capture.ts`).
+ *
+ * THE BLOCK WAS DRAWN AS A DEGRADED FENCE until this existed. `4cff0163` taught both engines to answer a capture
+ * with `register` and `fills`, and nothing here wrote the rows the renderer reads, so the generic branch wrote a
+ * fence with none and the parser refused it with "no into row", on every page that declared one.
+ *
+ * THE LIST'S ADDRESS IS THE BLOCK'S OWN SLICE, `registerHref` over its `where:`, because a reader who cannot add
+ * from here is sent to the list to add there, and the grid's line under the same filter fills the same values.
+ * The name is the register's, the one the block bar above already prints.
+ *
+ * NO LIST, NO ROWS, so a capture with nothing to add to still degrades rather than drawing a field that writes
+ * nowhere. Both engines refuse that declaration first, so this is only reached by a block built by hand.
+ */
+function captureRows(block: BlockResult): string[] {
+  const register = block.register;
+  if (!register) return [];
+  const into = ['into', register, REGISTERS[register]?.name ?? register, registerHref(register, block.where)];
+  return [into, ...Object.entries(block.fills ?? {}).map(([field, value]) => ['set', field, value])].map((cells) => cells.map(escapeCell).join(' | '));
+}
+
+/**
  * The heading is DELIBERATELY not passed through. The block bar above already names the block and
  * says where its rows came from; a figcaption repeating it is the same sentence twice, in two
  * different typographic registers.
@@ -889,7 +910,10 @@ function drawSegments(block: BlockResult): ReturnType<typeof parse> {
   /* A LINE A MEASURE, each chart its own fence under the measure's name, from the rows a project reported. */
   if (block.kind === 'lines' && (block.register || block.measures) && !block.authored?.length)
     return parse(linesText(measuresFor(block)), { page: true });
-  const heading = block.kind === 'section' && block.heading ? ` | ${escapeCell(block.heading)}` : '';
+  /* A CAPTURE'S HEADING GOES THROUGH TOO, because it is not a caption: it is the field's placeholder and its
+     accessible name (`captioned` leaves it off the figure), and without it the field asks "Add to Tasks" where
+     its author wrote "What needs doing?". */
+  const heading = (block.kind === 'section' || block.kind === 'capture') && block.heading ? ` | ${escapeCell(block.heading)}` : '';
   /* THE HERO FIGURE IS A FORM OF `stat`, written after the kind: ```stat lead. */
   const form = block.kind === 'stat' && block.lead ? ' lead' : block.kind === 'series' && block.net ? ' net' : block.kind === 'progress' && block.spent ? ' budget' : '';
   const head = `${block.kind}${form}${heading || (block.tone ? ` |  | ${block.tone}` : '')}`;
@@ -944,6 +968,8 @@ function drawSegments(block: BlockResult): ReturnType<typeof parse> {
         ? cardsRows(block)
       : block.kind === 'queue' && block.queue
         ? queueRows(block)
+      : block.kind === 'capture'
+        ? captureRows(block)
       : block.kind === 'section'
         ? [sectionRow(block)]
       : block.register && block.columns.length > 0 && spec
@@ -1172,10 +1198,11 @@ export function draw(
 
   /* A FIGURE IN A LABEL-AND-VALUE ROW READS AS MONEY, the way the table beside it does. The
      primitive draws its cells as text, so a `spec` block on a project page said `GBP 14.00` under a
-     table saying `£8,530.00`. A code block keeps what was written. */
+     table saying `£8,530.00`. A code block keeps what was written, and so does a capture, whose cells nobody
+     reads: they are the list and the values the host writes into a new row, in the form the record stores. */
   const home = homeCurrency();
   const segments = toSegments(block).map((s) =>
-    s.type === 'block' && s.kind !== 'code' ? { ...s, rows: s.rows.map((r) => ({ ...r, cells: r.cells.map((c) => symbolText(c, home)) })) } : s,
+    s.type === 'block' && s.kind !== 'code' && s.kind !== 'capture' ? { ...s, rows: s.rows.map((r) => ({ ...r, cells: r.cells.map((c) => symbolText(c, home)) })) } : s,
   );
   /* A CARD GRID IS BLANK WHEN IT HAS NO ENTRIES, whatever its first row says: that row names the
      columns and is not a card. A section over a register that admitted nothing has nothing under

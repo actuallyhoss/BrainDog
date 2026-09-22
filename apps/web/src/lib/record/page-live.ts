@@ -605,6 +605,10 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     working_now: atWork,
     past: remembered,
     measures: measured,
+    /* A CAPTURE'S LIST AND WHAT A NEW ROW IN IT IS FILLED WITH, taken by name so neither rides through `rest`
+       unchecked: `fills` is what a press writes, so a value in it the app did not look at is a value it would store. */
+    register: into,
+    fills: filled,
     ...rest
   } = b;
 
@@ -663,6 +667,17 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
   const cannot: LiveBlock = { ...shell, cannot: liveWords.cannot };
 
   if (refusals.length || drawn === false) return shell;
+  /* A CAPTURE READS NO ROWS, and it has no `source:` either, so it is answered before the check that sends a block
+     with none back as written text. Its list is kept on `register`, which every other block here takes from its
+     source, because `draw()` names the list from it and the page decides from it whether a line can be written.
+
+     FILLS THAT ARE NOT ALL TEXT ARE A BLOCK THIS BUILD CANNOT DRAW, and not a capture that fills less: dropping the
+     one value it could not read turns a line typed under "Later" into an open task, which is a write nobody made. */
+  if (kind === 'capture') {
+    const text = isObject(filled) && Object.values(filled).every((v) => typeof v === 'string');
+    if (typeof into !== 'string' || into === '' || !text) return cannot;
+    return { ...shell, register: into, fills: { ...(filled as Record<string, string>) } };
+  }
   /* A STAT OVER A REGISTER AND NO FIGURES draws a tile a measure from the rows (`measures.ts`), as the kernel answers it. */
   if (b.cells || (kind === 'stat' && !registerOf(b))) return { ...shell, metrics: (readings ?? []).map((cell) => tileOf(cell, values)) };
   /* A BAR OR A SPLIT OVER A FIGURE draws the parts the record read. */

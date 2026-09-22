@@ -712,12 +712,15 @@ export function inheritedFrom(register: string, filters: readonly Filter[]): Fie
     const field = decl.fields.find((x) => x.id === f.field);
     if (!field || field.id === decl.title) continue;
     if (field.type !== 'enum' && field.type !== 'text') continue;
-    /* AND AN ENUM'S LABEL IS ITS VALUE, as the record's parse reads it. `declaredValue` matches the value's own
-       words and not the register's label for it, so `state is Later` came back as `Later`, which tasks do not
+    /* AND AN ENUM'S LABEL IS ITS VALUE, as the record's parse reads it. `declaredValue` used to match the value's
+       own words and not the register's label for it, so `state is Later` came back as `Later`, which tasks do not
        declare, and was dropped here while the kernel filled the same line as `backlog`. `capture-block.test.ts`
-       found it on its first run: one `where:`, a task kept for later on a record and an ordinary one on the demo. */
-    const labelled = field.type === 'enum' ? Object.entries(field.labels ?? {}).find(([, label]) => label.toLowerCase() === f.values[0]!.trim().toLowerCase())?.[0] : undefined;
-    const said = labelled ?? declaredValue(register, f.field, f.values[0]!);
+       found it on its first run: one `where:`, a task kept for later on a record and an ordinary one on the demo.
+       THE REPAIR WAS A SECOND MATCHER, HERE, and it folded case where the kernel's `resolve` also collapses every run
+       of spaces and underscores, so `state is to_check` filled `review` on a record and nothing on the demo.
+       `declaredValue` reads labels with the kernel's own fold now, and this reads `declaredValue`, so there is one
+       matcher. `labels-parity.test.ts` holds it against the kernel. */
+    const said = declaredValue(register, f.field, f.values[0]!);
     if (field.type === 'enum' && !field.values?.includes(said)) continue;
     out[f.field] = said;
   }
