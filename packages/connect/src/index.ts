@@ -388,9 +388,11 @@ export const startOfGrain = (ms: number, grain: Grain, tz: string): string => {
  * The ingest declaration, as much of it as a connector reads.
  *
  * DECLARED STRUCTURALLY, like `RecordApi` below and for the same reason (`46 §4.6`'s pattern): the
- * whole declaration is `43 §4.2`'s, and importing it would put an edge from rank 14 to a package
- * that is unbuilt. What connect reads is `id`, `fetch` and `writes`, and naming exactly those is
- * also a statement that it reads nothing else.
+ * whole declaration is `43 §4.2`'s. When this was written that meant an edge from this package to
+ * one that was unbuilt; `extract` is built now, at rank 9 below this one's 15 (`31 §2`), and `Read`
+ * above already comes from it, so the import would be legal. What keeps the type here is that
+ * connect reads `id`, `fetch` and `writes`, and naming exactly those is also a statement that it
+ * reads nothing else.
  */
 export type IngestDecl = {
   id: string;

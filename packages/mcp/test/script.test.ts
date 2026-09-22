@@ -2,11 +2,13 @@
  * Authoring a script over MCP (`loop/research-shell-scripts.md` section 7, Brief 6): the grammar an agent reads before
  * it writes one, and the `propose` it files it with.
  *
- * `script_try` IS NOT HERE, AND THE REASON IS THE PACKAGE ORDER. It runs a script in the sandbox, which is
- * `@braindog/script` at rank 23 of `31-STACK` section 2, and this package is rank 12: the import points up the order and
- * `tools/gates/graph.mjs` refuses it. No host can hand it in either, because the record (11), `host` (15) and both apps
- * (21, 22) all sit below 23 too. A tool advertised with nothing behind it refuses on every build, which
- * `index.test.ts`'s "EVERY ADVERTISED TOOL REACHES A METHOD" exists to stop.
+ * `script_try` IS NOT HERE YET, AND THE PACKAGE ORDER NO LONGER STANDS IN ITS WAY. It runs a script in the sandbox,
+ * `@braindog/script`, and this comment used to say that package was rank 23 of `31-STACK` section 2 and this one 12, so
+ * the import pointed up the order and `tools/gates/graph.mjs` refused it. Script was re-ranked to 12 so that it could
+ * be taken: this package is 13 now, `host` 16 and the two apps that serve MCP 22 and 23, and every one of those edges
+ * points down. What is missing is the tool, which is backlog work. Until it is built it stays unadvertised, because a
+ * tool advertised with nothing behind it refuses on every build, which `index.test.ts`'s "EVERY ADVERTISED TOOL
+ * REACHES A METHOD" exists to stop.
  */
 
 import { test } from 'node:test';

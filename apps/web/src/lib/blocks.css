@@ -402,7 +402,7 @@
 
   /* FIGURES WRAP TO MORE ROWS BEFORE THEY SHRINK. The block is its own container, so a stat in a narrow column of a wide
      page answers its own width, not the viewport's. Five figures or more go three across below 60rem (a Dashboard at 1024
-     beside the rail), and four or more go two by two below 38rem. */
+     beside the rail), and four or more go two by two below 608px. */
   .block[data-kind='stat'] {
     container-type: inline-size;
   }
@@ -413,14 +413,20 @@
     }
   }
 
-  /* 38rem AND NOT 30, BECAUSE FOUR FIGURES ACROSS A LAPTOP'S FULL-WIDTH SLOT WERE CUT ON LINUX. This step was a phone's,
+  /* 608px AND NOT 30rem, BECAUSE FOUR FIGURES ACROSS A LAPTOP'S FULL-WIDTH SLOT WERE CUT ON LINUX. This step was a phone's,
      at 30rem, and a 900px window gives a full-width block 586px: four cells of 122.5px beside three 32px gaps.
      `£38,880.00` and `£10,416.16` on `/p/money` and `/p/ledger` draw 123.2px of Geist on Windows, already 0.7px over,
      and the same woff2 on a hosted ubuntu image draws about 1.6 per cent wider, so the CI runner measured them cut by
-     2.7px. Four figures of 123.2px with two per cent to spare need 4 x 125.7 + 96 = 599px; 38rem is 608px, which leaves
+     2.7px. Four figures of 123.2px with two per cent to spare need 4 x 125.7 + 96 = 599px; 608px, which was 38rem, leaves
      each cell 128px and so 3.9 per cent of room on Windows and about 2.2 on Linux. Below it they go two by two, as on a
-     phone, and at no size smaller than they were. `record/figure-fit.test.ts` holds the two per cent. */
-  @container (inline-size < 38rem) {
+     phone, and at no size smaller than they were. `record/figure-fit.test.ts` holds the two per cent.
+
+     AND IT IS 608px, NOT 38rem, BECAUSE THE FIGURE IT GUARDS IS A px WIDTH. `--t-xl` is 24px at any root, so the 123.2px
+     of ink does not move when a reader sets her browser's text smaller, and a rem step was the only thing that did. At
+     Chrome's "Small", a 12px root, 38rem was 456px, the 586px slot went back to four across, and the test measured
+     `£38,880.00` and `£10,416.16` 0.7px over their 122.5px cells, which is this defect again. `PageView.svelte`'s money
+     step is px for the same reason and says so at more length. */
+  @container (inline-size < 608px) {
     .grid:has(> .cell:nth-child(4)) {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }

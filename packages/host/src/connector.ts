@@ -4,8 +4,8 @@
  * WHY THIS IS HERE AND NOT IN EITHER APP. The mapping between a leased row and a `runPull` call is
  * the same on the Worker as on the self-host; what differs is the socket, the key store and the
  * clock, and those are arguments. A copy in each app would be two answers to one question, and the
- * one that ran less often would be the one that drifted. `31 §2`: `host` is rank 15 and `connect`
- * is 14, so the edge points down the order, and both packages are platform-neutral — nothing here
+ * one that ran less often would be the one that drifted. `31 §2`: `host` is rank 16 and `connect`
+ * is 15, so the edge points down the order, and both packages are platform-neutral — nothing here
  * or below it names `node:` or `cloudflare:`.
  *
  * WHAT THE KERNEL HANDS ACROSS IS A `Paged` AND NOT A REQUEST. `actions.ts` can send one request; a
@@ -91,7 +91,7 @@ const reportOf = (out: PullResult): PagedReport => ({
  * `42 §4.7`'s four non-JSON page formats, read.
  *
  * THE HOST IS WHERE THE TWO ENDS CAN MEET. The reader is `@braindog/extract`'s, rank 9; the
- * extractor is the record's, rank 7; neither may import the other and this package is rank 15 and
+ * extractor is the record's, rank 7; neither may import the other and this package is rank 16 and
  * may import both (`31 §2`). So the reader is handed down beside the row budget, and a host that
  * did not hand one down would answer the page with a sentence rather than with no rows.
  *

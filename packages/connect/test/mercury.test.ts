@@ -7,10 +7,13 @@
  * has to get right are *nothing goes out when there is no key* and *when there is one it goes out
  * in exactly one header*, and both are assertions about a `Call` this package makes.
  *
- * THE DECLARATION IS THE PACK'S, COPIED RATHER THAN IMPORTED. `@braindog/connect` is rank 14 and
- * `@braindog/seed` is above it (`31 §2`), so importing the pack would point an edge up the order.
- * What is copied is small and the seed test asserts the same four values off `mercuryPack`, so a
- * drift between this fixture and the shipped pack fails there.
+ * THE DECLARATION IS THE PACK'S, COPIED RATHER THAN IMPORTED. `@braindog/connect` is rank 15 and
+ * `@braindog/seed` is rank 10 (`31 §2`). This comment once said seed was above, and it never was:
+ * the import would point down the order and the gate would pass it. It is still not taken, because
+ * a devDependency is an edge, and one on `seed` would bring `kernel` and `declare` into a package
+ * whose row lists 2, 3 and 9 and nothing else. What is copied is small and the seed test asserts
+ * the same four values off `mercuryPack`, so a drift between this fixture and the shipped pack
+ * fails there.
  *
  * NO REAL HOST AND NO REAL KEY (`22 §10`). The origin is `.example` and the token is a literal
  * nobody can spend.

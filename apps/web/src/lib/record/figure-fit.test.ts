@@ -114,9 +114,10 @@ type Guard = { readonly px: number; readonly start: number; readonly end: number
 /**
  * Every `@media (width …)` or `@container (inline-size …)` in a stylesheet, as px at a 16px root.
  *
- * rem IS CONVERTED AND NOT REFUSED, because `blocks.css` writes its stat thresholds in rem while the
- * route writes its money threshold in px, deliberately, for the reason the route's own comment
- * argues at length. Both belong in this list, in the unit the measurement is in.
+ * rem IS CONVERTED AND NOT REFUSED, because `blocks.css` still writes its five-figure step in rem
+ * while the four-across step and the route's money step are px, deliberately, for the reason the
+ * route's own comment argues at length and the last test below measures. All of them belong in this
+ * list, in the unit the measurement is in.
  */
 function guards(css: string, needle: string): Guard[] {
   const out: Guard[] = [];
@@ -387,6 +388,23 @@ async function geometry(view: Page, width: number): Promise<Map<number, number>>
   return new Map(got);
 }
 
+/**
+ * Every slot a band can give each stat block, as pinned markup: both ends of the band and both sides
+ * of every container step inside it. Why that is the complete list and not a sample is argued where
+ * the first test uses it.
+ */
+async function bandProbes(view: Page, band: { from: number; to: number }): Promise<string> {
+  const low = await geometry(view, band.from);
+  const high = await geometry(view, band.to);
+  await view.setViewportSize({ width: band.from, height: 900 });
+  return GRIDS.flatMap((g) => {
+    const min = Math.ceil(low.get(g.span) ?? 0);
+    const max = Math.floor(high.get(g.span) ?? 0);
+    const widths = [min, max, ...STEPS.filter((px) => px > min && px <= max).flatMap((px) => [px - 1, px])];
+    return [...new Set(widths)].sort((a, b) => a - b).map((slot) => pinned(g, slot));
+  }).join('');
+}
+
 async function measured(view: Page, body: string, css = CASCADE): Promise<Verdict> {
   await view.setContent(chain(body, css));
   await view.evaluate(() => document.fonts.ready);
@@ -417,24 +435,14 @@ test('NO MONEY FIGURE A DECLARED PAGE DRAWS IS CUT, AT ANY WIDTH THE APP CAN PUT
   const bandsFollowing: string[] = [];
   let figures = 0;
   for (const band of BANDS) {
-    /* THE BAND'S OWN SLOT RANGE, PER SPAN, off the app's geometry at each end of it. */
-    const low = await geometry(view, band.from);
-    const high = await geometry(view, band.to);
-
-    /* WHICH WIDTHS INSIDE THE BAND, AND WHY THIS IS THE COMPLETE LIST RATHER THAN A SAMPLE. Between
-       two container steps the column count is fixed, so a cell is an increasing affine function of
-       the slot and the figure's ink is a constant: the narrowest slot of each step is that step's
-       worst case, and every wider slot in it is slack. So the ends of the band and both sides of
-       every step inside it are the whole of it. The finer sweep below is what keeps that an argument
-       nobody has to take on trust. */
-    await view.setViewportSize({ width: band.from, height: 900 });
-    const probes = GRIDS.flatMap((g) => {
-      const min = Math.ceil(low.get(g.span) ?? 0);
-      const max = Math.floor(high.get(g.span) ?? 0);
-      const widths = [min, max, ...STEPS.filter((px) => px > min && px <= max).flatMap((px) => [px - 1, px])];
-      return [...new Set(widths)].sort((a, b) => a - b).map((slot) => pinned(g, slot));
-    });
-    const seen = await measured(view, probes.join(''));
+    /* THE BAND'S OWN SLOT RANGE, PER SPAN, off the app's geometry at each end of it, and WHICH WIDTHS
+       INSIDE IT, AND WHY THIS IS THE COMPLETE LIST RATHER THAN A SAMPLE. Between two container steps
+       the column count is fixed, so a cell is an increasing affine function of the slot and the
+       figure's ink is a constant: the narrowest slot of each step is that step's worst case, and
+       every wider slot in it is slack. So the ends of the band and both sides of every step inside it
+       are the whole of it. The finer sweep below is what keeps that an argument nobody has to take on
+       trust. */
+    const seen = await measured(view, await bandProbes(view, band));
     assert.deepEqual(
       seen.cut.map(say),
       [],
@@ -559,5 +567,45 @@ test('THE CUT FIGURE WAS A NARROW SLOT ON A LAPTOP AND NEVER A PHONE, WITH THE R
       `lifting the repair out changes what a ${window}px window draws in its ${slot}px slot, so 60c6b817 did touch the phone after all`,
     );
     t.diagnostic(`a ${window}px window, ${slot}px slot: identical with and without the repair, closest call ${on.tightest ? say(on.tightest) : 'none'}`);
+  }
+});
+
+/**
+ * A READER WHO SETS HER BROWSER'S TEXT SMALLER GETS THE SAME FIGURES, WHOLE.
+ *
+ * The stat figures are drawn at `--t-xl`, which is 24px at any root font size, so a step that
+ * guards their width is a px width too. The four-across step was written `38rem`, and every
+ * measurement above takes rem at a 16px root, so a reader on Chrome's "Small" (12px) or "Very small"
+ * (9px) had a threshold of 456px or 342px in front of the same 123.2px figures: the 586px slot a
+ * 900px window gives went back to four across, which is the cut the first Linux run found. Nothing
+ * above could see it, because nothing above changed the root.
+ *
+ * THE ROOT IS THE BROWSER'S SETTING AND NOT A RULE ON `html`, set through the protocol the way the
+ * settings page sets it, and read back before anything is measured: a root that did not move would
+ * pass this test while proving nothing, the same way a fallback face would.
+ */
+test('A SMALLER ROOT FONT DOES NOT BRING A CUT FIGURE BACK', async (t) => {
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+
+  for (const root of [12, 9]) {
+    const view = await browser.newPage({ viewport: { width: 1180, height: 900 } });
+    const cdp = await view.context().newCDPSession(view);
+    await cdp.send('Page.setFontSizes', { fontSizes: { standard: root } });
+    await view.setContent(chain(''));
+    assert.equal(
+      await view.evaluate(() => getComputedStyle(document.documentElement).fontSize),
+      `${root}px`,
+      `the browser's font size was set to ${root}px and the root did not follow, so this would measure a 16px root again`,
+    );
+
+    const wrong: string[] = [];
+    for (const band of BANDS) {
+      const seen = await measured(view, await bandProbes(view, band));
+      wrong.push(...[...seen.cut, ...seen.short].map((s) => `${band.from}-${band.to}: ${say(s)}`));
+    }
+    assert.deepEqual([...new Set(wrong)], [], `at a ${root}px root, ${wrong.length} figures are cut or short of their ${MARGIN * 100}% margin`);
+    t.diagnostic(`a ${root}px root: every stat figure in every band fits with its ${MARGIN * 100}% margin`);
+    await view.close();
   }
 });

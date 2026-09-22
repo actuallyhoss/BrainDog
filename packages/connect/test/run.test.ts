@@ -734,8 +734,9 @@ test('AND A FORTY-PAGE RUN FINISHES IN UNDER TWO SECONDS, which is the ceiling a
  * `43`'s extractor, wired for real, because the two refusals below are ITS refusals and not a stub's.
  *
  * THE CASTS ARE THE PACKAGE BOUNDARY AND NOT A SHORTCUT. `IngestDecl`, `RawArrival` and the context
- * are declared structurally in `index.ts` (`47 §13` D1) so that rank 14 takes no edge on `43`, so
- * these are the same fields under two names and the compiler has no way of being told so.
+ * are declared structurally in `index.ts` (`47 §13` D1), so that rank 15 takes only the `Read`
+ * type from `43`'s package. These are the same fields under two names and the compiler has no way
+ * of being told so.
  */
 const realExtract: ExtractFn = (decl, raw, ctx) =>
   extractReal(decl as unknown as Declaration, raw, ctx as unknown as ExtractCtx) as Extraction;
