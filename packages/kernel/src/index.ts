@@ -32,6 +32,7 @@ import {
   jcs,
   lintBatch,
   liveTarget,
+  ownId,
   homeCurrency,
   speakingSettings,
   packSettings as declaredPackSettings,
@@ -1405,6 +1406,129 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (decl.kind === 'rule') {
         const bad = undeclarable(decl.id, body as unknown as RuleDecl, shape);
         if (bad) return bad;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * A register in the batch that the rows already in it contradict, or a `ref` it points at no list, as a refusal.
+   *
+   * A CHANGE REACHED `install` WITHOUT THE CHECKS A PACK MEETS. `packages/declare`'s `plan` refuses a type change and a new
+   * required field over a populated register (`FIELD_TYPE_CHANGED`, `REQUIRED_ON_POPULATED`, `04 §5`) and a list nothing
+   * holds (`REGISTER_UNRESOLVED`), and an accepted `change` and the in-app declare call `install` directly.
+   * `loop/research-batch-seventeen-audit.md` §6 accepted four such changes over two open Obligations rows, and each
+   * installed. Driven afterwards:
+   *
+   *     state narrowed to [paid]      every edit to either row  ENUM_VALUE_UNKNOWN "state has no value open."
+   *     what: text -> int             one row edited to 5, the other still "I2": one column, two types
+   *     a new required amount_due     both rows edited without it, accepted: required forwards, never backwards
+   *     ref to a list called nowhere  installed at v1, pointing at nothing any row could name
+   *
+   * THE SAME CODES AS THE PACK'S PATH, so one fault says one thing whichever way it arrives, and the narrowed enum takes
+   * the write path's own `ENUM_VALUE_UNKNOWN`, which is the refusal those rows would otherwise meet on every edit.
+   * A `default` is the answer for rows that have none, so a required field that ships one is not refused; a type
+   * change over a field no row holds breaks nothing, so it is not refused either. Live rows only, as the unique check
+   * in `applyDeclarations` counts them.
+   */
+  function contradicted(batch: readonly Declaration[]): Refusal | null {
+    const rows = (n: number) => (n === 1 ? '1 row' : `${n} rows`);
+    const arriving = new Set(batch.filter((d) => d.kind === 'register').map((d) => ownId(d)));
+    type Field = { id?: unknown; type?: unknown; of?: unknown; to?: unknown; values?: unknown; required?: unknown; default?: unknown; retired?: unknown; derived?: unknown };
+    const typeOf = (f: Field) => `${String(f.type)}${f.of === undefined ? '' : `<${String(f.of)}>`}`;
+
+    for (const decl of batch) {
+      if (decl.kind !== 'register') continue;
+      const register = ownId(decl);
+      const fields = (decl.body as { fields?: unknown }).fields;
+      if (!Array.isArray(fields)) continue;
+      const before = new Map<string, Field>((registers.get(register)?.fields ?? []).map((f) => [f.id, f as Field]));
+      const count = (where: string, ...params: (string | number)[]) =>
+        Number(sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND ${where}`, register, ...params)?.n ?? 0);
+
+      for (const f of fields as Field[]) {
+        if (typeof f?.id !== 'string' || f.retired === true) continue;
+        const at = `${decl.id}.fields.${f.id}`;
+
+        if ((f.type === 'ref' || (f.type === 'list' && f.of === 'ref')) && typeof f.to === 'string' && !registers.has(f.to) && !arriving.has(f.to))
+          return {
+            code: 'REGISTER_UNRESOLVED',
+            fix: `${decl.id}.${f.id} points at ${f.to}, and this record holds no list called ${f.to}. Point it at a list the record holds, or declare ${f.to} in the same change.`,
+            at: `${at}.to`,
+          };
+
+        /* A FIELD ID THE GRAMMAR REFUSES IS `validate`'s to say, after this, so it is passed over here rather than
+           spliced into a path. */
+        let path: string;
+        try {
+          path = jsonPath(f.id);
+        } catch {
+          continue;
+        }
+        const held = `json_extract(fields, '${path}') IS NOT NULL`;
+        const was = before.get(f.id);
+
+        if (was !== undefined && was.retired !== true && typeOf(was) !== typeOf(f)) {
+          const n = count(held);
+          if (n > 0)
+            return {
+              code: 'FIELD_TYPE_CHANGED',
+              fix: `${decl.id}.${f.id}: ${typeOf(was)} → ${typeOf(f)} changes a type, and ${rows(n)} hold a value written under the old one. Retire the field and add a new one.`,
+              at: `${at}.type`,
+            };
+        }
+
+        if ((f.type === 'enum' || (f.type === 'list' && f.of === 'enum')) && Array.isArray(f.values)) {
+          const values = f.values.map(String);
+          const kept = values.map(() => '?').join(', ') || "''";
+          const out = f.type === 'enum'
+            ? sql.all<{ v: string; n: number }>(
+                `SELECT json_extract(fields, '${path}') AS v, count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND ${held} AND json_extract(fields, '${path}') NOT IN (${kept}) GROUP BY v ORDER BY n DESC, v`,
+                register,
+                ...values,
+              )
+            : sql.all<{ v: string; n: number }>(
+                `SELECT j.value AS v, count(DISTINCT entry.id) AS n FROM entry, json_each(entry.fields, '${path}') AS j WHERE entry.register = ? AND entry.deleted_at IS NULL AND j.value NOT IN (${kept}) GROUP BY v ORDER BY n DESC, v`,
+                register,
+                ...values,
+              );
+          /* ONLY A VALUE THE LIST TAKES NOW AND WOULD STOP TAKING. Counted against the new list alone, a record the audit's
+             narrowing already reached (`state` at `[paid]` over two `open` rows) refused every later change to Obligations,
+             adding an unrelated text field included, with "would no longer take open", which it had not taken since. Those
+             rows are refused on every edit already, and this change does not make them so. A field that was not an enum
+             of the same shape before is held to every value, since nothing it declared took any of them. */
+          const took = was !== undefined && was.retired !== true && typeOf(was) === typeOf(f) && Array.isArray(was.values) ? new Set(was.values.map(String)) : null;
+          const dropped = took === null ? out : out.filter((o) => took.has(String(o.v)));
+          if (dropped.length > 0) {
+            const gone = dropped.map((o) => String(o.v));
+            /* A ROW, NOT A VALUE: a `list<enum>` row holding two of the dropped values is one row whose edits are refused. */
+            const n = f.type === 'enum'
+              ? dropped.reduce((sum, o) => sum + Number(o.n), 0)
+              : Number(
+                  sql.one<{ n: number }>(
+                    `SELECT count(DISTINCT entry.id) AS n FROM entry, json_each(entry.fields, '${path}') AS j WHERE entry.register = ? AND entry.deleted_at IS NULL AND j.value IN (${gone.map(() => '?').join(', ')})`,
+                    register,
+                    ...gone,
+                  )?.n ?? 0,
+                );
+            return {
+              code: 'ENUM_VALUE_UNKNOWN',
+              fix: `${decl.id}.${f.id} would no longer take ${gone.join(' or ')}, and ${rows(n)} ${n === 1 ? 'holds' : 'hold'} ${gone.length === 1 ? 'it' : 'them'}, so every edit to ${n === 1 ? 'that row' : 'those rows'} would be refused. Keep ${gone.length === 1 ? 'the value' : 'the values'}, or move those rows to another first.`,
+              at: `${at}.values`,
+              allowed: values,
+            };
+          }
+        }
+
+        if (f.required === true && f.default === undefined && f.derived !== true && was?.required !== true) {
+          const n = count(`json_extract(fields, '${path}') IS NULL`);
+          if (n > 0)
+            return {
+              code: 'REQUIRED_ON_POPULATED',
+              fix: `${decl.id}.${f.id} is required and ${rows(n)} ${n === 1 ? 'has' : 'have'} none. Give it a default, or fill those rows first.`,
+              at: `${at}.required`,
+            };
+        }
       }
     }
     return null;
@@ -3307,7 +3431,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (batch.length === 0 || batch.length !== listed.length) return ok(null);
       /* EVERY CHANGE IS LINTED WHEN IT IS FILED, with the checks the install runs on acceptance, and not only one that
          sends something out: a page proposed with no blocks was found by the owner who pressed accept. */
-      const fault = unreadable(batch) ?? lintBatch(sql, batch);
+      const fault = unreadable(batch) ?? lintBatch(sql, batch) ?? contradicted(batch);
       if (fault) return { ok: false as const, refusal: fault };
       const egress = batch.flatMap((d) => {
         const out = d.kind === 'ingest' ? egressOf(d.body, titleOfRow) : null;
@@ -3321,6 +3445,12 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       });
       if (changed.length === 0) return ok(null);
       return ok({ egress: changed, approve: approvalLines(changed) });
+    },
+    /* THE ROWS AGAIN AT ACCEPTANCE, and only the rows: `review` linted the declarations when the change was filed, and
+       what moves between the two is what was written under the register since. */
+    fits: (to) => {
+      const bundle = (to as { declarations?: unknown }).declarations;
+      return contradicted((Array.isArray(bundle) ? bundle : [to]) as Declaration[]);
     },
     row: (register, at) => {
       const found = get(at, { includeDeleted: true });
@@ -5054,7 +5184,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       );
       const refused = schemaRefusal(state);
       if (refused) return refused;
-      const cannot = unreadable(batch);
+      /* THE ROWS LAST, after every check about the declarations alone, so a declaration that is wrong in itself is told that
+         first rather than how many rows it would also break. */
+      const cannot = unreadable(batch) ?? lintBatch(sql, batch) ?? contradicted(batch);
       if (cannot) return { ok: false as const, refusal: cannot };
       const out = await installDeclarations(sql, clock.now(), batch, transaction, expect);
       if (out.ok) {

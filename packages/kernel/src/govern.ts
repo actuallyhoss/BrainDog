@@ -121,6 +121,14 @@ export type GovernDeps = {
    * otherwise `null` when the change sends nothing new.
    */
   review?: (to: Record<string, unknown>) => Result<{ egress: Egress[]; approve: string[] } | null>;
+  /**
+   * Whether what a `change` installs is still true of the rows, asked when it is accepted.
+   *
+   * AT ACCEPTANCE AS WELL AS WHEN IT IS FILED, because the rows move in between: a `state` narrowed to `paid` over a
+   * register with no open rows is filed cleanly, and two open rows written before the owner presses accept make it a
+   * register whose rows every later edit refuses. Refused here, nothing is decided and the question stays open.
+   */
+  fits?: (to: Record<string, unknown>) => Refusal | null;
 };
 
 /**
@@ -402,14 +410,8 @@ function checkBody(deps: GovernDeps, kind: BodyKind, body: Record<string, unknow
      record's `decide` before `reopen` could run. A decision that resolved with nothing installed behind it, from one
      malformed body any `propose` token can send. `review` below cannot catch it: it answers `null` for a batch it
      cannot read, which is right for egress and says nothing about whether the batch installs. */
-  const bundle = (body.to as { declarations?: unknown }).declarations;
-  const listed = Array.isArray(bundle) ? bundle : [body.to];
-  if (Array.isArray(body.to) || listed.length === 0 || !listed.every((d) => isMap(d) && typeof d.id === 'string' && typeof d.kind === 'string' && isMap(d.body)))
-    return {
-      code: 'VALUE_MALFORMED',
-      fix: 'A change is to a whole declaration, {"id":"register.<id>","kind":"register","body":{...}}, or to {"declarations":[...]} of them.',
-      at: 'body.to',
-    };
+  const wrong = shapeFault(body.to) ?? namesFault(body);
+  if (wrong) return wrong;
 
   /* AND ITS PREDICTION, IF IT CARRIES ONE — checked here rather than at acceptance, for the reason
      every other body is checked here: the person answering should not be the one who finds out it
@@ -423,6 +425,67 @@ function checkBody(deps: GovernDeps, kind: BodyKind, body: Record<string, unknow
 }
 
 const isMap = (x: unknown): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x);
+
+/** Whether a change's `to` is what `install` takes, for the reason given where `checkBody` asks it. */
+function shapeFault(to: unknown): Refusal | null {
+  const bundle = (to as { declarations?: unknown }).declarations;
+  const listed = Array.isArray(bundle) ? bundle : [to];
+  if (Array.isArray(to) || listed.length === 0 || !listed.every((d) => isMap(d) && typeof d.id === 'string' && typeof d.kind === 'string' && isMap(d.body)))
+    return {
+      code: 'VALUE_MALFORMED',
+      fix: 'A change is to a whole declaration, {"id":"register.<id>","kind":"register","body":{...}}, or to {"declarations":[...]} of them.',
+      at: 'body.to',
+    };
+  return null;
+}
+
+/**
+ * A `change` is about the declaration it names: `to` is that declaration, or a bundle that holds it.
+ *
+ * THE PROPOSER CHOSE WHO WAS ASKED. The record reads the list a change is about from `declaration_id` and nothing else,
+ * and nothing held `to` to it, so `loop/research-batch-seventeen-audit.md` §1 filed `declaration_id: register.obligations`
+ * over a new Diary from the owner's `propose` token: it was shown whole to a member invited to Obligations alone, with
+ * Diary's schema in it, and accepting it installed Diary at v2. Filed the other way round, a change to Obligations was
+ * held back from the member whose list it changed. The prediction a change carries is written under the same id, so a
+ * grade about one list was read by whoever reads the other.
+ *
+ * A BUNDLE HOLDS WHAT IT IS NAMED FOR, AND UNDER A LIST'S NAME NO OTHER LIST. A bundle is several declarations under one
+ * name (a pack update's two actions), so it cannot be held to one id; but a bundle named for `register.obligations`
+ * that also carries `register.diary` is the same leak with one more declaration in front of it. Under a name that is
+ * not a list's, the record asks only whoever reads the whole record, and nothing is shown to anybody it is not about.
+ *
+ * Checked when a change is filed, and again when it is accepted, for a change filed before this was.
+ */
+function namesFault(body: Record<string, unknown>): Refusal | null {
+  const named = String(body.declaration_id);
+  const to = body.to as { id?: unknown; declarations?: unknown };
+  const bundle = Array.isArray(to?.declarations) ? (to.declarations as { id?: unknown; kind?: unknown }[]) : null;
+  if (bundle === null)
+    return to?.id === named
+      ? null
+      : {
+          code: 'VALUE_MALFORMED',
+          fix: `This change installs ${String(to?.id)} and is filed as a change to ${named}, so it would be shown to whoever reads ${named}. File it with "declaration_id":"${String(to?.id)}".`,
+          at: 'body.to',
+        };
+  const ids = bundle.map((d) => String(d?.id));
+  if (!ids.includes(named))
+    return {
+      code: 'VALUE_MALFORMED',
+      fix: `This change is filed as a change to ${named}, and ${named} is not among what it installs (${ids.join(', ')}). Name one of them in "declaration_id".`,
+      at: 'body.to',
+    };
+  if (named.startsWith('register.')) {
+    const other = ids.find((id) => id.startsWith('register.') && id !== named);
+    if (other !== undefined)
+      return {
+        code: 'VALUE_MALFORMED',
+        fix: `This change is filed as a change to ${named} and also installs ${other}, so whoever reads ${named} would read ${other} in it. Propose ${other} as a change of its own.`,
+        at: 'body.to',
+      };
+  }
+  return null;
+}
 
 /**
  * The shape of a `pack`, `settings` or `arrange` body.
@@ -844,6 +907,14 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
       install = (row.body_kind === 'pattern' ? body.ingest : body.to) as Record<string, unknown>;
       if (!install || typeof install !== 'object')
         return no<Decided>('VALUE_MALFORMED', `${id} carries nothing to install.`, { at: 'body' });
+      /* AND A CHANGE IS HELD AT ACCEPTANCE TO WHAT IT IS HELD TO WHEN FILED, before anything is decided: a queue carried
+         from an earlier build holds changes filed before those checks existed, and `fits` asks the rows as they are now.
+         Refused here, the question stays open with nothing resolved, which a refusal from `install` afterwards could only
+         get back to by reopening it. */
+      if (row.body_kind === 'change') {
+        const wrong = shapeFault(install) ?? namesFault(body) ?? deps.fits?.(install) ?? null;
+        if (wrong) return { ok: false, refusal: wrong };
+      }
       /* EVERY KEY IT SENDS IS IN THE VAULT BEFORE ANYTHING IS ARMED. Accepting a call whose key is missing would arm
          it and pause it on its first run, which reads as approved and does nothing. Nothing is written until all are there. */
       if (row.body_kind === 'change' && Array.isArray(body.egress))
