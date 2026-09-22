@@ -3,6 +3,20 @@ via:    pull
 raises: packages/connect/src/status.ts
 at:     fetch.page[1]
 fix:    Wait for the provider; it retries on its own.
+declare: {
+    "id": "acme-orders",
+    "fetch": {
+      "base": "https://api.example.test", "path": "/v1/orders",
+      "auth": { "kind": "none" },
+      "schedule": { "every": "1h" },
+      "page": { "kind": "page_number", "param": "page" },
+      "read": { "rows": "items" }
+    },
+    "writes": { "register": "orders" }
+  }
+answers: [
+    { "status": 503, "body": {} }
+  ]
 
 # `raises:` AND `at:` BOTH NAMED SOMETHING THAT RAISES NOTHING. This fixture pointed at
 # `apps/web/src/lib/record/data.ts`, whose only use of this code is a demo sample row in the web
@@ -19,3 +33,6 @@ fix:    Wait for the provider; it retries on its own.
 # self-host's timer drive, and is written onto that run's ack as `result.error`. Nothing a `call:`
 # can express reaches it. The eighth `via` has its row in `40 §6` with `connect/test` as its runner,
 # and the counts there moved with it: `rpc` 37 to 30, `pull` 7, still 115.
+#
+# ONE ANSWER, A 503 ON THE FIRST PAGE, which is the `fetch.page[1]` above.
+# `packages/connect/test/refusals-pull.test.ts` drives it.

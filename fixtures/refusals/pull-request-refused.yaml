@@ -2,6 +2,10 @@ code:   PULL_REQUEST_REFUSED
 via:    pull
 raises: packages/host/src/actions.ts
 fix:    Check what the provider answered; this action does not expect that answer.
+declare: { "ingest": "acme-balance", "channel": "poll", "url": "https://api.example.test/v1/balance", "every": "1h" }
+answers: [
+    { "status": 200, "headers": { "content-length": "2000001" }, "body": "{}" }
+  ]
 
 # NO `at:`, AND THAT IS THE FINDING. This one is raised by `refuse(code, fix)` at
 # `packages/host/src/actions.ts:326`, whose whole envelope is `{ code, fix }`: an action's outcome is
@@ -16,3 +20,8 @@ fix:    Check what the provider answered; this action does not expect that answe
 # self-host's timer drive, and is written onto that run's ack as `result.error`. Nothing a `call:`
 # can express reaches it. The eighth `via` has its row in `40 §6` with `connect/test` as its runner,
 # and the counts there moved with it: `rpc` 37 to 30, `pull` 7, still 115.
+#
+# `declare:` IS AN ACTION THAT DOES NOT PAGE, which is what sends it to the loop above rather than to
+# `runPull`, where the same code carries an address. The one answer declares a body a byte over the
+# kernel's two-megabyte ceiling, so the loop refuses on the header before reading any of it.
+# `packages/host/test/refusals-pull.test.ts` drives it.

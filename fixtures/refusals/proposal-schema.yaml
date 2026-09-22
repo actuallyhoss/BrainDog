@@ -3,6 +3,16 @@ via:    ask
 raises: packages/spark/src/project.ts
 at:     body_kind
 fix:    Nothing was filed; ask again.
+ask:    what is still open
+replies: [
+    { "registers": ["obligations"], "where": { "all": [{ "field": "state", "is": "open" }] }, "q": null },
+    {
+      "text": "Two are open: {{ref:obligations#7}} and {{ref:obligations#8}}.",
+      "body_kind": "memo",
+      "body": {},
+      "flagged": false
+    }
+  ]
 
 # `via: ask` IS THE NINTH SURFACE, MINTED FOR THESE FOUR ON SEPTEMBER 21ST 2026, because a spark
 # refusal happens when a model answers and the input is a projection plus that reply, which none of
@@ -30,3 +40,9 @@ fix:    Nothing was filed; ask again.
 # kind the palette will not file, `jobs.ts` a pattern job whose answer carried no `ingest` body, and
 # `packages/ports/src/inference.ts` and `apps/worker/src/inference.ts` raise it from the adapter with
 # `at: schema`. The runner drives the palette, so the fixture names the file the palette refuses from.
+#
+# THE SECOND REPLY NAMES `memo`, WHICH IS OUTSIDE THE PINNED ENUM, and every other key matches the
+# schema so the first fault `checkSchema` meets is this one. The palette's own arm for an unfiled
+# body kind would answer the same code and address with a different sentence, and the runner in
+# `packages/spark/test/refusals-ask.test.ts` compares the sentence as well, so it tells the two
+# sites apart.

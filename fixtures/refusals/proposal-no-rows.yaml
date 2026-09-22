@@ -2,6 +2,16 @@ code:   PROPOSAL_NO_ROWS
 via:    ask
 raises: packages/spark/src/propose.ts
 fix:    A proposal names the rows behind it, or it is not filed.
+ask:    what is still open
+replies: [
+    { "registers": ["obligations"], "where": { "all": [{ "field": "state", "is": "open" }] }, "q": null },
+    {
+      "text": "Both of these are worth doing.",
+      "body_kind": "options",
+      "body": { "options": [{ "id": "a", "label": "Do it" }] },
+      "flagged": false
+    }
+  ]
 
 # `via: ask` IS THE NINTH SURFACE, MINTED FOR THESE FOUR ON SEPTEMBER 21ST 2026, because a spark
 # refusal happens when a model answers and the input is a projection plus that reply, which none of
@@ -15,3 +25,7 @@ fix:    A proposal names the rows behind it, or it is not filed.
 #
 # THE SENTENCE IS THE EMITTER'S, VERBATIM, and it is also the `fix` `46 §6` states for this code.
 # The two agreed on the day this fixture was written, which is the only way to know they agree.
+#
+# THE TWO REPLIES ARE PASS 1 AND PASS 2. The second carries no digit and no braces anywhere, so the
+# citation check passes it and the palette refuses it one step later for citing nothing, which is
+# the step this code belongs to. `packages/spark/test/refusals-ask.test.ts` drives it.

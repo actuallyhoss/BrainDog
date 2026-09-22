@@ -3,6 +3,20 @@ via:    pull
 raises: packages/connect/src/run.ts
 at:     lease
 fix:    The run was longer than its lease; it continues at the next attempt.
+declare: {
+    "id": "acme-orders",
+    "fetch": {
+      "base": "https://api.example.test", "path": "/v1/orders",
+      "auth": { "kind": "none" },
+      "schedule": { "every": "1h" },
+      "page": { "kind": "page_number", "param": "page" },
+      "read": { "rows": "items" }
+    },
+    "writes": { "register": "orders" }
+  }
+answers: [
+    { "ms": 290000, "body": { "items": [{ "at": "2026-01-19T10:00:00Z", "value": 1 }] } }
+  ]
 
 # `via: pull` WAS MINTED FOR THESE SEVEN ON SEPTEMBER 20TH 2026, and until then they said `rpc`,
 # which no RPC call could make true. `40 §6`'s `rpc` runner seeds a record and makes a `call:`; a
@@ -10,3 +24,9 @@ fix:    The run was longer than its lease; it continues at the next attempt.
 # self-host's timer drive, and is written onto that run's ack as `result.error`. Nothing a `call:`
 # can express reaches it. The eighth `via` has its row in `40 §6` with `connect/test` as its runner,
 # and the counts there moved with it: `rpc` 37 to 30, `pull` 7, still 115.
+#
+# THE ONE ANSWER TAKES 290 SECONDS, and that is the whole fixture. The lease is five minutes and the
+# run stops sixteen seconds short of it (the six-second page timeout and ten of slack), checked
+# before each page and never during one. So the first page lands, the second is not asked for, and
+# the run says why. With `ms` at 0 the run asks for a second page this fixture does not answer,
+# measured on September 22nd 2026 by `packages/connect/test/refusals-pull.test.ts`.

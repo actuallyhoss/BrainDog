@@ -3,6 +3,21 @@ via:    pull
 raises: packages/connect/src/auth.ts
 at:     fetch.auth.token_url
 fix:    Reconnect the credential.
+declare: {
+    "id": "acme-orders",
+    "fetch": {
+      "base": "https://api.example.test", "path": "/v1/orders",
+      "auth": { "kind": "oauth2_refresh", "grant": "acme", "token_url": "https://api.example.test/oauth/token" },
+      "schedule": { "every": "1h" },
+      "page": { "kind": "page_number", "param": "page" },
+      "read": { "rows": "items" }
+    },
+    "writes": { "register": "orders" }
+  }
+grant: { "refresh_token": "rt_fixture", "client_id": "client_fixture", "client_secret": "secret_fixture" }
+answers: [
+    { "status": 401, "body": { "error": "invalid_grant" } }
+  ]
 
 # `raises:` AND `at:` BOTH NAMED SOMETHING THAT RAISES NOTHING. This fixture pointed at
 # `apps/web/src/lib/record/data.ts`, whose only use of this code is a demo sample row in the web
@@ -17,3 +32,7 @@ fix:    Reconnect the credential.
 # self-host's timer drive, and is written onto that run's ack as `result.error`. Nothing a `call:`
 # can express reaches it. The eighth `via` has its row in `40 §6` with `connect/test` as its runner,
 # and the counts there moved with it: `rpc` 37 to 30, `pull` 7, still 115.
+#
+# `grant:` IS THE STORED FIELDS, SEALED BY THE RUNNER, because the run opens the grant itself and a
+# runner that handed it in plain would skip a step that can refuse. The one answer is the token
+# endpoint's 401, so no page is asked for. `packages/connect/test/refusals-pull.test.ts` drives it.

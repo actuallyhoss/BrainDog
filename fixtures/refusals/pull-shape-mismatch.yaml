@@ -3,6 +3,21 @@ via:    pull
 raises: packages/connect/src/page.ts
 at:     fetch.page.from
 fix:    The response shape changed; check fetch.page.from against a recent response.
+declare: {
+    "id": "acme-orders",
+    "fetch": {
+      "base": "https://api.example.test", "path": "/v1/orders",
+      "auth": { "kind": "none" },
+      "schedule": { "every": "1h" },
+      "page": { "kind": "cursor_param", "param": "starting_after", "from": "items[-1].id", "more": { "path": "has_more", "is": true } },
+      "read": { "rows": "items" }
+    },
+    "writes": { "register": "orders" }
+  }
+answers: [
+    { "body": { "has_more": true, "items": [{ "id": "ord_1", "at": "2026-01-19T10:00:00Z", "value": 1 }] } },
+    { "body": { "has_more": true, "items": [{ "id": "ord_1", "at": "2026-01-19T10:00:00Z", "value": 1 }] } }
+  ]
 
 # `via: pull` WAS MINTED FOR THESE SEVEN ON SEPTEMBER 20TH 2026, and until then they said `rpc`,
 # which no RPC call could make true. `40 §6`'s `rpc` runner seeds a record and makes a `call:`; a
@@ -10,3 +25,7 @@ fix:    The response shape changed; check fetch.page.from against a recent respo
 # self-host's timer drive, and is written onto that run's ack as `result.error`. Nothing a `call:`
 # can express reaches it. The eighth `via` has its row in `40 §6` with `connect/test` as its runner,
 # and the counts there moved with it: `rpc` 37 to 30, `pull` 7, still 115.
+#
+# THE TWO ANSWERS END ON THE SAME ROW, so the cursor read off the second is the cursor the second
+# was asked with, and a paginator that repeats itself is refused at the path that read it rather
+# than followed forever. `packages/connect/test/refusals-pull.test.ts` drives it.

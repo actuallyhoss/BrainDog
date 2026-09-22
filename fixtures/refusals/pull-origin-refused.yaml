@@ -2,6 +2,10 @@ code:   PULL_ORIGIN_REFUSED
 via:    pull
 raises: packages/host/src/actions.ts
 fix:    Call only an origin an installed declaration names; nothing was sent.
+declare: { "ingest": "acme-balance", "channel": "poll", "url": "https://api.example.test/v1/balance", "every": "1h" }
+answers: [
+    { "status": 302, "headers": { "location": "https://elsewhere.example.test/v1/balance" }, "body": "" }
+  ]
 
 # NO `at:`, AND THAT IS THE FINDING. This one is raised by `refuse(code, fix)` at
 # `packages/host/src/actions.ts:326`, whose whole envelope is `{ code, fix }`: an action's outcome is
@@ -16,3 +20,10 @@ fix:    Call only an origin an installed declaration names; nothing was sent.
 # self-host's timer drive, and is written onto that run's ack as `result.error`. Nothing a `call:`
 # can express reaches it. The eighth `via` has its row in `40 §6` with `connect/test` as its runner,
 # and the counts there moved with it: `rpc` 37 to 30, `pull` 7, still 115.
+#
+# `declare:` IS AN ACTION THAT DOES NOT PAGE, AND THAT IS WHAT ROUTES IT TO THE SITE ABOVE. The same
+# redirect off the base, handed to `runPull` in a connector's shape on September 22nd 2026, answered
+# this code with `at: fetch.page[1]`, which would have made this fixture look wrong for claiming no
+# address. It is not wrong; it names the send loop, and a declaration with no `fetch.page` and no
+# `fetch.read` is the one the kernel hands to that loop (`pages()` in
+# `packages/kernel/src/actions.ts`). `packages/host/test/refusals-pull.test.ts` drives it there.

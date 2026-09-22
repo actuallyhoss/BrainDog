@@ -2,6 +2,8 @@ code:   SPARK_BUDGET_SPENT
 via:    ask
 raises: packages/spark/src/propose.ts
 fix:    Add your own key, or wait.
+ask:    what is still open
+settings: { "tier": "a", "ask_cap": 80, "asks": 80 }
 
 # `via: ask` IS THE NINTH SURFACE, MINTED FOR THESE FOUR ON SEPTEMBER 21ST 2026, because a spark
 # refusal happens when a model answers and the input is a projection plus that reply, which none of
@@ -20,3 +22,7 @@ fix:    Add your own key, or wait.
 # this same code with `at: budget` when one call's own estimate is over its neuron ceiling, which is
 # a different subject with a different repair ("Raise the ceiling for this job, or send fewer
 # rows."). `30 §6` files the code as "an ask past `ask_cap` this month", and this is that site.
+#
+# NO `replies:`, BECAUSE THE CLAIM IS THAT NONE IS ASKED FOR. `settings:` puts eighty propose calls
+# on a meter capped at eighty, and `packages/spark/test/refusals-ask.test.ts` asserts the canned
+# model saw zero calls, which is this comment's first paragraph checked rather than stated.
