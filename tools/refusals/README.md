@@ -162,7 +162,34 @@ owners SEEDED -> CREATE_FOREIGN_REGISTER at register,
 So the code is right and the fixture's `via` is wrong. `40 §6`'s own split rule decides it: *"a code
 that cites rows, installed packs or the record's versions needs a record and is `install`"*, and this
 refusal's sentence names an installed pack. The fixture belongs in the `install` family, which moves
-the split from 27 + 20 to 26 + 21.
+the split from 27 + 20 to 26 + 21, or from today's 32 + 15 to 31 + 16 now that the five below have
+moved the other way.
+
+**Five `install` fixtures were `lint` all along, and now say so.** `ACTION_NOT_HTTPS`,
+`ACTION_HOST_COMPUTED`, `ACTION_GRANT_MISSING`, `ACTION_INTERVAL_TOO_SHORT` and `ACTION_EVALUATES` are
+raised by `actionFault` in `packages/kernel/src/declare.ts`, which `validate()` calls, and which reads
+the record only for a `sends:` check none of the five uses. `loop/research-via-runners.md` measured
+them against `validate` alone; that is not the `lint` driver's order, so on 22 September 2026 each was
+refiled as `via: lint` with its own `pack:` (one register, one `poll` or `call` declaration) and put
+through `normalise` first. None was refused by `normalise`, and all five answer their own code at their
+own address:
+
+```
+action-evaluates.yaml           ACTION_EVALUATES at body.text
+action-grant-missing.yaml       ACTION_GRANT_MISSING at grant
+action-host-computed.yaml       ACTION_HOST_COMPUTED at url
+action-interval-too-short.yaml  ACTION_INTERVAL_TOO_SHORT at every
+action-not-https.yaml           ACTION_NOT_HTTPS at url
+31/32 agreed with the surface; 27 ran on a borrowed input.
+```
+
+Each pack is one fault away from clean, which was checked rather than hoped: with the one bad value
+put right (an `https://` url, a written host, a named grant, `every: 1h`, a body with only `{until}`
+in it), all five lint clean through the same `normalise` and `validate`. So no fixture agrees because
+some other check happened to fire first. The red came first too: with `via:` changed and no `pack:`
+yet, the run read `26/32 agreed` at exit 1, the five saying *"carries no input, so nothing drives it"*.
+The one disagreement left is `create-foreign-register`, above. `run-via.mjs install` now reads
+*"install: 15 fixtures, and this runner drove none of them"* at exit 2.
 
 **Two of the 27 codes need an input key `40 §6`'s `lint` row has not got.** The row names one,
 `pack:`. Measured:

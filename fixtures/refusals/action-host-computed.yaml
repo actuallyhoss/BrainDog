@@ -1,5 +1,17 @@
 code:   ACTION_HOST_COMPUTED
-via:    install
+via:    lint
 raises: packages/kernel/src/declare.ts
 at:     url
 fix:    Write the host out in full, with no placeholder and no user name.
+pack: {
+    "pack": "fixture-lint", "version": "1.0.0",
+    "summary": "One pack built to trip exactly one lint refusal.",
+    "author": "BrainDog fixtures", "license": "MIT",
+    "declarations": [
+      { "register": "notes", "name": "Notes", "title": "what",
+        "fields": [ { "id": "what", "type": "text", "required": true } ] },
+      { "ingest": "balance", "channel": "poll",
+        "url": "https://{grant.host}/v1/balance", "every": "1h", "grant": "example read",
+        "extract": { "what": { "after": "balance " } }, "writes": { "register": "notes" } }
+    ]
+  }

@@ -1,5 +1,17 @@
 code:   ACTION_GRANT_MISSING
-via:    install
+via:    lint
 raises: packages/kernel/src/declare.ts
 at:     grant
 fix:    Name the key the action sends, by its label in the vault.
+pack: {
+    "pack": "fixture-lint", "version": "1.0.0",
+    "summary": "One pack built to trip exactly one lint refusal.",
+    "author": "BrainDog fixtures", "license": "MIT",
+    "declarations": [
+      { "register": "notes", "name": "Notes", "title": "what",
+        "fields": [ { "id": "what", "type": "text", "required": true } ] },
+      { "ingest": "balance", "channel": "poll",
+        "url": "https://api.example.test/v1/balance", "every": "1h", "grant": "",
+        "extract": { "what": { "after": "balance " } }, "writes": { "register": "notes" } }
+    ]
+  }

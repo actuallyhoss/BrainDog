@@ -1,5 +1,17 @@
 code:   ACTION_EVALUATES
-via:    install
+via:    lint
 raises: packages/kernel/src/declare.ts
 at:     body.text
 fix:    Substitute only {since} or {until}, with an optional format and no operator.
+pack: {
+    "pack": "fixture-lint", "version": "1.0.0",
+    "summary": "One pack built to trip exactly one lint refusal.",
+    "author": "BrainDog fixtures", "license": "MIT",
+    "declarations": [
+      { "register": "notes", "name": "Notes", "title": "what",
+        "fields": [ { "id": "what", "type": "text", "required": true } ] },
+      { "ingest": "ping", "channel": "call",
+        "url": "https://hooks.example.test/in?since={since:date}", "every": "15m", "grant": "hook key",
+        "body": { "text": "${process.env.HOME}", "count": 3 } }
+    ]
+  }

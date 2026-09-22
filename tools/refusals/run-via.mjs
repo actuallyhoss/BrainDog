@@ -33,7 +33,8 @@
  *
  * IT DRIVES THE TWO FILES THE FIXTURES NAME IN `raises:`, and that is a deliberate choice the write
  * runner made first. 22 of the 27 name `packages/kernel/src/declare.ts`, 4 name
- * `packages/declare/src/index.ts` and 1 names `packages/declare/src/shared.ts`. A runner one layer
+ * `packages/declare/src/index.ts` and 1 names `packages/declare/src/shared.ts`; the five `ACTION_`
+ * fixtures refiled from `install` on September 22nd 2026 make it 27 of 32 on the first. A runner one layer
  * above the raiser goes green the day the layer between them starts answering for itself, so a pack
  * is linted here exactly as `lintBatch` lints one: `normalise` first, then `validate` per
  * declaration with `known` and `owners` overlaid from the batch, which is what `knownTo` and
@@ -45,7 +46,9 @@
  * bodies live in `tools/refusals/lint-inputs.json` for now, keyed by fixture file name, and this
  * runner prefers a fixture's own `pack:` and falls back to that file. Every borrowed line is marked
  * `(borrowed)` in the output, because a fixture that passes on somebody else's input is still a
- * fixture with no input. `tools/refusals/README.md` says what to fold where.
+ * fixture with no input. `tools/refusals/README.md` says what to fold where. The five `ACTION_`
+ * fixtures that joined the family on September 22nd 2026 arrived with their own `pack:` and borrow
+ * nothing, so the run reads 32 driven and 27 borrowed.
  *
  * AND THE `where` FAMILY BORROWS NOTHING, which is what a folded family looks like. All seven
  * `register:` and `predicate:` bodies are in the fixtures themselves, because this driver and the fold
@@ -313,7 +316,11 @@ const DRIVERS = {
   where: driveWhere,
   write: 'driven by `packages/kernel/test/refusals-write.test.ts` since e74a563b. Run: node --test --experimental-strip-types "packages/kernel/test/refusals-write.test.ts"',
   render: 'driven by `apps/web/test/refusals-render.test.ts` since e74a563b. Run: node --test --experimental-strip-types "apps/web/test/refusals-render.test.ts"',
-  install: 'no driver. Needs `pack:` plus `installed:` and `facts:`, and a materialised record, because every one of its 20 codes cites rows, an installed pack or the record\'s versions.',
+  /* FIFTEEN AND NOT TWENTY SINCE THE FIVE `ACTION_` FIXTURES MOVED TO `lint`, and the old sentence
+     said "every one of its 20 codes cites rows, an installed pack or the record's versions", which five
+     of them never did. `actionFault` reads the record only for a `sends:` check, and all five are
+     refused through `normalise` then `validate` with nothing installed; see `tools/refusals/README.md`. */
+  install: 'no driver. Needs `pack:` plus `installed:` and `facts:`, and a materialised record, because every one of its 15 codes cites rows, an installed pack or the record\'s versions.',
   rpc: 'no driver. Needs `record:`, `call:` or `calls:`, and `principal:`, and a seeded record with a principal behind it. 30 fixtures, the largest family, and the most expensive harness.',
   import: 'no driver. Needs `record:` and `tamper:`, and an export-tamper-import round trip. Cheapest of the six left: `tamper:` is one word per code and `record:` is a seed name.',
   pull: 'no driver. Needs `declare:`, `grant:` and `answers:`, and the scheduled connector run driven the way the Worker\'s alarm drives it.',

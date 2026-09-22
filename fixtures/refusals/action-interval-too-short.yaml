@@ -1,5 +1,17 @@
 code:   ACTION_INTERVAL_TOO_SHORT
-via:    install
+via:    lint
 raises: packages/kernel/src/declare.ts
 at:     every
 fix:    Run it no more often than every fifteen minutes, or the provider's own higher floor.
+pack: {
+    "pack": "fixture-lint", "version": "1.0.0",
+    "summary": "One pack built to trip exactly one lint refusal.",
+    "author": "BrainDog fixtures", "license": "MIT",
+    "declarations": [
+      { "register": "notes", "name": "Notes", "title": "what",
+        "fields": [ { "id": "what", "type": "text", "required": true } ] },
+      { "ingest": "balance", "channel": "poll",
+        "url": "https://api.example.test/v1/balance", "every": "5m", "grant": "example read",
+        "extract": { "what": { "after": "balance " } }, "writes": { "register": "notes" } }
+    ]
+  }
