@@ -497,18 +497,19 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         empty: 'Nothing else of yours is due this week.',
       },
       {
-        /* THE QUEUE A PERSON WORKS FROM, with the note as the reason it waits. The due day this block carried at 1.5.0
-           has no cell left to sit in: a `todo` draws the task and one detail, and why a task is stuck is what a
-           person needs to act on it. It is still in the order it falls due. THE CHANGED BY COLUMN WENT THE SAME WAY, and
-           neither can come back without a new kind: `todo` is `cells: 2` in `braindog-render`'s `kinds.ts`, both
-           renderers draw `cells[0]` and `cells[1]` and no more, and a `todo` row of four cells written into a page is
-           refused whole as DIALECT_ARITY ("A todo row has 4 columns where todo takes 2"), measured on 22 September. */
+        /* THE QUEUE A PERSON WORKS FROM, with the note as the reason it waits and, under it, when the task falls due
+           and who changed it last: the two facts the 1.5.0 table carried. `todo` is `cells: 4, optional: 2` in
+           `braindog-render`'s `kinds.ts`, and both renderers draw the third and fourth cells as one quiet line
+           joined by a dot (`src/todo.ts`). THE KIND WIDENED IN c6e2a331 AND THIS BLOCK DID NOT: it kept two columns,
+           so the page padded every row to `title | detail |  | ` and the line stayed empty, measured on 22 September
+           (`loop/research-batch-twenty-eight-audit.md` finding 3, held by `test/waiting-due.test.ts`). `changed` is
+           not a field of tasks; the kernel reads it from each row's history. */
         kind: 'todo',
         heading: 'Waiting on you',
         span: 7,
         source: 'register.tasks',
         where: WAITING,
-        columns: [{ field: 'what' }, { field: 'note' }],
+        columns: [{ field: 'what' }, { field: 'note' }, { field: 'by' }, { field: 'changed' }],
         order: [{ field: 'by', dir: 'asc' }],
         limit: 8,
         empty: 'Nothing is waiting on you.',

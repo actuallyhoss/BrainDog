@@ -151,7 +151,7 @@ test('and the queue says why each task waits, in the order they fall due', async
 
   const waiting = block(page, 'Waiting on you');
   const columns = (waiting.columns ?? []).map((c) => String(c.field));
-  assert.deepEqual(columns, ['what', 'note'], `Waiting on you draws ${columns.join(', ')}`);
+  assert.deepEqual(columns, ['what', 'note', 'by', 'changed'], `Waiting on you draws ${columns.join(', ')}`);
 
   const days = waiting.rows.map((r) => String(r.fields.by));
   assert.ok(days.length > 1, 'the sample needs two waiting tasks for the order to mean anything');

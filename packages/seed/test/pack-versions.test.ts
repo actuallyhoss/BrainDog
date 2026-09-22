@@ -204,6 +204,33 @@ const DECLARED: Record<string, Version> = {
       'Still before any release, since every deploy since 1.6.0 was skipped: `ingest.bank-from-in` reads the `From HSBC:` credit off the `+` glued to its figure, and `ingest.bank-from-out` and `ingest.bank-from-unsure` refuse that sign so no line is claimed twice -> 03f76621c84239df',
     ],
   },
+  /**
+   * A VERSION AND NOT A RESET, AS THE LINE ABOVE ASKS FOR AN ID GAINED. Eight ids arrive, so 1.6.0 cannot be set again
+   * whatever its release state. Measured on 22 September with `gh run list --workflow deploy.yml`: every deploy since
+   * `aeef01c5` set 1.6.0 is still `skipped`, so no record holds 1.6.0 and a record on 1.5.0 is offered 1.7.0 directly.
+   */
+  'money-core@1.7.0': {
+    holds: `
+      ingest.bank-card-in ingest.bank-card-in-sms ingest.bank-card-out ingest.bank-card-out-sms ingest.bank-card-used
+      ingest.bank-card-used-sms ingest.bank-from-in ingest.bank-from-in-sms ingest.bank-from-out ingest.bank-from-out-sms
+      ingest.bank-from-unsure ingest.bank-from-unsure-sms ingest.bank-ipn-in ingest.bank-ipn-in-sms ingest.bank-ipn-out
+      ingest.bank-ipn-out-sms
+      metric.cash-accounts metric.cash-as-of metric.cash-now metric.days-late-in metric.due-30d metric.every-month-by-category
+      metric.every-month-in metric.every-month-out metric.in-30d metric.in-by-month metric.in-due-by-month metric.installments-due-30d
+      metric.installments-left metric.late-in metric.out-30d metric.out-by-month metric.out-due-by-month metric.overdue
+      metric.owed-by-you metric.owed-to-you metric.project-owed metric.received-30d metric.spent-30d metric.txn-uncategorised
+      page.home page.ledger page.money
+      register.accounts register.categories register.fx register.holdings register.installments register.obligations
+      register.recurring register.snapshots register.transactions
+      rule.cash-stale rule.installment-due-soon rule.invoice-late rule.recurring-ended rule.recurring-missed rule.txn-categorise
+      setting.home_currency setting.most_days_late setting.most_due_30d setting.most_on_one_category setting.most_out_30d
+      setting.most_out_every_month setting.most_owed_to_you
+    `,
+    declares: '9b29858e7ee11345',
+    history: [
+      'Raised for the eight webhook twins his iOS Shortcut posts a bank SMS to, `ingest.bank-from-out-sms` and the seven beside it, each the reading of its mail pattern behind `verify: { kind: path }`, matching nothing until an owner mints its token -> 9b29858e7ee11345',
+    ],
+  },
   'work@1.1.0': { declares: 'b49e051fe7c26ac5' },
   'work@1.2.0': { declares: '49a30d2ef8c1d672' },
   'work@1.3.0': { declares: 'fb82e66d80644e3d' },
@@ -249,13 +276,14 @@ const DECLARED: Record<string, Version> = {
       page.work page.work-board
       register.tasks register.tracks register.updates
     `,
-    declares: 'bc6a8f4d4c3319ab',
+    declares: '1e1996952c4dce03',
     history: [
       '`page.work` leads with what to do as six lists that tick, Today, This week, Waiting on you, With an agent, After this week and Later, cut by state, then agent, then day so no task falls under two; its Waiting on you, Due soon and With an agent tables, which nobody could tick from the Overview, are gone -> 93dcbade382b5e4a',
       /* THE SAME VERSION, BECAUSE 1.6.0 HAS NOT SHIPPED. Measured on 22 September with `gh run list --workflow deploy`:
          the last successful deploy is still `8bbf469e` at 16:23 UTC on the 21st, and `7e796bbe`, which set 1.6.0, is
          not behind it. Every deploy since was skipped. */
       'Still before any release: `page.work` gains a seventh list, No due day, `state is open or doing, agent is empty, by is empty`, because a task of yours with no due day was under none of the six and `by is empty or after +7d` is refused. Done lately goes back to the full width to make room -> bc6a8f4d4c3319ab',
+      'Still before any release, since every deploy since 1.6.0 was skipped: Waiting on you on `page.work` declares `what, note, by, changed`, so a todo row carries its due day and who changed it last as the third and fourth cells `c6e2a331` widened the kind to (`loop/research-batch-twenty-eight-audit.md` finding 3) -> 1e1996952c4dce03',
     ],
   },
   'estate@1.1.0': {
