@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 
 import { matches } from '../src/arrival.ts';
@@ -116,7 +117,7 @@ test('retained heap: one CSV at the row cap', () => {
    * It runs in a child process because nothing else may have allocated in it, and with `--expose-gc`
    * because a measurement taken before a collection is a measurement of the garbage too.
    */
-  const child = spawnSync(process.execPath, ['--expose-gc', new URL('./heap-child.ts', import.meta.url).pathname.slice(1)], {
+  const child = spawnSync(process.execPath, ['--expose-gc', fileURLToPath(new URL('./heap-child.ts', import.meta.url))], {
     encoding: 'utf8',
   });
   assert.equal(child.status, 0, child.stderr);

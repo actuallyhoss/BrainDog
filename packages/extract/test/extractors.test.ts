@@ -10,6 +10,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -152,7 +153,7 @@ test('AN EMPTY LITERAL IS NOT AN ANCHOR, AND WALKING ONE CANNOT HANG THE PROCESS
      child process the parent can kill on a timeout rather than an await nothing could resolve. */
   const child = spawnSync(
     process.execPath,
-    [new URL('./empty-anchor-child.ts', import.meta.url).pathname.slice(1)],
+    [fileURLToPath(new URL('./empty-anchor-child.ts', import.meta.url))],
     { encoding: 'utf8', timeout: 5_000 },
   );
   assert.equal(child.signal, null, `the child was killed (${child.signal}): the empty-literal walk hung`);
