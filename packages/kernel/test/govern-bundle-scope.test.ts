@@ -333,3 +333,115 @@ test('and a bundle that defines a figure only a page of Obligations reads is sti
   assert.ok(made.ok, fixOf(made));
   sql.close();
 });
+
+/**
+ * A declaration under the id of an installed one whose every figure has no live metric, replaced under Obligations.
+ *
+ * `loop/research-bundle-reads.md` §2. `replacedAbout` read the installed body's lists and dropped the figures it could
+ * not resolve, so a page or digest whose only figure was Diary's, retired or never declared, read as about no list at
+ * all, and a bundle under `register.obligations` replaced it with an Obligations body: all four shapes below were
+ * measured filed, accepted and installed (`{"ok":true,"value":{"id":"SG1"}}`). The same figure redefined from the same
+ * question was already refused by `pageOfOthers`, so the guard disagreed with itself about one page.
+ */
+const tabled: Declaration = { ...table('obligations'), id: 'page.figures', body: { ...(table('obligations').body as object), page: 'figures' } as never };
+const mailing = (sections: unknown[]): Declaration => ({
+  id: 'digest.weekly',
+  kind: 'digest',
+  body: { digest: 'weekly', schedule: { day: 'mon', at: '08:00' }, channels: ['in-app'], sections } as never,
+});
+const retiring = async (k: Kernel, was: Declaration) => (await k.install([OBLIGATIONS, DIARY, metric('diary'), was])).ok && k.retire(['metric.diary-count']).ok;
+const DEAD: [string, (k: Kernel) => Promise<boolean>, Declaration][] = [
+  ['a stat of a retired Diary figure, replaced by an Obligations table', (k) => retiring(k, figures('diary-count')), tabled],
+  ['a stat of a figure never declared, replaced by an Obligations table', async (k) => (await k.install([OBLIGATIONS, DIARY, figures('diary-count')])).ok, tabled],
+  ['a note whose prose reads a retired Diary figure, replaced by an Obligations table', (k) => retiring(k, { ...note('{{diary-count}} rows'), id: 'page.figures', body: { ...(note('{{diary-count}} rows').body as object), page: 'figures' } as never }), tabled],
+  [
+    'a digest whose only section is a retired Diary figure, replaced by an Obligations digest',
+    (k) => retiring(k, mailing([{ heading: 'Count', source: 'metric.diary-count', as: 'figure' }])),
+    mailing([{ heading: 'Rows', source: 'register.obligations', as: 'table', columns: [{ field: 'what' }] }]),
+  ],
+];
+
+test('A BUNDLE NAMED FOR OBLIGATIONS THAT REPLACES A PAGE OR DIGEST OF A DEAD FIGURE IS REFUSED, since nothing says whose it is', async () => {
+  const wrong: string[] = [];
+  for (const [what, arrange, now] of DEAD) {
+    const sql = openSqlite();
+    const k = await openRecord(sql, fixedClock(NOW));
+    if (!(await arrange(k))) {
+      wrong.push(`${what}: the record would not arrange`);
+      sql.close();
+      continue;
+    }
+    const out = k.propose(change('register.obligations', bundle(now)), 'p_1');
+    if (out.ok) wrong.push(`${what}: filed`);
+    else if (codeOf(out) !== 'VALUE_MALFORMED' || !new RegExp(`${now.id.replace('.', '\\.')}.*replaces one that reads a figure no live metric declares`).test(fixOf(out)))
+      wrong.push(`${what}: ${codeOf(out)} ${fixOf(out)}`);
+    else if (filed(sql) !== 0) wrong.push(`${what}: a row was written`);
+    sql.close();
+  }
+  assert.deepEqual(wrong, []);
+});
+
+/* A PAGE OF OBLIGATIONS THAT ALSO READS A DEAD FIGURE IS STILL OBLIGATIONS' TO REPLACE, as `replacedAbout` says: the
+   list it names is shown to whoever reads it already, and the dead figure draws nothing. Checked by making the dead
+   figure refuse whatever else the body names, which left every other test in `govern*.test.ts` green. */
+test('and a bundle that replaces an Obligations page also reading a dead figure is still filed', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  const both: Declaration = { ...tabled, body: { ...(tabled.body as { blocks: unknown[] }), blocks: [...(tabled.body as { blocks: unknown[] }).blocks, { kind: 'stat', cells: [{ metric: 'diary-count' }] }] } as never };
+  assert.ok(await retiring(k, both));
+  const made = k.propose(change('register.obligations', bundle(tabled)), 'p_1');
+  assert.ok(made.ok, fixOf(made));
+  sql.close();
+});
+
+/**
+ * A page per skill, as `packages/seed/src/packs/agents.ts` writes `page.skill`, filed under `register.skills`.
+ *
+ * `loop/research-bundle-reads.md` §3. The guard read the diff's `row: '{{spoken}}'` as a figure the bundle did not
+ * carry and refused the seed's own page under the list it is `for` ("reads the figure spoken, which it does not
+ * carry"), while `pages.ts` `fill` answers `{{spoken}}` with the row's spoken id before it reads a field or a metric.
+ */
+const SKILLS_FIELDS: Field[] = [
+  { id: 'name', type: 'text', required: true },
+  { id: 'trigger', type: 'text', required: true },
+  { id: 'body', type: 'document' },
+  { id: 'state', type: 'enum', values: ['active', 'retired'] },
+];
+const SKILLS = register('skills', 'Skills', SKILLS_FIELDS);
+const skill: Declaration = {
+  id: 'page.skill',
+  kind: 'page',
+  body: {
+    page: 'skill',
+    title: '{{name}}',
+    for: { register: 'skills', where: 'state is active' },
+    icon: 'skill',
+    requires: ['register.skills'],
+    blocks: [
+      { kind: 'note', span: 12, body: '{{trigger}}' },
+      { kind: 'diff', heading: 'Versions', span: 12, source: 'register.skills', row: '{{spoken}}', field: 'body', versions: 5, empty: 'One version so far.' },
+    ],
+  } as never,
+};
+
+test('a Skills page per row whose diff reads {{spoken}} is filed under register.skills, accepted and installed', async () => {
+  const { k, sql } = await record();
+  assert.ok((await k.install([SKILLS])).ok);
+  const made = k.propose(change('register.skills', { declarations: [SKILLS, skill] }), 'p_1');
+  assert.ok(made.ok, fixOf(made));
+  const out = k.decide(made.value.id, accept, 'p_owner');
+  assert.ok(out.ok, fixOf(out));
+  const put = await k.install((out.value.install as { declarations: Declaration[] }).declarations);
+  assert.ok(put.ok, fixOf(put));
+  assert.equal(sql.all("SELECT 1 FROM declaration WHERE id = 'page.skill' AND superseded_at IS NULL").length, 1);
+  sql.close();
+});
+
+test('but outside a template nothing fills {{spoken}}, so a note saying it under register.skills is still refused', async () => {
+  const { k, sql } = await record();
+  assert.ok((await k.install([SKILLS])).ok);
+  const out = k.propose(change('register.skills', { declarations: [SKILLS, note('This is {{spoken}}.')] }), 'p_1');
+  assert.equal(codeOf(out), 'VALUE_MALFORMED', JSON.stringify(out));
+  assert.match(fixOf(out), /page\.said.*figure spoken/);
+  sql.close();
+});

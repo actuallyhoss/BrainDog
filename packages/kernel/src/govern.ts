@@ -535,9 +535,11 @@ function aboutOthers(sql: Sql, named: string, bundle: { id?: unknown; kind?: unk
       return {
         code: 'VALUE_MALFORMED',
         fix:
-          was === '*'
-            ? `This change is filed as a change to ${named}, and ${String(d.id)} in it replaces one that reads across the whole record, so whoever reads ${named} would be asked to change what everybody reads. Propose ${String(d.id)} as a change of its own.`
-            : `This change is filed as a change to ${named}, and ${String(d.id)} in it replaces one that reads register.${was}, so whoever reads ${named} would be asked to change what ${was} shows. Propose ${String(d.id)} as a change of its own.`,
+          was === null
+            ? `This change is filed as a change to ${named}, and ${String(d.id)} in it replaces one that reads a figure no live metric declares, which names no list, so nothing here can say whose that is. Propose ${String(d.id)} as a change of its own.`
+            : was === '*'
+              ? `This change is filed as a change to ${named}, and ${String(d.id)} in it replaces one that reads across the whole record, so whoever reads ${named} would be asked to change what everybody reads. Propose ${String(d.id)} as a change of its own.`
+              : `This change is filed as a change to ${named}, and ${String(d.id)} in it replaces one that reads register.${was}, so whoever reads ${named} would be asked to change what ${was} shows. Propose ${String(d.id)} as a change of its own.`,
         at: 'body.to',
       };
     const reader = d.kind === 'metric' && isMap(d.body) && typeof d.body.metric === 'string' ? pageOfOthers(sql, d.body.metric, list, bundle) : undefined;
@@ -611,21 +613,28 @@ function pageOfOthers(
  * `register.obligations`, it was accepted and installed, and every page reading the Diary figure then read Obligations
  * behind a question the queue showed as a change to Obligations. A rule, a page and a digest under a Diary id with an
  * Obligations body were filed the same way (`govern-bundle-scope.test.ts`). The installed body's figures are read
- * through the installed metrics, since those are what it reads now. A figure nothing declares counts no list, so it is
- * not refused here as an unknown in the new body is: the new body is what would be installed, and the old one reads
- * nothing through it.
+ * through the installed metrics, since those are what it reads now.
+ *
+ * AN INSTALLED BODY WHOSE EVERY FIGURE HAS NO LIVE METRIC IS NOBODY'S TO REPLACE, and it answers `null`. This once
+ * dropped the figures it could not resolve, so a stat of a retired Diary figure, a stat of one never declared, a note
+ * whose prose read a retired one and a digest whose only section was one each read as about no list, and all four were
+ * filed under `register.obligations`, accepted and installed with Obligations bodies (`loop/research-bundle-reads.md`
+ * §2), while `pageOfOthers` refused the same figure redefined from the same question. The rule is now the one
+ * `pageOfOthers` keeps: an unknown is not a licence. A body that names a list besides its dead figure is judged by that
+ * list, since the page is already shown to whoever reads it and the dead figure draws nothing.
  */
-function replacedAbout(sql: Sql, id: string, list: string, fields: ReadonlySet<string>): string | undefined {
+function replacedAbout(sql: Sql, id: string, list: string, fields: ReadonlySet<string>): string | null | undefined {
   const installed = (at: string) =>
     sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1', at)?.body;
   const was = installed(id);
   if (was === undefined) return undefined;
   const body: unknown = JSON.parse(was);
   const page = id.startsWith('page.') ? { template: isMap(body) && body.for !== undefined, fields } : null;
-  const { lists } = listsNamed(body, page, (figure) => {
+  const { lists, unknown } = listsNamed(body, page, (figure) => {
     const metric = installed(`metric.${figure}`);
     return metric === undefined ? undefined : JSON.parse(metric);
   });
+  if (lists.size === 0 && unknown.size > 0) return null;
   return [...lists].find((l) => l !== list);
 }
 
@@ -676,10 +685,13 @@ function listsNamed(
       for (const m of node.matchAll(/\{\{\s*(?:[a-z]+:)?\s*([a-z][a-z0-9_]*)(?:#\d+)?\.[A-Za-z]/g)) lists.add(m[1]!);
       /* A BARE `{{diary-count}}` IN A PAGE'S PROSE IS A FIGURE, as `pathOf` reads one, and it named no list here: a note
          reading an installed Diary figure was filed under `register.obligations`. A code span is text and is skipped, as
-         `pathsOf` skips it, and in a template a field of the row is the row's. */
+         `pathsOf` skips it, and in a template a field of the row is the row's. So is `{{spoken}}` on a template: `fill`
+         answers it with the row's spoken id before it reads a field or a metric, and `declare.ts` reserves the word as a
+         field id, so there it is never a figure. Read as one, it refused the seed's own `page.skill` (a diff's
+         `row: '{{spoken}}'`) under `register.skills`. Outside a template nothing fills it, and it stays a figure. */
       if (page)
         for (const m of node.replace(/`[^`]*`/g, ' ').matchAll(/\{\{\s*(?:[a-z]+:\s*)?([a-z][a-z0-9_-]*)\s*\}\}/g))
-          if (!(page.template && page.fields.has(m[1]!))) figure(m[1]!);
+          if (!(page.template && (page.fields.has(m[1]!) || m[1] === 'spoken'))) figure(m[1]!);
       return;
     }
     if (Array.isArray(node)) {
