@@ -97,6 +97,12 @@ Nine source files, counted.
 | `src/snapshots.ts` | `VACUUM INTO` → strip `local` → manifest → sign → keep 30; the nightly timer | 110 |
 | `test/*.test.ts` | §9 | — |
 
+*This table is the design's count and has not been re-counted against the tree, which holds more than nine files
+in `src/`. Two that this spec describes as built: `src/spark.ts`, which builds Spark's model, engine and door over
+`@braindog/host/spark` ([46-SPEC-SPARK](46-SPEC-SPARK.md) §5.9), and `src/script.ts`, `scriptSandbox`, the QuickJS
+runner a scheduled script runs in, which passes `@braindog/host/script` only what a Node host has: `pinFor`,
+`pinnedSend` and the key opener (§5.23).*
+
 ---
 
 ## 4 · Data structures
@@ -600,6 +606,103 @@ reaches it because the router matched first. The image ships the built directory
 2. `addrs = isIP(host) ? [host] : (await dns.lookup(host, { all: true })).map(a => a.address)`; any address in `0/8 · 10/8 · 100.64/10 · 127/8 · 169.254/16 · 172.16/12 · 192.168/16 · ::1 · fc00::/7 · fe80::/10` or an IPv4-mapped form of one → throw `HttpRefused('private-range')`.
 3. `globalThis.fetch(url, init)` — Node 24's `fetch` is undici; read the body with a counter, abort past 2 MB → `HttpRefused('too-large')`; return `new Response(buf, { status, headers })`.
 
+### 5.23 · A person's script, in QuickJS
+
+*Added September 22nd 2026 for DIRECTION 22 ("scripts run hosted and outside"), from `apps/selfhost/src/script.ts`,
+`packages/host/src/script.ts`, `packages/host/src/script-try.ts`, `packages/script/src/quickjs.ts` and
+`packages/kernel/src/script-run.ts`, revised the same day for wave thirty-seven at `d23ac77d`. [51-SPEC-WORKER](51-SPEC-WORKER.md) §5.19 is the Cloud's half; the record's half, and why the record
+never runs a script, is [04-PACKS](04-PACKS.md) §1 and [25-CONNECTORS](25-CONNECTORS.md) §12.*
+
+A `script` declaration is the ninth kind. When its `runs.every` is due the record writes one `script.run` outbox
+row carrying the script's id, the version it fired under and its input, and nothing else. This host leases that row
+in the same pass as the scheduled actions and hands it to a sandbox; what comes back is a list of writes the record
+applies, or a refusal.
+
+1. **When.** Only where `options.actions` is set, which `main.ts` turns on and a test does not unless it asks: the
+   sandbox is built once, beside the executor, in `server.ts`'s `act()`, from the same `send`, `resolve` and key
+   opener the executor has. Each pass hands `runActions` `holdingScript(script, record, ledger.mayRun, admissions)`,
+   so a script asks the Directory's ledger on the same admission count as a `call` and a connector, and a record
+   with one run left spends it once. The self-host's records are on the `selfhost` plan, which is never held. Each
+   run's usage (requests, bytes, wall time) goes to `Directory.meter` with the rest of the pass.
+2. **Only a clock starts one.** `runs.door` and `runs.rule` install, and a script that fetches prints them in its
+   install-diff line, but the one caller that queues a `script.run` is the schedule's `fireScript`
+   (`packages/kernel/src/index.ts`): no ingest's arrival and no rule step starts a script yet, and an automation's
+   `script` step fails its run as not in this build. The MCP grammar says so (`packages/mcp/grammars/script.ts`,
+   `in_this_build`). A trial of a draft is not a queued run and is step 11.
+3. **The version is the one it fired under** (`prepareScript`): the declaration row of that exact version, superseded
+   or not, so a run queued before an edit runs the source the owner approved when it was queued. A script with no
+   active version (retired, its pack off) runs nothing and is metered `dropped`.
+4. **The sandbox** is `runInQuickJs` (`@braindog/script/quickjs`): QuickJS compiled to WebAssembly
+   (quickjs-ng 0.32.0 through `quickjs-emscripten-core`), a fresh module instance per run with its own
+   `WebAssembly.Memory` whose `maximum` is 32 MB, a 512 KB interpreter stack, and no globals but the language's own.
+   `ctx` is built inside it by the prelude from host functions and frozen; it is the only way out. The script's
+   default export is called with it. The ceilings are in §8; over one before the run starts is `OUT_OF_BOUNDS`, and
+   the run is refused with no writes.
+5. **`ctx.fetch(url, { method, headers, body, key })`**, checked in the sandbox's host function before anything
+   leaves: the URL's origin is in the script's `egress:` (compared as `URL.origin`, never as a prefix), the scheme is
+   `https:`, the URL carries no user name or password, the fetch count is under `limits.fetches`, and a `key` is a
+   label in `keys:`. The first three are `PULL_ORIGIN_REFUSED`, the count `OUT_OF_BOUNDS`, an undeclared key
+   `FORBIDDEN`. Before any of that, a declaration whose `keys:` names the vault's `spark` key is refused `FORBIDDEN`
+   and the sandbox never starts (`sparkDeclared`); the kernel refuses such a script at install too. Then the host (`scriptRunner`, `packages/host/src/script.ts`) resolves the label with `grantNamed`,
+   by label or id, never a revoked grant, the newest first and a tie broken on the id, as a `call`'s `keyNamed`
+   does; a label with no live grant is an error in the script, *"The key "<label>" is not in the vault, so nothing
+   was sent."*, and nothing is sent. Then `keyRefused`: the key goes only to the host the grant's `opens` names,
+   read as a host name when it parses as one and compared exactly, with no subdomain let in, and never when the grant
+   is the one labelled `spark`. A fetch that breaks it is `FORBIDDEN` and is kept: every later fetch of the run is
+   refused unsent, and the run answers that refusal whatever the script returned, as the Worker's `ScriptRuns` does
+   (`test/script-key-egress.test.ts`). Then `sendAction` (§8, *Scheduled actions*) over the script's own `egress:`,
+   not the record's ingest origins: the origin checked again, a literal private or local host refused, `pin`
+   resolving the name and refusing a private address before the socket, the socket connected to the address that
+   was checked, same-origin redirects three at most, 10 s, 2 MB, and the key opened only after all of that, sent as
+   `authorization: Bearer`, opened as `system` since nobody asked, and scrubbed from the answer in every spelling
+   `spellingsOf` names: the bytes as sent, JSON-escaped (with `/` escaped too, as PHP does), URL-encoded in either
+   case of hex, and base64 standard and URL-safe at each byte offset ([12-SECURITY](12-SECURITY.md) §6.2). Any
+   method the script asked for is sent as written. No response header comes back to the script, because
+   `sendAction` keeps none and scrubs only the body. A refusal here is a rejected promise the script may catch;
+   caught, nothing was sent and no key opened, except after `keyRefused`, which refuses the run however it is
+   handled.
+6. **`ctx.record.list(register, where)` and `ctx.record.get(spoken)`** (`scriptReads`, the same function the Worker
+   uses): the record's own `list` and `get`, asked as `{ kind: 'system', id: 'script:<id>@v<n>' }` with the
+   script's `reads:` as its `registers` ceiling. `list` of a register outside `reads:` is `FORBIDDEN` in the
+   sandbox; a `get` of a row outside it answers `null`, which is the record's answer to any caller who may not read
+   it. Every `secret` field and `list<secret>` field is taken off each row, and a `where` naming a secret field
+   anywhere in its tree is refused, *"… a script may not ask what a secret field holds."* Until
+   `7adc7d0c` this host handed a script no reads at all, so `reads: ["clients"]` ran on the Cloud and was refused
+   here.
+7. **`ctx.write(register, fields)` and `ctx.update(spoken, patch, version?)`** queue; nothing is applied during the
+   run. `write` checks the register against `writes:` and the count against `limits.writes` as it is called. An
+   update with no version is written without comparing; a version given that is not a whole number throws in the
+   prelude with a sentence naming the call, and uncaught that refuses the run.
+8. **The answer is applied in one transaction** (`finishScript`): the count of writes checked first against
+   `limits.writes` and never above 1,000, every create's register and every update's row's register checked against
+   `writes:` before the first write, then every write through the ordinary write path as
+   `script:<id>@v<n>`, one batch, in one savepoint, so the third of three refused takes the first two back. The
+   outbox ack is the first statement inside it, so a run whose lease lapsed while it ran applies nothing.
+9. **What is kept.** One `pull` event per run on `declaration:script.<id>`, with its outcome and usage, and
+   `ctx.log`'s text on it as `to_v.log`, cut at 8 KB on a character boundary (cut in the sandbox and again here),
+   with the lists the version read and wrote beside it as `to_v.lists`. The record shows the log only to an owner in a
+   browser who reads every one of those lists (`logOf`, `packages/record/src/index.ts`), and `--redacted--` to every
+   other reader. A refused run's note says only that it did not finish and that its log says why; the reason, which
+   can quote the script's own words, goes first in the log, so a log at its cap never loses it. A
+   refused run is metered as a run and never retried. Three refused runs in a row of the version now installed pause
+   the script's schedule row and tell the owner once; host failures, holds and drops between them neither count nor
+   break the streak, and a resume does break it. `resumeScript` (ADMIN, 30 §5) is the only way it starts again.
+10. **No rehearsal.** `rehearseOnThisMachine` wraps `pin` and `send` inside `actionExecutor` and is not exported, so a
+    script aimed at a local `.test` name is resolved by the system and fails as the network. That is the safe way
+    round, and it is not what a `call` gets.
+11. **A trial** (`script_try`, [25-CONNECTORS](25-CONNECTORS.md) §12). The record's `scriptTry` checks the draft
+    with the kernel's `scriptBody`, the check an install runs, and hands this host's `tryScript` the body, the input
+    and the caller's own `list` and `get`. `server.ts` wires it only when `options.actions` is set, for step 1's
+    reason; without it the record answers `NOT_IN_THIS_BUILD`. It builds one `scriptRunner` per trial through
+    `trialSandbox` (`packages/host/src/script-try.ts`) over `runInQuickJs`, the pinned socket, the name service and
+    the key opener a scheduled run uses, so every rule in steps 4 to 7 holds. What differs: the run is version 0 and
+    acts as `script:<id>@try`; it reads as the caller, not as `system`; it is handed the vault only when the caller
+    is the owner signed in as a person, so for anybody else a fetch naming a key is a rejected promise with *"A trial
+    opens no key for an agent…"*; and its answer stops where `finishScript` would start, so nothing is written, no
+    event is kept and nothing is filed. It asks the Directory's `mayRun` first and is metered on the script's line,
+    `channel: 'script'`, under an id minted for it; a sandbox that throws is counted as a failure that costs no run
+    and answered as the host's 500.
+
 ---
 
 ## 6 · Refusals and errors
@@ -675,6 +778,7 @@ boot or on the wire ever prints a token, a code, a cookie value or a payload.
 | Attachments | key = content SHA-256; type from bytes; SVG 415; 2 MB checked twice; served `nosniff`, `default-src 'none'; sandbox`, `noindex`, immutable |
 | `Http` | private, loopback, link-local, CGNAT and ULA ranges refused after resolution; `redirect: 'manual'`; 2 MB cap; timeout from the caller. `ponytail:` resolve-then-connect leaves a rebinding window |
 | Scheduled actions | The send loop is `@braindog/host/actions`, the one the Worker runs: https to an origin an active declaration names, a host written as a literal private or local address refused, same-origin redirects three at most, 10 s, 2 MB, the ledger asked first, and the key's value scrubbed from the answer and from every refusal sentence. `src/actions.ts` passes in what only this host has, September 15th 2026: its key opener, a `pin` step in which the host is resolved before connecting and refused when any address it gives is unspecified (`0/8`, `::`), loopback (`127/8`, `::1`), private (`10/8`, `172.16/12`, `192.168/16`), link-local (`169.254/16`, `fe80::/10`), unique-local (`fc00::/7`), carrier-grade NAT (`100.64/10`), multicast (`224/4`, `ff00::/8`), reserved (`240/4`), or an IPv6 form carrying one of those (mapped, compatible, NAT64); the socket connects through a `lookup` that answers only the checked address, so no second lookup happens; every same-origin redirect hop resolved and checked again, three at most; 10 s; 2 MB. A refused address is `PULL_ORIGIN_REFUSED` with one sentence, a failure on the run's event that pauses nothing and is not retried. Each run asks the Directory's `mayRun` first and each pass's usage goes to `meter`; the record is put on the `selfhost` plan at its first pass (and `init` provisions it there), so a self-host is never held |
+| Scripts | §5.23. A person's or an agent's code runs in QuickJS compiled to WebAssembly, a fresh instance and a fresh `WebAssembly.Memory` per run, never in this process's own JavaScript and never with `node:vm`. Ceilings, default and most a declaration may ask: `cpu_ms` 200 and 1,000, `fetches` 5 and 20, `wall_ms` 15,000 and 30,000, `writes` 200 and 1,000; 64 KB of source; 32 MB of memory; 8 KB of log. The memory ceiling is the WebAssembly `maximum`, because QuickJS's own limit is not a cap: measured on quickjs-ng 0.32.0, a hundred 1 MB strings pushed one at a time passed a 32 MB limit at 104,956,678 bytes. Time spent inside a host function counts against `cpu_ms` and `wall_ms`, running out of memory is `OUT_OF_BOUNDS`, and every refusal is sticky, so a script that catches one is still refused with no writes. The only way out is `ctx`; its `fetch` is the scheduled actions' send loop above over the script's own `egress:`, so the private-address rules, `pin` and the key discipline are the same code. A key is never in the sandbox: the script names a label, and the host opens the grant for one request after every check. Reads never carry a secret field and never filter on one. A key goes only to the host its vault entry opens, never the vault's `spark` key, and is scrubbed from the answer in every spelling `spellingsOf` names; a run's log is shown only to an owner who reads every list the script read and wrote, and a refused run's note carries none of the script's words. **Not built:** the install line does not say which host each key goes to, and a key whose `opens` is not among the script's origins is refused at each fetch, not at install. [12-SECURITY](12-SECURITY.md) §6.2 and §8 carry both |
 | SMTP | credentials from env, not the vault — the vault cannot hold what sends its own recovery mail (12 §6); TLS required |
 | Backups | a snapshot holds sealed `grant` rows and the KEK-wrapped `vault_key`; the six `local` tables are empty; it opens nothing without the KEK file. `braindog verify` proves it unchanged, and is **not built**: `verify` is specified in 48 §5.6 and is none of the eleven commands the CLI dispatches (48 §2), so nothing checks a snapshot today |
 | Logs | `{ code, route, recId }` and shapes only; the `secret-grep` gate (33 §8) runs over this app's write paths and log lines |
@@ -797,6 +901,25 @@ specified in 48 §5.6 and is none of the eleven commands the CLI dispatches (48 
 | `Http.fetch('http://10.0.0.1/')`, `('http://[::1]/')` | both throw `HttpRefused('private-range')` |
 | `Http.fetch` of a 3 MB body | throws `HttpRefused('too-large')` |
 
+**Scripts (§5.23).** `test/script.test.ts` and `test/script-reads.test.ts` drive the real `scriptSandbox`
+through `runActions` with a stubbed socket and name service; the sandbox's own cases are
+`packages/script/test/*.test.ts` and the record's half is `packages/kernel/test/script-run*.test.ts`.
+
+| Input | Expected |
+|---|---|
+| a scheduled script that fetches with its key and writes one row | the provider hears the key as a bearer; the row is written as `script:<id>@v<n>`; the Directory ledger shows one run |
+| the same script aimed at a local address, written as one or resolved to one | refused before any socket opens and before the key is opened |
+| a provider that echoes the `authorization` header | the key's value is not in what the script read, nor in its log |
+| a key sent to an origin in `egress:` that its vault entry does not open; a script declaring the vault's `spark` key; a provider echoing the key JSON-escaped, URL-encoded or in base64 | refused `FORBIDDEN` before the key is opened, the run refused; refused before the sandbox starts; none of those spellings in what the script read (`test/script-key-egress.test.ts`) |
+| a revoked grant and a live one under the same label; then none live | the live one is opened; with none, nothing is sent |
+| a script and a `call` in one pass with one run left | one of the two runs |
+| a script with `reads: [clients]` lists and gets | rows come back, with every secret field taken off |
+| a filter on a secret field | refused, so a grant id cannot be read back one prefix at a time |
+| a read outside `reads:` | `list` refused; `get` answers nothing |
+| `process`, `require`, a bare `fetch`, `import`, the `Function`-constructor escape | none reaches the host (`packages/script/test/escape.test.ts`) |
+| an answer with more writes than `limits.writes`, or over 1,000 with none declared | nothing written (`packages/kernel/test/script-run-limits.test.ts`) |
+| two refusals under v1, then v2 refused once | not paused: only runs of the installed version count |
+
 **Passkeys (phase 3)** — fixture vectors committed under `test/fixtures/webauthn/`: a P-256 registration and
 assertion pair, an RS256 pair, each generated once with `subtle` and stored.
 
@@ -831,8 +954,9 @@ assertion pair, an RS256 pair, each generated once with `subtle` and stored.
 - `ponytail:` attachments are the five image types; PDF when a register asks for it.
 - `ponytail:` inbound email trusts the forwarder's `Authentication-Results`; DKIM verification in-process (~150 lines, DNS + RSA) when a self-hoster runs their own MX.
 - `ponytail:` on Windows the KEK mode check is skipped; ACL inspection when a Windows self-host matters.
+- `ponytail:` a script starts only on its clock; `runs.door` and `runs.rule` are not wired (§5.23 step 2). A second WebAssembly instance per run is about 2 ms on the machine it was measured on, which a run every fifteen minutes can pay; a pool when a record runs scripts often enough to see it.
 
-Sixteen, counted.
+Seventeen, counted.
 
 ---
 
@@ -842,6 +966,7 @@ Sixteen, counted.
 |---|---|---|---|
 | runtime | `@pushforge/builder` | 2.0.5 | Web Push (VAPID + RFC 8291) for `notify.push` — the package ADR-046 already permits; the self-host uses it for the same reason the Worker does (§13 #9) |
 | workspace | `@braindog/ports` · `@braindog/kernel` · `@braindog/record` · `@braindog/mcp` · `@braindog/connect` | `workspace:*` | §1 |
+| workspace | `@braindog/script`, its `./quickjs` subpath, which brings `quickjs-emscripten-core` 0.32.0 and `@jitl/quickjs-ng-wasmfile-release-sync` 0.32.0 | `workspace:*` | the sandbox of §5.23; [31-STACK](31-STACK.md) §2 row 23 admits the edge |
 | workspace | `@braindog/web` — its `./node` subpath, adapter-node's `handler` in `build-node/` | `workspace:*`, built in the image | the shell and its assets (§5.19). 50 §2.1 calls the package `private` with no `exports` map while 50 §13 #1 names `@braindog/web/node`; this spec imports the latter and the audit reconciles 50 |
 | dev | `@types/node` 24.13.0 · `typescript` 6.0.3 | pins of 31 §3 | type-check only; tests are `node --test` on `.ts` |
 
@@ -903,8 +1028,9 @@ so its row is what this spec needs from it:
 | 21 | `main.ts` carries `init <slug> [--owner]` and `dev [--port]` (48 §5.14's contract); a slug is `^[a-z][a-z0-9-]{1,31}$`; `init` generates the record DEK, the connector DEK and the Ed25519 signing pair, wraps them under the KEK and hands them to `createRecord`; the inbound-email capability lives at `<slug>/inbound.token` (0600); `dev` prints mail and its throwaway `BRAINDOG_TOKEN` to stderr | 33 §5 `init` row (the owner flag, the token file); 34 §4 (a slug grammar row); 33 §6 |
 | 22 | `POST /api/export` answers streamed `text/plain` on this host too — 48 §13 D3's one exception to the `Result` envelope — and the host, not the record, emits the `dog_sig` line last (#19 names the key) | 33 §4 `/api/<method>` row (the export exception); 48 §13 D2 (who writes `dog_sig`) |
 | 23 | `createToken` · `listTokens` · `revokeToken` are routable ADMIN methods on this host, reached by a cookie or a `token` operation grant | 30 §5 ADMIN row (the three methods 48 §5.12 calls; 41 → 44 becomes 47 methods) |
+| 24 | **A script runs on this host in QuickJS compiled to WebAssembly**, one instance per run, leased with the scheduled actions and admitted on their count; its `ctx.fetch` is their send loop, and its reads are the record's own `list` and `get` as the script's actor. Not `node:vm`, which is not a boundary, and not `isolated-vm`, a native build on every self-hoster's machine (`loop/research-shell-scripts.md` §4) | 31 §2 row 23 (done); 12 §8 (the ceilings) |
 
-Twenty-three, counted.
+Twenty-four, counted.
 
 ---
 

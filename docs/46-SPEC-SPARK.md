@@ -23,7 +23,7 @@ Three boundaries, each structural rather than policed:
 
 1. **Ports are exactly `{ Sql, Clock, Inference }`** (33 §1). No `Http`, no `Dispatch`, no `KeyStore`: the package cannot fetch a URL, send a mail or unwrap a key. `fetch` is banned under `packages/spark/**` by the same lint rule that bans it under `packages/record/**` (31 §3, layer 4).
 2. **It reads the record only through `project()`** — the READ+ method of 30 §9, whose `secret` fields are already labels. There is no other read path in `RecordApi` (§2).
-3. **It never sees a credential, including the customer's own model key.** Tier B is an `Inference` adapter the host builds after opening the grant in the Worker (ADR-062); the package receives an object with a `complete()` method and nothing else (§5.9).
+3. **It never sees a credential, including the customer's own model key.** Tier B is an `Inference` adapter the host builds, which opens the grant in the host (the Worker, or the self-host process; ADR-062) when a call is made; the package receives an object with a `complete()` method and nothing else (§5.9).
 
 May import: `@braindog/ports` (types, memory adapters in tests), `@braindog/where` (validate the drafted predicate), `@braindog/declare` (validate an `ingest` or `change` body). Nothing else — `where` is added to 31 §2 row 11 by §13 #3.
 
@@ -53,9 +53,10 @@ export interface Spark {
   analyseDraft(signal: Signal, ctx: CallContext): Promise<Result<Proposal>>;            // files body_kind 'change'
 
   // ── the palette's second mode (23 §3, §7, §10): two calls, two passes ──
-  read(question: string, ctx: CallContext): Promise<Result<Reading>>;                    // pass 1: predicate + rows, drawn by code
-  propose(question: string, ctx: CallContext, byok?: Inference, askId?: string): Promise<Result<Proposal>>;
+  read(question: string, ctx: CallContext, inference?: Inference): Promise<Result<Reading>>;   // pass 1: predicate + rows, drawn by code
+  propose(question: string, ctx: CallContext, byok?: Inference, askId?: string, inference?: Inference): Promise<Result<Proposal>>;
                                                                                          // pass 2: one artifact with verbs
+                                                                                         // inference: the host's model for this ask alone (§5.9)
   // ── validation, exported because the tests and the runner use it alone ──
   cite(text: string, allowed: Citable): Result<{ text: string; citations: SpokenId[] }>;
 
@@ -84,6 +85,15 @@ export interface Dispatcher {
 export const PROMPTS: Record<PromptId, PromptTemplate>;   // also exported as '@braindog/spark/prompts' — data only
 export const MODELS: Record<ModelId, ModelRate>;          // the routing table's rates, 08 §6
 ```
+
+**As built, the surface is five methods and not the whole block above.** `packages/spark/src/types.ts` declares
+`Spark` as `read`, `propose`, `proposePattern`, `configure` and `status`; `triage`, `digestProse`, `embed`,
+`analyseDraft`, `cite` as a method, and `jobs` are not on it. The `inference` argument on `read` and `propose` is
+built on both: a host whose included model is keyed from the vault builds that model again for each asker and hands
+it in, so the key it opens is opened in the asker's name (§5.9). It is an argument and not a slot the host sets
+around the call, because two asks awaiting the model together would share a slot, and the Worker has no
+`AsyncLocalStorage` to scope one (`packages/spark/test/per-call-inference.test.ts`, two reads in flight each drafting
+on their own).
 
 Error contract: every method returns `Result<T>` (33 §2). `ok` carries `version` = the record version the last `RecordApi` call returned. A refusal's `code` is from 30 §6 or the five codes of §13 #5. Internal helpers throw `SparkError { code }`; nothing throws across the RPC.
 
@@ -143,10 +153,10 @@ PRAGMA user_version = 1;   -- best effort: a Durable Object's authorizer refuses
 
 CREATE TABLE IF NOT EXISTS settings (
   singleton  INTEGER PRIMARY KEY CHECK (singleton = 1),
-  tier       TEXT NOT NULL DEFAULT 'a' CHECK (tier IN ('a','b','byo')),   -- 26 §1; byo = a self-host endpoint, unmetered
+  tier       TEXT NOT NULL DEFAULT 'a' CHECK (tier IN ('a','b','byo')),   -- 26 §1; byo = the host's own endpoint asked for the owner's model name, metered by the host (§5.9)
   model      TEXT,                          -- b/byo: the conversation model. a: NULL — the routing table decides
   grant_id   TEXT,                          -- b: the api_token grant the HOST opens per ask. The key is never here
-  ask_cap    INTEGER NOT NULL DEFAULT 80,   -- 23 §8: asks per month on tier a
+  ask_cap    INTEGER NOT NULL DEFAULT 80,   -- 23 §8: asks per month; tier a counted here, b and byo by the host (§4.1)
   updated_at TEXT NOT NULL
 );
 
@@ -188,8 +198,30 @@ given an `ask_id` spends one (its draft was spent on pass 1), and a `propose` wi
 drafts its own predicate first (§5.5-1) and accounts that call as a `read` row. A pass 2 repeated on a stored `ask_id`
 spends one each time. A pass 2 whose rows came back empty calls no model (§5.5-2), so it spends nothing of its own:
 one with an `ask_id` spends none and one without spends only its drafting `read`. `model = '-'` is the one row that
-called nothing, the `read` on a record with no lists (§5.4-3), and it is not billed. Tiers `b` and `byo` are never
-metered.
+called nothing, the `read` on a record with no lists (§5.4-3), and it is not billed.
+
+**Tiers `b` and `byo` are metered too, by the host and not by this package.** This paragraph said they were never
+metered, on the reason "the asker is paying", and that reason was false: pass 1 drafts on the host's own model and
+key on every tier, and on `byo` the proposal does as well, because the settings hold no address of the owner's
+(§5.9). Measured before the host counted them, at `ask_cap: 1`: five tier `b` reads made five model calls on the
+operator's key while `status()` read 0 used (`apps/selfhost/test/spark-byok-guard.test.ts`), and on `byo` one read
+and five proposes on its `ask_id` answered 200 five times (`apps/selfhost/test/spark-byo-propose.test.ts`). The
+package's own check still stops tier `a` alone. Both hosts wrap the engine in `sparkGuardedEngine`
+(`packages/host/src/spark.ts`), which reads this table directly and counts, this month in UTC and with
+`model <> '-'`, the `read` rows on `b` and `byo` and the `propose` rows on `byo`:
+
+```sql
+SELECT COUNT(*) FROM call WHERE (kind = 'read' AND tier IN ('b','byo') OR kind = 'propose' AND tier = 'byo') AND model <> '-' AND ts >= ?
+```
+
+One count for both tiers, so an owner who moves between them in a month does not start the host's bill again. At
+or over `ask_cap` a `read` or `propose` is refused `SPARK_BUDGET_SPENT` before the engine runs, with one of two
+sentences: on `b`, that the reads before the owner's key answers are spent; on `byo`, that the asks are. A tier `b`
+propose on a stored `ask_id` is not stopped, because its one call is on the owner's key; on `byo` the same propose
+is counted, because it is on the host's. The check runs with no `await` before the engine's own, and the engine
+writes a hold row before its first `await`, so asks already in flight are in the count: four proposes on one `ask_id` sent
+together at the last `byo` ask made one model call. `status().asks.used` on `b` and `byo` is this count. `neurons` stays 0 off tier
+`a`, since the host counts asks and not money.
 
 **A failed or refused model call is billed.** The status is not in the filter, and every row below carries the model's
 name, so each counts as one. Measured on 22 September by driving `createSpark` over `test/double.ts` from a script
@@ -491,13 +523,28 @@ read from the standard's text and not measured in a browser.
 **What is mounted is four of the five cookie rows**, on both hosts: `read`, `status`, `settings` and `propose`.
 `servesSpark` matches those four paths and both hosts dispatch on it alone. `POST /api/spark/pattern` has no door,
 because `proposePattern` is neither metered nor capped (§5.3, F4) and a door in front of it would be an unmetered model
-call behind a button. Both hosts build `byok` (`sparkByokOf`, `packages/host/src/spark.ts`) wherever a key can be
-opened: the self-host when it has a key store (`sparkDoor`, `apps/selfhost/src/spark.ts`), the Worker when its wire
-has an `openKey` (`workerSparkDoor`, `apps/worker/src/spark.ts`), and `apps/selfhost/test/spark-named.test.ts` saves tier `b` with 200. A host
-that can open no key hands the door no `byok`, and there the settings door refuses `tier: 'b'` with `501
-NOT_IN_THIS_BUILD` at `tier` rather than store a tier no `propose` could serve. *(Until September 22nd this said
-neither host built `byok`; `bd8add33` built it on both, `loop/research-batch-thirty-one-audit.md` finding 6.)* The JOBS rows and `/ws/runner` wait on
-the record's six JOBS methods, which do not exist (`packages/spark/src/index.ts`, the header).
+call behind a button. Both hosts hand the door a `byok` wherever a key can be opened: the self-host when it has a
+key store (`sparkDoor`, `apps/selfhost/src/spark.ts`), the Worker when `KEK` is bound (`workerSparkDoor`,
+`apps/worker/src/spark.ts`), and `apps/selfhost/test/spark-named.test.ts` saves tier `b` with 200. A host that can
+open no key hands the door no `byok`, and there the settings door refuses `tier: 'b'` with `501 NOT_IN_THIS_BUILD`
+at `tier` rather than store a tier no `propose` could serve. *(Until September 22nd this said neither host built
+`byok`; `bd8add33` built it on both, `loop/research-batch-thirty-one-audit.md` finding 6.)*
+
+**The door asks `byok` for the session on a `read` as well as a `propose`**, after the engine is built
+(`serveSpark`, `packages/host/src/spark-ask.ts`). What it gets back is `sparkByokFor`'s answer (§5.9): an adapter,
+nothing, or a refusal. A refusal on a `propose` is the answer, before the engine is called, so a caller the vault
+turns away costs no model call. A `read` acts only on a refusal marked `hostKey`, which means the included model
+itself is keyed from the vault, and otherwise drops what it was given, because the proposal is not a read's to make.
+The JOBS rows and `/ws/runner` wait on the record's six JOBS methods, which do not exist
+(`packages/spark/src/index.ts`, the header).
+
+**No door answers an automation's question to Spark.** An automation's `ask_spark` step would queue one `infer.ask`
+outbox row for a host to answer (`packages/kernel/src/flow.ts`, migration 13), and no host leases that job, and
+nothing in this package serves it. So the kernel refuses the step at install, after its shape is checked, with
+`NOT_IN_THIS_BUILD`: *"… no host in this build answers an automation's question to Spark. Ask a person with
+ask_person instead."* (`flow-lint.ts`), and a run that reaches one installed by an earlier build fails there with
+the same code before anything is queued. `ask_person` is built: it files an `options` question in Decide, and the
+run waits until that question, and only that one, is answered.
 
 ### 5.3 · Tier A jobs
 
@@ -554,7 +601,7 @@ Any other changed path → `FORBIDDEN` with `fix: 'Spark may not change <path>; 
 
 ### 5.4 · The palette, pass 1 — `read(question, ctx)`
 
-1. Meter: `settings.tier = 'a'` and the month's count (§4.1) `≥ ask_cap` → `SPARK_BUDGET_SPENT`, fix `Spark is out of asks until <first of next month>. Add your own key, or wait.` No model call.
+1. Meter: `settings.tier = 'a'` and the month's count (§4.1) `≥ ask_cap` → `SPARK_BUDGET_SPENT`, fix `Spark is out of asks until <first of next month>. Add your own key, or wait.` No model call. On `b` and `byo` the host has already asked its own count (§4.1) and refused in its own sentence before this step runs.
 2. `question` is trimmed and capped at 400 bytes (the "conversation" budget of 11 §6 is one question here).
 3. `record.project({ registers: [] }, { tokens: 400 }, ctx)` → the index only, with fields. Zero registers → `nothing`.
 4. **Draft the predicate**: `PROMPTS.predicate` with `%INDEX%`, `%QUESTION%`; parse; `where.validate(out.where, register)` for each register named. A validation refusal, or `where: null`, falls back to `q = out.q ?? question`. No retry.
@@ -567,7 +614,7 @@ Any other changed path → `FORBIDDEN` with `fix: 'Spark may not change <path>; 
 
 1. With `askId`: `SELECT predicate, question FROM call WHERE id = ? AND kind = 'read'`; re-run step 5.4-5 with the stored predicate (the record is the cache — rows may have moved, and citations resolve at paint anyway). Without: run §5.4 first.
 2. Zero rows → `ok` with `{ text: '', body_kind: 'query', body: { registers, where, q }, verbs: ['open'], citations: [], filed: null, model: '—', read }`. No model call.
-3. Meter as 5.4-1. **As built the check runs first, before step 1**, once per call (`propose.ts`, `spent()`), so a pass 2 at the cap is refused `SPARK_BUDGET_SPENT` even where its rows would have come back empty and no model would have run; and a `propose` with no `ask_id` that starts one under the cap makes both of its calls and ends one over it. Choose the adapter and model: tier `a` → `deps.inference`, `glm-5.3-flash`; tier `b` → `byok` (absent → `FORBIDDEN`, fix `Your key is not open in this session. Open the vault, or switch Spark to the included model.`), `settings.model`; tier `byo` → `deps.inference`, `settings.model`.
+3. Meter as 5.4-1. **As built the check runs first, before step 1**, once per call (`propose.ts`, `spent()`), so a pass 2 at the cap is refused `SPARK_BUDGET_SPENT` even where its rows would have come back empty and no model would have run; and a `propose` with no `ask_id` that starts one under the cap makes both of its calls and ends one over it. Choose the adapter and model: tier `a` → the host's model, `glm-5.3-flash`; tier `b` → `byok` (absent → `FORBIDDEN`, fix `Your key is not open in this session. Open the vault, or switch Spark to the included model.`), `settings.model`; tier `byo` → the host's model, `settings.model`. "The host's model" is the `inference` argument when the host handed one for this ask, and `deps.inference` otherwise (`propose.ts`, `inference ?? fallback`); pass 1 drafts on the same one on every tier, tier `b` included. On `b` and `byo` the host's own count runs before this method is entered (§4.1), and on `b` the host's door has already refused a caller the vault turns away (§5.9), so this package's `FORBIDDEN` is reached only when no key can be had at all.
 4. Print rows, one line each, `register#seq | title | field: value …` from `ProjectionRow.summary` and `fields` — money as `EGP 5,005.00`, days as `2026-11-04` — until `tokens ≤ 6,000`. This is the model's *input*; digits are fine here.
 5. Steps §5.3-3 and -4 with `PROMPTS.propose`.
 6. `cite(out.text, citable(projection))` and, for `options`, `cite(option.because)` and `cite(option.label)` per option; for `rowset`, `cite(JSON of every text-typed field)` per row. Any refusal → the whole proposal is refused (`PROPOSAL_UNCITED`), status `refused`, and the client keeps pass 1 — the rows were the answer.
@@ -640,28 +687,118 @@ One statement claims; a second runner's identical statement finds nothing (`Idle
 3. `claim` → `record.claimJob` → `job` or `none`. `event` → `postJobEvent` → `ack`. `cancel?` → `readCancel` → `cancel`. Anything else → `refused` and close.
 4. Hibernation: the host accepts with the hibernation API and `setWebSocketAutoResponse('ping','pong')`; the object is asleep between frames and pays nothing (ADR-044). `wake()` iterates the host's socket list on the next `createJob`.
 
-### 5.9 · Tier B — the customer's key, never seen here
+### 5.9 · Tiers a, b and byo: which key answers, and who may open it
 
-1. The owner sets `configure({ tier: 'b', model, grant_id })` from a browser session; `grant_id` names an `api_token` grant in the record's vault. The package stores the id.
-2. On `POST /api/spark/propose` the **host** reads `settings.grant_id`, calls `record.openGrant(id, ctx)` under the asker's browser session (VAULT, 30 §5 — one `grant.read` event per ask, `opened + 1`), unwraps and decrypts in the Worker (ADR-062), and builds an `Inference` adapter whose provider request carries the plaintext as the auth header through gateway passthrough with `cf-aig-collect-log-payload: false` (11 §3). The gateway's own BYOK store is not used.
-3. The host passes that adapter as `byok`. The package calls `byok.complete(…)`, records `neurons = 0`, and drops the reference when the call returns. The plaintext was never in a package variable, a `call` row, a log line or a prompt.
-4. Vault passphrase on → `openGrant` needs the passphrase in-session; without it the host returns `FORBIDDEN` with the 5.5-3 fix before any model call.
+*(Rewritten September 22nd 2026 against `packages/host/src/spark.ts` and `packages/host/src/spark-ask.ts` at
+`8cab17d7`, after waves thirty-one to thirty-six, and unchanged in those files at `d23ac77d`. The earlier text
+described tier `b` alone, had the host open the grant through `record.openGrant` and send the key through the
+gateway's passthrough. The first is now true in effect and by another route; the second is not built. Both are said
+below.)*
+
+The package never holds a key on any tier; everything in this section is the host's (`packages/host/src/spark.ts`,
+the same builders on both hosts). Three keys can stand behind a Spark call:
+
+| Key | Where it is kept | What it answers |
+|---|---|---|
+| the operator's `SPARK_KEY` | the self-host's environment. The Worker never reads one (`sparkFromEnv(env, { operatorKey: false })`) | the included model, on every tier |
+| the vault's `spark` grant | the record's vault, label `spark` (`SPARK_KEY_LABEL`) | the included model wherever there is no `SPARK_KEY`, which on the Worker is always |
+| the owner's own key | a live `api_token` grant in the vault, named by `settings.grant_id` | tier `b`'s proposal, and nothing else |
+
+With no `SPARK_KEY` and no live `spark` grant the included model is called with no `authorization` header, which is
+right for an endpoint on the owner's own machine and opens nothing.
+
+What each tier sends where:
+
+| Tier | Pass 1, the predicate | Pass 2, the proposal | Metered by (§4.1) |
+|---|---|---|---|
+| `a` | the included model | the included model | this package |
+| `b` | the included model | `byok`, the owner's key, at `settings.model` as typed; `SPARK_MODEL` is not consulted | the host: pass 1 only |
+| `byo` | the included model | the included model, at `settings.model` as typed | the host: both passes |
+
+`byo` is not "a self-host endpoint" as §4.1's DDL comment says: the settings hold a tier, a model name, a grant id
+and a cap, and no address, so `byo` is the host's own endpoint asked for a model the owner named.
+
+**The vault gate** (`sparkByokFor`). It runs on every `read` and `propose` where the tier is `b` or the included
+model is keyed from the vault, and nowhere else:
+
+1. Ask the record's `listGrants(ctx)`, which is the record's `vault(ctx)` and nothing added: a person at `owner` on
+   the whole record, never a token, and a last proof no more than fifteen minutes old (`FRESH`,
+   `packages/record/src/index.ts`). It writes no event, which is why it is the probe and `openGrant` is not. A
+   context with no `provedAt`, a self-host in open mode where there is no session, passes as it does at the vault.
+2. Refused, where the included model is keyed from the vault: `FORBIDDEN`, *"Spark answers here on a key kept in
+   this record's vault, which opens only for the owner signed in within the last fifteen minutes. Sign in again, or
+   ask the owner."* (`SPARK_HOST_KEY_CLOSED`), on a `read` and on a `propose`. No model is called and no key opened.
+3. Refused, on tier `b` with the included model not on the vault: a `propose` is `FORBIDDEN` with the 5.5-3 sentence
+   (`SPARK_KEY_CLOSED`). A `read` goes on, because it opens nothing of the owner's: a colleague may read on an
+   operator's key.
+4. Passed, on tier `b`: `sparkByokOf` builds one adapter over the grant `settings.grant_id` names, and never the one
+   labelled `spark` nor `SPARK_KEY` in its place. A grant that cannot be opened when the call is made is a throw,
+   which the package accounts as `UNREACHABLE`, and never a call with no `authorization`, which would be an anonymous
+   call against the owner's provider account.
+
+Measured before the gate: a colleague at `read` whose last proof was fifty minutes old proposed with 200 and the
+proposal went out on the owner's key (`loop/research-batch-thirty-one-audit.md` §1); on the vault's `spark` key the
+same colleague answered `read=200 propose=200` on three model calls (`loop/research-batch-thirty-three-audit.md` §2).
+Both are cases in `apps/selfhost/test/spark-byok-guard.test.ts` and `spark-included-guard.test.ts`.
+
+**Every opening is a `grant.read` signed by the asker.** The key is asked for on each model call and not when the
+adapter is built: `post` calls `key()`, which calls the app's `keyOpener(api, store, actor)`, which calls
+`kernel.openGrant(…, actor)`, so each call is one `grant.read` with `opened + 1`. The actor is the person's id, or
+the person behind a token. For tier `b` the door's wire passes it; for the included model the door builds the model
+again for each asker (`sparkAskerEngine`) and hands it to `read` and `propose` as `inference` (§2). So an owner's
+tier `a` propose on the vault's `spark` key leaves two `grant.read` rows, both hers, and a tier `b` propose leaves
+one for the draft and one for the proposal where the included model is on the vault. A propose whose rows come back
+empty calls no model for the proposal and opens nothing for it. Before this, every opening was signed `system`
+because both hosts' `keyOpener` defaulted to it, so the vault's log could not tell her asks from a scheduled one.
+`system` is now what a caller with nobody asking gets: the record's own Spark model and its daily look
+(`sparkModelOf`), and a scheduled script (49 §5.23). A trial of a draft script is also signed `system`, although
+the owner asked for it: both hosts hand its sends the same opener a scheduled run uses, with no actor.
+
+**A script never opens the vault's `spark` key.** On a host with no `SPARK_KEY` that key answers everybody's asks,
+so the kernel refuses a script that names it at install and before a trial (`scriptBody`, `FORBIDDEN` at
+`keys[i]`), and both hosts refuse a run that declares it before the sandbox starts, or fetches with it by its grant
+id (`sparkDeclared` and `keyRefused`, `packages/host/src/script.ts`; 12 §6.2).
+
+**What a tier `b` save must name** (`sparkGuardedEngine`'s `configure`, for an owner; anybody else is left to
+`configure`'s own refusal, so the check never tells a colleague whether a grant id exists): a grant the vault holds
+and has not revoked, of kind `api_token`, and not the one labelled `spark`. Each miss is `VALUE_MALFORMED` at
+`grant_id` in its own sentence: *"That grant holds no key in this record…"*, *"That grant is not an API token, so
+Spark cannot answer with it…"*, *"That key is the one this host answers everybody with…"*. The kind rule is there
+because a live password opens like any other grant, and before it an owner who chose her bank login saved 200 and
+the next propose sent it to `SPARK_ENDPOINT` as the bearer.
+
+**Not built.**
+
+- **The key goes where this host's endpoint points, and nothing checks that is the provider which issued it.**
+  `sparkByokOf` posts to `SPARK_ENDPOINT`, the included model's own address, with the owner's key as
+  `authorization: Bearer`. The grant's `opens` column is not read on this path. So an owner's key is sent to
+  whatever endpoint the host operator configured, which is a trust in the host that 12 §6.2 states.
+- **No gateway passthrough.** The request goes straight to `SPARK_ENDPOINT` through `post`; `grep -rn cf-aig
+  packages apps` finds nothing, so no `cf-aig-collect-log-payload` header is set on this path. The one place the
+  gateway's payload setting is written, `collectLog: false`, is an adapter over the Workers AI binding
+  (`apps/worker/src/inference.ts`) that nothing in `apps/worker/src` imports yet.
+- **No passphrase step.** Step 4 of the earlier text asked for the vault passphrase in the session before
+  `openGrant`. No door asks for one: the gate is the owner and the fifteen minutes. The self-host's `keyOpener`
+  answers `null` for a key whose wrap has no `kek_id`, so a passphrase-wrapped key is not opened and the call is
+  `UNREACHABLE`, rather than refused up front in the 5.5-3 sentence.
 
 ## 6 · Refusals and errors
 
 | Code | Raised | `fix` a person reads |
 |---|---|---|
-| `FORBIDDEN` (30 §6) | an agent token at any JOBS method — the record, forwarded; a frame on a socket without a runner attachment — this package; a runner posting to a job it does not hold; `seq ≠ job.seq + 1`; a `change` touching a path outside §5.3's table; tier `b` with no open key | `A job is code execution on a machine; ask the owner to run it from Spark.` · `This job is not yours.` · `Post seq <n>.` · `Spark may not change <path>.` |
+| `FORBIDDEN` (30 §6) | an agent token at any JOBS method, raised by the record and forwarded; a frame on a socket without a runner attachment, raised by this package; a runner posting to a job it does not hold; `seq ≠ job.seq + 1`; a `change` touching a path outside §5.3's table; tier `b` with no open key; the host's vault gate refusing the asker (§5.9) | `A job is code execution on a machine; ask the owner to run it from Spark.` · `This job is not yours.` · `Post seq <n>.` · `Spark may not change <path>.` · the 5.5-3 sentence · *"Spark answers here on a key kept in this record's vault, which opens only for the owner signed in within the last fifteen minutes…"* |
 | `NEEDS_BROWSER_SESSION` (30 §6) | a bearer at `createJob cancelJob listJobs` or any `/api/spark/*` route — the router | `Open this in the app.` |
 | `PROPOSAL_UNCITED` (§13 #5) | a digit outside `{{…}}`; an unknown path or spoken id; a quoted money or day not in a row; a pattern anchor not in a sample; `pct` or `quantity` with a literal | `Name the path this figure comes from, or leave it out.` |
 | `PROPOSAL_NO_ROWS` (§13 #5) | a filed body with zero citations | `A proposal names the rows behind it, or it is not filed.` |
 | `PROPOSAL_SCHEMA` (§13 #5) | the model's JSON fails the kind's schema; a tier-C `end` result fails it (→ status `error`) | `The output did not match the <kind> schema at <path>.` |
 | `PREDICTION_UNMEASURABLE` (§13 #5) | twelve observations cannot accumulate in thirty days | `This change cannot be scored inside thirty days; it is not proposed.` |
-| `SPARK_BUDGET_SPENT` (§13 #5) | tier `a`, the month's asks ≥ `ask_cap` | `Spark is out of asks until <date>. Add your own key, or wait.` |
+| `SPARK_BUDGET_SPENT` (§13 #5) | tier `a`, the month's asks ≥ `ask_cap`; tiers `b` and `byo`, the host's count ≥ `ask_cap` (§4.1) | `Spark is out of asks until <date>. Add your own key, or wait.` · on `b` and `byo`, the host's two sentences, each naming this host's model and the date |
+| `VALUE_MALFORMED` (30 §6), raised by the host | a tier `b` save naming a grant that is missing or revoked, not an `api_token`, or labelled `spark` (§5.9) | one sentence per case, at `grant_id` |
 | grammar codes (30 §6) | the drafted predicate fails `where.validate` — never returned; the fallback is `q` | — |
 | `declare` codes (30 §6) | an `ingest` or `change` body fails its declaration schema | as `declare` states them |
 
-Five codes of its own, two shared with the record, two families passed through. A refusal never carries a field value, a prompt or a row: `found` is a span or a path, never a projection line (12 §8).
+Five codes of its own, two shared with the record, two families passed through; the host adds `VALUE_MALFORMED`
+at `grant_id` in front of `configure`, and `501 NOT_IN_THIS_BUILD` at `tier` where no key can be opened (§5.2). A refusal never carries a field value, a prompt or a row: `found` is a span or a path, never a projection line (12 §8).
 
 ## 7 · Performance budget
 
@@ -708,6 +845,9 @@ The lethal trifecta (12 §5): private data + untrusted content + a way out. Spar
 | The runner's job bearer is `propose`, one record, expires with the job | structural | minted inside `claimJob`, revoked at `end`; a second `end` for a job is refused |
 | Logs carry the code, the id and the shape | rule | `call.read` holds register, count and predicate — never a row; a refusal's `found` is a span, never a projection line |
 | The `secret-grep` gate covers `prompts.ts` | gate | 33 §8: no prompt template can carry a `grant` plaintext |
+| A vault key behind Spark opens only for the owner on a fresh proof, and is logged as whoever asked | procedural, the record's own gate | not this package: the host's `sparkByokFor` asks the record's `vault(ctx)` before any model call, and `sparkAskerEngine` builds the included model per asker so each `grant.read` names them (§5.9) |
+| A tier `b` key is a live API token the owner chose, never the key everybody's asks use | procedural | the host's `sparkGuardedEngine` refuses a save naming a missing, revoked, non-`api_token` or `spark`-labelled grant (§5.9) |
+| The key everybody's asks use is never a script's | procedural, the kernel's and the host's | not this package: `scriptBody` refuses a script naming `spark` at install, and `sparkDeclared` and `keyRefused` refuse a run that declares it or fetches with it (§5.9) |
 
 Trust within the deployment: only the Worker and the Spark object build a `CallContext`, and neither builds `{ kind: 'spark' }` or `{ kind: 'runner' }` from an external credential — `spark` is set only by this package on `propose`, `runner` only from a verified device grant or socket attachment.
 
@@ -769,6 +909,25 @@ What is not claimed: no classifier detects injection. The `flagged` bit is a hig
 | tier `b`, `byok` given | `byok.complete` called, `deps.inference.complete` not; `call.neurons = 0`, `tier 'b'` |
 | tier `b`, `byok` absent | `FORBIDDEN`; zero calls |
 | every filed proposal | `sparkCtx.principal.kind = 'spark'`; the asker's principal never reaches `record.propose` |
+| two `read`s in flight, each handed its own `inference` | each drafts on its own; the engine-wide one is not called (`test/per-call-inference.test.ts`) |
+| tier `b`, a `propose` handed `inference` and `byok` | the draft on `inference`, the proposal on `byok` |
+
+**The host's guards**, driven through a real self-host server (`apps/selfhost/test/`), because they are the host's
+and not this package's:
+
+| Case | Expected |
+|---|---|
+| tier `b`, a `read` colleague whose proof is fifty minutes old, proposes | `FORBIDDEN` before any model call, no `grant.read` (`spark-byok-guard`) |
+| tier `b`, the owner on a fresh proof, proposes | the proposal on her key; one `grant.read`, actor her id and not `system` |
+| back on tier `a` with the grant left in settings | no gate; the colleague proposes on the operator key |
+| tier `b` at `ask_cap: 1`, a second `read` | `SPARK_BUDGET_SPENT`; a propose on the first read's `ask_id` still answers |
+| tier `byo` at `ask_cap: 1`, a second `read`; at `ask_cap: 2`, a second propose on one `ask_id` | `SPARK_BUDGET_SPENT` both (`spark-byo-propose`) |
+| tier `b` naming a missing, revoked or non-`api_token` grant | 422 `VALUE_MALFORMED` at `grant_id` |
+| no `SPARK_KEY` and a live `spark` grant: the colleague reads, on tier `a` and on tier `b` | `FORBIDDEN` before any model call (`spark-included-guard`) |
+| the same, tier `b` naming the `spark` grant | 422 at `grant_id` |
+| the owner's own read, and her tier `a` propose | `grant.read` signed by her, once and twice |
+| an operator `SPARK_KEY` set | no gate anywhere; the included model never touches the vault |
+| the Worker's `keyOpener` | signs `grant.read` with the actor it is given, and `system` only when given none (`apps/worker/test/key-opener-actor.test.ts`) |
 
 **The dispatcher** — a fake `RecordApi` over the memory `Sql` running the 30 §1 `job`/`job_event` DDL and the §5.8 statements:
 
@@ -856,7 +1015,7 @@ Position: eleventh of fifteen (31 §2); Phase B7 for the palette, Phase A for `t
 | 7 | **`CallContext.principal` gains `{ kind: 'runner'; id; name }`**, built only from a verified device grant or a socket attachment; the JOBS runner half checks it, the session half checks `person` at `owner` | 33 §2, 30 §10 |
 | 8 | **The self-host runner transport is the long-poll**; the hibernatable socket is Cloud-only. No `ws` dependency; the hold runs in the host process where wall time costs nothing | 26 §2.2 parity row: "✅ (`ws`)" → "long-poll, §46"; 33 §11 *Wait* |
 | 9 | **No Spark inference passes `tools`.** Every call is schema-constrained structured output; retrieval is `project()`; the dual-context split holds with one context | 11 §6 ("tool-call headroom" → the schema), 11 §7 *Dual-context* |
-| 10 | **Tier B mechanics**: the host opens the grant under the asker's browser session per ask, decrypts in the Worker, and passes a per-call `Inference` adapter; one `grant.read` event per ask; the package never holds the key | 11 §3 *Bring your own model*, 26 §6 |
+| 10 | **Tier B mechanics**: the host opens the grant under the asker's browser session per ask, decrypts in the Worker, and passes a per-call `Inference` adapter; one `grant.read` event per ask; the package never holds the key. *Amended September 22nd 2026 to what is built (§5.9): the host asks the record's vault gate first, decrypts wherever its key store is (the Worker, or the self-host process), opens the key on each model call as the asker, and posts to `SPARK_ENDPOINT` directly with no gateway passthrough; the included model is held to the same gate when it is keyed from the vault; and tiers `b` and `byo` are metered by the host (§4.1)* | 11 §3 *Bring your own model*, 26 §6 |
 | 11 | **`Proposal` carries `model`, `filed` and `read`** beside the five named fields, and `body_kind` admits `query` for the answer that is never filed | 23 §1, §4 (*one object, four bodies* — a fifth shape, `query`, is the palette's unfiled answer) |
 | 12 | **The palette is two calls**, `read` then `propose`, so pass 1 renders without a stream and Escape between them is a free cancellation: pass 2 is never called and never spent. Pass 1 has already spent its one ask by then (§4.1, one per model call) | 23 §7 |
 | 13 | **Lost jobs are re-claimed once** inside the claim statement; expiry is applied by `claimJob`; `preferred` is not built | 26 §2.4, 33 §11 *Lost* and *Expire* |

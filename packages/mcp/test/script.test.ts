@@ -2,13 +2,12 @@
  * Authoring a script over MCP (`loop/research-shell-scripts.md` section 7, Brief 6): the grammar an agent reads before
  * it writes one, and the `propose` it files it with.
  *
- * `script_try` IS NOT HERE YET, AND THE PACKAGE ORDER NO LONGER STANDS IN ITS WAY. It runs a script in the sandbox,
- * `@braindog/script`, and this comment used to say that package was rank 23 of `31-STACK` section 2 and this one 12, so
- * the import pointed up the order and `tools/gates/graph.mjs` refused it. Script was re-ranked to 12 so that it could
- * be taken: this package is 13 now, `host` 16 and the two apps that serve MCP 22 and 23, and every one of those edges
- * points down. What is missing is the tool, which is backlog work. Until it is built it stays unadvertised, because a
- * tool advertised with nothing behind it refuses on every build, which `index.test.ts`'s "EVERY ADVERTISED TOOL
- * REACHES A METHOD" exists to stop.
+ * `script_try` IS BUILT, AND NOT HERE AND NOT AS A TOOL. It is `propose` on a script change that carries `"try"`, which
+ * the tool layer hands to the surface's `scriptTry`: the record checks the draft and the host runs it in its sandbox,
+ * writing nothing and filing nothing. So this package takes no edge to `@braindog/script` for it, and no tool was added,
+ * because the smallest one measured 102 tokens against the 3 left under the list's ceiling. Its cases are
+ * `script-try.test.ts`; this file holds the grammar, which says how to ask for one (`to_try`), and the plain `propose`,
+ * which files a script change with the record's own CALLS OUT line.
  */
 
 import { test } from 'node:test';

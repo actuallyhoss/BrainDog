@@ -153,6 +153,7 @@ interface Env {
   EMAIL: SendEmail; TELEMETRY: AnalyticsEngineDataset; RL_READ: RateLimit; RL_WRITE: RateLimit;
   AI_GATEWAY: string; AGE_RECIPIENT: string; PUBLIC_HOST: string;
   SESSION_SECRET?: string; PROVISION_KEY?: string; AUTH_MAIL_FROM?: string;   // two secrets and the sign-in sender (§5.8)
+  LOADER?: WorkerLoader;                                  // the Worker Loader a script runs in (§5.19); absent meters every run `dropped`
 }
 ```
 
@@ -596,6 +597,14 @@ queue(batch):
    inference: aiInference(env) }` — tier A jobs and, later, conversation. Every write it wants is a `propose` or
    `suggest` the Worker relays to the record with `auth: { kind: 'spark' }`; the `spark-actor` gate proves nothing else.
 
+*As built, September 22nd 2026: `apps/worker/src/do/spark.ts` does not exist. The palette's engine is built inside the
+record's own object on the first ask (`workerSparkDoor`, `apps/worker/src/spark.ts`), with Spark's `settings` and
+`call` tables in that object's storage, and it is reached through `/api/spark/*` rather than a `Spark` class. The
+Worker reads no operator key for Spark (`sparkFromEnv(env, { operatorKey: false })`), so wherever the vault holds a
+`spark` grant every ask, on every tier, goes through the record's vault gate and opens that grant in the asker's
+name ([46-SPEC-SPARK](46-SPEC-SPARK.md) §5.9). With no `KEK` bound no key can be opened, no engine is built, and
+`/api/version` says `spark: false`. The runner socket above is not built.*
+
 ### 5.16 · The conformance job (33 §3, 30 §13)
 
 1. `apps/worker/test/conformance.test.ts` under `@cloudflare/vitest-plugin`: `runInDurableObject(stub, (_, state) =>
@@ -622,6 +631,102 @@ queue(batch):
    `sha256(rec ‖ salt)` with a salt that rotates monthly (08 §5). Never a field value, a query, a prompt or a payload.
 2. `console.log(JSON.stringify({ t, code, rec, method, status, ms }))` on refusals, conflicts, 5xx and every queue
    dispatch: the code, the ids, the shape — never a value (35 §2, 12 §8). `observability.enabled` keeps them.
+
+### 5.19 · A person's script, in a Dynamic Worker
+
+*Added September 22nd 2026 for DIRECTION 22, from `apps/worker/src/script.ts` and `apps/worker/src/index.ts`, and
+revised the same day for wave thirty-seven at `d23ac77d`. The self-host's half is [49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §5.23, and what the record does before
+and after a run (the version pinned at fire time, the writes applied in one transaction, the log, the pause after
+three refusals) is the same code on both hosts and is written there once.*
+
+1. **The binding.** `worker_loaders: [{ binding: "LOADER" }]`, written out in `alpha` and in `production` because
+   wrangler does not inherit it. Workers Paid only, with no account resource to create first. `LOADER` is optional
+   in `Env`: absent, the alarm hands the kernel no runner, and the kernel meters each `script.run` `dropped` with the
+   sentence that this host has no sandbox, rather than the alarm failing on a binding. The compatibility flag the
+   design asked for, `enable_ctx_exports`, is not set: workerd 1.20260903.1 said it has been the default since
+   2025-11-17.
+2. **Where it runs.** In the record's own object, from `alarm()`, in the same pass as the scheduled actions of §5.10
+   step 4: `#scriptRunner` wraps `runScript` in `holdingScript` on the same admission count and the Directory's
+   `mayRun` over RPC, so a record on the hosted plan at its allowance holds a script as it holds a `call`, and each
+   run's usage goes to `Directory.meter`. Only a clock starts one, as on the self-host.
+3. **A fresh loaded Worker for every run.** `env.LOADER.load({ … })`, with no id and no cache, so no run is handed
+   another's module or `globalThis`, as on the self-host, where each run is a new QuickJS instance. Until wave
+   thirty-seven this was `env.LOADER.get('<record>:<script>:v<version>', …)`, cached by the platform under that id,
+   and the audit of wave thirty-five measured a second run of one version reading what the first had left on
+   `globalThis` (`test/script-isolation.test.ts`). The price is a unique Dynamic Worker per run rather than per
+   version per day, which is what billing counts. Its code is two modules:
+   `script.js`, the source, and `main.js`, the prelude `@braindog/script` exports (the same text QuickJS evaluates)
+   and a `WorkerEntrypoint` whose `run(meta)` builds `ctx` and calls the source's default export. Its date is the
+   record's own `compatibility_date`, 2026-09-01. Its `env` is `{ RECORD: ScriptRecord }` and its `globalOutbound` is
+   `ScriptOutbound`, two loopback entrypoints from `this.ctx.exports` whose props are this object's id and nothing
+   else. Its `limits` are `{ cpuMs: limits.cpu_ms }`.
+4. **The run id is the entrypoint's props**, not the stubs'. The stubs carry only what is the same for every run,
+   the object's id, which was needed while the stubs were built once per version and cached; with a Worker per run
+   it also means going back to a cache would not hand a later run the first run's id. `ScriptRuns`, in the object's memory, holds each open run: its declaration, its
+   limits, its fetch count and whether it has broken a rule. An id that is not open answers *"This run is over, so
+   nothing was sent."*
+5. **`ctx.fetch`** leaves the loaded Worker as a `fetch` with three headers the module stamps: the run
+   (`x-braindog-run`), the URL as the script wrote it (`x-braindog-url`, URI-encoded) and the key label
+   (`x-braindog-key`). `globalOutbound` receives every request and strips the three. A request with no run header is
+   a bare `fetch`, and throws before anything is sent, wherever it points. The object then checks, in QuickJS's
+   order: the origin in `egress:`, `https:`, no user name or password on the URL being sent or on the URL as written
+   (workerd drops `me:pw@` before the request reaches the gateway, so a check on the sent URL alone never fired), the
+   fetch count, the key label declared, and then `keyRefused` (`@braindog/host/script`, the self-host's function):
+   the key goes only to the host the grant's `opens` names, compared exactly with no subdomain let in, and never when
+   the grant is the one labelled `spark`. A declaration naming the `spark` key is refused `FORBIDDEN` before the
+   loader is asked (`sparkDeclared`), ahead of the declaration's shape, so a script that is both malformed and names
+   it is refused the same way on both hosts. A broken rule is sticky: every later call of that run is refused, and the run
+   answers `refused` with no writes, whatever the script did after. The key is resolved by `grantNamed` and the
+   request sent by `actionExecutor(() => egress, { openKey })`, the send loop of §5.10 step 4 over the script's own
+   origins: a literal private or local host refused, same-origin redirects three at most, 10 s, 2 MB, the key opened
+   by `keyOpener` under `KEK` for this one request as `system`, and scrubbed from the answer in every spelling
+   `spellingsOf` names ([12-SECURITY](12-SECURITY.md) §6.2). A `GET`
+   goes as `pull` and anything else as `call`, so a non-GET carries an idempotency key that is the job's id and the
+   fetch's number. No response header comes back. The provider's answer rides as JSON inside a 200, because a
+   `Response` cannot carry every status a provider sends.
+6. **`ctx.record.list` and `ctx.record.get`** go through `env.RECORD` to the object's `script(run, call)` RPC, which
+   refuses a `list` outside `reads:` and a `get` from a script that reads nothing, and answers the rest with
+   `scriptReads`, the self-host's function: the record's own reads as the script's actor, `reads:` as the ceiling,
+   secret fields taken off and a filter on one refused.
+7. **The answer.** The loaded module collects writes and the log and hands them back; nothing in it is a check,
+   because it runs where the script can reach it. `checkWrites` checks them again here (a list; no more than
+   `limits.writes`; a create into a register in `writes:`; an update whose version is a whole number or none, none
+   handed on as `NaN` and written without comparing), the log is cut at 8 KB, and the kernel's `finishScript`
+   applies them as on the self-host.
+8. **Time.** `wall_ms` is a timer raced against the run; when it wins the run is closed, so anything the script
+   asks for afterwards is refused. An answer that arrives after the deadline is refused `OUT_OF_BOUNDS` whoever won
+   the race, because the race cannot end code that never awaits: locally the loaded Worker runs on this object's
+   thread, so the timer cannot fire until the script lets go. A broken rule outranks the deadline, so a run that
+   sent a key away and then overran is `FORBIDDEN`, as on the self-host. `cpu_ms` is the platform's `cpuMs` on the loaded code, and the usage this host
+   reports says `cpu_ms: 0`, because the platform says nowhere this host can read at run time how much was spent;
+   the ledger meters wall time. No `subRequests` limit is set: the fetch count is `ScriptRuns`', and a platform count
+   that included the `env.RECORD` calls would refuse a script for reading. A loader that throws before the run starts
+   is the host failing, recorded `unrun: failed` and not counted against the script; a run that starts and rejects is
+   the script's.
+9. **A trial** (`script_try`, [25-CONNECTORS](25-CONNECTORS.md) §12). The record's `tryScript` dependency is wired
+   where the object opens its record (`#open`): `scriptTrial` (`packages/host/src/script-try.ts`) over `runScript`
+   with the same loader, `ScriptRuns`, send loop and key opener as the alarm (`#openKey`, the one reader of `KEK` for
+   both), the caller's own reads, and the vault only for the owner signed in as a person. It asks the Directory's
+   `mayRun` and is metered on its ledger like a run, and writes nothing. With no `LOADER` bound it answers a refusal
+   with no code, *"This deployment has no sandbox, so nothing ran."*
+
+Measured locally, workerd 1.20260903.1 through wrangler 4.129.0's miniflare (`apps/worker/test/script.test.ts`, run
+under `node --test` and not Vitest): the loader works, `this.ctx.exports` works from `alarm()`, a bare `fetch` is
+refused at the gateway, and a script that swaps `globalThis.fetch` cannot pass another origin off as the one it
+stamped. The audit of wave thirty-five (`loop/research-batch-thirty-five-audit.md`, *What held*) also found that
+`connect()` from `cloudflare:sockets` and `new WebSocket(…)` reach nothing, that a script reads only its own record
+and only its `reads:`, and that nothing a run left behind reaches the gateway after it closed.
+
+**What the audit found here, and where it stands.** From the same audit, §6: the loaded Worker kept module state
+between runs of one version, and locally the `wall_ms` race could not end a loop that never awaits (a 4-second loop
+under `wall_ms: 500` answered clean). Both are closed, by step 3 and by step 8's check on a late answer. A busy loop
+still runs until it lets go or the platform's `cpuMs` ends it, which local workerd does not enforce and no deploy
+smoke has run yet. This host sets no memory ceiling of its own; the loaded Worker has the platform's. What the
+self-host shares is closed here too, because the send loop, the key rule and the record's half are the same code:
+the key goes only to the host its vault entry opens, the scrub takes every spelling `spellingsOf` names, and the
+log is shown only to an owner who reads every list the script touched. **Not built**, on both hosts: the install
+line does not say which host each key goes to, and a key whose `opens` is not among the script's origins is refused
+at each fetch rather than at install ([12-SECURITY](12-SECURITY.md) §6.2).
 
 ---
 
@@ -737,6 +842,13 @@ run a connector, hold a model key or sign an export, with no call that could eve
 11. **The lockout** reserves before it compares, is sticky at ten, fails closed on a missing row, and does not apply to
     agent tokens (12 §8).
 12. **Email and webhook handlers parse nothing**; an unverified payload is stored `untriaged` and never matched (07 §2, 12 §3).
+13. **A script's only way out is the record's object** (§5.19). The loaded Worker's `globalOutbound` and its one
+    binding are loopback entrypoints into the object that started it; a request with no run header is refused
+    wherever it points, and a stamped one meets the same checks as on the self-host before `sendAction` sends it.
+    The sandbox never holds a key, only a label; the object opens the grant for one request, and only to the host
+    its vault entry opens. What the script reads has every secret field taken off. Rule 2 still holds for `Record`'s
+    ports: the fetch is made by the object's host code, in the alarm as a scheduled action's is, or for a trial in
+    the request that asked for it, and never by the record package.
 
 ---
 
@@ -768,6 +880,16 @@ used (31 §3). Files `apps/worker/test/*.test.ts`. Input → expected:
 | 19 | snapshot | `export.r2` row on a 2,000-row record | one dated key and `latest.brainl.age` in R2 with `customMetadata.rows === 2000`; decrypting with the test identity yields a `.brainl` whose manifest verifies |
 | 20 | snapshot ceiling | a dump over 40 MiB | `ackOutbox(…, 'failed', 'snapshot over 40 MiB…')` |
 | 21 | DO size | `wc -l src/do/*.ts` | `record.ts`, `spark.ts` ≤ 100; `directory.ts` ≤ 60 |
+
+*As built, the Worker's tests run under `node --test`, and the ones that need workerd start it through wrangler's
+miniflare from inside the test; `apps/worker/test/script.test.ts` is one, with nineteen cases on §5.19 (a bare fetch,
+the key scrubbed before the script reads the answer, a second run getting a Worker of its own, a caught refusal
+still refusing the run, user info in the URL, a swapped global `fetch`, an undeclared key, the fetch count, the
+method as asked, a write outside `writes:`, an update with and without a version, a throw, no default export,
+`wall_ms`, reads, a key sent away and then a late answer, a malformed declaration naming the `spark` key, and a
+trial's fetch for a caller given no keys), and `apps/worker/test/script-isolation.test.ts` another, with five
+(each run starting fresh, a late answer refused, and through the gateway the key held to its host, the `spark` key
+refused and the key scrubbed in each spelling).*
 
 CI rows this app owns in 33 §8: `conformance-count`, `boot-probe` (the FTS5 refusal message), `compat-date`,
 `deploy-parity`, `router-groups`. `gates.yml` runs the scripts; `ci.yml` runs the Vitest files; `deploy.yml` ends
@@ -801,6 +923,9 @@ with `deploy-parity`.
 - `ponytail:` `Spark.destroy()` does not exist until Spark stores conversation state (46).
 - `ponytail:` telemetry is one point per request and one per queue dispatch; sampling arrives with the first bill
   that shows it.
+- `ponytail:` one loaded Worker per script run (§5.19), so every run is a unique Dynamic Worker on the bill. A cache
+  per version would be cheaper and would let module state carry between runs, which the self-host never does.
+- `ponytail:` a script's `cpu_ms` is reported as 0; meter CPU when the platform exposes what a loaded Worker spent.
 
 ---
 
@@ -811,6 +936,7 @@ with `deploy-parity`.
 | runtime | `@pushforge/builder` | 2.0.5 | VAPID for Web Push; zero dependencies (ADR-046, 09 §3) |
 | runtime | `age-encryption` | 0.3.1 (+ five `@noble`/`@scure` transitive) | `.brainl.age` (ADR-046, 03 §5) |
 | workspace | `@braindog/ports` `where` `theme` `render` `declare` `mcp` `record` `spark` `connect` | `workspace:*` | 31 §2 row 14 |
+| workspace | `@braindog/script`, its root only (`PRELUDE`, `checkDecl`, `LOG_BYTES`, the types), never `./quickjs` | `workspace:*` | §5.19: the prelude the loaded Worker evaluates, and the ceilings it is held to |
 | dev | `wrangler` | 4.128.0 | 31 §3 |
 | dev | `vitest` | 4.1.11 | 31 §3 |
 | dev | `@cloudflare/vitest-plugin` | 1.1.2 | peers `vitest ^4.1.0` exactly — the repo's hardest pin (31 §3) |

@@ -98,6 +98,17 @@ and permits request interleaving (a correctness bug), **and** an object that can
 cannot exfiltrate (a security property). When a correctness rule and a security rule want the same
 constraint, take it.
 
+*(Added September 22nd 2026 for scripts, DIRECTION §22.)* **A person's or an agent's script does not change this,
+because the record never runs one.** A `script` declaration that is due writes one `script.run` outbox row, and a
+host leases it and runs the source in a sandbox: QuickJS on a self-host, a Dynamic Worker the record's object loads
+on the Cloud ([49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §5.23, [51-SPEC-WORKER](51-SPEC-WORKER.md) §5.19). The record
+gets back a list of writes and applies them as any caller's. A trial of a draft (`script_try`) is the same sandbox
+started by the host for one call, and the record hands it no write path at all. On the Cloud the sandbox's `fetch` does arrive at the
+record's own object, which sends it from its host code through the same loop a scheduled action uses; the record
+package's ports still have no `fetch`. What a script may do instead is carry what it reads to an origin it
+declares, which is why the install diff says so in its own sentence ([25-CONNECTORS](25-CONNECTORS.md) §12); what
+holds a running script in is §8, *A person's script*.
+
 ---
 
 ## 5 · Prompt injection and the lethal trifecta
@@ -116,6 +127,7 @@ communication.** BrainDog has the first two structurally. The full design is in
 | A redaction pass over every projection before it enters a prompt | **ours.** `secret` fields become their label; ciphertext never leaves the record |
 | AI Gateway DLP as a tripwire on prompts and responses | defence in depth. **Flag and block only — it cannot redact**, so it catches a mistake rather than preventing one |
 | Every proposal records what it read | audit |
+| A model key kept in the vault opens only for the owner on a proof under fifteen minutes old, and each opening names who asked | procedural, the vault's own gate, in the host ([46-SPEC-SPARK](46-SPEC-SPARK.md) §5.9, §6.2 below) |
 
 **No injection classifier is a control here.** ~95% accuracy at ~65 ms is a fine signal and a
 useless gate on a record holding credentials. It goes in the audit log as a flag.
@@ -373,6 +385,81 @@ alternative — end-to-end encryption — would mean no agent could ever read a 
 passkey loses the vault. The predecessor's owner chose the other trade knowingly, and the honesty table
 in §7 says so.
 
+### 6.2 · Where a key may go, and who may open it
+
+*Added September 22nd 2026, for Spark's three tiers and for scripts, and revised the same day for wave thirty-seven,
+checked against `packages/host/src/actions.ts`, `packages/host/src/script.ts`, `packages/host/src/script-try.ts`,
+`packages/host/src/spark.ts`, `packages/kernel/src/script.ts` and both apps' `keyOpener` at `d23ac77d`.*
+
+A key the vault holds leaves the host in one form only: an `authorization: Bearer` header on one request the host
+makes, opened for that request after every check on it has passed, and dropped when the answer is back. Four paths
+open one:
+
+| Path | Opened by, and the `grant.read` signed as | Sent to | Checked first |
+|---|---|---|---|
+| a scheduled `call`, `poll` or `pull` ([25-CONNECTORS](25-CONNECTORS.md) §9) | the host's `keyOpener`, as `system`: nobody asked | the origin its declaration names | `sendAction`: `https:`, an origin an active declaration names, a host written as a literal private or local address refused, and on the self-host `pin` resolving the name and refusing a private address before the socket opens |
+| a script's `ctx.fetch` | the same opener, as `system` | an origin in the script's `egress:`, and only the host the key's vault entry says it opens | in the sandbox, the origin, `https:`, no user name or password in the URL, the fetch count and a declared label; then `keyRefused`, the URL's host against the grant's `opens`; then `sendAction`'s checks again, over the script's own origins |
+| a trial of a draft script (`script_try`, [25-CONNECTORS](25-CONNECTORS.md) §12) | the same opener, as `system`, and only when the caller is the owner signed in as a person | as a script's | as a script's. For any other caller, a token included, the record hands the host no vault, and a fetch naming a key is refused unsent |
+| Spark ([46-SPEC-SPARK](46-SPEC-SPARK.md) §5.9) | the app's `keyOpener`, as the person who asked | `SPARK_ENDPOINT` | the vault's gate on the asker's own session: an owner, never a token, a proof under fifteen minutes old; for tier `b`, a live `api_token` grant that is not the one labelled `spark` |
+
+1. **Neither the sandbox nor the model ever holds a key.** A script names a label and the host resolves it, by
+   label or id, never a revoked grant, the newest first; Spark's package is handed an adapter whose key is asked
+   for on the call.
+2. **Every opening is rule 1's `grant.read`, and it names who caused it.** Before September 22nd every Spark opening
+   was signed `system`, because both hosts' opener defaulted to it, so an owner reading the log could not tell her
+   own asks from anybody else's. Spark's openings now carry the asker; `system` is what a run with nobody at the
+   keyboard gets. A trial of a draft script is the one exception left: the owner asked for it, and its opening is
+   still signed `system`, because both hosts hand it the scheduled runs' opener, which takes no actor.
+3. **A key other people's asks would open goes through the vault's own gate.** Where Spark's included model is
+   keyed from the vault (no operator key, and a live grant labelled `spark`, which on the Cloud is the only way it
+   is keyed), a colleague is refused before any model is called, on a read as well as a propose. Measured before the
+   gate: a colleague at `read` with a proof fifty minutes old read and proposed with 200, on three model calls on the
+   owner's key.
+4. **A script's key goes only to the host its vault entry opens** (`keyRefused`, the same function on both hosts).
+   The grant's `opens` is read as a host name when it parses as one (`api.gold.test`, `api.gold.test:8443` and
+   `https://api.gold.test/v1` all name `api.gold.test`) and compared with the fetched URL's host exactly, with no
+   subdomain let in: `opens: stripe.com` does not open `api.stripe.com`. An `opens` that names no host, such as "the
+   Bake test account", sends the key nowhere. A fetch that breaks this is `FORBIDDEN` and refuses the whole run,
+   however the script handles it, as an undeclared key does. Measured before it, by the audit of wave thirty-five
+   on the self-host runner: `goldapi`, whose row opens `api.gold.test`, was sent as a bearer to `collector.test`,
+   because that origin was also in the script's `egress:` (`loop/research-batch-thirty-five-audit.md` §2;
+   `apps/selfhost/test/script-key-egress.test.ts`).
+5. **No script may name the vault's `spark` key**, whatever it opens, because on a host with no `SPARK_KEY` it is
+   the key the included model answers everybody with, the same reason Spark refuses it as a tier `b` key. The kernel
+   refuses it at install and before a trial (`scriptBody`, `FORBIDDEN` at `keys[i]`), and both hosts refuse a run
+   that declares it before the sandbox starts (`sparkDeclared`) or fetches with it under its grant id (`keyRefused`
+   matches the label the lookup found).
+6. **The answer is scrubbed of the key** before the sandbox or the record sees it, in the body and in every refusal
+   sentence, and no response header is passed on, because a header is where a provider could echo the key and only
+   the body is scrubbed. The scrub takes out every spelling `spellingsOf` names: the bytes as sent; JSON-escaped, as
+   `JSON.stringify` writes it and with every `/` escaped as PHP's `json_encode` does by default; URL-encoded with
+   upper-case and with lower-case hex; and base64, standard and URL-safe, at each of the three offsets the key can
+   start at inside a longer encoded run, so `btoa('Bearer ' + key)` is caught as well as `btoa(key)`. Before it only
+   the exact bytes were scrubbed, and a provider that echoed the header in any of the other spellings handed the key
+   to the script, and from there to a row or the run's log (the same audit's §4).
+7. **Redirects stay on the approved origin**, three at most, each hop checked again.
+
+**What is not built.**
+
+- **The install line does not say which host each key goes to.** A script names its origins and its keys as two
+  lists, and `scriptEgress` (`packages/kernel/src/actions.ts`) joins them into one line (`CALLS OUT api.gold.test
+  and collector.test · every 1h · key "goldapi"`). It cannot pair them, because the kernel's egress line does not
+  see the vault. The pairing is enforced at the fetch (rule 4), so a key cannot reach the wrong host, but the owner
+  approving the line is not told where it will go.
+- **A key whose `opens` is not one of the script's `egress:` hosts is not refused at install.** Such a script
+  installs, and every fetch with that key is then refused at run time, three refused runs pausing it. Nothing at
+  install or in Decide compares the two, for the same reason: the check that sees the declaration does not see the
+  vault.
+- **A scheduled `call`, `poll` or `pull` does not read `opens` either.** Its declaration has one host and one grant,
+  and its install line names both together, so the owner sees the pairing; but a key sent by an action is not
+  compared with what its vault entry says it opens.
+- **The scrub catches the spellings above and no others.** A key re-encoded another way (hex, `\u` escapes of
+  ordinary characters, a hash of it) is not caught, and neither is a derived spelling shorter than eight characters,
+  which only a key of five bytes or fewer has; the bytes as sent are always scrubbed, however short.
+- **Spark's tier `b` key is sent to `SPARK_ENDPOINT`**, the endpoint the host's operator configured, whatever
+  provider issued the key, and its `opens` is not read on that path. Choosing a host is trusting its operator with
+  that address, and nothing in the tree checks it.
+
 ---
 
 ## 7 · What we can see, said plainly
@@ -445,6 +532,61 @@ removes our access going forward, and removes it from the backups thirty days la
 | Migrations | forward-only, checksummed, `--dry-run` first, `transferred_classes` never `deleted_classes`. A deploy carrying a kernel migration is never rolled back and never percentage-rolled; the canary is the ops record and recovery is fix-forward ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.3) |
 | Backups | nightly `.brainl.age` to R2 under the record's own prefix, 30 days, ≤ 40 MiB per record, plus platform PITR at any point in 30 days. The age identity lives outside Cloudflare — two copies in the operator's password manager; the Worker holds only `AGE_RECIPIENT`. Drilled: restore monthly, KEK rotation quarterly for real, erasure quarterly on the ops record, self-host upgrade every release, parity every deploy ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.4, §9) |
 
+
+### A person's script: the sandbox and its ceilings
+
+*Added September 22nd 2026 for DIRECTION §22, and revised the same day for wave thirty-seven, checked against
+`packages/script`, `packages/kernel/src/script-run.ts`, `packages/record/src/index.ts` and both hosts at
+`d23ac77d`.* A script is somebody's code, so the argument is not that it is harmless but that
+everything it can reach is enumerated and each limit is held outside it.
+
+| Ceiling | Default | Most a declaration may ask | Held by |
+|---|---|---|---|
+| `cpu_ms` | 200 | 1,000 | self-host: time inside the interpreter and inside every host function it calls, asked of the clock at each entry and exit, because QuickJS's interrupt handler never runs during a host call or a native one. Measured before that: two hundred large writes answered clean at 6,777 ms against 200. Cloud: the platform's `cpuMs` on the loaded Worker |
+| `fetches` | 5 | 20 | the sandbox's count on the self-host, the record's object on the Cloud; the platform's subrequest limit is not relied on |
+| `wall_ms` | 15,000 | 30,000 | a deadline raced against the run, and on the self-host the interrupt handler as well. On the Cloud an answer that arrives after the deadline is refused `OUT_OF_BOUNDS` whoever won the race, because the race cannot end code that never awaits: locally a four-second busy loop under `wall_ms: 500` answered clean before this check. In production the platform's `cpuMs` ends such a loop sooner |
+| `writes` | 200 | 1,000 | the sandbox as each is queued, the Cloud's object again when the answer comes back, and the record a third time before any is applied: never more than 1,000 in one run, whatever a declaration says, because the kernel installs any whole number there |
+| source | 64 KB | the same | refused before the run starts |
+| memory | 32 MB | the same | self-host: the `maximum` of a `WebAssembly.Memory` made for the run, since QuickJS's own limit let a hundred 1 MB strings through to 104,956,678 bytes. Cloud: the platform's; this host sets none |
+| log | 8 KB | the same | cut in the sandbox and again by the record, on a character boundary |
+
+A limit over its ceiling installs, because the kernel may not import the package that holds the numbers, and is
+refused `OUT_OF_BOUNDS` when the run starts. What else is held:
+
+- **The only way out is `ctx`.** On the self-host there is no `fetch`, `require`, `process` or `import` in the
+  sandbox, and the `Function`-constructor escape reaches an empty global. On the Cloud a bare `fetch`, `connect()`
+  and `new WebSocket(…)` reach nothing; the loaded Worker's only outbound is the record's own object.
+- **Every refusal is sticky.** A script that catches a refused fetch or an over-limit write and returns normally is
+  refused anyway, with no writes.
+- **Reads never show a secret field and never filter on one.** Taking the field off the row was not enough: a
+  filter using `starts` on a `secret` field read a grant id back one character at a time, measured on
+  September 22nd and closed the same day. A script reads as `system` with its `reads:` as the ceiling.
+- **Writes are a request, not a write.** The record checks each against `writes:` itself, then applies them through
+  its ordinary write path as `script:<id>@v<n>`, in one savepoint, so one refusal takes back the rest.
+- **A refused run is a run.** It is metered and never retried; three in a row of the installed version pause the
+  script until the owner resumes it, in a browser.
+- **Each run starts clean on both hosts.** The self-host starts a new QuickJS instance per run; the Cloud loads a new
+  Worker per run with `env.LOADER.load`, so nothing a run leaves on `globalThis` or in module state reaches the next.
+  Before that the Cloud cached one Worker per script version, and the audit of wave thirty-five measured a second
+  run reading what the first had left there (`apps/worker/test/script-isolation.test.ts`).
+- **What a script logged is shown only to whoever may read what it touched.** A run's `ctx.log` is kept on its
+  event with the lists its version read and wrote, and `recentHistory` and `whatsNew` hand the log only to an owner
+  in a browser who reads every one of those lists (`logOf`, `packages/record/src/index.ts`); everybody else sees the
+  run, its outcome and its counts, and `--redacted--` for the log. A token, the owner's included, never reads it.
+  Before that a member refused `list money` read a salary from a run's log line (the audit's §1).
+- **A refused or failed run's note carries none of the script's words.** The note is on a line every whole-record
+  reader sees, so it says only that the run did not finish and that its log says why; the reason, which can quote a
+  thrown message or a list name the script made up, goes first in the guarded log (`finishScript`,
+  `packages/record/test/script-refusal-note.test.ts`).
+- **A trial writes nothing and opens a key only for the owner.** `script_try` runs a draft in the same sandbox, with
+  the caller's own reads instead of `system`'s, since nobody approved the draft's `reads:`, and with no vault for any
+  caller but the owner signed in as a person (§6.2). It is metered as a run on the plan's allowance.
+
+The findings of `loop/research-batch-thirty-five-audit.md` about scripts (the log, the key's host, the `spark` key,
+the scrub, module state and `wall_ms`) are closed as above and in §6.2. **What is still open** is §6.2's *What is
+not built*: the install line does not say which host each key goes to, and a key whose `opens` is not among the
+script's origins is refused only when the script runs. The Cloud's memory ceiling is the platform's, and no deploy
+smoke has yet run a busy loop against the production `cpuMs`.
 
 ### Refusals that do not leak
 

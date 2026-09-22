@@ -82,6 +82,8 @@ export type McpSurface<C> = {
   handoff?(args: Args, ctx: C): Answer;                          // build step 6
   meet?(args: Args, ctx: C): Answer;                             // build step 16
   sessionsLive?(args: Record<string, never>, ctx: C): Answer;    // build step 6
+  dryRun?(args: { rule: Record<string, unknown>; limit?: number }, ctx: C): Answer;   // a rule change's preview, §4.4
+  scriptTry?(args: { body: Record<string, unknown>; input?: unknown }, ctx: C): Answer;   // propose with "try", §4.4
 };
 
 export type Tool = { name: string; description: string; input: Record<string, unknown>; writes: boolean };
@@ -311,6 +313,21 @@ The tool layer holds no checks of its own beyond addressing:
 - **Any other name** is `ROUTE_UNKNOWN`, with the fourteen in `allowed`. The lookup is `Object.hasOwn`, because the
   name comes from the caller and every name on `Object.prototype` would otherwise be found and called.
 - **A note** is an `update` with an empty patch, so it answers to the same permission and lands in the same history.
+- **`propose` on a rule change** is filed, and then the record's `dryRun` of the rule is added to the answer as
+  `dry_run`, the same account Decide reads; a body the record refuses is refused in its words and never previewed.
+- **`propose` on a script change that says `"try"`** is tried and not filed. `"try": true`, or `"try": {"input":
+  ...}` to hand the script what a door would, sits beside `to`; the tool reads the script body out of the change and
+  calls the surface's `scriptTry`, which is the record's: the draft is checked with the kernel's `scriptBody` as an
+  install would check it, run once in the host's sandbox, and answered as `{ script_try, proposed: false }`, the
+  writes it would make, its log and any refusal. Nothing is written and nothing is filed, so nobody is asked; the
+  agent sends the change again without `try` once it works. A script change without `try` is filed and runs
+  nothing, because a trial sends real requests to origins nobody has approved and is counted as a run of the plan.
+  A trial opens a key only for the owner signed in as a person, so over MCP, where every caller is a token, a fetch
+  naming a key is refused inside the run and the script may go on without it ([25-CONNECTORS](25-CONNECTORS.md)
+  §12, [12-SECURITY](12-SECURITY.md) §6.2). `try` spelt any other way, or on anything but a script change, is
+  `VALUE_MALFORMED` at `body.try`; a surface without `scriptTry` is `NOT_IN_THIS_BUILD`. It is not a tool of its
+  own because the smallest tool that could say it measured 102 tokens against the 3 left under §7's ceiling; what it
+  is and how to ask for it is said once, in the `braindog:grammar/script` resource (`to_try`).
 
 ### 4.5 · The descriptions
 
@@ -487,7 +504,8 @@ what `budget.test.ts` counts (§5.9).
    VAULT, JOBS and ADMIN method name, and every name on `Object.prototype` (§6.2).
 3. The tool addresses the call and does nothing more (§4.4). It parses `spoken` into `{ register, seq }`, or refuses
    `VALUE_MALFORMED` at `spoken`; `log` refuses an empty note `REQUIRED_MISSING` at `note`; a tool whose method the
-   surface does not offer refuses `NOT_IN_THIS_BUILD` with what to do instead.
+   surface does not offer refuses `NOT_IN_THIS_BUILD` with what to do instead; a `propose` of a script change that
+   carries `try` goes to `scriptTry` and never to `propose` (§4.4).
 4. The surface method runs with `ctx` as the transport handed it. `record_index` calls `boot`, then `version`, and
    answers the registers with `version` as a number, or `null` when it did not answer. The arguments are not checked
    against the published schema: the record refuses a wrong field by name, with `allowed` (§13 D7).
@@ -647,8 +665,11 @@ the call.
 > which is merged onto whatever is live when it lands, so two additions never race (`packages/kernel/src/govern.ts`,
 > `addTo`). A new list is not an addition: `addTo` refuses one with `REGISTER_UNKNOWN`, and it is proposed whole. The owner's answer of September 22nd: an additive, optional one lands at once and is logged in history
 > ("Claude added domain to Projects"); removing, retyping or narrowing a field still waits for the owner's Accept in
-> Decide. Measured at `da9326d6`, the landing without a press is not built yet, and an `add` still waits for Accept
-> like any change.
+> Decide. Built since: an `add` filed by a token whose person is the record's owner, at `owner` on the list too, is
+> answered by rule (`rule:additive`) and lands in the same call (`byRule`, `packages/record/src/index.ts`;
+> `additiveFault`, `packages/kernel/src/govern.ts`). It waits for Accept instead when the key is a member's, when a
+> field is required, unique, indexed, searched or scoped, when a field is a `ref` into a list the key cannot read,
+> or when the change sends anything out.
 
 | Code | Group | Methods (`tools/call` by name) | The `fix` an agent reads |
 |---|---|---|---|
@@ -684,20 +705,25 @@ All token figures are `tokenBudget` (§5.8) of the exact text `handle` returns, 
 
 | Item | Ceiling | Measured | How |
 |---|---|---|---|
-| `tools/list` result: `tools[]`, `instructions`, `ttlMs`, `cacheScope` | **≤ 2,600** | **2,311** | `budget.test.ts` |
+| `tools/list` result: `tools[]`, `instructions`, `ttlMs`, `cacheScope` | **≤ 2,600** | **2,597** | `budget.test.ts` |
 | The fourteen tool objects alone | reported | 1,945 | the same count, less the instructions |
 | One tool description | < 200 | 17 (`history`) to 72 (`context`) | `budget.test.ts`, each of the fourteen |
 | One tool object: name, description, `inputSchema`, `annotations` | reported | 75 (`record_index`) to 210 (`propose`) | |
-| `INSTRUCTIONS` | ≤ 400 | 352 | `budget.test.ts` |
+| `INSTRUCTIONS` | ≤ 400 | 392 | `budget.test.ts` |
 | `record_index` response | ≤ 500 | the record's; 10 §4's example is 106 | relayed unchanged here |
 | A `list` page, default 25 rows | ≤ 2,000 | the record's | relayed unchanged here |
 | `resources/list` | none | not in any turn; fetched when wanted | |
+
+*Re-measured at `d23ac77d` for the first row and `INSTRUCTIONS` only: `budget.test.ts` reports `tools/list` at 2,597
+tokens and the instructions at 392, on a list that now has sixteen tools (`activity` and `money` joined the fourteen
+of §4.4). The other rows are the fourteen-tool count and were not re-measured. `script_try` added nothing to the list
+(§4.4).*
 
 **2,600, where an earlier revision set 1,800.** That ceiling was set for eight tools. The agent path needs fourteen,
 because `context`, `handoff` and `meet` are what an agent does every session (`loop/research-agent-path.md` §1.5),
 and those three cost 500 tokens with their schemas. The instructions grew from 268 to 352 for the same reason: they
 now say to call `context` first, to hand off, to record learnings sparingly and to call `meet`, so their own ceiling
-moved from 300 to 400. The headroom is 289 tokens. One more clause in a description is a clause out of another, and
+moved from 300 to 400. The headroom was 289 tokens then and is 3 now. One more clause in a description is a clause out of another, and
 the test is the arbiter. The instructions are counted inside the figure, because every token of them sits in the
 context every turn.
 
@@ -738,6 +764,7 @@ and each case is named for what it holds.
 | `packages/mcp/test/rpc.test.ts` | `handle` over `stub.ts`. `initialize` negotiates, and an older client gets the newest version at or below its own. `server/discover` answers without reading the record, with `cacheScope: 'public'`. `ping`, and `prompts/list` as an empty list. `tools/list` is the fourteen, with the instructions and the read-only ones marked, and reads nothing. Each tool reaches its method with the transport's context. A value is compact JSON, a refusal is carried whole, and a conflict carries the current row and who changed it. An unknown tool, or a name off `Object.prototype`, runs nothing. A throw is `-32603` and a reference, with no exception text. A notification returns `null`, and the id is echoed exactly. A batch or a malformed message is `-32600`, an unknown method `-32601`, and parameters of the wrong shape `-32602`. Resources are listed, templated and read with their `ttlMs`, and an address that is not there, or is refused, is `-32002` |
 | `packages/mcp/test/mcp.test.ts` | the tools and resources over a real record. The count is fourteen, and there is no vault tool. Each tool says whether it writes. A row is addressed as a person says it, by `register#number` or by a prefixed id, and `S1` is the run. A refusal names what to send instead, and a stale write comes back as a conflict. `context` and `handoff` answer through the record, and so does `meet`, refused `REGISTER_UNKNOWN` with People switched off and then adding and matching a person; a host without `meet` is `NOT_IN_THIS_BUILD`. The five tools that left answer as any unknown name does. A `read` token reads through every tool and writes through none. Every resource listed reads, and what a surface cannot answer is not listed. A page is withheld for the level held, no metric is advertised that the record says does not exist, and a skill is read by its name |
 | `packages/mcp/test/http.test.ts` | `serveMcp` in §5.1's order: 405 with `Allow: POST`; 403 for any `Origin`; 415; 401 before a byte of the body; 413 on the claim and on the bytes; 400 with `-32700` for bytes that are not JSON or not UTF-8, and `-32600` for a batch; 202 for a notification; no session minted, and one a client sends ignored; 404 for a method this server does not have; the mirrored headers held to the body, required of a 2026-07-28 request and not of an older one; `-32022` for an unsupported version, `initialize` exempt; 500 for a throw; `no-store` on every answer, and no CORS or session header |
+| `packages/mcp/test/script-try.test.ts` | a trial writes nothing and is counted as one run; a held one starts nothing; a caller given no keys has none opened and one given keys has them opened by label and scrubbed; `pin` before any socket; the reads are the caller's; `scriptTry` routed as READ+ and a POST; a sandbox that throws is the host's; a script change without `try` is filed and never run, and with it is tried and filed nowhere; `try` refused on anything else; end to end on a real record, no row written and nothing waiting in Decide |
 | `packages/mcp/test/budget.test.ts` | §5.8's estimator on its worked examples, the ceilings of §7, and plain ASCII in everything a client shows a model (§5.9) |
 | `apps/cli/test/stdio.test.ts` | `braindog mcp` spawned against a stub `/api`. `initialize` and `tools/list` answer without touching the host. A list call carries the bearer and the session headers. The token comes from the hosts file when the environment has none. A line that is not JSON is a parse error, and the server keeps serving. A host that does not answer, or has nothing listening, gets the unreachable sentence. Calls in flight are answered when stdin ends. A startup failure is one line on stderr. The token is never printed |
 | `apps/cli/test/http.test.ts` | the hosts file, its path and its whole-file write; where the host and the token come from; the budget from `BRAINDOG_TIMEOUT_MS`; the bearer and the session headers on a request; no redirect followed; a header outside its grammar dropped |

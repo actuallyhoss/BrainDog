@@ -25,6 +25,10 @@ that exists as a table row.
 So this is not a new kind. **`ingest` gains a `fetch:` block when `channel: pull`, and the eight
 pack kinds stay eight.**
 
+*(Revised September 22nd 2026. A connector is still not a new kind. The kinds became nine for another reason:
+`script`, a person's or an agent's code, joined them in kernel migration 12 under DIRECTION §22. §12 says how a
+script stands beside a connector, and why neither replaces the other.)*
+
 ### But the price is real, and it is not the schema
 
 > **[04-PACKS](04-PACKS.md) §7's best row — *"a pack CANNOT make an outbound call of any kind"* —
@@ -518,6 +522,12 @@ A second tier — a Worker-side model with one `http_get` tool restricted to the
 possible, Cloud-only, `confidence: proposed` never `exact`. **Do not build it until a real connector
 has failed tier 1 twice.**
 
+*(Revised September 22nd 2026. There is now a third way past the ceiling, and it is not the model tier above: a
+person's or an agent's own script, which fetches, reshapes and writes rows through the record's own write path, run
+in a sandbox BrainDog hosts or anywhere outside that pushes in through a door or the API (§12). It does create
+capability, which is why it is its own kind with its own egress line and its own ceilings rather than a
+connector.)*
+
 ---
 
 ## 7 · OAuth, credentials and security
@@ -726,6 +736,71 @@ the recommendation.)*
 | 2 | **[15-ROADMAP](15-ROADMAP.md) §6** | its admission test — *"everything here is additive: it fits the eight kinds, the one grammar and the pack format **without changing them**"* — **rejects this feature as written.** Connectors change the security enumeration. Amend the test or place connectors outside Phase C explicitly |
 | 3 | [02-DATA-MODEL](02-DATA-MODEL.md) §1 | `metric_point` is a kernel table — done; the kernel is twenty-seven |
 | 4 | [17-OPEN-QUESTIONS](17-OPEN-QUESTIONS.md) Q13 | **Answered (b), [ADR-052](16-DECISIONS.md):** connector grants live under a second, KEK-wrapped DEK — the `connector` row of `vault_key` — so the Worker can decrypt a grant unattended with the passphrase on; [12-SECURITY](12-SECURITY.md) §7 carries the row and the bind screen says it in words. *This document asked the question; it is no longer open* |
+| 5 | [04-PACKS](04-PACKS.md) §1 and §7 | *Added September 22nd 2026.* A `script` is the ninth kind, and it calls out as an action does: its egress is a line in the install diff the owner approves (§12). 04 §1 already says so; the enumeration of §7 gains the script's line beside `source:` |
+
+---
+
+## 12 · Scripts beside connectors (DIRECTION §22)
+
+*Added September 22nd 2026, and revised the same day for wave thirty-seven, checked against
+`packages/kernel/src/script.ts`, `script-run.ts`, `actions.ts` (`scriptEgress`), `packages/script`,
+`packages/host/src/script.ts`, `packages/host/src/script-try.ts`, `packages/mcp/src/index.ts` and both hosts at
+`d23ac77d`.*
+
+The owner's rule of that day ([DIRECTION §22](../loop/DIRECTION.md)): BrainDog is the shell. The code ships
+primitives, doors in and out, schedules, scripts, registers, pages, automations and the vault, and never a use case.
+A gold rate or a bank's SMS is something a person or an agent builds on those. For this document that settles three
+things.
+
+**Never a script in the core.** No script ships in `packages/`: `packages/seed` declares none, and the two scripts
+the MCP grammar shows (`gold-rate`, `bank-sms`, in `packages/mcp/grammars/script.ts`) are text served at
+`braindog:grammar/script` for an agent writing one, installed only by that package's own test.
+
+**A person's or an agent's script is record content.** It is a declaration of kind `script`, versioned,
+attributable and retirable like the other eight, held in one record or in a pack somebody chooses to install. An
+agent files it through `propose` as a `change`, and the owner accepts it in Decide, where its egress is printed and
+approved like an action's. Every row it writes says `script:<id>@v<n>` wrote it. It runs hosted, in a sandbox
+BrainDog meters per account (QuickJS on a self-host, [49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §5.23; a Dynamic Worker
+on the Cloud, [51-SPEC-WORKER](51-SPEC-WORKER.md) §5.19), or anywhere outside, a Claude routine, a server, a cron,
+pushing in through a door or the API with a token like any other client. Hosted is never required.
+
+**A connector is still the first answer, and a script is the second.** Where the declaration of §3 can say it, it
+should, because substitution cannot do anything it was not written to do. Where it cannot, a script can, at the cost
+of being code:
+
+| | A connector (`ingest`, `channel: pull`) | A script (`script`) |
+|---|---|---|
+| Is | a declaration: substitution, never evaluation (§3.1) | JavaScript whose default export is `run(ctx)`, 64 KB at most |
+| Runs | on the host, the record never making the call | on the host in a sandbox, the record never running it: a fire writes one `script.run` outbox row and a host leases it |
+| Calls out to | one literal `base:` origin | the literal `https://` origins in `egress:`, each written out in full; a path, a port the parser would drop or a placeholder is `ACTION_HOST_COMPUTED`, anything not `https://` is `ACTION_NOT_HTTPS` |
+| Sends | one grant, by label | the vault labels in `keys:`, each only to the host its vault entry says it opens, checked at every fetch (`keyRefused`; a fetch elsewhere is `FORBIDDEN` and refuses the run). A key with no `egress:` to go to is refused at install, and so is the vault's `spark` key (`FORBIDDEN` at `keys[i]`) |
+| Reads the record | no | the registers in `reads:`, with every secret field taken off and a filter on one refused |
+| Writes | the rows its mapping makes, into one register or series | creates and updates into the registers in `writes:`, applied together after the run, all or none |
+| Starts | on its schedule | on `runs.every`, no more often than every fifteen minutes (`ACTION_INTERVAL_TOO_SHORT`), first due at a jitter and not at once. `runs.door` and `runs.rule` are declared and **not wired**: nothing but the schedule queues a run |
+| The install diff says | `CALLS OUT <host> · every … · grant "…"` (§7 rule 9) | `CALLS OUT <hosts> · every … · key "…"`, and when it both reads and fetches, a second sentence: *"<id> reads <lists> and may send what it reads to <hosts>."* Reading and fetching together is the one way a script can carry the record out, and that sentence is the owner's one chance to see it |
+| Ends short | the seven `PULL_*` codes (§9) | `PULL_ORIGIN_REFUSED`, `OUT_OF_BOUNDS`, `FORBIDDEN`, `DECLARATION_INVALID`, or the script's own throw with no code. The run's note says only that it did not finish; the reason goes in its log, which only an owner who reads every list the script touched is shown. Three refused runs in a row of the installed version pause it until the owner resumes it |
+| Tried before it is proposed | not by `script_try`, which takes a script only | yes, on request: `script_try` runs the draft now in the same sandbox, answers the writes it would make, its log and any refusal, and writes and files nothing |
+
+A changed script needs the owner's press again whenever its whole egress line or its read sentence changes
+(`egressChanged`): a second origin, another key, a new trigger or an added read is a promise the owner has not seen.
+
+**Trying a draft.** An agent asks for a trial on `propose` itself, with no tool of its own: a script change whose
+body carries `"try": true`, or `"try": {"input": ...}` to hand it what a door would, beside `to`, is checked by the
+kernel's `scriptBody` as an install would check it, run once in the host's sandbox, and answered as `script_try`
+with `proposed: false`. Nothing is filed, so nobody is asked, and the agent sends the change again without `try`
+once it works. A script change without `try` is filed and runs nothing. A trial's fetches are real and go through
+the same send loop and key rule as a scheduled run's; it reads with the caller's own reads, not `system`'s; it opens
+a key only when the caller is the owner signed in as a person, so over MCP, where every caller is a token, a fetch
+naming a key is refused unsent and the script may catch that and go on; and it is counted on the plan's allowance
+as a run. It runs on a self-host whose actions are on and on the Cloud where `LOADER` is bound; elsewhere it is
+`NOT_IN_THIS_BUILD`, or on a Cloud with no `LOADER` a refusal that says there is no sandbox.
+
+**What is not built, said here because this document is where a reader looks for egress.** A door or a rule cannot
+start a script: `runs.door` and `runs.rule` install, and only the schedule queues a run. The egress line joins every
+origin and every key into one line, so it does not say which host a key goes to, because `scriptEgress` does not
+see the vault; the key is held to its host at the fetch, not in the sentence the owner approves. And a key whose
+`opens` is not one of the script's `egress:` hosts is not refused at install, only at each fetch, where three
+refused runs pause the script ([12-SECURITY](12-SECURITY.md) §6.2).
 
 ---
 
