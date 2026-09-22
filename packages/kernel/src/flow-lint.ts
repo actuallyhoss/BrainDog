@@ -333,7 +333,7 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
         return bad('NOT_IN_THIS_BUILD', `${id} runs inside the write, and the inline pass does not read ${key}: yet. Give it a trigger other than a plain write, or drop ${key}:.`, key);
     if (body.enabled === false)
       return bad('NOT_IN_THIS_BUILD', `${id} runs inside the write, and the inline pass does not read enabled: yet. Retire the rule to stop it.`, 'enabled');
-    return null;
+    return fillFault(id, decl);
   }
 
   /* A RUN KEEPS ITS REGISTER IN ITS TRIGGER. A top-level `register` is what the inline pass selects by, so a clock rule
@@ -473,7 +473,61 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
     }
     return null;
   };
-  return choice(body.steps ?? body.then, body.steps !== undefined ? 'steps' : 'then');
+  return choice(body.steps ?? body.then, body.steps !== undefined ? 'steps' : 'then') ?? fillFault(id, decl);
+}
+
+/**
+ * Every value an action hands to `rules.ts`'s `fill`, by where it sits, so that one that is not text is refused here.
+ *
+ * `fill`'s FIRST LINE IS `template.replace`, AND NOTHING BEFORE IT ASKS WHAT THE TEMPLATE IS. So a create field holding
+ * `[late]` installed, and every write to its list then threw `TypeError: template.replace is not a function` out of the
+ * write (`loop/research-batch-thirty-eight-audit.md`, found outside the wave). The brief allowed numbers and booleans,
+ * and probing each value once found they throw the same way: `n: 5`, `b: true` and `null` in a create, `set.to: 5`,
+ * `note: 5` and the rest below. Text is the one form that works, and `n: '5'` made a row holding the number 5, so the
+ * sentence for a number or a boolean hands back its quoted form.
+ *
+ * BOTH PATHS. A step is filled first by the run, which leaves anything but text as it is, and is then acted through the
+ * same pass, so on the run path the same value fails the run at that step instead of failing the write.
+ *
+ * EVERY KEY THE ACTION CARRIES, NOT THE FIRST ONE. Nothing refuses a step with two verbs in it, and the pass takes
+ * whichever comes first in its own `if` chain, `set` before `create`. This walk used to stop at its first match with
+ * `create` ahead of `set`, so `{ set: { field: n, to: 5 }, create: { ... } }` was read as a create, installed, and
+ * threw out of every write. Holding each key to text whichever one the pass acts on cannot disagree with its order.
+ */
+function fillSites(action: Record<string, unknown>, at: string): { where: string; value: unknown; field?: string; into?: string }[] {
+  const of = (x: unknown, key: string): unknown => (isObject(x) ? x[key] : undefined);
+  const out: { where: string; value: unknown; field?: string; into?: string }[] = [];
+  if ('create' in action) {
+    const spec = action.create;
+    const fields = of(spec, 'fields');
+    /* `createFault` in `declare.ts` answers a create that is not an object; one with no `fields:` would throw at
+       `Object.entries` before `fill`, and is left to that check's owner rather than refused here for a new reason. */
+    const into = String(of(spec, 'register'));
+    if (isObject(fields)) for (const [field, value] of Object.entries(fields)) out.push({ where: `${at}.create.fields.${field}`, value, field, into });
+  }
+  if ('set' in action) out.push({ where: `${at}.set.to`, value: of(action.set, 'to') });
+  if ('note' in action) out.push({ where: `${at}.note`, value: action.note });
+  if ('notify' in action) out.push({ where: `${at}.notify.say`, value: of(action.notify, 'say') });
+  if ('schedule' in action) out.push({ where: `${at}.schedule.note`, value: of(action.schedule, 'note') });
+  if ('link' in action) out.push({ where: `${at}.link.to.value`, value: of(of(action.link, 'to'), 'value') });
+  if ('suggest' in action) out.push({ where: `${at}.suggest.question`, value: of(action.suggest, 'question') });
+  return out;
+}
+
+function fillFault(id: string, decl: FlowDecl): Refusal | null {
+  for (const { action, at } of actionsOf(decl))
+    for (const { where, value, field, into } of fillSites(action, at)) {
+      if (typeof value === 'string') continue;
+      const quotable = typeof value === 'number' || typeof value === 'boolean';
+      if (field !== undefined)
+        return quotable
+          ? bad('DECLARATION_INVALID', `${id} creates a ${into} row at ${at} with ${field}: ${String(value)}, and a rule fills every value it writes from text. Write ${field}: "${String(value)}", which the field reads as its own type.`, where)
+          : bad('DECLARATION_INVALID', `${id} creates a ${into} row at ${at} with ${field}: ${JSON.stringify(value)}, and a rule fills every value it writes from text, so ${Array.isArray(value) ? 'a list' : 'it'} would fail the rule each time it fired. Leave ${field} out of the create.`, where);
+      return quotable
+        ? bad('DECLARATION_INVALID', `${id}'s ${where} is ${String(value)}, and a rule fills every value it writes from text. Write "${String(value)}".`, where)
+        : bad('DECLARATION_INVALID', `${id}'s ${where} is ${value === undefined ? 'missing' : JSON.stringify(value)}, and a rule fills every value it writes from text, so it would fail the rule each time it fired. Write it as text.`, where);
+    }
+  return null;
 }
 
 function firstVerb(list: unknown, among: readonly string[]): string | null {
