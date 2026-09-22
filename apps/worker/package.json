@@ -10,6 +10,7 @@
     "@braindog/mcp": "workspace:*",
     "@braindog/ports": "workspace:*",
     "@braindog/record": "workspace:*",
+    "@braindog/script": "workspace:*",
     "@braindog/seed": "workspace:*",
     "@braindog/spark": "workspace:*"
   },

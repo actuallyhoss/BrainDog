@@ -31,7 +31,9 @@ import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler
 import { createDirectory, switcherAsk, type AccountUsage, type Directory as Dir, type RunUsage, type SwitcherAsk, type SwitcherRow } from '@braindog/record/directory';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 
-import { ALARM_RUNS, actionExecutor, holding, holdingPaged, invocation, keyOpener, meterPass, pass, sharedReader } from './actions.ts';
+import { ALARM_RUNS, actionExecutor, holding, holdingPaged, invocation, keyOpener, meterPass, pass, sharedReader, type Admissions, type Ledger, type OpenKey } from './actions.ts';
+import { holdingScript, runScript, ScriptRuns, type ScriptCall, type ScriptExports, type ScriptReply } from './script.ts';
+import type { Json } from '@braindog/script';
 import { pagedRunner } from '@braindog/host/connector';
 
 import { alarmScheduler } from './alarm.ts';
@@ -133,6 +135,13 @@ type Env = {
    * `snapshots.ts` will not write a plaintext copy for a deployment that believes its copies are sealed.
    */
   AGE_RECIPIENT?: string;
+  /**
+   * The Worker Loader a person's script runs in (`script.ts`), `worker_loaders` in `wrangler.jsonc`. Workers Paid only.
+   *
+   * OPTIONAL, AND ABSENT IS A SCRIPT THAT SAYS SO. With no loader the pass hands a `script.run` no runner, and the kernel
+   * meters it `dropped` with the sentence that this host has no sandbox, rather than the alarm failing on a binding.
+   */
+  LOADER?: WorkerLoader;
 };
 
 /** A `Result`'s refusal, for an RPC that hands back only the part a caller acts on. */
@@ -177,6 +186,13 @@ const serveMcp = (request: Request, api: RecordApi, ctx: CallContext): Promise<R
 /** Built once a Worker isolate, not once a record: every record on it is offered the same packs and use cases. */
 const CATALOGUE = seedCatalogue();
 
+/**
+ * THE SCRIPT SANDBOX'S TWO DOORS, EXPORTED FROM THE MAIN MODULE BECAUSE THAT IS WHAT `ctx.exports` IS MADE OF. A class
+ * that is only imported here has no loopback binding, and `this.ctx.exports.ScriptOutbound` would be `undefined` at the
+ * first run (`script.ts`).
+ */
+export { ScriptOutbound, ScriptRecord } from './script.ts';
+
 /** One customer's record. The class name is `Record$` because `Record` is a TypeScript builtin. */
 export class Record$ extends DurableObject<Env> {
   #api: Promise<RecordApi> | null = null;
@@ -203,6 +219,19 @@ export class Record$ extends DurableObject<Env> {
    */
   /** Spark's door, built on the first ask and kept, because the engine it holds writes its own tables. */
   #spark: SparkAskDoor<CallContext> | undefined;
+
+  /** The scripts running from this object's alarm, and the rules each is held to (`script.ts`). */
+  #scripts = new ScriptRuns();
+
+  /**
+   * One call a running script made, from `ScriptOutbound` or `ScriptRecord`: a fetch, a list or a get.
+   *
+   * AN RPC INTO THE OBJECT THE RUN STARTED IN, which is still awaiting it in `#act`. The key store, the vault and the
+   * record live here and nowhere the sandbox can reach, and a run id this object did not open answers with a refusal.
+   */
+  async script(run: string, call: ScriptCall): Promise<ScriptReply> {
+    return this.#scripts.answer(run, call);
+  }
 
   #record(): Promise<RecordApi> {
     if (this.#gone) return Promise.reject(new Error(DELETED.fix));
@@ -328,7 +357,9 @@ export class Record$ extends DurableObject<Env> {
       /* THE DIRECTORY'S LEDGER, OVER RPC: asked before each run, and told every run the pass metered. A record on the
          hosted plan at its monthly allowance answers `held`, sends nothing, and waits for the first of next month. */
       const ledger = this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('directory'));
-      const inner = actionExecutor(() => api.kernel.actionOrigins(), { openKey: keyOpener(api, this.env.KEK) });
+      /* ONE OPENER FOR THE ALARM, handed to the scripts' sends below as well, so KEK has one reader here and not two. */
+      const openKey = keyOpener(api, this.env.KEK);
+      const inner = actionExecutor(() => api.kernel.actionOrigins(), { openKey });
       /* ONE ADMISSION COUNT FOR BOTH, so a record with one run left cannot spend it twice. */
       const admissions = pass();
       const execute = holding(inner, record, (r, action, pending) => ledger.mayRun(r, action, pending), admissions);
@@ -347,11 +378,14 @@ export class Record$ extends DurableObject<Env> {
          instead, on the reading that one invocation drains every record; that is true of the outbox
          pump and not of this path, where the alarm is per object and each object is billed its own. */
       const budget = invocation();
+      /* A SCRIPT ASKS THE SAME LEDGER ON THE SAME ADMISSION COUNT, so a record with one run left spends it once. */
+      const script = this.#scriptRunner(api, record, openKey, (r, action, pending) => ledger.mayRun(r, action, pending), admissions);
       const out = await api.kernel.runActions(execute, {
         limit: ALARM_RUNS,
         scheduler: this.#alarm,
         page: holdingPaged(page, record, (r, action, pending) => ledger.mayRun(r, action, pending), admissions),
         budget,
+        ...(script === undefined ? {} : { script }),
       });
       await meterPass((r, run) => ledger.meter(r, run), record, out.usage);
       /* ROWS LEFT BECAUSE THE BUDGET RAN OUT, NOT BECAUSE THEY ARE NOT DUE. They are `pending` again
@@ -361,6 +395,60 @@ export class Record$ extends DurableObject<Env> {
     } catch (e) {
       console.error('actions:', e instanceof Error ? e.message : String(e));
     }
+  }
+
+  /**
+   * The sandbox a `script.run` goes to, or `undefined` on a deployment with no `LOADER`, where the kernel meters the
+   * run `dropped` and says this host has no sandbox.
+   *
+   * THE SEND IS THE SAME `actionExecutor` A `call` GETS, over the script's own declared origins rather than the
+   * record's ingest origins (`actionOrigins` reads only `ingest` declarations). The key is opened by `keyOpener` in this
+   * object, for one request, as `system`: a scheduled script has no asker, which is `keyOpener`'s own default.
+   *
+   * READS ARE THE RECORD'S OWN `list` AND `get`, asked as the script's actor with its `reads` as the ceiling, so the
+   * record's `reaches` is what keeps a `get` of a spoken id inside the registers the owner approved.
+   */
+  #scriptRunner(api: RecordApi, record: string, openKey: OpenKey | null, mayRun: Ledger['mayRun'], admissions: Admissions) {
+    const loader = this.env.LOADER;
+    if (!loader) return undefined;
+    return holdingScript(
+      (s) =>
+        runScript(
+          {
+            loader,
+            exports: this.ctx.exports as unknown as ScriptExports,
+            object: this.ctx.id.toString(),
+            runs: this.#scripts,
+            send: (egress) => actionExecutor(() => egress, { openKey }),
+            grant: (label) =>
+              api.kernel
+                .grants()
+                .filter((g) => g.label === label && g.revoked_at === null)
+                .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+                .map((g) => ({ id: g.id, label: g.label }))[0] ?? null,
+            read: (scripted) => {
+              const as: CallContext = { principal: { kind: 'system', id: scripted.scripted.actor }, registers: scripted.scripted.decl.reads };
+              return {
+                list: async (register, where) => {
+                  const page = await api.list({ register, ...(where === null ? {} : { where: where as never }) }, as);
+                  if (!page.ok) throw new Error(fixOf(page));
+                  return page.value.rows as unknown as Json[];
+                },
+                get: async (spoken) => {
+                  const row = await api.get({ spoken }, as);
+                  if (!row.ok) throw new Error(fixOf(row));
+                  return row.value as unknown as Json;
+                },
+              };
+            },
+            now: () => Date.now(),
+          },
+          s,
+        ),
+      record,
+      mayRun,
+      admissions,
+    );
   }
 
   /**

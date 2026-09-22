@@ -322,7 +322,7 @@ const bundled = async (): Promise<Bundle> => {
         setup(b: { onResolve: Function; onLoad: Function }) {
           b.onResolve({ filter: /^cloudflare:workers$/ }, () => ({ path: 'cf', namespace: 'cf' }));
           b.onLoad({ filter: /.*/, namespace: 'cf' }, () => ({
-            contents: 'export class DurableObject { constructor(ctx, env) { this.ctx = ctx; this.env = env; } }',
+            contents: 'export class DurableObject { constructor(ctx, env) { this.ctx = ctx; this.env = env; } } export class WorkerEntrypoint { constructor(ctx, env) { this.ctx = ctx; this.env = env; } }',
             loader: 'js',
           }));
         },

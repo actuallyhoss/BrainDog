@@ -337,7 +337,21 @@
          `AI_GATEWAY` above is the other half. It names the gateway the calls are routed through, so
          neurons are counted and rate-limited per environment (12 §8), and `collectLog: false` in
          `inference.ts` is what keeps the payloads out of the log (11 §3). */
-      "ai": { "binding": "AI" }
+      "ai": { "binding": "AI" },
+
+      /* THE SANDBOX A PERSON'S SCRIPT RUNS IN (`src/script.ts`, `loop/research-shell-scripts.md` section 3). Dynamic
+         Workers exist on Workers Paid only, and there is no account resource to create first: like `ai`, the binding
+         resolves on any paid account.
+
+         NOT INHERITABLE, and wrangler's own schema says so: "This field is not automatically inherited from the top
+         level environment, and so must be specified in every named environment." So it is written out again in
+         `production` below.
+
+         NO `enable_ctx_exports` IN `compatibility_flags`, although the research brief asked for one. `script.ts` needs
+         `ctx.exports`, and at this file's `compatibility_date` it is already on: workerd 1.20260903.1, handed the flag,
+         answered "The compatibility flag enable_ctx_exports became the default as of 2025-11-17 so does not need to be
+         specified anymore". The array stays empty, and a flag that is already the default is not a diff worth having. */
+      "worker_loaders": [{ "binding": "LOADER" }]
 
       /* ---------------------------------------------------------------------------------------
          THE REST OF 51 §4.6, DRAFTED AND NOT ACTIVE. Each block below binds a resource the code
@@ -434,7 +448,11 @@
          deploys, comes up, and answers `ModelUnavailable` to the first ask Spark makes. The
          argument for uncommenting it is in `alpha` above; there is no account resource to create
          for it, unlike every block still commented below. */
-      "ai": { "binding": "AI" }
+      "ai": { "binding": "AI" },
+
+      /* REPEATED IN FULL, for the same reason: `worker_loaders` is not inheritable. Production without it deploys and
+         meters every script run `dropped`, saying this host has no sandbox. The argument is in `alpha` above. */
+      "worker_loaders": [{ "binding": "LOADER" }]
 
       /* The same drafted blocks as alpha, without the suffix:
          "analytics_engine_datasets": [

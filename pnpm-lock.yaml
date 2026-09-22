@@ -78,6 +78,9 @@ importers:
       '@braindog/record':
         specifier: workspace:*
         version: link:../../packages/record
+      '@braindog/script':
+        specifier: workspace:*
+        version: link:../../packages/script
       '@braindog/seed':
         specifier: workspace:*
         version: link:../../packages/seed
@@ -186,6 +189,9 @@ importers:
       '@braindog/record':
         specifier: workspace:*
         version: link:../../packages/record
+      '@braindog/script':
+        specifier: workspace:*
+        version: link:../../packages/script
       '@braindog/seed':
         specifier: workspace:*
         version: link:../../packages/seed
@@ -258,6 +264,9 @@ importers:
       '@braindog/record':
         specifier: workspace:*
         version: link:../record
+      '@braindog/script':
+        specifier: workspace:*
+        version: link:../script
 
   packages/kernel:
     dependencies:
