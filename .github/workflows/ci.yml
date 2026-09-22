@@ -70,6 +70,10 @@ jobs:
       # steps exercise least directly.
       - run: pnpm typecheck
 
+      # THE SITE'S CROP TESTS LAUNCH CHROMIUM, and a hosted image has none cached (the first run on
+      # ubuntu-latest, 22 September, failed four tests on a missing chrome-headless-shell). On studio-pc
+      # this found the browser already installed and cost a second.
+      - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test
 
       # THE GATES THAT READ SOURCE. Named as an exclusion rather than as a list of them, because a
