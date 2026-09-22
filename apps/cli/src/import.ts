@@ -57,7 +57,7 @@ export type Door = {
   create: (args: { register: string; fields: Record<string, unknown>; note?: string }) => Promise<Result<unknown>>;
   update: (args: { register: string; seq: number; patch: Record<string, unknown>; version?: number; note?: string }) => Promise<Result<unknown>>;
   governance: (args: { register?: string; status?: string; limit?: number; cursor?: string }) => Promise<Result<unknown>>;
-  propose: (args: { question: string; body_kind: 'options' | 'pack'; body: Record<string, unknown> }) => Promise<Result<unknown>>;
+  propose: (args: { question: string; body_kind: 'options' | 'pack' | 'change'; body: Record<string, unknown> }) => Promise<Result<unknown>>;
   /**
    * The packs this record holds and at which version: read only when a bank pack is to be offered (see `banksOf`).
    * OPTIONAL BECAUSE A DOOR WITHOUT IT STILL WORKS. The pack is then proposed unchecked, and a record that cannot take
@@ -88,6 +88,12 @@ export type Report = {
    * too old to take it. Absent when the run was handed no bank to offer.
    */
   banks?: { filed: number; before: number; waiting: string[] };
+  /**
+   * The words the old tool used that a closed list here did not hold (`PlannedRow.own`), each said as `crypto as a kind in
+   * Holdings`: added to its list by this run, filed on Decide and waiting, or asked about before. Absent when there were
+   * none.
+   */
+  values?: { added: string[]; filed: string[]; before: string[] };
   /** Each row that changes, with the fields that change. */
   changes: { register: string; label: string; fields: string[] }[];
   refused: { label: string; register: string; fix: string }[];
@@ -218,8 +224,14 @@ async function readAll(door: Door, register: string): Promise<Row[]> {
   throw new PartlyRead(NAMES[register] ?? register, `This list is longer than an import reads in one run (${String(out.length)} rows and more).`);
 }
 
-/** The keys of every question already asked, and every pack already offered or installed. */
-type Decide = { asked: Set<string>; installs: Set<string> };
+/**
+ * The keys of every question already asked, every pack already offered or installed, and every value already proposed
+ * to a closed list, as `valueKey` spells one.
+ */
+type Decide = { asked: Set<string>; installs: Set<string>; values: Set<string> };
+
+/** One value proposed to one closed list, as `Decide.values` holds it. */
+const valueKey = (register: string, field: string, value: string) => `${register}\n${field}\n${value}`;
 
 /** The most rows one governance read answers with: the record clamps it there (`packages/kernel/src/govern.ts`). */
 const DECIDE_PAGE = 200;
@@ -241,17 +253,25 @@ const DECIDE_PAGE = 200;
 async function readDecide(door: Door): Promise<Result<Decide>> {
   const asked = new Set<string>();
   const installs = new Set<string>();
+  const values = new Set<string>();
   let cursor: string | undefined;
   for (let pages = 0; pages < 1000; pages++) {
     const got = await door.governance({ register: 'suggestion', status: 'all', limit: DECIDE_PAGE, ...(cursor === undefined ? {} : { cursor }) });
     if (!got.ok) return got;
-    if (!Array.isArray(got.value)) return ok({ asked, installs });
+    if (!Array.isArray(got.value)) return ok({ asked, installs, values });
     for (const s of got.value)
       if (isObj(s) && isObj(s.body)) {
         if (typeof s.body.from === 'string') asked.add(s.body.from);
         if (typeof s.body.install === 'string') installs.add(s.body.install);
+        /* A VALUE PROPOSED BY ANYBODY, IN ANY STATE. An open one is waiting on him, and one he turned down is an answer:
+           proposing it again every night is asking a question he has already answered. The record stores an addition as
+           it was asked (`packages/record/test/schema-add.test.ts`, B3), so the words are here as they were filed. */
+        const add = isObj(s.body.to) && isObj(s.body.to.add) ? s.body.to.add : null;
+        if (add && typeof add.register === 'string' && isObj(add.values))
+          for (const [field, more] of Object.entries(add.values))
+            for (const value of Array.isArray(more) ? more : []) if (typeof value === 'string') values.add(valueKey(add.register, field, value));
       }
-    if (got.value.length < DECIDE_PAGE) return ok({ asked, installs });
+    if (got.value.length < DECIDE_PAGE) return ok({ asked, installs, values });
     const last = got.value.at(-1);
     /* A PAGE OF THE LIMIT AND NO ID TO PAGE ON is a read that cannot be finished, and carrying on with what it has is
        the bug this function was written for. */
@@ -329,6 +349,8 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
   const answered = new Set<string>();
   /** The text fields each list declares, whole, so a dry run can put a row's texts to the kernel's own coercion. */
   const texts = new Map<string, Map<string, FieldDecl>>();
+  /** Each closed list's values as the record states them, by list and field: see `own` below. */
+  const closed = new Map<string, Map<string, Set<string>>>();
   for (const register of [...registers, ...spare] as string[]) {
     const has = await door.schema(register);
     if (has.ok) answered.add(register);
@@ -347,6 +369,10 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
       texts.set(
         register,
         new Map(fields.flatMap((f) => (isObj(f) && typeof f.id === 'string' && TEXTS.has(String(f.type === 'list' ? (f.of ?? 'text') : f.type)) ? [[f.id, f as unknown as FieldDecl]] : []))),
+      );
+      closed.set(
+        register,
+        new Map(fields.flatMap((f) => (isObj(f) && typeof f.id === 'string' && f.type === 'enum' && Array.isArray(f.values) ? [[f.id, new Set(f.values.filter((v): v is string => typeof v === 'string'))]] : []))),
       );
     }
   }
@@ -425,6 +451,12 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
     report.plan = plan;
     registers = registers.filter((r) => !absent.includes(r));
   }
+  /* WHAT A ROW CARRIES ON A RECORD WITHOUT A LIST IT LEANS ON (`PlannedRow.lacking`): a project's note keeps the domains
+     that would otherwise have arrived as Services rows, because on this record they arrive as nothing. */
+  if (plan.rows.some((r) => r.lacking !== undefined && absent.includes(r.lacking.register))) {
+    plan = { ...plan, rows: plan.rows.map((r) => (r.lacking !== undefined && absent.includes(r.lacking.register) ? { ...r, fields: { ...r.fields, ...r.lacking.fields } } : r)) };
+    report.plan = plan;
+  }
 
   /**
    * A FIELD THIS RECORD'S LIST DOES NOT DECLARE IS LEFT OFF THE ROW, AND THE ROW STILL ARRIVES.
@@ -477,6 +509,91 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
    * money-core 1.1.0 has no `installments` list, so the instalment wall stays in `obligations` and closing it there
    * would delete the largest number in his record rather than move it.
    */
+  /**
+   * DECIDE, READ ONCE FOR THE WHOLE RUN, and `null` when it could not be read, with the refusal said once. The values below
+   * need it before the first row is written and the questions and packs need it after the last one; two reads would be
+   * two refusal lines for one failure. Why a failed read asks nothing rather than asking everything is said above
+   * `decide`, further down.
+   */
+  let decideRead: Decide | null | undefined;
+  const readDecideOnce = async (): Promise<Decide | null> => {
+    if (decideRead !== undefined) return decideRead;
+    const got = await readDecide(door);
+    if (got.ok) return (decideRead = got.value);
+    if (unreachable(got)) throw new Unreachable();
+    report.refused.push({ label: 'What this record has already been asked', register: 'Decide', fix: fixOf(got) });
+    return (decideRead = null);
+  };
+
+  /**
+   * A WORD THE OLD TOOL USED THAT A CLOSED LIST HERE HAS NOT GOT IS PROPOSED TO THE LIST, BEFORE ANY ROW IS WRITTEN.
+   *
+   * Measured before this (`test/import-values.test.ts`): a `crypto` holding arrived as `other`, a `registrar` service as
+   * `hosting` and an `investor` as `collaborator`, and two of the three said nothing. The record grows a closed list at
+   * run time: an `add` of values is answered by rule and lands at once when the owner's own key files it, and waits on
+   * Decide when anybody else does (DIRECTION §22). So each list gets ONE `add` carrying every word it is missing, and a
+   * row carries its word only once the list holds it. Written before that, the row is `ENUM_VALUE_UNKNOWN` whole, and a
+   * question nobody has answered yet would cost him the row; written with the fallback, the next import after he
+   * approves moves it, because `applyPlan` patches a field whose planned value differs.
+   *
+   * ONLY AGAINST A SCHEMA ANSWER THAT STATES ITS VALUES. A door answering `{ register }` alone says nothing about any
+   * list, and proposing every word to it every night, with no way to tell whether one had landed, would be a question
+   * a night on Decide.
+   */
+  const wanted = new Map<string, Map<string, string[]>>();
+  for (const row of plan.rows)
+    for (const [field, word] of Object.entries(row.own ?? {})) {
+      const has = closed.get(row.register)?.get(field);
+      if (has === undefined || typeof word !== 'string' || has.has(word)) continue;
+      const fields = wanted.get(row.register) ?? new Map<string, string[]>();
+      const words = fields.get(field) ?? [];
+      if (!words.includes(word)) words.push(word);
+      wanted.set(row.register, fields.set(field, words));
+    }
+  if (wanted.size > 0) {
+    const values: NonNullable<Report['values']> = { added: [], filed: [], before: [] };
+    report.values = values;
+    const decided = await readDecideOnce();
+    for (const [register, fields] of decided === null ? [] : wanted) {
+      const put = (field: string, word: string) => `${word} as a ${field} in ${NAMES[register] ?? register}`;
+      const fresh: Record<string, string[]> = {};
+      for (const [field, words] of fields)
+        for (const word of words)
+          if (decided!.values.has(valueKey(register, field, word))) values.before.push(put(field, word));
+          else (fresh[field] ??= []).push(word);
+      const named = Object.entries(fresh).flatMap(([field, words]) => words.map((word) => put(field, word)));
+      if (named.length === 0) continue;
+      if (o.dryRun) {
+        values.filed.push(...named);
+        continue;
+      }
+      const done = await door.propose({ question: `Add ${and(named)}?`, body_kind: 'change', body: { declaration_id: `register.${register}`, to: { add: { register, values: fresh } } } });
+      if (!done.ok) {
+        if (unreachable(done)) throw new Unreachable();
+        report.refused.push({ label: `Add ${and(named)}`, register: 'Decide', fix: fixOf(done) });
+        continue;
+      }
+      /* `landed` IS THE RECORD SAYING THE LIST HOLDS THE WORDS NOW (`packages/record/src/index.ts`, `additive`). Without
+         it the addition is an open question, whatever the reason, and the rows keep the list's own word. */
+      if (!(isObj(done.value) && isObj(done.value.landed))) {
+        values.filed.push(...named);
+        continue;
+      }
+      for (const [field, words] of Object.entries(fresh)) for (const word of words) closed.get(register)?.get(field)?.add(word);
+      values.added.push(...named);
+    }
+  }
+  if (plan.rows.some((r) => r.own !== undefined)) {
+    plan = {
+      ...plan,
+      rows: plan.rows.map((r) => {
+        const put = Object.entries(r.own ?? {}).filter(([field, word]) => typeof word === 'string' && closed.get(r.register)?.get(field)?.has(word) === true);
+        return put.length > 0 ? { ...r, fields: { ...r.fields, ...Object.fromEntries(put) } } : r;
+      }),
+    };
+    report.plan = plan;
+  }
+
   const retiring = (plan.retire ?? []).filter((r) => !absent.includes(r.register) && !absent.includes(r.replaces));
 
   const ids = new Map<string, string>();
@@ -682,17 +799,9 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
    * written by this point, and an exception would take the report with it. Asking again is the harm, so the run
    * stops asking, files no poll, and says which read failed under "Refused by the record".
    */
-  let decide: Decide | null = { asked: new Set(), installs: new Set() };
+  let decide: Decide | null = { asked: new Set(), installs: new Set(), values: new Set() };
   const banks = o.banks ?? [];
-  if (plan.asks.length > 0 || plan.polls.length > 0 || banks.length > 0) {
-    const got = await readDecide(door);
-    if (got.ok) decide = got.value;
-    else if (unreachable(got)) throw new Unreachable();
-    else {
-      report.refused.push({ label: 'What this record has already been asked', register: 'Decide', fix: fixOf(got) });
-      decide = null;
-    }
-  }
+  if (plan.asks.length > 0 || plan.polls.length > 0 || banks.length > 0) decide = await readDecideOnce();
   const asked = decide?.asked ?? new Set<string>();
   const installs = decide?.installs ?? new Set<string>();
   if (decide !== null && plan.asks.length > 0) {
@@ -831,6 +940,20 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
   if (report.banks) {
     lines.push(`Banks: ${String(report.banks.filed)} ${o.dryRun ? 'would be filed' : 'filed'} on Decide for you to approve, ${String(report.banks.before)} filed before.`);
     for (const w of report.banks.waiting) lines.push(`- ${w}`);
+  }
+  if (report.values) {
+    const { added, filed, before } = report.values;
+    if (added.length > 0) lines.push(`Added to your lists, so those rows carry the word the old tool used: ${and(added)}.`);
+    /* A DRY RUN CANNOT SAY WHICH OF THE TWO IT WOULD BE: whether an addition lands is the record's answer to the key
+       that files it, and a dry run files nothing. */
+    if (filed.length > 0)
+      lines.push(
+        o.dryRun
+          ? `Would be proposed, so those rows can carry the word the old tool used: ${and(filed)}. From your own key it lands at once; otherwise it waits on Decide.`
+          : `Filed on Decide for you to approve: ${and(filed)}. Until you do, those rows carry the word the list already had, and the next import after you approve moves them.`,
+      );
+    if (before.length > 0)
+      lines.push(`Proposed before and not in your lists: ${and(before)}. It waits on Decide or was turned down there, so those rows carry the word the list already had.`);
   }
   const estate = plan.rows.filter((r) => /^legacy:(date|domain|service):/u.test(r.key));
   if (estate.length > 0) {
