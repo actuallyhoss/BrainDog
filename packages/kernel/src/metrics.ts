@@ -25,7 +25,7 @@
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import { fixOf, no, ok } from '@braindog/ports';
-import { compile, jsonPath, lookupRef, parseWhere, resolveDay, type Predicate, type Schema, type SentenceDeps } from '@braindog/where';
+import { KERNEL_FIELDS, compile, jsonPath, lookupRef, parseWhere, resolveDay, type Predicate, type Schema, type SentenceDeps } from '@braindog/where';
 
 import { GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, type Bucket } from './buckets.ts';
 import { across, convertMinor, dayFieldOf, pairParts, rateFor, rateIsStale, type Part, type Rate, type Reduce } from './fx.ts';
@@ -415,6 +415,25 @@ const UPPER = ['before', 'lt', 'lte', 'between', 'is', 'in'] as const;
 const conjuncts = (p: Predicate): Record<string, unknown>[] =>
   (Array.isArray((p as { all?: unknown }).all) ? (p as { all: Predicate[] }).all : [p]) as Record<string, unknown>[];
 
+/**
+ * The type a `where` leaf's field has, from the register or from the record's own columns.
+ *
+ * `created_at` AND `updated_at` ARE INSTANTS THAT NO REGISTER DECLARES. They are `KERNEL_FIELDS`, read
+ * off `entry`'s columns and addressable in any `where`, and `schema.fields` does not hold them. `endedAt`
+ * and `localInstants` asked `schema.fields` alone, so `created_at after -30d` got neither an as-of end
+ * nor local bounds: the audit (`loop/research-batch-twenty-four-audit.md` §3) measured the point stored
+ * under 4 September at 11111, every row, in New York, Tokyo and UTC, where the same instants in a
+ * declared `at` gave 10011, 10101 and 10101 (`test/metrics-local-day-kernel.test.ts`). This is the lookup
+ * `@braindog/where`'s `specOf` makes, so the compiler, these two and `resolveRelative` before them agree
+ * on which names are instants. The inbox's schema keeps no kernel columns, and its `ts` is declared.
+ */
+const typeOf = (schema: Schema, field: string): string | undefined =>
+  Object.hasOwn(schema.fields, field)
+    ? schema.fields[field]?.type
+    : schema.subject !== 'inbox_raw' && Object.hasOwn(KERNEL_FIELDS, field)
+      ? KERNEL_FIELDS[field]
+      : undefined;
+
 const dayAfter = (iso: string): string => new Date(Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) + DAY).toISOString().slice(0, 10);
 
 function endedAt(shifted: Predicate | undefined, current: Predicate | undefined | null, schema: Schema, thenMs: number): Predicate | undefined {
@@ -423,7 +442,7 @@ function endedAt(shifted: Predicate | undefined, current: Predicate | undefined 
   if (!shifted || current === undefined) return shifted;
   const clauses = conjuncts(shifted);
   const dated = (field: unknown): field is string =>
-    typeof field === 'string' && Object.hasOwn(schema.fields, field) && ['day', 'instant'].includes(schema.fields[field]?.type ?? '');
+    typeof field === 'string' && ['day', 'instant'].includes(typeOf(schema, field) ?? '');
   const started = new Set(clauses.filter((c) => dated(c.field) && LOWER.some((op) => op in c)).map((c) => c.field as string));
   for (const c of clauses) if (dated(c.field) && UPPER.some((op) => op in c)) started.delete(c.field as string);
 
@@ -534,7 +553,7 @@ function localInstants(where: Predicate | undefined, schema: Schema, tz: string 
     }
     const leaf = node as Record<string, unknown>;
     const field = typeof leaf.field === 'string' ? leaf.field : null;
-    if (!field || !Object.hasOwn(schema.fields, field) || schema.fields[field]?.type !== 'instant') return node;
+    if (!field || typeOf(schema, field) !== 'instant') return node;
     const on = (day: string): Predicate => ({ all: [{ field, gte: from(day) }, { field, lt: upTo(day) }] }) as Predicate;
     const off = (day: string): Predicate[] => [{ field, lt: from(day) }, { field, gte: upTo(day) }] as Predicate[];
     const v = (op: string) => leaf[op];
@@ -756,8 +775,14 @@ function resolveRelative(
   if (!where || typeof where !== 'object') return { predicate: where, bad: [] };
   const bad: Refusal[] = [];
 
-  const one = (field: string, value: unknown): unknown => {
+  const one = (field: string, value: unknown, instant: boolean): unknown => {
     if (typeof value !== 'string') return value;
+    /* A FULL TIMESTAMP ON AN INSTANT IS ALREADY WHAT IT MEANS, and the compiler compares it whole.
+       `resolveDay` reads days and refused it, so `{ field: at, after: '2020-01-01T00:00:00.000Z' }`
+       on a declared `instant` was `RELATIVE_LITERAL_UNKNOWN` while the same bound on `created_at`,
+       which this walk skipped, listed its rows (measured through `list` when `typeOf` came in, and
+       `pages.test.ts` holds the `created_at` half). */
+    if (instant && /^\d{4}-\d{2}-\d{2}T/u.test(value) && Number.isFinite(Date.parse(value))) return value;
     const day = resolveDay(value, nowMs);
     if (day === null) {
       /* `RELATIVE_LITERAL_UNKNOWN` — `30 §6`'s grammar family, *"a temporal literal outside the
@@ -781,16 +806,22 @@ function resolveRelative(
     /* AN `instant` IS A DATE HERE TOO, and it has to be: `before` and `after` are legal on both, and
        the sentence grammar resolves both to a plain day. Resolving only one of them meant a JSON
        predicate on an `instant` reached SQL as the word — and `'2026-09-15T…' < 'today'` is true of
-       every instant there has ever been. Two renderings of one grammar, and they agree. */
-    const type = field && Object.hasOwn(schema.fields, field) ? schema.fields[field]?.type : undefined;
+       every instant there has ever been. Two renderings of one grammar, and they agree.
+
+       `created_at` AND `updated_at` COUNT, through `typeOf`: asked of `schema.fields` alone,
+       `{ field: created_at, after: '-30d' }` reached SQL holding `-30d` and read every row
+       (`test/metrics-local-day-kernel.test.ts`), and once `endedAt` knew them it threw `Invalid time
+       value` dating the word. */
+    const type = field ? typeOf(schema, field) : undefined;
     if (!field || (type !== 'day' && type !== 'instant')) return node;
 
     const op = DATED.find((o) => o in leaf);
     if (!op) return node;
     const value = leaf[op];
+    const instant = type === 'instant';
     return {
       ...leaf,
-      [op]: Array.isArray(value) ? value.map((v) => one(field, v)) : one(field, value),
+      [op]: Array.isArray(value) ? value.map((v) => one(field, v, instant)) : one(field, value, instant),
     } as Predicate;
   };
 
