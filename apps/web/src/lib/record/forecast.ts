@@ -85,6 +85,20 @@ const iso = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
 const noon = (day: string): number => Date.parse(`${day}T12:00:00Z`);
 
 /**
+ * The cycle value a row carries that the leg's table does not name, or `null`.
+ *
+ * `?? 0` MADE `weekly` ON A LEG THAT NAMES `monthly` THE SAME AS `none`, and the walk below counted a
+ * weekly bill once and said nothing. `none` and an empty value mean exactly "once" and stay quiet; a
+ * value the table names, even with a zero, is the declaration saying "once" on purpose. The kernel
+ * asks the same question in `occurrences`, and `hasOwn` in both so a prototype key is not a cycle.
+ */
+function unreadCycle(row: Entry, leg: Leg): string | null {
+  if (!leg.every) return null;
+  const cycle = String(row.fields[leg.every.field] ?? '');
+  return cycle !== '' && cycle !== 'none' && !Object.hasOwn(leg.every.months, cycle) ? cycle : null;
+}
+
+/**
  * The days one row's movement lands on inside the window.
  *
  * BY THE CYCLE THE LEG DECLARES. A leg with no `every` is a one-off; one with it reads the row's own
@@ -98,14 +112,16 @@ const noon = (day: string): number => Date.parse(`${day}T12:00:00Z`);
 function occurrences(row: Entry, leg: Leg, first: string, until: number): { day: string; at: number }[] {
   const start = noon(first);
   if (!Number.isFinite(start)) return [];
-  const months = leg.every ? (leg.every.months[String(row.fields[leg.every.field] ?? '')] ?? 0) : 0;
+  const cycle = leg.every ? String(row.fields[leg.every.field] ?? '') : '';
+  const months = leg.every && Object.hasOwn(leg.every.months, cycle) ? leg.every.months[cycle]! : 0;
   /* A CYCLE THIS TABLE HAS NO FACTOR FOR IS A ONE-OFF, and a FRACTIONAL one is not. `!months` used
      to carry `!Number.isInteger(months)` beside it, so `monthly: 0.5`, which is how somebody writes
      a fortnightly charge, fell through to the one-off branch and charged each monthly
      service once in six months instead of six times. On the shipped services leg that closed at
      436,810 against a true 348,150: GBP 886.60 too high, over thirteen steps that look exactly like
      forty-four correct ones. The fraction is refused on the leg in `runway` now, so one cannot
-     reach this line; what is left here is the honest case, a cycle the leg's table does not name. */
+     reach this line; what is left here is the honest case, a cycle the leg's table does not name.
+     That one is still walked once, and `runway` says so through `unreadCycle`. */
   if (!months) return start <= until ? [{ day: first, at: start }] : [];
 
   /* A CYCLE BEFORE TODAY HAS ALREADY BEEN CHARGED. `renews` is an anchor nobody moves on, and every
@@ -227,6 +243,8 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180, onl
     }
 
     const decl = REGISTERS[leg.register];
+    /** Each cycle value the leg's table does not name, and how many walked rows carry it. */
+    const unread = new Map<string, number>();
     for (const row of ROWS[leg.register] ?? []) {
       /* THE SAME PREDICATE EVERY OTHER READ USES, compiled from the leg's own sentence — so a leg
          saying `state is open or part` means what the same words mean on a page. */
@@ -264,7 +282,14 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180, onl
       const incoming = leg.incoming ? row.fields[leg.incoming.field] === leg.incoming.is : false;
       const label = String(row.fields[decl?.title ?? leg.on] ?? '');
 
-      for (const r of occurrences(row, leg, on, until)) {
+      /* COUNTED WHERE THE KERNEL COUNTS IT: a row that reached the walk with money, a date and a
+         step inside the window. A row with no amount, or one whose first day is past the horizon,
+         is missing nothing from this walk whatever its cycle. */
+      const walked = occurrences(row, leg, on, until);
+      const cycle = unreadCycle(row, leg);
+      if (cycle !== null && walked.length) unread.set(cycle, (unread.get(cycle) ?? 0) + 1);
+
+      for (const r of walked) {
         /* AN OVERDUE MOVEMENT IS STILL A MOVEMENT, clamped to today rather than dropped: the walk
            stays in order, a balance that is already gone is gone at the top of it, and the label
            says which rows those are. Dropping them read 116 days where the truth was 93. */
@@ -284,6 +309,17 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180, onl
         });
       }
     }
+
+    /* ONE SENTENCE PER VALUE, IN THE KERNEL'S WORDS, typed twice because this app reaches the
+       kernel's walk only through its index and the sentence is not exported there. Driven before
+       it existed: a £100 bill with `repeats: weekly` on a leg naming only `monthly` walked as one
+       step of minus 10,000 and an empty list, where a 60-day window holds eight or nine of it.
+       `forecast-unknown-cycle.test.ts` holds this string against the kernel's, so the two cannot
+       drift apart the way the fractional-cycle sentence did. */
+    for (const [value, n] of [...unread].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+      refusals.push(
+        `${n} ${n === 1 ? 'row' : 'rows'} of ${leg.register} ${n === 1 ? 'has' : 'have'} ${leg.every!.field} set to ${value}, which this walk has no cycle for, and ${n === 1 ? 'its' : 'their'} money is in the walk once rather than every time it recurs. Give ${value} a whole number of months on this leg, or set the ${n === 1 ? 'row' : 'rows'} to a cycle the leg has.`,
+      );
   }
 
   /* ONE CURRENCY OR NO WALK, AND A NUMBER WITH NO CURRENCY IS NOT ONE. A crossing day computed from

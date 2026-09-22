@@ -207,6 +207,9 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
     /* A ROW THAT RAN OUT OF OCCURRENCES BEFORE THE HORIZON DID. See `EVERY_CAP`: this used to be a
        silent `break` in the middle of the money. */
     let truncated = 0;
+    /* EACH CYCLE VALUE THE LEG'S TABLE DOES NOT NAME, AND HOW MANY ROWS CARRY IT. See `occurrences`:
+       these rows are walked once, and this is what lets the walk say that the rest is missing. */
+    const unread = new Map<string, number>();
     for (const { id } of rows) {
       const entry = deps.hydrate(id);
       if (!entry) continue;
@@ -231,6 +234,9 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
 
       const recurs = occurrences(deps, entry, leg, dayOf(first), until, iso(deps.ctx.nowMs));
       if (recurs.capped) truncated++;
+      /* ONLY A ROW WITH A STEP INSIDE THE WINDOW: one whose first day is past the horizon is missing
+         nothing from this walk, whatever its cycle. The browser's walk counts the same rows. */
+      if (recurs.unread !== null && recurs.of.length) unread.set(recurs.unread, (unread.get(recurs.unread) ?? 0) + 1);
       for (const { day, at } of recurs.of) {
         /* CLAMPED TO TODAY, not dropped. The walk stays in order and a balance that is already gone
            is gone at the top of it; the label says which rows those are. */
@@ -273,6 +279,22 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
         code: 'OUT_OF_BOUNDS',
         fix: `${truncated} ${truncated === 1 ? 'row' : 'rows'} of ${leg.register} recur more than ${EVERY_CAP} times before this horizon ends, and the rest of their money is not in the walk. Shorten the horizon.`,
         at: 'every',
+      });
+    /* A CYCLE THE LEG HAS NO FACTOR FOR, IN THE SAME SHAPE AS `truncated` ABOVE, one sentence per value.
+       Driven before this existed: a £100 bill with `repeats: weekly` on a leg naming only `monthly`
+       walked as one step of minus 10,000 and no refusal at all, and a 60-day window holds eight or
+       nine of it. `LOOKUP_MISSING` is the metrics engine's code for the same gap in a factor table
+       (`metrics.ts`, "has no factor for"), and `allowed` says which cycles the leg does read.
+
+       THE BROWSER'S WALK SAYS THIS IN THE SAME WORDS, typed a second time because the web app
+       reaches this module only through the kernel's index. `forecast-unknown-cycle.test.ts` beside
+       the web copy compares the two strings, which nothing did for the fractional-cycle sentence. */
+    for (const [value, n] of [...unread].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+      refusals.push({
+        code: 'LOOKUP_MISSING',
+        fix: `${n} ${n === 1 ? 'row' : 'rows'} of ${leg.register} ${n === 1 ? 'has' : 'have'} ${leg.every!.field} set to ${value}, which this walk has no cycle for, and ${n === 1 ? 'its' : 'their'} money is in the walk once rather than every time it recurs. Give ${value} a whole number of months on this leg, or set the ${n === 1 ? 'row' : 'rows'} to a cycle the leg has.`,
+        at: 'every',
+        allowed: Object.keys(leg.every!.months),
       });
   }
 
@@ -404,11 +426,19 @@ function occurrences(
   first: string,
   until: number,
   today: string,
-): { of: { day: string; at: number }[]; capped: boolean } {
+): { of: { day: string; at: number }[]; capped: boolean; unread: string | null } {
   const start = noon(first);
-  if (!Number.isFinite(start)) return { of: [], capped: false };
-  const months = leg.every ? (leg.every.months[String(entry.fields[leg.every.field] ?? '')] ?? 0) : 0;
-  if (!months) return { of: start <= until ? [{ day: first, at: start }] : [], capped: false };
+  if (!Number.isFinite(start)) return { of: [], capped: false, unread: null };
+  const cycle = leg.every ? String(entry.fields[leg.every.field] ?? '') : '';
+  const months = leg.every && Object.hasOwn(leg.every.months, cycle) ? leg.every.months[cycle]! : 0;
+  /* A ONE-OFF, AND SAID WHEN IT IS ONLY A ONE-OFF BECAUSE THE TABLE HAS NO ROW FOR THE VALUE. `?? 0`
+     made `weekly` on a leg that names `monthly` indistinguishable from `none`, and the walk counted a
+     weekly bill once in silence. `none` and an empty value mean exactly "once", and every register
+     that repeats spells it that way (`obligations.repeats`), so those two stay quiet; a value the
+     table does name, even with a zero, is the declaration saying "once" on purpose. `hasOwn` rather
+     than `in`, because `in` would find `toString` on a row whose cycle was the word `toString`. */
+  const unread = leg.every && cycle !== '' && cycle !== 'none' && !Object.hasOwn(leg.every.months, cycle) ? cycle : null;
+  if (!months) return { of: start <= until ? [{ day: first, at: start }] : [], capped: false, unread };
 
   /* A CYCLE BEFORE TODAY HAS ALREADY BEEN CHARGED. `renews` is an anchor nobody moves on, and the
      walk started at it and clamped every past cycle to today as overdue: a monthly service anchored
@@ -428,7 +458,7 @@ function occurrences(
   /* AND THE CAP IS REPORTED RATHER THAN TAKEN. Running out of occurrences while the horizon still
      has room is money missing from the answer, and the caller has to be able to tell that from a
      leg that simply ends. */
-  return { of: out, capped: out.length === EVERY_CAP || n === SKIP_CAP };
+  return { of: out, capped: out.length === EVERY_CAP || n === SKIP_CAP, unread: null };
 }
 
 /**
