@@ -401,13 +401,17 @@
   }
 
   /* FIGURES WRAP TO MORE ROWS BEFORE THEY SHRINK. The block is its own container, so a stat in a narrow column of a wide
-     page answers its own width, not the viewport's. Five figures or more go three across below 60rem (a Dashboard at 1024
+     page answers its own width, not the viewport's. Five figures or more go three across below 960px (a Dashboard at 1024
      beside the rail), and four or more go two by two below 608px. */
   .block[data-kind='stat'] {
     container-type: inline-size;
   }
 
-  @container (inline-size < 60rem) {
+  /* 960px AND NOT 60rem, FOR THE REASON THE FOUR-ACROSS STEP BELOW GIVES. It is the same width at a 16px root, but at
+     Chrome's "Small", a 12px root, 60rem was 720px, and a 722px slot drew five `£16,570.00` cells of 118.8px for 123.2px
+     of ink, 4.4px cut; 258 readings across the laptop's full-width range came out cut or short of their two per cent.
+     No declared page has five figures, so the record could not show it and `record/figure-fit.test.ts` draws one. */
+  @container (inline-size < 960px) {
     .grid:has(> .cell:nth-child(5)) {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }

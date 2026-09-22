@@ -111,6 +111,7 @@ export const copy = {
   vault: 'Vault',
   settings: 'Settings',
   audit: 'History',
+  automations: 'Automations',
   more: 'More',
   close: 'Close',
 

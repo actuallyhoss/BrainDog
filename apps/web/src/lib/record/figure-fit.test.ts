@@ -114,10 +114,10 @@ type Guard = { readonly px: number; readonly start: number; readonly end: number
 /**
  * Every `@media (width …)` or `@container (inline-size …)` in a stylesheet, as px at a 16px root.
  *
- * rem IS CONVERTED AND NOT REFUSED, because `blocks.css` still writes its five-figure step in rem
- * while the four-across step and the route's money step are px, deliberately, for the reason the
- * route's own comment argues at length and the last test below measures. All of them belong in this
- * list, in the unit the measurement is in.
+ * rem IS CONVERTED AND NOT REFUSED, because `blocks.css` still writes steps in rem for blocks that
+ * draw no figure (its 30rem and 34rem), while every step a stat grid answers to is px, deliberately,
+ * for the reason the route's own comment argues at length and the last two tests below measure. All
+ * of them belong in this list, in the unit the measurement is in.
  */
 function guards(css: string, needle: string): Guard[] {
   const out: Guard[] = [];
@@ -608,4 +608,97 @@ test('A SMALLER ROOT FONT DOES NOT BRING A CUT FIGURE BACK', async (t) => {
     t.diagnostic(`a ${root}px root: every stat figure in every band fits with its ${MARGIN * 100}% margin`);
     await view.close();
   }
+});
+
+/** Where the `<div>` opening at `start` closes, by counting, since a cell holds nested divs and an svg but never a stray `<div`. */
+function closing(html: string, start: number): number {
+  let depth = 0;
+  for (let i = start; i < html.length; i += 1) {
+    if (html.startsWith('<div', i)) depth += 1;
+    else if (html.startsWith('</div>', i)) {
+      depth -= 1;
+      if (depth === 0) return i + '</div>'.length;
+    }
+  }
+  return -1;
+}
+
+/**
+ * AND THE SAME FOR THE FIVE-ACROSS STEP, WHICH NO DECLARED PAGE CAN SHOW, SO THIS TEST DRAWS ONE.
+ *
+ * The four-across step was repaired to 608px because the test above measured it cut at a 12px root.
+ * The five-across step beside it was still `60rem` and that test passed, not because the step was
+ * sound but because no declared page has a stat of five figures: at a 12px root `60rem` is 720px, and
+ * a 720px slot gives five cells of 118.4px for a figure that draws 123.2px of ink. So the grid here is
+ * the widest money figure the record draws, in the app's own markup from `toHTML`, copied into a
+ * shipped stat until it has five cells, which is the smallest stat that rule governs.
+ *
+ * TWO THINGS ARE HELD, AND THE SECOND IS THE ONE THAT NAMES THE FAULT. Every figure fits with its
+ * margin at every root, which is `13 §4.2` again; and the grid goes the same number of columns across
+ * at every slot whatever the root, because the figures it guards are px and a step that moves with
+ * the root is a step guarding nothing. The slots are the whole full-width range a laptop window gives,
+ * every 4px and both sides of every container step, so a step written in rem shows as the band of
+ * slots where 12px and 16px disagree.
+ */
+test('A FIFTH FIGURE GOES THREE ACROSS AT THE SAME SLOT AT EVERY ROOT, AND FITS', async (t) => {
+  const figureAt = /class="cell-figure[^"]*">([^<]*)</g;
+  const widest = GRIDS.flatMap((g) => [...g.html.matchAll(figureAt)].map((m) => ({ g, text: m[1]!, at: m.index }))).reduce((a, b) =>
+    b.text.length >= a.text.length ? b : a,
+  );
+  const start = widest.g.html.lastIndexOf('<div class="cell"', widest.at);
+  const end = closing(widest.g.html, start);
+  assert.ok(start !== -1 && end > widest.at, `the cell holding ${widest.text} on ${widest.g.where} could not be found in its own markup`);
+  const cell = widest.g.html.slice(start, end);
+  const had = (widest.g.html.match(/<div class="cell"/g) ?? []).length;
+  assert.ok(had >= 2 && had < 5, `${widest.g.where} already draws ${had} cells, so copying one is not how this test reaches five`);
+  const html = (widest.g.html.slice(0, end) + cell.repeat(5 - had) + widest.g.html.slice(end)).replace(/--cells:\d+/, '--cells:5');
+  const five: Grid = { where: `${widest.g.where}, drawn five across with ${widest.text}`, span: widest.g.span, html };
+
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const laptop = BANDS[BANDS.length - 1]!;
+  const probe = await browser.newPage({ viewport: { width: laptop.to, height: 900 } });
+  const from = Math.ceil((await geometry(probe, laptop.from)).get(12) ?? 0);
+  const to = Math.floor((await geometry(probe, laptop.to)).get(12) ?? 0);
+  await probe.close();
+  assert.ok(to > from, `a full-width slot measures ${from}px at ${laptop.from} and ${to}px at ${laptop.to}, so there is no range to probe`);
+  const slots = [
+    ...new Set([...Array.from({ length: Math.floor((to - from) / 4) + 1 }, (_, i) => from + i * 4), ...STEPS.flatMap((px) => [px - 1, px])]),
+  ]
+    .filter((px) => px >= from && px <= to)
+    .sort((a, b) => a - b);
+
+  const across = new Map<number, Map<number, number>>();
+  const wrong: string[] = [];
+  for (const root of [16, 12, 9]) {
+    const view = await browser.newPage({ viewport: { width: laptop.to, height: 900 } });
+    const cdp = await view.context().newCDPSession(view);
+    await cdp.send('Page.setFontSizes', { fontSizes: { standard: root } });
+    const seen = await measured(view, slots.map((slot) => pinned(five, slot)).join(''));
+    assert.equal(
+      await view.evaluate(() => getComputedStyle(document.documentElement).fontSize),
+      `${root}px`,
+      `the browser's font size was set to ${root}px and the root did not follow, so this would measure a 16px root again`,
+    );
+    wrong.push(...[...seen.cut, ...seen.short].map((s) => `a ${root}px root: ${say(s)}`));
+    const columns = await view.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>('.block-slot')].map((el) => {
+        const grid = el.querySelector('.grid');
+        return [Number(el.dataset.slot), grid ? getComputedStyle(grid).gridTemplateColumns.split(' ').length : 0] as const;
+      }),
+    );
+    across.set(root, new Map(columns));
+    await view.close();
+  }
+
+  const at16 = across.get(16)!;
+  const moved = [12, 9].flatMap((root) =>
+    slots
+      .filter((slot) => across.get(root)!.get(slot) !== at16.get(slot))
+      .map((slot) => `${slot}px at a ${root}px root: ${across.get(root)!.get(slot)} across where a 16px root draws ${at16.get(slot)}`),
+  );
+  assert.deepEqual([...new Set(wrong)], [], `${wrong.length} of the five-figure readings are cut or short of their ${MARGIN * 100}% margin`);
+  assert.deepEqual(moved, [], `${moved.length} slots lay five figures out differently once the root is smaller, so a step there is written in the root's unit`);
+  const changes = slots.filter((slot, i) => i > 0 && at16.get(slot) !== at16.get(slots[i - 1]!)).map((slot) => `${at16.get(slot)} across from ${slot}px`);
+  t.diagnostic(`${slots.length} slots from ${from}px to ${to}px, ${widest.text} five times: ${changes.join(', ')}, the same at 16, 12 and 9px roots`);
 });
