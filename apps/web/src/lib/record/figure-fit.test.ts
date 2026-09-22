@@ -13,9 +13,15 @@
  * is wrong.
  *
  * THIS FILE IS THE MEASUREMENT RATHER THAN THE PROSE, and it is the first of the two repairs that
- * audit offers and not the second: the threshold is still a hand-solved 280px, in a file this run
- * does not own. What is new is that the 0.8px is read off a drawn page on every run and printed, so
+ * audit offers and not the second: the threshold is still a hand-solved number, in a file this run
+ * did not own. What is new is that the 0.8px is read off a drawn page on every run and printed, so
  * the font swap that closes it is a failing test rather than a screenshot somebody notices later.
+ *
+ * AND THAT IS WHAT HAPPENED, ON THE FIRST LINUX RUN. The same woff2 drew 1.6 per cent wider there,
+ * four figures came out cut by up to 2.7px, and the thresholds moved: the route's money step from
+ * 280px to 288px and the four-across stat step in `blocks.css` from 30rem to 38rem. Neither was
+ * solved against Windows alone. `MARGIN` below makes every figure fit with two per cent of its own
+ * width to spare in whichever face the run draws, so the Linux runner holds the wider face to it too.
  *
  * AND FINDING 6 IS ANSWERED HERE TOO, IN THE SECOND TEST, FOR THE SAME REASON. That finding is that
  * the commit's message puts the defect on a phone at 390px where the diff changes nothing at 390, 360
@@ -215,12 +221,21 @@ const BANDS = [FLOOR, ...EDGES].map((from, i) => ({ from, to: (EDGES[i] ?? CEIL 
 
 /**
  * The widths a stat grid's own container queries change their mind at, read the same way. The
- * route's money threshold is one of these and is not named here, so moving it from 280 to 300 moves
- * every width probed below.
+ * route's money threshold is one of these and is not named here, so moving it from 280 to 288 moved
+ * every width probed below without an edit to this list.
  */
 const STEPS = [...new Set([...guards(blocksCss, '@container (inline-size < '), ...guards(routeCss, '@container (inline-size < ')].map((g) => g.px))].sort(
   (a, b) => a - b,
 );
+
+/**
+ * THE ROUTE'S MONEY STEP, NAMED ONLY WHERE A TEST HAS TO FIND THAT ONE RULE: the first test checks it
+ * is still in the cascade and the second lifts it out. It was 280 until the first Linux run cut
+ * `£22,600.00` in the 124px cell it left, and it is 288 because two cells of the Linux face's 125.2px
+ * ink with two per cent to spare need 287.4px, while a 320px phone's slot is exactly 288px and must
+ * not stack. 286 passed here and would have failed on the runner: 127px cells leave 1.4 per cent.
+ */
+const MONEY = 288;
 
 type Seen = {
   readonly where: string;
@@ -231,6 +246,8 @@ type Seen = {
   readonly room: number;
   readonly size: string;
   readonly columns: number;
+  /** The figure's box grows with its ink, so its `room` is always about zero and says nothing about the cell. */
+  readonly follows: boolean;
 };
 
 /**
@@ -251,6 +268,16 @@ function reading(): Seen[] {
       const rects = [...range.getClientRects()];
       const ink = rects.length ? Math.max(...rects.map((r) => r.width)) : 0;
       const box = el.getBoundingClientRect().width;
+      /* A BOX SIZED BY ITS OWN TEXT HAS NO SPARE ROOM TO MEASURE, which the phone's lead rows are:
+         the figure sits in a `minmax(0, auto)` track, so `£9,090.00` read 72.656px of ink in a
+         72.656px box, 0px to spare, and a wider face would widen the box rather than cut the digit.
+         So the text is widened for one reading and the box watched: if it moves, it is that kind.
+         Measured on the shipped record that is 96 of 524 readings, every one below a 640px window,
+         and the run prints the count per band so an exemption that spreads is seen spreading. */
+      const probe = el as HTMLElement;
+      probe.style.letterSpacing = '0.5em';
+      const follows = probe.getBoundingClientRect().width > box + 0.5;
+      probe.style.letterSpacing = '';
       out.push({
         where: (slot as HTMLElement).dataset.where ?? '',
         slot: Number((slot as HTMLElement).dataset.slot),
@@ -260,6 +287,7 @@ function reading(): Seen[] {
         room: round(box - ink),
         size: getComputedStyle(el).fontSize,
         columns,
+        follows,
       });
     }
   }
@@ -286,17 +314,44 @@ function reading(): Seen[] {
  */
 const SLACK = 1;
 
-/** Every figure that is cut past the slack, and the one with the least room to spare either way. */
-type Verdict = { readonly cut: Seen[]; readonly tightest: Seen | null; readonly figures: number };
+/**
+ * AND TWO PER CENT OF ROOM IN EVERY CELL, BECAUSE THE FACE IS NOT THE SAME FACE ON EVERY MACHINE.
+ *
+ * The slack above is the whole margin a figure had until the first run on a hosted ubuntu image.
+ * There the same woff2 drew about 1.6 per cent wider than it does here (125.2px of ink for
+ * `£38,880.00` where this machine reads 123.203px), and four figures between a 900px and a 1600px
+ * window came out cut by up to 2.7px: a defect for every reader on Linux that this file could not
+ * see from Windows, because it only asked whether the ink fitted the face it was drawn in.
+ *
+ * So a figure has to fit with room to spare, and the room is a share of its own width rather than
+ * a pixel count, because the Linux face is wider in proportion. Two per cent covers the measured
+ * 1.6, so a figure that passes here is not cut on the CI runner, and the face that widens a digit
+ * by another half per cent is a red test here before it is a cut figure anywhere. It is NOT true
+ * that a run passing here passes there: the runner asks for the same two per cent of its own wider
+ * ink, so a figure needs about 3.6 per cent here to pass on both. The money step was first moved to
+ * 286px, which left 3.1 here and 1.4 there; the tightest figure now has 3.9.
+ *
+ * NOT ON A BOX THAT GROWS WITH ITS TEXT. Such a box has no spare room by construction and a wider
+ * face moves the box, not the digit; `follows` says which figures those are.
+ */
+const MARGIN = 0.02;
+
+/** Every figure that is cut past the slack or short of its margin, and the one with the least room either way. */
+type Verdict = { readonly cut: Seen[]; readonly short: Seen[]; readonly tightest: Seen | null; readonly figures: number; readonly following: number };
 
 const verdict = (seen: Seen[]): Verdict => ({
   cut: seen.filter((s) => s.room < -SLACK),
-  tightest: seen.reduce<Seen | null>((a, b) => (a === null || b.room < a.room ? b : a), null),
+  short: seen.filter((s) => !s.follows && s.room < s.ink * MARGIN),
+  /* BY SHARE AND NOT BY PIXELS, and never a box that follows its text: the phone's lead rows answered
+     0px here on every run and hid the call that was actually close. */
+  tightest: seen.filter((s) => !s.follows).reduce<Seen | null>((a, b) => (a === null || b.room / b.ink < a.room / a.ink ? b : a), null),
   figures: seen.length,
+  following: seen.filter((s) => s.follows).length,
 });
 
 const say = (s: Seen): string =>
-  `${s.text} at ${s.size} draws ${s.ink}px of ink in a ${s.box}px cell (${s.columns} across a ${s.slot}px slot, ${s.where}): ${s.room}px to spare`;
+  `${s.text} at ${s.size} draws ${s.ink}px of ink in a ${s.box}px cell (${s.columns} across a ${s.slot}px slot, ${s.where}): ${s.room}px to spare` +
+  (s.follows ? ', in a box that grows with its text' : `, ${Math.round((s.room / s.ink) * 1000) / 10}% of its width`);
 
 /**
  * THE APP'S OWN CHAIN, and every box in it is the app's. The rail is a stub because `Sidebar.svelte`
@@ -339,20 +394,10 @@ async function measured(view: Page, body: string, css = CASCADE): Promise<Verdic
   return verdict(await view.evaluate(reading));
 }
 
-/* A TODO ON LINUX, AND ONLY THERE, SINCE 22 SEPTEMBER. The first run on a hosted ubuntu image drew the
-   shipped Geist about 1.6 per cent wider than Windows does (125.2px of ink for `£38,880.00` where this
-   file reads 123.2px on studio-pc), which is the one-per-cent font this file's header warned about: four
-   of 132 figures come out cut by up to 2.7px between 900px and 1600px. That is a real defect for a
-   reader on Linux, already live, and the repair is more headroom in `blocks.css` and `PageView.svelte`
-   (loop/BACKLOG.md, wave thirty-one). Until it lands the measurement still runs and prints on Linux. */
-const LINUX_TODO = process.platform === 'linux'
-  ? { todo: 'Geist draws about 1.6% wider on Linux; four figures are cut by up to 2.7px until blocks.css gains headroom' }
-  : {};
-
-test('NO MONEY FIGURE A DECLARED PAGE DRAWS IS CUT, AT ANY WIDTH THE APP CAN PUT IT IN', LINUX_TODO, async (t) => {
+test('NO MONEY FIGURE A DECLARED PAGE DRAWS IS CUT, AT ANY WIDTH THE APP CAN PUT IT IN', async (t) => {
   assert.ok(!routeCss.includes(':global('), 'a `:global(` survived the scan, so the rules under test are invalid CSS a browser drops');
   assert.ok(GRIDS.length > 0, 'no declared page draws a stat, so this whole file would pass over nothing');
-  assert.ok(STEPS.includes(280), `the stat stylesheets step at ${STEPS.join(', ')} and none of them is the money threshold this file was written for`);
+  assert.ok(STEPS.includes(MONEY), `the stat stylesheets step at ${STEPS.join(', ')} and none of them is the money threshold this file was written for`);
   /* THE BANDS ARE REPORTED AND NOT PINNED TO A LIST. Asserting that the cascade breaks at exactly
      400, 640 and 900 would make a breakpoint added upstairs a failure here instead of a width this
      file starts probing, which is the opposite of reading them out of the stylesheets. What has to
@@ -367,6 +412,10 @@ test('NO MONEY FIGURE A DECLARED PAGE DRAWS IS CUT, AT ANY WIDTH THE APP CAN PUT
   const view = await browser.newPage({ viewport: { width: 1180, height: 900 } });
 
   const tight: Seen[] = [];
+  const short: string[] = [];
+  let following = 0;
+  const bandsFollowing: string[] = [];
+  let figures = 0;
   for (const band of BANDS) {
     /* THE BAND'S OWN SLOT RANGE, PER SPAN, off the app's geometry at each end of it. */
     const low = await geometry(view, band.from);
@@ -391,8 +440,15 @@ test('NO MONEY FIGURE A DECLARED PAGE DRAWS IS CUT, AT ANY WIDTH THE APP CAN PUT
       [],
       `at a window between ${band.from}px and ${band.to}px, ${seen.cut.length} of ${seen.figures} figures are drawn short of a digit`,
     );
+    short.push(...seen.short.map((s) => `${band.from}-${band.to}: ${say(s)}`));
+    following += seen.following;
+    if (seen.following) bandsFollowing.push(`${band.from}-${band.to}: ${seen.following}`);
+    figures += seen.figures;
     if (seen.tightest) tight.push(seen.tightest);
   }
+  /* EVERY BAND BEFORE THE VERDICT, so a font that widens a digit is reported everywhere it bites. */
+  assert.deepEqual(short, [], `${short.length} figures fit this face with less than ${MARGIN * 100}% of their width to spare, so a wider face cuts them`);
+  t.diagnostic(`${figures - following} of ${figures} figures held to the ${MARGIN * 100}% margin; ${following} sit in a box that grows with its text (${bandsFollowing.join(", ")})`);
 
   /* AND A PIXEL AT A TIME ACROSS THE WHOLE RANGE OF THE ONE BLOCK THAT LIVES IN A NARROW SLOT, at
      the narrowest window that draws it at full size, which is where the audit found the defect and
@@ -410,6 +466,11 @@ test('NO MONEY FIGURE A DECLARED PAGE DRAWS IS CUT, AT ANY WIDTH THE APP CAN PUT
     Array.from({ length: to - from + 1 }, (_, i) => narrowGrids.map((g) => pinned(g, from + i)).join('')).join(''),
   );
   assert.deepEqual(sweep.cut.map(say), [], `${sweep.cut.length} of ${sweep.figures} figures are cut somewhere between a ${from}px and a ${to}px slot`);
+  assert.deepEqual(
+    sweep.short.map(say),
+    [],
+    `${sweep.short.length} of ${sweep.figures} figures between a ${from}px and a ${to}px slot have less than ${MARGIN * 100}% of their width to spare`,
+  );
   if (sweep.tightest) tight.push(sweep.tightest);
   t.diagnostic(`a ${narrow}-twelfth slot runs ${from}px to ${to}px, swept a pixel at a time`);
 
@@ -445,17 +506,17 @@ test('NO MONEY FIGURE A DECLARED PAGE DRAWS IS CUT, AT ANY WIDTH THE APP CAN PUT
  * restacked, which is the claim finding 6 is actually about.
  */
 test('THE CUT FIGURE WAS A NARROW SLOT ON A LAPTOP AND NEVER A PHONE, WITH THE REPAIR TAKEN BACK OUT', async (t) => {
-  const money = guards(routeCss, '@container (inline-size < ').filter((g) => g.px === 280);
-  assert.equal(money.length, 1, `the route declares ${money.length} container queries at 280px, and this test is about exactly one`);
+  const money = guards(routeCss, '@container (inline-size < ').filter((g) => g.px === MONEY);
+  assert.equal(money.length, 1, `the route declares ${money.length} container queries at ${MONEY}px, and this test is about exactly one`);
   const without = routeCss.slice(0, money[0]!.start) + routeCss.slice(money[0]!.end);
-  assert.ok(!without.includes('inline-size < 280px'), 'the repair is still in the cascade it was lifted out of');
+  assert.ok(!without.includes(`inline-size < ${MONEY}px`), 'the repair is still in the cascade it was lifted out of');
   /* THE ONE CASCADE WITH ONE RULE TAKEN OUT OF IT, and derived from `CASCADE` by substitution rather
      than reassembled from the sheets, because the two halves of this comparison have to differ in
      exactly that rule and nothing else. Reassembled, they drifted: a rule added to `CASCADE` while
      this was being written reached one side and not the other, and the phone comparison below failed
      on a difference this test had introduced itself. */
   const bareCascade = CASCADE.replace(routeCss, without);
-  assert.ok(!bareCascade.includes('inline-size < 280px'), 'the repair survived the substitution, so both sides of this comparison are the same cascade');
+  assert.ok(!bareCascade.includes(`inline-size < ${MONEY}px`), 'the repair survived the substitution, so both sides of this comparison are the same cascade');
   assert.equal(bareCascade.length, CASCADE.length - (money[0]!.end - money[0]!.start), 'the substitution changed more than the one rule it was meant to');
 
   const browser = await chromium.launch();

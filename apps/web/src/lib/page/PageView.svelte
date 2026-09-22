@@ -1208,11 +1208,17 @@
    * behind a link was the third option and it is the worst of the three here, because both figures
    * are already the answer to the heading above them.
    *
-   * 280px IS THE ROW'S OWN ARITHMETIC RATHER THAN A DEVICE: two cells of 123px with the 32px gap
-   * between them need 278px. Measured either side of it, the slot is 281px in a 1220px window and
-   * keeps its two columns at 124.3px each, and 274px at 1200 and stacks. The phone is untouched at
-   * both ends of its range, because the slot there is the page itself: 358px at 390 and 288px at
-   * 320, both above the threshold, so the two-up strip below is still what a phone draws.
+   * 288px IS THE ROW'S OWN ARITHMETIC RATHER THAN A DEVICE, and it was 280 until the same figure
+   * was drawn on Linux. Two cells of 123px with the 32px gap between them need 278px, and 280 left
+   * `£22,600.00` 0.8px in a 124px cell on Windows. The same woff2 on a hosted ubuntu image draws
+   * about 1.6 per cent wider, 125.2px, which is past that cell. `record/figure-fit.test.ts` asks
+   * for two per cent of room in the face the runner draws, so on Linux two cells need
+   * 2 x 127.7 + 32 = 287.4px. 286 was tried first and left each cell 127px, 3.1 per cent on Windows
+   * but 1.4 on Linux, which that test fails on the CI runner. 288 leaves each 128px: 3.9 per cent
+   * on Windows and about 2.2 on Linux. It stops at 288 because the phone is untouched at both ends
+   * of its range and has to stay so: the slot there is the page itself, 358px at 390 and exactly
+   * 288px at 320, and the query is strictly less than, so neither stacks and the two-up strip below
+   * is still what a phone draws.
    *
    * AND THE THRESHOLD IS px WHERE EVERY OTHER QUERY IN THIS SYSTEM IS rem, because the width it
    * guards is a px width: `--t-xl` is 24px whatever the root font size is, so the figure stays
@@ -1222,7 +1228,7 @@
    * that undoes the two-up strip below, for figures measured at 102.7px in a 152px cell, which were
    * never in any danger.
    */
-  @container (inline-size < 280px) {
+  @container (inline-size < 288px) {
     .block-slot :global(.grid:has(> .cell:nth-child(2))) {
       grid-template-columns: minmax(0, 1fr);
     }
