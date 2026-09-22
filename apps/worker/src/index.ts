@@ -34,7 +34,7 @@ import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 import { ALARM_RUNS, actionExecutor, holding, holdingPaged, invocation, keyOpener, meterPass, pass, sharedReader, type Admissions, type Ledger, type OpenKey } from './actions.ts';
 import { runScript, ScriptRuns, type ScriptCall, type ScriptExports, type ScriptReply } from './script.ts';
 import { grantNamed, holdingScript, scriptReads } from '@braindog/host/script';
-import { scriptTrial } from '@braindog/host/script-try';
+import { askerOf, scriptTrial } from '@braindog/host/script-try';
 import { pagedRunner } from '@braindog/host/connector';
 
 import { alarmScheduler } from './alarm.ts';
@@ -285,12 +285,13 @@ export class Record$ extends DurableObject<Env> {
         /* A DRAFT SCRIPT RUN NOW, WRITING NOTHING (`@braindog/host/script-try`), in the sandbox a scheduled run gets:
            `runScript`, a fresh Worker from `env.LOADER.load`, with this caller's reads and, for the owner only, the
            vault by label. Asked of the Directory's allowance and counted on its ledger like a run, because it is one.
-           No `LOADER` is a deployment with no sandbox, which says so and runs nothing. */
+           No `LOADER` is a deployment with no sandbox, which says so and runs nothing. The key is opened in the asker's
+           name (`askerOf`), not as `system`, which is the alarm's because a scheduled run has nobody behind it. */
         tryScript: (d) => {
           const loader = this.env.LOADER;
           if (!loader) return Promise.resolve({ refused: { code: null, why: 'This deployment has no sandbox, so nothing ran.' }, log: '', usage: { fetches: 0, bytes: 0, wall_ms: 0, cpu_ms: 0 } });
           const directory = this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('directory'));
-          const openKey = this.#openKey(api);
+          const openKey = this.#openKey(api, askerOf(d));
           return scriptTrial({
             sandbox: (s, t) =>
               runScript(
@@ -427,10 +428,11 @@ export class Record$ extends DurableObject<Env> {
 
   /**
    * The one opener over `KEK` for a single-request send: the alarm's actions and scripts, and a script's trial. One
-   * place, so `KEK` keeps the readers `test/vault.test.ts` names and a trial adds none.
+   * place, so `KEK` keeps the readers `test/vault.test.ts` names and a trial adds none. `actor` is whoever asked, and
+   * absent for the alarm, where `keyOpener` signs `system`.
    */
-  #openKey(api: RecordApi): OpenKey | null {
-    return keyOpener(api, this.env.KEK);
+  #openKey(api: RecordApi, actor?: string): OpenKey | null {
+    return keyOpener(api, this.env.KEK, actor);
   }
 
   /**

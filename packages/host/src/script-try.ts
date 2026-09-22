@@ -68,6 +68,24 @@ export type TriedScript = ScriptAnswer;
  */
 export type TrialSandbox = (s: Scripted, trial: { grantOf: GrantOf; reads: ScriptReads | undefined }) => Promise<ScriptAnswer>;
 
+/**
+ * The id a trial's key is opened in the name of: the `asker` the record hands `tryScript`, or `undefined`, which each
+ * app's `keyOpener` reads as `system`.
+ *
+ * A TRIAL HAS AN ASKER AND BOTH HOSTS OPENED ITS KEY AS NOBODY. Each handed the trial the opener it builds for the
+ * scheduled pass, whose actor is `system` because a scheduled run has no person behind it, so the owner trying her own
+ * draft left a `grant.read` the vault's log could not tell from the nightly run's: measured in
+ * `apps/selfhost/test/script-try-asker.test.ts`, one key sent and `grant.read ["system"]`. Spark's included key had the
+ * same fault and the same repair (`sparkAskerEngine` in `spark.ts`), the asker's id handed to `keyOpener` per ask.
+ *
+ * READ OFF THE DRAFT WITH `in`, NOT FROM ITS TYPE, BECAUSE THE RECORD DOES NOT SAY IT YET. `RecordDeps['tryScript']` in
+ * `packages/record` passes `owner` and no id, and this is written so that the day it passes `asker` the self-host signs
+ * with it and nothing here changes. Until then this answers `undefined` and the log still says `system`. The Worker's
+ * `Record$` does not call it yet (`apps/worker/test/script-try-asker.test.ts` says what is left there).
+ */
+export const askerOf = (draft: object): string | undefined =>
+  'asker' in draft && typeof draft.asker === 'string' && draft.asker !== '' ? draft.asker : undefined;
+
 /** The sentence a fetch naming a key gets in a trial by a caller the record gave no keys. */
 const NO_KEYS = (label: string): string =>
   `A trial opens no key for an agent, so the fetch naming "${label}" was not sent. Once the owner accepts the script, its runs send the key.`;

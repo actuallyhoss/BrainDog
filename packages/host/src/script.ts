@@ -128,6 +128,16 @@ export function scriptReads(api: Pick<RecordApi, 'kernel' | 'list' | 'get'>): (s
     const as: CallContext = { principal: { kind: 'system', id: s.scripted.actor }, registers: s.scripted.decl.reads };
     return {
       list: async (register, where) => {
+        /* A SENTENCE IS REFUSED BEFORE THE TREE IS WALKED, because `namesSealed` cannot see into one and the record's
+           `list` reads a string as a sentence. Measured before this line (`script-reads.test.ts`, the audit of wave
+           thirty-six, finding 7): `token is set`, `token is empty` and `token is <grant id>` each answered which client
+           holds a key, while the same question as a tree was refused. Refused rather than parsed, because a tree is what
+           the grammar tells a script to write, and parsing here would be a second reader of sentences that has to agree
+           with the kernel's on every word it adds. */
+        if (where !== null && (typeof where !== 'object' || Array.isArray(where)))
+          throw new Error(
+            `${s.scripted.script} filtered ${register} with ${JSON.stringify(where)}, and a script filters with a predicate tree, such as {"field":"name","is":"Acme"}, so nothing was read.`,
+          );
         const sealed = namesSealed(where, sealedOf(api, register));
         if (sealed !== null)
           throw new Error(`${s.scripted.script} filtered ${register} on ${sealed}, which is a secret, and a script may not ask what a secret field holds.`);

@@ -64,8 +64,11 @@ const LISTS = `export default async function run(ctx) {
   ctx.write('seen', { said: JSON.stringify({ rows, one }) });
 }`;
 
-/** A record with two clients, one of them pointing at a grant, and `scripts` due now. */
-async function selfhost(scripts: ReturnType<typeof reader>[]) {
+/**
+ * A record with two clients, one of them pointing at a grant, and `scripts` due now. `scripts` may be a function of the
+ * grant's id, for a script whose source has to name it, because the id is minted here.
+ */
+async function selfhost(scripts: ReturnType<typeof reader>[] | ((grantId: string) => ReturnType<typeof reader>[])) {
   const dir = mkdtempSync(join(tmpdir(), 'braindog-script-reads-'));
   const sent: string[] = [];
   const send: Send = async (url) => (sent.push(url.href), new Response('{}'));
@@ -87,13 +90,13 @@ async function selfhost(scripts: ReturnType<typeof reader>[]) {
     person.value.id,
   );
   assert.ok(grant.ok, JSON.stringify(grant));
-  const installed = await k.install([CLIENTS, SEEN, ...scripts] as never);
+  const grantId = (grant.value as { id: string }).id;
+  const installed = await k.install([CLIENTS, SEEN, ...(typeof scripts === 'function' ? scripts(grantId) : scripts)] as never);
   assert.ok(installed.ok, JSON.stringify(installed));
   const owner = { principal: { kind: 'person' as const, id: person.value.id, level: 'owner' as const } };
   for (const name of ['Acme', 'Bolt']) assert.ok((await running.api.create({ register: 'clients', fields: { name } }, owner)).ok);
   /* THE VAULT DOOR IS THE ONLY WRITER OF A SECRET FIELD, and it needs a key store this test does not stand up. The
      column is set the way `depositGrant` leaves it: the grant's id, and nothing else. */
-  const grantId = (grant.value as { id: string }).id;
   running.sql.exec("UPDATE entry SET fields = json_set(fields, '$.token', ?) WHERE register = 'clients' AND json_extract(fields, '$.name') = 'Acme'", grantId);
   running.sql.exec("UPDATE schedule SET due_at = ? WHERE kind = 'script'", new Date(Date.now() - 1_000).toISOString());
 
@@ -107,7 +110,10 @@ async function selfhost(scripts: ReturnType<typeof reader>[]) {
         'SELECT note, to_v FROM event WHERE target = ? AND to_v IS NOT NULL ORDER BY rowid',
         `declaration:script.${name}`,
       );
-      return { note: event?.note ?? 'no run event', outcome: (JSON.parse(event?.to_v ?? '{}') as { outcome?: string }).outcome };
+      /* A REFUSAL'S REASON IS IN THE RUN'S LOG, NOT ITS NOTE, since `d23ac77d`: the note is read by everybody who reads
+         the record and says only that the run did not finish, so these cases read `why` where the owner reads it. */
+      const to = JSON.parse(event?.to_v ?? '{}') as { outcome?: string; log?: string };
+      return { note: event?.note ?? 'no run event', outcome: to.outcome, why: to.log ?? '' };
     },
     close: async () => {
       await running.close();
@@ -185,8 +191,51 @@ test('A FILTER ON A SECRET FIELD IS REFUSED, so the grant id cannot be read back
     const run = s.run('probes-token');
     for (const said of s.seen()) assert.notEqual(said.toLowerCase(), s.grantId.toLowerCase(), 'the script read the grant id back through a filter');
     assert.equal(run.outcome, 'refused', run.note);
-    assert.match(run.note, /filtered clients on token, which is a secret/);
+    assert.match(run.why, /filtered clients on token, which is a secret/);
     assert.deepEqual(s.seen(), []);
+  } finally {
+    await s.close();
+  }
+});
+
+/**
+ * A SENTENCE IS A FILTER TOO, AND THE CHECK ABOVE ONLY WALKED A TREE. The record's `list` reads a `where` that is a
+ * string as a sentence, and QuickJS hands the script's `where` through as it was written, so `token is set` went to the
+ * record unasked. Measured by the audit of wave thirty-six (`loop/research-batch-thirty-six-audit.md` finding 7) and
+ * again here before the change: the four runs below answered `ok`, and wrote `["Acme"]`, `["Bolt"]`, `["Acme"]` and
+ * `[]`, so a script learned which client holds a key and whether an id it already had was the one sealed there. The
+ * grammar the agent reads promised the opposite ("a predicate that names one is refused").
+ *
+ * ONE SCRIPT PER SENTENCE, EACH UNCAUGHT, so every one of the four has to be refused on its own and a refusal of the
+ * first cannot stand in for the other three.
+ */
+test('A SENTENCE THAT FILTERS ON A SECRET FIELD IS REFUSED, as the tree that says the same is', async () => {
+  const sentences = (grantId: string): [string, string][] => [
+    ['set', 'token is set'],
+    ['empty', 'token is empty'],
+    ['right', `token is ${grantId}`],
+    ['wrong', `token is ${grantId.slice(0, -1)}${grantId.endsWith('0') ? '1' : '0'}`],
+  ];
+  const s = await selfhost((grantId) =>
+    sentences(grantId).map(([name, where]) =>
+      reader(
+        `sentence-${name}`,
+        ['clients'],
+        `export default async function run(ctx) {
+  const rows = await ctx.record.list('clients', ${JSON.stringify(where)});
+  ctx.write('seen', { said: ${JSON.stringify(name)} + ' ' + JSON.stringify(rows.map((r) => r.fields.name)) });
+}`,
+      ),
+    ),
+  );
+  try {
+    await s.running.poll();
+    const runs = sentences(s.grantId).map(([name]) => ({ name, ...s.run(`sentence-${name}`) }));
+    assert.deepEqual(s.seen(), [], 'a sentence on the secret field was answered');
+    for (const run of runs) {
+      assert.equal(run.outcome, 'refused', `${run.name}: ${run.note}`);
+      assert.match(run.why, /filters with a predicate tree/, run.name);
+    }
   } finally {
     await s.close();
   }
@@ -205,7 +254,7 @@ test('A READ OUTSIDE reads IS STILL REFUSED, OR ANSWERS NOTHING, now that the se
     await s.running.poll();
     const listed = s.run('reads-seen');
     assert.equal(listed.outcome, 'refused', listed.note);
-    assert.match(listed.note, /read clients, which is not in its reads/);
+    assert.match(listed.why, /read clients, which is not in its reads/);
 
     /* A `get` OF A ROW IN ANOTHER REGISTER ANSWERS AS A ROW THAT IS NOT THERE, which is how the record answers any
        caller that may not read it, so the register's existence is not confirmed either. The first case above reads

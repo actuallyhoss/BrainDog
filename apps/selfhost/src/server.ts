@@ -67,7 +67,7 @@ import {
 } from './actions.ts';
 import { pagedRunner } from '@braindog/host/connector';
 import { grantNamed, holdingScript } from '@braindog/host/script';
-import { scriptTrial, trialSandbox } from '@braindog/host/script-try';
+import { askerOf, scriptTrial, trialSandbox } from '@braindog/host/script-try';
 import { runInQuickJs } from '@braindog/script/quickjs';
 import { scriptSandbox } from './script.ts';
 import { httpFor } from './http.ts';
@@ -1039,7 +1039,8 @@ export async function start(options: {
     /* A DRAFT SCRIPT RUN NOW, WRITING NOTHING (`@braindog/host/script-try`), through the socket, name service and key
        opener a scheduled run's fetch leaves by. ONLY WHEN `actions` IS ON, for its reason: a trial sends a request to
        somebody else's server, and a self-host that was not asked to send any answers `NOT_IN_THIS_BUILD` instead. The
-       ledger is the Directory's, opened below, and a trial asked before it is counted by nobody. */
+       ledger is the Directory's, opened below, and a trial asked before it is counted by nobody. THE KEY IS OPENED IN
+       THE ASKER'S NAME, NOT THE SCHEDULED PASS'S `system` (`askerOf`), so the vault's log can tell her trial from a run. */
     tryScript:
       options.actions === undefined
         ? undefined
@@ -1050,7 +1051,7 @@ export async function start(options: {
                 run: runInQuickJs,
                 send: actions.send ?? pinnedSend,
                 pin: pinFor(actions.resolve ?? systemResolve),
-                openKey: actions.openKey ?? keyOpener(api, options.keys),
+                openKey: actions.openKey ?? keyOpener(api, options.keys, askerOf(d)),
                 now: clock.now,
               }),
               ledger: { mayRun: (r, a, p) => (ledger ? ledger.mayRun(r, a, p) : null), meter: (r, run) => ledger?.meter(r, run) },
