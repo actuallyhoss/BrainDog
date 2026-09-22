@@ -25,7 +25,7 @@
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import { fixOf, no, ok } from '@braindog/ports';
-import { compile, jsonPath, parseWhere, resolveDay, type Predicate, type Schema } from '@braindog/where';
+import { compile, jsonPath, lookupRef, parseWhere, resolveDay, type Predicate, type Schema, type SentenceDeps } from '@braindog/where';
 
 import { GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, type Bucket } from './buckets.ts';
 import { across, convertMinor, dayFieldOf, pairParts, rateFor, rateIsStale, type Part, type Rate, type Reduce } from './fx.ts';
@@ -580,8 +580,14 @@ export type EvalContext = {
   tz?: string | undefined;
   /** The register's declared fields, so a predicate and a field expression check against one shape. */
   schemaOf: (register: string) => Schema | null;
-  /** A ref written by name: `thing is Kiln`. Absent means a sentence cannot name one. */
-  refByTitle?: ((register: string, title: string) => string | null) | undefined;
+  /** A ref written by name: `thing is Kiln`, every row bearing it. Absent means a sentence cannot name one. */
+  refByTitle?: ((register: string, title: string) => string | readonly string[] | null) | undefined;
+  /** The register a row id's row is on, deleted or not; `SentenceDeps.refById` says why it is asked. */
+  refById?: ((id: string) => string | null) | undefined;
+  /** Whether the caller reads a register; absent is everything. `SentenceDeps.reads` says what it closes. */
+  reads?: ((register: string) => boolean) | undefined;
+  /** A ref naming no row refused, or matching no row. A rule evaluating a row asks for the second. */
+  absent?: 'refuse' | 'no-row' | undefined;
   /**
    * A ref written as the id a person or an agent is handed: `things#1`, or a prefixed one like `S6`.
    *
@@ -619,15 +625,19 @@ export function predicateOf(
     const refs = resolveRefs(dated.predicate, schema, ctx);
     return { predicate: refs.predicate, bad: [...dated.bad, ...refs.bad] };
   }
-  return parseWhere(where, schema, {
-    nowMs,
-    ...(ctx.refByTitle === undefined ? {} : { refByTitle: ctx.refByTitle }),
-    ...(ctx.refBySpoken === undefined ? {} : { refBySpoken: ctx.refBySpoken }),
-  });
+  return parseWhere(where, schema, { nowMs, ...refDeps(ctx) });
 }
 
-/** A row id, which a ref leaf keeps as it was written. */
-const ROW_ID = /^[0-9A-HJKMNP-TV-Z]{26}$/;
+/** The lookups a ref is read with, without the keys a context left out. */
+function refDeps(ctx: EvalContext): Omit<SentenceDeps, 'nowMs'> {
+  return {
+    ...(ctx.refByTitle === undefined ? {} : { refByTitle: ctx.refByTitle }),
+    ...(ctx.refBySpoken === undefined ? {} : { refBySpoken: ctx.refBySpoken }),
+    ...(ctx.refById === undefined ? {} : { refById: ctx.refById }),
+    ...(ctx.reads === undefined ? {} : { reads: ctx.reads }),
+    ...(ctx.absent === undefined ? {} : { absent: ctx.absent }),
+  };
+}
 
 /** The operators whose value on a ref field is a row: one, or a list of them. */
 const ADDRESSED = ['is', 'not', 'in', 'not_in'] as const;
@@ -642,10 +652,11 @@ const ADDRESSED = ['is', 'not', 'in', 'not_in'] as const;
  * Kiln's 14 among them, and `{is: 'Nowhere'}` answered ok with 0 where a refusal was owed. That is
  * 80 of the 93 task reads Sam's agents make, returning an empty board that reads as "nothing to do".
  *
- * THE ORDER IS THE ONE `coerce` WRITES WITH, then the sentence's title. A row id stays as written. An
- * id resolves in the register it names. A title resolves in the register the field points at. And
- * the title is tried before either refusal, so a project really called `Q3#2` or `S6` is still found
- * by its name rather than refused as an id it never was.
+ * THE ORDER IS THE ONE `coerce` WRITES WITH, then the sentence's title, and it is `lookupRef` in
+ * `@braindog/where` so the two forms cannot drift again. A row id is looked up, deleted rows
+ * included. An id resolves in the register it names. A title resolves to every row bearing it in
+ * the register the field points at. And the title is tried before either refusal, so a project
+ * really called `Q3#2` or `S6` is still found by its name rather than refused as an id it never was.
  *
  * NOTHING TO RESOLVE WITH IS NOT A REFUSAL. A context built without either lookup (a test's page
  * deps, for one) cannot say what a word means, so the leaf goes through as it went through before.
@@ -658,28 +669,34 @@ function resolveRefs(
   if (!where || typeof where !== 'object') return { predicate: where, bad: [] };
   if (ctx.refBySpoken === undefined && ctx.refByTitle === undefined) return { predicate: where, bad: [] };
   const bad: Refusal[] = [];
+  const deps = refDeps(ctx);
 
-  const one = (field: string, to: string | undefined, value: unknown): unknown => {
-    if (typeof value !== 'string') return value;
+  /* EVERY ROW THE WORDS NAME, which is one, several when a title is shared, or `NO_ROW`. */
+  const one = (field: string, to: string | undefined, value: unknown): unknown[] => {
+    if (typeof value !== 'string') return [value];
     const said = value.trim();
-    if (ROW_ID.test(said)) return said;
-    const spoken = ctx.refBySpoken?.(said) ?? null;
-    if (spoken && spoken.id !== null && (to === undefined || spoken.register === to)) return spoken.id;
-    const titled = to === undefined ? null : (ctx.refByTitle?.(to, said) ?? null);
-    if (titled !== null) return titled;
-    if (spoken && to !== undefined && spoken.register !== to) {
+    const found = lookupRef(to, said, deps);
+    if ('ids' in found) return found.ids;
+    if ('mismatch' in found)
       bad.push({
         code: 'REF_REGISTER_MISMATCH',
-        fix: `${field} points at ${to}, and ${said} is a ${spoken.register} row. Name a ${to} row.`,
+        fix: `${field} points at ${to}, and ${said} is a ${found.mismatch} row. Name a ${to} row.`,
         at: field,
-        allowed: [to],
+        ...(to === undefined ? {} : { allowed: [to] }),
       });
-      return value;
-    }
     /* `REF_UNKNOWN`, the code the sentence gives for the same words, and the one `unreadWhere` lets
-       through so a rule may name a row written tomorrow. */
-    bad.push({ code: 'REF_UNKNOWN', fix: `${field} is ${said}: there is no ${to ?? 'row'} called ${said}.`, at: field });
-    return value;
+       through so a rule may name a row written tomorrow. */ else
+      bad.push({ code: 'REF_UNKNOWN', fix: `${field} is ${said}: there is no ${to ?? 'row'} called ${said}.`, at: field });
+    return [value];
+  };
+
+  /* ONE VALUE THAT NAMED TWO ROWS WIDENS ITS OPERATOR, and the sentence builds the same shapes:
+     `is` either row is `in`, `not` either is `not_in`, `has` either is `any`, `lacks` both is `all`. */
+  const widened = (field: string, op: string, values: unknown[]): Predicate => {
+    if (op === 'in' || op === 'not_in') return { field, [op]: values } as Predicate;
+    if (values.length === 1) return { field, [op]: values[0] } as Predicate;
+    if (op === 'is' || op === 'not') return { field, [op === 'is' ? 'in' : 'not_in']: values } as Predicate;
+    return { [op === 'has' ? 'any' : 'all']: values.map((v) => ({ field, [op]: v })) } as Predicate;
   };
 
   const walk = (node: Predicate): Predicate => {
@@ -697,10 +714,21 @@ function resolveRefs(
     const op = (listed ? (['has', 'lacks'] as const) : ADDRESSED).find((o) => o in leaf);
     if (!op) return node;
     const value = leaf[op];
-    return {
-      ...leaf,
-      [op]: Array.isArray(value) ? value.map((v) => one(field, decl.to, v)) : one(field, decl.to, value),
-    } as Predicate;
+    /* A LIST THAT IS NOT ONE STAYS AS IT CAME, for `compile` to refuse in its own words. */
+    if ((op === 'in' || op === 'not_in') && !Array.isArray(value)) return node;
+    const values = Array.isArray(value) ? value.flatMap((v) => one(field, decl.to, v)) : one(field, decl.to, value);
+    /* THE LEAF'S OTHER KEYS GO WITH IT, `via` among them, so only the operator is rewritten. */
+    const rest: Record<string, unknown> = { ...leaf };
+    delete rest[op];
+    const read = widened(field, op, values) as Record<string, unknown>;
+    /* AND INTO EVERY BRANCH WHEN `has` WIDENED TO `any`. Returned bare, `{also has Kiln, via x}` over
+       two Kilns lost its `via` and answered two rows, where over one Kiln it is refused
+       `MATCH_OP_UNSUPPORTED`: a shared title turned a refused filter into an answer. */
+    if (!('field' in read)) {
+      const q = 'any' in read ? 'any' : 'all';
+      return { [q]: (read[q] as Record<string, unknown>[]).map((kid) => ({ ...rest, ...kid })) } as Predicate;
+    }
+    return { ...rest, ...read } as Predicate;
   };
 
   return { predicate: walk(where), bad };

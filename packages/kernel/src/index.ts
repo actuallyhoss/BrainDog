@@ -1341,17 +1341,26 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          a date alike, so filling one in would refuse correct templates by the type of the field. */
       if (decl.kind === 'page' && Array.isArray(body.blocks))
         for (const [i, raw] of body.blocks.entries()) {
-          const block = raw as { kind?: unknown; source?: unknown; where?: unknown } | null;
+          const block = raw as { kind?: unknown; source?: unknown; register?: unknown; where?: unknown } | null;
           if (!block || block.kind === 'diff') continue;
           /* A SENTENCE OR A TREE ONLY. Anything else is `declare.ts`'s `DECLARATION_INVALID`, and this
              check runs first, so reading `null` here would answer the same mistake with another code. */
           const where = block.where;
           if (typeof where !== 'string' && (where === null || typeof where !== 'object' || Array.isArray(where))) continue;
-          if (typeof block.source !== 'string' || !block.source.startsWith('register.')) continue;
+          /* A CAPTURE NAMES ITS LIST WITH `register:` AND HAS NO SOURCE, and its `where:` is what a new
+             row is filled with, so a field the list lacks is the same mistake as in a table's filter.
+             Reading only `source` let one install clean and refuse on every open. */
+          const list =
+            typeof block.source === 'string' && block.source.startsWith('register.')
+              ? block.source.slice('register.'.length)
+              : block.kind === 'capture' && typeof block.register === 'string'
+                ? block.register
+                : undefined;
+          if (list === undefined) continue;
           if (JSON.stringify(where).includes('{{')) continue;
-          const schema = shape(block.source.slice('register.'.length));
+          const schema = shape(list);
           if (!schema) continue;
-          const bad = unreadWhere(`${decl.id}.blocks[${i}]`, where, schema);
+          const bad = unreadWhere(`${decl.id}.blocks[${i}]`, where, schema, batch);
           if (bad) return bad;
         }
 
@@ -1373,7 +1382,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          block, so a rule with no `when` — which is a legal rule, meaning "every row" — installed
          with no bound, no `once_per`, three axes and a target register nobody has. */
       if (where !== undefined) {
-        const bad = unreadWhere(decl.id, where, schema);
+        const bad = unreadWhere(decl.id, where, schema, batch);
         if (bad) return bad;
       }
 
@@ -1619,8 +1628,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   }
 
   /** A `where` read against the register it filters: `null` when it can be read, the refusal when not. */
-  function unreadWhere(id: string, where: unknown, schema: Schema): Refusal | null {
-    const said = predicateOf(where as Predicate | string, schema, evalContext());
+  function unreadWhere(id: string, where: unknown, schema: Schema, batch: readonly Declaration[] = []): Refusal | null {
+    const said = predicateOf(where as Predicate | string, schema, evalContext(batch));
     const stop = said.bad.find((b) => b.code !== 'REF_UNKNOWN');
     if (stop) return { ...stop, fix: `${id} cannot be read: ${stop.fix}` };
 
@@ -1793,6 +1802,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     limit?: number;
     cursor?: string | null;
     includeDeleted?: boolean;
+    /**
+     * Which registers the caller reads, so a ref into one she cannot is not looked up. Absent is all.
+     *
+     * THE RECORD GUARDS THE REGISTER BEING LISTED AND NOTHING ELSE, and the ref's lookups read the
+     * whole record. So a member invited to Jobs alone, filtering by `client`, was told `ok 0` for a
+     * client that exists on the Clients list she cannot read and `REF_UNKNOWN` for one that does not.
+     * The kernel cannot know who is asking; the caller that does passes this.
+     */
+    reads?: (register: string) => boolean;
   }): Result<{ rows: Entry[]; cursor: string | null; matched: number }> {
     const barred = schemaRefusal(state);
     if (barred) return barred;
@@ -1800,7 +1818,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       return no('REGISTER_UNKNOWN', `There is no register called ${q.register}.`, { allowed: [...registers.keys()] });
 
     const schema = schemaOf(q.register);
-    const said = predicateOf(q.where, schema, evalContext());
+    const said = predicateOf(q.where, schema, q.reads === undefined ? evalContext() : { ...evalContext(), reads: q.reads });
     if (said.bad.length) return { ok: false, refusal: said.bad[0]! };
 
     /* A PREDICATE THAT COULD NOT BE READ RUNS NOTHING. Returning the register would be a list that
@@ -3022,28 +3040,68 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   const shown = (register: string, field: string, value: Json | undefined): Json | undefined =>
     value === undefined ? undefined : redacts(register, field) ? REDACTED : value;
 
-  /** What the evaluator needs beyond SQL: the clock, and the shape of a register. */
-  const evalContext = (): EvalContext => ({
+  /**
+   * What the evaluator needs beyond SQL: the clock, and the shape of a register.
+   *
+   * `staged` IS A BATCH BEING INSTALLED, whose registers are not in `registers` yet. A rule naming
+   * `jobs#1` in a ref to Things installed when Jobs arrived in the same `install` and was refused
+   * `REF_REGISTER_MISMATCH` when it came after (`loop/research-batch-twenty-two-audit.md` §6),
+   * because the lookup below read `jobs#1` as a title while Jobs was only staged. The mismatch is a
+   * fact about the declarations, the spoken register against the field's `to`, so the staged
+   * registers count as registers for it, with no row in any of them yet.
+   */
+  const evalContext = (staged: readonly Declaration[] = []): EvalContext => ({
     nowMs: clock.now(),
     schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null),
     /* A ref is written by NAME in a sentence — `thing is Kiln` — because that is what a person says.
-       The title field is the register's own, so the lookup is one indexed read per name. */
+       The title field is the register's own, so the lookup is one indexed read per name.
+
+       EVERY ROW BEARING IT, DELETED ONES TOO. It was `LIMIT 1` with no order, which over two Kilns
+       answered whichever SQLite reached first and dropped the other's jobs; `lookupRef` says why both
+       are the answer. And a deleted row's jobs still point at it, so its name still finds them, as
+       its spoken id and its row id do. */
     refByTitle: (register, title) => {
       const decl = registers.get(register);
       if (!decl) return null;
-      const row = sql.one<{ id: string }>(
-        `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '$.${decl.title}') = ? LIMIT 1`,
-        register,
-        title,
-      );
-      return row?.id ?? null;
+      return sql
+        .all<{ id: string }>(`SELECT id FROM entry WHERE register = ? AND json_extract(fields, '$.${decl.title}') = ?`, register, title)
+        .map((r) => r.id);
     },
     /* AND BY THE ID AN AGENT IS HANDED, `things#1` or `S6`, read exactly as `get` reads one. A register
-       that does not exist makes the words no id at all, so a title holding a `#` is still a title. */
+       that does not exist makes the words no id at all, so a title holding a `#` is still a title.
+       A DELETED ROW ANSWERS, because `nameOf` names it `P6` in every `context` an agent is shown and
+       refusing that id while one of its jobs still pointed at it named a row the record handed out. */
     refBySpoken: (said) => {
-      const at = parseSpoken(said) ?? prefixed(said);
-      if (!at || !registers.has(at.register)) return null;
-      return { register: at.register, id: bySeq(at.register, at.seq)?.id ?? null };
+      const arriving = staged.flatMap((d) => (d.kind === 'register' ? [d.body as { id?: unknown; seq_prefix?: unknown }] : []));
+      const stagedPrefix = (): { register: string; seq: number } | null => {
+        for (const b of arriving) {
+          if (typeof b.id !== 'string' || typeof b.seq_prefix !== 'string' || b.seq_prefix === '#') continue;
+          const n = said.trim().startsWith(b.seq_prefix) ? said.trim().slice(b.seq_prefix.length) : '';
+          if (/^[1-9][0-9]*$/.test(n)) return { register: b.id, seq: Number(n) };
+        }
+        return null;
+      };
+      const at = parseSpoken(said) ?? prefixed(said) ?? stagedPrefix();
+      if (!at) return null;
+      if (registers.has(at.register)) return { register: at.register, id: bySeq(at.register, at.seq, true)?.id ?? null };
+      return arriving.some((b) => b.id === at.register) ? { register: at.register, id: null } : null;
+    },
+    /* AND BY ITS ROW ID, WHICH WAS TAKEN ON TRUST. An id naming no row, or a row of another list,
+       answered `ok 0` in both forms, where the same row named by a spoken id is refused. Deleted rows
+       answer, for the spoken id's reason.
+
+       A ROW PURGED PAST RETENTION IS STILL A ROW ITS LEDGER NAMES. `nameOf` hands out the bare id
+       for it, since there is no row left to number, so the filter has to take that id too; `purge`
+       writes the list the row was on into its `purge` event, and that is where the register is read. */
+    refById: (id) => {
+      const row = byId(id, true);
+      if (row) return row.register;
+      const was = sql.one<{ from_v: string | null }>(
+        "SELECT from_v FROM event WHERE target = ? AND kind = 'purge' AND field = 'register' LIMIT 1",
+        `entry:${id}`,
+      )?.from_v;
+      const register: unknown = was ? JSON.parse(was) : null;
+      return typeof register === 'string' ? register : null;
     },
     /* THE HOME CURRENCY AND THE DATED RATES, read only when a money figure meets a second currency. The rates are the
        rows of the `fx` list when a pack declares one (`08 §2.5`); a record without it has none. */
@@ -3349,7 +3407,12 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         .map((r) => JSON.parse(r.body) as RuleDecl)
         .filter((r) => r.register === register),
     schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null),
-    ctx: evalContext(),
+    /* A REF NAMING NO ROW MATCHES NO ROW HERE, AND IS NOT A RULE THAT CANNOT BE READ. The rule was
+       allowed to install over a row nobody had written, and `matches` then read the `REF_UNKNOWN` on
+       every evaluation as "fires on nothing": `thing is not Launch` tagged no job at all until Launch
+       existed, and `thing in [Kiln, Launch]` did not tag the Kiln job it names. The tree form tagged
+       that Kiln job before `5fde092b` made it resolve, which is the behaviour this puts back. */
+    ctx: { ...evalContext(), absent: 'no-row' },
     /* CASCADE OFF. A rule's write does not run the rules pass again, so one rule cannot trigger
        another and nothing here loops — every product that allowed it grew a depth limit and then a
        graph explorer to explain the depth limit. */

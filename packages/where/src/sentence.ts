@@ -143,13 +143,46 @@ export function resolveDay(word: string, nowMs: number): string | null {
 export type SentenceDeps = {
   nowMs: number;
   /**
-   * The id of the row in `register` whose title is `title`, or `null`.
+   * The ids of the rows in `register` whose title is `title`, or `null`.
    *
    * A REF IS WRITTEN BY NAME because that is what a person says: "thing is Kiln", never
    * "thing is things#1". The lookup is a callback rather than a table here so this package stays
    * free of the kernel.
+   *
+   * AND EVERY ROW BEARING IT, WHEN MORE THAN ONE DOES. The kernel's lookup was `LIMIT 1` with no
+   * order, so over two rows titled Kiln `thing is Kiln` answered the first Kiln's two jobs and left
+   * the second Kiln's job out without a word (`loop/research-batch-twenty-two-audit.md` §2). A
+   * single id is still an answer, so a caller that knows titles are unique need not build a list.
    */
-  refByTitle?: (register: string, title: string) => string | null;
+  refByTitle?: (register: string, title: string) => string | readonly string[] | null;
+  /**
+   * The register a row id's row is on, deleted or purged, or `null` when no row ever held it.
+   *
+   * ABSENT IS THE OLD TRUST, where a row id went through unread: a context that has no rows to ask
+   * (a test's page deps) cannot tell a real id from a made-up one. The kernel gives it, because an
+   * id naming no row answered `ok 0` in both forms and a row of another list did the same, where a
+   * spoken id for either is refused (§4 of the same audit).
+   */
+  refById?: (id: string) => string | null;
+  /**
+   * Whether the caller may read this register. Absent is everything, which is the owner and a rule.
+   *
+   * A REF INTO A LIST SHE CANNOT READ IS NOT LOOKED UP AT ALL. Looking it up and answering `ok 0`
+   * for a row that exists and `REF_UNKNOWN` for one that does not confirmed a hidden title and
+   * counted the hidden list by halving on `clients#N`, measured at three rows in ten asks; the
+   * mismatch refusal named a list she was never shown. `get` answers `null` for a hidden row and an
+   * absent one alike, and this is the same rule: every word names no row, and nothing is refused.
+   */
+  reads?: (register: string) => boolean;
+  /**
+   * What a ref naming no row does: refuse (`REF_UNKNOWN`, the default) or match no row.
+   *
+   * A RULE EVALUATING A ROW ASKS FOR THE SECOND. It installs over a row nobody has written yet, on
+   * purpose, and then every evaluation refused, and `matches` reads any refusal as "fires on nothing".
+   * For `is` that happens to be right. For `thing is not Launch` it is the opposite of the truth, since
+   * no row is on Launch, and one unwritten member of `in [Kiln, Launch]` silenced the Kiln it named.
+   */
+  absent?: 'refuse' | 'no-row';
   /**
    * The register an id names and the row it holds, or `null` when the words are not an id.
    *
@@ -162,6 +195,68 @@ export type SentenceDeps = {
 };
 
 export type Parsed = { predicate: Predicate | undefined; bad: Refusal[] };
+
+/**
+ * A value no ref field holds, standing for "the words named no row" where that is not a refusal.
+ *
+ * A REF FIELD HOLDS A ROW ID AND NOTHING ELSE, since `coerce` turns every spoken id into one and
+ * refuses every other string, so a value that cannot be a row id equals no row's field. `is` and
+ * `in` then drop it and `not`, `not_in` and `lacks` hold, which is what a row that is not there
+ * means, and `compile` is handed an ordinary value rather than an empty `in` it refuses.
+ */
+export const NO_ROW = '(no row)';
+
+/** What a ref's words named: the rows, nothing at all, or a row of the list in `mismatch`. */
+export type RefFound = { ids: string[] } | { unknown: true } | { mismatch: string };
+
+/**
+ * The rows a ref's words name, read the one way the sentence and the kernel's tree both read it.
+ *
+ * IT LIVES HERE AND THE KERNEL IMPORTS IT because two copies of this order were how the two forms
+ * disagreed: the sentence refused a row id as a title while the tree kept it, and then the tree
+ * refused what the sentence resolved. A row id first, then a spoken id in the list it names, then
+ * the title in the list the field points at, and a refusal only once all three have missed.
+ *
+ * A DELETED ROW IS A ROW HERE. Its jobs still point at it, and `nameOf` names it `P6` in every
+ * `context` an agent reads, so refusing `P6` and `Gone` while its row id found the orphan (`ok 1`)
+ * gave three answers about one row. The lookups the kernel hands in include deleted rows for that.
+ */
+export function lookupRef(to: string | undefined, raw: string, deps: Omit<SentenceDeps, 'nowMs'>): RefFound {
+  const said = raw.trim();
+  const readable = (register: string) => deps.reads === undefined || deps.reads(register);
+  const nothing = (): RefFound => (deps.absent === 'no-row' ? { ids: [NO_ROW] } : { unknown: true });
+
+  /* NOT LOOKED UP, AND THE ROW ID KEPT: she was handed it on a row she can read, and `get` of it
+     would answer `null` whether the row exists or not, so keeping it tells her nothing new. */
+  if (to !== undefined && !readable(to)) return { ids: [ROW_ID.test(said) ? said : NO_ROW] };
+
+  if (ROW_ID.test(said)) {
+    if (deps.refById === undefined) return { ids: [said] };
+    const on = deps.refById(said);
+    /* A row on a list the caller cannot read is no row to her, for the reason above. */
+    if (on === null || !readable(on)) return nothing();
+    return to === undefined || on === to ? { ids: [said] } : { mismatch: on };
+  }
+
+  const found = deps.refBySpoken?.(said) ?? null;
+  /* A SPOKEN ID INTO A LIST SHE CANNOT READ IS WORDS, not an id: `diary#1` answered a mismatch
+     naming Diary where `nosuchlist#1` answered `REF_UNKNOWN`, which says which lists exist. */
+  const spoken = found !== null && readable(found.register) ? found : null;
+  if (spoken && spoken.id !== null && (to === undefined || spoken.register === to)) return { ids: [spoken.id] };
+
+  /**
+   * EVERY ROW BEARING THE TITLE, AND NOT A REFUSAL. The rule `link` action one file over takes
+   * exactly one match or links nothing, and a write has to: storing one of two Kilns is a wrong
+   * row nobody sees. A filter is a read, and both Kilns' jobs, each carrying its own row id, is the
+   * whole of what `thing is Kiln` can mean; a refusal would need a code the registry does not have
+   * and would leave the second Kiln unfilterable by its name. So `is` reads as `in` over both.
+   */
+  const titled = to === undefined ? null : (deps.refByTitle?.(to, said) ?? null);
+  const ids = titled === null ? [] : typeof titled === 'string' ? [titled] : [...new Set(titled)];
+  if (ids.length) return { ids };
+  if (spoken && to !== undefined && spoken.register !== to) return { mismatch: spoken.register };
+  return nothing();
+}
 
 /** Ordered comparisons, in the words the grammar uses. */
 const ORDERED: Record<string, string> = { before: 'before', after: 'after', on: 'is' };
@@ -460,7 +555,13 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
         bad.push(refuseValue(sentence, schema, field, element, wanted, deps));
         continue;
       }
-      clauses.push({ field, [no ? OPPOSITE[asked] : asked]: held } as Predicate);
+      /* TWO ROWS SHARING A TITLE ARE TWO ELEMENTS TO LOOK FOR: `has` either of them, `lacks` both. */
+      const put = no ? OPPOSITE[asked]! : asked;
+      clauses.push(
+        Array.isArray(held)
+          ? ({ [put === 'has' ? 'any' : 'all']: held.map((one) => ({ field, [put]: one })) } as Predicate)
+          : ({ field, [put]: held } as Predicate),
+      );
       continue;
     }
 
@@ -509,7 +610,8 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
      */
     const absence = ABSENCE[said.toLowerCase()];
     const declared = decl.type === 'enum' || decl.type === 'ref' ? resolve(schema, field, decl, said, deps) : null;
-    if (absence && declared === null) {
+    /* `NO_ROW` IS NOT A ROW CALLED `empty`, so the operator still reads where the words named nothing. */
+    if (absence && (declared === null || declared === NO_ROW)) {
       const op = negated ? INVERSE[absence] : absence;
       /**
        * AND ONLY WHERE THE TYPE TAKES IT, asked of the structured compiler's own table rather than
@@ -552,7 +654,7 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
         failed = true;
         break;
       }
-      values.push(resolved);
+      values.push(...(Array.isArray(resolved) ? resolved : [resolved]));
     }
     if (failed) continue;
 
@@ -586,7 +688,7 @@ function resolve(
   decl: FieldSpec,
   said: string,
   deps: SentenceDeps,
-): string | number | null {
+): string | number | string[] | null {
   /* A `list<enum>` IS AN ENUM HERE, AND `values` IS HOW THE SCHEMA SAYS SO. It is the same marker
      `compile`'s own `checkEnum` reads, for the same reason: a list that declares values is a
      `list<enum>` and nothing else is. Read `decl.type` alone and `chased has post` hands `post`
@@ -606,16 +708,15 @@ function resolve(
     return (decl.values ?? []).find((v) => v.toLowerCase() === wanted || v.replace(/_/g, ' ').toLowerCase() === said.toLowerCase()) ?? null;
   }
 
-  /* A ROW ID STAYS, AN ID RESOLVES, AND THEN THE TITLE, which is the order the kernel's tree form
-     reads the same leaf in, so `thing is things#1` and `{field: 'thing', is: 'things#1'}` are one
-     question. The row id was refused here as a title nobody had, while the tree kept it and answered
-     14: two renderings of one grammar giving two answers. */
+  /* A ROW ID, AN ID, AND THEN THE TITLE, through `lookupRef`, which is the one function the kernel's
+     tree form reads the same leaf with, so `thing is things#1` and `{field: 'thing', is: 'things#1'}`
+     are one question. The row id was refused here as a title nobody had, while the tree kept it and
+     answered 14: two renderings of one grammar giving two answers. A title two rows share comes back
+     as both ids, and the `is` branch widens to `or` over them. */
   if (decl.type === 'ref') {
-    if (ROW_ID.test(said)) return said;
-    const spoken = deps.refBySpoken?.(said) ?? null;
-    if (spoken && spoken.id !== null && (!decl.to || spoken.register === decl.to)) return spoken.id;
-    if (!decl.to || !deps.refByTitle) return null;
-    return deps.refByTitle(decl.to, said);
+    const found = lookupRef(decl.to, said, deps);
+    if (!('ids' in found)) return null;
+    return found.ids.length === 1 ? found.ids[0]! : found.ids;
   }
 
   if (decl.type === 'bool') return said === 'true' || said === 'yes' ? 'true' : said === 'false' || said === 'no' ? 'false' : null;
@@ -671,11 +772,12 @@ function refuseValue(
   /* AN ID OF ANOTHER REGISTER IS THE WRONG ROW, NOT NO ROW. `thing is tasks#1` names a row that
      exists, and `coerce` refuses the same value written into the same field with this code, so the
      read and the write give one answer about one address. */
-  const spoken = decl.type === 'ref' && decl.to ? (deps?.refBySpoken?.(said) ?? null) : null;
-  if (spoken && decl.to && spoken.register !== decl.to)
+  /* AND A ROW ID OF ANOTHER LIST IS THE SAME WRONG ROW, asked of the one lookup `resolve` used. */
+  const found = decl.type === 'ref' && decl.to && deps ? lookupRef(decl.to, said, deps) : null;
+  if (found && 'mismatch' in found && decl.to)
     return {
       code: 'REF_REGISTER_MISMATCH',
-      fix: `${sentence}: ${field} points at ${decl.to}, and ${said} is a ${spoken.register} row. Name a ${decl.to} row.`,
+      fix: `${sentence}: ${field} points at ${decl.to}, and ${said} is a ${found.mismatch} row. Name a ${decl.to} row.`,
       at: field,
       allowed: [decl.to],
     };
