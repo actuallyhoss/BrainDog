@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import { copy } from '../../lib/copy.ts';
 import type { PackState } from '../../lib/record/packs.ts';
-import { afterInstall, drawnOrder, installShared, moduleTitle, nothingElse, oneOf, relabelled, keepVoice, offerFor, olderThan, offeredVersion, planShared, readAddress, readOnHost, rowTitle, sharedPlanOf, speakingStates, switchTo, voiceQuestion, type SharingClient } from './sharing.ts';
+import { afterInstall, drawnOrder, installShared, moduleTitle, movesOf, nothingElse, oneOf, relabelled, keepVoice, offerFor, olderThan, offeredVersion, planShared, readAddress, readOnHost, rowTitle, sharedPlanOf, speakingStates, switchTo, voiceQuestion, type SharingClient } from './sharing.ts';
 import { speaking } from '../../lib/voice.ts';
 
 const COURSES_DOC = {
@@ -295,6 +295,25 @@ test('AN UPDATE THAT BRINGS ONLY ITS VERSION SAYS NOTHING ELSE CHANGES, and one 
   assert.equal(nothingElse(sharedPlanOf({ ...bare, packs: [{ ...bare.packs[0]!, direction: 'reinstall' }] })!), false, 'the same version says so in its own words');
   assert.equal(nothingElse(sharedPlanOf({ ...bare, packs: [{ ...bare.packs[0]!, changes: ['register.courses'] }] })!), false);
   assert.equal(copy.shareNothingElse, 'Nothing else changes');
+});
+
+/* THE RECORD TAKES A HANDED LIST OUT OF `retires` AND FILES IT UNDER `hands` (`@braindog/record` `usecase.ts`), and this
+   screen read `retires` alone, so a list an update passed to another pack was on no line at all: not taken away, and not
+   said as moving either. Decide says it in `arranged.ts`, and the shared plan says it in the same words. */
+test('A LIST AN UPDATE HANDS TO ANOTHER PACK IS SAID AS MOVING THERE, on a line of its own and not among what it takes away', () => {
+  const doc = { pack: 'usecase-study', version: '1.0.2', declarations: [{ page: 'studies', title: 'Studies' }] };
+  const handing = {
+    ...ANSWER,
+    enable: [],
+    packs: [{ ...ANSWER.packs[0]!, adds: [], examples: 0, retires: ['page.old'], hands: [{ id: 'register.reading', to: 'people' }], doc }],
+  };
+  const plan = sharedPlanOf(handing)!;
+  assert.deepEqual(plan.packs[0]?.retires, ['old']);
+  assert.deepEqual(plan.packs[0]?.hands, [{ name: 'Reading', to: 'People' }]);
+  assert.deepEqual(movesOf(plan), [copy.arrangeMovesTo('Reading', 'People')]);
+  /* AN UPDATE THAT ONLY HANDS SOMETHING ON STILL DOES SOMETHING, so it is not "Nothing else changes". */
+  assert.equal(nothingElse(sharedPlanOf({ ...handing, packs: [{ ...handing.packs[0]!, retires: [] }] })!), false);
+  assert.deepEqual(sharedPlanOf(ANSWER)!.packs[0]?.hands, [], 'a plan that hands nothing on has no line for it');
 });
 
 test("A MODULE ALREADY HERE IS OFFERED IN THE ADDED USE CASE'S WORDS, and left as it is when the person says no", async () => {

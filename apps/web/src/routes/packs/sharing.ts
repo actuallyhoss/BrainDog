@@ -141,6 +141,11 @@ export type SharedPack = {
   adds: { kind: 'list' | 'page' | 'other'; name: string }[];
   changes: string[];
   retires: string[];
+  /**
+   * What the update hands to another pack instead of taking away: still live, now under `to`'s name. The record files it
+   * apart from `retires` (`PlannedPack.hands`), and a screen that read only `retires` said nothing about it at all.
+   */
+  hands: { name: string; to: string }[];
   conflicts: string[];
   examples: number;
   calls: CallOut[];
@@ -189,7 +194,9 @@ function namesIn(doc: Body, others: readonly Body[] = []): (id: string) => { kin
     const bare = rest.join('.');
     if (kind === 'register') {
       const d = decls.find((x) => x.register === bare);
-      return { kind: 'list', name: typeof d?.name === 'string' ? filled(d.name) : bare };
+      /* A LIST THIS VERSION NO LONGER DECLARES, one it takes away or hands on, is not in the file to be named from, and
+         `reading` opened the sentence that says where it goes. This build's name for it, else its id in words. */
+      return { kind: 'list', name: typeof d?.name === 'string' ? filled(d.name) : (REGISTERS[bare]?.name ?? listWords(bare)) };
     }
     if (kind === 'page') {
       const d = decls.find((x) => x.page === bare);
@@ -228,6 +235,9 @@ export function sharedPlanOf(value: unknown, nav: readonly string[] = [], links:
       adds: strings(raw.adds).map(name),
       changes: strings(raw.changes).map((id) => name(id).name),
       retires: strings(raw.retires).map((id) => name(id).name),
+      hands: (Array.isArray(raw.hands) ? raw.hands : []).flatMap((h) =>
+        isMap(h) && typeof h.id === 'string' && typeof h.to === 'string' ? [{ name: name(h.id).name, to: moduleTitle(h.to) }] : [],
+      ),
       conflicts: (Array.isArray(raw.conflicts) ? raw.conflicts : []).flatMap((c) =>
         isMap(c) && typeof c.id === 'string' ? [copy.shareConflict(name(c.id).name, moduleTitle(String(c.pack ?? '')))] : [],
       ),
@@ -301,9 +311,16 @@ export const nothingElse = (plan: SharedPlan): boolean =>
       p.adds.length === 0 &&
       p.changes.length === 0 &&
       p.retires.length === 0 &&
+      p.hands.length === 0 &&
       p.calls.length === 0,
   ) &&
   plan.packs.length > 0;
+
+/**
+ * What the plan hands from one pack to another, one sentence each, in Decide's words (`arranged.ts`), for every pack in
+ * it: money-core's update is the one that hands a bank's door on, and it is a module, not the use case's own pack.
+ */
+export const movesOf = (plan: SharedPlan): string[] => plan.packs.flatMap((p) => p.hands.map((h) => copy.arrangeMovesTo(h.name, h.to)));
 
 /**
  * Install the plan that was read, a pack at a time through `planPack` and `installPack`. The modules that are off are

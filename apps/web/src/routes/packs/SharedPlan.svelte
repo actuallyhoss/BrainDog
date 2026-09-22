@@ -2,7 +2,7 @@
   What installing a shared use case would do, as the record planned it (`sharing.ts`).
 
   ONE PLAN, PACK BY PACK, IN THE ORDER THEY GO IN. The modules it builds on first, then its own pack. Each says what it
-  adds, what an update changes or takes away, what it calls out and how many example rows come with it, and a
+  adds, what an update changes, takes away or hands to another pack, what it calls out and how many example rows come with it, and a
   conflict with a list already here is said beside the pack it belongs to and keeps Install from being pressed.
 -->
 <script lang="ts">
@@ -13,7 +13,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { words as vaultWords } from '$lib/record/vault.ts';
-  import { installable, moduleTitle, nothingElse, relabelled, type SharedPlan } from './sharing.ts';
+  import { installable, moduleTitle, movesOf, nothingElse, relabelled, type SharedPlan } from './sharing.ts';
 
   let {
     plan,
@@ -39,7 +39,10 @@
   const modules = $derived(plan.packs.filter((p) => p.role === 'module' && p.installedVersion === null));
   const updates = $derived(relabelled(plan));
   const updating = $derived(own !== null && own.installedVersion !== null);
-  const same = $derived(own !== null && own.direction === 'reinstall' && own.adds.length === 0 && own.changes.length === 0 && own.retires.length === 0);
+  const moves = $derived(movesOf(plan));
+  const same = $derived(
+    own !== null && own.direction === 'reinstall' && own.adds.length === 0 && own.changes.length === 0 && own.retires.length === 0 && own.hands.length === 0,
+  );
 </script>
 
 <section class="plan" aria-label={copy.sharePlanTitle(plan.usecase.title, plan.usecase.version)}>
@@ -97,6 +100,12 @@
         <dt>{copy.shareTakesAway}</dt>
         <dd>{own.retires.join(', ')}</dd>
       {/if}
+    {/if}
+    <!-- WHAT AN UPDATE HANDS ON IS NOT TAKEN AWAY: it stays live under the pack it moves to. Every pack's, and not only the
+         use case's own, because the update that hands a bank's door on is money-core's. -->
+    {#if moves.length > 0}
+      <dt>{copy.arrangeMoving}</dt>
+      <dd>{#each moves as m (m)}<p>{m}</p>{/each}</dd>
     {/if}
     {#each plan.packs as p (p.id)}
       {#if p.conflicts.length > 0}

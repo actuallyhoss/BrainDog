@@ -2381,6 +2381,20 @@ export const copy = {
   proposalAccent: 'Accent',
   proposalScheme: 'Scheme',
   proposalSamples: (n: number) => `Drawn from ${n} ${n === 1 ? 'thing' : 'things'} that came in`,
+  /* AN AUTOMATION AND A SCRIPT, drawn as what they would do: Decide said "Rule" and an id and nothing else, so the owner
+     accepted a flow without reading its trigger or a step. What starts it and each step are the canvas's own sentences
+     (`flow.ts` `sayTrigger`, `sayStep`); these are only the words around them. */
+  proposalHowItRuns: 'How it runs',
+  /** Where a step sits: `Step 2`, and inside a branch `Step 2, if so 1` or `Step 2, if not 1`, in the canvas's arm words. */
+  proposalStep: (at: readonly string[]) => `Step ${at.join(', ')}`,
+  proposalArmStep: (arm: string, n: number) => `${arm.toLowerCase()} ${n}`,
+  /* `packages/record` `automations.ts` says it in these words in the dry run: a `call` or a `script` step installs, and a
+     run that reaches one fails there (`NOT_IN_THIS_BUILD` in the kernel's `flow.ts`). */
+  proposalNotBuilt: 'Not in this build: a run stops here, after the steps before it.',
+  proposalCallsOut: 'Calls out',
+  proposalCallsNothing: 'Nothing outside this record',
+  proposalMaySend: 'May send',
+  proposalSource: (name: string) => `The source of ${name}`,
   decideRows: (n: number, list: string) => `Changes ${n} ${n === 1 ? 'row' : 'rows'} in ${list}`,
   decideGroup: 'Group',
   decideGroupNone: 'One list',

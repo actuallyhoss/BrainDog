@@ -560,6 +560,15 @@
           <h2 class="options-title">{copy.proposalWillAppear}</h2>
         </div>
         <Proposed proposed={preview} />
+        <!-- A SCRIPT'S SOURCE, WHOLE AND FOLDED: it is what runs, and code keeps its lines, which a line of the preview
+             cannot. A scrolling box a keyboard can reach, as the canvas's written body is. -->
+        {#each preview.appears.filter((a) => a.source !== undefined) as a, i (i)}
+          <details class="source-fold">
+            <summary>{copy.proposalSource(a.title)}</summary>
+            <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+            <pre class="source" tabindex="0">{a.source}</pre>
+          </details>
+        {/each}
       </section>
     {/if}
 
@@ -885,6 +894,38 @@
 
   .pick-hint {
     margin: 0 0 var(--sp-2);
+  }
+
+  .source-fold {
+    margin-block-start: var(--sp-3);
+    color: var(--ink2);
+    font-size: var(--t-ui);
+  }
+
+  .source-fold > summary {
+    cursor: pointer;
+  }
+
+  @media (pointer: coarse) {
+    .source-fold > summary {
+      min-block-size: var(--tap);
+    }
+  }
+
+  /* The canvas's written body (`automations/[id]`), so a script reads the same wherever it is shown. */
+  .source {
+    margin: var(--sp-2) 0 0;
+    padding: var(--sp-3);
+    overflow: auto;
+    max-block-size: 60vh;
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    color: var(--ink2);
+    font-family: var(--font-id);
+    font-size: var(--t-sm);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
   }
 
   .calls-out {
