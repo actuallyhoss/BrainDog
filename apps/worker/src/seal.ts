@@ -167,8 +167,9 @@ function tagOf(key: Uint8Array, ct: Uint8Array): Uint8Array {
  * ChaCha20-Poly1305 seal of `plain` written straight into `out` at `at`: the ciphertext, then the
  * 16-byte tag. `out` must have `plain.length + 16` bytes free there.
  *
- * INTO THE CALLER'S BUFFER AND NOT A NEW ONE, because the caller is `sealTo` and its buffer is the
- * whole file. See the payload comment there for what that was measured to save.
+ * INTO THE CALLER'S BUFFER AND NOT A NEW ONE, because `sealTo`'s buffer is the whole file. Sealing
+ * each chunk into a fresh buffer and copying it across measured 34 MiB above the output at the
+ * ceiling (`test/seal-memory.test.ts`), all of it chunks the collector had not reached yet.
  */
 function sealInto(key: Uint8Array, nonce: Uint8Array, plain: Uint8Array, out: Uint8Array, at: number): void {
   const k = words(key);
@@ -315,61 +316,117 @@ async function hkdf(ikm: Uint8Array, salt: Uint8Array, info: string): Promise<Ui
 /** age's payload chunk: 64 KiB of plaintext, each sealed under its own counter nonce. */
 const CHUNK = 64 * 1024;
 
+/** A sealed file not yet written: how long it will be, and the stream that writes it. */
+export type Sealed = { length: number; stream: ReadableStream<Uint8Array> };
+
 /**
- * A sealer to one X25519 recipient, in the shape `snapshots.ts` calls a `Seal`.
+ * The sealer to one X25519 recipient, as a stream that seals one 64 KiB chunk per pull. The
+ * recipient must already have passed `recipientOf`. This is the one implementation of age here:
+ * the Worker streams it to R2 through `snapshots.ts`, and `sealTo` below reads it into a buffer.
  *
  * EVERY CALL IS A FRESH FILE KEY AND A FRESH EPHEMERAL SHARE, as the spec requires: two nights of
- * one record share nothing a reader of the bucket could line up.
+ * one record share nothing a reader of the bucket could line up. The stream reads `file` as it is
+ * pulled and never copies it, so the caller must not change `file` until the stream ends.
+ *
+ * WHY A STREAM AND NOT ONE BUFFER. `take` used to hold the sealed file beside the plaintext for
+ * both puts: measured by `test/snapshots-stream.test.ts` at the 40 MiB ceiling, 80 MiB live while
+ * the bucket read, 40 of it above the plaintext. Pulled a chunk at a time it measured 2 MiB above.
+ *
+ * WHY THERE IS ONLY ONE. For one commit (`629e8861`) this stream lived in `seal-stream.ts` as a
+ * line-for-line copy of the header and payload rules here, and the Worker called the copy while
+ * `seal.test.ts` and `seal-memory.test.ts` tested the original. Breaking the copy's final-chunk
+ * flag left both of those files green; only the streaming test saw it.
+ */
+export function sealStreamTo(recipient: Uint8Array): (file: Uint8Array) => Promise<Sealed> {
+  return async (file) => {
+    const { first, count, length, chunk } = await begin(recipient, file);
+
+    /* THE HEADER AND THE PAYLOAD NONCE ARE THE FIRST PULL, then one sealed chunk per pull. */
+    let i = -1;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(out) {
+        if (i === -1) {
+          out.enqueue(first);
+        } else if (i < count) {
+          const plain = i === count - 1 ? file.length - i * CHUNK : CHUNK;
+          const sealed = new Uint8Array(plain + 16);
+          chunk(i, sealed, 0);
+          out.enqueue(sealed);
+        } else {
+          out.close();
+        }
+        i++;
+      },
+    });
+    return { length, stream };
+  };
+}
+
+/**
+ * Everything about one sealed file but its payload bytes: the header and payload nonce that open it,
+ * its chunk count and length, and `chunk`, which seals chunk `i` into `out` at `at`. The one place
+ * the header, the HKDF salts, the low-order refusal and the STREAM nonce rules are written.
+ */
+async function begin(
+  recipient: Uint8Array,
+  file: Uint8Array,
+): Promise<{ first: Uint8Array; count: number; length: number; chunk: (i: number, out: Uint8Array, at: number) => void }> {
+  const fileKey = crypto.getRandomValues(new Uint8Array(16));
+
+  /* THE X25519 STANZA. The wrap key's salt is the ephemeral share then the recipient, in that order. */
+  const pair = (await subtle().generateKey({ name: 'X25519' }, true, ['deriveBits'])) as { publicKey: Key; privateKey: Key };
+  const share = new Uint8Array(await subtle().exportKey('raw', pair.publicKey));
+  const them = await subtle().importKey('raw', recipient, { name: 'X25519' }, true, []);
+  const shared = new Uint8Array(await subtle().deriveBits({ name: 'X25519', public: them }, pair.privateKey, 256));
+  /* AN ALL-ZERO SECRET MEANS A LOW-ORDER RECIPIENT, and the spec says to refuse it rather than wrap
+     to it. `recipientOf` refuses one before a sealer exists, so this is for a caller that hands
+     raw bytes in, and for a runtime whose WebCrypto returns the zeros instead of throwing. */
+  if (shared.every((b) => b === 0)) throw new Error(LOW_ORDER);
+  const wrapKey = await hkdf(shared, concat(share, recipient), 'age-encryption.org/v1/X25519');
+  const body = chacha20poly1305(wrapKey, new Uint8Array(12), fileKey);
+
+  /* THE HEADER AND ITS MAC. The MAC covers everything up to and including `---`, and not the space
+     after it. The body is 32 bytes, 43 base64 characters, so it is one line under 64 and the
+     stanza needs no empty closing line. */
+  const header = `age-encryption.org/v1\n-> X25519 ${b64(share)}\n${b64(body)}\n---`;
+  const macKey = await subtle().importKey('raw', await hkdf(fileKey, new Uint8Array(0), 'header'), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const mac = new Uint8Array(await subtle().sign('HMAC', macKey, new TextEncoder().encode(header)));
+
+  /* THE PAYLOAD. A 16-byte nonce salts the payload key, then STREAM: counter in the first eleven
+     bytes of the nonce, and the last byte set on the final chunk only. An empty file is one empty
+     final chunk; a file that is an exact multiple of 64 KiB ends on a full chunk that carries the
+     flag, never on an empty one after it, which age refuses. */
+  const nonce = crypto.getRandomValues(new Uint8Array(16));
+  const payloadKey = await hkdf(fileKey, nonce, 'payload');
+  const first = concat(new TextEncoder().encode(`${header} ${b64(mac)}\n`), nonce);
+  const count = Math.max(1, Math.ceil(file.length / CHUNK));
+  const length = first.length + file.length + 16 * count;
+  const chunk = (i: number, out: Uint8Array, at: number): void => {
+    const n = new Uint8Array(12);
+    new DataView(n.buffer).setUint32(7, i, false);
+    if (i === count - 1) n[11] = 1;
+    sealInto(payloadKey, n, file.subarray(i * CHUNK, (i + 1) * CHUNK), out, at);
+  };
+  return { first, count, length, chunk };
+}
+
+/**
+ * The same sealer read into one buffer, for a caller that wants the whole file: the tests, which
+ * open what it returns with `age-open.ts`, and anything without a bucket that takes a stream.
+ *
+ * THE SAME `begin` AS THE STREAM AND NOT A SECOND WRITER, so every test of this function is a test
+ * of the header and nonce rules the Worker puts. The buffer is allocated once at its final length and
+ * each chunk is sealed straight into its place, so the peak is the output plus a few MiB
+ * (`test/seal-memory.test.ts`).
  */
 export function sealTo(recipient: Uint8Array): (file: Uint8Array) => Promise<Uint8Array> {
   return async (file) => {
-    const fileKey = crypto.getRandomValues(new Uint8Array(16));
-
-    /* THE X25519 STANZA. The wrap key's salt is the ephemeral share then the recipient, in that order. */
-    const pair = (await subtle().generateKey({ name: 'X25519' }, true, ['deriveBits'])) as { publicKey: Key; privateKey: Key };
-    const share = new Uint8Array(await subtle().exportKey('raw', pair.publicKey));
-    const them = await subtle().importKey('raw', recipient, { name: 'X25519' }, true, []);
-    const shared = new Uint8Array(await subtle().deriveBits({ name: 'X25519', public: them }, pair.privateKey, 256));
-    /* AN ALL-ZERO SECRET MEANS A LOW-ORDER RECIPIENT, and the spec says to refuse it rather than wrap
-       to it. `recipientOf` refuses one before a sealer exists, so this is for a caller that hands
-       `sealTo` raw bytes, and for a runtime whose WebCrypto returns the zeros instead of throwing. */
-    if (shared.every((b) => b === 0)) throw new Error(LOW_ORDER);
-    const wrapKey = await hkdf(shared, concat(share, recipient), 'age-encryption.org/v1/X25519');
-    const body = chacha20poly1305(wrapKey, new Uint8Array(12), fileKey);
-
-    /* THE HEADER AND ITS MAC. The MAC covers everything up to and including `---`, and not the space
-       after it. The body is 32 bytes, 43 base64 characters, so it is one line under 64 and the
-       stanza needs no empty closing line. */
-    const header = `age-encryption.org/v1\n-> X25519 ${b64(share)}\n${b64(body)}\n---`;
-    const macKey = await subtle().importKey('raw', await hkdf(fileKey, new Uint8Array(0), 'header'), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-    const mac = new Uint8Array(await subtle().sign('HMAC', macKey, new TextEncoder().encode(header)));
-
-    /* THE PAYLOAD. A 16-byte nonce salts the payload key, then STREAM: counter in the first eleven
-       bytes of the nonce, and the last byte set on the final chunk only. An empty file is one empty
-       final chunk; a file that is an exact multiple of 64 KiB ends on a full chunk that carries the
-       flag, never on an empty one after it, which age refuses.
-
-       EACH CHUNK IS SEALED STRAIGHT INTO ITS PLACE IN THE FILE, which is allocated once at its final
-       length. The first version pushed every sealed chunk onto an array and concatenated the lot at
-       the end, so at the peak it held the ciphertext twice: sealing a 40 MiB dump raised Node's peak
-       resident memory by 86 MiB above the plaintext, against a Worker's 128 MB with the plaintext
-       still to fit. Written in place it measured a few MiB above the output itself, which is the
-       floor while `Seal` returns one buffer (`test/seal-memory.test.ts`). The bytes are the same. */
-    const nonce = crypto.getRandomValues(new Uint8Array(16));
-    const payloadKey = await hkdf(fileKey, nonce, 'payload');
-    const head = new TextEncoder().encode(`${header} ${b64(mac)}\n`);
-    const count = Math.max(1, Math.ceil(file.length / CHUNK));
-    const out = new Uint8Array(head.length + nonce.length + file.length + 16 * count);
-    out.set(head, 0);
-    out.set(nonce, head.length);
-    const n = new Uint8Array(12);
-    const counter = new DataView(n.buffer);
-    for (let i = 0, at = head.length + nonce.length; i < count; i++) {
-      counter.setUint32(7, i, false);
-      if (i === count - 1) n[11] = 1;
-      const plain = file.subarray(i * CHUNK, (i + 1) * CHUNK);
-      sealInto(payloadKey, n, plain, out, at);
-      at += plain.length + 16;
+    const { first, count, length, chunk } = await begin(recipient, file);
+    const out = new Uint8Array(length);
+    out.set(first, 0);
+    for (let i = 0, at = first.length; i < count; i++) {
+      chunk(i, out, at);
+      at += Math.min(CHUNK, file.length - i * CHUNK) + 16;
     }
     return out;
   };

@@ -29,8 +29,7 @@
 
 import { fixOf, type Result } from '@braindog/ports';
 
-import { recipientOf } from './seal.ts';
-import { sealStreamTo, type Sealed } from './seal-stream.ts';
+import { recipientOf, sealStreamTo, type Sealed } from './seal.ts';
 
 /** How many dated copies are kept. Thirty, because `apps/selfhost/src/snapshots.ts` keeps thirty (`53 §5.4`). */
 export const KEEP = 30;
