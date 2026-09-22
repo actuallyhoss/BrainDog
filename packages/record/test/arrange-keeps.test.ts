@@ -4,13 +4,17 @@
  * THE TWO DISAGREED. `arrangement` listed every declaration the owner had changed as `keeps` from the record's history
  * alone, without planning the update. On a record whose owner renamed `register.fx` "My rates", with a money-core 1.7.0
  * on offer that adds a `spread` field to fx and a figure summing it, `arrangement` answered
- * `{ id: 'money-core', from: '1.6.0', to: '1.7.0', keeps: ['register.fx'] }`, and `propose` for the same update was
+ * `{ id: 'money-core', from: '1.6.0', to: '1.7.0', keeps: ['register.fx'] }` (measured when 1.6.0 was current), and
+ * `propose` for the same update was
  * refused `PROVIDES_CONFLICT`: "changes your My rates list, which you changed". An agent reading the first was told an
  * update was fine that the second would refuse.
  *
  * SO `arrangement` PLANS EACH UPDATE IT OFFERS, the way `propose` does, and says the refusal where there is one. The
  * record is built through `planPack` and `installPack` rather than `installSeed`, because the seed writes its
  * declarations with no pack behind them, and a record with no money-core version has no update to offer.
+ *
+ * THE VERSIONS ARE READ, NOT WRITTEN. The record is on whatever `FIRST_PARTY_VERSIONS` says money-core is, and the update
+ * on offer is the minor step above it, so raising money-core does not turn these tests red for a reason that is not theirs.
  */
 
 import { test } from 'node:test';
@@ -18,7 +22,7 @@ import assert from 'node:assert/strict';
 
 import { createRecordApi, type CallContext } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
-import { FIRST_PARTY, firstPartyDocument } from '../../seed/src/index.ts';
+import { FIRST_PARTY, FIRST_PARTY_VERSIONS, firstPartyDocument } from '../../seed/src/index.ts';
 import { seedCatalogue } from '../../seed/src/usecases/catalogue.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
@@ -40,11 +44,16 @@ type Doc = { version: string; declarations: Record<string, unknown>[] };
 type Diff = { planHash: string; approve: string[] };
 type Update = { id: string; from: string; to: string; keeps?: string[]; refused?: { code: string; fix: string } };
 
-/** A money-core 1.7.0 on offer, built from the first-party document by `change`. */
+/** The version every first-party install below puts money-core on, and the minor step above it that is offered. */
+const CURRENT = FIRST_PARTY_VERSIONS['money-core'];
+const [major, minor] = CURRENT.split('.').map(Number) as [number, number];
+const NEXT = `${major}.${minor + 1}.0`;
+
+/** The next money-core on offer, built from the first-party document by `change`. */
 const offering = (doc: Doc) => seedCatalogue().map((e) => (e.id === 'money-core' ? { ...e, version: doc.version, doc: () => structuredClone(doc) as never } : e));
 const next = (change: (d: Doc) => void): Doc => {
   const d = structuredClone(firstPartyDocument('money-core')) as unknown as Doc;
-  d.version = '1.7.0';
+  d.version = NEXT;
   change(d);
   return d;
 };
@@ -103,7 +112,7 @@ test('an update that reads a list its module update adds is offered, as propose 
     said(await api.installPack({ doc: pack, source: { kind: 'local' }, planHash: planned.diff.planHash, approve: planned.diff.approve } as never, owner));
   }
   const ar = said<{ updates?: Update[] }>(await api.arrangement({}, agent));
-  assert.deepEqual(ar.updates?.find((u) => u.id === 'money-core'), { id: 'money-core', from: '1.6.0', to: '1.7.0' });
+  assert.deepEqual(ar.updates?.find((u) => u.id === 'money-core'), { id: 'money-core', from: CURRENT, to: NEXT });
   said(await api.propose({ question: 'Update money?', body_kind: 'pack', body: { install: 'money-core' } } as never, agent));
   sql.close();
 });
@@ -111,7 +120,7 @@ test('an update that reads a list its module update adds is offered, as propose 
 test('an update that leaves the changed list as the pack wrote it still says it keeps the list, and propose files it', async () => {
   const { sql, api } = await renamedRates(next(() => undefined));
   const ar = said<{ updates?: Update[] }>(await api.arrangement({}, agent));
-  assert.deepEqual(ar.updates, [{ id: 'money-core', from: '1.6.0', to: '1.7.0', keeps: ['register.fx'] }]);
+  assert.deepEqual(ar.updates, [{ id: 'money-core', from: CURRENT, to: NEXT, keeps: ['register.fx'] }]);
   said(await api.propose({ question: 'Update money?', body_kind: 'pack', body: { install: 'money-core' } } as never, agent));
   sql.close();
 });

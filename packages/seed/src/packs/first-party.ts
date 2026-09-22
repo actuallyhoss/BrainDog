@@ -82,6 +82,10 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   cost, a day they were acquired and sometimes a day they mature, and until now the only list that would take them was
  *   an account with a balance, which counts a policy as cash somebody could spend. `holdings` is the list that does not.
  *   One list added and nothing taken away, so the step is a minor one.
+ * - money-core 1.7.0: a bank text message files itself. Each of the eight bank patterns gains a webhook twin, the same
+ *   reading under the id `<pattern>-sms`, which an iOS Shortcut posts the SMS to at an address carrying a token only an
+ *   owner can make. Until the token is made every message posted there waits in the inbox, and none is written. Eight
+ *   declarations added and nothing taken away, so the step is a minor one.
  * - estate 1.2.0: a service carries a note. the old tool's domains carry the reason each name is held and what is
  *   unresolved about it, and Services had no field that holds prose, so the import left every note in the export. One
  *   field added and nothing taken away, so the step is a minor one. It moves the version rather than riding on 1.1.0
@@ -108,7 +112,7 @@ const SUMMARIES: Record<FirstPartyId, string> = {
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.4.0',
   people: '1.0.0',
-  'money-core': '1.6.0',
+  'money-core': '1.7.0',
   estate: '1.2.0',
   work: '1.6.0',
 };

@@ -35,15 +35,15 @@
  * bytes sent twice: with `verified: false` the payload was matched, extracted and written into a
  * register, and three unverified arrivals of one shape queued a model draft somebody pays for.
  *
- * WHAT IS STILL NOT HERE IS THE MATERIAL A `verify` ANSWERS WITH. `25 §3.2` writes a webhook ingest's
- * `verify: { kind: hmac_sha256, header, grant }` and `12 §3` names a random path token as the other
- * form; grepped on 2026-09-20, no `verify` key exists in `packages/kernel/src/declare.ts` or in
- * `packages/declare`, so no declaration in this build can carry one. Both hosts therefore answer
- * `{ kind: 'none' }` for an ingest somebody declared, every webhook arrival is stored `untriaged`,
- * and none is matched. That is `12 §3` applied to a record that has declared no verifier, and it is
- * the right way round: the pipeline is reachable, and nothing is trusted that nobody vouched for.
+ * A PATH TOKEN IS THE ONE `verify` A RECORD CAN ANSWER, SINCE 22 SEPTEMBER. `12 §3` names a random path
+ * token and `25 §3.2` an HMAC; `declare.ts` now takes `verify: { kind: path }` on a webhook and refuses
+ * `hmac_sha256` by name, because nothing binds a grant's key to an ingest yet. The record keeps the
+ * minted token's digest and answers it; `hook` digests the URL's segment and compares. An ingest that
+ * declares no verifier, or one nobody has minted a token for, is still answered `{ kind: 'none' }`, and
+ * every arrival at it is stored `untriaged` and matched by nothing, which is `12 §3` the right way
+ * round: the pipeline is reachable, and nothing is trusted that nobody vouched for.
  *
- * SO FORWARDED MAIL IS THE ONLY CHANNEL THAT CAN BE ELIGIBLE TODAY, and `forwarderPassed` below is
+ * FORWARDED MAIL IS THE OTHER CHANNEL THAT CAN BE ELIGIBLE, and `forwarderPassed` below is
  * where that whole decision lives. It has been wrong twice, once by believing a verdict the sender
  * wrote itself and once by believing a real verdict that was about somebody else's domain, and its
  * own header says what each of the two cost.
@@ -79,8 +79,20 @@ export type IngestPath =
  * `hmac_sha256` CARRIES THE KEY ALREADY UNSEALED, because unsealing is the host's: the Worker's binding
  * and the self-host's key store are the half that differs (`sealing.ts`'s own header). This file takes
  * bytes and does the comparison, once, for both.
+ *
+ * `path` CARRIES THE TOKEN'S SHA-256 IN HEX, which is all a record keeps (`ingestMint` in
+ * `packages/record/src/index.ts`). It carried the token itself until 22 September, and measured at
+ * `15a6aa33` that shape could never be answered: the record keeps no token, so it said `none` and the
+ * right token posted through the Worker's door was stored `untriaged`. `hook` digests the segment and
+ * compares the digests.
+ *
+ * THE `token` SPELLING IS STILL TAKEN, AND ONLY BY TESTS. `packages/host/test/ingest.test.ts` and
+ * `apps/worker/test/ingest.test.ts` build `{ kind: 'path', token }` doors of their own, and neither file
+ * was this change's to edit; it is digested on arrival here, so both spellings meet the same comparison.
+ * Nothing in either host answers it, and it goes when those two tests move to `sha256`.
  */
 export type IngestVerify =
+  | { kind: 'path'; sha256: string }
   | { kind: 'path'; token: string }
   | { kind: 'hmac_sha256'; header: string; key: Uint8Array }
   | { kind: 'none' };
@@ -544,6 +556,19 @@ async function signed(request: Request, body: Uint8Array<ArrayBuffer>, v: Extrac
 }
 
 /**
+ * Whether the URL's last segment is the token whose digest the record holds.
+ *
+ * THE SEGMENT IS DIGESTED FIRST AND THE RECORD'S VALUE NEVER IS, and the order is the security. Comparing the
+ * segment against the stored digest as it stands would make the digest the password, so a copy of a record, which
+ * carries the digest in its header, would be a working URL. `sameSecret` then digests both sides again to keep
+ * the comparison to 32 bytes, so the time it takes says nothing about where the two differ.
+ */
+async function pathToken(segment: string, v: Extract<IngestVerify, { kind: 'path' }>): Promise<boolean> {
+  const want = 'sha256' in v ? v.sha256 : await digest(utf8(v.token));
+  return sameSecret(await digest(utf8(segment)), want.toLowerCase());
+}
+
+/**
  * Answer one `/in/*` request.
  *
  * THE ORDER IS THE SECURITY, so it is worth reading as one list: the shape of the path, whether this
@@ -615,7 +640,7 @@ async function hook(request: Request, door: IngestDoor, path: Extract<IngestPath
      weaker of the two checks would always be the one that ran. */
   const verified =
     v.kind === 'path'
-      ? path.token !== undefined && (await sameSecret(path.token, v.token))
+      ? path.token !== undefined && (await pathToken(path.token, v))
       : v.kind === 'hmac_sha256'
         ? await signed(request, bytes, v)
         : false;

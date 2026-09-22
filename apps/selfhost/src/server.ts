@@ -484,11 +484,26 @@ function inboundDigest(file: string, now: () => number): () => Promise<string | 
 /**
  * The self-host's half of `/in/*`: one record, one process, and `49 §5.16`'s two shapes.
  *
- * THE CLOUD'S WEBHOOK SHAPE IS DECLINED HERE, and that is what `verify` answering `null` to an ask
- * carrying a `rec` means. `/in/webhook/<rec>/<ingest>/<token>` is a URL for a Worker serving every
- * record, and a self-host serving one record has nothing to resolve the first segment against: it
- * would either ignore the id, which makes two URLs one door, or compare it, which tells whoever
- * holds the URL what this record's id is. 404 says neither.
+ * THE CLOUD'S WEBHOOK SHAPE IS SERVED HERE FOR AN INGEST THAT READS A TOKEN, AND ONLY FOR THAT ONE.
+ * Until 22 September every ask carrying a `rec` was answered `null`, on the reasoning that comparing
+ * the id tells whoever holds the URL what it is. That left a path token nowhere to ride:
+ * `servesIngest` parses `/in/webhook/<ingest>` with no token segment and the five-segment
+ * `/in/webhook/<rec>/<ingest>/<token>` with one, so measured against this server
+ * (`apps/selfhost/test/shortcut-arrival.test.ts`) the right minted token answered 404 and the only
+ * URL a Shortcut could post to stored the SMS `untriaged` however right the token was. And the
+ * oracle it guarded against is not one: the id is in the URL the person was given, the Cloud
+ * compares it the same way, and a guessed ULID is 80 random bits away from this record.
+ *
+ * SO `rec` MUST BE THIS RECORD'S ID AND THE INGEST MUST ANSWER `path`, OR IT IS 404. The first half
+ * is what keeps a URL for somebody else's record from being a door here. The second is what keeps
+ * the rule that two URLs are not one door: an ingest declaring no `verify:` has nothing that would
+ * read the last segment, so it keeps the one URL it had and the Cloud-shape test in `server.test.ts`,
+ * a token appended to such an ingest, is still a 404. An ingest that declares a path token and has
+ * none minted is answered `none` by the record and so is a 404 here too, which is right: there is
+ * no token yet that the URL could be carrying.
+ *
+ * A WRONG TOKEN IS STILL A ROW AND NOT A REFUSAL. `hook` compares the segment against the digest
+ * the record answered and stores the arrival `untriaged` when they differ, the same as the Cloud.
  *
  * THE MAIL DOOR EXISTS ONLY WHERE THERE IS A DIRECTORY TO KEEP A TOKEN IN. `inbound` is absent for
  * a database in memory, and `serveIngest` then answers 404 for the whole `/in/email/*` surface, the
@@ -504,7 +519,13 @@ function inboundDigest(file: string, now: () => number): () => Promise<string | 
  */
 function arrivalDoor(api: Api, spend: (key: string) => number | null, inbound: (() => Promise<string | null>) | null): IngestDoor {
   return {
-    verify: async (ask) => (ask.rec === undefined ? api.ingestVerify({ ingest: ask.ingest }) : null),
+    verify: async (ask) => {
+      if (ask.rec === undefined) return api.ingestVerify({ ingest: ask.ingest });
+      const here = api.kernel.identity()?.id;
+      if (here === undefined || ask.rec !== here) return null;
+      const v = await api.ingestVerify({ ingest: ask.ingest });
+      return v?.kind === 'path' ? v : null;
+    },
     /* THE RECORD TAKES THE BYTES AND THE FLAG, AND NOTHING ELSE OF THE URL. `rec` is this process's
        one record and `ingest` is checked above; neither is a fact about the payload. */
     arrive: (arrival) =>

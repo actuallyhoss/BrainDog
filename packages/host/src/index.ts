@@ -202,6 +202,10 @@ export const ROUTES: readonly Route[] = [
   { name: 'deviceApprove', group: 'ADMIN', writes: true, what: 'Let in the device showing these six digits. A sign-in in the last fifteen minutes.' },
   { name: 'listDevices', group: 'ADMIN', writes: false, what: 'Every device grant by its handle, with when it was last heard from. Never the id it polls with.' },
   { name: 'revokeDevice', group: 'ADMIN', writes: true, what: 'Revoke one device by its handle. A login grant takes its token with it.' },
+  /* THE SHORTCUT'S DOOR, AND AN OWNER'S IN A BROWSER for `deviceApprove`'s reason: whoever holds the token can put a
+     bank line of their choosing into the ledger at `exact`. Unrouted, the mint was reachable from a test and from
+     nothing a person could open: `packages/host/test/ingest-shortcut.test.ts` (8) answered 404 `ROUTE_UNKNOWN`. */
+  { name: 'ingestMint', group: 'ADMIN', writes: true, what: "Make the token a webhook ingest's address carries. It is shown once, only its digest is kept, and minting again replaces it." },
   /* `writes: true` BECAUSE IT WRITES. An export appends an `export` event — 12 §6's rule that a
      vault whose reads are not audited cannot say whether anything got out — and a GET that mutates
      the record is a GET a proxy may replay and a browser may prefetch. */
@@ -436,6 +440,7 @@ export type RecordSurface = {
   deviceApprove(args: never, ctx: never): Promise<Result<unknown>>;
   listDevices(ctx: never): Promise<Result<unknown>>;
   revokeDevice(args: never, ctx: never): Promise<Result<unknown>>;
+  ingestMint(args: never, ctx: never): Promise<Result<unknown>>;
   export(args: never, ctx: never): Promise<Result<unknown>>;
   import(args: never, ctx: never): Promise<Result<unknown>>;
   snapshot(args: never, ctx: never): Promise<Result<unknown>>;
@@ -522,6 +527,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     deviceApprove: (a, ctx) => api.deviceApprove(a as never, ctx as never),
     listDevices: (_a, ctx) => api.listDevices(ctx as never),
     revokeDevice: (a, ctx) => api.revokeDevice(a as never, ctx as never),
+    ingestMint: (a, ctx) => api.ingestMint(a as never, ctx as never),
     export: (a, ctx) => api.export(a as never, ctx as never),
     import: (a, ctx) => api.import(a as never, ctx as never),
     snapshot: (a, ctx) => api.snapshot(a as never, ctx as never),

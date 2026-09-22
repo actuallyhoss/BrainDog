@@ -27,7 +27,7 @@ import { AGENTS_PACK, AGENTS_REGISTERS, RUNS_ON, agentsPackDocument } from './pa
 export { AGENTS_PACK, AGENTS_PAGES, AGENTS_REGISTERS, RUNS_ON, agentsPackDocument, type PackManifest } from './packs/agents.ts';
 export { FIRST_PARTY, FIRST_PARTY_VERSIONS, crossPack, firstPartyDocument, firstPartyManifest, type DocumentOptions, type FirstPartyId } from './packs/first-party.ts';
 export * from './modules/base.ts';
-export { ACCOUNTS, CATEGORIES, INSTALLMENTS, MONEY_INGESTS, OBLIGATIONS, RECURRING_ITEMS, SNAPSHOTS, TRANSACTIONS, cashSeries, nightOf, snapshotRows, type SeedIngest } from './modules/money.ts';
+export { ACCOUNTS, CATEGORIES, INSTALLMENTS, MONEY_INGESTS, MONEY_SMS_INGESTS, OBLIGATIONS, RECURRING_ITEMS, SNAPSHOTS, TRANSACTIONS, cashSeries, nightOf, snapshotRows, type SeedIngest } from './modules/money.ts';
 export { SERVICES } from './modules/estate.ts';
 export { PROJECTS_SAID, THINGS } from './modules/portfolio.ts';
 export { PEOPLE } from './modules/people.ts';
@@ -40,6 +40,7 @@ import {
   INSTALLMENTS,
   MONEY_HOME_SETTING,
   MONEY_INGESTS,
+  MONEY_SMS_INGESTS,
   MONEY_METRICS,
   MONEY_PAGES,
   MONEY_REGISTERS,
@@ -213,8 +214,13 @@ export const ruleDeclarations = (): Declaration[] =>
  * all. Measured on a seeded record before this line: nought declarations of kind `ingest`, and an
  * HSBC charge alert posted at the arrival path was stored, hashed, left `untriaged` and wrote
  * nothing, which is correct behaviour and an empty ledger beside a full inbox.
+ *
+ * AND THE SAME EIGHT READINGS AS WEBHOOKS, since money-core 1.7.0, because his bank's messages reach him as
+ * text on a phone that forwards no mail. Before `MONEY_SMS_INGESTS` was spread here, an SMS his Shortcut posted at
+ * `bank-from-out-sms` answered 404 on every record the product had set up
+ * (`packages/host/test/ingest-shortcut.test.ts` (7)). A twin matches nothing until an owner mints its token.
  */
-export const INGESTS: Record<string, SeedIngest> = { ...MONEY_INGESTS };
+export const INGESTS: Record<string, SeedIngest> = { ...MONEY_INGESTS, ...MONEY_SMS_INGESTS };
 
 export const ingestDeclarations = (): Declaration[] =>
   Object.values(INGESTS).map((body) => ({ id: `ingest.${body.ingest}`, kind: 'ingest' as const, body: body as never }));

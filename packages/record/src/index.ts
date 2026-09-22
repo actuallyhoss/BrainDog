@@ -102,15 +102,46 @@ export { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, 
 /**
  * What proves a caller is the sender an ingest expects, as the record can answer it today.
  *
- * ONE MEMBER, AND IT IS A UNION ON PURPOSE. `@braindog/host`'s `IngestVerify` has three kinds and
- * this answers the one a record with no declared verifier can honestly give; written as a union of
- * one, so the day a verifier can be answered it is added here and every caller that switched on
- * `kind` already compiles. `verify: { kind: path }` reached the grammar on 22 September and did not
- * add one: see `ingestVerify` for why the door cannot use what a record may keep. The record may not import the host's type: the
- * edge points the other way (`31 §2`), so this is structural and the door's parameter is what
- * checks the two agree.
+ * TWO MEMBERS OF `@braindog/host`'s `IngestVerify`, AND `hmac_sha256` IS NOT ONE OF THEM, because
+ * nothing binds a grant's key to an ingest yet and `declare.ts` refuses the spelling. `path` carries
+ * the SHA-256 of the token `ingestMint` showed, in hex, and never the token: the door digests the URL's
+ * segment and compares the two digests (`packages/host/src/ingest.ts`, `hook`). The record may not
+ * import the host's type: the edge points the other way (`31 §2`), so this is structural and the
+ * door's parameter is what checks the two agree.
  */
-export type IngestVerification = { kind: 'none' };
+export type IngestVerification = { kind: 'none' } | { kind: 'path'; sha256: string };
+
+/**
+ * Where a webhook ingest's token digest is kept: a `dog_meta` row per ingest.
+ *
+ * `dog_meta` BECAUSE IT NEEDS NO NEW TABLE, and a key-value row is the only shape of existing table
+ * that a digest per ingest fits without borrowing somebody else's columns. A table of its own would be
+ * the right home and is a kernel migration, which this file does not own; a table created here on
+ * first mint would break `apps/selfhost/src/snapshots.ts`, whose restore
+ * copies every table of the live database out of the snapshot by name: a snapshot taken before the
+ * first mint has no such table, and the whole restore would be refused (read, not run). The cost of the
+ * header is that the row travels in every export and a record opened from the file answers the same
+ * token, and a digest travelling is the case `apps/worker/src/inbound.ts` already argues is safe: the
+ * SHA-256 of 32 random bytes cannot be walked back, so a copy of the file is not a copy of the door.
+ */
+const ingestTokenKey = (ingest: string): string => `ingest_token.${ingest}`;
+
+/**
+ * Thirty-two random bytes, base64url and unpadded: 43 characters.
+ *
+ * THE FORWARDING ADDRESS'S OWN SHAPE (`secret` in `apps/worker/src/inbound.ts`, and `randomBytes(32)`
+ * on the self-host), so a person carries one kind of token between hosts, and it needs no percent
+ * escape in the URL his Shortcut posts to. A fifth copy of four lines, for the reason that file gives
+ * for its fourth: the exported ones are named for invitations.
+ */
+const webhookSecret = (): string => {
+  let s = '';
+  for (const b of crypto.getRandomValues(new Uint8Array(32))) s += String.fromCharCode(b);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+
+const sha256Hex = async (text: string): Promise<string> =>
+  [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))].map((b) => b.toString(16).padStart(2, '0')).join('');
 
 /* ── who is asking ───────────────────────────────────────────────────────── */
 
@@ -1139,6 +1170,45 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         at: 'principal',
       };
     return allows(ctx, 'owner', listName);
+  };
+
+  /**
+   * The digest `ingestMint` kept for one webhook ingest, while the declaration it was minted for is still the one in
+   * force, and nothing once it is not. A digest that is no longer good is deleted here, as it is found.
+   *
+   * THE ROW OUTLIVED ITS DECLARATION, AND THAT WAS THE CHECKER'S FINDING. Nothing deleted it, so an ingest retired and
+   * then declared again under the same id answered the old digest, and the token shown for the first declaration
+   * verified the second, which nobody had minted for. Dropping `verify:` and putting it back did the same. Both were
+   * measured red in `test/ingest-verify-digest.test.ts` before this was written.
+   *
+   * READ OFF THE DECLARATION'S OWN HISTORY RATHER THAN DELETED BY EVERY PATH THAT RETIRES ONE, because this file
+   * alone has several (`retireDeclaration`, `setDeclaration`, a pack's install, uninstall, disable and enable) and a
+   * test or a host may call `kernel.retire` directly, so a delete at each would be one more line somebody forgets.
+   * The kernel never deletes a declaration row (`0001_kernel.ts`): a change is a new version, a retire sets
+   * `retired` on the row that was live, and a reinstall after one is a new version too. So the mint keeps the
+   * version it was shown against, and the digest is good exactly while every version from that one on is
+   * unretired, a webhook, and `verify: { kind: path }`. A pack update that keeps `verify:` keeps his Shortcut working; turning money-core off
+   * and on again does not, because a disable retires the twin like any other retire.
+   */
+  const heldDigest = (ingest: string): string | undefined => {
+    const key = ingestTokenKey(ingest);
+    const value = sql.one<{ value: string }>('SELECT value FROM dog_meta WHERE key = ?', key)?.value;
+    if (value === undefined) return undefined;
+    const cut = value.indexOf(':');
+    const since = Number(value.slice(0, cut));
+    const rows =
+      cut > 0 && Number.isInteger(since)
+        ? sql.all<{ retired: number; body: string }>('SELECT retired, body FROM declaration WHERE id = ? AND version >= ? ORDER BY version', `ingest.${ingest}`, since)
+        : [];
+    const unbroken =
+      rows.length > 0 &&
+      rows.every((r) => {
+        const d = JSON.parse(r.body) as { channel?: unknown; verify?: { kind?: unknown } };
+        return r.retired === 0 && d.channel === 'webhook' && d.verify?.kind === 'path';
+      });
+    if (unbroken) return value.slice(cut + 1);
+    sql.exec('DELETE FROM dog_meta WHERE key = ?', key);
+    return undefined;
   };
 
   /**
@@ -4503,23 +4573,90 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * connector's register through a door meant for a bank, which is the same id with none of the
      * checks.
      *
-     * WHAT IS NOT HERE IS THE MATERIAL. A declaration can now say `verify: { kind: path }`, and
-     * `declare.ts`'s `verifyFault` refuses every other spelling, which before 22 September all
-     * installed unread. What it cannot say is the token, and this cannot answer one: the door
-     * compares the segment IN THE CLEAR against `{ kind: 'path', token }` (`packages/host/src/ingest.ts`,
-     * `hook`), and a record that kept its webhook token in a form that comparison could use would be
-     * keeping the credential itself, which the forwarding address's mint was built never to do
-     * (`apps/worker/src/inbound.ts`). The digest is the only form worth keeping, and it becomes an
-     * answer the day `hook` digests the segment before comparing it. Until then an ingest declaring
-     * a path token is answered as one declaring nothing, which stores every webhook arrival
-     * `untriaged` and matches none of them: `12 §3` applied to a verifier nobody can check, measured
-     * in `packages/host/test/ingest-shortcut.test.ts` (4), and better than treating the URL as proof.
+     * `{ kind: 'path', sha256 }` IS THE DIGEST `ingestMint` KEPT, and it is answered only for an
+     * ingest that still declares `verify: { kind: path }`. Measured at `15a6aa33`, before this answered
+     * one: the right token posted at a twin declaring it was stored `untriaged`, because this said
+     * `none` for every webhook and the door compared the segment in the clear against a token no
+     * record held. The door now digests the segment first, so what is kept here is never a password:
+     * `packages/host/test/ingest-shortcut.test.ts` (4) posts the digest itself as the segment and it
+     * is stored `untriaged`.
+     *
+     * A PATH TOKEN NOBODY HAS MINTED IS ANSWERED `none`, and so is a digest minted for an earlier
+     * declaration under the same id: one since retired, or one whose `verify:` was taken out on the way
+     * (`heldDigest`, which deletes it). Both store every arrival `untriaged` and match none of them:
+     * `12 §3` applied to a verifier nobody can check, which is better than treating the URL as proof.
      */
     async ingestVerify(args: { ingest: string }): Promise<IngestVerification | null> {
+      const held = typeof args?.ingest === 'string' ? heldDigest(args.ingest) : undefined;
       const row = kernel.declarations().find((d) => d.kind === 'ingest' && d.id === `ingest.${args.ingest}`);
       if (!row) return null;
-      const decl = JSON.parse(row.body) as { channel?: unknown };
-      return decl.channel === 'webhook' ? { kind: 'none' } : null;
+      const decl = JSON.parse(row.body) as { channel?: unknown; verify?: { kind?: unknown } };
+      if (decl.channel !== 'webhook') return null;
+      if (decl.verify?.kind !== 'path') return { kind: 'none' };
+      return held === undefined ? { kind: 'none' } : { kind: 'path', sha256: held };
+    },
+
+    /**
+     * Make the token a webhook ingest's URL carries, and show it once. ADMIN, routed as `/api/ingestMint`.
+     *
+     * THE SHAPE IS THE FORWARDING ADDRESS'S (`serveInbound` in `apps/worker/src/inbound.ts`), in the same order:
+     * who is asking, then what is being minted for, and only then the write. Only the SHA-256 is kept, and nothing
+     * here or anywhere reads the token back, so a person who loses it mints another and the new digest replaces the
+     * old one in the same statement: rotation is minting again, and the token he lost stops verifying at once.
+     *
+     * AN OWNER, IN A BROWSER, WITH A CREDENTIAL AND A PROOF IN THE LAST FIFTEEN MINUTES. The token decides which
+     * bank messages are written into his ledger at `exact` with nobody looking, so whoever holds it can put a debit
+     * of their choosing into the book; that is `deviceApprove`'s reasoning and its four checks, in its order. A token
+     * of any kind is refused before the level, because an agent that could mint this would be minting its own door.
+     *
+     * ONLY FOR A WEBHOOK THAT DECLARES `verify: { kind: path }`. A token minted for anything else is one nothing
+     * reads, and the person holding it would believe the ingest was verified: the fault `verifyFault` in
+     * `declare.ts` was written to close at install, and this is the same refusal at the mint.
+     */
+    async ingestMint(args: { ingest: string }, ctx: CallContext): Promise<Result<{ ingest: string; token: string }>> {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      /* THE FIX NAMES THE SERVER KEY AND NOTHING ELSE THAT IS CALLED A TOKEN. It said "Sign in, or send BRAINDOG_TOKEN"
+         until the checker read it against the line above: `credentialed: false` is a self-host started without that
+         variable, so there is no value to send and nobody can sign in, and the agent token a client keeps under the
+         same name is refused by `admin` before this is reached. `bearerFor` in `apps/selfhost/src/server.ts` maps the
+         server key to the owner with `credentialed: true`, which is the one caller this check lets through. */
+      if (ctx.credentialed === false)
+        return {
+          ok: false as const,
+          refusal: {
+            code: 'NEEDS_BROWSER_SESSION',
+            fix: 'A webhook token works from anywhere, and this BrainDog was started without BRAINDOG_TOKEN, so nothing here can prove who is asking. Start it with BRAINDOG_TOKEN set, then sign in from the app or send that same value as the bearer. An agent token is refused either way.',
+            at: 'principal',
+          },
+        };
+      if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
+        return { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to make a webhook token.', at: 'principal' } };
+
+      const ingest = args?.ingest;
+      if (typeof ingest !== 'string' || ingest === '') return no('REQUIRED_MISSING', 'Which ingest is the token for? Name it by its id.', { at: 'ingest' });
+      const row = kernel.declarations().find((d) => d.kind === 'ingest' && d.id === `ingest.${ingest}`);
+      if (!row) return no('DECLARATION_UNKNOWN', `This record declares no ingest called ${ingest}.`, { at: 'ingest' });
+      const decl = JSON.parse(row.body) as { channel?: unknown; verify?: { kind?: unknown } };
+      if (decl.channel !== 'webhook')
+        return no('VALUE_MALFORMED', `${ingest} arrives by ${String(decl.channel)}, and only a webhook is verified by a token in its URL.`, { at: 'ingest' });
+      if (decl.verify?.kind !== 'path')
+        return no('VALUE_MALFORMED', `${ingest} declares no verify: { kind: path }, so nothing would read a token. Declare it, then make the token.`, { at: 'ingest' });
+
+      /* THE VERSION IT WAS MINTED AGAINST IS KEPT WITH THE DIGEST, so `heldDigest` can tell the declaration it was
+         shown for from a later one under the same id. */
+      const since = sql.one<{ version: number }>(
+        'SELECT version FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1',
+        row.id,
+      )?.version;
+      if (since === undefined) return no('DECLARATION_UNKNOWN', `This record declares no ingest called ${ingest}.`, { at: 'ingest' });
+      const token = webhookSecret();
+      sql.exec(
+        'INSERT INTO dog_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value',
+        ingestTokenKey(ingest),
+        `${since}:${await sha256Hex(token)}`,
+      );
+      return ok({ ingest, token });
     },
 
     /**

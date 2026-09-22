@@ -1,6 +1,8 @@
 /**
- * A record on money-core 1.5.0 whose owner edited one money-core declaration in the app, offered 1.6.0
- * (`loop/research-pack-update-edited.md`, the probes `p1`, `p2` and the checker's `c1` made into assertions).
+ * A record on money-core 1.5.0 whose owner edited one money-core declaration in the app, offered the current version
+ * (`loop/research-pack-update-edited.md`, the probes `p1`, `p2` and the checker's `c1` made into assertions). The probe
+ * was offered 1.6.0. 1.6.0 was never released, so a record on 1.5.0 is now offered 1.7.0 directly, and what is kept and
+ * what is refused is the same.
  *
  * THE UPDATE WAS OFFERED AND THEN REFUSED. `arrangement` compared versions and offered 1.6.0; `propose` planned it, found
  * the edited `spent-30d` with `pack_id` null, called it `PROVIDES_CONFLICT`, and told the owner to retire the figure they
@@ -11,6 +13,9 @@
  * SO AN EDIT OF THE PACK'S OWN DECLARATION IS KEPT, NAMED, AND LEFT OUT OF WHAT IS STAGED. Four cases still refuse: a
  * declaration written in the app that was never the pack's, one another pack owns, a kept page reading a figure the
  * update retires, and a kept list the update changes, whose new field a new metric would sum over nothing.
+ *
+ * THE CURRENT VERSION IS READ FROM `FIRST_PARTY_VERSIONS`, NOT WRITTEN HERE, and the versions made up to be offered are
+ * the minor steps above it, so the next raise of money-core does not turn these tests red for a reason that is not theirs.
  */
 
 import { test } from 'node:test';
@@ -18,7 +23,7 @@ import assert from 'node:assert/strict';
 
 import { createRecordApi, type CallContext } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
-import { FIRST_PARTY, firstPartyDocument } from '../../seed/src/index.ts';
+import { FIRST_PARTY, FIRST_PARTY_VERSIONS, firstPartyDocument } from '../../seed/src/index.ts';
 import { seedCatalogue } from '../../seed/src/usecases/catalogue.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
@@ -38,15 +43,35 @@ const refused = (r: unknown): { code: string; fix: string } => {
 
 type Doc = { version: string; declarations: Record<string, unknown>[]; config?: unknown };
 type Diff = { planHash: string; approve: string[]; conflicts: { id: string; pack: string }[]; kept?: { id: string }[]; changes: { id: string }[]; adds: { id: string }[] };
-const BANK = ['bank-card-used', 'bank-ipn-out', 'bank-ipn-in', 'bank-from-out'];
 const NOW = Date.UTC(2026, 8, 22, 12);
 
-/** 1.5.0 rebuilt from 1.6.0 by undoing `aeef01c5` and `fcde1212`: fingerprint `6442babb13c81d12`, as the probe measured. */
+/** The version the first-party document is, and the made-up versions above it that the refusals below are offered. */
+const CURRENT = FIRST_PARTY_VERSIONS['money-core'];
+const [major, minor] = CURRENT.split('.').map(Number) as [number, number];
+const NEXT = `${major}.${minor + 1}.0`;
+const AFTER = `${major}.${minor + 2}.0`;
+/** The refusal's "leave money-core at <version>", with the dots of the version taken literally. */
+const leaveAt = (version: string) => new RegExp(`leave money-core at ${version.replaceAll('.', '\\.')}`, 'u');
+
+/** The only bank patterns 1.5.0 had. Every other one, mail pattern or SMS twin, arrived with a later version. */
+const IN_150 = ['bank-card-in', 'bank-card-out'];
+const BANK = (firstPartyDocument('money-core') as unknown as Doc).declarations
+  .map((x) => x.ingest)
+  .filter((i): i is string => typeof i === 'string' && !IN_150.includes(i));
+
+/**
+ * 1.5.0 REBUILT FROM THE CURRENT DOCUMENT, fingerprint `6442babb13c81d12`, the one `pack-versions.test.ts` records for
+ * `money-core@1.5.0`. Every bank pattern but the two 1.5.0 had is taken out, which undoes `aeef01c5`, `fcde1212`, the
+ * `From HSBC:` patterns 1.6.0 gained after them and 1.7.0's eight `-sms` twins, and Spent and Received count 31 days
+ * again. Measured on 22 September against `firstPartyDocument('money-core')` built from `aeef01c5^`: the declarations
+ * are the same JSON in the same order. Taking out only the four patterns the probe named left `ingest.bank-from-in` and
+ * `ingest.bank-from-unsure` behind, which fingerprints `7b4159bc59d812fa` and is not 1.5.0.
+ */
 const v150 = (): Doc => {
   const d = structuredClone(firstPartyDocument('money-core')) as unknown as Doc;
   d.version = '1.5.0';
   d.declarations = d.declarations
-    .filter((x) => !BANK.includes(String(x.ingest)))
+    .filter((x) => x.ingest === undefined || IN_150.includes(String(x.ingest)))
     .map((x) => (typeof x.where === 'string' && ['spent-30d', 'received-30d'].includes(String(x.metric)) ? { ...x, where: x.where.replace('on after -30d', 'on after -31d') } : x));
   return d;
 };
@@ -76,18 +101,18 @@ const row = (k: { declarations: () => { id: string; version: number; pack_id: st
   return r ? { version: r.version, pack: r.pack_id, body: JSON.parse(r.body) as Record<string, unknown> } : null;
 };
 
-/** A 1.7.0 of money-core on offer, so the refusals are driven through `propose` as an agent reaches them. */
+/** A next version of money-core on offer, so the refusals are driven through `propose` as an agent reaches them. */
 const offering = (doc: Doc) => seedCatalogue().map((e) => (e.id === 'money-core' ? { ...e, version: doc.version, doc: () => structuredClone(doc) as never } : e));
 
 for (const [edit, name] of [
   ['metric.spent-30d', 'Spent, last month'],
   ['page.money', 'My money'],
 ] as const)
-  test(`edited ${edit}: 1.6.0 is offered naming what it keeps, accepted, and takes everything else`, async () => {
+  test(`edited ${edit}: the current version is offered naming what it keeps, accepted, and takes everything else`, async () => {
     const { sql, api, k } = await recordWith(v150(), edit);
 
     const ar = said<{ updates?: unknown }>(await api.arrangement({}, agent));
-    assert.deepEqual(ar.updates, [{ id: 'money-core', from: '1.5.0', to: '1.6.0', keeps: [edit] }]);
+    assert.deepEqual(ar.updates, [{ id: 'money-core', from: '1.5.0', to: CURRENT, keeps: [edit] }]);
 
     const planned = said<{ diff: Diff }>(await api.planPack({ doc: firstPartyDocument('money-core'), source: { kind: 'local' } } as never, owner));
     assert.deepEqual(planned.diff.conflicts, [], 'the owner Install button is disabled while conflicts is not empty');
@@ -101,7 +126,7 @@ for (const [edit, name] of [
     assert.equal(asked.body.names?.[edit], name, 'Decide names the kept declaration by the name the owner gave it');
 
     said(await api.decide({ id: filed.id, decide: { option: 'accept', reason: 'yes' } } as never, owner));
-    assert.equal(k.packStates().find((p) => p.id === 'money-core')?.version, '1.6.0');
+    assert.equal(k.packStates().find((p) => p.id === 'money-core')?.version, CURRENT);
     assert.match(String(row(k, 'metric.received-30d')?.body.where), /on after -30d/u);
     for (const b of BANK) assert.ok(row(k, `ingest.${b}`), `ingest.${b} did not arrive`);
     const kept = row(k, edit)!;
@@ -118,7 +143,7 @@ for (const [edit, name] of [
 test('a declaration written in the app that was never the pack’s is still a conflict, in today’s sentence', async () => {
   const mine = { metric: 'fx-spread', name: 'My spread', source: 'register.fx', value: { count: true }, format: 'int', target: { lte: 100 }, window: '30d', compare: 'previous' };
   const next = structuredClone(firstPartyDocument('money-core')) as unknown as Doc;
-  next.version = '1.7.0';
+  next.version = NEXT;
   next.declarations.push({ ...mine, name: 'Spread' });
   const { sql, api, k } = await recordWith(null, null, offering(next));
   said(await api.setDeclaration({ body: mine } as never, owner));
@@ -140,7 +165,7 @@ test('a declaration another pack owns is still a conflict', async () => {
   const { sql, api, k } = await recordWith(null, null);
   const theirs = k.declarations().find((d) => d.pack_id !== null && d.pack_id !== 'money-core' && d.pack_id !== 'kernel' && d.kind === 'page')!;
   const next = structuredClone(firstPartyDocument('money-core')) as unknown as Doc;
-  next.version = '1.7.0';
+  next.version = NEXT;
   next.declarations.push({ page: theirs.id.slice('page.'.length), ...(JSON.parse(theirs.body) as object) });
   const planned = said<{ diff: Diff }>(await api.planPack({ doc: next, source: { kind: 'local' } } as never, owner));
   assert.deepEqual(planned.diff.conflicts, [{ id: theirs.id, pack: theirs.pack_id }]);
@@ -156,7 +181,7 @@ test('a declaration another pack owns is still a conflict', async () => {
 for (const ships of [true, false])
   test(`a kept page reading a figure the update retires is refused, and nothing is written (next version ${ships ? 'ships' : 'drops'} the page)`, async () => {
     const next = structuredClone(firstPartyDocument('money-core')) as unknown as Doc;
-    next.version = '1.7.0';
+    next.version = NEXT;
     next.declarations = next.declarations.filter((x) => x.metric !== 'cash-now' && (ships || x.page !== 'money'));
     const { sql, api, k } = await recordWith(null, 'page.money', offering(next));
     assert.ok(row(k, 'page.money')!.body.blocks && JSON.stringify(row(k, 'page.money')!.body).includes('cash-now'));
@@ -167,13 +192,13 @@ for (const ships of [true, false])
     assert.equal(put.code, 'PROVIDES_CONFLICT');
     assert.match(put.fix, /no longer has metric\.cash-now/u);
     assert.match(put.fix, /which you changed, reads it/u);
-    assert.match(put.fix, /leave money-core at 1\.6\.0/u);
+    assert.match(put.fix, leaveAt(CURRENT));
     const filed = refused(await api.propose({ question: 'Update money?', body_kind: 'pack', body: { install: 'money-core' } } as never, agent));
     assert.equal(filed.code, 'PROVIDES_CONFLICT');
     assert.match(filed.fix, /no longer has metric\.cash-now, and your My money page, which you changed, reads it/u);
     assert.equal(k.version(), before, 'a refused update wrote something');
     assert.ok(row(k, 'metric.cash-now'), 'the figure the page reads was retired');
-    assert.equal(k.packStates().find((p) => p.id === 'money-core')?.version, '1.6.0');
+    assert.equal(k.packStates().find((p) => p.id === 'money-core')?.version, CURRENT);
     sql.close();
   });
 
@@ -182,7 +207,7 @@ for (const ships of [true, false])
    have. The kernel does not catch that either (`c2`, `sum: 'nosuch'`, is also ok), so the kept rule has to. */
 test('a kept list the update changes is refused, and nothing is written', async () => {
   const next = structuredClone(firstPartyDocument('money-core')) as unknown as Doc;
-  next.version = '1.7.0';
+  next.version = NEXT;
   const fx = next.declarations.find((x) => x.register === 'fx' && !x.rule && !x.metric)! as { fields: unknown[] };
   fx.fields.push({ id: 'spread', type: 'decimal' });
   next.declarations.push({ metric: 'fx-spread', name: 'Spread', source: 'register.fx', value: { sum: 'spread' }, format: 'decimal', target: { lte: 100 }, window: '30d', compare: 'previous' });
@@ -208,13 +233,13 @@ test('a kept list the update changes is refused, and nothing is written', async 
    lacks, so it is kept like any other edit. */
 test('a kept list the update does not change is kept', async () => {
   const next = structuredClone(firstPartyDocument('money-core')) as unknown as Doc;
-  next.version = '1.7.0';
+  next.version = NEXT;
   const { sql, api, k } = await recordWith(null, 'register.fx', offering(next));
   const planned = said<{ diff: Diff }>(await api.planPack({ doc: next, source: { kind: 'local' } } as never, owner));
   assert.deepEqual(planned.diff.conflicts, []);
   assert.deepEqual(planned.diff.kept, [{ id: 'register.fx' }]);
   said(await api.installPack({ doc: next, source: { kind: 'local' }, planHash: planned.diff.planHash, approve: planned.diff.approve } as never, owner));
-  assert.equal(k.packStates().find((p) => p.id === 'money-core')?.version, '1.7.0');
+  assert.equal(k.packStates().find((p) => p.id === 'money-core')?.version, NEXT);
   assert.equal(row(k, 'register.fx')?.body.name, 'My rates');
   assert.equal(row(k, 'register.fx')?.pack, null);
   sql.close();
@@ -237,7 +262,7 @@ test('a page edited twice is still kept', async () => {
    of the query, the returning version planned the owner's figure as kept, with no conflict to stop the install. */
 test('a figure the pack retired and the owner wrote again is still a conflict when the pack brings it back', async () => {
   const without = structuredClone(firstPartyDocument('money-core')) as unknown as Doc;
-  without.version = '1.7.0';
+  without.version = NEXT;
   without.declarations = without.declarations.filter((x) => x.metric !== 'received-30d' && !JSON.stringify(x).includes('received-30d'));
   const { sql, api, k } = await recordWith(null, null);
   const dropped = said<{ diff: Diff }>(await api.planPack({ doc: without, source: { kind: 'local' } } as never, owner));
@@ -246,7 +271,7 @@ test('a figure the pack retired and the owner wrote again is still a conflict wh
   said(await api.setDeclaration({ body: { metric: 'received-30d', name: 'Mine', source: 'register.fx', value: { count: true }, format: 'int', target: { lte: 100 }, window: '30d', compare: 'previous' } } as never, owner));
 
   const back = structuredClone(firstPartyDocument('money-core')) as unknown as Doc;
-  back.version = '1.8.0';
+  back.version = AFTER;
   const planned = said<{ diff: Diff }>(await api.planPack({ doc: back, source: { kind: 'local' } } as never, owner));
   assert.deepEqual(planned.diff.kept, []);
   assert.deepEqual(planned.diff.conflicts, [{ id: 'metric.received-30d', pack: '(this record)' }]);
@@ -266,7 +291,7 @@ test('an edit of a declaration another pack wrote first is a conflict for this p
   said(await api.setDeclaration({ body: { ...fig, name: 'My rates' }, version: r.version } as never, owner));
 
   const next = structuredClone(firstPartyDocument('money-core')) as unknown as Doc;
-  next.version = '1.7.0';
+  next.version = NEXT;
   next.declarations.push(fig);
   const planned = said<{ diff: Diff }>(await api.planPack({ doc: next, source: { kind: 'local' } } as never, owner));
   assert.deepEqual(planned.diff.kept, []);

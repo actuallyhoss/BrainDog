@@ -2034,6 +2034,41 @@ export const MONEY_INGESTS: Record<string, SeedIngest> = {
   },
 };
 
+/** A `bank-*` pattern as its webhook twin `<id>-sms`: the same reading, behind a path token. */
+export type SmsIngest = SeedIngest & { verify: { kind: 'path' } };
+
+/**
+ * THE SAME EIGHT WORDINGS, ARRIVING AS WHAT THEY ARE: TEXT MESSAGES HIS SHORTCUT POSTS. The bodies
+ * `loop/research-bank-real.md` measured are the ones his iOS Shortcut posts to the old tool, and every pattern
+ * above is `channel: email`, so the only way any of them reached a record was a mail forwarder his phone
+ * does not have. Measured on
+ * 22 September through the Worker-shaped door in `packages/host/test/ingest-shortcut.test.ts`: the SMS
+ * posted at a `bank-*` id answered 404, because `ingestVerify` answers `null` for a mail pattern.
+ *
+ * TWINS AND NOT A CHANNEL LIST, for the reason `declare.ts` gives above `verifyFault`: a list would change
+ * `07 §3`'s `channel:`, and a twin is one more declaration of a shape that already exists. Each is BUILT
+ * from its mail pattern rather than written out, so the two cannot drift: a wording fixed above is fixed
+ * for the SMS in the same edit, and `money-ipn.test.ts`, which drives every key of `MONEY_INGESTS` by
+ * mail, still drives every reading these twins make.
+ *
+ * `verify: { kind: path }` AND NOTHING MORE. The token is minted by an owner (`ingestMint` in
+ * `packages/record/src/index.ts`), shown once, and kept as its digest; a declaration is exported and shown
+ * to every agent, so the grammar refuses a token written here. Until one is minted every arrival at a twin
+ * is stored `untriaged` and none is matched, which is `12 §3` for a door nobody has vouched for yet.
+ *
+ * NOT IN `MONEY_INGESTS`, AND IN THE PACK SINCE money-core 1.7.0. `INGESTS` in `packages/seed/src/index.ts`
+ * is the one road from this file into a record, and it spreads both. Putting them in `MONEY_INGESTS` instead
+ * would break `money-ipn.test.ts`'s rule that every key there has a mail wording, because a webhook twin
+ * never claims mail.
+ */
+export const MONEY_SMS_INGESTS: Record<string, SmsIngest> = Object.fromEntries(
+  Object.values(MONEY_INGESTS).map((mail) => {
+    const ingest = `${mail.ingest}-sms`;
+    const twin: SmsIngest = { ...mail, ingest, channel: 'webhook', verify: { kind: 'path' } };
+    return [ingest, twin];
+  }),
+);
+
 /**
  * EVERY LIST ON THIS RECORD THAT HOLDS A DATED AMOUNT, WRITTEN ONCE.
  *

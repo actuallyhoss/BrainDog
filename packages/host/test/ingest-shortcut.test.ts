@@ -14,52 +14,54 @@
  * And a declaration carrying `verify: { kind: 'hmac_sha256' }`, or `verify:` on an email ingest, installed without a
  * word, because nothing in `declare.ts` read the key: a person could believe an ingest was verified that never was.
  *
- * WHAT THIS FILE DOES NOT HOLD, said here because it is the half of the brief this build cannot give. The door
- * compares the path token IN THE CLEAR (`packages/host/src/ingest.ts`, `hook`: `sameSecret(path.token, v.token)`), and
- * the record has no table for a secret of its own (`history-cursor.ts`'s header), so a record that keeps only the
- * token's digest has nothing the door can compare. The door below therefore holds the token itself, which is the one
- * piece a host would take from the record once `hook` digests the segment before comparing it. And a self-host refuses
- * the five-segment shape outright (`apps/selfhost/src/server.ts`, `arrivalDoor`, and its test at `:232`), so on the
- * self-host his Shortcut has no URL a path token can ride in at all.
+ * MEASURED AGAIN AT `15a6aa33`, AFTER `ef182a6c` PUT `verify: { kind: path }` IN THE GRAMMAR: the right token, posted
+ * through that same door at a twin declaring it, was still stored `untriaged`. The door compared the segment in the
+ * clear against a token the record could not answer with, because it keeps none, so `ingestVerify` said `none` and
+ * the earlier cut of this file had to hold the token in its own door to show a match at all. Now the record keeps the
+ * mint's digest, the door digests the segment before it compares, and the door below holds nothing: it passes the
+ * record's answer through, which is exactly what the Worker does.
+ *
+ * WHAT THIS FILE STILL DOES NOT HOLD. A self-host refuses the five-segment shape outright (`apps/selfhost/src/server.ts`,
+ * `arrivalDoor`, and its test at `:232`), and its own three-segment shape carries no token, so on the self-host his
+ * Shortcut has no URL a path token can ride in yet; that door is `apps/selfhost`'s to open. The mint is routed now,
+ * as the ADMIN write `/api/ingestMint`, and (8) drives it from the request a browser would send to the SMS it matches.
  */
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { createRecordApi } from '@braindog/record';
+import { createRecordApi, type CallContext } from '@braindog/record';
 import type { Kernel } from '@braindog/kernel';
 import type { Sql } from '@braindog/ports';
 
-import { serveIngest, type IngestDoor } from '../src/index.ts';
+import { ROUTES, handlersFor, serveApi, serveIngest, type IngestDoor } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { NOW, day, installSeed } from '../../seed/src/index.ts';
-import { MONEY_INGESTS } from '../../seed/src/modules/money.ts';
+import { MONEY_INGESTS, MONEY_SMS_INGESTS } from '../../seed/src/modules/money.ts';
 
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
 
-/** Invented, and never a credential anywhere: the token a mint would show him once. */
-const TOKEN = 'tk_shortcut_0b7e4c19d2a85f36e1c07a9b4d58f2e6';
+const OWNER: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 'owner' } };
 
 /** `money-ipn.test.ts`'s own `bank-from-out` wording: a withdrawal of EGP 2,500.00 from the account ending 327. */
 const SMS = 'From HSBC: 16AUG26 ATM Cash Withdrawal from 042-118***-327 EGP 2500.00- Your available balance is EGP 31,040.25';
+
+/** A second withdrawal in the same wording, so a test can post two debits that are not one arrival twice. */
+const SMS_AGAIN = 'From HSBC: 17AUG26 ATM Cash Withdrawal from 042-118***-327 EGP 1200.00- Your available balance is EGP 29,840.25';
 
 /** And its `bank-from-in` wording: EGP 418.62 of interest into the same account. */
 const CREDIT = 'From HSBC: 01AUG26 Deposit Interest 042-118***-327 EGP 418.62+ Your available balance is EGP 33,540.25';
 
 /**
- * The webhook twin of one `bank-*` pattern, as the Shortcut's door would declare it.
- *
- * BUILT HERE AND NOT READ FROM THE PACK, because the pack cannot carry one in this build: `INGESTS` in
- * `packages/seed/src/index.ts` is the only road from `money.ts` into the pack, and `money-ipn.test.ts` holds every key
- * of `MONEY_INGESTS` to a wording it drives by mail. What is taken from the pack is everything but the channel, so the
- * twin reads exactly what the mail pattern reads.
+ * The pack's webhook twins, as declarations. The seed installs them since money-core 1.7.0, so installing them again
+ * here changes nothing, and the tests that do so still say which twins each one leans on.
  */
-const twin = (of: string) => {
-  const { pack: _pack, ...body } = MONEY_INGESTS[of]!;
-  return { id: `ingest.${of}-sms`, kind: 'ingest' as const, body: { ...body, ingest: `${of}-sms`, channel: 'webhook', verify: { kind: 'path' } } as never };
-};
+const twins = (...ids: string[]) =>
+  ids.map((id) => ({ id: `ingest.${id}`, kind: 'ingest' as const, body: MONEY_SMS_INGESTS[id]! as never }));
 
-async function record(): Promise<{ k: Kernel; sql: ReturnType<typeof openSqlite>; api: Awaited<ReturnType<typeof createRecordApi>> }> {
+type Api = Awaited<ReturnType<typeof createRecordApi>>;
+
+async function record(): Promise<{ k: Kernel; sql: ReturnType<typeof openSqlite>; api: Api }> {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   const k = api.kernel;
@@ -74,39 +76,43 @@ async function record(): Promise<{ k: Kernel; sql: ReturnType<typeof openSqlite>
 }
 
 /**
- * The Worker's door over one record. `token` is what a host would hold for a declared ingest; `null` is the host as
- * both are wired today, which answers whatever the record says.
+ * The Worker's door over one record, and nothing more. `verify` passes the record's answer through untouched, which
+ * is `arrivals` in `apps/worker/src/index.ts`: the door holds no token, so whatever matches is the record's doing.
  */
-function door(api: Awaited<ReturnType<typeof createRecordApi>>, token: string | null): IngestDoor {
+function door(api: Api): IngestDoor {
   return {
-    verify: async (ask) => {
-      if (ask.rec !== REC) return null;
-      const said = await api.ingestVerify({ ingest: ask.ingest });
-      return said === null || token === null ? said : { kind: 'path', token };
-    },
+    verify: async (ask) => (ask.rec === REC ? api.ingestVerify({ ingest: ask.ingest }) : null),
     arrive: (arrival) => api.arrive({ channel: arrival.channel, headers: arrival.headers, body: arrival.body, sha256: arrival.sha256, verified: arrival.verified }),
     limit: async () => null,
   };
+}
+
+/** The token the mint shows once, which is what he would paste into the Shortcut. */
+async function minted(api: Api, ingest: string): Promise<string> {
+  const out = await api.ingestMint({ ingest }, OWNER);
+  assert.ok(out.ok, JSON.stringify(out));
+  return out.value.token;
 }
 
 const post = (d: IngestDoor, path: string, body: string) => serveIngest(new Request(`https://in.example${path}`, { method: 'POST', body }), d);
 
 const stored = (sql: Sql) => sql.all<{ state: string; channel: string }>('SELECT state, channel FROM inbox_raw').map((r) => ({ state: r.state, channel: r.channel }));
 
-test('(1) AT THE MAIL PATTERN\'S ID, THE SMS IS A 404: no bank pattern is a webhook, so there is no door to post at', async () => {
+test('(1) AT THE MAIL PATTERN\'S ID, THE SMS IS A 404: no mail pattern is a webhook, so there is no door to post at', async () => {
   const { sql, api } = await record();
-  const out = await post(door(api, TOKEN), `/in/webhook/${REC}/bank-from-out/${TOKEN}`, SMS);
+  const out = await post(door(api), `/in/webhook/${REC}/bank-from-out/tk_any_token_at_all`, SMS);
   assert.equal(out.status, 404);
   assert.deepEqual(stored(sql), []);
   sql.close();
 });
 
-test('(2) WITH THE TOKEN, THE SMS LANDS matched AND WRITES THE WITHDRAWAL', async () => {
+test('(2) WITH THE MINTED TOKEN, THE SMS LANDS matched AND WRITES THE WITHDRAWAL', async () => {
   const { k, sql, api } = await record();
-  const put = await k.install(['bank-from-out', 'bank-from-in', 'bank-from-unsure'].map(twin));
+  const put = await k.install(twins('bank-from-out-sms', 'bank-from-in-sms', 'bank-from-unsure-sms'));
   assert.ok(put.ok, JSON.stringify(put));
+  const token = await minted(api, 'bank-from-out-sms');
   const before = k.count('transactions');
-  const out = await post(door(api, TOKEN), `/in/webhook/${REC}/bank-from-out-sms/${TOKEN}`, SMS);
+  const out = await post(door(api), `/in/webhook/${REC}/bank-from-out-sms/${token}`, SMS);
   assert.equal(out.status, 202);
   assert.equal(await out.text(), '', 'the answer said something about what the bytes did');
   assert.deepEqual(stored(sql), [{ state: 'matched', channel: 'webhook' }]);
@@ -114,36 +120,58 @@ test('(2) WITH THE TOKEN, THE SMS LANDS matched AND WRITES THE WITHDRAWAL', asyn
 
   /* ONE TWIN'S URL IS THE DOOR FOR ALL OF THEM, because neither host hands the URL's ingest id to `arrive`: a credit
      posted at the withdrawal's URL is claimed by `bank-from-in-sms`, which is what lets his one Shortcut post every
-     message to one address. */
-  const credit = await post(door(api, TOKEN), `/in/webhook/${REC}/bank-from-out-sms/${TOKEN}`, CREDIT);
+     message to one address with one token. */
+  const credit = await post(door(api), `/in/webhook/${REC}/bank-from-out-sms/${token}`, CREDIT);
   assert.equal(credit.status, 202);
-  const claimed = sql.one<{ ingest_id: string }>("SELECT r.ingest_id FROM ingest_receipt r JOIN inbox_raw i ON i.id = r.raw_id WHERE i.body = ?", CREDIT);
+  const claimed = sql.one<{ ingest_id: string }>('SELECT r.ingest_id FROM ingest_receipt r JOIN inbox_raw i ON i.id = r.raw_id WHERE i.body = ?', CREDIT);
   assert.equal(claimed?.ingest_id, 'bank-from-in-sms');
   sql.close();
 });
 
 test('(3) WITH A WRONG TOKEN, THE SAME SMS IS STORED untriaged AND WRITES NOTHING', async () => {
   const { k, sql, api } = await record();
-  assert.ok((await k.install(['bank-from-out'].map(twin))).ok);
+  assert.ok((await k.install(twins('bank-from-out-sms'))).ok);
+  await minted(api, 'bank-from-out-sms');
   const before = k.count('transactions');
-  const out = await post(door(api, TOKEN), `/in/webhook/${REC}/bank-from-out-sms/tk_shortcut_not_the_one_he_was_shown`, SMS);
+  const out = await post(door(api), `/in/webhook/${REC}/bank-from-out-sms/tk_shortcut_not_the_one_he_was_shown`, SMS);
   assert.equal(out.status, 202, 'a wrong token is a row somebody can look at, not a refusal nobody sees');
   assert.deepEqual(stored(sql), [{ state: 'untriaged', channel: 'webhook' }]);
   assert.equal(k.count('transactions'), before);
   sql.close();
 });
 
-test('(4) AS BOTH HOSTS ARE WIRED, THE RIGHT TOKEN STILL LANDS untriaged, because the record answers nothing to compare', async () => {
+test('(4) A TOKEN THAT WAS ROTATED AWAY IS A WRONG TOKEN, and so is the digest of the right one sent as the segment', async () => {
   const { k, sql, api } = await record();
-  assert.ok((await k.install(['bank-from-out'].map(twin))).ok);
+  assert.ok((await k.install(twins('bank-from-out-sms'))).ok);
+  const before = k.count('transactions');
+  const old = await minted(api, 'bank-from-out-sms');
+  await minted(api, 'bank-from-out-sms');
+  const held = await api.ingestVerify({ ingest: 'bank-from-out-sms' });
+  assert.equal(held?.kind, 'path');
+  /* THE DIGEST IS NOT A PASSWORD. A copy of the record hands somebody the digest, and posting it as the segment must
+     not verify, which it would if the door compared the segment against what the record keeps without digesting it. */
+  const leaked = held !== null && 'sha256' in held ? held.sha256 : '';
+  assert.ok((await post(door(api), `/in/webhook/${REC}/bank-from-out-sms/${old}`, SMS)).status === 202);
+  assert.ok((await post(door(api), `/in/webhook/${REC}/bank-from-out-sms/${leaked}`, SMS_AGAIN)).status === 202);
+  assert.deepEqual(stored(sql), [
+    { state: 'untriaged', channel: 'webhook' },
+    { state: 'untriaged', channel: 'webhook' },
+  ]);
+  assert.equal(k.count('transactions'), before);
+  sql.close();
+});
+
+test('(5) BEFORE ANYTHING IS MINTED, THE RIGHT-SHAPED URL STILL LANDS untriaged, because the record has nothing to compare', async () => {
+  const { k, sql, api } = await record();
+  assert.ok((await k.install(twins('bank-from-out-sms'))).ok);
   assert.deepEqual(await api.ingestVerify({ ingest: 'bank-from-out-sms' }), { kind: 'none' });
-  const out = await post(door(api, null), `/in/webhook/${REC}/bank-from-out-sms/${TOKEN}`, SMS);
+  const out = await post(door(api), `/in/webhook/${REC}/bank-from-out-sms/tk_shortcut_0b7e4c19d2a85f36e1c07a9b4d58f2e6`, SMS);
   assert.equal(out.status, 202);
   assert.deepEqual(stored(sql), [{ state: 'untriaged', channel: 'webhook' }]);
   sql.close();
 });
 
-test('(5) verify: IS READ WHERE IT IS WRITTEN: a path token on a webhook, and nothing else installs', async () => {
+test('(6) verify: IS READ WHERE IT IS WRITTEN: a path token on a webhook, and nothing else installs', async () => {
   const { k, sql } = await record();
   const refused = async (body: Record<string, unknown>, why: RegExp) => {
     const { pack: _pack, ...base } = MONEY_INGESTS['bank-from-out']!;
@@ -157,8 +185,46 @@ test('(5) verify: IS READ WHERE IT IS WRITTEN: a path token on a webhook, and no
   };
   await refused({ channel: 'email', verify: { kind: 'path' } }, /only a webhook/u);
   await refused({ channel: 'webhook', verify: { kind: 'hmac_sha256', header: 'x-signature' } }, /hmac_sha256 is not built/u);
-  await refused({ channel: 'webhook', verify: { kind: 'path', token: TOKEN } }, /never in a declaration/u);
+  await refused({ channel: 'webhook', verify: { kind: 'path', token: 'tk_written_into_the_declaration' } }, /never in a declaration/u);
   await refused({ channel: 'webhook', verify: 'path' }, /\{ kind: path \}/u);
-  assert.ok((await k.install([twin('bank-from-out')])).ok, 'the one shape that is built was refused');
+  assert.ok((await k.install(twins('bank-from-out-sms'))).ok, 'the one shape that is built was refused');
+  sql.close();
+});
+
+test('(7) THE SEED SHIPS THE TWINS: a record set up with money-core has the Shortcut\'s door with nothing installed by hand', async () => {
+  /* RED BEFORE `INGESTS` SPREAD `MONEY_SMS_INGESTS`: `ingestVerify` answered null here, so the SMS was a 404 on every
+     record the product had set up, and each test above had to install the twins itself to show anything. */
+  const { k, sql, api } = await record();
+  assert.deepEqual(await api.ingestVerify({ ingest: 'bank-from-out-sms' }), { kind: 'none' });
+  assert.deepEqual(
+    k.declarations().filter((d) => d.kind === 'ingest' && d.id.endsWith('-sms')).map((d) => d.id).length,
+    Object.keys(MONEY_SMS_INGESTS).length,
+  );
+  sql.close();
+});
+
+test('(8) /api/ingestMint IS AN ADMIN WRITE, and the token it answers is the one the door then matches', async () => {
+  /* RED BEFORE THE ROW: `serveApi` answered 404 `ROUTE_UNKNOWN`, so the mint was reachable from a test and from
+     nothing a person could open. */
+  const route = ROUTES.find((r) => r.name === 'ingestMint') ?? assert.fail('ingestMint is not routed');
+  assert.deepEqual([route.group, route.writes], ['ADMIN', true]);
+
+  const { k, sql, api } = await record();
+  const handlers = handlersFor(api);
+  const call = async (ctx: CallContext) => {
+    const res = await serveApi(new Request('https://x/api/ingestMint', { method: 'POST', body: JSON.stringify({ ingest: 'bank-from-out-sms' }) }), handlers, ctx);
+    return { status: res.status, body: (await res.json()) as { ok: boolean; value?: { ingest: string; token: string }; refusal?: { code: string } } };
+  };
+  const agent = await call({ principal: { kind: 'token', id: 't_1', scope: 'write', person: 'p_owner', level: 'owner' } });
+  assert.deepEqual([agent.status, agent.body.refusal?.code], [403, 'NEEDS_BROWSER_SESSION']);
+
+  const session = await call({ ...OWNER, credentialed: true, provedAt: NOW - 60_000 });
+  assert.equal(session.status, 200, JSON.stringify(session.body));
+  const token = session.body.value!.token;
+  const before = k.count('transactions');
+  const out = await post(door(api), `/in/webhook/${REC}/bank-from-out-sms/${token}`, SMS);
+  assert.equal(out.status, 202);
+  assert.deepEqual(stored(sql), [{ state: 'matched', channel: 'webhook' }]);
+  assert.equal(k.count('transactions'), before + 1);
   sql.close();
 });
