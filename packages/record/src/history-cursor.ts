@@ -65,7 +65,9 @@ const EVENT_ID = /^[0-9A-Za-z]{1,40}$/u;
 
 /** One instance's cursors, with a key drawn now and held in memory for as long as the instance lives. */
 export async function historyCursors(): Promise<HistoryCursors> {
-  const key: Key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  /* A SYMMETRIC KEY, SAID TO THE TYPES. Node's lib narrows `generateKey` by its algorithm and the Workers types do not, so
+     the Worker's typecheck read this as `CryptoKey | CryptoKeyPair`; AES-GCM only ever gives the first. */
+  const key = (await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])) as Key;
   return {
     mint: (id) => `e.${id}`,
     async seal(rowid) {
