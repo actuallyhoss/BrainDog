@@ -14,10 +14,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import type { Reading } from '@braindog/client';
+import type { Reading, SparkProposal, SparkStatus } from '@braindog/client';
 
 import { copy } from '../copy.ts';
-import { drawReading, offersSpark, whereWords } from './spark.ts';
+import { capLine, drawProposal, drawReading, offersSpark, pass2Refused, secondPass, sparkWords, whereWords } from './spark.ts';
 
 const ASK = { spark: true, prefix: null, text: 'which invoices are late', pending: false, places: 0 };
 
@@ -119,4 +119,73 @@ test('A DRAFT THAT DID NOT FIT IS A KEYWORD SEARCH, and the drawing says which o
   /* A PREDICATE IN THE FOLD THAT IS NOT JSON is printed as it came rather than dropped, so the fold never loses a line. */
   const odd = drawReading({ ...READING, read: [{ register: 'tasks', rows: 1, predicate: 'not json' }] });
   assert.equal(odd.fold[0], 'tasks: 1 row, not json');
+});
+
+/*
+ * PASS 2, W2 of `loop/research-spark-routes.md`: what the palette asks after the rows, and what it draws from the answer.
+ * The markup cannot be held here; these are the four decisions it makes, each of which `23 §6` or `23 §8` states as a rule.
+ */
+
+const PROPOSAL: SparkProposal = {
+  text: 'Two invoices are open. [tasks#1] is the older.',
+  citations: ['tasks#1', 'tasks#12'],
+  verbs: ['decide', 'defer', 'dismiss'],
+  body_kind: 'options',
+  body: { options: [] },
+  model: 'glm-5.3',
+  filed: 'SG14',
+  read: READING.read,
+};
+
+test('PASS 2 IS ASKED ONLY WHEN PASS 1 FOUND ROWS: zero rows is zero inference (`23 §6`)', () => {
+  assert.equal(secondPass(READING), true);
+  assert.equal(secondPass({ ...READING, rows: [] }), false);
+});
+
+test('A PROPOSAL IS DRAWN WITH ITS MODEL IN THE FOOTER, ALWAYS, and with a way to Decide what it filed', () => {
+  const drawn = drawProposal(PROPOSAL);
+  assert.equal(drawn.text, PROPOSAL.text);
+  assert.equal(drawn.footer, sparkWords.drawnBy('glm-5.3'));
+  assert.match(drawn.footer, /glm-5\.3/u);
+  assert.equal(drawn.decide, '/decide/SG14');
+  /* NOTHING THE PACKAGE SENT IS DROPPED ON THE WAY: the verbs arrive as it sent them, in its order. */
+  assert.deepEqual(drawn.verbs, ['decide', 'defer', 'dismiss']);
+});
+
+test('A PROPOSAL WHOSE MODEL IS MISSING STILL HAS A FOOTER, and the footer says the host named none', () => {
+  /* `23 §8`: *"every Spark output carries the model name in its footer, always"*. A host that answered without one is a
+     host fault to show, not a line to leave out: a missing footer is exactly how a downgrade goes unseen. */
+  for (const model of ['', '   ', undefined as unknown as string]) {
+    const drawn = drawProposal({ ...PROPOSAL, model });
+    assert.equal(drawn.footer, sparkWords.noModel, JSON.stringify(model));
+  }
+});
+
+test('A QUERY FILES NOTHING, so there is nothing to Decide and no link to it', () => {
+  assert.equal(drawProposal({ ...PROPOSAL, body_kind: 'query', verbs: ['edit', 'save', 'open'], filed: null }).decide, null);
+});
+
+test('THE 80 % LINE IS SHOWN ONCE A MONTH, ON TIER A, BELOW THE CAP, UNTIL DISMISSED FOR THAT MONTH', () => {
+  const at = (used: number, cap = 80, tier: SparkStatus['tier'] = 'a'): SparkStatus => ({ tier, model: 'm', asks: { used, cap, resets: '2026-10-01T00:00:00.000Z' } });
+  assert.equal(capLine(at(63), null), false);
+  assert.equal(capLine(at(64), null), true);
+  /* DISMISSED THIS MONTH IS GONE THIS MONTH, and back when the count resets, because the key is the reset instant. */
+  assert.equal(capLine(at(64), '2026-10-01T00:00:00.000Z'), false);
+  assert.equal(capLine(at(64), '2026-09-01T00:00:00.000Z'), true);
+  /* AT THE CAP THE BUDGET REFUSAL SAYS IT, under the rows; the footer line would be the same fact twice. A cap of zero is
+     Spark turned off, and `0 of 0 used` is not a warning about anything. */
+  assert.equal(capLine(at(80), null), false);
+  assert.equal(capLine(at(0, 0), null), false);
+  /* OFF TIER `a` NOTHING IS COUNTED, so there is nothing to be near. */
+  assert.equal(capLine(at(79, 80, 'byo'), null), false);
+});
+
+test('A SPENT BUDGET ON PASS 2 IS ITS OWN FIX, VERBATIM, THEN THE SENTENCE THAT THE ROWS WERE DRAWN WITHOUT IT', () => {
+  const fix = 'Spark is out of asks until 2026-10-01. Add your own key, or wait.';
+  assert.deepEqual(pass2Refused({ code: 'SPARK_BUDGET_SPENT', fix }), { fix, without: 'Everything above this line was drawn without it.' });
+  /* ANY OTHER REFUSAL IS ITS FIX ALONE: the sentence is only true of a budget stop with rows above it. */
+  assert.deepEqual(pass2Refused({ code: 'PROPOSAL_NO_ROWS', fix: 'A proposal names the rows behind it, or it is not filed.' }), {
+    fix: 'A proposal names the rows behind it, or it is not filed.',
+    without: null,
+  });
 });

@@ -69,7 +69,8 @@
   import type { Hits, Reader } from '../record/palette-live.ts';
   import type { Metric } from '../record/api.ts';
   import { latest } from './latest.ts';
-  import { drawReading, offersSpark, type Drawn } from './spark.ts';
+  import { capLine, drawProposal, drawReading, offersSpark, pass2Refused, secondPass, sparkWords, type Drawn, type DrawnProposal } from './spark.ts';
+  import type { SparkStatus } from '@braindog/client';
 
   let { open = $bindable(false), nav }: { open?: boolean; nav: NavEntry[] } = $props();
 
@@ -130,24 +131,86 @@
    * once, with no effect to clear it, and `latest` drops an answer to a question the box has moved on from, so a slow read
    * cannot land over the next one. `Esc` in the mode goes back to the list and keeps the text; a second `Esc` closes.
    */
-  let spark = $state<{ q: string; question: string; drawn: Drawn | null; fix: string | null } | null>(null);
+  /** Pass 2 under the rows: `null` while it is being written, then the proposal or the refusal, never both. */
+  type Second = { drawn: DrawnProposal | null; refused: { fix: string; without: string | null } | null };
+  let spark = $state<{ q: string; question: string; drawn: Drawn | null; fix: string | null; second: Second | null } | null>(null);
   const sparkShown = $derived(spark !== null && spark.q === q ? spark : null);
+  const unreached = (e: unknown) => ({ ok: false as const, refusal: { code: 'UNREACHABLE', fix: e instanceof Error ? e.message : String(e) } });
+  const client = () => import('@braindog/client').then(({ createClient }) => createClient({ base: page.url.origin }));
   const sparkAsk = latest((question: string) =>
-    import('@braindog/client')
-      .then(({ createClient }) => createClient({ base: page.url.origin }).sparkRead(question))
-      .catch((e: unknown) => ({ ok: false as const, refusal: { code: 'UNREACHABLE', fix: e instanceof Error ? e.message : String(e) } })),
+    client()
+      .then((c) => c.sparkRead(question))
+      .catch(unreached),
+  );
+  /* PASS 2 THROUGH ITS OWN `latest`, so a proposal written for an older question is dropped exactly as pass 1's rows are.
+     THE REQUEST ITSELF IS NEVER ABORTED, which is `46 §5.5` step 11: Escape during pass 2 goes back to the list, and the
+     proposal the engine was already writing is still filed on Decide. `latest` only decides whether the answer is drawn. */
+  const sparkPropose = latest((a: { question: string; askId: string }) =>
+    client()
+      .then((c) => c.sparkPropose(a.question, a.askId))
+      .catch(unreached),
   );
 
   function askSpark(question: string) {
     const asked = q;
-    spark = { q: asked, question, drawn: null, fix: null };
+    spark = { q: asked, question, drawn: null, fix: null, second: null };
     cursor = 0;
     sparkAsk.ask(question, (out) => {
       if (spark?.q !== asked) return;
-      spark = out.ok
-        ? { q: asked, question, drawn: drawReading(out.value), fix: null }
-        : { q: asked, question, drawn: null, fix: 'refusal' in out ? out.refusal.fix : copy.sparkNothing };
+      if (!out.ok) {
+        spark = { q: asked, question, drawn: null, fix: 'refusal' in out ? out.refusal.fix : copy.sparkNothing, second: null };
+        return;
+      }
+      /* THE ASK ID GOES BACK WITH PASS 2, so the engine re-runs the predicate it already drafted instead of asking the model
+         for a second one, which would be a second draft and a second ask for the same question. */
+      const more = secondPass(out.value);
+      spark = { q: asked, question, drawn: drawReading(out.value), fix: null, second: more ? { drawn: null, refused: null } : null };
+      if (!more) return;
+      sparkPropose.ask({ question, askId: out.value.ask_id }, (said) => {
+        if (spark?.q !== asked || spark.second === null) return;
+        spark.second = said.ok
+          ? { drawn: drawProposal(said.value), refused: null }
+          : { drawn: null, refused: pass2Refused('refusal' in said ? said.refusal : { code: 'CONFLICT', fix: copy.sparkNothing }) };
+      });
     });
+  }
+
+  /**
+   * THE WARM-UP, AND THE ONE NUMBER IT BRINGS BACK (`46 §5.2`, `23 §8`). Opening the palette on a host with a model asks
+   * `sparkStatus()` once, which builds the engine so the first question finds it built, and answers this month's asks, which
+   * is all the 80 % line needs. A refused status is not drawn here: Settings shows it, and a palette opened to go somewhere
+   * else is the wrong place for it.
+   */
+  let sparkStatus = $state<SparkStatus | null>(null);
+  const CAP_LINE_KEY = 'braindog.palette.sparkCapLine';
+  /* PER BROWSER, AND ALLOWED TO BE LOST. A private window forgets it and shows the line once more that month, which is the
+     cheap way to be wrong; storage that throws is treated the same as storage that is empty. */
+  let capDismissed = $state<string | null>(null);
+  const capShown = $derived(sparkHere && sparkStatus !== null && capLine(sparkStatus, capDismissed));
+  function warm() {
+    try {
+      capDismissed = localStorage.getItem(CAP_LINE_KEY);
+    } catch {
+      capDismissed = null;
+    }
+    void client()
+      .then((c) => c.sparkStatus())
+      .then(
+        (out) => {
+          if (out.ok) sparkStatus = out.value;
+        },
+        () => {},
+      );
+  }
+  function dismissCapLine() {
+    if (!sparkStatus) return;
+    capDismissed = sparkStatus.asks.resets;
+    try {
+      localStorage.setItem(CAP_LINE_KEY, capDismissed);
+    } catch {
+      /* The line is hidden for this open either way; only next time's memory of it is lost. */
+    }
+    input?.focus();
   }
   const lists = $derived(listsOf(isLive, shell.index?.registers ?? []));
   const listNamed = $derived(new Map(lists.map((l) => [l.id, l])));
@@ -787,6 +850,7 @@
       q = '';
       cursor = 0;
       spark = null;
+      if (sparkHere) warm();
       queueMicrotask(() => input?.focus());
     } else if (!open && el.open) {
       el.close();
@@ -965,6 +1029,27 @@
         <p class="p-none" role="status">{copy.sparkAsking}</p>
       {:else}
         {#if sparkShown.drawn.rows.length === 0}<p class="p-none">{copy.sparkNothing}</p>{/if}
+        <!-- PASS 2, UNDER THE ROWS AND NEVER INSTEAD OF THEM (`23 §7`): the rows were drawn by code before any of this was
+             written, which is the only reason the budget sentence below can be true. -->
+        {#if sparkShown.second}
+          <section class="p-spark-second" aria-label={sparkWords.proposed}>
+            {#if sparkShown.second.refused}
+              <p class="p-spark-said">{sparkShown.second.refused.fix}</p>
+              {#if sparkShown.second.refused.without}<p class="p-spark-said">{sparkShown.second.refused.without}</p>{/if}
+            {:else if sparkShown.second.drawn}
+              {#if sparkShown.second.drawn.text}<p class="p-spark-text">{sparkShown.second.drawn.text}</p>{/if}
+              {#if sparkShown.second.drawn.decide}
+                <a class="p-spark-decide" href={sparkShown.second.drawn.decide} onclick={() => (open = false)}
+                  >{sparkWords.decide(sparkShown.second.drawn.decide.slice('/decide/'.length))}</a
+                >
+              {/if}
+              <!-- `23 §8`: EVERY SPARK OUTPUT CARRIES THE MODEL IN ITS FOOTER, ALWAYS. `drawProposal` never leaves it empty. -->
+              <p class="p-spark-model">{sparkShown.second.drawn.footer}</p>
+            {:else}
+              <p class="p-spark-said" role="status">{sparkWords.proposing}</p>
+            {/if}
+          </section>
+        {/if}
         <details class="p-spark-fold">
           <summary>{copy.sparkFold}</summary>
           <ul>
@@ -987,6 +1072,11 @@
        `@ people` goes when the record has no people register, because a prefix that narrows to a
        list this record does not hold is an instruction that cannot be followed. -->
   <footer class="p-foot">
+    <!-- `23 §8` AT 80 %: ONE LINE, HERE, ONCE A MONTH. Not a chip, not a modal, and gone for the month once hidden. -->
+    {#if capShown && sparkStatus}
+      <span class="p-cap">{sparkWords.capLine(sparkStatus.asks.used, sparkStatus.asks.cap, sparkStatus.asks.resets)}</span>
+      <button type="button" class="p-cap-hide tap" onclick={dismissCapLine}>{sparkWords.capDismiss}</button>
+    {/if}
     <span class="p-hint">&gt; commands · # rows{listNamed.has(PEOPLE) ? ' · @ people' : ''} · / pages</span>
   </footer>
 </dialog>
@@ -1366,6 +1456,50 @@
     list-style: none;
     font-family: var(--font-id);
     font-size: var(--t-xs);
+  }
+
+  .p-spark-second {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    padding: var(--sp-3) var(--sp-4) 0;
+    border-block-start: 1px solid var(--line);
+  }
+
+  .p-spark-text,
+  .p-spark-said {
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--ink2);
+    line-height: var(--lh-body);
+  }
+
+  .p-spark-decide {
+    align-self: flex-start;
+    color: var(--accent);
+  }
+
+  /* RECEDED, SMALL, MONO (`23 §8`), and still there on every proposal. */
+  .p-spark-model {
+    margin: 0;
+    color: var(--dim);
+    font-family: var(--font-id);
+    font-size: var(--t-xs);
+  }
+
+  .p-cap {
+    min-inline-size: 0;
+  }
+
+  .p-cap-hide {
+    flex: none;
+    padding: 0 var(--sp-1);
+    border: 0;
+    background: none;
+    color: var(--ink2);
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
   }
 
   .p-foot {

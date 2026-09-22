@@ -493,7 +493,9 @@
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
   import SparkAsks from '$lib/ui/SparkAsks.svelte';
+  import SparkModel from '$lib/ui/SparkModel.svelte';
   import SparkDaily from '$lib/ui/SparkDaily.svelte';
+  import ShortcutDoor from '$lib/ui/ShortcutDoor.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Chip from '$lib/ui/Chip.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -2426,6 +2428,7 @@
         {/if}
       </Section>
       <SparkAsks owner={anOwner} />
+      <SparkModel owner={anOwner} />
       <!-- SPARK LOOKING ON ITS OWN is the owner's choice, beside the agents they let in (`loop/research-spark.md` S15). -->
       <SparkDaily link />
     {:else if area === 'ingest'}
@@ -2605,6 +2608,10 @@
           <p class="hint">{mailWords.freshWhy}</p>
         {/if}
       </Section>
+      <!-- THE OTHER SENDER, AND A RECORD METHOD RATHER THAN A HOST DOOR. `ingestMint` is in `ROUTES` on both hosts,
+           so unlike the mail section there is no probe: the section is drawn, and a record that does not declare the
+           SMS ingest says so in its own sentence on the press. -->
+      <ShortcutDoor owner={anOwner} />
     {:else if area === 'notifications'}
       <!--
         `09` SPECIFIES A COMPLETE MECHANISM WITH ZERO USER-CONFIGURABLE SETTINGS. Every constant is

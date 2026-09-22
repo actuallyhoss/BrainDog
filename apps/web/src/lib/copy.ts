@@ -2491,6 +2491,31 @@ export const copy = {
   arrangeNotInBatch: 'A proposal that arranges this BrainDog is answered on its own, so it is not in this answer.',
   decideSelect: 'Select',
   decideSelectDone: 'Done',
+
+  /* ── the Shortcut door: bank texts posted from a phone (`ShortcutDoor.svelte`) ── */
+  /* WHAT IT IS, WHAT HE DOES WITH IT, AND WHAT IT COSTS HIM, in the mail section's order, because the two sit one under
+     the other on the same screen and are the same act spelled for a different sender. */
+  shortcutTitle: 'Bank texts sent from your phone',
+  shortcutHow: 'An iPhone Shortcut can post each text your bank sends to this record, and a withdrawal it recognises is written to Money. The Shortcut needs a web address with a token in it, made here.',
+  /* THE FACT THE SCREEN CANNOT HIDE, as the mail section states its own: only the digest is kept, so nothing reads the
+     token back, and a blank where a value would go reads as "you have none". */
+  shortcutUnknown: 'This screen cannot show a token the record already has. Only a fingerprint of it is kept, so if you no longer have it, make a new one and the old one stops working.',
+  shortcutMint: 'Make a Shortcut address',
+  shortcutMinting: 'Making',
+  shortcutOnce: 'Shown once, now. Copy it before you leave this screen: it cannot be shown again, and making another replaces it.',
+  shortcutCopyUrl: 'Copy the address',
+  shortcutUrlCopied: 'Shortcut address copied',
+  shortcutCopyToken: 'Copy the token',
+  shortcutTokenCopied: 'Token copied',
+  /* THE WHOLE RECIPE IN ONE LINE, in the words the Shortcuts app itself uses, because the person following it is on a
+     phone with that app open and nothing else to read. */
+  shortcutIos: 'In Shortcuts, make a personal automation for Message, with the sender set to your bank. Add Get Contents of URL with this address, method POST, and the message as the request body.',
+  /* THE ADDRESS NEEDS THE RECORD'S ID AND THIS HOST DID NOT ANSWER IT. Both doors refuse any other value in that segment,
+     so the screen says what is missing rather than printing an address that would never match. */
+  shortcutNoAddress: 'This host answered the token without the record id the address is built from, so no address is shown. The token alone is not enough for the Shortcut yet.',
+  shortcutMade: 'Made. Making another replaces this one, which is also how a leaked address is dealt with.',
+  shortcutNoToken: 'This host answered without a token in it, so nothing was shown. Try again, and if it happens twice nothing has been changed.',
+  shortcutFreshWhy: 'Making an address needs a sign-in from the last fifteen minutes, because whoever holds it can write withdrawals into your books.',
 } as const;
 
 export type Copy = typeof copy;

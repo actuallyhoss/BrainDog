@@ -15,9 +15,10 @@
  */
 
 import { money, yesno } from 'braindog-render';
-import type { Reading, SparkWhere } from '@braindog/client';
+import type { Reading, SparkProposal, SparkStatus, SparkWhere } from '@braindog/client';
 
 import { copy } from '../copy.ts';
+import { atCap, nearCap, resetsWords } from '../ui/spark-asks.ts';
 
 /**
  * The question the row would ask, or `null` when there is no row.
@@ -126,3 +127,71 @@ export function drawReading(r: Reading): Drawn {
     ],
   };
 }
+
+/*
+ * PASS 2 (`46 §5.5`, Brief W2 of `loop/research-spark-routes.md`): after the rows, what Spark proposes about them.
+ *
+ * THE WORDS ARE HERE AND NOT IN `copy.ts`, because `copy.ts` was another agent's file for the run that built this. They
+ * are the palette's and nobody else's, so moving them into its Spark block later changes an import and nothing else.
+ */
+export const sparkWords = {
+  proposing: 'Spark is writing a proposal about these rows.',
+  proposed: 'What Spark proposes',
+  /* `23 §8`'s footer: receded, small, and naming the model on every output. */
+  drawnBy: (model: string) => `Drawn by ${model}`,
+  noModel: 'Drawn by a model this host did not name',
+  decide: (id: string) => `Decide ${id}`,
+  without: 'Everything above this line was drawn without it.',
+  capLine: (used: number, cap: number, resets: string) =>
+    `Spark has used ${used} of this month's ${cap} asks. The count resets on ${resetsWords(resets)}.`,
+  capDismiss: 'Hide until next month',
+} as const;
+
+/**
+ * Whether to ask for a proposal at all. ZERO ROWS IS ZERO INFERENCE (`23 §6`): the engine already answers a zero-row
+ * propose without calling the model, but the palette asking is still a request, a held ask and a `query` body with
+ * nothing to say, for a question the record already answered with *Nothing in the record answers that.*
+ */
+export const secondPass = (r: Reading): boolean => r.rows.length > 0;
+
+export type DrawnProposal = { text: string; verbs: SparkProposal['verbs']; decide: string | null; footer: string };
+
+/**
+ * A `Proposal`, as the palette draws it under the rows.
+ *
+ * THE FOOTER IS NEVER LEFT OUT. `23 §8` makes it a mechanism rather than a policy: a downgrade the footer does not name is a
+ * downgrade nobody sees. So a proposal that arrives with no model still gets a footer, and it says the host named none.
+ *
+ * `decide` IS WHERE THE VERBS ARE CARRIED OUT. An `options` or `rowset` answer is filed as `SG<n>` on Decide, and decide,
+ * defer and dismiss are that screen's; the palette links to it rather than keeping a second copy of the gate. A `query`
+ * files nothing, so it has no link, and its rows are already the ones drawn above.
+ */
+export function drawProposal(p: SparkProposal): DrawnProposal {
+  const model = typeof p.model === 'string' ? p.model.trim() : '';
+  return {
+    text: p.text,
+    verbs: [...p.verbs],
+    decide: p.filed === null ? null : `/decide/${encodeURIComponent(p.filed)}`,
+    footer: model === '' ? sparkWords.noModel : sparkWords.drawnBy(model),
+  };
+}
+
+/**
+ * Whether the palette's footer carries the 80 % line (`23 §8`): once a month, dismissible, never a modal.
+ *
+ * `dismissed` IS THE RESET INSTANT THE LINE WAS HIDDEN FOR, so hiding it lasts exactly until the count starts again and
+ * needs no clock here. At the cap the pass-2 refusal says it under the rows, so the line stops at 100 %; that also keeps
+ * a cap of zero, which is Spark switched off, from reading as a warning.
+ */
+export const capLine = (s: SparkStatus, dismissed: string | null): boolean =>
+  nearCap(s) && !atCap(s) && dismissed !== s.asks.resets;
+
+/**
+ * A refusal on pass 2, drawn under the rows. The `fix` is shown as it came (`13 §6`). ONLY A SPENT BUDGET adds the second
+ * sentence, because only there is it true in the sense `23 §8` means: the rows above were found by code and the proposal
+ * is what the missing ask would have bought.
+ */
+export const pass2Refused = (r: { code: string; fix: string }): { fix: string; without: string | null } => ({
+  fix: r.fix,
+  without: r.code === 'SPARK_BUDGET_SPENT' ? sparkWords.without : null,
+});
