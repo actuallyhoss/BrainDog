@@ -12,6 +12,8 @@
 
 import type { Attached, Brief, Context } from '@braindog/client';
 
+import { clip } from './clip.ts';
+
 export const MAX_LINES = 40;
 export const MAX_CHARS = 3_000;
 
@@ -25,12 +27,6 @@ export type Moved = number | null | undefined;
 
 /* A line the cap may drop, or one it keeps: who this is, the handoff, the warning, the questions, the next step. */
 type Line = { text: string; keep: boolean };
-
-/** One line of someone else's words: control characters and runs of space collapsed, and long text cut. */
-export const clip = (said: string, max: number): string => {
-  const one = said.replace(/[\x00-\u001f\s]+/g, ' ').trim();
-  return one.length > max ? `${one.slice(0, max - 3)}...` : one;
-};
 
 export function ago(seconds: number): string {
   if (seconds < 60) return 'just now';

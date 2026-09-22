@@ -19,6 +19,8 @@ import type { Client } from '@braindog/client';
 import { refused } from '@braindog/ports';
 
 import { ago } from './brief.ts';
+/* `clip` AND NOT `oneLine`: this file has its own `oneLine`, the verb that sends a next step, a tried or a note. */
+import { clip } from './clip.ts';
 import { readSession, sessionPath } from './hooks.ts';
 import { positionOf } from './position.ts';
 import { refuse } from './json.ts';
@@ -71,12 +73,6 @@ const ENDED: Record<State, (spoken: string) => string> = {
 };
 
 /* ── the pieces every verb shares ──────────────────────────────────────── */
-
-/** One line of somebody else's words: control characters and runs of space collapsed, and long text cut. */
-const clip = (said: string, max: number): string => {
-  const one = said.replace(/[\x00-\u001f\s]+/g, ' ').trim();
-  return one.length > max ? `${one.slice(0, max - 3)}...` : one;
-};
 
 /** A printed line ends in a full stop, whoever wrote the words inside it. */
 const stopped = (text: string): string => (/[.!?]$/.test(text) ? text : `${text}.`);
@@ -133,7 +129,9 @@ async function show(rest: string[], io: AgentIo): Promise<number> {
   }
 
   const place = c.project ? `project ${clip(c.project.name, 60)}` : 'no project here';
-  io.out(c.session.state === null ? `${c.session.spoken} · ${place}.` : `${c.session.spoken} is ${c.session.state} · ${place}.`);
+  /* A STATE IS THE RECORD'S WORD, not a closed list: the client types it `string | null`, and `braindog context` clips
+     the same field in its headline. Printed as sent here, a DEL and a U+009B in it reached the terminal. */
+  io.out(c.session.state === null ? `${c.session.spoken} · ${place}.` : `${c.session.spoken} is ${clip(c.session.state, 40)} · ${place}.`);
 
   if (c.handoff === null) io.out('No handoff has been left here.');
   else {
@@ -145,7 +143,7 @@ async function show(rest: string[], io: AgentIo): Promise<number> {
   const others = c.live.same_repo.filter((r) => r.spoken !== own);
   if (others.length === 0) io.out('Nobody else is live in this repository.');
   else {
-    const named = others.slice(0, PER_LINE).map((r) => `${r.spoken} ${r.state ?? 'unknown'}${r.doing ? ` "${clip(r.doing, 60)}"` : ''}, seen ${ago(r.age_s)}`);
+    const named = others.slice(0, PER_LINE).map((r) => `${r.spoken} ${typeof r.state === 'string' ? clip(r.state, 40) : 'unknown'}${r.doing ? ` "${clip(r.doing, 60)}"` : ''}, seen ${ago(r.age_s)}`);
     io.out(`Also live here: ${named.join('; ')}.`);
   }
   /* The same three facts the lines carry, unclipped: a caller that has to clip them can, and one that

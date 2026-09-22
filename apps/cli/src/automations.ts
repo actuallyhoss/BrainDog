@@ -210,7 +210,10 @@ async function run(args: string[], io: AgentIo): Promise<number> {
   if (typeof at === 'number') return at;
   const answer = await at.client.automationRun(got.name);
   if (!answer.ok) return refuse(io, answer);
-  io.out(`${got.name} started as ${answer.value.run}. The next drain takes it.`);
+  /* THE ID IS THE RECORD'S, NOT A CONSTANT. These three verbs print one field each and skipped `printable` on the
+     grounds that an id is not somebody's words; a stub answering `run` with a DEL and a U+009B in it put both on the
+     terminal. The name typed is the person's own and is printed as typed. */
+  io.out(`${got.name} started as ${printable(answer.value).run}. The next drain takes it.`);
   io.answer?.({ value: answer.value });
   return 0;
 }
@@ -222,7 +225,7 @@ async function cancel(args: string[], io: AgentIo): Promise<number> {
   if (typeof at === 'number') return at;
   const answer = await at.client.cancelRun(got.name);
   if (!answer.ok) return refuse(io, answer);
-  io.out(`${answer.value.run} is cancelled. A run stopped while it waits never resumes.`);
+  io.out(`${printable(answer.value).run} is cancelled. A run stopped while it waits never resumes.`);
   io.answer?.({ value: answer.value });
   return 0;
 }
@@ -269,7 +272,7 @@ export async function scripts(args: string[], io: AgentIo): Promise<number> {
   const answer = await at.client.resumeScript(got.name);
   if (!answer.ok) return refuse(io, answer);
   /* NOT A FIX, as `script-run.ts` says: a source that still fails pauses again, and a person should hear that now. */
-  io.out(`${answer.value.script} runs again now. Three more refused runs in a row pause it again.`);
+  io.out(`${printable(answer.value).script} runs again now. Three more refused runs in a row pause it again.`);
   io.answer?.({ value: answer.value });
   return 0;
 }

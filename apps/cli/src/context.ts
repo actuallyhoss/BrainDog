@@ -15,7 +15,8 @@
 
 import { parseArgs } from 'node:util';
 
-import { briefingOf, clip, placeOf, repoOf } from './brief.ts';
+import { briefingOf, placeOf, repoOf } from './brief.ts';
+import { clip } from './clip.ts';
 import { movedSince } from './hooks.ts';
 import { positionOf } from './position.ts';
 import { connect, type AgentIo } from './skills.ts';
