@@ -3,3 +3,7 @@ via:    import
 raises: packages/kernel/src/migrate.ts
 at:     migration[3]
 fix:    Restore the migration text and add a new migration instead.
+tamper: migration-text
+
+# THE VERB DAMAGES THE TARGET, NOT THE FILE, for the reason `schema-newer.yaml` gives: the ledger
+# does not import. The runner changes version 3's checksum in the target's own ledger and reopens it.

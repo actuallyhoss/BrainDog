@@ -3,3 +3,4 @@ via:    import
 raises: packages/kernel/src/brainl.ts
 at:     dogl
 fix:    Upgrade BrainDog, and it will open.
+tamper: format

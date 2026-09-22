@@ -2,3 +2,7 @@ code:   IMPORT_NOT_EMPTY
 via:    import
 raises: packages/kernel/src/brainl.ts
 fix:    Import into a record that holds no rows.
+tamper: not-empty
+
+# NO `at:`. The refusal is about every table the file would touch at once and says so in `fix`. The
+# runner's verb imports the untampered export back into the record it came from, which holds rows.

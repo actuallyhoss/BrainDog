@@ -1,5 +1,16 @@
 code:   SCHEMA_NEWER
 via:    import
 raises: packages/kernel/src/migrate.ts
-at:     migration[11]
+at:     migration[99]
 fix:    Deploy the newer build.
+tamper: migration-ahead
+
+# 99, NOT TODAY'S LAST MIGRATION PLUS ONE. This said `migration[11]` while `MIGRATIONS` ended at 10,
+# and the day an eleventh migration lands, a ledger row for version 11 with a made-up checksum is
+# SCHEMA_MISMATCH and not SCHEMA_NEWER, so the fixture would fail for a reason unrelated to the
+# code. `migrate.test.ts` inserts 99 for exactly this, and so does the runner.
+#
+# THE VERB DAMAGES THE TARGET, NOT THE FILE. The `migration` table travels in a `.brainl` and is
+# skipped on import, so no edit to the export reaches this code. The runner inserts the row into the
+# ledger of the record being imported into and reopens it; `openRecord` makes the refusal sticky and
+# `import` answers it before reading a line.
