@@ -504,6 +504,66 @@ $ braindog rule test renewal-30d
 A rule you cannot test before enabling is a rule you enable and hope. This runs the real
 predicate against the real rows and writes nothing.
 
+## 6.2 · A rule with a trigger and steps is an automation
+
+*(Added September 22nd 2026 for [DIRECTION §22](../loop/DIRECTION.md)'s automations layer. The design is
+`loop/research-shell-automations.md` §2 to §4; this section is what the lint holds today. The runner, its tables and
+the steps that wait are later work, and nothing below says they exist.)*
+
+**Not a ninth kind.** [04-PACKS](04-PACKS.md) closes the list at eight, so an automation is a `rule` body that has
+grown two keys: `on:`, what starts it, and `steps:`, what it does. A rule with neither is an automation whose trigger
+is a write to its register, which is every rule installed before this section was written. The canvas can open all
+of them.
+
+```yaml
+rule: gold_rate
+on: { every: 1h }                         # or written, arrival, metric, manual
+steps:
+  - call: { ingest: gold_price, as: price }
+  - if: "price > 3000"                    # a condition over the run's answers
+    then:
+      - notify: { say: "Gold is at {{vars.price}}" }
+```
+
+**Two paths, and the body decides which.** `pathOf` in `packages/kernel/src/flow-lint.ts` answers `inline` or
+`run`, and nobody declares it:
+
+- **inline** is this section's rules as they have always run, inside the write's transaction: a write trigger with
+  no filter, and a `then:` list.
+- **run** is everything else: a clock, an arrival, a metric, a button, a write trigger that filters by `op:` or
+  `fields:` or accepts writes made by rules (`from_rules:`), or any `steps:` list. The inline pass cannot read any of
+  these. It fires on every write of the register, it has no idea which fields changed, and it walks `then:` alone.
+
+**What the lint refuses, and why each is refused rather than ignored.** Each of these installed before September
+22nd, and each would then have done nothing.
+
+| Refused | Because |
+|---|---|
+| no `register:` and no `on:` | the pass selects rules by register, so nothing would ever start it |
+| `every:` under `15m`, or a clock it cannot read | fifteen minutes is the shortest clock the record keeps, as it is for a connector; `at:` belongs to `every: 1d` or `every: 1w` with a `day:` |
+| two triggers in one `on:` | a run has to say which one started it |
+| `decided:` | reserved: a run's own questions resume it without a trigger |
+| a top-level `register:` on the run path | the inline pass would also run the body inside every write of that register |
+| `on: { written: { register } }` inline without `register:` beside it | the inline pass reads the top-level key and nothing else |
+| a row verb (`tag`, `set`, `move`, `note`, `run` and the rest) or a `when:` on `every`, `metric` or `manual` | those triggers have no row to act on |
+| `enabled: false`, `limits:` or `project:` on the inline path | the inline pass reads none of them, so a switch would be drawn and do nothing: `NOT_IN_THIS_BUILD` |
+| `then:` and `steps:` together | one list of things |
+| more than 50 steps, counting both arms of every branch; a branch nested past 3; more than 64 answer names | the kernel's ceilings, which `limits:` may lower and never raise (`runs_per_day` at most 1,000) |
+| a `call` step naming an address, or a call that is not declared with `trigger: rule` or `both` | a step names a declared call, whose host, key and fields were approved at install, exactly as `run:` does |
+| an answer name (`as:`) that is not an identifier, or is `trigger` or `vars` | it is read back as `{{vars.<name>}}`, and those two are the run context's own keys |
+| a step that notifies, creates, suggests, runs, calls or asks about a written row with no `once_per` | the same reason `notify` has always needed it |
+
+A `create` inside a branch meets the same bound and the same foreign-register check as one in `then:`, because the
+lint walks every action wherever it sits.
+
+**One older shape is let through.** Some rules carry `on: create` as a word. Nothing ever read it: the pass fired
+those rules on every write. They lint as they did and answer `inline`.
+
+**What installs and does not yet run.** A body on the run path installs, and no runner executes it until the runner
+lands. A `script` step is checked for shape only, because `script.<id>` is the scripts brief's declaration. One thing
+still refuses a body this section accepts: the kernel's own install check requires a non-empty `then:`, so a
+`steps:`-only rule is refused at install until that check learns about `steps:`.
+
 ---
 
 ## 7 · The pipeline, mechanically

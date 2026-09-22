@@ -74,6 +74,50 @@ export type RuleAction =
   | { run: string }
   | { stop: true };
 
+/**
+ * What starts an automation. `loop/research-shell-automations.md` §3 and §4.1.
+ *
+ * ABSENT MEANS `written`, WHICH IS WHAT EVERY RULE MEANT BEFORE THIS TYPE EXISTED. That is the whole reason an automation
+ * is a rule that grew a trigger rather than a ninth kind: the rules already installed in somebody's record are
+ * automations the canvas can open, with no migration and no second engine doing the same job.
+ *
+ * ONE KEY, and `every` is the only one with companions (`at`, `day`). A body naming two triggers is refused rather than
+ * read as "either", because nothing downstream could say which one started a run.
+ */
+export type Trigger =
+  | { written: { register: string; op?: ('create' | 'update' | 'delete')[]; fields?: string[]; from_rules?: boolean } }
+  | { arrival: { ingest?: string; channel?: 'webhook' | 'email' | 'paste' | 'api' | 'pull'; state?: string[] } }
+  | { every: string; at?: string; day?: string }
+  | { metric: { id: string; crosses: 'target' | { lte: number } | { gte: number } } }
+  /** Reserved. A run's own asks resume it without this, and the lint refuses it as not in this build. */
+  | { decided: { automation?: string } }
+  | { manual: true };
+
+/**
+ * One step of an automation: a branch, a transform, something that waits, or any action a rule already has.
+ *
+ * EVERY STEP IS A CLOSED VERB THAT NAMES A DECLARATION, never an address and never code. `call` names a declared call
+ * whose host, key and fields were approved at install, and `script` names a `script.<id>` whose runtime is another
+ * brief's; that is what keeps 04 §7's security argument an enumeration over closed lists.
+ */
+export type Step =
+  | { if: Predicate | string; then: Step[]; else?: Step[] }
+  | { set_var: { name: string; to: string } }
+  | { script: { id: string; input?: Record<string, string>; as: string } }
+  | { call: { ingest: string; as?: string } }
+  | { ask_spark: { question: string; about?: string[]; as: string; shape?: 'text' | 'number' | 'choice'; choices?: string[] } }
+  | { ask_person: { question: string; options: string[]; as: string; to?: string; wait?: string } }
+  | { wait: string }
+  | RuleAction;
+
+/**
+ * A rule as the inline pass reads it: a register, a condition and a flat list of actions.
+ *
+ * `register` AND `then` STAY REQUIRED HERE, because this is the shape `runRules`, `dryRun` and `applyRule` walk, and
+ * `flow-lint.ts`'s `pathOf` answers `inline` only for a body that has both. The wider shape a person or an agent may
+ * declare is `FlowDecl` below; a body of that shape that is not inline never reaches the pass, since the pass selects
+ * rules by their top-level `register` and the lint refuses one on a body that runs as a run.
+ */
 export type RuleDecl = {
   rule: string;
   register: string;
@@ -83,7 +127,22 @@ export type RuleDecl = {
   priority?: number;
   /** Which tuple makes this rule's firing unique. Mandatory on `notify`, `create` and `suggest`. */
   once_per?: string[];
+  /** What the canvas card says. The id when absent. */
+  name?: string;
+  /** Absent is `{ written: { register } }`, today's meaning. */
+  on?: Trigger;
+  /** Exclusive with `then`. */
+  steps?: Step[];
+  /** A scopes-register row id, as `ActionDecl.project`. Absent is global. */
+  project?: string;
+  /** Default true. False keeps the version and stops it triggering. */
+  enabled?: boolean;
+  /** Under ceilings the kernel holds: a declaration can lower them and never raise them. */
+  limits?: { runs_per_day?: number; steps_per_run?: number };
 };
+
+/** A rule body as it may be declared: `register` is required only on the inline path, and `steps` may stand for `then`. */
+export type FlowDecl = Omit<RuleDecl, 'register' | 'then'> & { register?: string; then?: RuleAction[] };
 
 export type Fired = {
   entry: Entry;

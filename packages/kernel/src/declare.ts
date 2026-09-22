@@ -37,6 +37,8 @@ import { HOME_CURRENCY_SETTING, homeFrom } from './fx.ts';
    is what two lists that disagree cost. */
 import { FREQ, shiftFrom } from './schedule.ts';
 import { spanMs } from './vault.ts';
+import { actionsOf, callFault, flowFault, subjectOf } from './flow-lint.ts';
+import type { FlowDecl } from './rules.ts';
 
 /**
  * `34-GRAMMARS` §4. Checked before an id is inlined into an index name or a JSON path.
@@ -3271,22 +3273,32 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
     const over = patternFault((decl.body as { when?: unknown }).when, decl.id);
     if (over) return over;
 
+    /* THE TRIGGER, THE STEPS AND THE PATH, in `flow-lint.ts`. A rule with `on: { every: 1h }` installed before this line
+       existed and so did one with `every: 5m`, a `tag` on a clock tick, or no register and no trigger at all: nothing
+       read `on:`, and the pass selects rules by `register`, so each was a declaration read by nothing. A rule that
+       names only `register`, `when` and `then` meets one new check there, that the register is named. */
+    const flowed = flowFault(decl.id, decl.body, installed);
+    if (flowed) return flowed;
+    const body = decl.body as FlowDecl;
+    const subject = subjectOf(body);
+
     /* AND A SPAN THIS RECORD CANNOT READ IS REFUSED WHERE IT IS WRITTEN. `{ schedule: { in: '2 weeks'
        } }` would install and then be dropped at fire time — and the row it was meant to chase is
-       exactly the row somebody is trusting it to chase. */
-    for (const action of ((decl.body as { then?: unknown }).then ?? []) as { schedule?: { in?: unknown }; create?: unknown }[]) {
-      if (!action || typeof action !== 'object') continue;
+       exactly the row somebody is trusting it to chase. Every action is walked, `then`'s or a step's inside a branch. */
+    const actions = actionsOf(body);
+    for (const { action: raw, at } of actions) {
+      const action = raw as { schedule?: { in?: unknown }; create?: unknown };
       if (action.schedule !== undefined) {
         const span = typeof action.schedule.in === 'string' ? spanMs(action.schedule.in) : null;
         if (span === null)
           return bad(
             'DECLARATION_INVALID',
             `${decl.id} schedules ${String(action.schedule.in)} ahead, and a span is a number and one of d, w, m or y. Write 14d.`,
-            'then',
+            at.startsWith('then[') ? 'then' : at,
           );
       }
       if ('create' in action) {
-        const unbounded = createFault(decl.id, action, (decl.body as { register?: unknown }).register, installed, owners, decl.pack ?? null);
+        const unbounded = createFault(decl.id, action, subject ?? undefined, installed, owners, decl.pack ?? null);
         if (unbounded) return unbounded;
       }
     }
@@ -3298,24 +3310,16 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
     /* A RULE THAT RUNS A CALL NAMES ONE THE OWNER ALREADY APPROVED. The host, the key and the fields it sends are on
        the call, so the rule can reach nothing new; and it runs once per row, because a call on every write of a row
        is the same post sent again each time somebody fixes a typo. */
-    const then = (decl.body as { then?: unknown }).then;
-    for (const [i, action] of (Array.isArray(then) ? then : []).entries()) {
-      if (!action || typeof action !== 'object' || !('run' in action)) continue;
-      const at = `then[${i}].run`;
-      const run = (action as { run?: unknown }).run;
-      if (typeof run !== 'string' || !/^[a-z][a-z0-9_]*$/.test(run))
-        return bad('DECLARATION_INVALID', `${decl.id} runs ${JSON.stringify(run)}, and run: is the id of a declared call.`, at);
+    for (const { action, at: where } of actions) {
+      if (!('run' in action)) continue;
+      const at = `${where}.run`;
+      const run = action.run;
+      const shape = callFault(decl.id, run, at, subject);
+      if (shape) return shape;
       if (once === undefined)
-        return bad('REQUIRED_MISSING', `${decl.id} runs ${run} and declares no once_per, so it would send on every write of the row.`, 'once_per');
-      if (installed === undefined) continue;
-      const call = installed.get(`ingest.${run}`) as { channel?: unknown; trigger?: unknown; sends?: unknown } | undefined;
-      if (call === undefined) return bad('DECLARATION_UNKNOWN', `${decl.id} runs ${run}, and there is no action called ${run}.`, at);
-      if (call.channel !== 'call' || (call.trigger !== 'rule' && call.trigger !== 'both'))
-        return bad('DECLARATION_INVALID', `${decl.id} runs ${run}, which is not a call a rule may start. Give ${run} trigger: rule or trigger: both.`, at);
-      const register = (decl.body as { register?: unknown }).register;
-      const from = Array.isArray(call.sends) && typeof call.sends[0] === 'string' ? call.sends[0].split('.')[0] : null;
-      if (from !== null && from !== register)
-        return bad('DECLARATION_INVALID', `${decl.id} is about ${String(register)}, and ${run} sends fields of ${from}.`, at);
+        return bad('REQUIRED_MISSING', `${decl.id} runs ${String(run)} and declares no once_per, so it would send on every write of the row.`, 'once_per');
+      const fault = callFault(decl.id, run, at, subject, installed);
+      if (fault) return fault;
     }
     return null;
   }
