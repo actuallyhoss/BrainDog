@@ -2686,7 +2686,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          there keeps the mark they had. For an owner the first event walked is the one asked for, so nothing moves. */
       const seen = walk(ctx, (asked ?? kernel.newestEvent()) + 1, 1, 1).lines[0]?.rowid ?? null;
       const person = ctx.principal.id;
-      if (seen === null) return ok({ upTo: null, seen_at: markOf(person) });
+      /* NOTHING TO MARK IS `upTo: 0`, which is what this answered on an empty log before the walk: the client types
+         `upTo` as a number, and 0 names no event, so it tells a scoped caller nothing about what is hidden. */
+      if (seen === null) return ok({ upTo: 0, seen_at: markOf(person) });
       return ok({ upTo: seen, seen_at: kernel.markRead(person, seen) });
     },
 
