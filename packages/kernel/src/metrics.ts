@@ -382,6 +382,68 @@ const yearBefore = (nowMs: number): number => {
   );
 };
 
+/**
+ * The window before, given the end the current one takes from the clock.
+ *
+ * A WINDOW THAT WRITES ONLY ITS START ENDS AT THE CLOCK, AND THE CLOCK WAS THE ONE THING THAT DID NOT
+ * MOVE. The comparison resolves the same predicate at a moved clock, which moves every day the
+ * predicate names and nothing it leaves unsaid. `on after -31d` names a start; its end is "up to now".
+ * Resolved thirty days back it became `on after -61d`, still up to now, so the window before was
+ * sixty-one days CONTAINING the thirty-one it was compared with. Both figures in the tree that declare
+ * `compare: previous` (`spent-30d`, `received-30d`) are written this way. Measured in
+ * `test/metrics-window.test.ts`, 150,000 spent in each of two consecutive months read `delta: -0.5`,
+ * a doubled month read `-0.33`, and the Ledger's lead tile could not say "up" for any spending at all.
+ * `year_ago` did the same over thirteen months and read `-0.875` against an identical month.
+ *
+ * SO THE END MOVES WITH THE CLOCK, AS THE START DOES: the day the moved clock falls on is the last day
+ * of the window before, unless that is inside the current window, and a clause saying so is added to
+ * each field that has a start and no end. That is `08 §2.4`'s rule rather than a new one, "this month
+ * to the 14th against last month to the 14th", and where a declaration's span is its window it makes
+ * `on after -30d` compare exactly as `on after -30d, on before tomorrow` does, which is one set of rows
+ * spelled twice and was compared with two different windows.
+ *
+ * A FIELD WITH A WRITTEN END IS LEFT ALONE, because its end already moved with the clock, and so is a
+ * field with no start: `due before today` is a balance at a moment, and the moment is its definition.
+ * Only the top conjunction is read, which is every shape the sentence grammar writes; a start inside
+ * `any` or `none` is not a window and is not given an end.
+ */
+const LOWER = ['after', 'gt', 'gte'] as const;
+const UPPER = ['before', 'lt', 'lte', 'between', 'is', 'in'] as const;
+
+const conjuncts = (p: Predicate): Record<string, unknown>[] =>
+  (Array.isArray((p as { all?: unknown }).all) ? (p as { all: Predicate[] }).all : [p]) as Record<string, unknown>[];
+
+const dayAfter = (iso: string): string => new Date(Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) + DAY).toISOString().slice(0, 10);
+
+function endedAt(shifted: Predicate | undefined, current: Predicate | undefined, schema: Schema, thenMs: number): Predicate | undefined {
+  if (!shifted || !current) return shifted;
+  const clauses = conjuncts(shifted);
+  const dated = (field: unknown): field is string =>
+    typeof field === 'string' && Object.hasOwn(schema.fields, field) && ['day', 'instant'].includes(schema.fields[field]?.type ?? '');
+  const started = new Set(clauses.filter((c) => dated(c.field) && LOWER.some((op) => op in c)).map((c) => c.field as string));
+  for (const c of clauses) if (dated(c.field) && UPPER.some((op) => op in c)) started.delete(c.field as string);
+  if (started.size === 0) return shifted;
+
+  /* `before` THE DAY AFTER, because `before` is exclusive of its day (`34 §6`) and the moved clock's
+     own day belongs to the window before, as today belongs to this one. */
+  const clock = dayAfter(new Date(thenMs).toISOString());
+  const ends = [...started].map((field) => {
+    /* AND NEVER PAST THE DAY THE CURRENT WINDOW STARTS, so no row is in both. The two coincide when a
+       declaration's span is its window, and the seed's are not: `on after -31d` is thirty-one days
+       and `window: 30d` moves the clock thirty, so the moved clock's own day is the current window's
+       first. Ending there counted that day's rows on both sides of the comparison. The window before
+       is cut at the day before instead: thirty days, labelled "the 30 days before", which it is. */
+    const starts = conjuncts(current)
+      .filter((c) => c.field === field)
+      .flatMap((c) => LOWER.filter((op) => typeof c[op] === 'string').map((op) => (op === 'gte' ? (c[op] as string).slice(0, 10) : dayAfter(c[op] as string))))
+      .sort();
+    /* The latest start is where the current window begins, when a field is given two. */
+    const begins = starts.at(-1);
+    return { field, before: begins !== undefined && begins < clock ? begins : clock } as Predicate;
+  });
+  return { all: [...(clauses as Predicate[]), ...ends] } as Predicate;
+}
+
 export type EvalContext = {
   nowMs: number;
   /**
@@ -694,7 +756,10 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
     const moveTo = decl.compare === 'year_ago' ? yearBefore(ctx.nowMs) : ctx.nowMs - shift;
     const shifted = predicateOf(decl.where, schema, { ...ctx, nowMs: moveTo });
     const moved = JSON.stringify(shifted.predicate) !== JSON.stringify(said.predicate);
-    const before = read(sql, shifted.predicate, schema, decl, tablesOf(decl), fx);
+    /* AND THE WINDOW BEFORE ENDS WHERE ITS CLOCK IS. `moved` above is asked of the predicate as
+       written, because a clause this adds is not a sign the declaration mentions time; `endedAt`
+       carries the measurement for why the end has to be written in. */
+    const before = read(sql, endedAt(shifted.predicate, said.predicate, schema, moveTo), schema, decl, tablesOf(decl), fx);
 
     if (!before.ok) why = fixOf(before);
     else if (!moved) {

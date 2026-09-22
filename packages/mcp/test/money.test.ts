@@ -233,9 +233,9 @@ test('A CALLER WHO MAY NOT READ AT ALL GETS THE RECORD\'S OWN SENTENCE, not an i
 
 test('MOVEMENT COMES THROUGH ON A FIGURE THAT DECLARES A COMPARISON, because "spent GBP 1,650" and "spent GBP 1,650, down two fifths" are different answers', async () => {
   /* THE NUMBER IS THE KERNEL'S AND THIS IS ONLY ABOUT ITS ARRIVING. A comparison is the same
-     predicate against a clock moved back thirty days, and `on after -31d` has no upper bound, so the
-     earlier window holds September's row as well as August's: 165,000 against 275,000 is -0.4. That
-     is the record's arithmetic to defend. What is asserted here is that the tool hands it on, which
+     predicate over the window immediately before, the same length and ending where this one starts. It held September's
+     row as well as August's until 22 September, which compared a window with a superset of itself and
+     could only ever say down: now 165,000 against 110,000 is +0.5. What is asserted here is that the tool hands it on, which
      it did not until this test was written: dropping the `delta` line from `figureOf` left every
      test in this file green. */
   const { sql, api, mcp } = await studio();
@@ -244,7 +244,7 @@ test('MOVEMENT COMES THROUGH ON A FIGURE THAT DECLARES A COMPARISON, because "sp
 
   const money = figures(await mcp.call('money', {}, owner));
   assert.equal(typeof money['spent-30d']?.delta, 'number', 'a figure that declares a comparison came back without one');
-  assert.equal(money['spent-30d']?.delta, -0.4);
+  assert.equal(money['spent-30d']?.delta, 0.5);
   const alone = (await api.metric({ metric: 'spent-30d' }, owner)) as { ok: true; value: { delta: number } };
   assert.equal(money['spent-30d']?.delta, alone.value.delta);
   /* AND A FIGURE THAT DECLARES NO COMPARISON CARRIES NO KEY, rather than a null an agent has to read. */

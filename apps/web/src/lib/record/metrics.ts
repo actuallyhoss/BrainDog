@@ -649,6 +649,50 @@ const resolvedAt = (w: Where, now: number): string =>
 /** Does this predicate say anything different at the moved clock? Without that, the two sets are one set. */
 const moves = (w: Where, now: number, then: number): boolean => resolvedAt(w, now) !== resolvedAt(w, then);
 
+/** The day after a day, in UTC as `resolveDay` counts. */
+const dayAfter = (iso: string): string => new Date(Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) + DAY_MS).toISOString().slice(0, 10);
+
+/**
+ * The window before, given the end the current one takes from the clock.
+ *
+ * A WINDOW THAT WRITES ONLY ITS START ENDS AT THE CLOCK, AND THE CLOCK WAS THE ONE THING THAT DID NOT
+ * MOVE. `matches` at the moved clock moves every day a clause names and nothing the predicate leaves
+ * unsaid, so `on after -31d` thirty days back was `on after -61d` up to today: sixty-one days holding
+ * the thirty-one it was compared with. `spent-30d` and `received-30d` are written that way, and in
+ * `metrics-window.test.ts` equal money in two consecutive months read `delta: -0.5` under "on the 30
+ * days before", a doubled month `-0.33`, and `year_ago` `-0.875` against an identical month. The
+ * Ledger's lead tile could not say "up" for any spending at all.
+ *
+ * SO THE END MOVES WITH THE CLOCK AS THE START DOES, and a `before` clause saying so is added to each
+ * dated field with an `after` and no `before` or `on`: the moved clock's day is the last day of the
+ * window before, which is `08 §2.4`'s "last month to the 14th". AND NEVER PAST THE DAY BEFORE THE
+ * CURRENT WINDOW STARTS, because the seed's `-31d` is thirty-one days and `window: 30d` moves thirty,
+ * so the moved clock's own day is this window's first and its rows would be counted on both sides.
+ *
+ * A field with a written end is left alone, because that end already moved, and so is a field with no
+ * start: `due before today` is a balance at a moment. `packages/kernel/src/metrics.ts` `endedAt` is the
+ * same rule over the record's predicate tree, and the two test files hold both to the same rows.
+ */
+const endedAt = (w: Where, now: number, then: number): Where => {
+  const dated = w.clauses.filter((c): c is Extract<Clause, { day: string }> => 'day' in c);
+  const started = new Set(dated.filter((c) => c.op === 'after').map((c) => c.field));
+  for (const c of dated) if (c.op === 'before' || c.op === 'on') started.delete(c.field);
+  if (started.size === 0) return w;
+  const clock = dayAfter(new Date(then).toISOString());
+  const ends = [...started].map((field): Clause => {
+    /* The latest start is where the current window begins, when a field is given two. */
+    const begins = dated
+      .filter((c) => c.field === field && c.op === 'after')
+      .map((c) => resolveDay(c.day, now))
+      .filter((d): d is string => d !== null)
+      .map(dayAfter)
+      .sort()
+      .at(-1);
+    return { field, op: 'before', day: begins !== undefined && begins < clock ? begins : clock };
+  });
+  return { ...w, clauses: [...w.clauses, ...ends] };
+};
+
 /** Does the predicate mention time at all? Read for the sentence under a tile that has no comparison. */
 const timeless = (w: Where, now: number): boolean => w.clauses.every((c) => dayAt(w.register, c, now) === null);
 
@@ -1062,7 +1106,10 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
       ? 'nothing here is dated, so there is no before to compare with'
       : 'this asks about one fixed date, so the same rows are on both sides of the window';
   } else {
-    const before = all.filter((e) => matches(e, w, then));
+    /* The window before ends where its clock is; `endedAt` has the measurement. `moves` above asks
+       of the predicate as written, because an end added here is not the declaration mentioning time. */
+    const prior = endedAt(w, now, then);
+    const before = all.filter((e) => matches(e, prior, then));
     if (rows.length === 0 || before.length === 0) {
       why = 'one of the two windows is empty';
       unmeasured = 'nothing to compare with yet';
