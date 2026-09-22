@@ -1276,8 +1276,10 @@ function arrivals(env: Env): CloudIngestDeps {
   return {
     knows: (rec) => directory.knows(rec),
     verifies: (rec, ingest) => env.RECORD.get(env.RECORD.idFromName(rec)).ingestVerify({ ingest }),
-    /* THE BYTES AND THE FLAG, AND NOTHING ELSE OF THE URL. The record id was the address and the token was
-       the proof; neither is a fact about the payload, and a raw row is kept for ever. */
+    /* THE BYTES, THE FLAG AND THE INGEST, AND NOTHING ELSE OF THE URL. The record id was the address and
+       the token was the proof; the ingest is what the token was checked against, and without it the
+       record offered a verified webhook to every webhook pattern in declaration order
+       (test/arrive-ingest.test.ts). Mail names none. */
     arrives: (rec, arrival) =>
       env.RECORD.get(env.RECORD.idFromName(rec)).arrive({
         channel: arrival.channel,
@@ -1285,6 +1287,7 @@ function arrivals(env: Env): CloudIngestDeps {
         body: arrival.body,
         sha256: arrival.sha256,
         verified: arrival.verified,
+        ...(arrival.ingest === undefined ? {} : { ingest: arrival.ingest }),
       }),
     spends: async (ask) => spendArrival(`${ask.channel}:${ask.key}`),
     /* AND THE MAIL DOOR, WHICH WAS THE ONE KEY MISSING AND THEREFORE THE WHOLE SURFACE. `cloudIngest`

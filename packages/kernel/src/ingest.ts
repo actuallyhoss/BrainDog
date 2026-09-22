@@ -225,6 +225,18 @@ export type Arrival = {
    * have made every connector answer and every pasted payload untriaged for ever.
    */
   verified?: boolean;
+  /**
+   * The one ingest this arrival is for, when the door that took it knows (`/in/webhook/<rec>/<ingest>/<token>`).
+   *
+   * NAMED, ONLY THAT INGEST'S PATTERN IS TRIED. The URL's token was checked against this ingest's digest and
+   * no other, and both hosts dropped the name on the way in, so the record offered a verified webhook to every
+   * webhook pattern in declaration order: two ingests that matched one text sent every arrival to the first,
+   * written by the first's extraction under a token minted for the second (`test/arrive-ingest.test.ts`).
+   *
+   * ABSENT IS EVERY INGEST ON THE CHANNEL, which is what mail needs. One forwarding address serves the whole
+   * record, so a message has no ingest to name.
+   */
+  ingest?: string;
 };
 
 export type Arrived = {
@@ -661,12 +673,16 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
 
     /* THE FIRST MATCHING INGEST WINS, and the order is the declaration order. Two patterns that both
        match one payload is a thing to notice rather than a thing to merge — merging two extractions
-       produces a row neither declaration describes. */
+       produces a row neither declaration describes.
+
+       UNLESS THE ARRIVAL NAMES ONE, and then it is that ingest or none. A named ingest whose pattern does
+       not match leaves the payload untriaged rather than handing it to a neighbour that does, because the
+       neighbour's sender never vouched for these bytes. */
     const matched = unverified
       ? undefined
       : deps
           .ingests()
-          .filter((i) => i.channel === arrival.channel)
+          .filter((i) => i.channel === arrival.channel && (arrival.ingest === undefined || i.ingest === arrival.ingest))
           .find((i) => i.match === undefined || evaluate(i.match, fields, INBOX_RAW));
 
     const store = (state: Arrived['state'], reason: string | null): void => {

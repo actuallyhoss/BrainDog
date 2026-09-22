@@ -526,8 +526,11 @@ function arrivalDoor(api: Api, spend: (key: string) => number | null, inbound: (
       const v = await api.ingestVerify({ ingest: ask.ingest });
       return v?.kind === 'path' ? v : null;
     },
-    /* THE RECORD TAKES THE BYTES AND THE FLAG, AND NOTHING ELSE OF THE URL. `rec` is this process's
-       one record and `ingest` is checked above; neither is a fact about the payload. */
+    /* THE RECORD TAKES THE BYTES, THE FLAG AND THE INGEST, AND NOTHING ELSE OF THE URL. `rec` is this
+       process's one record and is no fact about the payload. The ingest was dropped here too until
+       22 September, and it is what the token was checked against: without it the record offered a
+       verified webhook to every webhook pattern in declaration order, and `server.test.ts` measured a
+       token minted for `till-b` written under `till`. Mail names none and is offered to them all. */
     arrive: (arrival) =>
       api.arrive({
         channel: arrival.channel,
@@ -535,6 +538,7 @@ function arrivalDoor(api: Api, spend: (key: string) => number | null, inbound: (
         body: arrival.body,
         sha256: arrival.sha256,
         verified: arrival.verified,
+        ...(arrival.ingest === undefined ? {} : { ingest: arrival.ingest }),
       }),
     limit: async (ask) => spend(`${ask.channel}:${ask.key}`),
     ...(inbound === null

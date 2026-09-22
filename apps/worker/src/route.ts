@@ -295,7 +295,7 @@ export type CloudIngestDeps = {
   /** What verifies this ingest on that record, or `null` for one nobody declared. */
   verifies(rec: string, ingest: string): Promise<IngestVerify | null>;
   /** Store the raw arrival on that record. Everything after storing it is the record's. */
-  arrives(rec: string, arrival: Omit<IngestArrival, 'rec' | 'ingest'>): Promise<Result<unknown>>;
+  arrives(rec: string, arrival: Omit<IngestArrival, 'rec'>): Promise<Result<unknown>>;
   /** Whole seconds to wait, or `null` to let this one through. */
   spends(ask: { channel: string; key: string }): Promise<number | null>;
   /**
@@ -382,6 +382,7 @@ export function cloudIngest(deps: CloudIngestDeps): IngestDoor {
             body: arrival.body,
             sha256: arrival.sha256,
             verified: arrival.verified,
+            ...(arrival.ingest === undefined ? {} : { ingest: arrival.ingest }),
           }),
     limit: (ask) => deps.spends(ask),
     /* AN ABSENT KEY AND NOT A METHOD ANSWERING `null`, and the difference is not one a caller can

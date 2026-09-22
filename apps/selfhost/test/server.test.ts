@@ -23,6 +23,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import type { Declaration } from '@braindog/kernel';
+import type { CallContext } from '@braindog/record';
 
 import { IN_TOKEN_MS, start } from '../src/server.ts';
 
@@ -226,16 +227,47 @@ test('and a `pull` ingest is not a webhook, so its own id is 404 at this door', 
   }
 });
 
-test("and the Cloud's own webhook shape is declined here, rather than answered by half", async () => {
+test("and the Cloud's own webhook shape is declined for an ingest that reads no token", async () => {
   const made = await host();
   try {
-    /* `/in/webhook/<rec>/<ingest>/<token>` is a URL for a Worker serving every record. A self-host
-       serving one record would either ignore the first segment, making two URLs one door, or
-       compare it, which tells whoever holds the URL what this record's id is. */
+    /* THIS RECORD'S OWN ID IS IN THE URL AND IT IS STILL A 404, because `till` declares no `verify:` and
+       so has nothing that would read the last segment. The self-host does compare the first segment now,
+       since 22 September (`arrivalDoor` in `src/server.ts` says why the oracle it was once said to open is
+       not one); what it will not do is let a second URL reach an ingest whose one URL has no token in it,
+       which would make two URLs one door. `shortcut-arrival.test.ts` is the ingest that does read one. */
     const out = await send(made.port, '/in/webhook/rec_01JZ8QK3F7R2M9V4XN6TCB5HAD/till/some-token', 'charge');
     assert.equal(out.status, 404);
     assert.equal(await out.text(), '', 'the `/api` fallback answered, not the arrival door');
     assert.equal(raws(made.running).length, 0);
+  } finally {
+    await stop(made);
+  }
+});
+
+/** A webhook that reads a path token, matching every `charge` the way `till` does. */
+const TOKENED = (ingest: string): Declaration => ({
+  id: `ingest.${ingest}`,
+  kind: 'ingest',
+  body: { ...(HOOK.body as object), ingest, verify: { kind: 'path' } } as never,
+});
+
+test('A TOKEN MINTED FOR ONE INGEST IS MATCHED BY THAT INGEST, though two declared before it match the same text', async () => {
+  const made = await host();
+  try {
+    /* THE URL NAMED `till-b` AND THE RECORD TRIED `till` FIRST. Measured before the arrival carried the
+       ingest: this POST came back `matched` with `till` on the receipt, because the door dropped every part
+       of the URL but the flag and the kernel offered a verified webhook to each webhook pattern in
+       declaration order. `till` and `till-a` both match `charge` and neither sender holds this token. */
+    assert.ok((await made.running.api.kernel.install([TOKENED('till-a'), TOKENED('till-b')])).ok);
+    const owner: CallContext = { principal: { kind: 'person', id: 'p_self', level: 'owner' } };
+    const mint = await made.running.api.ingestMint({ ingest: 'till-b' }, owner);
+    assert.ok(mint.ok, JSON.stringify(mint));
+
+    const out = await send(made.port, `/in/webhook/rec_01JZ8QK3F7R2M9V4XN6TCB5HAD/till-b/${mint.value.token}`, '{"merchant":"Halden Coffee","charge":1316}');
+    assert.equal(out.status, 202);
+    assert.equal(raws(made.running)[0]?.state, 'matched');
+    const receipt = made.running.sql.one<{ ingest_id: string }>('SELECT ingest_id FROM ingest_receipt');
+    assert.equal(receipt?.ingest_id, 'till-b', 'the arrival was matched by an ingest its token was not minted for');
   } finally {
     await stop(made);
   }
