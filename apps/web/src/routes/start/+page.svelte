@@ -29,7 +29,7 @@
   import { SPEAKS, voiceBatch, voiceWrites, withSpeaks, type SpeakingState } from '$lib/voice.ts';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
-  import { addedIn, firstModules, firstRun, onwardFrom, type AddedRows } from '$lib/first-run.ts';
+  import { addedIn, firstModules, firstRun, keptNothingCause, onwardFrom, type AddedRows, type KeptCause } from '$lib/first-run.ts';
   import { heardFor, INSTALL_ORDER, LEANS_ON, shape, titleOfRow, toTurnOn, type PackId, type Shape } from '$lib/shape.ts';
   import { USE_CASES, alongside, arrange, listsOf, modulesFor, pagesOf, type UseCase } from '@braindog/seed/usecases';
   import { carriedDocument, claimedBy, dayOf, formedFor, forms, moduleDocument, moduleManifest, plantedRows, withoutRows } from '@braindog/seed/usecases/install';
@@ -78,6 +78,14 @@
    * refusal, which is a second answer to a question that has one.
    */
   const sampled = $derived(!page.data.live);
+
+  /* WHY NOTHING TYPED HERE WAS KEPT, said per host once `/auth/methods` answers. Until it does, and on a
+     host it cannot reach, `keptNothingWhy` is the sentence, because it is true in every state. */
+  let cause = $state<KeptCause | null>(null);
+  $effect(() => {
+    if (sampled) void methods().then((m) => (cause = keptNothingCause(m)));
+  });
+  const keptWhy = $derived(cause === null ? firstRun.keptNothingWhy : firstRun.keptNothingFor[cause]);
 
   /**
    * WHETHER THE RECORD BEHIND THIS SCREEN IS ALREADY MADE, and it is asked because this screen is
@@ -1104,7 +1112,7 @@
                 <Button weight="quiet" href={`/decide/${outcome.plan}`}>{firstRun.usePlanSee}</Button>
               </div>
             {/if}
-            {#if outcome.waiting}<p class="kept-why">{firstRun.keptNothing} {firstRun.keptNothingWhy}</p>{/if}
+            {#if outcome.waiting}<p class="kept-why">{firstRun.keptNothing} {keptWhy}</p>{/if}
             {#if outcome.onward}
               <div class="actions">
                 <Button weight="primary" href={`/r/${outcome.onward.register}?first=1`}>{firstRun.seeTheList(outcome.onward.list)}</Button>
@@ -1263,7 +1271,7 @@
               <p class="kept-what">{known.waiting ? firstRun.youArePending(known.name, copy.markNotWritten) : firstRun.youAreKnown(known.name)}</p>
             {/if}
             {#if saved === null}
-              <p class="kept-why">{firstRun.keptNothing} {firstRun.keptNothingWhy}</p>
+              <p class="kept-why">{firstRun.keptNothing} {keptWhy}</p>
               <p class="kept-why">{firstRun.keptExamples}</p>
             {:else if saved.ok}
               <p class="kept-why">{firstRun.keptSaved}</p>

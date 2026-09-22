@@ -13,7 +13,11 @@
  * about one module. This is the same place, addressed by what reads it.
  */
 
+import type { Methods, Said } from './auth.ts';
 import type { IconName } from './ui/icons.ts';
+
+/** Why the row a person typed on `/start` was not saved, as `keptNothingFor` says it. */
+export type KeptCause = 'noDoor' | 'signIn' | 'noRecord' | 'noHost';
 
 export const firstRun = {
   /* FIRST RUN, TURN 1 (`loop/research-modular.md` §2). A question, a field and four chips; what was
@@ -227,8 +231,29 @@ export const firstRun = {
      September 10th, neither half was true. The row was also on the list the button under it opens,
      and leaving and coming back found this form empty with no outcome under it, while a reload
      took the row off the list as well. How long `pending` holds a row is the true part, so it is
-     what this says. The second `yet` went too: the sentence before it already has one. */
-  keptNothingWhy: 'This record cannot be written to from the browser, so the row lasts until this tab is closed or reloaded.',
+     what this says. The second `yet` went too: the sentence before it already has one.
+
+     AND ITS CAUSE WAS FALSE ON THE ONLY HOSTS A STRANGER CAN REACH. It read "This record cannot be
+     written to from the browser", and this same screen writes the row from the browser whenever
+     `boot` answers with a record. Driven against brain.dog and app.brain.dog, what the stranger
+     lacked was a way to sign in at all: `/auth/methods` answered `passkey: true, magic: false, key: false, me: null,
+     firstRun: true`, so there was no passkey to assert with, no sign-in email to send, no server key,
+     and `/auth/provision` was 404 because `PROVISION_KEY` is unset, so no claim link could be minted.
+     The screen is drawn from the sample whenever `boot` answers `UNAUTHORIZED` or `UNREACHABLE`
+     (`noRecord` in `record/device.ts`), and the one fact true of both is that no record of the
+     person's own is open. That is what this says while `/auth/methods` has not answered, and
+     `keptNothingFor` below says the cause once it has. */
+  keptNothingWhy: 'No record of your own is open here, so the row lasts until this tab is closed or reloaded.',
+  /* ONE CAUSE PER STATE THE SAMPLE IS DRAWN IN, chosen by `keptNothingCause` from `/auth/methods`.
+     Each says only what the host can do in that state: the one for the live hosts offers no sign-in,
+     because there is none to offer, and the one for a page with no host behind it offers nothing,
+     because there is nowhere to go. */
+  keptNothingFor: {
+    noDoor: 'This host offers no way to sign in yet, so there is no record of your own for the row to go to, and it lasts until this tab is closed or reloaded.',
+    signIn: 'You are not signed in, so the row lasts until this tab is closed or reloaded.',
+    noRecord: 'You are signed in, and no record of your own is open on this host yet, so the row lasts until this tab is closed or reloaded.',
+    noHost: 'No record answered this page, so it shows the worked example, and the row lasts until this tab is closed or reloaded.',
+  } as Record<KeptCause, string>,
   /* AND THE WAY ONWARD IS AN OFFER, NAMED FOR WHAT IS THERE. It used to be the only path and it was
      taken without asking: a list of somebody else's invoices, arrived at with no explanation, reads
      as the row having been written and gone somewhere strange. Named, it reads as what it is.
@@ -492,4 +517,28 @@ export function addedIn(added: readonly { name: string; rows: AddedRows }[]): { 
     const names = added.filter((a) => a.rows === rows).map((a) => a.name);
     return names.length > 0 ? [{ rows, names: firstRun.shapeAnd(names) }] : [];
   });
+}
+
+/**
+ * WHICH OF `keptNothingFor` IS TRUE OF THE HOST BEHIND THIS PAGE, read off `/auth/methods`, or `null`
+ * while that has not answered and `keptNothingWhy` is the sentence to draw.
+ *
+ * A WAY IN IS ONE SOMEBODY COULD PRESS, which is `waysOf` in `signin.ts` and not the raw flags. The
+ * live hosts answer `passkey: true` with `firstRun: true`, and a passkey that has never been made
+ * signs nobody in, so `passkey` alone would have told a stranger to sign in on a host with no door.
+ * The server key counts, because the operator of a self-host holds it and can sign in with it.
+ *
+ * `open` IS A HOST THAT LETS ANYBODY IN, so a sample drawn over one is a `boot` that did not answer,
+ * which is the same fact as no host at all.
+ *
+ * IT HOLDS NO SENTENCE, for the reason `addedIn` gives: the screen maps the answer to its key.
+ */
+export function keptNothingCause(said: Said<Methods> | null): KeptCause | null {
+  if (said === null) return null;
+  if (!said.ok) return 'noHost';
+  const it = said.value;
+  if (it.me) return 'noRecord';
+  if (it.open) return 'noHost';
+  const passkey = it.passkey && it.firstRun !== true;
+  return passkey || it.magic || it.key ? 'signIn' : 'noDoor';
 }
