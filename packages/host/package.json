@@ -8,6 +8,7 @@
     "./actions": "./src/actions.ts",
     "./auth": "./src/auth.ts",
     "./connector": "./src/connector.ts",
+    "./script": "./src/script.ts",
     "./spark": "./src/spark.ts"
   },
   "dependencies": {
@@ -15,7 +16,8 @@
     "@braindog/extract": "workspace:*",
     "@braindog/kernel": "workspace:*",
     "@braindog/ports": "workspace:*",
-    "@braindog/record": "workspace:*"
+    "@braindog/record": "workspace:*",
+    "@braindog/script": "workspace:*"
   },
   "scripts": {
     "test": "node --test test/*.test.ts",

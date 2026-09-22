@@ -37,7 +37,7 @@ import {
   type CookieMode,
 } from '@braindog/host/auth';
 import { gate, serveMcp, unauthorized } from '@braindog/mcp/http';
-import type { Execute, OutboxKind, OutboxRow, PagedRun, Signer } from '@braindog/kernel';
+import type { Execute, OutboxKind, OutboxRow, PagedRun, ScriptRunner, Signer } from '@braindog/kernel';
 import { createRecordApi, type CallContext } from '@braindog/record';
 import { readFileSync as readWhole, existsSync as present, rmSync as removeTree } from 'node:fs';
 import { basename as baseOf, dirname as dirOf, join as joinPath } from 'node:path';
@@ -50,6 +50,8 @@ import type { Auth, Param, Refusal, Row, Scheduler, Sql } from '@braindog/ports'
 
 import { actionExecutor, holding, holdingPaged, keyOpener, meterPass, pass, sharedReader, type OpenKey, type RehearseOnThisMachine, type Resolve, type Send } from './actions.ts';
 import { pagedRunner } from '@braindog/host/connector';
+import { holdingScript } from '@braindog/host/script';
+import { scriptSandbox } from './script.ts';
 import { httpFor } from './http.ts';
 import { sparkDoor, sparkFromEnv, sparkModelFor, type SparkConfig } from './spark.ts';
 import type { KeyStore } from './keys.ts';
@@ -701,8 +703,13 @@ export async function start(options: {
    * OFF UNLESS ASKED, because an action sends a request to somebody else's server, and a test that installs a
    * pack should not. `main.ts` turns it on. `send` and `openKey` are for tests: the defaults are `fetch` and
    * the key store above, and `./actions.ts` says what either may send.
+   *
+   * A SCRIPT RUNS HERE TOO, in `./script.ts`'s sandbox, and its `ctx.fetch` leaves through the same `send`, `resolve`
+   * and `openKey`. `resolve` is for tests, as `send` is: the default is the system's name service.
    */
-  actions?: { send?: Send | undefined; openKey?: OpenKey | undefined; rehearseOnThisMachine?: RehearseOnThisMachine | undefined } | undefined;
+  actions?:
+    | { send?: Send | undefined; resolve?: Resolve | undefined; openKey?: OpenKey | undefined; rehearseOnThisMachine?: RehearseOnThisMachine | undefined }
+    | undefined;
   /**
    * How a shared use-case file is read from an address (`fetchUseCase`). The default is the pinned socket and the
    * system's name service; a test passes a web of its own so nothing leaves the machine.
@@ -875,6 +882,9 @@ export async function start(options: {
   /* THE CONNECTOR RUNNER IS BUILT ONCE, beside the executor and for the same reason: both hold a
      socket and a key store, and a new one per pass would resolve and unwrap on every tick. */
   let paged: PagedRun | null = null;
+  /* THE SANDBOX IS BUILT ONCE TOO. Each run gets its own QuickJS instance inside it; what is kept is the socket, the
+     name service and the key opener, which are the executor's. */
+  let script: ScriptRunner | null = null;
   let acting = false;
   /* THE DIRECTORY IS OPENED BELOW, after the record, so a pass that fires first waits for the next one. */
   let ledger: Directory | null = null;
@@ -889,11 +899,14 @@ export async function start(options: {
          again until the Directory knows the record: `init` provisions on that plan, and this covers a record made
          before plans existed. */
       if (planned !== record && ledger.setPlan(record, 'selfhost').ok) planned = record;
+      const openKey = options.actions.openKey ?? keyOpener(api, options.keys);
       execute ??= actionExecutor(api, {
-        openKey: options.actions.openKey ?? keyOpener(api, options.keys),
+        openKey,
         send: options.actions.send,
+        resolve: options.actions.resolve,
         rehearseOnThisMachine: options.actions.rehearseOnThisMachine,
       });
+      script ??= scriptSandbox(api, { openKey, send: options.actions.send, resolve: options.actions.resolve, now: clock.now });
       /* A CONNECTOR PAGES AND THE EXECUTOR ABOVE CANNOT. Without this the kernel finishes the row
          and meters it `dropped`, which is honest but means no self-host ever runs a connector. */
       paged ??= pagedRunner(api, {
@@ -904,10 +917,11 @@ export async function start(options: {
         clock: { now: () => Date.now() },
         keys: options.keys,
       });
-      /* ONE ADMISSION COUNT FOR BOTH, so a record with one run left cannot spend it twice. */
+      /* ONE ADMISSION COUNT FOR ALL THREE, so a record with one run left cannot spend it twice. */
       const admissions = pass();
       const out = await api.kernel.runActions(holding(execute, record, ledger.mayRun, admissions), {
         page: holdingPaged(paged, record, ledger.mayRun, admissions),
+        script: holdingScript(script, record, ledger.mayRun, admissions),
       });
       await meterPass(ledger.meter, record, out.usage);
       if (out.fired > 0 || out.ran > 0 || out.dropped > 0) await api.kernel.tail(scheduler);
