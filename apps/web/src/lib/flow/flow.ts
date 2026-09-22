@@ -287,8 +287,15 @@ export function nudge(nodes: readonly Node[], key: string, dir: Nudge): Moved {
  * One automation as the canvas holds it.
  *
  * `rest` IS EVERY KEY THE CANVAS DOES NOT DRAW, carried through untouched: `priority`, `once_per`, `project`,
- * `enabled`, `limits`, a `when` written as a tree, and whatever a later build adds. A canvas that dropped the keys it
- * did not understand would make every save by a person a quiet edit of what an agent wrote.
+ * `enabled`, `limits`, and whatever a later build adds. A canvas that dropped the keys it did not understand would make
+ * every save by a person a quiet edit of what an agent wrote.
+ *
+ * A `when` WRITTEN AS A TREE IS NOT IN `rest`, though the canvas cannot edit one. It was, and three things followed
+ * from nothing drawing it (`loop/research-batch-thirty-six-audit.md` finding 3, measured on an installed rule tagging
+ * bills above 500): the trigger card said the rule started on every write; a sentence typed into "Only when" was
+ * shown on the card and then lost to the tree, because `rest` is spread after it; and a switch to a clock left the tree
+ * in the body with `faultsOf` silent and the record refusing on Send. Held here beside the sentence, it is drawn, it
+ * gives way to what the person types, and it goes when the trigger stops being a change.
  *
  * `form` IS HOW THE BODY SPELLED ITS LIST, and it decides which path a saved body takes (see `bodyOf`).
  */
@@ -296,8 +303,10 @@ export type Draft = {
   id: string;
   name: string;
   trigger: Trigger;
-  /** The condition as a `where` sentence, or `null` when there is none or it was written as a tree (then it is in `rest`). */
+  /** The condition as a `where` sentence, or `null` when none was typed. */
   when: string | null;
+  /** A condition written as a tree, `{ field: amount, gt: 500 }`, or `null`. Filed only while `when` is empty. */
+  whenTree: unknown;
   steps: Node[];
   form: 'then' | 'steps';
   /** Whether an inline body spelled its trigger out as `on: { written }` beside `register`, so it is written back that way. */
@@ -324,15 +333,15 @@ export function triggerOfBody(body: Body): Trigger {
 export function draftOf(id: string, body: Body): Draft {
   const rest: Body = {};
   for (const [k, v] of Object.entries(body)) if (!DRAWN.has(k)) rest[k] = v;
-  /* A WORD IN `on:` (`create`, the one older spelling the lint still lets through) and a `when` written as a tree are
-     kept as they were, since the canvas cannot draw either and must not drop them. */
+  /* A WORD IN `on:` (`create`, the one older spelling the lint still lets through) is kept as it was, since the canvas
+     cannot draw it and must not drop it. */
   if (typeof body.on === 'string') rest.on = body.on;
-  if (body.when !== undefined && typeof body.when !== 'string') rest.when = body.when;
   return {
     id,
     name: typeof body.name === 'string' ? body.name : '',
     trigger: triggerOfBody(body),
     when: typeof body.when === 'string' ? body.when : null,
+    whenTree: body.when !== undefined && body.when !== null && typeof body.when !== 'string' ? body.when : null,
     steps: nodesOf(body.steps ?? body.then),
     form: body.steps === undefined && body.then !== undefined ? 'then' : 'steps',
     spelledOn: isObject(body.on) && body.steps === undefined,
@@ -346,6 +355,7 @@ export const blankDraft = (id = 'automation', name = ''): Draft => ({
   name,
   trigger: { manual: true },
   when: null,
+  whenTree: null,
   steps: [],
   form: 'then',
   spelledOn: false,
@@ -365,6 +375,28 @@ export function pathOf(body: Body): 'inline' | 'run' {
 
 const hasVerb = (nodes: readonly Node[], among: readonly string[]): boolean =>
   nodes.some((n) => among.some((v) => v in n.step) || (isBranch(n) && (hasVerb(n.then ?? [], among) || hasVerb(n.else ?? [], among))));
+
+/**
+ * The condition a draft files: the sentence the person typed when there is one, and the tree it was opened with only
+ * when there is not. THE TYPED ONE WINS because it is the one on the screen; the card said "only when what is Rent"
+ * over a body that still held `{ field: amount, gt: 500 }` while the tree came second in `bodyOf`.
+ */
+export function conditionOf(d: Draft): unknown {
+  const typed = (d.when ?? '').trim();
+  if (typed !== '') return typed;
+  return d.whenTree ?? null;
+}
+
+/**
+ * The draft with another trigger. THE CONDITION GOES WITH THE CHANGE, BOTH FORMS OF IT: only a change has a row for a
+ * condition to be about, and only a change draws the "Only when" field, so a condition carried to a clock, a button or
+ * an arrival is one the record refuses and the person has no field left to clear. `Inspector.svelte`'s `pick` cleared
+ * the sentence and left the tree, which is how C3 in the thirty-sixth audit filed a `when:` on a clock.
+ */
+export function withTrigger(d: Draft, trigger: Trigger): Draft {
+  const leaves = triggerKind(d.trigger) !== triggerKind(trigger) && !('written' in trigger);
+  return leaves ? { ...d, trigger, when: null, whenTree: null } : { ...d, trigger };
+}
 
 const onlyActions = (nodes: readonly Node[]): boolean => nodes.every((n) => !isBranch(n) && (ACTIONS as readonly string[]).includes(verbOf(n.step) ?? ''));
 
@@ -390,7 +422,8 @@ export function bodyOf(d: Draft): Body {
   const inline =
     plainWrite && d.form === 'then' && onlyActions(d.steps) && rest.project === undefined && rest.limits === undefined && rest.enabled !== false;
   if (written !== null && hasVerb(d.steps, ONCE) && !(Array.isArray(rest.once_per) && rest.once_per.length > 0)) rest.once_per = ['entry'];
-  const when = d.when !== null && d.when.trim() !== '' ? { when: d.when.trim() } : {};
+  const filed = conditionOf(d);
+  const when = filed === null ? {} : { when: filed };
   const name = d.name.trim() === '' ? {} : { name: d.name.trim() };
   if (inline) {
     const { on: legacy, ...others } = rest;
@@ -405,11 +438,18 @@ export function bodyOf(d: Draft): Body {
  * The proposal a save files: a `change` to `rule.<id>`, with the whole body, and the version it was drawn from.
  *
  * THE SAME PROPOSAL AN AGENT FILES, so the two editors are one. `packages/mcp/src/index.ts` documents this body for
- * `propose`, and Decide shows the dry run and the calls it makes the same way whichever of them drew it. The owner's
+ * `propose`, and Decide reads it the same way whichever of them drew it. What Decide draws of it today is thin: a rule
+ * change is the word "Rule" and the id (`routes/decide/[id]/proposed.ts` `appearsOf`), with no trigger, no steps and
+ * no dry run, although an earlier line here said it showed the dry run (`loop/research-canvas-ux.md` 1.1). The owner's
  * press is what installs it: the canvas never writes a declaration of its own.
  *
- * `from_version` IS LEFT OUT FOR A NEW ONE, which the record reads as drawn from nothing. For an edit it is the version
- * the canvas opened, so a second change that landed in between is a conflict on Decide rather than a quiet overwrite.
+ * `from_version` IS 0 FOR A NEW ONE, AND NEVER LEFT OUT. This comment used to say an absent version was read as drawn
+ * from nothing, and the record reads it the other way: an absent version is stamped with the one live at filing
+ * (`packages/kernel/src/govern.ts` `stamp`). A member who cannot read Money sees no clocks in the list, so `freshId`
+ * gave her "Gold rate" the id of the owner's hourly clock, and the owner's accept of "Add the automation Gold rate?"
+ * replaced its steps with hers (`loop/research-batch-thirty-six-audit.md` finding 4). A 0 is kept as written
+ * (`isDrawn`), and an accept over a live version is a conflict that reopens the question instead. For an edit it is
+ * the version the canvas opened, so a second change that landed in between is a conflict on Decide as well.
  */
 export function proposalOf(d: Draft, fromVersion: number | null) {
   const id = `rule.${d.id}`;
@@ -420,7 +460,7 @@ export function proposalOf(d: Draft, fromVersion: number | null) {
     body: {
       declaration_id: id,
       to: { id, kind: 'rule', body: bodyOf(d) },
-      ...(fromVersion === null ? {} : { from_version: fromVersion }),
+      from_version: fromVersion ?? 0,
     },
   };
 }
@@ -440,7 +480,9 @@ export function idFrom(name: string): string {
  * A new automation's id, from its name, that is not one the record already has.
  *
  * A NAME TWO AUTOMATIONS SHARE WOULD BE A CHANGE TO THE FIRST. The proposal names `rule.<id>`, and a change to an id
- * that is installed is read as a new version of it, so "Gold rate" drawn twice would have replaced the first on accept.
+ * that is installed is read as a new version of it. `taken` is only the automations the caller can read, though, so
+ * this keeps a new one off the ids somebody could see, and `proposalOf`'s `from_version: 0` is what turns an accept
+ * over one they could not see into a conflict rather than a replacement.
  */
 export function freshId(name: string, taken: readonly string[]): string {
   /* `new` IS TAKEN BY THE ROUTE. `/automations/new` opens a blank draft, so a rule with that id could be filed and
@@ -548,9 +590,16 @@ export function clockOf(every: string, at?: string, day?: string): Trigger {
 
 /* ── the step kinds, as the menu offers and the inspector edits them ──────── */
 
-/** What each verb is called where a person picks it. */
+/**
+ * What each verb is called where a person picks it.
+ *
+ * `if` IS "IF" AND NOT "ONLY IF". "Only if" is Zapier's word for a Filter, which stops the Zap, and the runner does not
+ * stop: `plan` in `packages/kernel/src/flow.ts` walks the arm it took and then carries on down the parent list either
+ * way. A person who picked "Only if" and added the next step under it in the main column believed that step was
+ * guarded, and it ran every time (`loop/research-canvas-ux.md` 1.3).
+ */
 export const VERB_LABELS: Record<Verb, string> = {
-  if: 'Only if',
+  if: 'If',
   set_var: 'Remember a value',
   stop: 'Stop here',
   tag: 'Add a tag',
@@ -633,62 +682,72 @@ export function blankStep(verb: Verb): Step {
  * inspector offers as chips rather than asking anybody to type braces.
  */
 export type ArgKind = 'text' | 'long' | 'name' | 'number' | 'span' | 'later' | 'list' | 'pairs' | 'condition';
-export type Arg = { path: readonly string[]; label: string; kind: ArgKind; required?: boolean; template?: boolean; hint?: string };
+type ArgBase = { path: readonly string[]; label: string; kind: ArgKind; template?: boolean; hint?: string };
+/**
+ * A REQUIRED ARGUMENT CARRIES THE SENTENCE ITS ABSENCE SAYS, and the type will not take one without it. The fault was
+ * assembled, `${verb} needs ${label}.`, and worked through `ARGS` it said "Tell you needs say.", "Add a note needs
+ * note." and "Ask Spark needs keep the answer as." (`loop/research-canvas-ux.md` 1.7). A label names a field; it does
+ * not also make a sentence with a verb's name in front of it.
+ */
+export type Arg = (ArgBase & { required?: false }) | (ArgBase & { required: true; missing: string });
+
+/** One sentence, for every step that keeps an answer, because the reason to name it is the same each time. */
+const NAME_IT = 'Name the answer, so later steps can use it.';
 
 export const ARGS: Record<Verb, readonly Arg[]> = {
-  if: [{ path: ['if'], label: 'Only when', kind: 'condition', required: true, hint: 'state is open, due before today' }],
+  if: [{ path: ['if'], label: 'Only when', kind: 'condition', required: true, missing: 'Write what has to be true for this branch.', hint: 'state is open, due before today' }],
   set_var: [
-    { path: ['set_var', 'name'], label: 'Call it', kind: 'name', required: true },
+    { path: ['set_var', 'name'], label: 'Call it', kind: 'name', required: true, missing: 'Name the value, so later steps can use it.' },
     { path: ['set_var', 'to'], label: 'Value', kind: 'text', template: true },
   ],
   stop: [],
-  tag: [{ path: ['tag'], label: 'Tag', kind: 'text', required: true }],
-  untag: [{ path: ['untag'], label: 'Tag', kind: 'text', required: true }],
+  tag: [{ path: ['tag'], label: 'Tag', kind: 'text', required: true, missing: 'Say which tag to add.' }],
+  untag: [{ path: ['untag'], label: 'Tag', kind: 'text', required: true, missing: 'Say which tag to take off.' }],
   set: [
-    { path: ['set', 'field'], label: 'Field', kind: 'text', required: true },
+    { path: ['set', 'field'], label: 'Field', kind: 'text', required: true, missing: 'Say which field to set.' },
     { path: ['set', 'to'], label: 'To', kind: 'text', template: true },
   ],
-  move: [{ path: ['move'], label: 'To the state', kind: 'text', required: true }],
+  move: [{ path: ['move'], label: 'To the state', kind: 'text', required: true, missing: 'Say which state to move it to.' }],
   link: [
-    { path: ['link', 'field'], label: 'Field', kind: 'text', required: true },
-    { path: ['link', 'to', 'register'], label: 'In the list', kind: 'text', required: true },
-    { path: ['link', 'to', 'by'], label: 'Matched by the field', kind: 'text', required: true },
-    { path: ['link', 'to', 'value'], label: 'Equal to', kind: 'text', required: true, template: true },
+    { path: ['link', 'field'], label: 'Field', kind: 'text', required: true, missing: 'Say which field holds the link.' },
+    { path: ['link', 'to', 'register'], label: 'In the list', kind: 'text', required: true, missing: 'Say which list the other row is in.' },
+    { path: ['link', 'to', 'by'], label: 'Matched by the field', kind: 'text', required: true, missing: 'Say which field finds the other row.' },
+    { path: ['link', 'to', 'value'], label: 'Equal to', kind: 'text', required: true, missing: 'Say what that field has to be.', template: true },
   ],
-  note: [{ path: ['note'], label: 'Note', kind: 'long', required: true, template: true }],
+  note: [{ path: ['note'], label: 'Note', kind: 'long', required: true, missing: 'Write the note.', template: true }],
   create: [
-    { path: ['create', 'register'], label: 'In the list', kind: 'text', required: true },
-    { path: ['create', 'bound'], label: 'At most this many rows', kind: 'number', required: true },
+    { path: ['create', 'register'], label: 'In the list', kind: 'text', required: true, missing: 'Say which list the rows go in.' },
+    { path: ['create', 'bound'], label: 'At most this many rows', kind: 'number', required: true, missing: 'Say how many rows it may add at most.' },
     { path: ['create', 'fields'], label: 'Fields', kind: 'pairs', template: true, hint: 'title: Chase the invoice' },
   ],
-  notify: [{ path: ['notify', 'say'], label: 'Say', kind: 'long', required: true, template: true }],
+  notify: [{ path: ['notify', 'say'], label: 'Say', kind: 'long', required: true, missing: 'Say what to tell you.', template: true }],
   suggest: [
-    { path: ['suggest', 'question'], label: 'Question', kind: 'long', required: true, template: true },
-    { path: ['suggest', 'options'], label: 'Answers', kind: 'list', required: true },
+    { path: ['suggest', 'question'], label: 'Question', kind: 'long', required: true, missing: 'Write the question to put on Decide.', template: true },
+    { path: ['suggest', 'options'], label: 'Answers', kind: 'list', required: true, missing: 'Give at least one answer to choose from.' },
   ],
   ask_person: [
-    { path: ['ask_person', 'question'], label: 'Question', kind: 'long', required: true, template: true },
-    { path: ['ask_person', 'options'], label: 'Answers', kind: 'list', required: true },
-    { path: ['ask_person', 'as'], label: 'Keep the answer as', kind: 'name', required: true },
+    { path: ['ask_person', 'question'], label: 'Question', kind: 'long', required: true, missing: 'Write the question to ask.', template: true },
+    { path: ['ask_person', 'options'], label: 'Answers', kind: 'list', required: true, missing: 'Give at least one answer to choose from.' },
+    { path: ['ask_person', 'as'], label: 'Keep the answer as', kind: 'name', required: true, missing: NAME_IT },
     { path: ['ask_person', 'wait'], label: 'Wait at most', kind: 'span', hint: '7d' },
   ],
   ask_spark: [
-    { path: ['ask_spark', 'question'], label: 'Question', kind: 'long', required: true, template: true },
-    { path: ['ask_spark', 'as'], label: 'Keep the answer as', kind: 'name', required: true },
+    { path: ['ask_spark', 'question'], label: 'Question', kind: 'long', required: true, missing: 'Write the question for Spark.', template: true },
+    { path: ['ask_spark', 'as'], label: 'Keep the answer as', kind: 'name', required: true, missing: NAME_IT },
   ],
   call: [
-    { path: ['call', 'ingest'], label: 'The declared call', kind: 'text', required: true, hint: 'gold_rate' },
+    { path: ['call', 'ingest'], label: 'The declared call', kind: 'text', required: true, missing: 'Say which call to make.', hint: 'gold_rate' },
     { path: ['call', 'as'], label: 'Keep the answer as', kind: 'name' },
   ],
-  run: [{ path: ['run'], label: 'The declared call', kind: 'text', required: true }],
+  run: [{ path: ['run'], label: 'The declared call', kind: 'text', required: true, missing: 'Say which call to run on this row.' }],
   script: [
-    { path: ['script', 'id'], label: 'The script', kind: 'text', required: true },
-    { path: ['script', 'as'], label: 'Keep the answer as', kind: 'name', required: true },
+    { path: ['script', 'id'], label: 'The script', kind: 'text', required: true, missing: 'Say which script to run.' },
+    { path: ['script', 'as'], label: 'Keep the answer as', kind: 'name', required: true, missing: NAME_IT },
   ],
-  wait: [{ path: ['wait'], label: 'For', kind: 'span', required: true, hint: '2h' }],
+  wait: [{ path: ['wait'], label: 'For', kind: 'span', required: true, missing: 'Say how long to wait.', hint: '2h' }],
   schedule: [
-    { path: ['schedule', 'in'], label: 'In', kind: 'later', required: true, hint: '14d' },
-    { path: ['schedule', 'note'], label: 'Note', kind: 'text', required: true, template: true },
+    { path: ['schedule', 'in'], label: 'In', kind: 'later', required: true, missing: 'Say when to come back.', hint: '14d' },
+    { path: ['schedule', 'note'], label: 'Note', kind: 'text', required: true, missing: 'Write what to come back to.', template: true },
   ],
 };
 
@@ -698,7 +757,8 @@ export const words = {
   heading: 'Automations',
   newOne: 'New automation',
   untitled: 'Untitled automation',
-  none: 'Nothing is automated here yet.',
+  /* A TITLE, SO NO FULL STOP, as Appendix C15 and D10 of `loop/DESIGN-SYSTEM.md` already made Search and Decide. */
+  none: 'Nothing runs on its own yet',
   noneWhy: 'An automation starts on a change, an arrival, a clock or a button, and then does its steps in order.',
   absent: 'This record does not list its automations yet. You can still draw one and send it to Decide.',
   sample: 'This is the sample record. Nothing you draw here is sent anywhere.',
@@ -707,9 +767,11 @@ export const words = {
   written: 'As written',
   addStep: 'Add a step',
   addHere: 'Add a step here',
-  emptyArm: 'Nothing yet',
-  then: 'Then',
-  otherwise: 'Otherwise',
+  then: 'If so',
+  otherwise: 'If not',
+  /* WHERE THE COLUMN RESUMES UNDER A BRANCH, because a step there runs whichever arm was taken, and nothing on the
+     canvas said so while the branch was called "Only if". `FlowList.svelte` draws it. */
+  eitherWay: 'Then, either way',
   edit: 'Edit',
   remove: 'Remove',
   moveUp: 'Move up',
@@ -730,6 +792,13 @@ export const words = {
   condition: 'Only when',
   inline: 'Runs inside the change that starts it.',
   asRun: 'Runs after what starts it, one step at a time.',
+  /* SAID ONLY WHEN AN EDIT IS ABOUT TO MOVE IT, by the new path. Which path a rule runs on matters to its timing and its
+     history and to nobody choosing what to automate, and the two lines above were printed on the trigger card, in the
+     trigger's sheet and on every row of the list (`loop/research-canvas-ux.md` 1.11). */
+  pathChange: {
+    inline: 'Once sent, it runs inside the change that starts it, rather than one step at a time after it.',
+    run: 'Once sent, it runs after what starts it, one step at a time, rather than inside the change.',
+  } as Record<'inline' | 'run', string>,
   filed: 'Sent to Decide. It runs once you accept it there.',
   openDecide: 'Open it on Decide',
   notFiled: 'This is the sample record, so nothing was sent. On your record this goes to Decide.',
@@ -796,6 +865,18 @@ function laterWords(span: string): string {
 export const unbrace = (text: string): string => text.replace(/\{\{\s*([^}]+?)\s*\}\}/gu, (_, path: string) => path.split('.').pop() ?? path);
 
 const str = (v: unknown): string => (typeof v === 'string' ? unbrace(v.trim()) : typeof v === 'number' ? String(v) : '');
+
+/*
+ * A REFERENCE IS MARKED WHILE A SENTENCE IS BUILT, AND CUT OUT AFTER. `unbrace` read `{{vars.rate}}` as `rate` and the
+ * card printed it in the running text, so the sample said "Tell you: Gold is rate a gram" and "Ask you: File body as
+ * spending?" (`loop/research-canvas-ux.md` 1.6). Every case in `saying` keeps its words; only the value it reads is
+ * marked, with two control characters no template holds, and `sayParts` splits on them.
+ */
+const OPEN = '\u0002';
+const SHUT = '\u0003';
+const MARKED = /\u0002([^\u0003]*)\u0003/gu;
+const mark = (text: string): string => text.replace(/\{\{\s*([^}]+?)\s*\}\}/gu, (_, path: string) => `${OPEN}${path}${SHUT}`);
+const aloud = (v: unknown): string => (typeof v === 'string' ? mark(v.trim()) : typeof v === 'number' ? String(v) : '');
 const withText = (lead: string, text: string): string => (text === '' ? lead : `${lead}: ${text}`);
 const andList = (items: readonly string[], joint = 'and'): string =>
   items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} ${joint} ${items[items.length - 1]}`;
@@ -835,10 +916,26 @@ export const leafTo = (field: string, op: CompareOp, value: number): Record<stri
 
 /** A condition in words: a sentence as written, a numeric leaf in the builder's words, and a tree as what it is. */
 export function sayCondition(cond: unknown): string {
-  if (typeof cond === 'string') return unbrace(cond.trim());
+  return unmark(conditionWords(cond));
+}
+
+function conditionWords(cond: unknown): string {
+  if (typeof cond === 'string') return mark(cond.trim());
   const leaf = leafOf(cond);
   if (leaf) return `${leaf.field.replace(/_/gu, ' ')} ${COMPARE.find((c) => c.op === leaf.op)!.said} ${leaf.value}`;
   return isObject(cond) ? 'the condition holds' : '';
+}
+
+/**
+ * What starts it and what it waits for, as the trigger card says it. THE CONDITION IS SAID IN EITHER FORM: the card
+ * drew only a typed sentence, so a rule that tags only bills above 500 was shown as starting on every write to bills.
+ * A tree the builder can read is said in its words, "amount is more than 500", and any other as "the condition holds",
+ * which is less than it could say and is not nothing.
+ */
+export function sayStart(d: Draft): string {
+  const filed = conditionOf(d);
+  const cond = filed === null ? '' : sayCondition(filed);
+  return cond === '' ? sayTrigger(d.trigger) : `${sayTrigger(d.trigger)}, only when ${cond}`;
 }
 
 /** What starts it, in one sentence. */
@@ -868,32 +965,58 @@ export function sayTrigger(t: Trigger): string {
   return 'When you press Run now';
 }
 
+/** A marked sentence with its references read aloud: `{{vars.rate}}` as `rate`. */
+const unmark = (text: string): string => text.replace(MARKED, (_, path: string) => path.split('.').pop() ?? path);
+
+/** One piece of a card's sentence: words, or a reference (`ref` is its whole path, `text` the name a card shows). */
+export type Part = { text: string; ref?: string };
+
+/**
+ * What one step does, as words and references, so a card can draw `{{vars.rate}}` as a chip and not as a word in the
+ * sentence. The texts joined are `sayStep`, character for character, so every other reader is unchanged.
+ */
+export function sayParts(step: Step): Part[] {
+  const whole = saying(step);
+  const out: Part[] = [];
+  let at = 0;
+  for (const m of whole.matchAll(MARKED)) {
+    if (m.index > at) out.push({ text: whole.slice(at, m.index) });
+    const path = m[1]!;
+    out.push({ text: path.split('.').pop() ?? path, ref: path });
+    at = m.index + m[0].length;
+  }
+  if (at < whole.length) out.push({ text: whole.slice(at) });
+  return out;
+}
+
 /** What one step does, in one line, with no braces. */
-export function sayStep(step: Step): string {
+export const sayStep = (step: Step): string => unmark(saying(step));
+
+function saying(step: Step): string {
   const verb = verbOf(step);
   const a = verb === null ? undefined : step[verb];
-  const at = (...path: string[]) => str(getAt(a, path));
+  const at = (...path: string[]) => aloud(getAt(a, path));
   switch (verb) {
     case 'if': {
-      const cond = sayCondition(a);
-      return cond === '' ? 'Only if' : `Only if ${cond}`;
+      const cond = conditionWords(a);
+      return cond === '' ? 'If' : `If ${cond}`;
     }
     case 'set_var':
       return at('name') === '' ? 'Remember a value' : withText(`Remember ${at('name')}`, at('to'));
     case 'stop':
       return 'Stop here';
     case 'tag':
-      return withText('Tag it', str(a));
+      return withText('Tag it', aloud(a));
     case 'untag':
-      return withText('Take the tag off', str(a));
+      return withText('Take the tag off', aloud(a));
     case 'set':
       return at('field') === '' ? 'Set a field' : `Set ${at('field')} to ${at('to') || 'nothing'}`;
     case 'move':
-      return str(a) === '' ? 'Move it to a state' : `Move it to ${str(a)}`;
+      return aloud(a) === '' ? 'Move it to a state' : `Move it to ${aloud(a)}`;
     case 'link':
       return at('field') === '' ? 'Link it to a row' : `Link ${at('field')} to the ${at('to', 'register') || 'row'} whose ${at('to', 'by')} is ${at('to', 'value')}`;
     case 'note':
-      return withText('Add a note', str(a));
+      return withText('Add a note', aloud(a));
     case 'create': {
       const bound = Number(getAt(a, ['bound']));
       return at('register') === '' ? 'Add rows' : `Add rows to ${at('register')}${bound > 0 ? `, at most ${bound}` : ''}`;
@@ -902,18 +1025,20 @@ export function sayStep(step: Step): string {
       return withText('Tell you', at('say'));
     case 'suggest':
       return withText('Suggest on Decide', at('question'));
+    /* "THE OWNER", NOT "YOU". The card is read by whoever opens the canvas, a member among them, and the runner opens the
+       question as a suggestion on Decide (`packages/kernel/src/flow.ts`), which is the owner's to answer. */
     case 'ask_person':
-      return withText(`Ask ${at('to') || 'you'}`, at('question'));
+      return withText(`Ask ${at('to') || 'the owner'}`, at('question'));
     case 'ask_spark':
       return withText('Ask Spark', at('question'));
     case 'call':
       return at('ingest') === '' ? 'Call a service' : `Call ${at('ingest')}${at('as') ? `, keeping the answer as ${at('as')}` : ''}`;
     case 'run':
-      return str(a) === '' ? 'Run a call on this row' : `Run ${str(a)} on this row`;
+      return aloud(a) === '' ? 'Run a call on this row' : `Run ${aloud(a)} on this row`;
     case 'script':
       return at('id') === '' ? 'Run a script' : `Run the script ${at('id')}${at('as') ? `, keeping the answer as ${at('as')}` : ''}`;
     case 'wait':
-      return str(a) === '' ? 'Wait' : `Wait ${spanWords(str(a))}`;
+      return aloud(a) === '' ? 'Wait' : `Wait ${spanWords(aloud(a))}`;
     case 'schedule':
       return at('in') === '' ? 'Come back later' : withText(`Come back in ${laterWords(at('in'))}`, at('note'));
     case null:
@@ -1009,13 +1134,17 @@ export function faultsOf(d: Draft): Fault[] {
     else if (ms < FLOOR_MS) out.push({ key: null, say: 'The shortest clock is every 15 minutes.' });
   }
   if ('metric' in t) out.push({ key: null, say: 'Nothing in this build watches a metric yet, so it would never start.' });
-  if (rowless && d.when !== null && d.when.trim() !== '')
-    out.push({ key: null, say: 'A clock or a button has no row for a condition to be about. Put the condition in an Only if step.' });
+  /* EITHER FORM OF THE CONDITION, because the record refuses either. Read off the typed sentence alone, a tree `when`
+     carried to a clock said nothing here and was refused on Send: "rule.paid-tag is started by every, which has no row
+     for when: to be about" (`loop/research-batch-thirty-six-audit.md` finding 3, C3). */
+  const conditioned = conditionOf(d) !== null;
+  if (rowless && conditioned)
+    out.push({ key: null, say: 'A clock or a button has no row for a condition to be about. Put the condition in an If step.' });
   /* THE TWO BELOW WERE MEASURED, NOT READ. Both bodies went through the kernel's `flowFault` and came back refused at
      `when` while this list was empty (`flow.test.ts` has the pair), so a person pressed Send and heard about it on
      Decide. The run-path one is reached from the sample's own "Chase late payments" by adding a single branch. */
-  if ('arrival' in t && (d.when ?? '').trim() !== '')
-    out.push({ key: null, say: 'The runner does not read a condition on an arrival yet. Narrow it by its door, or test the row in an Only if step.' });
+  if ('arrival' in t && conditioned)
+    out.push({ key: null, say: 'The runner does not read a condition on an arrival yet. Narrow it by its door, or test the row in an If step.' });
   if ('written' in t) {
     const body = bodyOf(d);
     if (pathOf(body) === 'run' && Array.isArray(body.once_per) && body.once_per.length > 0 && RELATIVE_DAY.test(JSON.stringify(body.when ?? '')))
@@ -1039,7 +1168,7 @@ export function faultsOf(d: Draft): Fault[] {
       if (rowless && ROW_VERBS.includes(verb)) out.push({ key: n.key, say: `${sayTrigger(t)} brings no row, and "${sayStep(n.step)}" acts on one.` });
       for (const arg of ARGS[verb]) {
         const v = getAt(n.step, arg.path);
-        if (arg.required && blank(v)) out.push({ key: n.key, say: `${VERB_LABELS[verb]} needs ${arg.label.toLowerCase()}.` });
+        if (arg.required && blank(v)) out.push({ key: n.key, say: arg.missing });
         else if (arg.kind === 'name' && !blank(v) && (typeof v !== 'string' || !NAME.test(v) || RESERVED.includes(v)))
           out.push({ key: n.key, say: `${String(v)} is not a name an answer can have. Use lower-case letters, digits and underscores.` });
         else if (arg.kind === 'span' && !blank(v) && (typeof v !== 'string' || everyMs(v) === null))
@@ -1048,7 +1177,7 @@ export function faultsOf(d: Draft): Fault[] {
           out.push({ key: n.key, say: `${String(v)} is not a span. Write 14d, 2w, 3m or 1y.` });
       }
       if (verb === 'if') {
-        if ((n.then ?? []).length === 0) out.push({ key: n.key, say: 'A branch says what to do then.' });
+        if ((n.then ?? []).length === 0) out.push({ key: n.key, say: 'Add a step under If so, or this branch does nothing.' });
         if (depth + 1 > DEPTH_CEILING) out.push({ key: n.key, say: `Branches go ${DEPTH_CEILING} deep at most.` });
         walk(n.then ?? [], depth + 1);
         walk(n.else ?? [], depth + 1);

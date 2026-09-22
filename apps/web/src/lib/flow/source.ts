@@ -26,10 +26,13 @@
  * from a body what the record left out, and leaves out only a row with no id.
  */
 
+import { fillTemplate } from '@braindog/kernel';
 import { since } from 'braindog-render';
 
 import { copy } from '../copy.ts';
-import { pathOf, sayTrigger, triggerKind, triggerOfBody, words, type Body } from './flow.ts';
+import { ROWS } from '../record/data.ts';
+import { compile, matches } from '../record/where.ts';
+import { pathOf, sayStep, sayTrigger, triggerKind, triggerOfBody, words, type Body } from './flow.ts';
 
 /* ── the shapes ─────────────────────────────────────────────────────────── */
 
@@ -72,6 +75,19 @@ export type AutomationRow = {
 
 /** `propose`'s answer: the suggestion's id, or `null` on the sample, where nothing is filed. */
 export type Filed = { id: string | null };
+
+/** One row an inline rule's dry run walked: the row as the record names it, what it would get, and why not if nothing. */
+export type TriedRow = { spoken: string; would: string[]; reason: string | null };
+
+/**
+ * What a body would do, as the record's `dryRun` answers it (`packages/record/src/index.ts`, `dryRun`).
+ *
+ * TWO ANSWERS, ONE SHAPE HERE, as with `AutomationRow`. Every body gets the record's own sentences (`path`, `trigger`,
+ * `steps`, from `automations.ts` `said`). An inline body is also walked over its list by the kernel, which adds how many
+ * rows it read and matched and the first twenty with what each would get; a run reads no row, so `matches` and `rows`
+ * are `null` for it and `sample` is empty, and the screen says the sentences alone.
+ */
+export type Tried = { path: 'inline' | 'run'; trigger: string; steps: string[]; matches: number | null; rows: number | null; sample: TriedRow[] };
 
 /* ── reading an answer that is being written in the same wave ────────────── */
 
@@ -139,6 +155,51 @@ export function rowOf(r: unknown): AutomationRow | null {
 
 /** The list answer, read into rows. A row with no id is left out: there is nothing to open. */
 export const rowsOf = (raw: unknown): AutomationRow[] => (Array.isArray(raw) ? raw.map(rowOf).filter((x): x is AutomationRow => x !== null) : []);
+
+/**
+ * A dry run's answer, read by name for `rowOf`'s reason. An answer with no sentences at all is `null`, because a trial
+ * that says nothing is not something the screen can draw as an answer.
+ */
+export function triedOf(raw: unknown): Tried | null {
+  if (!isObject(raw) || !Array.isArray(raw.steps) || typeof raw.trigger !== 'string') return null;
+  const count = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  const sample = Array.isArray(raw.sample)
+    ? raw.sample.flatMap((s): TriedRow[] =>
+        isObject(s) && typeof s.spoken === 'string'
+          ? [{ spoken: s.spoken, would: Array.isArray(s.would) ? s.would.filter((w): w is string => typeof w === 'string') : [], reason: text(s.reason) }]
+          : [],
+      )
+    : [];
+  return {
+    path: raw.path === 'inline' ? 'inline' : 'run',
+    trigger: raw.trigger,
+    steps: raw.steps.filter((l): l is string => typeof l === 'string'),
+    matches: count(raw.matches),
+    rows: count(raw.rows),
+    sample,
+  };
+}
+
+/**
+ * A step's answer as a person reads it: `rate 71.4`, not `{"rate": 71.4}`.
+ *
+ * THE RUNNER KEEPS IT AS TEXT, and usually as the JSON the step handed back (`automation_step.answer`, at most 64 KB),
+ * so the Runs tab printed braces and quotes in the identifier face. An object is said as its keys and values, a list as
+ * its items, and anything that does not parse is the text it was kept as. A value that is itself an object stays JSON,
+ * because flattening it would say something the step did not.
+ */
+export function answerWords(answer: string): string {
+  let v: unknown;
+  try {
+    v = JSON.parse(answer);
+  } catch {
+    return answer;
+  }
+  const one = (x: unknown): string => (typeof x === 'string' ? x : JSON.stringify(x));
+  if (Array.isArray(v)) return v.map(one).join(', ');
+  if (isObject(v)) return Object.entries(v).map(([k, x]) => `${k} ${one(x)}`).join(', ');
+  return one(v);
+}
 
 /** The register a body's rows come from, as `flow-lint.ts`'s `subjectOf` reads it. */
 function subjectOfBody(body: Body): string | null {
@@ -216,6 +277,8 @@ export type Source = {
   run(rule: string): Promise<Answer<{ run: string }>>;
   cancel(run: string): Promise<Answer<{ run: string }>>;
   propose(p: Proposal): Promise<Answer<Filed>>;
+  /** What a body would do, before it is sent anywhere. It writes nothing, on the record or here. */
+  dryRun(body: Body): Promise<Answer<Tried>>;
 };
 
 export function live(io: Fetch, base = ''): Source {
@@ -238,6 +301,16 @@ export function live(io: Fetch, base = ''): Source {
     propose: async (p) => {
       const out = await send<{ id?: unknown }>(io, `${base}/api/propose`, p);
       return out.ok ? { ok: true, value: { id: typeof out.value?.id === 'string' ? out.value.id : null } } : out;
+    },
+    /* A GET WITH THE BODY AS JSON IN `rule`. The route is `writes: false`, and its table types `rule` as `json`, so the
+       GET branch of `serveApi` (`packages/host/src/index.ts`) `JSON.parse`s that one value and hands every other query
+       value on as the text it was sent as. `automation` above sends its `rule` as a bare id because there it is `text`;
+       the same name is a different type on the two routes, which is why this was read and not assumed. */
+    dryRun: async (body) => {
+      const out = await send<unknown>(io, `${base}/api/dryRun?${new URLSearchParams({ rule: JSON.stringify(body) }).toString()}`);
+      if (!out.ok) return out;
+      const tried = triedOf(out.value);
+      return tried ? { ok: true, value: tried } : unreachable();
     },
   };
 }
@@ -346,7 +419,13 @@ export function SAMPLE_AUTOMATIONS(now: number): AutomationRow[] {
         rule: 'friday-review',
         name: 'Friday review',
         on: { manual: true },
-        steps: [{ ask_spark: { question: 'What moved this week, in three lines?', as: 'summary' } }, { notify: { say: '{{vars.summary}}' } }],
+        /* NOT `ask_spark`, WHICH THIS BUILD REFUSES AT INSTALL (`flow.ts` `NOT_YET`, since `6ec8011d`). The sample asked
+           Spark here, so the one button in it opened with a fault on its first card and could not be sent, and the
+           test below that every sample has nothing to fix had been failing since that commit. */
+        steps: [
+          { ask_person: { question: 'Did everything due this week go out?', options: ['All of it', 'Not yet'], as: 'sent' } },
+          { notify: { say: 'Friday review: {{vars.sent}}' } },
+        ],
       },
     },
   ]);
@@ -400,5 +479,82 @@ export function sample(at: () => number = () => Date.now()): Source {
       }
       return { ok: true, value: { id: null } };
     },
+    dryRun: async (body) => triedOnSample(body, at()),
   };
+}
+
+/**
+ * The record's `said`, from the canvas's own sentences: the sample cannot import `packages/record`, so the words are
+ * `flow.ts`'s and the shape is the record's, a branch's line ending in a colon and its arms indented two spaces under it.
+ */
+function saidOnSample(body: Body): Pick<Tried, 'path' | 'trigger' | 'steps'> {
+  const out: string[] = [];
+  const stop = (s: string): string => (/[.?!:]$/u.test(s) ? s : `${s}.`);
+  const walk = (list: unknown, pad: string): void => {
+    for (const step of Array.isArray(list) ? list : []) {
+      if (!isObject(step)) continue;
+      if (!('if' in step)) {
+        out.push(`${pad}${stop(sayStep(step))}`);
+        continue;
+      }
+      out.push(`${pad}${sayStep(step)}:`);
+      walk(step.then, `${pad}  `);
+      if (step.else === undefined) continue;
+      out.push(`${pad}Otherwise:`);
+      walk(step.else, `${pad}  `);
+    }
+  };
+  walk(body.steps ?? body.then, '');
+  const when = typeof body.when === 'string' && body.when.trim() !== '' ? `, if ${body.when.trim()}` : '';
+  return { path: pathOf(body), trigger: stop(`${sayTrigger(triggerOfBody(body))}${when}`), steps: out };
+}
+
+/**
+ * An inline body walked over the sample's own rows, as the kernel's `dryRun` walks a record's (`rules.ts`).
+ *
+ * THE SAME FILL AS THE RECORD, IMPORTED AND NOT COPIED. `would` goes through the kernel's own `fill`, so a template the
+ * inline pass cannot fill shows here the way it will land. Measured on the day: the sample's "Chase late payments"
+ * says `{{trigger.row.what}} is past due`, and the kernel's inline `fill` reads only `{{field}}`, so it writes the braces
+ * as they are; a sample that filled them would promise a sentence the record does not send.
+ *
+ * WHAT IT LEAVES OUT: the kernel also ranks the candidate among the list's other rules and counts the rows an earlier
+ * rule took or a `once_per` key already spent. The sample installs no rules of its own, so every match is the
+ * candidate's and `reason` is always `null`.
+ */
+function triedOnSample(body: Body, now: number): Answer<Tried> {
+  const said = saidOnSample(body);
+  if (said.path === 'run') return { ok: true, value: { ...said, matches: null, rows: null, sample: [] } };
+  const register = subjectOfBody(body);
+  if (register === null || !Object.hasOwn(ROWS, register))
+    return { ok: false, refusal: { code: 'REGISTER_UNKNOWN', fix: `There is no register called ${register ?? '(none)'}.`, at: 'register' } };
+  const w = compile(register, typeof body.when === 'string' ? body.when : undefined);
+  if (w.bad.length > 0) return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: w.bad[0]!, at: 'when' } };
+  const then = Array.isArray(body.then) ? body.then.filter(isObject) : [];
+  const rows = ROWS[register]!;
+  const sample: TriedRow[] = [];
+  let hits = 0;
+  for (const entry of rows) {
+    if (!matches(entry, w, now)) continue;
+    hits += 1;
+    if (sample.length >= 20) continue;
+    const spoken = `${register}#${entry.seq}`;
+    const row = { id: spoken, seq: entry.seq, register, fields: entry.fields } as unknown as Parameters<typeof fillTemplate>[1];
+    const fill = (v: unknown): string => fillTemplate(typeof v === 'string' ? v : '', row, now);
+    const arg = (a: Record<string, unknown>, verb: string, key: string): unknown => (isObject(a[verb]) ? (a[verb] as Record<string, unknown>)[key] : undefined);
+    const would = then.flatMap((a): string[] => {
+      if ('tag' in a) return [`tag ${String(a.tag)}`];
+      if ('untag' in a) return [`untag ${String(a.untag)}`];
+      if ('set' in a) return [`set ${String(arg(a, 'set', 'field'))} to ${fill(arg(a, 'set', 'to'))}`];
+      if ('move' in a) return [`move to ${String(a.move)}`];
+      if ('note' in a) return [`note ${fill(a.note)}`];
+      if ('notify' in a) return [`notify ${fill(arg(a, 'notify', 'say'))}`];
+      if ('schedule' in a) return [`in ${String(arg(a, 'schedule', 'in'))}, ${fill(arg(a, 'schedule', 'note'))}`];
+      if ('stop' in a) return ['stop'];
+      if ('run' in a) return [`run ${String(a.run)}, which a rule applied to rows already there does not send`];
+      if ('link' in a) return [`link ${String(arg(a, 'link', 'field'))}`];
+      return [];
+    });
+    sample.push({ spoken, would, reason: null });
+  }
+  return { ok: true, value: { ...said, matches: hits, rows: rows.length, sample } };
 }

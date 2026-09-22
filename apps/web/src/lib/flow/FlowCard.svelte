@@ -24,7 +24,7 @@
   import type { IconName } from '$lib/ui/icons.ts';
   import Menu from '$lib/ui/Menu.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { ROOT, sayStep, verbOf, words, type ListId, type Node, type Nudge, type Verb } from './flow.ts';
+  import { ROOT, sayParts, sayStep, verbOf, words, type ListId, type Node, type Nudge, type Verb } from './flow.ts';
   import type { FlowDraft } from './flow.svelte.ts';
 
   let {
@@ -37,7 +37,14 @@
   }: { flow: FlowDraft; node: Node; list: ListId; at: number; count: number; faults?: string[] } = $props();
 
   const said = $derived(sayStep(node.step));
+  /* THE SENTENCE AS PARTS, so a value a step reads is a chip and not a word run into the words round it: the sample
+     said "Tell you: Gold is rate a gram" (`loop/research-canvas-ux.md` 1.6). `said` stays the plain join for every
+     label and the live region, where a chip has nothing to draw. */
+  const parts = $derived(sayParts(node.step));
   const verb = $derived(verbOf(node.step));
+  /* A CARD JUST ADDED KEEPS ITS FAULTS UNTIL THE SHEET HAS CLOSED ON IT ONCE (`FlowDraft.holds`): every required box
+     starts empty, and the card was told off while the inspector was still opening on it to be filled. */
+  const shown = $derived(flow.holds(node.key) ? [] : faults);
 
   /** One glyph per group of verbs, from the set the app already draws. No new artwork. */
   const GLYPH: Partial<Record<Verb, IconName>> = {
@@ -156,7 +163,7 @@
   data-drop={edge}
   data-dragging={dragging ? '' : undefined}
   data-selected={flow.selected === node.key ? '' : undefined}
-  data-fault={faults.length > 0 ? '' : undefined}
+  data-fault={shown.length > 0 ? '' : undefined}
   role="group"
   aria-label={said}
   {onkeydown}
@@ -177,7 +184,7 @@
 
   <button type="button" class="say tap" onclick={() => flow.select(node.key)}>
     {#if verb && GLYPH[verb]}<span class="glyph"><Icon name={GLYPH[verb]!} size="s" /></span>{/if}
-    <span class="said">{said}</span>
+    <span class="said">{#each parts as p, i (i)}{#if p.ref}<span class="ref">{p.text}</span>{:else}{p.text}{/if}{/each}</span>
   </button>
 
   <div class="more">
@@ -194,9 +201,9 @@
     </Menu>
   </div>
 
-  {#if faults.length > 0}
+  {#if shown.length > 0}
     <ul class="faults">
-      {#each faults as f (f)}<li>{f}</li>{/each}
+      {#each shown as f (f)}<li><span class="warn"><Icon name="alert" size="m" /></span>{f}</li>{/each}
     </ul>
   {/if}
 </div>
@@ -223,11 +230,9 @@
     border-color: var(--accent);
   }
 
-  /* A FAULT IS A WORD UNDER THE CARD, not a red box around it. The warn wash is the one tint the app uses for "this
-     needs you", and red is kept for what has already gone wrong. */
-  .card[data-fault] {
-    background: var(--warn-wash);
-  }
+  /* A FAULT IS A WORD UNDER THE CARD, NOT A TINT ON IT. The card was `--warn-wash` behind its text, and
+     `loop/DESIGN-SYSTEM.md` 1.2 and 4.8 draw an intent as a word, a dot or a 16px glyph and an error as ink with a
+     glyph, never as a wash; so the card stays neutral and each sentence under it leads with the warn glyph. */
 
   /* The one held: half there, so the column does not close up and move every other card under the pointer. */
   .card[data-dragging] {
@@ -311,6 +316,22 @@
     overflow-wrap: anywhere;
   }
 
+  /* THE INSPECTOR'S CHIP, IN THE UI FACE. `rate` and `what` are names a person picked, not identifiers to copy, so
+     not `--font-id` (`loop/DESIGN-SYSTEM.md` 2.1). */
+  .ref {
+    display: inline-block;
+    margin-inline: 2px;
+    padding: 0 var(--sp-2);
+    background: var(--s2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-pill);
+    color: var(--ink2);
+    font-family: var(--font-ui);
+    font-size: var(--t-xs);
+    line-height: calc(var(--ctl-h-sm) - 2px);
+    vertical-align: baseline;
+  }
+
   .handle:hover,
   .say:hover,
   .more-trigger:hover {
@@ -324,6 +345,18 @@
     list-style: none;
     color: var(--ink2);
     font-size: var(--t-sm);
+  }
+
+  .faults li {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-2);
+  }
+
+  .warn {
+    display: inline-flex;
+    padding-block-start: 1px;
+    color: var(--warn);
   }
 
   .vh {
@@ -351,14 +384,17 @@
     cursor: pointer;
   }
 
-  .mi[data-tone='bad'] {
-    color: var(--danger);
-  }
-
   .mi:hover,
   .mi:focus-visible {
     background: var(--hover-wash);
     color: var(--ink);
+  }
+
+  /* RED ONLY UNDER THE POINTER OR THE FOCUS. Remove was `--danger` at rest, and `loop/DESIGN-SYSTEM.md` 4.3 gives a
+     destructive ghost its danger label on hover or focus alone; at rest it is one more item in the menu. */
+  .mi[data-tone='bad']:hover,
+  .mi[data-tone='bad']:focus-visible {
+    color: var(--danger);
   }
 
   @media (pointer: coarse) {

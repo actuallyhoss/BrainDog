@@ -1,8 +1,17 @@
 <!--
   Automations: `/automations`, the list (`loop/research-shell-automations.md` §6, Brief E).
 
-  ONE ROW EACH: its name, what starts it, and where it stands, in the words the scheduled-actions list uses, so an
-  automation and a scheduled action read alike on the two screens that show them. A row opens the canvas.
+  ONE ROW EACH, TWO LINES: its name, then what starts it and where it stands, in the words the scheduled-actions list
+  uses, so an automation and a scheduled action read alike on the two screens that show them. A row opens the canvas.
+  It was four lines (name, trigger, runs, and whether it runs inside the change or after it), boxed by full rules
+  above the list and under every row, with the name at 600; DESIGN-SYSTEM 4.4 is a subject and one line of detail,
+  `--line-soft` between rows and nothing round the list. The inside-or-after line is the kernel's path, which matters
+  to the record's timing and to nobody choosing what to automate, and it is said once, in the trigger's sheet.
+
+  A DOT FOR WHAT NEEDS A LOOK, AND ONLY THAT. A failed last run takes the danger dot and a turned-off automation a
+  neutral one, each leading the sentence that says it ("Last run 2h ago, failed.", "Turned off."), so the dot never
+  stands alone (DESIGN-SYSTEM 1.2). A failed run was a sentence in `dim` with nothing to find it by, and a turned-off
+  one only a greyer name.
 
   EVERY RULE IS HERE, the ones an agent wrote and the ones a pack installed, because an automation is a rule that grew a
   trigger and steps rather than a kind of its own: a rule installed before this screen existed is an automation whose
@@ -50,6 +59,13 @@
   });
 
   const now = $derived(sample ? NOW : Date.now());
+
+  /* AN AGENT SETS THESE UP AS READILY AS A PERSON (DIRECTION §22), so the empty list says what to ask one, in the form
+     every other empty state's prompt takes. An example a person reads and replaces, not a feature the code ships. */
+  const agentPrompt = 'read my record, then propose an automation that fetches the gold price every hour and tells me when it is over 70 a gram';
+
+  /** The one row state worth a dot. Off first: a turned-off automation's last run is history, and its line says "Turned off." */
+  const dotOf = (r: AutomationRow): 'off' | 'failed' | null => (!r.enabled ? 'off' : r.last?.state === 'failed' ? 'failed' : null);
 </script>
 
 <svelte:head><title>{titleOf(words.heading)}</title></svelte:head>
@@ -69,16 +85,21 @@
     {#if from === 'absent'}
       <Empty kind="no-data-yet" title={words.absent} />
     {:else if rows.length === 0}
-      <Empty kind="no-data-yet" title={words.none} body={words.noneWhy} />
+      <Empty kind="no-data-yet" title={words.none} body={words.noneWhy} {agentPrompt}>
+        {#snippet actions()}<Button href="/automations/new">{words.newOne}</Button>{/snippet}
+      </Empty>
     {:else}
       <ul class="rows">
         {#each rows as r (r.id)}
+          {@const dot = dotOf(r)}
           <li>
-            <a class="row tap" href="/automations/{encodeURIComponent(r.id)}" data-off={r.enabled ? undefined : ''}>
+            <a class="row tap" href="/automations/{encodeURIComponent(r.id)}">
               <span class="name">{r.name}</span>
-              <span class="what">{rowTrigger(r)}</span>
-              <span class="where">{rowLine(r, now)}</span>
-              <span class="path">{r.path === 'inline' ? words.inline : words.asRun}</span>
+              <span class="detail">
+                <span class="what">{rowTrigger(r)}</span>
+                <span class="sep" aria-hidden="true">·</span>
+                <span class="where" data-dot={dot ?? undefined}>{rowLine(r, now)}</span>
+              </span>
             </a>
           </li>
         {/each}
@@ -108,15 +129,21 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    border-block-start: 1px solid var(--line);
   }
 
+  li + li {
+    border-block-start: 1px solid var(--line-soft);
+  }
+
+  /* THE HOVER WASH BLEEDS 8PX PAST THE GUTTER AND THE TEXT DOES NOT (DESIGN-SYSTEM 3.1), so the names sit on the
+     heading's edge. */
   .row {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 2px;
+    margin-inline: calc(-1 * var(--sp-2));
     padding: var(--sp-3) var(--sp-2);
-    border-block-end: 1px solid var(--line);
+    border-radius: var(--r-sm);
     color: inherit;
     text-decoration: none;
   }
@@ -125,24 +152,56 @@
     background: var(--hover-wash);
   }
 
-  .row[data-off] .name {
-    color: var(--dim);
+  .name,
+  .what,
+  .where {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .name {
     color: var(--ink);
     font-size: var(--t-ui);
-    font-weight: 600;
+    font-weight: 500;
+  }
+
+  /* ONE LINE, AND THE STATE KEEPS ITS ROOM. What starts it gives way first, down to a few words, so on a phone a
+     failed run's dot and its sentence are not the part the ellipsis takes. */
+  .detail {
+    display: flex;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
   }
 
   .what {
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    flex: 0 1 auto;
+    min-inline-size: 6ch;
   }
 
-  .where,
-  .path {
-    color: var(--dim);
-    font-size: var(--t-sm);
+  .where {
+    flex: 0 0 auto;
+    max-inline-size: 65%;
+  }
+
+  .sep {
+    flex: none;
+  }
+
+  .where[data-dot]::before {
+    content: '';
+    display: inline-block;
+    inline-size: var(--dot);
+    block-size: var(--dot);
+    margin-inline-end: var(--sp-1);
+    border-radius: var(--r-pill);
+    background: var(--faint);
+    vertical-align: middle;
+  }
+
+  .where[data-dot='failed']::before {
+    background: var(--danger-fill);
   }
 </style>

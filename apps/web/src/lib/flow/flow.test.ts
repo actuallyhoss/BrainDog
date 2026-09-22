@@ -9,11 +9,17 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
+
+import { openRecord } from '@braindog/kernel';
 
 import {
+  ARGS,
   STEP_GROUPS,
   NOT_YET,
   VERBS,
+  VERB_LABELS,
+  blankDraft,
   blankStep,
   blankTrigger,
   bodyOf,
@@ -33,6 +39,7 @@ import {
   listOf,
   listText,
   moveBetween,
+  nodesOf,
   nudge,
   pairsFrom,
   pairsText,
@@ -40,11 +47,15 @@ import {
   proposalOf,
   removeKey,
   sayCondition,
+  sayParts,
+  sayStart,
   sayStep,
   sayTrigger,
   setAt,
   varsBefore,
   withChip,
+  withTrigger,
+  words,
   type Node,
 } from './flow.ts';
 
@@ -275,7 +286,9 @@ test('THE PROPOSAL IS THE ONE AN AGENT FILES: a change to rule.<id>, the whole b
   assert.deepEqual(p.body.to, { id: 'rule.gold', kind: 'rule', body: bodyOf(d) });
   assert.equal(p.body.from_version, 4);
   assert.match(p.question, /Gold rate/);
-  assert.equal('from_version' in proposalOf(d, null).body, false, 'a new automation is drawn from nothing, and says nothing');
+  /* A NEW ONE SAYS 0, NOT NOTHING. The record stamps an absent version with the live one (`govern.ts` `stamp`), so
+     leaving it out made "Add the automation" a whole replacement of whatever already held the id. */
+  assert.equal(proposalOf(d, null).body.from_version, 0, 'a new automation is drawn from nothing, and says so');
 });
 
 test('an id is made from the name in the record grammar, and never starts with a digit', () => {
@@ -314,7 +327,7 @@ test('every trigger and every verb is said in a sentence, with no braces and no 
 });
 
 test('A NUMBER IS COMPARED AS A LEAF, because the sentence grammar has no word for more than, and it is said back in words', () => {
-  assert.equal(sayStep({ if: { field: 'rate', gt: 70 } }), 'Only if rate is more than 70');
+  assert.equal(sayStep({ if: { field: 'rate', gt: 70 } }), 'If rate is more than 70');
   assert.deepEqual(leafOf({ field: 'rate', lte: 3 }), { field: 'rate', op: 'lte', value: 3 });
   assert.deepEqual(leafTo('rate', 'gte', 5), { field: 'rate', gte: 5 });
   assert.equal(leafOf({ field: 'rate', gt: '70' }), null, 'a number written as text is not a number the builder can edit');
@@ -430,4 +443,155 @@ test('the calls a flow makes are found in both arms, once each, by call step or 
   });
   assert.deepEqual(callsIn(d.steps), ['gold_rate', 'fx']);
   assert.deepEqual(callsIn(draftOf('y', { rule: 'y', register: 'tasks', then: [{ run: 'hook' }] }).steps), ['hook']);
+});
+
+/* ── the words a stranger meets (loop/research-canvas-ux.md, brief 2) ─────── */
+
+/*
+ * THE FAULT WAS A TEMPLATE, AND HALF OF WHAT IT MADE WAS NOT ENGLISH. Worked from `ARGS` on 22 September, a freshly
+ * added card said "Tell you needs say.", "Add a note needs note." and "Ask Spark needs keep the answer as.": a verb's
+ * label, the word "needs", and a field label lower-cased. Each required argument now carries its own sentence.
+ */
+test('EVERY REQUIRED ARGUMENT LEFT BLANK FAULTS WITH A WHOLE SENTENCE OF ITS OWN, never "<label> needs <label>."', () => {
+  for (const verb of VERBS) {
+    for (const arg of ARGS[verb].filter((a) => a.required)) {
+      const empty = arg.kind === 'list' ? [] : arg.kind === 'number' ? 0 : '';
+      const step = setAt(blankStep(verb), [...arg.path], empty);
+      const d = { ...blankDraft('x'), trigger: { written: { register: 'tasks' } }, steps: [{ key: 'k', step, then: [], else: [] }] };
+      const said = faultsOf(d)
+        .filter((f) => f.key === 'k')
+        .map((f) => f.say);
+      const where = `${verb} ${arg.path.join('.')}`;
+      assert.ok(said.length > 0, `${where} left blank says nothing`);
+      for (const s of said) {
+        assert.doesNotMatch(s, / needs [a-z ]+\.$/u, where);
+        assert.match(s, /^[A-Z"].*\.$/u, `${where}: ${s}`);
+      }
+    }
+  }
+});
+
+test('"IF" IS A BRANCH AND SAYS SO: its arms are "If so" and "If not", and the column resumes "Then, either way"', () => {
+  assert.equal(VERB_LABELS.if, 'If');
+  assert.equal(words.then, 'If so');
+  assert.equal(words.otherwise, 'If not');
+  assert.equal(words.eitherWay, 'Then, either way');
+  assert.equal(sayStep({ ask_person: { question: 'Pay it?' } }), 'Ask the owner: Pay it?');
+  assert.doesNotMatch(words.none, /\.$/u, 'an empty state title has no full stop');
+});
+
+/*
+ * `loop/research-batch-thirty-six-audit.md` FINDING 3, C2 AND C3. An installed rule that tags only bills above 500 drew
+ * its trigger card as "When a row in bills is added or changed", because `draftOf` put a tree `when` in `rest` where
+ * nothing drew it; typing a sentence then filed the tree anyway, because `...others` came after `...when`; and switched
+ * to a clock, `faultsOf` said nothing while the record refused the body on Send.
+ */
+const bigBills = { rule: 'paid-tag', register: 'bills', when: { field: 'amount', gt: 500 }, then: [{ tag: 'big' }] };
+
+test('C2: A TREE CONDITION IS HELD IN THE DRAFT WHERE THE CARD CAN SEE IT, and a typed sentence is what gets filed', () => {
+  const d = draftOf('paid-tag', bigBills);
+  assert.deepEqual(d.whenTree, { field: 'amount', gt: 500 }, 'the tree is the draft’s, not hidden in rest');
+  assert.equal(sayStart(d), 'When a row in bills is added or changed, only when amount is more than 500');
+  assert.deepEqual(bodyOf(d), bigBills, 'opened and not touched, it files what it read');
+  const typed = { ...d, when: 'what is Rent' };
+  assert.equal(bodyOf(typed).when, 'what is Rent', 'the sentence the person typed is the one filed');
+  assert.equal(sayStart(typed), 'When a row in bills is added or changed, only when what is Rent', 'and the card says the one filed');
+  assert.deepEqual(bodyOf({ ...typed, when: '  ' }).when, bigBills.when, 'the box emptied again, the tree it opened with comes back');
+  const deep = draftOf('x', { ...bigBills, when: { any: [{ field: 'amount', gt: 500 }, { field: 'what', is: 'Rent' }] } });
+  assert.equal(sayStart(deep), 'When a row in bills is added or changed, only when the condition holds', 'a tree the builder cannot read is still named');
+});
+
+test('C3: A CONDITION IN EITHER FORM ON A TRIGGER WITH NO ROW IS SAID BEFORE SEND', () => {
+  const d = draftOf('paid-tag', bigBills);
+  const onClock = { ...d, trigger: { every: '1h' }, steps: nodesOf([{ notify: { say: 'x' } }]) };
+  assert.ok(
+    faultsOf(onClock).some((f) => f.key === null && /no row/u.test(f.say)),
+    'the record refuses a when: on a clock, and the canvas said nothing',
+  );
+  const onArrival = { ...d, trigger: blankTrigger('arrival'), steps: nodesOf([{ notify: { say: 'x' } }]) };
+  assert.ok(faultsOf(onArrival).some((f) => f.key === null && /arrival/u.test(f.say)));
+});
+
+test('A SWITCH AWAY FROM A CHANGE TAKES THE CONDITION WITH IT, both forms, and an edit of the change keeps it', () => {
+  const d = { ...draftOf('paid-tag', bigBills), when: 'what is Rent' };
+  const clock = withTrigger(d, blankTrigger('every'));
+  assert.equal(clock.when, null);
+  assert.equal(clock.whenTree, null, 'the inspector cleared the sentence and left the tree, and the record refused the body');
+  assert.equal(bodyOf(clock).when, undefined);
+  assert.deepEqual(faultsOf({ ...clock, steps: nodesOf([{ notify: { say: 'x' } }]) }), []);
+  const narrowed = withTrigger(d, { written: { register: 'bills', op: ['create'] } });
+  assert.equal(narrowed.when, 'what is Rent');
+  assert.deepEqual(narrowed.whenTree, bigBills.when);
+});
+
+test('A CARD SAYS A REFERENCE AS A PART OF ITS OWN, so it is drawn as a chip, and the parts joined are the sentence', () => {
+  const step = { notify: { say: 'Gold is {{vars.rate}} a gram, {{ trigger.row.what }}' } };
+  assert.deepEqual(sayParts(step), [
+    { text: 'Tell you: Gold is ' },
+    { text: 'rate', ref: 'vars.rate' },
+    { text: ' a gram, ' },
+    { text: 'what', ref: 'trigger.row.what' },
+  ]);
+  assert.deepEqual(sayParts({ if: 'what is {{vars.name}}' }), [{ text: 'If what is ' }, { text: 'name', ref: 'vars.name' }]);
+  for (const v of VERBS) assert.equal(sayParts(blankStep(v)).map((p) => p.text).join(''), sayStep(blankStep(v)), v);
+  assert.equal(sayParts(step).map((p) => p.text).join(''), sayStep(step));
+});
+
+/* ── a new automation, against a record ───────────────────────────────────── */
+
+function openSqlite(): Parameters<typeof openRecord>[0] {
+  const db = new DatabaseSync(':memory:');
+  let depth = 0;
+  const sql = {
+    exec: (text: string, ...params: unknown[]) => {
+      if (params.length === 0) db.exec(text);
+      else db.prepare(text).run(...(params as never[]));
+    },
+    all: (text: string, ...params: unknown[]) => db.prepare(text).all(...(params as never[])),
+    one: (text: string, ...params: unknown[]) => db.prepare(text).get(...(params as never[])),
+    transactionSync<T>(fn: () => T): T {
+      if (depth > 0) return fn();
+      db.exec('BEGIN');
+      depth++;
+      try {
+        const value = fn();
+        db.exec('COMMIT');
+        return value;
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      } finally {
+        depth--;
+      }
+    },
+  };
+  return sql as unknown as Parameters<typeof openRecord>[0];
+}
+
+/*
+ * `loop/research-batch-thirty-six-audit.md` FINDING 4, F. A member who cannot see the owner's clocks reads an empty
+ * automations list, so `freshId` hands her "Gold rate" the id `gold-rate`, which the owner's hourly clock already
+ * holds. Measured at `8cab17d7`: filed with no `from_version`, the record stamped it at the live 1, and the owner's
+ * accept of "Add the automation Gold rate?" replaced the clock's steps with the member's.
+ *
+ * THE KERNEL, NOT THE RECORD, because `@braindog/record` is not a dependency of this app and a relative import across
+ * packages is what the graph gate refuses. The glue is the record's own two lines: `decide` hands back the body and the
+ * version it must find, and `install` is given both.
+ */
+test('F: "ADD THE AUTOMATION" ON A TAKEN ID IS A CONFLICT ON ACCEPT, and the automation already there keeps its steps', async () => {
+  const k = await openRecord(openSqlite(), { now: () => Date.UTC(2026, 8, 22, 12) });
+  const clock = { rule: 'gold-rate', name: 'Gold rate', on: { every: '1h' }, steps: [{ notify: { say: 'Look at the gold price' } }] };
+  const put = await k.install([{ id: 'rule.gold-rate', kind: 'rule', body: clock } as never]);
+  assert.ok(put.ok, JSON.stringify(put));
+
+  const drawn = { ...blankDraft(freshId('Gold rate', []), 'Gold rate'), trigger: { every: '1h' }, steps: nodesOf([{ notify: { say: 'Buy bread' } }]) };
+  const filed = k.propose(proposalOf(drawn, null) as never, 'p_2');
+  assert.ok(filed.ok, JSON.stringify(filed));
+  const decided = k.decide(filed.value.id, { decide: { option: 'accept', reason: 'it is useful' } }, 'p_1');
+  assert.ok(decided.ok, JSON.stringify(decided));
+  const landed = await k.install([decided.value.install as never], decided.value.expect);
+
+  const live = k.declarations().find((d) => d.id === 'rule.gold-rate')!;
+  assert.deepEqual((JSON.parse(live.body) as { steps: unknown }).steps, clock.steps, 'the owner’s clock was replaced by a question that said "add"');
+  assert.equal(landed.ok, false);
 });

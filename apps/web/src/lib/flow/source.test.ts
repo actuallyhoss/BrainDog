@@ -15,7 +15,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { bodyOf, draftOf, faultsOf, proposalOf } from './flow.ts';
-import { SAMPLE_AUTOMATIONS, live, openAutomations, rowLine, rowOf, rowTrigger, rowsOf, sample, type Fetch } from './source.ts';
+import { NOW, ROWS } from '../record/data.ts';
+import { SAMPLE_AUTOMATIONS, answerWords, live, openAutomations, rowLine, rowOf, rowTrigger, rowsOf, sample, type Fetch } from './source.ts';
 
 const answer = (status: number, value: unknown): Response => new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json' } });
 
@@ -153,4 +154,74 @@ test('the sample runs only a button, stops only a run that has not finished, and
   assert.ok(one.ok);
   assert.equal(one.value.version, 2);
   assert.equal(one.value.runs[0]!.state, 'cancelled', 'a save keeps the runs it had');
+});
+
+/* ── Try it: the record's own dry run, before anything is sent ──────────── */
+
+test("TRY IT ASKS THE RECORD'S dryRun WITH THE WHOLE BODY IN THE QUERY, as JSON the host decodes, and nothing is written", async () => {
+  const asked: { url: string; method: string | undefined }[] = [];
+  const io: Fetch = async (url, init) => {
+    asked.push({ url, method: init?.method });
+    return answer(200, { ok: true, value: { path: 'run', trigger: 'Every 1h.', steps: ['Call gold_rate.'] } });
+  };
+  const body = SAMPLE_AUTOMATIONS(0)[1]!.body!;
+  const out = await live(io).dryRun(body);
+  assert.equal(asked.length, 1);
+  assert.equal(asked[0]!.method, 'GET', 'dryRun is a READ+ route, so it is not a POST');
+  const url = new URL(asked[0]!.url, 'http://x');
+  assert.equal(url.pathname, '/api/dryRun');
+  /* THE HOST JSON-PARSES AN ARGUMENT ITS TABLE TYPES `json` (`packages/host/src/index.ts`, `takes: { rule: 'json' }`),
+     so what arrives is exactly what this parse gives back. */
+  assert.deepEqual(JSON.parse(url.searchParams.get('rule')!), body);
+  assert.deepEqual(out, { ok: true, value: { path: 'run', trigger: 'Every 1h.', steps: ['Call gold_rate.'], matches: null, rows: null, sample: [] } });
+});
+
+test('THE SAMPLE TRIES "Chase late payments" OVER ITS OWN ROWS, and answers how many match and what each would get', async () => {
+  const s = sample(() => NOW);
+  const body = SAMPLE_AUTOMATIONS(NOW)[0]!.body!;
+  const out = await s.dryRun(body);
+  assert.ok(out.ok, 'the sample answers a dry run');
+  assert.equal(out.value.path, 'inline');
+  assert.ok(typeof out.value.matches === 'number' && out.value.matches > 0, 'the sample has open obligations past due');
+  assert.equal(out.value.sample.length, Math.min(out.value.matches, 20));
+  /* COUNTED BY HAND FROM THE ROWS, NOT BY `where.ts` AGAIN. With the walk's `matches` filter removed, every assertion
+     above still passed: forty rows "matched" a condition three of them meet, and the test said nothing. */
+  const today = new Date(NOW).toISOString().slice(0, 10);
+  const late = ROWS.obligations!.filter((e) => e.fields.state === 'open' && String(e.fields.due) < today);
+  assert.ok(late.length < ROWS.obligations!.length, 'the sample has obligations that are not late, or this proves nothing');
+  assert.equal(out.value.matches, late.length);
+  assert.equal(out.value.rows, ROWS.obligations!.length);
+  assert.deepEqual(
+    out.value.sample.map((r) => r.spoken),
+    late.slice(0, 20).map((e) => `obligations#${e.seq}`),
+  );
+  const first = out.value.sample[0]!;
+  assert.match(first.spoken, /^obligations#\d+$/u, "a row is named the way the record's dry run names it");
+  assert.equal(first.would[0], 'tag late');
+  /* THROUGH THE KERNEL'S OWN FILL, so it reads as the inline pass will send it (`source.ts` `triedOnSample` says what
+     that is today). */
+  assert.match(first.would[1]!, /^notify .* is past due$/u);
+  assert.ok(out.value.steps.length === 2, 'and the steps are said, as the record says them beside the walk');
+});
+
+test('the sample says a run as its trigger and step lines, with a branch indented, and matches nothing because it walks no rows', async () => {
+  const out = await sample(() => 0).dryRun(SAMPLE_AUTOMATIONS(0)[1]!.body!);
+  assert.ok(out.ok);
+  assert.equal(out.value.path, 'run');
+  assert.equal(out.value.matches, null);
+  assert.ok(out.value.steps.some((l) => l.startsWith('  ')), 'the arms are indented under the branch');
+  assert.ok(out.value.steps.includes('Otherwise:'));
+});
+
+test("a condition the sample's lists cannot read is refused with the compiler's own sentence, as the record refuses it", async () => {
+  const out = await sample(() => NOW).dryRun({ rule: 'x', register: 'obligations', when: 'colour is mauve', then: [{ tag: 'x' }] });
+  assert.equal(out.ok, false);
+  assert.ok(!out.ok && /colour/u.test(out.refusal.fix), 'the sentence names what it could not read');
+});
+
+test("A STEP'S ANSWER IS SAID AS NAME AND VALUE, not printed as the JSON the runner kept", () => {
+  assert.equal(answerWords('{"rate": 71.4}'), 'rate 71.4');
+  assert.equal(answerWords('{"file": "File it", "n": 2}'), 'file File it, n 2');
+  assert.equal(answerWords('plain words'), 'plain words');
+  assert.equal(answerWords('[1,2]'), '1, 2');
 });

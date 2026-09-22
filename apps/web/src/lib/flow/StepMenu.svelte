@@ -8,20 +8,29 @@
   THE GROUP HEADINGS ARE `role="none"`, so the menu's roving focus walks the verbs and skips the words over them, and a
   screen reader hears each verb once with its group as the list's structure rather than as a stop.
 
-  THE TRIGGER IS A CIRCLE ON THE CONNECTOR in the column, `compact`, and a labelled button under an empty arm. Both are
-  44px under a thumb: touch has no hover to reveal a control that only shows on hover, so these are always drawn.
+  THE TRIGGER IS A CIRCLE ON THE CONNECTOR in the column, `compact`, and the labelled pill alone in an empty list. Both
+  are 44px under a thumb: touch has no hover to reveal a control that only shows on hover, so these are always drawn.
+
+  THE PILL SAYS WHEN A DRAG WILL LAND ON IT, `landing`. The row it sits in is the empty list's drop target, and with the
+  "Nothing yet" box gone the pill is the only thing there to light up, so it takes the accent edge the landing line
+  between two cards is drawn in.
 -->
 <script lang="ts">
   import Menu from '$lib/ui/Menu.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { STEP_GROUPS, VERB_LABELS, words, type Verb } from './flow.ts';
 
-  let { label = words.addStep, compact = false, onpick }: { label?: string; compact?: boolean; onpick: (verb: Verb) => void } = $props();
+  let {
+    label = words.addStep,
+    compact = false,
+    landing = false,
+    onpick,
+  }: { label?: string; compact?: boolean; landing?: boolean; onpick: (verb: Verb) => void } = $props();
 
   let open = $state(false);
 </script>
 
-<div class="step-menu" data-compact={compact ? '' : undefined}>
+<div class="step-menu" data-compact={compact ? '' : undefined} data-landing={landing ? '' : undefined}>
   <Menu {label} bind:open>
     {#snippet trigger()}
       <span class="add">
@@ -69,6 +78,12 @@
     color: var(--ink);
   }
 
+  .step-menu[data-landing] .add {
+    border-style: solid;
+    border-color: var(--accent);
+    color: var(--ink2);
+  }
+
   /* 44 UNDER A THUMB, as every target in this app is (`13 §7`), and the circle stays a circle. */
   @media (pointer: coarse) {
     .add {
@@ -90,12 +105,13 @@
     white-space: nowrap;
   }
 
+  /* A HEADING IN SENTENCE CASE AT 500, NOT AN EYEBROW. The 600 and 0.02em it had were the letterspaced eyebrow that
+     DESIGN-SYSTEM 2.2 bans, and `loop/research-canvas-ux.md` 1.8 found it here, over the arms and over the trigger. */
   .group {
     margin: var(--sp-2) var(--sp-3) var(--sp-1);
     color: var(--dim);
     font-size: var(--t-xs);
-    font-weight: 600;
-    letter-spacing: 0.02em;
+    font-weight: 500;
   }
 
   .group:first-child {

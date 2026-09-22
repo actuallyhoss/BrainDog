@@ -32,6 +32,7 @@ import {
   replaceStep,
   sayStep,
   blankStep,
+  withTrigger,
   type Body,
   type Draft,
   type ListId,
@@ -72,6 +73,13 @@ export class FlowDraft {
   #undo = $state.raw<Draft[]>([]);
   /** Set when the inspector opens on a card, and spent by the first edit there. */
   #fresh = false;
+  /**
+   * CARDS ADDED HERE WHOSE FAULTS ARE NOT SAID YET, until the inspector has closed on them once. `blankStep` leaves every
+   * required argument empty, so a card turned into a fault the moment it was added, while the sheet was still opening
+   * on it to be filled (`loop/research-canvas-ux.md` 1.7). A card read from the body is never held: what an agent wrote
+   * wrong is said at once.
+   */
+  #held = $state.raw<ReadonlySet<string>>(new Set());
 
   /** Open a body. `null` is a new automation, which has no version and nothing to compare against. */
   open(id: string, body: Body | null, version: number | null) {
@@ -79,6 +87,7 @@ export class FlowDraft {
     this.version = body ? version : null;
     this.#opened = body ? JSON.stringify(bodyOf(this.draft)) : '';
     this.#undo = [];
+    this.#held = new Set();
     this.selected = null;
     this.dragging = null;
     this.over = null;
@@ -172,14 +181,27 @@ export class FlowDraft {
     const key = mintKey();
     const node = verb === 'if' ? { key, step: blankStep(verb), then: [], else: [] } : { key, step: blankStep(verb) };
     this.draft = { ...this.draft, steps: insertAt(this.draft.steps, list, at, node) };
+    /* NOT `select`, which would arm `#fresh`: the add is already on the undo stack, and one Undo takes back the card
+       and what was typed into it together. The card the sheet was on before is released as `select` would. */
+    this.#release(this.selected);
+    this.#held = new Set([...this.#held, key]);
     this.selected = key;
     this.said = `${sayStep(node.step)}: added.`;
+  }
+
+  /** Whether a card's faults wait for the inspector to close on it first. */
+  holds(key: string): boolean {
+    return this.#held.has(key);
   }
 
   remove(key: string) {
     const step = find(this.draft.steps, key)?.node.step;
     this.#keep();
     this.draft = { ...this.draft, steps: removeKey(this.draft.steps, key) };
+    /* RELEASED HERE AS WELL, because the sheet's Remove closes it by clearing `selected` and not through `select`.
+       Held past that, a card added, removed from the sheet and brought back by Undo came back empty with its faults
+       still silent, and stayed silent until somebody opened it and closed it again. */
+    this.#release(key);
     if (this.selected === key) this.selected = null;
     this.said = `${step ? sayStep(step) : 'The step'}: removed.`;
   }
@@ -200,9 +222,10 @@ export class FlowDraft {
     this.draft = { ...this.draft, steps: replaceStep(this.draft.steps, key, step) };
   }
 
+  /** Through `withTrigger`, so a switch from a change to anything else takes both forms of the condition with it. */
   setTrigger(trigger: Trigger) {
     this.#keepOnce();
-    this.draft = { ...this.draft, trigger };
+    this.draft = withTrigger(this.draft, trigger);
   }
 
   setName(name: string) {
@@ -216,7 +239,13 @@ export class FlowDraft {
   }
 
   select(key: string | null) {
+    if (this.selected !== key) this.#release(this.selected);
     this.#fresh = key !== null;
     this.selected = key;
+  }
+
+  /** The inspector has closed on this card, or moved off it, so its faults are said from now on. */
+  #release(key: string | null) {
+    if (key !== null && this.#held.has(key)) this.#held = new Set([...this.#held].filter((k) => k !== key));
   }
 }
