@@ -74,9 +74,15 @@ and never a disabled field.
 | `rows` | label · value · note, one per line | `spec` `params` |
 | `proportional` | rows whose number drives a drawn magnitude | `bar` `gauge` `sparkline` `split` `bridge` `series` `lines` `progress` `forecast` |
 | `inline` | a run of pills | `chips` |
-| `list` | title · detail · optional state marker | `todo` `steps` `timeline` `feed` `agents` `queue` |
+| `list` | title · detail · optional state marker; on a `todo`, up to two more facts as one quiet line under the title | `todo` `steps` `timeline` `feed` `agents` `queue` |
 | `table` | real columns, a header, per-column alignment | `comparison` `table` |
 | `media` | a figure with a caption | `code` `tree` `diff` |
+
+A `todo` row is `[ ] title | detail | fact | fact`, and the two facts are optional: where either is
+there, both renderers draw them after the detail as one `<span class="item-meta">`, joined by ` · `,
+and where both are blank there is no span at all, so a two-cell todo draws exactly what it always
+did. A fifth cell degrades the block. Placing the line under the title is the host stylesheet's job,
+as every other class here is.
 
 A board is a **grid of lists**. A roadmap is a **list with dates**. A risk matrix is a **grid of
 inlines**. Which is why a third party can add a kind without asking a designer: a kind is not code,

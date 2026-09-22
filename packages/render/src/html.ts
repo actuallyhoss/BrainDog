@@ -22,6 +22,7 @@ import { FEED_EARLIER, feedNew, feedPlan } from './feed.ts';
 import { QUEUE_RECOMMENDED, queueMore, queuePlan } from './queue.ts';
 import { captureNowhere, capturePlan, capturePromptFor } from './capture.ts';
 import { takeWorking, WORKING_GLYPH, WORKING_LABEL } from './working.ts';
+import { TODO_META_JOIN, todoMeta as metaCells } from './todo.ts';
 import { TABLE_CHUNK, TABLE_ROWS_LABEL, ariaSort, chunkRows, comparisonPlan, glyphColumn, intrinsicRows, tableCellBody } from './table.ts';
 import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
 import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitPlan, splitSentence } from './split.ts';
@@ -144,6 +145,17 @@ function renderInline(nodes: Inline[], opts: RenderOptions): string {
 const cell = (name: string, value: string | undefined, opts: RenderOptions, extra = '', after = ''): string => {
   const { text, working } = takeWorking(value ?? null);
   return `<span class="${name}"${extra}>${working ? workingSpan() : ''}${text ? renderInline(inline(text, opts), opts) : ''}${after ? ` ${after}` : ''}</span>`;
+};
+
+/**
+ * A todo row's third and fourth cells, as the one quiet line under its title, or nothing.
+ *
+ * NOTHING, NOT AN EMPTY SPAN, where the row carries neither: a two-cell todo draws the markup it drew
+ * before this line existed, and a page pads every two-column todo to four cells with blanks.
+ */
+const todoMeta = (cells: readonly string[], opts: RenderOptions): string => {
+  const parts = metaCells(cells);
+  return parts.length ? `<span class="item-meta">${parts.map((c) => renderInline(inline(c, opts), opts)).join(TODO_META_JOIN)}</span>` : '';
 };
 
 /** The dot itself, said the same way `Table`, `Grid` and `List` say it. */
@@ -366,7 +378,7 @@ function list(b: Block, o: RenderOptions): string {
   const body = b.rows
     .map((r) => {
       if (b.kind === 'todo')
-        return `<li class="item"><span class="item-marker" data-done="${r.done ? 'yes' : 'no'}" role="img" aria-label="${r.done ? 'done' : 'not done'}">${r.done ? '✓' : ''}</span>${cell('item-title', r.cells[0], o)}${cell('item-detail', r.cells[1], o)}</li>`;
+        return `<li class="item"><span class="item-marker" data-done="${r.done ? 'yes' : 'no'}" role="img" aria-label="${r.done ? 'done' : 'not done'}">${r.done ? '✓' : ''}</span>${cell('item-title', r.cells[0], o)}${cell('item-detail', r.cells[1], o)}${todoMeta(r.cells, o)}</li>`;
       if (b.kind === 'timeline')
         /* THE GLYPH SITS WITH THE TITLE, as `List.svelte` has drawn it since a tone five hundred pixels
            from the thing it qualifies was found to qualify nothing (13 §2.3). This drew it after the

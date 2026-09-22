@@ -195,7 +195,20 @@ const TABLE = {
   params: { primitive: 'rows', cells: 3, tone: false, minSpan: 4, purpose: 'list' },
 
   /* Work */
-  todo: { primitive: 'list', cells: 2, tone: false, checkbox: true, minSpan: 3, purpose: 'plan' },
+  /* A todo row is `title | detail | fact | fact`, the two facts optional and drawn as ONE quiet line under the
+     title, joined by a dot (`src/html.ts`, `svelte/p/List.svelte`).
+
+     TWO FACTS AND NOT ONE, because what was lost was two. Work's Waiting on you said when each task fell due and
+     who changed it last at 1.5.0, and on a `todo` of two cells both went, since a four-cell row written into a
+     page degraded whole as DIALECT_ARITY (measured 22 September). A third cell alone would have made that page
+     choose again, or join the two upstream into one string, and a joined string cannot be formatted per field:
+     the due day is a date and the change is an actor and an age, and `display()` knows each only by its field.
+
+     AND NO MORE THAN TWO, because one line under a title holds two short facts and a third is a table. A row
+     of five cells still degrades. `optional` changes nothing a reader sees on a kind with no tone word, and it is
+     written so the declaration says what the row means: the last two cells may be left off, and a two-cell
+     todo, or one whose last two cells are blank as a page's projection pads them, draws exactly as it did. */
+  todo: { primitive: 'list', cells: 4, optional: 2, tone: false, checkbox: true, minSpan: 3, purpose: 'plan' },
   steps: { primitive: 'list', cells: 3, tone: false, ordered: true, minSpan: 4, purpose: 'plan' },
   timeline: { primitive: 'list', cells: 3, tone: true, minSpan: 4, purpose: 'plan' },
   board: { primitive: 'grid', cells: 3, tone: false, minSpan: 6, purpose: 'plan' },

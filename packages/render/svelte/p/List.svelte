@@ -21,6 +21,7 @@
 <script lang="ts">
   import { inline, takeWorking, text, TONES, WORKING_GLYPH, WORKING_LABEL, type Block, type RenderOptions, type Row } from '../../src/index.ts';
   import { moveTick, nextTicks, tickState } from '../../src/ticks.ts';
+  import { TODO_META_JOIN, todoMeta } from '../../src/todo.ts';
   import Agents from '../Agents.svelte';
   import Feed from '../Feed.svelte';
   import Queue from '../Queue.svelte';
@@ -110,6 +111,7 @@
       {@const state = tickState(row.done, ticks.get(i))}
       <!-- `working: true`'s dot, on the cell `blocks.ts` marked, which for a todo is its own name. -->
       {@const title = takeWorking(row.cells[0] ?? '')}
+      {@const meta = todoMeta(row.cells)}
       <li class="item">
         {#if ontick}
           <!-- `role="checkbox"` and not a bare button: what it does is set a state, not run a verb,
@@ -147,6 +149,14 @@
           >{#if title.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}<Text nodes={inline(title.text ?? '', opts)} {opts} /></span
         >
         <span class="item-detail"><Text nodes={inline(row.cells[1] ?? '', opts)} {opts} /></span>
+        <!-- THE THIRD AND FOURTH CELLS, when the row carries either, as one quiet line: when it falls due and who
+             changed it last, on Work's Waiting on you. Outside the box's name on purpose, which stays the task. And
+             before the unsaved mark, so a reader hears the row's facts before what this session did to it. -->
+        {#if meta.length}
+          <span class="item-meta"
+            >{#each meta as part, n}{#if n > 0}{TODO_META_JOIN}{/if}<Text nodes={inline(part, opts)} {opts} />{/each}</span
+          >
+        {/if}
         <!-- THE ROW STAYS, WEARING WHAT HAPPENED TO IT, AND THE WAY BACK IS THE BOX.
              Thirteen of eighty-five human writes in the record this product is modelled on reversed
              the write immediately before them, twelve of those inside five seconds, because the row

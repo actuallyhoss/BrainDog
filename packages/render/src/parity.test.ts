@@ -97,6 +97,11 @@ const SHAPES: Record<string, string> = {
      the head of one cell, and if the two renderers read them differently one of them prints a glyph
      nobody asked for. */
   'a todo with an agent working on one of its rows': '```todo\n[ ] ●︎ Draft the September issue | due Friday\n[x] Send the quote | done\n```',
+  /* A TODO'S THIRD AND FOURTH CELLS ARE ONE LINE, and a row with them blank draws no line at all: the
+     blank row is what a page writes for every two-column todo, so the two sides disagreeing about it
+     would be a difference on every task the product shows. */
+  'a todo whose rows carry a due day and who changed them':
+    '```todo\n[ ] Check the export | blocked on the bank | due 24 Sep | Claude, 3h ago\n[x] Send the quote |  | due 20 Sep\n[ ] ●︎ Proof the italics | review |  | [Codex](/r/sessions/4)\n[ ] Book the printer | waiting |  | \n```',
   'a timeline whose newest row is being worked on': '```timeline\n3h ago | ●︎ Specimen page rebuild | Codex picked it up | warn\n2d ago | Variable axis QA | Claude finished\n```',
   'steps with one being worked on': '```steps\n●︎ Cut the masters | Codex | running\nProof the italics |  | waiting\n```',
   'a board with an agent on one card': '```board\nDoing | ●︎ Write the notes | Claude\nDone | Fix login | Codex\n```',
@@ -253,6 +258,21 @@ test('a capture draws its field only where the host can write, prompted by its h
   assert.doesNotMatch(field, /disabled|capture-elsewhere|figcaption/u);
   const without = tree(render(Block, { props: { block } }).body);
   assert.doesNotMatch(without, /<input|<button|<form/u, 'with nowhere to write, nothing takes a key');
+});
+
+test('THE BOX STILL TICKS ON A ROW THAT CARRIES A LINE UNDER ITS TITLE, and is still named for the task alone', () => {
+  const block = page(SHAPES['a todo whose rows carry a due day and who changed them']!);
+  const Tickable = Block as unknown as Component<{ block: BlockSegment; ontick: (row: unknown, done: boolean) => void }>;
+  const drawn = tree(render(Tickable, { props: { block, ontick: () => {} } }).body);
+  const boxes = [...drawn.matchAll(/<button [^>]*>/gu)].map((m) => m[0]);
+  assert.equal(boxes.length, 4, 'one box a row');
+  for (const box of boxes) assert.ok(box.includes('role="checkbox"') && box.includes('aria-checked='), box);
+  /* The due day and who changed the row are not the task, and a box named "Check the export, due
+     24 Sep, Claude, 3h ago" is a control named after its row's metadata. */
+  assert.ok(boxes[0]!.includes('aria-label="Check the export"'), boxes[0]);
+  assert.ok(boxes[2]!.includes('aria-label="Proof the italics"'), boxes[2]);
+  assert.equal(boxes.filter((b) => b.includes('tabindex="0"')).length, 1, 'one tab stop across the list');
+  assert.equal((drawn.match(/class="item-meta"/gu) ?? []).length, 3, 'three rows carry the line and the blank one does not');
 });
 
 test('a figure longer than a tile holds says its longest amount, as drawn, and a short one says nothing', async () => {
