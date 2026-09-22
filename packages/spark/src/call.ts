@@ -79,7 +79,7 @@ export type Core = {
   monthStart(): string;
   /** The first instant of the next month, which is the sentence `SPARK_BUDGET_SPENT` ends on. */
   resets(): string;
-  /** `SELECT COUNT(*)` on `call_meter`: tier `a` proposals this month. */
+  /** `SELECT COUNT(*)` on `call_meter`: tier `a` reads and proposals this month that called a model. */
   asksUsed(): number;
   account(row: AccountRow): void;
   run(args: RunArgs): Promise<Ran>;
@@ -273,9 +273,18 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference): Core => {
     now,
     monthStart: () => monthOf(clock.now(), 0),
     resets: () => monthOf(clock.now(), 1),
+    /* A READ IS AN ASK, AND IT WAS NEVER COUNTED. `46 §4.1` counts `kind = 'propose'` alone, which
+       fitted a palette whose pass 1 was free; the only door built is `read`, which writes
+       `kind = 'read'`, so an owner who set `ask_cap` to 2 was answered on five asks out of five,
+       five model calls on their own key, with `status()` reading 0 of 2 throughout
+       (`test/read-meter.test.ts`). Both kinds count now, one per model call, so pass 1 and pass 2
+       of one question are two, and a repeated pass 2 on a stored `ask_id` cannot run unmetered
+       either. `model <> '-'` is the one read row that called nothing: a record with no lists
+       answers `nothing` without a model, and billing it is the meter `propose`'s zero-rows arm
+       already refuses to be. The index `call_meter (tier, kind, ts)` still serves the count. */
     asksUsed: () =>
       sql.one<{ n: number }>(
-        "SELECT COUNT(*) AS n FROM call WHERE tier = 'a' AND kind = 'propose' AND ts >= ?",
+        "SELECT COUNT(*) AS n FROM call WHERE tier = 'a' AND kind IN ('read', 'propose') AND model <> '-' AND ts >= ?",
         monthOf(clock.now(), 0),
       )?.n ?? 0,
     account,

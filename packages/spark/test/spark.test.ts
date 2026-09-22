@@ -52,7 +52,7 @@ test('status is tier a, the routing table model, and a meter that resets on the 
   });
 });
 
-test('the meter counts tier a proposals in this month and nothing else', () => {
+test('the meter counts tier a asks in this month, reads and proposals alike, and nothing else', () => {
   const { sql, spark } = build();
   const put = (kind: string, tier: string, ts: string): void =>
     sql.exec(
@@ -65,11 +65,12 @@ test('the meter counts tier a proposals in this month and nothing else', () => {
     );
   put('propose', 'a', '2026-11-02T00:00:00.000Z');
   put('propose', 'a', '2026-11-13T00:00:00.000Z');
-  /* Not this month, not this tier, and not an ask: three rows that must not be counted. */
+  /* A READ IS AN ASK since the read door was metered: before, `ask_cap` could never be reached through the only door. */
+  put('read', 'a', '2026-11-05T00:00:00.000Z');
+  /* Not this month, not this tier: two rows that must not be counted. */
   put('propose', 'a', '2026-10-30T00:00:00.000Z');
   put('propose', 'b', '2026-11-05T00:00:00.000Z');
-  put('read', 'a', '2026-11-05T00:00:00.000Z');
-  assert.equal(spark.status().asks.used, 2);
+  assert.equal(spark.status().asks.used, 3);
 });
 
 test('configure is the owner and nobody else', () => {

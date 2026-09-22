@@ -1,25 +1,23 @@
 /**
  * The ask: `POST /api/spark/read`, the half both hosts share. `docs/46` §5.2, `23 §7`.
  *
- * THE THIRTEENTH PACKAGE IS REACHED BY NOTHING, AND A DOOR NOBODY MOUNTS IS NOT A CALLER EITHER.
- * Finding 2 of `loop/research-batch-five-audit.md` drove it first, and it was re-driven on 2026-09-21
- * with a `throw` on the first line of each engine builder: `apps/selfhost/test/*.test.ts` is 204 tests,
- * 202 pass, 0 fail, 2 skipped, which is the unmutated tally exactly, and `apps/worker/test/*.test.ts`
- * is 179 tests, 176 pass, 3 fail, with all three reds inside `apps/worker/test/spark.test.ts`. The
- * audit's 172 and 199 were those suites LESS `spark.test.ts`, and a memo that dropped the exclusion
- * turned them into two false tallies about whole apps. Either number says the same thing: the only
- * callers either builder has are the tests that name it.
+ * BOTH HOSTS MOUNT THIS DOOR, AND THE ENGINE IS REACHED THROUGH IT FROM A BROWSER. `903bc9c9` wrote the
+ * door and `1816500a` wrote the two branches in front of it, eight minutes apart on 21 September:
+ * `apps/selfhost/src/server.ts` hands a request to `serveSpark` when `servesSpark` names the path, ahead
+ * of `servesKeys`, and `apps/worker/src/index.ts` does the same in `Record$.#answer`, beside `servesMcp`'s
+ * branch and behind two locks of its own (a person, and a credentialed one). The palette's `sparkRead`
+ * (`packages/client/src/index.ts`) is the caller. This header said for a day afterwards that nothing
+ * reached the door; that was true only between those two commits, and `loop/research-spark-seam.md` §0
+ * is the survey that caught it.
  *
- * AND THE PRODUCT ANSWERS A 404, which is the measurement no grep can give and the one three reports
- * in a row did not take. A real self-host started with a `SPARK_ENDPOINT` and a key says `spark: true`
- * at `/api/version` and answers `POST /api/spark/read` with 404 `ROUTE_UNKNOWN` "There is no method
- * called spark/read.", from `serveApi`, because nothing stands in front of it. So this file is what a
- * request WOULD reach, and nothing reaches it: `apps/worker/src/index.ts` (`Record$.#answer`, beside
- * `servesMcp`'s branch) and `apps/selfhost/src/server.ts` (`:1352`, ahead of `servesKeys`) are the two
- * places a branch has to appear, and until it does the export at `index.ts:29` and the two door
- * builders at `apps/worker/src/spark.ts` and `apps/selfhost/src/spark.ts` are three layers of edge with
- * no path through them. `apps/selfhost/src/spark.ts`'s own memo records the self-host mount being
- * driven green under a load hook, and what came out of it.
+ * WHAT WAS WRONG ONCE IT WAS REACHED WAS THE WORKER'S BUILD OF THE ENGINE, and neither host's tests saw it,
+ * because every one of them ran over `node:sqlite`. On a Durable Object `createSpark` threw
+ * `not authorized: SQLITE_AUTH` from an unguarded `PRAGMA`, so `engine()` below rejected and every ask was
+ * the 500 `INTERNAL` this door answers for a builder that threw, while `/api/version` said `spark: true`.
+ * `packages/spark/src/index.ts` guards the pragma now, and `apps/worker/test/spark-in-do.test.ts` drives the
+ * ask through workerd on real object storage: 500 before the guard, 200 after it. The same file carries a
+ * `todo` for the fault behind that one, which is this package's: `post` in `spark.ts` sends
+ * `redirect: 'error'`, workerd refuses the value, and so no model call leaves the Worker yet.
  *
  * IT IS A DOOR AND NOT A ROW IN `ROUTES`, AND THAT WAS MEASURED RATHER THAN PREFERRED. `ROUTES` is
  * the RECORD's surface and two gates hold it to that. `tools/gates/guards.mjs` reads every routed

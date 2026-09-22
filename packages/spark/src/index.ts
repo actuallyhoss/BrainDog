@@ -96,7 +96,20 @@ const GRANT_ID = /^g_[0-9A-HJKMNP-TV-Z]{26}$/u;
  */
 export function createSpark(deps: SparkDeps): Spark {
   for (const statement of DDL) deps.sql.exec(statement);
-  deps.sql.exec('PRAGMA user_version = 1');
+  /* BEST EFFORT, BECAUSE A DURABLE OBJECT REFUSES IT. Measured in workerd on 22 September: the two
+     `CREATE TABLE IF NOT EXISTS` run, and this statement throws `not authorized: SQLITE_AUTH` out of
+     the object's authorizer, so on the Worker every ask answered 500 before a model was called
+     (`apps/worker/test/spark-in-do.test.ts`). The directory met the same refusal first and guards
+     its pragma reads (`packages/record/src/directory.ts`), and `packages/kernel/src/migrate.ts`
+     wraps its own write the same way. Nothing in this package reads `user_version` back, so a DO
+     that never holds it loses nothing today. THE FIRST SCHEMA CHANGE TO `46 §4.1` NEEDS THE VERSION
+     IN A ROW, as `dir_meta` carries the directory's, because on the Worker this pragma will read 0
+     for ever and a migration keyed on it would run on every build. */
+  try {
+    deps.sql.exec('PRAGMA user_version = 1');
+  } catch {
+    /* the Durable Object's authorizer; see above */
+  }
   deps.sql.exec(
     'INSERT OR IGNORE INTO settings (singleton, tier, model, grant_id, ask_cap, updated_at) VALUES (1, ?, NULL, NULL, ?, ?)',
     'a',

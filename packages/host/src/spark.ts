@@ -115,7 +115,10 @@ const post = async (url: URL, options: EndpointModelOptions, body: unknown): Pro
     method: 'POST',
     headers,
     body: JSON.stringify(body),
-    redirect: 'error',
+    /* `manual`, NEVER `error`: workerd refuses `redirect: 'error'` outright ("must be one of follow or manual") before any
+       request leaves, so on the Worker every Spark call was UNREACHABLE and fell to the rules. `manual` still follows
+       nothing: a 3xx, or the opaque redirect a browser-style fetch hands back, is not `ok` and is thrown below. */
+    redirect: 'manual',
     signal: AbortSignal.timeout(options.timeoutMs ?? SPARK_TIMEOUT_MS),
   });
   /* THE STATUS AND NOTHING ELSE. An error body can echo the request, and the request can carry the key. */
