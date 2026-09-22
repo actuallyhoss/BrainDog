@@ -260,8 +260,11 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean })
   const absent: string[] = [];
   /** The fields each list declares, where the record's answer says: see `unheld` below. */
   const declared = new Map<string, Set<string>>();
+  /** Every list the record answered for, so the sentence about a missing one can tell an old pack from no pack. */
+  const answered = new Set<string>();
   for (const register of [...registers, ...spare] as string[]) {
     const has = await door.schema(register);
+    if (has.ok) answered.add(register);
     if (!has.ok) {
       if (unreachable(has)) throw new Unreachable();
       if (OPTIONAL.has(register) || spare.includes(register)) absent.push(register);
@@ -279,6 +282,36 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean })
   /* A LIST THIS RECORD DOES NOT HAVE AND DOES NOT NEED: its rows are left out, each named, with what installing adds them. */
   if (absent.length > 0) {
     const out = plan.rows.filter((r) => absent.includes(r.register));
+    /**
+     * UPDATE WHEN THE PACK IS THERE AT AN OLDER VERSION, INSTALL WHEN IT IS NOT, AND THE SENTENCE SAID INSTALL TO BOTH.
+     *
+     * `PROVIDED_BY.holdings` names `Money 1.5.0`, and a record on Money 1.4.0 was told "Install Money 1.5.0 beside Solo
+     * founder": a pack the catalogue shows it as already holding, where the thing to press is the update. The record
+     * does not answer which version it holds, so the question asked is the one it can answer: does it hold any other
+     * list the same pack provides. If it does, the pack is installed and older. Only a provider with a version in it
+     * is asked about, because "Update Estate" names no version to update to and is not a sentence anybody can act on.
+     */
+    const lead = new Map<string, string>();
+    for (const register of new Set(out.map((r) => r.register))) {
+      const by = PROVIDED_BY[register] ?? register;
+      const versioned = /^(.+) (\d+\.\d+\.\d+)$/u.exec(by);
+      if (!versioned) {
+        lead.set(register, `Install ${by} beside Solo founder`);
+        continue;
+      }
+      const pack = versioned[1]!;
+      const version = versioned[2]!;
+      const siblings = Object.entries(PROVIDED_BY).flatMap(([r, p]) => (r !== register && (p === pack || p.startsWith(`${pack} `)) ? [r] : []));
+      let held = siblings.some((r) => answered.has(r));
+      for (const r of siblings) {
+        if (held) break;
+        if (absent.includes(r) || report.missing.includes(r)) continue;
+        const has = await door.schema(r);
+        if (!has.ok && unreachable(has)) throw new Unreachable();
+        held = has.ok;
+      }
+      lead.set(register, held ? `Update ${pack} to ${version}` : `Install ${by} beside Solo founder`);
+    }
     plan = {
       ...plan,
       rows: plan.rows.filter((r) => !absent.includes(r.register)),
@@ -289,7 +322,7 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean })
         ...absent
           .filter((register) => out.some((r) => r.register === register))
           .map((register) => ({
-            reason: `This BrainDog has no ${NAMES[register] ?? register} list. Install ${PROVIDED_BY[register] ?? register} beside Solo founder, then run the import again to bring these in`,
+            reason: `This BrainDog has no ${NAMES[register] ?? register} list. ${lead.get(register) ?? `Install ${PROVIDED_BY[register] ?? register} beside Solo founder`}, then run the import again to bring these in`,
             items: out.filter((r) => r.register === register).map((r) => r.label),
           })),
       ],
