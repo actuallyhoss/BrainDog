@@ -94,46 +94,65 @@ const bits13 = (buf: Uint8Array, at: number): number => {
 };
 
 /**
- * Poly1305 over `msg` with a one-time 32-byte key.
+ * One Poly1305 block of 16 bytes from `buf` folded into the accumulator `h`, in place. `buf` is 19
+ * bytes: the block, then the byte that marks its end, then the two of slack `bits13` reads past.
  *
  * TEN LIMBS OF THIRTEEN BITS, so the widest intermediate is ten products of a 14-bit limb and a
  * 16-bit one, about 2^34, and every sum is exact in a double. Reduction folds the high half back
- * with the factor 5, because 2^130 is 5 modulo 2^130 - 5. The last step is BigInt, once per tag,
- * where clarity costs nothing.
+ * with the factor 5, because 2^130 is 5 modulo 2^130 - 5.
  */
-function poly1305(key: Uint8Array, msg: Uint8Array): Uint8Array {
+function absorb(h: number[], r: number[], r5: number[], buf: Uint8Array, d: number[]): void {
+  for (let k = 0; k < 10; k++) h[k] = (h[k] ?? 0) + bits13(buf, 13 * k);
+  for (let i = 0; i < 10; i++) {
+    let sum = 0;
+    for (let j = 0; j < 10; j++) sum += (h[j] ?? 0) * (j <= i ? (r[i - j] ?? 0) : (r5[i - j + 10] ?? 0));
+    d[i] = sum;
+  }
+  let c = 0;
+  for (let i = 0; i < 10; i++) {
+    const v = (d[i] ?? 0) + c;
+    c = Math.floor(v / 8192);
+    d[i] = v - c * 8192;
+  }
+  d[0] = (d[0] ?? 0) + c * 5;
+  c = Math.floor((d[0] ?? 0) / 8192);
+  d[0] = (d[0] ?? 0) - c * 8192;
+  d[1] = (d[1] ?? 0) + c;
+  for (let k = 0; k < 10; k++) h[k] = d[k] ?? 0;
+}
+
+/**
+ * The RFC 8439 AEAD tag over ciphertext `ct` with no associated data, under a one-time 32-byte key.
+ *
+ * THE PADDING AND THE LENGTH BLOCK ARE FED IN, NOT BUILT. The first version copied the ciphertext
+ * into a fresh zero-padded buffer with the lengths on the end and ran Poly1305 over that, which is a
+ * second copy of every chunk. Here the last partial block is zero-filled in the 19-byte scratch
+ * buffer, which is what the padding is, and the length block is one more block through the same
+ * buffer. Every block counts as full, so the end marker is always byte 16. The last step is BigInt,
+ * once per tag, where clarity costs nothing.
+ */
+function tagOf(key: Uint8Array, ct: Uint8Array): Uint8Array {
   const rb = new Uint8Array(19);
   rb.set(key.subarray(0, 16));
   for (const i of [3, 7, 11, 15]) rb[i] = (rb[i] ?? 0) & 15;
   for (const i of [4, 8, 12]) rb[i] = (rb[i] ?? 0) & 252;
   const r = Array.from({ length: 10 }, (_, k) => bits13(rb, 13 * k));
   const r5 = r.map((v) => v * 5);
-  let h = new Array<number>(10).fill(0);
+  const h = new Array<number>(10).fill(0);
+  const d = new Array<number>(10).fill(0);
   const buf = new Uint8Array(19);
-  for (let at = 0; at < msg.length; at += 16) {
-    const n = Math.min(16, msg.length - at);
+  for (let at = 0; at < ct.length; at += 16) {
     buf.fill(0);
-    buf.set(msg.subarray(at, at + n));
-    buf[n] = 1;
-    for (let k = 0; k < 10; k++) h[k] = (h[k] ?? 0) + bits13(buf, 13 * k);
-    const d = new Array<number>(10);
-    for (let i = 0; i < 10; i++) {
-      let sum = 0;
-      for (let j = 0; j < 10; j++) sum += (h[j] ?? 0) * (j <= i ? (r[i - j] ?? 0) : (r5[i - j + 10] ?? 0));
-      d[i] = sum;
-    }
-    let c = 0;
-    for (let i = 0; i < 10; i++) {
-      const v = (d[i] ?? 0) + c;
-      c = Math.floor(v / 8192);
-      d[i] = v - c * 8192;
-    }
-    d[0] = (d[0] ?? 0) + c * 5;
-    c = Math.floor((d[0] ?? 0) / 8192);
-    d[0] = (d[0] ?? 0) - c * 8192;
-    d[1] = (d[1] ?? 0) + c;
-    h = d;
+    buf.set(ct.subarray(at, Math.min(at + 16, ct.length)));
+    buf[16] = 1;
+    absorb(h, r, r5, buf, d);
   }
+  /* THE LENGTH BLOCK: eight bytes of associated-data length, which is zero, then eight of ciphertext length. */
+  buf.fill(0);
+  new DataView(buf.buffer).setUint32(8, ct.length, true);
+  buf[16] = 1;
+  absorb(h, r, r5, buf, d);
+
   let acc = 0n;
   for (let k = 9; k >= 0; k--) acc = (acc << 13n) + BigInt(h[k] ?? 0);
   let s = 0n;
@@ -144,27 +163,31 @@ function poly1305(key: Uint8Array, msg: Uint8Array): Uint8Array {
   return out;
 }
 
-/** ChaCha20-Poly1305 seal: ciphertext then the 16-byte tag. Exported for the test that holds it against OpenSSL. */
-export function chacha20poly1305(key: Uint8Array, nonce: Uint8Array, plain: Uint8Array): Uint8Array {
+/**
+ * ChaCha20-Poly1305 seal of `plain` written straight into `out` at `at`: the ciphertext, then the
+ * 16-byte tag. `out` must have `plain.length + 16` bytes free there.
+ *
+ * INTO THE CALLER'S BUFFER AND NOT A NEW ONE, because the caller is `sealTo` and its buffer is the
+ * whole file. See the payload comment there for what that was measured to save.
+ */
+function sealInto(key: Uint8Array, nonce: Uint8Array, plain: Uint8Array, out: Uint8Array, at: number): void {
   const k = words(key);
   const n = words(nonce);
   const block = new Uint8Array(64);
   chachaBlock(k, n, 0, block);
   const polyKey = block.slice(0, 32);
-
-  const padded = Math.ceil(plain.length / 16) * 16;
-  const mac = new Uint8Array(padded + 16);
-  for (let at = 0, counter = 1; at < plain.length; at += 64, counter++) {
+  for (let from = 0, counter = 1; from < plain.length; from += 64, counter++) {
     chachaBlock(k, n, counter, block);
-    const end = Math.min(64, plain.length - at);
-    for (let i = 0; i < end; i++) mac[at + i] = (plain[at + i] ?? 0) ^ (block[i] ?? 0);
+    const end = Math.min(64, plain.length - from);
+    for (let i = 0; i < end; i++) out[at + from + i] = (plain[from + i] ?? 0) ^ (block[i] ?? 0);
   }
-  /* THE LENGTH BLOCK: eight bytes of associated-data length, which is zero, then eight of ciphertext length. */
-  new DataView(mac.buffer).setUint32(padded + 8, plain.length, true);
+  out.set(tagOf(polyKey, out.subarray(at, at + plain.length)), at + plain.length);
+}
 
+/** ChaCha20-Poly1305 seal: ciphertext then the 16-byte tag. Exported for the test that holds it against OpenSSL. */
+export function chacha20poly1305(key: Uint8Array, nonce: Uint8Array, plain: Uint8Array): Uint8Array {
   const out = new Uint8Array(plain.length + 16);
-  out.set(mac.subarray(0, plain.length));
-  out.set(poly1305(polyKey, mac), plain.length);
+  sealInto(key, nonce, plain, out, 0);
   return out;
 }
 
@@ -324,17 +347,30 @@ export function sealTo(recipient: Uint8Array): (file: Uint8Array) => Promise<Uin
     /* THE PAYLOAD. A 16-byte nonce salts the payload key, then STREAM: counter in the first eleven
        bytes of the nonce, and the last byte set on the final chunk only. An empty file is one empty
        final chunk; a file that is an exact multiple of 64 KiB ends on a full chunk that carries the
-       flag, never on an empty one after it, which age refuses. */
+       flag, never on an empty one after it, which age refuses.
+
+       EACH CHUNK IS SEALED STRAIGHT INTO ITS PLACE IN THE FILE, which is allocated once at its final
+       length. The first version pushed every sealed chunk onto an array and concatenated the lot at
+       the end, so at the peak it held the ciphertext twice: sealing a 40 MiB dump raised Node's peak
+       resident memory by 86 MiB above the plaintext, against a Worker's 128 MB with the plaintext
+       still to fit. Written in place it measured a few MiB above the output itself, which is the
+       floor while `Seal` returns one buffer (`test/seal-memory.test.ts`). The bytes are the same. */
     const nonce = crypto.getRandomValues(new Uint8Array(16));
     const payloadKey = await hkdf(fileKey, nonce, 'payload');
-    const chunks: Uint8Array[] = [];
+    const head = new TextEncoder().encode(`${header} ${b64(mac)}\n`);
     const count = Math.max(1, Math.ceil(file.length / CHUNK));
-    for (let i = 0; i < count; i++) {
-      const n = new Uint8Array(12);
-      new DataView(n.buffer).setUint32(7, i, false);
+    const out = new Uint8Array(head.length + nonce.length + file.length + 16 * count);
+    out.set(head, 0);
+    out.set(nonce, head.length);
+    const n = new Uint8Array(12);
+    const counter = new DataView(n.buffer);
+    for (let i = 0, at = head.length + nonce.length; i < count; i++) {
+      counter.setUint32(7, i, false);
       if (i === count - 1) n[11] = 1;
-      chunks.push(chacha20poly1305(payloadKey, n, file.subarray(i * CHUNK, (i + 1) * CHUNK)));
+      const plain = file.subarray(i * CHUNK, (i + 1) * CHUNK);
+      sealInto(payloadKey, n, plain, out, at);
+      at += plain.length + 16;
     }
-    return concat(new TextEncoder().encode(`${header} ${b64(mac)}\n`), nonce, ...chunks);
+    return out;
   };
 }
