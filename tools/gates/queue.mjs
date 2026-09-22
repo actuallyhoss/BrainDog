@@ -55,10 +55,15 @@
  * throw on the first one, for the same reason `a11y.mjs` and `passkey.mjs` do not.
  *
  * ITS OWN EPHEMERAL PORT (`server.listen(0)`), exactly as `passkey.mjs` takes one, and for the same
- * reason: the other browser gates in this directory share port 5189 (`budgets.json`'s `layout`
- * section), and a gate that took a fixed port of its own would be one more number in that queue. An
- * ephemeral port never collides with it, so this gate can be run by hand while a full `pnpm gates`
- * is going, the same claim `passkey.mjs` makes about itself.
+ * reason: a fixed port is one that a second run of the same gate finds taken. The self-hosted CI
+ * runner is the PC the loop runs these gates on by hand, so a CI run and a desk run of one gate can
+ * start within a minute of each other, and with a fixed port one of them goes red for a reason that
+ * is not in the tree. An ephemeral port never collides, so this gate can be run by hand while a full
+ * `pnpm gates` is going, the same claim `passkey.mjs` makes about itself.
+ *
+ * THIS PARAGRAPH USED TO SAY THE OTHER BROWSER GATES SHARE PORT 5189, and they never did. Read off
+ * `budgets.json` and the `listen` calls on 22 September (`loop/research-ci-gates.md` §1): `layout`
+ * had 5189, `a11y` 5186, `prefs` 4183 and `keys` 4184, one each.
  */
 
 import { createReadStream } from 'node:fs';

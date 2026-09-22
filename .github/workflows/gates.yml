@@ -107,14 +107,23 @@ jobs:
       - id: browser
         run: echo "version=$(node -p "require('./node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/cache@v4
+      # ON A HOSTED IMAGE ONLY. `~/.cache/ms-playwright` is where Playwright keeps browsers on Linux;
+      # on Windows it is %LOCALAPPDATA%\ms-playwright, so on studio-pc this step never once hit (the
+      # 21 September run logged `Cache not found for input keys: ms-playwright-Windows-1.62.1`).
+      # Pointing it at the Windows path would be no better: the self-hosted runner is a PC whose
+      # browser is already installed and persists between runs, and the install below found it in
+      # one second, so a cache there would restore 150 MB from GitHub to overwrite files that were
+      # already on disk. The cache is for the day `CI_RUNNER` names a hosted image again, where every job starts empty.
+      - if: runner.environment == 'github-hosted'
+        uses: actions/cache@v4
         id: browser-cache
         with:
           path: ~/.cache/ms-playwright
           key: ms-playwright-${{ runner.os }}-${{ steps.browser.outputs.version }}
 
       # CHROMIUM ONLY — the four browser gates ask for `chromium` and nothing else, and installing
-      # the other two is 300 MB nothing opens (52 §10 records the deliberate ceiling).
+      # the other two is 300 MB nothing opens (52 §10 records the deliberate ceiling). A skipped
+      # cache step has no `cache-hit` output, so on the self-hosted runner this is the step that runs.
       - if: steps.browser-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium
 

@@ -1,8 +1,11 @@
 name: ci
 
-# 52 §2's `ci.yml`, less the browser: install, typecheck, the whole suite, and the fourteen gates
-# that read source. The five that need a built app and a real browser are `gates.yml`'s, and the
-# reason for the split is at the top of that file.
+# 52 §2's `ci.yml`, less most of the browser: install, typecheck, the whole suite and every gate
+# that reads source in `check`, and in `build` the app and the site built, plus the three gates that
+# read that build and bind no fixed port (`bundle`, `passkey`, `queue`). `prefs`, `keys`, `layout`,
+# `a11y` and `self-test` are `gates.yml`'s, and the reason for the split is at the top of that file
+# and beside the `--only` list below. The counts this line used to carry (fourteen and five) were
+# twenty and seven by 22 September, so it names the gates that are elsewhere rather than counting.
 #
 # WHAT THIS COSTS IS THE POINT OF IT. The suite is 1,308 tests in about 90 seconds and the source
 # gates are greps; the two browser gates alone are 627 page-runs and 212 audits, about nineteen
@@ -69,9 +72,9 @@ jobs:
 
       - run: pnpm test
 
-      # THE GATES THAT READ SOURCE. Named as an exclusion rather than as a list of the fourteen,
-      # because a list of what to run stops running the gate somebody adds tomorrow and says nothing
-      # about it; an exclusion picks it up, and if the new gate turns out to need a build it exits 3,
+      # THE GATES THAT READ SOURCE. Named as an exclusion rather than as a list of them, because a
+      # list of what to run stops running the gate somebody adds tomorrow and says nothing about it;
+      # an exclusion picks it up, and if the new gate turns out to need a build it exits 3,
       # which `run.mjs` makes red under CI. The failure that arrives is then a sentence naming the
       # gate rather than a green run that checked one thing fewer than it claims.
       #
@@ -90,18 +93,16 @@ jobs:
       # `self-test` is excluded for the same reason at one remove. Five of its sixty-six seeded
       # negatives are browser gates, so without a build it catches sixty-one and says so, and its own
       # exit code is the failure rather than the runner's skip. The other sixty-one are worth having
-      # on every push, so the honest home for it is the job that builds; until then `gates.yml` is
-      # where all sixty-six are driven.
+      # on every push, so the honest home for it is `build` below, the job that builds. It is not
+      # there yet because it seeds the fixed-port gates (see the comment on `build`'s last step), so
+      # until then `gates.yml` is where all sixty-six are driven.
       #
-      # Not building is deliberate. Not building is deliberate: `bundle`'s staleness guard makes the build a
-      # PREREQUISITE rather than a step, so a job that builds must build everything the gates
-      # measure — `build/`, the three variant records and the marketing site — and that is
-      # `gates.yml`.
+      # NOT BUILDING IS DELIBERATE. `bundle`'s staleness guard makes the build a PREREQUISITE
+      # rather than a step, so a job that builds must build everything the gates it runs measure,
+      # and that is `build` below for the three it can afford and `gates.yml` for the rest. Building
+      # here as well would pay for the same Vite builds twice in one push on a single runner.
       #
-      # NEEDS `--except`, which `run.mjs` does not have on master. The patch is beside this file at
-      # `tools/gates/run.mjs`; without it this step runs all nineteen gates, reports five skips, and
-      # is red under CI.
-      # `deploy-parity` joins the excluded list for a different reason than the other five: they
+      # `deploy-parity` joins the excluded list for a different reason than the other eight: they
       # need a build this job does not do, and it needs a LIVE HOST, which only `deploy.yml` has.
       - run: pnpm gates -- --except typecheck,bundle,keys,prefs,layout,a11y,passkey,queue,self-test,deploy-parity
 
@@ -114,8 +115,10 @@ jobs:
     # SELF-HOSTED, BECAUSE THE ACCOUNT RAN OUT OF ACTIONS MINUTES (September 17th, the owner's call).
     # Self-hosted minutes are free. Set the repository variable CI_RUNNER to ubuntu-24.04 to go back.
     runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
-    # Four Vite builds for the app (the shipped record plus the cloud, quiet and busy variants) and
-    # one for the site.
+    # Four Vite builds for the app (the shipped record plus the cloud, quiet and busy variants), one
+    # for the site, and three gates that read them. The job took 2 min 39 s on studio-pc on 21
+    # September before the gates were added, and the three measured 6.4 s in `gates.yml` run
+    # 35587734418, so 15 is still a ceiling for a hang and not a budget.
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -137,3 +140,31 @@ jobs:
       # every tracked file is as committed, or the build generates something a person has not
       # reviewed.
       - run: git diff --exit-code
+
+      # THE BROWSER, WHICH IS ALREADY ON studio-pc. `passkey` and `queue` launch chromium. The
+      # install found it in %LOCALAPPDATA%\ms-playwright and took one second in the 21 September
+      # `gates.yml` run; the step is here for the day CI_RUNNER points back at a hosted image, where
+      # it is a download of about 150 MB and a minute or two with no cache.
+      - run: pnpm exec playwright install --with-deps chromium
+
+      # THE GATES THAT READ THIS BUILD, WHICH `check` HAS TO EXCLUDE BECAUSE IT DOES NOT BUILD.
+      #
+      # A LIST AND NOT AN EXCLUSION, and `check`'s argument against lists does not reach it. A gate
+      # added tomorrow that needs a build is still selected by `check`'s exclusion, `run.mjs` refuses
+      # it there for want of the build, and a refusal under CI is red. So a new gate cannot go unrun
+      # because it is missing from this list: the run that would have skipped it is red and names it.
+      #
+      # `layout` AND `a11y` ARE NOT HERE, AND THE REASON IS THE CANCELLATION RATE. They are about 14
+      # of the 19 minutes `pnpm gates` took on this runner, and over five days of pushes a `ci` run
+      # of 21 minutes or more would have been cancelled by the next push more than half the time. A
+      # cancelled `ci` is a deploy that never starts. They stay in `gates.yml`.
+      #
+      # `prefs`, `keys` AND `self-test` ARE NOT HERE YET, BECAUSE OF A PORT. On master `prefs` binds
+      # 4183 and `keys` 4184, and `self-test` seeds negatives for both plus `layout` (5189) and
+      # `a11y` (5186). This runner is the PC the loop runs the same gates on by hand, so a CI run and
+      # a desk run of one gate can collide, and the red that arrives is about the machine rather
+      # than the tree. When those four take an ephemeral port as `passkey` and `queue` do, the list
+      # becomes `self-test,bundle,prefs,keys,passkey,queue` (about +4.5 minutes a push, measured
+      # once) and `timeout-minutes` above goes to 20. `run.mjs` runs a selection in registry order,
+      # so `self-test` would run first whatever order the list is written in.
+      - run: node tools/gates/run.mjs --only bundle,passkey,queue

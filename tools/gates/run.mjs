@@ -662,11 +662,24 @@ process.on('exit', () => {
   );
 });
 
+/**
+ * HOW LONG EACH GATE TOOK, ON A LINE OF ITS OWN AFTER IT, whatever it answered.
+ *
+ * `loop/research-ci-gates.md` had to price eight gates for `ci.yml` from a runner that printed no
+ * duration, so every figure in its table is the gap between two `▸` headers in a step log, and the
+ * last gate of a run has no next header to subtract from. The closing glyph is `◂` and not `▸`
+ * because the tests beside this file prove a gate was asked by matching `▸ <name>`, and a log read
+ * that way would otherwise count every gate twice. `test/durations.test.mjs` holds the shape:
+ * two spaces, `◂`, the name, `·`, seconds to one decimal, `s`.
+ */
+const took = (name, t0) => console.log(`  ◂ ${name} · ${((performance.now() - t0) / 1000).toFixed(1)} s`);
+
 for (const [name, [cmd, args, opts]] of SELECTED) {
   const d = dialects.get(name);
   /* THE DIALECT IS ON THE LINE, because two ways of running a gate is two things that can be wrong
      and a reader of one screen of output should not have to work out which one a gate took. */
   process.stdout.write(`\n▸ ${name} · ${d.how}\n`);
+  const t0 = performance.now();
   /* THE RUNNER'S REFUSAL, AND IT READS DIFFERENTLY FROM A GATE'S SKIP ON PURPOSE. Nothing was
      spawned, so nobody measured anything and nobody reported on it. It joins `skipped` because
      that is what a gate that could not run is, and `--allow-skip` and the CI rule below apply to
@@ -694,12 +707,14 @@ for (const [name, [cmd, args, opts]] of SELECTED) {
          this file says it will not do. */
       console.error(`  ${name} threw rather than reporting: ${cause?.stack ?? cause}`);
       failed.push(name);
+      took(name, t0);
       continue;
     } finally {
       /* `finally` RATHER THAN A LINE AFTER THE BLOCK, because the `catch` above ends in `continue`
          and a reset the failing path skips would name the wrong gate for the rest of the run. */
       inside = null;
     }
+    took(name, t0);
     /* AND AN ANSWER OUTSIDE THE CONTRACT IS A FAILURE, NAMED, rather than a refusal that abandons
        the rest. A gate that returns 7 has not passed and has not skipped, and the gates after it are
        still worth asking. */
@@ -713,6 +728,7 @@ for (const [name, [cmd, args, opts]] of SELECTED) {
     continue;
   }
   const r = spawnSync(cmd, args, { cwd: root, stdio: 'inherit', shell: false, ...opts });
+  took(name, t0);
   if (r.status === 3) skipped.push(name);
   else if (r.status !== 0) failed.push(name);
 }
