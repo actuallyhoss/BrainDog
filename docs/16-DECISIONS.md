@@ -125,6 +125,14 @@ agent — and the product is already about agents.
 **Would reverse it:** a class of pack customers demonstrably need that no declaration plus an agent
 can express — and the answer would still be a ninth kind before a sandbox.
 
+**Under review (September 22nd 2026).** DIRECTION §22 makes scripts user content: a person, Claude
+or Spark writes one and attaches it to a schedule or a door. Whether that script runs where the
+person runs it (this ADR survives, with "an agent" widened to "an agent or the person's own code")
+or in a sandbox BrainDog hosts (this ADR is reversed) is the owner's open decision under
+[DIRECTION §22](../loop/DIRECTION.md), set out in
+[research-shell-scripts.md](../loop/research-shell-scripts.md). It needs a superseding ADR once
+decided, and until then nothing here changes.
+
 ---
 
 ## ADR-006 · Embeddings live in the customer's own SQLite; no shared vector index

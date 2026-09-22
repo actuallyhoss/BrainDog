@@ -17,6 +17,13 @@ credentials, decisions and their reasons — in one typed database that every ag
 over MCP, and that renders itself as a web app. Open source under Apache-2.0, self-hostable free
 and complete, hosted at $12/mo (D41).
 
+> **Read the sentence above as examples, not as the product (September 22nd 2026, [DIRECTION
+> §22](../loop/DIRECTION.md)).** BrainDog is the shell: a typed record, doors in and out, schedules,
+> pages and a vault, which a person and their agents shape to whatever they run. Money, renewals,
+> hosting and credentials are one owner's use cases built on those primitives. The code ships the
+> primitives; use cases, integrations and metadata (a field, a list, a relation) are added at run
+> time by people or agents, or brought by a pack somebody chose to install.
+
 ---
 
 ## How to read this
@@ -149,6 +156,13 @@ across [05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) and [13-UI](13-UI.md). It
 A table survives a shared Worker; an `eval` does not. So there is no sandbox to secure, every
 variant is a readable diffable file, and everything modular in this design follows from it.
 
+> **Open question, not settled here (September 22nd 2026).** DIRECTION §22 makes scripts user
+> content, and whether that means a script the person runs with their own tools or one BrainDog runs
+> in a sandbox it hosts is the owner's open decision under [DIRECTION §22](../loop/DIRECTION.md);
+> the two readings and what each reverses are laid out in
+> [research-shell-scripts.md](../loop/research-shell-scripts.md). Until it is decided, this rule
+> stands as written.
+
 ---
 
 ## What is deliberately not here
@@ -157,7 +171,7 @@ variant is a readable diffable file, and everything modular in this design follo
 |---|---|
 | Real-time co-editing | ~15–20d plus permanent maintenance, and it is where Nimbalyst and AFFiNE already sit. Tier 4, not this year |
 | A double-entry accounting rewrite | 25–40d to reach parity with what Actual Budget and Firefly III give away free |
-| A plugin system that runs user code | See the rule above. This is not a limit on the platform — it is what makes it possible |
+| A plugin system that runs user code | See the rule above. This is not a limit on the platform — it is what makes it possible. Whatever is decided about scripts, user code never runs inside the record's own object; whether a person's script may run in a sandbox BrainDog hosts is open under DIRECTION §22 ([research-shell-scripts.md](../loop/research-shell-scripts.md)) |
 | Paid packs in v1 | Tax, VAT, refunds, chargebacks and moderation are a company, not a feature |
 | A shared vector index | Breaks self-host parity and the isolation proof. See [ADR-006](16-DECISIONS.md) |
 | Event tracking, funnels, sessions on customer data | This is a record, not an analytics product |

@@ -9,6 +9,11 @@ A table survives a shared Worker; an `eval` does not. So nothing a user or a pac
 is ever executed. Anything needing real computation is an agent with a skill and a schedule —
 which is what this product is already about.
 
+> **Open question (September 22nd 2026).** Whether a script a person or an agent writes may run in
+> a sandbox BrainDog hosts, or only where the person runs it, is the owner's open decision under
+> [DIRECTION §22](../loop/DIRECTION.md); see
+> [research-shell-scripts.md](../loop/research-shell-scripts.md). This page does not settle it.
+
 ---
 
 ## 1 · The eight kinds, and the list is CLOSED
@@ -25,7 +30,14 @@ which is what this product is already about.
 | `digest` | scheduled output | schedule, sections (each `as:` a kind, `omit_when_empty:` to drop an empty one), channel |
 
 A ninth kind means a ninth schema, a ninth validator and a ninth way to be insecure. **If it does
-not fit these eight, it is an agent.**
+not fit these eight, it is an agent, or the person's own script, attached to a door or a
+schedule and writing through the same API anything else uses.**
+
+*An earlier revision stopped at "it is an agent". DIRECTION §22 (September 22nd 2026) makes
+scripts user content and asks for an automations layer (trigger, steps, action) that a person
+draws and an agent edits through MCP. Whether an automation is a ninth kind or a composition of
+`ingest`, `rule` and schedules is not yet specified; it has to be decided here, because the closed
+list is the security argument in §7.*
 
 The closure is load-bearing rather than tidy: the security argument in §7 is an *enumeration*,
 and an enumeration only works over a finite list.
@@ -353,6 +365,13 @@ and [32-PARITY](32-PARITY.md) §5 lists what each carries. *An earlier draft nam
 If the first registers are special-cased, the pack API is half-built forever. VS Code ships its
 own languages as extensions for exactly this reason, and it is the difference between a platform
 and a product with a plugin folder.
+
+**What this rule does not mean (September 22nd 2026, DIRECTION §22).** The six are examples in a
+shared catalogue, not the set the product is defined by. Money, estate and portfolio are one
+owner's use cases, and a use case not everyone needs is not shipped with the code. The code ships
+primitives; use cases, integrations and metadata are added to a record at run time by people or
+agents, or brought by a pack the person chose to install. What stays true is the mechanism: a
+first-party pack goes through the same pack API as anyone else's.
 
 The measurable form of this rule, which belongs in CI rather than in a code review:
 

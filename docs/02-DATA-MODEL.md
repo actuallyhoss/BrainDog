@@ -310,6 +310,13 @@ Three rules, all enforced at the validator rather than by convention:
 nothing could look a row up by.)* A converted total renders as `~$41,420 at 48.9 EGP/USD, 26 Aug 2026` — the
 approximation sign and the date are part of the value, not decoration.
 
+*(September 22nd 2026, DIRECTION §22: the kernel owns the money type and the rule that two
+currencies are never added, because those are primitives. Which register holds rates, and which
+setting names a home currency, belong to whoever installed that use case, and should be passed in
+rather than named by the kernel. Measured on that date, `packages/kernel/src/fx.ts:242` still
+exports `HOME_CURRENCY_SETTING = 'home_currency'`, so the code names a use-case setting this
+paragraph says it should not.)*
+
 ---
 
 ## 4 · Time
@@ -935,14 +942,18 @@ the code, does not "refuse to start" in some vague sense: the runner sets a modu
 schema is worse than an outage. The procedure is [33-CONTRACTS](33-CONTRACTS.md) §9, and
 `applyMigrations` stays INTERNAL for the self-host path.
 
-**Declaration changes** are a pack's. They never run DDL **on a table** — no `CREATE TABLE`, no
+**Declaration changes** are anyone's who goes through the proposal path, not only a pack's
+(corrected September 22nd 2026 under DIRECTION §22). A person in the register editor, or an agent
+with a `change` proposal the person accepts, adds a field, a list or a relation to a live record
+at run time; a pack is one way to bring several at once. The core ships a thing with an identity
+and a history, and the metadata on it is added. Whoever makes the change, it never runs DDL **on a table** — no `CREATE TABLE`, no
 `ALTER TABLE`, no `DROP`. Adding a field marked `index: true` does create an *index*, which is the
 one exception and it is a narrow one: an index is derived, additive, droppable without touching a
 row, and rebuildable from the data. The rule is therefore *"a declaration never changes the shape of
 a table"*, which is what it was always for. An earlier draft said "never runs DDL" flatly, which the
 expression-index model in §1 contradicts. Adding a field is a declaration edit;
 existing rows simply lack it, and a `required` field added to a populated register is
-**refused** — the pack must ship a default or a migration *rule* that fills it, and the rule runs
+**refused** — whoever adds it (a pack, a person or an agent's proposal) must supply a default or a migration *rule* that fills it, and the rule runs
 through the same approval gate everything else does.
 
 **A declaration is versioned by supersession, never edited.** `declaration` is keyed

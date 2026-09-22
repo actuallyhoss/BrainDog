@@ -1127,6 +1127,13 @@ Twenty-one, each a `ponytail:` line in the file named.
 20. `metrics.ts` — `ponytail: trend is one log-linear fit; no seasonality, no changepoints. Six points cannot carry more.`
 21. `index.ts` — `ponytail: a saved view is a local table and does not travel in a .brain export; a travelling table is FORMAT_VERSION 2 and every reader of the format. Make it travel when somebody moves a record and asks where their views went.`
 
+*(Item 7, read September 22nd 2026 against DIRECTION §22.)* The fix item 7 names is the right
+shape and the wrong default. The core should know only "a row a rule marks urgent": a declared
+marker on `remind:` that whoever built the list sets. Which rows are urgent (a payment failing, a
+domain expiring) is that person's or that pack's to declare, because payments and domains are use
+cases, not primitives. The one urgent default the core keeps is the vault's own credential expiry
+inside 48 hours, which the file already has.
+
 ---
 
 ## 11 · Dependencies

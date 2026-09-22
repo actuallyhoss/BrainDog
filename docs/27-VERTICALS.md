@@ -125,6 +125,13 @@ otherwise in the first hour.
 That is longer, it is testable, and it is still a large market: freelancers, agencies, landlords,
 consultancies, studios, small clinics, small labels, anybody running several things at once.
 
+*(Read September 22nd 2026 against DIRECTION §22.)* The claim above describes what the record
+can hold, and it stays true. It is not a list of use cases the product ships. BrainDog is the
+shell: a typed record, doors in and out, schedules, pages and a vault. The code ships those
+primitives; the lists, fields, integrations and metadata a given business needs are added at run
+time by the person or their agents, or brought by a pack they choose to install. The verticals in
+this document are tests of the primitives, not packs the product is obliged to carry.
+
 **What it is not, said plainly:** a general database, a BI tool, a ledger, a PIM, or a calendar.
 Each of those is a real product that this deliberately is not, and each refusal is written down
 next to the vertical that asked for it.

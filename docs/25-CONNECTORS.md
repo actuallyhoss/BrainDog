@@ -705,6 +705,12 @@ long as UK consent.**
 > already solves the actual job — *knowing what left the account*. If it is ever built, the shape to
 > copy is `we-promise/sure`: a per-household app id and PEM, encrypted at rest.
 
+*(Revised September 22nd 2026 under DIRECTION §22. Ship paste as a door, because a door is a
+primitive. An HSBC SMS pattern is one owner's use case: it belongs in a shared pack a person
+chooses to install, or in their own script or agent writing through the API, and not in the code.
+Measured on that date, `packages/seed` still ships a `bank-from-out-sms` ingest, which is the first
+thing §22 names to move out.)*
+
 *(For the record, since it was researched: a UK **RAISP** costs **£1,130**, has a three-month
 statutory decision window, requires **zero initial capital**, and — surprisingly — **a sole trader
 can be one**. Cheaper still is being a registered agent of a principal AISP. None of that changes

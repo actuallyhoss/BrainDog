@@ -444,12 +444,12 @@ without changing them. That is the test for whether something belongs in this li
 | Never | Because |
 |---|---|
 | A tenant column | nine spoken id sequences. The second customer's first task would be #4,732 |
-| A plugin system that runs user code | a table survives a shared Worker; an `eval` does not. **This is not a limit on the platform — it is what makes it possible** |
+| A plugin system that runs user code | a table survives a shared Worker; an `eval` does not. **This is not a limit on the platform — it is what makes it possible.** User code never runs inside the record's own object, whatever else is decided. A person's script is user content under DIRECTION §22, and whether BrainDog may run it in a hosted sandbox is the owner's open decision there ([research-shell-scripts.md](../loop/research-shell-scripts.md)) |
 | A double-entry accounting rewrite | 25–40d to reach parity with what Actual Budget and Firefly III give away, and the best-funded attempt archived at 54,315★ |
 | A port of the prior `analytics.js` | keep the ~80-line metric model, delete the other 906 |
 | Arbitrary SQL anywhere | an `eval` by another name. **This is what refuses PostHog's HogQL query API** — its own docs call it *"effectively a wrapper around ClickHouse SQL"*, and a shareable connector file would carry it |
 | A connector that fans out over a **fetched** list | it is 47% of real Airbyte connectors and it is still refused: host N+1 would come from response N, so the install diff could not name every host it will call |
-| A `poll:` state machine — create, poll, download | three requests, a termination condition and often a second host. That is a workflow DSL, and it is where Ansible and CloudFormation each crossed the line without noticing |
+| A `poll:` state machine — create, poll, download | three requests, a termination condition and often a second host. That is a workflow DSL, and it is where Ansible and CloudFormation each crossed the line without noticing. The refusal is of a workflow DSL *inside a connector file*. DIRECTION §22 asks for an automations layer (trigger, steps, action), which is its own declared thing with its own caps and its own install diff, not a connector that grew a state machine |
 | A bank connector | the format handles it in five minutes; **the credential does not exist.** UK open banking has no self-serve path at all since GoCardless closed signups, and unattended access is capped at four calls a day *by law* |
 | A shared vector index | breaks self-host parity and the isolation proof |
 | Templating the native screens on principle | two tiers instead, and the engine earns them one at a time |

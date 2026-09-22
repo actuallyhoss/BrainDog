@@ -306,6 +306,13 @@ exception as above. On a live record it turns on a pack that is off and does not
 record lacks, because the app holds no document per first-party pack; that is still this screen's
 job, with its diffs.)*
 
+*(Contradicts DIRECTION §22, noted September 22nd 2026: the sentence is read by a fixed word table,
+`LEXICON` in `apps/web/src/lib/shape.ts:65-73`, that maps words to the six first-party packs
+(domains and subscriptions turn on `estate`, invoices and VAT turn on `money-core`). A fixed keyword
+table is a list of use cases compiled into the app. The direction is that the sentence goes to
+Spark, or to a rule set a pack brings, and comes back as proposed lists, fields and pages the person
+accepts. The code ships the primitives; the use cases are added at run time or brought by a pack.)*
+
 Three things that arrive with a pack, and the third is the one that matters:
 
 1. Registers — the shape.
@@ -319,6 +326,12 @@ somebody fills in and a record somebody abandons.
 > **The cold start is attacked by packs, and packs are therefore not optional scope.** They are
 > the mitigation for the highest-ranked death in the record. That is the argument for building
 > the pack format first, before anything declarative.
+
+*(Revised September 22nd 2026 under DIRECTION §22: packs are one source against the cold start,
+and optional. The others are the record proposing its own shape from the first rows
+([29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §3, T1) and Spark proposing lists and fields from what the person
+says. The pack format is still built first, because it is the mechanism every one of those writes
+through; what is no longer true is that a new record needs a shipped pack to be useful.)*
 
 ---
 
