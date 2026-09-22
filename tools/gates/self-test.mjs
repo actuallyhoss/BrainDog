@@ -26,7 +26,7 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { keyPaths } from './lib.mjs';
+import { keyPaths, webBuildUnmet } from './lib.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const negatives = join(here, 'negative');
@@ -408,12 +408,21 @@ const BROWSER = [
   },
 ];
 
+/* A STALE BUILD IS AN ABSENT ONE, and this asked only whether `apps/web/build` existed until
+   22 September, which is the blind spot `run.mjs` closed the same day. A violation seeded into a
+   build older than the source is a negative run against an app that is no longer this code: a gate
+   fixed since the build goes red for the old reason, and a fixture the build predates goes red for
+   none. The walk and the sentence are `run.mjs`'s own, from `lib.mjs`, so the two cannot disagree
+   about which build is current. A variant list it cannot read is the same refusal rather than a
+   stack trace, because one unreadable fact must not end the run before the fixture cases report. */
+const buildUnmet = await webBuildUnmet(join(here, '..', '..')).catch((cause) => cause.message);
+
 function seededBrowser({ gate, seed, names, blind, red }) {
-  /* SKIPPED WHEN THERE IS NO BUILD, like the gate itself, AND WRITTEN DOWN. This returned without
-     touching either counter, so the five browser negatives could every one of them be skipped and
-     the only trace was five lines above a summary that still read like a full pass. */
-  if (!existsSync(join(here, '..', '..', 'apps/web/build'))) {
-    console.log(`  ${gate}: no build, so its negative is not run`);
+  /* SKIPPED WHEN THE BUILD CANNOT BE MEASURED, like the gate itself, AND WRITTEN DOWN. This returned
+     without touching either counter, so the five browser negatives could every one of them be
+     skipped and the only trace was five lines above a summary that still read like a full pass. */
+  if (buildUnmet !== null) {
+    console.log(`  ${gate}: ${buildUnmet}, so its negative is not run`);
     notRun.push(gate);
     return;
   }
@@ -642,7 +651,7 @@ if (failed.length) {
   const asked = ran + notRun.length;
   console.log(
     `\n  self-test: ${ran} of ${asked} negatives caught, and ${notRun.length} not run for want of ` +
-      `apps/web/build: ${notRun.join(', ')}. Build, then ask again.\n`,
+      `a current apps/web/build: ${notRun.join(', ')}. \`pnpm --filter @braindog/web build\`, then ask again.\n`,
   );
   process.exit(3);
 } else {
