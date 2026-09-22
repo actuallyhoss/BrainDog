@@ -470,6 +470,94 @@ function endedAt(shifted: Predicate | undefined, current: Predicate | undefined 
   return { all: [...(clauses as Predicate[]), ...ends] } as Predicate;
 }
 
+/**
+ * The instant a local day starts at in `tz`.
+ *
+ * MIDNIGHT UNDER THE OFFSET IN FORCE A DAY EITHER SIDE, AND THE EARLIER OF THE TWO THAT IS ON THE
+ * DAY. Reading the offset at UTC midnight alone is wrong east of UTC on the day the clocks go
+ * forward: in `Australia/Sydney` 00:00 UTC on 4 October 2026 is already under +11:00, which put the
+ * start at 13:00 UTC on the 3rd, an hour of 3 October; the day starts at 14:00 UTC under the +10:00
+ * it began in. A candidate that is not on the day is dropped, which is also what finds the start of
+ * a day with no local midnight (`America/Santiago` on 6 September 2026 starts at 01:00, 04:00 UTC).
+ * Both were measured against `Intl` when this was written, as were both New York and London changes.
+ */
+const offsetAt = (ms: number, tz: string): number => {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      .formatToParts(new Date(ms))
+      .map((p) => [p.type, Number(p.value)]),
+  ) as Record<string, number>;
+  return Date.UTC(parts.year!, parts.month! - 1, parts.day!, parts.hour!, parts.minute!, parts.second!) - Math.floor(ms / 1000) * 1000;
+};
+
+const localDate = (ms: number, tz: string): string =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
+
+const dayStartsAt = (day: string, tz: string): string => {
+  const midnight = Date.parse(`${day}T00:00:00Z`);
+  const on = [midnight - offsetAt(midnight - DAY, tz), midnight - offsetAt(midnight + DAY, tz)].filter((ms) => localDate(ms, tz) === day);
+  /* Neither is on the day only if a zone moved its clocks by a day, which Samoa did once in 2011. */
+  return new Date(on.length ? Math.min(...on) : midnight).toISOString();
+};
+
+/**
+ * A bare day bounding an `instant` field, rewritten as the instants the day starts and ends at in `tz`.
+ *
+ * THE COMPILER COMPARES A BARE DAY WITH AN INSTANT'S FIRST TEN CHARACTERS, WHICH ARE ITS UTC DATE.
+ * `snapshot` asks each day's question at noon UTC of the record's local date, so every day in the
+ * predicate is a local day, and for a `day` field that is the whole of it. An `instant` was still
+ * dated in UTC: `loop/research-batch-twenty-audit.md` §5 measured the point stored under 4 September
+ * in `America/New_York` at 10101 where the local thirty days hold 10011, because ten at night on the
+ * 4th is the 5th by UTC and ten at night on 5 August is the 6th (`test/metrics-instant-day.test.ts`).
+ * Solo founder's `datapoints-30d` is that window over that type.
+ *
+ * SO THE BOUND BECOMES AN INSTANT, which the compiler compares whole: `after D` is from the start of
+ * the day after, `before D` is up to the start of D, and `is`, `between` and `in` hold the instants
+ * from a day's start to the next day's. `not` and `not_in` keep a row with no value, as the compiler
+ * does for them, so `empty` goes beside the two sides of the day. A bound that is already a full
+ * timestamp is compared as written, as it was.
+ *
+ * IT RUNS ONLY WHERE A ZONE WAS GIVEN, and only on the predicate handed to `read`, after `endedAt`
+ * has written its bare-day ends. `moved` and `endedAt` read the declaration's own days, which are
+ * unchanged. A read with no `tz` compares as it always has.
+ */
+function localInstants(where: Predicate | undefined, schema: Schema, tz: string | undefined): Predicate | undefined {
+  if (!where || typeof where !== 'object' || tz === undefined) return where;
+  const bare = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(v);
+  const from = (day: string) => dayStartsAt(day, tz);
+  const upTo = (day: string) => dayStartsAt(dayAfter(day), tz);
+
+  const walk = (node: Predicate): Predicate => {
+    for (const q of ['all', 'any', 'none'] as const) {
+      const kids = (node as Record<string, unknown>)[q];
+      if (Array.isArray(kids)) return { ...node, [q]: kids.map((k) => walk(k as Predicate)) } as Predicate;
+    }
+    const leaf = node as Record<string, unknown>;
+    const field = typeof leaf.field === 'string' ? leaf.field : null;
+    if (!field || !Object.hasOwn(schema.fields, field) || schema.fields[field]?.type !== 'instant') return node;
+    const on = (day: string): Predicate => ({ all: [{ field, gte: from(day) }, { field, lt: upTo(day) }] }) as Predicate;
+    const off = (day: string): Predicate[] => [{ field, lt: from(day) }, { field, gte: upTo(day) }] as Predicate[];
+    const v = (op: string) => leaf[op];
+
+    if (bare(v('after')) || bare(v('gt'))) return { field, gte: upTo((v('after') ?? v('gt')) as string) } as Predicate;
+    if (bare(v('gte'))) return { field, gte: from(v('gte') as string) } as Predicate;
+    if (bare(v('before')) || bare(v('lt'))) return { field, lt: from((v('before') ?? v('lt')) as string) } as Predicate;
+    if (bare(v('lte'))) return { field, lt: upTo(v('lte') as string) } as Predicate;
+    if (bare(v('is'))) return on(v('is') as string);
+    if (bare(v('not'))) return { any: [{ field, empty: true }, ...off(v('not') as string)] } as Predicate;
+    const pair = v('between');
+    if (Array.isArray(pair) && bare(pair[0]) && bare(pair[1]))
+      return { all: [{ field, gte: from(pair[0]) }, { field, lt: upTo(pair[1]) }] } as Predicate;
+    const list = v('in') ?? v('not_in');
+    if (Array.isArray(list) && list.some(bare)) {
+      const each = list.map((x) => (bare(x) ? on(x) : ({ field, is: x } as Predicate)));
+      return 'in' in leaf ? ({ any: each } as Predicate) : ({ any: [{ field, empty: true }, { none: each }] } as Predicate);
+    }
+    return node;
+  };
+  return walk(where);
+}
+
 export type EvalContext = {
   nowMs: number;
   /**
@@ -481,6 +569,15 @@ export type EvalContext = {
    * every event and would still be a different question.
    */
   asOfMs?: number | undefined;
+  /**
+   * The record's zone, which dates an `instant` on its local day (`localInstants`).
+   *
+   * ONLY `snapshot` SETS IT, because only `snapshot` resolves its days locally: it asks at noon UTC
+   * of the local date, so `today` and `-30d` are local days. A live read still resolves them from
+   * the UTC date of `nowMs`, and giving it a zone without also moving that clock would compare a
+   * UTC day's name against a local day's instants, which is a third answer and not the right one.
+   */
+  tz?: string | undefined;
   /** The register's declared fields, so a predicate and a field expression check against one shape. */
   schemaOf: (register: string) => Schema | null;
   /** A ref written by name: `thing is Kiln`. Absent means a sentence cannot name one. */
@@ -824,7 +921,11 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
    * `test/metrics-asof-end.test.ts` holds it. A live read is not given the end, because a live window
    * has always counted a row dated ahead of today and that is not what was wrong here.
    */
-  const current = ctx.asOfMs === undefined ? said.predicate : endedAt(said.predicate, null, schema, ctx.asOfMs);
+  const current = localInstants(
+    ctx.asOfMs === undefined ? said.predicate : endedAt(said.predicate, null, schema, ctx.asOfMs),
+    schema,
+    ctx.tz,
+  );
   const now = read(sql, current, schema, decl, tablesOf(decl), fx);
   if (!now.ok) return now;
 
@@ -899,7 +1000,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
     /* AND THE WINDOW BEFORE ENDS WHERE ITS CLOCK IS. `moved` above is asked of the predicate as
        written, because a clause this adds is not a sign the declaration mentions time; `endedAt`
        carries the measurement for why the end has to be written in. */
-    const before = read(sql, endedAt(shifted.predicate, said.predicate, schema, moveTo), schema, decl, tablesOf(decl), fx);
+    const before = read(sql, localInstants(endedAt(shifted.predicate, said.predicate, schema, moveTo), schema, ctx.tz), schema, decl, tablesOf(decl), fx);
 
     if (!before.ok) why = fixOf(before);
     else if (!moved) {
@@ -1887,7 +1988,9 @@ export function snapshot(
      * date has that date as its UTC date in every zone, which is what a live read made at noon UTC
      * on the same day resolves against.
      */
-    const read = evaluateMetric(sql, decl, { ...ctx, asOfMs: Date.parse(`${day}T12:00:00Z`) });
+    /* AND THE ZONE GOES WITH IT, because noon UTC makes every bare day in the predicate a local day
+       and an `instant` is only compared with one in a zone (`localInstants`). */
+    const read = evaluateMetric(sql, decl, { ...ctx, asOfMs: Date.parse(`${day}T12:00:00Z`), tz: deps.tz });
     /* A NULL VALUE IS NO ROW. A series with a zero on every day nothing happened is a series that
        cannot tell "nothing" from "no answer", and the difference is the whole of a trend. */
     if (!read.ok || read.value.value === null) return 'missing';
