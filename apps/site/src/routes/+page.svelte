@@ -52,8 +52,8 @@
    *               becoming the reader's own, redrawn as they press.
    *   0002        the dashboard PHOTOGRAPHED, wider than the screen, with the sentence lying on its
    *               top strip.
-   *   0003        the mechanism, all of it, in one band: registers, agents, the ledger arriving,
-   *               and the three honest columns.
+   *   0003        the mechanism, all of it, in one band: agents, an agent's proposal decided by a
+   *               person and landing under the agent's name, and the three honest columns.
    *   close       the accent as a whole field.
    *
    * THIS PARAGRAPH USED TO READ *EVERY ONE OF THE FIRST THREE LED BY SOMETHING DRAWN RATHER THAN
@@ -80,13 +80,20 @@
    * 26 of those list items are off the screen, out of the tab order and out of the accessibility
    * tree at any one moment. What a reader actually meets in 0001 is 92 words and ten rows.
    *
-   * WHAT WOULD MAKE 0001'S DRAWING A DRAWING RATHER THAN A LIST OF NOUNS IS NOT IN THIS FILE. Every
-   * row of the rail carries a grey square where the application draws a glyph, and
-   * `lib/Arrange.svelte:390` says so itself at its `.mark` rule: *there is no glyph to draw for a
-   * row that is only a name*. The application draws 63 of them, counted off the keys of
-   * `apps/web/src/lib/ui/icons.ts`, and `lib/icons.ts:17` carries four, because four is all this
-   * site has asked for so far. Ten real glyphs down that rail is the difference between a picture
-   * of a navigation rail and a bulleted list, and it costs two files that this one does not own.
+   * WHAT MADE 0001'S DRAWING A DRAWING RATHER THAN A LIST OF NOUNS WAS NOT IN THIS FILE, AND IT IS
+   * IN `lib/Arrange.svelte` NOW. Every row of the rail carried a grey square where the application
+   * draws a glyph, and `lib/icons.ts` carried four paths where the app carries 63. On 2026-09-22 the
+   * rail gained the app's own glyphs and a miniature of the page each case opens on, and what it
+   * draws on that page is `site.arrange.cases[].glyph` and `.tiles`, read off the seed's example
+   * rows. This file only places it; the words are in `copy.ts` and the drawing is in the component.
+   *
+   * AND 0001 AND 0002 NO LONGER OPEN THE SAME WAY, which was the last repeated layout the survey
+   * found (`loop/research-site-now.md`, fault 1). Both opened on the same three-span mark above the
+   * band's body. 0001 still does, because its heading sits above a strip the width of the screen and
+   * the mark is what ties the two together. 0002's mark moved INTO the card that lies on the
+   * dashboard, so that band opens on the card and the picture rather than on a line of chrome, and
+   * the card's overlap is unaffected: it is set by the card's bottom margin against the band's
+   * width, so a card one line taller grows upward and the edge stays at source row 202.
    *
    * WHAT SURVIVED FROM THE TWO PASSES BEFORE THIS ONE, because those measurements are still the
    * reason these shapes are the shapes:
@@ -116,7 +123,7 @@
    */
   import Arrange from '$lib/Arrange.svelte';
   import Icon from '$lib/Icon.svelte';
-  import Ledger from '$lib/Ledger.svelte';
+  import Decide from '$lib/Decide.svelte';
   import { APP, site } from '$lib/copy.ts';
   import type { Hue } from '$lib/icons.ts';
 
@@ -151,8 +158,8 @@
      It used to carry the promise, a five-row ledger at 1,200px, and four counted figures across the
      column, which is three things competing to be looked at first and two of them made of text. The
      ledger is a list of records, which is literally what he said the page was all of, and the four
-     figures are the stats he called silly. Both are gone from here: the ledger is the evidence in
-     band 0003, and the figures are gone from the site.
+     figures are the stats he called silly. Both are gone from here: the ledger went to band 0003
+     and has since given way to a drawn decision there, and the figures are gone from the site.
 
      THERE IS NO SEQUENCE MARK ABOVE THE HEADLINE. Every other band opens with one, and on the hero
      it would be an uppercase eyebrow over an `h1`, which `loop/DIRECTION.md` §1 lists by name as a
@@ -278,18 +285,19 @@
      fault this page was rebuilt to remove: the title takes the left five twelfths and the sentence
      the right six, and the strip reaches both edges of the reading column. -->
 <section class="band" data-ground="page" aria-labelledby="report-title">
-  <div class="in">
-    <p class="band-mark">
-      <span class="band-seq">0002</span>
-      <span class="band-rule"></span>
-      <span class="band-tag">{site.report.tag}</span>
-    </p>
-  </div>
   <div class="report reveal">
     <!-- THE HEADING COMES FIRST IN THE MARKUP AND LAST IN THE PAINT ORDER. A reader with a screen
          reader meets the heading and then the picture, which is the order the section is written
-         in; `z-index` alone decides which of the two grid items is on top. -->
+         in; `z-index` alone decides which of the two grid items is on top.
+
+         THE BAND'S MARK IS THE CARD'S FIRST LINE, so 0002 opens on the card lying on the picture
+         rather than on the same line of chrome 0001 opens on. -->
     <div class="report-card">
+      <p class="band-mark report-mark">
+        <span class="band-seq">0002</span>
+        <span class="band-rule"></span>
+        <span class="band-tag">{site.report.tag}</span>
+      </p>
       <h2 class="title" id="report-title">{site.report.title}</h2>
       <p class="lead">{site.report.lead}</p>
     </div>
@@ -334,10 +342,16 @@
      3,000px, spread from the second screen to the sixth. They are one band at the foot of the page
      now, for the reader who has been convinced and wants to know what they would be buying.
 
-     THE LEDGER IS THE EVIDENCE FOR THE SENTENCE ABOVE IT AND NOT AN ORNAMENT. The lead ends `every
-     change carries a name`; the `who` column is You, Codex, a rule and Claude, and three of the
-     four arrive while the reader is looking at it. In the hero, where it used to live, it was
-     proving a sentence two lines above it that nobody had a reason to doubt yet.
+     THE DRAWN DECISION IS THE EVIDENCE FOR THE SENTENCE ABOVE IT AND NOT AN ORNAMENT. The lead ends
+     `every change carries a name`; the scene is Claude proposing a change, a person accepting it,
+     and the row landing in the history with Claude's name on it. It replaced the ledger on
+     2026-09-22, which proved the same sentence with five rows of the record's own addresses
+     (`tasks#12`, `services#6`) that a stranger has no record to look up. The ledger's argument,
+     that the history is only added to, is the scene's last beat: one row arriving under two.
+
+     THE LEAD LOST ITS FIRST SENTENCE. `A register is a typed collection` opened the band, which
+     asked a reader to learn a word of the product's plumbing before anything else in it, and
+     nothing else on the page uses the word.
 
      THE OPENER IS ONE LINE. The heading sits on the mark's own line and the rule runs from the end
      of the words to the tag, so the band starts with three lines of chrome fewer than the two above
@@ -353,18 +367,10 @@
     <p class="lead lead-wide">{site.plain.lead}</p>
   </div>
 
-  <!-- THE LEDGER AT THE READING COLUMN AND ITS GUTTERS, which is 1,200px at 1440 and 83 per cent
-       of the screen. The rows are five columns of tabular text and the room goes to `what`, which
-       is the column that ellipsises first: the one element whose job is to prove nothing is
-       overwritten must not be truncating its own sentences. `overflow: hidden` because the rows
-       animate in from the right. -->
+  <!-- THE SCENE AT THE READING COLUMN AND ITS GUTTERS, which is 1,200px at 1440, the stage the
+       ledger had. `overflow: hidden` stays because the scene's rows move while it plays. -->
   <div class="proof reveal">
-    <Ledger
-      events={site.ledger.events}
-      head={site.ledger.head}
-      only={site.ledger.only}
-      all={site.ledger.all}
-    />
+    <Decide scene={site.decide} />
   </div>
 
   <div class="in">
@@ -738,6 +744,13 @@
     max-inline-size: 46ch;
   }
 
+  /* THE MARK ACROSS BOTH OF THE CARD'S COLUMNS, as its first row. The card's own gap stands in for
+     the mark's bottom margin, which would otherwise double it. */
+  .report-mark {
+    grid-column: 1 / -1;
+    margin-block-end: 0;
+  }
+
   /**
    * THE CLIP LIVES ON THE FIGURE, AND WHICH KEYWORD IT IS MATTERS TWICE.
    *
@@ -849,11 +862,11 @@
     max-inline-size: none;
   }
 
-  /* THE LEDGER'S STAGE IS THE SCREEN AND THE LEDGER INSIDE IT IS THE READING COLUMN. The padding
+  /* THE SCENE'S STAGE IS THE SCREEN AND THE SCENE INSIDE IT IS THE READING COLUMN. The padding
      is `max(--sp-6, (100% - --site-max) / 2)`, so at 1440 it puts 120px on each side and the
-     ledger measures x=120, w=1200, which is the reading column plus its two gutters and 83 per
-     cent of the screen. At 1,200px the room goes to `what`, which is the column that was
-     ellipsising first when this component lived in a 540px box. */
+     scene measures x=120, w=1200, which is the reading column plus its two gutters and 83 per
+     cent of the screen. It is the box the ledger was measured in, kept so the band's height moves
+     only by the difference between the two drawings. */
   .proof {
     margin-block-start: var(--sp-7);
     padding-inline: max(var(--sp-6), calc((100% - var(--site-max)) / 2));

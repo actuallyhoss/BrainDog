@@ -208,19 +208,35 @@ test('every page links GitHub and the legal page', when(NO_BUILD), () => {
 });
 
 /**
- * THE REGISTERS THE COPY NAMES BY EXAMPLE ARE REGISTERS THAT EXIST.
+ * THE REGISTERS THE COPY NAMES BY EXAMPLE ARE REGISTERS THAT EXIST, AND THE WORD IS NOT USED UNTAUGHT.
  *
- * One sentence on the home page teaches a stranger the word `register` by naming three of them, and
+ * One sentence on the home page taught a stranger the word `register` by naming three of them, and
  * for some time one of the three was `domains`, which has never been a register in this product:
  * `domain` is one of four values of the `kind` field on `services`. That is the cheapest class of
  * defect to catch and the one that keeps recurring, because the registers get renamed in the seed
  * and the marketing copy is not next to them.
  *
- * The examples are read back out of the built page rather than out of `copy.ts`, and the sentence
- * going missing is a FAILURE rather than a quiet pass, because a check that stops finding what it
- * measures has stopped measuring.
+ * THE SENTENCE LEFT THE PAGE ON 2026-09-22, AND THIS CHECK USED TO THROW WHEN IT DID. Band 0003
+ * opened on it, which asked a reader to learn a word of the product's plumbing before anything
+ * else in the band, and `loop/research-site-now.md` ranked taking it out as part of the page's
+ * value-first rewrite. The throw was right for the page it was written for: the sentence going
+ * missing while the word stayed would leave a stranger reading a term nobody had defined. So that
+ * is what it asks now. If `register` is on the home page, the sentence that teaches it must be too,
+ * and every example it names must be declared. If neither is there, there is nothing to get wrong.
  */
 test('every register the copy names by example is one the seed declares', when(NO_BUILD ?? NO_SEED), () => {
+  const page = prose(read('index.html'));
+  const sentence = /A register is a typed collection:([^.]*)\./.exec(page);
+  if (!sentence) {
+    const used = /\bregisters?\b/i.exec(page);
+    assert.equal(
+      used,
+      null,
+      `index.html says "${used?.[0]}" and no longer teaches what one is: ${used ? around(page, used[0]).join(' | ') : ''}`,
+    );
+    return;
+  }
+
   const source = seedSource();
   const blocks = [...source.matchAll(/^export const [A-Z_]*REGISTERS\b/gm)].map((m) => {
     const rest = source.slice(m.index ?? 0);
@@ -241,14 +257,6 @@ test('every register the copy names by example is one the seed declares', when(N
   }
   assert.equal(declared.size > 8, true, `only ${declared.size} register words parsed out of the seed; its shape has changed`);
 
-  const sentence = /A register is a typed collection:([^.]*)\./.exec(prose(read('index.html')));
-  if (!sentence) {
-    throw new Error(
-      'the sentence that teaches a stranger what a register is has gone from the home page. ' +
-        'It is the one place the copy names registers by example, and this check has nothing left to read.',
-    );
-  }
-
   const named = (sentence[1] ?? '')
     .split(/,|\band\b/)
     .map((word) => word.trim().toLowerCase())
@@ -266,60 +274,49 @@ test('every register the copy names by example is one the seed declares', when(N
 });
 
 /**
- * EVERY ROW THE HOME PAGE CLAIMS IS IN A REGISTER THE SEED DECLARES.
+ * THE HOME PAGE NAMES NO ROW BY ITS ADDRESS.
  *
- * WHAT THIS USED TO READ, and why it moved. The page drew one row of the money register beside
- * the types its fields hold, and the check read the field labels out of that figure's `<dt>`
- * elements. The figure is gone: it was one of ten pictures of the product on a page a stranger
- * could not read, and the redesign kept two. The check is not gone, because the defect it caught
- * is not: `Party` became `Who`, `Direction` became `Which way` and `State` became `Status` in a
- * single pass, and the marketing copy is never next to the declaration that moved.
+ * WHAT THIS USED TO CHECK, AND WHY IT TURNED ROUND. The ledger in band 0003 named the record's own
+ * rows the way the record writes them (`Moved tasks#12 from open to done`, `Created services#6`),
+ * and this test held every `register#n` it served to a register the seed declares. It caught real
+ * renames. What it could not catch was that the addresses were the fault: a stranger has no record,
+ * `tasks#12` is a thing they cannot look up, and `loop/research-site-now.md` read the band as a
+ * table of record ids, which is the "all records and text" of §19 in its purest form. The ledger
+ * gave way to a drawn decision whose history names what changed in words, so the anchor this test
+ * needed is gone on purpose, and the rule is the opposite one: no address at all.
  *
- * WHAT IT READS NOW is the ledger under the hero, which is the one thing on the site that names
- * the record's own rows: `Created services#6`, `Moved tasks#12 from open to done`. Every
- * `register#n` a stranger is shown is a claim that such a register exists, and it is a stronger
- * anchor than the old one because the ledger's whole point is that nothing in it was made up.
- *
- * The ledger going missing is a FAILURE and not a quiet pass, for the reason the register check
- * gives about itself: a check that stops finding what it measures has stopped measuring.
+ * IT READS THE SERVED BYTES AND ALSO `site.decide`, because the scene's last row arrives after
+ * load and a claim a reader is shown three seconds late is the same claim. An `#uc-personal` in an
+ * href is not read, because `prose` reads text and the attributes a person hears, not links.
  */
-test('every row the home page names belongs to a register the seed declares', when(NO_BUILD ?? NO_SEED), () => {
-  const source = seedSource();
-  const declared = new Set<string>();
-  for (const m of source.matchAll(/^ {2}([a-z_]+): \{$/gm)) declared.add(m[1] ?? '');
-  assert.equal(declared.size > 8, true, `only ${declared.size} register ids parsed out of the seed; its shape has changed`);
+test('the home page names no row by its address', when(NO_BUILD), async () => {
+  const rowRef = /\b[a-z_]+#\d+\b/g;
+  const served = [...prose(read('index.html')).matchAll(rowRef)].map((m) => m[0]);
+  assert.deepEqual(served, [], `index.html shows a stranger the record's own row addresses: ${served.join(', ')}`);
 
-  /* `services#6`, as the record itself writes a row's address: the register id, a hash, the
-     number. Read from the prose so a `#uc-personal` in an href cannot be mistaken for one. */
-  const rowRef = /\b([a-z_]+)#\d+\b/g;
-  const served = [...prose(read('index.html')).matchAll(rowRef)].map((m) => m[1] ?? '');
-  if (served.length === 0) {
-    throw new Error(
-      'the ledger has gone from the home page, or it no longer names the rows it claims to have ' +
-        "changed. It is the one place the site names the record's own rows, and this check has " +
-        'nothing left to read.',
-    );
-  }
+  type Copy = { site: { decide?: unknown } };
+  const { site } = (await import(new URL('../src/lib/copy.ts', import.meta.url).href)) as Copy;
+  const strings = (v: unknown): string[] =>
+    typeof v === 'string' ? [v] : v && typeof v === 'object' ? Object.values(v).flatMap(strings) : [];
+  const scripted = strings(site.decide).flatMap((line) => [...line.matchAll(rowRef)].map((m) => m[0]));
+  assert.deepEqual(scripted, [], `site.decide names rows by address, and the scene shows them after load: ${scripted.join(', ')}`);
+});
 
-  /* AND THE THREE THAT ARE NOT IN THE SERVED BYTES. `Ledger.svelte` prerenders the first two
-     events and appends the rest on a four-second tick, so three of the five reach a reader's eyes
-     and never reach this file's `read('index.html')`. Reading the source for those is not a
-     softening of the rule that this test measures what is served: it is the only way to measure
-     them at all short of driving a browser, and a claim a reader is shown four seconds late is
-     the same claim. */
-  const copy = readFileSync(new URL('../src/lib/copy.ts', import.meta.url), 'utf8');
-  const ledger = copy.slice(copy.indexOf('  ledger: {'), copy.indexOf('  arrange: {'));
-  const written = [...ledger.matchAll(rowRef)].map((m) => m[1] ?? '');
-  assert.equal(written.length >= served.length, true, 'copy.ts holds fewer row addresses than the page serves');
-
-  for (const register of [...served, ...written]) {
-    assert.equal(
-      declared.has(register),
-      true,
-      `the home page says it changed a row in "${register}" and packages/seed declares no such ` +
-        `register. It declares: ${[...declared].sort().join(', ')}`,
-    );
-  }
+/**
+ * THE FIRST SCREEN'S SENTENCE SAYS WHAT A READER GETS, NOT HOW THE STORAGE WORKS.
+ *
+ * `hero.sub` read *Every change is an event, and the log only grows*: true, audited, and the most
+ * technical words above the fold, on the one screen §19 is explicit about (*shows the value, not
+ * what it does technically, at least not for the first blocks*). The words below are the ones that
+ * sentence and its predecessors reached for. They are all still allowed further down, where band
+ * 0003 is the mechanism on purpose.
+ */
+test('the hero sentence names no mechanism', async () => {
+  type Copy = { site: { hero: { sub: string } } };
+  const { site } = (await import(new URL('../src/lib/copy.ts', import.meta.url).href)) as Copy;
+  const MECHANISM = /\b(events?|log|logs|registers?|rows?|MCP|append|ledger|typed|overwritten)\b/i;
+  const hit = MECHANISM.exec(site.hero.sub);
+  assert.equal(hit, null, `hero.sub explains the storage on the first screen ("${hit?.[0]}"): ${site.hero.sub}`);
 });
 
 /**

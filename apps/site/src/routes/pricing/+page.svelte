@@ -14,6 +14,17 @@
 
   The paragraph about there being no free hosted tier stays on the page. A price nobody explains
   reads as a price somebody is embarrassed by, and the reason is a good one.
+
+  THREE BANDS ON `page, flip, page`, AND THEY WERE FOUR ON `page, sunk, page, sunk`.
+  `loop/research-site-now.md` change 5 read this page as the home page before its rebuild: every
+  band opened with the same mark, and the ground alternated with `--sunk`, which is 1.07:1 against
+  `--bg` and which the eye adapts to rather than reads. The title and the two plans are one band now,
+  because the plans ARE what the title promises and a band holding only a headline and one status
+  line was the emptiest screen on the site. So both seams are inversions, the table is the band that
+  turns over, and no two bands open the same way: the first with no mark at all (an eyebrow over
+  the `h1` is a regression `DIRECTION.md` §1 lists by name), the table with the one-line opener the
+  home page gives its 0003, and the last with the plain mark. `bands.test.ts` beside this file holds
+  all three.
 -->
 <script lang="ts">
   import Icon from '$lib/Icon.svelte';
@@ -31,28 +42,19 @@
   <meta property="og:description" content={site.meta.pricing.description} />
 </svelte:head>
 
+<!-- ONE GRID, TWO ROWS, TWO COLUMNS: the title over the free plan and the state of the product over
+     the paid one. The status line sits directly above the plan it most qualifies, which is the
+     hosted one, because that is the plan with a button under it. -->
 <section class="band head" data-ground="page">
-  <div class="in">
-    <p class="band-mark">
-      <span class="band-seq">0001</span>
-      <span class="band-rule"></span>
-      <span class="band-tag">Pricing</span>
-    </p>
-    <div class="head-row">
-      <h1 class="display">{p.title}</h1>
-      <!-- ABOVE THE PRICES, NOT UNDER THEM. A price on a page is an offer, and neither of these can
-           be accepted today. Saying so once, before the plans, is what lets the plans describe
-           themselves in the present tense without the page lying. -->
-      <div class="status">
-        <h2 class="status-title"><span class="dot" aria-hidden="true"></span>{p.statusTitle}</h2>
-        <p class="status-body">{p.status}</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="band plans-band" data-ground="sunk">
   <div class="in plans">
+    <h1 class="display">{p.title}</h1>
+    <!-- ABOVE THE PRICES, NOT UNDER THEM. A price on a page is an offer, and neither of these can
+         be accepted today. Saying so once, before the plans, is what lets the plans describe
+         themselves in the present tense without the page lying. -->
+    <div class="status">
+      <h2 class="status-title"><span class="dot" aria-hidden="true"></span>{p.statusTitle}</h2>
+      <p class="status-body">{p.status}</p>
+    </div>
     {#each [p.self, p.hosted] as plan, i (plan.name)}
       <article class="plan" data-featured={i === 1 ? '' : undefined}>
         <h2 class="plan-name">{plan.name}</h2>
@@ -82,14 +84,19 @@
   </div>
 </section>
 
-<section class="band" data-ground="page" aria-labelledby="compare-title">
+<!-- THE TABLE IS THE BAND THAT TURNS OVER, and not the plans, for a reason in the tokens. The hosted
+     card is painted in `--accent-ground`, which `tokens.css` mixes against `--bg` on `:root`, so on
+     a flipped band it would keep the current scheme's ground: in the dark scheme, a near-black
+     card in the middle of a near-white field. The hairline grid is made of nothing but `--line`, `--bg` and `--s1`, and `app.css`
+     re-solves all three for this ground. -->
+<section class="band" data-ground="flip" aria-labelledby="compare-title">
   <div class="in">
-    <p class="band-mark">
-      <span class="band-seq">0002</span>
+    <div class="band-mark band-mark-line">
+      <span class="band-seq">0001</span>
+      <h2 class="title" id="compare-title">{p.compareTitle}</h2>
       <span class="band-rule"></span>
       <span class="band-tag">Side by side</span>
-    </p>
-    <h2 class="title" id="compare-title">{p.compareTitle}</h2>
+    </div>
 
     <!--
       A GRID AND NOT A `<table>` ELEMENT, with `role` put back on by hand, which is the treatment
@@ -128,13 +135,14 @@
 </section>
 
 <!-- THE LAST BAND WAS A 16px HEADING AND TWO LINES IN THE LEFT HALF OF A 1,136px COLUMN, which is
-     the emptiness fault the home page was rebuilt to remove, on the page that asks for money. It
-     opens with the same mark every other band on this site opens with, the question is a heading at
-     the size of a heading, and the answer sits beside it so the row reaches both edges. -->
-<section class="band" data-ground="sunk" aria-labelledby="honest-title">
+     the emptiness fault the home page was rebuilt to remove, on the page that asks for money. The
+     question is a heading at the size of a heading, and the answer sits beside it so the row
+     reaches both edges. It is the one band here with the plain mark, and on the page's own ground
+     that is the one place on this page the sequence number is drawn in the accent. -->
+<section class="band" data-ground="page" aria-labelledby="honest-title">
   <div class="in">
     <p class="band-mark">
-      <span class="band-seq">0003</span>
+      <span class="band-seq">0002</span>
       <span class="band-rule"></span>
       <span class="band-tag">{p.honestTag}</span>
     </p>
@@ -165,16 +173,6 @@
     padding-block: var(--sp-7) var(--sp-8);
   }
 
-  /* THE TITLE AND THE STATE OF THE PRODUCT ON ONE ROW. They were stacked, which left the right
-     half of a 1,440 viewport empty for the whole of the first screen, and the status line, which
-     is the most important sentence on the page, sat below the fold's centre of gravity. */
-  .head-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-    gap: var(--sp-8);
-    align-items: end;
-  }
-
   .display {
     margin: 0;
     color: var(--ink);
@@ -190,6 +188,24 @@
     margin: 0;
     font-size: var(--t-xl);
     letter-spacing: var(--tr-tight);
+  }
+
+  /* THE ONE-LINE OPENER, the home page's 0003 treatment. A `div` and not a `p`, because it carries
+     the band's `h2` and a heading inside a paragraph is markup a validator refuses. The heading
+     takes the mark's baseline and the rule runs from the end of its words to the tag. */
+  .band-mark-line {
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-2) var(--sp-4);
+  }
+
+  /* A FLOOR UNDER THE RULE SO IT WRAPS RATHER THAN VANISHES. At 390 the column is 326px, and the
+     number, twenty-one characters of 24px heading and the uppercase tag come to more than that
+     before any gap. A `flex: 1` rule with no minimum is the item that gives way first, down to
+     nothing; with a floor it takes the tag onto a second line instead. */
+  .band-mark-line .band-rule {
+    align-self: center;
+    min-inline-size: var(--sp-7);
   }
 
   /* A fact about the state of the product, not an alarm: a line of text with one dot of state. */
@@ -223,15 +239,27 @@
     text-wrap: pretty;
   }
 
-  /* THE SAME HEIGHT, SIDE BY SIDE. `align-items: start` kept the free plan short because it has no
-     action under it while the repository is private, and two cards ending 50px apart read as a
-     layout that did not finish. The space under the free plan's list is quieter than a ragged
-     edge, and on a phone, where they stack, height does not apply. */
+  /* THE TITLE, THE STATE OF THE PRODUCT AND BOTH PLANS IN ONE GRID. The title and the status were
+     a row of their own, and before that they were stacked, which left the right half of a 1,440
+     viewport empty for the whole of the first screen. As the first row of the plans' own grid they
+     share its two columns, so the status line stands over the hosted plan it qualifies and the
+     band has one set of edges instead of two.
+
+     THE CARDS ARE THE SAME HEIGHT, SIDE BY SIDE. `align-items: start` kept the free plan short
+     because it has no action under it while the repository is private, and two cards ending 50px
+     apart read as a layout that did not finish. On a phone, where they stack, height does not
+     apply. The first row sits on its baseline instead, so a one-line title and a three-line status
+     end together. */
   .plans {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: stretch;
-    gap: var(--sp-4);
+    gap: var(--sp-7) var(--sp-4);
+  }
+
+  .plans > .display,
+  .plans > .status {
+    align-self: end;
   }
 
   .plan {
@@ -246,10 +274,14 @@
 
   /* THE HOSTED PLAN TAKES A FIRMER EDGE AND THE ACCENT GROUND, and nothing else: no glow, no
      ribbon, no "most popular", no scale transform. `tokens.css` names exactly two callers for
-     `--accent-ground`, and this is the second of them; the first, brain.dog's closing band, moved
-     to the full accent when the measurement found the tint reading at 1.04:1 against the page.
-     Here it is not doing that job: it sits on `--sunk` rather than on `--bg`, so the mix is a step
-     away from its surround rather than a step away from nothing. */
+     `--accent-ground`, and this is the second of them.
+
+     THE EDGE CARRIES IT NOW AND THE TINT IS THE SECOND SIGNAL. The card sat on `--sunk` while the
+     plans had a band of their own, so the tint was a step away from its surround. On the page's
+     own ground it is the pair the home page measured at 1.04:1 when its closing band wore it. The
+     1440 dark capture of this band on 22 September shows the tint does read beside an untinted
+     card, faintly, but `--accent-edge` against `--bg` is the difference a reader meets first, and
+     the free plan beside it is drawn in `--line` alone. */
   .plan[data-featured] {
     background: var(--accent-ground);
     border-color: var(--accent-edge);
@@ -407,7 +439,6 @@
   }
 
   @media (width < 900px) {
-    .head-row,
     .honest-row {
       grid-template-columns: minmax(0, 1fr);
       gap: var(--sp-6);

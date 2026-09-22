@@ -25,12 +25,13 @@
  * grammars that were drawn as a grid two bands further down. `test/content.test.ts` now fails if any
  * of them comes back.
  *
- * THE DRAWINGS ARE COPY TOO. The home page draws two working things rather than pictures of them: a
- * ledger whose events are only ever added to, and a switcher that rearranges the page as you pick
- * who the record is for. Every name, figure and time in both is below, read off the demo record
- * (`apps/web/src/lib/record/data.ts` and `packages/seed/src/index.ts`). Nothing in a drawing is
- * invented: when the seed's sample business changes, these change with it, not before it. A key
- * that nothing renders is deleted rather than kept for later.
+ * THE DRAWINGS ARE COPY TOO. The home page draws two working things rather than pictures of them: an
+ * agent's proposal that a person decides, landing in the history under the agent's name, and a
+ * switcher that rearranges the page as you pick who the record is for. Every name, figure and time
+ * in both is below, read off the demo record (`apps/web/src/lib/record/data.ts` and
+ * `packages/seed`). Nothing in a drawing is invented: when the seed's sample changes, these change
+ * with it, not before it. Where a drawing takes a liberty with the sample, the comment beside it
+ * names the liberty. A key that nothing renders is deleted rather than kept for later.
  *
  * WHY THERE ARE FEWER SECTIONS THAN THERE WERE. `typed` and `agents` were two bands of their own and
  * are now three sentences inside one. The page used to open on typed rows, registers and the MCP
@@ -127,8 +128,17 @@ export const site = {
      * `provision.ts` deletes past the retention cutoff. Three greps falsify the old claim. What is
      * true without qualification is the half that matters to a reader: changes are events, and the
      * list of them only grows.
+     *
+     * AND THEN IT SAID WHAT THE STORAGE DOES INSTEAD OF WHAT THE READER GETS, which is the order
+     * §19 asks this page to stop using on its first screen. `loop/research-site-now.md` counted it:
+     * of the sub-line's three sentences, the last was spent on events and a log, the most technical
+     * words above the fold. What a reader gets is the switcher's promise (their own things, arranged
+     * for them), the agents doing the upkeep, and being able to see who changed what. The last half
+     * is the same claim `plain.lead` makes and the drawn decision in band 0003 shows, so it is said
+     * here in the reader's words and proven there. `test/content.test.ts` fails if a word of
+     * mechanism comes back into this sentence.
      */
-    sub: 'One record. You and your AI agents both write to it. Every change is an event, and the log only grows.',
+    sub: 'Everything you keep track of, in one place arranged around you. You and your AI agents keep it up to date, and every change says who made it.',
     /**
      * `Open the app` AND NOT `Open the demo`, WHICH IS THE VERB THIS SITE ALREADY USES for the same
      * address in the nav and on the pricing page.
@@ -172,8 +182,15 @@ export const site = {
      *
      * The caption is literal about the pixels and it has to stay that way. The capture is 1440 CSS
      * px wide, so at a 1440 viewport it paints one device pixel per captured pixel.
+     *
+     * IT SAID `photographed on the day this build was made`, AND THE BUILD PHOTOGRAPHS NOTHING. The
+     * site's `build` script is `theme && vite build`, `deploy.yml` never runs `scripts/product.mjs`,
+     * and `git log -- static/shots/home-light.webp` last touches the file at `a76bb402`, on 21
+     * September. Every deploy since has shipped a photograph older than the build the caption named.
+     * So it names the day. `src/lib/claims.test.ts` fails if the caption credits the build while the
+     * build script runs no capture, and the date here moves the day somebody re-shoots.
      */
-    caption: 'One record, photographed on the day this build was made',
+    caption: 'One record, photographed from the app on 21 September',
     alt:
       'The home screen of a record: what it is owed and what is due, the money falling due this ' +
       'week, the questions waiting on a decision, and what its agents and rules did while you ' +
@@ -181,85 +198,54 @@ export const site = {
   },
 
   /**
-   * THE LEDGER, which the home page draws as rows rather than as a picture of rows. `head` and
-   * `only` are its heading, drawn as one line.
+   * THE DECISION, which the home page draws as a scene rather than as a table of rows. It replaced
+   * the ledger on 2026-09-22, and the ledger's argument is the scene's last beat rather than gone.
    *
-   * IT MOVED OUT OF THE HERO AND DOWN TO THE LAST BAND BEFORE THE CLOSE, and the move is the whole
-   * of §19 in one component. A list of five text rows is a record, and a record on the first screen
-   * is exactly what the owner meant by *it is all records and text*. Where it now sits it is the
-   * evidence for the sentence above it, which is that every change carries a name: the `who` column
-   * is You, Codex, a rule and Claude, and the reader watches the last three of them arrive.
+   * WHY THE TABLE WENT. `loop/research-site-now.md` read band 0003 as a table of record ids under a
+   * paragraph about registers: `tasks#12`, `obligations#1`, `services#6`, five rows of the record's
+   * own addresses shown to a stranger who has no record. And it found the one thing BrainDog does
+   * that no other product page can show was on this page only as two names in a `who` column: an
+   * agent proposes, a person decides, and the change lands carrying the agent's name. That is the
+   * app's `decide` screen, and `agents.cannot` states the rule under it (*no token reaches it. A
+   * person has to do it, signed in*).
    *
-   * WHAT IS CHECKABLE ABOUT THESE FIVE, said exactly, because the looser version of this sentence
-   * was wrong three ways at once and an audit found all three.
-   *   - Every register named is one `packages/seed` declares, and `test/content.test.ts` holds
-   *     them to it, reading the served bytes for the two that prerender and this file for the
-   *     three the tick appends.
-   *   - Every actor named is a person, an agent, or a rule this build actually ships. It said
-   *     `Renewal rule` and `Reply rule`, which are neither: they are the fallback string
-   *     `apps/web/src/lib/record/api.ts` synthesises from an id when `ruleName()` finds nothing.
-   *     The three rules that exist are named in `packages/seed/src/usecases/names.ts`.
-   *   - A `seq` is a place in a list and never a number typed beside a row, which is
-   *     `apps/web/src/lib/record/data.ts`'s own rule about itself: it sorts the ledger and
-   *     renumbers from the top, so every number typed here was overwritten by position anyway.
-   *     These ascend, they are spaced the way a real ledger's are, and nothing reads them as an
-   *     address.
+   * EVERY WORD IS THE SAMPLE RECORD'S, and there is one liberty, named here. `SG33` in
+   * `packages/seed/src/index.ts` and `apps/web/src/lib/record/data.ts` asks *Add the two services on
+   * the Fenwick invoice?*, recommends *Add both* with this `change` as its body, is decided by you,
+   * and is followed by Claude creating `services#6` and `services#7`, three hours before the sample
+   * is opened. THE LIBERTY: in the sample the question is opened by the record's own reader of the
+   * arriving invoice, not by Claude. An agent proposing over MCP is real (`propose` is one of the six
+   * writes `agents.mcp.writes` lists), so the scene draws a thing the product does, compressed into
+   * one agent where the sample has two actors.
    *
-   * A sixth event invented here would be this file breaking its own rule, in the one section whose
-   * whole point is that nothing in it was made up.
-   *
-   * OLDEST FIRST, which is not the order a history page shows and is the order this list needs.
-   * `Ledger.svelte` draws the first two and then appends one every four seconds, so the array's
-   * order is the order a reader watches them arrive in. Newest first would have the sequence
-   * number counting DOWN as rows landed, under a heading that says only ever added: the one
-   * component on the site whose job is to prove the claim beside it would be contradicting it.
+   * `history` IS OLDEST FIRST, and its LAST ROW IS THE LANDING POINT: the scene ends when Claude's
+   * row arrives under the two that were already there, which is the ledger's append-only thesis kept
+   * in one row instead of five. The two earlier rows are the ledger's own, with their ids taken out:
+   * `test/content.test.ts` now fails if a `register#n` address reaches a stranger again.
    */
-  ledger: {
-    head: 'History',
-    only: 'only ever added',
-    /* TWO WORDS, AND NO REASON GIVEN. The control ends the wait; it does not explain that there
-       is a timer, how long is left, or why the rows appear one at a time. */
-    all: 'Show all',
-    events: [
-      {
-        seq: '4176',
-        who: 'You',
-        /* `12d ago` AND NOT `14h ago`: `packages/seed/src/modules/work.ts:35` carries
-           `done_on: day(-12)` on this row, and the copy was quoting the other of the demo's two
-           sources, which disagreed with it. */
-        what: 'Moved tasks#12 from open to done',
-        age: '12d ago',
-      },
-      {
-        seq: '4181',
-        who: 'Codex',
-        /* NO ID ON THIS ONE, because the id it carried was a sample's and not a record's.
-           `packages/seed/src/index.ts:424-429` is explicit that a question is filed under the
-           record's own counter, so the sample's `SG31` is filed as something else entirely.
-           Naming the question rather than numbering it is true under either counter. */
-        what: 'Opened a question, Kiln licensing model',
-        age: '2d ago',
-      },
-      {
-        seq: '4183',
-        who: 'You',
-        what: 'Moved services#2 from live to lapsing',
-        age: '1d ago',
-      },
-      {
-        seq: '4187',
-        /* A RULE THAT EXISTS, under the name the seed gives it. `packages/seed/src/usecases/names.ts:45`
-           names `invoice-late` as this, and chasing a late invoice is what it does. */
-        who: 'Chase late payments',
-        what: 'Added a note to obligations#1',
-        age: '14h ago',
-      },
-      {
-        seq: '4191',
-        who: 'Claude',
-        what: 'Created services#6, Object storage',
-        age: '3h ago',
-      },
+  decide: {
+    /* What a screen reader calls the scene, and the line a sighted reader sees over it. */
+    label: 'An agent proposes. You decide.',
+    agent: 'Claude',
+    person: 'You',
+    proposal: {
+      title: 'Add the two services on the Fenwick invoice?',
+      change: 'Object storage and the Workers plan, with the renewal dates from the invoice.',
+    },
+    /* `acceptIt` in `apps/web/src/lib/copy.ts`: the word the app's own button says. */
+    verb: 'Accept',
+    accepted: 'Accepted by you',
+    history: [
+      /* THE TIMES ARE `data.ts`'s AND NOT THE OLD LEDGER'S. It said `2d ago` and `14h ago`; the
+         rows it was quoting are `seq 4160` at `stamp(-31)` and `seq 4188` at `stamp(-9)`, and
+         `stamp` counts hours (`packages/seed/src/modules/base.ts:104`). Named, never numbered. */
+      { who: 'Codex', what: 'Opened a question about the Kiln licensing model', when: '1d ago' },
+      /* A rule that exists, under the name `packages/seed/src/usecases/names.ts:45` gives it. The
+         note it added reads *Chased twice. 45-day terms expired 3 August.* */
+      { who: 'Chase late payments', what: 'Added a note to an invoice that is late', when: '9h ago' },
+      /* `seq 4192` and `4191` in `data.ts`, both at `stamp(-3)`: Object storage and the Workers
+         plan, each `from the Fenwick invoice`. */
+      { who: 'Claude', what: 'Added Object storage and the Workers plan, from the Fenwick invoice', when: '3h ago' },
     ],
   },
 
@@ -278,6 +264,16 @@ export const site = {
    * reason at the top of this file: it is a word a stranger reads. All four were literals inside
    * `+page.svelte` until 2026-09-21, which meant the em-dash scan over this file could not see
    * them and nobody editing copy would have found them.
+   *
+   * `glyph` AND `tiles` ARE WHAT MAKE THE SWITCHER A PICTURE RATHER THAN A LIST OF NOUNS.
+   * `loop/research-site-now.md` ranks it first of five: the rail drew a grey square where the app
+   * draws a glyph, and a box of nouns beside grey squares was the most text-like thing on the first
+   * screen after the headline. `glyph` is a Lucide name `lib/icons.ts` draws. `tiles` are two or
+   * three of what that record's home would show on its first day, every value read off the example
+   * rows the use case installs (`packages/seed/src/usecases/*.ts`, `seeds` and `FOUNDER_EXAMPLES`),
+   * with the day arithmetic done the way `install.ts` does it: a `+3d` row is due in three days on
+   * whichever day somebody starts. None of them counts the product's own parts. A tile that said how
+   * many pages a setup ships would be the stat §19 named, drawn in a box.
    */
   arrange: {
     tag: 'Yours',
@@ -319,6 +315,18 @@ export const site = {
            "Bills" and not "Money". A personal record never shows a page or a list called Money;
            the word survives only as a heading in the rail, which is not what `holds` lists. */
         label: 'Personal',
+        glyph: 'house',
+        /* The two groceries rows in the sample week (6,420 and 2,135 pence) against the 30,000 the
+           groceries budget allows, the two `PUT_BY` rows toward Lisbon (20,000 and 22,000) against
+           its 90,000 target, and the first of the habits, all in `personal.ts` `seeds`. THE LISBON
+           TILE SAID `GBP 900.00, saving towards it`, which is the target drawn where the groceries
+           tile beside it draws the amount so far: a reader of the pair takes 900 as saved, and the
+           seed has put 420 by. */
+        tiles: [
+          { title: 'Groceries', value: 'GBP 85.55', note: 'of GBP 300.00 budgeted' },
+          { title: 'Trip to Lisbon', value: 'GBP 420.00', note: 'of GBP 900.00 put by' },
+          { title: 'Run three times a week', value: 'A habit', note: 'logged as you go' },
+        ],
         holds: [
           'Day to day',
           'Spending',
@@ -335,11 +343,24 @@ export const site = {
       {
         id: 'student',
         label: 'Student',
+        glyph: 'graduation-cap',
+        tiles: [
+          { title: 'Problem set 1: probability', value: 'Due in 3 days', note: 'Introduction to statistics' },
+          { title: 'Study session tomorrow', value: '90 minutes', note: 'Conditional probability' },
+        ],
         holds: ['Today', 'Studies', 'Courses', 'Assignments', 'Study sessions'],
       },
       {
         id: 'founder',
         label: 'Solo founder',
+        glyph: 'wallet',
+        /* `FOUNDER_EXAMPLES` in `founder.ts`: the current account at 2,480,000 pence, the hosting bill
+           at 32,000 due `+9d`, and the one datapoint the setup seeds, reported `-1d`. */
+        tiles: [
+          { title: 'Northwind current account', value: 'GBP 24,800.00' },
+          { title: 'Monthly recurring revenue', value: 'GBP 4,200', note: 'reported yesterday' },
+          { title: 'Cloud hosting', value: 'GBP 320.00', note: 'due in 9 days' },
+        ],
         holds: ['Overview', 'Dashboard', 'Organisations', 'Datapoints', 'Money', 'Projects', 'People', 'Tasks'],
       },
       {
@@ -348,11 +369,23 @@ export const site = {
            `:538` put two pages under a section called Work, and they are titled Overview and
            Board. `holds` lists what a reader will actually see named on a page or a list. */
         label: 'Team',
+        glyph: 'users',
+        /* `team.ts` `seeds`: one active cycle, and four planned tickets at 2, 1, 3 and 5 points. */
+        tiles: [
+          { title: 'Cycle 1', value: 'Active', note: 'Ship the first version of the board' },
+          { title: 'Cycle plan', value: '11 points', note: 'across four tickets' },
+        ],
         holds: ['Team', 'Cycles', 'Agent work', 'Board', 'Tickets', 'Cycle plan', 'Teammates'],
       },
       {
         id: 'guide',
         label: 'New project',
+        glyph: 'rocket',
+        tiles: [
+          { title: 'Say what it is and who it is for', value: 'Underway', note: 'the first milestone' },
+          { title: 'What will it be called?', value: 'Open', note: 'a choice to make' },
+          { title: 'Next step', value: 'In 2 days', note: 'Write one sentence about what this is' },
+        ],
         holds: ['Your project', 'Guide', 'Milestones', 'Steps', 'Choices', 'Resources'],
       },
     ],
@@ -393,29 +426,29 @@ export const site = {
    * columns side by side. The middle column is the reason the other two get believed, which is why
    * it is the longest of the three and why it lost nothing in the cut.
    *
-   * `lead` IS TWO BANDS' WORTH OF PAGE IN THREE SENTENCES, and each one is load-bearing:
+   * `lead` IS ONE SENTENCE NOW, AND IT WAS TWO.
    *
-   *   - `A register is a typed collection: money, services, people.` is the one sentence on the
-   *     site that teaches the word by example, and `test/content.test.ts` reads the three names
-   *     back out of the served bytes and checks each against the seed's declarations. It was the
-   *     lead of a band called `Typed rows, not a pile of notes`, at the top of the page, which is
-   *     the mechanism-before-value order §19 asks us to stop using.
+   *   - `A register is a typed collection: money, services, people.` WENT, on 2026-09-22. It was
+   *     the one sentence on the site that taught the word by example, and it opened the band, so
+   *     the first thing band 0003 asked of a reader was to learn a term of the product's own
+   *     plumbing. Nothing else on the home page uses the word, so there was nothing left for the
+   *     definition to serve: `test/content.test.ts` now fails if `register` reaches the home page
+   *     without the sentence that teaches it, and still checks the examples if it comes back.
    *   - The agents sentence is what `loop/research-site-copy.md` ranks FIRST of the eight things
    *     this page should say: an agent gets a typed surface, not a chat window. The sixteen tool
    *     names that used to be drawn under it as a grid are gone, because a reader who does not
    *     already know what `governance` or `handoff` means learns nothing from reading the word,
    *     and a reader who does will go to the protocol.
-   *   - `every change carries a name` is the claim the ledger under this paragraph demonstrates.
-   *     It is placed last for that reason: the names in the `who` column are You, Codex, a rule
-   *     and Claude, and three of the four arrive while the reader is looking at them.
+   *   - `every change carries a name` is the claim the drawn decision under this paragraph
+   *     demonstrates, and it is placed last for that reason: the scene ends with Claude's row
+   *     arriving in the history under Claude's name.
    */
   plain: {
     tag: 'In writing',
     title: 'Plain about what it is',
     lead:
-      'A register is a typed collection: money, services, people. Claude, Codex and Cursor read ' +
-      'and write the same rows you do, over MCP, with a key you issue, and every change carries a ' +
-      'name.',
+      'Claude, Codex and Cursor read and write the same record you do, over MCP, with a key you ' +
+      'issue, and every change carries a name.',
     /**
      * THE LIMIT ON THE SENTENCE ABOVE, and it is a limit about records rather than about the door.
      *
@@ -467,7 +500,22 @@ export const site = {
         ],
       },
       {
-        head: 'Not built yet',
+        /**
+         * IT WAS HEADED `Not built yet`, AND THE FIRST LINE UNDER IT IS BUILT.
+         *
+         * The comment on that line keeps it in this column on purpose and defines the column as what
+         * a visitor can do nothing with, which is right. A stranger reads the head and not the
+         * comment, and the head said the opposite of the comment: both hosts wire `@braindog/spark`
+         * (`apps/worker/src/spark.ts`, `apps/selfhost/src/spark.ts`), the palette asks it, and
+         * `SPARK_ENDPOINT` is `""` in both of `apps/worker/wrangler.jsonc`'s environments. Built and
+         * switched off is not unbuilt. `Not switched on yet`, the survey's suggestion, fits that line
+         * and the third, and misreads the second: nothing is built that reaches into an inbox, so a
+         * head saying it is only switched off would overstate the product the other way. What is true
+         * of all three is the column's own definition, said to the reader in the words of the column
+         * beside it. `src/lib/claims.test.ts` fails if the head says `built` while both hosts wire the
+         * engine.
+         */
+        head: 'Not yours to use yet',
         lines: [
           /**
            * THIS LINE WAS TRUE ON 2026-09-21 IN THE MORNING AND FALSE BY THE EVENING, which is what

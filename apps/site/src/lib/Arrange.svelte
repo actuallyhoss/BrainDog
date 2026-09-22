@@ -2,12 +2,20 @@
   The proof that the record rearranges itself, drawn rather than photographed.
 
   Five near-identical screenshots of a navigation rail is five downloads of the same picture with
-  three words changed in each. This is the rail itself, drawn once, with the five arrangements
-  swapped through it — which is both smaller and more honest, because what differs between the use
-  cases is exactly the list of rows and nothing else.
+  three words changed in each. This is the app's frame itself, drawn once, with the five
+  arrangements swapped through it, which is both smaller and more honest than five photographs.
+
+  A MINIATURE OF THE APP AND NOT A LIST OF NOUNS. Until 22 September this drew the rail alone: a
+  box of names beside grey squares, the most text-like thing on the first screen after the
+  headline (`loop/research-site-now.md`, change 1). Now each case draws a rail with the glyph the
+  app draws beside each row, the page that case opens on, and two or three tiles that page shows
+  on its first day, so a student sees an assignment falling due and a founder sees the bank
+  balance. Every glyph in the rail is the one the seed declares for that page (`rail.ts`, checked
+  by `arrange.test.ts`), and every tile's figure is read off the rows that setup installs
+  (`copy.ts` says which). A drawing of the app that drew the wrong glyph would be a mock-up.
 
   IT IS A REAL TAB CONTROL, not five buttons and a `{#if}`. `role="tablist"`, arrow keys, a roving
-  `tabindex`, and one panel per case wired to its own tab — so a keyboard reaches the five
+  `tabindex`, and one panel per case wired to its own tab, so a keyboard reaches the five
   arrangements the way it reaches any other tabs, and a screen reader is told which of them it is
   looking at. The selected option is marked by weight and by a lifted ground, never by hue alone.
 
@@ -23,8 +31,25 @@
   stays pointed at a real control rather than at something kept alive for it.
 -->
 <script lang="ts">
-  /** One use case, as `copy.ts` writes it: an id, what to call it, and the rail it arranges. */
-  type Case = { id: string; label: string; holds: readonly string[] };
+  import Icon from './Icon.svelte';
+  import { isIconName } from './icons.ts';
+  import { RAIL } from './rail.ts';
+
+  /**
+   * One use case, as `copy.ts` writes it: an id, what to call it, the rail it arranges, the glyph
+   * its tab and page title carry, and the tiles its first page shows. `holds[0]` is that page: it
+   * is the case's Home, under the title the setup gives it.
+   *
+   * `glyph` AND `tiles` ARE REQUIRED, like `head` and `label` below and for the same reason: a case
+   * that forgot them would draw an empty page, and a type error is where that should be found.
+   */
+  type Case = {
+    id: string;
+    label: string;
+    glyph: string;
+    holds: readonly string[];
+    tiles: readonly { title: string; value: string; note?: string }[];
+  };
 
   /* NO DEFAULTS ON THE TWO STRINGS A READER SEES. `head` and `label` are copy, and all of this
      site's copy lives in `copy.ts` where the content test can scan it. A default here would be a
@@ -45,7 +70,7 @@
 
   let selected = $state(0);
 
-  /* The five buttons, so an arrow key can move focus as well as selection — a roving `tabindex`
+  /* The five buttons, so an arrow key can move focus as well as selection: a roving `tabindex`
      without a focus move is a control that announces the wrong thing. */
   let tabs: (HTMLButtonElement | null)[] = $state([]);
 
@@ -110,20 +135,21 @@
             onclick={() => choose(i)}
             {onkeydown}
           >
+            <!-- THE GLYPH WHERE THE COUNT WAS. The segment's second line said `10 parts`, `5 parts`,
+                 which is a figure about the product's own parts: the kind of counted stat §19 asks
+                 the page to stop showing. The case's glyph says which record this is by shape
+                 instead, and it is the same glyph as the page title in the panel it opens, so the
+                 tab and what it shows match. -->
+            {#if isIconName(c.glyph)}<span class="tab-glyph"><Icon name={c.glyph} size="m" /></span>{/if}
             <span class="tab-label">{c.label}</span>
-            <!-- THE COUNT IS `holds.length` AND NOT A TYPED NUMBER, so it cannot disagree with the
-                 list under it. `copy.ts` is the one place a case's parts are written down, and a
-                 second place saying how many there are is a second place to be wrong. -->
-            <span class="tab-count num">{c.holds.length} parts</span>
           </button>
         {/each}
       </div>
     </div>
   </div>
 
-  <div class="in rail-wrap">
-    <div class="rail">
-      <p class="rail-head">{head}</p>
+  <div class="in frame-wrap">
+    <div class="frame">
       <div class="stack">
         {#each cases as c, i (c.id)}
           <div
@@ -134,11 +160,34 @@
             aria-labelledby="uc-{c.id}"
             tabindex="0"
           >
-            <ul class="holds">
-              {#each c.holds as hold}
-                <li class="hold"><span class="mark" aria-hidden="true"></span><span class="name">{hold}</span></li>
-              {/each}
-            </ul>
+            <div class="rail">
+              <p class="rail-head">{head}</p>
+              <ul class="holds">
+                {#each c.holds as hold, j}
+                  {@const glyph = RAIL[hold]}
+                  <li class="hold" class:here={j === 0}>
+                    {#if glyph}<Icon name={glyph} size="m" />{:else}<span class="mark" aria-hidden="true"></span>{/if}
+                    <span class="name">{hold}</span>
+                  </li>
+                {/each}
+              </ul>
+            </div>
+
+            <div class="page">
+              <p class="page-title">
+                {#if isIconName(c.glyph)}<span class="page-glyph"><Icon name={c.glyph} size="l" /></span>{/if}
+                <span>{c.holds[0]}</span>
+              </p>
+              <ul class="tiles">
+                {#each c.tiles as tile (tile.title)}
+                  <li class="tile">
+                    <span class="tile-title">{tile.title}</span>
+                    <span class="tile-value num">{tile.value}</span>
+                    {#if tile.note}<span class="tile-note">{tile.note}</span>{/if}
+                  </li>
+                {/each}
+              </ul>
+            </div>
           </div>
         {/each}
       </div>
@@ -156,7 +205,7 @@
     inline-size: 100%;
   }
 
-  .rail-wrap {
+  .frame-wrap {
     margin-block-start: var(--sp-6);
   }
 
@@ -206,10 +255,16 @@
       color var(--d-state) var(--ease-out);
   }
 
-  /* The count is a second line only once the control is a row of segments. In the pill form below
-     760px there is no room for it and the label alone is the control. */
-  .tab-count {
-    display: none;
+  /* The glyph sits before the label in a pill and above it in a segment, in the label's own colour,
+     so the chosen tab's glyph darkens with its label and nothing else has to say which is chosen. */
+  .tab {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  .tab-glyph {
+    display: inline-flex;
   }
 
   .tab:hover {
@@ -281,35 +336,23 @@
       border-block-start-color: var(--ink);
       color: var(--ink);
     }
-
-    .tab-count {
-      display: block;
-      color: var(--dim);
-      font-family: var(--font-id);
-      font-size: var(--t-xs);
-      font-weight: 400;
-    }
   }
 
   /**
-   * THE RAIL, AND THE 240px CAP IS GONE.
+   * THE FRAME: THE APP'S CANVAS, ITS RAIL, AND THE PAGE BESIDE IT.
    *
-   * It was `max-inline-size: var(--rail)`, which is the record app's own sidebar proportion, and
-   * the argument for it was that this drawing should be the app's rail rather than a list. The
-   * argument was right about the ROWS and wrong about the BOX, and
-   * `loop/research-site-reference.md` measured the cost: the band this component sits in used 529
-   * of 1,440 pixels, 37 per cent, with the right two thirds of it empty, and 21 per cent of that
-   * band's rows carried no ink at all. A 240px box in a 1,136px column is not a sidebar, it is a
-   * sidebar-shaped hole.
+   * The box is `--sunk` inside a hairline, which is the app's own canvas one step below the page,
+   * and `app.css` flips `--sunk` with the rest of this band so the frame stays made of the band's
+   * two colours. The page sits on it at `--bg` inside its own hairline, the way the app lifts a
+   * page off its canvas, so the one picture holds both of the app's grounds.
    *
-   * What makes it read as a rail is unchanged and is where it always was: the `Switch record`
-   * line above a hairline, rows at `--rail-item-h`, a mark where the app draws a glyph, a sunk
-   * ground inside a hairline. Those are the app's proportions. The width of the box is the page's
-   * business, and the page now gives it a column to fill.
+   * THE RAIL IS THE APP'S PROPORTION AND THE PAGE TAKES THE REST. `--rail` is the record app's own
+   * sidebar width, 240px, and the argument for drawing it at that width is the one this file used
+   * to make about the whole box: it should be the app's rail and not a list. It was wrong about
+   * the box, which `loop/research-site-reference.md` measured at 37 per cent of the band with the
+   * right two thirds empty. It is right about the rail now that the page fills the two thirds.
    */
-  .rail {
-    display: flex;
-    flex-direction: column;
+  .frame {
     inline-size: 100%;
     padding: var(--sp-2);
     background: var(--sunk);
@@ -317,7 +360,7 @@
     border-radius: var(--r-lg);
   }
 
-  /* The one cell every arrangement is drawn in, so the box is the height of the longest of them
+  /* The one cell every arrangement is drawn in, so the frame is the height of the longest of them
      and choosing another moves nothing on the page. */
   .stack {
     display: grid;
@@ -325,11 +368,14 @@
 
   .panel {
     grid-area: 1 / 1;
+    display: grid;
+    grid-template-columns: minmax(0, var(--rail)) minmax(0, 1fr);
+    gap: var(--sp-2);
     opacity: 0;
     visibility: hidden;
     transition:
-      opacity var(--d-state) var(--ease-out),
-      visibility var(--d-state) var(--ease-out);
+      opacity var(--d-enter) var(--ease-out),
+      visibility var(--d-enter) var(--ease-out);
   }
 
   .on {
@@ -339,35 +385,19 @@
 
   /* THE ROW THE REAL SIDEBAR PUTS AT ITS TOP, where `Switch record` sits: what you are in, above
      a hairline, before the list of where you can go. One line, and it is the line that makes the
-     box read as a rail rather than as bullets. */
+     column read as a rail rather than as bullets. */
   .rail-head {
     padding-inline: var(--sp-2);
-    padding-block-end: var(--sp-1);
+    padding-block: var(--sp-1);
     margin-block-end: var(--sp-1);
     border-block-end: 1px solid var(--line);
     color: var(--dim);
     font-family: var(--font-id);
     font-size: var(--t-xs);
-    line-height: 1;
+    line-height: 1.5;
   }
 
-  /**
-   * A GRID AND NOT A BALANCED MULTI-COLUMN, now that the rail is the width of the column.
-   *
-   * `columns: 2` filled a column downwards before it started the next one, which reads correctly
-   * in a narrow box and wrongly in a wide one: at five columns a reader's eye goes across the row
-   * and the list would have gone down. A grid lays the names in source order, left to right, and
-   * an arrangement with fewer names than cells simply leaves the last cells empty rather than
-   * rebalancing every column when the case changes.
-   *
-   * Five columns and not four or six, because the longest arrangement `copy.ts` declares holds ten
-   * names, and ten across five is exactly two rows. Every other case is one row or two, so the box
-   * is the same height whichever of the five is chosen and choosing one moves nothing below it.
-   */
   .holds {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0 var(--sp-3);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -385,12 +415,20 @@
     font-weight: 500;
   }
 
-  /* Where the rail draws a glyph. There is no glyph to draw for a row that is only a name, and a
-     column of bare words does not read as a rail, so it is a mark and not an icon. */
+  /* THE PAGE THE CASE OPENS ON, marked in the rail the way the app marks where you are: heavier, on
+     the lifted ground, in full ink. Not a hue, for the reason the chosen tab above gives. */
+  .here {
+    background: var(--bg);
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  /* Only for a name `rail.ts` has no glyph for, which `arrange.test.ts` fails on, so a reader
+     should never meet one. It keeps the row the width of its neighbours if one ever lands. */
   .mark {
     flex: none;
-    inline-size: var(--sp-2);
-    block-size: var(--sp-2);
+    inline-size: var(--icon-m);
+    block-size: var(--icon-m);
     background: var(--edge);
     border-radius: var(--r-sm);
   }
@@ -400,6 +438,103 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-5);
+    min-inline-size: 0;
+    padding: var(--sp-5);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+  }
+
+  .page-title {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: var(--t-xl);
+    font-weight: 600;
+    line-height: var(--lh-tight);
+  }
+
+  /* The case's glyph in a chip, which is how the app heads a page that has one. */
+  .page-glyph {
+    display: inline-grid;
+    place-items: center;
+    inline-size: 40px;
+    block-size: 40px;
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+  }
+
+  /**
+   * THREE FIXED COLUMNS ON A DESK, so a tile is the same width in every case. Two of the five cases
+   * have two tiles and three have three, and a grid that stretched two tiles to half the page each
+   * would resize every box under the cross-fade between Personal and Student. Here the third cell
+   * of a two-tile page is simply empty, which is what an app page with two things on it looks like.
+   *
+   * The first pass was `repeat(auto-fill, minmax(12rem, 1fr))`, and the screenshot at 1440 showed
+   * what that costs: three 196px tiles in an 846px page, with a quarter of the page's width empty
+   * to their right. Fixed thirds fill it. Below 1000px it drops to two: at 860 the page is
+   * 528px wide, a third of that less its gaps and padding leaves about 135px of text, and
+   * `Northwind current account` needs about 165. Below 760 it is one.
+   */
+  .tiles {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .tile {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    padding: var(--sp-4);
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+  }
+
+  .tile-title {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 500;
+  }
+
+  @media (width >= 760px) {
+    .tiles {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (width >= 1000px) {
+    .tiles {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  /* THE FIGURE IS THE LARGEST THING ON THE TILE, as it is on the app's own tiles: a reader looking
+     at a home page reads the balance first and its label second. */
+  .tile-value {
+    color: var(--ink);
+    font-size: var(--t-xl);
+    font-weight: 600;
+    line-height: var(--lh-tight);
+  }
+
+  .tile-note {
+    color: var(--dim);
+    font-size: var(--t-sm);
   }
 
   /* ── The phone ───────────────────────────────────────────────────────── */
@@ -423,26 +558,70 @@
       scroll-snap-align: start;
     }
 
-  }
+    /**
+     * THE RAIL FOLDS TO ITS GLYPHS, the way the app's own rail does on a phone. A 240px rail
+     * beside a page inside 358px leaves the page 100px, and a rail stacked over the page makes
+     * Personal's ten rows the first 330px of the picture with the tiles below the fold. So the
+     * rail keeps one column of glyphs and the names leave the eye but not the page: they are
+     * clipped rather than `display: none`, so a screen reader still reads the rail in full.
+     */
+    .panel {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
 
-  /* TWO COLUMNS ONCE THERE IS ROOM FOR TWO, AND FIVE ONCE THERE IS ROOM FOR FIVE. One column below
-     640px, whatever the count: two columns of a ten-row rail inside 358px is two columns of
-     ellipsis, because `Savings goals` and `Day to day` are both wider than 160px at 13px and
-     `.name` truncates rather than wraps. At 1000px the column is 936px wide and a fifth of it is
-     187px, which holds every name this record declares at its own size. */
-  @media (width >= 640px) {
-    .holds {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+    .rail-head {
+      display: none;
+    }
+
+    .hold {
+      justify-content: center;
+      padding-inline: var(--sp-2);
+    }
+
+    .name {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .page {
+      padding: var(--sp-4);
+      gap: var(--sp-4);
+    }
+
+    .page-title {
+      font-size: var(--t-lg);
+    }
+
+    .tiles {
+      grid-template-columns: minmax(0, 1fr);
     }
   }
 
-  @media (width >= 1000px) {
-    .holds {
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+  /**
+   * THE CROSS-FADE, AND A LIFT UNDER IT FOR A READER WHO HAS NOT ASKED FOR LESS MOTION.
+   *
+   * The fade is a state change: under `prefers-reduced-motion` it lands at once (below), and
+   * `a11y.css` collapses every duration to 1ms besides. The lift is movement, so it is written
+   * only inside `no-preference` rather than written everywhere and switched off, which is the
+   * pattern `app.css` gives for `.btn-primary`: a transform left outside this query would be
+   * absent under the collapse rather than damped, and a reader who asked for stillness would
+   * still see the tiles jump the four pixels in one frame.
+   */
+  @media (prefers-reduced-motion: no-preference) {
+    .panel .page {
+      transform: translateY(var(--sp-1));
+      transition: transform var(--d-enter) var(--ease-out);
+    }
+
+    .on .page {
+      transform: none;
     }
   }
 
-  /* The swap is a state change, and a state change still has to land — it just lands at once. */
   @media (prefers-reduced-motion: reduce) {
     .panel {
       transition: none;

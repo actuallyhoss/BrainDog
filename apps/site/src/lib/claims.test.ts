@@ -7,9 +7,9 @@
  * another package and nothing on the site side was reading it. So each check below reads the other
  * package's file and not a copy of its value.
  *
- * IT SITS IN `src/lib` ONLY BECAUSE `test/` BELONGED TO ANOTHER AGENT WHEN IT WAS WRITTEN, and the
- * package's `test` script globs `test/*.test.ts`, so `pnpm test` does not run it yet. Run it as
- * `node --test --experimental-strip-types "apps/site/src/lib/*.test.ts"` until it moves.
+ * IT SITS IN `src/lib` BECAUSE `test/` BELONGED TO ANOTHER AGENT WHEN IT WAS WRITTEN. For a while
+ * `pnpm test` globbed `test/*.test.ts` only and never ran it, nor the component tests beside it;
+ * the package's `test` script now globs `src/lib/*.test.ts` and the pages' `bands.test.ts` too.
  */
 
 import { test } from 'node:test';
@@ -70,5 +70,42 @@ test('the hosted backup cell does not promise copies while the sealing key is a 
   const hosted = row[2] ?? '';
   if (recipient.includes('<')) {
     assert.match(hosted, /\byet\b/, `the key is ${recipient}, so no hosted copy is kept, and the cell says "${hosted}"`);
+  }
+});
+
+test('the hero caption does not credit a build that photographs nothing', () => {
+  /* THE CAPTION SAID `photographed on the day this build was made`. The build is `package.json`'s
+     `build` script, and it runs the theme and Vite: the capture is `scripts/product.mjs`, which a
+     person runs by hand. So a caption that dates the picture by the build is true only on the day
+     somebody happens to run both, and false on every deploy after. */
+  const scripts = (JSON.parse(readFileSync(new URL('package.json', SITE), 'utf8')) as { scripts: Record<string, string> }).scripts;
+  const captures = /product\.mjs|shot\.mjs/.test(scripts.build ?? '');
+  if (!captures) {
+    assert.doesNotMatch(
+      site.hero.caption,
+      /\bbuild\b|\btoday\b|\bnow\b/i,
+      `the build script is "${scripts.build}", which takes no photograph, and the caption says "${site.hero.caption}"`,
+    );
+  }
+});
+
+test('the column over the Spark line does not call it unbuilt while both hosts wire the engine', () => {
+  /* `loop/research-site-now.md`, claim 3. The line under the head was careful; the head was not, and
+     the head is what a stranger reads. Both files are read rather than trusted, so the day one host
+     drops the engine this check stands down instead of defending a head that has become true.
+
+     THE ENGINE'S NAME IS READ OFF ITS OWN `package.json` AND NOT TYPED HERE. `test/promises.test.mjs`
+     refuses a workspace package name anywhere under `src/` outside an import or a comment, because a
+     package name in a sentence is an install command with the verb left off, and it measured this
+     file doing exactly that on the first draft. */
+  const engine = (JSON.parse(readFileSync(new URL('packages/spark/package.json', REPO), 'utf8')) as { name: string }).name;
+  const wired = ['apps/worker/src/spark.ts', 'apps/selfhost/src/spark.ts'].every((path) => {
+    const at = new URL(path, REPO);
+    return existsSync(at) && readFileSync(at, 'utf8').includes(`'${engine}'`);
+  });
+  const column = site.plain.columns.find((c) => c.lines.some((l: string) => l.startsWith('Asking your record a question in words')));
+  assert.ok(column, 'no column holds the Spark line; this check should go with it');
+  if (wired) {
+    assert.doesNotMatch(column.head, /\bbuilt\b/i, `both hosts wire ${engine}, and the column over it is headed "${column.head}"`);
   }
 });
