@@ -1,5 +1,8 @@
 /**
- * `POST /api/spark/read` (`src/spark-ask.ts`), driven over a real socket against a real record.
+ * `POST /api/spark/read` (`src/spark-ask.ts`), driven over a real socket against a real record, and since
+ * `loop/research-spark-routes.md` Brief D1 the three doors beside it: status, settings and propose. Those
+ * five tests at the foot of the file were written first and run against the one-door `servesSpark`: 14 tests,
+ * 9 pass, 5 fail, every new door answering 404 because nothing in front of the method router matched it.
  *
  * WHAT THIS IS FOR IS THE PATH AND NOT THE EDGE. Finding 2 of `loop/research-batch-five-audit.md` made both
  * engine builders throw on every call and watched every suite but the builders' own pass unmoved. Re-driven on
@@ -268,12 +271,15 @@ test('NO MODEL CONFIGURED SAYS SO IN WORDS, and every other route on the same ho
   const listed = (await rows.json()) as { ok: boolean; value: { rows: unknown[] } };
   assert.equal(listed.value.rows.length, 3);
 
-  /* AND THE FOUR SPARK ROUTES `46 §5.2` NAMES AND NOBODY HAS BUILT ARE NOT SILENTLY THE ASK. `servesSpark`
-     matches one path, so `/api/spark/status` falls through to the method router and is told there is no such
-     method, which is true, rather than being answered by the one door that exists. */
-  const status = await ask(host.origin, {}, {}, '/api/spark/status');
-  assert.equal(status.status, 404);
-  assert.equal(status.body.refusal?.code, 'ROUTE_UNKNOWN');
+  /* AND THE SPARK ROUTE NOBODY HAS BUILT IS NOT SILENTLY ONE OF THE OTHERS. `/api/spark/pattern` falls through
+     to the method router and is told there is no such method, which is true, rather than being answered by a
+     door that does something else. Status with no model says the same sentence the ask does. */
+  const pattern = await ask(host.origin, {}, {}, '/api/spark/pattern');
+  assert.equal(pattern.status, 404);
+  assert.equal(pattern.body.refusal?.code, 'ROUTE_UNKNOWN');
+  const status = await fetch(`${host.origin}/api/spark/status`);
+  assert.equal(status.status, 501);
+  assert.equal(((await status.json()) as Answer['body']).refusal?.code, 'NOT_IN_THIS_BUILD');
 });
 
 test('A BEARER IS REFUSED BEFORE THE ENGINE IS ASKED, and so is a page this host does not answer for', async (t) => {
@@ -435,7 +441,11 @@ test('THE DOOR IS NOT A METHOD, which is what keeps it out of the record surface
   assert.equal(servesSpark('/api/sparkAsk'), null);
   assert.equal(servesSpark('/api/spark/read'), 'read');
   assert.equal(servesSpark('//api//spark//read/'), 'read');
-  assert.equal(servesSpark('/api/spark/propose'), null);
+  assert.equal(servesSpark('/api/spark/propose'), 'propose');
+  assert.equal(servesSpark('/api/spark/status/'), 'status');
+  assert.equal(servesSpark('/api/spark/settings'), 'settings');
+  /* `proposePattern` IS NEITHER METERED NOR CAPPED (`loop/research-spark-routes.md` F4), so it has no door yet. */
+  assert.equal(servesSpark('/api/spark/pattern'), null);
 });
 
 /**
@@ -474,4 +484,180 @@ test('BOTH HOSTS ROUTE THE DOOR, which is the claim three reports made and none 
   const selfhost = read('apps/selfhost/src/server.ts');
   assert.ok(selfhost.includes('servesSpark('), 'the self-host does not route POST /api/spark/read');
   assert.ok(selfhost.includes('sparkDoor('), 'the self-host builds no Spark door, so nothing it routes could be answered');
+});
+
+/**
+ * A real engine with a spy around each method, so a test can say both what the door answered and what it asked.
+ *
+ * THE SPY IS A WRAPPER AND NOT A DOUBLE, because the doors below are about what reaches the engine and in what
+ * shape, and `createSpark` is the only thing that can say whether a patch the door let through is one the engine
+ * accepts. A double would answer `ok` to anything the test forgot to refuse.
+ */
+function spied(it: Awaited<ReturnType<typeof record>>, net = endpoint(() => completion(DRAFT))) {
+  const real = createSpark({
+    sql: it.own,
+    clock: it.clock,
+    inference: endpointInference({ url: 'http://127.0.0.1:11434/v1/chat/completions', model: 'small', send: net.send }),
+    record: sparkRecord(it.api),
+  });
+  const calls: { method: string; args: unknown[] }[] = [];
+  const engine: SparkAskEngine<CallContext> = {
+    read: (question, ctx) => (calls.push({ method: 'read', args: [question] }), real.read(question, ctx)),
+    status: () => (calls.push({ method: 'status', args: [] }), real.status()),
+    configure: (patch, ctx) => (calls.push({ method: 'configure', args: [patch] }), real.configure(patch as never, ctx)),
+    propose: (question, ctx, byok, askId) => (
+      calls.push({ method: 'propose', args: [question, byok, askId] }), real.propose(question, ctx, byok as never, askId)
+    ),
+  };
+  return { engine, calls, net };
+}
+
+test('GET /api/spark/status ANSWERS A BROWSER THAT SENT NO Origin, and refuses a page that named another one', async (t) => {
+  /* A BROWSER SENDS NO `Origin` ON A SAME-ORIGIN GET (the Fetch standard adds it to a same-origin request only when
+     the method is neither GET nor HEAD), so the read door's rule, which refuses a request with none, would refuse
+     every palette that opened. What a GET is held to instead is `apps/selfhost/src/server.ts` `forged`: a NAMED
+     foreign origin, or a `Sec-Fetch-Site` that says another site, is a forgery, and neither at all is admitted. */
+  const it = await record(t);
+  const spy = spied(it);
+  const host = await listen(t, () => Promise.resolve(spy.engine), it.api);
+
+  const res = await fetch(`${host.origin}/api/spark/status`, { headers: { 'sec-fetch-site': 'same-origin' } });
+  const out = (await res.json()) as Answer['body'];
+  assert.equal(res.status, 200, JSON.stringify(out));
+  assert.equal(out.ok, true);
+  const value = out.value as { tier: string; model: string; asks: { used: number; cap: number; resets: string } };
+  assert.equal(value.tier, 'a');
+  assert.deepEqual({ used: value.asks.used, cap: value.asks.cap }, { used: 0, cap: 80 });
+
+  for (const headers of [{ origin: 'https://evil.example' }, { 'sec-fetch-site': 'cross-site' }, { 'sec-fetch-site': 'same-site' }]) {
+    const refused = await fetch(`${host.origin}/api/spark/status`, { headers });
+    assert.equal(refused.status, 403, JSON.stringify(headers));
+    assert.equal(((await refused.json()) as Answer['body']).refusal?.at, 'origin');
+  }
+
+  /* AND A POST IS NOT A STATUS: a door that took both would be two doors with one set of checks. */
+  const posted = await ask(host.origin, {}, {}, '/api/spark/status');
+  assert.equal(posted.status, 405);
+  assert.deepEqual(
+    spy.calls.map((c) => c.method),
+    ['status'],
+  );
+});
+
+test('POST /api/spark/settings CHANGES THE CAP FOR THE OWNER, and a key it does not know is refused before the engine sees it', async (t) => {
+  const it = await record(t);
+  const spy = spied(it);
+  const host = await listen(t, () => Promise.resolve(spy.engine), it.api);
+
+  const set = await ask(host.origin, { ask_cap: 5 }, {}, '/api/spark/settings');
+  assert.equal(set.status, 200, JSON.stringify(set.body));
+  assert.equal((set.body.value as { ask_cap: number }).ask_cap, 5);
+  const after = await fetch(`${host.origin}/api/spark/status`);
+  assert.equal(((await after.json()) as { value: { asks: { cap: number } } }).value.asks.cap, 5);
+
+  /* F3 OF `loop/research-spark-routes.md`, MEASURED THERE: `configure({ tier: 'a', bogus: 1 })` answered `ok` with
+     nothing changed, so a typo an owner made was a save that did nothing and said it had worked. */
+  spy.calls.length = 0;
+  const stray = await ask(host.origin, { bogus: 1 }, {}, '/api/spark/settings');
+  assert.equal(stray.status, 422, JSON.stringify(stray.body));
+  assert.equal(stray.body.refusal?.code, 'FIELD_UNKNOWN');
+  assert.equal(stray.body.refusal?.at, 'bogus');
+
+  /* A VALUE OF THE WRONG TYPE IS THE DOOR'S, because `model.trim()` on a number is a TypeError in the engine. */
+  for (const [key, value] of [
+    ['ask_cap', '5'],
+    ['model', 7],
+    ['tier', 1],
+    ['grant_id', {}],
+  ] as const) {
+    const out = await ask(host.origin, { [key]: value }, {}, '/api/spark/settings');
+    assert.equal(out.status, 422, `${key}: ${JSON.stringify(out.body)}`);
+    assert.equal(out.body.refusal?.code, 'VALUE_MALFORMED');
+    assert.equal(out.body.refusal?.at, key);
+  }
+
+  /* TIER `b` ON A HOST THAT CANNOT OPEN A KEY FOR IT IS A SETTING THAT BREAKS THE PALETTE ON SAVE: every later
+     `propose` would answer `FORBIDDEN`. So it is refused here, in words, and never stored. */
+  const b = await ask(host.origin, { tier: 'b', grant_id: 'g_01M33H56ZCMM62YT38ARN8JRM8' }, {}, '/api/spark/settings');
+  assert.equal(b.status, 501, JSON.stringify(b.body));
+  assert.equal(b.body.refusal?.code, 'NOT_IN_THIS_BUILD');
+  assert.deepEqual(spy.calls, [], 'a refused patch reached configure');
+});
+
+test('A MEMBER WHO IS NOT THE OWNER IS REFUSED BY THE PACKAGE, which is where the owner check lives', async (t) => {
+  const it = await record(t);
+  const spy = spied(it);
+  const member: CallContext = { principal: { kind: 'person', id: 'p_member', level: 'write' } };
+  const host = await listen(t, () => Promise.resolve(spy.engine), it.api, member);
+  const out = await ask(host.origin, { ask_cap: 0 }, {}, '/api/spark/settings');
+  assert.equal(out.status, 403, JSON.stringify(out.body));
+  assert.equal(out.body.refusal?.fix, 'Only the record owner changes how Spark is set up.');
+});
+
+test('POST /api/spark/propose HANDS THE ENGINE THE ask_id PASS 1 ANSWERED, and refuses one that is not text', async (t) => {
+  const it = await record(t);
+  const spy = spied(it);
+  const host = await listen(t, () => Promise.resolve(spy.engine), it.api);
+
+  await ask(host.origin, { question: 'Which tasks are open?', ask_id: '01M33H56ZCMM62YT38ARN8JRM8' }, {}, '/api/spark/propose');
+  assert.deepEqual(spy.calls.at(-1), { method: 'propose', args: ['Which tasks are open?', undefined, '01M33H56ZCMM62YT38ARN8JRM8'] });
+
+  spy.calls.length = 0;
+  const bad = await ask(host.origin, { question: 'Which tasks are open?', ask_id: 7 }, {}, '/api/spark/propose');
+  assert.equal(bad.status, 422, JSON.stringify(bad.body));
+  assert.equal(bad.body.refusal?.at, 'ask_id');
+  const unworded = await ask(host.origin, { question: 7 }, {}, '/api/spark/propose');
+  assert.equal(unworded.status, 422);
+  assert.equal(unworded.body.refusal?.at, 'question');
+  assert.deepEqual(spy.calls, []);
+});
+
+test('A BEARER AT EACH OF THE THREE NEW DOORS IS REFUSED, before the origin and before the engine', async (t) => {
+  const it = await record(t);
+  let asked = 0;
+  const host = await listen(t, () => (asked += 1, Promise.resolve(undefined)), it.api);
+  const authorization = 'Bearer bd_obviously_fake_for_tests';
+
+  const status = await fetch(`${host.origin}/api/spark/status`, { headers: { authorization } });
+  assert.equal(status.status, 403);
+  assert.equal(((await status.json()) as Answer['body']).refusal?.code, 'NEEDS_BROWSER_SESSION');
+  for (const path of ['/api/spark/settings', '/api/spark/propose']) {
+    const out = await ask(host.origin, { question: 'x' }, { authorization }, path);
+    assert.equal(out.status, 403, `${path}: ${JSON.stringify(out.body)}`);
+    assert.equal(out.body.refusal?.code, 'NEEDS_BROWSER_SESSION');
+  }
+  assert.equal(asked, 0);
+});
+
+test("A HOST THAT CAN OPEN A KEY GETS TIER b THROUGH, and propose is handed what the host's byok answered", async () => {
+  /* NO TEST REACHED `byok` UNTIL THIS ONE. The checker dropped the spread that puts `sparkAskDoor`'s third argument on
+     the door and every other test in this file still passed, because both hosts pass none and every test above
+     builds its door the same way. Without the spread a host that could open a key would still be told 501 at
+     settings, and `propose` would never see the key it opened. A double engine, because what is measured is only
+     what the door hands on. */
+  const seen: { method: string; args: unknown[] }[] = [];
+  const engine: SparkAskEngine<CallContext> = {
+    read: () => Promise.resolve({ ok: true, value: null }),
+    status: () => null,
+    configure: (patch) => (seen.push({ method: 'configure', args: [patch] }), { ok: true, value: patch }),
+    propose: (question, _ctx, byok, askId) => (seen.push({ method: 'propose', args: [question, byok, askId] }), Promise.resolve({ ok: true, value: null })),
+  };
+  const origin = 'https://braindog.example';
+  const post = (path: string, body: unknown) =>
+    new Request(`${origin}${path}`, { method: 'POST', headers: { origin, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+
+  const door = sparkAskDoor(new Set([origin]), () => Promise.resolve(engine), (ctx) => Promise.resolve({ key: 'opened for', who: ctx.principal.id }));
+  const b = await serveSpark(post('/api/spark/settings', { tier: 'b', grant_id: 'g_01M33H56ZCMM62YT38ARN8JRM8', model: 'm' }), door, owner);
+  assert.equal(b.status, 200, await b.clone().text());
+  const proposed = await serveSpark(post('/api/spark/propose', { question: 'Which tasks are open?' }), door, owner);
+  assert.equal(proposed.status, 200, await proposed.clone().text());
+  assert.deepEqual(seen.map((c) => c.method), ['configure', 'propose']);
+  assert.deepEqual(seen[1]!.args, ['Which tasks are open?', { key: 'opened for', who: 'p_owner' }, undefined]);
+
+  /* AND A KEY THAT WOULD NOT OPEN IS A 500 IN WORDS, before the engine is asked anything. */
+  const shut = sparkAskDoor(new Set([origin]), () => Promise.resolve(engine), () => Promise.reject(new Error('the grant is revoked')));
+  const refused = await serveSpark(post('/api/spark/propose', { question: 'Which tasks are open?' }), shut, owner);
+  assert.equal(refused.status, 500);
+  assert.match(((await refused.json()) as { refusal: { fix: string } }).refusal.fix, /the grant is revoked/);
+  assert.equal(seen.length, 2);
 });

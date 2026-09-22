@@ -20,12 +20,14 @@ import {
   endpointModel,
   sparkFromEnv,
   sparkInferenceOf,
+  sparkModelNameOf,
   sparkModelOf,
+  sparkNamedEngine,
   sparkRecord,
   SPARK_INSTRUCTIONS,
   SPARK_PLAN_INSTRUCTIONS,
 } from '../src/spark.ts';
-import { createSpark } from '../../spark/src/index.ts';
+import { createSpark, MODELS } from '../../spark/src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 const FAKE_KEY = 'fake-key-for-tests-only';
@@ -141,6 +143,56 @@ test('THE SAME ENDPOINT IS THE PACKAGE\'S Inference PORT, asked with a schema an
     endpointInference({ url: 'http://localhost:9/v1/chat/completions', send: down.send }).complete({ model: 'glm-5.3-flash', messages: [], maxTokens: 10, jsonSchema: {} }),
     /answered 503/u,
   );
+});
+
+/* ── `SPARK_MODEL` maps the package's four short names and nothing else (research-spark-routes F1, F2) ─── */
+
+const ask = (model: string) => ({ model, messages: [], maxTokens: 10, jsonSchema: {} });
+const sentModel = (net: { sent: { init: RequestInit }[] }, i: number): string => (JSON.parse(String(net.sent[i]!.init.body)) as { model: string }).model;
+
+test('A MODEL THE OWNER NAMED REACHES THE ENDPOINT, and SPARK_MODEL stands in only for the package\'s four routing names', async () => {
+  const net = endpoint(() => usedCompletion('{}', { prompt_tokens: 1, completion_tokens: 1 }));
+  const inference = endpointInference({ url: 'http://localhost:11434/v1/chat/completions', model: 'ENV_MODEL', send: net.send });
+  /* THE FAILURE, AS IT WAS MEASURED: an owner's `llama3:8b` on tier `byo` was posted as `ENV_MODEL`, so a settings route
+     would have stored a model that nothing sends. */
+  await inference.complete(ask('llama3:8b'));
+  assert.equal(sentModel(net, 0), 'llama3:8b');
+  /* THE PACKAGE'S OWN TABLE AND NOT A COPY OF IT, so a fifth model added there and not to `ROUTING_NAMES` is red here. */
+  const shorts = Object.keys(MODELS);
+  assert.equal(shorts.length, 4);
+  for (const short of shorts) await inference.complete(ask(short));
+  assert.deepEqual([1, 2, 3, 4].map((i) => sentModel(net, i)), ['ENV_MODEL', 'ENV_MODEL', 'ENV_MODEL', 'ENV_MODEL']);
+  /* WITH NO SPARK_MODEL EVERY NAME PASSES THROUGH, the short ones included. */
+  await endpointInference({ url: 'http://localhost:11434/v1/chat/completions', send: net.send }).complete(ask('glm-5.3'));
+  assert.equal(sentModel(net, 5), 'glm-5.3');
+});
+
+test('A TIER a STATUS NAMES THE MODEL THAT ANSWERS, which on a host with SPARK_MODEL is that and not the routing short name', async () => {
+  const own = openSqlite();
+  const sql = openSqlite();
+  const clock = fixedClock(Date.UTC(2026, 8, 22, 9));
+  const api = await createRecordApi({ sql, clock });
+  const net = endpoint(() => usedCompletion('{}', { prompt_tokens: 1, completion_tokens: 1 }));
+  const config = sparkFromEnv({ SPARK_ENDPOINT: 'http://localhost:11434/v1/chat/completions', SPARK_MODEL: 'llama3' }, { operatorKey: false });
+  const inference = sparkInferenceOf(config, { grants: () => [], openKey: async () => null, send: net.send })!;
+  const spark = sparkNamedEngine(createSpark({ sql: own, clock, inference, record: sparkRecord(api) }), sparkModelNameOf(config));
+  /* THE FAILURE, AS IT WAS MEASURED: `{"tier":"a","model":"glm-5.3-flash",...}` over an endpoint serving `llama3`. */
+  assert.equal(spark.status().tier, 'a');
+  assert.equal(spark.status().model, 'llama3');
+  /* THE REST OF THE ENGINE IS THE ENGINE'S: the wrap changes one answer and hides no method. */
+  assert.equal(typeof spark.read, 'function');
+  assert.equal(spark.status().asks.cap, createSpark({ sql: own, clock, inference, record: sparkRecord(api) }).status().asks.cap);
+
+  /* AN OWNER'S OWN NAME ON TIER byo IS SHOWN AS IT WAS TYPED, because that is also what is now sent. */
+  assert.ok(spark.configure({ tier: 'byo', model: 'llama3:8b' }, owner).ok);
+  assert.equal(spark.status().model, 'llama3:8b');
+
+  /* AND A HOST WITH NO SPARK_MODEL SHOWS THE SHORT NAME, which is what its endpoint is sent. */
+  assert.equal(sparkModelNameOf(sparkFromEnv({ SPARK_ENDPOINT: 'http://localhost:1/v1' })), undefined);
+  const bare = sparkNamedEngine(createSpark({ sql: openSqlite(), clock, inference, record: sparkRecord(api) }), undefined);
+  assert.equal(bare.status().model, 'glm-5.3-flash');
+  sql.close();
+  own.close();
 });
 
 const TASKS = {

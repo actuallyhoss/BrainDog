@@ -1,5 +1,11 @@
 /**
- * The ask: `POST /api/spark/read`, the half both hosts share. `docs/46` §5.2, `23 §7`.
+ * Spark's doors: `POST /api/spark/read`, `GET /api/spark/status`, `POST /api/spark/settings` and
+ * `POST /api/spark/propose`, the half both hosts share. `docs/46` §5.2, `23 §7` and `§8`.
+ *
+ * FOUR OF `46 §5.2`'s FIVE, AND THE READ WAS ALONE FOR A DAY. `loop/research-spark-routes.md` found that
+ * the Spark object both hosts build has five methods and only `read` had a door, so tier stayed `a`, the
+ * cap stayed 80, and an owner could neither see nor set Spark's model from the product. Status, settings
+ * and propose are here now; `pattern` is not, and `SparkAskEngine` says why.
  *
  * BOTH HOSTS MOUNT THIS DOOR, AND THE ENGINE IS REACHED THROUGH IT FROM A BROWSER. `903bc9c9` wrote the
  * door and `1816500a` wrote the two branches in front of it, eight minutes apart on 21 September:
@@ -48,7 +54,9 @@
  * at all, and only then the body. It is `keys.ts`'s order for `keys.ts`'s reasons. A bearer is refused
  * `NEEDS_BROWSER_SESSION` whatever it is, which is `46 §5.2`'s own last line and `§6`'s row for it;
  * a request with no `Origin`, or one this host does not answer for, is the half of CSRF that does not
- * depend on the browser (`12 §8`), and it is why a cookie is admissible here at all.
+ * depend on the browser (`12 §8`), and it is why a cookie is admissible here at all. The one exception
+ * is status, a GET, on which a browser sends no `Origin` to its own site; `serveSpark` says the rule
+ * that replaces it.
  *
  * THE ENGINE IS A THUNK AND NOT AN OBJECT, because `46 §5.1` has the host `import()` the package once
  * and only when an endpoint is configured, and `apps/worker/src/spark.ts` builds it on the first ask
@@ -70,15 +78,27 @@ import { httpStatus } from './index.ts';
 import { VAULT_HEADERS } from './vault.ts';
 
 /**
- * The one method of `Spark` this door calls, over whatever context the host resolves a session to.
+ * The four methods of `Spark` these doors call, over whatever context the host resolves a session to.
  *
  * STRUCTURAL, AS `RecordSurface` IS. `packages/host` must not depend on `@braindog/spark`: `31 §2`
  * puts the package at row 13 and `46 §5.1` puts the `import()` in the app, so naming the type here
- * would be the edge this file exists to serve, pointing the wrong way. One method rather than five
- * because a door that names `configure` is a door somebody can reach settings through.
+ * would be the edge this file exists to serve, pointing the wrong way. Both hosts already pass the
+ * whole `Spark`, which satisfies this shape without a line of either app changing.
+ *
+ * FOUR AND NOT FIVE. This type said "one method rather than five because a door that names `configure`
+ * is a door somebody can reach settings through", and that was the right caution while nothing checked
+ * who was configuring. The check is the package's, and it was measured before this door named the
+ * method: `configure` answers a `write` member and a `system` principal 403 `FORBIDDEN`, "Only the
+ * record owner changes how Spark is set up." `proposePattern` is still left out on purpose, because it
+ * is neither metered nor capped (`loop/research-spark-routes.md` F4: with `ask_cap: 0`, `read` refused
+ * and `proposePattern` called the model anyway), and a door in front of it would be a second unmetered
+ * model call behind a button until `docs/46` §4.1 says whether a pattern is an ask.
  */
 export type SparkAskEngine<C> = {
   read(question: string, ctx: C): Promise<Result<unknown>>;
+  status(): unknown;
+  configure(patch: Record<string, unknown>, ctx: C): Result<unknown>;
+  propose(question: string, ctx: C, byok?: unknown, askId?: string): Promise<Result<unknown>>;
 };
 
 /**
@@ -91,10 +111,16 @@ export type SparkAskEngine<C> = {
  * `engine` IS ABSENT WHERE THE HOST WIRED NONE and answers `undefined` where it wired one and the
  * deployment configured no endpoint. Both are the same fact to a person, so both get the same
  * sentence.
+ *
+ * `byok` IS THE HOST'S WAY TO OPEN THE OWNER'S OWN KEY FOR ONE PROPOSE, and it is absent on both hosts
+ * today. The door reads nothing about tiers: it hands `propose` whatever `byok` answers for this
+ * session. Where it is absent the settings door refuses tier `b` outright, because a stored tier `b`
+ * that no host can serve would make every later `propose` answer `FORBIDDEN`.
  */
 export type SparkAskDoor<C> = {
   origins: ReadonlySet<string>;
   engine?: (() => Promise<SparkAskEngine<C> | undefined>) | undefined;
+  byok?: ((ctx: C) => Promise<unknown>) | undefined;
 };
 
 /**
@@ -115,7 +141,11 @@ export type SparkAskDoor<C> = {
  * day opens a vault grant, which can fail for a reason that has passed by the second ask, so a failure is
  * forgotten here and the next ask is a retry rather than an echo.
  */
-export function sparkAskDoor<C>(origins: ReadonlySet<string>, build: () => Promise<SparkAskEngine<C> | undefined>): SparkAskDoor<C> {
+export function sparkAskDoor<C>(
+  origins: ReadonlySet<string>,
+  build: () => Promise<SparkAskEngine<C> | undefined>,
+  byok?: (ctx: C) => Promise<unknown>,
+): SparkAskDoor<C> {
   let built: Promise<SparkAskEngine<C> | undefined> | null = null;
   return {
     origins,
@@ -126,13 +156,29 @@ export function sparkAskDoor<C>(origins: ReadonlySet<string>, build: () => Promi
       });
       return built;
     },
+    ...(byok === undefined ? {} : { byok }),
   };
 }
 
-/** Which Spark door a path is, or `null`. `46 §5.2` has five; this is the one with a caller. */
-export function servesSpark(pathname: string): 'read' | null {
-  return /^\/+api\/+spark\/+read\/*$/.test(pathname) ? 'read' : null;
+/** A Spark door this file answers. */
+export type SparkRoute = 'read' | 'status' | 'settings' | 'propose';
+
+/**
+ * Which Spark door a path is, or `null`. `46 §5.2` has five and four are served here; `pattern` waits for
+ * `46 §4.1` to say whether a pattern is an ask (see `SparkAskEngine`).
+ *
+ * BOTH HOSTS DISPATCH ON THE TRUTH OF THIS AND NOTHING ELSE, which is why widening it mounted three doors
+ * without an edit to either app: `apps/selfhost/src/server.ts` hands the request to `serveSpark` when it
+ * answers anything, and `apps/worker/src/index.ts` does the same inside `Record$` and refuses a bearer in
+ * the router on `!== null`.
+ */
+export function servesSpark(pathname: string): SparkRoute | null {
+  const hit = /^\/+api\/+spark\/+(read|status|settings|propose)\/*$/.exec(pathname);
+  return hit ? (hit[1] as SparkRoute) : null;
 }
+
+/** The four keys a settings patch may carry, which are the four `configure` reads (`packages/spark/src/index.ts`). */
+const SETTINGS = ['tier', 'model', 'grant_id', 'ask_cap'] as const;
 
 /**
  * A question is 400 bytes to the engine (`propose.ts` `ASK_BYTES`), and this is the envelope around it.
@@ -140,8 +186,8 @@ export function servesSpark(pathname: string): 'read' | null {
  * IT IS A CEILING ON THE READ AND NOT A SECOND OPINION ABOUT THE QUESTION. The engine truncates to
  * its own budget and says so; what this stops is a stranger posting a megabyte at a door that is
  * about to run a model call, which is the same reason `keys.ts` caps its body at the vault's limit.
- * ONE CALL AND NOT TWO: `46 §13` D12's second pass is `propose`, which `servesSpark` does not serve,
- * and the test measures `sent.length === 1` for a `read` that answered rows.
+ * ONE CALL AND NOT TWO: `46 §13` D12's second pass is `propose`, which is its own door, so a `read`
+ * never proposes, and the test measures `sent.length === 1` for a `read` that answered rows.
  */
 const BODY_LIMIT = 4_000;
 
@@ -183,55 +229,156 @@ const NO_MODEL: Refusal = {
  * this, because an action that swallowed it into an `ok` would be an action nothing reaches again.
  */
 export async function serveSpark<C>(request: Request, door: SparkAskDoor<C>, ctx: C): Promise<Response> {
-  if (servesSpark(new URL(request.url).pathname) === null)
-    return refusal(404, { code: 'ROUTE_UNKNOWN', fix: "Spark's ask is at /api/spark/read." });
-  if (request.method !== 'POST')
-    return refusal(405, { code: 'ROUTE_UNKNOWN', fix: '/api/spark/read takes a POST.' }, [['allow', 'POST']]);
+  const route = servesSpark(new URL(request.url).pathname);
+  if (route === null)
+    return refusal(404, { code: 'ROUTE_UNKNOWN', fix: "Spark's doors are /api/spark/read, /api/spark/status, /api/spark/settings and /api/spark/propose." });
+  const path = `/api/spark/${route}`;
+  const verb = route === 'status' ? 'GET' : 'POST';
+  if (request.method !== verb) return refusal(405, { code: 'ROUTE_UNKNOWN', fix: `${path} takes a ${verb}.` }, [['allow', verb]]);
 
   /* A BEARER OF ANY KIND, BEFORE ANYTHING ELSE, as in `keys.ts`: on a self-host the server key makes
      the owner and would pass every check below this one, so it is the header that is refused rather
      than the principal behind it. */
   if (request.headers.get('authorization') !== null) return refusal(403, NO_BEARER);
 
+  /* TWO ORIGIN RULES, BECAUSE A BROWSER SENDS `Origin` ON ONE METHOD AND NOT THE OTHER. Every browser
+     sends it on a POST, so a POST with none is not a page and is refused. The Fetch standard adds it to a
+     same-origin request only when the method is neither GET nor HEAD, so the palette's own
+     `fetch('/api/spark/status')` carries none, and the POST rule would refuse every palette that opened.
+     The GET is held to `apps/selfhost/src/server.ts` `forged` instead: a NAMED origin this host does not
+     answer for, or a `Sec-Fetch-Site` that names another site, is a page somewhere else. Status reads no
+     row and calls no model, so what a request with neither header can learn is a tier, a model name and
+     a count. */
   const origin = request.headers.get('origin');
-  if (origin === null || !door.origins.has(origin))
-    return refusal(403, { code: 'FORBIDDEN', fix: 'Spark is asked from this app, in a browser, on this address.', at: 'origin' });
+  const site = request.headers.get('sec-fetch-site');
+  const foreign =
+    route === 'status'
+      ? (origin !== null && !door.origins.has(origin)) || (site !== null && site !== 'same-origin' && site !== 'none')
+      : origin === null || !door.origins.has(origin);
+  if (foreign) return refusal(403, { code: 'FORBIDDEN', fix: 'Spark is asked from this app, in a browser, on this address.', at: 'origin' });
 
   if (!door.engine) return refusal(501, NO_MODEL);
 
-  if ((request.headers.get('content-type') ?? '').split(';')[0]?.trim().toLowerCase() !== 'application/json')
-    return refusal(400, { code: 'BODY_MALFORMED', fix: '/api/spark/read takes a JSON object, sent as application/json.' });
-  const raw = await request.text();
-  if (raw.length > BODY_LIMIT) return refusal(400, { code: 'BODY_MALFORMED', fix: 'A question is a sentence, and Spark reads the first 400 bytes of it.', at: 'question' });
-  let body: unknown;
-  try {
-    body = JSON.parse(raw);
-  } catch {
-    body = null;
+  if (route === 'status') {
+    const engine = await built(door.engine);
+    if (engine instanceof Response) return engine;
+    return answer(() => ({ ok: true, value: engine.status() }));
   }
-  if (body === null || typeof body !== 'object' || Array.isArray(body))
-    return refusal(400, { code: 'BODY_MALFORMED', fix: '/api/spark/read takes a JSON object, sent as application/json.' });
+
+  if ((request.headers.get('content-type') ?? '').split(';')[0]?.trim().toLowerCase() !== 'application/json')
+    return refusal(400, { code: 'BODY_MALFORMED', fix: `${path} takes a JSON object, sent as application/json.` });
+  const raw = await request.text();
+  if (raw.length > BODY_LIMIT)
+    return route === 'settings'
+      ? refusal(400, { code: 'BODY_MALFORMED', fix: "Spark's settings are four short fields, and this is far longer than all four." })
+      : refusal(400, { code: 'BODY_MALFORMED', fix: 'A question is a sentence, and Spark reads the first 400 bytes of it.', at: 'question' });
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    parsed = null;
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed))
+    return refusal(400, { code: 'BODY_MALFORMED', fix: `${path} takes a JSON object, sent as application/json.` });
+  const body = parsed as Record<string, unknown>;
+
+  if (route === 'settings') {
+    const wrong = unsettled(body, door.byok !== undefined);
+    if (wrong) return wrong;
+    const engine = await built(door.engine);
+    if (engine instanceof Response) return engine;
+    return answer(() => engine.configure(body, ctx));
+  }
 
   /* THE TYPE AND NOT THE CONTENTS. A blank question is the engine's own refusal, in the engine's own
      words ("Ask Spark a question first. A blank ask has nothing to read."), and saying it twice in
      two files is two sentences to keep in step. What the engine cannot survive is a question that is
      not text at all: `question.trim()` on a number is a TypeError, which is a 500 for a value a
      caller can see and fix. */
-  const question = (body as Record<string, unknown>)['question'];
+  const question = body['question'];
   if (typeof question !== 'string')
-    return refusal(422, { code: 'VALUE_MALFORMED', fix: `question is what you want to know, in words, and this one is ${JSON.stringify(question) ?? String(question)}.`, at: 'question' });
+    return refusal(422, { code: 'VALUE_MALFORMED', fix: `question is what you want to know, in words, and this one is ${shown(question)}.`, at: 'question' });
 
-  let engine: SparkAskEngine<C> | undefined;
+  /* `ask_id` IS PASS 1'S OWN ANSWER QUOTED BACK, so the package re-projects the predicate it stored instead
+     of drafting a second one, which would be a second model call for the same question (`46 §5.5` step 1).
+     Absent is a propose with no pass 1 behind it and the package drafts; anything but text is a caller
+     that has confused the field with something else. */
+  const askId = body['ask_id'];
+  if (route === 'propose' && askId !== undefined && typeof askId !== 'string')
+    return refusal(422, { code: 'VALUE_MALFORMED', fix: `ask_id is the one Spark's reading answered, as text, and this one is ${shown(askId)}.`, at: 'ask_id' });
+
+  const engine = await built(door.engine);
+  if (engine instanceof Response) return engine;
+  if (route === 'read') return answer(() => engine.read(question, ctx));
+
+  let byok: unknown;
   try {
-    engine = await door.engine();
+    byok = door.byok ? await door.byok(ctx) : undefined;
+  } catch (e) {
+    return refusal(500, { code: 'INTERNAL', fix: `Your key could not be opened for Spark: ${e instanceof Error ? e.message : String(e)}.` });
+  }
+  return answer(() => engine.propose(question, ctx, byok, askId as string | undefined));
+}
+
+const shown = (value: unknown): string => JSON.stringify(value) ?? String(value);
+
+/** The engine, or the refusal a person gets for a builder that threw or a host that configured no model. */
+async function built<C>(engine: () => Promise<SparkAskEngine<C> | undefined>): Promise<SparkAskEngine<C> | Response> {
+  let out: SparkAskEngine<C> | undefined;
+  try {
+    out = await engine();
   } catch (e) {
     return refusal(500, { code: 'INTERNAL', fix: `Spark could not be started here: ${e instanceof Error ? e.message : String(e)}.` });
   }
-  if (engine === undefined) return refusal(501, NO_MODEL);
+  return out ?? refusal(501, NO_MODEL);
+}
 
+/** One engine call, answered, with a throw out of it a 500 and a sentence rather than a hung socket. */
+async function answer(run: () => Result<unknown> | Promise<Result<unknown>>): Promise<Response> {
   try {
-    return sparkReply(await engine.read(question, ctx));
+    return sparkReply(await run());
   } catch (e) {
     return refusal(500, { code: 'INTERNAL', fix: `Spark could not answer that: ${e instanceof Error ? e.message : String(e)}.` });
   }
+}
+
+/**
+ * What the settings door refuses before `configure` reads the patch, or `null`.
+ *
+ * A KEY THIS DOOR DOES NOT KNOW IS REFUSED, BECAUSE THE ENGINE DOES NOT REFUSE IT. Measured on the package:
+ * `configure({ tier: 'a', bogus: 1 }, owner)` answered `ok` with nothing changed, so an owner's typo was a
+ * save that said it had worked. The record answers a stray `FIELD_UNKNOWN` everywhere, in `stray`'s sentence
+ * (`packages/record/src/index.ts`), and this is that sentence.
+ *
+ * A VALUE OF THE WRONG JS TYPE IS REFUSED HERE TOO, because the engine's checks assume the type: `model.trim()`
+ * on a number is a TypeError and a 500, the reason the ask checks `question`. The engine's own refusals about
+ * the values themselves (a tier it does not run, a cap below zero, a grant id of the wrong shape) stay the
+ * engine's, in its words.
+ *
+ * AND TIER `b` WHERE THE HOST CANNOT OPEN A KEY IS 501, because storing it would break the palette on save:
+ * every later `propose` would answer `FORBIDDEN` for a key no host here can open.
+ */
+function unsettled(patch: Record<string, unknown>, byok: boolean): Response | null {
+  const stray = Object.keys(patch).find((k) => !(SETTINGS as readonly string[]).includes(k));
+  if (stray !== undefined)
+    return refusal(422, {
+      code: 'FIELD_UNKNOWN',
+      fix: `${stray} is not something this call takes. It takes ${SETTINGS.join(', ')}.`,
+      at: stray,
+      allowed: [...SETTINGS],
+    });
+  for (const key of ['tier', 'model', 'grant_id'] as const) {
+    const value = patch[key];
+    if (value !== undefined && value !== null && typeof value !== 'string')
+      return refusal(422, { code: 'VALUE_MALFORMED', fix: `${key} is text or null, and this one is ${shown(value)}.`, at: key });
+  }
+  if (patch['ask_cap'] !== undefined && typeof patch['ask_cap'] !== 'number')
+    return refusal(422, {
+      code: 'VALUE_MALFORMED',
+      fix: `ask_cap is a number of asks, and this one is ${shown(patch['ask_cap'])}.`,
+      at: 'ask_cap',
+    });
+  if (patch['tier'] === 'b' && !byok)
+    return refusal(501, { code: 'NOT_IN_THIS_BUILD', fix: 'Spark cannot use a key of your own on this host yet.', at: 'tier' });
+  return null;
 }

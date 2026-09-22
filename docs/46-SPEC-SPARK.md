@@ -126,6 +126,18 @@ Six source files, counted. `prompts.ts` imports nothing so the CLI's runner can 
 
 ### 4.1 · Spark's own SQLite — two tables
 
+**Where the database lives, as built.** On the self-host it is `<dir>/spark.sqlite`, the file beside the record's own
+database in the record's directory (`apps/selfhost/src/server.ts`, `sparkFile`, since `b8a07ebd`), and it is held in
+memory only when the record itself is (`file: ':memory:'`). It was `:memory:` on every self-host before that, so each
+restart began the month's meter again and put the owner's `settings` row back to the defaults;
+`apps/selfhost/test/spark-meter-persists.test.ts` asks twice across a restart and reads both rows back. **The snapshots do not
+carry it.** A snapshot is `VACUUM INTO` of the record file alone (`apps/selfhost/src/snapshots.ts`), so neither the
+nightly copy nor one a person takes holds `settings` or `call`, and a record restored from one keeps whatever
+`spark.sqlite` is already beside it. Destroying the record removes `spark.sqlite` and its `-wal` and `-shm` with it. On
+the Worker the tables are created in the record's own Durable Object storage (`apps/worker/src/index.ts`,
+`storageSql(this.ctx.storage)`), not in the separate `Spark` object §1 names: that object is not built yet, which is a
+gap against §1 and not a decision.
+
 ```sql
 PRAGMA user_version = 1;   -- best effort: a Durable Object's authorizer refuses it (SQLITE_AUTH), so on the Worker it reads 0 and a migration may not key on it
 
@@ -156,13 +168,17 @@ CREATE TABLE IF NOT EXISTS call (          -- one row per model call: the meter,
 CREATE INDEX IF NOT EXISTS call_meter ON call(tier, kind, ts);
 ```
 
-Invariants a test checks: `settings` has exactly one row after `createSpark`; a `call` row exists for every `Inference` call made, including refused ones; `neurons = 0` wherever `tier <> 'a'`; no `call.read` entry ever carries a field value. There is no conversation table — nothing accumulates (23 §3) — and no retrieval cache: the predicate is the cache key and the record is the cache (§13 #2).
+Invariants a test checks: `settings` has exactly one row after `createSpark`; a `call` row exists for every `Inference` call made, including refused ones (one path breaks this today, see the failure paragraph below); `neurons = 0` wherever `tier <> 'a'`; no `call.read` entry ever carries a field value. There is no conversation table — nothing accumulates (23 §3) — and no retrieval cache: the predicate is the cache key and the record is the cache (§13 #2).
 
 The month's meter is one indexed count:
 
 ```sql
-SELECT COUNT(*) FROM call WHERE tier = 'a' AND kind IN ('read','propose') AND model <> '-' AND ts >= ?   -- ? = the first instant of the month, record tz
+SELECT COUNT(*) FROM call WHERE tier = 'a' AND kind IN ('read','propose') AND model <> '-' AND ts >= ?   -- ? = the first instant of the month, UTC
 ```
+
+The intent is the first instant of the month in the record's time zone. The code uses UTC (`call.ts`, `monthOf`), because
+`RecordApi` has no method that answers the zone; `createSpark`'s header says so. That is a gap: in a zone east of UTC the
+meter resets a few hours after local midnight on the first, and west of it a few hours before.
 
 **One ask is one model call, on pass 1 or pass 2.** The count was `kind = 'propose'` alone, which fitted a palette whose
 pass 1 was free; the only door built is `POST /api/spark/read`, which writes `kind = 'read'`, so an owner who set
@@ -171,9 +187,26 @@ pass 1 was free; the only door built is `POST /api/spark/read`, which writes `ki
 given an `ask_id` spends one (its draft was spent on pass 1), and a `propose` with no `ask_id` spends two, because it
 drafts its own predicate first (§5.5-1) and accounts that call as a `read` row. A pass 2 repeated on a stored `ask_id`
 spends one each time. A pass 2 whose rows came back empty calls no model (§5.5-2), so it spends nothing of its own:
-one with an `ask_id` spends none and one without spends only its drafting `read`. A refused or failed model call still counts: the status is not in the filter. `model = '-'` is
-the one row that called nothing, the `read` on a record with no lists (§5.4-3), and it is not billed. Tiers `b` and
-`byo` are never metered.
+one with an `ask_id` spends none and one without spends only its drafting `read`. `model = '-'` is the one row that
+called nothing, the `read` on a record with no lists (§5.4-3), and it is not billed. Tiers `b` and `byo` are never
+metered.
+
+**A failed or refused model call is billed.** The status is not in the filter, and every row below carries the model's
+name, so each counts as one. Measured on 22 September by driving `createSpark` over `test/double.ts` from a script
+outside the tree:
+
+| What happened | Row written | `asks.used` after |
+|---|---|---|
+| pass 1, the provider did not answer | `read · error · UNREACHABLE`, `tokens_in` = the prompt estimate, `tokens_out` 0. The `read` itself answers `ok` on the keyword fallback (§5.4-4) | 1 |
+| pass 1, the reply was not JSON | `read · error · PROPOSAL_SCHEMA`; the `read` answers `ok` on the keyword fallback | 1 |
+| pass 2 on an `ask_id`, the provider did not answer | `propose · error · UNREACHABLE`; the answer is the `UNREACHABLE` refusal | 2 (pass 1 and pass 2) |
+| pass 2 on an `ask_id`, the text typed a digit | `propose · refused · PROPOSAL_UNCITED` | 2 |
+| pass 1, the model answered and the rows projection (§5.4-5) was then refused by the record | none | 0 |
+
+The last row is a gap against the invariant above, and it is the one failure that is not billed. `look` in
+`propose.ts` returns the record's refusal before `accountRead` runs, so a model call was made and no `call` row says
+so. The same holds for a `propose` with no `ask_id`, which drafts through the same path. The intent stands: every
+`Inference` call has its row.
 
 > **OPEN QUESTION FOR THE OWNER, not settled here.** [23-ASSISTANT-UI](23-ASSISTANT-UI.md) §8 says the unit a person
 > sees is an *ask*, and §14 below says "a second identical ask in the same month increments the meter by one". Under
@@ -427,7 +460,7 @@ Every deterministic feature is the same bytes either way — the e2e gate of §9
 
 | Route | Auth | Calls |
 |---|---|---|
-| `GET /api/spark/status` | cookie | `status()` — also the palette's warm-up on open (23 §7) |
+| `GET /api/spark/status` | cookie; the origin rule is `Sec-Fetch-Site`, below | `status()`, also the palette's warm-up on open (23 §7) |
 | `POST /api/spark/read` | cookie | `read(question, ctx)` |
 | `POST /api/spark/propose` | cookie | `propose(question, ctx, byok?, ask_id?)` — the host builds `byok` when `settings.tier = 'b'` (§5.9) |
 | `POST /api/spark/pattern` | cookie | `proposePattern(samples, ctx)` — the raw-inbox row's one affordance (23 §3) |
@@ -437,6 +470,22 @@ Every deterministic feature is the same bytes either way — the e2e gate of §9
 | `GET /ws/runner` | device grant | upgrade; `jobs.attach(socket)`; Cloud only (§13 #8) |
 
 Every bearer at a cookie route is `403 NEEDS_BROWSER_SESSION`; every MCP token at any JOBS route is `FORBIDDEN` (§6).
+
+**The origin rule differs by method.** The `POST` rows take the read door's rule: a request whose `Origin` is absent
+or not one the host answers for is `403 FORBIDDEN` at `origin` (`serveSpark`, `packages/host/src/spark-ask.ts`).
+`GET /api/spark/status` cannot, because under the Fetch standard a browser adds `Origin` to a same-origin request only
+when the method is neither `GET` nor `HEAD`, so the app's own `fetch('/api/spark/status')` carries none and that rule
+would refuse every browser. Status therefore takes the rule the self-host's `forged()` already applies
+(`apps/selfhost/src/server.ts`): a named `Origin` outside the host's set, or a `Sec-Fetch-Site` other than `same-origin`
+or `none`, is `403 FORBIDDEN`, and a request carrying neither is admitted (`loop/research-spark-routes.md` F5). This is
+read from the standard's text and not measured in a browser.
+
+**What is mounted is four of the five cookie rows**, on both hosts: `read`, `status`, `settings` and `propose`.
+`servesSpark` matches those four paths and both hosts dispatch on it alone. `POST /api/spark/pattern` has no door,
+because `proposePattern` is neither metered nor capped (§5.3, F4) and a door in front of it would be an unmetered model
+call behind a button. Neither host builds `byok` yet, so the settings door refuses `tier: 'b'` with `501
+NOT_IN_THIS_BUILD` at `tier` rather than store a tier no `propose` could serve. The JOBS rows and `/ws/runner` wait on
+the record's six JOBS methods, which do not exist (`packages/spark/src/index.ts`, the header).
 
 ### 5.3 · Tier A jobs
 
@@ -455,7 +504,7 @@ Common steps, then the differences. Every job:
 5b. On a parse or schema failure the verdict is `{ kind: 'other', actionable: true }`: a wrong skip is the silent failure (07 §2), so failure lands in front of a person.
 Returns `{ shape, kind, actionable, model }`. The ingest Workflow writes `inbox_raw.state` and `reason`; this package does not.
 
-**`proposePattern(samples, ctx)`** — 07 §4, 23 §4. Samples are three or more `RawPayload`s of one `shape`:
+**`proposePattern(samples, ctx)`** — 07 §4, 23 §4. The intent is three or more `RawPayload`s of one `shape` (24 §4.3's n_min 3). **The code does not keep either half.** `jobs.ts` refuses only an empty list (`VALUE_MALFORMED` at `samples`, no model call) and compares no `shape`: measured on 22 September, one sample reached the model and was accounted as a `pattern` row. The gap is open; the three-of-one-shape rule is today the caller's to keep, and no caller exists. Two more gaps sit beside it (`loop/research-spark-routes.md` F4): the job is not metered, because `asksUsed` does not count `kind = 'pattern'` and `proposePattern` never checks the cap, so `ask_cap: 0` does not stop it; and it always calls `deps.inference`, never a tier `b` adapter.
 5a. `declare.validate('ingest', out.ingest)` — a refusal (e.g. `KIND_UNKNOWN`, `MATCH_FIELD_UNKNOWN`, `CONTAINS_TOO_LONG`) is returned as-is.
 5b. **The anchor check**: every string literal under `match.*.is|contains|starts|ends` and `extract.*.after|before|between[*]` must occur verbatim in at least one sample's `from`, `subject` or `body`. One that does not → `PROPOSAL_UNCITED` at its path (`extract.merchant.between[1]`). The model cannot invent an anchor the messages do not contain.
 5c. `writes.register` ∈ `index.registers`; `writes.confidence` is **overwritten** to `needs-review`; `on_conflict` to `skip`. So no Spark-derived pattern can write `exact` — 11 §9's injection suite passes by construction.
@@ -505,7 +554,7 @@ Any other changed path → `FORBIDDEN` with `fix: 'Spark may not change <path>; 
 
 1. With `askId`: `SELECT predicate, question FROM call WHERE id = ? AND kind = 'read'`; re-run step 5.4-5 with the stored predicate (the record is the cache — rows may have moved, and citations resolve at paint anyway). Without: run §5.4 first.
 2. Zero rows → `ok` with `{ text: '', body_kind: 'query', body: { registers, where, q }, verbs: ['open'], citations: [], filed: null, model: '—', read }`. No model call.
-3. Meter as 5.4-1. Choose the adapter and model: tier `a` → `deps.inference`, `glm-5.3-flash`; tier `b` → `byok` (absent → `FORBIDDEN`, fix `Your key is not open in this session. Open the vault, or switch Spark to the included model.`), `settings.model`; tier `byo` → `deps.inference`, `settings.model`.
+3. Meter as 5.4-1. **As built the check runs first, before step 1**, once per call (`propose.ts`, `spent()`), so a pass 2 at the cap is refused `SPARK_BUDGET_SPENT` even where its rows would have come back empty and no model would have run; and a `propose` with no `ask_id` that starts one under the cap makes both of its calls and ends one over it. Choose the adapter and model: tier `a` → `deps.inference`, `glm-5.3-flash`; tier `b` → `byok` (absent → `FORBIDDEN`, fix `Your key is not open in this session. Open the vault, or switch Spark to the included model.`), `settings.model`; tier `byo` → `deps.inference`, `settings.model`.
 4. Print rows, one line each, `register#seq | title | field: value …` from `ProjectionRow.summary` and `fields` — money as `EGP 5,005.00`, days as `2026-11-04` — until `tokens ≤ 6,000`. This is the model's *input*; digits are fine here.
 5. Steps §5.3-3 and -4 with `PROMPTS.propose`.
 6. `cite(out.text, citable(projection))` and, for `options`, `cite(option.because)` and `cite(option.label)` per option; for `rowset`, `cite(JSON of every text-typed field)` per row. Any refusal → the whole proposal is refused (`PROPOSAL_UNCITED`), status `refused`, and the client keeps pass 1 — the rows were the answer.
@@ -796,7 +845,7 @@ Position: eleventh of fifteen (31 §2); Phase B7 for the palette, Phase A for `t
 | 9 | **No Spark inference passes `tools`.** Every call is schema-constrained structured output; retrieval is `project()`; the dual-context split holds with one context | 11 §6 ("tool-call headroom" → the schema), 11 §7 *Dual-context* |
 | 10 | **Tier B mechanics**: the host opens the grant under the asker's browser session per ask, decrypts in the Worker, and passes a per-call `Inference` adapter; one `grant.read` event per ask; the package never holds the key | 11 §3 *Bring your own model*, 26 §6 |
 | 11 | **`Proposal` carries `model`, `filed` and `read`** beside the five named fields, and `body_kind` admits `query` for the answer that is never filed | 23 §1, §4 (*one object, four bodies* — a fifth shape, `query`, is the palette's unfiled answer) |
-| 12 | **The palette is two calls**, `read` then `propose`, so pass 1 renders without a stream and Escape between them is a free cancellation | 23 §7 |
+| 12 | **The palette is two calls**, `read` then `propose`, so pass 1 renders without a stream and Escape between them is a free cancellation: pass 2 is never called and never spent. Pass 1 has already spent its one ask by then (§4.1, one per model call) | 23 §7 |
 | 13 | **Lost jobs are re-claimed once** inside the claim statement; expiry is applied by `claimJob`; `preferred` is not built | 26 §2.4, 33 §11 *Lost* and *Expire* |
 | 14 | **A Spark-derived `pattern` always files `confidence: needs-review`**; a person raises it at review | 07 §4, 23 §4 |
 | 15 | **`Triage.shape` is deterministic** — channel, sender domain, digit-blanked subject; the model contributes `kind` and `actionable` only | 11 §3 *Triage*, 24 §4.3 *Unmatched ingest shape* |
@@ -813,7 +862,7 @@ Sixteen, counted.
 - [ ] the `spark-actor` gate is empty over every fixture after the full suite
 - [ ] the five refusal fixtures exist and produce their codes; 30 §6's count reads eighty
 - [ ] `SPARK_ENDPOINT` unset: the Worker and self-host bundles contain no `@braindog/spark` module; every e2e suite passes; `/api/version` says `spark: false`
-- [ ] `SPARK_ENDPOINT` set on the fixture record: a palette ask files `SG<n>` with actor `spark`, `model` in the footer, `grant — refused` in the fold; a second identical ask in the same month increments the meter by one
+- [ ] `SPARK_ENDPOINT` set on the fixture record: a palette ask files `SG<n>` with actor `spark`, `model` in the footer, `grant — refused` in the fold; a second identical ask in the same month increments the meter by one. Under the per-call count of §4.1 that line holds only for an ask that stops at pass 1; an ask that files `SG<n>` has made two model calls and increments it by two. The line is kept as the intent, and §4.1's open question decides which of the two is changed
 - [ ] a runner enrolled with a device grant claims over the socket and over `claimJob?wait=20`; a job cancelled mid-run ends `cancelled` with its transcript intact; a stale lease shows `lost` and is claimed once more
 - [ ] the modelled month on the fixture record sums to ≤ $0.20 in `call.neurons`
 - [ ] the sixteen amendments of §13 are applied to their design documents in the same revision

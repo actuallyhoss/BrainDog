@@ -490,6 +490,32 @@ export type SparkRow = { id: string; register: string; seq: number; spoken: stri
 export type Reading = { ask_id: string; predicate: SparkWhere | null; q: string | null; read: SparkTrace[]; rows: SparkRow[] };
 
 /**
+ * `sparkStatus`'s answer, `Status` in `packages/spark/src/types.ts` key for key, and written by hand for `Reading`'s reason.
+ * `model` is the package's short name on tier `a` today and not the model that answers, which is F2 of
+ * `loop/research-spark-routes.md` and the host's to fix, so a page drawing it is drawing what the host said.
+ */
+export type SparkTier = 'a' | 'b' | 'byo';
+export type SparkStatus = { tier: SparkTier; model: string; asks: { used: number; cap: number; resets: string } };
+
+/** `sparkSettings`'s answer, `Settings` in the same file. `model` is `null` on tier `a`, which has none of its own. */
+export type SparkSettings = { tier: SparkTier; model: string | null; grant_id: string | null; ask_cap: number; updated_at: string };
+
+/** The four keys a settings patch may carry. The door refuses any other with `FIELD_UNKNOWN`. */
+export type SparkSettingsPatch = Partial<Pick<SparkSettings, 'tier' | 'model' | 'grant_id' | 'ask_cap'>>;
+
+/** `sparkPropose`'s answer, `Proposal` in the same file. `filed` is the `SG<n>` it put on Decide, or `null` for a `query`. */
+export type SparkProposal = {
+  text: string;
+  citations: string[];
+  verbs: ('decide' | 'defer' | 'dismiss' | 'edit' | 'save' | 'open')[];
+  body_kind: 'query' | 'options' | 'pattern' | 'rowset' | 'change';
+  body: Record<string, unknown>;
+  model: string;
+  filed: string | null;
+  read: SparkTrace[];
+};
+
+/**
  * Call one method.
  *
  * The verb follows the route table rather than the caller's guess, so a write is a POST because the
@@ -562,8 +588,8 @@ export function createClient(options: ClientOptions) {
   }
 
   /**
-   * The host's own doors: the app's key doors, `POST /api/keys/put` and `POST /api/keys/open`, and Spark's ask,
-   * `POST /api/spark/read`.
+   * The host's own doors: the app's key doors, `POST /api/keys/put` and `POST /api/keys/open`, and Spark's,
+   * `POST /api/spark/read`, `/api/spark/settings` and `/api/spark/propose` (and its one GET, in `hostGet` below).
    *
    * NOT THROUGH `call`, BECAUSE THEY ARE NOT METHODS. `ROUTES` is the record's surface; these are a host step in
    * front of it at a fixed path, and a name in `NAMES` would be a name `handlersFor` had to route. The key doors
@@ -574,14 +600,34 @@ export function createClient(options: ClientOptions) {
    * sending the caller's would turn every call into `NEEDS_BROWSER_SESSION`. The cookie and the `Origin` are the
    * browser's own and it sends both by itself.
    */
-  async function hostDoor<T>(path: 'keys/put' | 'keys/open' | 'spark/read', args: Record<string, unknown>): Promise<Result<T>> {
-    let res: Response;
-    try {
-      res = await doFetch(`${base}/api/${path}`, {
+  async function hostDoor<T>(
+    path: 'keys/put' | 'keys/open' | 'spark/read' | 'spark/settings' | 'spark/propose',
+    args: Record<string, unknown>,
+  ): Promise<Result<T>> {
+    return hostAnswer<T>(() =>
+      doFetch(`${base}/api/${path}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(args),
-      });
+      }),
+    );
+  }
+
+  /**
+   * The one host door that is a GET, `GET /api/spark/status`, under the same no-bearer rule.
+   *
+   * A GET AND NOT `hostDoor` WITH AN EMPTY BODY, because `46 §5.2` has it as a GET and the door holds it to one:
+   * a browser sends no `Origin` on a same-origin GET, and the door's origin rule for status is written for exactly
+   * that request. A POST here would be answered 405.
+   */
+  async function hostGet<T>(path: 'spark/status'): Promise<Result<T>> {
+    return hostAnswer<T>(() => doFetch(`${base}/api/${path}`, { method: 'GET' }));
+  }
+
+  async function hostAnswer<T>(send: () => Promise<Response>): Promise<Result<T>> {
+    let res: Response;
+    try {
+      res = await send();
     } catch (e) {
       return { ok: false, refusal: unreachable(e instanceof Error ? e.message : String(e)) };
     }
@@ -609,6 +655,22 @@ export function createClient(options: ClientOptions) {
      * which `version().spark` already says as `false`, and 422 `SPARK_BUDGET_SPENT` once the month's asks are used.
      */
     sparkRead: (question: string) => hostDoor<Reading>('spark/read', { question }),
+    /**
+     * Spark's tier, the model it names, and this month's asks against the cap. Any signed-in person may ask; the palette
+     * asks on open, which also builds the engine so the first question of the day finds it built. 501 with no model.
+     */
+    sparkStatus: () => hostGet<SparkStatus>('spark/status'),
+    /**
+     * Change how Spark is set up. The owner only, which the engine decides and answers 403 `FORBIDDEN` to anyone else;
+     * a key the door does not know is 422 `FIELD_UNKNOWN`, and tier `b` on a host that cannot open a key is 501.
+     */
+    sparkSettings: (patch: SparkSettingsPatch) => hostDoor<SparkSettings>('spark/settings', patch as Record<string, unknown>),
+    /**
+     * Pass 2 of `46 §5.5`: what Spark proposes about the rows pass 1 found. `askId` is `Reading.ask_id`, and with it the
+     * engine re-projects the predicate it already drafted rather than asking the model for a second one.
+     */
+    sparkPropose: (question: string, askId?: string) =>
+      hostDoor<SparkProposal>('spark/propose', askId === undefined ? { question } : { question, ask_id: askId }),
     boot: () => call<Boot>('boot'),
     version: () => call<Version>('version'),
     schema: (register: string) => call<unknown>('schema', { register }),

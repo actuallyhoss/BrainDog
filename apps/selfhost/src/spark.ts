@@ -21,7 +21,16 @@
  * carries what a real socket answers through it, and what that answer does not contain.
  */
 
-import { SPARK_KEY_LABEL, sparkFromEnv as fromEnv, sparkInferenceOf, sparkModelOf, sparkRecord, type SparkHostConfig } from '@braindog/host/spark';
+import {
+  SPARK_KEY_LABEL,
+  sparkFromEnv as fromEnv,
+  sparkInferenceOf,
+  sparkModelNameOf,
+  sparkModelOf,
+  sparkNamedEngine,
+  sparkRecord,
+  type SparkHostConfig,
+} from '@braindog/host/spark';
 import { sparkAskDoor, type SparkAskDoor } from '@braindog/host';
 import type { Clock, Sql } from '@braindog/ports';
 import type { CallContext, RecordApi, SparkModel } from '@braindog/record';
@@ -86,7 +95,9 @@ export async function sparkEngineFor(
   const inference = sparkInferenceOf(config, wireOf(config, api, store));
   if (inference === undefined) return undefined;
   const { createSpark } = await import('@braindog/spark');
-  return createSpark({ sql: deps.sql, clock: deps.clock, inference, record: sparkRecord(api()) });
+  /* NAMED BY THIS HOST, because on tier `a` the package can only say `glm-5.3-flash` and what answers is `SPARK_MODEL`
+     (`loop/research-spark-routes.md` F2). Every door this engine is handed to reads the one `status()`. */
+  return sparkNamedEngine(createSpark({ sql: deps.sql, clock: deps.clock, inference, record: sparkRecord(api()) }), sparkModelNameOf(config));
 }
 
 /**

@@ -187,6 +187,22 @@ export interface SparkInference {
   complete(call: SparkInferenceCall): Promise<SparkInferenceReply>;
 }
 
+/**
+ * The package's routing short names, the four `ModelId`s of `packages/spark/src/prompts.ts`, WRITTEN OUT AND NOT IMPORTED.
+ *
+ * `packages/host` MUST NOT DEPEND ON `@braindog/spark` (`31 §2` puts the package at row 13, and `46 §5.1` has only the app
+ * `import()` it, and only when an endpoint is configured), so reading `MODELS` here would be the edge that rule forbids,
+ * loaded on every host. The cost is a fifth model added to the package and not to this list: that name would reach the
+ * endpoint unmapped, which a self-host sees as its server refusing an unknown model. `test/spark.test.ts` drives every key of
+ * the package's own `MODELS` through this rule (a test may reach across; `graph.mjs` reads `src/**` alone), so that drift is
+ * a red test and not a silent refusal.
+ */
+const ROUTING_NAMES: ReadonlySet<string> = new Set(['llama-3.2-1b', 'glm-5.3-flash', 'glm-5.3', 'bge-m3']);
+
+/** What the endpoint is sent for what the package asked: `SPARK_MODEL` in place of a short name, anything else as it came. */
+const modelSent = (asked: string, configured: string | undefined): string =>
+  configured !== undefined && ROUTING_NAMES.has(asked) ? configured : asked;
+
 /** A count the endpoint may not have sent. Absent is zero, and zero bills nothing rather than guessing a figure. */
 const counted = (value: unknown): number => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
 
@@ -197,6 +213,13 @@ const counted = (value: unknown): number => (typeof value === 'number' && Number
  * for `glm-5.3-flash` because that is what its table routes the job to; what answers is whatever `SPARK_MODEL` names on this
  * host, an Ollama tag or a gateway's id, and the mapping lives here so no provider is named in the package. With no
  * `SPARK_MODEL` the short name is passed through, which is right for an endpoint that serves exactly one model and says so.
+ *
+ * ONLY A SHORT NAME IS MAPPED, AND A NAME THE OWNER TYPED PASSES THROUGH. This line used to read
+ * `options.model ?? call.model`, and measured on 22 September an owner's `llama3:8b` on tier `byo` was posted as
+ * `ENV_MODEL`: the package hands `settings.model` down as `call.model` on tiers `b` and `byo` (`propose.ts`), so on any
+ * host with `SPARK_MODEL` set the model a settings route stored was a model nothing sent (`loop/research-spark-routes.md`
+ * F1). `modelSent` below is the whole rule, and `sparkNamedEngine` uses the same function so that what a status names and
+ * what the endpoint is sent cannot come apart.
  *
  * `response_format` IS `json_schema` AND NOT `json_object`, which is the whole difference from `endpointModel`'s ask: the
  * package pins a schema per job and re-checks the answer by hand (`checkSchema`), and an endpoint that enforces the schema
@@ -211,7 +234,7 @@ export function endpointInference(options: EndpointModelOptions): SparkInference
   return {
     complete: async (call: SparkInferenceCall): Promise<SparkInferenceReply> => {
       const text = await post(url, options, {
-        model: options.model ?? call.model,
+        model: modelSent(call.model, options.model),
         temperature: 0,
         max_tokens: call.maxTokens,
         response_format: { type: 'json_schema', json_schema: { name: 'answer', schema: call.jsonSchema, strict: true } },
@@ -302,6 +325,32 @@ export function sparkModelOf(config: SparkHostConfig | undefined, deps: SparkHos
 export function sparkInferenceOf(config: SparkHostConfig | undefined, deps: SparkHostDeps): SparkInference | undefined {
   const options = endpointOptionsOf(config, deps);
   return options === undefined ? undefined : endpointInference(options);
+}
+
+/** The model this host's endpoint answers with when the package asks by short name: `SPARK_MODEL`, or nothing when unset. */
+export const sparkModelNameOf = (config: SparkHostConfig | undefined): string | undefined => config?.model;
+
+/**
+ * The package's engine with a `status()` that names what answers.
+ *
+ * THE PACKAGE CANNOT KNOW THE PROVIDER ID AND MUST NOT (`46 §2`), so on tier `a` its `status()` says `glm-5.3-flash`,
+ * measured as `{"tier":"a","model":"glm-5.3-flash",...}` on a host whose `SPARK_MODEL` was an Ollama tag. `23 §8` makes the
+ * model name the one thing a person is never told wrong, so the host corrects it here with the same `modelSent` the
+ * endpoint is sent through (`loop/research-spark-routes.md` F2). A name the owner typed on tier `b` or `byo` is left as it
+ * is, because that is now what goes on the wire too.
+ *
+ * STRUCTURAL AND GENERIC, for the reason `SparkInference` is declared rather than imported: naming `Spark` here would be
+ * the edge to row 13. `Object.create` rather than a spread so every other method is the engine's own, whatever shape
+ * `createSpark` builds it in.
+ */
+export function sparkNamedEngine<E extends { status(): { model: string } }>(engine: E, name: string | undefined): E {
+  if (name === undefined) return engine;
+  const named = Object.create(engine) as E;
+  named.status = () => {
+    const status = engine.status();
+    return { ...status, model: modelSent(status.model, name) };
+  };
+  return named;
 }
 
 /* ── the `RecordApi` port of `@braindog/spark`, over the record's own guarded reads ─────────────── */

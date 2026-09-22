@@ -25,7 +25,15 @@
  * `workerSparkDoor`'s own memo below carries what a real socket answers through the self-host's mirror of it.
  */
 
-import { sparkFromEnv, sparkInferenceOf, sparkModelOf, sparkRecord, type SparkHostDeps } from '@braindog/host/spark';
+import {
+  sparkFromEnv,
+  sparkInferenceOf,
+  sparkModelNameOf,
+  sparkModelOf,
+  sparkNamedEngine,
+  sparkRecord,
+  type SparkHostDeps,
+} from '@braindog/host/spark';
 import type { OpenKey } from '@braindog/host/actions';
 import { sparkAskDoor, type SparkAskDoor } from '@braindog/host';
 import type { Clock, Sql } from '@braindog/ports';
@@ -87,10 +95,13 @@ export type SparkEngineDeps = SparkWire & {
  * passes `workerSparkModel`, which is assigned after this module's own `#open` has begun.
  */
 export async function workerSparkEngine(env: SparkEnv, api: () => RecordApi, deps: SparkEngineDeps): Promise<Spark | undefined> {
-  const inference = sparkInferenceOf(sparkFromEnv(env, { operatorKey: false }), wireOf(env, api, deps));
+  const config = sparkFromEnv(env, { operatorKey: false });
+  const inference = sparkInferenceOf(config, wireOf(env, api, deps));
   if (inference === undefined) return undefined;
   const { createSpark } = await import('@braindog/spark');
-  return createSpark({ sql: deps.sql, clock: deps.clock, inference, record: sparkRecord(api()) });
+  /* NAMED BY THIS HOST, as on the self-host: the package's tier `a` status says `glm-5.3-flash` whatever `SPARK_MODEL`
+     sends (`loop/research-spark-routes.md` F2), and one wrap here is what every door over this engine reads. */
+  return sparkNamedEngine(createSpark({ sql: deps.sql, clock: deps.clock, inference, record: sparkRecord(api()) }), sparkModelNameOf(config));
 }
 
 /**
