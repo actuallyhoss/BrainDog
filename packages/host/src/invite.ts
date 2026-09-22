@@ -34,7 +34,13 @@ export const INVITE_ROUTES: readonly AuthRoute[] = [
 export type InviteDoor = {
   /** The live invitation behind a token: the address it is for, and when it runs out. */
   look(token: string): Promise<Result<{ email: string; expires_at: string }>>;
-  /** Spend it for a verified person, and give them the record in the Directory. */
+  /**
+   * Spend it for a verified person, and give them the record in the Directory.
+   *
+   * `{ slug }` OF THE RECORD JOINED, WHERE A HOST HOLDS MORE THAN ONE, and a signed-in person's session is moved
+   * onto it. The Worker answers it; the self-host holds one record, so there is nowhere else a session could be,
+   * and it answers what it always did.
+   */
   accept(token: string, person: { id: string; email: string; name?: string }): Promise<Result<unknown>>;
   /** Whether this address can already sign in here, and so must, before a link is spent for it. */
   known(email: string): Promise<boolean>;
@@ -144,6 +150,12 @@ function reply(status: number, payload: object): Response {
 
 const refusal = (status: number, refused: Refusal): Response => reply(status, { ok: false, refusal: refused });
 
+/** The slug an `accept` answered, or `null` for a host that answered none. */
+function joinedSlug(value: unknown): string | null {
+  const slug = typeof value === 'object' && value !== null ? (value as { slug?: unknown }).slug : undefined;
+  return typeof slug === 'string' && slug !== '' ? slug : null;
+}
+
 /** What the page is told before anybody accepts: the address, when it runs out, and who is signed in. */
 export type InviteSeen = { email: string; expires_at: string; signedInAs: string | null };
 
@@ -185,6 +197,21 @@ export async function serveInvite(
       return refusal(403, { code: 'FORBIDDEN', fix: 'This invitation is for another address. Sign out, then open the link again.', at: 'email' });
     const out = await invite.accept(token, { id: who.person, email: who.email });
     if (!out.ok) return reply(httpStatus(out), out);
+    /* AND THE SESSION MOVES ONTO THE RECORD JUST JOINED, where the host names one. This answered `live` as it was,
+       so a colleague who owns a record of their own was told "You are on the record." and `Open BrainDog` opened
+       theirs: the session row still named it, and a fresh sign-in picks an owned record first
+       (`loop/research-invite-landing.md` finding 2). THE ROTATED COOKIE IS CARRIED BACK BY HAND. The `session` call
+       above rotates a day-old cookie, and the switch answers no cookie of its own, so an answer built from the
+       switch alone left the browser holding an id that dies a minute later (`test/invite-session-move.test.ts`
+       went red on exactly that). The switch is sent with the new id as well, though the old one, inside its
+       minute of grace, was measured to move the row just the same. A switch the Directory refuses leaves them on
+       the record they were on, which is where they were before, and the invitation is spent all the same. */
+    const slug = joinedSlug(out.value);
+    if (slug !== null) {
+      const rotated = live.session !== undefined && live.session !== 'clear' ? live.session : undefined;
+      const moved = await door.auth({ flow: 'switch', sid: rotated?.sid ?? sid ?? '', slug });
+      if (moved.status === 200) return finish({ ...moved, ...(rotated ? { session: rotated } : {}) });
+    }
     return finish({ ...live, body: who });
   }
 

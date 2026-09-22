@@ -639,6 +639,12 @@ export class Record$ extends DurableObject<Env> {
          the only thing this object is told about the caller, and `inward()` has already taken the header the door
          would look for, so a token context forwarded here by any other branch would be answered as a person. */
       if (ctx.principal.kind !== 'person') return json({ ok: false, refusal: NO_SPARK_TOKEN }, 403);
+      /* AND A SIGNED-IN PERSON, NOT THE DEMO. `DEMO_CONTEXT` is a person too, `p_demo` at `read`, and this lock
+         answered it 200 with one model call, which on a live host opens the owner's `spark` key and spends the
+         record's `ask_cap` for somebody who never signed in (`loop/research-batch-seventeen-audit.md` finding 5,
+         `test/spark-demo.test.ts`). Only the router's GET-only `demoRecord` stood in the way. A session's context
+         says `credentialed: true` and the demo's says `false`, so anything short of `true` is not a session. */
+      if (ctx.credentialed !== true) return json({ ok: false, refusal: NO_SPARK_DEMO }, 403);
       this.#spark ??= workerSparkDoor(
         this.env,
         () => api,
@@ -1332,6 +1338,8 @@ const noSession = (): Response =>
 
 /** What a token gets at `/api/spark/read`, from the router and from the object. The sentence is `serveSpark`'s own. */
 const NO_SPARK_TOKEN: Refusal = { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this in the app; a token cannot ask Spark about this record.', at: 'principal' };
+/** What the public demo, or any context that is not a signed-in session, gets at `/api/spark/read` from the object. */
+const NO_SPARK_DEMO: Refusal = { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in to ask Spark about a record.', at: 'principal' };
 
 /**
  * `/api/keys/*`: the app's own key doors, for the browser session `doorOf` has already resolved.
@@ -1464,7 +1472,16 @@ function invites(env: Env): InviteDoor {
       const found = await recordOf(inviteToken);
       if (!found) return gone;
       const out = (await found.stub.acceptInvite({ token: inviteToken, person })) as unknown as Result<unknown>;
-      return out.ok ? ((await directory.joinRecord(found.id, person.id)) as unknown as Result<null>) : out;
+      if (!out.ok) return out;
+      const joined = (await directory.joinRecord(found.id, person.id)) as unknown as Result<null>;
+      if (!joined.ok) return joined;
+      /* THE SLUG OF THE RECORD JUST JOINED, so `serveInvite` can move a signed-in person's session onto it. This
+         answered the join's `null`, and a colleague who owns a record of their own was told they were on the invited
+         one while their cookie still opened theirs (`loop/research-invite-landing.md` finding 2,
+         `test/invite-accept.test.ts`). `reaches` and not `resolve`, because the token names an id and the name is
+         the Directory's to say. A record with no live name answers `null`, and the session stays where it was. */
+      const slug = (await directory.reaches(person.id)).find((r) => r.record === found.id)?.slug ?? null;
+      return { ok: true, value: { slug } };
     },
     known: async (email) => Boolean(await directory.inviteKnown(email)),
     person: async (email, name) => (await directory.invitee(email, name)) as unknown as Result<{ id: string; email: string; name: string | null }>,
