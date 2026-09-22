@@ -258,13 +258,22 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean })
   const spare: string[] = [...new Set((plan.retire ?? []).flatMap((r) => [r.register, r.replaces]).filter((r) => !held.has(r)))];
 
   const absent: string[] = [];
+  /** The fields each list declares, where the record's answer says: see `unheld` below. */
+  const declared = new Map<string, Set<string>>();
   for (const register of [...registers, ...spare] as string[]) {
     const has = await door.schema(register);
     if (!has.ok) {
       if (unreachable(has)) throw new Unreachable();
       if (OPTIONAL.has(register) || spare.includes(register)) absent.push(register);
       else report.missing.push(register);
+      continue;
     }
+    /* A RETIRED FIELD IS LEFT OUT because the kernel leaves it out of what a write may name (`packages/kernel/src/index.ts`,
+       `known`), so counting it here would send a field the record then refuses. An answer with no `fields` is read as
+       saying nothing, and every planned field is sent as it always was. */
+    const fields = isObj(has.value) && Array.isArray(has.value.fields) ? has.value.fields : null;
+    if (fields !== null)
+      declared.set(register, new Set(fields.flatMap((f) => (isObj(f) && typeof f.id === 'string' && f.retired !== true ? [f.id] : []))));
   }
   if (report.missing.length > 0) return report;
   /* A LIST THIS RECORD DOES NOT HAVE AND DOES NOT NEED: its rows are left out, each named, with what installing adds them. */
@@ -287,6 +296,50 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean })
     };
     report.plan = plan;
     registers = registers.filter((r) => !absent.includes(r));
+  }
+
+  /**
+   * A FIELD THIS RECORD'S LIST DOES NOT DECLARE IS LEFT OFF THE ROW, AND THE ROW STILL ARRIVES.
+   *
+   * A list a pack declares gains fields as the pack moves on, and a record keeps the version it installed until the
+   * owner takes the update. Sent as planned, the one field that record has not got is `FIELD_UNKNOWN`, and the record
+   * refuses the WHOLE ROW over it. Measured on 2026-09-22 against the kernel (`test/import-note.test.ts`): a domain row
+   * carrying the `note` Estate 1.2.0 declares, sent to a record on 1.1.0, was refused, and its name, registrar and
+   * status went with it. `holdings.currency` did the same to fourteen rows at once. So the field is taken off, the rest
+   * is written, and every row that lost one is named with the list and the pack whose update brings the field in.
+   *
+   * ONLY FROM A ROW THAT HAD A VALUE THERE, which is what makes the line worth reading: a domain with no note loses
+   * nothing and is not in it.
+   */
+  const unheld = new Map<string, { register: string; field: string; items: string[] }>();
+  plan = {
+    ...plan,
+    rows: plan.rows.map((row) => {
+      const has = declared.get(row.register);
+      if (has === undefined) return row;
+      const off = Object.keys(row.fields).filter((f) => !has.has(f));
+      if (off.length === 0) return row;
+      for (const field of off) {
+        const at = `${row.register}.${field}`;
+        const entry = unheld.get(at) ?? { register: row.register, field, items: [] };
+        entry.items.push(row.label);
+        unheld.set(at, entry);
+      }
+      return { ...row, fields: Object.fromEntries(Object.entries(row.fields).filter(([f]) => has.has(f))) };
+    }),
+  };
+  if (unheld.size > 0) {
+    plan = {
+      ...plan,
+      skipped: [
+        ...plan.skipped,
+        ...[...unheld.values()].map(({ register, field, items }) => ({
+          reason: `This BrainDog's ${NAMES[register] ?? register} list has no ${field} field yet, so each of these is sent without its ${field} and with everything else. Update ${(PROVIDED_BY[register] ?? register).replace(/ \d+\.\d+\.\d+$/u, '')}, then run the import again to bring it in`,
+          items,
+        })),
+      ],
+    };
+    report.plan = plan;
   }
 
   /**

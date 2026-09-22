@@ -82,6 +82,11 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   cost, a day they were acquired and sometimes a day they mature, and until now the only list that would take them was
  *   an account with a balance, which counts a policy as cash somebody could spend. `holdings` is the list that does not.
  *   One list added and nothing taken away, so the step is a minor one.
+ * - estate 1.2.0: a service carries a note. the old tool's domains carry the reason each name is held and what is
+ *   unresolved about it, and Services had no field that holds prose, so the import left every note in the export. One
+ *   field added and nothing taken away, so the step is a minor one. It moves the version rather than riding on 1.1.0
+ *   because a record on 1.1.0 is told about the field only through an update, and without one the importer would be
+ *   sending a field that record answers `FIELD_UNKNOWN` to.
  * - work 1.1.0: tasks gain an owner, an agent, a priority, steps, a done day and a Backlog status; the Overview and the
  *   Board pages, and the figures under them.
  * - work 1.2.0: Open, on Work and on a project, leaves out work kept for later, and Kept for later is its own figure.
@@ -96,7 +101,7 @@ export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.4.0',
   people: '1.0.0',
   'money-core': '1.5.0',
-  estate: '1.1.0',
+  estate: '1.2.0',
   work: '1.5.0',
 };
 

@@ -66,6 +66,13 @@ export const ESTATE_REGISTERS: Record<string, SeedRegister> = {
          taken out, which is what `labelOf` would have produced with no label here at all. */
       { id: 'points_at', label: 'Points at', type: 'text' },
       { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
+      /* A NOTE, SINCE 1.2.0, AND IT IS NOT `points_at` WITH MORE ROOM. the old tool's domain register carries prose on most
+         of its rows: a standing conflict between two registers, the open task behind a site that resolves nowhere, the
+         whole clearance search behind a purchase. With nine fields and none of them prose, the import left every one of
+         those in the export, because the only text beside the name says where it sends traffic and filing the reason a
+         name is held under "Points at" mislabels it. Same id and type as the note on every Money list, so an importer
+         and a form treat it the same way; not indexed and not searched, because it is read on the row and not filtered. */
+      { id: 'note', type: 'text' },
     ],
   },
 };

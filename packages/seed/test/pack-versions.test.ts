@@ -209,6 +209,15 @@ const DECLARED: Record<string, Version> = {
     declares: '90cc384470cccf30',
     history: ['An imported domain arrives with what the source did not know left blank, so `services` requires neither a renewal day nor a cost -> 90cc384470cccf30'],
   },
+  'estate@1.2.0': {
+    holds: `
+      metric.estate-year metric.lapsing metric.points-nowhere metric.project-cost metric.renews-30d
+      page.estate
+      register.services
+    `,
+    declares: 'd7e0189d652eca6f',
+    history: ['A domain carries the reason it is held, so `services` gains a text `note` and the import stops leaving every domain note in the export -> d7e0189d652eca6f'],
+  },
 };
 
 /** The shortest a reason may be. The value it justifies is sixteen characters, and a reason has to be worth more room than that. */
