@@ -112,8 +112,8 @@ test('TWO TASKS DUE ON ONE DAY ARE LISTED IN ONE ORDER BY BOTH ENGINES, newest f
   const record = k.page('work');
   assert.ok(record.ok);
   const said = (rows: readonly { fields: Record<string, unknown> }[]) => rows.map((r) => String(r.fields.what));
-  const kb = record.value.blocks.find((b) => b.heading === 'Due soon')!;
-  const wb = page('work')!.blocks.find((b) => b.heading === 'Due soon')!;
+  const kb = record.value.blocks.find((b) => b.heading === 'This week')!;
+  const wb = page('work')!.blocks.find((b) => b.heading === 'This week')!;
   const pair = ['Check the September bank statement', 'Draft the September issue'];
   const days = new Set(kb.rows.filter((r) => pair.includes(String(r.fields.what))).map((r) => r.fields.by));
   assert.equal(days.size, 1, 'the sample keeps the two on one day');

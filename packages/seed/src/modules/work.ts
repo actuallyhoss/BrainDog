@@ -284,10 +284,27 @@ const OPEN = 'state is not backlog or done or dropped';
  * What waits on a person: handed back to be checked, or stuck.
  *
  * ONE PREDICATE FOR THE FIGURE AND THE QUEUE UNDER IT, because they are the same question asked twice on one screen and
- * they were two copies of one sentence. The Overview's Due soon now says it is what is due and NOT this, so a third copy
- * drifting would put a ticket back under two headings without either of them changing.
+ * they were two copies of one sentence. The Overview's other lists are cut from `IN_HAND` below, which is the states
+ * this is not, so a copy drifting would put a ticket back under two headings without either of them changing.
  */
 const WAITING = 'state is review or blocked';
+
+/**
+ * TAKEN ON AND NOT WAITING ON ANYBODY: what the Overview's lists divide between them.
+ *
+ * THE LISTS ARE CUT SO THAT NO TASK CAN FALL UNDER TWO, and the cut is by state first, then by agent, then by day.
+ * Waiting on you takes `WAITING` whoever holds the task, because a task an agent handed back is waiting on a person
+ * and not on the agent. With an agent takes the rest of what an agent holds. What is left is yours, and the day
+ * divides it: Today (on or before it), This week, After this week. Later is the backlog, whatever its date, which is
+ * the word the Board already uses for it.
+ *
+ * WHAT NO LIST DRAWS, measured rather than assumed: a task in hand with nobody's agent on it and no due day. The list
+ * that would hold it is "no day, or a day after this week", and `by is empty or after +7d` is refused by the record
+ * (VALUE_MALFORMED: "empty is not a value by can hold"), the same wall `money-core`'s `recurring-ended` hit. The
+ * Board's Everything open draws those tasks; the sample has none.
+ */
+const IN_HAND = 'state is open or doing';
+const YOURS = `${IN_HAND}, agent is empty`;
 
 /**
  * WORK'S FIGURES, as documents a page names. Counts of tasks, never a score: how much is open, what is due soon or past
@@ -450,50 +467,69 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         ],
       },
       {
-        /* THE QUEUE A PERSON WORKS FROM: what an agent handed back to be checked, and what cannot move, with who touched
-           it last, so a person sees whose work they are checking. */
-        /* AND WHEN EACH ONE IS DUE, because Due soon below no longer draws these rows a second time and this was the only
-           other place their date appeared. Without this column a ticket blocked and due tomorrow said neither. */
-        kind: 'table',
+        /* A `todo` AND NOT A `table`, SO THAT A TASK CAN BE FINISHED WHERE IT IS READ. The host wires the tick onto
+           every `todo` row (`apps/web/src/routes/p/[slug]/+page.svelte:810`); drawn as tables, the only lists on
+           Work's own Overview were the ones nobody could tick. PAST ITS DATE IS TODAY'S, because it is still the next
+           thing to do, and a separate Overdue list would put the most urgent work under the least read heading. */
+        kind: 'todo',
+        heading: 'Today',
+        span: 6,
+        source: 'register.tasks',
+        where: `${YOURS}, by before +1d`,
+        columns: [{ field: 'what' }, { field: 'by' }],
+        order: [{ field: 'by', dir: 'asc' }],
+        limit: 8,
+        empty: 'Nothing of yours is due today.',
+      },
+      {
+        kind: 'todo',
+        heading: 'This week',
+        span: 6,
+        source: 'register.tasks',
+        where: `${YOURS}, by after today, by before +8d`,
+        columns: [{ field: 'what' }, { field: 'by' }],
+        order: [{ field: 'by', dir: 'asc' }],
+        limit: 8,
+        empty: 'Nothing else of yours is due this week.',
+      },
+      {
+        /* THE QUEUE A PERSON WORKS FROM, with the note as the reason it waits. The due day this block carried at 1.5.0
+           has no cell left to sit in: a `todo` draws the task and one detail, and why a task is stuck is what a
+           person needs to act on it. It is still in the order it falls due. */
+        kind: 'todo',
         heading: 'Waiting on you',
-        span: 12,
+        span: 7,
         source: 'register.tasks',
         where: WAITING,
-        columns: [
-          DESCRIPTION,
-          { field: 'state', label: 'Status', width: '12ch' },
-          { field: 'agent', label: 'Agent', width: '10ch' },
-          { field: 'note', label: 'Why', width: 'minmax(16ch,1fr)' },
-          { field: 'by', label: 'Due', width: '13ch' },
-          { field: 'changed', label: 'Changed by', width: '16ch' },
-        ],
+        columns: [{ field: 'what' }, { field: 'note' }],
         order: [{ field: 'by', dir: 'asc' }],
-        limit: 12,
+        limit: 8,
         empty: 'Nothing is waiting on you.',
       },
       {
-        /* WHAT IS DUE THAT IS NOT ALREADY IN THE QUEUE ABOVE IT. `state is not review or blocked` is the whole of the
-           difference, and it is here because a person reading down this page was counting the same ticket twice: driven
-           against the sample at 390 and at 1440, this page drew 21 rows and `Chase Halden on 2026-041`, `Reconcile the
-           Fenwick invoice against services` and `Decide the licensing tier split` were all three of them under Waiting on
-           you and then again here. `loop/research-usability-2026-09-21.md` finding 15 measured the same overlap on the
-           team pack's Home and says what it costs: the first reading is that the board is double-counting. */
-        kind: 'table',
-        heading: 'Due soon',
-        span: 7,
+        /* WHAT AGENTS HOLD NOW, with the dot on the one an agent is on this minute. Not what they handed back: that
+           waits on you, above. */
+        kind: 'todo',
+        heading: 'With an agent',
+        span: 5,
         source: 'register.tasks',
-        where: `${LIVE}, state is not review or blocked, by before +15d`,
-        columns: [
-          DESCRIPTION,
-          { field: 'thing', label: 'Project', width: 'minmax(8ch,14ch)' },
-          { field: 'by', label: 'Due', width: '13ch', align: 'end' },
-        ],
+        where: `${IN_HAND}, agent is set`,
+        columns: [{ field: 'what' }, { field: 'agent' }],
         order: [{ field: 'by', dir: 'asc' }],
         limit: 8,
-        /* "ELSE", BECAUSE THE BLOCK CAN NOW BE EMPTY WHILE WORK IS DUE and the old line said the opposite. Driven against
-           the sample with its eight open tickets due inside the fortnight moved to blocked, this block drew no rows and
-           read "Nothing is due in the next two weeks." directly under a queue holding eleven tickets due inside it. */
-        empty: 'Nothing else is due in the next two weeks.',
+        working: true,
+        empty: 'No agent holds a task. An agent takes one by setting itself as its agent.',
+      },
+      {
+        kind: 'todo',
+        heading: 'After this week',
+        span: 7,
+        source: 'register.tasks',
+        where: `${YOURS}, by after +7d`,
+        columns: [{ field: 'what' }, { field: 'by' }],
+        order: [{ field: 'by', dir: 'asc' }],
+        limit: 8,
+        empty: 'Nothing of yours is due after this week.',
       },
       {
         /* WHERE THE OPEN WORK SITS, in days of effort, and what belongs to no project, last. A task with no size adds
@@ -518,26 +554,20 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         empty: 'Nothing was finished or is due in these weeks.',
       },
       {
-        /* WHAT AGENTS HOLD NOW, and where each one is with it. */
-        kind: 'table',
-        heading: 'With an agent',
-        span: 12,
+        kind: 'todo',
+        heading: 'Later',
+        span: 5,
         source: 'register.tasks',
-        where: `${LIVE}, agent is set`,
-        columns: [
-          DESCRIPTION,
-          { field: 'agent', label: 'Agent', width: '10ch' },
-          { field: 'state', label: 'Status', width: '12ch' },
-          { field: 'by', label: 'Due', width: '13ch', align: 'end' },
-        ],
+        where: 'state is backlog',
+        columns: [{ field: 'what' }, { field: 'thing' }],
         order: [{ field: 'by', dir: 'asc' }],
-        limit: 12,
-        empty: 'No agent holds a task. An agent takes one by setting itself as its agent.',
+        limit: 8,
+        empty: 'Nothing is kept for later.',
       },
       {
         kind: 'table',
         heading: 'Done lately',
-        span: 12,
+        span: 7,
         source: 'register.tasks',
         where: 'state is done',
         columns: [

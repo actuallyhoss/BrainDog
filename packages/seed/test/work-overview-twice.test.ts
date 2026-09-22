@@ -8,16 +8,23 @@
  * tickets appeared under more than one heading. `Chase Halden on 2026-041` and `Reconcile the
  * Fenwick invoice against services` were each drawn three times.
  *
- * WHAT THIS HOLDS AND WHAT IT DOES NOT. `Waiting on you` is the queue a person works from and
- * `Due soon` is what is due: two questions about the same tickets, one above the other, and a
- * ticket in both is counted twice by anybody reading down the page. Those two are held apart here.
- * `With an agent` further down is NOT: it answers a different question — which of these an agent
- * took and where that agent is with it — and it is the page's answer to "what are my agents doing"
- * (`loop/DIRECTION.md` §3). A row there is the answer rather than a second count of the work.
+ * WHAT THIS HOLDS. Since work 1.6.0 the Overview draws what is in play as lists that tick, one heading per
+ * question: Today, This week, After this week, Waiting on you, With an agent and Later. EVERY ONE OF THOSE IS HELD
+ * APART FROM EVERY OTHER here, `With an agent` included. Under 1.5.0 it was not, on the argument that a row there
+ * answered a different question; that argument held for a table and does not hold for a list a person ticks down,
+ * where one task under two headings is two ticks for one piece of work.
  *
- * AND THE DUE DAY HAS TO SURVIVE THE FIX, which is the second test. Taking what waits on you out of
- * `Due soon` would otherwise take a blocked ticket's date off the screen altogether: `Waiting on
- * you` drew Status, Agent, Why and Changed by, and no date at all.
+ * THE SAMPLE ALONE DOES NOT BITE ON THE CORNERS, so the first test adds the tasks that would land under two
+ * headings, or under none, if one predicate drifted: handed back by an agent and due today, taken by an agent and due
+ * today, kept for later with a date this week, and one of yours on each side of the two day lines, due today,
+ * tomorrow, in seven days and in eight. THE DAY LINES WERE MISSED AT FIRST: with only the first three, widening
+ * Today to `by before +2d` drew nothing twice on the sample and the test passed, because the sample has no task of
+ * yours due tomorrow.
+ *
+ * AND WHAT WAS GIVEN UP, said here because a test that stops asking a question should say so. 1.5.0 put the due day on
+ * `Waiting on you` so that holding a ticket back from `Due soon` did not take its date off the screen. A `todo` draws
+ * two cells, the task and one detail, and the brief gives that detail to the reason it waits, the note. The queue is
+ * still in the order it falls due, which the second test holds.
  */
 
 import { test } from 'node:test';
@@ -76,28 +83,57 @@ const block = (page: PageResult, heading: string) => {
   return found;
 };
 
-test('NO TICKET IS DRAWN UNDER BOTH OF WORK’S TWO QUEUES, because a person reading down the page counts it twice', async () => {
-  const { page, sql } = await overview();
+const GROUPS = ['Today', 'This week', 'After this week', 'Waiting on you', 'With an agent', 'Later'];
 
-  const waiting = block(page, 'Waiting on you');
-  const due = block(page, 'Due soon');
-  assert.ok(waiting.rows.length > 0 && due.rows.length > 0, 'the sample needs rows in both for this to bite');
+test('NO TASK IS DRAWN UNDER TWO OF WORK’S LISTS, because a person ticking down the page would tick it twice', async () => {
+  const { page: sample, sql: first } = await overview();
+  for (const heading of ['Today', 'This week', 'Waiting on you', 'With an agent']) assert.ok(block(sample, heading).rows.length > 0, `the sample draws nothing under ${heading}, so this does not bite`);
+  first.close();
 
-  const above = new Set(waiting.rows.map((r) => r.id));
-  const twice = due.rows.filter((r) => above.has(r.id)).map((r) => String(r.fields.what));
-  assert.deepEqual(twice, [], 'drawn under Waiting on you and again under Due soon');
+  const sql = openSqlite();
+  const k: Kernel = await openRecord(sql, { now: () => NOW });
+  const seeded = await installSeed(k);
+  assert.ok(seeded.ok, sayOf(seeded));
+  const today = new Date(NOW).toISOString().slice(0, 10);
+  const on = (days: number) => new Date(NOW + days * 86_400_000).toISOString().slice(0, 10);
+  const corners = [
+    { what: 'Handed back by an agent, due today', state: 'review', agent: 'claude', by: today },
+    { what: 'Taken by an agent, due today', state: 'doing', agent: 'claude', by: today },
+    { what: 'Kept for later, dated this week', state: 'backlog', by: on(3) },
+    { what: 'Yours, due today', state: 'open', by: today },
+    { what: 'Yours, due tomorrow', state: 'open', by: on(1) },
+    { what: 'Yours, due in seven days', state: 'open', by: on(7) },
+    { what: 'Yours, due in eight days', state: 'open', by: on(8) },
+  ];
+  for (const c of corners) assert.ok(k.create('tasks', c, { actor: 'p_1' }).ok, c.what);
+  const out = k.page('work');
+  assert.ok(out.ok, sayOf(out));
+
+  const where = new Map<string, string[]>();
+  for (const heading of GROUPS) {
+    const b = block(out.value, heading);
+    assert.equal(b.kind, 'todo', `${heading} cannot be ticked`);
+    for (const r of b.rows) where.set(String(r.fields.what), [...(where.get(String(r.fields.what)) ?? []), heading]);
+  }
+  const twice = [...where].filter(([, hs]) => hs.length > 1).map(([what, hs]) => `${what}: ${hs.join(' and ')}`);
+  assert.deepEqual(twice, [], 'drawn under two headings');
+  assert.deepEqual(
+    corners.map((c) => where.get(c.what)),
+    [['Waiting on you'], ['With an agent'], ['Later'], ['Today'], ['This week'], ['This week'], ['After this week']],
+    'each corner is drawn once, under the heading that answers it',
+  );
   sql.close();
 });
 
-test('and the queue says when each of them is due, so holding it back from Due soon does not lose the date', async () => {
+test('and the queue says why each task waits, in the order they fall due', async () => {
   const { page, sql } = await overview();
 
   const waiting = block(page, 'Waiting on you');
   const columns = (waiting.columns ?? []).map((c) => String(c.field));
-  assert.ok(columns.includes('by'), `Waiting on you draws ${columns.join(', ')} and no due day`);
+  assert.deepEqual(columns, ['what', 'note'], `Waiting on you draws ${columns.join(', ')}`);
 
-  /* AND THE ROWS CARRY ONE. A column over a field every row left empty is a column of dashes. */
-  const dated = waiting.rows.filter((r) => r.fields.by !== null && r.fields.by !== undefined);
-  assert.ok(dated.length > 0, 'nothing in the queue has a due day, so the column says nothing');
+  const days = waiting.rows.map((r) => String(r.fields.by));
+  assert.ok(days.length > 1, 'the sample needs two waiting tasks for the order to mean anything');
+  assert.deepEqual(days, [...days].sort(), 'the queue is not in the order it falls due');
   sql.close();
 });

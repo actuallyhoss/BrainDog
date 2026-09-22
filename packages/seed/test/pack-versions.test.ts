@@ -195,6 +195,12 @@ const DECLARED: Record<string, Version> = {
          offered 1.6.0 and there is no record on it to strand. Raising to 1.7.0 would also have put a version nobody
          shipped between 1.5.0 and this one. If a deploy has succeeded by the time this is read, this line is wrong and
          the id belongs to 1.7.0. */
+      /* THE LAST SENTENCE ABOVE IS NOT RIGHT, and 1.7.0 was asked for on the strength of it and not raised. Measured
+         on 22 September at 07:30 UTC: the last successful deploy is `8bbf469e` at 16:23 UTC on the 21st, before
+         `aeef01c5` set 1.6.0, and the one run not yet finished is `ci` on `d9e43931`, which has `3bc64513` behind it. A
+         deploy ships a whole commit, so every build that can now reach a record carries `ingest.bank-from-in` under
+         1.6.0, and no record can hold a 1.6.0 without it. What a first successful deploy does change is the next line:
+         from then on 1.6.0 is released, and any id added under it is a raise to 1.7.0, not a line here. */
       'Still before any release, since every deploy since 1.6.0 was skipped: `ingest.bank-from-in` reads the `From HSBC:` credit off the `+` glued to its figure, and `ingest.bank-from-out` and `ingest.bank-from-unsure` refuse that sign so no line is claimed twice -> 03f76621c84239df',
     ],
   },
@@ -228,6 +234,24 @@ const DECLARED: Record<string, Version> = {
     history: [
       'Due soon on `page.work` stops drawing the tickets that are already in the queue above it, and that queue gained the due day it was the only other place to see: the sample drew three of its fourteen tickets twice on one screen -> 43b75b3712bfb336',
       'Words only, and the same version because it was never released: `page.work`\'s Due soon now reads "Nothing else is due in the next two weeks." A block that holds work back can be empty while work is due, and driven against the sample with its eight open tickets inside the fortnight moved to blocked it said nothing was due over a queue of eleven that were -> 39887628aa89f296',
+    ],
+  },
+  /**
+   * A VERSION AND NOT A RESET, because 1.5.0 shipped: the deploy of `8bbf469e` on 21 September at 16:23 UTC succeeded
+   * and `79f17031`, which set 1.5.0, is behind it. No id moved, which the unchanged `holds` says; every change is inside
+   * `page.work`, which is exactly the case the ids cannot see and the reason below has to.
+   */
+  'work@1.6.0': {
+    holds: `
+      metric.open-tasks metric.project-done-7d metric.project-due-soon metric.project-in-review metric.project-open
+      metric.tasks-done-7d metric.tasks-done-7d-agents metric.tasks-done-by-week metric.tasks-due-7d metric.tasks-due-by-week
+      metric.tasks-later metric.tasks-overdue metric.tasks-waiting metric.tasks-with-agents
+      page.work page.work-board
+      register.tasks register.tracks register.updates
+    `,
+    declares: '93dcbade382b5e4a',
+    history: [
+      '`page.work` leads with what to do as six lists that tick, Today, This week, Waiting on you, With an agent, After this week and Later, cut by state, then agent, then day so no task falls under two; its Waiting on you, Due soon and With an agent tables, which nobody could tick from the Overview, are gone -> 93dcbade382b5e4a',
     ],
   },
   'estate@1.1.0': {

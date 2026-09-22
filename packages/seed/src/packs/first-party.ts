@@ -96,13 +96,19 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   tickets twice on one screen. Nothing is taken away and no list or field moves, so the step is a minor one: what
  *   changed is `page.work`'s Due soon predicate, its empty line, which would otherwise say nothing is due while blocked
  *   work is, and the Waiting on you columns.
+ * - work 1.6.0: the Overview leads with what to do, as lists a person ticks. Waiting on you, Due soon and With an agent
+ *   were tables, so a task could be finished from the Board and from a project's page and not from Work's own Overview.
+ *   They are now six `todo` lists cut so that no task falls under two: Today, This week, Waiting on you, With an agent,
+ *   After this week and Later. No list or field moves and nothing is taken away but the tables' extra columns, so the
+ *   step is a minor one. It is a step and not a reset because 1.5.0 has been released: the last successful deploy,
+ *   on 21 September at 16:23 UTC, came after `79f17031` set it.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.4.0',
   people: '1.0.0',
   'money-core': '1.6.0',
   estate: '1.2.0',
-  work: '1.5.0',
+  work: '1.6.0',
 };
 
 type Body = Record<string, unknown>;
