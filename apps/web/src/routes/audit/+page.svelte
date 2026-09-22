@@ -30,6 +30,7 @@
      `undefined.word`. `isEventKind` is the kernel's own guard, beside the list. */
   import { isEventKind } from '@braindog/kernel';
   import type { AuditEvent, EventKind } from '$lib/record/schema.ts';
+  import type { Cursor } from '@braindog/client';
   import { untrack } from 'svelte';
 
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
@@ -123,7 +124,7 @@
    * what the record called each target, a row's title or a question from its governance row. Until the page arrives the
    * screen draws no lines and no empty state, and a refusal is the record's own sentence.
    */
-  let live = $state<{ events: AuditEvent[]; names: Map<string, string>; cursor: number | null } | null>(null);
+  let live = $state<{ events: AuditEvent[]; names: Map<string, string>; cursor: Cursor | null } | null>(null);
   let refused = $state<string | null>(null);
   const LOG = $derived(route.data.live ? (live?.events ?? []) : AUDIT);
   const clock = $derived(route.data.live ? Date.now() : NOW);
@@ -487,7 +488,9 @@
             lines tall for two numbers somebody wants once they have found the line.
           -->
           <span class="line-when">
-            <time datetime={e.at} title="{stamp(e.at)} · v{e.version.toLocaleString('en')}">{since(e.at, clock)}</time>
+            <!-- AND NO VERSION WHERE THE RECORD SENT NONE. A member held to named lists is sent no rowid, so `readLog`
+                 gives her lines `version: 0`, and "v0" is a place in the log that is no place. -->
+            <time datetime={e.at} title={e.version > 0 ? `${stamp(e.at)} · v${e.version.toLocaleString('en')}` : stamp(e.at)}>{since(e.at, clock)}</time>
           </span>
         </div>
       </li>
@@ -504,7 +507,10 @@
        version are the same fact, so a version number is a place in this list" is true, and it is a
        sentence about how the record is built. What a reader needs from the number is what it is
        FOR: it is how you name a moment when you talk to somebody about it. -->
-  {#if LOG[0]}
+  <!-- AND NOT FOR A READER WHO WAS SENT NO VERSION. For a member invited to one list this said "version 4,192" off the
+       rowid of her newest line, which is a count of every write on the record, hers or not
+       (`loop/research-history-cursor.md`). She is sent none now, and her lines carry `version: 0`. -->
+  {#if LOG[0] && LOG[0].version > 0}
     <p class="foot">{copy.auditVersion(LOG[0].version.toLocaleString('en'))}</p>
   {/if}
 </div>

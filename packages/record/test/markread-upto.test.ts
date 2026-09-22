@@ -50,26 +50,36 @@ async function record() {
   return { sql, api, wren };
 }
 
-test('NOTHING THE CALLER MAY SEE TO MARK IS `upTo: 0`, not null, with no `upTo` and with one past the log', async () => {
+test('NOTHING THE CALLER MAY SEE TO MARK IS `upTo: 0`, not null, and a number from her is refused rather than walked', async () => {
   const { sql, api, wren } = await record();
   /* ONLY THE DIARY HAS ROWS, and Wren was invited to Obligations, so every event she could land on is hidden. */
   value(await api.create({ register: 'diary', fields: { body: 'Dinner with the auditor' } } as never, owner));
   const before = sql.one<{ n: number }>('SELECT count(*) AS n FROM event')!.n;
   assert.ok(before > 0, 'the log is not empty, so this is the walk finding nothing and not an empty record');
 
-  for (const args of [undefined, {}, { upTo: 1 }, { upTo: 1_000_000_000_000 }]) {
+  for (const args of [undefined, {}]) {
     const out = value<{ upTo: unknown; seen_at: unknown }>(await api.markRead(args, wren));
     assert.strictEqual(out.upTo, 0, `markRead(${JSON.stringify(args)}) answered upTo ${JSON.stringify(out.upTo)}`);
     assert.strictEqual(out.seen_at, null, 'a mark nobody set moved');
   }
+  /* A NUMBER FROM HER IS REFUSED NOW, one past the log included (`history-cursor.test.ts`): the answer to a number was
+     the rowid it walked to, which said where her lines sit. The owner's `upTo: 0` for nothing to mark is unchanged. */
+  for (const upTo of [1, 1_000_000_000_000]) {
+    const out = (await api.markRead({ upTo }, wren)) as Out;
+    assert.equal(out.ok, false, `markRead({ upTo: ${upTo} }) was taken from a member held to one list`);
+    assert.equal(out.refusal?.code, 'VALUE_MALFORMED');
+  }
   sql.close();
 });
 
-test('and a caller with something to mark is answered the event it landed on', async () => {
+test('and a caller with something to mark is answered the event it landed on, by the id she was shown', async () => {
   const { sql, api, wren } = await record();
   value(await api.create({ register: 'obligations', fields: { what: 'Invoice 41' } } as never, owner));
-  const out = value<{ upTo: number; seen_at: string | null }>(await api.markRead(undefined, wren));
-  assert.ok(Number.isSafeInteger(out.upTo) && out.upTo >= 1, `upTo was ${out.upTo}`);
+  const out = value<{ upTo: unknown; seen_at: string | null }>(await api.markRead(undefined, wren));
+  const newest = value<{ events: { id: string }[] }>(await api.recentHistory({ limit: 1 }, wren)).events[0]!;
+  assert.equal(out.upTo, `e.${newest.id}`, `upTo was ${JSON.stringify(out.upTo)}`);
   assert.equal(typeof out.seen_at, 'string');
+  const again = value<{ upTo: unknown }>(await api.markRead({ upTo: out.upTo as string }, wren));
+  assert.equal(again.upTo, out.upTo, 'what markRead answered is not what it takes back');
   sql.close();
 });

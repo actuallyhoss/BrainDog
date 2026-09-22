@@ -90,6 +90,7 @@ import { arranger, carryUpdate, speakingNow, writeVoice, type CatalogueEntry } f
 import { useCases, type ExportArgs } from './usecase.ts';
 import { catalogueDrafts, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, noticeUsage, pageShowsAgents, readUsage, SPARK_OPEN_CAP, stableKey, type CatalogueOffer, type Offered, type SparkDraft, type SparkModel } from './spark.ts';
 import { grammarOf } from './grammar.ts';
+import { historyCursors, type HistoryCursors } from './history-cursor.ts';
 import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 
 export type { CatalogueEntry, FigureTest, Grows, RowIo } from './arrange.ts';
@@ -558,7 +559,17 @@ export type Boot = {
 };
 
 /** One line of the log as a caller sees it: the event, and what it is about when they may read that. */
-export type EventLine = LogLine & {
+export type EventLine = Omit<LogLine, 'rowid'> & {
+  /**
+   * The event's place in the log. SENT TO A CALLER WHO READS THE WHOLE RECORD, AND TO NOBODY ELSE: between two lines of
+   * a member invited to one list it is a count of the events she was not shown (`loop/research-history-cursor.md`).
+   */
+  rowid?: number;
+  /**
+   * On a `decide` line, the question it settled (`SG4`), so a screen can fold the `resolve` written beside it into the
+   * decision. The screen paired them by `rowid - 1`, which is a number a member held to named lists is no longer sent.
+   */
+  settles?: string;
   /** The row's register and number, when the event is about a row. */
   register: string | null;
   seq: number | null;
@@ -567,15 +578,24 @@ export type EventLine = LogLine & {
 };
 
 /**
+ * Where a page of the log stops, or what a read mark reaches: the event's rowid for a caller who reads the whole record,
+ * and for anybody else `e.<event id>` or `s.<sealed>`, which only this record opens (`history-cursor.ts`).
+ */
+export type Cursor = number | string;
+
+/** A line inside the record, where the walk and the read mark still need its place in the log. */
+type Walked = EventLine & { rowid: number };
+
+/**
  * `whatsNew`: what changed since the read mark, NEWEST FIRST and at most sixty.
  *
  * `upTo` is the newest event in the answer, which is what `markRead` takes to say all of these were seen.
  * `sinceCapped` says there is more between the mark and the oldest line here; the rest is `recentHistory`'s.
  */
-export type WhatsNew = { events: EventLine[]; upTo: number | null; sinceCapped: boolean };
+export type WhatsNew = { events: EventLine[]; upTo: Cursor | null; sinceCapped: boolean };
 
 /** `recentHistory`: one page of the log, newest first, and the cursor for the page below it. */
-export type HistoryPage = { events: EventLine[]; cursor: number | null };
+export type HistoryPage = { events: EventLine[]; cursor: Cursor | null };
 
 /** `inbox`: one page of what arrived and no rule filed, newest first, and the cursor for the page below it. */
 export type InboxPage = { arrivals: InboxLine[]; cursor: number | null };
@@ -842,10 +862,12 @@ export async function createRecordApi(deps: RecordDeps) {
   });
   /* A use case installed before `speaks` existed reads as declaring it (`speaks.ts`). */
   const kernel = backfillSpeaks(opened, deps.sql);
-  return { ...api(kernel, deps), kernel };
+  /* THE LOG'S CURSORS FOR A CALLER HELD TO NAMED LISTS, with this instance's key (`history-cursor.ts`). */
+  const cursors = await historyCursors();
+  return { ...api(kernel, deps, cursors), kernel };
 }
 
-function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'sparkModel' | 'catalogueOffers'>) {
+function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'sparkModel' | 'catalogueOffers'>, cursors: HistoryCursors) {
   const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
   /**
    * The page declaration served at a slug, and its version: the one named exactly, or else the one whose name slugs to it
@@ -1445,6 +1467,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const DRAWN = ['where', 'fx', 'walk', 'walks', 'walkFx', 'past', 'inherited', 'scopes', 'rings', 'history', 'bars', 'changes', 'working_now', 'lateness', 'late_name', 'seen'] as const;
 
   /**
+   * AND WHAT A REFUSED BLOCK WAS WRITTEN TO READ, which is the names of lists and figures she cannot open.
+   * `loop/research-batch-seventeen-audit.md` finding 4 measured a member invited to Obligations reading
+   * `cells: [{ metric: 'diary-count' }]` off a refused figures block, and `from: [{ register: 'bills' }]` with
+   * `opening: 1000000` off a refused cash walk: two list names `boot` hides from her and, on a hand-written page, an
+   * opening balance. The legs and the cells are what `blockRegisters` and `alsoReads` judged the block by, so what is
+   * refused is exactly what they name.
+   *
+   * `source` IS NOT HERE YET. `register.diary` on a refused table is the same kind of name, and
+   * `test/scoped-audit.test.ts` finds that block by it; the test has to find it another way before `source` can go.
+   */
+  const WRITTEN = ['from', 'cells', 'opening'] as const;
+
+  /**
    * The `example` marker, which IS the value `example` in a register's own `tags` field.
    *
    * A SEEDED ROW NOBODY CAN TELL FROM A REAL ONE IS A ROW NOBODY DELETES. The marker is a value in
@@ -1657,8 +1692,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * the vault and the members list are theirs. Everything else is about the record as a whole, so somebody invited to
    * named registers does not see it.
    */
-  const lineOf = (ctx: CallContext, e: LogLine): EventLine | null => {
-    const bare: EventLine = { ...e, register: null, seq: null, title: null };
+  const lineOf = (ctx: CallContext, e: LogLine): Walked | null => {
+    const bare: Walked = { ...e, register: null, seq: null, title: null };
     const target = e.target ?? '';
     const colon = target.indexOf(':');
     const kind = e.target_kind ?? (colon > 0 ? target.slice(0, colon) : null);
@@ -1675,7 +1710,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* A DECISION NAMES THE QUESTION IT ANSWERS, and the words are that question's. */
       const asked = kind === 'suggestion' ? id : typeof row?.question === 'string' ? row.question : null;
       const title = asked === null ? null : (kernel.question(asked) ?? (kind === 'decision' ? asked : null));
-      return { ...bare, title };
+      /* AND A `decide` LINE SAYS WHICH QUESTION IT SETTLED. Nothing else on the two lines ties a decision to the
+         `resolve` written beside it (the `to` is the question's words, and neither carries a batch), so Home paired them
+         by `rowid - 1`. The kernel's `SETTLED` already makes that join in SQL, where the number never leaves the server,
+         and `row.suggestion` is its answer. */
+      const settles = e.kind === 'decide' && kind === 'decision' && typeof row?.suggestion === 'string' ? row.suggestion : null;
+      return settles === null ? { ...bare, title } : { ...bare, title, settles };
     }
     if (/^(?:grant|access|share)\./u.test(e.kind) || ['grant', 'vault_key', 'device_grant', 'member', 'person'].includes(kind ?? ''))
       return allows(ctx, 'owner') === null ? bare : null;
@@ -1695,20 +1735,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * Walk the log down from `before`, no lower than `floor`, keeping what the caller may see, until `want` are kept.
    * `next` is where a further walk would start, and `null` once nothing is left above the floor.
    */
-  const walk = (ctx: CallContext, before: number | null, floor: number, want: number, setups = false): { lines: EventLine[]; next: number | null } => {
-    const lines: EventLine[] = [];
+  const walk = (ctx: CallContext, before: number | null, floor: number, want: number, setups = false): { lines: Walked[]; next: number | null } => {
+    const lines: Walked[] = [];
     /* THE FEED SAYS A RECORD SETTING ITSELF UP AS ONE LINE (`kernel/src/feed.ts`); the log keeps every write. */
     const setup = setups
-      ? setupCollapser<EventLine>((line) => {
+      ? setupCollapser<Walked>((line) => {
           const id = (line.target ?? '').replace(/^entry:/u, '');
           const tags = kernel.get(id, { includeDeleted: true })?.fields.tags;
           return Array.isArray(tags) && tags.includes('example');
         })
       : null;
-    const keep = (line: EventLine): void => {
+    const keep = (line: Walked): void => {
       for (const out of setup ? setup.push(line) : [line]) lines.push(out);
     };
-    const done = (next: number | null): { lines: EventLine[]; next: number | null } => {
+    const done = (next: number | null): { lines: Walked[]; next: number | null } => {
       if (setup) lines.push(...setup.flush());
       return { lines, next };
     };
@@ -1736,11 +1776,63 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const readerOf = (ctx: CallContext): string | null =>
     ctx.principal.kind === 'person' ? ctx.principal.id : ctx.principal.kind === 'token' ? ctx.principal.person : null;
 
+  /**
+   * A line as it leaves the record. THE ROWID STAYS BEHIND FOR A CALLER HELD TO NAMED LISTS, and only at the edge: the
+   * walk, `newsFor` and `markRead` all need it, so `lineOf` keeps it and every answer that hands lines out asks this.
+   */
+  const shown = (ctx: CallContext, line: Walked): EventLine => {
+    if (wholeRecord(ctx)) return line;
+    const { rowid: _rowid, ...rest } = line;
+    return rest;
+  };
+
+  /** Where a line sits, said to this caller: its rowid to whoever reads the whole record, and its id to anybody else. */
+  const pointAt = (ctx: CallContext, line: Walked): Cursor => (wholeRecord(ctx) ? line.rowid : cursors.mint(line.id));
+
+  /**
+   * The rowid a cursor from this caller names, or the one refusal for everything that is not a cursor they were given.
+   *
+   * A WHOLE-RECORD CALLER SENDS A WHOLE NUMBER, as before, or its digits as text, because the host now hands a GET's
+   * `cursor` through as the text it was sent rather than coercing it (a scoped caller's `e.01M...` is not a number).
+   *
+   * ANYBODY ELSE SENDS WHAT THEY WERE HANDED: `e.<id>` of a line `lineOf` shows them, or an `s.` this instance sealed. A
+   * whole number, an id nobody minted, an id of an event they were not shown and a seal that does not open are all the
+   * same sentence, because a refusal that differed would say which of them it was, and "that event exists but is not
+   * yours" is the fact the cursor exists to withhold (door 7 of `loop/research-scoped-audit.md`).
+   */
+  const cursorOf = async (ctx: CallContext, given: unknown, at: 'cursor' | 'upTo'): Promise<number | Refusal> => {
+    if (wholeRecord(ctx)) {
+      const whole = typeof given === 'string' && /^[1-9]\d{0,15}$/u.test(given) ? Number(given) : given;
+      if (typeof whole === 'number' && Number.isSafeInteger(whole) && whole >= 1) return whole;
+      return {
+        code: 'VALUE_MALFORMED',
+        fix: at === 'cursor' ? 'A cursor is the number of an event, a whole number from 1.' : 'upTo is the number of an event, a whole number from 1.',
+        at,
+      };
+    }
+    const refused: Refusal = {
+      code: 'VALUE_MALFORMED',
+      fix:
+        at === 'cursor'
+          ? 'A cursor is one this BrainDog answered with, on a page it showed you. Start again from the newest page.'
+          : 'upTo is one this BrainDog answered with, for a line it showed you. Mark from the newest line instead.',
+      at,
+    };
+    const opened = typeof given === 'string' ? await cursors.open(given) : null;
+    if (opened === null) return refused;
+    if ('rowid' in opened) return opened.rowid;
+    const found = sql.one<{ rowid: number }>('SELECT rowid FROM event WHERE id = ?', opened.id);
+    if (!found) return refused;
+    const rowid = Number(found.rowid);
+    const line = kernel.eventsBefore(rowid + 1, 1)[0];
+    return line && line.rowid === rowid && lineOf(ctx, line) !== null ? rowid : refused;
+  };
+
   /** What changed since `cursor`, or since the caller's read mark. A token reads its person's mark. */
   const newsFor = (ctx: CallContext, cursor?: number): WhatsNew => {
     const { lines, next } = walk(ctx, null, cursor ?? kernel.unreadFrom(readerOf(ctx)), NEWS + 1, true);
     const events = lines.slice(0, NEWS);
-    return { events, upTo: events[0]?.rowid ?? null, sinceCapped: next !== null };
+    return { events: events.map((line) => shown(ctx, line)), upTo: events[0] ? pointAt(ctx, events[0]) : null, sinceCapped: next !== null };
   };
 
   /**
@@ -2650,7 +2742,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           if (!beyond && b.source === 'activity' && 'seen' in b) return { ...b, seen: markOf(readerOf(ctx)) };
           if (!beyond) return b;
           const kept: Record<string, unknown> = { ...b };
-          for (const key of DRAWN) delete kept[key];
+          for (const key of [...DRAWN, ...WRITTEN]) delete kept[key];
           return {
             ...(kept as typeof b),
             rows: [],
@@ -2797,7 +2889,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        button under them refused every press. A read mark is about the caller's own attention and
        nobody else's rows, so it asks what `whatsNew` asks — and `append` alone still refuses, because
        somebody who may only file has read nothing to mark. */
-    async markRead(args: { upTo?: number } | undefined, ctx: CallContext) {
+    async markRead(args: { upTo?: Cursor } | undefined, ctx: CallContext) {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       if (ctx.principal.kind !== 'person')
@@ -2805,20 +2897,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return no('FORBIDDEN', 'A read mark belongs to a person, and a token is not one.', { at: 'principal' });
       /* CHECKED AS `whatsNew` CHECKS ITS CURSOR, because the route hands the body straight through: `{ "upTo": true }`
          reached the SQL binding, which threw, and the caller got a 500 for the mistake `whatsNew` answers with a 422. */
-      const asked = args?.upTo;
-      if (asked !== undefined && !(Number.isSafeInteger(asked) && asked >= 1))
-        return no('VALUE_MALFORMED', 'upTo is the number of an event, a whole number from 1.', { at: 'upTo' });
+      /* AND FROM A CALLER HELD TO NAMED LISTS IT IS ONE SHE WAS HANDED, never a number: the walk below answered the
+         rowid it landed on, so stepping `upTo` through the log said which rowids were hers (`cursorOf`). */
+      const asked = args?.upTo === undefined ? null : await cursorOf(ctx, args.upTo, 'upTo');
+      if (asked !== null && typeof asked !== 'number') return { ok: false as const, refusal: asked };
       /* AND THE MARK LANDS ON AN EVENT THE CALLER MAY SEE. The answer is that event's own `ts`, so marking a hidden
          event handed a member invited to one list the exact time the owner wrote in another, one rowid per call; the
          audit read a diary write's instant this way. So `upTo` is walked down to the newest event at or below it that
          `lineOf` shows this caller, which is the same sight `whatsNew` answers with, and a caller who can see nothing
          there keeps the mark they had. For an owner the first event walked is the one asked for, so nothing moves. */
-      const seen = walk(ctx, (asked ?? kernel.newestEvent()) + 1, 1, 1).lines[0]?.rowid ?? null;
+      const landed = walk(ctx, (asked ?? kernel.newestEvent()) + 1, 1, 1).lines[0] ?? null;
       const person = ctx.principal.id;
-      /* NOTHING TO MARK IS `upTo: 0`, which is what this answered on an empty log before the walk: the client types
-         `upTo` as a number, and 0 names no event, so it tells a scoped caller nothing about what is hidden. */
-      if (seen === null) return ok({ upTo: 0, seen_at: markOf(person) });
-      return ok({ upTo: seen, seen_at: kernel.markRead(person, seen) });
+      /* NOTHING TO MARK IS `upTo: 0`, which is what this answered on an empty log before the walk: 0 names no event, so
+         it tells a scoped caller nothing about what is hidden. */
+      if (landed === null) return ok({ upTo: 0 as Cursor, seen_at: markOf(person) });
+      return ok({ upTo: pointAt(ctx, landed), seen_at: kernel.markRead(person, landed.rowid) });
     },
 
     /**
@@ -3232,10 +3325,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          `Cannot read properties of undefined (reading 'writes')` out of `install` before the `reopen` below ran:
          the owner saw a crash and the record kept the suggestion resolved with nothing installed
          (`test/decide-install.test.ts`). A throw here is the same answer as a refusal, in the record's words. */
+      /* A `TypeError` AND NOTHING ELSE. The bare `catch` answered every throw with this sentence, so a full disk or a
+         corrupt page told the owner to propose the change again in a shape that was never wrong, and the driver's own
+         message went nowhere (`test/decide-install-throws.test.ts`). Any other throw puts the question back first, so
+         the record is not left resolved with nothing installed, and then surfaces as itself: the host answers it 500
+         with its message. */
       let put: Awaited<ReturnType<typeof kernel.install>>;
       try {
         put = await kernel.install([decl as never]);
-      } catch {
+      } catch (thrown) {
+        if (!(thrown instanceof TypeError)) {
+          kernel.reopen(out.value.suggestion);
+          throw thrown;
+        }
         put = no(
           'VALUE_MALFORMED',
           'What this change would install is not a declaration, so nothing was changed and the question is open again. Propose it again as {"id":"register.<id>","kind":"register","body":{...}}.',
@@ -4407,12 +4509,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * NEWEST FIRST AND CAPPED, because it is what a first screen draws under "since you were away", and the oldest sixty
      * lines of a month away are the wrong sixty. The whole of it, in order, is `recentHistory`.
      */
-    async whatsNew(args: { cursor?: number } | undefined, ctx: CallContext): Promise<Result<WhatsNew>> {
+    async whatsNew(args: { cursor?: Cursor } | undefined, ctx: CallContext): Promise<Result<WhatsNew>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
-      const cursor = args?.cursor;
-      if (cursor !== undefined && !(Number.isSafeInteger(cursor) && cursor >= 1))
-        return no('VALUE_MALFORMED', 'A cursor is the number of an event, a whole number from 1.', { at: 'cursor' });
+      if (args?.cursor === undefined) return ok(newsFor(ctx));
+      const cursor = await cursorOf(ctx, args.cursor, 'cursor');
+      if (typeof cursor !== 'number') return { ok: false, refusal: cursor };
       return ok(newsFor(ctx, cursor));
     },
 
@@ -4422,19 +4524,25 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * `cursor` is the one the page above answered with, and a page is short only where the walk stopped, never because
      * the caller may see less, so a `cursor` of `null` is the one sign there is nothing further down.
      */
-    async recentHistory(args: { cursor?: number; limit?: number } | undefined, ctx: CallContext): Promise<Result<HistoryPage>> {
+    async recentHistory(args: { cursor?: Cursor; limit?: number } | undefined, ctx: CallContext): Promise<Result<HistoryPage>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
-      const cursor = args?.cursor;
-      if (cursor !== undefined && !(Number.isSafeInteger(cursor) && cursor >= 1))
-        return no('VALUE_MALFORMED', 'A cursor is the number of an event, a whole number from 1.', { at: 'cursor' });
+      const cursor = args?.cursor === undefined ? null : await cursorOf(ctx, args.cursor, 'cursor');
+      if (cursor !== null && typeof cursor !== 'number') return { ok: false, refusal: cursor };
       const asked = args?.limit;
       if (asked !== undefined && !Number.isSafeInteger(asked))
         return no('VALUE_MALFORMED', 'A limit is a whole number of lines.', { at: 'limit' });
       const limit = Math.min(Math.max(1, asked ?? 50), 200);
-      const { lines, next } = walk(ctx, cursor ?? null, 1, limit + 1);
+      const { lines, next } = walk(ctx, cursor, 1, limit + 1);
       const events = lines.slice(0, limit);
-      return ok({ events, cursor: lines.length > limit ? (events.at(-1)?.rowid ?? null) : next });
+      const last = events.at(-1);
+      /* A FULL PAGE ENDS ON A LINE THE CALLER WAS SHOWN, and its cursor names that line. A page the walk cap cut short
+         ends on `next`, an event they were not shown: its rowid to whoever reads the whole record, as before, and sealed
+         for anybody else, since its id would hand them the hidden event's millisecond (`history-cursor.ts`). */
+      let below: Cursor | null = null;
+      if (lines.length > limit) below = last ? pointAt(ctx, last) : null;
+      else if (next !== null) below = wholeRecord(ctx) ? next : await cursors.seal(next);
+      return ok({ events: events.map((line) => shown(ctx, line)), cursor: below });
     },
 
     /**

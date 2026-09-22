@@ -125,10 +125,15 @@ export const ROUTES: readonly Route[] = [
     takes: { register: 'text', seq: 'integer' } },
   { name: 'backlinks', group: 'READ+', writes: false, what: 'What points at one row: the rows of other lists whose reference fields name it, a page at a time.',
     takes: { register: 'text', seq: 'integer', limit: 'integer', cursor: 'text' } },
+  /* `cursor` IS NOT DECLARED ON THESE TWO, SO IT ARRIVES AS THE TEXT IT WAS SENT on a GET and as itself in a POST. It
+     was `integer`, and a member held to named lists is now handed `e.<event id>` rather than the event's rowid
+     (`loop/research-history-cursor.md`: the rowid between two of her lines counted the events she was not shown), so
+     the host refused her own cursor with a 422 before the record could read it. `text` would refuse the owner's rowid
+     in a POST body, which is a number there. The record checks both spellings and says what it wanted. */
   { name: 'whatsNew', group: 'READ+', writes: false, what: 'What changed since you last read, newest first, held to what you may see.',
-    takes: { cursor: 'integer' } },
+    takes: {} },
   { name: 'recentHistory', group: 'READ+', writes: false, what: 'Every change to this record, newest first, a page at a time, held to what you may see.',
-    takes: { cursor: 'integer', limit: 'integer' } },
+    takes: { limit: 'integer' } },
   { name: 'inbox', group: 'READ+', writes: false, what: 'What arrived and no rule filed, newest first, a page at a time. An owner reads it, and no token does.',
     takes: { cursor: 'integer', limit: 'integer' } },
   { name: 'search', group: 'DATA', writes: false, what: 'Rows whose text matches, across every register you can see, best first.',
@@ -387,7 +392,7 @@ export type RecordSurface = {
   dryRun(args: never, ctx: never): Promise<Result<unknown>>;
   whoami(ctx: never): Promise<Result<unknown>>;
   digestToday(args: never, ctx: never): Promise<Result<unknown>>;
-  markRead(args: { upTo?: number } | undefined, ctx: never): Promise<Result<unknown>>;
+  markRead(args: { upTo?: number | string } | undefined, ctx: never): Promise<Result<unknown>>;
   setPref(args: never, ctx: never): Promise<Result<unknown>>;
   log(args: never, ctx: never): Promise<Result<unknown>>;
   governance(args: never, ctx: never): Promise<Result<unknown>>;
@@ -473,7 +478,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     dryRun: (a, ctx) => api.dryRun(a as never, ctx as never),
     whoami: (_a, ctx) => api.whoami(ctx as never),
     digestToday: (a, ctx) => api.digestToday(a as never, ctx as never),
-    markRead: (a, ctx) => api.markRead(a as { upTo?: number } | undefined, ctx as never),
+    markRead: (a, ctx) => api.markRead(a as { upTo?: number | string } | undefined, ctx as never),
     setPref: (a, ctx) => api.setPref(a as never, ctx as never),
     log: (a, ctx) => api.log(a as never, ctx as never),
     governance: (a, ctx) => api.governance(a as never, ctx as never),

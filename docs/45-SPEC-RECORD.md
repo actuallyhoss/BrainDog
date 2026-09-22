@@ -288,9 +288,11 @@ type UpdateArgs  = { register: string; seq?: number; id?: string; patch: Record<
 type ProposeArgs = { question: string; body_kind: 'options' | 'pattern' | 'rowset' | 'change'; body: object; op_id?: string };
 type LogArgs     = { note: string; target?: string };                                                 // note ≤ 280
 type ProjectArgs = ({ registers?: string[]; where?: Predicate; q?: string; limit?: number } | { metric: string }) & { budget: { tokens: number } };
-type EventLine   = EventRow & { register: string | null; seq: number | null; title: string | null };
-type WhatsNew    = { events: EventLine[]; upTo: number | null; sinceCapped: boolean };                 // ≤ 60, newest first
-type HistoryPage = { events: EventLine[]; cursor: number | null };                                     // newest first
+type EventLine   = Omit<EventRow, 'rowid'> & { rowid?: number; settles?: string;                       // rowid: whole-record callers only
+                   register: string | null; seq: number | null; title: string | null };                // settles: a `decide` line's question
+type Cursor      = number | string;                                        // a rowid, or `e.<id>` / `s.<sealed>` for a caller held to named lists
+type WhatsNew    = { events: EventLine[]; upTo: Cursor | null; sinceCapped: boolean };                 // ≤ 60, newest first
+type HistoryPage = { events: EventLine[]; cursor: Cursor | null };                                     // newest first
 type Boot        = { registers: RegisterCount[]; now: string; sessions: LiveRun[]; waiting: Waiting[];
                      record: { slug; name; locale } | null; me: { kind; person; name; level };
                      pages: { slug; title; nav; icon }[]; counts: { decide: number; inbox: number | null };
@@ -564,7 +566,9 @@ grant's id never appears (§4.4 rule 3). The learnings `learningsFor` returned i
 1. `cursor ?? SELECT COALESCE(MIN(rowid), (SELECT COALESCE(MAX(rowid), 0) + 1 FROM event)) FROM event WHERE ts > COALESCE((SELECT seen_at FROM member WHERE person_id = ? AND register = '*'), '')` — the first rowid after the read mark; a token uses its person's.
 2. Walk the log down from the newest event, `SELECT rowid, id, ts, actor, kind, target, target_kind, field, from_v, to_v, note FROM event WHERE rowid < ? ORDER BY rowid DESC LIMIT 500` a batch at a time, stopping below step 1's rowid, at 61 kept lines, or after 5,000 lines walked.
 3. Keep a line when the caller may see it: an `entry` line when `readable` passes on its row's register (and it carries `register`, `seq` and the row's title); a `suggestion` or `decision` line when `holds` does not (with the question as its title); a line about access or keys (`grant.*`, `access.*`, `share.*`, a `token`, `member`, `device_grant` or `vault_key` target) for an owner only; a `register.<id>` declaration when that register is readable; any other line only for a caller who reads the whole record.
-4. 61 kept → answer the newest 60, `sinceCapped: true`; the walk stopping early is `sinceCapped: true` too. `upTo` = the newest kept rowid. Values were redacted at write (20 §8).
+4. 61 kept → answer the newest 60, `sinceCapped: true`; the walk stopping early is `sinceCapped: true` too. `upTo` = the newest kept rowid for a caller who reads the whole record, and `e.<its id>` for anybody else, whose lines also leave without `rowid`. A cursor from such a caller is resolved by `SELECT rowid FROM event WHERE id = ?` and taken only when step 3 keeps that line for them. Values were redacted at write (20 §8).
+
+*Amended September 22nd 2026: a caller held to named lists is sent no rowid and none is taken from them. Between two of her lines the rowid counted the events she was not shown, a whole-number cursor she chose was a probe that said which rowids were hers, and `markRead` answered the rowid it walked to (`loop/research-history-cursor.md`).*
 
 *Amended September 15th 2026: newest first, where it was oldest first with `cursor` = last + 1. A first screen draws the latest lines, and oldest first showed somebody away a month the first sixty things that happened after they left. The whole log in order is `recentHistory`, which walks the same way below its `cursor` and keeps the same lines.*
 

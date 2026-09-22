@@ -13,12 +13,13 @@
  * state rather than about whether there is one. `forget` drops the answer after a write that changes it.
  */
 
-import { createClient, type Boot, type ClientOptions, type EventLine } from '@braindog/client';
+import { createClient, type Boot, type ClientOptions, type Cursor, type EventLine } from '@braindog/client';
 import { railRoom } from '@braindog/kernel';
 import { useCaseName } from '@braindog/seed/usecases/names';
 
 import { iconFor, NOW, PACKS, REGISTERS, setupSaid, whoDid, type boot, type NavEntry } from './api.ts';
 import { copy } from '../copy.ts';
+import type { SwitcherRow } from './switcher.ts';
 import { noRecord } from './device.ts';
 import { QUEUE } from './data.ts';
 import { noteOf } from './history-live.ts';
@@ -41,7 +42,8 @@ export type Shell = Omit<Sample, 'me'> & {
     person: string;
     level: string;
     owner: boolean;
-    records: { slug: string; name: string; level: string }[];
+    /* THE SWITCHER'S OWN ROW, so a record where somebody holds some lists arrives with `level: null` and `held`. */
+    records: SwitcherRow[];
     /**
      * THE LISTS A COLLEAGUE HOLDS WHEN THEY HOLD LISTS AND NOT THE RECORD, by id; `null` for everybody else.
      *
@@ -103,7 +105,8 @@ export type Shell = Omit<Sample, 'me'> & {
   open: number;
   now: number;
   live: boolean;
-  upTo: number | null;
+  /* A ROWID FOR THE OWNER AND `e.<id>` FOR A MEMBER HELD TO NAMED LISTS: handed back to `markRead` as it came. */
+  upTo: Cursor | null;
 };
 
 let kept: Promise<Booted> | null = null;
@@ -314,15 +317,22 @@ function hrefOf(e: EventLine): string {
 /**
  * THE REASON A QUESTION WAS ANSWERED IS PART OF ITS DECISION. Accepting writes `decide` and then `resolve` with the reason as
  * its note (`govern.ts`), and the feed drew the reason, "Yes, for the proof.", as a line of its own under "Decided: ...".
- * A `resolve` written straight after a `decide` is folded into that decision's line; any other `resolve` keeps its own.
+ * The `resolve` of the question a decision `settles`, written in the same instant, is folded into that decision's line;
+ * any other `resolve` keeps its own.
+ *
+ * BY `settles`, AND IT WAS `rowid - 1`. A member held to named lists is sent no rowid (`loop/research-history-cursor.md`:
+ * the gap between two of hers counted the events she was not shown), so the pairing had nothing to read, and the record
+ * now says on the decision which question it settled, from the join the kernel already makes in SQL. The lines are keyed
+ * by themselves, since each is one object in one answer and needs no number to be told apart.
  */
-function reasonsOf(events: readonly EventLine[]): { byDecision: Map<number, string | null>; folded: Set<number> } {
-  const decides = new Map(events.filter((e) => e.kind === 'decide' && e.title).map((e) => [e.rowid, e]));
-  const out = { byDecision: new Map<number, string | null>(), folded: new Set<number>() };
+function reasonsOf(events: readonly EventLine[]): { byDecision: Map<EventLine, string | null>; folded: Set<EventLine> } {
+  const decides = new Map(events.filter((e) => e.kind === 'decide' && e.title && e.settles).map((e) => [`suggestion:${e.settles} ${e.ts}`, e]));
+  const out = { byDecision: new Map<EventLine, string | null>(), folded: new Set<EventLine>() };
   for (const e of events) {
-    if (e.kind !== 'resolve' || !decides.has(e.rowid - 1)) continue;
-    out.byDecision.set(e.rowid - 1, e.note && e.note.trim() !== '' ? e.note.trim() : null);
-    out.folded.add(e.rowid);
+    const decision = e.kind === 'resolve' ? decides.get(`${e.target} ${e.ts}`) : undefined;
+    if (!decision || out.byDecision.has(decision)) continue;
+    out.byDecision.set(decision, e.note && e.note.trim() !== '' ? e.note.trim() : null);
+    out.folded.add(e);
   }
   return out;
 }
@@ -361,15 +371,15 @@ const BULK_KIND: Record<string, BulkPart> = {
  * (or emptied) is folded into the move. A write's first line carries no batch and the lines after it carry its id, so a
  * move is keyed by its batch or else its own id. A day a person sets on its own keeps its line.
  */
-function finishedDays(events: readonly EventLine[]): Set<number> {
+function finishedDays(events: readonly EventLine[]): Set<EventLine> {
   const moves = new Set(events.filter((e) => e.kind === 'state').map((e) => `${e.batch ?? e.id} ${e.target} ${e.actor}`));
   const day = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(v);
   const near = (d: string, ts: string): boolean => Math.abs(Date.parse(d) - Date.parse(ts.slice(0, 10))) <= 86_400_000;
-  const out = new Set<number>();
+  const out = new Set<EventLine>();
   for (const e of events) {
     if (e.kind !== 'edit' || !e.batch || !moves.has(`${e.batch} ${e.target} ${e.actor}`)) continue;
     const emptied = (e.to === null || e.to === undefined || e.to === '') && day(e.from);
-    if (emptied || (day(e.to) && near(e.to, e.ts))) out.add(e.rowid);
+    if (emptied || (day(e.to) && near(e.to, e.ts))) out.add(e);
   }
   return out;
 }
@@ -380,11 +390,11 @@ export function newsOf(events: readonly EventLine[], me: string | null, names: R
   const reasons = reasonsOf(events);
   const folded = finishedDays(events);
   const said = events.flatMap((e, i): { e: EventLine; last: boolean; item: NewsItem }[] => {
-    if (folded.has(e.rowid)) return [];
+    if (folded.has(e)) return [];
     /* WHAT AN ACCEPTED ARRANGEMENT DID, kept on its decision (`keepApplied`), is the decision's own line and not news. */
     if (e.kind === 'note' && e.target_kind === 'decision') return [];
-    if (reasons.folded.has(e.rowid)) return [];
-    const reason = reasons.byDecision.get(e.rowid);
+    if (reasons.folded.has(e)) return [];
+    const reason = reasons.byDecision.get(e);
     const text = voice.has(i) ? voice.get(i) : reason !== undefined && e.title ? copy.feedDecided(e.title, reason) : textOf(e);
     const last = i === events.length - 1 && events.length >= WHATS_NEW_CAP;
     return text == null ? [] : [{ e, last, item: { at: e.ts, by: feedActor(e.actor, me, names), text, href: hrefOf(e) } }];
@@ -512,8 +522,9 @@ export function layoutOf(b: Boot): Shell {
     questions: (b.waiting ?? []).map((w, i) => ({ id: w.id, title: w.question || w.id, cost: '', rank: i + 1, opened: w.opened_at, options: [] })),
     whatsNew: newsOf(b.whatsNew?.events ?? [], person, new Map(Object.entries(b.names ?? {}))),
     sinceCapped: b.whatsNew?.sinceCapped ?? false,
-    /* THE NEWEST LINE THIS CALLER MAY SEE, which is as near the record's version as `boot` says. */
-    version: b.whatsNew?.upTo ?? 0,
+    /* THE NEWEST LINE THIS CALLER MAY SEE, which is as near the record's version as `boot` says. A member held to named
+       lists is sent a cursor and no number, and 0 is what "names no event" already means. */
+    version: typeof b.whatsNew?.upTo === 'number' ? b.whatsNew.upTo : 0,
     assistant: false,
     inbox: b.counts?.inbox ?? 0,
     open: b.counts?.decide ?? (b.waiting ?? []).length,

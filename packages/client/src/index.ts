@@ -95,7 +95,11 @@ export type Boot = {
 
 /** One line of the log, as `whatsNew` and `recentHistory` send it. See `EventLine` in `@braindog/record`. */
 export type EventLine = {
-  rowid: number;
+  /**
+   * The event's place in the log. Sent to a caller who reads the whole record and to nobody else: between two lines of a
+   * member invited to one list it counted the events she was not shown. Key a line by `id`, which every line carries.
+   */
+  rowid?: number;
   id: string;
   ts: string;
   actor: string;
@@ -113,13 +117,21 @@ export type EventLine = {
   seq: number | null;
   /** What the thing is called: a row's title, or a question. */
   title: string | null;
+  /** On a `decide` line, the question it settled (`SG4`): the `resolve` beside it targets `suggestion:<settles>`. */
+  settles?: string;
 };
 
+/**
+ * Where a page of the log stops, or what a read mark reaches. A rowid for a caller who reads the whole record, and an
+ * opaque string (`e.<id>`, `s.<sealed>`) for anybody else. Hand it back as it came; do not do arithmetic on it.
+ */
+export type Cursor = number | string;
+
 /** `whatsNew`: newest first, at most sixty. `upTo` is what `markRead` takes to mark all of them read. */
-export type WhatsNew = { events: EventLine[]; upTo: number | null; sinceCapped: boolean };
+export type WhatsNew = { events: EventLine[]; upTo: Cursor | null; sinceCapped: boolean };
 
 /** `recentHistory`: one page, newest first, and the cursor for the page below it. */
-export type HistoryPage = { events: EventLine[]; cursor: number | null };
+export type HistoryPage = { events: EventLine[]; cursor: Cursor | null };
 
 /** One arrival no rule filed, as `inbox` sends it. See `InboxLine` in `@braindog/kernel`. */
 export type InboxLine = {
@@ -605,10 +617,10 @@ export function createClient(options: ClientOptions) {
     /** What points at one row, held to the lists this caller may read. `limit` is rows across the whole answer. */
     backlinks: (args: { register: string; seq: number; limit?: number; cursor?: string }) =>
       call<BacklinksAnswer>('backlinks', args as Record<string, unknown>),
-    /** What changed since the caller's read mark, or since `cursor`, an event rowid, when one is given. */
-    whatsNew: (cursor?: number) => call<WhatsNew>('whatsNew', cursor === undefined ? {} : { cursor }),
+    /** What changed since the caller's read mark, or since `cursor`, one the record answered with, when one is given. */
+    whatsNew: (cursor?: Cursor) => call<WhatsNew>('whatsNew', cursor === undefined ? {} : { cursor }),
     /** The record's log, newest first. `cursor` is the one the page above answered with. */
-    recentHistory: (args: { cursor?: number | null; limit?: number } = {}) =>
+    recentHistory: (args: { cursor?: Cursor | null; limit?: number } = {}) =>
       call<HistoryPage>('recentHistory', args as Record<string, unknown>),
     /** What arrived and no rule filed, newest first. An owner's read; `cursor` is the one the page above answered with. */
     inbox: (args: { cursor?: number; limit?: number } = {}) => call<InboxPage>('inbox', args as Record<string, unknown>),
@@ -726,8 +738,8 @@ export function createClient(options: ClientOptions) {
        mark and nothing else, and with no `upTo` the record uses its own newest event, so a caller
        never has to know a number to say "I have seen this". `log` is a note against a row: it is a
        write, and it leaves the row's version where it was. */
-    markRead: (upTo?: number) =>
-      call<{ upTo: number; seen_at: unknown }>('markRead', upTo === undefined ? {} : { upTo }),
+    markRead: (upTo?: Cursor) =>
+      call<{ upTo: Cursor; seen_at: unknown }>('markRead', upTo === undefined ? {} : { upTo }),
     log: (args: { register: string; seq: number; note?: string }) => call<unknown>('log', args as Record<string, unknown>),
     /** The reader's own rail: `nav.order` or `nav.hidden`, a list of addresses, or `null` to take it away. */
     setPref: (key: 'nav.order' | 'nav.hidden', value: string[] | null) =>

@@ -8,7 +8,7 @@
  * other refusal is the record's own sentence. A live answer is drawn from the answer and nothing else.
  */
 
-import { createClient, type EventLine } from '@braindog/client';
+import { createClient, type Cursor, type EventLine } from '@braindog/client';
 import { isEventKind, type FxRead, type Part } from '@braindog/kernel';
 import { MISSING, money } from 'braindog-render';
 
@@ -103,7 +103,8 @@ export function tileOf(id: string, r: Reading | null): Metric {
   };
 }
 
-export type News = { items: NewsItem[]; upTo: number | null; sinceCapped: boolean };
+/** `upTo` is the record's cursor for the newest line: a rowid for the owner, `e.<id>` for a member held to named lists. */
+export type News = { items: NewsItem[]; upTo: Cursor | null; sinceCapped: boolean };
 
 export type HomeRead = { from: 'live'; tiles: Metric[]; news: News } | { from: 'sample' } | { from: 'refused'; fix: string };
 
@@ -134,7 +135,7 @@ async function namesFor(base: string, io?: Fetch): Promise<ReadonlyMap<string, s
 }
 
 /** Mark everything up to `upTo` read, and drop the shell's kept answer, whose feed it was. */
-export async function markAll(base: string, upTo: number | null, io?: Fetch): Promise<boolean> {
+export async function markAll(base: string, upTo: Cursor | null, io?: Fetch): Promise<boolean> {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   const out = await client.markRead(upTo ?? undefined);
   forget();
@@ -145,7 +146,7 @@ export async function markAll(base: string, upTo: number | null, io?: Fetch): Pr
 export const LOG_PAGE = 200;
 
 export type LogRead =
-  | { from: 'live'; events: AuditEvent[]; names: Map<string, string>; more: boolean; cursor: number | null }
+  | { from: 'live'; events: AuditEvent[]; names: Map<string, string>; more: boolean; cursor: Cursor | null }
   | { from: 'sample' }
   | { from: 'refused'; fix: string };
 
@@ -163,7 +164,7 @@ function targetOf(e: EventLine): string | undefined {
  * `names` IS WHAT EACH TARGET IS CALLED, as the record resolved it: a row's title, or a question from its governance
  * row. History read those from the sample's rows and questions, which say nothing about a live record.
  */
-export async function readLog(base: string, me: string | null, io?: Fetch, before: number | null = null): Promise<LogRead> {
+export async function readLog(base: string, me: string | null, io?: Fetch, before: Cursor | null = null): Promise<LogRead> {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   const out = await client.recentHistory({ limit: LOG_PAGE, ...(before === null ? {} : { cursor: before }) });
   if (!out.ok) {
@@ -176,14 +177,18 @@ export async function readLog(base: string, me: string | null, io?: Fetch, befor
     if (!isEventKind(e.kind)) continue;
     const target = targetOf(e);
     if (target !== undefined && e.title) names.set(target, e.title);
+    /* NO ROWID IS NO VERSION. A member held to named lists is sent none, because the gap between two of her lines
+       counted what she was not shown, and her newest line's rowid was what the footer called "version 4,192". 0 is what
+       "names no event" already means (`markRead`'s `upTo: 0`), and `/audit` draws no version for it. */
+    const at = e.rowid ?? 0;
     events.push({
-      seq: e.rowid,
+      seq: at,
       at: e.ts,
       by: actorFor(e.actor, me),
       kind: e.kind,
       ...(target === undefined ? {} : { target }),
       note: e.note ?? (e.register !== null ? noteOf(e.register, e) : ''),
-      version: e.rowid,
+      version: at,
     });
   }
   return { from: 'live', events, names, more: out.value.cursor !== null, cursor: out.value.cursor };

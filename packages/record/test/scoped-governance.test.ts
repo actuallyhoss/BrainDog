@@ -118,10 +118,20 @@ test('A READ MARK TELLS A SCOPED MEMBER NOTHING ABOUT AN EVENT THEY CANNOT SEE',
 
   /* NAMED OUTRIGHT, the hidden event's number came back with its exact time: one call per rowid read the whole log's
      clock, which is when the owner wrote in a list this member was never shown. */
-  const named = value<{ upTo: number | null; seen_at: string | null }>(await api.markRead({ upTo: secret.rowid }, reader));
+  /* AND SINCE `loop/research-history-cursor.md` THE NUMBER IS NOT TAKEN FROM THEM AT ALL. The walk down to a line they
+     may see stopped the time leaking, and still answered the rowid it landed on, so stepping `upTo` said which rowids
+     were theirs. The hidden event's number and its id are refused in the same words. */
+  type Refused = { ok: boolean; refusal?: { code: string; fix: string; at?: string } };
+  const byNumber = (await api.markRead({ upTo: secret.rowid! }, reader)) as Refused;
+  const byId = (await api.markRead({ upTo: `e.${secret.id}` }, reader)) as Refused;
+  assert.equal(byNumber.ok, false, 'a scoped reader marked by rowid');
+  assert.equal(byNumber.refusal?.at, 'upTo');
+  assert.deepEqual(byId, byNumber, 'the refusal says whether the event exists');
+  const named = value<{ upTo: unknown; seen_at: string | null }>(await api.markRead({ upTo: `e.${visible.id}` }, reader));
   assert.notEqual(named.seen_at, secret.ts, 'markRead answered the time of an event the read half hides');
-  assert.equal(named.seen_at, visible.ts, 'the mark is the newest event they may see at or below what they asked for');
-  assert.equal(named.upTo, visible.rowid);
+  assert.equal(named.seen_at, visible.ts, 'the mark is the event they named, which they were shown');
+  assert.equal(named.upTo, `e.${visible.id}`);
+  assert.ok(!('rowid' in visible), 'the history handed them the rowid it no longer takes back');
 
   /* AND WITH NO ARGUMENT, which means the newest event, and the newest is the hidden one. */
   const all = value<{ seen_at: string | null }>(await api.markRead(undefined, reader));
@@ -161,5 +171,49 @@ test("A TOKEN'S ACTIVITY FEED READS ITS PERSON'S MARK, not a mark nobody could e
   const block = value<Feed>(await api.page({ slug: 'log' }, reading)).blocks[0]!;
   assert.deepEqual(block.refusals ?? [], [], 'the token must be one that may read the activity block at all');
   assert.equal(block.seen, marked.seen_at, "the token's feed drew every line as unread");
+  sql.close();
+});
+
+test('A REFUSED BLOCK CARRIES NO NAME OF A LIST SHE CANNOT OPEN, and no figure somebody wrote into it', async () => {
+  /* `loop/research-batch-seventeen-audit.md` finding 4: `DRAWN` took back what a refused block computed and its `where`,
+     and handed back the rest of what the owner wrote. Measured at the time: a figures block kept
+     `cells: [{ metric: 'diary-count' }]`, and a cash walk kept `from: [{ register: 'bills' }]` and `opening: 1000000`,
+     so a member invited to Obligations read the names of two lists and a figure her own `list('bills')` refuses. */
+  const { api, sql } = await record();
+  const BILLS = {
+    id: 'register.bills',
+    kind: 'register' as const,
+    body: { id: 'bills', name: 'Bills', title: 'what', fields: [{ id: 'what', type: 'text', required: true }, { id: 'amount', type: 'money', required: true }, { id: 'due', type: 'day', required: true }] } as never,
+  };
+  const COUNT = { id: 'metric.diary-count', kind: 'metric', body: { metric: 'diary-count', name: 'Diary entries', source: 'register.diary', value: { count: 'body' }, format: 'int', target: { lte: 99 }, window: '30d' } } as never;
+  const DESK = {
+    id: 'page.desk',
+    kind: 'page',
+    body: {
+      page: 'desk',
+      title: 'Desk',
+      /* HER OWN LIST FIRST, so the page is one she may open and the two blocks after it are refused inside it. */
+      blocks: [
+        { kind: 'table', source: 'register.obligations' },
+        { kind: 'stat', cells: [{ metric: 'diary-count' }] },
+        { kind: 'forecast', source: 'forecast.runway', opening: 1_000_000, from: [{ register: 'bills', on: 'due', amount: 'amount' }], horizon: 60 },
+      ],
+    },
+  } as never;
+  assert.ok((await api.kernel.install([BILLS, COUNT, DESK])).ok);
+  const reader = await wren(api);
+
+  type Block = { kind: string; refusals?: { code: string }[]; cells?: unknown; from?: unknown; opening?: unknown };
+  const [, figures, walk] = value<{ blocks: Block[] }>(await api.page({ slug: 'desk' }, reader)).blocks;
+  for (const b of [figures!, walk!]) assert.equal(b.refusals?.[0]?.code, 'FORBIDDEN', `${b.kind} was drawn for her, so it measures nothing`);
+  assert.equal(figures!.cells, undefined, 'a refused figures block named the figure over the diary');
+  assert.equal(walk!.from, undefined, 'a refused cash walk named the Bills list');
+  assert.equal(walk!.opening, undefined, 'a refused cash walk kept the opening balance somebody wrote');
+  assert.doesNotMatch(JSON.stringify([figures, walk]), /diary-count|bills|1000000/u);
+
+  /* THE OWNER'S BLOCKS ARE AS WRITTEN, so this is about who reads them and not blocks that lost their keys. */
+  const [, mine, theirs] = value<{ blocks: Block[] }>(await api.page({ slug: 'desk' }, owner)).blocks;
+  assert.deepEqual(mine!.cells, [{ metric: 'diary-count' }]);
+  assert.equal(theirs!.opening, 1_000_000);
   sql.close();
 });

@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createRecordApi, type Boot, type CallContext, type HistoryPage, type InboxPage, type WhatsNew } from '../src/index.ts';
+import { createRecordApi, type Boot, type CallContext, type Cursor, type HistoryPage, type InboxPage, type WhatsNew } from '../src/index.ts';
 import type { ArrivalSettled, Backlinks } from '@braindog/kernel';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
@@ -89,7 +89,8 @@ test('WHAT IS NEW STOPS AT SIXTY, says so, and a cursor reads from where it is t
   assert.equal(news.sinceCapped, true);
   assert.equal(news.events[0]?.title, 'Row 70', 'the cap kept the oldest sixty, which is the wrong sixty');
 
-  const newest = news.upTo!;
+  /* A NUMBER, BECAUSE THE OWNER READS THE WHOLE RECORD: a caller held to named lists is handed `e.<id>` instead. */
+  const newest = news.upTo as number;
   const tail = value<WhatsNew>(await api.whatsNew({ cursor: newest - 9 }, owner));
   assert.equal(tail.events.length, 10);
   assert.equal(tail.sinceCapped, false);
@@ -141,7 +142,7 @@ test('THE LOG PAGES NEWEST FIRST, with no line twice and a null cursor only at t
   assert.equal(whole.cursor, null);
 
   const pages: HistoryPage[] = [];
-  let cursor: number | null = null;
+  let cursor: Cursor | null = null;
   do {
     const page: HistoryPage = value<HistoryPage>(await api.recentHistory({ limit: 3, ...(cursor === null ? {} : { cursor }) }, owner));
     assert.ok(page.events.length <= 3);
@@ -152,7 +153,7 @@ test('THE LOG PAGES NEWEST FIRST, with no line twice and a null cursor only at t
   const joined = pages.flatMap((p) => p.events.map((e) => e.rowid));
   assert.deepEqual(joined, whole.events.map((e) => e.rowid), 'the pages do not add up to the log');
   assert.equal(new Set(joined).size, joined.length);
-  assert.ok(joined.every((r, i) => i === 0 || r < joined[i - 1]!), 'not newest first');
+  assert.ok(joined.every((r, i) => i === 0 || r! < joined[i - 1]!), 'not newest first');
 
   assert.equal((await api.recentHistory({ limit: 1.5 }, owner)).ok, false);
   assert.equal(value<HistoryPage>(await api.recentHistory({ limit: 9_999 }, owner)).events.length, whole.events.length);

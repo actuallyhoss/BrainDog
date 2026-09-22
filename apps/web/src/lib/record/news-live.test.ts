@@ -188,6 +188,45 @@ test("marking all read sends the newest line's number, and the shell asks boot a
   forget();
 });
 
+test('A MEMBER HELD TO ONE LIST MARKS WITH THE CURSOR SHE WAS HANDED, and it goes back exactly as it came', async () => {
+  /* `loop/research-history-cursor.md`: she is sent `upTo: 'e.<id>'` and no rowid, and the record refuses her a number.
+     `markAll` typed `upTo` as a number, so the one thing it could send her back was a number, which is now a refusal. */
+  forget();
+  const upTo = 'e.01M1RQ3130J6MBME97EKYKKWZ2';
+  const { rowid: _rowid, ...hers } = line({ id: '01M1RQ3130J6MBME97EKYKKWZ2', register: 'obligations', seq: 2, title: 'Rent', target: 'entry:x', target_kind: 'entry' });
+  const { io, sent } = host((url) =>
+    url.pathname === '/api/whatsNew'
+      ? json(200, { ok: true, value: { events: [hers], upTo, sinceCapped: false } })
+      : url.pathname === '/api/markRead'
+        ? json(200, { ok: true, value: { upTo, seen_at: '2026-09-15T09:00:00.000Z' } })
+        : json(200, { ok: true, value: { registers: [], now: '2026-09-15T12:00:00.000Z' } }),
+  );
+  const home = await readHome(BASE, 'p_9', io, []);
+  assert.equal(home.from, 'live');
+  if (home.from !== 'live') return;
+  assert.equal(home.news.upTo, upTo);
+  assert.equal(await markAll(BASE, home.news.upTo, io), true);
+  const mark = sent.find((s) => new URL(s.url).pathname === '/api/markRead')!;
+  assert.deepEqual(JSON.parse(mark.body ?? '{}'), { upTo });
+  forget();
+});
+
+test('HER LOG HAS NO VERSION TO SAY, and the page below is asked for with her cursor as it came', async () => {
+  const strip = (l: ReturnType<typeof line>) => {
+    const { rowid: _rowid, ...rest } = l;
+    return rest;
+  };
+  const cursor = 'e.01M1RQ3130J6MBME97EKYKKWZ1';
+  const { io, sent } = host(() => json(200, { ok: true, value: { events: [strip(line({ kind: 'export', note: 'Hers' }))], cursor } }));
+  const out = await readLog(BASE, 'p_9', io);
+  assert.equal(out.from, 'live');
+  if (out.from !== 'live') return;
+  assert.deepEqual(out.events.map((e) => [e.seq, e.version]), [[0, 0]], 'a line with no rowid was drawn with a version');
+  assert.equal(out.cursor, cursor);
+  await readLog(BASE, 'p_9', io, out.cursor);
+  assert.equal(new URL(sent[1]!.url).searchParams.get('cursor'), cursor);
+});
+
 test("the log is the record's newest page, named by what the record called each thing", async () => {
   const { io, sent } = host(() =>
     json(200, {

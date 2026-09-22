@@ -122,6 +122,35 @@ test('what is new and the log are reads, with their numbers checked on the way i
   sql.close();
 });
 
+test("a member held to one list pages the log with the `e.` cursor she was handed, through a GET", async () => {
+  /* THE HOST REFUSED IT BEFORE THE RECORD WAS ASKED. `takes: { cursor: 'integer' }` answered `e.01M...` 422 "a whole
+     number", which was true of the rowid the record handed everybody and is not true of the cursor it hands a member
+     now (`loop/research-history-cursor.md`). The owner's rowid still arrives as its digits and still pages. */
+  const { api, call, sql } = await host();
+  await call('create', { register: 'obligations', fields: { what: 'Invoice 41', state: 'open' } });
+  await call('create', { register: 'obligations', fields: { what: 'Invoice 42', state: 'open' } });
+  const invited = await api.invite({ person: 'p_9', name: 'Wren', registers: { obligations: 'read' } }, owner);
+  assert.ok(invited.ok);
+  const held = api.kernel.access('p_9')!;
+  const wren: CallContext = { principal: { kind: 'person', id: 'p_9', level: held.level }, registers: held.registers ?? '*', levels: held.levels };
+
+  type Page = { events: { id: string; title: string | null }[]; cursor: number | string | null };
+  const first = await call('recentHistory?limit=1', undefined, wren);
+  assert.equal(first.status, 200, JSON.stringify(first.body));
+  const cursor = (first.body.value as Page).cursor;
+  assert.ok(typeof cursor === 'string' && cursor.startsWith('e.'), `her cursor was ${JSON.stringify(cursor)}`);
+  const second = await call(`recentHistory?limit=1&cursor=${encodeURIComponent(cursor)}`, undefined, wren);
+  assert.equal(second.status, 200, JSON.stringify(second.body));
+  assert.equal((second.body.value as Page).events[0]?.title, 'Invoice 41');
+
+  const mine = await call('recentHistory?limit=1');
+  const below = (mine.body.value as Page).cursor;
+  assert.equal(typeof below, 'number', 'the owner is handed the rowid, as before');
+  const next = await call(`recentHistory?limit=1&cursor=${String(below)}`);
+  assert.equal(next.status, 200, JSON.stringify(next.body));
+  sql.close();
+});
+
 test('the inbox is a read an owner makes, and a token is refused it', async () => {
   const { api, call, sql } = await host();
   api.kernel.arrive({ channel: 'email', headers: { From: 'billing@fenwick.example', Subject: 'Your invoice' }, body: 'Total GBP 58.00', sha256: 'h1' });

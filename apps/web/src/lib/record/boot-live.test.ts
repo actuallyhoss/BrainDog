@@ -173,15 +173,38 @@ test('THE REASON A QUESTION WAS ACCEPTED FOR IS PART OF ITS DECISION LINE, never
   const items = newsOf(
     [
       line({ rowid: 12, kind: 'resolve', target: 'suggestion:SG2', target_kind: 'suggestion', to: 'addressed', note: 'Yes, for the proof.', title: 'Add Personal?' }),
-      line({ rowid: 11, kind: 'decide', target: 'decision:D2', target_kind: 'decision', title: 'Add Personal?' }),
+      line({ rowid: 11, kind: 'decide', target: 'decision:D2', target_kind: 'decision', title: 'Add Personal?', settles: 'SG2' }),
       /* A resolve with no decision before it (a no) keeps its own line. */
       line({ rowid: 5, kind: 'resolve', target: 'suggestion:SG1', target_kind: 'suggestion', to: 'wont-fix', note: 'Not this week.', title: 'Add Student?' }),
     ] as never,
     null,
   );
   assert.deepEqual(items.map((i) => i.text), ['Decided: Add Personal? Yes, for the proof.', 'Not this week.']);
-  const bare = newsOf([line({ rowid: 3, kind: 'resolve', target: 'suggestion:SG3', to: 'addressed', note: null }), line({ rowid: 2, kind: 'decide', title: 'Renew' })] as never, null);
+  const bare = newsOf([line({ rowid: 3, kind: 'resolve', target: 'suggestion:SG3', to: 'addressed', note: null }), line({ rowid: 2, kind: 'decide', title: 'Renew', settles: 'SG3' })] as never, null);
   assert.deepEqual(bare.map((i) => i.text), ['Decided: Renew']);
+});
+
+test('A MEMBER HELD TO ONE LIST IS SENT NO ROWID, and the reason still folds into its decision by the question it settled', () => {
+  /* THE PAIR WAS `rowid - 1`. `loop/research-history-cursor.md`: the record no longer sends a rowid to somebody invited to
+     named lists, because the gap between two of hers counted the events she was not shown, so the decision's line says
+     which question it settled and the `resolve` is found by that. Here the two sit apart in the answer, with a line of
+     somebody else's between them, which `rowid - 1` could never have paired even when the numbers were there. */
+  const scoped = [
+    line({ id: 'e9', kind: 'resolve', target: 'suggestion:SG7', target_kind: 'suggestion', to: 'addressed', note: 'It is ours.', title: 'File Invoice 43?' }),
+    line({ id: 'e8', kind: 'create', register: 'obligations', seq: 4, title: 'Invoice 43', target: 'entry:x', target_kind: 'entry' }),
+    line({ id: 'e7', kind: 'decide', target: 'decision:D5', target_kind: 'decision', title: 'File Invoice 43?', settles: 'SG7' }),
+    /* A resolve of another question at another moment keeps its own line. */
+    line({ id: 'e6', ts: '2026-09-15T08:00:00.000Z', kind: 'resolve', target: 'suggestion:SG1', target_kind: 'suggestion', to: 'wont-fix', note: 'Not this week.', title: 'Add Student?' }),
+  ].map(({ rowid: _rowid, ...rest }) => rest);
+  assert.ok(!scoped.some((e) => 'rowid' in e));
+  const texts = newsOf(scoped as never, null).map((i) => i.text);
+  assert.equal(texts.length, 3, JSON.stringify(texts));
+  assert.equal(texts[1], 'Decided: File Invoice 43? It is ours.', JSON.stringify(texts));
+  assert.ok(!texts.includes('It is ours.'), 'the reason is a line of its own');
+  assert.equal(texts[2], 'Not this week.');
+  const shell = layoutOf({ ...BOOT, whatsNew: { events: scoped, upTo: 'e.e9', sinceCapped: false } } as never);
+  assert.equal(shell.upTo, 'e.e9', 'the cursor she was handed is what Mark all read sends back');
+  assert.equal(shell.version, 0, 'a version drawn from a cursor that is not a number');
 });
 
 test('access given or taken away reads as a sentence, never as "Access grant"', () => {
