@@ -303,7 +303,10 @@ test('INSTALLING THE SEED INSTALLS THE DOOR A BANK MESSAGE COMES THROUGH, and th
   const { k, sql } = await seeded();
   assert.deepEqual(
     k.declarations().filter((d) => d.kind === 'ingest').map((d) => d.id).sort(),
-    ['ingest.bank-card-in', 'ingest.bank-card-out', 'ingest.bank-card-used', 'ingest.bank-from-out', 'ingest.bank-ipn-in', 'ingest.bank-ipn-out'],
+    [
+      'ingest.bank-card-in', 'ingest.bank-card-out', 'ingest.bank-card-used', 'ingest.bank-from-out', 'ingest.bank-from-unsure',
+      'ingest.bank-ipn-in', 'ingest.bank-ipn-out',
+    ],
     'the seed installed no pattern for a forwarded bank message',
   );
 

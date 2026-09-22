@@ -92,7 +92,23 @@ function mayStart(text: string, i: number): boolean {
  */
 function startsNumber(text: string, p: number): boolean {
   const q = isSpace(text[p]) ? p + 1 : p;
-  return isDigit(text[q]) && mayStart(text, q);
+  /* WITH NO SPACE, THE LETTER BEFORE THE DIGIT IS THE CODE ITSELF, which the caller has just found in the
+     table, so the identifier rule in `mayStart` is not the question. `EGP 5.00 USD245.00` is two amounts, and
+     asking `mayStart` refused the second, left `USD` looking like the first one's suffix, and dropped both
+     on the disagreement rule. */
+  return isDigit(text[q]) && (q === p || mayStart(text, q));
+}
+
+/**
+ * Where the run of digits that `i` sits in ends, over the separators that do not end a number.
+ *
+ * NOT OVER A SPACE, although a space groups digits inside a token. A refused run is an identifier or a date,
+ * and `INV1250 5.00` is a reference and then an amount, which one space between them does not make one thing.
+ */
+function runEnd(text: string, i: number): number {
+  let j = i;
+  while (isDigit(text[j]) || (isSep(text[j]) && !isSpace(text[j]) && isDigit(text[j + 1]))) j += 1;
+  return j;
 }
 
 /**
@@ -100,12 +116,25 @@ function startsNumber(text: string, p: number): boolean {
  *
  * A separator is only part of the token when a digit follows it, so a full stop ending a sentence ends the
  * token, and two spaces end it even though one would not.
+ *
+ * `glued` IS HOW A CURRENCY CODE TOUCHING ITS FIGURE GETS THE FIGURE. Only `scanMoney` has the table that says
+ * whether the three letters before a digit are a code, so it answers here; `scanInts` and `scanDecimals` pass
+ * nothing and a letter before a digit still refuses it.
+ *
+ * AND A REFUSED NUMBER IS REFUSED WHOLE, which is `loop/research-batch-eighteen-audit.md` section 2. This walked
+ * on one character at a time after a refusal, so the first separator inside the figure started a fresh number
+ * behind it: `EGP2500.00` read as `00` and `EGP1,284.50` as `284.50`, both in the fallback currency, and
+ * `INV1250.75` gave the integer 75. The tail of a figure that could not start is never a figure anybody sent.
  */
-export function numberTokens(text: string): NumberToken[] {
+export function numberTokens(text: string, glued?: (at: number) => boolean): NumberToken[] {
   const out: NumberToken[] = [];
   for (let i = 0; i < text.length; ) {
-    if (!isDigit(text[i]) || !mayStart(text, i)) {
+    if (!isDigit(text[i])) {
       i += 1;
+      continue;
+    }
+    if (!mayStart(text, i) && !(isLetter(text[i - 1]) && glued?.(i) === true)) {
+      i = runEnd(text, i);
       continue;
     }
     let j = i;
@@ -270,7 +299,10 @@ export function scanMoney(text: string, table: CurrencyTable, declared?: string)
      characters as its leading one. See the two-amount note below. */
   let claimed = -1;
 
-  for (const token of numberTokens(text)) {
+  /* A LETTER TOUCHING THE FIRST DIGIT IS ALLOWED ONLY WHEN IT ENDS A CODE THE TABLE HOLDS, so `EGP2500.00` is
+     EGP 2,500.00 and `INV1250` is still an identifier. `codeBefore` is the same test the backward walk below
+     makes, so the code that let the number start is the code it is read in. */
+  for (const token of numberTokens(text, (at) => codeBefore(text, at, table) !== null)) {
     /* Backwards: spaces, a currency, a sign and an opening parenthesis, each at most once and in whichever
        order they come — `-EGP 5` and `EGP -5` are the same amount and both are written. */
     let before: string | null = null;

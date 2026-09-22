@@ -108,11 +108,15 @@ const CARD = 'Your Credit Card ending with *** 6180 has been used for EGP 1,284.
 /** Shape two: an InstaPay transfer, both directions and the purchase variant. DD-MM-YYYY, then a time. */
 const IPN_OUT = 'Your HSBC Account ***327 was debited with IPN outward transfer for EGP 3,250.00 on 07-08-2026 16:42 to MARLOW JOINERY with reference 9c4e1f7a2b';
 const IPN_IN = 'Your HSBC Account ***327 was credited with IPN inward transfer for EGP 12,400.00 on 11-08-2026 08:05 from quill.harbour@instapay with reference 5d0b33e8aa';
-const IPN_BUY = 'Your HSBC Account ***327 was debited with IPN purchase for EGP 615.75 on 19-08-2026 21:10 to GRANARY MARKET with reference 0f7d2c91e4';
+/* THE PURCHASE NAMES ITS PAYEE AFTER `from`. This said `to`, the transfer's word, and the one real purchase
+   in `loop/research-bank-real.md` does not: it was claimed and held with `what` unread. */
+const IPN_BUY = 'Your HSBC Account ***327 was debited with IPN purchase for EGP 615.75 on 19-08-2026 21:10 from GRANARY MARKET with reference 0f7d2c91e4';
 
 /** Shape three: the general account line. A day like 16AUG26, and a debit marked only by a trailing hyphen. */
 const FROM_OUT = 'From HSBC: 16AUG26 ATM Cash Withdrawal from 042-118***-327 EGP 2500.00- Your available balance is EGP 31,040.25';
 const FROM_IN = 'From HSBC: 01AUG26 Deposit Interest to 042-118***-327 EGP 418.62 Your available balance is EGP 33,540.25';
+/** The audit's line (`loop/research-batch-eighteen-audit.md` section 3): a hyphen with a space either side, on a transfer in. */
+const FROM_SPACED = 'From HSBC: 01AUG26 Transfer from NADIA FARID to 042-118***-327 EGP 418.62 - Your available balance is EGP 33,540.25';
 
 test('HSBC\'S CARD ALERT BECOMES A ROW, at exact, with the merchant that sits after `at` and before the full stop', async () => {
   const { k, card } = await bank();
@@ -193,6 +197,16 @@ test('THE GENERAL `From HSBC:` DEBIT IS CLAIMED BY ITS OWN PATTERN, and the cred
   assert.equal(credit.ingest, null);
   assert.equal(k.count('transactions'), before, 'a bare kernel wrote a row it could not read');
 
+  /**
+   * A HYPHEN THAT DOES NOT TOUCH THE FIGURE IS NOT THE DEBIT'S SIGN, and the line goes to a person. Measured red
+   * here before `bank-from-out` asked for a digit against its hyphen: this line was claimed by `bank-from-out`,
+   * and on a record with the readers wired it wrote a transfer in as money OUT at `exact`.
+   */
+  const spaced = forward(k, FROM_SPACED, 'from-spaced');
+  assert.equal(spaced.ingest, 'bank-from-unsure', `from-spaced was claimed by ${spaced.ingest}: ${spaced.reason}`);
+  assert.equal(spaced.state, 'review', spaced.reason ?? '');
+  assert.equal(k.count('transactions'), before, 'a line whose sign could go either way wrote a row');
+
   /* AND `MMM` STILL MEANS `MM` THEN `M`. The month name is `MON`, and `43 §9.3`'s worked refusal for
      two month tokens is unchanged, so a pattern written the obvious way is still turned away at the
      door with the code that says why. */
@@ -230,7 +244,7 @@ test('NO WORDING IS CLAIMED BY TWO PATTERNS, so the order they are declared in d
   /* The two sentences `money.test.ts` forwards, copied, so the older patterns are held to it too. */
   const CHARGE = 'HSBC: Your card ending 4471 was debited GBP 42.99 at FENWICK CLOUD on 18/09/26. If this was not you, call us.';
   const CREDIT = 'HSBC: Your card ending 4471 was credited GBP 5,005.00 from NILE REALTY on 29/08/26.';
-  for (const body of [CARD, IPN_OUT, IPN_IN, IPN_BUY, FROM_OUT, FROM_IN, CHARGE, CREDIT]) {
+  for (const body of [CARD, IPN_OUT, IPN_IN, IPN_BUY, FROM_OUT, FROM_IN, FROM_SPACED, CHARGE, CREDIT]) {
     const claims: string[] = [];
     for (const ingest of Object.keys(MONEY_INGESTS)) if (await claimedBy(ingest, body)) claims.push(ingest);
     assert.ok(claims.length <= 1, `${body.slice(0, 40)} is claimed by ${claims.join(' and ')}`);

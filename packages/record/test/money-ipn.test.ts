@@ -25,6 +25,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { Arrived, Kernel } from '@braindog/kernel';
+import type { Sql } from '@braindog/ports';
 
 import { createRecordApi } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
@@ -32,8 +33,9 @@ import { NOW, day, installSeed } from '../../seed/src/index.ts';
 import { MONEY_INGESTS } from '../../seed/src/modules/money.ts';
 
 /** The seeded record, and two EGP accounts whose digits the invented wordings name. */
-async function record(): Promise<{ k: Kernel; card: string; current: string; company: string }> {
-  const api = await createRecordApi({ sql: openSqlite(), clock: fixedClock(NOW) });
+async function record(): Promise<{ k: Kernel; sql: Sql; card: string; current: string; company: string }> {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   const k = api.kernel;
   const seeded = await installSeed(k);
   assert.ok(seeded.ok, JSON.stringify(seeded));
@@ -47,7 +49,7 @@ async function record(): Promise<{ k: Kernel; card: string; current: string; com
   /* The seed's own card, whose digits the two older sterling alerts name. */
   const seedCard = k.get('accounts#3');
   assert.equal(seedCard?.fields.last4, '4471', 'the seed\'s third account is no longer the card ending 4471');
-  return { k, card, current, company: seedCard.id };
+  return { k, sql, card, current, company: seedCard.id };
 }
 
 const forward = (k: Kernel, body: string, sha256: string): Arrived => {
@@ -97,9 +99,13 @@ const WORDINGS: Want[] = [
     body: 'Your HSBC Account ***327 was debited with IPN outward transfer for EGP 3,250.00 on 07-08-2026 16:42 to MARLOW JOINERY with reference 9c4e1f7a2b',
     direction: 'out', amount: 325_000, currency: 'EGP', what: 'MARLOW JOINERY', on: '2026-08-07', account: 'current',
   },
+  /* THE PURCHASE NAMES ITS PAYEE AFTER `from`, and this fixture said `to`, which is the transfer's word.
+     `loop/research-bank-real.md`, *The three that did not read*, item 1: the one real purchase in the window
+     was claimed, read in every field but `what`, and held for a person. Measured red here before the anchor
+     moved: `review`, `bank-ipn-out could not read what out of this one.` */
   {
     ingest: 'bank-ipn-out',
-    body: 'Your HSBC Account ***327 was debited with IPN purchase for EGP 615.75 on 19-08-2026 21:10 to GRANARY MARKET with reference 0f7d2c91e4',
+    body: 'Your HSBC Account ***327 was debited with IPN purchase for EGP 615.75 on 19-08-2026 21:10 from GRANARY MARKET with reference 0f7d2c91e4',
     direction: 'out', amount: 61_575, currency: 'EGP', what: 'GRANARY MARKET', on: '2026-08-19', account: 'current',
   },
   {
@@ -112,11 +118,46 @@ const WORDINGS: Want[] = [
     body: 'From HSBC: 16AUG26 ATM Cash Withdrawal from 042-118***-327 EGP 2500.00- Your available balance is EGP 31,040.25',
     direction: 'out', amount: 250_000, currency: 'EGP', what: '16AUG26 ATM Cash Withdrawal', on: '2026-08-16', account: 'current',
   },
+  /* THE CODE AGAINST THE FIGURE. `loop/research-batch-eighteen-audit.md` section 2 filed this line `matched`,
+     `exact`, as an OUT of GBP 0.00, because `scanMoney` read `EGP2500.00` as the `00` after its point in the
+     fallback currency. Nothing measured says HSBC Egypt glues the code; the reader was wrong either way. */
+  {
+    ingest: 'bank-from-out',
+    body: 'From HSBC: 16AUG26 ATM Cash Withdrawal from 042-118***-327 EGP2500.00- Your available balance is EGP 31,040.25',
+    direction: 'out', amount: 250_000, currency: 'EGP', what: '16AUG26 ATM Cash Withdrawal', on: '2026-08-16', account: 'current',
+  },
+];
+
+type Held = Omit<Want, 'direction'> & { why: string };
+
+/**
+ * THE `From HSBC:` LINES WHOSE SIGN IS A HYPHEN THAT DOES NOT TOUCH THE FIGURE, held for a person and not written.
+ *
+ * `loop/research-batch-eighteen-audit.md` section 3: `match:` was the substring `- your available balance`, so a
+ * hyphen with a space either side satisfied it, and a transfer IN printed that way was filed OUT at `exact`.
+ * Measured red here before the repair: the first line below came back `matched`, `bank-from-out`, `exact`, a row
+ * with `direction: out`. Whether a spaced hyphen is the bank's sign or a separator the bank never printed is
+ * not something one line can settle, so the answer is a person, with the figure, the day and the account
+ * already read and the direction left for them to say.
+ */
+const HELD: Held[] = [
+  {
+    ingest: 'bank-from-unsure',
+    why: 'a hyphen with a space either side',
+    body: 'From HSBC: 01AUG26 Transfer from NADIA FARID to 042-118***-327 EGP 418.62 - Your available balance is EGP 33,540.25',
+    amount: 41_862, currency: 'EGP', what: '01AUG26 Transfer', on: '2026-08-01', account: 'current',
+  },
+  {
+    ingest: 'bank-from-unsure',
+    why: 'a hyphen touching the word and not the figure',
+    body: 'From HSBC: 16AUG26 ATM Cash Withdrawal from 042-118***-327 EGP 2500.00 -Your available balance is EGP 31,040.25',
+    amount: 250_000, currency: 'EGP', what: '16AUG26 ATM Cash Withdrawal', on: '2026-08-16', account: 'current',
+  },
 ];
 
 test('EVERY MONEY PATTERN IS DRIVEN HERE, so a pattern added without a row to check fails this file', () => {
   assert.deepEqual(
-    [...new Set(WORDINGS.map((w) => w.ingest))].sort(),
+    [...new Set([...WORDINGS, ...HELD].map((w) => w.ingest))].sort(),
     Object.keys(MONEY_INGESTS).sort(),
     'a pattern in MONEY_INGESTS has no wording here, so nothing checks what it writes',
   );
@@ -141,6 +182,34 @@ for (const want of WORDINGS)
     assert.equal(row.fields.account, r[want.account], `the lookup did not land on the ${want.account} account the digits name`);
   });
 
+for (const held of HELD)
+  test(`${held.ingest} HOLDS ${held.currency} ${held.amount} FOR A PERSON when the sign is ${held.why}`, async () => {
+    const r = await record();
+    const before = r.k.count('transactions');
+
+    const out = forward(r.k, held.body, `money-ipn-held-${held.amount}`);
+    assert.equal(out.ingest, held.ingest, `claimed by ${out.ingest}: ${out.reason}`);
+    assert.equal(out.state, 'review', `${out.state} at ${out.confidence}: ${out.reason}`);
+    assert.equal(out.confidence, 'needs-review');
+    assert.equal(r.k.count('transactions'), before, 'a line whose sign could go either way was written to the ledger');
+
+    /* WHAT THE PERSON IS ASKED TO ACCEPT is everything but the direction, read exactly, so the one question left
+       is the one the line could not answer. A direction in here would be a guess put in front of them as a fact. */
+    assert.ok(out.suggestion, 'held with nothing for a person to accept');
+    const body = JSON.parse(r.sql.one<{ body: string }>('SELECT body FROM suggestion WHERE id = ?', out.suggestion)!.body) as {
+      register: string;
+      rows: Record<string, unknown>[];
+    };
+    assert.equal(body.register, 'transactions');
+    assert.equal(body.rows.length, 1);
+    const row = body.rows[0]!;
+    assert.equal(row.direction, undefined, 'the held row carries a direction the line never settled');
+    assert.deepEqual(row.amount, { amount: held.amount, currency: held.currency }, 'the figure or the code is not the one the bank printed');
+    assert.equal(row.what, held.what);
+    assert.equal(row.on, held.on);
+    assert.equal(row.account, r[held.account], `the lookup did not land on the ${held.account} account the digits name`);
+  });
+
 test('THE `From HSBC:` CREDIT IS STORED AND CLAIMED BY NOTHING, because its only sign is a hyphen that is not there', async () => {
   const { k } = await record();
   const before = k.count('transactions');
@@ -148,4 +217,34 @@ test('THE `From HSBC:` CREDIT IS STORED AND CLAIMED BY NOTHING, because its only
   assert.equal(out.state, 'untriaged', `claimed by ${out.ingest}: ${out.reason}`);
   assert.equal(out.ingest, null);
   assert.equal(k.count('transactions'), before, 'a line with no pattern wrote a row');
+});
+
+/**
+ * ONE ACCOUNT, PRINTED TWO WAYS, AND NOT YET READ. `loop/research-bank-real.md`, *The three that did not read*,
+ * item 3: the InstaPay messages print his EGP account as stars and four digits, the `From HSBC:` lines as a branch
+ * code, three stars and the last three of those four. `lookup` answers the row whose `last4` is a WHOLE TOKEN in
+ * the slice, so whichever form he types, one family goes to `review` with `account` unread.
+ *
+ * A TODO AND NOT A PASS, because the repair is not in the money pack. The declaration can only name a slice; the
+ * whole-token rule is `matchFolded` in `packages/extract/src/extractors.ts`, shared with `enum`, and the kernel
+ * reaches it through `deps.literals` in `packages/kernel/src/ingest.ts`, so a lookup-only suffix rule needs both.
+ * Measured on this file as it stands: `review`, `bank-from-out could not read account out of this one.`
+ */
+test('A `last4` OF FOUR DIGITS IS THE ACCOUNT A LINE PRINTING ITS LAST THREE BEHIND STARS NAMES, when exactly one account ends so', { todo: 'suffix matching lives in extractors.ts and ingest.ts, outside the money pack' }, async () => {
+  const r = await record();
+  const four = r.k.create('accounts', { name: 'Cairo savings', kind: 'bank', balance: { amount: 0, currency: 'EGP' }, as_of: day(0), liquid: true, last4: '6518' }, { actor: 'p_seed' });
+  assert.ok(four.ok, JSON.stringify(four));
+
+  const out = forward(r.k, 'From HSBC: 03AUG26 ATM Cash Withdrawal from 042-118***-518 EGP 900.00- Your available balance is EGP 4,100.00', 'money-ipn-suffix');
+  assert.equal(out.state, 'matched', out.reason ?? '');
+  const row = r.k.get(out.wrote[0]!)!;
+  assert.equal(row.fields.direction, 'out');
+  assert.deepEqual(row.fields.amount, { amount: 90_000, currency: 'EGP' });
+  assert.equal(row.fields.account, four.value.id, 'the three printed digits did not land on the one account ending in them');
+
+  /* AND TWO ACCOUNTS ENDING IN THE SAME THREE IS A PERSON'S QUESTION, never the first one found. */
+  const twin = r.k.create('accounts', { name: 'Cairo deposit', kind: 'bank', balance: { amount: 0, currency: 'EGP' }, as_of: day(0), liquid: false, last4: '7518' }, { actor: 'p_seed' });
+  assert.ok(twin.ok, JSON.stringify(twin));
+  const again = forward(r.k, 'From HSBC: 04AUG26 ATM Cash Withdrawal from 042-118***-518 EGP 50.00- Your available balance is EGP 4,050.00', 'money-ipn-suffix-twin');
+  assert.equal(again.state, 'review', 'three digits two accounts end in were filed against one of them');
 });

@@ -1673,6 +1673,21 @@ const NOT_A_MOVEMENT: SeedIngest['skip'] = [
  */
 const SAME_MOVEMENT: SeedIngest['dedupe'] = { near: { on: ['amount', 'account'], day: 'on', prefix: { field: 'what', chars: 12 } } };
 
+/* ── the `From HSBC:` line, shared by the pattern that writes it and the one that holds it ── */
+
+/** The debit's sign: a hyphen against the last digit of the figure, then the balance. */
+const SIGNED_DEBIT = [...'0123456789'].map((digit) => ({ field: 'body', contains: `${digit}- your available balance` }));
+
+/** `NOT_A_MOVEMENT` without `balance is`, which every one of these lines prints (see `bank-from-out`). */
+const FROM_HSBC_SKIP: SeedIngest['skip'] = [
+  { when: { field: 'body', contains: 'refund' }, reason: 'A refund is money coming back, and this pattern reads a charge.' },
+  { when: { field: 'body', contains: 'your pin' }, reason: 'A PIN reminder carries the card digits and moves no money.' },
+];
+
+const FROM_HSBC_WHAT = { text: { between: ['From HSBC: ', ' from '] } } as const;
+const FROM_HSBC_DAY = { date: { format: 'DDMONYY', after: 'From HSBC: ' } } as const;
+const FROM_HSBC_ACCOUNT = { lookup: { register: 'accounts', by: 'last4', between: ['***-', ' '] } } as const;
+
 export const MONEY_INGESTS: Record<string, SeedIngest> = {
   'bank-card-out': {
     ingest: 'bank-card-out',
@@ -1805,7 +1820,28 @@ export const MONEY_INGESTS: Record<string, SeedIngest> = {
     },
     skip: NOT_A_MOVEMENT,
     extract: {
-      what: { text: { between: [' to ', ' with reference'] } },
+      /**
+       * TWO ARMS, BECAUSE THE PURCHASE NAMES ITS PAYEE AFTER `from` AND THE TRANSFER AFTER `to`. The real
+       * purchase in `loop/research-bank-real.md` (*The three that did not read*, item 1) reads *"... on
+       * DD-MM-YYYY HH:MM from <payee> with reference <hex>"*, and with ` to ` as the only opening anchor it was
+       * claimed, read in every other field, and held with `what` unread. The fixtures had written it with `to`,
+       * the transfer's word, so nothing here ever saw it.
+       *
+       * `first:` AND NOT TWO PATTERNS, because the payee is the only thing that moves. A message carrying both
+       * words before its reference yields on both arms and files at `chosen`, which writes nothing and asks a
+       * person; neither wording in the window does.
+       *
+       * THE CLOSING ANCHOR IS STILL ` with reference`, and that is measured rather than kept by default. The
+       * inbox tool cuts a body at 180 characters and every InstaPay message was cut, but in the boilerplate
+       * after the reference: the tightest had 14 characters between the end of ` with reference` and the cut.
+       * The payee now opens earlier on neither arm, so that margin is what it was.
+       */
+      what: {
+        first: [
+          { text: { between: [' to ', ' with reference'] } },
+          { text: { between: [' from ', ' with reference'] } },
+        ],
+      },
       direction: { enum: { map: { debited: 'out' } } },
       on: { date: { format: 'DD-MM-YYYY', after: ' on ' } },
       amount: { money: { after: ' for ', currency: HOME_CURRENCY } },
@@ -1846,9 +1882,15 @@ export const MONEY_INGESTS: Record<string, SeedIngest> = {
    *
    * THE SIGN IS A HYPHEN GLUED TO THE FIGURE, AND THE HYPHEN IS IN `match:` AND NOT IN `enum`. `enum`
    * reads a literal as a whole token, and the character before `-` is a digit, so no literal holding the
-   * hyphen is ever a whole token here. `contains` is a plain substring, so `- your available balance`
-   * is what tells this debit from the credit (*"EGP 418.62 Your available balance"*). The enum then
-   * states `out` off a phrase the match has already guaranteed, as `bank-card-used` does with `used`.
+   * hyphen is ever a whole token here. `contains` is a plain substring, so the hyphen is matched there
+   * (`SIGNED_DEBIT` above) and the enum states `out` off a phrase the match has already guaranteed, as
+   * `bank-card-used` does with `used`.
+   *
+   * AND THE HYPHEN HAS TO TOUCH A DIGIT, which is ten literals because `contains` has no digit class. It
+   * was the one substring `- your available balance`, and a hyphen with a space either side satisfies
+   * that: `loop/research-batch-eighteen-audit.md` section 3 filed *"Transfer from ... EGP 418.62 - Your
+   * available balance"* as money OUT at `exact`. A spaced hyphen may be the bank's sign or a separator,
+   * and one line cannot say which, so that line is `bank-from-unsure`'s below, and a person's.
    *
    * THE CREDIT HALF HAS NO PATTERN, and that is the choice this comment exists to record. A credit is
    * marked by the hyphen being ABSENT, so its `match:` would be `none: [- your available balance]`, and
@@ -1858,7 +1900,10 @@ export const MONEY_INGESTS: Record<string, SeedIngest> = {
    *
    * THE AMOUNT IS THE SECOND FIGURE AFTER THE STARS, and it has to be counted. Between `***-` and the
    * hyphen sit the account's own digits and the code: `scanMoney` over `327 EGP 2500.00` answers EGP
-   * 3.27 and then EGP 2,500.00, because `327 EGP` is a figure with a code after it. No literal separates
+   * 327.00 and then EGP 2,500.00, because `327 EGP` is a figure with a code after it. With the code
+   * against the figure (`327 EGP2500.00`) it answered EGP 327.00 and then GBP 0.00, the tail after the
+   * point in the fallback currency, until `scanMoney` read a code touching its figure as that figure's
+   * code (`packages/extract/test/money-glued.test.ts`). No literal separates
    * the digits from the code except the code itself, and anchoring on `EGP` is the defect `movement`
    * above was written to remove. The slice ends BEFORE the hyphen so the record's reader, which takes a
    * trailing minus as a sign (measured: `-250000`), reads the figure as the size of a debit.
@@ -1876,24 +1921,60 @@ export const MONEY_INGESTS: Record<string, SeedIngest> = {
     pack: 'money-core',
     channel: 'email',
     match: {
-      all: [
-        { field: 'body', contains: 'from hsbc:' },
-        { field: 'body', contains: '- your available balance' },
-        { none: [{ field: 'body', contains: 'debited' }, { field: 'body', contains: 'credited' }] },
-      ],
+      all: [{ field: 'body', contains: 'from hsbc:' }, { any: SIGNED_DEBIT }, { none: [{ field: 'body', contains: 'debited' }, { field: 'body', contains: 'credited' }] }],
     },
-    skip: [
-      { when: { field: 'body', contains: 'refund' }, reason: 'A refund is money coming back, and this pattern reads a charge.' },
-      { when: { field: 'body', contains: 'your pin' }, reason: 'A PIN reminder carries the card digits and moves no money.' },
-    ],
+    skip: FROM_HSBC_SKIP,
     extract: {
-      what: { text: { between: ['From HSBC: ', ' from '] } },
+      what: FROM_HSBC_WHAT,
       direction: { enum: { map: { 'your available balance': 'out' } } },
-      on: { date: { format: 'DDMONYY', after: 'From HSBC: ' } },
+      on: FROM_HSBC_DAY,
       amount: { nth: { n: 2, of: { money: { between: ['***-', '- Your available balance'], currency: HOME_CURRENCY } } } },
-      account: { lookup: { register: 'accounts', by: 'last4', between: ['***-', ' '] } },
+      account: FROM_HSBC_ACCOUNT,
     },
     writes: { register: 'transactions', confidence: 'exact' },
+    dedupe: SAME_MOVEMENT,
+    on_conflict: 'skip',
+  },
+
+  /**
+   * THE SAME LINE WITH A HYPHEN THAT DOES NOT TOUCH THE FIGURE, AND IT WRITES NOTHING. `EGP 418.62 - Your
+   * available balance` and `EGP 2500.00 -Your available balance` carry a hyphen where the debit carries its
+   * sign, and neither is the wording the bank was measured printing. Before `bank-from-out` asked for the
+   * hyphen against a digit, the first was filed OUT at `exact`, and the audit's line was a transfer in.
+   *
+   * CLAIMED RATHER THAN LEFT `untriaged`, because everything but the sign reads: the figure, the day, the
+   * account and the description sit where the debit has them. So the ceiling is `needs-review`, which stores
+   * the bytes as `review` and puts the reading in front of a person as a suggestion, and there is NO
+   * `direction` in it. A direction here could only be a guess, and a guess inside a suggestion is read as the
+   * bank's word by whoever accepts it.
+   *
+   * THE AMOUNT'S SLICE ENDS AT `Your available balance`, WITHOUT THE HYPHEN, because the hyphen is on either
+   * side of a space here and the debit's closing literal (`- Your`) is absent from `2500.00 -Your`. What the
+   * slice ends with is a space and perhaps a hyphen after it, and `scanMoney` reads a minus as a sign only
+   * when it touches the digits, so the figure is read as a size and never as a signed amount.
+   *
+   * `none:` HOLDS `SIGNED_DEBIT`, so a line carrying the real glued sign as well as a stray hyphen belongs to
+   * the debit and never to both. `test/money-bank.test.ts` asks every pattern of every wording.
+   */
+  'bank-from-unsure': {
+    ingest: 'bank-from-unsure',
+    pack: 'money-core',
+    channel: 'email',
+    match: {
+      all: [
+        { field: 'body', contains: 'from hsbc:' },
+        { any: [{ field: 'body', contains: ' - your available balance' }, { field: 'body', contains: ' -your available balance' }] },
+        { none: [...SIGNED_DEBIT, { field: 'body', contains: 'debited' }, { field: 'body', contains: 'credited' }] },
+      ],
+    },
+    skip: FROM_HSBC_SKIP,
+    extract: {
+      what: FROM_HSBC_WHAT,
+      on: FROM_HSBC_DAY,
+      amount: { nth: { n: 2, of: { money: { between: ['***-', 'Your available balance'], currency: HOME_CURRENCY } } } },
+      account: FROM_HSBC_ACCOUNT,
+    },
+    writes: { register: 'transactions', confidence: 'needs-review' },
     dedupe: SAME_MOVEMENT,
     on_conflict: 'skip',
   },
