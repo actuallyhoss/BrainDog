@@ -435,7 +435,7 @@ function cutOverProfile(dir: string, claudeJson: string): { settings: string; be
     {
       numStartups: 41,
       mcpServers: {
-        brain: { type: 'stdio', command: 'node', args: ['C:\\Tools\\legacy\\mcp\\brain-mcp.mjs'], env: { BRAIN_TOKEN: HB_SECRET } },
+        brain: { type: 'stdio', command: 'node', args: ['C:\\Tools\\legacy\\mcp\\brain-mcp.mjs'], env: { MCP_TOKEN: HB_SECRET } },
         /* No record says the old tool was ever registered over HTTP; this is here so the URL branch is driven. */
         'brain-http': { type: 'http', url: `https://brain.example.com/mcp?token=${HB_SECRET}`, headers: { Authorization: `Bearer ${HB_SECRET}` } },
         figma: { type: 'http', url: 'https://mcp.figma.com/mcp' },
