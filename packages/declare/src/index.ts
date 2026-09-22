@@ -165,6 +165,10 @@ export type Diff = {
    * `by` IS THE MIRROR: `id` is a list the owner changed and kept, and `by` is a declaration this version stages that
    * reads `field` as the pack's list has it and the owner's does not (taken off, `retyped`, `relabelled`, or without
    * `value`). The audit of batch twenty measured it on `fx.source`: a plan with no conflicts, then `FIELD_UNKNOWN`.
+   *
+   * `changed` WITH `field` AND NOTHING ELSE is a list the owner added `field` to, and this version brings a field of its
+   * own under the same id. Two fields cannot share an id, and the rows already written under the owner's would be read
+   * as the pack's, so it stays refused where every other addition is rebased.
    */
   conflicts: {
     id: string;
@@ -182,8 +186,13 @@ export type Diff = {
    *
    * NAMED AND NOT HIDDEN, because the update does not rewrite what the owner wrote, and an edit that carried the old
    * version's window keeps it: on the probe, `spent-30d` stayed at `-31d` while `received-30d` moved to `-30d`.
+   *
+   * `rebased` IS A LIST THE OWNER ONLY ADDED TO, which this version changes all the same: the update's body with the
+   * owner's fields and enum values laid over it, as JCS text, and `adds` names what was laid over (`domains`, or
+   * `lane.sold` for a value). `install` stages the update's body as the pack's and this one after it as the owner's, so
+   * the owner's row stays detached from the pack's newest body and the next update is asked the same question.
    */
-  kept: { id: string }[];
+  kept: { id: string; adds?: string[]; rebased?: string }[];
   seeds: { count: number; registers: { register: string; rows: number }[] };
   /** Every rule that would generate rows, with the ceiling it declares. */
   spawns: { rule: string; register: string; bound: number; when: string }[];
@@ -886,8 +895,25 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
          checker's probe kept an edited `register.fx` under a version adding a `spread` field and a metric summing it, and
          the install went through with the metric summing a field the list did not have. The kernel took `sum: 'nosuch'`
          as well. One comparison with the body the edit started from closes it. */
-      if (decl.kind === 'register' && edited.body !== decl.canonical) conflicts.push({ id: decl.id, pack: OWN, changed: true });
-      else kept.push({ id: decl.id });
+      if (decl.kind !== 'register' || edited.body === decl.canonical) {
+        kept.push({ id: decl.id });
+        continue;
+      }
+      /* UNLESS ALL THE OWNER DID WAS ADD. The arm above locked a list against its pack for good the moment somebody added
+         a field to it: `loop/research-shell-seed.md` M1 measured `domains` on `register.things` refusing every later
+         portfolio that touched `things`, and §22 makes adding a field the ordinary way a record grows. An edit that is
+         the body it started from plus fields and enum values that body lacks has nothing the update could undo, so the
+         update's body is staged as the pack's and the additions are laid over it as the owner's row. */
+      const over = rebased(edited.body, already.body, decl.body);
+      if (over === null) conflicts.push({ id: decl.id, pack: OWN, changed: true });
+      else if ('clash' in over) conflicts.push({ id: decl.id, pack: OWN, changed: true, field: over.clash });
+      else {
+        kept.push({ id: decl.id, adds: over.adds, rebased: over.body });
+        /* THE UPDATE'S OWN CHANGES STILL MEET THE ROWS: a field it retypes under rows is refused here as it is for a list
+           nobody edited, asked of what will be live, so the owner's additions are never mistaken for the update's. */
+        const rows = installed.rows[decl.id.slice('register.'.length)] ?? 0;
+        if (rows > 0) unreadable({ ...decl, body: JSON.parse(over.body) as Record<string, Json> }, already.body, rows, retypes, newlyRequired);
+      }
       continue;
     }
     /* ANOTHER PACK'S DECLARATION IS NOT YOURS TO CHANGE. Two packs owning one register is two
@@ -965,6 +991,14 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
     const found = movedFields(was, decl.body);
     if (found !== null && found.moved.length > 0) moved.set(change.id, found);
   }
+  /* A REBASED LIST IS CHANGED TOO, by whatever the update did to the pack's fields, and the owner's other edits may read
+     one it takes off. Asked of the rebased body, which is what will be live, so the owner's own additions never count. */
+  for (const k of kept) {
+    const was = live.get(k.id)?.body;
+    if (k.rebased === undefined || was === undefined) continue;
+    const found = movedFields(was, JSON.parse(k.rebased));
+    if (found !== null && found.moved.length > 0) moved.set(k.id, found);
+  }
   const gone = new Set(retires.map((r) => r.id));
   for (const [id, edited] of Object.entries(installed.detached ?? {})) {
     if (edited.was !== mine || conflicts.some((c) => c.id === id)) continue;
@@ -992,9 +1026,12 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
      exactly what the owner did, and only what this version stages is asked: a pack declaration it leaves as it was was
      already reading the owner's list before this update. */
   const staged = new Set([...adds, ...changes].map((c) => c.id));
-  for (const { id } of kept) {
+  for (const { id, rebased: over } of kept) {
     const decl = pack.declarations.find((d) => d.id === id);
-    const theirs = live.get(id)?.body;
+    /* A REBASED LIST IS ASKED AS IT WILL STAND, the update's fields and the owner's. Asked as it stands now, an update
+       adding `launched` and a page showing it was refused as `{ field: 'launched', by: 'page.projects' }`, because the
+       owner's row is older than the update and so lacks the update's own field (`plan-additive.test.ts`). */
+    const theirs = over ?? live.get(id)?.body;
     if (decl?.kind !== 'register' || theirs === undefined || conflicts.some((c) => c.id === id)) continue;
     let owner: unknown;
     try {
@@ -1257,6 +1294,8 @@ export function conflictFault(diff: Pick<Diff, 'pack' | 'installed_version' | 'c
         } Take ${first.field} off ${who} first, or ${stay}.`
       : first.reads !== undefined
       ? `${pack} ${diff.pack.version} no longer has ${first.reads}, and ${names(first.id)}, which you changed, reads it. Take ${first.reads} off ${names(first.id)} first, or ${stay}.`
+      : first.changed && first.field !== undefined
+      ? `${pack} ${diff.pack.version} adds a field called ${first.field} to ${who}, and you added one with that id already. Two fields cannot share an id, so for now, ${stay}.`
       : `${pack} ${diff.pack.version} changes ${names(first.id)}, which you changed: kept as you left it, it would lack what the update adds to it. For now, ${stay}.`;
   return { code: 'PROVIDES_CONFLICT', fix, at: first.id };
 }
@@ -1359,6 +1398,76 @@ function movedFields(was: string, now: unknown): { fields: Map<string, Record<st
       for (const v of then.values) if (typeof v === 'string' && !kept.has(v)) moved.push({ field: id, value: v });
   }
   return { fields, moved };
+}
+
+/**
+ * The update's list body with the owner's additions laid over it, when `mine` is `from` plus fields and enum values
+ * `from` lacks and nothing else; `null` for any other edit, and `clash` for an added field id `now` brings as well.
+ *
+ * NOTHING BUT ADDITIONS, AND IN PLACE. Every key of `from` but `fields` is the same, every field of `from` is there in
+ * its order and its shape, and an enum field may carry more `values` after its own (with `labels` for the new ones
+ * only). A renamed list, a retyped field or a value taken off is an edit the update would undo or be undone by, so it
+ * stays the conflict it was. The owner's fields go after the update's, and their values after the update's values.
+ */
+function rebased(from: string, mine: string, now: Record<string, Json>): { body: string; adds: string[] } | { clash: string } | null {
+  let was: Record<string, unknown>;
+  let theirs: Record<string, unknown>;
+  try {
+    was = JSON.parse(from) as Record<string, unknown>;
+    theirs = JSON.parse(mine) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  if (!isObject(was as Json) || !isObject(theirs as Json) || !Array.isArray(was.fields) || !Array.isArray(theirs.fields)) return null;
+  const rest = (b: Record<string, unknown>) => canonicalise({ ...b, fields: null });
+  if (rest(was) !== rest(theirs)) return null;
+
+  const before = fieldsOf(was);
+  const after = fieldsOf(theirs);
+  if (before.size !== was.fields.length || after.size !== theirs.fields.length) return null;
+  const order = [...after.keys()].filter((id) => before.has(id));
+  if (order.length !== before.size || order.some((id, i) => id !== [...before.keys()][i])) return null;
+
+  const values = new Map<string, { values: string[]; labels: Record<string, unknown> }>();
+  for (const [id, then] of before) {
+    const f = after.get(id)!;
+    const plain = (x: Record<string, unknown>) => canonicalise({ ...x, values: null, labels: null });
+    if (plain(then) !== plain(f)) return null;
+    const old = Array.isArray(then.values) ? (then.values as unknown[]) : null;
+    const got = Array.isArray(f.values) ? (f.values as unknown[]) : null;
+    if ((old === null) !== (got === null)) return null;
+    const more = got === null ? [] : got.filter((v) => !old!.includes(v));
+    if (old !== null && canonicalise(got!.filter((v) => old.includes(v))) !== canonicalise(old)) return null;
+    if (more.some((v) => typeof v !== 'string')) return null;
+    const oldLabels = isObject(then.labels as Json) ? (then.labels as Record<string, unknown>) : {};
+    const gotLabels = isObject(f.labels as Json) ? (f.labels as Record<string, unknown>) : {};
+    if (then.labels !== undefined && !isObject(then.labels as Json)) return null;
+    for (const [k, v] of Object.entries(gotLabels))
+      if (k in oldLabels ? canonicalise(v) !== canonicalise(oldLabels[k]) : !more.includes(k)) return null;
+    if (Object.keys(oldLabels).some((k) => !(k in gotLabels))) return null;
+    if (more.length > 0)
+      values.set(id, { values: more as string[], labels: Object.fromEntries(Object.entries(gotLabels).filter(([k]) => more.includes(k))) });
+  }
+  const added = [...after.values()].filter((f) => !before.has(f.id as string));
+  if (added.length === 0 && values.size === 0) return null;
+
+  const next = Array.isArray(now.fields) ? (structuredClone(now.fields) as Record<string, unknown>[]) : null;
+  if (next === null) return null;
+  const at = new Map(next.filter((f) => isObject(f as Json)).map((f) => [f.id, f]));
+  const clash = added.find((f) => at.has(f.id));
+  if (clash) return { clash: clash.id as string };
+  for (const [id, more] of values) {
+    /* A FIELD THE OWNER GAVE VALUES TO AND THE UPDATE TAKES OFF OR MAKES SOMETHING ELSE has nowhere to put them. */
+    const f = at.get(id);
+    if (f === undefined || !Array.isArray(f.values)) return null;
+    f.values = [...f.values, ...more.values.filter((v) => !(f.values as unknown[]).includes(v))];
+    const labels = isObject(f.labels as Json) ? (f.labels as Record<string, unknown>) : {};
+    const extra = Object.fromEntries(Object.entries(more.labels).filter(([k]) => !(k in labels)));
+    if (Object.keys(extra).length > 0) f.labels = { ...labels, ...extra };
+  }
+  const body = canonicalise({ ...now, fields: [...next, ...added] });
+  if (body === null) return null;
+  return { body, adds: [...added.map((f) => f.id as string), ...[...values].flatMap(([id, v]) => v.values.map((x) => `${id}.${x}`))] };
 }
 
 /**
@@ -1889,10 +1998,18 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
   }
   /* WHAT THE OWNER CHANGED IS NOT STAGED, so it stands at its own version with `pack_id` null, and a later uninstall of
      this pack still cannot take it. */
-  const keep = new Set(diff.kept.map((k) => k.id));
-  const staged = await host.stage(
-    filled.declarations.filter((d) => !keep.has(d.id)).map((d) => ({ id: d.id, kind: d.kind, body: d.body, pack: pack.manifest.pack })),
-  );
+  const keep = new Set(diff.kept.filter((k) => k.rebased === undefined).map((k) => k.id));
+  /* A REBASED LIST IS STAGED TWICE IN ONE BATCH: the update's body as the pack's, then the owner's additions over it with
+     no pack. The kernel supersedes the first with the second, so the live row is still the owner's, and `detached()`
+     then reads the pack's newest body as the one the edit started from. Staged once as the owner's, measured through
+     the record: portfolio one step up went through, and the step after it was refused `{ changed: true, field:
+     'launched' }`, because the edit still started from the older body and the first update's own `launched` read as
+     the owner's addition. */
+  const over = diff.kept.flatMap((k) => (k.rebased === undefined ? [] : [{ id: k.id, kind: 'register', body: JSON.parse(k.rebased) as Json }]));
+  const staged = await host.stage([
+    ...filled.declarations.filter((d) => !keep.has(d.id)).map((d) => ({ id: d.id, kind: d.kind, body: d.body, pack: pack.manifest.pack })),
+    ...over,
+  ]);
   if (!staged.ok) return staged;
 
   /* ONE TRANSACTION, AND A REFUSAL ROLLS IT BACK. Declarations, retires, seeds and the pack row

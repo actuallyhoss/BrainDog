@@ -4,10 +4,12 @@
  * TIER A READ A SENTENCE; THIS READS THE RECORD. Which lists grow, which pages are opened, what nothing has touched in a
  * quarter, and what agents write. From that it says what it noticed, in plain sentences, and drafts at most a few
  * proposals in the kinds an agent already files (`pack`, `settings`, `arrange`, and a `rowset` for a skill a use case names),
- * each with its reason as the question. The words it may change are only those the speaking use case declares (S8).
+ * each with its reason as the question. The words it may change are only those the speaking use case declares (S8). A
+ * model may also draft a `change` that builds a register, an ingest, a rule or a page (`fromModel`, Brief D).
  *
  * IT RECOMMENDS AND NEVER REARRANGES (§5c, `docs/29` §1). Nothing here writes a row, a pack or a setting. A draft becomes a
- * question only through `arranger().prepare`, the same door and the same validation a token's proposal goes through, and
+ * question only through `arranger().prepare`, the same door and the same validation a token's proposal goes through, or
+ * for a `change` through `kernel.propose`, whose review works out what it would send out exactly as for an agent's; and
  * only an owner's press on Decide applies it. A draft the owner dismissed is never drafted again.
  *
  * DETERMINISTIC FIRST, A MODEL OPTIONALLY. `readUsage` and `noticeUsage` need nothing configured, so a fresh self-host runs
@@ -137,7 +139,7 @@ export type SparkDraft = {
   /** What it is about, stable across readings, so the same draft is recognised once it has been asked. */
   key: string;
   question: string;
-  body_kind: 'pack' | 'settings' | 'arrange' | 'rowset';
+  body_kind: 'pack' | 'settings' | 'arrange' | 'rowset' | 'change';
   body: Record<string, unknown>;
   /** Who drafted it: the rules, or the model named. */
   by: string;
@@ -651,7 +653,7 @@ const keyed = (drafts: readonly SparkDraft[]): SparkDraft[] => drafts.map((d) =>
  * A model Spark may ask to draft proposals. THE PORT, NOT A PROVIDER: the host builds one from a person's own key or a self-host's
  * endpoint, and this package never sees either. It is handed the reading, what was noticed, the rules' drafts and what is on
  * offer, and answers raw drafts. It writes nothing: what it answers is checked by `fromModel` and filed, if at all, through
- * the same `prepare` a token's proposal goes through.
+ * the same `prepare` a token's proposal goes through, or for a `change` the same `kernel.propose` an agent's goes through.
  */
 export interface SparkModel {
   /** A short name to say who drafted, such as `endpoint` or `own key`. Never a key or an address. */
@@ -670,11 +672,48 @@ export type SparkModelInput = {
   rules: readonly { question: string; body_kind: string; body: Record<string, unknown> }[];
   offered: readonly { id: string; kind: string; title: string }[];
   /** The kinds it may answer, and how many at most. */
-  kinds: readonly ['pack', 'settings', 'arrange'];
+  kinds: readonly SparkKind[];
   most: number;
 };
 
+/** What a model may draft: the three that arrange what is installed, and a `change` that builds one declaration. */
+export type SparkKind = 'pack' | 'settings' | 'arrange' | 'change';
+
 const QUESTION_MAX = 280;
+
+/**
+ * THE DECLARATIONS A MODEL MAY BUILD WITH A `change` (`loop/research-shell-mcp.md` §4 Brief D, `DIRECTION.md` §22): a list,
+ * a door in or out, a rule, a page. A gold rate on a schedule is an `ingest` into a register, and before this Spark dropped
+ * it with "Spark files only pack, settings and arrange", so the one use case the owner named could not be built by Spark.
+ * A theme, a metric, a digest or a block is left to a person or an agent, because nothing Spark reads says what one should be.
+ */
+const BUILDS: ReadonlySet<string> = new Set(['register', 'ingest', 'rule', 'page']);
+
+/** "a register", "an ingest": the article a kind takes when a dropped line names it. */
+const aKind = (kind: string): string => `${/^[aeiou]/u.test(kind) ? 'an' : 'a'} ${kind}`;
+
+/**
+ * A model's `change` body as the kernel takes it, or why it is dropped. `to` is one declaration or `{ declarations }` of
+ * them, and every one must be a kind in `BUILDS`. `declaration_id` is filled from `to` when the model left it out, as the
+ * kernel's `namesFault` would otherwise refuse it; a wrong one is left for the kernel to refuse with its own sentence.
+ *
+ * WHAT IT SENDS OUT IS LEFT TO THE KERNEL, WHICH IS THE GUARD. `kernel.propose` drops whatever `egress` and `approve` a
+ * proposer wrote and stores its own review of the declarations (`kernel/src/govern.ts`). A second strip here was measured
+ * to change nothing: with it removed the gold-rate test still found no trace of the model's host in the filed row, and
+ * `stableKey` never reads either field, so a model that varies the egress it writes is still asked once.
+ */
+function changeBody(body: Record<string, unknown>, n: number): { ok: true; body: Record<string, unknown> } | { ok: false; why: string } {
+  const to = body.to;
+  if (to === null || typeof to !== 'object' || Array.isArray(to)) return { ok: false, why: `Proposal ${n} was a change with no declaration in it.` };
+  const bundle = (to as { declarations?: unknown }).declarations;
+  const listed = (Array.isArray(bundle) ? bundle : [to]) as { id?: unknown; kind?: unknown }[];
+  if (listed.length === 0) return { ok: false, why: `Proposal ${n} was a change with no declaration in it.` };
+  const stray = listed.find((d) => typeof d?.kind !== 'string' || !BUILDS.has(d.kind));
+  if (stray !== undefined)
+    return { ok: false, why: `Proposal ${n} was a change to ${aKind(String(stray?.kind ?? 'unnamed kind')).slice(0, 40)}, and Spark changes only a register, an ingest, a rule or a page.` };
+  const named = typeof body.declaration_id === 'string' ? body.declaration_id : String(listed[0]?.id ?? '');
+  return { ok: true, body: { ...body, declaration_id: named } };
+}
 
 /**
  * A model's answer as drafts: `{ drafts: [{ question, body_kind, body }] }` or the bare list. Anything else is dropped, and
@@ -691,19 +730,28 @@ export function fromModel(raw: unknown, name: string, most = SPARK_OPEN_CAP): { 
       dropped.push(`Proposal ${i + 1} had no question, or one over ${QUESTION_MAX} characters.`);
       continue;
     }
-    if (d.body_kind !== 'pack' && d.body_kind !== 'settings' && d.body_kind !== 'arrange') {
-      dropped.push(`Proposal ${i + 1} was a ${String(d.body_kind)} proposal, and Spark files only pack, settings and arrange.`);
+    if (d.body_kind !== 'pack' && d.body_kind !== 'settings' && d.body_kind !== 'arrange' && d.body_kind !== 'change') {
+      dropped.push(`Proposal ${i + 1} was a ${String(d.body_kind)} proposal, and Spark files only pack, settings, arrange and change.`);
       continue;
     }
     if (d.body === null || typeof d.body !== 'object' || Array.isArray(d.body)) {
       dropped.push(`Proposal ${i + 1} had no body.`);
       continue;
     }
+    let body = d.body as Record<string, unknown>;
+    if (d.body_kind === 'change') {
+      const built = changeBody(body, i + 1);
+      if (!built.ok) {
+        dropped.push(built.why);
+        continue;
+      }
+      body = built.body;
+    }
     if (drafts.length >= most) {
       dropped.push(`Proposal ${i + 1} was past the ${most} Spark files at once.`);
       continue;
     }
-    drafts.push({ key: stableKey(d.body as Record<string, unknown>), question: d.question.trim(), body_kind: d.body_kind, body: d.body as Record<string, unknown>, by: name });
+    drafts.push({ key: stableKey(body), question: d.question.trim(), body_kind: d.body_kind, body, by: name });
   }
   return { drafts, dropped };
 }
@@ -714,6 +762,10 @@ export function stableKey(body: Record<string, unknown>): string {
   const carried = body.doc !== null && typeof body.doc === 'object' ? (body.doc as { version?: unknown }).version : undefined;
   if (typeof body.install === 'string' && typeof carried === 'string') return `install:${body.install}@${carried}`;
   for (const k of ['install', 'enable', 'disable', 'usecase'] as const) if (typeof body[k] === 'string') return `${k}:${body[k]}`;
+  /* A CHANGE IS THE DECLARATION IT INSTALLS, whole, so a gold rate declined is not asked again and a different one is a new
+     question. The egress the kernel adds is left out, so the key is the same on the draft and on the row it was filed as. */
+  if (typeof body.declaration_id === 'string' && body.to !== null && typeof body.to === 'object')
+    return `change:${body.declaration_id}:${JSON.stringify(body.to)}`;
   /* A SETTINGS CHANGE IS WHAT IT SETS, so turning a line one way and back again are two questions, and each is asked once. */
   if (typeof body.pack === 'string')
     return `settings:${body.pack}:${Object.entries((body.values as Record<string, unknown>) ?? {})

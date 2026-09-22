@@ -313,10 +313,18 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
      of the declarations is stored in its place. */
   let body: Record<string, unknown> = p.body ?? {};
   if (p.body_kind === 'change') {
-    const { egress: _theirs, approve: _theirLines, ...rest } = body;
+    const { egress: _theirs, approve: _theirLines, from_version: _theirVersion, ...rest } = body;
     body = rest;
-    if (deps.review && body.to && typeof body.to === 'object') {
-      const read = deps.review(body.to as Record<string, unknown>);
+    /* AND THE VERSION IT WAS DRAWN FROM, FOR THE SAME REASON. Accepted with no version to land against, the second of two
+       changes drawn from one reading replaced the first whole: `domain` went with a value still under it, and both
+       decisions read "accept" (`loop/research-shell-schema.md` blocker 1, `record/test/schema-add.test.ts`). Taken from
+       the proposer, the stamp is whatever it says, and one that names the version it guesses will be live at acceptance
+       lands over whatever came in between. An `add` needs none: it is merged onto
+       whatever is live when the owner presses. */
+    if (!isAdd(body.to)) body = { ...body, from_version: liveVersion(deps.sql, String(body.declaration_id)) };
+    const to = resolveTo(deps.sql, body);
+    if (deps.review && to.ok) {
+      const read = deps.review(to.value.to);
       if (!read.ok) return read as Result<{ id: string }>;
       if (read.value !== null) body = { ...body, egress: read.value.egress, approve: read.value.approve };
     }
@@ -410,7 +418,9 @@ function checkBody(deps: GovernDeps, kind: BodyKind, body: Record<string, unknow
      record's `decide` before `reopen` could run. A decision that resolved with nothing installed behind it, from one
      malformed body any `propose` token can send. `review` below cannot catch it: it answers `null` for a batch it
      cannot read, which is right for egress and says nothing about whether the batch installs. */
-  const wrong = shapeFault(body.to) ?? namesFault(deps.sql, body);
+  const to = resolveTo(deps.sql, body);
+  if (!to.ok) return 'refusal' in to ? to.refusal : missing('to');
+  const wrong = shapeFault(to.value.to) ?? namesFault(deps.sql, { ...body, to: to.value.to });
   if (wrong) return wrong;
 
   /* AND ITS PREDICTION, IF IT CARRIES ONE — checked here rather than at acceptance, for the reason
@@ -437,6 +447,94 @@ function shapeFault(to: unknown): Refusal | null {
       at: 'body.to',
     };
   return null;
+}
+
+/** Whether a change's `to` is a field-level addition, `{ add: {...} }`, rather than a whole declaration. */
+const isAdd = (to: unknown): to is { add: unknown } => isMap(to) && 'add' in to;
+
+/** The version of `id` live now, and 0 when none is, which is how `install`'s `expect` spells "drawn from nothing". */
+function liveVersion(sql: Sql, id: string): number {
+  return sql.one<{ version: number }>(
+    'SELECT version FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1',
+    id,
+  )?.version ?? 0;
+}
+
+/**
+ * What a change installs if it is accepted now: its `to` as filed, or an `add` merged onto the list as it is live.
+ *
+ * AT ACCEPTANCE AND NOT AT FILING, because resolving an `add` when it is filed turns it back into a whole body drawn
+ * from one reading, which is the race it exists to end. So the stored body keeps what was asked, and this is run when it
+ * is filed (to check it) and again when it is accepted (to install it). `version` is the live version it was merged onto.
+ */
+function resolveTo(sql: Sql, body: Record<string, unknown>): Result<{ to: Record<string, unknown>; version?: number }> {
+  /* ANYTHING ELSE IS PASSED ON AS IT IS, for `shapeFault` to refuse in its own words: an array is not a declaration, and
+     "needs to" would be a wrong answer to a proposer who sent one. */
+  return isAdd(body.to) ? addTo(sql, body.to, body.declaration_id) : ok({ to: body.to as Record<string, unknown> });
+}
+
+const ADD_KEYS = ['register', 'fields', 'values'];
+
+/**
+ * An addition to a live list: new fields, and new values at the end of a closed list, and nothing else.
+ *
+ * AN AGENT THAT WANTED ONE OPTIONAL FIELD HAD TO SEND THE WHOLE LIST. `to` was a whole declaration or nothing, so adding
+ * `hosting: text` to Projects meant reading twenty-odd fields, copying them and sending them back, and `{ field: {...} }`
+ * was refused `VALUE_MALFORMED` (`loop/research-shell-schema.md` blocker 7). DIRECTION §22 has metadata added this way as
+ * the ordinary case, by people and agents alike.
+ *
+ * ADDITIVE BY CONSTRUCTION. A field id the list already has, retired ones included, is refused rather than replaced, and
+ * there is no key that removes anything: a retype or a removal is a whole-body change and is read as one. The merged
+ * body then goes through every check a whole body does (`namesFault`, `review`, `fits`, the install's own lint).
+ */
+function addTo(sql: Sql, to: { add: unknown }, named: unknown): Result<{ to: Record<string, unknown>; version: number }> {
+  const add = to.add;
+  if (!isMap(add)) return no('VALUE_MALFORMED', 'add is {"register":"<list>","fields":[...],"values":{"<field>":[...]}}.', { at: 'body.to.add' });
+  const extra = Object.keys(to).find((k) => k !== 'add') ?? Object.keys(add).find((k) => !ADD_KEYS.includes(k));
+  if (extra !== undefined)
+    return no('FIELD_UNKNOWN', `An addition takes register, fields and values, and nothing else, so ${extra} is not one of them. To take something away or change its type, propose the whole list.`, {
+      at: `body.to.add.${extra}`,
+      allowed: ADD_KEYS,
+    });
+  /* THE LIST IS THE ONE THE CHANGE IS FILED UNDER unless it says otherwise, so the example agents are taught in every
+     turn does not spend tokens saying it twice (`mcp/src/index.ts`, measured against the 2,600 ceiling). A `register`
+     that disagrees with `declaration_id` is still refused, by `namesFault`, for the reason it gives. */
+  const said = add.register ?? (typeof named === 'string' && named.startsWith('register.') ? named : undefined);
+  if (typeof said !== 'string') return no('REQUIRED_MISSING', 'An addition names the list it adds to, as register, or is filed under "declaration_id":"register.<list>".', { at: 'body.to.add.register' });
+  const list = said.startsWith('register.') ? said.slice('register.'.length) : said;
+  const id = `register.${list}`;
+  const live = sql.one<{ version: number; body: string }>(
+    "SELECT version, body FROM declaration WHERE id = ? AND kind = 'register' AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1",
+    id,
+  );
+  const was = live ? parse(live.body) : null;
+  if (!live || !was) return no('REGISTER_UNKNOWN', `There is no list called ${list} to add to. To make one, propose it whole.`, { at: 'body.to.add.register' });
+
+  const fields = (Array.isArray(was.fields) ? was.fields : []).map((f) => (isMap(f) ? { ...f } : f)) as Record<string, unknown>[];
+  const adding = add.fields ?? [];
+  const values = add.values ?? {};
+  if (!Array.isArray(adding) || !adding.every((f) => isMap(f) && typeof f.id === 'string'))
+    return no('VALUE_MALFORMED', 'fields is a list of fields, each {"id":"<id>","type":"<type>"}.', { at: 'body.to.add.fields' });
+  if (!isMap(values) || !Object.values(values).every((v) => Array.isArray(v) && v.every((x) => typeof x === 'string')))
+    return no('VALUE_MALFORMED', 'values is {"<field>":["<value>",...]}, the values to add to each closed list.', { at: 'body.to.add.values' });
+  if (adding.length === 0 && Object.keys(values).length === 0)
+    return no('REQUIRED_MISSING', 'An addition names fields to add, values to add to a closed list, or both.', { at: 'body.to.add' });
+
+  for (const f of adding as Record<string, unknown>[]) {
+    if (fields.some((held) => held.id === f.id))
+      return no('VALUE_MALFORMED', `${list} already has a field called ${String(f.id)}. An addition only adds; to change that field, propose the whole list.`, {
+        at: 'body.to.add.fields',
+      });
+    fields.push(f);
+  }
+  for (const [field, more] of Object.entries(values) as [string, string[]][]) {
+    const held = fields.find((f) => f.id === field);
+    if (!held) return no('FIELD_UNKNOWN', `${list} has no field called ${field}.`, { at: `body.to.add.values.${field}` });
+    if (!Array.isArray(held.values))
+      return no('VALUE_MALFORMED', `${field} is not a closed list, so there are no values to add to it.`, { at: `body.to.add.values.${field}` });
+    held.values = [...held.values, ...more.filter((v) => !(held.values as unknown[]).includes(v))];
+  }
+  return ok({ to: { id, kind: 'register', body: { ...was, fields } }, version: live.version });
 }
 
 /**
@@ -977,6 +1075,11 @@ export type Decided = {
   /** A declaration an accepted `pattern` or `change` asks the caller to install. */
   install?: Record<string, unknown>;
   /**
+   * The version an accepted `change` must find live when it installs, for the caller to pass as `install`'s `expect`:
+   * the version a whole body was filed against, or the one an addition was merged onto.
+   */
+  expect?: { id: string; version: number };
+  /**
    * An accepted `pack`, `settings` or `arrange`, for the caller to apply. Installing a pack is asynchronous,
    * like a `change`, so the gate hands the body back, and the caller reopens the question if it will not land.
    */
@@ -1102,6 +1205,7 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
 
   const wrote: string[] = [];
   let install: Record<string, unknown> | undefined;
+  let expect: Decided['expect'];
   let apply: Decided['apply'];
 
   if (option === 'accept') {
@@ -1132,8 +1236,17 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
          Refused here, the question stays open with nothing resolved, which a refusal from `install` afterwards could only
          get back to by reopening it. */
       if (row.body_kind === 'change') {
-        const wrong = shapeFault(install) ?? namesFault(deps.sql, body) ?? deps.fits?.(install) ?? null;
+        /* AN ADDITION IS MERGED HERE, onto the list as it is at the press, and held to that version: the install is
+           asynchronous, and a whole-body change landing in between is the one thing it must not quietly undo. */
+        const resolved = resolveTo(deps.sql, body);
+        if (!resolved.ok) return resolved as Result<Decided>;
+        install = resolved.value.to;
+        const wrong = shapeFault(install) ?? namesFault(deps.sql, { ...body, to: install }) ?? deps.fits?.(install) ?? null;
         if (wrong) return { ok: false, refusal: wrong };
+        /* A WHOLE BODY IS HELD TO THE VERSION IT WAS FILED AGAINST. A change filed before the stamp existed carries none,
+           and is installed as it always was rather than refused for a number nobody wrote. */
+        const from = resolved.value.version ?? body.from_version;
+        if (typeof from === 'number') expect = { id: String(isAdd(body.to) ? install.id : body.declaration_id), version: from };
       }
       /* EVERY KEY IT SENDS IS IN THE VAULT BEFORE ANYTHING IS ARMED. Accepting a call whose key is missing would arm
          it and pause it on its first run, which reads as approved and does nothing. Nothing is written until all are there. */
@@ -1200,6 +1313,7 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
     status: 'resolved',
     wrote,
     ...(install === undefined ? {} : { install }),
+    ...(expect === undefined ? {} : { expect }),
     ...(apply === undefined ? {} : { apply }),
   });
 }

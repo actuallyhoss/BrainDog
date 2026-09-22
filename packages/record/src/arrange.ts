@@ -819,7 +819,7 @@ export function arranger(d: ArrangeDeps) {
       if (speaker !== null) writeVoice(kernel, speaker, actor);
     }
     for (const page of Array.isArray(body.pages) ? (body.pages as Body[]) : []) {
-      const put = await kernel.install([{ id: String(page.id), kind: 'page', body: page.body as never }]);
+      const put = await kernel.install([{ id: String(page.id), kind: 'page', body: page.body as never }], undefined, { actor });
       if (!put.ok) return stopped(put);
       done.pages.push(String(page.id));
     }

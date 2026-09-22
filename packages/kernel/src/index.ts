@@ -43,6 +43,7 @@ import {
   stageDeclarations,
   type Declaration,
   type Expected,
+  type Installed,
   type PackConfig,
   type PackToggle,
 } from './declare.ts';
@@ -312,6 +313,15 @@ export type { Claimed, Drained, Handler, ScheduleKind } from './schedule.ts';
 export type { Hit } from './fts.ts';
 export type { ConfigDecl, ConfigType, Declaration, DeclKind, Expected, Installed, PackConfig, PackToggle } from './declare.ts';
 export { CONFIG_TYPES, configReads, configValue, fillConfig, readConfig } from './declare.ts';
+
+/**
+ * Who a declaration change is by, for its `declare` event: the person or token that pressed, and on an accepted
+ * `change` the suggestion it answers, whose `opened_by` the event's note names as the proposer.
+ *
+ * OPTIONAL ON `install` BECAUSE THE SEED AND A BARE KERNEL CALL IT TOO, and an install nobody is named for writes no
+ * `declare` line: it is setup, not a change somebody made (see `declared`).
+ */
+export type DeclaredBy = { actor: string; suggestion?: string };
 
 /**
  * One pack as `packStates()` reads it. `version` is `null` for a pack the seed owns by its body, which
@@ -1462,6 +1472,30 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const count = (where: string, ...params: (string | number)[]) =>
         Number(sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND ${where}`, register, ...params)?.n ?? 0);
 
+      /* A FIELD LEFT OUT OVER VALUES THE ROWS STILL HOLD. `loop/research-shell-schema.md` blocker 2: two agents each
+         added a field from one reading, the owner accepted both, and the second body had no `domain` while a row held
+         one. Every check below walks the ARRIVING fields, so a field that was simply absent was never asked about: it
+         installed, the value stayed in the row's JSON through every later edit, and no reader could see it. Retiring is
+         the removal that keeps the value and says so, and it stays legal; a field already retired may then go, since
+         its values were put away on purpose. */
+      const named = new Set((fields as Field[]).map((f) => f?.id).filter((id): id is string => typeof id === 'string'));
+      for (const [id, was] of before) {
+        if (named.has(id) || was.retired === true) continue;
+        let path: string;
+        try {
+          path = jsonPath(id);
+        } catch {
+          continue;
+        }
+        const n = count(`json_extract(fields, '${path}') IS NOT NULL`);
+        if (n > 0)
+          return {
+            code: 'WOULD_ORPHAN',
+            fix: `${rows(n)} ${n === 1 ? 'holds' : 'hold'} ${id}. Mark it retired rather than leaving it out.`,
+            at: `${decl.id}.fields`,
+          };
+      }
+
       for (const f of fields as Field[]) {
         if (typeof f?.id !== 'string' || f.retired === true) continue;
         const at = `${decl.id}.fields.${f.id}`;
@@ -1633,6 +1667,73 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       }
     }
     return null;
+  }
+
+  /**
+   * One `declare` event for each declaration a change moved to a new version: who, from which version to which, and for a
+   * register the field ids it added or took off.
+   *
+   * NOTHING WROTE ONE. `declare` has been a declaration event kind since `events.ts` was drawn, and
+   * `loop/research-shell-schema.md` blocker 5 measured a change that gave Projects a `domain` leaving zero events: the
+   * `declaration` table has no actor, so "who added domain to Projects" had no answer at all, and "when" only by diffing
+   * version bodies. The feed needs the sentence "agent:claude added domain to Projects", and this is where it comes from.
+   *
+   * THE DIFF IS AGAINST THE VERSION THIS ONE SUPERSEDED, read after the write inside the same transaction, so it is the
+   * body that was actually live and not whatever the caller last read. A retire and a drop are both "took off": either
+   * way a reader no longer sees the field. An unchanged declaration answered `changed: false` and gets no line.
+   *
+   * ONLY WHEN SOMEONE IS NAMED. Signed `system` on every bare install, the seed's own setup put three `declare` lines ahead
+   * of the row events `rules.test.ts` asserts and doubled the activity feed `pages-computed.test.ts` draws; a real
+   * record's setup declares dozens, and they would open the owner's first feed. An install with no actor is setup, and
+   * the pack path writes its own `install` line for that.
+   */
+  function declared(installed: readonly Installed[], by: DeclaredBy | undefined): void {
+    if (by?.actor === undefined) return;
+    const liveFields = (body: string | undefined): string[] => {
+      if (body === undefined) return [];
+      try {
+        const fields = (JSON.parse(body) as { fields?: unknown }).fields;
+        return Array.isArray(fields)
+          ? (fields as { id?: unknown; retired?: unknown }[]).filter((f) => typeof f?.id === 'string' && f.retired !== true).map((f) => f.id as string)
+          : [];
+      } catch {
+        return [];
+      }
+    };
+    const listed = (ids: string[]) => (ids.length <= 1 ? ids.join('') : `${ids.slice(0, -1).join(', ')} and ${ids.at(-1)}`);
+    const proposer = by?.suggestion === undefined ? undefined : sql.one<{ by: string }>('SELECT opened_by AS by FROM suggestion WHERE id = ?', by.suggestion)?.by;
+    const at = instant(clock.now());
+
+    for (const one of installed) {
+      if (!one.changed) continue;
+      const now = sql.one<{ kind: string; body: string }>('SELECT kind, body FROM declaration WHERE id = ? AND version = ?', one.id, one.version);
+      const was = sql.one<{ version: number; body: string }>(
+        'SELECT version, body FROM declaration WHERE id = ? AND version < ? ORDER BY version DESC LIMIT 1',
+        one.id,
+        one.version,
+      );
+      const said: string[] = [];
+      if (now?.kind === 'register') {
+        const before = liveFields(was?.body);
+        const after = liveFields(now.body);
+        const added = after.filter((f) => !before.includes(f));
+        const off = before.filter((f) => !after.includes(f));
+        if (added.length > 0) said.push(`Added ${listed(added)}.`);
+        if (off.length > 0) said.push(`Took off ${listed(off)}.`);
+      }
+      if (proposer !== undefined) said.push(`Proposed by ${proposer} in ${by!.suggestion}.`);
+      const note = said.join(' ');
+      sql.exec(
+        "INSERT INTO event (id, ts, actor, kind, target, target_kind, from_v, to_v, note) VALUES (?, ?, ?, 'declare', ?, 'declaration', ?, ?, ?)",
+        mint(),
+        at,
+        by.actor,
+        `declaration:${one.id}`,
+        was === undefined ? null : String(was.version),
+        String(one.version),
+        note === '' ? null : note.slice(0, 280),
+      );
+    }
   }
 
   /** A `where` read against the register it filters: `null` when it can be read, the refusal when not. */
@@ -5345,7 +5446,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * reloaded is a register the write path still refuses — a failure that looks like the install
      * silently not working.
      */
-    async install(given: readonly (Declaration | DeclarationBundle)[], expect?: Expected) {
+    async install(given: readonly (Declaration | DeclarationBundle)[], expect?: Expected, by?: DeclaredBy) {
       /* A BUNDLE IS ITS DECLARATIONS, so an accepted change carrying several installs and arms them in one go. */
       const batch: Declaration[] = given.flatMap((d) =>
         Array.isArray((d as DeclarationBundle).declarations) ? (d as DeclarationBundle).declarations : [d as Declaration],
@@ -5356,7 +5457,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          first rather than how many rows it would also break. */
       const cannot = unreadable(batch) ?? lintBatch(sql, batch) ?? contradicted(batch) ?? stranded(batch);
       if (cannot) return { ok: false as const, refusal: cannot };
-      const out = await installDeclarations(sql, clock.now(), batch, transaction, expect);
+      /* THE HISTORY LINE IS WRITTEN IN THE TRANSACTION THAT WRITES THE VERSION, so a change that lands always has one and a
+         refused or rolled-back one never does. The wrapper sees only this call's result, which is `Result<Installed[]>`. */
+      const recorded = <T,>(fn: () => T): T =>
+        transaction(() => {
+          const done = fn() as Result<Installed[]>;
+          if (done.ok) declared(done.value, by);
+          return done as T;
+        });
+      const out = await installDeclarations(sql, clock.now(), batch, recorded, expect);
       if (out.ok) {
         reload();
         /* AND THE ROWS THE DECLARATIONS EARN. `digest`, `snapshot` and `analyse` have complete

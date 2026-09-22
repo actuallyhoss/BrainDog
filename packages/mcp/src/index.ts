@@ -268,10 +268,16 @@ export const TOOLS: readonly Tool[] = [
       {
         question: str('One sentence a person can answer.'),
         body_kind: str('options, rowset, pattern, change, pack, settings or arrange.'),
+        /* THE change EXAMPLE WAS ONE THE RECORD REFUSES. Sent as written it answered `REQUIRED_MISSING` at
+           `body.declaration_id`, and it taught the whole-declaration form for adding a field, which meant copying every
+           field of the list and racing any other agent doing the same (`loop/research-shell-schema.md` blockers 6 and 7).
+           `record/test/schema-add.test.ts` files the addition below against a real record. The rowset example lacked its
+           `register`, which `checkBody` also requires. The fix cost 33 tokens of the 35 the ceiling had left (2,565 to
+           2,598), which is why the addition names no `register` of its own: the record reads it from `declaration_id`. */
         body: {
           type: 'object',
           description:
-            'options: {"options":[...]}, two or more, each with id, label and because. rowset: {"rows":[{"at":"skills#3","version":1,"patch":{...}}]}. change: {"to":{"id":"page.x","kind":"page","body":{...}}}. pack, settings and arrange change what this BrainDog is: read braindog:arrangement and braindog:grammar/proposals first.',
+            'options: {"options":[...]}, two or more, each with id, label and because. rowset: {"register":"skills","rows":[{"at":"skills#3","version":1,"patch":{...}}]}. change adds fields: {"declaration_id":"register.things","to":{"add":{"fields":[{"id":"domain","type":"url"}]}}}, or to is a whole declaration of that id. pack, settings and arrange: read braindog:arrangement and braindog:grammar/proposals first.',
         },
       },
       ['question', 'body_kind', 'body'],

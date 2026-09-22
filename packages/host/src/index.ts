@@ -205,7 +205,10 @@ export const ROUTES: readonly Route[] = [
   /* THE SHORTCUT'S DOOR, AND AN OWNER'S IN A BROWSER for `deviceApprove`'s reason: whoever holds the token can put a
      bank line of their choosing into the ledger at `exact`. Unrouted, the mint was reachable from a test and from
      nothing a person could open: `packages/host/test/ingest-shortcut.test.ts` (8) answered 404 `ROUTE_UNKNOWN`. */
-  { name: 'ingestMint', group: 'ADMIN', writes: true, what: "Make the token a webhook ingest's address carries. It is shown once, only its digest is kept, and minting again replaces it." },
+  { name: 'ingestMint', group: 'ADMIN', writes: true, what: "Make the token a webhook ingest's address carries, and answer that address. It is shown once, only its digest is kept, and minting again replaces it." },
+  /* THE DOORS THIS RECORD DECLARES, so the screen that mints their tokens learns them from the record and names none of
+     its own. An owner's, for the mint's reason; the digest is never in it. */
+  { name: 'doors', group: 'ADMIN', writes: false, what: 'Every webhook door this record declares: what it is, how it is verified, whether a token is held for it and the list it writes. Never the token.' },
   /* `writes: true` BECAUSE IT WRITES. An export appends an `export` event — 12 §6's rule that a
      vault whose reads are not audited cannot say whether anything got out — and a GET that mutates
      the record is a GET a proxy may replay and a browser may prefetch. */
@@ -441,6 +444,7 @@ export type RecordSurface = {
   listDevices(ctx: never): Promise<Result<unknown>>;
   revokeDevice(args: never, ctx: never): Promise<Result<unknown>>;
   ingestMint(args: never, ctx: never): Promise<Result<unknown>>;
+  doors(ctx: never): Promise<Result<unknown>>;
   export(args: never, ctx: never): Promise<Result<unknown>>;
   import(args: never, ctx: never): Promise<Result<unknown>>;
   snapshot(args: never, ctx: never): Promise<Result<unknown>>;
@@ -528,6 +532,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     listDevices: (_a, ctx) => api.listDevices(ctx as never),
     revokeDevice: (a, ctx) => api.revokeDevice(a as never, ctx as never),
     ingestMint: (a, ctx) => api.ingestMint(a as never, ctx as never),
+    doors: (_a, ctx) => api.doors(ctx as never),
     export: (a, ctx) => api.export(a as never, ctx as never),
     import: (a, ctx) => api.import(a as never, ctx as never),
     snapshot: (a, ctx) => api.snapshot(a as never, ctx as never),

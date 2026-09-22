@@ -264,13 +264,13 @@ test('A MODEL DRAFTS BEHIND THE PORT, and what it answers goes through the same 
   assert.equal(asked.length, 1);
   const input = asked[0] as { usage: { lists: unknown[] }; rules: unknown[]; kinds: string[]; most: number };
   assert.ok(input.usage.lists.length >= 3 && input.rules.length === 3);
-  assert.deepEqual(input.kinds, ['pack', 'settings', 'arrange']);
+  assert.deepEqual(input.kinds, ['pack', 'settings', 'arrange', 'change']);
 
   assert.equal(out.by, 'test model');
   assert.deepEqual(out.filed.map((f) => [f.question, f.by]), [['Turn off Log? You have a page for it now.', 'test model']]);
   assert.equal(out.skipped.length, 1);
   assert.match(out.skipped[0]!.why, /nonsense/u);
-  assert.deepEqual(out.dropped, ['Proposal 3 was a rowset proposal, and Spark files only pack, settings and arrange.', 'Proposal 4 had no question, or one over 280 characters.']);
+  assert.deepEqual(out.dropped, ['Proposal 3 was a rowset proposal, and Spark files only pack, settings, arrange and change.', 'Proposal 4 had no question, or one over 280 characters.']);
   assert.ok(api.kernel.packStates().find((p) => p.id === 'log')?.disabled_at === null, 'a model draft changed the record');
   assert.deepEqual(sql.all<{ kind: string }>("SELECT DISTINCT kind FROM event WHERE actor = 'spark'").map((e) => e.kind), ['suggest']);
   sql.close();

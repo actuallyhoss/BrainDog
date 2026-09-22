@@ -1403,7 +1403,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const asked = new Map<string, { id: string; status: string }>();
     const waiting: { id: string; question: string }[] = [];
     for (const row of sql.all<{ id: string; body: string; status: string; opened_by: string }>(
-      "SELECT id, body, status, opened_by FROM suggestion WHERE body_kind IN ('pack', 'settings', 'arrange', 'rowset') AND (opened_by = ? OR status = 'open') ORDER BY opened_at",
+      "SELECT id, body, status, opened_by FROM suggestion WHERE body_kind IN ('pack', 'settings', 'arrange', 'rowset', 'change') AND (opened_by = ? OR status = 'open') ORDER BY opened_at",
       SPARK,
     )) {
       try {
@@ -1437,7 +1437,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           noticed: r.noticed,
           rules: r.drafts.map(({ question, body_kind, body }) => ({ question, body_kind, body })),
           offered: r.offered.map(({ id, kind, title }) => ({ id, kind, title })),
-          kinds: ['pack', 'settings', 'arrange'],
+          kinds: ['pack', 'settings', 'arrange', 'change'],
           most: SPARK_OPEN_CAP,
         });
         const got = fromModel(raw, model.name);
@@ -1480,7 +1480,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         skipped.push({ question: d.question, why: `${SPARK_OPEN_CAP} of Spark's questions are already waiting on Decide.` });
         continue;
       }
-      const prepared = d.body_kind === 'rowset' ? ok(d.body) : await arrangement.prepare(d.body_kind, d.body);
+      /* A CHANGE GOES STRAIGHT TO `kernel.propose`, NOT THROUGH `prepare`. It builds a declaration rather than arranging
+         packs, and the kernel's review is what works out what it sends out; `prepare` knows only pack, settings and
+         arrange and refused it, so a gold rate a model drafted never reached Decide (`test/spark-change.test.ts`). */
+      const prepared = d.body_kind === 'rowset' || d.body_kind === 'change' ? ok(d.body) : await arrangement.prepare(d.body_kind, d.body);
       if (!prepared.ok) {
         skipped.push({ question: d.question, why: 'refusal' in prepared ? prepared.refusal.fix : 'It would not apply.' });
         continue;
@@ -3666,7 +3669,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          with its message. */
       let put: Awaited<ReturnType<typeof kernel.install>>;
       try {
-        put = await kernel.install([decl as never]);
+        /* AGAINST THE VERSION THE GATE NAMES, as `setDeclaration` has always installed. Without it the second of two
+           changes drawn from one reading replaced the first whole, and `domain` went with a value still under it
+           (`test/schema-add.test.ts`). A conflict reopens the question below, like any install that will not land. */
+        put = await kernel.install([decl as never], out.value.expect, { actor: actorOf(ctx), suggestion: out.value.suggestion });
       } catch (thrown) {
         if (!(thrown instanceof TypeError)) {
           kernel.reopen(out.value.suggestion);
@@ -3679,7 +3685,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         );
       }
       if (!put.ok) {
-        kernel.reopen(out.value.suggestion, 'refusal' in put ? put.refusal.fix : undefined);
+        /* A CONFLICT SAYS WHICH VERSION IT MET, so the question comes back saying why rather than "would not install". */
+        const why =
+          'refusal' in put
+            ? put.refusal.fix
+            : `${String(decl.id)} changed after this was proposed and is at version ${String(put.conflict.version)} now. Propose it again against the list as it is.`;
+        kernel.reopen(out.value.suggestion, why);
         return tail(put);
       }
       return tail(settledAs(ctx, args.id, out));
@@ -4016,7 +4027,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (at && at.id !== decl.id) decl = { ...decl, id: at.id, body: { ...(decl.body as object), page: at.id.slice('page.'.length) } as never };
       }
       const expect = args.version === undefined ? undefined : { id: decl.id, version: args.version };
-      return tail(await kernel.install([{ id: decl.id, kind: decl.kind, body: decl.body as never }], expect));
+      return tail(await kernel.install([{ id: decl.id, kind: decl.kind, body: decl.body as never }], expect, { actor: actorOf(ctx) }));
     },
 
     /** Retire one. Its rows stay; a declaration is a shape, not the things under it. */
@@ -4670,7 +4681,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * reads, and the person holding it would believe the ingest was verified: the fault `verifyFault` in
      * `declare.ts` was written to close at install, and this is the same refusal at the mint.
      */
-    async ingestMint(args: { ingest: string }, ctx: CallContext): Promise<Result<{ ingest: string; token: string }>> {
+    async ingestMint(args: { ingest: string }, ctx: CallContext): Promise<Result<{ ingest: string; token: string; rec: string | null; path: string | null }>> {
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       /* THE FIX NAMES THE SERVER KEY AND NOTHING ELSE THAT IS CALLED A TOKEN. It said "Sign in, or send BRAINDOG_TOKEN"
@@ -4713,7 +4724,53 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ingestTokenKey(ingest),
         `${since}:${await sha256Hex(token)}`,
       );
-      return ok({ ingest, token });
+      /* AND THE ADDRESS, BECAUSE NOTHING ELSE ANSWERED IT. `whoami` and `boot` carry no record id, so the screen that
+         showed this token could not build the URL it goes in, and on a live record the owner's press never yielded
+         one (`loop/research-shell-doors.md` §3c). `<rec>` is `kernel.identity().id` because that is what both hosts
+         route by: the self-host compares the segment to it, and the Worker reaches the object `provision` created under
+         the same id it wrote there. A record with no identity yet has no address, and says `null` rather than guess. */
+      const rec = kernel.identity()?.id ?? null;
+      const path = rec === null ? null : `/in/webhook/${encodeURIComponent(rec)}/${encodeURIComponent(ingest)}/${token}`;
+      return ok({ ingest, token, rec, path });
+    },
+
+    /**
+     * Every live webhook door this record declares, for the screen that mints their tokens. ADMIN, routed as `/api/doors`.
+     *
+     * THE APP NAMED THE ONE DOOR IT COULD SHOW. `shortcut-door.ts` held `bank-from-out-sms` as a constant, so a door a
+     * person or an agent declared at run time (DIRECTION §22) had no screen at all. The record lists them instead.
+     *
+     * `held` SAYS WHETHER A TOKEN IS GOOD FOR IT, AND NEVER WHAT THE TOKEN'S DIGEST IS. The digest is what the `/in/*`
+     * door compares against, so answering it here would hand the verifier to a screen that has no use for it. `held`
+     * is read through `heldDigest`, so a digest minted for an earlier declaration under the same id reads `false`.
+     *
+     * AN OWNER'S, IN A BROWSER, for `ingestMint`'s reason: a door is where rows come in at `exact` with nobody looking,
+     * and which of them are open is the owner's to see before it is anybody's to use.
+     */
+    async doors(ctx: CallContext): Promise<Result<{ id: string; description: string; verify: string; held: boolean; register: string }[]>> {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      const out: { id: string; description: string; verify: string; held: boolean; register: string }[] = [];
+      for (const row of kernel.declarations()) {
+        if (row.kind !== 'ingest') continue;
+        const decl = JSON.parse(row.body) as { channel?: unknown; description?: unknown; verify?: { kind?: unknown }; writes?: { register?: unknown } };
+        if (decl.channel !== 'webhook') continue;
+        const id = row.id.slice('ingest.'.length);
+        const writes = decl.writes?.register;
+        /* A ROUTING TABLE WRITES SEVERAL LISTS, named here in the order the table gives them. */
+        const register =
+          typeof writes === 'string'
+            ? writes
+            : [...new Set(((writes as { to?: { register?: unknown }[] } | undefined)?.to ?? []).map((t) => String(t?.register)))].join(', ');
+        out.push({
+          id,
+          description: typeof decl.description === 'string' ? decl.description : '',
+          verify: typeof decl.verify?.kind === 'string' ? decl.verify.kind : 'none',
+          held: heldDigest(id) !== undefined,
+          register,
+        });
+      }
+      return ok(out);
     },
 
     /**

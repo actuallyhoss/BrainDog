@@ -14,14 +14,15 @@
  *
  * THEY ARE TWO FEATURES THAT SHARE A NAME, AND NEITHER IS A NEWER VERSION OF THE OTHER, so neither is deleted. This file is
  * the model behind the RECORD's Spark, which reads how a BrainDog is used and drafts `pack`, `settings` and `arrange`
- * proposals about its arrangement (`packages/record/src/spark.ts`, `loop/research-spark.md` S15). `@braindog/spark` is
+ * proposals about its arrangement, and a `change` that builds a register, an ingest, a rule or a page
+ * (`packages/record/src/spark.ts`, `loop/research-spark.md` S15, `loop/research-shell-mcp.md` §4 Brief D). `@braindog/spark` is
  * `docs/46`'s assistant engine: a person's typed question turned into a predicate, their own rows, and one cited proposal
  * with verbs, plus the ingest-pattern proposer, the meter and the tiers.
  *
  * THEY OVERLAP ON EXACTLY ONE BODY KIND OF SEVEN, AND `rowset` IS IT. An earlier line here called the two sets disjoint,
- * which `grep -n rowset packages/record/src/spark.ts` refutes at `:620`: the record's Spark files `pack`, `settings`,
- * `arrange` and one `rowset`, the skill row a use case names and the Skills list has not got. The package files `query`,
- * `options`, `rowset` and `pattern`. The one shared kind is not one feature written twice either, because what reaches it
+ * which `grep -n rowset packages/record/src/spark.ts` refutes at `:622`: the record's Spark files `pack`, `settings`,
+ * `arrange`, a model's `change` (Brief D), and one `rowset`, the skill row a use case names and the Skills list has not
+ * got. The package files `query`, `options`, `rowset` and `pattern`. The one shared kind is not one feature written twice either, because what reaches it
  * differs: the record's is drafted from usage by rules with no model in the path, and the package's is drafted from a typed
  * question against rows the asker may read and is refused unless it cites one. So a deletion either way loses a feature, and
  * a rewrite of one as a thin caller of the other would be a rewrite of what it does, not of how it calls out.
@@ -61,8 +62,9 @@ export const SPARK_INSTRUCTIONS = [
   'You are Spark, the manager of one BrainDog: a record a person keeps, arranged as lists, pages, packs and a voice.',
   'You are given how the record is used: which lists grow, which pages are opened, what nothing has touched, what agents write, and what the host offers to install.',
   'Propose at most `most` changes that would make this BrainDog fit how it is really used. Each is one question the owner answers on Decide, with the reason in the question.',
-  'Answer only JSON: {"drafts":[{"question":"...","body_kind":"pack"|"settings"|"arrange","body":{...}}]}. The rules\' drafts show the body shapes.',
+  'Answer only JSON: {"drafts":[{"question":"...","body_kind":"pack"|"settings"|"arrange"|"change","body":{...}}]}. The rules\' drafts show the body shapes.',
   'pack bodies: {"install":"<offered id>"}, {"enable":"<id>"}, {"disable":"<id>"}. settings: {"pack":"<id>","values":{...}} or {"voice":{"home":"..."}}. arrange: {"why":["..."],"usecase"?,"packs"?,"pages"?,"settings"?,"voice"?}.',
+  'change builds what the record does not have yet, such as a rate fetched on a schedule into a list: {"to":{"id":"ingest.<id>","kind":"ingest","body":{...}}} for one register, ingest, rule or page, or {"to":{"declarations":[...]}} for several that belong together, like a list and the door that fills it. Write each body whole, in the record\'s grammar for its kind (grammar/register, grammar/ingest, grammar/rule, grammar/page). Never write what it calls out to: the record works that out and shows the owner.',
   'Tone is settings too: the words the speaking use case declares are in usage.tone.settings (voice_* lines, label_* words), and only those names may be set, as {"pack":"<usage.tone.pack>","values":{"label_tickets":"Issues"}}, with the reason drawn from how the record is used.',
   'Never name a figure that is not in the reading. Write plainly and warmly, with no dashes used as punctuation. If nothing would help, answer {"drafts":[]}.',
 ].join('\n');
