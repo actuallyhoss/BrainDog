@@ -282,17 +282,31 @@ function matchFolded(folded: string, entries: readonly (readonly [string, Json])
  * which of two accounts the bank meant, and filing against the wrong one moves a balance nobody checks.
  *
  * `enum` NEVER GETS HERE. A map's words are a provider's vocabulary and a masked number is not a word in it.
+ *
+ * THE MASK IS READ ONLY IN THE SLICE'S FIRST TOKEN, where the anchor put it (`maskedStart` here, `maskAtEnd` in the
+ * kernel). The card patterns read their account `after: 'ending '` with no end, so the slice runs to the end of the
+ * message, and a star anywhere in it named an account: `SUMUP *44 KIOSK`, `*** 1 of 2 ***` and `Ref ***-30` each
+ * filed an unregistered card's spend at `exact` against a registered account ending in those digits, where the
+ * parent sent all three to review (`loop/research-batch-twenty-one-audit.md`, finding 1). A star past the first
+ * token is prose.
+ *
+ * AND A TAIL IS AT LEAST THREE DIGITS, the shortest the bank was measured printing (`loop/research-bank-real.md`).
+ * `***-8` and `***27` each filed at `exact` against the one row ending in them (the same audit, finding 2).
  */
 function matchMaskedTail(folded: string, entries: readonly (readonly [string, Json])[]): Json[] | 'ambiguous' {
   let answer: Json | undefined;
-  for (let i = folded.indexOf('*'); i !== -1; i = folded.indexOf('*', i + 1)) {
+  let first = 0;
+  while (folded[first] === ' ') first += 1;
+  const space = folded.indexOf(' ', first);
+  const firstEnd = space === -1 ? folded.length : space;
+  for (let i = folded.indexOf('*'); i !== -1 && i < firstEnd; i = folded.indexOf('*', i + 1)) {
     if (folded[i - 1] === '*') continue;
     let at = i;
     while (folded[at] === '*') at += 1;
     if (folded[at] === '-' || folded[at] === ' ') at += 1;
     const from = at;
     while (folded[at] !== undefined && folded[at]! >= '0' && folded[at]! <= '9') at += 1;
-    if (at === from || isWordChar(folded[at])) continue;
+    if (at - from < 3 || isWordChar(folded[at])) continue;
     const digits = folded.slice(from, at);
 
     for (const [literal, value] of entries) {

@@ -70,3 +70,28 @@ test('THE PACKAGE\'S OWN `lookup` READS A MASK ITS ANCHOR SWALLOWED, because the
   const bare: Form = { lookup: { register: 'accounts', by: 'last4', between: ['account ', ' '] } };
   assert.deepEqual(read(bare, 'your account 518 was debited', [SAVINGS]), { values: [], note: 'exact' });
 });
+
+/* `loop/research-batch-twenty-one-audit.md` findings 1 and 2. The card patterns read `after: 'ending '` with no end, so
+   the slice is the rest of the message, and a star in a merchant descriptor, a footer or a reference named an account.
+   Measured red before the repair: P1 to P3 answered `studio`, `company` and `tax` at `exact`, and the two short tails
+   answered the one row ending in them. */
+const STUDIO = { id: 'a_studio', value: '2044' };
+const COMPANY = { id: 'a_company', value: '4471' };
+const TAX = { id: 'a_tax', value: '7730' };
+
+test('A STAR PAST THE SLICE\'S FIRST TOKEN IS PROSE, and an unregistered card names no account through it', () => {
+  const card: Form = { lookup: { register: 'accounts', by: 'last4', after: 'ending ' } };
+  const rows = [STUDIO, COMPANY, TAX];
+  for (const line of [
+    'Your card ending 9012 was debited EGP 120.00 at SUMUP *44 KIOSK on 18/09/26.',
+    'Your card ending 9012 was debited EGP 120.00 at FENWICK on 18/09/26. *** 1 of 2 ***',
+    'Your card ending 9012 was debited EGP 120.00 at FENWICK on 18/09/26. Ref ***-30',
+  ])
+    assert.deepEqual(read(card, line, rows), { values: [], note: 'exact' }, line);
+});
+
+test('A TAIL OF FEWER THAN THREE DIGITS IS NOT A TAIL', () => {
+  assert.deepEqual(matchLiterals('***-8', table(SAVINGS), 'lookup'), []);
+  assert.deepEqual(matchLiterals('***27', table(CURRENT), 'lookup'), []);
+  assert.deepEqual(matchLiterals('***327', table({ id: 'a_long', value: '10327' }), 'lookup'), ['a_long']);
+});
