@@ -13,11 +13,20 @@
  * one request and scrubbed from the answer) and any rule added to that path later holds here without anybody
  * remembering this file. What a trial changes is who it is for, and that is two arguments the record decides:
  *
- * A KEY IS OPENED ONLY FOR A CALLER THE RECORD HANDS `grantOf`. A scheduled run sends a key to an origin the owner
+ * A KEY IS OPENED ONLY FOR A CALLER THE RECORD CALLS `owner`. A scheduled run sends a key to an origin the owner
  * approved in Decide; a draft has been approved by nobody, so a token that could try one could send the owner's key to
  * the provider it opens with any request the token cared to write, which is acting on that provider as the owner. The
- * record passes `grantOf` for an owner and `null` for everybody else, and then a fetch naming a key is a rejected promise
+ * record says `owner` only for a person its vault gate would let in (`scriptTry` in `packages/record`), each host builds
+ * `grantOf` from that word and passes `null` for everybody else, and then a fetch naming a key is a rejected promise
  * inside the run: the script may catch it and go on, and the caller sees how far it got.
+ *
+ * THE VAULT GATE, NOT `level === 'owner'`. Audit thirty-eight (finding 2) planted a session proved two hours ago: the
+ * vault refused it `listGrants` with `NEEDS_BROWSER_SESSION`, and the same cookie's trial sent a request carrying the
+ * owner's key and left a `grant.read` in her name. So `owner` is the record's `vault()` answer, held to a person. A trial
+ * refused the key for that reason alone still runs, keyless: the record says `stale` when the proof's age is the only
+ * reason, the self-host hands it on as `ScriptDraft.stale`, and the fetch is told to sign in again, because the draft is
+ * not what is wrong. The Worker's `Record$` does not pass `stale` yet, so its owner is refused the key all the same and
+ * is told the `NO_KEYS` sentence instead.
  *
  * THE READS ARE THE CALLER'S OWN. `scriptReads` reads as `system`, held to the script's `reads:`, because a scheduled run
  * has no person behind it and its reads were approved at accept. A trial's `reads:` were approved by nobody either, and
@@ -60,6 +69,11 @@ export type ScriptDraft = {
   reads?: ScriptReads | undefined;
   /** The vault by label, for a caller the record lets open a key; `null` for every other caller. */
   grantOf: GrantOf | null;
+  /**
+   * `true` when `grantOf` is `null` for one reason only: the owner's last proof is older than the vault allows. It
+   * changes what a fetch naming a key is told, never whether a key opens, which `grantOf` alone decides.
+   */
+  stale?: boolean | undefined;
 };
 
 /** What a trial answers: the kernel's `ScriptAnswer`, which is the sandbox's, or `held`. */
@@ -84,10 +98,11 @@ export type TrialSandbox = (s: Scripted, trial: { grantOf: GrantOf; reads: Scrip
  * `apps/selfhost/test/script-try-asker.test.ts`, one key sent and `grant.read ["system"]`. Spark's included key had the
  * same fault and the same repair (`sparkAskerEngine` in `spark.ts`), the asker's id handed to `keyOpener` per ask.
  *
- * READ OFF THE DRAFT WITH `in`, NOT FROM ITS TYPE, BECAUSE THE RECORD DOES NOT SAY IT YET. `RecordDeps['tryScript']` in
- * `packages/record` passes `owner` and no id, and this is written so that the day it passes `asker` the self-host signs
- * with it and nothing here changes. Until then this answers `undefined` and the log still says `system`. The Worker's
- * `Record$` does not call it yet (`apps/worker/test/script-try-asker.test.ts` says what is left there).
+ * THE RECORD HANDS `asker` AND BOTH HOSTS PASS IT ON. `RecordDeps['tryScript']` in `packages/record` sends the person
+ * behind a token, or the person, and the self-host's `tryScript` and the Worker's `Record$` each build `keyOpener` with
+ * `askerOf(d)`, so the owner's trial is signed with her id. A token's trial opens no key whatever `asker` says, because
+ * the record gives it no `grantOf`: the id names who asked, and never decides whether a key opens. It is read with `in`
+ * because it was written before the record's type carried the field, and answers `undefined` for a draft without one.
  */
 export const askerOf = (draft: object): string | undefined =>
   'asker' in draft && typeof draft.asker === 'string' && draft.asker !== '' ? draft.asker : undefined;
@@ -95,6 +110,13 @@ export const askerOf = (draft: object): string | undefined =>
 /** The sentence a fetch naming a key gets in a trial by a caller the record gave no keys. */
 const NO_KEYS = (label: string): string =>
   `A trial opens no key for an agent, so the fetch naming "${label}" was not sent. Once the owner accepts the script, its runs send the key.`;
+
+/**
+ * The sentence for the owner whose last proof is too old for the vault, in Spark's words for the same gate
+ * (`SPARK_HOST_KEY_CLOSED` in `spark.ts`), because "for an agent" would tell her she is one and leave her nothing to do.
+ */
+const STALE = (label: string): string =>
+  `A trial opens the owner's key only for the owner signed in within the last fifteen minutes, so the fetch naming "${label}" was not sent. Sign in again to try it with the key.`;
 
 /**
  * The trial sandbox a host with `scriptRunner`'s sandbox builds, the self-host's: `runInQuickJs` as `run`, its pinned
@@ -191,7 +213,7 @@ export function scriptTrial(options: ScriptTrialOptions): (draft: ScriptDraft) =
     const grantOf: GrantOf =
       draft.grantOf ??
       ((label) => {
-        throw new Error(NO_KEYS(label));
+        throw new Error((draft.stale ? STALE : NO_KEYS)(label));
       });
 
     let answer: ScriptAnswer;

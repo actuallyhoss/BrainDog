@@ -103,17 +103,21 @@ async function stack() {
   assert.ok(running.directory.provision({ slug: 'the-studio', email: 'ada@example.com', record: REC }).ok);
   assert.ok((await running.api.kernel.install([KEYS, GOLD_LIST])).ok);
 
-  /* A FRESH SESSION FOR ADA, planted as `spark-byok-guard.test.ts` plants one, because the vault door takes a key only
-     from an owner whose proof is under fifteen minutes old. */
-  const sid = randomBytes(32).toString('base64url');
-  const db = new DatabaseSync(join(dir, 'directory.sqlite'));
-  try {
-    const now = Date.now();
-    db.prepare('INSERT INTO dir_session (id_hash, person, record, expires, rotated_at, authed_at) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(createHmac('sha256', sessionKey).update(`s:${sid}`).digest('hex'), owner, REC, now + 60 * MINUTE, now, now);
-  } finally {
-    db.close();
-  }
+  /* A SESSION FOR ADA, planted as `spark-byok-guard.test.ts` plants one, proved at `authedAt`. The vault door takes a key
+     only from an owner whose proof is under fifteen minutes old, so the key goes in through a fresh one. */
+  const plant = (authedAt: number): string => {
+    const sid = randomBytes(32).toString('base64url');
+    const db = new DatabaseSync(join(dir, 'directory.sqlite'));
+    try {
+      const now = Date.now();
+      db.prepare('INSERT INTO dir_session (id_hash, person, record, expires, rotated_at, authed_at) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(createHmac('sha256', sessionKey).update(`s:${sid}`).digest('hex'), owner, REC, now + 60 * MINUTE, now, authedAt);
+    } finally {
+      db.close();
+    }
+    return sid;
+  };
+  const sid = plant(Date.now());
   const value = ['bd_fake_gold_', randomBytes(16).toString('hex')].join('');
   const put = await fetch(`${origin}/api/keys/put`, {
     method: 'POST',
@@ -125,6 +129,12 @@ async function stack() {
   return {
     running,
     owner,
+    plant,
+    /** One call over HTTP with a session's cookie, as the app sends it. */
+    async call(cookie: string, name: string, body: unknown): Promise<{ status: number; text: string }> {
+      const r = await fetch(`${origin}/api/${name}`, { method: 'POST', headers: { cookie: `bd_s=${cookie}`, origin, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      return { status: r.status, text: await r.text() };
+    },
     value,
     sent,
     reads: () => running.sql.all<{ actor: string }>("SELECT actor FROM event WHERE kind = 'grant.read' ORDER BY rowid").map((e) => e.actor),
@@ -144,6 +154,48 @@ test("THE OWNER'S TRIAL OPENS HER KEY IN HER NAME, and the grant.read it leaves 
     assert.equal(s.sent.length, 1, JSON.stringify(tried.value));
     assert.ok(s.sent[0]!.auth === `Bearer ${s.value}`, 'the trial did not send the owner key it opened');
     assert.deepEqual(s.reads(), [s.owner], 'the grant.read was not signed by the owner who asked for the trial');
+  } finally {
+    await s.close();
+  }
+});
+
+/*
+ * A TRIAL OPENED THE OWNER'S KEY FOR A SESSION THE VAULT ITSELF REFUSES (audit thirty-eight, finding 2). The record
+ * handed the trial the vault on `level === 'owner'` alone, and the vault's own gate asks one thing more, a proof under
+ * fifteen minutes old. Measured by the audit on this stack: a session proved two hours ago was refused `listGrants` with
+ * `NEEDS_BROWSER_SESSION`, and the same cookie's `scriptTry` sent one request carrying the owner's key and left a
+ * `grant.read` signed with her id, for an opening her session could not have made. A cookie is thirty days of standing
+ * access, and the draft chooses the origin, so the trial was what a laptop left open reached.
+ */
+test('A SESSION PROVED TWO HOURS AGO IS REFUSED THE VAULT, AND ITS TRIAL SENDS NO KEY, opens nothing and is told to sign in again', async () => {
+  const s = await stack();
+  try {
+    const stale = s.plant(Date.now() - 120 * MINUTE);
+    /* V1, THE WITNESS THAT THE VAULT REFUSES THIS SESSION, so the case below is about the trial and not the cookie. */
+    const v1 = await s.call(stale, 'listGrants', {});
+    assert.equal(v1.status, 403, v1.text);
+    assert.match(v1.text, /NEEDS_BROWSER_SESSION/);
+
+    const v2 = await s.call(stale, 'scriptTry', { body: DRAFT });
+    /* THE TRIAL STILL RUNS, KEYLESS, rather than being refused whole: the answer is the run's, with the fetch refused. */
+    assert.equal(v2.status, 200, v2.text);
+    assert.equal(s.sent.length, 0, 'the trial of a session the vault refuses sent a request');
+    assert.deepEqual(s.reads(), [], 'the trial of a session the vault refuses opened the owner key');
+    assert.match(v2.text, /Sign in again to try it with the key/, `the trial did not say why the key stayed shut: ${v2.text}`);
+  } finally {
+    await s.close();
+  }
+});
+
+test('A SESSION PROVED A MINUTE AGO TRIES THE SAME DRAFT WITH THE KEY, so the gate above is the proof and not the cookie', async () => {
+  const s = await stack();
+  try {
+    const fresh = s.plant(Date.now() - MINUTE);
+    const tried = await s.call(fresh, 'scriptTry', { body: DRAFT });
+    assert.equal(tried.status, 200, tried.text);
+    assert.equal(s.sent.length, 1, tried.text);
+    assert.ok(s.sent[0]!.auth === `Bearer ${s.value}`, 'the fresh trial did not send the owner key');
+    assert.deepEqual(s.reads(), [s.owner]);
   } finally {
     await s.close();
   }

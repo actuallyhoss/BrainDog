@@ -302,3 +302,134 @@ test('A schedule AFTER THE ASK NEEDS WHAT A NOTE NEEDS: append on the row\'s lis
   assert.equal(state(), 'done');
   sql.close();
 });
+
+/* AUDIT THIRTY-NINE, FINDING 1. An arrival's run names a list only when the arrival wrote a row, and a question that
+   names no list went to every whole-record reader. The run's scope carries the arrival's own words as `trigger.body`,
+   so "Arrived: {{trigger.body}}" put the inbox in front of a member at `decide` whom `inbox` itself refuses: measured,
+   the arrival wrote `[]`, her `inbox` was `FORBIDDEN`, and her `governance` named Omar. The body is the owner's alone,
+   so the question is too, and it is held as `inbox` holds it. */
+test('A QUESTION ABOUT AN ARRIVAL THAT WROTE NO ROW IS HELD TO THE OWNER, as the inbox it was filled from is', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const ARRIVED = {
+    id: 'rule.arrived',
+    kind: 'rule' as const,
+    body: {
+      rule: 'arrived',
+      on: { arrival: { channel: 'webhook' } },
+      steps: [{ ask_person: { question: 'Arrived: {{trigger.body}}', options: ['pay', 'hold'], as: 'answer', wait: '1d' } }],
+    } as never,
+  };
+  assert.ok((await api.kernel.install([MONEY, ARRIVED])).ok);
+  const got = api.kernel.arrive({ channel: 'webhook', body: 'Payroll: Omar 91000', sha256: 'x1', verified: true } as never);
+  assert.ok(got.ok, JSON.stringify(got));
+  assert.deepEqual((got as { value: { wrote: unknown[] } }).value.wrote, [], 'the arrival wrote a row, so this is not the case');
+  await api.kernel.drain();
+  const sg = sql.one<{ id: string }>("SELECT id FROM suggestion WHERE opened_by = 'rule:arrived' AND status = 'open'");
+  assert.ok(sg, 'the rule asked nothing');
+
+  /* THE WITNESS: the inbox the question was filled from is refused her. */
+  const inbox = (await api.inbox({}, appender)) as Out;
+  assert.equal(inbox.refusal?.code, 'FORBIDDEN');
+  const g = (await api.governance({ status: 'open' }, appender)) as Out;
+  assert.equal(JSON.stringify(g).includes('Omar'), false, "the arrival's words reached governance for a member the inbox refuses");
+  const news = await api.whatsNew({}, appender);
+  assert.equal(JSON.stringify(news).includes('Omar'), false, "the arrival's words reached whatsNew for a member the inbox refuses");
+  const d = (await api.decide({ id: sg.id, resolved_as: 'wont-fix', reason: 'No.' }, appender)) as Out;
+  assert.equal(d.refusal?.fix, `There is no suggestion called ${sg.id}.`);
+
+  const o = (await api.governance({ status: 'open' }, owner)) as Out;
+  assert.equal(JSON.stringify(o).includes('Payroll: Omar 91000'), true, 'the owner lost her own question');
+  sql.close();
+});
+
+/* AND A STEP `suggest` ON THE SAME ARRIVAL, which carries no run, so its rule is all there is to place it by. The rule
+   names no door whose row it could be about, so it is held as the run's own question is. */
+test('A STEP suggest FILLED FROM AN ARRIVAL THAT WROTE NO ROW IS HELD TO THE OWNER TOO', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const ARRIVED = {
+    id: 'rule.arrived',
+    kind: 'rule' as const,
+    body: { rule: 'arrived', on: { arrival: { channel: 'webhook' } }, steps: [{ suggest: { question: 'Arrived: {{trigger.body}}', options: ['yes', 'no'] } }] } as never,
+  };
+  assert.ok((await api.kernel.install([MONEY, ARRIVED])).ok);
+  assert.ok(api.kernel.arrive({ channel: 'webhook', body: 'Payroll: Omar 91000', sha256: 'x1', verified: true } as never).ok);
+  await api.kernel.drain();
+  assert.ok(sql.one("SELECT id FROM suggestion WHERE opened_by = 'rule:arrived' AND status = 'open'"), 'the rule asked nothing');
+  const g = (await api.governance({ status: 'open' }, appender)) as Out;
+  assert.equal(JSON.stringify(g).includes('Omar'), false, "the arrival's words reached governance for a member the inbox refuses");
+  const o = (await api.governance({ status: 'open' }, owner)) as Out;
+  assert.equal(JSON.stringify(o).includes('Payroll: Omar 91000'), true, 'the owner lost her own question');
+  sql.close();
+});
+
+/* AUDIT THIRTY-NINE, FINDING 6. A question with no run is placed by its rule's body, and that was read `ORDER BY version
+   DESC`, today's body and not the one that asked. Measured: `rule.chase` on Money suggested "Chase Salary: Omar?", held
+   back from a member at `append` on Money, and the moment the owner re-declared the rule on Inbox the same question,
+   still about the Money row, reached her `governance` and `whatsNew`. */
+test('AN INLINE suggest STAYS WITH THE LIST ITS RULE WAS ON WHEN IT ASKED, after the rule moves to another list', async () => {
+  const INBOX = {
+    id: 'register.inbox',
+    kind: 'register' as const,
+    body: { id: 'inbox', name: 'Inbox', title: 'what', fields: [{ id: 'what', type: 'text', required: true }] } as never,
+  };
+  const chase = (register: string) => ({
+    id: 'rule.chase',
+    kind: 'rule' as const,
+    body: { rule: 'chase', register, once_per: ['entry'], then: [{ suggest: { question: 'Chase {{what}}?', options: ['yes', 'no'] } }] } as never,
+  });
+  const sql = openSqlite();
+  const clock = fixedClock(NOW);
+  const api = await createRecordApi({ sql, clock });
+  assert.ok((await api.kernel.install([MONEY, INBOX, chase('money')])).ok);
+  assert.ok(api.kernel.create('money', { what: 'Salary: Omar', amount: 91000 }, { actor: 'p_owner' }).ok);
+  await api.kernel.drain();
+  const seen = async () => JSON.stringify(await api.governance({ status: 'open' }, appender)).includes('Omar');
+  assert.equal(await seen(), false);
+
+  clock.advance(60 * 60 * 1000);
+  const moved = await api.kernel.install([chase('inbox')]);
+  assert.ok(moved.ok, JSON.stringify(moved));
+  assert.equal(await seen(), false, 'the Money question reached a member refused list money once its rule moved to Inbox');
+  const news = await api.whatsNew({}, appender);
+  assert.equal(JSON.stringify(news).includes('Omar'), false, 'whatsNew named the Money row after the rule moved');
+  sql.close();
+});
+
+/* AUDIT THIRTY-NINE, FINDING 8, THE `run` HALF: DECIDED, AND HELD TO NO LEVEL. The walk counts every verb that changes
+   the record, and `run` changes nothing in it: it queues one call carrying the fields its `sends:` names, to the host
+   and with the key the owner approved when the call was installed. Measured here, a member at `read` on Money answers,
+   the call is queued, and the row is as it was. What she is shown is already held: the lint keeps a call's `sends:` on
+   its rule's list and `holds` asks her to read that list first, so she has read every field the call sends. If this
+   goes red because a level was added, that is a change of the decision, and the comment on `answersNot` changes too. */
+test('A run AFTER THE ASK IS ANSWERED BY A MEMBER WHO READS THE LIST: the call is queued and nothing on the row changes', async () => {
+  const POST = {
+    id: 'ingest.post_money',
+    kind: 'ingest' as const,
+    body: { ingest: 'post_money', channel: 'call', url: 'https://hooks.example.test/money', trigger: 'rule', grant: 'hook key', sends: ['money.what'] } as never,
+  };
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const put = await api.kernel.install([MONEY, POST, rule('postit', [ASK, { if: 'answer is yes', then: [{ run: 'post_money' }], else: [] }])]);
+  assert.ok(put.ok, JSON.stringify(put));
+  /* A call whose key is missing pauses instead of queueing, so the key is in the vault. */
+  const key = { label: 'hook key', opens: 'hooks.example.test', kind: 'api_token' as const, ciphertext: new Uint8Array([1]), nonce: new Uint8Array([9]), kdf: 'hkdf', wrapped_by: 'kek' as const, kek_id: 'kek_2f' };
+  assert.ok(api.kernel.bindGrant(key, 'p_owner').ok);
+  assert.ok(api.kernel.create('money', { what: 'Salary: Omar', amount: 91000 }, { actor: 'p_owner' }).ok);
+  await api.kernel.drain();
+  const calls = () => sql.all<{ payload: string }>("SELECT payload FROM outbox WHERE json_extract(payload, '$.ingest') = 'post_money'").length;
+  const before = calls();
+  const sg = sql.one<{ id: string; body: string }>("SELECT id, body FROM suggestion WHERE opened_by = 'rule:postit' AND status = 'open'")!;
+  const yes = (JSON.parse(sg.body) as { options: { id: string; label: string }[] }).options.find((o) => o.label === 'yes')!.id;
+  const row = () => sql.one<{ fields: string }>("SELECT fields FROM entry WHERE register = 'money'")!.fields;
+  const was = row();
+
+  const d = (await api.decide({ id: sg.id, decide: { option: yes, reason: 'Go.' } }, reader)) as Out;
+  assert.ok(d.ok, `a member at read was refused a question whose only later step is a call: ${JSON.stringify(d)}`);
+  await api.kernel.drain();
+  assert.equal(sql.one<{ state: string }>("SELECT state FROM automation_run WHERE rule = 'postit'")?.state, 'done');
+  assert.equal(calls(), before + 1, 'the answer did not queue the call');
+  assert.equal(row(), was, 'the call changed the row');
+  sql.close();
+});

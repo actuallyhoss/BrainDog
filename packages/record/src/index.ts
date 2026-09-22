@@ -86,6 +86,7 @@ import {
   rowRegisterOf,
   runPlan,
   scriptBody,
+  egressOf,
 } from '@braindog/kernel';
 import { parseWhere, type Predicate } from '@braindog/where';
 import type { Json as JsonValue } from '@braindog/kernel';
@@ -840,8 +841,12 @@ export type RecordDeps = {
    * `catalogueDrafts`). Spark asks about each on Decide through the same `prepare`; absent, it asks about none.
    */
   catalogueOffers?: ((held: readonly { id: string; version: string; on: boolean }[]) => Promise<readonly CatalogueOffer[]>) | undefined;
-  /** A draft script run now in the host's sandbox, writing nothing (`@braindog/host/script-try`). Absent, `scriptTry` refuses `NOT_IN_THIS_BUILD`. */
-  tryScript?: ((draft: { record: { id: string; tz: string }; body: Record<string, unknown>; input: unknown; reads: { list(register: string, where: unknown): Promise<unknown[]>; get(spoken: string): Promise<unknown> }; owner: boolean; asker: string }) => Promise<unknown>) | undefined;
+  /**
+   * A draft script run now in the host's sandbox, writing nothing (`@braindog/host/script-try`). Absent, `scriptTry` refuses `NOT_IN_THIS_BUILD`.
+   * `owner` is whether the vault's own gate would open for this caller, and the host opens a key only on it; `stale` is
+   * `true` when the one thing keeping it shut is a proof older than the vault allows, which changes what the run is told.
+   */
+  tryScript?: ((draft: { record: { id: string; tz: string }; body: Record<string, unknown>; input: unknown; reads: { list(register: string, where: unknown): Promise<unknown[]>; get(spoken: string): Promise<unknown> }; owner: boolean; stale: boolean; asker: string }) => Promise<unknown>) | undefined;
 };
 
 /** What `invite` says when the host never said it can take invitations. */
@@ -1685,8 +1690,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * `opened_by` IS WHAT MAKES IT THE RULE'S. The gate lets a proposer put any `run` on an options body; only the rule's own
    * `propose` signs `rule:<name>`, and a run is believed only when its rule is the one that signed. A body naming a run
    * of another rule is somebody else's question and is read as naming no list.
+   *
+   * `inbox` IS A QUESTION ABOUT AN ARRIVAL THAT WROTE NO ROW, and it is the owner's alone. Such a run names no list, and
+   * its scope carries the arrival's own words as `trigger.body`: `loop/research-batch-thirty-nine-audit.md` finding 1
+   * filled "Arrived: {{trigger.body}}" from a webhook no door claimed, and a member at `decide` whom `inbox` refuses
+   * `FORBIDDEN` read "Payroll: Omar 91000" in `governance`. So `holds` asks it what `inbox` asks. It is a flag and not a
+   * list id, because a record may declare a list called `inbox`, and `every` and `manual` keep the whole record, since
+   * their scope carries no row and no arrival.
    */
-  const ruleAsked = (row: Record<string, unknown>): { rule: string; run: { id: string; version: number } | null; list: string | null } | null => {
+  const ruleAsked = (row: Record<string, unknown>): { rule: string; run: { id: string; version: number } | null; list: string | null; inbox?: true } | null => {
     if (row.body_kind !== 'options' || typeof row.opened_by !== 'string' || !row.opened_by.startsWith('rule:')) return null;
     const rule = row.opened_by.slice('rule:'.length);
     const body = row.body as Record<string, unknown> | undefined;
@@ -1694,17 +1706,31 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const run = sql.one<{ rule: string; version: number; trigger: string }>('SELECT rule, version, trigger FROM automation_run WHERE id = ?', body.run);
       if (run && run.rule !== rule) return null;
       if (run) {
-        const said = JSON.parse(run.trigger) as { register?: unknown };
-        return { rule, run: { id: body.run, version: run.version }, list: typeof said.register === 'string' ? said.register : null };
+        const said = JSON.parse(run.trigger) as { kind?: unknown; register?: unknown };
+        const list = typeof said.register === 'string' ? said.register : null;
+        return { rule, run: { id: body.run, version: run.version }, list, ...(list === null && said.kind === 'arrival' ? { inbox: true as const } : {}) };
       }
     }
-    const newest = (id: string): unknown => {
-      const found = sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? ORDER BY version DESC LIMIT 1', id)?.body;
+    /* THE BODY THAT ASKED, NOT TODAY'S (audit thirty-nine, finding 6). This read `ORDER BY version DESC`, so re-declaring
+       `rule.chase` from Money onto Inbox handed its open "Chase Salary: Omar?", still about the Money row, to a member
+       held to `append` on Money, in `governance` and `whatsNew`. A version is live from its `created_at`, so the one that
+       asked is the newest created by the time the question was opened, and a door is read at the same moment. Where no
+       version is that old (an import that rewrote the times), the newest is still the answer, as it was. */
+    const opened = typeof row.opened_at === 'string' ? row.opened_at : null;
+    const asOf = (id: string): unknown => {
+      const found =
+        (opened === null ? undefined : sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND created_at <= ? ORDER BY version DESC LIMIT 1', id, opened)?.body) ??
+        sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? ORDER BY version DESC LIMIT 1', id)?.body;
       return found === undefined ? undefined : JSON.parse(found);
     };
-    const decl = newest(`rule.${rule}`);
+    const decl = asOf(`rule.${rule}`);
     if (decl === undefined) return { rule, run: null, list: null };
-    return { rule, run: null, list: rowRegisterOf(decl as Parameters<typeof rowRegisterOf>[0], (door) => newest(`ingest.${door}`)) };
+    const list = rowRegisterOf(decl as Parameters<typeof rowRegisterOf>[0], (door) => asOf(`ingest.${door}`));
+    /* AN ARRIVAL RULE WHOSE ROW NO DOOR NAMES asked about an arrival that wrote nothing, as far as can be told without
+       its run, and is held as the run's own question is. */
+    const on = (decl as { on?: unknown } | null)?.on;
+    const arrival = on !== null && typeof on === 'object' && 'arrival' in on;
+    return { rule, run: null, list, ...(list === null && arrival ? { inbox: true as const } : {}) };
   };
 
   /**
@@ -1729,14 +1755,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * due writes a `note` event on the row signed by the rule; a member at `read` answered a run whose only later step
    * was one, and may not add a note by hand.
    *
-   * `run` IS HELD TO NO LEVEL, AND ON PURPOSE. It queues one run of a declared call with the fields of the run's row that
-   * the call's `sends:` names, and writes nothing in the record. Measured: no member can set a call off by hand at any
-   * level of any list, because every route that starts one (`automationRun`, `resumeAction`, `ruleApply`) is an owner's
-   * in a browser, so the level "she could do it herself" would name is the owner's, and holding the answer there would
-   * turn every question an owner put in front of a call into one only the owner may answer. What the call sends, where
-   * and with which key the owner approved when the call and the rule were installed; the lint keeps its `sends:` on the
-   * rule's own list, and `holds` has already required the answerer to read that list, so she reads every field it
-   * sends before she is shown the question.
+   * `run` IS HELD TO NO LEVEL, AND ON PURPOSE (audit thirty-nine, finding 8, decided). It queues one run of a declared
+   * call with the fields of the run's row that the call's `sends:` names, and writes nothing in the record: a `call`'s
+   * answer lands no row (`finishAction` writes back for a `poll` or a `pull` only). The levels are what a person may
+   * change here, so `write`, the level the audit asked about, says nothing about a call. Measured, with `run:` on
+   * Money's creates: a member at `append` set the call off by adding a row and so did one at `write`, a member at
+   * `read` was refused the row, and `automationRun` refused a member at `write` `LEVEL_REQUIRED`, since every route
+   * that starts a call by name (`automationRun`, `resumeAction`, `ruleApply`) is an owner's in a browser. So `write`
+   * would ask of the answer more than the rule asks of a new row, and the owner's level would make every question an
+   * owner put in front of a call one only the owner may answer. What the call sends, where and with which key the
+   * owner approved when the call and the rule were installed; the lint keeps its `sends:` on the rule's own list, and
+   * `holds` has already required the answerer to read that list, so she reads every field it sends before she is shown
+   * the question. `test/ask-person-reach.test.ts` holds a member at `read` answering one, and goes red the day a level
+   * is added here.
    */
   const answersNot = (ctx: CallContext, asked: { rule: string; run: { id: string; version: number } | null; list: string | null }): Refusal | null => {
     if (asked.run === null) return null;
@@ -1835,6 +1866,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       return list === '' ? !wholeRecord(ctx) : readable(ctx, list) !== null;
     }
     const body = row.body as Record<string, unknown> | undefined;
+    /* A QUESTION FILLED FROM AN ARRIVAL THAT WROTE NO ROW IS HELD AS THE INBOX IS, to the owner reading the whole record
+       (`ruleAsked`, audit thirty-nine finding 1). */
+    if (row.body_kind === 'options' && ruleAsked(row)?.inbox === true) return allows(ctx, 'owner', listName) !== null || !wholeRecord(ctx);
     /* EVERY BODY THAT NAMES A REGISTER, not only a `rowset`. A `pattern` carries a whole ingest
        declaration with `writes.register` on it and a `change` carries a `declaration_id`; both name
        a register and both used to pass unfiltered while the one that carries ROWS was filtered. An `options` question a
@@ -2323,6 +2357,25 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const handle = /^SG[1-9][0-9]*$/u.test(spoken) ? nameOf(ctx, 'suggestion', spoken) : null;
     if (handle === null || !('refusal' in out)) return out;
     return { ...out, refusal: { ...out.refusal, fix: out.refusal.fix.replace(new RegExp(`\\b${spoken}\\b`, 'gu'), handle) } };
+  };
+
+  /**
+   * Each script line a `change` showed that reads differently with the vault as it is now, as it would now read.
+   *
+   * ONLY THE LINES IT SHOWED. `body.egress` is what `review` worked out when the change was filed, so a script already
+   * installed unchanged is not in it and cannot be refused here by mistake. Only a script's line reads the vault (its key
+   * is said with the host its entry opens); an action's line is its declaration alone, and cannot move under a question.
+   */
+  const staleScriptLines = (body: unknown): string[] => {
+    const object = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+    if (!object(body) || !Array.isArray(body.egress) || !object(body.to)) return [];
+    const members: unknown[] = Array.isArray(body.to.declarations) ? body.to.declarations : [body.to];
+    return (body.egress as unknown[]).flatMap((shown) => {
+      if (!object(shown) || shown.channel !== 'script') return [];
+      const decl = members.find((d) => object(d) && d.kind === 'script' && object(d.body) && d.body.script === shown.ingest);
+      const now = object(decl) ? egressOf(decl.body, undefined, (label) => kernel.opensOf(label)) : null;
+      return now !== null && now.line !== shown.line ? [now.line] : [];
+    });
   };
 
   /**
@@ -3594,8 +3647,27 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           return row.value === null ? null : unsealed(row.value);
         },
       };
+      /* THE VAULT'S OWN GATE, AND NOT `level === 'owner'` (audit thirty-eight, finding 2). The host opens a key for a
+         trial on `owner` alone, and this said it for any person at owner: a session proved two hours ago, which the
+         vault refuses `listGrants` with `NEEDS_BROWSER_SESSION`, tried a draft that sent her key and left a `grant.read`
+         in her name. `vault()` is asked, and held to a person, because `allows` lets `system` through everything and
+         `vault` refuses only tokens, so `vault() === null` alone would hand `system` the key the old line kept from it
+         (`test/script-try-stale.test.ts`). A person at owner always passes `allows(ctx, 'owner')`, so for her a refusal
+         can only be the proof's age, and `stale` says so to the host, which tells the run to sign in again. */
+      const shut = vault(ctx);
+      const p = ctx.principal;
       const who = kernel.identity();
-      return ok(await deps.tryScript({ record: { id: who?.id ?? 'self', tz: who?.tz ?? 'UTC' }, body: b, input: said.input ?? null, reads, owner: ctx.principal.kind === 'person' && ctx.principal.level === 'owner', asker: ctx.principal.kind === 'token' ? ctx.principal.person : ctx.principal.id }));
+      return ok(
+        await deps.tryScript({
+          record: { id: who?.id ?? 'self', tz: who?.tz ?? 'UTC' },
+          body: b,
+          input: said.input ?? null,
+          reads,
+          owner: p.kind === 'person' && shut === null,
+          stale: p.kind === 'person' && shut !== null && p.level === 'owner',
+          asker: p.kind === 'token' ? p.person : p.id,
+        }),
+      );
     },
 
     /**
@@ -4117,6 +4189,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (kind === 'pack' || kind === 'settings' || kind === 'arrange') {
           const owner = admin(ctx, 'accept a change to what this record is');
           if (owner) return { ok: false as const, refusal: owner };
+        }
+        /* THE SCRIPT LINES THE OWNER IS PRESSING ARE WORKED OUT AGAIN, WITH THE VAULT AS IT IS NOW. A script's line names
+           the host its key's vault entry opens, read when the change was filed, and nothing read it again: the audit of
+           wave thirty-eight (finding 4) filed "key "goldapi" to api.goldapi.io", replaced the entry with one that opens
+           `collector.test`, and the accept installed a script whose key went to `collector.test`. A pack's plan is
+           refused `PLAN_STALE` for the same drift (`arrange.ts`), and so is this. It is asked before the kernel decides,
+           so nothing is decided and the question stays open (`test/change-script-stale.test.ts`). */
+        if (kind === 'change') {
+          const stale = staleScriptLines(asked?.body);
+          if (stale.length > 0)
+            return no('PLAN_STALE', `This change now calls out something it did not show: ${stale.join('; ')}. Propose it again.`, { at: 'body.approve' });
         }
       }
       const out = kernel.decide(args.id, verdict, actorOf(ctx));
