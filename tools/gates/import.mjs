@@ -159,13 +159,14 @@ const TOKEN = 'gate-import-bearer-not-a-secret';
 const TODAY = '2026-09-17';
 
 /**
- * The three packs, and between them every list the planner writes to.
+ * The two packs, and between them every list the planner writes to.
  *
  * INSTALLED THROUGH DECIDE, which is how the owner installs one: `propose` files the pack and
- * `decide` accepts it. Solo founder pulls Projects, People, Money and Work in under itself, so
- * naming those four here would be naming the same install twice.
+ * `decide` accepts it. Solo founder pulls Projects, People, Money, Work and, since `72e1b7a3`,
+ * Estate in under itself, so naming any of those here is naming the same install twice, and the
+ * record refuses it: `TRANSITION_ILLEGAL, estate is already installed and on`.
  */
-const PACKS = ['usecase-founder', 'estate', 'agents'];
+const PACKS = ['usecase-founder', 'agents'];
 
 /** Every row of one register, page by page, so this file holds no page size of its own. */
 function rowsOf(kernel, register) {
