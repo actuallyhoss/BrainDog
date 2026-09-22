@@ -68,6 +68,27 @@ const INVISIBLE_EDGE = new RegExp(`^${EDGE}+|${EDGE}+$`, 'gv');
 /* AND WHAT MAY NOT SIT INSIDE A NAME. White space between words is a name; a zero-width space or a filler between
    them is two names drawn as one, or a gap nobody can see is there. */
 const INVISIBLE_INSIDE = new RegExp(String.raw`[[\p{Default_Ignorable_Code_Point}\p{Cf}\u2800]--${SPELLS_WITH}]`, 'v');
+/* A JOINER IS SPELLING ONLY WHERE A SCRIPT SPELLS WITH IT. The exemption above was for every script, so the audit
+   stored `Bob\u200cSmith` and `a`, 98 joiners and `b` (`loop/research-batch-sixteen-audit.md` finding 6). A joiner is
+   kept after a letter or mark of a script that writes with one (Script_Extensions, so an Arabic vowel mark counts as
+   Arabic), or as ZWJ between two emoji, which is how a family or the rainbow flag is written. Each joiner must follow
+   one of those itself, so a second joiner in a row follows a joiner and is refused: no script needs a run of them. */
+const JOINS_WITH = String.raw`[\p{scx=Arabic}\p{scx=Syriac}\p{scx=Nko}\p{scx=Mongolian}\p{scx=Devanagari}\p{scx=Bengali}\p{scx=Gurmukhi}\p{scx=Gujarati}\p{scx=Oriya}\p{scx=Tamil}\p{scx=Telugu}\p{scx=Kannada}\p{scx=Malayalam}\p{scx=Sinhala}\p{scx=Khmer}\p{scx=Myanmar}]`;
+const JOINER_SPELLING = new RegExp(
+  String.raw`(?<=${JOINS_WITH})[\u200c\u200d]|(?<=[\p{Extended_Pictographic}\p{Emoji_Modifier}\ufe0f])\u200d(?=\p{Extended_Pictographic})`,
+  'gv',
+);
+/* WHAT IS VISIBLE AND STILL NO NAME (finding 7). A mark with no letter under it, at the start or after a space, draws
+   a floating accent. A run of more than `MARKS_MAX` marks is the audit's letter carrying 99 of them, and a variation
+   selector is a mark too, so the same run refuses 90 of those. The longest run in the names
+   `invite-names-drawn.test.ts` keeps is three, a Tibetan stack, but a Burmese syllable such as `ချွှေး` carries five
+   (every sign after the first letter is a mark), so six is the tightest bound that keeps it. Private use draws
+   whatever one font chose, or a box. A noncharacter is not text at all. */
+const MARKS_MAX = 6;
+const NOISE = new RegExp(String.raw`(?:^|\p{White_Space})\p{M}|\p{M}{${MARKS_MAX + 1}}|[\p{Co}\p{Noncharacter_Code_Point}]`, 'u');
+/* A RUN OF WHITE SPACE IS ONE, AND THE FIRST OF THE RUN IS THE ONE KEPT, so a Japanese name keeps its ideographic
+   space. Run after the controls are refused, because a tab and a line feed are white space too. */
+const SPACE_RUN = /(\p{White_Space})\p{White_Space}+/gu;
 
 /**
  * The name a person typed for themselves: `null` for none, or refused with `VALUE_MALFORMED` at `name`.
@@ -80,7 +101,10 @@ const INVISIBLE_INSIDE = new RegExp(String.raw`[[\p{Default_Ignorable_Code_Point
  * SOMETHING VISIBLE AND SOMETHING DANGEROUS IS REFUSED, NOT CLEANED. `node:sqlite` stored `Bo\u0000Tanner` as `Bo`
  * at the bind, and nobody was told; cleaning here would be the same silence one layer up. Refused: a control
  * character (NUL, CR, LF, BEL, ESC, tab, DEL, C1), a bidi control (an override makes the stored `Bo nimda` draw as `Bo admin`), an
- * invisible character between two visible ones, a lone surrogate (stored as U+FFFD), and more than `NAME_MAX`.
+ * invisible character between two visible ones, a joiner outside the scripts and emoji that spell with one, a mark
+ * with no letter under it or more than `MARKS_MAX` in a row, private use, a noncharacter, a lone surrogate (stored as
+ * U+FFFD), and more than `NAME_MAX`. The one thing cleaned inside is a run of spaces, which draws as a gap between
+ * the words the person typed and hides nothing, so it becomes one space as the edges already become none.
  *
  * `NAME_MAX` IS 100 CODE POINTS. A person's name needs far less, and the audit's 60,000-character name would have
  * been the passkey chooser's `displayName` (`packages/record/src/identity.ts:413`). Code points and not UTF-16
@@ -95,9 +119,10 @@ export function personName(raw: unknown): Result<string | null> {
   if ([...name].length > NAME_MAX) return malformed(`A name is at most ${NAME_MAX} characters.`);
   /* `\p{Zl}` AND `\p{Zp}` BESIDE THE CONTROLS: U+2028 and U+2029 are white space, not controls, and a check for
      `\p{Cc}` alone stored `Bo Tanner` as a name drawn on two lines. */
-  if (/[\p{Cc}\p{Zl}\p{Zp}\p{Bidi_Control}]/u.test(name) || INVISIBLE_INSIDE.test(name))
+  if (/[\p{Cc}\p{Zl}\p{Zp}\p{Bidi_Control}]/u.test(name) || INVISIBLE_INSIDE.test(name) || /[\u200C\u200D]/.test(name.replace(JOINER_SPELLING, '')))
     return malformed('That name has a hidden character in it, such as a line break or a direction mark. Type it again without it.');
-  return { ok: true, value: name };
+  if (NOISE.test(name)) return malformed('That name has a character in it that draws no letter, such as an accent on its own. Type it again without it.');
+  return { ok: true, value: name.replace(SPACE_RUN, '$1') };
 }
 
 /** The part of a host's `AuthDoor` this route reads. */
