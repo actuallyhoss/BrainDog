@@ -26,6 +26,7 @@
 import type { Conflict, Refusal, Result } from '@braindog/ports';
 import { no, ok, refused } from '@braindog/ports';
 import { credentialKey as credential, credentialValue, NESTED_MOST, nestedPast } from './credentials.ts';
+import { FIRST_PARTY_LISTS } from './usecase.ts';
 import { KINDS, approvalLines, configReads, configValue, digest, egressChanged, egressOf as egressOfBody, fillConfig, jcs, readConfig, widens, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
 
 /**
@@ -39,7 +40,7 @@ export type { Egress };
 /* A use case: a pack with a front, its modules, signals and voice (`loop/research-spark.md` §2.1). */
 export { SHARED_MOST_BYTES, SHARED_SUFFIX, exampleFields, exportUseCase, kindUnknownSentence, laterVersion, nextVersion, readShared, sharedFileName, unfilled, type ExportParts, type Shared, type VersionStep } from './shared.ts';
 export { looksLikeCredential } from './credentials.ts';
-export { AUDIENCES, LABEL_KEY, MODULES, MODULE_LISTS, SHARED_VERSION, SPEAKS, VOICE_KEYS, labelKeyOf, labelSetting, labelsOf, speakingPack, voiceWhenAdding, voiceWrites, normaliseUseCase, packIdOf, useCasePack, voiceOf, voiceSetting, type Audience, type ExampleLink, type SpeakingState, type UseCase, type VoiceKey } from './usecase.ts';
+export { AUDIENCES, FIRST_PARTY_LISTS, LABEL_KEY, MODULES, MODULE_LISTS, SHARED_VERSION, SPEAKS, VOICE_KEYS, labelKeyOf, labelSetting, labelsOf, speakingPack, voiceWhenAdding, voiceWrites, normaliseUseCase, packIdOf, useCasePack, voiceOf, voiceSetting, type Audience, type ExampleLink, type ModuleId, type SpeakingState, type UseCase, type VoiceKey } from './usecase.ts';
 
 /* ── the grammars, and they are `34-GRAMMARS` §4's ───────────────────────── */
 
@@ -1265,30 +1266,6 @@ function filledWith(pack: Pack, config: Diff['config']): Pack {
   });
   return { ...pack, declarations, seeds };
 }
-
-/**
- * The first-party pack that declares each list, so a refusal can name what to install.
- *
- * WRITTEN OUT HERE, because this package cannot import the seed that builds those packs. A test in
- * `test/pack.test.ts` reads the seed's own manifests and fails when this map drifts from them.
- */
-export const FIRST_PARTY_LISTS: ReadonlyMap<string, string> = new Map([
-  ['things', 'portfolio'],
-  ['people', 'people'],
-  ['accounts', 'money-core'],
-  ['categories', 'money-core'],
-  ['fx', 'money-core'],
-  ['holdings', 'money-core'],
-  ['installments', 'money-core'],
-  ['obligations', 'money-core'],
-  ['recurring', 'money-core'],
-  ['snapshots', 'money-core'],
-  ['transactions', 'money-core'],
-  ['services', 'estate'],
-  ['tasks', 'work'],
-  ['tracks', 'work'],
-  ['updates', 'work'],
-]);
 
 /** The kernel's own lists, which migration 2 seats in every record and no pack declares. */
 const KERNEL_LISTS = new Set(['session']);

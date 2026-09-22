@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { FIRST_PARTY_LISTS, install, normalise, plan, unresolvedFault, type Host, type Installed, type Pack } from '../src/index.ts';
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
-import { FIRST_PARTY, firstPartyDocument } from '../../seed/src/index.ts';
+import { FIRST_PARTY, agentsPackDocument, firstPartyDocument } from '../../seed/src/index.ts';
 
 const NOW = Date.UTC(2026, 8, 15, 12);
 
@@ -281,13 +281,17 @@ test('MONEY ALONE ON AN EMPTY RECORD IS REFUSED, and the first-party five still 
   ordered.sql.close();
 });
 
-test('THE FIRST-PARTY MAP AGREES WITH THE SEED: every list names the pack that declares it', () => {
+test('THE FIRST-PARTY MAP AGREES WITH THE SEED: every list names the pack that declares it, the agents pack among them', () => {
   const lists: [string, string][] = [];
   for (const id of FIRST_PARTY) {
     const doc = firstPartyDocument(id) as { declarations: Record<string, unknown>[] };
     /* A RULE NAMES THE LIST IT WATCHES WITH `register:` TOO, and declares none. */
     for (const d of doc.declarations) if (typeof d.register === 'string' && d.rule === undefined) lists.push([d.register, id]);
   }
+  /* AGENTS WAS LEFT OUT OF THE HAND-WRITTEN MAP, and an add-on declaring `skills` read as fine because of it (N4). The
+     agents pack is not one of `FIRST_PARTY`, so its lists are read off its own document. */
+  const agents = agentsPackDocument() as { declarations: Record<string, unknown>[] };
+  for (const d of agents.declarations) if (typeof d.register === 'string' && d.rule === undefined) lists.push([d.register, 'agents']);
   assert.deepEqual([...FIRST_PARTY_LISTS].sort(), lists.sort());
 });
 

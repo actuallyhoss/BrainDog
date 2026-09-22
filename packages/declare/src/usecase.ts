@@ -43,13 +43,19 @@ export type Audience = (typeof AUDIENCES)[number];
 
 /** The first-party packs a use case may name as modules. The seed's test holds this to its own list. */
 export const MODULES = ['portfolio', 'people', 'money-core', 'estate', 'work', 'agents'] as const;
+export type ModuleId = (typeof MODULES)[number];
 
 /**
  * The lists each first-party module provides, by id, and the name a person knows it by. A shared use case may not declare
  * one of these unless it installs that module (`readShared`), because the record reads some of them as the module's own:
  * `boot` names members to whoever may read People. Held equal to the modules' manifests by `packages/seed`'s tests.
+ *
+ * THE ONE TABLE OF WHICH MODULE OWNS WHICH LIST (`loop/research-shell-seed-next.md` N4). There was a second, written out by
+ * hand in `index.ts` as `FIRST_PARTY_LISTS`, and it had left Agents out: an add-on declaring `skills` or `credentials` was
+ * read as fine by `readPackFile` while a use case declaring the same list was refused by `readShared`, and the add-on then
+ * collided at install on any record with Agents. Moving a list between modules is an edit here and nowhere else.
  */
-export const MODULE_LISTS: Readonly<Record<(typeof MODULES)[number], { name: string; lists: readonly string[] }>> = {
+export const MODULE_LISTS: Readonly<Record<ModuleId, { name: string; lists: readonly string[] }>> = {
   portfolio: { name: 'Portfolio', lists: ['things'] },
   people: { name: 'People', lists: ['people'] },
   'money-core': {
@@ -60,6 +66,12 @@ export const MODULE_LISTS: Readonly<Record<(typeof MODULES)[number], { name: str
   work: { name: 'Work', lists: ['tasks', 'tracks', 'updates'] },
   agents: { name: 'Agents', lists: ['credentials', 'learnings', 'skills', 'tools'] },
 };
+
+/**
+ * The module that owns each list, read off `MODULE_LISTS`: what a refusal names when a file declares a module's list, and
+ * what "Install X first" names when a pack points at one nothing holds.
+ */
+export const FIRST_PARTY_LISTS: ReadonlyMap<string, ModuleId> = new Map(MODULES.flatMap((m) => MODULE_LISTS[m].lists.map((l): [string, ModuleId] => [l, m])));
 
 export type UseCase = {
   usecase: string;

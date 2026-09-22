@@ -29,7 +29,7 @@ import { digest, jcs, validateDeclaration, type Json } from '@braindog/kernel';
 import { credentialKey, credentialValue, NESTED_MOST, nestedPast } from './credentials.ts';
 import { egressOf, FIRST_PARTY_LISTS, normalise, type Pack, type PackSource } from './index.ts';
 import { kindUnknownSentence, readShared, SHARED_MOST_BYTES, type Shared } from './shared.ts';
-import { MODULES } from './usecase.ts';
+import { MODULE_LISTS, MODULES } from './usecase.ts';
 import {
   isRevocation,
   isRotation,
@@ -227,7 +227,7 @@ export async function readPackFile(input: unknown, source: PackSource = { kind: 
     const list = decl.kind === 'register' ? decl.id.slice('register.'.length) : null;
     const owner = list === null ? undefined : FIRST_PARTY_LISTS.get(list);
     if (owner !== undefined)
-      return no('PROVIDES_CONFLICT', `This add-on declares a list called ${list}, which belongs to BrainDog's ${owner} module. Name the list something else.`, { at: decl.id });
+      return no('PROVIDES_CONFLICT', `This add-on declares a list called ${list}, which belongs to BrainDog's ${MODULE_LISTS[owner].name} module. Name the list something else.`, { at: decl.id });
     const fault = validateDeclaration({ id: decl.id, kind: decl.kind, body: decl.body });
     if (fault?.code === 'KIND_UNKNOWN') return { ok: false, refusal: { ...fault, fix: kindUnknownSentence(fault.fix).replace('This setup', 'This add-on'), at: `${decl.id}${fault.at ? `.${fault.at}` : ''}` } };
   }

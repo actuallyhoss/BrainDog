@@ -21,7 +21,7 @@ import { validateDeclaration } from '@braindog/kernel';
 
 import { credentialKey, credentialValue, NESTED_MOST, nestedPast } from './credentials.ts';
 import { normalise, SEEDS_PER_REGISTER, type Pack, type PackSource } from './index.ts';
-import { MODULE_LISTS, MODULES, normaliseUseCase, packIdOf, useCasePack, type Audience, type ExampleLink, type UseCase, type VoiceKey } from './usecase.ts';
+import { FIRST_PARTY_LISTS, MODULE_LISTS, normaliseUseCase, packIdOf, useCasePack, type Audience, type ExampleLink, type UseCase, type VoiceKey } from './usecase.ts';
 
 /** The most a shared use case may weigh, in bytes of its file. The built-in five are each under 40 KB. */
 export const SHARED_MOST_BYTES = 256 * 1024;
@@ -96,7 +96,7 @@ export async function readShared(input: unknown, source: PackSource = { kind: 'p
     /* A FIRST-PARTY MODULE'S LIST IS THE MODULE'S. One declared by a use case that does not install the module would be
        read by the record as the module's own list; one that does install it is refused at install, as a conflict. */
     const list = decl.kind === 'register' ? decl.id.slice('register.'.length) : null;
-    const owner = list === null ? undefined : MODULES.find((m) => MODULE_LISTS[m].lists.includes(list));
+    const owner = list === null ? undefined : FIRST_PARTY_LISTS.get(list);
     if (owner !== undefined && !u.value.modules.includes(owner))
       return no('PROVIDES_CONFLICT', `This setup declares a list called ${list}, which belongs to the ${MODULE_LISTS[owner].name} module. Name the list something else, or add ${owner} to its modules.`, {
         at: decl.id,
