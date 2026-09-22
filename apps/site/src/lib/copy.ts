@@ -41,6 +41,28 @@
  * argued each sentence into its current wording moved with them rather than being thrown away.
  */
 
+/**
+ * The addresses, in one place, and ABOVE `site` so every link inside it can be built from them.
+ *
+ * `APP` IS THE ONE PLACE THE APP'S ADDRESS IS WRITTEN. Every "Open the app" on the site, the header,
+ * the hero, the close, the pricing card and the changelog, and the footer's sign-in, read it from
+ * here. It sat below `site` until 22 September, which is why the footer's sign-in was a second
+ * literal of the same address; the day the app moves, this line is the whole change.
+ *
+ * `SOURCE` IS PUBLISHED AHEAD OF THE REPOSITORY GOING PUBLIC, on the owner's word, 2026-09-16. The
+ * repository is private until the product launches, and the link is on the site now so it is
+ * already in place on the day it opens.
+ *
+ * `DOCS` AND `BUILD` ARE STILL `null`. They point inside the repository at pages that are not
+ * written for a stranger yet. `null` and not a different URL, so every call site has to decide what
+ * to draw when there is no address, and the type makes it decide.
+ */
+export const APP = 'https://app.brain.dog';
+export const SOURCE: string | null = 'https://github.com/actuallyhoss/BrainDog';
+export const DOCS: string | null = null;
+/** The build instructions, which is what a self-hoster is actually sent to. */
+export const BUILD: string | null = null;
+
 export const site = {
   product: 'BrainDog',
   /** The slogan. It is the README's headline, unchanged, and it takes no full stop. */
@@ -134,7 +156,7 @@ export const site = {
      * of the sub-line's three sentences, the last was spent on events and a log, the most technical
      * words above the fold. What a reader gets is the switcher's promise (their own things, arranged
      * for them), the agents doing the upkeep, and being able to see who changed what. The last half
-     * is the same claim `plain.lead` makes and the drawn decision in band 0003 shows, so it is said
+     * is the same claim `plain.lead` makes and the drawn decision in the mechanism band shows, so it is said
      * here in the reader's words and proven there. `test/content.test.ts` fails if a word of
      * mechanism comes back into this sentence.
      */
@@ -172,40 +194,17 @@ export const site = {
      */
     secondary: 'See what it costs',
     note: 'The app opens on a sample record. Neither plan is open yet.',
-    /**
-     * THE CAPTION AND THE ALT BELONG TO THE HERO NOW, because the picture does.
-     *
-     * They were `typed.caption` and `typed.alt`, under a band whose heading was `Typed rows, not a
-     * pile of notes`: the product's own screen, used as the illustration for a sentence about data
-     * modelling. §19 says the picture is the argument, so it moved up into the first screen and the
-     * sentence it used to illustrate moved down into `plain`. The words themselves are unchanged.
-     *
-     * The caption is literal about the pixels and it has to stay that way. The capture is 1440 CSS
-     * px wide, so at a 1440 viewport it paints one device pixel per captured pixel.
-     *
-     * IT SAID `photographed on the day this build was made`, AND THE BUILD PHOTOGRAPHS NOTHING. The
-     * site's `build` script is `theme && vite build`, `deploy.yml` never runs `scripts/product.mjs`,
-     * and `git log -- static/shots/home-light.webp` last touches the file at `a76bb402`, on 21
-     * September. Every deploy since has shipped a photograph older than the build the caption named.
-     * So it names the day. `src/lib/claims.test.ts` fails if the caption credits the build while the
-     * build script runs no capture, and the date here moves the day somebody re-shoots.
-     */
-    caption: 'One record, photographed from the app on 22 September',
-    /* IT SAID `each card a task and the project it belongs to`, AND THE PICTURE DISAGREES. In
-       `static/shots/home-light.png`, "Check the September bank statement", "Year-end pack for Pell
-       & Vine" and "Send the August invoices" carry no project, so a reader of the alt was told
-       something a sighted reader could see was not so (`loop/research-batch-twenty-eight-audit.md`
-       finding 7). The six columns and their order do match the picture. */
-    alt:
-      'The work board of the sample record: six columns from Later to Done, each card a task, most ' +
-      'of them naming the project they belong to.',
+    /* THE HERO HAS NO PHOTOGRAPH, AND SO NO CAPTION AND NO ALT. On 22 September the owner said of
+       the screenshots on this page *i hate those screenshots. they look terrible*, and asked for the
+       drawn app to take their place, overlapping the hero. That drawing is `arrange` below, and
+       every word in it is a string a screen reader reads as text, so it needs no alt. */
   },
 
   /**
    * THE DECISION, which the home page draws as a scene rather than as a table of rows. It replaced
    * the ledger on 2026-09-22, and the ledger's argument is the scene's last beat rather than gone.
    *
-   * WHY THE TABLE WENT. `loop/research-site-now.md` read band 0003 as a table of record ids under a
+   * WHY THE TABLE WENT. `loop/research-site-now.md` read the mechanism band as a table of record ids under a
    * paragraph about registers: `tasks#12`, `obligations#1`, `services#6`, five rows of the record's
    * own addresses shown to a stranger who has no record. And it found the one thing BrainDog does
    * that no other product page can show was on this page only as two names in a `who` column: an
@@ -263,11 +262,12 @@ export const site = {
   },
 
   /**
-   * THE ARRANGEMENT SWITCHER, and it is the page's first band after the hero because it is the one
-   * that answers *what is this worth to me*. Pressing a case redraws the rail in front of the
-   * reader, so the claim above it is made by the page doing the thing rather than by a sentence
-   * about it, and what it shows is the product becoming the reader's own: their money, their
-   * studies, their companies, their team, their new project.
+   * THE DRAWN APP, and it sits across the bottom edge of the hero because it is the product. On 22
+   * September the owner asked for the screenshots to go and for this drawing to take their place,
+   * overlapping the hero, with the records inside it pressable. Pressing a case redraws the window
+   * in front of the reader, and pressing a list, a row, Decide or Automations inside it opens that
+   * page of the drawn app, so the claim is made by the page doing the thing rather than by a
+   * sentence about it: their money, their studies, their companies, their team, their new project.
    *
    * `id` is what the switcher tracks and what /start calls the setup. `holds` is the pages and the
    * lists that setup ships, each under the name the record itself gives it, so a reader can check
@@ -297,6 +297,41 @@ export const site = {
        application says Switch record; `label` is what a screen reader calls the switcher. */
     head: 'Your record',
     label: 'What your record is for',
+    /* THE LINE UNDER THE WINDOW THAT SAYS IT CAN BE PRESSED. A drawing of an app looks like a
+       picture of one, and a picture is not something anybody tries to click. */
+    hint: 'Pick who it is for, then open a list, a row or a question.',
+    /**
+     * THE WORDS THE DRAWN APP ITSELF SAYS, each one the app's own for the same place.
+     *
+     * `decide`, `automations`, `accept` and `reject` are the rail entry, the page titles and the two
+     * buttons `apps/web` draws (`lib/copy.ts`, and the Decide screen's Accept and Reject).
+     * `noQuestions` is `copy.noQuestions` and `noRules` is `flow.none`, the two empty states;
+     * `notRun` is `flow.neverRun`, which is true of every rule in a record made today; `inline` is
+     * `flow.inline`, which is how every rule below runs; `starts` and `only` are `flow.trigger` and
+     * `flow.condition`. `accepted` is the scene's own word further down this file.
+     */
+    app: {
+      decide: 'Decide',
+      automations: 'Automations',
+      toDecide: (n: number) => `${n} to decide`,
+      noQuestions: 'Nothing waits on you',
+      noRules: 'Nothing runs on its own yet',
+      notRun: 'Not run yet.',
+      inline: 'Runs inside the change that starts it.',
+      starts: 'Starts',
+      only: 'Only when',
+      then: 'Then',
+      from: 'From',
+      opened: 'opened just now',
+      accept: 'Accept',
+      reject: 'Reject',
+      accepted: 'Accepted by you',
+      rejected: 'Rejected by you',
+      /* What a screen reader calls the drawn window and its rail, and the back link's first word. */
+      window: 'A drawing of the app',
+      rail: 'Pages and lists',
+      back: 'Back to',
+    },
     lead:
       'Say what your record is for. The pages, the lists and the words follow. Underneath, every ' +
       'part can be changed or turned off.',
@@ -349,6 +384,77 @@ export const site = {
           { title: 'Trip to Lisbon', value: 'GBP 420.00', note: 'of GBP 900.00 put by' },
           { title: 'Run three times a week', value: 'A habit', note: 'logged as you go' },
         ],
+        /* HOME'S TABLE UNDER ITS TILES, as `home-personal` in `personal.ts` draws one: `Bills due this
+           week`, which on a record made today is the three bills due inside seven days. `rows` are
+           indexes into the list it names, so every row here is one Bills already opens. */
+        soon: { heading: 'Bills due this week', list: 'Bills', rows: [0, 1, 2] },
+        /**
+         * THE LISTS THAT OPEN, THE QUESTION AND THE RULES. The rows are `PERSONAL_EXAMPLES` in
+         * `personal.ts`, all eight bills and all three accounts, with the days counted the way
+         * `install.ts` counts them. A row's page draws its cells under the list's column names and
+         * then the fields listed with it, each one a field the seed row carries.
+         *
+         * THE QUESTION IS THE ONE LIBERTY, and it is the same one `decide` below names: a record
+         * made today holds no question, and this is one an agent could put over MCP (`propose`),
+         * about rows that are really there. The Lisbon goal and the GBP 420.00 put by toward it are
+         * the `seeds`' own.
+         *
+         * THE RULES ARE THREE OF THE SEVEN THE SETUP INSTALLS, the three over lists this rail names,
+         * with their names from `RULE_NAMES` and their conditions (`MONEY_RULES`, `PORTFOLIO_RULES`)
+         * said in words. A rule's `suggest` is a question on Decide, which is what `then` says.
+         */
+        lists: [
+          {
+            name: 'Bills',
+            columns: ['What', 'Amount', 'Due'],
+            rows: [
+              { cells: ['Streaming subscription', 'GBP 10.99', 'In 2 days'], fields: [['Repeats', 'Monthly']] },
+              { cells: ['Phone contract', 'GBP 18.00', 'In 3 days'], fields: [['Repeats', 'Monthly']] },
+              { cells: ['Rent', 'GBP 850.00', 'In 6 days'], fields: [['Repeats', 'Monthly']] },
+              { cells: ['Pay day', 'GBP 2,450.00', 'In 10 days'], fields: [['Repeats', 'Monthly'], ['Direction', 'Owed to you']] },
+              { cells: ['Gym membership', 'GBP 32.00', 'In 12 days'], fields: [['Repeats', 'Monthly']] },
+              { cells: ['Energy bill', 'GBP 96.00', 'In 18 days'], fields: [['Repeats', 'Monthly']] },
+              { cells: ['Contents insurance', 'GBP 8.50', 'In 21 days'], fields: [['Repeats', 'Monthly']] },
+              { cells: ['Council tax', 'GBP 142.00', 'In 25 days'], fields: [['Repeats', 'Monthly']] },
+            ],
+          },
+          {
+            name: 'Accounts',
+            columns: ['Account', 'Balance', 'As of'],
+            rows: [
+              { cells: ['Current account', 'GBP 1,240.56', 'Today'], fields: [['Kind', 'Bank']] },
+              { cells: ['Savings account', 'GBP 2,420.00', '2 days ago'], fields: [['Kind', 'Bank']] },
+              { cells: ['Credit card', 'GBP -186.40', 'Yesterday'], fields: [['Kind', 'Card']] },
+            ],
+          },
+        ],
+        questions: [
+          {
+            from: 'Claude',
+            question: 'Put GBP 50.00 by toward the Trip to Lisbon?',
+            change: 'A new row in Put by. GBP 420.00 of the GBP 900.00 is put by so far.',
+          },
+        ],
+        rules: [
+          {
+            name: 'Keep balances current',
+            starts: 'When a row in Accounts is added or changed',
+            only: 'Its balance was last set more than a week ago',
+            then: 'Asks you on Decide to update it, once for each account and date',
+          },
+          {
+            name: 'Chase late payments',
+            starts: 'When a row in Bills is added or changed',
+            only: 'It is owed to you, still open, and more than a week past due',
+            then: 'Asks you on Decide whether to chase it',
+          },
+          {
+            name: 'Ask about a missed day',
+            starts: 'When a row in Projects is added or changed',
+            only: 'It is still in play and the day it aimed for has passed',
+            then: 'Asks you on Decide to move the day or park it',
+          },
+        ],
         holds: [
           'Day to day',
           'Spending',
@@ -370,6 +476,36 @@ export const site = {
           { title: 'Problem set 1: probability', value: 'Due in 3 days', note: 'Introduction to statistics' },
           { title: 'Study session tomorrow', value: '90 minutes', note: 'Conditional probability' },
         ],
+        /* `home-student`'s `Study sessions` table: the one session, tomorrow, inside its eight days. */
+        soon: { heading: 'Study sessions', list: 'Study sessions', rows: [0] },
+        /* `student.ts` `seeds`: one course, one assignment, one study session, each list with its one
+           row. The setup installs no module, so it has no rule, and Automations says so in the app's
+           own words. The question is the liberty `decide` names, about the assignment that is there. */
+        lists: [
+          {
+            name: 'Assignments',
+            columns: ['Assignment', 'State', 'Due'],
+            rows: [{ cells: ['Problem set 1: probability', 'Doing', 'In 3 days'], fields: [['Course', 'Introduction to statistics']] }],
+          },
+          {
+            name: 'Courses',
+            columns: ['Course', 'Term', 'Teacher'],
+            rows: [{ cells: ['Introduction to statistics', 'Autumn', 'Dr Adeyemi'] }],
+          },
+          {
+            name: 'Study sessions',
+            columns: ['Session', 'On', 'Minutes'],
+            rows: [{ cells: ['Go over the lecture on conditional probability', 'Tomorrow', '90'], fields: [['Done', 'Not yet']] }],
+          },
+        ],
+        questions: [
+          {
+            from: 'Claude',
+            question: 'Add a study session for Problem set 1?',
+            change: 'Sixty minutes on the problem set, the day before it is due.',
+          },
+        ],
+        rules: [],
         holds: ['Today', 'Studies', 'Courses', 'Assignments', 'Study sessions'],
       },
       {
@@ -382,6 +518,60 @@ export const site = {
           { title: 'Northwind current account', value: 'GBP 24,800.00' },
           { title: 'Monthly recurring revenue', value: 'GBP 4,200', note: 'reported yesterday' },
           { title: 'Cloud hosting', value: 'GBP 320.00', note: 'due in 9 days' },
+        ],
+        /* `home-founder`'s `Latest numbers` table, which is the one figure reported so far. */
+        soon: { heading: 'Latest numbers', list: 'Datapoints', rows: [0] },
+        /* `FOUNDER_EXAMPLES` and the pack's `seeds`, one row a list, as the setup gives them. The
+           question is the liberty `decide` names, about the hosting bill that is there; the rules are
+           three of the seven the setup installs, as Personal's are. */
+        lists: [
+          {
+            name: 'Money',
+            columns: ['What', 'Amount', 'Due'],
+            rows: [{ cells: ['Cloud hosting, Northwind app', 'GBP 320.00', 'In 9 days'], fields: [['Repeats', 'Monthly']] }],
+          },
+          {
+            name: 'Datapoints',
+            columns: ['Measure', 'Value', 'At'],
+            rows: [{ cells: ['Monthly recurring revenue', 'GBP 4,200', 'Yesterday'], fields: [['Source', 'Example']] }],
+          },
+          {
+            name: 'Organisations',
+            columns: ['Name', 'Kind', 'Country'],
+            rows: [{ cells: ['Northwind Labs Ltd', 'Company', 'United Kingdom'], fields: [['Currency', 'GBP']] }],
+          },
+          {
+            name: 'Tasks',
+            columns: ['Task', 'State', 'By'],
+            rows: [{ cells: ['Write the pricing page copy', 'Open', 'In 4 days'] }],
+          },
+        ],
+        questions: [
+          {
+            from: 'Claude',
+            question: 'Add a task to check the hosting bill before it is paid?',
+            change: 'Cloud hosting, Northwind app, GBP 320.00, due in 9 days.',
+          },
+        ],
+        rules: [
+          {
+            name: 'Chase late payments',
+            starts: 'When a row in Money is added or changed',
+            only: 'It is owed to you, still open, and more than a week past due',
+            then: 'Asks you on Decide whether to chase it',
+          },
+          {
+            name: 'Keep balances current',
+            starts: 'When a row in Accounts is added or changed',
+            only: 'Its balance was last set more than a week ago',
+            then: 'Asks you on Decide to update it, once for each account and date',
+          },
+          {
+            name: 'Ask about a missed day',
+            starts: 'When a row in Projects is added or changed',
+            only: 'It is still in play and the day it aimed for has passed',
+            then: 'Asks you on Decide to move the day or park it',
+          },
         ],
         holds: ['Overview', 'Dashboard', 'Organisations', 'Datapoints', 'Money', 'Projects', 'People', 'Tasks'],
       },
@@ -397,6 +587,52 @@ export const site = {
           { title: 'Cycle 1', value: 'Active', note: 'Ship the first version of the board' },
           { title: 'Cycle plan', value: '11 points', note: 'across four tickets' },
         ],
+        /* `home-team`'s `Due this week`, which leaves out what is doing, in review or blocked: of the six
+           tickets that is only the one about the next cycle, due in three days. */
+        soon: { heading: 'Due this week', list: 'Tickets', rows: [1] },
+        /* `TEAM_EXAMPLES` for the six tickets, with each one's state, priority and agent, and the
+           pack's `seeds` for the four planned ones. Claude is the agent the seed names on three of
+           them, so the question is Claude's too, about the ticket the seed leaves in review. Portfolio
+           brings `project-past-aim`, the one rule this setup carries. */
+        lists: [
+          {
+            name: 'Tickets',
+            columns: ['Ticket', 'State', 'Priority'],
+            rows: [
+              { cells: ['Write the release notes', 'In progress', 'Normal'], fields: [['Agent', 'Claude']] },
+              { cells: ['Agree what goes in the next cycle', 'To do', 'High'], fields: [['By', 'In 3 days']] },
+              { cells: ['Fix the sign-in link that expires too soon', 'In review', 'Urgent'], fields: [['Agent', 'Claude']] },
+              { cells: ['Wait on the design for the settings screen', 'Blocked', 'Normal'], fields: [['By', 'In 5 days']] },
+              { cells: ['Tidy the backlog labels', 'Done', 'Low'], fields: [['Agent', 'Claude']] },
+              { cells: ['Let a teammate export the board as a spreadsheet', 'Backlog', 'Low'] },
+            ],
+          },
+          {
+            name: 'Cycle plan',
+            columns: ['Ticket', 'Points'],
+            rows: [
+              { cells: ['Write the release notes', '2'], fields: [['Cycle', 'Cycle 1']] },
+              { cells: ['Agree what goes in the next cycle', '1'], fields: [['Cycle', 'Cycle 1']] },
+              { cells: ['Fix the sign-in link that expires too soon', '3'], fields: [['Cycle', 'Cycle 1']] },
+              { cells: ['Wait on the design for the settings screen', '5'], fields: [['Cycle', 'Cycle 1']] },
+            ],
+          },
+        ],
+        questions: [
+          {
+            from: 'Claude',
+            question: 'Move “Fix the sign-in link that expires too soon” to Done?',
+            change: 'The fix is written, and it is waiting in review.',
+          },
+        ],
+        rules: [
+          {
+            name: 'Ask about a missed day',
+            starts: 'When a row in Projects is added or changed',
+            only: 'It is still in play and the day it aimed for has passed',
+            then: 'Asks you on Decide to move the day or park it',
+          },
+        ],
         holds: ['Team', 'Cycles', 'Agent work', 'Board', 'Tickets', 'Cycle plan', 'Teammates'],
       },
       {
@@ -408,37 +644,50 @@ export const site = {
           { title: 'What will it be called?', value: 'Open', note: 'a choice to make' },
           { title: 'Next step', value: 'In 2 days', note: 'Write one sentence about what this is' },
         ],
+        /* `home-guide`'s `Your next steps`, the three steps in order. */
+        soon: { heading: 'Your next steps', list: 'Steps', rows: [0, 1, 2] },
+        /* `guide.ts` `seeds`: the six milestones in order with their stage and state, the three
+           steps and the one choice. No module, so no rule. The question is the liberty `decide`
+           names, about the choice that is open. */
+        lists: [
+          {
+            name: 'Milestones',
+            columns: ['Milestone', 'Stage', 'State'],
+            rows: [
+              { cells: ['Say what it is and who it is for', 'Idea', 'Underway'] },
+              { cells: ['Find the people who want it', 'Idea', 'Not started'] },
+              { cells: ['Plan the smallest first version', 'Plan', 'Not started'] },
+              { cells: ['Make the first version', 'Build', 'Not started'] },
+              { cells: ['Share it with the first people', 'Launch', 'Not started'] },
+              { cells: ['Keep it going and learn from it', 'Grow', 'Not started'] },
+            ],
+          },
+          {
+            name: 'Steps',
+            columns: ['Step', 'State', 'By'],
+            rows: [
+              { cells: ['Write one sentence about what this is and who it is for', 'To do', 'In 2 days'] },
+              { cells: ['Name three people who would use it', 'To do', 'In 5 days'] },
+              { cells: ['Ask one of them what they would want first', 'To do', 'In 9 days'] },
+            ],
+          },
+          {
+            name: 'Choices',
+            columns: ['Question', 'State'],
+            rows: [{ cells: ['What will it be called?', 'To make'] }],
+          },
+        ],
+        questions: [
+          {
+            from: 'Claude',
+            question: 'Add a step to write down five names?',
+            change: 'For the open choice, “What will it be called?”, by the end of the week.',
+          },
+        ],
+        rules: [],
         holds: ['Your project', 'Guide', 'Milestones', 'Steps', 'Choices', 'Resources'],
       },
     ],
-  },
-
-  /**
-   * THE OWNER'S OWN CASE: numbers arriving from the projects themselves, drawn as dashboards.
-   * `caption` says where the numbers in the picture came from, because a dashboard with no
-   * provenance is a mock-up.
-   *
-   * THE SPECIFICATION THAT USED TO LIE ON THIS PICTURE IS GONE FROM THE PAGE. It was four rows of
-   * what a report key can and cannot do (write only, one register, 100 rows and 256 KB a call, 600
-   * rows a minute), every figure read off `packages/record/src/report.ts:1-30`, and every one of
-   * them true. It is also a table of limits on a credential, which is a thing a reader wants at the
-   * moment they are about to paste one into a deploy script and at no moment before that. §19 puts
-   * it plainly: what is worth keeping belongs on a page a curious reader reaches on purpose. There
-   * is no such page on this site yet, so the rows are recorded here and drawn nowhere, and the
-   * band is about two hundred and thirty pixels shorter for it.
-   */
-  report: {
-    tag: 'Reported',
-    title: 'Your projects report. Your dashboards draw.',
-    lead: 'Give a project a report key, or an address to poll. The numbers arrive and the tiles draw.',
-    caption: 'sixty days of rows, written the way a project reports them',
-    /* `region` WENT WITH THE SCROLLING BOX IT NAMED. It was the accessible name of a 420px window
-       a reader had to scroll, and there is no window now: the picture is painted at its own size
-       and the band clips what will not fit. This file's own rule is that a key nothing renders is
-       deleted rather than kept for later. */
-    alt:
-      "A founder's Dashboard: cash across organisations, the balance of each, and active users, " +
-      'recurring revenue and signups drawn against the thirty days before.',
   },
 
   /**
@@ -452,7 +701,7 @@ export const site = {
    *
    *   - `A register is a typed collection: money, services, people.` WENT, on 2026-09-22. It was
    *     the one sentence on the site that taught the word by example, and it opened the band, so
-   *     the first thing band 0003 asked of a reader was to learn a term of the product's own
+   *     the first thing the mechanism band asked of a reader was to learn a term of the product's own
    *     plumbing. Nothing else on the home page uses the word, so there was nothing left for the
    *     definition to serve: `test/content.test.ts` now fails if `register` reaches the home page
    *     without the sentence that teaches it, and still checks the examples if it comes back.
@@ -647,8 +896,13 @@ export const site = {
      * takes, and the two actions are honest: the app opens, and the pricing is there to read. What the
      * heading has to stop doing is instruct. The day `/auth/provision` answers, `Start your record` is
      * the right heading again and this comment is how somebody knows it.
+     *
+     * IN TWO HALVES, LIKE THE HERO'S, so the last three words can carry the accent. The band under
+     * it was a whole field of red until 22 September, when the owner asked for it to be much less
+     * red; the colour now lives in these words and nowhere else on the band.
      */
-    title: 'What would you keep in it?',
+    title: 'What would you',
+    titleAccent: 'keep in it?',
     /* IT SAID `The demo is a made-up business`, and there is no demo. What is true and is the
        better sentence anyway: making a record is two answers long. `/start` asks who you are and
        what the record is for, and arranges the rest from those (`packages/seed/src/usecases`).
@@ -894,9 +1148,9 @@ export const site = {
           { label: 'Changelog', href: '/changelog' },
           { label: 'GitHub', href: 'https://github.com/actuallyhoss/BrainDog' },
           /* THE FOOTER AND NOT THE HEADER: the hero says there is no sign-up, and a sign-in beside
-             it would contradict the sentence a reader has just been given. A literal and not
-             `${APP}/signin`, because `APP` is declared below `site` in this module. */
-          { label: 'Sign in', href: 'https://app.brain.dog/signin' },
+             it would contradict the sentence a reader has just been given. Built from `APP`, so the
+             app's address is written once. */
+          { label: 'Sign in', href: `${APP}/signin` },
         ],
       },
       {
@@ -907,20 +1161,3 @@ export const site = {
     ],
   },
 } as const;
-
-/**
- * The addresses, in one place.
- *
- * `SOURCE` IS PUBLISHED AHEAD OF THE REPOSITORY GOING PUBLIC, on the owner's word, 2026-09-16. The
- * repository is private until the product launches, and the link is on the site now so it is
- * already in place on the day it opens.
- *
- * `DOCS` AND `BUILD` ARE STILL `null`. They point inside the repository at pages that are not
- * written for a stranger yet. `null` and not a different URL, so every call site has to decide what
- * to draw when there is no address, and the type makes it decide.
- */
-export const APP = 'https://app.brain.dog';
-export const SOURCE: string | null = 'https://github.com/actuallyhoss/BrainDog';
-export const DOCS: string | null = null;
-/** The build instructions, which is what a self-hoster is actually sent to. */
-export const BUILD: string | null = null;

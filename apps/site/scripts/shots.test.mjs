@@ -1,16 +1,14 @@
 /**
- * Every file in `static/shots/` is one the site asks for, and neither capture script writes another.
+ * Every file in `static/shots/` is one the site asks for, and no capture script writes another.
  *
  *   node --test apps/site/scripts/shots.test.mjs
  *
- * THIRTY-THREE FILES AND NINE READERS. On 22 September `static/shots/` held 33 captures, 5.2 MB on
- * disk, and the built site named 9 of them: every `/shots/` token in `build/*.html` and the page
- * chunk was extracted, and `apps/site/src` holds the same 9 as literals and no `/shots/${...}`
- * template. The other 24 were deployed to Cloudflare on every push and fetched by nobody. They were
- * there because `product.mjs` still photographed five screens the page had stopped drawing, and
- * `usecases.mjs` wrote its founder home capture beside the dashboard one the page actually serves.
- * Deleting the files by hand fixes that once; the next run of either script puts them straight
- * back, which is why the scripts' lists are held to the page here too.
+ * ONE FILE AND ONE READER. `static/shots/` held 33 captures on 22 September and the built site named
+ * 9; the next day the owner said of the screenshots on the home page *i hate those screenshots. they
+ * look terrible*, and the home page stopped drawing any. What is left is the link preview,
+ * `home-light.png`, which `app.html` names as the `og:image`. Deleting the files by hand fixes that
+ * once; the next run of a capture script puts them straight back, which is why the scripts are held
+ * to the page here too.
  *
  * THE SCRIPTS ARE READ AS TEXT AND NOT IMPORTED, because importing either one runs it: both open a
  * browser at the top level, and `product.mjs` binds a port the browser gates share.
@@ -25,10 +23,6 @@ const SITE = join(import.meta.dirname, '..');
 const SRC = join(SITE, 'src');
 const SHOTS = join(SITE, 'static', 'shots');
 
-/* The two passes both scripts make, wide then phone, each in both schemes. */
-const SIZES = ['', '-phone'];
-const SCHEMES = ['light', 'dark'];
-
 function sources(dir) {
   return readdirSync(dir, { withFileTypes: true, recursive: true })
     .filter((e) => e.isFile() && /\.(svelte|ts|js|html|css)$/.test(e.name))
@@ -42,27 +36,11 @@ function referenced() {
   return names;
 }
 
-/** Every name a SHOTS entry in `product.mjs` makes: a WebP per size and scheme, and a PNG when it asks. */
+/** Every name a SHOTS entry in `product.mjs` makes: one light PNG each. */
 function productWrites() {
   const text = readFileSync(join(import.meta.dirname, 'product.mjs'), 'utf8');
   const list = text.slice(text.indexOf('const SHOTS = ['), text.indexOf('];', text.indexOf('const SHOTS = [')));
-  const out = [];
-  for (const m of list.matchAll(/\{\s*name:\s*'([^']+)'[^}]*\}/g)) {
-    for (const size of SIZES) for (const scheme of SCHEMES) out.push(`${m[1]}${size}-${scheme}.webp`);
-    if (/png:\s*true/.test(m[0])) out.push(`${m[1]}-light.png`);
-  }
-  return out;
-}
-
-/** The base names `usecases.mjs` lets into `static/shots/`, from its SHIPPED list. */
-function usecaseWrites() {
-  const text = readFileSync(join(import.meta.dirname, 'usecases.mjs'), 'utf8');
-  const list = /const SHIPPED = new Set\(\[([^\]]*)\]\)/.exec(text);
-  assert.ok(list, 'usecases.mjs declares no SHIPPED list, so every capture it takes is written into static/shots');
-  const out = [];
-  for (const m of list[1].matchAll(/'([^']+)'/g))
-    for (const size of SIZES) for (const scheme of SCHEMES) out.push(`${m[1]}${size}-${scheme}.webp`);
-  return out;
+  return [...list.matchAll(/\{\s*name:\s*'([^']+)'[^}]*\}/g)].map((m) => `${m[1]}-light.png`);
 }
 
 test('the site names its captures as literals, so a literal scan sees all of them', () => {
@@ -92,9 +70,8 @@ test('product.mjs writes nothing the site does not name', () => {
   assert.deepEqual(writes.filter((f) => !names.has(f)), []);
 });
 
-test('usecases.mjs lets nothing into static/shots that the site does not name', () => {
-  const names = referenced();
-  const writes = usecaseWrites();
-  assert.ok(writes.length > 0, 'no SHIPPED entry parsed out of usecases.mjs');
-  assert.deepEqual(writes.filter((f) => !names.has(f)), []);
+test('usecases.mjs writes nothing into static/shots', () => {
+  /* It photographs for a person to look at, into the directory `--png=` names, and never ships. */
+  const text = readFileSync(join(import.meta.dirname, 'usecases.mjs'), 'utf8');
+  assert.doesNotMatch(text, /['"]static['"],\s*['"]shots['"]/, 'usecases.mjs builds a path into static/shots again');
 });

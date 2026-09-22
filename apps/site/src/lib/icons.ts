@@ -8,7 +8,7 @@
  *
  * TWO SOURCES, KEPT APART BY NAME. The first block is the app's shell set,
  * `apps/web/src/lib/ui/icons.ts`, under the app's own names: it is what the record's rail draws
- * beside every page and list, and band 0001's miniature rail draws the same rows, so it takes the
+ * beside every page and list, and the home page's drawn app draws the same rows, so it takes the
  * same glyph under the same key (`rail.ts` says which, and `arrange.test.ts` checks every path
  * byte for byte against the app's file). The second block is Lucide, under Lucide's names, taken
  * from `packages/render/src/glyphs` where the renderer keeps it: one glyph per use case, the one
@@ -27,6 +27,9 @@ export const PATHS = {
   check: 'm5 12 5 5L19 6',
   close: 'M6 6l12 12M18 6 6 18',
   rows: 'M4 6h16M4 12h16M4 18h16',
+  /* The drawn app's back link and its Automations entry, under the app's own names. */
+  back: 'M19 12H5m6-6-6 6 6 6',
+  refresh: 'M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5',
 
   /* The app's rail glyphs, for the rows `rail.ts` names. */
   home: 'M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-4v-5h-6v5H5a1 1 0 0 1-1-1z',

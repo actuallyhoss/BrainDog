@@ -98,18 +98,14 @@
   }
 
   /**
-   * A BAND'S GROUND, in four values, and one of them is "the page".
+   * A BAND'S GROUND, in three values, and one of them is "the page".
    *
    * `page` is written rather than assumed so a section that changes its mind is one attribute
    * value, and so the list of grounds this site has is readable in one place.
    *
-   * `brand` IS THE ACCENT AS A WHOLE FIELD, and `--accent-ink` is the token the theme already
-   * solves against `--accent` for exactly this: it is what a filled accent control puts its label
-   * in, so the pair is certified in both schemes by `packages/theme/src/checks.ts`. On this ground
-   * there is no secondary text colour at all, and that is deliberate: every candidate mix of
-   * `--accent-ink` towards `--accent` came out between 3.9:1 and 4.4:1, under the body floor, so
-   * hierarchy on a brand band is made with size and weight instead. `--line` there is decoration
-   * rather than text and only has to clear 3:1.
+   * THERE WAS A FOURTH, `brand`, the accent as a whole field under the home page's closing band. The
+   * owner asked on 22 September for that band to be much less red, it went back to the page ground
+   * with the accent in its heading, and a ground nothing uses was deleted with it.
    */
   [data-ground] {
     background: var(--bg);
@@ -169,24 +165,6 @@
     --accent-text: var(--flip-ink);
   }
 
-  [data-ground='brand'] {
-    --bg: var(--accent);
-    --ink: var(--accent-ink);
-    --ink2: var(--accent-ink);
-    --dim: var(--accent-ink);
-    --line: color-mix(in srgb, var(--accent-ink) 42%, var(--accent));
-    --line-soft: color-mix(in srgb, var(--accent-ink) 24%, var(--accent));
-    --s1: color-mix(in srgb, var(--accent-ink) 12%, var(--accent));
-    --s2: color-mix(in srgb, var(--accent-ink) 18%, var(--accent));
-    --hover-wash: color-mix(in srgb, var(--accent-ink) 14%, transparent);
-    --primary-hover: color-mix(in srgb, var(--ink) 88%, var(--bg));
-    /* Same reason as the flipped band above, and a sharper case: `--accent-text` against
-       `--accent` is a dark magenta on a magenta field in light and a light pink on it in dark, so
-       the focus ring on the page's closing action would be about 2:1. `--accent-ink` is the token
-       the theme solves against this exact ground. */
-    --accent-text: var(--accent-ink);
-  }
-
   /**
    * THE READING COLUMN, and the number was already right.
    *
@@ -202,16 +180,11 @@
   }
 
   /**
-   * THE BAND OPENER: a sequence number, a rule that runs to the far edge, and a word.
+   * THE BAND OPENER: a word, and a rule that runs from it to the far edge of the column.
    *
-   * The sequence numbers are the one thing this page does that none of the four references do, and
-   * `research-site-reference.md` ranks the way they were drawn ninth on its list of faults: the
-   * best idea on the page at the quietest possible volume, costing a 96px gutter on every band to
-   * carry four `--dim` characters at 12px. So the gutter is gone and the number is in the accent,
-   * which is what FirstLook does with the same device (`counter(s, decimal-leading-zero)` in cyan
-   * mono at 13px). The rule between the number and the label is the thing that actually earns its
-   * place: it is 1px of ink running the entire width of the column, on a page where the median row
-   * of ink used to stop at x=389 of 1440.
+   * It carried a sequence number in the accent, `0001` upwards, until 22 September, when the owner
+   * asked for the numbering to go. The rule is what earns the opener its place: 1px of ink across
+   * the whole column, on a page where the median row of ink once stopped at x=389 of 1440.
    */
   .band-mark {
     display: flex;
@@ -220,11 +193,6 @@
     margin-block-end: var(--sp-5);
     font-family: var(--font-id);
     font-size: var(--t-xs);
-  }
-
-  .band-seq {
-    color: var(--accent-text);
-    font-variant-numeric: tabular-nums;
   }
 
   .band-rule {

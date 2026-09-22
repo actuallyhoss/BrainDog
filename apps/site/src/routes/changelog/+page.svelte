@@ -148,9 +148,8 @@
 <section class="band" data-ground="sunk">
   <div class="head">
     <p class="band-mark">
-      <span class="band-seq">0001</span>
-      <span class="band-rule"></span>
       <span class="band-tag">Where it stands</span>
+      <span class="band-rule"></span>
     </p>
     <h1 class="title">{site.nav.changelog}</h1>
   <p class="lede">{site.changelog.lede}</p>

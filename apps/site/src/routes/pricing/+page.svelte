@@ -23,7 +23,7 @@
   line was the emptiest screen on the site. So both seams are inversions, the table is the band that
   turns over, and no two bands open the same way: the first with no mark at all (an eyebrow over
   the `h1` is a regression `DIRECTION.md` §1 lists by name), the table with the one-line opener the
-  home page gives its 0003, and the last with the plain mark. `bands.test.ts` beside this file holds
+  home page gives its mechanism band, and the last with the plain mark. `bands.test.ts` beside this file holds
   all three.
 -->
 <script lang="ts">
@@ -92,7 +92,6 @@
 <section class="band" data-ground="flip" aria-labelledby="compare-title">
   <div class="in">
     <div class="band-mark band-mark-line">
-      <span class="band-seq">0001</span>
       <h2 class="title" id="compare-title">{p.compareTitle}</h2>
       <span class="band-rule"></span>
       <span class="band-tag">Side by side</span>
@@ -137,14 +136,12 @@
 <!-- THE LAST BAND WAS A 16px HEADING AND TWO LINES IN THE LEFT HALF OF A 1,136px COLUMN, which is
      the emptiness fault the home page was rebuilt to remove, on the page that asks for money. The
      question is a heading at the size of a heading, and the answer sits beside it so the row
-     reaches both edges. It is the one band here with the plain mark, and on the page's own ground
-     that is the one place on this page the sequence number is drawn in the accent. -->
+     reaches both edges. It is the one band here with the plain mark: its tag and a rule. -->
 <section class="band" data-ground="page" aria-labelledby="honest-title">
   <div class="in">
     <p class="band-mark">
-      <span class="band-seq">0002</span>
-      <span class="band-rule"></span>
       <span class="band-tag">{p.honestTag}</span>
+      <span class="band-rule"></span>
     </p>
     <!-- THE CAP GOES ON THE PARAGRAPH AND NOT ON `.in`. `.in` is `margin-inline: auto`, so
          narrowing the element that carries it centred the whole block in the page: the one section
@@ -190,7 +187,7 @@
     letter-spacing: var(--tr-tight);
   }
 
-  /* THE ONE-LINE OPENER, the home page's 0003 treatment. A `div` and not a `p`, because it carries
+  /* THE ONE-LINE OPENER, the home page's mechanism band treatment. A `div` and not a `p`, because it carries
      the band's `h2` and a heading inside a paragraph is markup a validator refuses. The heading
      takes the mark's baseline and the rule runs from the end of its words to the tag. */
   .band-mark-line {

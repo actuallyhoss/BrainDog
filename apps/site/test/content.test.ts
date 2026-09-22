@@ -216,8 +216,8 @@ test('every page links GitHub and the legal page', when(NO_BUILD), () => {
  * defect to catch and the one that keeps recurring, because the registers get renamed in the seed
  * and the marketing copy is not next to them.
  *
- * THE SENTENCE LEFT THE PAGE ON 2026-09-22, AND THIS CHECK USED TO THROW WHEN IT DID. Band 0003
- * opened on it, which asked a reader to learn a word of the product's plumbing before anything
+ * THE SENTENCE LEFT THE PAGE ON 2026-09-22, AND THIS CHECK USED TO THROW WHEN IT DID. The
+ * mechanism band opened on it, which asked a reader to learn a word of the product's plumbing before anything
  * else in the band, and `loop/research-site-now.md` ranked taking it out as part of the page's
  * value-first rewrite. The throw was right for the page it was written for: the sentence going
  * missing while the word stayed would leave a stranger reading a term nobody had defined. So that
@@ -276,7 +276,7 @@ test('every register the copy names by example is one the seed declares', when(N
 /**
  * THE HOME PAGE NAMES NO ROW BY ITS ADDRESS.
  *
- * WHAT THIS USED TO CHECK, AND WHY IT TURNED ROUND. The ledger in band 0003 named the record's own
+ * WHAT THIS USED TO CHECK, AND WHY IT TURNED ROUND. The ledger in the mechanism band named the record's own
  * rows the way the record writes them (`Moved tasks#12 from open to done`, `Created services#6`),
  * and this test held every `register#n` it served to a register the seed declares. It caught real
  * renames. What it could not catch was that the addresses were the fault: a stranger has no record,
@@ -314,8 +314,8 @@ test('the home page names no row by its address', when(NO_BUILD), async () => {
  * `hero.sub` read *Every change is an event, and the log only grows*: true, audited, and the most
  * technical words above the fold, on the one screen §19 is explicit about (*shows the value, not
  * what it does technically, at least not for the first blocks*). The words below are the ones that
- * sentence and its predecessors reached for. They are all still allowed further down, where band
- * 0003 is the mechanism on purpose.
+ * sentence and its predecessors reached for. They are all still allowed further down, where the
+ * mechanism band is about mechanism on purpose.
  */
 test('the hero sentence names no mechanism', async () => {
   type Copy = { site: { hero: { sub: string } } };
@@ -526,7 +526,7 @@ test('the home page counts none of the product own parts at a stranger', when(NO
 });
 
 /**
- * THE HOME PAGE IS FIVE BANDS, AND THE PRODUCT IS IN THE FIRST ONE.
+ * THE HOME PAGE IS AT MOST FIVE BANDS, THE PRODUCT IS IN THE FIRST ONE, AND IT IS DRAWN.
  *
  * Two measurements, one test, because they are the same complaint. `loop/DIRECTION.md` §19:
  * *i dont like how it's so long, and it's all records and text. i want it to be more graphical, and
@@ -540,13 +540,18 @@ test('the home page counts none of the product own parts at a stranger', when(NO
  * reasonable decision at a time. Six would pass this and be a regression worth arguing about, which
  * is why the bound is the number the page actually has rather than a round one above it.
  *
- * THE ORDER, AS THE ONE THING IN THE MARKUP THAT SHOWS IT. A `<picture>` inside the first band means
- * the product's own screen is on the first screen. It was in the SECOND band, 235px of mark, heading
- * and lead below the hairline that opened it, and the first band held a five-row ledger and four
- * counted figures instead. There is no way to check "graphical" from bytes, but there is a way to
- * check that the picture is not below the fold of the argument, and that was the fault.
+ * THE ORDER, AS THE ONE THING IN THE MARKUP THAT SHOWS IT. The first band has to hold the product,
+ * and since 22 September the product is the drawn app: its case tabs are the `role="tablist"` this
+ * reads. It was once in the SECOND band, 235px of mark, heading and lead below the hairline that
+ * opened it, with a five-row ledger and four counted figures in the first. There is no way to check
+ * "graphical" from bytes, but there is a way to check that the product is not below the fold of the
+ * argument, and that was the fault.
+ *
+ * AND NO PHOTOGRAPH OF IT. The owner said of the screenshots this page carried *i hate those
+ * screenshots. they look terrible. dont just add scnreehots like that*. A `<picture>` or an `<img>`
+ * coming back into the home page is that regression, so it fails here by name.
  */
-test('the home page is five bands and opens on the product', when(NO_BUILD), () => {
+test('the home page is at most five bands, opens on the drawn product, and holds no screenshot', when(NO_BUILD), () => {
   const html = uncommented(read('index.html'));
 
   const bands = [...html.matchAll(/<section class="band\b/g)];
@@ -561,11 +566,14 @@ test('the home page is five bands and opens on the product', when(NO_BUILD), () 
   const first = html.slice(bands[0]?.index ?? 0, bands[1]?.index ?? html.length);
   assert.match(
     first,
-    /<picture\b/,
-    "the first band of index.html holds no product picture, so the page opens on words again. The " +
-      'screens are the best thing this product has and the fault they were part of was being used ' +
-      'as illustrations beside prose further down.',
+    /\srole="tablist"/,
+    'the first band of index.html does not hold the drawn app, so the page opens on words again. The ' +
+      'product is the best thing this page has, and the fault it was once part of was being used as ' +
+      'an illustration beside prose further down.',
   );
+
+  const pictures = [...html.matchAll(/<(?:picture|img)\b[^>]*>/g)].map((m) => m[0]);
+  assert.deepEqual(pictures, [], 'index.html draws a photograph again, where the product on this page is drawn in HTML and CSS');
 });
 
 /**

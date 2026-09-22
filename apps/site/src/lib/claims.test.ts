@@ -73,22 +73,6 @@ test('the hosted backup cell does not promise copies while the sealing key is a 
   }
 });
 
-test('the hero caption does not credit a build that photographs nothing', () => {
-  /* THE CAPTION SAID `photographed on the day this build was made`. The build is `package.json`'s
-     `build` script, and it runs the theme and Vite: the capture is `scripts/product.mjs`, which a
-     person runs by hand. So a caption that dates the picture by the build is true only on the day
-     somebody happens to run both, and false on every deploy after. */
-  const scripts = (JSON.parse(readFileSync(new URL('package.json', SITE), 'utf8')) as { scripts: Record<string, string> }).scripts;
-  const captures = /product\.mjs|shot\.mjs/.test(scripts.build ?? '');
-  if (!captures) {
-    assert.doesNotMatch(
-      site.hero.caption,
-      /\bbuild\b|\btoday\b|\bnow\b/i,
-      `the build script is "${scripts.build}", which takes no photograph, and the caption says "${site.hero.caption}"`,
-    );
-  }
-});
-
 test('the column over the Spark line does not call it unbuilt while both hosts wire the engine', () => {
   /* `loop/research-site-now.md`, claim 3. The line under the head was careful; the head was not, and
      the head is what a stranger reads. Both files are read rather than trusted, so the day one host

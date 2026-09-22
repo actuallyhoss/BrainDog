@@ -1,5 +1,5 @@
 /**
- * The glyph the app's rail draws beside each name band 0001's miniature rail names.
+ * The glyph the app's rail draws beside each name the home page's drawn rail names.
  *
  * READ OFF THE SEED, NOT CHOSEN. Every one of these is the `icon:` the page or list is declared
  * with in `packages/seed`, found by walking each use case the way `test/content.test.ts` walks it

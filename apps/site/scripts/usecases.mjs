@@ -1,26 +1,16 @@
 /**
- * The "Who it's for" screenshots on brain.dog: one fresh self-hosted record per use case, set up the
- * way a stranger would set it up, through /start, and photographed on the page that use case opens on.
+ * One fresh self-hosted record per use case, set up the way a stranger would set it up, through
+ * /start, and photographed on the page that use case opens on, FOR A PERSON TO LOOK AT.
  *
- *   node scripts/usecases.mjs                          # the captures the site serves
- *   node scripts/usecases.mjs --png=<dir>              # and every use case, as PNGs, to look at
+ *   node scripts/usecases.mjs --png=<dir>              # every use case, as PNGs
  *   node scripts/usecases.mjs --png=<dir> student team # just these
  *
- * WHAT THE SITE ACTUALLY SERVES TODAY IS ONE OF THESE: usecase-founder-dashboard-<scheme>.webp, in
- * the band about projects reporting their own numbers. The five use cases are drawn on the home
- * page by a switcher now rather than by five photographs, because five pictures of five
- * arrangements of the same application, each painted below full size, were five pictures a reader
- * could not read and could not tell apart. The rest are still worth taking, because they are the
- * cheapest way to see what a stranger actually gets out of /start, but they go to `--png=<dir>`
- * for a person to look at and never into `static/shots/`.
- *
- * "DO NOT COMMIT THE ONES NO PAGE ASKS FOR" WAS THE RULE HERE, AND IT WAS NOT KEPT. This header
- * said so while the script wrote every capture into `static/shots/`, and on 22 September four of
- * them were tracked and deployed: `usecase-founder[-phone]-<scheme>.webp`, the founder's home,
- * 609,036 bytes that no page names. A rule a script's own output breaks on every run is a rule
- * that depends on somebody deleting files by hand, so the script now decides: SHIPPED below is the
- * list of what goes to `static/shots/`, and `scripts/shots.test.mjs` fails if it names a capture
- * `apps/site/src` does not.
+ * NOTHING HERE SHIPS. It used to write the founder's dashboard into `static/shots/` for a band on
+ * the home page. On 22 September the owner said of the screenshots on that page *i hate those
+ * screenshots. they look terrible*; the band went and the page draws the app in HTML and CSS
+ * instead, so the WebP pass, its encoder and the list of shipped captures went with it. What is left
+ * is the cheapest way to see what a stranger actually gets out of /start, and that is a picture for
+ * whoever is checking the drawn app in `src/lib/copy.ts` against the real one.
  *
  * Each capture is taken at 1440 by 900 (2x) and at 390 by 844 (3x) as `-phone`, in both schemes,
  * named usecase-<id>[-<page>][-phone]-<scheme>, where <page> is any further page a use case lists
@@ -51,15 +41,7 @@ import { chromium } from '@playwright/test';
 
 const REPO = join(import.meta.dirname, '..', '..', '..');
 const MAIN = join(REPO, 'apps', 'selfhost', 'src', 'main.ts');
-const OUT = join(import.meta.dirname, '..', 'static', 'shots');
 const RESERVED = new Set([5189, 5317]);
-
-/**
- * THE CAPTURES THE SITE SERVES, by the name before the size and scheme. Only these are written to
- * `static/shots/`, as WebP. `+page.svelte` draws the founder dashboard in the band about projects
- * reporting their own numbers, and that is the one reader any capture of this script has.
- */
-const SHIPPED = new Set(['usecase-founder-dashboard']);
 
 /** Each use case: the chip it is offered under on /start, who the person is, and what they said it is for. */
 const CASES = [
@@ -71,7 +53,7 @@ const CASES = [
     chip: 'Solo founder',
     who: 'Jordan Hale, founder',
     about: 'I run a few companies and want dashboards for the numbers my apps report.',
-    /* AND THE DASHBOARD, which the founder section of the site draws beside the story of numbers arriving. */
+    /* AND THE DASHBOARD, the page the founder's reported numbers draw on. */
     more: [{ name: 'dashboard', route: '/p/dashboard' }],
     prime: reportNumbers,
   },
@@ -181,19 +163,16 @@ if (!existsSync(join(REPO, 'apps', 'web', 'build', 'index.html'))) {
   process.exit(1);
 }
 
-/** `--png=<dir>` also keeps each PNG there, for a person to look at before the WebPs ship. */
+/** `--png=<dir>` is where the PNGs go, and without it there is nothing to do. */
 const PNG = process.argv.find((a) => a.startsWith('--png='))?.slice('--png='.length) ?? null;
+if (!PNG) {
+  console.error('  nothing to write: pass --png=<dir>. This script ships nothing to the site.');
+  process.exit(1);
+}
 const wanted = process.argv.slice(2).filter((a) => !a.startsWith('-'));
-/* WITHOUT `--png` A USE CASE WITH NOTHING SHIPPED WOULD BE A RECORD MADE AND THROWN AWAY, a fresh
-   init and a /start run each, so the default is only the use cases that have a served capture. */
 const base = (c, view) => `usecase-${c.id}${view.name ? `-${view.name}` : ''}`;
-const views = (c) => [{ name: '', route: '/' }, ...(c.more ?? [])].filter((v) => PNG || SHIPPED.has(base(c, v)));
-const cases = (wanted.length ? CASES.filter((c) => wanted.includes(c.id)) : CASES).filter((c) => views(c).length > 0);
-/* A NAMED USE CASE THAT FILTER DROPS IS SAID, NOT SWALLOWED. `node scripts/usecases.mjs student` used
-   to write student captures; after SHIPPED it launched a browser, made no record, wrote nothing and
-   printed nothing, which reads exactly like a run that worked. */
-const dropped = wanted.filter((id) => CASES.some((c) => c.id === id) && !cases.some((c) => c.id === id));
-if (dropped.length) console.log(`  ${dropped.join(', ')}: nothing of theirs ships, so nothing is taken without --png=<dir>`);
+const views = (c) => [{ name: '', route: '/' }, ...(c.more ?? [])];
+const cases = wanted.length ? CASES.filter((c) => wanted.includes(c.id)) : CASES;
 if (!cases.length) process.exit(0);
 
 /**
@@ -261,24 +240,8 @@ async function setUp(page, base, c) {
   return true;
 }
 
-await import('node:fs/promises').then((fs) => fs.mkdir(OUT, { recursive: true }));
+await import('node:fs/promises').then((fs) => fs.mkdir(PNG, { recursive: true }));
 const browser = await chromium.launch();
-const encoder = await browser.newPage();
-
-async function webp(png, file) {
-  const b64 = await encoder.evaluate(async (src) => {
-    const img = new Image();
-    img.src = `data:image/png;base64,${src}`;
-    await img.decode();
-    const canvas = new OffscreenCanvas(img.naturalWidth, img.naturalHeight);
-    canvas.getContext('2d').drawImage(img, 0, 0);
-    const bytes = new Uint8Array(await (await canvas.convertToBlob({ type: 'image/webp', quality: 0.88 })).arrayBuffer());
-    let out = '';
-    for (let i = 0; i < bytes.length; i += 0x8000) out += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-    return btoa(out);
-  }, png.toString('base64'));
-  await writeFile(file, Buffer.from(b64, 'base64'));
-}
 
 const skipped = [];
 try {
@@ -316,25 +279,11 @@ try {
             await page.goto(`${host.base}${view.route}`, { waitUntil: 'networkidle' });
             await page.waitForSelector('main#main[data-screen]', { timeout: 10000 }).catch(() => {});
             await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
-            /* THE HEADER'S TWO CONTROLS ARE HIDDEN IN A SHIPPED CAPTURE, AND KEPT IN ITS LAYOUT. The
-               site's 0002 card lies on the picture's top strip across the reading column only, so
-               `How this is built` and `Edit layout` stood out to its right, cut by the card's edge,
-               in the shots of 22 September: a stranger reads a button sliced in half as a broken
-               page. `visibility` rather than `display` so nothing moves and the source rows the
-               page's overlap is measured against (`+page.svelte`, row 202) stay where they were. */
-            if (SHIPPED.has(base(c, view)))
-              await page.addStyleTag({ content: '.source-slot,.arrange-slot{visibility:hidden !important}' });
             await page.waitForTimeout(400);
             const png = await page.screenshot();
             const name = `${base(c, view)}${size.suffix}-${scheme}`;
-            if (SHIPPED.has(base(c, view))) {
-              await webp(png, join(OUT, `${name}.webp`));
-              console.log(`  static/shots/${name}.webp`);
-            }
-            if (PNG) {
-              await writeFile(join(PNG, `${name}.png`), png);
-              console.log(`  ${join(PNG, `${name}.png`)}`);
-            }
+            await writeFile(join(PNG, `${name}.png`), png);
+            console.log(`  ${join(PNG, `${name}.png`)}`);
           }
           await context.close();
         }

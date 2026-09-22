@@ -12,12 +12,14 @@
   on the old 960px document layout on purpose, and the purpose was sound as far as it went: a
   licence is read, not sold, so it keeps a reading measure and gets no picture, no ledger and no
   brand field. What did not survive a second look is that it also kept a DIFFERENT SKELETON. Every
-  other route opens each section with a sequence number against a hairline that runs the width of
+  other route opens each section with a hairline that runs the width of
   the column, and changes ground where one idea stops; this one had neither, so a reader arriving
   from the footer met a page that looked like somebody else's.
 
-  So the three sections are bands with the site's own opener and the site's own two grounds, and
-  the PROSE keeps its 68ch measure inside them. The document layout was right about the words and
+  So the three sections are bands on the site's own two grounds with a hairline at each seam, and
+  the PROSE keeps its 68ch measure inside them. They carried the site's opener too, a sequence
+  number and a rule with no word after it, because here the heading is the label; when the numbers
+  went on 22 September a bare rule over a heading was all that was left, so it went with them. The document layout was right about the words and
   wrong about the frame around them.
 -->
 <script lang="ts">
@@ -37,23 +39,12 @@
 
 <section class="band head" data-ground="sunk">
   <div class="in">
-    <!-- NO WORD AFTER THE RULE ON THIS PAGE. Elsewhere the mark carries a short label because the
-         heading under it is a sentence; here the heading IS the label, and printing `LEGAL` twice
-         one line apart is the page counting one word as two. -->
-    <p class="band-mark">
-      <span class="band-seq">0001</span>
-      <span class="band-rule"></span>
-    </p>
     <h1 class="title">{l.title}</h1>
   </div>
 </section>
 
 <section class="band" data-ground="page" aria-labelledby="licence-title">
   <div class="in part">
-    <p class="band-mark">
-      <span class="band-seq">0002</span>
-      <span class="band-rule"></span>
-    </p>
     <h2 class="part-title" id="licence-title">{l.licence.title}</h2>
     {#each l.licence.body as paragraph}
       <p class="part-body">{paragraph}</p>
@@ -69,10 +60,6 @@
 
 <section class="band" data-ground="sunk" aria-labelledby="terms-title">
   <div class="in part">
-    <p class="band-mark">
-      <span class="band-seq">0003</span>
-      <span class="band-rule"></span>
-    </p>
     <h2 class="part-title" id="terms-title">{l.terms.title}</h2>
     <p class="part-body">{l.terms.body}</p>
   </div>
@@ -113,10 +100,6 @@
 
   .part > * {
     max-inline-size: 68ch;
-  }
-
-  .part .band-mark {
-    max-inline-size: none;
   }
 
   .part-title {

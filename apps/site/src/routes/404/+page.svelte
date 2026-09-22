@@ -26,14 +26,6 @@
 
 <section class="band head" data-ground="sunk">
   <div class="in">
-    <!-- THE SEQUENCE NUMBER IS THE STATUS CODE. Every other band on the site counts 0001 upwards
-         because the record it sells is append-only; this page is not part of that sequence and
-         saying 0001 here would be the device used as decoration. The response really is a 404,
-         and the mono figure is the truest four characters this page could carry. -->
-    <p class="band-mark">
-      <span class="band-seq">404</span>
-      <span class="band-rule"></span>
-    </p>
     <h1 class="title">{n.title}</h1>
     <p class="lede">{n.lede}</p>
     <ul class="part-links">
@@ -55,10 +47,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-5);
-  }
-
-  .head .band-mark {
-    margin-block-end: 0;
   }
 
   .title {

@@ -16,7 +16,7 @@
   the reader wants a specification. What this page had instead was two lists of identifiers under
   two uppercase headings, which is the counted-stat texture §19 named: sixteen names with nothing
   saying how they relate. `loop/research-site-now.md` change 5 asked for the relation to be drawn,
-  so band 0001 is a diagram of a client reaching the record, the writes arriving as named events on
+  so the first band is a diagram of a client reaching the record, the writes arriving as named events on
   one side and the reads leaving on the other, built from the same strings and nothing new.
 
   FOUR BANDS ON `page, flip, page, page`, AND THEY WERE `page, sunk, page, sunk`. `--sunk` against
@@ -55,7 +55,7 @@
   </div>
 </section>
 
-<!-- ── 0001 · Over MCP ──────────────────────────────────────────────────────
+<!-- ── Over MCP ────────────────────────────────────────────────────────────────
      THE DRAWING IS ONE `<figure>` AND THE LISTS INSIDE IT ARE STILL LISTS. A reader who is not
      looking at it meets the same three headed lists it replaced, in the order they are drawn; the
      wires, the bus and the arrowheads are borders on elements that are otherwise empty, so none of
@@ -63,7 +63,6 @@
 <section class="band" data-ground="flip" aria-labelledby="mcp-title">
   <div class="in">
     <div class="band-mark band-mark-line">
-      <span class="band-seq">0001</span>
       <h2 class="title" id="mcp-title">{a.mcp.title}</h2>
       <span class="band-rule"></span>
       <span class="band-tag">{a.mcp.tag}</span>
@@ -125,7 +124,7 @@
   </div>
 </section>
 
-<!-- ── 0002 · Reported ──────────────────────────────────────────────────────
+<!-- ── Reported ────────────────────────────────────────────────────────────────
      THE ARGUMENT ON THE LEFT AND THE SIX LIMITS AS A GRID ON THE RIGHT. They were a two-column
      definition list under the lead, the same shape as the band after it, so the page had one layout
      twice in a row. Six limits of one or two words each are what a hairline grid is for: each cell
@@ -133,9 +132,8 @@
 <section class="band" data-ground="page" aria-labelledby="report-title">
   <div class="in">
     <p class="band-mark">
-      <span class="band-seq">0002</span>
-      <span class="band-rule"></span>
       <span class="band-tag">{a.report.tag}</span>
+      <span class="band-rule"></span>
     </p>
     <div class="split">
       <div>
@@ -154,14 +152,13 @@
   </div>
 </section>
 
-<!-- ── 0003 · Refused ───────────────────────────────────────────────────────
+<!-- ── Refused ────────────────────────────────────────────────────────────────
      THE MARK STANDS IN A RAIL OF ITS OWN, the third opener on this page and the one the previous
-     two cannot be: the number and the tag stacked in a narrow left column, and the heading, the
+     two cannot be: the tag alone in a narrow left column, and the heading, the
      lead and the refusals sharing one left edge beside it. -->
 <section class="band" data-ground="page" aria-labelledby="cannot-title">
   <div class="in side">
     <p class="band-mark band-mark-side">
-      <span class="band-seq">0003</span>
       <span class="band-tag">{a.cannot.tag}</span>
     </p>
     <div>
@@ -245,7 +242,7 @@
     letter-spacing: var(--tr-tight);
   }
 
-  /* THE ONE-LINE OPENER, the home page's 0003 treatment and the pricing page's table band: the
+  /* THE ONE-LINE OPENER, the home page's mechanism band treatment and the pricing page's table band: the
      heading takes the mark's baseline and the rule runs from the end of its words to the tag.
      `flex-wrap` and a floor under the rule, because this heading is forty-one characters of 24px and
      does not fit beside the tag on a phone; the rule takes the tag to a second line rather than
@@ -261,7 +258,7 @@
     min-inline-size: var(--sp-7);
   }
 
-  /* ── 0001 · The drawing ───────────────────────────────────────────────── */
+  /* ── The drawing ─────────────────────────────────────────────────────── */
 
   /* FIVE COLUMNS: what arrives, a link, the record, a link, what leaves. The links are their own
      tracks rather than margins on the record so the wire between a lane's bus and the record is an
@@ -442,7 +439,7 @@
     text-wrap: pretty;
   }
 
-  /* ── 0002 · Reported ──────────────────────────────────────────────────── */
+  /* ── Reported ────────────────────────────────────────────────────────── */
 
   .split {
     display: grid;
@@ -473,7 +470,7 @@
     text-wrap: pretty;
   }
 
-  /* ── 0003 · Refused ───────────────────────────────────────────────────── */
+  /* ── Refused ────────────────────────────────────────────────────────── */
 
   .side {
     display: grid;

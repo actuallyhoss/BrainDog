@@ -649,3 +649,59 @@ and this run does not own that directory. The test to write reads the two ratios
 `+page.svelte` and asserts that the source column and source row they name carry no ink in either
 capture, which is four lines of arithmetic once something in the tree can decode a WebP. Until
 then the guard is this section.
+
+## 8. The fifth pass, 22 September: no photographs, no numbers, and a close that is not red
+
+The owner, verbatim: *i hate those screenshots. they look terrible. dont just add scnreehots like
+that. instead maybe push that interactive multi-tab section to be overlapping with th ejumbotron,
+in a neat way, and make the actual records interactble to show different pages, etc. i dont like
+the "0001" stuff either. remove that.* And of the closing band: *make the what would you keep in it
+less red please*.
+
+**The two photographs are gone, with their files, their alt copy and `test/crop.test.ts`.** That
+also closes what section 7 left open: there is no WebP left on the page for a crop test to decode.
+`static/shots/` keeps `home-light.png`, the link preview `app.html` names, and nothing else.
+
+**The drawn app is the hero's product.** `Arrange.svelte` starts inside the hero and runs
+`clamp(120px, 14vw, 216px)` past its bottom edge, over the hairline and the change of ground from
+`--sunk` to the page. It is the one thing on the site with a shadow, which reverses section 1's "no
+new shadow" for exactly one element and for the reason that section gives against the rest: a
+shadow says a thing sits on something, and this is the only thing that does. It is `--e3`, solved
+per scheme by the theme, with a 7 per cent ink hairline inside the top edge in dark, where a shadow
+on near-black is close to nothing and the edge is what reads.
+
+**Measured on the built page, 22 September, Chromium through Playwright on port 4400.** The
+window's box across Home, a list, a row's page and a rule's page, which is the no-jump claim:
+
+| viewport | Home | Bills | Rent | a rule | document | horizontal scroll |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1440x900 | 1136x507 | 1136x507 | 1136x507 | 1136x507 | 2,754px tall | none, `scrollWidth` 1440 |
+| 390x844 | 358x543 | 358x543 | 358x543 | 358x543 | 4,012px tall | none, `scrollWidth` 390 |
+
+The same in both schemes. Focus after opening a row or going back lands on the new page's title,
+and a tab from there reaches the page's first control; arrow keys move between the cases.
+
+**Home had 250px of nothing under three tiles** in the first capture of this pass, which is how an
+empty page looks rather than how the app's Home does. Every setup's Home draws a table under its
+figures (`Bills due this week`, `Study sessions`, `Latest numbers`, `Due this week`, `Your next
+steps`), so the drawing does too, from rows its lists already open.
+
+**`tools/gates/css-rules.mjs` read 5 findings on this pass's first build and 0 after.** Two were a
+focus ring removed with no reason beside it; three were column classes written as `c{i}`, which a
+stylesheet check cannot see the markup emit. The columns are now said by position.
+
+**The close is on the page ground.** The `brand` ground, the accent as a whole field, is deleted.
+The band keeps a radial wash of the accent at 9 per cent behind its heading, and the last three
+words of the heading carry `--accent-text`, which is certified for text on the page ground in both
+schemes. The button stays ink, as every primary on the site is.
+Measured from the computed tokens on the built page, against the page ground and against the
+wash at its strongest point:
+
+| role | light, page | light, wash | dark, page | dark, wash |
+| --- | --- | --- | --- | --- |
+| `--ink2` | 9.92:1 | 8.66:1 | 11.32:1 | 10.70:1 |
+| `--dim` | 7.14:1 | 6.23:1 | 8.17:1 | 7.72:1 |
+| `--accent-text` | 7.67:1 | 6.70:1 | 7.54:1 | 7.13:1 |
+
+**The band numbers are gone from every route**, with `.band-seq` and the comments that argued for
+it. Where a band opened on a number, a rule and a word, it now opens on the word and the rule.
