@@ -92,7 +92,19 @@ import { arranger, carryUpdate, speakingNow, writeVoice, type CatalogueEntry } f
 import { useCases, type ExportArgs } from './usecase.ts';
 import { catalogueDrafts, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, noticeUsage, pageShowsAgents, readUsage, SPARK_OPEN_CAP, stableKey, type CatalogueOffer, type Offered, type SparkDraft, type SparkModel } from './spark.ts';
 import { grammarOf } from './grammar.ts';
-import { SAID_DEPTH, automation as oneAutomation, automations as listAutomations, nestedPast, pathOf as flowPath, said as saidOf, subjectOf as flowSubject } from './automations.ts';
+import {
+  BODY_DEPTH,
+  SAID_DEPTH,
+  automation as oneAutomation,
+  automations as listAutomations,
+  deeperThan,
+  listsReached,
+  nestedPast,
+  pathOf as flowPath,
+  said as saidOf,
+  scripts as listScripts,
+  subjectOf as flowSubject,
+} from './automations.ts';
 import { historyCursors, type HistoryCursors } from './history-cursor.ts';
 import { handleOf, isHandle, spokenOf } from './question-handles.ts';
 import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
@@ -100,7 +112,7 @@ import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, 
 export type { CatalogueEntry, FigureTest, Grows, RowIo } from './arrange.ts';
 export { formedRows, fromModel, growsDrafts, noticeUsage, readUsage, FORM_SAID_MOST, SPARK_OPEN_CAP, type CatalogueOffer, type FormField, type FormList, type FormSpec, type NextSpec, type Noticed, type SparkDraft, type SparkFormInput, type SparkModel, type SparkModelInput, type Usage } from './spark.ts';
 export type { ExportArgs, PlannedPack } from './usecase.ts';
-export type { Automation, AutomationRow, AutomationRun, Said as AutomationSaid } from './automations.ts';
+export type { Automation, AutomationRow, AutomationRun, Said as AutomationSaid, ScriptRow } from './automations.ts';
 export { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 
 /**
@@ -827,7 +839,7 @@ export type RecordDeps = {
    */
   catalogueOffers?: ((held: readonly { id: string; version: string; on: boolean }[]) => Promise<readonly CatalogueOffer[]>) | undefined;
   /** A draft script run now in the host's sandbox, writing nothing (`@braindog/host/script-try`). Absent, `scriptTry` refuses `NOT_IN_THIS_BUILD`. */
-  tryScript?: ((draft: { record: { id: string; tz: string }; body: Record<string, unknown>; input: unknown; reads: { list(register: string, where: unknown): Promise<unknown[]>; get(spoken: string): Promise<unknown> }; owner: boolean }) => Promise<unknown>) | undefined;
+  tryScript?: ((draft: { record: { id: string; tz: string }; body: Record<string, unknown>; input: unknown; reads: { list(register: string, where: unknown): Promise<unknown[]>; get(spoken: string): Promise<unknown> }; owner: boolean; asker: string }) => Promise<unknown>) | undefined;
 };
 
 /** What `invite` says when the host never said it can take invitations. */
@@ -1349,12 +1361,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        than refusing the whole update as somebody else's (`declare` `plan`). */
     detached: Object.fromEntries(kernel.detached().map((d) => [d.id, { was: d.was, body: d.body }])),
     nameOf: (ref) => kernel.titleOfRow(ref),
+    opensOf: (label) => kernel.opensOf(label),
     /* WHICH DOORS THIS RECORD HAS PUT TO WORK, so a pack's `hands` passes on only those (`declare` `plan`): every ingest
        that has filed an arrival, and every webhook door holding a token. Without it money-core handed all twelve HSBC
-       Egypt doors on every record (`test/handover-used.test.ts`). */
+       Egypt doors on every record (`test/handover-used.test.ts`).
+       AND EVERY DOOR THAT HAS CLAIMED AN ARRIVAL, WHATEVER IT FILED. A receipt is written only on the exact path, so a
+       door whose lines wait in review filed none and was retired as unused: `bank-from-unsure` files at `needs-review`
+       by design, and was retired on every record (audit thirty-six, finding 2). Every claim leaves an event signed
+       `ingest:<id>`, so that is read too. It scans `event`, which has no index on `actor`: 32 ms over 500,000 rows,
+       measured, once per plan an owner asks for. */
     used: [
       ...new Set([
         ...sql.all<{ ingest_id: string }>('SELECT DISTINCT ingest_id FROM ingest_receipt').map((r) => `ingest.${r.ingest_id}`),
+        ...sql.all<{ id: string }>("SELECT DISTINCT substr(actor, 8) AS id FROM event WHERE actor LIKE 'ingest:%'").map((r) => `ingest.${r.id}`),
         ...kernel
           .declarations()
           .filter((d) => d.kind === 'ingest' && heldDigest(d.id.slice('ingest.'.length)) !== undefined)
@@ -3302,6 +3321,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return no('VALUE_MALFORMED', 'A rule names a register and what it would then do.', { at: 'rule' });
       if (nestedPast(body.steps ?? body.then))
         return no('OUT_OF_BOUNDS', `This nests a branch more than ${SAID_DEPTH} deep, and 3 is the most a rule may. Lift the inner branch into its own step.`, { at: 'rule.steps' });
+      /* AND A VALUE NESTED PAST ANY RULE'S IS REFUSED BEFORE ANYTHING READS IT (audit thirty-six, finding 8). The branch
+         cap above let a 20,000-deep array in one `notify.say` through, and it blew the stack in `said`. */
+      if (deeperThan(body))
+        return no('OUT_OF_BOUNDS', `This body nests more than ${BODY_DEPTH} levels deep, and no rule needs half that. Send the rule as it would be installed.`, { at: 'rule' });
+      /* EVERY OTHER LIST IT REACHES IS GUARDED AS THE ONE IT IS ABOUT, before the kernel is asked (audit thirty-six,
+         finding 6). The kernel's walk looks up each `link` target in its list and says whether one row, none or two bear
+         the value, so a member held to `append` on Money, refused `list money`, read "link payee" for a name that was
+         there and "nothing bears that name" for one that was not. Refused on both paths, so a body cannot be reshaped
+         from `then:` to `steps:` to be answered, and with `guard`'s own sentence, which `list` gives her already. */
+      for (const reached of listsReached(body)) {
+        const out = guard(ctx, 'read', reached.register);
+        if (out) return { ok: false as const, refusal: { ...out, at: reached.at } };
+      }
       if (flowPath(body) === 'run') {
         if (!Array.isArray(body.steps ?? body.then)) return no('REQUIRED_MISSING', 'An automation says what starts it and the steps it then takes.', { at: 'rule.steps' });
         return ok(saidOf(body));
@@ -3345,7 +3377,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         },
       };
       const who = kernel.identity();
-      return ok(await deps.tryScript({ record: { id: who?.id ?? 'self', tz: who?.tz ?? 'UTC' }, body: b, input: said.input ?? null, reads, owner: ctx.principal.kind === 'person' && ctx.principal.level === 'owner' }));
+      return ok(await deps.tryScript({ record: { id: who?.id ?? 'self', tz: who?.tz ?? 'UTC' }, body: b, input: said.input ?? null, reads, owner: ctx.principal.kind === 'person' && ctx.principal.level === 'owner', asker: ctx.principal.kind === 'token' ? ctx.principal.person : ctx.principal.id }));
     },
 
     /**
@@ -4047,6 +4079,26 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return no('DECLARATION_UNKNOWN', `There is no automation called ${id}${id.endsWith('.') ? '' : '.'}`, { at: 'rule' });
       }
       return ok(found);
+    },
+
+    /**
+     * Every installed script, with its last run, how many refused runs in a row it has and whether that paused it.
+     * READ+, and what `braindog scripts list` prints (`automations.ts` `scripts`).
+     *
+     * THERE WAS NO READ OF A SCRIPT AT ALL. `resumeScript` was routed and nothing listed what it could resume: `actions`
+     * filters to `pull`, `call` and `poll`, so the id to resume was only in the event that paused the script, and the
+     * terminal refused `scripts list` for want of an answer to print.
+     *
+     * HELD TO WHAT THE CALLER MAY READ, ONE SCRIPT AT A TIME, as `automations` is. A script is shown to a caller who reads
+     * every list it reads and writes, the lists its run's log may quote (`keepLog` in the kernel), so which scripts
+     * touch Money is not told to somebody held to `append` there. A script that touches no list is shown to any reader.
+     */
+    async scripts(args: Record<string, never> | undefined, ctx: CallContext) {
+      const stop = scoped(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      const extra = Object.keys(args ?? {})[0];
+      if (extra !== undefined) return no('FIELD_UNKNOWN', `${extra} is not something this call takes. It takes nothing, and answers every script you can read.`, { at: extra });
+      return ok(listScripts(sql, clock.now()).filter((s) => [...s.reads, ...s.writes].every((list) => readable(ctx, list) === null)));
     },
 
     /**

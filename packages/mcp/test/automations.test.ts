@@ -16,7 +16,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createRecordApi, type CallContext } from '@braindog/record';
-import { SAID_DEPTH } from '../../record/src/automations.ts';
+import { SAID_DEPTH, said } from '../../record/src/automations.ts';
 
 import { TOOLS, TEMPLATES, tools, ttlOf } from '../src/index.ts';
 import { handle, type Reply } from '../src/rpc.ts';
@@ -264,6 +264,25 @@ test('A DRY RUN OF A BODY NESTED PAST ANY CEILING IS REFUSED, not a blown stack 
   sql.close();
 });
 
+test('D3: A DRY RUN OF A BODY WHOSE VALUE NESTS PAST ANY DEPTH IS REFUSED, and `said` on its own does not throw either', async () => {
+  /* THE DEPTH CAP ABOVE BOUNDS `if` NESTING, AND NOTHING ELSE. Measured red first (audit thirty-six, finding 8): a
+     40 KB body off the wire with a 20,000-deep array in one `notify.say`, sent through the READ+ `dryRun`, threw
+     `RangeError: Maximum call stack size exceeded` out of `words` in `automations.ts`, which was `JSON.stringify`. */
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const wire = `{"rule":"deep","on":{"every":"1h"},"steps":[{"notify":{"say":${'['.repeat(20_000)}"x"${']'.repeat(20_000)}}}]}`;
+  const body = JSON.parse(wire) as Record<string, unknown>;
+  const refused = refusal(await api.dryRun({ rule: body as never }, owner));
+  assert.equal(refused.code, 'OUT_OF_BOUNDS');
+  /* And whoever else calls `said` is not handed a stack overflow: past eight levels a value is named by its kind. */
+  const out = said(body);
+  assert.equal(out.steps[0], `Tell the owner: ${'['.repeat(8)}a list of 1 item${']'.repeat(8)}`);
+  /* An ordinary body still prints its values as it did. */
+  const plain = said({ rule: 'p', on: { every: '1h' }, steps: [{ notify: { say: 'Look at the rate.' } }, { set: { field: 'n', to: 3 } }] });
+  assert.deepEqual(plain.steps, ['Tell the owner: Look at the rate.', 'Set n to 3.']);
+  sql.close();
+});
+
 test('braindog:automations IS LISTED AND ANSWERS EVERY RULE, inline ones too, with what starts it, when it runs next and how its runs went', async () => {
   const { sql, api, mcp } = await record();
   value(api.kernel.automationRun('chase', 'p_1'));
@@ -343,6 +362,33 @@ test('THE THREE ARE ROUTED IN THE GROUPS THE BRIEF NAMES, served by both hosts\'
   ctx = agent;
   const refused = await client.automationRun('chase');
   assert.equal(refusal(refused).code, 'NEEDS_BROWSER_SESSION');
+  sql.close();
+});
+
+test('scripts IS ROUTED READ+ AS A GET, served by the one table, and a token reads it through the client', async () => {
+  /* MEASURED BEFORE IT: `resumeScript` was routed and nothing listed what it could resume, so `ROUTES` had no `scripts`
+     and the client no call to make. The script is installed and never run, so its row says only what it may touch. */
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const installed = await api.kernel.install([
+    register('gold_egp', [{ id: 'at', type: 'text', required: true }]),
+    { id: 'script.gold-rate', kind: 'script' as const, body: { script: 'gold-rate', runs: { every: '1h' }, egress: ['https://api.goldapi.io'], keys: [], reads: [], writes: ['gold_egp'], source: 'export default async function run(ctx) {}' } as never },
+  ]);
+  assert.ok(installed.ok, JSON.stringify(installed));
+  const route = ROUTES.find((r) => r.name === 'scripts');
+  assert.deepEqual([route?.group, route?.writes], ['READ+', false]);
+
+  const seen: string[] = [];
+  const client = createClient({
+    base: 'https://dog.example.test',
+    fetch: async (url, init) => {
+      seen.push(`${init?.method ?? 'GET'} ${new URL(String(url)).pathname}`);
+      return serveApi(new Request(String(url), init), handlersFor(api as never), agent);
+    },
+  });
+  const rows = value<{ script: string; status: string; last: unknown; writes: string[] }[]>(await client.scripts());
+  assert.deepEqual(rows.map((r) => [r.script, r.status, r.last, r.writes]), [['gold-rate', 'on', null, ['gold_egp']]]);
+  assert.deepEqual(seen, ['GET /api/scripts']);
   sql.close();
 });
 

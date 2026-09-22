@@ -5,7 +5,8 @@
  * `plan` learned to hand a `hands` entry only when the record uses it (`Installed.used`), and a caller that says nothing
  * gets everything handed as before. The record said nothing, so on every real record money-core 1.8.0 still handed all
  * twelve HSBC Egypt doors to `bank-hsbc-eg`, a pack the owner never chose. `installedState` now names every ingest that
- * has filed an arrival (`ingest_receipt`) and every webhook door that holds a token (`heldDigest`).
+ * has filed an arrival (`ingest_receipt`) and every webhook door that holds a token (`heldDigest`), and, since audit
+ * thirty-six's finding 2, every door that has claimed an arrival at all, which is a door whose lines wait in review.
  */
 
 import { test } from 'node:test';
@@ -66,5 +67,32 @@ test('THE RECORD NAMES WHAT IT USES, SO THE UPDATE HANDS A DOOR THAT FILED A ROW
     ['ingest.bank-ipn-in-sms', 'bank-hsbc-eg'],
   ]);
   assert.equal(hsbc.filter((r) => r.to === undefined).length, 10, 'a door nobody used was handed');
+  sql.close();
+});
+
+test('A DOOR WHOSE ARRIVALS WAIT IN REVIEW IS A DOOR IN USE, so bank-from-unsure is handed and not retired (audit thirty-six, finding 2)', async () => {
+  /* THE CASE ABOVE PUTS THE ACCOUNT ON FILE SO THE LINE FILES A ROW, which is exactly the one that passed. Measured on
+     the record as it stood: `bank-from-unsure` files at `needs-review` by design, so it leaves a suggestion and never an
+     `ingest_receipt`, and the plan retired it with the other eleven; after money-core 1.8.0 installed, the next such
+     line arrived `untriaged`, claimed by nothing. The claim itself is an event signed `ingest:bank-from-unsure`. */
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  type Planned = { diff: { planHash: string; approve?: string[]; retires: Retire[] } };
+  const put = async (doc: unknown) => {
+    const { diff } = value<Planned>(await api.planPack({ doc }, owner));
+    value(await api.installPack({ doc, planHash: diff.planHash, approve: diff.approve } as never, owner));
+  };
+  for (const id of FIRST_PARTY) await put(id === 'money-core' ? v170() : firstPartyDocument(id));
+
+  value(api.kernel.create('accounts', { name: 'Cairo current account', kind: 'bank', balance: { amount: 0, currency: 'EGP' }, as_of: '2026-08-01', liquid: true, last4: '327' }, { actor: 'p_seed' }));
+  const out = value<{ ingest: string | null; state: string; reason?: string }>(
+    api.kernel.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example', Subject: 'HSBC' }, body: 'From HSBC: 01AUG26 Transfer from NADIA FARID to 042-118***-327 EGP 418.62 - Your available balance is EGP 33,540.25', sha256: 'handover-used-review' }),
+  );
+  assert.deepEqual([out.ingest, out.state], ['bank-from-unsure', 'review'], out.reason);
+  assert.equal(sql.all('SELECT ingest_id FROM ingest_receipt').length, 0, 'the line filed a row, so this is the case above');
+
+  const { diff } = value<Planned>(await api.planPack({ doc: firstPartyDocument('money-core') }, owner));
+  const handed = diff.retires.filter((r) => HSBC.includes(r.id) && r.to !== undefined).map((r) => [r.id, r.to]);
+  assert.deepEqual(handed, [['ingest.bank-from-unsure', 'bank-hsbc-eg']]);
   sql.close();
 });

@@ -177,6 +177,9 @@ export const ROUTES: readonly Route[] = [
      no `rule` it is the list; with one it is that automation with its last ten runs, each step's outcome beside it. */
   { name: 'automations', group: 'READ+', writes: false, what: 'Every automation: what starts it, when it runs next and how its runs went; or one, with its last ten runs step by step.',
     takes: { rule: 'text' } },
+  /* THE SCRIPTS, WHICH NOTHING LISTED. `resumeScript` was routed and no read named what it could resume: `actions` stops at
+     `pull`, `call` and `poll`. Held by the record to the lists each script reads and writes. */
+  { name: 'scripts', group: 'READ+', writes: false, what: 'Every installed script: what it may read, write and fetch, whether it is paused, its last run and its refused runs in a row.' },
   { name: 'planPack', group: 'ADMIN', writes: false, what: 'What installing a pack would do to this record. It writes nothing.',
     takes: { doc: 'json', source: 'json' } },
   { name: 'spark', group: 'ADMIN', writes: false, what: 'What Spark noticed about how this BrainDog is used, and the arrangement proposals it would file. It writes nothing.' },
@@ -449,6 +452,7 @@ export type RecordSurface = {
   sparkForm(args: never, ctx: never): Promise<Result<unknown>>;
   actions(ctx: never): Promise<Result<unknown>>;
   automations(args: never, ctx: never): Promise<Result<unknown>>;
+  scripts(args: never, ctx: never): Promise<Result<unknown>>;
   automationRun(args: never, ctx: never): Promise<Result<unknown>>;
   cancelRun(args: never, ctx: never): Promise<Result<unknown>>;
   setPackConfig(args: never, ctx: never): Promise<Result<unknown>>;
@@ -545,6 +549,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     sparkForm: (a, ctx) => api.sparkForm(a as never, ctx as never),
     actions: (_a, ctx) => api.actions(ctx as never),
     automations: (a, ctx) => api.automations(a as never, ctx as never),
+    scripts: (a, ctx) => api.scripts(a as never, ctx as never),
     automationRun: (a, ctx) => api.automationRun(a as never, ctx as never),
     cancelRun: (a, ctx) => api.cancelRun(a as never, ctx as never),
     setPackConfig: (a, ctx) => api.setPackConfig(a as never, ctx as never),

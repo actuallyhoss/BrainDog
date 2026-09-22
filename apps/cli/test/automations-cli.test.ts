@@ -91,6 +91,44 @@ const CHASE = {
   ],
 };
 
+/** Two scripts as the record's `scripts` sends them: one paused by three refused runs, one a door starts that has one. */
+const SCRIPTS = [
+  {
+    id: 'script.gold-rate',
+    script: 'gold-rate',
+    title: 'Gold rate',
+    version: 2,
+    pack: null,
+    runs: { every: '1h', door: null, rule: false },
+    reads: [],
+    writes: ['gold_egp'],
+    egress: ['https://api.goldapi.io'],
+    keys: ['goldapi'],
+    status: 'paused',
+    next: null,
+    last: { at: '2026-09-22T10:00:00.000Z', version: 2, outcome: 'refused', say: 'gold-rate did not finish, so it wrote nothing; its log says why.' },
+    refused: { in_a_row: 3, pauses_at: 3 },
+    month: { runs: 4, ok: 1, refused: 3 },
+  },
+  {
+    id: 'script.tally',
+    script: 'tally',
+    title: 'tally',
+    version: 1,
+    pack: 'money-core',
+    runs: { every: null, door: 'bank-in', rule: true },
+    reads: ['money'],
+    writes: ['sums'],
+    egress: [],
+    keys: [],
+    status: 'on',
+    next: '2026-09-22T13:00:00.000Z',
+    last: null,
+    refused: { in_a_row: 1, pauses_at: 3 },
+    month: { runs: 0, ok: 0, refused: 0 },
+  },
+];
+
 type Seen = { method: string; args: Record<string, unknown> };
 
 /** The record's own sentence for a token at an ADMIN door, with the words each method passes to `admin()`. */
@@ -99,7 +137,7 @@ const browserOnly = (reads?: string) => ({
   refusal: { code: 'NEEDS_BROWSER_SESSION', fix: reads === undefined ? 'Open this from the app; a token cannot change what this record is.' : `Open this from the app; a token cannot ${reads}.`, at: 'principal' },
 });
 
-async function stub(t: { after: (fn: () => void | Promise<void>) => void }, opts: { admin?: boolean; rows?: unknown[] } = {}) {
+async function stub(t: { after: (fn: () => void | Promise<void>) => void }, opts: { admin?: boolean; rows?: unknown[]; scripts?: unknown[] } = {}) {
   const seen: Seen[] = [];
   const server: Server = createServer((req, res) => {
     const chunks: Buffer[] = [];
@@ -124,6 +162,7 @@ async function stub(t: { after: (fn: () => void | Promise<void>) => void }, opts
       if (method === 'automationRun') return answer(admin ? { ok: true, value: { run: 'run_01JANEWNEWNEWNEWNEWNEWNEWN' } } : browserOnly('start an automation'));
       if (method === 'cancelRun') return answer(admin ? { ok: true, value: { run: args.run, state: 'cancelled' } } : browserOnly('stop a run'));
       if (method === 'resumeScript') return answer(admin ? { ok: true, value: { script: args.script } } : browserOnly());
+      if (method === 'scripts') return answer({ ok: true, value: opts.scripts ?? SCRIPTS });
       return answer({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `The stub does not answer ${method}.` } });
     });
   });
@@ -132,7 +171,7 @@ async function stub(t: { after: (fn: () => void | Promise<void>) => void }, opts
   return { base: `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`, seen };
 }
 
-async function setup(t: { after: (fn: () => void | Promise<void>) => void }, opts: { admin?: boolean; rows?: unknown[] } = {}) {
+async function setup(t: { after: (fn: () => void | Promise<void>) => void }, opts: { admin?: boolean; rows?: unknown[]; scripts?: unknown[] } = {}) {
   const h = await stub(t, opts);
   const dir = mkdtempSync(join(tmpdir(), 'braindog-automations-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -229,12 +268,30 @@ test('scripts resume: sends the id to resumeScript, and a token gets the ADMIN s
   assert.deepEqual(ok.answered, [{ value: { script: 'fx-rates' } }]);
 });
 
-test('scripts list is refused before any request, and says why there is no list to read', async (t) => {
+test('scripts list: one line each, saying how it starts, whether it is paused, its last run and its refused runs in a row', async (t) => {
+  /* THIS WAS REFUSED BEFORE ANY REQUEST, "no read that lists scripts yet", because the record had none. It has
+     `scripts` now, READ+, so the list is the record's answer printed, and the value is that answer unchanged. */
   const h = await setup(t);
-  assert.equal(await scripts(['list'], h.io), 1);
-  assert.equal(h.seen.length, 0);
-  assert.match(h.said[0] ?? '', /^braindog scripts takes resume <id>/);
-  assert.match(h.said[0] ?? '', /no read that lists scripts/);
+  assert.equal(await scripts(['list'], h.io), 0);
+  assert.deepEqual(h.out, [
+    'Scripts on this BrainDog:',
+    '  gold-rate  Gold rate. Every 1h. Paused: its last 3 runs were refused, and it runs again only when somebody resumes it in the app. Last run refused at 2026-09-22 10:00 UTC: gold-rate did not finish, so it wrote nothing; its log says why. This month 4 runs: 1 ok, 3 refused. Writes gold_egp. Fetches from https://api.goldapi.io.',
+    '  tally  When bank-in receives an arrival, or when a rule runs it. From money-core. Next 2026-09-22 13:00 UTC. No run yet. 1 refused run in a row; 3 pause it. Reads money. Writes sums.',
+  ]);
+  assert.deepEqual(h.answered, [{ value: SCRIPTS }]);
+  assert.deepEqual(called(h.seen, 'scripts')[0]?.args, {});
+});
+
+test('scripts list: none is one sentence, and a verb it does not know is refused before any request', async (t) => {
+  const h = await setup(t, { scripts: [] });
+  assert.equal(await scripts(['list'], h.io), 0);
+  assert.deepEqual(h.out, ['No script you can read is installed on this BrainDog.']);
+
+  const seen = h.seen.length;
+  assert.equal(await scripts(['list', '--all'], h.io), 1);
+  assert.equal(await scripts(['show', 'tally'], h.io), 1);
+  assert.deepEqual(h.said, ['braindog scripts list takes --host <host>, and nothing else.', 'braindog scripts takes list, or resume <id>, and --host.']);
+  assert.equal(h.seen.length, seen, 'a bad flag or verb sends nothing');
 });
 
 type Ran = { code: number | null; stdout: string; stderr: string };

@@ -53,7 +53,8 @@ of four codes (§4.4).
 | `automations list` | `--host <host>` | `GET /api/context`, then `GET /api/automations` with no `rule`: READ+, held by the record to the lists the caller reads | `Automations on this BrainDog:` and one line each: the bare id, the name when one was given, what starts it and whether as a run or inside the write, `Turned off.`, the pack and project, the next clock time, the last run's state, time and sentence, the runs still open, and this month's counts. `No automation you can read is set up on this BrainDog.` when the list is empty. Under `--json` the value is the record's `AutomationRow[]` unchanged | 0 · 1 · 3 |
 | `automations show <id>` | `<id>` = `chase` or `rule.chase` · `--host <host>` | `GET /api/automations { rule }` | the id, name and version; what starts it and whether it is on; this month's counts and the runs open; then the last ten runs, newest first, each with its state, start time, actor and how it began, and under it each step as `<n> <kind>: <state>` with the step's answer cut to 120 characters. An inline rule says it has no runs to show because it happens inside the write. The value is the record's `Automation`, body and runs whole. An unknown id is the record's `DECLARATION_UNKNOWN` sentence | 0 · 1 · 3 |
 | `automations run <id>` · `automations cancel <run>` | `--host <host>` | `POST /api/automationRun { rule }` or `POST /api/cancelRun { run }`. Both are ADMIN, and the record's `admin()` refuses every token before it reads the arguments, so from this command both answer `NEEDS_BROWSER_SESSION` with `Open this from the app; a token cannot start an automation.` or `... cannot stop a run.` They are built rather than left out, as `page push` is, so they work unchanged the day a proven session that is not a cookie can reach an ADMIN door | `<id> started as <run>. The next drain takes it.` or `<run> is cancelled. A run stopped while it waits never resumes.`; the value is the record's `{ run }` or `{ run, state }` | 0 · 1 · 3 |
-| `scripts resume <id>` | `--host <host>` | `POST /api/resumeScript { script }`, ADMIN, so refused to a token for the same reason | `<id> runs again now. Three more refused runs in a row pause it again.`; the value is `{ script }`. There is no `scripts list`, because the record has no read that lists scripts (§2, below the table) | 0 · 1 · 3 |
+| `scripts list` | `--host <host>` | `GET /api/context`, then `GET /api/scripts`: READ+, held by the record to a caller who reads every list a script reads and writes | `Scripts on this BrainDog:` and one line each: the bare id, the title when one was given, how it starts (its clock, the door that hands it an arrival, a rule), `Paused` with where to resume it when three refused runs in a row stopped it, the pack, the next clock time, the last run's outcome, time and the record's sentence, the refused runs in a row while it is still on, this month's runs, and the lists it reads and writes and the origins it fetches from. `No script you can read is installed on this BrainDog.` when the list is empty. No log and no key's value: the log stays on the run's event. Under `--json` the value is the record's `ScriptRow[]` unchanged | 0 · 1 · 3 |
+| `scripts resume <id>` | `--host <host>` | `POST /api/resumeScript { script }`, ADMIN, so refused to a token for the same reason | `<id> runs again now. Three more refused runs in a row pause it again.`; the value is `{ script }`. The id is the first word of its `scripts list` line | 0 · 1 · 3 |
 | `mcp` | `--agent claude\|codex\|cursor\|other` · `--host <host>` | reads one JSON-RPC message per line on stdin and answers it with `handle` from `@braindog/mcp/rpc`; a tool call is `GET` or `POST /api/<method>` with the bearer and the session headers of `loop/research-agent-path.md` §3.4, inside a 20-second budget | JSON-RPC on stdout and nothing else; one line on stderr when it cannot start. A host that does not answer is a tool error carrying the unreachable sentence of the agent path's §1.7 | 0 once stdin closes and every call in flight is answered · 1 when it cannot start |
 | `hook start` · `hook end` | none; Claude Code runs it with its event on stdin (`session_id`, `cwd`, `source`) | `start`: `POST /api/attach { source, client_id, branch, head }` with the session headers, inside 8 seconds, then writes the session file, then on `startup` or `resume` runs `skills sync` and `tools scan` in what is left of the 8 seconds. `end`: `POST /api/meet { name, email or handle, where }` for each author of the commits since the run began, at most 10, then `POST /api/handoff { state: 'idle', branch, head }`, all as the run the session file names | `start`: the briefing, at most 40 lines and 3,000 characters; or one line when the machine is not signed in, the host does not answer, or the host refuses. `end`: nothing | 0, always, because a non-zero exit is how a hook stops a session |
 | `install` | `--apply` · `--config-dir <folder>` (repeatable) | nothing on the network; reads `<profile>/settings.json`, where the profile is each `--config-dir`, else `CLAUDE_CONFIG_DIR`, else `~/.claude` | each entry it would add, as `+ hooks.<Event>: <json>`, then the `claude mcp add-json` line that registers `mcp`. With `--apply` it writes them, after copying the file to `settings.json.bak`, or the first free `.bak<n>` | 0 · 1 when a settings file is not JSON or not the settings shape, and then nothing is written |
@@ -79,7 +80,7 @@ of four codes (§4.4).
 Thirty commands plus `--version`, counted: the seventeen of the first design, then `mcp`, `serve`, `hook`
 (its two events in one row), `install`, `keys put` and `keys exec`, `skills sync`, `tools scan` and `tools write`,
 and the agent path's `logout`, `run`, `session` (its five verbs in one row) and `context`. `automations` and `scripts`
-came after the count, for DIRECTION 22, and have their four rows above.
+came after the count, for DIRECTION 22, and have their five rows above.
 `--json` **is built.** Exactly one JSON document on stdout, every progress line moved to stderr, and the flag is
 taken out of the arguments before dispatch so no command's own `parseArgs` has to know a global exists
 (`apps/cli/src/json.ts`). `mcp` is excluded, because its stdout is the protocol; §4.5 lists the other six.
@@ -87,7 +88,7 @@ taken out of the arguments before dispatch so no command's own `parseArgs` has t
 `default`. A host is written `https://origin[/slug]`; a bare name means https, and plain http is refused
 except to this machine, because the bearer would cross the network in the clear.
 
-**Built today: `mcp`, `hook`, `install`, `login`, `logout`, `keys put`, `keys exec`, `run`, `skills sync`, `tools scan`, `tools write`, `session`, `context`, `automations`, `scripts resume`, `--version`, `init` and `serve`.** The command runs from a checkout as
+**Built today: `mcp`, `hook`, `install`, `login`, `logout`, `keys put`, `keys exec`, `run`, `skills sync`, `tools scan`, `tools write`, `session`, `context`, `automations`, `scripts`, `--version`, `init` and `serve`.** The command runs from a checkout as
 `node apps/cli/src/main.ts`. Until §3's bundle exists, the manifest's `bin` points at that file and the manifest
 stays `private`, so `tools/release.mjs` does not offer a file npm could not run. `init` and `serve` are the
 self-host's, which has no `bin` of its own and tells people to type them, so this command claims the name and
@@ -97,14 +98,13 @@ have their rows above, so nothing in this table is a command that names itself a
 command at all, which is the difference: a word it does not know is a typo, and it says so.
 
 **`automations` and `scripts` are the automations canvas from a terminal** (`loop/DIRECTION.md` §22,
-`apps/cli/src/automations.ts`), over the four methods the canvas and the MCP tools already call: `automations`,
-`automationRun`, `cancelRun` and `resumeScript`. Reading is open to any token the record lets read the lists
+`apps/cli/src/automations.ts`), over five record methods: the four the canvas and the MCP tools already call,
+`automations`, `automationRun`, `cancelRun` and `resumeScript`, and the `scripts` read. Reading is open to any token the record lets read the lists
 involved; starting, stopping and resuming are ADMIN, and a token is refused at that door by the record, not by this
-command, so a person is told where the button is. **`scripts list` is not built, and cannot be yet**: measured on
-2026-09-22, no method in `packages/host/src/index.ts`'s route table reads the `schedule` rows of kind `script` or
-lists script declarations (`actions` filters to `pull`, `call` and `poll`). A list here would have to invent its
-answer, so `scripts` refuses any verb but `resume` and says so; the id to resume is in the event that paused the
-script. The record needs a READ+ `scripts` method first.
+command, so a person is told where the button is. **`scripts list` was refused here until the record could answer it**:
+measured on 2026-09-22, no method in `packages/host/src/index.ts`'s route table read the `schedule` rows of kind
+`script` or listed script declarations (`actions` filters to `pull`, `call` and `poll`), so the id to resume was only
+in the event that paused the script. The record's READ+ `scripts` is that read now, and `list` prints it.
 
 Claude Code registers `mcp` once per profile, and no token appears in the line or in the file it writes:
 

@@ -1,5 +1,5 @@
 /**
- * `braindog automations list|show|run|cancel` and `braindog scripts resume`: the record's automations and scripts from a
+ * `braindog automations list|show|run|cancel` and `braindog scripts list|resume`: the record's automations and scripts from a
  * terminal, over the methods the canvas and an agent's MCP tools already call (`loop/DIRECTION.md` §22).
  *
  * READING IS FOR ANY TOKEN; STARTING, STOPPING AND RESUMING ARE A BROWSER'S. `automations` is READ+, held to the lists
@@ -11,11 +11,10 @@
  * that is not a browser cookie, they work with no change here, and until then a person reading the refusal learns where
  * the button is rather than learning that the command does not exist.
  *
- * THERE IS NO `scripts list`, AND THAT IS THE RECORD'S GAP, NOT THIS FILE'S. Measured on 2026-09-22 across
- * `packages/host/src/index.ts`'s route table: no method reads the `schedule` rows of kind `script` or lists script
- * declarations, and `actions` filters to `pull`, `call` and `poll`. A list verb here would have to invent its answer.
- * The pause event names the script (`script-run.ts`: "<script> is paused: its last 3 runs were refused"), which is where
- * the id for `resume` comes from until a read exists.
+ * `scripts list` WAS REFUSED HERE UNTIL THE RECORD HAD A READ TO ANSWER IT. Measured on 2026-09-22 across
+ * `packages/host/src/index.ts`'s route table: no method read the `schedule` rows of kind `script` or listed script
+ * declarations, and `actions` filters to `pull`, `call` and `poll`, so a list verb here would have had to invent its
+ * answer. The record's READ+ `scripts` is that read now, held to the lists each script touches, and `list` prints it.
  *
  * PLAIN SENTENCES FOR A PERSON, THE RECORD'S OWN OBJECTS FOR AN AGENT. Under `--json` the value is exactly what the
  * record answered, handed over with `io.answer`, so an agent branches on `state` and `last.state` rather than splitting
@@ -24,7 +23,7 @@
 
 import { parseArgs } from 'node:util';
 
-import type { Automation, AutomationRow, AutomationRun } from '@braindog/client';
+import type { Automation, AutomationRow, AutomationRun, ScriptRow } from '@braindog/client';
 
 import { refuse } from './json.ts';
 import { connect, type AgentIo } from './skills.ts';
@@ -211,12 +210,37 @@ async function cancel(args: string[], io: AgentIo): Promise<number> {
   return 0;
 }
 
-const SCRIPTS_USAGE =
-  'braindog scripts takes resume <id>, and --host. There is no list: the record has no read that lists scripts yet, and a paused script is named in the event that paused it.';
+const SCRIPTS_USAGE = 'braindog scripts takes list, or resume <id>, and --host.';
 
-/** `braindog scripts resume`, and the exit code the command decides. */
+/** How a script starts, as a sentence: its clock, the door that hands it an arrival, a rule's `run:`, or any of them. */
+function scriptStarts(r: ScriptRow['runs']): string {
+  const ways = [r.every === null ? null : `Every ${r.every}`, r.door === null ? null : `When ${r.door} receives an arrival`, r.rule ? 'When a rule runs it' : null].filter((w): w is string => w !== null);
+  if (ways.length === 0) return 'Nothing starts it.';
+  return `${ways.map((w, i) => (i === 0 ? w : w.charAt(0).toLowerCase() + w.slice(1))).join(', or ')}.`;
+}
+
+function scriptLine(s: ScriptRow): string {
+  const said = [
+    s.title === s.script ? null : closed(s.title),
+    scriptStarts(s.runs),
+    /* PAUSED SAYS WHERE THE BUTTON IS: `resume` from this command is ADMIN and a token is refused at that door. */
+    s.status === 'paused' ? `Paused: its last ${String(s.refused.pauses_at)} runs were refused, and it runs again only when somebody resumes it in the app.` : null,
+    s.pack === null ? null : `From ${s.pack}.`,
+    s.next === null ? null : `Next ${when(s.next)}.`,
+    s.last === null ? 'No run yet.' : `Last run ${s.last.outcome} at ${when(s.last.at)}${s.last.say ? `: ${closed(s.last.say)}` : '.'}`,
+    s.status !== 'paused' && s.refused.in_a_row > 0 ? `${plural(s.refused.in_a_row, 'refused run', 'refused runs')} in a row; ${String(s.refused.pauses_at)} pause it.` : null,
+    s.month.runs === 0 ? null : `This month ${plural(s.month.runs, 'run', 'runs')}: ${String(s.month.ok)} ok, ${String(s.month.refused)} refused.`,
+    s.reads.length === 0 ? null : `Reads ${s.reads.join(', ')}.`,
+    s.writes.length === 0 ? null : `Writes ${s.writes.join(', ')}.`,
+    s.egress.length === 0 ? null : `Fetches from ${s.egress.join(', ')}.`,
+  ].filter((x): x is string => x !== null);
+  return `  ${s.script}  ${said.join(' ')}`;
+}
+
+/** `braindog scripts list|resume`, and the exit code the command decides. */
 export async function scripts(args: string[], io: AgentIo): Promise<number> {
   const [verb, ...rest] = args;
+  if (verb === 'list') return scriptList(rest, io);
   if (verb !== 'resume') {
     io.say(SCRIPTS_USAGE);
     return 1;
@@ -229,6 +253,32 @@ export async function scripts(args: string[], io: AgentIo): Promise<number> {
   if (!answer.ok) return refuse(io, answer);
   /* NOT A FIX, as `script-run.ts` says: a source that still fails pauses again, and a person should hear that now. */
   io.out(`${answer.value.script} runs again now. Three more refused runs in a row pause it again.`);
+  io.answer?.({ value: answer.value });
+  return 0;
+}
+
+async function scriptList(args: string[], io: AgentIo): Promise<number> {
+  let values: { host?: string | undefined };
+  try {
+    ({ values } = parseArgs({ args, strict: true, options: { host: { type: 'string' } } }));
+  } catch {
+    io.say('braindog scripts list takes --host <host>, and nothing else.');
+    return 1;
+  }
+  const at = await connect(values.host, io);
+  if (typeof at === 'number') return at;
+  const answer = await at.client.scripts();
+  if (!answer.ok) return refuse(io, answer);
+  if (!Array.isArray(answer.value)) {
+    io.say(`${at.to.key} answered scripts in a shape this build does not recognise.`);
+    return 1;
+  }
+  /* "YOU CAN READ", as for automations: the record shows a script only to a caller who reads every list it touches. */
+  if (answer.value.length === 0) io.out('No script you can read is installed on this BrainDog.');
+  else {
+    io.out('Scripts on this BrainDog:');
+    for (const s of answer.value) io.out(scriptLine(s));
+  }
   io.answer?.({ value: answer.value });
   return 0;
 }

@@ -17,6 +17,7 @@
  * day they part.
  */
 
+import { REFUSED_IN_A_ROW } from '@braindog/kernel';
 import type { Sql } from '@braindog/ports';
 
 type Body = Record<string, unknown>;
@@ -75,7 +76,50 @@ export type Said = {
   steps: string[];
 };
 
-const words = (x: unknown): string => (typeof x === 'string' ? x : JSON.stringify(x));
+/**
+ * How deep `words` prints a value before it names what is left by its kind and size.
+ *
+ * `words` WAS `JSON.stringify`, WHICH RECURSES INTO ANY VALUE. `SAID_DEPTH` bounds `if` nesting and nothing else, so a
+ * 40 KB body off the wire with a 20,000-deep array in one `notify.say` threw `RangeError: Maximum call stack size
+ * exceeded` out of here through the READ+ `dryRun` (audit thirty-six, finding 8). Eight levels print every predicate
+ * tree the lint lets install in full, which is what an `if` line shows, and past that a reader learns the shape.
+ */
+export const PRINT_DEPTH = 8;
+
+const counted = (n: number, one: string, many: string): string => `${String(n)} ${n === 1 ? one : many}`;
+
+function printed(x: unknown, depth: number): string {
+  if (x === null || typeof x !== 'object') return String(JSON.stringify(x));
+  const entries = Array.isArray(x) ? null : Object.entries(x);
+  if (depth >= PRINT_DEPTH) return entries === null ? `a list of ${counted((x as unknown[]).length, 'item', 'items')}` : `an object of ${counted(entries.length, 'key', 'keys')}`;
+  if (entries === null) return `[${(x as unknown[]).map((v) => printed(v, depth + 1)).join(',')}]`;
+  return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${printed(v, depth + 1)}`).join(',')}}`;
+}
+
+const words = (x: unknown): string => (typeof x === 'string' ? x : printed(x, 0));
+
+/**
+ * The deepest a dry-run body's JSON may nest: far past any body the lint installs, and far short of a stack.
+ *
+ * A BODY IS REFUSED PAST IT, NOT ONLY PRINTED SHORT, because `said` is one reader and the kernel's inline walk is
+ * another, and what the dry run hands on should be a body some rule could be. The deepest honest shape is three
+ * branches (`then` array and step object each), a predicate tree under the last `if`, and a `create`'s fields, which
+ * is well under twenty levels. Walked with a stack of its own, so a body of any depth is measured without recursion.
+ */
+export const BODY_DEPTH = 32;
+
+/** Whether a value nests deeper than `limit`. Iterative, and it looks no deeper than `limit + 1` levels. */
+export function deeperThan(value: unknown, limit: number = BODY_DEPTH): boolean {
+  const stack: [unknown, number][] = [[value, 0]];
+  while (stack.length > 0) {
+    const [x, depth] = stack.pop()!;
+    if (x === null || typeof x !== 'object') continue;
+    if (depth >= limit) return true;
+    for (const v of Array.isArray(x) ? x : Object.values(x)) stack.push([v, depth + 1]);
+  }
+  return false;
+}
+
 const listed = (x: unknown): string => (Array.isArray(x) ? x.map(words).join(' or ') : words(x));
 
 /** What starts a body, in one sentence a person reads on Decide. */
@@ -123,9 +167,39 @@ function started(body: Body): string {
  * THE DRY RUN IS A READ, AND IT RAN BEFORE THE LINT. `propose` lints first and refuses depth over 3, but the READ+
  * `dryRun` route takes any body a read token sends, and a body nested some 2,000 `if` levels deep (about 50 KB) blew the
  * stack in `stepLines`, so the host answered INTERNAL. Past this depth the record refuses instead, and `stepLines` stops
- * descending on its own, so `said` is safe whoever calls it.
+ * descending on its own. That bounded the branches and not the values: this comment said `said` was then safe whoever
+ * calls it, and a deep array in one step still blew the stack in `words` (audit thirty-six, finding 8). `PRINT_DEPTH`
+ * bounds the values, and only the two together make it so.
  */
 export const SAID_DEPTH = 3 + 5;
+
+/**
+ * Every other list a body's steps reach and the kernel's walk would look into: a `link`'s target and a `create`'s list,
+ * with where each step sits. It descends no further than `SAID_DEPTH` branches, as `stepLines` does.
+ */
+export function listsReached(body: Body): { register: string; at: string }[] {
+  const out: { register: string; at: string }[] = [];
+  const walk = (list: unknown, at: string, depth: number): void => {
+    if (!Array.isArray(list) || depth > SAID_DEPTH) return;
+    for (const [i, step] of list.entries()) {
+      if (!isObject(step)) continue;
+      const here = `${at}[${String(i)}]`;
+      /* A STEP WITH AN `if` IS STILL READ FOR A `link` AND A `create`, and not skipped once its branches are walked. The
+         kernel's `describe` has no `if` case, so `{ if, link }` was looked up in Money for a member refused Money. */
+      if ('if' in step) {
+        walk(step.then, `${here}.then`, depth + 1);
+        walk(step.else, `${here}.else`, depth + 1);
+      }
+      const link = isObject(step.link) && isObject(step.link.to) ? step.link.to.register : undefined;
+      if (typeof link === 'string') out.push({ register: link, at: `${here}.link.to.register` });
+      const create = isObject(step.create) ? step.create.register : undefined;
+      if (typeof create === 'string') out.push({ register: create, at: `${here}.create.register` });
+    }
+  };
+  walk(body.then, 'rule.then', 0);
+  walk(body.steps, 'rule.steps', 0);
+  return out;
+}
 
 /** Whether any branch in a list of steps nests past `limit`. It never descends further than that, however deep it goes. */
 export function nestedPast(list: unknown, limit: number = SAID_DEPTH, depth = 0): boolean {
@@ -340,4 +414,118 @@ export function automation(sql: Sql, named: string, nowMs: number): Automation |
       };
     });
   return { ...shown, body, runs };
+}
+
+/* ── the installed scripts, and how their runs went ────────────────── */
+
+/**
+ * One installed script as the `scripts` read answers it: what it may touch, whether it is paused, its last run and how
+ * close it is to being paused.
+ *
+ * NOTHING SEALED AND NO LOG. A key is its vault label, which the declaration already names. A run's log quotes what the
+ * script read, so it stays on the run's event, where `lineOf` holds it to an owner who reads every list the version
+ * touched; the `say` here is the event's note, which is the record's own sentence and which every whole-record reader
+ * already sees in `recentHistory`.
+ */
+export type ScriptRow = {
+  /** `script.<id>`, the declaration's own id. */
+  id: string;
+  /** The bare id, as `resumeScript` takes it. */
+  script: string;
+  /** Its `title`, or the id when it has none. */
+  title: string;
+  version: number;
+  pack: string | null;
+  runs: { every: string | null; door: string | null; rule: boolean };
+  reads: string[];
+  writes: string[];
+  /** The origins it may fetch from. */
+  egress: string[];
+  /** The keys it may have opened for a request, by label. */
+  keys: string[];
+  /** `paused` after three refused runs in a row, until somebody resumes it; `on` otherwise. */
+  status: 'on' | 'paused';
+  /** When its clock next starts it, while one is armed. */
+  next: string | null;
+  last: { at: string; version: number | null; outcome: string; say: string } | null;
+  /** Refused runs of the version now installed since its last good run or resume, and how many pause it. */
+  refused: { in_a_row: number; pauses_at: number };
+  /** This calendar month so far, UTC. `runs` counts only runs that ran the source: `ok` and `refused`. */
+  month: { runs: number; ok: number; refused: number };
+};
+
+const strings = (x: unknown): string[] => (Array.isArray(x) ? x.filter((v): v is string => typeof v === 'string') : []);
+
+/**
+ * Every live script, by id.
+ *
+ * FROM THE RECORD'S OWN ROWS, as `listActions` is: the declaration, the `schedule` row of kind `script` that every
+ * installed script has (one only a door or a rule starts has one too, which pausing reads), and the `pull` events
+ * `meter` wrote for its runs, signed `script:<id>@v<n>`. The streak is read the way `pauseAfterRefusals` reads it: only
+ * the installed version's `ok` and `refused` runs, a resume (an event with no `to_v`) ending it, so the number here is
+ * the one that pauses it.
+ */
+export function scripts(sql: Sql, nowMs: number): ScriptRow[] {
+  const month = `${new Date(nowMs).toISOString().slice(0, 7)}-01T00:00:00.000Z`;
+  return sql
+    .all<Declared>("SELECT id, version, body, pack_id FROM declaration WHERE kind = 'script' AND superseded_at IS NULL AND retired = 0 ORDER BY id")
+    .map((d): ScriptRow => {
+      const body = JSON.parse(d.body) as Body;
+      const bare = d.id.slice('script.'.length);
+      const target = `declaration:${d.id}`;
+      const runs = isObject(body.runs) ? body.runs : {};
+      const row = sql.one<{ state: string; due_at: string }>("SELECT state, due_at FROM schedule WHERE kind = 'script' AND key = ?", bare);
+      const every = typeof runs.every === 'string' ? runs.every : null;
+
+      const lastEvent = sql.one<{ ts: string; actor: string; outcome: string; note: string | null }>(
+        `SELECT ts, actor, json_extract(to_v, '$.outcome') AS outcome, note FROM event
+          WHERE kind = 'pull' AND target = ? AND to_v IS NOT NULL AND json_valid(to_v) AND json_extract(to_v, '$.outcome') IS NOT NULL
+          ORDER BY rowid DESC LIMIT 1`,
+        target,
+      );
+      const version = lastEvent ? /@v(\d+)$/.exec(lastEvent.actor) : null;
+
+      let inARow = 0;
+      for (const e of sql.all<{ outcome: string | null }>(
+        `SELECT json_extract(to_v, '$.outcome') AS outcome FROM event
+          WHERE kind = 'pull' AND target = ?
+            AND (to_v IS NULL OR (actor = ? AND CASE WHEN json_valid(to_v) THEN json_extract(to_v, '$.outcome') END IN ('ok', 'refused')))
+          ORDER BY rowid DESC LIMIT 50`,
+        target,
+        `script:${bare}@v${String(d.version)}`,
+      )) {
+        if (e.outcome !== 'refused') break;
+        inARow += 1;
+      }
+
+      const counts = { runs: 0, ok: 0, refused: 0 };
+      for (const r of sql.all<{ outcome: string; n: number }>(
+        `SELECT json_extract(to_v, '$.outcome') AS outcome, count(*) AS n FROM event
+          WHERE kind = 'pull' AND target = ? AND ts >= ? AND to_v IS NOT NULL AND json_valid(to_v) GROUP BY outcome`,
+        target,
+        month,
+      )) {
+        if (r.outcome !== 'ok' && r.outcome !== 'refused') continue;
+        counts[r.outcome] += r.n;
+        counts.runs += r.n;
+      }
+
+      return {
+        id: d.id,
+        script: bare,
+        title: typeof body.title === 'string' && body.title.trim() !== '' ? body.title : bare,
+        version: d.version,
+        pack: d.pack_id ?? (typeof body.pack === 'string' ? body.pack : null),
+        runs: { every, door: typeof runs.door === 'string' ? runs.door : null, rule: runs.rule === true },
+        reads: strings(body.reads),
+        writes: strings(body.writes),
+        egress: strings(body.egress),
+        keys: strings(body.keys),
+        status: row?.state === 'paused' ? 'paused' : 'on',
+        next: every !== null && (row?.state === 'pending' || row?.state === 'firing') ? row.due_at : null,
+        last: lastEvent ? { at: lastEvent.ts, version: version ? Number(version[1]) : null, outcome: lastEvent.outcome, say: lastEvent.note ?? '' } : null,
+        refused: { in_a_row: inARow, pauses_at: REFUSED_IN_A_ROW },
+        month: counts,
+      };
+    });
 }

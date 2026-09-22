@@ -294,6 +294,33 @@ export type ActionResumed = { ingest: string; kind: 'pull' | 'call' | 'poll' };
 /** `resumeScript`: the script that runs again now. */
 export type ScriptResumed = { script: string };
 
+/**
+ * `scripts`: one installed script. See `ScriptRow` in `@braindog/record`.
+ *
+ * `refused.in_a_row` IS THE NUMBER THAT PAUSES IT: refused runs of the version now installed since its last good run or
+ * resume, which pauses the script at `pauses_at`. A key is its vault label, and no run's log is here: the log quotes what
+ * the script read, and stays on the run's event for an owner who reads every list it touched.
+ */
+export type ScriptRow = {
+  id: string;
+  script: string;
+  title: string;
+  version: number;
+  pack: string | null;
+  runs: { every: string | null; door: string | null; rule: boolean };
+  reads: string[];
+  writes: string[];
+  egress: string[];
+  keys: string[];
+  status: 'on' | 'paused';
+  /** When its clock next starts it. */
+  next: string | null;
+  last: { at: string; version: number | null; outcome: string; say: string } | null;
+  refused: { in_a_row: number; pauses_at: number };
+  /** This calendar month so far, UTC: the runs that ran the source, and how many were refused. */
+  month: { runs: number; ok: number; refused: number };
+};
+
 /** Where one run of an automation stands. */
 export type RunState = 'pending' | 'running' | 'waiting' | 'done' | 'failed' | 'cancelled';
 
@@ -902,6 +929,8 @@ export function createClient(options: ClientOptions) {
     resumeAction: (ingest: string) => call<ActionResumed>('resumeAction', { ingest }),
     /** A script paused by three refused runs in a row, started again now. ADMIN, and the only thing that restarts one. */
     resumeScript: (script: string) => call<ScriptResumed>('resumeScript', { script }),
+    /** Every installed script with its last run and its refused runs in a row. READ+, held to the lists each touches. */
+    scripts: () => call<ScriptRow[]>('scripts'),
 
     /* THE AUTOMATIONS. `automations` is READ+, held to the lists the caller reads, and is one method for the list and for
        one automation with its runs, which is why it has two names here. `automationRun` and `cancelRun` are ADMIN, so a
