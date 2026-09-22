@@ -60,8 +60,8 @@ export const needs = ['web-build'];
  * THE WHOLE SWEEP, AS A FUNCTION THE RUNNER CALLS. `52 §5.1` step 3.
  *
  * IT OWNS A PORT, A RECORD AND A BROWSER, AND A CALLED GATE HAS TO GIVE THEM BACK, which a spawned
- * one got for nothing: the process ending closed whatever it held. In this process a server left on
- * `budgets.json`'s `layout.port` is the next run failing to bind, and a browser left running is a
+ * one got for nothing: the process ending closed whatever it held. In this process a server left
+ * listening is a handle the runner cannot exit past, and a browser left running is a
  * runner that never exits. The two returns above the record are the only ones that need no cleanup;
  * everything below it is inside ONE `try`, and the `finally` is the only place any of the three is
  * handed back, on the run that finished and on the run that threw alike.
@@ -115,7 +115,6 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
     { name: 'busy', root: join(root, 'apps', 'web', 'build-busy'), routes: ['/search?q=renewal', '/decide'] },
   ];
   const L = budget('layout');
-  const PORT = L.port;
 
   /**
    * Every route the app has, derived from the tree, plus a few extra addresses of the same routes.
@@ -234,7 +233,8 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
    * where no browser is installed. Any of those skipped all three closes. `run.mjs` calls this gate
    * IN-PROCESS, so what was skipped stayed open for the rest of the run. Measured on 21 September on
    * `keys.mjs`, which had the identical shape: a throw after the launch left the gate's port answering
-   * **HTTP 200**, the rebind every later gate needs came back **EADDRINUSE**, and the machine went from
+   * **HTTP 200**, the rebind a later gate then needed came back **EADDRINUSE** (the port was fixed
+   * then and is ephemeral now), and the machine went from
    * 18 browser processes to 21. With the `finally` the same throw rebinds free and the count returns
    * to 18.
    *
@@ -283,7 +283,15 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
       }
       res.writeHead(404).end();
     });
-    await new Promise((r) => server.listen(PORT, r));
+    /* AN EPHEMERAL PORT, AS `passkey.mjs` AND `queue.mjs` TAKE ONE. This gate used to bind a fixed
+       port out of `budgets.json`, and the CI runner is the same PC where sessions run this gate by
+       hand, so a CI run and a desk run of it could meet on one port and one of the two would go red
+       for a reason that is not in the tree (`loop/research-ci-gates.md` §2). Port 0 is a port the
+       operating system hands out free at the moment of the bind, and every URL below is built from
+       what it handed out. `localhost` still, because the bind names no host and takes the dual-stack
+       `::`, which is what `localhost` reaches first on this machine. */
+    await new Promise((r) => server.listen(0, r));
+    const PORT = server.address().port;
     await answers(`http://localhost:${PORT}`);
 
     const present = [];
@@ -630,7 +638,8 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
      */
     await browser?.close().catch(() => {});
     /* AWAITED, unlike the bare `server.close()` this replaces: the callback is the moment the listening
-       socket is actually gone, and the next gate in the run wants this exact port. */
+       socket is actually gone. The port is ephemeral, so no later gate is waiting on this number, but a
+       socket still listening is a handle that keeps the runner from exiting. */
     if (server !== null) await new Promise((r) => server.close(() => r()));
     await record.close().catch(() => {});
   }
