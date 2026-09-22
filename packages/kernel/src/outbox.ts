@@ -28,6 +28,9 @@ import { actionJitterMs } from './actions.ts';
  * What the DDL's `CHECK` admits. Another is a migration, which is the point of the check.
  *
  * `script.run` IS MIGRATION 12'S: one run of a `script` declaration, leased by a host that runs it in a sandbox.
+ *
+ * `infer.ask` IS AN AUTOMATION'S QUESTION TO SPARK (`flow.ts`, Brief C): `{ run, step, question, shape, choices?,
+ * about? }`, answered by an ack whose `result.text` is the answer. The `CHECK` that admits it is a migration of its own.
  */
 export const OUTBOX_KINDS = [
   'notify.email',
@@ -40,6 +43,7 @@ export const OUTBOX_KINDS = [
   'infer.prose',
   'infer.draft',
   'script.run',
+  'infer.ask',
 ] as const;
 
 export type OutboxKind = (typeof OUTBOX_KINDS)[number];
@@ -237,6 +241,13 @@ export type AckDeps = {
    * how one path acquires a channel the other has never heard of.
    */
   sendDigest?: (assembled: unknown, prose: string) => void;
+  /**
+   * Hand an automation the answer to the question it asked Spark, or the reason there is none.
+   *
+   * INJECTED FOR THE SAME REASON AGAIN. Where the answer goes, and what shape it must have to go there, is the run's
+   * business (`flow.ts`'s `answerStep`), and this file only knows that a job came back.
+   */
+  answerRun?: (a: { run: string; step: number; by: string; answer?: string; failed?: string }) => void;
 };
 
 /**
@@ -296,8 +307,30 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
       { at: 'kind' },
     );
 
+  /* THE SAME FOR A QUESTION A RUN IS WAITING ON. Marked done with nowhere to put the answer, the run would wait out its
+     day and fail as though Spark had never answered. */
+  if (row.kind === 'infer.ask' && !deps.answerRun)
+    return no<null>('NOT_IN_THIS_BUILD', `Job ${args.id} is an automation waiting on Spark's answer, and this host wired no way to hand it back.`, {
+      at: 'kind',
+    });
+
   if (args.state === 'done') {
     sql.exec("UPDATE outbox SET state = 'done', leased_until = NULL WHERE id = ?", args.id);
+
+    /* AN ANSWER TO AN AUTOMATION GOES BACK TO ITS RUN, in this transaction, which is the `infer.draft` branch's shape
+       below with a run where that has the gate. A reply with no text is still a reply: the run is told there was no
+       answer and stops with that sentence, rather than the job walking a ladder that would ask the same model again. */
+    if (row.kind === 'infer.ask') {
+      const asked = JSON.parse(row.payload) as { run?: unknown; step?: unknown };
+      const said = args.result as { text?: unknown } | undefined;
+      if (typeof asked.run === 'string' && typeof asked.step === 'number')
+        deps.answerRun?.(
+          typeof said?.text === 'string'
+            ? { run: asked.run, step: asked.step, by: args.id, answer: said.text }
+            : { run: asked.run, step: asked.step, by: args.id, failed: `Spark answered job ${args.id} with no text, so the run stopped at step ${asked.step + 1}.` },
+        );
+      return ok(null);
+    }
 
     /* AND THE RESULT GOES BACK IN, in this transaction. `infer.draft` is the analyser's one output:
        the model drafted a question and a body, and until now the ack marked the row done and threw
@@ -420,6 +453,22 @@ function deadLetter(
   deps: AckDeps,
   job: { id: string; kind: string; payload: string; attempts: number; error: string },
 ): void {
+  /* A QUESTION AN AUTOMATION ASKED ENDS ITS RUN INSTEAD. "Retry it, or change what produces it" has nothing to retry:
+     the run it would answer has stopped waiting by the time a person reads it, so the run fails here with the error as
+     its sentence, and the run is the item the owner sees. Both ends of the ladder come through here, an eighth failed
+     ack and an eighth abandoned lease. */
+  if (job.kind === 'infer.ask') {
+    const asked = JSON.parse(job.payload) as { run?: unknown; step?: unknown };
+    if (typeof asked.run === 'string' && typeof asked.step === 'number' && deps.answerRun) {
+      deps.answerRun({
+        run: asked.run,
+        step: asked.step,
+        by: job.id,
+        failed: `Spark could not be reached after ${job.attempts} attempts (${job.error}), so the run stopped at step ${asked.step + 1}.`,
+      });
+      return;
+    }
+  }
   openChangeSuggestion(sql, deps, {
     declarationId: 'kernel.outbox',
     from: { kind: job.kind, error: job.error, attempts: job.attempts, payload: summary(job.payload) },

@@ -24,6 +24,7 @@ import { ROUTES, handlersFor, serveApi } from '../../host/src/index.ts';
 import { createClient } from '../../client/src/index.ts';
 import { DEPTH_CEILING, RUNS_PER_DAY_CEILING, STEP_CEILING, VARS_CEILING, pathOf, triggerOf } from '../../kernel/src/flow-lint.ts';
 import { FLOOR_MS } from '../../kernel/src/pull.ts';
+import { ASK_PERSON_WAIT } from '../../kernel/src/flow.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { stub } from './stub.ts';
 
@@ -164,7 +165,7 @@ test('A PROPOSE OF A RULE CHANGE ANSWERS WITH ITS DRY RUN: what would start it a
     'Otherwise:',
     '  Tell the owner: Look now.',
     'Wait 2h.',
-    'Ask the owner "Pay the rent today?", yes or no, and keep the answer as pay. Not in this build: a run stops here, after the steps before it.',
+    'Ask in Decide "Pay the rent today?", yes or no, and keep the answer as pay. If nobody answers within 7d, the run stops here.',
   ]);
 
   assert.deepEqual(
@@ -217,22 +218,29 @@ test('THE DRY RUN SAYS THE PATH THE KERNEL TAKES, for every shape of trigger, si
 });
 
 test('WHAT THE DRY RUN SAYS OF A STEP THAT WAITS ON SOMEBODY ELSE IS WHAT A REAL RUN DOES IN THIS BUILD', async () => {
-  /* THE RECORD'S SENTENCE IS A COPY OF A FACT IN `flow.ts`, so it is held to a run of the real runner here: the day Brief C
-     builds those steps, this goes red and the sentence is taken out, rather than left promising a stop that no longer
-     happens. The grammar's `not_in_this_build` says the same thing and is held by the same run. */
+  /* THE RECORD'S SENTENCE IS A COPY OF A FACT IN `flow.ts`, so it is held to a run of the real runner here. It went red
+     the day Brief C built `ask_person`, as it said it would: the run read `waiting` where `failed` was expected. So an
+     ask of a person is said as the question Decide shows and the wait the runner arms, and the grammar no longer lists
+     it; a `call` still stops the run, and an ask of Spark, which no host answers yet, is refused at install. */
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   const asks = { rule: 'asks', on: { manual: true }, steps: [{ ask_person: { question: 'Go?', options: ['yes', 'no'], as: 'go' } }] };
   value(await api.kernel.install([rule(asks)]));
   const said = value<{ steps: string[] }>(await api.dryRun({ rule: asks as never }, owner));
-  assert.match(said.steps[0]!, /Not in this build: a run stops here/);
+  assert.equal(said.steps[0], `Ask in Decide "Go?", yes or no, and keep the answer as go. If nobody answers within ${ASK_PERSON_WAIT}, the run stops here.`);
   const { run } = value<{ run: string }>(await api.automationRun({ rule: 'asks' }, owner));
   await api.kernel.drain();
-  const row = sql.one<{ state: string; say: string }>('SELECT state, say FROM automation_run WHERE id = ?', run)!;
-  assert.equal(row.state, 'failed');
-  assert.match(row.say, /NOT_IN_THIS_BUILD/);
+  const row = sql.one<{ state: string; say: string | null }>('SELECT state, say FROM automation_run WHERE id = ?', run)!;
+  assert.equal(row.state, 'waiting', row.say ?? '');
+  assert.equal(sql.one<{ n: number }>("SELECT count(*) AS n FROM suggestion WHERE status = 'open' AND opened_by = 'rule:asks'")?.n, 1, 'no question was opened in Decide');
+
+  const spark = { rule: 'spark', on: { manual: true }, steps: [{ ask_spark: { question: 'Go?', as: 'go' } }] };
+  assert.match(value<{ steps: string[] }>(await api.dryRun({ rule: spark as never }, owner)).steps[0]!, /Not in this build: a rule with this step is refused at install/);
+  assert.equal(refusal(await api.kernel.install([rule(spark)])).code, 'NOT_IN_THIS_BUILD');
+
   const grammar = value<{ not_in_this_build: { steps: string[] } }>(await tools(api).read('braindog:grammar/automations', owner));
-  assert.ok(grammar.not_in_this_build.steps.includes('ask_person'));
+  assert.equal(grammar.not_in_this_build.steps.includes('ask_person'), false);
+  assert.ok(grammar.not_in_this_build.steps.includes('ask_spark'));
   sql.close();
 });
 
@@ -355,7 +363,7 @@ test('braindog:grammar/automations IS LISTED FOR ANY CALLER WHO READS, and its n
     answers: VARS_CEILING,
     shortest_clock: `${FLOOR_MS / 60_000}m`,
   });
-  assert.deepEqual(grammar.not_in_this_build, { triggers: ['metric', 'decided'], steps: ['call', 'script', 'ask_spark', 'ask_person'] });
+  assert.deepEqual(grammar.not_in_this_build, { triggers: ['metric', 'decided'], steps: ['call', 'script', 'ask_spark'] });
 
   /* A STUB ANSWERS IT TOO, since it is this package's own text asked of `version`, which every surface has. */
   assert.ok((await tools(stub().surface).resources({ who: 'agent' })).some((r) => r.uri === 'braindog:grammar/automations'));
@@ -371,6 +379,18 @@ test('EVERY EXAMPLE IN THE GRAMMAR INSTALLS ON A REAL RECORD AND DRY-RUNS, so th
     assert.ok(put.ok, `${example.id}: ${JSON.stringify(put)}`);
     value(await api.dryRun({ rule: example.body as never }, owner));
   }
+  sql.close();
+});
+
+test('THE GRAMMAR\'S ask_person STEP INSTALLS AS WRITTEN, so an agent copying it is not refused', async () => {
+  /* IT CARRIED `"to":"<person>"`, which the lint refuses as not in this build, and no test installed it: the examples
+     above are whole rules and this is one step. Measured red first: NOT_IN_THIS_BUILD at steps[0].ask_person.to. */
+  const { sql, api } = await record();
+  const grammar = contents(await readOver(api, 'braindog:grammar/automations', agent)) as { steps: Record<string, string> };
+  const written = grammar.steps.ask_person!;
+  const step = JSON.parse(written.slice(0, written.lastIndexOf('}}') + 2).replace(/<[a-z]+>/g, 'x')) as Record<string, unknown>;
+  const put = await api.kernel.install([rule({ rule: 'asks', on: { manual: true }, steps: [step] })]);
+  assert.ok(put.ok, JSON.stringify(put));
   sql.close();
 });
 

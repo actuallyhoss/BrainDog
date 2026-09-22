@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 
 import {
   STEP_GROUPS,
+  NOT_YET,
   VERBS,
   blankStep,
   blankTrigger,
@@ -322,9 +323,10 @@ test('A NUMBER IS COMPARED AS A LEAF, because the sentence grammar has no word f
   assert.equal(sayCondition('state is open'), 'state is open');
 });
 
-test('THE MENU OFFERS EVERY VERB THE RECORD READS, ONCE, in the five groups', () => {
+test('THE MENU OFFERS EVERY VERB THE RECORD READS AND INSTALLS, ONCE, in the five groups', () => {
   const offered = STEP_GROUPS.flatMap((g) => g.verbs);
-  assert.deepEqual([...offered].sort(), [...VERBS].sort());
+  assert.deepEqual([...offered, ...NOT_YET].sort(), [...VERBS].sort());
+  assert.ok(!offered.some((v) => NOT_YET.includes(v)), 'a verb the record refuses at install is not offered');
   assert.equal(new Set(offered).size, offered.length);
   assert.deepEqual(STEP_GROUPS.map((g) => g.label), ['Check', 'Change', 'Ask', 'Call out', 'Wait']);
 });
@@ -349,6 +351,8 @@ test('what the record would refuse is said before saving, in its own terms', () 
   assert.ok(faultsOf(fast).some((f) => /15 minutes/.test(f.say)));
   const blank = draftOf('w', { rule: 'w', on: { manual: true }, steps: [{ ask_spark: { question: '', as: '' } }] });
   assert.ok(faultsOf(blank).length >= 1);
+  const spark = draftOf('s', { rule: 's', on: { manual: true }, steps: [{ ask_spark: { question: 'Why?', as: 'why' } }] });
+  assert.ok(faultsOf(spark).some((f) => /not in this build/.test(f.say)), 'an ask_spark an agent wrote is named before Send');
   assert.deepEqual(faultsOf(branched()), []);
 });
 

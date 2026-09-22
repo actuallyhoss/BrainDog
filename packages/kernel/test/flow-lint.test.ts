@@ -161,7 +161,8 @@ test('THEN AND STEPS ARE ONE LIST OR THE OTHER, never both', () => {
 test('A STEP IS ONE OF THE CLOSED VERBS, and its answer lands under a name a template can read', () => {
   const one = (step: unknown) => code(rule({ rule: 'one', on: { manual: true }, steps: [step] }));
   assert.equal(one({ fetch: 'https://example.test' }), 'DECLARATION_INVALID');
-  assert.equal(one({ ask_spark: { question: 'Gold today?', as: 'rate', shape: 'number' } }), null);
+  /* A WELL-MADE ask_spark IS NOT IN THIS BUILD, since no host answers one; a malformed one is told what is wrong first. */
+  assert.equal(one({ ask_spark: { question: 'Gold today?', as: 'rate', shape: 'number' } }), 'NOT_IN_THIS_BUILD');
   assert.equal(one({ ask_spark: { question: 'Gold today?', as: 'Rate!' } }), 'DECLARATION_INVALID');
   assert.equal(one({ ask_spark: { question: 'Which?', as: 'vars' } }), 'DECLARATION_INVALID');
   assert.equal(one({ ask_spark: { question: 'Which?', as: 'pick', shape: 'choice' } }), 'REQUIRED_MISSING');

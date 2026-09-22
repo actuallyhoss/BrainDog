@@ -186,19 +186,23 @@ test('WHEN A CHANGE TAKES TWO FIELDS AND THE FIGURE READS ONE, THE REFUSAL NAMES
 });
 
 test('A FIGURE ALREADY FAILING BEFORE THE CHANGE DOES NOT HOLD UP A CHANGE THAT BREAKS NOTHING MORE', async () => {
-  /* The only way this record reaches that state is the one this check does not guard: a pack upgrade through
-     `stageInstall` that drops a field an owner's figure sums. */
+  /* This record reached that state by the one path this check did not guard, a pack upgrade through `stageInstall`
+     that drops a field an owner's figure sums. `stageInstall` runs `stranded` now and refuses it, so the state is
+     written into the table as an earlier build left it. */
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
   const land = async (batch: Declaration[]) => {
     const staged = await k.stageInstall(batch.map((d) => ({ ...d, pack: 'third' })) as Declaration[]);
-    assert.equal(answer(staged), 'installed');
-    assert.equal(answer((staged as { value: () => unknown }).value()), 'installed');
+    if (!staged.ok) return answer(staged);
+    const out = answer((staged as { value: () => unknown }).value());
     k.reload();
+    return out;
   };
-  await land([ledger()]);
+  assert.equal(await land([ledger()]), 'installed');
   assert.equal(answer(await k.install([metric()])), 'installed');
-  await land([dropping('amount')]);
+  assert.equal(await land([dropping('amount')]), 'FIELD_UNKNOWN at metric.total');
+  sql.exec("UPDATE declaration SET body = ? WHERE id = 'register.ledger' AND superseded_at IS NULL", JSON.stringify(dropping('amount').body));
+  k.reload();
   assert.equal(answer(await k.install([ledger(FIELDS.filter((f) => f.id !== 'amount' && f.id !== 'party'))])), 'installed');
   sql.close();
 });

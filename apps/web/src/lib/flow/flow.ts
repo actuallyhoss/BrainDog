@@ -571,11 +571,15 @@ export const VERB_LABELS: Record<Verb, string> = {
   schedule: 'Come back later',
 };
 
-/** §6's five groups, in the order the menu draws them. Every verb is in exactly one. */
+/** Verbs the record reads but refuses at install in this build, so the menu does not offer them. Asking Spark waits on a
+    host that answers `infer.ask` (`packages/kernel/src/flow-lint.ts`); a body an agent wrote with one says so before Send. */
+export const NOT_YET: readonly Verb[] = ['ask_spark'];
+
+/** §6's five groups, in the order the menu draws them. Every verb the menu offers is in exactly one. */
 export const STEP_GROUPS: readonly { label: string; verbs: readonly Verb[] }[] = [
   { label: 'Check', verbs: ['if', 'set_var', 'stop'] },
   { label: 'Change', verbs: ['tag', 'untag', 'set', 'move', 'link', 'note', 'create'] },
-  { label: 'Ask', verbs: ['notify', 'suggest', 'ask_person', 'ask_spark'] },
+  { label: 'Ask', verbs: ['notify', 'suggest', 'ask_person'] },
   { label: 'Call out', verbs: ['call', 'run', 'script'] },
   { label: 'Wait', verbs: ['wait', 'schedule'] },
 ];
@@ -1031,6 +1035,7 @@ export function faultsOf(d: Draft): Fault[] {
         out.push({ key: n.key, say: 'This step names no verb this build reads.' });
         continue;
       }
+      if (NOT_YET.includes(verb)) out.push({ key: n.key, say: `"${VERB_LABELS[verb]}" is not in this build yet, so the record would refuse it. Ask a person instead.` });
       if (rowless && ROW_VERBS.includes(verb)) out.push({ key: n.key, say: `${sayTrigger(t)} brings no row, and "${sayStep(n.step)}" acts on one.` });
       for (const arg of ARGS[verb]) {
         const v = getAt(n.step, arg.path);

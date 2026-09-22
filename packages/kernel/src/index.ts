@@ -131,6 +131,7 @@ import {
 import { CREATE_CEILING, applyRule, dryRun, marker, runRules, type Applied as RuleApplied, type DryRun, type FlowDecl, type RuleDecl, type RulesDeps } from './rules.ts';
 import {
   advance as advanceRun,
+  answerStep,
   cancelRun,
   cancelRunsOf,
   clockKey,
@@ -303,7 +304,9 @@ export { MAP_TYPES, mapField, select, type MapDeps, type Mapped, type Mapping } 
 export type { ExtractDecl, ExtractDeps } from './extract.ts';
 export type { MetricPoint, PageWrote, PulledPage, PulledRow } from './fetched.ts';
 export type { Fired as PullFired, PullDecl, PullDeps } from './pull.ts';
-export { egressChanged } from './script.ts';
+/* `scriptBody` IS THE SHAPE CHECK A DRAFT MEETS BEFORE IT IS TRIED, the one install runs, so `scriptTry` in the record refuses
+   what an install would and never runs a body the record could not hold. */
+export { egressChanged, scriptBody } from './script.ts';
 export { finishScript, prepareScript, resumeScript, REFUSED_IN_A_ROW, type ScriptAnswer, type ScriptRunner, type ScriptRunDeps, type ScriptUnrun, type Scripted } from './script-run.ts';
 export { ACTION_KINDS, ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, KEYS_REACH_ALL, RULE_CALLS_PER_DAY, actionJitterMs, answerHash, approvalLines, egressOf, originsOf, reserveFor } from './actions.ts';
 export type {
@@ -348,7 +351,18 @@ export type DeclaredBy = { actor: string; suggestion?: string };
  * One pack as `packStates()` reads it. `version` is `null` for a pack the seed owns by its body, which
  * has no `pack` row to carry one; `registers` are the ones it holds while on and the ones it went off with.
  */
-export type PackState = { id: string; version: string | null; disabled_at: string | null; registers: string[] };
+export type PackState = {
+  id: string;
+  version: string | null;
+  disabled_at: string | null;
+  registers: string[];
+  /**
+   * Holds declarations another pack handed it, and was never installed: no `pack` row, and live declarations whose
+   * `pack_id` names it. Read as on at no version otherwise, which is how `bank-hsbc-eg` looked after money-core handed it
+   * a door (`declare`'s `test/plan-handover-shown.test.ts`).
+   */
+  handed?: true;
+};
 
 /**
  * One saved view: a register's way of looking at itself, as `views()` and `view()` read it.
@@ -3825,7 +3839,44 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       return typeof value === 'string' && value !== '' ? value : null;
     },
     tz: recordIdentity(sql)?.tz ?? 'UTC',
+    /* THROUGH THE GATE'S OWN `propose`, as a rule's `suggest` goes, so a run's question is a suggestion like any other:
+       the same checks, the same `suggest` event, the same queue. The run and the step ride on the body, which is what
+       `decide` below reads to find the run it answers. */
+    ask: (question, options, actor, about) =>
+      openSuggestion(governDeps(), actor, {
+        question,
+        body_kind: 'options',
+        body: {
+          options: options.map((label, i) => ({ id: `o${i + 1}`, label, because: `${actor.replace(/^rule:/, 'rule.')} waits on this answer` })),
+          requires_reason: true,
+          run: about.run,
+          step: about.step,
+        },
+      }),
+    withdraw: (suggestion, actor, why) => void decide(governDeps(), suggestion, { resolved_as: 'wont-fix', reason: why }, actor),
   });
+
+  /**
+   * A decision just made on a question an automation asked: hand the pick to the run, or tell it no answer is coming.
+   *
+   * HERE AND NOT IN `govern.ts`'s `decide`, because this is the one door every decision comes through and the gate is
+   * the record's own, knowing nothing of runs; and inside `decide`'s own `attempt`, so a decision that rolls back never
+   * moved the run. A put-off question is not an answer and changes nothing.
+   */
+  const answered = (id: string, verdict: Verdict): void => {
+    if ('defer' in verdict) return;
+    const body = sql.one<{ body: string }>('SELECT body FROM suggestion WHERE id = ?', id)?.body;
+    const parsed = body === undefined ? null : (JSON.parse(body) as { run?: unknown; step?: unknown; options?: { id?: unknown; label?: unknown }[] });
+    if (typeof parsed?.run !== 'string' || typeof parsed.step !== 'number') return;
+    const at = { run: parsed.run, step: parsed.step, by: id };
+    if ('decide' in verdict) {
+      const label = parsed.options?.find((o) => o.id === verdict.decide.option)?.label;
+      if (typeof label === 'string') void answerStep(flowDeps(), { ...at, answer: label });
+      return;
+    }
+    const how = 'resolved_as' in verdict ? verdict.resolved_as : 'by rule';
+    void answerStep(flowDeps(), { ...at, failed: `${id} was closed without an answer (${how}), so the run stopped at step ${parsed.step + 1}.` });
+  };
 
   /** Take a run's steps with its depth set, so a write it makes starts a chained run one deeper. */
   const advanceAt = (run: string): number | null => {
@@ -4103,6 +4154,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
        and parked on this row; the ack is where it leaves. Two sentences at most, capped here rather
        than trusted from the wire — 45 §5.10. */
     sendDigest: (assembled, prose) => sendDigest(digestDeps(), assembled as Assembled, twoSentences(prose)),
+    /* AND AN AUTOMATION'S QUESTION TO SPARK, answered into its run in the ack's transaction. */
+    answerRun: (a) => void answerStep(flowDeps(), a),
   });
 
   /** The same, plus who is asking and which record this is — the two halves of a `grant.read` row. */
@@ -5526,7 +5579,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * asynchronous and a decision that resolved before its change landed would be a lie.
      */
     decide: (id: string, verdict: Verdict, actor: string): Result<Decided> =>
-      attempt(sql, transaction, () => decide(governDeps(), id, verdict, actor)),
+      attempt(sql, transaction, () => {
+        const out = decide(governDeps(), id, verdict, actor);
+        if (out.ok) answered(id, verdict);
+        return out;
+      }),
 
     /** Put one back in the queue, for the change the gate accepted and could not land. */
     reopen: (id: string, why?: string): Result<null> => transaction(() => reopen(governDeps(), id, why)),
@@ -5843,8 +5900,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          `known`, `metricFieldFault` returns before it looks, and `loop/research-batch-twenty-audit.md` §1 measured a
          third party's pack whose figure summed `nosuch` plan ok, install ok and read `FIELD_UNKNOWN` on every page,
          while the same figure through `install` was refused. Every `installPack` and every accepted pack proposal
-         comes through here, so a check that only `install` ran was a check a pack never met. */
-      const cannot = unreadable(batch) ?? lintBatch(sql, batch);
+         comes through here, so a check that only `install` ran was a check a pack never met.
+
+         AND `stranded` FOR THE SAME REASON. Without it a pack update that opened `lane` to text staged here with its own
+         figure resent beside it unchanged, and `lane is earning money` read 1 before and 0 after with nothing refused
+         (`packages/record/test/plan-widen-record.test.ts`); `arriving` already treats a reader sent with the same bytes as
+         the record's and not the batch's. */
+      const cannot = unreadable(batch) ?? lintBatch(sql, batch) ?? stranded(batch);
       if (cannot) return { ok: false as const, refusal: cannot };
       const staged = await stageDeclarations(batch);
       if (!staged.ok) return staged;
@@ -5931,7 +5993,20 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     disablePack(id: string, opts: { alsoDisable?: readonly string[]; actor?: string } = {}): Result<PackToggle> {
       const refused = schemaRefusal(state);
       if (refused) return refused;
-      const out = disableDeclaredPack(sql, clock.now(), id, opts, transaction, mint);
+      /* THE PACK'S AUTOMATIONS STOP WITH IT, IN THE SAME TRANSACTION (audit thirty-five §3). Left to the wake, a pack
+         turned off and on again inside the wait put the rule back live first, and the run then wrote `note: chased` and
+         notified "Chased Rent" for an owner who had switched it off. `attempt` and not `transaction`, because the
+         kernel's transaction is re-entrant: `declare.ts`'s own would become a no-op inside this one, and a refusal it
+         carried out would commit the retires made before it. */
+      const out = attempt(sql, transaction, () => {
+        const done = disableDeclaredPack(sql, clock.now(), id, opts, transaction, mint);
+        if (!done.ok || !done.value.changed) return done;
+        const packs = done.value.packs;
+        const off = packs.length === 1 ? `pack ${packs[0]} was` : `packs ${packs.join(', ')} were`;
+        for (const d of done.value.declarations)
+          if (d.startsWith('rule.')) cancelRunsOf(flowDeps(), d.slice('rule.'.length), `${off} turned off, and ${d} with it, so this run stopped before its next step.`);
+        return done;
+      });
       if (out.ok && out.value.changed) reload();
       return out;
     },
@@ -6043,6 +6118,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         }
       };
       const registersOf = (ids: readonly string[]) => ids.filter((d) => d.startsWith('register.')).map((d) => d.slice('register.'.length));
+      /* WHO A LIVE DECLARATION'S `pack_id` NAMES. The seed's body-owned packs leave `pack_id` null and the pack path writes
+         a `pack` row with it, so a `pack_id` with no row is what a handover leaves and nothing else does. */
+      const pinned = new Set(
+        sql.all<{ pack_id: string }>('SELECT DISTINCT pack_id FROM declaration WHERE superseded_at IS NULL AND retired = 0 AND pack_id IS NOT NULL').map((r) => r.pack_id),
+      );
 
       const out: PackState[] = [];
       /* `kernel` IS THE RECORD'S OWN and no person may turn it off, so it is not a pack on this list. */
@@ -6053,7 +6133,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         const offAt = row ? row.disabled_at : on.length === 0 && last.get(id)?.kind === 'retire' ? (last.get(id)?.ts ?? null) : null;
         /* A BODY-OWNED PACK WITH NOTHING LIVE AND NO `retire` LAST was uninstalled, or never was. */
         if (!row && on.length === 0 && offAt === null) continue;
-        out.push({ id, version: row?.version ?? null, disabled_at: offAt, registers: registersOf(offAt === null ? on : wentOff(id)) });
+        out.push({
+          id,
+          version: row?.version ?? null,
+          disabled_at: offAt,
+          registers: registersOf(offAt === null ? on : wentOff(id)),
+          ...(!row && offAt === null && pinned.has(id) ? { handed: true as const } : {}),
+        });
       }
       return out.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
     },

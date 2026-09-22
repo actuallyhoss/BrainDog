@@ -51,16 +51,21 @@ export function subjectOf(body: Body): string | null {
 /* ── what a body would do ───────────────────────────────────────────── */
 
 /**
- * The steps that hand off to somebody else and come back later. `flow.ts` fails a run that reaches one with
- * `NOT_IN_THIS_BUILD`, after taking every step before it, until Brief C lands.
+ * The steps that hand off to somebody else and do not come back in this build. `flow.ts` fails a run that reaches a
+ * `call` or a `script` with `NOT_IN_THIS_BUILD`, after taking every step before it, and the lint refuses `ask_spark` at
+ * install, because no host serves the question it would queue. `ask_person` is not here: it opens its question in
+ * Decide and the decision wakes the run (Brief C).
  *
- * SAID IN THE DRY RUN BECAUSE THE LINT LETS THEM INSTALL, so that the canvas can draw them. An agent told only "would ask
- * the owner" files the rule, the owner accepts it, and the first run fails at that step while its author reads the dry
- * run as a promise. The test that holds this list runs a real one.
+ * SAID IN THE DRY RUN BECAUSE THE DRY RUN IS NOT THE LINT. `call` and `script` install so that the canvas can draw
+ * them, and an agent told only "would call" files the rule, the owner accepts it, and the first run fails at that step
+ * while its author reads the dry run as a promise. The test that holds this list runs a real one.
  */
-export const WAITS_ON_OTHERS: readonly string[] = ['call', 'script', 'ask_spark', 'ask_person'];
+export const WAITS_ON_OTHERS: readonly string[] = ['call', 'script', 'ask_spark'];
 
 const NOT_BUILT = ' Not in this build: a run stops here, after the steps before it.';
+const NOT_INSTALLED = ' Not in this build: a rule with this step is refused at install.';
+/** `flow.ts`'s `ASK_PERSON_WAIT`, copied for the reason the three above are and held by the same test. */
+const ASK_PERSON_WAIT = '7d';
 
 export type Said = {
   path: 'inline' | 'run';
@@ -162,12 +167,13 @@ function stepLines(step: unknown, depth: number, out: string[]): void {
     return line(`Call ${words(spec('call').ingest)}, a declared call${as}.${NOT_BUILT}`);
   }
   if ('script' in s) return line(`Run script.${words(spec('script').id)}, and keep its answer as ${words(spec('script').as)}.${NOT_BUILT}`);
-  if ('ask_spark' in s) return line(`Ask Spark ${JSON.stringify(words(spec('ask_spark').question))}, and keep the answer as ${words(spec('ask_spark').as)}.${NOT_BUILT}`);
+  if ('ask_spark' in s) return line(`Ask Spark ${JSON.stringify(words(spec('ask_spark').question))}, and keep the answer as ${words(spec('ask_spark').as)}.${NOT_INSTALLED}`);
   if ('ask_person' in s) {
+    /* IN DECIDE, WHERE ANYONE WHO DECIDES ANSWERS IT: nothing addresses a question to one person, and the lint refuses
+       `to:` for that reason, so the line names no person. */
     const ask = spec('ask_person');
-    const who = typeof ask.to === 'string' ? ask.to : 'the owner';
-    const wait = typeof ask.wait === 'string' ? ` It waits ${ask.wait} for an answer.` : '';
-    return line(`Ask ${who} ${JSON.stringify(words(ask.question))}, ${listed(ask.options)}, and keep the answer as ${words(ask.as)}.${wait}${NOT_BUILT}`);
+    const wait = typeof ask.wait === 'string' ? ask.wait : ASK_PERSON_WAIT;
+    return line(`Ask in Decide ${JSON.stringify(words(ask.question))}, ${listed(ask.options)}, and keep the answer as ${words(ask.as)}. If nobody answers within ${wait}, the run stops here.`);
   }
   if ('tag' in s) return line(`Tag the row ${words(s.tag)}.`);
   if ('untag' in s) return line(`Take the tag ${words(s.untag)} off the row.`);

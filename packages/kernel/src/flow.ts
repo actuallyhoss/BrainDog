@@ -14,23 +14,35 @@
  * and the rest therefore meet the write path, the transitions and `create`'s bound exactly as an inline rule's do,
  * with the rule's own name as the actor. Two things are changed for a step, and both are said where they are done.
  *
- * WHAT WAITS ON SOMEBODY ELSE IS NOT IN THIS BUILD. `call`, `script`, `ask_spark` and `ask_person` hand off and come
- * back through machinery Brief C adds; until then a run that reaches one fails there with a sentence, and the lint
- * already lets them install so that the canvas can draw them.
+ * A STEP THAT ASKS HANDS OFF AND PARKS, AND THE ANSWER IS WHAT WAKES IT (Brief C). `ask_person` opens an `options`
+ * suggestion whose body names the run and the step, and the kernel's `decide` hands the pick to `answerStep` in the
+ * decision's own transaction. `ask_spark` queues one `infer.ask` outbox row, and the outbox's `ack` hands the model's
+ * text to `answerStep` in the ack's transaction. Either way the step row says `waiting` and holds what it is waiting on,
+ * the suggestion or the job, and the run's schedule row is armed for the end of the wait: a wake that finds the step
+ * still `waiting` is the wait running out, and fails the run with a sentence.
+ *
+ * ASKING SPARK IS BUILT HERE AND NOT SERVED. No host leases an `infer.ask` job yet, so `advance` fails a run that
+ * reaches one with `NOT_IN_THIS_BUILD` before anything is queued, and the lint refuses the step at install. The day a
+ * host serves the job, that one check in `advance` and the lint's refusal come out together.
+ *
+ * `call` AND `script` ARE STILL NOT IN THIS BUILD. A call's answer comes back through `finishAction` and a script's
+ * through `finishScript`, and neither carries a run yet; a run that reaches one fails there with a sentence, and the
+ * lint lets them install so that the canvas can draw them.
  */
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
-import { no, ok, refused } from '@braindog/ports';
+import { fixOf, no, ok, refused } from '@braindog/ports';
 import { compile, evaluate, type Predicate, type Schema } from '@braindog/where';
 
 import { meter, type Metered } from './actions.ts';
 import { nextOccurrence } from './digest.ts';
-import { RUNS_PER_DAY_CEILING, pathOf, triggerOf } from './flow-lint.ts';
+import { RUNS_PER_DAY_CEILING, pathOf, triggerOf, UNSENDABLE } from './flow-lint.ts';
 import type { Entry } from './index.ts';
 import { instant } from './migrate.ts';
 import { predicateOf, type EvalContext } from './metrics.ts';
+import { enqueue } from './outbox.ts';
 import { intervalMs } from './pull.ts';
-import { marker, onceKey, runRules, type FlowDecl, type RuleAction, type RuleDecl, type RulesDeps, type Trigger } from './rules.ts';
+import { fill as fillRow, marker, onceKey, runRules, type FlowDecl, type RuleAction, type RuleDecl, type RulesDeps, type Trigger } from './rules.ts';
 
 /** Three, as §4.1 says: a run started by a rule's write carries its depth plus one, and the fourth is not started. */
 export const CHAIN_CEILING = 3;
@@ -40,6 +52,16 @@ const VARS_BYTES = 65_536;
 /** A finished run older than this goes in the hourly sweep. Its metered `pull` event stays, which is its one line. */
 export const KEEP_RUNS_MS = 90 * 86_400_000;
 const DAY_MS = 86_400_000;
+/** §4.3: a question put to a person waits a week unless its step says `wait:`. */
+export const ASK_PERSON_WAIT = '7d';
+/**
+ * How long a run waits on Spark before it stops.
+ *
+ * A DAY, BECAUSE THE OUTBOX'S OWN LADDER IS OVER LONG BEFORE IT. Eight failed attempts end in about four hours, and that
+ * path fails the run at once; this is for the other one, a host that serves no `infer.ask` at all and leaves the row
+ * `pending`, which without a bound would park the run for the ninety days a run is kept.
+ */
+export const ASK_SPARK_WAIT_MS = DAY_MS;
 
 /** The keys of the two kinds of `rule` schedule row this file owns. A rule's own reminders are `<rule>:<row>`. */
 export const runKey = (run: string): string => `flow.run:${run}`;
@@ -58,6 +80,13 @@ export type FlowDeps = {
   /** The project a row belongs to, by its register's scope field, or `null` for a global row. */
   projectOf: (entry: Entry) => string | null;
   tz: string;
+  /**
+   * Put a question of options in front of the record's people, through the gate's own `propose`. `about` goes on the
+   * suggestion's body, which is how `decide` finds the run it answers.
+   */
+  ask: (question: string, options: readonly string[], actor: string, about: { run: string; step: number }) => Result<{ id: string }>;
+  /** Close a question nobody will read the answer to, as `wont-fix` with the reason. A question already closed is left. */
+  withdraw: (suggestion: string, actor: string, why: string) => void;
 };
 
 /** A run-path rule as installed: its bare id, the version a run pins, and its body. */
@@ -170,12 +199,18 @@ function stopped(sql: Sql, rule: string): string | null {
  * Cancel every unfinished run of a rule that has just been switched off or retired, with the reason as its sentence.
  *
  * CALLED IN THE TRANSACTION THAT STOPS THE RULE, so the screen that switched it off never shows a run still waiting
- * under it. `advance` asks the same question at every wake as well, because a pack turned off retires its rules in
- * `declare.ts` and not through the kernel's `retire`, and that path does not come through here.
+ * under it: an install that says `enabled: false`, the kernel's `retire`, and a pack turned off. The last retires its
+ * rules in `declare.ts` and did not come through here until audit thirty-five §3 measured why it must: a pack turned off
+ * and on again before the wake had its run wake under the rule turned back on, write its row and notify. `advance` still
+ * asks at every wake, for a record an earlier build left holding a run of a rule already gone.
+ *
+ * `because` IS THE SENTENCE WHEN THE CALLER KNOWS MORE THAN THE ROW DOES. A pack's rule reads as retired, and "retired"
+ * sends the owner looking for a retire nobody made.
  */
-export function cancelRunsOf(deps: FlowDeps, rule: string): number {
-  const say = stopped(deps.sql, rule);
-  if (say === null) return 0;
+export function cancelRunsOf(deps: FlowDeps, rule: string, because?: string): number {
+  const off = stopped(deps.sql, rule);
+  if (off === null) return 0;
+  const say = because ?? off;
   const open = deps.sql.all<RunRow>(
     "SELECT id, rule, version, trigger, state, step, vars, depth, project, actor FROM automation_run WHERE rule = ? AND state IN ('pending', 'running', 'waiting')",
     rule,
@@ -430,9 +465,11 @@ export function advance(deps: FlowDeps, id: string): number | null {
   const scope = () => ({ vars, trigger: context(deps, trigger, read()) });
   deps.sql.exec("UPDATE automation_run SET state = 'running' WHERE id = ?", id);
 
+  /* FINISHED BEFORE THE STEP ROW SAYS FAILED, because `finish` lets go of whatever a `waiting` step row still holds,
+     and the expiry of an ask is a failure whose row was `waiting` until this line. */
   const fail = (n: number, kind: string, say: string): null => {
-    record(deps, id, n, kind, 'failed', null);
     finish(deps, { ...run, step: n }, 'failed', say, vars);
+    record(deps, id, n, kind, 'failed', null);
     return null;
   };
 
@@ -494,11 +531,46 @@ export function advance(deps: FlowDeps, id: string): number | null {
         continue;
       }
 
-      if (op.verb === 'call' || op.verb === 'script' || op.verb === 'ask_spark' || op.verb === 'ask_person')
+      /* SPARK IS NOT ASKED WHILE NOTHING WOULD ANSWER: a question queued for no host waits its day and fails, having
+         asked nobody. Before anything is queued, for a rule an earlier build let install; the lint refuses it now. */
+      if (op.verb === 'ask_spark')
         return fail(
           i,
           op.verb,
-          `rule.${run.rule} reached a ${op.verb} step, and a step that waits on ${op.verb === 'call' ? 'a call' : op.verb === 'script' ? 'a script' : op.verb === 'ask_spark' ? 'Spark' : 'a person'} is not in this build (NOT_IN_THIS_BUILD). The steps before it were taken.`,
+          `rule.${run.rule} reached an ask_spark step, and no host in this build answers an automation's question to Spark (NOT_IN_THIS_BUILD). The steps before it were taken.`,
+        );
+
+      if (op.verb === 'ask_person' || op.verb === 'ask_spark') {
+        /* THE SECOND TIME AN ASK IS REACHED IS THE END OF ITS WAIT, as for `wait`. An answer moves the run past the
+           step before the drain comes back (`answerStep`), so a wake that lands here with the row still `waiting` is
+           a wake nobody answered before. */
+        const was = deps.sql.one<{ state: string; answer: string | null }>('SELECT state, answer FROM automation_step WHERE run = ? AND n = ?', id, i);
+        if (was?.state === 'done') {
+          i = saved(i + 1);
+          continue;
+        }
+        if (was?.state === 'waiting') {
+          const spec = step[op.verb] as { wait?: string };
+          return fail(
+            i,
+            op.verb,
+            op.verb === 'ask_person'
+              ? `rule.${run.rule} asked ${was.answer ?? 'a question'} at step ${i + 1}, and nobody answered it within ${spec.wait ?? ASK_PERSON_WAIT}, so the run stopped there.`
+              : `rule.${run.rule} asked Spark at step ${i + 1}, and Spark did not answer within a day, so the run stopped there.`,
+          );
+        }
+        const asked = ask(deps, run.rule, op.verb, step, i, id, scope(), read(), actor);
+        if (!asked.ok) return fail(i, op.verb, asked.say);
+        record(deps, id, i, op.verb, 'waiting', asked.holds);
+        deps.sql.exec("UPDATE automation_run SET state = 'waiting', step = ?, vars = ? WHERE id = ?", i, JSON.stringify(vars), id);
+        return deps.nowMs + asked.waitMs;
+      }
+
+      if (op.verb === 'call' || op.verb === 'script')
+        return fail(
+          i,
+          op.verb,
+          `rule.${run.rule} reached a ${op.verb} step, and a step that waits on ${op.verb === 'call' ? 'a call' : 'a script'} is not in this build (NOT_IN_THIS_BUILD). The steps before it were taken.`,
         );
 
       const acted = act(deps, run.rule, op.verb, fill(step, scope()) as RuleAction, subject, id, actor, subject === null ? last : null);
@@ -577,6 +649,143 @@ function act(
   return { ok: true, stop: out.stopped, answer: call ? call.outcome : null };
 }
 
+/**
+ * Put an ask's question where it will be answered: the suggestion queue for a person, the outbox for Spark. What it
+ * hands back is the id the step row holds while it waits, and how long it waits.
+ *
+ * THE QUESTION IS FILLED TWICE, as a `notify` is: `{{vars.…}}` and `{{trigger.…}}` by the run, then the row's own
+ * `{{what}}` by the pass's `fill`. The options are not filled, because they are the answers an `if` after the step
+ * compares against, and an answer that changed with the row would never match the condition written for it.
+ */
+function ask(
+  deps: FlowDeps,
+  rule: string,
+  verb: 'ask_person' | 'ask_spark',
+  step: Record<string, unknown>,
+  n: number,
+  run: string,
+  scope: Record<string, unknown>,
+  row: Entry | null,
+  actor: string,
+): { ok: true; holds: string; waitMs: number } | { ok: false; say: string } {
+  const spec = step[verb] as { question: string; options?: string[]; wait?: string; about?: string[]; shape?: string; choices?: string[] };
+  let question = String(fill(spec.question, scope));
+  if (row) question = fillRow(question, row, deps.nowMs);
+  if (question.length > VAR_BYTES) return { ok: false, say: `rule.${rule}'s question at step ${n + 1} runs to ${question.length} characters, and a question holds ${VAR_BYTES}.` };
+
+  if (verb === 'ask_person') {
+    const waitMs = intervalMs(spec.wait ?? ASK_PERSON_WAIT);
+    if (waitMs === null) return { ok: false, say: `rule.${rule} waits ${JSON.stringify(spec.wait)} for an answer at step ${n + 1}, and a span is a number and one of m, h, d or w.` };
+    const opened = deps.ask(question, spec.options ?? [], actor, { run, step: n });
+    if (!opened.ok) return { ok: false, say: `rule.${rule} could not ask its question at step ${n + 1}: ${fixOf(opened)}` };
+    return { ok: true, holds: opened.value.id, waitMs };
+  }
+
+  /* `about` IS THE FIELDS OF THE RUN'S ROW THAT GO WITH THE QUESTION, and nothing else of the record does. A field typed
+     secret or file is left out here whatever the lint let through, as `queueCall` leaves one out of what a call sends:
+     the install check is one check and this is the second. */
+  const about: Record<string, unknown> = {};
+  const types = row ? deps.schemaOf(row.register)?.fields : undefined;
+  for (const field of spec.about ?? []) {
+    if (UNSENDABLE.includes(String(types?.[field]?.type))) continue;
+    about[field] = row?.fields[field] ?? null;
+  }
+  const job = enqueue(deps.sql, deps.mint, deps.nowMs, 'infer.ask', {
+    run,
+    step: n,
+    question,
+    shape: spec.shape ?? 'text',
+    ...(spec.choices === undefined ? {} : { choices: spec.choices }),
+    ...(spec.about === undefined ? {} : { about }),
+  });
+  return { ok: true, holds: job, waitMs: ASK_SPARK_WAIT_MS };
+}
+
+/**
+ * An answer to a step that asked: from `decide` for a person, from the outbox's `ack` for Spark. Called in the
+ * transaction that carries the answer, so a decision that rolls back never moved the run.
+ *
+ * AN ANSWER TO A RUN THAT IS NOT WAITING ON THAT STEP CHANGES NOTHING. A run cancelled, switched off or timed out lets
+ * go of its question when it ends, but a host may still be holding a Spark job it leased before then, and its ack is not
+ * the host's fault; the job is done and the run stays as it ended.
+ *
+ * `by` IS THE SUGGESTION OR THE JOB THE ANSWER CAME THROUGH, AND IT HAS TO BE THE ONE THE STEP ROW HOLDS. The run and
+ * the step ride on a suggestion's body, and the gate lets any proposer put any key there: before this check an agent's
+ * own options suggestion carrying a waiting run's id and step, decided by a person who read it as the agent's question,
+ * wrote its label into the run as the answer and woke it, and the run's real question stayed open with nothing behind
+ * it. Closing such a suggestion unanswered failed the run the same way.
+ *
+ * THE ANSWER IS WRITTEN AND THE STEP IS PASSED HERE, AND THE NEXT STEP IS THE DRAIN'S. The run goes `pending` with its
+ * wake row armed for now, as a trigger leaves one, so the steps after the answer are taken where every other step is,
+ * and a decision on a screen never runs a rule's writes inside the person's own request.
+ */
+export function answerStep(deps: FlowDeps, a: { run: string; step: number; by: string; answer?: string; failed?: string }): Result<null> {
+  const run = deps.sql.one<RunRow>('SELECT id, rule, version, trigger, state, step, vars, depth, project, actor FROM automation_run WHERE id = ?', a.run);
+  if (!run || run.state !== 'waiting' || run.step !== a.step) return ok(null);
+  const row = deps.sql.one<{ kind: string; state: string; answer: string | null }>('SELECT kind, state, answer FROM automation_step WHERE run = ? AND n = ?', a.run, a.step);
+  if (!row || row.state !== 'waiting' || row.answer !== a.by || (row.kind !== 'ask_person' && row.kind !== 'ask_spark')) return ok(null);
+
+  const stop = (say: string): Result<null> => {
+    finish(deps, run, 'failed', say);
+    record(deps, run.id, a.step, row.kind, 'failed', null);
+    return ok(null);
+  };
+  if (a.failed !== undefined || a.answer === undefined) return stop(a.failed ?? `rule.${run.rule}'s question at step ${a.step + 1} came back with no answer.`);
+
+  const decl = pinned(deps.sql, run.rule, run.version);
+  const spec = (decl ? plan(decl.steps ?? decl.then)[a.step]?.step[row.kind] : undefined) as { as?: string; shape?: string; choices?: string[] } | undefined;
+  if (!spec || typeof spec.as !== 'string') return stop(`rule.${run.rule} version ${run.version} has no ask at step ${a.step + 1} to answer.`);
+
+  /* SPARK'S TEXT IS HELD TO THE SHAPE THE STEP ASKED FOR. A person picks from the options, which `decide` has already
+     held them to; a model writes whatever it writes, and a `number` that arrives as "about four" would reach an `if`
+     that compares it as text and quietly takes the wrong arm. */
+  const said = a.answer.trim();
+  let value: string | number = said;
+  if (row.kind === 'ask_spark' && spec.shape === 'number') {
+    const n = Number(said.replace(/,/g, ''));
+    if (said === '' || !Number.isFinite(n)) return stop(`Spark answered ${JSON.stringify(said.slice(0, 80))} at step ${a.step + 1} of rule.${run.rule}, which asked for a number.`);
+    value = n;
+  }
+  if (row.kind === 'ask_spark' && spec.shape === 'choice') {
+    const hit = (spec.choices ?? []).find((c) => c.toLowerCase() === said.toLowerCase());
+    if (hit === undefined)
+      return stop(`Spark answered ${JSON.stringify(said.slice(0, 80))} at step ${a.step + 1} of rule.${run.rule}, which asked it to choose one of ${(spec.choices ?? []).join(', ')}.`);
+    value = hit;
+  }
+  if (String(value).length > VAR_BYTES) return stop(`The answer at step ${a.step + 1} of rule.${run.rule} runs to ${String(value).length} characters, and one answer holds ${VAR_BYTES}.`);
+  const vars = { ...(JSON.parse(run.vars) as Vars), [spec.as]: value };
+  if (JSON.stringify(vars).length > VARS_BYTES) return stop(`rule.${run.rule}'s answers passed ${VARS_BYTES} characters at step ${a.step + 1}.`);
+
+  record(deps, run.id, a.step, row.kind, 'done', String(value));
+  deps.sql.exec("UPDATE automation_run SET state = 'pending', step = ?, vars = ? WHERE id = ?", a.step + 1, JSON.stringify(vars), run.id);
+  wake(deps, run.id, deps.nowMs);
+  return ok(null);
+}
+
+/**
+ * Let go of what a run's waiting ask still holds, as the run ends: the question comes out of the queue, and a Spark
+ * job nobody has leased yet comes out of the outbox.
+ *
+ * WITHOUT THIS A CANCELLED RUN LEFT ITS QUESTION OPEN, and the person who answered it a day later was answering nothing:
+ * `answerStep` reads the run as over and the pick goes nowhere. A job a host already holds is left to its ack, for the
+ * reason `answerStep` gives. The Spark job is deleted rather than marked `done`, because nothing was delivered, and its
+ * `retry` row goes with it.
+ */
+function release(deps: FlowDeps, run: RunRow, say: string | null): void {
+  const held = deps.sql.all<{ kind: string; answer: string | null }>(
+    "SELECT kind, answer FROM automation_step WHERE run = ? AND state = 'waiting' AND kind IN ('ask_person', 'ask_spark')",
+    run.id,
+  );
+  for (const h of held) {
+    if (h.answer === null) continue;
+    if (h.kind === 'ask_person') deps.withdraw(h.answer, `rule:${run.rule}`, say ?? `rule.${run.rule}'s run ended before this was answered.`);
+    else {
+      deps.sql.exec("DELETE FROM outbox WHERE id = ? AND kind = 'infer.ask' AND state IN ('pending', 'failed')", h.answer);
+      deps.sql.exec("DELETE FROM schedule WHERE kind = 'retry' AND key = ?", `outbox:${h.answer}`);
+    }
+  }
+}
+
 function record(deps: FlowDeps, run: string, n: number, kind: string, state: 'done' | 'waiting' | 'failed' | 'skipped', answer: string | null): void {
   deps.sql.exec(
     `INSERT INTO automation_step (run, n, kind, state, answer, ms, at) VALUES (?, ?, ?, ?, ?, NULL, ?)
@@ -598,6 +807,7 @@ function record(deps: FlowDeps, run: string, n: number, kind: string, state: 'do
  * columns are put right in the same transaction; the usage it counts is the part that has to agree.
  */
 function finish(deps: FlowDeps, run: RunRow, state: 'done' | 'failed' | 'cancelled', say: string | null, vars?: Vars): Metered {
+  release(deps, run, say);
   deps.sql.exec(
     'UPDATE automation_run SET state = ?, step = ?, vars = coalesce(?, vars), finished_at = ?, say = ? WHERE id = ?',
     state,

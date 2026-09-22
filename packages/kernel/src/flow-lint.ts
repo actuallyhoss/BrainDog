@@ -12,10 +12,12 @@
  * nothing on it, which is the failure this tree keeps recording: a declaration that looks complete, installs, and is
  * read by nothing.
  *
- * THE RUNNER IS `flow.ts`, AND THE STEPS THAT WAIT ARE NOT IN IT YET (Brief C). A body this file accepts on the `run`
- * path installs and runs; a run that reaches `call`, `script`, `ask_spark` or `ask_person` fails there with a sentence,
- * which is the answer §4.4 gives a `script` step until its runtime lands, and it is why the lint is strict about
- * everything it CAN know now.
+ * THE RUNNER IS `flow.ts`, AND THIS FILE REFUSES WHAT IT WOULD NOT DO. `ask_person` runs (Brief C), so its shape is
+ * held here to what the runner and the gate accept: two options or more, each once, since `propose` refuses a choice
+ * of one, and no `to:`, since nothing addresses a question to one person. `ask_spark` is refused as not in this build
+ * once its shape is checked, because no host serves the `infer.ask` job it queues and a run would wait its day and
+ * fail. `call` and `script` still install and fail at the run with a sentence, which is the answer §4.4 gives a
+ * `script` step until its runtime lands, and it is why the lint is strict about everything it CAN know now.
  */
 
 import type { Refusal } from '@braindog/ports';
@@ -64,6 +66,12 @@ const ROWLESS: readonly string[] = ['every', 'metric', 'manual'];
 
 /** The verbs §3 says need `once_per` on a trigger about a row: notifies, creates, calls or asks. */
 const ONCE: readonly string[] = ['notify', 'create', 'suggest', 'run', 'call', 'ask_spark', 'ask_person'];
+
+/**
+ * Field types whose value never leaves the record with a question: `ask_spark`'s `about:` is refused them here, and
+ * the runner leaves them out of the `infer.ask` payload again, as `queueCall` leaves them out of what a call sends.
+ */
+export const UNSENDABLE: readonly string[] = ['secret', 'file'];
 
 /** A name a step's answer lands under, read back as `{{vars.<name>}}`. */
 const NAME = /^[a-z][a-z0-9_]{0,31}$/;
@@ -299,6 +307,28 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
         return bad('DECLARATION_INVALID', `${id} is started by ${trigger}, which has no row, and ${here} is ${verb}, which acts on one.`, here);
       const fault = stepFault(id, verb, step, here, subjectOf(decl), installed, names);
       if (fault) return fault;
+      /* `about:` IS FIELDS OF THE RUN'S ROW, SO IT NEEDS ONE, and the fields have to be on it. The runner reads each
+         from the row it holds and would send `null` for a field the list does not have, which is a question with its
+         facts missing and no sentence to say so. A field the lint cannot place, on an arrival at no named door, is
+         left to the runner. */
+      if (verb === 'ask_spark' && (step.ask_spark as { about?: unknown }).about !== undefined) {
+        const about = (step.ask_spark as { about: string[] }).about;
+        if (rowless) return bad('DECLARATION_INVALID', `${id} is started by ${trigger}, which has no row, and ${here} sends fields of one with about:.`, `${here}.ask_spark.about`);
+        const fields = row === null ? undefined : ((installed?.get(`register.${row}`) as { fields?: { id?: unknown; type?: unknown }[] } | undefined)?.fields ?? undefined);
+        if (fields !== undefined)
+          for (const name of about) {
+            const field = fields.find((f) => f.id === name);
+            if (!field) return bad('FIELD_UNKNOWN', `${id} sends ${name} to Spark at ${here}, and ${row} has no field called ${name}.`, `${here}.ask_spark.about`);
+            if (UNSENDABLE.includes(String(field.type)))
+              return bad('DECLARATION_INVALID', `${id} sends ${name} to Spark at ${here}, and a ${String(field.type)} field never leaves the record.`, `${here}.ask_spark.about`);
+          }
+      }
+      /* AND THEN NOT IN THIS BUILD, AFTER EVERY CHECK OF ITS SHAPE, as a `metric` trigger is. The runner queues the
+         question and the ack hands back the answer, but no host leases an `infer.ask` job yet, so a run that asked
+         would wait its day and fail with nobody having been asked. The runner refuses the step too, for a rule an
+         earlier build let install. */
+      if (verb === 'ask_spark')
+        return bad('NOT_IN_THIS_BUILD', `${id} asks Spark at ${here}, and no host in this build answers an automation's question to Spark. Ask a person with ask_person instead.`, `${here}.ask_spark`);
       /* A CALL THAT SENDS A ROW NEEDS ONE, AS A STEP OR AS `run:`. `run:` was refused on a clock by `ROW_VERBS` and the
          same call as a step installed on a clock, a button and any arrival (audit thirty-two, section 4): an hourly
          post of a row nobody handed it, and a pattern of sending the owner approved as once per row and never saw.
@@ -339,7 +369,26 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
     const loud = firstVerb(body.steps ?? body.then, ONCE);
     if (loud) return bad('REQUIRED_MISSING', `${id} ${loud}s about a row and declares no once_per, so it would do it on every write of the row.`, 'once_per');
   }
-  return null;
+
+  /* A CHOICE IS BETWEEN TWO OR MORE, EACH ONCE, because the gate's `propose` refuses anything less and the runner opens
+     its question through it: a question of one installed here and failed at every run. Held after `once_per` and not
+     inside the walk, so that a body missing both is told about the key it is missing first, as it always was. */
+  const choice = (list: unknown, at: string): Refusal | null => {
+    if (!Array.isArray(list)) return null;
+    for (const [i, step] of list.entries()) {
+      if (!isObject(step)) continue;
+      const here = `${at}[${i}]`;
+      const options = isObject(step.ask_person) ? step.ask_person.options : undefined;
+      if (Array.isArray(options) && (options.length < 2 || new Set(options).size !== options.length))
+        return bad('OUT_OF_BOUNDS', `${id} asks a person at ${here} to choose from ${options.length < 2 ? 'one answer' : 'the same answer twice'}. A choice is between at least two, each once.`, `${here}.ask_person.options`);
+      if ('if' in step) {
+        const inner = choice(step.then, `${here}.then`) ?? choice(step.else, `${here}.else`);
+        if (inner) return inner;
+      }
+    }
+    return null;
+  };
+  return choice(body.steps ?? body.then, body.steps !== undefined ? 'steps' : 'then');
 }
 
 function firstVerb(list: unknown, among: readonly string[]): string | null {
@@ -551,6 +600,9 @@ function stepFault(
         return bad('REQUIRED_MISSING', `${id} asks Spark to choose at ${at} and lists nothing to choose from. Give it choices:.`, `${at}.ask_spark.choices`);
       if (choices !== undefined && spec.shape !== 'choice')
         return bad('DECLARATION_INVALID', `${id} lists choices at ${at} for an answer that is not a choice. Write shape: choice.`, `${at}.ask_spark.choices`);
+      const about = spec.about;
+      if (about !== undefined && (!Array.isArray(about) || about.length === 0 || about.some((f) => typeof f !== 'string' || !NAME.test(f))))
+        return bad('DECLARATION_INVALID', `${id}'s ${at}.ask_spark.about is a list of the row's field ids.`, `${at}.ask_spark.about`);
       return null;
     }
     case 'ask_person': {
@@ -559,8 +611,10 @@ function stepFault(
       if (fault) return fault;
       if (!Array.isArray(spec.options) || spec.options.length === 0 || spec.options.some((o) => typeof o !== 'string' || o === ''))
         return bad('DECLARATION_INVALID', `${id} asks a person at ${at} and offers no answers. options: is a list of at least one.`, `${at}.ask_person.options`);
-      if (spec.to !== undefined && typeof spec.to !== 'string')
-        return bad('DECLARATION_INVALID', `${id}'s ${at}.ask_person.to names a person.`, `${at}.ask_person.to`);
+      /* `to:` WOULD BE DRAWN AND DO NOTHING. The runner opens the question in the record's one queue, which everyone who
+         decides reads, and nothing in this build addresses a suggestion to one person. */
+      if (spec.to !== undefined)
+        return bad('NOT_IN_THIS_BUILD', `${id} asks ${JSON.stringify(spec.to)} at ${at}, and a question goes to the record's queue, where anyone who decides answers it. Drop to:.`, `${at}.ask_person.to`);
       return spec.wait === undefined ? null : span(spec.wait, `${at}.ask_person.wait`);
     }
     case 'wait':

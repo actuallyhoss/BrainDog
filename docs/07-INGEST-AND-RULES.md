@@ -507,9 +507,9 @@ predicate against the real rows and writes nothing.
 ## 6.2 · A rule with a trigger and steps is an automation
 
 *(Added September 22nd 2026 for [DIRECTION §22](../loop/DIRECTION.md)'s automations layer. The design is
-`loop/research-shell-automations.md` §2 to §4; this section is what the lint holds and what the runner does. The steps
-that wait on somebody else, a call, a script, Spark or a person, are later work, and the section says where a run
-meets one.)*
+`loop/research-shell-automations.md` §2 to §4; this section is what the lint holds and what the runner does. Of the
+steps that wait on somebody else, asking a person runs; asking Spark is built and refused at install until a host
+serves it; a call and a script are later work, and the section says where a run meets one.)*
 
 **Not a kind of its own.** [04-PACKS](04-PACKS.md) closes the list of kinds, nine since `script` joined it on
 September 22nd (`KINDS` in `packages/kernel/src/declare.ts`), so an automation is a `rule` body that has
@@ -557,6 +557,10 @@ steps:
 | a `call` step or `run:` whose call `sends:` fields of a register, on a trigger that brings no row of that register: a clock, a button, or an arrival whose `ingest:` does not write it | the call would post a row nobody handed it. A call that sends nothing, such as the price in the example above, needs no row and runs on a clock |
 | an answer name (`as:`) that is not an identifier, or is `trigger` or `vars` | it is read back as `{{vars.<name>}}`, and those two are the run context's own keys |
 | a step that notifies, creates, suggests, runs, calls or asks about a written row with no `once_per` | the same reason `notify` has always needed it |
+| an `ask_person` with fewer than two `options:`, or the same one twice | the question is opened through the gate's own `propose`, which refuses a choice of one, so it would install and fail at every run |
+| `to:` on an `ask_person` | a question goes to the record's queue, where anyone who decides answers it, and nothing addresses one to a person yet: `NOT_IN_THIS_BUILD` |
+| `about:` on an `ask_spark` that is not a list of field ids, on a trigger with no row, naming a field the row's list does not have (`FIELD_UNKNOWN`), or naming a `secret` or `file` field | `about:` is the fields of the run's row that go with the question, and a secret or a file never leaves the record |
+| `ask_spark`, once its `question:`, `as:`, `shape:`, `choices:` and `about:` are right | no host serves the `infer.ask` job it would queue yet, so a run would wait its day and fail with nobody asked: `NOT_IN_THIS_BUILD` until one does |
 
 A `create` inside a branch meets the same bound and the same foreign-register check as one in `then:`, because the
 lint walks every action wherever it sits.
@@ -617,7 +621,9 @@ for in writing.
 | `set_var` | fills `{{vars.…}}` and `{{trigger.…}}` into `to:` and keeps the answer; one answer holds 4 KB, all of them 64 KB |
 | `if` | reads the condition with the sentence builder over the run's row and its answers together; a field of the row wins over an answer of the same name |
 | `wait` | parks the run on its own schedule row and resumes it when the span has passed. A wait whose step row already says `done` is over and is not armed again |
-| `call`, `script`, `ask_spark`, `ask_person` | fail the run there, with a sentence saying the step is not in this build; the steps before it stand |
+| `ask_person` | opens an `options` suggestion through the gate, by `rule:<id>`, whose body carries the run and the step, and parks the run until the end of its `wait:` (a week when it names none). A decision on it hands the chosen option's words to the run as `{{vars.<as>}}` and wakes it for the next drain; putting it off changes nothing; closing it unanswered, or the wait running out, fails the run with a sentence, and a question whose run has ended is closed with it |
+| `ask_spark` | refused at install, above. A rule an earlier build let install fails the run there with `NOT_IN_THIS_BUILD` before anything is queued, and the steps before it stand. What runs once a host serves the job is built: one `infer.ask` outbox job, `{ run, step, question, shape, choices?, about? }`, with the run parked for a day; the ack's `result.text` held to the step's `shape:` (a number, or one of its `choices:`) and kept as `{{vars.<as>}}`; and an answer of the wrong shape, no text, or the retry ladder running out failing the run with a sentence instead of opening a dead letter |
+| `call`, `script` | fail the run there, with a sentence saying the step is not in this build; the steps before it stand |
 
 **Where the run is, is saved after every step that finishes,** not only at a wait and at the end. A run that stops
 between two steps carries on from the next one and never takes a finished step a second time.
@@ -635,10 +641,14 @@ body, parsed when it is JSON.
 refused with a sentence and not started. A rule with `enabled: false` starts no runs.
 
 **Switching a rule off or retiring it stops the runs it already started.** The install that sets `enabled: false`,
-by hand or in a pack's version, and the kernel's `retire`, cancel every unfinished run of that rule in their own transaction, each with a sentence
-saying why. The runner also asks at every wake whether an active, not-retired version of the rule exists and is on,
-and cancels the run when not, so a rule a pack took away when it was turned off stops its runs as well. A plain edit
-does not: a run keeps the version it started under and finishes those steps.
+by hand or in a pack's version, the kernel's `retire`, and turning off the pack the rule belongs to, cancel every
+unfinished run of that rule in their own transaction, each with a sentence saying why. The pack's case was measured
+before it was fixed: a run waiting when its pack went off, with the pack turned on again before the wake, woke under
+the rule turned back on, wrote to its row and notified. A turn-off refused part way, after one of its packs' rules was
+retired, takes that retire back with the refusal, and the run goes on. The runner also asks at every wake whether an active,
+not-retired version of the rule exists and is on, and cancels the run when not, for a record an earlier build left
+holding a run of a rule already gone. A plain edit does not: a run keeps the version it started under and finishes
+those steps.
 
 **What is kept, and what is counted.** A finished run is kept ninety days and pruned by the hourly sweep. Every run
 that ends writes one `pull` event with actor `rule:<id>`, the same shape a scheduled action's run writes, so the ledger
@@ -646,7 +656,9 @@ that counts scheduled actions counts automations beside them: a failed or cancel
 A run can be cancelled while it waits, and its wake is dropped with it.
 
 **Not yet.** Runs are `local`: they do not travel in a `.brain` file, and carrying them means a format revision. A
-`call`'s answer, Spark's answer and a person's decision do not resume a run yet.
+`call`'s answer and a script's do not resume a run yet. Kernel migration 13 admits `infer.ask` in the outbox's `CHECK`,
+and no host leases one yet, which is why the lint refuses `ask_spark`; the day a host serves it, that refusal and the
+runner's come out together.
 
 ---
 

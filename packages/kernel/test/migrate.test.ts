@@ -32,7 +32,7 @@ const open = async () => {
 test('an empty database becomes a record', async () => {
   const { sql, result } = await open();
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value, { kernel: 12, format: 1, applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] });
+  assert.deepEqual(result.value, { kernel: 13, format: 1, applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] });
 
   const tables = sql
     .all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
@@ -52,9 +52,9 @@ test('applying twice applies nothing twice', async () => {
   const first = await applyMigrations(sql, clock);
   const second = await applyMigrations(sql, clock);
   assert.ok(first.result.ok && second.result.ok);
-  assert.deepEqual(first.result.value.applied, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  assert.deepEqual(first.result.value.applied, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
   assert.deepEqual(second.result.value.applied, [], 'a second run re-applied a migration');
-  assert.equal(sql.all('SELECT version FROM migration').length, 12);
+  assert.equal(sql.all('SELECT version FROM migration').length, 13);
   sql.close();
 });
 
@@ -120,7 +120,7 @@ test('A RECORD CREATED BEFORE MIGRATION 2 TAKES IT ON OPEN, and everything it he
 
   const { result } = await applyMigrations(sql, fixedClock(NOW));
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  assert.deepEqual(result.value.applied, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
 
   const after = snapshot(sql);
   assert.deepEqual(after.entry, before.entry, 'a row changed');
@@ -273,6 +273,7 @@ test('AN APPLIED MIGRATION IS NEVER EDITED, so each checksum is pinned here', as
     '87bde4f4b6f80a93bf9c4e400e9e3c1cb89502f7a20195d096984e434ac438ae',
     '173a692f24bb00387fcfd6907d43a0c9fe1d3d9fbbfc9b3e4ef433a3738be87f',
     'a8d8837345552ba259423346f3cdbe109f6ca73f0d2d0da143e1ef8751f260b2',
+    '4f26cd437a0d4d5e454477c5428f57e96b749cfecdf8c08822f3d798e57bd185',
   ]);
 });
 
@@ -294,7 +295,7 @@ test('MIGRATION 4 REBUILDS device_grant: every row copied, a seventh reach, and 
 
   const { result } = await applyMigrations(sql, clock);
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  assert.deepEqual(result.value.applied, [4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
   assert.deepEqual(
     { ...sql.one<Record<string, unknown>>('SELECT id, code_hash, status, reach, label, tries, scope FROM device_grant') },
     { id: 'fake-poll-id', code_hash: 'fake-hash', status: 'denied', reach: 'runner', label: 'old-box', tries: 5, scope: null },
@@ -302,6 +303,33 @@ test('MIGRATION 4 REBUILDS device_grant: every row copied, a seventh reach, and 
   sql.exec("INSERT INTO device_grant (id, code_hash, status, reach, scope, expires) VALUES ('v', 'h', 'pending', 'vault', '*', 'x')");
   assert.throws(() => sql.exec("INSERT INTO device_grant (id, code_hash, status, reach, expires) VALUES ('e', 'h', 'pending', 'eighth', 'x')"), /CHECK/);
   assert.equal(sql.all("SELECT name FROM sqlite_master WHERE name = 'device_grant_next'").length, 0);
+  sql.close();
+});
+
+test('MIGRATION 13 REBUILDS outbox: every row copied, and infer.ask admitted', async () => {
+  const sql = openSqlite();
+  const clock = fixedClock(NOW);
+  await applyMigrations(sql, clock);
+  /* Back to the table migration 12 made, with a row in it, so migration 13 runs over something. */
+  const twelve = statements(MIGRATIONS[11]!.sql);
+  sql.exec('DROP TABLE outbox');
+  sql.exec(twelve.find((s) => s.startsWith('CREATE TABLE outbox_next'))!);
+  sql.exec('ALTER TABLE outbox_next RENAME TO outbox');
+  sql.exec('CREATE INDEX outbox_ready ON outbox(state, created)');
+  sql.exec('DELETE FROM migration WHERE version >= 13');
+  sql.exec("INSERT INTO outbox (id, created, kind, payload, state, attempts) VALUES ('j1', '2026-09-01T00:00:00.000Z', 'script.run', '{}', 'failed', 3)");
+  assert.throws(() => sql.exec("INSERT INTO outbox (id, created, kind, payload) VALUES ('j2', 'x', 'infer.ask', '{}')"), /CHECK/);
+
+  const { result } = await applyMigrations(sql, clock);
+  assert.ok(result.ok, fixOf(result));
+  assert.deepEqual(result.value.applied, [13]);
+  assert.deepEqual(
+    { ...sql.one<Record<string, unknown>>('SELECT id, kind, state, attempts FROM outbox') },
+    { id: 'j1', kind: 'script.run', state: 'failed', attempts: 3 },
+  );
+  sql.exec("INSERT INTO outbox (id, created, kind, payload) VALUES ('j2', 'x', 'infer.ask', '{}')");
+  assert.throws(() => sql.exec("INSERT INTO outbox (id, created, kind, payload) VALUES ('j3', 'x', 'infer.guess', '{}')"), /CHECK/);
+  assert.equal(sql.all("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'outbox_ready'").length, 1);
   sql.close();
 });
 
