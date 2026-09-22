@@ -361,9 +361,10 @@ test('A PAGE OF WHAT AGENTS DID IS FOR WHOEVER MAY READ THE WHOLE RECORD, becaus
   assert.ok(api.kernel.create('notes', { body: 'Ship it' }, { actor: 'S3' }).ok);
 
   const narrow = { ...owner, registers: ['notes'] } as CallContext;
-  const theirs = value<{ blocks: { feed?: unknown[]; refusals?: { code: string }[] }[] }>(await api.page({ slug: 'agent-work' }, narrow));
-  assert.deepEqual(theirs.blocks[0]?.feed, [], 'the log was handed to somebody invited to one list');
-  assert.equal(theirs.blocks[0]?.refusals?.[0]?.code, 'FORBIDDEN');
+  /* HIDDEN, NOT SERVED BLANK. Since the kernel names what an activity block reads as the whole record, `page` answers
+     a page made only of one exactly as `pages` lists it, so somebody invited to one list is told there is no such
+     page rather than handed its title with the feed emptied. */
+  assert.equal(refusal(await api.page({ slug: 'agent-work' }, narrow)).code, 'PAGE_UNKNOWN', 'the log was handed to somebody invited to one list');
 
   const mine = value<{ blocks: { feed?: { who: string; thing?: string }[]; refusals?: unknown[] }[] }>(await api.page({ slug: 'agent-work' }, owner));
   assert.deepEqual(mine.blocks[0]?.refusals, []);
@@ -1384,8 +1385,8 @@ test('AN `append` GRANT READS NOTHING, and every reader that named no register l
   const listed = value<{ slug: string }[]>(await api.pages(them));
   assert.equal(listed.some((p) => p.slug === 'jotted'), false, 'a page title is a sentence about the register it draws from');
 
-  const drawn = value<{ blocks: { rows?: unknown[] }[] }>(await api.page({ slug: 'jotted' }, them));
-  assert.deepEqual(drawn.blocks[0]?.rows, [], 'a block over a register they may only file into drew its rows');
+  /* `page` answers as `pages` lists: a page hidden from the list is refused by its slug too, the way a missing one is. */
+  assert.equal(refusal(await api.page({ slug: 'jotted' }, them)).code, 'PAGE_UNKNOWN', 'a page over a register they may only file into was served');
 
   assert.equal(refusal(await api.metric({ metric: 'jotted' }, them)).code, 'METRIC_UNKNOWN');
   assert.deepEqual(

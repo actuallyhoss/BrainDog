@@ -1381,12 +1381,55 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /* A USE CASE SHARED AS A FILE, and one planned here (`usecase.ts`). */
   const sharing = useCases({ kernel, catalogue: deps.catalogue ?? [], installed: () => installedState() });
 
-  /** The pages a caller may open, as `pages` lists them: one is visible when any register it draws from is readable. */
+  /**
+   * Whether a caller may open one page `kernel.pages()` lists, the one rule `pages`, `boot`, `arrangement` and `page` share.
+   *
+   * VISIBLE WHEN ANY LIST IT DRAWS FROM IS READABLE, AND NEVER WHEN THE ROW IT IS ABOUT IS NOT. A page made for each diary
+   * row takes its title and slug from the row, so a page per row whose blocks read Obligations was listed by the diary
+   * entry's title to a member invited to Obligations alone. `about` is the row a template expanded over (`kernel.pages`),
+   * and the list that row lives in is asked on its own, whatever the blocks read.
+   */
+  const seesPage = (ctx: CallContext, p: { registers: string[]; about: { register: string } | null }): boolean =>
+    (p.registers.length === 0 || p.registers.some((id) => !readable(ctx, id))) && (p.about === null || !readable(ctx, p.about.register));
+
+  /** The pages a caller may open, as `pages` lists them. */
   const visiblePages = (ctx: CallContext) =>
     kernel
       .pages()
-      .filter((p) => p.registers.length === 0 || p.registers.some((id) => !readable(ctx, id)))
+      .filter((p) => seesPage(ctx, p))
       .map((p) => ({ slug: p.slug, title: p.title }));
+
+  /**
+   * The computed sources that read across the whole record rather than any one list: the log, the scheduled actions and
+   * the open questions. `loop/research-scoped-audit.md` §2 measured the last two on a Desk page handing a member invited
+   * to Obligations a diary rowset's question and a bank key's host and label, while `governance` and `actions` both held
+   * those back from her. The record asks the source itself rather than waiting for `kernel.blockRegisters` to name
+   * something for it, so the block is held whether or not the kernel's answer carries a name for the whole record.
+   */
+  const ACROSS = new Set(['activity', 'actions', 'governance.open']);
+
+  /**
+   * The lists one block reads that `kernel.blockRegisters` may not name: each leg of a cash walk, and `session` for a
+   * block that draws the live runs or marks the rows a run is working on. Measured before: a walk over Bills drew
+   * *Severance for Sam*, -1,250,000, to a member `list('bills')` refuses, because the kernel named only the list its
+   * opening figure counts; and a `sessions.live` block gave her three runs' repo, work and token id, which
+   * `sessionsLive` refuses somebody without `read` on `session`. A leg is JSON somebody wrote, so one with no list names
+   * nothing here and the walk refuses it when it runs.
+   */
+  const alsoReads = (b: { source?: unknown; from?: unknown; working?: unknown }): string[] => [
+    ...(Array.isArray(b.from)
+      ? (b.from as unknown[]).flatMap((leg) => (leg !== null && typeof leg === 'object' && typeof (leg as { register?: unknown }).register === 'string' ? [(leg as { register: string }).register] : []))
+      : []),
+    ...(b.source === 'sessions.live' || b.working === true ? [SESSION] : []),
+  ];
+
+  /**
+   * What a refused block drew, taken back. The empties that were blanked before stay as empties, so a host that reads
+   * `readings` of a refused `stat` still finds a list; everything else a block computes goes. `walk` did not, so a cash
+   * walk refused for its legs would still have carried every step, and `where` is a filter a person wrote with a field
+   * value in it (`body is Dinner with the auditor`, measured in §6).
+   */
+  const DRAWN = ['where', 'fx', 'walk', 'walks', 'walkFx', 'past', 'inherited', 'scopes', 'rings', 'history', 'bars', 'changes', 'working_now', 'lateness', 'late_name', 'seen'] as const;
 
   /**
    * The `example` marker, which IS the value `example` in a register's own `tags` field.
@@ -1448,6 +1491,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const settled = typeof row.suggestion === 'string' ? kernel.governanceRow('suggestion', row.suggestion) : null;
       return settled === null ? !wholeRecord(ctx) : holds(ctx, settled);
     }
+    /* A PREDICTION IS ABOUT THE DECLARATION IT NAMES, and it named none this function asked about. It has no `body_kind`,
+       so it fell to the last line and went to everyone: `loop/research-scoped-audit.md` §3 read a prediction about the
+       diary, its claim, its measure and `baseline: 2`, off `governance` as a member invited to Obligations, while the
+       change it grades and that change's decision were held back from her in the same run. `for_decl` is read as the
+       `change` branch reads `declaration_id`: a list's declaration asks that list, and anything else (a page, a rule) is
+       about the record as a whole. */
+    if (typeof row.for_decl === 'string') {
+      const list = row.for_decl.startsWith('register.') ? row.for_decl.slice('register.'.length) : '';
+      return list === '' ? !wholeRecord(ctx) : readable(ctx, list) !== null;
+    }
     const body = row.body as Record<string, unknown> | undefined;
     /* EVERY BODY THAT NAMES A REGISTER, not only a `rowset`. A `pattern` carries a whole ingest
        declaration with `writes.register` on it and a `change` carries a `declaration_id`; both name
@@ -1458,15 +1511,22 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         : row.body_kind === 'pattern'
           ? ((body?.ingest as { body?: { register?: unknown } } | undefined)?.body?.register ??
             (body?.ingest as { writes?: { register?: unknown } } | undefined)?.writes?.register)
-          : row.body_kind === 'change'
-            ? String(body?.declaration_id ?? '').replace(/^register\./, '')
+          : row.body_kind === 'change' && String(body?.declaration_id ?? '').startsWith('register.')
+            ? String(body?.declaration_id).slice('register.'.length)
             : undefined;
     /* AND IT IS THE LEVEL, NOT ONLY THE CEILING. This asked `reaches`, so a `rowset` over a register
        somebody may only append to came back to them with every field value in it. */
     /* A PLAN'S ROWS name their lists one row at a time, and the whole question is held back when any is out of reach. */
-    if (row.body_kind === 'arrange' && Array.isArray(body?.rows))
-      return (body.rows as { register?: unknown }[]).some((r) => typeof r?.register === 'string' && readable(ctx, r.register) !== null);
-    return typeof named === 'string' && named !== '' && readable(ctx, named) !== null;
+    if (row.body_kind === 'arrange' && Array.isArray(body?.rows) && body.rows.length > 0)
+      return (body.rows as { register?: unknown }[]).some((r) => (typeof r?.register === 'string' ? readable(ctx, r.register) !== null : !wholeRecord(ctx)));
+    /* A QUESTION THAT NAMES NO LIST IS ABOUT THE WHOLE RECORD, and goes where `lineOf` sends a line about the whole record:
+       to somebody who reads all of it. This answered `false` for any body that named no list, so an `options` question,
+       its answer and the owner's reason (*The auditor must not see his salary line*) reached a member invited to
+       Obligations through `governance`, `whatsNew` and `recentHistory` (§5), and so did the question a missed prediction
+       files, whose body carries only its two options (§3). A `pack` or `settings` proposal is about what the record is,
+       and a `change` to a page or a rule is about no one list, so each takes the same rule. */
+    if (typeof named !== 'string' || named === '') return !wholeRecord(ctx);
+    return readable(ctx, named) !== null;
   };
 
   /**
@@ -1709,14 +1769,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* THE SAME FILTER `pages` RUNS, and the register list stays behind for the same reason. */
       pages: kernel
         .pages()
-        .filter((page) => page.registers.length === 0 || page.registers.some((id) => !readable(ctx, id)))
-        /* THE ONE LIST A PAGE DRAWS, when it draws one this caller reads, so a saved view sits under its list in the rail. */
+        .filter((page) => seesPage(ctx, page))
+        /* THE ONE LIST A PAGE DRAWS, when it draws one this caller reads, so a saved view sits under its list in the rail.
+           A name the kernel gives a read across the whole record is not a list (`*`, a character no register id holds). */
         .map((page) => ({
           slug: page.slug,
           title: page.title,
           nav: page.nav,
           icon: page.icon,
-          list: page.registers.length === 1 && !readable(ctx, page.registers[0]!) ? page.registers[0]! : null,
+          list: page.registers.length === 1 && /^[a-z]/u.test(page.registers[0]!) && !readable(ctx, page.registers[0]!) ? page.registers[0]! : null,
         })),
       counts: {
         decide: open.ok ? open.value.filter((row) => !holds(ctx, row)).length : 0,
@@ -2238,7 +2299,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
              they can use. One that names none is prose, and prose is for anybody who may read. */
           /* AND VISIBLE MEANS READABLE. This asked the ceiling, so a page over the payroll register
              was listed by its title to somebody invited to file rows into it and nothing else. */
-          .filter((p) => p.registers.length === 0 || p.registers.some((id) => !readable(ctx, id)))
+          /* AND NEVER A PAGE ABOUT A ROW THEY CANNOT READ, which `seesPage` says why. */
+          .filter((p) => seesPage(ctx, p))
           /* AND THE REGISTER LIST DOES NOT TRAVEL. It is what the filter is FOR, and shipping it
              would hand back the names the filter exists to withhold. */
           .map((p) => ({ slug: p.slug, title: p.title })),
@@ -2487,6 +2549,30 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          not, and the exception did not even reach the client: the request simply hung. */
       if (typeof args?.slug !== 'string' || !args.slug)
         return no('REQUIRED_MISSING', 'A page is asked for by its slug.', { at: 'slug' });
+      /* A PAGE THIS CALLER CANNOT SEE IS A PAGE THAT DOES NOT EXIST, AND `allowed` IS WHAT THEY MAY OPEN.
+         `loop/research-scoped-audit.md` §1 and §6: `pages` hid a page and `page` served it by its slug, so a member invited
+         to Obligations read a diary entry's full text as the title and body of the page made for its row, and an ordinary
+         page's title, prose, a `where` literal and its version off a page over the diary. One wrong slug gave the slugs,
+         each a row title, since the kernel's refusal listed every page and cannot tell who is asking. So a caller who
+         does not read the whole record is answered the way `pages` lists, with one refusal for both cases, and the sentence
+         for a page they cannot see is the sentence for one nobody declared: the kernel's own, asked of a name no slug can
+         be (`slugify` leaves no capital and no space) and given back with theirs in it. The owner's answer is the
+         kernel's, unchanged: somebody who reads the whole record with no level of their own on any list reads every
+         list alike, and `scoped` above already asked that of them, so the list is not built for them. */
+      const everyList = wholeRecord(ctx) && Object.keys(ctx.levels ?? {}).length === 0;
+      const listed = everyList ? null : kernel.pages();
+      const seen = listed?.find((p) => p.slug === args.slug);
+      if (listed && (!seen || !seesPage(ctx, seen))) {
+        const shown = new Set(listed.filter((p) => seesPage(ctx, p)).map((p) => p.slug));
+        const NOWHERE = 'NO SUCH PAGE';
+        const nowhere = kernel.page(NOWHERE);
+        const said: Refusal =
+          !nowhere.ok && 'refusal' in nowhere ? nowhere.refusal : { code: 'PAGE_UNKNOWN', fix: `There is no page at ${NOWHERE}.`, at: 'slug' };
+        return {
+          ok: false as const,
+          refusal: { ...said, fix: said.fix.split(NOWHERE).join(args.slug), ...(said.allowed ? { allowed: said.allowed.filter((slug) => shown.has(slug)) } : {}) },
+        };
+      }
       const out = kernel.page(args.slug);
       /* AND THE OBSERVATION IS AFTER THE ANSWER, not before it. It ran first, on the caller's raw
          slug, so `GET /api/page?slug=<anything>` inserted a row keyed by whatever a reader typed and
@@ -2524,14 +2610,23 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           /* WHAT HAPPENED ACROSS THE RECORD IS FOR WHOEVER MAY READ ALL OF IT. A `feed` or `agents` block reads the
              whole log and names rows of every list, so somebody invited to named lists is refused the block, as
              `whatsNew` holds a line about the record as a whole back from them. */
+          /* AND THE OPEN QUESTIONS AND THE SCHEDULED ACTIONS ARE THE SAME KIND OF READ (`ACROSS`). */
           const log: Refusal | null =
-            b.source === 'activity' && (!wholeRecord(ctx) || allows(ctx, 'read') !== null)
-              ? { code: 'FORBIDDEN', fix: 'What happened across this BrainDog is shown to people who can read all of it.', at: 'source' }
+            typeof b.source === 'string' && ACROSS.has(b.source) && (!wholeRecord(ctx) || allows(ctx, 'read') !== null)
+              ? {
+                  code: 'FORBIDDEN',
+                  fix:
+                    b.source === 'activity'
+                      ? 'What happened across this BrainDog is shown to people who can read all of it.'
+                      : b.source === 'actions'
+                        ? 'What this BrainDog does on a schedule is shown to people who can read all of it.'
+                        : 'The questions open across this BrainDog are shown to people who can read all of it.',
+                  at: 'source',
+                }
               : null;
           const beyond =
             log ??
-            kernel
-              .blockRegisters(b)
+            [...kernel.blockRegisters(b), ...alsoReads(b)]
               .map((register) => readable(ctx, register))
               .find((said) => said !== null);
           /* WHERE THIS READER LAST LOOKED. The kernel does not know who is reading, so a feed that marks what is new came back
@@ -2540,7 +2635,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
              own id and no member row has it, so a person's agent drew every line as unread however far the person had
              read, while `whatsNew` for the same token read the person's mark. Both now ask `readerOf`. */
           if (!beyond && b.source === 'activity' && 'seen' in b) return { ...b, seen: markOf(readerOf(ctx)) };
-          return beyond ? { ...b, rows: [], matched: 0, ...(b.readings ? { readings: [] } : {}), ...(b.measures ? { measures: [] } : {}), ...(b.values ? { values: {} } : {}), ...(b.feed ? { feed: [] } : {}), refusals: [beyond] } : b;
+          if (!beyond) return b;
+          const kept: Record<string, unknown> = { ...b };
+          for (const key of DRAWN) delete kept[key];
+          return {
+            ...(kept as typeof b),
+            rows: [],
+            matched: 0,
+            ...(b.readings ? { readings: [] } : {}),
+            ...(b.measures ? { measures: [] } : {}),
+            ...(b.values ? { values: {} } : {}),
+            ...(b.feed ? { feed: [] } : {}),
+            ...(b.queue ? { queue: [] } : {}),
+            refusals: [beyond],
+          };
         }),
       });
     },
@@ -2639,9 +2747,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          still went out to them. */
       return ok(
         kernel.digestToday(args?.digest).map((d) => {
+          /* A SECTION OVER A FIGURE READS THE FIGURE'S LIST. The kernel reads `metric.<id>` through the metric's own
+             declaration (`digest.ts`), and this kept any source that did not start with `register.`, so §4 of
+             `loop/research-scoped-audit.md` read `Monday: Diary 2` and a reading of 2 off a figure over the diary, while
+             `metric('diary-count')` answered the same member METRIC_UNKNOWN. So the figure's own source is asked, as
+             `metric` asks it, and a figure over no list, or one that is not declared, is kept only for somebody who reads
+             the whole record. A section the kernel wrote about the digest itself (`Not sent`) names no source. */
           const sections = d.sections.filter((s) => {
-            const register = s.source.startsWith('register.') ? s.source.slice('register.'.length) : null;
-            return register === null || !readable(ctx, register);
+            const figure = s.source.startsWith('metric.') ? (kernel.metricDecl(s.source.slice('metric.'.length))?.source ?? '') : s.source;
+            const register = figure.startsWith('register.') ? figure.slice('register.'.length) : null;
+            if (register !== null) return !readable(ctx, register);
+            return !s.source.startsWith('metric.') || wholeRecord(ctx);
           });
           return { ...d, sections, carrying: carryingOf(sections).length, headline: headline(d.name, carryingOf(sections)) };
         }),
@@ -2974,6 +3090,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          the limit is the last one. */
       if (args?.cursor !== undefined && (typeof args.cursor !== 'string' || args.cursor === ''))
         return no('VALUE_MALFORMED', 'A cursor is the id of the last row the page above answered with.', { at: 'cursor' });
+      /* A CURSOR ON A ROW YOU MAY NOT SEE IS ANSWERED AS ONE ON NO ROW AT ALL. The kernel resolves the cursor over the
+         whole table before this ceiling runs, so a member scoped to one list could ask for `SG<n>` a number at a time
+         and read which ones exist, which is how many questions and decisions the record holds (research-scoped-audit
+         §7). The sentence is the kernel's own, byte for byte, so the two answers cannot be told apart. */
+      if (args?.cursor !== undefined) {
+        const at = kernel.governanceRow(register, args.cursor);
+        if (at && holds(ctx, at)) return no('VALUE_MALFORMED', 'A cursor is the id of the last row the page above answered with. Start from the first page.', { at: 'cursor' });
+      }
       const after = args?.cursor === undefined ? {} : { cursor: args.cursor };
       const rows = kernel.governance(register, {
         ...(args?.status === undefined ? {} : { status: String(args.status) }),

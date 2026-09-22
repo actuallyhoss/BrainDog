@@ -363,6 +363,15 @@ export type PageDeps = {
 /** The sources a block may name that are not a register. Named, so a new one is a refusal. */
 const COMPUTED = new Set(['forecast.runway', 'activity', 'sessions.live', 'actions', 'governance.open']);
 
+/** The name `registersOf` gives a read across the whole record, which no register id can be. */
+export const WHOLE_RECORD = '*';
+
+/**
+ * The computed sources that belong to no list. The other two are named by what they read: a walk by its legs'
+ * lists, the live runs by `session`.
+ */
+const WHOLE: ReadonlySet<string> = new Set(['activity', 'actions', 'governance.open']);
+
 /**
  * The kinds that ADD THEIR ROWS UP, whose `limit:` cuts the GROUPS they draw and never the rows they read.
  *
@@ -600,11 +609,20 @@ export function railRoom(): (about: { register: string; section: string } | null
 
 /** One page, with every block run. */
 export function readPage(deps: PageDeps, slug: string): Result<PageResult> {
-  const found = resolvePages(deps).find((p) => p.slug === slug);
+  const every = resolvePages(deps);
+  const found = every.find((p) => p.slug === slug);
+  /* THE SLUGS OFFERED ARE THE PAGES SOMEBODY WROTE, AND NEVER THE ONES A TEMPLATE MADE OUT OF ROWS. A page per
+     row is named after the row's title, so listing those slugs listed every row title of every templated list,
+     and this function cannot tell who is asking. Measured in `loop/research-scoped-audit.md` §1: a member invited
+     to Obligations alone asked for `nope` and was handed `dinner-with-the-auditor` and
+     `told-sam-about-the-redundancy-list` from a Diary she cannot read, while `pages` in the same run listed her
+     `desk` and nothing else. A written page's slug is the author's word for a page, so the owner who types `dsek`
+     still gets `desk`; one who mistypes a project's page is sent to `pages`, which answers each caller with what
+     that caller may open. */
   if (!found)
-    return no<PageResult>('PAGE_UNKNOWN', `There is no page at ${slug}.`, {
+    return no<PageResult>('PAGE_UNKNOWN', `There is no page at ${slug}. A page made for each row of a list is not named here; pages lists every page you can open.`, {
       at: 'slug',
-      allowed: resolvePages(deps).map((p) => p.slug),
+      allowed: every.filter((p) => !p.row).map((p) => p.slug),
     });
 
   /* A PAGE THAT COULD NOT BE EXPANDED IS A PAGE WITH ONE SENTENCE ON IT, not a 404. The person
@@ -1774,6 +1792,12 @@ export function fill(doc: unknown, row: Entry | null, param?: string): unknown {
  * record. The caller passes one; a page whose metric cannot be resolved contributes nothing, which
  * is the same answer `metric` gives for a name it cannot reach and is the safe direction: the
  * listing is filtered by what a page IS known to touch, so an unknown is not a licence.
+ *
+ * WHAT IT ANSWERS, for a caller deciding what to hold back: every register id the page reads, each once, plus
+ * `WHOLE_RECORD` (`*`) when any block reads across the whole record (`activity`, `actions`, `governance.open`).
+ * An empty answer is prose. A caller that asks `reaches` or `readable` of every name refuses `*` to anybody whose
+ * ceiling is not the whole record, and a caller that treats the answer as a list of lists to NAME must leave `*`
+ * out.
  */
 export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl | null): string[] {
   const named = new Set<string>();
@@ -1783,6 +1807,25 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
   if (decl.for?.register) named.add(decl.for.register);
   for (const block of decl.blocks ?? []) {
     add(block.source);
+    /* A CASH WALK READS EVERY LIST ITS LEGS WALK, and this read only the list its opening figure counts. So a
+       walk over Bills was a block about Accounts, and `loop/research-scoped-audit.md` §2 measured a member invited
+       to Obligations alone reading *Severance for Sam*, -1,250,000, off the Desk page while `list('bills')` refused
+       her. A leg is JSON somebody wrote, so one with no list names nothing here and the walk refuses it when it runs. */
+    if (Array.isArray(block.from))
+      for (const leg of block.from as unknown[])
+        if (leg !== null && typeof leg === 'object' && typeof (leg as { register?: unknown }).register === 'string')
+          named.add((leg as { register: string }).register);
+    /* THE RUNS ARE ROWS OF `session`, whether a block lists the live ones or marks which of its own rows has an
+       agent on it. `sessionsLive` refuses somebody without `read` on `session`, and the block on the same page
+       handed that person each run's repo, what it was doing and its token id. */
+    if (block.source === 'sessions.live' || block.working === true) named.add(SESSION);
+    /* WHAT READS ACROSS THE RECORD IS NAMED `*`. The open questions, the scheduled actions and the log belong to
+       no list, and naming none made each one prose: `pages` listed the page to anybody and `page` drew the queue
+       and a bank key's host and label to a member whom `governance` and `actions` both refuse. `*` is the one
+       name the record's `reaches` already answers only for a ceiling of the whole record, so asking whether a
+       caller may read it is asking whether they read all of it. It is never a list's id: `declare.ts` refuses
+       a register id that is not lower-case letters, digits and underscores. */
+    if (typeof block.source === 'string' && WHOLE.has(block.source)) named.add(WHOLE_RECORD);
     for (const cell of block.cells ?? []) {
       /* THE FIRST COLON SEPARATES, as everywhere else: `project-owed:C:\Repos` is one project. */
       const at = cell.metric.indexOf(':');
