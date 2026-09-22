@@ -410,7 +410,7 @@ function checkBody(deps: GovernDeps, kind: BodyKind, body: Record<string, unknow
      record's `decide` before `reopen` could run. A decision that resolved with nothing installed behind it, from one
      malformed body any `propose` token can send. `review` below cannot catch it: it answers `null` for a batch it
      cannot read, which is right for egress and says nothing about whether the batch installs. */
-  const wrong = shapeFault(body.to) ?? namesFault(body);
+  const wrong = shapeFault(body.to) ?? namesFault(deps.sql, body);
   if (wrong) return wrong;
 
   /* AND ITS PREDICTION, IF IT CARRIES ONE — checked here rather than at acceptance, for the reason
@@ -456,7 +456,7 @@ function shapeFault(to: unknown): Refusal | null {
  *
  * Checked when a change is filed, and again when it is accepted, for a change filed before this was.
  */
-function namesFault(body: Record<string, unknown>): Refusal | null {
+function namesFault(sql: Sql, body: Record<string, unknown>): Refusal | null {
   const named = String(body.declaration_id);
   const to = body.to as { id?: unknown; declarations?: unknown };
   const bundle = Array.isArray(to?.declarations) ? (to.declarations as { id?: unknown; kind?: unknown }[]) : null;
@@ -483,7 +483,7 @@ function namesFault(body: Record<string, unknown>): Refusal | null {
         fix: `This change is filed as a change to ${named} and also installs ${other}, so whoever reads ${named} would read ${other} in it. Propose ${other} as a change of its own.`,
         at: 'body.to',
       };
-    return aboutOthers(named, bundle);
+    return aboutOthers(sql, named, bundle);
   }
   return null;
 }
@@ -502,7 +502,7 @@ function namesFault(body: Record<string, unknown>): Refusal | null {
  * page leaked to a one-list reader once (`pages.ts` `registersOf`), so a figure this cannot resolve is refused rather
  * than taken as harmless. Propose that page under its own name.
  */
-function aboutOthers(named: string, bundle: { id?: unknown; kind?: unknown; body?: unknown }[]): Refusal | null {
+function aboutOthers(sql: Sql, named: string, bundle: { id?: unknown; kind?: unknown; body?: unknown }[]): Refusal | null {
   const list = named.slice('register.'.length);
   const metrics = new Map<string, unknown>();
   for (const d of bundle) if (d?.kind === 'metric' && isMap(d.body) && typeof d.body.metric === 'string') metrics.set(d.body.metric, d.body);
@@ -512,7 +512,7 @@ function aboutOthers(named: string, bundle: { id?: unknown; kind?: unknown; body
   for (const d of bundle) {
     if (d?.id === named || d?.kind === 'register') continue;
     const page = d.kind === 'page' ? { template: isMap(d.body) && d.body.for !== undefined, fields } : null;
-    const { lists, unknown } = listsNamed(d.body, page, metrics);
+    const { lists, unknown } = listsNamed(d.body, page, (id) => metrics.get(id));
     const other = [...lists].find((l) => l !== list);
     if (other !== undefined)
       return {
@@ -530,8 +530,44 @@ function aboutOthers(named: string, bundle: { id?: unknown; kind?: unknown; body
         fix: `This change is filed as a change to ${named}, and ${String(d.id)} in it reads the figure ${figure}, which it does not carry, so nothing here can say whose list that figure counts. Add metric.${figure} to the bundle, or propose ${String(d.id)} as a change of its own.`,
         at: 'body.to',
       };
+    const was = replacedAbout(sql, String(d.id), list, fields);
+    if (was !== undefined)
+      return {
+        code: 'VALUE_MALFORMED',
+        fix:
+          was === '*'
+            ? `This change is filed as a change to ${named}, and ${String(d.id)} in it replaces one that reads across the whole record, so whoever reads ${named} would be asked to change what everybody reads. Propose ${String(d.id)} as a change of its own.`
+            : `This change is filed as a change to ${named}, and ${String(d.id)} in it replaces one that reads register.${was}, so whoever reads ${named} would be asked to change what ${was} shows. Propose ${String(d.id)} as a change of its own.`,
+        at: 'body.to',
+      };
   }
   return null;
+}
+
+/**
+ * The list other than `list` that the installed declaration under `id` is about, if there is one.
+ *
+ * WHAT A DECLARATION REPLACES IS ABOUT A LIST TOO, and reading only the new body let it through:
+ * `loop/research-batch-twenty-two-audit.md` §7 filed `metric.diary-count` redefined over Obligations under
+ * `register.obligations`, it was accepted and installed, and every page reading the Diary figure then read Obligations
+ * behind a question the queue showed as a change to Obligations. A rule, a page and a digest under a Diary id with an
+ * Obligations body were filed the same way (`govern-bundle-scope.test.ts`). The installed body's figures are read
+ * through the installed metrics, since those are what it reads now. A figure nothing declares counts no list, so it is
+ * not refused here as an unknown in the new body is: the new body is what would be installed, and the old one reads
+ * nothing through it.
+ */
+function replacedAbout(sql: Sql, id: string, list: string, fields: ReadonlySet<string>): string | undefined {
+  const installed = (at: string) =>
+    sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1', at)?.body;
+  const was = installed(id);
+  if (was === undefined) return undefined;
+  const body: unknown = JSON.parse(was);
+  const page = id.startsWith('page.') ? { template: isMap(body) && body.for !== undefined, fields } : null;
+  const { lists } = listsNamed(body, page, (figure) => {
+    const metric = installed(`metric.${figure}`);
+    return metric === undefined ? undefined : JSON.parse(metric);
+  });
+  return [...lists].find((l) => l !== list);
 }
 
 /** A register named in full, as a metric's `source`, a table's and a digest section's are. */
@@ -540,7 +576,7 @@ const LIST_REF = /^register\.([a-z][a-z0-9_]*)$/;
 const PAGE_SOURCES = new Set(['forecast.runway']);
 
 /**
- * Every list a declaration body names, and every figure it reads that `metrics` cannot resolve.
+ * Every list a declaration body names, and every figure it reads that `metricOf` cannot resolve.
  *
  * WALKED RATHER THAN READ KIND BY KIND, because a list is named in a dozen places: a rule's `register`, a `create` or a
  * `link` inside its `then`, an ingest's `writes.register` or each leg of its route, a `lookup`, a cash walk's legs, a
@@ -551,7 +587,7 @@ const PAGE_SOURCES = new Set(['forecast.runway']);
 function listsNamed(
   body: unknown,
   page: { template: boolean; fields: ReadonlySet<string> } | null,
-  metrics: ReadonlyMap<string, unknown>,
+  metricOf: (id: string) => unknown,
 ): { lists: Set<string>; unknown: Set<string> } {
   const lists = new Set<string>();
   const unknown = new Set<string>();
@@ -562,7 +598,8 @@ function listsNamed(
     const id = at < 0 ? said : said.slice(0, at);
     if (seen.has(id)) return;
     seen.add(id);
-    if (metrics.has(id)) visit(metrics.get(id), undefined);
+    const metric = metricOf(id);
+    if (metric !== undefined) visit(metric, undefined);
     else unknown.add(id);
   };
   const visit = (node: unknown, key: string | undefined): void => {
@@ -1024,7 +1061,7 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
          Refused here, the question stays open with nothing resolved, which a refusal from `install` afterwards could only
          get back to by reopening it. */
       if (row.body_kind === 'change') {
-        const wrong = shapeFault(install) ?? namesFault(body) ?? deps.fits?.(install) ?? null;
+        const wrong = shapeFault(install) ?? namesFault(deps.sql, body) ?? deps.fits?.(install) ?? null;
         if (wrong) return { ok: false, refusal: wrong };
       }
       /* EVERY KEY IT SENDS IS IN THE VAULT BEFORE ANYTHING IS ARMED. Accepting a call whose key is missing would arm

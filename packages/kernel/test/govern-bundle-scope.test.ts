@@ -195,3 +195,67 @@ test('a bundle filed under a name that is not a list is not held to one', async 
   assert.ok(made.ok, fixOf(made));
   sql.close();
 });
+
+/**
+ * A declaration under the id of one installed about Diary, with a body about Obligations.
+ *
+ * `loop/research-batch-twenty-two-audit.md` §7. The guard read each declaration's new body and not what it replaces:
+ * `metric.diary-count` redefined over Obligations was filed under `register.obligations` and installed, and every page
+ * reading the Diary figure then read Obligations under a question the queue showed as a change to Obligations. The same
+ * held for the rule, the page and the digest below, each measured filed before the guard read the installed body.
+ */
+const renamed = (d: Declaration, id: string): Declaration => {
+  const [kind, name] = id.split('.') as [string, string];
+  return { ...d, id, body: { ...(d.body as object), [kind]: name } as never };
+};
+const REPLACING: [string, Declaration, Declaration, ...Declaration[]][] = [
+  ['the Diary figure, counting Obligations', metric('diary'), renamed(metric('obligations'), 'metric.diary-count')],
+  ['the rule on Diary, watching Obligations', rule('diary'), renamed(rule('obligations'), 'rule.diary-watch')],
+  ['the page of Diary, tabling Obligations', table('diary'), renamed(table('obligations'), 'page.diary-table')],
+  ['the Diary digest, mailing Obligations', digest('diary'), renamed(digest('obligations'), 'digest.diary-weekly')],
+  /* No list is named on a page of figures, so what it replaces is read through the installed metric behind its figure. */
+  ['the page whose figure counts Diary, now counting Obligations', figures('diary-count'), figures('obligations-count'), metric('obligations')],
+];
+
+test('A BUNDLE NAMED FOR OBLIGATIONS THAT REPLACES A DECLARATION ABOUT DIARY IS REFUSED, however its new body reads', async () => {
+  const wrong: string[] = [];
+  for (const [what, was, now, ...also] of REPLACING) {
+    const { k, sql } = await record();
+    const put = await k.install([was]);
+    if (!put.ok) {
+      wrong.push(`${what}: the Diary one would not install, ${fixOf(put)}`);
+      sql.close();
+      continue;
+    }
+    const out = k.propose(change('register.obligations', bundle(now, ...also)), 'p_1');
+    if (out.ok) wrong.push(`${what}: filed`);
+    else if (codeOf(out) !== 'VALUE_MALFORMED' || !new RegExp(`${now.id.replace('.', '\\.')}.*replaces.*diary`).test(fixOf(out)))
+      wrong.push(`${what}: ${codeOf(out)} ${fixOf(out)}`);
+    else if (filed(sql) !== 0) wrong.push(`${what}: a row was written`);
+    sql.close();
+  }
+  assert.deepEqual(wrong, []);
+});
+
+test('AND ONE ALREADY IN THE QUEUE THAT REPLACES THE DIARY FIGURE IS REFUSED WHEN IT IS ACCEPTED', async () => {
+  const { k, sql } = await record();
+  const now = renamed(metric('obligations'), 'metric.diary-count');
+  sql.exec(
+    "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at) VALUES ('SG91', 'change', ?, 'open', 'p_1', ?)",
+    JSON.stringify({ declaration_id: 'register.obligations', to: bundle(now) }),
+    new Date(NOW).toISOString(),
+  );
+  const out = k.decide('SG91', accept, 'p_owner');
+  assert.equal(codeOf(out), 'VALUE_MALFORMED', JSON.stringify(out));
+  assert.equal(sql.one<{ source: string }>("SELECT json_extract(body, '$.source') AS source FROM declaration WHERE id = 'metric.diary-count' AND superseded_at IS NULL")?.source, 'register.diary');
+  sql.close();
+});
+
+test('and a bundle that replaces a declaration already about Obligations is still filed', async () => {
+  const { k, sql } = await record();
+  assert.ok((await k.install([metric('obligations'), rule('obligations')])).ok);
+  const wider = { ...metric('obligations'), body: { ...(metric('obligations').body as object), window: '90d' } as never };
+  const made = k.propose(change('register.obligations', bundle(wider, rule('obligations', [{ tag: 'looked' }]))), 'p_1');
+  assert.ok(made.ok, fixOf(made));
+  sql.close();
+});
