@@ -2,9 +2,9 @@ name: ci
 
 # 52 §2's `ci.yml`, less most of the browser: install, typecheck, the whole suite and every gate
 # that reads source in `check`, and in `build` the app and the site built, plus the three gates that
-# read that build and bind no fixed port (`bundle`, `passkey`, `queue`). `prefs`, `keys`, `layout`,
-# `a11y` and `self-test` are `gates.yml`'s, and the reason for the split is at the top of that file
-# and beside the `--only` list below. The counts this line used to carry (fourteen and five) were
+# read that build and are quick enough to wait for (`self-test`, `bundle`, `prefs`, `keys`, `passkey`,
+# `queue`). `layout` and `a11y` are `gates.yml`'s, and the reason for the split is at the top of that
+# file and beside the `--only` list below. The counts this line used to carry (fourteen and five) were
 # twenty and seven by 22 September, so it names the gates that are elsewhere rather than counting.
 #
 # WHAT THIS COSTS IS THE POINT OF IT. The suite is 1,308 tests in about 90 seconds and the source
@@ -116,10 +116,11 @@ jobs:
     # Self-hosted minutes are free. Set the repository variable CI_RUNNER to ubuntu-24.04 to go back.
     runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
     # Four Vite builds for the app (the shipped record plus the cloud, quiet and busy variants), one
-    # for the site, and three gates that read them. The job took 2 min 39 s on studio-pc on 21
+    # for the site, and six gates that read them. The job took 2 min 39 s on studio-pc on 21
     # September before the gates were added, and the three measured 6.4 s in `gates.yml` run
-    # 35587734418, so 15 is still a ceiling for a hang and not a budget.
-    timeout-minutes: 15
+    # 35587734418. `self-test`, `prefs` and `keys` add about 4.5 minutes (measured once), which is
+    # why the ceiling moved from 15 to 20: a ceiling for a hang, not a budget.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
@@ -159,12 +160,10 @@ jobs:
       # of 21 minutes or more would have been cancelled by the next push more than half the time. A
       # cancelled `ci` is a deploy that never starts. They stay in `gates.yml`.
       #
-      # `prefs`, `keys` AND `self-test` ARE NOT HERE YET, BECAUSE OF A PORT. On master `prefs` binds
-      # 4183 and `keys` 4184, and `self-test` seeds negatives for both plus `layout` (5189) and
-      # `a11y` (5186). This runner is the PC the loop runs the same gates on by hand, so a CI run and
-      # a desk run of one gate can collide, and the red that arrives is about the machine rather
-      # than the tree. When those four take an ephemeral port as `passkey` and `queue` do, the list
-      # becomes `self-test,bundle,prefs,keys,passkey,queue` (about +4.5 minutes a push, measured
-      # once) and `timeout-minutes` above goes to 20. `run.mjs` runs a selection in registry order,
-      # so `self-test` would run first whatever order the list is written in.
-      - run: node tools/gates/run.mjs --only bundle,passkey,queue
+      # `prefs`, `keys` AND `self-test` JOINED ONCE NO GATE HELD A FIXED PORT (`a9897f7a`). This
+      # runner is the PC the loop runs the same gates on by hand, and while `prefs` bound 4183, `keys`
+      # 4184, `layout` 5189 and `a11y` 5186, a CI run and a desk run of one gate could collide and
+      # go red for a reason that is about the machine rather than the tree. All four take port 0 now,
+      # proven on 22 September by a desk run of all four, green. `run.mjs` runs a selection in
+      # registry order, so `self-test` runs first whatever order the list is written in.
+      - run: node tools/gates/run.mjs --only self-test,bundle,prefs,keys,passkey,queue
