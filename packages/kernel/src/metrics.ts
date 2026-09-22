@@ -753,8 +753,16 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
        moves it by the declared window and `year_ago` by a year, which is what each of them says.
        This line was `ctx.nowMs - shift` for both, so the two words named one figure and only one of
        the two labels above it was true. `yearBefore` carries the argument for what a year is. */
-    const moveTo = decl.compare === 'year_ago' ? yearBefore(ctx.nowMs) : ctx.nowMs - shift;
-    const shifted = predicateOf(decl.where, schema, { ...ctx, nowMs: moveTo });
+    /* AND IT MOVES FROM THE CLOCK THE CURRENT WINDOW WAS READ AT, WHICH UNDER `asOfMs` IS NOT `nowMs`.
+       This moved `ctx.nowMs` and handed the result over as `nowMs`, but `predicateOf` reads
+       `asOfMs ?? nowMs`, so under `asOfMs` the moved clock was never looked at: the window before was
+       the current predicate again, and a comparison read sixty days back over a doubled month came
+       back `delta: null`, "the predicate does not mention time", where the same rows read live on
+       that day say `delta: 1` (`test/metrics-asof.test.ts`). The moved clock goes in as `asOfMs`,
+       the one field `predicateOf` reads first, so it is honoured whether or not the caller set one. */
+    const anchor = ctx.asOfMs ?? ctx.nowMs;
+    const moveTo = decl.compare === 'year_ago' ? yearBefore(anchor) : anchor - shift;
+    const shifted = predicateOf(decl.where, schema, { ...ctx, asOfMs: moveTo });
     const moved = JSON.stringify(shifted.predicate) !== JSON.stringify(said.predicate);
     /* AND THE WINDOW BEFORE ENDS WHERE ITS CLOCK IS. `moved` above is asked of the predicate as
        written, because a clause this adds is not a sign the declaration mentions time; `endedAt`
