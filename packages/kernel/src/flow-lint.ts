@@ -213,6 +213,77 @@ export function rowRegisterOf(decl: FlowDecl, doorOf: (door: string) => unknown)
 }
 
 /**
+ * A path the run fills from its own context before the step acts (`flow.ts`'s `fill`), so the word exists only at the run.
+ *
+ * THE WHOLE OF `flow.ts`'s `PATH`, NOT ITS PREFIX. Read as `{{vars.` alone, `{{vars.a-b}}` and an unclosed `{{trigger.x`
+ * were let through over a `list<enum>` of `[chase]`; `fill` leaves both as typed, and the run failed "tags has no value
+ * {{vars.a-b}}." while a list whose values held that literal took it. Not the `g` regex itself, whose `lastIndex` a
+ * `test` would move.
+ */
+const RUN_FILLED = /\{\{\s*(?:vars|trigger)\.[A-Za-z0-9_.]+\s*\}\}/;
+
+/**
+ * Every `tag` and `untag` of a rule that a list's declared `tags` would refuse, with where it sits and, for a
+ * `list<enum>`, the word the enum lacks. Empty when the list takes every one.
+ *
+ * THE SHAPE ALONE WAS THE FIRST QUESTION, AND IT REFUSED A LIST THAT WORKS. Wave thirty-eight's check read any `tags` that
+ * was not `list<text>` as refusing every tag, so `tags: list<enum>` of `[late, chase]` under `rule.late` tagging `late` was
+ * refused `FIELD_TYPE_CHANGED` "would refuse every tag it writes", though every write that rule makes is a value the enum
+ * takes. An enum is asked word by word:
+ *
+ *   - A `tag` whose word the values lack is refused, since the pass writes the row's tags plus that word in one patch with
+ *     everything else the rule does. Measured over `[chase]` with `then: [{ tag: late }, { set: note }]`: the Rent went
+ *     in holding `what` alone, neither the tag nor the note, and nothing was refused.
+ *   - An `untag` never is: the pass writes back the words the row already holds, less one, and the list took those.
+ *   - A tag on the run path holding `{{vars.…}}` or `{{trigger.…}}` is filled from the run, so no word exists to compare
+ *     at install. It is let through in silence rather than guessed at. On the `then:` path nothing fills a tag, so the
+ *     braces there are the literal word and are judged like any other.
+ *
+ * ANY OTHER SHAPE REFUSES EVERY ONE, `untag` included, because the pass always writes an array.
+ */
+export function tagsRefusing(decl: FlowDecl, tags: { type?: unknown; of?: unknown; values?: unknown }): { verb: 'tag' | 'untag'; at: string; word?: string }[] {
+  if (tags.type === 'list' && tags.of === 'text') return [];
+  const out: { verb: 'tag' | 'untag'; at: string; word?: string }[] = [];
+  const enumOf = tags.type === 'list' && tags.of === 'enum';
+  const values = enumOf && Array.isArray(tags.values) ? new Set(tags.values.map(String)) : new Set<string>();
+  for (const { action, at } of actionsOf(decl)) {
+    if (!('tag' in action) && !('untag' in action)) continue;
+    const verb = 'tag' in action ? 'tag' : 'untag';
+    if (!enumOf) {
+      out.push({ verb, at });
+      continue;
+    }
+    const word = action.tag;
+    if (verb === 'untag' || typeof word !== 'string') continue;
+    if (at.startsWith('steps') && RUN_FILLED.test(word)) continue;
+    if (!values.has(word)) out.push({ verb, at, word });
+  }
+  return out;
+}
+
+/**
+ * The refusal of a list's `tags` under a rule that tags it, ONE SENTENCE WHICHEVER ARRIVED SECOND. The list narrowed
+ * under the rule and the rule installed over the narrowed list are the same fault, and a person who meets both should
+ * read the same words; only `at` moves, to the declaration the change sent.
+ */
+export function tagsRefusal(
+  register: string,
+  rule: string,
+  found: { verb: 'tag' | 'untag'; at: string; word?: string },
+  shape: string,
+  at: string,
+): Refusal {
+  const lead = `register.${register}.tags: every list takes tags as list<text>, and ${rule} ${found.verb}s ${register}`;
+  return found.word === undefined
+    ? bad('FIELD_TYPE_CHANGED', `${lead} at ${found.at}, so ${shape} would refuse every tag it writes. Leave tags out, or declare it as list<text>.`, at)
+    : bad(
+        'FIELD_TYPE_CHANGED',
+        `${lead} ${found.word} at ${found.at}, so list<enum> without ${found.word} would refuse every write that tags it. Leave tags out, declare it as list<text>, or add ${found.word} to its values.`,
+        at,
+      );
+}
+
+/**
  * What an automation body may not say, as the first refusal, or `null`.
  *
  * A BODY WITH NO `on:` AND NONE OF THE NEW KEYS MEETS ONE NEW CHECK HERE, that it names a register. Before this, a rule

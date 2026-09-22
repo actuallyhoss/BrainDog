@@ -144,7 +144,7 @@ import {
   startRun,
   type FlowDeps,
 } from './flow.ts';
-import { actionsOf, pathOf, rowRegisterOf, subjectOf, triggerOf } from './flow-lint.ts';
+import { pathOf, rowRegisterOf, subjectOf, tagsRefusal, tagsRefusing, triggerOf } from './flow-lint.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
 import { arrive, day, exponentOf, propose, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps, type NumberReaders } from './ingest.ts';
 import { analyse, observe, type Analysis, type Observation } from './observe.ts';
@@ -1581,13 +1581,25 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   }
 
   /**
-   * The first rule, as the batch would leave the record, whose run tags or untags a row of `register`: its id, which of
-   * the two it does and where. `null` when nothing tags the list.
+   * The first `tag` or `untag`, among the rules as the batch would leave the record, that `tags` would refuse on a row of
+   * `register` and `was` would not have: the rule's id, the verb, where it sits and, for an enum, the word. `null` when
+   * the change refuses nothing a rule writes that the list took before.
    *
    * EVERY ACTION `actionsOf` FINDS, so `then:` and `steps:` and both arms of every `if` are read, and an arrival's rule
-   * counts for the list its door writes, whose row is the one its run is handed.
+   * counts for the list its door writes, whose row is the one its run is handed. What each one is asked is
+   * `tagsRefusing`'s, so an enum holding the word is not refused and a templated tag is not judged.
+   *
+   * ONLY WHAT THIS CHANGE STARTS REFUSING. Wave thirty-eight asked a change of shape and nothing else, which let a
+   * `list<enum>` drop the word a rule tags from its values, one shape to the same shape, and every later write that
+   * tagged it was `ENUM_VALUE_UNKNOWN`. Asked against `was` as well, the narrowing is refused and a list that already
+   * refused a rule's tag before this change is still not blamed for it.
    */
-  function taggerOf(batch: readonly Declaration[], register: string): { rule: string; verb: 'tag' | 'untag'; at: string } | null {
+  function taggerOf(
+    batch: readonly Declaration[],
+    register: string,
+    tags: { type?: unknown; of?: unknown; values?: unknown },
+    was: { type?: unknown; of?: unknown; values?: unknown; retired?: unknown } | undefined,
+  ): { rule: string; verb: 'tag' | 'untag'; at: string; word?: string } | null {
     const sent = new Map(batch.filter((d) => d.kind === 'rule').map((d) => [d.id, d.body as unknown]));
     const stored = sql
       .all<{ id: string; body: string }>("SELECT id, body FROM declaration WHERE kind = 'rule' AND superseded_at IS NULL AND retired = 0 ORDER BY id")
@@ -1604,8 +1616,53 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (body === null || typeof body !== 'object') continue;
       const rule = body as FlowDecl;
       if (rowRegisterOf(rule, doorOf) !== register) continue;
-      for (const { action, at } of actionsOf(rule))
-        if ('tag' in action || 'untag' in action) return { rule: id, verb: 'tag' in action ? 'tag' : 'untag', at };
+      const before = new Set(was === undefined || was.retired === true ? [] : tagsRefusing(rule, was).map((r) => r.at));
+      const found = tagsRefusing(rule, tags).find((r) => !before.has(r.at));
+      if (found !== undefined) return { rule: id, ...found };
+    }
+    return null;
+  }
+
+  /**
+   * A rule in the batch that tags a list whose `tags` would refuse what it writes, as the refusal the list's own change
+   * meets, or `null`.
+   *
+   * THE CHECK ABOVE RAN ONLY WHEN THE LIST CHANGED, SO THE OTHER ORDER WAS NEVER ASKED. `tags: int` declared first, while
+   * no rule tagged Jobs, is the list's own choice; `rule.late` installed alone after it went in, and the next Rent was
+   * written without its tag, with no refusal and no event (`test/tags-rule-order.test.ts`, driven before this). A
+   * `list<enum>` without `late` did the same. So each rule the batch sends is asked against `tags` as the batch leaves
+   * its list, with the list's sentence, and `at` on the rule, which is the declaration this change sent.
+   *
+   * A RULE RESENT WITH THE SAME BYTES IS NOT ASKED. A pack update sends every declaration it holds, and a rule that
+   * installed over the list before this check existed would otherwise block every update of its pack, for a fault
+   * that change did not make. A rule sent with any other bytes is new to the record and is asked everything.
+   */
+  function taggingRefused(batch: readonly Declaration[]): Refusal | null {
+    const doorOf = doorsOf(batch);
+    for (const decl of batch) {
+      if (decl.kind !== 'rule' || decl.body === null || typeof decl.body !== 'object') continue;
+      const stored = sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0', decl.id);
+      if (stored !== undefined && stored !== null) {
+        try {
+          if (jcs(decl.body as unknown as Json) === jcs(JSON.parse(stored.body) as Json)) continue;
+        } catch {
+          /* AN UNREADABLE STORED BODY IS NOT THE SAME BYTES, so the rule is asked as a new one. */
+        }
+      }
+      const rule = decl.body as unknown as FlowDecl;
+      const register = rowRegisterOf(rule, doorOf);
+      if (register === null) continue;
+      /* THE LIST AS THE BATCH LEAVES IT: its fields as sent, or as held. A list with no declared `tags` takes the
+         `list<text>` every list takes (`withTags`), and a retired one is not a shape this check reads. */
+      const arriving = batch.find((d) => d.kind === 'register' && ownId(d) === register);
+      const fields = arriving !== undefined ? (arriving.body as { fields?: unknown }).fields : registers.get(register)?.fields;
+      if (!Array.isArray(fields)) continue;
+      const tags = (fields as { id?: unknown; type?: unknown; of?: unknown; values?: unknown; retired?: unknown }[]).find((f) => f?.id === 'tags');
+      if (tags === undefined || tags.retired === true) continue;
+      const found = tagsRefusing(rule, tags).at(0);
+      if (found === undefined) continue;
+      const shape = `${String(tags.type)}${tags.of === undefined ? '' : `<${String(tags.of)}>`}`;
+      return tagsRefusal(register, decl.id, found, shape, `${decl.id}.${found.at}`);
     }
     return null;
   }
@@ -1742,16 +1799,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
            is stored, and `loop/research-batch-thirty-six-audit.md` §5 found the reader it did not count: Bills with no tag
            on any row and `rule.late` tagging each Rent took `tags: int`, and the next Rent went in without its tag, with
            no refusal and no event, one `write.refused` observation the only trace. A rule's `tag` or `untag`, on either
-           path and in either arm, is a reader of the list's tags, so it is asked here as the rows are above. Only a change
-           of shape is asked: a list that already declared another shape under such a rule is not this change's fault. */
-        if (f.id === 'tags' && typeOf(f) !== typeOf(TAGS) && (was === undefined || typeOf(was) !== typeOf(f))) {
-          const tagging = taggerOf(batch, register);
-          if (tagging !== null)
-            return {
-              code: 'FIELD_TYPE_CHANGED',
-              fix: `${decl.id}.tags: every list takes tags as list<text>, and ${tagging.rule} ${tagging.verb}s ${register} at ${tagging.at}, so ${typeOf(f)} would refuse every tag it writes. Leave tags out, or declare it as list<text>.`,
-              at: `${at}.type`,
-            };
+           path and in either arm, is a reader of the list's tags, so it is asked here as the rows are above. Only what the
+           change starts refusing is asked: a list that already refused a rule's tag before it is not this change's fault. */
+        if (f.id === 'tags') {
+          const tagging = taggerOf(batch, register, f, was);
+          if (tagging !== null) return tagsRefusal(register, tagging.rule, tagging, typeOf(f), `${at}.type`);
         }
 
         if ((f.type === 'enum' || (f.type === 'list' && f.of === 'enum')) && Array.isArray(f.values)) {
@@ -1807,7 +1859,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         }
       }
     }
-    return null;
+    return taggingRefused(batch);
   }
 
   /**
@@ -6018,8 +6070,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          AND `stranded` FOR THE SAME REASON. Without it a pack update that opened `lane` to text staged here with its own
          figure resent beside it unchanged, and `lane is earning money` read 1 before and 0 after with nothing refused
          (`packages/record/test/plan-widen-record.test.ts`); `arriving` already treats a reader sent with the same bytes as
-         the record's and not the batch's. */
-      const cannot = unreadable(batch) ?? lintBatch(sql, batch) ?? stranded(batch);
+         the record's and not the batch's.
+
+         AND A RULE THAT TAGS A LIST WHOSE `tags` REFUSES IT (`taggingRefused`), which `contradicted` asks on the other paths
+         and this one never ran. A pack's `rule.late` staged here over a Jobs whose `tags` was `int` installed, and the
+         next Rent went in untagged with nothing refused (`test/tags-rule-order.test.ts`). Only that half of
+         `contradicted`: the rows are `packages/declare`'s `plan` to count on this path. */
+      const cannot = unreadable(batch) ?? lintBatch(sql, batch) ?? stranded(batch) ?? taggingRefused(batch);
       if (cannot) return { ok: false as const, refusal: cannot };
       const staged = await stageDeclarations(batch);
       if (!staged.ok) return staged;
