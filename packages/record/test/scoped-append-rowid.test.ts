@@ -9,9 +9,10 @@
  * writes she cannot see sitting at 7, 8 and 9. The question that decides the rowid is `lineOf`'s own: does she read every
  * list.
  *
- * AND A LIST HELD AT A LEVEL THAT STILL READS CHANGES NOTHING. A bookkeeper at `read` with one list raised to `write`
- * reads everything, so the gap between two of her lines counts nothing she may not read, and she keeps the rowid as the
- * owner does.
+ * AND READING EVERY LIST WAS NOT ENOUGH EITHER. A bookkeeper at `read` with one list raised to `write` reads every list,
+ * and this file said she kept the rowid as the owner does. `lineOf` keeps the owner's invitations from her, so the gap
+ * between two of her lines counted them (`loop/research-batch-twenty-one-audit.md` finding 4, measured again in
+ * `reader-rowid-gap.test.ts`). Only an owner holds a rowid now.
  */
 
 import { test } from 'node:test';
@@ -93,17 +94,26 @@ test('(1) A READER WITH ONE LIST HELD TO APPEND IS HANDED NO ROWID, on a page, i
   sql.close();
 });
 
-test('(2) A READER WHOSE HELD LIST STILL READS KEEPS THE ROWID, as the owner does', async () => {
+test('(2) A READER WHOSE HELD LIST STILL READS IS HANDED NO ROWID EITHER, and the owner keeps his', async () => {
   const { sql, api, bea } = await busy();
   const rowidOf = new Map(sql.all<{ rowid: number; id: string }>('SELECT rowid, id FROM event').map((e) => [e.id, Number(e.rowid)]));
-  for (const ctx of [owner, bea]) {
-    /* BEA IS NOT SHOWN THE INVITATIONS, which are the owner's lines, so her page is compared line by line with the log. */
-    const whole = value<Page>(await api.recentHistory({ limit: 200 } as never, ctx));
-    assert.ok(whole.events.some((e) => e.register === 'diary'), 'the control reads the diary');
-    assert.deepEqual(whole.events.map((e) => e.rowid), whole.events.map((e) => rowidOf.get(e.id)), 'somebody who reads every list lost the rowid');
-    const [newest, second, third] = whole.events;
-    assert.equal(value<News>(await api.whatsNew(undefined, ctx)).upTo, newest!.rowid);
-    assert.equal(value<Page>(await api.recentHistory({ cursor: second!.rowid, limit: 1 } as never, ctx)).events[0]!.id, third!.id);
-  }
+  const whole = value<Page>(await api.recentHistory({ limit: 200 } as never, owner));
+  assert.ok(whole.events.some((e) => e.register === 'diary'), 'the owner reads the diary');
+  assert.deepEqual(whole.events.map((e) => e.rowid), whole.events.map((e) => rowidOf.get(e.id)), 'the owner lost the rowid');
+  const [newest, second, third] = whole.events;
+  assert.equal(value<News>(await api.whatsNew(undefined, owner)).upTo, newest!.rowid);
+  assert.equal(value<Page>(await api.recentHistory({ cursor: second!.rowid, limit: 1 } as never, owner)).events[0]!.id, third!.id);
+
+  /* BEA READS EVERY LIST AND IS STILL NOT SHOWN THE INVITATIONS, which are the owner's lines, so the gap between two of
+     hers counted them. This asserted she kept the rowid, over its own note that she was not shown them
+     (`loop/research-batch-twenty-one-audit.md` finding 4). She pages on the cursors Iris pages on. */
+  const hers = value<Page>(await api.recentHistory({ limit: 200 } as never, bea));
+  assert.ok(hers.events.some((e) => e.register === 'diary'), 'Bea reads the diary');
+  assert.ok(!hers.events.some((e) => 'rowid' in e), `her lines carry rowids: ${hers.events.map((e) => e.rowid).join(' ')}`);
+  const news = value<News>(await api.whatsNew(undefined, bea));
+  assert.equal(news.upTo, `e.${news.events[0]!.id}`);
+  const first = value<Page>(await api.recentHistory({ limit: 1 } as never, bea));
+  assert.equal(value<Page>(await api.recentHistory({ cursor: first.cursor!, limit: 1 } as never, bea)).events[0]!.id, hers.events[1]!.id, 'her own cursor does not page');
+  assert.equal(((await api.recentHistory({ cursor: second!.rowid, limit: 1 } as never, bea)) as Out).ok, false, 'a rowid was taken from her');
   sql.close();
 });

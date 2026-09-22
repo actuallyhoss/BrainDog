@@ -210,8 +210,29 @@ export function arranger(d: ArrangeDeps) {
    * How this BrainDog is arranged, compactly: its packs, what else is on offer, its voice and other
    * settings, the pages the caller can open, and the arrangements already waiting.
    */
-  function overview(pages: readonly { slug: string; title: string }[]): Body {
+  async function overview(pages: readonly { slug: string; title: string }[]): Promise<Body> {
     const packs = states();
+    /* A PACK ON AT AN OLDER VERSION THAN THE ONE OFFERED, which a `pack` install proposal updates, PLANNED AS `propose` PLANS
+       IT. This listed every declaration the owner had changed as `keeps`, read from the record's history without building a
+       document, and so told an agent that money-core 1.7.0 kept an edited `register.fx` when `propose` for the same update
+       was refused `PROVIDES_CONFLICT`, because 1.7.0 adds a field to that list. Measured on `arrange-keeps.test.ts`. Now
+       the update is planned through `planAll`, the one `propose` calls, and says what it keeps or the refusal it would get.
+       IT IS EXPANDED FIRST, AS `propose` EXPANDS IT: planned alone, a money-core 1.7.0 reading a list only portfolio 1.5.0
+       adds was said as refused `REGISTER_UNRESOLVED`, while `propose` for it updated portfolio first and filed. */
+    const updates: Body[] = [];
+    for (const p of packs) {
+      const version = p.disabled_at === null && p.version !== null ? entryOf(p.id)?.version : undefined;
+      if (version === undefined || version === p.version || laterVersion(version, p.version) !== version) continue;
+      const order = expand([p.id], 'body.install', new Map());
+      const planned = order.ok ? await planAll(order.value.install, new Map()) : order;
+      if (!planned.ok) {
+        const { code, fix } = (planned as { refusal: Refusal }).refusal;
+        updates.push({ id: p.id, from: p.version, to: version, refused: { code, fix } });
+        continue;
+      }
+      const keeps = planned.value.plan.flatMap((step) => (Array.isArray(step.keeps) ? (step.keeps as string[]) : []));
+      updates.push({ id: p.id, from: p.version, to: version, ...(keeps.length === 0 ? {} : { keeps }) });
+    }
     const settings: Record<string, Body> = {};
     for (const p of packs) {
       if (p.disabled_at !== null) continue;
@@ -242,20 +263,7 @@ export function arranger(d: ArrangeDeps) {
           summary: e.summary,
           ...(e.modules.length === 0 ? {} : { modules: e.modules }),
         })),
-      /* A PACK ON AT AN OLDER VERSION THAN THE ONE OFFERED, which a `pack` install proposal updates. */
-      ...(() => {
-        const detached = kernel.detached();
-        const updates = packs.flatMap((p) => {
-          const version = p.disabled_at === null && p.version !== null ? entryOf(p.id)?.version : undefined;
-          if (version === undefined || version === p.version || laterVersion(version, p.version) !== version) return [];
-          /* WHAT THE UPDATE WOULD LEAVE AS THE OWNER CHANGED IT, said before an agent files the question, from the record's
-             own history and without building a document. A kept list the update changes is refused at `propose`, which
-             plans; this cannot see that without the document, and says only what was changed. */
-          const keeps = detached.filter((x) => x.was === p.id).map((x) => x.id);
-          return [{ id: p.id, from: p.version, to: version, ...(keeps.length === 0 ? {} : { keeps }) }];
-        });
-        return updates.length === 0 ? {} : { updates };
-      })(),
+      ...(updates.length === 0 ? {} : { updates }),
       /* THE KEYS ARE IN braindog:grammar/proposals, read once; here is only what this record says. */
       voice: { pack: voicePack, said },
       ...(Object.keys(settings).length === 0 ? {} : { settings }),

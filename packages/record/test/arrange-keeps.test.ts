@@ -1,0 +1,117 @@
+/**
+ * What `arrangement` says about an update, against what `propose` then does with it.
+ *
+ * THE TWO DISAGREED. `arrangement` listed every declaration the owner had changed as `keeps` from the record's history
+ * alone, without planning the update. On a record whose owner renamed `register.fx` "My rates", with a money-core 1.7.0
+ * on offer that adds a `spread` field to fx and a figure summing it, `arrangement` answered
+ * `{ id: 'money-core', from: '1.6.0', to: '1.7.0', keeps: ['register.fx'] }`, and `propose` for the same update was
+ * refused `PROVIDES_CONFLICT`: "changes your My rates list, which you changed". An agent reading the first was told an
+ * update was fine that the second would refuse.
+ *
+ * SO `arrangement` PLANS EACH UPDATE IT OFFERS, the way `propose` does, and says the refusal where there is one. The
+ * record is built through `planPack` and `installPack` rather than `installSeed`, because the seed writes its
+ * declarations with no pack behind them, and a record with no money-core version has no update to offer.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { createRecordApi, type CallContext } from '../src/index.ts';
+import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
+import { FIRST_PARTY, firstPartyDocument } from '../../seed/src/index.ts';
+import { seedCatalogue } from '../../seed/src/usecases/catalogue.ts';
+
+const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
+const agent: CallContext = { principal: { kind: 'token', id: 't', scope: 'propose', person: 'p_1', level: 'owner' } };
+
+type Out = { ok: boolean; value?: unknown; refusal?: { code: string; fix: string; at?: string } };
+const said = <T>(r: unknown): T => {
+  const x = r as Out;
+  assert.ok(x.ok, x.ok ? '' : `${x.refusal?.code} at ${x.refusal?.at}: ${x.refusal?.fix}`);
+  return x.value as T;
+};
+const refused = (r: unknown): { code: string; fix: string } => {
+  const x = r as Out;
+  assert.equal(x.ok, false, `expected a refusal, got ${JSON.stringify(x).slice(0, 300)}`);
+  return x.refusal!;
+};
+
+type Doc = { version: string; declarations: Record<string, unknown>[] };
+type Diff = { planHash: string; approve: string[] };
+type Update = { id: string; from: string; to: string; keeps?: string[]; refused?: { code: string; fix: string } };
+
+/** A money-core 1.7.0 on offer, built from the first-party document by `change`. */
+const offering = (doc: Doc) => seedCatalogue().map((e) => (e.id === 'money-core' ? { ...e, version: doc.version, doc: () => structuredClone(doc) as never } : e));
+const next = (change: (d: Doc) => void): Doc => {
+  const d = structuredClone(firstPartyDocument('money-core')) as unknown as Doc;
+  d.version = '1.7.0';
+  change(d);
+  return d;
+};
+
+/** Every first-party pack installed as the owner, then `register.fx` renamed "My rates" through `setDeclaration`. */
+async function renamedRates(doc: Doc) {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 22, 12)), catalogue: offering(doc) });
+  for (const id of FIRST_PARTY) {
+    const pack = firstPartyDocument(id);
+    const planned = said<{ diff: Diff }>(await api.planPack({ doc: pack, source: { kind: 'local' } } as never, owner));
+    said(await api.installPack({ doc: pack, source: { kind: 'local' }, planHash: planned.diff.planHash, approve: planned.diff.approve } as never, owner));
+  }
+  const r = api.kernel.declarations().find((x) => x.id === 'register.fx')!;
+  said(await api.setDeclaration({ body: { register: 'fx', ...(JSON.parse(r.body) as object), name: 'My rates' }, version: r.version } as never, owner));
+  return { sql, api };
+}
+
+test('an update that changes a list the owner changed is said as refused, in the sentence propose refuses it with', async () => {
+  const { sql, api } = await renamedRates(
+    next((d) => {
+      const fx = d.declarations.find((x) => x.register === 'fx' && !x.rule && !x.metric)! as { fields: unknown[] };
+      fx.fields.push({ id: 'spread', type: 'decimal' });
+      d.declarations.push({ metric: 'fx-spread', name: 'Spread', source: 'register.fx', value: { sum: 'spread' }, format: 'decimal', target: { lte: 100 }, window: '30d', compare: 'previous' });
+    }),
+  );
+  const filed = refused(await api.propose({ question: 'Update money?', body_kind: 'pack', body: { install: 'money-core' } } as never, agent));
+  assert.equal(filed.code, 'PROVIDES_CONFLICT');
+
+  const ar = said<{ updates?: Update[] }>(await api.arrangement({}, agent));
+  const update = ar.updates?.find((u) => u.id === 'money-core');
+  assert.ok(update, 'the update is no longer offered at all, and an agent is not told why');
+  assert.equal(update.keeps, undefined, 'arrangement says the update keeps a list propose will refuse it for');
+  assert.deepEqual(update.refused, { code: filed.code, fix: filed.fix });
+  assert.match(update.refused.fix, /changes your My rates list, which you changed/u);
+  sql.close();
+});
+
+/* PLANNED ALONE, AN UPDATE THAT READS WHAT ITS MODULE'S UPDATE ADDS WAS SAID AS REFUSED. `propose` expands money-core to
+   portfolio's update first and files it; `arrangement` planned money-core by itself against a record without the new
+   list and said `REGISTER_UNRESOLVED`. Measured by the checker, and red against `planAll([p.id])`. */
+test('an update that reads a list its module update adds is offered, as propose files it', async () => {
+  const portfolio = structuredClone(firstPartyDocument('portfolio')) as unknown as Doc;
+  portfolio.version = '1.5.0';
+  const list = structuredClone(portfolio.declarations.find((x) => x.register === 'things')!);
+  portfolio.declarations.push({ ...list, register: 'extra', name: 'Extra' });
+  const money = next((d) => {
+    d.declarations.push({ metric: 'extra-count', name: 'Extra count', source: 'register.extra', value: 'count', format: 'decimal', window: '30d', compare: 'none' });
+  });
+  const sql = openSqlite();
+  const catalogue = offering(money).map((e) => (e.id === 'portfolio' ? { ...e, version: '1.5.0', doc: () => structuredClone(portfolio) as never } : e));
+  const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 22, 12)), catalogue });
+  for (const id of FIRST_PARTY) {
+    const pack = firstPartyDocument(id);
+    const planned = said<{ diff: Diff }>(await api.planPack({ doc: pack, source: { kind: 'local' } } as never, owner));
+    said(await api.installPack({ doc: pack, source: { kind: 'local' }, planHash: planned.diff.planHash, approve: planned.diff.approve } as never, owner));
+  }
+  const ar = said<{ updates?: Update[] }>(await api.arrangement({}, agent));
+  assert.deepEqual(ar.updates?.find((u) => u.id === 'money-core'), { id: 'money-core', from: '1.6.0', to: '1.7.0' });
+  said(await api.propose({ question: 'Update money?', body_kind: 'pack', body: { install: 'money-core' } } as never, agent));
+  sql.close();
+});
+
+test('an update that leaves the changed list as the pack wrote it still says it keeps the list, and propose files it', async () => {
+  const { sql, api } = await renamedRates(next(() => undefined));
+  const ar = said<{ updates?: Update[] }>(await api.arrangement({}, agent));
+  assert.deepEqual(ar.updates, [{ id: 'money-core', from: '1.6.0', to: '1.7.0', keeps: ['register.fx'] }]);
+  said(await api.propose({ question: 'Update money?', body_kind: 'pack', body: { install: 'money-core' } } as never, agent));
+  sql.close();
+});

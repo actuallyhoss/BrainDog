@@ -1799,16 +1799,33 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     ctx.principal.kind === 'person' ? ctx.principal.id : ctx.principal.kind === 'token' ? ctx.principal.person : null;
 
   /**
-   * Whether the gap between two of this caller's lines counts nothing they may not read, which is who may hold a rowid.
+   * Whether this caller reads every list, which is who may be handed a question's number and the table's counts.
    *
    * NOT `wholeRecord`, WHICH ASKS ONLY ABOUT THE CEILING. A member invited at `read` with Diary held to `append` has no
    * ceiling, so `wholeRecord` called her whole, and `lineOf` hid Diary from her because `append` does not read: her two
    * lines came back as rowids 10 and 6 with the three Diary writes she cannot see at 7, 8 and 9
    * (`loop/research-batch-nineteen-audit.md` finding 3). So this asks `lineOf`'s own question of every list she holds at
-   * a level of its own. A list raised to `write` still reads, and keeps the rowid it had.
+   * a level of its own. A list raised to `write` still reads. Who holds a rowid is `holdsRowids`, which asks this and more.
    */
   const readsEveryList = (ctx: CallContext): boolean =>
     wholeRecord(ctx) && Object.keys(ctx.levels ?? {}).every((list) => readable(ctx, list) === null);
+
+  /**
+   * Whether the gap between two of this caller's lines counts nothing they may not read, which is who may hold a rowid.
+   *
+   * AN OWNER, AND NOBODY ELSE. This was `readsEveryList`, and reading every list is not reading every line: `lineOf`
+   * keeps every `grant`, `access.*`, `share.*`, `member`, `person` and `vault_key` line for an owner. A colleague at
+   * `read` with no list held apart read two lines at rowids 3 and 7 with the owner's three `access.grant` lines between
+   * them, so the gap was a count of the people he had invited (`loop/research-batch-twenty-one-audit.md` finding 4).
+   * Everybody else is on the `e.` and `s.` cursors a member invited to one list already pages with. A question's number
+   * stays with `readsEveryList`, because `holds` shows her every question and the gap between two numbers counts none.
+   *
+   * AND AN OWNER WHO READS EVERY LIST, NOT EVERY OWNER. `members.ts` lets one owner hold another to a level on one list,
+   * and an owner held to `append` on Diary read his two Obligations lines at rowids 7 and 9 over the Diary write at 8
+   * that `lineOf` hid from him (`reader-rowid-gap.test.ts` (3)). `readsEveryList` alone had already kept that from him,
+   * so asking only `owner` handed back a gap this function was written to close.
+   */
+  const holdsRowids = (ctx: CallContext): boolean => allows(ctx, 'owner') === null && readsEveryList(ctx);
 
   /**
    * A question's or a decision's name as this caller is handed it: `SG6` to whoever reads every list, and `q.<id>` to
@@ -1834,6 +1851,27 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const filedAs = (ctx: CallContext, out: Result<{ id: string }>): Result<{ id: string }> =>
     out.ok && !readsEveryList(ctx) ? ok({ ...out.value, id: nameOf(ctx, 'suggestion', out.value.id) ?? '' }) : out;
+
+  /**
+   * Why `decide` refuses a person invited to named lists, said as the rule it is.
+   *
+   * `allows`'S SENTENCE IS FOR A CALL ABOUT THE RECORD ITSELF, AND A QUESTION IS OFTEN ABOUT HER LIST. A member invited to
+   * Tasks at `decide`, answering the owner's question about Tasks, was told "This belongs to the whole record ... Open
+   * it", and she was reading it from the list she had open (`loop/research-appender-landing.md` finding 7). What is true
+   * is that answering any question is for somebody invited to the whole record, whatever the question is about; whether
+   * a list's `decide` should answer that list's questions is the owner's D5 and is not decided here. The sentence is said
+   * before the id is read, so a question about a list she cannot see and an id that names nothing get the same words.
+   */
+  const decidesNot = (ctx: CallContext, stop: Refusal): Refusal => {
+    const p = ctx.principal;
+    const held = p.kind === 'person' && p.level === null && Array.isArray(ctx.registers) && ctx.registers.length > 0 ? ctx.registers : null;
+    if (held === null || stop.code !== 'FORBIDDEN') return stop;
+    const named = new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(held.map(listName));
+    return {
+      ...stop,
+      fix: `Deciding a question is for somebody invited to the whole record, and you were invited to ${named}, and to nothing else. Ask the owner to answer it, or to invite you to the whole record.`,
+    };
+  };
 
   /**
    * What `decide` answers, as `filedAs` answers `propose`. A member at `decide` with Diary held to `append` does not read
@@ -1875,24 +1913,24 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * A line as it leaves the record. THE ROWID STAYS BEHIND FOR A CALLER WHO CANNOT READ EVERY LIST, and only at the
-   * edge: the walk, `newsFor` and `markRead` all need it, so `lineOf` keeps it and every answer that hands lines out
+   * A line as it leaves the record. THE ROWID STAYS BEHIND FOR A CALLER WHO IS NOT AN OWNER (`holdsRowids`), and only at
+   * the edge: the walk, `newsFor` and `markRead` all need it, so `lineOf` keeps it and every answer that hands lines out
    * asks this.
    */
   const shown = (ctx: CallContext, line: Walked): EventLine => {
-    if (readsEveryList(ctx)) return line;
+    if (holdsRowids(ctx)) return line;
     const { rowid: _rowid, ...rest } = line;
     return rest;
   };
 
-  /** Where a line sits, said to this caller: its rowid to whoever reads the whole record, and its id to anybody else. */
-  const pointAt = (ctx: CallContext, line: Walked): Cursor => (readsEveryList(ctx) ? line.rowid : cursors.mint(line.id));
+  /** Where a line sits, said to this caller: its rowid to an owner, and its id to anybody else. */
+  const pointAt = (ctx: CallContext, line: Walked): Cursor => (holdsRowids(ctx) ? line.rowid : cursors.mint(line.id));
 
   /**
    * The rowid a cursor from this caller names, or the one refusal for everything that is not a cursor they were given.
    *
-   * A CALLER WHO READS EVERY LIST SENDS A WHOLE NUMBER, as before, or its digits as text, because the host now hands a GET's
-   * `cursor` through as the text it was sent rather than coercing it (a scoped caller's `e.01M...` is not a number).
+   * AN OWNER SENDS A WHOLE NUMBER, as before, or its digits as text, because the host now hands a GET's `cursor` through
+   * as the text it was sent rather than coercing it (a scoped caller's `e.01M...` is not a number).
    *
    * ANYBODY ELSE SENDS WHAT THEY WERE HANDED: `e.<id>` of a line `lineOf` shows them, or an `s.` this instance sealed. A
    * whole number, an id nobody minted, an id of an event they were not shown and a seal that does not open are all the
@@ -1900,7 +1938,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * yours" is the fact the cursor exists to withhold (door 7 of `loop/research-scoped-audit.md`).
    */
   const cursorOf = async (ctx: CallContext, given: unknown, at: 'cursor' | 'upTo'): Promise<number | Refusal> => {
-    if (readsEveryList(ctx)) {
+    if (holdsRowids(ctx)) {
       const whole = typeof given === 'string' && /^[1-9]\d{0,15}$/u.test(given) ? Number(given) : given;
       if (typeof whole === 'number' && Number.isSafeInteger(whole) && whole >= 1) return whole;
       return {
@@ -2532,7 +2570,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (typeof args.page !== 'string' || !args.page) return no('REQUIRED_MISSING', 'A page is asked for by its slug, such as studies.', { at: 'page' });
         return arrangement.declaration(args.page, visiblePages(ctx));
       }
-      return ok(arrangement.overview(visiblePages(ctx)));
+      return ok(await arrangement.overview(visiblePages(ctx)));
     },
 
     /**
@@ -3392,7 +3430,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      */
     async decide(args: { id: string; decide?: { option: string; reason: string }; defer?: { until: string; why: string }; resolved_as?: 'wont-fix' | 'incorrect'; reason?: string }, ctx: CallContext) {
       const stop = guard(ctx, 'decide');
-      if (stop) return { ok: false as const, refusal: stop };
+      if (stop) return { ok: false as const, refusal: decidesNot(ctx, stop) };
       if (!args?.id) return no('REQUIRED_MISSING', 'Which suggestion?', { at: 'id' });
       /* A HANDLE IS TAKEN AS THE NUMBER IT NAMES, before anything reads the id, as `governance` takes one. */
       args = { ...args, id: spokenIn(String(args.id)) };
@@ -4659,11 +4697,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const events = lines.slice(0, limit);
       const last = events.at(-1);
       /* A FULL PAGE ENDS ON A LINE THE CALLER WAS SHOWN, and its cursor names that line. A page the walk cap cut short
-         ends on `next`, an event they were not shown: its rowid to whoever reads the whole record, as before, and sealed
+         ends on `next`, an event they were not shown: its rowid to whoever `holdsRowids`, as before, and sealed
          for anybody else, since its id would hand them the hidden event's millisecond (`history-cursor.ts`). */
       let below: Cursor | null = null;
       if (lines.length > limit) below = last ? pointAt(ctx, last) : null;
-      else if (next !== null) below = readsEveryList(ctx) ? next : await cursors.seal(next);
+      else if (next !== null) below = holdsRowids(ctx) ? next : await cursors.seal(next);
       return ok({ events: events.map((line) => shown(ctx, line)), cursor: below });
     },
 
