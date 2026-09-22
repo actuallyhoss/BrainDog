@@ -417,8 +417,10 @@ const conjuncts = (p: Predicate): Record<string, unknown>[] =>
 
 const dayAfter = (iso: string): string => new Date(Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) + DAY).toISOString().slice(0, 10);
 
-function endedAt(shifted: Predicate | undefined, current: Predicate | undefined, schema: Schema, thenMs: number): Predicate | undefined {
-  if (!shifted || !current) return shifted;
+function endedAt(shifted: Predicate | undefined, current: Predicate | undefined | null, schema: Schema, thenMs: number): Predicate | undefined {
+  /* `current: null` IS THE CURRENT WINDOW ITSELF, ended at an as-of clock: there is no later window
+     for it to stay clear of, so only the clock's day bounds it. */
+  if (!shifted || current === undefined) return shifted;
   const clauses = conjuncts(shifted);
   const dated = (field: unknown): field is string =>
     typeof field === 'string' && Object.hasOwn(schema.fields, field) && ['day', 'instant'].includes(schema.fields[field]?.type ?? '');
@@ -438,7 +440,7 @@ function endedAt(shifted: Predicate | undefined, current: Predicate | undefined,
        day's rows on both sides of the comparison. It stays for any declaration whose span is longer
        than its window: the window before is cut at the day before, and holds only days the current
        one does not. */
-    const starts = conjuncts(current)
+    const starts = (current === null ? [] : conjuncts(current))
       .filter((c) => c.field === field)
       .flatMap((c) => LOWER.filter((op) => typeof c[op] === 'string').map((op) => (op === 'gte' ? (c[op] as string).slice(0, 10) : dayAfter(c[op] as string))))
       .sort();
@@ -698,7 +700,19 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
     today: new Date(ctx.asOfMs ?? ctx.nowMs).toISOString().slice(0, 10),
     day: dayFieldOf(schema.fields),
   };
-  const now = read(sql, said.predicate, schema, decl, tablesOf(decl), fx);
+  /**
+   * AND UNDER `asOfMs` THE CURRENT WINDOW ENDS AT THE AS-OF DAY, as the window before ends at its own.
+   *
+   * A start with no end ends at the clock, and the clock the rows are compared against is the real
+   * one, which under `asOfMs` is days or months later than the day asked about. `on after -30d` read
+   * as of sixty days back counted every row dated after that day up to now: the audit
+   * (`loop/research-batch-seventeen-audit.md` §3) measured 14,300,000 in four rows where the thirty
+   * days to the as-of day hold 300,000 in two, and `snapshot` backfills every missing day this way.
+   * `test/metrics-asof-end.test.ts` holds it. A live read is not given the end, because a live window
+   * has always counted a row dated ahead of today and that is not what was wrong here.
+   */
+  const current = ctx.asOfMs === undefined ? said.predicate : endedAt(said.predicate, null, schema, ctx.asOfMs);
+  const now = read(sql, current, schema, decl, tablesOf(decl), fx);
   if (!now.ok) return now;
 
   /**
@@ -787,7 +801,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
     else delta = deltaFrom(before.value.value, now.value.value);
   }
 
-  const grouped = decl.group_by === undefined ? null : groupsOf(sql, said.predicate, schema, decl, ctx, fx);
+  const grouped = decl.group_by === undefined ? null : groupsOf(sql, current, schema, decl, ctx, fx);
   if (grouped && !grouped.ok) return grouped;
 
   /* A TARGET IS IN THE CURRENCY THE FIGURE DECLARES, so a figure converted into another currency is judged against the
