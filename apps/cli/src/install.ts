@@ -312,11 +312,23 @@ const looksLikeToken = (piece: string) =>
 /* Each path segment on its own, so a folder is still named while a token between two slashes is not. */
 const hidePieces = (text: string) => text.split(/([\\/])/).map((piece) => (piece === '/' || piece === '\\' || !looksLikeToken(piece) ? piece : HIDDEN)).join('');
 
-/** A URL as its origin and path, with no query, fragment or sign-in, and every token-like segment hidden. */
+/*
+ * THE PATH SEGMENTS A URL MAY SHOW ARE NAMED, AND EVERY OTHER ONE IS HIDDEN. It was every segment that did not look
+ * like a token, and batch twenty-eight's audit (§5) measured `https://brain.example.com/mcp/tq7Rw2xT9` printed whole: nine
+ * characters is no length a shape test can tell from a folder's name. Only the old tool's entries are described, and
+ * its endpoint is `/mcp`, so a reader loses nothing by seeing `[hidden]` for the rest while the origin still says
+ * whose server it is.
+ */
+const URL_WORDS = /^(?:|mcp|sse|api|v\d)$/i;
+
+/** A URL as its origin and path, with no query, fragment or sign-in, and every segment but a named one hidden. */
 function hideUrl(text: string): string {
   try {
     const url = new URL(text);
-    return `${url.origin}${hidePieces(url.pathname)}`;
+    return `${url.origin}${url.pathname
+      .split('/')
+      .map((piece) => (URL_WORDS.test(piece) ? piece : HIDDEN))
+      .join('/')}`;
   } catch {
     return HIDDEN;
   }
@@ -346,22 +358,30 @@ function hideWord(word: string): string {
  * `/mcp/hb_live_SECRET_88` in the path were printed whole on the dry run and under `--json`. A word after one that
  * names a secret is hidden, and so is every word or path segment shaped like a token, and a run of hidden words
  * is shown once.
+ *
+ * A WORD NAMING A SECRET HIDES EVERY WORD AFTER IT UP TO THE NEXT FLAG OR URL, not the one word. Measured before this
+ * (batch twenty-eight's audit, §5): `--header X-Brain-Token <value>` printed the value, because the header's name was
+ * hidden as the flag's value but names nothing by `namesSecret`'s rule, and `--token x <token>` printed a twenty-letter
+ * token that followed a throwaway word. A flag or a URL ends the run because either is what tells a reader which
+ * entry this is, and neither is a value a secret flag takes as a second word.
  */
 function describe(server: Record<string, unknown>): string {
   const words = typeof server.url === 'string' ? [server.url] : wordsOf(server);
   const shown: string[] = [];
-  let hideNext = false;
-  let unsure = false;
+  /* 1 on the word straight after one naming a secret, which is hidden whatever it is; 2 on the words after that. */
+  let secret: 0 | 1 | 2 = 0;
+  let short = false;
   for (const word of words) {
     const bare = word.replace(/^["']+|["']+$/g, '');
-    /* `Bearer` hidden after `Authorization:` still names a secret, so the key after it is hidden too. */
-    const next = namesSecret(bare);
-    const short = !next && isShortFlag(bare);
     /* After a one-letter flag, a word that is itself a flag is no value, and a URL is shown as `hideUrl` shows one. */
-    const text = hideNext && !(unsure && (/^-/.test(bare) || isUrl(bare))) ? HIDDEN : hideWord(word);
+    const ends = /^-/.test(bare) || isUrl(bare);
+    const hidden: boolean = secret === 1 || ((secret === 2 || short) && !ends);
+    const text = hidden ? HIDDEN : hideWord(word);
     if (!(text === HIDDEN && shown.at(-1) === HIDDEN)) shown.push(text);
-    hideNext = next || short;
-    unsure = short;
+    /* `Bearer` hidden after `Authorization:` still names a secret, so the key after it is hidden too. */
+    const names = namesSecret(bare);
+    secret = names ? 1 : secret !== 0 && hidden ? 2 : 0;
+    short = !names && isShortFlag(bare);
   }
   return shown.join(' ');
 }
