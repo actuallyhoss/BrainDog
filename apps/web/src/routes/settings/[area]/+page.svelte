@@ -49,9 +49,10 @@
   import { mintsMail } from '$lib/record/inbound-door.ts';
   /* THE WRITES THIS SCREEN MAKES, and the one reading of what the record answered to each. */
   import {
-    addException, alsoKnown, dropException, exportFile, moveLevel, readPeople, removeAccess, wrote,
+    addException, dropException, exportFile, moveLevel, readPeople, removeAccess, wrote,
     type ExportKind, type Wrote,
   } from '$lib/record/settings-write.ts';
+  import { namesHeld, personSaid, secondSaid } from './people-said.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
   /* Lane F: backups, putting a copy back, erasing a person and deleting the record. */
   import { backUpNow, deleteRecordNow, downloadSnapshot, erasePerson, readSnapshots, restoreSnapshot } from '$lib/record/settings-write.ts';
@@ -1204,6 +1205,14 @@
    */
   const self = (who: Person) => who.id === me.person;
   /**
+   * WHAT A ROW CALLS ITS PERSON, and it was their email. `personOf` puts the address in `name` when
+   * the record holds none, which on a real record is everybody, so the face, the name slot and the
+   * level control all said `ben@ashgrove.co.uk`. `people-said.ts` says it the way `/audit` and Home
+   * do, and the address moves to the detail line, where it tells two people apart.
+   */
+  const peopleNames = $derived(namesHeld(people));
+  const said = (who: Person) => personSaid(who, me.person, peopleNames);
+  /**
    * The signed-in person's own row, which is where their name and address live.
    *
    * FROM WHICHEVER LIST WAS DRAWN, AND NEVER THE SAMPLE'S OVER A LIVE RECORD. It read
@@ -1747,8 +1756,8 @@
             {#each people as p (p.id)}
               <li class="who">
                 <div class="who-head">
-                  <Face name={p.name} you={self(p)} />
-                  <span class="who-name">{p.name}</span>
+                  <Face name={said(p)} you={self(p)} />
+                  <span class="who-name">{said(p)}</span>
                   <!-- THE EMAIL, because that is what the invitation is bound to (12 §3) and what
                        tells two people with one name apart. And WHEN, because access with no date is
                        a list you cannot audit. -->
@@ -1764,9 +1773,9 @@
                   <span class="who-detail">
                     {#if peopleFrom === 'live'}
                       <!-- A RECORD KEEPS NO ACCEPTANCE DATE, so it says when they last looked and nothing it cannot know. -->
-                      {#if alsoKnown(p)}{alsoKnown(p)}{' · '}{/if}{p.seen ? copy.lastLooked(since(p.seen, peopleNow())) : copy.neverLooked}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, peopleNow()))}{/if}
+                      {#if secondSaid(p, said(p))}{secondSaid(p, said(p))}{' · '}{/if}{p.seen ? copy.lastLooked(since(p.seen, peopleNow())) : copy.neverLooked}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, peopleNow()))}{/if}
                     {:else}
-                    {#if alsoKnown(p)}{alsoKnown(p)}{' · '}{/if}{p.since ? copy.sinceWhen(relative(p.since, NOW)) : copy.inviteOut}{#if p.since}{' · '}{p.seen ? copy.lastLooked(since(p.seen, NOW)) : copy.neverLooked}{/if}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, NOW))}{/if}
+                    {#if secondSaid(p, said(p))}{secondSaid(p, said(p))}{' · '}{/if}{p.since ? copy.sinceWhen(relative(p.since, NOW)) : copy.inviteOut}{#if p.since}{' · '}{p.seen ? copy.lastLooked(since(p.seen, NOW)) : copy.neverLooked}{/if}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, NOW))}{/if}
                     {/if}
                   </span>
                   <span class="who-do">
@@ -1795,7 +1804,7 @@
                     and reading left to right the row now says *nothing on the record, then these
                     lists* — which is the sentence "invite the bookkeeper" makes.
                   -->
-                  <div class="segmented levels" role="group" aria-label={copy.levelFor(p.name)}>
+                  <div class="segmented levels" role="group" aria-label={copy.levelFor(said(p))}>
                     <!-- THE SIXTH OPTION IS NOT A LEVEL, AND ONLY THE COMMENT SAID SO. It rendered as
                          the first of six identical chips with the same `aria-pressed`, inside a group
                          labelled "What <name> can do" — so a screen reader heard six equivalent levels
