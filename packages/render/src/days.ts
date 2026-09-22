@@ -1,7 +1,7 @@
 /**
  * Day grids, as functions the `heat` and `calendar` drawers will call.
  *
- * Two kinds draw days in cells and share every piece of arithmetic under them: `heat` is weeks
+ * `heat` and `calendar` both draw days in cells and share every piece of arithmetic under them: `heat` is weeks
  * across and weekdays down, eight or twelve weeks ending on this one, each day washed in one of four
  * steps; `calendar` is a month of whole weeks or a strip of fourteen days, each day holding up to
  * three dots. Neither kind is registered yet. This file is the ground under both, written first so
