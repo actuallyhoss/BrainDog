@@ -28,6 +28,14 @@ const REFUSED: [string, string][] = [
   ['an emoji with a trailing ZWJ', '\u{1F468}\u200d'],
   ['a name ending in an emoji with a trailing ZWJ', 'Bo \u{1F468}\u200d\u{1F469}\u200d'],
   ['an emoji ZWJ onto a Latin letter', '\u{1F468}\u200dBo'],
+  /* ONE BORROWED MARK MADE A LATIN NAME A JOINING ONE. `7f6610bd` asked the script of the character before the joiner,
+     so a single haraka, candrabindu or Adlam mark on `b` passed as Arabic, Devanagari or Adlam, and the joiner after it
+     split `Bob` from `Smith` unseen (`loop/research-batch-twenty-audit.md` finding 7). The Adlam line was refused
+     before `7f6610bd` put Adlam on the list. */
+  ['Bob, one Arabic haraka, ZWNJ, Smith', 'Bob\u064b\u200cSmith'],
+  ['Bob, one Devanagari mark, ZWJ, Smith', 'Bob\u0901\u200dSmith'],
+  ['Bob, one Adlam mark, ZWJ, Smith', 'Bob\u{1E944}\u200dSmith'],
+  ['Bob, two Arabic harakat, ZWNJ, Smith', 'Bob\u064b\u064e\u200cSmith'],
 ];
 
 const KEPT: [string, string][] = [
@@ -39,6 +47,11 @@ const KEPT: [string, string][] = [
   ['six marks, a joiner, a letter, six marks', `क${'ँ'.repeat(6)}\u200dक${'ँ'.repeat(6)}`],
   ['Persian with a non-joiner after a vowel mark', 'مِ\u200cر'],
   ['a Malayalam chillu', 'ന്\u200d'],
+  /* AND A JOINING SCRIPT'S OWN MARKS STILL CARRY A JOINER, since the base under them is of the script. */
+  ['Adlam with a mark and a joiner', '\u{1E900}\u{1E944}\u200d\u{1E901}'],
+  ['Hanifi Rohingya with a mark and a non-joiner', '\u{10D00}\u{10D24}\u200c\u{10D01}'],
+  ['Arabic with two harakat and a non-joiner', '\u0628\u064b\u064e\u200c\u0631'],
+  ['Devanagari with a virama and a joiner', '\u0915\u094d\u200d\u0937'],
   ['an emoji family', '\u{1F468}\u200d\u{1F469}\u200d\u{1F467}'],
 ];
 

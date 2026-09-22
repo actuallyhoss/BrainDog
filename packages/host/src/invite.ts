@@ -81,10 +81,16 @@ const INVISIBLE_INSIDE = new RegExp(String.raw`[[\p{Default_Ignorable_Code_Point
    one of those itself, so a second joiner in a row follows a joiner and is refused: no script needs a run of them.
    ADLAM AND HANIFI ROHINGYA ARE ON IT TOO. Both are cursive scripts with living users (Fula, Rohingya), a joiner is
    spelling there as it is in Arabic, and leaving them off newly refused `\u{1E900}\u200d\u{1E901}`
-   (`loop/research-batch-eighteen-audit.md` finding 8). */
+   (`loop/research-batch-eighteen-audit.md` finding 8).
+   THE SCRIPT ASKED IS THE BASE LETTER'S, NOT THE MARK'S. Asking the character just before the joiner let one borrowed
+   mark stand in for a script: `Bob`, one haraka, ZWNJ, `Smith` passed as Arabic, a candrabindu as Devanagari, and once
+   Adlam was on the list an Adlam mark as Adlam, three ways to split a Latin name unseen
+   (`loop/research-batch-twenty-audit.md` finding 7). The lookbehind now steps back over every mark to the letter under
+   them and asks that letter, so a Persian `\u0645\u0650` or a Malayalam chillu keeps its joiner and `b` with a haraka does not.
+   It does not step over a joiner, so a mark after a joiner has no base and cannot carry a second one. */
 const JOINS_WITH = String.raw`[\p{scx=Arabic}\p{scx=Syriac}\p{scx=Nko}\p{scx=Adlam}\p{scx=Hanifi_Rohingya}\p{scx=Mongolian}\p{scx=Devanagari}\p{scx=Bengali}\p{scx=Gurmukhi}\p{scx=Gujarati}\p{scx=Oriya}\p{scx=Tamil}\p{scx=Telugu}\p{scx=Kannada}\p{scx=Malayalam}\p{scx=Sinhala}\p{scx=Khmer}\p{scx=Myanmar}]`;
 const JOINER_SPELLING = new RegExp(
-  String.raw`(?<=${JOINS_WITH})[\u200c\u200d]|(?<=[\p{Extended_Pictographic}\p{Emoji_Modifier}\ufe0f])\u200d(?=\p{Extended_Pictographic})`,
+  String.raw`(?<=[${JOINS_WITH}--\p{M}]\p{M}*)[\u200c\u200d]|(?<=[\p{Extended_Pictographic}\p{Emoji_Modifier}\ufe0f])\u200d(?=\p{Extended_Pictographic})`,
   'gv',
 );
 /* WHAT IS VISIBLE AND STILL NO NAME (finding 7). A mark with no letter under it, at the start or after a space, draws
