@@ -515,8 +515,11 @@ test('AN ALERT IN A CURRENCY THAT IS NOT STERLING IS READ, because the amount is
    * no pattern anchors on a code again.
    */
   assert.equal((row.fields.amount as { currency: string }).currency, 'GBP', 'a bare record read something other than the declared fallback');
+  /* A PATTERN THAT READS THE SECOND FIGURE IN A LINE HOLDS ITS MONEY INSIDE `nth`, as `bank-from-out` does, so both
+     places are read. */
+  type Money = { after?: string; currency?: string };
   const forms = Object.values(MONEY_INGESTS).flatMap((body) =>
-    Object.entries(body.extract ?? {}).map(([field, form]) => [`${body.ingest}.${field}`, (form as { money?: { after?: string; currency?: string } }).money] as const),
+    Object.entries(body.extract ?? {}).map(([field, form]) => [`${body.ingest}.${field}`, (form as { money?: Money }).money ?? (form as { nth?: { of?: { money?: Money } } }).nth?.of?.money] as const),
   );
   const monies = forms.filter(([, money]) => money);
   assert.equal(monies.length, Object.keys(MONEY_INGESTS).length, 'a pattern no longer reads one amount');
