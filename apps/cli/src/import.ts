@@ -29,10 +29,12 @@ import { mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'no
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { satisfies } from '@braindog/declare';
 import { coerce, type FieldDecl } from '@braindog/kernel';
 import { no, ok, refused, type Result } from '@braindog/ports';
 
 import { budgetOf, hostsPath, target, type Target } from './http.ts';
+import { bankHsbcEgPack } from '@braindog/seed';
 import { pollPack } from '@braindog/seed/usecases/founder-poll';
 
 import { KEY_PREFIX, OPTIONAL, ORDER, draftSetup, holdsKey, PROVIDED_BY, isRef, planLegacyTool, readLegacyTool, readSetup, type Plan, type PlannedRow, type Setup } from './legacy.ts';
@@ -56,7 +58,21 @@ export type Door = {
   update: (args: { register: string; seq: number; patch: Record<string, unknown>; version?: number; note?: string }) => Promise<Result<unknown>>;
   governance: (args: { register?: string; status?: string; limit?: number; cursor?: string }) => Promise<Result<unknown>>;
   propose: (args: { question: string; body_kind: 'options' | 'pack'; body: Record<string, unknown> }) => Promise<Result<unknown>>;
+  /**
+   * The packs this record holds and at which version: read only when a bank pack is to be offered (see `banksOf`).
+   * OPTIONAL BECAUSE A DOOR WITHOUT IT STILL WORKS. The pack is then proposed unchecked, and a record that cannot take
+   * it answers with its own refusal, which lands under "Refused by the record" like any other.
+   */
+  packs?: () => Promise<Result<{ id: string; version: string | null }[]>>;
 };
+
+/**
+ * A pack his export shows he uses, to be offered on Decide with its document: see `banksOf`.
+ *
+ * THE DOCUMENT TRAVELS WITH THE ID because the pack is in no catalogue a record resolves an install id against.
+ * `bank-hsbc-eg` is deliberately not in `seedCatalogue`: a pack in the catalogue is a pack every record is offered.
+ */
+export type PlannedBank = { install: string; name: string; question: string; doc: Record<string, unknown> };
 
 export type Tally = { added: number; updated: number; unchanged: number };
 
@@ -67,6 +83,11 @@ export type Report = {
   alreadyAsked: number;
   /** Polls filed on Decide, and those already filed or installed. */
   polls: { filed: number; before: number };
+  /**
+   * Bank packs filed on Decide, those filed before, and a sentence for each one held back because the record's Money is
+   * too old to take it. Absent when the run was handed no bank to offer.
+   */
+  banks?: { filed: number; before: number; waiting: string[] };
   /** Each row that changes, with the fields that change. */
   changes: { register: string; label: string; fields: string[] }[];
   refused: { label: string; register: string; fix: string }[];
@@ -241,10 +262,48 @@ async function readDecide(door: Door): Promise<Result<Decide>> {
 }
 
 /**
+ * The words a ledger row's `source` carries when a bank's own message wrote it. Only `sms` was seen on his live ledger
+ * on 22 September (beside `sheet`, his typed rows); the two mail words are here because the pack reads alert mails as
+ * well and a row a mail wrote is the same evidence as one a text wrote.
+ */
+const READ_FROM_A_MESSAGE = new Set(['sms', 'email', 'mail']);
+
+/**
+ * THE BANK PACKS HIS EXPORT SHOWS HE USES, AND ONLY THOSE: today one, `bank-hsbc-eg`.
+ *
+ * money-core 1.8.0 gave HSBC Egypt's wordings to an optional pack (`loop/DIRECTION.md` section 22), so a record set up
+ * for him no longer reads his bank's texts until somebody installs it, and the import is the one moment that knows he
+ * needs it. It has to know that from his data and not from being his importer, or it is the core assuming one bank
+ * again in another file.
+ *
+ * WHAT COUNTS IS AN HSBC ACCOUNT WITH A ROW ON IT THAT A MESSAGE WROTE, and the export carries nothing better. It holds
+ * no pattern and no inbox (`scripts/legacy-export.mjs` asks four routes and none of them is either); what it does
+ * hold, measured against his live `/api/money/overview` and `/api/money/txn` on 22 September, is two accounts whose id
+ * and name say HSBC and a `source` on every ledger row, `sms` on the rows the bank's texts wrote and `sheet` on the ones
+ * he typed in before the texts were wired. Neither alone is enough. An account called HSBC whose every row was typed
+ * says he banks there, not that there is anything for the pack to read; a row read from a text on some other account
+ * says a bank texts him, not which. the old tool's parser reads only the Egypt wordings the pack carries, so a row it
+ * wrote from a text onto an HSBC account is a message in exactly those wordings.
+ */
+export function banksOf(exp: Record<string, unknown>): PlannedBank[] {
+  const money = isObj(exp.money) ? exp.money : null;
+  if (!money) return [];
+  const hsbc = new Set<string>();
+  for (const a of Array.isArray(money.accounts) ? money.accounts : [])
+    if (isObj(a) && (typeof a.id === 'string' || typeof a.id === 'number') && /hsbc/iu.test(`${String(a.id)} ${typeof a.name === 'string' ? a.name : ''}`)) hsbc.add(String(a.id).toLowerCase());
+  if (hsbc.size === 0) return [];
+  /* THE LEDGER IN EVERY SHAPE `legacy.ts` READS IT IN: the route's answer whole, or its rows under one of three names. */
+  const ledger = money.ledger;
+  const rows: unknown[] = Array.isArray(ledger) ? ledger : isObj(ledger) ? [ledger.txns, ledger.transactions, ledger.rows].find(Array.isArray) ?? [] : [];
+  const read = rows.some((t) => isObj(t) && typeof t.source === 'string' && READ_FROM_A_MESSAGE.has(t.source.toLowerCase()) && hsbc.has(String(t.account_id ?? t.account).toLowerCase()));
+  return read ? [{ install: 'bank-hsbc-eg', name: 'HSBC Egypt', question: 'Read HSBC Egypt texts and mails into Money?', doc: bankHsbcEgPack() }] : [];
+}
+
+/**
  * Apply a plan through a door. Refs are resolved to the id of the row they name once it is written; a ref to a row in
  * the same list written later is set in a second pass.
  */
-export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean }): Promise<Report> {
+export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; banks?: PlannedBank[] }): Promise<Report> {
   let plan = given;
   const report: Report = { missing: [], tally: {}, asked: 0, alreadyAsked: 0, polls: { filed: 0, before: 0 }, changes: [], refused: [], retired: [], clashes: [], examples: 0, outcomes: {}, plan };
   let registers = ORDER.filter((r) => plan.rows.some((row) => row.register === r));
@@ -624,7 +683,8 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean })
    * stops asking, files no poll, and says which read failed under "Refused by the record".
    */
   let decide: Decide | null = { asked: new Set(), installs: new Set() };
-  if (plan.asks.length > 0 || plan.polls.length > 0) {
+  const banks = o.banks ?? [];
+  if (plan.asks.length > 0 || plan.polls.length > 0 || banks.length > 0) {
     const got = await readDecide(door);
     if (got.ok) decide = got.value;
     else if (unreachable(got)) throw new Unreachable();
@@ -687,6 +747,52 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean })
     }
     report.polls.filed++;
   }
+
+  /**
+   * A BANK PACK HIS DATA SHOWS HE USES, FILED ONCE, THE WAY A POLL IS, AND NOT FILED AT ALL ON A MONEY TOO OLD TO TAKE IT.
+   *
+   * `bank-hsbc-eg` requires money-core ^1.8.0, and on 1.7.0 the same twelve ids are still money-core's: the pack's own
+   * header records that install being refused `PROVIDES_CONFLICT` on all twelve, a sentence about two packs owning one
+   * declaration that does not say the step he is missing is Money's update. Filed anyway, it would sit on Decide as a
+   * proposal that refuses the moment he presses it. So the version is read first and the report names the update.
+   * A door that cannot say which packs it holds files unchecked, and the record's own refusal is then what he reads.
+   */
+  if (banks.length > 0 && decide !== null) {
+    report.banks = { filed: 0, before: 0, waiting: [] };
+    const held = door.packs ? await door.packs() : null;
+    if (held !== null && !held.ok && unreachable(held)) throw new Unreachable();
+    const money = held?.ok ? (held.value.find((p) => p.id === 'money-core') ?? null) : undefined;
+    for (const bank of banks) {
+      /* HELD IS AS GOOD AS OFFERED. The pack's header says whoever banks with HSBC Egypt may install it by hand, which
+         leaves nothing on Decide, and `propose` does not refuse a pack the record already holds: reading Decide alone
+         filed a second offer of a pack that was already reading his texts (`test/import-bank-pack.test.ts`). */
+      if (installs.has(bank.install) || (held?.ok === true && held.value.some((p) => p.id === bank.install))) {
+        report.banks.before++;
+        continue;
+      }
+      const requires = isObj(bank.doc.requires) && isObj(bank.doc.requires.packs) ? bank.doc.requires.packs['money-core'] : undefined;
+      if (typeof requires === 'string' && money !== undefined && !satisfies(money?.version ?? null, requires)) {
+        report.banks.waiting.push(
+          money === null
+            ? `Reading ${bank.name} texts and mails (the ${bank.install} pack) was not filed on Decide: it reads messages into Money, and this BrainDog has no Money. Install Money, then run the import again.`
+            : `Reading ${bank.name} texts and mails (the ${bank.install} pack) was not filed on Decide: it needs Money ${requires} and this BrainDog has Money ${money.version ?? 'at no version'}. Take the Money update, then run the import again.`,
+        );
+        continue;
+      }
+      if (o.dryRun) {
+        report.banks.filed++;
+        continue;
+      }
+      const done = await door.propose({ question: bank.question, body_kind: 'pack', body: { install: bank.install, doc: bank.doc } });
+      if (!done.ok) {
+        if (unreachable(done)) throw new Unreachable();
+        if (refused(done) && done.refusal.code === 'TRANSITION_ILLEGAL') report.banks.before++;
+        else report.refused.push({ label: bank.question, register: 'Decide', fix: fixOf(done) });
+        continue;
+      }
+      report.banks.filed++;
+    }
+  }
   return report;
 }
 
@@ -722,6 +828,10 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
   if (plan.asks.length > 0) lines.push(`Decide: ${String(report.asked)} ${o.dryRun ? 'would be asked' : 'asked'}, ${String(report.alreadyAsked)} asked before.`);
   if (plan.polls.length > 0)
     lines.push(`Polls: ${String(report.polls.filed)} ${o.dryRun ? 'would be filed' : 'filed'} on Decide for you to approve, ${String(report.polls.before)} filed before.`);
+  if (report.banks) {
+    lines.push(`Banks: ${String(report.banks.filed)} ${o.dryRun ? 'would be filed' : 'filed'} on Decide for you to approve, ${String(report.banks.before)} filed before.`);
+    for (const w of report.banks.waiting) lines.push(`- ${w}`);
+  }
   const estate = plan.rows.filter((r) => /^legacy:(date|domain|service):/u.test(r.key));
   if (estate.length > 0) {
     lines.push('', 'Dates, domains and services:');
@@ -1061,10 +1171,11 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
     update: (a) => client.update(a),
     governance: (a) => client.governance(a),
     propose: (a) => client.call('propose', a),
+    packs: () => client.packs(),
   };
   let report: Report;
   try {
-    report = await applyPlan(plan, door, { dryRun: values['dry-run'] === true });
+    report = await applyPlan(plan, door, { dryRun: values['dry-run'] === true, banks: banksOf(read.value) });
   } catch (e) {
     if (e instanceof Unreachable) {
       io.say(`${to.key} stopped answering part way. Run the import again: rows already written are found and not added twice.`);
