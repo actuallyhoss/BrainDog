@@ -492,6 +492,7 @@
 
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
+  import SparkAsks from '$lib/ui/SparkAsks.svelte';
   import SparkDaily from '$lib/ui/SparkDaily.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Chip from '$lib/ui/Chip.svelte';
@@ -2424,6 +2425,7 @@
         {/if}
         {/if}
       </Section>
+      <SparkAsks owner={anOwner} />
       <!-- SPARK LOOKING ON ITS OWN is the owner's choice, beside the agents they let in (`loop/research-spark.md` S15). -->
       <SparkDaily link />
     {:else if area === 'ingest'}
