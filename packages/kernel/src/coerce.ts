@@ -164,6 +164,28 @@ export function isJsonQuoted(s: string): boolean {
 export const hasEscapedNewline = (s: string): boolean => s.includes('\\n') && !s.includes('\n');
 
 /**
+ * A whole value that reads as a Windows path: anchored at a drive (`C:\`, `C:/`), a UNC share (`\\host\`), the long-path
+ * prefix (`\\?\C:\`) or `.\` and `..\`, and holding nothing a Windows filename cannot hold after that.
+ *
+ * WHY IT EXISTS. `loop/research-import-real.md` (finding 1) measured a real export refused on two agent runs' `cwd`:
+ * both were drive-letter paths with a folder starting with `n`, which is backslash and `n` with no line break, so
+ * `hasEscapedNewline` fired on a value that was never text. 186 of that export's 198 `cwd` values were Windows paths,
+ * and the refusal's repair, "send a real newline", cannot be applied to one.
+ *
+ * WHY THE ANCHOR AND NOT ANY BACKSLASH. `Work\notes` and `first\nsecond` are the same shape, and a bare word pair is
+ * exactly what a double-encoded two-line text looks like, so an unanchored relative path is still refused. A text
+ * that was encoded once too often almost never opens with `C:\` or `\\`, and when it carries a quote (`\"`), a pipe,
+ * a tab or a colon past the drive (a time, a label) it is not a filename and the refusal stands.
+ */
+/* THE SHARE NEEDS A HOST, WITH NO SPACE IN IT, AND THE SEPARATOR AFTER IT. With `\\` alone as the anchor, a value
+   that opens with an escaped backslash and then carries escaped newlines (`\\nfirst line\nsecond line`) was
+   measured accepted as a share; a host name cannot hold a space, and a line of prose almost always does. And the
+   long-path form of a share, `\\?\UNC\host\share`, was measured refused, because only the drive form was listed. */
+const WINDOWS_PATH =
+  /^(?:\\\\\?\\(?:[A-Za-z]:|UNC)\\|[A-Za-z]:[\\/]|\\\\[^\\\s:*?"<>|\u0000-\u001f]+\\|\.{1,2}\\)[^:*?"<>|\u0000-\u001f]*$/u;
+export const readsAsWindowsPath = (s: string): boolean => WINDOWS_PATH.test(s);
+
+/**
  * The shapes a published key takes, by its issuer's own prefix: a private key's PEM header, Stripe,
  * GitHub, GitLab, Slack, AWS, Google, Anthropic and OpenAI, npm, 25 §7's own `phx_` and `vcp_`, a
  * JWT, the two webhook addresses that are their own secret, and a password written into a URL.
@@ -324,7 +346,10 @@ export function coerce(field: FieldDecl, value: unknown, look: Lookups = {}, at 
           `${at} arrived as a JSON-quoted string. Send the text itself, not the result of stringifying it.`,
           at,
         );
-      if (hasEscapedNewline(value))
+      /* A PATH IS EXEMPT HERE, NOT INSIDE `hasEscapedNewline`, because that helper is exported and its own test
+         pins it as a textual rule (`C:\next` is true there, on purpose); the decision about what to refuse is
+         this one, and it is the one a real import tripped on. */
+      if (hasEscapedNewline(value) && !readsAsWindowsPath(value))
         return bad(
           'TEXT_ESCAPED_NEWLINE',
           `${at} contains the two characters backslash and n, and no line break anywhere. Send a real newline; or, if those two characters are meant literally, a value with a real line break in it as well.`,
