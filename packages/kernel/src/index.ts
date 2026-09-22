@@ -2954,6 +2954,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       );
       return row?.id ?? null;
     },
+    /* AND BY THE ID AN AGENT IS HANDED, `things#1` or `S6`, read exactly as `get` reads one. A register
+       that does not exist makes the words no id at all, so a title holding a `#` is still a title. */
+    refBySpoken: (said) => {
+      const at = parseSpoken(said) ?? prefixed(said);
+      if (!at || !registers.has(at.register)) return null;
+      return { register: at.register, id: bySeq(at.register, at.seq)?.id ?? null };
+    },
     /* THE HOME CURRENCY AND THE DATED RATES, read only when a money figure meets a second currency. The rates are the
        rows of the `fx` list when a pack declares one (`08 §2.5`); a record without it has none. */
     fx: () => ({

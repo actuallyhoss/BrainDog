@@ -486,6 +486,15 @@ export type EvalContext = {
   /** A ref written by name: `thing is Kiln`. Absent means a sentence cannot name one. */
   refByTitle?: ((register: string, title: string) => string | null) | undefined;
   /**
+   * A ref written as the id a person or an agent is handed: `things#1`, or a prefixed one like `S6`.
+   *
+   * `null` WHEN THE WORDS ARE NOT AN ID AT ALL, so the caller goes on to read them as a title. An id
+   * that parses answers with the register it names, even when no row holds it, because the caller
+   * has to tell `tasks#1` in a field pointing at `things` (the wrong row) from `things#999` (no row):
+   * `REF_REGISTER_MISMATCH` and `REF_UNKNOWN` are repaired differently, as `coerce` says for a write.
+   */
+  refBySpoken?: ((said: string) => { register: string; id: string | null } | null) | undefined;
+  /**
    * The record's home currency and its dated rates, read when a money figure meets a second currency. Absent is no
    * home currency and no rates, so such a figure comes back in parts.
    */
@@ -508,11 +517,96 @@ export function predicateOf(
   ctx: EvalContext,
 ): { predicate: Predicate | undefined; bad: Refusal[] } {
   const nowMs = ctx.asOfMs ?? ctx.nowMs;
-  if (typeof where !== 'string') return resolveRelative(where, schema, nowMs);
+  if (typeof where !== 'string') {
+    const dated = resolveRelative(where, schema, nowMs);
+    const refs = resolveRefs(dated.predicate, schema, ctx);
+    return { predicate: refs.predicate, bad: [...dated.bad, ...refs.bad] };
+  }
   return parseWhere(where, schema, {
     nowMs,
     ...(ctx.refByTitle === undefined ? {} : { refByTitle: ctx.refByTitle }),
+    ...(ctx.refBySpoken === undefined ? {} : { refBySpoken: ctx.refBySpoken }),
   });
+}
+
+/** A row id, which a ref leaf keeps as it was written. */
+const ROW_ID = /^[0-9A-HJKMNP-TV-Z]{26}$/;
+
+/** The operators whose value on a ref field is a row: one, or a list of them. */
+const ADDRESSED = ['is', 'not', 'in', 'not_in'] as const;
+
+/**
+ * A ref leaf in the tree form, read the way a ref field is written.
+ *
+ * `{field: 'thing', is: 'things#1'}` REACHED SQL AS THE STRING, and no row's `thing` holds the string
+ * `things#1`: it holds the row id `create` resolved that same string to. Measured over the seed
+ * (`loop/research-mcp-parity.md` §3), the tree the `list` tool teaches answered ok with 0 rows on a
+ * project with 14 tasks, `{is: 'Kiln'}` answered 0, `{not: 'things#1'}` answered all 27 tasks with
+ * Kiln's 14 among them, and `{is: 'Nowhere'}` answered ok with 0 where a refusal was owed. That is
+ * 80 of the 93 task reads Sam's agents make, returning an empty board that reads as "nothing to do".
+ *
+ * THE ORDER IS THE ONE `coerce` WRITES WITH, then the sentence's title. A row id stays as written. An
+ * id resolves in the register it names. A title resolves in the register the field points at. And
+ * the title is tried before either refusal, so a project really called `Q3#2` or `S6` is still found
+ * by its name rather than refused as an id it never was.
+ *
+ * NOTHING TO RESOLVE WITH IS NOT A REFUSAL. A context built without either lookup (a test's page
+ * deps, for one) cannot say what a word means, so the leaf goes through as it went through before.
+ */
+function resolveRefs(
+  where: Predicate | undefined,
+  schema: Schema,
+  ctx: EvalContext,
+): { predicate: Predicate | undefined; bad: Refusal[] } {
+  if (!where || typeof where !== 'object') return { predicate: where, bad: [] };
+  if (ctx.refBySpoken === undefined && ctx.refByTitle === undefined) return { predicate: where, bad: [] };
+  const bad: Refusal[] = [];
+
+  const one = (field: string, to: string | undefined, value: unknown): unknown => {
+    if (typeof value !== 'string') return value;
+    const said = value.trim();
+    if (ROW_ID.test(said)) return said;
+    const spoken = ctx.refBySpoken?.(said) ?? null;
+    if (spoken && spoken.id !== null && (to === undefined || spoken.register === to)) return spoken.id;
+    const titled = to === undefined ? null : (ctx.refByTitle?.(to, said) ?? null);
+    if (titled !== null) return titled;
+    if (spoken && to !== undefined && spoken.register !== to) {
+      bad.push({
+        code: 'REF_REGISTER_MISMATCH',
+        fix: `${field} points at ${to}, and ${said} is a ${spoken.register} row. Name a ${to} row.`,
+        at: field,
+        allowed: [to],
+      });
+      return value;
+    }
+    /* `REF_UNKNOWN`, the code the sentence gives for the same words, and the one `unreadWhere` lets
+       through so a rule may name a row written tomorrow. */
+    bad.push({ code: 'REF_UNKNOWN', fix: `${field} is ${said}: there is no ${to ?? 'row'} called ${said}.`, at: field });
+    return value;
+  };
+
+  const walk = (node: Predicate): Predicate => {
+    for (const q of ['all', 'any', 'none'] as const) {
+      const kids = (node as Record<string, unknown>)[q];
+      if (Array.isArray(kids)) return { ...node, [q]: kids.map((k) => walk(k as Predicate)) } as Predicate;
+    }
+    const leaf = node as Record<string, unknown>;
+    const field = typeof leaf.field === 'string' ? leaf.field : null;
+    const decl = field && Object.hasOwn(schema.fields, field) ? schema.fields[field] : undefined;
+    /* A `list<ref>` ELEMENT IS THE SAME ADDRESS, asked with `has` and `lacks`: the sentence reads
+       `projects has things#1` through the same `resolve`, and the tree has to agree with it. */
+    const listed = decl?.type === 'list' && decl.of === 'ref';
+    if (!field || !decl || (decl.type !== 'ref' && !listed)) return node;
+    const op = (listed ? (['has', 'lacks'] as const) : ADDRESSED).find((o) => o in leaf);
+    if (!op) return node;
+    const value = leaf[op];
+    return {
+      ...leaf,
+      [op]: Array.isArray(value) ? value.map((v) => one(field, decl.to, v)) : one(field, decl.to, value),
+    } as Predicate;
+  };
+
+  return { predicate: walk(where), bad };
 }
 
 /** The operators that carry a day. `empty` and `present` carry a boolean and are left alone. */
@@ -1762,43 +1856,23 @@ export function snapshot(
   const at = (ms: number): string => dayFmt.format(new Date(ms));
 
   /**
-   * The last instant of a local day, as a UTC timestamp.
+   * The local date `n` days before `day`, counted on the calendar and not on the clock.
    *
-   * BY SEARCH RATHER THAN BY ARITHMETIC, because an offset is not a constant: a day that a
-   * government moves the clock in is 23 or 25 hours long, and adding a fixed offset to midnight puts
-   * the boundary an hour inside the neighbouring day twice a year. Starting from noon — which no
-   * transition has ever crossed — and stepping to the last minute that still names this day is
-   * arithmetic-free and correct in every zone.
+   * THIS STEPPED BACK 24 HOURS AT A TIME FROM THE LAST INSTANT OF LOCAL TODAY, and a day the clocks
+   * go back on is 25 hours long. Measured in `Europe/London` and `America/New_York`
+   * (`test/metrics-backfill-dst.test.ts`): from the morning after it, the stride that should have
+   * reached the day before landed at 00:59 on the same date as the stride before, so one day was
+   * filed twice and the thirty-first day back was never reached; on the 25-hour day itself the first
+   * stride was still that day, and today's moving figure was stored as yesterday's. A date string
+   * has no length to get wrong, and noon UTC is only a place to do the subtraction, since no zone is
+   * consulted here.
    */
-  const endOf = (ms: number): number => {
-    const want = at(ms);
-    let t = Date.parse(`${want}T12:00:00Z`);
-    /**
-     * AND NOON UTC IS ONLY INSIDE THE LOCAL DAY FOR OFFSETS BETWEEN MINUS TWELVE AND PLUS TWELVE.
-     *
-     * The paragraph above argues for noon because no clock change has ever crossed it, and that is
-     * true of noon LOCAL. This seeded noon UTC, which in `Pacific/Auckland` is one o'clock the NEXT
-     * morning: the walk then started in the wrong day and every instant it stepped to was in the
-     * wrong day too, so a record at UTC+12 or east stamped today's local date on a reading taken
-     * as of one in the morning and called it yesterday. The zone the comment above is written about
-     * is the zone it was wrong in, and `provision.test.ts` admits Auckland as a record's timezone.
-     *
-     * A YYYY-MM-DD STRING ORDERS LIKE THE DATE IT IS, so stepping in hours towards the day that is
-     * wanted needs no offset table and no arithmetic on a zone. It is at most fourteen steps.
-     */
-    while (at(t) > want) t -= 3_600_000;
-    while (at(t) < want) t += 3_600_000;
-    /* Forward in hours while it is still this day, then back off by a millisecond. */
-    while (at(t + 3_600_000) === want) t += 3_600_000;
-    while (at(t + 60_000) === want) t += 60_000;
-    return t + 60_000 - 1;
-  };
+  const back = (day: string, n: number): string => new Date(Date.parse(`${day}T12:00:00Z`) - n * DAY).toISOString().slice(0, 10);
 
-  /** Yesterday, locally: the last instant of the day before the local day `nowMs` falls in. */
-  const yesterday = endOf(ctx.nowMs) - DAY;
+  /** Yesterday, locally: the date before the local date `nowMs` falls on. */
+  const yesterday = back(at(ctx.nowMs), 1);
 
-  const write = (dayMs: number, overwrite: boolean): 'wrote' | 'kept' | 'missing' => {
-    const day = at(dayMs);
+  const write = (day: string, overwrite: boolean): 'wrote' | 'kept' | 'missing' => {
     if (!overwrite && sql.one("SELECT 1 AS x FROM metric_point WHERE series = ? AND grain = 'day' AND at = ?", decl.metric, day))
       return 'kept';
 
@@ -1843,7 +1917,7 @@ export function snapshot(
   let missing = today === 'missing' ? 1 : 0;
 
   for (let n = 1; n <= backfillDays; n++) {
-    const out = write(yesterday - n * DAY, false);
+    const out = write(back(yesterday, n), false);
     if (out === 'wrote') backfilled++;
     if (out === 'missing') missing++;
   }

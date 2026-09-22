@@ -655,3 +655,28 @@ test('`fieldSql` IS ONE STRING FOR THREE PLACES, and nothing was asking it anyth
   /* AN EXPLICIT PART WINS OVER THE TYPE'S OWN, which is how the qualifier half is reached. */
   assert.equal(fieldSql('amount', 'money', '.currency'), "json_extract(fields, '$.amount.currency')");
 });
+
+test('a ref is read by the id an agent is handed, and by its row id, before its title', () => {
+  /**
+   * `thing is things#1` WAS REFUSED `REF_UNKNOWN`, "there is no things called things#1", on the one
+   * project an agent had just been told was things#1: `context` and every `list` answer hand out that
+   * id, and this branch asked only `refByTitle`. The row id was refused the same way while the tree
+   * form kept it and answered 14 rows (`loop/research-mcp-parity.md` §3). The lookup is a callback,
+   * as the title one is, because only the record knows what `things#1` holds.
+   */
+  const ids: Record<string, { register: string; id: string | null }> = {
+    'things#1': { register: 'things', id: THINGS.Kiln! },
+    'things#9': { register: 'things', id: null },
+    'tasks#1': { register: 'tasks', id: '01ABCDEFGHJKMNPQRSTVWXYZ99' },
+  };
+  const spoken = { ...deps, refBySpoken: (said: string) => ids[said] ?? null };
+  const read = (text: string) => parseWhere(text, OBLIGATIONS, spoken);
+
+  assert.deepEqual(read('thing is things#1').predicate, { field: 'thing', is: THINGS.Kiln });
+  assert.deepEqual(read(`thing is ${THINGS.Kiln}`).predicate, { field: 'thing', is: THINGS.Kiln });
+  assert.deepEqual(read('thing is Kiln').predicate, { field: 'thing', is: THINGS.Kiln });
+  assert.deepEqual(read('projects has things#1').predicate, { field: 'projects', has: THINGS.Kiln });
+  assert.equal(read('thing is things#9').bad[0]?.code, 'REF_UNKNOWN');
+  /* THE WRONG ROW IS NOT NO ROW, and the write refuses the same value with the same code. */
+  assert.equal(read('thing is tasks#1').bad[0]?.code, 'REF_REGISTER_MISMATCH');
+});

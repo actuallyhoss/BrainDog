@@ -53,6 +53,8 @@ const ISO = /^\d{4}-\d{2}-\d{2}$/;
    the grammar of one of the two implementations, in neither document. */
 const RELATIVE = /^([+-])(\d{1,4})([dwm])$/;
 const iso = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+/** A row id, which a ref keeps as written. The kernel's `coerce` reads the same shape. */
+const ROW_ID = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
 /** The temporal literals `02-DATA-MODEL` §6 settled on. Not a set invented here. */
 const WORDS = ['today', 'tomorrow', 'yesterday', 'bow', 'bom', 'eom', 'boy', 'eoy'] as const;
@@ -148,6 +150,15 @@ export type SentenceDeps = {
    * free of the kernel.
    */
   refByTitle?: (register: string, title: string) => string | null;
+  /**
+   * The register an id names and the row it holds, or `null` when the words are not an id.
+   *
+   * AND AN AGENT SAYS `thing is things#1`, because that is the id `context` and every `list` answer
+   * hand it. The paragraph above was right about a person and wrong about the caller who writes most
+   * of these: measured over the seed, `thing is things#1` was refused `REF_UNKNOWN`, "there is no
+   * things called things#1", on the one project an agent had just been told was things#1.
+   */
+  refBySpoken?: (said: string) => { register: string; id: string | null } | null;
 };
 
 export type Parsed = { predicate: Predicate | undefined; bad: Refusal[] };
@@ -446,7 +457,7 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
           ? ({ true: true, yes: true, false: false, no: false }[wanted.toLowerCase()] ?? null)
           : resolve(schema, field, element, wanted, deps);
       if (held === null) {
-        bad.push(refuseValue(sentence, schema, field, element, wanted));
+        bad.push(refuseValue(sentence, schema, field, element, wanted, deps));
         continue;
       }
       clauses.push({ field, [no ? OPPOSITE[asked] : asked]: held } as Predicate);
@@ -537,7 +548,7 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
     for (const one of said_values) {
       const resolved = resolve(schema, field, decl, one, deps);
       if (resolved === null) {
-        bad.push(refuseValue(sentence, schema, field, decl, one));
+        bad.push(refuseValue(sentence, schema, field, decl, one, deps));
         failed = true;
         break;
       }
@@ -595,7 +606,14 @@ function resolve(
     return (decl.values ?? []).find((v) => v.toLowerCase() === wanted || v.replace(/_/g, ' ').toLowerCase() === said.toLowerCase()) ?? null;
   }
 
+  /* A ROW ID STAYS, AN ID RESOLVES, AND THEN THE TITLE, which is the order the kernel's tree form
+     reads the same leaf in, so `thing is things#1` and `{field: 'thing', is: 'things#1'}` are one
+     question. The row id was refused here as a title nobody had, while the tree kept it and answered
+     14: two renderings of one grammar giving two answers. */
   if (decl.type === 'ref') {
+    if (ROW_ID.test(said)) return said;
+    const spoken = deps.refBySpoken?.(said) ?? null;
+    if (spoken && spoken.id !== null && (!decl.to || spoken.register === decl.to)) return spoken.id;
     if (!decl.to || !deps.refByTitle) return null;
     return deps.refByTitle(decl.to, said);
   }
@@ -648,7 +666,19 @@ function refuseValue(
   field: string,
   decl: FieldSpec,
   said: string,
+  deps?: SentenceDeps,
 ): Refusal {
+  /* AN ID OF ANOTHER REGISTER IS THE WRONG ROW, NOT NO ROW. `thing is tasks#1` names a row that
+     exists, and `coerce` refuses the same value written into the same field with this code, so the
+     read and the write give one answer about one address. */
+  const spoken = decl.type === 'ref' && decl.to ? (deps?.refBySpoken?.(said) ?? null) : null;
+  if (spoken && decl.to && spoken.register !== decl.to)
+    return {
+      code: 'REF_REGISTER_MISMATCH',
+      fix: `${sentence}: ${field} points at ${decl.to}, and ${said} is a ${spoken.register} row. Name a ${decl.to} row.`,
+      at: field,
+      allowed: [decl.to],
+    };
   if (decl.type === 'enum' || (decl.type === 'list' && decl.values))
     return {
       code: 'ENUM_VALUE_UNKNOWN',
