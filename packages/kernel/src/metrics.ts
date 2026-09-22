@@ -426,6 +426,30 @@ function endedAt(shifted: Predicate | undefined, current: Predicate | undefined 
     typeof field === 'string' && Object.hasOwn(schema.fields, field) && ['day', 'instant'].includes(schema.fields[field]?.type ?? '');
   const started = new Set(clauses.filter((c) => dated(c.field) && LOWER.some((op) => op in c)).map((c) => c.field as string));
   for (const c of clauses) if (dated(c.field) && UPPER.some((op) => op in c)) started.delete(c.field as string);
+
+  /* THE FIRST DAY A WINDOW HOLDS: `gte` names it, `after` names the day before it. The latest start
+     is where the window begins, when a field is given two. */
+  const startOf = (of: readonly Record<string, unknown>[], field: string): string | undefined =>
+    of
+      .filter((c) => c.field === field)
+      .flatMap((c) => LOWER.filter((op) => typeof c[op] === 'string').map((op) => (op === 'gte' ? (c[op] as string).slice(0, 10) : dayAfter(c[op] as string))))
+      .sort()
+      .at(-1);
+
+  /* AND AN AS-OF END ONLY FOR A WINDOW THAT LOOKS BACK. `5ae403ff` ended every such window at the
+     as-of day, and `due after today` became `due > asOf and due < asOf + 1`, which holds nothing: the
+     audit (`loop/research-batch-nineteen-audit.md` §5) measured two open bills due 3 and 12 days
+     ahead at 300,000 live on the day and 0 as of that day, and the same for `due after -1d`. A
+     window whose first day is the as-of day or later is a question about what is coming, and the
+     rows it counts were there to be counted on that day; only one that begins before the day has
+     rows from after it that had not happened yet. `test/metrics-asof-forward.test.ts` holds both. */
+  if (current === null) {
+    const asOfDay = new Date(thenMs).toISOString().slice(0, 10);
+    for (const field of [...started]) {
+      const begins = startOf(clauses, field);
+      if (begins === undefined || begins >= asOfDay) started.delete(field);
+    }
+  }
   if (started.size === 0) return shifted;
 
   /* `before` THE DAY AFTER, because `before` is exclusive of its day (`34 §6`) and the moved clock's
@@ -440,12 +464,7 @@ function endedAt(shifted: Predicate | undefined, current: Predicate | undefined 
        day's rows on both sides of the comparison. It stays for any declaration whose span is longer
        than its window: the window before is cut at the day before, and holds only days the current
        one does not. */
-    const starts = (current === null ? [] : conjuncts(current))
-      .filter((c) => c.field === field)
-      .flatMap((c) => LOWER.filter((op) => typeof c[op] === 'string').map((op) => (op === 'gte' ? (c[op] as string).slice(0, 10) : dayAfter(c[op] as string))))
-      .sort();
-    /* The latest start is where the current window begins, when a field is given two. */
-    const begins = starts.at(-1);
+    const begins = current === null ? undefined : startOf(conjuncts(current), field);
     return { field, before: begins !== undefined && begins < clock ? begins : clock } as Predicate;
   });
   return { all: [...(clauses as Predicate[]), ...ends] } as Predicate;
