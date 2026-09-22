@@ -954,7 +954,7 @@ test('--SINCE A DAY IS THE LOCAL DAY: a run at 02:30 on the 22nd at +03:00 is fo
   /* AND THE EDGE MOVES THE OTHER WAY WEST OF UTC: 03:00 UTC on the 22nd is still the evening of the 21st at -05:00. */
   const early = runOf(await applyPlan(plan(), mem.door, { dryRun: false }), { at: '2026-09-22T03:00:00.000Z', host: 'h', file: 'e.json' });
   assert.equal(sinceSaid([early], '2026-09-22', () => -300).found, 0);
-  assert.equal(sinceSaid([early], '2026-09-21', () => -300).lines[0], '2026-09-21 22:00 -05:00 into h, export of 2026-09-15:');
+  assert.equal(sinceSaid([early], '2026-09-21', () => -300).lines[0], '2026-09-21 22:00 -05:00 into h, export of 2026-09-14:');
   assert.equal(sinceSaid([night], '2026-09-21', UTC).lines[0], '2026-09-21 23:30 UTC into h, export of 2026-09-15:');
 });
 

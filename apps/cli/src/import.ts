@@ -29,6 +29,7 @@ import { mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'no
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { coerce, type FieldDecl } from '@braindog/kernel';
 import { no, ok, refused, type Result } from '@braindog/ports';
 
 import { budgetOf, hostsPath, target, type Target } from './http.ts';
@@ -130,6 +131,8 @@ const NAMES: Readonly<Record<string, string>> = {
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const fixOf = (r: Result<unknown>): string => (refused(r) ? `${r.refusal.fix} (${r.refusal.code})` : 'Somebody else changed it at the same moment. Run the import again.');
+/** The field types whose values a dry run puts to the kernel's coercion: see `textRefusal` in `applyPlan`. */
+const TEXTS = new Set(['text', 'document']);
 const unreachable = (r: Result<unknown>) => refused(r) && r.refusal.code === 'UNREACHABLE';
 
 /** JSON with its keys in order, so two values that mean the same compare the same. */
@@ -265,6 +268,8 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean })
   const declared = new Map<string, Set<string>>();
   /** Every list the record answered for, so the sentence about a missing one can tell an old pack from no pack. */
   const answered = new Set<string>();
+  /** The text fields each list declares, whole, so a dry run can put a row's texts to the kernel's own coercion. */
+  const texts = new Map<string, Map<string, FieldDecl>>();
   for (const register of [...registers, ...spare] as string[]) {
     const has = await door.schema(register);
     if (has.ok) answered.add(register);
@@ -278,9 +283,37 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean })
        `known`), so counting it here would send a field the record then refuses. An answer with no `fields` is read as
        saying nothing, and every planned field is sent as it always was. */
     const fields = isObj(has.value) && Array.isArray(has.value.fields) ? has.value.fields : null;
-    if (fields !== null)
+    if (fields !== null) {
       declared.set(register, new Set(fields.flatMap((f) => (isObj(f) && typeof f.id === 'string' && f.retired !== true ? [f.id] : []))));
+      texts.set(
+        register,
+        new Map(fields.flatMap((f) => (isObj(f) && typeof f.id === 'string' && TEXTS.has(String(f.type === 'list' ? (f.of ?? 'text') : f.type)) ? [[f.id, f as unknown as FieldDecl]] : []))),
+      );
+    }
   }
+
+  /**
+   * WHAT THE KERNEL'S COERCION WOULD SAY OF A ROW'S TEXTS, ASKED BEFORE A DRY RUN COUNTS IT.
+   *
+   * Measured on his real export (`loop/research-import-real.md`, finding 3): `--dry-run` ended 0 and printed `Agent runs:
+   * 198 would be added` with no refusal block, and the real run added 195 and ended 1, all three refused as
+   * `TEXT_ESCAPED_NEWLINE`. A dry run reads the lists and sends nothing, so a refusal the kernel makes on a value never
+   * reached it, and the command he is told to run first promised rows the record would not take. So each text a write
+   * would carry is put to `coerce` itself, imported from the kernel and not copied, against the field the record's own
+   * schema answer declares: the same checks, in the same order, and the same sentence. Only texts, because a ref in a
+   * dry run points at a row that was never written, and a lookup the record owns cannot be answered here.
+   */
+  const textRefusal = (register: string, fields: Record<string, unknown>): string | null => {
+    const has = texts.get(register);
+    if (has === undefined) return null;
+    for (const [id, value] of Object.entries(fields)) {
+      const field = has.get(id);
+      if (field === undefined || value === null) continue;
+      const got = coerce(field, value);
+      if (!got.ok) return fixOf({ ok: false, refusal: got.refusal } as Result<unknown>);
+    }
+    return null;
+  };
   if (report.missing.length > 0) return report;
   /* A LIST THIS RECORD DOES NOT HAVE AND DOES NOT NEED: its rows are left out, each named, with what installing adds them. */
   if (absent.length > 0) {
@@ -471,6 +504,12 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean })
     if (!found) {
       const create = row.register === 'session' ? fields : { ...fields, tags: [row.key] };
       if (o.dryRun) {
+        const turned = textRefusal(row.register, create);
+        if (turned !== null) {
+          report.refused.push({ label: row.label, register: row.register, fix: turned });
+          report.outcomes[row.key] = 'refused';
+          continue;
+        }
         tally.added++;
         report.outcomes[row.key] = 'added';
         ids.set(row.key, `(new ${row.key})`);
@@ -501,6 +540,12 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean })
     report.changes.push({ register: row.register, label: row.label, fields: Object.keys(patch) });
     report.outcomes[row.key] = 'updated';
     if (o.dryRun) {
+      const turned = textRefusal(row.register, patch);
+      if (turned !== null) {
+        report.refused.push({ label: row.label, register: row.register, fix: turned });
+        report.outcomes[row.key] = 'refused';
+        continue;
+      }
       tally.updated++;
       continue;
     }
@@ -708,7 +753,8 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
       lines.push(`- ${c.label}: ${c.fix} ${c.rows === 0 ? 'No ledger row named it.' : c.rows === 1 ? 'One ledger row arrived without a category.' : `${String(c.rows)} ledger rows arrived without a category.`}`);
   }
   if (report.refused.length > 0) {
-    lines.push('', 'Refused by the record:');
+    /* A DRY RUN SENT NOTHING, so the record refused nothing yet: these are the rows the kernel's coercion says it will. */
+    lines.push('', o.dryRun ? 'Would be refused by the record:' : 'Refused by the record:');
     for (const r of report.refused) lines.push(`- ${r.label} (${NAMES[r.register] ?? r.register}): ${r.fix}`);
   }
   if (plan.changed.length > 0) {
@@ -812,7 +858,11 @@ export function sinceSaid(runs: Run[], since: string, offsetOf: (at: Date) => nu
     const before = runs.slice(0, i).findLast((r) => r.host === run.host);
     const had = new Set((before?.skipped ?? []).flatMap((s) => s.items.map((item) => `${s.reason}\n${item}`)));
     if (lines.length > 0) lines.push('');
-    lines.push(`${local[i]!.day} ${local[i]!.time} ${local[i]!.zone} into ${run.host}${run.taken ? `, export of ${run.taken.slice(0, 10)}` : ''}:`);
+    /* THE EXPORT'S DAY IN THE SAME ZONE AS THE HEADER IT SITS BESIDE. It was the UTC date, so at +03:00 an export taken
+       at 01:30 on the 22nd sat beside a header saying the 22nd and was called an export of the 21st. A `taken` that is
+       not an instant is printed as it came, because a guess at its day would be worse than its own words. */
+    const taken = run.taken ? (Number.isNaN(Date.parse(run.taken)) ? run.taken.slice(0, 10) : localClock(run.taken, offsetOf).day) : null;
+    lines.push(`${local[i]!.day} ${local[i]!.time} ${local[i]!.zone} into ${run.host}${taken ? `, export of ${taken}` : ''}:`);
     const start = lines.length;
     const byList = <T extends { register: string }>(rows: T[], say: (row: T) => string, head: string) => {
       const lists = new Map<string, string[]>();
@@ -911,7 +961,11 @@ function rememberRun(home: string, run: Run): number[] {
 }
 
 /** `braindog import legacy <file>`, and the exit code: 0 done, 1 refused or partly refused, 3 the host did not answer. */
-export async function importCommand(args: string[], io: AgentIo, today: string = new Date().toISOString().slice(0, 10), now: () => Date = () => new Date(), offsetOf: (at: Date) => number = localOffset): Promise<number> {
+export async function importCommand(args: string[], io: AgentIo, given?: string, now: () => Date = () => new Date(), offsetOf: (at: Date) => number = localOffset): Promise<number> {
+  /* THE PLAN'S DAY IS THE OWNER'S LOCAL DAY, NOT THE UTC DATE. It was `toISOString().slice(0, 10)`, so a nightly run at
+     22:30 at -03:00 planned on tomorrow's UTC date: a date due today was filed as already done, and a run at 01:30 at
+     +03:00 planned on yesterday's. Taken from `now` and `offsetOf`, the same clock `--since` reads a run by. */
+  const today = given ?? localClock(now().toISOString(), offsetOf).day;
   let values: { host?: string | undefined; 'dry-run'?: boolean | undefined; setup?: string | undefined; 'draft-setup'?: boolean | undefined; since?: string | undefined };
   let positionals: string[];
   try {
