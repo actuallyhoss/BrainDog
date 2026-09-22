@@ -692,7 +692,10 @@ export type Context = {
  * step 3 reads `spark` to decide whether the Spark surface exists at all. Both read a number.
  */
 export type Version = {
-  /** `MAX(event.rowid)`: what changed since is a range scan from here. */
+  /**
+   * `MAX(event.rowid)` to an owner who reads every list, for whom what changed since is a range scan from here. Anybody
+   * else is answered a number that changes when a line they may read is written and is not ordered (`versionFor`).
+   */
   version: number;
   /** The `.brain` format revision this build reads (`03 §11`). */
   format: number;
@@ -1965,6 +1968,35 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return line && line.rowid === rowid && lineOf(ctx, line) !== null ? rowid : refused;
   };
 
+  /**
+   * The number `version()` answers this caller: `MAX(event.rowid)` to whoever holds rowids, and to anybody else a number
+   * drawn from the id of the newest line `lineOf` shows them, or 0 when it shows them none.
+   *
+   * `MAX(event.rowid)` WENT TO EVERY READER, AFTER `99caef53` TOOK THE ROWID OUT OF THEIR HISTORY. A colleague at `read`
+   * polled 4 and then 9 across three invitations she is shown none of and two Diary rows, and a member at `read` with
+   * Diary held to `append` polled 9 and then 14 across the same (`loop/research-batch-twenty-four-audit.md` finding 2):
+   * the gap was the count `holdsRowids` exists to withhold. So the number is keyed to what she can see. It moves when a
+   * line she reads is written and stands still while only lines she cannot read are, and it is a hash of an id she is
+   * already handed as an `e.` cursor, so it tells her nothing she could not read off her own history.
+   *
+   * IT IS NOT ORDERED FOR HER, AND NOTHING READS IT AS ORDERED. Nothing in `apps/web` compares the number: `+layout.ts`
+   * and `start` read `spark` off this call and nothing else, and `recentHistory` refuses a whole number as a cursor from
+   * anybody `holdsRowids` refuses, so "a range scan from here" was never hers to make. A poller asks whether it changed.
+   *
+   * THE WALK IS NOT CAPPED AT `WALK`, because a cap that gave up would answer 0 once her newest line sank past it, and the
+   * number would change with nothing she can see changing. It stops at her newest line, which is usually near the top.
+   */
+  const versionFor = (ctx: CallContext): number => {
+    if (holdsRowids(ctx)) return kernel.version();
+    let before: number | null = null;
+    for (;;) {
+      const { lines, next } = walk(ctx, before, 0, 1);
+      if (lines[0]) return idNumber(lines[0].id);
+      if (next === null) return 0;
+      before = next;
+    }
+  };
+
   /** What changed since `cursor`, or since the caller's read mark. A token reads its person's mark. */
   const newsFor = (ctx: CallContext, cursor?: number): WhatsNew => {
     const { lines, next } = walk(ctx, null, cursor ?? kernel.unreadFrom(readerOf(ctx)), NEWS + 1, true);
@@ -2392,7 +2424,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          of them is not an answer to it. */
       if (kernel.register(args.register)) kernel.observe([{ kind: 'register.read', subject: args.register }]);
 
-      return kernel.list(args);
+      /* A REF INTO A LIST THE CALLER CANNOT READ NAMES NO ROW, WHETHER OR NOT THE ROW EXISTS. The kernel
+         resolves refs and only this layer knows who is asking, so without `reads` a member invited to
+         Jobs alone read `ok 0` for a hidden client that exists and `REF_UNKNOWN` for one that does not
+         (audit twenty-two, finding 1). */
+      return kernel.list({ ...args, reads: (register) => readable(ctx, register) === null });
     },
 
     /**
@@ -4835,7 +4871,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       return stop
         ? { ok: false, refusal: stop }
         : ok({
-            version: kernel.version(),
+            version: versionFor(ctx),
             format: FORMAT_VERSION,
             kernel: KERNEL_MIGRATION,
             primitives: PRIMITIVES_VERSION,
@@ -4848,6 +4884,24 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           });
     },
   };
+}
+
+/**
+ * An event id as a whole number from 1 to 2^53 - 1, for `versionFor`: two 32-bit FNV-1a passes with different offsets,
+ * the first kept to 21 bits so the pair stays a safe integer.
+ *
+ * A HASH AND NOT A COUNTER, because every counter this record keeps is a count over lines the caller may not read. It
+ * is never 0, which `versionFor` keeps for "she is shown no line at all".
+ */
+function idNumber(id: string): number {
+  let a = 0x811c9dc5;
+  let b = 0x01000193;
+  for (let i = 0; i < id.length; i++) {
+    const c = id.charCodeAt(i);
+    a = Math.imul(a ^ c, 0x01000193);
+    b = Math.imul(b ^ c, 0x01000193) ^ (a >>> 13);
+  }
+  return ((a >>> 11) * 2 ** 32 + (b >>> 0)) || 1;
 }
 
 export type RecordApi = Awaited<ReturnType<typeof createRecordApi>>;
