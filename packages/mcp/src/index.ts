@@ -43,6 +43,19 @@
  * for a rule change rather than as a tool, and the definitions, one automation with its runs, and the grammar are
  * resources. The list measured 2,597 tokens before and 2,597 after.
  *
+ * AND SO DID `script_try`, BY THE SAME ROUTE (`loop/research-shell-scripts.md` section 7). The design asked for a tool,
+ * and the smallest one that says what it does, a name, a sentence and one `body` argument, measured 102 tokens by
+ * `budget.test.ts`'s estimator against the 3 the ceiling had left. Nothing that size can be taken out of sixteen
+ * descriptions that three passes have already cut to what the schema and the instructions do not say. So a trial is
+ * asked on `propose`: a script change whose body also carries `"try"` is run now and filed nowhere, and the one place
+ * that says so is `braindog:grammar/script`, a resource, so the list measured 2,597 after it.
+ *
+ * ASKED FOR, NEVER RUN ON EVERY SCRIPT CHANGE. It first came back on every script change's answer as `dry_run` does, and
+ * a trial is not a dry run: it sends real requests, a POST among them, to origins nobody has approved yet, and spends a
+ * run of the plan. So `propose` without `try` runs nothing, and "it changes nothing by itself" stays true either way,
+ * because a trial writes nothing and files nothing. Filing nothing is also what lets an agent iterate: a trial per
+ * attempt, and one question in Decide for the draft that works.
+ *
  * AND THE RESOURCES ARE NOT TOOLS, which is the other half of the same argument. A resource list is
  * fetched when it is wanted, so the per-register variability, one `schema/<register>` each, costs
  * nothing in a turn that does not ask for it.
@@ -121,6 +134,12 @@ export type McpSurface<C> = {
    * change exactly as before and says nothing about what it would do.
    */
   dryRun?(args: { rule: Record<string, unknown>; limit?: number }, ctx: C): Answer;
+  /**
+   * A draft script run now, answering the writes it would make and writing none (`packages/host/src/script-try.ts`).
+   * READ+, and optional for `dryRun`'s reason: it backs only `propose`'s `try` on a script change, and a surface
+   * without it answers that `NOT_IN_THIS_BUILD`.
+   */
+  scriptTry?(args: { body: Record<string, unknown>; input?: unknown }, ctx: C): Answer;
 };
 
 /**
@@ -820,6 +839,34 @@ export function tools<C>(surface: McpSurface<C>) {
     return to.kind === 'rule' || (to.kind === undefined && id.startsWith('rule.')) ? to.body : null;
   };
 
+  /** The script body a change installs, or `null` for a change to anything else. The same reading as `ruleIn`. */
+  const scriptIn = (body: Record<string, unknown>): Record<string, unknown> | null => {
+    const to = body.to;
+    if (!isObject(to) || !isObject(to.body)) return null;
+    const id = typeof to.id === 'string' ? to.id : typeof body.declaration_id === 'string' ? body.declaration_id : '';
+    return to.kind === 'script' || (to.kind === undefined && id.startsWith('script.')) ? to.body : null;
+  };
+
+  /**
+   * A script change run now in the host's sandbox and filed nowhere: `propose` with `"try": true`, or `"try": {"input":
+   * ...}` to hand it what a door would have, beside `to` (`loop/research-shell-scripts.md` section 7).
+   *
+   * NOTHING IS FILED, SO NOBODY IS ASKED. The answer is the trial, `script_try`, and `proposed: false`; the agent sends the
+   * change again without `try` to put it in front of the owner. The record checks the draft as it would at install
+   * before anything runs, and refuses in its own words.
+   */
+  const trial = async (body: Record<string, unknown>, ctx: C): Answer => {
+    const said = body.try;
+    if (said !== true && !(isObject(said) && Object.keys(said).every((k) => k === 'input')))
+      return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'try is true, or {"input": ...} to hand the script what a door would.', at: 'body.try' } };
+    const script = scriptIn(change(body));
+    if (script === null)
+      return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'Only a script change can be tried. Send this one without try to propose it.', at: 'body.try' } };
+    if (!surface.scriptTry) return unbuilt('a trial', 'Send the change without try, and the owner reads the source in Decide.');
+    const tried = await surface.scriptTry({ body: script, ...(isObject(said) && said.input !== undefined ? { input: said.input } : {}) }, ctx);
+    return tried.ok ? { ok: true, value: { script_try: tried.value, proposed: false } } : tried;
+  };
+
   const run: Record<string, (args: Args, ctx: C) => Answer> = {
     /**
      * THE REGISTERS AND THE VERSION, AND NOTHING ELSE `boot` CARRIES. `boot` is the app's first screen in one
@@ -982,8 +1029,12 @@ export function tools<C>(surface: McpSurface<C>) {
      * said here, on the answer to the call that filed it, which costs the list nothing. It is the record's own `dryRun`,
      * the one Decide reads, so the agent and the owner read one account of it. Asked after the filing, so a body the
      * record refuses is refused in the record's words and never previewed.
+     *
+     * AND A SCRIPT CHANGE THAT SAYS `"try"` IS TRIED INSTEAD OF FILED (`trial` below), and one that does not is filed
+     * and never run: a trial fetches and is counted as a run, so it happens only when the agent asks for it.
      */
     propose: async (args, ctx) => {
+      if (args.body_kind === 'change' && isObject(args.body) && args.body.try !== undefined) return trial(args.body, ctx);
       const body = !isObject(args.body)
         ? args.body
         : args.body_kind === 'rowset'
@@ -992,10 +1043,13 @@ export function tools<C>(surface: McpSurface<C>) {
             ? change(args.body)
             : args.body;
       const filed = await surface.propose({ ...args, ...(body === undefined ? {} : { body }) } as never, ctx);
-      const rule = args.body_kind === 'change' && isObject(body) ? ruleIn(body) : null;
-      if (!filed.ok || rule === null || !surface.dryRun || !isObject(filed.value)) return filed;
-      const dry = await surface.dryRun({ rule }, ctx);
-      return { ok: true, value: { ...filed.value, dry_run: dry.ok ? dry.value : { refused: 'refusal' in dry ? dry.refusal : dry } } };
+      if (!filed.ok || !isObject(filed.value) || args.body_kind !== 'change' || !isObject(body)) return filed;
+      const rule = ruleIn(body);
+      if (rule !== null && surface.dryRun) {
+        const dry = await surface.dryRun({ rule }, ctx);
+        return { ok: true, value: { ...filed.value, dry_run: dry.ok ? dry.value : { refused: 'refusal' in dry ? dry.refusal : dry } } };
+      }
+      return filed;
     },
 
     create: (args, ctx) =>

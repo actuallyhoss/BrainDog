@@ -48,9 +48,27 @@ import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 import { createDirectory, switcherAsk, type Directory } from '@braindog/record/directory';
 import type { Auth, Param, Refusal, Row, Scheduler, Sql } from '@braindog/ports';
 
-import { actionExecutor, holding, holdingPaged, keyOpener, meterPass, pass, sharedReader, type OpenKey, type RehearseOnThisMachine, type Resolve, type Send } from './actions.ts';
+import {
+  actionExecutor,
+  holding,
+  holdingPaged,
+  keyOpener,
+  meterPass,
+  pass,
+  pinFor,
+  pinnedSend,
+  sharedReader,
+  systemResolve,
+  type OpenKey,
+  type Pinned,
+  type RehearseOnThisMachine,
+  type Resolve,
+  type Send,
+} from './actions.ts';
 import { pagedRunner } from '@braindog/host/connector';
-import { holdingScript } from '@braindog/host/script';
+import { grantNamed, holdingScript } from '@braindog/host/script';
+import { scriptTrial, trialSandbox } from '@braindog/host/script-try';
+import { runInQuickJs } from '@braindog/script/quickjs';
 import { scriptSandbox } from './script.ts';
 import { httpFor } from './http.ts';
 import { sparkDoor, sparkFromEnv, sparkModelFor, type SparkConfig } from './spark.ts';
@@ -1018,6 +1036,27 @@ export async function start(options: {
     catalogue: seedCatalogue(),
     /* A SHARED FILE AT AN ADDRESS IS READ HERE, not in the tab, so a site with no CORS header still installs. */
     readAddress: sharedReader(options.shared),
+    /* A DRAFT SCRIPT RUN NOW, WRITING NOTHING (`@braindog/host/script-try`), through the socket, name service and key
+       opener a scheduled run's fetch leaves by. ONLY WHEN `actions` IS ON, for its reason: a trial sends a request to
+       somebody else's server, and a self-host that was not asked to send any answers `NOT_IN_THIS_BUILD` instead. The
+       ledger is the Directory's, opened below, and a trial asked before it is counted by nobody. */
+    tryScript:
+      options.actions === undefined
+        ? undefined
+        : (d) => {
+            const actions = options.actions ?? {};
+            return scriptTrial({
+              sandbox: trialSandbox<Pinned>({
+                run: runInQuickJs,
+                send: actions.send ?? pinnedSend,
+                pin: pinFor(actions.resolve ?? systemResolve),
+                openKey: actions.openKey ?? keyOpener(api, options.keys),
+                now: clock.now,
+              }),
+              ledger: { mayRun: (r, a, p) => (ledger ? ledger.mayRun(r, a, p) : null), meter: (r, run) => ledger?.meter(r, run) },
+              now: clock.now,
+            })({ record: d.record, body: d.body as never, input: d.input as never, reads: d.reads as never, grantOf: d.owner ? grantNamed(() => api.kernel.grants()) : null });
+          },
     /* SPARK'S MODEL, when this host points at one; the record files what it drafts through the proposal door or not at all. */
     sparkModel,
     /* NEWER VERSIONS IN THIS HOST'S CATALOGUE, for Spark to ask about on Decide. */

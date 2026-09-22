@@ -28,7 +28,7 @@ import {
   unresolvedFault,
 } from '@braindog/declare';
 import { isDuplicate, matchLiterals, normalise as normaliseText, parseDate, scanDates, scanDecimals, scanInts, scanMoney, type CurrencyTable } from '@braindog/extract';
-import { no, ok } from '@braindog/ports';
+import { fixOf, no, ok } from '@braindog/ports';
 import { backfillSpeaks } from './speaks.ts';
 import type { EraseReport, EraseRequest } from '@braindog/kernel';
 import type { InvitationRow } from '@braindog/kernel';
@@ -83,8 +83,9 @@ import {
   slugify,
   SPARK,
   looksLikeCredential,
+  scriptBody,
 } from '@braindog/kernel';
-import type { Predicate } from '@braindog/where';
+import { parseWhere, type Predicate } from '@braindog/where';
 import type { Json as JsonValue } from '@braindog/kernel';
 
 import { arranger, carryUpdate, speakingNow, writeVoice, type CatalogueEntry } from './arrange.ts';
@@ -825,6 +826,8 @@ export type RecordDeps = {
    * `catalogueDrafts`). Spark asks about each on Decide through the same `prepare`; absent, it asks about none.
    */
   catalogueOffers?: ((held: readonly { id: string; version: string; on: boolean }[]) => Promise<readonly CatalogueOffer[]>) | undefined;
+  /** A draft script run now in the host's sandbox, writing nothing (`@braindog/host/script-try`). Absent, `scriptTry` refuses `NOT_IN_THIS_BUILD`. */
+  tryScript?: ((draft: { record: { id: string; tz: string }; body: Record<string, unknown>; input: unknown; reads: { list(register: string, where: unknown): Promise<unknown[]>; get(spoken: string): Promise<unknown> }; owner: boolean }) => Promise<unknown>) | undefined;
 };
 
 /** What `invite` says when the host never said it can take invitations. */
@@ -914,7 +917,7 @@ export async function createRecordApi(deps: RecordDeps) {
   return { ...api(kernel, deps, cursors), kernel };
 }
 
-function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'sparkModel' | 'catalogueOffers'>, cursors: HistoryCursors) {
+function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'sparkModel' | 'catalogueOffers' | 'tryScript'>, cursors: HistoryCursors) {
   const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
   /**
    * The page declaration served at a slug, and its version: the one named exactly, or else the one whose name slugs to it
@@ -1358,6 +1361,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           .map((d) => d.id),
       ]),
     ],
+    /* HOW A FIGURE'S WORDS READ, so the plan can name the ones a widening would move (`declare`'s `misreads`), with
+       `where`'s own parser, as the kernel's `stranded` reads the same sentence. Without it `misreads` was empty on every
+       real plan, and `declare`'s install refusal over one never fired outside its tests (`test/plan-widen-record.test.ts`).
+       A title no row holds yet reads the same either way, so `REF_UNKNOWN` is passed over as `stranded` passes it. */
+    sentence: (where, schema) => {
+      const read = parseWhere(where, schema, { nowMs: clock.now() });
+      return read.bad.every((b) => b.code === 'REF_UNKNOWN') ? (read.predicate ?? null) : null;
+    },
   });
 
   /**
@@ -3299,6 +3310,42 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return no('VALUE_MALFORMED', 'A rule names a register and what it would then do.', { at: 'rule' });
       const rows = kernel.dryRun(body as RuleDecl, args.limit);
       return rows.ok ? ok({ ...rows.value, ...saidOf(body) }) : rows;
+    },
+
+    /**
+     * A draft script, run now by the host in its sandbox, writing nothing: what it would have read, fetched and written.
+     *
+     * PROPOSE, AS FILING ONE IS, because a trial is what an agent does before it proposes. The body meets the kernel's own
+     * `scriptBody`, the check an install runs, so a draft the record could never hold is refused here and never run; and
+     * the reads it is handed are this record's `list` and `get` with the caller's own context, so a trial reads what
+     * its caller may and nothing more. `owner` tells the host whether it may open a key for it.
+     */
+    async scriptTry(args: { body?: unknown; input?: unknown } | undefined, ctx: CallContext) {
+      const stop = guard(ctx, 'propose');
+      if (stop) return { ok: false as const, refusal: stop };
+      const said = (args ?? {}) as Record<string, unknown>;
+      const extra = stray(said, ['body', 'input']);
+      if (extra) return { ok: false as const, refusal: extra };
+      const body = said.body;
+      if (body === null || typeof body !== 'object' || Array.isArray(body)) return no('REQUIRED_MISSING', "body is a script declaration's body, as braindog:grammar/script says.", { at: 'body' });
+      const b = body as Record<string, unknown>;
+      const bad = scriptBody({ id: `script.${String(b.script)}`, body: b });
+      if (bad) return { ok: false as const, refusal: bad };
+      if (!deps.tryScript) return no('NOT_IN_THIS_BUILD', 'This BrainDog cannot try a script yet, so nothing ran. Propose it, and the owner reads the source in Decide.');
+      const reads = {
+        list: async (register: string, where: unknown) => {
+          const page = await this.list({ register, ...(where === null ? {} : { where }) } as never, ctx);
+          if (!page.ok) throw new Error(fixOf(page));
+          return page.value.rows;
+        },
+        get: async (spoken: string) => {
+          const row = await this.get({ spoken } as never, ctx);
+          if (!row.ok) throw new Error(fixOf(row));
+          return row.value;
+        },
+      };
+      const who = kernel.identity();
+      return ok(await deps.tryScript({ record: { id: who?.id ?? 'self', tz: who?.tz ?? 'UTC' }, body: b, input: said.input ?? null, reads, owner: ctx.principal.kind === 'person' && ctx.principal.level === 'owner' }));
     },
 
     /**

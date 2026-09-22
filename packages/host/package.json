@@ -9,6 +9,7 @@
     "./auth": "./src/auth.ts",
     "./connector": "./src/connector.ts",
     "./script": "./src/script.ts",
+    "./script-try": "./src/script-try.ts",
     "./spark": "./src/spark.ts"
   },
   "dependencies": {

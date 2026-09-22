@@ -20,7 +20,8 @@
  * A REFUSED FETCH IS A REJECTED PROMISE IN THE SCRIPT. `CtxHost` has no way to refuse a run from outside, so a refusal
  * reaches the script as an ordinary error carrying `sendAction`'s sentence. Uncaught, the run is refused with that
  * sentence on its event. Caught, the script goes on without the answer, which is all catching it can buy: nothing was
- * sent, and no key was opened.
+ * sent, and no key was opened. THE ONE EXCEPTION IS A KEY SENT WHERE ITS VAULT ENTRY DOES NOT OPEN (`keyRefused`), which
+ * is a rule broken rather than a provider failing, and refuses the run however the script handles it.
  *
  * NO `node:` IMPORT, and only types from `@braindog/script`, so the Worker can build its runner here too.
  */
@@ -28,15 +29,20 @@
 import { ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, type ActionRequest, type Entry, type ScriptRunner, type Scripted } from '@braindog/kernel';
 import { fixOf } from '@braindog/ports';
 import type { CallContext, RecordApi } from '@braindog/record';
-import type { CtxHost, HostRequest, HostResponse, Json, ScriptAnswer, ScriptDecl } from '@braindog/script';
+import type { CtxHost, HostRequest, HostResponse, Json, ScriptAnswer, ScriptDecl, ScriptRefusal } from '@braindog/script';
 
 import { pass, sendAction, type Admissions, type Ledger, type OpenKey, type Pin, type Send } from './actions.ts';
+import { SPARK_KEY_LABEL } from './spark.ts';
 
 /** One run of one script in a sandbox: `runInQuickJs` on the self-host, a Dynamic Worker on Cloud. */
 export type RunSandbox = (decl: ScriptDecl, host: CtxHost) => Promise<ScriptAnswer>;
 
-/** The grant a vault label names, or `null`. By reference: an id and a label, never the bytes. */
-export type GrantOf = (label: string) => { id: string; label: string } | null;
+/**
+ * The grant a vault label names, or `null`. By reference: an id, a label and what its vault entry says it opens, never
+ * the bytes. `opens` is carried because it decides where the key may go (`keyRefused`).
+ */
+export type GrantOf = (label: string) => ScriptGrant | null;
+export type ScriptGrant = { id: string; label: string; opens: string };
 
 /** `ctx.record.list` and `ctx.record.get` for one run, already held to its `reads`. */
 export type ScriptReads = {
@@ -148,8 +154,66 @@ export function grantNamed(grants: () => ReturnType<RecordApi['kernel']['grants'
       .filter((g) => (g.label === label || g.id === label) && g.revoked_at === null)
       .sort((a, b) => (a.created_at === b.created_at ? (a.id < b.id ? 1 : -1) : a.created_at < b.created_at ? 1 : -1));
     const found = live[0];
-    return found === undefined ? null : { id: found.id, label: found.label };
+    return found === undefined ? null : { id: found.id, label: found.label, opens: found.opens };
   };
+}
+
+/**
+ * The host a grant's `opens` names, or `null` when it names none.
+ *
+ * `opens` IS WHAT A PERSON TYPED, "a host, an account, a machine" as the vault's own refusal puts it, so it is read as a
+ * host only when it parses as one: `api.gold.test`, `api.gold.test:8443` or `https://api.gold.test/v1` all name
+ * `api.gold.test`, and "the Bake test account" names nothing. Not a string at all names nothing either, so a lookup that
+ * forgot to carry `opens` sends no key rather than every key.
+ */
+function hostOpened(opens: unknown): string | null {
+  if (typeof opens !== 'string') return null;
+  const text = opens.trim().toLowerCase();
+  if (text === '') return null;
+  try {
+    return new URL(text.includes('://') ? text : `https://${text}`).hostname.replace(/\.$/, '');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Why a script may not send `grant` to `at`, or `null` when it may. The refusal is `FORBIDDEN` and is a rule broken, so
+ * it refuses the whole run on both hosts, as a key the script does not declare does.
+ *
+ * A KEY GOES ONLY TO THE HOST ITS VAULT ENTRY SAYS IT OPENS. A script names its keys and its origins as two lists, and
+ * nothing joined them: the audit of wave thirty-five sent `goldapi`, whose entry opens `api.gold.test`, to
+ * `collector.test` as a bearer, because that origin was also in the script's `egress:`, and the one line the owner
+ * approves names both lists without saying which host gets the key. A `call` has one host and one grant, so the pairing
+ * was implicit there; a script is the first declaration that can hold two origins and one key. The host is compared
+ * exactly, with no subdomain let in: `opens: stripe.com` does not open `api.stripe.com`, because a vault entry that names
+ * a parent would otherwise open every name under it, whoever holds them.
+ *
+ * AND NEVER THE VAULT'S `spark` KEY, WHATEVER IT OPENS. On a host with no `SPARK_KEY` it is the key the included model
+ * answers everybody with (`hostKeyedFromVault`), which `sparkGuardedEngine` already refuses as a tier `b` key for the
+ * same reason. It is matched on the label the lookup found, so naming it by its grant id is refused too.
+ */
+export function keyRefused(script: string, grant: ScriptGrant, at: URL): ScriptRefusal | null {
+  if (grant.label === SPARK_KEY_LABEL)
+    return { code: 'FORBIDDEN', why: `${script} named the vault's "${SPARK_KEY_LABEL}" key, which is the key this host's included model answers with, and a script may not send it anywhere.` };
+  const host = at.hostname.replace(/\.$/, '');
+  if (hostOpened(grant.opens) === host) return null;
+  return {
+    code: 'FORBIDDEN',
+    why: `The key "${grant.label}" opens ${hostOpened(grant.opens) ?? JSON.stringify(grant.opens ?? '')}, and ${script} fetched ${host} with it, so nothing was sent. A script sends a key only to the host its vault entry says it opens.`,
+  };
+}
+
+/**
+ * The refusal for a script that declares the vault's `spark` key, asked before its sandbox starts, or `null`.
+ *
+ * BEFORE THE SANDBOX AND NOT ONLY AT THE FETCH, so a script that names the key and never uses it is refused all the
+ * same: a declaration that names the included model's key is one the owner should not have been asked to approve.
+ * Refusing it at install is the kernel's (`declare.ts`), which this file does not reach.
+ */
+export function sparkDeclared(script: string, keys: readonly string[]): ScriptRefusal | null {
+  if (!keys.includes(SPARK_KEY_LABEL)) return null;
+  return { code: 'FORBIDDEN', why: `${script} declares the vault's "${SPARK_KEY_LABEL}" key, which is the key this host's included model answers with, and a script may not name it.` };
 }
 
 /**
@@ -162,11 +226,25 @@ export function scriptRunner<P extends object | undefined = undefined>(options: 
   const now = options.now ?? (() => Date.now());
   return async (s) => {
     const { scripted } = s;
+    const sparked = sparkDeclared(scripted.script, scripted.decl.keys);
+    if (sparked !== null) return { refused: sparked, log: '', usage: { fetches: 0, bytes: 0, wall_ms: 0, cpu_ms: 0 } };
     const execute = sendAction<P>({ origins: () => scripted.decl.egress, openKey: options.openKey, send: options.send, pin: options.pin });
 
+    /* A KEY SENT WHERE IT DOES NOT OPEN IS A RULE BROKEN, AND IT STAYS BROKEN. `CtxHost` can only reject the one fetch,
+       which the script may catch and carry on from, so the refusal is kept here: every fetch after it is refused
+       unsent, and the run's answer is the refusal whatever the script returned. That is what the Worker's `ScriptRuns`
+       does with the same refusal, so one script meets one rule on either host. */
+    const kept: { stop: ScriptRefusal | null } = { stop: null };
+
     const fetch = async (asked: HostRequest): Promise<HostResponse> => {
+      if (kept.stop !== null) throw new Error(kept.stop.why);
       const grant = asked.key === null ? null : options.grantOf(asked.key);
       if (asked.key !== null && grant === null) throw new Error(`The key "${asked.key}" is not in the vault, so nothing was sent.`);
+      const broken = grant === null ? null : keyRefused(scripted.script, grant, new URL(asked.url));
+      if (broken !== null) {
+        kept.stop = broken;
+        throw new Error(broken.why);
+      }
       const request: ActionRequest = {
         job: s.job.id,
         /* `sendAction` NEVER READS THE CHANNEL; only `idempotentCalls` does, and a script's fetch is not wrapped in it. */
@@ -192,7 +270,7 @@ export function scriptRunner<P extends object | undefined = undefined>(options: 
 
     const { decl } = scripted;
     const reads = options.reads?.(s);
-    return options.run(
+    const answer = await options.run(
       {
         id: scripted.script,
         version: scripted.version,
@@ -211,6 +289,7 @@ export function scriptRunner<P extends object | undefined = undefined>(options: 
         input: (scripted.input ?? null) as Json,
       },
     );
+    return kept.stop === null ? answer : { refused: kept.stop, log: answer.log, usage: answer.usage };
   };
 }
 

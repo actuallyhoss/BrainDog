@@ -153,6 +153,14 @@ export const ROUTES: readonly Route[] = [
   { name: 'revokeGrant', group: 'VAULT', writes: true, what: 'Take a credential out of service. The bytes go; the row stays, because what it opened is a fact.' },
   { name: 'dryRun', group: 'READ+', writes: false, what: 'What a rule would do, before anybody turns it on. It writes nothing.',
     takes: { rule: 'json', limit: 'integer' } },
+  /* A DRAFT SCRIPT, RUN NOW (`script-try.ts`). READ+ AND NOT ADMIN, because `admin` refuses every token and the caller
+     this exists for is an agent trying a script before it proposes one (`loop/research-shell-scripts.md` section 7),
+     at `propose`'s rung, as `dryRun` is READ+ for a rule. What READ+ would otherwise let through is held elsewhere: a
+     token's trial opens no key, its reads are the caller's own and never `system`'s, and the allowance is asked first.
+     `writes: true` ALTHOUGH IT WRITES NOTHING TO THE RECORD, because the flag is what makes a route a POST and a trial
+     is not safe to repeat: it spends a run of the plan and may send a POST of its own to a provider. As a GET it would
+     also carry the whole source in a query string, and a prefetched link could run it. */
+  { name: 'scriptTry', group: 'READ+', writes: true, what: 'Run a draft script now and answer the writes it would make, its log and any refusal. It writes nothing, and it is counted as a run.' },
   { name: 'governance', group: 'READ+', writes: false, what: 'What has been proposed, what was decided, and what was predicted.',
     takes: { register: 'text', id: 'text', status: 'text', limit: 'integer', cursor: 'text' } },
   { name: 'propose', group: 'DATA', writes: true, what: 'Put a question in front of a person. It changes nothing by itself.' },
@@ -406,6 +414,12 @@ export type RecordSurface = {
   listGrants(ctx: never): Promise<Result<unknown>>;
   revokeGrant(args: never, ctx: never): Promise<Result<unknown>>;
   dryRun(args: never, ctx: never): Promise<Result<unknown>>;
+  /**
+   * OPTIONAL, AND THE ONLY ONE THAT IS. The route lands before the record's method does, and a required member here
+   * would stop both hosts compiling until it did; `handlersFor` answers `NOT_IN_THIS_BUILD` meanwhile, which is the
+   * truth, where calling a method that is not there would be a 500.
+   */
+  scriptTry?(args: never, ctx: never): Promise<Result<unknown>>;
   whoami(ctx: never): Promise<Result<unknown>>;
   digestToday(args: never, ctx: never): Promise<Result<unknown>>;
   markRead(args: { upTo?: number | string } | undefined, ctx: never): Promise<Result<unknown>>;
@@ -498,6 +512,10 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     listGrants: (_a, ctx) => api.listGrants(ctx as never),
     revokeGrant: (a, ctx) => api.revokeGrant(a as never, ctx as never),
     dryRun: (a, ctx) => api.dryRun(a as never, ctx as never),
+    scriptTry: async (a, ctx) =>
+      api.scriptTry
+        ? api.scriptTry(a as never, ctx as never)
+        : { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog cannot try a script yet, so nothing ran. Propose it, and the owner reads the source in Decide.' } },
     whoami: (_a, ctx) => api.whoami(ctx as never),
     digestToday: (a, ctx) => api.digestToday(a as never, ctx as never),
     markRead: (a, ctx) => api.markRead(a as { upTo?: number | string } | undefined, ctx as never),

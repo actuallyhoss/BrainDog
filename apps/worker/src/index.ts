@@ -34,6 +34,7 @@ import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 import { ALARM_RUNS, actionExecutor, holding, holdingPaged, invocation, keyOpener, meterPass, pass, sharedReader, type Admissions, type Ledger, type OpenKey } from './actions.ts';
 import { runScript, ScriptRuns, type ScriptCall, type ScriptExports, type ScriptReply } from './script.ts';
 import { grantNamed, holdingScript, scriptReads } from '@braindog/host/script';
+import { scriptTrial } from '@braindog/host/script-try';
 import { pagedRunner } from '@braindog/host/connector';
 
 import { alarmScheduler } from './alarm.ts';
@@ -281,6 +282,33 @@ export class Record$ extends DurableObject<Env> {
         delivers: DELIVERS,
         /* A SHARED FILE AT AN ADDRESS IS READ HERE, not in the tab, so a site with no CORS header still installs. */
         readAddress: sharedReader(),
+        /* A DRAFT SCRIPT RUN NOW, WRITING NOTHING (`@braindog/host/script-try`), in the sandbox a scheduled run gets:
+           `runScript`, a fresh Worker from `env.LOADER.load`, with this caller's reads and, for the owner only, the
+           vault by label. Asked of the Directory's allowance and counted on its ledger like a run, because it is one.
+           No `LOADER` is a deployment with no sandbox, which says so and runs nothing. */
+        tryScript: (d) => {
+          const loader = this.env.LOADER;
+          if (!loader) return Promise.resolve({ refused: { code: null, why: 'This deployment has no sandbox, so nothing ran.' }, log: '', usage: { fetches: 0, bytes: 0, wall_ms: 0, cpu_ms: 0 } });
+          const directory = this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('directory'));
+          const openKey = this.#openKey(api);
+          return scriptTrial({
+            sandbox: (s, t) =>
+              runScript(
+                {
+                  loader,
+                  exports: this.ctx.exports as unknown as ScriptExports,
+                  object: this.ctx.id.toString(),
+                  runs: this.#scripts,
+                  send: (egress) => actionExecutor(() => egress, { openKey }),
+                  grant: t.grantOf,
+                  read: t.reads,
+                  now: () => Date.now(),
+                },
+                s,
+              ),
+            ledger: { mayRun: (r, a, p) => directory.mayRun(r, a, p), meter: (r, run) => directory.meter(r, run) },
+          })({ record: d.record, body: d.body as never, input: d.input as never, reads: d.reads as never, grantOf: d.owner ? grantNamed(() => api.kernel.grants()) : null });
+        },
         /* WHAT AN AGENT MAY PROPOSE INSTALLING, and the carry step an update from an older use case runs. The same list the
            self-host hands in (`@braindog/seed/usecases/catalogue`): without it a hosted Personal 1.0.0 record updated and
            left what it kept typed where nothing reads it. */
@@ -358,7 +386,7 @@ export class Record$ extends DurableObject<Env> {
          hosted plan at its monthly allowance answers `held`, sends nothing, and waits for the first of next month. */
       const ledger = this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('directory'));
       /* ONE OPENER FOR THE ALARM, handed to the scripts' sends below as well, so KEK has one reader here and not two. */
-      const openKey = keyOpener(api, this.env.KEK);
+      const openKey = this.#openKey(api);
       const inner = actionExecutor(() => api.kernel.actionOrigins(), { openKey });
       /* ONE ADMISSION COUNT FOR BOTH, so a record with one run left cannot spend it twice. */
       const admissions = pass();
@@ -395,6 +423,14 @@ export class Record$ extends DurableObject<Env> {
     } catch (e) {
       console.error('actions:', e instanceof Error ? e.message : String(e));
     }
+  }
+
+  /**
+   * The one opener over `KEK` for a single-request send: the alarm's actions and scripts, and a script's trial. One
+   * place, so `KEK` keeps the readers `test/vault.test.ts` names and a trial adds none.
+   */
+  #openKey(api: RecordApi): OpenKey | null {
+    return keyOpener(api, this.env.KEK);
   }
 
   /**

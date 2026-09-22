@@ -128,8 +128,8 @@ function cutLog(log: string): string {
  *
  * ON THE EVENT AND NOT IN `Metered`. `Metered` is the row `meterPass` hands the Directory, which holds counts for every
  * record it serves and never a customer's text, so the log goes beside the counts in the record's own log and nowhere
- * else. The owner reads it where every run is read, `recentHistory`, whose `to` is this `to_v`: that is where a refused
- * run's "why" was already one 280-character sentence, and the log is what explains the sentence.
+ * else. The owner reads it where every run is read, `recentHistory`, whose `to` is this `to_v`: a refused run's note says
+ * that it was refused, and its log says why, first, since the why quotes what the script chose (`finishScript`).
  *
  * AND THE LISTS THE VERSION READ AND WROTE GO BESIDE IT, as `to_v.lists`, because the log quotes them and nobody else
  * should read it. A run line is about a declaration, and the record hands a line about a declaration to every
@@ -249,15 +249,21 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
   }
 
   const spent = { requests: answer.usage.fetches, bytes: answer.usage.bytes, ms: answer.usage.wall_ms };
-  const refuse = (say: string): Metered => {
-    const metered = keepLog(deps, meter(deps, { ...base, ...spent, outcome: 'refused', failures: 1 }, say), answer.log, decl);
+  /* THE NOTE IS THE RECORD'S WORDS AND THE WHY GOES IN THE LOG. A refusal's reason quotes what the script chose: its
+     thrown message, a register name it made up, a value the write path quoted back. The note is on a line every
+     whole-record reader sees, and `logOf` holds the log to the owner who reads every list the script touched; measured
+     before this, a member held to `append` on Money read "tally threw: Salary: Omar 91000" in `recentHistory`. The
+     why goes first, so a log at its cap never loses it. */
+  const refuse = (say: string, why?: string): Metered => {
+    const log = why === undefined ? answer.log : answer.log === '' ? why : `${why}\n${answer.log}`;
+    const metered = keepLog(deps, meter(deps, { ...base, ...spent, outcome: 'refused', failures: 1 }, say), log, decl);
     pauseAfterRefusals(deps, script);
     return metered;
   };
 
   if ('refused' in answer) {
     done();
-    return refuse(`${script} did not finish, so it wrote nothing: ${answer.refused.why}`);
+    return refuse(`${script} did not finish, so it wrote nothing; its log says why.`, answer.refused.why);
   }
 
   /* THE COUNT IS CHECKED HERE TOO, AND FIRST. The sandbox stops at `limits.writes`, but the count is what a host could
@@ -283,8 +289,10 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
     done();
     const w = answer.writes[outside]!;
     const named = w.op === 'create' ? w.register : `${w.spoken}${targets[outside] === null ? ', which names no row' : ` in ${targets[outside]}`}`;
+    const only = decl.writes.length ? decl.writes.join(', ') : 'nothing';
     return refuse(
-      `${script} wrote nothing: it asked to write to ${named}, and it may write only to ${decl.writes.length ? decl.writes.join(', ') : 'nothing'}.`,
+      `${script} wrote nothing: it asked to write outside what it may write, which is ${only}; its log says why.`,
+      `${script} asked to write to ${named}, and it may write only to ${only}.`,
     );
   }
   const shapeless = answer.writes.findIndex((w) => !isObject(w.op === 'create' ? w.fields : w.patch));
@@ -337,7 +345,7 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
     /* THE ACK WAS ROLLED BACK WITH THE WRITES, so it is made again on its own. */
     done();
     const why = 'refusal' in applied ? applied.refusal.fix : 'a row it updates was changed by somebody else first.';
-    return refuse(`${script} wrote nothing: write ${failedAt + 1} of ${answer.writes.length} was refused. ${why}`);
+    return refuse(`${script} wrote nothing: write ${failedAt + 1} of ${answer.writes.length} was refused; its log says why.`, why);
   }
   const n = answer.writes.length;
   return keepLog(

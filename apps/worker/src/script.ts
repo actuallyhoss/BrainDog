@@ -12,11 +12,11 @@
  * object, where `ScriptRuns` holds the run: its egress, its fetch count, its key labels and whether it has already
  * broken a rule. Nothing the script can rewrite (its `ctx`, the prelude, the module that calls it) decides anything.
  *
- * WHY THE RUN IS NOT IN THE GATEWAY'S PROPS. `env.LOADER.get` caches the loaded Worker by id, and the id is
- * `<record>:<script>:v<version>` because billing counts one unique Dynamic Worker per id per day, so the code, its
- * `env` and its `globalOutbound` are built once per version and reused by every later run. Props baked into those
- * stubs would be the first run's for ever. So the stubs carry only what is the same for every run (the object), and
- * the run id reaches the sandbox as the entrypoint's own props, which the module stamps on each request it makes.
+ * WHY THE RUN IS NOT IN THE GATEWAY'S PROPS. The loaded Worker was cached by `env.LOADER.get` under
+ * `<record>:<script>:v<version>` and reused by every later run, so props baked into its stubs would have been the first
+ * run's for ever. Every run now gets a Worker of its own from `env.LOADER.load` (`runScript` says why), and the run id
+ * still reaches the sandbox as the entrypoint's own props, which the module stamps on each request it makes: the stubs
+ * carry only what is the same for every run (the object), so going back to a cache would not reopen that hole.
  *
  * A BARE `fetch` IS REFUSED WHEREVER IT POINTS. It carries no run, so the gateway has nothing to check it against and
  * throws before anything is sent. That matches QuickJS, where `fetch` is not defined at all: a script that catches it
@@ -40,7 +40,7 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 
 import type { ActionRequest, Execute } from '@braindog/host/actions';
-import type { ScriptReads } from '@braindog/host/script';
+import { keyRefused, sparkDeclared, type ScriptGrant, type ScriptReads } from '@braindog/host/script';
 import type { ScriptAnswer, Scripted } from '@braindog/kernel';
 import {
   checkDecl,
@@ -174,7 +174,7 @@ type Turn = {
   limits: ScriptLimits;
   job: string;
   send: Execute;
-  grant: (label: string) => { id: string; label: string } | null;
+  grant: (label: string) => ScriptGrant | null;
   read: ScriptReads | undefined;
   fetches: number;
   bytes: number;
@@ -272,6 +272,10 @@ export class ScriptRuns {
        it was revoked since, the script gets an error it may catch, and nothing is sent without it. */
     const grant = call.key === null ? null : turn.grant(call.key);
     if (call.key !== null && grant === null) return { error: `The key "${call.key}" is not in the vault any more, so nothing was sent.` };
+    /* AND A KEY GOES ONLY TO THE HOST ITS VAULT ENTRY OPENS, never the vault's `spark` key: `keyRefused`, which the
+       self-host's runner asks too, and a rule broken like the four above. Judged on `url`, the request being sent. */
+    const broken = grant === null ? null : keyRefused(decl.id, grant, url);
+    if (broken !== null) return refuse(broken);
 
     turn.fetches += 1;
     const method = call.method.toUpperCase();
@@ -376,8 +380,11 @@ export type ScriptWiring = {
   runs: ScriptRuns;
   /** The executor for one run's declared origins: `actionExecutor` with this record's `keyOpener`. */
   send: (egress: readonly string[]) => Execute;
-  /** A vault label to the grant a send opens, or `null` when the vault holds no such key. The row, never its bytes. */
-  grant: (label: string) => { id: string; label: string } | null;
+  /**
+   * A vault label to the grant a send opens, or `null` when the vault holds no such key. The row, never its bytes, and
+   * with what it opens, which decides where the key may go.
+   */
+  grant: (label: string) => ScriptGrant | null;
   /** Live reads, scoped to a run's `reads` and signed as its actor. Absent: `ctx.record` refuses. */
   read?: ((scripted: Scripted) => ScriptReads) | ScriptReads | undefined;
   now: () => number;
@@ -437,6 +444,11 @@ export async function runScript(wiring: ScriptWiring, s: Scripted): Promise<Scri
   const full: ScriptDecl = { id: script, version, ...decl };
   const usage = (turn?: Turn) => ({ fetches: turn?.fetches ?? 0, bytes: turn?.bytes ?? 0, wall_ms: Math.max(0, wiring.now() - started), cpu_ms: 0 });
 
+  /* THE `spark` KEY BEFORE THE DECLARATION'S SHAPE, in `scriptRunner`'s order, because on the self-host the shape is
+     checked inside the sandbox and `sparkDeclared` runs before it: a declaration that is both malformed and names the
+     key is `FORBIDDEN` on either host, not `DECLARATION_INVALID` on one of them. */
+  const sparked = sparkDeclared(script, decl.keys);
+  if (sparked !== null) return { refused: sparked, log: '', usage: usage() };
   const limits = checkDecl(full);
   if (isRefusal(limits)) return { refused: limits, log: '', usage: usage() };
 
@@ -444,14 +456,20 @@ export async function runScript(wiring: ScriptWiring, s: Scripted): Promise<Scri
   const run = wiring.runs.open({ decl: full, limits, job: s.job.id, send: wiring.send(decl.egress), grant: wiring.grant, read });
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const worker = wiring.loader.get(`${record.id}:${script}:v${version}`, () => ({
+    /* `load`, NOT `get`: A FRESH WORKER FOR EVERY RUN. `get` caches by id, and the id was `<record>:<script>:v<n>`, so
+       every run of one version shared one module and one `globalThis`: measured by the audit of wave thirty-five, a
+       second run read "one,two" off what the first had left there, where the self-host starts each run in a new
+       QuickJS instance and would have said "one" (`test/script-isolation.test.ts`). A script that works on one host
+       by carrying state between runs, or trips on another run's leftovers, would behave differently on the other.
+       THE PRICE IS A UNIQUE DYNAMIC WORKER PER RUN rather than per version per day, which is what billing counts. */
+    const worker = wiring.loader.load({
       compatibilityDate: COMPATIBILITY_DATE,
       mainModule: 'main.js',
       modules: { 'main.js': MAIN, 'script.js': decl.source },
       env: { RECORD: wiring.exports.ScriptRecord({ props: { object: wiring.object } }) },
       globalOutbound: wiring.exports.ScriptOutbound({ props: { object: wiring.object } }),
       limits: { cpuMs: limits.cpu_ms },
-    }));
+    });
     const entry = worker.getEntrypoint(undefined, { props: { run } }) as unknown as { run(meta: Json): Promise<Handed> };
     const meta: Json = { input: (input ?? null) as Json, now: new Date(started).toISOString(), tz: record.tz };
 
@@ -470,13 +488,19 @@ export async function runScript(wiring: ScriptWiring, s: Scripted): Promise<Scri
     const turn = wiring.runs.close(run);
     const spent = usage(turn);
 
-    if (outcome === 'late') return { refused: { code: 'OUT_OF_BOUNDS', why: `${script} ran past its wall_ms of ${limits.wall_ms}.` }, log: '', usage: spent };
-    if ('failed' in outcome) return { refused: turn?.stop ?? { code: null, why: `${script} stopped: ${outcome.failed}` }, log: '', usage: spent };
-
-    const handed = isObject(outcome.handed) ? (outcome.handed as Handed) : {};
+    /* AN ANSWER THAT ARRIVED PAST THE DEADLINE IS LATE, WHOEVER WON THE RACE. The race cannot end code that never
+       awaits: locally the loaded Worker runs on this object's thread, so the timer cannot fire until the script lets
+       go, and the audit's four-second busy loop under `wall_ms: 500` then answered clean with its log and writes.
+       The self-host refuses the same run by its last check of the deadline (`runInQuickJs`), so this is that check.
+       In production `cpuMs` ends such a loop sooner, which local workerd does not enforce. */
+    const handed = outcome !== 'late' && 'handed' in outcome && isObject(outcome.handed) ? (outcome.handed as Handed) : {};
     const log = cut(typeof handed.log === 'string' ? handed.log : '');
-    /* A BROKEN RULE OUTRANKS EVERYTHING THE SCRIPT SAID AFTER IT, including a clean return. */
+    /* A BROKEN RULE OUTRANKS EVERYTHING THE SCRIPT SAID AFTER IT, including a clean return, AND A LATE ONE. The
+       self-host answers its kept refusal over the sandbox's own (`scriptRunner`), and `runInQuickJs` answers its
+       sticky `stop` before its deadline, so a run that sent a key away and then overran is `FORBIDDEN` on both hosts. */
     if (turn?.stop) return { refused: turn.stop, log, usage: spent };
+    if (outcome === 'late' || spent.wall_ms > limits.wall_ms) return { refused: { code: 'OUT_OF_BOUNDS', why: `${script} ran past its wall_ms of ${limits.wall_ms}.` }, log: '', usage: spent };
+    if ('failed' in outcome) return { refused: { code: null, why: `${script} stopped: ${outcome.failed}` }, log: '', usage: spent };
     if (handed.invalid === true) return { refused: { code: 'DECLARATION_INVALID', why: `${script}'s source has no default export that is a function.` }, log, usage: spent };
     if (typeof handed.threw === 'string') return { refused: { code: null, why: `${script} threw: ${handed.threw}` }, log, usage: spent };
     const writes = checkWrites(full, limits, handed.writes);

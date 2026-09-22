@@ -196,7 +196,10 @@ test('THE SAME SCRIPT AIMED AT A LOCAL ADDRESS IS REFUSED BEFORE ANY SOCKET OPEN
   /* `inside.gold.test` IS A NAME, so only `pin` can know it is loopback: it resolves there. `127.0.0.1` is written as
      an address, and `sendAction` refuses it before `pin` is asked, which is why the name service never hears of it. */
   const dns = names({ 'inside.gold.test': ['127.0.0.1'] });
-  const s = await selfhost([script('gold-local', 'https://127.0.0.1'), script('gold-inside', 'https://inside.gold.test')], dns.resolve, net.send);
+  /* WITHOUT A KEY, because the rule under test is the address: `goldapi` opens `api.gold.test`, and sent to either host
+     below it would be refused as a key sent away (`keyRefused`) before the address was ever asked about. */
+  const keyless = (s: ReturnType<typeof script>) => ({ ...s, body: { ...s.body, keys: [] as string[], source: s.body.source.replace(", { key: 'goldapi' }", '') } });
+  const s = await selfhost([keyless(script('gold-local', 'https://127.0.0.1')), keyless(script('gold-inside', 'https://inside.gold.test'))], dns.resolve, net.send);
   try {
     await s.running.poll();
 
@@ -229,7 +232,7 @@ test("THE KEY'S VALUE IS NOT IN THE SANDBOX'S LOG EITHER, as the runner hands it
   const { scriptSandbox } = await import('../src/script.ts');
   const net = provider();
   const runner = scriptSandbox(
-    { kernel: { grants: () => [{ id: 'g_1', label: 'goldapi', revoked_at: null, created_at: '2026-09-22T00:00:00.000Z' }] } } as never,
+    { kernel: { grants: () => [{ id: 'g_1', label: 'goldapi', opens: 'api.gold.test', revoked_at: null, created_at: '2026-09-22T00:00:00.000Z' }] } } as never,
     { openKey: async () => FAKE_KEY, send: net.send, resolve: names({ 'api.gold.test': [PUBLIC] }).resolve },
   );
   const decl = script('gold-rate', 'https://api.gold.test').body;
@@ -250,7 +253,7 @@ test('A REVOKED KEY IS NEVER OPENED FOR A SCRIPT: the live one under the same la
      with the host's "not in the vault" refusal deleted, which sent the request bare. A key revoked after the script was
      installed is the ordinary way to reach both. */
   const { scriptSandbox } = await import('../src/script.ts');
-  const run = async (grants: { id: string; label: string; revoked_at: string | null; created_at: string }[]) => {
+  const run = async (grants: { id: string; label: string; opens: string; revoked_at: string | null; created_at: string }[]) => {
     const net = provider();
     const opened: string[] = [];
     const runner = scriptSandbox({ kernel: { grants: () => grants } } as never, {
@@ -268,13 +271,13 @@ test('A REVOKED KEY IS NEVER OPENED FOR A SCRIPT: the live one under the same la
 
   /* THE REVOKED ONE IS THE NEWER, so an order that forgot `revoked_at` would pick it first. */
   const rotated = await run([
-    { id: 'g_new', label: 'goldapi', revoked_at: '2026-09-22T01:00:00.000Z', created_at: '2026-09-22T00:00:00.000Z' },
-    { id: 'g_old', label: 'goldapi', revoked_at: null, created_at: '2026-09-01T00:00:00.000Z' },
+    { id: 'g_new', label: 'goldapi', opens: 'api.gold.test', revoked_at: '2026-09-22T01:00:00.000Z', created_at: '2026-09-22T00:00:00.000Z' },
+    { id: 'g_old', label: 'goldapi', opens: 'api.gold.test', revoked_at: null, created_at: '2026-09-01T00:00:00.000Z' },
   ]);
   assert.ok('writes' in rotated.answer, JSON.stringify(rotated.answer));
   assert.deepEqual(rotated.opened, ['g_old']);
 
-  const revoked = await run([{ id: 'g_new', label: 'goldapi', revoked_at: '2026-09-22T01:00:00.000Z', created_at: '2026-09-22T00:00:00.000Z' }]);
+  const revoked = await run([{ id: 'g_new', label: 'goldapi', opens: 'api.gold.test', revoked_at: '2026-09-22T01:00:00.000Z', created_at: '2026-09-22T00:00:00.000Z' }]);
   assert.ok('refused' in revoked.answer, JSON.stringify(revoked.answer));
   assert.match(revoked.answer.refused.why, /The key "goldapi" is not in the vault, so nothing was sent\./);
   assert.deepEqual([revoked.calls, revoked.opened.length], [0, 0]);

@@ -105,6 +105,18 @@ test('BUT `pack:` IS READ, by the record, so a script a first-party pack owns th
   sql.close();
 });
 
+test("THE VAULT'S spark KEY IS REFUSED AT INSTALL, with a sentence, so the owner is never asked to approve sending it", async () => {
+  const r = await refusal(GOLD({ keys: ['goldapi', 'spark'] }));
+  assert.equal(r.code, 'FORBIDDEN');
+  assert.equal(r.at, 'keys[1]');
+  assert.match(r.fix, /"spark" key/);
+  assert.match(r.fix, /included model/);
+  /* A LABEL THAT ONLY STARTS WITH IT IS SOMEBODY'S OWN KEY, and installs. */
+  const { k, sql } = await record();
+  assert.ok((await k.install([GOLD({ keys: ['sparkpost'] })])).ok);
+  sql.close();
+});
+
 test('THE EGRESS IS PRINTED FROM THE SCRIPT BODY, with every origin and every key, so the review sees what a run can reach', () => {
   const e = egressOf(GOLD({ reads: ['obligations'] }).body);
   assert.ok(e, 'a script that fetches has egress');

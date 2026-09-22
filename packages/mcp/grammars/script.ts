@@ -11,8 +11,8 @@
  * row names 2 and 11 only and its manifest has no `@braindog/script`, and an edge taken for five numbers is an edge the
  * graph gate holds for good. So the numbers below are copies, and `test/script.test.ts` holds each one to `CEILINGS`,
  * `DEFAULT_LIMITS`, `SOURCE_BYTES`, `LOG_BYTES` and the kernel's `FLOOR_MS`, and installs both examples through a real
- * record. A copy nobody checks is how one of two becomes wrong. When `script_try` arrives it takes the edge anyway, and
- * the copies can go with it.
+ * record. A copy nobody checks is how one of two becomes wrong. `script_try` took no edge either: it reaches the sandbox
+ * through the record's `scriptTry`, which each host wires, so the copies stay.
  *
  * IT SAYS WHAT DOES NOT RUN YET. An agent told only the grammar would propose a script started by a door and then
  * wonder why nothing happened. This said no host ran a script at all, which stopped being true when both hosts wired
@@ -85,6 +85,8 @@ export const SCRIPT_GRAMMAR = {
   ],
   to_propose:
     'propose body_kind change with {"declaration_id":"script.<name>","to":<the declaration>}. The owner approves each origin and key in Decide, and a key must be in the vault before they can accept.',
+  to_try:
+    'the same change with "try":true beside "to", or "try":{"input":...} to hand it what a door would. It runs now and answers script_try: the writes it would make, its log and any refusal. Nothing is written and nothing is proposed, so send it again without try when it works. It fetches for real and counts as a run of the plan, and it opens a key only for the owner.',
   in_this_build:
-    'an accepted script runs on its clock, on the self-host and on the Cloud. Nothing starts a script from a door or a rule yet, so give it runs.every. script_try, which runs one without writing, is not in this build.',
+    'an accepted script runs on its clock, on the self-host and on the Cloud. Nothing starts a script from a door or a rule yet, so give it runs.every. A trial runs on a self-host whose actions are on, and on the Cloud.',
 };

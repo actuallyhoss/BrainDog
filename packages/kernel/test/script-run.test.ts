@@ -370,7 +370,10 @@ test('A REFUSED RUN KEEPS ITS LOG ON ITS EVENT, where the owner reads why, and t
   const m = finishScript(r.deps, prepared(r), { refused: { code: null, why: 'TypeError: price_gram_24k is undefined' }, log, usage: USAGE });
 
   assert.equal(m.outcome, 'refused');
-  assert.equal((lastRun(r.k)?.to as { log?: unknown } | null)?.log, log);
+  /* THE WHY GOES FIRST IN IT, and not on the note: a thrown message is the script's own text, and the note is on a line
+     every whole-record reader sees (`packages/record/test/script-refusal-note.test.ts`). */
+  assert.equal((lastRun(r.k)?.to as { log?: unknown } | null)?.log, `TypeError: price_gram_24k is undefined\n${log}`);
+  assert.equal(lastRun(r.k)?.note, 'gold-rate did not finish, so it wrote nothing; its log says why.');
   assert.equal(lastRun(r.k)?.id, m.event, 'the log is on the run event itself, not on one beside it');
   /* THE LEDGER'S SHAPE IS `Metered`, handed to the Directory by `meterPass`, and a log in it would be customer text in a
      table that holds counts. */
@@ -388,11 +391,12 @@ test('A RUN THAT WROTE KEEPS ITS LOG TOO, and one that logged nothing adds no em
 
 test('A LOG OVER 8 KB IS CUT AT 8 KB ON THE RECORD SIDE, whatever the host sent, and never through a character', async () => {
   const r = await record();
-  /* THE SANDBOX CUTS AT 8 KB ALREADY, and this is the host that did not: 8,191 bytes of ASCII then a three-byte
-     character that straddles the line, then more. */
-  const log = `${'a'.repeat(8191)}€${'b'.repeat(20_000)}`;
+  /* THE SANDBOX CUTS AT 8 KB ALREADY, and this is the host that did not: 8,191 bytes of ASCII, the refusal's why first
+     among them, then a three-byte character that straddles the line, then more. */
+  const why = 'boom\n';
+  const log = `${'a'.repeat(8191 - why.length)}€${'b'.repeat(20_000)}`;
   finishScript(r.deps, prepared(r), { refused: { code: null, why: 'boom' }, log, usage: USAGE });
   const kept = (lastRun(r.k)?.to as { log: string }).log;
-  assert.equal(kept, 'a'.repeat(8191));
+  assert.equal(kept, `${why}${'a'.repeat(8191 - why.length)}`);
   assert.ok(new TextEncoder().encode(kept).length <= 8 * 1024);
 });

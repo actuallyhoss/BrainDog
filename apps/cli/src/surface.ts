@@ -37,8 +37,11 @@ const reachable = <T>(r: Result<T>): Result<T> =>
  * what this BrainDog runs on a schedule was unreachable from the command line. Driving `resources/list` over the
  * transport is what found it (`test/stdio.test.ts`), after reading the list found nothing: the name is in the client's
  * own table and in the record's routes, and only this line was short.
+ *
+ * `scriptTry` IS ON IT FROM THE DAY IT WAS ROUTED, for `recentHistory`'s lesson: it backs `propose` with `"try"` on a
+ * script change, and a stdio agent left off this list would be told this record cannot try a script when its host can.
  */
-const LATER = ['context', 'handoff', 'meet', 'sessionsLive', 'arrangement', 'recentHistory', 'automations', 'dryRun'] as const;
+const LATER = ['context', 'handoff', 'meet', 'sessionsLive', 'arrangement', 'recentHistory', 'automations', 'dryRun', 'scriptTry'] as const;
 
 export async function surfaceOver(clientFor: (ctx: Ctx) => Client): Promise<McpSurface<Ctx>> {
   const ask = async <T>(ctx: Ctx, name: string, args: unknown = {}): Promise<Result<T>> =>

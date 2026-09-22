@@ -19,8 +19,8 @@
  * and its own key opener, or `null` for a host with no key store.
  *
  * THE KEY IS OPENED FOR ONE REQUEST, only once every check has passed, and sent as a bearer to the origin that named
- * it. Its value is scrubbed from everything this file returns, the provider's answer included, so a provider that
- * echoes the header back does not put the key in the record.
+ * it. Its value is scrubbed from everything this file returns, the provider's answer included, in every spelling
+ * `spellingsOf` names, so a provider that echoes the header back does not put the key in the record.
  *
  * NO RUNTIME HERE. No `node:` import and no bare `fetch`, so both hosts import it and the stack gate holds.
  */
@@ -61,6 +61,51 @@ export const REDACTED = '--redacted--';
 
 /** The sentence an action that names a key gets on a host with no key store. */
 export const NO_KEY_STORE = 'This host holds no key store yet, so the key';
+
+/** A derived spelling shorter than this is not scrubbed: see `spellingsOf`. */
+const SHORTEST_SPELLING = 8;
+
+/**
+ * Every spelling of an opened key that `sendAction` takes out of what it returns, longest first.
+ *
+ * THE EXACT BYTES WERE THE ONLY SPELLING, AND A PROVIDER THAT ECHOES THE HEADER NEED NOT ECHO THOSE. Measured by the
+ * audit of wave thirty-five in workerd, through the real gateway, with a key holding a `/`: a provider that answered the
+ * authorization header JSON-escaped the PHP way (`\/`), base64-encoded whole, or URL-encoded put all three into the
+ * sandbox intact, and from there `ctx.log(await r.text())` carried the key onto the run's event.
+ *
+ * THE SPELLINGS, and no others:
+ *
+ *   · the bytes as sent;
+ *   · JSON-escaped, both as `JSON.stringify` writes a string (a `"`, a `\` or a control character escaped) and with every
+ *     `/` escaped as well, which is PHP's `json_encode` default;
+ *   · URL-encoded as `encodeURIComponent` writes it, and the same with lower-case hex (`%2f`), which other encoders write;
+ *   · base64, standard and URL-safe, at each of the three byte offsets the key can start at inside a longer encoded
+ *     run, so `btoa('Bearer ' + key)` is caught as well as `btoa(key)`. Only the characters every bit of which is the
+ *     key's are replaced; the one or two at either end also carry the bytes beside the key, which differ echo to echo.
+ *
+ * NOT CAUGHT, AND SAID SO: a key re-encoded any other way (hex, `\u` escapes of ordinary characters, a hash of it), and
+ * any derived spelling shorter than eight characters, which only a key of five bytes or fewer has and which would
+ * otherwise be struck out of ordinary text by chance. The bytes as sent are always scrubbed, however short.
+ */
+export function spellingsOf(secret: string): string[] {
+  const json = JSON.stringify(secret).slice(1, -1);
+  const url = encodeURIComponent(secret);
+  const derived = new Set<string>([json, json.replaceAll('/', '\\/'), url, url.replace(/%[0-9A-F]{2}/g, (hex) => hex.toLowerCase())]);
+  const bytes = new TextEncoder().encode(secret);
+  for (const lead of [0, 1, 2]) {
+    const padded = new Uint8Array(lead + bytes.length);
+    padded.set(bytes, lead);
+    let binary = '';
+    for (const byte of padded) binary += String.fromCharCode(byte);
+    /* A CHARACTER IS SIX BITS, so the first `ceil(8 * lead / 6)` hold some of the lead's and everything from
+       `floor(8 * (lead + n) / 6)` on holds some of whatever follows the key. What lies between is the key's alone. */
+    const core = btoa(binary).slice(Math.ceil((8 * lead) / 6), Math.floor((8 * (lead + bytes.length)) / 6));
+    derived.add(core);
+    derived.add(core.replaceAll('+', '-').replaceAll('/', '_'));
+  }
+  const out = [secret, ...[...derived].filter((s) => s !== secret && s.length >= SHORTEST_SPELLING)];
+  return out.sort((a, b) => b.length - a.length);
+}
 
 /* ── the ledger ─────────────────────────────────────────────────────────── */
 
@@ -321,8 +366,9 @@ export function sendAction<P extends object | undefined = undefined>(options: Se
     const started = Date.now();
     let requests = 0;
     let bytes = 0;
-    let secret: string | null = null;
-    const scrub = (text: string): string => (secret ? text.split(secret).join(REDACTED) : text);
+    /* EVERY SPELLING OF THE KEY, NOT ONLY ITS BYTES (`spellingsOf` says which). Empty until a key is opened. */
+    let secret: string[] = [];
+    const scrub = (text: string): string => secret.reduce((out, spelling) => out.split(spelling).join(REDACTED), text);
     const refuse = (code: RefusedCode, fix: string): ActionAnswer => ({
       refused: { code, fix: scrub(fix) },
       bytes,
@@ -353,7 +399,7 @@ export function sendAction<P extends object | undefined = undefined>(options: Se
         if (!options.openKey) return refuse('WRONG_KEY', `${NO_KEY_STORE} "${request.grant.label}" was not opened and nothing was sent.`);
         const opened = await options.openKey(request.grant);
         if (opened === null) return refuse('WRONG_KEY', `The key "${request.grant.label}" could not be opened on this host, so nothing was sent.`);
-        if (opened !== '') secret = opened;
+        if (opened !== '') secret = spellingsOf(opened);
         headers.set('authorization', `Bearer ${opened}`);
       }
 

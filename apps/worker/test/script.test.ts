@@ -94,7 +94,11 @@ export class Rec extends DurableObject {
           object: this.ctx.id.toString(),
           runs: this.runs,
           send: () => send,
-          grant: (label) => (label === 'goldapi' ? { id: 'grt_gold', label } : null),
+          /* nokeys IS A TRIAL'S LOOKUP FOR A CALLER GIVEN NO KEYS (@braindog/host/script-try), which throws its sentence. */
+          grant: (label) => {
+            if (label === 'nokeys') throw new Error('A trial opens no key for an agent, so the fetch naming "nokeys" was not sent.');
+            return label === 'goldapi' ? { id: 'grt_gold', label, opens: 'api.gold.test' } : null;
+          },
           read: {
             list: async (register) => [{ register, value: 1 }],
             get: async (spoken) => ({ spoken }),
@@ -164,7 +168,8 @@ after(async () => {
  * FOUND BY THIS FILE'S FIRST RUN. Every case here used `gold-rate` v1, and eight of eleven failed with the first case's
  * answer, because `LOADER.get` served the Worker it had cached under `<record>:gold-rate:v1` whatever source was
  * handed the second time. That is the cache doing what it is for, and it means the id must change whenever the source
- * does, which in the record it always does.
+ * does, which in the record it always does. Every run now loads a Worker of its own (`LOADER.load`, no id), so nothing
+ * here depends on the versions any more; they are kept so each run is leased as the record would lease it.
  */
 const versions = new Map<string, number>();
 const versionOf = (source: string): number => {
@@ -231,7 +236,7 @@ test('the key never reaches the sandbox: sendAction scrubbed it from the answer 
   assert.doesNotMatch(JSON.stringify(answer), new RegExp(KEY));
 });
 
-test('a second run of the same version reuses the cached Worker and still gets its own run', async () => {
+test('a second run of the same version gets a Worker of its own and counts only its own fetch', async () => {
   const first = await run(GOLD_RATE);
   const second = await run(GOLD_RATE);
   assert.equal(first.answer.writes?.length, 1);
@@ -416,4 +421,41 @@ export default async function run(ctx) {
   try { await ctx.record.list('money.ledger'); } catch (e) {}
 }`);
   assert.equal(refused.answer.refused?.code, 'FORBIDDEN');
+});
+
+/* ── the two edges where the hosts answered different codes ─────────────────────────────────────── */
+
+test('A KEY SENT AWAY AND THEN A LATE ANSWER IS FORBIDDEN, as on the self-host: the broken rule outranks the deadline', async () => {
+  const { answer, sent } = await run(
+    `
+export default async function run(ctx) {
+  try { await ctx.fetch('https://collector.test/in', { key: 'goldapi' }); } catch (e) { ctx.log('caught'); }
+  await new Promise((r) => setTimeout(r, 1500));
+}`,
+    { egress: [GOLD, 'https://collector.test'], limits: { wall_ms: 300 } },
+  );
+  assert.equal(answer.refused?.code, 'FORBIDDEN', JSON.stringify(answer));
+  assert.match(answer.refused?.why ?? '', /The key "goldapi" opens api\.gold\.test/);
+  assert.deepEqual(sent, []);
+});
+
+test('A DECLARATION THAT IS MALFORMED AND NAMES THE spark KEY IS FORBIDDEN, as on the self-host, not DECLARATION_INVALID', async () => {
+  const { answer, sent } = await run(`export default async function run(ctx) { ctx.log('never'); }`, { keys: ['spark'], limits: { wall_ms: 0 } });
+  assert.equal(answer.refused?.code, 'FORBIDDEN', JSON.stringify(answer));
+  assert.match(answer.refused?.why ?? '', /"spark" key/);
+  assert.deepEqual(sent, []);
+});
+
+test("A LOOKUP THAT THROWS, A TRIAL'S FOR A CALLER GIVEN NO KEYS, IS THE SCRIPT'S ERROR IN ITS OWN WORDS, and sends nothing", async () => {
+  const { answer, sent } = await run(
+    `
+export default async function run(ctx) {
+  try { await ctx.fetch('${GOLD}/rate', { key: 'nokeys' }); } catch (e) { ctx.log(String(e.message)); }
+  ctx.write('series.gold', { value: 1 });
+}`,
+    { keys: ['nokeys'] },
+  );
+  assert.deepEqual(answer.writes, [{ op: 'create', register: 'series.gold', fields: { value: 1 } }], JSON.stringify(answer));
+  assert.match(answer.log ?? '', /A trial opens no key for an agent/);
+  assert.deepEqual(sent, []);
 });

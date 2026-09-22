@@ -95,6 +95,33 @@ test('THE KEY IS SCRUBBED FROM WHAT COMES BACK, when a provider echoes the heade
   assert.match(fixOf(refused), new RegExp(`redirected to ${REDACTED}\\.example\\.test`));
 });
 
+test('THE TWO SPELLINGS NOTHING ELSE CATCHES ARE SCRUBBED: URL-encoded with lower-case hex, and URL-safe base64', async () => {
+  /* A KEY WHOSE ENCODINGS DIFFER FROM THE ONES ALREADY CAUGHT: a `/` so `%2f` is not `%2F`, and bytes whose base64 has
+     `+` and `/`, so the URL-safe alphabet's `-` and `_` are not the standard's. Each echo below carries only the one
+     spelling, so taking either line out of `spellingsOf` turns this red. */
+  const key = `bd/fake>>>?key/${'x'.repeat(12)}~~~???`;
+  const opened: OpenKey = async () => key;
+  const header = `Bearer ${key}`;
+  const lower = encodeURIComponent(header).replace(/%[0-9A-F]{2}/g, (hex) => hex.toLowerCase());
+  const urlSafe = btoa(header).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+  assert.notEqual(lower, encodeURIComponent(header), 'the key has no hex letter to lower-case');
+  assert.notEqual(urlSafe, btoa(header).replace(/=+$/, ''), 'the key has no + or / in its base64');
+  for (const [how, echoed] of [
+    ['lower-case %2f', lower],
+    ['URL-safe base64', urlSafe],
+  ] as const) {
+    const echo = wire(async () => new Response(JSON.stringify({ heard: echoed })));
+    const answer = await sendAction({ origins: declaring(ORIGIN), openKey: opened, send: echo.send })(request());
+    assert.equal(codeOf(answer), 200);
+    const said = 'body' in answer ? answer.body : '';
+    assert.match(said, new RegExp(REDACTED), `${how}: nothing was scrubbed`);
+    /* THE KEY'S OWN SPAN IN EITHER SPELLING, which is what `spellingsOf` promises; a character at either end of a base64
+       run also carries the `Bearer ` beside it and is not the key's to strike. */
+    const span = how === 'lower-case %2f' ? encodeURIComponent(key).replace(/%[0-9A-F]{2}/g, (hex) => hex.toLowerCase()) : urlSafe.slice(10, -2);
+    assert.equal(said.includes(span), false, `the key came back ${how}: ${said}`);
+  }
+});
+
 test('AN UNDECLARED ORIGIN, PLAIN HTTP AND A HOST WRITTEN AS A PRIVATE OR LOCAL ADDRESS ARE REFUSED before the key is opened', async () => {
   let opened = 0;
   const counting: OpenKey = async () => (opened++, FAKE);
