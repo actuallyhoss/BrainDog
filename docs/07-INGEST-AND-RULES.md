@@ -586,11 +586,19 @@ the transaction of whatever started it, and the next drain takes its steps.
 | Trigger | Where it is noticed | What it reads |
 |---|---|---|
 | `written` | the write path, beside the inline pass | `op:`, `fields:` (which fields this write changed), `project:` (the row's scope field), `when:`, and `once_per:`, claimed when the run starts with the marker an inline rule uses |
-| `arrival` | after `arrive` has committed, in a transaction of its own | `ingest:`, `channel:`, `state:`; never a redelivery. The run's row is the first row the arrival wrote |
+| `arrival` | after `arrive` has committed, in a transaction of its own | `ingest:`, `channel:`, `state:`; never a redelivery, and never an arrival nothing verified unless the trigger says `unverified: true`. The run's row is the first row the arrival wrote |
 | `every` | a `rule` schedule row keyed `flow.every:<id>`, armed at install one interval out, or at the next `at:` | taken at once when the row fires; the next turn counts from when this one was due, so an hourly rule stays on its hour |
 | `manual` | `automationRun(rule, actor)` on the kernel | only a rule that says `on: { manual: true }` |
 
 `metric` is noticed nowhere yet, and the lint refuses it until it is.
+
+**An arrival nothing verified starts nothing, unless the rule asks for it.** A webhook with a wrong token is stored
+`untriaged` and offered no pattern, and until September 22nd it still started every arrival automation on its
+channel. The audit of that week sent five such posts at a rule with `runs_per_day: 5`: each started a run that wrote
+the sender's own text into a note, and the owner's real message after them started nothing, because the day was
+spent. A rule that wants to hear about bad tokens says `on: { arrival: { unverified: true } }`, and its run reads
+`{{trigger.verified}}` as `false`. `unverified:` is true or false; anything else is refused at install. An arrival
+from a door that cannot be asked (`pull`, `paste`, `api`) counts as verified, as it does for matching.
 
 **A run started by a delete reads the deleted row.** A deleted row is hidden from every read, so the run is marked as
 started by a delete and reads the row from the record past that filter: its `if` conditions and its `{{trigger.row.…}}`
@@ -608,8 +616,16 @@ for in writing.
 | any action of the table above | one step through the inline pass, against the run's row, with the rule's own name as the actor: the write path, the transitions and `create`'s bound apply as they do to an inline rule. On a run with no row, `notify` writes a note (or interrupts, when `urgent`), `suggest` opens a question, and the row verbs fail the run |
 | `set_var` | fills `{{vars.…}}` and `{{trigger.…}}` into `to:` and keeps the answer; one answer holds 4 KB, all of them 64 KB |
 | `if` | reads the condition with the sentence builder over the run's row and its answers together; a field of the row wins over an answer of the same name |
-| `wait` | parks the run on its own schedule row and resumes it when the span has passed |
+| `wait` | parks the run on its own schedule row and resumes it when the span has passed. A wait whose step row already says `done` is over and is not armed again |
 | `call`, `script`, `ask_spark`, `ask_person` | fail the run there, with a sentence saying the step is not in this build; the steps before it stand |
+
+**Where the run is, is saved after every step that finishes,** not only at a wait and at the end. A run that stops
+between two steps carries on from the next one and never takes a finished step a second time.
+
+**A step that throws fails the run.** The runner catches it, marks that step `failed` and ends the run `failed` with
+a sentence naming the step and the error. Before September 22nd a throw went to the drain's retry ladder with the run
+still `running`, and every retry took again each step since the last wait: one row sent the same notify six times in
+twelve hours, and a run with no wait ended `running` for ever, outside the ninety-day prune.
 
 `{{vars.<name>}}` and `{{trigger.<path>}}` are filled in every string of a step before the row's own `{{field}}`s are.
 `trigger` carries the kind, the row's fields as `row`, the arrival's `channel` and `ingest`, and for an arrival its
@@ -617,6 +633,12 @@ body, parsed when it is JSON.
 
 **Ceilings.** `limits.runs_per_day` (at most 1,000) is counted over the last twenty-four hours, and a run past it is
 refused with a sentence and not started. A rule with `enabled: false` starts no runs.
+
+**Switching a rule off or retiring it stops the runs it already started.** The install that sets `enabled: false`,
+by hand or in a pack's version, and the kernel's `retire`, cancel every unfinished run of that rule in their own transaction, each with a sentence
+saying why. The runner also asks at every wake whether an active, not-retired version of the rule exists and is on,
+and cancels the run when not, so a rule a pack took away when it was turned off stops its runs as well. A plain edit
+does not: a run keeps the version it started under and finishes those steps.
 
 **What is kept, and what is counted.** A finished run is kept ninety days and pruned by the hourly sweep. Every run
 that ends writes one `pull` event with actor `rule:<id>`, the same shape a scheduled action's run writes, so the ledger

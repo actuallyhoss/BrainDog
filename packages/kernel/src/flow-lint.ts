@@ -413,7 +413,12 @@ function triggerFault(id: string, on: unknown, installed?: Known): Refusal | nul
       return null;
     }
     case 'arrival': {
-      if (!isObject(value)) return bad('DECLARATION_INVALID', `${id}'s arrival: is { ingest, channel, state }, each optional.`, at);
+      if (!isObject(value)) return bad('DECLARATION_INVALID', `${id}'s arrival: is { ingest, channel, state, unverified }, each optional.`, at);
+      /* `unverified: true` IS HOW A RULE HEARS AN ARRIVAL NOTHING VERIFIED, and without it `onArrival` starts nothing for
+         one (audit thirty-three §5). A rule that wants to know about wrong tokens asks for that in writing; `'yes'`
+         would have read as absent and silently heard nothing, so anything but true or false is refused. */
+      if (value.unverified !== undefined && typeof value.unverified !== 'boolean')
+        return bad('DECLARATION_INVALID', `${id}'s unverified: is true or false. True also starts it for arrivals nothing verified.`, `${at}.unverified`);
       if (value.ingest !== undefined) {
         if (typeof value.ingest !== 'string' || !NAME.test(value.ingest))
           return bad('DECLARATION_INVALID', `${id} waits for arrivals at ${JSON.stringify(value.ingest)}, and ingest: is the id of a declared ingest.`, `${at}.ingest`);

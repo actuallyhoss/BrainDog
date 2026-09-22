@@ -72,6 +72,8 @@ export type RunTrigger = {
   arrival?: string;
   channel?: string;
   ingest?: string | null;
+  /** Whether anything proved an arrival came from its sender. Only a rule that says `unverified: true` sees `false`. */
+  verified?: boolean;
   /**
    * A delete started the run. A deleted row is hidden from `deps.entry`, so without this a run about a delete had
    * nothing to read: its `if` failed and its `{{trigger.row.…}}` was a hole. A FLAG AND NOT A COPY: the first form of
@@ -146,6 +148,43 @@ export function installed(sql: Sql): Installed[] {
 function pinned(sql: Sql, rule: string, version: number): FlowDecl | null {
   const row = sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND version = ? AND kind = 'rule'", `rule.${rule}`, version);
   return row ? (JSON.parse(row.body) as FlowDecl) : null;
+}
+
+/**
+ * Why a run of this rule may not take another step, or `null` when the rule is still on.
+ *
+ * THE PIN IS FOR WHAT A RUN DOES, NOT FOR WHETHER IT MAY. `loop/research-batch-thirty-three-audit.md` §4 installed
+ * `enabled: false` as version 2, and then retired the rule, while a run of version 1 waited an hour: both times the run
+ * woke, wrote `note: chased` and notified, because `startRun` was the only place that read `enabled`. A plain edit still
+ * leaves the run on the steps it started with, as migration 11 promises; only a live version that is off, or none at
+ * all, stops it.
+ */
+function stopped(sql: Sql, rule: string): string | null {
+  const live = sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'rule' AND superseded_at IS NULL AND retired = 0", `rule.${rule}`);
+  if (!live) return `rule.${rule} was retired, so this run stopped before its next step.`;
+  if ((JSON.parse(live.body) as FlowDecl).enabled === false) return `rule.${rule} was switched off (enabled: false), so this run stopped before its next step.`;
+  return null;
+}
+
+/**
+ * Cancel every unfinished run of a rule that has just been switched off or retired, with the reason as its sentence.
+ *
+ * CALLED IN THE TRANSACTION THAT STOPS THE RULE, so the screen that switched it off never shows a run still waiting
+ * under it. `advance` asks the same question at every wake as well, because a pack turned off retires its rules in
+ * `declare.ts` and not through the kernel's `retire`, and that path does not come through here.
+ */
+export function cancelRunsOf(deps: FlowDeps, rule: string): number {
+  const say = stopped(deps.sql, rule);
+  if (say === null) return 0;
+  const open = deps.sql.all<RunRow>(
+    "SELECT id, rule, version, trigger, state, step, vars, depth, project, actor FROM automation_run WHERE rule = ? AND state IN ('pending', 'running', 'waiting')",
+    rule,
+  );
+  for (const run of open) {
+    deps.sql.exec("DELETE FROM schedule WHERE kind = 'rule' AND key = ? AND state = 'pending'", runKey(run.id));
+    finish(deps, run, 'cancelled', say);
+  }
+  return open.length;
 }
 
 /* ── the plan ───────────────────────────────────────────────────────── */
@@ -294,12 +333,18 @@ export function onWritten(
 export function onArrival(
   deps: FlowDeps,
   rules: readonly Installed[],
-  a: { raw: string; channel: string; ingest: string | null; state: string; wrote: readonly string[]; redelivered?: true },
+  a: { raw: string; channel: string; ingest: string | null; state: string; wrote: readonly string[]; verified: boolean; redelivered?: true },
 ): void {
   if (a.redelivered) return;
   for (const rule of rules) {
     if (triggerOf(rule.body) !== 'arrival') continue;
-    const spec = (rule.body.on as Extract<Trigger, { arrival: unknown }>).arrival;
+    const spec = (rule.body.on as Extract<Trigger, { arrival: unknown }>).arrival as Extract<Trigger, { arrival: unknown }>['arrival'] & { unverified?: boolean };
+    /* AN ARRIVAL NOTHING VERIFIED STARTS NOTHING UNLESS THE RULE ASKED FOR IT IN WRITING. Audit thirty-three §5: five
+       posts with a wrong token each started a run on `channel: webhook`, spent a `runs_per_day` of five, and wrote the
+       sender's own text into five notes, and the owner's real message after them started nothing. A rule keyed on an
+       `ingest:` was already safe, because an unverified arrival is stored with none; a rule on a channel or on
+       `state: [untriaged]` was not. */
+    if (!a.verified && spec.unverified !== true) continue;
     if (spec.ingest !== undefined && spec.ingest !== a.ingest) continue;
     if (spec.channel !== undefined && spec.channel !== a.channel) continue;
     if (spec.state !== undefined && !spec.state.includes(a.state)) continue;
@@ -308,7 +353,7 @@ export function onArrival(
     startRun(
       deps,
       rule,
-      { kind: 'arrival', arrival: a.raw, channel: a.channel, ingest: a.ingest, ...(row ? { entry: row.id, register: row.register } : {}) },
+      { kind: 'arrival', arrival: a.raw, channel: a.channel, ingest: a.ingest, verified: a.verified, ...(row ? { entry: row.id, register: row.register } : {}) },
       { actor: `ingest:${a.ingest ?? a.channel}` },
     );
   }
@@ -361,6 +406,11 @@ export function onClock(deps: FlowDeps, rule: string, dueAt: string): number | n
 export function advance(deps: FlowDeps, id: string): number | null {
   const run = deps.sql.one<RunRow>('SELECT id, rule, version, trigger, state, step, vars, depth, project, actor FROM automation_run WHERE id = ?', id);
   if (!run || (run.state !== 'pending' && run.state !== 'running' && run.state !== 'waiting')) return null;
+  const off = stopped(deps.sql, run.rule);
+  if (off !== null) {
+    finish(deps, run, 'cancelled', off);
+    return null;
+  }
   const decl = pinned(deps.sql, run.rule, run.version);
   if (!decl) {
     finish(deps, run, 'failed', `rule.${run.rule} version ${run.version}, which this run started under, is not in the record.`);
@@ -386,63 +436,86 @@ export function advance(deps: FlowDeps, id: string): number | null {
     return null;
   };
 
+  /* WHERE THE RUN IS, SAVED AFTER EVERY STEP THAT IS DONE. This was written only at a wait and at the end, so a run that
+     stopped between two steps started again from its last wait and took every step since a second time: audit
+     thirty-three §1 counted six notifies in twelve hours from one row. A step that finished is never taken again. */
+  const saved = (next: number): number => {
+    deps.sql.exec('UPDATE automation_run SET step = ?, vars = ? WHERE id = ?', next, JSON.stringify(vars), id);
+    return next;
+  };
+
   let i = run.step;
-  while (i < program.length) {
-    const op = program[i]!;
-    const step = op.step;
+  try {
+    while (i < program.length) {
+      const op = program[i]!;
+      const step = op.step;
 
-    if (op.verb === 'jump') {
-      i = op.to;
-      continue;
-    }
-
-    if (op.verb === 'if') {
-      const said = test(deps, fill(step.if, scope()) as Predicate | string, read(), vars);
-      if (said.bad) return fail(i, 'if', `rule.${run.rule} could not read its condition at step ${i + 1}: ${said.bad}`);
-      record(deps, id, i, 'if', 'done', said.yes ? 'then' : 'else');
-      i = said.yes ? i + 1 : op.to;
-      continue;
-    }
-
-    if (op.verb === 'wait') {
-      /* THE SECOND TIME THIS STEP IS REACHED IS THE WAKE. Its row says `waiting` from the first, and nothing else sets
-         a step row to that state, so there is no second clock to compare against and nothing to drift. */
-      if (deps.sql.one("SELECT 1 AS x FROM automation_step WHERE run = ? AND n = ? AND state = 'waiting'", id, i)) {
-        deps.sql.exec("UPDATE automation_step SET state = 'done', at = ? WHERE run = ? AND n = ?", instant(deps.nowMs), id, i);
-        i++;
+      if (op.verb === 'jump') {
+        i = op.to;
         continue;
       }
-      const ms = typeof step.wait === 'string' ? intervalMs(step.wait) : null;
-      if (ms === null) return fail(i, 'wait', `rule.${run.rule} waits ${JSON.stringify(step.wait)} at step ${i + 1}, and a span is a number and one of m, h, d or w.`);
-      record(deps, id, i, 'wait', 'waiting', null);
-      deps.sql.exec("UPDATE automation_run SET state = 'waiting', step = ?, vars = ? WHERE id = ?", i, JSON.stringify(vars), id);
-      return deps.nowMs + ms;
+
+      if (op.verb === 'if') {
+        const said = test(deps, fill(step.if, scope()) as Predicate | string, read(), vars);
+        if (said.bad) return fail(i, 'if', `rule.${run.rule} could not read its condition at step ${i + 1}: ${said.bad}`);
+        record(deps, id, i, 'if', 'done', said.yes ? 'then' : 'else');
+        i = saved(said.yes ? i + 1 : op.to);
+        continue;
+      }
+
+      if (op.verb === 'wait') {
+        /* THE SECOND TIME THIS STEP IS REACHED IS THE WAKE. Its row says `waiting` from the first, and nothing else sets
+           a step row to that state, so there is no second clock to compare against and nothing to drift.
+
+           AND A ROW THAT SAYS `done` IS A WAIT ALREADY OVER. A plan has no loops, so a step index is reached once per
+           run, and a wait whose row is done has had its span. Reading only `waiting` as the wake parked such a run for
+           the whole span again, and the drain's reset of `attempts` on every park kept it from ever failing. */
+        const was = deps.sql.one<{ state: string }>('SELECT state FROM automation_step WHERE run = ? AND n = ?', id, i)?.state;
+        if (was === 'waiting' || was === 'done') {
+          if (was === 'waiting') deps.sql.exec("UPDATE automation_step SET state = 'done', at = ? WHERE run = ? AND n = ?", instant(deps.nowMs), id, i);
+          i = saved(i + 1);
+          continue;
+        }
+        const ms = typeof step.wait === 'string' ? intervalMs(step.wait) : null;
+        if (ms === null) return fail(i, 'wait', `rule.${run.rule} waits ${JSON.stringify(step.wait)} at step ${i + 1}, and a span is a number and one of m, h, d or w.`);
+        record(deps, id, i, 'wait', 'waiting', null);
+        deps.sql.exec("UPDATE automation_run SET state = 'waiting', step = ?, vars = ? WHERE id = ?", i, JSON.stringify(vars), id);
+        return deps.nowMs + ms;
+      }
+
+      if (op.verb === 'set_var') {
+        const spec = step.set_var as { name: string; to: string };
+        const value = String(fill(spec.to, scope()));
+        if (value.length > VAR_BYTES) return fail(i, 'set_var', `rule.${run.rule} sets ${spec.name} to ${value.length} characters, and one answer holds ${VAR_BYTES}.`);
+        vars[spec.name] = value;
+        if (JSON.stringify(vars).length > VARS_BYTES) return fail(i, 'set_var', `rule.${run.rule}'s answers passed ${VARS_BYTES} characters at step ${i + 1}.`);
+        record(deps, id, i, 'set_var', 'done', value);
+        i = saved(i + 1);
+        continue;
+      }
+
+      if (op.verb === 'call' || op.verb === 'script' || op.verb === 'ask_spark' || op.verb === 'ask_person')
+        return fail(
+          i,
+          op.verb,
+          `rule.${run.rule} reached a ${op.verb} step, and a step that waits on ${op.verb === 'call' ? 'a call' : op.verb === 'script' ? 'a script' : op.verb === 'ask_spark' ? 'Spark' : 'a person'} is not in this build (NOT_IN_THIS_BUILD). The steps before it were taken.`,
+        );
+
+      const acted = act(deps, run.rule, op.verb, fill(step, scope()) as RuleAction, subject, id, actor, subject === null ? last : null);
+      if (!acted.ok) return fail(i, op.verb, acted.say);
+      record(deps, id, i, op.verb, 'done', acted.answer);
+      if (subject) subject = deps.entry(subject.id);
+      if (acted.stop) break;
+      i = saved(i + 1);
     }
-
-    if (op.verb === 'set_var') {
-      const spec = step.set_var as { name: string; to: string };
-      const value = String(fill(spec.to, scope()));
-      if (value.length > VAR_BYTES) return fail(i, 'set_var', `rule.${run.rule} sets ${spec.name} to ${value.length} characters, and one answer holds ${VAR_BYTES}.`);
-      vars[spec.name] = value;
-      if (JSON.stringify(vars).length > VARS_BYTES) return fail(i, 'set_var', `rule.${run.rule}'s answers passed ${VARS_BYTES} characters at step ${i + 1}.`);
-      record(deps, id, i, 'set_var', 'done', value);
-      i++;
-      continue;
-    }
-
-    if (op.verb === 'call' || op.verb === 'script' || op.verb === 'ask_spark' || op.verb === 'ask_person')
-      return fail(
-        i,
-        op.verb,
-        `rule.${run.rule} reached a ${op.verb} step, and a step that waits on ${op.verb === 'call' ? 'a call' : op.verb === 'script' ? 'a script' : op.verb === 'ask_spark' ? 'Spark' : 'a person'} is not in this build (NOT_IN_THIS_BUILD). The steps before it were taken.`,
-      );
-
-    const acted = act(deps, run.rule, op.verb, fill(step, scope()) as RuleAction, subject, id, actor, subject === null ? last : null);
-    if (!acted.ok) return fail(i, op.verb, acted.say);
-    record(deps, id, i, op.verb, 'done', acted.answer);
-    if (subject) subject = deps.entry(subject.id);
-    if (acted.stop) break;
-    i++;
+  } catch (e) {
+    /* A STEP THAT THROWS IS A STEP THAT FAILED, and the run ends here with a sentence. Left to the drain, the throw walked
+       its retry ladder over a run still `running`, and each attempt took again every step since the last save; the run
+       was never finished, so `pruneRuns` never took it and it held no metered line. What threw in the audit was
+       `{ note: { text } }`, which the lint let through and `fill` could not read, but a driver error or a full disk
+       arrives the same way. */
+    const why = e instanceof Error ? e.message : String(e);
+    return fail(i, program[i]?.verb ?? 'step', `rule.${run.rule} broke at step ${i + 1}: ${why}`);
   }
 
   finish(deps, { ...run, step: i }, 'done', null, vars);

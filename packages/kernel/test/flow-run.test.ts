@@ -317,3 +317,188 @@ test('A RUN STARTED BY A RULE WRITE ONLY WHERE from_rules SAYS SO, and the chain
   assert.deepEqual(runs(sql, 'echo').map((r) => r.depth), [1, 2, 3]);
   sql.close();
 });
+
+/* ── audit thirty-three: sections 1, 4 and 5 ─────────────────────────── */
+
+test('A STEP THAT THROWS FAILS THE RUN WITH A SENTENCE, and nothing it already did is done again', async () => {
+  /* `loop/research-batch-thirty-three-audit.md` §1, `f6.mts`. A throw left `advance` for the drain's ladder, the run
+     stayed `running` at the step it had saved, and the next attempt took every step before the throw again: with a wait
+     first, the wait's row already said `done`, so it parked again and the ladder was reset, and the notify went out
+     every two hours for as long as the probe ran; without one, eight notifies and a run that never ended.
+
+     THE BODY IS WRITTEN UNDER THE LINT, straight into the declaration row, because what is under test is a throw from
+     any step (a driver error, a full disk, a bug) and not the one malformed shape the audit happened to find. At HEAD
+     `{ note: { text } }` also installed through the front door, and a lint that refuses it would not change this. */
+  const on = { written: { register: 'paid', op: ['create'] } };
+  const { k, sql, clock } = await record(
+    rule({ rule: 'chase', on, once_per: ['entry'], steps: [{ wait: '1h' }, { notify: { say: 'Chase {{merchant}}' } }, { note: 'x' }] }),
+    rule({ rule: 'nag', on, once_per: ['entry'], steps: [{ notify: { say: 'Nag {{merchant}}' } }, { note: 'x' }] }),
+  );
+  for (const [id, list] of [
+    ['rule.chase', [{ wait: '1h' }, { notify: { say: 'Chase {{merchant}}' } }, { note: { text: 'x' } }]],
+    ['rule.nag', [{ notify: { say: 'Nag {{merchant}}' } }, { note: { text: 'x' } }]],
+  ] as const)
+    sql.exec("UPDATE declaration SET body = json_set(body, '$.steps', json(?)) WHERE id = ?", JSON.stringify(list), id);
+
+  value(k.create('paid', { merchant: 'Acme' }, { actor: 'p_1' }));
+  await k.drain();
+  for (let h = 0; h < 12; h++) {
+    clock.advance(HOUR);
+    await k.drain();
+  }
+
+  assert.deepEqual(notes(sql, 'rule:chase'), ['Chase Acme'], 'the notify before the throw was sent again');
+  assert.deepEqual(notes(sql, 'rule:nag'), ['Nag Acme'], 'the notify before the throw was sent again');
+  for (const name of ['chase', 'nag']) {
+    const all = runs(sql, name);
+    assert.deepEqual(all.map((r) => r.state), ['failed'], `rule.${name}'s run did not end`);
+    assert.match(all[0]!.say ?? '', /step \d/, 'a failed run says where it failed');
+    assert.equal(steps(sql, all[0]!.id).at(-1)?.state, 'failed');
+  }
+  assert.equal(
+    sql.one("SELECT 1 AS x FROM schedule WHERE kind = 'rule' AND key LIKE 'flow.run:%' AND state != 'done'"),
+    undefined,
+    'a run row is still armed',
+  );
+  sql.close();
+});
+
+test('A RUN WHOSE SAVED STEP IS A WAIT ALREADY DONE DOES NOT WAIT AGAIN', async () => {
+  /* THE STATE §1 LEFT BEHIND: the wait's own row `done` and the run's `step` still pointing at it, which is what a run
+     that died after its wake and before its step was saved looks like. The wait arm read only `waiting` as the wake,
+     so it parked the run for the whole span again. */
+  const { k, sql, clock } = await record(rule({ rule: 'woke', on: { manual: true }, steps: [{ wait: '1h' }, { notify: { say: 'after' } }] }));
+  const { run } = value<{ run: string }>(k.automationRun('woke', 'p_1'));
+  await k.drain();
+  assert.equal(runs(sql, 'woke')[0]?.state, 'waiting');
+  sql.exec("UPDATE automation_step SET state = 'done' WHERE run = ? AND n = 0", run);
+  sql.exec("UPDATE automation_run SET state = 'running' WHERE id = ?", run);
+
+  clock.advance(HOUR);
+  await k.drain();
+  assert.deepEqual(notes(sql, 'rule:woke'), ['after'], 'a wait that was done was armed again');
+  assert.equal(runs(sql, 'woke')[0]?.state, 'done');
+  sql.close();
+});
+
+/** §4's rule: a wait, then a write and a notify, about an obligation. */
+const CHASED = {
+  rule: 'chased',
+  on: { written: { register: 'obligations', op: ['create'] } },
+  once_per: ['entry'],
+  steps: [{ wait: '1h' }, { set: { field: 'note', to: 'chased' } }, { notify: { say: 'Chased {{what}}' } }],
+};
+
+test('SWITCHING AN AUTOMATION OFF CANCELS THE RUN THAT WAITS, in the install that switches it', async () => {
+  /* §4, `flow.mts off`, line one. `enabled: false` landed as version 2 and the run pinned to version 1 woke, wrote
+     `chased` and notified: nothing after `startRun` asked whether the rule was still on. */
+  const { k, sql, clock } = await record(rule(CHASED));
+  const made = value<Entry>(k.create('obligations', { what: 'Rent' }, { actor: 'p_1' }));
+  await k.drain();
+  assert.equal(runs(sql, 'chased')[0]?.state, 'waiting');
+
+  const off = await k.install([rule({ ...CHASED, enabled: false })]);
+  assert.ok(off.ok, why(off));
+  assert.equal(runs(sql, 'chased')[0]?.state, 'cancelled', 'the install that switched the rule off left its run waiting');
+  assert.match(runs(sql, 'chased')[0]?.say ?? '', /switched off/);
+
+  clock.advance(2 * HOUR);
+  await k.drain();
+  assert.equal(runs(sql, 'chased')[0]?.state, 'cancelled');
+  assert.equal(k.get(made.id)?.fields.note, undefined, 'a switched-off rule wrote to the row');
+  assert.deepEqual(notes(sql, 'rule:chased'), []);
+  sql.close();
+});
+
+test('RETIRING AN AUTOMATION CANCELS THE RUN THAT WAITS, in the same transaction', async () => {
+  /* §4, `flow.mts off`, line two. */
+  const { k, sql, clock } = await record(rule(CHASED));
+  const made = value<Entry>(k.create('obligations', { what: 'Rent' }, { actor: 'p_1' }));
+  await k.drain();
+  value(k.retire(['rule.chased'], { actor: 'p_1' }));
+  assert.equal(runs(sql, 'chased')[0]?.state, 'cancelled', 'the retire left its run waiting');
+  assert.match(runs(sql, 'chased')[0]?.say ?? '', /retired/);
+
+  clock.advance(2 * HOUR);
+  await k.drain();
+  assert.equal(k.get(made.id)?.fields.note, undefined, 'a retired rule wrote to the row');
+  assert.deepEqual(notes(sql, 'rule:chased'), []);
+  sql.close();
+});
+
+test('A RUN THAT WAKES UNDER A RULE NOTHING KEEPS LIVE IS CANCELLED, whoever took the rule off', async () => {
+  /* A PACK TURNED OFF RETIRES ITS RULES IN `declare.ts`, which is not the kernel's `retire`, and a record written by an
+     earlier build may hold a run of a rule already gone. So the runner asks again at every wake, and this retires the
+     row under it to prove that the question is asked there and not only by `retire`. */
+  const { k, sql, clock } = await record(rule(CHASED));
+  const made = value<Entry>(k.create('obligations', { what: 'Rent' }, { actor: 'p_1' }));
+  await k.drain();
+  sql.exec("UPDATE declaration SET retired = 1 WHERE id = 'rule.chased'");
+
+  clock.advance(2 * HOUR);
+  await k.drain();
+  assert.equal(runs(sql, 'chased')[0]?.state, 'cancelled', 'a run woke and acted for a rule that is retired');
+  assert.equal(k.get(made.id)?.fields.note, undefined);
+  assert.deepEqual(notes(sql, 'rule:chased'), []);
+  sql.close();
+});
+
+test("A PACK'S INSTALL THAT SWITCHES AN AUTOMATION OFF CANCELS ITS WAITING RUN AS WELL, in the write it stages", async () => {
+  /* EVERY PACK INSTALL AND PACK UPGRADE COMES THROUGH `stageInstall`, not `install`, and the first form of this fix
+     cancelled only in `install`: a pack version shipping `enabled: false` left the run showing `waiting` for its whole
+     span, and only the check at the wake stopped it. */
+  const { k, sql } = await record(rule(CHASED));
+  value(k.create('obligations', { what: 'Rent' }, { actor: 'p_1' }));
+  await k.drain();
+  const staged = await k.stageInstall([rule({ ...CHASED, enabled: false })]);
+  assert.ok(staged.ok, why(staged));
+  value(staged.value() as never);
+  assert.equal(runs(sql, 'chased')[0]?.state, 'cancelled', 'the staged install that switched the rule off left its run waiting');
+  sql.close();
+});
+
+test('A PLAIN EDIT KEEPS THE RUN ON THE VERSION IT STARTED UNDER', async () => {
+  /* WHAT MIGRATION 11 PROMISES, held beside the three cancellations above so that none of them is made by cancelling
+     every run whose version is no longer the live one. */
+  const { k, sql, clock } = await record(rule(CHASED));
+  const made = value<Entry>(k.create('obligations', { what: 'Rent' }, { actor: 'p_1' }));
+  await k.drain();
+  const edit = await k.install([rule({ ...CHASED, steps: [{ wait: '1h' }, { notify: { say: 'Edited {{what}}' } }] })]);
+  assert.ok(edit.ok, why(edit));
+
+  clock.advance(2 * HOUR);
+  await k.drain();
+  assert.equal(runs(sql, 'chased')[0]?.state, 'done');
+  assert.equal(k.get(made.id)?.fields.note, 'chased');
+  assert.deepEqual(notes(sql, 'rule:chased'), ['Chased Rent']);
+  sql.close();
+});
+
+test('AN ARRIVAL NOTHING VERIFIED STARTS NO AUTOMATION, so five forged posts do not spend the day', async () => {
+  /* §5, `flow.mts unverified`. Five posts with a wrong token each started a run and wrote the sender's text into a
+     note, and the owner's real message that followed started nothing, because `runs_per_day` was spent. */
+  const { k, sql } = await record(
+    rule({ rule: 'heard', on: { arrival: { channel: 'webhook' } }, limits: { runs_per_day: 5 }, steps: [{ notify: { say: 'Arrived: {{trigger.body.msg}}' } }] }),
+  );
+  for (let i = 0; i < 5; i++)
+    value(k.arrive({ channel: 'webhook', body: JSON.stringify({ msg: `forged ${i}` }), sha256: `forged${i}`, verified: false }));
+  value(k.arrive({ channel: 'webhook', body: JSON.stringify({ msg: 'real' }), sha256: 'real', verified: true }));
+  await k.drain();
+  assert.deepEqual(notes(sql, 'rule:heard'), ['Arrived: real'], 'an unverified arrival started a run');
+  assert.equal(runs(sql, 'heard').length, 1);
+  sql.close();
+});
+
+test('A RULE THAT ASKS FOR unverified: true HEARS THE ARRIVALS NOTHING VERIFIED, and the lint reads the word', async () => {
+  const { k, sql } = await record(
+    rule({ rule: 'bad_tokens', on: { arrival: { channel: 'webhook', unverified: true } }, steps: [{ notify: { say: 'Bad token: {{trigger.verified}}' } }] }),
+  );
+  value(k.arrive({ channel: 'webhook', body: 'hello', sha256: 'u1', verified: false }));
+  await k.drain();
+  assert.deepEqual(notes(sql, 'rule:bad_tokens'), ['Bad token: false']);
+
+  const wrong = await k.install([rule({ rule: 'odd', on: { arrival: { unverified: 'yes' } }, steps: [{ notify: { say: 'x' } }] })]);
+  const refusal = (wrong as { refusal?: { code: string; at?: string } }).refusal;
+  assert.deepEqual([refusal?.code, refusal?.at], ['DECLARATION_INVALID', 'on.arrival.unverified']);
+  sql.close();
+});

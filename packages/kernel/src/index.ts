@@ -132,6 +132,7 @@ import { CREATE_CEILING, applyRule, dryRun, marker, runRules, type Applied as Ru
 import {
   advance as advanceRun,
   cancelRun,
+  cancelRunsOf,
   clockKey,
   firstDue,
   installed as installedFlows,
@@ -4700,7 +4701,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       }
       /* AN AUTOMATION ON ARRIVALS IS STARTED HERE, after the arrival committed and in a transaction of its own, for the
          reason `3′` above gives: the bytes are the record's memory, and nothing an automation does may roll them
-         back. Every state starts one, matched or not, and a redelivery starts none (`onArrival`). */
+         back. Every state starts one, matched or not, and a redelivery starts none (`onArrival`); an arrival nothing
+         verified starts one only for a rule that says `unverified: true`. */
       if (out.ok && !out.value.redelivered) {
         const flows = installedFlows(sql);
         if (flows.some((f) => triggerOf(f.body) === 'arrival'))
@@ -4711,6 +4713,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
               ingest: out.value.ingest,
               state: out.value.state,
               wrote: out.value.wrote,
+              /* ABSENT IS VERIFIED, as `Arrival.verified` says: only a public door can answer the question at all. */
+              verified: arrival.verified !== false,
             }),
           );
       }
@@ -5717,6 +5721,12 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         transaction(() => {
           const done = fn() as Result<Installed[]>;
           if (done.ok) declared(done.value, by);
+          /* A VERSION THAT SAYS `enabled: false` STOPS THE RUNS ALREADY GOING, in the transaction that installs it. A
+             plain edit leaves them on the version they started under. `cancelRunsOf` reads the body now live rather than
+             the batch, and an install that rolls back takes its cancellations with it. */
+          if (done.ok)
+            for (const d of batch)
+              if (d.kind === 'rule' && (d.body as { enabled?: unknown }).enabled === false) cancelRunsOf(flowDeps(), d.id.slice('rule.'.length));
           return done as T;
         });
       const out = await installDeclarations(sql, clock.now(), batch, recorded, expect);
@@ -5768,6 +5778,16 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
            got a refusal and the schedule held a `digest` row for a declaration that does not exist.
            It fires once, finds nothing, and goes `done`. */
         if (out.ok) armDerived(batch);
+        /* AND A PACK VERSION THAT SAYS `enabled: false` STOPS THE RUNS ALREADY GOING, as `install` does. Every pack
+           install and upgrade comes through here and not through `install`, and cancelling only there left a pack's
+           switched-off rule showing its run `waiting` for the whole span. AFTER THE WRITE AND NOT AROUND IT: wrapping
+           `staged.value` in a transaction would make its own a nested no-op, and a `UniqueClash` it turns into a
+           refusal would then keep the rows written before the clash. */
+        if (out.ok)
+          transaction(() => {
+            for (const d of batch)
+              if (d.kind === 'rule' && (d.body as { enabled?: unknown }).enabled === false) cancelRunsOf(flowDeps(), d.id.slice('rule.'.length));
+          });
         return out;
       });
     },
@@ -5803,6 +5823,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           return hit ? [{ id, version: hit.version }] : [];
         });
         const done = retireDeclarations(sql, ids, transaction);
+        /* A RETIRED AUTOMATION'S RUNS END WITH IT, in this transaction (audit thirty-three §4): a run of the retired
+           rule woke an hour later, wrote to its row and notified, because nothing after `startRun` asked. */
+        if (done.ok) for (const one of live) if (one.id.startsWith('rule.')) cancelRunsOf(flowDeps(), one.id.slice('rule.'.length));
         /* UNDER A SUGGESTION IT NAMES WHO PROPOSED IT, as `declared` does for an install. */
         const proposer = by?.suggestion === undefined ? undefined : sql.one<{ by: string }>('SELECT opened_by AS by FROM suggestion WHERE id = ?', by.suggestion)?.by;
         const note = proposer === undefined ? 'Retired.' : `Retired. Proposed by ${proposer} in ${by!.suggestion}.`.slice(0, 280);
