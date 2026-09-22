@@ -83,6 +83,7 @@ import {
   slugify,
   SPARK,
   looksLikeCredential,
+  rowRegisterOf,
   scriptBody,
 } from '@braindog/kernel';
 import { parseWhere, type Predicate } from '@braindog/where';
@@ -1668,6 +1669,111 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
+   * The rule that opened an `options` question, and the list whose row its question is about, or `null` for a question
+   * no rule opened.
+   *
+   * A RULE'S QUESTION IS FILLED FROM ITS ROW AND NAMED NO LIST. `ask_person` fills `{{what}}` and `{{trigger.row.…}}` and
+   * files the result as an `options` body carrying the run and the step, and `holds` sent a body that names no list to
+   * every whole-record reader. `loop/research-batch-thirty-seven-audit.md` finding 1: a member at `decide` with Money held
+   * to `append`, refused `list money`, read "Pay Salary: Omar, 91000" in `governance` and `whatsNew`. The kernel's `ask`
+   * does not put the list on the body, so the list is found where the kernel already keeps it: the run's own row, whose
+   * trigger names the list of a written row and of the row an arrival wrote. A run pruned after its ninety days leaves the
+   * rule, whose row list is `rowRegisterOf`'s answer, and the same answer places a rule's inline `suggest`, which fills
+   * its question from the row in the same way and carries no run at all.
+   *
+   * `opened_by` IS WHAT MAKES IT THE RULE'S. The gate lets a proposer put any `run` on an options body; only the rule's own
+   * `propose` signs `rule:<name>`, and a run is believed only when its rule is the one that signed. A body naming a run
+   * of another rule is somebody else's question and is read as naming no list.
+   */
+  const ruleAsked = (row: Record<string, unknown>): { rule: string; run: { id: string; version: number } | null; list: string | null } | null => {
+    if (row.body_kind !== 'options' || typeof row.opened_by !== 'string' || !row.opened_by.startsWith('rule:')) return null;
+    const rule = row.opened_by.slice('rule:'.length);
+    const body = row.body as Record<string, unknown> | undefined;
+    if (typeof body?.run === 'string') {
+      const run = sql.one<{ rule: string; version: number; trigger: string }>('SELECT rule, version, trigger FROM automation_run WHERE id = ?', body.run);
+      if (run && run.rule !== rule) return null;
+      if (run) {
+        const said = JSON.parse(run.trigger) as { register?: unknown };
+        return { rule, run: { id: body.run, version: run.version }, list: typeof said.register === 'string' ? said.register : null };
+      }
+    }
+    const newest = (id: string): unknown => {
+      const found = sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? ORDER BY version DESC LIMIT 1', id)?.body;
+      return found === undefined ? undefined : JSON.parse(found);
+    };
+    const decl = newest(`rule.${rule}`);
+    if (decl === undefined) return { rule, run: null, list: null };
+    return { rule, run: null, list: rowRegisterOf(decl as Parameters<typeof rowRegisterOf>[0], (door) => newest(`ingest.${door}`)) };
+  };
+
+  /**
+   * Why this caller may not answer a question a run is waiting on, or `null` when they may.
+   *
+   * AN ANSWER IS THE LAST THING BETWEEN A PERSON AND THE RULE'S WRITES, SO IT NEEDS WHAT THEY NEED. In the audit the member
+   * at `append` on Money picked `pay`, and the run's next step set `note` on the Money row, signed by the rule: a change
+   * her own level refuses her by hand. So the answerer is held to every write the rule's steps can make: a field, a tag,
+   * a move or a link on the run's row needs `write` on its list, a note on it and a new row anywhere need `append`. Every
+   * branch is counted, the one her answer would not take included: which arm an answer takes is the `if`'s to evaluate
+   * once the run wakes, against the row as it is then, and this does not guess it ahead. Closing the question or putting
+   * it off is not held to this, because neither lets the run write.
+   */
+  const answersNot = (ctx: CallContext, asked: { rule: string; run: { id: string; version: number } | null; list: string | null }): Refusal | null => {
+    if (asked.run === null) return null;
+    const found = sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND version = ? AND kind = 'rule'", `rule.${asked.rule}`, asked.run.version)?.body;
+    if (found === undefined) return null;
+    const decl = JSON.parse(found) as Record<string, unknown>;
+    const needs: { need: Need; list: string; does: string }[] = [];
+    const walk = (steps: unknown, depth: number): void => {
+      if (!Array.isArray(steps) || depth > SAID_DEPTH) return;
+      for (const step of steps) {
+        if (step === null || typeof step !== 'object' || Array.isArray(step)) continue;
+        const s = step as Record<string, unknown>;
+        walk(s.then, depth + 1);
+        walk(s.else, depth + 1);
+        if (asked.list !== null) {
+          for (const verb of ['set', 'tag', 'untag', 'move', 'link'])
+            if (verb in s) needs.push({ need: 'write', list: asked.list, does: `change a row of ${listName(asked.list)}` });
+          if ('note' in s) needs.push({ need: 'append', list: asked.list, does: `add a note to a row of ${listName(asked.list)}` });
+        }
+        const into = (s.create as { register?: unknown } | undefined)?.register;
+        if (typeof into === 'string') needs.push({ need: 'append', list: into, does: `add a row to ${listName(into)}` });
+      }
+    };
+    walk(decl.steps ?? decl.then, 0);
+    for (const n of needs) {
+      const stop = guard(ctx, n.need, n.list);
+      if (stop) return { ...stop, fix: `Answering this lets rule.${asked.rule} ${n.does}, which you may not do yourself. ${stop.fix}`, at: 'id' };
+    }
+    return null;
+  };
+
+  /**
+   * The fields of a list a script is never told about, `secret` and `list<secret>`, as the host's `sealedOf` names them.
+   * A trial keeps the scheduled run's rules (`scriptTry`), and these three are those rules.
+   */
+  const sealedOf = (register: string): Set<string> =>
+    new Set((kernel.register(register)?.fields ?? []).filter((f) => f.type === 'secret' || (f.type === 'list' && f.of === 'secret')).map((f) => f.id));
+
+  /** One row as a script is handed it: every field but a secret. The host's `unsealed`. */
+  const unsealed = (row: Entry): Entry => {
+    const sealed = sealedOf(row.register);
+    if (sealed.size === 0) return row;
+    return { ...row, fields: Object.fromEntries(Object.entries(row.fields).filter(([id]) => !sealed.has(id))) };
+  };
+
+  /** The first sealed field a filter names anywhere in its tree, or `null`. The host's `namesSealed`. */
+  const namesSealed = (where: unknown, sealed: Set<string>): string | null => {
+    if (where === null || typeof where !== 'object') return null;
+    const node = where as Record<string, unknown>;
+    if (typeof node.field === 'string' && sealed.has(node.field)) return node.field;
+    for (const value of Object.values(node)) {
+      const found = namesSealed(value, sealed);
+      if (found !== null) return found;
+    }
+    return null;
+  };
+
+  /**
    * Whether a governance row is about a register this caller cannot reach.
    *
    * ONLY A `rowset` NAMES ONE. An `options` body is a question and its answers, a `pattern` is a
@@ -1699,7 +1805,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const body = row.body as Record<string, unknown> | undefined;
     /* EVERY BODY THAT NAMES A REGISTER, not only a `rowset`. A `pattern` carries a whole ingest
        declaration with `writes.register` on it and a `change` carries a `declaration_id`; both name
-       a register and both used to pass unfiltered while the one that carries ROWS was filtered. */
+       a register and both used to pass unfiltered while the one that carries ROWS was filtered. An `options` question a
+       rule opened is about its row, and names that row's list through `ruleAsked` (audit thirty-seven, finding 1). */
     const named =
       row.body_kind === 'rowset'
         ? body?.register
@@ -1708,7 +1815,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             (body?.ingest as { writes?: { register?: unknown } } | undefined)?.writes?.register)
           : row.body_kind === 'change' && String(body?.declaration_id ?? '').startsWith('register.')
             ? String(body?.declaration_id).slice('register.'.length)
-            : undefined;
+            : (ruleAsked(row)?.list ?? undefined);
     /* AND IT IS THE LEVEL, NOT ONLY THE CEILING. This asked `reaches`, so a `rowset` over a register
        somebody may only append to came back to them with every field value in it. */
     /* A PLAN'S ROWS name their lists one row at a time, and the whole question is held back when any is out of reach. */
@@ -3349,8 +3456,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      *
      * PROPOSE, AS FILING ONE IS, because a trial is what an agent does before it proposes. The body meets the kernel's own
      * `scriptBody`, the check an install runs, so a draft the record could never hold is refused here and never run; and
-     * the reads it is handed are this record's `list` and `get` with the caller's own context, so a trial reads what
-     * its caller may and nothing more. `owner` tells the host whether it may open a key for it.
+     * the reads it is handed are this record's `list` and `get` under the caller's own context narrowed to the body's
+     * `reads:`, with secret fields kept out, so a trial reads no more than its caller may and no more than its run will.
+     * `owner` tells the host whether it may open a key for it.
      */
     async scriptTry(args: { body?: unknown; input?: unknown } | undefined, ctx: CallContext) {
       const stop = guard(ctx, 'propose');
@@ -3364,16 +3472,33 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const bad = scriptBody({ id: `script.${String(b.script)}`, body: b });
       if (bad) return { ok: false as const, refusal: bad };
       if (!deps.tryScript) return no('NOT_IN_THIS_BUILD', 'This BrainDog cannot try a script yet, so nothing ran. Propose it, and the owner reads the source in Decide.');
+      /* THE RUN'S READS, WITH THE CALLER'S AS A FURTHER LIMIT (audit thirty-seven, finding 4). These were the caller's
+         `list` and `get` and nothing else, while a scheduled run reads through the host's `scriptReads`: held to the
+         body's `reads:`, a secret field off every row, a filter on one refused. The audit tried one source by a propose
+         token and then ran it on its clock: the trial listed Acme's grant id, read `seen#1` outside `reads:` and answered
+         a filter on the secret, and the run read none of the three. So the ceiling is narrowed to the lists the body
+         reads, and every rule `scriptReads` keeps is kept here in its words, since the record cannot import the host.
+         `packages/record/test/script-try-reads.test.ts` asks both the same questions and fails the day they part. */
+      const declared = (Array.isArray(b.reads) ? b.reads : []).filter((r): r is string => typeof r === 'string');
+      const ceiling = ctx.registers === undefined || ctx.registers === '*' ? declared : declared.filter((r) => (ctx.registers as readonly string[]).includes(r));
+      const as: CallContext = { ...ctx, registers: ceiling };
+      const script = String(b.script);
       const reads = {
         list: async (register: string, where: unknown) => {
-          const page = await this.list({ register, ...(where === null ? {} : { where }) } as never, ctx);
+          if (where !== null && (typeof where !== 'object' || Array.isArray(where)))
+            throw new Error(
+              `${script} filtered ${register} with ${JSON.stringify(where)}, and a script filters with a predicate tree, such as {"field":"name","is":"Acme"}, so nothing was read.`,
+            );
+          const field = namesSealed(where, sealedOf(register));
+          if (field !== null) throw new Error(`${script} filtered ${register} on ${field}, which is a secret, and a script may not ask what a secret field holds.`);
+          const page = await this.list({ register, ...(where === null ? {} : { where }) } as never, as);
           if (!page.ok) throw new Error(fixOf(page));
-          return page.value.rows;
+          return page.value.rows.map(unsealed);
         },
         get: async (spoken: string) => {
-          const row = await this.get({ spoken } as never, ctx);
+          const row = await this.get({ spoken } as never, as);
           if (!row.ok) throw new Error(fixOf(row));
-          return row.value;
+          return row.value === null ? null : unsealed(row.value);
         },
       };
       const who = kernel.identity();
@@ -3862,7 +3987,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (stop) return { ok: false as const, refusal: decidesNot(ctx, stop) };
       if (!args?.id) return no('REQUIRED_MISSING', 'Which suggestion?', { at: 'id' });
       /* A HANDLE IS TAKEN AS THE NUMBER IT NAMES, before anything reads the id, as `governance` takes one. */
-      args = { ...args, id: spokenIn(String(args.id)) };
+      const given = String(args.id);
+      args = { ...args, id: spokenIn(given) };
+      /* A QUESTION YOU MAY NOT SEE IS ONE YOU MAY NOT ANSWER, and it is answered as a missing one is, in the words the
+         kernel uses and with the id as the caller gave it. No suggestion asked this before audit thirty-seven: the
+         member held to `append` on Money read the run's question nowhere she was entitled to, decided it by its number,
+         and woke the run. Not through `settledAs`, which would swap the number for the question's handle and so say
+         that it exists. */
+      const target = kernel.governanceRow('suggestion', String(args.id));
+      if (target && holds(ctx, target)) return no('OUT_OF_BOUNDS', `There is no suggestion called ${given}.`, { at: 'id' });
+      const run = target && args.decide !== undefined ? ruleAsked(target) : null;
+      const answering = run ? answersNot(ctx, run) : null;
+      if (answering) return { ok: false as const, refusal: answering };
       /* NO VERDICT IS A MISSING ANSWER, NOT A BAD ONE. With none of the three it fell through to the
          resolve branch and was refused "undefined is not a way to resolve one". */
       if (args.decide === undefined && args.defer === undefined && args.resolved_as === undefined)
