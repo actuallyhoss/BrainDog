@@ -14,6 +14,10 @@
  * the owner on a fifty-minute-old proof `a stale owner session opened the key: 200`. The operator-key case passed before
  * and after, which is its job: it is the line the repair must not cross.
  *
+ * THE OWNER'S OWN ASKS ARE SIGNED BY HER SINCE, and were a `todo` here until the included model was built per ask. With
+ * the engine's one adapter her read left `grant.read ["system"]`; with `sparkAskerEngine`'s two call sites put back to the
+ * old two-argument calls, both her read and her propose go red again, which is how the pair was checked.
+ *
  * THE SAME STACK AS `spark-byok-guard.test.ts`, WITH `key` LEFT OUT OF THE SPARK CONFIG, because that one omission is the
  * whole premise: with an operator key the included model never touches the vault, and the last case here says so.
  *
@@ -268,24 +272,33 @@ test("§2: THE OWNER ON A FRESH PROOF STILL READS ON THE spark KEY, and on a sta
   }
 });
 
-test(
-  "§2: THE OWNER'S OWN READ IS SIGNED BY HER AND NOT BY system",
-  {
-    todo:
-      'The included model is built once with no asker (`sparkEngineFor` in apps/selfhost/src/spark.ts), and the package calls `complete` with no context, so the gate holds and the log still says system.',
-  },
-  async () => {
-    const s = await stack();
-    try {
-      const ada = s.plant(s.owner);
-      await s.put(ada, 'spark');
-      assert.equal((await s.call('/api/spark/read', ada, ASK)).status, 200);
-      assert.deepEqual(s.reads(), [s.owner]);
-    } finally {
-      await s.close();
-    }
-  },
-);
+test("§2: THE OWNER'S OWN READ IS SIGNED BY HER AND NOT BY system", async () => {
+  const s = await stack();
+  try {
+    const ada = s.plant(s.owner);
+    const { value } = await s.put(ada, 'spark');
+    assert.equal((await s.call('/api/spark/read', ada, ASK)).status, 200);
+    assert.deepEqual(s.reads(), [s.owner], 'the grant.read was not signed by the asker');
+    assert.ok(s.sent.length === 1 && s.bearer(s.sent[0]!) === `Bearer ${value}`, "the read did not go out once, on the spark key");
+  } finally {
+    await s.close();
+  }
+});
+
+test("§2: AND HER OWN PROPOSE, WHICH DRAFTS AND PROPOSES ON THE spark KEY ON TIER a, IS SIGNED BY HER TWICE", async () => {
+  const s = await stack();
+  try {
+    const ada = s.plant(s.owner);
+    const { value } = await s.put(ada, 'spark');
+    const out = await s.call('/api/spark/propose', ada, ASK);
+    assert.equal(out.status, 200, out.raw);
+    assert.deepEqual(s.reads(), [s.owner, s.owner], 'a grant.read of the propose was not signed by the asker');
+    assert.ok(s.sent.length === 2 && s.sent.every((init) => s.bearer(init) === `Bearer ${value}`), 'the propose did not go out twice, on the spark key');
+    assert.ok(!out.raw.includes(value), 'the key came back in the answer');
+  } finally {
+    await s.close();
+  }
+});
 
 test('§2: WITH AN OPERATOR KEY THE GATE STANDS NOWHERE, since the included model never touches the vault', async () => {
   const s = await stack(true);

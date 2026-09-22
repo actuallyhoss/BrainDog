@@ -468,10 +468,9 @@ const hostKeyedFromVault = (config: SparkHostConfig, grants: () => readonly { la
  * `serveSpark` reads to refuse a READ as well as a propose. A refusal about tier `b`'s own grant alone does not carry it,
  * because a read on an operator's key opens nothing of the owner's and a colleague may ask it.
  *
- * WHAT THIS DOES NOT DO IS SIGN THE INCLUDED MODEL'S `grant.read` WITH THE ASKER. That engine is built once per host with no
- * asker, and `@braindog/spark` calls `complete` with no context to carry one, so the owner's own fresh read is still logged
- * `system`. The gate is what keeps anybody else from reaching the key; the log line needs the app to build that inference
- * per asker, and the test file above keeps the case as a `todo` until it does.
+ * WHAT THIS DOES NOT DO IS SIGN THE INCLUDED MODEL'S `grant.read` WITH THE ASKER. The gate is what keeps anybody else from
+ * reaching the key; the log line is `sparkAskerEngine`'s, below, which each app's door wraps its engine in so the included
+ * model is built per ask, for the asker, and handed to `read` and `propose` as an argument.
  *
  * `undefined` WHERE NOTHING OF THE OWNER'S WOULD BE OPENED: tier `a` (from `sparkGrantIdOf`) on an operator key or a keyless
  * endpoint, and tier `a` on the vault's key once the gate has let the asker through.
@@ -489,8 +488,39 @@ export async function sparkByokFor<A extends SparkVaultApi>(
   const gate = await api.listGrants(ctx);
   if (!gate.ok) return hostKey ? { ok: false, refusal: SPARK_HOST_KEY_CLOSED, hostKey: true } : { ok: false, refusal: SPARK_KEY_CLOSED };
   if (grantId === null) return undefined;
-  const actor = ctx.principal.kind === 'token' ? ctx.principal.person : ctx.principal.id;
-  return sparkByokOf(config, wire(api, actor), grantId);
+  return sparkByokOf(config, wire(api, actorOf(ctx)), grantId);
+}
+
+/** Who a `grant.read` is signed by for this caller: the person behind a token, and the principal's own id otherwise. */
+const actorOf = (ctx: CallContext): string => (ctx.principal.kind === 'token' ? ctx.principal.person : ctx.principal.id);
+
+type Asked = {
+  read(question: string, ctx: CallContext, inference?: SparkInference): Promise<Result<unknown>>;
+  propose(question: string, ctx: CallContext, byok?: unknown, askId?: string, inference?: SparkInference): Promise<Result<unknown>>;
+};
+
+/**
+ * The engine a door holds, with this host's own model built for the asker on every `read` and `propose`.
+ *
+ * THE INCLUDED MODEL IS BUILT ONCE PER HOST, WITH NOBODY ASKING, SO EVERY `grant.read` IT MADE WAS SIGNED `system`. Where
+ * there is no `SPARK_KEY` that model is keyed with the vault's `spark` grant (`endpointOptionsOf`), and measured in
+ * `apps/selfhost/test/spark-included-guard.test.ts` the owner's own fresh read left `grant.read ["system"]`, so the vault's
+ * log could not tell her asks from a scheduled one. `sparkByokFor`'s gate already kept everybody else off that key; this
+ * is the log line.
+ *
+ * `inferenceFor` IS BUILT PER CALL AND HANDED IN AS AN ARGUMENT, never kept. `@braindog/spark`'s `read` and `propose` take
+ * it for that one ask, which is the only shape that holds with two asks in flight: a slot set around the call is shared by
+ * both, and a colleague's read would open the key in the owner's name, or the other way about. `AsyncLocalStorage` would
+ * scope it, and the Worker has not got it. Each app passes its own `wireOf(..., actor)`, the same wire `sparkByokFor`
+ * signs tier `b`'s key with, so the two openings a propose may make are signed alike.
+ *
+ * `Object.create`, AS `sparkNamedEngine` DOES, so `status` and `configure` stay the wrapped engine's own.
+ */
+export function sparkAskerEngine<E extends Asked>(engine: E, inferenceFor: (actor: string) => SparkInference | undefined): E {
+  const asked = Object.create(engine) as E;
+  asked.read = (question, ctx) => engine.read(question, ctx, inferenceFor(actorOf(ctx)));
+  asked.propose = (question, ctx, byok, askId) => engine.propose(question, ctx, byok, askId, inferenceFor(actorOf(ctx)));
+  return asked;
 }
 
 /**
@@ -525,8 +555,8 @@ const SPARK_GRANT_KIND = 'api_token';
 
 type Guarded = {
   status(): unknown;
-  read(question: string, ctx: CallContext): Promise<Result<unknown>>;
-  propose(question: string, ctx: CallContext, byok?: unknown, askId?: string): Promise<Result<unknown>>;
+  read(question: string, ctx: CallContext, inference?: SparkInference): Promise<Result<unknown>>;
+  propose(question: string, ctx: CallContext, byok?: unknown, askId?: string, inference?: SparkInference): Promise<Result<unknown>>;
   configure(patch: Record<string, unknown>, ctx: CallContext): Result<unknown>;
 };
 
@@ -551,34 +581,46 @@ type Guarded = {
  * exposes no count by tier and changing that is an edit to `packages/spark`. `status()` is corrected with the same count,
  * because `23 §8` has a person told what they have used, and on tier `b` that was always 0.
  *
- * A PROPOSE ON A STORED `ask_id` DRAFTS NOTHING, so it is not stopped: its one call is on the owner's key. Any other
- * propose drafts first, on this host, and is held to the cap like a read.
+ * A PROPOSE ON A STORED `ask_id` DRAFTS NOTHING, AND ON TIER `b` ALONE THAT MAKES IT FREE TO THIS HOST: its one call is
+ * on the owner's key. On `byo` the proposal is on `fallback` too, `SPARK_ENDPOINT` with this host's key, because the
+ * settings hold no address of the owner's, so there it is counted and stopped like a draft. This comment once said the
+ * exemption held for both tiers, and measured at `ask_cap: 1` one read and five proposes on its `ask_id` answered 200
+ * five times on six calls to the operator key, with status reading 1 of 1 (`loop/research-batch-thirty-four-audit.md`
+ * §3, `apps/selfhost/test/spark-byo-propose.test.ts`). Any propose with no stored draft drafts first, on this host, and
+ * is held to the cap like a read on either tier.
  */
 export function sparkGuardedEngine<E extends Guarded>(engine: E, deps: SparkGuardDeps): E {
   const tierOf = (): { tier: string; grant_id: string | null; ask_cap: number } | undefined =>
     deps.sql.one<{ tier: string; grant_id: string | null; ask_cap: number }>('SELECT tier, grant_id, ask_cap FROM settings WHERE singleton = 1');
   /* BOTH TIERS IN ONE COUNT, so an owner moving between `b` and `byo` in a month does not start this host's bill again
-     from zero. Tier `a` stays the package's own count, as it was. */
+     from zero. Tier `a` stays the package's own count, as it was. EVERY CALL THIS HOST PAID FOR AND NO OTHER: a draft on
+     either tier, and a proposal on `byo`, whose `propose` row is on this host's key where tier `b`'s is on the owner's.
+     The package's hold rows are `kind = 'propose'` on `byo` too, so a proposal in flight is already in this count. */
   const drafted = (): number =>
     deps.sql.one<{ n: number }>(
-      "SELECT COUNT(*) AS n FROM call WHERE tier IN ('b', 'byo') AND kind = 'read' AND model <> '-' AND ts >= ?",
+      "SELECT COUNT(*) AS n FROM call WHERE (kind = 'read' AND tier IN ('b', 'byo') OR kind = 'propose' AND tier = 'byo') AND model <> '-' AND ts >= ?",
       monthOf(deps.clock.now(), 0),
     )?.n ?? 0;
   const hostDrafted = (tier: string | undefined): boolean => tier !== undefined && HOST_DRAFTED.includes(tier);
   const spent = (askId: string | undefined): Refusal | null => {
     const s = tierOf();
     if (s === undefined || !hostDrafted(s.tier)) return null;
-    if (askId !== undefined && deps.sql.one("SELECT 1 AS n FROM call WHERE id = ? AND kind = 'read' AND predicate IS NOT NULL", askId) !== undefined)
+    if (
+      s.tier === 'b' &&
+      askId !== undefined &&
+      deps.sql.one("SELECT 1 AS n FROM call WHERE id = ? AND kind = 'read' AND predicate IS NOT NULL", askId) !== undefined
+    )
       return null;
     if (drafted() < s.ask_cap) return null;
     const until = monthOf(deps.clock.now(), 1).slice(0, 10);
-    /* TWO SENTENCES, because "before your own key answers it" is false on `byo`: nothing of the owner's is asked there. */
+    /* TWO SENTENCES, because "before your own key answers it" is false on `byo`: nothing of the owner's is asked there,
+       and the proposal is spent from the same count as the read, so the sentence names asks and not reads. */
     return {
       code: 'SPARK_BUDGET_SPENT',
       fix:
         s.tier === 'b'
           ? `Spark reads each question on this host's model before your own key answers it, and those reads are spent until ${until}. Raise the monthly limit, or wait.`
-          : `Spark reads each question on this host's model first, and those reads are spent until ${until}. Raise the monthly limit, or wait.`,
+          : `Spark reads and answers each question on this host's model, and those asks are spent until ${until}. Raise the monthly limit, or wait.`,
     };
   };
 
@@ -588,13 +630,13 @@ export function sparkGuardedEngine<E extends Guarded>(engine: E, deps: SparkGuar
     if (!hostDrafted(tierOf()?.tier) || status?.asks === undefined) return status;
     return { ...status, asks: { ...status.asks, used: drafted() } };
   };
-  guarded.read = (question, ctx) => {
+  guarded.read = (question, ctx, inference) => {
     const stop = spent(undefined);
-    return stop ? Promise.resolve({ ok: false, refusal: stop }) : engine.read(question, ctx);
+    return stop ? Promise.resolve({ ok: false, refusal: stop }) : engine.read(question, ctx, inference);
   };
-  guarded.propose = (question, ctx, byok, askId) => {
+  guarded.propose = (question, ctx, byok, askId, inference) => {
     const stop = spent(askId);
-    return stop ? Promise.resolve({ ok: false, refusal: stop }) : engine.propose(question, ctx, byok, askId);
+    return stop ? Promise.resolve({ ok: false, refusal: stop }) : engine.propose(question, ctx, byok, askId, inference);
   };
   /* A TIER `b` SAVE MUST NAME A KEY THE VAULT HOLDS. `configure` checks a grant id's shape and never the vault, so an id
      that is not there saved with 200 and every propose after it was 403 (`loop/research-batch-thirty-one-audit.md` §5).

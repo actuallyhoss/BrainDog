@@ -167,8 +167,8 @@ type Read = Drafted & {
 };
 
 export type Palette = {
-  read(question: string, ctx: CallContext): Promise<Result<Reading>>;
-  propose(question: string, ctx: CallContext, byok?: Inference, askId?: string): Promise<Result<Proposal>>;
+  read(question: string, ctx: CallContext, inference?: Inference): Promise<Result<Reading>>;
+  propose(question: string, ctx: CallContext, byok?: Inference, askId?: string, inference?: Inference): Promise<Result<Proposal>>;
 };
 
 export const palette = (core: Core, record: RecordApi, fallback: Inference): Palette => {
@@ -178,7 +178,8 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
    * `byo` the proposal does too, since the settings hold no address of the owner's. Only tier `b`'s proposal is on the
    * asker's key. Measured at `ask_cap: 1`: five reads on `b` made five calls on the operator's key
    * (`loop/research-batch-thirty-one-audit.md` §3), and on `byo` the four reads after the first all answered 200
-   * (`apps/selfhost/test/spark-byok-guard.test.ts`, red before the host counted `byo`). The host meters those drafts, in
+   * (`apps/selfhost/test/spark-byok-guard.test.ts`, red before the host counted `byo`). The host meters those drafts and
+   * the `byo` proposal (`apps/selfhost/test/spark-byo-propose.test.ts`), in
    * `packages/host/src/spark.ts` `sparkGuardedEngine`, because the count is of money this package never sees spent.
    */
   const spent = (): Refusal | null => {
@@ -199,7 +200,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
    * budget twice to arrive back at the same few ids. The registers the rows come back under are the
    * index pass 2 needs, and the projection carries them.
    */
-  const look = async (question: string, ctx: CallContext, stored?: Drafted): Promise<Result<Read>> => {
+  const look = async (question: string, ctx: CallContext, host: Inference, stored?: Drafted): Promise<Result<Read>> => {
     let registers: string[];
     let where: Where | null;
     let q: string | null;
@@ -237,7 +238,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
       const ran = await core.run({
         id: 'predicate',
         slots: { '%INDEX%': indexLines(known), '%QUESTION%': question },
-        inference: fallback,
+        inference: host,
       });
       model = ran.model;
       usage = ran.usage;
@@ -328,7 +329,10 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
     return askId;
   };
 
-  const read = async (question: string, ctx: CallContext): Promise<Result<Reading>> => {
+  /* `inference` IS THE HOST'S MODEL FOR THIS ASK ALONE, and `fallback` is what answers when the host hands none. The host
+     keys it for the asker, so the opening of a vault key it makes is signed by them (`types.ts`, `Spark`). It is threaded
+     through as an argument down to the one `core.run` that drafts, and nothing here stores it. */
+  const read = async (question: string, ctx: CallContext, inference?: Inference): Promise<Result<Reading>> => {
     const stop = spent();
     if (stop) return { ok: false, refusal: stop };
 
@@ -341,7 +345,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
        the `ask_id`, on every path that called a model, and is given back on the ones that did not. */
     const held = core.reserve('read', core.settings().tier, PROMPTS.predicate.model);
     try {
-      const looked = await look(asked, ctx);
+      const looked = await look(asked, ctx, inference ?? fallback);
       if (!looked.ok) return looked;
       const it = looked.value;
 
@@ -356,6 +360,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
     ctx: CallContext,
     byok?: Inference,
     askId?: string,
+    inference?: Inference,
   ): Promise<Result<Proposal>> => {
     const stop = spent();
     if (stop) return { ok: false, refusal: stop };
@@ -382,7 +387,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
     const proposing = core.reserve('propose', s0.tier, s0.tier === 'a' ? PROMPTS.propose.model : (s0.model ?? PROMPTS.propose.model));
     const drafting = stored === undefined ? core.reserve('read', s0.tier, PROMPTS.predicate.model) : undefined;
     try {
-      return await pass2(asked, ctx, byok, stored, drafting, proposing);
+      return await pass2(asked, ctx, byok, inference ?? fallback, stored, drafting, proposing);
     } finally {
       if (drafting !== undefined) core.release(drafting);
       core.release(proposing);
@@ -393,11 +398,12 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
     asked: string,
     ctx: CallContext,
     byok: Inference | undefined,
+    host: Inference,
     stored: Drafted | undefined,
     drafting: string | undefined,
     callId: string,
   ): Promise<Result<Proposal>> => {
-    const looked = await look(asked, ctx, stored);
+    const looked = await look(asked, ctx, host, stored);
     if (!looked.ok) return looked;
     const it = looked.value;
     /* The draft this pass made itself is its own row, settling its hold; a stored one was accounted on pass 1. */
@@ -424,8 +430,8 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
     /* TIER `b` IS THE CUSTOMER'S OWN KEY AND THIS PACKAGE HAS NEVER SEEN IT (`46 §5.9`). The host opens
        the grant under the asker's own browser session, decrypts it where key material belongs, and
        hands in an adapter for one call. No adapter means no open key, which is a sentence about the
-       vault and not a fault in the question. */
-    const engine = s.tier === 'b' ? byok : fallback;
+       vault and not a fault in the question. On `a` and `byo` the proposal is the host's model, handed in for this ask. */
+    const engine = s.tier === 'b' ? byok : host;
     if (engine === undefined)
       return no(
         'FORBIDDEN',

@@ -216,9 +216,18 @@ export type SparkDeps = {
   record: RecordApi;
 };
 
+/**
+ * The engine.
+ *
+ * `inference` ON `read` AND `propose` IS THE HOST'S OWN MODEL FOR THIS ONE ASK, in place of `SparkDeps.inference`. A host
+ * whose model is keyed from the vault opens that key on every call, and the opening is an event with an actor; built once
+ * for the engine, the adapter can name nobody, so the owner's own read was logged `system`. An argument and not a slot the
+ * host sets around the call, because two asks awaiting the model together would share the slot, and not
+ * `AsyncLocalStorage`, which the Worker has not got. `byok` stays tier `b`'s key for the proposal and nothing else.
+ */
 export interface Spark {
-  read(question: string, ctx: CallContext): Promise<Result<Reading>>;
-  propose(question: string, ctx: CallContext, byok?: Inference, askId?: string): Promise<Result<Proposal>>;
+  read(question: string, ctx: CallContext, inference?: Inference): Promise<Result<Reading>>;
+  propose(question: string, ctx: CallContext, byok?: Inference, askId?: string, inference?: Inference): Promise<Result<Proposal>>;
   proposePattern(samples: readonly RawPayload[], ctx: CallContext): Promise<Result<Proposal>>;
   configure(patch: Partial<Pick<Settings, 'tier' | 'model' | 'grant_id' | 'ask_cap'>>, ctx: CallContext): Result<Settings>;
   status(): Status;

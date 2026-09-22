@@ -23,6 +23,7 @@
 
 import {
   SPARK_KEY_LABEL,
+  sparkAskerEngine,
   sparkByokFor,
   sparkFromEnv as fromEnv,
   sparkGrantIdOf,
@@ -55,8 +56,9 @@ export const sparkFromEnv = (env: Record<string, string | undefined>): SparkConf
  * The endpoint deps both ports are built from. Written once because the key discipline is the part that must not be copied.
  *
  * `actor` SIGNS EVERY `grant.read` THIS WIRE OPENS, AND `system` IS RIGHT ONLY WHERE NOBODY ASKED: the record's own model and
- * `@braindog/spark`'s engine both run with nobody at the keyboard, so their callers pass none and `keyOpener`'s own default
- * stands. `sparkByokFor` is the caller that has an asker, and passes their id.
+ * the engine's build-time model both run with nobody at the keyboard, so their callers pass none and `keyOpener`'s own
+ * default stands. The door's two callers have an asker and pass their id: `sparkByokFor` for tier `b`'s key, and
+ * `sparkAskerEngine` for this host's own model, built again on each ask.
  */
 const wireOf = (config: SparkConfig, api: () => RecordApi, store: KeyStore | undefined, actor?: string) => ({
   grants: () => api().kernel.grants(),
@@ -187,5 +189,14 @@ export function sparkDoor(
     config === undefined || store === undefined
       ? undefined
       : async (ctx: CallContext) => sparkByokFor(config, sparkGrantIdOf(deps.sql), api(), ctx, (_asker, actor) => wireOf(config, api, store, actor));
-  return sparkAskDoor(origins, () => sparkEngineFor(config, api, store, deps), byok);
+  /* AND THE INCLUDED MODEL IS BUILT FOR THE ASKER ON EACH ASK, off the same `wireOf` with the same `actor`. `sparkEngineFor`
+     builds its model once with nobody asking, so where it is keyed from the vault the owner's own read was logged
+     `system` (`apps/selfhost/test/spark-included-guard.test.ts`); `sparkAskerEngine` says why it is an argument per call. */
+  const build = async () => {
+    const engine = await sparkEngineFor(config, api, store, deps);
+    return engine === undefined || config === undefined
+      ? engine
+      : sparkAskerEngine(engine, (actor) => sparkInferenceOf(config, wireOf(config, api, store, actor)));
+  };
+  return sparkAskDoor(origins, build, byok);
 }

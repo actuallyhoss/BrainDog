@@ -17,7 +17,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRecordApi } from '@braindog/record';
 
 import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
-import { sparkLook, workerSparkEngine, workerSparkModel } from '../src/spark.ts';
+import { sparkLook, workerSparkDoor, workerSparkEngine, workerSparkModel } from '../src/spark.ts';
 
 const URL_ = 'https://gateway.example.test/v1/chat/completions';
 const FAKE_KEK = '0'.repeat(64);
@@ -202,6 +202,41 @@ test("A REAL ASK REACHES THE PACKAGE'S ENGINE THROUGH THE WORKER'S OWN BUILDER, 
   /* NO KEY ON THE CALL, because this record's vault holds no live grant labelled `spark`. What a grant that IS there does is
      the test above, over the same `wireOf` these two builders share, so it is not driven twice through the slower path. */
   assert.equal((wire.sent[0]!.headers as Record<string, string>).authorization, undefined);
+
+  sql.close();
+  own.close();
+});
+
+/**
+ * THE DOOR'S BUILDER OPENS THE VAULT'S spark KEY IN THE ASKER'S NAME, NOT IN NOBODY'S. On a hosted record the included model
+ * is always keyed from the vault, and `workerSparkDoor`'s `build` wraps the engine in `sparkAskerEngine` so each ask's
+ * `grant.read` is signed by whoever asked. Nothing measured that on the Worker: with the wrap replaced by `return engine;`
+ * every Worker test stayed green (`check:spark-byo-and-signing`). The opener here records the actor it was built for,
+ * which is the actor the real `keyOpener` signs `grant.read` with (`key-opener-actor.test.ts`).
+ */
+test("THE WORKER DOOR'S ENGINE OPENS THE spark KEY FOR THE ASKER, so its grant.read is signed by her and never by system", async () => {
+  const clock = fixedClock(Date.UTC(2026, 8, 21, 9));
+  const { sql, api } = await twoOpenTasks(clock);
+  /* A LIVE spark GRANT, SO THE MODEL OPENS A KEY AT ALL: with none it is called keyless and nothing is signed by anybody. */
+  const grants = [{ id: 'g_spark', kind: 'api_key', label: 'spark', revoked_at: null }];
+  (api.kernel as { grants: () => unknown }).grants = () => grants;
+  const own = openSqlite();
+  const wire = modelDouble();
+  const opened: (string | undefined)[] = [];
+  const door = workerSparkDoor({ SPARK_ENDPOINT: URL_, SPARK_MODEL: 'small', KEK: FAKE_KEK }, () => api, {
+    sql: own,
+    clock,
+    send: wire.send,
+    open: (_api, actor) => async () => (opened.push(actor), FAKE_PERSON_KEY),
+  }, new Set());
+  const engine = await door.engine!();
+  assert.ok(engine, 'a configured Worker built no engine');
+
+  const out = await engine.propose('Which tasks are open?', OWNER);
+  assert.ok(out.ok, `refused: ${JSON.stringify(out)}`);
+  assert.equal(wire.sent.length, 2);
+  assert.ok(wire.sent.every((init) => (init.headers as Record<string, string>).authorization === `Bearer ${FAKE_PERSON_KEY}`), 'the ask did not go out on the spark key');
+  assert.deepEqual(opened, ['p_owner', 'p_owner'], 'a grant.read of the ask was not signed by the asker');
 
   sql.close();
   own.close();
