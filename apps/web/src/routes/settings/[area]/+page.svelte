@@ -495,7 +495,7 @@
   import SparkAsks from '$lib/ui/SparkAsks.svelte';
   import SparkModel from '$lib/ui/SparkModel.svelte';
   import SparkDaily from '$lib/ui/SparkDaily.svelte';
-  import ShortcutDoor from '$lib/ui/ShortcutDoor.svelte';
+  import WebhookDoors from '$lib/ui/WebhookDoors.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Chip from '$lib/ui/Chip.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -2608,10 +2608,10 @@
           <p class="hint">{mailWords.freshWhy}</p>
         {/if}
       </Section>
-      <!-- THE OTHER SENDER, AND A RECORD METHOD RATHER THAN A HOST DOOR. `ingestMint` is in `ROUTES` on both hosts,
-           so unlike the mail section there is no probe: the section is drawn, and a record that does not declare the
-           SMS ingest says so in its own sentence on the press. -->
-      <ShortcutDoor owner={anOwner} />
+      <!-- EVERY OTHER SENDER, AND RECORD METHODS RATHER THAN A HOST DOOR. `doors` lists what this record declares and
+           `ingestMint` mints for one of them, so unlike the mail section there is no probe: the section is drawn, and
+           a record that declares no door says so in its own empty state. -->
+      <WebhookDoors owner={anOwner} />
     {:else if area === 'notifications'}
       <!--
         `09` SPECIFIES A COMPLETE MECHANISM WITH ZERO USER-CONFIGURABLE SETTINGS. Every constant is

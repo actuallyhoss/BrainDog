@@ -1829,7 +1829,14 @@ export const copy = {
   quietHours: 'Quiet hours',
   quietHoursAre: '22:00 to 08:00 in this record’s timezone. Anything not urgent waits until they end.',
   urgentKinds: 'Urgent',
-  urgentKindsAre: 'A payment failing, a credential expiring inside 48 hours, a domain expiring inside 7 days.',
+  /* WHAT THE RECORD ITSELF RAISES, AND THEN WHAT A RULE DOES. This said "a payment failing, a domain expiring inside 7
+     days" as if they were the product's own, and the kernel raises neither: `notify` in `digest.ts` interrupts for what
+     a rule declares `urgent: true`, and what it raises by itself is two things: a vault credential two days from
+     expiry (`vault.ts`), and a scheduled action held back, paused because its key is missing or refused or stopped at
+     its daily limit of calls from rules (`actions.ts`, whose `notify` the kernel routes with `urgent: true`). The first
+     rewrite named only the credential, and the checker found the action's three call sites. A payment and a domain
+     are what one use case's rules might say, not what BrainDog does. */
+  urgentKindsAre: 'A credential in the vault expiring inside 48 hours, a scheduled action held back because its key is missing or it reached its daily limit, and anything a rule marks urgent. Each rule says so itself, and adding a pack shows which of its rules would interrupt you.',
   interruptCap: 'At most',
   interruptCapIs: 'One urgent interruption an hour.',
   unreadCount: 'Unread',
@@ -2492,30 +2499,50 @@ export const copy = {
   decideSelect: 'Select',
   decideSelectDone: 'Done',
 
-  /* ── the Shortcut door: bank texts posted from a phone (`ShortcutDoor.svelte`) ── */
+  /* ── webhook doors: the web addresses this record takes things in at (`WebhookDoors.svelte`) ── */
   /* WHAT IT IS, WHAT HE DOES WITH IT, AND WHAT IT COSTS HIM, in the mail section's order, because the two sit one under
-     the other on the same screen and are the same act spelled for a different sender. */
-  shortcutTitle: 'Bank texts sent from your phone',
-  shortcutHow: 'An iPhone Shortcut can post each text your bank sends to this record, and a withdrawal it recognises is written to Money. The Shortcut needs a web address with a token in it, made here.',
+     the other on the same screen and are the same act spelled for a different sender.
+     NO SENDER IS NAMED. These keys were `shortcut*` and said "your bank", "an iPhone Shortcut" and "withdrawals", so a
+     record whose only door took a build server's results read a section about bank texts (`DIRECTION.md` §22). The
+     sender is whatever posts, and `webhook-doors.test.ts` fails if a use case comes back into these words. */
+  doorsTitle: 'Web addresses that take things in',
+  doorsHow: 'Each door below is a web address a phone, a script or another service posts to, and what arrives is written to the list the door names. The address carries a token, made here.',
   /* THE FACT THE SCREEN CANNOT HIDE, as the mail section states its own: only the digest is kept, so nothing reads the
      token back, and a blank where a value would go reads as "you have none". */
-  shortcutUnknown: 'This screen cannot show a token the record already has. Only a fingerprint of it is kept, so if you no longer have it, make a new one and the old one stops working.',
-  shortcutMint: 'Make a Shortcut address',
-  shortcutMinting: 'Making',
-  shortcutOnce: 'Shown once, now. Copy it before you leave this screen: it cannot be shown again, and making another replaces it.',
-  shortcutCopyUrl: 'Copy the address',
-  shortcutUrlCopied: 'Shortcut address copied',
-  shortcutCopyToken: 'Copy the token',
-  shortcutTokenCopied: 'Token copied',
-  /* THE WHOLE RECIPE IN ONE LINE, in the words the Shortcuts app itself uses, because the person following it is on a
-     phone with that app open and nothing else to read. */
-  shortcutIos: 'In Shortcuts, make a personal automation for Message, with the sender set to your bank. Add Get Contents of URL with this address, method POST, and the message as the request body.',
-  /* THE ADDRESS NEEDS THE RECORD'S ID AND THIS HOST DID NOT ANSWER IT. Both doors refuse any other value in that segment,
-     so the screen says what is missing rather than printing an address that would never match. */
-  shortcutNoAddress: 'This host answered the token without the record id the address is built from, so no address is shown. The token alone is not enough for the Shortcut yet.',
-  shortcutMade: 'Made. Making another replaces this one, which is also how a leaked address is dealt with.',
-  shortcutNoToken: 'This host answered without a token in it, so nothing was shown. Try again, and if it happens twice nothing has been changed.',
-  shortcutFreshWhy: 'Making an address needs a sign-in from the last fifteen minutes, because whoever holds it can write withdrawals into your books.',
+  doorsUnknown: 'This screen cannot show a token the record already has. Only a fingerprint of it is kept, so if you no longer have it, make a new one and the old one stops working.',
+  doorsReading: 'Reading the doors this record declares.',
+  /* THE EMPTY STATE SAYS WHO ADDS ONE AND HOW, because nothing on this screen can: a door is a declaration, and a
+     declaration arrives as a change somebody approves. The prompt is the one to hand an agent. */
+  doorsNone: 'No door declared yet',
+  doorsNoneWhy: 'An agent adds one by proposing a change that declares an ingest with channel webhook and verify kind path, naming the list it writes to. Once the change is approved, the door is listed here with a button that makes its address.',
+  doorsPrompt: 'read my record, then propose a webhook door with verify kind path for what I want posted in, and name the list it writes to',
+  doorsWrites: (list: string) => `Writes to ${list}.`,
+  doorsHeld: 'An address is in use. Making a new one stops the old one working.',
+  doorsNotHeld: 'No address made yet.',
+  /* `ingestMint` REFUSES EVERY OTHER KIND, so the row says why it has no button rather than drawing one that fails. */
+  doorsOtherCheck: 'This door checks its senders another way, so there is no address to make here.',
+  doorsMint: 'Make the address',
+  doorsRemint: 'Make a new address',
+  doorsMinting: 'Making',
+  /* THE CONFIRM, SAID AS WHAT IS LOST. A replaced token stops verifying in the same statement that keeps the new one,
+     so whatever is posting to the old address is turned away from that moment with nothing to tell it why. */
+  doorsReplaceAsk: 'Anything still posting to the address in use will be turned away the moment a new one is made.',
+  doorsReplace: 'Replace it',
+  doorsKeep: 'Keep the one in use',
+  doorsOnce: 'Shown once, now. Copy it before you leave this screen: it cannot be shown again, and making another replaces it.',
+  doorsCopyUrl: 'Copy the address',
+  doorsUrlCopied: 'Address copied',
+  doorsCopyToken: 'Copy the token',
+  doorsTokenCopied: 'Token copied',
+  /* THE WHOLE OF WHAT A SENDER NEEDS, in words that hold for a phone, a script or a service's webhook setting. */
+  doorsPost: 'Send each item as the body of a POST to this address. The token in the address is the whole of the check, so nothing else needs setting up.',
+  /* THE ADDRESS IS THE PATH THE RECORD ANSWERED, AND THIS HOST ANSWERED NONE. The screen says what is missing rather
+     than building one that neither door would match. */
+  doorsNoAddress: 'This host answered the token without the path the address is built from, so no address is shown. Keep the token: it is the only copy there will be.',
+  doorsMade: 'Made. Making another replaces this one, which is also how a leaked address is dealt with.',
+  doorsNoToken: 'This host answered without a token in it, so nothing was shown. Try again, and if it happens twice nothing has been changed.',
+  doorsNoRead: 'This host does not list its doors yet, so none can be shown here. Updating it brings the list.',
+  doorsFreshWhy: 'Making an address needs a sign-in from the last fifteen minutes, because whoever holds it can write into this record.',
 } as const;
 
 export type Copy = typeof copy;
