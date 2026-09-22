@@ -231,6 +231,25 @@ const DECLARED: Record<string, Version> = {
       'Raised for the eight webhook twins his iOS Shortcut posts a bank SMS to, `ingest.bank-from-out-sms` and the seven beside it, each the reading of its mail pattern behind `verify: { kind: path }`, matching nothing until an owner mints its token -> 9b29858e7ee11345',
     ],
   },
+  'money-core@1.8.0': {
+    holds: `
+      ingest.bank-card-in ingest.bank-card-in-sms ingest.bank-card-out ingest.bank-card-out-sms
+      metric.cash-accounts metric.cash-as-of metric.cash-now metric.days-late-in metric.due-30d metric.every-month-by-category
+      metric.every-month-in metric.every-month-out metric.in-30d metric.in-by-month metric.in-due-by-month metric.installments-due-30d
+      metric.installments-left metric.late-in metric.out-30d metric.out-by-month metric.out-due-by-month metric.overdue
+      metric.owed-by-you metric.owed-to-you metric.project-owed metric.received-30d metric.spent-30d metric.txn-uncategorised
+      page.home page.ledger page.money
+      register.accounts register.categories register.fx register.holdings register.installments register.obligations
+      register.recurring register.snapshots register.transactions
+      rule.cash-stale rule.installment-due-soon rule.invoice-late rule.recurring-ended rule.recurring-missed rule.txn-categorise
+      setting.home_currency setting.most_days_late setting.most_due_30d setting.most_on_one_category setting.most_out_30d
+      setting.most_out_every_month setting.most_owed_to_you
+    `,
+    declares: '8bcd20187c61cf1b',
+    history: [
+      "HSBC Egypt's six wordings and their six `-sms` twins leave for the `bank-hsbc-eg` pack, and `ingest.bank-card-out` and `ingest.bank-card-in` stay -> 8bcd20187c61cf1b",
+    ],
+  },
   'work@1.1.0': { declares: 'b49e051fe7c26ac5' },
   'work@1.2.0': { declares: '49a30d2ef8c1d672' },
   'work@1.3.0': { declares: 'fb82e66d80644e3d' },

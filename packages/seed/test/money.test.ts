@@ -20,6 +20,7 @@ import { refused, sayOf } from '@braindog/ports';
 
 import { CATEGORIES, INSTALLMENTS, LOOKUPS, METRICS, NOW, OBLIGATIONS, PAGES, REGISTERS, RECURRING_ITEMS, RULES, SNAPSHOTS, day, firstPartyDocument, gbp, installSeed } from '../src/index.ts';
 import { MONEY_HOME_SETTING, MONEY_INGESTS, MONEY_METRICS, MONEY_TARGET_SETTINGS, nightOf } from '../src/modules/money.ts';
+import { HSBC_EG_INGESTS } from '../src/packs/bank-hsbc-eg.ts';
 import { USE_CASES } from '../src/usecases/index.ts';
 
 function openSqlite(): Sql {
@@ -518,11 +519,12 @@ test('AN ALERT IN A CURRENCY THAT IS NOT STERLING IS READ, because the amount is
   /* A PATTERN THAT READS THE SECOND FIGURE IN A LINE HOLDS ITS MONEY INSIDE `nth`, as `bank-from-out` does, so both
      places are read. */
   type Money = { after?: string; currency?: string };
-  const forms = Object.values(MONEY_INGESTS).flatMap((body) =>
+  const ALL_MONEY_INGESTS = { ...MONEY_INGESTS, ...HSBC_EG_INGESTS };
+  const forms = Object.values(ALL_MONEY_INGESTS).flatMap((body) =>
     Object.entries(body.extract ?? {}).map(([field, form]) => [`${body.ingest}.${field}`, (form as { money?: Money }).money ?? (form as { nth?: { of?: { money?: Money } } }).nth?.of?.money] as const),
   );
   const monies = forms.filter(([, money]) => money);
-  assert.equal(monies.length, Object.keys(MONEY_INGESTS).length, 'a pattern no longer reads one amount');
+  assert.equal(monies.length, Object.keys(ALL_MONEY_INGESTS).length, 'a pattern no longer reads one amount');
   for (const [where, money] of monies)
     assert.ok(!/^[A-Z]{3}$/u.test((money!.after ?? '').trim()), `${where} anchors on a currency code, so an alert in any other currency reads nothing`);
   assert.equal(new Set(monies.map(([, money]) => money!.currency)).size, 1, 'the two patterns fall back on two different currencies');

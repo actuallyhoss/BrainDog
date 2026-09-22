@@ -23,7 +23,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import type { CallContext } from '@braindog/record';
-import { MONEY_INGESTS, day, installSeed } from '@braindog/seed';
+import { HSBC_EG_INGESTS, day, installSeed } from '@braindog/seed';
 
 import { start } from '../src/server.ts';
 
@@ -34,11 +34,11 @@ const OWNER: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 
 const SMS = 'From HSBC: 16AUG26 ATM Cash Withdrawal from 042-118***-327 EGP 2500.00- Your available balance is EGP 31,040.25';
 
 /**
- * `bank-from-out`'s webhook twin, built the way `MONEY_SMS_INGESTS` in `packages/seed/src/modules/money.ts` builds it:
- * the mail pattern, carried by a webhook, verified by a path token. Written out because the seed's index does not export
- * the twins yet, and a copy of one spread is less to drift than a path into another package's source.
+ * `bank-from-out`'s webhook twin, built the way `HSBC_EG_SMS_INGESTS` in `packages/seed/src/packs/bank-hsbc-eg.ts`
+ * builds it: the mail pattern, carried by a webhook, verified by a path token. Written out because the seed's index
+ * does not export the twins yet, and a copy of one spread is less to drift than a path into another package's source.
  */
-const TWIN = { ...MONEY_INGESTS['bank-from-out']!, ingest: 'bank-from-out-sms', channel: 'webhook', verify: { kind: 'path' } };
+const TWIN = { ...HSBC_EG_INGESTS['bank-from-out']!, ingest: 'bank-from-out-sms', channel: 'webhook', verify: { kind: 'path' } };
 
 type Running = Awaited<ReturnType<typeof start>>;
 

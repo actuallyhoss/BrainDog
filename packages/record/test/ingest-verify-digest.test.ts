@@ -17,6 +17,7 @@ import { createRecordApi, type CallContext } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { NOW, installSeed } from '../../seed/src/index.ts';
 import { MONEY_SMS_INGESTS } from '../../seed/src/modules/money.ts';
+import { HSBC_EG_SMS_INGESTS } from '../../seed/src/packs/bank-hsbc-eg.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 'owner' } };
 
@@ -26,7 +27,7 @@ async function record() {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   assert.ok((await installSeed(api.kernel)).ok);
-  const twins = Object.values(MONEY_SMS_INGESTS).map((body) => ({ id: `ingest.${body.ingest}`, kind: 'ingest' as const, body: body as never }));
+  const twins = Object.values({ ...MONEY_SMS_INGESTS, ...HSBC_EG_SMS_INGESTS }).map((body) => ({ id: `ingest.${body.ingest}`, kind: 'ingest' as const, body: body as never }));
   const put = await api.kernel.install(twins);
   assert.ok(put.ok, JSON.stringify(put));
   return { sql, api };
@@ -103,7 +104,7 @@ test('A TOKEN IS MINTED ONLY FOR A WEBHOOK INGEST THAT DECLARES verify: { kind: 
   /* THE MAIL PATTERN IS DECLARED AND IS NOT A DOOR: mail is verified by its forwarder, never by a URL. */
   await refused('bank-from-out', 'VALUE_MALFORMED');
   /* AND A WEBHOOK THAT DECLARES NO VERIFIER is told to declare one, rather than handed a token nothing reads. */
-  const { verify: _verify, ...bare } = MONEY_SMS_INGESTS['bank-from-out-sms']!;
+  const { verify: _verify, ...bare } = HSBC_EG_SMS_INGESTS['bank-from-out-sms']!;
   assert.ok((await api.kernel.install([{ id: 'ingest.bare-sms', kind: 'ingest', body: { ...bare, ingest: 'bare-sms' } as never }])).ok);
   await refused('bare-sms', 'VALUE_MALFORMED');
   assert.deepEqual(holding(sql, 'ingest_token'), [], 'a refused mint wrote something');
@@ -128,7 +129,7 @@ test('A TOKEN DOES NOT OUTLIVE ITS DECLARATION: retired and declared again, the 
   const held = sha256(minted.value.token);
   const retired = api.kernel.retire(['ingest.bank-from-out-sms']);
   assert.ok(retired.ok, JSON.stringify(retired));
-  await redeclare(api, MONEY_SMS_INGESTS['bank-from-out-sms']!);
+  await redeclare(api, HSBC_EG_SMS_INGESTS['bank-from-out-sms']!);
   assert.deepEqual(await api.ingestVerify({ ingest: 'bank-from-out-sms' }), { kind: 'none' }, 'the token minted for the retired declaration verifies its successor');
   assert.deepEqual(holding(sql, held), [], 'the retired declaration left its digest in the record');
   /* AND A NEW MINT IS WHAT MAKES THE NEW DECLARATION A DOOR, which is the only way one should become one. */
@@ -143,10 +144,10 @@ test('A DECLARATION THAT DROPS verify: TAKES THE DIGEST WITH IT, so putting veri
   const minted = await api.ingestMint({ ingest: 'bank-from-out-sms' }, owner);
   assert.ok(minted.ok);
   const held = sha256(minted.value.token);
-  const { verify: _verify, ...bare } = MONEY_SMS_INGESTS['bank-from-out-sms']!;
+  const { verify: _verify, ...bare } = HSBC_EG_SMS_INGESTS['bank-from-out-sms']!;
   await redeclare(api, bare);
   assert.deepEqual(await api.ingestVerify({ ingest: 'bank-from-out-sms' }), { kind: 'none' });
-  await redeclare(api, MONEY_SMS_INGESTS['bank-from-out-sms']!);
+  await redeclare(api, HSBC_EG_SMS_INGESTS['bank-from-out-sms']!);
   assert.deepEqual(await api.ingestVerify({ ingest: 'bank-from-out-sms' }), { kind: 'none' }, 'the token minted before verify: was dropped verifies again');
   assert.deepEqual(holding(sql, held), [], 'the digest outlived the declaration that dropped verify:');
   sql.close();
@@ -156,7 +157,7 @@ test('A NEW VERSION THAT STILL DECLARES verify: KEEPS THE TOKEN, so a pack updat
   const { sql, api } = await record();
   const minted = await api.ingestMint({ ingest: 'bank-from-out-sms' }, owner);
   assert.ok(minted.ok);
-  await redeclare(api, { ...MONEY_SMS_INGESTS['bank-from-out-sms']!, description: 'The same pattern, reworded by a later version of the pack.' });
+  await redeclare(api, { ...HSBC_EG_SMS_INGESTS['bank-from-out-sms']!, description: 'The same pattern, reworded by a later version of the pack.' });
   assert.deepEqual(await api.ingestVerify({ ingest: 'bank-from-out-sms' }), { kind: 'path', sha256: sha256(minted.value.token) });
   sql.close();
 });

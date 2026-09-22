@@ -38,6 +38,7 @@ import { ROUTES, handlersFor, serveApi, serveIngest, type IngestDoor } from '../
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { NOW, day, installSeed } from '../../seed/src/index.ts';
 import { MONEY_INGESTS, MONEY_SMS_INGESTS } from '../../seed/src/modules/money.ts';
+import { HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS } from '../../seed/src/packs/bank-hsbc-eg.ts';
 
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
 
@@ -57,7 +58,7 @@ const CREDIT = 'From HSBC: 01AUG26 Deposit Interest 042-118***-327 EGP 418.62+ Y
  * here changes nothing, and the tests that do so still say which twins each one leans on.
  */
 const twins = (...ids: string[]) =>
-  ids.map((id) => ({ id: `ingest.${id}`, kind: 'ingest' as const, body: MONEY_SMS_INGESTS[id]! as never }));
+  ids.map((id) => ({ id: `ingest.${id}`, kind: 'ingest' as const, body: HSBC_EG_SMS_INGESTS[id]! as never }));
 
 type Api = Awaited<ReturnType<typeof createRecordApi>>;
 
@@ -174,7 +175,7 @@ test('(5) BEFORE ANYTHING IS MINTED, THE RIGHT-SHAPED URL STILL LANDS untriaged,
 test('(6) verify: IS READ WHERE IT IS WRITTEN: a path token on a webhook, and nothing else installs', async () => {
   const { k, sql } = await record();
   const refused = async (body: Record<string, unknown>, why: RegExp) => {
-    const { pack: _pack, ...base } = MONEY_INGESTS['bank-from-out']!;
+    const { pack: _pack, ...base } = HSBC_EG_INGESTS['bank-from-out']!;
     const put = (await k.install([{ id: 'ingest.probe', kind: 'ingest', body: { ...base, ingest: 'probe', ...body } as never }])) as {
       ok: boolean;
       refusal?: { code: string; fix: string; at?: string };
@@ -198,7 +199,7 @@ test('(7) THE SEED SHIPS THE TWINS: a record set up with money-core has the Shor
   assert.deepEqual(await api.ingestVerify({ ingest: 'bank-from-out-sms' }), { kind: 'none' });
   assert.deepEqual(
     k.declarations().filter((d) => d.kind === 'ingest' && d.id.endsWith('-sms')).map((d) => d.id).length,
-    Object.keys(MONEY_SMS_INGESTS).length,
+    Object.keys(MONEY_SMS_INGESTS).length + Object.keys(HSBC_EG_SMS_INGESTS).length,
   );
   sql.close();
 });

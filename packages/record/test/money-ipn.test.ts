@@ -31,6 +31,7 @@ import { createRecordApi } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { NOW, day, installSeed } from '../../seed/src/index.ts';
 import { MONEY_INGESTS } from '../../seed/src/modules/money.ts';
+import { HSBC_EG_INGESTS } from '../../seed/src/packs/bank-hsbc-eg.ts';
 
 /** The seeded record, and two EGP accounts whose digits the invented wordings name. */
 async function record(): Promise<{ k: Kernel; sql: Sql; card: string; current: string; company: string }> {
@@ -165,7 +166,7 @@ const HELD: Held[] = [
 test('EVERY MONEY PATTERN IS DRIVEN HERE, so a pattern added without a row to check fails this file', () => {
   assert.deepEqual(
     [...new Set([...WORDINGS, ...HELD].map((w) => w.ingest))].sort(),
-    Object.keys(MONEY_INGESTS).sort(),
+    Object.keys({ ...MONEY_INGESTS, ...HSBC_EG_INGESTS }).sort(),
     'a pattern in MONEY_INGESTS has no wording here, so nothing checks what it writes',
   );
 });

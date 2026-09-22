@@ -86,6 +86,14 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   reading under the id `<pattern>-sms`, which an iOS Shortcut posts the SMS to at an address carrying a token only an
  *   owner can make. Until the token is made every message posted there waits in the inbox, and none is written. Eight
  *   declarations added and nothing taken away, so the step is a minor one.
+ * - money-core 1.8.0: HSBC Egypt's wordings leave for a pack of their own, `bank-hsbc-eg` (`packs/bank-hsbc-eg.ts`).
+ *   Six mail patterns and their six `-sms` twins read one bank in one country, and every record set up as Personal,
+ *   Founder or Small business carried them (`loop/DIRECTION.md` section 22). The two generic card wordings stay. Twelve
+ *   ingests taken away and no list and no field, so by the rule above the step is a minor one, as 1.4.0's two figures
+ *   were. A record on 1.7.0 that updates LOSES the twelve until it installs `bank-hsbc-eg`, which needs `^1.8.0` so that
+ *   it cannot be installed first and collide with money-core's own ids. Any path token minted for one of the six twins
+ *   does not survive the move: the update retires the twin, and `heldDigest` in `packages/record/src/index.ts` answers
+ *   nothing for a declaration retired since its mint, so the owner mints again after installing the pack.
  * - estate 1.2.0: a service carries a note. the old tool's domains carry the reason each name is held and what is
  *   unresolved about it, and Services had no field that holds prose, so the import left every note in the export. One
  *   field added and nothing taken away, so the step is a minor one. It moves the version rather than riding on 1.1.0
@@ -112,7 +120,7 @@ const SUMMARIES: Record<FirstPartyId, string> = {
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.4.0',
   people: '1.0.0',
-  'money-core': '1.7.0',
+  'money-core': '1.8.0',
   estate: '1.2.0',
   work: '1.6.0',
 };

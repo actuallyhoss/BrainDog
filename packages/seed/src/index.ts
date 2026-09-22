@@ -26,6 +26,8 @@ import { AGENTS_PACK, AGENTS_REGISTERS, RUNS_ON, agentsPackDocument } from './pa
 
 export { AGENTS_PACK, AGENTS_PAGES, AGENTS_REGISTERS, RUNS_ON, agentsPackDocument, type PackManifest } from './packs/agents.ts';
 export { FIRST_PARTY, FIRST_PARTY_VERSIONS, crossPack, firstPartyDocument, firstPartyManifest, type DocumentOptions, type FirstPartyId } from './packs/first-party.ts';
+export { BANK_HSBC_EG_VERSION, HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS, bankHsbcEgPack } from './packs/bank-hsbc-eg.ts';
+import { HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS } from './packs/bank-hsbc-eg.ts';
 export * from './modules/base.ts';
 export { ACCOUNTS, CATEGORIES, INSTALLMENTS, MONEY_INGESTS, MONEY_SMS_INGESTS, OBLIGATIONS, RECURRING_ITEMS, SNAPSHOTS, TRANSACTIONS, cashSeries, nightOf, snapshotRows, type SeedIngest } from './modules/money.ts';
 export { SERVICES } from './modules/estate.ts';
@@ -219,11 +221,26 @@ export const ruleDeclarations = (): Declaration[] =>
  * text on a phone that forwards no mail. Before `MONEY_SMS_INGESTS` was spread here, an SMS his Shortcut posted at
  * `bank-from-out-sms` answered 404 on every record the product had set up
  * (`packages/host/test/ingest-shortcut.test.ts` (7)). A twin matches nothing until an owner mints its token.
+ *
+ * money-core's ONLY, SINCE 1.8.0: the two card wordings and their twins. HSBC Egypt's six and their twins are the
+ * `bank-hsbc-eg` pack's (`packs/bank-hsbc-eg.ts`), and this is what `packDocument()` and every first-party document are
+ * built from, so a starter use case no longer carries them.
  */
 export const INGESTS: Record<string, SeedIngest> = { ...MONEY_INGESTS, ...MONEY_SMS_INGESTS };
 
 export const ingestDeclarations = (): Declaration[] =>
   Object.values(INGESTS).map((body) => ({ id: `ingest.${body.ingest}`, kind: 'ingest' as const, body: body as never }));
+
+/**
+ * THE SAMPLE RECORD STILL HOLDS THE BANK PACK'S TWELVE, and only the sample. `installSeed` is a fixture and a demo, not
+ * a way a person's record is set up, and it is what the bank tests forward their lines into. Measured with these left
+ * out on 22 September: six tests in this package and seven of the eight in `packages/host/test/ingest-shortcut.test.ts`
+ * went red, every one of them a `From HSBC:`, InstaPay or card-used line arriving at a record with no pattern for it.
+ * They are installed as the pack declares them, `pack: 'bank-hsbc-eg'` in the body, so a sample exported and opened
+ * elsewhere says whose they are.
+ */
+const sampleBankDeclarations = (): Declaration[] =>
+  [...Object.values(HSBC_EG_INGESTS), ...Object.values(HSBC_EG_SMS_INGESTS)].map((body) => ({ id: `ingest.${body.ingest}`, kind: 'ingest' as const, body: body as never }));
 
 export const metricDeclarations = (): Declaration[] =>
   Object.values(METRICS).map((body) => ({ id: `metric.${body.metric}`, kind: 'metric' as const, body: body as never }));
@@ -417,6 +434,7 @@ export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Res
     ...pageDeclarations().filter((d) => d.id !== 'page.project'),
     ...metricDeclarations(),
     ...ingestDeclarations(),
+    ...sampleBankDeclarations(),
   ]);
   if (!installed.ok) return installed as Result<Seeded>;
   const agents = await installAgentsPack(kernel, actor);

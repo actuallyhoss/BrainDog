@@ -36,6 +36,7 @@ import { sayOf } from '@braindog/ports';
 
 import { METRICS, NOW, day, installSeed } from '../src/index.ts';
 import { MONEY_INGESTS } from '../src/modules/money.ts';
+import { HSBC_EG_INGESTS } from '../src/packs/bank-hsbc-eg.ts';
 
 function openSqlite(): Sql {
   const db = new DatabaseSync(':memory:');
@@ -66,7 +67,7 @@ function openSqlite(): Sql {
 }
 
 const ingests = (): Declaration[] =>
-  Object.values(MONEY_INGESTS).map((body) => ({ id: `ingest.${body.ingest}`, kind: 'ingest' as const, body: body as never }));
+  Object.values({ ...MONEY_INGESTS, ...HSBC_EG_INGESTS }).map((body) => ({ id: `ingest.${body.ingest}`, kind: 'ingest' as const, body: body as never }));
 
 /**
  * A seeded record holding the patterns, and two accounts the invented digits name.
@@ -274,7 +275,7 @@ test('NO WORDING IS CLAIMED BY TWO PATTERNS, so the order they are declared in d
   const CREDIT = 'HSBC: Your card ending 4471 was credited GBP 5,005.00 from NILE REALTY on 29/08/26.';
   for (const body of [CARD, IPN_OUT, IPN_IN, IPN_BUY, FROM_OUT, FROM_IN, FROM_PLUS, FROM_SPACED, CHARGE, CREDIT]) {
     const claims: string[] = [];
-    for (const ingest of Object.keys(MONEY_INGESTS)) if (await claimedBy(ingest, body)) claims.push(ingest);
+    for (const ingest of Object.keys({ ...MONEY_INGESTS, ...HSBC_EG_INGESTS })) if (await claimedBy(ingest, body)) claims.push(ingest);
     assert.ok(claims.length <= 1, `${body.slice(0, 40)} is claimed by ${claims.join(' and ')}`);
   }
 
@@ -285,7 +286,7 @@ test('NO WORDING IS CLAIMED BY TWO PATTERNS, so the order they are declared in d
      a stray hyphen. With `SIGNED_CREDIT` taken out of `bank-from-unsure`'s `none:`, the second line was claimed twice. */
   const claimsOf = async (body: string): Promise<string[]> => {
     const claims: string[] = [];
-    for (const ingest of Object.keys(MONEY_INGESTS)) if (await claimedBy(ingest, body)) claims.push(ingest);
+    for (const ingest of Object.keys({ ...MONEY_INGESTS, ...HSBC_EG_INGESTS })) if (await claimedBy(ingest, body)) claims.push(ingest);
     return claims;
   };
   const BOTH = 'From HSBC: 01AUG26 Deposit Interest 042-118***-327 EGP 418.62+ Your available balance is EGP 2500.00- Your available balance is EGP 1.00';
