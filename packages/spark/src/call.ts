@@ -81,6 +81,11 @@ export type Core = {
   resets(): string;
   /** `SELECT COUNT(*)` on `call_meter`: tier `a` reads and proposals this month that called a model. */
   asksUsed(): number;
+  /** Hold one ask on the meter before its model is called; see `reserve` below. Returns the row id to settle. */
+  reserve(kind: 'read' | 'propose', tier: Tier, model: string): string;
+  /** Give a held ask back when no model was called. A row already settled by `account` is left alone. */
+  release(id: string): void;
+  /** Write the row, or settle a held one: the same id replaces the hold. */
   account(row: AccountRow): void;
   run(args: RunArgs): Promise<Ran>;
 };
@@ -178,8 +183,10 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference): Core => {
       row.tier === 'a' && rate !== undefined
         ? Math.round((row.usage.in * rate.in) / 1e6 + (row.usage.out * rate.out) / 1e6)
         : 0;
+    /* OR REPLACE, BECAUSE A HELD ASK IS SETTLED BY ITS OWN ID. The row `reserve` wrote is overwritten by the outcome, so a
+       `call` row still reads as one row per model call, with `ts` the moment it was settled, as it was before holds. */
     sql.exec(
-      `INSERT INTO call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, question, predicate, read, filed)
+      `INSERT OR REPLACE INTO call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, question, predicate, read, filed)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       row.id,
       now(),
@@ -287,6 +294,29 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference): Core => {
         "SELECT COUNT(*) AS n FROM call WHERE tier = 'a' AND kind IN ('read', 'propose') AND model <> '-' AND ts >= ?",
         monthOf(clock.now(), 0),
       )?.n ?? 0,
+    /* THE CHECK AND THE COUNT WERE TWO STEPS WITH A MODEL BETWEEN THEM. `spent()` read `asksUsed()`, and the row that
+       count reads was written after the model answered, so every ask in flight passed the check against the same number:
+       ten `read`s sent together at `ask_cap: 2`, over a model answering in 20 ms, made ten model calls and `status()` read
+       10 of 2 (`loop/research-batch-twenty-eight-audit.md` §1, `test/cap-concurrent.test.ts`). The hold is a real row,
+       written in the same synchronous step as the check, so the next ask's count already includes it. It is a row and not
+       a counter in memory because both hosts build a Spark per request, and a counter would be one per request.
+       IT IS `error · SPARK_PENDING` AND NOT A NEW STATUS because the `46 §4.1` CHECK admits four, and changing it is the
+       first schema change, which `createSpark` says needs its version in a row first. A process that dies mid-call leaves
+       the hold counted, which is the side of the line a cap should err on. */
+    reserve: (kind, tier, model) => {
+      const id = ulid(clock.now());
+      sql.exec(
+        `INSERT INTO call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code)
+         VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, 'error', 'SPARK_PENDING')`,
+        id,
+        now(),
+        kind,
+        tier,
+        model,
+      );
+      return id;
+    },
+    release: (id) => sql.exec("DELETE FROM call WHERE id = ? AND code = 'SPARK_PENDING'", id),
     account,
     run,
   };

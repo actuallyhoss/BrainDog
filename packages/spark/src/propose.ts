@@ -28,6 +28,7 @@ import { no, ok, refused, type Refusal, type Result } from '@braindog/ports';
 import { compile, type Schema } from '@braindog/where';
 
 import type { Core } from './call.ts';
+import { PROMPTS } from './prompts.ts';
 import { citable, cite, firstBytes, isRecord } from './project.ts';
 import type {
   CallContext,
@@ -300,8 +301,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
    * the meter still balances, because only proposals are metered, but the person reading what Spark
    * did sees one call where two were made.
    */
-  const accountRead = (it: Read, question: string): string => {
-    const askId = core.mint();
+  const accountRead = (it: Read, question: string, askId: string): string => {
     core.account({
       id: askId,
       kind: 'read',
@@ -328,11 +328,19 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
     if (asked === '')
       return no('VALUE_MALFORMED', 'Ask Spark a question first. A blank ask has nothing to read.', { at: 'question' });
 
-    const looked = await look(asked, ctx);
-    if (!looked.ok) return looked;
-    const it = looked.value;
+    /* NO `await` BETWEEN `spent()` AND HERE. The hold is what the next ask's check counts, so it has to exist before
+       this function first yields; `core.reserve` says why it is a row. The hold becomes the ask's own row, and its id
+       the `ask_id`, on every path that called a model, and is given back on the ones that did not. */
+    const held = core.reserve('read', core.settings().tier, PROMPTS.predicate.model);
+    try {
+      const looked = await look(asked, ctx);
+      if (!looked.ok) return looked;
+      const it = looked.value;
 
-    return ok({ ask_id: accountRead(it, asked), predicate: it.where, q: it.q, read: it.read, rows: it.rows });
+      return ok({ ask_id: accountRead(it, asked, held), predicate: it.where, q: it.q, read: it.read, rows: it.rows });
+    } finally {
+      core.release(held);
+    }
   };
 
   const propose = async (
@@ -356,13 +364,37 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
       return no('VALUE_MALFORMED', 'Ask Spark a question first. A blank ask has nothing to read.', { at: 'question' });
 
     const stored = earlier?.predicate == null ? undefined : storedDraft(earlier.predicate);
+    /* EVERY MODEL CALL THIS PASS MAY MAKE IS HELD before the first `await`, as `read` holds its one. With a stored draft
+       that is the proposal alone; with none it is the drafting `read` and then the proposal. Holding only the first left
+       the second counted after the model answered: ten proposes with no `ask_id` sent together at `ask_cap: 2` admitted
+       two, made four model calls and `status()` read 4 of 2, where the same ten sent one after another read 2 of 2. The
+       check still runs once per call to this method, so one propose at the last ask still "starts one under the cap and
+       ends one over" as `46 §5.5` records; two sent together no longer both do. */
+    const s0 = core.settings();
+    const proposing = core.reserve('propose', s0.tier, s0.tier === 'a' ? PROMPTS.propose.model : (s0.model ?? PROMPTS.propose.model));
+    const drafting = stored === undefined ? core.reserve('read', s0.tier, PROMPTS.predicate.model) : undefined;
+    try {
+      return await pass2(asked, ctx, byok, stored, drafting, proposing);
+    } finally {
+      if (drafting !== undefined) core.release(drafting);
+      core.release(proposing);
+    }
+  };
+
+  const pass2 = async (
+    asked: string,
+    ctx: CallContext,
+    byok: Inference | undefined,
+    stored: Drafted | undefined,
+    drafting: string | undefined,
+    callId: string,
+  ): Promise<Result<Proposal>> => {
     const looked = await look(asked, ctx, stored);
     if (!looked.ok) return looked;
     const it = looked.value;
-    /* The draft this pass made itself is its own row; a stored one was accounted on pass 1. */
-    if (stored === undefined) accountRead(it, asked);
+    /* The draft this pass made itself is its own row, settling its hold; a stored one was accounted on pass 1. */
+    if (drafting !== undefined) accountRead(it, asked, drafting);
 
-    const callId = core.mint();
     const body = { registers: it.registers, where: it.where, q: it.q };
 
     /* ZERO ROWS, ZERO INFERENCE (`23 §6`). No account row either: nothing was called, and spending an
