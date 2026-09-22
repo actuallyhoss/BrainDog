@@ -69,3 +69,43 @@ test('and a token held to one list is still told about tokens, because a wider o
   const bare = allows({ principal: { kind: 'token', id: 't_2', scope: 'read', person: 'p_1', level: null }, registers: [] }, 'read');
   assert.match(bare!.fix, /Ask the owner for a token\.$/);
 });
+
+/**
+ * AND THE LIST IS NAMED AS `boot` NAMES IT. `allows` joined `ctx.registers`, which are ids, so a member of the seed's
+ * Money list read "you were invited to obligations and nothing else" on the screen whose rail said Money
+ * (`loop/research-scoped-leftovers.md` §2). The name is the declaration's; `allowed` stays ids, since an agent sends one
+ * of those back, and a token is still told the id for the same reason.
+ */
+test('A PERSON IS TOLD THE NAMES OF THE LISTS THEY WERE INVITED TO, joined as a sentence, and `allowed` keeps the ids', async () => {
+  const MONEY = {
+    id: 'register.obligations',
+    kind: 'register' as const,
+    body: { id: 'obligations', name: 'Money', title: 'what', fields: [{ id: 'what', type: 'text', required: true }] } as never,
+  };
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 22, 12)) });
+  assert.ok((await api.kernel.install([TASKS, MONEY])).ok);
+  assert.ok(
+    api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok,
+  );
+  const member = async (person: string, registers: Record<string, string>): Promise<CallContext> => {
+    const invited = (await api.invite({ person, name: person, registers } as never, owner)) as Out;
+    assert.ok(invited.ok, JSON.stringify(invited));
+    const held = api.kernel.access(person)!;
+    return { principal: { kind: 'person', id: person, level: held.level }, registers: held.registers ?? '*', levels: held.levels };
+  };
+
+  const one = ((await api.inbox(undefined, await member('p_9', { obligations: 'write' }))) as Out).refusal!;
+  assert.equal(one.code, 'FORBIDDEN');
+  assert.match(one.fix, /invited to Money, and to nothing else\. Open it, or ask the owner/u);
+  assert.doesNotMatch(one.fix, /obligations|one of those/u, 'the sentence named the list by its id, or offered one list as a choice');
+  assert.deepEqual(one.allowed, ['obligations']);
+
+  const two = ((await api.inbox(undefined, await member('p_8', { obligations: 'read', tasks: 'write' }))) as Out).refusal!;
+  assert.match(two.fix, /invited to (?:Money and Tasks|Tasks and Money), and to nothing else\. Open one of those/u);
+  assert.doesNotMatch(two.fix, /obligations/u);
+
+  const token = allows({ principal: { kind: 'token', id: 't_1', scope: 'write', person: 'p_1', level: null }, registers: ['obligations'] }, 'read');
+  assert.match(token!.fix, /you hold obligations and nothing else\. Name one of those/u);
+  sql.close();
+});

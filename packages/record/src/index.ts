@@ -378,7 +378,7 @@ const LEVEL_REACH: Record<Level, Need[]> = {
  * token says what the holder may do with their access, never what access they have. Getting this
  * backwards is how a revoked colleague keeps writing through a token they were issued last year.
  */
-export function allows(ctx: CallContext, need: Need): Refusal | null {
+export function allows(ctx: CallContext, need: Need, nameOf: (list: string) => string = (list) => list): Refusal | null {
   const p = ctx.principal;
   if (p.kind === 'system') return null;
 
@@ -395,15 +395,23 @@ export function allows(ctx: CallContext, need: Need): Refusal | null {
      `loop/research-invite-landing.md` finding 6 measured nine methods (`inbox`, `packs`, `planPack`, `decide`
      among them) saying it to a colleague invited to one list, who signed in from a link, holds no token and was
      never offered one. It was the sentence on `/inbox`, `/spark`, `/packs` and every `/start` tile. The token's
-     wording stays, because a wider token is exactly what its owner can mint. */
+     wording stays, because a wider token is exactly what its owner can mint.
+
+     AND THE PERSON IS TOLD THE LISTS' NAMES. This joined the ids, so a member of the seed's Money list read "invited to
+     obligations" on the screen whose rail said Money (`loop/research-scoped-leftovers.md` §2). `nameOf` is the record's
+     own lookup, passed by `createRecordApi`, since `CallContext` carries ids and this function has no kernel. A token
+     keeps the ids, because "Name one of those" asks an agent to send one back, and `allowed` stays ids for the same
+     reason. */
   if (p.level === null) {
-    const lists = ctx.registers && ctx.registers !== '*' && ctx.registers.length > 0 ? [...ctx.registers].join(', ') : null;
+    const held = ctx.registers && ctx.registers !== '*' && ctx.registers.length > 0 ? [...ctx.registers] : null;
+    const lists = held ? held.join(', ') : null;
     const person = p.kind === 'person';
+    const named = held ? new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(held.map(nameOf)) : null;
     return {
       code: 'FORBIDDEN',
-      fix: lists
+      fix: held
         ? person
-          ? `This belongs to the whole record, and you were invited to ${lists} and nothing else. Open one of those, or ask the owner to invite you to the whole record.`
+          ? `This belongs to the whole record, and you were invited to ${named}, and to nothing else. Open ${held.length === 1 ? 'it' : 'one of those'}, or ask the owner to invite you to the whole record.`
           : `This call is about the record itself, and you hold ${lists} and nothing else. Name one of those, or ask the owner for a record-wide token.`
         : person
           ? 'This belongs to the whole record, and you have no access to it. Ask the owner to invite you.'
@@ -985,6 +993,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const BOUND = 'the bound register';
 
+  /** A list as its declaration names it, which is the name `boot` gives the rail, or its id when nothing declares it. */
+  const listName = (list: string): string => kernel.register(list)?.name ?? list;
+
   /** Every method starts here: the ladder, then the ceiling, then the work. */
   const guard = (ctx: CallContext, need: Need, asked?: string): Refusal | null => {
     /* A REPORT KEY REACHES `report` AND NOTHING ELSE. Every DATA and READ+ method asks this function or `scoped`,
@@ -1015,7 +1026,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ? ctx
         : { ...ctx, principal: { ...ctx.principal, level: held } };
 
-    return allows(at, need) ?? (register ? reaches(ctx, register) : null);
+    return allows(at, need, listName) ?? (register ? reaches(ctx, register) : null);
   };
 
   /**
@@ -1061,7 +1072,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* AND WHEN NONE OF THEM DOES, THE REFUSAL IS THE FURTHEST-REACHING GRANT'S, so the sentence
        names the largest thing they hold rather than whichever register happened to be listed first. */
     const best = held.sort((a, b) => LEVELS.indexOf(b) - LEVELS.indexOf(a))[0]!;
-    return allows({ ...ctx, principal: { ...p, level: best } }, need);
+    return allows({ ...ctx, principal: { ...p, level: best } }, need, listName);
   };
 
   /**
@@ -1095,7 +1106,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         fix: 'Open this from the app; a token cannot reach the vault.',
         at: 'principal',
       };
-    const stop = allows(ctx, 'owner');
+    const stop = allows(ctx, 'owner', listName);
     if (stop) return stop;
     /* AND A SESSION WHOSE LAST PROOF IS OLDER THAN FIFTEEN MINUTES IS SENT BACK TO PROVE IT AGAIN. A
        cookie is thirty days of standing access; the vault is the one place a laptop left open on a desk
@@ -1122,7 +1133,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         fix: reads === undefined ? 'Open this from the app; a token cannot change what this record is.' : `Open this from the app; a token cannot ${reads}.`,
         at: 'principal',
       };
-    return allows(ctx, 'owner');
+    return allows(ctx, 'owner', listName);
   };
 
   /**
@@ -1780,22 +1791,35 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     ctx.principal.kind === 'person' ? ctx.principal.id : ctx.principal.kind === 'token' ? ctx.principal.person : null;
 
   /**
-   * A line as it leaves the record. THE ROWID STAYS BEHIND FOR A CALLER HELD TO NAMED LISTS, and only at the edge: the
-   * walk, `newsFor` and `markRead` all need it, so `lineOf` keeps it and every answer that hands lines out asks this.
+   * Whether the gap between two of this caller's lines counts nothing they may not read, which is who may hold a rowid.
+   *
+   * NOT `wholeRecord`, WHICH ASKS ONLY ABOUT THE CEILING. A member invited at `read` with Diary held to `append` has no
+   * ceiling, so `wholeRecord` called her whole, and `lineOf` hid Diary from her because `append` does not read: her two
+   * lines came back as rowids 10 and 6 with the three Diary writes she cannot see at 7, 8 and 9
+   * (`loop/research-batch-nineteen-audit.md` finding 3). So this asks `lineOf`'s own question of every list she holds at
+   * a level of its own. A list raised to `write` still reads, and keeps the rowid it had.
+   */
+  const readsEveryList = (ctx: CallContext): boolean =>
+    wholeRecord(ctx) && Object.keys(ctx.levels ?? {}).every((list) => readable(ctx, list) === null);
+
+  /**
+   * A line as it leaves the record. THE ROWID STAYS BEHIND FOR A CALLER WHO CANNOT READ EVERY LIST, and only at the
+   * edge: the walk, `newsFor` and `markRead` all need it, so `lineOf` keeps it and every answer that hands lines out
+   * asks this.
    */
   const shown = (ctx: CallContext, line: Walked): EventLine => {
-    if (wholeRecord(ctx)) return line;
+    if (readsEveryList(ctx)) return line;
     const { rowid: _rowid, ...rest } = line;
     return rest;
   };
 
   /** Where a line sits, said to this caller: its rowid to whoever reads the whole record, and its id to anybody else. */
-  const pointAt = (ctx: CallContext, line: Walked): Cursor => (wholeRecord(ctx) ? line.rowid : cursors.mint(line.id));
+  const pointAt = (ctx: CallContext, line: Walked): Cursor => (readsEveryList(ctx) ? line.rowid : cursors.mint(line.id));
 
   /**
    * The rowid a cursor from this caller names, or the one refusal for everything that is not a cursor they were given.
    *
-   * A WHOLE-RECORD CALLER SENDS A WHOLE NUMBER, as before, or its digits as text, because the host now hands a GET's
+   * A CALLER WHO READS EVERY LIST SENDS A WHOLE NUMBER, as before, or its digits as text, because the host now hands a GET's
    * `cursor` through as the text it was sent rather than coercing it (a scoped caller's `e.01M...` is not a number).
    *
    * ANYBODY ELSE SENDS WHAT THEY WERE HANDED: `e.<id>` of a line `lineOf` shows them, or an `s.` this instance sealed. A
@@ -1804,7 +1828,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * yours" is the fact the cursor exists to withhold (door 7 of `loop/research-scoped-audit.md`).
    */
   const cursorOf = async (ctx: CallContext, given: unknown, at: 'cursor' | 'upTo'): Promise<number | Refusal> => {
-    if (wholeRecord(ctx)) {
+    if (readsEveryList(ctx)) {
       const whole = typeof given === 'string' && /^[1-9]\d{0,15}$/u.test(given) ? Number(given) : given;
       if (typeof whole === 'number' && Number.isSafeInteger(whole) && whole >= 1) return whole;
       return {
@@ -2746,6 +2770,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           if (!beyond) return b;
           const kept: Record<string, unknown> = { ...b };
           for (const key of [...DRAWN, ...WRITTEN]) delete kept[key];
+          /* AND WHAT IT READS, WHEN THAT IS A LIST OR A FIGURE. A refused Diary block still said `source: register.diary`,
+             the id `boot` leaves out of her rail, and `columns` with Diary's field ids, which is the schema `schema`
+             refuses her; a figure's said `source: metric.diary-count` (`loop/research-scoped-leftovers.md` §1). The web
+             reads neither off a refused block: `blockOf` draws the shell, headed from `refusals`, the moment one is
+             there. A source that names a view and no list stays, since it says nothing she could not guess: the `log`
+             ones, and the two below, which are the kernel's computed sources that `ACROSS` does not hold. */
+          if (!log && typeof b.source === 'string' && b.source !== 'forecast.runway' && b.source !== 'sessions.live') {
+            delete kept.source;
+            delete kept.columns;
+          }
           return {
             ...(kept as typeof b),
             rows: [],
@@ -4544,7 +4578,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          for anybody else, since its id would hand them the hidden event's millisecond (`history-cursor.ts`). */
       let below: Cursor | null = null;
       if (lines.length > limit) below = last ? pointAt(ctx, last) : null;
-      else if (next !== null) below = wholeRecord(ctx) ? next : await cursors.seal(next);
+      else if (next !== null) below = readsEveryList(ctx) ? next : await cursors.seal(next);
       return ok({ events: events.map((line) => shown(ctx, line)), cursor: below });
     },
 
@@ -4558,7 +4592,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     async inbox(args: { cursor?: number; limit?: number } | undefined, ctx: CallContext): Promise<Result<InboxPage>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
-      const owner = allows(ctx, 'owner');
+      const owner = allows(ctx, 'owner', listName);
       if (owner) return { ok: false, refusal: { ...owner, code: 'FORBIDDEN' } };
       if (!wholeRecord(ctx))
         return no('FORBIDDEN', 'The inbox belongs to the whole record, and this caller is held to part of it.', { at: 'principal' });

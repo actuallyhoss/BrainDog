@@ -63,8 +63,11 @@ const DECLS = [
       { kind: 'table', source: 'sessions.live' },
       { kind: 'table', source: 'actions' },
       { kind: 'forecast', source: 'forecast.runway', opening: 1_000_000, from: [{ register: 'bills', on: 'due', amount: 'amount' }], horizon: 60 },
-      /* A BLOCK OVER THE DIARY ON A PAGE SHE MAY OPEN, whose filter is a diary entry's words. */
-      { kind: 'table', source: 'register.diary', where: 'body is Told Sam about the redundancy list' },
+      /* A BLOCK OVER THE DIARY ON A PAGE SHE MAY OPEN, whose filter is a diary entry's words and whose columns name the
+         diary's own fields, which is the schema `schema({ register: 'diary' })` refuses her. */
+      { kind: 'table', source: 'register.diary', where: 'body is Told Sam about the redundancy list', columns: [{ field: 'body', label: 'What I told Sam' }] },
+      /* AND A FIGURE OVER THE DIARY, whose `source` is the figure's name. */
+      { kind: 'series', source: 'metric.diary-count', heading: 'Diary entries' },
     ],
   }),
   decl('metric', 'diary-count', { metric: 'diary-count', name: 'Diary entries', source: 'register.diary', value: { count: 'body' }, format: 'int', target: { lte: 99 }, window: '30d' }),
@@ -205,7 +208,11 @@ test('2. A BLOCK WHOSE SOURCE IS NOT A LIST IS JUDGED BY WHAT IT READS: the cash
   );
 
   const desk = value<PageOut>(await api.page({ slug: 'desk' }, wren));
-  const block = (source: string) => desk.blocks.find((b) => b.source === source)!;
+  /* FOUND BY WHERE THE PAGE DECLARES IT, because a refused block no longer says what it reads: `source: register.diary`
+     named the list `boot` leaves out of her rail. The page answers its blocks in the order they are declared. */
+  const declared = (DECLS as { id: string; body: { blocks?: { source?: string }[] } }[]).find((d) => d.id === 'page.desk')!.body.blocks!;
+  assert.equal(desk.blocks.length, declared.length);
+  const block = (source: string) => desk.blocks[declared.findIndex((b) => b.source === source)]!;
   const said = JSON.stringify(desk);
 
   /* MEASURED BEFORE: `Severance for Sam`, -1,250,000 on 2026-09-20, balance -250,000, from a list `list` refuses her. */
@@ -230,6 +237,16 @@ test('2. A BLOCK WHOSE SOURCE IS NOT A LIST IS JUDGED BY WHAT IT READS: the cash
   /* AND A REFUSED BLOCK DOES NOT CARRY ITS FILTER, which is a diary entry's words written into the page. */
   assert.equal(block('register.diary').refusals?.[0]?.code, 'FORBIDDEN');
   assert.equal(block('register.diary').where, undefined, 'a refused block kept the `where` a person wrote with a diary entry in it');
+
+  /* NOR WHAT IT READS. MEASURED BEFORE: `source: register.diary` with `columns: [{ field: body }]`, and
+     `source: metric.diary-count` on the figure, three names for what she cannot open. */
+  assert.equal(block('register.diary').source, undefined, 'a refused block named the list it reads, which `boot` hides from her');
+  assert.equal((block('register.diary') as { columns?: unknown }).columns, undefined, "a refused block carried the hidden list's field ids");
+  assert.equal(block('metric.diary-count').refusals?.[0]?.code, 'FORBIDDEN');
+  assert.equal(block('metric.diary-count').source, undefined, 'a refused block named a figure over a list she cannot open');
+  /* A SOURCE THAT NAMES A VIEW AND NO LIST STAYS, since it says nothing she could not guess. */
+  assert.equal(block('forecast.runway').source, 'forecast.runway');
+  assert.equal(block('sessions.live').source, 'sessions.live');
   sql.close();
 });
 

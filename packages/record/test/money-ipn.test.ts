@@ -220,17 +220,17 @@ test('THE `From HSBC:` CREDIT IS STORED AND CLAIMED BY NOTHING, because its only
 });
 
 /**
- * ONE ACCOUNT, PRINTED TWO WAYS, AND NOT YET READ. `loop/research-bank-real.md`, *The three that did not read*,
- * item 3: the InstaPay messages print his EGP account as stars and four digits, the `From HSBC:` lines as a branch
- * code, three stars and the last three of those four. `lookup` answers the row whose `last4` is a WHOLE TOKEN in
- * the slice, so whichever form he types, one family goes to `review` with `account` unread.
+ * ONE ACCOUNT, PRINTED TWO WAYS. `loop/research-bank-real.md`, *The three that did not read*, item 3: the InstaPay
+ * messages print his EGP account as stars and four digits, the `From HSBC:` lines as a branch code, three stars and
+ * the last three of those four. `lookup` answered only the row whose `last4` is a WHOLE TOKEN in the slice, so
+ * whichever form he typed, one family went to `review` with `account` unread.
  *
- * A TODO AND NOT A PASS, because the repair is not in the money pack. The declaration can only name a slice; the
- * whole-token rule is `matchFolded` in `packages/extract/src/extractors.ts`, shared with `enum`, and the kernel
- * reaches it through `deps.literals` in `packages/kernel/src/ingest.ts`, so a lookup-only suffix rule needs both.
- * Measured on this file as it stands: `review`, `bank-from-out could not read account out of this one.`
+ * READ NOW BY `lookup`'s SUFFIX RULE (`matchLiterals` in `packages/extract/src/extractors.ts`, asked for by name
+ * from `packages/kernel/src/ingest.ts`): digits printed behind stars are the tail of the one row whose longer value
+ * ends in them, and of two such rows, neither. Measured red on this file before the repair, with the `todo` taken
+ * off: `review`, `bank-from-out could not read account out of this one.`
  */
-test('A `last4` OF FOUR DIGITS IS THE ACCOUNT A LINE PRINTING ITS LAST THREE BEHIND STARS NAMES, when exactly one account ends so', { todo: 'suffix matching lives in extractors.ts and ingest.ts, outside the money pack' }, async () => {
+test('A `last4` OF FOUR DIGITS IS THE ACCOUNT A LINE PRINTING ITS LAST THREE BEHIND STARS NAMES, when exactly one account ends so', async () => {
   const r = await record();
   const four = r.k.create('accounts', { name: 'Cairo savings', kind: 'bank', balance: { amount: 0, currency: 'EGP' }, as_of: day(0), liquid: true, last4: '6518' }, { actor: 'p_seed' });
   assert.ok(four.ok, JSON.stringify(four));
@@ -241,6 +241,11 @@ test('A `last4` OF FOUR DIGITS IS THE ACCOUNT A LINE PRINTING ITS LAST THREE BEH
   assert.equal(row.fields.direction, 'out');
   assert.deepEqual(row.fields.amount, { amount: 90_000, currency: 'EGP' });
   assert.equal(row.fields.account, four.value.id, 'the three printed digits did not land on the one account ending in them');
+
+  /* THE SAME `last4` STILL READS THE INSTAPAY FAMILY, which prints all four digits behind its stars. */
+  const ipn = forward(r.k, 'Your HSBC Account ********6518 was debited with IPN outward transfer for EGP 75.00 on 05-08-2026 10:15 to ORCHARD PRINTS with reference 3a9e0c55d1', 'money-ipn-suffix-four');
+  assert.equal(ipn.state, 'matched', ipn.reason ?? '');
+  assert.equal(r.k.get(ipn.wrote[0]!)!.fields.account, four.value.id, 'the four printed digits did not land on the account holding them');
 
   /* AND TWO ACCOUNTS ENDING IN THE SAME THREE IS A PERSON'S QUESTION, never the first one found. */
   const twin = r.k.create('accounts', { name: 'Cairo deposit', kind: 'bank', balance: { amount: 0, currency: 'EGP' }, as_of: day(0), liquid: false, last4: '7518' }, { actor: 'p_seed' });
