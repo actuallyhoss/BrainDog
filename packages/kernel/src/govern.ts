@@ -540,8 +540,67 @@ function aboutOthers(sql: Sql, named: string, bundle: { id?: unknown; kind?: unk
             : `This change is filed as a change to ${named}, and ${String(d.id)} in it replaces one that reads register.${was}, so whoever reads ${named} would be asked to change what ${was} shows. Propose ${String(d.id)} as a change of its own.`,
         at: 'body.to',
       };
+    const reader = d.kind === 'metric' && isMap(d.body) && typeof d.body.metric === 'string' ? pageOfOthers(sql, d.body.metric, list, bundle) : undefined;
+    if (reader !== undefined)
+      return {
+        code: 'VALUE_MALFORMED',
+        fix:
+          reader.other === undefined
+            ? `This change is filed as a change to ${named}, and ${String(d.id)} in it defines a figure ${reader.page} reads, which names no list, so nothing here can say whose page that is. Propose ${String(d.id)} as a change of its own.`
+            : reader.other === '*'
+              ? `This change is filed as a change to ${named}, and ${String(d.id)} in it defines a figure ${reader.page} reads, which reads across the whole record, so whoever reads ${named} would be asked to change what everybody reads. Propose ${String(d.id)} as a change of its own.`
+              : `This change is filed as a change to ${named}, and ${String(d.id)} in it defines a figure ${reader.page} reads, which reads register.${reader.other}, so whoever reads ${named} would be asked to change what ${reader.other} shows. Propose ${String(d.id)} as a change of its own.`,
+        at: 'body.to',
+      };
   }
   return null;
+}
+
+/**
+ * An installed page or digest not about `list` that reads `figure` while no live metric declares it, if there is one.
+ *
+ * A PAGE READS A FIGURE BY NAME, WHATEVER STATE ITS METRIC IS IN, and `replacedAbout` reads only a live one: with
+ * `metric.diary-count` retired, or never declared, a bundle under `register.obligations` defining it over Obligations
+ * replaced nothing the guard could read, was filed, and a page of Diary then showed Obligations' count
+ * (`govern-bundle-scope.test.ts`, all three cases measured filed before this). So the pages are asked instead. A figure
+ * with a live metric is left to `replacedAbout`: its `source` already says whose it is, and a page reading it already
+ * shows that list to whoever reads the page, so a page that reads Obligations among other lists is no bar to changing
+ * Obligations' own figure. A page the bundle replaces is skipped, since its new body is what gets checked. A page that
+ * names no list is refused too: nothing says whose it is, and an unknown is not a licence.
+ */
+function pageOfOthers(
+  sql: Sql,
+  figure: string,
+  list: string,
+  bundle: { id?: unknown }[],
+): { page: string; other: string | undefined } | undefined {
+  const live = (at: string) =>
+    sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1', at)?.body;
+  if (live(`metric.${figure}`) !== undefined) return undefined;
+  const replaced = new Set(bundle.map((d) => d?.id));
+  /* A DIGEST READS A FIGURE BY NAME TOO, as a `metric.<id>` section (`digest.ts`), and asking only the pages filed a
+     Diary digest's retired figure redefined over Obligations. It is walked as the replaced digest is, with no page. */
+  const readers = sql.all<{ id: string; kind: string; body: string }>(
+    "SELECT id, kind, body FROM declaration WHERE kind IN ('page', 'digest') AND superseded_at IS NULL AND retired = 0 ORDER BY id",
+  );
+  for (const row of readers) {
+    if (replaced.has(row.id)) continue;
+    const body: unknown = JSON.parse(row.body);
+    /* A TEMPLATE'S `{{field}}` IS ITS ROW'S, read from the list it is for as installed. */
+    const forList = isMap(body) && isMap(body.for) && typeof body.for.register === 'string' ? body.for.register : undefined;
+    const shape = forList === undefined ? undefined : live(`register.${forList}`);
+    const own: unknown = shape === undefined ? undefined : JSON.parse(shape);
+    const fields = new Set(isMap(own) && Array.isArray(own.fields) ? own.fields.map((f) => (isMap(f) ? f.id : undefined)).filter((f) => typeof f === 'string') : []);
+    const { lists, unknown } = listsNamed(body, row.kind === 'page' ? { template: forList !== undefined, fields } : null, (id) => {
+      if (id === figure) return undefined;
+      const metric = live(`metric.${id}`);
+      return metric === undefined ? undefined : JSON.parse(metric);
+    });
+    if (!unknown.has(figure)) continue;
+    const other = [...lists].find((l) => l !== list);
+    if (other !== undefined || lists.size === 0) return { page: row.id, other };
+  }
+  return undefined;
 }
 
 /**

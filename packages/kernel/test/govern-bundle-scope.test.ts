@@ -259,3 +259,77 @@ test('and a bundle that replaces a declaration already about Obligations is stil
   assert.ok(made.ok, fixOf(made));
   sql.close();
 });
+
+/**
+ * A figure no live metric declares, read by an installed page of Diary, defined over Obligations.
+ *
+ * THE GUARD READ WHAT A METRIC REPLACES ONLY WHILE THAT METRIC WAS LIVE, and a page reads a figure by name whatever
+ * its metric's state. With `metric.diary-count` retired, or never declared, a bundle under `register.obligations`
+ * defining `metric.diary-count` over Obligations replaced nothing the guard could read, and a page of Diary then showed
+ * Obligations' count. Each case below was measured filed before the guard asked which installed pages read the figure.
+ */
+const diaryLook: Declaration = {
+  id: 'page.diary-look',
+  kind: 'page',
+  body: {
+    page: 'diary-look',
+    title: 'Diary',
+    blocks: [
+      { kind: 'stat', cells: [{ metric: 'diary-count' }] },
+      { kind: 'table', heading: 'Rows', span: 12, source: 'register.diary', columns: [{ field: 'body' }], limit: 50, empty: 'None.' },
+    ],
+  } as never,
+};
+const obligationsLook: Declaration = {
+  id: 'page.obligations-look',
+  kind: 'page',
+  body: {
+    page: 'obligations-look',
+    title: 'Obligations',
+    blocks: [
+      { kind: 'stat', cells: [{ metric: 'obligations-count' }] },
+      { kind: 'table', heading: 'Rows', span: 12, source: 'register.obligations', columns: [{ field: 'what' }], limit: 50, empty: 'None.' },
+    ],
+  } as never,
+};
+const diaryMail: Declaration = {
+  ...digest('diary'),
+  body: { ...(digest('diary').body as { sections: unknown[] }), sections: [...(digest('diary').body as { sections: unknown[] }).sections, { heading: 'Count', source: 'metric.diary-count', as: 'figure' }] } as never,
+};
+const UNDECLARED: [string, (k: Kernel) => Promise<boolean>][] = [
+  ['the Diary figure retired, a Diary page still reading it', async (k) => (await k.install([OBLIGATIONS, DIARY, metric('diary'), diaryLook])).ok && k.retire(['metric.diary-count']).ok],
+  ['the Diary figure never declared, a Diary page reading it', async (k) => (await k.install([OBLIGATIONS, DIARY, diaryLook])).ok],
+  /* A page that names no list but the figure's is nobody's to redefine from one list's question. */
+  ['the Diary figure retired, a page of that figure alone reading it', async (k) => (await k.install([OBLIGATIONS, DIARY, metric('diary'), figures('diary-count')])).ok && k.retire(['metric.diary-count']).ok],
+  /* A DIGEST READS A FIGURE BY NAME AS A PAGE DOES (`digest.ts`, a `metric.<id>` section), and asking only the pages
+     filed this one: the Diary digest would have mailed Obligations' count to whoever takes it. */
+  ['the Diary figure retired, a Diary digest still mailing it', async (k) => (await k.install([OBLIGATIONS, DIARY, metric('diary'), diaryMail])).ok && k.retire(['metric.diary-count']).ok],
+];
+
+test('A BUNDLE NAMED FOR OBLIGATIONS THAT DEFINES A FIGURE A DIARY PAGE OR DIGEST READS IS REFUSED, whatever the figure\'s metric state', async () => {
+  const wrong: string[] = [];
+  for (const [what, arrange] of UNDECLARED) {
+    const sql = openSqlite();
+    const k = await openRecord(sql, fixedClock(NOW));
+    if (!(await arrange(k))) {
+      wrong.push(`${what}: the record would not arrange`);
+      sql.close();
+      continue;
+    }
+    const out = k.propose(change('register.obligations', bundle(renamed(metric('obligations'), 'metric.diary-count'))), 'p_1');
+    if (out.ok) wrong.push(`${what}: filed`);
+    else if (codeOf(out) !== 'VALUE_MALFORMED' || !/metric\.diary-count.*(?:page|digest)\./.test(fixOf(out))) wrong.push(`${what}: ${codeOf(out)} ${fixOf(out)}`);
+    else if (filed(sql) !== 0) wrong.push(`${what}: a row was written`);
+    sql.close();
+  }
+  assert.deepEqual(wrong, []);
+});
+
+test('and a bundle that defines a figure only a page of Obligations reads is still filed', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  assert.ok((await k.install([OBLIGATIONS, DIARY, obligationsLook])).ok);
+  const made = k.propose(change('register.obligations', bundle(metric('obligations'))), 'p_1');
+  assert.ok(made.ok, fixOf(made));
+  sql.close();
+});
