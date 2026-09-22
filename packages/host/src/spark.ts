@@ -47,7 +47,7 @@
  * `RecordApi` and `Inference`, and `createSpark` is called by the app with what this file builds.
  */
 
-import { ok, type Result, type Sql } from '@braindog/ports';
+import { ok, type Refusal, type Result, type Sql } from '@braindog/ports';
 import type { Entry, RegisterDecl } from '@braindog/kernel';
 import type { CallContext, RecordApi, SparkFormInput, SparkModel, SparkModelInput } from '@braindog/record';
 
@@ -379,8 +379,176 @@ export function sparkByokOf(config: SparkHostConfig | undefined, deps: SparkHost
  * package edit). If the package renames the column this answers `null` for nobody and throws for everybody, which the door
  * turns into a 500 on the first tier `b` propose rather than a silent fall to the included model.
  */
-export const sparkGrantIdOf = (sql: Sql): string | null =>
-  sql.one<{ grant_id: string | null }>('SELECT grant_id FROM settings WHERE singleton = 1')?.grant_id ?? null;
+export const sparkGrantIdOf = (sql: Sql): string | null => {
+  /* ONLY ON TIER `b`, because `configure` keeps `grant_id` when an owner moves back to `a` (`packages/spark/src/index.ts`,
+     `grant = patch.grant_id === undefined ? before.grant_id : ...`). Answering it on `a` made every propose on the
+     included model open the vault gate in `sparkByokFor`, so a read colleague on tier `a` would have been refused a key
+     nobody was going to send. */
+  const row = sql.one<{ tier: string; grant_id: string | null }>('SELECT tier, grant_id FROM settings WHERE singleton = 1');
+  return row?.tier === 'b' ? (row.grant_id ?? null) : null;
+};
+
+/**
+ * `46 §5.5` step 3's sentence for tier `b` with no open key, which `§5.9` step 4 has the host answer when the vault refuses.
+ *
+ * THE PACKAGE SAYS IT TOO, BUT ONLY AFTER PASS ONE HAS DRAFTED. `pass2` reads the rows, which on a `propose` with no
+ * `ask_id` is a model call on this host's endpoint, and only then finds `byok` absent. So the host says it first, in the
+ * same words, where no model has been asked anything.
+ */
+export const SPARK_KEY_CLOSED: Refusal = {
+  code: 'FORBIDDEN',
+  fix: 'Your key is not open in this session. Open the vault, or switch Spark to the included model.',
+};
+
+/** What `sparkByokFor` needs of the record: the vault gate, asked through a read that writes no event, and the kernel. */
+export type SparkVaultApi = Pick<RecordApi, 'kernel' | 'listGrants'>;
+
+/**
+ * Tier `b`'s adapter FOR THIS ASKER: the vault's own check on their session first, and every `grant.read` signed by them.
+ *
+ * `46 §5.9` step 2 HAS THE HOST OPEN THE GRANT "UNDER THE ASKER'S BROWSER SESSION", AND AS BUILT IT OPENED IT AS `system`.
+ * Both hosts handed the door `sparkByokOf` over their `keyOpener`, which calls `kernel.openGrant(..., 'system')`, and the
+ * door's `ctx` was dropped on the floor. Measured in `test/spark-byok-guard.test.ts` before this function existed: a `read`
+ * colleague whose last proof was fifty minutes old proposed, got 200, and the proposal went out on the owner's key; the
+ * owner's own ask left one `grant.read` whose actor was `system`, so an owner reading the vault's log could not tell her own
+ * asks from anybody else's (`loop/research-batch-thirty-one-audit.md` §1).
+ *
+ * SO THE VAULT GATE RUNS FIRST, AND IT IS THE RECORD'S AND NOT A COPY. `listGrants(ctx)` is the record's `vault(ctx)` and
+ * nothing else: a person at `owner`, never a bearer, and a proof in the last fifteen minutes. It writes no event, which is
+ * why it is the probe and `openGrant` is not: a propose that finds no rows opens no key, and should leave no `grant.read`.
+ * Refused, the door answers `SPARK_KEY_CLOSED` and the engine is never called, so nothing is drafted either.
+ *
+ * AND THE READ IS SIGNED BY THE ASKER, through the opener the host already has. `keyOpener` lives in each app's
+ * `actions.ts` and is shared with scheduled actions, where `system` is the truth, so the opener is not changed: it is
+ * handed a view of the record whose `kernel.openGrant` puts the asker's id where it would have put `system`. That is
+ * exactly what the record's own `openGrant(args, ctx)` does after the same gate (`packages/record/src/index.ts`,
+ * `kernel.openGrant(args, actorOf(ctx))`), split in two so the gate can answer before the model is asked and the event
+ * is written only when the key is.
+ *
+ * `undefined` ON EVERY TIER BUT `b`, from `sparkGrantIdOf`, so nothing here stands in front of the included model.
+ */
+export async function sparkByokFor<A extends SparkVaultApi>(
+  config: SparkHostConfig | undefined,
+  grantId: string | null,
+  api: A,
+  ctx: CallContext,
+  wire: (asker: A) => SparkHostDeps,
+): Promise<SparkInference | { ok: false; refusal: Refusal } | undefined> {
+  if (!config || grantId === null) return undefined;
+  const gate = await api.listGrants(ctx);
+  if (!gate.ok) return { ok: false, refusal: SPARK_KEY_CLOSED };
+  const actor = ctx.principal.kind === 'token' ? ctx.principal.person : ctx.principal.id;
+  const kernel = Object.create(api.kernel) as A['kernel'];
+  kernel.openGrant = (args, _system) => api.kernel.openGrant(args, actor);
+  const asker = Object.create(api) as A;
+  Object.defineProperty(asker, 'kernel', { value: kernel });
+  return sparkByokOf(config, wire(asker), grantId);
+}
+
+/**
+ * The first of the month, as the package's `call.ts` `monthOf` writes it, so a count here and a count there agree.
+ */
+const monthOf = (ms: number, add: number): string => {
+  const at = new Date(ms);
+  return new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth() + add, 1)).toISOString();
+};
+
+export type SparkGuardDeps = {
+  /** Spark's own SQLite, the one the app handed `createSpark`. */
+  sql: Sql;
+  clock: { now(): number };
+  /** The record's vault rows, read on each settings save so a grant revoked a second ago counts. */
+  grants: () => readonly { id: string; revoked_at: string | null }[];
+};
+
+type Guarded = {
+  status(): unknown;
+  read(question: string, ctx: CallContext): Promise<Result<unknown>>;
+  propose(question: string, ctx: CallContext, byok?: unknown, askId?: string): Promise<Result<unknown>>;
+  configure(patch: Record<string, unknown>, ctx: CallContext): Result<unknown>;
+};
+
+/**
+ * The package's engine, with the two host-side rules tier `b` was missing: its drafts counted against `ask_cap`, and a
+ * save refused when the grant it names is not a live key.
+ *
+ * TIER `b`'s PASS ONE IS THIS HOST'S MODEL ON THIS HOST'S KEY, AND THE PACKAGE DOES NOT METER IT. `spent()` stops tier `a`
+ * alone ("on `b` and `byo` the asker is paying"), and `look` drafts every predicate on `fallback`, which is the host's
+ * endpoint; only the proposal goes on `byok`. Measured in `test/spark-byok-guard.test.ts` before this wrap: at `ask_cap: 1`
+ * five reads made five model calls, all five as `Bearer fake-operator-key`, and status read `used 0`
+ * (`loop/research-batch-thirty-one-audit.md` §3). The audit offered two repairs, drafting on the owner's key or metering
+ * the draft, and this is the second: drafting on `byok` needs the asker's session inside `fallback.complete`, which has
+ * no context to carry it, and a slot shared between two asks in flight would open one person's key for another.
+ *
+ * THE CHECK IS SYNCHRONOUS AND RIGHT BEFORE THE ENGINE'S OWN, AND THAT IS WHAT MAKES IT A CAP. The package writes a hold
+ * row (`core.reserve`) before its first `await`, so the count here, taken with no `await` before the call, includes every
+ * draft already in flight. `packages/spark/src/call.ts` records what a check and a count with a model between them cost:
+ * ten asks at `ask_cap: 2` made ten calls.
+ *
+ * A HOST READING A TABLE `46 §4.1` DEFINES, AGAIN, which `sparkGrantIdOf` already does for the same reason: the package
+ * exposes no count by tier and changing that is an edit to `packages/spark`. `status()` is corrected with the same count,
+ * because `23 §8` has a person told what they have used, and on tier `b` that was always 0.
+ *
+ * A PROPOSE ON A STORED `ask_id` DRAFTS NOTHING, so it is not stopped: its one call is on the owner's key. Any other
+ * propose drafts first, on this host, and is held to the cap like a read.
+ */
+export function sparkGuardedEngine<E extends Guarded>(engine: E, deps: SparkGuardDeps): E {
+  const tierOf = (): { tier: string; grant_id: string | null; ask_cap: number } | undefined =>
+    deps.sql.one<{ tier: string; grant_id: string | null; ask_cap: number }>('SELECT tier, grant_id, ask_cap FROM settings WHERE singleton = 1');
+  const drafted = (): number =>
+    deps.sql.one<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM call WHERE tier = 'b' AND kind = 'read' AND model <> '-' AND ts >= ?",
+      monthOf(deps.clock.now(), 0),
+    )?.n ?? 0;
+  const spent = (askId: string | undefined): Refusal | null => {
+    const s = tierOf();
+    if (s?.tier !== 'b') return null;
+    if (askId !== undefined && deps.sql.one("SELECT 1 AS n FROM call WHERE id = ? AND kind = 'read' AND predicate IS NOT NULL", askId) !== undefined)
+      return null;
+    if (drafted() < s.ask_cap) return null;
+    return {
+      code: 'SPARK_BUDGET_SPENT',
+      fix: `Spark reads each question on this host's model before your own key answers it, and those reads are spent until ${monthOf(deps.clock.now(), 1).slice(0, 10)}. Raise the monthly limit, or wait.`,
+    };
+  };
+
+  const guarded = Object.create(engine) as E;
+  guarded.status = () => {
+    const status = engine.status() as { asks?: { used: number } };
+    if (tierOf()?.tier !== 'b' || status?.asks === undefined) return status;
+    return { ...status, asks: { ...status.asks, used: drafted() } };
+  };
+  guarded.read = (question, ctx) => {
+    const stop = spent(undefined);
+    return stop ? Promise.resolve({ ok: false, refusal: stop }) : engine.read(question, ctx);
+  };
+  guarded.propose = (question, ctx, byok, askId) => {
+    const stop = spent(askId);
+    return stop ? Promise.resolve({ ok: false, refusal: stop }) : engine.propose(question, ctx, byok, askId);
+  };
+  /* A TIER `b` SAVE MUST NAME A KEY THE VAULT HOLDS. `configure` checks a grant id's shape and never the vault, so an id
+     that is not there saved with 200 and every propose after it was 403 (`loop/research-batch-thirty-one-audit.md` §5).
+     The grant it checks is the one tier `b` would open: the patch's, or the one already stored when the patch names none,
+     which is how a revoked key reached the save. A caller who is not the owner is left to `configure`, which refuses them
+     in its own sentence, so this check never tells a colleague whether a grant id exists. */
+  guarded.configure = (patch, ctx) => {
+    if (ctx.principal.kind !== 'person' || ctx.principal.level !== 'owner') return engine.configure(patch, ctx);
+    const before = tierOf();
+    const tier = patch['tier'] ?? before?.tier;
+    const grant = patch['grant_id'] === undefined ? (before?.grant_id ?? null) : patch['grant_id'];
+    if (tier === 'b' && typeof grant === 'string' && !deps.grants().some((g) => g.id === grant && g.revoked_at === null))
+      return {
+        ok: false,
+        refusal: {
+          code: 'VALUE_MALFORMED',
+          fix: 'That grant holds no key in this record. Put the key in the vault first, then choose it here.',
+          at: 'grant_id',
+        },
+      };
+    return engine.configure(patch, ctx);
+  };
+  return guarded;
+}
 
 /** The model this host's endpoint answers with when the package asks by short name: `SPARK_MODEL`, or nothing when unset. */
 export const sparkModelNameOf = (config: SparkHostConfig | undefined): string | undefined => config?.model;

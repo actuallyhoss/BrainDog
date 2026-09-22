@@ -112,10 +112,13 @@ export type SparkAskEngine<C> = {
  * deployment configured no endpoint. Both are the same fact to a person, so both get the same
  * sentence.
  *
- * `byok` IS THE HOST'S WAY TO OPEN THE OWNER'S OWN KEY FOR ONE PROPOSE, and it is absent on both hosts
- * today. The door reads nothing about tiers: it hands `propose` whatever `byok` answers for this
- * session. Where it is absent the settings door refuses tier `b` outright, because a stored tier `b`
- * that no host can serve would make every later `propose` answer `FORBIDDEN`.
+ * `byok` IS THE HOST'S WAY TO OPEN THE OWNER'S OWN KEY FOR ONE PROPOSE, built on both hosts wherever a
+ * key store is (`bd8add33`), and handed the asker's context so the vault's own gate runs on it
+ * (`sparkByokFor` in `spark.ts`). The door reads nothing about tiers: it hands `propose` whatever
+ * `byok` answers for this session, and when that answer is a refusal it is the answer, before the
+ * engine is called, so a caller the vault turns away costs no model call. Where `byok` is absent the
+ * settings door refuses tier `b` outright, because a stored tier `b` that no host can serve would make
+ * every later `propose` answer `FORBIDDEN`.
  */
 export type SparkAskDoor<C> = {
   origins: ReadonlySet<string>;
@@ -317,8 +320,16 @@ export async function serveSpark<C>(request: Request, door: SparkAskDoor<C>, ctx
   } catch (e) {
     return refusal(500, { code: 'INTERNAL', fix: `Your key could not be opened for Spark: ${e instanceof Error ? e.message : String(e)}.` });
   }
+  /* A REFUSED OPENING IS THE ANSWER, AND THE ENGINE IS NOT ASKED. Handing the package `undefined` instead would reach
+     its own `FORBIDDEN` only after pass one had drafted on this host's model, so a caller the vault refuses would
+     still have spent a call. */
+  if (refusedKey(byok)) return sparkReply(byok);
   return answer(() => engine.propose(question, ctx, byok, askId as string | undefined));
 }
+
+/** A `byok` answer that is the host refusing to open the key, as `sparkByokFor` writes one, and not an adapter. */
+const refusedKey = (value: unknown): value is { ok: false; refusal: Refusal } =>
+  typeof value === 'object' && value !== null && (value as { ok?: unknown }).ok === false && typeof (value as { refusal?: unknown }).refusal === 'object';
 
 const shown = (value: unknown): string => JSON.stringify(value) ?? String(value);
 

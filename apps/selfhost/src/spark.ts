@@ -23,9 +23,10 @@
 
 import {
   SPARK_KEY_LABEL,
-  sparkByokOf,
+  sparkByokFor,
   sparkFromEnv as fromEnv,
   sparkGrantIdOf,
+  sparkGuardedEngine,
   sparkInferenceOf,
   sparkModelNameOf,
   sparkModelOf,
@@ -99,7 +100,10 @@ export async function sparkEngineFor(
   const { createSpark } = await import('@braindog/spark');
   /* NAMED BY THIS HOST, because on tier `a` the package can only say `glm-5.3-flash` and what answers is `SPARK_MODEL`
      (`loop/research-spark-routes.md` F2). Every door this engine is handed to reads the one `status()`. */
-  return sparkNamedEngine(createSpark({ sql: deps.sql, clock: deps.clock, inference, record: sparkRecord(api()) }), sparkModelNameOf(config));
+  const engine = sparkNamedEngine(createSpark({ sql: deps.sql, clock: deps.clock, inference, record: sparkRecord(api()) }), sparkModelNameOf(config));
+  /* GUARDED BY THIS HOST, because tier `b`'s drafts are on this host's key and the package meters tier `a` alone, and
+     because `configure` checks a grant id's shape and never the vault (`sparkGuardedEngine`). */
+  return sparkGuardedEngine(engine, { sql: deps.sql, clock: deps.clock, grants: () => api().kernel.grants() });
 }
 
 /**
@@ -169,8 +173,13 @@ export function sparkDoor(
      answers `null` for every grant, and a `byok` handed in here is what lets the settings door store tier `b`, so
      offering it would save a setting every later propose refuses. `SPARK_KEY` does not make a host able to open the
      owner's key and so does not count. The grant id is read on each propose, after the engine that made the `settings`
-     table has been built, so a grant the owner names or revokes counts on the next ask. */
+     table has been built, so a grant the owner names or revokes counts on the next ask.
+     AND IT IS OPENED FOR THE ASKER, NOT FOR `system`. `sparkByokFor` runs the vault's own gate on `ctx` and signs the
+     `grant.read` with the asker's id; before it, a read colleague with a fifty-minute-old proof proposed on the owner's key
+     and the log said `system` (`loop/research-batch-thirty-one-audit.md` §1). */
   const byok =
-    config === undefined || store === undefined ? undefined : async () => sparkByokOf(config, wireOf(config, api, store), sparkGrantIdOf(deps.sql));
+    config === undefined || store === undefined
+      ? undefined
+      : async (ctx: CallContext) => sparkByokFor(config, sparkGrantIdOf(deps.sql), api(), ctx, (asker) => wireOf(config, () => asker, store));
   return sparkAskDoor(origins, () => sparkEngineFor(config, api, store, deps), byok);
 }

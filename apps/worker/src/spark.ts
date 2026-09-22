@@ -26,9 +26,10 @@
  */
 
 import {
-  sparkByokOf,
+  sparkByokFor,
   sparkFromEnv,
   sparkGrantIdOf,
+  sparkGuardedEngine,
   sparkInferenceOf,
   sparkModelNameOf,
   sparkModelOf,
@@ -103,7 +104,10 @@ export async function workerSparkEngine(env: SparkEnv, api: () => RecordApi, dep
   const { createSpark } = await import('@braindog/spark');
   /* NAMED BY THIS HOST, as on the self-host: the package's tier `a` status says `glm-5.3-flash` whatever `SPARK_MODEL`
      sends (`loop/research-spark-routes.md` F2), and one wrap here is what every door over this engine reads. */
-  return sparkNamedEngine(createSpark({ sql: deps.sql, clock: deps.clock, inference, record: sparkRecord(api()) }), sparkModelNameOf(config));
+  const engine = sparkNamedEngine(createSpark({ sql: deps.sql, clock: deps.clock, inference, record: sparkRecord(api()) }), sparkModelNameOf(config));
+  /* GUARDED BY THIS HOST, as on the self-host: tier `b`'s drafts are on this Worker's endpoint and the package meters tier
+     `a` alone, and `configure` checks a grant id's shape and never the vault (`sparkGuardedEngine`). */
+  return sparkGuardedEngine(engine, { sql: deps.sql, clock: deps.clock, grants: () => api().kernel.grants() });
 }
 
 /**
@@ -169,7 +173,13 @@ export function workerSparkDoor(
      time the engine is built and its `settings` table exists for `sparkGrantIdOf` to read. */
   const config = sparkFromEnv(env, { operatorKey: false });
   const wire = wireOf(env, api, deps);
-  const byok = config === undefined || wire.openKey === null ? undefined : async () => sparkByokOf(config, wire, sparkGrantIdOf(deps.sql));
+  /* OPENED FOR THE ASKER, NOT FOR `system`: `sparkByokFor` runs the vault's own gate on `ctx` and signs the `grant.read`
+     with the asker's id, where this line once opened the owner's key for any caller the door let through
+     (`loop/research-batch-thirty-one-audit.md` §1). */
+  const byok =
+    config === undefined || wire.openKey === null
+      ? undefined
+      : async (ctx: CallContext) => sparkByokFor(config, sparkGrantIdOf(deps.sql), api(), ctx, (asker) => wireOf(env, () => asker, deps));
   return sparkAskDoor(origins, () => workerSparkEngine(env, api, deps), byok);
 }
 
