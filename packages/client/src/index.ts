@@ -220,6 +220,15 @@ export type PackToggle = { id: string; state: 'enabled' | 'disabled'; changed: b
 
 /** `33 §4` line 356, six keys. `app` is `null` on a host that was not told what it is running. */
 export type Version = {
+  /**
+   * `MAX(event.rowid)` to an owner who reads every list, and to anybody else a hash of the id of the newest line they
+   * are shown, or 0 when they are shown none (`versionFor` in `@braindog/record`).
+   *
+   * A MEMBER MAY ASK WHETHER IT CHANGED AND NOTHING ELSE. Before `83875130` she was handed the rowid, and the gap between
+   * two of her polls counted the events she was not shown. The hash is not ordered: two of hers are equal or they are
+   * not, and subtracting them, sorting by them or passing one on as a cursor means nothing, since `recentHistory`
+   * refuses a whole-number cursor from anybody who is not handed rowids.
+   */
   version: number;
   format: number;
   kernel: number;

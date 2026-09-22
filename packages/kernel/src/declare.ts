@@ -1410,8 +1410,53 @@ const ROUTE_VALUE_MOST = 200;
 const SKIP_MOST = 16;
 const SKIP_REASON_MOST = 120;
 
+/**
+ * `25 §3.2`'s `verify:` on a webhook ingest, the half of it that is built: `{ kind: path }`, a random segment in the URL.
+ *
+ * NOTHING READ THIS KEY, SO EVERY SPELLING OF IT INSTALLED. Measured on 22 September against `validate` at `1c9bb0f0`:
+ * `verify: { kind: path }` on an email ingest, `verify: { kind: hmac_sha256, header }` with no key behind it, a path
+ * token written into the declaration itself, and the bare word `verify: path` were all answered `null`, and the record
+ * answers `{ kind: 'none' }` for every webhook ingest whatever it carries.
+ * A person who wrote one had every reason to believe the ingest was verified, and every arrival at it was stored
+ * `untriaged`, which is correct behaviour with nothing to say why.
+ *
+ * ONLY A WEBHOOK, because it is the only channel whose door this record's host terminates with a URL a sender is given
+ * (`packages/host/src/ingest.ts`). Mail is verified by the forwarder's own `Authentication-Results`, and `pull`, `call`
+ * and `poll` are fetched by the record itself, so a `verify:` on any of them would be a promise nothing keeps.
+ *
+ * `hmac_sha256` IS REFUSED BY NAME AND NOT AS A TYPO. The door compares one, but its key is a grant, and nothing yet
+ * binds a grant to an ingest; a declaration naming it would install and verify nothing, which is the fault above.
+ *
+ * AND THE TOKEN IS NEVER IN A DECLARATION. A declaration is exported, planned, diffed and shown to every agent that reads
+ * `arrangement`, so a token written here would be a credential in all of those at once. `{ kind: path }` says a token is
+ * wanted; the token itself is minted outside the declaration and shown once.
+ *
+ * WHY THE SHORTCUT GETS WEBHOOK TWINS OF THE `bank-*` PATTERNS AND NOT A CHANNEL LIST ON EACH. `loop/research-switch-matrix.md`
+ * brief 2 left the choice open. The list is the better grammar: one declaration per wording, read the same whichever way
+ * it arrived. It is also a change to `07 §3`'s `channel:`, which is one word here, in `IngestDecl`, and in `arrive`'s
+ * `i.channel === arrival.channel` (`ingest.ts`), and that makes it a `docs/07` row before it is code. A twin changes
+ * nothing anybody reads: it is one more declaration of an existing shape, carrying this key. The cost that is not
+ * obvious is that the URL's ingest id chooses only the verifier: neither host hands it to `arrive`
+ * (`apps/selfhost/src/server.ts` `arrivalDoor`, `apps/worker/src/route.ts` `cloudIngest`), so a verified arrival is
+ * offered every webhook pattern on the record, in declaration order, and one twin's URL is the door for all of them.
+ */
+function verifyFault(id: string, channel: string, verify: unknown): Refusal | null {
+  if (verify === undefined) return null;
+  if (channel !== 'webhook')
+    return bad('DECLARATION_INVALID', `${id} arrives by ${channel}, and only a webhook is verified at its door. Take verify out, or declare channel: webhook.`, 'verify');
+  const kind = verify !== null && typeof verify === 'object' && !Array.isArray(verify) ? (verify as { kind?: unknown }).kind : undefined;
+  if (kind === 'hmac_sha256')
+    return bad('DECLARATION_INVALID', `${id}'s verify names hmac_sha256, and hmac_sha256 is not built: nothing binds its key to an ingest yet. Use { kind: path }.`, 'verify', ['path']);
+  if (kind !== 'path') return bad('DECLARATION_INVALID', `${id}'s verify is { kind: path }.`, 'verify', ['path']);
+  const stray = Object.keys(verify as object).find((k) => k !== 'kind');
+  if (stray === 'token')
+    return bad('DECLARATION_INVALID', `${id}'s verify carries a token, and a token is never in a declaration: it is minted and shown once. Keep { kind: path }.`, 'verify');
+  if (stray !== undefined) return bad('DECLARATION_INVALID', `${id}'s verify declares ${stray}, and { kind: path } takes nothing else.`, 'verify', ['kind']);
+  return null;
+}
+
 function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
-  const body = decl.body as { channel?: unknown; match?: unknown; extract?: unknown; map?: unknown; fetch?: unknown; dedupe?: unknown; skip?: unknown; writes?: unknown };
+  const body = decl.body as { channel?: unknown; match?: unknown; extract?: unknown; map?: unknown; fetch?: unknown; dedupe?: unknown; skip?: unknown; writes?: unknown; verify?: unknown };
   const id = decl.id;
 
   if (typeof body.channel !== 'string' || !(CHANNELS_IN as readonly string[]).includes(body.channel))
@@ -1421,6 +1466,9 @@ function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
       'channel',
       CHANNELS_IN as unknown as string[],
     );
+
+  const unverifiable = verifyFault(id, body.channel, body.verify);
+  if (unverifiable) return unverifiable;
 
   /* THE TREE FORM ONLY. A `match:` may also be the sentence a person writes, and parsing one needs a
      `Schema` and a clock — `parseWhere`'s `SentenceDeps` — neither of which a context-free check

@@ -104,8 +104,9 @@ export { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, 
  *
  * ONE MEMBER, AND IT IS A UNION ON PURPOSE. `@braindog/host`'s `IngestVerify` has three kinds and
  * this answers the one a record with no declared verifier can honestly give; written as a union of
- * one, the day `verify:` reaches the declaration grammar the other two are added here and every
- * caller that switched on `kind` already compiles. The record may not import the host's type: the
+ * one, so the day a verifier can be answered it is added here and every caller that switched on
+ * `kind` already compiles. `verify: { kind: path }` reached the grammar on 22 September and did not
+ * add one: see `ingestVerify` for why the door cannot use what a record may keep. The record may not import the host's type: the
  * edge points the other way (`31 §2`), so this is structural and the door's parameter is what
  * checks the two agree.
  */
@@ -1249,11 +1250,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return run && run.seq !== null ? `${PREFIX}${run.seq}` : `agent:${hints.agent ?? 'other'}`;
   };
 
-  /** The declaration state a plan is built against. */
-  const installedState = (): Installed => ({
+  /**
+   * The declaration state a plan is built against, for `ctx` when a caller will read the plan.
+   *
+   * `record_version` IS KEYED TO THE CALLER, AS `version()` IS SINCE `83875130`. `declare`'s `plan` writes it in the clear
+   * as the integer half of `planHash`, and `planPack` is `admin`, which asks for an owner and nothing about lists: an
+   * owner held to `append` on Diary read 4 and then 6 at the head of his plan across two Diary writes he may not read
+   * (`installed-state-version.test.ts` (1)), the count `holdsRowids` exists to withhold. So he is given `versionFor`'s
+   * number, and `installPack` builds its own plan with the same caller, so the hash he approves is the hash it checks.
+   * What he gives up is `PLAN_STALE` for a write he cannot see, which is a write whose count he was not to be told.
+   * Without a caller, as the arranger and the use-case planner ask, the plan never leaves the record and keeps the rowid.
+   */
+  const installedState = (ctx?: CallContext): Installed => ({
     format: FORMAT_VERSION,
     primitives: PRIMITIVES_VERSION,
-    record_version: kernel.version(),
+    record_version: ctx === undefined ? kernel.version() : versionFor(ctx),
     packs: kernel.packs(),
     declarations: kernel.declarations() as Installed['declarations'],
     rows: kernel.census(),
@@ -3562,7 +3573,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
       const pack = await normalise(args?.doc, args?.source ?? { kind: 'local' });
       if (!pack.ok) return pack;
-      const diff = await plan(pack.value, installedState());
+      const diff = await plan(pack.value, installedState(ctx));
       /* A PACK POINTING AT A LIST NOTHING HOLDS IS REFUSED AT THE PLAN, and not only at the install,
          because the repair is to install something else first and the plan is where a person reads it. */
       const unheld = unresolvedFault(diff);
@@ -3593,7 +3604,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
       const pack = await normalise(args.doc, args.source ?? { kind: 'local' });
       if (!pack.ok) return pack;
-      const state = installedState();
+      const state = installedState(ctx);
       const diff = await plan(pack.value, state);
       /* AN UPDATE MOVES WHAT THE OLDER VERSION KEPT TYPED into the rows the newer one reads, here and not in a tab, so every
          caller that updates a use case does it (`arrange.ts` `carryUpdate`). */
@@ -4492,15 +4503,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * connector's register through a door meant for a bank, which is the same id with none of the
      * checks.
      *
-     * WHAT IS NOT HERE IS THE MATERIAL, and it is missing at the source rather than here. `25 §3.2`
-     * writes a webhook ingest's `verify: { kind: hmac_sha256, header, grant }` and `12 §3` names a
-     * random path token as the other form; grepped on 2026-09-20, no `verify` key exists anywhere in
-     * `packages/kernel/src/declare.ts` or `packages/declare`, so no declaration in this build can
-     * carry one and `declare` would refuse it as an unknown key if it did. Until that lands the
-     * honest answer for an ingest somebody declared is that nothing verifies it, which stores every
-     * webhook arrival `untriaged` and matches none of them. That is `12 §3`'s own rule applied to a
-     * record that has declared no verifier, and it is a great deal better than the alternative of
-     * treating the URL as the proof.
+     * WHAT IS NOT HERE IS THE MATERIAL. A declaration can now say `verify: { kind: path }`, and
+     * `declare.ts`'s `verifyFault` refuses every other spelling, which before 22 September all
+     * installed unread. What it cannot say is the token, and this cannot answer one: the door
+     * compares the segment IN THE CLEAR against `{ kind: 'path', token }` (`packages/host/src/ingest.ts`,
+     * `hook`), and a record that kept its webhook token in a form that comparison could use would be
+     * keeping the credential itself, which the forwarding address's mint was built never to do
+     * (`apps/worker/src/inbound.ts`). The digest is the only form worth keeping, and it becomes an
+     * answer the day `hook` digests the segment before comparing it. Until then an ingest declaring
+     * a path token is answered as one declaring nothing, which stores every webhook arrival
+     * `untriaged` and matches none of them: `12 §3` applied to a verifier nobody can check, measured
+     * in `packages/host/test/ingest-shortcut.test.ts` (4), and better than treating the URL as proof.
      */
     async ingestVerify(args: { ingest: string }): Promise<IngestVerification | null> {
       const row = kernel.declarations().find((d) => d.kind === 'ingest' && d.id === `ingest.${args.ingest}`);

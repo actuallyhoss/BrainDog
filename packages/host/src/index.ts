@@ -138,7 +138,7 @@ export const ROUTES: readonly Route[] = [
     takes: { cursor: 'integer', limit: 'integer' } },
   { name: 'search', group: 'DATA', writes: false, what: 'Rows whose text matches, across every register you can see, best first.',
     takes: { q: 'text', limit: 'integer' } },
-  { name: 'version', group: 'READ+', writes: false, what: "The record's version, so a client can ask what changed since." },
+  { name: 'version', group: 'READ+', writes: false, what: "The record's version, to tell whether anything you may see has changed. An owner who reads every list gets the newest event's rowid and may ask what changed since; anybody else gets a number that is only equal or not, never larger or smaller." },
   { name: 'whoami', group: 'READ+', writes: false, what: 'Who you are to this record, and which verbs you reach.' },
   { name: 'sessionsLive', group: 'READ+', writes: false, what: 'The runs that are live now, with how long since each was heard from.' },
   { name: 'context', group: 'READ+', writes: false, what: 'Where an agent stands: its run, its project, the last handoff, who is live, what waits, and what applies here.' },
