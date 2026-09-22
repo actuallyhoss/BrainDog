@@ -13,7 +13,11 @@
  *            is being interpreted to interrupt.
  *   cpu_ms   the time spent inside the interpreter, summed over every slice (the first evaluation,
  *            and each `executePendingJobs` after a host call settles). Time waiting on the host is
- *            not the script's CPU, and a Dynamic Worker's `cpuMs` does not count it either.
+ *            not the script's CPU, and a Dynamic Worker's `cpuMs` does not count it either. A host
+ *            function called from a slice is inside it: copying what the script handed across is
+ *            work the script asked for.
+ *            BOTH ARE ASKED BY `overBudget`, NOT ONLY BY THE HANDLER, because the handler runs on a
+ *            count of instructions and never runs at all during a host function or a native call.
  *   memory   a `WebAssembly.Memory` per run with a hard `maximum` (see `HEAP_BYTES` for why the
  *            QuickJS limit alone is not one). A new memory means a new module instance per run.
  *            Measured at about 2 ms on this machine, which a script run every 15 minutes can pay.
@@ -87,7 +91,7 @@ const variant = ((): QuickJSSyncVariant => {
  */
 const Wasm = (globalThis as unknown as {
   WebAssembly: {
-    Memory: new (descriptor: { initial: number; maximum: number }) => object;
+    Memory: new (descriptor: { initial: number; maximum: number }) => { grow(pages: number): number };
     RuntimeError: new () => Error;
   };
 }).WebAssembly;
@@ -120,6 +124,10 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
     code: 'OUT_OF_BOUNDS',
     why: `${decl.id} ran out of its ${HEAP_BYTES / 1024 / 1024} MB of memory.`,
   };
+  const cpuRefusal: ScriptRefusal = {
+    code: 'OUT_OF_BOUNDS',
+    why: `${decl.id} spent more than its cpu_ms of ${limits.cpu_ms}.`,
+  };
 
   /* THE SIGNAL THAT ENDS A WAIT EARLY. A refusal recorded inside a host function, or by the
      interrupt handler during a pending job, may leave the run's promise pending for good, and the
@@ -135,17 +143,54 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
   };
 
   const memory = new Wasm.Memory({ initial: INITIAL_PAGES, maximum: HEAP_BYTES / PAGE });
+  /* THE ONE WITNESS THAT THE HEAP RAN OUT. Many small objects fill the heap in pieces no single
+     allocation of which is refused, and when the engine then cannot allocate even its "out of
+     memory" error it throws a bare `null`, which is also what `throw null` in a script looks like.
+     Audit thirty-two saw 300,000 pushed objects answered as the script's own throw. The runtime's
+     own usage is no help afterwards: the objects die with the frame that held them, and it read
+     96,798 bytes. What does not die is the fact that emscripten asked this memory to grow past its
+     maximum and was told no, and emscripten asks through the object it was handed, so the refusal
+     can be seen here. */
+  let heapFull = false;
+  const grow = memory.grow.bind(memory);
+  memory.grow = (pages: number): number => {
+    try {
+      return grow(pages);
+    } catch (error) {
+      heapFull = true;
+      throw error;
+    }
+  };
   const module = await newQuickJSWASMModuleFromVariant(newVariant(variant, { wasmMemory: memory }));
   const runtime = module.newRuntime();
   runtime.setMemoryLimit(HEAP_BYTES);
   runtime.setMaxStackSize(STACK_BYTES);
 
   let slice: number | null = null;
-  runtime.setInterruptHandler(() => {
+
+  /**
+   * THE TWO TIME BUDGETS, ASKED BY THE CLOCK RATHER THAN BY THE INTERPRETER. QuickJS calls the
+   * interrupt handler after a count of interpreted instructions, so time that is not interpretation
+   * (a 5 MB object copied across in `ctx.write`, a native `JSON.stringify` inside the engine) never
+   * reaches it. Audit thirty-two measured two hundred such writes answered clean at `cpu_ms: 6777`
+   * against a limit of 200. So the handler, every host function, every settle after a host await
+   * and the end of the run all ask this same question.
+   */
+  const overBudget = (): ScriptRefusal | null => {
     const now = performance.now();
-    if (now > deadline) stop ??= wallRefusal;
-    else if (slice !== null && cpu + (now - slice) > limits.cpu_ms)
-      stop ??= { code: 'OUT_OF_BOUNDS', why: `${decl.id} spent more than its cpu_ms of ${limits.cpu_ms}.` };
+    if (now > deadline) return wallRefusal;
+    if (cpu + (slice === null ? 0 : now - slice) > limits.cpu_ms) return cpuRefusal;
+    return null;
+  };
+
+  /** At the top of a host function and again after it has decoded what it was handed. */
+  const charge = (): void => {
+    const over = stop ?? overBudget();
+    if (over !== null) throw refuse(over);
+  };
+
+  runtime.setInterruptHandler(() => {
+    stop ??= overBudget();
     if (stop !== null) wake();
     return stop !== null;
   });
@@ -188,6 +233,15 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
        the run's refusal, recorded like any other, and the race below wakes on it. */
     const settle = (into: () => void): void => {
       if (done || !vm.alive) return;
+      /* A HOST THAT HELD THE THREAD PAST THE DEADLINE ANSWERS NOBODY. The race's timer cannot fire
+         while the host is busy, and once its promise settles the script's continuation would run
+         as microtasks ahead of the timer: a host that spun 400 ms after its first await had its
+         answer taken and a write queued under a 300 ms wall_ms, and the run was answered clean. */
+      const over = stop ?? overBudget();
+      if (over !== null) {
+        refuse(over);
+        return;
+      }
       try {
         into();
         pump();
@@ -218,7 +272,9 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
 
   const hostFns: Record<string, (...args: QuickJSHandle[]) => QuickJSHandle | undefined> = {
     fetch: (arg) => {
+      charge();
       const asked = json(arg) as { url: string; init: Record<string, Json> | null };
+      charge();
       const init = asked.init ?? {};
       let url: URL;
       try {
@@ -230,6 +286,15 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
          origin and parses to `evil.example`; a prefix test would have sent it. */
       if (!decl.egress.includes(url.origin))
         throw refuse({ code: 'PULL_ORIGIN_REFUSED', why: `${decl.id} fetched ${url.origin}, which is not in its egress.` });
+      /* AND THE ORIGIN IS NOT THE WHOLE URL. A `blob:` URL's origin is the origin inside it, and user
+         info is no part of an origin, so `blob:https://api.gold.example/abc` and
+         `https://user:pw@api.gold.example/x` both compared equal above and reached the host as
+         written. What the host is handed is a bare https request or nothing. The credentials are not
+         repeated in the refusal, because the refusal is kept on the run's event. */
+      if (url.protocol !== 'https:')
+        throw refuse({ code: 'PULL_ORIGIN_REFUSED', why: `${decl.id} fetched a ${url.protocol} URL; a script fetches plain https:// URLs only.` });
+      if (url.username !== '' || url.password !== '')
+        throw refuse({ code: 'PULL_ORIGIN_REFUSED', why: `${decl.id} fetched ${url.origin} with a user name or password in the URL, which a script may not send.` });
       if (usage.fetches >= limits.fetches)
         throw refuse({ code: 'OUT_OF_BOUNDS', why: `${decl.id} made more than its ${limits.fetches} fetches.` });
       const key = typeof init['key'] === 'string' ? init['key'] : null;
@@ -254,43 +319,57 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
       });
     },
 
+    /* THE SECOND charge() IS THE ONE THAT MATTERS FOR A BIG WRITE. Decoding what crossed is most of
+       the cost of a write, and it happens here, after the first check. */
     write: (register, fields) => {
+      charge();
       const name = text(register);
       if (!decl.writes.includes(name))
         throw refuse({ code: 'FORBIDDEN', why: `${decl.id} wrote to ${name}, which is not in its writes.` });
       if (writes.length >= limits.writes)
         throw refuse({ code: 'OUT_OF_BOUNDS', why: `${decl.id} queued more than its ${limits.writes} writes.` });
-      writes.push({ op: 'create', register: name, fields: json(fields) });
+      const decoded = json(fields);
+      charge();
+      writes.push({ op: 'create', register: name, fields: decoded });
       return undefined;
     },
 
     /* THE REGISTER OF AN UPDATE IS CHECKED WHEN IT IS APPLIED, NOT HERE. A spoken id names its
        register through a prefix only the record resolves, so what this can hold is the count. */
     update: (spoken, patch, version) => {
+      charge();
       if (writes.length >= limits.writes)
         throw refuse({ code: 'OUT_OF_BOUNDS', why: `${decl.id} queued more than its ${limits.writes} writes.` });
-      writes.push({ op: 'update', spoken: text(spoken), patch: json(patch), version: version === undefined ? 0 : vm.getNumber(version) });
+      const write: ScriptWrite = { op: 'update', spoken: text(spoken), patch: json(patch), version: version === undefined ? 0 : vm.getNumber(version) };
+      charge();
+      writes.push(write);
       return undefined;
     },
 
     log: (words) => {
+      charge();
       const line = `${text(words)}\n`;
+      charge();
       const room = LOG_BYTES - utf8.encode(log).length;
       if (room > 0) log += new TextDecoder().decode(utf8.encode(line).slice(0, room)).replace(/�$/u, '');
       return undefined;
     },
 
     list: (register, where) => {
+      charge();
       const name = text(register);
       if (!decl.reads.includes(name) || host.list === undefined)
         throw refuse({ code: 'FORBIDDEN', why: `${decl.id} read ${name}, which is not in its reads.` });
       const list = host.list.bind(host);
       const filter = json(where);
+      charge();
       return deferred(async () => JSON.stringify(await list(name, filter)));
     },
 
     get: (spoken) => {
+      charge();
       const id = text(spoken);
+      charge();
       if (decl.reads.length === 0 || host.get === undefined)
         throw refuse({ code: 'FORBIDDEN', why: `${decl.id} read ${id} and declares no reads.` });
       const get = host.get.bind(host);
@@ -306,18 +385,24 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
     return out;
   };
 
-  const errorText = (ctx: QuickJSContext, error: QuickJSHandle): string => {
+  /**
+   * What was thrown, as words, or `null` when the thrown value was `null` itself (see `heapFull`).
+   * `dump` calls the thrown object's getters, which is the script's code running, so every caller
+   * reads it inside `inVm`.
+   */
+  const errorText = (ctx: QuickJSContext, error: QuickJSHandle): string | null => {
     const dumped: unknown = ctx.dump(error);
     error.dispose();
-    if (dumped !== null && typeof dumped === 'object' && 'message' in dumped) return String(dumped.message);
+    if (dumped === null) return null;
+    if (typeof dumped === 'object' && 'message' in dumped) return String(dumped.message);
     return String(dumped);
   };
 
   /** A script error, or a refusal the interpreter surfaced as one. */
-  const fromError = (message: string): ScriptRefusal => {
+  const fromError = (message: string | null): ScriptRefusal => {
     if (stop !== null) return stop;
-    if (/out of memory/iu.test(message)) return memoryRefusal;
-    return { code: null, why: `${decl.id} threw: ${message}` };
+    if (message === null ? heapFull : /out of memory/iu.test(message)) return memoryRefusal;
+    return { code: null, why: `${decl.id} threw: ${String(message)}` };
   };
 
   let clean = false;
@@ -356,7 +441,7 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
 
     if ('invalid' in entered)
       return answer(stop ?? { code: 'DECLARATION_INVALID', why: `${decl.id}'s source has no default export that is a function.` });
-    if ('error' in entered) return answer(fromError(entered.error));
+    if ('error' in entered) return answer(stop ?? overBudget() ?? fromError(entered.error));
 
     const settled = vm.resolvePromise(entered.value);
     entered.value.dispose();
@@ -370,8 +455,21 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
     if (stop !== null) return answer(stop);
     if (outcome === 'timeout') return answer(wallRefusal);
     if (outcome === 'stopped') return answer(stop ?? wallRefusal);
-    if ('error' in outcome && outcome.error !== undefined) return answer(fromError(errorText(vm, outcome.error)));
+    if ('error' in outcome && outcome.error !== undefined) {
+      /* INSIDE inVm, BECAUSE READING THE ERROR RUNS THE SCRIPT. Read outside it, a thrown object
+         whose `message` getter spun had no slice to be measured against, so the handler checked
+         only the deadline: the audit's probe spun its whole 3,000 ms wall_ms and was metered at
+         `cpu_ms: 12` under a limit of 100. */
+      const thrown = outcome.error;
+      const message = inVm(() => errorText(vm, thrown));
+      return answer(stop ?? overBudget() ?? fromError(message));
+    }
     outcome.value.dispose();
+    /* THE LAST CHECK, FOR TIME NO OTHER CHECK FELL INSIDE. `JSON.stringify` of two 3 MB strings is
+       one native call in the engine: no interrupt during it, no host function after it, and the
+       run answered clean at `cpu_ms: 111` against a limit of 5. */
+    const over = overBudget();
+    if (over !== null) return answer(over);
     clean = true;
     return answer(null);
   } catch (error) {

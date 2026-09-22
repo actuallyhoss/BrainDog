@@ -119,7 +119,112 @@ test('waiting on the host is not CPU: a slow answer inside wall_ms is a normal r
   assert.ok(a.usage.wall_ms >= 150);
 });
 
+/* THE HANDLER IS NOT A CLOCK. QuickJS asks the interrupt handler after a count of interpreted
+   instructions, and a loop that hands a 5 MB object to `ctx.write` two hundred times runs only a
+   few thousand of them: nearly all its time is the copy across the boundary and the host's
+   `JSON.parse`. Audit thirty-two measured this exact script, at the default limits, answer clean
+   with 1,048,577,600 bytes queued and `cpu_ms: 6777` in its own usage. */
+test('time spent inside ctx.write is the script\'s CPU and is refused at cpu_ms', async () => {
+  const t = performance.now();
+  const a = await runInQuickJs(
+    decl(`export default function run(ctx) { const s = 'x'.repeat(5 * 1024 * 1024); for (let i = 0; i < 200; i++) ctx.write('series.gold-egp', { s }) }`),
+    host(),
+  );
+  const took = performance.now() - t;
+  const r = refusedOf(a);
+  assert.equal(r.code, 'OUT_OF_BOUNDS');
+  assert.match(r.why, /cpu_ms of 200/u);
+  assert.ok(took < 2 * 200 + 200, `took ${Math.round(took)} ms`);
+});
+
+/* The same shape through `ctx.log`: the log is cut to 8 KB, but each call copied the whole 8 MB
+   onto the host first, and the audit's thousand of them were refused only after 16,930 ms against
+   a cpu_ms of 1,000. */
+test('time spent inside ctx.log is refused at cpu_ms, although the log itself is cut', async () => {
+  const t = performance.now();
+  const a = await runInQuickJs(
+    decl(`export default function run(ctx) { const s = 'x'.repeat(8 * 1024 * 1024); for (let i = 0; i < 100; i++) ctx.log(s) }`, { limits: { cpu_ms: 200 } }),
+    host(),
+  );
+  const took = performance.now() - t;
+  assert.match(refusedOf(a).why, /cpu_ms of 200/u);
+  assert.ok(took < 2 * 200 + 200, `took ${Math.round(took)} ms`);
+});
+
+/* NO HOST CALL AND NO INTERRUPT. `JSON.stringify` of two 3 MB strings is one native call inside
+   the engine, so the handler is never asked during it and there is no host function to ask
+   either. It answered clean at `cpu_ms: 111` against a limit of 5. Only a check after the run can
+   see it. */
+test('a run that ends past its cpu_ms is refused even when no check fell inside it', async () => {
+  const a = await runInQuickJs(
+    decl(`export default function run() { const s = 'x'.repeat(3 * 1024 * 1024); return JSON.stringify([s, s]).length }`, { limits: { cpu_ms: 5 } }),
+    host(),
+  );
+  assert.match(refusedOf(a).why, /cpu_ms of 5/u);
+});
+
+/* A HOST THAT HOLDS THE THREAD PAST THE DEADLINE, AFTER ITS FIRST AWAIT. The race's timer is a
+   macrotask, so it cannot fire while the host spins, and once the host's promise settles the
+   script's continuation runs as microtasks ahead of it. Before this change the script below took its
+   answer, wrote, and the run was answered clean at 421 ms of a 300 ms wall_ms. THREE CHECKS NOW SEE
+   IT, EACH ON ITS OWN: the settle after the await, the write's `charge()`, and the last check before
+   a clean answer. Taking out the settle check alone, or any two of the three, left this green; it
+   went red only with all three gone. So this pins the three together and not the settle check by
+   itself. The `await` in the double matters: without it the spin ran synchronously inside the host
+   function, inside the CPU slice, which is the other case. */
+test('a host answer that arrives past wall_ms is refused, not handed on to the script', async () => {
+  const a = await runInQuickJs(
+    decl(`export default async function run(ctx) { await ctx.fetch('${ORIGIN}/slow'); ctx.write('series.gold-egp', { value: 1 }) }`, { limits: { wall_ms: 300 } }),
+    host(async () => {
+      await null;
+      const until = performance.now() + 400;
+      while (performance.now() < until) {
+        /* the host itself, busy */
+      }
+      return { status: 200, headers: {}, body: '{}' };
+    }),
+  );
+  assert.match(refusedOf(a).why, /wall_ms of 300/u);
+});
+
+/* READING A THROWN ERROR RUNS THE SCRIPT'S CODE. `ctx.dump` of a thrown object calls its getters,
+   and the host read it outside every CPU slice, so the handler checked only the deadline. The
+   audit's probe spun for its whole 3,000 ms wall_ms and was metered at `cpu_ms: 12`. */
+test('a getter that spins while the host reads the thrown error is the script\'s CPU', async () => {
+  const t = performance.now();
+  const a = await runInQuickJs(
+    decl(`export default async function run(ctx) { await ctx.fetch('${ORIGIN}/'); throw { get message() { for (;;) {} } } }`, { limits: { cpu_ms: 100, wall_ms: 3_000 } }),
+    host(),
+  );
+  const took = performance.now() - t;
+  const r = refusedOf(a);
+  assert.equal(r.code, 'OUT_OF_BOUNDS');
+  assert.match(r.why, /cpu_ms of 100/u);
+  assert.ok(a.usage.cpu_ms >= 100, `metered ${a.usage.cpu_ms} ms`);
+  assert.ok(took < 1_000, `took ${Math.round(took)} ms`);
+});
+
 /* ── Memory ───────────────────────────────────────────────────────────────────────────────────── */
+
+/* QUICKJS THROWS null WHEN IT CANNOT ALLOCATE EVEN THE ERROR. Many small objects fill the heap in
+   pieces too small for any single one to be refused, and the exception that ends the run is the
+   bare `null` the engine throws when "out of memory" itself will not fit. Audit thirty-two saw it
+   answered `{ code: null, why: 'p threw: null' }`, which says the script chose to throw. */
+test('running out of memory through many small objects is OUT_OF_BOUNDS, not the script\'s throw', async () => {
+  const a = await runInQuickJs(
+    decl(`export default function run(ctx) { const a = []; for (let i = 0; i < 300000; i++) a.push({ k: i, v: 'x' + i }); ctx.write('series.gold-egp', { n: a.length }) }`, { limits: { cpu_ms: 1000 } }),
+    host(),
+  );
+  const r = refusedOf(a);
+  assert.equal(r.code, 'OUT_OF_BOUNDS');
+  assert.match(r.why, /32 MB of memory/u);
+});
+
+test('a script that throws null itself, with its memory to spare, is still its own throw', async () => {
+  const r = refusedOf(await runInQuickJs(decl('export default function run() { throw null }'), host()));
+  assert.equal(r.code, null);
+  assert.match(r.why, /threw: null/u);
+});
 
 test('100 MB in one allocation is refused under the 32 MB cap', async () => {
   const a = await runInQuickJs(decl('export default function run() { return new Uint8Array(100 * 1024 * 1024).length }'), host());
@@ -167,6 +272,12 @@ for (const [what, url] of [
   ['the declared origin as userinfo in front of another', `${ORIGIN}@evil.example/`],
   ['the declared host on another port', 'https://api.gold.example:8443/'],
   ['not a URL at all', 'api.gold.example/api'],
+  /* THE ORIGIN IS NOT THE WHOLE QUESTION. A `blob:` URL's origin is the origin inside it, and user
+     info is not part of an origin at all, so both of these compared equal to the declared origin and
+     reached the host as written. */
+  ['a blob: URL wrapped round the declared origin', `blob:${ORIGIN}/abc`],
+  ['the declared origin with credentials in it', 'https://user:pw@api.gold.example/x'],
+  ['the declared origin with only a user name in it', 'https://user@api.gold.example/x'],
 ] as const)
   test(`ctx.fetch to ${what} never reaches the host function`, async () => {
     const h = host();
