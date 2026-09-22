@@ -1053,7 +1053,7 @@ the documents that still cite the earlier decision.
 - [x] The command line's surface offers every optional method its client routes, `actions` among them.
 - [ ] The tokenizer calibration of §9 is built.
 - [ ] A default `list` page is at or under 10 §4's 2,000 tokens (§7 measured 5,380).
-- [ ] 45 agrees with this document: its §2 still says the tools are fourteen.
+- [x] 45 agrees with this document: its §2 counts the sixteen tools (45-SPEC-RECORD:159).
 
 ---
 
