@@ -61,7 +61,7 @@ test('the reader’s level reaches the screen at all', () => {
     /const answerable = \$derived\(mayAnswer\(me\.level, me\.owner\)\);/u,
     'nothing on this screen asks whether this reader may answer',
   );
-  assert.match(page, /const whyNot = \$derived\(whyNotAnswering\(me\.level\)\);/u, 'nothing on this screen holds the sentence');
+  assert.match(page, /const whyNot = \$derived\(whyNotAnswering\(me\.level, me\.lists\)\);/u, 'nothing on this screen holds the sentence');
 });
 
 test('every option’s own button is off for a reader who may not answer, and says why', () => {

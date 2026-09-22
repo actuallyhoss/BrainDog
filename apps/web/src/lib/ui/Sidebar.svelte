@@ -43,7 +43,7 @@
   import RowMenu from './RowMenu.svelte';
   import Kbd from './Kbd.svelte';
   import { toasts } from './toast.svelte.ts';
-  import { openRecord } from '../record/switcher.ts';
+  import { levelWord, openRecord, type SwitcherRow } from '../record/switcher.ts';
 
   let {
     nav,
@@ -60,7 +60,7 @@
     nav: NavEntry[];
     pen: PageDecl[];
     record: string;
-    records?: { slug: string; name: string; level: string }[];
+    records?: SwitcherRow[];
     /** Why the rest of the records could not be listed, when they could not: the host's own sentence. */
     refused?: string | undefined;
     registers: { id: string; name: string; count: number; icon: IconName; views?: { key: string; name: string; href: string }[] }[];
@@ -357,6 +357,7 @@
         a place it does not take you is the shape a reader learns not to trust.
       -->
       {#each records as r}
+        {@const word = levelWord(r)}
         <button
           type="button"
           class="mi"
@@ -368,8 +369,9 @@
           <span class="mi-name">{r.name}</span>
           <!-- The level is on the ROW, not on a settings screen. Which record you are in and what
                you are allowed to do in it are one fact, and separating them is how somebody edits
-               the wrong record's rows. -->
-          {#if r.level !== 'owner'}<span class="mi-level">{r.level}</span>{/if}
+               the wrong record's rows. A colleague who holds lists and not the record has no level,
+               and the row printed an empty span for them; it wears the host's `held` word now. -->
+          {#if word !== null}<span class="mi-level">{word}</span>{/if}
           {#if r.name === record}<Icon name="check" size="s" />{/if}
         </button>
       {/each}

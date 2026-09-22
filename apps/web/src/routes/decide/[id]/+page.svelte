@@ -134,7 +134,7 @@
    */
   const me = $derived((page.data as unknown as Shell).me);
   const answerable = $derived(mayAnswer(me.level, me.owner));
-  const whyNot = $derived(whyNotAnswering(me.level));
+  const whyNot = $derived(whyNotAnswering(me.level, me.lists));
 
   const question = $derived(
     from === 'live'

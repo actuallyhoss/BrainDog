@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { copy } from '../copy.ts';
-import { openRecord, readRecordsForSwitcher, type Fetch, type SwitcherRow } from './switcher.ts';
+import { levelWord, openRecord, readRecordsForSwitcher, type Fetch, type SwitcherRow } from './switcher.ts';
 
 const json = (status: number, body: unknown): Response =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -73,4 +73,19 @@ test('OPENING ANOTHER RECORD posts its name from this page, and a host that hold
   const fix = 'You are on no open record by that name.';
   assert.deepEqual(await openRecord(host(() => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix, at: 'slug' } })).io, 'kiln'), { from: 'refused', fix });
   assert.deepEqual(await openRecord(host(null).io, 'kiln'), { from: 'refused', fix: copy.recordNotOpened });
+});
+
+/* ── the word a row wears ───────────────────────────────────────────── */
+
+test('A ONE-LIST MEMBER\'S ROW wears the word the host sent, where it used to draw an empty level', async () => {
+  /* Both hosts answer this shape since `switcherRows` stopped dropping the row (`packages/record/src/directory.ts`). */
+  const rows: SwitcherRow[] = [
+    { slug: 'the-studio', name: 'The Studio', level: 'owner' },
+    { slug: 'kiln', name: 'Kiln', level: 'read' },
+    { slug: 'ledger', name: 'Ledger', level: null, lists: ['expenses'], held: 'Some lists' },
+  ];
+  const out = await readRecordsForSwitcher(host(() => json(200, { ok: true, value: rows })).io);
+  assert.ok(out.ok);
+  /* An owner's row says nothing, a level says itself, and a row with no level says what the host called it. */
+  assert.deepEqual(out.value.map(levelWord), [null, 'read', 'Some lists']);
 });

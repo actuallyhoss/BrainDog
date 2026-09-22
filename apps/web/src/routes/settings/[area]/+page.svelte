@@ -58,6 +58,7 @@
   import type { Snapshot as KeptCopy } from '@braindog/client';
   /* Lane G: inviting somebody by address, with a link the owner sends and nobody mails. */
   import { inviteEmail, inviteLink, readInvites, withdrawInvite } from '$lib/record/settings-write.ts';
+  import { levelWord } from '$lib/record/switcher.ts';
   import type { Invitation } from '@braindog/client';
   import { AGENTS_PACK, agentsPackDocument } from '@braindog/seed';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
@@ -862,6 +863,23 @@
     ((page.data as { lists?: readonly { id: string; name: string }[] }).lists ??
       Object.entries(REGISTERS).map(([id, r]) => ({ id, name: r.name }))),
   );
+  const listName = (id: string) => lists.find((l) => l.id === id)?.name ?? REGISTERS[id]?.name ?? id;
+  const namesOf = (ids: readonly string[]) => new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(ids.map(listName));
+
+  /**
+   * WHAT A WAITING INVITATION GIVES, AND A ONE-LIST INVITATION GIVES NO RECORD LEVEL.
+   *
+   * The row read a missing level as `read`, and drew the invitation `probe2` minted, `level: null, registers:
+   * { expenses: 'write' }`, as "Reads", which told the owner the bookkeeper would read the whole business
+   * (`research-invite-landing.md` finding 5). The lists it carries are the whole of what it gives, so they are what
+   * the row names, each at its own level.
+   */
+  const inviteGives = (inv: Invitation): string =>
+    inv.level !== null
+      ? levelSaid(inv.level)
+      : Object.keys(inv.registers).length > 0
+        ? Object.entries(inv.registers).map(([id, level]) => `${listName(id)}: ${levelSaid(level)}`).join(', ')
+        : levelSaid(null);
   let picking = $state<string | null>(null);
   let pickList = $state('');
   let pickLevel = $state<Level>('read');
@@ -1956,7 +1974,7 @@
             {#each waitingInvites as inv (inv.id)}
               <li class="invite">
                 <span class="invite-who">{inv.email}</span>
-                <span class="invite-when">{copy.inviteWaitingRow(levelSaid(inv.level ?? 'read'), inv.expires_at.slice(0, 10))}</span>
+                <span class="invite-when">{copy.inviteWaitingRow(inviteGives(inv), inv.expires_at.slice(0, 10))}</span>
                 <Button weight="bare" tone="bad" disabled={peopleBusy} onclick={() => void withdraw(inv)}>{copy.inviteWithdraw}</Button>
               </li>
             {/each}
@@ -2135,7 +2153,10 @@
                address is what an invitation binds to and what identifies you across the records
                listed below. -->
           <li><span class="fact-key">{copy.signedInAs}</span><span class="fact-value">{signedInEmail ?? mine?.email ?? mine?.name ?? me.person}</span></li>
-          <li><span class="fact-key">{copy.onThisRecord}</span><span class="fact-value">{copy.levelMeans[me.level] ?? me.level}</span></li>
+          <!-- A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD was told "Can read, cannot change": the shell's
+               `read` is a fallback for them, and the Expenses bookkeeper's whole job is changing rows
+               (`research-invite-landing.md` finding 3). What they hold is the lists, so the lists are named. -->
+          <li><span class="fact-key">{copy.onThisRecord}</span><span class="fact-value">{me.lists && me.lists.length > 0 ? namesOf(me.lists) : (copy.levelMeans[me.level] ?? me.level)}</span></li>
         </ul>
         <p class="hint">{copy.identityOutside}</p>
         <!-- AND THE WAY TO REACH ANOTHER RECORD, from the area that is about who this one
@@ -2182,7 +2203,7 @@
               >
                 <span class="seq"><Icon name="rows" size="s" /></span>
                 <span class="line-main"><span class="line-title">{r.name}</span></span>
-                <span class="line-amount"><span class="means">{copy.levelMeans[r.level] ?? r.level}</span></span>
+                <span class="line-amount"><span class="means">{r.level === null ? levelWord(r) : (copy.levelMeans[r.level] ?? r.level)}</span></span>
                 <span class="line-when">{#if here}{copy.thisOne}{/if}</span>
               </svelte:element>
             </li>

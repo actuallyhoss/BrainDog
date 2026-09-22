@@ -118,7 +118,7 @@
    */
   const me = $derived((route.data as unknown as Shell).me);
   const answerable = $derived(mayAnswer(me.level, me.owner));
-  const whyNot = $derived(whyNotAnswering(me.level));
+  const whyNot = $derived(whyNotAnswering(me.level, me.lists));
 
   const open = $derived(
     from === 'live' ? (live?.open ?? []) : from === 'sample' ? QUEUE : [],

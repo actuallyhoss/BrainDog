@@ -9,8 +9,8 @@
  * `/account/usage` by hand rather than through the record's client.
  *
  * NAMED AND LEVELLED BY EACH RECORD ITSELF, never a guess built from the Directory alone: `switcherRows`
- * in `@braindog/record/directory` drops a record that answers with no level, so a person the Directory
- * still lists and a record has since removed is left off this list rather than shown with a level
+ * in `@braindog/record/directory` drops a record that answers with no level and no lists, so a person the
+ * Directory still lists and a record has since removed is left off this list rather than shown with a level
  * nobody granted. This file only draws what the host already decided.
  *
  * PURE, for the reason `device.ts` gives: `node --test` cannot import a `.svelte.ts` file. The fetch
@@ -24,8 +24,24 @@ export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 export type Refusal = { code: string; fix: string; at?: string | undefined };
 export type Answer<T> = { ok: true; value: T } | { ok: false; refusal: Refusal };
 
-/** One row: a record this person can reach, the name it calls itself, and the level they actually hold there. */
-export type SwitcherRow = { slug: string; name: string; level: string };
+/**
+ * One row: a record this person can reach, the name it calls itself, and the level they actually hold there.
+ *
+ * A PERSON WHO HOLDS LISTS AND NOT THE RECORD ARRIVES WITH `level: null`, from both hosts, plus the list ids and a
+ * word for the row in `held` (`SwitcherRow` in `@braindog/record/directory`, which this mirrors because the web does
+ * not depend on that package). This type said `level: string` after the hosts stopped dropping that row, so nothing
+ * checked the one place that drew it: the rail printed `{r.level}` into an empty span beside the one record a
+ * bookkeeper invited to Expenses was on.
+ */
+export type SwitcherRow =
+  | { slug: string; name: string; level: string }
+  | { slug: string; name: string; level: null; lists: string[]; held: string };
+
+/**
+ * The word a row wears beside its name: nothing for an owner, the level for anybody else who holds the record, and
+ * the host's `held` word for somebody who holds lists only. The host chose that word so the web would not have to.
+ */
+export const levelWord = (row: SwitcherRow): string | null => (row.level === null ? row.held : row.level === 'owner' ? null : row.level);
 
 const isAnswer = (v: unknown): v is Answer<unknown> =>
   typeof v === 'object' && v !== null && 'ok' in v && ((v as { ok: unknown }).ok === true ? 'value' in v : 'refusal' in v);
