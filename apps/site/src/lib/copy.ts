@@ -191,9 +191,14 @@ export const site = {
      * build script runs no capture, and the date here moves the day somebody re-shoots.
      */
     caption: 'One record, photographed from the app on 22 September',
+    /* IT SAID `each card a task and the project it belongs to`, AND THE PICTURE DISAGREES. In
+       `static/shots/home-light.png`, "Check the September bank statement", "Year-end pack for Pell
+       & Vine" and "Send the August invoices" carry no project, so a reader of the alt was told
+       something a sighted reader could see was not so (`loop/research-batch-twenty-eight-audit.md`
+       finding 7). The six columns and their order do match the picture. */
     alt:
-      'The work board of the sample record: six columns from Later to Done, each card a task and ' +
-      'the project it belongs to.',
+      'The work board of the sample record: six columns from Later to Done, each card a task, most ' +
+      'of them naming the project they belong to.',
   },
 
   /**
@@ -246,9 +251,14 @@ export const site = {
          that is the name a reader who opens the sample sees on this row. The note it added reads
          *Chased twice. 45-day terms expired 3 August.* on `obligations#1`. */
       { who: 'reply rule', what: 'Added a note to an invoice that is late', when: '9h ago' },
-      /* `seq 4192` and `4191` in `data.ts`, both at `stamp(-3)`: Object storage and the Workers
-         plan, each `from the Fenwick invoice`. */
-      { who: 'Claude', what: 'Added Object storage and the Workers plan, from the Fenwick invoice', when: '3h ago' },
+      /* `seq 4192` and `4191` in `data.ts`: Object storage and the Workers plan, each `from the
+         Fenwick invoice`. THE TIME IS NOT THE SAMPLE'S `stamp(-3)`, AND THAT IS DELIBERATE. This row
+         lands the moment the reader presses Accept, and it said `3h ago` while doing so: a row
+         written a second ago under a time three hours old. The app's word for a row under a minute
+         old is `just now` (`packages/render/src/format.ts`, `since`), and `decide-copy.test.ts`
+         reads the word from `since` so the two cannot drift. The two rows above keep `data.ts`'s
+         times, because they were already there when the reader arrived. */
+      { who: 'Claude', what: 'Added Object storage and the Workers plan, from the Fenwick invoice', when: 'just now' },
     ],
   },
 
@@ -324,7 +334,16 @@ export const site = {
            its 90,000 target, and the first of the habits, all in `personal.ts` `seeds`. THE LISBON
            TILE SAID `GBP 900.00, saving towards it`, which is the target drawn where the groceries
            tile beside it draws the amount so far: a reader of the pair takes 900 as saved, and the
-           seed has put 420 by. */
+           seed has put 420 by.
+           THE GROCERIES FIGURE IS THE HOME FROM A MONTH'S THIRD DAY, NOT FROM ITS FIRST. The
+           6,420 shop is dated two days back, so on the 1st and 2nd it falls in the month before and
+           the Home counts only the 2,135 one. Measured by making the Personal record the way
+           `packages/seed/test/usecase-install.test.ts` does, at noon UTC on 1, 2 and 3 October 2026,
+           and reading "Spending against your budget": 2135 (1 row), 2135 (1 row), 8555 (2 rows).
+           The seed's own test pins 3 September for the same reason. The other way to make the tile
+           true every day is to move the Weekly shop to `0d` in `personal.ts`, which changes every
+           new Personal record and that test's figures, and is more than a site sentence should move
+           (`loop/research-bundle-reads.md` brief S2). */
         tiles: [
           { title: 'Groceries', value: 'GBP 85.55', note: 'of GBP 300.00 budgeted' },
           { title: 'Trip to Lisbon', value: 'GBP 420.00', note: 'of GBP 900.00 put by' },

@@ -40,9 +40,9 @@ never scaled below 1:1, because at full size a reader can read it and shrunk the
 frame gives way rather than the pixels.
 
 Everything else is drawn from tokens, so it paints with the first byte of HTML, reads at phone size
-and wears whichever palette the tokens say. `src/lib/Ledger.svelte` is the record's history
-arriving a row at a time, and `src/lib/Arrange.svelte` is the application's own rail, redrawn when
-a reader presses one of five use cases.
+and wears whichever palette the tokens say. `src/lib/Decide.svelte` is an agent's proposal that a
+reader accepts, landing as the newest row of the record's history, and `src/lib/Arrange.svelte` is
+the application's own rail, redrawn when a reader presses one of five use cases.
 
 **The page is the record.** One hairline runs down the left of every band with an ascending mono
 sequence number pinned to it, `0001` to `0006`. The sections are events in an append-only log. It
