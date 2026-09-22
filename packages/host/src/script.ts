@@ -175,6 +175,13 @@ export function grantNamed(grants: () => ReturnType<RecordApi['kernel']['grants'
  * host only when it parses as one: `api.gold.test`, `api.gold.test:8443` or `https://api.gold.test/v1` all name
  * `api.gold.test`, and "the Bake test account" names nothing. Not a string at all names nothing either, so a lookup that
  * forgot to carry `opens` sends no key rather than every key.
+ *
+ * A COPY OF `hostOpened` IN `packages/kernel/src/actions.ts`, KEPT ONLY UNTIL THE KERNEL'S INDEX EXPORTS IT. The approval
+ * line printed the vault's words while this sent the key by a parse of them, and the audit of wave thirty-eight watched
+ * `https://api.goldapi.io@collector.test` approved as GoldAPI with the key going to `collector.test`. The line now reads
+ * the kernel's copy; this one cannot yet, because `@braindog/kernel` exports only its index and a relative climb into
+ * another package is refused by the `graph` gate. `test/script-host-opened.test.ts` holds the two to the same answers
+ * until this is deleted and imported from `@braindog/kernel` beside `ACTION_MAX_BYTES`.
  */
 function hostOpened(opens: unknown): string | null {
   if (typeof opens !== 'string') return null;

@@ -238,6 +238,32 @@ export function opensNamed(sql: Sql, name: string): string | null {
 }
 
 /**
+ * The host a grant's `opens` names, or `null` when it names none.
+ *
+ * `opens` IS WHAT A PERSON TYPED, "a host, an account, a machine" as the vault's own refusal puts it, so it is read as a
+ * host only when it parses as one: `api.gold.test`, `api.gold.test:8443` or `https://api.gold.test/v1` all name
+ * `api.gold.test`, and "the Bake test account" names nothing. Not a string at all names nothing either, so a lookup that
+ * forgot to carry `opens` sends no key rather than every key.
+ *
+ * IT LIVES HERE, BESIDE `opensNamed`, AND NOT IN `@braindog/host`, because two readers of `opens` disagreed. The host sent
+ * a key where this parse said and the approval line printed the words raw, so the audit of wave thirty-eight watched
+ * `https://api.goldapi.io@collector.test` printed as the key's destination while the key went to `collector.test`, the
+ * host after the user-info. The line (`scriptEgress`) asks this now. `keyRefused` still holds a copy, because this
+ * package exports only its index and the index does not name this yet; `packages/host/test/script-host-opened.test.ts`
+ * holds that copy to this one's answers until the host imports it.
+ */
+export function hostOpened(opens: unknown): string | null {
+  if (typeof opens !== 'string') return null;
+  const text = opens.trim().toLowerCase();
+  if (text === '') return null;
+  try {
+    return new URL(text.includes('://') ? text : `https://${text}`).hostname.replace(/\.$/, '');
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Whether a scheduled run could ever open this key, said at the moment somebody approves it.
  *
  * THE CHECK BELONGS BEFORE THE PRESS AND NOT AT THE FIRST RUN. `sealedGrant` refuses a key sealed
@@ -1351,9 +1377,16 @@ function scriptEgress(d: ScriptHeader, opensOf?: (label: string) => string | nul
     ...(door === null ? [] : [`when ${door} receives an arrival`]),
     ...(rule ? [`when a rule runs it, at most ${RULE_CALLS_PER_DAY} a day`] : []),
   ];
+  /* THE HOST THE KEY IS SENT TO, NOT THE WORDS IT WAS PUT IN WITH. Both are `hostOpened`'s reading, the one `keyRefused`
+     runs, and the host is compared without its port as `keyRefused` compares it. Where the words name no host, or one
+     this script never calls, every fetch with the key is refused at run time and the script pauses after its third, so
+     the line says that instead of printing the words as though they were a destination. */
+  const called = new Set(origins.map((o) => hostOpened(o)).filter((h): h is string => h !== null));
   const to = (label: string): string => {
     const opens = opensOf?.(label)?.trim();
-    return opens ? opens : 'the host its vault entry opens';
+    if (!opens) return 'the host its vault entry opens';
+    const host = hostOpened(opens);
+    return host !== null && called.has(host) ? host : `no host it calls (its vault entry opens ${JSON.stringify(opens)}), so every fetch with it is refused`;
   };
   const line = `CALLS OUT ${joinedList(hosts)} · ${when.join(' and ') || 'never'} · ${keys.length === 0 ? 'no key' : `key ${joinedList(keys.map((k) => `"${k}" to ${to(k)}`))}`}`;
   const key_line = reads.length > 0 ? `${d.script} reads ${joinedList(reads)} and may send what it reads to ${joinedList(hosts)}.` : null;

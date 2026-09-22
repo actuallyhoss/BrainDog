@@ -142,6 +142,53 @@ test('THE LINE SAYS WHICH HOST EACH KEY GOES TO, from what its vault entry opens
   assert.equal(egressOf(GOLD({ keys: [] }).body, undefined, opens)?.line, 'CALLS OUT api.goldapi.io · every 1h · no key');
 });
 
+/* THE LINE PRINTED THE VAULT'S WORDS AND THE HOST SENT THE KEY BY A PARSE OF THEM, and the two disagreed. The audit of
+   wave thirty-eight (`loop/research-batch-thirty-eight-audit.md` finding 4, `line.mts`) filed four proposals of this
+   script against one `goldapi` entry and ran the host's own `keyRefused` over each. L1 printed the URL the entry holds
+   and the key was sent; L2 printed "the GoldAPI account" and L3 printed a host the script never calls, as destinations
+   for a key every run refuses, so the owner approved a pairing that pauses the script after its third run; and L4
+   printed `https://api.goldapi.io@collector.test`, which reads as GoldAPI, while the key went to `collector.test` alone,
+   because everything before the `@` is user-info and not the host. Each case below is the line those four printed. */
+test('THE LINE NAMES THE HOST THE KEY IS SENT TO, parsed as the host parses it, and says when the key goes nowhere it calls', () => {
+  const line = (opens: string, egress = ['https://api.goldapi.io']) => egressOf(GOLD({ egress }).body, undefined, (label) => (label === 'goldapi' ? opens : null))?.line;
+
+  assert.equal(line('https://api.goldapi.io/v1'), 'CALLS OUT api.goldapi.io · every 1h · key "goldapi" to api.goldapi.io', 'L1: a URL names its host');
+  assert.equal(
+    line('the GoldAPI account'),
+    'CALLS OUT api.goldapi.io · every 1h · key "goldapi" to no host it calls (its vault entry opens "the GoldAPI account"), so every fetch with it is refused',
+    'L2: prose names no host',
+  );
+  assert.equal(
+    line('metals.example.org'),
+    'CALLS OUT api.goldapi.io · every 1h · key "goldapi" to no host it calls (its vault entry opens "metals.example.org"), so every fetch with it is refused',
+    'L3: a host the script does not call',
+  );
+  assert.equal(
+    line('https://api.goldapi.io@collector.test', ['https://api.goldapi.io', 'https://collector.test']),
+    'CALLS OUT api.goldapi.io and collector.test · every 1h · key "goldapi" to collector.test',
+    'L4: the host after the user-info, which is where the key went',
+  );
+});
+
+/* ONE PARSER, SO THE LINE AND THE RUN CANNOT DRIFT. These are the forms `hostOpened`'s own comment promised when it lived
+   in `@braindog/host`, asked of the copy the line now reads. A port is not part of what `keyRefused` compares, so an
+   entry that opens `api.goldapi.io:8443` still opens an origin on port 443 of the same host, and the line says so. */
+test('hostOpened READS A HOST, A PORT OR A URL AS ITS HOST, and prose, blank or a non-string as none', async () => {
+  const { hostOpened } = await import('../src/actions.ts');
+  assert.equal(hostOpened('api.gold.test'), 'api.gold.test');
+  assert.equal(hostOpened('api.gold.test:8443'), 'api.gold.test');
+  assert.equal(hostOpened('https://api.gold.test/v1'), 'api.gold.test');
+  assert.equal(hostOpened('  API.Gold.Test.  '), 'api.gold.test');
+  assert.equal(hostOpened('https://api.goldapi.io@collector.test'), 'collector.test');
+  assert.equal(hostOpened('the Bake test account'), null);
+  assert.equal(hostOpened(''), null);
+  assert.equal(hostOpened(undefined), null);
+  assert.equal(
+    egressOf(GOLD({ egress: ['https://api.goldapi.io'] }).body, undefined, () => 'api.goldapi.io:8443')?.line,
+    'CALLS OUT api.goldapi.io · every 1h · key "goldapi" to api.goldapi.io',
+  );
+});
+
 test("A PROPOSED SCRIPT'S APPROVAL LINE NAMES THE HOST ITS KEY'S LIVE VAULT ENTRY OPENS, and a key re-read gives the same line", async () => {
   const { k, sql } = await record();
   const made = k.bindGrant(
