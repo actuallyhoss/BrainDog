@@ -264,9 +264,80 @@ function matchFolded(folded: string, entries: readonly (readonly [string, Json])
   return clash ? 'ambiguous' : [best.value];
 }
 
-/** `matchFolded` over text that has not been folded yet — the form a caller outside this file wants. */
-export function matchLiterals(text: string, entries: readonly (readonly [string, Json])[]): Json[] | 'ambiguous' {
-  return matchFolded(fold(text), entries);
+/**
+ * `lookup`'s second rule, asked only when no row's value is a whole token: DIGITS PRINTED BEHIND STARS ARE THE
+ * TAIL OF A LONGER VALUE, and they answer the one row whose value ends in them, or `'ambiguous'` for two or more.
+ *
+ * WHY IT EXISTS. `loop/research-bank-real.md`, *The three that did not read*, item 3: his bank prints one EGP
+ * account as stars and four digits in its InstaPay messages and as a branch code, three stars and the last three
+ * of those four in its `From HSBC:` lines. The whole-token rule could read one family or the other, never both,
+ * so whichever `last4` he typed, one family went to review with the account unread.
+ *
+ * THE STARS ARE REQUIRED, because they are the bank saying the digits are a tail and nothing else in a slice
+ * says so. A bare digit run is a figure as often as not, and `00` out of `EGP 900.00` ends a great many account
+ * numbers. One `-` or space may stand between the stars and the digits, which is the `From HSBC:` shape. A value
+ * no longer than the digits is not asked about, because a value that short would have been a whole token.
+ *
+ * TWO ROWS ENDING IN THE DIGITS IS A PERSON'S QUESTION and never the first row found: the declaration cannot know
+ * which of two accounts the bank meant, and filing against the wrong one moves a balance nobody checks.
+ *
+ * `enum` NEVER GETS HERE. A map's words are a provider's vocabulary and a masked number is not a word in it.
+ */
+function matchMaskedTail(folded: string, entries: readonly (readonly [string, Json])[]): Json[] | 'ambiguous' {
+  let answer: Json | undefined;
+  for (let i = folded.indexOf('*'); i !== -1; i = folded.indexOf('*', i + 1)) {
+    if (folded[i - 1] === '*') continue;
+    let at = i;
+    while (folded[at] === '*') at += 1;
+    if (folded[at] === '-' || folded[at] === ' ') at += 1;
+    const from = at;
+    while (folded[at] !== undefined && folded[at]! >= '0' && folded[at]! <= '9') at += 1;
+    if (at === from || isWordChar(folded[at])) continue;
+    const digits = folded.slice(from, at);
+
+    for (const [literal, value] of entries) {
+      const whole = fold(literal);
+      if (whole.length <= digits.length || !whole.endsWith(digits)) continue;
+      if (answer !== undefined && JSON.stringify(answer) !== JSON.stringify(value)) return 'ambiguous';
+      answer = value;
+    }
+  }
+  return answer === undefined ? [] : [answer];
+}
+
+/**
+ * `matchFolded` over text that has not been folded yet, which is the form a caller outside this file wants, and for
+ * `lookup` alone `matchMaskedTail` when the whole-token rule found nothing.
+ *
+ * THE FORM IS AN ARGUMENT AND NOT A SECOND EXPORT, so the record that hands this down (`record/src/index.ts`,
+ * `literals: matchLiterals`) reaches the lookup rule with no new wiring, and a caller that names no form gets the
+ * rule `enum` has always had.
+ */
+export function matchLiterals(
+  text: string,
+  entries: readonly (readonly [string, Json])[],
+  form: 'enum' | 'lookup' = 'enum',
+): Json[] | 'ambiguous' {
+  const folded = fold(text);
+  const got = matchFolded(folded, entries);
+  if (form !== 'lookup' || got === 'ambiguous' || got.length > 0) return got;
+  return matchMaskedTail(folded, entries);
+}
+
+/**
+ * Where a lookup slice starts once the mask in front of it is counted: the run of stars, and the one `-` or space
+ * after them, that an anchor such as `between: ['***-', ' ']` consumed.
+ *
+ * THE ANCHOR IS WHERE THE STARS WERE. `bank-from-out` boxes its account between `***-` and a space, so the slice
+ * is a bare `518` and the one sign that it is a tail sits outside it. Widening over stars and one separator adds
+ * no letter or digit, so no whole token changes.
+ */
+function maskedStart(folded: string, start: number): number {
+  let at = start;
+  if ((folded[at - 1] === '-' || folded[at - 1] === ' ') && folded[at - 2] === '*') at -= 1;
+  if (folded[at - 1] !== '*') return start;
+  while (folded[at - 1] === '*') at -= 1;
+  return at;
 }
 
 /* ── the forms ───────────────────────────────────────────────────────────── */
@@ -408,7 +479,7 @@ export function run(form: Form, text: string, folded: string, ctx: RunCtx, at = 
       if (typeof register !== 'string' || typeof by !== 'string')
         throw unknown(at, 'A lookup: needs register: and by:, naming the list to search and the field to match.');
       const rows = ctx.lookup(register, by);
-      return resolveOne(picked, folded, () => rows.map((r) => [r.value, r.id] as [string, Json]));
+      return resolveOne(picked, folded, () => rows.map((r) => [r.value, r.id] as [string, Json]), 'lookup');
     }
 
     default:
@@ -421,11 +492,15 @@ function resolveOne(
   picked: readonly Slice[],
   folded: string,
   entries: () => [string, Json][],
+  form: 'enum' | 'lookup' = 'enum',
 ): Found {
   const table = entries();
   let answer: Json[] | null = null;
   for (const s of picked) {
-    const got = matchFolded(folded.slice(s.start, s.end), table);
+    const got =
+      form === 'lookup'
+        ? matchLiterals(folded.slice(maskedStart(folded, s.start), s.end), table, 'lookup')
+        : matchFolded(folded.slice(s.start, s.end), table);
     if (got === 'ambiguous') return 'ambiguous';
     if (got.length === 0) continue;
     if (answer !== null && JSON.stringify(answer) !== JSON.stringify(got)) return 'ambiguous';

@@ -301,7 +301,14 @@ export type IngestDeps = {
    * legal value for the field, off a substring of an unrelated word, so nothing downstream catches
    * it — and two literals both present were decided by the order `Object.keys` happened to give.
    */
-  literals?: ((text: string, entries: readonly (readonly [string, Json])[]) => Json[] | 'ambiguous') | undefined;
+  /*
+   * THE THIRD ARGUMENT NAMES THE FORM, and `lookup` is the one that passes it. `lookup` has a rule `enum` must not
+   * have: digits printed behind stars are the tail of the one row whose longer value ends in them
+   * (`loop/research-bank-real.md`, *The three that did not read*, item 3, where one account printed two ways sent
+   * one family of his bank's messages to review whichever `last4` he typed). An argument rather than a second
+   * seam, so a record already handing down `matchLiterals` reaches the new rule without a line of new wiring.
+   */
+  literals?: ((text: string, entries: readonly (readonly [string, Json])[], form?: 'enum' | 'lookup') => Json[] | 'ambiguous') | undefined;
   /**
    * `43 §4.3`'s `date`, when the record handed it down: every valid calendar day in the text
    * matching `format`, in text order.
@@ -1204,8 +1211,10 @@ function candidatesAt(deps: IngestDeps, form: Extractor, text: string, depth: nu
   const table = literalsOf(deps, form);
   if (table !== null && deps.literals !== undefined) {
     let answer: Json[] | null = null;
+    const lookup = 'lookup' in form ? form.lookup : null;
+    const mask = lookup === null ? '' : maskAtEnd(lookup.between?.[0] ?? lookup.after ?? '');
     for (const anchored of slices(form as Record<string, unknown>, text)) {
-      const got = deps.literals(anchored, table);
+      const got = lookup === null ? deps.literals(anchored, table) : deps.literals(mask + anchored, table, 'lookup');
       if (got === AMBIGUOUS) return AMBIGUOUS;
       if (got.length === 0) continue;
       if (answer !== null && JSON.stringify(answer) !== JSON.stringify(got)) return AMBIGUOUS;
@@ -1261,6 +1270,20 @@ type Candidates = Json[] | typeof AMBIGUOUS;
  * does: *every live row's `by` value*. Reading it here rather than one value at a time is what
  * makes *longest wins* and *equal length is ambiguous* askable at all.
  */
+/**
+ * The mask a lookup's anchor ends in: its trailing run of stars and the one `-` or space after them, or `''`.
+ * `bank-from-out` boxes its account between `***-` and a space, so the slice is a bare `518` and the one sign that
+ * it is a tail sits in the anchor. Put back in front of the slice, it is what `lookup`'s masked-tail rule reads.
+ */
+function maskAtEnd(anchor: string): string {
+  let at = anchor.length;
+  if (anchor[at - 1] === '-' || anchor[at - 1] === ' ') at -= 1;
+  const sep = anchor.slice(at);
+  let stars = at;
+  while (anchor[stars - 1] === '*') stars -= 1;
+  return stars === at ? '' : anchor.slice(stars, at) + sep;
+}
+
 function literalsOf(deps: IngestDeps, form: Extractor): readonly (readonly [string, Json])[] | null {
   if ('enum' in form) return Object.entries(form.enum.map);
   if ('lookup' in form) return deps.rows(form.lookup.register, form.lookup.by).map((r) => [r.value, r.id] as const);
