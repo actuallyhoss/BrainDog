@@ -249,9 +249,13 @@ const DECLARED: Record<string, Version> = {
       page.work page.work-board
       register.tasks register.tracks register.updates
     `,
-    declares: '93dcbade382b5e4a',
+    declares: 'bc6a8f4d4c3319ab',
     history: [
       '`page.work` leads with what to do as six lists that tick, Today, This week, Waiting on you, With an agent, After this week and Later, cut by state, then agent, then day so no task falls under two; its Waiting on you, Due soon and With an agent tables, which nobody could tick from the Overview, are gone -> 93dcbade382b5e4a',
+      /* THE SAME VERSION, BECAUSE 1.6.0 HAS NOT SHIPPED. Measured on 22 September with `gh run list --workflow deploy`:
+         the last successful deploy is still `8bbf469e` at 16:23 UTC on the 21st, and `7e796bbe`, which set 1.6.0, is
+         not behind it. Every deploy since was skipped. */
+      'Still before any release: `page.work` gains a seventh list, No due day, `state is open or doing, agent is empty, by is empty`, because a task of yours with no due day was under none of the six and `by is empty or after +7d` is refused. Done lately goes back to the full width to make room -> bc6a8f4d4c3319ab',
     ],
   },
   'estate@1.1.0': {

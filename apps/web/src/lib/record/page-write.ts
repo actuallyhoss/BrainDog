@@ -37,7 +37,11 @@ export type Updated =
  * record declares registers this build has never heard of, and a board or a checklist over one of those was a gesture
  * that answered "no state to say it with" about a register that has one.
  */
-export type Declared = { state?: string | undefined; done?: readonly string[] | undefined; fields: readonly { id: string; values?: readonly string[] | undefined }[] };
+export type Declared = {
+  state?: string | undefined;
+  done?: readonly string[] | undefined;
+  fields: readonly { id: string; values?: readonly string[] | undefined; default?: unknown }[];
+};
 
 const norm = (v: string): string => v.toLowerCase().replace(/_/g, ' ').trim();
 
@@ -48,14 +52,24 @@ export function movePatch(ref: RowRef, field: string, to: string, decl?: Declare
   return { [field]: values?.find((v) => norm(v) === norm(to)) ?? to };
 }
 
-/** The patch that marks a task done or not done, or `null` when its register declares no state to say it with. */
+/**
+ * The patch that marks a task done or not done, or `null` when its register declares no state to say it with.
+ *
+ * NOT DONE IS THE STATE A NEW ROW STARTS IN, and only when the register names none is it the first that is not
+ * terminal. `tasks` lists `backlog` first so that the Board draws Later as its first column, and its `default` is
+ * `open`. Taking the first in the list, an un-ticked task was sent to `backlog`, which on Work's Overview took it off
+ * Today and out of the Open figure and put it under Later. A default is used only when it is one of the field's own
+ * values and is not terminal, because a default of `done` would make un-ticking a second tick.
+ */
 export function tickPatch(ref: RowRef, done: boolean, declared?: Declared | null): Record<string, unknown> | null {
   const decl = declared ?? REGISTERS[ref.register];
   const field = decl?.state;
   if (!decl || !field) return null;
   const terminal = decl.done ?? [];
-  const values = decl.fields.find((f) => f.id === field)?.values ?? [];
-  const value = done ? terminal[0] : values.find((v) => !terminal.includes(v));
+  const spec = decl.fields.find((f) => f.id === field);
+  const values = spec?.values ?? [];
+  const started = typeof spec?.default === 'string' && values.includes(spec.default) && !terminal.includes(spec.default) ? spec.default : undefined;
+  const value = done ? terminal[0] : (started ?? values.find((v) => !terminal.includes(v)));
   return value === undefined ? null : { [field]: value };
 }
 

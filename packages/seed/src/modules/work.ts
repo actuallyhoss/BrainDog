@@ -295,13 +295,17 @@ const WAITING = 'state is review or blocked';
  * THE LISTS ARE CUT SO THAT NO TASK CAN FALL UNDER TWO, and the cut is by state first, then by agent, then by day.
  * Waiting on you takes `WAITING` whoever holds the task, because a task an agent handed back is waiting on a person
  * and not on the agent. With an agent takes the rest of what an agent holds. What is left is yours, and the day
- * divides it: Today (on or before it), This week, After this week. Later is the backlog, whatever its date, which is
- * the word the Board already uses for it.
+ * divides it: Today (on or before it), This week, After this week, and No due day. Later is the backlog, whatever its
+ * date, which is the word the Board already uses for it.
  *
- * WHAT NO LIST DRAWS, measured rather than assumed: a task in hand with nobody's agent on it and no due day. The list
- * that would hold it is "no day, or a day after this week", and `by is empty or after +7d` is refused by the record
- * (VALUE_MALFORMED: "empty is not a value by can hold"), the same wall `money-core`'s `recurring-ended` hit. The
- * Board's Everything open draws those tasks; the sample has none.
+ * A TASK OF YOURS WITH NO DUE DAY HAS A LIST OF ITS OWN because no sentence the grammar reads can put it under After
+ * this week. At 1.6.0 it was under none of the six: a task created with nothing but a description, state `open` by
+ * default and no agent, was on no list of the Overview (`test/work-overview-twice.test.ts` found it left out). A
+ * sentence ANDs its clauses on the comma and reads `or` only between values of one field, so `by is empty or after +7d`
+ * is refused (VALUE_MALFORMED: "empty is not a value by can hold", the wall `money-core`'s `recurring-ended` hit), and
+ * `by is not before +8d` is refused the same way. The only clauses on a day that a missing day passes are `is empty`
+ * and `is not` a finite list of days, and neither can leave out every day up to a line, so no one list can hold both
+ * the undated and the far off. `by is empty` is read by the record and by the app's sample engine alike.
  */
 const IN_HAND = 'state is open or doing';
 const YOURS = `${IN_HAND}, agent is empty`;
@@ -495,7 +499,10 @@ export const WORK_PAGES: Record<string, SeedPage> = {
       {
         /* THE QUEUE A PERSON WORKS FROM, with the note as the reason it waits. The due day this block carried at 1.5.0
            has no cell left to sit in: a `todo` draws the task and one detail, and why a task is stuck is what a
-           person needs to act on it. It is still in the order it falls due. */
+           person needs to act on it. It is still in the order it falls due. THE CHANGED BY COLUMN WENT THE SAME WAY, and
+           neither can come back without a new kind: `todo` is `cells: 2` in `braindog-render`'s `kinds.ts`, both
+           renderers draw `cells[0]` and `cells[1]` and no more, and a `todo` row of four cells written into a page is
+           refused whole as DIALECT_ARITY ("A todo row has 4 columns where todo takes 2"), measured on 22 September. */
         kind: 'todo',
         heading: 'Waiting on you',
         span: 7,
@@ -532,6 +539,28 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         empty: 'Nothing of yours is due after this week.',
       },
       {
+        /* WHAT IS YOURS AND HAS NO DAY, which no other list can hold: `IN_HAND` above says why it cannot be After this
+           week's. The project is its detail, because there is no day to show. */
+        kind: 'todo',
+        heading: 'No due day',
+        span: 5,
+        source: 'register.tasks',
+        where: `${YOURS}, by is empty`,
+        columns: [{ field: 'what' }, { field: 'thing' }],
+        order: [{ field: 'by', dir: 'asc' }],
+        limit: 8,
+        empty: 'Everything of yours has a due day.',
+      },
+      {
+        kind: 'series',
+        heading: 'Done, and due ahead',
+        span: 12,
+        series: [{ metric: 'tasks-done-by-week', then: 'tasks-due-by-week', label: 'Done, then due' }],
+        back: 8,
+        ahead: 4,
+        empty: 'Nothing was finished or is due in these weeks.',
+      },
+      {
         /* WHERE THE OPEN WORK SITS, in days of effort, and what belongs to no project, last. A task with no size adds
            nothing and draws no bar, so open work nobody sized says the empty line rather than "No project 0 d". */
         kind: 'bar',
@@ -545,18 +574,9 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         empty: 'No open work has a size yet.',
       },
       {
-        kind: 'series',
-        heading: 'Done, and due ahead',
-        span: 12,
-        series: [{ metric: 'tasks-done-by-week', then: 'tasks-due-by-week', label: 'Done, then due' }],
-        back: 8,
-        ahead: 4,
-        empty: 'Nothing was finished or is due in these weeks.',
-      },
-      {
         kind: 'todo',
         heading: 'Later',
-        span: 5,
+        span: 7,
         source: 'register.tasks',
         where: 'state is backlog',
         columns: [{ field: 'what' }, { field: 'thing' }],
@@ -567,7 +587,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
       {
         kind: 'table',
         heading: 'Done lately',
-        span: 7,
+        span: 12,
         source: 'register.tasks',
         where: 'state is done',
         columns: [

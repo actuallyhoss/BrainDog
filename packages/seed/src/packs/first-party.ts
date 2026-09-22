@@ -101,7 +101,9 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   They are now six `todo` lists cut so that no task falls under two: Today, This week, Waiting on you, With an agent,
  *   After this week and Later. No list or field moves and nothing is taken away but the tables' extra columns, so the
  *   step is a minor one. It is a step and not a reset because 1.5.0 has been released: the last successful deploy,
- *   on 21 September at 16:23 UTC, came after `79f17031` set it.
+ *   on 21 September at 16:23 UTC, came after `79f17031` set it. Still under 1.6.0, because nothing has deployed since:
+ *   a seventh list, No due day, holds a task of yours with no due day, which none of the six could, so every task in
+ *   play is under exactly one list.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.4.0',

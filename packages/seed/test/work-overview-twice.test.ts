@@ -9,7 +9,7 @@
  * Fenwick invoice against services` were each drawn three times.
  *
  * WHAT THIS HOLDS. Since work 1.6.0 the Overview draws what is in play as lists that tick, one heading per
- * question: Today, This week, After this week, Waiting on you, With an agent and Later. EVERY ONE OF THOSE IS HELD
+ * question: Today, This week, After this week, No due day, Waiting on you, With an agent and Later. EVERY ONE IS HELD
  * APART FROM EVERY OTHER here, `With an agent` included. Under 1.5.0 it was not, on the argument that a row there
  * answered a different question; that argument held for a table and does not hold for a list a person ticks down,
  * where one task under two headings is two ticks for one piece of work.
@@ -20,6 +20,10 @@
  * tomorrow, in seven days and in eight. THE DAY LINES WERE MISSED AT FIRST: with only the first three, widening
  * Today to `by before +2d` drew nothing twice on the sample and the test passed, because the sample has no task of
  * yours due tomorrow.
+ *
+ * AND UNDER NONE WAS NOT ASKED AT ALL until a task of yours with no due day was added: at 1.6.0 it matched no list, and
+ * the test passed, because every corner had a date or an agent. So the lists are now read against the whole register,
+ * every task in play must be under exactly one of them, and No due day is the seventh list that holds it.
  *
  * AND WHAT WAS GIVEN UP, said here because a test that stops asking a question should say so. 1.5.0 put the due day on
  * `Waiting on you` so that holding a ticket back from `Due soon` did not take its date off the screen. A `todo` draws
@@ -83,9 +87,9 @@ const block = (page: PageResult, heading: string) => {
   return found;
 };
 
-const GROUPS = ['Today', 'This week', 'After this week', 'Waiting on you', 'With an agent', 'Later'];
+const GROUPS = ['Today', 'This week', 'After this week', 'No due day', 'Waiting on you', 'With an agent', 'Later'];
 
-test('NO TASK IS DRAWN UNDER TWO OF WORK’S LISTS, because a person ticking down the page would tick it twice', async () => {
+test('NO TASK IS DRAWN UNDER TWO OF WORK’S LISTS AND NONE IS LEFT OUT, because a person ticking down the page would tick it twice or never', async () => {
   const { page: sample, sql: first } = await overview();
   for (const heading of ['Today', 'This week', 'Waiting on you', 'With an agent']) assert.ok(block(sample, heading).rows.length > 0, `the sample draws nothing under ${heading}, so this does not bite`);
   first.close();
@@ -104,22 +108,39 @@ test('NO TASK IS DRAWN UNDER TWO OF WORK’S LISTS, because a person ticking dow
     { what: 'Yours, due tomorrow', state: 'open', by: on(1) },
     { what: 'Yours, due in seven days', state: 'open', by: on(7) },
     { what: 'Yours, due in eight days', state: 'open', by: on(8) },
+    { what: 'Yours, with no day', state: 'open' },
+    { what: 'Taken by an agent, with no day', state: 'doing', agent: 'codex' },
+    { what: 'Kept for later, with no day', state: 'backlog' },
   ];
   for (const c of corners) assert.ok(k.create('tasks', c, { actor: 'p_1' }).ok, c.what);
   const out = k.page('work');
   assert.ok(out.ok, sayOf(out));
 
+  /* EVERY LIST ON THE PAGE THAT TICKS, and not only the ones named here, so a list added later is held apart too. */
+  const lists = out.value.blocks.filter((b) => b.kind === 'todo');
   const where = new Map<string, string[]>();
-  for (const heading of GROUPS) {
-    const b = block(out.value, heading);
-    assert.equal(b.kind, 'todo', `${heading} cannot be ticked`);
-    for (const r of b.rows) where.set(String(r.fields.what), [...(where.get(String(r.fields.what)) ?? []), heading]);
+  for (const b of lists) {
+    assert.deepEqual(b.refusals, [], `${String(b.heading)} refused`);
+    /* A list cut short by its limit would hide what it matched, and a task hidden that way is left out too. */
+    assert.equal(b.rows.length, b.matched, `${String(b.heading)} matched ${String(b.matched)} and drew ${b.rows.length}, so this cannot see the rest`);
+    for (const r of b.rows) where.set(String(r.fields.what), [...(where.get(String(r.fields.what)) ?? []), String(b.heading)]);
   }
   const twice = [...where].filter(([, hs]) => hs.length > 1).map(([what, hs]) => `${what}: ${hs.join(' and ')}`);
   assert.deepEqual(twice, [], 'drawn under two headings');
+
+  /* AND EVERY TASK IN PLAY IS UNDER ONE OF THEM, asked of the record and not of the corners above, so a task of a shape
+     nobody thought to add is still found. */
+  const all = k.list({ register: 'tasks', limit: 200 });
+  assert.ok(all.ok, sayOf(all));
+  const left = all.value.rows
+    .filter((r) => !['done', 'dropped'].includes(String(r.fields.state)) && !where.has(String(r.fields.what)))
+    .map((r) => `${String(r.fields.what)} (${String(r.fields.state)}, ${String(r.fields.agent ?? 'no agent')}, ${String(r.fields.by ?? 'no day')})`);
+  assert.deepEqual(left, [], 'in play and under none of the lists');
+
+  assert.deepEqual(lists.map((b) => String(b.heading)).sort(), [...GROUPS].sort(), 'the lists that tick are not the ones this names');
   assert.deepEqual(
     corners.map((c) => where.get(c.what)),
-    [['Waiting on you'], ['With an agent'], ['Later'], ['Today'], ['This week'], ['This week'], ['After this week']],
+    [['Waiting on you'], ['With an agent'], ['Later'], ['Today'], ['This week'], ['This week'], ['After this week'], ['No due day'], ['With an agent'], ['Later']],
     'each corner is drawn once, under the heading that answers it',
   );
   sql.close();

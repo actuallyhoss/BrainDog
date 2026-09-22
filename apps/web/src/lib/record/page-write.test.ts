@@ -29,14 +29,41 @@ function host(answer: (() => Response) | null): { io: Fetch; sent: { url: string
 /* A register the sample declares with a state and terminal states, whichever it is. */
 const withState = Object.values(REGISTERS).find((r) => r.state && (r.done?.length ?? 0) > 0 && r.fields.some((f) => f.id === r.state && (f.values?.length ?? 0) > 1));
 
-test('a ticked task is its register state: the first terminal one, and back to the first that is not', () => {
+test('a ticked task is its register state: the first terminal one, and back to the one a new row starts in', () => {
   assert.ok(withState, 'the sample declares no register with a state and terminal states');
   const field = withState.state!;
-  const values = withState.fields.find((f) => f.id === field)!.values!;
+  const decl = withState.fields.find((f) => f.id === field)! as { values: readonly string[]; default?: unknown };
   const ref = { register: withState.id, seq: 1, version: 1 };
   assert.deepEqual(tickPatch(ref, true), { [field]: withState.done![0] });
-  assert.deepEqual(tickPatch(ref, false), { [field]: values.find((v) => !withState.done!.includes(v)) });
+  const started = typeof decl.default === 'string' && !withState.done!.includes(decl.default) ? decl.default : decl.values.find((v) => !withState.done!.includes(v));
+  assert.deepEqual(tickPatch(ref, false), { [field]: started });
   assert.equal(tickPatch({ register: 'no-such-list', seq: 1, version: 1 }, true), null);
+});
+
+/**
+ * UN-TICKING A TASK PUT IT IN LATER, WHICH IS NOT WHERE IT WAS. `tasks` declares its states `backlog` first, so that the
+ * Board draws Later as its first column, and the tick went back to the first state that is not terminal. Run against
+ * the sample before the repair, un-ticking `tasks#3` sent `{ state: 'backlog' }`: on work 1.6.0's Overview that is a
+ * task ticked under Today by mistake which, un-ticked, leaves Today and the Open figure and comes back under Later. The
+ * register already says where a task nobody placed belongs: its `default` is `open`, which is what a new task is and
+ * so what a reopened one is.
+ */
+test('AN UN-TICKED TASK GOES BACK TO THE STATE A NEW ONE STARTS IN, and not to the first one the register lists', () => {
+  const tasks = REGISTERS.tasks!;
+  assert.equal(tasks.fields.find((f) => f.id === 'state')?.values?.[0], 'backlog', 'the sample no longer lists backlog first, so this does not bite');
+  assert.deepEqual(tickPatch({ register: 'tasks', seq: 3, version: 1 }, false), { state: 'open' });
+
+  /* A RECORD'S OWN DECLARATION IS READ THE SAME WAY, and one with no default, or a terminal one, falls back as before. */
+  const shots = (dflt?: string) => ({
+    state: 'stage',
+    done: ['wrapped', 'cut'],
+    fields: [{ id: 'stage', values: ['idea', 'to_shoot', 'wrapped', 'cut'], ...(dflt === undefined ? {} : { default: dflt }) }],
+  });
+  const ref = { register: 'shots', seq: 1, version: 1 };
+  assert.deepEqual(tickPatch(ref, false, shots('to_shoot')), { stage: 'to_shoot' });
+  assert.deepEqual(tickPatch(ref, false, shots()), { stage: 'idea' });
+  assert.deepEqual(tickPatch(ref, false, shots('wrapped')), { stage: 'idea' }, 'a terminal default is not a way to reopen');
+  assert.deepEqual(tickPatch(ref, false, shots('nowhere')), { stage: 'idea' }, 'a default the field does not declare is not a state');
 });
 
 test("a moved card's column goes back to the declared value", () => {
