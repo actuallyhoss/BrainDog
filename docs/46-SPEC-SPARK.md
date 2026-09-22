@@ -127,7 +127,7 @@ Six source files, counted. `prompts.ts` imports nothing so the CLI's runner can 
 ### 4.1 · Spark's own SQLite — two tables
 
 ```sql
-PRAGMA user_version = 1;
+PRAGMA user_version = 1;   -- best effort: a Durable Object's authorizer refuses it (SQLITE_AUTH), so on the Worker it reads 0 and a migration may not key on it
 
 CREATE TABLE IF NOT EXISTS settings (
   singleton  INTEGER PRIMARY KEY CHECK (singleton = 1),
@@ -161,8 +161,26 @@ Invariants a test checks: `settings` has exactly one row after `createSpark`; a 
 The month's meter is one indexed count:
 
 ```sql
-SELECT COUNT(*) FROM call WHERE tier = 'a' AND kind = 'propose' AND ts >= ?   -- ? = the first instant of the month, record tz
+SELECT COUNT(*) FROM call WHERE tier = 'a' AND kind IN ('read','propose') AND model <> '-' AND ts >= ?   -- ? = the first instant of the month, record tz
 ```
+
+**One ask is one model call, on pass 1 or pass 2.** The count was `kind = 'propose'` alone, which fitted a palette whose
+pass 1 was free; the only door built is `POST /api/spark/read`, which writes `kind = 'read'`, so an owner who set
+`ask_cap` to 2 was answered on five asks out of five and `status()` read 0 of 2 throughout
+(`packages/spark/test/read-meter.test.ts`, `1d4d6cb3`). So a `read` that drafted a predicate spends one, a `propose`
+given an `ask_id` spends one (its draft was spent on pass 1), and a `propose` with no `ask_id` spends two, because it
+drafts its own predicate first (§5.5-1) and accounts that call as a `read` row. A pass 2 repeated on a stored `ask_id`
+spends one each time. A pass 2 whose rows came back empty calls no model (§5.5-2), so it spends nothing of its own:
+one with an `ask_id` spends none and one without spends only its drafting `read`. A refused or failed model call still counts: the status is not in the filter. `model = '-'` is
+the one row that called nothing, the `read` on a record with no lists (§5.4-3), and it is not billed. Tiers `b` and
+`byo` are never metered.
+
+> **OPEN QUESTION FOR THE OWNER, not settled here.** [23-ASSISTANT-UI](23-ASSISTANT-UI.md) §8 says the unit a person
+> sees is an *ask*, and §14 below says "a second identical ask in the same month increments the meter by one". Under
+> the rule above, a palette question that goes on to pass 2 is two model calls and so spends two, and the §14 line holds
+> only while the read door is the only one mounted. Either the Settings row counts questions and the meter should
+> count one per `ask_id`, or the unit is a model call and 23 §8 and §14 should say so. Neither document has been
+> edited to pick one.
 
 ### 4.2 · The Proposal
 
@@ -683,7 +701,9 @@ What is not claimed: no classifier detects injection. The `flagged` bit is a hig
 | `propose` golden `options`, recommended C with an uncited `because` | filed; no option recommended |
 | `propose` golden `rowset`, one row with no citation | filed with that row dropped; `text` unchanged |
 | `propose` golden `text` containing `"14 rows"` | `PROPOSAL_UNCITED`; `propose` not called; `call.status 'refused'` |
-| tier `a`, 80 `propose` rows this month | `read` → `SPARK_BUDGET_SPENT`; zero `Inference` calls |
+| tier `a`, 80 `read` and `propose` rows this month that called a model (`model <> '-'`) | `read` → `SPARK_BUDGET_SPENT`; zero `Inference` calls |
+| tier `a`, `ask_cap` 2, two `read`s that drafted a predicate | the third `read` → `SPARK_BUDGET_SPENT` with no model call; `status().asks.used` is 2 (`test/read-meter.test.ts`) |
+| `read` on a record with no lists | `status 'nothing'`, zero `Inference` calls, `status().asks.used` unchanged |
 | tier `b`, `byok` given | `byok.complete` called, `deps.inference.complete` not; `call.neurons = 0`, `tier 'b'` |
 | tier `b`, `byok` absent | `FORBIDDEN`; zero calls |
 | every filed proposal | `sparkCtx.principal.kind = 'spark'`; the asker's principal never reaches `record.propose` |
@@ -734,7 +754,7 @@ What is not claimed: no classifier detects injection. The `flagged` bit is a hig
 - `ponytail:` the self-host runner transport is long-poll only — no WebSocket server, no `ws` dependency (§13 #8). Add a server when a self-hoster measures the 1.5 s claim latency as a problem.
 - `ponytail:` `explain` in tier A is deterministic (the rows behind a metric); the model `explain` is tier C only. Add a tier A `explain` job when the *Show me the rows* affordance is measured insufficient.
 - `ponytail:` the pattern proposal carries no per-field hit counts; the review's dry run computes them. Add them here only if the review screen cannot run the extractors.
-- `ponytail:` two schema migrations by `CREATE TABLE IF NOT EXISTS` and `PRAGMA user_version`; no migration table. Add one at the second migration.
+- `ponytail:` two schema migrations by `CREATE TABLE IF NOT EXISTS` and `PRAGMA user_version`; no migration table. The pragma cannot be the key on the Worker, where it reads 0 for ever (§4.1), so the first schema change carries its version in a row, as `dir_meta` does for the directory.
 - `ponytail:` result schemas are checked by hand (`typeof`, enum membership); no validator library. Add `declare`'s Valibot path if a schema grows past ten keys.
 
 Twelve, counted.

@@ -155,7 +155,7 @@ interface KindSpec {
 | `forecast` | proportional | mark (`opening` `past` `step` `horizon` `knobs`) · day · label · amount | 4 | no | — | page-only; knobs and scrub only with `RenderOptions.scenario` |
 | `spec` | rows | label · value · note | 3 | no | — | |
 | `params` | rows | label · value · note | 3 | no | — | |
-| `todo` | list | title · detail | 2 | no | — | marker |
+| `todo` | list | title · detail · fact · fact (the two facts optional) | 4 | no | — | marker; the two facts are one quiet line under the title, joined by ` · `, and a row with both blank draws no line, so a two-cell row draws as it did before the facts existed |
 | `steps` | list | title · detail · state | 3 | no | — | ordered |
 | `timeline` | list | date · title · detail | 3 | yes | — | ordered |
 | `board` | grid | column · title · detail | 3 | no | — | |
@@ -389,7 +389,7 @@ in the kind's order; an absent cell renders as an empty span — columns never s
 | `gauge` | `<div class="gauge[ tone-x]" style="--magnitude:0.70"><span class="label"> <span class="figure">value</span> <span class="target">target</span></div>` |
 | `chips` | `<ul class="chips"><li class="chip[ tone-x]"><span class="glyph" data-glyph="G" aria-hidden="true"></span><span class="figure"> <span class="word"></li>…</ul>`; a row with an empty figure or an empty word is not drawn (05 §7.4) |
 | `spec` · `params` | `<dl><div class="row"><dt>label</dt><dd class="value">value</dd><dd class="note">note</dd></div>…</dl>` |
-| `todo` | `<ul class="todo"><li class="item[ done]"><input type="checkbox" disabled[ checked]> <span class="title"> <span class="detail"></li>…</ul>` |
+| `todo` | `<ul class="todo"><li class="item[ done]"><input type="checkbox" disabled[ checked]> <span class="title"> <span class="detail">[ <span class="meta">fact · fact</span>]</li>…</ul>`; `meta` only when the third or fourth cell is not blank, and a blank one is left out with its dot |
 | `steps` | `<ol class="steps"><li class="step" data-state="S"><span class="title"> <span class="detail"> <span class="state">S</span></li>…</ol>` |
 | `timeline` | `<ol class="timeline"><li class="event[ tone-x]"><time datetime="2026-09-02">2 Sep 2026</time> <span class="title"> <span class="detail"></li>…</ol>`; a date cell that is not `YYYY-MM-DD` → `<span class="date">` |
 | `board` | `<div class="columns"><section class="column"><h4>column</h4><ul><li class="card"><span class="title"> <span class="detail"></li>…</ul></section>…</div>` — columns in order of first appearance |

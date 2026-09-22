@@ -84,7 +84,7 @@ export interface Kernel {
   appendEvent(e: NewEvent): { id: string; rowid: number };
   replay(opId: string): Result<Entry> | undefined;
   observe(batch: { kind: ObservationKind; subject: string }[]): void;
-  version(): number;                                 // MAX(event.rowid), 0 on an empty record
+  version(): number;                                 // MAX(event.rowid), 0 on an empty record; the record passes it on only to an owner who reads every list (45, `versionFor`)
 
   // ── queues (in a transaction; the rules hook and the record use them) ───────────────────────
   schedule(row: ScheduleRow): void;                  // INSERT … ON CONFLICT (kind, key) DO UPDATE
@@ -319,7 +319,7 @@ The stored shapes are the DDL of [30-BLUEPRINT](30-BLUEPRINT.md) §1 and the can
 - K12 · An `event.op_id` value appears at most once, and only on the first row a write produces; every other row of the same write carries the same `batch` and a `NULL` `op_id`.
 - K13 · A write's event rows share one `batch`; a re-entrant rule write shares its trigger's `batch`.
 - K14 · A redacted value is the literal `--redacted--`; an erased value is the literal `--erased--`; `from_v IS NULL` means only that the field had no prior value. `to_v` on an `edit`, `state`, `tag`, `untag` or `link` row is never `NULL` — a cleared field is the four characters `null`.
-- K15 · `MAX(event.rowid)` is monotonic and equals the `version` of every `ok` result returned after that write.
+- K15 · `MAX(event.rowid)` is monotonic and equals the `version` of every `ok` result returned after that write. This is the kernel's number; the record hands it out only to a caller `holdsRowids` admits, and answers anybody else an unordered hash of the newest line they are shown (33 §4 `/api/version`).
 - K16 · A `grant.*` event's `note` matches `^g_[0-9A-HJKMNP-TV-Z]{26} (api_token|password|ssh_key|recovery_codes|note)$` — the id and the kind, never a label ([12-SECURITY](12-SECURITY.md) §8).
 
 **Refusals**

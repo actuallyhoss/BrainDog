@@ -511,7 +511,7 @@ options: [{ id: 'retry', label: 'Run it now' }, { id: 'ignore', label: 'Ignore' 
 
 ### 5.14 · The live channel — phase 2 polls
 
-`GET /api/version` → `{ version: api.kernel.version() }` (41 §2 — `MAX(event.rowid)`, 30 §1), `no-store`. `/ws` answers 404 so the client falls back to 15 s
+`GET /api/version` → `api.version(ctx)` (33 §4), `no-store`: `version` is `MAX(event.rowid)` (41 §2, 30 §1) to an owner who reads every list, and to anybody else an unordered 53-bit hash of the id of the newest event line they are shown, or `0`, which a poller compares for change and never scans from. `/ws` answers 404 so the client falls back to 15 s
 polling after its two failures (22 §5) without waiting on a handshake. The upgrade path is §10.
 
 ### 5.15 · `claimJob?wait=20` — the long poll (phase 7)
@@ -714,7 +714,7 @@ and captures `DATA`).
 | `POST /api/list` with cookie and `Origin: https://evil.example` | 403 `FORBIDDEN` |
 | `POST /api/nope` | 404 bare |
 | `POST /api/restore` | 404 bare |
-| `GET /api/version` | `{ version }` equal to `MAX(event.rowid)` |
+| `GET /api/version` | `{ version }` equal to `MAX(event.rowid)` for an owner who reads every list; for a member, a number that does not move while only lines hidden from her are written |
 | `GET /ws` | 404 |
 | 1 MB + 1 byte body on `/api/log` | 413 |
 | 61 requests in one second with one token | the 61st is 429 with `Retry-After` |

@@ -342,6 +342,16 @@ Every response carries `version`; the live channel pushes `{version, registers}`
 refetches only the blocks whose `source` appears in that list. One integer of coordination,
 identical for a browser tab, the CLI and an agent.
 
+**`MAX(event.rowid)` is what an owner who reads every list is answered, and nobody else.** Handed to
+a member, the gap between two polls counted the events she was not shown: a colleague at `read` polled
+4 and then 9 across three invitations hidden from her and two Diary rows
+(`loop/research-batch-twenty-four-audit.md` finding 2). Since `83875130`, `version()` answers anybody
+the record's `holdsRowids` refuses a 53-bit hash, from two FNV-1a passes, of the id of the newest
+event line she is shown, or `0` when she is shown none. It moves when a line she may read is written
+and stands still otherwise. **It is not ordered**: a client may compare two of hers for "did it
+change" and must not subtract them, sort by them, or ask for "what changed since" with one; the
+rowid range scan is the owner's alone.
+
 > **Do not build on a database change hook.** Node's SQLite has `ENABLE_PREUPDATE_HOOK` and
 > `ENABLE_SESSION`; the Durable Object's SQL API exposes **neither**. A mechanism that exists on one
 > adapter only is a trap. The `event` row written at step 8 of the write path is the changelog.
