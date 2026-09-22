@@ -3,3 +3,26 @@ via:    install
 raises: packages/kernel/src/index.ts
 at:     group_by
 fix:    Group by a field with at most fifty values, or cut a date into buckets.
+pack: {
+    "pack": "fixture-install", "version": "1.0.0",
+    "summary": "One pack built to trip exactly one install refusal.",
+    "author": "BrainDog fixtures", "license": "MIT",
+    "declarations": [
+      { "register": "obligations", "name": "Obligations", "title": "what",
+        "fields": [ { "id": "what", "type": "text", "required": true },
+                    { "id": "client", "type": "ref", "to": "clients" } ] },
+      { "metric": "by-client", "name": "By client", "source": "register.obligations",
+        "value": { "count": "id" }, "group_by": "client",
+        "format": "int", "target": { "gte": 0 }, "window": "30d" }
+    ]
+  }
+installed: [
+    { "pack": "fixture-other", "version": "1.0.0",
+      "summary": "The pack whose list already holds more rows than a chart can draw.",
+      "author": "BrainDog fixtures", "license": "MIT",
+      "declarations": [
+        { "register": "clients", "name": "Clients", "title": "name",
+          "fields": [ { "id": "name", "type": "text", "required": true } ] }
+      ] }
+  ]
+facts: { "rows": { "clients": 51 } }

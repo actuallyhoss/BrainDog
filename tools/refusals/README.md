@@ -191,6 +191,12 @@ yet, the run read `26/32 agreed` at exit 1, the five saying *"carries no input, 
 The one disagreement left is `create-foreign-register`, above. `run-via.mjs install` now reads
 *"install: 15 fixtures, and this runner drove none of them"* at exit 2.
 
+**And `create-foreign-register` has moved, so `lint` agrees with itself.** Later on 22 September 2026
+the fixture became `via: install` with its own `pack:` and an `installed:` holding the pack that owns
+`invoices`, and its entry here in `lint-inputs.json` was deleted, because a lending nothing borrows is
+dead data. `run-via.mjs lint` reads `31/31 agreed with the surface; 26 ran on a borrowed input.` at
+exit 0. What the move found is in the next section.
+
 **Two of the 27 codes need an input key `40 §6`'s `lint` row has not got.** The row names one,
 `pack:`. Measured:
 
@@ -400,11 +406,11 @@ carries a `pack:` still. So the bodies sit in
 and marks every line it borrows `(borrowed)`. A fixture that passes on somebody else's input is still
 a fixture with no input.
 
-**What to fold where.** For each of the 27 entries in `lint-inputs.json`, add one key to the fixture
+**What to fold where.** For each of the 26 entries in `lint-inputs.json`, add one key to the fixture
 of the same name, as a YAML flow collection over several lines with every continuation indented,
 which is the form `fixtures/corpus.ts` reads and `refusal-fixtures.mjs` skips:
 
-- 25 entries become `pack: { … }`.
+- 24 entries become `pack: { … }`.
 - `pack-over-cap.yaml` becomes `usecase: "…"`, a document over 256 KB.
 - `kind-unknown.yaml` becomes `decl: { … }`, one declaration outside the eight kinds.
 
@@ -418,6 +424,68 @@ fixtures by necessity rather than by carelessness.
 extension is not `.yaml`, and a finding sets `process.exitCode = 1`. A `README.md` in that directory
 would turn the enumeration gate red for the same reason, which is why the notes for the corpus are in
 this file instead.
+
+## What the `install` runner found
+
+The `install` family is driven by `packages/record/test/refusals-install.test.ts` and not from this
+file, for the reason `write` is: `40 §6` puts it in `record/test`, and five of its thirteen need a
+SQLite record. Sixteen fixtures: thirteen driven, and `contrast-floor`, `intent-inseparable` and
+`theme-ladder-order` skipped by name, because `packages/theme/src/checks.ts` is on no install path
+(`loop/research-via-runners.md` §2 finding 3). The test asserts the count, so a seventeenth arrives
+red. Each fixture carries its own `pack:`, `installed:` (the packs already on the record, each a whole
+manifest) and `facts:` (`rows`, `format`, `primitives`, `disabled`); nothing is borrowed, so there is
+no `install-inputs.json` and there should not be one.
+
+**Two drivers, chosen by `raises:`.** The eight that name `packages/declare/src/index.ts` go through
+`plan` and `install` over an `Installed` the test builds from `installed:` and `facts:`, with a `Host`
+that stages nothing, because every refusal `install` owns is decided before `stage` is called. The five
+that name the kernel go through a real record: `createRecordApi` over `openSqlite()`, `installed:`
+through `planPack` and `installPack`, `facts.rows` written as rows, `facts.disabled` through
+`disablePack`, then `pack:` planned and installed. The pure half is not a shortcut:
+`FORMAT_OUT_OF_RANGE` and `PRIMITIVES_OUT_OF_RANGE` cite numbers a real record has exactly one of,
+and only a built `Installed` can hold another.
+
+**The pure half needed `40 §6`'s rule one written into it, measured.** `plan` never asks whether an
+installed body is legal, and the first draft of `field-type-changed` and `required-on-populated`
+declared `"type": "number"`, which is no field type. Both agreed through the pure driver. Put through a
+real record, their `installed:` was refused `FIELD_TYPE_UNKNOWN`, and `required-on-populated` answered
+that instead of its own code. The test now lints every body through the kernel's `validate` against
+the packs installed before it, and fails on `number`; with `decimal`, all eight `declare` fixtures
+answer the same code at the same address through `planPack` and `installPack` on a real record too
+(the two `_OUT_OF_RANGE` ones by requiring 2 against a build at 1).
+
+**`DEPENDENCY_UNRESOLVED` at `requires` cannot be reached through a pack, measured.** On the pack path
+`declare`'s plan answers first: a page requiring `register.clients` through `planPack` is
+`REGISTER_UNRESOLVED` at `page.clients.requires`, and so is the same page after a version retires
+`clients` and after the pack declaring `clients` is disabled; a page requiring the kernel's own
+`register.session` installs clean. The kernel's arm is what a declaration set from the app meets,
+because `setDeclaration` hands one body to `kernel.install` with no plan in front, and there the same
+page answers `DEPENDENCY_UNRESOLVED` at `requires`. The test drives that one fixture through
+`setDeclaration` and names it in `IN_APP` with the reason. Its other two arms (a block reading, or a
+capture writing, a register the page does not require) need no record and would be `lint` fixtures.
+
+**`create-foreign-register`'s `lint` body was missing a `once_per`, and the `lint` runner could not
+see it.** Put through a real install, the body lent from `lint-inputs.json` answered
+`REQUIRED_MISSING`: *"rule.spawn-invoices notifies, creates or suggests, and declares no once_per"*.
+That check is in the kernel's install path and not in `validate`, so `lint` accepted a pack no record
+would. With `once_per: ["entry"]` the fixture answers `CREATE_FOREIGN_REGISTER` at `register` against a
+record holding the other pack, and on a fresh record the same pack is `REGISTER_UNKNOWN`, because
+`invoices` does not exist.
+
+**`seq-prefix-taken` takes the installed arm and says so in a comment.** `INV` is no kernel prefix;
+the pack alone installs clean on a fresh record, and with `installed:` in place it answers *"seq_prefix
+'INV' is taken by register.invoices"*. The kernel arm (`D`, `SG`, `S`) needs no record and would be a
+`lint` fixture.
+
+**`GROUP_BY_CARDINALITY` is driven on its ref arm**, a `ref` to a list holding 51 rows, because that is
+the arm that needs a record. The enum arm (51 declared values) is refused by the kernel's install as
+well but needs no rows. `facts.distinct`, which `40 §6` lists, is carried by no fixture: the one code
+about values is driven where the values are rows.
+
+**Proved red** by cutting `field-type-changed.yaml`'s `at` one segment short, to
+`register.obligations.fields.amount`: the run read `pass 13, fail 1, skipped 3`, the failure
+*"claims `at: register.obligations.fields.amount`"* against `register.obligations.fields.amount.type`,
+and restoring it read `pass 14, fail 0, skipped 3`.
 
 ## Adding the next driver
 
@@ -437,12 +505,14 @@ rewrite"*: nothing about the `lint` driver moved, and nothing about the reportin
 did.
 
 `DRIVERS` holds a sentence instead of a function for the seven `via`s this file does not drive, and
-the sentences are not interchangeable: `write` and `render` are driven elsewhere, and the other five
-are not driven at all. `import` is the cheapest of the five genuinely unbuilt: `tamper:` is one word per code
+the sentences are not interchangeable: `write`, `render` and, since 22 September 2026, `install` are
+driven elsewhere, and the other four are not driven at all. `import` is the cheapest of the four genuinely unbuilt: `tamper:` is one word per code
 and `record:` is a seed name, so its seven fixtures need two scalar lines each rather than a
 hand-written body, though the harness behind them is an export, a tamper and an import against a real
 record, which is more than `where` needed. `rpc` is the largest and the most expensive. `install` needs
-everything `lint` needs plus a materialised record, which is why the two families are split at all.
+everything `lint` needs plus what is already on the record, which is why the two families are split at
+all: five of its thirteen driven fixtures open a real one, and the other eight read an `Installed`
+built to stand in for one.
 
 ## What the runner asserts
 

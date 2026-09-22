@@ -3,3 +3,14 @@ via:    install
 raises: packages/declare/src/index.ts
 at:     requires.format
 fix:    Update BrainDog: this pack needs a newer record format.
+pack: {
+    "pack": "fixture-install", "version": "1.0.0",
+    "summary": "One pack built to trip exactly one install refusal.",
+    "author": "BrainDog fixtures", "license": "MIT",
+    "requires": { "format": 2 },
+    "declarations": [
+      { "register": "obligations", "name": "Obligations", "title": "what",
+        "fields": [ { "id": "what", "type": "text", "required": true } ] }
+    ]
+  }
+facts: { "format": 1 }

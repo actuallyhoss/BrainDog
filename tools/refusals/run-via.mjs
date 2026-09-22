@@ -9,7 +9,8 @@
  * `loop/STATUS.md` §5 and `docs/40-SPEC-FIXTURES.md` §6 still say none of the eight exists; both are
  * one day stale. So the gap is not "no runner drives a fixture", it is "seven of nine vias have no
  * driver and there is no one place that says which". Five of nine as of the `where` driver below:
- * `install`, `rpc`, `import`, `pull` and `ask`, which is what `DRIVERS` says in sentences.
+ * `install`, `rpc`, `import`, `pull` and `ask`, which is what `DRIVERS` says in sentences. Four since
+ * `packages/record/test/refusals-install.test.ts` began driving `install` on September 22nd 2026.
  *
  * WHAT A DRIVER IS. One async function per `via`, `(input, fixture) => Envelope`, where `Envelope`
  * is `{ kind, code?, at?, fix?, extra? }` and `kind` is `refusal`, `conflict` or `accepted`. Nothing else in
@@ -34,7 +35,8 @@
  * IT DRIVES THE TWO FILES THE FIXTURES NAME IN `raises:`, and that is a deliberate choice the write
  * runner made first. 22 of the 27 name `packages/kernel/src/declare.ts`, 4 name
  * `packages/declare/src/index.ts` and 1 names `packages/declare/src/shared.ts`; the five `ACTION_`
- * fixtures refiled from `install` on September 22nd 2026 make it 27 of 32 on the first. A runner one layer
+ * fixtures refiled from `install` on September 22nd 2026 made it 27 of 32 on the first, and
+ * `create-foreign-register` leaving for `install` the same day made it 26 of 31. A runner one layer
  * above the raiser goes green the day the layer between them starts answering for itself, so a pack
  * is linted here exactly as `lintBatch` lints one: `normalise` first, then `validate` per
  * declaration with `known` and `owners` overlaid from the batch, which is what `knownTo` and
@@ -48,7 +50,8 @@
  * `(borrowed)` in the output, because a fixture that passes on somebody else's input is still a
  * fixture with no input. `tools/refusals/README.md` says what to fold where. The five `ACTION_`
  * fixtures that joined the family on September 22nd 2026 arrived with their own `pack:` and borrow
- * nothing, so the run reads 32 driven and 27 borrowed.
+ * nothing, so the run read 32 driven and 27 borrowed, and since `create-foreign-register` moved to
+ * `install` (its lending in `lint-inputs.json` went with it) it reads 31 driven and 26 borrowed.
  *
  * AND THE `where` FAMILY BORROWS NOTHING, which is what a folded family looks like. All seven
  * `register:` and `predicate:` bodies are in the fixtures themselves, because this driver and the fold
@@ -149,7 +152,8 @@ function envelopeOf(result) {
  * overlay the batch; with no record there is only the overlay. That is enough for
  * `CREATE_OVER_BOUND`, whose axes are an enum's `values` in a register the same pack declares, and
  * it is NOT enough for `CREATE_FOREIGN_REGISTER`, which needs a register another pack already owns.
- * See `tools/refusals/README.md`.
+ * That is why `create-foreign-register` is an `install` fixture now, driven against a record holding
+ * the other pack; see `tools/refusals/README.md`.
  */
 async function driveLint(input) {
   /* THREE INPUT SHAPES, AND `40 §6` NAMES ONE. Measured while building the inputs: two of the 27
@@ -307,8 +311,8 @@ async function driveWhere(input) {
  * Every `via` and what drives it. A `string` in place of a function is the reason there is none, and
  * it is printed rather than treated as an absence.
  *
- * THE SEVEN REASONS ARE NOT THE SAME REASON, which is why they are written out. `write` and `render`
- * are not missing a driver, they have one somewhere else and a second copy here would be two answers
+ * THE SEVEN REASONS ARE NOT THE SAME REASON, which is why they are written out. `write`, `render`
+ * and `install` are not missing a driver, they have one somewhere else and a second copy here would be two answers
  * about one corpus. The rest are missing a driver AND the input it would read.
  */
 const DRIVERS = {
@@ -316,11 +320,13 @@ const DRIVERS = {
   where: driveWhere,
   write: 'driven by `packages/kernel/test/refusals-write.test.ts` since e74a563b. Run: node --test --experimental-strip-types "packages/kernel/test/refusals-write.test.ts"',
   render: 'driven by `apps/web/test/refusals-render.test.ts` since e74a563b. Run: node --test --experimental-strip-types "apps/web/test/refusals-render.test.ts"',
-  /* FIFTEEN AND NOT TWENTY SINCE THE FIVE `ACTION_` FIXTURES MOVED TO `lint`, and the old sentence
-     said "every one of its 20 codes cites rows, an installed pack or the record's versions", which five
-     of them never did. `actionFault` reads the record only for a `sends:` check, and all five are
-     refused through `normalise` then `validate` with nothing installed; see `tools/refusals/README.md`. */
-  install: 'no driver. Needs `pack:` plus `installed:` and `facts:`, and a materialised record, because every one of its 15 codes cites rows, an installed pack or the record\'s versions.',
+  /* SIXTEEN SINCE `create-foreign-register` ARRIVED FROM `lint`, fifteen since the five `ACTION_`
+     fixtures left for it, and twenty before that. This sentence read "no driver" and named the input a
+     driver would need; the driver is `packages/record/test/refusals-install.test.ts`, which drives 13
+     and skips the three theme codes by name, because `packages/theme/src/checks.ts` is on no install
+     path. A `record/test` file and not a function here, for the reason `write` has one: `40 §6` puts
+     the family there, and five of the thirteen need a SQLite record this file has no business opening. */
+  install: 'driven by `packages/record/test/refusals-install.test.ts`: 13 of 16, and the three theme codes skipped by name. Run: node --test --experimental-strip-types "packages/record/test/refusals-install.test.ts"',
   rpc: 'no driver. Needs `record:`, `call:` or `calls:`, and `principal:`, and a seeded record with a principal behind it. 30 fixtures, the largest family, and the most expensive harness.',
   import: 'no driver. Needs `record:` and `tamper:`, and an export-tamper-import round trip. Cheapest of the six left: `tamper:` is one word per code and `record:` is a seed name.',
   pull: 'no driver. Needs `declare:`, `grant:` and `answers:`, and the scheduled connector run driven the way the Worker\'s alarm drives it.',

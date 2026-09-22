@@ -43,45 +43,6 @@
       }
     }
   },
-  "create-foreign-register.yaml": {
-    "pack": {
-      "pack": "fixture-lint",
-      "version": "1.0.0",
-      "summary": "One pack built to trip exactly one lint refusal.",
-      "author": "BrainDog fixtures",
-      "license": "MIT",
-      "declarations": [
-        {
-          "register": "obligations",
-          "name": "Obligations",
-          "title": "what",
-          "fields": [
-            {
-              "id": "what",
-              "type": "text",
-              "required": true
-            }
-          ]
-        },
-        {
-          "rule": "spawn-invoices",
-          "register": "obligations",
-          "when": {
-            "field": "what",
-            "is": "x"
-          },
-          "then": [
-            {
-              "create": {
-                "register": "invoices",
-                "bound": 10
-              }
-            }
-          ]
-        }
-      ]
-    }
-  },
   "create-over-bound.yaml": {
     "pack": {
       "pack": "fixture-lint",

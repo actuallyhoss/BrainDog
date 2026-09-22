@@ -3,3 +3,27 @@ via:    install
 raises: packages/kernel/src/declare.ts
 at:     seq_prefix
 fix:    Choose a prefix that no other register uses.
+pack: {
+    "pack": "fixture-install", "version": "1.0.0",
+    "summary": "One pack built to trip exactly one install refusal.",
+    "author": "BrainDog fixtures", "license": "MIT",
+    "declarations": [
+      { "register": "obligations", "name": "Obligations", "title": "what", "seq_prefix": "INV",
+        "fields": [ { "id": "what", "type": "text", "required": true } ] }
+    ]
+  }
+installed: [
+    { "pack": "fixture-other", "version": "1.0.0",
+      "summary": "The pack whose register already speaks INV.",
+      "author": "BrainDog fixtures", "license": "MIT",
+      "declarations": [
+        { "register": "invoices", "name": "Invoices", "title": "what", "seq_prefix": "INV",
+          "fields": [ { "id": "what", "type": "text", "required": true } ] }
+      ] }
+  ]
+
+# THE INSTALLED ARM, AND NOT THE KERNEL'S. `prefixHolder` in `packages/kernel/src/declare.ts` asks
+# the kernel's own prefixes (D, SG, S) before it reads anything installed, and a pack claiming one of
+# those is refused with no record behind it at all, which is a `lint` fixture. This one claims `INV`,
+# which no kernel list holds: measured on a fresh record, the pack alone installs clean, and with
+# `installed:` in place first it answers "seq_prefix 'INV' is taken by register.invoices".

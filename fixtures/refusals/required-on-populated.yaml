@@ -3,3 +3,24 @@ via:    install
 raises: packages/declare/src/index.ts
 at:     register.obligations.fields.vat.required
 fix:    Ship a default or a fill rule.
+pack: {
+    "pack": "fixture-install", "version": "1.1.0",
+    "summary": "One pack built to trip exactly one install refusal.",
+    "author": "BrainDog fixtures", "license": "MIT",
+    "declarations": [
+      { "register": "obligations", "name": "Obligations", "title": "what",
+        "fields": [ { "id": "what", "type": "text", "required": true },
+                    { "id": "vat", "type": "decimal", "required": true } ] }
+    ]
+  }
+installed: [
+    { "pack": "fixture-install", "version": "1.0.0",
+      "summary": "One pack built to trip exactly one install refusal.",
+      "author": "BrainDog fixtures", "license": "MIT",
+      "declarations": [
+        { "register": "obligations", "name": "Obligations", "title": "what",
+          "fields": [ { "id": "what", "type": "text", "required": true },
+                      { "id": "vat", "type": "decimal" } ] }
+      ] }
+  ]
+facts: { "rows": { "obligations": 2 } }

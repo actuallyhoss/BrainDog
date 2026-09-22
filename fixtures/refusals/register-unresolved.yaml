@@ -3,3 +3,13 @@ via:    install
 raises: packages/declare/src/index.ts
 at:     register.obligations.fields.counterparty.to
 fix:    Install the pack that declares the list first, or declare it in this pack.
+pack: {
+    "pack": "fixture-install", "version": "1.0.0",
+    "summary": "One pack built to trip exactly one install refusal.",
+    "author": "BrainDog fixtures", "license": "MIT",
+    "declarations": [
+      { "register": "obligations", "name": "Obligations", "title": "what",
+        "fields": [ { "id": "what", "type": "text", "required": true },
+                    { "id": "counterparty", "type": "ref", "to": "counterparties" } ] }
+    ]
+  }

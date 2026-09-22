@@ -3,3 +3,24 @@ via:    install
 raises: packages/declare/src/index.ts
 at:     register.obligations
 fix:    Move the rows first.
+pack: {
+    "pack": "fixture-install", "version": "1.1.0",
+    "summary": "One pack built to trip exactly one install refusal.",
+    "author": "BrainDog fixtures", "license": "MIT",
+    "declarations": [
+      { "register": "notes", "name": "Notes", "title": "what",
+        "fields": [ { "id": "what", "type": "text", "required": true } ] }
+    ]
+  }
+installed: [
+    { "pack": "fixture-install", "version": "1.0.0",
+      "summary": "One pack built to trip exactly one install refusal.",
+      "author": "BrainDog fixtures", "license": "MIT",
+      "declarations": [
+        { "register": "notes", "name": "Notes", "title": "what",
+          "fields": [ { "id": "what", "type": "text", "required": true } ] },
+        { "register": "obligations", "name": "Obligations", "title": "what",
+          "fields": [ { "id": "what", "type": "text", "required": true } ] }
+      ] }
+  ]
+facts: { "rows": { "obligations": 2 } }
