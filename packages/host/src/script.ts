@@ -25,8 +25,9 @@
  * NO `node:` IMPORT, and only types from `@braindog/script`, so the Worker can build its runner here too.
  */
 
-import { ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, type ActionRequest, type ScriptRunner } from '@braindog/kernel';
-import type { RecordApi } from '@braindog/record';
+import { ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, type ActionRequest, type Entry, type ScriptRunner, type Scripted } from '@braindog/kernel';
+import { fixOf } from '@braindog/ports';
+import type { CallContext, RecordApi } from '@braindog/record';
 import type { CtxHost, HostRequest, HostResponse, Json, ScriptAnswer, ScriptDecl } from '@braindog/script';
 
 import { pass, sendAction, type Admissions, type Ledger, type OpenKey, type Pin, type Send } from './actions.ts';
@@ -37,6 +38,12 @@ export type RunSandbox = (decl: ScriptDecl, host: CtxHost) => Promise<ScriptAnsw
 /** The grant a vault label names, or `null`. By reference: an id and a label, never the bytes. */
 export type GrantOf = (label: string) => { id: string; label: string } | null;
 
+/** `ctx.record.list` and `ctx.record.get` for one run, already held to its `reads`. */
+export type ScriptReads = {
+  list(register: string, where: Json): Promise<Json[]>;
+  get(spoken: string): Promise<Json>;
+};
+
 export type ScriptRunnerOptions<P> = {
   run: RunSandbox;
   send: Send<P>;
@@ -45,9 +52,91 @@ export type ScriptRunnerOptions<P> = {
   /** `null` on a host with no key store: a fetch that names a key sends nothing and says why. */
   openKey: OpenKey | null;
   grantOf: GrantOf;
+  /**
+   * The run's reads, built from what was leased (`scriptReads`). ABSENT IS A HOST THAT READS NOTHING, and QuickJS then
+   * refuses `ctx.record` with the sentence it uses for a register outside `reads`, which is why every host passes it.
+   */
+  reads?: ((s: Scripted) => ScriptReads) | undefined;
   /** The host clock, which `ctx.now()` reads. Absent is `Date.now`. */
   now?: (() => number) | undefined;
 };
+
+/** The fields of `register` a script is never told about: `secret`, and `list<secret>`. */
+function sealedOf(api: Pick<RecordApi, 'kernel'>, register: string): Set<string> {
+  const decl = api.kernel.register(register);
+  return new Set((decl?.fields ?? []).filter((f) => f.type === 'secret' || (f.type === 'list' && f.of === 'secret')).map((f) => f.id));
+}
+
+/**
+ * One row as a script is handed it: every field but a secret.
+ *
+ * A SECRET FIELD HOLDS A GRANT ID, NOT THE KEY, AND IT IS STILL TAKEN OFF. It says which vault entry opens what, and a
+ * script can copy anything it is handed into a row it writes or a line of its log, both of which people read who were
+ * never shown the vault. The script names its keys by label in `keys:` and the host opens them; it never needs to know
+ * where they are sealed. `list<secret>` is refused at install (`declare.ts`), and is named here anyway, because this is
+ * the last place that could catch one and the kernel's own `redacts` reads a list by its element type the same way.
+ */
+function unsealed(api: Pick<RecordApi, 'kernel'>, row: Entry): Json {
+  const sealed = sealedOf(api, row.register);
+  if (sealed.size === 0) return row as unknown as Json;
+  const fields: Record<string, unknown> = {};
+  for (const [id, value] of Object.entries(row.fields)) if (!sealed.has(id)) fields[id] = value;
+  return { ...row, fields } as unknown as Json;
+}
+
+/**
+ * The first sealed field a `where` names, anywhere in its tree, or `null`.
+ *
+ * TAKING THE FIELD OFF THE ROW IS NOT ENOUGH WHILE THE FILTER CAN STILL ASK ABOUT IT. `@braindog/where` lets `starts`
+ * test a `secret` like any text, so a script that asked which rows start with each character in turn read the grant id
+ * back out of how many rows came home: measured by the checker on September 22nd, the whole id written into a row in
+ * one run (`apps/selfhost/test/script-reads.test.ts`). Every value in the tree is walked, not only `all`, `any` and
+ * `none`, so a group shape added later is covered without anyone remembering this function; a leaf names its field by
+ * id only (`IDENT` there), so the id is the one spelling to catch.
+ */
+function namesSealed(where: unknown, sealed: Set<string>): string | null {
+  if (where === null || typeof where !== 'object') return null;
+  const node = where as Record<string, unknown>;
+  if (typeof node.field === 'string' && sealed.has(node.field)) return node.field;
+  for (const value of Object.values(node)) {
+    const found = namesSealed(value, sealed);
+    if (found !== null) return found;
+  }
+  return null;
+}
+
+/**
+ * The reads a script's `ctx.record` is built from, on either host: the record's own `list` and `get`, asked as the
+ * script's actor with its `reads` as the ceiling.
+ *
+ * `system`, BECAUSE A SCHEDULED RUN HAS NO PERSON BEHIND IT, and `registers` is what keeps it to its reads. A `get` of a
+ * spoken id outside them answers as a row that is not there, the record's answer to any caller who may not read it,
+ * so the prefix `runInQuickJs` cannot resolve is resolved here by the only party that can.
+ *
+ * THE WORKER HAD THIS INLINE SINCE BRIEF 5 AND THE SELF-HOST DID NOT HAVE IT AT ALL: its `CtxHost` carried no `list`
+ * and no `get`, so `reads: ["clients"]` ran on the Cloud and was refused at home as "read clients, which is not in its
+ * reads" (`apps/selfhost/test/script-reads.test.ts`). One copy here is what keeps the two answering alike.
+ */
+export function scriptReads(api: Pick<RecordApi, 'kernel' | 'list' | 'get'>): (s: Scripted) => ScriptReads {
+  return (s) => {
+    const as: CallContext = { principal: { kind: 'system', id: s.scripted.actor }, registers: s.scripted.decl.reads };
+    return {
+      list: async (register, where) => {
+        const sealed = namesSealed(where, sealedOf(api, register));
+        if (sealed !== null)
+          throw new Error(`${s.scripted.script} filtered ${register} on ${sealed}, which is a secret, and a script may not ask what a secret field holds.`);
+        const page = await api.list({ register, ...(where === null ? {} : { where: where as never }) }, as);
+        if (!page.ok) throw new Error(fixOf(page));
+        return page.value.rows.map((row) => unsealed(api, row));
+      },
+      get: async (spoken) => {
+        const row = await api.get({ spoken }, as);
+        if (!row.ok) throw new Error(fixOf(row));
+        return row.value === null ? null : unsealed(api, row.value);
+      },
+    };
+  };
+}
 
 /**
  * The label a script names, resolved the way `keyNamed` resolves an action's `grant:`: by label or id, never a revoked
@@ -102,6 +191,7 @@ export function scriptRunner<P extends object | undefined = undefined>(options: 
     };
 
     const { decl } = scripted;
+    const reads = options.reads?.(s);
     return options.run(
       {
         id: scripted.script,
@@ -115,6 +205,7 @@ export function scriptRunner<P extends object | undefined = undefined>(options: 
       },
       {
         fetch,
+        ...(reads === undefined ? {} : { list: reads.list, get: reads.get }),
         now: () => new Date(now()).toISOString(),
         tz: scripted.record.tz,
         input: (scripted.input ?? null) as Json,

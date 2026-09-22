@@ -39,8 +39,9 @@
 
 import { WorkerEntrypoint } from 'cloudflare:workers';
 
-import type { ActionRequest, Admissions, Execute, Ledger } from '@braindog/host/actions';
-import type { ScriptAnswer, ScriptRunner, Scripted } from '@braindog/kernel';
+import type { ActionRequest, Execute } from '@braindog/host/actions';
+import type { ScriptReads } from '@braindog/host/script';
+import type { ScriptAnswer, Scripted } from '@braindog/kernel';
 import {
   checkDecl,
   isRefusal,
@@ -64,6 +65,11 @@ export const COMPATIBILITY_DATE = '2026-09-01';
 export const RUN_HEADER = 'x-braindog-run';
 /** The header `ctx.fetch` names its key label in. Stripped here; it never reaches the provider. */
 export const KEY_HEADER = 'x-braindog-key';
+/**
+ * The header `ctx.fetch` carries the URL in as the script wrote it, URI-encoded because a header is Latin-1 and a URL
+ * need not be. Read for the user name only (`ScriptRuns.answer` says why), and stripped like the other two.
+ */
+export const URL_HEADER = 'x-braindog-url';
 
 /** A provider gets ten seconds and two megabytes, as a `call` does (`research-scheduled-actions` section 2.3). */
 const TIMEOUT_MS = 10_000;
@@ -76,7 +82,17 @@ const BARE =
 
 /** One call the sandbox made, as the record's object receives it. */
 export type ScriptCall =
-  | { op: 'fetch'; url: string; method: string; headers: Record<string, string>; body: string | null; key: string | null }
+  | {
+      op: 'fetch';
+      /** The URL workerd is sending, which every check but the user name's reads. */
+      url: string;
+      /** The URL as the script wrote it, before workerd dropped its user info, or `null` when nothing said. */
+      asked: string | null;
+      method: string;
+      headers: Record<string, string>;
+      body: string | null;
+      key: string | null;
+    }
   | { op: 'list'; register: string; where: Json }
   | { op: 'get'; spoken: string };
 
@@ -106,11 +122,20 @@ export class ScriptOutbound extends WorkerEntrypoint<Wired, Linked> {
     const run = request.headers.get(RUN_HEADER);
     if (run === null) throw new Error(BARE);
     const headers: Record<string, string> = {};
-    for (const [name, value] of request.headers) if (name !== RUN_HEADER && name !== KEY_HEADER) headers[name] = value;
+    for (const [name, value] of request.headers) if (name !== RUN_HEADER && name !== KEY_HEADER && name !== URL_HEADER) headers[name] = value;
     const body = request.method === 'GET' || request.method === 'HEAD' ? null : await request.text();
+    const stamped = request.headers.get(URL_HEADER);
+    let asked: string | null = null;
+    try {
+      asked = stamped === null ? null : decodeURIComponent(stamped);
+    } catch {
+      /* A STAMP THAT DOES NOT DECODE WAS NOT WRITTEN BY THE MODULE BELOW, which encodes every one; the request is judged
+         on the URL being sent, as if nothing had been said. */
+    }
     const reply = await home(this.env, this.ctx.props).script(run, {
       op: 'fetch',
       url: request.url,
+      asked,
       method: request.method,
       headers,
       body,
@@ -138,11 +163,11 @@ export class ScriptRecord extends WorkerEntrypoint<Wired, Linked> {
 
 /* ── the run, held by the record's object ───────────────────────────────────────────────────────── */
 
-/** Live reads for one run, already scoped to its `reads` and signed as its actor by whoever built them. */
-export type ScriptReads = {
-  list(register: string, where: Json): Promise<Json[]>;
-  get(spoken: string): Promise<Json>;
-};
+/**
+ * Live reads for one run, already scoped to its `reads` and signed as its actor: `scriptReads` in `@braindog/host/script`,
+ * which the self-host builds its reads from too, so the two hosts hand a script the same rows with the same fields off.
+ */
+export type { ScriptReads };
 
 type Turn = {
   decl: ScriptDecl;
@@ -216,16 +241,27 @@ export class ScriptRuns {
       return refuse({ code: 'PULL_ORIGIN_REFUSED', why: `${decl.id} fetched ${JSON.stringify(call.url)}, which is not a URL.` });
     }
     /* THE SAME FOUR CHECKS AS `runInQuickJs`, IN ITS ORDER, so one script meets one set of rules on either host.
-       EXCEPT THAT THE USER NAME CHECK NEVER FIRES HERE, measured by the checker on September 22nd: workerd's `fetch`
-       inside the loaded Worker drops `me:pw@` from the URL before the request reaches this gateway, so
-       `https://me:pw@<declared origin>/rate` arrived as the bare URL with no authorization header and was sent. Nothing
-       of the credentials left, but the self-host refuses that run and this host runs it clean. The line stays for a
-       runtime that does pass the user name through. */
+
+       THE USER NAME IS READ OFF THE URL THE SCRIPT WROTE, AND EVERYTHING ELSE OFF THE URL BEING SENT. workerd's `fetch`
+       inside the loaded Worker drops `me:pw@` before the request reaches this gateway (measured by the checker on
+       September 22nd: `https://me:pw@<declared origin>/rate` arrived bare, with no authorization header, and was sent),
+       so a check on `call.url` alone never fired, and a run the self-host refuses ran clean here. `call.asked` is the
+       URL the loaded module stamped before calling `fetch`. That module runs where the script can reach it, which is
+       why the stamp decides nothing else: a script that swaps `globalThis.fetch` keeps the stamp and sends elsewhere,
+       and the origin below is still the one the request is going to (`test/script.test.ts` holds both). A stamp
+       stripped or forged to hide user info hides credentials workerd drops anyway. */
+    let written: URL = url;
+    try {
+      if (call.asked !== null) written = new URL(call.asked);
+    } catch {
+      /* NOT A URL AS WRITTEN IS NOT THIS CHECK'S QUESTION: workerd parsed something and is sending it, and that is
+         judged below as it arrived. */
+    }
     if (!decl.egress.includes(url.origin))
       return refuse({ code: 'PULL_ORIGIN_REFUSED', why: `${decl.id} fetched ${url.origin}, which is not in its egress.` });
     if (url.protocol !== 'https:')
       return refuse({ code: 'PULL_ORIGIN_REFUSED', why: `${decl.id} fetched a ${url.protocol} URL; a script fetches plain https:// URLs only.` });
-    if (url.username !== '' || url.password !== '')
+    if (url.username !== '' || url.password !== '' || written.username !== '' || written.password !== '')
       return refuse({ code: 'PULL_ORIGIN_REFUSED', why: `${decl.id} fetched ${url.origin} with a user name or password in the URL, which a script may not send.` });
     if (turn.fetches >= turn.limits.fetches)
       return refuse({ code: 'OUT_OF_BOUNDS', why: `${decl.id} made more than its ${turn.limits.fetches} fetches.` });
@@ -295,6 +331,7 @@ export default class extends WorkerEntrypoint {
         if (given.headers !== null && typeof given.headers === 'object')
           for (const [name, value] of Object.entries(given.headers)) headers.set(name, String(value));
         headers.set('${RUN_HEADER}', run);
+        headers.set('${URL_HEADER}', encodeURIComponent(String(url)));
         if (typeof given.key === 'string') headers.set('${KEY_HEADER}', given.key);
         const method = typeof given.method === 'string' ? given.method.toUpperCase() : 'GET';
         const body = typeof given.body === 'string' && method !== 'GET' && method !== 'HEAD' ? given.body : undefined;
@@ -353,10 +390,13 @@ const cut = (text: string): string => {
 
 const isObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
 
+/** An update's version as the kernel reads it: a whole number, or none at all (absent, `null` or `NaN`), never anything else. */
+const lastWriterOrWhole = (v: unknown): boolean => v === undefined || v === null || Number.isNaN(v) || Number.isInteger(v);
+
 /**
  * The writes the loaded Worker handed back, checked as `runInQuickJs` checks them as they are queued: each one a
- * create into a register in `writes` or an update with a whole version, and no more than `limits.writes`. The kernel
- * checks the register again when it applies them (`finishScript`), on purpose.
+ * create into a register in `writes` or an update with a whole version or none, and no more than `limits.writes`. The
+ * kernel checks the register again when it applies them (`finishScript`), on purpose.
  */
 function checkWrites(decl: ScriptDecl, limits: ScriptLimits, handed: unknown): ScriptWrite[] | ScriptRefusal {
   if (!Array.isArray(handed)) return { code: 'DECLARATION_INVALID', why: `${decl.id} handed back something that is not a list of writes.` };
@@ -366,8 +406,11 @@ function checkWrites(decl: ScriptDecl, limits: ScriptLimits, handed: unknown): S
     if (isObject(w) && w['op'] === 'create' && typeof w['register'] === 'string') {
       if (!decl.writes.includes(w['register'])) return { code: 'FORBIDDEN', why: `${decl.id} wrote to ${w['register']}, which is not in its writes.` };
       writes.push({ op: 'create', register: w['register'], fields: (w['fields'] ?? null) as Json });
-    } else if (isObject(w) && w['op'] === 'update' && typeof w['spoken'] === 'string' && Number.isInteger(w['version'])) {
-      writes.push({ op: 'update', spoken: w['spoken'], patch: (w['patch'] ?? null) as Json, version: w['version'] as number });
+    } else if (isObject(w) && w['op'] === 'update' && typeof w['spoken'] === 'string' && lastWriterOrWhole(w['version'])) {
+      /* NO VERSION IS HANDED ON AS NONE (`NaN`), which `finishScript` writes as last-writer, as the self-host does. The
+         prelude sends `NaN` for `ctx.update(spoken, patch)`, and asking for a whole number here refused it. */
+      const version = w['version'];
+      writes.push({ op: 'update', spoken: w['spoken'], patch: (w['patch'] ?? null) as Json, version: Number.isInteger(version) ? (version as number) : NaN });
     } else return { code: 'DECLARATION_INVALID', why: `${decl.id} handed back a write this host cannot read.` };
   }
   return writes;
@@ -443,19 +486,4 @@ export async function runScript(wiring: ScriptWiring, s: Scripted): Promise<Scri
     if (timer !== undefined) clearTimeout(timer);
     wiring.runs.close(run);
   }
-}
-
-/**
- * The runner, asking the plan's allowance first, on the pass's one admission count.
- *
- * THE WORKER'S COPY OF WHAT BRIEF 4 PUTS IN `@braindog/host`. `holding` and `holdingPaged` live there and a third
- * wrapper belongs beside them; that file is not this run's, and until it exists this is the same four lines over the
- * same `Admissions`, so a record with one run left cannot spend it on a script and a `call` both.
- */
-export function holdingScript(runner: ScriptRunner, record: string, mayRun: Ledger['mayRun'], admissions: Admissions): ScriptRunner {
-  return async (s) => {
-    const hold = await admissions.ask(record, s.scripted.script, mayRun);
-    if (hold) return { held: hold };
-    return runner(s);
-  };
 }

@@ -6,14 +6,17 @@
  * WHY IT IS HERE AND NOT BESIDE THE OTHER TWO. `braindog:grammar/page` and `braindog:grammar/proposals` are the record's
  * (`packages/record/src/grammar.ts`, reached through `arrangement`), because the page grammar reads the render package's
  * block list and the voice keys, which only the record may import. This one reads nothing from any package: the kernel's
- * `scriptBody` is the lint and `@braindog/script` holds the ceilings, and `31-STACK` section 2 puts that package at rank
- * 23, above both this one (12) and the record (11), so neither may import it. So the numbers below are copies, and
- * `test/script.test.ts` holds each one to `CEILINGS`, `DEFAULT_LIMITS`, `SOURCE_BYTES`, `LOG_BYTES` and the kernel's
- * `FLOOR_MS`, and installs both examples through a real record. A copy nobody checks is how one of two becomes wrong.
+ * `scriptBody` is the lint and `@braindog/script` holds the ceilings. `31-STACK` section 2 ranks that package 12, below
+ * this one (13) and above the record (11), so the record may not import it and this package could, but this package's
+ * row names 2 and 11 only and its manifest has no `@braindog/script`, and an edge taken for five numbers is an edge the
+ * graph gate holds for good. So the numbers below are copies, and `test/script.test.ts` holds each one to `CEILINGS`,
+ * `DEFAULT_LIMITS`, `SOURCE_BYTES`, `LOG_BYTES` and the kernel's `FLOOR_MS`, and installs both examples through a real
+ * record. A copy nobody checks is how one of two becomes wrong. When `script_try` arrives it takes the edge anyway, and
+ * the copies can go with it.
  *
- * IT SAYS WHAT DOES NOT RUN YET. An accepted script is armed and queues a run on its clock, and no host in this build
- * runs one: nothing imports `@braindog/script`. An agent told only the grammar would propose a script and then wonder
- * for an hour why its series stayed empty.
+ * IT SAYS WHAT DOES NOT RUN YET. An agent told only the grammar would propose a script started by a door and then
+ * wonder why nothing happened. This said no host ran a script at all, which stopped being true when both hosts wired
+ * their sandbox (`apps/selfhost/src/script.ts`, `apps/worker/src/script.ts`): a scheduled one runs on either now.
  */
 
 export const SCRIPT_GRAMMAR = {
@@ -34,8 +37,8 @@ export const SCRIPT_GRAMMAR = {
     'fetch(url, {method?, headers?, body?, key?})': 'one request, to an origin in egress; key is a label from keys, and the host adds it, so the script never holds its bytes. Answers {status, ok, headers, text(), json()}',
     'write(register, fields)': 'queue a new row in a register in writes',
     'update(spoken, patch, version)': 'queue a change to a row of a register in writes, at the version you read',
-    'record.list(register, where?)': 'rows of a register in reads, with a predicate tree as list takes it',
-    'record.get(spoken)': 'one row, of a register in reads',
+    'record.list(register, where?)': 'rows of a register in reads, with a predicate tree as list takes it. A secret field is left off, and a predicate that names one is refused',
+    'record.get(spoken)': 'one row, of a register in reads. A secret field is left off',
     input: 'what started it: null on a schedule, and from a door its body and headers',
     'now()': "the run's instant, from the host clock",
     tz: "the record's timezone",
@@ -83,5 +86,5 @@ export const SCRIPT_GRAMMAR = {
   to_propose:
     'propose body_kind change with {"declaration_id":"script.<name>","to":<the declaration>}. The owner approves each origin and key in Decide, and a key must be in the vault before they can accept.',
   in_this_build:
-    'an accepted script is scheduled and its runs are queued, and no host runs one yet; nothing starts a script from a door or a rule yet either. script_try, which runs one without writing, is not in this build.',
+    'an accepted script runs on its clock, on the self-host and on the Cloud. Nothing starts a script from a door or a rule yet, so give it runs.every. script_try, which runs one without writing, is not in this build.',
 };

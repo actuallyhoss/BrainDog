@@ -17,7 +17,7 @@
  */
 
 import type { ScriptRunner } from '@braindog/kernel';
-import { grantNamed, scriptRunner } from '@braindog/host/script';
+import { grantNamed, scriptReads, scriptRunner } from '@braindog/host/script';
 import type { RecordApi } from '@braindog/record';
 import { runInQuickJs } from '@braindog/script/quickjs';
 
@@ -28,7 +28,7 @@ import { pinFor, pinnedSend, systemResolve, type OpenKey, type Pinned, type Reso
  * defaults are the pinned socket and the system's name service, as for the executor.
  */
 export function scriptSandbox(
-  api: Pick<RecordApi, 'kernel'>,
+  api: Pick<RecordApi, 'kernel' | 'list' | 'get'>,
   options: { openKey: OpenKey; send?: Send | undefined; resolve?: Resolve | undefined; now?: (() => number) | undefined },
 ): ScriptRunner {
   return scriptRunner<Pinned>({
@@ -37,6 +37,7 @@ export function scriptSandbox(
     pin: pinFor(options.resolve ?? systemResolve),
     openKey: options.openKey,
     grantOf: grantNamed(() => api.kernel.grants()),
+    reads: scriptReads(api),
     now: options.now,
   });
 }

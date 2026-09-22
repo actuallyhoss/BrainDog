@@ -30,7 +30,13 @@ import type { OutboxRow } from './outbox.ts';
 import { activeScript, type ScriptBody } from './script.ts';
 import { attempt } from './tx.ts';
 
-/** A write the sandbox asked for. Structurally `@braindog/script`'s `ScriptWrite`. */
+/**
+ * A write the sandbox asked for. Structurally `@braindog/script`'s `ScriptWrite`.
+ *
+ * AN UPDATE'S `version` MAY BE NO NUMBER AT ALL, whatever the type says. `ctx.update(spoken, patch)` with no version
+ * crosses from the prelude as `NaN`, and as `null` from any host that puts the answer through JSON, and `finishScript`
+ * reads anything that is not a whole number as "none was given" (see the note at the write).
+ */
 export type ScriptWrite =
   | { op: 'create'; register: string; fields: unknown }
   | { op: 'update'; spoken: string; patch: unknown; version: number };
@@ -87,6 +93,19 @@ export const REFUSED_IN_A_ROW = 3;
  * same number, and it is written out again rather than imported for the rank reason in this file's header.
  */
 export const LOG_BYTES = 8 * 1024;
+
+/**
+ * The most writes one run may hand back: `@braindog/script`'s `CEILINGS.writes`, written out again for the rank reason in
+ * this file's header.
+ *
+ * THE CEILING AND NOT THE DEFAULT OF 200, for the reason `FETCHES_UNSAID` in `actions.ts` gives: both are copies, and
+ * if the sandbox's default is ever raised a copied default would refuse every honest run above the old number, where a
+ * copied ceiling still holds the line no declaration can move. It also caps a declared `limits.writes`, because the
+ * kernel installs any whole number there and only the sandbox refuses one above 1,000. Audit thirty-four measured
+ * 5,000 creates from a script with no limit applied in one transaction of 1.0 to 3.4 seconds, and on a Durable Object
+ * that is the record's one thread.
+ */
+export const WRITES_CEILING = 1_000;
 
 /**
  * The first `LOG_BYTES` of a log, cut on a character boundary.
@@ -230,6 +249,21 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
     return refuse(`${script} did not finish, so it wrote nothing: ${answer.refused.why}`);
   }
 
+  /* THE COUNT IS CHECKED HERE TOO, AND FIRST. The sandbox stops at `limits.writes`, but the count is what a host could
+     get wrong in the way that costs the most: audit thirty-four handed back 500 creates from a script declaring 2 and
+     all 500 landed. Refused before a single register is resolved, so an oversized answer costs one comparison. */
+  const declared = decl.limits?.writes;
+  if (answer.writes.length > Math.min(declared ?? WRITES_CEILING, WRITES_CEILING)) {
+    done();
+    const said =
+      declared === undefined
+        ? `no script may write more than ${WRITES_CEILING} rows in one run`
+        : declared > WRITES_CEILING
+          ? `its limits.writes of ${declared} is held to the ${WRITES_CEILING} any script may ask for`
+          : `its limits.writes is ${declared}`;
+    return refuse(`${script} wrote nothing: it handed back ${answer.writes.length} writes, and ${said}.`);
+  }
+
   /* EVERY WRITE IS CHECKED BEFORE THE FIRST ONE IS MADE. An update names a row, not a register, so the register is the
      row's own: a spoken id cannot carry a write into a register the script does not declare. */
   const targets = answer.writes.map((w) => (w.op === 'create' ? w.register : deps.registerOf(w.spoken)));
@@ -261,11 +295,18 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
       lost = true;
       return acked;
     }
+    /* AN UPDATE WITH NO WHOLE-NUMBER VERSION IS WRITTEN WITHOUT COMPARING, which is what the write path offers any
+       caller that leaves `version` out. Handed on as it came, `ctx.update(spoken, patch)` reached the write as `NaN`
+       (or `null` over JSON) and was refused with "Leave it out to write without comparing", a fix no script can
+       follow, so every such run was refused and the third paused the script (audit thirty-four, finding 6). Reading
+       NaN as "none" gives a script nothing it could not already have by passing the row's current version, and the
+       prelude refuses a version that was given but is not a whole number, so a typo is not silently read as "none". */
     for (const [i, w] of answer.writes.entries()) {
+      const version = w.op === 'update' && Number.isSafeInteger(w.version) ? { version: w.version } : {};
       const out =
         w.op === 'create'
           ? deps.write(w.register, null, w.fields as Record<string, unknown>, { actor, batch, note })
-          : deps.write(targets[i]!, w.spoken, w.patch as Record<string, unknown>, { actor, batch, note, version: w.version });
+          : deps.write(targets[i]!, w.spoken, w.patch as Record<string, unknown>, { actor, batch, note, ...version });
       if (!out.ok) {
         failedAt = i;
         return out;
@@ -303,21 +344,28 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
  * the script again at once. ONCE: a row already paused is not paused again,
  * because a door or a rule can still queue runs the schedule row does not gate, and each of those would otherwise be
  * another notification about the same stop.
+ *
+ * ONLY RUNS OF THE SOURCE NOW INSTALLED ARE COUNTED (audit thirty-four, finding 9). The streak read the last three
+ * events whatever wrote them, and two things were measured wrong. Two refusals under v1 and one under the owner's fixed
+ * v2 paused v2 on its first failure, "its last 3 runs were refused", so only events signed `script:<id>@v<active>`
+ * count, and installing a version starts the count again. And a `failed`, `held` or `dropped` between refusals broke
+ * the streak, so six refusals interleaved with six host failures paused nothing, though none of those three ran the
+ * source; they are skipped, so they neither break the streak nor count in it. A resume is written with no `to_v` and
+ * is kept in the read, so it still breaks the streak.
  */
 function pauseAfterRefusals(deps: ScriptRunDeps, script: string): void {
-  const last = deps.sql.all<{ to_v: string | null }>(
-    "SELECT to_v FROM event WHERE kind = 'pull' AND target = ? ORDER BY rowid DESC LIMIT ?",
+  const active = activeScript(deps.sql, script);
+  if (!active) return;
+  const last = deps.sql.all<{ outcome: string | null }>(
+    `SELECT json_extract(to_v, '$.outcome') AS outcome FROM event
+      WHERE kind = 'pull' AND target = ?
+        AND (to_v IS NULL OR (actor = ? AND CASE WHEN json_valid(to_v) THEN json_extract(to_v, '$.outcome') END IN ('ok', 'refused')))
+      ORDER BY rowid DESC LIMIT ?`,
     `declaration:script.${script}`,
+    `script:${script}@v${active.version}`,
     REFUSED_IN_A_ROW,
   );
-  const refused = last.filter((e) => {
-    try {
-      return e.to_v !== null && (JSON.parse(e.to_v) as { outcome?: unknown }).outcome === 'refused';
-    } catch {
-      return false;
-    }
-  });
-  if (refused.length < REFUSED_IN_A_ROW) return;
+  if (last.filter((e) => e.outcome === 'refused').length < REFUSED_IN_A_ROW) return;
   const row = deps.sql.one<{ state: string }>("SELECT state FROM schedule WHERE kind = 'script' AND key = ?", script);
   if (!row || row.state === 'paused') return;
   pause(deps, 'script', script, `${script} is paused: its last ${REFUSED_IN_A_ROW} runs were refused, so it will not run again until somebody resumes it.`, {

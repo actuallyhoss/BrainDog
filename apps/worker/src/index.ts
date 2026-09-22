@@ -32,8 +32,8 @@ import { createDirectory, switcherAsk, type AccountUsage, type Directory as Dir,
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 
 import { ALARM_RUNS, actionExecutor, holding, holdingPaged, invocation, keyOpener, meterPass, pass, sharedReader, type Admissions, type Ledger, type OpenKey } from './actions.ts';
-import { holdingScript, runScript, ScriptRuns, type ScriptCall, type ScriptExports, type ScriptReply } from './script.ts';
-import type { Json } from '@braindog/script';
+import { runScript, ScriptRuns, type ScriptCall, type ScriptExports, type ScriptReply } from './script.ts';
+import { grantNamed, holdingScript, scriptReads } from '@braindog/host/script';
 import { pagedRunner } from '@braindog/host/connector';
 
 import { alarmScheduler } from './alarm.ts';
@@ -407,6 +407,12 @@ export class Record$ extends DurableObject<Env> {
    *
    * READS ARE THE RECORD'S OWN `list` AND `get`, asked as the script's actor with its `reads` as the ceiling, so the
    * record's `reaches` is what keeps a `get` of a spoken id inside the registers the owner approved.
+   *
+   * THE READS, THE KEY LOOKUP AND THE HOLD ARE `@braindog/host/script`'s, THE SELF-HOST'S OWN. This object had copies of
+   * all three, and they had drifted: the self-host had no reads at all, and this lookup matched a label only and sorted
+   * two grants made in the same millisecond by a comparator that answered -1 both ways round, so which key a script
+   * opened rested on the order the rows came back in. `grantNamed` breaks the tie on the id, as `keyNamed` does for a
+   * `call`, and `scriptReads` takes secret fields off every row before the sandbox sees it.
    */
   #scriptRunner(api: RecordApi, record: string, openKey: OpenKey | null, mayRun: Ledger['mayRun'], admissions: Admissions) {
     const loader = this.env.LOADER;
@@ -420,27 +426,8 @@ export class Record$ extends DurableObject<Env> {
             object: this.ctx.id.toString(),
             runs: this.#scripts,
             send: (egress) => actionExecutor(() => egress, { openKey }),
-            grant: (label) =>
-              api.kernel
-                .grants()
-                .filter((g) => g.label === label && g.revoked_at === null)
-                .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
-                .map((g) => ({ id: g.id, label: g.label }))[0] ?? null,
-            read: (scripted) => {
-              const as: CallContext = { principal: { kind: 'system', id: scripted.scripted.actor }, registers: scripted.scripted.decl.reads };
-              return {
-                list: async (register, where) => {
-                  const page = await api.list({ register, ...(where === null ? {} : { where: where as never }) }, as);
-                  if (!page.ok) throw new Error(fixOf(page));
-                  return page.value.rows as unknown as Json[];
-                },
-                get: async (spoken) => {
-                  const row = await api.get({ spoken }, as);
-                  if (!row.ok) throw new Error(fixOf(row));
-                  return row.value as unknown as Json;
-                },
-              };
-            },
+            grant: grantNamed(() => api.kernel.grants()),
+            read: scriptReads(api),
             now: () => Date.now(),
           },
           s,

