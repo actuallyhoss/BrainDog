@@ -20,10 +20,11 @@
  * through to the `total === 0` arm. The screen states `Nothing matches "<the new words>"` over a
  * record nobody has asked about them.
  *
- * AND IT COMPOUNDS WITH A RECORD WHOSE LISTS CANNOT BE SEARCHED. `packages/seed`'s `personal` use
- * case ships `budgets` with no `search: true` on any of its four fields, so every query that record
- * is asked answers nothing, so every following query opens on the false verdict rather than only the
- * ones after a genuine miss.
+ * IT USED TO COMPOUND WITH A LIST NOTHING COULD FIND. `packages/seed`'s `personal` use case ships
+ * `budgets` with no `search: true` on any of its four fields, and until `2dc32e2f` that register had
+ * nothing in the index, so every query about a budget answered nothing and the query after it opened
+ * on the false verdict. That commit indexes a row's title whatever the flags say, so a budget line is
+ * found by its category now; the rule here stands on the empty `find('')` alone.
  *
  * THE RULE, AND IT IS NOT "REDRAW EVERYTHING": a list of hits is content, and a reader can see that
  * content is about something. A verdict is a claim, and this one quotes the words in the box. So

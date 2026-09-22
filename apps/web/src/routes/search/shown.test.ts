@@ -8,9 +8,10 @@
  * the screen states `Nothing matches "<the words just typed>"` over a record nobody has asked about
  * them, and offers to check the spelling.
  *
- * AND IT COMPOUNDS ON A RECORD WHOSE LISTS CANNOT BE SEARCHED, which is not hypothetical: `personal`
- * ships `budgets` with no `search: true` on any of its four fields, so every query that record is
- * asked answers nothing and every following query opens on the false verdict.
+ * IT USED TO COMPOUND ON A LIST NOTHING COULD FIND: `personal` ships `budgets` with no `search: true`
+ * on any of its four fields, and until `2dc32e2f` indexed every row's title that register answered no
+ * query at all. It is found by its category now, so the landing on an empty `find('')` is the whole
+ * of the defect held shut here.
  */
 
 import assert from 'node:assert/strict';
