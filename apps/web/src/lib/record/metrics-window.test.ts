@@ -2,7 +2,7 @@
  * The window a comparison reads BEFORE the current one, in the browser's engine.
  *
  * THE SAME DEFECT AS THE KERNEL'S, BLOCK FOR BLOCK, because the mechanism was written twice.
- * `spent-30d` says `on after -31d` and nothing about an end, so its window ends at the clock. The
+ * `spent-30d` says `on after -30d` and nothing about an end, so its window ends at the clock. The
  * comparison matched the same clauses at a clock thirty days back, which moved the start to `-61d`
  * and left the end at today: the window before was sixty-one days CONTAINING the thirty-one it was
  * compared with. Measured here before the repair, 150,000 spent in each of two consecutive months
@@ -47,7 +47,7 @@ function over<T>(rows: ReadonlyArray<[offset: number, amount: number]>, run: () 
 }
 
 test('the declaration under test is the Ledger tile as it ships', () => {
-  assert.equal(SPENT.where, 'state is cleared, transfer is false, direction is out, on after -31d');
+  assert.equal(SPENT.where, 'state is cleared, transfer is false, direction is out, on after -30d');
   assert.equal(SPENT.window, '30d');
   assert.equal(SPENT.compare, 'previous');
 });
@@ -66,10 +66,10 @@ test('AND A RISE READS AS A RISE, which a superset can never report', () => {
 });
 
 test('A ROW ON THE DAY THE WINDOW STARTS IS IN THIS WINDOW AND NOT THE ONE BEFORE', () => {
-  /* `on after -31d` is today and the thirty days before it, and the clock moves thirty, so the moved
-     clock's own day is this window's first. Day -31 is the last day of the window before. */
-  const r = over([[-30, 100_000], [-5, 50_000], [-31, 100_000], [-50, 50_000]], () => read(SPENT, NOW));
-  assert.equal(r.value, 150_000, 'day -30 is inside `on after -31d`');
+  /* `on after -30d` is today and the twenty-nine days before it, since `after` leaves out its own day, and the
+     clock moves thirty, so day -29 is this window's first and day -30 is the last day of the window before. */
+  const r = over([[-29, 100_000], [-5, 50_000], [-30, 100_000], [-50, 50_000]], () => read(SPENT, NOW));
+  assert.equal(r.value, 150_000, 'day -29 is inside `on after -30d`');
   assert.equal(r.delta, 0, `a row on the boundary was counted twice or not at all, and the reading was ${r.delta}`);
 });
 

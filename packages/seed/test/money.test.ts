@@ -519,7 +519,7 @@ test('AN ALERT IN A CURRENCY THAT IS NOT STERLING IS READ, because the amount is
     Object.entries(body.extract ?? {}).map(([field, form]) => [`${body.ingest}.${field}`, (form as { money?: { after?: string; currency?: string } }).money] as const),
   );
   const monies = forms.filter(([, money]) => money);
-  assert.equal(monies.length, 2, 'the two patterns no longer read one amount each');
+  assert.equal(monies.length, Object.keys(MONEY_INGESTS).length, 'a pattern no longer reads one amount');
   for (const [where, money] of monies)
     assert.ok(!/^[A-Z]{3}$/u.test((money!.after ?? '').trim()), `${where} anchors on a currency code, so an alert in any other currency reads nothing`);
   assert.equal(new Set(monies.map(([, money]) => money!.currency)).size, 1, 'the two patterns fall back on two different currencies');

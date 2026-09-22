@@ -1365,13 +1365,20 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
      Every figure over the ledger says `transfer is false` and `state is cleared`. The first leaves out
      money moved between your own accounts, which is not spending; the second leaves out a payment the
      bank has taken and not yet settled, which is not a fact yet. A figure that omitted either would be
-     a number about the same money counted twice, or about money that has not moved. */
+     a number about the same money counted twice, or about money that has not moved.
+
+     THIRTY DAYS IN THE SENTENCE BECAUSE THE WINDOW IS THIRTY. `window: 30d` is how far the comparison moves
+     the clock, and the window before is cut where this one starts, so it is thirty days whatever the
+     sentence says. `after` does not include its own day, and these said `on after -31d`: today and the
+     thirty before it, thirty-one days, compared with thirty and named "30 days". Measured in
+     `test/money-bank.test.ts`: a cleared payment dated day -30 was counted. Now the two windows are the
+     same length, abut, and share no day. */
 
   'spent-30d': {
     metric: 'spent-30d',
     name: 'Spent, 30 days',
     source: 'register.transactions',
-    where: 'state is cleared, transfer is false, direction is out, on after -31d',
+    where: 'state is cleared, transfer is false, direction is out, on after -30d',
     value: { sum: 'amount' },
     format: SAMPLE_MONEY,
     target: { lte: 1_500_000 },
@@ -1383,7 +1390,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     metric: 'received-30d',
     name: 'Received, 30 days',
     source: 'register.transactions',
-    where: 'state is cleared, transfer is false, direction is in, on after -31d',
+    where: 'state is cleared, transfer is false, direction is in, on after -30d',
     value: { sum: 'amount' },
     format: SAMPLE_MONEY,
     target: { gte: 0 },
@@ -1728,6 +1735,116 @@ export const MONEY_INGESTS: Record<string, SeedIngest> = {
     dedupe: SAME_MOVEMENT,
     on_conflict: 'skip',
   },
+
+  /* ── the wordings HSBC Egypt sends, which the two above never read ─────── */
+
+  /**
+   * HSBC'S CREDIT-CARD ALERT, AND IT WAS UNTRIAGED: `test/money-bank.test.ts` forwarded the shape
+   * the old tool parses, with invented values, and it matched nothing. It says *"Your Credit Card
+   * ending with *** 6180 has been used for EGP 1,284.50 on 14/08/2026 at CEDAR LANE BAKERY. Your
+   * available limit is EGP 23,715.50"*: no `debited`, a four-digit year, and the merchant AFTER the
+   * date and ended by a full stop, so not one of `bank-card-out`'s reads lands on it.
+   *
+   * A PATTERN OF ITS OWN AND NOT A `first:` ARM IN `bank-card-out`, because the amount cannot share an
+   * anchor. `debited ` is nowhere in this wording, and every literal the two do share (`ending `,
+   * ` on `) has the card digits or the date between it and the figure. Arms would also cost the
+   * confidence: `first:` over two wordings that both happen to yield files at `chosen`, which writes
+   * nothing. Five patterns whose `match:` exclude each other keep every field a straight read.
+   *
+   * THE AMOUNT IS ANCHORED ON `used for ` AND THE ACCOUNT IS BOXED BETWEEN THE STARS AND ` has been`,
+   * and both are about the two other numbers in this sentence. The available limit after the figure
+   * is money too, and a lookup whose slice ran to the end of the message would try the year and the
+   * amount against every account's digits.
+   */
+  'bank-card-used': {
+    ingest: 'bank-card-used',
+    pack: 'money-core',
+    channel: 'email',
+    match: {
+      all: [
+        { field: 'body', contains: 'credit card ending' },
+        { field: 'body', contains: 'has been used for' },
+        { none: [{ field: 'body', contains: 'debited' }, { field: 'body', contains: 'credited' }] },
+      ],
+    },
+    skip: NOT_A_MOVEMENT,
+    extract: {
+      what: { text: { between: [' at ', '. Your available'] } },
+      direction: { enum: { map: { used: 'out' } } },
+      on: { date: { format: 'DD/MM/YYYY', after: ' on ' } },
+      amount: { money: { after: 'used for ', currency: HOME_CURRENCY } },
+      account: { lookup: { register: 'accounts', by: 'last4', between: ['*** ', ' has been'] } },
+    },
+    writes: { register: 'transactions', confidence: 'exact' },
+    dedupe: SAME_MOVEMENT,
+    on_conflict: 'skip',
+  },
+
+  /**
+   * AN INSTAPAY TRANSFER OUT, AND THE PURCHASE THAT IS WORDED THE SAME WAY. *"Your HSBC Account ***327
+   * was debited with IPN outward transfer for EGP 3,250.00 on 07-08-2026 16:42 to MARLOW JOINERY with
+   * reference 9c4e1f7a2b"*, and `IPN purchase` in place of `IPN outward transfer` for a shop. It says
+   * `debited` and not `card ending`, which is why `bank-card-out` never claimed it.
+   *
+   * THE ACCOUNT IS THREE DIGITS. The bank prints `***327`, and `accounts.last4` is text, so the suffix
+   * it prints is what a person types there; the lookup is boxed between the stars and ` was ` for the
+   * same reason as the card's.
+   *
+   * THE DATE IS `DD-MM-YYYY`, WHICH A BARE KERNEL CANNOT READ. `ingest.ts`'s own `day` holds four
+   * formats and this is not one; a record reads it through `@braindog/extract`'s `scanDates`, which
+   * `@braindog/record` hands down. Measured in `test/money-bank.test.ts` on a bare kernel: the right
+   * pattern claims the message and names `on` as the one field it could not read, which is `review`
+   * and no row. The time after the date is not read at all, because `transactions.on` is a day.
+   */
+  'bank-ipn-out': {
+    ingest: 'bank-ipn-out',
+    pack: 'money-core',
+    channel: 'email',
+    match: {
+      all: [{ field: 'body', contains: 'hsbc account' }, { field: 'body', contains: 'debited with ipn' }, { none: [{ field: 'body', contains: 'credited' }] }],
+    },
+    skip: NOT_A_MOVEMENT,
+    extract: {
+      what: { text: { between: [' to ', ' with reference'] } },
+      direction: { enum: { map: { debited: 'out' } } },
+      on: { date: { format: 'DD-MM-YYYY', after: ' on ' } },
+      amount: { money: { after: ' for ', currency: HOME_CURRENCY } },
+      account: { lookup: { register: 'accounts', by: 'last4', between: ['Account ***', ' was '] } },
+    },
+    writes: { register: 'transactions', confidence: 'exact' },
+    dedupe: SAME_MOVEMENT,
+    on_conflict: 'skip',
+  },
+
+  /* AN INSTAPAY TRANSFER IN, the same sentence with `credited` and `from` where the other has
+     `debited` and `to`. The sender is often an InstaPay address rather than a name, and it is kept
+     as written, because it is the only thing the message says about who paid. */
+  'bank-ipn-in': {
+    ingest: 'bank-ipn-in',
+    pack: 'money-core',
+    channel: 'email',
+    match: {
+      all: [{ field: 'body', contains: 'hsbc account' }, { field: 'body', contains: 'credited with ipn' }, { none: [{ field: 'body', contains: 'debited' }] }],
+    },
+    skip: NOT_A_MOVEMENT,
+    extract: {
+      what: { text: { between: [' from ', ' with reference'] } },
+      direction: { enum: { map: { credited: 'in' } } },
+      on: { date: { format: 'DD-MM-YYYY', after: ' on ' } },
+      amount: { money: { after: ' for ', currency: HOME_CURRENCY } },
+      account: { lookup: { register: 'accounts', by: 'last4', between: ['Account ***', ' was '] } },
+    },
+    writes: { register: 'transactions', confidence: 'exact' },
+    dedupe: SAME_MOVEMENT,
+    on_conflict: 'skip',
+  },
+
+  /* THE THIRD WORDING HAS NO PATTERN, ON PURPOSE. *"From HSBC: 16AUG26 ATM Cash Withdrawal from
+     042-118***-327 EGP 2500.00- Your available balance is ..."* dates itself with a month NAME, which
+     `43 §4.3` has no token for (`DDMMMYY` is refused at install as DATE_FORMAT_INVALID, measured),
+     and marks a debit with a trailing hyphen and a credit with nothing, so there is no word for
+     `enum` to read the sign from. It lands `untriaged` with its bytes, which is where a wording
+     nothing can read belongs until the grammar can say both. */
 };
 
 /**
