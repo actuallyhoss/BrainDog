@@ -13,7 +13,7 @@
  * ten past must run the source whose egress and keys the owner approved at ten, not whatever was accepted between.
  *
  * WHAT THIS FILE DOES NOT CHECK, AND WHY. `@braindog/script` holds the ceilings (`CEILINGS`, `SOURCE_BYTES`) and
- * `checkDecl`, and `31-STACK` section 2 puts it at rank 23 with the kernel at 7, so the kernel may not import it. The
+ * `checkDecl`, and `31-STACK` section 2 puts it at rank 12 with the kernel at 7, so the kernel may not import it. The
  * numbers are not copied here either: two copies of a ceiling is how one of them becomes wrong. So this file refuses
  * every SHAPE a header can get wrong, and a limit over its ceiling installs and is refused by `checkDecl` when the run
  * starts. Closing that gap is moving the constants below the kernel, which is a change to the package order.

@@ -291,6 +291,9 @@ export type ActionRow = {
 /** `resumeAction`: the action that runs again now. */
 export type ActionResumed = { ingest: string; kind: 'pull' | 'call' | 'poll' };
 
+/** `resumeScript`: the script that runs again now. */
+export type ScriptResumed = { script: string };
+
 /**
  * One saved view, as `views` and `view` send it. See `ViewRow` in `@braindog/kernel`.
  *
@@ -845,6 +848,8 @@ export function createClient(options: ClientOptions) {
        thing that starts a paused action again. */
     actions: () => call<ActionRow[]>('actions'),
     resumeAction: (ingest: string) => call<ActionResumed>('resumeAction', { ingest }),
+    /** A script paused by three refused runs in a row, started again now. ADMIN, and the only thing that restarts one. */
+    resumeScript: (script: string) => call<ScriptResumed>('resumeScript', { script }),
 
     /* THE SAVED VIEWS. `views` and `view` are READ+, held to the list they belong to; `saveView` and
        `retireView` are ADMIN, so a browser session, because a saved view goes on the list for

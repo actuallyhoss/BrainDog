@@ -16,7 +16,7 @@
  * takes the first two back with it. A half-run that left half a ledger is what the design's point 4 exists to prevent,
  * and a refusal is a value here rather than a throw, which is exactly the case `attempt` was written for.
  *
- * WHY THE ANSWER TYPE IS COPIED AND NOT IMPORTED. `@braindog/script` is rank 23 and the kernel is rank 7 (`31-STACK`
+ * WHY THE ANSWER TYPE IS COPIED AND NOT IMPORTED. `@braindog/script` is rank 12 and the kernel is rank 7 (`31-STACK`
  * section 2), so the shape is written out here structurally, as `PullHandoff` is for the connector. Brief 4's
  * self-host test hands a real `ScriptAnswer` to this file, and that is where a drift between the two goes red.
  */
@@ -81,6 +81,44 @@ export type ScriptRunDeps = Pick<ActionDeps, 'sql' | 'recordId' | 'nowMs' | 'min
 
 /** How many refused runs in a row pause a script. Design section 2, point 8. */
 export const REFUSED_IN_A_ROW = 3;
+
+/**
+ * How much of a run's `ctx.log` its event keeps: 8 KB, the design's `ctx` table. `@braindog/script`'s `LOG_BYTES` is the
+ * same number, and it is written out again rather than imported for the rank reason in this file's header.
+ */
+export const LOG_BYTES = 8 * 1024;
+
+/**
+ * The first `LOG_BYTES` of a log, cut on a character boundary.
+ *
+ * CUT HERE AS WELL AS IN THE SANDBOX, for the reason the writes are checked twice: a host is code the record does not
+ * control, and a log is written into the record's own event table, so its size is the record's to hold. The cut backs
+ * off any UTF-8 continuation byte, so a three-byte character straddling the line is dropped whole rather than kept as
+ * a replacement character.
+ */
+function cutLog(log: string): string {
+  const bytes = new TextEncoder().encode(log);
+  if (bytes.length <= LOG_BYTES) return log;
+  let end = LOG_BYTES;
+  while (end > 0 && (bytes[end]! & 0xc0) === 0x80) end -= 1;
+  return new TextDecoder().decode(bytes.subarray(0, end));
+}
+
+/**
+ * Keep a run's log on the event `meter` just wrote for it, as `to_v.log`, and hand the metered run back unchanged.
+ *
+ * ON THE EVENT AND NOT IN `Metered`. `Metered` is the row `meterPass` hands the Directory, which holds counts for every
+ * record it serves and never a customer's text, so the log goes beside the counts in the record's own log and nowhere
+ * else. The owner reads it where every run is read, `recentHistory`, whose `to` is this `to_v`: that is where a refused
+ * run's "why" was already one 280-character sentence, and the log is what explains the sentence.
+ *
+ * AN EMPTY LOG ADDS NOTHING, so a script that says nothing leaves the event exactly as a `call`'s.
+ */
+function keepLog(deps: Pick<ScriptRunDeps, 'sql'>, metered: Metered, log: string): Metered {
+  if (typeof log === 'string' && log !== '')
+    deps.sql.exec("UPDATE event SET to_v = json_set(to_v, '$.log', ?) WHERE id = ?", cutLog(log), metered.event);
+  return metered;
+}
 
 const hostOf = (origin: string | undefined): string | null => {
   if (origin === undefined) return null;
@@ -182,7 +220,7 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
 
   const spent = { requests: answer.usage.fetches, bytes: answer.usage.bytes, ms: answer.usage.wall_ms };
   const refuse = (say: string): Metered => {
-    const metered = meter(deps, { ...base, ...spent, outcome: 'refused', failures: 1 }, say);
+    const metered = keepLog(deps, meter(deps, { ...base, ...spent, outcome: 'refused', failures: 1 }, say), answer.log);
     pauseAfterRefusals(deps, script);
     return metered;
   };
@@ -237,7 +275,11 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
   });
 
   if (lost)
-    return meter(deps, { ...base, ...spent, outcome: 'dropped', failures: 0 }, `${script} ran, and another host holds its job now, so what it wrote was not applied here.`);
+    return keepLog(
+      deps,
+      meter(deps, { ...base, ...spent, outcome: 'dropped', failures: 0 }, `${script} ran, and another host holds its job now, so what it wrote was not applied here.`),
+      answer.log,
+    );
   if (!applied.ok) {
     /* THE ACK WAS ROLLED BACK WITH THE WRITES, so it is made again on its own. */
     done();
@@ -245,7 +287,11 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
     return refuse(`${script} wrote nothing: write ${failedAt + 1} of ${answer.writes.length} was refused. ${why}`);
   }
   const n = answer.writes.length;
-  return meter(deps, { ...base, ...spent, outcome: 'ok', failures: 0 }, `${script} ran and wrote ${n === 0 ? 'nothing' : n === 1 ? 'one row' : `${n} rows`}.`);
+  return keepLog(
+    deps,
+    meter(deps, { ...base, ...spent, outcome: 'ok', failures: 0 }, `${script} ran and wrote ${n === 0 ? 'nothing' : n === 1 ? 'one row' : `${n} rows`}.`),
+    answer.log,
+  );
 }
 
 /**

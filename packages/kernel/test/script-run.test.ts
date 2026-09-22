@@ -358,3 +358,41 @@ test('A RESUMED SCRIPT RUNS AGAIN, and the refusals before the resume do not pau
   assert.equal(r.told.length, 1);
   assert.equal(resumeScript(r.deps, 'gold-rate', 'p_1').ok, false, 'a running script has nothing to resume');
 });
+
+/* ── the run's log ──────────────────────────────────────────────────────────── */
+
+/** The newest run event on the script, as `recentHistory` hands it to the owner: `eventsBefore`, whose `to` is `to_v`. */
+const lastRun = (k: Kernel) => k.eventsBefore(null, 50).find((e) => e.kind === 'pull' && e.target === 'declaration:script.gold-rate' && e.to !== null);
+
+test('A REFUSED RUN KEEPS ITS LOG ON ITS EVENT, where the owner reads why, and the ledger row the Directory counts carries none', async () => {
+  const r = await record();
+  const log = 'fetched 1 quote\nprice_gram_24k missing from {"error":"rate limited"}\n';
+  const m = finishScript(r.deps, prepared(r), { refused: { code: null, why: 'TypeError: price_gram_24k is undefined' }, log, usage: USAGE });
+
+  assert.equal(m.outcome, 'refused');
+  assert.equal((lastRun(r.k)?.to as { log?: unknown } | null)?.log, log);
+  assert.equal(lastRun(r.k)?.id, m.event, 'the log is on the run event itself, not on one beside it');
+  /* THE LEDGER'S SHAPE IS `Metered`, handed to the Directory by `meterPass`, and a log in it would be customer text in a
+     table that holds counts. */
+  assert.ok(!('log' in m), `the metered run carries ${JSON.stringify(m)}`);
+});
+
+test('A RUN THAT WROTE KEEPS ITS LOG TOO, and one that logged nothing adds no empty field', async () => {
+  const r = await record();
+  finishScript(r.deps, prepared(r), { writes: [{ op: 'create', register: 'gold_egp', fields: { at: 'noon', value: 1 } }], log: 'one point\n', usage: USAGE });
+  assert.equal((lastRun(r.k)?.to as { log?: unknown }).log, 'one point\n');
+
+  finishScript(r.deps, prepared(r), { writes: [], log: '', usage: USAGE });
+  assert.ok(!('log' in (lastRun(r.k)?.to as object)), 'an empty log was kept as a field');
+});
+
+test('A LOG OVER 8 KB IS CUT AT 8 KB ON THE RECORD SIDE, whatever the host sent, and never through a character', async () => {
+  const r = await record();
+  /* THE SANDBOX CUTS AT 8 KB ALREADY, and this is the host that did not: 8,191 bytes of ASCII then a three-byte
+     character that straddles the line, then more. */
+  const log = `${'a'.repeat(8191)}€${'b'.repeat(20_000)}`;
+  finishScript(r.deps, prepared(r), { refused: { code: null, why: 'boom' }, log, usage: USAGE });
+  const kept = (lastRun(r.k)?.to as { log: string }).log;
+  assert.equal(kept, 'a'.repeat(8191));
+  assert.ok(new TextEncoder().encode(kept).length <= 8 * 1024);
+});
