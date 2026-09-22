@@ -255,10 +255,49 @@ export type Named = { record: string; slug: string };
 /** A record this person can reach. What they may DO in it is the record's answer, not this one's. */
 export type Membership = { record: string; slug: string | null; closed: boolean };
 
-/** What a record answers when it is asked directly: the level this person holds there, and its own name. `null` for either is "not on this record", the same answer as one it never joined. */
-export type SwitcherAsk = { level: string | null; name: string | null };
-/** One row of the switcher: a record this person can reach, its name, and the level they actually hold there. */
-export type SwitcherRow = { slug: string; name: string; level: string };
+/**
+ * What a record answers when it is asked directly: the level this person holds there, the lists they hold when that
+ * level is `null`, and the record's own name.
+ *
+ * `level: null` ON ITS OWN MEANT TWO THINGS, and the switcher could tell neither from the other. A person the record
+ * has removed answers `null`, and so does a person invited to one list, because `kernel.access` gives somebody with
+ * only register rows no record-wide level. `research-invite-landing.md` probe3 measured what that cost: a colleague
+ * who owned `books-co` and accepted one list on `the-studio` was shown `[books-co]` and nothing else, so the record
+ * that had just admitted them was unreachable from every screen. `lists` is the second answer: absent or empty is
+ * "not on this record", and a non-empty list with a `null` level is "on it, with these lists only".
+ */
+export type SwitcherAsk = { level: string | null; name: string | null; lists?: readonly string[] | null };
+/**
+ * One row of the switcher: a record this person can reach, its name, and the level they actually hold there.
+ *
+ * A PERSON WHO HOLDS LISTS AND NOT THE RECORD gets `level: null`, never a level nobody granted, plus the list ids in
+ * `lists` and a word for the row in `held`. The word is here rather than in the web because the web draws `level`
+ * raw, and a row whose level is `null` would draw nothing where every other row names what you may do.
+ */
+export type SwitcherRow = { slug: string; name: string; level: string } | { slug: string; name: string; level: null; lists: string[]; held: string };
+
+/** The word a one-list row carries in `held`. One word for one list or five, so the row does not read as a count. */
+export const SOME_LISTS = 'Some lists';
+
+/** The two reads of a record `switcherAsk` needs, which is all of `kernel` it touches. */
+export type SwitcherSource = {
+  access(person: string): { level: string | null; registers: readonly string[] | null } | null;
+  identity(): { name?: string | null } | null | undefined;
+};
+
+/**
+ * What a record answers the switcher about this person, from its own tables.
+ *
+ * BOTH HOSTS ASK THROUGH THIS, `Record$.switcherRow` on the Worker and the self-host's `records` callback, because
+ * each had written `access(person)?.level ?? null` by hand and each had the same hole in it. One function is one
+ * place for the next answer to be added, and the test in `switcher-lists.test.ts` calls this and not a copy of it.
+ */
+export function switcherAsk(kernel: SwitcherSource, person: string): SwitcherAsk {
+  const held = kernel.access(person);
+  const name = kernel.identity()?.name ?? null;
+  if (held === null) return { level: null, name };
+  return held.level !== null ? { level: held.level, name } : { level: null, name, lists: [...(held.registers ?? [])] };
+}
 
 export type Directory = ReturnType<typeof createDirectory>;
 
@@ -791,11 +830,14 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
      * invited rather than joined. `ask` is how each open record answers for itself, in its own
      * words, so the level and the name here are never a second copy of either.
      *
-     * A RECORD THAT ANSWERS WITH NO LEVEL IS LEFT OUT, not shown with a level nobody granted. The
-     * Directory still naming somebody after the record has removed them is not a contradiction to
-     * paper over: it is what "removed" looks like before the two tables agree, and the row that does
-     * not lie about it is no row at all. A closed record, or one with no live name, is left out the
-     * same way `recordsOf`'s own callers already filter it.
+     * A RECORD THAT ANSWERS WITH NO LEVEL AND NO LISTS IS LEFT OUT, not shown with a level nobody
+     * granted. The Directory still naming somebody after the record has removed them is not a
+     * contradiction to paper over: it is what "removed" looks like before the two tables agree, and
+     * the row that does not lie about it is no row at all. A closed record, or one with no live name,
+     * is left out the same way `recordsOf`'s own callers already filter it.
+     *
+     * THIS USED TO LEAVE OUT THE ONE-LIST MEMBER TOO, because a `null` level was the whole test. A
+     * record that answers lists is kept with `level: null` and those lists; see `SwitcherAsk`.
      */
     switcherRows: async (person: string, ask: (record: string) => Promise<SwitcherAsk> | SwitcherAsk): Promise<SwitcherRow[]> => {
       const open = sql
@@ -810,7 +852,9 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
       const rows = await Promise.all(
         open.map(async (r): Promise<SwitcherRow | null> => {
           const held = await ask(r.record);
-          return held.level === null ? null : { slug: r.slug as string, name: held.name ?? (r.slug as string), level: held.level };
+          const name = held.name ?? (r.slug as string);
+          if (held.level !== null) return { slug: r.slug as string, name, level: held.level };
+          return held.lists && held.lists.length > 0 ? { slug: r.slug as string, name, level: null, lists: [...held.lists], held: SOME_LISTS } : null;
         }),
       );
       return rows.filter((r): r is SwitcherRow => r !== null);

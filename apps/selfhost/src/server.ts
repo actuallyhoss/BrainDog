@@ -45,7 +45,7 @@ import { catalogueAnswer, catalogueFolder, catalogueOffersFrom } from './catalog
 import { certificateNames, originFor } from './reach.ts';
 import { fileSnapshots, type FileSnapshots } from './snapshots.ts';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
-import { createDirectory, type Directory } from '@braindog/record/directory';
+import { createDirectory, switcherAsk, type Directory } from '@braindog/record/directory';
 import type { Auth, Param, Refusal, Row, Scheduler, Sql } from '@braindog/ports';
 
 import { actionExecutor, holding, holdingPaged, keyOpener, meterPass, pass, sharedReader, type OpenKey, type RehearseOnThisMachine, type Resolve, type Send } from './actions.ts';
@@ -1147,11 +1147,15 @@ export async function start(options: {
        other read: "a self-host serves the one record it has... answering for whichever one
        happened to sort first would be a person reading somebody else's record." Any other id gets
        `null`, which `switcherRows` reads as "not on this record" and leaves out, rather than a
-       guess about a file this process never opened. */
+       guess about a file this process never opened.
+
+       THE ONE IT HOLDS ANSWERS THROUGH `switcherAsk`, the Worker's function too. This was
+       `access(person)?.level ?? null` written out, which is `null` for a colleague invited to one
+       list, so they were left out of the record they were on. */
     records: async (person) => {
       const here = api.kernel.identity()?.id;
       const rows = await directory.switcherRows(person, (record) =>
-        record === here ? { level: api.kernel.access(person)?.level ?? null, name: api.kernel.identity()?.name ?? null } : { level: null, name: null },
+        record === here ? switcherAsk(api.kernel, person) : { level: null, name: null },
       );
       return { ok: true as const, value: rows };
     },

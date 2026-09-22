@@ -28,7 +28,7 @@ import { createRecordApi, type CallContext, type Deposited, type IngestVerificat
 import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Sql, Who } from '@braindog/ports';
 
-import { createDirectory, type AccountUsage, type Directory as Dir, type RunUsage } from '@braindog/record/directory';
+import { createDirectory, switcherAsk, type AccountUsage, type Directory as Dir, type RunUsage, type SwitcherAsk, type SwitcherRow } from '@braindog/record/directory';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 
 import { ALARM_RUNS, actionExecutor, holding, holdingPaged, invocation, keyOpener, meterPass, pass, sharedReader } from './actions.ts';
@@ -436,11 +436,16 @@ export class Record$ extends DurableObject<Env> {
    * `access` above is the same `member` table read the same way, and `kernel.identity()` is what
    * `boot` names the record by. The Directory cannot answer either question about a record that is
    * not itself.
+   *
+   * AND THE LISTS, WHEN THERE IS NO LEVEL. This answered `access(person)?.level ?? null`, which is
+   * `null` for a colleague invited to one list, so `switcherRows` dropped the record that had just
+   * admitted them (`research-invite-landing.md` finding 2). `switcherAsk` is shared with the self-host
+   * so the two cannot drift back apart.
    */
-  async switcherRow(person: string): Promise<{ level: string | null; name: string | null }> {
+  async switcherRow(person: string): Promise<SwitcherAsk> {
     if (this.#gone) return { level: null, name: null };
     const api = await this.#record();
-    return { level: api.kernel.access(person)?.level ?? null, name: api.kernel.identity()?.name ?? null };
+    return switcherAsk(api.kernel, person);
   }
 
   /**
@@ -891,9 +896,10 @@ export class Directory$ extends DurableObject<Env> {
    * `reaches` ABOVE STOPS AT WHICH; this asks each one what, over RPC to that record's own object,
    * through `idFromName(rec_id)` and never the slug, so a rename never changes which object answers
    * (ADR-061). `switcherRows` is `@braindog/record/directory`'s: it drops a record that answers with
-   * no level, which is a person the Directory still lists and the record has since removed.
+   * no level and no lists, which is a person the Directory still lists and the record has since
+   * removed, and keeps a one-list member with `level: null` and the lists they hold.
    */
-  async recordsFor(person: string): Promise<{ slug: string; name: string; level: string }[]> {
+  async recordsFor(person: string): Promise<SwitcherRow[]> {
     return this.#directory().switcherRows(person, (record) => this.env.RECORD.get(this.env.RECORD.idFromName(record)).switcherRow(person));
   }
 }
