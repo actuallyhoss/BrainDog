@@ -36,6 +36,7 @@
   import { appliedLines, arrangedOf, isArranging, partialOf, type Partial } from './[id]/arranged.ts';
   import { answerFor, optionsOf, reasonState, record, setReason, withdraw, wouldRecord, type Answer } from '$lib/record/answer.ts';
   import { mayAnswer, whyNotAnswering } from './answering.ts';
+  import { spoken } from './spoken.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { keepDecided, olderDecisions, plainOf, readQueue, type Queue } from '$lib/record/governance.ts';
   import { answerQuestion } from '$lib/record/decide-write.ts';
@@ -588,7 +589,7 @@
               <!-- What it would cost to get this one wrong, which is why it sits where it sits. The
                    word is `braindog-render`'s, the same one the `queue` block draws. -->
               {#if queueCost(q.band ?? '')}<span class="q-band" data-cost={q.band}>{queueCost(q.band ?? '')}</span>{/if}
-              <span class="q-id">{q.id}</span>
+              {#if spoken(q.id)}<span class="q-id">{q.id}</span>{/if}
             </span>
           </span>
         </a>
@@ -828,7 +829,7 @@
                 <span class="line-title">{q.title}</span>
                 <span class="line-detail">{#if choseTitle}<span class="decided-choice">{choseTitle}</span> {/if}{q.decided?.reason}</span>
               </span>
-              <span class="line-when">{since(q.decided?.at ?? '', now)}<span class="decided-id">{q.id}</span></span>
+              <span class="line-when">{since(q.decided?.at ?? '', now)}{#if spoken(q.id)}<span class="decided-id">{q.id}</span>{/if}</span>
             </a>
           </li>
         {/each}

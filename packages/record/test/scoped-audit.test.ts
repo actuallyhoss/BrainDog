@@ -224,7 +224,9 @@ test('2. A BLOCK WHOSE SOURCE IS NOT A LIST IS JUDGED BY WHAT IT READS: the cash
   assert.doesNotMatch(said, /redundancy/u, 'the queue carried a question about the diary');
   assert.equal(block('governance.open').refusals?.[0]?.code, 'FORBIDDEN');
   assert.deepEqual(block('governance.open').queue ?? [], []);
-  assert.deepEqual(value<{ id: string }[]>(await api.governance({ register: 'suggestion' }, wren)).map((q) => q.id), [hers.id]);
+  /* Her queue carries handles, not numbers (`scoped-question-ids.test.ts`); the owner reads each back as its number. */
+  const queue = value<{ id: string }[]>(await api.governance({ register: 'suggestion' }, wren));
+  assert.deepEqual(await Promise.all(queue.map(async (q) => value<{ id: string }>(await api.governance({ id: q.id }, owner)).id)), [hers.id]);
 
   /* MEASURED BEFORE: three live runs with `repo: acme/payroll-secret` and what each was doing. */
   assert.doesNotMatch(said, /payroll-secret|Drafting/u, "the live runs went to somebody `sessionsLive` refuses");

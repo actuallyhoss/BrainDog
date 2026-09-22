@@ -40,6 +40,7 @@
   import CallsOut from '$lib/ui/CallsOut.svelte';
   import { ARRANGING, PROPOSALS, QUEUE, ROWSETS } from '$lib/record/data.ts';
   import Changes from './Changes.svelte';
+  import { spoken } from '../spoken.ts';
   import Proposed from './Proposed.svelte';
   import Arranged from './Arranged.svelte';
   import Applied from './Applied.svelte';
@@ -538,7 +539,7 @@
     </Empty>
   </div>
 {:else}
-  <PageHead icon="decide" kicker={copy.decide} title={question.title} id={question.id} />
+  <PageHead icon="decide" kicker={copy.decide} title={question.title} id={spoken(question.id) ? question.id : undefined} />
 
   <div class="page">
     <!-- THE BLOCK EXISTED AND ONLY THE RECORD COULD REACH IT. It was gated on `question.decided`,

@@ -91,6 +91,7 @@ import { useCases, type ExportArgs } from './usecase.ts';
 import { catalogueDrafts, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, noticeUsage, pageShowsAgents, readUsage, SPARK_OPEN_CAP, stableKey, type CatalogueOffer, type Offered, type SparkDraft, type SparkModel } from './spark.ts';
 import { grammarOf } from './grammar.ts';
 import { historyCursors, type HistoryCursors } from './history-cursor.ts';
+import { handleOf, isHandle, spokenOf } from './question-handles.ts';
 import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 
 export type { CatalogueEntry, FigureTest, Grows, RowIo } from './arrange.ts';
@@ -1671,14 +1672,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (!rows.ok) return [];
     return rows.value
       .filter((row) => !holds(ctx, row))
-      .slice(0, 20)
-      .map((row) => ({
-        id: String(row.id),
-        body_kind: String(row.body_kind),
-        opened_by: String(row.opened_by),
-        opened_at: String(row.opened_at),
-        question: kernel.question(String(row.id)) ?? '',
-      }));
+      .flatMap((row) => {
+        /* THE QUEUE `boot` AND `context` READ OUT, so its ids go out as `nameOf` hands them. */
+        const id = nameOf(ctx, 'suggestion', String(row.id));
+        return id === null
+          ? []
+          : [{ id, body_kind: String(row.body_kind), opened_by: String(row.opened_by), opened_at: String(row.opened_at), question: kernel.question(String(row.id)) ?? '' }];
+      })
+      .slice(0, 20);
   };
 
   /**
@@ -1728,8 +1729,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          `resolve` written beside it (the `to` is the question's words, and neither carries a batch), so Home paired them
          by `rowid - 1`. The kernel's `SETTLED` already makes that join in SQL, where the number never leaves the server,
          and `row.suggestion` is its answer. */
-      const settles = e.kind === 'decide' && kind === 'decision' && typeof row?.suggestion === 'string' ? row.suggestion : null;
-      return settles === null ? { ...bare, title } : { ...bare, title, settles };
+      const spokenSettles = e.kind === 'decide' && kind === 'decision' && typeof row?.suggestion === 'string' ? row.suggestion : null;
+      /* AND BOTH NUMBERS ARE HANDED AS `nameOf` HANDS THEM, the one in `target` and the one in `settles`: these two
+         fields were how the survey's walk found `SG7` and `D4` in a scoped member's `recentHistory` and `whatsNew`. On a
+         question's first `suggest` line the handle is `q.` and that line's own `id`, so it tells her nothing twice. */
+      const own = nameOf(ctx, kind, id);
+      const settles = spokenSettles === null ? null : nameOf(ctx, 'suggestion', spokenSettles);
+      if (own === null || (spokenSettles !== null && settles === null)) return null;
+      const said = own === id ? bare : { ...bare, target: `${kind}:${own}` };
+      return settles === null ? { ...said, title } : { ...said, title, settles };
     }
     if (/^(?:grant|access|share)\./u.test(e.kind) || ['grant', 'vault_key', 'device_grant', 'member', 'person'].includes(kind ?? ''))
       return allows(ctx, 'owner') === null ? bare : null;
@@ -1801,6 +1809,70 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const readsEveryList = (ctx: CallContext): boolean =>
     wholeRecord(ctx) && Object.keys(ctx.levels ?? {}).every((list) => readable(ctx, list) === null);
+
+  /**
+   * A question's or a decision's name as this caller is handed it: `SG6` to whoever reads every list, and `q.<id>` to
+   * anybody else, whose gap between two numbers would count the questions about lists they were not shown
+   * (`question-handles.ts`). `null` when there is no event to hand, which holds the row back.
+   *
+   * `readsEveryList`, NOT `wholeRecord`, for the reason the rowid gave: a member at `read` with Diary held to `append`
+   * has no ceiling, `holds` hides every Diary question from her, and handed numbers she read `SG1 SG6 SG7` and `D1 D4`
+   * over four hidden questions and two hidden decisions, exactly as a member invited to Obligations alone did.
+   */
+  const nameOf = (ctx: CallContext, register: 'suggestion' | 'decision', spoken: string): string | null =>
+    readsEveryList(ctx) ? spoken : handleOf(sql, register, spoken);
+
+  /** A question or decision a caller named, as the kernel keys it: a handle is turned back into its number, anything else goes as it came. */
+  const spokenIn = (given: string): string => (isHandle(given) ? (spokenOf(sql, given) ?? given) : given);
+
+  /**
+   * What `propose` answers, with the question's name as `nameOf` hands it. THE WORST OF THE TWO LEAKS, because it needs
+   * nothing to subtract from: an `append` member who reads no governance at all was told `SG7` by her own proposal,
+   * which is every question filed before hers on every list. The kernel writes the `suggest` event in the transaction
+   * that allocates the number, so a handle is always found; were it not, she is answered an empty id rather than the
+   * number.
+   */
+  const filedAs = (ctx: CallContext, out: Result<{ id: string }>): Result<{ id: string }> =>
+    out.ok && !readsEveryList(ctx) ? ok({ ...out.value, id: nameOf(ctx, 'suggestion', out.value.id) ?? '' }) : out;
+
+  /**
+   * What `decide` answers, as `filedAs` answers `propose`. A member at `decide` with Diary held to `append` does not read
+   * every list, and her `decide` on the third invoice answered `{ decision: 'D5', suggestion: 'SG7' }`: the three Diary
+   * decisions by subtraction from the two she is shown. The kernel's refusal names the question by its number too
+   * ("SG7 is resolved"), so that sentence has the number put back as the handle she would be given for it. `spoken` is
+   * the number the kernel was asked about, and only that word is rewritten, NOT EVERY NUMBER IN THE SENTENCE.
+   */
+  const settledAs = <T extends { decision: string | null; suggestion: string }>(ctx: CallContext, spoken: string, out: Result<T>): Result<T> => {
+    if (readsEveryList(ctx)) return out;
+    if (out.ok)
+      return ok({
+        ...out.value,
+        suggestion: nameOf(ctx, 'suggestion', out.value.suggestion) ?? '',
+        decision: out.value.decision === null ? null : (nameOf(ctx, 'decision', out.value.decision) ?? ''),
+      });
+    const handle = /^SG[1-9][0-9]*$/u.test(spoken) ? nameOf(ctx, 'suggestion', spoken) : null;
+    if (handle === null || !('refusal' in out)) return out;
+    return { ...out, refusal: { ...out.refusal, fix: out.refusal.fix.replace(new RegExp(`\\b${spoken}\\b`, 'gu'), handle) } };
+  };
+
+  /**
+   * A governance row as it leaves the record, its own name and the names it carries of the other kind rewritten by
+   * `nameOf`. One helper at each exit, NOT A PATTERN OVER THE ANSWER, which would also rewrite an owner's reason that
+   * happens to say "D4". A row whose own event cannot be found, or a decision whose question's cannot, is held back from
+   * a caller who would be handed a handle, as `holds` holds back a decision whose question cannot be found: none is
+   * made in this tree, but an import could make one.
+   */
+  const handed = <T>(ctx: CallContext, register: string, row: T): T | null => {
+    if (row === null || typeof row !== 'object' || readsEveryList(ctx) || (register !== 'suggestion' && register !== 'decision')) return row;
+    const r = row as Record<string, unknown>;
+    const own = nameOf(ctx, register, String(r.id));
+    if (own === null) return null;
+    const other = register === 'suggestion' ? 'decision' : 'suggestion';
+    const link = typeof r[other] === 'string' ? nameOf(ctx, other, r[other]) : null;
+    if (register === 'decision' && typeof r.suggestion === 'string' && link === null) return null;
+    const supersedes = typeof r.supersedes === 'string' ? nameOf(ctx, 'decision', r.supersedes) : null;
+    return { ...r, id: own, [other]: link, ...('supersedes' in r ? { supersedes } : {}) } as T;
+  };
 
   /**
    * A line as it leaves the record. THE ROWID STAYS BEHIND FOR A CALLER WHO CANNOT READ EVERY LIST, and only at the
@@ -1918,7 +1990,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
            record is held back from none, so theirs is the table's count. A member invited to named lists is held back from
            the decisions `holds` holds, and the table's count told them 2 where the list showed them 1: a number the
            Decisions screen draws, and a count of what was decided about lists they were never shown. */
-        decided: wholeRecord(ctx)
+        /* `readsEveryList` AND NOT `wholeRecord`: a member at `read` with Diary held to `append` was told `decided: 4`
+           beside the two decisions her list showed her, which is the count of the Diary ones by subtraction. */
+        decided: readsEveryList(ctx)
           ? kernel.governanceCount('decision')
           : ((all) => (all.ok ? all.value.filter((row) => !holds(ctx, row)).length : 0))(kernel.governance('decision', { every: true })),
       },
@@ -3222,26 +3296,32 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       const register = (args?.register ?? 'suggestion') as GovernRegister;
-      if (args?.id) {
+      /* A HANDLE IN IS TURNED BACK INTO ITS NUMBER BEFORE ANY CHECK BELOW, so a hidden question named by handle meets the
+         same `holds` and answers the same `null` or the same sentence as one named by number, and a handle naming no
+         event goes on as it came and is answered as a number naming no row (`question-handles.ts`). */
+      const id = args?.id ? spokenIn(String(args.id)) : undefined;
+      const cursor = typeof args?.cursor === 'string' ? spokenIn(args.cursor) : args?.cursor;
+      const out = <T>(row: T): T | null => handed(ctx, register, asked(register, row));
+      if (id !== undefined) {
         /* AND ONE BY ID ANSWERS TO THE SAME CEILING. The list path was filtered and this was not,
            and the ids are sequential — `SG1`, `SG2` — so one extra query parameter walked the whole
            queue. A row you may not see does not exist, which is the same answer a missing id gets. */
-        const row = kernel.governanceRow(register, String(args.id));
-        return ok(row && holds(ctx, row) ? null : asked(register, row));
+        const row = kernel.governanceRow(register, id);
+        return ok(row && holds(ctx, row) ? null : out(row));
       }
       /* A PAGE AT A TIME PAST THE LIMIT: `cursor` is the id of the last row the page above held, and a page shorter than
          the limit is the last one. */
-      if (args?.cursor !== undefined && (typeof args.cursor !== 'string' || args.cursor === ''))
+      if (cursor !== undefined && (typeof cursor !== 'string' || cursor === ''))
         return no('VALUE_MALFORMED', 'A cursor is the id of the last row the page above answered with.', { at: 'cursor' });
       /* A CURSOR ON A ROW YOU MAY NOT SEE IS ANSWERED AS ONE ON NO ROW AT ALL. The kernel resolves the cursor over the
          whole table before this ceiling runs, so a member scoped to one list could ask for `SG<n>` a number at a time
          and read which ones exist, which is how many questions and decisions the record holds (research-scoped-audit
          §7). The sentence is the kernel's own, byte for byte, so the two answers cannot be told apart. */
-      if (args?.cursor !== undefined) {
-        const at = kernel.governanceRow(register, args.cursor);
+      if (cursor !== undefined) {
+        const at = kernel.governanceRow(register, cursor);
         if (at && holds(ctx, at)) return no('VALUE_MALFORMED', 'A cursor is the id of the last row the page above answered with. Start from the first page.', { at: 'cursor' });
       }
-      const after = args?.cursor === undefined ? {} : { cursor: args.cursor };
+      const after = cursor === undefined ? {} : { cursor };
       const rows = kernel.governance(register, {
         ...(args?.status === undefined ? {} : { status: String(args.status) }),
         ...(args?.limit === undefined ? {} : { limit: Number(args.limit) }),
@@ -3255,14 +3335,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          through a method that names no register and therefore ran no ceiling check. `list` refuses
          that register, `boot` hides it, and the digest was taught the same lesson one commit
          earlier; the gate is the last read that had not been. */
-      const kept = rows.value.filter((r) => !holds(ctx, r));
-      if (kept.length === rows.value.length) return ok(kept.map((r) => asked(register, r)));
+      /* A ROW `handed` HOLDS BACK IS HELD BACK HERE, before the page is counted, so the page is filled past it as it is
+         past a row `holds` holds back. */
+      const shownRows = (all: typeof rows.value) => all.filter((r) => !holds(ctx, r)).flatMap((r) => ((o) => (o === null ? [] : [o]))(out(r)));
+      const kept = shownRows(rows.value);
+      if (kept.length === rows.value.length) return ok(kept);
       /* AND THE PAGE IS FILLED FROM WHAT IS LEFT. Trimmed to the limit and then filtered, a token
          scoped to one register was handed an empty page whenever the newest fifty were about
          another, with its own questions still open behind them. */
       const every = kernel.governance(register, { ...(args?.status === undefined ? {} : { status: String(args.status) }), every: true, ...after });
       if (!every.ok) return every;
-      return ok(every.value.filter((r) => !holds(ctx, r)).slice(0, rows.value.length).map((r) => asked(register, r)));
+      return ok(shownRows(every.value).slice(0, rows.value.length));
     },
 
     /**
@@ -3292,11 +3375,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             return no('FIELD_UNKNOWN', 'An arrangement you propose carries no rows. Propose rows as body_kind rowset, one list at a time.', { at: 'body.rows' });
           const filed = await arrangement.prepare(args.body_kind, body);
           if (!filed.ok) return filed;
-          return tail(kernel.propose({ ...args, body: filed.value }, writerOf(ctx)));
+          return tail(filedAs(ctx, kernel.propose({ ...args, body: filed.value }, writerOf(ctx))));
         }
       }
       /* A TOKEN'S PROPOSAL IS SIGNED BY ITS RUN, as its writes are. */
-      return kernel.propose(args, writerOf(ctx));
+      return filedAs(ctx, kernel.propose(args, writerOf(ctx)));
     },
 
     /**
@@ -3311,6 +3394,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const stop = guard(ctx, 'decide');
       if (stop) return { ok: false as const, refusal: stop };
       if (!args?.id) return no('REQUIRED_MISSING', 'Which suggestion?', { at: 'id' });
+      /* A HANDLE IS TAKEN AS THE NUMBER IT NAMES, before anything reads the id, as `governance` takes one. */
+      args = { ...args, id: spokenIn(String(args.id)) };
       /* NO VERDICT IS A MISSING ANSWER, NOT A BAD ONE. With none of the three it fell through to the
          resolve branch and was refused "undefined is not a way to resolve one". */
       if (args.decide === undefined && args.defer === undefined && args.resolved_as === undefined)
@@ -3349,9 +3434,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         const { apply: _handed, ...decided } = out.value;
         /* KEPT ON THE DECISION, so what was applied is read back after a reload and by every other member. */
         if (decided.decision !== null) kernel.keepApplied(decided.decision, applied.value as Record<string, unknown>, actorOf(ctx));
-        return tail(ok({ ...decided, applied: applied.value }));
+        return tail(settledAs(ctx, args.id, ok({ ...decided, applied: applied.value })));
       }
-      if (!out.ok || !out.value.install) return tail(out);
+      if (!out.ok || !out.value.install) return tail(settledAs(ctx, args.id, out));
 
       /* THE DECLARATION LANDS BEFORE THE ANSWER DOES. If it will not install, the gate's own
          transaction has already committed — so the suggestion is reopened rather than left resolved
@@ -3385,7 +3470,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         kernel.reopen(out.value.suggestion, 'refusal' in put ? put.refusal.fix : undefined);
         return tail(put);
       }
-      return tail(out);
+      return tail(settledAs(ctx, args.id, out));
     },
 
     /* ── ADMIN: PACKS ───────────────────────────────── */

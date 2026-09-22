@@ -86,7 +86,9 @@ test('A DECISION ABOUT A LIST SOMEBODY CANNOT READ IS NOT THEIRS TO READ, its qu
   /* THE SUGGESTION WAS ALREADY HELD BACK, and its decision was not: the audit read the question and the reason of the
      diary one straight off the list. */
   const decisions = value<{ id: string; question: string; reason: string }[]>(await api.governance({ register: 'decision' }, reader));
-  assert.deepEqual(decisions.map((d) => d.id), [theirs], 'a scoped member read a decision about a list they were not invited to');
+  /* She is handed `d.` handles, not numbers (`scoped-question-ids.test.ts`); the owner reads each back as its number. */
+  const spoken = await Promise.all(decisions.map(async (d) => value<{ id: string }>(await api.governance({ register: 'decision', id: d.id }, owner)).id));
+  assert.deepEqual(spoken, [theirs], 'a scoped member read a decision about a list they were not invited to');
   assert.equal(value(await api.governance({ register: 'decision', id: hidden }, reader)), null, 'and one by id walked straight past the filter');
 
   /* THE OWNER STILL READS BOTH, so the filter is about sight and not a decision table that went missing. */
@@ -95,7 +97,7 @@ test('A DECISION ABOUT A LIST SOMEBODY CANNOT READ IS NOT THEIRS TO READ, its qu
   /* AND THE LOG ASKS THE SAME QUESTION ONE EVENT AT A TIME: the `decide` line carried the question as its title. */
   const lines = value<HistoryPage>(await api.recentHistory(undefined, reader)).events;
   assert.ok(!lines.some((e) => e.target === `decision:${hidden}`), 'the history named the hidden decision');
-  assert.ok(lines.some((e) => e.target === `decision:${theirs}`), 'and it must still name the one they may see');
+  assert.ok(lines.some((e) => e.target === `decision:${decisions[0]!.id}`), 'and it must still name the one they may see');
 
   /* AND THE COUNT IS OF WHAT THEY MAY READ. Boot handed them the table's count, 2, for a list that shows them 1, and the
      Decisions screen draws that number as how many there are to page through. */

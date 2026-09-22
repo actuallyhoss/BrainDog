@@ -178,7 +178,9 @@ test('(6) A `decide` LINE SAYS WHICH QUESTION IT SETTLED, so the resolve beside 
     const lines = value<Page>(await api.recentHistory(undefined, ctx)).events;
     const decide = lines.find((e) => e.kind === 'decide')!;
     const resolve = lines.find((e) => e.kind === 'resolve')!;
-    assert.equal(decide.settles, asked);
+    /* A one-list member is handed a `q.` handle rather than the number (`scoped-question-ids.test.ts`), and the owner
+       reads either back as the question it names. */
+    assert.equal(value<{ id: string } | null>(await api.governance({ id: decide.settles! }, owner))?.id, asked);
     assert.equal(resolve.target, `suggestion:${decide.settles}`);
     assert.equal(resolve.ts, decide.ts);
     assert.ok(!lines.some((e) => e.kind !== 'decide' && 'settles' in e), 'settles on a line that settles nothing');
