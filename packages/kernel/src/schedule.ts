@@ -348,7 +348,7 @@ export const due = (sql: Sql, now: number, limit = 100) =>
 
 /* ── the alarm handler ──────────────────────────────────────────── */
 
-/** The twelve migration 5's `CHECK` admits: 0001's ten, and `call` and `poll` beside `pull`. */
+/** The thirteen the `CHECK` admits: 0001's ten, `call` and `poll` from migration 5, and `script` from migration 12. */
 export const SCHEDULE_KINDS = [
   'digest',
   'reminder',
@@ -362,6 +362,7 @@ export const SCHEDULE_KINDS = [
   'analyse',
   'score',
   'snapshot',
+  'script',
 ] as const;
 
 export type ScheduleKind = (typeof SCHEDULE_KINDS)[number];

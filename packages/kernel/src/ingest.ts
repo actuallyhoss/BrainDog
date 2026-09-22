@@ -605,12 +605,39 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
     /* IDEMPOTENT ON THE HASH. A redelivery is the ordinary case — every webhook sender retries, and
        most mail servers will too — and writing the row twice is the failure people notice as a
        duplicate invoice. */
-    const already = deps.sql.one<{ id: string; state: string }>(
-      'SELECT id, state FROM inbox_raw WHERE channel = ? AND sha256 = ?',
+    const already = deps.sql.one<{ id: string; state: string; reason: string | null }>(
+      'SELECT id, state, reason FROM inbox_raw WHERE channel = ? AND sha256 = ?',
       arrival.channel,
       arrival.sha256,
     );
-    if (already) {
+
+    /**
+     * BUT A REDELIVERY IS THE SAME BYTES AT A DOOR THAT ACCEPTED THEM, NOT ANY EARLIER SIGHTING OF THEM.
+     *
+     * The key was checked before any matching, so the first door to see a set of bytes decided what they were
+     * for good, and two ordinary orders of events lost a write while both posts answered 202
+     * (`test/arrive-redelivery.test.ts`). A Shortcut still holding a rotated token stored a withdrawal
+     * `untriaged` with `UNVERIFIED` on it, and the same SMS sent again with the right token came back
+     * `redelivered` with nothing written. A credit posted to the withdrawal twin's URL a few milliseconds before
+     * the credit twin's was stored `untriaged` by a pattern that does not read credits, and the credit URL then
+     * answered `redelivered` with zero rows in `in`.
+     *
+     * SO AN UNTRIAGED ROW THAT NOTHING WAS OFFERED, OR THAT WAS OFFERED TO ONE NAMED DOOR, IS RUN AGAIN when a
+     * verified arrival brings the same bytes, on the row itself: `UNIQUE (channel, sha256)` still holds, and
+     * the pipeline below writes through the stored row's id instead of beside it. Everything else keeps the
+     * old answer. A row any pattern accepted (`matched`, `review`, `proposed`, `skipped`) is spoken for, a row
+     * a person filed or archived has left the inbox, and an unverified arrival is never offered a pattern, so
+     * it cannot rescue or undo anything.
+     *
+     * UNNAMED MAIL IS NOT RUN AGAIN. It was offered to every mail pattern the first time, so an untriaged mail
+     * with no `UNVERIFIED` on it has had the only answer this record can give it.
+     */
+    const rescue =
+      already !== undefined &&
+      already.state === 'untriaged' &&
+      arrival.verified !== false &&
+      (already.reason === UNVERIFIED || arrival.ingest !== undefined);
+    if (already && !rescue) {
       const receipt = deps.sql.one<{ wrote: string; ingest_id: string }>(
         'SELECT wrote, ingest_id FROM ingest_receipt WHERE raw_id = ?',
         already.id,
@@ -625,7 +652,7 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
       });
     }
 
-    const raw = deps.mint();
+    const raw = already ? already.id : deps.mint();
     /**
      * The arrival a `match:` is a question about, and it holds all seven of `34 §1.9`'s names.
      *
@@ -686,6 +713,13 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
           .find((i) => i.match === undefined || evaluate(i.match, fields, INBOX_RAW));
 
     const store = (state: Arrived['state'], reason: string | null): void => {
+      /* A RESCUE MOVES THE ROW IT FOUND. The bytes are the same by their hash and the first `ts` is when they
+         turned up, so only the verdict changes; an INSERT here would fail on `UNIQUE (channel, sha256)` and roll
+         the whole arrival back. */
+      if (already) {
+        deps.sql.exec('UPDATE inbox_raw SET state = ?, reason = ? WHERE id = ?', state, reason, raw);
+        return;
+      }
       deps.sql.exec(
         'INSERT INTO inbox_raw (id, ts, channel, headers, body, sha256, state, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         raw,
@@ -722,6 +756,12 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
          pattern here recognised this"; untriaged with `UNVERIFIED` on it is "nothing was tried",
          and only the second is answered by fixing the sender's signature rather than the pattern. */
       store('untriaged', unverified ? UNVERIFIED : null);
+      /* A RESCUE THAT FOUND NOTHING IS STILL A REDELIVERY when the row reads as it did, which is the same bytes
+         at a door that does not want them, again. Answered as new, it would observe the shape and queue a draft
+         once per retry, which is the bill the kernel's `redelivered` check exists to stop. A row that loses its
+         `UNVERIFIED` is new in the way that matters: it is the first time a pattern was tried. */
+      if (already && already.reason === null)
+        return ok<Arrived>({ raw, ingest: null, state: 'untriaged', wrote: [], reason: 'this arrived before, and no pattern at this door reads it', redelivered: true });
       return ok<Arrived>({ raw, ingest: null, state: 'untriaged', wrote: [], ...(unverified ? { reason: UNVERIFIED } : {}) });
     }
 

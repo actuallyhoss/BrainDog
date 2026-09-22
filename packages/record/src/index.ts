@@ -54,6 +54,7 @@ import {
   type OutboxKind,
   carryingOf,
   headline,
+  type Decided,
   type GovernRegister,
   type Patch,
   type Proposal,
@@ -1946,8 +1947,50 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * that allocates the number, so a handle is always found; were it not, she is answered an empty id rather than the
    * number.
    */
-  const filedAs = (ctx: CallContext, out: Result<{ id: string }>): Result<{ id: string }> =>
+  const filedAs = <T extends { id: string }>(ctx: CallContext, out: Result<T>): Result<T> =>
     out.ok && !readsEveryList(ctx) ? ok({ ...out.value, id: nameOf(ctx, 'suggestion', out.value.id) ?? '' }) : out;
+
+  /**
+   * Whether an agent's `change` is one the additive rule may answer (DIRECTION §22): an `add`, from a key, about a list
+   * that key reaches. The gate then decides whether its fields are loose enough (`additiveFault`), so this only says who
+   * may be answered by rule at all.
+   *
+   * A KEY AND NOBODY ELSE. The owner's answer was about agents; a person who proposes is asking somebody, and a member at
+   * `propose` answering her own question by rule would be the member at `decide` she was not invited to be.
+   *
+   * AND A LIST THE KEY REACHES. Filing names no register to `guard`, so a key held to Diary may ask about Projects; it
+   * may not change Projects on its own, and its question waits for the owner as it did before.
+   */
+  const byRule = (args: Proposal, ctx: CallContext): boolean => {
+    if (ctx.principal.kind !== 'token' || args?.body_kind !== 'change') return false;
+    const to = (args.body as { to?: unknown })?.to;
+    const add = to !== null && typeof to === 'object' && 'add' in to ? (to as { add: unknown }).add : undefined;
+    if (add === null || typeof add !== 'object') return false;
+    const said = (add as { register?: unknown }).register ?? (args.body as { declaration_id?: unknown }).declaration_id;
+    if (typeof said !== 'string') return false;
+    return guard(ctx, 'propose', said.startsWith('register.') ? said.slice('register.'.length) : said) === null;
+  };
+
+  /**
+   * Answer an agent's addition by rule and land it, or leave it open. `{ landed }` when it is in the list now.
+   *
+   * SIGNED BY WHOEVER FILED IT. The gate signs the decision `rule:additive`, because nobody pressed anything, and the
+   * install is signed by the suggestion's `opened_by`, the same run or name its question went out under, so the
+   * `declare` line reads "agent:claude added domain to Projects" and not the owner's name on a change she never saw.
+   *
+   * ANYTHING THAT WILL NOT LAND STAYS A QUESTION. The gate refuses a required, unique or indexed field before it writes
+   * anything, and an install that is refused afterwards reopens it in `land`, so the proposer's answer is then the
+   * suggestion as filed, with nothing claimed.
+   */
+  const additive = async (id: string): Promise<{ landed?: { declaration: string; version: number } }> => {
+    const by = kernel.governanceRow('suggestion', id)?.opened_by;
+    if (typeof by !== 'string') return {};
+    const out = kernel.decide(id, { rule: 'additive' }, by);
+    if (!out.ok || !out.value.install) return {};
+    const put = await land(out.value, by);
+    const at = put.ok ? put.value.find((d) => d.id === (out.value.install as { id?: unknown }).id) : undefined;
+    return at === undefined ? {} : { landed: { declaration: at.id, version: at.version } };
+  };
 
   /**
    * Why `decide` refuses a person invited to named lists, said as the rule it is.
@@ -1988,6 +2031,54 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const handle = /^SG[1-9][0-9]*$/u.test(spoken) ? nameOf(ctx, 'suggestion', spoken) : null;
     if (handle === null || !('refusal' in out)) return out;
     return { ...out, refusal: { ...out.refusal, fix: out.refusal.fix.replace(new RegExp(`\\b${spoken}\\b`, 'gu'), handle) } };
+  };
+
+  /**
+   * Install what an accepted `pattern` or `change` hands back, and put the question back in the queue if it will not land.
+   *
+   * THE DECLARATION LANDS BEFORE THE ANSWER DOES. If it will not install, the gate's own transaction has already
+   * committed, so the suggestion is reopened rather than left resolved with nothing behind it. One helper, because an
+   * owner's press in `decide` and the additive rule in `propose` must land a change the same way: the rule's install
+   * reopening on a conflict is what keeps "automatic" from meaning "unchecked".
+   */
+  const land = async (decided: Decided, actor: string): Promise<Awaited<ReturnType<typeof kernel.install>>> => {
+    const decl = decided.install as { id?: string; kind?: string; body?: unknown };
+    /* AND A `to` THAT IS NOT A DECLARATION THROWS RATHER THAN REFUSES. d15066d2 stopped one being filed, but a
+       change already in the queue from before it still holds `{ values: [...] }`, and accepting it threw
+       `Cannot read properties of undefined (reading 'writes')` out of `install` before the `reopen` below ran:
+       the owner saw a crash and the record kept the suggestion resolved with nothing installed
+       (`test/decide-install.test.ts`). A throw here is the same answer as a refusal, in the record's words. */
+    /* A `TypeError` AND NOTHING ELSE. The bare `catch` answered every throw with this sentence, so a full disk or a
+       corrupt page told the owner to propose the change again in a shape that was never wrong, and the driver's own
+       message went nowhere (`test/decide-install-throws.test.ts`). Any other throw puts the question back first, so
+       the record is not left resolved with nothing installed, and then surfaces as itself: the host answers it 500
+       with its message. */
+    let put: Awaited<ReturnType<typeof kernel.install>>;
+    try {
+      /* AGAINST THE VERSION THE GATE NAMES, as `setDeclaration` has always installed. Without it the second of two
+         changes drawn from one reading replaced the first whole, and `domain` went with a value still under it
+         (`test/schema-add.test.ts`). A conflict reopens the question below, like any install that will not land. */
+      put = await kernel.install([decl as never], decided.expect, { actor, suggestion: decided.suggestion });
+    } catch (thrown) {
+      if (!(thrown instanceof TypeError)) {
+        kernel.reopen(decided.suggestion);
+        throw thrown;
+      }
+      put = no(
+        'VALUE_MALFORMED',
+        'What this change would install is not a declaration, so nothing was changed and the question is open again. Propose it again as {"id":"register.<id>","kind":"register","body":{...}}.',
+        { at: 'body.to' },
+      );
+    }
+    if (!put.ok) {
+      /* A CONFLICT SAYS WHICH VERSION IT MET, so the question comes back saying why rather than "would not install". */
+      const why =
+        'refusal' in put
+          ? put.refusal.fix
+          : `${String(decl.id)} changed after this was proposed and is at version ${String(put.conflict.version)} now. Propose it again against the list as it is.`;
+      kernel.reopen(decided.suggestion, why);
+    }
+    return put;
   };
 
   /**
@@ -3594,7 +3685,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         }
       }
       /* A TOKEN'S PROPOSAL IS SIGNED BY ITS RUN, as its writes are. */
-      return filedAs(ctx, kernel.propose(args, writerOf(ctx)));
+      const filed = kernel.propose(args, writerOf(ctx));
+      if (!filed.ok || !byRule(args, ctx)) return filedAs(ctx, filed);
+      return tail(filedAs(ctx, ok({ ...filed.value, ...(await additive(filed.value.id)) })));
     },
 
     /**
@@ -3652,47 +3745,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return tail(settledAs(ctx, args.id, ok({ ...decided, applied: applied.value })));
       }
       if (!out.ok || !out.value.install) return tail(settledAs(ctx, args.id, out));
-
-      /* THE DECLARATION LANDS BEFORE THE ANSWER DOES. If it will not install, the gate's own
-         transaction has already committed — so the suggestion is reopened rather than left resolved
-         with nothing behind it. */
-      const decl = out.value.install as { id?: string; kind?: string; body?: unknown };
-      /* AND A `to` THAT IS NOT A DECLARATION THROWS RATHER THAN REFUSES. d15066d2 stopped one being filed, but a
-         change already in the queue from before it still holds `{ values: [...] }`, and accepting it threw
-         `Cannot read properties of undefined (reading 'writes')` out of `install` before the `reopen` below ran:
-         the owner saw a crash and the record kept the suggestion resolved with nothing installed
-         (`test/decide-install.test.ts`). A throw here is the same answer as a refusal, in the record's words. */
-      /* A `TypeError` AND NOTHING ELSE. The bare `catch` answered every throw with this sentence, so a full disk or a
-         corrupt page told the owner to propose the change again in a shape that was never wrong, and the driver's own
-         message went nowhere (`test/decide-install-throws.test.ts`). Any other throw puts the question back first, so
-         the record is not left resolved with nothing installed, and then surfaces as itself: the host answers it 500
-         with its message. */
-      let put: Awaited<ReturnType<typeof kernel.install>>;
-      try {
-        /* AGAINST THE VERSION THE GATE NAMES, as `setDeclaration` has always installed. Without it the second of two
-           changes drawn from one reading replaced the first whole, and `domain` went with a value still under it
-           (`test/schema-add.test.ts`). A conflict reopens the question below, like any install that will not land. */
-        put = await kernel.install([decl as never], out.value.expect, { actor: actorOf(ctx), suggestion: out.value.suggestion });
-      } catch (thrown) {
-        if (!(thrown instanceof TypeError)) {
-          kernel.reopen(out.value.suggestion);
-          throw thrown;
-        }
-        put = no(
-          'VALUE_MALFORMED',
-          'What this change would install is not a declaration, so nothing was changed and the question is open again. Propose it again as {"id":"register.<id>","kind":"register","body":{...}}.',
-          { at: 'body.to' },
-        );
-      }
-      if (!put.ok) {
-        /* A CONFLICT SAYS WHICH VERSION IT MET, so the question comes back saying why rather than "would not install". */
-        const why =
-          'refusal' in put
-            ? put.refusal.fix
-            : `${String(decl.id)} changed after this was proposed and is at version ${String(put.conflict.version)} now. Propose it again against the list as it is.`;
-        kernel.reopen(out.value.suggestion, why);
-        return tail(put);
-      }
+      const put = await land(out.value, actorOf(ctx));
+      if (!put.ok) return tail(put);
       return tail(settledAs(ctx, args.id, out));
     },
 

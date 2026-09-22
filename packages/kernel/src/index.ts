@@ -127,11 +127,26 @@ import {
   type DigestDecl,
   type DigestDeps,
 } from './digest.ts';
-import { CREATE_CEILING, applyRule, dryRun, marker, runRules, type Applied as RuleApplied, type DryRun, type RuleDecl, type RulesDeps } from './rules.ts';
+import { CREATE_CEILING, applyRule, dryRun, marker, runRules, type Applied as RuleApplied, type DryRun, type FlowDecl, type RuleDecl, type RulesDeps } from './rules.ts';
+import {
+  advance as advanceRun,
+  cancelRun,
+  clockKey,
+  firstDue,
+  installed as installedFlows,
+  onArrival,
+  onClock,
+  onWritten,
+  pruneRuns,
+  startRun,
+  type FlowDeps,
+} from './flow.ts';
+import { pathOf, subjectOf, triggerOf } from './flow-lint.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
 import { arrive, day, exponentOf, propose, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps, type NumberReaders } from './ingest.ts';
 import { analyse, observe, type Analysis, type Observation } from './observe.ts';
 import { applyPull, firePull, type PullDecl, type PullDeps } from './pull.ts';
+import { activeScript, egressChanged, fireScript, firstDueMs, scriptDeps } from './script.ts';
 import { applyPage, writePoints, type MetricPoint, type PageWrote, type PulledPage } from './fetched.ts';
 import { extractPull, type ExtractDecl, type ExtractDeps, type Extraction } from './extract.ts';
 import {
@@ -284,6 +299,7 @@ export { MAP_TYPES, mapField, select, type MapDeps, type Mapped, type Mapping } 
 export type { ExtractDecl, ExtractDeps } from './extract.ts';
 export type { MetricPoint, PageWrote, PulledPage, PulledRow } from './fetched.ts';
 export type { Fired as PullFired, PullDecl, PullDeps } from './pull.ts';
+export { egressChanged } from './script.ts';
 export { ACTION_KINDS, ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, KEYS_REACH_ALL, RULE_CALLS_PER_DAY, actionJitterMs, answerHash, approvalLines, egressOf, originsOf, reserveFor } from './actions.ts';
 export type {
   ActionAnswer, ActionDecl, ActionKind, ActionRequest, ActionRow, ActionsRun, CallQueued, Egress, Execute,
@@ -1235,6 +1251,20 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          read. Its one scheduled turn finds nothing to send and marks it done. */
       else if (decl.kind === 'ingest' && body.channel === 'call' && body.trigger === 'rule')
         arm('call', bare, { ingest: bare }, clock.now());
+      /* A SCRIPT IS ARMED ON ITS OWN CLOCK (`script.ts`). One only a door or a rule starts still gets its row, which
+         pausing and the list read, and its one turn ends it. */
+      if (decl.kind === 'script') {
+        const every = (body.runs as { every?: unknown } | undefined)?.every;
+        arm('script', bare, { script: bare }, firstDueMs(recordIdentity(sql)?.id ?? 'self', bare, typeof every === 'string' ? every : null, clock.now()));
+      }
+
+      /* AN AUTOMATION ON A CLOCK IS ARMED AS A CONNECTOR IS, and one interval out rather than now: a connector's first
+         fetch proves its key, and an automation's first run proves nothing a person asked for at the moment of
+         install. It is a `rule` row keyed `flow.every:<id>`, which `0011_automation_run.ts` says the reason for. */
+      if (decl.kind === 'rule' && pathOf(body as FlowDecl) === 'run' && triggerOf(body as FlowDecl) === 'every') {
+        const at = firstDue(body as FlowDecl, clock.now(), tz);
+        if (at !== null) arm('rule', clockKey(bare), { every: bare }, at);
+      }
 
       /* A METRIC WITH `snapshot:` REMEMBERS ITS OWN READINGS. Five past midnight, so the day it is
          about is finished and nothing else is competing for the alarm. */
@@ -1390,6 +1420,20 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
             ? source.slice('register.'.length)
             : undefined;
       const where = decl.kind === 'rule' ? body.when : decl.kind === 'metric' ? body.where : undefined;
+
+      /* AN AUTOMATION KEEPS ITS REGISTER IN `on.written`, and its `when:` is read by the runner against that register's
+         rows. This check keyed on the top-level `register:` alone, so `when: 'due is before today'` over a day field,
+         which an inline rule is refused for with VALUE_MALFORMED, installed on `on: { written: … }` and then started no
+         run on any write, because `flow.ts`'s `holds` answers false for a condition it cannot read. The register's
+         own existence stays the lint's to say, so an unknown one is skipped here rather than refused twice. */
+      if (decl.kind === 'rule' && typeof register !== 'string' && where !== undefined) {
+        const subject = subjectOf(body as FlowDecl);
+        const schema = subject === null ? null : shape(subject);
+        if (schema) {
+          const bad = unreadWhere(decl.id, where, schema, batch);
+          if (bad) return bad;
+        }
+      }
       if (typeof register !== 'string') continue;
 
       const schema = shape(register);
@@ -1773,6 +1817,12 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * facts about the declaration, so both belong here rather than at the thousandth row.
    */
   function undeclarable(id: string, rule: RuleDecl, shape: (register: string) => Schema | null): Refusal | null {
+    /* A `steps:` BODY IS THE AUTOMATION LINT'S, WHOLE. This function is reached only for a body with a top-level
+       `register:`, and for one with `steps:` it answered first with "does not say what it would then do": a sentence
+       about `then:`, which that body was right to leave out, in front of `flow-lint.ts`'s sentence about the
+       `register:` it should move into `on:`. Every check below is about `then:`, and the lint walks `steps:` itself. */
+    if ((rule as { steps?: unknown }).steps !== undefined) return null;
+
     /* A RULE WITH NO `then` DOES NOTHING, and the pass then read `.some` of `undefined` and threw
        the TRIGGERING WRITE out of the record — across a boundary this package promises nothing
        throws over. Refused where a sentence fits. */
@@ -2778,7 +2828,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           to: Object.fromEntries(Object.entries(merged).map(([k, v]) => [k, shown(register, k, v) ?? null])) as Json,
           ...(w.opId === undefined ? {} : { opId: w.opId }),
         });
-        return ok(rules(entry, register, w, batch));
+        return ok(rules(entry, register, w, batch, { op: 'create', changed: Object.keys(merged) }));
       }
 
       sql.exec(
@@ -2860,7 +2910,12 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         if (batch === '') write(first, null, undefined, undefined);
       }
 
-      return ok(rules(entry, register, w, batch));
+      return ok(
+        rules(entry, register, w, batch, {
+          op: first === 'delete' ? 'delete' : 'update',
+          changed: touched.filter((key) => JSON.stringify(current.fields[key] ?? null) !== JSON.stringify(merged[key] ?? null)),
+        }),
+      );
     });
   }
 
@@ -3027,9 +3082,26 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     };
   }
 
-  function rules(entry: Entry, register: string, w: WriteContext, batch: string): Entry {
-    if (w.cascade === false) return entry;
+  function rules(
+    entry: Entry,
+    register: string,
+    w: WriteContext,
+    batch: string,
+    change: { op: 'create' | 'update' | 'delete'; changed: readonly string[] },
+  ): Entry {
+    const byRule = w.actor.startsWith('rule:');
+    if (w.cascade === false && !byRule) return entry;
     if (!sql.one("SELECT 1 AS x FROM declaration WHERE kind = 'rule' AND superseded_at IS NULL AND retired = 0")) return entry;
+
+    /* AUTOMATIONS FIRST, AND BEFORE THE CASCADE CHECK. A rule's own write carries `cascade: false`, which is what keeps
+       the inline pass one step; an automation that says `from_rules: true` asked to see exactly those writes, so it is
+       offered them here, at the depth of the run that wrote plus one. Nothing runs yet: `onWritten` records the run
+       and arms it, inside this write's transaction, and the drain takes its steps. */
+    const flows = installedFlows(sql);
+    if (flows.length > 0)
+      onWritten(flowDeps(), flows, { entry, register, ...change, byRule, depth: byRule ? flowDepth + 1 : 0, actor: w.actor });
+    if (w.cascade === false) return entry;
+
     runRules(rulesDeps(), { entry, register, batch, actor: w.actor });
     /* The row as the rules left it. A caller that wrote `state: open` and got back a row a rule
        moved to `late` is being told the truth about what is in the record. */
@@ -3557,6 +3629,44 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     nowMs: clock.now(),
   });
 
+  /**
+   * The depth of the automation run whose steps are being taken right now, or 0 when none is.
+   *
+   * THE WRITE PATH CANNOT BE TOLD IT DIRECTLY, because a step's write goes through `runRules` and the write context it
+   * builds has an actor and a batch and nothing else. Steps are taken synchronously inside one drain turn, so the run
+   * being advanced is the only run that can be writing, and a write by `rule:*` while this is 2 was made at depth 2.
+   */
+  let flowDepth = 0;
+
+  /** What the automation runner reads and writes through: the rule pass's own dependencies, and a row's project. */
+  const flowDeps = (): FlowDeps => ({
+    sql,
+    mint,
+    nowMs: clock.now(),
+    rules: rulesDeps,
+    entry: (id) => byId(id),
+    schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null),
+    note: (actor, text) => noteEvent(sql, mint, clock.now(), actor, text),
+    projectOf: (entry) => {
+      const f = scopeFieldOf(registers.get(entry.register)?.fields ?? []);
+      const value = f ? entry.fields[f.id] : undefined;
+      return typeof value === 'string' && value !== '' ? value : null;
+    },
+    tz: recordIdentity(sql)?.tz ?? 'UTC',
+  });
+
+  /** Take a run's steps with its depth set, so a write it makes starts a chained run one deeper. */
+  const advanceAt = (run: string): number | null => {
+    const depth = sql.one<{ depth: number }>('SELECT depth FROM automation_run WHERE id = ?', run)?.depth ?? 0;
+    const was = flowDepth;
+    flowDepth = depth;
+    try {
+      return advanceRun(flowDeps(), run);
+    } finally {
+      flowDepth = was;
+    }
+  };
+
   /** The weekly look at what the record has noticed. One draft at most, and the governors first. */
   const analyseNow = (): Analysis =>
     analyse({
@@ -3643,6 +3753,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     return row ? (JSON.parse(row.body) as PullDecl) : null;
   };
 
+  /** The active body of a script, or `null` when there is none: what its egress was approved as. */
+  const scriptDecl = (script: string): unknown => {
+    const row = sql.one<{ body: string }>(
+      "SELECT body FROM declaration WHERE id = ? AND kind = 'script' AND superseded_at IS NULL AND retired = 0",
+      `script.${script}`,
+    );
+    return row ? (JSON.parse(row.body) as unknown) : null;
+  };
+
   /** The active declaration a scheduled action runs from, and its pack, or `null` when it is retired or its pack is off. */
   const actionDecl = (ingest: string): { decl: ActionDecl; pack: string | null } | null => {
     const row = sql.one<{ body: string; pack_id: string | null }>(
@@ -3703,14 +3822,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const fault = unreadable(batch) ?? lintBatch(sql, batch) ?? contradicted(batch) ?? stranded(batch);
       if (fault) return { ok: false as const, refusal: fault };
       const egress = batch.flatMap((d) => {
-        const out = d.kind === 'ingest' ? egressOf(d.body, titleOfRow) : null;
+        /* A SCRIPT CALLS OUT AS AN ACTION DOES, and its line is how the owner sees where it fetches and with which key. */
+        const out = d.kind === 'ingest' || d.kind === 'script' ? egressOf(d.body, titleOfRow) : null;
         return out === null ? [] : [out];
       });
       if (egress.length === 0) return ok(null);
       const changed = egress.filter((e) => {
-        const was = actionDecl(e.ingest);
-        const before = was === null ? null : egressOf(was.decl);
-        return before === null || before.host !== e.host || before.key !== e.key || before.sends.join('\n') !== e.sends.join('\n');
+        const was = e.channel === 'script' ? scriptDecl(e.ingest) : (actionDecl(e.ingest)?.decl ?? null);
+        const before = was === null ? null : egressOf(was);
+        return before === null || egressChanged(before, e);
       });
       if (changed.length === 0) return ok(null);
       return ok({ egress: changed, approve: approvalLines(changed) });
@@ -3862,6 +3982,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /* A DEVICE GRANT past its time, or silent for fourteen days, is let go in the same hour. */
     transaction(() => deviceSweep(tokenDeps()));
     rulesAboutTime();
+    /* A FINISHED AUTOMATION RUN IS KEPT NINETY DAYS, and its metered event after that: one line per run, as §4.5 asks.
+       Here and not in the `purge` handler alone, because this is the one function both the hourly row and `purge()` by
+       hand run; the first cut put it in the handler, and a sweep by hand left every old run in place. */
+    transaction(() => pruneRuns(sql, clock.now()));
     return { ...out, sessions };
   }
 
@@ -4119,6 +4243,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
        declaration that is gone, or whose pack is off, ends the row, and a key that is gone pauses it. */
     call: (row) => fireAction(actionDeps(), row),
     poll: (row) => fireAction(actionDeps(), row),
+    /* A scheduled `script`: one `script.run` outbox row for a host to run in a sandbox, and the next run armed. */
+    script: (row) => fireScript(scriptDeps(sql, { recordId: recordIdentity(sql)?.id ?? 'self', nowMs: clock.now(), mint }), row, activeScript(sql, row.key)),
 
     /* A credential due for rotation. It says the id and the kind and never the label — a
        notification naming "Stripe, live" tells whoever can see it which one is worth taking. */
@@ -4133,7 +4259,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * grammar has always had a shape for.
      */
     rule: (row) => {
-      const p = JSON.parse(row.payload) as { entry?: string; register?: string; rule?: string; note?: string };
+      const p = JSON.parse(row.payload) as { entry?: string; register?: string; rule?: string; note?: string; run?: string; every?: string };
+      /* AN AUTOMATION'S TWO ROWS COME THROUGH THIS DOOR, told apart by the payload as `snapshot`'s two are. A run due
+         now or waking from a wait answers its next wake or `null`; a clock answers its next turn. */
+      if (typeof p.run === 'string') return advanceAt(p.run);
+      if (typeof p.every === 'string') return onClock(flowDeps(), p.every, row.due_at);
       const entry = p.entry ? byId(p.entry) : null;
       /* THE ROW MOVED ON. Same rule as a reminder whose row was deleted: the thing it is about is not
          true any more, and firing it anyway is the failure the derived-schedule design exists to
@@ -4466,6 +4596,22 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           );
         });
       }
+      /* AN AUTOMATION ON ARRIVALS IS STARTED HERE, after the arrival committed and in a transaction of its own, for the
+         reason `3′` above gives: the bytes are the record's memory, and nothing an automation does may roll them
+         back. Every state starts one, matched or not, and a redelivery starts none (`onArrival`). */
+      if (out.ok && !out.value.redelivered) {
+        const flows = installedFlows(sql);
+        if (flows.some((f) => triggerOf(f.body) === 'arrival'))
+          transaction(() =>
+            onArrival(flowDeps(), flows, {
+              raw: out.value.raw,
+              channel: arrival.channel,
+              ingest: out.value.ingest,
+              state: out.value.state,
+              wrote: out.value.wrote,
+            }),
+          );
+      }
       return out;
     },
 
@@ -4660,7 +4806,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       approvalLines(
         sql
           .all<{ body: string }>(
-            "SELECT body FROM declaration WHERE coalesce(pack_id, json_extract(body, '$.pack')) = ? AND kind = 'ingest' AND superseded_at IS NULL AND retired = 1 ORDER BY id",
+            "SELECT body FROM declaration WHERE coalesce(pack_id, json_extract(body, '$.pack')) = ? AND kind IN ('ingest', 'script') AND superseded_at IS NULL AND retired = 1 ORDER BY id",
             id,
           )
           .flatMap((r) => {
@@ -5899,7 +6045,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         /* KEPT FOR A REINSTALL: the settings chosen for it and its pending schedules, as they are now (`pack_removed`). */
         const version = sql.one<{ version: string }>('SELECT version FROM pack WHERE id = ?', id)?.version;
         const pending = sql.all<{ kind: string; key: string; due_at: string; payload: string; state: string; attempts: number }>(
-          `SELECT kind, key, due_at, payload, state, attempts FROM schedule WHERE state IN ('pending', 'paused') AND kind IN ('digest', 'pull', 'call', 'poll', 'snapshot')
+          `SELECT kind, key, due_at, payload, state, attempts FROM schedule WHERE state IN ('pending', 'paused') AND kind IN ('digest', 'pull', 'call', 'poll', 'snapshot', 'script')
            AND key IN (SELECT substr(id, instr(id, '.') + 1) FROM declaration WHERE pack_id = ?) ORDER BY kind, key`,
           id,
         );
@@ -5923,7 +6069,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         /* ITS SCHEDULE ROWS GO WITH IT. A digest for a page nobody has any more is a notification
            about nothing, arriving every Monday for ever. */
         sql.exec(
-          `DELETE FROM schedule WHERE state IN ('pending', 'paused') AND kind IN ('digest', 'pull', 'call', 'poll', 'snapshot')
+          `DELETE FROM schedule WHERE state IN ('pending', 'paused') AND kind IN ('digest', 'pull', 'call', 'poll', 'snapshot', 'script')
            AND key IN (SELECT substr(id, instr(id, '.') + 1) FROM declaration WHERE pack_id = ?)`,
           id,
         );
@@ -5957,6 +6103,26 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     update: (register: string, ref: string, patch: Patch, w: WriteContext) => write(register, ref, patch, w),
     /* Four arguments and no fifth: a `Door` is the kernel's own to open. */
     write: (register: string, ref: string | null, patch: Patch, w: WriteContext) => write(register, ref, patch, w),
+
+    /**
+     * Run an automation now: the canvas's button, and the `manual` trigger's only door (§4.1).
+     *
+     * ONLY A RULE THAT SAYS `on: { manual: true }`. A button on a clock rule would be a second clock nobody declared,
+     * and one on a write rule would be a run with no row to be about. The run is armed for now and its steps are taken
+     * by the next drain, as every other trigger's are. Who may press it is the host's to decide (Brief D).
+     */
+    automationRun: (rule: string, actor: string): Result<{ run: string }> =>
+      transaction(() => {
+        const id = rule.startsWith('rule.') ? rule.slice('rule.'.length) : rule;
+        const found = installedFlows(sql).find((r) => r.id === id);
+        if (!found) return no<{ run: string }>('DECLARATION_UNKNOWN', `There is no automation called rule.${id}.`, { at: 'rule' });
+        if (triggerOf(found.body) !== 'manual')
+          return no<{ run: string }>('DECLARATION_INVALID', `rule.${id} is started by ${triggerOf(found.body)}, not by a button. Give it on: { manual: true }.`, { at: 'on' });
+        return startRun(flowDeps(), found, { kind: 'manual' }, { actor });
+      }),
+
+    /** Stop a run that has not finished. A run cancelled while it waits does not resume. */
+    cancelRun: (run: string, actor: string) => transaction(() => cancelRun(flowDeps(), run, actor)),
   };
   return kernel;
 }

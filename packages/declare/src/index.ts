@@ -26,14 +26,14 @@
 import type { Conflict, Refusal, Result } from '@braindog/ports';
 import { no, ok, refused } from '@braindog/ports';
 import { credentialKey as credential, credentialValue, NESTED_MOST, nestedPast } from './credentials.ts';
-import { KINDS, approvalLines, configReads, configValue, digest, egressOf as egressOfBody, fillConfig, jcs, readConfig, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
+import { KINDS, approvalLines, configReads, configValue, digest, egressChanged, egressOf as egressOfBody, fillConfig, jcs, readConfig, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
 
 /**
  * What one declaration sends out of the record, or `null` when it sends nothing: every host, how often, the key by label
  * and the fields. The same reading the record stores on a proposal, so a plan and a proposal print the same lines.
  */
 export const egressOf = (decl: { kind: string; body: unknown }, nameOf?: (project: string) => string | null): Egress | null =>
-  decl.kind === 'ingest' ? egressOfBody(decl.body, nameOf) : null;
+  decl.kind === 'ingest' || decl.kind === 'script' ? egressOfBody(decl.body, nameOf) : null;
 export type { Egress };
 
 /* A use case: a pack with a front, its modules, signals and voice (`loop/research-spark.md` §2.1). */
@@ -1753,7 +1753,7 @@ const callsOf = (pack: Pack, installed: Installed): Diff['calls_out'] =>
     const change: 'new' | 'changed' | 'same' =
       was === undefined || before === null
         ? 'new'
-        : before.host !== e.host || before.key !== e.key || before.sends.join('\n') !== e.sends.join('\n')
+        : egressChanged(before, e)
           ? 'changed'
           : 'same';
     return [

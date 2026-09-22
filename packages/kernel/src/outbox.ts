@@ -24,7 +24,11 @@ import { no, ok } from '@braindog/ports';
 
 import { actionJitterMs } from './actions.ts';
 
-/** The nine the DDL's `CHECK` admits. A tenth is a migration, which is the point of the check. */
+/**
+ * What the DDL's `CHECK` admits. Another is a migration, which is the point of the check.
+ *
+ * `script.run` IS MIGRATION 12'S: one run of a `script` declaration, leased by a host that runs it in a sandbox.
+ */
 export const OUTBOX_KINDS = [
   'notify.email',
   'notify.push',
@@ -35,6 +39,7 @@ export const OUTBOX_KINDS = [
   'infer.embed',
   'infer.prose',
   'infer.draft',
+  'script.run',
 ] as const;
 
 export type OutboxKind = (typeof OUTBOX_KINDS)[number];

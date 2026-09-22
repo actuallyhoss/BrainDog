@@ -537,6 +537,43 @@ function addTo(sql: Sql, to: { add: unknown }, named: unknown): Result<{ to: Rec
   return ok({ to: { id, kind: 'register', body: { ...was, fields } }, version: live.version });
 }
 
+/** Who answers a question the additive rule settles: `decision.decided_by`, and the actor on its `decide` and `resolve`. */
+export const ADDITIVE_RULE = 'rule:additive';
+
+/**
+ * The keys that make an added field something other than loose metadata: it asks every writer for a value, it refuses
+ * a value another row holds, or it builds an index. `search` is the full-text index, so it counts as one.
+ */
+const HELD_KEYS = ['required', 'required_when', 'unique', 'index', 'search'] as const;
+
+/**
+ * Why a change cannot land by the additive rule, or `null` when it can.
+ *
+ * THE OWNER'S ANSWER OF SEPTEMBER 22ND (DIRECTION §22): an agent's purely additive, optional field lands at once and is
+ * logged, and removing, retyping, requiring or narrowing still waits for his press. `addTo` already makes an `add`
+ * additive by construction (no field it names may exist, and values are only appended), so what is left to hold back is
+ * a field that constrains the rows: `required` refuses every writer who does not know the new field, `unique` and
+ * `index` build on the table, and all three are what "loop/research-shell-schema.md" put outside the narrow rule.
+ *
+ * A KEY SET TO `false` IS NOT A CONSTRAINT, so `required: false` still lands; any other value holds it back, because
+ * the install's lint is the one that decides what `required: "yes"` means, and it should do so with the owner watching.
+ */
+export function additiveFault(body: Record<string, unknown> | null): string | null {
+  if (!body || !isAdd(body.to)) return 'Only an addition lands by rule. A whole list is proposed, and waits for the owner.';
+  const add = body.to.add;
+  if (!isMap(add)) return 'The addition cannot be read.';
+  /* AN EGRESS LINE IS SOMETHING SENT OUT, and what leaves the record is the owner's to approve whatever the shape. */
+  if (Array.isArray(body.egress) && body.egress.length > 0) return 'It sends something out, and that waits for the owner.';
+  for (const f of (Array.isArray(add.fields) ? add.fields : []) as Record<string, unknown>[]) {
+    const held = HELD_KEYS.find((k) => isMap(f) && f[k] !== undefined && f[k] !== false);
+    if (held !== undefined) return `${String(f?.id)} is ${held === 'required_when' ? 'required sometimes' : held === 'search' ? 'searched' : held}, and that waits for the owner.`;
+  }
+  return null;
+}
+
+/** What the decision says when the rule answered, in the words the owner reads it by in Decide. */
+const ADDITIVE_REASON = 'It only adds optional fields or values, and those land without a press. Taking away, retyping or requiring anything still asks.';
+
 /**
  * A `change` is about the declaration it names: `to` is that declaration, or a bundle that holds it.
  *
@@ -1093,7 +1130,12 @@ export type Verdict =
    */
   | { decide: { option: string; reason: string; rows?: number[] } }
   | { defer: { until: string; why: string } }
-  | { resolved_as: 'wont-fix' | 'incorrect'; reason?: string };
+  | { resolved_as: 'wont-fix' | 'incorrect'; reason?: string }
+  /**
+   * Accepted by the additive rule and not by a person: only a `change` that `additiveFault` passes, answered as
+   * `ADDITIVE_RULE` whatever `actor` says. The record sends it on an agent's own `propose`, and never from `decide`.
+   */
+  | { rule: 'additive' };
 
 /**
  * The gate.
@@ -1141,6 +1183,20 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
       at: 'status',
       allowed: ['open'],
     });
+
+  /* THE RULE IS CHECKED HERE, NOT ONLY WHERE IT IS SENT. The gate is the one place every acceptance passes, so a caller
+     that sent `rule` for a required field would otherwise have a person's accept without a person. Past this it is an
+     ordinary accept, with every check an accept runs (`resolveTo`, `namesFault`, `fits`), signed by the rule. The
+     resolution stays `addressed` because that is what `reopen` and the feed read as "accepted", and an install that
+     will not land must come back to the queue exactly as a pressed one does. */
+  if ('rule' in verdict) {
+    if (verdict.rule !== 'additive')
+      return no<Decided>('ENUM_VALUE_UNKNOWN', `${String(verdict.rule)} is not a rule that answers questions.`, { at: 'rule', allowed: ['additive'] });
+    const why = row.body_kind === 'change' ? additiveFault(parse(row.body)) : `A ${row.body_kind} is never answered by rule.`;
+    if (why !== null) return no<Decided>('TRANSITION_ILLEGAL', `${id} waits for the owner. ${why}`, { at: 'rule' });
+    verdict = { decide: { option: 'accept', reason: ADDITIVE_REASON } };
+    actor = ADDITIVE_RULE;
+  }
 
   /* NO IS AN ANSWER AND IS RECORDED AS ONE. `incorrect` also feeds the brake: a class of proposal
      that keeps being wrong stops being proposed, and it can only learn that from being told. */

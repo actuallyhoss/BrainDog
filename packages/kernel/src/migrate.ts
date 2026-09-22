@@ -24,6 +24,8 @@ import view0007 from './migrations/0007_view.ts';
 import arrange0008 from './migrations/0008_arrange.ts';
 import pref0009 from './migrations/0009_pref.ts';
 import grantSealedUnder0010 from './migrations/0010_grant_sealed_under.ts';
+import automationRun0011 from './migrations/0011_automation_run.ts';
+import script0012 from './migrations/0012_script.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -39,6 +41,8 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 8, slug: 'arrange', sql: arrange0008 },
   { version: 9, slug: 'pref', sql: pref0009 },
   { version: 10, slug: 'grant_sealed_under', sql: grantSealedUnder0010 },
+  { version: 11, slug: 'automation_run', sql: automationRun0011 },
+  { version: 12, slug: 'script', sql: script0012 },
 ];
 
 /**

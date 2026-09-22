@@ -507,8 +507,9 @@ predicate against the real rows and writes nothing.
 ## 6.2 · A rule with a trigger and steps is an automation
 
 *(Added September 22nd 2026 for [DIRECTION §22](../loop/DIRECTION.md)'s automations layer. The design is
-`loop/research-shell-automations.md` §2 to §4; this section is what the lint holds today. The runner, its tables and
-the steps that wait are later work, and nothing below says they exist.)*
+`loop/research-shell-automations.md` §2 to §4; this section is what the lint holds and what the runner does. The steps
+that wait on somebody else, a call, a script, Spark or a person, are later work, and the section says where a run
+meets one.)*
 
 **Not a ninth kind.** [04-PACKS](04-PACKS.md) closes the list at eight, so an automation is a `rule` body that has
 grown two keys: `on:`, what starts it, and `steps:`, what it does. A rule with neither is an automation whose trigger
@@ -520,7 +521,7 @@ rule: gold_rate
 on: { every: 1h }                         # or written, arrival, metric, manual
 steps:
   - call: { ingest: gold_price, as: price }
-  - if: "price > 3000"                    # a condition over the run's answers
+  - if: { field: price, gt: 3000 }       # a condition over the run's answers
     then:
       - notify: { say: "Gold is at {{vars.price}}" }
 ```
@@ -556,13 +557,65 @@ steps:
 A `create` inside a branch meets the same bound and the same foreign-register check as one in `then:`, because the
 lint walks every action wherever it sits.
 
-**One older shape is let through.** Some rules carry `on: create` as a word. Nothing ever read it: the pass fired
-those rules on every write. They lint as they did and answer `inline`.
+**One older shape is let through, and only one.** Some rules carry `on: create` as a word. Nothing ever read it:
+the pass fired those rules on every write. They lint as they did and answer `inline`. `create` is the only word any
+rule in the seed, the packs, the docs or the fixtures carried, so any other word is refused with a sentence:
+`on: hourly` used to install as an inline rule that fired on every write of its register, and is now told to write
+`on: { every: 1h }`.
 
-**What installs and does not yet run.** A body on the run path installs, and no runner executes it until the runner
-lands. A `script` step is checked for shape only, because `script.<id>` is the scripts brief's declaration. One thing
-still refuses a body this section accepts: the kernel's own install check requires a non-empty `then:`, so a
-`steps:`-only rule is refused at install until that check learns about `steps:`.
+An arrival trigger with a `when:` is refused as `NOT_IN_THIS_BUILD`: the runner does not read one, and a filter that
+filters nothing is worse than none. A `script` step is checked for shape only, because `script.<id>` is the scripts
+brief's declaration.
+
+### What the runner does
+
+`packages/kernel/src/flow.ts`, over two tables from kernel migration 11, `automation_run` and `automation_step`.
+
+**A run is a row, and so is each step it took.** The run pins the declaration's version for its life, so a run that
+waits a day while somebody edits the rule finishes the steps it started with. Its steps are flattened into one list,
+with a branch as a jump, and the run row holds the index of the next one; a step row is keyed by that index. Nothing
+is held in memory between two steps, so a restart in the middle of a wait loses nothing.
+
+**Each trigger only records that a run is due.** The run is inserted `pending` and its schedule row armed for now, in
+the transaction of whatever started it, and the next drain takes its steps.
+
+| Trigger | Where it is noticed | What it reads |
+|---|---|---|
+| `written` | the write path, beside the inline pass | `op:`, `fields:` (which fields this write changed), `project:` (the row's scope field), `when:`, and `once_per:`, claimed when the run starts with the marker an inline rule uses |
+| `arrival` | after `arrive` has committed, in a transaction of its own | `ingest:`, `channel:`, `state:`; never a redelivery. The run's row is the first row the arrival wrote |
+| `every` | a `rule` schedule row keyed `flow.every:<id>`, armed at install one interval out, or at the next `at:` | taken at once when the row fires; the next turn counts from when this one was due, so an hourly rule stays on its hour |
+| `manual` | `automationRun(rule, actor)` on the kernel | only a rule that says `on: { manual: true }` |
+
+`metric` is linted and not yet noticed anywhere; it belongs with the steps that wait.
+
+**A write made by a rule starts nothing,** unless the trigger says `from_rules: true`. Then the run carries the
+writer's depth plus one, and a fourth level is not started. Rules have never chained; a chain is a thing somebody asks
+for in writing.
+
+**The steps.**
+
+| Step | What the runner does |
+|---|---|
+| any action of the table above | one step through the inline pass, against the run's row, with the rule's own name as the actor: the write path, the transitions and `create`'s bound apply as they do to an inline rule. On a run with no row, `notify` writes a note (or interrupts, when `urgent`), `suggest` opens a question, and the row verbs fail the run |
+| `set_var` | fills `{{vars.…}}` and `{{trigger.…}}` into `to:` and keeps the answer; one answer holds 4 KB, all of them 64 KB |
+| `if` | reads the condition with the sentence builder over the run's row and its answers together; a field of the row wins over an answer of the same name |
+| `wait` | parks the run on its own schedule row and resumes it when the span has passed |
+| `call`, `script`, `ask_spark`, `ask_person` | fail the run there, with a sentence saying the step is not in this build; the steps before it stand |
+
+`{{vars.<name>}}` and `{{trigger.<path>}}` are filled in every string of a step before the row's own `{{field}}`s are.
+`trigger` carries the kind, the row's fields as `row`, the arrival's `channel` and `ingest`, and for an arrival its
+body, parsed when it is JSON.
+
+**Ceilings.** `limits.runs_per_day` (at most 1,000) is counted over the last twenty-four hours, and a run past it is
+refused with a sentence and not started. A rule with `enabled: false` starts no runs.
+
+**What is kept, and what is counted.** A finished run is kept ninety days and pruned by the hourly sweep. Every run
+that ends writes one `pull` event with actor `rule:<id>`, the same shape a scheduled action's run writes, so the ledger
+that counts scheduled actions counts automations beside them: a failed or cancelled run is free, as a failed action is.
+A run can be cancelled while it waits, and its wake is dropped with it.
+
+**Not yet.** Runs are `local`: they do not travel in a `.brain` file, and carrying them means a format revision. A
+`call`'s answer, Spark's answer and a person's decision do not resume a run yet.
 
 ---
 

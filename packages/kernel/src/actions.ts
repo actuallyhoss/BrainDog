@@ -1129,8 +1129,9 @@ export const RULE_CALLS_PER_DAY = 100;
  * `calls_out`, and a proposal that adds or changes an action carries it as the lines approving it would arm.
  */
 export type Egress = {
+  /** The action's ingest id, or a script's own id: the name the line is about. */
   ingest: string;
-  channel: ActionKind;
+  channel: ActionKind | 'script';
   method: 'GET' | 'POST';
   host: string | null;
   /** The interval it runs on, or `null` for a call only a rule runs. */
@@ -1183,6 +1184,7 @@ const joinedList = (items: readonly string[]): string =>
  */
 export function egressOf(body: unknown, nameOf?: (project: string) => string | null): Egress | null {
   if (body === null || typeof body !== 'object' || Array.isArray(body)) return null;
+  if (typeof (body as { script?: unknown }).script === 'string') return scriptEgress(body as ScriptHeader);
   const d = body as Partial<ActionDecl> & { ingest?: unknown; channel?: unknown; every?: unknown; project?: unknown };
   const channel = d.channel;
   if (typeof channel !== 'string' || !(ACTION_KINDS as readonly string[]).includes(channel)) return null;
@@ -1218,6 +1220,58 @@ export function egressOf(body: unknown, nameOf?: (project: string) => string | n
       : null;
 
   return { ingest, channel: channel as ActionKind, method: channel === 'call' ? 'POST' : 'GET', host, every, trigger, per_day: perDay, key, paged: pages(d as ActionDecl), sends, project, line, key_line };
+}
+
+/** The part of a `script` body its egress is read from. The whole shape is `ScriptBody` in `script.ts`, which imports this file. */
+type ScriptHeader = { script: string; runs?: { every?: unknown; door?: unknown; rule?: unknown }; egress?: unknown; keys?: unknown; reads?: unknown };
+
+/**
+ * A script's egress, from its header, or `null` when it fetches from nowhere.
+ *
+ * ONE LINE FOR EVERY ORIGIN, NOT ONE PER ORIGIN, because the thing approved is the script: its origins, its keys and its
+ * clock are one decision, and splitting them would let a reader approve two lines of three. `host` is the first origin,
+ * because `Egress` holds one and the plan diff compares by it; the line carries them all.
+ *
+ * AND A SCRIPT THAT READS AND FETCHES SAYS SO IN ITS OWN SENTENCE (design section 2, point 5). Reading and fetching
+ * together is the one exfiltration path a script has, and the sentence is the owner's only chance to see it.
+ *
+ * `trigger` HAS NO WORD FOR A DOOR. It is the plan diff's closed union, owned by `@braindog/declare`, and a door-started
+ * script is reported as rule-started there. The line says `when <door> receives an arrival`, which is the truth.
+ */
+function scriptEgress(d: ScriptHeader): Egress | null {
+  const origins = Array.isArray(d.egress) ? d.egress.filter((o): o is string => typeof o === 'string') : [];
+  if (origins.length === 0) return null;
+  const hosts = origins.map((o) => hostOf(o) ?? o);
+  const keys = Array.isArray(d.keys) ? d.keys.filter((k): k is string => typeof k === 'string') : [];
+  const reads = Array.isArray(d.reads) ? d.reads.filter((r): r is string => typeof r === 'string') : [];
+  const every = typeof d.runs?.every === 'string' ? d.runs.every : null;
+  const door = typeof d.runs?.door === 'string' ? d.runs.door : null;
+  const rule = d.runs?.rule === true;
+
+  const when = [
+    ...(every === null ? [] : [`every ${every}`]),
+    ...(door === null ? [] : [`when ${door} receives an arrival`]),
+    ...(rule ? [`when a rule runs it, at most ${RULE_CALLS_PER_DAY} a day`] : []),
+  ];
+  const line = `CALLS OUT ${joinedList(hosts)} · ${when.join(' and ') || 'never'} · ${keys.length === 0 ? 'no key' : `key ${keys.map((k) => `"${k}"`).join(', ')}`}`;
+  const key_line = reads.length > 0 ? `${d.script} reads ${joinedList(reads)} and may send what it reads to ${joinedList(hosts)}.` : null;
+
+  return {
+    ingest: d.script,
+    channel: 'script',
+    /* A SCRIPT'S FETCH TAKES ANY METHOD, and the wider of the two is the honest one to approve. */
+    method: 'POST',
+    host: hosts[0] ?? null,
+    every,
+    trigger: every !== null && (door !== null || rule) ? 'both' : every !== null ? 'schedule' : 'rule',
+    per_day: rule ? RULE_CALLS_PER_DAY : null,
+    key: keys.length === 0 ? null : keys.join(', '),
+    paged: false,
+    sends: [],
+    project: null,
+    line,
+    key_line,
+  };
 }
 
 /* ── a call a rule runs ─────────────────────────────────────────────────── */

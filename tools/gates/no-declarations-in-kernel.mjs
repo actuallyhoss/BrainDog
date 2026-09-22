@@ -24,7 +24,7 @@
  *      `register.session` with `pack_id = 'kernel'`, as `52 §5.2` says. Migration 0002 writes it, so
  *      zero now means the register every agent write resolves to has been lost, which is a mistake
  *      and not a thing nobody has written yet.
- *   3. No object literal under `src/**` with a `kind:` of one of the eight pack kinds beside an
+ *   3. No object literal under `src/**` with a `kind:` of one of the nine pack kinds beside an
  *      `id:`. That is a declaration written in TypeScript, and the way this rule actually gets
  *      broken. Nobody adds a YAML file to the kernel; somebody adds a `const DEFAULT_PAGE = { id:
  *      'page.home', kind: 'page', … }` and it looks like configuration.
@@ -38,8 +38,8 @@ import { skipDir } from './lib.mjs';
 
 const root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
-/** `04 §1`'s eight. A ninth is a migration, which is what `closed-lists` is for. */
-const KINDS = ['register', 'page', 'block', 'ingest', 'rule', 'metric', 'theme', 'digest'];
+/** `04 §1`'s nine, `script` from kernel migration 12. Another is a migration, which is what `closed-lists` is for. */
+const KINDS = ['register', 'page', 'block', 'ingest', 'rule', 'metric', 'theme', 'digest', 'script'];
 
 function walk(dir, out = []) {
   let entries;
@@ -76,7 +76,7 @@ for (const file of files)
 let inserts = 0;
 for (const file of files.filter((f) => /migrations[\\/].*\.ts$/.test(f))) {
   const text = decomment(readFileSync(file, 'utf8'));
-  for (const m of text.matchAll(/INSERT INTO declaration/g)) {
+  for (const m of text.matchAll(/INSERT INTO declaration\b/g)) {
     inserts++;
     const rest = text.slice(m.index, m.index + 600);
     if (!rest.includes("'register.session'"))

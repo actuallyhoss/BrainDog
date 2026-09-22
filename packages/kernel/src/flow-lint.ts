@@ -12,9 +12,10 @@
  * nothing on it, which is the failure this tree keeps recording: a declaration that looks complete, installs, and is
  * read by nothing.
  *
- * THE RUNNER IS NOT HERE, and neither are the migration nor the steps that wait (Briefs B and C). A body this file
- * accepts on the `run` path installs and is not yet executed by anything; that is the same answer §4.4 gives a `script`
- * step until its runtime lands, and it is why the lint is strict about everything it CAN know now.
+ * THE RUNNER IS `flow.ts`, AND THE STEPS THAT WAIT ARE NOT IN IT YET (Brief C). A body this file accepts on the `run`
+ * path installs and runs; a run that reaches `call`, `script`, `ask_spark` or `ask_person` fails there with a sentence,
+ * which is the answer §4.4 gives a `script` step until its runtime lands, and it is why the lint is strict about
+ * everything it CAN know now.
  */
 
 import type { Refusal } from '@braindog/ports';
@@ -40,6 +41,8 @@ export const VARS_CEILING = 64;
 
 const TRIGGERS = ['written', 'arrival', 'every', 'metric', 'decided', 'manual'] as const;
 const OPS = ['create', 'update', 'delete'] as const;
+/** The words a rule's `on:` was written with before it was an object. `create` is the only one any rule ever carried. */
+const LEGACY_WORDS = ['create'] as const;
 const CHANNELS = ['webhook', 'email', 'paste', 'api', 'pull'] as const;
 const SHAPES = ['text', 'number', 'choice'] as const;
 
@@ -79,7 +82,7 @@ const bad = (code: string, fix: string, at?: string, allowed?: readonly string[]
 const isObject = (x: unknown): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x);
 
 /** The one trigger key a body names, or `written` when it names none. Only meaningful after `triggerFault` passed. */
-const triggerOf = (decl: FlowDecl): string => {
+export const triggerOf = (decl: FlowDecl): string => {
   if (decl.on === undefined || typeof decl.on === 'string') return 'written';
   return Object.keys(decl.on).find((k) => (TRIGGERS as readonly string[]).includes(k)) ?? 'written';
 };
@@ -229,6 +232,10 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
   const rowless = ROWLESS.includes(trigger);
   if (rowless && body.when !== undefined)
     return bad('DECLARATION_INVALID', `${id} is started by ${trigger}, which has no row for when: to be about. Put the condition in an if step.`, 'when');
+  /* AN ARRIVAL'S `when:` WOULD BE READ AGAINST THE RAW PAYLOAD, and the runner does not read it: a run starts for every
+     arrival its `ingest`, `channel` and `state` admit. Refused rather than installed as a filter that filters nothing. */
+  if (trigger === 'arrival' && body.when !== undefined)
+    return bad('NOT_IN_THIS_BUILD', `${id} is started by an arrival, and the runner does not read when: on one yet. Narrow it with ingest:, channel: or state:, or test the row in an if step.`, 'when');
 
   /* THE WALK: shape, verbs, depth, count and names, over `then` or `steps` alike, since on this path `then` is a flat
      list of steps. */
@@ -310,12 +317,20 @@ function limitsFault(id: string, limits: unknown): Refusal | null {
 /** The trigger, alone. `undefined` is `written` by the body's own register, and is the inline path's to check. */
 function triggerFault(id: string, on: unknown, installed?: Known): Refusal | null {
   if (on === undefined) return null;
-  /* A WORD IN `on:` IS AN OLDER SHAPE THAT NOTHING EVER READ, and it is let through as it always was. The first run of
-     the rule suite against this file failed two tests on `on: 'create'`, and `digest.test.ts` and
-     `install-known.test.ts` carry the same key: rules written that way are installed, the inline pass ignores the word
-     and fires on every write, and refusing them now would break a record's rules on its next reinstall for a key that
-     never did anything. It reads as today's meaning, `written` by the body's own register. */
-  if (typeof on === 'string') return null;
+  /* A WORD IN `on:` IS AN OLDER SHAPE THAT NOTHING EVER READ, and the one word rules were written with is let through
+     as it always was. The first run of the rule suite against this file failed two tests on `on: 'create'`, and
+     `digest.test.ts` and `install-known.test.ts` carry the same key: rules written that way are installed, the inline
+     pass ignores the word and fires on every write, and refusing them now would break a record's rules on its next
+     reinstall for a key that never did anything. It reads as today's meaning, `written` by the body's own register.
+
+     ANY OTHER WORD IS REFUSED. Letting every string through meant `on: 'hourly'` installed as an inline rule and fired
+     on every write of its register, which is the opposite of what its author asked for; grepping the seed, the packs,
+     the docs and every fixture found `create` and no other word under a rule's `on:`. */
+  if (typeof on === 'string') {
+    if ((LEGACY_WORDS as readonly string[]).includes(on)) return null;
+    const every = /^(?:hourly|daily|weekly)$/.test(on) ? ` Write on: { every: ${on === 'hourly' ? '1h' : on === 'daily' ? '1d' : '1w'} }.` : ' Write a trigger such as on: { every: 1h }.';
+    return bad('DECLARATION_INVALID', `${id}'s on: is ${JSON.stringify(on)}, and a rule's trigger is an object naming one of ${TRIGGERS.join(', ')}.${every}`, 'on', TRIGGERS);
+  }
   if (!isObject(on)) return bad('DECLARATION_INVALID', `${id}'s on: is one trigger, such as { every: 1h }.`, 'on', TRIGGERS);
   const named = Object.keys(on).filter((k) => (TRIGGERS as readonly string[]).includes(k));
   const stray = Object.keys(on).find((k) => !(TRIGGERS as readonly string[]).includes(k) && !((k === 'at' || k === 'day') && 'every' in on));

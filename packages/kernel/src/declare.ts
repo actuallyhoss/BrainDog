@@ -25,6 +25,7 @@ import { FIELD_TYPES, coerce, isAbsent, isCurrencyCode, measure, range, type Fie
 import { instant } from './migrate.ts';
 import { SESSION_BODY } from './migrations/0002_session.ts';
 import { checkInterval, type PullDecl } from './pull.ts';
+import { scriptBody } from './script.ts';
 /* THE SCHEMA THE MATCHER RUNS AGAINST, so the names this file refuses and the names that fire are
    one list. See `MATCH_FIELDS`: they were two lists and they disagreed. A same-package edge, which
    `31 §2`'s order is not about. `DATE_FORMATS` used to come over it for the same reason — a
@@ -51,7 +52,9 @@ import type { FlowDecl } from './rules.ts';
  */
 const IDENT = /^(?!.*__)[a-z][a-z0-9_]{0,31}$/;
 
-export const KINDS = ['register', 'page', 'block', 'ingest', 'rule', 'metric', 'theme', 'digest'] as const;
+/* `script` IS THE NINTH, and migration 12 rebuilds the CHECK that holds the database to this list. A person's or an
+   agent's code, run by a host in a sandbox and never by the record (`script.ts`, DIRECTION section 22). */
+export const KINDS = ['register', 'page', 'block', 'ingest', 'rule', 'metric', 'theme', 'digest', 'script'] as const;
 export type DeclKind = (typeof KINDS)[number];
 
 export type Declaration = {
@@ -3190,7 +3193,7 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
      answered `DECLARATION_INVALID`. A registry entry no source file produces is a code a caller
      cannot handle and a fixture nobody can write — which is the whole subject of `30 §6`. */
   if (!KINDS.includes(decl.kind))
-    return bad('KIND_UNKNOWN', `${decl.kind} is not one of the eight kinds of declaration.`, 'kind', KINDS);
+    return bad('KIND_UNKNOWN', `${decl.kind} is not one of the ${KINDS.length} kinds of declaration: ${KINDS.join(', ')}.`, 'kind', KINDS);
   const own = ownId(decl);
   if (decl.id !== `${decl.kind}.${own}`)
     return bad(
@@ -3232,6 +3235,7 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
   if (decl.kind === 'page') return pageBody(decl, installed);
   if (decl.kind === 'theme') return themeBody(decl);
   if (decl.kind === 'ingest') return ingestBody(decl, installed);
+  if (decl.kind === 'script') return scriptBody(decl);
 
   /**
    * A STANDALONE `block.<id>` DECLARATION WAS CHECKED BY NOTHING, AND IT IS DRAWN BY NOTHING.
