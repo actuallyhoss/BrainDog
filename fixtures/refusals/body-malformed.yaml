@@ -1,5 +1,14 @@
-code:   BODY_MALFORMED
-via:    rpc
-raises: packages/host/src/index.ts
-at:     body
-fix:    Send a JSON object as the body.
+code:      BODY_MALFORMED
+via:       rpc
+raises:    packages/host/src/index.ts
+fix:       Send a JSON object as the body.
+call:      { "method": "create", "args": [] }
+principal: { "kind": "person", "level": "owner" }
+
+# NO `at:`, BECAUSE THE ROUTER GIVES NONE. This said `at: body` until 2026-09-22, when
+# `packages/host/test/refusals-rpc.test.ts` drove it for the first time and `serveApi` answered
+# `{ code, fix }` with no address. `41 §6` makes `at` optional, and a refusal with nothing to point at
+# carries none; whether the router should say `body` is a change to the router and not to this file.
+#
+# AN ARRAY, NOT BROKEN TEXT. `[]` is valid JSON that is not an object, which is the half of the
+# refusal a flow collection can carry; text that is not JSON at all takes the same `catch`.

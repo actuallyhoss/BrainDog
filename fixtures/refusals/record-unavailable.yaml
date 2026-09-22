@@ -1,5 +1,12 @@
-code:   RECORD_UNAVAILABLE
-via:    rpc
-raises: apps/selfhost/src/server.ts
-at:     record
-fix:    Un-suspend an owner of this record.
+code:      RECORD_UNAVAILABLE
+via:       rpc
+raises:    apps/selfhost/src/server.ts
+at:        record
+fix:       Un-suspend an owner of this record.
+call:      { "method": "boot", "args": {} }
+principal: { "kind": "person", "level": "owner", "suspended": true }
+
+# `suspended` IS THE RECORD'S STATE, CARRIED ON THE PRINCIPAL, because the server key is the owner
+# and the one fact this refusal needs is that the owner may not act. `record:` would name a seed, and
+# no seed exists yet. `apps/selfhost/test/refusals-rpc.test.ts` suspends them with SQL, because
+# `suspendMember` refuses to suspend the last owner who can act.

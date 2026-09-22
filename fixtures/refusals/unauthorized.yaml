@@ -1,5 +1,10 @@
-code:   UNAUTHORIZED
-via:    rpc
-raises: apps/selfhost/src/server.ts
-at:     authorization
-fix:    Send a credential this record knows.
+code:      UNAUTHORIZED
+via:       rpc
+raises:    apps/selfhost/src/server.ts
+at:        authorization
+fix:       Send a credential this record knows.
+call:      { "method": "boot", "args": {} }
+principal: { "kind": "bearer", "known": false }
+
+# A BEARER THE RECORD NEVER ISSUED, on a server started with a key. The other way to this code, no
+# credential at all, answers the same code at the same address in a different sentence.
