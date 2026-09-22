@@ -44,11 +44,12 @@ test('a backslash-n where a line break was meant is refused', () => {
   assert.equal(r.code, 'TEXT_ESCAPED_NEWLINE');
   assert.ok(hasEscapedNewline('a\\nb'));
   assert.ok(!hasEscapedNewline('a\nb'), 'a real newline is not the bug');
-  /* AND THE FALSE POSITIVE IT ACCEPTS, stated rather than hidden: a Windows path whose next
-     character is `n` looks exactly like an escaped newline, because it IS the same two
-     characters. The trade is deliberate — an agent sending `\n` for a line break is common and
-     silent, and `C:\\next` in a text field is rare and visible — and the refusal names what it saw so
-     the caller can tell which of the two happened. */
+  /* THE HELPER STAYS TEXTUAL, AND COERCE IS WHERE A PATH IS EXEMPTED. A Windows path whose next
+     character is `n` holds exactly the same two characters as an escaped newline, so
+     `hasEscapedNewline` says yes to `C:\\next` and is right to. This used to be the accepted cost
+     of the rule, until a real export was refused on two agent runs' `cwd` for it
+     (`loop/research-import-real.md`, finding 1). `coerce` now skips the refusal when
+     `readsAsWindowsPath` holds; that side is asserted in `escaped-newline-path.test.ts`. */
   assert.ok(hasEscapedNewline('C:\\next'), 'the rule is textual and this is the cost of it');
   assert.ok(!hasEscapedNewline('C:\\next\nand a real break'), 'a real newline anywhere clears it');
   assert.equal(take(f('text'), 'first\nsecond'), 'first\nsecond');

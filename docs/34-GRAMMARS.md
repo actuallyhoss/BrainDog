@@ -349,7 +349,7 @@ compares against it; the checksum in §5 is computed over it.
 
 | Type | JSON | Rule |
 |---|---|---|
-| `text` | string | never itself JSON-quoted (`TEXT_JSON_QUOTED`); no literal `\n` where a newline was meant (`TEXT_ESCAPED_NEWLINE`) |
+| `text` | string | never itself JSON-quoted (`TEXT_JSON_QUOTED`); no literal `\n` where a newline was meant (`TEXT_ESCAPED_NEWLINE`), except in a value that reads whole as a Windows path (`C:\Work\notes`, `\\host\share`, `.\notes`), which is stored as it arrived (41 §5.4 step 3) |
 | `document` | string | the dialect of §2, LF line endings |
 | `int` | integer | `|n| ≤ 2^53 − 1`, else `INT_OUT_OF_RANGE` |
 | `decimal` | number | ≤ 15 significant digits, else `VALUE_MALFORMED`; never money |
