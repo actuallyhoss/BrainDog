@@ -315,7 +315,7 @@ function lookupsNamed(value: unknown, out = new Set<string>()): Set<string> {
  * window cannot be acted on."* That is the whole argument for this product having metrics rather
  * than counters, and it was enforced nowhere.
  */
-function metricBody(decl: Declaration): Refusal | null {
+function metricBody(decl: Declaration, installed?: Known): Refusal | null {
   const body = decl.body as {
     source?: unknown;
     value?: unknown;
@@ -469,6 +469,60 @@ function metricBody(decl: Declaration): Refusal | null {
 
   /* THE GROUPING IS READ (`metrics.ts`'s `groupsOf`), so a well-formed one installs. Whether the
      field is a date, and so whether it takes a bucket, is the evaluator's to say: it has the schema. */
+  return installed === undefined ? null : metricFieldFault(id, body.source, body.value, body.group_by, installed);
+}
+
+/** Every field a metric's value names, as `metrics.ts`'s `aggregationsOf` reads them: the first key of each aggregation. */
+function valueFields(value: unknown): string[] {
+  const flat = (agg: unknown): string[] => {
+    if (agg === null || typeof agg !== 'object') return [];
+    const operand = Object.values(agg)[0];
+    if (typeof operand === 'string') return [operand];
+    const p = (operand as { product?: unknown } | undefined)?.product;
+    if (!Array.isArray(p) || typeof p[0] !== 'string') return [];
+    const by = (p[1] as { by?: unknown } | undefined)?.by;
+    return typeof by === 'string' ? [p[0], by] : [p[0]];
+  };
+  const v = value as { ratio?: { of?: unknown; per?: unknown }; diff?: { of?: unknown; per?: unknown } };
+  const pair = v.ratio ?? v.diff;
+  return pair !== undefined && pair !== null && typeof pair === 'object' ? [...flat(pair.of), ...flat(pair.per)] : flat(value);
+}
+
+/**
+ * A FIGURE OVER A FIELD ITS REGISTER DOES NOT DECLARE INSTALLED CLEAN, and was refused on every read.
+ *
+ * Measured by the checker of `loop/research-pack-update-edited.md`: `value: { sum: 'nosuch' }` went
+ * in through an ordinary install, and `metrics.ts`'s `evaluateMetric` then answered `FIELD_UNKNOWN: ledger has
+ * no field called nosuch` on every page the figure sat on. `index.ts`'s install check handed the
+ * field to `unaggregatableIn`, which looks up the field's TYPE, found none, and read "no type" as "no
+ * objection". `group_by: 'nosuch'` went in the same way. The predicate was never part of this: a
+ * `where` naming an undeclared field is already refused at install by `unreadWhere`, which reads the
+ * five record-owned fields too, so this does not look at `where`.
+ *
+ * THE SAME RULE THE READER KEEPS, NO WIDER. `evaluateMetric` admits `id` in a value and nothing else the
+ * record owns, and admits no record-owned field as a grouping, so a `sum: 'created_at'` accepted
+ * here would be the same defect with a better-sounding name. The code is `FIELD_UNKNOWN` because it
+ * is the code the reader already gives this fact, and `30 §6`'s "one code, two moments" is the
+ * argument for giving it the same one at install. A source whose register is not known is left to
+ * the install check's `REGISTER_UNKNOWN`, and a `series.<id>` source has no fields to check.
+ */
+function metricFieldFault(id: string, source: unknown, value: unknown, groupBy: unknown, installed: Known): Refusal | null {
+  if (typeof source !== 'string' || !source.startsWith('register.')) return null;
+  const shape = installed.get(source);
+  if (shape === undefined || !Array.isArray(shape.fields)) return null;
+  /* NOT A RETIRED FIELD, which stays in the body and is dropped by `index.ts`'s `schemaOf`, so the
+     reader answers `FIELD_UNKNOWN` for it. Counting it here let `sum: 'old'` install and then fail
+     on its first read, which the checker of this change measured. */
+  const declared = (shape.fields as { id?: unknown; retired?: unknown }[])
+    .filter((f) => f?.retired !== true)
+    .map((f) => f?.id)
+    .filter((f): f is string => typeof f === 'string');
+  const register = source.slice('register.'.length);
+  for (const field of valueFields(value))
+    if (field !== 'id' && !declared.includes(field))
+      return bad('FIELD_UNKNOWN', `${id} reads ${field}, and ${register} has no field called ${field}.`, 'value', ['id', ...declared]);
+  if (typeof groupBy === 'string' && !declared.includes(groupBy))
+    return bad('FIELD_UNKNOWN', `${id} groups by ${groupBy}, and ${register} has no field called ${groupBy}.`, 'group_by', declared);
   return null;
 }
 
@@ -3092,7 +3146,7 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
     * success and does nothing.
     */
   if (decl.kind === 'digest') return digestBody(decl);
-  if (decl.kind === 'metric') return metricBody(decl);
+  if (decl.kind === 'metric') return metricBody(decl, installed);
   if (decl.kind === 'page') return pageBody(decl, installed);
   if (decl.kind === 'theme') return themeBody(decl);
   if (decl.kind === 'ingest') return ingestBody(decl, installed);
