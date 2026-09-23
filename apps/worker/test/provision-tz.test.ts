@@ -251,7 +251,8 @@ test('A PLACEHOLDER IN ANY BRACKETS IS REFUSED AT name, and so are the words "yo
 
 test('but a name with a bracket inside it is a name: the bracket has to open it and close it', async () => {
   /* `Sam (work)` IS HOW SOMEBODY TELLS TWO OF HIS OWN PASSKEYS APART, and a rule that refused a bracket anywhere
-     would take that from him. So the rule is the name's two ends, and each of these is stored as typed. */
+     would take that from him. So the rule is a name that is all one bracketed span, and each of these is stored as
+     typed. */
   const { provision, made } = await host();
   const names = ['Sam (work)', 'Zoë [Z] O’Brien', '(Ada) Lovelace', 'Bo {B} Tanner', 'Yourname'];
   for (const [i, name] of names.entries()) {
@@ -259,4 +260,34 @@ test('but a name with a bracket inside it is a name: the bracket has to open it 
     assert.equal(out.status, 200, `${JSON.stringify(name)} was refused: ${out.text}`);
   }
   assert.deepEqual(made.map((m) => m.owner?.name), names);
+});
+
+test('A NAME IS REFUSED FOR ITS BRACKETS ONLY WHEN IT IS ONE BRACKETED SPAN, however many brackets deep', async () => {
+  /* THE RULE WAS "OPENS WITH AN OPENING BRACKET AND CLOSES WITH A CLOSING ONE", and it refused two names made the way
+     `Sam (work)` is made: `(ex-Acme) Sam (work)` is the same telling-apart said at both ends, and `(Sam) [work]` is
+     a name and a note. Both were 422 at name through this Worker (`loop/research-batch-fifty-audit.md` §3). So a name
+     is refused for its brackets when it is one span: a run of opening brackets, then no closing bracket, then a run of
+     closing ones. THE RUNS ARE HELD HERE, because with one bracket at each end `{{name}}`, `[[Name]]`, `{{ owner }}` and
+     `((Name))` would each have been stored: their first closing brace is a closing bracket between. The audit ran the
+     one-bracket form over this file's spellings and those four and found it 4 wrong.
+
+     AND THE GERMAN QUOTATION IS REFUSED WHERE THE FRENCH ONE IS. `„Anita“` was stored where `«Anita»` was refused,
+     because the closing mark U+201C is an initial quote to Unicode and not a closing bracket. The same nickname in two
+     spellings is one decision, and the rule already refused the French one. */
+  const { provision, made, people } = await host();
+  const wrong: string[] = [];
+  const refused = ['{{name}}', '[[Name]]', '{{ owner }}', '((Name))', '(Sam]', '【山田】', '「山田太郎」', '(Sam)', '«Anita»', '„Anita“', '„Anita”', '‚Anita‘', '[O’Brien]'];
+  for (const [i, name] of refused.entries()) {
+    const out = await provision({ slug: `span-${i}`, email: `span-${i}@example.test`, name, tz: 'Europe/London' });
+    if (out.status !== 422 || out.json.refusal?.at !== 'name') wrong.push(`${JSON.stringify(name)} -> ${out.status}, stored`);
+  }
+  const left = people();
+  const kept = ['(ex-Acme) Sam (work)', '(Sam) [work]', 'Ana María «Anita» López', 'Ana „Anita“ López', '山田（太郎）', '(김민준) Kim'];
+  for (const [i, name] of kept.entries()) {
+    const out = await provision({ slug: `kept-${i}`, email: `kept-${i}@example.test`, name, tz: 'Europe/London' });
+    if (out.status !== 200) wrong.push(`${JSON.stringify(name)} -> ${out.status} ${out.json.refusal?.at ?? ''}, refused`);
+  }
+  assert.deepEqual(wrong, [], wrong.join(' | '));
+  assert.equal(left, 0, 'a refused name left a person in the Directory with no record behind them');
+  assert.deepEqual(made.map((m) => m.owner?.name), kept);
 });

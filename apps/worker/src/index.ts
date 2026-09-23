@@ -1935,11 +1935,26 @@ function zoneFix(asked: unknown): string {
  * apart, is a name, and so is `Zoë [Z] O’Brien`. And a name holding `<` or `>` anywhere, the entities `&lt;` or
  * `&gt;`, or the words `your name` in any case. `personName` has trimmed the edges by now; this trims again so the
  * rule does not lean on it.
+ *
+ * AND THE TWO ENDS HAVE TO BE ONE SPAN. Tested only at its ends, the rule refused `(ex-Acme) Sam (work)` and
+ * `(Sam) [work]` at name through this Worker, which are `Sam (work)` said at both ends and a name with a note
+ * (`loop/research-batch-fifty-audit.md` §3). So a name is refused for its brackets when it is a run of opening
+ * brackets, then no closing bracket at all, then a run of closing ones. THE RUNS ARE WHAT KEEPS `{{name}}` REFUSED:
+ * with one bracket allowed at each end, `{{name}}`, `[[Name]]`, `{{ owner }}` and `((Name))` each have a closing
+ * brace between their ends and would have been stored. The audit ran both forms over the spellings in
+ * `test/provision-tz.test.ts` and those four, and the one-bracket form got 4 wrong where the runs got none.
+ *
+ * `“` `”` AND `‘` CLOSE A NAME AND DO NOT OPEN ONE, because `„` and `‚`, the German and Polish opening quotes, are
+ * already opening brackets to Unicode and these are what close them. Without them `„Anita“` was stored where
+ * `«Anita»` was refused, the same nickname decided two ways by which country typed it. They open nothing here so
+ * that `“Name”` stays what it was, a spelling the rule does not chase: the form prints no placeholder any more, and a
+ * list of spellings has no end. `’` is left out of the closers, since it is the apostrophe in `O’Brien`, and every
+ * closer is also a bracket that breaks the span: with `’` among them `[O’Brien]` was stored where `[Sam]` is refused.
  */
 function placeholderName(name: string): boolean {
   const trimmed = name.trim();
   if (/[<>]/u.test(trimmed) || /&[lg]t;/iu.test(trimmed) || /\byour\s+name\b/iu.test(trimmed)) return true;
-  return /^[\p{Ps}<＜‹«]/u.test(trimmed) && /[\p{Pe}>＞›»]$/u.test(trimmed);
+  return /^[\p{Ps}<＜‹«]+[^\p{Pe}>＞›»“”‘]*[\p{Pe}>＞›»“”‘]+$/u.test(trimmed);
 }
 
 /** The one letter sign-in sends: plain text, the link on a line of its own, and what it is for. */

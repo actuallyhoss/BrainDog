@@ -424,6 +424,18 @@ export function readProvision(status, body) {
  * neither the transcript nor PSReadLine's history, and `$pk` was gone at the prompt after. `$pk` and `$key` then die with
  * the block, so `Remove-Variable` is redundant; it stays, because it costs nothing and holds if the lines are ever run
  * bare.
+ *
+ * AND THE BLOCK ENDS WITH AN EMPTY LINE UNDER `}`, because only PSReadLine runs a block when it closes. Which line
+ * editor reads the paste decides it. PSReadLine, loaded in a 5.1 console by default, parses what it holds and runs the
+ * block at the `}`. The console host's own line reader, which is what reads the line when PSReadLine is not loaded,
+ * holds any input of more than one line at `>>` until it is sent an empty line, closed or not. Measured
+ * (`loop/research-batch-fifty-audit.md` §2, 5.1.26100 started with `Remove-Module PSReadLine`, these lines as printed,
+ * answers typed three seconds apart): without the empty line nothing ran in 3 of 3, and the operator key typed after
+ * the paste went into the script as the line under the brace, unmasked and in that console's transcript. With it the
+ * post went with the right bearer, 2 of 2 without PSReadLine and 4 of 4 with it, where the empty line was never
+ * taken as the operator key by the first `Read-Host`. `pwsh` 7 was not measured: it is not on the machine the audit
+ * ran on. READY says to copy through that line, in `printedForms`, since every block he has copied before ended at
+ * its brace.
  */
 export function provisionCommands(origin, zone = localZone()) {
   const url = `${origin}/auth/provision`;
@@ -447,6 +459,7 @@ export function provisionCommands(origin, zone = localZone()) {
         'Remove-Variable pk, key',
       ].map((line) => `  ${line}`),
       '}',
+      '',
     ],
     bash: [
       "read -rs -p 'Operator key: ' PK; echo",
@@ -462,6 +475,25 @@ export function provisionCommands(origin, zone = localZone()) {
       'unset PK',
     ],
   };
+}
+
+/**
+ * What READY prints of the two forms: a heading for each shell, then its lines four spaces in.
+ *
+ * THE EMPTY LINE IS PRINTED EMPTY, NOT FOUR SPACES IN, because it is the line that runs the block where PSReadLine is
+ * not loaded, what was measured was an empty line, and whether that line reader takes a line of spaces as one was not.
+ * And the sentence to copy through it is above `& {`, where
+ * a person starts copying, rather than after the form, where he has already stopped.
+ */
+export function printedForms(commands) {
+  const indent = (line) => (line === '' ? '' : `    ${line}`);
+  return [
+    '  IN WINDOWS POWERSHELL 5.1, where curl is Invoke-WebRequest and curl.exe with quoted JSON answers BODY_MALFORMED.',
+    '  Copy through the empty line under the closing brace: without PSReadLine, that line is what runs it.',
+    ...commands.powershell.map(indent),
+    '  IN GIT BASH, OR ANY BASH:',
+    ...commands.bash.map(indent),
+  ];
 }
 
 /** The zone this machine keeps, by `Intl`'s own name for it, or `UTC` when it has none or answers an offset. */
@@ -714,13 +746,8 @@ export default async function provisionCheck(named, { account = true, root = ROO
     console.log('  The next command is the provision itself, and its answer is the only copy of the claim link there will ever be.');
     console.log('  The slug, the name and the time zone are fixed at provision. No screen renames the record or moves its zone later,');
     console.log('  and the Directory never gives a slug out twice, so choose all three before typing it. The name is also the display name on the passkey.');
-    const commands = provisionCommands(origin);
     console.log('');
-    console.log('  IN WINDOWS POWERSHELL 5.1, where curl is Invoke-WebRequest and curl.exe with quoted JSON answers BODY_MALFORMED:');
-    for (const line of commands.powershell) console.log(`    ${line}`);
-    console.log('');
-    console.log('  IN GIT BASH, OR ANY BASH:');
-    for (const line of commands.bash) console.log(`    ${line}`);
+    for (const line of printedForms(provisionCommands(origin))) console.log(line);
     console.log('');
     console.log('  Each asks for the operator key at a prompt that echoes nothing and removes it after. This script never reads it.');
     console.log('  Each then asks for the slug, the email, the name and the time zone. Enter at the zone keeps this machine\'s, shown in brackets.');

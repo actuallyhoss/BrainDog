@@ -26,7 +26,7 @@ import { execFile } from 'node:child_process';
 import { createServer } from 'node:http';
 import { test } from 'node:test';
 
-import { provisionCommands } from './provision-check.mjs';
+import { printedForms, provisionCommands } from './provision-check.mjs';
 
 const ORIGIN = 'https://app.example.test';
 const ZONE = 'Africa/Cairo';
@@ -49,15 +49,16 @@ test('THE POWERSHELL FORM ASKS FOR EACH OF THE FOUR, and offers this machine\'s 
   assert.match(text, /@\{ slug = \$slug; email = \$email; name = \$name; tz = \$tz \}/, 'the body is not built from the answers');
 });
 
-test('THE POWERSHELL FORM IS ONE SCRIPT BLOCK, & { on the first line and } on the last, so no Read-Host runs before the paste is whole', () => {
+test('THE POWERSHELL FORM IS ONE SCRIPT BLOCK, & { on the first line and } on the last that is not empty, so no Read-Host runs before the paste is whole', () => {
   /* STANDS IN FOR THE PASTE, WHICH A UNIT TEST CANNOT MAKE. Pasted as twelve bare lines into a 5.1 console, PSReadLine
      ran line one while the rest was still arriving, and the first Read-Host took the tail of line two as the operator
      key in 2 of 14 runs: a ParserError, `$pk` never set, UNAUTHORIZED, and the answers typed after it run as commands
      (`loop/research-batch-forty-eight-audit.md` §3, `paste-answers.ps1`). The same lines inside `& { ... }` were 8 of 8.
      So the braces are counted as well as the ends: a block that closed on an earlier line would run from there. */
-  const lines = provisionCommands(ORIGIN, ZONE).powershell;
+  const all = provisionCommands(ORIGIN, ZONE).powershell;
+  const lines = all.slice(0, all.findLastIndex((line) => line !== '') + 1);
   assert.equal(lines[0], '& {', `the form opens with ${JSON.stringify(lines[0])}`);
-  assert.equal(lines.at(-1), '}', `the form ends with ${JSON.stringify(lines.at(-1))}`);
+  assert.equal(lines.at(-1), '}', `the form's last line that is not empty is ${JSON.stringify(lines.at(-1))}`);
   let depth = 0;
   lines.forEach((line, i) => {
     depth += (line.match(/\{/g) ?? []).length - (line.match(/\}/g) ?? []).length;
@@ -65,6 +66,35 @@ test('THE POWERSHELL FORM IS ONE SCRIPT BLOCK, & { on the first line and } on th
     if (i > 0 && i < lines.length - 1) assert.match(line, /^ {2,}\S/, `line ${i + 1} is not indented inside the block: ${JSON.stringify(line)}`);
   });
   assert.equal(depth, 0, 'the braces of the form do not balance');
+});
+
+test('AND THE POWERSHELL FORM ENDS WITH ONE EMPTY LINE UNDER }, because 5.1 without PSReadLine runs nothing until it is sent one', () => {
+  /* THE CONSOLE HOST'S OWN LINE READER HOLDS MULTI-LINE INPUT AT `>>` UNTIL AN EMPTY LINE, closed or not. Pasted without
+     one into 5.1.26100 with PSReadLine removed, the form ran nothing in 3 of 3 runs, and the operator key typed after
+     the paste went into the script as a line under the closing brace, unmasked and in that console's transcript
+     (`loop/research-batch-fifty-audit.md` §2). With the empty line in the paste it posted with the right bearer, 2 of 2
+     without PSReadLine and 4 of 4 with it, where the blank line was never taken as the key. EMPTY AND NOT SPACES, since
+     what was measured was an empty line, and whether that line reader takes a line of spaces as one was not. And only
+     the one: an empty line inside the block is where that line reader would stop reading it. */
+  const lines = provisionCommands(ORIGIN, ZONE).powershell;
+  assert.equal(lines.at(-1), '', `the form ends with ${JSON.stringify(lines.at(-1))} and not an empty line`);
+  assert.equal(lines.at(-2), '}', `the line above the empty one is ${JSON.stringify(lines.at(-2))} and not the closing brace`);
+  assert.equal(lines.filter((line) => line.trim() === '').length, 1, 'the form has an empty line inside the block, where the console host would stop reading it');
+});
+
+test('THE CHECKER SAYS TO COPY THROUGH THE EMPTY LINE, above the form, and prints that line empty', () => {
+  /* A PERSON COPYING THE FORM STOPS AT THE BRACE, which is where a block ends everywhere else. So it is said above the
+     `& {` he starts from, in the lines READY prints. And the line is printed with nothing on it: the indent the other
+     lines get would make it four spaces. */
+  const printed = printedForms(provisionCommands(ORIGIN, ZONE));
+  const opens = printed.indexOf('    & {');
+  const closes = printed.indexOf('    }');
+  assert.ok(opens > 0 && closes > opens, `the PowerShell form is not in what READY prints:\n${printed.join('\n')}`);
+  assert.ok(
+    printed.slice(0, opens).some((line) => /copy through the empty line under the closing brace/i.test(line)),
+    `nothing above the form says to copy through the empty line:\n${printed.slice(0, opens).join('\n')}`,
+  );
+  assert.equal(printed[closes + 1], '', `the line under the closing brace is printed as ${JSON.stringify(printed[closes + 1])}`);
 });
 
 test('THE CLAIM LINK IS PRINTED BY ITSELF, so an 80-column window does not break the only copy across two lines', () => {
