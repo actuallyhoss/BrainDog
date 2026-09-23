@@ -138,6 +138,33 @@ type RunRow = {
 
 type Vars = Record<string, string | number | boolean | null>;
 
+/**
+ * What a question to Spark reads for each variable a `set_var` filled from a field that never leaves the record: the
+ * same `to` filled again from the row `sendable` leaves, so `{{trigger.row.pin}}` is the dash a missing field is
+ * written as and `{{trigger.row}}` is the row's JSON without `pin`. A variable not here was the same either way.
+ *
+ * KEPT BESIDE `vars` IN THE RUN'S OWN COLUMN, UNDER A KEY NO VARIABLE CAN HAVE. A run parks at every ask and wait and
+ * is read back from its row, so what it keeps has to be in the row, and `automation_run` has one column for it.
+ * `-sendable` fails the lint's `NAME` and `RUN_PATH` alike, so no step names it and no `{{vars.…}}` reaches it, and it
+ * is taken off before `vars` is read (`unpack`). `finish` writes `vars` alone, so it goes when a run ends with its
+ * answers written, since no question follows the last step; a cancelled run, whose column is left as it was, keeps it.
+ */
+type Kept = Record<string, string>;
+const KEPT = '-sendable';
+
+/** A run's stored `vars`, split into the variables and what a question to Spark reads in their place. */
+function unpack(stored: string): { vars: Vars; kept: Kept } {
+  const all = JSON.parse(stored) as Vars & { [KEPT]?: Kept };
+  const kept = all[KEPT] ?? {};
+  delete all[KEPT];
+  return { vars: all as Vars, kept };
+}
+
+/** The two again, as the run's column holds them. With nothing kept it is `vars` alone, as it was before this key. */
+function pack(vars: Vars, kept: Kept): string {
+  return JSON.stringify(Object.keys(kept).length === 0 ? vars : { ...vars, [KEPT]: kept });
+}
+
 const isObject = (x: unknown): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x);
 
 /* ── what is installed ──────────────────────────────────────────────── */
@@ -465,7 +492,7 @@ export function advance(deps: FlowDeps, id: string): number | null {
 
   const program = plan(decl.steps ?? decl.then);
   const trigger = JSON.parse(run.trigger) as RunTrigger;
-  const vars = JSON.parse(run.vars) as Vars;
+  const { vars, kept } = unpack(run.vars);
   let subject = trigger.entry ? deps.entry(trigger.entry) : null;
   /* WHAT A STEP READS AND WHAT IT WRITES ARE TWO ROWS WHEN A DELETE STARTED THE RUN. Its conditions and templates read
      the row as it was deleted, which is what the rule was written about; its writes get `subject`, which is `null`,
@@ -488,7 +515,7 @@ export function advance(deps: FlowDeps, id: string): number | null {
      stopped between two steps started again from its last wait and took every step since a second time: audit
      thirty-three §1 counted six notifies in twelve hours from one row. A step that finished is never taken again. */
   const saved = (next: number): number => {
-    deps.sql.exec('UPDATE automation_run SET step = ?, vars = ? WHERE id = ?', next, JSON.stringify(vars), id);
+    deps.sql.exec('UPDATE automation_run SET step = ?, vars = ? WHERE id = ?', next, pack(vars, kept), id);
     return next;
   };
 
@@ -527,7 +554,7 @@ export function advance(deps: FlowDeps, id: string): number | null {
         const ms = typeof step.wait === 'string' ? intervalMs(step.wait) : null;
         if (ms === null) return fail(i, 'wait', `rule.${run.rule} waits ${JSON.stringify(step.wait)} at step ${i + 1}, and a span is a number and one of m, h, d or w.`);
         record(deps, id, i, 'wait', 'waiting', null);
-        deps.sql.exec("UPDATE automation_run SET state = 'waiting', step = ?, vars = ? WHERE id = ?", i, JSON.stringify(vars), id);
+        deps.sql.exec("UPDATE automation_run SET state = 'waiting', step = ?, vars = ? WHERE id = ?", i, pack(vars, kept), id);
         return deps.nowMs + ms;
       }
 
@@ -536,6 +563,17 @@ export function advance(deps: FlowDeps, id: string): number | null {
         const value = String(fill(spec.to, scope()));
         if (value.length > VAR_BYTES) return fail(i, 'set_var', `rule.${run.rule} sets ${spec.name} to ${value.length} characters, and one answer holds ${VAR_BYTES}.`);
         vars[spec.name] = value;
+        /* AND FILLED A SECOND TIME, FROM WHAT A QUESTION TO SPARK MAY CARRY: the row `sendable` leaves, and every
+           variable already kept here read as it was kept, so one set from another carries the cleaning with it. The
+           first fill alone is what audit forty-six measured leaving through a real self-host: `set_var: { to:
+           '{{trigger.row.pin}}' }` then `{{vars.p}}` put "given hunter2" in the model's request body, and `to:
+           '{{trigger.row}}'` put the row's JSON there with `pin` in it. The lint refuses both at install; this is the
+           second line, for a rule an earlier build let install. */
+        const row = read();
+        const now = scope();
+        const clean = String(fill(spec.to, { vars: { ...vars, ...kept }, trigger: row ? { ...now.trigger, row: sendable(deps, row).fields } : now.trigger }));
+        if (clean === value) delete kept[spec.name];
+        else kept[spec.name] = clean;
         if (JSON.stringify(vars).length > VARS_BYTES) return fail(i, 'set_var', `rule.${run.rule}'s answers passed ${VARS_BYTES} characters at step ${i + 1}.`);
         record(deps, id, i, 'set_var', 'done', value);
         i = saved(i + 1);
@@ -570,10 +608,10 @@ export function advance(deps: FlowDeps, id: string): number | null {
               : `rule.${run.rule} asked Spark at step ${i + 1}, and Spark did not answer within a day, so the run stopped there.`,
           );
         }
-        const asked = ask(deps, run.rule, op.verb, step, i, id, scope(), read(), actor);
+        const asked = ask(deps, run.rule, op.verb, step, i, id, scope(), kept, read(), actor);
         if (!asked.ok) return fail(i, op.verb, asked.say);
         record(deps, id, i, op.verb, 'waiting', asked.holds);
-        deps.sql.exec("UPDATE automation_run SET state = 'waiting', step = ?, vars = ? WHERE id = ?", i, JSON.stringify(vars), id);
+        deps.sql.exec("UPDATE automation_run SET state = 'waiting', step = ?, vars = ? WHERE id = ?", i, pack(vars, kept), id);
         return deps.nowMs + asked.waitMs;
       }
 
@@ -676,6 +714,7 @@ function ask(
   n: number,
   run: string,
   scope: Record<string, unknown>,
+  kept: Kept,
   row: Entry | null,
   actor: string,
 ): { ok: true; holds: string; waitMs: number } | { ok: false; say: string } {
@@ -688,7 +727,12 @@ function ask(
      holding the words `{{pin}}`, which the run's fill writes into the question and the row's fill then reads, so the
      field is taken out of both fills and not only the first. */
   const facts = verb === 'ask_spark' && row ? sendable(deps, row) : row;
-  const scoped = facts === row ? scope : { ...scope, trigger: { ...(scope.trigger as Record<string, unknown>), row: facts!.fields } };
+  /* AND EACH VARIABLE SET FROM A FIELD THAT NEVER LEAVES IS READ AS IT WAS KEPT (`advance`'s `set_var`), so a question
+     to Spark gets the dash where `{{vars.p}}` held `pin`. A question to a person stays in the record and reads the value. */
+  const scoped =
+    verb !== 'ask_spark'
+      ? scope
+      : { vars: { ...(scope.vars as Vars), ...kept }, trigger: facts ? { ...(scope.trigger as Record<string, unknown>), row: facts.fields } : scope.trigger };
   let question = String(fill(spec.question, scoped));
   if (facts) question = fillRow(question, facts, deps.nowMs);
   if (question.length > VAR_BYTES) return { ok: false, say: `rule.${rule}'s question at step ${n + 1} runs to ${question.length} characters, and a question holds ${VAR_BYTES}.` };
@@ -778,11 +822,15 @@ export function answerStep(deps: FlowDeps, a: { run: string; step: number; by: s
     value = hit;
   }
   if (String(value).length > VAR_BYTES) return stop(`The answer at step ${a.step + 1} of rule.${run.rule} runs to ${String(value).length} characters, and one answer holds ${VAR_BYTES}.`);
-  const vars = { ...(JSON.parse(run.vars) as Vars), [spec.as]: value };
+  /* AN ANSWER OVERWRITES WHAT WAS KEPT UNDER ITS NAME, since the variable now holds the answer and not the field it was
+     set from, and a later question to Spark reading the kept dash would be asking about a value the run no longer has. */
+  const stored = unpack(run.vars);
+  const vars = { ...stored.vars, [spec.as]: value };
+  delete stored.kept[spec.as];
   if (JSON.stringify(vars).length > VARS_BYTES) return stop(`rule.${run.rule}'s answers passed ${VARS_BYTES} characters at step ${a.step + 1}.`);
 
   record(deps, run.id, a.step, row.kind, 'done', String(value));
-  deps.sql.exec("UPDATE automation_run SET state = 'pending', step = ?, vars = ? WHERE id = ?", a.step + 1, JSON.stringify(vars), run.id);
+  deps.sql.exec("UPDATE automation_run SET state = 'pending', step = ?, vars = ? WHERE id = ?", a.step + 1, pack(vars, stored.kept), run.id);
   wake(deps, run.id, deps.nowMs);
   return ok(null);
 }

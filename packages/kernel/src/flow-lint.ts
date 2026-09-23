@@ -272,6 +272,27 @@ function hiddenIn(question: string, hidden: ReadonlyMap<string, string>): { fiel
 }
 
 /**
+ * Where a secret or file field entered a variable: the `set_var` that put it there, the variable it went into first,
+ * the field, and the spelling that reached it.
+ */
+type Carried = { at: string; name: string; field: string; type: string; spelled: string };
+
+/**
+ * The first `{{vars.x}}` in `text`, any spacing, naming a variable that `carried` says holds a field that never leaves the
+ * record, or `null`. Read with `RUN_PATH`, the pattern `fill` writes the variable in with, so a spelling this misses is
+ * one the run leaves as typed.
+ */
+function carriedIn(text: string, carried: ReadonlyMap<string, Carried>): { name: string; spelled: string; from: Carried } | null {
+  for (const m of text.matchAll(RUN_PATH)) {
+    if (m[1] !== 'vars') continue;
+    const name = m[2]!.split('.')[0]!;
+    const from = carried.get(name);
+    if (from) return { name, spelled: m[0], from };
+  }
+  return null;
+}
+
+/**
  * Where the first `ask_spark` step of a body sits, as `steps[1]` or `steps[0].then[2]`, or `null` when it asks nothing.
  *
  * ITS OWN WALK, BOTH ARMS OF EVERY BRANCH, because `actionsOf` returns only `ACTIONS` and `ask_spark` is a step's verb.
@@ -465,6 +486,14 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
   const names = new Set<string>();
   let count = 0;
   const row = installed === undefined ? null : rowOf(decl, trigger, installed);
+  const fields = row === null ? undefined : ((installed?.get(`register.${row}`) as { fields?: { id?: unknown; type?: unknown }[] } | undefined)?.fields ?? undefined);
+  const hidden = new Map((fields ?? []).filter((f) => UNSENDABLE.includes(String(f.type))).map((f) => [String(f.id), String(f.type)]));
+  /* EVERY VARIABLE A `set_var` FILLED FROM A FIELD THAT NEVER LEAVES THE RECORD, by the step that did it. Read in the
+     walk's own order, which is the order the plan takes the steps in, so only a step before the question counts. A
+     `set_var` inside either arm of an `if` counts for every step after the branch, since the lint cannot tell which arm
+     the row will take, and a later `set_var` of the same name does not take it off, since the lint does not follow
+     which of two writes of one name a run took last. */
+  const carried = new Map<string, Carried>();
   const walk = (list: unknown, at: string, depth: number): Refusal | null => {
     if (!Array.isArray(list)) return bad('DECLARATION_INVALID', `${id}'s ${at} is a list of steps.`, at);
     for (const [i, step] of list.entries()) {
@@ -488,7 +517,6 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
       if (verb === 'ask_spark' && (step.ask_spark as { about?: unknown }).about !== undefined) {
         const about = (step.ask_spark as { about: string[] }).about;
         if (rowless) return bad('DECLARATION_INVALID', `${id} is started by ${trigger}, which has no row, and ${here} sends fields of one with about:.`, `${here}.ask_spark.about`);
-        const fields = row === null ? undefined : ((installed?.get(`register.${row}`) as { fields?: { id?: unknown; type?: unknown }[] } | undefined)?.fields ?? undefined);
         if (fields !== undefined)
           for (const name of about) {
             const field = fields.find((f) => f.id === name);
@@ -497,14 +525,35 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
               return bad('DECLARATION_INVALID', `${id} sends ${name} to Spark at ${here}, and a ${String(field.type)} field never leaves the record.`, `${here}.ask_spark.about`);
           }
       }
+      /* A VARIABLE CARRIES WHAT IT WAS SET FROM. `set_var` fills `to` from the whole row, before `sendable` is anywhere
+         near it, so the question's own braces were checked and a variable was not: audit forty-six measured, through a
+         real self-host, `set_var: { to: '{{trigger.row.pin}}' }` then `{{vars.p}}` installing clean and the model's
+         request body holding "What rate applies to Rent, given hunter2?". A variable set from another carried one
+         carries it too, and the refusal names the `set_var` where the field went in. */
+      if (verb === 'set_var') {
+        const spec = step.set_var as { name: string; to: string };
+        const direct = hidden.size === 0 ? null : hiddenIn(spec.to, hidden);
+        const through = direct ? null : carriedIn(spec.to, carried);
+        if (direct) carried.set(spec.name, { at: here, name: spec.name, ...direct });
+        else if (through) carried.set(spec.name, through.from);
+      }
+      if (verb === 'ask_spark') {
+        const via = carriedIn(String((step.ask_spark as { question: unknown }).question), carried);
+        if (via) {
+          const held = via.from.spelled.replace(/\s/g, '') === '{{trigger.row}}' ? `the whole ${row ?? 'trigger'} row, ${via.from.field} in it` : via.from.field;
+          return bad(
+            'DECLARATION_INVALID',
+            `${id} puts ${via.spelled} in its question to Spark at ${here}, and ${via.name} holds ${held}${via.from.name === via.name ? '' : `, by way of ${via.from.name}`}: ${via.from.at} put it there with ${via.from.spelled}, and a ${via.from.type} field never leaves the record. Take ${via.spelled} out of the question, or set ${via.name} from fields that may leave.`,
+            `${here}.ask_spark.question`,
+          );
+        }
+      }
       /* AND THE QUESTION ITSELF LEAVES THE RECORD, so what it names is held to the rule `about:` is. `about:` was
          checked and the question was not: over a list whose `pin` is secret, `{{pin}}` in the question installed, and
          the checker measured on 23 September, through `ask_person`, whose question is filled the same way, that
          `{{trigger.row.pin}}` and `{{ trigger.row.pin }}` were asked as `hunter2` and `{{trigger.row}}` as the JSON of
          the whole row, `pin` in it. Each spelling is read with the pattern that fills it (`ROW_FILL`, `RUN_PATH`). */
       if (verb === 'ask_spark' && !rowless) {
-        const fields = row === null ? undefined : ((installed?.get(`register.${row}`) as { fields?: { id?: unknown; type?: unknown }[] } | undefined)?.fields ?? undefined);
-        const hidden = new Map((fields ?? []).filter((f) => UNSENDABLE.includes(String(f.type))).map((f) => [String(f.id), String(f.type)]));
         const found = hidden.size === 0 ? null : hiddenIn(String((step.ask_spark as { question: unknown }).question), hidden);
         if (found)
           return bad(
