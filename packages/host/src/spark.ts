@@ -59,6 +59,16 @@ export const SPARK_TIMEOUT_MS = 30_000;
 /** At most this much of an answer is read. Three proposals are a few kilobytes. */
 const ANSWER_BYTES = 64_000;
 
+/**
+ * The most tokens one side of one call is billed, whatever the provider's body says (`counted`).
+ *
+ * A MILLION, WHICH IS SEVENTY TIMES THE LARGEST CALL THE PACKAGE MAKES: its `propose` template caps the prompt at 12,000
+ * tokens and the completion at 1,500, and the largest `maxTokens` any template sends is 2,048. A count past it is not a
+ * count a call to this host can have spent. It keeps the ledger's columns whole, and tier `a`'s `neurons`, at the dearest
+ * rate in `MODELS` (400,000 a million out), comes to 400,000 for one side, which an `INTEGER` column holds exactly.
+ */
+export const SPARK_TOKENS_CEILING = 1_000_000;
+
 /** What the model is told. Data, so it can be read and reviewed in one place. */
 export const SPARK_INSTRUCTIONS = [
   'You are Spark, the manager of one BrainDog: a record a person keeps, arranged as lists, pages, packs and a voice.',
@@ -261,8 +271,9 @@ export type SparkInferenceCall = {
 /**
  * What the package reads back. `usage` is the provider's own count, which is what the meter bills (`46 §4.1`).
  *
- * `model` IS THE NAME THIS HOST SENT, AND IT IS OPTIONAL. The package's `InferenceReply` has no such field and `answer`
- * reads it structurally, as it reads `answered` off a throw, so an adapter that leaves it out keeps the template's name.
+ * `model` IS THE NAME THIS HOST SENT, AND IT IS OPTIONAL. The package's `InferenceReply` has no such field and every
+ * call it accounts reads it structurally (`nameIn`, `packages/spark/src/propose.ts`), as `answer` reads `answered` off a
+ * throw, so an adapter that leaves it out keeps the template's name.
  */
 export type SparkInferenceReply = { text: string; usage: { in: number; out: number }; model?: string };
 
@@ -293,8 +304,15 @@ const modelSent = (asked: string, configured: string | undefined): string =>
  * it is handed: measured on 23 September, a body reporting `prompt_tokens: -40` and `completion_tokens: 2.5` reached the
  * package as exactly that, a count that subtracts from the month and a REAL in an integer column. A fraction is rounded
  * up, as the package's own estimate (`tokens`) rounds, so a count nobody can bill in halves is never billed low.
+ *
+ * AND NOT PAST `SPARK_TOKENS_CEILING`, because whole and not negative is also true of `1e300`: `Number.isInteger(1e300)`
+ * holds, so wave 48's clamp handed it on, and measured on 23 September the ledger stored `tokens_in` and `tokens_out` as a
+ * REAL 1e300, with tier `a`'s `neurons` a REAL beside them (`packages/spark/test/spark-ledger-model.test.ts`). A number
+ * past the ceiling, `Infinity` included, which is what `JSON.parse` makes of `1e999`, is billed at the ceiling and not as
+ * zero, so a body that lies high is still counted high. `NaN > 0` is false, so a count that is not a number stays zero.
  */
-const counted = (value: unknown): number => (typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.ceil(value) : 0);
+const counted = (value: unknown): number =>
+  typeof value === 'number' && value > 0 ? Math.min(Math.ceil(value), SPARK_TOKENS_CEILING) : 0;
 
 /**
  * The same endpoint as the package's `Inference` port.

@@ -22,7 +22,7 @@ import { no, ok, refused, type Result } from '@braindog/ports';
 
 import type { Core } from './call.ts';
 import { ANSWER_SCHEMA, fenced, PROMPTS } from './prompts.ts';
-import { printValue } from './propose.ts';
+import { nameIn, printValue } from './propose.ts';
 import type { Ask, Inference } from './types.ts';
 
 const SHAPES: readonly string[] = ['text', 'number', 'choice'];
@@ -58,19 +58,6 @@ export const answerSchema = (ask: Pick<Ask, 'shape' | 'choices'>): object => ({
 type Heard = { usage: { in: number; out: number } | undefined; model: string | undefined };
 
 const count = (value: unknown): number | undefined => (typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : undefined);
-
-/**
- * The name the host says it sent the model under, read structurally off its reply or its throw, or nothing.
- *
- * THE PACKAGE ASKS BY ROUTING NAME AND THE HOST MAPS IT, so the name `core.run` holds is the template's and not what ran.
- * Measured on 23 September through the self-host with `SPARK_MODEL=llama3`: every `answer` row read `glm-5.3-flash`.
- * The host's `endpointInference` now says `model` on both (`packages/host/src/spark.ts`); an adapter that says nothing
- * keeps the template's name, which is what every row carried before.
- */
-const nameIn = (source: unknown): string | undefined => {
-  const model = typeof source === 'object' && source !== null ? (source as { model?: unknown }).model : undefined;
-  return typeof model === 'string' && model.trim() !== '' ? model : undefined;
-};
 
 /**
  * The host's `answered: true` mark on a thrown error, read structurally, or `null` for a model not reached.
@@ -131,11 +118,12 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
     const s = core.settings();
     /* THE CAP IS CHECKED HERE ON TIER `a` ONLY, as `read`'s is (`propose.ts`, `spent`). On `b` and `byo` this package
        does not refuse on the count at all: the host's model answers there too, and the host's `sparkGuardedEngine`
-       (`packages/host/src/spark.ts`) is what holds those tiers to `ask_cap`. That guard names `read` and `propose` and
-       not this method, so until it names `answer` (Brief C, in `packages/host`) an automation on `b` or `byo` is
-       unbounded. It is not guarded here as well, because the host counts those tiers with its own query over this same
-       table, and a second check here would be a second copy of that count to drift from it. The row below carries the
-       settings' tier so that guard's `kind = 'read' AND tier IN ('b', 'byo')` count already sees it. */
+       (`packages/host/src/spark.ts`) is what holds those tiers to `ask_cap`. That guard wraps `answer` as well as `read`
+       and `propose`: before it did, an automation on `b` or `byo` at `ask_cap: 1` with one read made still reached the
+       engine (`packages/host/test/spark-guard-answer.test.ts`). It is not guarded here as well, because the host counts
+       those tiers with its own query over this same table, and a second check here would be a second copy of that count
+       to drift from it. The row below carries the settings' tier so that guard's `kind = 'read' AND tier IN ('b', 'byo')`
+       count already sees it. */
     if (s.tier === 'a' && core.asksUsed() >= s.ask_cap)
       return no(
         'SPARK_BUDGET_SPENT',

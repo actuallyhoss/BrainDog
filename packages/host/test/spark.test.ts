@@ -312,9 +312,9 @@ test('A PROPOSAL ARRIVES FROM THE PACKAGE\'S ENGINE ONTO A REAL RECORD\'S DECIDE
   const reading = (await api.spark({}, owner)) as { ok: boolean; value: { model: string | null } };
   assert.equal(reading.value.model, null);
 
-  /* TWO CALLS, TWO ROWS IN SPARK'S OWN METER (`46 §4.1`), and the endpoint answered both. */
+  /* TWO CALLS, TWO ROWS IN SPARK'S OWN METER (`46 §4.1`), the endpoint answered both, and each row names the model the host sent. */
   const metered = own.all<{ kind: string; status: string; model: string }>('SELECT kind, status, model FROM call ORDER BY rowid');
-  assert.deepEqual(metered.map((row) => `${row.kind}:${row.status}:${row.model}`), ['read:ok:glm-5.3-flash', 'propose:ok:glm-5.3-flash']);
+  assert.deepEqual(metered.map((row) => `${row.kind}:${row.status}:${row.model}`), ['read:ok:small', 'propose:ok:small']);
   assert.equal(net.sent.length, 2);
 
   /* WHAT THE MODEL WAS SHOWN OF THE INDEX carries no open count, because a host reading the record through `list` cannot

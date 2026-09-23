@@ -68,6 +68,46 @@ const VERBS_FOR: Record<string, Verb[]> = {
   pattern: ['decide', 'dismiss'],
 };
 
+/**
+ * The name the host says it sent the model under, read structurally off its reply or its throw, or nothing.
+ *
+ * THE PACKAGE ASKS BY ROUTING NAME AND THE HOST MAPS IT, so the name `core.run` holds is the template's and not what ran.
+ * Measured on 23 September through the self-host with `SPARK_MODEL=llama3`: every `answer` row read `glm-5.3-flash`.
+ * The host's `endpointInference` now says `model` on both (`packages/host/src/spark.ts`); an adapter that says nothing
+ * keeps the template's name, which is what every row carried before.
+ */
+export const nameIn = (source: unknown): string | undefined => {
+  const model = typeof source === 'object' && source !== null ? (source as { model?: unknown }).model : undefined;
+  return typeof model === 'string' && model.trim() !== '' ? model : undefined;
+};
+
+/**
+ * `engine`, and the name the host said it sent the last call under, off the reply or off the throw.
+ *
+ * WAVE 48 READ THIS NAME FOR `answer` AND NOT HERE, so one self-host wrote two names for one model: with `SPARK_MODEL=llama3`
+ * an automation's row read `llama3`, and the palette's `read` and `propose` rows, sent to the same endpoint as the same
+ * `llama3`, read `glm-5.3-flash` (`test/spark-ledger-model.test.ts`). A throw is read as a reply is, because the host's
+ * marked throws say the name too and a plain one says none, which leaves the template's.
+ */
+const naming = (engine: Inference): { inference: Inference; sent(): string | undefined } => {
+  let sent: string | undefined;
+  return {
+    inference: {
+      complete: async (call) => {
+        try {
+          const reply = await engine.complete(call);
+          sent = nameIn(reply);
+          return reply;
+        } catch (e) {
+          sent = nameIn(e);
+          throw e;
+        }
+      },
+    },
+    sent: () => sent,
+  };
+};
+
 /** Spark's own principal. `30 §3`: every event this package causes carries actor `spark`. */
 export const SPARK_CTX: CallContext = { principal: { kind: 'system', id: 'spark' } };
 
@@ -236,12 +276,13 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
           status: 'nothing',
         });
 
+      const drafter = naming(host);
       const ran = await core.run({
         id: 'predicate',
         slots: { '%INDEX%': indexLines(known), '%QUESTION%': question },
-        inference: host,
+        inference: drafter.inference,
       });
-      model = ran.model;
+      model = drafter.sent() ?? ran.model;
       usage = ran.usage;
       ms = ran.ms;
       /* NO RETRY, AND A FALLBACK RATHER THAN A REFUSAL (`46 §10`). A predicate that did not come back,
@@ -440,10 +481,11 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
       );
 
     const kept = { rows: it.rows.length };
+    const proposer = naming(engine);
     const ran = await core.run({
       id: 'propose',
       slots: { '%INDEX%': indexLines(it.shown), '%QUESTION%': asked },
-      inference: engine,
+      inference: proposer.inference,
       model: s.tier === 'a' ? undefined : (s.model ?? undefined),
       trim: {
         slot: '%ROWS%',
@@ -453,13 +495,16 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
         },
       },
     });
+    /* THE ROW AND THE PROPOSAL BOTH SAY IT, because `model` ships with every output (`23 §1`) and a proposal naming a
+       model nothing was sent is the ledger's fault again, one screen further out. */
+    const used = proposer.sent() ?? ran.model;
 
     const account = (status: 'ok' | 'refused' | 'error', code?: string, filed?: string): void =>
       core.account({
         id: callId,
         kind: 'propose',
         tier: s.tier,
-        model: ran.model,
+        model: used,
         usage: ran.usage,
         ms: ran.ms,
         status,
@@ -518,7 +563,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
       verbs: VERBS_FOR[kind] ?? [],
       body_kind: kind === 'options' ? 'options' : kind === 'rowset' ? 'rowset' : 'query',
       body: checked.value.body,
-      model: ran.model,
+      model: used,
       filed,
       read: trimmedRead(it.read, kept.rows),
     });
