@@ -90,7 +90,7 @@
            `aria-rowcount` now; this was the one caller of six that added the header itself, and
            the other five did not, so five surfaces announced one row too few and this one was
            right by hand. -->
-      <Table columns={comparison.columns} rows={comparison.rows} total={comparison.rows.length} label={block.heading} />
+      <Table columns={comparison.columns} rows={comparison.rows} total={comparison.rows.length} label={block.heading} href={opts.href} />
     {/if}
   {:else if spec.primitive === 'grid'}
     <!-- BY NAME rather than through `Draw`, because the callback belongs to one primitive: handed

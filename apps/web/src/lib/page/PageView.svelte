@@ -178,6 +178,8 @@
     ...(live ? {} : { hole: pressHole }),
     /* A forecast's knobs and its readout: arithmetic over the walk already on the page, kept in memory. */
     scenario: true,
+    /* EVERY LINK THE RENDERER DRAWS, under the app: the record writes `/decide`, and the tab is on `/app/<slug>`. */
+    href: inApp,
   });
 
   /**
@@ -795,11 +797,11 @@
             {:else if block.kind === 'table' && walkTables(block)}
               <!-- A TABLE OVER A WALK DRAWN ONCE PER CURRENCY: each currency's rows under its code, and why, once. -->
               {#each walkTables(block) ?? [] as part}
-                {#each part.said as segment}{#if segment.type === 'markdown'}<div class="document"><Markdown {segment} /></div>{/if}{/each}
-                {#if part.table}<Table columns={part.table.columns} rows={part.table.rows} total={part.table.total} label={block.heading} />{/if}
+                {#each part.said as segment}{#if segment.type === 'markdown'}<div class="document"><Markdown {segment} opts={{ href: inApp }} /></div>{/if}{/each}
+                {#if part.table}<Table columns={part.table.columns} rows={part.table.rows} total={part.table.total} label={block.heading} href={inApp} />{/if}
               {/each}
             {:else if block.kind === 'table'}
-              <Table columns={block.columns} rows={block.rows} total={block.total} label={block.heading} />
+              <Table columns={block.columns} rows={block.rows} total={block.total} label={block.heading} href={inApp} />
             {:else}
               {#each drawn.segments as segment}
                 <!-- A FIGURE IS A DOOR, and the address is the metric's own: `hrefFor` derives it
@@ -826,7 +828,7 @@
                     ontick={(row, done) => tickTask(row, done)}
                     onact={(row, option) => askGate(row, option)}
                     oncapture={capturable(block) ? captureLine : undefined}
-                  />{:else if segment.type === 'degraded'}<Degraded {segment} />{:else if segment.type === 'markdown'}<div class="document"><Markdown {segment} /></div>{/if}
+                  />{:else if segment.type === 'degraded'}<Degraded {segment} />{:else if segment.type === 'markdown'}<div class="document"><Markdown {segment} opts={{ href: inApp }} /></div>{/if}
               {/each}
             {/if}
 

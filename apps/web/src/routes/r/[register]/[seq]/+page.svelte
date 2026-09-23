@@ -768,7 +768,7 @@
                      prose is the same hole in the same dialect. -->
                 <Document
                   src={String(row.fields[f.id])}
-                  opts={{ resolve, link, now: clock, ...(live ? {} : { hole: pressHole }) }}
+                  opts={{ resolve, link, now: clock, href: at, ...(live ? {} : { hole: pressHole }) }}
                 />
               {:else}
                 <p class="missing">{copy.editNotSet}</p>
@@ -794,7 +794,7 @@
               {#if twice}<span class="incoming-label">{copy.linkedThrough(rel.label)}</span>{/if}
               <span class="incoming-count num">{rel.total}</span>
             </h2>
-            <Table columns={rel.columns} rows={rel.rows} total={rel.total} label="{rel.name} · {rel.label}" />
+            <Table columns={rel.columns} rows={rel.rows} total={rel.total} label="{rel.name} · {rel.label}" href={at} />
             {#if rel.total > rel.rows.length}
               <a class="incoming-more" href={at(rel.href)}>
                 All {rel.total} <Icon name="chevron" size="s" />

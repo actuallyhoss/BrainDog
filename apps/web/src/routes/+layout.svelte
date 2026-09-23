@@ -16,7 +16,6 @@
 -->
 <script lang="ts">
   import { apiBase, at, here } from '$lib/at.ts';
-  import { addressed } from '$lib/addressed.ts';
   /* The shared skin first: `tokens.css` opens with the `@layer` statement, so the layer ORDER — and
      with it the rule that no installed theme can reach the a11y layer — is established before any
      other stylesheet is parsed. */
@@ -388,8 +387,7 @@
        the window simply had two thirds of itself below a fold that could not be crossed: `/s/<token>`
        is 2,628px of projected page in a 993px window, and the only part anybody could read was the
        first third. That is the artefact somebody hands an accountant. -->
-  <!-- `addressed`: the block renderer's own links, put under `/app` after they are drawn (`lib/addressed.ts`). -->
-  <main id="main" class="bare" data-screen={settled()} {@attach addressed}>{@render children()}</main>
+  <main id="main" class="bare" data-screen={settled()}>{@render children()}</main>
 {:else}
   <div class="shell" data-rail={railIcons ? 'icons' : undefined} data-shape={shape}>
     {#if shape === 'rail'}
@@ -445,7 +443,7 @@
       that carried meaning by moving would have to say it another way as well.
     -->
     {#key page.url.pathname}
-    <main id="main" class="body" data-screen={settled()} {@attach addressed}>
+    <main id="main" class="body" data-screen={settled()}>
       <!-- ABOVE THE SCREEN AND INSIDE THE SCROLLER, so it is the first thing read and the first
            thing to leave when the reader scrolls. A fixed strip across the top of every screen is a
            permanent tax on the height of every screen, and this is a sentence somebody reads once. -->

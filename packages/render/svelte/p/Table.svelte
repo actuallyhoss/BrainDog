@@ -26,7 +26,7 @@
 <script lang="ts">
   import { rowsAsCards } from '../cards.svelte.ts';
   import type { Snippet } from 'svelte';
-  import { TONES } from '../../src/index.ts';
+  import { TONES, hrefFor, type RenderOptions } from '../../src/index.ts';
   import { ariaSort, cardCells, cardPlan, chunkRows, moveCell, type CardCell, type Cell, type Column, type TableRow } from '../types.ts';
   import { glyphColumn, intrinsicRows, tableCellBody, TABLE_CHUNK, TABLE_ROWS_LABEL } from '../../src/table.ts';
   import { MISSING } from '../../src/format.ts';
@@ -46,6 +46,7 @@
     onsort,
     onmore,
     cellSnippet,
+    href,
   }: {
     columns: readonly Column[];
     rows: readonly TableRow[];
@@ -71,6 +72,8 @@
     onsort?: ((field: string) => void) | undefined;
     onmore?: (() => void) | undefined;
     cellSnippet?: Snippet<[TableRow, Column, string | null]> | undefined;
+    /** Where a row's link goes, as the host serves it: `RenderOptions.href`, which this primitive is not otherwise handed. */
+    href?: RenderOptions['href'];
   } = $props();
 
   const tracks = $derived(columns.map((c) => c.width).join(' '));
@@ -298,7 +301,7 @@
            `div[role=row]` with `cursor: auto` and makes no promise at all, which is what this
            branch now matches. A row that cannot be activated is not a control. -->
       {#if row.href}
-        <a class="table-card" href={row.href} data-intent={row.tone}>
+        <a class="table-card" href={hrefFor({ href }, row.href)} data-intent={row.tone}>
           {@render card(row)}
         </a>
       {:else if onactivate}

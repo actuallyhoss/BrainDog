@@ -14,7 +14,7 @@
   line; whether the write lands is the host's to say, beside the row it adds.
 -->
 <script lang="ts">
-  import { CAPTURE_ADD, captureNowhere, capturePlan, capturePrompt, capturePromptFor, captureSubmit, inline, text as plain, type Block, type RenderOptions } from '../src/index.ts';
+  import { CAPTURE_ADD, captureNowhere, hrefFor, capturePlan, capturePrompt, capturePromptFor, captureSubmit, inline, text as plain, type Block, type RenderOptions } from '../src/index.ts';
   import type { OnCapture } from './types.ts';
 
   let {
@@ -53,6 +53,6 @@
   </form>
 {:else}
   <div class="capture">
-    <p class="capture-elsewhere">{#if plan.href}<a class="capture-where" href={plan.href}>{capturePromptFor(plan.label)}</a>{:else}{captureNowhere(plan.label)}{/if}</p>
+    <p class="capture-elsewhere">{#if plan.href}<a class="capture-where" href={hrefFor(opts, plan.href)}>{capturePromptFor(plan.label)}</a>{:else}{captureNowhere(plan.label)}{/if}</p>
   </div>
 {/if}

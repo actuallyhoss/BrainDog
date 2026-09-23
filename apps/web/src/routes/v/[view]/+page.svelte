@@ -373,6 +373,7 @@
         total={matched}
         cap={DOM_CAP}
         label={name}
+        href={at}
         bind:focus
         onactivate={(row) => goto(at(`/r/${register}/${row.key.split('#')[1]}`))}
       />

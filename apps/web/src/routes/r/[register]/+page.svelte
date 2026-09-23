@@ -2545,6 +2545,7 @@
           cap={DOM_CAP}
           {...cursor === null ? {} : { onmore: more }}
           label={decl.name}
+          href={at}
           {sort}
           selected={selectedKeys}
           bind:focus

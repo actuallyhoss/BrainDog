@@ -28,6 +28,7 @@
     resolve: (path: string) => said(resolverOf(block.values)(path)),
     now,
     cellHref: (i: number) => block.metrics?.[i]?.href ?? null,
+    href: at,
   });
   const openHref = (block: LiveBlock): string | null => (block.register ? registerHref(block.register, block.where) : null);
 </script>
@@ -58,10 +59,10 @@
           {/snippet}
         </Empty>
       {:else if block.kind === 'table'}
-        <Table columns={block.columns} rows={block.rows} total={block.total} label={block.heading} />
+        <Table columns={block.columns} rows={block.rows} total={block.total} label={block.heading} href={at} />
       {:else}
         {#each drawn.segments as segment}
-          {#if segment.type === 'block'}<Block block={segment} opts={optsFor(block)} />{:else if segment.type === 'degraded'}<Degraded {segment} />{:else if segment.type === 'markdown'}<div class="document"><Markdown {segment} /></div>{/if}
+          {#if segment.type === 'block'}<Block block={segment} opts={optsFor(block)} />{:else if segment.type === 'degraded'}<Degraded {segment} />{:else if segment.type === 'markdown'}<div class="document"><Markdown {segment} opts={{ href: at }} /></div>{/if}
         {/each}
       {/if}
       {#if !drawn.refusal && !block.cannot && block.total > block.shown}

@@ -12,7 +12,7 @@
  */
 
 export { parse, splitRow, type Block, type Degraded, type Markdown, type ParseOptions, type Row, type RowRef, type Segment } from './parse.ts';
-export { toHTML, captioned, describe, escape, holeLabel, verbatimText, type RenderOptions } from './html.ts';
+export { toHTML, captioned, describe, escape, holeLabel, hrefFor, verbatimText, type RenderOptions } from './html.ts';
 export {
   CARD_ROLES,
   CARDS_NONE,

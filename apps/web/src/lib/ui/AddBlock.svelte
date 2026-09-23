@@ -32,6 +32,7 @@
   import { KINDS, isKind } from 'braindog-render';
   import { Block, Degraded } from 'braindog-render/svelte';
 
+  import { at } from '../at.ts';
   import { copy } from '../copy.ts';
   import { NOW, REGISTERS, page as readPage, values } from '../record/api.ts';
   import { toSegments } from '../record/blocks.ts';
@@ -59,7 +60,7 @@
      came from `NOW` — the Money page said an invoice was 6w overdue and the Home page said 5w, for
      the same row, two clicks apart. In production that reads differently on two devices and drifts
      a day further every day. */
-  const opts = { resolve: (path: string) => resolved[path] ?? null, now: NOW };
+  const opts = { resolve: (path: string) => resolved[path] ?? null, now: NOW, href: at };
 
   const PURPOSES = ['figure', 'list', 'plan', 'say', 'media'] as const;
 

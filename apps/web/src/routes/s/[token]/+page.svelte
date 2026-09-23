@@ -51,7 +51,7 @@
      came from `NOW` — the Money page said an invoice was 6w overdue and the Home page said 5w, for
      the same row, two clicks apart. In production that reads differently on two devices and drifts
      a day further every day. */
-  const opts = { resolve: (path: string) => resolved[path] ?? null, now: NOW };
+  const opts = { resolve: (path: string) => resolved[path] ?? null, now: NOW, href: at };
 
   /**
    * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
@@ -135,10 +135,10 @@
             {#if drawn.refusal}
               <Empty compact kind={drawn.refusal.kind} title={drawn.refusal.title} body={drawn.refusal.body} lines={drawn.refusal.lines} />
             {:else if block.kind === 'table'}
-              <Table columns={block.columns} rows={block.rows} total={block.total} label={block.heading} />
+              <Table columns={block.columns} rows={block.rows} total={block.total} label={block.heading} href={at} />
             {:else}
               {#each drawn.segments as segment}
-                {#if segment.type === 'block'}<Block block={segment} {opts} />{:else if segment.type === 'degraded'}<Degraded {segment} />{:else if segment.type === 'markdown'}<div class="document"><Markdown {segment} /></div>{/if}
+                {#if segment.type === 'block'}<Block block={segment} {opts} />{:else if segment.type === 'degraded'}<Degraded {segment} />{:else if segment.type === 'markdown'}<div class="document"><Markdown {segment} {opts} /></div>{/if}
               {/each}
             {/if}
 

@@ -12,7 +12,7 @@
 -->
 <script lang="ts">
   import { tick } from 'svelte';
-  import { figureChars, inline, leadingCode, symbolFigure, symbolText, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
+  import { figureChars, hrefFor, inline, leadingCode, symbolFigure, symbolText, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
   import { columnAt, columnsOf, dropTarget, lanes, moveTarget, type Moves } from '../../src/board.ts';
   import { takeWorking, WORKING_GLYPH, WORKING_LABEL } from '../../src/working.ts';
   import { valueWord } from '../../src/format.ts';
@@ -373,7 +373,8 @@
   -->
   <div class="grid" style="--cells:{block.rows.length}">
     {#each block.rows as row, i}
-      {@const href = opts.cellHref?.(i) ?? null}
+      {@const to = opts.cellHref?.(i) ?? null}
+      {@const href = to === null ? null : hrefFor(opts, to)}
       <!-- THE CURRENCY CODE IS PRESENT AND QUIET. A figure the size of this one read "GBP" as loudly
            as the number, three capitals in front of every headline on the screen. The code stays,
            because money is never a bare number, and the text is unchanged; only the emphasis moves,

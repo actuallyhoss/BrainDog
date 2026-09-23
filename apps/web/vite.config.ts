@@ -127,14 +127,29 @@ function resolveDependencies(file: string, deps: string[], { hostId, hostType }:
   return layout ? kept.filter((d) => d === file || !layout.has(d)) : kept;
 }
 
+/**
+ * AND `/app/<slug>/api/*`, AS WRITTEN, TO THE SAME PLACE. Under a slug `apiBase()` (`lib/at.ts`) sends every record
+ * call to `/app/<slug>/api/<method>`, and with only `/api` here nothing forwarded it, so a dev tab on
+ * `/app/acme/r/tasks` asked Vite for the record and Vite has none. The path is NOT rewritten to `/api`: the record
+ * answers it for its own slug and refuses any other (`research-one-domain.md` §3.2), and a proxy that cut the slug off
+ * would answer every slug with whichever record is listening, which is the check the path exists to make. A key that
+ * opens with `^` is a pattern to Vite (`doesProxyContextMatchUrl`), and every other key is a prefix.
+ *
+ * THE SEGMENT IS A SLUG BY `SLUG`'S GRAMMAR IN `lib/at.ts`, AND NOT ANY SEGMENT. `api` is a legal register id
+ * (`REGISTER_ID` in the kernel), so with `[^/]+` a reload of `/app/r/api/3`, row 3 of that register on a tab with no
+ * slug, matched and was sent to the record instead of the app. A slug is at least two characters, so `r`, `p`, `v`
+ * and the other one-letter routes can never be one.
+ */
+const PROXY = { '/api': API, '/auth': API, '/account': API, '/app/catalogue': API, '^/app/[a-z][a-z0-9-]{0,30}[a-z0-9]/api/': API };
+
 export default defineConfig({
   plugins: [sveltekit(), entryGraphPlugin],
   define: { __BRAINDOG_VARIANT__: JSON.stringify(VARIANT), __BRAINDOG_ENV__: JSON.stringify(ENV) },
   resolve: { alias: [{ find: '@braindog/skin/house.css', replacement: PALETTE }] },
   /* `/app/catalogue` AND NOT `/catalogue`: the app is served under `/app` (`svelte.config.js`) and asks for the catalogue
-     there (`routes/packs/browse/catalogue.ts`), so a proxy on the old path forwarded nothing. The record, the sign-in
-     and the account stay at the root, where the app still sends them. */
-  server: { port: 5183, strictPort: true, proxy: { '/api': API, '/auth': API, '/account': API, '/app/catalogue': API } },
-  preview: { port: 5183, strictPort: true, proxy: { '/api': API, '/auth': API, '/account': API, '/app/catalogue': API } },
+     there (`routes/packs/browse/catalogue.ts`), so a proxy on the old path forwarded nothing. The sign-in and the
+     account stay at the root, and so does the record for a tab with no slug. */
+  server: { port: 5183, strictPort: true, proxy: PROXY },
+  preview: { port: 5183, strictPort: true, proxy: PROXY },
   build: { target: 'es2022', cssMinify: 'lightningcss', modulePreload: { resolveDependencies } },
 });

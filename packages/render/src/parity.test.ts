@@ -45,6 +45,9 @@ registerHooks({
 const { default: Block } = (await import(new URL('../svelte/Block.svelte', import.meta.url).href)) as {
   default: Component<{ block: BlockSegment }>;
 };
+const { default: Markdown } = (await import(new URL('../svelte/Markdown.svelte', import.meta.url).href)) as {
+  default: Component<{ segment: unknown; opts: Record<string, unknown> }>;
+};
 
 const ENTITY: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", '#x27': "'" };
 const decode = (s: string): string => s.replace(/&(amp|lt|gt|quot|#39|#x27);/gu, (_, e: string) => ENTITY[e] ?? '');
@@ -285,4 +288,60 @@ test('a figure longer than a tile holds says its longest amount, as drawn, and a
   const html = toHTML([page('```stat\nCash now | EGP 43,700.00 · USD 1.00\nUsers | 36\n```')]);
   assert.match(html, /<span class="cell-figure num" data-fit="" style="--chars:13">/u);
   assert.match(html, /<span class="cell-figure num">36<\/span>/u);
+});
+
+/* ── the host's `href` ─────────────────────────────────────────────────────── */
+
+/**
+ * WHERE THE HOST LIVES IS THE HOST'S TO SAY, and the record's text does not know it. A queue's "N more", a
+ * capture's list, a table row, a `[label](/r/x)` note and a `{{ref:}}` are all written record-relative, as
+ * `/decide` or `/r/things/1`, and this package drew them exactly so. Under a host served from `/app/<slug>` each
+ * of those is outside the app: the web app shipped a `MutationObserver` over its `<main>` that rewrote every
+ * root-path `href` after the renderer had drawn it, because the renderer had nowhere to be told.
+ *
+ * THIS STANDS IN FOR THAT HOST, and it is idempotent the way the app's `at()` is, because the renderer passes
+ * the host's own answers (`link`, `cellHref`) through it too and some of those are rendered already.
+ */
+const under = (p: string): string => (p.startsWith('/') && !p.startsWith('//') && !p.startsWith('/app/') ? `/app/acme${p}` : p);
+const hrefsOf = (t: string): string[] => [...t.matchAll(/ href="([^"]*)"/gu)].map((m) => m[1]!);
+const Hosted = Block as unknown as Component<{ block: BlockSegment; opts: Record<string, unknown> }>;
+
+test('EVERY ADDRESS BOTH RENDERERS DRAW GOES THROUGH THE HOST\'S `href`, and the two trees still agree', () => {
+  const opts = { href: under, link: (spoken: string) => `/r/${spoken.replace('#', '/')}` };
+  const shapes = [
+    SHAPES['a queue whose count of what is left says where the rest are']!,
+    SHAPES['a capture with nowhere to write and a door to its list']!,
+    SHAPES['figures, trends, rings and a link']!,
+    '```feed\nagent | Claude | 2 | saves on {{ref:things#4}} | 3h ago\n```',
+  ];
+  const seen: string[] = [];
+  for (const src of shapes) {
+    const block = page(src);
+    const svelte = tree(render(Hosted, { props: { block, opts } }).body);
+    const html = tree(toHTML([block], opts));
+    assert.equal(noRovingStop(svelte), noRovingStop(html), src);
+    seen.push(...hrefsOf(svelte), ...hrefsOf(html));
+  }
+  assert.deepEqual(
+    [...new Set(seen)].sort(),
+    ['/app/acme/decide', '/app/acme/r/tasks?f=state:is:backlog', '/app/acme/r/things/1', '/app/acme/r/things/4'],
+  );
+
+  /* PROSE, which is where a note's `[label](/r/x)` is, through both markdown drawers. */
+  const [prose] = parse('See [the export](/r/tasks/3) first.');
+  assert.equal(prose?.type, 'markdown');
+  assert.deepEqual(hrefsOf(tree(render(Markdown, { props: { segment: prose, opts } }).body)), ['/app/acme/r/tasks/3']);
+  assert.deepEqual(hrefsOf(tree(toHTML([prose!], opts))), ['/app/acme/r/tasks/3']);
+});
+
+test('A HOST WITH NO `href` GETS THE ADDRESS AS WRITTEN, which is every host but the web app', () => {
+  const block = page(SHAPES['a queue whose count of what is left says where the rest are']!);
+  assert.deepEqual(hrefsOf(tree(render(Block, { props: { block } }).body)), ['/decide']);
+  assert.deepEqual(hrefsOf(tree(toHTML([block]))), ['/decide']);
+});
+
+test('A TILE\'S DOOR GOES THROUGH IT TOO, although only the Svelte drawer draws the tile as a door', () => {
+  const block = page('```stat\nCash now | GBP 12,400.00\n```');
+  const tile = tree(render(Hosted, { props: { block, opts: { href: under, cellHref: () => '/p/money' } } }).body);
+  assert.deepEqual(hrefsOf(tile), ['/app/acme/p/money']);
 });

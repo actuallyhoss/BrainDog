@@ -77,7 +77,22 @@ export type RenderOptions = InlineOptions & {
    * tests compare the two without it.
    */
   scenario?: boolean;
+  /**
+   * Where an address this renderer draws goes, as the host serves it. Absent, it is drawn as written.
+   *
+   * THE RECORD WRITES ITS ADDRESSES RECORD-RELATIVE AND THE HOST MAY NOT LIVE AT THE ROOT. A queue's "N more"
+   * is `/decide`, a capture's list is `/r/tasks?…`, a note's link is `/r/things/1`, and under a host served
+   * from `/app/<slug>` every one of those left the app: a press loaded the marketing site's 404. The web app
+   * repaired it with a `MutationObserver` over `<main>` that rewrote each `href` after this package drew it,
+   * because nothing here asked. Now every `href` either renderer draws passes through this last, the host's
+   * own answers from `link`, `dayHref` and `cellHref` included, so a host whose answers are record-relative
+   * too has one place to put itself. It must be safe to call on an address it has already rendered.
+   */
+  href?: (path: string) => string;
 };
+
+/** An address as the host serves it (`RenderOptions.href`). */
+export const hrefFor = (o: { href?: RenderOptions['href'] | undefined }, path: string): string => (o.href ? o.href(path) : path);
 
 /**
  * A hole's label, as prose rather than as an address.
@@ -108,7 +123,7 @@ function renderInline(nodes: Inline[], opts: RenderOptions): string {
         case 'em':
           return `<em>${renderInline(n.body, opts)}</em>`;
         case 'link':
-          return `<a href="${escape(n.href)}">${renderInline(n.body, opts)}</a>`;
+          return `<a href="${escape(hrefFor(opts, n.href))}">${renderInline(n.body, opts)}</a>`;
         case 'path':
           // A path that names nothing renders as the path, marked, and it is an AFFORDANCE: an
           // unknown is a hole, and a hole is a task somebody has to close (05 §7.5).
@@ -119,7 +134,7 @@ function renderInline(nodes: Inline[], opts: RenderOptions): string {
         case 'typed': {
           const href = n.link === 'row' ? opts.link?.(n.arg) : n.link === 'day' ? opts.dayHref?.(n.arg) : null;
           const body = `<span class="typed num" data-form="${n.form}">${escape(n.text)}</span>`;
-          return href ? `<a href="${escape(href)}">${body}</a>` : body;
+          return href ? `<a href="${escape(hrefFor(opts, href))}">${body}</a>` : body;
         }
         case 'evidence':
           // `{unknown}` is not a weak claim, it is a hole, so it renders as an affordance.
@@ -187,7 +202,7 @@ const toneGlyph = (tone?: string): string => {
 
 function panel(b: Block, o: RenderOptions): string {
   if (b.kind === 'section') return section(b, o);
-  if (b.kind === 'capture') return capture(b);
+  if (b.kind === 'capture') return capture(b, o);
   if (b.kind === 'quote') {
     const r = b.rows[0] ?? { cells: [] };
     return `<blockquote class="panel">${cell('quote-text', r.cells[0], o)}${r.cells[1] ? `<cite class="quote-by">${escape(r.cells[1])}</cite>` : ''}</blockquote>`;
@@ -691,11 +706,11 @@ function section(b: Block, o: RenderOptions): string {
  * drawer draws this same tree when its host passes no `oncapture`, so the two are equal by construction.
  * A block whose rows name no list draws an empty panel, which the parser never lets a fence reach.
  */
-function capture(b: Block): string {
+function capture(b: Block, o: RenderOptions): string {
   const plan = capturePlan(b.rows);
   if (!plan) return '<div class="capture"></div>';
   const said = plan.href
-    ? `<a class="capture-where" href="${escape(plan.href)}">${escape(capturePromptFor(plan.label))}</a>`
+    ? `<a class="capture-where" href="${escape(hrefFor(o, plan.href))}">${escape(capturePromptFor(plan.label))}</a>`
     : escape(captureNowhere(plan.label));
   return `<div class="capture"><p class="capture-elsewhere">${said}</p></div>`;
 }
@@ -767,7 +782,7 @@ function queue(b: Block, o: RenderOptions): string {
     })
     .join('');
   const said = escape(queueMore(plan.more));
-  const more = plan.more === 0 ? '' : plan.moreHref ? `<a class="queue-more" href="${escape(plan.moreHref)}">${said}</a>` : `<p class="queue-more">${said}</p>`;
+  const more = plan.more === 0 ? '' : plan.moreHref ? `<a class="queue-more" href="${escape(hrefFor(o, plan.moreHref))}">${said}</a>` : `<p class="queue-more">${said}</p>`;
   return `<div class="queue">${body}${more}</div>`;
 }
 

@@ -18,7 +18,7 @@
   already picked is a question that gets pressed through.
 -->
 <script lang="ts">
-  import { QUEUE_RECOMMENDED, inline, queueMore, queuePlan, type Block, type RenderOptions, type Row } from '../src/index.ts';
+  import { QUEUE_RECOMMENDED, hrefFor, inline, queueMore, queuePlan, type Block, type RenderOptions, type Row } from '../src/index.ts';
   import Text from './Text.svelte';
 
   let {
@@ -67,7 +67,7 @@
       </article>
     {/each}
     {#if plan.more > 0}
-      {#if plan.moreHref}<a class="queue-more" href={plan.moreHref}>{queueMore(plan.more)}</a>{:else}<p class="queue-more">{queueMore(plan.more)}</p>{/if}
+      {#if plan.moreHref}<a class="queue-more" href={hrefFor(opts, plan.moreHref)}>{queueMore(plan.more)}</a>{:else}<p class="queue-more">{queueMore(plan.more)}</p>{/if}
     {/if}
   </div>
 {/if}

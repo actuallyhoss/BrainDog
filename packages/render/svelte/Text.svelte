@@ -6,7 +6,7 @@
 -->
 <script lang="ts">
   import type { Inline, RenderOptions } from '../src/index.ts';
-  import { MISSING, holeLabel } from '../src/index.ts';
+  import { MISSING, holeLabel, hrefFor } from '../src/index.ts';
   import Self from './Text.svelte';
 
   let { nodes, opts = {} }: { nodes: Inline[]; opts?: RenderOptions } = $props();
@@ -14,8 +14,10 @@
   /* NEITHER LINK IS INVENTED HERE. `row` has always asked the host; `day` was hard-coded to a
      `/calendar/` route no host in this workspace serves, so every date in a document was an anchor
      to the error page. */
-  const href = (n: Extract<Inline, { type: 'typed' }>) =>
-    n.link === 'row' ? (opts.link?.(n.arg) ?? null) : n.link === 'day' ? (opts.dayHref?.(n.arg) ?? null) : null;
+  const href = (n: Extract<Inline, { type: 'typed' }>) => {
+    const to = n.link === 'row' ? (opts.link?.(n.arg) ?? null) : n.link === 'day' ? (opts.dayHref?.(n.arg) ?? null) : null;
+    return to === null ? null : hrefFor(opts, to);
+  };
 
   /** A hole is a control only where the host can act on it. See `RenderOptions.hole`. */
   const onHole = (path: string | null) => {
@@ -28,7 +30,7 @@
   {:else if node.type === 'code'}<code>{node.text}</code>
   {:else if node.type === 'strong'}<strong><Self nodes={node.body} {opts} /></strong>
   {:else if node.type === 'em'}<em><Self nodes={node.body} {opts} /></em>
-  {:else if node.type === 'link'}<a href={node.href}><Self nodes={node.body} {opts} /></a>
+  {:else if node.type === 'link'}<a href={hrefFor(opts, node.href)}><Self nodes={node.body} {opts} /></a>
   {:else if node.type === 'path'}
     {#if node.resolved === null}
       <!-- A hole is a task, not a value: an unknown never participates in a scale, never sorts
