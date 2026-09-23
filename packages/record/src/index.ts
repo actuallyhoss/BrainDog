@@ -2177,11 +2177,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * STALE IS DERIVED AND NEVER STORED: a run that crashed never says so, so the clock is compared with
    * `last_seen` here. `same_repo` compares with the caller's own hints, and is `false` for a caller that
    * sent none.
+   *
+   * ONLY A RUN SOMEBODY HEARD FROM IS LIVE. The ladder stamps `last_seen` on every run it opens or hears from, and no
+   * caller can write it (`packages/seed/src/index.ts:397`), so a row without one was written, not run: the the old tool
+   * import's runs are all like that. Aged from `updated_at`, which is the import's own write, each one read
+   * `stale: false` for the 45 minutes after an import, beside the agents actually working (finding 4 of
+   * `loop/research-agent-first-day.md`). `isStale` keeps its fallback on purpose, for the rows that reach it by
+   * another road; this list does not ask it about rows nobody heard from.
    */
   const live = (ctx: CallContext): LiveRun[] => {
     const rows = kernel.list({
       register: SESSION,
-      where: { field: RUN.state, in: LIVE },
+      where: { all: [{ field: RUN.state, in: LIVE }, { field: 'last_seen', present: true }] } as Predicate,
       order: [{ field: 'last_seen', dir: 'desc' }],
       limit: 50,
     });
@@ -2902,9 +2909,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         : null;
 
     /* THE RUNS, when the caller may read them: the newest other one here that left a next step, and
-       the others live now. Here is the project, or with no project the repository. */
+       the others live now. Here is the project, or with no project the repository.
+       A RUN THAT NAMES NO PROJECT BUT THIS REPOSITORY IS HERE TOO. `project` is `KERNEL_WRITTEN`, so a run the Sam
+       Brain import wrote carries only `repo`, and keying on `project` alone answered `handoff: null` in the very
+       repository its next step was left in (`loop/research-agent-first-day.md`, finding 4). A run placed on another
+       project is not here, whatever repository it names. */
     const runs = !readable(ctx, SESSION);
-    const here = project ? { field: 'project', is: project.spoken } : repo ? { field: 'repo', is: repo } : null;
+    const here = project
+      ? repo
+        ? { any: [{ field: 'project', is: project.spoken }, { all: [{ field: 'project', empty: true }, { field: 'repo', is: repo }] }] }
+        : { field: 'project', is: project.spoken }
+      : repo
+        ? { field: 'repo', is: repo }
+        : null;
     const left =
       runs && here
         ? kernel.list({
