@@ -40,12 +40,12 @@
  * one until then, and finding 2 of `loop/research-switch-left.md` measured what that entry does, in a scratch config
  * folder with a do-nothing server. Claude Code does read a `.mcp.json` from a parent folder, but starts a server
  * there only when its name is in `enabledMcpjsonServers`, and `C:\Repos\acme\.claude\settings.local.json` approves
- * `brain` and `relay` by name, so `braindog` stayed `Pending approval (run claude to approve)`: one prompt in an
+ * `brain` and one other server by name, so `braindog` stayed `Pending approval (run claude to approve)`: one prompt in an
  * interactive session, and no brain at all in a headless `claude -p`. Where a user-scope entry of the same name also
  * exists, as every named profile now has, that one is started, with a diagnostic about the two scopes. So the entry
  * here was a prompt and a diagnostic, and never the server that ran.
  *
- * AND IT RETIRES THE `legacy-tool` SKILL (brief 45-A). With the hooks and servers out and the skill left, a session
+ * AND IT RETIRES THE OLD TOOL'S SKILL (brief 45-A), found by the host its `SKILL.md` names rather than by its folder's name. With the hooks and servers out and the skill left, a session
  * still loads a skill whose description says to use it "whenever you start work in a Quartz repo", and reads and
  * writes `brain.example.com` beside BrainDog: the split brain again, by another door. A folder under a profile's
  * `skills/` whose `SKILL.md` names that host is moved to `skills/.replaced/<name>-<date>/`, never deleted, inside the

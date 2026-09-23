@@ -1,9 +1,9 @@
 /**
- * `braindog install --replace` retiring the `legacy-tool` skill, and warning when it runs from a checkout that is
+ * `braindog install --replace` retiring the `old-brain` skill, and warning when it runs from a checkout that is
  * still moving: brief 45-A of `loop/research-switch-left.md`.
  *
  * MEASURED BEFORE THIS EXISTED, at the tree wave forty-four left: the dry run named nothing under `skills/`, and
- * `--apply` left `skills/legacy-tool` where it was, so a session went on loading a skill that says to use it
+ * `--apply` left `skills/old-brain` where it was, so a session went on loading a skill that says to use it
  * "whenever you start work in a Quartz repo" and reads and writes `brain.example.com`, beside BrainDog. All three of
  * his profiles hold that folder, and it is the only skill in each whose `SKILL.md` names the host. And a checkout
  * with another agent's edit in it printed nothing about it, though the hooks and the server run from there
@@ -32,7 +32,7 @@ const HB_START = 'powershell -NoProfile -ExecutionPolicy Bypass -File "C:\\Tools
 const SAM = { type: 'stdio', command: 'node', args: ['C:\\Tools\\legacy\\mcp\\brain-mcp.mjs'] };
 
 /* The skill's first lines as the real one begins, which is how it names the host. */
-const SAM_SKILL = "---\nname: legacy-tool\ndescription: Read and write Sam's cross-project brain at https://brain.example.com.\n---\n\n# the old tool\n";
+const SAM_SKILL = "---\nname: old-brain\ndescription: Read and write Sam's cross-project brain at https://brain.example.com.\n---\n\n# the old tool\n";
 const OTHER_SKILL = '---\nname: tidy\ndescription: Tidy the imports in a file.\n---\n\n# Tidy\n';
 const MOVING = /has uncommitted changes/;
 
@@ -71,35 +71,35 @@ const tree = (dir: string): Record<string, string> => {
 };
 
 /**
- * A named profile as his are: the old tool's start hook, its server in `.claude.json`, the `legacy-tool` skill with a
+ * A named profile as his are: the old tool's start hook, its server in `.claude.json`, the `old-brain` skill with a
  * second file in a subfolder, a skill of his own, and a command that names the host, which is not a skill.
  */
 function profile(home: string, name: string) {
   const dir = join(home, name);
-  mkdirSync(join(dir, 'skills', 'legacy-tool', 'references'), { recursive: true });
+  mkdirSync(join(dir, 'skills', 'old-brain', 'references'), { recursive: true });
   mkdirSync(join(dir, 'skills', 'tidy'), { recursive: true });
   mkdirSync(join(dir, 'commands'), { recursive: true });
   writeFileSync(join(dir, 'settings.json'), `${JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: 'command', command: HB_START }] }] } }, null, 2)}\n`);
   const claudeJson = join(dir, '.claude.json');
   writeFileSync(claudeJson, `${JSON.stringify({ mcpServers: { brain: SAM } }, null, 2)}\n`);
-  writeFileSync(join(dir, 'skills', 'legacy-tool', 'SKILL.md'), SAM_SKILL);
-  writeFileSync(join(dir, 'skills', 'legacy-tool', 'references', 'api.md'), 'GET https://brain.example.com/api/db\n');
+  writeFileSync(join(dir, 'skills', 'old-brain', 'SKILL.md'), SAM_SKILL);
+  writeFileSync(join(dir, 'skills', 'old-brain', 'references', 'api.md'), 'GET https://brain.example.com/api/db\n');
   writeFileSync(join(dir, 'skills', 'tidy', 'SKILL.md'), OTHER_SKILL);
   writeFileSync(join(dir, 'commands', 'brain.md'), 'Read https://brain.example.com first.\n');
-  return { dir, claudeJson, skill: join(dir, 'skills', 'legacy-tool'), tidy: join(dir, 'skills', 'tidy'), commands: join(dir, 'commands') };
+  return { dir, claudeJson, skill: join(dir, 'skills', 'old-brain'), tidy: join(dir, 'skills', 'tidy'), commands: join(dir, 'commands') };
 }
 
 /* A folder in no git working tree, so the checkout warning is neither owed nor printed. */
 const still = () => folder('checkout');
 
-test('A PROFILE HOLDING THE legacy-tool SKILL: the dry run lists - skills/legacy-tool, and moves nothing', () => {
+test('A PROFILE HOLDING THE old-brain SKILL: the dry run lists - skills/old-brain, and moves nothing', () => {
   const home = folder('home');
   const p = profile(home, '.claude-quartz');
   const before = tree(p.dir);
 
   const dry = installEvery([p.dir], [], { apply: false, replace: true, scripts, home, checkout: still() });
   assert.ok(
-    dry.some((l) => l.startsWith('  - skills/legacy-tool')),
+    dry.some((l) => l.startsWith('  - skills/old-brain')),
     `no line for the skill:\n${dry.join('\n')}`,
   );
   /* Named once, and never the skill that does not name the host. */
@@ -107,16 +107,16 @@ test('A PROFILE HOLDING THE legacy-tool SKILL: the dry run lists - skills/legacy
   assert.deepEqual(tree(p.dir), before, 'the dry run changed the profile');
 });
 
-test('--APPLY MOVES IT UNDER skills/.replaced/ WITH THE SAME BYTES, and skills/legacy-tool is gone', () => {
+test('--APPLY MOVES IT UNDER skills/.replaced/ WITH THE SAME BYTES, and skills/old-brain is gone', () => {
   const home = folder('home');
   const p = profile(home, '.claude-quartz');
   const skill = tree(p.skill);
 
   const lines = installEvery([p.dir], [], { apply: true, replace: true, scripts, home, checkout: still() });
-  assert.ok(!existsSync(p.skill), `skills/legacy-tool is still there:\n${lines.join('\n')}`);
+  assert.ok(!existsSync(p.skill), `skills/old-brain is still there:\n${lines.join('\n')}`);
   const kept = readdirSync(join(p.dir, 'skills', '.replaced'));
   assert.equal(kept.length, 1, kept.join(', '));
-  assert.match(kept[0]!, /^legacy-tool-\d{4}-\d{2}-\d{2}$/);
+  assert.match(kept[0]!, /^old-brain-\d{4}-\d{2}-\d{2}$/);
   assert.deepEqual(tree(join(p.dir, 'skills', '.replaced', kept[0]!)), skill);
   /* Where it went is said, as the copy of each file is. */
   assert.ok(lines.some((l) => l.includes(join(p.dir, 'skills', '.replaced', kept[0]!))), lines.join('\n'));
@@ -188,14 +188,14 @@ test('A CHECKOUT WITH AN UNCOMMITTED CHANGE PRINTS THE WARNING, a clean one does
   assert.equal(warned.length, 1, moving.join('\n'));
   /* It names the tree and the fix, and the run goes on to plan everything it would without it. */
   assert.ok(warned[0]!.includes(repo) && warned[0]!.includes('git worktree add'), warned[0]);
-  assert.ok(moving.some((l) => l.startsWith('  - skills/legacy-tool')), moving.join('\n'));
+  assert.ok(moving.some((l) => l.startsWith('  - skills/old-brain')), moving.join('\n'));
 });
 
 /*
  * STEP 14'S DRY RUN AS HE WILL RUN IT, through main.ts: every profile lists both lines the step says to look for. The
  * warning is read against the real tree's own `git status`, since main.ts names no other checkout.
  */
-test('THROUGH main.ts, each profile lists + mcpServers.braindog and - skills/legacy-tool, and the warning follows the real tree', () => {
+test('THROUGH main.ts, each profile lists + mcpServers.braindog and - skills/old-brain, and the warning follows the real tree', () => {
   const home = folder('home');
   const quartz = profile(home, '.claude-quartz');
   const acme = profile(home, '.claude-acme');
@@ -206,7 +206,7 @@ test('THROUGH main.ts, each profile lists + mcpServers.braindog and - skills/leg
   assert.equal(ran.status, 0, ran.stderr);
   const lines = ran.stdout.split('\n');
   assert.equal(lines.filter((l) => l.startsWith('  + mcpServers.braindog')).length, 2, ran.stdout);
-  assert.equal(lines.filter((l) => l.startsWith('  - skills/legacy-tool')).length, 2, ran.stdout);
+  assert.equal(lines.filter((l) => l.startsWith('  - skills/old-brain')).length, 2, ran.stdout);
   const dirty = execFileSync('git', ['--no-optional-locks', 'status', '--porcelain', '--untracked-files=no'], { cwd: APP, encoding: 'utf8', windowsHide: true }).trim() !== '';
   assert.equal(lines.filter((l) => MOVING.test(l)).length, dirty ? 1 : 0, ran.stdout);
 });

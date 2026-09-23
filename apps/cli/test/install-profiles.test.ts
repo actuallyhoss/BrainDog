@@ -38,7 +38,7 @@ const HB_START = 'powershell -NoProfile -ExecutionPolicy Bypass -File "C:\\Tools
 const SAM = { type: 'stdio', command: 'node', args: ['C:\\Tools\\legacy\\mcp\\brain-mcp.mjs'], env: { MCP_TOKEN: SECRET } };
 const SAM_HTTP = { type: 'http', url: `https://brain.example.com/mcp?token=${SECRET}`, headers: { Authorization: `Bearer ${SECRET}` } };
 const FIGMA = { type: 'http', url: 'https://mcp.figma.com/mcp' };
-const RELAY = { type: 'stdio', command: 'node', args: ['C:\\Repos\\relay\\mcp.mjs'], env: { DISCORD_TOKEN: SECRET } };
+const BOT = { type: 'stdio', command: 'node', args: ['C:\\Repos\\bot\\mcp.mjs'], env: { DISCORD_TOKEN: SECRET } };
 
 const scratch = mkdtempSync(join(tmpdir(), 'braindog-install-profiles-'));
 /* A read-only file cannot be removed on Windows, so everything is made writable before the folder goes. */
@@ -80,7 +80,7 @@ function his(home: string) {
   const work = profile(home, '.claude-work', { mcpServers: { 'brain-http': SAM_HTTP } });
   const repos = folder('repos');
   const mcpJson = join(repos, '.mcp.json');
-  writeFileSync(mcpJson, `${JSON.stringify({ mcpServers: { brain: SAM, relay: RELAY, figma: FIGMA } }, null, 2)}\n`);
+  writeFileSync(mcpJson, `${JSON.stringify({ mcpServers: { brain: SAM, bot: BOT, figma: FIGMA } }, null, 2)}\n`);
   return { quartz, acme, work, mcpJson };
 }
 
@@ -160,7 +160,7 @@ test('--APPLY OVER HIS THREE PROFILES, through main.ts: every .claude.json ends 
   const shared = servers(mcpJson);
   assert.ok(!('brain' in shared), JSON.stringify(shared));
   assert.ok(!('braindog' in shared), JSON.stringify(shared));
-  assert.deepEqual(shared.relay, RELAY);
+  assert.deepEqual(shared.bot, BOT);
   assert.deepEqual(shared.figma, FIGMA);
 
   /* Every named profile is served, so the line telling him to register one by hand is owed to none of them. */
@@ -255,7 +255,7 @@ test('NO TOKEN IN ANY ENTRY OR LINE, on the dry run, on --apply, or in a file wr
     assert.equal(run.code, 0, run.stderr);
     assert.ok(!`${run.stdout}${run.stderr}`.includes(SECRET), run.stdout);
   }
-  /* The token that stays is relay's own, in its own entry; none was carried into a braindog entry. */
+  /* The token that stays is bot's own, in its own entry; none was carried into a braindog entry. */
   for (const file of [quartz.claudeJson, acme.claudeJson, work.claudeJson]) assert.ok(!readFileSync(file, 'utf8').includes(SECRET), `${file} holds a token`);
   assert.ok(!JSON.stringify(servers(mcpJson).braindog ?? {}).includes(SECRET));
 });
