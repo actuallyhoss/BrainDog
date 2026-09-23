@@ -36,7 +36,7 @@
   import { day, queueCost, since, symbolText } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
-  import { DECIDED, DEPLOYMENT, NOW, QUESTIONS, REGISTERS, ROWS, display, whoDid } from '$lib/record/api.ts';
+  import { DECIDED, NOW, QUESTIONS, REGISTERS, ROWS, display, whoDid } from '$lib/record/api.ts';
   import { installWords } from '$lib/record/actions.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
   import { ARRANGING, PROPOSALS, QUEUE, ROWSETS } from '$lib/record/data.ts';
@@ -56,6 +56,7 @@
   import { mayAnswer, whyNotAnswering } from '../answering.ts';
   import { nextOpen, stillWaiting, words as onwardWords } from './onward.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
+  import { hostedHere } from '../../settings/billing.ts';
   import { goto, invalidateAll } from '$app/navigation';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
   import { createClient } from '@braindog/client';
@@ -614,7 +615,7 @@
     {#if from === 'live' && live && live.calls.length > 0 && !settled && !live.closed}
       <section class="changed">
         <dl class="calls-out">
-          <CallsOut calls={live.calls} hosted={DEPLOYMENT.kind !== 'self-host'} note={installWords.acceptApproves} />
+          <CallsOut calls={live.calls} hosted={hostedHere(page.data as unknown as Shell)} note={installWords.acceptApproves} />
         </dl>
       </section>
     {/if}

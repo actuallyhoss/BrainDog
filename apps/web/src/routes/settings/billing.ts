@@ -26,6 +26,7 @@
  */
 
 import { copy } from '../../lib/copy.ts';
+import { DEPLOYMENT } from '../../lib/record/data.ts';
 
 export const words = {
   /* TRUE ON BOTH HOSTS, which is why it is the default: a self-host is not charged either. */
@@ -47,4 +48,22 @@ export function billingLine(b: Billed): string {
   if (!b.live) return b.sample === 'self-host' ? copy.billingSelfHost : copy.billingCloud;
   const selfHost = b.host === undefined ? b.mintsMail === false : b.host === 'self-host';
   return selfHost ? copy.billingSelfHost : words.notChargedYet;
+}
+
+/**
+ * Whether this record's scheduled calls are counted against the hosted allowance, which is what `<CallsOut hosted>` asks.
+ *
+ * FIVE PROPS ANSWERED IT FROM THE BUILD, AND A SIXTH FROM NOTHING AT ALL. The Packs screen's diff and offer, a shared
+ * plan, the Settings plan and the Decide gate passed `DEPLOYMENT.kind !== 'self-host'`, which is `false` in the bundle
+ * production serves, and the automation builder passed `false`. So on the Cloud `estimateOf` said "with no monthly limit
+ * on this record" while the Worker holds a hosted record's runs at `ALLOWANCE.hosted`, 15,000 a month, and sends nothing past it
+ * (`loop/research-batch-forty-eight-audit.md` section 2).
+ *
+ * A LIVE RECORD WITH NO `host` IS NOT HOSTED. Every Worker at HEAD sends one, so a host that sends none is a self-host
+ * older than the field, and telling it about an allowance it does not have would be the same mistake the other way.
+ * The mail door `billingLine` falls back to is not asked here either: the only host that sends no `host` is a
+ * self-host, and the door could only say so again.
+ */
+export function hostedHere(shell: Pick<Billed, 'live' | 'host'>, sample: Billed['sample'] = DEPLOYMENT.kind): boolean {
+  return shell.live ? shell.host === 'cloud' : sample === 'cloud';
 }

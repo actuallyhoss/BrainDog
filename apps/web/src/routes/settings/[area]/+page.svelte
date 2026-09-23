@@ -54,7 +54,7 @@
     type ExportKind, type Wrote,
   } from '$lib/record/settings-write.ts';
   import { namesHeld, personSaid, secondSaid } from './people-said.ts';
-  import { billingLine } from '../billing.ts';
+  import { billingLine, hostedHere } from '../billing.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
   /* Lane F: backups, putting a copy back, erasing a person and deleting the record. */
   import { backUpNow, deleteRecordNow, downloadSnapshot, erasePerson, readSnapshots, restoreSnapshot } from '$lib/record/settings-write.ts';
@@ -2421,7 +2421,7 @@
                   <dt>{copy.diffConflicts}</dt>
                   <dd>{#each offer.conflicts as c (c)}<p>{c}</p>{/each}</dd>
                 {/if}
-                <CallsOut calls={offerCalls} hosted={DEPLOYMENT.kind !== 'self-host'} />
+                <CallsOut calls={offerCalls} hosted={hostedHere(shell)} />
                 {#if offer.seeds}
                   <dt>{copy.diffSeeds}</dt>
                   <dd>{offer.seeds}</dd>

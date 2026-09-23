@@ -31,6 +31,8 @@
   import { compile, explain } from '$lib/record/where.ts';
   import { openActions, type ActionRow, type CallOut } from '$lib/record/actions.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
+  import type { Shell } from '$lib/record/boot-live.ts';
+  import { hostedHere } from '../../settings/billing.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -45,7 +47,7 @@
   import { ROOT, VERB_LABELS, callsIn, freshId, sayStart, words, type Verb } from '$lib/flow/flow.ts';
   import { answerWords, openAutomations, type Answer, type AutomationRow, type Source, type Tried as TriedAnswer } from '$lib/flow/source.ts';
 
-  const flow = new FlowDraft({ spark: page.data.spark === true });
+  const flow = new FlowDraft({ spark: () => page.data.spark === true });
 
   /* THE WORDS THIS PAGE ADDS, kept here while `flow.ts` is another brief's file; they can move into `words` there. */
   const say = {
@@ -270,7 +272,7 @@
       {#if triedNow}<Tried tried={triedNow} />{/if}
 
       {#if calls.length > 0}
-        <dl class="calls"><CallsOut {calls} hosted={false} /></dl>
+        <dl class="calls"><CallsOut {calls} hosted={hostedHere(page.data as unknown as Shell)} /></dl>
       {/if}
 
       <div class="bar">

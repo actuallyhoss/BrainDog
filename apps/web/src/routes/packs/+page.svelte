@@ -17,8 +17,10 @@
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { DEPLOYMENT, PAGES, REGISTERS, PACKS, packDiff, pages } from '$lib/record/api.ts';
+  import { PAGES, REGISTERS, PACKS, packDiff, pages } from '$lib/record/api.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
+  import type { Shell } from '$lib/record/boot-live.ts';
+  import { hostedHere } from '../settings/billing.ts';
   import { installWords } from '$lib/record/actions.ts';
   import { blocked, choose, installPlanned, moduleUpdates, packDocument, planInstall, words, type Blocked, type Offer, type PackState, type Refusal, type Source } from '$lib/record/packs.ts';
   import { words as vaultWords } from '$lib/record/vault.ts';
@@ -307,7 +309,7 @@
       <dd>{#each d.conflicts as c}<p>{c}</p>{/each}</dd>
     {/if}
 
-    <CallsOut calls={d.calls} hosted={DEPLOYMENT.kind !== 'self-host'} note={installWords.asksOnce} />
+    <CallsOut calls={d.calls} hosted={hostedHere(page.data as unknown as Shell)} note={installWords.asksOnce} />
 
     <dt>{copy.diffSeeds}</dt>
     <dd>{d.seeds}</dd>
@@ -338,7 +340,7 @@
         <dt>{copy.diffConflicts}</dt>
         <dd>{#each offer.plan.conflicts as c (c)}<p>{c}</p>{/each}</dd>
       {/if}
-      <CallsOut calls={offer.calls} hosted={DEPLOYMENT.kind !== 'self-host'} note={installWords.asksOnce} />
+      <CallsOut calls={offer.calls} hosted={hostedHere(page.data as unknown as Shell)} note={installWords.asksOnce} />
       {#if offer.plan.seeds}
         <dt>{copy.diffSeeds}</dt>
         <dd>{offer.plan.seeds}</dd>

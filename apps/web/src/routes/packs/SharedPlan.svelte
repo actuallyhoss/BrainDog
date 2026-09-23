@@ -7,9 +7,11 @@
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
-  import { DEPLOYMENT } from '$lib/record/api.ts';
   import { installWords } from '$lib/record/actions.ts';
+  import { page } from '$app/state';
   import CallsOut from '$lib/ui/CallsOut.svelte';
+  import type { Shell } from '$lib/record/boot-live.ts';
+  import { hostedHere } from '../settings/billing.ts';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { words as vaultWords } from '$lib/record/vault.ts';
@@ -113,7 +115,7 @@
         <dd>{#each p.conflicts as c (c)}<p>{c}</p>{/each}</dd>
       {/if}
     {/each}
-    <CallsOut calls={plan.packs.flatMap((p) => p.calls)} hosted={DEPLOYMENT.kind !== 'self-host'} note={installWords.asksOnce} />
+    <CallsOut calls={plan.packs.flatMap((p) => p.calls)} hosted={hostedHere(page.data as unknown as Shell)} note={installWords.asksOnce} />
     {#if voice}
       <dt>{copy.voiceAsk}</dt>
       <dd>
