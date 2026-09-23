@@ -15,6 +15,8 @@
  *                                       those two and `is not set` is the first
  *     tags has urgent                   a LIST holds the value
  *     tags lacks urgent                 and it does not. `has not` is the second of those two
+ *     what contains uber                a TEXT holds the words, in any case
+ *     what contains "uber or lyft"      quoted, the text is taken exactly as written
  *     state is live, cycle is monthly   clauses are ANDed on the comma
  *
  * IT COMPILES TO THE SAME PREDICATE THE STRUCTURED FORM PRODUCES, and that is the whole reason it
@@ -323,6 +325,34 @@ const COMPOUND = new Set(['money', 'quantity', 'file', 'json']);
 const OPPOSITE = { has: 'lacks', lacks: 'has' } as const;
 
 /**
+ * The pairs of marks a `contains` text may be quoted in: straight, and the curly pair a phone types.
+ *
+ * iOS turns a typed `"` into `“` and `”` unless smart punctuation is switched off, so a person
+ * quoting from a phone sends the curly pair and never the straight one. Refusing it would have made
+ * quoting a desktop feature on the form written most often from a thumb.
+ */
+const QUOTES: readonly (readonly [string, string])[] = [
+  ['"', '"'],
+  ["'", "'"],
+  ['“', '”'],
+  ['‘', '’'],
+];
+
+/**
+ * The types `contains` is refused on in a sentence though `operatorAllowed` admits it.
+ *
+ * THE STRUCTURED TABLE SAYS YES AND THE COLUMN SAYS NO. `38 §4.3` puts `enum` and `ref` among the
+ * textual types, which is right about the column: both hold a string, and `instr` runs over it. But
+ * a sentence carries the words a SCREEN shows, and on these two the words are not what the column
+ * holds. `thing contains Kiln` hands `instr` a column of row ids and the four letters of a title,
+ * and `state contains owed to me` looks for spaces in `owed_to_me`. Both compile, both run, both
+ * match nothing for ever, which is the failure this file's header is written against. The JSON form
+ * keeps the operator for a caller who knows the stored value; the sentence refuses and names `is`,
+ * which already reads both types in their words.
+ */
+const SPOKEN_AS_NOT_STORED = new Set(['enum', 'ref']);
+
+/**
  * One sentence into one predicate.
  *
  * An empty sentence is `undefined` — every row — rather than an empty `all`, because the caller
@@ -565,6 +595,96 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
       continue;
     }
 
+    /* ── contains ─────────────────────────────────────────────────────────── */
+    /**
+     * THE JSON FORM HAS RUN THIS LEAF ALL ALONG, AND THE SENTENCE REFUSED IT.
+     *
+     * Measured before this branch (`loop/research-living-in-it.md` §6): `{field: what, contains:
+     * UBER}` as a rule fired on "UBER *TRIP 1234" in either case, and a list over a `document` found
+     * its row, while `what contains uber` answered `MATCH_OP_UNSUPPORTED`. The grid's search box
+     * compiles every word it is given to this same leaf, so the one filter the record builds most
+     * often was the one filter nobody could type into a page's `where:` or a rule's `when:`.
+     *
+     * IT EMITS `{ field, contains }` AND NOTHING ELSE, so the compiler's own checks still stand behind
+     * it: `SERIES_HAS_NO_TEXT` on a series and the empty-needle refusal both come from there.
+     */
+    if (verb === 'contains') {
+      if (!operatorAllowed('contains', decl.type) || SPOKEN_AS_NOT_STORED.has(decl.type)) {
+        const instead =
+          decl.type === 'list'
+            ? ` Write has to ask for one value in a list.`
+            : SPOKEN_AS_NOT_STORED.has(decl.type)
+              ? ` It holds ${decl.type === 'ref' ? 'a row id' : 'a declared value'}, not the words shown for it. Write is, which reads it in those words.`
+              : '';
+        bad.push({ code: 'MATCH_OP_UNSUPPORTED', fix: `${sentence}: ${field} is a ${decl.type}, and contains is about text.${instead}`, at: field });
+        continue;
+      }
+
+      /* THE TEXT AS TYPED, NOT AS RE-JOINED. `rest` is the words glued back with ONE space, so a run
+         of spaces or a tab inside the text comes back as a single space. A single space survives
+         either way (`" uber "` is `" uber "` from `rest` too; measured), but a bank pads its
+         descriptors, and `"UBER   *TRIP"` read from `rest` searched for `UBER *TRIP`, which the
+         row does not hold. Splitting with the separators kept gives every token its own whitespace. */
+      const text = sentence
+        .split(/(\s+)/)
+        .slice(2 * (after + 1))
+        .join('');
+      const pair = QUOTES.find(([open, close]) => text.length >= 2 && text.startsWith(open) && text.endsWith(close));
+
+      if (pair) {
+        const inside = text.slice(pair[0].length, text.length - pair[1].length);
+        /* AN EMPTY NEEDLE IS IN EVERY ROW. SQLite's `instr` answers 1 for `''`, which is why
+           `compile` refuses the literal; refused here too, with the sentence a person can act on. */
+        if (!inside) {
+          bad.push({ code: 'REQUIRED_MISSING', fix: `${sentence}: contains what? The quotes hold nothing.`, at: field });
+          continue;
+        }
+        clauses.push({ field, contains: inside } as Predicate);
+        continue;
+      }
+
+      /* A QUOTE THAT OPENS AND NEVER CLOSES IS A COMMA'S WORK. The clauses were split on every comma
+         before this line ran, so `what contains "Smith, J"` arrives here as `"Smith` and would have
+         searched for the quote mark. A straight apostrophe is left alone, because `McDonald's` is
+         bare text and `'` opens nothing in it; only a text that STARTS with a mark is read as quoted. */
+      if (QUOTES.some(([open]) => text.startsWith(open))) {
+        bad.push({
+          code: 'VALUE_MALFORMED',
+          fix: `${sentence}: the quote is not closed. A comma ends a clause, so text holding one cannot be written here; ask in the structured form, as {"field": "${field}", "contains": "..."}.`,
+          at: field,
+        });
+        continue;
+      }
+
+      const bare = text.trim();
+      if (!bare) {
+        bad.push({ code: 'REQUIRED_MISSING', fix: `${sentence}: contains what?`, at: field });
+        continue;
+      }
+      /* `not` AND `or` ARE THE GRAMMAR'S WORDS EVERYWHERE ELSE IN THIS FILE, and a bare text holding
+         one would be searched for literally: `what contains not uber` would answer the rows that say
+         "not uber", the opposite of what was meant, and `uber or lyft` would look for all three words
+         in a row. Quoting says the words are text, so the refusal names the quote. */
+      if (bare === 'not' || bare.startsWith('not ')) {
+        bad.push({
+          code: 'MATCH_OP_UNSUPPORTED',
+          fix: `${sentence}: contains not is not something a filter can say yet. To look for the words, quote them: ${field} contains "${bare}".`,
+          at: field,
+        });
+        continue;
+      }
+      if (/ or /i.test(bare)) {
+        bad.push({
+          code: 'VALUE_MALFORMED',
+          fix: `${sentence}: contains takes one text to look for. To look for these words together, quote them: ${field} contains "${bare}".`,
+          at: field,
+        });
+        continue;
+      }
+      clauses.push({ field, contains: bare } as Predicate);
+      continue;
+    }
+
     /* ── is · is not ─────────────────────────────────────────────────────── */
     if (verb !== 'is') {
       bad.push({
@@ -572,10 +692,15 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
         /* `predicate` IS THE SCHEMA'S WORD FOR THIS AND NOBODY ELSE'S. It reached three screens,
            every one of them inside error copy, where the reader is already stuck — and the control
            that produced the thing is labelled *Filter*. The word for what a person wrote is the word
-           on the button they pressed. */
-        fix: `${sentence}: ${verb || '(nothing)'} is not something a filter can say. Write is, is not, before, after, has or lacks.`,
+           on the button they pressed.
+           AND THE SENTENCE NAMES WHAT `allowed` NAMES, IN ITS ORDER. It named six while `allowed`
+           named seven: `on` was left out while `ORDERED` has read it since it was written, and
+           `apps/web/src/lib/record/where.ts` copies this sentence and records that gap as this
+           line's to close. Widened for `contains`, it closes the gap too, since the line changed
+           anyway and so did every test that pins it. */
+        fix: `${sentence}: ${verb || '(nothing)'} is not something a filter can say. Write is, is not, before, after, on, has, lacks or contains.`,
         at: field,
-        allowed: ['is', 'is not', 'before', 'after', 'on', 'has', 'lacks'],
+        allowed: ['is', 'is not', 'before', 'after', 'on', 'has', 'lacks', 'contains'],
       });
       continue;
     }

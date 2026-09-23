@@ -62,7 +62,7 @@ test('AN if THE RUN CANNOT READ IS REFUSED AT INSTALL, in the words the run woul
   const run = sql.one<{ state: string; say: string }>("SELECT state, say FROM automation_run WHERE rule = 'check'");
   assert.equal(run?.state, 'failed');
   const said = run!.say.replace(/^rule\.check could not read its condition at step 1: /, '');
-  assert.equal(said, 'amount more than 1000: more is not something a filter can say. Write is, is not, before, after, has or lacks.');
+  assert.equal(said, 'amount more than 1000: more is not something a filter can say. Write is, is not, before, after, on, has, lacks or contains.');
 
   const fresh = await open();
   const out = await fresh.k.install([check([{ if: 'amount more than 1000', then: TOLD }])]);
