@@ -116,28 +116,54 @@ test("A FOUNDER'S PROJECT DRAWS WHAT IT RUNS ON: a domain pointed at it is on it
   assert.ok(blocks.some((b) => b.heading === 'Send numbers here'), 'the founder half of the page is still under it');
 });
 
+/** The fingerprint `usecase-versions.test.ts` takes of a document, so a rebuilt version is held to the one it recorded. */
+const printOf = (d: { declarations: unknown; config?: unknown }): string =>
+  createHash('sha256').update(JSON.stringify({ declarations: d.declarations, config: d.config ?? null })).digest('hex').slice(0, 16);
+
 /**
- * A RECORD MADE ON 1.3.2, REBUILT: the four modules it named, and its pack as it shipped. The project page is the one
- * thing 1.4.0 moved, so the current document with that page taken from Portfolio's template without services is 1.3.2,
- * and its fingerprint is checked against the one `usecase-versions.test.ts` recorded for 1.3.2 so that the rebuild is
- * held to what shipped rather than to what this file believes shipped.
+ * A RECORD MADE ON 1.3.2, REBUILT: the four modules it named, and its pack as it shipped. It is rebuilt backwards one
+ * version at a time, and each step is checked against the fingerprint `usecase-versions.test.ts` recorded for that
+ * version, so the rebuild is held to what shipped rather than to what this file believes shipped.
+ *
+ * TWO STEPS AND NOT ONE, BECAUSE 1.5.0 MOVED A SECOND PAGE. Until it, the project page was the only thing between the
+ * current document and 1.3.2, and undoing it alone printed 3e4927061f959b6d. Once Home gained "Due this week" and
+ * "Lapsing", the same undo printed 4d2724eb47aa50e0, which is no version anybody shipped. Undoing 1.5.0 first and
+ * checking the 1.4.0 it gives means a later version that moves a third page fails at the step it broke.
  */
 async function onEarlier(): Promise<{ k: Kernel; before: Record<string, unknown> }> {
   const u = useCase('founder')!;
   const now = useCaseDocument('founder', TODAY) as { declarations: Record<string, unknown>[]; version: string; config?: unknown };
+
+  /* 1.5.0 TO 1.4.0: Home without the two tables it gained, and without the services list they read. */
+  const added = new Set(['Due this week', 'Lapsing']);
+  const v140 = {
+    ...now,
+    version: '1.4.0',
+    declarations: now.declarations.map((d) =>
+      d.page !== 'home-founder'
+        ? d
+        : {
+            ...d,
+            requires: (d.requires as string[]).filter((r) => r !== 'register.services'),
+            blocks: (d.blocks as { heading?: string }[]).filter((b) => !added.has(b.heading ?? '')),
+          },
+    ),
+  };
+  assert.equal(printOf(v140), '15c1f37be2561258', 'the rebuilt 1.4.0 is not the 1.4.0 that shipped');
+
+  /* 1.4.0 TO 1.3.2: the project page taken from Portfolio's template without services. */
   const withServices = projectTemplate(['things', 'tasks', 'obligations', 'services']).blocks as unknown[];
   const without = projectTemplate(['things', 'tasks', 'obligations']);
   const before = {
-    ...now,
+    ...v140,
     version: '1.3.2',
-    declarations: now.declarations.map((d) =>
+    declarations: v140.declarations.map((d) =>
       d.page !== 'project'
         ? d
         : { ...d, requires: (d.requires as string[]).filter((r) => r !== 'register.services'), blocks: [...(without.blocks as unknown[]), ...(d.blocks as unknown[]).slice(withServices.length)] },
     ),
   };
-  const printed = createHash('sha256').update(JSON.stringify({ declarations: before.declarations, config: before.config ?? null })).digest('hex').slice(0, 16);
-  assert.equal(printed, '3e4927061f959b6d', 'the rebuilt 1.3.2 is not the 1.3.2 that shipped');
+  assert.equal(printOf(before), '3e4927061f959b6d', 'the rebuilt 1.3.2 is not the 1.3.2 that shipped');
 
   const k = await openRecord(openSqlite(), fixedClock(NOW));
   for (const m of ['portfolio', 'people', 'money-core', 'work']) {
@@ -149,18 +175,24 @@ async function onEarlier(): Promise<{ k: Kernel; before: Record<string, unknown>
   return { k, before };
 }
 
-test('A RECORD ON 1.3.2 IS OFFERED ESTATE THEN 1.4.0, and neither loses a row or a page of what it held', async () => {
+/**
+ * WHAT THE RECORD IS OFFERED IS THE VERSION THIS BUILD SHIPS, NOT 1.4.0. The update sends the current document, so since
+ * 1.5.0 a record on 1.3.2 lands on 1.5.0 in the same step, and the pin that read '1.4.0' failed with '1.5.0' the moment
+ * the version moved. It reads the use case's own version now, and Home is held to draw the two tables 1.5.0 added.
+ */
+test('A RECORD ON 1.3.2 IS OFFERED ESTATE THEN THE CURRENT VERSION, and neither loses a row or a page of what it held', async () => {
   const { k } = await onEarlier();
   const org = value<{ id: string }>(k.create('organisations', { name: 'Harbour Studio', kind: 'company', currency: 'GBP' }, OWNER));
   value(k.create('datapoints', { name: 'Sign-ups', value: 12, organisation: org.id, source: 'reported', at: new Date(NOW).toISOString() }, OWNER));
   const u = useCase('founder')!;
   const next = useCaseDocument('founder', TODAY, held(k));
 
-  /* THE PACK ALONE DOES NOT PLAN, AND THAT IS WHY THE ORDER IS THE PLAN'S. Its project page requires services, which the
-     record does not hold yet, so an update that sent only the use case's pack would be refused rather than half made. */
+  /* THE PACK ALONE DOES NOT PLAN, AND THAT IS WHY THE ORDER IS THE PLAN'S. Its project page and, since 1.5.0, its Home
+     require services, which the record does not hold yet, so an update that sent only the use case's pack would be
+     refused rather than half made. */
   const alone = value<Pack>(await normalise(next, { kind: 'local' }));
   const refused = await plan(alone, stateOf(k));
-  assert.deepEqual(refused.unresolved.map((x) => x.register), ['services'], 'the new project page asks for the list Estate brings');
+  assert.deepEqual(refused.unresolved.map((x) => x.register), ['services'], 'the new project page and Home ask for the list Estate brings');
 
   /* THE ORDER `planFile` TAKES: each module the use case names and the record lacks, then the use case's own pack. */
   const lacking = modulesFor(u).filter((m) => !k.packs().some((p) => p.id === m));
@@ -169,11 +201,12 @@ test('A RECORD ON 1.3.2 IS OFFERED ESTATE THEN 1.4.0, and neither loses a row or
   await put(k, moduleDocument(u, 'estate', { today: TODAY, holds }));
   await put(k, next);
 
-  assert.equal(k.packs().find((p) => p.id === 'usecase-founder')?.version, '1.4.0');
+  assert.equal(k.packs().find((p) => p.id === 'usecase-founder')?.version, u.version);
   assert.ok(held(k).includes('services'));
   assert.equal(k.count('organisations'), 2, 'the example organisation and his own, both kept');
   assert.equal(k.count('datapoints'), 2, 'the example number and his own, both kept');
-  drawn(k, 'home-founder');
+  const home = drawn(k, 'home-founder').map((b) => b.heading);
+  assert.ok(home.includes('Due this week') && home.includes('Lapsing'), `the updated Home draws ${home.join(', ')}`);
   drawn(k, 'dashboard');
   const pages = k.pages() as unknown as { slug: string; title: string }[];
   const project = pages.find((p) => p.title === 'Northwind app');

@@ -13,7 +13,17 @@
  * (`loop/research-switch.md` section 3, ranked gap 5).
  */
 
+import { MONEY_PAGES } from '../modules/money.ts';
 import { projectTemplate } from '../modules/portfolio.ts';
+
+/**
+ * MONEY'S OWN "DUE THIS WEEK", TAKEN AND NOT COPIED, the way the project page takes Portfolio's template. A founder's
+ * Home is drawn in place of Money's `home`, so this table was declared on every founder record and drawn on none of
+ * them (`loop/research-living-in-it.md` 3.1). One declaration means the window, the columns and the order cannot drift
+ * apart between the two Homes; and because it is read from Money, an edit there moves this use case's fingerprint,
+ * which `usecase-versions.test.ts` then asks a version for.
+ */
+const DUE_THIS_WEEK = (MONEY_PAGES.home!.blocks as Record<string, unknown>[]).find((b) => b.heading === 'Due this week')!;
 
 /** The lists a founder's record holds once its five modules and this pack are in, services among them. */
 const HOLDS = ['things', 'people', 'accounts', 'obligations', 'services', 'tasks', 'tracks', 'runs', 'updates', 'organisations', 'datapoints'];
@@ -41,8 +51,12 @@ export const FOUNDER = {
 
      1.4.0 BECAUSE ESTATE IS ONE OF THE MODULES, which is more than a reworded tile: the project page draws
      each project's services and what they cost a year, so it requires a list 1.3.2 never asked for. A
-     minor step and not a patch, because a record taking it gains a module and a list. */
-  version: '1.4.0',
+     minor step and not a patch, because a record taking it gains a module and a list.
+
+     1.5.0 BECAUSE HOME GAINS TWO TABLES AND A LIST IT REQUIRES: "Due this week", which Money's own Home drew
+     and a founder's Home replaced, and "Lapsing", over Estate's services. Nothing is declared or taken away,
+     but `page.home-founder` now requires `register.services`, which is the same kind of step 1.4.0 was. */
+  version: '1.5.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',
@@ -143,11 +157,16 @@ export const FOUNDER = {
       {
         /* HOME, AS THIS USE CASE ANSWERS IT (`loop/research-spark.md` S13): the money across every organisation and
            the numbers the projects sent, in place of the house figures. No `nav`, because Home is on the rail
-           already. The first heading reads the voice, so a line changed at `/packs` changes it too. */
+           already. The first heading reads the voice, so a line changed at `/packs` changes it too.
+
+           WHAT IS DUE AND WHAT IS LAPSING COME STRAIGHT UNDER THE FIGURES SINCE 1.5.0, above the numbers, because
+           they are the two lists on this page somebody has to act on this week. Before it, the three headings
+           were the figures, Latest numbers and Organisations, and a bill due in three days or a domain about to
+           lapse was on no page a founder opens first. */
         page: 'home-founder',
         title: 'Overview',
         icon: 'home',
-        requires: ['register.datapoints', 'register.organisations', 'register.accounts', 'register.obligations'],
+        requires: ['register.datapoints', 'register.organisations', 'register.accounts', 'register.obligations', 'register.services'],
         blocks: [
           {
             /**
@@ -172,6 +191,25 @@ export const FOUNDER = {
               { metric: 'out-30d', label: 'Owed by you, 30 days' },
               { metric: 'datapoints-30d', label: 'Reported, 30 days' },
             ],
+          },
+          DUE_THIS_WEEK,
+          {
+            /* THE SET ESTATE'S OWN `lapsing` TILE COUNTS, `state is lapsing` and nothing else, so the number on
+               the Services page and the rows here are one set. Soonest renewal first, since that is the one
+               that goes first. */
+            kind: 'table',
+            heading: 'Lapsing',
+            span: 12,
+            source: 'register.services',
+            where: 'state is lapsing',
+            columns: [
+              { field: 'name', label: 'Name', width: 'minmax(16ch,1fr)' },
+              { field: 'renews', label: 'Renews', width: '15ch', align: 'end' },
+              { field: 'cost', label: 'Cost', width: '13ch', align: 'end' },
+            ],
+            order: [{ field: 'renews', dir: 'asc' }],
+            limit: 6,
+            empty: 'Nothing is lapsing.',
           },
           {
             kind: 'table',

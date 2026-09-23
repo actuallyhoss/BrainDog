@@ -187,10 +187,16 @@ test("A USE CASE'S HOME OPENS, every block readable, with its headings in the re
 
   const founder = await made('founder');
   const blocks = value<{ blocks: Drawn[] }>(founder.k.page(homePageOf('founder'))).blocks;
-  assert.deepEqual(blocks.map((b) => b.heading), ['The numbers', 'Latest numbers', 'Organisations']);
+  /* WHAT IS DUE AND WHAT IS LAPSING SIT UNDER THE FIGURES SINCE FOUNDER 1.5.0 (`founder-home.test.ts`). Both are empty on a
+     new record: the example bill falls due in nine days, one past the week, and no example service is lapsing. So the
+     row count below is found by heading, because by position it had come to read "Due this week" and counted nothing. */
+  assert.deepEqual(blocks.map((b) => b.heading), ['The numbers', 'Due this week', 'Lapsing', 'Latest numbers', 'Organisations']);
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   for (const cell of blocks[0]!.readings ?? []) assert.ok(cell.reading && cell.reading.value !== null && !cell.refusal, `${cell.metric} cannot be worked out`);
-  assert.equal(blocks[1]!.rows?.length, 1);
+  const rowsUnder = (heading: string): number | undefined => blocks.find((b) => b.heading === heading)?.rows?.length;
+  assert.equal(rowsUnder('Latest numbers'), 1);
+  assert.equal(rowsUnder('Due this week'), 0);
+  assert.equal(rowsUnder('Lapsing'), 0);
   founder.sql.close();
 });
 

@@ -245,6 +245,22 @@ const DECLARED: Record<string, Version> = {
     declares: '15c1f37be2561258',
     history: ["Raised to 1.4.0 because Solo founder installs Estate, so `page.project` draws a project's services and what they cost a year, and requires the services list -> 15c1f37be2561258"],
   },
+  /**
+   * THE SAME IDS AGAIN, AND AGAIN A NEW VERSION. What moved is inside `page.home-founder`: two tables, one of them
+   * Money's own Due this week taken by reference, and a `requires` that now names `register.services`. So an edit to
+   * that block in `modules/money.ts` moves this fingerprint too, which is the watch the note above DECLARED asks for.
+   */
+  'founder@1.5.0': {
+    holds: `
+      metric.datapoints-30d page.dashboard page.home-founder page.organisation page.project
+      register.datapoints register.organisations
+      setting.shared_version setting.speaks
+      setting.voice_home setting.voice_lists setting.voice_needs_you setting.voice_nothing_needs_you
+      setting.voice_right_now setting.voice_since_away
+    `,
+    declares: 'b3550baded7ee204',
+    history: ["Raised to 1.5.0 because `page.home-founder` draws Money's Due this week and a Lapsing table over Estate's services, and requires the services list -> b3550baded7ee204"],
+  },
   'team@2.3.0': {
     holds: `
       page.agent-work page.cycles page.home-team page.project register.cycle_plan register.cycles
