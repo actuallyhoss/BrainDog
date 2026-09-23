@@ -75,12 +75,14 @@ import {
 } from '@braindog/declare/catalogue';
 import { refused, type Result } from '@braindog/ports';
 
+import { oneLine, printable } from './clip.ts';
 import { hostsPath } from './http.ts';
 import { refuse } from './json.ts';
 import type { AgentIo } from './skills.ts';
 import { proposeFile, readSource } from './usecase.ts';
 
-const saidWithCode = (r: Result<unknown>): string => (refused(r) ? `${r.refusal.fix} (${r.refusal.code})` : 'That was not read.');
+/* ONE CLEAN LINE, because a refusal of a catalogue's file is free to name what the file holds, and the file is a stranger's. */
+const saidWithCode = (r: Result<unknown>): string => (refused(r) ? oneLine(`${r.refusal.fix} (${r.refusal.code})`) : 'That was not read.');
 const ID = /^[a-z][a-z0-9-]{0,62}$/u;
 const VERSION = /^\d{1,6}\.\d{1,6}\.\d{1,6}$/u;
 
@@ -214,7 +216,7 @@ async function checkPack(args: string[], io: AgentIo): Promise<number> {
   const read = await readFileAs(file, io, 'pack');
   if (typeof read === 'number') return read;
   if (read.file.kind !== 'pack') return 1;
-  const { pack, title } = read.file.file;
+  const { pack, title } = printable(read.file.file);
   const count = (k: string) => pack.declarations.filter((d) => d.kind === k).length;
   io.out(`${title} ${pack.manifest.version} reads as an add-on: ${count('register')} lists, ${count('page')} pages and ${pack.seeds.length} example rows. Nothing was sent.`);
   io.out(`  By ${pack.manifest.author}, ${pack.manifest.license}.`);
@@ -224,8 +226,15 @@ async function checkPack(args: string[], io: AgentIo): Promise<number> {
 
 /* ── what a file reaches, said ──────────────────────────────────────────── */
 
-/** The lines `check` and `search` say about what a version can reach. */
-export function reachLines(reach: Reach): string[] {
+/**
+ * The lines `check` and `search` say about what a version can reach.
+ *
+ * SCRUBBED HERE AND NOT BY EACH CALLER. `search` hands over the reach an index states, which is a stranger's file, and
+ * audit thirty-nine measured a page name holding OSC 0 printed as sent; three commands build these lines, and none of
+ * them has to remember that.
+ */
+export function reachLines(given: Reach): string[] {
+  const reach = printable(given);
   const list = (xs: readonly string[]) => (xs.length === 0 ? 'none' : xs.join(', '));
   return [
     `  Installs first: ${list(reach.modules)}`,
@@ -235,8 +244,9 @@ export function reachLines(reach: Reach): string[] {
   ];
 }
 
-/** What `diff` and `publish` say changed. */
-export function changeLines(c: Changes): string[] {
+/** What `diff` and `publish` say changed, with the titles of the file's declarations made one clean line each. */
+export function changeLines(given: Changes): string[] {
+  const c = printable(given);
   const named = (xs: Changes['added']) => xs.map((x) => `${x.title} (${x.kind === 'register' ? 'list' : x.kind})`).join(', ');
   const lines = [`${c.from ?? 'nothing'} to ${c.to} needs at least a ${c.bump} version.`];
   if (c.added.length) lines.push(`  Adds: ${named(c.added)}`);
@@ -252,8 +262,10 @@ export function changeLines(c: Changes): string[] {
   return lines;
 }
 
-/** How a signature is said, with what this machine knows of the key. */
-export function trustLine(trust: Trust, author: string): string {
+/** How a signature is said, with what this machine knows of the key. A revocation's reason is its author's words, so it is scrubbed too. */
+export function trustLine(given: Trust, named: string): string {
+  const trust = printable(given);
+  const author = oneLine(named);
   switch (trust.kind) {
     case 'unsigned':
       return 'Unsigned: nothing says who published it beyond the catalogue it came from.';
@@ -499,7 +511,7 @@ async function publish(args: string[], io: AgentIo, kind: EntryKind): Promise<nu
   writeFileSync(target, source.text);
   writeFileSync(join(at.where, CATALOGUE_INDEX), `${JSON.stringify(out.value.index, null, 2)}\n`);
   const { entry, version, changes } = out.value;
-  io.out(`${entry.title} ${version.version} published to ${at.where}${version.signature ? `, signed by key ${version.signature.key_id}` : ', unsigned'}.`);
+  io.out(`${oneLine(entry.title)} ${version.version} published to ${at.where}${version.signature ? `, signed by key ${version.signature.key_id}` : ', unsigned'}.`);
   if (changes.from !== null) for (const line of changeLines(changes)) io.out(line);
   for (const line of reachLines(version.reach)) io.out(line);
   return 0;
@@ -533,7 +545,9 @@ async function search(args: string[], io: AgentIo, kind: EntryKind): Promise<num
   const statements = await verifiedStatements(at.index.keys);
   for (const e of found) {
     const v = e.versions[0];
-    io.out(`${e.id}  ${e.title} ${e.latest} by ${e.author}. ${e.summary}`);
+    /* THE ENTRY AS THE INDEX HOLDS IT decides trust, and a scrubbed copy is what is printed (audit thirty-nine finding 2). */
+    const shown = printable(e);
+    io.out(`${shown.id}  ${shown.title} ${shown.latest} by ${shown.author}. ${shown.summary}`);
     if (v) for (const line of reachLines(v.reach)) io.out(line);
     io.out(`  ${trustLine(trustOf(known, trustSubject(e), v?.signature, statements, v ? await keysSignedBefore(e, v.version) : []), e.author)}`);
   }
@@ -609,7 +623,7 @@ export async function installFromCatalogue(id: string, from: string, version: st
   }
   const chosen = entry.versions.find((v) => v.version === (version ?? entry.latest));
   if (!chosen) {
-    io.say(`${entry.title} has no version ${version} in this catalogue. It has ${entry.versions.map((v) => v.version).join(', ')}.`);
+    io.say(`${oneLine(entry.title)} has no version ${version} in this catalogue. It has ${entry.versions.map((v) => v.version).join(', ')}.`);
     return 1;
   }
   const path = catalogueFile(entry.id, chosen.version, kind);
@@ -639,20 +653,21 @@ export async function installFromCatalogue(id: string, from: string, version: st
   }
   const statements = await verifiedStatements(at.index.keys);
   /* A REVOKED KEY IS SAID AND NOTHING IS ASKED. */
-  const revoked = revokedNotice(statements, entry.title, chosen.version, held.value);
+  const title = oneLine(entry.title);
+  const revoked = revokedNotice(statements, title, chosen.version, held.value);
   if (revoked !== null) {
-    io.say(`${revoked} Nothing was sent.`);
+    io.say(`${oneLine(revoked)} Nothing was sent.`);
     return 1;
   }
   const before = await keysSignedBefore(entry, chosen.version);
   /* NOR IS ONE THAT LOST ITS SIGNATURE AFTER SIGNED VERSIONS. */
   if (held.value === null && before.length > 0) {
-    io.say(`${strippedNotice(entry.title, chosen.version, before)} Nothing was sent.`);
+    io.say(`${strippedNotice(title, chosen.version, before)} Nothing was sent.`);
     return 1;
   }
   const trust = trustOf(knownKeys(io), trustSubject(entry), held.value, statements, before);
   if (trust.kind === 'stripped') {
-    io.say(`${entry.title} ${chosen.version}: ${trustLine(trust, entry.author)} Nothing was sent.`);
+    io.say(`${title} ${chosen.version}: ${trustLine(trust, entry.author)} Nothing was sent.`);
     return 1;
   }
   const said = trustLine(trust, entry.author);
@@ -660,7 +675,7 @@ export async function installFromCatalogue(id: string, from: string, version: st
   /* THE KEY IS REMEMBERED ON FIRST USE, OR WHEN A KEY ALREADY TRUSTED NAMED IT. A different key is said on Decide and never replaces the one seen before. */
   const keep = keyToKeep(trust);
   if (keep !== null) remember(io, trustSubject(entry), keep);
-  const question = `Install ${entry.title} ${chosen.version} from a catalogue? ${said}`;
+  const question = `Install ${title} ${chosen.version} from a catalogue? ${said}`;
   if (read.value.kind === 'usecase') return proposeFile(text, read.value.shared.usecase, host, io, question);
   return proposePack(read.value.file.pack.manifest.pack, read.value.file.doc, question, host, io);
 }
@@ -746,7 +761,8 @@ async function preview(args: string[], io: AgentIo): Promise<number> {
     io.say('The scratch record for the preview could not be created.');
     return 1;
   }
-  io.out(`Previewing ${read.shared.usecase.title} ${read.shared.usecase.version} on a scratch BrainDog. Open http://localhost:${port}/packs/browse/${read.shared.usecase.usecase}?from=catalogue and press Review the plan. Stop with Ctrl+C; the scratch record is removed.`);
+  /* THE FILE'S TITLE IS ITS AUTHOR'S, and `preview` reads a file from an address as readily as `check` does. */
+  io.out(`Previewing ${oneLine(read.shared.usecase.title)} ${oneLine(read.shared.usecase.version)} on a scratch BrainDog. Open http://localhost:${port}/packs/browse/${read.shared.usecase.usecase}?from=catalogue and press Review the plan. Stop with Ctrl+C; the scratch record is removed.`);
   const code = await run(['serve'], true);
   rmSync(scratch, { recursive: true, force: true });
   return code;

@@ -49,3 +49,46 @@ test('printable: every string at any depth is one clean line, and numbers, boole
   /* A COPY, NEVER THE VALUE ITSELF: the same object is what `--json` hands an agent, bytes and all. */
   assert.deepEqual(kept, before);
 });
+
+/*
+ * AUDIT THIRTY-NINE FINDING 11. Every control character (Unicode's Cc) was gone and no format character (Cf) was: the
+ * audit's `clip.mts` printed PASSES for U+202E, the isolates, U+200F, U+061C, U+200B, U+2060, U+00AD, a tag character
+ * and U+FFF9, and this file run against the old class failed on each. None of them tells a terminal to do anything, but
+ * a terminal that lays text out both ways (VTE, Konsole, mlterm) draws `invoice U+202E fdp.exe` as `invoiceexe.pdf`.
+ */
+const u = (n: number): string => String.fromCodePoint(n);
+const FORMAT = [0x061c, 0x200b, 0x200e, 0x200f, 0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2060, 0x2066, 0x2067, 0x2068, 0x2069, 0x00ad, 0xfff9, 0xfffa, 0xfffb, 0xe0000, 0xe0041, 0xe007f];
+
+test('oneLine: every bidirectional control and invisible character the audit named is taken out, and the word is left whole', () => {
+  for (const n of FORMAT) {
+    const hex = n.toString(16).toUpperCase().padStart(4, '0');
+    assert.equal(oneLine(`co${u(n)}op`), 'coop', `U+${hex} got through`);
+  }
+  assert.equal(oneLine(`invoice${u(0x202e)}fdp.exe`), 'invoicefdp.exe');
+});
+
+test('oneLine: the zero width joiner stays, because a family or a rainbow flag is drawn from it', () => {
+  const family = `\u{1f468}${u(0x200d)}\u{1f469}${u(0x200d)}\u{1f467}`;
+  assert.equal(oneLine(`The ${family} row`), `The ${family} row`);
+});
+
+/*
+ * THE AUDIT'S CHECKER SAW `clip cuts a surrogate pair: true`, and it was real: `slice` counts UTF-16 units, so an emoji
+ * straddling the cut left its high half on the line, which a terminal draws as a replacement box or, in some, an error.
+ */
+test('clip: never cuts a character in half, so an emoji at the cut is kept whole or left out whole', () => {
+  const cut = clip(`${'x'.repeat(6)}\u{1f600}${'y'.repeat(10)}`, 10);
+  assert.equal(/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/u.test(cut), false, JSON.stringify(cut));
+  assert.equal(cut, `${'x'.repeat(6)}\u{1f600}...`);
+  assert.equal(clip('\u{1f600}'.repeat(5), 5), '\u{1f600}'.repeat(5));
+});
+
+/*
+ * A KEY IS SOMEBODY ELSE'S WORDS TOO. `automations show` hands `printable` the whole answer, a rule's `body` among it,
+ * and a `script` step's `input` is a map whose names the lint does not look at. No line prints a key today; the whole
+ * value is scrubbed so that the next line to print one does not have to remember where it came from.
+ */
+test('printable: an object key holding ESC is made one clean line as well as its value', () => {
+  const keyed = printable({ [`k\u001b]0;owned\u0007`]: 'v', plain: { [`in${u(0x202e)}ner`]: 1 } });
+  assert.deepEqual(keyed, { 'k ]0;owned': 'v', plain: { inner: 1 } });
+});

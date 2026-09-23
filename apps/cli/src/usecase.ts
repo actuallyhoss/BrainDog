@@ -34,14 +34,18 @@ import { reachOf } from '@braindog/declare/catalogue';
 import { refused, type Result } from '@braindog/ports';
 
 import { installFromCatalogue, reachLines, sdkVerb } from './catalogue.ts';
+import { oneLine, printable } from './clip.ts';
 import { refuse } from './json.ts';
 import { connect, fixOf, type AgentIo, type Connected } from './skills.ts';
 
 const USAGE =
   'braindog usecase takes new <id>, check <file>, diff <a> <b>, publish <file> --to <folder> [--sign <key file>], key <file> --author <name>, search [words] --from <catalogue>, preview <file> [--port <n>], list [--host <host>], export [--out <file>] [--title <title>] [--version <x.y.z> | --minor] [--example <list>:<n>,<n>] [--signal <word>] [--skill <n>], or install <id|file|url> [--from <catalogue>] [--version <x.y.z>] [--host <host>].';
 
-/** A refusal's sentence with its code after it, or the plain sentence for an answer that carries none. */
-const saidWithCode = (r: Result<unknown>): string => (refused(r) ? `${r.refusal.fix} (${r.refusal.code})` : fixOf(r));
+/**
+ * A refusal's sentence with its code after it, or the plain sentence for an answer that carries none, as one clean line:
+ * `readShared` refusing a file is free to name what the file holds, and the file may be anybody's.
+ */
+const saidWithCode = (r: Result<unknown>): string => oneLine(refused(r) ? `${r.refusal.fix} (${r.refusal.code})` : String(fixOf(r)));
 
 export async function usecase(args: string[], io: AgentIo): Promise<number> {
   const [verb, ...rest] = args;
@@ -164,7 +168,9 @@ async function check(args: string[], io: AgentIo): Promise<number> {
     refuse(io, shared, saidWithCode(shared));
     return 1;
   }
-  const u = shared.value.usecase;
+  /* THE FILE'S WORDS ARE ITS AUTHOR'S, and `readShared` takes a title, author or license holding ESC and BEL without a
+     word (audit thirty-nine finding 2), so the lines are built from a scrubbed copy. */
+  const u = printable(shared.value.usecase);
   const lists = shared.value.pack?.declarations.filter((d) => d.kind === 'register').length ?? 0;
   const pages = shared.value.pack?.declarations.filter((d) => d.kind === 'page').length ?? 0;
   const needs = u.modules.length === 0 ? 'no module first' : `${u.modules.join(', ')} first`;
@@ -278,7 +284,9 @@ async function installFile(args: string[], io: AgentIo): Promise<number> {
  * A `pack` proposal carrying a file already read through `readShared`, and the Decide link it prints. The record reads the
  * file through the same door again and plans it; nothing is installed until the owner accepts it.
  */
-export async function proposeFile(text: string, u: { title: string; version: string }, host: string | undefined, io: AgentIo, question?: string): Promise<number> {
+export async function proposeFile(text: string, file: { title: string; version: string }, host: string | undefined, io: AgentIo, question?: string): Promise<number> {
+  /* The question and the line are built from a scrubbed copy; `text`, the file itself, is sent byte for byte. */
+  const u = printable({ title: file.title, version: file.version });
   const at = await connect(host, io);
   if (typeof at === 'number') return at;
   const answer = await at.client.call<{ id: string }>('propose', {
@@ -295,7 +303,7 @@ export async function proposeFile(text: string, u: { title: string; version: str
     return 1;
   }
   const link = new URL(`/decide/${encodeURIComponent(id)}`, at.to.base).href;
-  io.out(`${question === undefined ? `Asked the owner to install ${u.title} ${u.version}.` : `Asked the owner: ${question}`} Nothing is installed until they accept it: ${link}`);
+  io.out(`${question === undefined ? `Asked the owner to install ${u.title} ${u.version}.` : `Asked the owner: ${oneLine(question)}`} Nothing is installed until they accept it: ${link}`);
   return 0;
 }
 
@@ -343,7 +351,8 @@ async function list(args: string[], io: AgentIo): Promise<number> {
   }
   const read = await arrangementOf(values.host, io);
   if (typeof read === 'number') return read;
-  const { packs, offer, voice } = read.value;
+  /* AN OFFER'S NAME AND SUMMARY ARE A USE CASE'S WORDS, written by whoever wrote its file, not by the person reading them. */
+  const { packs, offer, voice } = printable(read.value);
   const on = packs.filter((p) => p.id.startsWith(USE_CASE));
   const offered = offer.filter((o) => o.id.startsWith(USE_CASE) || typeof o.usecase === 'string');
   if (on.length === 0) io.out('No use case is set up on this BrainDog yet.');
@@ -382,7 +391,7 @@ async function installOffered(given: string, host: string | undefined, io: Agent
     io.say(held ? `${idWords(id)} is already on this BrainDog. ${others}` : `There is no use case called ${id.slice(USE_CASE.length)} on offer here. ${others}`);
     return 1;
   }
-  const title = offered?.usecase ?? idWords(id);
+  const title = oneLine(offered?.usecase ?? idWords(id));
   const answer = await at.client.call<{ id: string }>('propose', { question: update ? `Update ${title} from ${update.from} to ${update.to}?` : `Set this BrainDog up for ${title}?`, body_kind: 'pack', body: { install: id } });
   if (!answer.ok) {
     return refuse(io, answer, saidWithCode(answer));

