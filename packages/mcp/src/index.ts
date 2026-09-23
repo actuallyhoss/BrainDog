@@ -759,7 +759,7 @@ export function tools<C>(surface: McpSurface<C>) {
      the caller may not read is not kept, and that register's rows are named `register#number`. */
   const prefixes = new Map<string, string>();
   /* AND ITS REF FIELDS, READ FROM THE SAME SCHEMA, each `true` where the field is a list of refs. They move no more
-     often than the prefix does, and they are what the naming pass below and the prefixed write in `refsIn` read. */
+     often than the prefix does, and they are what the naming pass below reads. */
   const refFields = new Map<string, Map<string, boolean>>();
   const learnPrefix = async (register: string, ctx: C): Promise<void> => {
     const schema = await surface.schema({ register }, ctx);
@@ -842,42 +842,6 @@ export function tools<C>(surface: McpSurface<C>) {
       : r;
   };
 
-  /**
-   * The fields of a write, with each prefixed id in a ref field made the `register#number` the record's write path takes.
-   *
-   * THE NAMING PASS ABOVE HANDS AN AGENT `supersedes: "LN8"`, and measured on the seed the record refuses exactly that
-   * ("supersedes takes a row id or a spoken id like learnings#41"): `coerce.ts` reads `register#number` and a row id,
-   * and only a predicate reads a prefix. So an answer sent straight back would have been refused for a value this
-   * package put in it. `locate` already asks the record which register owns a prefix, and this is the same question
-   * for a field. The `register#number` form, not the row id, so a prefix that names the wrong register is still
-   * refused `REF_REGISTER_MISMATCH` in the record's words; a prefix nobody can read goes on as sent, and is refused
-   * there too.
-   */
-  const refsIn = async (register: string, fields: Args, ctx: C): Promise<Args> => {
-    /* A WRITE WITH NO PREFIXED VALUE IN IT, which is nearly every write, costs nothing more: the schema is asked only
-       when there is something to qualify, so `rpc.test.ts`'s golden `create` and `update` still reach one method. */
-    const prefixed = (v: unknown): v is string => typeof v === 'string' && PREFIXED.test(v.trim());
-    if (!Object.values(fields).some((v) => prefixed(v) || (Array.isArray(v) && v.some(prefixed)))) return fields;
-    if (!prefixes.has(register)) await learnPrefix(register, ctx);
-    const refs = refFields.get(register);
-    if (!refs || refs.size === 0) return fields;
-    const qualify = async (value: unknown): Promise<unknown> => {
-      if (!prefixed(value)) return value;
-      const found = await surface.get({ spoken: value.trim() }, ctx);
-      return found.ok && isEntry(found.value) && found.value.seq !== null ? `${found.value.register}#${String(found.value.seq)}` : value;
-    };
-    const out = { ...fields };
-    for (const [id, many] of refs) {
-      if (!Object.hasOwn(out, id)) continue;
-      const value = out[id];
-      if (many && Array.isArray(value)) {
-        const each: unknown[] = [];
-        for (const one of value) each.push(await qualify(one));
-        out[id] = each;
-      } else if (!many) out[id] = await qualify(value);
-    }
-    return out;
-  };
   /**
    * Where a row is, from any way an agent says it: `register#number` as it is, and a prefixed id such as
    * `LN7` asked of the record, which alone knows which register owns a prefix.
@@ -1179,12 +1143,21 @@ export function tools<C>(surface: McpSurface<C>) {
       return filed;
     },
 
+    /**
+     * THE FIELDS GO TO THE RECORD AS SENT, a prefixed ref among them, because the record reads `LN8` itself.
+     *
+     * THIS PACKAGE QUALIFIED A PREFIX HERE AND IN `update`, and `propose`'s `rowset` was the third writer of a row and
+     * went round it: a skill's `because: ["LN6"]`, as `get` answers it, was filed and then refused at the owner's accept
+     * (audit fifty-two section 1). A reader at each tool is a reader some tool lacks, so there is one, in `coerce.ts`,
+     * which every write reaches, the accept of a rowset among them. `refs-round-trip.test.ts` sends every ref any tool
+     * answers back through every tool that writes.
+     */
     create: async (args, ctx) => {
       const register = String(args.register);
       return surface.create(
         {
           register,
-          fields: isObject(args.fields) ? await refsIn(register, args.fields, ctx) : ((args.fields ?? {}) as Args),
+          fields: (args.fields ?? {}) as Args,
           ...(args.note === undefined ? {} : { note: String(args.note) }),
         },
         ctx,
@@ -1197,7 +1170,7 @@ export function tools<C>(surface: McpSurface<C>) {
       return surface.update(
         {
           ...at.value,
-          patch: isObject(args.patch) ? await refsIn(at.value.register, args.patch, ctx) : ((args.patch ?? {}) as Args),
+          patch: (args.patch ?? {}) as Args,
           ...(args.version === undefined ? {} : { version: Number(args.version) }),
           ...(args.note === undefined ? {} : { note: String(args.note) }),
         },
@@ -1398,8 +1371,14 @@ export function tools<C>(surface: McpSurface<C>) {
       if (name === 'log') {
         const said = shaped(answer, prefixOf);
         if (!said.ok || !isObject(said.value)) return said;
-        const { spoken, version, updated_at } = said.value;
-        return { ok: true, value: { spoken, version, ...(updated_at === undefined ? {} : { updated_at }) } };
+        /* AND `deleted_at` WHEN THE ROW HAS ONE. The record takes a note on a deleted row, and cutting the answer to three
+           fields cut the one that said so: an agent logging on an id carried from another session was told `ok` and
+           nothing else (audit fifty-two section 7), which is the case where it did not already have the row. */
+        const { spoken, version, updated_at, deleted_at } = said.value;
+        return {
+          ok: true,
+          value: { spoken, version, ...(updated_at === undefined ? {} : { updated_at }), ...(deleted_at === undefined ? {} : { deleted_at }) },
+        };
       }
       return shaped(await spokenRefs(answer, ctx), prefixOf);
     },

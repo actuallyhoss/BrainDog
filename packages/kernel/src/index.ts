@@ -3121,7 +3121,32 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
       const look = {
         refId: (reg: string, seq: number) => bySeq(reg, seq)?.id ?? null,
+        prefixed,
+        deleted: (reg: string, seq: number) => Boolean(bySeq(reg, seq, true)?.deleted_at),
         grantExists: (id: string) => Boolean(sql.one('SELECT 1 AS x FROM grant WHERE id = ?', id)),
+      };
+      /**
+       * The lookups for one field of the patch: a deleted row this field already points at is still found by its name.
+       *
+       * A ROW SENT BACK AS IT WAS READ WAS REFUSED FOR A VALUE IT HELD. A task read while its project was live answers
+       * `thing: things#5`; the project is deleted, and the same fields back through `update` were refused `thing names
+       * things#5, and there is no such row` (audit fifty-two section 2), the same through a rowset at the owner's accept.
+       * The row id for the same target was taken, so the refusal was of the name and not of the ref.
+       *
+       * ONLY WHAT THE FIELD ALREADY HOLDS, and not every deleted row. A new ref to a deleted row by its name stays
+       * refused, now saying it was deleted, because pointing a row at a project somebody removed is a mistake worth a
+       * sentence, and a round trip that changes nothing is not.
+       */
+      const lookAt = (key: string) => {
+        const held = current?.fields[key];
+        const holds = (id: string) => (Array.isArray(held) ? held.includes(id) : held === id);
+        return {
+          ...look,
+          refId: (reg: string, seq: number) => {
+            const row = bySeq(reg, seq, true);
+            return row && (!row.deleted_at || holds(row.id)) ? row.id : null;
+          },
+        };
       };
 
       /* Defaults first, and on a create only: a default is what a row starts as, not what it
@@ -3189,7 +3214,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           continue;
         }
 
-        const out = coerce(field, value, look);
+        const out = coerce(field, value, lookAt(key));
         if (!out.ok) return { ok: false, refusal: out.refusal };
 
         /* AFTER COERCION, AND STRUCTURALLY. This compared the RAW patch value against the STORED

@@ -307,6 +307,17 @@ export function parseSpoken(s: string): { register: string; seq: number } | null
 export type Lookups = {
   /** `obligations#41` to the row's 26-character id, or `null` when there is no such row. */
   refId?: (register: string, seq: number) => string | null;
+  /**
+   * `LN8` to `learnings` and 8, by the prefixes the record has installed, or `null` when no register owns the prefix.
+   *
+   * A PREFIX IS THE RECORD'S OWN WORD FOR A ROW, and this case read only `register#number`. Every answer an agent reads
+   * names a learning `LN8`, so the MCP package qualified a prefix on the way into `create` and `update`, and `propose`'s
+   * `rowset` went round it: filed, then refused `because[0] takes a row id or a spoken id` at the owner's accept
+   * (audit fifty-two section 1). Read here, every writer of a row reads a prefix, the accept among them.
+   */
+  prefixed?: (said: string) => { register: string; seq: number } | null;
+  /** Whether `obligations#41` is a row that was deleted, so a refusal says that rather than that it never existed. */
+  deleted?: (register: string, seq: number) => boolean;
   /** Does a grant with this id exist? */
   grantExists?: (id: string) => boolean;
 };
@@ -479,7 +490,7 @@ export function coerce(field: FieldDecl, value: unknown, look: Lookups = {}, at 
       if (typeof value !== 'string') return malformed(`${at} takes a row id or a spoken id.`);
       const s = value.trim();
       if (ULID.test(s)) return good(s);
-      const said = parseSpoken(s);
+      const said = parseSpoken(s) ?? look.prefixed?.(s) ?? null;
       if (!said) return malformed(`${at} takes a row id or a spoken id like ${field.to ?? 'register'}#41.`);
 
       /**
@@ -513,7 +524,12 @@ export function coerce(field: FieldDecl, value: unknown, look: Lookups = {}, at 
         );
 
       const id = look.refId?.(said.register, said.seq) ?? null;
-      if (!id) return malformed(`${at} names ${s}, and there is no such row.`);
+      if (!id)
+        return malformed(
+          look.deleted?.(said.register, said.seq)
+            ? `${at} names ${s}, which was deleted. Name a live row, or restore ${s} first.`
+            : `${at} names ${s}, and there is no such row.`,
+        );
       return good(id);
     }
 
