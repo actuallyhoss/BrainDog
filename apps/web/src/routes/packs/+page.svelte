@@ -34,6 +34,7 @@
   import { drew } from '../../lib/ui/screen.svelte.ts';
   import InstallShared from './InstallShared.svelte';
   import CatalogueUpdates from './CatalogueUpdates.svelte';
+  import { browseable } from './browseable.ts';
   import { catalogueTitles, readHostCatalogue } from './browse/catalogue.ts';
   import { moduleName } from '@braindog/seed/usecases/names';
 
@@ -61,8 +62,8 @@
   let live = $state(false);
 
   const installed = $derived(states ?? []);
-  /* ON A RECORD, EVERY CATALOGUE ENTRY IT DOES NOT HOLD. `installed` on an entry is the sample's own fact. */
-  const available = $derived(PACKS.filter((p) => (live || !p.installed) && !installed.some((s) => s.id === p.id)));
+  /* ON A RECORD, ONLY WHAT THIS BUILD SHIPS: the sample's two pictured add-ons were offered there with star counts (`browseable.ts`). */
+  const available = $derived(browseable(PACKS, live, installed));
 
   let diff = $state<string | null>(null);
 

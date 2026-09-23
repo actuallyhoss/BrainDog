@@ -26,31 +26,37 @@
      =========================================================================================== */
 
   /* ===========================================================================================
-     THE MOVE TO ONE DOMAIN GOES OUT IN THREE PUSHES, AND THIS FILE IS THE FIRST OF THEM.
-     `loop/research-one-domain-cutover.md` section 5 is the runbook; this block is the part of it
-     that is config, kept here so it is parsed and tested rather than remembered.
+     THE MOVE TO ONE DOMAIN: THIS FILE IS PUSH A, AND IT IS LIVE. `loop/research-push-a-checks.md`
+     section 3 is the runbook, corrected on 23 September; this block is the part of it that is
+     config, kept here so it is parsed and tested rather than remembered. Its `STAGE` fragments are
+     read by `pushes()` and three tests, so they stay until the push that replaces them lands.
 
      PUSH A, THIS FILE: the app under `/app` on `app.brain.dog` and `app.alpha.brain.dog`, still
      Custom Domains, with no zone route, `LEGACY_HOSTS` empty and `RP_ID` already the parent. A page
      load outside `/app` on the public host is a 308 to `/app` on the same name (`legacyRedirect` in
      `src/route.ts`); without it the survey measured `/`, `/signin` and `/r/tasks` answering a JSON
-     `ROUTE_UNKNOWN` 404, because the build has no root `index.html` any more.
+     `ROUTE_UNKNOWN` 404, because the build has no root `index.html` any more. The Custom Domain
+     carries every path, so `/app` is not dark on `app.brain.dog`: production answered `/app/` with
+     the shell and a 200 on 23 September (`loop/research-push-a-live.md` P5). It is dark on
+     `brain.dog` only, which is the site's until the move.
 
-     PUSH A2: the zone routes below, and nothing else. It is its own push for two measured reasons.
-     `wrangler deploy` uploads the version, which is live at once, and only then writes the routes
-     (run `35786512090`: "Uploaded", then "Deployed ... triggers"). And the deploy token may not hold
-     Zone > Workers Routes > Edit on `brain.dog`, which only the owner can grant: every deploy so far
-     re-asserted an existing Custom Domain, which needs no more than Editor. So the one push that
-     needs the permission changes nothing else, and if its route write fails the Worker left serving
-     is A's, whole and on its old name.
+     PUSH A2, THE ZONE ROUTES BELOW, WILL NOT BE PUSHED. `loop/ROADMAP.md` W54 moves `brain.dog`'s
+     doors to this Worker through a service binding from the site Worker (its
+     `assets.run_worker_first`) instead. A zone route needs Zone > Workers Routes > Edit on
+     `brain.dog`, which only the owner can grant and every deploy so far has done without; a binding
+     needs no new permission, and it is proved on alpha first. What the fragment still records, and
+     measured: `wrangler deploy` uploads the version, which is live at once, and only then writes the
+     routes (run `35786512090`: "Uploaded", then "Deployed ... triggers"), so any push that changes
+     how the name is reached must change nothing else.
 
      PUSH B: the two vars that move people, and no route, so an Editor token is enough. Set the
-     repository variable `DEPLOY_HOST` to `brain.dog` after A2 is green and before B is pushed; with
-     A2's routes live the Parity step's three paths answer the same on both names. Alpha keeps
-     `app.alpha.brain.dog` as a legacy host in B rather than dropping it, because dropping a Custom
-     Domain is a route change too and B must make none; it goes with production's old name later.
+     repository variable `DEPLOY_HOST` to `brain.dog` once `brain.dog` hands the doors to this
+     Worker and before B is pushed; then the Parity step's three paths answer the same on both
+     names. Alpha keeps `app.alpha.brain.dog` as a legacy host in B rather than dropping it, because
+     dropping a Custom Domain is a route change too and B must make none; it goes with production's
+     old name later.
 
-     THE ZONE ROUTES WIN ON THE SHARED NAME, AND THAT IS DOCUMENTED RATHER THAN HOPED. "Routes can
+     IF ZONE ROUTES WERE USED, THEY WOULD WIN ON THE SHARED NAME, AND THAT IS DOCUMENTED. "Routes can
      `fetch()` Custom Domains and take precedence if configured on the same hostname"
      (developers.cloudflare.com/workers/configuration/routing/routes, read 23 September), so
      `brain.dog/api/boot` reaches this Worker and `brain.dog/pricing`, which no route names, reaches
@@ -294,8 +300,8 @@
        ----------------------------------------------------------------------------------------- */
     "alpha": {
       /* PUSH A: ALPHA STAYS ON `app.alpha.brain.dog`, ITS OWN CUSTOM DOMAIN, WITH NO ZONE ROUTE. It is
-         production's push-A shape on alpha's names, and the zone routes that give it `alpha.brain.dog`
-         beside the alpha site are `STAGE A2` at the top of this file; `test/wrangler-routes.test.ts`
+         production's push-A shape on alpha's names. `alpha.brain.dog` beside the alpha site was to be
+         `STAGE A2`'s zone routes, and is W54's service binding now; `test/wrangler-routes.test.ts`
          holds the two environments to the same paths in every push. Alpha deploys from `deploy.yml`
          only when `DEPLOY_ALPHA` is set, but a Workers Builds connection may deploy it on any push to
          master (the cut-over's O4), which is one more reason this block asks for no new permission.
@@ -489,8 +495,8 @@
          `brain.dog` IS STILL ONLY THE SITE'S. The owner asked on 22 September for the app to leave
          `app.brain.dog`, and `loop/research-one-domain.md` section 2.2 splits `brain.dog` between two
          Workers: the site keeps it as its Custom Domain, unchanged, and this Worker takes only the paths
-         it answers, as zone routes. Those routes are `STAGE A2` at the top of this file, with the
-         argument for their shape and for why they are a push of their own.
+         it answers. That was to be zone routes, `STAGE A2` at the top of this file; W54 now hands the
+         paths over by a service binding from the site Worker instead, and the top block says why.
 
          A CUSTOM DOMAIN CARRIES EVERY PATH ("Other parts (path, query parameters) of the URL are not
          considered", developers.cloudflare.com/workers/configuration/routing/custom-domains), so on
