@@ -1125,7 +1125,7 @@ export const site = {
       /* `TEMPLATES` in the same file: six `uriTemplate` entries. This said five and named `RESOURCES`,
          an array that file has never had, and stayed five for a day after `braindog:automation/{id}`
          was added. `test/content.test.ts` now imports `TEMPLATES` and holds this list and its count to it. */
-      resourcesTitle: 'And six addresses a client can read directly',
+      resourcesTitle: 'And seven addresses a client can read directly',
       resources: [
         { uri: 'braindog:schema/{register}', said: 'The fields of one register.' },
         { uri: 'braindog:page/{slug}', said: 'One page with every block run: rows and figures, never markup.' },
@@ -1133,6 +1133,7 @@ export const site = {
         { uri: 'braindog:skill/{name}', said: 'The text of one skill, and when to reach for it.' },
         { uri: 'braindog:declaration/{slug}', said: 'One page as declared, to change and propose back.' },
         { uri: 'braindog:automation/{id}', said: 'One automation as declared, with its last ten runs, each step with its outcome.' },
+        { uri: 'braindog:inbox/{state}', said: 'The arrivals in one state: untriaged, review, skipped, matched, proposed, ignored, or all. Skipped is where a wrong skip rule shows.' },
       ],
     },
 

@@ -140,6 +140,11 @@ export type McpSurface<C> = {
    * without it answers that `NOT_IN_THIS_BUILD`.
    */
   scriptTry?(args: { body: Record<string, unknown>; input?: unknown }, ctx: C): Answer;
+  /**
+   * What arrived and no rule filed, in one state or all of them, with a count for each. The record's own rung, which today
+   * is the owner and no token, and optional for the command line's reason above: its surface is a fixed list.
+   */
+  inbox?(args: { state?: string }, ctx: C): Answer;
 };
 
 /**
@@ -728,6 +733,7 @@ const FIXED: readonly Resource[] = [
   ),
   resource('digest/today', 'What the digest would say if it went now.'),
   resource('decisions', 'What has been proposed and not yet answered.'),
+  resource('inbox', 'What arrived and nothing filed yet, newest first, with how many arrivals are in each state.'),
   resource('actions', 'Every scheduled action: what it calls, how often, whether it is paused and why, and this month so far. Keys by name only.'),
   resource('automations', 'Every automation: what starts it, when it runs next, and how its runs went this month.'),
   resource('arrangement', 'How this BrainDog is arranged: its packs, what else is on offer, its voice and settings, its pages, and what waits.'),
@@ -745,6 +751,11 @@ export const TEMPLATES = [
   { uriTemplate: 'braindog:skill/{name}', name: 'skill', description: 'The text of one skill, and when to reach for it.' },
   { uriTemplate: 'braindog:declaration/{slug}', name: 'declaration', description: 'One page as declared, to change and propose back.' },
   { uriTemplate: 'braindog:automation/{id}', name: 'automation', description: 'One automation as declared, with its last ten runs, each step with its outcome.' },
+  {
+    uriTemplate: 'braindog:inbox/{state}',
+    name: 'inbox',
+    description: 'The arrivals in one state: untriaged, review, skipped, matched, proposed, ignored, or all. Skipped is where a wrong skip rule shows.',
+  },
 ] as const;
 
 /**
@@ -1277,6 +1288,13 @@ export function tools<C>(surface: McpSurface<C>) {
     if (head === 'actions' && !rest)
       return surface.actions ? surface.actions(ctx) : unbuilt('actions', 'Nothing else lists scheduled actions yet.');
     if (head === 'digest' && rest === 'today') return surface.digestToday({}, ctx);
+    /* THE STATE IS THE RECORD'S TO CHECK. The segment is held to a name here so a path never reaches it, and a name that
+       is not a state is refused by the record, with the seven words it takes; a second list of states here would be a second
+       list to keep in step. Who may read it is the record's too, so an agent's token is refused in the record's words. */
+    if (head === 'inbox' && (!rest || NAMED.test(rest)))
+      return surface.inbox
+        ? surface.inbox(rest ? { state: rest } : {}, ctx)
+        : unbuilt(uri, 'Nothing else lists what arrived yet.');
     /* THE SCRIPT GRAMMAR IS THIS PACKAGE'S OWN TEXT (`grammars/script.ts` says why it is not the record's), and it is
        still asked of the record before it is answered. `version` is `guard(ctx, 'read')`, the rung `arrangement` puts
        the other two grammars on, and unlike `arrangement` every surface has it, so the command line serves this too. */

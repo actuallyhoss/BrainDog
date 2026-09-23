@@ -680,9 +680,21 @@ export type InboxLine = {
   to: string;
   subject: string;
   body: string | null;
-  state: 'untriaged' | 'review';
+  state: InboxState;
   reason: string | null;
 };
+
+/**
+ * The states an arrival can be read back in: the DDL's seven, less `erased`.
+ *
+ * `erased` IS NOT A STATE ANYBODY READS. Its bytes are gone on purpose, so a line for it would be a sender and a subject
+ * the person asked to have forgotten. The other six are each an answer somebody wants: `skipped` is the only place a
+ * skip pattern that is too wide shows, and `matched` is what the ingest filed.
+ */
+export const INBOX_STATES = ['untriaged', 'review', 'skipped', 'matched', 'proposed', 'ignored'] as const;
+export type InboxState = (typeof INBOX_STATES)[number];
+/** What waits on a person, and what the inbox shows when it is asked for nothing in particular. */
+export const INBOX_WAITING: readonly InboxState[] = ['untriaged', 'review'];
 
 /**
  * What filing or archiving an arrival did: the arrival, the state it is in now, the row it became when it was filed,
@@ -5967,15 +5979,37 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       Number(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM inbox_raw WHERE state IN ('untriaged', 'review')")?.n ?? 0),
 
     /**
-     * The arrivals `inboxWaiting` counts, below `before`, newest first: what the record's `inbox` pages through.
+     * How many arrivals are in each state the inbox can be read in, every one of the six named and zero when none.
+     *
+     * ONE GROUPED READ AND NOT SIX. A count per state is what tells a person how much was skipped before they open a
+     * single arrival, and a state with no row has to say zero rather than be missing, or a caller reading
+     * `counts.skipped` gets `undefined` on the day nothing was skipped.
+     */
+    inboxCounts: (): Record<InboxState, number> => {
+      const counts = Object.fromEntries(INBOX_STATES.map((s) => [s, 0])) as Record<InboxState, number>;
+      for (const r of sql.all<{ state: string; n: number }>('SELECT state, COUNT(*) AS n FROM inbox_raw GROUP BY state'))
+        if ((INBOX_STATES as readonly string[]).includes(r.state)) counts[r.state as InboxState] = Number(r.n);
+      return counts;
+    },
+
+    /**
+     * The arrivals in `states`, below `before`, newest first: what the record's `inbox` pages through. Left out, the
+     * states are the two `inboxWaiting` counts.
      *
      * `rowid` AND NOT `ts`, because a burst arrives inside one millisecond and a cursor on `ts` would drop or repeat the
-     * rest of it. Rows are only ever inserted, so the order they were stored in is the order they arrived in.
+     * rest of it. Rows are only ever inserted, so the order they were stored in is the order they arrived in, and a
+     * cursor stays good across a change of state: the row keeps its rowid when it moves.
+     *
+     * THE STATES ARE BOUND, NEVER SPLICED. Each is checked against `INBOX_STATES` by the caller and again here, since a
+     * word from the wire reaches this list, and only the count of placeholders is written into the text.
      */
-    inboxBefore: (before: number | null, limit: number): InboxLine[] =>
-      sql
+    inboxBefore: (before: number | null, limit: number, states: readonly InboxState[] = INBOX_WAITING): InboxLine[] => {
+      const asked = states.filter((s) => (INBOX_STATES as readonly string[]).includes(s));
+      if (asked.length === 0) return [];
+      return sql
         .all<{ rowid: number; id: string; ts: string; channel: string; headers: string | null; body: string | null; state: string; reason: string | null }>(
-          "SELECT rowid, id, ts, channel, headers, body, state, reason FROM inbox_raw WHERE state IN ('untriaged', 'review') AND rowid < ? ORDER BY rowid DESC LIMIT ?",
+          `SELECT rowid, id, ts, channel, headers, body, state, reason FROM inbox_raw WHERE state IN (${asked.map(() => '?').join(', ')}) AND rowid < ? ORDER BY rowid DESC LIMIT ?`,
+          ...asked,
           before ?? Number.MAX_SAFE_INTEGER,
           limit,
         )
@@ -5999,10 +6033,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
             to: text('to'),
             subject: text('subject'),
             body: r.body,
-            state: r.state === 'review' ? 'review' : 'untriaged',
+            /* The row's own state: the query asked only for the ones `asked` names, so this is one of them. It read
+               "review, or else untriaged", which was true only while the inbox could be asked for nothing else. */
+            state: r.state as InboxState,
             reason: r.reason,
           };
-        }),
+        });
+    },
 
     /**
      * File an arrival as a row: the row goes through the ordinary write path, signed like any write, and the arrival is

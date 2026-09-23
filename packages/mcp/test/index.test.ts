@@ -159,6 +159,7 @@ test('AND THE RESOURCES GO THE SAME WAY, more quietly, which is the half of this
   assert.deepEqual(whole.filter((uri) => !narrow.includes(uri)), [
     'braindog:context',
     'braindog:sessions/live',
+    'braindog:inbox',
     'braindog:actions',
     'braindog:automations',
     'braindog:arrangement',

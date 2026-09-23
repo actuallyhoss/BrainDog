@@ -78,6 +78,8 @@ import {
   type Waiting as DeviceWaiting,
   type EventLine as LogLine,
   type InboxLine,
+  type InboxState,
+  INBOX_STATES,
   type ArrivalSettled,
   setupCollapser,
   isUlid,
@@ -702,8 +704,11 @@ export type WhatsNew = { events: EventLine[]; upTo: Cursor | null; sinceCapped: 
 /** `recentHistory`: one page of the log, newest first, and the cursor for the page below it. */
 export type HistoryPage = { events: EventLine[]; cursor: Cursor | null };
 
-/** `inbox`: one page of what arrived and no rule filed, newest first, and the cursor for the page below it. */
-export type InboxPage = { arrivals: InboxLine[]; cursor: number | null };
+/**
+ * `inbox`: one page of the arrivals in the state asked for, newest first, the cursor for the page below it, and how many
+ * arrivals are in each state, whichever one was asked for.
+ */
+export type InboxPage = { arrivals: InboxLine[]; cursor: number | null; counts: Record<InboxState, number> };
 
 /** One live run: the row, its spoken id, and what is worked out when it is read. */
 export type LiveRun = Entry & {
@@ -6098,14 +6103,34 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * AN OWNER'S, AND NO TOKEN'S. The inbox holds whatever was sent in, about any register or none, so it cannot be held
      * to a register the way the log is: a caller who may not read the whole record reads none of it. The refusal is
      * `FORBIDDEN` for all of them, and the sentence says which of the three it was.
+     *
+     * `state` PICKS WHICH ARRIVALS, AND THE DEFAULT IS WHAT WAITS ON A PERSON. It took no state and checked no key, so
+     * `{ state: 'skipped' }` was answered as the default pair and read as "nothing was skipped", when what a pattern
+     * skipped is the one place a skip that is too wide shows. `counts` names all six states on every page, so a caller
+     * learns how much sits in each before asking for any. The arguments are read after the owner's check, so a caller
+     * who is refused is not told which keys the inbox takes.
      */
-    async inbox(args: { cursor?: number; limit?: number } | undefined, ctx: CallContext): Promise<Result<InboxPage>> {
+    async inbox(
+      /* `state` IS A STRING because it arrives from the wire, as an MCP address segment or a JSON body, and is checked below. */
+      args: { state?: string; cursor?: number; limit?: number } | undefined,
+      ctx: CallContext,
+    ): Promise<Result<InboxPage>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
       const owner = allows(ctx, 'owner', listName);
       if (owner) return { ok: false, refusal: { ...owner, code: 'FORBIDDEN' } };
       if (!wholeRecord(ctx))
         return no('FORBIDDEN', 'The inbox belongs to the whole record, and this caller is held to part of it.', { at: 'principal' });
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['state', 'cursor', 'limit']);
+      if (extra) return { ok: false, refusal: extra };
+      const state: unknown = args?.state;
+      const allowed = [...INBOX_STATES, 'all'];
+      if (state !== undefined && !(typeof state === 'string' && allowed.includes(state)))
+        return no('VALUE_MALFORMED', `state is one of ${allowed.join(', ')}. Left out, it is untriaged and review together.`, {
+          at: 'state',
+          allowed,
+        });
+      const states: readonly InboxState[] | undefined = state === 'all' ? INBOX_STATES : state === undefined ? undefined : [state as InboxState];
       const cursor = args?.cursor;
       if (cursor !== undefined && !(Number.isSafeInteger(cursor) && cursor >= 1))
         return no('VALUE_MALFORMED', 'A cursor is the number of an arrival, a whole number from 1.', { at: 'cursor' });
@@ -6113,9 +6138,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (asked !== undefined && !Number.isSafeInteger(asked))
         return no('VALUE_MALFORMED', 'A limit is a whole number of arrivals.', { at: 'limit' });
       const limit = Math.min(Math.max(1, asked ?? 50), 200);
-      const lines = kernel.inboxBefore(cursor ?? null, limit + 1);
+      const lines = kernel.inboxBefore(cursor ?? null, limit + 1, states);
       const arrivals = lines.slice(0, limit);
-      return ok({ arrivals, cursor: lines.length > limit ? (arrivals.at(-1)?.rowid ?? null) : null });
+      return ok({ arrivals, cursor: lines.length > limit ? (arrivals.at(-1)?.rowid ?? null) : null, counts: kernel.inboxCounts() });
     },
 
     /**
