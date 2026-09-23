@@ -144,7 +144,11 @@ test("Portfolio's next minor keeps the field extends laid on Projects, and the r
   const { api, close } = await recordOf();
   said(await put(api, domains()));
   const made = said<{ id: string }>(api.kernel.create('things', { name: 'acme.example', lane: 'earning', domain: 'https://acme.example/' }, { actor: 'p_1' }));
-  /* STAGED WITH NO PACK, so it reads as the record's own from here and a later uninstall of Portfolio cannot take it. */
+  /* STAGED WITH NO PACK, so it reads as the record's own from here and a later uninstall of Portfolio cannot take it.
+     NOT UNDER PORTFOLIO, which audit forty-four's finding 2 was first answered with and which this test then measured:
+     Projects under Portfolio took the next minor as a plain change, and the list came out ending `tags, launched` with
+     `domain` gone under a row holding one. Nothing a plan is handed says which of a list's fields another pack laid,
+     and `detached()` says it only while the row has no pack. */
   assert.equal(listOf(api, 'things').pack_id, null);
 
   const [major, minor] = FIRST_PARTY_VERSIONS.portfolio.split('.').map(Number) as [number, number];
@@ -233,5 +237,57 @@ test('uninstalling the pack that extended a list leaves the field and what rows 
   assert.ok(listOf(api, 'things').body.fields.some((f) => f.id === 'domain'));
   assert.equal(api.kernel.get(made.id)!.fields.domain, 'https://acme.example/');
   said(api.kernel.update('things', made.id, { name: 'acme.example (live)' }, { actor: 'p_1' }));
+  close();
+});
+
+/* ── a value an update keeps, on a list its own pack owns ── */
+
+/** People as `version`, with `registrar` taken off `role` and `more` fields after its own, as `update-keeps-value.test.ts` builds it. */
+const peopleAt = (version: string, more: Field[] = []): Doc => {
+  const d = structuredClone(firstPartyDocument('people')) as unknown as Doc;
+  d.version = version;
+  d.declarations = d.declarations.map((x) =>
+    x.register === 'people' && Array.isArray(x.fields)
+      ? { ...x, fields: [...(x.fields as Field[]).map((f) => (f.id === 'role' ? { ...f, values: f.values!.filter((v) => v !== 'registrar') } : f)), ...more] }
+      : x,
+  );
+  return d;
+};
+
+/*
+ * AUDIT FORTY-FOUR'S FINDING 2 AS IT WAS MEASURED: every first-party pack, a row holding `role: registrar`, People 2.0.0
+ * without `registrar`, then People 2.1.0 with a `pronouns` field. The value 2.0.0 kept was staged with no pack, so 2.1.0
+ * found People "changed in the app" and planned it as `kept` with a rebased body, which Decide says as "Keeps People as
+ * you changed it. This update's version of it is not taken". Nobody changed it, and the update was taken.
+ */
+test('A VALUE AN UPDATE KEEPS STAYS UNDER ITS OWN PACK, so the next update of People is a change of People and not a kept edit', async () => {
+  const { api, close } = await recordOf();
+  said(api.kernel.create('people', { name: 'Nordhaven', role: 'registrar' }, { actor: 'p_1' }));
+  said(await put(api, peopleAt('2.0.0')));
+  assert.equal(listOf(api, 'people').pack_id, 'people', 'the list a value was kept on reads as edited in the app');
+
+  const next = peopleAt('2.1.0', [{ id: 'pronouns', label: 'Pronouns', type: 'text' }]);
+  const diff = await planOf(api, next);
+  assert.deepEqual(diff.kept, [], 'People 2.1.0 was planned as a list kept as the owner changed it');
+  assert.ok(diff.changes.some((c) => c.id === 'register.people'), JSON.stringify(diff.changes));
+  assert.deepEqual(diff.stays.map((s) => [s.id, s.values]), [['register.people', ['role.registrar']]]);
+  said(await put(api, next));
+  const people = listOf(api, 'people');
+  assert.equal(people.pack_id, 'people');
+  assert.ok(people.body.fields.some((f) => f.id === 'pronouns'));
+  assert.ok(people.body.fields.find((f) => f.id === 'role')!.values!.includes('registrar'), 'the second update dropped the value the first one kept');
+  close();
+});
+
+test('the same People again changes nothing, with the value it keeps still kept', async () => {
+  const { api, close } = await recordOf();
+  said(api.kernel.create('people', { name: 'Nordhaven', role: 'registrar' }, { actor: 'p_1' }));
+  said(await put(api, peopleAt('2.0.0')));
+  const version = api.kernel.declarations().find((d) => d.id === 'register.people')!.version;
+  const again = await planOf(api, peopleAt('2.0.0'));
+  assert.deepEqual([again.direction, again.changes, again.kept], ['reinstall', [], []]);
+  said(await put(api, peopleAt('2.0.0')));
+  assert.equal(api.kernel.declarations().find((d) => d.id === 'register.people')!.version, version);
+  assert.ok(listOf(api, 'people').body.fields.find((f) => f.id === 'role')!.values!.includes('registrar'));
   close();
 });

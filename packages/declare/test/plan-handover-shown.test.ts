@@ -9,8 +9,12 @@
  *
  * Driven as the audit measured it: every first-party pack in, money-core at 1.7.0 with the twelve HSBC Egypt doors its
  * own, a token minted for one of them, then money-core's current document proposed as an update by an agent. The record
- * names what it uses (`handover-used.test.ts`), so one door is handed and eleven retire.
+ * names what it uses (`handover-used.test.ts`), so the door with the token is handed, and with it `bank-from-out-sms`,
+ * the door that pattern names (`door-follows-patterns.test.ts`). Ten retire.
  */
+
+/** The door his Shortcut posts to, and the door it names through `door:`, which goes where it goes. */
+const HANDED = ['ingest.bank-from-out-sms', 'ingest.bank-ipn-in-sms'];
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -77,10 +81,10 @@ test('DECIDE IS FILED THE HANDED DOOR WITH THE PACK IT GOES TO, and the doors th
   assert.equal(hsbc.length, 12, JSON.stringify(money.retires));
   assert.deepEqual(
     hsbc.filter((r) => r.to !== undefined),
-    [{ id: 'ingest.bank-ipn-in-sms', rows: 0, to: 'bank-hsbc-eg', to_name: 'HSBC Egypt' }],
-    'the handed door was filed as a retire',
+    HANDED.map((id) => ({ id, rows: 0, to: 'bank-hsbc-eg', to_name: 'HSBC Egypt' })),
+    'a handed door was filed as a retire',
   );
-  assert.equal(hsbc.filter((r) => r.to === undefined).length, 11, 'a door nobody used was filed as handed');
+  assert.equal(hsbc.filter((r) => r.to === undefined).length, 10, 'a door nobody used was filed as handed');
   sql.close();
 });
 
@@ -146,8 +150,8 @@ test('A USE CASE PLANNED OVER THE UPDATE NAMES THE HANDED DOOR APART, with the p
   );
   const money = planned.packs.find((p) => p.id === 'money-core');
   assert.ok(money, JSON.stringify(planned.packs.map((p) => p.id)));
-  assert.deepEqual(money.hands, [{ id: 'ingest.bank-ipn-in-sms', to: 'bank-hsbc-eg' }]);
-  assert.equal(money.retires.includes('ingest.bank-ipn-in-sms'), false, 'the handed door was said as retired');
-  assert.equal(money.retires.filter((r) => HSBC.includes(r)).length, 11);
+  assert.deepEqual(money.hands, HANDED.map((id) => ({ id, to: 'bank-hsbc-eg' })));
+  for (const id of HANDED) assert.equal(money.retires.includes(id), false, `${id}, handed, was said as retired`);
+  assert.equal(money.retires.filter((r) => HSBC.includes(r)).length, 10);
   sql.close();
 });

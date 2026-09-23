@@ -41,7 +41,7 @@ const v170 = (): Doc => {
   return d;
 };
 
-test('THE RECORD NAMES WHAT IT USES, SO THE UPDATE HANDS A DOOR THAT FILED A ROW AND A DOOR WITH A TOKEN, and retires the other ten', async () => {
+test('THE RECORD NAMES WHAT IT USES, SO THE UPDATE HANDS A DOOR THAT FILED A ROW, A DOOR WITH A TOKEN AND THE DOOR THAT ONE NAMES, and retires the other nine', async () => {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   type Planned = { diff: { planHash: string; approve?: string[]; retires: Retire[] } };
@@ -62,11 +62,14 @@ test('THE RECORD NAMES WHAT IT USES, SO THE UPDATE HANDS A DOOR THAT FILED A ROW
 
   const { diff } = value<Planned>(await api.planPack({ doc: firstPartyDocument('money-core') }, owner));
   const hsbc = diff.retires.filter((r) => HSBC.includes(r.id));
+  /* `bank-from-out-sms` IS HANDED FOR `bank-ipn-in-sms`, which names it through `door:` and goes to the same pack
+     (`declare/test/door-follows-patterns.test.ts`). It filed nothing and holds no token. */
   assert.deepEqual(hsbc.filter((r) => r.to !== undefined).map((r) => [r.id, r.to]).sort(), [
     ['ingest.bank-card-used', 'bank-hsbc-eg'],
+    ['ingest.bank-from-out-sms', 'bank-hsbc-eg'],
     ['ingest.bank-ipn-in-sms', 'bank-hsbc-eg'],
   ]);
-  assert.equal(hsbc.filter((r) => r.to === undefined).length, 10, 'a door nobody used was handed');
+  assert.equal(hsbc.filter((r) => r.to === undefined).length, 9, 'a door nobody used was handed');
   sql.close();
 });
 

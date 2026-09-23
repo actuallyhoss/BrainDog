@@ -154,7 +154,10 @@ test('the value is laid back after the update’s own values, with the label the
   assert.deepEqual(lane.labels, { building: 'Building', parked: 'Parked', earning: 'Earning' });
 });
 
-test('install stages the update’s body as the pack’s, and the list with the value kept after it as the record’s own', async () => {
+/* ONE ROW, UNDER THE PACK, and not the pack's body then the kept list with no pack after it. Staged with no pack the list
+   read as changed in the app, and the next update of the pack was filed for Decide as keeping the owner's edit
+   (`loop/research-batch-forty-four-audit.md` finding 2, `pack-extends.test.ts`). */
+test('install stages the list with the value kept as the pack’s own body of it, in one row', async () => {
   const next = await packOf(DOC('1.1.0', WITHOUT_EARNING()));
   const diff = await plan(next, await recordAt(5));
   const batches: { id: string; pack?: string; lane: unknown }[][] = [];
@@ -173,12 +176,7 @@ test('install stages the update’s body as the pack’s, and the list with the 
     claimed: () => [],
   };
   said(await install(next, diff, host, diff.planHash));
-  assert.deepEqual(batches, [
-    [
-      { id: 'register.things', pack: 'mini', lane: ['building', 'parked'] },
-      { id: 'register.things', lane: ['building', 'parked', 'earning'] },
-    ],
-  ]);
+  assert.deepEqual(batches, [[{ id: 'register.things', pack: 'mini', lane: ['building', 'parked', 'earning'] }]]);
 });
 
 test('a page the owner changed that asks for the value is not refused over it, because the value stays', async () => {

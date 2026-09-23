@@ -19,7 +19,7 @@
 
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
-import { conflictFault, labelsOf, laterVersion, normalise, packIdOf, plan, readShared, install, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
+import { conflictFault, installFault, installOrder, labelsOf, laterVersion, normalise, packIdOf, plan, plannedState, readShared, install, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
 import { configValue, ulids, type ConfigDecl, type Declaration, type Kernel } from '@braindog/kernel';
 import type { FormSpec, NextSpec } from './spark.ts';
 
@@ -334,8 +334,11 @@ export function arranger(d: ArrangeDeps) {
     return ok({ install, enable });
   }
 
-  /** `kept` is each declaration an update leaves as the owner changed it, with the name the owner gave it. */
-  type Planned = { plan: Body[]; approve: string[]; batch: Declaration[]; config: Map<string, Record<string, ConfigDecl>>; packs: Map<string, Pack>; kept: Map<string, string> };
+  /**
+   * `kept` is each declaration an update leaves as the owner changed it, with the name the owner gave it. `order` is the
+   * packs in the order they install, which is the order a proposal files and `apply` runs.
+   */
+  type Planned = { order: string[]; plan: Body[]; approve: string[]; batch: Declaration[]; config: Map<string, Record<string, ConfigDecl>>; packs: Map<string, Pack>; kept: Map<string, string> };
 
   /**
    * A declaration by the name the record holds for it now, which for one the owner changed is theirs and not the pack's.
@@ -359,10 +362,20 @@ export function arranger(d: ArrangeDeps) {
   };
 
   /** Each pack planned in order, each against the record as the ones before it would leave it. Nothing is written. */
-  async function planAll(ids: readonly string[], docs: ReadonlyMap<string, Body>): Promise<Result<Planned>> {
+  async function planAll(asked: readonly string[], docs: ReadonlyMap<string, Body>): Promise<Result<Planned>> {
     const base = d.installed();
-    let state: Installed = { ...base, packs: [...base.packs], declarations: [...base.declarations] };
-    const out: Planned = { plan: [], approve: [], batch: [], config: new Map(), packs: new Map(), kept: new Map() };
+    /* IN THE ORDER THAT INSTALLS, and not the order asked. The owner can only accept an arrangement, and `base` 2.0.0
+       named before the `leaf` 1.1.0 that takes it was filed and refused `PACK_REQUIRED` at the accept, telling him to do
+       "first" an update that was already in it (`loop/research-batch-forty-four-audit.md` finding 3). */
+    const coming: { id: string; version: string; requires: Readonly<Record<string, string>> }[] = [];
+    for (const id of asked) {
+      const read = await packOf(id, docs, heldBy(base), useCaseFor(asked, id));
+      if (!read.ok) return read;
+      coming.push({ id, version: read.value.manifest.version, requires: read.value.manifest.requires.packs });
+    }
+    const ids = installOrder(coming, base);
+    let state: Installed = base;
+    const out: Planned = { order: ids, plan: [], approve: [], batch: [], config: new Map(), packs: new Map(), kept: new Map() };
     for (const id of ids) {
       const read = await packOf(id, docs, heldBy(state), useCaseFor(ids, id));
       if (!read.ok) return read;
@@ -377,7 +390,14 @@ export function arranger(d: ArrangeDeps) {
       if (edited) return { ok: false, refusal: { ...edited, at: 'body.packs' } };
       if (clash)
         return refuse('PROVIDES_CONFLICT', `${id} would take over ${clash.id}, which ${clash.pack} holds. Leave ${id} out, or retire ${clash.id} first.`, 'body.packs');
-      const kept = new Set(diff.kept.map((k) => k.id));
+      /* AND EVERY OTHER REFUSAL THE ACCEPT WOULD GIVE, from the same function `install` asks, so what is filed installs. */
+      const fault = installFault(pack, diff);
+      if (fault) return { ok: false, refusal: { ...fault, at: 'body.packs' } };
+      /* A REBASED LIST IS NOT KEPT: its update installs, with what the owner or another pack laid put back on it. Filed
+         as `keeps`, Decide said "This update's version of it is not taken" of an update that was (finding 2). */
+      const kept = new Set(diff.kept.filter((k) => k.rebased === undefined).map((k) => k.id));
+      const rebased = diff.kept.filter((k) => k.rebased !== undefined).map((k) => k.id);
+      const changes = [...diff.changes.map((c) => c.id), ...rebased.filter((k) => !diff.changes.some((c) => c.id === k))];
       for (const k of kept) out.kept.set(k, spokenOf(k, false));
       const from = state.packs.find((p) => p.id === id)?.version ?? null;
       out.plan.push({
@@ -385,7 +405,7 @@ export function arranger(d: ArrangeDeps) {
         ...(from === null ? {} : { from }),
         version: pack.manifest.version,
         adds: diff.adds.map((a) => a.id),
-        ...(diff.changes.length === 0 ? {} : { changes: diff.changes.map((c) => c.id) }),
+        ...(changes.length === 0 ? {} : { changes }),
         /* WHAT AN UPDATE TAKES AWAY, with the rows it keeps, so Decide says it beside what it adds. AND `to` FOR WHAT IT
            HANDS ON INSTEAD: copied as `{ id, rows }`, the HSBC door money-core hands to `bank-hsbc-eg` and keeps live was
            filed exactly as one it retires (`loop/research-batch-thirty-four-audit.md` §8, `declare`'s
@@ -408,16 +428,10 @@ export function arranger(d: ArrangeDeps) {
       out.packs.set(id, pack);
       const staged = pack.declarations.filter((decl) => !kept.has(decl.id));
       for (const decl of staged) out.batch.push({ id: decl.id, kind: decl.kind, body: decl.body, pack: id });
-      /* THE OWNER'S ROW STAYS IN THE STATE CARRIED FORWARD, as the install leaves it: its `pack_id` is null, so the filter
-         keeps it, and the pack's version of the same id is not added beside it. */
-      state = {
-        ...state,
-        packs: [...state.packs.filter((p) => p.id !== id), { id, version: pack.manifest.version }],
-        declarations: [
-          ...state.declarations.filter((decl) => decl.pack_id !== id),
-          ...staged.map((decl) => ({ id: decl.id, version: 1, kind: decl.kind, pack_id: id, body: decl.canonical, checksum: '' })),
-        ],
-      };
+      /* THE RECORD AS THE INSTALL LEAVES IT, from `declare`, which stages it. The fold this replaced carried `{ id,
+         version }` with no `requires` and nothing an `extends` laid, so a second pack laying `domain` on the same list
+         was planned against a list with none, filed, and refused half-way at the accept (finding 3). */
+      state = plannedState(state, pack, diff);
     }
     return ok(out);
   }
@@ -628,7 +642,7 @@ export function arranger(d: ArrangeDeps) {
         /* A FILE IS SAID BY ITS OWN TITLE, even over a catalogue use case with the same id: it is what the owner was asked about. */
         ...(fromFile ? { kind: 'usecase', title: fromFile.title, summary: fromFile.summary } : entry ? { kind: entry.kind, title: entry.title, summary: entry.summary } : {}),
         ...(keeps === null ? {} : { keeps }),
-        packs: { install: order.value.install, ...(order.value.enable.length === 0 ? {} : { enable: order.value.enable }) },
+        packs: { install: planned.value.order, ...(order.value.enable.length === 0 ? {} : { enable: order.value.enable }) },
         plan: planned.value.plan,
         approve: planned.value.approve,
         ...(Object.keys(names).length === 0 ? {} : { names }),
@@ -712,7 +726,8 @@ export function arranger(d: ArrangeDeps) {
       ...(beside.length === 0 ? {} : { alongside: beside.map((id) => id.slice(USE_CASE.length)) }),
       why: body.why,
       packs: {
-        ...(order.value.install.length === 0 ? {} : { install: order.value.install }),
+        /* THE ORDER `planAll` PLANNED, which `apply` runs as written. */
+        ...(planned.value.order.length === 0 ? {} : { install: planned.value.order }),
         ...(enable.length === 0 ? {} : { enable }),
         ...(disable.length === 0 ? {} : { disable }),
       },

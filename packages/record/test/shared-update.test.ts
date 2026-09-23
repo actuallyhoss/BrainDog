@@ -36,11 +36,30 @@ test('an update that takes a list away files what it retires and the rows kept, 
   value(await api.decide({ id: first.id, decide: { option: 'accept', reason: 'yes' } } as never, owner));
   value(await api.create({ register: 'meetings', fields: { name: 'June' } }, owner));
 
+  /* A LIST WITH ROWS IS NOT FILED AS RETIRED, because the accept refuses to orphan them. This was filed with
+     `retires: [{ id: 'register.meetings', rows: 1 }]`, and accepting it answered `WOULD_ORPHAN` (measured on the held
+     wave forty-six tree): a question the owner could only lose. `planAll` now asks `installFault` as the accept does. */
+  const next = (await api.propose({ question: 'Update Reading club?', body_kind: 'pack', body: { file: file('2.0.0', [BOOKS]) } } as never, agent)) as Out;
+  assert.equal(next.ok, false, 'filed an update the accept refuses');
+  assert.deepEqual([next.refusal?.code, next.refusal?.at], ['WOULD_ORPHAN', 'body.packs']);
+  assert.match(next.refusal?.fix ?? '', /register\.meetings, and there are 1 rows in it/u);
+  assert.deepEqual(api.kernel.packStates().map((p) => p.version), ['1.0.0'], 'a proposal updated something');
+  sql.close();
+});
+
+test('an update that takes an empty list away files what it retires, and only the owner applies it', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 17, 12)) });
+  const first = value<{ id: string }>(await api.propose({ question: 'Install Reading club?', body_kind: 'pack', body: { file: file('1.0.0', [BOOKS, MEETINGS]) } } as never, agent));
+  value(await api.decide({ id: first.id, decide: { option: 'accept', reason: 'yes' } } as never, owner));
+
   const next = value<{ id: string }>(await api.propose({ question: 'Update Reading club?', body_kind: 'pack', body: { file: file('2.0.0', [BOOKS]) } } as never, agent));
   const row = value<{ body: { plan: { pack: string; from?: string; retires?: { id: string; rows: number }[] }[] } }>(await api.governance({ id: next.id }, owner));
   const step = row.body.plan.find((s) => s.pack === 'usecase-club');
   assert.equal(step?.from, '1.0.0');
-  assert.deepEqual(step?.retires, [{ id: 'register.meetings', rows: 1 }]);
+  assert.deepEqual(step?.retires, [{ id: 'register.meetings', rows: 0 }]);
   assert.deepEqual(api.kernel.packStates().map((p) => p.version), ['1.0.0'], 'a proposal updated something');
+  value(await api.decide({ id: next.id, decide: { option: 'accept', reason: 'yes' } } as never, owner));
+  assert.deepEqual(api.kernel.packStates().map((p) => p.version), ['2.0.0']);
   sql.close();
 });

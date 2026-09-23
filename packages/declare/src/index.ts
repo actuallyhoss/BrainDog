@@ -316,10 +316,11 @@ export type Diff = {
    * when nobody used it, a value costs a word in a picker; taken off a list whose rows hold it, every later edit of
    * such a row was `ENUM_VALUE_UNKNOWN`, whatever field the edit was about (`update-keeps-value.test.ts`).
    *
-   * `body` IS THE LIST AS IT WILL BE LIVE, as JCS text, for a list this pack owns: `install` stages the update's body as
-   * the pack's and this one after it with no pack, as it stages a rebased list, so the value reads as the record's own
-   * from then on and the next update is asked the same question through `detached()`. A list the owner added to has no
-   * `body` here, because the value is laid into its `kept[].rebased`.
+   * `body` IS THE LIST AS IT WILL BE LIVE, as JCS text, for a list this pack owns: `install` stages it as the pack's body
+   * of the list, in place of the file's, and the next update meets the value as the pack's and lays it back again while
+   * the list holds rows. Staged with no pack, as it was until audit forty-four's finding 2, it read as changed in the
+   * app, and every later update of the pack was filed for Decide as keeping the owner's edit. A list the owner added to
+   * has no `body` here, because the value is laid into its `kept[].rebased`.
    */
   stays: { id: string; values: string[]; rows: number; body?: string }[];
   /**
@@ -331,6 +332,12 @@ export type Diff = {
    * `install` STAGES `body` WITH NO PACK, as it stages a rebased list, so the kernel is handed an ordinary register body
    * and the list reads as the record's own from then on. The owning pack's next update keeps the additions through
    * `detached()` and `rebased`, the road the owner's own additions already take (`pack-extends.test.ts`).
+   *
+   * NOT UNDER THE LIST'S OWN PACK, which audit forty-four's finding 2 was first answered with: staged under Portfolio,
+   * Portfolio's next minor planned Projects as a plain change and installed it without `domain`, under a row holding
+   * one. `detached()` is the only thing a plan is handed that says which fields another pack laid, and only while the
+   * row has no pack. So that finding's other half, Decide saying a rebased list's update is not taken, is the
+   * arranger's to fix: a `kept` entry with `rebased` is an update that installs.
    *
    * WHAT TURNING THE EXTENDING PACK OFF OR TAKING IT OUT DOES: NOTHING TO THE LIST. Its fields and values stay and are
    * the record's own. Rows hold values in them, and a field taken off the rows that hold it is the break M2 measured for
@@ -1264,17 +1271,21 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
       continue;
     }
     if (already.body !== decl.canonical) {
-      changes.push({ id: decl.id, from_version: already.version, summary: summarise(decl) });
-      /* AND WHAT THE CHANGE DOES TO THE ROWS UNDER IT. This compared the two bodies for INEQUALITY
-         and wrote down a summary; it never looked inside them, so an upgrade that moved a field's
-         type or made one required was reported as "1 change" and installed. */
       const rows = decl.id.startsWith('register.') ? (installed.rows[decl.id.slice('register.'.length)] ?? 0) : 0;
-      if (rows > 0) unreadable(decl, already.body, rows, retypes, newlyRequired);
       /* AND A VALUE IT TAKES OFF A CLOSED LIST THAT HOLDS ROWS IS LAID BACK, after the update's own (M2). Taken off, a row
          holding it could not be edited at all: People 2.0.0 without `registrar` planned clean, and the next edit to that
          row's `note` was `ENUM_VALUE_UNKNOWN` over a field the edit never touched (`update-keeps-value.test.ts`). */
       const back = rows > 0 ? laidBack(already.body, decl.body) : null;
       if (back !== null) stays.push({ id: decl.id, values: back.values, rows, body: back.body });
+      /* A LIST THAT IS ALREADY THE UPDATE WITH ITS KEPT VALUES LAID BACK IS NOT CHANGED BY IT. The kept value lives under
+         the pack now (`install`), so the live body and the file's differ by that value on every later plan of the same
+         version, and a reinstall of People 2.0.0 was "1 change" that staged the bytes already there. */
+      if (back?.body === already.body) continue;
+      changes.push({ id: decl.id, from_version: already.version, summary: summarise(decl) });
+      /* AND WHAT THE CHANGE DOES TO THE ROWS UNDER IT. This compared the two bodies for INEQUALITY
+         and wrote down a summary; it never looked inside them, so an upgrade that moved a field's
+         type or made one required was reported as "1 change" and installed. */
+      if (rows > 0) unreadable(decl, already.body, rows, retypes, newlyRequired);
     }
   }
 
@@ -1319,6 +1330,23 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
     }
     retires.push({ id: decl.id, rows });
     orphans += rows;
+  }
+  /* A DOOR GOES WHERE THE PATTERNS NAMING IT GO. money-core's plan handed `ingest.bank-ipn-in-sms`, which names `door:
+     bank-from-out-sms`, and retired the door, since it held no token and filed nothing: every text reached it through
+     the pattern. So the handed pattern arrived naming a door that was gone, the declaration the kernel's `doorFault`
+     refuses at install (`loop/research-batch-forty-two-audit.md` finding 4 (c), `door-follows-patterns.test.ts`). The
+     door is handed to the pack its pattern goes to, whatever `used` says of the door itself. */
+  const doorsTo = new Map<string, string>();
+  for (const r of retires)
+    if (r.to !== undefined && r.body !== undefined) {
+      const door = (JSON.parse(r.body) as { door?: unknown }).door;
+      if (typeof door === 'string') doorsTo.set(`ingest.${door}`, r.to);
+    }
+  for (const [i, r] of retires.entries()) {
+    const to = r.to === undefined ? doorsTo.get(r.id) : undefined;
+    const live = to === undefined ? undefined : installed.declarations.find((d) => d.id === r.id);
+    const body = to === undefined || live === undefined ? null : handedBody(live.body, to);
+    if (to !== undefined && body !== null) retires[i] = { id: r.id, rows: r.rows, to, body };
   }
   /* WHAT IS HANDED STAYS LIVE, so nothing below may treat it as gone: not a figure that reads it, not a list a field
      points at, and not half of a rename. */
@@ -2392,6 +2420,267 @@ function warningsOf(pack: Pack): { at: string; say: string }[] {
 /* ── the install ─────────────────────────────────────────────────────────── */
 
 /**
+ * The refusal `install` gives this plan before it stages anything, other than a conflict, a stale plan or an approval,
+ * or `null`. It is for the arranger to ask of every pack it files, so no plan is filed that the accept then refuses.
+ *
+ * ONE LIST, AND `install` READS IT TOO. `planAll` asked `unresolvedFault` and `conflictFault` and neither of the refusals
+ * wave forty-four added, `dependents` and `extends[].refusal`, so audit forty-four's finding 3 filed an arrangement that
+ * the accept refused `PACK_REQUIRED`, and one laying `domain` twice that it refused `PROVIDES_CONFLICT` half-way through
+ * (`plan-all-refusals.test.ts`). Kept in one function, what the arranger asks and what the install refuses cannot drift.
+ */
+export function installFault(pack: Pack, diff: Diff): Refusal | null {
+  const r = faultOf(pack, diff);
+  return r !== null && refused(r) ? r.refusal : null;
+}
+
+function faultOf(pack: Pack, diff: Diff): Result<never> | null {
+  /**
+   * EACH HAS ITS OWN CODE, and both said `OUT_OF_BOUNDS`.
+   *
+   * `04 §5` gives them separate rows with separate repairs, and the difference is not cosmetic:
+   * `FORMAT_OUT_OF_RANGE` is *"requires format 2; this record is format 1. Update BrainDog"*, and
+   * `PRIMITIVES_OUT_OF_RANGE` is *"requires primitives 2; this record renders primitives 1. Update
+   * BrainDog, or ask the author for a primitives-1 build"*. The second repair has a second half,
+   * because a pack author can ship a primitives-1 build and cannot ship a format-1 one.
+   *
+   * `OUT_OF_BOUNDS` IS THE CODE FOR A NUMBER OUTSIDE ITS RANGE, which is true of both and is what
+   * makes it the wrong answer: an agent branching on it learns that something was too big. `30 §6`
+   * publishes two codes for this and both were emitted by nothing, which is how it was found.
+   *
+   * A MISSING PACK KEEPS `OUT_OF_BOUNDS` below, because `04 §5` gives that case no code of its own.
+   */
+  /* WRITTEN OUT RATHER THAN LOOPED, so the code sits where `refusals.mjs` reads one: a literal
+     handed to the constructor. In a tuple it is a string in an array and the gate that counts what
+     the product emits sees nothing, which is how both of these came to be published in `30 §6` and
+     emitted by nothing. Two calls, four lines, and the sentences can differ. */
+  if (!diff.requires.format.ok)
+    return no<never>(
+      'FORMAT_OUT_OF_RANGE',
+      `${diff.pack.id} needs format ${diff.requires.format.wanted} and this record is at ${diff.requires.format.has}. Update BrainDog.`,
+      { at: 'requires.format' },
+    );
+
+  if (!diff.requires.primitives.ok)
+    return no<never>(
+      'PRIMITIVES_OUT_OF_RANGE',
+      `${diff.pack.id} needs primitives ${diff.requires.primitives.wanted} and this record renders ${diff.requires.primitives.has}. Update BrainDog, or ask the author for a build against the primitives this record renders.`,
+      { at: 'requires.primitives' },
+    );
+
+  const missing = diff.requires.packs.find((p) => !p.ok);
+  if (missing)
+    return no<never>(
+      'OUT_OF_BOUNDS',
+      `${diff.pack.id} needs ${missing.id} ${missing.range}, and this record has ${missing.installed ?? 'none'}.`,
+      { at: `requires.packs.${missing.id}` },
+    );
+
+  /* AND WHAT THE HELD PACKS ASK OF THIS ONE. money-core 2.0.0 installed under bank-hsbc-eg 1.0.0, whose `^1.8.0` it does
+     not satisfy, and the plan named neither (`held-pack-range.test.ts`). `PACK_REQUIRED` because it is the kernel's code
+     for the same fact from the other side, a pack another pack leans on through `requires.packs` (`disablePack`).
+     REFUSED ONLY WHEN THIS STEP BREAKS IT. A requirement already false stays in `dependents` and refuses nothing: a
+     record that took money-core 2.0.0 before this check would otherwise be refused every later money-core, for a range
+     none of them can meet. The way out named is the order that was driven and installs: the held pack's update, first. */
+  const leaning = diff.dependents.find((d) => d.was && !d.ok);
+  if (leaning)
+    return no<never>(
+      'PACK_REQUIRED',
+      `${leaning.id} ${leaning.version} needs ${diff.pack.id} ${leaning.range}, which ${diff.pack.id} ${diff.pack.version} is not, and the ${diff.pack.id} ${diff.installed_version} this record holds is. Update ${leaning.id} to a version that takes ${diff.pack.id} ${diff.pack.version} first, then install ${diff.pack.id} ${diff.pack.version}.`,
+      { at: `dependents.${leaning.id}` },
+    );
+
+  /* A LIST NOTHING HOLDS IS REFUSED BEFORE ANYTHING IS STAGED. A field pointing at it would be a ref
+     no row can satisfy, and a page requiring it would draw an empty table under a heading that
+     promises one. */
+  const unheld = unresolvedFault(diff);
+  if (unheld) return { ok: false, refusal: unheld };
+
+  /* AND A LIST THAT CANNOT TAKE WHAT THIS PACK LAYS ON IT, in the sentence `plan` wrote for it (`extended`). */
+  const unlaid = diff.extends.find((e) => e.refusal !== undefined);
+  if (unlaid?.refusal) return { ok: false, refusal: unlaid.refusal };
+
+  /**
+   * A RENAME IS REFUSED BEFORE THE ORPHAN IT ALSO IS, because it is the truer sentence.
+   *
+   * `plan` built its adds and its retires in one function and never compared them, so a pack that
+   * renamed something was planned as one add and one retire. Driven end to end through the record's
+   * `planPack` and `installPack`:
+   *
+   *     register.obligations -> register.bills, 0 rows   ACCEPTED; list obligations -> REGISTER_UNKNOWN
+   *     register.obligations -> register.bills, 2 rows   WOULD_ORPHAN "... there are 2 rows in it. Move them first."
+   *     page.money -> page.finance, same body            ACCEPTED
+   *
+   * The first dropped the id every page, rule and note pointing at it was written against, and said
+   * nothing. The second told an author who had renamed a register to go and move its rows, when the
+   * rows were fine and the new id was the mistake. `04 §5` and `02 §2` both say it the other way
+   * round: ids are stable for ever and there is no alias key, so the repair is to keep the old id and
+   * change the name, which is a label and moves nothing.
+   */
+  const renamed = diff.renames[0];
+  if (renamed)
+    return no<never>(
+      'ID_RENAMED',
+      `${renamed.from} → ${renamed.to} renames ${
+        renamed.rows > 0
+          ? `a spoken id, so ${renamed.from.slice(renamed.from.indexOf('.') + 1)}#<n> in a note would stop resolving`
+          : `an id, so anything written against ${renamed.from} would stop resolving`
+      }. Ids are stable for ever: keep ${renamed.from} and change its name instead.`,
+      { at: renamed.to },
+    );
+
+  /* ROWS ARE NEVER THE PRICE OF AN UPGRADE. A pack that dropped a register somebody has been
+     writing into for a year would take the year with it, and there is no `--force` in v1 because
+     there is no sentence that makes that a good idea. */
+  if (diff.orphans > 0) {
+    const at = diff.retires.find((r) => r.rows > 0)!;
+    return no<never>(
+      'WOULD_ORPHAN',
+      `${diff.pack.id} ${diff.direction}s away ${at.id}, and there are ${at.rows} rows in it. Move them first.`,
+      { at: at.id },
+    );
+  }
+
+  /* AND NEITHER IS A ROW LEFT UNREADABLE UNDER A REGISTER THAT KEEPS ITS NAME. `WOULD_ORPHAN`
+     above covers the register that goes away; these two cover the one that stays and stops
+     describing what is in it. `02 §7`: a type change *"does not exist in v1"*, and the repair is
+     the author's — retire the field, add another — not a migration this record can guess.
+
+     TWO CALLS AND NOT A LOOP, so each code sits as a literal after its own constructor: `42 §9`
+     greps for exactly that, and a code chosen into one call is a code the gate that counts what
+     this product emits cannot see. */
+  const retyped = diff.retypes[0];
+  if (retyped)
+    return no<never>(
+      'FIELD_TYPE_CHANGED',
+      `${retyped.id}.${retyped.field}: ${retyped.from} → ${retyped.to} changes a type, and ${retyped.rows} rows were written under the old one. Retire the field and add a new one.`,
+      { at: `${retyped.id}.fields.${retyped.field}.type` },
+    );
+
+  /* AND A LIST OPENED TO TEXT UNDER A READER WHOSE WORDS ONLY THE CLOSED LIST COULD READ, in the kernel's own sentence
+     (`stranded`), because the pack path's `stageInstall` does not ask it and the figure would change its answer with
+     nothing refused (`misreadsOf`). */
+  const moved = diff.misreads[0];
+  if (moved) {
+    const what = moved.reader.startsWith('metric.') ? 'the figure' : moved.reader.startsWith('page.') ? 'the page' : `the ${moved.reader.slice(0, moved.reader.indexOf('.'))}`;
+    const listed = pack.declarations.find((d) => d.id === moved.id)?.body as { name?: unknown } | undefined;
+    const list = typeof listed?.name === 'string' ? listed.name : moved.id.slice('register.'.length);
+    const says = moved.written === '' ? 'reads it differently' : `says ${moved.written}`;
+    return no<never>(
+      'FIELD_TYPE_CHANGED',
+      `Opening ${moved.field} on ${list} to free text would quietly change which rows ${what} ${moved.name === moved.reader ? moved.reader : `${moved.name} (${moved.reader})`} reads: its ${moved.at} "${moved.where}" ${says}, which only the closed list read as ${moved.stored}, and free text compares the word as written. Write ${moved.stored} there first, then open ${moved.field}.`,
+      { at: moved.reader },
+    );
+  }
+
+  const demanded = diff.newly_required[0];
+  if (demanded)
+    return no<never>(
+      'REQUIRED_ON_POPULATED',
+      `${demanded.id}.${demanded.field} is required and ${demanded.rows} rows were written before it. Ship a default or a fill rule.`,
+      { at: `${demanded.id}.fields.${demanded.field}.required` },
+    );
+
+  /* A TEXT SETTING IS A VALUE A PERSON CHOSE AFTER `normalise` LOOKED, so the colour rule is asked again of every body a
+     setting filled. It sat in `install` after the approvals until the checker of this list found `installFault` answering
+     `null` for a chosen `shade: '#ff00aa'` that the accept refused (`plan-all-refusals.test.ts`). */
+  const filled = filledWith(pack, diff.config);
+  for (const d of filled.declarations) {
+    if (d.kind === 'theme' || d === pack.declarations.find((o) => o.id === d.id)) continue;
+    const painted = colour(d.body);
+    if (painted)
+      return no<never>(
+        'COLOUR_OUTSIDE_THEME',
+        `${d.id} sets ${painted.at} to ${painted.value} from a setting. A ${d.kind} names an intent (good, warn, bad or info), and the theme names the colour.`,
+        { at: `${d.id}.${painted.at}` },
+      );
+  }
+  return null;
+}
+
+/**
+ * The record as installing `diff` would leave it, for planning the next pack of an arrangement against. Nothing is
+ * written: it is `installed` with what `install` stages laid on it, in `install`'s order, and what it retires taken out.
+ *
+ * WHAT THE ARRANGER CARRIED FORWARD WAS EACH PACK'S FILE AND `{ id, version }`, so the pack after it was planned against
+ * a record the one before would not leave (audit forty-four, finding 3). Without `requires`, `base` 2.0.0 after `leaf`
+ * 1.1.0 read no range and planned clean where it would have been refused; without what `extends` laid, a second pack
+ * laying `domain` on the same list was planned against a list with no `domain`, filed, and refused half-way at accept.
+ *
+ * THE KERNEL'S TWO RULES FOR A STAGED ROW ARE KEPT: the same bytes are the same version and keep the owner they had, and
+ * a row with no pack over one a pack wrote is `detached()`, naming that pack and its body. Versions count up by one and
+ * checksums are empty, as nothing but a plan's hash reads them.
+ */
+export function plannedState(installed: Installed, pack: Pack, diff: Diff): Installed {
+  const mine = pack.manifest.pack;
+  const live = new Map(installed.declarations.map((d) => [d.id, d]));
+  const detached = { ...(installed.detached ?? {}) };
+  const put = (id: string, kind: DeclKind, pack_id: string | null, body: string): void => {
+    const was = live.get(id);
+    if (was?.body === body) return;
+    if (pack_id !== null) delete detached[id];
+    else if (was?.pack_id != null) detached[id] = { was: was.pack_id, body: was.body };
+    live.set(id, { id, version: (was?.version ?? 0) + 1, kind, pack_id, body, checksum: '' });
+  };
+  const keep = new Set(diff.kept.filter((k) => k.rebased === undefined).map((k) => k.id));
+  const staying = new Map(diff.stays.flatMap((s) => (s.body === undefined ? [] : [[s.id, s.body] as const])));
+  for (const d of filledWith(pack, diff.config).declarations) if (!keep.has(d.id)) put(d.id, d.kind, mine, staying.get(d.id) ?? d.canonical);
+  for (const k of diff.kept) if (k.rebased !== undefined) put(k.id, 'register', null, k.rebased);
+  for (const r of diff.retires) if (r.to !== undefined && r.body !== undefined) put(r.id, live.get(r.id)?.kind ?? 'register', r.to, r.body);
+  for (const e of diff.extends) if (e.body !== undefined) put(e.id, 'register', null, e.body);
+  for (const r of diff.retires)
+    if (r.to === undefined) {
+      live.delete(r.id);
+      delete detached[r.id];
+    }
+  const rows = { ...installed.rows };
+  for (const s of diff.seeds.registers) if ((rows[s.register] ?? 0) === 0) rows[s.register] = s.rows;
+  const chosen = diff.config.filter((c) => c.from === 'kept');
+  const { [mine]: _was, ...config } = installed.config ?? {};
+  return {
+    ...installed,
+    packs: [...installed.packs.filter((p) => p.id !== mine), { id: mine, version: pack.manifest.version, requires: pack.manifest.requires.packs }],
+    declarations: [...live.values()].sort((a, b) => a.id.localeCompare(b.id)),
+    rows,
+    config: chosen.length === 0 ? config : { ...config, [mine]: Object.fromEntries(chosen.map((c) => [c.key, c.value])) },
+    detached,
+  };
+}
+
+/**
+ * The order to install an arrangement's packs in, so each one meets the record as the ones before it leave it. Each
+ * pack is `{ id, version, requires }`, `requires` being its manifest's `requires.packs`. Stable: the order given, but
+ * for a pack that has to wait for another in the same arrangement.
+ *
+ * TWO WAITS, AND THE ORDER GIVEN OTHERWISE. A pack waits for one whose update it needs, where the held version does not
+ * meet its range and the coming one does. And a pack waits for a held pack that leans on it when its own update breaks
+ * that pack's range and that pack's update takes it: audit forty-four measured `base` 2.0.0 then `leaf` 1.1.0 filed and
+ * refused `PACK_REQUIRED` at accept, and the same two the other way round installed. A pack both would have to wait
+ * for is a pair no order installs, and is left in the order given, where `installFault` names the refusal.
+ */
+export function installOrder(coming: readonly { id: string; version: string; requires: Readonly<Record<string, string>> }[], installed: Installed): string[] {
+  const held = (id: string) => installed.packs.find((p) => p.id === id);
+  const after = new Map(coming.map((c) => [c.id, new Set<string>()]));
+  for (const x of coming)
+    for (const y of coming) {
+      if (x.id === y.id) continue;
+      const needs = x.requires[y.id];
+      if (needs !== undefined && !satisfies(held(y.id)?.version ?? null, needs) && satisfies(y.version, needs)) after.get(x.id)!.add(y.id);
+      const leans = held(y.id)?.requires?.[x.id];
+      const next = y.requires[x.id];
+      if (leans !== undefined && satisfies(held(x.id)?.version ?? null, leans) && !satisfies(x.version, leans) && (next === undefined || satisfies(x.version, next)))
+        after.get(x.id)!.add(y.id);
+    }
+  const out: string[] = [];
+  const left = coming.map((c) => c.id);
+  while (left.length > 0) {
+    const i = left.findIndex((id) => [...after.get(id)!].every((b) => out.includes(b)));
+    if (i < 0) return [...out, ...left];
+    out.push(...left.splice(i, 1));
+  }
+  return out;
+}
+
+/**
  * Apply the plan, or say why not.
  *
  * EVERY REFUSAL FIRST, AND THEN ONE TRANSACTION. Half a pack is a record whose pages name registers
@@ -2448,151 +2737,9 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
     );
   }
 
-  /**
-   * EACH HAS ITS OWN CODE, and both said `OUT_OF_BOUNDS`.
-   *
-   * `04 §5` gives them separate rows with separate repairs, and the difference is not cosmetic:
-   * `FORMAT_OUT_OF_RANGE` is *"requires format 2; this record is format 1. Update BrainDog"*, and
-   * `PRIMITIVES_OUT_OF_RANGE` is *"requires primitives 2; this record renders primitives 1. Update
-   * BrainDog, or ask the author for a primitives-1 build"*. The second repair has a second half,
-   * because a pack author can ship a primitives-1 build and cannot ship a format-1 one.
-   *
-   * `OUT_OF_BOUNDS` IS THE CODE FOR A NUMBER OUTSIDE ITS RANGE, which is true of both and is what
-   * makes it the wrong answer: an agent branching on it learns that something was too big. `30 §6`
-   * publishes two codes for this and both were emitted by nothing, which is how it was found.
-   *
-   * A MISSING PACK KEEPS `OUT_OF_BOUNDS` below, because `04 §5` gives that case no code of its own.
-   */
-  /* WRITTEN OUT RATHER THAN LOOPED, so the code sits where `refusals.mjs` reads one: a literal
-     handed to the constructor. In a tuple it is a string in an array and the gate that counts what
-     the product emits sees nothing, which is how both of these came to be published in `30 §6` and
-     emitted by nothing. Two calls, four lines, and the sentences can differ. */
-  if (!diff.requires.format.ok)
-    return no<Applied>(
-      'FORMAT_OUT_OF_RANGE',
-      `${diff.pack.id} needs format ${diff.requires.format.wanted} and this record is at ${diff.requires.format.has}. Update BrainDog.`,
-      { at: 'requires.format' },
-    );
-
-  if (!diff.requires.primitives.ok)
-    return no<Applied>(
-      'PRIMITIVES_OUT_OF_RANGE',
-      `${diff.pack.id} needs primitives ${diff.requires.primitives.wanted} and this record renders ${diff.requires.primitives.has}. Update BrainDog, or ask the author for a build against the primitives this record renders.`,
-      { at: 'requires.primitives' },
-    );
-
-  const missing = diff.requires.packs.find((p) => !p.ok);
-  if (missing)
-    return no<Applied>(
-      'OUT_OF_BOUNDS',
-      `${diff.pack.id} needs ${missing.id} ${missing.range}, and this record has ${missing.installed ?? 'none'}.`,
-      { at: `requires.packs.${missing.id}` },
-    );
-
-  /* AND WHAT THE HELD PACKS ASK OF THIS ONE. money-core 2.0.0 installed under bank-hsbc-eg 1.0.0, whose `^1.8.0` it does
-     not satisfy, and the plan named neither (`held-pack-range.test.ts`). `PACK_REQUIRED` because it is the kernel's code
-     for the same fact from the other side, a pack another pack leans on through `requires.packs` (`disablePack`).
-     REFUSED ONLY WHEN THIS STEP BREAKS IT. A requirement already false stays in `dependents` and refuses nothing: a
-     record that took money-core 2.0.0 before this check would otherwise be refused every later money-core, for a range
-     none of them can meet. The way out named is the order that was driven and installs: the held pack's update, first. */
-  const leaning = diff.dependents.find((d) => d.was && !d.ok);
-  if (leaning)
-    return no<Applied>(
-      'PACK_REQUIRED',
-      `${leaning.id} ${leaning.version} needs ${diff.pack.id} ${leaning.range}, which ${diff.pack.id} ${diff.pack.version} is not, and the ${diff.pack.id} ${diff.installed_version} this record holds is. Update ${leaning.id} to a version that takes ${diff.pack.id} ${diff.pack.version} first, then install ${diff.pack.id} ${diff.pack.version}.`,
-      { at: `dependents.${leaning.id}` },
-    );
-
-  /* A LIST NOTHING HOLDS IS REFUSED BEFORE ANYTHING IS STAGED. A field pointing at it would be a ref
-     no row can satisfy, and a page requiring it would draw an empty table under a heading that
-     promises one. */
-  const unheld = unresolvedFault(diff);
-  if (unheld) return { ok: false, refusal: unheld };
-
-  /* AND A LIST THAT CANNOT TAKE WHAT THIS PACK LAYS ON IT, in the sentence `plan` wrote for it (`extended`). */
-  const unlaid = diff.extends.find((e) => e.refusal !== undefined);
-  if (unlaid?.refusal) return { ok: false, refusal: unlaid.refusal };
-
-  /**
-   * A RENAME IS REFUSED BEFORE THE ORPHAN IT ALSO IS, because it is the truer sentence.
-   *
-   * `plan` built its adds and its retires in one function and never compared them, so a pack that
-   * renamed something was planned as one add and one retire. Driven end to end through the record's
-   * `planPack` and `installPack`:
-   *
-   *     register.obligations -> register.bills, 0 rows   ACCEPTED; list obligations -> REGISTER_UNKNOWN
-   *     register.obligations -> register.bills, 2 rows   WOULD_ORPHAN "... there are 2 rows in it. Move them first."
-   *     page.money -> page.finance, same body            ACCEPTED
-   *
-   * The first dropped the id every page, rule and note pointing at it was written against, and said
-   * nothing. The second told an author who had renamed a register to go and move its rows, when the
-   * rows were fine and the new id was the mistake. `04 §5` and `02 §2` both say it the other way
-   * round: ids are stable for ever and there is no alias key, so the repair is to keep the old id and
-   * change the name, which is a label and moves nothing.
-   */
-  const renamed = diff.renames[0];
-  if (renamed)
-    return no<Applied>(
-      'ID_RENAMED',
-      `${renamed.from} → ${renamed.to} renames ${
-        renamed.rows > 0
-          ? `a spoken id, so ${renamed.from.slice(renamed.from.indexOf('.') + 1)}#<n> in a note would stop resolving`
-          : `an id, so anything written against ${renamed.from} would stop resolving`
-      }. Ids are stable for ever: keep ${renamed.from} and change its name instead.`,
-      { at: renamed.to },
-    );
-
-  /* ROWS ARE NEVER THE PRICE OF AN UPGRADE. A pack that dropped a register somebody has been
-     writing into for a year would take the year with it, and there is no `--force` in v1 because
-     there is no sentence that makes that a good idea. */
-  if (diff.orphans > 0) {
-    const at = diff.retires.find((r) => r.rows > 0)!;
-    return no<Applied>(
-      'WOULD_ORPHAN',
-      `${diff.pack.id} ${diff.direction}s away ${at.id}, and there are ${at.rows} rows in it. Move them first.`,
-      { at: at.id },
-    );
-  }
-
-  /* AND NEITHER IS A ROW LEFT UNREADABLE UNDER A REGISTER THAT KEEPS ITS NAME. `WOULD_ORPHAN`
-     above covers the register that goes away; these two cover the one that stays and stops
-     describing what is in it. `02 §7`: a type change *"does not exist in v1"*, and the repair is
-     the author's — retire the field, add another — not a migration this record can guess.
-
-     TWO CALLS AND NOT A LOOP, so each code sits as a literal after its own constructor: `42 §9`
-     greps for exactly that, and a code chosen into one call is a code the gate that counts what
-     this product emits cannot see. */
-  const retyped = diff.retypes[0];
-  if (retyped)
-    return no<Applied>(
-      'FIELD_TYPE_CHANGED',
-      `${retyped.id}.${retyped.field}: ${retyped.from} → ${retyped.to} changes a type, and ${retyped.rows} rows were written under the old one. Retire the field and add a new one.`,
-      { at: `${retyped.id}.fields.${retyped.field}.type` },
-    );
-
-  /* AND A LIST OPENED TO TEXT UNDER A READER WHOSE WORDS ONLY THE CLOSED LIST COULD READ, in the kernel's own sentence
-     (`stranded`), because the pack path's `stageInstall` does not ask it and the figure would change its answer with
-     nothing refused (`misreadsOf`). */
-  const moved = diff.misreads[0];
-  if (moved) {
-    const what = moved.reader.startsWith('metric.') ? 'the figure' : moved.reader.startsWith('page.') ? 'the page' : `the ${moved.reader.slice(0, moved.reader.indexOf('.'))}`;
-    const listed = pack.declarations.find((d) => d.id === moved.id)?.body as { name?: unknown } | undefined;
-    const list = typeof listed?.name === 'string' ? listed.name : moved.id.slice('register.'.length);
-    const says = moved.written === '' ? 'reads it differently' : `says ${moved.written}`;
-    return no<Applied>(
-      'FIELD_TYPE_CHANGED',
-      `Opening ${moved.field} on ${list} to free text would quietly change which rows ${what} ${moved.name === moved.reader ? moved.reader : `${moved.name} (${moved.reader})`} reads: its ${moved.at} "${moved.where}" ${says}, which only the closed list read as ${moved.stored}, and free text compares the word as written. Write ${moved.stored} there first, then open ${moved.field}.`,
-      { at: moved.reader },
-    );
-  }
-
-  const demanded = diff.newly_required[0];
-  if (demanded)
-    return no<Applied>(
-      'REQUIRED_ON_POPULATED',
-      `${demanded.id}.${demanded.field} is required and ${demanded.rows} rows were written before it. Ship a default or a fill rule.`,
-      { at: `${demanded.id}.fields.${demanded.field}.required` },
-    );
+  /* EVERY REFUSAL THE DIFF ALONE DECIDES, in `installFault`, so the arranger can ask the same of each pack it files. */
+  const fault = installFault(pack, diff);
+  if (fault) return { ok: false, refusal: fault };
 
   /* WHAT IT CALLS OUT IS APPROVED IN THE SAME PRESS, OR NOTHING IS ARMED (`loop/research-scheduled-actions.md` §5).
      A new action, or a new host, key or field on one, installs only beside the exact lines the plan printed for it.
@@ -2622,19 +2769,8 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
     }
 
   /* THE SETTINGS ARE WRITTEN IN HERE, from the plan that was approved, so the bodies staged are the
-     bodies the plan compared. A text setting is a value a person chose after `normalise` looked, so
-     the colour rule is asked again of every body a setting filled. */
+     bodies the plan compared. The colour rule for what a setting filled is asked in `installFault`. */
   const filled = filledWith(pack, diff.config);
-  for (const d of filled.declarations) {
-    if (d.kind === 'theme' || d === pack.declarations.find((o) => o.id === d.id)) continue;
-    const painted = colour(d.body);
-    if (painted)
-      return no<Applied>(
-        'COLOUR_OUTSIDE_THEME',
-        `${d.id} sets ${painted.at} to ${painted.value} from a setting. A ${d.kind} names an intent (good, warn, bad or info), and the theme names the colour.`,
-        { at: `${d.id}.${painted.at}` },
-      );
-  }
   /* WHAT THE OWNER CHANGED IS NOT STAGED, so it stands at its own version with `pack_id` null, and a later uninstall of
      this pack still cannot take it. */
   const keep = new Set(diff.kept.filter((k) => k.rebased === undefined).map((k) => k.id));
@@ -2654,16 +2790,20 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
   );
   /* WHAT IT LAYS ON ANOTHER PACK'S LIST IS STAGED WITH NO PACK, as a rebased list is, so the kernel supersedes the owner's
      row with an ordinary body and `detached()` then says whose list it was. Staged under this pack, the list would change
-     owners, and taking this pack out would retire a list whose rows it never wrote. */
+     owners, and taking this pack out would retire a list whose rows it never wrote. Staged under the list's own pack, its
+     next update drops what was laid (`Diff['extends']` says what was measured). */
   const laid = diff.extends.flatMap((e) => (e.body === undefined ? [] : [{ id: e.id, kind: 'register', body: JSON.parse(e.body) as Json }]));
-  /* AND A VALUE THAT STAYS ON A LIST THIS PACK OWNS, after the pack's own body, for the same reason as a rebased list. */
-  const staying = diff.stays.flatMap((s) => (s.body === undefined ? [] : [{ id: s.id, kind: 'register', body: JSON.parse(s.body) as Json }]));
+  /* AND A VALUE THAT STAYS ON A LIST THIS PACK OWNS IS STAGED AS THE PACK'S BODY OF IT, in place of the file's. Staged with
+     no pack after the file's, as it was until audit forty-four's finding 2, the list read as changed in the app from
+     then on: People 2.1.0 was planned as `kept` with a rebased body, and Decide said "Keeps People as you changed it.
+     This update's version of it is not taken" of an update nobody's edit stood in and that installed its `pronouns`.
+     Under the pack, the next update meets the value as the pack's and `laidBack` keeps it again while rows are there. */
+  const staying = new Map(diff.stays.flatMap((s) => (s.body === undefined ? [] : [[s.id, JSON.parse(s.body) as Json] as const])));
   const staged = await host.stage([
-    ...filled.declarations.filter((d) => !keep.has(d.id)).map((d) => ({ id: d.id, kind: d.kind, body: d.body, pack: pack.manifest.pack })),
+    ...filled.declarations.filter((d) => !keep.has(d.id)).map((d) => ({ id: d.id, kind: d.kind, body: staying.get(d.id) ?? d.body, pack: pack.manifest.pack })),
     ...over,
     ...handing,
     ...laid,
-    ...staying,
   ]);
   if (!staged.ok) return staged;
 

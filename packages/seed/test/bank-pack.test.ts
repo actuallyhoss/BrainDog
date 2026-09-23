@@ -207,7 +207,10 @@ test('A RECORD THAT NEVER USED THE TWELVE RETIRES THEM ON THE UPDATE, and holds 
   sql.close();
 });
 
-test('A DOOR THE RECORD USES IS HANDED, AND ONLY THAT ONE: a pattern that filed a row, and a twin with a token', async () => {
+/* AND THE DOOR A HANDED PATTERN NAMES GOES WITH IT. `bank-ipn-in-sms` names `door: bank-from-out-sms`, which filed
+   nothing and holds no token, so `used` does not name it; retired, the pattern arrived under `bank-hsbc-eg` naming a
+   door that was gone (`declare/test/door-follows-patterns.test.ts`). */
+test('A DOOR THE RECORD USES IS HANDED, WITH THE DOOR IT NAMES, AND NOTHING ELSE: a pattern that filed a row, and a twin with a token', async () => {
   const { k, sql } = await record();
   for (const id of FIRST_PARTY) await put(k, id === 'money-core' ? v170() : firstPartyDocument(id));
   /* THE ACCOUNT THE LINE NAMES, so the arrival files a row. Without it the line waits in review and has filed nothing. */
@@ -219,18 +222,20 @@ test('A DOOR THE RECORD USES IS HANDED, AND ONLY THAT ONE: a pattern that filed 
   const used = usedOf(sql, ['ingest.bank-ipn-in-sms']);
   assert.deepEqual(used, ['ingest.bank-card-used', 'ingest.bank-ipn-in-sms']);
 
+  const handed = [...used, 'ingest.bank-from-out-sms'].sort();
+
   const update = await put(k, firstPartyDocument('money-core'), used);
   assert.deepEqual(
     update.retires.filter((r) => r.to !== undefined).map((r) => [r.id, r.to]),
-    used.map((id) => [id, 'bank-hsbc-eg']),
+    handed.map((id) => [id, 'bank-hsbc-eg']),
   );
-  /* THE OTHER TEN RETIRE, and so does the empty `holdings` 2.0.0 hands, for the test above's reason. */
-  assert.deepEqual(update.retires.filter((r) => r.to === undefined).map((r) => r.id).sort(), [...HSBC.filter((id) => !used.includes(id)), 'register.holdings'].sort());
-  assert.deepEqual(k.declarations().filter((d) => HSBC.includes(d.id)).map((d) => [d.id, d.pack_id]), used.map((id) => [id, 'bank-hsbc-eg']));
+  /* THE OTHER NINE RETIRE, and so does the empty `holdings` 2.0.0 hands, for the test above's reason. */
+  assert.deepEqual(update.retires.filter((r) => r.to === undefined).map((r) => r.id).sort(), [...HSBC.filter((id) => !handed.includes(id)), 'register.holdings'].sort());
+  assert.deepEqual(k.declarations().filter((d) => HSBC.includes(d.id)).map((d) => [d.id, d.pack_id]), handed.map((id) => [id, 'bank-hsbc-eg']));
 
   const bank = await put(k, bankHsbcEgPack(), usedOf(sql, ['ingest.bank-ipn-in-sms']));
   assert.deepEqual(bank.conflicts, []);
-  assert.deepEqual(bank.adds.filter((a) => a.handed).map((a) => a.id).sort(), used);
+  assert.deepEqual(bank.adds.filter((a) => a.handed).map((a) => a.id).sort(), handed);
   assert.deepEqual([...new Set(k.declarations().filter((d) => HSBC.includes(d.id)).map((d) => d.pack_id))], ['bank-hsbc-eg']);
   sql.close();
 });
