@@ -869,11 +869,20 @@ export const site = {
            Double entry stays, because DIRECTION §2 is explicit that Money is not a ledger.
 
            ALL THREE SURVIVED THE CUT. A refusal is the cheapest credibility a marketing page can
-           buy and the most expensive to win back once it is dropped. */
+           buy and the most expensive to win back once it is dropped.
+
+           THE THIRD SAID `Run code from a pack. Ever.` AND STOPPED BEING TRUE ON 22 SEPTEMBER.
+           DIRECTION §22 made a script record content ("never a script in the core; a user's script is
+           content"), `script` is the ninth kind of declaration, and a pack may own one through its
+           body's `pack:` (`packages/kernel/test/script-declare.test.ts` installs one under `money`).
+           What stayed true is where it runs: the record never runs it, a host runs it in a sandbox
+           of its own (QuickJS on a self-host, a Dynamic Worker on the Cloud), and every fetch is held
+           to the origins its `egress:` lists (`packages/host/src/script.ts`, `apps/worker/src/script.ts`).
+           So the refusal names that, and says scripts exist rather than implying they do not. */
         lines: [
           'Double entry, or a general ledger.',
           'A pipeline, a sequence or a lead score.',
-          'Run code from a pack. Ever.',
+          'Run a script inside your record. A script runs in a sandbox of its own, and calls out only to the addresses it names.',
         ],
       },
     ],
@@ -1097,14 +1106,17 @@ export const site = {
       reads: ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'money', 'governance'],
       writesTitle: 'Write',
       writes: ['propose', 'create', 'update', 'log', 'handoff', 'meet'],
-      /* `RESOURCES` in the same file: five `uriTemplate` entries. */
-      resourcesTitle: 'And five addresses a client can read directly',
+      /* `TEMPLATES` in the same file: six `uriTemplate` entries. This said five and named `RESOURCES`,
+         an array that file has never had, and stayed five for a day after `braindog:automation/{id}`
+         was added. `test/content.test.ts` now imports `TEMPLATES` and holds this list and its count to it. */
+      resourcesTitle: 'And six addresses a client can read directly',
       resources: [
         { uri: 'braindog:schema/{register}', said: 'The fields of one register.' },
         { uri: 'braindog:page/{slug}', said: 'One page with every block run: rows and figures, never markup.' },
         { uri: 'braindog:metric/{id}', said: 'One figure, with its target and how it compares.' },
         { uri: 'braindog:skill/{name}', said: 'The text of one skill, and when to reach for it.' },
         { uri: 'braindog:declaration/{slug}', said: 'One page as declared, to change and propose back.' },
+        { uri: 'braindog:automation/{id}', said: 'One automation as declared, with its last ten runs, each step with its outcome.' },
       ],
     },
 

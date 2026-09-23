@@ -31,6 +31,8 @@
   `test/content.test.ts` looks each use case up by. Inside a panel the rail entries are buttons that
   carry `aria-current` for the page they show, and opening a row or going back moves focus to the
   new page's title, so a keyboard is never left on a control that has just been taken away.
+  Answering a question on Decide takes its two buttons away too, and focus goes to the page's title
+  the same way, while the answer is spoken by a status region that was there, empty, before it.
 -->
 <script lang="ts">
   import { tick } from 'svelte';
@@ -172,8 +174,26 @@
     }
   }
 
-  function answer(c: Case, q: number, said: 'accepted' | 'rejected') {
+  /**
+   * ANSWER A QUESTION, AND PUT THE KEYBOARD SOMEWHERE THAT IS STILL THERE.
+   *
+   * The two buttons are replaced by the stamp the moment the answer is recorded, so the one that was
+   * pressed is gone. This used to record the answer and nothing else, and `loop/research-batch-forty-audit.md`
+   * §9 measured the result in headless Chromium: after Enter on Accept, `document.activeElement` was
+   * `body`, and the next Tab left the drawn app for the page's own links. So focus goes to the page's
+   * title, which is where `open` puts it for the same reason and which now reads "Decide" with the
+   * count gone from beside it. Every case in `copy.ts` asks one question, so there is never a second
+   * Accept to go to instead; a case that asks two should send focus to the next one still waiting.
+   *
+   * THE OUTCOME IS SPOKEN BY THE STAMP, which is a `role="status"` region drawn empty from the start
+   * and filled here. It used to arrive already holding its words, and a live region that is born full
+   * is not reliably announced. Focus goes to the title rather than to the stamp so a screen reader
+   * does not read "Accepted by you" twice, once as the region changes and again as it takes focus.
+   */
+  async function answer(c: Case, q: number, said: 'accepted' | 'rejected') {
     answers = { ...answers, [`${c.id}:${q}`]: said };
+    await tick();
+    titles[selected]?.focus();
   }
 </script>
 
@@ -344,16 +364,19 @@
                       </p>
                       <p class="ask-title">{q.question}</p>
                       <p class="change"><span class="plus" aria-hidden="true"></span><span>{q.change}</span></p>
+                      <!-- THE STAMP IS ALWAYS HERE, EMPTY UNTIL THE ANSWER, so the words arrive in a live
+                           region that already exists. `answer` says why. -->
                       <div class="answer">
-                        {#if said}
-                          <p class="stamp" role="status">
-                            <Icon name={said === 'accepted' ? 'check' : 'close'} size="s" />
-                            <span>{said === 'accepted' ? app.accepted : app.rejected}</span>
-                          </p>
-                        {:else}
+                        {#if !said}
                           <button class="do do-primary" type="button" onclick={() => answer(c, qi, 'accepted')}>{app.accept}</button>
                           <button class="do" type="button" onclick={() => answer(c, qi, 'rejected')}>{app.reject}</button>
                         {/if}
+                        <p class="stamp" role="status">
+                          {#if said}
+                            <Icon name={said === 'accepted' ? 'check' : 'close'} size="s" />
+                            <span>{said === 'accepted' ? app.accepted : app.rejected}</span>
+                          {/if}
+                        </p>
                       </div>
                     </div>
                   {/each}

@@ -657,3 +657,43 @@ test('_headers caches hashed assets immutably and the screenshots for a day', ()
   assert.match(rules, /^\/_app\/immutable\/\*\n {2}Cache-Control: public, max-age=31536000, immutable$/m);
   assert.match(rules, /^\/shots\/\*\n {2}Cache-Control: public, max-age=86400\b/m);
 });
+
+/**
+ * /AGENTS COUNTS THE MCP SURFACE OFF THE MCP'S OWN ARRAYS, NOT OFF WHOEVER LAST COUNTED IT.
+ *
+ * It said "And five addresses a client can read directly" and listed five, under a comment naming
+ * `RESOURCES` as the array it came from. The array is `TEMPLATES` (`RESOURCES` does not exist; the
+ * fixed resources are `FIXED`), and it held six: the count was true on 21 September when it was
+ * written, and `braindog:automation/{id}` landed the next day without the page hearing of it
+ * (`loop/research-batch-forty-audit.md` §10). Nothing failed, because the page was a hand count and
+ * nothing compared it with the code.
+ *
+ * SO THIS IMPORTS THE ARRAYS THEMSELVES. The addresses are held to `TEMPLATES` in order, the read
+ * and write names to `TOOLS` split on `writes`, and each title's number word to the length it
+ * claims to be, so the next template or tool added fails here until the page says it.
+ */
+test('/agents names every MCP tool and template the MCP declares, and counts them right', async () => {
+  type Mcp = { mcp: { title: string; reads: readonly string[]; writes: readonly string[]; resourcesTitle: string; resources: readonly { uri: string }[] } };
+  const { site } = (await import(new URL('../src/lib/copy.ts', import.meta.url).href)) as { site: { agents: Mcp } };
+  const { TEMPLATES, TOOLS } = (await import(new URL('../../../packages/mcp/src/index.ts', import.meta.url).href)) as {
+    TEMPLATES: readonly { uriTemplate: string }[];
+    TOOLS: readonly { name: string; writes: boolean }[];
+  };
+  const page = site.agents.mcp;
+  const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'];
+  const word = (n: number): string => WORDS[n] ?? String(n);
+  const says = (line: string, n: number): boolean => new RegExp(`\\b${word(n)}\\b`, 'i').test(line);
+
+  assert.deepEqual(
+    page.resources.map((r) => r.uri),
+    TEMPLATES.map((t) => t.uriTemplate),
+    '/agents lists other addresses than TEMPLATES in packages/mcp/src/index.ts declares',
+  );
+  assert.ok(says(page.resourcesTitle, TEMPLATES.length), `"${page.resourcesTitle}" and TEMPLATES holds ${TEMPLATES.length}`);
+
+  const reads = TOOLS.filter((t) => !t.writes).map((t) => t.name);
+  const writes = TOOLS.filter((t) => t.writes).map((t) => t.name);
+  assert.deepEqual(page.reads, reads, '/agents lists other read tools than TOOLS declares');
+  assert.deepEqual(page.writes, writes, '/agents lists other write tools than TOOLS declares');
+  assert.ok(says(page.title, TOOLS.length) && says(page.title, reads.length), `"${page.title}" and TOOLS holds ${TOOLS.length}, ${reads.length} of them reads`);
+});
