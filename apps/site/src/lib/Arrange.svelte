@@ -905,6 +905,18 @@
     inset: 0;
   }
 
+  /* `13 §7`, as `app.css` holds `.btn`: 44 under a thumb. The layout gate measured the icon-only rail at 44x32, the
+     "to decide" pill at 28 and a row's name at 36 on a coarse pointer at 320 and 360, all under the 44 a finger
+     needs; a mouse keeps the tighter rows the real app draws. */
+  @media (pointer: coarse) {
+    /* `.holds .hold`, one class stronger than the phone width's `.hold` below, which would otherwise win by order. */
+    .holds .hold,
+    .pill,
+    .open {
+      min-block-size: var(--tap);
+    }
+  }
+
   .open:focus-visible {
     /* focus-ok: the button's box is stretched over the whole row, and `tr:has(.open:focus-visible)`
        above draws the ring round the row the reader sees rather than round the name alone. */
