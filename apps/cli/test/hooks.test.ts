@@ -523,7 +523,8 @@ test('INSTALL --REPLACE --APPLY copies each file beside itself, removes only the
   assert.deepEqual(Object.keys(mcp.mcpServers), ['figma', 'brainy', 'braindog']);
   assert.deepEqual(mcp.projects['C:/Repos/acme'], { allowedTools: [], mcpServers: {} });
 
-  const again = installInto(dir, { apply: true, replace: true, scripts, home });
+  /* `checkout` a folder in no git tree, so the moving-checkout line, which follows the real tree's state, is not owed. */
+  const again = installInto(dir, { apply: true, replace: true, scripts, home, checkout: home });
   assert.deepEqual(again, [
     `${settings} already runs both BrainDog hooks and no the old tool hook. Nothing to change.`,
     `${claudeJson} registers no the old tool MCP server. Nothing to change.`,
@@ -579,7 +580,17 @@ test('INSTALL --REPLACE --MCP-JSON names the the old tool servers in a .mcp.json
   assert.ok(dry.stdout.includes(`braindog install --replace would change ${file}:`), dry.stdout);
   assert.ok(dry.stdout.includes("  - mcpServers.brain, the old tool's: node C:\\Tools\\legacy\\mcp\\brain-mcp.mjs"), dry.stdout);
   assert.ok(dry.stdout.includes("  - mcpServers.proxied, the old tool's: npx -y mcp-remote https://brain.example.com/mcp"), dry.stdout);
-  /* Through the command as he runs it, not only the function: the file that loses the old tool's gains BrainDog's. */
+  /*
+   * BRAINDOG'S SERVER GOES INTO THE PROFILE, NOT THE .mcp.json (brief 44-B of `loop/research-switch-left.md`). This
+   * once read the whole stdout for the `+` line, and wave forty-four's builder found it passing only because the
+   * profile gained the entry too, so it could not tell which file did. The `.mcp.json`'s own plan is now read on its
+   * own, from its heading to the sentence that ends it.
+   */
+  const lines = dry.stdout.split('\n');
+  const at = lines.indexOf(`braindog install --replace would change ${file}:`);
+  assert.ok(at >= 0, dry.stdout);
+  const plan = lines.slice(at, lines.findIndex((l, i) => i > at && l.startsWith('Nothing was changed.')));
+  assert.ok(!plan.some((l) => l.includes('mcpServers.braindog')), plan.join('\n'));
   assert.ok(dry.stdout.includes('  + mcpServers.braindog: {"type":"stdio","command":"node"'), dry.stdout);
   assert.ok(!dry.stdout.includes('figma') && !dry.stdout.includes('brainy') && !dry.stdout.includes(HB_SECRET), dry.stdout);
   /*
@@ -598,7 +609,8 @@ test('INSTALL --REPLACE --MCP-JSON names the the old tool servers in a .mcp.json
   assert.ok(applied.stdout.includes(`The file as it was is kept at ${file}.bak.`), applied.stdout);
   assert.equal(readFileSync(`${file}.bak`, 'utf8'), before);
   const now = JSON.parse(readFileSync(file, 'utf8')) as { mcpServers: Record<string, unknown>; note: string };
-  assert.deepEqual(Object.keys(now.mcpServers), ['figma', 'brainy', 'braindog']);
+  /* No `braindog` here: a new name in this file is only a prompt to approve, and the profile holds the entry instead. */
+  assert.deepEqual(Object.keys(now.mcpServers), ['figma', 'brainy']);
   assert.equal(now.note, 'kept as it was');
   /* The same run wrote the profile's hooks: one change, not two. */
   assert.ok(existsSync(join(profile, 'settings.json')));

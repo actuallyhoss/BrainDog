@@ -35,9 +35,31 @@
  * cut-over needs, `C:\Repos\.mcp.json`, is in no repository, and leaving it to a hand edit made step 9 one sitting
  * plus a line that, missed, leaves a session on the old record. `--replace --mcp-json <file>` opens it, in the same
  * dry run and the same all-or-none write as the profiles. A project's settings file is changed only when it is named.
+ *
+ * AND THE NAMED `.mcp.json` LOSES THE OLD TOOL'S SERVER AND GAINS NO `braindog` (brief 44-B's second half). It gained
+ * one until then, and finding 2 of `loop/research-switch-left.md` measured what that entry does, in a scratch config
+ * folder with a do-nothing server. Claude Code does read a `.mcp.json` from a parent folder, but starts a server
+ * there only when its name is in `enabledMcpjsonServers`, and `C:\Repos\acme\.claude\settings.local.json` approves
+ * `brain` and `relay` by name, so `braindog` stayed `Pending approval (run claude to approve)`: one prompt in an
+ * interactive session, and no brain at all in a headless `claude -p`. Where a user-scope entry of the same name also
+ * exists, as every named profile now has, that one is started, with a diagnostic about the two scopes. So the entry
+ * here was a prompt and a diagnostic, and never the server that ran.
+ *
+ * AND IT RETIRES THE `legacy-tool` SKILL (brief 45-A). With the hooks and servers out and the skill left, a session
+ * still loads a skill whose description says to use it "whenever you start work in a Quartz repo", and reads and
+ * writes `brain.example.com` beside BrainDog: the split brain again, by another door. A folder under a profile's
+ * `skills/` whose `SKILL.md` names that host is moved to `skills/.replaced/<name>-<date>/`, never deleted, inside the
+ * same all-or-none write. A skill that does not name the host is somebody else's, and `commands/` holds no skill
+ * folders, so neither is opened.
+ *
+ * AND IT SAYS WHEN THE CHECKOUT IT RUNS FROM IS MOVING (finding 3). The hooks and the server this writes run this
+ * checkout's own files, and the dry run over his profiles planned both from `C:\Repos\braindog`, the tree the loop's
+ * agents edit every wave, so a session would start on whatever half-written file was there at the time. One line says
+ * so and names the worktree fix. It never refuses, because the tree may be his, changed on purpose.
  */
 
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -131,12 +153,19 @@ const backupOf = (file: string): string => {
   return n === 0 ? `${file}.bak` : `${file}.bak${String(n)}`;
 };
 
-type Options = { apply: boolean; scripts: string; platform?: string; replace?: boolean; home?: string };
+type Options = { apply: boolean; scripts: string; platform?: string; replace?: boolean; home?: string; checkout?: string };
 
 /** One file's change, read and decided before anything is written: the lines to print, and what to write. */
 type Write = { file: string; had: boolean; value: unknown };
+/** One folder set aside, renamed in the same pass as the files are and renamed back with them. */
+type Move = { from: string; to: string };
 /* `serves` is set on a profile's servers plan alone: whether the file holds BrainDog's server once the plan is written. */
-type Plan = { lines: string[]; write: Write | null; serves?: boolean };
+type Plan = { lines: string[]; write: Write | null; moves?: Move[]; serves?: boolean };
+
+type FileStep = Write & { tmp: string; kept: string | null; made: string | undefined; renamed: boolean };
+type MoveStep = Move & { made: string | undefined; renamed: boolean };
+type Step = FileStep | MoveStep;
+const isMove = (step: Step): step is MoveStep => 'to' in step;
 
 /**
  * Removes a file this command made, `.tmp` or `.bak`. BOTH TAKE THE ORIGINAL'S MODE, so both can be read-only, and
@@ -157,46 +186,82 @@ const discard = (path: string): void => {
  * MEASURED BEFORE THIS EXISTED (`loop/research-batch-twenty-four-audit.md` §1): each file was written on its own,
  * so a read-only `.claude.json` left `settings.json` cut over and the MCP server in, the split brain `--replace`
  * exists to prevent, and printed only the `EPERM`. The thrown sentence now names every file and what became of it.
+ *
+ * A SKILL FOLDER SET ASIDE IS ONE MORE RENAME IN THE SAME PASS, in plan order, so a profile's skill is moved after its
+ * two files and before the next profile's. Measured with the move done at planning time instead, as a mutation: a
+ * later profile's read-only `.claude.json` put every file back and left the first profile's skill under `.replaced`
+ * beside the old tool's restored hooks, which is neither the old state nor the new.
  */
 function commit(plans: Plan[]): string[] {
-  type Step = Write & { tmp: string; kept: string | null; made: string | undefined; renamed: boolean };
   const steps: Step[] = [];
   let failing = '';
   try {
-    for (const write of plans.flatMap((plan) => (plan.write ? [plan.write] : []))) {
-      failing = write.file;
-      const step: Step = { ...write, tmp: `${write.file}.tmp`, kept: null, made: undefined, renamed: false };
-      steps.push(step);
-      /* A `.tmp` still here is an earlier run's, which failed, and it holds nothing the file does not. */
-      discard(step.tmp);
-      if (write.had) {
-        step.kept = backupOf(write.file);
-        copyFileSync(write.file, step.kept);
-      } else step.made = mkdirSync(dirname(write.file), { recursive: true });
-      /* The mode is carried over because `.claude.json` holds the account's sign-in, and a fresh file would be made readable by the umask. */
-      writeFileSync(step.tmp, `${JSON.stringify(write.value, null, 2)}\n`, write.had ? { mode: statSync(write.file).mode & 0o777 } : {});
+    for (const plan of plans) {
+      if (plan.write) {
+        const write = plan.write;
+        failing = write.file;
+        const step: FileStep = { ...write, tmp: `${write.file}.tmp`, kept: null, made: undefined, renamed: false };
+        steps.push(step);
+        /* A `.tmp` still here is an earlier run's, which failed, and it holds nothing the file does not. */
+        discard(step.tmp);
+        if (write.had) {
+          step.kept = backupOf(write.file);
+          copyFileSync(write.file, step.kept);
+        } else step.made = mkdirSync(dirname(write.file), { recursive: true });
+        /* The mode is carried over because `.claude.json` holds the account's sign-in, and a fresh file would be made readable by the umask. */
+        writeFileSync(step.tmp, `${JSON.stringify(write.value, null, 2)}\n`, write.had ? { mode: statSync(write.file).mode & 0o777 } : {});
+      }
+      for (const move of plan.moves ?? []) {
+        failing = move.from;
+        const step: MoveStep = { ...move, made: undefined, renamed: false };
+        steps.push(step);
+        step.made = mkdirSync(dirname(move.to), { recursive: true });
+      }
     }
     for (const step of steps) {
-      failing = step.file;
-      renameSync(step.tmp, step.file);
+      if (isMove(step)) {
+        failing = step.from;
+        renameSync(step.from, step.to);
+      } else {
+        failing = step.file;
+        renameSync(step.tmp, step.file);
+      }
       step.renamed = true;
     }
   } catch (e) {
     throw new Error(undo(steps, plans, failing, e));
   }
-  const kept = new Map(steps.map((step) => [step.file, step.kept]));
+  const kept = new Map(steps.flatMap((step) => (isMove(step) ? [] : [[step.file, step.kept] as const])));
   return plans.flatMap((plan) => {
-    if (!plan.write) return plan.lines;
+    const moved = (plan.moves ?? []).map((move) => `The folder as it was is kept at ${move.to}.`);
+    if (!plan.write) return [...plan.lines, ...moved];
     const copy = kept.get(plan.write.file);
     return [...plan.lines, copy ? `The file as it was is kept at ${copy}.` : 'There was no file before, so there is nothing to keep a copy of.'];
   });
 }
 
 /** Puts back what `commit` changed, newest first, and says exactly which files are as they were and which are not. */
-function undo(steps: { file: string; tmp: string; kept: string | null; made: string | undefined; renamed: boolean }[], plans: Plan[], failing: string, cause: unknown): string {
+function undo(steps: Step[], plans: Plan[], failing: string, cause: unknown): string {
   const stuck = new Map<string, string>();
   const left: string[] = [];
   for (const step of [...steps].reverse()) {
+    if (isMove(step)) {
+      if (step.renamed) {
+        try {
+          renameSync(step.to, step.from);
+        } catch {
+          stuck.set(step.from, `  ${step.from}, which is at ${step.to}`);
+          continue;
+        }
+      }
+      /* The `.replaced` folder, when this run made it and it is empty again. */
+      try {
+        if (step.made) rmdirSync(step.made);
+      } catch {
+        /* Not empty, so an earlier run's skill is in it, and it is left. */
+      }
+      continue;
+    }
     if (step.renamed) {
       try {
         /* Through a fresh `.tmp` and a rename, not a copy over the file, because the file may be read-only. */
@@ -223,7 +288,7 @@ function undo(steps: { file: string; tmp: string; kept: string | null; made: str
       /* A folder left behind is empty and harmless, and saying so would bury the line that matters. */
     }
   }
-  const files = plans.flatMap((plan) => (plan.write ? [plan.write.file] : []));
+  const files = plans.flatMap((plan) => [...(plan.write ? [plan.write.file] : []), ...(plan.moves ?? []).map((move) => move.from)]);
   const asWas = files.filter((file) => !stuck.has(file)).map((file) => `  ${file}`);
   const why = `Writing ${failing} failed: ${cause instanceof Error ? cause.message : String(cause)}`;
   const lines =
@@ -278,11 +343,19 @@ export function installProfiles(profiles: string[], files: string[], options: Op
   };
   for (const dir of profiles) {
     add(join(dir, 'settings.json'), planSettings);
-    if (options.replace) add(serversFileOf(dir, options.home), planServers);
+    if (options.replace) {
+      add(serversFileOf(dir, options.home), planServers);
+      add(join(dir, 'skills'), planSkills);
+    }
   }
   for (const file of files) add(file, planSettings);
   for (const file of mcpFiles) add(file, planMcpJson);
-  const lines = commit(plans);
+  /*
+   * AFTER THE PLAN, NOT BEFORE IT: a run's first line has always been its first file's heading, and main.ts's own
+   * tests read it there. Printed first, it failed two of them whenever the tree held another agent's edit.
+   */
+  const moving = movingCheckout(options.checkout ?? dirname(fileURLToPath(import.meta.url)));
+  const lines = [...commit(plans), ...(moving ? [moving] : [])];
   const owed = new Set<string>();
   const unserved = profiles.filter((dir) => {
     const file = serversFileOf(dir, options.home);
@@ -292,6 +365,24 @@ export function installProfiles(profiles: string[], files: string[], options: Op
     return !(served.get(key) ?? holdsBraindog(file));
   });
   return { lines, unserved };
+}
+
+/**
+ * The one line owed when the checkout this runs from has uncommitted changes, naming it, or null. TRACKED FILES ONLY:
+ * when this was written the tree held three untracked test files of other agents, which no hook or server runs, and
+ * a new source file only runs once a tracked one imports it, which is then a change. NO OPTIONAL LOCKS, because other
+ * agents run git in the same tree and a plain `status` may take the index lock to refresh it. Not a git tree, or no
+ * git on the path, is no warning: nothing can be said, and install must not fail on it.
+ */
+function movingCheckout(dir: string): string | null {
+  const git = (...args: string[]) => execFileSync('git', ['--no-optional-locks', '-C', dir, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true, timeout: 10_000 }).trim();
+  try {
+    if (git('status', '--porcelain', '--untracked-files=no') === '') return null;
+    const root = resolve(git('rev-parse', '--show-toplevel'));
+    return `${root} has uncommitted changes, and the hooks and the MCP server this installs run that tree's files as they are when each session starts. To pin them, install from a worktree of a pushed commit instead: git worktree add ../braindog-cli <commit>, then pnpm install there.`;
+  } catch {
+    return null;
+  }
 }
 
 /* Read without `readObject`'s refusal, because a plain install never writes this file and must not fail on it. */
@@ -515,8 +606,8 @@ function withoutSam(servers: unknown, where: string, removed: string[]): unknown
 }
 
 /**
- * BrainDog's server added to the top-level `mcpServers` of a profile's servers file, or of a `.mcp.json` the old tool's
- * were just taken out of, with the line that says so, and what became of it. AT USER SCOPE EVEN WHEN THE OLD TOOL'S WAS
+ * BrainDog's server added to the top-level `mcpServers` of a profile's servers file, never a `.mcp.json` (see the
+ * header), with the line that says so, and what became of it. AT USER SCOPE EVEN WHEN THE OLD TOOL'S WAS
  * ONLY IN ONE PROJECT'S LOCAL SCOPE, because BrainDog's server reads the folder it runs in, so one registration serves
  * every project, where one per project would be copies to keep in step. A `braindog` entry already there is the
  * person's own and is left exactly as it is, never replaced with this checkout's path.
@@ -546,7 +637,8 @@ function workingTreeOf(file: string): string | null {
 }
 
 /**
- * A `.mcp.json` the person named with `--mcp-json`, its top-level `mcpServers` without the old tool's. REFUSED INSIDE A
+ * A `.mcp.json` the person named with `--mcp-json`, its top-level `mcpServers` without the old tool's, and with no
+ * server of BrainDog's put in (the header says why). REFUSED INSIDE A
  * GIT WORKING TREE, because there it is shared through the repository and removing an entry removes it for everyone
  * who pulls; refused when it is missing, because a name that finds nothing is a typo, and a cut-over that reports
  * "nothing to change" for a typo leaves the server in. Either refusal is thrown before anything is written.
@@ -562,8 +654,8 @@ function planMcpJson(named: string, options: Options): Plan {
   const next: Record<string, unknown> = { ...config };
   if ('mcpServers' in config) next.mcpServers = withoutSam(config.mcpServers, '', removed);
   if (removed.length === 0) return { lines: [`${file} registers no the old tool MCP server. Nothing to change.`], write: null };
+  /* No `withBraindog` here: a new name in this file is only a prompt, as the header says finding 2 measured. */
   const lines = [`${options.apply ? 'Changed' : 'braindog install --replace would change'} ${file}:`, ...removed];
-  withBraindog(next, lines);
   if (!options.apply) return { lines: [...lines, dryTail(options)], write: null };
   return { lines, write: { file, had: true, value: next } };
 }
@@ -601,4 +693,44 @@ function planServers(file: string, options: Options): Plan {
   const close = had ? ['Close every Claude Code session on this profile before --apply, since each one rewrites this file.'] : [];
   if (!options.apply) return { lines: [...lines, ...close, dryTail(options)], write: null, serves };
   return { lines, write: { file, had, value: next }, serves };
+}
+
+/**
+ * the old tool's skills in one profile's `skills/` folder, each set aside under `skills/.replaced/<name>-<date>/`: a
+ * folder whose `SKILL.md` names the old tool's host. MOVED, NEVER DELETED, so the skill is one rename from back if he
+ * wants it, and the copy is dated because the cut-over may be run again after a restore.
+ *
+ * A NAME STARTING WITH A DOT IS NEVER A SKILL HERE, because `.replaced` is this command's own. The skip is said
+ * outright, not left to the layout: a checker removed it as a mutation and every test stayed green, since the
+ * retired `SKILL.md` files sit one level down and `.replaced` has none of its own, so the second run passed it over
+ * anyway. The line keeps that true if a skill is ever set aside flat.
+ */
+function planSkills(skills: string, options: Options): Plan {
+  if (!existsSync(skills)) return { lines: [], write: null };
+  const date = new Date().toISOString().slice(0, 10);
+  const moves: Move[] = [];
+  for (const name of readdirSync(skills).sort()) {
+    if (name.startsWith('.')) continue;
+    const from = join(skills, name);
+    let text: string;
+    try {
+      if (!statSync(from).isDirectory()) continue;
+      text = readFileSync(join(from, 'SKILL.md'), 'utf8');
+    } catch {
+      /* No `SKILL.md`, or one that cannot be read: nothing says whose it is, so it is left. */
+      continue;
+    }
+    if (!text.toLowerCase().includes(SAM_HOST)) continue;
+    let to = join(skills, '.replaced', `${name}-${date}`);
+    for (let n = 2; existsSync(to); n++) to = join(skills, '.replaced', `${name}-${date}-${String(n)}`);
+    moves.push({ from, to });
+  }
+  /* Nothing to retire is no line at all: most profiles hold no skill of the old tool's, and a line each would bury the rest. */
+  if (moves.length === 0) return { lines: [], write: null };
+  const lines = [
+    `${options.apply ? 'Changed' : 'braindog install --replace would change'} ${skills}:`,
+    ...moves.map((move) => `  - skills/${basename(move.from)}, the old tool's skill, set aside as skills/.replaced/${basename(move.to)}`),
+  ];
+  if (!options.apply) return { lines: [...lines, dryTail(options)], write: null };
+  return { lines, write: null, moves };
 }

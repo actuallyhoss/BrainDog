@@ -135,6 +135,8 @@ test('--APPLY OVER HIS THREE PROFILES, through main.ts: every .claude.json ends 
   const dry = cli(args, home);
   assert.equal(dry.code, 0, dry.stderr);
   for (const p of [quartz, acme, work]) assert.ok(planFor(dry.stdout, p.claudeJson).includes(PLUS), `no + line for ${p.claudeJson}:\n${dry.stdout}`);
+  /* The .mcp.json is planned, for the old tool's removal, and plans no entry of BrainDog's. */
+  assert.ok(planFor(dry.stdout, mcpJson).length > 0 && !planFor(dry.stdout, mcpJson).includes(PLUS), dry.stdout);
   /*
    * THE DRY RUN OWES NO HAND-RUN LINE EITHER, since it plans the entry for all three. Asked of the files alone it
    * would: none holds `braindog` until --apply, and a checker's mutation reading only the files, not the plan, printed
@@ -151,13 +153,13 @@ test('--APPLY OVER HIS THREE PROFILES, through main.ts: every .claude.json ends 
   assert.equal((JSON.parse(readFileSync(acme.claudeJson, 'utf8')) as { numStartups: number }).numStartups, 4);
 
   /*
-   * THE .mcp.json LOSES THE OLD TOOL'S AND KEEPS THE REST AS IT WAS, the other two entries compared whole. Brief 44-B
-   * also asks that no `braindog` be added here, since a new name in this file is only a prompt; that half is not in
-   * this change, because `hooks.test.ts`, which another brief owns, still asserts the entry is added. So `braindog`
-   * is neither required nor refused here.
+   * THE .mcp.json LOSES THE OLD TOOL'S, GAINS NOTHING, AND KEEPS THE REST AS IT WAS, the other two entries compared
+   * whole. A new name in this file is only a prompt (finding 2), so `braindog` is refused here. Wave forty-four left
+   * this half, because `hooks.test.ts` was another brief's and still asserted the entry was added.
    */
   const shared = servers(mcpJson);
   assert.ok(!('brain' in shared), JSON.stringify(shared));
+  assert.ok(!('braindog' in shared), JSON.stringify(shared));
   assert.deepEqual(shared.relay, RELAY);
   assert.deepEqual(shared.figma, FIGMA);
 

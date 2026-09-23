@@ -84,7 +84,8 @@ test('A PROFILE WHOSE .claude.json RUNS brain-mcp.mjs: the dry run lists + mcpSe
 
   /* A second run finds nothing of the old tool's and BrainDog's server in, so it writes nothing and keeps no second copy. */
   const after = readFileSync(p.claudeJson, 'utf8');
-  assert.deepEqual(installInto(p.dir, { apply: true, replace: true, scripts, home }).slice(-1), [`${p.claudeJson} registers no the old tool MCP server. Nothing to change.`]);
+  /* `checkout: home`, a folder in no git tree, so the last line is the file's and not the moving-checkout warning. */
+  assert.deepEqual(installInto(p.dir, { apply: true, replace: true, scripts, home, checkout: home }).slice(-1), [`${p.claudeJson} registers no the old tool MCP server. Nothing to change.`]);
   assert.equal(readFileSync(p.claudeJson, 'utf8'), after);
   assert.deepEqual(readdirSync(p.dir).sort(), ['.claude.json', '.claude.json.bak', 'settings.json']);
 });
@@ -104,10 +105,11 @@ test("A SERVER ONLY IN ONE PROJECT'S LOCAL SCOPE is replaced at user scope, sinc
  * server was not given BrainDog's either, and that was the fault: finding 2 of the same file measured that a new
  * name in a `.mcp.json` stays `Pending approval` wherever a `settings.local.json` approved the old one by name, so the
  * profile's own user-scope entry is the one that is started. The profile now gains the entry.
- * The `.mcp.json` half is as it was: the brief also asks that no `braindog` be added there, and that is not done in
- * this change because `hooks.test.ts`, which another brief owns, still asserts it is added.
+ * AND THE .mcp.json GAINS NOTHING, the half wave forty-four left because `hooks.test.ts` was another brief's then. It
+ * asserted `{ braindog }` here, which is the entry finding 2 measured as `Pending approval` in `C:\Repos\acme` and
+ * shadowed by the user-scope one wherever both exist: a prompt, and no server.
  */
-test('A .mcp.json HOLDING THE ONLY THE OLD TOOL SERVER, the acme shape: after --apply the profile holds braindog too, and nothing else in the .mcp.json moved', () => {
+test('A .mcp.json HOLDING THE ONLY THE OLD TOOL SERVER, the acme shape: after --apply the profile holds braindog, and the .mcp.json loses brain and gains nothing', () => {
   const home = folder('home');
   const p = profile(home, '.claude-acme', { mcpServers: {} });
   const repos = folder('repos');
@@ -118,7 +120,7 @@ test('A .mcp.json HOLDING THE ONLY THE OLD TOOL SERVER, the acme shape: after --
   assert.ok(dry.includes(PLUS), dry.join('\n'));
 
   installEvery([p.dir], [], { apply: true, replace: true, scripts, home }, [file]);
-  assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), { mcpServers: { braindog: BRAINDOG }, note: 'kept' });
+  assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), { mcpServers: {}, note: 'kept' });
   assert.deepEqual(read(p.claudeJson).mcpServers, { braindog: BRAINDOG });
 });
 
