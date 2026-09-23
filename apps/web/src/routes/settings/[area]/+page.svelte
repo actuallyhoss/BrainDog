@@ -514,6 +514,7 @@
   import SparkModel from '$lib/ui/SparkModel.svelte';
   import SparkDaily from '$lib/ui/SparkDaily.svelte';
   import WebhookDoors from '$lib/ui/WebhookDoors.svelte';
+  import PushToggle from '$lib/ui/PushToggle.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Chip from '$lib/ui/Chip.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -595,7 +596,9 @@
    *
    * "Nothing you do here is saved yet." rendered on all twelve, three of which offer nothing to do.
    * `notifications` is four stated facts and two hints and `copy.muteAtSource` says out loud that
-   * there is no switch on it; `billing` is one sentence and a link to Export; `identity` reports
+   * nothing there mutes one of them. Its one switch, Web Push for this device, is kept by the
+   * browser and the record the moment it is pressed, so the notice would be false there too;
+   * `billing` is one sentence and a link to Export; `identity` reports
    * who you are and which records you hold, and `33 §10` is why it cannot do more than report:
    * login is account-level, so identity lives outside the record.
    *
@@ -2652,7 +2655,9 @@
         toggles here would be four controls that write nothing, which is the failure this whole
         session has been removing.
 
-        Muting is turned off at the source: edit or retire the rule that raises it.
+        Muting is turned off at the source: edit or retire the rule that raises it. The one switch
+        below is Web Push for this device (W58-4), which is kept by the browser and the record, not a
+        preference over what interrupts.
       -->
       <Section title={copy.whenWeInterrupt}>
         <p class="hint">{copy.batchByDefault}</p>
@@ -2664,6 +2669,10 @@
         </ul>
         <p class="hint">{copy.muteAtSource}</p>
       </Section>
+      <!-- THE ONE CONTROL ON THIS SCREEN, AND IT IS ABOUT THE DEVICE, NOT THE RECORD. The facts above are still the
+           record's and still have no switch; this says whether this browser is rung when one of them interrupts. It
+           draws nothing until the host hands it a key, so on a host without one this screen is as it was. -->
+      <PushToggle />
     {:else if area === 'backups'}
       <!--
         `53 §5.4`: "Three mechanisms, one contract: nightly, sealed, thirty kept, restorable." And

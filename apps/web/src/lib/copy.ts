@@ -1845,7 +1845,28 @@ export const copy = {
      product has not got: there is no rules screen, no link, and nothing in the nav that reaches
      one. Advice a reader cannot follow is worse than no advice, because they go looking. What is
      true is that a rule raised it and the rule is named on the row itself. */
-  muteAtSource: 'There is no switch here. Each of these is raised by a rule, and the rule is named on the row.',
+  /* "THERE IS NO SWITCH HERE" STOPPED BEING TRUE WHEN THE DEVICE ROW BELOW LANDED ON THE SAME SCREEN. What still has no
+     switch is muting one kind of interruption, which is what this sentence was always about. */
+  muteAtSource: 'There is no switch that mutes one of these. Each is raised by a rule, and the rule is named on the row.',
+
+  /* notifications on this device: Web Push, `loop/research-living-in-it.md` W58-4, drawn only where the host has a key.
+     THE LINE NEVER SAYS WHAT HAPPENED, because a push passes through a push service nobody here runs (`09 §3`). */
+  pushTitle: 'Notifications on this device',
+  pushHow: 'When something in this record interrupts you, this device shows one line, and pressing it opens BrainDog. The line never says what happened: the record tells you once it is open.',
+  pushTurnOn: 'Turn on for this device',
+  pushTurnOff: 'Turn off for this device',
+  pushAsking: 'Asking the browser',
+  pushIsOn: 'This device is told when something interrupts you.',
+  pushIsOff: 'This device is not told.',
+  pushDenied: 'This browser blocks notifications from BrainDog. Allow them in the browser’s settings for this site, then turn this on again.',
+  pushDismissed: 'Nothing was turned on, because the browser’s question was closed without an answer.',
+  pushUnsupported: 'This browser cannot show notifications from BrainDog. On an iPhone or iPad, add BrainDog to the Home Screen and turn this on from there.',
+  pushNoService: 'The browser’s push service did not answer, so nothing was turned on. Try again in a minute.',
+  pushNoRoute: 'This record cannot keep a device’s address yet, so nothing was turned on.',
+  pushNotSent: 'The record was not reached, so nothing was turned on. Try again once you are online.',
+  /* WHAT OPENING THE ROW SAYS WHEN THE BROWSER WOULD NOT ANSWER WHETHER IT IS SUBSCRIBED. Off is the safe reading: a press
+     then subscribes, or finds the one already held under the same key and sends it again, so nothing is doubled. */
+  pushUnread: 'This browser did not say whether this device is already told, so this starts as off.',
 
   /* backups — `53 §5.4` */
   kept: 'What is kept',

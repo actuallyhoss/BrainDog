@@ -59,6 +59,12 @@ export default {
     paths: { base: BASE },
     alias: { $lib: 'src/lib' },
     files: { assets: 'static' },
+    /* THE WORKER IS REGISTERED BY THE PRESS THAT NEEDS IT, NOT BY EVERY PAGE. At the default of `true`, the mere presence
+       of `src/service-worker.ts` puts a `register` call in the shell's inline boot script, and the generated
+       `internal.js` read `service_worker: true`: every visitor to every page installed a worker, whether or not they
+       ever turned notifications on. `PushToggle.svelte` registers it when he does. The file is still built to
+       `service-worker.js` either way, because building it follows the file and not this flag. */
+    serviceWorker: { register: false },
     version: { pollInterval: 0 },
   },
   compilerOptions: {

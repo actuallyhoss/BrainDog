@@ -1,0 +1,10 @@
+{
+  "id": "/app/",
+  "name": "BrainDog",
+  "short_name": "BrainDog",
+  "description": "Everything about your business that is not just code, in one record your agents can write to.",
+  "start_url": "/app/",
+  "scope": "/app/",
+  "display": "standalone",
+  "icons": [{ "src": "/app/mark.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
