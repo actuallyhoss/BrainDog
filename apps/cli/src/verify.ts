@@ -128,6 +128,13 @@ export async function verify(args: string[], io: VerifyIo): Promise<number> {
  * HTTPS ONLY, BUT FOR THIS MACHINE. A key fetched over plain HTTP is a key anybody on the path can
  * replace, and then the pin proves that the file matches the attacker's key, which is the forgery
  * this command exists to catch. Loopback is allowed because nothing crosses a network to reach it.
+ *
+ * AND EVERY ADDRESS IT IS SENT ON TO PASSES THE SAME TEST. Wave fifty-five's checker found the test made once, on the
+ * address typed, and `fetch` then left to follow redirects on its own: Node 24's `fetch`, asked an https address that
+ * answers 302 to an http one, follows it and hands back the http answer with `redirected: true` (measured against a
+ * local https server). So an https address was as good as an http one to anybody who could make it redirect, or who
+ * sat on the path of the second request. The moves are followed here, one at a time, and the first one that fails
+ * the test ends the read before that address is asked anything.
  */
 async function keyFrom(given: string, get: typeof fetch): Promise<string | { error: string }> {
   if (RAW_KEY.test(given)) return given;
@@ -140,12 +147,23 @@ async function keyFrom(given: string, get: typeof fetch): Promise<string | { err
   } catch {
     return wrong;
   }
-  const loopback = url.hostname === '127.0.0.1' || url.hostname === 'localhost' || url.hostname === '[::1]';
-  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && loopback)) return wrong;
+  if (!safe(url)) return wrong;
 
   let body: unknown;
   try {
-    const res = await get(url, { signal: AbortSignal.timeout(10_000), headers: { accept: 'application/json' } });
+    let res: Response;
+    /* FIVE MOVES, which is more than any key address needs and far short of `fetch`'s twenty: a chain longer than
+       that is an address nobody should be pinning to. */
+    for (let moves = 0; ; moves++) {
+      res = await get(url, { signal: AbortSignal.timeout(10_000), headers: { accept: 'application/json' }, redirect: 'manual' });
+      const location = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
+      if (location === null) break;
+      const next = new URL(location, url);
+      if (!safe(next))
+        return { error: `${url.origin} sent the request for the key on to ${next.href}, which is not https, so nothing was checked.` };
+      if (moves === 5) return { error: `${given} moved more than five times, so nothing was checked.` };
+      url = next;
+    }
     if (!res.ok) return { error: `${url.origin} answered ${res.status} for the key, so nothing was checked.` };
     body = await res.json();
   } catch {
@@ -159,6 +177,12 @@ async function keyFrom(given: string, get: typeof fetch): Promise<string | { err
   if (typeof key_id === 'string' && key_id !== (await keyIdOf(new Uint8Array(Buffer.from(public_key, 'base64url')))))
     return { error: `${url.origin} answered a key whose id is not ${key_id}, so nothing was checked.` };
   return public_key;
+}
+
+/** https, or http to this machine: the one test every address a key is read from has to pass. */
+function safe(url: URL): boolean {
+  const loopback = url.hostname === '127.0.0.1' || url.hostname === 'localhost' || url.hostname === '[::1]';
+  return url.protocol === 'https:' || (url.protocol === 'http:' && loopback);
 }
 
 /** What the first bytes say the file is. The name is not asked: a copy renamed is still what it is. */

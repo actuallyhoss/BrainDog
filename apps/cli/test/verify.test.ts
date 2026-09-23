@@ -28,6 +28,7 @@ import { b64url, keyIdOf, openRecord, signBrainl } from '@braindog/kernel';
 
 import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
 import { testSigner, type TestSigner } from '../../../packages/kernel/test/signer.ts';
+import { verify } from '../src/verify.ts';
 
 const MAIN = fileURLToPath(new URL('../src/main.ts', import.meta.url));
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
@@ -184,6 +185,86 @@ test('--key <url> FETCHES { key_id, public_key } ONCE, and pins to what it answe
   const other = await ran(['verify', 'copy.brainl', '--key', url], dir);
   assert.equal(other.code, 1, other.stdout);
   assert.match(other.stderr, /the key you named is/);
+});
+
+/**
+ * A `fetch` that answers as `fetch` does: `redirect: 'follow'` (the default) is followed here and the final answer
+ * handed back, `'manual'` hands back the 3xx itself, and `'error'` throws. `hops` maps an address to where it moves.
+ */
+function redirecting(hops: Record<string, string>, key: string, asked: string[]): typeof fetch {
+  const get = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+    const at = String(input);
+    asked.push(at);
+    const next = hops[at];
+    if (next === undefined)
+      return new Response(JSON.stringify({ public_key: key }), { status: 200, headers: { 'content-type': 'application/json' } });
+    if (init?.redirect === 'error') throw new TypeError('fetch failed');
+    if (init?.redirect === 'manual') return new Response(null, { status: 302, headers: { location: next } });
+    return get(next, init);
+  };
+  return get as typeof fetch;
+}
+
+test('A KEY ADDRESS THAT MOVES FROM https TO http IS REFUSED, and the http address is never asked', async (t) => {
+  /* WAVE FIFTY-FIVE'S CHECKER: `keyFrom` tested the address typed and then let `fetch` follow wherever it was sent,
+     so an https address answering 302 to an http one was read over plain http and pinned. Anybody on the path of
+     that second request chooses the key, and the forgery this command exists to refuse is pinned as genuine. */
+  const dir = scratch(t);
+  const signer = testSigner();
+  writeFileSync(join(dir, 'copy.brainl'), `${(await exported(signer)).join('\n')}\n`);
+  const asked: string[] = [];
+  const said: string[] = [];
+  const out: string[] = [];
+  const typed = 'https://keys.example.test/.well-known/braindog-key';
+  const plain = 'http://keys.example.test/.well-known/braindog-key';
+
+  const code = await verify(['copy.brainl', '--key', typed], {
+    cwd: dir,
+    out: (l) => void out.push(l),
+    say: (l) => void said.push(l),
+    fetch: redirecting({ [typed]: plain }, b64url(await signer.publicKey), asked),
+  });
+  assert.equal(code, 1, out.join('\n'));
+  assert.deepEqual(out, [], 'a block was printed for a key read over http');
+  assert.deepEqual(asked, [typed], 'the http address was asked for the key');
+  assert.ok(said.some((l) => l.includes(plain) && l.includes('nothing was checked')), said.join('\n'));
+});
+
+test('A KEY ADDRESS THAT MOVES TO ANOTHER https ADDRESS IS STILL READ, and pinned', async (t) => {
+  const dir = scratch(t);
+  const signer = testSigner();
+  writeFileSync(join(dir, 'copy.brainl'), `${(await exported(signer)).join('\n')}\n`);
+  const asked: string[] = [];
+  const out: string[] = [];
+  const typed = 'https://brain.example.test/.well-known/braindog-key';
+  const moved = 'https://app.brain.example.test/.well-known/braindog-key';
+
+  const code = await verify(['copy.brainl', '--key', typed], {
+    cwd: dir,
+    out: (l) => void out.push(l),
+    say: () => {},
+    fetch: redirecting({ [typed]: moved }, b64url(await signer.publicKey), asked),
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(asked, [typed, moved]);
+  assert.ok(out.some((l) => l.includes('pinned')), out.join('\n'));
+});
+
+test('A KEY ADDRESS THAT KEEPS MOVING IS GIVEN UP ON, not followed for ever', async (t) => {
+  const dir = scratch(t);
+  const said: string[] = [];
+  const asked: string[] = [];
+  const at = (n: number) => `https://keys.example.test/${n}`;
+  const hops = Object.fromEntries(Array.from({ length: 50 }, (_, n) => [at(n), at(n + 1)]));
+  const code = await verify(['missing.brainl', '--key', at(0)], {
+    cwd: dir,
+    out: () => {},
+    say: (l) => void said.push(l),
+    fetch: redirecting(hops, 'unused', asked),
+  });
+  assert.equal(code, 1);
+  assert.ok(asked.length < 10, `followed ${asked.length} moves`);
+  assert.ok(said.some((l) => l.includes('nothing was checked')), said.join('\n'));
 });
 
 test('A SEALED COPY IS REFUSED NAMING age -d, told by its first bytes and not by a damage sentence', async (t) => {

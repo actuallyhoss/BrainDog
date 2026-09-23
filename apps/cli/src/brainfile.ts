@@ -217,9 +217,10 @@ export async function exportFile(args: string[], io: BrainfileIo): Promise<numbe
   if (host === null) return 1;
 
   const sections = values.sections?.split(',').map((s) => s.trim()).filter((s) => s !== '');
-  /* THE WRAPPING KEY IS NAMED, OR ASKED FOR. With no `--kek`, `redactGrants: false` still goes, with no key named, and
-     the record refuses it with `WRONG_KEY` and a sentence that names the key it holds, which is where a person learns
-     the id: no read of the record says it, and this command does not scrape it out of the sentence. */
+  /* THE WRAPPING KEY IS NAMED, OR ASKED FOR. With no `--kek`, `redactGrants: false` still goes, with no key named. A
+     record with no vault takes it and hands back the whole file, since there is nothing sealed to guard; one with a
+     vault refuses it with `WRONG_KEY` and a sentence that names the key it holds, which is where a person learns the
+     id: no read of the record says it, and this command does not scrape it out of the sentence. */
   const asked = {
     ...(sections === undefined ? {} : { sections }),
     redactGrants: redact,
@@ -230,10 +231,17 @@ export async function exportFile(args: string[], io: BrainfileIo): Promise<numbe
   if (!got.ok) {
     const code = refuse(io, got);
     const refusal = (got as { refusal?: Refusal }).refusal;
-    if (refusal?.code === 'WRONG_KEY')
+    /* `--kek` ONLY WHEN THE RECORD NAMED A KEY, which it says with `at: 'kek_id'`. This line was said on every
+       `WRONG_KEY`, and wave fifty-five's checker found it sending the owner of a record with no vault to name a key that
+       does not exist. The record now takes that export, and refuses a vault whose key has no id at `vault_key`, which
+       gets the one sentence that is true of it. A record build older than this one still answers a vault-less record
+       at `kek_id`, and that owner still hears `--kek` until the host is updated: the refusal carries no other signal. */
+    if (refusal?.code === 'WRONG_KEY' && refusal.at === 'kek_id')
       io.say(
         'A backup carries the sealed bytes, so it names the key they are wrapped by: run braindog export --kek <that key>. braindog export --redact-grants writes a copy without them, to share, and braindog import cannot put the keys back from it.',
       );
+    else if (refusal?.code === 'WRONG_KEY')
+      io.say('braindog export --redact-grants writes a copy without the sealed bytes, to share, and braindog import cannot put the keys back from it.');
     return code;
   }
   const lines = got.value;

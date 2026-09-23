@@ -5414,17 +5414,27 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          It is the same check `openGrant` makes, on the path that copies every grant instead of one.
 
          The rows still travel under redaction: labels, what each key opens, its kind, its rotation
-         dates and its scopes. What is missing is the bytes. */
+         dates and its scopes. What is missing is the bytes.
+
+         A RECORD WITH NO VAULT HAS NO BYTES TO GUARD, SO THE FULL FILE IS NOT BARRED. This refused
+         every such record `WRONG_KEY` with "This record has no vault", and there is no key it could
+         have been given, so `braindog export`, which asks for the full file so a backup can put the
+         record back, could not take one at all (wave fifty-five's checker; `brainfile-novault.test.ts`
+         in the CLI). "No vault" is the replacing import's own two counts, no `vault_key` row and no
+         grant holding a `ciphertext`: a record with a sealed credential and no key row is not waved
+         through on the strength of the missing row.
+
+         A VAULT WHOSE KEY HAS NO ID is one wrapped by a passphrase (`vault_key.kek_id` is null there),
+         and it used to be told it had no vault. It is refused at `vault_key` rather than `kek_id`, so
+         a caller is not sent to name a key that does not exist. */
       if (args?.redactGrants === false) {
         const held = kernel.wrappingKey();
-        if (!held || args.kek_id !== held)
-          return no(
-            'WRONG_KEY',
-            held
-              ? `The sealed bytes are wrapped by ${held}. An export carrying them names that key.`
-              : 'This record has no vault, so there are no sealed bytes to carry.',
-            { at: 'kek_id' },
-          );
+        const keys = Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM vault_key')?.n ?? 0);
+        const sealed = Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM grant WHERE ciphertext IS NOT NULL')?.n ?? 0);
+        if (held === null && (keys > 0 || sealed > 0))
+          return no('WRONG_KEY', 'This record holds sealed bytes and names no wrapping key for them, so no export can carry them.', { at: 'vault_key' });
+        if (held !== null && args.kek_id !== held)
+          return no('WRONG_KEY', `The sealed bytes are wrapped by ${held}. An export carrying them names that key.`, { at: 'kek_id' });
       }
 
       return kernel.export({
