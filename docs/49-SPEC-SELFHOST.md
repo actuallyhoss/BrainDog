@@ -245,7 +245,8 @@ type Route = { method: 'GET' | 'POST'; path: string | RegExp; group: Group; auth
 | `/auth/device` · `/auth/device/token` · `/auth/device/approve` | POST | none · none · cookie | AUTH | 2 |
 | `/auth/passkey/register/options` · `/auth/passkey/register` · `/auth/passkey/assert/options` · `/auth/passkey/assert` | POST | cookie · cookie · none · none | AUTH | 3 |
 | `/ws` | GET | — | PUBLIC | 404 in phase 2 (§13 #4) |
-| everything else, `GET /signin` included: the built app, falling back to its `index.html`, contained by `realpath`, served with `frame-ancestors 'none'` | GET | none | SHELL | 3 |
+| `/app/<slug>/api/<method>` (September 23rd 2026): `/api/<method>` for the record the path names, moved to the root before anything reads it; a slug that is not this process's record is refused once the caller is known, so a request with no credential gets the root's own 401 | as `/api/<method>` | as `/api/<method>` | as `/api/<method>` | as `/api/<method>` |
+| `/app` and everything under it, `GET /app/signin` included: the built app, falling back to its `index.html`, contained by `realpath`, served with `frame-ancestors 'none'`; a missing file under `/app/_app/` is a 404. Every other path is a `308` into `/app`, so `/`, `/signin` and a mailed `/signin#magic=` link land there with their fragment (§5.19) | GET | none | SHELL | 3 |
 
 Forty-nine `/api/<method>` routes come from `ROUTES` in `@braindog/host`, 21 of them ADMIN; INTERNAL methods have none; `restore`
 answers 404 on this host (§13 #10). The `router-groups` gate (33 §8) asserts every entry has a `group`, that
@@ -262,7 +263,9 @@ type DevicePoll    = { pending: true; interval: number } | { token: string; expi
 ```
 
 `device_grant.reach` is the column 48 §13 D1 adds to 30 §1; `label` is stored in `label` and `subject` in `ua` —
-48 sends no user agent, and the approver reads both (§13 #14). `verification_uri` is `${origin}/settings/agents`.
+48 sends no user agent, and the approver reads both (§13 #14). `verification_uri` is `${origin}/app/settings/agents`
+since push A of the one-domain move: this host holds one record, so the address names no slug, where the Cloud's
+names the one the start asked for (`packages/host/src/device.ts`).
 What each reach mints is §5.9 step 3.
 
 ### 4.9 · The share token (phase 7)
@@ -363,7 +366,7 @@ handful of typos from one address over a month added up to a lock.
    §13 #15). With no mail transport the route is 404 and `/auth/methods` says `magic: false`, so the screen never
    offers it. This host has no SMTP yet, so today it is always off here, and a link is never printed instead.
 2. `t` = 32 random bytes, base64url; `INSERT INTO dir_link (hash, person, purpose, expires)` with the HMAC of `t`,
-   `'magic'` and `now + 15 min`. The host sends `<origin>/signin#magic=<t>` without waiting for the send, so a
+   `'magic'` and `now + 15 min`. The host sends `<origin>/app/signin#magic=<t>` without waiting for the send, so a
    known and an unknown address answer in the same time. A fragment never reaches a server, a log or a link
    pre-fetcher.
 3. The app reads the fragment once, removes it from the address bar, and on a press sends
@@ -392,7 +395,7 @@ passkey is registered (12 §8: registration needs a session in place of attestat
 
 ### 5.9 · Device grant — RFC 8628, 12 §6.1
 
-1. `POST /auth/device { slug?, reach, label, subject? }` (48 §4.2): resolve the record — `slug`, else the host's only record (§5.3); reserve `device:<ip>` in the record's `auth_fail`; `device_code = base64url(randomBytes(32))`; `user_code = String(randomInt(0, 1_000_000)).padStart(6, '0')`; `INSERT INTO device_grant (id, code_hash, status, reach, label, ua, tries, expires) VALUES (device_code, hmac(k_code, user_code), 'pending', reach, label, subject, 0, now + 10 min)`; 200 `{ ok: true, value: { device_code, user_code, verification_uri: `${origin}/settings/agents`, expires_in: 600, interval: 5 }, version }`. The device keeps `device_code`; the code is never sent by the device again.
+1. `POST /auth/device { slug?, reach, label, subject? }` (48 §4.2): resolve the record — `slug`, else the host's only record (§5.3); reserve `device:<ip>` in the record's `auth_fail`; `device_code = base64url(randomBytes(32))`; `user_code = String(randomInt(0, 1_000_000)).padStart(6, '0')`; `INSERT INTO device_grant (id, code_hash, status, reach, label, ua, tries, expires) VALUES (device_code, hmac(k_code, user_code), 'pending', reach, label, subject, 0, now + 10 min)`; 200 `{ ok: true, value: { device_code, user_code, verification_uri: `${origin}/app/settings/agents`, expires_in: 600, interval: 5 }, version }`. The device keeps `device_code`; the code is never sent by the device again.
 2. `POST /auth/device/approve { user_code }` (cookie; a `token` bearer → 403 `NEEDS_BROWSER_SESSION`): reserve `device:<ip>`; then one `transactionSync`:
    1. `UPDATE device_grant SET tries = tries + 1 WHERE status = 'pending' AND expires > ?` — every pending row pays for a wrong guess.
    2. `SELECT id, reach, label, ua FROM device_grant WHERE status = 'pending' AND expires > ? AND code_hash = ?`.
@@ -567,10 +570,20 @@ do.
 
 ### 5.19 · The shell and its assets
 
-Every unmatched GET — `/signin?next=` included — goes to the `handler(req, res, next)` of `@braindog/web/node`,
+Every unmatched GET — `/app/signin?next=` included — goes to the `handler(req, res, next)` of `@braindog/web/node`,
 adapter-node's output in `build-node/` (50 §13 #1–#2; 22 §9 differences 1 and 2): it serves `/_app/immutable/*`
 with `immutable`, and renders the shell through the one `render()` call of `hooks.server.ts`. `/api/*` never
 reaches it because the router matched first. The image ships the built directory; the self-hoster runs no bundler.
+
+*(Amended September 23rd 2026, checked against `apps/selfhost/src/shell.ts` at `bb13a0b8`.)* **What is built is a
+static handler over `adapter-static`'s build, and it is mounted at `/app`.** `apps/web` is built with
+`paths.base: '/app'` and writes every file under `build/app/`, so its pages ask for `/app/_app/…`; `shellOf` takes the
+`app/` folder as its root, or `BRAINDOG_SHELL`. Under `/app` a file is that file, a missing file under `/app/_app/` is a
+404, and any other path is `index.html`, which reads its own path. `/fonts/*` is read from the same folder. Every
+other path is a `308` to `/app<path><query>`, whatever the request asks for: `/` because that is where a person types
+the address, and `/signin` or `/r/tasks` because a bookmark or a link mailed before the move points there, and the
+browser keeps a `#magic=` fragment across a `Location` that has none. `/api`, `/auth`, `/account`, `/mcp` and `/in`
+stay at the root and are answered before the shell is reached, and `/app/<slug>/api/<method>` is `/api/<method>` (§4.7).
 
 ### 5.22 · `init <slug>` and `dev` — the two subcommands 48 §5.14 spawns
 
@@ -768,7 +781,7 @@ boot or on the wire ever prints a token, a code, a cookie value or a payload.
 | The KEK | one file, 32 bytes, 0600, created `wx`; refused when group/other-readable; read once, derived twice, zero-filled; never logged, never in a snapshot, never in an export. It is what a self-hoster must back up **separately** — Settings → backups says so in one line |
 | Decryption | in the host, never the record (ADR-062): `openGrant` returns sealed material; the host unwraps the DEK, derives the grant key by HKDF, decrypts under `aad = record_id ‖ grant_id ‖ version` and returns plaintext once |
 | Cookie | `HttpOnly SameSite=Lax`, `Secure` wherever the origin allows it, 30 days, rotated after 24 h of use with a 60-second grace; `authed_at` gates the vault at 15 minutes |
-| The app | served from the same origin as `/auth` and `/api`: the built `apps/web`, or `BRAINDOG_SHELL`, with `realpath` containment, `frame-ancestors 'none'` and `nosniff` |
+| The app | served from the same origin as `/auth` and `/api`, mounted at `/app` (§5.19): the built `apps/web`, or `BRAINDOG_SHELL`, with `realpath` containment, `frame-ancestors 'none'` and `nosniff` |
 | CSRF | `SameSite=Lax` plus the `Origin` / `Sec-Fetch-Site` check on every cookie-authenticated non-GET (12 §8), and on every `/auth` POST, which must also be `application/json`. With no server key, a `Host` this process was not reached by is an empty 421 (DNS rebinding), and a write whose `Origin` names another site is 403 |
 | Lockout | reserve before compare; ten compared and the eleventh refused with 429 and `Retry-After` for fifteen minutes, sticky; a first strike forgotten after fifteen minutes; an address cleared by a success on it; fail closed (503 on no row); bearers bypass it; `X-Forwarded-For` only behind `BRAINDOG_TRUST_PROXY=1`; device codes and share tokens on the record's own `auth_fail` |
 | `/auth/*` rate | `mint:<ip>` and `device:<ip>` through the same table — ten starts per fifteen minutes; device codes additionally pay `tries` on every pending row |
@@ -827,7 +840,7 @@ and captures `DATA`).
 
 | Input | Expected |
 |---|---|
-| `POST /auth/magic/start` with a known email | one message whose text contains `/signin#magic=`; `POST /auth/magic/redeem` with its token → 200 and the cookie exactly as §4.2 writes it; the `dir_link` row gone |
+| `POST /auth/magic/start` with a known email | one message whose text contains `/app/signin#magic=`; `POST /auth/magic/redeem` with its token → 200 and the cookie exactly as §4.2 writes it; the `dir_link` row gone |
 | the same link twice | second → 401 |
 | the link at +16 min (injected clock) | 401 |
 | `/auth/magic/start` with an unknown email | 200 `{}`; SMTP receives nothing |
@@ -847,7 +860,7 @@ and captures `DATA`).
 | Input | Expected |
 |---|---|
 | `POST /auth/device { reach: 'login' }` → approve with cookie → `/auth/device/token` | `{ token, expires, reach: 'login' }` once; a `token` row with `scope: 'write'`, `expires_at` ≈ +90 d; the grant row `active` with the same hash; a second `/auth/device/token` → 401 |
-| `verification_uri` in the start reply | equals `${origin}/settings/agents` — 48 §5.2 refuses any other origin |
+| `verification_uri` in the start reply | equals `${origin}/app/settings/agents` — 48 §5.2 refuses any other origin |
 | approve with a bearer | 403 `NEEDS_BROWSER_SESSION` |
 | five wrong codes | rows `denied`; fifth → 422 `DEVICE_CODE_TRIES`; the denied row still exists; polling it → 422 `DEVICE_CODE_TRIES` |
 | poll at +11 min while pending | 422 `DEVICE_CODE_EXPIRED`; row `expired` |
@@ -996,7 +1009,7 @@ so its row is what this spec needs from it:
 | 44 | `serveMcp(request, surface, ctx \| null, { maxBodyBytes? }): Promise<Response>`, with `gate(request)` and `unauthorized()` beside it, from `@braindog/mcp/http`; `surface` is the `RecordApi` | `loop/research-agent-path.md` §1.7 |
 | 47 | `runPull(job: OutboxRow<'pull.fetch'>, deps: { http, keys, clock, record, ctx }): Promise<PullResult>` — acks itself | 47 §2 |
 | 48 | `apps/selfhost/src/main.ts` with `init <slug>` and `dev`; `POST /auth/device { slug?, reach, label, subject? }` → `DeviceCode`; `POST /auth/device/token { device_code }` → `DevicePoll`; `Reach`; operation grants and `device_grant.reach`; `createToken listTokens revokeToken`; `POST /api/export` as streamed `text/plain`; `#dog` / `#table` block order with `dog_sig` last | 48 §4.2, §5.2–§5.3, §5.12, §5.14, §13 D1–D3 |
-| 50 | `@braindog/web/node` → `handler(req, res, next)`; `/signin?next=`; `/decide/[id]`; `/settings/<area>` — `agents` for the code entry (`verification_uri`), `recovery` for the first passkey; `/r/<register>/<seq>` | 50 §2.2, §5.13, §13 #1–#2; 19 §2 |
+| 50 | `@braindog/web/node` → `handler(req, res, next)`; `/app/signin?next=`; `/decide/[id]`; `/settings/<area>` — `agents` for the code entry (`verification_uri`), `recovery` for the first passkey; `/r/<register>/<seq>` | 50 §2.2, §5.13, §13 #1–#2; 19 §2 |
 | 45 | `createRecordApi({ sql, scheduler, clock }): RecordApi & { kernel: Kernel }`; `drainSchedule`, `leaseOutbox({ kinds, n })`, `ackOutbox({ id, outcome, error })`, `applyPull`; `createRecord({ id, slug, name, tz, locale, owner, keys: { record, connector, signing } })` writing `record`, the `person` mirror, `member('*', 'owner')` and the three `vault_key` rows; `invite({ person, levels })` at acceptance; `arrive({ channel, headers, body, ingest_id?, verified })` — INTERNAL, the arrival write 33 §4 describes and 30 §5 does not list; the three token methods of 48 §5.12 | 30 §5, 33 §2, §9; this spec §5.8, §5.16, §5.22 |
 
 ---
@@ -1018,7 +1031,7 @@ so its row is what this spec needs from it:
 | 11 | `POST /a` uploads (the table listed only the GET); `POST /api/snapshot`, `GET /api/snapshots[/:id]` are the two owner routes 12 §8 names | 33 §4 (three rows) |
 | 12 | `invite` is the **acceptance-time** record write, called with the owner principal from `record_dir.owner_person`; minting is a Directory write and an email by the host | 33 §10 Invite row; 30 §5 ADMIN note |
 | 13 | A share recipient is a principal: `{ kind: 'share'; id; slug }`; tokens are HMAC-signed with `HKDF(KEK, 'braindog/share')`, stateless, terminally revoked by `share.close` | 33 §2 `CallContext.principal`; 30 §10 share row |
-| 14 | **48 §13 D1's device wire is adopted whole** — `POST /auth/device` / `POST /auth/device/token`, `Reach`, `device_grant.reach`, operation grants of ten minutes resolved to the approver with `ctx.op`, ADMIN admitting them by reach; two things this host adds: 48's `subject` is stored in 30 §1's `ua` column (the second free-text column the approver reads), and `verification_uri` is `${origin}/settings/agents` | 30 §1 (`device_grant.ua` comment: "label · subject"); 33 §10 Device grant row; 50 (a code-entry control at `/settings/agents`) |
+| 14 | **48 §13 D1's device wire is adopted whole** — `POST /auth/device` / `POST /auth/device/token`, `Reach`, `device_grant.reach`, operation grants of ten minutes resolved to the approver with `ctx.op`, ADMIN admitting them by reach; two things this host adds: 48's `subject` is stored in 30 §1's `ua` column (the second free-text column the approver reads), and `verification_uri` is `${origin}/app/settings/agents` (`${origin}/settings/agents` before push A of the one-domain move) | 30 §1 (`device_grant.ua` comment: "label · subject"); 33 §10 Device grant row; 50 (a code-entry control at `/settings/agents`) |
 | 15 | **Sign-up is closed on a self-host**: persons come from `braindog init` and invitations; an unknown email at `/auth/magic/start` gets 200 and no mail | 33 §10 Sign up row: "Cloud; self-host: `init` and invitations" |
 | 16 | `session.authed_at` (a ninth column, not a ninth table) records the last proof; rotation every 24 h of use with a sliding 30-day expiry never moves it; VAULT requires it within 15 minutes | 33 §10 `session` row |
 | 17 | Lockout constants: ten compared and the eleventh refused, fifteen minutes, a capped counter, a count forgotten fifteen minutes after its first strike, an address cleared by a success; keys `ip:` `email:` `mint:` `device:`; device codes and share tokens on the record's `auth_fail` | 12 §8 (the numbers) |

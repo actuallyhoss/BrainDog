@@ -38,6 +38,20 @@ stage 3 and **this spec specifies** (§2.7) — `@braindog/where` (the root: par
 'single-page-application'`) and the self-host's disk root (22 §9). No request is ever rendered on a server — §13 D1.
 Licence `Apache-2.0`.
 
+*(Amended September 23rd 2026 for push A of the one-domain move, checked against `apps/web/svelte.config.js`,
+`src/hooks.ts` and `src/lib/at.ts` at `bb13a0b8`.)* **The app lives under `/app`.** It is built with
+`paths.base: '/app'` and every file lands under `build/app/`, so the shell is `/app/` and its chunks are
+`/app/_app/…`. The first segment after `/app/` is either one of the app's own words (`APP_WORDS` in `at.ts`: `r`,
+`signin`, `settings` and the rest), which means the record the session is on, or a record's slug: the `reroute` hook
+hands SvelteKit the address with the slug taken out, so `/app/acme/r/tasks` matches `routes/r/[register]` and the
+route tree does not move. `at(path)` puts the slug back on every link the app renders, and `apiBase()` sends every
+record call from a page under a slug to `/app/<slug>/api/…`, where the host checks the person is on that record
+(33 §4). Data keeps record-relative paths (`/r/<list>`, `/p/<page>`); only rendering adds the prefix. Neither host
+uses the SPA fallback any more: the Worker has `not_found_handling: 'none'` and draws the shell for an app navigation
+itself, and the self-host mounts the build at `/app` (49 §5.19). On the Cloud the app is at `app.brain.dog/app`
+today, and a page load elsewhere on that name is a `308` into `/app`; it moves to `brain.dog/app` at push B, after
+push A2 has routed those paths of `brain.dog` to the Worker (51 §4.4).
+
 ---
 
 ## 2 · Public API
@@ -652,7 +666,7 @@ mechanism 2, amended in §13 D1). Per device — §10.
 
 1. `export const ssr = false`; the shell mounts its silhouette (`<main aria-busy="true">`) before any call returns.
 2. Fire `boot()`, `GET /api/version` and the route's own call **in parallel**; a page therefore costs one round trip
-   after the shell. `UNAUTHORIZED` from any of them → `location.assign('/signin?next=' + path)`. `/signin` goes on to `next` only when it is a path on this origin (`safeNext` in `packages/host/src/auth.ts`: no `//`, no backslash, no scheme, nothing that decodes to one), else to `/`.
+   after the shell. `UNAUTHORIZED` from any of them → `location.assign('/app/signin?next=' + path)`. `/app/signin` goes on to `next` only when it is a path on this origin (`safeNext` in `packages/host/src/auth.ts`: no `//`, no backslash, no scheme, nothing that decodes to one), else to `/app/`. *(Since push A, September 23rd 2026, `signInFirst` and `onward` in `lib/at.ts`: `next` must also be an address under `/app`. With nobody signed in, bare `/app` draws the sample as before, and only a 401 under `/app/<slug>/` is sent to sign-in, because the sample there would be dressed as that record.)*
 3. `live.spark = version.spark`; `version.record = max(boot.version, version.version)`; `aria-busy` is set back.
 4. The record switcher's rows come from `GET /account/records` (33 §4), read only when `boot.signIn` is not `false`: a host
    where nobody signs in answers that route 401, the answer an ended session gets, and the switcher would offer a
@@ -678,7 +692,7 @@ The app raises no refusal code of its own; it renders the server's. The one thin
 | `ok` | the overlay entry is dropped; *saved* to the polite live region; an Undo toast |
 | `refusals` (422) | each `fix` verbatim, next to its field; also in the summary when >1 or unplaced. Never a toast — a blocking error must be read (13 §6) |
 | `conflict` (409) | after the rule of §5.3 step 5: either silent re-apply, or *{actor} changed this: {theirs}* with **Keep mine** / **Take theirs**; a toast *Reloaded — {actor} changed this row* |
-| `UNAUTHORIZED` (401) | redirect to `/signin?next=<path>`; nothing else is said |
+| `UNAUTHORIZED` (401) | redirect to `/app/signin?next=<path>`; nothing else is said |
 | `FORBIDDEN` (403) | the `no-permission` state |
 | `NEEDS_BROWSER_SESSION` (403) | cannot occur: the app never sends a bearer. If seen, it is rendered as `error` with its `fix`, and it is a bug in a host |
 | `SCHEMA_MISMATCH` · `SCHEMA_NEWER` (503) | a full-screen `error`: *The record is being updated. Try again in a minute.* |
@@ -782,7 +796,7 @@ pack kind · a deliberately unknown primitive — × widths 390 · 768 · 1024 �
 | `motion` | `--ease-spring` sampled at 1,000 points: last value 1, max ≤ 1.05; no duration token > 300 ms; under `prefers-reduced-motion` every duration is 1 ms and every state still changes something |
 | `bundle` | the §7 rows |
 | `a11y-tree` | for every fixture block and the degraded fence, the accessibility tree of `<Block>`/`<Table>` equals that of `toHTML`'s markup parsed by the browser, and the `--cells` and `--cols` values are equal — 36 §9's stage-3 row |
-| `shell` | `/r/obligations` requested directly answers `index.html` (the SPA fallback) and the grid renders; `/_app/version.json` exists and equals the build's |
+| `shell` | `/app/r/obligations` requested directly answers `app/index.html` (drawn by the host since push A, not a fallback) and the grid renders; `/app/_app/version.json` exists and equals the build's |
 | `grid-contract` | the §4.2 checklist; `aria-rowcount` = N or −1 by rule; DOM rows = `min(rows, 2,000)`; the cap line at 2,000; header cell widths === body cell widths exactly; no phantom tracks and an empty tail < 2 px on every grid and flex container (22 §10's assertion) |
 | `page-render` | every declared block appears once, in order; each `empty:` string appears **iff** its query returned zero rows; a failed block renders `role="status"` and the page one `role="alert"`; the unknown-primitive fixture renders *Block "…" needs a newer client.* |
 | `draft-survives-load` | type into a Sheet, then release the gated `schema` load → the typed text is still there; removing the seed guard makes it fail |
@@ -906,7 +920,7 @@ spec's §9), and 36 §9's stage-3 parity row.
 - [ ] Screenshot mode: boxes and page height identical off → on; digits `0` and `8` pixel-identical; `/vault` absent.
 - [ ] `SPARK_ENDPOINT` unset: every spec green, the word *Spark* nowhere in the DOM.
 - [ ] Leaving Home advances `member.seen_at`; opening it does not.
-- [ ] Both hosts serve `build/` unchanged: `/r/obligations` on either answers `index.html` and renders the grid; `deploy-parity` matches `/` and `/_app/version.json`.
+- [ ] Both hosts serve `build/` unchanged: `/app/r/obligations` and `/app/<slug>/r/obligations` on either answer `app/index.html` and render the grid, and a page load of `/r/obligations` is a `308` to `/app/r/obligations`; `deploy-parity` matches `/app/` and `/app/_app/version.json` (`/` and `/_app/version.json` before push A).
 - [ ] The `a11y-tree` parity gate is green for all sixteen kinds and the degraded fence — 36 §9's stage-3 row.
 - [ ] `node --test` runs the twelve unit tests in under a second; every `ponytail:` line of §10 is a comment at its call site.
 - [ ] Every row of §13 is applied to its design document in the same revision.

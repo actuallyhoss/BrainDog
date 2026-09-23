@@ -230,7 +230,7 @@ rather than this table's.
 | `a11y` | axe-core over every route of five build roots (`apps/web/build`, the three variant builds, `apps/site/build`), both schemes, two widths | no unnamed control, no heading level skipped, no `aria-*` that names nothing, no contrast under the floor. It declares no `needs` on purpose: each root is skipped by name, so a tree with only the site built still gets a real audit | — |
 | `passkey` | a real browser against a real record, on its own ephemeral port | the ceremony end to end: arrive signed out, come in by the server key, add a passkey, sign out, come back in with it | `web-build` |
 | `queue` | `/p/agents` in a real browser, on its own ephemeral port | pressing an option lands on its gate, highlighted and unchosen; pressing the count of what is left lands on Decide | `web-build` |
-| `deploy-parity` | `DEPLOY_HOST`; `apps/web/build/`; `BRAINDOG_BUILD` | SHA-256 of the live `/` and `/_app/version.json` equal the build's; `/.well-known/braindog-build` carries this run's `app` tuple. The one gate that measures something outside this repository | `host` `web-build` |
+| `deploy-parity` | `DEPLOY_HOST`; `apps/web/build/`; `BRAINDOG_BUILD` | SHA-256 of the live `/app/` and `/app/_app/version.json` equal the build's (`/` and `/_app/version.json` before push A of the one-domain move); `/.well-known/braindog-build` carries this run's `app` tuple. The one gate that measures something outside this repository | `host` `web-build` |
 
 ## 4 · Data structures
 
@@ -580,8 +580,11 @@ the gate this becomes when the corpus record exists.
 
 **`deploy-parity`** (22 §9; 30 §14; `needs: ['host', 'web-build']`)
 
-1. For `/` and `/_app/version.json`: fetch `https://${DEPLOY_HOST}<path>` with `Cache-Control: no-cache`;
-   SHA-256 the body; compare with `apps/web/build/index.html` and `apps/web/build/_app/version.json`.
+1. For `/app/` and `/app/_app/version.json`: fetch `https://${DEPLOY_HOST}<path>` with `Cache-Control: no-cache`;
+   SHA-256 the body; compare with `apps/web/build/app/index.html` and `apps/web/build/app/_app/version.json`.
+   *(Amended September 23rd 2026 for push A of the one-domain move: the app is built under `paths.base: '/app'`,
+   and once push A2 routes `brain.dog` to the Worker, `/` and `/_app/version.json` there are the marketing site's.
+   `DEPLOY_HOST` is `app.brain.dog` through pushes A and A2 and is set to `brain.dog` before push B.)*
 2. Fetch `/.well-known/braindog-build`; assert `app === BRAINDOG_BUILD`. That path is public and
    `/api/version` is not: the build id belongs to the Worker version rather than to a record, and this
    gate holds no bearer. An unset build answers `null`, which reads as an absent tuple rather than as
@@ -704,7 +707,7 @@ sixteen plus `vault-screen`; 50 owns the spec files, this spec owns their place 
 | `motion` | 1 · `--ease-spring` sampled at 1,000 points: last value `=== budgets.motion.springEnd`, max `≤ springPeakMax`; no duration token > `ceilingMs`; 2 · open a panel; after `transitionend`, its box equals the target box exactly — a spring ending at 0.998 leaves a gap; 3 · `prefers-reduced-motion: reduce`: the same state change completes within `reducedMs` and still changes something | 13 §9; 50 §9 |
 | `bundle` | no browser; reads the step-6 build: 1 · parse `build/index.html` for the `_app/immutable/**.js` it preloads and the `.css` it links; 2 · `brotliCompressSync` each — JS sum ≤ `mainJsBrotli`, CSS sum ≤ `mainCssBrotli`; `gzipSync(index.html)` ≤ `htmlGzip`; 3 · `build/**/*.woff2` count `=== fontFiles`, bytes ≤ `fontsBytes`; 4 · from `.svelte-kit/output/client/.vite/manifest.json`, BFS from the entry over static `imports` never reaches the chunk owning `src/lib/editor/index.ts`, whose gzip ≤ `editorGzip` | 22 §9 |
 | `a11y-tree` | 1 · for every fixture block and the degraded fence, the accessibility tree of `<Block>`/`<Table>` equals that of `toHTML`'s markup parsed by the browser, and `--cells`/`--cols` are equal (31 §2; 36 §9); 2 · every plot's list twin holds ≥ every event the plot draws | 22 §10; 19 §4; 50 §9 |
-| `shell` | `/r/obligations` requested directly answers `index.html` and the grid renders; `/_app/version.json` exists and equals the build's | 50 §9 |
+| `shell` | `/app/r/obligations` requested directly answers `app/index.html` and the grid renders; `/app/_app/version.json` exists and equals the build's | 50 §9 |
 | `grid-contract` | 1 · the APG checklist: roving `tabindex` on the row; ←→↑↓, `Home`/`End`, `⌘Home`/`⌘End`, `PageUp`/`PageDown`; `aria-sort`; `aria-rowcount`/`aria-rowindex` when windowed; the labelled `role=region` with `tabindex=0`; 2 · DOM rows = `min(rows, 2,000)` and the cap line at 2,000; 3 · every grid and flex container: tracks not `0px` equal `children.length`; container width − (children widths + gaps) < `budgets.layout.emptyTailPx`; header cell widths `===` body cell widths, exactly | 13 §7; 22 §10; 50 §9 |
 | `page-render` | every declared block once, in order; each `expect.empty` string present iff zero rows; `aria-rowcount === page.expect.rows`; degraded blocks `=== page.expect.degraded`; a failed block renders `role="status"` and the page one `role="alert"`; the unknown-primitive page renders *Block "…" needs a newer client.* | 22 §10; 40 §9; 50 §9 |
 | `no-model` | with `SPARK_ENDPOINT` unset every spec passes and no element's text contains *Spark* | 23 §8; 50 §9 |
@@ -885,7 +888,7 @@ preloads a 40 KB chunk and whose manifest imports the editor statically) — und
 - `ponytail:` `css-rules` is a regex tokeniser over first-party CSS we control, not a CSS parser; add `postcss` (dev only) the first time a real rule is missed or a false red needs a hand-written exception.
 - `ponytail:` `graph` does layers 3–5 of 31 §3 by regex over import specifiers; add ESLint flat + `import-x` when a rule needs an AST (re-exports, type-only imports, `import.meta`).
 - `ponytail:` `mcp-budget` counts with 44's `tokenBudget`, a calibrated heuristic; the day 44 swaps in a real tokenizer this gate changes nothing.
-- `ponytail:` `deploy-parity` checks `/`, `/_app/version.json` and `/.well-known/braindog-build`; add the hashed asset list from `build/` when a stale sub-asset is ever served with a fresh shell.
+- `ponytail:` `deploy-parity` checks `/app/`, `/app/_app/version.json` and `/.well-known/braindog-build`; add the hashed asset list from `build/` when a stale sub-asset is ever served with a fresh shell.
 - `ponytail:` the browser matrix runs Chromium only; add WebKit for the `focus`, `targets` and `grid-contract` specs when a Safari-only layout bug reaches a user.
 - `ponytail:` no sharding, no retries, no flaky-test quarantine; shard at the §7 budget, and a flaky spec is fixed or deleted, never retried.
 - `ponytail:` the property test runs 1,000 cases in CI (33 §8 said 10,000); raise `budgets.property.runs` when a seed is found that 1,000 runs missed twice.

@@ -237,6 +237,26 @@ The skeleton in 33 §7 lacked `send_email`, `analytics_engine_datasets`, `rateli
 `KEK_PREV` and `not_found_handling`; §13 D18 amends it. Every binding shape is a §13 assumption until
 `wrangler deploy --dry-run` accepts the file.
 
+*(Amended September 23rd 2026 for push A of the one-domain move, read from `apps/worker/wrangler.jsonc` at
+`bb13a0b8`.)* **The block above is the design, and the file does not put the Worker on `brain.dog` yet.** The owner
+asked on 22 September for the app to leave its own subdomain, and `loop/research-one-domain.md` §2.2 splits
+`brain.dog` between two Workers: the marketing site keeps it as its Custom Domain, and this Worker takes only the paths
+it answers, as zone routes. That goes out in three pushes, and the file carries the two still to come as `STAGE A2` and
+`STAGE B` fragments in its opening comment, which `pushes()` in `scripts/provision-check.mjs` reads and
+`test/wrangler-routes.test.ts` holds to the same route checks as the file.
+
+| Push | `routes` (production) | `PUBLIC_HOST` · `LEGACY_HOSTS` · `RP_ID` | State on 23 September |
+|---|---|---|---|
+| **A** | `app.brain.dog` as a Custom Domain, and nothing else | `app.brain.dog` · empty · `brain.dog` | live. The app is under `/app` on `app.brain.dog`; a page load outside `/app` and the host's own paths there is a `308` to `/app<path>` on the same name (`legacyRedirect` in `src/route.ts`) |
+| **A2** | the same, plus eight zone routes on `brain.dog`: `/app`, `/app/*`, `/api/*`, `/mcp`, `/in/*`, `/auth/*`, `/account/*`, `/.well-known/braindog-build` | unchanged | not made. It is a push of its own because it is the one that needs *Zone > Workers Routes > Edit* on `brain.dog` |
+| **B** | unchanged | `brain.dog` · `app.brain.dog` · `brain.dog` | not made. A page load on `app.brain.dog` becomes a `308` to `https://brain.dog/app<path>`, or to the same path when it is already under `/app`; `/api/*`, `/mcp`, `/in/*`, `/auth/*`, `/account/*` and the build id stay served there with no redirect, for at least the 90 days a token lives |
+
+Alpha is the same on its own names: `app.alpha.brain.dog`, with `RP_ID` `alpha.brain.dog` from push A, and in push B
+`alpha.brain.dog` as the public host with `app.alpha.brain.dog` kept as a legacy host. `RP_ID` must not change between
+pushes: a rollback to a version that does not read it asks for RP ID `app.brain.dog` and strands every passkey made
+since. `assets` in the file is `not_found_handling: 'none'` with 33 §4's `run_worker_first`, `/app`, `/app/*`,
+`!/app/_app/*` and `!/app/catalogue/*` included, so the Worker draws the shell for an app navigation itself (`appPage` in `src/index.ts`).
+
 ---
 
 ## 5 · Algorithms
@@ -249,7 +269,12 @@ The skeleton in 33 §7 lacked `send_email`, `analytics_engine_datasets`, `rateli
    cleared, and never the demo principal (a 429 or a 503 passes through as itself). The record is `who.record`,
    the record's own `access(person)` gives the level (none → **403** `FORBIDDEN`), and `provedAt` is
    `who.provedAt`. A rotation's `Set-Cookie` rides on the eventual response. The order is `src/session.ts`'s:
-   bearer, cookie, then the demo for a credential-free read, else **401**.
+   bearer, cookie, then the demo for a credential-free read, else **401**. *(Since push A, September 23rd 2026.)* A
+   request at `/app/<slug>/api/<method>` is moved to `/api/<method>` and the slug goes with the cookie to the Directory
+   as `auth({ flow: 'session', sid, slug })`, which answers the record only for a live name, an open record and a
+   `dir_member` row for this person, and otherwise the one **403** `FORBIDDEN` *"You are not on this record."*; the
+   session row's record does not move, and `access(person)` is never asked for a refused slug. A bearer under a slug must name the same
+   record, else **403**, and the demo never answers there.
 3. Cookie auth on a mutating method (`POST`, `PUT`) requires `Origin` equal to `https://<PUBLIC_HOST>` or
    `Sec-Fetch-Site: same-origin` → else **403** `FORBIDDEN` (12 §8 CSRF). Bearer requests skip this.
 4. `session` from `BrainDog-Session` if valid; `now = Date.now()`; `surface` from the route: `/api/*` cookie → `web`,
@@ -364,7 +389,10 @@ Write:
 
 `/auth/*` is `serveAuth` from `packages/host/src/auth.ts` over the Directory's one RPC, `Directory.auth(call)`, with
 the origin from `PUBLIC_HOST` and the lockout's address from `cf-connecting-ip`, which Cloudflare writes and a
-caller cannot. The routes are 33 §4's table; this host serves all of them but `/auth/token`, the self-host's
+caller cannot. The passkeys' relying party is `RP_ID` when `PUBLIC_HOST` is that name or under it, and the exact host
+when `RP_ID` is empty; a name the host is not under turns passkeys off rather than offering a ceremony the browser
+refuses (`relyingParty` in `packages/host/src/auth.ts`). Since push A it is `brain.dog` while `PUBLIC_HOST` is still
+`app.brain.dog`, so a passkey made now is still offered after push B moves the app to `brain.dog` (§4.4). The routes are 33 §4's table; this host serves all of them but `/auth/token`, the self-host's
 server key, and adds the operator's two.
 
 **Shipped switched off.** Without `SESSION_SECRET` (32 characters or more) the Directory holds no MAC key:
@@ -376,7 +404,7 @@ server key, and adds the operator's two.
 |---|---|---|
 | `POST /auth/passkey/register/options` · `/register` | `passkey.register.options` · `passkey.register` | a live session, in place of attestation |
 | `POST /auth/passkey/assert/options` · `/assert` | `passkey.assert.options` · `passkey.assert` | every failure is the one body, 401 "That did not sign you in." (12 §8) |
-| `POST /auth/magic/start` · `/redeem` | `magic.start` · `magic.redeem` | start is always 200 and mails only a live person; the link is `/signin#magic=`, redeemed by a POST |
+| `POST /auth/magic/start` · `/redeem` | `magic.start` · `magic.redeem` | start is always 200 and mails only a live person; the link is `https://<PUBLIC_HOST>/app/signin#magic=` since push A (`/signin#magic=` before it, which still lands through the `308`), redeemed by a POST |
 | `GET /auth/methods` · `/session` · `/passkeys`; `POST /auth/passkey/remove` · `/logout` | as named | a logout deletes the row and clears the cookie |
 | `POST /auth/provision` | (the operator's) | a `PROVISION_KEY` bearer; `{ slug, email, name? }` → the record first, then its Directory rows (D21), then a 24-hour claim link handed back to the operator and never mailed |
 | `POST /auth/claim/mint` | `claim.mint` | a `PROVISION_KEY` bearer; a new claim link for a person already provisioned |
@@ -624,6 +652,13 @@ name ([46-SPEC-SPARK](46-SPEC-SPARK.md) §5.9). With no `KEK` bound no key can b
 2. What this spec guarantees for it: neither path is in `run_worker_first`, so `ASSETS` serves the built bytes
    unchanged; the Worker never rewrites, compresses or injects into a shell response. `/` is the prerendered shell in
    `build/` (§13 A16).
+3. *(Amended September 23rd 2026, push A of the one-domain move.)* The two paths are `/app/` and
+   `/app/_app/version.json` on `https://<DEPLOY_HOST>`, compared with `build/app/index.html` and
+   `build/app/_app/version.json` (`PATHS` in `tools/gates/deploy-parity.mjs`), because the app is built under
+   `paths.base: '/app'` and, once push A2 routes `brain.dog`, `/` and `/_app/version.json` there are the marketing
+   site's. `/app/_app/*` is a negative in `run_worker_first`, so step 2 holds for it; `/app/` is in `/app/*`, so the
+   Worker answers it by fetching the same bytes from `ASSETS` unchanged. `DEPLOY_HOST` stays `app.brain.dog` through
+   A and A2 and becomes `brain.dog` before push B.
 
 ### 5.18 · Telemetry and logging
 
@@ -869,7 +904,7 @@ used (31 §3). Files `apps/worker/test/*.test.ts`. Input → expected:
 | 8 | socket read-only | send `"hello"` on the `/ws` socket | close code 1003 |
 | 9 | queue idempotency | `queue()` twice with `{ record }` after one outbox row | one `notify.email` sent (the `EMAIL` mock counts 1); second batch leases nothing |
 | 10 | queue crash | the dispatcher throws for a `notify.webhook` row | `ackOutbox(id, 'failed', sentence)`; a `retry` schedule row exists; the outbox row is `failed`, not re-leased by the consumer |
-| 11 | deploy parity | `SELF.fetch('/')` and `/_app/version.json` in the plugin's asset mode | bytes equal `apps/web/build/*`; the live check runs in `deploy.yml` |
+| 11 | deploy parity | `SELF.fetch('/app/')` and `/app/_app/version.json` in the plugin's asset mode (`/` and `/_app/version.json` before push A) | bytes equal `apps/web/build/app/*`; the live check runs in `deploy.yml` |
 | 12 | customer deletion | a record with one alarm, two attachments, one snapshot | after `deleteCustomer`: `getAlarm() === null`, `BLOBS.list({ prefix })` empty, `DIRECTORY.resolve(slug) === null` |
 | 13 | bearer routing | `Authorization: Bearer rec_X.secret` where the record holds `sha256(secret)` | 200; the same secret against another record → 401 |
 | 14 | browser-only groups | a bearer at `/api/openGrant` | 403 `NEEDS_BROWSER_SESSION` before any RPC (the stub mock records zero calls) |
@@ -1019,7 +1054,7 @@ and 53's runbooks (restore, key rotation, erasure, deletion).
 | A13 | WebCrypto `Ed25519` sign/verify and `HKDF` are available in workerd | a unit test in the plugin |
 | A14 | Inbound Email Routing adds `Authentication-Results` with `dkim=`/`spf=`; `msg.raw`, `msg.rawSize`, `msg.setReject()`; the size ceiling | a staging message |
 | A15 | `analytics_engine_datasets` binding; `writeDataPoint({ blobs, doubles, indexes })`; 250 points per invocation | 08 §5 states the limits; dry-run |
-| A16 | `assets.not_found_handling: 'single-page-application'` serves `index.html` for unknown paths; `run_worker_first` globs as written; asset requests are free | 22 §9 states *free and unlimited*; test #11 |
+| A16 | `assets.not_found_handling: 'single-page-application'` serves `index.html` for unknown paths; `run_worker_first` globs as written; asset requests are free. *(Superseded by push A, September 23rd 2026: the file sets `none`, a miss reaches the Worker, and the Worker draws the shell for `/app/*` itself, because on a shared `brain.dog` the fallback would answer a POST under `/app/<slug>/api/` with a page and a 200.)* | 22 §9 states *free and unlimited*; test #11 |
 | A17 | `ratelimits` binding with `simple: { limit, period }` and `limit({ key })`; `period` of 60 | dry-run |
 | A18 | `wrangler types` emits `worker-configuration.d.ts` for the bindings of §4.4 | `pnpm exec wrangler types` |
 | A19 | `env.AI.run(model, input, { gateway: { id } })`; model ids `@cf/meta/llama-3.2-1b-instruct`, `@cf/baai/bge-m3`; the GLM-5.3-Flash id; `cf-aig-collect-log-payload` as a gateway setting | 11 §3 names the models; the catalogue |
@@ -1038,7 +1073,7 @@ and 53's runbooks (restore, key rotation, erasure, deletion).
 - [ ] Every route in `index.ts` declares its group; `router-groups` passes; a bearer at `openGrant` is 403 before any RPC.
 - [ ] A browser holds `/ws` for an hour in staging and the object's GB-s stay under 100; a write reaches the tab as `{ version, registers }`.
 - [ ] A redelivered queue message leaves the `EMAIL` mock at one call.
-- [ ] `deploy.yml` passes `deploy-parity` against `https://brain.dog/`.
+- [ ] `deploy.yml` passes `deploy-parity` against `https://brain.dog/app/` (against `https://app.brain.dog/app/` until push B, §4.4).
 - [ ] A staging record is snapshotted, deleted, and restored to a bookmark; the `export` and `restore.pitr` events exist; no alarm and no R2 object survive the deletion.
 - [ ] Every row of §13's amendment column is applied to its design document in the same revision.
 

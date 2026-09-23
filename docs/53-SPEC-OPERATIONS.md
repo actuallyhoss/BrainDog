@@ -232,7 +232,7 @@ did, §5.3 applies as well.
 1. `wrangler versions list --json` → note the active `<prev-version-id>`. `log` in the ops record: `deploy <sha> —
    replaces <prev-version-id>`.
 2. `deploy.yml` runs `wrangler deploy` with the CI token scoped to deploy only (12 §8).
-3. The same job runs the parity gate: fetch `/` and `/_app/version.json` from the live host; each SHA-256 must equal the
+3. The same job runs the parity gate: fetch `/app/` and `/app/_app/version.json` from the live host (`/` and `/_app/version.json` before push A of the one-domain move); each SHA-256 must equal the
    `build/` output (33 §8 `deploy-parity`; 18 §6). A mismatch fails the job — the deploy is **live and wrong**. Go to
    Rollback.
 4. Open the ops record in a browser. It is the first open after the deploy, so its boot probe runs.
@@ -723,7 +723,7 @@ by a named reason (12 §7). Ours: the ops record, one `note` per procedure (§4)
 
 | Gate or drill | Kind | Cadence | Asserts |
 |---|---|---|---|
-| `deploy-parity` | script, `deploy.yml` | every deploy | `/` and `/_app/version.json` SHA-256 = `build/` (33 §8) |
+| `deploy-parity` | script, `deploy.yml` | every deploy | `/app/` and `/app/_app/version.json` SHA-256 = `build/app/` (33 §8) |
 | `boot-probe` | vitest | CI | a build without FTS5 refuses with the exact text (30 §13) |
 | `compat-date` | script | CI | `compatibility_date ≥ 2026-02-24` |
 | `brain-roundtrip` | vitest | CI | export → import → export: identical canonical dump |

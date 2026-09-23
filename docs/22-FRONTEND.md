@@ -619,8 +619,14 @@ Assets are *"free and unlimited"* and do not count toward the bundle limit — `
 names the Worker's routes (`/api/*`, `/mcp`, `/auth/*`, `/a/*`, `/in/*`, `/s/*`, `/ws/*`;
 [33-CONTRACTS](33-CONTRACTS.md) §7) so asset requests never invoke the Worker.
 
-**CI asserts the deployed shell matches the build byte for byte**: after `wrangler deploy`, fetch `/`
-and `/_app/version.json` from the live host and compare their SHA-256 to the `build/` output, failing
+*(Amended September 23rd 2026 for push A of the one-domain move.)* The app is now built under
+`paths.base: '/app'`, so its chunks are `/app/_app/immutable/*`, and `run_worker_first` also names `/app` and
+`/app/*` with `!/app/_app/*` and `!/app/catalogue/*` taking precedence, so a hashed chunk still never invokes the
+Worker while an app navigation always does, because under `/app/<slug>/` the slug is checked first
+([33-CONTRACTS](33-CONTRACTS.md) §4).
+
+**CI asserts the deployed shell matches the build byte for byte**: after `wrangler deploy`, fetch `/app/`
+and `/app/_app/version.json` from the live host (`/` and `/_app/version.json` before push A) and compare their SHA-256 to the `build/` output, failing
 on mismatch; the same gate reads the `app` tuple back and requires it to equal the deploying run's
 `BRAINDOG_BUILD` ([33-CONTRACTS](33-CONTRACTS.md) §8; [52-SPEC-TESTING-AND-CI](52-SPEC-TESTING-AND-CI.md) §5).
 

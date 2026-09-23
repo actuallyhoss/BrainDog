@@ -358,12 +358,22 @@ no preview and no crawlable title.
 hand-maintained path list anywhere.** `/api/*` is matched first. If a future change requires
 enumerating app paths in two files, that change is wrong.
 
+*(Amended September 23rd 2026 for push A of the one-domain move.)* The catch-all is now `/app/*`: the app is built
+under `/app`, and `/app/<slug>/…` names a record in the path. That did bring a list of the app's top-level words, in
+two places, because the first segment after `/app/` is a page or a record's name by that list alone: `APP_WORDS` in
+`apps/web/src/lib/at.ts` and the Directory's `RESERVED` in `packages/record/src/directory.ts`, which refuses those
+words as slugs. Each is held to the route tree rather than to the other: `at.test.ts` and `directory.test.ts` each read
+the app's route and static folders and fail for any word their set does not hold. The platform's own words beside them
+(`api`, `auth`, `www` and the rest of `RESERVED`'s first two lines) are copied into `APP_WORDS` by hand, and no test
+compares the two sets.
+
 `/<ID>` is resolved by the shell, not a server 302 — no server renders a request
 ([22-FRONTEND](22-FRONTEND.md) §2): `[id]/+page.svelte` reads a question (`SG`, `D`) through `governance`
 as Decide does and a row through `get({ spoken })`, and `replaceState`s to the canonical address
 ([50-SPEC-WEB](50-SPEC-WEB.md) §2.2). It reads the sample only when no record answers (`UNREACHABLE` or
-`UNAUTHORIZED`). `brain.dog/D41` is a sentence one
-person can say to another and a string an agent can emit with no lookup. One resolver, and it is the
+`UNAUTHORIZED`). `brain.dog/app/D41`, or `brain.dog/app/<slug>/D41` naming its record, is a sentence one
+person can say to another (on `app.brain.dog/app/…` until push B of the one-domain move; a slug shaped like a spoken
+id is refused, so `/app/d41` is always the question) and a string an agent can emit with no lookup. One resolver, and it is the
 cheapest legibility win available.
 
 ### What goes where

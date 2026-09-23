@@ -402,6 +402,7 @@ Every route declares its group; a CI gate walks the router and fails on a route 
 | Route | Method | Auth | Group / does |
 |---|---|---|---|
 | `/api/<method>` | POST | bearer or cookie | one route per DATA and READ+ method, by property lookup on the `RecordApi` object; body = args; `Result<T>` |
+| `/app/<slug>/api/<method>` | as `/api/<method>` | bearer or cookie | the same routes for the record the path names, which is where the app sends every record call made from a page under `/app/<slug>/` (`apiBase` in `apps/web/src/lib/at.ts`). The host takes the slug off and answers `/api/<method>` with it. A cookie reaches that record only once the Directory finds the name live, the record open and the person in `dir_member`, and the record's own `access(person)` agrees; any other name, one that does not exist included, is one `403 FORBIDDEN` *"You are not on this record."*, and nothing is addressed first. A bearer must name the same record or it is `403`; the demo never answers here, and the key doors (`/api/vault/*`) are only at the root. `/app/api/<method>`, with no slug, is `ROUTE_UNKNOWN`. The self-host serves it for the one record it holds (added September 23rd 2026, push A of the one-domain move) |
 | `/api/<method>` | POST | **cookie only** | VAULT, and the browser four of JOBS (`createJob cancelJob listJobs jobEvents`) — a bearer gets **403 `NEEDS_BROWSER_SESSION`**; every MCP token is refused the job surface |
 | `/api/<method>` | POST | cookie, **or a bearer carrying an operation grant** for exactly this method | ADMIN — `ctx.op` is the grant: single-use, ten minutes, the operation named at approval (§10; ADR-060 as amended) |
 | `/api/claimJob` · `/api/postJobEvent` · `/api/readCancel` | POST | the runner's grant | the runner three of JOBS; `claimJob { wait }` long-polls in the host, never inside the object (§11) |
@@ -421,7 +422,7 @@ Every route declares its group; a CI gate walks the router and fails on a route 
 | `/a/<sha256>` | GET | none | attachment bytes, type sniffed, SVG 415, `default-src 'none'; sandbox`; the record from the session or `?r=` |
 | `/a/<sha256>` | PUT | cookie, or a `write` bearer | upload: the client computes the hash, the server verifies it — a mismatch is `CHECKSUM_MISMATCH` |
 | `/s/<token>` | GET | the share token → a `share` principal | one projected page, read-only; an invalid token is 404 |
-| `/<ID>` | GET | cookie | a spoken id, resolved by the shell — there is no server 302 |
+| `/app/<ID>` · `/app/<slug>/<ID>` | GET | cookie | a spoken id, resolved by the shell — there is no server 302. It is under `/app` since push A; a slug of the spoken-id shape (`d41`) is refused, so the segment is never both |
 | `/.well-known/braindog-key` | GET | none | **Specified and not built.** `{ key_id, public_key }`, the host's signing key, for `braindog verify` (03 §4; 48 §13 D10). Neither host answers it, and `braindog-build` is the only path served under this prefix. It keeps this path when it lands |
 | `/.well-known/braindog-build` | GET | none | `{ app }`: the `BRAINDOG_BUILD` tuple this Worker version was deployed with, and `null` when the deploy named none. It needs no credential because it is a fact about the deployment rather than about any record; `deploy-parity` reads it (§8) |
 | `/.well-known/oauth-protected-resource` | GET | none | **deferred** — Phase A ships agent tokens only; when built BrainDog is its own authorization server |
@@ -429,7 +430,8 @@ Every route declares its group; a CI gate walks the router and fails on a route 
 | `/ws/runner` | GET (upgrade) | the runner's grant | Cloud only: the doorbell socket, `{ t: 'wake' }`; the self-host runner long-polls (§11) |
 | `/auth/*` | GET · POST | per route | the sign-in routes below, which are the Directory's (§10) |
 | `/account/*` | GET | **cookie only** | the account routes below, which are the Directory's like sign-in and never reach a record |
-| everything else | GET | — | the static shell: one `build/`, served as assets by both hosts; no server renders a request |
+| `/app` · `/app/*` | GET | none | the static shell: one build, written under `build/app/` by `paths.base: '/app'`, served by both hosts; no server renders a request. A page under `/app/<slug>/` is the same shell, and its data comes from `/app/<slug>/api/*` above, so a stranger there is sent to `/app/signin?next=`, never to the sample. Bare `/app` on the Cloud is a `302` to `/app/<slug>/` for a session on a record, to `/app/start` for one on none, and the shell (the sample) with no cookie. A missing file under `/app/_app/` is a 404 |
+| everything else | GET · HEAD | none | a browser's page load (`Accept: text/html`) is a `308` to `/app<path><query>` on the same name, so a bookmark or a link mailed before push A still lands, fragment and all; on the Cloud anything else is the router's `ROUTE_UNKNOWN` 404, and the self-host redirects it too (September 23rd 2026) |
 
 **The `/auth/*` routes, once.** `AUTH_ROUTES` in `packages/host/src/auth.ts` is this table as data (its two device rows come from `device.ts`), and both hosts
 answer it through one `serveAuth`. A POST needs `application/json` and a same-origin `Origin`. A 200 is the `/api`
@@ -443,11 +445,11 @@ is a bare `429` with `Retry-After` and `{ ok: false, retryAfter }`; a lockout st
 | `/auth/token` | POST | self-host | `{ serverKey }`: `BRAINDOG_TOKEN` for a session, where the Directory holds one person |
 | `/auth/passkey/register/options` · `/auth/passkey/register` | POST | both | the registration ceremony, behind a session |
 | `/auth/passkey/assert/options` · `/auth/passkey/assert` | POST | both | signing in with a passkey |
-| `/auth/magic/start` | POST | both | `{ email }`: a link, mailed as `<origin>/signin#magic=<token>`; an unknown address gets the same 200 and no mail |
+| `/auth/magic/start` | POST | both | `{ email }`: a link, mailed as `<origin>/app/signin#magic=<token>` (`linkOf` in `packages/host/src/auth.ts`; a claim link is `#claim=` on the same page); an unknown address gets the same 200 and no mail. A link mailed before push A as `<origin>/signin#magic=` still works, because that page load is a `308` to `/app/signin` and a browser keeps the fragment |
 | `/auth/magic/redeem` | POST | both | `{ linkToken }` or `{ claimToken }`: spent once, by a press, never by a GET |
 | `/auth/passkeys` · `/auth/passkey/remove` | GET · POST | both | a person's own passkeys, and removing one, the last included |
 | `/auth/logout` | POST | both | ends the session and clears the cookie |
-| `/auth/device` | POST | both | `{ slug?, reach, label, scope? }` with no credential, and no `Origin` needed because a CLI sends none: `{ device_code, user_code, verification_uri, expires_in, expires, interval }`, where `verification_uri` is always `<origin>/settings/agents`. `403` when the host was reached by another name or a page on another origin sent it; ten starts per address in 15 minutes, then `429` |
+| `/auth/device` | POST | both | `{ slug?, reach, label, scope? }` with no credential, and no `Origin` needed because a CLI sends none: `{ device_code, user_code, verification_uri, expires_in, expires, interval }`, where `verification_uri` is always on `<origin>`: `<origin>/app/<slug>/settings/agents` on the Cloud when the start named a slug, and `<origin>/app/settings/agents`, the record the session is on, otherwise and on the self-host (`packages/host/src/device.ts`, since push A). `403` when the host was reached by another name or a page on another origin sent it; ten starts per address in 15 minutes, then `429` |
 | `/auth/device/token` | POST | both | `{ slug?, device_code }`: `{ pending: true, interval }` until approved, then the bearer once. `slug` names the record on Cloud; the self-host holds one, and answers both routes only when `BRAINDOG_TOKEN` is set |
 | `/auth/invite` | POST | both | `{ inviteToken, accept? }`, the token from the link's fragment: without `accept` it looks and spends nothing, answering `{ email, expires_at, signedInAs }`. With it, somebody signed in at that address goes on the record; an address that can already sign in here is 401 and signs in first; a new address is made, put on the record and given a session. A self-host whose owner has no passkey is 409, because its server key stops working at the second person |
 | `/auth/switch` | POST | both | `{ slug }` with the session cookie, as JSON, from a page on this origin (`sameOrigin`: `Origin` exactly this origin, or without it `Sec-Fetch-Site: same-origin`; a cross-site form or link moves nothing). No session is 401. The session row's record moves to that one and `Who` comes back; the cookie is not rewritten. The slug must be ASCII, `^[A-Za-z][A-Za-z0-9-]{1,31}$`, before it is lowered, so a character that folds to a letter (the Kelvin sign) opens nothing. The record must be open, under a live name, listed with the person in the Directory, **and** say so itself: the host's `admits(record, person)` asks the record's own `member` table, because the Directory keeps listing somebody `removeMember` took off. The update re-asks the same question in its own statement and finds the row by its current or previous id, so a cookie rotated on this request or a name released meanwhile moves nothing. Anything else is one `403 FORBIDDEN` at `slug`, *"You are on no open record by that name."*, the same for a record that does not exist and one the person is not on. A self-host admits only the record its process serves, asked after the session, so a caller with no cookie cannot learn which name that is; what a person may do inside is still the record's own table |
@@ -456,7 +458,7 @@ is a bare `429` with `Retry-After` and `{ ok: false, retryAfter }`; a lockout st
 Specified and not built: `/auth/device/approve` (the operation grant of
 §10). It keeps this path when it lands. *(`/auth/switch` landed September 16th 2026 as a POST taking `{ slug }`, not the
 `GET /auth/switch/<slug>` of `50`: a GET that moves a session is a link any page can make a browser follow.)* *(`/auth/invite` landed September 16th 2026, as a POST taking the
-token in its body: the link is `<origin>/invite#<token>` and the fragment keeps the token out of logs, proxies and `Referer`,
+token in its body: the link is `<origin>/app/invite#<token>`, with no slug because the token names its record, and was `<origin>/invite#<token>` before push A; the fragment keeps the token out of logs, proxies and `Referer`,
 as a sign-in link's does.)*
 
 **The `/account/*` routes.** `ACCOUNT_ROUTES` in `packages/host/src/auth.ts` is this table as data, and both hosts
@@ -471,7 +473,7 @@ both hosts, behind the session, and named here.
 | `/account/records` | GET | both | `{ slug, name, level }[]`, every open record the signed-in person can reach, each named and levelled by that record's own answer rather than the Directory's: the record switcher's rows. A record the Directory still lists but which answers with no level is left out, never shown with one nobody granted |
 
 `Cache-Control: no-store` on `/api/*` and `/mcp`; no CORS; `run_worker_first: ['/api/*', '/mcp', '/a', '/a/*', '/in/*',
-'/s/*', '/ws', '/ws/*', '/auth/*', '/account/*', '/.well-known/*']`, the list in `apps/worker/wrangler.jsonc`. INTERNAL methods have no route. There is no admin scope: VAULT never
+'/s/*', '/ws', '/ws/*', '/auth/*', '/account/*', '/.well-known/*', '/app', '/app/*', '!/app/_app/*', '!/app/catalogue/*']`, the list in `apps/worker/wrangler.jsonc`, with `not_found_handling: 'none'` since push A: the Worker sees every app navigation before a file answers it, because under `/app/<slug>/` the slug must be checked first, and the two negatives leave the hashed chunks and the bundled catalogue to the files. INTERNAL methods have no route. There is no admin scope: VAULT never
 sees a bearer, and ADMIN sees one only when it carries an operation grant for exactly that method.
 
 **Error bodies.** Both hosts return the `Result` envelope unchanged; the status is `host.httpStatus(result)`: `ok`
@@ -479,6 +481,8 @@ sees a bearer, and ADMIN sees one only when it carries an operation grant for ex
 with an empty body · `FORBIDDEN` and `NEEDS_BROWSER_SESSION` 403 with the envelope · the migration refusal 503. Every
 response echoes the client's `X-Request-Id`, and both hosts log it. A request names its record by its session
 (browser; the record is on the session row), by the bearer's hash, or by its own path (a share, an email, a webhook).
+A browser's call under `/app/<slug>/api/` names its record by the slug instead, checked as the table's `/app/<slug>/api/<method>` row says, and the
+session row's record is then the one last opened, which only `/auth/switch` moves.
 
 ---
 
@@ -490,7 +494,7 @@ in [48-SPEC-CLI](48-SPEC-CLI.md) §4.5, which also records what building it woul
 
 | Command | Does |
 |---|---|
-| `braindog login <host>` | the RFC 8628 device flow of [12-SECURITY](12-SECURITY.md) §6.1 with `reach = login`: prints a six-digit code, the owner approves in the browser, the CLI receives a **`read`+`write` agent token** and stores it in `hosts.json` (0600) — under `$XDG_CONFIG_HOME/braindog/`, `~/.config/braindog/` when unset, `%APPDATA%\braindog\` on Windows unless `XDG_CONFIG_HOME` is set. `BRAINDOG_HOST` / `BRAINDOG_TOKEN` override. That token never reaches ADMIN |
+| `braindog login <host>` | the RFC 8628 device flow of [12-SECURITY](12-SECURITY.md) §6.1 with `reach = login`: prints a six-digit code, the owner approves in the browser, the CLI receives a **`read`+`write` agent token** and stores it in `hosts.json` (0600) — under `$XDG_CONFIG_HOME/braindog/`, `~/.config/braindog/` when unset, `%APPDATA%\braindog\` on Windows unless `XDG_CONFIG_HOME` is set. `BRAINDOG_HOST` / `BRAINDOG_TOKEN` override. That token never reaches ADMIN. `<host>` is what the app's connect screen prints, `<origin>/app/<slug>` (on the Cloud today `https://app.brain.dog/app/<slug>`); the CLI keeps it as `<origin>/<slug>`, taking `/app` off, so a login written either way is one entry. There is no default host |
 | `braindog init <slug> [--owner]` · `braindog dev [--port]` | self-host only; both spawn the self-host entry with `process.execPath` (`BRAINDOG_SELFHOST`, or `apps/selfhost/src/main.ts` in a checkout) — the CLI never imports `apps/selfhost` and never links `packages/record`. `init` creates `<data>/<slug>/record.brain`, runs migration 0001, writes the owner into the Directory and mints `<slug>/inbound.token` (0600). `dev` runs against a scratch data dir with real ports over `:memory:` and prints its mail and a throwaway `BRAINDOG_TOKEN` to stderr |
 | `braindog export [--with-attachments] [--redact-grants] [--sections data,origin,governance] [--mirror] [-o file]` | streams the `.brainl` (41 §5.10's line format) from the record and materialises a signed `.brain`; `--mirror` also writes rendered markdown in the layout of 32 §2 |
 | `braindog import <file.brain \| file.brainl>` | one `text/plain` body into an empty record only (`IMPORT_NOT_EMPTY`), §9 |
@@ -536,7 +540,7 @@ polling in place of `/ws`, and inbound email through a forwarding webhook; passk
 | Scheduler | one `setTimeout` over `MIN(due_at)` per record; one outbox poller per record, which `wake()` kicks (`setImmediate`); one nightly timer per process |
 | Snapshots | nightly `VACUUM INTO` (permitted here) → keep 30, under `<slug>/snapshots/`. **A snapshot is a full copy that keeps the six `local` tables and never leaves the host** — disaster recovery, restored offline by putting the file back; **an export is the portable `.brain` without them** (§9) |
 | Live channel | no `/ws` in phase 2 — 404, and the client polls `/api/version` |
-| Web | the same static `build/` the Worker serves, from disk |
+| Web | the same static build the Worker serves, from disk, mounted at `/app` (`apps/selfhost/src/shell.ts`): a missing file under `/app/_app/` is a 404, any other path under `/app` is the shell, `/fonts/*` is read from the app folder, and every other path the process does not answer itself is a `308` into `/app`, whatever it asks for |
 | Boot | `measureCaps` per record file; a build without FTS5 refuses to start, naming the driver. One sick record does not stop the host: `SCHEMA_MISMATCH` / `SCHEMA_NEWER` is per record, 503 on its routes only |
 | Limits | the adapter enforces `DO_LIMITS` (§1) so a self-host never out-runs the Cloud |
 
@@ -595,6 +599,19 @@ stateless.
 }
 ```
 
+*(Amended September 23rd 2026 for push A of the one-domain move, read from `apps/worker/wrangler.jsonc` at `bb13a0b8`.)*
+The skeleton is the design's, and the file differs from it in more than names; these are the differences that say
+where the app lives. **Push A, live:** each environment's only route is its Custom Domain, `app.brain.dog` in
+production and `app.alpha.brain.dog` in alpha; the app is under `/app` there; `PUBLIC_HOST` is still that name,
+`LEGACY_HOSTS` is empty, and `RP_ID` is already the parent, `brain.dog` (`alpha.brain.dog` in alpha), so a passkey
+made now is still offered on `brain.dog` after the move. `assets` has `not_found_handling: 'none'` and §4's
+`run_worker_first`. `brain.dog` itself is still only the marketing site's. **Push A2, not made:** eight zone routes on
+`brain.dog` (`/app`, `/app/*`, `/api/*`, `/mcp`, `/in/*`, `/auth/*`, `/account/*`, `/.well-known/braindog-build`) and
+nothing else. **Push B, after it:** `PUBLIC_HOST` becomes `brain.dog` and `LEGACY_HOSTS` becomes `app.brain.dog`, so a
+page load on the old name is a `308` to `https://brain.dog/app<path>` (a path already under `/app` keeps its own) while `/api/*`, `/mcp` and `/in/*` are served
+there with no redirect. Both are the `STAGE A2` and `STAGE B` fragments at the top of the file, and the runbook is
+`loop/research-one-domain-cutover.md` §5.
+
 Sign-up generates three keys — the record DEK, the connector DEK and the signing key — wrapped under the current KEK
 ([12-SECURITY](12-SECURITY.md) §6). The nightly `scheduled()` at `17 3 * * *` takes the snapshot and runs the
 operations ladder — re-wrap under `KEK`, reconcile, the drills' checks (53). There is no staging environment: the ops
@@ -630,7 +647,7 @@ the one home; a count is never a budget — it is read from the owning enumerati
 | `css-rules` | script | the CSS usage rules over first-party CSS and the emitted token set — the gate that stands where Stylelint would; there is no Stylelint |
 | `conformance-count` | script | every host wrote `packages/ports/test/results/<host>.json` with the same number of cases; every skip printed |
 | `compat-date` | script | `compatibility_date ≥ 2026-02-24` |
-| `deploy-parity` | script | after `wrangler deploy`, fetch `/` and `/_app/version.json` from the live host; SHA-256 must equal the `build/` output; `/.well-known/braindog-build` answers the deployed `app`, with no credential, because the build id is the Worker version's and not a record's |
+| `deploy-parity` | script | after `wrangler deploy`, fetch `/app/` and `/app/_app/version.json` from the live host (`/` and `/_app/version.json` before push A, and on `brain.dog` those are the site's); SHA-256 must equal `build/app/index.html` and `build/app/_app/version.json`; `/.well-known/braindog-build` answers the deployed `app`, with no credential, because the build id is the Worker version's and not a record's |
 | `where-property` | test | the compiler and the evaluator agree on **1,000** random predicates in CI and **10,000** nightly; failing seeds committed |
 | `boot-probe` | test | a build without FTS5 refuses with the exact message, naming the driver |
 | `brain-roundtrip` | test | export → import → export over the `corpus` record differs by exactly one appended `import` event |
@@ -676,7 +693,7 @@ Durable Object class (Cloud) or `directory.sqlite` (self-host), same schema, sam
 | Directory table | Holds |
 |---|---|
 | `person` | `id` (`p_` + ULID), `email` UNIQUE, `name`, `created_at`, `suspended_at` |
-| `passkey` | `id`, `person`, `jwk`, `alg` (ES256 or RS256), `sign_count`, `label`, `backed_up`, `created_at`, `last_used`; both hosts |
+| `passkey` | `id`, `person`, `jwk`, `alg` (ES256 or RS256), `sign_count`, `label`, `backed_up`, `created_at`, `last_used`; both hosts. The relying party is the Cloud's `RP_ID` when the host is under it (`brain.dog` in production since push A, so a passkey made at `app.brain.dog` is still offered once push B puts the app on `brain.dog`) and otherwise the exact host, which is the self-host's case; an `RP_ID` the host is not under switches passkeys off (`relyingParty` in `packages/host/src/auth.ts`) |
 | `session` | `id_hash` (HMAC-SHA-256 of `s:` and the id, under the host's session key), `person`, `record` (the record the session opened, so a browser holds one cookie), `expires`, `rotated_at`, `authed_at`, `prev_hash`, `prev_until`. The cookie: `__Host-bd_s`, `HttpOnly Secure SameSite=Lax`, 30 days sliding, rotated after 24 h of use; the replaced id answers for sixty seconds, because the app sends its first calls in parallel and the first to arrive rotates; `authed_at` records the last proof, rotation never moves it, and VAULT requires it within 15 minutes |
 | `link` | `hash` (HMAC-SHA-256 of `l:` and the token), `person`, `purpose` (`magic`, 15 min; `claim`, 24 h), `expires`; single use, spent by the statement that deletes it |
 | `challenge` | `hash` (HMAC-SHA-256 of `c:` and the challenge), `purpose`, `person`, `expires` (5 min): WebAuthn challenges in a table rather than in memory, so a ceremony survives the Directory object being evicted; single use, and minting refuses past 10,000 live rows |
@@ -688,16 +705,17 @@ Durable Object class (Cloud) or `directory.sqlite` (self-host), same schema, sam
 The record keeps `person` as a mirror (`id email name suspended_at`) so a `.brain` resolves its actors offline, plus
 `member`, `token`, `device_grant` (with its `reach`) and its own `auth_fail` for device codes and share tokens. A browser
 request's record is on its session row, set at sign-in to a record the person owns (else the first they joined),
-and the host asks that record's own `member` table what the person may do, as it does for a bearer. In code the
+and the host asks that record's own `member` table what the person may do, as it does for a bearer. A request under
+`/app/<slug>/api/` is the exception: its record is the slug's, once the Directory has found the person on it (§4). In code the
 tables are `dir_`-prefixed, at Directory version 3.
 
 | Flow | Steps |
 |---|---|
 | Sign up | Cloud: email → magic link → `createRecord` (INTERNAL) writes the record first — the record row, the owner's `person` mirror, `member('*', 'owner')` — then the Directory rows `record_dir` and `person_record`; sign-up generates the record DEK, the connector DEK and the signing key ([12-SECURITY](12-SECURITY.md) §6); a passkey is registered after, from phase 3. Self-host: closed — `init` and invitations; an unknown email at `/auth/magic/start` gets 200 and no mail |
 | Sign in | passkey first where one exists, the magic link as the fallback — the self-host's only path in phase 2; both produce a `session` row, which carries the record; a self-host also takes its server key at `/auth/token`; **no passwords** |
-| Invite | `invite({ email, level?, registers? })` (ADMIN, the owner) mints an invitation — one address, 24 h, the token stored as `sha256` and answered once. No host mails it: the owner copies the link out of Settings. The invitee opens `<origin>/invite#<token>`, presses Accept, and `POST /auth/invite` signs them in and calls `acceptInvite` (INTERNAL) with the Directory's verified person, which writes the record's `person` mirror, the `member` rows and one `access.grant` event per register |
+| Invite | `invite({ email, level?, registers? })` (ADMIN, the owner) mints an invitation — one address, 24 h, the token stored as `sha256` and answered once. No host mails it: the owner copies the link out of Settings. The invitee opens `<origin>/app/invite#<token>`, presses Accept, and `POST /auth/invite` signs them in and calls `acceptInvite` (INTERNAL) with the Directory's verified person, which writes the record's `person` mirror, the `member` rows and one `access.grant` event per register |
 | Agent token | minted from a browser session (`createToken`) or by `braindog login`'s device flow; scoped `read` / `propose` / `write` — one word stored, the ladder's top; the bearer is `<rec_id>.<secret>` and the record's `token` table stores `sha256(secret)` with `last_used_at` and `last_surface`; one record |
-| Device grant | six digits, ten minutes, five tries; `code_hash = sha256(id ‖ ':' ‖ user_code)` — `id` is the poll id, never the code; approved by the owner from a sign-in proved in the last 15 minutes (`deviceApprove`); `verification_uri` is `${origin}/settings/agents`; `device_grant.reach` names what the grant reaches — `login` or `runner` mint a 90-day bearer in `token_hash`; the CLI, an agent and a runner all enrol this way |
+| Device grant | six digits, ten minutes, five tries; `code_hash = sha256(id ‖ ':' ‖ user_code)` — `id` is the poll id, never the code; approved by the owner from a sign-in proved in the last 15 minutes (`deviceApprove`); `verification_uri` is `${origin}/app/<slug>/settings/agents`, or `${origin}/app/settings/agents` with no slug and on the self-host (§4); `device_grant.reach` names what the grant reaches — `login` or `runner` mint a 90-day bearer in `token_hash`; the CLI, an agent and a runner all enrol this way |
 | Operation grant | `reach ∈ export \| import \| pack \| token`: from a browser session the owner approves **one named operation** after seeing its summary; the approval is single-use, expires in ten minutes, is recorded in `device_grant.reach` and an `access.grant` event, and the bearer then reaches exactly that ADMIN method once with `ctx.op` set (§4; [ADR-060](16-DECISIONS.md) as amended) |
 | Suspend | `person.suspended_at` in the Directory; the record's mirror follows on the next request; suspending a person suspends their tokens in the same record transaction |
 | Delete | `deleteRecord({ slug })` — the owner, a browser session re-authenticated, the slug typed; the Worker `destroy()`s the object's storage and removes the R2 prefix; the lapse ladder runs the same deletion at day 90 of `billing = lapsed` (02 §9) |

@@ -248,7 +248,7 @@ the `.ts` sources directly under Node 24.13 (`node --test`). esbuild is a devDep
 ```ts
 type HostsFile = {
   default?: string;                                  // a key of `hosts`
-  hosts: Record<string, {                            // key: 'https://brain.dog/acme' — origin + '/' + slug, no trailing slash
+  hosts: Record<string, {                            // key: 'https://brain.dog/acme' — origin + '/' + slug, no trailing slash; a leading '/app' is taken off
     token?:  { value: string; expires: string; label: string };   // login: the read+write agent token, 90 days
     runner?: { value: string; expires: string; label: string };   // runner enroll: the 90-day device grant
     vault?:  Record<string, { value: string; expires: string }>;  // login --vault: key = the project's id, or '*'
@@ -258,6 +258,15 @@ type HostsFile = {
 
 A vault grant is kept under its scope, so one host can hold grants for several projects; `keys` uses `--vault`,
 or the only one held.
+
+*(Amended September 23rd 2026 for push A of the one-domain move, checked against `hostKey` in
+`apps/cli/src/http.ts`.)* The app's connect screen prints `braindog login <origin>/app/<slug>` when it knows the
+record's slug, because the app is under `/app` now, and `hostKey` keeps that as `<origin>/<slug>`: `app` is a reserved slug, so a first segment of
+`app` is always the prefix. `login`, `logout` and `--host` key through the same function, so a login written with or
+without `/app` is one entry, and keys written before the move do not change. The CLI has no default host. On the
+Cloud the origin is `https://app.brain.dog` today and becomes `https://brain.dog` at push B; the API calls go to the
+origin's root, `/auth/device` and `/api/*`, which the old name keeps serving after B with no redirect. That matters
+because every request here is sent with `redirect: 'error'`, so a redirect on either would fail every command.
 
 Invariants a test checks: the file's mode is `0600` on POSIX; a write is a rename of a complete file; a `value`
 appears in no other file, no log line, no `--json` output; an `expires` in the past makes the CLI say
@@ -427,7 +436,7 @@ parses the `Result` that comes back.
 
 `device(host, request, onCode)` — RFC 8628 over the `Result` envelope:
 
-1. `POST ${origin}/auth/device` with `{ slug, reach, label: `${os.hostname()} · braindog-cli`, subject }` → `DeviceCode`, or a `429` with `Retry-After` once this address has started ten in 15 minutes. `slug` is the host's path segment; absent, the self-host's only record.
+1. `POST ${origin}/auth/device` with `{ slug, reach, label: `${os.hostname()} · braindog-cli`, subject }` → `DeviceCode`, or a `429` with `Retry-After` once this address has started ten in 15 minutes. `slug` is the host's path segment, after `hostKey` has taken a leading `/app` off it (§4.1); absent, the self-host's only record.
 2. Refuse a `verification_uri` whose origin differs from the host's — a phished approval page is the one thing this flow must never print.
 3. `onCode(code)` prints to stderr: `Open ${verification_uri} and enter  ${user_code.slice(0,3)} ${user_code.slice(3)}   (10 minutes)`.
 4. Every `interval` seconds until `expires_in` has elapsed: `POST /auth/device/token { slug, device_code }`. `pending` → sleep the reply's `interval` (so a slow-down is obeyed). A bearer → return it. A refusal (`DEVICE_CODE_EXPIRED`, `DEVICE_CODE_TRIES`) → `Refused`. `expires_in` elapsed with no answer → `Refused([DEVICE_CODE_EXPIRED])`.
