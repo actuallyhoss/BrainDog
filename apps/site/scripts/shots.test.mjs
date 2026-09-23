@@ -11,7 +11,7 @@
  * to the page here too.
  *
  * THE SCRIPTS ARE READ AS TEXT AND NOT IMPORTED, because importing either one runs it: both open a
- * browser at the top level, and `product.mjs` binds a port the browser gates share.
+ * browser at the top level, and `usecases.mjs` starts a record per use case.
  */
 
 import { test } from 'node:test';
@@ -36,11 +36,10 @@ function referenced() {
   return names;
 }
 
-/** Every name a SHOTS entry in `product.mjs` makes: one light PNG each. */
+/** The one file `product.mjs` writes, by the `FILE` constant it writes it under. */
 function productWrites() {
   const text = readFileSync(join(import.meta.dirname, 'product.mjs'), 'utf8');
-  const list = text.slice(text.indexOf('const SHOTS = ['), text.indexOf('];', text.indexOf('const SHOTS = [')));
-  return [...list.matchAll(/\{\s*name:\s*'([^']+)'[^}]*\}/g)].map((m) => `${m[1]}-light.png`);
+  return [...text.matchAll(/^const FILE = '([^']+)';$/gm)].map((m) => m[1]);
 }
 
 test('the site names its captures as literals, so a literal scan sees all of them', () => {
@@ -66,8 +65,30 @@ test('every capture the site names is in static/shots', () => {
 test('product.mjs writes nothing the site does not name', () => {
   const names = referenced();
   const writes = productWrites();
-  assert.ok(writes.length > 0, 'no SHOTS entry parsed out of product.mjs');
+  assert.equal(writes.length, 1, 'no `const FILE` parsed out of product.mjs');
   assert.deepEqual(writes.filter((f) => !names.has(f)), []);
+});
+
+test('product.mjs draws the card from the site build and not from the record app', () => {
+  /* ON 23 SEPTEMBER IT COULD NOT RUN AT ALL. It looked for `apps/web/build/index.html`, and the
+     record app now builds under `apps/web/build/app/`, so the run printed "no record-app build" and
+     exited 1 with the app freshly built beside it. The card is made of the site's own mark, face and
+     palette, so the site's build is the one it reads, and it starts no record and forwards no
+     `/api` because nothing on the card is a read of one. */
+  const text = readFileSync(join(import.meta.dirname, 'product.mjs'), 'utf8');
+  assert.match(text, /const ROOT = join\(import\.meta\.dirname, '\.\.', 'build'\);/, 'product.mjs does not read apps/site/build');
+  assert.doesNotMatch(text, /'web',\s*'build'/, 'product.mjs reads the record app build again');
+  assert.doesNotMatch(text, /tools\/gates\/record\.mjs|startRecord/, 'product.mjs starts a record again');
+});
+
+test('the link preview is a 1200 by 630 card and not a capture of the app', () => {
+  /* The file it replaced was 2880 by 1800: the Work board at 1440 by 900 at a device scale of 2,
+     288 KB, which is a screenshot of the app under another name. 1200 by 630 is the size the Open
+     Graph card is drawn at, and a drawing made to that size is the only thing that is. The width
+     and height are the IHDR chunk's, bytes 16 to 24 of any PNG. */
+  const png = readFileSync(join(SHOTS, 'home-light.png'));
+  assert.equal(png.subarray(1, 4).toString('latin1'), 'PNG');
+  assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [1200, 630]);
 });
 
 test('usecases.mjs writes nothing into static/shots', () => {

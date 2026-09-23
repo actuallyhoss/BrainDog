@@ -64,8 +64,12 @@ can stop a transition and cannot stop a timer, so under that preference no timer
 
 **The captures that remain are for people, not for the page.** `static/shots/` holds one file,
 `home-light.png`, which `src/app.html` names as the `og:image` for link previews, and
-`scripts/shots.test.mjs` fails if a capture script writes anything else there. `scripts/product.mjs`
-makes that one file from the app's build, or from a running app with `--from=http://localhost:5317`.
+`scripts/shots.test.mjs` fails if a capture script writes anything else there. It is a drawn card
+and not a photograph of the app: `scripts/product.mjs` lifts the mark, the wordmark and the hero's
+slogan out of this site's own build and renders them at 1200 by 630, so `pnpm -C apps/site build`
+first. Until 23 September it photographed the record app's Work board, and it had stopped running
+when the app moved under `/app`; it no longer reads the app's build, starts a record or binds a
+port.
 `scripts/usecases.mjs` creates one self-hosted record per use case, sets it up through `/start` the
 way a stranger would, and writes what it sees into the directory `--png=<dir>` names, because that
 is the cheapest way to see what a stranger actually gets out of `/start`; it writes nothing that

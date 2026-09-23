@@ -27,10 +27,14 @@
       sentence per page and not two that can disagree. This comment said `+layout.svelte`, which has
       no `svelte:head` in it at all.
 
-      `og:image` IS THE PRODUCT AND NOT A LOGO. A screenshot of the home screen is what the product
-      looks like, it is already in `static/`, and a preview card is one of the two places a stranger
-      decides whether to click. An absolute URL, because a preview is fetched by somebody else's
-      server and a relative one resolves against nothing.
+      `og:image` IS A DRAWN CARD AND NOT A SCREENSHOT. It was a 288 KB capture of the record app's
+      Work board until 23 September, the last screenshot of the app left anywhere on the site after
+      the owner said of them *i hate those screenshots. they look terrible*. It is now the mark,
+      the wordmark and the slogan on the hero's own ground, 1200 by 630, which `scripts/product.mjs`
+      draws out of the built home page, so its words, faces and colours are the site's and cannot
+      drift from them. The file name did not change, so `_headers` still caches it for a day. An
+      absolute URL, because a preview is fetched by somebody else's server and a relative one
+      resolves against nothing.
     -->
     <meta property="og:site_name" content="BrainDog" />
     <meta property="og:type" content="website" />

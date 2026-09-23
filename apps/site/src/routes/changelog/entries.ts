@@ -87,6 +87,104 @@ export type Entry = {
  */
 export const ENTRIES: Entry[] = [
   {
+    date: '2026-09-23',
+    kind: 'changed',
+    title: 'This site draws the app instead of photographing it',
+    body:
+      'The screenshots on the home page are gone, and so are the numbers that opened each band. ' +
+      'The app window is drawn in HTML and CSS across the foot of the hero. Its lists, rows, ' +
+      'Decide and an automation open when pressed.',
+    commits: ['1cffbb7a', '6e5f4e73', 'ba1cac19'],
+  },
+  {
+    date: '2026-09-23',
+    kind: 'changed',
+    /* THE SMALLER THING, ON PURPOSE. The commit moves the app and runs dark; the push after it sends
+       app.brain.dog's page loads to /app; brain.dog itself serves nothing of the app until the two
+       pushes `fe14e8be` leaves waiting in the config. An entry saying "one domain" would be ahead of
+       the product by exactly those two pushes. */
+    title: 'The app moves under /app, the first step to living on one domain',
+    body:
+      'The record app builds under /app, and its links, sign-in links, device links and the command ' +
+      'line all follow. A page load on app.brain.dog outside /app goes to /app. Serving the app ' +
+      'from brain.dog itself is the next step and has not happened yet.',
+    commits: ['f88eb95b', 'fe14e8be', '0cfee8c6'],
+  },
+  {
+    date: '2026-09-23',
+    kind: 'shipped',
+    /* THE SWITCH IS THE HOST'S, whatever `82eae966`'s subject says about the record's: the kernel's
+       `answersSpark` is off unless the host says it serves the question, and each host says so only
+       where a model stands behind Spark (`apps/selfhost/src/server.ts`, `apps/worker/src/index.ts`,
+       from `eb1a131b` and `6d78d936` later the same day). */
+    title: 'An automation can put a question to Spark, where a model is there to answer it',
+    body:
+      'A step can ask Spark a question, and a host with no model behind Spark refuses it at install. ' +
+      'The Cloud answers with the owner’s key from the vault and refuses at once where there is ' +
+      'none. A question never carries a secret or a file field.',
+    commits: ['82eae966', 'ee317fa3', 'eb1a131b', '6d78d936', '3d299358', 'eae8aff6'],
+  },
+  {
+    date: '2026-09-23',
+    kind: 'fixed',
+    title: 'A key sealed on the Cloud can be opened, where every read had failed',
+    body:
+      'The Cloud’s database hands a stored value back in a form the unseal read as empty. ' +
+      'Every key read there answered WRONG_KEY, and the self-host was never affected. The value ' +
+      'is read whole now.',
+    commits: ['973f2ecc'],
+  },
+  {
+    date: '2026-09-22',
+    kind: 'shipped',
+    title: 'A script can be part of a record, and it runs in a sandbox',
+    body:
+      'A script is proposed like any other change, and Decide shows its source and the host each ' +
+      'key goes to. It runs in QuickJS on the self-host and in its own Worker on the Cloud, under ' +
+      'ceilings on time, memory, fetches and writes. A key reaches only the host its vault entry opens.',
+    commits: ['94ba1ad8', 'bc82bae5', 'f5c02b73', 'eafe8c20', '7adc7d0c', 'd23ac77d', '1f252e34'],
+  },
+  {
+    date: '2026-09-22',
+    kind: 'shipped',
+    title: 'Automations: a trigger and its steps, built on a canvas or by an agent',
+    body:
+      'A rule can carry a trigger and steps, and a step can wait for a person to answer through ' +
+      'Decide. The canvas edits one by pointer, keyboard or touch and saves the same definition an ' +
+      'agent proposes. The terminal lists, runs, cancels and resumes them.',
+    commits: ['20be80ac', '6ec8011d', '151ac7a2', '309e3dad', 'f6529ce9'],
+  },
+  {
+    date: '2026-09-22',
+    kind: 'shipped',
+    title: 'The Cloud sends sign-in links, from hello@brain.dog',
+    body:
+      'The sender was empty, so the Cloud mailed no sign-in link at all. A link now brings you back ' +
+      'to the page you were sent from, and Open BrainDog opens your record rather than the sample. ' +
+      'A hosted record is still made by the operator, and sign-up is not open.',
+    commits: ['54a16ffb', '6959cf06', 'bb8c7393', 'ae348358', '1db7dd1e', '9df8ded7'],
+  },
+  {
+    date: '2026-09-22',
+    kind: 'shipped',
+    title: 'A field added from a row appears on every row, form and list',
+    body:
+      'A field can be added while looking at a row, and it stays after you move away. A field that ' +
+      'rows still hold cannot be dropped, and every schema change is kept in history. A pack update ' +
+      'keeps the fields an owner added.',
+    commits: ['50a6874a', '545c95f6'],
+  },
+  {
+    date: '2026-09-22',
+    kind: 'fixed',
+    title: 'The the old tool import says what it could not carry, instead of dropping it',
+    body:
+      'A section it has no reader for is named with its row count. A word it does not know ' +
+      'arrives as the default, with a line saying so. Values from a closed list are proposed ' +
+      'rather than guessed, and seven fields it used to drop now arrive.',
+    commits: ['6700ad7c', '91bf07df', '67c3ce82', '3ec36550'],
+  },
+  {
     date: '2026-09-21',
     kind: 'shipped',
     title: 'A forwarded message can reach a hosted record, on an address you mint',
@@ -106,7 +204,7 @@ export const ENTRIES: Entry[] = [
     title: 'The accent is the mark\u2019s own red again, and the indigo is gone',
     body:
       'The product wore an indigo accent from the 10th of September. It is the red the mark has ' +
-      'always been, solved against every surface in both schemes so that a figure drawn in it clears ' +
+      'always been, solved against every surface in both schemes. A figure drawn in it clears ' +
       'the contrast floor rather than only looking right on one ground.',
     commits: ['411272a7', '938175fb'],
   },

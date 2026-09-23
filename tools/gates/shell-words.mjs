@@ -108,7 +108,7 @@ const OUT = {
   'apps/site': {
     why: 'the public site is prose about the product, not code that runs a record (1 hit).',
     words: {
-      egypt: 'the changelog entry at `routes/changelog/entries.ts:199` says `Egyptian pounds` about a currency fix that shipped.',
+      egypt: 'the changelog entry at `routes/changelog/entries.ts:297` says `Egyptian pounds` about a currency fix that shipped.',
     },
   },
   'apps/cli/src/legacy.ts': {
