@@ -120,7 +120,8 @@ const printMoney = (amount: number, currency: string): string => {
   return `${currency} ${amount < 0 ? '-' : ''}${units.replace(THOUSANDS, ',')}.${cents}`;
 };
 
-const printValue = (value: unknown): string => {
+/** One field's value as the model reads it: money as `EGP 5,005.00`, a quantity with its unit, the rest as text. */
+export const printValue = (value: unknown): string => {
   if (value === null || value === undefined) return '';
   if (Array.isArray(value)) return value.map(printValue).join(', ');
   if (typeof value === 'object') {

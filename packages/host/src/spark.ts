@@ -51,6 +51,8 @@ import { ok, type Refusal, type Result, type Sql } from '@braindog/ports';
 import type { Entry, RegisterDecl } from '@braindog/kernel';
 import type { CallContext, RecordApi, SparkFormInput, SparkModel, SparkModelInput } from '@braindog/record';
 
+import type { SparkAsk } from './spark-answers.ts';
+
 /** How long a draft may take before Spark's own rules speak instead. */
 export const SPARK_TIMEOUT_MS = 30_000;
 
@@ -553,11 +555,25 @@ const HOST_DRAFTED: readonly string[] = ['b', 'byo'];
 /** `46 §5.9` step 1: the grant tier `b` names holds an API token. A password or an SSH key is sent as nobody's bearer. */
 const SPARK_GRANT_KIND = 'api_token';
 
+/**
+ * OPTIONAL `answer`, BECAUSE THE PACKAGE GAINS IT IN A BRIEF BESIDE THIS ONE (`loop/research-infer-ask.md` §6 Brief B), and
+ * both apps pass their engine here today. Required, every host would fail to typecheck until that package landed; absent,
+ * the guard adds nothing, so a host on the older package keeps the shape it had.
+ */
 type Guarded = {
   status(): unknown;
   read(question: string, ctx: CallContext, inference?: SparkInference): Promise<Result<unknown>>;
   propose(question: string, ctx: CallContext, byok?: unknown, askId?: string, inference?: SparkInference): Promise<Result<unknown>>;
   configure(patch: Record<string, unknown>, ctx: CallContext): Result<unknown>;
+  answer?(ask: SparkAsk, inference?: SparkInference): Promise<Result<{ text: string }>>;
+};
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/** `2026-10-01T00:00:00.000Z` as `1 October`, written out so the sentence does not depend on the runtime's locale. */
+const dayOf = (iso: string): string => {
+  const at = new Date(iso);
+  return `${at.getUTCDate()} ${MONTHS[at.getUTCMonth()]}`;
 };
 
 /**
@@ -638,6 +654,28 @@ export function sparkGuardedEngine<E extends Guarded>(engine: E, deps: SparkGuar
     const stop = spent(askId);
     return stop ? Promise.resolve({ ok: false, refusal: stop }) : engine.propose(question, ctx, byok, askId, inference);
   };
+  /* AN AUTOMATION'S QUESTION IS SPENT FROM THE SAME COUNT AS A PERSON'S READ, which is `loop/research-infer-ask.md` §5 Q2's
+     default. Before this line the guard named `read` and `propose` alone, so `answer` reached the engine through the
+     prototype `Object.create` leaves, and the package stops tier `a` only: measured in `test/spark-guard-answer.test.ts`,
+     on tiers `b` and `byo` at `ask_cap: 1` with one read made, the engine was called once where the cap allowed none. A
+     clock rule at the fifteen-minute floor is 96 calls a day on this host's model with nothing in front of it.
+     The package accounts an answer as `kind = 'read'` with no predicate (Brief B), so `drafted()` already counts it, and
+     `spent(undefined)` because there is no stored draft to exempt. The sentence is its own because the run shows it, and
+     it names the rule and the step, never a value from the row. */
+  if (typeof engine.answer === 'function') {
+    const answer = engine.answer.bind(engine);
+    guarded.answer = (ask, inference) => {
+      if (spent(undefined) === null) return answer(ask, inference);
+      const until = dayOf(monthOf(deps.clock.now(), 1));
+      return Promise.resolve({
+        ok: false,
+        refusal: {
+          code: 'SPARK_BUDGET_SPENT',
+          fix: `rule.${ask.rule} asked Spark at step ${ask.step + 1}, and this month's asks are spent until ${until}. Raise the monthly limit, or wait.`,
+        },
+      });
+    };
+  }
   /* A TIER `b` SAVE MUST NAME A KEY THE VAULT HOLDS. `configure` checks a grant id's shape and never the vault, so an id
      that is not there saved with 200 and every propose after it was 403 (`loop/research-batch-thirty-one-audit.md` §5).
      The grant it checks is the one tier `b` would open: the patch's, or the one already stored when the patch names none,

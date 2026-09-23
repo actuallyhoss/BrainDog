@@ -61,8 +61,11 @@ export type ModelId = 'llama-3.2-1b' | 'glm-5.3-flash' | 'glm-5.3' | 'bge-m3';
 /** Neurons per million tokens, `08 §6`. */
 export type ModelRate = { in: number; out: number };
 
-/** The three templates this package calls. `46 §4.5` describes eight; the other five have no caller here yet. */
-export type PromptId = 'predicate' | 'propose' | 'pattern';
+/**
+ * The four templates this package calls. `46 §4.5` describes eight and names no automation's question; `answer` is
+ * `loop/research-infer-ask.md` §4's, and the other five of the eight have no caller here yet.
+ */
+export type PromptId = 'predicate' | 'propose' | 'pattern' | 'answer';
 
 export type PromptTemplate = {
   model: ModelId;
@@ -208,6 +211,22 @@ export type RawPayload = {
   body: string;
 };
 
+/**
+ * One automation's question, as the kernel's `infer.ask` outbox row carries it (`packages/kernel/src/flow.ts`, `ask`).
+ *
+ * `step` IS THE KERNEL'S, COUNTED FROM ZERO, and every sentence about it says `step + 1`, as the kernel's own do.
+ * `about` IS THE RUN'S ROW, ALREADY CUT DOWN BY THE KERNEL to the fields the rule named, with no `secret` or `file` field
+ * among them (`UNSENDABLE`), so this package is handed values and never reads the record for them.
+ */
+export type Ask = {
+  rule: string;
+  step: number;
+  question: string;
+  shape: 'text' | 'number' | 'choice';
+  choices?: readonly string[] | undefined;
+  about?: Readonly<Record<string, unknown>> | undefined;
+};
+
 export type SparkDeps = {
   /** Spark's OWN SQLite: the `settings` and `call` tables of `46 §4.1`, never the record's database. */
   sql: Sql;
@@ -229,6 +248,11 @@ export interface Spark {
   read(question: string, ctx: CallContext, inference?: Inference): Promise<Result<Reading>>;
   propose(question: string, ctx: CallContext, byok?: Inference, askId?: string, inference?: Inference): Promise<Result<Proposal>>;
   proposePattern(samples: readonly RawPayload[], ctx: CallContext): Promise<Result<Proposal>>;
+  /**
+   * An automation's question, answered in the shape its rule asked for. `inference` is the host's model for this job,
+   * keyed in the rule's name, as `read`'s is keyed in the asker's; it takes no `CallContext` because nobody is asking.
+   */
+  answer(ask: Ask, inference?: Inference): Promise<Result<{ text: string }>>;
   configure(patch: Partial<Pick<Settings, 'tier' | 'model' | 'grant_id' | 'ask_cap'>>, ctx: CallContext): Result<Settings>;
   status(): Status;
 }

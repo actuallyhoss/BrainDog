@@ -1,0 +1,185 @@
+/**
+ * The pass that answers an automation's question to Spark: lease the `infer.ask` jobs, ask `answer` for each, ack each
+ * with what came back, then tail the scheduler once. `loop/research-infer-ask.md` §4 and §6 Brief C.
+ *
+ * THE RECORD IS THE QUEUE AND THE JUDGE, AND THIS IS ONLY THE PASS. `flow.ts` `ask()` queued the question, `answerStep`
+ * holds the text to the shape the rule asked for, and `outbox.ts` `ack` walks the ladder and ends the run with a sentence
+ * at its eighth rung. Nothing here decides a shape, keeps a count or retries: it chooses which of three acks to send, and
+ * that choice is the whole file.
+ *
+ * NEITHER PUMP COULD CARRY THIS JOB, which is why it is a pass of its own. Both hand a job to a `Deliver` that returns
+ * `void` and ack `done` with no `result` (`apps/worker/src/pump.ts`, `apps/selfhost/src/server.ts`), so an `infer.ask` on
+ * either list would be acked with no text and every run would end on *"Spark answered job … with no text"*. The Worker
+ * calls this in `alarm()` after `#act`, inside the object that holds the vault, and the self-host at the end of `act()`
+ * (Briefs E and D).
+ *
+ * STRUCTURAL, AND IT IMPORTS NEITHER `@braindog/spark` NOR AN APP. `answer` is handed in as a function, so the package's
+ * `answer` method, the key opened in the rule's name and the tier all stay the app's to build; `31 §2` puts the package at
+ * row 13 and `46 §5.1` has only the app `import()` it, which is the rule `spark.ts` states at its own header.
+ */
+
+import type { Kernel, OutboxRow } from '@braindog/kernel';
+import { codeOf, fixOf, type Result, type Scheduler } from '@braindog/ports';
+
+/**
+ * One question, as `flow.ts` `ask()` queues it and `@braindog/spark`'s `answer` takes it.
+ *
+ * `step` IS THE KERNEL'S, COUNTED FROM 0, and every sentence a person reads says `step + 1`, as `flow.ts` does. `rule` is
+ * Brief A's addition to the payload: Spark's ledger row is written as `rule.<id> step <n>` and the key is opened as
+ * `rule:<id>`, so a job without it cannot be answered in anybody's name.
+ */
+export type SparkAsk = {
+  run: string;
+  step: number;
+  rule: string;
+  question: string;
+  shape: 'text' | 'number' | 'choice';
+  choices?: readonly string[] | undefined;
+  about?: Readonly<Record<string, unknown>> | undefined;
+};
+
+/** What answers one job: `@braindog/spark`'s `answer`, with the inference for this rule already chosen by the app. */
+export type SparkAnswer = (job: SparkAsk) => Promise<Result<{ text: string }>>;
+
+/** The three kernel methods this pass calls, and not the kernel. */
+export type SparkAsksKernel = Pick<Kernel, 'leaseOutbox' | 'ackOutbox' | 'tail'>;
+
+/**
+ * What one pass did. `answered`, `refused` and `failed` count acks that landed; `unacked` counts acks that threw or that
+ * the kernel refused, whose leases expire into a retry, which is what a lease is for.
+ */
+export type SparkAsksServed = { answered: number; failed: number; refused: number; unacked: number };
+
+/**
+ * The one refusal a retry can change.
+ *
+ * `UNREACHABLE` SAYS THE MODEL WAS NOT REACHED, AND EVERY OTHER REFUSAL IS SPARK DECIDING. The brief names three that end
+ * the run (`SPARK_BUDGET_SPENT`, `PROPOSAL_SCHEMA`, `FORBIDDEN`), and this is the same rule stated from the other side, so
+ * a refusal the package adds later ends the run with its own sentence rather than walking eight rungs. A cap that is
+ * spent is spent for the month, and asking it seven more times would be seven more hold rows on the owner's allowance.
+ */
+const RETRIED: ReadonlySet<string> = new Set(['UNREACHABLE']);
+
+const SHAPES: readonly string[] = ['text', 'number', 'choice'];
+
+/** The ack for one job, without its id and lease, and the counter it lands in. */
+type Settled =
+  | { ack: { state: 'done'; result: { text: string } }; counts: 'answered' }
+  | { ack: { state: 'done'; result: { failed: string } }; counts: 'refused' }
+  | { ack: { state: 'failed'; error: string }; counts: 'failed' };
+
+/**
+ * The job's payload as a question, or the step it was at when it cannot be read.
+ *
+ * EVERY FIELD IS CHECKED, AND ONLY THE KNOWN ONES ARE PASSED ON. The payload is the kernel's own JSON, but a row queued by
+ * a build before Brief A has no `rule`, and a model call built from a half-read job would bill the owner for a question
+ * whose answer nothing could file.
+ */
+function askOf(payload: string): SparkAsk | { unread: true; step: number | undefined } {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(payload);
+  } catch {
+    return { unread: true, step: undefined };
+  }
+  const p = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
+  const step = typeof p.step === 'number' && Number.isInteger(p.step) && p.step >= 0 ? p.step : undefined;
+  const choices = p.choices;
+  const about = p.about;
+  if (
+    step === undefined ||
+    typeof p.run !== 'string' ||
+    typeof p.rule !== 'string' ||
+    p.rule === '' ||
+    typeof p.question !== 'string' ||
+    typeof p.shape !== 'string' ||
+    !SHAPES.includes(p.shape) ||
+    (choices !== undefined && !(Array.isArray(choices) && choices.every((c) => typeof c === 'string'))) ||
+    (about !== undefined && (typeof about !== 'object' || about === null || Array.isArray(about)))
+  )
+    return { unread: true, step };
+  return {
+    run: p.run,
+    step,
+    rule: p.rule,
+    question: p.question,
+    shape: p.shape as SparkAsk['shape'],
+    ...(choices === undefined ? {} : { choices: choices as readonly string[] }),
+    ...(about === undefined ? {} : { about: about as Readonly<Record<string, unknown>> }),
+  };
+}
+
+/** THE MESSAGE AND NEVER THE PAYLOAD, `pump.ts`'s rule: a question carries a row's values, and an error line goes to logs. */
+const said = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+const warn = (line: string): void => console.error(line);
+
+/** What one job comes to, with every throw inside `answer` caught here so it is a `failed` ack and not a lost batch. */
+async function settle(job: OutboxRow, answer: SparkAnswer): Promise<Settled> {
+  const ask = askOf(job.payload);
+  if ('unread' in ask) {
+    const at = ask.step === undefined ? '' : ` at step ${ask.step + 1}`;
+    return { ack: { state: 'done', result: { failed: `The question${at} was queued without what Spark needs to answer it, so the run stopped there.` } }, counts: 'refused' };
+  }
+  let out: Result<{ text: string }>;
+  try {
+    out = await answer(ask);
+  } catch (e) {
+    return { ack: { state: 'failed', error: said(e) }, counts: 'failed' };
+  }
+  if (out.ok) return { ack: { state: 'done', result: { text: out.value.text } }, counts: 'answered' };
+  /* `fixOf` AND NOT `.refusal.fix`, because a `Result` has a conflict arm too, and a sentence read off the wrong arm is
+     `undefined` on the run a person reads. */
+  if (RETRIED.has(codeOf(out))) return { ack: { state: 'failed', error: fixOf(out) }, counts: 'failed' };
+  return { ack: { state: 'done', result: { failed: fixOf(out) } }, counts: 'refused' };
+}
+
+/**
+ * One pass over this record's questions to Spark.
+ *
+ * THE JOBS ARE ASKED TOGETHER AND NOT IN TURN, because in turn does not fit inside the lease. `INFER_LEASE_MS` is 120
+ * seconds (`packages/kernel/src/outbox.ts`) and a Spark call may take `SPARK_TIMEOUT_MS`, 30 seconds (`spark.ts`), so the
+ * fifth of five asked in turn is acked up to 150 seconds after it was leased, when another pass may hold it and the fence
+ * refuses the answer. Together is safe for the cap: the package writes its hold row before its first `await` and the
+ * guard counts before calling through, so ten asks at `ask_cap: 2` make two model calls (`packages/spark/test/cap-concurrent.test.ts`).
+ *
+ * EACH JOB IS ACKED AS IT SETTLES, so a quick answer is not held behind a slow one's thirty seconds.
+ *
+ * AN ACK THAT WILL NOT LAND IS NOT A REASON TO ABANDON THE REST, `pump.ts`'s rule and for its reason: the lease expires
+ * and the job is reclaimed. A refused ack is counted the same way, because the kernel refuses one only when the lease is
+ * over or the job is gone, and either way this pass no longer holds it.
+ *
+ * THE TAIL IS ONCE, AND ONLY AFTER AN ACK LANDED. `answerStep` arms the woken run's wake for now and a `failed` ack arms a
+ * `retry` row, and neither reaches the alarm until the scheduler is tailed, which the self-host's `poll` already does for
+ * the retry rows. A pass that leased nothing changed nothing, and a tail then is a storage read for no reason on every alarm.
+ */
+export async function serveAsks(
+  kernel: SparkAsksKernel,
+  answer: SparkAnswer,
+  scheduler: Scheduler,
+  n = 5,
+  log: (line: string) => void = warn,
+): Promise<SparkAsksServed> {
+  const out: SparkAsksServed = { answered: 0, failed: 0, refused: 0, unacked: 0 };
+  const jobs = kernel.leaseOutbox(['infer.ask'], n);
+
+  await Promise.all(
+    jobs.map(async (job) => {
+      const settled = await settle(job, answer);
+      try {
+        const acked = kernel.ackOutbox({ id: job.id, ...settled.ack, leasedUntil: job.leasedUntil });
+        if (acked.ok) out[settled.counts]++;
+        else {
+          out.unacked++;
+          log(`ack ${job.id}: ${fixOf(acked)}`);
+        }
+      } catch (e) {
+        out.unacked++;
+        log(`ack ${job.id}: ${said(e)}`);
+      }
+    }),
+  );
+
+  if (out.answered + out.failed + out.refused > 0) await kernel.tail(scheduler);
+  return out;
+}

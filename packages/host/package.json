@@ -10,7 +10,8 @@
     "./connector": "./src/connector.ts",
     "./script": "./src/script.ts",
     "./script-try": "./src/script-try.ts",
-    "./spark": "./src/spark.ts"
+    "./spark": "./src/spark.ts",
+    "./spark-answers": "./src/spark-answers.ts"
   },
   "dependencies": {
     "@braindog/connect": "workspace:*",

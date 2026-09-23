@@ -18,7 +18,7 @@
 
 import { no, ok, type Clock, type Result, type Sql } from '@braindog/ports';
 
-import { PROMPTS, MODELS, SYSTEM, fill, type ModelId, type PromptId } from './prompts.ts';
+import { PROMPTS, MODELS, fill, type ModelId, type PromptId } from './prompts.ts';
 import { checkSchema, isRecord, tokens } from './project.ts';
 import type { Inference, ReadTrace, Settings, Tier } from './types.ts';
 
@@ -65,6 +65,13 @@ export type RunArgs = {
    * fold that lies about what was read, which is the one thing that fold is for.
    */
   trim?: { slot: string; lines: readonly string[]; onKept?: ((kept: number) => void) | undefined } | undefined;
+  /**
+   * The result schema for this call alone, in place of the template's, sent to the provider and checked on the way back.
+   *
+   * `answer` IS THE ONE CALLER, because its schema depends on the ask: a `choice` is an enum of that rule's choices. The
+   * template's schema would admit any string, and the rule's `if` would then compare an answer no choice spells.
+   */
+  schema?: object | undefined;
 };
 
 export type Core = {
@@ -210,6 +217,11 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference): Core => {
     const t0 = clock.now();
     const template = PROMPTS[args.id];
     const model = args.model ?? template.model;
+    /* THE TEMPLATE'S OWN SYSTEM AND NOT `SYSTEM`. Three templates carry `SYSTEM` and `answer` carries its own, whose
+       rules admit a digit and ask for no citation (`prompts.ts`, `ANSWER_SYSTEM`); read from `SYSTEM` here, an
+       automation's number question was sent a rule forbidding the number. */
+    const system = template.system;
+    const schema = args.schema ?? template.schema;
 
     let slots = args.slots;
     if (args.trim) {
@@ -217,7 +229,7 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference): Core => {
          record's own order, which is the order the caller asked the record for. */
       const lines = [...args.trim.lines];
       let content = fill(template.user, { ...slots, [args.trim.slot]: lines.join('\n') });
-      while (lines.length > 0 && tokens(SYSTEM) + tokens(content) > template.capIn) {
+      while (lines.length > 0 && tokens(system) + tokens(content) > template.capIn) {
         lines.pop();
         content = fill(template.user, { ...slots, [args.trim.slot]: lines.join('\n') });
       }
@@ -226,18 +238,18 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference): Core => {
     }
 
     const content = fill(template.user, slots);
-    const estimate = tokens(SYSTEM) + tokens(content);
+    const estimate = tokens(system) + tokens(content);
 
     let reply;
     try {
       reply = await (args.inference ?? fallback).complete({
         model,
         messages: [
-          { role: 'system', content: SYSTEM },
+          { role: 'system', content: system },
           { role: 'user', content },
         ],
         maxTokens: template.maxTokens,
-        jsonSchema: template.schema,
+        jsonSchema: schema,
       });
     } catch (e) {
       /* A PROVIDER THAT DID NOT ANSWER IS NOT A REFUSAL ABOUT THE ASK, and saying `PROPOSAL_SCHEMA`
@@ -264,7 +276,7 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference): Core => {
       return { model, ms, usage, out: no('PROPOSAL_SCHEMA', 'The model did not answer with JSON. Nothing was filed; ask again.') };
     }
 
-    const fault = checkSchema(template.schema, parsed);
+    const fault = checkSchema(schema, parsed);
     if (fault) return { model, ms, usage, out: { ok: false, refusal: fault } };
     if (!isRecord(parsed))
       return { model, ms, usage, out: no('PROPOSAL_SCHEMA', 'The model did not answer with an object. Nothing was filed; ask again.') };

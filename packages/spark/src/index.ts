@@ -2,10 +2,11 @@
  * `@braindog/spark`: the assistant's engine.
  *
  * WHAT IT DOES, AND THE ONE THING IT REFUSES. It answers the palette's fallback row in two passes,
- * it proposes an ingest pattern for messages nothing parsed, and it keeps the settings and the
- * meter behind those. It does not write a row: its only write is `record.propose`, its actor is
- * `spark`, and `30 §3`'s query over the event log (`actor = 'spark' AND kind NOT IN ('suggest',
- * 'propose', 'predict')`) is empty by construction rather than by policy.
+ * it proposes an ingest pattern for messages nothing parsed, it answers an automation's `ask_spark`
+ * question in the shape the rule asked for, and it keeps the settings and the meter behind those.
+ * It does not write a row: its only write is `record.propose`, its actor is `spark`, and `30 §3`'s
+ * query over the event log (`actor = 'spark' AND kind NOT IN ('suggest', 'propose', 'predict')`)
+ * is empty by construction rather than by policy.
  *
  * THREE BOUNDARIES, EACH STRUCTURAL RATHER THAN POLICED (`46 §1`):
  *
@@ -18,7 +19,8 @@
  *       here is an object with a `complete()` method and nothing else.
  *
  * WHAT IS BUILT HERE AND WHAT IS NOT. `46 §2` describes eleven methods; this is five of them, the
- * five the interface audits agree on. `triage`, `digestProse`, `embed` and `analyseDraft` have no
+ * five the interface audits agree on, and `answer`, which `46 §2` does not name and
+ * `loop/research-infer-ask.md` §4 does. `triage`, `digestProse`, `embed` and `analyseDraft` have no
  * caller in this tree yet, and `AUDIT-interface-B` IB-60 is explicit that tier A `triage` has no
  * dispatcher at all: no outbox kind carries it and no record step calls it. The tier C dispatcher
  * (`jobs`) is the other half, and it waits on the record's six JOBS methods, which do not exist
@@ -34,15 +36,18 @@
 
 import { no, ok, type Result } from '@braindog/ports';
 
+import { answering } from './answer.ts';
 import { core as makeCore, DDL } from './call.ts';
 import { patterns } from './jobs.ts';
 import { palette } from './propose.ts';
 import type { CallContext, Settings, Spark, SparkDeps, Status, Tier } from './types.ts';
 
 export { cite, citable, shapeOf, tokens } from './project.ts';
-export { MODELS, PROMPTS, SYSTEM } from './prompts.ts';
+export { answerSchema } from './answer.ts';
+export { ANSWER_SYSTEM, MODELS, PROMPTS, SYSTEM } from './prompts.ts';
 export type { ModelId, ModelRate, PromptId, PromptTemplate } from './prompts.ts';
 export type {
+  Ask,
   CallContext,
   Citable,
   Inference,
@@ -120,6 +125,7 @@ export function createSpark(deps: SparkDeps): Spark {
   const core = makeCore(deps.sql, deps.clock, deps.inference);
   const asking = palette(core, deps.record, deps.inference);
   const pattern = patterns(core, deps.record, deps.inference);
+  const automation = answering(core, deps.inference);
 
   const status = (): Status => {
     const s = core.settings();
@@ -193,6 +199,7 @@ export function createSpark(deps: SparkDeps): Spark {
     read: asking.read,
     propose: asking.propose,
     proposePattern: pattern.proposePattern,
+    answer: automation.answer,
     configure,
     status,
   };
