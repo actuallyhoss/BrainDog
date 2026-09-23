@@ -82,6 +82,8 @@ export type Runway = {
 
 const DAY_MS = 86_400_000;
 const iso = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+/** The last day of the month a `YYYY-MM-DD` day falls in: day zero of the month after it, at noon. */
+const endOfMonth = (day: string): string => iso(Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)), 0, 12));
 const noon = (day: string): number => Date.parse(`${day}T12:00:00Z`);
 
 /**
@@ -128,6 +130,11 @@ function occurrences(row: Entry, leg: Leg, first: string, until: number): { day:
      past cycle was clamped to today as overdue, so a monthly service anchored three months back
      charged four times on day one. Skipped cycles do not count toward the 64, as in the kernel. */
   const today = iso(NOW);
+  /* A FIRST DAY THAT IS ITS MONTH'S LAST DAY STAYS ON THE LAST DAY, as the kernel's walk does since W57-2
+     (`packages/kernel/src/forecast.ts`, `f732179d`). The clamp alone stepped a bill due 30 September to 30 October
+     and 30 December, and `engines.test.ts` holds the two engines to the same walk, so CI went red on the push that
+     carried the kernel half alone. A first day that is not a month end steps exactly as before. */
+  const monthEnd = endOfMonth(first) === first;
   const out: { day: string; at: number }[] = [];
   for (let n = 0; out.length < 64 && n < 64 + 1_200; n++) {
     /* `resolveDay` RATHER THAN `setUTCMonth`, because `setUTCMonth` OVERFLOWS. A monthly charge on
@@ -138,7 +145,8 @@ function occurrences(row: Entry, leg: Leg, first: string, until: number): { day:
        The fix was written once already and landed in a `renewals` helper nothing called, under a
        comment claiming this path did it. This is the live path, and it is now the same arithmetic
        `where.ts` uses for predicates: clamp to the last day of the month intended. */
-    const day = n === 0 ? iso(start) : resolveDay(`+${months * n}m`, start);
+    const stepped = n === 0 ? iso(start) : resolveDay(`+${months * n}m`, start);
+    const day = stepped && n > 0 && monthEnd ? endOfMonth(stepped) : stepped;
     if (!day) break;
     const at = noon(day);
     if (!Number.isFinite(at) || at > until) break;
