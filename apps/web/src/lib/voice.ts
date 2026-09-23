@@ -269,3 +269,10 @@ export const heardLabels = (labels: Labels): void => {
   held = labels;
 };
 export const labels = (): Labels => held;
+
+/**
+ * A declared value as a control offers it: the record's label for it (`relabel` lays it in `f.labels`), else the value
+ * spelt as a word. THE FORM READ NO LABEL, so a household's picker offered Client where its saved row read Work contact
+ * (`ui/value-said.test.ts`).
+ */
+export const valueSaid = (f: { labels?: Readonly<Record<string, string>> }, value: string): string => f.labels?.[value] ?? copy.valueWord(value);

@@ -6,7 +6,14 @@
  * person's words through labels ("Bills", not "Money"). Money needs Projects and People, so those come too, and
  * Projects is where a passion project lives, its states relabelled Active, Ongoing, On hold and Finished. The people in
  * a life are People's list with Personal's own roles laid on it (`extends` below): family, friend, landlord,
- * tradesperson and adviser. Nothing here says client, invoice or runway.
+ * tradesperson and adviser.
+ *
+ * THE STUDIO'S ROLES ARE STILL ON THE LIST, IN A HOUSEHOLD'S WORDS. People's picker offers client, contractor,
+ * accountant, registrar and collaborator first, because `extends` lays values after a list's own, and Personal reads
+ * them as Work contact, Hired help, Tax and accounts, Agency and Project partner (`labels` below). Relabelled and not
+ * hidden, by the owner's call: a hidden value leaves a row that holds one with a word the form no longer offers. The
+ * form reads the label since 1.6.0 (`RowForm.svelte`, `valueSaid`); before, it drew every value raw, and a household
+ * was offered Client and Registrar (`personal-words.test.ts`).
  *
  * WHAT MONEY DOES NOT HOLD IS THIS PACK'S. Day-to-day spending carries a person's own categories (groceries, getting
  * around), which Money's closed business categories cannot say and a use case cannot add to another pack's list. So
@@ -130,8 +137,9 @@ const budgetProgress = (heading: string) => ({
 export const PERSONAL = {
   usecase: 'personal',
   /* 1.3.0: the Projects page went, so the rail has one Projects Overview, and its next steps are on Home.
-     1.5.0: Personal lays its own roles on People through `extends`, and the relabels of the studio's roles went. */
-  version: '1.5.0',
+     1.5.0: Personal lays its own roles on People through `extends`, and the relabels of the studio's roles went.
+     1.6.0: the studio's roles are relabelled in a household's words that are not its own five. */
+  version: '1.6.0',
   title: 'Personal',
   summary: 'Your money and bills, what you are saving for, and the projects and goals you care about.',
   author: 'BrainDog',
@@ -166,8 +174,9 @@ export const PERSONAL = {
      PEOPLE'S ROLES ARE NOT RELABELLED ANY MORE. Personal read `client` as Family, `contractor` as Tradesperson,
      `accountant` as Adviser, `registrar` as Landlord and `collaborator` as Friend, so the screen said Family and the list
      had no such value: an agent told "family" was refused `ENUM_VALUE_UNKNOWN` (`personal-words.test.ts`). The five words
-     are values of the list now (`extends`), and the relabels went rather than stayed, because kept they would offer
-     each word twice, once under its own value and once over a studio's. The case for keeping them is a Personal record
+     are values of the list now (`extends`), and those relabels went rather than stayed, because kept they would show
+     each word twice, once under its own value and once over a studio's. 1.6.0 relabels the studio's five again, to
+     words that are none of Personal's own, so each word is offered once (the header). The case for keeping them is a Personal record
      made before 1.5.0 reading as it did, and there is no such record to protect: production has none
      (`loop/STATUS.md`: `/auth/methods` says `firstRun: true`), and the owner's own record comes from the import, which
      proposes a founder's setup and not Personal (`loop/research-shell-next.md` Brief V). So no migration moves a
@@ -193,6 +202,14 @@ export const PERSONAL = {
     'things.lane.retired': 'Finished',
     'things.revenue': 'Money made',
     'people:holds': 'the people in your life worth keeping track of: family, friends, a landlord, a plumber',
+    /* THE STUDIO'S ROLES IN A HOUSEHOLD'S WORDS, and none of them one of the five Personal lays, so no word is offered
+       twice. Relabelled and not hidden, by the owner's call: a hidden value leaves a row that holds one reading a word
+       the form no longer offers. */
+    'people.role.client': 'Work contact',
+    'people.role.contractor': 'Hired help',
+    'people.role.accountant': 'Tax and accounts',
+    'people.role.registrar': 'Agency',
+    'people.role.collaborator': 'Project partner',
     spending: 'Spending',
     'spending:one': 'purchase',
     budgets: 'Budget',
@@ -211,7 +228,9 @@ export const PERSONAL = {
     pack: 'usecase-personal',
     requires: { format: 1, primitives: 1, packs: {} },
     /* THE PEOPLE IN A LIFE, AS VALUES OF PEOPLE'S OWN LIST, after the studio's, so a client a person also has still reads
-       as Client. They stay the record's own if Personal is ever taken out, because rows hold them. */
+       as the record's word for it. After is not a choice: `extends` has no other place to put them, so a household's
+       picker reads the studio's five first, in the household's words (`labels`). They stay the record's own if Personal
+       is ever taken out, because rows hold them. */
     extends: { 'register.people': { values: { role: ['family', 'friend', 'landlord', 'tradesperson', 'adviser'] } } },
     declarations: [
       {

@@ -23,6 +23,7 @@
   import type { FieldDecl, Fields } from '../record/schema.ts';
   import { exponentOf } from 'braindog-render';
   import { copy } from '../copy.ts';
+  import { valueSaid } from '../voice.ts';
   import { firstAsks } from '../first-run.ts';
   import Icon from './Icon.svelte';
 
@@ -374,13 +375,13 @@
                 (e.currentTarget.parentElement?.children[(i + step + values.length) % values.length] as HTMLElement | undefined)?.focus();
               }}
             >
-              {copy.valueWord(value)}
+              {valueSaid(f, value)}
             </button>
           {/each}
         </div>
       {:else if f.type === 'enum'}
         <select class="row-input" id={id(f)} required={f.required} bind:value={typed[f.id]}>
-          {#each f.values ?? [] as value}<option value={value}>{copy.valueWord(value)}</option>{/each}
+          {#each f.values ?? [] as value}<option value={value}>{valueSaid(f, value)}</option>{/each}
         </select>
       {:else if f.type === 'ref'}
         <select class="row-input" id={id(f)} required={f.required} bind:value={typed[f.id]}>

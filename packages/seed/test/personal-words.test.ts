@@ -17,7 +17,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { install, normalise, plan, type Host, type Installed, type Pack } from '@braindog/declare';
+import { install, labelsOf, normalise, plan, type Host, type Installed, type Pack } from '@braindog/declare';
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
@@ -99,11 +99,33 @@ test('Family is offered once: a value of the list, and no longer a relabel of cl
   const role = roleOf(k);
   for (const word of WORDS) assert.equal(role.values.filter((v) => v === word).length, 1, `${word} is not offered exactly once`);
   assert.deepEqual(role.values.slice(-WORDS.length), WORDS, "Personal's words do not come after People's own");
-  /* THE RELABELS GO, so client reads as the list has it, Client, and no other value is shown as one of the five words. */
+  /* A RELABEL IS OVER A STUDIO VALUE ONLY, AND NEVER ONE OF THE FIVE WORDS, so no word is offered twice: once as its own
+     value and once over a studio's, which is why 1.5.0 took the old relabels away. */
   const labels = useCase('personal')!.labels;
-  assert.deepEqual(Object.keys(labels).filter((key) => key.startsWith('people.role.')), []);
+  const over = Object.keys(labels).filter((key) => key.startsWith('people.role.')).map((key) => key.slice('people.role.'.length));
+  assert.deepEqual(over.filter((v) => WORDS.includes(v)), []);
   assert.ok(!Object.values(labels).some((word) => ['Family', 'Friend', 'Landlord', 'Tradesperson', 'Adviser'].includes(word)));
   sql.close();
+});
+
+/* THE STUDIO'S WORDS A HOUSEHOLD IS OFFERED, which are four of the five People's own list starts with. `registrar` is
+   also one of the ten words `tools/gates/shell-words.mjs` keeps out of the core as a studio's. */
+const STUDIO = ['client', 'contractor', 'accountant', 'registrar'];
+
+/* THE WORDS A HOUSEHOLD IS OFFERED, as the form draws them: each value by the record's label for it, else its own.
+   Run against 1.5.0 the household was offered client, contractor, accountant, registrar, collaborator, other, family,
+   friend, landlord, tradesperson, adviser. THE OWNER'S CALL (wave forty-seven): relabel the studio's values in a
+   household's words rather than hide them, because a hidden value leaves a row that holds one with a word the form no
+   longer knows. The studio's values stay on the list, since the L2 case above still writes `client`. */
+test("a household's People picker offers none of the studio's words, and no word twice", async () => {
+  const { k, sql } = await made('personal');
+  const read = k.packConfig('usecase-personal');
+  assert.ok(read.ok, 'Personal holds no settings');
+  const labels = labelsOf(read.value.values as Record<string, unknown>, read.value.config as never);
+  const shown = roleOf(k).values.map((v) => labels[`people.role.${v}`] ?? v);
+  sql.close();
+  assert.deepEqual(shown.filter((w) => STUDIO.some((s) => w.toLowerCase().includes(s))), [], `a household is offered ${shown.join(', ')}`);
+  assert.equal(new Set(shown.map((w) => w.toLowerCase())).size, shown.length, `a word is offered twice: ${shown.join(', ')}`);
 });
 
 test('a Founder record is not offered family: the words are laid by Personal, not by People', async () => {
