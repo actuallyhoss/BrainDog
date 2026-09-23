@@ -37,8 +37,13 @@ import type { Call } from './webhook-doors.ts';
 export async function hostKey(base: string, get: (url: string) => Promise<Response> = (u) => fetch(u, { credentials: 'same-origin' })): Promise<string | null> {
   try {
     const res = await get(`${base}/api/push/key`);
+    /* THE BODY IS READ EVEN WHEN IT IS NOT WANTED. A refusal left unread stays an open request in Chromium for as long
+       as the page lives, and every host but the Worker refuses this route: the a11y gate waited on `networkidle` for
+       `/app/settings/notifications` until it timed out, which turned CI 35927285626 red. Measured in a probe beside the
+       gate's own server: the record answered 404 in 15 ms and the browser still held the request open eight seconds on. */
+    const text = await res.text();
     if (!res.ok) return null;
-    const body = (await res.json()) as { key?: unknown } | null;
+    const body = JSON.parse(text) as { key?: unknown } | null;
     return typeof body?.key === 'string' ? body.key : null;
   } catch {
     return null;
