@@ -479,7 +479,7 @@ class Poller {
 |---|---|
 | `notify.email` | `dispatch.email(payload)` |
 | `notify.push` | `dispatch.push(payload.sub, payload)` |
-| `notify.webhook` | `dispatch.webhook(new URL(payload.url), payload.body, payload.signature)`; a non-2xx status throws |
+| `notify.webhook` | `dispatch.webhook(new URL(payload.url), payload.body, payload.signature)`; a non-2xx status throws. `payload.signature` is computed at delivery and never stored: HMAC-SHA256 over the raw `payload.body` bytes, keyed by the secret of the grant `payload.grant` names (a vault label or id, the newest live one, as `keyNamed` resolves a call's key), sent as `x-braindog-signature: sha256=<lower-case hex>`, the shape an inbound `verify: hmac_sha256` reads. The key is opened by `sealedGrant` under this job's lease (`poll()` binds the opener to the leased row) and unwrapped with `keys`. A `payload.grant` that is gone, revoked or unopenable fails the job with the reason and posts nothing; no `payload.grant` posts unsigned. `signedWebhooks(post)` in `server.ts` is this handler; `main.ts` passes no deliverer yet, so on a running self-host the row waits in `pending` |
 | `pull.fetch` | `runPull(row, { http, keys, clock, record: api, ctx: systemCtx })` — 47 §2, phase 4. **It acks itself** (`applyPull` · `ackOutbox`), so `one()` skips the ack for this kind |
 | `export.r2` | `snapshots.take('export')` |
 | `erase.r2` | delete the blobs the payload names, or every key from `blobs.list(recId)` when it names none |

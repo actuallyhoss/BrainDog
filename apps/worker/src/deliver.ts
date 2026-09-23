@@ -21,15 +21,46 @@
  * The kind, the id and the message the transport gave are the whole of what is safe to say.
  */
 
-import type { OutboxKind, OutboxRow } from '@braindog/kernel';
+import { grantAad, grantKey, openSealed } from '@braindog/host';
+import type { LeasedSeal, OutboxKind, OutboxRow } from '@braindog/kernel';
+import { fixOf, type Result } from '@braindog/ports';
 
-/** What the platform contributes, and not one thing more. Both are injected so both can be faked. */
+import { unwrap, type KeyStore } from './keys.ts';
+
+/** One message as Email Service takes it: `to` is one address or up to fifty, and `from` is required. */
+export type Mail = { from: string; to: string | string[]; subject: string; text: string };
+
+/** The key a post names, opened, or the sentence that says why it was not. Never both, and the secret never logged. */
+export type Opened = { ok: true; secret: Uint8Array } | { ok: false; why: string };
+
+/** Open the key a leased `notify.webhook` names, under that job's lease and no other. */
+export type OpenPostKey = (job: OutboxRow, grant: string) => Promise<Opened>;
+
+/** What the platform contributes, and not one thing more. Every one is injected so every one can be faked. */
 export type Transports = {
   /** Cloudflare's `send_email` binding, or anything with the same one method. */
-  email?: ((message: { to: string; subject: string; text: string }) => Promise<void>) | undefined;
-  /** `fetch`, narrowed to what a webhook needs. */
-  post?: ((url: string, body: string) => Promise<{ ok: boolean; status: number }>) | undefined;
+  email?: ((message: Mail) => Promise<void>) | undefined;
+  /**
+   * The address notification mail is sent from: `MAIL_FROM`, else `AUTH_MAIL_FROM`, on a domain Email Service sends
+   * for. Blank or absent, and no notification mail is sent, because Email Service refuses a message without one.
+   */
+  from?: string | undefined;
+  /** `fetch`, narrowed to what a webhook needs: the address, the raw body, and the headers that go with it. */
+  post?: ((url: string, body: string, headers: Record<string, string>) => Promise<{ ok: boolean; status: number }>) | undefined;
+  /** How a named signing key is opened. Absent, and a post that names one is refused rather than sent bare. */
+  open?: OpenPostKey | undefined;
 };
+
+/**
+ * The header a signed post carries: `sha256=` and the lower-case hex HMAC-SHA256 of the raw body, keyed by the secret.
+ *
+ * THE SHAPE THIS PRODUCT'S OWN INBOUND `verify: hmac_sha256` READS (`packages/host/src/ingest.ts` takes the prefix off
+ * and compares hex), so one record can take another record's digest as a verified arrival. `49 §5.12` names it.
+ */
+export const SIGNATURE_HEADER = 'x-braindog-signature';
+
+/** Email Service's own ceiling for `to`, `cc` and `bcc` together. More owners than this is a dead letter that says so. */
+const MAX_RECIPIENTS = 50;
 
 export type Deliver = (job: OutboxRow) => Promise<void>;
 
@@ -90,6 +121,73 @@ const read = (payload: string): Record<string, unknown> | null => {
 
 const text = (v: unknown): string => (typeof v === 'string' ? v : '');
 
+/**
+ * Who a `notify.email` goes to: one address, or a list of them, or `null` for nobody.
+ *
+ * THE KERNEL WRITES A LIST. `digest.ts` queues `to: deps.owners()` and so does an urgent notice, and this read a
+ * string: every digest email it was ever handed came out as `''` and dead-lettered as having no recipient. A list
+ * with a blank or a non-string in it is refused whole, because mailing the rest would be a guess about who was meant.
+ */
+const recipients = (v: unknown): string | string[] | null => {
+  if (typeof v === 'string') return v.trim() === '' ? null : v;
+  if (!Array.isArray(v) || v.length === 0) return null;
+  return v.every((to): to is string => typeof to === 'string' && to.trim() !== '') ? v : null;
+};
+
+const hex = (bytes: ArrayBuffer): string => [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('');
+
+/** `sha256=<hex>` over exactly these bytes. The body is signed as it is sent, and never re-serialised first. */
+async function signed(secret: Uint8Array, body: string): Promise<string> {
+  const key = await crypto.subtle.importKey('raw', secret, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return `sha256=${hex(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(body)))}`;
+}
+
+const b64 = (text: string): Uint8Array => Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
+
+/**
+ * The record's half of opening a post's key: which record it is, and the seal its lease earned. Over RPC on the
+ * Worker, as `Record$.sealFor`, because the record holds the lease and the vault and the Worker holds the KEK.
+ */
+export type SealAsk = (args: { outbox: string; leasedUntil: string; grant: string }) => Promise<Result<{ record: string; seal: LeasedSeal }>>;
+
+/**
+ * An opener over the record's `sealedGrant` and this host's key store.
+ *
+ * THE LEASE IS THE AUTHORITY, not the Worker's say-so. The record checks that the job is still leased to this holder
+ * and that its payload names this key, and only then hands back sealed bytes; the Worker unwraps them with the KEK the
+ * record never sees (ADR-062). The store is asked for lazily, because a malformed `KEK` throws, and a throw at the top
+ * of `drainOutbox` would stop every email in the pass for the sake of one signed post.
+ */
+export function leasedOpener(ask: SealAsk, store: () => Promise<KeyStore | null>): OpenPostKey {
+  return async (job, grant) => {
+    const keys = await store();
+    if (!keys) return { ok: false, why: 'This deployment has no key store, so no signing key can be opened.' };
+    const out = await ask({ outbox: job.id, leasedUntil: job.leasedUntil, grant });
+    if (!out.ok) return { ok: false, why: fixOf(out) };
+    const { record, seal } = out.value;
+    const dek = await unwrap(keys, record, seal.dek.purpose, {
+      wrapped: b64(seal.dek.wrapped),
+      nonce: b64(seal.dek.nonce),
+      kek_id: seal.dek.kek_id,
+      wrapped_by: 'kek',
+    });
+    if (!dek) return { ok: false, why: `The key "${grant}" is wrapped by a root key this deployment does not hold.` };
+    try {
+      const plain = await openSealed(
+        await grantKey(dek, seal.grant.grant_id),
+        b64(seal.grant.nonce),
+        grantAad(record, seal.grant.grant_id, String(seal.grant.version)),
+        b64(seal.grant.ciphertext),
+      );
+      /* A FAILED DECRYPT SAYS ONE THING, as `sealing.ts` says: which of a wrong key, a wrong AAD or a tampered tag it
+         was is information about the key hierarchy that the reader of a dead letter has no use for. */
+      return plain ? { ok: true, secret: plain } : { ok: false, why: `The key "${grant}" did not open.` };
+    } finally {
+      dek.fill(0);
+    }
+  };
+}
+
 export function makeDeliver(transports: Transports): Deliver {
   return async (job: OutboxRow): Promise<void> => {
     const payload = read(job.payload);
@@ -99,10 +197,17 @@ export function makeDeliver(transports: Transports): Deliver {
 
     if (job.kind === 'notify.email') {
       if (!transports.email) throw new Error('this deployment has no email transport');
-      const to = text(payload.to);
+      /* NO SENDER, NO SEND. Measured at afb3b1b2, the message went to `EMAIL.send` with no `from`, which Email Service
+         refuses as `E_FIELD_MISSING`, so the sentence here is the one that names the repair. */
+      const from = (transports.from ?? '').trim();
+      if (from === '')
+        throw new Error('this deployment has no sender for notification mail: set MAIL_FROM to an address on a domain Email Service sends for');
+      const to = recipients(payload.to);
       const subject = text(payload.subject);
       if (!to || !subject) throw new Error('a notify.email needs a recipient and a subject');
-      await transports.email({ to, subject, text: text(payload.text) });
+      if (Array.isArray(to) && to.length > MAX_RECIPIENTS)
+        throw new Error(`a notify.email goes to at most ${MAX_RECIPIENTS} addresses, and this one names ${to.length}`);
+      await transports.email({ from, to, subject, text: text(payload.text) });
       return;
     }
 
@@ -110,7 +215,33 @@ export function makeDeliver(transports: Transports): Deliver {
       if (!transports.post) throw new Error('this deployment has no outbound http');
       const url = postable(text(payload.url));
       if (!url) throw new Error('a webhook goes to an https address on a public host');
-      const out = await transports.post(url, text(payload.body));
+      const body = text(payload.body);
+      const headers: Record<string, string> = {};
+      /* A NAMED KEY SIGNS THE POST OR NOTHING IS POSTED. A key that is gone, revoked, wrapped by a root key this
+         deployment lacks, or behind an opener that threw is a dead letter with the reason in it; posting the body bare
+         would hand the owner's rows to a receiver that was promised a signature. A payload that names no key is a
+         declaration that chose an unsigned post (`webhook.grant` is optional, `09 §6`), and it goes as it always did. */
+      const grant = text(payload.grant);
+      if (grant !== '') {
+        if (!transports.open) throw new Error(`this deployment cannot open the key "${grant}" that signs this post, so nothing was posted`);
+        let opened: Opened;
+        try {
+          opened = await transports.open(job, grant);
+        } catch (e) {
+          opened = { ok: false, why: e instanceof Error ? e.message : String(e) };
+        }
+        if (!opened.ok) {
+          /* THE REFUSAL SENTENCE ALONE REACHES THE ERROR, taken out by name so no path from the secret to a message exists. */
+          const why = opened.why;
+          throw new Error(`${why} So nothing was posted.`);
+        }
+        try {
+          headers[SIGNATURE_HEADER] = await signed(opened.secret, body);
+        } finally {
+          opened.secret.fill(0);
+        }
+      }
+      const out = await transports.post(url, body, headers);
       /* THE STATUS IS THE ANSWER. A deliverer that treated 500 as delivered would ack a job that
          never arrived, and the row would be `done` for ever with nothing on the other end. */
       if (!out.ok) throw new Error(`the endpoint answered ${out.status}`);

@@ -413,8 +413,17 @@ export function openGrant(
  */
 export type LeasedSeal = {
   grant: { ciphertext: string; nonce: string; kek_id: string; grant_id: string; version: number };
-  dek: { wrapped: string; nonce: string; kek_id: string };
+  /**
+   * `purpose` IS WHICH DATA KEY THIS IS, because the host unwraps it under an AAD that names its purpose and a wrong
+   * guess is an `OperationError` indistinguishable from a wrong KEK. A connector's is always `connector`; a webhook's
+   * signing key is whichever key sealed it, which for a key a person deposited is `record`.
+   */
+  dek: { wrapped: string; nonce: string; kek_id: string; purpose: 'record' | 'connector' };
 };
+
+/** The two jobs that send a key under their lease: a connector's pull, and a post that is signed. */
+const SENDS_A_KEY = ['pull.fetch', 'notify.webhook'] as const;
+type SendsAKey = (typeof SENDS_A_KEY)[number];
 
 /**
  * Hand a credential to whoever is holding a live lease on the job that needs it.
@@ -437,6 +446,11 @@ export type LeasedSeal = {
  *
  * THE RECORD STILL NEVER DECRYPTS. Sealed bytes and a wrapped key go out, exactly as they do to a
  * person. The host unwraps, because the host is where the KEK is.
+ *
+ * AND A SIGNED POST IS THE SECOND JOB THAT MAY ASK. A `notify.webhook` whose payload names `grant` is a
+ * digest whose POST is signed with that key (`09 §6`, `49 §5.12`), so the deliverer holding its lease
+ * opens it here under the same three lease checks and the same payload check. It names the key by
+ * label, and `test/vault-webhook-grant.test.ts` holds what that changes.
  */
 export function sealedGrant(
   sql: Sql,
@@ -444,11 +458,16 @@ export function sealedGrant(
   args: { outbox: string; leasedUntil: string; grant: string },
   transaction: <T>(fn: () => T) => T,
 ): Result<LeasedSeal> {
-  const job = sql.one<{ state: string; leased_until: string | null; payload: string }>(
-    "SELECT state, leased_until, payload FROM outbox WHERE id = ? AND kind = 'pull.fetch'",
+  /* TWO KINDS AND NO MORE. A `notify.webhook` names the key that signs its body (`09 §6`, `digest.ts`), and until
+     wave fifty-five this read `kind = 'pull.fetch'` alone, so the one door a deliverer could open that key through
+     answered "There is no connector job" and the post went unsigned. An email or a push names no key, and a lease on
+     one opens nothing, which is the same refusal it always was. */
+  const job = sql.one<{ kind: SendsAKey; state: string; leased_until: string | null; payload: string }>(
+    `SELECT kind, state, leased_until, payload FROM outbox WHERE id = ? AND kind IN (${SENDS_A_KEY.map(() => '?').join(', ')})`,
     args.outbox,
+    ...SENDS_A_KEY,
   );
-  if (!job) return no<LeasedSeal>('OUT_OF_BOUNDS', `There is no connector job ${args.outbox}.`, { at: 'outbox' });
+  if (!job) return no<LeasedSeal>('OUT_OF_BOUNDS', `There is no connector job or signed post ${args.outbox}.`, { at: 'outbox' });
   if (job.state !== 'leased' || job.leased_until === null)
     return no<LeasedSeal>('PULL_LEASE_EDGE', `${args.outbox} is ${job.state}, not leased, so nothing is opened for it.`, {
       at: 'outbox',
@@ -481,7 +500,7 @@ export function sealedGrant(
       { at: 'grant' },
     );
 
-  const row = sql.one<{
+  type Held = {
     id: string;
     kind: GrantKind;
     version: number;
@@ -490,8 +509,29 @@ export function sealedGrant(
     kek_id: string;
     revoked_at: string | null;
     sealed_under: 'record' | 'connector';
-  }>('SELECT id, kind, version, ciphertext, nonce, kek_id, revoked_at, sealed_under FROM grant WHERE id = ?', args.grant);
-  if (!row) return no<LeasedSeal>('OUT_OF_BOUNDS', `There is no grant ${args.grant}.`, { at: 'grant' });
+  };
+  const COLUMNS = 'id, kind, version, ciphertext, nonce, kek_id, revoked_at, sealed_under';
+  /* A POST NAMES ITS KEY BY LABEL AND A CONNECTOR BY ID. `09 §6` makes `webhook.grant` a vault label and `digest.ts`
+     copies it as written, so it resolves as `keyNamed` resolves a call's key: label or id, never a revoked grant,
+     newest first and the tie on the id. Only when nothing live answers is a revoked row read, so the refusal can say
+     the key was revoked rather than that it never existed. */
+  const row =
+    job.kind === 'notify.webhook'
+      ? (sql.one<Held>(
+          `SELECT ${COLUMNS} FROM grant WHERE (label = ? OR id = ?) AND revoked_at IS NULL ORDER BY created_at DESC, id DESC LIMIT 1`,
+          args.grant,
+          args.grant,
+        ) ??
+        sql.one<Held>(`SELECT ${COLUMNS} FROM grant WHERE label = ? OR id = ? ORDER BY created_at DESC, id DESC LIMIT 1`, args.grant, args.grant))
+      : sql.one<Held>(`SELECT ${COLUMNS} FROM grant WHERE id = ?`, args.grant);
+  if (!row)
+    return no<LeasedSeal>(
+      'OUT_OF_BOUNDS',
+      job.kind === 'notify.webhook'
+        ? `There is no key "${args.grant}" in the vault, so the post it signs is not sent.`
+        : `There is no grant ${args.grant}.`,
+      { at: 'grant' },
+    );
   /* REVOKED BETWEEN THE FIRE AND THE RUN is the ordinary case, not an exotic one: a person revokes a
      key precisely when they have decided the thing using it should stop. */
   if (row.revoked_at)
@@ -503,7 +543,7 @@ export function sealedGrant(
      away in the host, with nothing here saying why. It is also the more important half: a
      credential a person deposited to open on a screen, with themselves present, is not one a
      scheduled run may have. Re-seal it under the connector key; nothing else converts it. */
-  if (row.sealed_under !== 'connector')
+  if (job.kind === 'pull.fetch' && row.sealed_under !== 'connector')
     return no<LeasedSeal>(
       'OUT_OF_BOUNDS',
       `${args.grant} was sealed for use by a person, not by a connector. Re-add it to the connector before it runs.`,
@@ -511,29 +551,46 @@ export function sealedGrant(
     );
 
   /* THE CONNECTOR DEK, NOT THE RECORD'S. `12 §6` keeps them apart so that what a connector run can
-     open is only ever a connector's credential, even if a runner were compromised outright. */
+     open is only ever a connector's credential, even if a runner were compromised outright.
+
+     A SIGNED POST GETS THE KEY ITS GRANT WAS SEALED UNDER. A digest is `paged: false` in `digestEgress`, so its
+     approval takes a key a person deposited at the vault door, and that key is sealed `record`. The key that door
+     opens for a scheduled `call` is the same record key (`keyOpener`, `openGrant`), so this hands out nothing a
+     scheduled run could not already open, and it hands it out under a lease on the one post that names it. Refusing
+     it here would be a digest that was approved and dead-letters on its first post. */
+  const purpose: 'record' | 'connector' = job.kind === 'pull.fetch' ? 'connector' : row.sealed_under;
   const dek = sql.one<{ wrapped: Uint8Array; nonce: Uint8Array; wrapped_by: string; kek_id: string | null }>(
-    "SELECT wrapped, nonce, wrapped_by, kek_id FROM vault_key WHERE purpose = 'connector'",
+    'SELECT wrapped, nonce, wrapped_by, kek_id FROM vault_key WHERE purpose = ?',
+    purpose,
   );
   if (!dek)
-    return no<LeasedSeal>('OUT_OF_BOUNDS', 'This record has no connector key, so a connector cannot open anything.', {
-      at: 'grant',
-    });
+    return no<LeasedSeal>(
+      'OUT_OF_BOUNDS',
+      purpose === 'connector'
+        ? 'This record has no connector key, so a connector cannot open anything.'
+        : 'This record has no record key, so the key that signs this post cannot be opened.',
+      { at: 'grant' },
+    );
   /* A CONNECTOR KEY IS ALWAYS WRAPPED BY A KEK (ADR-052), so a passphrase here is a record whose
      connector key nobody can supply without a person present, which is the one thing a scheduled
-     run does not have. Say so rather than hand out bytes no runner can open. */
+     run does not have. Say so rather than hand out bytes no runner can open.
+
+     A RECORD KEY CAN BE BEHIND A PASSPHRASE, and a signed post is refused by the key it asked for. This sentence said
+     "connector key" for both, so an owner whose digest dead-lettered here was sent to a connector the post never used. */
   if (dek.wrapped_by !== 'kek' || !dek.kek_id)
     return no<LeasedSeal>(
       'WRONG_KEY',
-      'This record’s connector key is not held by a key this host can use, so scheduled runs cannot open it.',
+      purpose === 'connector'
+        ? 'This record’s connector key is not held by a key this host can use, so scheduled runs cannot open it.'
+        : 'This record’s own record key is behind a passphrase or a key this host cannot use, so the key that signs this post cannot be opened without a person present.',
       { at: 'kek_id' },
     );
 
   return attempt(sql, transaction, () => {
     /* A RUN IS A READING. `opened` answers "is this credential actually used", and a count that left
        out every automated use would answer it wrongly for exactly the credentials that are. */
-    sql.exec('UPDATE grant SET opened = opened + 1, last_opened = ? WHERE id = ?', instant(deps.nowMs), args.grant);
-    event(sql, deps, 'grant.read', args.grant, row.kind);
+    sql.exec('UPDATE grant SET opened = opened + 1, last_opened = ? WHERE id = ?', instant(deps.nowMs), row.id);
+    event(sql, deps, 'grant.read', row.id, row.kind);
     return ok({
       grant: {
         ciphertext: base64(row.ciphertext!),
@@ -542,7 +599,7 @@ export function sealedGrant(
         grant_id: row.id,
         version: row.version,
       },
-      dek: { wrapped: base64(dek.wrapped), nonce: base64(dek.nonce), kek_id: dek.kek_id! },
+      dek: { wrapped: base64(dek.wrapped), nonce: base64(dek.nonce), kek_id: dek.kek_id!, purpose },
     });
   });
 }

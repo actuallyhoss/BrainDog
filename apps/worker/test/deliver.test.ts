@@ -36,16 +36,43 @@ const threw = async (fn: () => Promise<unknown>): Promise<string> => {
 
 /* ── it delivers ─────────────────────────────────────────────────────────── */
 
-test('AN EMAIL IS SENT WITH WHAT THE ROW SAYS, and nothing else', async () => {
+test('AN EMAIL IS SENT WITH WHAT THE ROW SAYS, from the sender this deployment names, and nothing else', async () => {
   const sent: unknown[] = [];
-  const deliver = makeDeliver({ email: async (m) => void sent.push(m) });
+  const deliver = makeDeliver({ email: async (m) => void sent.push(m), from: 'notify@brain.example' });
 
   await deliver(job('notify.email', { to: 'ada@example.com', subject: 'Monday', text: '2 overdue' }));
-  assert.deepEqual(sent, [{ to: 'ada@example.com', subject: 'Monday', text: '2 overdue' }]);
+  assert.deepEqual(sent, [{ from: 'notify@brain.example', to: 'ada@example.com', subject: 'Monday', text: '2 overdue' }]);
 
   // A row with no recipient is a dead letter, not an email to nobody.
   assert.match(await threw(() => deliver(job('notify.email', { subject: 'Monday' }))), /recipient and a subject/);
   assert.equal(sent.length, 1);
+});
+
+test('A RECORD NAMES ITS OWNERS AS A LIST, and the list is who the mail goes to', async () => {
+  /* MEASURED AT afb3b1b2: `digest.ts` queues `to: deps.owners()`, which is `string[]`, and so does an urgent notice.
+     This file read `payload.to` as a string, got `''` for the array, and threw "a notify.email needs a recipient and a
+     subject". So every digest and every urgent email the kernel has ever queued dead-lettered here, from and all. */
+  const sent: { to: unknown }[] = [];
+  const deliver = makeDeliver({ email: async (m) => void sent.push(m), from: 'notify@brain.example' });
+  await deliver(job('notify.email', { to: ['ada@example.com', 'bo@example.com'], subject: 'Monday', text: '2 overdue' }));
+  assert.deepEqual(sent.map((m) => m.to), [['ada@example.com', 'bo@example.com']]);
+
+  // An empty list, or one with a blank or a non-string in it, is nobody, and nobody is a dead letter.
+  for (const to of [[], [''], ['ada@example.com', 7]])
+    assert.match(await threw(() => deliver(job('notify.email', { to, subject: 'Monday' }))), /recipient and a subject/, JSON.stringify(to));
+  assert.equal(sent.length, 1);
+});
+
+test('WITHOUT A SENDER NO MAIL IS SENT, and the dead letter names the setting', async () => {
+  /* MEASURED AT afb3b1b2: `drainOutbox` called `env.EMAIL.send({ to, subject, text })` with no `from`, which Email
+     Service refuses as `E_FIELD_MISSING`. A message nobody can deliver is not sent; the ladder walks with a sentence
+     that says what to set. A blank sender is the same as none. */
+  for (const from of [undefined, '', '   ']) {
+    const sent: unknown[] = [];
+    const deliver = makeDeliver({ email: async (m) => void sent.push(m), from });
+    assert.match(await threw(() => deliver(job('notify.email', { to: 'ada@example.com', subject: 'Monday' }))), /MAIL_FROM/);
+    assert.deepEqual(sent, [], `a message with no sender was handed to the transport (from: ${JSON.stringify(from)})`);
+  }
 });
 
 test('AND A WEBHOOK THAT ANSWERED 500 IS NOT DELIVERED', async () => {
@@ -82,7 +109,7 @@ test('and a payload nobody can read, or a transport nobody configured, fails rat
   assert.match(await threw(() => makeDeliver(none)(job('notify.email', { to: 'a@b.c', subject: 'x' }))), /no email transport/);
   assert.match(await threw(() => makeDeliver(none)(job('notify.webhook', { url: 'https://x.example' }))), /no outbound http/);
 
-  const deliver = makeDeliver({ email: async () => {} });
+  const deliver = makeDeliver({ email: async () => {}, from: 'notify@brain.example' });
   assert.match(await threw(() => deliver(job('notify.email', 'not json'))), /payload this host cannot read/);
   assert.match(await threw(() => deliver(job('notify.email', '"a string"'))), /payload this host cannot read/);
 });

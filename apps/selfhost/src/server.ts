@@ -18,6 +18,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { argv, env, exit } from 'node:process';
 
 import {
+  grantAad, grantKey, openSealed,
   handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveKeys, serveSpark, serveVault, servesKeys, servesSpark, servesVault, sessionOf, withSession,
   type Handler, type IngestDoor, type KeysDoor, type SparkAskDoor, type VaultDoor,
 } from '@braindog/host';
@@ -46,7 +47,7 @@ import { certificateNames, originFor } from './reach.ts';
 import { fileSnapshots, type FileSnapshots } from './snapshots.ts';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 import { badSlug, createDirectory, switcherAsk, type Directory } from '@braindog/record/directory';
-import type { Auth, Param, Refusal, Row, Scheduler, Sql } from '@braindog/ports';
+import { fixOf, type Auth, type Param, type Refusal, type Row, type Scheduler, type Sql } from '@braindog/ports';
 
 import {
   actionExecutor,
@@ -74,7 +75,7 @@ import { runInQuickJs } from '@braindog/script/quickjs';
 import { scriptSandbox } from './script.ts';
 import { httpFor } from './http.ts';
 import { sparkAnswersFor, sparkDoor, sparkFromEnv, sparkModelFor, type SparkConfig } from './spark.ts';
-import type { KeyStore } from './keys.ts';
+import { unwrap, type KeyStore } from './keys.ts';
 import { shellOf } from './shell.ts';
 import { signerFor } from './sign.ts';
 import { keysDoor, vaultDoor } from './vault.ts';
@@ -375,7 +376,121 @@ async function contextFor(request: Request, host: string, site: Site): Promise<S
  * because the retry ladder is the record's and a deliverer that decided its own retries would be the
  * second ladder [09-ALARMS] spends a paragraph forbidding.
  */
-export type Deliver = (job: OutboxRow) => Promise<void>;
+export type Deliver = (job: OutboxRow, keys: PostKeys) => Promise<void>;
+
+/** The key a post names, opened, or the sentence that says why it was not. The secret is never logged or kept. */
+export type Opened = { ok: true; secret: Uint8Array } | { ok: false; why: string };
+
+/**
+ * What the poller hands a deliverer beside the job: an opener bound to THAT job's lease.
+ *
+ * BOUND BY THE POLLER AND NOT BUILT BY THE DELIVERER, so a deliverer can ask for the key its own leased job names and
+ * for nothing else. The record's `sealedGrant` checks the lease is still this holder's and that the payload names the
+ * key; the host unwraps with the KEK the record never sees (ADR-062).
+ */
+export type PostKeys = { open(grant: string): Promise<Opened> };
+
+/**
+ * The header a signed post carries: `sha256=` and the lower-case hex HMAC-SHA256 of the raw body, keyed by the secret.
+ * The Worker's `deliver.ts` sends the same, and the inbound `verify: hmac_sha256` reads it (`49 §5.12`).
+ */
+export const SIGNATURE_HEADER = 'x-braindog-signature';
+
+const hexOf = (bytes: ArrayBuffer): string => [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('');
+const unb64 = (text: string): Uint8Array => Uint8Array.from(Buffer.from(text, 'base64'));
+
+/** Posts one body with its headers, and says what the endpoint answered. The address checks are the sender's. */
+export type WebhookPost = (url: string, body: string, headers: Record<string, string>) => Promise<{ ok: boolean; status: number }>;
+
+/**
+ * The `notify.webhook` deliverer: the body as queued, signed with the key the payload names, or not posted at all.
+ *
+ * A NAMED KEY THAT DOES NOT OPEN IS A DEAD LETTER, NEVER A BARE POST. Gone, revoked, wrapped by a root key this host
+ * lacks, or no key store at all: the ladder walks with the reason, because a receiver that checks signatures drops an
+ * unsigned body and one that does not has been handed the owner's rows by a record that was told to sign them. A
+ * payload naming no key is a declaration that chose an unsigned post (`webhook.grant` is optional, `09 §6`).
+ *
+ * `post` OWNS WHERE THE REQUEST MAY GO. This refuses anything but `https:`, as the Worker does; a name that resolves to
+ * a private address is the pinned sender's to refuse (`./actions.ts`), and `main.ts` wires none yet.
+ */
+export function signedWebhooks(post: WebhookPost): Deliver {
+  return async (job, keys) => {
+    if (job.kind !== 'notify.webhook') throw new Error(`nothing in this deployment delivers a ${job.kind}`);
+    let payload: { url?: unknown; body?: unknown; grant?: unknown };
+    try {
+      payload = JSON.parse(job.payload) as typeof payload;
+    } catch {
+      throw new Error('a notify.webhook payload this host cannot read');
+    }
+    const text = (v: unknown): string => (typeof v === 'string' ? v : '');
+    let url: URL;
+    try {
+      url = new URL(text(payload.url));
+    } catch {
+      throw new Error('a webhook goes to an https address');
+    }
+    if (url.protocol !== 'https:') throw new Error('a webhook goes to an https address');
+    const body = text(payload.body);
+    const headers: Record<string, string> = {};
+    const grant = text(payload.grant);
+    if (grant !== '') {
+      let opened: Opened;
+      try {
+        opened = await keys.open(grant);
+      } catch (e) {
+        opened = { ok: false, why: e instanceof Error ? e.message : String(e) };
+      }
+      if (!opened.ok) {
+        /* THE REFUSAL SENTENCE ALONE REACHES THE ERROR, taken out by name so no path from the secret to a message exists. */
+        const why = opened.why;
+        throw new Error(`${why} So nothing was posted.`);
+      }
+      try {
+        const key = await crypto.subtle.importKey('raw', opened.secret, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+        headers[SIGNATURE_HEADER] = `sha256=${hexOf(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(body)))}`;
+      } finally {
+        opened.secret.fill(0);
+      }
+    }
+    const out = await post(url.toString(), body, headers);
+    if (!out.ok) throw new Error(`the endpoint answered ${out.status}`);
+  };
+}
+
+/**
+ * The opener the poller binds to one leased job: the record's `sealedGrant` under that lease, unwrapped with this host's
+ * key store. `system` signs the `grant.read`, as it does for a scheduled call, because nobody asked.
+ */
+function postKeys(api: { kernel: Pick<Api['kernel'], 'sealedGrant' | 'identity'> }, store: KeyStore | undefined, job: OutboxRow): PostKeys {
+  return {
+    async open(grant) {
+      if (!store) return { ok: false, why: 'This host has no key store, so no signing key can be opened.' };
+      const record = api.kernel.identity()?.id;
+      if (!record) return { ok: false, why: 'This record has not been created, so it holds no key.' };
+      const out = api.kernel.sealedGrant({ outbox: job.id, leasedUntil: job.leasedUntil, grant }, 'system');
+      if (!out.ok) return { ok: false, why: fixOf(out) };
+      const sealed = out.value;
+      const dek = await unwrap(store, record, sealed.dek.purpose, {
+        wrapped: unb64(sealed.dek.wrapped),
+        nonce: unb64(sealed.dek.nonce),
+        kek_id: sealed.dek.kek_id,
+        wrapped_by: 'kek',
+      });
+      if (!dek) return { ok: false, why: `The key "${grant}" is wrapped by a root key this host does not hold.` };
+      try {
+        const plain = await openSealed(
+          await grantKey(dek, sealed.grant.grant_id),
+          unb64(sealed.grant.nonce),
+          grantAad(record, sealed.grant.grant_id, String(sealed.grant.version)),
+          unb64(sealed.grant.ciphertext),
+        );
+        return plain ? { ok: true, secret: plain } : { ok: false, why: `The key "${grant}" did not open.` };
+      } finally {
+        dek.fill(0);
+      }
+    },
+  };
+}
 
 /* ── /in/*: the arrival door ─────────────────────────────────────────────── */
 
@@ -1019,7 +1134,7 @@ export async function start(options: {
       let sent = false;
       let why = '';
       try {
-        await options.deliver(job);
+        await options.deliver(job, postKeys(api, options.keys, job));
         sent = true;
       } catch (e) {
         why = e instanceof Error ? e.message : String(e);
@@ -1197,6 +1312,21 @@ export async function start(options: {
     if (/^\/+\.well-known\/+braindog-build\/*$/.test(new URL(req.url ?? '/', 'http://localhost').pathname)) {
       res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
       res.end(JSON.stringify({ app: buildApp || null }));
+      return;
+    }
+    /* `/healthz`, AS THE WORKER ANSWERS IT (ROADMAP W55): `{ ok, app }`, before any door and with no credential, so a
+       container's health check needs no token. Measured at afb3b1b2 it was the router's 404 `ROUTE_UNKNOWN`. BEFORE THE
+       DELETED-RECORD 503, because the question is whether this process answers, and a restart loop over a record that
+       was deleted on purpose would fix nothing. */
+    if (/^\/+healthz\/*$/.test(new URL(req.url ?? '/', 'http://localhost').pathname)) {
+      const method = req.method ?? 'GET';
+      if (method !== 'GET' && method !== 'HEAD') {
+        res.writeHead(405, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', allow: 'GET, HEAD' });
+        res.end(JSON.stringify({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: '/healthz is read with GET or HEAD.' } }));
+        return;
+      }
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      res.end(method === 'HEAD' ? undefined : JSON.stringify({ ok: true, app: buildApp || null }));
       return;
     }
     /* A CATALOGUE IS FILES, answered before any door, and never a record's: a deleted record does not change it. */

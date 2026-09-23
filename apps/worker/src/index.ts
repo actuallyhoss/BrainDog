@@ -23,7 +23,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveSpark, servesSpark, withSession, type SessionHints, type SparkAskDoor, type VaultGrantSeen } from '@braindog/host';
 import { deriveSessionKey, relyingParty, serveAccount, serveAuth, type DeviceDoor, type InviteDoor, type Provisioned } from '@braindog/host/auth';
 import { gate, serveMcp as answerMcp, unauthorized as unknownAgent } from '@braindog/mcp/http';
-import { INVITE_GONE, ulids, type Arrival, type Arrived, type CreateRecordArgs, type DeviceCode, type Exchanged, type OutboxRow, type VaultGrant, type Waiting } from '@braindog/kernel';
+import { INVITE_GONE, ulids, type Arrival, type Arrived, type CreateRecordArgs, type DeviceCode, type Exchanged, type LeasedSeal, type OutboxRow, type VaultGrant, type Waiting } from '@braindog/kernel';
 import { createRecordApi, type CallContext, type Deposited, type IngestVerification, type Limited, type OpenedForGrant, type RecordApi, type SealTarget, type Sealed } from '@braindog/record';
 import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Sql, Who } from '@braindog/ports';
@@ -42,7 +42,7 @@ import { alarmScheduler } from './alarm.ts';
 import { sparkLook, workerSparkAnswers, workerSparkDoor, workerSparkModel } from './spark.ts';
 import { workerCatalogueOffers } from './catalogue.ts';
 import { DELETED, destroyRecord } from './destroy.ts';
-import { DELIVERS, makeDeliver } from './deliver.ts';
+import { DELIVERS, leasedOpener, makeDeliver, type Mail } from './deliver.ts';
 import { consume, pump } from './pump.ts';
 import { appPath, asPage, atRoot, cloudIngest, copyAsked, copyRefusal, drained, ingestBudget, inward, isRecordId, legacyRedirect, servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesMcp, type AppPath, type CloudIngestDeps } from './route.ts';
 import { NO_MINT_SESSION, serveInbound, servesInbound } from './inbound.ts';
@@ -69,10 +69,11 @@ const KNOWN_ADDRESS = `SELECT 1 AS x FROM dir_person p WHERE lower(p.email) = lo
   AND (EXISTS (SELECT 1 FROM dir_passkey k WHERE k.person = p.id) OR EXISTS (SELECT 1 FROM dir_member m WHERE m.person = p.id))`;
 
 /**
- * Cloudflare's `send_email` binding. `from` is the sender Email Service needs; sign-in mail sets it from
- * `AUTH_MAIL_FROM`, and the outbox's `notify.email` does not pass one yet.
+ * Cloudflare's `send_email` binding. `from` is the sender Email Service needs and refuses a message without; sign-in
+ * mail sets it from `AUTH_MAIL_FROM`, and the outbox's `notify.email` from `MAIL_FROM`, falling back to the same.
+ * `to` is one address or up to fifty, because a digest goes to every owner of the record at once.
  */
-type EmailBinding = { send(message: { from?: string; to: string; subject: string; text: string }): Promise<void> };
+type EmailBinding = { send(message: Mail): Promise<void> };
 
 type Env = {
   RECORD: DurableObjectNamespace<Record$>;
@@ -126,6 +127,15 @@ type Env = {
   KEK?: KekBinding;
   /** The sender for sign-in links, on a domain Email Service sends for. Empty, or no `EMAIL`, and there are no links. */
   AUTH_MAIL_FROM?: string;
+  /**
+   * The sender for notification mail, a digest or an urgent notice, on a domain Email Service sends for.
+   *
+   * EMPTY OR UNSET FALLS BACK TO `AUTH_MAIL_FROM`, because the one address this deployment already sends from is the
+   * one Email Service is known to accept, and a second var nobody set should not be the reason a digest never arrives.
+   * Neither set, and each `notify.email` dead-letters with a sentence naming this var rather than going out with no
+   * sender, which Email Service refuses as `E_FIELD_MISSING` (`deliver.ts`).
+   */
+  MAIL_FROM?: string;
   /** The app's host name: the cookie's origin, the passkeys' relying party, and what a cookie write must come from. */
   PUBLIC_HOST?: string;
   /**
@@ -785,6 +795,26 @@ export class Record$ extends DurableObject<Env> {
     return broken ? { ok: false, refusal: broken } : api.openForGrant(args, by, hints, kekId);
   }
 
+  /**
+   * The key a leased `notify.webhook` names, sealed, for the Worker to sign the post with. AN RPC AND NEVER A ROUTE.
+   *
+   * THE LEASE IS THE AUTHORITY, AND THE RECORD CHECKS IT. `sealedGrant` refuses a job that is no longer leased to the
+   * caller, one whose lease has lapsed, and a key the job's payload does not name, so the Worker holding this stub can
+   * open the one key that one post asked for and nothing else in the vault. The record's id comes back beside the seal
+   * because the Worker addresses this object by its Durable Object id, and the AAD and the KEK wrap both name the
+   * record's own. `system` signs the `grant.read`, as it does for the alarm's scheduled calls: nobody asked.
+   */
+  async sealFor(args: { outbox: string; leasedUntil: string; grant: string }): Promise<Result<{ record: string; seal: LeasedSeal }>> {
+    if (this.#gone) return { ok: false, refusal: DELETED };
+    const api = await this.#record();
+    const broken = api.kernel.refused();
+    if (broken) return { ok: false, refusal: broken };
+    const record = api.kernel.identity()?.id;
+    if (!record) return { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'This record has not been created, so it holds no key.' } };
+    const out = api.kernel.sealedGrant(args, 'system');
+    return out.ok ? ok({ record, seal: out.value }) : out;
+  }
+
   /** How it went. The ladder walks from here, and a failed ack arms the `retry` row that tails. */
   /**
    * How it went, and which lease it is about.
@@ -1153,7 +1183,14 @@ export class Directory$ extends DurableObject<Env> {
 async function drainOutbox(env: Env, id: string): Promise<void> {
   const record = env.RECORD.get(env.RECORD.idFromString(id));
   const deliver = makeDeliver({
-    ...(env.EMAIL === undefined ? {} : { email: (m: { to: string; subject: string; text: string }) => env.EMAIL!.send(m) }),
+    ...(env.EMAIL === undefined ? {} : { email: (m: Mail) => env.EMAIL!.send(m) }),
+    from: env.MAIL_FROM || env.AUTH_MAIL_FROM,
+    /* THE KEY A POST NAMES, OPENED UNDER ITS LEASE BY THE RECORD AND UNWRAPPED HERE. `KEK` is read only when a post
+       names a key, so a deployment with a malformed one still sends its email. */
+    open: leasedOpener(
+      async (args) => (await record.sealFor(args)) as unknown as Result<{ record: string; seal: LeasedSeal }>,
+      () => keyStoreOf(env.KEK),
+    ),
     /* `redirect: 'manual'` AND A TIMEOUT, and both are the difference between a validated URL and a
        validated request. `postable()` checks the address it is handed and `fetch` followed a 302
        wherever it pointed — so a webhook that answers `302 -> http://169.254.169.254/…` reached
@@ -1163,10 +1200,10 @@ async function drainOutbox(env: Env, id: string): Promise<void> {
        AND A REQUEST THAT NEVER RETURNS IS A LEASE THAT EXPIRES UNDER SOMEBODY. Twenty seconds is
        well inside the sixty-second notify lease, so a slow endpoint fails and retries rather than
        being delivered twice by two workers who both think they hold it. */
-    post: async (url: string, body: string) => {
+    post: async (url: string, body: string, headers: Record<string, string>) => {
       const out = await fetch(url, {
         method: 'POST',
-        headers: { 'content-type': 'application/json; charset=utf-8' },
+        headers: { ...headers, 'content-type': 'application/json; charset=utf-8' },
         body,
         redirect: 'manual',
         signal: AbortSignal.timeout(20_000),
@@ -1253,6 +1290,34 @@ const json = (body: unknown, status: number, extra: [string, string][] = []): Re
  * entire question being asked.
  */
 const buildId = (env: Env): Response => json({ app: env.BRAINDOG_BUILD || null }, 200);
+
+/** `/healthz`, with the slashes every other door here forgives, and nothing below it. */
+const HEALTHZ = /^\/+healthz\/*$/;
+
+/**
+ * `GET /healthz`: `{ ok: true, app }` and a 200, to anybody, from this isolate alone (ROADMAP W55, `53 §13 #9`).
+ *
+ * IT TOUCHES NO DURABLE OBJECT AND READS NO CREDENTIAL. The question a monitor asks is whether this Worker answers, and
+ * a probe that woke a record every minute would cost a storage read per probe and go red when one customer's object is
+ * sick, which is a different question with its own answer in that record's `/api/version`. `test/healthz.test.ts`
+ * hands the bundle bindings that throw on first touch.
+ *
+ * `app` IS THE SAME VALUE, UNDER THE SAME KEY, `/.well-known/braindog-build` ANSWERS, `null` when the deploy was never
+ * told, so a monitor that sees a restart can also see which version came back. `53 §13 #9` also asks for `format`,
+ * `kernel` and `primitives` and a 503 under a module-level refusal; those need a record's boot probe, which is the one
+ * thing this answer must not touch, so they are not here. HEAD answers the same status and headers with no body, and
+ * any other method is 405 with `Allow`, because a POST here is a caller who has the wrong address.
+ *
+ * WHERE THE SITE FRONTS THIS WORKER, `/healthz` HAS TO BE IN THE SITE'S `run_worker_first` (`apps/site/wrangler.jsonc`),
+ * because the site's assets answer first and a path not on that list gets the site's 404 page and never arrives here.
+ * At afb3b1b2 the list is alpha's alone and does not name it. `app.brain.dog`'s Custom Domain sends every path here.
+ */
+function healthz(request: Request, env: Env): Response {
+  if (request.method !== 'GET' && request.method !== 'HEAD')
+    return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: '/healthz is read with GET or HEAD.' } }, 405, [['allow', 'GET, HEAD']]);
+  const out = json({ ok: true, app: env.BRAINDOG_BUILD || null }, 200);
+  return request.method === 'HEAD' ? new Response(null, { status: out.status, headers: out.headers }) : out;
+}
 
 /**
  * The one answer to every way of not being let in.
@@ -1385,6 +1450,10 @@ async function nightly(env: Env): Promise<void> {
 
 async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    /* LIVENESS BEFORE EVERYTHING, THE OLD HOST'S REDIRECT INCLUDED. Measured at afb3b1b2 `/healthz` was the router's 404
+       on `PUBLIC_HOST` and a 308 to `/app/healthz` on a legacy host for a caller sending `accept: text/html`, so a monitor
+       either read the Worker as down or followed the redirect to the app shell and read somebody else's 200. */
+    if (HEALTHZ.test(url.pathname)) return healthz(request, env);
     /* THE OLD HOST FIRST, AND ONLY FOR A PAGE LOAD (`loop/research-one-domain.md` §2.5). `legacyRedirect` answers
        `null` for every path this Worker serves itself, the build id and sign-in included, so an agent, a webhook
        sender and a stale tab on `app.brain.dog` are served where they stand. Unset `LEGACY_HOSTS` is no host at all. */
@@ -1412,7 +1481,10 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     /* `/app` IS THE APP, AND `/app/<slug>/api/*` IS THAT RECORD'S API (§2.4). The slug is stripped here, because no
        route pattern can pick it out, and handed to the door, which has the Directory check it before anything is
        addressed. AFTER THE ROOT'S OWN DOORS, which none of its paths can reach: every one of them is a prefix that
-       `/app` is not. Nothing routes `/app` to this Worker until `wrangler.jsonc` lists it, so this is dark until then. */
+       `/app` is not. THIS IS LIVE, NOT DARK: `app.brain.dog`'s Custom Domain sends every path to this Worker, `/app`
+       included, and production answered `GET https://app.brain.dog/app/` with 200 `text/html` at 14:18 UTC on
+       23 September. An earlier line here said nothing reached it until `wrangler.jsonc` listed `/app`, which was true
+       only of `brain.dog`, where the site's assets answer first. */
     const app = appPath(url.pathname);
     if (app !== null) return servesApi(app.rest) ? recordApi(atRoot(request, app.rest), env, app.slug) : appPage(request, env, app);
     if (!servesApi(url.pathname))
