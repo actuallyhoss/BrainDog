@@ -14,6 +14,7 @@
 
   import { acceptInvite, lookInvite, passkeyRegister, support, takeInvite, type InviteSeen, type Said } from '$lib/auth.ts';
   import { copy } from '$lib/copy.ts';
+  import { forget } from '$lib/record/boot-live.ts';
   import { titleOf } from '$lib/title.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -46,6 +47,15 @@
     closed(true, at);
   }
 
+  /**
+   * ACCEPTING SIGNS SOMEBODY IN, SO IT DROPS THE BOOT THIS TAB KEPT. The layout's load asked `boot` for `/app/invite`,
+   * which names no record, was refused, and kept the sample for the tab; Accept is a `fetch` that sets a cookie and
+   * nothing more. Measured through the real `readBoot` (`loop/research-batch-forty-six-audit.md` section 5), the next
+   * move was handed The Studio, "Nothing you do here is saved.", with no request made, which is what `/signin` drew
+   * for the owner before 6959cf06. "Open BrainDog" below is a full page load, which is the repair; this is for any
+   * move out of here that is not one, so it at least asks the record rather than drawing the sample. Only on success:
+   * a refused Accept leaves the tab as signed out as it was, and the sample is still the right answer for it.
+   */
   async function accept() {
     if (!token || busy) return;
     busy = 'accept';
@@ -54,8 +64,10 @@
     const out = await acceptInvite(token, seen?.ok && !seen.value.signedInAs ? name : undefined);
     closed(true, at);
     busy = null;
-    if (out.ok) joined = true;
-    else failed = sentence(out);
+    if (out.ok) {
+      forget();
+      joined = true;
+    } else failed = sentence(out);
   }
 
   async function addPasskey() {
@@ -139,7 +151,11 @@
             </Button>
           {/if}
           {#if failed}<p class="status" role="status">{failed}</p>{/if}
-          <Button weight={keyAdded || !(here.webauthn && here.secure) ? 'primary' : 'quiet'} href="/">{copy.openBrainDog}</Button>
+          <!-- A FULL PAGE LOAD, AS ON `/signin`, AND THAT IS THE REPAIR. A client-side move to `/app/` kept everything
+               this tab decided before Accept: the sample boot, the switcher's list, the voice. `/signin` walked it
+               twice and drew The Studio with no request made; a reload draws the colleague's record, because the
+               Worker answers `/app/` with a 302 to `/app/<slug>/` once there is a session. -->
+          <Button weight={keyAdded || !(here.webauthn && here.secure) ? 'primary' : 'quiet'} href="/" data-sveltekit-reload>{copy.openBrainDog}</Button>
         </div>
       {/if}
     </div>

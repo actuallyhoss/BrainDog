@@ -16,7 +16,11 @@
  * WHY 1, 7 AND 8 ARE HELD BY READING THE PAGE'S SOURCE. A Svelte route does not mount under `node --test`, and the
  * browser gates that could drive it share ports with a full run. What can be held here is the mechanism (the kept
  * sample, and what `forget` does to it, driven through the real `readBoot`) and the page's own wiring, read as text.
- * The source checks are narrow on purpose: they name the three buttons, the one function and the one class.
+ * The source checks are narrow on purpose: they name the four buttons, the two functions and the one class.
+ *
+ * THE INVITATION HOLDS FRICTION 1 AS WELL. `/invite` is the first screen a colleague meets, it signs them in on
+ * Accept exactly as `/signin` does, and `loop/research-batch-forty-six-audit.md` section 5 found it drawing the sample
+ * after the repair had been made here, so its "Open BrainDog" and its `accept` are held by the same two checks.
  */
 
 import { test } from 'node:test';
@@ -77,12 +81,21 @@ function buttonFor(src: string, key: string): string | null {
   return m ? m[0] : null;
 }
 
-for (const key of ['openBrainDog', 'openYourRecord', 'openTheDemo'] as const) {
-  test(`"${copy[key]}" IS A FULL PAGE LOAD, so nothing the tab kept before signing in is drawn after it`, () => {
+/* THE INVITATION IS THE SAME DOOR FOR THE FIRST COLLEAGUE. `loop/research-batch-forty-six-audit.md` section 5 drove
+   the mechanism through the real `readBoot` for `/app/invite`: the layout kept the sample with nobody signed in,
+   Accept set a cookie and nothing more, and "Open BrainDog" was `href="/"` with no reload, so the next move was handed
+   `{"from":"sample"}` with one request made in all. The repair of 6959cf06 had been made on `/signin` alone. */
+for (const [where, src, key] of [
+  ['sign-in', SIGNIN, 'openBrainDog'],
+  ['sign-in', SIGNIN, 'openYourRecord'],
+  ['sign-in', SIGNIN, 'openTheDemo'],
+  ['invite', INVITE, 'openBrainDog'],
+] as const) {
+  test(`"${copy[key]}" ON THE ${where.toUpperCase()} SCREEN IS A FULL PAGE LOAD, so nothing the tab kept before signing in is drawn after it`, () => {
     /* A full load drops every tab-kept answer at once (the boot, the switcher's `reach`, the voice) and lets the
        Worker's 302 put `/app/<slug>/` in the address. A client-side move keeps all of them, which was the bug. */
-    const tag = buttonFor(SIGNIN, key);
-    assert.ok(tag, `no Button labelled copy.${key} on the sign-in screen`);
+    const tag = buttonFor(src, key);
+    assert.ok(tag, `no Button labelled copy.${key} on the ${where} screen`);
     /* THE VALUE IS READ TOO, not just the name. SvelteKit takes "" and "true" as a reload and "off" or "false" as
        the opposite, so a bare name check passed `data-sveltekit-reload="off"`, which is the client-side move again. */
     assert.match(tag, /\sdata-sveltekit-reload(?=[\s>])|\sdata-sveltekit-reload=(?:""|"true"|\{true\})/u, `copy.${key} is a client-side move: ${tag}`);
@@ -93,6 +106,14 @@ test('SIGNING IN FORGETS THE KEPT BOOT, so a move that is not a full load still 
   const enter = /const enter = [\s\S]*?\n {2}\};/u.exec(SIGNIN)?.[0] ?? '';
   assert.ok(enter, 'no `enter` on the sign-in screen');
   assert.match(enter, /\bforget\(\)/u, `enter() does not call forget():\n${enter}`);
+});
+
+test('ACCEPTING AN INVITATION FORGETS THE KEPT BOOT, and only once the host has said yes', () => {
+  const accept = /async function accept\(\) \{[\s\S]*?\n {2}\}/u.exec(INVITE)?.[0] ?? '';
+  assert.ok(accept, 'no `accept` on the invite screen');
+  /* ON SUCCESS, NOT BEFORE THE ANSWER. A refused Accept leaves the stranger exactly as signed out as before, and the
+     kept sample is still the right answer for a tab with no session, so dropping it there only asks for it again. */
+  assert.match(accept, /if \(out\.ok\) \{[^}]*\bforget\(\)/u, `accept() does not call forget() on success:\n${accept}`);
 });
 
 /* ── 7 · the dot where an icon was ───────────────────────────────────── */
