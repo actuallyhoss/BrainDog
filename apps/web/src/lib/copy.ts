@@ -2473,10 +2473,23 @@ export const copy = {
   arrangeKept: 'Kept',
   arrangeKeeps: (name: string) => `Keeps ${name} as you changed it. This update's version of it is not taken.`,
   arrangeKeepsPage: (name: string) => `Keeps your ${name} page as you arranged it. This update's version of it is not taken.`,
-  /* A CHOICE AN UPDATE TAKES OFF A LIST WHOSE ROWS MAY HOLD IT, which stays: said beside what it keeps, because the list the
-     owner sees after accepting still offers it. `rows` is the list's, since nothing counts the rows holding one value. */
-  arrangeStays: (name: string, field: string, values: readonly string[], rows: number) =>
-    `${name} keeps ${values.length === 1 ? `the choice ${values[0]}` : `${values.length} choices, ${list([...values])},`} for ${field}, which this update takes off, because it holds ${rows} ${rows === 1 ? 'row' : 'rows'} that may use ${values.length === 1 ? 'it' : 'them'}.`,
+  /* A CHOICE AN UPDATE TAKES OFF A LIST WHOSE ROWS HOLD IT, which stays: said beside what it keeps, because the list the
+     owner sees after accepting still offers it. `holding` is how many of the list's `rows` hold it, and both are said:
+     the list's count alone read "it holds 3 rows that may use it" on a record where none of the three did (audit
+     forty-eight, §4). `null` is a record that could not count holders, which keeps the choice for the list's rows and
+     says so in those words. */
+  arrangeStays: (name: string, field: string, values: readonly string[], rows: number, holding: number | null = null) => {
+    const it = values.length === 1 ? 'it' : 'one of them';
+    const why =
+      holding === null
+        ? `it holds ${rows} ${rows === 1 ? 'row' : 'rows'} that may use ${values.length === 1 ? 'it' : 'them'}`
+        : holding >= rows
+          ? rows === 1
+            ? `its one row holds ${it}`
+            : `all ${rows} of its rows hold ${it}`
+          : `${holding} of its ${rows} rows ${holding === 1 ? 'holds' : 'hold'} ${it}`;
+    return `${name} keeps ${values.length === 1 ? `the choice ${values[0]}` : `${values.length} choices, ${list([...values])},`} for ${field}, which this update takes off, because ${why}.`;
+  },
   /* WHAT A PACK LAYS ON A LIST ANOTHER PACK OWNS: Personal's roles on People. Named apart from what it adds, because the
      list is not new, and counted, because the owner is asked to take every one of them. */
   arrangeExtended: 'Adds to a list',

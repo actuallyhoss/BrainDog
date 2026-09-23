@@ -77,6 +77,32 @@ test('THE OWNER’S WORDS FOR A CHOICE ARE USED, and several choices and rows ar
   );
 });
 
+/* THE ROWS THAT HOLD IT, NOT THE LIST'S. "Because it holds 3 rows that may use it" was said of a Personal record whose
+   three People rows were all Family (`loop/research-batch-forty-eight-audit.md` §4). Where the record counts holders the
+   step carries `holding`, keyed as `values` is, and the sentence gives both numbers. */
+test('A CHOICE KEPT FOR THE ROWS THAT HOLD IT SAYS HOW MANY OF THE LIST’S ROWS DO', () => {
+  const stays = (s: Record<string, unknown>, labels?: Record<string, string>) =>
+    appearing(arrangedOf('pack', { ...SHEDS, plan: [{ ...SHEDS.plan[0], stays: [{ id: 'register.people', ...s }] }] }, labels === undefined ? {} : { labels }))
+      .filter((a) => a.kind === 'Kept')
+      .map((a) => a.title);
+  assert.deepEqual(stays({ values: ['role.registrar'], rows: 2, holding: { 'role.registrar': 1 } }), [
+    'People keeps the choice Registrar for Role, which this update takes off, because 1 of its 2 rows holds it.',
+  ]);
+  assert.deepEqual(stays({ values: ['role.registrar'], rows: 1, holding: { 'role.registrar': 1 } }), [
+    'People keeps the choice Registrar for Role, which this update takes off, because its one row holds it.',
+  ]);
+  assert.deepEqual(
+    stays(
+      { values: ['role.registrar', 'role.collaborator'], rows: 5, holding: { 'role.registrar': 1, 'role.collaborator': 2 } },
+      { 'people.role.registrar': 'Agency', 'people.role.collaborator': 'Project partner', people: 'Contacts' },
+    ),
+    ['Contacts keeps 2 choices, Agency and Project partner, for Role, which this update takes off, because 3 of its 5 rows hold one of them.'],
+  );
+  assert.deepEqual(stays({ values: ['role.registrar', 'role.collaborator'], rows: 3, holding: { 'role.registrar': 1, 'role.collaborator': 2 } }), [
+    'People keeps 2 choices, Registrar and Collaborator, for Role, which this update takes off, because all 3 of its rows hold one of them.',
+  ]);
+});
+
 test('A FIELD LAID ON A LIST IS SAID AS A FIELD, and a step that lays nothing says nothing of it', () => {
   const field = arrangedOf('pack', {
     install: 'plus',

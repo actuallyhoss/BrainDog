@@ -158,6 +158,18 @@ export type Installed = {
   declarations: { id: string; version: number; kind: DeclKind; pack_id: string | null; body: string; checksum: string }[];
   rows: Record<string, number>;
   /**
+   * How many live rows of `list` hold each value of each of `fields`, by field id and then value: one `GROUP BY` over the
+   * list, asked only of a list a plan would take a value off (`laidBack`). `null` when the record cannot say for that list.
+   *
+   * WHAT DECIDES WHETHER A VALUE AN UPDATE TAKES OFF STAYS. `rows` stood in for it, so a Personal record whose three
+   * People rows were all Family was filed as keeping Agency, and Decide said the list "holds 3 rows that may use it"
+   * when none did (`loop/research-batch-forty-eight-audit.md` §4, `test/stays-holding.test.ts`).
+   *
+   * OPTIONAL, as `used` is: a caller that cannot count keeps every value on a list that holds rows, which is the side of
+   * the line where no later edit is refused `ENUM_VALUE_UNKNOWN`.
+   */
+  holding?: (list: string, fields: readonly string[]) => Record<string, Record<string, number>> | null;
+  /**
    * The settings somebody chose, by pack id: `pack.manifest.config_values` for each pack that has any.
    *
    * OPTIONAL, because a record with no pack settings, and every caller written before settings
@@ -312,9 +324,11 @@ export type Diff = {
    * The enum values this version takes off a list that holds rows, which stay on it: `values` names each as
    * `<field>.<value>`, laid after the update's own values with the label the list had for it.
    *
-   * BY LIST AND NOT BY ROW, because `rows` is a count per list and nothing here can ask which values rows hold. Kept
-   * when nobody used it, a value costs a word in a picker; taken off a list whose rows hold it, every later edit of
-   * such a row was `ENUM_VALUE_UNKNOWN`, whatever field the edit was about (`update-keeps-value.test.ts`).
+   * BY ROW WHERE THE RECORD CAN COUNT, and `holding` is how many live rows hold each kept value, keyed as `values` is.
+   * A value no row holds goes, as the update asked. Taken off a list whose rows hold it, every later edit of such a row
+   * was `ENUM_VALUE_UNKNOWN`, whatever field the edit was about (`update-keeps-value.test.ts`). A record that cannot
+   * count (`Installed.holding` absent or `null`) keeps every value by list, as before, and `holding` is absent: kept when
+   * nobody used it, a value costs a word in a picker.
    *
    * `body` IS THE LIST AS IT WILL BE LIVE, as JCS text, for a list this pack owns: `install` stages it as the pack's body
    * of the list, in place of the file's, and the next update meets the value as the pack's and lays it back again while
@@ -322,7 +336,7 @@ export type Diff = {
    * app, and every later update of the pack was filed for Decide as keeping the owner's edit. A list the owner added to
    * has no `body` here, because the value is laid into its `kept[].rebased`.
    */
-  stays: { id: string; values: string[]; rows: number; body?: string }[];
+  stays: { id: string; values: string[]; rows: number; holding?: Record<string, number>; body?: string }[];
   /**
    * What this pack lays on each list it `extends`: `adds` names what is new to the list (`domain`, or `role.family` for a
    * value), and `body` is the live list with those laid after its own, as JCS text, absent when the list has them all
@@ -1245,8 +1259,8 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
         /* AND A VALUE THE UPDATE TAKES OFF A LIST THAT HOLDS ROWS STAYS HERE TOO (`laidBack`). A list the owner or another
            pack's `extends` added to is exactly the one this arm sees, so without it Personal's People, which carries
            Personal's roles, would lose `registrar` on the People update that sheds it from a studio's record. */
-        const back = rows > 0 ? laidBack(already.body, JSON.parse(over.body) as Record<string, Json>) : null;
-        if (back !== null) stays.push({ id: decl.id, values: back.values, rows });
+        const back = rows > 0 ? laidBack(already.body, JSON.parse(over.body) as Record<string, Json>, holdersOf(installed, decl.id)) : null;
+        if (back !== null) stays.push({ id: decl.id, values: back.values, rows, ...(back.holding === undefined ? {} : { holding: back.holding }) });
         const body = back?.body ?? over.body;
         kept.push({ id: decl.id, adds: over.adds, rebased: body });
         /* THE UPDATE'S OWN CHANGES STILL MEET THE ROWS: a field it retypes under rows is refused here as it is for a list
@@ -1275,8 +1289,8 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
       /* AND A VALUE IT TAKES OFF A CLOSED LIST THAT HOLDS ROWS IS LAID BACK, after the update's own (M2). Taken off, a row
          holding it could not be edited at all: People 2.0.0 without `registrar` planned clean, and the next edit to that
          row's `note` was `ENUM_VALUE_UNKNOWN` over a field the edit never touched (`update-keeps-value.test.ts`). */
-      const back = rows > 0 ? laidBack(already.body, decl.body) : null;
-      if (back !== null) stays.push({ id: decl.id, values: back.values, rows, body: back.body });
+      const back = rows > 0 ? laidBack(already.body, decl.body, holdersOf(installed, decl.id)) : null;
+      if (back !== null) stays.push({ id: decl.id, values: back.values, rows, ...(back.holding === undefined ? {} : { holding: back.holding }), body: back.body });
       /* A LIST THAT IS ALREADY THE UPDATE WITH ITS KEPT VALUES LAID BACK IS NOT CHANGED BY IT. The kept value lives under
          the pack now (`install`), so the live body and the file's differ by that value on every later plan of the same
          version, and a reinstall of People 2.0.0 was "1 change" that staged the bytes already there. */
@@ -1876,14 +1890,26 @@ function rebased(from: string, mine: string, now: Record<string, Json>): { body:
   return { body, adds: [...added.map((f) => f.id as string), ...[...values].flatMap(([id, v]) => v.values.map((x) => `${id}.${x}`))] };
 }
 
+/** `Installed.holding` for one list declaration, as `laidBack` asks it; absent when the record cannot count. */
+const holdersOf = (installed: Installed, id: string): ((fields: readonly string[]) => Record<string, Record<string, number>> | null) | undefined =>
+  installed.holding === undefined || !id.startsWith('register.') ? undefined : (fields) => installed.holding!(id.slice('register.'.length), fields);
+
 /**
  * The update's list body with every enum value the live list holds and it takes off laid back after its own values, with
  * the label the live list had for it; `null` when it takes none off, or a body will not parse (`Diff['stays']`).
  *
+ * ONLY A VALUE A ROW HOLDS, when `holders` can count them (`Installed.holding`), and `holding` is that count for each one
+ * laid back. A value no row holds goes, which is what the update asked; laid back on the list's row count alone, three
+ * Family rows kept Agency on Personal's People (audit forty-eight, §4).
+ *
  * ONLY ON A FIELD THAT IS STILL A CLOSED LIST OF THE SAME TYPE. A field the update takes off or retypes is `retypes`'
  * question and not this one, and a value laid on a field that is now text would be a value nothing checks.
  */
-function laidBack(live: string, now: Record<string, Json>): { body: string; values: string[] } | null {
+function laidBack(
+  live: string,
+  now: Record<string, Json>,
+  holders?: (fields: readonly string[]) => Record<string, Record<string, number>> | null,
+): { body: string; values: string[]; holding?: Record<string, number> } | null {
   let was: unknown;
   try {
     was = JSON.parse(live);
@@ -1893,23 +1919,34 @@ function laidBack(live: string, now: Record<string, Json>): { body: string; valu
   const next = Array.isArray(now.fields) ? (structuredClone(now.fields) as Record<string, unknown>[]) : null;
   if (next === null) return null;
   const at = new Map(next.filter((f) => isObject(f as Json)).map((f) => [f.id, f]));
-  const values: string[] = [];
+  const lost: { id: string; then: Record<string, unknown>; f: Record<string, unknown>; gone: string[] }[] = [];
   for (const [id, then] of fieldsOf(was)) {
     const f = at.get(id);
     if (f === undefined || !Array.isArray(then.values) || !Array.isArray(f.values) || typeSaid(then) !== typeSaid(f)) continue;
-    const held = f.values as unknown[];
-    const gone = then.values.filter((v): v is string => typeof v === 'string' && !held.includes(v));
+    const own = f.values as unknown[];
+    const gone = then.values.filter((v): v is string => typeof v === 'string' && !own.includes(v));
+    if (gone.length > 0) lost.push({ id, then, f, gone });
+  }
+  if (lost.length === 0) return null;
+  /* ASKED ONCE, AND ONLY WHEN SOMETHING WOULD GO: every plan of every pack passes through here, and a list the update
+     takes nothing off has no value to count. */
+  const counted = holders?.(lost.map((l) => l.id)) ?? null;
+  const values: string[] = [];
+  const holding: Record<string, number> = {};
+  for (const { id, then, f, gone: taken } of lost) {
+    const gone = counted === null ? taken : taken.filter((v) => (counted[id]?.[v] ?? 0) > 0);
     if (gone.length === 0) continue;
-    f.values = [...held, ...gone];
+    f.values = [...(f.values as unknown[]), ...gone];
     const said = isObject(then.labels as Json) ? (then.labels as Record<string, unknown>) : {};
     const labels = isObject(f.labels as Json) ? (f.labels as Record<string, unknown>) : {};
     const extra = Object.fromEntries(gone.filter((v) => v in said && !(v in labels)).map((v) => [v, said[v]]));
     if (Object.keys(extra).length > 0) f.labels = { ...labels, ...extra };
     values.push(...gone.map((v) => `${id}.${v}`));
+    if (counted !== null) for (const v of gone) holding[`${id}.${v}`] = counted[id]![v]!;
   }
   if (values.length === 0) return null;
   const body = canonicalise({ ...now, fields: next } as Json);
-  return body === null ? null : { body, values };
+  return body === null ? null : { body, values, ...(counted === null ? {} : { holding }) };
 }
 
 /** A live body as JCS text with `pack` set to `to`, which is what a handover stages; `null` for one that will not parse. */
@@ -2760,11 +2797,23 @@ export function plannedState(installed: Installed, pack: Pack, diff: Diff): Inst
       delete detached[r.id];
     }
   const rows = { ...installed.rows };
-  for (const s of diff.seeds.registers) if ((rows[s.register] ?? 0) === 0) rows[s.register] = s.rows;
+  const seeded = new Set<string>();
+  for (const s of diff.seeds.registers)
+    if ((rows[s.register] ?? 0) === 0) {
+      rows[s.register] = s.rows;
+      seeded.add(s.register);
+    }
+  /* A LIST THIS STEP SEEDS IS COUNTED FROM ITS SEEDS, and its examples are not in the table until the accept writes them.
+     Asked of the table, the next pack in the same arrangement would find no row holding a value the examples are about
+     to be written under, take it off, and the kernel's stage check would refuse the accept half-way. `null` keeps every
+     value on that list, as a record that cannot count does. */
+  const counts = installed.holding;
+  const holding = counts === undefined || seeded.size === 0 ? counts : (list: string, fields: readonly string[]) => (seeded.has(list) ? null : counts(list, fields));
   const chosen = diff.config.filter((c) => c.from === 'kept');
   const { [mine]: _was, ...config } = installed.config ?? {};
   return {
     ...installed,
+    ...(holding === undefined ? {} : { holding }),
     packs: [...installed.packs.filter((p) => p.id !== mine), { id: mine, version: pack.manifest.version, requires: pack.manifest.requires.packs }],
     declarations: [...live.values()].sort((a, b) => a.id.localeCompare(b.id)),
     rows,
