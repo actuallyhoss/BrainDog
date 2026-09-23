@@ -254,7 +254,8 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference): Core => {
     } catch (e) {
       /* A PROVIDER THAT DID NOT ANSWER IS NOT A REFUSAL ABOUT THE ASK, and saying `PROPOSAL_SCHEMA`
          here would send a person looking at their question for a fault that is in the network. The
-         estimate is billed as `tokens_in` so a month of outages is visible in the meter. */
+         estimate is billed as `tokens_in` so a month of outages is visible in the meter. `answer`
+         settles that row under `-`, so there it keeps `tokens_in` and no neurons (`asksUsed`). */
       return {
         model,
         ms: clock.now() - t0,
@@ -298,9 +299,17 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference): Core => {
        five model calls on their own key, with `status()` reading 0 of 2 throughout
        (`test/read-meter.test.ts`). Both kinds count now, one per model call, so pass 1 and pass 2
        of one question are two, and a repeated pass 2 on a stored `ask_id` cannot run unmetered
-       either. `model <> '-'` is the one read row that called nothing: a record with no lists
-       answers `nothing` without a model, and billing it is the meter `propose`'s zero-rows arm
-       already refuses to be. The index `call_meter (tier, kind, ts)` still serves the count. */
+       either. `model <> '-'` passes over the two read rows that are not asks. One called nothing:
+       a record with no lists answers `nothing` without a model, and billing it is the meter
+       `propose`'s zero-rows arm already refuses to be. The other tried and reached nothing: an
+       `answer` whose model was `UNREACHABLE`, which `answer.ts` settles under `-` because the host
+       asks an `UNREACHABLE` again up to the ladder's eighth rung, and finding 6 of
+       `loop/research-batch-forty-two-audit.md` put an outage at half the default cap spent on
+       asks that reached no model. `read`'s and `propose`'s own `UNREACHABLE` rows keep the model's
+       name and still count. Under `-`, that `answer` row keeps the prompt estimate in `tokens_in`
+       and gets 0 neurons on tier `a`, because `account` finds no rate for `-` in `MODELS`; under
+       the model's name it was billed on that estimate. It also no longer says which model was
+       not reached. The index `call_meter (tier, kind, ts)` still serves the count. */
     asksUsed: () =>
       sql.one<{ n: number }>(
         "SELECT COUNT(*) AS n FROM call WHERE tier = 'a' AND kind IN ('read', 'propose') AND model <> '-' AND ts >= ?",

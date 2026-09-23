@@ -201,7 +201,12 @@ test('(6) A MODEL THAT DID NOT ANSWER IS UNREACHABLE, with one settled row and n
       rows().map((r) => [r.kind, r.status, r.code]),
       [['read', 'error', 'UNREACHABLE']],
     );
-    assert.equal(spark.status().asks.used, 1);
+    /* AND IT IS NOT AN ASK. `answer` settles an `UNREACHABLE` row under `-`, which `asksUsed` passes over, so a host
+       retrying through an outage does not spend the cap (`loop/research-batch-forty-two-audit.md` finding 6). This read
+       1 before that change and reads 0 after it. Under `-` the row carries the prompt estimate in `tokens_in` and no
+       neurons, since `MODELS` has no rate for `-`. */
+    assert.equal(spark.status().asks.used, 0);
+    assert.deepEqual({ ...sql.one<{ model: string; neurons: number }>('SELECT model, neurons FROM call') }, { model: '-', neurons: 0 });
   } finally {
     sql.close();
   }
@@ -214,10 +219,16 @@ test('(7) NO `call` ROW EVER HOLDS THE FILLED QUESTION OR A FIELD VALUE, on any 
     inference.say(JSON.stringify({ answer: 5005 }));
     inference.say(JSON.stringify({ answer: 'about four' }));
     inference.say(new Error('502 from the gateway'));
-    for (let i = 0; i < 4; i++) await spark.answer(RATE);
+    /* FIVE ASKS FOR FOUR ROWS, SO THE REFUSED PATH IS STILL WALKED. The `UNREACHABLE` ask is not counted, so the fourth
+       reaches a model and answers, and only the fifth finds three asks spent and writes no row. With four asks, as
+       before that change, the fourth also reached the model, found nothing queued, and there was no budget refusal. */
+    inference.say(JSON.stringify({ answer: 7 }));
+    const outs = [];
+    for (let i = 0; i < 5; i++) outs.push(codeOf(await spark.answer(RATE)) || 'ok');
+    assert.deepEqual(outs, ['ok', 'PROPOSAL_SCHEMA', 'UNREACHABLE', 'ok', 'SPARK_BUDGET_SPENT']);
 
     const all = sql.all('SELECT * FROM call');
-    assert.equal(all.length, 3);
+    assert.equal(all.length, 4);
     const text = JSON.stringify(all);
     for (const leak of [RATE.question, 'Office rent', '500500', 'EGP'])
       assert.ok(!text.includes(leak), `a call row holds ${JSON.stringify(leak)}: ${text}`);

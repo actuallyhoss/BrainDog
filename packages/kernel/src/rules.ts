@@ -33,6 +33,7 @@ import { instant } from './migrate.ts';
 import { spanMs } from './vault.ts';
 import { predicateOf, type EvalContext } from './metrics.ts';
 import { inlineFault } from './flow-lint.ts';
+import { observe } from './observe.ts';
 
 export type RuleAction =
   | { tag: string }
@@ -305,7 +306,44 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
     const runs: string[] = [];
     let stop = false;
 
-    for (const action of then) {
+    /* A STEP LEFT UNDONE SAYS SO, WHERE IT CAN BE READ. The inline pass's own outcome is dropped by the write, so the
+       sentence goes two ways: into `refused`, which a bulk apply hands back and a run fails on; and into one
+       `write.refused` observation under the list, since that is the trace a person's refused write leaves too. */
+    const undone = (at: string, code: 'NOT_IN_THIS_BUILD' | 'DECLARATION_INVALID', fix: string): void => {
+      out.refused.push({ code, fix, at });
+      observe(deps.sql, deps.nowMs, [{ kind: 'write.refused', subject: `${fired.register}.rule.${rule.rule}.${at}:${code}` }]);
+    };
+    const notText = (at: string, word: unknown, what: string): void => {
+      const shown = typeof word === 'number' || typeof word === 'boolean' ? String(word) : word === undefined ? 'missing' : JSON.stringify(word);
+      undone(
+        at,
+        'DECLARATION_INVALID',
+        `rule.${rule.rule}'s ${at} is ${shown}, and ${what} is written as text. The rule was stored before install refused that, so this step was left out of what the rule wrote.`,
+      );
+    };
+
+    for (const [i, action] of then.entries()) {
+      /* A VERB ONLY A STEP HAS IS NOT ACTED ON, NOR IS WHAT SITS BESIDE IT. `inlineFault` refuses one at install, and a
+         body stored before that lint still reaches here (`loop/research-batch-forty-two-audit.md` finding 3): measured
+         on 23 September, `{ if: 'what is Nothing', then: [], set: note }` set the note on a row the condition excluded,
+         because the chain below takes the first action an item carries, and `{ wait: 1h, set: note }` wrote the note at
+         once. The lint is asked of the one item, so the pass and the install cannot disagree about which verbs those are. */
+      const step = inlineFault(`rule.${rule.rule}`, { ...rule, then: [action] } as FlowDecl);
+      if (step?.code === 'NOT_IN_THIS_BUILD') {
+        const here = `then[${i}]`;
+        undone(step.at?.replace('then[0]', here) ?? here, 'NOT_IN_THIS_BUILD', step.fix.replace('then[0]', here));
+        continue;
+      }
+      /* A TAG OR A MOVE THAT IS NOT TEXT IS LEFT OUT OF THE PATCH, since the list refuses it and the rule's whole patch
+         went with it: a stored `tag: 5` (audit forty-one, finding 3) and `move: 5` (forty-two, finding 3) each left the
+         Water row without the `set` beside them. No `fill` reads either word, so neither has `fill`'s guard. The verb is
+         found in the chain's own order, so the word asked about is the one the chain below would act on. */
+      const verb = 'tag' in action ? 'tag' : 'untag' in action ? 'untag' : 'set' in action ? 'set' : 'move' in action ? 'move' : null;
+      const word = verb === 'tag' || verb === 'untag' || verb === 'move' ? (action as Record<string, unknown>)[verb] : '';
+      if (typeof word !== 'string') {
+        notText(`then[${i}].${verb}`, word, verb === 'move' ? "a move's state" : 'a tag');
+        continue;
+      }
       /* FROM THE PATCH IF THIS RULE HAS ALREADY TOUCHED IT, and from the row otherwise. Each branch
          rebuilt the set from the row's PRE-WRITE tags, so `then: [{ tag: late }, { tag: chase }]`
          kept only `chase` — while `did` reported both and the dry run previewed both, which is a

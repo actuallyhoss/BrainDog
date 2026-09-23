@@ -57,6 +57,11 @@ export type SparkAsksServed = { answered: number; failed: number; refused: numbe
  * the run (`SPARK_BUDGET_SPENT`, `PROPOSAL_SCHEMA`, `FORBIDDEN`), and this is the same rule stated from the other side, so
  * a refusal the package adds later ends the run with its own sentence rather than walking eight rungs. A cap that is
  * spent is spent for the month, and asking it seven more times would be seven more hold rows on the owner's allowance.
+ *
+ * AND A RETRY OF `UNREACHABLE` SPENDS NOTHING. The package settles that row under `-`, which no count reads
+ * (`packages/spark/src/answer.ts`, `test/spark-answers-unreachable.test.ts`). Settled under the model's name, each rung
+ * was an ask: `loop/research-batch-forty-two-audit.md` finding 6 put a fifteen-minute clock rule through a two-hour
+ * outage at about forty asks that reached nothing, half the default cap of 80, by the ladder's arithmetic and not by a run.
  */
 const RETRIED: ReadonlySet<string> = new Set(['UNREACHABLE']);
 

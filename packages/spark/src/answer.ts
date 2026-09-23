@@ -136,12 +136,18 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
 
       /* `rule.<id> step <n>` AND NEVER THE QUESTION. The kernel filled the question with the run's row, and `46 §4.1`
          keeps a row's values out of this ledger; the rule and the step are what a person reading it can look up. */
+      /* A MODEL NOT REACHED IS SETTLED UNDER `-`, THE LEDGER'S MARK FOR A ROW THAT CALLED NOTHING, and both counts pass
+         over it: the tier `a` count here (`asksUsed`) and the host's for `b` and `byo`. Settled under the model's name,
+         `loop/research-batch-forty-two-audit.md` finding 6 measured three `ECONNREFUSED` answers at `ask_cap: 3` leave the
+         fourth `SPARK_BUDGET_SPENT` on tiers `a` and `b`, and the host asks an `UNREACHABLE` again up to the ladder's
+         eighth rung. The row stays, so an outage is still in the ledger. `PROPOSAL_SCHEMA` keeps the model's name,
+         because there the model did answer and was paid for. */
       const account = (status: 'ok' | 'error', code?: string): void =>
         core.account({
           id: held,
           kind: 'read',
           tier: s.tier,
-          model: ran.model,
+          model: code === 'UNREACHABLE' ? '-' : ran.model,
           usage: ran.usage,
           ms: ran.ms,
           status,

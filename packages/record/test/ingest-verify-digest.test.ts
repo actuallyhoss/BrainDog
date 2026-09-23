@@ -117,8 +117,8 @@ test('A TOKEN IS MINTED ONLY FOR A WEBHOOK INGEST THAT DECLARES verify: { kind: 
  * the same id answered the old digest, and the token shown for the first declaration verified the second, which
  * nobody had minted anything for. Taking `verify:` out answered `none`, but put back it answered the old digest too.
  */
-const redeclare = async (api: Awaited<ReturnType<typeof record>>['api'], body: Record<string, unknown>) => {
-  const put = await api.kernel.install([{ id: 'ingest.bank-from-out-sms', kind: 'ingest', body: body as never }]);
+const redeclare = async (api: Awaited<ReturnType<typeof record>>['api'], body: Record<string, unknown>, ingest = 'bank-from-out-sms') => {
+  const put = await api.kernel.install([{ id: `ingest.${ingest}`, kind: 'ingest', body: { ...body, ingest } as never }]);
   assert.ok(put.ok, JSON.stringify(put));
 };
 
@@ -140,15 +140,23 @@ test('A TOKEN DOES NOT OUTLIVE ITS DECLARATION: retired and declared again, the 
 });
 
 test('A DECLARATION THAT DROPS verify: TAKES THE DIGEST WITH IT, so putting verify: back does not bring the old token back', async () => {
+  /* A WEBHOOK NO PATTERN NAMES AS ITS DOOR, and not `bank-from-out-sms`. Five of the bank's patterns read that one, and
+     since `loop/research-batch-forty-two-audit.md` finding 4 (b) dropping its `verify:` is refused while they do, so
+     this case failed on 23 September at `DECLARATION_INVALID at verify` before it reached the digest. The refusal is
+     asserted first, so the reason for the second webhook stays in the file; the digest is the same code on either id. */
   const { sql, api } = await record();
-  const minted = await api.ingestMint({ ingest: 'bank-from-out-sms' }, owner);
-  assert.ok(minted.ok);
+  const door = HSBC_EG_SMS_INGESTS['bank-from-out-sms']!;
+  const { verify: _verify, ...bare } = door;
+  const kept = await api.kernel.install([{ id: 'ingest.bank-from-out-sms', kind: 'ingest', body: bare as never }]);
+  assert.equal(!kept.ok && 'refusal' in kept ? kept.refusal.at : JSON.stringify(kept), 'verify', 'the bank door lost verify: while its patterns still name it');
+  await redeclare(api, door, 'lone-sms');
+  const minted = await api.ingestMint({ ingest: 'lone-sms' }, owner);
+  assert.ok(minted.ok, JSON.stringify(minted));
   const held = sha256(minted.value.token);
-  const { verify: _verify, ...bare } = HSBC_EG_SMS_INGESTS['bank-from-out-sms']!;
-  await redeclare(api, bare);
-  assert.deepEqual(await api.ingestVerify({ ingest: 'bank-from-out-sms' }), { kind: 'none' });
-  await redeclare(api, HSBC_EG_SMS_INGESTS['bank-from-out-sms']!);
-  assert.deepEqual(await api.ingestVerify({ ingest: 'bank-from-out-sms' }), { kind: 'none' }, 'the token minted before verify: was dropped verifies again');
+  await redeclare(api, bare, 'lone-sms');
+  assert.deepEqual(await api.ingestVerify({ ingest: 'lone-sms' }), { kind: 'none' });
+  await redeclare(api, door, 'lone-sms');
+  assert.deepEqual(await api.ingestVerify({ ingest: 'lone-sms' }), { kind: 'none' }, 'the token minted before verify: was dropped verifies again');
   assert.deepEqual(holding(sql, held), [], 'the digest outlived the declaration that dropped verify:');
   sql.close();
 });

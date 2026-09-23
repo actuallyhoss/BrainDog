@@ -1488,13 +1488,105 @@ function doorFault(id: string, channel: string, door: unknown, installed?: Known
   if (channel !== 'webhook')
     return bad('DECLARATION_INVALID', `${id} arrives by ${channel}, and only a webhook pattern is offered what arrives at a door. Take door out, or declare channel: webhook.`, 'door');
   if (installed === undefined) return null;
-  const named = installed.get(`ingest.${door}`) as { channel?: unknown; verify?: { kind?: unknown } } | undefined;
+  const named = installed.get(`ingest.${door}`) as { channel?: unknown; verify?: { kind?: unknown }; match?: unknown } | undefined;
   if (named === undefined)
     return bad('DECLARATION_INVALID', `${id} names ${door} as its door, and no ingest ${door} is installed. Install it first, or in the same batch.`, 'door');
   if (named.channel !== 'webhook')
     return bad('DECLARATION_INVALID', `${id} names ${door} as its door, and ${door} arrives by ${String(named.channel)}: a door is a webhook's URL.`, 'door');
   if (named.verify?.kind !== 'path')
     return bad('DECLARATION_INVALID', `${id} names ${door} as its door, and ${door} takes no path token, so nothing arriving there is verified and no pattern is tried. Give ${door} verify: { kind: path }.`, 'door');
+  /* A DOOR WITH NO `match:` TAKES EVERY ARRIVAL FIRST, so a pattern naming it is never offered one. `offered` in
+     `ingest.ts` puts the door's own pattern ahead of the patterns naming it on purpose, and measured by
+     `loop/research-batch-forty-two-audit.md` finding 4 (a), a text only `b` asks for was filed by the door, rows one and
+     two `1 0`, with the install silent. A wider phrase does the same to part of a twin's texts and is not refused:
+     whether one phrase covers another cannot be read from the two declarations, and it stays the author's. */
+  if (takesEvery(named.match))
+    return bad('DECLARATION_INVALID', `${id} names ${door} as its door, and ${door} ${matchless(named.match)}, so it takes every arrival there before ${id} is asked. Give ${door} a match: on a field, or give ${id} a door of its own.`, 'door');
+  return null;
+}
+
+/**
+ * Whether a door's `match:` takes every arrival, which is the one case of "the door shadows its twins" the declaration
+ * alone can answer.
+ *
+ * A `match:` THAT NAMES NO FIELD IS THE SAME ANSWER FOR EVERY ARRIVAL, whatever `ingest.ts` is handed. Checking only a
+ * missing `match:` let the checker's second spelling
+ * through: measured on 23 September through `arrive` and `drain`, a door declared `{ all: [] }` installed with a twin
+ * naming it and filed the twin's own text, rows one and two `1 0`, and `{ none: [] }` did the same, because `evaluate`
+ * answers an empty group with `q !== 'any'`. `{ any: [] }` and `match: null` were measured too, and filed that text
+ * through the twin, `0 1`: they match nothing, so the door files nothing and they are harmless here.
+ *
+ * SO THE TREE IS FOLDED, AND NOT ONLY WHEN IT NAMES NO FIELD. The first version asked `evaluate` only of a tree with no
+ * leaf in it, and `{ any: [{ all: [] }, { field: body, contains: paid }] }` compiled clean, answered true for an empty
+ * arrival and for `You withdrew 5 EGP` alike, and installed with a twin naming it, measured by this batch's checker on 23
+ * September. A group whose answer its constant children already settle is folded to that answer, the way `evaluate`
+ * reads an empty group (`all` and `none` true, `any` false), and a leaf is unknown. Only a tree whose phrase decides
+ * is the wider-phrase case `doorFault` leaves to the author. Fuzzed against `evaluate` over twenty thousand trees that
+ * compile clean, the fold settled 7683 of them and disagreed with `evaluate` on none; the 51 it left open and `evaluate`
+ * answered true for every sample text were a phrase beside its own `none`, which is logic over leaves and not a fold.
+ */
+function takesEvery(match: unknown): boolean {
+  if (match === undefined) return true;
+  /* THE SAME PRECEDENCE AS `where`'s `childrenOf`, so a node carrying two quantifiers is read the way it is run.
+     `undefined` is "the text decides"; a shape `compile` refuses never installs, so its answer here does not matter. */
+  const settled = (node: unknown): boolean | undefined => {
+    if (typeof node !== 'object' || node === null || Array.isArray(node)) return undefined;
+    const [q, kids] = 'all' in node ? ['all', node.all] : 'any' in node ? ['any', node.any] : 'none' in node ? ['none', node.none] : [];
+    if (q === undefined || !Array.isArray(kids)) return undefined;
+    const said = kids.map(settled);
+    const any = said.includes(true) ? true : said.every((s) => s === false) ? false : undefined;
+    if (q === 'any') return any;
+    if (q === 'none') return any === undefined ? undefined : !any;
+    return said.includes(false) ? false : said.every((s) => s === true) ? true : undefined;
+  };
+  return settled(match) === true;
+}
+
+const matchless = (match: unknown): string => (match === undefined ? 'has no match:' : `matches ${JSON.stringify(match)}, which is true of every text`);
+
+/**
+ * The other side of `doorFault`: a webhook ingest that patterns name as their `door:` stays one they can read through.
+ *
+ * `doorFault` IS ASKED WHEN THE PATTERN IS INSTALLED, AND THE DOOR CAN CHANGE AFTERWARDS. Measured by
+ * `loop/research-batch-forty-two-audit.md` finding 4 (b): the door re-installed without `verify:` answered `ok`, and
+ * left its pattern installed under exactly the declaration `doorFault` refuses, a door whose arrivals are stored
+ * unverified and never matched. So the door's new body is asked the same three questions the pattern asked of it,
+ * against every pattern that will still name it once the batch lands: the batch counts, so a pattern dropping its
+ * `door:` in the same call is not counted.
+ *
+ * RETIRING THE DOOR IS NOT REFUSED HERE OR IN `retireDeclarations`, though the audit's (c) measured the same hole that
+ * way. Tried on 23 September, the refusal stopped money-core's own update: its plan hands `bank-ipn-in-sms`, which filed
+ * a row, to `bank-hsbc-eg` with its `door: bank-from-out-sms`, and retires the door, which holds no token and filed
+ * nothing (`packages/seed/test/bank-pack.test.ts`, `packages/declare/test/plan-handover-shown.test.ts`). Which of the two
+ * the plan should hand is `packages/declare`'s question, and it is left open there.
+ *
+ * ASKED AFTER EVERY DECLARATION OF THE BATCH HAS PASSED `validate` (`doorsKept`), NOT INSIDE IT. Asked from
+ * `ingestBody`, a batch shipping a door with no token and a pattern naming it was answered at the door's `verify` before
+ * the pattern's own `door` was reached, and `test/ingest-door.test.ts` holds the pattern's answer for that batch.
+ */
+function doorsKept(batch: readonly Declaration[], known: Known): Refusal | null {
+  for (const decl of batch)
+    if (decl.kind === 'ingest') {
+      const fault = doorNamedFault(decl.id, decl.body as { channel?: unknown; verify?: unknown; match?: unknown }, known);
+      if (fault) return fault;
+    }
+  return null;
+}
+
+function doorNamedFault(id: string, body: { channel?: unknown; verify?: unknown; match?: unknown }, installed?: Known): Refusal | null {
+  if (installed === undefined || !id.startsWith('ingest.')) return null;
+  const door = id.slice('ingest.'.length);
+  const naming = [...installed].filter(([other, b]) => other !== id && other.startsWith('ingest.') && b.door === door).map(([other]) => other).sort();
+  if (naming.length === 0) return null;
+  const names = listed(naming);
+  const reads = naming.length === 1 ? 'reads' : 'read';
+  const out = `take door: ${door} out of ${names} in the same batch`;
+  if (body.channel !== 'webhook')
+    return bad('DECLARATION_INVALID', `${id} is the door ${names} ${reads}, and a door is a webhook's URL. Keep channel: webhook, or ${out}.`, 'channel');
+  if ((body.verify as { kind?: unknown } | undefined)?.kind !== 'path')
+    return bad('DECLARATION_INVALID', `${id} is the door ${names} ${reads}, and without verify: { kind: path } nothing arriving there is verified and no pattern is tried. Keep verify: { kind: path }, or ${out}.`, 'verify');
+  if (takesEvery(body.match))
+    return bad('DECLARATION_INVALID', `${id} is the door ${names} ${reads}, and it ${matchless(body.match)}, so it takes every arrival there before ${naming.length === 1 ? 'that pattern is' : 'those patterns are'} asked. Keep a match: on a field, or ${out}.`, 'match');
   return null;
 }
 
@@ -3873,7 +3965,7 @@ export function lintBatch(sql: Sql, batch: readonly Declaration[]): Refusal | nu
     const fault = validate(decl, known, owners);
     if (fault) return fault;
   }
-  return null;
+  return doorsKept(batch, known);
 }
 
 function ownersTo(sql: Sql, batch: readonly Declaration[]): Owners {
@@ -3923,6 +4015,8 @@ export async function stageDeclarations(
     const wrong = validate(decl, known, owners);
     if (wrong) return { ok: false, refusal: wrong };
   }
+  const unread = known === undefined ? null : doorsKept(batch, known);
+  if (unread) return { ok: false, refusal: unread };
   const sums = await Promise.all(batch.map((d) => digest(jcs(d.body))));
   return ok((sql, now, transaction, expect) => applyDeclarations(sql, now, batch, sums, transaction, expect));
 }
