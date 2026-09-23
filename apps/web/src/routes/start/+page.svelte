@@ -32,7 +32,9 @@
   import { copy } from '$lib/copy.ts';
   import { addedIn, firstModules, firstRun, keptNothingCause, onwardFrom, type AddedRows, type KeptCause } from '$lib/first-run.ts';
   import { heardFor, INSTALL_ORDER, LEANS_ON, shape, titleOfRow, toTurnOn, type PackId, type Shape } from '$lib/shape.ts';
-  import { USE_CASES, alongside, arrange, listsOf, modulesFor, pagesOf, type UseCase } from '@braindog/seed/usecases';
+  import { USE_CASES, alongside, listsOf, modulesFor, pagesOf, type UseCase } from '@braindog/seed/usecases';
+  import { arrangeTurns } from '$lib/arrange.ts';
+  import { clearExamples, offerOf, readExamples, type Examples, type ExamplesClient } from '$lib/record/examples.ts';
   import { carriedDocument, claimedBy, dayOf, formedFor, forms, moduleDocument, moduleManifest, plantedRows, withoutRows } from '@braindog/seed/usecases/install';
   import { linkExamples } from '@braindog/seed/usecases/links';
   import { PACKS } from '$lib/record/data.ts';
@@ -268,13 +270,9 @@
 
   /* ── what this BrainDog is for: the use case suggested (`loop/research-spark.md` §3, tier A) ── */
 
-  /* THE SENTENCE FIRST, AND TURN 1'S WORDS WHEN IT SAYS NOTHING. "I'm a student" in turn 1 is as much an
-     answer as the same words here, and the proposal's reasons are phrases of whichever one was read. */
-  const arranged = $derived.by(() => {
-    if (!read || read.declined === 'language') return null;
-    const own = arrange(about);
-    return own.pick || !heard?.bio ? { ...own, from: about } : { ...arrange(heard.bio), from: heard.bio };
-  });
+  /* BOTH TURNS, READ TOGETHER (`arrangeTurns`). "I'm a student" in turn 1 is as much an answer as the
+     same words here, and turn two used to be read alone, which made a founder's record Personal. */
+  const arranged = $derived(!read || read.declined === 'language' ? null : arrangeTurns(heard?.bio, about));
   /** A use case the person chose over the suggestion, by id. Kept while they keep typing. */
   let picked_use = $state<string | null>(null);
   const proposal = $derived<UseCase | null>(USE_CASES.find((u) => u.usecase === picked_use) ?? arranged?.pick ?? null);
@@ -374,9 +372,58 @@
 
   /* `added` CARRIES WHAT EACH LIST HOLDS AND NOT ONLY ITS NAME, because the one sentence this screen had
      for all of them claimed example rows in lists that arrived empty (`addedIn`). */
-  type Outcome = { made: { name: string; list: string; register: string }[]; onward: { register: string; list: string } | null; on: string[]; added: { name: string; rows: AddedRows }[]; absent: string[]; refused: string[]; waiting: boolean; plan: string | null };
+  type Outcome = { made: { name: string; list: string; register: string }[]; onward: { register: string; list: string } | null; on: string[]; added: { name: string; rows: AddedRows }[]; absent: string[]; refused: string[]; waiting: boolean; plan: string | null; as: string | null };
   let outcome = $state<Outcome | null>(null);
   let making = $state(false);
+
+  /**
+   * THE LIVE RECORD TOOK ALL OF IT, so the choice is over and the screen stops offering it.
+   *
+   * One press installed seven packs and seven example rows for Solo founder in 1.3 s, and afterwards
+   * the suggestion card, the six use-case chips and an enabled "Make my record" were drawn exactly as
+   * before the press, as if nothing had been made yet (`loop/research-first-sign-in.md` §3, friction
+   * 4). So once it is made the suggestion folds to one line saying what it was made as, and the button
+   * goes. Not on the sample, where nothing was kept, and not after a refusal, where pressing again is
+   * how somebody tries once more.
+   */
+  const settledMade = $derived(outcome !== null && !outcome.waiting && outcome.refused.length === 0);
+  /* A SENTENCE TYPED HERE AND NOT IN `first-run.ts`, where every other sentence on this screen is,
+     only because the change that wrote this line could not write that file. It belongs there as
+     `useMade`, and moving it changes no word. */
+  const madeAs = (title: string): string => `Made as ${title}`;
+
+  /**
+   * THE EXAMPLES ARE CLEARED FROM THE OUTCOME, because clearing them is the next thing a person moving
+   * a real record in does, and Home was the only place that offered it. The same record calls and the
+   * same words Home uses (`$lib/record/examples.ts`), asked once more with the count because it deletes
+   * rows. `null` on the sample and for anyone who is not the owner, since the record refuses to count.
+   */
+  let examples = $state<Examples | null>(null);
+  const clearOffer = $derived(outcome && !outcome.waiting ? offerOf(examples) : null);
+  let clearAsking = $state(false);
+  let clearing = $state(false);
+  let clearedSaid = $state<string | null>(null);
+
+  async function clearTheExamples() {
+    if (clearing) return;
+    clearing = true;
+    try {
+      const client = createClient({ base: apiBase() }) as unknown as ExamplesClient;
+      const out = await clearExamples(client);
+      if (!out.ok) {
+        toasts.push(out.fix, { intent: 'bad' });
+        return;
+      }
+      clearedSaid = out.said;
+      clearAsking = false;
+      examples = await readExamples(client);
+      /* THE RAIL IS DRAWN FROM A KEPT `boot`, for the reason `ClearExamples.svelte` measured: without
+         this, the next screen draws pages named after rows that are gone. */
+      (await import('$lib/record/boot-live.ts')).forget();
+    } finally {
+      clearing = false;
+    }
+  }
   let kept = $state<HTMLDivElement | undefined>(undefined);
   /** Rows this screen already made, by register and title, so a second press corrects or skips rather than duplicates. */
   const madeRows = new Map<string, number>();
@@ -401,7 +448,7 @@
       const client = createClient({ base: apiBase() });
       const chosen = await recordOrSample(client, sampled);
       const installed = chosen.first.ok ? chosen.first.value : [];
-      const out: Outcome = { made: [], onward: null, on: [], added: [], absent: [], refused: [], waiting: chosen.source.sample, plan: null };
+      const out: Outcome = { made: [], onward: null, on: [], added: [], absent: [], refused: [], waiting: chosen.source.sample, plan: null, as: u?.title ?? null };
       /* WHETHER A MODEL IS BEHIND SPARK HERE, so a use case that forms a plan asks it before planting its own (`sparkForm`). */
       const modelHere = !chosen.source.sample && (await client.version().then((v) => v.ok && v.value.spark).catch(() => false));
 
@@ -602,6 +649,10 @@
       out.onward = onwardFrom(out, ownFirst, ownHeld, firstOn ? { register: firstOn, list: REGISTERS[firstOn]?.name ?? firstOn } : null);
       /* THE SHELL READS THE RECORD AGAIN, so the rail shows the new lists and pages and speaks in the new voice. */
       if (!chosen.source.sample) (await import('$lib/record/boot-live.ts')).forget();
+      /* COUNTED BEFORE THE OUTCOME IS DRAWN, so the offer arrives with it and the status is read once. */
+      examples = chosen.source.sample ? null : await readExamples(client as unknown as ExamplesClient);
+      clearAsking = false;
+      clearedSaid = null;
       outcome = out;
       await tick();
       kept?.scrollIntoView({ block: 'nearest' });
@@ -1049,7 +1100,9 @@
         <!-- Always in the document, for the reason turn 1's line gives. -->
         <p class="heard-now" role="status">{shapeSaid}</p>
 
-        {#if read && read.declined !== 'empty' && read.declined !== 'language'}
+        {#if settledMade}
+          {#if outcome?.as}<p class="use use-title">{madeAs(outcome.as)}</p>{/if}
+        {:else if read && read.declined !== 'empty' && read.declined !== 'language'}
           <section class="use" aria-labelledby="use-h">
             {#if proposal}
               <h3 class="col-h" id="use-h">{firstRun.useSuggested}</h3>
@@ -1115,7 +1168,9 @@
         {/if}
 
         <div class="actions shape-actions">
-          <Button weight={outcome?.onward ? 'quiet' : 'primary'} disabled={!read || (read.declined !== null && !(read.declined === 'unread' && proposal)) || making} onclick={() => void make()}>{firstRun.shapeMake}</Button>
+          {#if !settledMade}
+            <Button weight={outcome?.onward ? 'quiet' : 'primary'} disabled={!read || (read.declined !== null && !(read.declined === 'unread' && proposal)) || making} onclick={() => void make()}>{firstRun.shapeMake}</Button>
+          {/if}
           <Button weight="bare" onclick={() => void goto(at('/start?list'), { keepFocus: true, noScroll: true })}>{firstRun.shapeFromList}</Button>
         </div>
 
@@ -1143,9 +1198,16 @@
               </div>
             {/if}
             {#if outcome.waiting}<p class="kept-why">{firstRun.keptNothing} {keptWhy}</p>{/if}
-            {#if outcome.onward}
+            {#if clearedSaid}<p class="kept-why">{clearedSaid}</p>{/if}
+            {#if outcome.onward || clearOffer}
               <div class="actions">
-                <Button weight="primary" href={`/r/${outcome.onward.register}?first=1`}>{firstRun.seeTheList(outcome.onward.list)}</Button>
+                {#if outcome.onward}<Button weight="primary" href={`/r/${outcome.onward.register}?first=1`}>{firstRun.seeTheList(outcome.onward.list)}</Button>{/if}
+                {#if clearOffer && clearAsking}
+                  <Button weight="quiet" tone="bad" disabled={clearing} onclick={() => void clearTheExamples()}>{clearOffer.confirm}</Button>
+                  <Button weight="bare" disabled={clearing} onclick={() => (clearAsking = false)}>{clearOffer.keep}</Button>
+                {:else if clearOffer}
+                  <Button weight="quiet" onclick={() => (clearAsking = true)}>{clearOffer.button}</Button>
+                {/if}
               </div>
             {/if}
           </div>
