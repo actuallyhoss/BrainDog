@@ -69,10 +69,18 @@ export class FlowDraft {
   /** The version it was opened at, or `null` for a new one. What a save is drawn from. */
   version: number | null = null;
   /**
-   * Whether this host answers Spark, which decides whether an `ask_spark` card is a fault (`faultsOf`). Fixed for the
-   * draft's life because the layout asks `/api/version` once for the tab, and the page reads it from there.
+   * Whether this host answers Spark, which decides whether an `ask_spark` card is a fault (`faultsOf`).
+   *
+   * READ EACH TIME, NOT KEPT, because it was kept and the menu beside it is not. The layout forgets a refused
+   * `/api/version` and asks again on the next navigation, a move from one automation to another keeps the page, and
+   * `StepMenu`'s `$derived` follows the new answer: kept from the first load, the draft faulted every Ask Spark card the
+   * menu had just offered (`flow.svelte.test.ts`). A function read inside `faults` is also what a `$derived` over the
+   * faults tracks, so the two cannot disagree. A plain boolean is still taken, for a caller with nothing to follow.
    */
-  readonly spark: boolean;
+  get spark(): boolean {
+    return this.#spark();
+  }
+  #spark: () => boolean;
   /** State, so that `sent` quietens the button: `dirty` reads it, and a plain field would not tell anything it moved. */
   #opened = $state('');
   #undo = $state.raw<Draft[]>([]);
@@ -86,8 +94,8 @@ export class FlowDraft {
    */
   #held = $state.raw<ReadonlySet<string>>(new Set());
 
-  constructor({ spark }: { spark: boolean }) {
-    this.spark = spark;
+  constructor({ spark }: { spark: boolean | (() => boolean) }) {
+    this.#spark = typeof spark === 'function' ? spark : () => spark;
   }
 
   /** Open a body. `null` is a new automation, which has no version and nothing to compare against. */

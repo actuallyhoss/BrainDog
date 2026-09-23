@@ -132,7 +132,9 @@ test('EVERY SAMPLE AUTOMATION ROUND-TRIPS UNCHANGED AND HAS NOTHING TO FIX, so o
   for (const row of SAMPLE_AUTOMATIONS(0)) {
     const d = draftOf(row.id, row.body!);
     assert.deepEqual(bodyOf(d), row.body, row.id);
-    assert.deepEqual(faultsOf(d), [], row.id);
+    /* ON A HOST WITH NO MODEL, said out loud rather than left to the default: the sample is drawn whatever the host
+       said of a model, and an Ask Spark card in it would be a fault on every host that has none. */
+    assert.deepEqual(faultsOf(d, { spark: false }), [], row.id);
   }
 });
 

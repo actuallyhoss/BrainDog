@@ -24,7 +24,7 @@ import { ROUTES, handlersFor, serveApi } from '../../host/src/index.ts';
 import { createClient } from '../../client/src/index.ts';
 import { DEPTH_CEILING, RUNS_PER_DAY_CEILING, STEP_CEILING, VARS_CEILING, pathOf, triggerOf } from '../../kernel/src/flow-lint.ts';
 import { FLOOR_MS } from '../../kernel/src/pull.ts';
-import { ASK_PERSON_WAIT } from '../../kernel/src/flow.ts';
+import { ASK_PERSON_WAIT, ASK_SPARK_WAIT_MS } from '../../kernel/src/flow.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { stub } from './stub.ts';
 
@@ -261,6 +261,27 @@ test('ON A HOST THAT ANSWERS SPARK, NEITHER THE DRY RUN NOR THE GRAMMAR SAYS ask
   );
   assert.deepEqual(grammar.not_in_this_build, { triggers: ['metric', 'decided'], steps: ['call', 'script'] });
   assert.doesNotMatch(grammar.not_in_this_build_says, /ask_spark/u, grammar.not_in_this_build_says);
+  sql.close();
+});
+
+test('ON A HOST THAT ANSWERS SPARK, THE GRAMMAR SAYS HOW A STEP SENDS FIELDS OF THE ROW AND HOW LONG THE RUN WAITS, and the step installs as written', async () => {
+  /* `ANSWERED_GRAMMAR` KEPT THE FLAG-OFF TEXT FOR THE STEP, which names question, as and shape and nothing else. So the
+     one host that runs it told an agent neither that `about:` is how fields of the row go with the question nor that the
+     run parks a day and stops without an answer, where `ask_person`'s entry says its week. Measured red first: the
+     entry matched neither /about/ nor the runner's `ASK_SPARK_WAIT_MS` as a span. */
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW), answersSpark: true, build: { app: '2026-09-23+test', spark: true } });
+  const grammar = value<{ steps: Record<string, string> }>(await tools(api).read('braindog:grammar/automations', owner));
+  const written = grammar.steps.ask_spark!;
+  assert.match(written, /"about":\[/u, written);
+  assert.match(written, new RegExp(`\\b${ASK_SPARK_WAIT_MS / 86_400_000}d\\b`, 'u'), written);
+  /* AND WHAT IT SAYS INSTALLS: the step as written, placeholders filled, on a rule about a row that has the field. */
+  const step = JSON.parse(written.slice(0, written.lastIndexOf('}}') + 2).replace(/<[a-z]+>/g, 'x')) as Record<string, unknown>;
+  const put = await api.kernel.install([
+    register('bills', [{ id: 'x', type: 'text', required: true }]),
+    rule({ rule: 'rates', on: { written: { register: 'bills', op: ['create'] } }, once_per: ['entry'], steps: [step] }),
+  ]);
+  assert.ok(put.ok, JSON.stringify(put));
   sql.close();
 });
 

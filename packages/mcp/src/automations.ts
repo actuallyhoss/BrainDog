@@ -98,9 +98,20 @@ export const AUTOMATION_GRAMMAR = {
  * MEASURED BEFORE THIS, ON A RECORD OPENED WITH `answersSpark: true`: a rule asking Spark installed and parked on its
  * question, and this resource still listed `ask_spark` under `not_in_this_build` and said it "is refused at install". An
  * agent reading that would not file the one step the host serves (`test/automations.test.ts`, "ON A HOST THAT ANSWERS").
+ *
+ * AND THE STEP ITSELF IS SAID IN FULL HERE, because the flag-off entry above was all this host served of it: question,
+ * as and shape, with no word of `about:`, which is the only way a field of the row goes with the question unless the
+ * question's braces name it, and no word of the wait, where `ask_person`'s entry states its week. The day is
+ * `flow.ts`'s `ASK_SPARK_WAIT_MS`, copied for the reason the limits are and held by the same test, which also installs
+ * the step as written.
  */
 export const ANSWERED_GRAMMAR = {
   ...AUTOMATION_GRAMMAR,
+  steps: {
+    ...AUTOMATION_GRAMMAR.steps,
+    ask_spark:
+      '{"ask_spark":{"question":"<text>","about":["<field>"],"as":"<answer>","shape":"text"}}: shape is text, number or choice, and choice needs choices. about is optional: the fields of the run\'s row that go with the question, so it needs a trigger with a row, and a secret or file field is refused in about and in the question alike. The run waits 1d for this host\'s model to answer, and stops if none comes',
+  },
   not_in_this_build: { triggers: AUTOMATION_GRAMMAR.not_in_this_build.triggers, steps: ['call', 'script'] },
   not_in_this_build_says:
     'a metric or decided trigger is refused at install. A call or script step installs, and a run that reaches it fails there with a sentence, after taking every step before it',

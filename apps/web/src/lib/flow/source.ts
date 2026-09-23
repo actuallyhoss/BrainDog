@@ -419,9 +419,12 @@ export function SAMPLE_AUTOMATIONS(now: number): AutomationRow[] {
         rule: 'friday-review',
         name: 'Friday review',
         on: { manual: true },
-        /* NOT `ask_spark`, WHICH THIS BUILD REFUSES AT INSTALL (`flow.ts` `NOT_YET`, since `6ec8011d`). The sample asked
-           Spark here, so the one button in it opened with a fault on its first card and could not be sent, and the
-           test below that every sample has nothing to fix had been failing since that commit. */
+        /* NOT `ask_spark`, WHICH A HOST WITH NO MODEL REFUSES AT INSTALL (`sparkAskAt` in the kernel's `flow-lint.ts`),
+           and the canvas says so as a fault on the card wherever the layout has not read `spark: true` (`flow.ts`
+           `notYet(spark)`). The sample is drawn when the record is unreachable or refuses the caller, whatever the host
+           said of a model, so it is held to no model and opens clean on either. It asked Spark once, and from `6ec8011d`, which
+           made the refusal, the one button in it opened with a fault on its first card and could not be sent, and the
+           test that every sample has nothing to fix failed until the step was changed. */
         steps: [
           { ask_person: { question: 'Did everything due this week go out?', options: ['All of it', 'Not yet'], as: 'sent' } },
           { notify: { say: 'Friday review: {{vars.sent}}' } },
