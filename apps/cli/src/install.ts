@@ -26,7 +26,7 @@
  * through `C:\Repos\.mcp.json`, and finding 2 there measured why that file cannot stand in: a new name in a
  * `.mcp.json` stays `Pending approval` wherever a `settings.local.json` approved the old one by name, so a headless
  * `claude -p` has no brain, while a user-scope entry of the same name is the one started. A profile with no
- * `.claude.json` gets one holding only the entry. And the `claude mcp add-json` line main.ts prints is owed per
+ * `.claude.json` gets one holding only the entry. And the `claude mcp add` line main.ts prints is owed per
  * profile, with `CLAUDE_CONFIG_DIR` naming it: it was one answer for the whole run, so the audit's two-profile
  * `--apply` (`loop/research-batch-forty-two-audit.md` §5) left `.claude-acme` with no server and no line.
  *
@@ -92,8 +92,8 @@ export const REPLACE_BY_HAND =
   'A .mcp.json is opened only when it is named, so a the old tool server registered in one (C:\\Repos\\.mcp.json had one) stays until you run this again with --mcp-json <file>.';
 
 /**
- * BrainDog's MCP server as a registration: this checkout's `main.ts` run by Node, the entry main.ts prints for
- * `claude mcp add-json`. NO `env` AND NO `headers`, so no token is ever written here: the server reads the sign-in
+ * BrainDog's MCP server as a registration: this checkout's `main.ts` run by Node, the entry the hand-run line has
+ * `claude mcp add` write. NO `env` AND NO `headers`, so no token is ever written here: the server reads the sign-in
  * `braindog login` keeps, and the entry it replaces is never copied from, since that is where the old tool kept its key.
  */
 export const BRAINDOG_SERVER = {
@@ -104,19 +104,57 @@ export const BRAINDOG_SERVER = {
 
 const ADDS_SERVER = '  + mcpServers.braindog: ';
 
-/** What registers BrainDog's server in the profile the shell is in, which `byHand` prefixes to name another. */
-export const HAND_RUN = `claude mcp add-json braindog '${JSON.stringify(BRAINDOG_SERVER)}' --scope user`;
+/*
+ * A word quoted for the shell the line is printed for: PowerShell doubles a `'`, `sh` closes and reopens around it.
+ * POWERSHELL READS FOUR MORE CHARACTERS AS `'`: U+2018, U+2019, U+201A and U+201B. With only the ASCII one doubled,
+ * a profile folder named `prof’s` printed a line 5.1 refused whole, "The string is missing the terminator".
+ */
+const quote = (word: string, platform: string): string =>
+  platform === 'win32' ? `'${word.replace(/['\u2018\u2019\u201A\u201B]/g, '$&$&')}'` : `'${word.replaceAll("'", "'\\''")}'`;
+
+/**
+ * What registers BrainDog's server in the profile the shell is in, for the shell `platform` names.
+ *
+ * `claude mcp add`, NOT `add-json`, BECAUSE NO SHELL HAS TO CARRY JSON. The `add-json` line lost its inner double
+ * quotes in Windows PowerShell 5.1, which reached `claude` as `{type:stdio,command:node,...}` and did not parse
+ * (finding 1 of `loop/research-batch-forty-four-audit.md`). Written `\"`, the audit measured 5.1 keeping them and 7.3
+ * passing the backslashes through, and `add-json` reads no file, only its argument (its `--help` in Claude Code 2.1.280).
+ *
+ * THE `--` IS QUOTED IN POWERSHELL. Without it Claude Code reads `--agent` as its own option and exits 1, "unknown
+ * option '--agent'", and PowerShell 5.1 drops a bare `--` before it reaches a `.ps1`, the `claude` that `npm install -g`
+ * puts on the PATH: a stand-in `claude.ps1` was handed no `--`, and `'--'` arrived whole. `claude.exe` from the
+ * native installer took the quoted form and wrote exactly `BRAINDOG_SERVER`, plus an empty `env`, in a scratch profile.
+ */
+export function handRun(platform: string = process.platform): string {
+  const [main, ...rest] = BRAINDOG_SERVER.args;
+  const dashes = platform === 'win32' ? "'--'" : '--';
+  return `claude mcp add --scope user braindog ${dashes} ${BRAINDOG_SERVER.command} ${quote(main, platform)} ${rest.join(' ')}`;
+}
+
+/** The line for this machine's shell, which main.ts prints bare when a run names only settings files. */
+export const HAND_RUN = handRun();
 
 /**
  * The hand-run line for each profile `installProfiles` left without BrainDog's server, WITH `CLAUDE_CONFIG_DIR` NAMING
  * IT, because run bare the line registers the server in whichever profile the shell is in. The default profile is
- * the one exception: Claude Code keeps its servers in `~/.claude.json` only when no `CLAUDE_CONFIG_DIR` is set (see
- * `serversFileOf`), so setting it to `~/.claude` would be read as a named profile and write inside the folder.
+ * named by the variable's absence: Claude Code keeps its servers in `~/.claude.json` only when no `CLAUDE_CONFIG_DIR`
+ * is set (see `serversFileOf`), so setting it to `~/.claude` would be read as a named profile and write inside the
+ * folder, and leaving the shell's own, as the line once did, wrote into whichever profile the window was in.
+ *
+ * POWERSHELL ON WIN32, BECAUSE THAT IS WHERE IT IS PASTED. The `sh` form, `CLAUDE_CONFIG_DIR='<dir>' claude ...`, is
+ * `CommandNotFoundException` in PowerShell 5.1 and "not recognized" in `cmd`; only Git Bash ran it. The PowerShell form
+ * PUTS THE SHELL'S OWN VALUE BACK rather than removing it: his window already sits in a profile, and a line ending in
+ * `Remove-Item Env:CLAUDE_CONFIG_DIR` left it unset, so every later `claude` there ran in `~/.claude`. Assigning the
+ * saved `$null` back removes the variable, so a shell that had none is left with none.
  */
-export function byHand(unserved: string[], home: string = homedir()): string[] {
-  return unserved.map((dir) =>
-    serversFileOf(dir, home) === join(home, '.claude.json') ? HAND_RUN : `CLAUDE_CONFIG_DIR='${resolve(dir).replaceAll("'", "'\\''")}' ${HAND_RUN}`,
-  );
+export function byHand(unserved: string[], home: string = homedir(), platform: string = process.platform): string[] {
+  const line = handRun(platform);
+  return unserved.map((dir) => {
+    const named = serversFileOf(dir, home) !== join(home, '.claude.json');
+    if (platform !== 'win32') return named ? `CLAUDE_CONFIG_DIR=${quote(resolve(dir), platform)} ${line}` : `(unset CLAUDE_CONFIG_DIR; ${line})`;
+    const set = named ? quote(resolve(dir), platform) : '$null';
+    return `$braindogWas = $env:CLAUDE_CONFIG_DIR; $env:CLAUDE_CONFIG_DIR = ${set}; ${line}; $env:CLAUDE_CONFIG_DIR = $braindogWas`;
+  });
 }
 
 /** The profile folders to change: each `--config-dir`, else `CLAUDE_CONFIG_DIR`, else `~/.claude`. */

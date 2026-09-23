@@ -339,7 +339,7 @@ test('INSTALL IS A DRY RUN BY DEFAULT, and with --apply keeps a copy, keeps othe
   assert.ok(dry.stdout.includes(`  + hooks.SessionStart: ${JSON.stringify({ hooks: [{ type: 'command', command: start, timeout: 20 }] })}`));
   assert.ok(dry.stdout.includes(`  + hooks.SessionEnd: ${JSON.stringify({ hooks: [{ type: 'command', command: end, timeout: 15 }] })}`));
   assert.ok(dry.stdout.includes('Nothing was changed. Run braindog install --apply to write it.'));
-  assert.ok(dry.stdout.includes('claude mcp add-json braindog'));
+  assert.ok(dry.stdout.includes('claude mcp add --scope user braindog'));
   assert.equal(readFileSync(file, 'utf8'), before, 'the dry run changed the settings');
   assert.deepEqual(readdirSync(profile), ['settings.json']);
 

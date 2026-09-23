@@ -141,7 +141,7 @@ test('THE AUDIT’S TWO-PROFILE RUN through main.ts: both profiles end with brai
   assert.equal(ran.status, 0, ran.stderr);
   assert.deepEqual(read(quartz.claudeJson).mcpServers, { braindog: BRAINDOG });
   assert.deepEqual(read(acme.claudeJson).mcpServers, { braindog: BRAINDOG });
-  assert.ok(!ran.stdout.includes('claude mcp add-json'), ran.stdout);
+  assert.ok(!ran.stdout.includes('claude mcp add'), ran.stdout);
 });
 
 test('A FILE ALREADY HOLDING A braindog SERVER keeps it as it is: byte for byte with nothing else to do, and the entry itself untouched beside a removal', () => {

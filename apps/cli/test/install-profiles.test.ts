@@ -31,7 +31,16 @@ const scripts = join(APP, 'hooks');
 /* Written out, not imported, for the reason `install-adds-server.test.ts` gives. */
 const BRAINDOG = { type: 'stdio', command: 'node', args: [join(APP, 'src', 'main.ts').replaceAll('\\', '/'), 'mcp', '--agent', 'claude'] };
 const PLUS = `  + mcpServers.braindog: ${JSON.stringify(BRAINDOG)}`;
-const HAND = `claude mcp add-json braindog '${JSON.stringify(BRAINDOG)}' --scope user`;
+/*
+ * THE HAND-RUN LINE FOR THIS MACHINE'S SHELL, written out for the same reason: PowerShell on Windows, where a bare
+ * `--` is dropped before a `claude.ps1` and so is quoted, and `sh` elsewhere. `install-hand-line.test.ts` runs both.
+ */
+const WIN = process.platform === 'win32';
+const HAND = `claude mcp add --scope user braindog ${WIN ? "'--'" : '--'} node '${BRAINDOG.args[0]}' mcp --agent claude`;
+const inPs = (set: string) => `$braindogWas = $env:CLAUDE_CONFIG_DIR; $env:CLAUDE_CONFIG_DIR = ${set}; ${HAND}; $env:CLAUDE_CONFIG_DIR = $braindogWas`;
+const forProfile = (dir: string) => (WIN ? inPs(`'${dir.replaceAll("'", "''")}'`) : `CLAUDE_CONFIG_DIR='${dir}' ${HAND}`);
+/* The default profile is named by the variable's absence, so the line clears the shell's own for the one call. */
+const FOR_DEFAULT = WIN ? inPs('$null') : `(unset CLAUDE_CONFIG_DIR; ${HAND})`;
 
 const SECRET = 'hb-token-never-printed-3e0f';
 const HB_START = 'powershell -NoProfile -ExecutionPolicy Bypass -File "C:\\Tools\\legacy\\hooks\\session-start.ps1"';
@@ -142,7 +151,7 @@ test('--APPLY OVER HIS THREE PROFILES, through main.ts: every .claude.json ends 
    * would: none holds `braindog` until --apply, and a checker's mutation reading only the files, not the plan, printed
    * the line three times here and kept every other test green.
    */
-  assert.ok(!dry.stdout.includes('claude mcp add-json'), dry.stdout);
+  assert.ok(!dry.stdout.includes('claude mcp add'), dry.stdout);
 
   const applied = cli([...args, '--apply'], home);
   assert.equal(applied.code, 0, applied.stderr);
@@ -164,7 +173,7 @@ test('--APPLY OVER HIS THREE PROFILES, through main.ts: every .claude.json ends 
   assert.deepEqual(shared.figma, FIGMA);
 
   /* Every named profile is served, so the line telling him to register one by hand is owed to none of them. */
-  assert.ok(!applied.stdout.includes('claude mcp add-json'), applied.stdout);
+  assert.ok(!applied.stdout.includes('claude mcp add'), applied.stdout);
 
   /* A second run has nothing left to do in any profile, and keeps no second copy. */
   const again = cli([...args, '--apply'], home);
@@ -218,8 +227,8 @@ test('WITHOUT --replace, the hand-run line is printed once for each profile that
 
   const ran = cli(['install', '--config-dir', settled.dir, '--config-dir', acme.dir, '--config-dir', bare.dir], home);
   assert.equal(ran.code, 0, ran.stderr);
-  const hand = ran.stdout.split('\n').filter((l) => l.includes('claude mcp add-json'));
-  assert.deepEqual(hand, [`CLAUDE_CONFIG_DIR='${acme.dir}' ${HAND}`, `CLAUDE_CONFIG_DIR='${bare.dir}' ${HAND}`], ran.stdout);
+  const hand = ran.stdout.split('\n').filter((l) => l.includes('claude mcp add'));
+  assert.deepEqual(hand, [forProfile(acme.dir), forProfile(bare.dir)], ran.stdout);
 });
 
 /*
@@ -227,23 +236,23 @@ test('WITHOUT --replace, the hand-run line is printed once for each profile that
  * stayed green: the prefix on the default profile, the one-line-per-file dedupe, and the `mcpServers` that is not an
  * object, which gains no entry and so is still owed the line.
  */
-test('THE DEFAULT ~/.claude PROFILE gets the bare line, a profile named twice gets one line, and one whose mcpServers is a list is still owed it under --replace', () => {
+test('THE DEFAULT ~/.claude PROFILE gets the line that clears CLAUDE_CONFIG_DIR, a profile named twice gets one line, and one whose mcpServers is a list is still owed it under --replace', () => {
   const home = folder('home');
   /* No `--config-dir` and no `CLAUDE_CONFIG_DIR`: the profile is `~/.claude`, whose servers are in `~/.claude.json`. */
   const bare = cli(['install'], home);
   assert.equal(bare.code, 0, bare.stderr);
-  assert.deepEqual(bare.stdout.split('\n').filter((l) => l.includes('claude mcp add-json')), [HAND], bare.stdout);
+  assert.deepEqual(bare.stdout.split('\n').filter((l) => l.includes('claude mcp add')), [FOR_DEFAULT], bare.stdout);
 
   const acme = profile(home, '.claude-acme', { mcpServers: { figma: FIGMA } });
   const twice = cli(['install', '--config-dir', acme.dir, '--config-dir', acme.dir], home);
   assert.equal(twice.code, 0, twice.stderr);
-  assert.deepEqual(twice.stdout.split('\n').filter((l) => l.includes('claude mcp add-json')), [`CLAUDE_CONFIG_DIR='${acme.dir}' ${HAND}`], twice.stdout);
+  assert.deepEqual(twice.stdout.split('\n').filter((l) => l.includes('claude mcp add')), [forProfile(acme.dir)], twice.stdout);
 
   const listed = profile(home, '.claude-listed', { mcpServers: [] });
   const refused = cli(['install', '--replace', '--config-dir', listed.dir], home);
   assert.equal(refused.code, 0, refused.stderr);
   assert.ok(refused.stdout.includes(`${listed.claudeJson} registers no the old tool MCP server. Nothing to change. Its mcpServers is not an object`), refused.stdout);
-  assert.deepEqual(refused.stdout.split('\n').filter((l) => l.includes('claude mcp add-json')), [`CLAUDE_CONFIG_DIR='${listed.dir}' ${HAND}`], refused.stdout);
+  assert.deepEqual(refused.stdout.split('\n').filter((l) => l.includes('claude mcp add')), [forProfile(listed.dir)], refused.stdout);
 });
 
 test('NO TOKEN IN ANY ENTRY OR LINE, on the dry run, on --apply, or in a file written', () => {
