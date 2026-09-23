@@ -49,12 +49,17 @@ const USAGE =
 /** The largest export this reads: the old tool's is about 108 KB of document and an audit of up to 100,000 lines. */
 export const IMPORT_MOST_BYTES = 64 * 1024 * 1024;
 
-type Row = { id: string; seq: number | null; version: number; fields: Record<string, unknown> };
+type Row = { id: string; seq: number | null; version: number; fields: Record<string, unknown>; deleted_at?: string | null };
 
 /** The part of the client an import uses, so a test can hand it a record of its own. */
 export type Door = {
   schema: (register: string) => Promise<Result<unknown>>;
-  list: (args: { register: string; limit?: number; cursor?: string | null }) => Promise<Result<{ rows: unknown[]; cursor: string | null }>>;
+  /**
+   * `deleted: true` ASKS FOR THE ROWS HE DELETED AS WELL AS THE LIVE ONES, each with its `deleted_at`, which is how the
+   * import tells a row he threw away from a row nobody has written yet: see `gone` in `applyPlan`. A door that answers
+   * live rows only is safe, and no worse than before: nothing is read as deleted, so nothing is held back.
+   */
+  list: (args: { register: string; limit?: number; cursor?: string | null; deleted?: boolean }) => Promise<Result<{ rows: unknown[]; cursor: string | null }>>;
   create: (args: { register: string; fields: Record<string, unknown>; note?: string }) => Promise<Result<unknown>>;
   update: (args: { register: string; seq: number; patch: Record<string, unknown>; version?: number; note?: string }) => Promise<Result<unknown>>;
   governance: (args: { register?: string; status?: string; limit?: number; cursor?: string }) => Promise<Result<unknown>>;
@@ -127,8 +132,13 @@ export type Report = {
   clashes: { label: string; rows: number; fix: string }[];
   /** Example rows setting up planted, found in the lists the import writes to: the report suggests clearing them on Home. */
   examples: number;
+  /**
+   * Each planned row he deleted in this BrainDog, held back rather than written again: see `gone` in `applyPlan`.
+   * OPTIONAL FOR THE SAME REASON AS `questions`: `applyPlan` always sets it, and a report written by hand may not.
+   */
+  deleted?: { register: string; label: string }[];
   /** What happened to each planned row, by its key: the report lists dates, domains and services one by one. */
-  outcomes: Record<string, 'added' | 'updated' | 'unchanged' | 'refused'>;
+  outcomes: Record<string, 'added' | 'updated' | 'unchanged' | 'refused' | 'deleted'>;
   plan: Plan;
 };
 
@@ -226,7 +236,7 @@ class PartlyRead extends Error {
 }
 
 /**
- * Every row of one list, page by page.
+ * Every row of one list, page by page, the rows he deleted included (`Door.list`, `deleted`).
  *
  * THE PAGE BUDGET IS A REFUSAL AND NOT A `break`, for the same reason: the record pages a list at 500 rows, so a
  * thousand pages is half a million rows in one list, and a run that reached it would have been carrying on with an
@@ -236,7 +246,7 @@ async function readAll(door: Door, register: string): Promise<Row[]> {
   const out: Row[] = [];
   let cursor: string | null = null;
   for (let pages = 0; pages < 1000; pages++) {
-    const got = await door.list({ register, limit: 500, ...(cursor === null ? {} : { cursor }) });
+    const got = await door.list({ register, limit: 500, deleted: true, ...(cursor === null ? {} : { cursor }) });
     if (!got.ok) {
       if (unreachable(got)) throw new Unreachable();
       throw new PartlyRead(NAMES[register] ?? register, fixOf(got));
@@ -438,6 +448,7 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
   let plan = given;
   const questions: NonNullable<Report['questions']> = [];
   const waiting: Waiting[] = [];
+  const deleted: NonNullable<Report['deleted']> = [];
   const report: Report = {
     missing: [],
     tally: {},
@@ -451,6 +462,7 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
     retired: [],
     clashes: [],
     examples: 0,
+    deleted,
     outcomes: {},
     plan,
   };
@@ -743,8 +755,28 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
    * only thing said is one refusal line that names no ledger row.
    */
   const named = new Map<string, Row>();
+  /**
+   * EVERY KEY A ROW HE DELETED HERE STILL HOLDS, AND THE PLAN DOES NOT WRITE ONE OF THEM AGAIN.
+   *
+   * `readAll` listed live rows only, and a planned key no live row holds is a row to create, so a task or a ledger row
+   * he deleted in BrainDog was added back by the next night's import, which is every night of the shadow week: Sam
+   * Brain is still where he works, and its export still holds the row (`test/import-deleted-stays.test.ts`, measured
+   * before this: `Tasks: 1 added` and `Ledger: 1 added` for the two rows deleted). A deleted row is still a row in the
+   * record until it is purged, with its tags, so its key is read with the live ones and set aside here.
+   *
+   * A LIVE ROW UNDER THE SAME KEY WINS. A record the import ran on before this holds, for each row he deleted, the
+   * deleted one and the copy the next night added back; that copy is his now, and it is updated as any live row is.
+   * And a deleted row takes no example count and no category name, because the record's unique index on a name is on
+   * live rows alone (`packages/kernel/src/declare.ts`, `deleted_at IS NULL`).
+   */
+  const gone = new Set<string>();
   for (const register of [...new Set([...registers, ...retiring.map((r) => r.register)])])
     for (const row of await readAll(door, register)) {
+      if (typeof row.deleted_at === 'string' && row.deleted_at !== '') {
+        const key = keyOf(register, row.fields);
+        if (key) gone.add(key);
+        continue;
+      }
       if (Array.isArray(row.fields.tags) && row.fields.tags.includes('example')) report.examples++;
       if (register === 'categories' && typeof row.fields.name === 'string') named.set(row.fields.name.toLowerCase(), row);
       const key = keyOf(register, row.fields);
@@ -781,7 +813,7 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
    * What one row's write says, held until every row of its list has answered and then added to the report in plan
    * order: see the loop over `lists` below.
    */
-  type Said = { changes: Report['changes']; refused: Report['refused']; later: typeof later };
+  type Said = { changes: Report['changes']; refused: Report['refused']; later: typeof later; deleted: NonNullable<Report['deleted']> };
 
   /** One planned row, written or found and patched, with what it says put in `said`. */
   const writeRow = async (row: PlannedRow, said: Said): Promise<void> => {
@@ -825,6 +857,13 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
       }
     }
     const found = existing.get(row.key);
+    /* HE DELETED IT HERE, SO IT IS NOT CREATED AGAIN: see `gone`. First, so a deleted category is not also reported as
+       a name taken. Said once under its list and not tallied, because nothing was added, updated or found unchanged. */
+    if (!found && gone.has(row.key)) {
+      said.deleted.push({ register: row.register, label: row.label });
+      report.outcomes[row.key] = 'deleted';
+      return;
+    }
     if (holdsKey(fields)) {
       said.refused.push({ label: row.label, register: row.register, fix: 'A field looked like a key itself, so the row was not sent.' });
       return;
@@ -949,7 +988,7 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
     else lists.push([row]);
   }
   for (const list of lists) {
-    const said: Said[] = list.map(() => ({ changes: [], refused: [], later: [] }));
+    const said: Said[] = list.map(() => ({ changes: [], refused: [], later: [], deleted: [] }));
     let next = 0;
     let failed: { error: unknown } | null = null;
     const lane = async () => {
@@ -972,6 +1011,7 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
     for (const s of said) {
       report.changes.push(...s.changes);
       report.refused.push(...s.refused);
+      deleted.push(...s.deleted);
       later.push(...s.later);
     }
   }
@@ -1188,6 +1228,9 @@ const hostOf = (url: string): string => {
 const and = (items: string[]) => (items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${String(items.at(-1))}`);
 const few = (items: string[], most = 8) => (items.length <= most ? items.join(', ') : `${items.slice(0, most).join(', ')} and ${String(items.length - most)} more`);
 
+/** The rows held back because he deleted them here, as both reports name them: each one's label and its list. */
+const deletedSaid = (rows: { register: string; label: string }[]): string => few(rows.map((r) => `${r.label} (${NAMES[r.register] ?? r.register})`));
+
 /** A question waiting on Decide as both reports name it: its the old tool id, its words, and what the old tool did with it. */
 const waitingSaid = (w: Waiting): string => `${w.label}${w.question ? `, ${w.question}` : ''}, ${w.answer}.`;
 
@@ -1242,6 +1285,10 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
       if (was === 'added') return o.dryRun ? 'would be added' : 'added';
       if (was === 'updated') return o.dryRun ? 'would be updated' : 'updated';
       if (was === 'refused') return 'refused';
+      /* A ROW HE DELETED HERE IS NOT "UNCHANGED". It fell through to that word, so the same night's report called
+         lanternly.example unchanged on Estate two lines above saying it was deleted and not added again (measured on
+         the synthetic export with the domain deleted, `test/import-deleted-stays.test.ts`). */
+      if (was === 'deleted') return o.dryRun ? 'deleted here, so it would not be added again' : 'deleted here, so not added again';
       return 'unchanged';
     };
     for (const r of estate) lines.push(`- ${kind(r)}: ${r.label}, ${outcome(r)} (${NAMES[r.register] ?? r.register}).`);
@@ -1267,6 +1314,11 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
     for (const c of report.clashes)
       lines.push(`- ${c.label}: ${c.fix} ${c.rows === 0 ? 'No ledger row named it.' : c.rows === 1 ? 'One ledger row arrived without a category.' : `${String(c.rows)} ledger rows arrived without a category.`}`);
   }
+  /* ONE LINE FOR EVERY ROW HELD BACK, because the rows are in every export until the old tool closes and a line a row would
+     be the same list every night. What to do is the second sentence: put back here, a row is his again and the next
+     import updates it. */
+  if ((report.deleted ?? []).length > 0)
+    lines.push('', `Deleted in this BrainDog, so ${o.dryRun ? 'it would not be' : 'not'} added again: ${deletedSaid(report.deleted ?? [])}. To have one back, put it back here; the import then keeps it up to date.`);
   if (report.refused.length > 0) {
     /* A DRY RUN SENT NOTHING, so the record refused nothing yet: these are the rows the kernel's coercion says it will. */
     lines.push('', o.dryRun ? 'Would be refused by the record:' : 'Refused by the record:');
@@ -1323,6 +1375,8 @@ export type Run = {
   asked?: { label: string; question: string }[];
   retired?: { register: string; label: string; why: string }[];
   waiting?: Waiting[];
+  /** The rows held back because he deleted them here (`Report.deleted`). Optional for the reason the three above are. */
+  deleted?: { register: string; label: string }[];
 };
 
 /** The run a report describes, as `--since` reads it back. */
@@ -1342,6 +1396,7 @@ export function runOf(report: Report, o: { at: string; host: string; file: strin
     asked: report.questions ?? [],
     retired: report.retired,
     waiting: report.waiting ?? [],
+    deleted: report.deleted ?? [],
   };
 }
 
@@ -1407,6 +1462,11 @@ export function sinceSaid(runs: Run[], since: string, offsetOf: (at: Date) => nu
     for (const w of run.waiting ?? [])
       lines.push(`- Still open on Decide here, answered in the old tool: ${waitingSaid(w)} ${w.answer.startsWith('decided') ? 'Answer it on Decide the same way, or dismiss it.' : 'Dismiss it on Decide too.'}`);
     for (const r of run.refused) lines.push(`- Not carried, ${NAMES[r.register] ?? r.register}: ${r.label}. ${r.fix}`);
+    /* A ROW HELD BACK THE NIGHT BEFORE AS WELL IS NOT SAID AGAIN, for the reason the skips below are not: the export
+       holds a row he deleted here every night until the old tool closes, and the morning is for what is new. */
+    const heldBefore = new Set((before?.deleted ?? []).map((r) => `${r.register}\n${r.label}`));
+    const newlyHeld = (run.deleted ?? []).filter((r) => !heldBefore.has(`${r.register}\n${r.label}`));
+    if (newlyHeld.length > 0) lines.push(`- Deleted in this BrainDog, so not added again: ${deletedSaid(newlyHeld)}.`);
     for (const s of run.skipped) {
       const fresh = s.items.filter((item) => !had.has(`${s.reason}\n${item}`));
       if (fresh.length > 0) lines.push(`- Newly left out: ${few(fresh)}. ${s.reason}.`);
@@ -1456,6 +1516,7 @@ function isRun(run: unknown): run is Run {
     itemsHold(run.skipped, ['reason'], ['items']) &&
     (run.asked === undefined || itemsHold(run.asked, ['label', 'question'])) &&
     (run.retired === undefined || itemsHold(run.retired, ['register', 'label', 'why'])) &&
+    (run.deleted === undefined || itemsHold(run.deleted, ['register', 'label'])) &&
     (run.waiting === undefined || (itemsHold(run.waiting, ['label', 'answer']) && (run.waiting as { question?: unknown }[]).every((w) => w.question === null || isText(w.question))))
   );
 }
@@ -1496,6 +1557,48 @@ function rememberRun(home: string, run: Run): number[] {
   writeFileSync(`${file}.tmp`, `${kept.map((r) => JSON.stringify(r)).join('\n')}\n`);
   renameSync(`${file}.tmp`, file);
   return read.passed;
+}
+
+/**
+ * One page of a list with the rows he deleted in it, AS A POST, and why it is not `client.list`.
+ *
+ * THE KERNEL HAS THE READ AND THE ROUTE TABLE DOES NOT NAME IT. `kernel.list` takes `includeDeleted`, and the record's
+ * `list` hands the kernel every argument it was sent, but the host's table (`packages/host/src/index.ts`, `ROUTES`)
+ * declares `register`, `where`, `limit`, `cursor` and `order` alone, and `client.list` sends a read as a GET. Probed on
+ * 23 September through `serveApi` over an in-memory record with one live row and one deleted: the GET's
+ * `includeDeleted=true` arrived as the text "true", which the kernel does not read as `true`, and the answer was the
+ * live row alone with nothing said. A POST's body keeps its JSON types, and the same read answered both rows. So this
+ * sends the POST, with the headers, the bearer and the deadline every other request of the run carries.
+ *
+ * THIS IS THE SECOND DOOR THE IMPORT KNOWS AND IT SHOULD NOT BE. Once `ROUTES` names `includeDeleted` as `json` and
+ * `client.list` takes it, this becomes `client.list({ ...args, includeDeleted: true })`. Until then a host that stops
+ * passing the argument through answers live rows, which holds nothing back, so it fails back to how the import was.
+ */
+async function listWithDeleted(send: typeof fetch, to: Target, args: { register: string; limit?: number; cursor?: string | null }): Promise<Result<{ rows: unknown[]; cursor: string | null }>> {
+  const lost = (why: string) => no<never>('UNREACHABLE', `The record could not be reached: ${why}`);
+  let res: Response;
+  try {
+    res = await send(`${to.base.replace(/\/+$/u, '')}/api/list`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...(to.token ? { authorization: `Bearer ${to.token}` } : {}) },
+      body: JSON.stringify({ ...args, includeDeleted: true }),
+    });
+  } catch (e) {
+    return lost(e instanceof Error ? e.message : String(e));
+  }
+  let body: unknown;
+  try {
+    body = await res.json();
+  } catch {
+    return lost(`${String(res.status)} with a body that is not JSON`);
+  }
+  /* THE SHAPE IS CHECKED THE WAY THE CLIENT CHECKS IT (`packages/client/src/index.ts`, `answered`): a gateway's own
+     JSON with `ok: 1` read as a success would be a list with no rows, which is the one answer this read must not give. */
+  if (isObj(body) && body.ok === true && isObj(body.value) && Array.isArray(body.value.rows))
+    return ok({ rows: body.value.rows, cursor: typeof body.value.cursor === 'string' ? body.value.cursor : null });
+  if (isObj(body) && body.ok === false && isObj(body.refusal) && typeof body.refusal.code === 'string' && typeof body.refusal.fix === 'string')
+    return no(body.refusal.code, body.refusal.fix);
+  return lost(`${String(res.status)} with an answer this import does not recognise`);
 }
 
 /** `braindog import legacy <file>`, and the exit code: 0 done, 1 refused or partly refused, 3 the host did not answer. */
@@ -1603,18 +1706,15 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
   };
   const ms = budgetOf(io.env);
   /* ONE DEADLINE A REQUEST, not one for the run: an import is hundreds of requests, and each is as quick as any other. */
-  const client = createClient({
-    base: to.base,
-    ...(to.token ? { token: to.token } : {}),
-    fetch: async (input, init) => {
-      const sent = new Headers(init?.headers);
-      for (const [name, value] of Object.entries(headers)) sent.set(name, value);
-      return fetch(input, { ...init, headers: sent, signal: AbortSignal.timeout(ms), redirect: 'error' });
-    },
-  });
+  const send: typeof fetch = async (input, init) => {
+    const sent = new Headers(init?.headers);
+    for (const [name, value] of Object.entries(headers)) sent.set(name, value);
+    return fetch(input, { ...init, headers: sent, signal: AbortSignal.timeout(ms), redirect: 'error' });
+  };
+  const client = createClient({ base: to.base, ...(to.token ? { token: to.token } : {}), fetch: send });
   const door: Door = {
     schema: (register) => client.schema(register),
-    list: (a) => client.list(a),
+    list: ({ deleted, ...a }) => (deleted === true ? listWithDeleted(send, to, a) : client.list(a)),
     create: (a) => client.create(a),
     update: (a) => client.update(a),
     governance: (a) => client.governance(a),

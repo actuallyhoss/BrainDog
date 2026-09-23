@@ -173,7 +173,7 @@ test('open questions are asked on Decide once, and decided, dismissed, put off a
   assert.deepEqual(skippedItems(p, /^Dismissed/u), ['SG5']);
   assert.deepEqual(skippedItems(p, /^Put off/u), ['SG8 (until 2099-01-01)']);
   assert.deepEqual(skippedItems(p, /two options/u), ['SG9']);
-  assert.deepEqual(skippedItems(p, /decision already made on no project/u), ['D4']);
+  assert.deepEqual(skippedItems(p, /decision already made on no project/u), []);
 });
 
 test('the agents pack: learnings with what replaced them, skills kept by hand, an MCP server as a tool, and no hook', () => {
