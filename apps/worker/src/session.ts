@@ -16,6 +16,7 @@
  */
 
 import { clearCookie, readSid, sameOrigin, sessionContext, sessionCookie } from '@braindog/host/auth';
+import { OPERATION_METHOD } from '@braindog/kernel';
 import type { AuthResult, Refusal, Who } from '@braindog/ports';
 import type { CallContext } from '@braindog/record';
 
@@ -104,11 +105,25 @@ export type BearerDeps = {
   access: (record: string, person: string) => Promise<Held | null>;
   /** The record a live name means, the Directory's `resolve`. Asked only for a bearer that came under `/app/<slug>`. */
   named?: (slug: string) => Promise<string | null>;
+  /**
+   * The record's `operationGrant`: the method an operation bearer opens and who approved it, SPENT BY THE ASKING, or
+   * `null` when the bearer is not one. Absent, and no operation bearer is taken, which is the Worker before W55-7.
+   */
+  operation?: (record: string, bearer: string) => Promise<{ method: string; person: string } | null>;
 };
 
 export type Bearer = { record: string; ctx: CallContext } | { status: 401 } | { status: 403; refusal: Refusal };
 
 type TokenPrincipal = Extract<CallContext['principal'], { kind: 'token' }>;
+
+/** The four methods an operation grant opens, by the name a path gives them: `export`, `import`, `installPack`, `createToken`. */
+const OPERATIONS: ReadonlySet<string> = new Set(Object.values(OPERATION_METHOD));
+
+/** The method `/api/<method>` names when it is one an operation grant can open, and `null` for every other path. */
+export const operationAsked = (pathname: string): string | null => {
+  const name = /^\/+api\/+([^/]+)\/*$/.exec(pathname)?.[1] ?? '';
+  return OPERATIONS.has(name) ? name : null;
+};
 
 /**
  * An agent's bearer, for `/api` and `/mcp` alike, so a token reaches the same person at the same level
@@ -121,6 +136,14 @@ type TokenPrincipal = Extract<CallContext['principal'], { kind: 'token' }>;
  *
  * THEN THE RECORD CHECKS THE SECRET AGAINST ITS OWN TABLE, and says what the person may do inside it. A level
  * read from the Directory is one `invite` and `remove` never write, so removing somebody would not stop them.
+ *
+ * AND A BEARER THE TOKEN TABLE DOES NOT KNOW MAY BE AN OPERATION, AT THE FOUR PATHS ONE CAN OPEN AND NOWHERE ELSE.
+ * `braindog export` and `braindog import` hold a device grant of reach `export` or `import`, `<rec>.<secret>` like a
+ * token, and at 07ba6dbd this answered it 401 because only `verify` was asked (`test/record-doors.test.ts`). Asking
+ * `operation` spends the grant, so it is asked only where the path is one of `OPERATIONS`: a CLI that sent its bearer to
+ * `/api/boot` by mistake keeps it. A grant for another method is spent and refused, in the record's own sentence, so the
+ * record never sees a context it would refuse anyway. The context is `packages/record`'s `CallContext.operation`: the
+ * approver, at the level they hold now, and the one method.
  */
 export async function bearerOf(request: Request, surface: 'api' | 'mcp', deps: BearerDeps, slug: string | null = null): Promise<Bearer> {
   const authorization = request.headers.get('authorization');
@@ -128,25 +151,61 @@ export async function bearerOf(request: Request, surface: 'api' | 'mcp', deps: B
   if (!record || !(await deps.knows(record))) return { status: 401 };
   const bearer = /^Bearer\s+(.+)$/i.exec(authorization ?? '')?.[1];
   const seen = bearer ? await deps.verify(record, bearer, surface) : null;
-  if (!seen) return { status: 401 };
-  /* UNDER `/app/<slug>` THE PATH HAS TO AGREE WITH THE BEARER, OR NOTHING IS ANSWERED. The bearer names the record,
-     and a URL that says it reads another one is the failure this boundary exists to prevent, so neither is picked.
-     AFTER THE SECRET IS CHECKED, so a bearer nobody issued is the same 401 under any slug and a stranger cannot ask
-     which record a name belongs to. A name nobody holds is the same 403 as another record's. */
-  if (slug !== null && (deps.named === undefined || (await deps.named(slug)) !== record))
-    return { status: 403, refusal: { code: 'FORBIDDEN', fix: 'This token is for a different record than the one this address names.', at: 'slug' } };
-  const held = await deps.access(record, seen.person_id);
-  if (!held) return { status: 403, refusal: { code: 'FORBIDDEN', fix: 'You are not on this record.' } };
+  if (!seen) {
+    const asked = surface === 'api' && bearer && deps.operation ? operationAsked(new URL(request.url).pathname) : null;
+    const grant = asked !== null && bearer && deps.operation ? await deps.operation(record, bearer) : null;
+    if (!grant) return { status: 401 };
+    if (grant.method !== asked)
+      return { status: 403, refusal: { code: 'FORBIDDEN', fix: `This bearer was approved for one ${grant.method} and reaches nothing else. Start the device again for this.`, at: 'operation' } };
+    const admitted = await heldBy(deps, record, grant.person, slug);
+    if ('status' in admitted) return admitted;
+    return {
+      record,
+      ctx: {
+        principal: { kind: 'person', id: grant.person, level: admitted.held.level as PersonPrincipal['level'] },
+        operation: grant.method,
+        credentialed: true,
+        ...scoped(admitted.held),
+      },
+    };
+  }
+  const admitted = await heldBy(deps, record, seen.person_id, slug);
+  if ('status' in admitted) return admitted;
+  const held = admitted.held;
   /* BOTH HALVES GO OVER, the token's scope and the person's level, and the record computes where they meet: a
      token says what its holder may do with their access and never what access they have. */
   return {
     record,
     ctx: {
       principal: { kind: 'token', id: seen.id, scope: seen.scope as TokenPrincipal['scope'], person: seen.person_id, level: held.level as TokenPrincipal['level'] },
-      ...(held.registers === null ? {} : { registers: held.registers }),
-      ...(Object.keys(held.levels).length === 0 ? {} : { levels: held.levels as CallContext['levels'] }),
+      ...scoped(held),
     },
   };
+}
+
+type PersonPrincipal = Extract<CallContext['principal'], { kind: 'person' }>;
+
+/** The lists a person is held to on the record, when they are held to any. */
+const scoped = (held: Held): Pick<CallContext, 'registers' | 'levels'> => ({
+  ...(held.registers === null ? {} : { registers: held.registers }),
+  ...(Object.keys(held.levels).length === 0 ? {} : { levels: held.levels as CallContext['levels'] }),
+});
+
+/**
+ * The half every bearer shares once its secret is checked: the path's slug agrees with the bearer's record, and the
+ * record says the person is on it.
+ *
+ * UNDER `/app/<slug>` THE PATH HAS TO AGREE WITH THE BEARER, OR NOTHING IS ANSWERED. The bearer names the record, and a
+ * URL that says it reads another one is the failure this boundary exists to prevent, so neither is picked. AFTER THE
+ * SECRET IS CHECKED, so a bearer nobody issued is the same 401 under any slug and a stranger cannot ask which record a
+ * name belongs to. A name nobody holds is the same 403 as another record's.
+ */
+async function heldBy(deps: BearerDeps, record: string, person: string, slug: string | null): Promise<{ held: Held } | { status: 403; refusal: Refusal }> {
+  if (slug !== null && (deps.named === undefined || (await deps.named(slug)) !== record))
+    return { status: 403, refusal: { code: 'FORBIDDEN', fix: 'This token is for a different record than the one this address names.', at: 'slug' } };
+  const held = await deps.access(record, person);
+  if (!held) return { status: 403, refusal: { code: 'FORBIDDEN', fix: 'You are not on this record.' } };
+  return { held };
 }
 
 /** What `GET /app` needs: the Directory's `session` and `slugOf`, and the shell the static assets hold. */

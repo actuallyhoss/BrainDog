@@ -6,6 +6,11 @@
  * the Worker as down on every probe. `/.well-known/braindog-build` answers the build and was the nearest thing, but it
  * is a gate's question about which deploy is live, and a monitor that follows the convention asks `/healthz`.
  *
+ * AND AT 07ba6dbd IT ANSWERED `{ ok: true, app }` AND NOTHING ELSE, where `53 §13 #9` asks for `format`, `kernel` and
+ * `primitives` too. The three are constants of the build, the numbers every record's `/api/version` answers, so they
+ * need no record; each is compared here with the module that owns it, `primitives` with the renderer's own, because the
+ * Worker holds a copy of that one (`src/health.ts` says why).
+ *
  * NO DURABLE OBJECT, NO DIRECTORY, NO CREDENTIAL. A liveness probe that woke a record would be a probe that costs a
  * storage read every minute and fails when one record is sick, which is not the question it asks. The env here throws
  * on every binding a record or the Directory would need, so a route that reached for one fails the test by name.
@@ -14,7 +19,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { FORMAT_VERSION, KERNEL_MIGRATION } from '@braindog/kernel';
+
+import { PRIMITIVES_VERSION } from '../../../packages/render/src/kinds.ts';
 import { bundled } from './bundled-worker.ts';
+
+/* `53 §13 #9`'s TUPLE, EACH FROM THE MODULE THAT OWNS IT, so a build that moved one and not this door goes red here. */
+const TUPLE = { format: FORMAT_VERSION, kernel: KERNEL_MIGRATION, primitives: PRIMITIVES_VERSION };
 
 const touched: string[] = [];
 const trap = (name: string) =>
@@ -34,18 +45,18 @@ async function ask(path: string, init: RequestInit & { host?: string; build?: st
   return worker.fetch(new Request(`https://${init.host ?? 'brain.example.test'}${path}`, init), env, { waitUntil: () => {} });
 }
 
-test('GET /healthz IS 200 AND SAYS ok AND WHICH BUILD AS `app`, with no-store, and touches no object', async () => {
+test('GET /healthz IS 200 WITH THE TUPLE OF 53 §13 #9, `ok` BESIDE IT, with no-store, and touches no object', async () => {
   touched.length = 0;
   const out = await ask('/healthz');
   assert.equal(out.status, 200, await out.clone().text());
-  assert.deepEqual(await out.json(), { ok: true, app: '2026.09.23+abc1234' });
+  assert.deepEqual(await out.json(), { ok: true, app: '2026.09.23+abc1234', ...TUPLE });
   assert.equal(out.headers.get('cache-control'), 'no-store');
   assert.match(out.headers.get('content-type') ?? '', /^application\/json/);
   assert.deepEqual(touched, [], 'a binding was reached for a liveness probe');
 });
 
 test('AN UNSET BUILD IS null, as `/.well-known/braindog-build` says it', async () => {
-  assert.deepEqual(await (await ask('/healthz', { build: '' })).json(), { ok: true, app: null });
+  assert.deepEqual(await (await ask('/healthz', { build: '' })).json(), { ok: true, app: null, ...TUPLE });
 });
 
 test('HEAD ANSWERS HEAD: the same status and headers, and no body', async () => {
@@ -71,5 +82,5 @@ test('A BROWSER ON THE OLD HOST IS ANSWERED WHERE IT STANDS, not sent to /app/he
      `accept: text/html` would follow a 308 to the app shell and read a 200 from the wrong thing. */
   const out = await ask('/healthz', { host: 'app.brain.example.test', headers: { accept: 'text/html' } });
   assert.equal(out.status, 200);
-  assert.deepEqual(await out.json(), { ok: true, app: '2026.09.23+abc1234' });
+  assert.deepEqual(await out.json(), { ok: true, app: '2026.09.23+abc1234', ...TUPLE });
 });

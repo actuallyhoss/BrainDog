@@ -23,10 +23,10 @@ import { DurableObject } from 'cloudflare:workers';
 import { handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveSpark, servesSpark, withSession, type SessionHints, type SparkAskDoor, type VaultGrantSeen } from '@braindog/host';
 import { deriveSessionKey, relyingParty, serveAccount, serveAuth, type DeviceDoor, type InviteDoor, type Provisioned } from '@braindog/host/auth';
 import { gate, serveMcp as answerMcp, unauthorized as unknownAgent } from '@braindog/mcp/http';
-import { INVITE_GONE, ulids, type Arrival, type Arrived, type CreateRecordArgs, type DeviceCode, type Exchanged, type LeasedSeal, type OutboxRow, type VaultGrant, type Waiting } from '@braindog/kernel';
+import { INVITE_GONE, ulids, type Arrival, type Arrived, type CreateRecordArgs, type DeviceCode, type Exchanged, type LeasedSeal, type OperationGrant, type OutboxRow, type VaultGrant, type Waiting } from '@braindog/kernel';
 import { createRecordApi, type CallContext, type Deposited, type IngestVerification, type Limited, type OpenedForGrant, type RecordApi, type SealTarget, type Sealed } from '@braindog/record';
 import { fixOf, ok, refused } from '@braindog/ports';
-import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Sql, Who } from '@braindog/ports';
+import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Snapshots, Sql, Who } from '@braindog/ports';
 
 import { createDirectory, switcherAsk, type AccountUsage, type Directory as Dir, type RunUsage, type SessionAsk, type SwitcherAsk, type SwitcherRow } from '@braindog/record/directory';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
@@ -41,10 +41,13 @@ import { serveAsks, type SparkAnswer } from '@braindog/host/spark-answers';
 import { alarmScheduler } from './alarm.ts';
 import { sparkLook, workerSparkAnswers, workerSparkDoor, workerSparkModel } from './spark.ts';
 import { workerCatalogueOffers } from './catalogue.ts';
-import { DELETED, destroyRecord } from './destroy.ts';
+import { cloudSnapshots, type Pitr } from './copies.ts';
+import { DELETED, destroyRecord, expireFinal } from './destroy.ts';
+import { directoryCopies } from './directory-copy.ts';
 import { DELIVERS, leasedOpener, makeDeliver, type Mail } from './deliver.ts';
 import { consume, pump } from './pump.ts';
-import { appPath, asPage, atRoot, cloudIngest, copyAsked, copyRefusal, drained, ingestBudget, inward, isRecordId, legacyRedirect, servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesMcp, type AppPath, type CloudIngestDeps } from './route.ts';
+import { afterRestore, appPath, asPage, atRoot, cloudIngest, copyAsked, copyRefusal, drained, ingestBudget, inward, isRecordId, legacyRedirect, restoreAsked, servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesKey, servesMcp, type AppPath, type CloudIngestDeps, type Restored } from './route.ts';
+import { HEALTHZ, healthz } from './health.ts';
 import { NO_MINT_SESSION, serveInbound, servesInbound } from './inbound.ts';
 import { appEntry, bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
 import { httpFor } from './http.ts';
@@ -52,8 +55,54 @@ import { isBound, keyStoreOf, recordKeys, type KekBinding } from './keys.ts';
 import { keylessRefusal } from './keyless.ts';
 import { fleetFailure, nightlyWalk } from './nightly.ts';
 import { workerSigner } from './sign.ts';
-import { dumpOf, r2Snapshots, type Dump } from './snapshots.ts';
+import { dumpOf, prefixOf, r2Snapshots, type Dump } from './snapshots.ts';
 import { serveWorkerKeys, serveWorkerVault, servesKeys, servesVault, type KeyDeps } from './vault.ts';
+
+/** What a record answers between arming a restore and being reset: the gap between `51 D15`'s two calls. */
+const RESTORING: Refusal = { code: 'RECORD_UNAVAILABLE', fix: 'This record is going back to a copy and starts again in a moment. Ask again then.', at: 'record' };
+
+/** The copies port `Record$` hands its record, which is `copies.ts`'s own and says it `reopens`. */
+type CloudPort = ReturnType<typeof cloudSnapshots>;
+
+/**
+ * The copies port, built the first time it is used.
+ *
+ * LAZY BECAUSE THE PORT NAMES THE RECORD AND THE RECORD IS NAMED LATER. `createRecordApi` takes `snapshots` when the
+ * object opens, and the record's id is its identity row, which exists only once `createRecord` has run: an object the
+ * operator is provisioning opens with none. The prefix every copy lives under is that id (`prefixOf`), so the port is
+ * made on the first `take`, `list` or `restore`, by which time there is an id, and kept, because `copies.ts` remembers
+ * the `before-restore` copy between the two calls a restore makes.
+ */
+function lazily(build: () => CloudPort): Snapshots & { readonly reopens: true } {
+  let port: CloudPort | undefined;
+  const get = (): CloudPort => (port ??= build());
+  return {
+    reopens: true as const,
+    take: (label) => get().take(label),
+    list: () => get().list(),
+    restore: (id) => get().restore(id),
+    prune: (keep) => get().prune(keep),
+  };
+}
+
+/**
+ * The key a copy the port took was written under, found by listing its id.
+ *
+ * LISTED AND NOT BUILT. `take` answers the copy's id, `final-2026-09-23`, and `destroyRecord` wants the key, because
+ * the sweep keeps exactly that key and a record whose id stood in for it would have its final copy refused before
+ * anything was deleted (`destroy.ts`, which checks the key against its first listing). Which extension the key has is
+ * the seal's to decide (`snapshots.ts`), and asking the bucket keeps that in one place. The dot keeps a second final
+ * copy the same day, `final-2026-09-23-2`, out of the listing for the first.
+ */
+async function keyOf(blobs: R2Bucket, record: string, id: string): Promise<string> {
+  const page = await blobs.list({ prefix: `${prefixOf(record)}${id}.` });
+  const key = page.objects.map((o) => o.key).find((k) => /\.brainl(?:\.age)?$/u.test(k));
+  if (key === undefined) throw new Error(`The final copy ${id} is not in the bucket after it was taken, so nothing was deleted. Run the delete again.`);
+  return key;
+}
+
+/** Who a restore was asked by, as the record writes it: the person, or the person behind a token. */
+const actorOf = (ctx: CallContext): string => (ctx.principal.kind === 'token' ? ctx.principal.person : ctx.principal.id);
 
 /** Why an owner cannot invite anybody here: an invitation is spent by signing in, and sign-in needs its secret. */
 const INVITES_OFF = 'Sign-in is off on this host until SESSION_SECRET is set, so an invitation link would lead nowhere.';
@@ -246,8 +295,55 @@ export { ScriptOutbound, ScriptRecord } from './script.ts';
 /** One customer's record. The class name is `Record$` because `Record` is a TypeScript builtin. */
 export class Record$ extends DurableObject<Env> {
   #api: Promise<RecordApi> | null = null;
-  /** Set by `deleteRecord`, and never cleared: every door this object has answers as a deleted record from then on. */
+  /**
+   * Set by `deleteRecord` once the bytes are being deleted, and never cleared: every door this object has answers as a
+   * deleted record from then on.
+   *
+   * AT `deleteAll` AND NOT BEFORE THE FINAL COPY. It was set first, so a delete whose sweep failed, which `destroy.ts`
+   * throws before touching the bytes so the owner can ask again, left an object whole and answering DELETED to every
+   * door until it was evicted (`test/restore-in-do.test.ts`, the refused sweep).
+   */
   #gone = false;
+
+  /**
+   * Set when a restore has armed this object to come back at a copy, and never cleared: the object ends at the
+   * Worker's `reopen`, and the one that starts is new.
+   *
+   * WHAT IT STOPS IS A WRITE THE REWIND WOULD TAKE. `onNextSessionRestoreBookmark` restores at the next start, so between
+   * the arm and `ctx.abort()` anything written here is thrown away, and a person told "saved" in that gap would be told
+   * something false. Every door answers `RESTORING` instead, and the alarm does nothing.
+   *
+   * SET AT THE ARM, BY `#arming`, AND NOT WHEN `restore` ANSWERS. It was set on the answer, and `copies.ts` puts its
+   * receipt to R2 after arming: an input gate stays shut for this object's storage and not for a bucket, so a request
+   * can arrive inside that put. Measured by the checker: a `setPref` sent from inside it was answered 200
+   * (`test/restore-in-do.test.ts`, the receipt being put).
+   */
+  #armed = false;
+
+  /**
+   * This object's two PITR methods for `copies.ts`, with `#armed` set before the bookmark is armed. An arm that throws
+   * put nothing in place, so the flag goes back to what it was; a second arm, the undo bookmark a called-off restore
+   * sets, leaves it set, because the object is still going back at its next start.
+   */
+  #arming(): Pitr {
+    const storage = this.ctx.storage;
+    return {
+      getCurrentBookmark: () => storage.getCurrentBookmark(),
+      onNextSessionRestoreBookmark: async (bookmark) => {
+        const was = this.#armed;
+        this.#armed = true;
+        try {
+          return await storage.onNextSessionRestoreBookmark(bookmark);
+        } catch (e) {
+          this.#armed = was;
+          throw e;
+        }
+      },
+    };
+  }
+
+  /** The copies port, or `undefined` on a deployment with no `BLOBS`, where the record says it keeps none. */
+  #copies: (Snapshots & { readonly reopens: true }) | undefined;
 
   /**
    * The `Scheduler` port over this object's own alarm. One per customer, and this is the one.
@@ -294,6 +390,7 @@ export class Record$ extends DurableObject<Env> {
 
   #record(): Promise<RecordApi> {
     if (this.#gone) return Promise.reject(new Error(DELETED.fix));
+    if (this.#armed) return Promise.reject(new Error(RESTORING.fix));
     /* AND A REJECTED PROMISE IS NOT A CACHED ANSWER. `??=` stored whatever the opener returned,
        including a rejection — so one transient failure at cold start (a queue hiccup in the tail, a
        storage read that timed out) was remembered as this record's permanent state, and every
@@ -317,6 +414,22 @@ export class Record$ extends DurableObject<Env> {
        engine is handed, so the two engines count one `ask_cap`. Before this line a Worker with a model said `spark: true`
        and refused `ask_spark` at propose as if it had none (`test/spark-answers.test.ts`). */
     this.#answers = workerSparkAnswers(this.env, () => api, { sql, clock: { now: () => Date.now() } });
+    /* THE RECORD'S COPIES, IN THE BUCKET THE NIGHT WRITES TO (`copies.ts`). Taken, listed and gone back to from inside
+       this object, because `onNextSessionRestoreBookmark` is this storage's and nothing outside the object can call it.
+       No `BLOBS` and there is no port, so the record answers `NOT_IN_THIS_BUILD` as it always did. */
+    const blobs = this.env.BLOBS;
+    this.#copies = blobs
+      ? lazily(() => {
+          const record = api.kernel.identity()?.id;
+          if (!record) throw new Error('This record has not been created yet, so it keeps no copies.');
+          return cloudSnapshots(blobs, this.#arming(), (at, bookmark) => dumpOf(api, at, bookmark), {
+            record,
+            now: () => Date.now(),
+            recipient: this.env.AGE_RECIPIENT ?? '',
+          });
+        })
+      : undefined;
+    const copies = this.#copies;
     await this.ctx.blockConcurrencyWhile(async () => {
       api = await createRecordApi({
         sql,
@@ -388,15 +501,26 @@ export class Record$ extends DurableObject<Env> {
         catalogueOffers: workerCatalogueOffers(this.env.ASSETS),
         /* AN INVITATION IS SPENT BY SIGNING IN, and nobody signs in here without the Directory's key. */
         invitations: () => ((this.env.SESSION_SECRET ?? '').length >= 32 ? null : INVITES_OFF),
-        /* DELETION, `51 §5.13`. The record has checked the owner, the sign-in and the typed name; this is the alarm,
-           the bytes and the names, with no request answered in between. */
+        ...(copies === undefined ? {} : { snapshots: copies }),
+        /* DELETION, `51 §5.13`, in `loop/research-restore.md` §5's order: a final copy, every other object under the
+           record's prefix, the alarm, the bytes, the names. The record has checked the owner, the sign-in and the typed
+           name, and no request is answered in between. Measured before the bucket was passed: 2 objects under the prefix
+           before and 2 after, for good, because the walk lists open records only. */
         destroy: async () => {
           const id = api.kernel.identity()?.id ?? null;
           const directory = this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('directory'));
+          const storage = this.ctx.storage;
+          const wipe = {
+            deleteAlarm: () => storage.deleteAlarm(),
+            deleteAll: async () => {
+              this.#gone = true;
+              this.#api = null;
+              await storage.deleteAll();
+            },
+          };
+          const swept = blobs && copies ? { blobs, final: async (record: string) => keyOf(blobs, record, (await copies.take('final')).id) } : undefined;
           await this.ctx.blockConcurrencyWhile(async () => {
-            this.#gone = true;
-            this.#api = null;
-            await destroyRecord(this.ctx.storage, (record) => directory.close(record), id);
+            await destroyRecord(wipe, (record) => directory.close(record), id, swept);
           });
         },
       });
@@ -428,7 +552,7 @@ export class Record$ extends DurableObject<Env> {
    * alarm is set to now and the next fire drains the rest.
    */
   override async alarm(): Promise<void> {
-    if (this.#gone) return;
+    if (this.#gone || this.#armed) return;
     const api = await this.#record();
     await api.kernel.drain(this.#alarm);
     const more = await this.#act(api);
@@ -631,6 +755,49 @@ export class Record$ extends DurableObject<Env> {
       /* PITR is not on every deployment, and a copy without a bookmark is still a copy. */
     }
     return dumpOf(api, at, bookmark);
+  }
+
+  /**
+   * `51 D15`'s reset: `ctx.abort()` on an object a restore has armed, so it starts again at the copy. `false` when
+   * nothing is armed, and then nothing happens. AN RPC AND NEVER A ROUTE: the Worker calls it straight after the
+   * record's `restore` has answered, and a caller who could reset any object at will could drop its in-flight work.
+   *
+   * IT DOES NOT RETURN WHEN IT WORKS. The platform ends the object inside this call, so the Worker's promise rejects, and
+   * that rejection is the answer `afterRestore` in `route.ts` waits for.
+   */
+  async reopen(): Promise<boolean> {
+    if (!this.#armed) return false;
+    this.ctx.abort('This record was put back to a copy, and starts again from it.');
+    return true;
+  }
+
+  /**
+   * `51 D15`'s second call, on the object that started after the reset: `restore.pitr`, written where the rewind cannot
+   * take it. AN RPC AND NEVER A ROUTE: `restored` is INTERNAL, and the Worker says who asked and what was kept.
+   */
+  async restored(args: Restored): Promise<Result<{ event: string }>> {
+    if (this.#gone) return { ok: false, refusal: DELETED };
+    const api = await this.#record();
+    const broken = api.kernel.refused();
+    return broken ? { ok: false, refusal: broken } : api.restored(args);
+  }
+
+  /** An operation bearer, checked and spent, for the bearer path in `session.ts`. AN RPC AND NEVER A ROUTE: INTERNAL. */
+  async operationGrant(bearer: string): Promise<Result<OperationGrant>> {
+    if (this.#gone) return { ok: false, refusal: DELETED };
+    const api = await this.#record();
+    const broken = api.kernel.refused();
+    return broken ? { ok: false, refusal: broken } : api.operationGrant(bearer);
+  }
+
+  /**
+   * The key this record's exports are signed with, `{ key_id, public_key }`, or `null` for a record that signs nothing.
+   * AN RPC AND NEVER A ROUTE: `signingKey` is INTERNAL, and `/app/<slug>/.well-known/braindog-key` is its one caller.
+   */
+  async signingKey(): Promise<{ key_id: string; public_key: string } | null> {
+    if (this.#gone) return null;
+    const api = await this.#record();
+    return api.kernel.refused() ? null : api.signingKey();
   }
 
   /**
@@ -853,6 +1020,7 @@ export class Record$ extends DurableObject<Env> {
 
   async #answer(request: Request): Promise<Response> {
     if (this.#gone) return json({ ok: false, refusal: DELETED }, 503);
+    if (this.#armed) return json({ ok: false, refusal: RESTORING }, 503);
     const api = await this.#record();
 
     const refused = api.kernel.refused();
@@ -908,6 +1076,8 @@ export class Record$ extends DurableObject<Env> {
 
     /* SPARK'S DAILY LOOK, beside the answer and not in its way: the record says whether it is due, at most once a UTC day. */
     this.ctx.waitUntil(sparkLook(api));
+    /* A RESTORE THE PORT HAS ARMED ENDS THIS OBJECT, and nothing is written here from the arm on: `#arming` sets `#armed`
+       as the bookmark is armed, which is before `restore` answers, and the Worker's `reopen` ends the object after. */
     return serveApi(request, handlersFor(api), ctx);
   }
 }
@@ -1109,6 +1279,34 @@ export class Directory$ extends DurableObject<Env> {
     return ids.length === limit ? { ids, cursor: ids[ids.length - 1] ?? '' } : { ids };
   }
 
+  /**
+   * The records closed before `cutoff` (epoch milliseconds), a page at a time: the night's list of prefixes whose final
+   * copies have been kept as long as `FINAL_KEPT_DAYS` promises (`nightly.ts`). The query is `createDirectory`'s own.
+   */
+  closedBefore(cutoff: number, cursor?: string): { ids: string[]; cursor?: string } {
+    return this.#directory().closedBefore(cutoff, cursor);
+  }
+
+  /**
+   * The Directory's carried tables as lines, for the night's sealed copy (`directory-copy.ts`, `loop/research-restore.md`
+   * §6). Sessions, links, challenges and strikes are left out by `createDirectory`, so a copy signs nobody in.
+   */
+  dump(): string[] {
+    return this.#directory().dump();
+  }
+
+  /**
+   * A copy's lines, into this Directory, which must be empty: the one way back from losing it. AN RPC AND NEVER A ROUTE.
+   *
+   * NOTHING CALLS IT YET BUT A TEST, AND THAT IS SAID RATHER THAN HIDDEN. The operator's path to it, a copy opened with
+   * the backup identity and handed to a Directory that has just been emptied, is a script nobody has written, and a
+   * route would be a door that replaces the tenant map. `load` refuses a Directory anybody has used, so an RPC here
+   * cannot merge two maps whoever calls it.
+   */
+  load(lines: string[]): Result<{ tables: number; rows: number }> {
+    return this.#directory().load(lines);
+  }
+
   /** Which record this name means, or `null` if it means none. The hop, and the whole of it. */
   resolve(slug: string): { record: string; slug: string } | null {
     return this.#directory().resolve(slug);
@@ -1243,6 +1441,11 @@ function bearerDeps(env: Env): BearerDeps {
     access: (id, person) => record(id).access(person),
     /* ASKED ONLY UNDER `/app/<slug>`, to hold the path to the record the bearer names. */
     named: async (slug) => (await directory.resolve(slug))?.record ?? null,
+    /* ASKED ONLY AT THE FOUR PATHS AN OPERATION OPENS, because asking spends it (`session.ts`). */
+    operation: async (id, bearer) => {
+      const out = (await record(id).operationGrant(bearer)) as unknown as Result<OperationGrant>;
+      return out.ok ? { method: out.value.method, person: out.value.person } : null;
+    },
   };
 }
 
@@ -1290,34 +1493,6 @@ const json = (body: unknown, status: number, extra: [string, string][] = []): Re
  * entire question being asked.
  */
 const buildId = (env: Env): Response => json({ app: env.BRAINDOG_BUILD || null }, 200);
-
-/** `/healthz`, with the slashes every other door here forgives, and nothing below it. */
-const HEALTHZ = /^\/+healthz\/*$/;
-
-/**
- * `GET /healthz`: `{ ok: true, app }` and a 200, to anybody, from this isolate alone (ROADMAP W55, `53 §13 #9`).
- *
- * IT TOUCHES NO DURABLE OBJECT AND READS NO CREDENTIAL. The question a monitor asks is whether this Worker answers, and
- * a probe that woke a record every minute would cost a storage read per probe and go red when one customer's object is
- * sick, which is a different question with its own answer in that record's `/api/version`. `test/healthz.test.ts`
- * hands the bundle bindings that throw on first touch.
- *
- * `app` IS THE SAME VALUE, UNDER THE SAME KEY, `/.well-known/braindog-build` ANSWERS, `null` when the deploy was never
- * told, so a monitor that sees a restart can also see which version came back. `53 §13 #9` also asks for `format`,
- * `kernel` and `primitives` and a 503 under a module-level refusal; those need a record's boot probe, which is the one
- * thing this answer must not touch, so they are not here. HEAD answers the same status and headers with no body, and
- * any other method is 405 with `Allow`, because a POST here is a caller who has the wrong address.
- *
- * WHERE THE SITE FRONTS THIS WORKER, `/healthz` HAS TO BE IN THE SITE'S `run_worker_first` (`apps/site/wrangler.jsonc`),
- * because the site's assets answer first and a path not on that list gets the site's 404 page and never arrives here.
- * At afb3b1b2 the list is alpha's alone and does not name it. `app.brain.dog`'s Custom Domain sends every path here.
- */
-function healthz(request: Request, env: Env): Response {
-  if (request.method !== 'GET' && request.method !== 'HEAD')
-    return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: '/healthz is read with GET or HEAD.' } }, 405, [['allow', 'GET, HEAD']]);
-  const out = json({ ok: true, app: env.BRAINDOG_BUILD || null }, 200);
-  return request.method === 'HEAD' ? new Response(null, { status: out.status, headers: out.headers }) : out;
-}
 
 /**
  * The one answer to every way of not being let in.
@@ -1421,18 +1596,35 @@ export default {
 async function nightly(env: Env): Promise<void> {
   if (!env.BLOBS)
     throw new Error('The nightly copy did not run: this deployment has no BLOBS binding, so there is nowhere to put one.');
+  const blobs = env.BLOBS;
   const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
-  const copies = r2Snapshots(env.BLOBS, { recipient: env.AGE_RECIPIENT ?? '' });
+  const copies = r2Snapshots(blobs, { recipient: env.AGE_RECIPIENT ?? '' });
   /* ONE INSTANT FOR THE WHOLE WALK, so every copy taken tonight is filed under tonight's date even
      when the walk crosses midnight UTC. Two dates in one run would leave a day with two copies and
      the next with none, and the retention count would be counting nights that are not nights. */
   const at = new Date().toISOString();
+  /* THE DIRECTORY FIRST, BECAUSE IT IS ONE OBJECT AND EVERY RECORD DEPENDS ON IT. Lose it and every record survives with
+     nobody able to reach one (`loop/research-restore.md` §6), and nothing copied it before this line. Before the walk, so
+     a fleet slow enough to run the invocation out of time costs a record its night and never the tenant map its copy.
+     A failure is said at once and makes the invocation red below, after the records have had their turn. */
+  let directoryFailed: string | null = null;
+  try {
+    const kept = await directoryCopies(blobs, { recipient: env.AGE_RECIPIENT ?? '' }).take(await directory.dump(), at);
+    console.log(`walk directory backup=${String(kept.rows)} rows ${String(kept.bytes)} bytes`);
+  } catch (e) {
+    const why = e instanceof Error ? e.message : String(e);
+    directoryFailed = `The Directory's nightly copy was not written: ${why}`;
+    console.error(`walk directory backup=failed: ${why}`);
+  }
   /* THE TALLY IS SAID AND NOT RETURNED. `53 §5.1` step 5 is a person reading the closing line the
      morning after; the ops record's `log` note needs a record to write it to, which is `ops.ts`'s
      half of this and not built. Nothing else reads the numbers yet. */
   const walked = await nightlyWalk({
     records: async (cursor) => directory.listRecords(cursor),
     snapshot: async (record) => copies.take(record, await env.RECORD.get(env.RECORD.idFromName(record)).dump(at)),
+    /* WHAT DELETED RECORDS LEFT: every record closed longer ago than a final copy is kept, and its prefix emptied. */
+    closed: async (cutoff, cursor) => directory.closedBefore(cutoff, cursor),
+    expire: (record) => expireFinal(blobs, record),
     say: (line) => {
       console.log(line);
     },
@@ -1444,8 +1636,8 @@ async function nightly(env: Env): Promise<void> {
   /* AND A NIGHT THAT COPIED NOTHING MAKES THE INVOCATION ITSELF RED. Every per-record failure is
      already in the tail, but a tail is read by somebody who is already worried; a failed cron run
      is what tells them to be. */
-  const fleet = fleetFailure(walked);
-  if (fleet) throw new Error(fleet);
+  const red = [fleetFailure(walked), directoryFailed].filter((line): line is string => line !== null);
+  if (red.length > 0) throw new Error(red.join(' '));
 }
 
 async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -1453,7 +1645,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     /* LIVENESS BEFORE EVERYTHING, THE OLD HOST'S REDIRECT INCLUDED. Measured at afb3b1b2 `/healthz` was the router's 404
        on `PUBLIC_HOST` and a 308 to `/app/healthz` on a legacy host for a caller sending `accept: text/html`, so a monitor
        either read the Worker as down or followed the redirect to the app shell and read somebody else's 200. */
-    if (HEALTHZ.test(url.pathname)) return healthz(request, env);
+    if (HEALTHZ.test(url.pathname)) return healthz(request, env.BRAINDOG_BUILD);
     /* THE OLD HOST FIRST, AND ONLY FOR A PAGE LOAD (`loop/research-one-domain.md` §2.5). `legacyRedirect` answers
        `null` for every path this Worker serves itself, the build id and sign-in included, so an agent, a webhook
        sender and a stale tab on `app.brain.dog` are served where they stand. Unset `LEGACY_HOSTS` is no host at all. */
@@ -1486,6 +1678,8 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
        23 September. An earlier line here said nothing reached it until `wrangler.jsonc` listed `/app`, which was true
        only of `brain.dog`, where the site's assets answer first. */
     const app = appPath(url.pathname);
+    /* A RECORD'S PUBLIC KEY, UNDER ITS NAME, before the page and the API are told apart: it is neither. */
+    if (app !== null && app.slug !== null && servesKey(app.rest)) return recordKey(request, env, app.slug);
     if (app !== null) return servesApi(app.rest) ? recordApi(atRoot(request, app.rest), env, app.slug) : appPage(request, env, app);
     if (!servesApi(url.pathname))
       return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record method is at /api/<method>.' } }, 404);
@@ -1549,7 +1743,7 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
           ? await appKeys(request, env, door.record, door.ctx)
           : mintAsked
             ? await mailAddress(request, env, door.record, door.ctx)
-            : await env.RECORD.get(env.RECORD.idFromName(door.record)).fetch(inward(request, door.ctx)),
+            : await forward(inward(request, door.ctx), env, door.record, door.ctx),
         door.cookie,
       );
 
@@ -1584,7 +1778,53 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
     /* THE WORKER AUTHENTICATES AND THE RECORD AUTHORISES, and neither does the other's half. Every check about
        what a caller may do is inside `createRecordApi`, so the CLI and the MCP server answer to the same ladder
        as the browser. `inward` writes the context over whatever the caller sent and drops the bearer. */
-    return env.RECORD.get(env.RECORD.idFromName(found.record)).fetch(inward(request, found.ctx));
+    return forward(inward(request, found.ctx), env, found.record, found.ctx);
+}
+
+/**
+ * A request into the record it names, with `51 D15`'s second half after a restore (`afterRestore` in `route.ts`).
+ *
+ * EVERY CALL IS A NEW STUB, AND THAT IS THE POINT OF THE SECOND ONE. `ctx.abort()` breaks the stub it was reached
+ * through, so `restored` has to be asked of a stub made after the reset, which reaches the object PITR started. Only a
+ * signed-in owner gets this far with a restore today, since the record refuses it to a token, and the bearer branch
+ * comes here too so the rule does not depend on which door a restore arrived by.
+ *
+ * `inner` IS ALREADY `inward`'s, and the caller makes it: the context is set in each door's own line, which is where
+ * `test/demo.test.ts` counts them. `ctx` comes along for the one thing the second call needs, who asked.
+ */
+async function forward(inner: Request, env: Env, record: string, ctx: CallContext): Promise<Response> {
+  const stub = () => env.RECORD.get(env.RECORD.idFromName(record));
+  const out = await stub().fetch(inner);
+  if (!restoreAsked(inner.method, new URL(inner.url).pathname)) return out;
+  return afterRestore(out, actorOf(ctx), {
+    reset: () => stub().reopen(),
+    restored: async (args) => (await stub().restored(args)) as unknown as Result<unknown>,
+  });
+}
+
+/**
+ * `GET /app/<slug>/.well-known/braindog-key`: `{ key_id, public_key }`, the key the record's exports are signed with
+ * (`03 §4`), to anybody, so `braindog verify --key <url>` pins a file to a key it did not come with.
+ *
+ * THE DIRECTORY FIRST, AND A NAME IT DOES NOT HOLD WAKES NOTHING. `idFromName` on an id nobody has creates the object,
+ * so the record is addressed by the id `resolve` answers and never by the name. A released name and one never given
+ * answer the same 404 as a record that signs nothing, one sentence for the three.
+ *
+ * WHAT IT DOES TELL A STRANGER IS THAT A LIVE NAME EXISTS, which no other door here does without a credential: every
+ * other answer under a slug is the shell or one 401. A key published per name cannot avoid it, and it is recorded
+ * rather than decided here (`loop/research-restore.md` §8 put the URL per record). The id-shaped alternative,
+ * `/.well-known/braindog-key/<rec_id>`, would say nothing a caller did not already hold.
+ */
+async function recordKey(request: Request, env: Env, slug: string): Promise<Response> {
+  if (request.method !== 'GET' && request.method !== 'HEAD')
+    return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record\'s key is read with GET.' } }, 405, [['allow', 'GET, HEAD']]);
+  const none = json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `No record here publishes a key as ${slug}.`, at: 'slug' } }, 404);
+  const found = await env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).resolve(slug);
+  if (!found) return none;
+  const key = await env.RECORD.get(env.RECORD.idFromName(found.record)).signingKey();
+  if (!key) return none;
+  const out = json({ key_id: key.key_id, public_key: key.public_key }, 200);
+  return request.method === 'HEAD' ? new Response(null, { status: out.status, headers: out.headers }) : out;
 }
 
 /**

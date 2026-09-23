@@ -20,7 +20,7 @@
  */
 
 import { ROUTES, sessionOf, withSession, type IngestArrival, type IngestDoor, type IngestVerify } from '@braindog/host';
-import type { Result, Snapshot } from '@braindog/ports';
+import { fixOf, type Result, type Snapshot } from '@braindog/ports';
 import type { CallContext } from '@braindog/record';
 import { badSlug } from '@braindog/record/directory';
 
@@ -93,8 +93,8 @@ export const servesIn = (pathname: string): boolean => /^\/+in(?:\/|$)/.test(pat
  * it meant carrying a bearer for a question with no record in it. The build id is a property of the
  * Worker version, so it is answered where nothing has to be opened to read it. `33 §4` puts the
  * `/.well-known/braindog-key` that `braindog verify` reads beside it, under the same rule and with no
- * credential, and THAT one is specified and not built: nothing answers it in any of the three apps, and
- * the test below pins this prefix to `braindog-build` alone.
+ * credential. This Worker answers that one per record, at `/app/<slug>/.well-known/braindog-key`
+ * (`servesKey` below), and `test/build.test.ts` pins this prefix to `braindog-build` alone.
  *
  * `/.well-known/*` IS IN `run_worker_first`, which is what makes this path the Worker's at all. Off
  * that list the app shell answers here with `index.html` and a 200, which is worse than a 404
@@ -103,23 +103,103 @@ export const servesIn = (pathname: string): boolean => /^\/+in(?:\/|$)/.test(pat
 export const servesBuild = (pathname: string): boolean => /^\/+\.well-known\/+braindog-build\/*$/.test(pathname);
 
 /**
+ * `/.well-known/braindog-key`: the key a record's exports are signed with (`03 §4`), under a slug on this Worker.
+ *
+ * A PATH AFTER THE SLUG AND NOT AT THE ROOT, BECAUSE ONE WORKER SERVES MANY RECORDS. `03 §4` puts the key at the host's
+ * root, which on a self-host is one record and here is every record on the deployment, each signing with its own key.
+ * So the router asks this of `appPath`'s `rest` alone (`loop/research-restore.md` §9, W55-7), and `/app/*` is already
+ * the Worker's in the site's `run_worker_first`. THE ROOT IS LEFT TO THE ROUTER'S 404: the site forwards no
+ * `/.well-known/braindog-key`, so an answer there would be one `app.brain.dog` gives and `brain.dog` never does, and
+ * `test/site-binding.test.ts` holds every root branch of `route()` to a door the site forwards.
+ */
+export const servesKey = (pathname: string): boolean => /^\/+\.well-known\/+braindog-key\/*$/.test(pathname);
+
+/**
  * `GET /api/snapshots/<id>`: one kept copy as a file, which is the self-host's door (`49 §5.13`). The id, or `null`.
  *
- * THE WORKER KEEPS NO COPIES, AND IT SAYS SO HERE AS IT DOES ON THE LIST. Without this the path fell through to the
- * method router and answered `ROUTE_UNKNOWN`, while `snapshot`, `snapshots` and `restore` on the same record answer
- * `NOT_IN_THIS_BUILD`, so one question had two answers depending on which door it was asked at.
+ * THE WORKER ANSWERS IT WITH A SENTENCE AND NEVER A FILE. Without this the path fell through to the method router and
+ * answered `ROUTE_UNKNOWN`, while `snapshot`, `snapshots` and `restore` on the same record answered otherwise, so one
+ * question had two answers depending on which door it was asked at. `copyRefusal` says which sentence.
  */
 export const copyAsked = (method: string, pathname: string): string | null =>
   method === 'GET' ? (/^\/+api\/+snapshots\/+([^/]+)\/*$/.exec(pathname)?.[1] ?? null) : null;
 
 /**
- * What a copy's door answers where no file can be streamed: the list's own refusal, which on a Worker is
- * `NOT_IN_THIS_BUILD`, or, should a list ever answer, that this id is not one of its copies.
+ * What a copy's door answers where no file can be streamed: the list's own refusal when the record keeps no copies, the
+ * reason a copy it does keep cannot be handed over, or that this id is not one of its copies.
+ *
+ * A COPY THE LIST SHOWS IS NEVER ANSWERED AS ABSENT. Before the Worker kept copies the list always refused, and the
+ * last line below was written for a list that "should ever answer". Once `Record$` handed the record `copies.ts`, it
+ * answered every id that way, the one the list had just shown included (`test/copy.test.ts`). A Cloud copy is sealed to
+ * the operator's backup recipient and this Worker holds only the public half (`12 §8`), so the bytes would open for
+ * nobody who asked for them; the sentence names the two doors that do what they wanted.
  */
 export async function copyRefusal(id: string, list: () => Promise<Result<Snapshot[]>>): Promise<Result<Snapshot[]>> {
   const listed = await list();
   if (!listed.ok) return listed;
+  if (listed.value.some((copy) => copy.id === id))
+    return {
+      ok: false,
+      refusal: {
+        code: 'NOT_IN_THIS_BUILD',
+        fix: `${id} is kept sealed to the operator's backup key, which this app never holds, so it cannot be downloaded here. Going back to it is Restore, and a file of the record as it is now is Export.`,
+        at: 'id',
+      },
+    };
   return { ok: false, refusal: { code: 'OUT_OF_BOUNDS', fix: `${id} is not one of the copies this record keeps.`, at: 'id' } };
+}
+
+/** `POST /api/restore`, the one method whose answer the Worker acts on after the record has given it. */
+export const restoreAsked = (method: string, pathname: string): boolean => method === 'POST' && /^\/+api\/+restore\/*$/.test(pathname);
+
+/** What was restored, as the record's `restored` takes it: the copy, the copy of what it was, and who asked. */
+export type Restored = { bookmark: string; kept: string | null; by: string };
+
+/**
+ * `51 D15`'s second half, after the record has answered a restore: reset the object, then write `restore.pitr` on the
+ * object that comes back. `out` is handed back unchanged, because the restore is done by then whatever follows.
+ *
+ * `reset` IS THE OBJECT'S `reopen`, AND ITS REJECTING IS THE EXPECTED ANSWER. `ctx.abort()` ends the object in the middle
+ * of the call, so the caller sees a rejection; `false` is an object that armed nothing, a port that put rows back in
+ * place and wrote the event itself, and then there is no second call to make. `restored` goes to the object PITR
+ * started, which only a stub asked for after the reset reaches: the old stub is broken by the abort.
+ *
+ * A SECOND CALL THAT FAILS IS SAID, NOT ANSWERED. The record is back at the copy by then and the receipt `copies.ts`
+ * put beside it says how, so turning the owner's 200 into a refusal would tell them a restore that happened did not. What
+ * is missing is one event, and the line says which copy it was for.
+ *
+ * AND A REFUSED RESTORE IS RESET TOO, BECAUSE ONE CAN BE REFUSED AFTER IT WAS ARMED. When the bucket refuses the receipt,
+ * `copies.ts` calls the restore off by arming the undo bookmark, and there is no call that disarms: the object is still
+ * set to go back, to the moment of the first arm, at its next start. Left running, every write it accepted until an
+ * eviction would be taken by that rewind. Measured by the checker: the Worker reset nothing for a refused restore
+ * (`test/restore-in-do.test.ts`, the restore called off). `reopen` answers `false` for an object that armed nothing, so
+ * asking after every refusal costs one call and resets only what is armed. No `restore.pitr` follows, since none happened.
+ */
+export async function afterRestore(
+  out: Response,
+  by: string,
+  o: { reset: () => Promise<boolean>; restored: (args: Restored) => Promise<Result<unknown>> },
+): Promise<Response> {
+  const said = (await out
+    .clone()
+    .json()
+    .catch(() => null)) as Result<{ bookmark?: unknown; kept?: unknown }> | null;
+  const bookmark = out.status === 200 && said?.ok === true && typeof said.value.bookmark === 'string' ? said.value.bookmark : null;
+  let reset = true;
+  try {
+    reset = await o.reset();
+  } catch {
+    /* The object ended, which is what was asked of it. */
+  }
+  if (!reset || bookmark === null || said?.ok !== true) return out;
+  const kept = typeof said.value.kept === 'string' ? said.value.kept : null;
+  try {
+    const wrote = await o.restored({ bookmark, kept, by });
+    if (!wrote.ok) console.error(`restore: the record is back at ${bookmark} and restore.pitr was refused: ${fixOf(wrote)}`);
+  } catch (e) {
+    console.error(`restore: the record is back at ${bookmark} and restore.pitr was not written: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  return out;
 }
 
 /**
