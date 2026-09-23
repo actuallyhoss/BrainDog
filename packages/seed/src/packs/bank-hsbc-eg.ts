@@ -65,8 +65,12 @@ import { HOME_CURRENCY, NOT_A_MOVEMENT, SAME_MOVEMENT, smsTwins, type SeedIngest
  * `declare/test/held-pack-range.test.ts` drive on purpose, so it is left for whoever owns that upgrade path to decide.
  * Laying the field from here through `extends` was measured too, and it is worse: the next money-core update was refused
  * `PROVIDES_CONFLICT` at `register.transactions`, because the laid field made the list the record's own.
+ *
+ * 1.3.0: `bank-not-mine-sms` (`HSBC_EG_NOT_MINE` below) skips a text at the Shortcut's door that carries none of the
+ * bank's movement phrases, with the reason "Not a message from the bank", where it was left `untriaged`. A minor step:
+ * one declaration added, none changed, so a record that updates reads every bank text as it did.
  */
-export const BANK_HSBC_EG_VERSION = '1.2.0';
+export const BANK_HSBC_EG_VERSION = '1.3.0';
 
 /* ── the `From HSBC:` line, shared by the pattern that writes it and the one that holds it ── */
 
@@ -410,6 +414,63 @@ export const HSBC_EG_SMS_INGESTS: Record<string, SmsIngest> = Object.fromEntries
 );
 
 /**
+ * The phrases a movement from this bank carries, one of which every one of the six `match:` lists requires: `from hsbc:`
+ * for the three `From HSBC:` lines, `debited with ipn` and `credited with ipn` for InstaPay, `has been used for` for the
+ * card. `loop/research-bank-real.md` read all four absent from the two marketing texts the bank sent him.
+ */
+const BANK_MOVEMENT_WORDS = ['from hsbc:', 'debited with ipn', 'credited with ipn', 'has been used for'];
+
+/** A text that carries none of them, which is what `bank-not-mine-sms` claims and then skips. */
+const NOT_A_BANK_MOVEMENT = { none: BANK_MOVEMENT_WORDS.map((contains) => ({ field: 'body', contains })) };
+
+/**
+ * A text posted to the Shortcut's door that no pattern here reads, skipped with a reason instead of queued as work.
+ *
+ * ONE IN FOUR OF HIS FORWARDED TEXTS IS NOT A MOVEMENT. His Shortcut posts whatever his phone receives from a short
+ * list of senders, and the old tool's live inbox for 28 August to 18 September held 26 skipped beside 84 parsed:
+ * verification codes, shop promotions, delivery notices and the bank's own marketing
+ * (`loop/research-legacy-keeps.md` section 1). The `skip:` lists above hang off their patterns, so they reach only
+ * a text some pattern already matched, and an arrival nothing matches is `untriaged` by rule. Measured before this
+ * pattern with four such bodies posted to the door: four `untriaged`, a badge of four for texts nobody has to read
+ * (`test/bank-not-mine.test.ts`). With it, four `skipped`, each saying why.
+ *
+ * THE KERNEL HAS NO PRIORITY, SO THIS IS NOT LAST BY POSITION. An arrival named for the door is offered the door's own
+ * pattern and then every pattern naming it in the order their declaration rows were written, and a pattern a later
+ * version of this pack changes is written again, after this one. Measured on 24 September with no `match:` here: a card
+ * alert at the door filed on the first install, and after a 1.3.1 that changed only `bank-card-used-sms`'s description
+ * the next card alert was claimed by this pattern and held in `review`. So its `match:` refuses `BANK_MOVEMENT_WORDS`,
+ * a phrase each of the six twins requires, and the two sets are disjoint whatever order they are offered in: the same
+ * update with this `match:` filed the alert. `test/bank-not-mine.test.ts` holds the phrase for every twin.
+ *
+ * AND A LINE IN THE BANK'S OWN WORDING THAT NOTHING READS STAYS A PERSON'S. `bank-from-out` says a `From HSBC:` line no
+ * sign pattern takes goes to a person as `untriaged`, and a catch-all that skipped it would call a real movement a
+ * stranger's text. What it does take from the bank is marketing, which prints none of the four, and the declined card
+ * text the same research quotes, which is the bank's and moves no money; the reason is wrong about the sender there
+ * and right about what a person has to do with it.
+ *
+ * THE DOOR ONLY, AND NO MAIL TWIN. A mail arrival names no ingest and is offered every mail pattern on the record, so a
+ * mail catch-all would skip every other pack's unread mail as not the bank's. A webhook always arrives named, and
+ * `door:` keeps this to what was posted to the bank's own URL.
+ *
+ * NOT IN `HSBC_EG_SMS_INGESTS` OR `MONEY_CORE_HANDS`. money-core never declared it, so it has nothing to hand, and the
+ * sample record's twelve are what the bank tests forward their lines into.
+ *
+ * `writes:` IS AT `needs-review` AND NOTHING IS READ, because the skip below takes every arrival the match does and the
+ * grammar still asks where a pattern would write. Should the two ever part, the text waits for a person and no row is
+ * written on a guess.
+ */
+export const HSBC_EG_NOT_MINE: SmsIngest = {
+  ingest: 'bank-not-mine-sms',
+  pack: 'bank-hsbc-eg',
+  channel: 'webhook',
+  verify: { kind: 'path' },
+  door: HSBC_EG_SMS_DOOR,
+  match: NOT_A_BANK_MOVEMENT,
+  skip: [{ when: NOT_A_BANK_MOVEMENT, reason: 'Not a message from the bank' }],
+  writes: { register: 'transactions', confidence: 'needs-review' },
+};
+
+/**
  * What money-core hands to this pack, as `hands:` in money-core's own document from 1.8.0: each of the twelve ids,
  * mapped to `bank-hsbc-eg`.
  *
@@ -436,7 +497,10 @@ export const MONEY_CORE_HANDS: Readonly<Record<string, string>> = Object.fromEnt
   [...Object.values(HSBC_EG_INGESTS), ...Object.values(HSBC_EG_SMS_INGESTS)].map((i) => [`ingest.${i.ingest}`, 'bank-hsbc-eg']),
 );
 
-/** The pack document: twelve ingests, no list, no page, and money-core 1.8.0 or later, before 3.0.0, underneath. */
+/**
+ * The pack document: thirteen ingests, the twelve and the door's catch-all, no list, no page, and money-core 1.8.0 or
+ * later, before 3.0.0, underneath.
+ */
 export function bankHsbcEgPack(): Record<string, unknown> {
   return {
     pack: 'bank-hsbc-eg',
@@ -445,6 +509,6 @@ export function bankHsbcEgPack(): Record<string, unknown> {
     author: 'BrainDog',
     license: 'MIT',
     requires: { format: 1, primitives: 1, packs: { 'money-core': '>=1.8.0 <3.0.0' } },
-    declarations: [...Object.values(HSBC_EG_INGESTS), ...Object.values(HSBC_EG_SMS_INGESTS)],
+    declarations: [...Object.values(HSBC_EG_INGESTS), ...Object.values(HSBC_EG_SMS_INGESTS), HSBC_EG_NOT_MINE],
   };
 }

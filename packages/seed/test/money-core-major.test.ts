@@ -87,8 +87,8 @@ test('EACH RANGE MOVED WITH A VERSION OF ITS OWN, and neither admits a money-cor
      bank-hsbc-eg is a minor step instead, 1.1.0, because its five twin doors gained `door:` on top of the wider range
      (one door, several patterns; wave forty-two), and 1.2.0 since `bank-card-used` reads and compares the limit its
      alert prints; the range did not move with it. */
-  assert.equal(BANK_HSBC_EG_VERSION, '1.2.0');
-  assert.equal(bankHsbcEgPack().version, '1.2.0');
+  assert.equal(BANK_HSBC_EG_VERSION, '1.3.0');
+  assert.equal(bankHsbcEgPack().version, '1.3.0');
   assert.equal(mercuryPack(MERCURY).version, '1.0.1');
   for (const [name, doc] of [['bank-hsbc-eg', bankHsbcEgPack()], ['mercury', mercuryPack(MERCURY)]] as const) {
     const range = (doc.requires as { packs: Record<string, string> }).packs['money-core']!;

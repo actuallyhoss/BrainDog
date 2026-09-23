@@ -133,12 +133,12 @@ test('THE PACK DECLARES EXACTLY THE TWELVE, needs money-core 1.8.0 or later befo
   const doc = bankHsbcEgPack() as unknown as Doc;
   assert.equal(doc.pack, 'bank-hsbc-eg');
   assert.equal(doc.version, BANK_HSBC_EG_VERSION);
-  assert.deepEqual(ingestsOf(doc), HSBC);
+  assert.deepEqual(ingestsOf(doc), [...HSBC, 'ingest.bank-not-mine-sms'].sort());
   /* `>=1.8.0 <3.0.0` SINCE 1.0.1: the caret it had at 1.0.0 admits no 2.0.0 (`bank-hsbc-eg.ts`). The floor is unmoved. */
   assert.deepEqual(doc.requires.packs, { 'money-core': '>=1.8.0 <3.0.0' });
   for (const d of doc.declarations) assert.equal(d.pack, 'bank-hsbc-eg', `${String(d.ingest)} still says it is money-core's`);
   const pack = value<Pack>(await normalise(doc, { kind: 'local' }));
-  assert.deepEqual([...pack.manifest.provides].sort(), HSBC);
+  assert.deepEqual([...pack.manifest.provides].sort(), [...HSBC, 'ingest.bank-not-mine-sms'].sort());
   assert.ok(!(FIRST_PARTY as readonly string[]).includes('bank-hsbc-eg'));
 });
 
@@ -173,11 +173,12 @@ test('A RECORD ON 1.7.0 UPDATES WITHOUT A REFUSAL, then takes the pack, and ends
 
   const bank = await put(k, bankHsbcEgPack());
   assert.deepEqual(bank.conflicts, []);
-  assert.deepEqual(bank.adds.map((a) => a.id).sort(), HSBC);
+  assert.deepEqual(bank.adds.map((a) => a.id).sort(), [...HSBC, 'ingest.bank-not-mine-sms'].sort());
 
   const after = k.declarations().filter((d) => d.kind === 'ingest');
-  assert.deepEqual(after.map((d) => d.id).sort(), before);
-  for (const d of after) assert.equal(d.pack_id, HSBC.includes(d.id) ? 'bank-hsbc-eg' : 'money-core', d.id);
+  /* PLUS THE PACK'S CATCH-ALL SINCE 1.3.0 (K2): a text no other door took is skipped as not the bank's, not queued. */
+  assert.deepEqual(after.map((d) => d.id).sort(), [...before, 'ingest.bank-not-mine-sms'].sort());
+  for (const d of after) assert.equal(d.pack_id, HSBC.includes(d.id) || d.id === 'ingest.bank-not-mine-sms' ? 'bank-hsbc-eg' : 'money-core', d.id);
 
   /* AND A LINE FROM THE BANK IS STILL CLAIMED BY ITS PATTERN, which is what the owner notices if this goes wrong. */
   const out = value<{ ingest: string | null }>(
@@ -216,7 +217,7 @@ test('A RECORD THAT NEVER USED THE TWELVE RETIRES THEM ON THE UPDATE, and holds 
   /* AND THE PACK STILL INSTALLS LATER, as twelve new doors rather than twelve taken over. */
   const bank = await put(k, bankHsbcEgPack(), usedOf(sql));
   assert.deepEqual(bank.conflicts, []);
-  assert.deepEqual(bank.adds.map((a) => [a.id, a.handed ?? false]).sort(), HSBC.map((id) => [id, false]));
+  assert.deepEqual(bank.adds.map((a) => [a.id, a.handed ?? false]).sort(), [...HSBC.map((id) => [id, false]), ['ingest.bank-not-mine-sms', false]].sort());
   sql.close();
 });
 

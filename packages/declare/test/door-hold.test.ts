@@ -106,7 +106,7 @@ test('A TOKEN MINTED ON 1.7.0 OPENS THE DOOR AFTER THE UPDATE AND AFTER THE PACK
 
   const bank = await put(api, bankHsbcEgPack());
   assert.deepEqual(bank.conflicts, []);
-  assert.deepEqual(bank.adds.map((a) => a.id).sort(), HSBC);
+  assert.deepEqual(bank.adds.map((a) => a.id).sort(), [...HSBC, 'ingest.bank-not-mine-sms'].sort());
   assert.deepEqual(await api.ingestVerify({ ingest: 'bank-from-out-sms' }), door, 'the owner has to mint again');
 
   const owners = api.kernel.declarations().filter((d) => HSBC.includes(d.id)).map((d) => d.pack_id);
