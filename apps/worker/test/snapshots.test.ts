@@ -117,6 +117,28 @@ test('A NIGHTLY COPY IS WRITTEN, AND IT READS BACK THROUGH THE IMPORTER', async 
   assert.ok(sound.ok, JSON.stringify(sound));
 });
 
+test('THE ROW COUNT IS THE RECORD\'S ROWS, AND NOT THE FILE\'S OWN FOUR HEADER TABLES COUNTED BESIDE THEM', async () => {
+  // `customMetadata.rows` is what Settings shows beside a copy, and the comment on `dumpOf` promised
+  // "rows of record". MEASURED BEFORE THIS FIX (`loop/research-restore.md` 3.1): 94 for a record
+  // holding 25, because every line that was not a header was counted, and `dog_meta`, `dog_section`,
+  // `dog_manifest` and `dog_sig` describe the file rather than hold the record. The expected count is
+  // read from the file's own manifest, which is the kernel's count and not a second reading of lines.
+  const { api } = await record();
+  const dump = await dumpOf(api, AT);
+  const lines = dump.text.split('\n');
+  const at = lines.findIndex((line) => line.startsWith('#table dog_manifest '));
+  const manifest: [string, number][] = [];
+  for (const line of lines.slice(at + 1)) {
+    if (line.startsWith('#')) break;
+    const [name, rows] = JSON.parse(line) as [string, number];
+    manifest.push([name, rows]);
+  }
+  const held = manifest.filter(([name]) => !name.startsWith('dog_')).reduce((n, [, rows]) => n + rows, 0);
+  const lined = lines.filter((line) => !line.startsWith('#')).length;
+  assert.ok(held > 0 && lined > held, `the manifest counts ${String(held)} record rows in ${String(lined)} lines`);
+  assert.equal(dump.rows, held, `the dump counted ${String(dump.rows)} rows for a record holding ${String(held)}`);
+});
+
 test('A PUT THAT FAILED IS THROWN, NEVER SWALLOWED, and nothing is left claiming a copy was taken', async () => {
   // The worst bug this file can have. A `take` that caught its own error would leave last night's
   // `latest` in place, the list would show a copy, and the record would have been unbacked for as

@@ -18,6 +18,9 @@
  * bytes it dumped; the put, the list and the prune happen in the Worker with the Worker's binding,
  * the way `deliver.ts` does the outbox's I/O. And nothing here imports `cloudflare:`: R2 arrives as
  * the five methods below and not one more, so every rule worth testing runs in a bare Node process.
+ * The one exception is a copy the record asks for itself, before a restore or by hand: that runs
+ * inside the object through `copies.ts`, because the restore it pairs with can only be armed there,
+ * and it seals through `write` below so there is still one sealing path.
  *
  * A NAMED RECIPIENT SEALS, AND A RECIPIENT THAT WILL NOT DO STOPS THE WALK BEFORE IT STARTS.
  * `53 §5.4` wants the cloud copy sealed to `AGE_RECIPIENT`, and `seal.ts` writes age v1 to it. Until
@@ -85,7 +88,14 @@ export type Blobs = {
   /* `body` IS OPTIONAL SO A TEST'S BUCKET NEED NOT HAVE ONE. R2's always does, and it is read only
      where a `Fixed` exists, which is to say in the Worker and in `test/snapshots-stream.test.ts`. */
   get(key: string): Promise<{ size: number; text(): Promise<string>; body?: ReadableStream<Uint8Array> } | null>;
-  list(options?: { prefix?: string; cursor?: string }): Promise<{ objects: { key: string; size: number }[]; truncated: boolean; cursor?: string }>;
+  /* `include` IS R2'S OWN OPTION, AND WITHOUT IT A LISTING CARRIES NO `customMetadata` AT ALL. The
+     walk never asks, because it prunes by key; `copies.ts` asks, because the bookmark a restore
+     needs is in the metadata and nowhere else (`loop/research-restore.md` 3.3). */
+  list(options?: { prefix?: string; cursor?: string; include?: 'customMetadata'[] }): Promise<{
+    objects: { key: string; size: number; customMetadata?: Record<string, string> }[];
+    truncated: boolean;
+    cursor?: string;
+  }>;
   delete(keys: string | string[]): Promise<void>;
 };
 
@@ -253,9 +263,9 @@ function sealerOf(recipient: string | undefined): ((file: Uint8Array | Plain) =>
  * `actor: 'system'` because the walk is not a person, and the `export` event the kernel writes is
  * the answer to "did anything leave" (`12 §6`). It is written to the record and left out of the
  * file on purpose, so the copy does not grow by one row a night on a record nobody touched.
- * Measured on a fresh record: two dumps back to back are 114 lines and 88 counted rows each, and
- * they differ in exactly one field, the signature's `signedAt` (see `sign.ts`). The copies are not
- * byte-identical, and nothing here should be written as though they were.
+ * Two dumps of one record back to back differ in exactly one field, the signature's `signedAt`
+ * (see `sign.ts`). The copies are not byte-identical, and nothing here should be written as though
+ * they were.
  */
 export async function dumpOf(
   api: { kernel: { export(opts: { redactGrants?: boolean; actor?: string }): Promise<Result<string[]>> } },
@@ -264,9 +274,16 @@ export async function dumpOf(
 ): Promise<Dump> {
   const out = await api.kernel.export({ redactGrants: false, actor: 'system' });
   if (!out.ok) throw new Error(`the record would not export: ${fixOf(out)}`);
-  /* A ROW IS A LINE THAT IS NOT A HEADER. `#dogl <n>` and every `#table` line describe the file;
-     what is counted here is what `customMetadata.rows` promises, which is rows of record. */
-  const rows = out.value.reduce((n, line) => (line.startsWith('#') ? n : n + 1), 0);
+  /* A ROW OF RECORD IS A LINE UNDER A TABLE THAT IS NOT ONE OF THE FILE'S OWN. This counted every
+     line that was not a header, and the four `dog_` tables (`dog_meta`, `dog_section`,
+     `dog_manifest`, `dog_sig`) describe the file rather than hold the record: a fresh record read 94
+     for the 25 its manifest counts (`loop/research-restore.md` 3.1), and Settings showed the 94. */
+  let table = '';
+  let rows = 0;
+  for (const line of out.value) {
+    if (line.startsWith('#table ')) table = line.slice('#table '.length).split(' ')[0] ?? '';
+    else if (!line.startsWith('#') && !table.startsWith('dog_')) rows++;
+  }
   return { text: out.value.join('\n'), rows, at, ...(bookmark === undefined ? {} : { bookmark }) };
 }
 
@@ -347,63 +364,80 @@ export function r2Snapshots(
     if (doomed.length > 0) await blobs.delete(doomed);
   };
 
+  /**
+   * One copy put under `name`, sealed as this deployment seals, and `latest` pointed at it when
+   * `pointer` says so. `stored` is the size of the object as the bucket holds it, sealed, which is
+   * what a listing reports as `size`, so a port that returns this and later lists it says one size.
+   *
+   * SHARED WITH `copies.ts`, SO A COPY TAKEN BY HAND IS SEALED BY THE SAME LINES AS A NIGHT. A
+   * second sealing path would be a second place for a plaintext object to leak into a sealed bucket.
+   */
+  const write = async (record: string, name: string, dump: Dump, pointer: boolean): Promise<Kept & { stored: number }> => {
+    /* THE STRING IS NEVER ENCODED WHOLE ON WORKERD. It stays live for all of `take` whatever is
+       done with it: the audit's probe dropped the caller's reference before `take` ran and the
+       suspended frame still held the parameter, 120.8 MiB either way. So what can be cut is only
+       what is made beside it, and here that is a count and then one 64 KiB piece per pull. */
+    const utf8 = plainOf(dump.text);
+    if (utf8.length > CEILING)
+      throw new Error(
+        `snapshot over 40 MiB: this record dumped ${String(utf8.length)} bytes and the Worker signs the whole file in memory. Raise the ceiling or stream it (51 §10).`,
+      );
+
+    const key = `${prefixOf(record)}${name}${ext}`;
+    const meta = {
+      rows: String(dump.rows),
+      bytes: String(utf8.length),
+      at: dump.at,
+      ...(dump.bookmark === undefined ? {} : { bookmark: dump.bookmark }),
+    };
+    const latestKey = `${prefixOf(record)}${latest}`;
+
+    /* THE DATED KEY FIRST AND `latest` SECOND. If the second put fails, `latest` still points at a
+       copy that opens; the other order leaves the pointer naming an object nobody finished. */
+    if (fixed && !seal) {
+      /* SEALED AS R2 READS IT, so the sealed file is never whole in this isolate. Measured by
+         `test/snapshots-stream.test.ts` at the 40 MiB ceiling: holding the sealed buffer for both
+         puts was 80 MiB live while the bucket read, 40 above the plaintext; streamed it is 2 above
+         it, which is a chunk and the queue behind it.
+
+         AND `latest` IS READ BACK FROM THE DATED COPY, NOT SEALED A SECOND TIME. A stream reads
+         once, and the binding has no server-side copy. Sealing again would cost the whole cipher
+         over again, 1.8 s of CPU at the ceiling by `seal.ts`'s own measure, and would leave a
+         pointer whose bytes differ from the copy it points at. One GET streams the same bytes
+         through, and a dated copy that R2 did not keep is a throw here and not a pointer at nothing.
+
+         AN UNSEALED COPY STREAMS THE SAME WAY, because it is the same string: putting it as one
+         buffer would be the encoded file beside the string, which is the peak this path exists
+         to avoid, on the deployments that chose not to seal. */
+      const body = stream ? await stream(utf8) : streamOf(utf8);
+      const r2 = blobs as StreamBlobs;
+      await r2.put(key, fixed(body.stream, body.length), { customMetadata: meta });
+      if (pointer) {
+        const copy = await r2.get(key);
+        if (!copy?.body) throw new Error(`the copy just written to ${key} could not be read back to point latest at it`);
+        await r2.put(latestKey, fixed(copy.body, copy.size), { customMetadata: meta });
+      }
+      return { key, bytes: utf8.length, rows: dump.rows, at: dump.at, stored: body.length };
+    }
+    /* NO `FixedLengthStream`, which is Node, or a test's own `seal`: one buffer, put once for the
+       copy and again for `latest` when it moves, as before streaming. */
+    const file = new TextEncoder().encode(dump.text);
+    const body = stream ? await drain(await stream(file)) : seal ? await seal(file) : file;
+    await blobs.put(key, body, { customMetadata: meta });
+    if (pointer) await blobs.put(latestKey, body, { customMetadata: meta });
+    return { key, bytes: utf8.length, rows: dump.rows, at: dump.at, stored: body.length };
+  };
+
   return {
     list,
     prune,
+    write,
 
+    /** The night's copy, `nightly-<date>`, with `latest` moved to it and the nights past `KEEP` pruned. */
     async take(record: string, dump: Dump): Promise<Kept> {
-      /* THE STRING IS NEVER ENCODED WHOLE ON WORKERD. It stays live for all of `take` whatever is
-         done with it: the audit's probe dropped the caller's reference before `take` ran and the
-         suspended frame still held the parameter, 120.8 MiB either way. So what can be cut is only
-         what is made beside it, and here that is a count and then one 64 KiB piece per pull. */
-      const utf8 = plainOf(dump.text);
-      if (utf8.length > CEILING)
-        throw new Error(
-          `snapshot over 40 MiB: this record dumped ${String(utf8.length)} bytes and the Worker signs the whole file in memory. Raise the ceiling or stream it (51 §10).`,
-        );
-
-      const key = snapshotKey(record, dump.at, ext);
-      const meta = {
-        rows: String(dump.rows),
-        bytes: String(utf8.length),
-        at: dump.at,
-        ...(dump.bookmark === undefined ? {} : { bookmark: dump.bookmark }),
-      };
-      const pointer = `${prefixOf(record)}${latest}`;
-
-      /* THE DATED KEY FIRST AND `latest` SECOND. If the second put fails, `latest` still points at a
-         copy that opens; the other order leaves the pointer naming an object nobody finished. */
-      if (fixed && !seal) {
-        /* SEALED AS R2 READS IT, so the sealed file is never whole in this isolate. Measured by
-           `test/snapshots-stream.test.ts` at the 40 MiB ceiling: holding the sealed buffer for both
-           puts was 80 MiB live while the bucket read, 40 above the plaintext; streamed it is 2 above
-           it, which is a chunk and the queue behind it.
-
-           AND `latest` IS READ BACK FROM THE DATED COPY, NOT SEALED A SECOND TIME. A stream reads
-           once, and the binding has no server-side copy. Sealing again would cost the whole cipher
-           over again, 1.8 s of CPU at the ceiling by `seal.ts`'s own measure, and would leave a
-           pointer whose bytes differ from the copy it points at. One GET streams the same bytes
-           through, and a dated copy that R2 did not keep is a throw here and not a pointer at nothing.
-
-           AN UNSEALED COPY STREAMS THE SAME WAY, because it is the same string: putting it as one
-           buffer would be the encoded file beside the string, which is the peak this path exists
-           to avoid, on the deployments that chose not to seal. */
-        const body = stream ? await stream(utf8) : streamOf(utf8);
-        const r2 = blobs as StreamBlobs;
-        await r2.put(key, fixed(body.stream, body.length), { customMetadata: meta });
-        const copy = await r2.get(key);
-        if (!copy?.body) throw new Error(`the copy just written to ${key} could not be read back to point latest at it`);
-        await r2.put(pointer, fixed(copy.body, copy.size), { customMetadata: meta });
-      } else {
-        /* NO `FixedLengthStream`, which is Node, or a test's own `seal`: one buffer, put twice, as
-           before streaming. */
-        const file = new TextEncoder().encode(dump.text);
-        const body = stream ? await drain(await stream(file)) : seal ? await seal(file) : file;
-        await blobs.put(key, body, { customMetadata: meta });
-        await blobs.put(pointer, body, { customMetadata: meta });
-      }
+      const { stored: _, ...kept } = await write(record, `nightly-${dump.at.slice(0, 10)}`, dump, true);
       await prune(record);
-      return { key, bytes: utf8.length, rows: dump.rows, at: dump.at };
+      return kept;
     },
   };
 }
