@@ -10,8 +10,9 @@
  * NEITHER PUMP COULD CARRY THIS JOB, which is why it is a pass of its own. Both hand a job to a `Deliver` that returns
  * `void` and ack `done` with no `result` (`apps/worker/src/pump.ts`, `apps/selfhost/src/server.ts`), so an `infer.ask` on
  * either list would be acked with no text and every run would end on *"Spark answered job … with no text"*. The Worker
- * calls this in `alarm()` after `#act`, inside the object that holds the vault, and the self-host at the end of `act()`
- * (Briefs E and D).
+ * calls this in `alarm()` after `#act`, inside the object that holds the vault, and sets the next alarm for now when a pass
+ * leased its full `n`, since nothing rings for the rest; the self-host calls it in `poll`, after `act()` and not inside it,
+ * because `act()` returns on its first line where no actions runner is configured (Briefs E and D).
  *
  * STRUCTURAL, AND IT IMPORTS NEITHER `@braindog/spark` NOR AN APP. `answer` is handed in as a function, so the package's
  * `answer` method, the key opened in the rule's name and the tier all stay the app's to build; `31 §2` puts the package at

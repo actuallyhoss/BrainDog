@@ -26,6 +26,7 @@
  */
 
 import {
+  SPARK_KEY_LABEL,
   sparkAskerEngine,
   sparkByokFor,
   sparkFromEnv,
@@ -40,7 +41,8 @@ import {
 } from '@braindog/host/spark';
 import type { OpenKey } from '@braindog/host/actions';
 import { sparkAskDoor, type SparkAskDoor } from '@braindog/host';
-import type { Clock, Sql } from '@braindog/ports';
+import type { SparkAnswer } from '@braindog/host/spark-answers';
+import { no, type Clock, type Sql } from '@braindog/ports';
 import type { CallContext, RecordApi, SparkModel } from '@braindog/record';
 import type { Spark } from '@braindog/spark';
 
@@ -122,6 +124,56 @@ export async function workerSparkEngine(env: SparkEnv, api: () => RecordApi, dep
   /* GUARDED BY THIS HOST, as on the self-host: tier `b`'s drafts are on this Worker's endpoint and the package meters tier
      `a` alone, and `configure` checks a grant id's shape and never the vault (`sparkGuardedEngine`). */
   return sparkGuardedEngine(engine, { sql: deps.sql, clock: deps.clock, grants: () => api().kernel.grants() });
+}
+
+/**
+ * What answers an automation's question to Spark on this Worker, or nothing: `serveAsks`'s `answer`, one job at a time.
+ *
+ * `undefined` EXACTLY WHERE `workerSparkEngine` IS, AND DECIDED WITHOUT AN `await`, because `Record$.#open` reads it to set
+ * the record's `answersSpark` before `createRecordApi` runs. The test is the builder's own (`sparkInferenceOf` over the same
+ * `wireOf`), and `workerSparkModel`, which `/api/version`'s `spark` reads, comes out of the same `endpointOptionsOf`, so the
+ * switch that files `ask_spark` and the flag the canvas reads are one fact (`test/spark-answers.test.ts` cases 2 and 5).
+ *
+ * THE ENGINE IS BUILT ONCE, ON THE FIRST QUESTION, THROUGH `workerSparkEngine`, so it is the guarded one and it meters on
+ * the same `settings` and `call` tables the door's engine does, in the same storage: one `ask_cap` for a person's read and
+ * an automation's question. A build that throws is let go, as `apps/selfhost/src/spark.ts` `sparkAnswersFor` lets it go,
+ * so the next pass builds again rather than every question after it failing on one bad import.
+ *
+ * NO KEY LABELLED `spark`, NO POST, AND THE RULE IS THIS FILE'S ALONE. The host's key path sends with no `authorization`
+ * when the vault has no `spark` grant, which on a self-host is a local model working. Here the endpoint is a hosted provider
+ * on the owner's own bill. With this check taken out, measured on 23 September in `test/spark-answers.test.ts`'s no-key
+ * case with the provider answering 401: one POST with no `authorization` header, a ledger row settled `UNREACHABLE`, the run
+ * still `waiting` and a `retry` row queued, so every rung of the ladder would be another keyless POST for a day. The
+ * survey's W2 read the same POST counted as an ask and blamed on the model, under the status rule as it stood then. Either
+ * way it is wrong here, so the job is refused `FORBIDDEN` before the engine is built or anything is held, and nothing is
+ * written to the ledger (Q7's default).
+ *
+ * EACH QUESTION IS ASKED ON A WIRE SIGNED `rule:<id>`, so the vault's `grant.read` for the owner's key names the rule that
+ * opened it and not `system`. This never calls `sparkByokFor`: a rule has no session for the vault's gate to read, and
+ * installing a rule that asks Spark is the owner's consent to its question going to this Worker's endpoint (Q3's default).
+ */
+export function workerSparkAnswers(env: SparkEnv, api: () => RecordApi, deps: SparkEngineDeps): SparkAnswer | undefined {
+  const config = sparkFromEnv(env, { operatorKey: false });
+  if (sparkInferenceOf(config, wireOf(env, api, deps)) === undefined) return undefined;
+  let built: Promise<Spark | undefined> | null = null;
+  return async (ask) => {
+    if (!api().kernel.grants().some((g) => g.label === SPARK_KEY_LABEL && g.revoked_at === null))
+      return no(
+        'FORBIDDEN',
+        `rule.${ask.rule} asked Spark at step ${ask.step + 1}, and this record's vault holds no key labelled ${SPARK_KEY_LABEL}, so the run stopped there. Put your model key in the vault under ${SPARK_KEY_LABEL}.`,
+        { at: 'grant' },
+      );
+    built ??= workerSparkEngine(env, api, deps).catch((e: unknown) => {
+      built = null;
+      throw e;
+    });
+    const engine = await built;
+    const inference = sparkInferenceOf(config, wireOf(env, api, deps, `rule:${ask.rule}`));
+    /* NEITHER IS REACHABLE WHILE THE TEST ABOVE HOLDS, and a thrown sentence here becomes the ladder's `failed` ack
+       rather than an answer nobody asked for. */
+    if (engine === undefined || inference === undefined) throw new Error('Spark has no model on this Worker to answer with.');
+    return engine.answer(ask, inference);
+  };
 }
 
 /**

@@ -36,9 +36,10 @@ import { runScript, ScriptRuns, type ScriptCall, type ScriptExports, type Script
 import { grantNamed, holdingScript, scriptReads } from '@braindog/host/script';
 import { askerOf, scriptTrial } from '@braindog/host/script-try';
 import { pagedRunner } from '@braindog/host/connector';
+import { serveAsks, type SparkAnswer } from '@braindog/host/spark-answers';
 
 import { alarmScheduler } from './alarm.ts';
-import { sparkLook, workerSparkDoor, workerSparkModel } from './spark.ts';
+import { sparkLook, workerSparkAnswers, workerSparkDoor, workerSparkModel } from './spark.ts';
 import { workerCatalogueOffers } from './catalogue.ts';
 import { DELETED, destroyRecord } from './destroy.ts';
 import { DELIVERS, makeDeliver } from './deliver.ts';
@@ -56,6 +57,12 @@ import { serveWorkerKeys, serveWorkerVault, servesKeys, servesVault, type KeyDep
 
 /** Why an owner cannot invite anybody here: an invitation is spent by signing in, and sign-in needs its secret. */
 const INVITES_OFF = 'Sign-in is off on this host until SESSION_SECRET is set, so an invitation link would lead nowhere.';
+
+/**
+ * How many questions to Spark one alarm asks: `serveAsks`'s own default, written here because `#ask` compares against it.
+ * A pass that leased this many may have left more behind, and `alarm()` then sets the next alarm for now.
+ */
+const ASKS_PER_PASS = 5;
 
 /** An address that can already sign in: a person with a passkey, or with a record. */
 const KNOWN_ADDRESS = `SELECT 1 AS x FROM dir_person p WHERE lower(p.email) = lower(?)
@@ -253,6 +260,15 @@ export class Record$ extends DurableObject<Env> {
   /** Spark's door, built on the first ask and kept, because the engine it holds writes its own tables. */
   #spark: SparkAskDoor<CallContext> | undefined;
 
+  /**
+   * What answers an automation's question to Spark from this object's alarm, or `undefined` where there is no model.
+   *
+   * SET IN `#open` AND NOT LAZILY, unlike `#spark` above, because the record's `answersSpark` is decided when
+   * `createRecordApi` runs and a rule that asks Spark is filed or refused on it. What is lazy is the engine inside
+   * (`workerSparkAnswers`).
+   */
+  #answers: SparkAnswer | undefined;
+
   /** The scripts running from this object's alarm, and the rules each is held to (`script.ts`). */
   #scripts = new ScriptRuns();
 
@@ -286,6 +302,11 @@ export class Record$ extends DurableObject<Env> {
     /* SPARK'S MODEL: the endpoint the deployment names, called with the person's own vault key, or none (`spark.ts`). */
     const sparkModel = workerSparkModel(this.env, () => api);
     const sql = storageSql(this.ctx.storage);
+    /* WHAT ANSWERS AN AUTOMATION'S QUESTION TO SPARK, off the same endpoint and the same key path as `sparkModel`, so
+       `answersSpark` below and `/api/version`'s `spark` are one fact. The storage is this object's own, the one the door's
+       engine is handed, so the two engines count one `ask_cap`. Before this line a Worker with a model said `spark: true`
+       and refused `ask_spark` at propose as if it had none (`test/spark-answers.test.ts`). */
+    this.#answers = workerSparkAnswers(this.env, () => api, { sql, clock: { now: () => Date.now() } });
     await this.ctx.blockConcurrencyWhile(async () => {
       api = await createRecordApi({
         sql,
@@ -316,6 +337,9 @@ export class Record$ extends DurableObject<Env> {
            do. A kind with no deliverer sits `pending` for ever — which is honest — and without
            this every write afterwards rang the queue about it. */
         delivers: DELIVERS,
+        /* THE SWITCH THAT FILES `ask_spark`, ON WHERE `alarm()` HAS A PASS TO ASK IT. `infer.ask` is not added to
+           `DELIVERS` above: the pump acks a job `done` with no `result`, and every run would end on "no text". */
+        answersSpark: this.#answers !== undefined,
         /* A SHARED FILE AT AN ADDRESS IS READ HERE, not in the tab, so a site with no CORS header still installs. */
         readAddress: sharedReader(),
         /* A DRAFT SCRIPT RUN NOW, WRITING NOTHING (`@braindog/host/script-try`), in the sandbox a scheduled run gets:
@@ -397,8 +421,42 @@ export class Record$ extends DurableObject<Env> {
     if (this.#gone) return;
     const api = await this.#record();
     await api.kernel.drain(this.#alarm);
-    await this.#act(api);
+    const more = await this.#act(api);
+    const asked = await this.#ask(api);
     await sparkLook(api);
+    /* WORK LEFT FOR THE NEXT INVOCATION SETS THE ALARM FOR NOW, AND IT IS SET LAST. `kernel.tail` sets the alarm from the
+       `schedule` table alone, and both the ask pass and the daily look tail it, so a `set(now)` made inside `#act`
+       before either of them could be moved out to the next schedule row, or cleared, by a pass that answered one
+       question. Neither jobs `#act` released nor questions left in the outbox are schedule rows, so nothing else here
+       would set it back. */
+    if (more || asked) await this.#alarm.set(Date.now());
+  }
+
+  /**
+   * The questions to Spark this record's rules have queued, answered after `#act` (the self-host's `poll` order).
+   *
+   * NO DOORBELL IS NEEDED FOR THE FIRST FIVE AND NOTHING RINGS FOR THE SIXTH. Every `infer.ask` row is queued by a drain,
+   * and the only drain on this host is the alarm's own, just above, so a question is asked in the invocation that
+   * queued it. But `serveAsks` leases five, `infer.ask` is not in `DELIVERS` so the tail rings nobody, and its tail arms
+   * the alarm from `schedule` alone. Seven questions and a one-shot pass, measured in `test/spark-answers.test.ts`
+   * case 10: five runs ended, two questions left `pending`, and the alarm armed an hour out for the record's `purge`
+   * sweep, the next row in `schedule`, and not for them; with no such row it is the parked runs' day. So a pass that
+   * leased its full five answers `true`, and `alarm()` sets the next alarm for now. That, and not a loop here, because
+   * each question is a POST and a vault opening, and `#act` has already spent up to 800 of this invocation's 1,000
+   * subrequests (`invocation()`): five more fit in the 200 it leaves, a queue's worth may not.
+   *
+   * A PASS THAT THROWS IS LOGGED AND NOT RETHROWN, `#act`'s rule. `serveAsks` catches what `answer` throws itself; this
+   * `try` is for the lease and the tail. The message only, because a question carries a row's values.
+   */
+  async #ask(api: RecordApi): Promise<boolean> {
+    if (this.#answers === undefined || api.kernel.refused()) return false;
+    try {
+      const out = await serveAsks(api.kernel, this.#answers, this.#alarm, ASKS_PER_PASS);
+      return out.answered + out.failed + out.refused + out.unacked >= ASKS_PER_PASS;
+    } catch (e) {
+      console.error('spark answers:', e instanceof Error ? e.message : String(e));
+      return false;
+    }
   }
 
   /**
@@ -413,11 +471,14 @@ export class Record$ extends DurableObject<Env> {
    *
    * A PASS THAT THROWS IS LOGGED AND NOT RETHROWN. The drain has already re-armed, and a throwing `alarm()` is
    * retried by the platform, which would run the drain again for a failure that was the network's.
+   *
+   * IT ANSWERS WHETHER ROWS WERE LEFT FOR LACK OF BUDGET, and `alarm()` sets the alarm for them again after every other
+   * pass has tailed it.
    */
-  async #act(api: RecordApi): Promise<void> {
-    if (api.kernel.refused()) return;
+  async #act(api: RecordApi): Promise<boolean> {
+    if (api.kernel.refused()) return false;
     const record = api.kernel.identity()?.id;
-    if (!record) return;
+    if (!record) return false;
     try {
       /* THE DIRECTORY'S LEDGER, OVER RPC: asked before each run, and told every run the pass metered. A record on the
          hosted plan at its monthly allowance answers `held`, sends nothing, and waits for the first of next month. */
@@ -462,10 +523,15 @@ export class Record$ extends DurableObject<Env> {
       }
       /* ROWS LEFT BECAUSE THE BUDGET RAN OUT, NOT BECAUSE THEY ARE NOT DUE. They are `pending` again
          and their schedule has not moved, so nothing re-arms them: this alarm has to. Now, because
-         the work was due before the budget was the reason it did not happen. */
+         the work was due before the budget was the reason it did not happen. AND ANSWERED UPWARD TOO,
+         because the ask pass and the daily look after this one tail the alarm from `schedule` and can
+         move this setting out again; `alarm()` sets it once more after both (`test/budget.test.ts`
+         reads this line). */
       if (out.more) await this.#alarm.set(Date.now());
+      return out.more;
     } catch (e) {
       console.error('actions:', e instanceof Error ? e.message : String(e));
+      return false;
     }
   }
 
