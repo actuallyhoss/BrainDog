@@ -38,7 +38,7 @@ import { compile, evaluate, type Predicate, type Schema } from '@braindog/where'
 
 import { meter, type Metered } from './actions.ts';
 import { nextOccurrence } from './digest.ts';
-import { RUN_PATH, RUNS_PER_DAY_CEILING, pathOf, triggerOf, UNSENDABLE } from './flow-lint.ts';
+import { RUN_PATH, RUNS_PER_DAY_CEILING, pathOf, sealedAs, triggerOf } from './flow-lint.ts';
 import type { Entry } from './index.ts';
 import { instant } from './migrate.ts';
 import { predicateOf, type EvalContext } from './metrics.ts';
@@ -248,6 +248,11 @@ function rebuilt(deps: FlowDeps, run: string, program: Op[], started: Record<str
  * FILLED AS THE STEP IS: `advance` fills every string of the step from the run, then the pass fills a `set`'s `to` from
  * the row (`rules.ts`'s `fill`), and a tag's word from nothing more. Two fills that agree wrote nothing a question could
  * not already carry.
+ *
+ * AND THE FIELD IS THE ONE THE RUN FILLS IT TO, since `act` hands the pass the filled step. Read as written, `field:
+ * '{{vars.f}}'` with `f` set to `note` held back `{{vars.f}}`, the pass wrote `note` from `{{pin}}`, and the question
+ * after it went out as `Rate for hunter2 hunter2?` with `about: { note: 'hunter2' }` (audit fifty-one §3, L4). The lint
+ * refuses a field in braces at install; this is the second line, for a rule stored before it did.
  */
 function writes(
   deps: FlowDeps,
@@ -267,7 +272,7 @@ function writes(
   if (typeof spec?.field !== 'string' || typeof spec.to !== 'string') return null;
   const as = fillRow(String(fill(spec.to, scope)), row, deps.nowMs);
   const clean = fillRow(String(fill(spec.to, cleanScope)), cleanRow, deps.nowMs);
-  return { field: spec.field, carries: as !== clean, clean };
+  return { field: String(fill(spec.field, scope)), carries: as !== clean, clean };
 }
 
 /**
@@ -911,7 +916,7 @@ function ask(
   const about: Record<string, unknown> = {};
   const types = row ? deps.schemaOf(row.register)?.fields : undefined;
   for (const field of spec.about ?? []) {
-    if (UNSENDABLE.includes(String(types?.[field]?.type)) || unsent.has(field)) continue;
+    if (sealedAs(types?.[field]) !== null || unsent.has(field)) continue;
     about[field] = row?.fields[field] ?? null;
   }
   /* `rule` IS WHO ASKS. The host's pass refuses a job without it and never calls Spark (`spark-answers.ts` `askOf`),
@@ -1129,15 +1134,14 @@ function context(deps: FlowDeps, trigger: RunTrigger, subject: Entry | null): Re
 }
 
 /**
- * The row as a question to Spark may carry it: every field the live list types `secret` or `file` taken out, and every
- * field the live list does not declare, since a value with no live type has none to ask whether it may leave. `unsent`
- * is the fields a step of the run wrote from one of those (`-unsent`), which go the same way.
+ * The row as a question to Spark may carry it: every field the live list types `secret` or `file` taken out, a list of
+ * either with it (`sealedAs`), and every field the live list does not declare, since a value with no live type has
+ * none to ask whether it may leave. `unsent` is the fields a step of the run wrote from one of those (`-unsent`), which
+ * go the same way.
  */
 function sendable(deps: FlowDeps, row: Entry, unsent: ReadonlySet<string> = new Set()): Entry {
   const types = deps.schemaOf(row.register)?.fields ?? {};
-  const fields = Object.fromEntries(
-    Object.entries(row.fields).filter(([id]) => types[id] !== undefined && !UNSENDABLE.includes(String(types[id]!.type)) && !unsent.has(id)),
-  );
+  const fields = Object.fromEntries(Object.entries(row.fields).filter(([id]) => types[id] !== undefined && sealedAs(types[id]) === null && !unsent.has(id)));
   return { ...row, fields: fields as Entry['fields'] };
 }
 

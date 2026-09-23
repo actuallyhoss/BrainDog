@@ -75,6 +75,20 @@ const ONCE: readonly string[] = ['notify', 'create', 'suggest', 'run', 'call', '
  */
 export const UNSENDABLE: readonly string[] = ['secret', 'file'];
 
+/**
+ * The type by which a field never leaves the record, `secret` or `file`, or `null` for a field that may.
+ *
+ * A `list<T>` IS READ BY ITS ELEMENT TYPE, as the write path reads it (`index.ts` seals `field.of === 'secret'`) and
+ * `redacts` reads a `list<money>`. Asking the field's own type, which is `list`, let a `list<secret>` stored past
+ * `declare.ts`'s refusal of one be put in a question, named in `about:` and copied into a text field; measured on 23
+ * September through the runner, a stored rule queued `Rate for hunter2 ["hunter2"]?` with `about: { keys: ['hunter2'] }`.
+ * `flow.ts` asks this too, so the lint and the runner cannot come to read one field two ways.
+ */
+export const sealedAs = (field: { type?: unknown; of?: unknown } | undefined): string | null => {
+  const kind = String(field?.type === 'list' ? field.of : field?.type);
+  return UNSENDABLE.includes(kind) ? kind : null;
+};
+
 /** A name a step's answer lands under, read back as `{{vars.<name>}}`. */
 const NAME = /^[a-z][a-z0-9_]{0,31}$/;
 /** `trigger` and `vars` are the run context's own two keys, so a var called either would shadow the path to itself. */
@@ -253,14 +267,17 @@ const ROW_FILL = /\{\{(\w+)(?::(\w+))?\}\}/g;
  * `rowFill: false` IS FOR A WORD ONLY THE RUN FILLS. A `tag` step's word is filled by `flow.ts`'s `fill` and never by
  * the pass's (`rules.ts` says no `fill` reads it), so `tag: '{{pin}}'` tags the braces as typed, and reading them as the
  * field would refuse a rule that sends nothing.
+ *
+ * `runFill: false` IS FOR A WORD ONLY THE PASS FILLS, which is a `set` on the inline path: `rules.ts`'s `fill` reads the
+ * row's `{{field}}` and leaves `{{trigger.row.pin}}` as typed, so the braces are the words written.
  */
-function hiddenIn(question: string, hidden: ReadonlyMap<string, string>, rowFill = true): { field: string; type: string; spelled: string } | null {
+function hiddenIn(question: string, hidden: ReadonlyMap<string, string>, rowFill = true, runFill = true): { field: string; type: string; spelled: string } | null {
   if (rowFill) for (const m of question.matchAll(ROW_FILL)) {
     const field = m[2] ?? m[1]!;
     const type = hidden.get(field);
     if (type !== undefined) return { field, type, spelled: m[0] };
   }
-  for (const m of question.matchAll(RUN_PATH)) {
+  if (runFill) for (const m of question.matchAll(RUN_PATH)) {
     if (m[1] !== 'trigger') continue;
     const [head, field] = m[2]!.split('.');
     if (head !== 'row') continue;
@@ -277,51 +294,91 @@ function hiddenIn(question: string, hidden: ReadonlyMap<string, string>, rowFill
 
 /**
  * Where a secret or file field entered a variable: the `set_var` that put it there, the variable it went into first,
- * the field, and the spelling that reached it. `via` is set when that spelling reached a field of the row a step wrote
- * from the secret (`Wrote`), and says which step and from what, so the refusal walks the whole way back.
+ * the field, and the spelling that reached it.
  */
-type Carried = { at: string; name: string; field: string; type: string; spelled: string; via?: string };
+type Carried = { at: string; name: string; field: string; type: string; spelled: string };
 
-/**
- * Where a secret or file field entered another field of the run's own row: the step that wrote it (`set`, or `tag` for
- * `tags`), the field written, the spelling in that step that reached the secret, the secret field at the root and its
- * type, and `via`, the rest of the way back when the spelling was a variable or a field an earlier step wrote.
- */
-type Wrote = { at: string; field: string; spelled: string; source: string; type: string; via?: string };
+/** A field of a list as its declaration says it, which is all the lint reads of one. */
+type Declared = { id?: unknown; type?: unknown; of?: unknown; retired?: unknown };
 
-/** The fields of the row a step wrote from a secret, typed as the secret they hold, for `hiddenIn` to read. */
-const typesOf = (wrote: ReadonlyMap<string, Wrote>): Map<string, string> => new Map([...wrote].map(([field, w]) => [field, w.type]));
+/** The fields `register` declares, retired ones included, or `undefined` where the list is not known. */
+const fieldsOf = (installed: Known, register: string | null): Declared[] | undefined =>
+  register === null ? undefined : (installed.get(`register.${register}`) as { fields?: Declared[] } | undefined)?.fields;
 
 /** Every field of `register` that never leaves the record, by its type, retired ones included (`hiddenIn` says why). */
 function hiddenOf(installed: Known, register: string | null): Map<string, string> {
-  const fields = register === null ? undefined : (installed.get(`register.${register}`) as { fields?: { id?: unknown; type?: unknown }[] } | undefined)?.fields;
-  return new Map((fields ?? []).filter((f) => UNSENDABLE.includes(String(f.type))).map((f) => [String(f.id), String(f.type)]));
+  return new Map((fieldsOf(installed, register) ?? []).flatMap((f) => {
+    const sealed = sealedAs(f);
+    return sealed === null ? [] : [[String(f.id), sealed] as const];
+  }));
 }
 
 /**
- * The first field a call's `sends:` names that `wrote` says a step filled from a secret, or `null`. A field of another
- * register is not this row's, and `callFault` refuses that call on its own.
+ * What a `set` or a `tag` may not write, as the refusal, or `null`: a field named any way but by its id, and a value
+ * that copies a secret or file field into a field that may leave the record.
+ *
+ * THE FIELD IS READ AS TYPED, AND SO IT HAS TO BE THE FIELD. `set: { field: '{{vars.f}}', to: '{{pin}}' }` with `f` set
+ * to `note` installed, and the pass wrote `note`: the lint read the braces and found no field to follow, and the
+ * runner's `writes()` held back `{{vars.f}}` rather than `note`, so the question after it went out as `Rate for
+ * hunter2?` (`loop/research-batch-fifty-one-audit.md` §3, L4). A field the list does not have fails every run at the
+ * write path, which refuses it `FIELD_UNKNOWN`, so it is refused here with that code. `tags` is one every list takes.
+ *
+ * A SECRET IS COPIED ONLY WHERE IT STILL NEVER LEAVES. The walk used to follow a field a step wrote from `pin` to the
+ * questions and calls later in the same list, and a record has more than one rule: `rule.write` wrote `note` from
+ * `{{pin}}` on create, `rule.ask` asked about `note` on an ordinary edit, each installed clean, and the edit queued
+ * `Rate for hunter2?` with `about: { note: 'hunter2' }` (the same audit, L1). The write also put the secret in a text
+ * field every reader of the list sees. Refusing the copy closes every reader at once, in this rule or any other, so no
+ * reader follows a written field any more; a field typed secret or file is already one no reader may send.
+ *
+ * `run: false` IS THE INLINE PATH, where nothing fills `{{trigger.…}}` or a tag and no variable exists, so only a
+ * `set`'s row fill is read (`hiddenIn`'s `runFill`).
  */
-function sentFrom(call: unknown, register: string | null, wrote: ReadonlyMap<string, Wrote>): Wrote | null {
-  const sends = isObject(call) ? call.sends : undefined;
-  if (!Array.isArray(sends)) return null;
-  for (const said of sends) {
-    if (typeof said !== 'string') continue;
-    const dot = said.indexOf('.');
-    if (register !== null && said.slice(0, dot) !== register) continue;
-    const w = wrote.get(said.slice(dot + 1));
-    if (w) return w;
-  }
-  return null;
-}
-
-/** The refusal of a call that would send what a step wrote from a secret, walked back to the step, as the question's is. */
-const sentRefusal = (id: string, verb: string, name: string, here: string, w: Wrote, why = ''): Refusal =>
-  bad(
+function writeFault(
+  id: string,
+  verb: 'set' | 'tag',
+  step: Record<string, unknown>,
+  here: string,
+  row: string | null,
+  fields: Declared[] | undefined,
+  hidden: ReadonlyMap<string, string>,
+  carried: ReadonlyMap<string, Carried>,
+  run: boolean,
+): Refusal | null {
+  const spec = verb === 'set' && isObject(step.set) ? step.set : undefined;
+  const named = verb === 'set' ? spec?.field : 'tags';
+  const list = row ?? 'its list';
+  if (typeof named !== 'string' || named.trim() === '')
+    return bad('DECLARATION_INVALID', `${id}'s ${here}.set.field is ${JSON.stringify(named ?? null)}, and a set names the field it writes by its id in ${list}.`, `${here}.set.field`);
+  if (named.includes('{{'))
+    return bad(
+      'DECLARATION_INVALID',
+      `${id} writes ${named} at ${here}, and a set names the field it writes by its id in ${list}, never by braces the run fills. Write the field's id.`,
+      `${here}.set.field`,
+    );
+  const target = fields?.find((f) => f.id === named && f.retired !== true);
+  if (fields !== undefined && target === undefined && named !== 'tags')
+    return bad(
+      'FIELD_UNKNOWN',
+      `${id} writes ${named} at ${here}, and ${list} has no field called ${named}.`,
+      `${here}.set.field`,
+      fields.filter((f) => f.retired !== true).map((f) => String(f.id)),
+    );
+  const to = verb === 'set' ? spec?.to : step.tag;
+  if (typeof to !== 'string' || sealedAs(target) !== null) return null;
+  const direct = hidden.size === 0 ? null : hiddenIn(to, hidden, verb === 'set', run);
+  const through = direct || !run ? null : carriedIn(to, carried);
+  if (!direct && !through) return null;
+  const whole = (spelled: string, field: string) => (spelled.replace(/\s/g, '') === '{{trigger.row}}' ? `the whole ${list} row, ${field} in it` : null);
+  const lead = direct
+    ? `${id} writes ${named} from ${direct.spelled} at ${here}${whole(direct.spelled, direct.field) === null ? '' : `, which is ${whole(direct.spelled, direct.field)}`}`
+    : `${id} writes ${named} from ${through!.spelled} at ${here}, and ${through!.name} holds ${whole(through!.from.spelled, through!.from.field) ?? through!.from.field}${through!.from.name === through!.name ? '' : `, by way of ${through!.from.name}`}: ${through!.from.at} put it there with ${through!.from.spelled}`;
+  const type = direct ? direct.type : through!.from.type;
+  return bad(
     'DECLARATION_INVALID',
-    `${id} ${verb === 'call' ? 'calls' : 'runs'} ${name} at ${here}, which sends ${w.field}, and ${w.at} wrote ${w.field} from ${w.spelled}${w.via ?? ''}, so it holds ${w.source}, and a ${w.type} field never leaves the record.${why} Write ${w.field} from fields that may leave, or name a call that does not send ${w.field}.`,
-    verb === 'call' ? `${here}.call.ingest` : `${here}.run`,
+    `${lead}, and a ${type} field is copied only into another secret or file field, which ${named} is not. Write ${named} from fields that may leave.`,
+    verb === 'set' ? `${here}.set.to` : `${here}.tag`,
   );
+}
 
 /**
  * The first `{{vars.x}}` in `text`, any spacing, naming a variable that `carried` says holds a field that never leaves the
@@ -532,7 +589,7 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
   const names = new Set<string>();
   let count = 0;
   const row = installed === undefined ? null : rowOf(decl, trigger, installed);
-  const fields = row === null ? undefined : ((installed?.get(`register.${row}`) as { fields?: { id?: unknown; type?: unknown }[] } | undefined)?.fields ?? undefined);
+  const fields = installed === undefined ? undefined : fieldsOf(installed, row);
   const hidden = installed === undefined ? new Map<string, string>() : hiddenOf(installed, row);
   /* EVERY VARIABLE A `set_var` FILLED FROM A FIELD THAT NEVER LEAVES THE RECORD, by the step that did it, as it stands
      on the way into each step. Read in the walk's own order, which is the order the plan takes the steps in, so only a
@@ -553,10 +610,10 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
      plain and takes nothing off. An answer written with `as:` is left carried: the runner drops the kept dash for it
      too, and the lint has not been taught that.
 
-     AND EVERY FIELD OF THE ROW A STEP WROTE FROM ONE, in `wrote`, held the same way: one map per arm, joined after the
-     branch, and a plain `set` of the same field taking it off on the way it is on. A `tag` carrying one marks `tags`,
-     and nothing takes that off, since a tag is added to the ones already there. */
-  const walk = (list: unknown, at: string, depth: number, carried: Map<string, Carried>, wrote: Map<string, Wrote>): Refusal | null => {
+     NO FIELD OF THE ROW IS CARRIED THIS WAY, because no step may write one from a secret (`writeFault`). A second map
+     held the fields a step wrote from one, for the questions and calls later in the same list, and it could see no
+     further than that list. */
+  const walk = (list: unknown, at: string, depth: number, carried: Map<string, Carried>): Refusal | null => {
     if (!Array.isArray(list)) return bad('DECLARATION_INVALID', `${id}'s ${at} is a list of steps.`, at);
     for (const [i, step] of list.entries()) {
       const here = `${at}[${i}]`;
@@ -583,15 +640,8 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
           for (const name of about) {
             const field = fields.find((f) => f.id === name);
             if (!field) return bad('FIELD_UNKNOWN', `${id} sends ${name} to Spark at ${here}, and ${row} has no field called ${name}.`, `${here}.ask_spark.about`);
-            if (UNSENDABLE.includes(String(field.type)))
-              return bad('DECLARATION_INVALID', `${id} sends ${name} to Spark at ${here}, and a ${String(field.type)} field never leaves the record.`, `${here}.ask_spark.about`);
-            const w = wrote.get(name);
-            if (w)
-              return bad(
-                'DECLARATION_INVALID',
-                `${id} sends ${name} to Spark at ${here}, and ${w.at} wrote ${name} from ${w.spelled}${w.via ?? ''}, so it holds ${w.source}, and a ${w.type} field never leaves the record. Take ${name} out of about:, or write ${name} from fields that may leave.`,
-                `${here}.ask_spark.about`,
-              );
+            const sealed = sealedAs(field);
+            if (sealed !== null) return bad('DECLARATION_INVALID', `${id} sends ${name} to Spark at ${here}, and a ${sealed} field never leaves the record.`, `${here}.ask_spark.about`);
           }
       }
       /* A VARIABLE CARRIES WHAT IT WAS SET FROM. `set_var` fills `to` from the whole row, before `sendable` is anywhere
@@ -603,50 +653,18 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
         const spec = step.set_var as { name: string; to: string };
         const direct = hidden.size === 0 ? null : hiddenIn(spec.to, hidden);
         const through = direct ? null : carriedIn(spec.to, carried);
-        const written = direct || through || wrote.size === 0 ? null : hiddenIn(spec.to, typesOf(wrote));
         if (direct) carried.set(spec.name, { at: here, name: spec.name, ...direct });
         else if (through) carried.set(spec.name, through.from);
-        else if (written) {
-          const w = wrote.get(written.field)!;
-          carried.set(spec.name, { at: here, name: spec.name, field: w.source, type: w.type, spelled: written.spelled, via: `, which ${w.at} wrote from ${w.spelled}${w.via ?? ''}` });
-        } else carried.delete(spec.name);
+        else carried.delete(spec.name);
       }
-      /* A FIELD OF THE ROW CARRIES WHAT A STEP WROTE INTO IT. The two checks above follow a secret into a variable and
-         not into the row, and a question reads the row as it is after every step before it (`advance` reads the row
-         again after each write): audit forty-nine §7 measured, through the real lint and the real kernel, `set: { field:
-         note, to: '{{pin}}' }` then `{{note}}`, `{{trigger.row.note}}`, `about: [note]` and a `set_var` from `note`, and
-         `to: '{{vars.p}}'` with `p` set from `pin`, each installing clean and each queueing `hunter2` for Spark. It also
-         wrote the secret into a text field every reader of the list sees. `tag: '{{trigger.row.pin}}'` did the same
-         through `tags`, measured the same way: `Rate for hunter2 ["hunter2"]?`. `note` and `create` write no field of
-         this row, measured the same way as `Rate for plain?`, and `move` writes the state, which `declare.ts` holds to an
-         enum of the list's own words, so none of the three is followed. */
+      /* A STEP THAT WRITES THE ROW MAY NOT COPY A SECRET INTO IT (`writeFault` says why, and what the audits measured).
+         This is the one place the row is followed: with the copy refused, a question, `about:` or a call later in this
+         list or in another rule reads a field no step filled from a secret, which is why the checks here that followed
+         a written field to a question and to a call are gone. `note` and `create` write no field of this row, and
+         `move` writes the state, which `declare.ts` holds to an enum of the list's own words. */
       if (verb === 'set' || verb === 'tag') {
-        const field = verb === 'set' ? (step.set as { field?: unknown }).field : 'tags';
-        const to = verb === 'set' ? (step.set as { to?: unknown }).to : step.tag;
-        if (typeof field === 'string' && typeof to === 'string') {
-          const rowFill = verb === 'set';
-          const direct = hidden.size === 0 ? null : hiddenIn(to, hidden, rowFill);
-          const through = direct ? null : carriedIn(to, carried);
-          const earlier = direct || through || wrote.size === 0 ? null : hiddenIn(to, typesOf(wrote), rowFill);
-          if (direct) wrote.set(field, { at: here, field, spelled: direct.spelled, source: direct.field, type: direct.type });
-          else if (through)
-            wrote.set(field, { at: here, field, spelled: through.spelled, source: through.from.field, type: through.from.type, via: `, which ${through.from.at} set from ${through.from.spelled}${through.from.via ?? ''}` });
-          else if (earlier) {
-            const w = wrote.get(earlier.field)!;
-            wrote.set(field, { at: here, field, spelled: earlier.spelled, source: w.source, type: w.type, via: `, which ${w.at} wrote from ${w.spelled}${w.via ?? ''}` });
-          } else if (verb === 'set') wrote.delete(field);
-        }
-      }
-      /* AND A CALL SENDS THE ROW AS THE STEPS BEFORE IT LEFT IT, which is the other road out. `queueCall` copies the
-         fields `sends:` names from the row the pass hands it, after every write before the step, and left a field out
-         by its type alone: measured on 23 September through the real lint and kernel, `set: { field: party, to:
-         '{{trigger.row.token}}' }` then `run: paid_hook`, and the same through `set_var`, through `memo`, through `tags`
-         and inside a branch, each installing clean and each queueing `hunter2` for the host to post. A `call` step is
-         held to the same, since a rule installed now sends once that step runs. */
-      if (installed !== undefined && wrote.size > 0 && (verb === 'call' || verb === 'run')) {
-        const name = String(verb === 'call' ? (step.call as { ingest?: unknown }).ingest : step.run);
-        const w = sentFrom(installed.get(`ingest.${name}`), row, wrote);
-        if (w) return sentRefusal(id, verb, name, here, w);
+        const fault = writeFault(id, verb, step, here, row, fields, hidden, carried, true);
+        if (fault) return fault;
       }
       if (verb === 'ask_spark') {
         const via = carriedIn(String((step.ask_spark as { question: unknown }).question), carried);
@@ -654,7 +672,7 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
           const held = via.from.spelled.replace(/\s/g, '') === '{{trigger.row}}' ? `the whole ${row ?? 'trigger'} row, ${via.from.field} in it` : via.from.field;
           return bad(
             'DECLARATION_INVALID',
-            `${id} puts ${via.spelled} in its question to Spark at ${here}, and ${via.name} holds ${held}${via.from.name === via.name ? '' : `, by way of ${via.from.name}`}: ${via.from.at} put it there with ${via.from.spelled}${via.from.via ?? ''}, and a ${via.from.type} field never leaves the record. Take ${via.spelled} out of the question, or set ${via.name} from fields that may leave.`,
+            `${id} puts ${via.spelled} in its question to Spark at ${here}, and ${via.name} holds ${held}${via.from.name === via.name ? '' : `, by way of ${via.from.name}`}: ${via.from.at} put it there with ${via.from.spelled}, and a ${via.from.type} field never leaves the record. Take ${via.spelled} out of the question, or set ${via.name} from fields that may leave.`,
             `${here}.ask_spark.question`,
           );
         }
@@ -674,17 +692,6 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
               : `${id} puts ${found.field} in its question to Spark at ${here} with ${found.spelled}, and a ${found.type} field never leaves the record. Take it out of the question.`,
             `${here}.ask_spark.question`,
           );
-        /* AND A FIELD A STEP BEFORE IT WROTE FROM ONE, read by the same spellings, since the row the question is filled
-           from is the row as that step left it. */
-        const laundered = wrote.size === 0 ? null : hiddenIn(String((step.ask_spark as { question: unknown }).question), typesOf(wrote));
-        if (laundered) {
-          const w = wrote.get(laundered.field)!;
-          return bad(
-            'DECLARATION_INVALID',
-            `${id} puts ${laundered.field} in its question to Spark at ${here} with ${laundered.spelled}, and ${w.at} wrote ${laundered.field} from ${w.spelled}${w.via ?? ''}, so it holds ${w.source}, and a ${w.type} field never leaves the record. Take ${laundered.spelled} out of the question, or write ${laundered.field} from fields that may leave.`,
-            `${here}.ask_spark.question`,
-          );
-        }
       }
       /* A CALL THAT SENDS A ROW NEEDS ONE, AS A STEP OR AS `run:`. `run:` was refused on a clock by `ROW_VERBS` and the
          same call as a step installed on a clock, a button and any arrival (audit thirty-two, section 4): an hourly
@@ -707,20 +714,15 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
         /* AN `if` WITH NO `else` HAS AN EMPTY ONE, so what held before the branch is one of the two ways out of it. */
         const yes = new Map(carried);
         const no = new Map(carried);
-        const yesWrote = new Map(wrote);
-        const noWrote = new Map(wrote);
-        const inner =
-          walk(step.then, `${here}.then`, depth + 1, yes, yesWrote) ?? (step.else === undefined ? null : walk(step.else, `${here}.else`, depth + 1, no, noWrote));
+        const inner = walk(step.then, `${here}.then`, depth + 1, yes) ?? (step.else === undefined ? null : walk(step.else, `${here}.else`, depth + 1, no));
         if (inner) return inner;
         carried.clear();
         for (const [name, from] of [...no, ...yes]) carried.set(name, from);
-        wrote.clear();
-        for (const [field, w] of [...noWrote, ...yesWrote]) wrote.set(field, w);
       }
     }
     return null;
   };
-  const walked = walk(body.steps ?? body.then, body.steps !== undefined ? 'steps' : 'then', 0, new Map(), new Map());
+  const walked = walk(body.steps ?? body.then, body.steps !== undefined ? 'steps' : 'then', 0, new Map());
   if (walked) return walked;
 
   const ceiling = isObject(body.limits) && typeof body.limits.steps_per_run === 'number' ? body.limits.steps_per_run : STEP_CEILING;
@@ -790,47 +792,29 @@ export function inlineFault(id: string, decl: FlowDecl, installed?: Known): Refu
         `${here}.${verb}`,
       );
     }
-  return fillFault(id, decl, installed) ?? inlineSent(id, decl, installed);
+  return fillFault(id, decl, installed) ?? inlineWrites(id, decl, installed);
 }
 
 /**
- * A `run:` of the inline path that would send a field a `set` of the same rule wrote from a secret, as a refusal.
+ * Each `set` of the inline path held to what a step's is (`writeFault`): its field by id, and no secret copied into a
+ * field that may leave.
  *
  * THE INLINE PASS READS THE LIST ITS OWN WAY, so this is not the walk `flowFault` takes over steps. It fills a `set`'s
  * `to` with `rules.ts`'s `fill` alone, which reads `{{field}}` and `{{kind:field}}` and leaves `{{trigger.row.token}}`
- * as typed, and it fills every `set` from the row as it was before the rule, so one `set` cannot pass a secret to
- * another. The first `set` of a field is the one written (`setFields`), and every `run:` is queued after the patch
- * whatever its place in the list. Measured on 23 September before this check: `then: [{ set: { field: party, to:
- * '{{token}}' } }, { run: paid_hook }]` installed and queued `party: 'hunter2'`, and with the two the other way round
- * queued `party: 'Bearer hunter2'` for `to: 'Bearer {{token}}'`. A `tag` is filled by nothing here, so it carries
- * nothing.
+ * as typed, and it reads no variable, since the pass has none. A `tag` is filled by nothing here, so it copies nothing.
+ * This replaced a check that followed a `set` from a secret to a `run:` of the same `then:`: measured on 23 September
+ * before that check, `then: [{ set: { field: party, to: '{{token}}' } }, { run: paid_hook }]` queued `party:
+ * 'hunter2'`, and a second rule running the same call queued it too, which no check of one body could see. The copy
+ * is the fault in both, and it is refused whichever rule would send it.
  */
-function inlineSent(id: string, decl: FlowDecl, installed?: Known): Refusal | null {
+function inlineWrites(id: string, decl: FlowDecl, installed?: Known): Refusal | null {
   if (installed === undefined || pathOf(decl) !== 'inline' || !Array.isArray(decl.then) || typeof decl.register !== 'string') return null;
+  const fields = fieldsOf(installed, decl.register);
   const hidden = hiddenOf(installed, decl.register);
-  if (hidden.size === 0) return null;
-  const wrote = new Map<string, Wrote>();
-  const first = new Set<string>();
-  const place = new Map<string, number>();
   for (const [i, item] of (decl.then as unknown[]).entries()) {
-    const spec = isObject(item) ? item.set : undefined;
-    if (!isObject(spec) || typeof spec.field !== 'string' || typeof spec.to !== 'string' || first.has(spec.field)) continue;
-    first.add(spec.field);
-    for (const m of spec.to.matchAll(ROW_FILL)) {
-      const source = m[2] ?? m[1]!;
-      const type = hidden.get(source);
-      if (type === undefined) continue;
-      wrote.set(spec.field, { at: `then[${i}]`, field: spec.field, spelled: m[0], source, type });
-      place.set(spec.field, i);
-      break;
-    }
-  }
-  if (wrote.size === 0) return null;
-  for (const [i, item] of (decl.then as unknown[]).entries()) {
-    if (!isObject(item) || !('run' in item)) continue;
-    const name = String(item.run);
-    const w = sentFrom(installed.get(`ingest.${name}`), decl.register, wrote);
-    if (w) return sentRefusal(id, 'run', name, `then[${i}]`, w, place.get(w.field)! > i ? ' The pass sends a call after the rule has written the row, whatever their order in then:.' : '');
+    if (!isObject(item) || !('set' in item)) continue;
+    const fault = writeFault(id, 'set', item, `then[${i}]`, decl.register, fields, hidden, new Map(), false);
+    if (fault) return fault;
   }
   return null;
 }

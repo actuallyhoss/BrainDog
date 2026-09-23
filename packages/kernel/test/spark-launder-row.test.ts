@@ -7,6 +7,12 @@
  * `note`, each installed clean and each sent `hunter2`. It also wrote the secret into a text field every reader of the
  * list sees, which is why the lint refuses it at install rather than only cleaning the question.
  *
+ * AND SINCE AUDIT FIFTY-ONE §3 THE LINT REFUSES THE COPY ITSELF, at the `set` or `tag`, and no longer the question that
+ * reads it: a second rule on a later edit read `note` and sent `hunter2`, and no walk of one body could see that
+ * (`launder-across-rules.test.ts`). So each refusal below names the step that writes the field, and the bodies that
+ * installed because nothing after the write read it are refused now too. The stored cases, which are the runner's
+ * second line, are unchanged.
+ *
  * `hunter2` IS PUT IN BY SQL AFTER THE ROW IS MADE AND BEFORE THE DRAIN, as `spark-vars-hidden.test.ts` puts it, so the
  * pin is in the row before the run takes its first step. In use a secret field holds a vault grant's id and nothing
  * else, and a plaintext is the plainest way to see whether it left.
@@ -76,8 +82,8 @@ const LAUNDERED: { what: string; steps: unknown[]; wrote: RegExp; field?: string
   {
     what: 'set_var p from pin, set note from vars.p, ask {{note}}',
     steps: [{ set_var: { name: 'p', to: '{{trigger.row.pin}}' } }, { set: { field: 'note', to: '{{vars.p}}' } }, { ask_spark: { question: 'Rate for {{note}}?', as: 'rate' } }],
-    /* THE STEP THAT WROTE THE FIELD, and then the `set_var` that took the secret into the variable it was written from. */
-    wrote: /steps\[1\] wrote note from \{\{vars\.p\}\}, which steps\[0\] set from \{\{trigger\.row\.pin\}\}/,
+    /* THE STEP THAT WRITES THE FIELD, and then the `set_var` that took the secret into the variable it is written from. */
+    wrote: /writes note from \{\{vars\.p\}\} at steps\[1\], and p holds pin: steps\[0\] put it there with \{\{trigger\.row\.pin\}\}/,
     sends: { question: 'Rate for —?' },
   },
   {
@@ -89,7 +95,8 @@ const LAUNDERED: { what: string; steps: unknown[]; wrote: RegExp; field?: string
   {
     what: 'set note from pin, set_var n from trigger.row.note, ask vars',
     steps: [{ set: { field: 'note', to: '{{pin}}' } }, { set_var: { name: 'n', to: '{{trigger.row.note}}' } }, { ask_spark: { question: 'Rate for {{vars.n}}?', as: 'rate' } }],
-    wrote: /steps\[1\] put it there with \{\{trigger\.row\.note\}\}, which steps\[0\] wrote from \{\{pin\}\}/,
+    /* REFUSED AT THE WRITE, before the `set_var` that reads it: the copy into `note` is the fault. */
+    wrote: /writes note from \{\{pin\}\} at steps\[0\]/,
     sends: { question: 'Rate for —?' },
   },
   /* NOT IN THE PROBE: a tag is filled by the run, and `tags` then holds it. Measured before the repair through the same
@@ -97,21 +104,21 @@ const LAUNDERED: { what: string; steps: unknown[]; wrote: RegExp; field?: string
   {
     what: 'tag from trigger.row.pin, ask {{tags}}',
     steps: [{ tag: '{{trigger.row.pin}}' }, { ask_spark: { question: 'Rate for {{tags}} {{trigger.row.tags}}?', as: 'rate' } }],
-    wrote: /steps\[0\] wrote tags from \{\{trigger\.row\.pin\}\}/,
+    wrote: /writes tags from \{\{trigger\.row\.pin\}\} at steps\[0\]/,
     field: 'tags',
     sends: { question: 'Rate for — —?' },
   },
 ];
 
-test('A QUESTION TO SPARK READING A FIELD A STEP WROTE FROM A SECRET IS REFUSED AT INSTALL, naming the step that wrote it', async () => {
+test('A STEP THAT WOULD WRITE A SECRET INTO A FIELD A QUESTION TO SPARK READS IS REFUSED AT INSTALL, at the step', async () => {
   const { k, sql } = await sparked();
   const cases = [
     ...LAUNDERED.map((c) => [c.what, c.steps, c.wrote] as const),
-    /* A FIELD WRITTEN FROM ANOTHER THAT A STEP WROTE FROM THE SECRET holds it too, and the refusal walks back to both. */
+    /* A FIELD WRITTEN FROM ANOTHER THAT A STEP WROTE FROM THE SECRET is never reached: the first copy is refused. */
     [
       'set note from pin, set memo from note, ask {{memo}}',
       [{ set: { field: 'note', to: '{{pin}}' } }, { set: { field: 'memo', to: 'again {{note}}' } }, { ask_spark: { question: 'Rate for {{memo}}?', as: 'rate' } }],
-      /steps\[1\] wrote memo from \{\{note\}\}, which steps\[0\] wrote from \{\{pin\}\}/,
+      /writes note from \{\{pin\}\} at steps\[0\]/,
     ] as const,
     /* A BRANCH TAKEN BEFORE THE QUESTION may have written it, and the lint cannot tell which arm the row will take. */
     [
@@ -125,21 +132,25 @@ test('A QUESTION TO SPARK READING A FIELD A STEP WROTE FROM A SECRET IS REFUSED 
     assert.equal(out?.code, 'DECLARATION_INVALID', `${what}: ${out?.fix ?? 'installed'}`);
     assert.match(out!.fix, /pin/, what);
     assert.match(out!.fix, /note|tags/, what);
-    assert.match(out!.fix, wrote, `${what}: the refusal does not name the step that wrote the field: ${out!.fix}`);
+    assert.match(out!.fix, wrote, `${what}: the refusal does not name the step that writes the field: ${out!.fix}`);
   }
-  /* WHAT NO QUESTION TO SPARK CAN CARRY INSTALLS. A plain `set` of the same field after the secret one puts a plain
-     value where it stood; a question to a person stays in the record; the arm beside the one that wrote it is never
-     taken after it; and a question that reads another field reads nothing the step wrote. */
-  for (const steps of [
-    [{ set: { field: 'note', to: '{{pin}}' } }, { set: { field: 'note', to: 'plain' } }, { ask_spark: { question: 'Rate for {{note}}?', as: 'rate' } }],
-    [{ set: { field: 'note', to: '{{pin}}' } }, { ask_person: { question: 'Pay {{note}}?', options: ['yes', 'no'], as: 'a' } }],
-    [{ if: 'what is Rent', then: [{ set: { field: 'note', to: '{{pin}}' } }], else: [{ ask_spark: { question: 'Rate for {{note}}?', as: 'rate' } }] }],
-    [{ set: { field: 'note', to: '{{pin}}' } }, { ask_spark: { question: 'Rate for {{what}}?', about: ['what'], as: 'rate' } }],
-    [{ set: { field: 'note', to: '{{what}} {{trigger.row.memo}}' } }, { ask_spark: { question: 'Rate for {{note}}?', as: 'rate' } }],
-  ]) {
-    const out = refusal((await k.install([rule(steps)])) as Result<unknown>);
-    assert.equal(out, null, out?.fix);
+  /* THESE INSTALLED WHILE THE LINT FOLLOWED THE FIELD TO A QUESTION, and are refused now. A plain `set` after the secret
+     one, a question to a person, the arm beside the write, and a question about another field each left no question
+     in this rule reading what the step wrote; but the write put `pin` in `note`, which every reader of the list sees
+     and any other rule may ask Spark about, so the copy is refused whatever follows it. */
+  for (const [steps, at] of [
+    [[{ set: { field: 'note', to: '{{pin}}' } }, { set: { field: 'note', to: 'plain' } }, { ask_spark: { question: 'Rate for {{note}}?', as: 'rate' } }], 'steps[0]'],
+    [[{ set: { field: 'note', to: '{{pin}}' } }, { ask_person: { question: 'Pay {{note}}?', options: ['yes', 'no'], as: 'a' } }], 'steps[0]'],
+    [[{ if: 'what is Rent', then: [{ set: { field: 'note', to: '{{pin}}' } }], else: [{ ask_spark: { question: 'Rate for {{note}}?', as: 'rate' } }] }], 'steps[0].then[0]'],
+    [[{ set: { field: 'note', to: '{{pin}}' } }, { ask_spark: { question: 'Rate for {{what}}?', about: ['what'], as: 'rate' } }], 'steps[0]'],
+  ] as const) {
+    const out = refusal((await k.install([rule([...steps])])) as Result<unknown>);
+    assert.equal(out?.code, 'DECLARATION_INVALID', out?.fix ?? 'installed');
+    assert.ok(out!.fix.includes(`writes note from {{pin}} at ${at}, and a secret field is copied only into another secret or file field`), out!.fix);
   }
+  /* WHAT COPIES NO SECRET STILL INSTALLS. */
+  const plain = refusal((await k.install([rule([{ set: { field: 'note', to: '{{what}} {{trigger.row.memo}}' } }, { ask_spark: { question: 'Rate for {{note}}?', as: 'rate' } }])])) as Result<unknown>);
+  assert.equal(plain, null, plain?.fix);
   sql.close();
 });
 

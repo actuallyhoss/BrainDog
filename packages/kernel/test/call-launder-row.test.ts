@@ -7,8 +7,14 @@
  * '{{token}}' }` beside `run: paid_hook`, a call whose `sends:` names `party`, installed clean on both paths and queued
  * `party: 'hunter2'` for the host to post: inline, where the pass holds every `run` until the patch is written, so the
  * order of the two did not matter; and as a run, through `set_var`, through another field, through `tags` and inside a
- * branch. A rule that only writes the field and another that only runs the call install clean even now, since neither
- * body says both, and that pair queued the secret too.
+ * branch. A rule that only writes the field and another that only runs the call installed clean, since neither body
+ * says both, and that pair queued the secret too.
+ *
+ * SINCE AUDIT FIFTY-ONE §3 THE LINT REFUSES THE COPY ITSELF, at the `set` or `tag` that writes the secret into a field
+ * that may leave, and no longer the call that sends it (`launder-across-rules.test.ts`). So each refusal below names
+ * the step that writes, the bodies that installed because their call did not send the field are refused too, and the
+ * pair can no longer be installed: its tests store the writing rule past the lint, as an earlier build let it in, so
+ * that `queueCall`'s second line is still what they measure.
  *
  * `hunter2` IS PUT IN BY SQL AFTER THE ROW IS MADE, as the Spark tests put their pin, because in use a secret field
  * holds a vault grant's id and a plaintext is the plainest way to see whether it left.
@@ -102,66 +108,83 @@ const LAUNDERED: { what: string; decl: Declaration; wrote: RegExp; field?: strin
   {
     what: 'inline: set party from the row fill, then run',
     decl: inline([{ set: { field: 'party', to: '{{token}}' } }, { run: 'paid_hook' }]),
-    wrote: /then\[0\] wrote party from \{\{token\}\}/,
+    wrote: /writes party from \{\{token\}\} at then\[0\]/,
   },
   /* THE PASS HOLDS EVERY `run` UNTIL THE PATCH IS WRITTEN (`rules.ts`), so a `run` ahead of the `set` sends what the
      `set` wrote. */
   {
     what: 'inline: run, then set party from the row fill',
     decl: inline([{ run: 'paid_hook' }, { set: { field: 'party', to: 'Bearer {{token}}' } }]),
-    wrote: /then\[1\] wrote party from \{\{token\}\}/,
+    wrote: /writes party from \{\{token\}\} at then\[1\]/,
   },
   {
     what: 'run: set party from trigger.row.token, then run',
     decl: run([{ set: { field: 'party', to: '{{trigger.row.token}}' } }, { run: 'paid_hook' }]),
-    wrote: /steps\[0\] wrote party from \{\{trigger\.row\.token\}\}/,
+    wrote: /writes party from \{\{trigger\.row\.token\}\} at steps\[0\]/,
   },
   {
     what: 'run: set_var p from token, set party from vars.p, then run',
     decl: run([{ set_var: { name: 'p', to: '{{trigger.row.token}}' } }, { set: { field: 'party', to: '{{vars.p}}' } }, { run: 'paid_hook' }]),
-    wrote: /steps\[1\] wrote party from \{\{vars\.p\}\}, which steps\[0\] set from \{\{trigger\.row\.token\}\}/,
+    wrote: /writes party from \{\{vars\.p\}\} at steps\[1\], and p holds token: steps\[0\] put it there with \{\{trigger\.row\.token\}\}/,
   },
   {
     what: 'run: set memo from token, set party from memo, then run',
     decl: run([{ set: { field: 'memo', to: '{{token}}' } }, { set: { field: 'party', to: 'again {{memo}}' } }, { run: 'paid_hook' }]),
-    wrote: /steps\[1\] wrote party from \{\{memo\}\}, which steps\[0\] wrote from \{\{token\}\}/,
+    /* REFUSED AT THE FIRST COPY, into `memo`, which the call does not send but every reader of the list sees. */
+    wrote: /writes memo from \{\{token\}\} at steps\[0\]/,
   },
   {
     what: 'run: tag from trigger.row.token, then run a call that sends tags',
     decl: run([{ tag: '{{trigger.row.token}}' }, { run: 'tags_hook' }]),
-    wrote: /steps\[0\] wrote tags from \{\{trigger\.row\.token\}\}/,
+    wrote: /writes tags from \{\{trigger\.row\.token\}\} at steps\[0\]/,
     field: 'tags',
     hook: 'tags_hook',
   },
   {
     what: 'run: set inside a branch, then run after it',
     decl: run([{ if: 'what is Invoice 41', then: [{ set: { field: 'party', to: '{{token}}' } }] }, { run: 'paid_hook' }]),
-    wrote: /steps\[0\]\.then\[0\] wrote party/,
+    wrote: /writes party from \{\{token\}\} at steps\[0\]\.then\[0\]/,
   },
 ];
 
-test('A CALL THAT SENDS A FIELD A STEP WROTE FROM A SECRET IS REFUSED AT INSTALL, naming the step that wrote it', async () => {
+test('A STEP THAT WOULD WRITE A SECRET INTO A FIELD A CALL SENDS IS REFUSED AT INSTALL, at the step', async () => {
   const { k, sql } = await record();
   const cases = [
     ...LAUNDERED.map((c) => [c.what, c.decl, c.wrote] as const),
-    /* A `call` STEP IS HELD TO WHAT `run:` IS. The runner fails the step today (`NOT_IN_THIS_BUILD`), and a rule
-       installed now is a rule that sends once the call step runs. */
-    ['run: set party from token, then a call step', run([{ set: { field: 'party', to: '{{token}}' } }, { call: { ingest: 'paid_hook' } }]), /steps\[0\] wrote party/] as const,
+    /* A `call` STEP AFTER THE WRITE, as `run:` after it: the write is refused either way. */
+    ['run: set party from token, then a call step', run([{ set: { field: 'party', to: '{{token}}' } }, { call: { ingest: 'paid_hook' } }]), /writes party from \{\{token\}\} at steps\[0\]/] as const,
   ];
   for (const [what, decl, wrote] of cases) {
     const out = refusal((await k.install([decl])) as Result<unknown>);
     assert.equal(out?.code, 'DECLARATION_INVALID', `${what}: ${out?.fix ?? 'installed'}`);
     assert.match(out!.fix, /token/, what);
-    assert.match(out!.fix, /party|tags/, what);
-    assert.match(out!.fix, wrote, `${what}: the refusal does not name the step that wrote the field: ${out!.fix}`);
+    assert.match(out!.fix, /party|tags|memo/, what);
+    assert.match(out!.fix, /a secret field is copied only into another secret or file field/, what);
+    assert.match(out!.fix, wrote, `${what}: the refusal does not name the step that writes the field: ${out!.fix}`);
+  }
+  /* THESE INSTALLED WHILE THE LINT FOLLOWED THE FIELD TO A CALL, and are refused now. The call did not send `memo`, a
+     plain `set` put `plain` over `party` before the call, or the call sat in the arm beside the write; but each wrote
+     the secret into a field every reader of the list sees and another rule's call may send, so the copy is refused
+     whatever follows it. */
+  for (const [what, decl, said] of [
+    ['inline: set memo from token, which the call does not send', inline([{ set: { field: 'memo', to: '{{token}}' } }, { run: 'paid_hook' }]), 'writes memo from {{token}} at then[0]'],
+    ['run: a plain set of party after the secret one', run([{ set: { field: 'party', to: '{{token}}' } }, { set: { field: 'party', to: 'plain' } }, { run: 'paid_hook' }]), 'writes party from {{token}} at steps[0]'],
+    [
+      'run: the call in the arm beside the one that wrote party',
+      run([{ if: 'what is Invoice 41', then: [{ set: { field: 'party', to: '{{token}}' } }], else: [{ run: 'paid_hook' }] }]),
+      'writes party from {{token}} at steps[0].then[0]',
+    ],
+  ] as const) {
+    const out = refusal((await k.install([decl])) as Result<unknown>);
+    assert.equal(out?.code, 'DECLARATION_INVALID', `${what}: ${out?.fix ?? 'installed'}`);
+    assert.ok(out!.fix.includes(said), `${what}: ${out!.fix}`);
   }
   sql.close();
 });
 
-test('WHAT NO CALL CAN CARRY INSTALLS: a field the call does not send, a word nothing fills, a plain set after, the other arm', async () => {
+test('WHAT COPIES NO SECRET INSTALLS: a word nothing fills, and fields that may leave', async () => {
   const { k, sql } = await record();
   for (const [what, decl] of [
-    ['inline: set memo from token, which the call does not send', inline([{ set: { field: 'memo', to: '{{token}}' } }, { run: 'paid_hook' }])],
     /* ON THE INLINE PATH NOTHING FILLS `{{trigger.…}}` (`rules.ts`'s `fill` reads `{{field}}` alone), and nothing fills a
        tag at all, so both write the braces as typed. */
     ['inline: set party from trigger.row.token, which the pass leaves as typed', inline([{ set: { field: 'party', to: '{{trigger.row.token}}' } }, { run: 'paid_hook' }])],
@@ -169,8 +192,6 @@ test('WHAT NO CALL CAN CARRY INSTALLS: a field the call does not send, a word no
     /* THE `rowFill = false` BRANCH OF `hiddenIn`, ON THE RUN PATH. The run fills a tag from `{{vars.…}}` and
        `{{trigger.…}}` only, and the pass does not fill it, so `{{token}}` is tagged as typed. */
     ['run: tag {{token}}, which the run leaves as typed', run([{ tag: '{{token}}' }, { run: 'tags_hook' }])],
-    ['run: a plain set of party after the secret one', run([{ set: { field: 'party', to: '{{token}}' } }, { set: { field: 'party', to: 'plain' } }, { run: 'paid_hook' }])],
-    ['run: the call in the arm beside the one that wrote party', run([{ if: 'what is Invoice 41', then: [{ set: { field: 'party', to: '{{token}}' } }], else: [{ run: 'paid_hook' }] }])],
     ['run: party written from fields that may leave', run([{ set: { field: 'party', to: '{{what}} {{trigger.row.memo}}' } }, { run: 'paid_hook' }])],
   ] as const) {
     const out = refusal((await k.install([decl])) as Result<unknown>);
@@ -230,9 +251,23 @@ test('A RULE STORED PAST THE LINT SENDS NO VALUE A STEP WROTE FROM A SECRET, and
   }
 });
 
-test('TWO RULES THAT EACH INSTALL CLEAN, one writing party from the secret and one running the call, send no secret', async () => {
-  /* NEITHER BODY SAYS BOTH, so no lint of one body can refuse the pair; the second line is the only line. */
-  const { k, sql } = await record(inline([{ set: { field: 'party', to: '{{token}}' } }], 'copy'), inline([{ run: 'paid_hook' }], 'post'));
+/**
+ * The pair: `rule.post` runs the call, and `rule.copy` writes `party` from `{{token}}`, stored past the lint, which now
+ * refuses it at the `set` (`launder-across-rules.test.ts`). A record an earlier build let the pair into still holds it,
+ * and `queueCall`'s second line is the only line for that record.
+ */
+async function pair(): Promise<{ k: Kernel; sql: NodeSql }> {
+  const { k: first, sql, clock } = await record(inline([{ tag: 'placeholder' }], 'copy'), inline([{ run: 'paid_hook' }], 'post'));
+  const copy = inline([{ set: { field: 'party', to: '{{token}}' } }], 'copy');
+  assert.match(refusal((await first.install([copy])) as Result<unknown>)?.fix ?? 'installed', /rule\.copy writes party from \{\{token\}\} at then\[0\]/);
+  sql.exec("UPDATE declaration SET body = ? WHERE id = 'rule.copy' AND superseded_at IS NULL", JSON.stringify(copy.body));
+  return { k: await opened(sql, clock), sql };
+}
+
+test('TWO RULES STORED PAST THE LINT, one writing party from the secret and one running the call, send no secret', async () => {
+  /* NEITHER BODY SAYS BOTH, so no lint of the call's body can refuse the pair; the write is refused now, and this is the
+     second line for a record that holds it from before. */
+  const { k, sql } = await pair();
   const made = value<Entry>(k.create('invoices', { what: 'Invoice 41', party: 'Fenwick', state: 'open' }, { actor: 'p_1' }));
   sql.exec("UPDATE entry SET fields = json_set(fields, '$.token', 'hunter2') WHERE id = ?", made.id);
   value(k.update('invoices', made.id, { state: 'paid' }, { actor: 'p_1' }) as Result<unknown>);
@@ -248,7 +283,7 @@ test('AND A RETIRED SECRET, WHICH THE ROWS WRITTEN BEFORE IT STILL HOLD, is left
   /* THE LIVE SCHEMA DROPS A RETIRED FIELD AND THE ROW KEEPS ITS VALUE, and `fill` reads the row. Measured by the checker
      on 23 September: with `token` retired, the lint refused the single body (`hiddenOf` reads retired fields) and the
      pair below queued `party: 'hunter2'`, because `queueCall` asked the live schema which fields were secret. */
-  const { k, sql } = await record(inline([{ set: { field: 'party', to: '{{token}}' } }], 'copy'), inline([{ run: 'paid_hook' }], 'post'));
+  const { k, sql } = await pair();
   const made = value<Entry>(k.create('invoices', { what: 'Invoice 41', party: 'Fenwick', state: 'open' }, { actor: 'p_1' }));
   sql.exec("UPDATE entry SET fields = json_set(fields, '$.token', 'hunter2') WHERE id = ?", made.id);
   const fields = (INVOICES.body as { fields: { id: string }[] }).fields.map((f) => (f.id === 'token' ? { ...f, retired: true } : f));
