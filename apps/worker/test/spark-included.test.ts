@@ -46,7 +46,8 @@ const fakeAi = (answers: string[]) => {
   };
 };
 
-/** The production environment's Spark vars as `wrangler.jsonc` declares them, over a fake binding. */
+/** The production environment's Spark vars as `wrangler.jsonc` declared them until 24 September, when he switched the
+    included model on (`SPARK_INCLUDED: yes` in both environments), over a fake binding. */
 const shipped = (ai: ReturnType<typeof fakeAi>) => ({ SPARK_ENDPOINT: '', AI: ai.AI, AI_GATEWAY: 'braindog' });
 /** And the same with the included model switched on. */
 const switchedOn = (ai: ReturnType<typeof fakeAi>) => ({ ...shipped(ai), SPARK_INCLUDED: 'yes' });

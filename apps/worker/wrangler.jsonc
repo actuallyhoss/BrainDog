@@ -348,6 +348,10 @@
         "AI_GATEWAY": "braindog-alpha",
         "AGE_RECIPIENT": "age1f6rykmshc4zf5y3lf0ecuyzyqr8a4ek29wlmp688gydyxckwjq3s75n58r",
         "SPARK_ENDPOINT": "",
+        /* THE INCLUDED MODEL IS ON, AT HIS WORD ("turn on spark yeah", 24 September). `apps/worker/src/spark.ts` answers
+           with Workers AI only when this is `yes`; the binding alone never switched it on. An ask may spend about 2,500
+           neurons (about $0.03) before it is stopped, within the package's monthly cap. */
+        "SPARK_INCLUDED": "yes",
         "BRAINDOG_BUILD": "",
         /* THE RECORD AN ANONYMOUS GET READS, for the public demo, and empty is none. `demoRecord` in
            `src/route.ts` is the whole of what it opens. It is set to the demo record's `rec_...` id
@@ -522,6 +526,10 @@
         "AI_GATEWAY": "braindog",
         "AGE_RECIPIENT": "age1av0654ll7t2ghrzr7ekervs5hjc9sm0he0569z45cvu92dd43aqql9gm3t",
         "SPARK_ENDPOINT": "",
+        /* THE INCLUDED MODEL IS ON, AT HIS WORD ("turn on spark yeah", 24 September). `apps/worker/src/spark.ts` answers
+           with Workers AI only when this is `yes`; the binding alone never switched it on. An ask may spend about 2,500
+           neurons (about $0.03) before it is stopped, within the package's monthly cap. */
+        "SPARK_INCLUDED": "yes",
         "BRAINDOG_BUILD": "",
         "DEMO_RECORD": "",
         /* EMPTY IS NO SIGN-IN LINKS. The sender, on a domain Email Service sends for, switches them on
