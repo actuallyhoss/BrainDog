@@ -2186,6 +2186,7 @@ export const copy = {
   signedInTitle: 'You are signed in',
   /* Every screen reads the record once somebody is signed in; the sample is only for a browser with none. */
   signedInReads: 'Every screen now reads this record.',
+  linkWaitsSignedIn: 'A link arrived. Sign out to use it as someone else.',
   addPasskeyHere: 'Add a passkey on this device',
   /* SAID BY THE WAY HE CAME IN. "Without the key" is the self-host's server key, and it was said after a claim link
      too, to an owner on the Cloud who had never seen a key (`loop/research-first-sign-in.md` friction 9). `null` is a
@@ -2469,6 +2470,18 @@ export const copy = {
   arrangeKept: 'Kept',
   arrangeKeeps: (name: string) => `Keeps ${name} as you changed it. This update's version of it is not taken.`,
   arrangeKeepsPage: (name: string) => `Keeps your ${name} page as you arranged it. This update's version of it is not taken.`,
+  /* A CHOICE AN UPDATE TAKES OFF A LIST WHOSE ROWS MAY HOLD IT, which stays: said beside what it keeps, because the list the
+     owner sees after accepting still offers it. `rows` is the list's, since nothing counts the rows holding one value. */
+  arrangeStays: (name: string, field: string, values: readonly string[], rows: number) =>
+    `${name} keeps ${values.length === 1 ? `the choice ${values[0]}` : `${values.length} choices, ${list([...values])},`} for ${field}, which this update takes off, because it holds ${rows} ${rows === 1 ? 'row' : 'rows'} that may use ${values.length === 1 ? 'it' : 'them'}.`,
+  /* WHAT A PACK LAYS ON A LIST ANOTHER PACK OWNS: Personal's roles on People. Named apart from what it adds, because the
+     list is not new, and counted, because the owner is asked to take every one of them. */
+  arrangeExtended: 'Adds to a list',
+  arrangeExtendsFields: (pack: string, name: string, fields: readonly string[]) =>
+    `${pack} adds ${fields.length} ${fields.length === 1 ? 'field' : 'fields'} to ${name}: ${list([...fields])}`,
+  /* THE CHOICES SECOND, so `access.test.ts` can render it with the argument shapes it tries; last, no shape reached it. */
+  arrangeExtendsValues: (pack: string, values: readonly string[], field: string, name: string) =>
+    `${pack} adds ${values.length} ${values.length === 1 ? 'choice' : 'choices'} to ${field} in ${name}: ${list([...values])}`,
   /* WHAT AN UPDATE HANDS TO ANOTHER PACK, which stays live: said apart from what it takes away, because a door the owner's
      Shortcut posts to goes on answering (`loop/research-batch-thirty-four-audit.md` §8). */
   arrangeMoving: 'Moves',

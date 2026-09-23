@@ -421,6 +421,15 @@ export function arranger(d: ArrangeDeps) {
             }),
         /* WHAT IT LEAVES AS THE OWNER CHANGED IT, so Decide says the update's version of it is not taken. */
         ...(kept.size === 0 ? {} : { keeps: [...kept] }),
+        /* WHAT IT LAYS ON A LIST ANOTHER PACK OWNS, by list, as `field` or `field.value`. Without it Personal's step named
+           only its own lists and pages, and the five roles it lays on People reached Decide as nothing: measured on the
+           seed catalogue, the step was `["pack","version","adds","examples"]`. A list that has everything already lays
+           nothing, which is every later update of the same pack, so it says nothing either. */
+        ...((laid) => (laid.length === 0 ? {} : { extends: laid }))(diff.extends.flatMap((e) => (e.adds.length === 0 || e.refusal !== undefined ? [] : [{ id: e.id, adds: e.adds }]))),
+        /* AND THE VALUES AN UPDATE TAKES OFF A LIST HOLDING ROWS, WHICH STAY ON IT. The People update that sheds `registrar`
+           from a record holding a registrar row was filed as `changes: ["register.people"]` and nothing else, the same
+           step as an update that did take the choice away. `body` is the install's, not Decide's. */
+        ...(diff.stays.length === 0 ? {} : { stays: diff.stays.map(({ id, values, rows }) => ({ id, values, rows })) }),
         ...(diff.seeds.count === 0 ? {} : { examples: diff.seeds.count }),
       });
       out.approve.push(...diff.approve.filter((line) => !out.approve.includes(line)));

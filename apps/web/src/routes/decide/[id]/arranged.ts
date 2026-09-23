@@ -130,18 +130,34 @@ function declared(doc: unknown): Map<string, { id: string; kind: string; body: R
 const newKind = (kind: string): string => copy.arrangeNew(copy.proposalKind(kind));
 
 /**
+ * What a step lays on or keeps on one list, `domain` or `role.family` as the record files them, sorted into the fields and
+ * each field's choices, every one said as the screen says it: the label the record gives it now, else its own word.
+ */
+function byField(list: string, ids: readonly string[], ctx: Context): { fields: string[]; values: Map<string, string[]> } {
+  const out = { fields: [] as string[], values: new Map<string, string[]>() };
+  for (const id of ids) {
+    const [field = '', value] = id.split('.');
+    const called = ctx.labels?.[`${list}.${field}`] ?? copy.valueWord(field);
+    if (value === undefined) out.fields.push(called);
+    else out.values.set(called, [...(out.values.get(called) ?? []), ctx.labels?.[`${list}.${field}.${value}`] ?? copy.valueWord(value)]);
+  }
+  return out;
+}
+
+/**
  * What each planned pack adds and changes, as what will appear.
  *
  * A PAGE OR A LIST WITH SOMETHING TO SAY IS DRAWN ON ITS OWN, where the body carries the pack's document and so where it
  * lands in the sidebar and what it shows. EVERYTHING ELSE IS NAMED, one line per kind: Money alone adds twenty measures,
  * and twenty bold titles would bury the page a person will actually open.
  */
-function planned(plan: unknown, doc: unknown, ctx: Context): { appears: Appears[]; examples: number; pages: number; lists: number; more: number } {
+function planned(plan: unknown, doc: unknown, ctx: Context, name: (id: string) => string): { appears: Appears[]; examples: number; pages: number; lists: number; more: number } {
   const known = declared(doc);
   const drawn: Appears[] = [];
   const named = new Map<string, string[]>();
   const changed = new Map<string, string[]>();
   const retired = new Map<string, string[]>();
+  const extended: Appears[] = [];
   const moving: Appears[] = [];
   const kept: Appears[] = [];
   const out = { examples: 0, pages: 0, lists: 0, more: 0 };
@@ -167,6 +183,26 @@ function planned(plan: unknown, doc: unknown, ctx: Context): { appears: Appears[
       const kind = id.split('.')[0] ?? '';
       const title = kind === 'register' ? listName(id, ctx) : (ctx.names?.[id] ?? words(id));
       kept.push({ kind: copy.arrangeKept, title: kind === 'page' ? copy.arrangeKeepsPage(title) : copy.arrangeKeeps(title), lines: [] });
+    }
+    /* WHAT A PACK LAYS ON A LIST ANOTHER PACK OWNS, one sentence for its fields and one for each field it adds choices to.
+       Personal's step named its own lists and pages, and the five roles it lays on People were nowhere on the screen. */
+    for (const laid of Array.isArray(step.extends) ? step.extends.filter(isRow) : []) {
+      const bare = text(laid.id).replace(/^register\./u, '');
+      const { fields, values } = byField(bare, strings(laid.adds), ctx);
+      if (fields.length === 0 && values.size === 0) continue;
+      const list = listName(bare, ctx);
+      const pack = name(text(step.pack));
+      if (fields.length) extended.push({ kind: copy.arrangeExtended, title: copy.arrangeExtendsFields(pack, list, fields), lines: [] });
+      for (const [field, choices] of values) extended.push({ kind: copy.arrangeExtended, title: copy.arrangeExtendsValues(pack, choices, field, list), lines: [] });
+      out.more++;
+    }
+    /* AND A CHOICE AN UPDATE TAKES OFF A LIST WHOSE ROWS MAY HOLD IT, which stays. Without it the People update that sheds
+       `registrar` read "Changes: People", the line an update that did take the choice away would get. */
+    for (const stay of Array.isArray(step.stays) ? step.stays.filter(isRow) : []) {
+      const bare = text(stay.id).replace(/^register\./u, '');
+      const rows = typeof stay.rows === 'number' ? stay.rows : 0;
+      for (const [field, choices] of byField(bare, strings(stay.values), ctx).values)
+        kept.push({ kind: copy.arrangeKept, title: copy.arrangeStays(listName(bare, ctx), field, choices, rows), lines: [] });
     }
     for (const [ids, fresh] of [
       [strings(step.adds), true],
@@ -201,6 +237,7 @@ function planned(plan: unknown, doc: unknown, ctx: Context): { appears: Appears[
   const lines = (group: Map<string, string[]>) => [...group].sort(([a], [b]) => first(a) - first(b)).map(([label, names]) => ({ label, value: names.join(', ') }));
   if (named.size) appears.push({ kind: appears.length ? copy.arrangeAlso : copy.arrangeAdds, title: '', lines: lines(named) });
   if (changed.size) appears.push({ kind: copy.arrangeChanges, title: '', lines: lines(changed) });
+  appears.push(...extended);
   if (retired.size) appears.push({ kind: copy.arrangeRetires, title: '', lines: lines(retired) });
   appears.push(...moving, ...kept);
   return { appears, ...out };
@@ -306,7 +343,7 @@ export function arrangedOf(kind: string, body: Row, screen: Context = {}): Arran
   if (registers.length && kind === 'pack') packLines.push(text(body.disable) ? copy.arrangeListsLeave(registers) : copy.arrangeListsReturn(registers));
   if (packLines.length) parts.push({ part: 'packs', lines: packLines });
 
-  const plan = planned(body.plan, body.doc, ctx);
+  const plan = planned(body.plan, body.doc, ctx, name);
   const pages = (Array.isArray(body.pages) ? body.pages.filter(isRow) : []).map((p) => pageOf(p, ctx)).filter((a): a is Appears => a !== null);
   const appears = [...pages, ...plan.appears].map((a, i) => (i > 0 && a.kind === copy.arrangeAdds ? { ...a, kind: copy.arrangeAlso } : a));
   if (appears.length || plan.examples) parts.push({ part: 'appears', appears, examples: plan.examples });
