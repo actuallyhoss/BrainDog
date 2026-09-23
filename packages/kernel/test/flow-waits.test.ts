@@ -407,8 +407,7 @@ test('A RULE STORED WITH A SECRET IN ITS QUESTION SENDS THE QUESTION WITHOUT IT'
   sql.exec("UPDATE declaration SET body = ? WHERE id = 'rule.rate' AND superseded_at IS NULL", JSON.stringify(body));
   const k = await openRecord(sql, clock, { answersSpark: true });
   /* ONLY THE VAULT WRITES A SECRET FIELD, so `pin` is put in the row as the vault would leave a value there, before the
-     drain takes the run. `note` holds the words `{{pin}}`, which the run's fill writes into the question before the
-     row's fill reads it. */
+     drain takes the run. `note` holds the words `{{pin}}`, which a question filled twice would read a second time. */
   const made = value<Entry>(k.create('obligations', { what: 'Rent', note: '{{pin}}' }, { actor: 'p_1' }));
   sql.exec("UPDATE entry SET fields = json_set(fields, '$.pin', 'hunter2') WHERE id = ?", made.id);
   /* AND A VALUE UNDER A FIELD THE LIST NO LONGER DECLARES, which has no live type to say whether it may leave, so it
@@ -422,9 +421,15 @@ test('A RULE STORED WITH A SECRET IN ITS QUESTION SENDS THE QUESTION WITHOUT IT'
   assert.ok(job, 'no infer.ask row was queued');
   const question = (JSON.parse(job.payload) as { question: string }).question;
   /* WITH THE SECOND LINE OFF THIS WAS `Rate for Rent, hunter2, hunter2, hunter2, {"what":"Rent","note":"hunter2",
-     "pin":"hunter2"}, hunter2?`. Each hole is the dash a path to nothing is written as. */
+     "pin":"hunter2"}, hunter2?`. Each hole is the dash a path to nothing is written as.
+
+     AND `note` IS ASKED AS THE WORDS IT HOLDS, `{{pin}}`, both in the row's JSON and by `{{trigger.row.note}}`. This read
+     `"note":"—"` and `—` while the question was filled twice, the run's fill and then the row's over what it had made:
+     the second read the braces the first wrote in and filled them from the cleaned row, which has no `pin`. That was
+     no leak here, and it is the fill that leaked through a question to a person, where the row is not cleaned the same
+     way (`flow-secret-verbs.test.ts`, SEC-3). The question is filled once now, for both. */
   assert.doesNotMatch(question, /hunter2/, question);
-  assert.equal(question, 'Rate for Rent, —, —, —, {"what":"Rent","note":"—"}, —, —?');
+  assert.equal(question, 'Rate for Rent, —, —, —, {"what":"Rent","note":"{{pin}}"}, {{pin}}, —?');
   sql.close();
 });
 

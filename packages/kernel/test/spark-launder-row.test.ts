@@ -213,7 +213,8 @@ test('A PLAIN SET OF THE SAME FIELD PUTS THE FIELD BACK IN THE QUESTION, and a q
 
 test('A RUN PARKED BY A BUILD BEFORE -unsent HOLDS THE FIELD BACK WHEN IT WAKES, replayed from the steps it had taken', async () => {
   /* THAT BUILD WROTE `-sendable` AND NOTHING ABOUT THE ROW, so the column is taken as this build leaves it and the key is
-     removed by SQL, as `spark-vars-hidden.test.ts` removes `-sendable` for the build before that one. */
+     removed by SQL, as `spark-vars-hidden.test.ts` removes `-sendable` for the build before that one. It wrote no
+     `-sealed` either, which came after it, so that key goes too. */
   const steps = [
     { set: { field: 'note', to: '{{pin}}' } },
     { ask_person: { question: 'Pay?', options: ['yes', 'no'], as: 'a' } },
@@ -225,7 +226,7 @@ test('A RUN PARKED BY A BUILD BEFORE -unsent HOLDS THE FIELD BACK WHEN IT WAKES,
   const made = value<Entry>(k.create('obligations', { what: 'Rent', note: 'plain' }, { actor: 'p_1' }));
   sql.exec("UPDATE entry SET fields = json_set(fields, '$.pin', 'hunter2') WHERE id = ?", made.id);
   await k.drain();
-  sql.exec(`UPDATE automation_run SET vars = json_remove(vars, '$."-unsent"') WHERE rule = 'rate'`);
+  sql.exec(`UPDATE automation_run SET vars = json_remove(vars, '$."-unsent"', '$."-sealed"') WHERE rule = 'rate'`);
   const stored = JSON.parse(sql.one<{ vars: string }>("SELECT vars FROM automation_run WHERE rule = 'rate'")!.vars) as Record<string, unknown>;
   assert.deepEqual(stored, { '-sendable': {} });
   const asked = sql.one<{ id: string; body: string }>("SELECT id, body FROM suggestion WHERE status = 'open' AND opened_by = 'rule:rate'")!;
@@ -256,7 +257,7 @@ test('A RUN PARKED BY A BUILD BEFORE -unsent HOLDS THE FIELD BACK WHEN THE SECRE
   const made = value<Entry>(k.create('obligations', { what: 'Rent', note: 'plain' }, { actor: 'p_1' }));
   sql.exec("UPDATE entry SET fields = json_set(fields, '$.pin', 'hunter2') WHERE id = ?", made.id);
   await k.drain();
-  sql.exec(`UPDATE automation_run SET vars = json_remove(vars, '$."-unsent"') WHERE rule = 'rate'`);
+  sql.exec(`UPDATE automation_run SET vars = json_remove(vars, '$."-unsent"', '$."-sealed"') WHERE rule = 'rate'`);
   sql.exec("UPDATE entry SET fields = json_remove(fields, '$.pin') WHERE id = ?", made.id);
   const asked = sql.one<{ id: string; body: string }>("SELECT id, body FROM suggestion WHERE status = 'open' AND opened_by = 'rule:rate'")!;
   const yes = (JSON.parse(asked.body) as { options: { id: string; label: string }[] }).options.find((o) => o.label === 'yes')!.id;

@@ -38,13 +38,26 @@ import { compile, evaluate, type Predicate, type Schema } from '@braindog/where'
 
 import { meter, type Metered } from './actions.ts';
 import { nextOccurrence } from './digest.ts';
-import { RUN_PATH, RUNS_PER_DAY_CEILING, pathOf, sealedAs, triggerOf } from './flow-lint.ts';
+import { RUN_PATH, RUNS_PER_DAY_CEILING, passFilled, pathOf, sealedAs, triggerOf } from './flow-lint.ts';
 import type { Entry } from './index.ts';
 import { instant } from './migrate.ts';
 import { predicateOf, type EvalContext } from './metrics.ts';
 import { enqueue } from './outbox.ts';
 import { intervalMs } from './pull.ts';
-import { fill as fillRow, marker, onceKey, runRules, type FlowDecl, type RuleAction, type RuleDecl, type RulesDeps, type Trigger } from './rules.ts';
+import {
+  filling,
+  marker,
+  onceKey,
+  present,
+  runRules,
+  sealedOf,
+  type FlowDecl,
+  type RuleAction,
+  type RuleDecl,
+  type RulesDeps,
+  type RunFill,
+  type Trigger,
+} from './rules.ts';
 
 /** Three, as §4.1 says: a run started by a rule's write carries its depth plus one, and the fourth is not started. */
 export const CHAIN_CEILING = 3;
@@ -165,17 +178,32 @@ const KEPT = '-sendable';
 const UNSENT = '-unsent';
 
 /**
- * A run's stored `vars`, split into the variables, what a question to Spark reads in their place, and the fields it
- * reads as absent. `kept` is `null` when the column has no `-sendable`, which is a run a build before the key parked,
- * or one no step has saved yet, and `unsent` is `null` when it has no `-unsent`, for the same two reasons.
+ * The variables a `set_var` filled from a secret or file field, or from another such variable, which a step that
+ * writes may not copy anywhere but into another such field (`sealedPaths`).
+ *
+ * NOT `-sendable`, WHICH IS WIDER ON PURPOSE. What a question to Spark reads in a variable's place is filled from
+ * `sendable`'s row, which also drops every field the live list does not declare, so a variable set from
+ * `{{trigger.row}}` is kept there whenever the row holds one. Refusing a write on that would refuse a note on a list
+ * with no secret field. This key holds only what came from a field declared secret or file. Kept beside the other two
+ * in the run's column for their reason: a run parks between the `set_var` and the step that writes it.
  */
-function unpack(stored: string): { vars: Vars; kept: Kept | null; unsent: string[] | null } {
-  const all = JSON.parse(stored) as Vars & { [KEPT]?: Kept; [UNSENT]?: string[] };
+const SEALED = '-sealed';
+
+/**
+ * A run's stored `vars`, split into the variables, what a question to Spark reads in their place, the fields it reads
+ * as absent, and the variables set from a secret. `kept` is `null` when the column has no `-sendable`, which is a run a
+ * build before the key parked, or one no step has saved yet, and `unsent` and `sealed` are `null` when the column has
+ * no key of theirs, for the same two reasons.
+ */
+function unpack(stored: string): { vars: Vars; kept: Kept | null; unsent: string[] | null; sealed: string[] | null } {
+  const all = JSON.parse(stored) as Vars & { [KEPT]?: Kept; [UNSENT]?: string[]; [SEALED]?: string[] };
   const kept = all[KEPT] ?? null;
   const unsent = Array.isArray(all[UNSENT]) ? all[UNSENT] : null;
+  const sealed = Array.isArray(all[SEALED]) ? all[SEALED] : null;
   delete all[KEPT];
   delete all[UNSENT];
-  return { vars: all as Vars, kept, unsent };
+  delete all[SEALED];
+  return { vars: all as Vars, kept, unsent, sealed };
 }
 
 /**
@@ -245,9 +273,9 @@ function rebuilt(deps: FlowDeps, run: string, program: Op[], started: Record<str
  * would write from the row a question to Spark may carry and the variables as they were kept (`-sendable`). `null`
  * for a step whose shape names no field, which the pass refuses on its own.
  *
- * FILLED AS THE STEP IS: `advance` fills every string of the step from the run, then the pass fills a `set`'s `to` from
- * the row (`rules.ts`'s `fill`), and a tag's word from nothing more. Two fills that agree wrote nothing a question could
- * not already carry.
+ * FILLED AS THE STEP IS: the pass fills a `set`'s `to` from the run and the row in one pass (`rules.ts`'s `filling`),
+ * and `advance` fills a tag's word from the run alone. Two fills that agree wrote nothing a question could not already
+ * carry.
  *
  * AND THE FIELD IS THE ONE THE RUN FILLS IT TO, since `act` hands the pass the filled step. Read as written, `field:
  * '{{vars.f}}'` with `f` set to `note` held back `{{vars.f}}`, the pass wrote `note` from `{{pin}}`, and the question
@@ -270,8 +298,8 @@ function writes(
   }
   const spec = step.set as { field?: unknown; to?: unknown } | undefined;
   if (typeof spec?.field !== 'string' || typeof spec.to !== 'string') return null;
-  const as = fillRow(String(fill(spec.to, scope)), row, deps.nowMs);
-  const clean = fillRow(String(fill(spec.to, cleanScope)), cleanRow, deps.nowMs);
+  const as = filling(spec.to, row, deps.nowMs, { run: pathsOf(scope) }).text;
+  const clean = filling(spec.to, cleanRow, deps.nowMs, { run: pathsOf(cleanScope) }).text;
   return { field: String(fill(spec.field, scope)), carries: as !== clean, clean };
 }
 
@@ -296,8 +324,36 @@ function mark(unsent: Set<string>, verb: 'set' | 'tag', w: { field: string; carr
  * is now: measured on 23 September, `p` set from `note` while it said `plain`, `note` edited during the wait, and Spark
  * asked `Given changed?` about a variable holding `plain`, in a rule with no secret in it.
  */
-function pack(vars: Vars, kept: Kept | null, unsent: Iterable<string> | null): string {
-  return JSON.stringify(kept === null ? vars : { ...vars, [KEPT]: kept, ...(unsent === null ? {} : { [UNSENT]: [...unsent] }) });
+function pack(vars: Vars, kept: Kept | null, unsent: Iterable<string> | null, sealed: Iterable<string> | null): string {
+  return JSON.stringify(
+    kept === null ? vars : { ...vars, [KEPT]: kept, ...(unsent === null ? {} : { [UNSENT]: [...unsent] }), ...(sealed === null ? {} : { [SEALED]: [...sealed] }) },
+  );
+}
+
+/**
+ * The variables a run set from a secret, taken again from the steps it has done, for a column a build before `-sealed`
+ * parked. Each `set_var` in the order the run took it, over the row as it is now, since the row as it was is not kept;
+ * an answer written under a name takes it off, as `answerStep` does.
+ */
+function sealedAgain(deps: FlowDeps, run: string, program: Op[], scope: Record<string, unknown>, row: Entry | null): Set<string> {
+  const out = new Set<string>();
+  const fields = row ? sealedOf(deps.sql, row.register) : new Set<string>();
+  for (const done of deps.sql.all<{ n: number; kind: string }>(
+    "SELECT n, kind FROM automation_step WHERE run = ? AND state = 'done' AND kind IN ('set_var', 'ask_person', 'ask_spark') ORDER BY n",
+    run,
+  )) {
+    const spec = program[done.n]?.step[done.kind] as { name?: unknown; to?: unknown; as?: unknown } | undefined;
+    if (done.kind !== 'set_var') {
+      if (typeof spec?.as === 'string') out.delete(spec.as);
+      continue;
+    }
+    if (typeof spec?.name !== 'string' || typeof spec.to !== 'string') continue;
+    /* EVERY VARIABLE READ AS HOLDING SOMETHING, since only its step row knows what it held then. */
+    const reads = sealedPaths({ ...scope, vars: Object.fromEntries([...out].map((n) => [n, 'x'])) }, row, fields, out);
+    if (sealedIn(spec.to, reads) !== null) out.add(spec.name);
+    else out.delete(spec.name);
+  }
+  return out;
 }
 
 const isObject = (x: unknown): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x);
@@ -627,7 +683,7 @@ export function advance(deps: FlowDeps, id: string): number | null {
 
   const program = plan(decl.steps ?? decl.then);
   const trigger = JSON.parse(run.trigger) as RunTrigger;
-  const { vars, kept: stored, unsent: marked } = unpack(run.vars);
+  const { vars, kept: stored, unsent: marked, sealed: tainted } = unpack(run.vars);
   let subject = trigger.entry ? deps.entry(trigger.entry) : null;
   /* WHAT A STEP READS AND WHAT IT WRITES ARE TWO ROWS WHEN A DELETE STARTED THE RUN. Its conditions and templates read
      the row as it was deleted, which is what the rule was written about; its writes get `subject`, which is `null`,
@@ -648,6 +704,13 @@ export function advance(deps: FlowDeps, id: string): number | null {
     (stored === null || marked === null) && program.slice(run.step).some((o) => o.verb === 'ask_spark') ? rebuilt(deps, id, program, context(deps, trigger, read()), read()) : null;
   const kept = stored ?? again?.kept ?? {};
   const unsent = new Set(marked ?? again?.unsent ?? []);
+  const sealedVars = new Set(tainted ?? sealedAgain(deps, id, program, context(deps, trigger, read()), read()));
+  /* THE FIELDS OF THE RUN'S ROW THAT NEVER LEAVE, and the run's paths over them, as a step that writes reads them. */
+  const sealedFields = (): ReadonlySet<string> => {
+    const row = read();
+    return row ? sealedOf(deps.sql, row.register) : new Set();
+  };
+  const paths = (): RunFill => sealedPaths(scope(), read(), sealedFields(), sealedVars);
   deps.sql.exec("UPDATE automation_run SET state = 'running' WHERE id = ?", id);
 
   /* FINISHED BEFORE THE STEP ROW SAYS FAILED, because `finish` lets go of whatever a `waiting` step row still holds,
@@ -662,7 +725,7 @@ export function advance(deps: FlowDeps, id: string): number | null {
      stopped between two steps started again from its last wait and took every step since a second time: audit
      thirty-three §1 counted six notifies in twelve hours from one row. A step that finished is never taken again. */
   const saved = (next: number): number => {
-    deps.sql.exec('UPDATE automation_run SET step = ?, vars = ? WHERE id = ?', next, pack(vars, kept, unsent), id);
+    deps.sql.exec('UPDATE automation_run SET step = ?, vars = ? WHERE id = ?', next, pack(vars, kept, unsent, sealedVars), id);
     return next;
   };
 
@@ -701,7 +764,7 @@ export function advance(deps: FlowDeps, id: string): number | null {
         const ms = typeof step.wait === 'string' ? intervalMs(step.wait) : null;
         if (ms === null) return fail(i, 'wait', `rule.${run.rule} waits ${JSON.stringify(step.wait)} at step ${i + 1}, and a span is a number and one of m, h, d or w.`);
         record(deps, id, i, 'wait', 'waiting', null);
-        deps.sql.exec("UPDATE automation_run SET state = 'waiting', step = ?, vars = ? WHERE id = ?", i, pack(vars, kept, unsent), id);
+        deps.sql.exec("UPDATE automation_run SET state = 'waiting', step = ?, vars = ? WHERE id = ?", i, pack(vars, kept, unsent, sealedVars), id);
         return deps.nowMs + ms;
       }
 
@@ -722,9 +785,14 @@ export function advance(deps: FlowDeps, id: string): number | null {
         const row = read();
         const now = scope();
         const clean = String(fill(spec.to, { vars: { ...vars, ...kept }, trigger: row ? { ...now.trigger, row: sendable(deps, row, unsent).fields } : now.trigger }));
+        /* AND WHETHER IT TOOK A SECRET, read from where its paths go before the value goes in (`sealedPaths`), for the
+           steps after it that write. */
+        const secret = sealedIn(spec.to, paths());
         vars[spec.name] = value;
         if (clean === value) delete kept[spec.name];
         else kept[spec.name] = clean;
+        if (secret !== null) sealedVars.add(spec.name);
+        else sealedVars.delete(spec.name);
         if (JSON.stringify(vars).length > VARS_BYTES) return fail(i, 'set_var', `rule.${run.rule}'s answers passed ${VARS_BYTES} characters at step ${i + 1}.`);
         record(deps, id, i, 'set_var', 'done', value);
         i = saved(i + 1);
@@ -759,10 +827,10 @@ export function advance(deps: FlowDeps, id: string): number | null {
               : `rule.${run.rule} asked Spark at step ${i + 1}, and Spark did not answer within a day, so the run stopped there.`,
           );
         }
-        const asked = ask(deps, run.rule, op.verb, step, i, id, scope(), kept, unsent, read(), actor);
+        const asked = ask(deps, run.rule, op.verb, step, i, id, scope(), kept, unsent, sealedVars, read(), actor);
         if (!asked.ok) return fail(i, op.verb, asked.say);
         record(deps, id, i, op.verb, 'waiting', asked.holds);
-        deps.sql.exec("UPDATE automation_run SET state = 'waiting', step = ?, vars = ? WHERE id = ?", i, pack(vars, kept, unsent), id);
+        deps.sql.exec("UPDATE automation_run SET state = 'waiting', step = ?, vars = ? WHERE id = ?", i, pack(vars, kept, unsent, sealedVars), id);
         return deps.nowMs + asked.waitMs;
       }
 
@@ -784,7 +852,27 @@ export function advance(deps: FlowDeps, id: string): number | null {
         cleanRow && subject && (op.verb === 'set' || op.verb === 'tag')
           ? writes(deps, op.verb, step, scope(), { vars: { ...vars, ...kept }, trigger: { ...scope().trigger, row: cleanRow.fields } }, subject, cleanRow)
           : null;
-      const acted = act(deps, run.rule, op.verb, fill(step, scope()) as RuleAction, subject, id, actor, subject === null ? last : null);
+      /* A STEP THAT WRITES ANYWHERE BUT THE RUN'S OWN ROW COPIES NO SECRET, unless into a field that never leaves
+         either. The lint refuses such a step at install (`flow-lint.ts`, `copyFault`); this is the second line, for a
+         rule stored before it did.
+         Measured on 23 September at HEAD `afb3b1b2` with the rule written into the table: `note`, `notify`,
+         `schedule`, `create` into another list, `suggest`, `tag` and `set` each wrote `hunter2` from
+         `{{trigger.row.pin}}`, `{{trigger.row}}` or a variable set from `pin`, into the note event, a Payments row, the
+         schedule, the question queue and the row itself. The texts the pass fills are handed to it as typed with the
+         run's paths beside them (`handOn`), so each is filled once and the pass refuses the copy there; every other
+         string is filled here, and a copy in one of those fails the step here. The sentence names the spelling and
+         never the value. */
+      const by = paths();
+      const handed = handOn(step, by, subject !== null);
+      /* A `set` AND A `tag` OF THE RUN'S OWN ROW ARE WRITTEN AND HELD BACK INSTEAD, as `rules.ts` says of a `set` and
+         for the tests it names; `mark` below is what holds the field back from Spark. */
+      if (handed.secret !== null && op.verb !== 'set' && op.verb !== 'tag')
+        return fail(
+          i,
+          op.verb,
+          `rule.${run.rule}'s ${op.verb} at step ${i + 1} reads ${handed.secret}, which holds what a secret or file field holds, and such a field is copied only into another secret or file field. The step was not taken; the steps before it were.`,
+        );
+      const acted = act(deps, run.rule, op.verb, handed.action as RuleAction, subject, id, actor, subject === null ? last : null, by);
       if (!acted.ok) return fail(i, op.verb, acted.say);
       if (op.verb === 'set' || op.verb === 'tag') mark(unsent, op.verb, wrote);
       record(deps, id, i, op.verb, 'done', acted.answer);
@@ -814,6 +902,9 @@ export function advance(deps: FlowDeps, id: string): number | null {
  * `schedule` row per step of every run, for ever, recording nothing the run row does not. The synthetic rule carries
  * `once_per: [entry]` only so that the pass's own refusal of an unkeyed `notify` does not fire on a step that is
  * already once.
+ *
+ * AND THE RUN'S PATHS GO WITH THE ACTION (`run`), so the pass fills its texts from the run and the row in one pass and
+ * says which reach a secret. `handOn` left those texts as typed for it.
  */
 function act(
   deps: FlowDeps,
@@ -824,6 +915,7 @@ function act(
   batch: string,
   actor: string,
   gone: Entry | null,
+  run: RunFill,
 ): { ok: true; stop: boolean; answer: string | null } | { ok: false; say: string } {
   const r = deps.rules();
   if (verb === 'stop') return { ok: true, stop: true, answer: null };
@@ -852,7 +944,7 @@ function act(
   const one: RuleDecl = { rule, register: subject.register, then: [action], once_per: ['entry'] };
   const out = runRules(
     { ...r, rules: () => [one], schedule: () => true },
-    { entry: subject, register: subject.register, batch, actor },
+    { entry: subject, register: subject.register, batch, actor, run },
   );
   const first: Refusal | undefined = out.refused[0];
   if (first) return { ok: false, say: first.fix };
@@ -865,8 +957,8 @@ function act(
  * Put an ask's question where it will be answered: the suggestion queue for a person, the outbox for Spark. What it
  * hands back is the id the step row holds while it waits, and how long it waits.
  *
- * THE QUESTION IS FILLED TWICE, as a `notify` is: `{{vars.…}}` and `{{trigger.…}}` by the run, then the row's own
- * `{{what}}` by the pass's `fill`. The options are not filled, because they are the answers an `if` after the step
+ * THE QUESTION IS FILLED FROM THE RUN AND THE ROW, as a `notify` is: `{{vars.…}}` and `{{trigger.…}}`, and the row's
+ * own `{{what}}`, in one pass. The options are not filled, because they are the answers an `if` after the step
  * compares against, and an answer that changed with the row would never match the condition written for it.
  */
 function ask(
@@ -879,6 +971,7 @@ function ask(
   scope: Record<string, unknown>,
   kept: Kept,
   unsent: ReadonlySet<string>,
+  tainted: ReadonlySet<string>,
   row: Entry | null,
   actor: string,
 ): { ok: true; holds: string; waitMs: number } | { ok: false; say: string } {
@@ -891,15 +984,25 @@ function ask(
      holding the words `{{pin}}`, which the run's fill writes into the question and the row's fill then reads, so the
      field is taken out of both fills and not only the first. Every field a step of this run wrote from such a field
      is taken out with it (`-unsent`). */
-  const facts = verb === 'ask_spark' && row ? sendable(deps, row, unsent) : row;
+  /* A QUESTION TO A PERSON IS FILLED WITH EVERY SECRET AND FILE FIELD TAKEN OUT TOO, and every variable set from one
+     read as the dash. It goes into the record's one queue, which everyone who decides reads, and the same queue took a
+     `suggest`'s question with the field refused. Measured at HEAD `afb3b1b2` with the rule written into the table:
+     `x {{pin}}` and `x {{trigger.row.pin}}` were asked as `x hunter2`, `x {{vars.p}}` with `p` set from `pin` as
+     `x k hunter2`, and `x {{trigger.row}}` with `"pin":"hunter2"` in it. The lint refuses that question at install
+     now; this is the second line. Only fields declared secret or file are taken out here, so a list with none asks as
+     it did. */
+  const facts = row === null ? null : verb === 'ask_spark' ? sendable(deps, row, unsent) : withoutSealed(deps, row);
   /* AND EACH VARIABLE SET FROM A FIELD THAT NEVER LEAVES IS READ AS IT WAS KEPT (`advance`'s `set_var`), so a question
-     to Spark gets the dash where `{{vars.p}}` held `pin`. A question to a person stays in the record and reads the value. */
-  const scoped =
-    verb !== 'ask_spark'
-      ? scope
-      : { vars: { ...(scope.vars as Vars), ...kept }, trigger: facts ? { ...(scope.trigger as Record<string, unknown>), row: facts.fields } : scope.trigger };
-  let question = String(fill(spec.question, scoped));
-  if (facts) question = fillRow(question, facts, deps.nowMs);
+     to Spark gets the dash where `{{vars.p}}` held `pin`. */
+  const vars = scope.vars as Vars;
+  const cleanVars = verb === 'ask_spark' ? { ...vars, ...kept } : { ...vars, ...Object.fromEntries([...tainted].filter((n) => n in vars).map((n) => [n, '—'])) };
+  const scoped = { vars: cleanVars, trigger: facts ? { ...(scope.trigger as Record<string, unknown>), row: facts.fields } : scope.trigger };
+  /* FILLED ONCE (`rules.ts`'s `filling`), the run's paths and the row's fields in one pass. It was the run's fill and
+     then the row's over what it had made, so a text field holding the words `{{pin}}`, put in by
+     `{{trigger.row.note}}`, was read a second time as a field of the row. Both fills read the cleaned row, so for
+     Spark the second reached nothing the first could not and wrote the dash; for a person, at HEAD `afb3b1b2`, `is
+     {{trigger.row.note}}` was asked as `is hunter2`. */
+  const question = facts ? filling(spec.question, facts, deps.nowMs, { run: pathsOf(scoped) }).text : String(fill(spec.question, scoped));
   if (question.length > VAR_BYTES) return { ok: false, say: `rule.${rule}'s question at step ${n + 1} runs to ${question.length} characters, and a question holds ${VAR_BYTES}.` };
 
   if (verb === 'ask_person') {
@@ -993,10 +1096,11 @@ export function answerStep(deps: FlowDeps, a: { run: string; step: number; by: s
   const stored = unpack(run.vars);
   const vars = { ...stored.vars, [spec.as]: value };
   if (stored.kept) delete stored.kept[spec.as];
+  const sealed = stored.sealed?.filter((name) => name !== spec.as) ?? null;
   if (JSON.stringify(vars).length > VARS_BYTES) return stop(`rule.${run.rule}'s answers passed ${VARS_BYTES} characters at step ${a.step + 1}.`);
 
   record(deps, run.id, a.step, row.kind, 'done', String(value));
-  deps.sql.exec("UPDATE automation_run SET state = 'pending', step = ?, vars = ? WHERE id = ?", a.step + 1, pack(vars, stored.kept, stored.unsent), run.id);
+  deps.sql.exec("UPDATE automation_run SET state = 'pending', step = ?, vars = ? WHERE id = ?", a.step + 1, pack(vars, stored.kept, stored.unsent, sealed), run.id);
   wake(deps, run.id, deps.nowMs);
   return ok(null);
 }
@@ -1146,22 +1250,94 @@ function sendable(deps: FlowDeps, row: Entry, unsent: ReadonlySet<string> = new 
 }
 
 /**
- * `{{vars.x}}` and `{{trigger.row.amount}}`, filled in every string of a step, before the pass fills the row's own
- * `{{field}}`s. A path that reaches nothing is an em dash for the same reason `fill` writes one: a sentence with a
- * hole in it reads as a bug. The pattern is `flow-lint.ts`'s `RUN_PATH`, so the lint reads a question's braces as this
- * fills them.
+ * The row with every field its declaration types secret or file taken out, retired ones included (`sealedOf`), and
+ * nothing else: what a question to a person reads, since it stays in the record and a field with no live type is one
+ * the list's readers already see.
+ */
+function withoutSealed(deps: FlowDeps, row: Entry): Entry {
+  const sealed = sealedOf(deps.sql, row.register);
+  return { ...row, fields: Object.fromEntries(Object.entries(row.fields).filter(([id]) => !sealed.has(id))) as Entry['fields'] };
+}
+
+/**
+ * `{{vars.x}}` and `{{trigger.row.amount}}`, filled in a string that no fill of the row reads after: a condition, a
+ * `set_var`, and a question with no row. A text the pass fills is filled in the same `replace` as the row's own
+ * `{{field}}`s instead (`handOn`, `rules.ts`'s `filling`). A path that reaches nothing is an em dash for the same
+ * reason `fill` writes one: a sentence with a hole in it reads as a bug. The pattern is `flow-lint.ts`'s `RUN_PATH`,
+ * so the lint reads a question's braces as this fills them.
  */
 function fill(x: unknown, scope: Record<string, unknown>): unknown {
-  if (typeof x === 'string')
-    return x.replace(RUN_PATH, (_whole, head: string, path: string) => {
-      let at: unknown = scope[head];
-      for (const part of path.split('.')) at = isObject(at) ? at[part] : Array.isArray(at) ? at[Number(part)] : undefined;
-      if (at === undefined || at === null || at === '') return '—';
-      return typeof at === 'object' ? JSON.stringify(at) : String(at);
-    });
+  if (typeof x === 'string') return x.replace(RUN_PATH, (_whole, head: string, path: string) => pathValue(scope, head, path));
   if (Array.isArray(x)) return x.map((v) => fill(v, scope));
   if (isObject(x)) return Object.fromEntries(Object.entries(x).map(([k, v]) => [k, fill(v, scope)]));
   return x;
+}
+
+/** What one `{{vars.…}}` or `{{trigger.…}}` path is written as. */
+function pathValue(scope: Record<string, unknown>, head: string, path: string): string {
+  let at: unknown = scope[head];
+  for (const part of path.split('.')) at = isObject(at) ? at[part] : Array.isArray(at) ? at[Number(part)] : undefined;
+  if (at === undefined || at === null || at === '') return '—';
+  return typeof at === 'object' ? JSON.stringify(at) : String(at);
+}
+
+/** The run's paths as the pass is handed them, from `scope`, saying of none that it reaches a secret. */
+const pathsOf = (scope: Record<string, unknown>): RunFill => ({ value: (head, path) => pathValue(scope, head, path), sealed: () => false });
+
+/**
+ * The run's paths as a step that writes is handed them, saying which reach a value a secret or file field gave: a
+ * variable in `tainted` that holds something, `{{trigger.row.pin}}` where `pin` never leaves and holds something, and
+ * `{{trigger.row}}` where any such field of the row holds something.
+ *
+ * BY WHERE THE PATH GOES, NEVER BY WHAT IT HOLDS, and by the declared types alone. The held attempt of wave fifty-three
+ * compared the step filled from the row with the step filled from `sendable`'s row, which also drops every field the
+ * live list does not declare. Measured on 23 September with that diff applied to `afb3b1b2`: on Jobs, a list declaring
+ * no secret field, a `note` of `x {{trigger.row.what}} {{vars.v}}` failed "would copy what old holds", because `v` was
+ * set from `{{trigger.row}}` and the row carried a value under `old`, a field the list no longer declares. Such a value
+ * has no type saying it may not leave, so a question to Spark goes without it, and a note the list's own readers see
+ * may carry it. Comparing words would be no better: a `note` that happens to say what `pin` says is not a copy.
+ */
+function sealedPaths(scope: Record<string, unknown>, row: Entry | null, fields: ReadonlySet<string>, tainted: ReadonlySet<string>): RunFill {
+  const vars = scope.vars as Vars;
+  return {
+    value: (head, path) => pathValue(scope, head, path),
+    sealed: (head, path) => {
+      const [first, second] = path.split('.');
+      if (head === 'vars') return tainted.has(first!) && present(vars[first!]);
+      if (head !== 'trigger' || first !== 'row' || row === null) return false;
+      if (second === undefined) return [...fields].some((f) => present(row.fields[f]));
+      return fields.has(second) && present(row.fields[second]);
+    },
+  };
+}
+
+/**
+ * The step as `act` hands it on: every string filled from the run, except the texts the pass fills itself when there
+ * is a row for it to fill them from (`passFilled`), which go on as typed with the run's paths beside them, so each is
+ * filled once. `secret` is the first spelling in a string filled here that reached a secret, or `null`.
+ */
+function handOn(step: Record<string, unknown>, by: RunFill, passes: boolean): { action: Record<string, unknown>; secret: string | null } {
+  let secret: string | null = null;
+  const walk = (v: unknown, at: string[]): unknown => {
+    if (typeof v === 'string') {
+      if (passes && passFilled(at)) return v;
+      return v.replace(RUN_PATH, (whole: string, head: string, p: string) => {
+        if (by.sealed(head, p)) secret ??= whole;
+        return by.value(head, p);
+      });
+    }
+    if (Array.isArray(v)) return v.map((one, i) => walk(one, [...at, String(i)]));
+    if (isObject(v)) return Object.fromEntries(Object.entries(v).map(([k, one]) => [k, walk(one, [...at, k])]));
+    return v;
+  };
+  const action = walk(step, []) as Record<string, unknown>;
+  return { action, secret };
+}
+
+/** The first run path in `text` that reaches a secret, or `null`: what a `set_var` taking it would carry. */
+function sealedIn(text: string, by: RunFill): string | null {
+  for (const m of text.matchAll(RUN_PATH)) if (by.sealed(m[1]!, m[2]!)) return m[0];
+  return null;
 }
 
 /**

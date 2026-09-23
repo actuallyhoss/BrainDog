@@ -51,10 +51,14 @@ const CHANNELS = ['webhook', 'email', 'paste', 'api', 'pull'] as const;
 const SHAPES = ['text', 'number', 'choice'] as const;
 
 /** Every action a rule had before steps, closed. The inline pass's dispatch has one arm for each. */
-const ACTIONS = ['tag', 'untag', 'set', 'move', 'link', 'note', 'notify', 'schedule', 'create', 'suggest', 'run', 'stop'] as const;
+export const ACTIONS = ['tag', 'untag', 'set', 'move', 'link', 'note', 'notify', 'schedule', 'create', 'suggest', 'run', 'stop'] as const;
 /** The verbs only a step has. */
 const FLOW = ['if', 'set_var', 'script', 'call', 'ask_spark', 'ask_person', 'wait'] as const;
-const VERBS: readonly string[] = [...ACTIONS, ...FLOW];
+/**
+ * Every verb a rule or a step may name. Exported so that `flow-secret-verbs.test.ts` asks each one what it does with a
+ * secret, and a verb added here without an answer there fails that test.
+ */
+export const VERBS: readonly string[] = [...ACTIONS, ...FLOW];
 
 /**
  * THE VERBS THAT ARE ABOUT A ROW. `tag` on a clock tick has nothing to tag: `runRules` hands each of these the entry that
@@ -396,6 +400,121 @@ function carriedIn(text: string, carried: ReadonlyMap<string, Carried>): { name:
 }
 
 /**
+ * Whether the text at `path` in an action is one the inline pass fills from the row (`rules.ts`'s `runRules`): the
+ * places `fillSites` lists. `flow.ts` leaves these as typed for the pass to fill once, with the run's own paths handed
+ * over beside them, and fills every other string of a step itself.
+ */
+export function passFilled(path: readonly string[]): boolean {
+  if (path[0] === 'create') return path[1] === 'fields' && path.length === 3;
+  const at = path.join('.');
+  return at === 'set.to' || at === 'note' || at === 'notify.say' || at === 'schedule.note' || at === 'suggest.question' || at === 'link.to.value';
+}
+
+/**
+ * The verbs that put text somewhere other than a field of the run's own row, which `writeFault` holds. The rest put
+ * none: `untag` writes back words the row already has, less one; `run` and `call` send the call's declared fields,
+ * which `queueCall` holds to the ones that may leave; `if` is read and not written; `set_var` is carried, and followed
+ * into every verb here that writes it out; `ask_spark` has its own checks below; `stop` and `wait` carry nothing.
+ */
+const COPIERS: readonly string[] = ['move', 'link', 'note', 'notify', 'schedule', 'create', 'suggest', 'script', 'ask_person'];
+
+/** Where a text of a step goes, as a refusal names it, from its path inside the step. */
+function placeOf(path: readonly string[], spec: Record<string, unknown>): string {
+  const at = path.join('.');
+  if (path[0] === 'create' && path[1] === 'fields' && path.length === 3) return `${path[2]} of the ${String(spec.register)} row it creates`;
+  if (path[0] === 'suggest' && path[1] === 'options') return 'an answer it offers in the queue';
+  if (path[0] === 'script' && path[1] === 'input') return `the input ${path[2]} it hands a script`;
+  const named: Record<string, string> = {
+    note: 'a note',
+    'notify.say': 'a notification',
+    'schedule.note': 'a reminder',
+    'suggest.question': 'a question in the queue',
+    'link.to.value': 'the value it links by',
+    'ask_person.question': 'its question to a person',
+    move: 'the state it moves the row to',
+  };
+  return named[at] ?? `its ${at}`;
+}
+
+/**
+ * What a step or an item of `then:` may not copy, as the refusal, or `null`: a secret or file field reached by any
+ * spelling that fills it, put into any place its verb puts text, unless that place is a field of another list that
+ * never leaves either. `set` and `tag` are `writeFault`'s, and a question to Spark has its own checks in the walk.
+ *
+ * THE CHECK FOLLOWED `set` AND `tag` AND NOTHING ELSE, measured on 23 September at HEAD `afb3b1b2` over a list whose
+ * `pin` is secret (`flow-secret-verbs.test.ts`): `note`, `notify`, `schedule`, `create` into another list's text field,
+ * `suggest` and `link` each installed holding `{{pin}}` on the inline path and `{{trigger.row.pin}}`, `{{trigger.row}}`
+ * or a variable set from `pin` as a step, and so did a `move`, a script's `input`, a question to a person, and a
+ * `create` crossing `each: [pin]`. Every one of those writes where the list's readers, or another list's, can see it.
+ *
+ * `run: false` IS THE INLINE PATH, where only the texts the pass fills are filled, from the row alone, and no variable
+ * exists. On the run path every string of the step is filled from the run first, so every one is read.
+ *
+ * A QUESTION TO A PERSON IS REFUSED WITH THE REST. `spark-vars-hidden.test.ts` let one read a variable set from `pin`,
+ * "which stays in the record"; it stays in the record's one queue, where a `suggest` beside it was the same leak, and
+ * everyone who decides reads it.
+ */
+function copyFault(
+  id: string,
+  verb: string,
+  step: Record<string, unknown>,
+  here: string,
+  t: { row: string | null; hidden: ReadonlyMap<string, string>; carried: ReadonlyMap<string, Carried>; run: boolean; installed: Known | undefined },
+): Refusal | null {
+  if (!COPIERS.includes(verb)) return null;
+  const spec = isObject(step[verb]) ? (step[verb] as Record<string, unknown>) : {};
+  /* A CREATE THAT CROSSES ONE COPIES IT WITH NO TEXT AT ALL: each value becomes `{{each.0}}` and the `_each` of every row
+     it makes. */
+  if (verb === 'create' && Array.isArray(spec.each)) {
+    const field = spec.each.map(String).find((f) => t.hidden.has(f));
+    if (field !== undefined)
+      return bad(
+        'DECLARATION_INVALID',
+        `${id} crosses ${field} at ${here}, so every ${String(spec.register)} row it creates would hold a value of it, and a ${t.hidden.get(field)} field is copied only into another secret or file field. Cross fields that may leave.`,
+        `${here}.create.each`,
+      );
+  }
+  if (t.hidden.size === 0 && t.carried.size === 0) return null;
+  const theirs = verb === 'create' && t.installed !== undefined ? fieldsOf(t.installed, String(spec.register)) : undefined;
+  const list = t.row ?? 'its list';
+  const texts: { path: string[]; text: string }[] = [];
+  const collect = (v: unknown, path: string[]): void => {
+    if (typeof v === 'string') texts.push({ path, text: v });
+    else if (Array.isArray(v)) v.forEach((one, i) => collect(one, [...path, String(i)]));
+    else if (isObject(v)) for (const [k, one] of Object.entries(v)) collect(one, [...path, k]);
+  };
+  collect(step[verb], [verb]);
+  for (const { path, text } of texts) {
+    const rowFill = passFilled(path) || path.join('.') === 'ask_person.question';
+    if (!t.run && !passFilled(path)) continue;
+    if (path[0] === 'ask_person' && path[1] !== 'question') continue;
+    /* INTO A FIELD OF THE OTHER LIST THAT NEVER LEAVES EITHER, which no reader of it can see. */
+    if (path[0] === 'create' && path.length === 3 && sealedAs(theirs?.find((f) => f.id === path[2] && f.retired !== true)) !== null) continue;
+    const direct = t.hidden.size === 0 ? null : hiddenIn(text, t.hidden, rowFill, t.run);
+    const through = direct || !t.run ? null : carriedIn(text, t.carried);
+    if (!direct && !through) continue;
+    const where = `${here}.${path.join('.')}`;
+    const place = placeOf(path, spec);
+    if (direct) {
+      const whole = direct.spelled.replace(/\s/g, '') === '{{trigger.row}}' ? `the whole ${list} row, ${direct.field} in it` : direct.field;
+      return bad(
+        'DECLARATION_INVALID',
+        `${id} copies ${whole} into ${place} at ${here} with ${direct.spelled}, and a ${direct.type} field is copied only into another secret or file field. Take ${direct.spelled} out.`,
+        where,
+      );
+    }
+    const from = through!.from;
+    const held = from.spelled.replace(/\s/g, '') === '{{trigger.row}}' ? `the whole ${list} row, ${from.field} in it` : from.field;
+    return bad(
+      'DECLARATION_INVALID',
+      `${id} copies ${through!.spelled} into ${place} at ${here}, and ${through!.name} holds ${held}${from.name === through!.name ? '' : `, by way of ${from.name}`}: ${from.at} put it there with ${from.spelled}, and a ${from.type} field is copied only into another secret or file field. Take ${through!.spelled} out, or set ${through!.name} from fields that may leave.`,
+      where,
+    );
+  }
+  return null;
+}
+
+/**
  * Where the first `ask_spark` step of a body sits, as `steps[1]` or `steps[0].then[2]`, or `null` when it asks nothing.
  *
  * ITS OWN WALK, BOTH ARMS OF EVERY BRANCH, because `actionsOf` returns only `ACTIONS` and `ask_spark` is a step's verb.
@@ -666,6 +785,9 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
         const fault = writeFault(id, verb, step, here, row, fields, hidden, carried, true);
         if (fault) return fault;
       }
+      /* AND A STEP THAT PUTS TEXT ANYWHERE ELSE MAY NOT COPY ONE THERE EITHER (`copyFault`). */
+      const copied = copyFault(id, verb, step, here, { row, hidden, carried, run: true, installed });
+      if (copied) return copied;
       if (verb === 'ask_spark') {
         const via = carriedIn(String((step.ask_spark as { question: unknown }).question), carried);
         if (via) {
@@ -796,8 +918,8 @@ export function inlineFault(id: string, decl: FlowDecl, installed?: Known): Refu
 }
 
 /**
- * Each `set` of the inline path held to what a step's is (`writeFault`): its field by id, and no secret copied into a
- * field that may leave.
+ * Each item of the inline path held to what a step is: a `set`'s field by id and no secret copied into a field that may
+ * leave (`writeFault`), and no secret copied into any other place the pass fills from the row (`copyFault`).
  *
  * THE INLINE PASS READS THE LIST ITS OWN WAY, so this is not the walk `flowFault` takes over steps. It fills a `set`'s
  * `to` with `rules.ts`'s `fill` alone, which reads `{{field}}` and `{{kind:field}}` and leaves `{{trigger.row.token}}`
@@ -812,8 +934,12 @@ function inlineWrites(id: string, decl: FlowDecl, installed?: Known): Refusal | 
   const fields = fieldsOf(installed, decl.register);
   const hidden = hiddenOf(installed, decl.register);
   for (const [i, item] of (decl.then as unknown[]).entries()) {
-    if (!isObject(item) || !('set' in item)) continue;
-    const fault = writeFault(id, 'set', item, `then[${i}]`, decl.register, fields, hidden, new Map(), false);
+    if (!isObject(item)) continue;
+    const here = `then[${i}]`;
+    const fault =
+      ('set' in item ? writeFault(id, 'set', item, here, decl.register, fields, hidden, new Map(), false) : null) ??
+      /* EVERY VERB THE ITEM CARRIES, since the pass acts on the first in its own order and nothing refuses a second. */
+      ACTIONS.reduce<Refusal | null>((found, verb) => found ?? (verb in item ? copyFault(id, verb, item, here, { row: decl.register!, hidden, carried: new Map(), run: false, installed }) : null), null);
     if (fault) return fault;
   }
   return null;

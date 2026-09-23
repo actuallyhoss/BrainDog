@@ -117,16 +117,21 @@ test('A QUESTION TO SPARK NAMING A VARIABLE SET FROM A SECRET FIELD IS REFUSED A
     };
     assert.match(out!.fix, setter[what] ?? /steps\[0\]/, `${what}: the refusal does not name the set_var: ${out!.fix}`);
   }
-  /* A VARIABLE SET FROM FIELDS THAT MAY LEAVE IS ASKED ABOUT AS ALWAYS, and so is a secret one in a question to a
-     person, which stays in the record. */
+  /* A VARIABLE SET FROM FIELDS THAT MAY LEAVE IS ASKED ABOUT AS ALWAYS. */
   for (const steps of [
     [{ set_var: { name: 'p', to: '{{trigger.row.what}}, {{trigger.row.note}}' } }, { ask_spark: { question: 'Rate given {{vars.p}}?', as: 'rate' } }],
     [{ set_var: { name: 'p', to: '{{trigger.row.pin}}' } }, { ask_spark: { question: 'Rate given {{vars.q}}?', as: 'rate' } }],
-    [{ set_var: { name: 'p', to: '{{trigger.row.pin}}' } }, { ask_person: { question: 'Pay {{vars.p}}?', options: ['yes', 'no'], as: 'a' } }],
+    [{ set_var: { name: 'p', to: '{{trigger.row.note}}' } }, { ask_person: { question: 'Pay {{vars.p}}?', options: ['yes', 'no'], as: 'a' } }],
   ]) {
     const out = refusal((await k.install([rule(steps)])) as Result<unknown>);
     assert.equal(out, null, out?.fix);
   }
+  /* AND A SECRET ONE IN A QUESTION TO A PERSON IS REFUSED TOO. This installed until 23 September, "a question to a
+     person stays in the record"; it stays in the record's one queue, which everyone who decides reads, and at run time
+     it was asked as `Pay hunter2?` (`flow-secret-verbs.test.ts` measured each spelling). */
+  const person = refusal((await k.install([rule([{ set_var: { name: 'p', to: '{{trigger.row.pin}}' } }, { ask_person: { question: 'Pay {{vars.p}}?', options: ['yes', 'no'], as: 'a' } }])])) as Result<unknown>);
+  assert.equal(person?.code, 'DECLARATION_INVALID', person?.fix ?? 'installed');
+  assert.match(person!.fix, /\{\{vars\.p\}\} into its question to a person at steps\[1\], and p holds pin: steps\[0\] put it there/);
   sql.close();
 });
 
@@ -212,19 +217,22 @@ test('A RULE STORED WITH SUCH A VARIABLE SENDS THE DASH A FIELD IS WRITTEN AS, a
   sql.close();
 });
 
-test('WHAT WAS KEPT GOES WHEN THE VARIABLE IS SET AGAIN FROM A FIELD THAT MAY LEAVE, and a question to a person reads the value', async () => {
+test('WHAT WAS KEPT GOES WHEN THE VARIABLE IS SET AGAIN FROM A FIELD THAT MAY LEAVE, for Spark and for a person alike', async () => {
   /* TWO LINES THE CASE ABOVE LEFT UNTESTED, found by the checker on 23 September by taking each out and watching the
      suite stay green. With the `delete` at `set_var` taken out, `r` set from `pin` and then from `note` kept its dash
-     and Spark was asked `Given — and —?` about a variable holding `plain`. With `ask()` reading the kept values for every
-     verb, the person was asked `Pay —?`, and a question to a person stays in the record, so it has no reason to lose
-     what it asks about. */
+     and Spark was asked `Given — and —?` about a variable holding `plain`.
+
+     AND A QUESTION TO A PERSON NO LONGER READS THE SECRET. This test pinned `Pay hunter2?`, "a question to a person
+     stays in the record", and that was the leak itself: it stays in the record's one queue, which everyone who decides
+     reads, and a `suggest` into the same queue is refused the same copy (`flow-secret-verbs.test.ts`). The person is
+     asked with the dash where `p` held `pin`, and `r`, set again from `note`, reads its value. */
   const { sql, clock } = await sparked(rule([{ set_var: { name: 'x', to: 'y' } }]));
   const steps = [
     { set_var: { name: 'p', to: '{{trigger.row.pin}}' } },
     { set_var: { name: 'r', to: '{{trigger.row.pin}}' } },
     { set_var: { name: 'r', to: '{{trigger.row.note}}' } },
     { ask_spark: { question: 'Given {{vars.p}} and {{vars.r}}?', as: 'a' } },
-    { ask_person: { question: 'Pay {{vars.p}}?', options: ['yes', 'no'], as: 'b' } },
+    { ask_person: { question: 'Pay {{vars.p}} {{vars.r}}?', options: ['yes', 'no'], as: 'b' } },
   ];
   sql.exec("UPDATE declaration SET body = ? WHERE id = 'rule.rate' AND superseded_at IS NULL", JSON.stringify({ rule: 'rate', on: WRITTEN, once_per: ['entry'], steps }));
   const k = await openRecord(sql, clock, { answersSpark: true });
@@ -242,7 +250,8 @@ test('WHAT WAS KEPT GOES WHEN THE VARIABLE IS SET AGAIN FROM A FIELD THAT MAY LE
   assert.equal(open.length, 1, `${open.length} questions opened for the person`);
   /* THE QUESTION RIDES ON THE `suggest` EVENT the gate writes, not on the suggestion's body. */
   const said = JSON.stringify(sql.all("SELECT * FROM event WHERE actor = 'rule:rate'"));
-  assert.match(said, /Pay hunter2\?/, said);
+  assert.match(said, /Pay — plain\?/, said);
+  assert.doesNotMatch(said, /hunter2/, said);
   sql.close();
 });
 

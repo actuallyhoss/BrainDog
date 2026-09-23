@@ -32,7 +32,7 @@ import { exponentOf } from './ingest.ts';
 import { instant } from './migrate.ts';
 import { spanMs } from './vault.ts';
 import { predicateOf, type EvalContext } from './metrics.ts';
-import { inlineFault } from './flow-lint.ts';
+import { RUN_PATH, inlineFault, sealedAs } from './flow-lint.ts';
 import { observe } from './observe.ts';
 
 export type RuleAction =
@@ -151,6 +151,12 @@ export type Fired = {
   register: string;
   batch: string;
   actor: string;
+  /**
+   * A run's own paths, where a step of a run is acting through the pass (`flow.ts`'s `act`). The pass then fills them
+   * in the same `replace` as the row's fields, so nothing the run wrote is filled again (`filling`). Absent on the
+   * inline path, where `{{trigger.…}}` is left as typed.
+   */
+  run?: RunFill;
 };
 
 export type RulesOutcome = {
@@ -256,6 +262,9 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
      the rule that wins is the first one to reach the field, and a per-rule set would let the second
      one overwrite it. */
   const setFields = new Set<string>();
+  /* THE FIELDS OF THIS LIST THAT NEVER LEAVE THE RECORD, read once the first text asks and kept for every rule after. */
+  let sealed: Set<string> | null = null;
+  const sealedHere = (): Set<string> => (sealed ??= sealedOf(deps.sql, fired.register));
 
   for (const rule of order(deps.rules(fired.register))) {
     if (!matches(deps, schema, rule, fired.entry)) continue;
@@ -297,12 +306,12 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
     /* A NOTICE, NOT A STRING. `urgent` was declared, printed in the install diff as "interrupts
        you", and then flattened into the same list a plain `note` goes in — so a rule saying
        "Payment failed" wrote an event and nothing left the record. 09 §4: `true` interrupts. */
-    const said: { text: string; urgent: boolean }[] = [];
+    const notes: { text: string; urgent: boolean }[] = [];
     /* HELD LIKE THE NOTES ARE, until the write has happened. A rule whose write the register then
        refuses has not done anything, and a reminder about what it did not do is worse than silence. */
     const later: { in: string; note: string }[] = [];
-    const made: { register: string; each?: string[]; bound: number; fields: Record<string, string> }[] = [];
-    const asks: { question: string; options: string[] }[] = [];
+    const made: { register: string; each?: string[]; bound: number; fields: Record<string, string>; at: string }[] = [];
+    const asks: { question: string; options: string[]; at: string }[] = [];
     const runs: string[] = [];
     let stop = false;
 
@@ -320,6 +329,17 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
         'DECLARATION_INVALID',
         `rule.${rule.rule}'s ${at} is ${shown}, and ${what} is written as text. The rule was stored before install refused that, so this step was left out of what the rule wrote.`,
       );
+    };
+    /* A TEXT THE PASS FILLS, FILLED ONCE, AND REFUSED WHERE IT WOULD CARRY A SECRET OUT. The lint refuses such a text at
+       install (`flow-lint.ts`, `copyFault`); this is the second line, for a rule stored before it did, and the only one
+       for a run's step, whose values exist only at the run. Measured at HEAD `afb3b1b2` with such a rule written into
+       the table, inline and as a run: `note`, `notify`, `schedule` and `suggest` wrote `x hunter2` into the note event,
+       the schedule and the question queue. `null` means the step is left out. */
+    const said = (text: unknown, at: string, what: string): string | null => {
+      const got = filling(text, fired.entry, deps.nowMs, { sealed: sealedHere(), ...(fired.run ? { run: fired.run } : {}) });
+      if (got.secret === null) return got.text;
+      undone(at, 'DECLARATION_INVALID', copied(rule.rule, got.secret, what));
+      return null;
     };
 
     for (const [i, action] of then.entries()) {
@@ -361,8 +381,14 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
       } else if ('set' in action) {
         /* THE EARLIER RULE WON, and this one says so rather than overwriting. */
         if (setFields.has(action.set.field)) continue;
+        /* A `set` IS FILLED ONCE AND NOT REFUSED HERE: a copy of a secret into the row is written, and held back from
+           everything that leaves (`queueCall`'s second line, and a run's `-unsent`). The lint refuses it at install.
+           Refusing it here too would be the stronger line, since the list's own readers see the field, and it is the
+           one this file does not draw yet: `secret-out.test.ts`, `call-launder-row.test.ts`,
+           `launder-across-rules.test.ts` and `spark-launder-row.test.ts` each store such a copy to test the lines
+           after it, and pin that the row keeps it. */
         setFields.add(action.set.field);
-        patch[action.set.field] = fill(action.set.to, fired.entry, deps.nowMs);
+        patch[action.set.field] = filling(action.set.to, fired.entry, deps.nowMs, fired.run ? { run: fired.run } : {}).text;
         did.push(`set ${action.set.field}`);
       } else if ('move' in action) {
         /* `move` IS A `set` OF THE STATE FIELD, and claiming the field is what stops two rules
@@ -385,10 +411,12 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
            rule that picked one would pick a different one next week. */
         /* `by` IS A FIELD ID FROM A DECLARATION, and it was inlined into the path with no grammar
            check — see the note on `jsonPath`. A rule can arrive in a pack. */
+        const value = said(action.link.to.value, `then[${i}].link.to.value`, 'the value it links by');
+        if (value === null) continue;
         const found = deps.sql.all<{ id: string }>(
           `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '${jsonPath(action.link.to.by)}') = ? LIMIT 2`,
           action.link.to.register,
-          fill(action.link.to.value, fired.entry, deps.nowMs),
+          value,
         );
         if (found.length === 1) {
           patch[action.link.field] = found[0]!.id;
@@ -397,19 +425,25 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
       } else if ('note' in action) {
         /* HELD UNTIL THE WRITE HAS HAPPENED. A rule whose write the register then refuses has not
            done anything, and a notification about what it did not do is worse than silence. */
-        said.push({ text: fill(action.note, fired.entry, deps.nowMs), urgent: false });
+        const text = said(action.note, `then[${i}].note`, 'a note');
+        if (text === null) continue;
+        notes.push({ text, urgent: false });
         did.push('note');
       } else if ('notify' in action) {
-        said.push({ text: fill(action.notify.say, fired.entry, deps.nowMs), urgent: action.notify.urgent === true });
+        const text = said(action.notify.say, `then[${i}].notify.say`, 'a notification');
+        if (text === null) continue;
+        notes.push({ text, urgent: action.notify.urgent === true });
         did.push('notify');
       } else if ('schedule' in action) {
-        later.push({ in: action.schedule.in, note: fill(action.schedule.note, fired.entry, deps.nowMs) });
+        const note = said(action.schedule.note, `then[${i}].schedule.note`, 'a reminder');
+        if (note === null) continue;
+        later.push({ in: action.schedule.in, note });
         did.push(`schedule ${action.schedule.in}`);
       } else if ('create' in action) {
-        made.push(action.create);
+        made.push({ ...action.create, at: `then[${i}]` });
         did.push(`create in ${action.create.register}`);
       } else if ('suggest' in action) {
-        asks.push(action.suggest);
+        asks.push({ ...action.suggest, at: `then[${i}]` });
         did.push('suggest');
       } else if ('run' in action) {
         /* HELD UNTIL THE WRITE HAS HAPPENED, like a note: a call about a row the register then refused is a post
@@ -454,7 +488,7 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
       });
     }
 
-    for (const one of said)
+    for (const one of notes)
       /* AN URGENT ONE GOES THROUGH THE ROUTER, which writes the same event and then interrupts —
          once an hour per record, 09 §4. A plain one is the event and nothing else, which is what
          "batch by default" means: it lands in the digest. */
@@ -463,14 +497,20 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
 
     /* THE EXPANSION IS LAST, and it shares the triggering write's batch — so "undo this expansion"
        is one query rather than an archaeology of timestamps. */
-    let happened = Object.keys(patch).length > 0 || said.length > 0 || later.length > 0;
+    let happened = Object.keys(patch).length > 0 || notes.length > 0 || later.length > 0;
     for (const spec of made) {
       const grown = expand(deps, rule, spec, fired);
-      if (grown.refusals.length) out.refused.push(...grown.refusals);
+      /* A COPY OF A SECRET IS OBSERVED as the other texts' are (`undone`); a bound or an axis is refused as it was. */
+      for (const r of grown.refusals)
+        if (r.code === 'DECLARATION_INVALID' && /secret or file field/.test(r.fix)) undone(`${spec.at}.create.${r.at ?? 'fields'}`, 'DECLARATION_INVALID', r.fix);
+        else out.refused.push(r);
       if (grown.grew) happened = true;
     }
     for (const ask of asks) {
-      const opened = deps.suggest(fill(ask.question, fired.entry, deps.nowMs), ask.options, `rule:${rule.rule}`);
+      /* FILLED AFTER THE WRITE, from the row as the write left it, which is what the question has always read. */
+      const question = said(ask.question, `${ask.at}.suggest.question`, 'a question in the queue');
+      if (question === null) continue;
+      const opened = deps.suggest(question, ask.options, `rule:${rule.rule}`);
       if (refused(opened)) out.refused.push(opened.refusal);
       else happened = true;
     }
@@ -538,30 +578,103 @@ const DAY_MS = 86_400_000;
  * `template.replace is not a function` out of every write to its list, and the row a person asked for was lost with it.
  */
 export function fill(template: string, row: Entry, nowMs = Date.now()): string {
-  if (typeof template !== 'string') return wordsOf(template);
-  return template.replace(/\{\{(\w+)(?::(\w+))?\}\}/g, (_whole, head: string, tail?: string) => {
-    if (head === 'id') return row.seq === null ? row.id : `${row.register}#${row.seq}`;
-    const field = tail ?? head;
-    const kind = tail ? head : null;
-    const value = row.fields[field];
-    if (value === null || value === undefined || value === '') return '—';
+  return filling(template, row, nowMs).text;
+}
 
-    if (kind === 'money' || (!kind && isMoney(value)))
-      /* THE CURRENCY'S OWN DECIMALS. It was `amount / 100` to two places for every code, so JPY 129,900
-         was written `JPY 1299.00` and KWD 1.500 was `KWD 15.00`, into patches, notes and questions. */
-      return isMoney(value) ? `${value.currency} ${(value.amount / 10 ** exponentOf(value.currency)).toFixed(exponentOf(value.currency))}` : String(value);
-    if (kind === 'quantity' && isQuantity(value)) return `${value.value} ${value.unit}`;
-    if (kind === 'until' || kind === 'ago') {
-      const at = Date.parse(`${String(value).slice(0, 10)}T12:00:00Z`);
-      if (!Number.isFinite(at)) return String(value);
-      const days = Math.round((at - nowMs) / DAY_MS);
-      if (days === 0) return 'today';
-      return days > 0 ? `in ${days} day${days === 1 ? '' : 's'}` : `${-days} day${days === -1 ? '' : 's'} ago`;
+/**
+ * The run's own paths, as a run hands them to the pass: what `{{vars.x}}` or `{{trigger.row.note}}` is written as, and
+ * whether that path reaches a value a secret or file field gave it. `flow.ts` builds one for each step it acts.
+ */
+export type RunFill = { value: (head: string, path: string) => string; sealed: (head: string, path: string) => boolean };
+
+/**
+ * What `filling` reads besides the row: the fields of the row that never leave the record, a create's tuple, and the
+ * run's paths. Each spelling is left as typed where what fills it is not given. A tuple crossed from a field that never
+ * leaves is refused before it is filled (`expand`), so a tuple is never counted here.
+ */
+export type FillBy = { sealed?: ReadonlySet<string>; each?: readonly string[]; run?: RunFill };
+
+/**
+ * Every spelling a text can be filled from, in one pattern: the run's `{{vars.x}}` and `{{trigger.row.pin}}`
+ * (`flow-lint.ts`'s `RUN_PATH`), a create's `{{each.0}}`, and the row's `{{field}}` and `{{kind:field}}`.
+ */
+const SPELLED = new RegExp(`${RUN_PATH.source}|\\{\\{each\\.(\\d)\\}\\}|\\{\\{(\\w+)(?::(\\w+))?\\}\\}`, 'g');
+
+/** Whether a field holds anything a fill would write as more than the dash: an empty list holds nothing either. */
+export const present = (value: unknown): boolean => value !== null && value !== undefined && value !== '' && !(Array.isArray(value) && value.length === 0);
+
+/**
+ * `fill`, IN ONE PASS OVER THE TEXT, and the first spelling in it that reached a value a secret or file field gave it,
+ * or `null`.
+ *
+ * ONE `replace`, SO NOTHING ONE SPELLING WROTE IS READ AGAIN AS ANOTHER. The fills used to run one after the other:
+ * `withEach` wrote a create's tuple in, then `fill` read the row's `{{field}}`s out of the result, and `flow.ts` wrote
+ * the run's paths into a step before the pass filled it from the row. So a value holding the words `{{pin}}` was filled
+ * a second time, as the secret. Measured on 23 September at HEAD `afb3b1b2`: a `kinds` item `{{pin}}` crossed by `each:
+ * [kinds]` into `what: 'x {{each.0}}'` wrote `x hunter2` into a Payments row, and a run's `note: 'is
+ * {{trigger.row.note}}'` over a `note` holding `{{pin}}` wrote `is hunter2` into the note event. No lint can see either,
+ * since the braces are data.
+ *
+ * THE SECRET IS NAMED BY WHERE IT WAS READ, NEVER BY WHAT IT HOLDS. A field is counted when `sealed` has it and it holds
+ * a value, and a path when the run says so. Comparing the words written against the secret's words would refuse a row
+ * whose note happens to say what its pin says, and would miss the pin put in by way of a variable.
+ */
+export function filling(template: unknown, row: Entry, nowMs: number, by: FillBy = {}): { text: string; secret: string | null } {
+  if (typeof template !== 'string') return { text: wordsOf(template), secret: null };
+  let secret: string | null = null;
+  const text = template.replace(SPELLED, (whole: string, runHead?: string, runPath?: string, each?: string, head?: string, tail?: string) => {
+    if (runHead !== undefined) {
+      if (by.run === undefined) return whole;
+      if (by.run.sealed(runHead, runPath!)) secret ??= whole;
+      return by.run.value(runHead, runPath!);
     }
-    if (kind === 'pct') return `${(Number(value) * 100).toFixed(0)}%`;
-    if (Array.isArray(value)) return value.map(String).join(', ');
-    return String(value);
+    if (each !== undefined) {
+      if (by.each === undefined) return whole;
+      return by.each[Number(each)] ?? '';
+    }
+    const field = tail ?? head!;
+    if (head !== 'id' && by.sealed?.has(field) === true && present(row.fields[field])) secret ??= whole;
+    return rowValue(head!, tail, row, nowMs);
   });
+  return { text, secret };
+}
+
+/**
+ * The fields of `register` that never leave the record, by the declaration as it stands, retired ones included, and a
+ * list of either with them (`sealedAs`).
+ *
+ * THE DECLARATION AND NOT THE LIVE SCHEMA, which drops a retired field while the rows written before it was retired
+ * keep its value. `actions.ts` reads a call's sends the same way, for the same reason.
+ */
+export function sealedOf(sql: Sql, register: string): Set<string> {
+  const declared = sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'register' AND superseded_at IS NULL AND retired = 0", `register.${register}`)?.body;
+  const fields = ((declared === undefined ? {} : JSON.parse(declared)) as { fields?: { id?: unknown; type?: unknown; of?: unknown }[] }).fields ?? [];
+  return new Set(fields.filter((f) => sealedAs(f) !== null).map((f) => String(f.id)));
+}
+
+/** One `{{field}}` or `{{kind:field}}` of the row, as `fill` writes it. */
+function rowValue(head: string, tail: string | undefined, row: Entry, nowMs: number): string {
+  if (head === 'id') return row.seq === null ? row.id : `${row.register}#${row.seq}`;
+  const field = tail ?? head;
+  const kind = tail ? head : null;
+  const value = row.fields[field];
+  if (value === null || value === undefined || value === '') return '—';
+
+  if (kind === 'money' || (!kind && isMoney(value)))
+    /* THE CURRENCY'S OWN DECIMALS. It was `amount / 100` to two places for every code, so JPY 129,900
+       was written `JPY 1299.00` and KWD 1.500 was `KWD 15.00`, into patches, notes and questions. */
+    return isMoney(value) ? `${value.currency} ${(value.amount / 10 ** exponentOf(value.currency)).toFixed(exponentOf(value.currency))}` : String(value);
+  if (kind === 'quantity' && isQuantity(value)) return `${value.value} ${value.unit}`;
+  if (kind === 'until' || kind === 'ago') {
+    const at = Date.parse(`${String(value).slice(0, 10)}T12:00:00Z`);
+    if (!Number.isFinite(at)) return String(value);
+    const days = Math.round((at - nowMs) / DAY_MS);
+    if (days === 0) return 'today';
+    return days > 0 ? `in ${days} day${days === 1 ? '' : 's'}` : `${-days} day${days === -1 ? '' : 's'} ago`;
+  }
+  if (kind === 'pct') return `${(Number(value) * 100).toFixed(0)}%`;
+  if (Array.isArray(value)) return value.map(String).join(', ');
+  return String(value);
 }
 
 /** A value that is not text, as `fill` would write it had it been a field: a dash for nothing, a list by its items. */
@@ -631,6 +744,22 @@ function expand(
       at: 'bound',
     });
 
+  /* A SECRET OR FILE FIELD IS COPIED INTO NO ROW THIS MAKES, unless into a field of the other list that never leaves
+     either. Crossing one copies its values whatever the fields say, into `{{each.0}}` and into the `_each` every
+     generated row carries, so that is refused first. Checked before anything is written, for the bound's reason: a
+     half-made matrix looks like sizes nobody stocks. The lint refuses both at install (`flow-lint.ts`, `copyFault`),
+     and this is the second line, for a rule stored before it did and for a run's step, whose values exist only at the
+     run. */
+  const own = sealedOf(deps.sql, fired.register);
+  const theirs = sealedOf(deps.sql, spec.register);
+  const crossed = (spec.each ?? []).find((f) => own.has(f) && present(fired.entry.fields[f]));
+  if (crossed !== undefined)
+    return nothing({ code: 'DECLARATION_INVALID', fix: copied(rule.rule, `each: ${crossed}`, `every ${spec.register} row it creates`), at: 'each' });
+  for (const [id, template] of Object.entries(spec.fields)) {
+    const secret = filling(template, fired.entry, deps.nowMs, { sealed: own, ...(fired.run ? { run: fired.run } : {}) }).secret;
+    if (secret !== null && !theirs.has(id)) return nothing({ code: 'DECLARATION_INVALID', fix: copied(rule.rule, secret, `${id} of the ${spec.register} row it creates`), at: `fields.${id}` });
+  }
+
   const out: Refusal[] = [];
   let grew = false;
   for (const tuple of tuples) {
@@ -662,10 +791,13 @@ function expand(
     /* A VALUE THAT IS NOT TEXT GOES THROUGH AS IT WAS WRITTEN. `withEach` called `.replace` on each one, so a create
        holding `tags: ["late"]`, installed before the lint refused it, threw out of every write to the parent's list
        (measured on 23 September). Passed through, the list reads it as its own type, or refuses it as it would any
-       other value. */
+       other value.
+
+       AND THE TUPLE IS FILLED IN THE SAME PASS AS THE ROW. `withEach` wrote it in first and `fill` then read the
+       result, so a `kinds` item holding the words `{{pin}}` became the secret (`filling` says what was measured). */
     const fields: Record<string, unknown> = {};
     for (const [id, template] of Object.entries(spec.fields))
-      fields[id] = typeof template === 'string' ? fill(withEach(template, tuple), fired.entry, deps.nowMs) : template;
+      fields[id] = typeof template === 'string' ? filling(template, fired.entry, deps.nowMs, { each: tuple, ...(fired.run ? { run: fired.run } : {}) }).text : template;
 
     const made = deps.generate(spec.register, fields, `rule:${rule.rule}`, fired.batch, {
       _rule: rule.rule,
@@ -679,13 +811,11 @@ function expand(
 }
 
 /**
- * `{{each.0}}` and `{{each.1}}`, resolved before the ordinary template is.
- *
- * A SEPARATE PASS because the tuple is not a field on the row — it is the position in the matrix,
- * which is the only thing the generated row knows that its parent does not.
+ * The sentence for a step the pass leaves out because it would copy a secret or file field. It names the spelling and
+ * never the value, since the sentence is read by whoever reads the run or the list's refusals.
  */
-const withEach = (template: string, tuple: string[]): string =>
-  template.replace(/\{\{each\.(\d)\}\}/g, (_w, i: string) => tuple[Number(i)] ?? '');
+const copied = (rule: string, spelled: string, into: string): string =>
+  `rule.${rule} would put ${spelled} into ${into}, and ${spelled} reads what a secret or file field holds, which is copied only into another secret or file field. That step was not taken.`;
 
 /** A `list` is its items, an `enum` is its one value, and anything else is nothing to cross. */
 const asValues = (value: unknown): string[] =>
