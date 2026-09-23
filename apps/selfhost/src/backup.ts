@@ -8,11 +8,22 @@
  * DUE ONCE A DAY, AT A TIME OF DAY IN UTC, AND CAUGHT UP ON START. A machine that was off at that time takes the copy the
  * first time it looks after it: the question is always "is there a nightly copy since the last time it was due?", never
  * "is it that minute now?". So a laptop asleep at night still keeps one a day, and a restart never takes a second.
+ *
+ * AND THE DIRECTORY IS COPIED ON THE SAME CLOCK, `VACUUM INTO <data>/directory-snapshots/<time>-nightly.sqlite`, thirty
+ * kept (`loop/research-restore.md` section 6). Measured at 1586f2a2, a nightly copy left the data directory holding the
+ * record's copy and nothing of `directory.sqlite`, the only file that knows which name reaches which record, who owns it
+ * and their passkeys: lose it and every record is whole and nobody can reach one. It is the whole file, sessions
+ * included, because it is a backup of this machine and never leaves it; the Cloud's copy, which does leave, carries only
+ * the durable tables (W55-6). Asked on its own question, "is there a Directory copy since it fell due?", so a host
+ * upgraded after tonight's record copy still takes tonight's Directory copy.
  */
+
+import { chmodSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 
 import type { Sql } from '@braindog/ports';
 
-import { fileSnapshots, isNightly } from './snapshots.ts';
+import { fileSnapshots, isNightly, KEEP } from './snapshots.ts';
 
 /** the old tool's own nightly copy ran at 03:20 UTC; this keeps the hour. */
 export const NIGHTLY_AT = '03:20';
@@ -54,6 +65,8 @@ export function nightlyBackups(o: {
   /** The log line, `export`, as a copy from the app writes it. */
   logged?: (note: string) => void;
   say?: (line: string) => void;
+  /** The Directory, through the connection the server holds, and its file; copies go in `directory-snapshots/` beside it. */
+  directory?: { sql: Sql; file: string } | undefined;
 }): Nightly {
   const minutes = minutesOf(o.at ?? NIGHTLY_AT);
   if (minutes === null) throw new Error(`${String(o.at)} is not a time of day. Write it as HH:MM in UTC, such as 03:20, or off.`);
@@ -66,11 +79,24 @@ export function nightlyBackups(o: {
     try {
       const since = new Date(lastDue(o.now(), minutes)).toISOString();
       const kept = await copies.list();
-      if (kept.some((c) => isNightly(c.id) && c.at >= since)) return null;
-      const taken = await copies.take('nightly');
-      o.logged?.(`snapshot ${taken.id} ${String(taken.bytes)} bytes`);
-      o.say?.(`braindog · nightly copy ${taken.id} · ${String(taken.bytes)} bytes`);
-      return taken.id;
+      let taken: string | null = null;
+      if (!kept.some((c) => isNightly(c.id) && c.at >= since)) {
+        const copy = await copies.take('nightly');
+        o.logged?.(`snapshot ${copy.id} ${String(copy.bytes)} bytes`);
+        o.say?.(`braindog · nightly copy ${copy.id} · ${String(copy.bytes)} bytes`);
+        taken = copy.id;
+      }
+      /* THE DIRECTORY'S COPY FAILING DOES NOT UNDO THE RECORD'S, and it is said on its own: the sentence `look` gives
+         names the record's folder, and this is a different file in a different one. */
+      if (o.directory)
+        try {
+          directoryCopy(o.directory, since, o.now);
+        } catch (e) {
+          o.say?.(
+            `braindog · the Directory's nightly copy was not taken, and the record is still served: ${e instanceof Error ? e.message : String(e)}. Check that ${join(dirname(o.directory.file), DIRECTORY_COPIES)} can be written; it is tried again every ten minutes.`,
+          );
+        }
+      return taken;
     } finally {
       busy = false;
     }
@@ -94,4 +120,39 @@ export function nightlyBackups(o: {
       if (timer) clearInterval(timer);
     },
   };
+}
+
+/** The folder beside `directory.sqlite` its nightly copies go in. */
+export const DIRECTORY_COPIES = 'directory-snapshots';
+
+/* `2026-09-16T22-00-00Z-nightly.sqlite`, the record copies' stamp with the Directory's own extension: a copy is a SQLite
+   file `sqlite3` opens as it is, and nothing here builds a path from anything but this shape. */
+const DIRECTORY_COPY = /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})Z-nightly(?:-\d+)?\.sqlite$/u;
+
+/**
+ * Copy the Directory if no copy has been taken since `since`, then keep the newest thirty. The copy's name, or `null`.
+ *
+ * 0600, AS THE RECORD'S COPIES ARE: it holds every address on this installation and every passkey's public half.
+ */
+export function directoryCopy(directory: { sql: Sql; file: string }, since: string, now: () => number): string | null {
+  const folder = join(dirname(directory.file), DIRECTORY_COPIES);
+  const atOf = (name: string): string => {
+    const m = DIRECTORY_COPY.exec(name);
+    return m ? `${m[1]}T${m[2]}:${m[3]}:${m[4]}.000Z` : '';
+  };
+  const held = (): string[] => (existsSync(folder) ? readdirSync(folder).filter((n) => DIRECTORY_COPY.test(n)) : []);
+  if (held().some((n) => atOf(n) >= since)) return null;
+  mkdirSync(folder, { recursive: true, mode: 0o700 });
+  const stamp = `${new Date(now()).toISOString().slice(0, 19).replace(/:/g, '-')}Z-nightly`;
+  let name = `${stamp}.sqlite`;
+  for (let n = 2; existsSync(join(folder, name)); n++) name = `${stamp}-${String(n)}.sqlite`;
+  directory.sql.exec('VACUUM INTO ?', join(folder, name));
+  try {
+    chmodSync(join(folder, name), 0o600);
+  } catch {
+    /* Advisory on Windows. */
+  }
+  const newest = held().sort((a, b) => (atOf(a) === atOf(b) ? b.localeCompare(a, 'en', { numeric: true }) : atOf(a) < atOf(b) ? 1 : -1));
+  for (const old of newest.slice(KEEP)) rmSync(join(folder, old), { force: true });
+  return name;
 }

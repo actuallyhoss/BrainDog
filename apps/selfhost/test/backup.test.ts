@@ -1,5 +1,5 @@
 /**
- * The nightly copy: due once a day at a time in UTC, caught up on start, thirty kept apart from the copies a person takes, and put back; a copy that cannot be written stops nothing.
+ * The nightly copy: due once a day at a time in UTC, caught up on start, thirty kept apart from the copies a person takes, and put back; a copy that cannot be written stops nothing; and the Directory copied beside it.
  *
  * REAL FILES IN A TEMPORARY DIRECTORY and a clock the test moves, because the claims are about days: that a host asleep
  * at the hour takes the copy when it wakes, that a restart takes no second one, and that the copy restores.
@@ -7,13 +7,14 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { lastDue, minutesOf, nightlyBackups } from '../src/backup.ts';
 import { KEEP } from '../src/snapshots.ts';
-import { start } from '../src/server.ts';
+import { openSqlite, start } from '../src/server.ts';
+import { createDirectory } from '@braindog/record/directory';
 
 const OBLIGATIONS = {
   id: 'register.obligations',
@@ -140,5 +141,48 @@ test('A NIGHTLY COPY THAT CANNOT BE WRITTEN IS SAID IN ONE SENTENCE, and the hos
     nightly.stop();
     await running.close();
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('THE DIRECTORY IS COPIED WITH THE NIGHTLY COPY, into <data>/directory-snapshots/, once a night and thirty kept', async () => {
+  /* MEASURED AT 1586f2a2, BEFORE THIS TEST: after a nightly copy the data directory held the record's copy in
+     `<slug>/snapshots/` and nothing of `directory.sqlite`, which is the only file that knows which name reaches which
+     record, who owns it and their passkeys (`loop/research-restore.md` section 6). A lost Directory left every record
+     whole and nobody able to reach one. */
+  const data = mkdtempSync(join(tmpdir(), 'braindog-nightly-dir-'));
+  const dirFile = join(data, 'directory.sqlite');
+  mkdirSync(join(data, 'the-studio'));
+  const file = join(data, 'the-studio', 'record.brain');
+  let now = Date.parse('2026-09-16T22:00:00Z');
+  const running = await start({ file, directory: dirFile, port: 0, pollMs: 0, now: () => now });
+  const nightly = nightlyBackups({ sql: running.sql, file, now: () => now, at: '03:20', tickMs: 0, directory: { sql: running.directorySql, file: dirFile } });
+  try {
+    assert.ok(running.directory.person$('ada@example.com', 'Ada').ok);
+    assert.ok(running.directory.provision({ slug: 'the-studio', email: 'ada@example.com', record: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', plan: 'selfhost' }).ok);
+
+    assert.ok(await nightly.check());
+    const copies = join(data, 'directory-snapshots');
+    assert.deepEqual(readdirSync(copies), ['2026-09-16T22-00-00Z-nightly.sqlite']);
+    assert.equal(await nightly.check(), null);
+    assert.equal(readdirSync(copies).length, 1, 'a second look the same night copied the Directory again');
+
+    /* THE COPY IS A DIRECTORY: opened on its own it names the record and its owner. */
+    const copy = openSqlite(join(copies, '2026-09-16T22-00-00Z-nightly.sqlite'));
+    const back = createDirectory(copy, { now: () => now });
+    assert.equal(back.claimed('the-studio'), 'taken');
+    assert.deepEqual(back.namesOf('rec_01JZ8QK3F7R2M9V4XN6TCB5HAD').map((n) => n.slug), ['the-studio']);
+    copy.close();
+
+    for (let d = 0; d < KEEP + 5; d++) {
+      now = Date.parse('2026-09-18T04:00:00Z') + d * 86_400_000;
+      assert.ok(await nightly.check());
+    }
+    const kept = readdirSync(copies).filter((n) => n.endsWith('.sqlite'));
+    assert.equal(kept.length, KEEP);
+    assert.ok(!kept.includes('2026-09-16T22-00-00Z-nightly.sqlite'), 'the oldest Directory copy was kept past thirty');
+  } finally {
+    nightly.stop();
+    await running.close();
+    rmSync(data, { recursive: true, force: true });
   }
 });

@@ -29,6 +29,7 @@ import { idempotentCalls, readPublic, refusedAddress, sendAction, type Execute, 
 import type { RecordApi } from '@braindog/record';
 
 import { unwrap, type KeyStore } from './keys.ts';
+import type { WebhookPost } from './server.ts';
 
 export {
   IDEMPOTENCY_KEY,
@@ -208,6 +209,40 @@ export function pinFor(resolve: Resolve): Pin<Pinned> {
  */
 export function sharedReader(options: { send?: Send | undefined; resolve?: Resolve | undefined } = {}): (address: string) => Promise<PublicRead> {
   return readPublic<Pinned>({ send: options.send ?? pinnedSend, pin: pinFor(options.resolve ?? systemResolve) });
+}
+
+/**
+ * How long one webhook post may take before it is a failure the ladder tries again. The scheduled actions' ten seconds.
+ */
+export const WEBHOOK_MS = 10_000;
+
+/**
+ * The post `server.ts`'s `signedWebhooks` is handed on this host: every address the name resolves to checked, the one
+ * that was checked connected to, and the answer's status and nothing of its body.
+ *
+ * WIRED IN `main.ts` BECAUSE NOTHING WAS. deb5b703 built the signing and left the send to whoever called `start()`, and
+ * `serve` called it with no deliverer, so a `notify.webhook` sat `pending` for the life of the process (measured at
+ * 1586f2a2, `test/webhook-wired.test.ts`).
+ *
+ * THE SAME RULE AS A SCHEDULED ACTION'S. A webhook address is typed by whoever wrote the automation, so a name that
+ * resolves to a private or loopback address is refused before the key that signs the body is ever opened, and a
+ * redirect is not followed: `node:https` follows none, and a 3xx is an answer that is not ok. `send` and `resolve` are for
+ * tests; the defaults are `pinnedSend` and the system's name service.
+ */
+export function webhookPost(options: { send?: Send | undefined; resolve?: Resolve | undefined } = {}): WebhookPost {
+  const send = options.send ?? pinnedSend;
+  const pin = pinFor(options.resolve ?? systemResolve);
+  return async (url, body, headers) => {
+    const at = new URL(url);
+    const signal = AbortSignal.timeout(WEBHOOK_MS);
+    const pinned = await pin(at, signal);
+    if (typeof pinned === 'string') throw new Error(pinned);
+    const res = await send(at, { method: 'POST', headers: { ...headers, 'content-type': 'application/json; charset=utf-8' }, body, signal }, pinned);
+    /* THE BODY IS NOT READ. A receiver's answer is its status, and reading an unbounded body from somebody else's server
+       into this process is a cost nothing here needs. */
+    await res.body?.cancel().catch(() => {});
+    return { ok: res.ok, status: res.status };
+  };
 }
 
 /* ── a retry that is not a second call ──────────────────────────────────── */

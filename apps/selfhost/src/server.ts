@@ -15,7 +15,7 @@ import { createServer, type IncomingMessage, type RequestListener, type ServerRe
 import { createServer as createTlsServer } from 'node:https';
 import type { AddressInfo } from 'node:net';
 import { DatabaseSync } from 'node:sqlite';
-import { argv, env, exit } from 'node:process';
+import { env } from 'node:process';
 
 import {
   grantAad, grantKey, openSealed,
@@ -38,7 +38,7 @@ import {
   type CookieMode,
 } from '@braindog/host/auth';
 import { gate, serveMcp, unauthorized } from '@braindog/mcp/http';
-import type { Execute, OutboxKind, OutboxRow, PagedRun, ScriptRunner, Signer } from '@braindog/kernel';
+import { OPERATION_METHOD, type Execute, type OutboxKind, type OutboxRow, type PagedRun, type ScriptRunner, type Signer } from '@braindog/kernel';
 import { createRecordApi, type CallContext } from '@braindog/record';
 import { readFileSync as readWhole, existsSync as present, rmSync as removeTree } from 'node:fs';
 import { basename as baseOf, dirname as dirOf, join as joinPath } from 'node:path';
@@ -223,7 +223,10 @@ type Site = {
   arrivals: IngestDoor;
   /** `/account/*`: the Directory's usage ledger, and the switcher's rows, for a signed-in person. */
   /** The copies kept beside the record file, `<slug>/snapshots/` (`53 §5.4`); absent for a database in memory. */
-  snapshots: FileSnapshots | undefined;  usage: AccountDoor['usage'];
+  snapshots: FileSnapshots | undefined;
+  /** Whether the Directory gives this record `slug` as a name it holds now, beside the one the record carries. */
+  names: (slug: string) => boolean;
+  usage: AccountDoor['usage'];
   records: AccountDoor['records'];
 };
 
@@ -290,7 +293,7 @@ function presented(request: Request): string | undefined {
  * the same person at the same level through either, and `surface` is only what the token's listing shows as
  * where it was last used.
  */
-async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp'): Promise<Known> {
+async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', door?: string): Promise<Known> {
   const { api, token } = site;
   /* THE SERVER KEY IS COMPARED IN CONSTANT TIME, `49 §5.4` step 1. `!==` stops at the first byte that
      differs, so how long a wrong guess took said how much of it was right. */
@@ -305,7 +308,7 @@ async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp'): Prom
      token used to promote it to the owner, and `Authorization: x` on an open self-host was the owner. */
   if (!sent.includes('.')) return { refused: UNKNOWN };
   const seen = await api.kernel.verifyToken(sent, surface);
-  if (!seen.ok) return { refused: UNKNOWN };
+  if (!seen.ok) return door !== undefined && OPERATION_DOORS.has(door) ? operationFor(sent, api) : { refused: UNKNOWN };
 
   /* THE PERSON'S LEVEL COMES FROM THE RECORD, never from a constant, so a token outlives nothing its
      holder has lost. NOT ON THIS RECORD IS 403, and a credential this record does not know is 401. */
@@ -321,18 +324,56 @@ async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp'): Prom
 }
 
 /**
+ * The four record doors an operation bearer can open, by the name `/api/<method>` carries (`OPERATION_METHOD`).
+ *
+ * ASKED BEFORE THE GRANT IS READ, BECAUSE READING IT SPENDS IT. `operationGrant` marks the row used in the same turn it
+ * finds it, so a bearer sent to `/api/boot` by mistake would be gone before anything knew it was the wrong door. Only a
+ * request to one of these four is allowed to spend one; at the wrong one of the four it is spent and the record's own
+ * gate refuses it, which is the approver's phone saying "import" and the request saying "export".
+ */
+const OPERATION_DOORS: ReadonlySet<string> = new Set(Object.values(OPERATION_METHOD));
+
+/**
+ * An operation bearer (`48 §5.2`): checked and spent by the record, then the approver at the level they hold NOW.
+ *
+ * MEASURED BEFORE THIS EXISTED (`test/operation-bearer.test.ts`): the bearer `braindog export` had just been handed by
+ * `/auth/device/token` was answered 401 "This record does not know that credential." at `/api/export`, because
+ * `verifyToken` reads the `token` table and an operation lives in `device_grant`. W55-2 gave the record the check and the
+ * gate, and no host built the context between them.
+ *
+ * `operation` IS WHAT HOLDS IT TO ONE DOOR. `allows` refuses a context carrying it everywhere, and `admin` admits it only
+ * for the method it names, so the approver's owner level reaches that one call and nothing a session would reach.
+ */
+async function operationFor(sent: string, api: Api): Promise<Known> {
+  const grant = await api.operationGrant(sent);
+  if (!grant.ok) return { refused: UNKNOWN };
+  const held = api.kernel.access(grant.value.person);
+  if (!held) return { refused: OFF };
+  return {
+    ctx: {
+      principal: { kind: 'person', id: grant.value.person, level: held.level },
+      operation: grant.value.method,
+      credentialed: true,
+      ...(held.registers === null ? {} : { registers: held.registers }),
+      ...(Object.keys(held.levels).length === 0 ? {} : { levels: held.levels }),
+    },
+  };
+}
+
+/**
  * Who is asking, in the order `49 §5.4` gives, amended: a bearer, then the session cookie, then open mode.
  *
  * `host` IS THE `Host` HEADER AS THE SOCKET RECEIVED IT, because in open mode it is the check: a page that
  * rebinds its own name to 127.0.0.1 reaches this port with its own name in `Host`, and gets a 421.
  */
-async function contextFor(request: Request, host: string, site: Site): Promise<Seen> {
+async function contextFor(request: Request, host: string, site: Site, door?: string): Promise<Seen> {
   const { api, token } = site;
   const sent = presented(request);
 
-  /* ONE · A BEARER, which is an agent or the server key and never a browser, so the origin checks below do
-     not apply to it: nothing ambient sends an `Authorization` header. */
-  if (sent !== undefined) return bearerFor(sent, site, 'api');
+  /* ONE · A BEARER, which is an agent, the server key or an operation, and never a browser, so the origin checks below
+     do not apply to it: nothing ambient sends an `Authorization` header. `door` is the method the path names, the one
+     thing an operation bearer is checked against. */
+  if (sent !== undefined) return bearerFor(sent, site, 'api', door);
 
   /* TWO · THE SESSION COOKIE. A BAD ONE IS A 401 AND IS CLEARED, AND NEVER FALLS THROUGH TO OPEN MODE: a
      cookie that names no session is somebody who thinks they are signed in, and answering them as the
@@ -411,7 +452,7 @@ export type WebhookPost = (url: string, body: string, headers: Record<string, st
  * payload naming no key is a declaration that chose an unsigned post (`webhook.grant` is optional, `09 §6`).
  *
  * `post` OWNS WHERE THE REQUEST MAY GO. This refuses anything but `https:`, as the Worker does; a name that resolves to
- * a private address is the pinned sender's to refuse (`./actions.ts`), and `main.ts` wires none yet.
+ * a private address is the pinned sender's to refuse (`./actions.ts` `webhookPost`, which `main.ts` wires).
  */
 export function signedWebhooks(post: WebhookPost): Deliver {
   return async (job, keys) => {
@@ -881,6 +922,16 @@ export async function start(options: {
    * asks hourly.
    */
   sparkTickMs?: number | undefined;
+  /**
+   * Told once, the first time a pass finds `notify.email` jobs waiting on a host that does not deliver them, with how many.
+   *
+   * BECAUSE THEY WAIT IN SILENCE OTHERWISE. A self-host has no mail transport until W61, so a digest an automation mails
+   * is queued `pending` and stays there, which is the honest state (`49 §5.12` note 1: a kind not delivered is never
+   * leased), and nothing anywhere said so: measured at 1586f2a2, a job queued before `serve` started was still `pending`
+   * with nothing on stderr (`test/webhook-wired.test.ts`). Once per process, because the count is the same news every
+   * fifteen seconds. `main.ts` says it on stderr.
+   */
+  unsentMail?: ((waiting: number) => void) | undefined;
 } & (
     | {
         /**
@@ -1101,6 +1152,22 @@ export async function start(options: {
     }
   };
 
+  /* WHETHER THE WAITING MAIL HAS BEEN MENTIONED, which happens at most once in a process (`unsentMail`). */
+  let mailTold = false;
+  const tellUnsentMail = (): void => {
+    if (mailTold || gone || !options.unsentMail || delivers.includes('notify.email')) return;
+    let waiting = 0;
+    try {
+      waiting = Number(sql.one<{ n: number }>("SELECT count(*) AS n FROM outbox WHERE kind = 'notify.email' AND state = 'pending'")?.n ?? 0);
+    } catch {
+      /* A file this build refuses may not have the table this build expects; that is the refusal's to say. */
+      return;
+    }
+    if (waiting === 0) return;
+    mailTold = true;
+    options.unsentMail(waiting);
+  };
+
   /**
    * Lease, deliver, ack. One pass.
    *
@@ -1108,6 +1175,8 @@ export async function start(options: {
    * queue that keeps filling is drained by the doorbell rather than by a `while` nobody can stop.
    */
   const poll = async (): Promise<void> => {
+    /* NOTHING IS LEASED OR SENT FROM A RECORD THIS BUILD REFUSES, for the reason the doors above refuse it. */
+    if (api.kernel.refused()) return;
     await act();
     /* THE QUESTIONS TO SPARK, HERE AND NOT IN `act()`, which returns on its first line when `options.actions` is absent,
        as it is for every embedder and every test that does not pass it; a pass there left a record admitting the step and
@@ -1120,6 +1189,7 @@ export async function start(options: {
         console.error('spark answers:', e instanceof Error ? e.message : String(e));
       }
     }
+    tellUnsentMail();
     if (!options.deliver) return;
     let jobs: OutboxRow[];
     try {
@@ -1172,11 +1242,15 @@ export async function start(options: {
    * private key when a file is actually being written, so a server that runs for a month and exports
    * nothing never materialises that key at all.
    */
+  /* AND NOTHING IS DECIDED BEFORE THERE IS A RECORD. The first ask used to settle the answer for the life of the process,
+     so `/.well-known/braindog-key` asked before `createRecord` cached "no signer", and the record created a moment later
+     answered 404 for its key and exported unsigned until a restart (measured in `test/healthz.test.ts`). */
   let resolved: Signer | null | undefined;
   const sign: Signer = async (bytes) => {
     if (resolved === undefined) {
       const identity = sql.one<{ id: string }>('SELECT id FROM record WHERE singleton = 1');
-      resolved = options.keys && identity ? await signerFor(sql, options.keys, identity.id) : null;
+      if (!identity) return null;
+      resolved = options.keys ? await signerFor(sql, options.keys, identity.id) : null;
     }
     return resolved ? resolved(bytes) : null;
   };
@@ -1250,11 +1324,17 @@ export async function start(options: {
     build: { app: buildApp, spark: sparkModel !== undefined, host: 'self-host' },
   });
 
-  const refused = api.kernel.refused();
-  if (refused) {
-    console.error(`${refused.code}: ${refused.fix}`);
-    exit(1);
-  }
+  /* A MODULE-LEVEL REFUSAL NO LONGER ENDS THE PROCESS. This called `process.exit(1)` from inside a library function, so a
+     record whose ledger names a migration this build lacks took the process down before `/healthz` could answer, and a
+     test that opened such a file died with it (`test/healthz.test.ts`). `33 §9` says the refusal is returned by every RPC
+     as 503 "until a deploy fixes it, per record on a self-host", and `53 §13 #9` makes `/healthz` a 503 with its code, so
+     the process stays up and says so: every record method already answers the refusal through the kernel, and
+     `main.ts` prints the sentence. `api.kernel.refused()` is how an embedder asks. */
+
+  /* `53 §13 #9`'S TUPLE, READ ONCE: the three numbers are this build's, and asked after a delete they would read a closed
+     file. `/api/version` answers the same three behind a credential, from the same call. */
+  const shape = await api.version({ principal: { kind: 'system', id: 'healthz' } });
+  const tuple = shape.ok ? { format: shape.value.format, kernel: shape.value.kernel, primitives: shape.value.primitives } : null;
 
   /* THE WIRING IS SHARED, not copied. Both hosts call `handlersFor`, so a route cannot exist in one
      and not the other — and it throws at start rather than 404ing in production. */
@@ -1314,10 +1394,13 @@ export async function start(options: {
       res.end(JSON.stringify({ app: buildApp || null }));
       return;
     }
-    /* `/healthz`, AS THE WORKER ANSWERS IT (ROADMAP W55): `{ ok, app }`, before any door and with no credential, so a
-       container's health check needs no token. Measured at afb3b1b2 it was the router's 404 `ROUTE_UNKNOWN`. BEFORE THE
-       DELETED-RECORD 503, because the question is whether this process answers, and a restart loop over a record that
-       was deleted on purpose would fix nothing. */
+    /* `/healthz` (ROADMAP W55, `53 §13 #9`): `{ ok, app, format, kernel, primitives }` and a 200, or `{ ok, code }` and a
+       503 while the kernel holds a module-level refusal, before any door and with no credential, so a container's health
+       check needs no token. Never a slug: the record's name is not a fact about whether the process is well. `ok` and
+       `app` are the Worker's two (`apps/worker/test/healthz.test.ts` pins them there), so one monitor reads both hosts;
+       the Worker cannot add the other three without waking a record, and this host has its one record open already.
+       BEFORE THE DELETED-RECORD 503, because the question is whether this process answers, and a restart loop over a
+       record that was deleted on purpose would fix nothing. */
     if (/^\/+healthz\/*$/.test(new URL(req.url ?? '/', 'http://localhost').pathname)) {
       const method = req.method ?? 'GET';
       if (method !== 'GET' && method !== 'HEAD') {
@@ -1325,8 +1408,9 @@ export async function start(options: {
         res.end(JSON.stringify({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: '/healthz is read with GET or HEAD.' } }));
         return;
       }
-      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
-      res.end(method === 'HEAD' ? undefined : JSON.stringify({ ok: true, app: buildApp || null }));
+      const stopped = api.kernel.refused();
+      res.writeHead(stopped ? 503 : 200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      res.end(method === 'HEAD' ? undefined : JSON.stringify(stopped ? { ok: false, code: stopped.code } : { ok: true, app: buildApp || null, ...tuple }));
       return;
     }
     /* A CATALOGUE IS FILES, answered before any door, and never a record's: a deleted record does not change it. */
@@ -1336,10 +1420,29 @@ export async function start(options: {
       res.end(req.method === 'HEAD' ? undefined : listed.body);
       return;
     }
+    /* A RECORD THIS BUILD REFUSES ANSWERS NOTHING BUT THE REFUSAL, AT 503, HERE AND NOT METHOD BY METHOD. Kept up rather
+       than exited (above), the process was measured answering `GET /api/boot` 200 over a file whose ledger names a
+       migration this build does not have (`test/healthz.test.ts`): not every record method asks the kernel's refusal
+       first, and a method that does not reads tables this build does not know the shape of. So no door is reached, the
+       sign-in and arrival doors included, and `Retry-After` is the five minutes `51 §6.1` gives this refusal. */
+    const held = api.kernel.refused();
+    if (held) {
+      res.writeHead(503, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'retry-after': '300' });
+      res.end(JSON.stringify({ ok: false, refusal: held }));
+      return;
+    }
     /* A DELETED RECORD ANSWERS NOTHING BUT THAT, and never reads a file that is no longer there. */
     if (gone) {
       res.writeHead(503, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
       res.end(JSON.stringify({ ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'This record was deleted. Create another with braindog init.' } }));
+      return;
+    }
+    /* `/.well-known/braindog-key` (`03 §4`): the key this record's exports are signed with, `{ key_id, public_key }`, to
+       anybody and with no credential, so `braindog verify --key <url>` has a place to fetch it other than the file it
+       is checking. Measured at 1586f2a2 it was the router's 404 `ROUTE_UNKNOWN`. One record per process, so the root is
+       the record's; the Worker serves many and answers it under the record's path instead. */
+    if (/^\/+\.well-known\/+braindog-key\/*$/.test(new URL(req.url ?? '/', 'http://localhost').pathname)) {
+      void keyDoor(req.method ?? 'GET', res, api).catch(() => res.destroy());
       return;
     }
     void answer(req, res, handlers, site, shell, trustProxy).catch((e: unknown) => {
@@ -1457,6 +1560,10 @@ export async function start(options: {
     /* ONE BUDGET PER PROCESS, built here so it outlives a request and is shared by every ingest. */
     arrivals: arrivalDoor(api, ingestBudget(clock.now), inboundMail),
     snapshots: kept,
+    names: (slug) => {
+      const here = api.kernel.identity()?.id;
+      return here !== undefined && directory.namesOf(here).some((n) => n.slug === slug && n.released_at === null);
+    },
     door: {
       on: 'selfhost',
       origin,
@@ -1509,6 +1616,9 @@ export async function start(options: {
     drain: run,
     poll,
     directory,
+    /* THE DIRECTORY'S CONNECTION, for the nightly copy's `VACUUM INTO` (`backup.ts`), so the copy is taken through the
+       handle this process already holds and closes, and never through a second one somebody has to remember. */
+    directorySql: dirSql,
     signIn: { origin, ways, off },
     close: () =>
       new Promise<void>((r) => {
@@ -1609,7 +1719,11 @@ async function answer(
      caller is known, so a request with no credential gets the root's own 401 and learns nothing about which name is here. */
   const named = slugApi(asked.pathname);
   const url = named === null ? asked.href : new URL(`${named.rest}${asked.search}`, asked.origin).href;
-  const foreign = named !== null && named.slug !== site.api.kernel.identity()?.slug;
+  /* AND A NAME THE DIRECTORY GIVES THIS RECORD IS THIS RECORD. `init <slug> --from <file>` restores a copy under the name
+     it is given while the record keeps the one inside the file, because rewriting its row would make its next export a
+     different file from the copy (`test/restore-from.test.ts`); the switcher hands out the Directory's name, and the
+     app's calls under it were refused "You are not on this record." */
+  const foreign = named !== null && named.slug !== site.api.kernel.identity()?.slug && !site.names(named.slug);
 
   /* FOUR DOORS, AND THEY ARE `33 §4`'S: sign-in, an agent's MCP client, the record, and the app for everything
      else. The app is what makes `/signin` the same origin as the cookie it asks for. `/mcp` is taken before a
@@ -1661,7 +1775,7 @@ async function answer(
         : json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'The key doors are at /api/vault/, and a grant names its own record.' } }),
     );
 
-  const seen = await contextFor(request, req.headers.host ?? '', site);
+  const seen = await contextFor(request, req.headers.host ?? '', site, /^\/+api\/+([A-Za-z]+)\/*$/.exec(path)?.[1]);
   /* A NAME THAT IS NOT THIS RECORD'S, TO A CALLER THIS HOST KNOWS. One record is served here, so no credential reaches
      another, and the sentence is the Directory's for a name that is not yours, whether or not it names anything. A
      caller it does not know falls through to the root's own refusal below, which never reaches the record. */
@@ -1699,6 +1813,29 @@ async function answer(
   if (seen.bare === 421) return write(res, new Response(null, { status: 421, headers: { 'cache-control': 'no-store' } }));
   if (seen.bare === 429) return write(res, json(429, { ok: false, retryAfter: seen.retryAfter }, [['retry-after', String(seen.retryAfter)]]));
   return write(res, json(503, { ok: false }));
+}
+
+/**
+ * `GET /.well-known/braindog-key`: `signingKey()` as `03 §4` shapes it, or a 404 that says there is no key to give.
+ *
+ * NO KEY IS AN ANSWER AND NOT AN ERROR. A record not yet created, a host started with no key store, and a record restored
+ * from a copy wrapped by another host's root key all sign nothing, and saying so is what tells the person with a file in
+ * hand that a check against this host cannot pass. It never invents a key and never reads the private half: the record
+ * learns the public one by signing a fixed string no caller chooses (`packages/kernel/src/index.ts`, `signingKey`).
+ */
+async function keyDoor(method: string, res: ServerResponse, api: Api): Promise<void> {
+  const head = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' };
+  if (method !== 'GET' && method !== 'HEAD') {
+    res.writeHead(405, { ...head, allow: 'GET, HEAD' });
+    res.end(JSON.stringify({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: '/.well-known/braindog-key is read with GET or HEAD.' } }));
+    return;
+  }
+  const key = await api.signingKey();
+  const body = key
+    ? { key_id: key.key_id, public_key: key.public_key }
+    : { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This host holds no signing key for its record, so what it exports is unsigned and there is no key here to check a file against.' } };
+  res.writeHead(key ? 200 : 404, head);
+  res.end(method === 'HEAD' ? undefined : JSON.stringify(body));
 }
 
 /**

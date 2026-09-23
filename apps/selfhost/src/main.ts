@@ -47,7 +47,9 @@ import { fixOf } from '@braindog/ports';
 import { NIGHTLY_AT, nightlyBackups } from './backup.ts';
 import { lockDown, openKeyStore, recordKeys } from './keys.ts';
 import { nameChange, reachLine, reachOf } from './reach.ts';
-import { openSqlite, start } from './server.ts';
+import { initFrom } from './restore.ts';
+import { openSqlite, signedWebhooks, start } from './server.ts';
+import { webhookPost } from './actions.ts';
 
 /**
  * One sentence on stderr, and nothing on stdout — ever.
@@ -131,7 +133,8 @@ const recordIn = (dir: string): string | null => {
 };
 
 /**
- * `init <slug> [--owner <email>]`, and `BRAINDOG_OWNER` when the flag is absent.
+ * `init <slug> [--owner <email>]`, and `BRAINDOG_OWNER` when the flag is absent. `init <slug> --from <file.brainl>
+ * [--key <public key>] [--owner <email>]` restores a copy instead, and is `./restore.ts`'s from its first step.
  *
  * THE ORDER IS `49 §5.22`'S, with the record id minted first. The spec wraps the keys at step 4 and
  * mints the id at step 6, which cannot both be done as written once the wrapping is bound to the
@@ -139,9 +142,35 @@ const recordIn = (dir: string): string | null => {
  */
 async function init(args: readonly string[]): Promise<void> {
   const slug = args[0];
-  if (!slug) return refuse('braindog init needs a name for the record: init <slug> --owner <email>');
+  if (!slug) return refuse('braindog init needs a name for the record: init <slug> --owner <email>, or init <slug> --from <file.brainl>');
 
   const flag = args.indexOf('--owner');
+
+  /* `--from <file.brainl>` IS A RESTORE, AND IT IS ITS OWN PATH (`./restore.ts`). The record, its id and its owner come
+     from the file, so nothing below applies: no id is minted, no keys are made, and `createRecord` is never called,
+     because a record it made is not empty and a copy cannot be imported into it (`IMPORT_NOT_EMPTY`, measured). */
+  const from = args.indexOf('--from');
+  if (from >= 0) {
+    const path = args[from + 1];
+    if (!path || path.startsWith('--')) return refuse('braindog init --from needs the file to restore: init <slug> --from <file.brainl>');
+    const keyAt = args.indexOf('--key');
+    const key = keyAt >= 0 ? args[keyAt + 1] : undefined;
+    if (keyAt >= 0 && (!key || key.startsWith('--'))) return refuse('--key needs the public key the copy must be signed by, 43 characters of base64url.');
+    const data = dataDir();
+    const out = await initFrom({
+      data,
+      slug,
+      from: path,
+      key,
+      owner: flag >= 0 ? args[flag + 1] : env.BRAINDOG_OWNER,
+      kekFile: env.BRAINDOG_KEK_FILE ?? join(data, 'kek'),
+      now: clock.now,
+      say,
+    });
+    if (!out.ok) return refuse(out.said);
+    for (const line of out.said) say(line);
+    return;
+  }
   /* TRIMMED AND LOWER-CASED ONCE, HERE, and this value is the only one used afterwards. `49 §4.1`
      stores a person's address lower-cased and trimmed — and ` ada@example.com ` went through
      untrimmed, so `person$` stored the trimmed form and `provision` then looked up the untrimmed one
@@ -560,12 +589,27 @@ async function serve(): Promise<void> {
     actions: {},
     /* SPARK LOOKS ONCE A DAY on its own unless the owner turned that off; asking hourly is how a day is noticed. */
     sparkTickMs: 3_600_000,
+    /* A SIGNED WEBHOOK LEAVES THROUGH THE PINNED POST, and it is the one kind this process delivers. Nothing was passed
+       here before, so a `notify.webhook` an automation queued sat `pending` for the life of the process (measured,
+       `test/webhook-wired.test.ts`). `pull.fetch` is the scheduled actions' own, above. */
+    delivers: ['notify.webhook'],
+    deliver: signedWebhooks(webhookPost()),
+    /* AND MAIL, WHICH HAS NO WAY OUT OF THIS HOST YET, IS SAID ONCE rather than left to wait unseen. The jobs stay queued:
+       a transport added later (W61) sends them, where dropping them would lose the digest somebody was promised. */
+    unsentMail: (waiting) =>
+      say(
+        `braindog · ${String(waiting)} notification ${waiting === 1 ? 'email is' : 'emails are'} waiting to be sent, and this host has no way to send mail yet. ${waiting === 1 ? 'It stays' : 'They stay'} queued, and nothing is lost; this is said once each time the host starts.`,
+      ),
   });
   /* `importKey` copied it, so these are the last copies this process holds as bytes. */
   sessionKey.fill(0);
   store.sessionKey.fill(0);
 
   say(`braindog · ${file} · ${running.signIn.origin}`);
+  /* A RECORD THIS BUILD REFUSES IS SERVED AS A REFUSAL, and this is the sentence that says why. `start()` used to exit
+     here, so a container's health check saw a process gone rather than `/healthz`'s 503 and its code. */
+  const stopped = running.api.kernel.refused();
+  if (stopped) say(`  ${stopped.code}: ${stopped.fix} Every request is answered 503 until then, and /healthz says ${stopped.code}.`);
   /* ONE LINE FOR WHO MAY GET IN, SAID OUT LOUD, because the safe default is also the surprising one:
      somebody who expected the server on their LAN needs to know why it is not, and somebody who set a
      token needs to know where to sign in. It names ways, never a key. */
@@ -597,7 +641,16 @@ async function serve(): Promise<void> {
   const nightly =
     at === 'off'
       ? null
-      : nightlyBackups({ sql: running.sql, file, at, now: () => Date.now(), say, logged: (note) => running.api.kernel.lifecycle('export', 'system', note) });
+      : nightlyBackups({
+          sql: running.sql,
+          file,
+          at,
+          now: () => Date.now(),
+          say,
+          logged: (note) => running.api.kernel.lifecycle('export', 'system', note),
+          /* AND THE DIRECTORY, into `<data>/directory-snapshots/`, when this host has one. */
+          ...(existsSync(dirFile) ? { directory: { sql: running.directorySql, file: dirFile } } : {}),
+        });
   /* A COPY THAT CANNOT BE WRITTEN DOES NOT STOP THE HOST. It is said in one sentence and tried again on the clock. */
   if (nightly) await nightly.look();
 
