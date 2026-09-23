@@ -16,6 +16,11 @@
  * So the stand-in here is a `.ps1`, the harsher of the two; `claude.exe` from the native installer took the quoted
  * form and wrote the entry, checked by hand once against the real CLI in a scratch `CLAUDE_CONFIG_DIR`.
  *
+ * AND A LINE PRINTED FOR ONE SHELL MUST RUN NOTHING IN ANOTHER (finding 6 of `loop/research-batch-forty-six-audit.md`).
+ * The PowerShell form was bare `;` statements, and Git Bash ran them one by one: the assignments failed and `claude mcp
+ * add` ran in the shell's own profile. So the form is chosen by the shell where it can be told, and each is tested in
+ * the shell it is not for as well as the one it is.
+ *
  * NOTHING HERE RUNS THE REAL `claude`. A stand-in earlier on the PATH prints the `CLAUDE_CONFIG_DIR` it saw and each
  * argument it was given, and every folder is under a temporary one.
  */
@@ -28,7 +33,7 @@ import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { byHand } from '../src/install.ts';
+import { byHand, shellOf } from '../src/install.ts';
 
 const APP = join(dirname(fileURLToPath(import.meta.url)), '..');
 const MAIN = join(APP, 'src', 'main.ts').replaceAll('\\', '/');
@@ -54,18 +59,28 @@ function withBin(bin: string): NodeJS.ProcessEnv {
   return env;
 }
 
-test('ON WIN32 A NAMED PROFILE IS NAMED THE WAY POWERSHELL SETS A VARIABLE, with no inline JSON and the apostrophe doubled', () => {
-  const [line = ''] = byHand([named], home, 'win32');
-  assert.ok(line.startsWith('$braindogWas = $env:CLAUDE_CONFIG_DIR; $env:CLAUDE_CONFIG_DIR = '), line);
+test('IN POWERSHELL A NAMED PROFILE IS NAMED THE WAY POWERSHELL SETS A VARIABLE, inside one script block, with no inline JSON and the apostrophe doubled', () => {
+  const [line = ''] = byHand([named], home, 'PowerShell');
+  assert.ok(line.startsWith('& { $was = $env:CLAUDE_CONFIG_DIR; $env:CLAUDE_CONFIG_DIR = '), line);
   assert.ok(line.includes(`'${named.replaceAll("'", "''")}'`), line);
   assert.ok(!line.includes("'{") && !line.includes('add-json'), line);
-  assert.ok(line.endsWith('; $env:CLAUDE_CONFIG_DIR = $braindogWas'), line);
+  assert.ok(line.endsWith('; $env:CLAUDE_CONFIG_DIR = $was }'), line);
 });
 
 test('ELSEWHERE THE LINE STAYS sh, with the apostrophe closed and reopened, and no inline JSON either', () => {
-  const [line = ''] = byHand([named], home, 'linux');
+  const [line = ''] = byHand([named], home, 'sh');
   assert.ok(line.startsWith(`CLAUDE_CONFIG_DIR='${named.replaceAll("'", "'\\''")}' claude mcp add --scope user braindog -- node `), line);
   assert.ok(!line.includes("'{") && !line.includes('add-json'), line);
+  assert.deepEqual(byHand([named, join(home, '.claude')], home, 'Git Bash'), byHand([named, join(home, '.claude')], home, 'sh'));
+});
+
+test('THE SHELL IS GIT BASH ON WIN32 WHERE MSYSTEM OR A bash SHELL SAYS SO, PowerShell otherwise, and sh off Windows', () => {
+  assert.equal(shellOf({ MSYSTEM: 'MINGW64' }, 'win32'), 'Git Bash');
+  assert.equal(shellOf({ SHELL: '/usr/bin/bash' }, 'win32'), 'Git Bash');
+  assert.equal(shellOf({ PSModulePath: 'C:\\Windows\\system32\\WindowsPowerShell\\v1.0\\Modules' }, 'win32'), 'PowerShell');
+  assert.equal(shellOf({}, 'win32'), 'PowerShell');
+  assert.equal(shellOf({ MSYSTEM: 'MINGW64' }, 'linux'), 'sh');
+  assert.equal(shellOf({}, 'darwin'), 'sh');
 });
 
 /**
@@ -98,7 +113,7 @@ function inPowerShell(lines: string[], was: string | null) {
 }
 
 test('PASTED INTO POWERSHELL 5.1, THE NAMED LINE REACHES claude WITH THE PROFILE, EVERY ARGUMENT AND THE --, AND HANDS THE SHELL BACK ITS OWN', { skip: process.platform !== 'win32' }, () => {
-  const lines = byHand([named], home, 'win32');
+  const lines = byHand([named], home, 'PowerShell');
   const ran = inPowerShell(lines, WAS);
   assert.deepEqual(ran.dirs, [named], ran.stdout);
   assert.deepEqual(ran.args, ARGS, ran.stdout);
@@ -118,7 +133,7 @@ test('A CURLY APOSTROPHE IN THE PROFILE IS DOUBLED TOO, because PowerShell ends 
    * included.
    */
   const curly = join(home, '.claude-prof\u2019s \u2018x\u2019');
-  const ran = inPowerShell(byHand([curly], home, 'win32'), WAS);
+  const ran = inPowerShell(byHand([curly], home, 'PowerShell'), WAS);
   assert.deepEqual(ran.dirs, [curly], ran.stdout);
   assert.deepEqual(ran.args, ARGS, ran.stdout);
   assert.equal(ran.after, `after=${WAS}|set=True`, ran.stdout);
@@ -130,11 +145,57 @@ test('THE DEFAULT PROFILE IS REACHED FROM A SHELL THAT SITS IN ANOTHER: CLAUDE_C
    * registered the server in the quartz profile. Claude Code keeps the default profile's servers in `~/.claude.json`
    * only when the variable is unset, so unset is the one value that names it.
    */
-  const lines = byHand([join(home, '.claude')], home, 'win32');
+  const lines = byHand([join(home, '.claude')], home, 'PowerShell');
   const ran = inPowerShell(lines, WAS);
   assert.deepEqual(ran.dirs, [''], ran.stdout);
   assert.deepEqual(ran.args, ARGS, ran.stdout);
   assert.equal(ran.after, `after=${WAS}|set=True`, ran.stdout);
+});
+
+/*
+ * BASH ONLY WHERE IT REACHES THE STAND-IN, or the test below would pass without testing anything: a bash that cannot
+ * run the stand-in at all never shows it running. This machine's PATH carries three `bash.exe`, Git's first, then
+ * `System32` (the WSL launcher) and `WindowsApps`, so which one answers depends on the PATH, and the probe asks it.
+ */
+function bashReaching(bin: string): string | false {
+  const probe = spawnSync('bash', ['-c', 'claude probe'], { env: withBin(bin), encoding: 'utf8', timeout: 30_000 });
+  if (probe.error) return 'no bash on the PATH';
+  return probe.stdout.includes('arg=probe') ? false : `the bash on the PATH does not reach a stand-in on it (${probe.stdout}${probe.stderr})`.trim();
+}
+
+test('THE POWERSHELL LINES PASTED INTO GIT BASH RUN NOTHING, so a line printed for the wrong shell fails closed', (t) => {
+  /*
+   * MEASURED BEFORE THIS TEST EXISTED (audit forty-six, finding 6): bash ran each `;` statement of the PowerShell
+   * line, the two assignments failed with "=: command not found", and `claude mcp add` then ran in whatever profile
+   * the shell was in, the acme one for a line that named another and for the line that meant `~/.claude`.
+   */
+  const dir = mkdtempSync(join(scratch, 'bash-'));
+  mkdirSync(join(dir, 'bin'));
+  writeFileSync(join(dir, 'bin', 'claude'), '#!/bin/sh\nprintf "dir=%s\\n" "${CLAUDE_CONFIG_DIR-}"\nfor a in "$@"; do printf "arg=%s\\n" "$a"; done\n', { mode: 0o755 });
+  const skip = bashReaching(join(dir, 'bin'));
+  if (skip) return t.skip(skip);
+  for (const line of byHand([named, join(home, '.claude')], home, 'PowerShell')) {
+    const ran = spawnSync('bash', ['-c', line], { env: { ...withBin(join(dir, 'bin')), CLAUDE_CONFIG_DIR: WAS }, encoding: 'utf8', timeout: 30_000 });
+    assert.ok(!ran.stdout.includes('arg=mcp'), `the stand-in ran for ${line}\n${ran.stdout}\n${ran.stderr}`);
+    assert.notEqual(ran.status, 0, `${ran.stdout}\n${ran.stderr}`);
+  }
+});
+
+test('AND THE sh LINES PASTED INTO POWERSHELL 5.1 RUN NOTHING, since the shell is told from the environment and can be told wrong', { skip: process.platform !== 'win32' }, () => {
+  /*
+   * A PowerShell started under Git Bash inherits `MSYSTEM`, so `install` run there prints the `sh` form. Each line is
+   * its own script, because a `ParserError` in one file refuses the whole file and would hide what the other did.
+   */
+  const dir = mkdtempSync(join(scratch, 'ps-sh-'));
+  mkdirSync(join(dir, 'bin'));
+  writeFileSync(join(dir, 'bin', 'claude.ps1'), 'Write-Output "dir=$env:CLAUDE_CONFIG_DIR"\r\nforeach ($a in $args) { Write-Output "arg=$a" }\r\n');
+  byHand([named, join(home, '.claude')], home, 'Git Bash').forEach((line, i) => {
+    const file = join(dir, `line-${i}.ps1`);
+    writeFileSync(file, `﻿${line}\r\n`);
+    const ran = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', file], { env: withBin(join(dir, 'bin')), encoding: 'utf8', timeout: 60_000 });
+    assert.ok(!ran.stdout.includes('arg=mcp'), `the stand-in ran for ${line}\n${ran.stdout}\n${ran.stderr}`);
+    assert.ok(/not recognized|Missing closing|missing the terminator/.test(ran.stdout + ran.stderr), `${ran.stdout}\n${ran.stderr}`);
+  });
 });
 
 /* Git Bash on Windows, sh anywhere else: skipped only where no `sh` answers at all. */
@@ -144,7 +205,7 @@ test('PASTED INTO sh, BOTH LINES REACH claude WITH THE PROFILE THEY NAME AND EVE
   const dir = mkdtempSync(join(scratch, 'sh-'));
   mkdirSync(join(dir, 'bin'));
   writeFileSync(join(dir, 'bin', 'claude'), '#!/bin/sh\nprintf "dir=%s\\n" "${CLAUDE_CONFIG_DIR-}"\nfor a in "$@"; do printf "arg=%s\\n" "$a"; done\n', { mode: 0o755 });
-  const lines = byHand([named, join(home, '.claude')], home, 'linux');
+  const lines = byHand([named, join(home, '.claude')], home, 'Git Bash');
   const script = [`CLAUDE_CONFIG_DIR='${WAS}'`, 'export CLAUDE_CONFIG_DIR', ...lines, 'printf "after=%s\\n" "$CLAUDE_CONFIG_DIR"', ''].join('\n');
   const ran = spawnSync('sh', ['-c', script], { env: withBin(join(dir, 'bin')), encoding: 'utf8', timeout: 30_000 });
   assert.equal(ran.status, 0, `${ran.stdout}\n${ran.stderr}`);

@@ -37,7 +37,7 @@ const PLUS = `  + mcpServers.braindog: ${JSON.stringify(BRAINDOG)}`;
  */
 const WIN = process.platform === 'win32';
 const HAND = `claude mcp add --scope user braindog ${WIN ? "'--'" : '--'} node '${BRAINDOG.args[0]}' mcp --agent claude`;
-const inPs = (set: string) => `$braindogWas = $env:CLAUDE_CONFIG_DIR; $env:CLAUDE_CONFIG_DIR = ${set}; ${HAND}; $env:CLAUDE_CONFIG_DIR = $braindogWas`;
+const inPs = (set: string) => `& { $was = $env:CLAUDE_CONFIG_DIR; $env:CLAUDE_CONFIG_DIR = ${set}; ${HAND}; $env:CLAUDE_CONFIG_DIR = $was }`;
 const forProfile = (dir: string) => (WIN ? inPs(`'${dir.replaceAll("'", "''")}'`) : `CLAUDE_CONFIG_DIR='${dir}' ${HAND}`);
 /* The default profile is named by the variable's absence, so the line clears the shell's own for the one call. */
 const FOR_DEFAULT = WIN ? inPs('$null') : `(unset CLAUDE_CONFIG_DIR; ${HAND})`;
@@ -95,7 +95,7 @@ function his(home: string) {
 
 function cli(args: string[], home: string) {
   const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: join(home, 'config') };
-  for (const name of Object.keys(env)) if (name.startsWith('BRAINDOG_') || name === 'CLAUDE_CONFIG_DIR') delete env[name];
+  for (const name of Object.keys(env)) if (name.startsWith('BRAINDOG_') || name === 'CLAUDE_CONFIG_DIR' || name === 'MSYSTEM' || name === 'SHELL') delete env[name];
   const ran = spawnSync(process.execPath, [join(APP, 'src', 'main.ts'), ...args], { cwd: home, env, encoding: 'utf8', timeout: 30_000 });
   return { code: ran.status, stdout: ran.stdout, stderr: ran.stderr };
 }

@@ -28,7 +28,7 @@ import { automations, scripts } from './automations.ts';
 import { hookEnd, hookStart, readSession, sessionPath } from './hooks.ts';
 import { budgetOf, clientFor, hostsPath, target } from './http.ts';
 import { importCommand } from './import.ts';
-import { HAND_RUN, REPLACE_BY_HAND, byHand, installProfiles, profilesOf } from './install.ts';
+import { REPLACE_BY_HAND, byHand, handRun, installProfiles, profilesOf, shellOf } from './install.ts';
 import { machine, takeJson, type Machine } from './json.ts';
 import { keys, spawnInherit } from './keys.ts';
 import { login } from './login.ts';
@@ -364,9 +364,13 @@ function install(args: string[]): void {
    * any file gained the entry, and the audit's `.claude-acme` ended with no server and no line
    * (`loop/research-batch-forty-two-audit.md` §5). A run that names only settings files has no profile to name, so
    * its line is for the profile the shell is in, as it always was.
+   *
+   * HEADED WITH THE SHELL IT IS FOR, because that is chosen from the environment and can be wrong (see `shellOf`).
+   * Each form is refused whole by the other shells, and the heading is what tells him which window to paste it into.
    */
-  const hand = profiles.length === 0 ? [HAND_RUN] : byHand(run.unserved);
-  if (hand.length > 0) lines.push('', 'The MCP server is registered once per profile by Claude Code itself, and install does not run it:', ...hand);
+  const shell = shellOf();
+  const hand = profiles.length === 0 ? [handRun(shell)] : byHand(run.unserved, undefined, shell);
+  if (hand.length > 0) lines.push('', 'The MCP server is registered once per profile by Claude Code itself, and install does not run it.', `In ${shell}, run:`, ...hand);
   if (json) {
     for (const line of lines) json.out(line);
     emit(json.envelope(0));

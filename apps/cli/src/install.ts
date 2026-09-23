@@ -104,16 +104,39 @@ export const BRAINDOG_SERVER = {
 
 const ADDS_SERVER = '  + mcpServers.braindog: ';
 
+/**
+ * The shell a hand-run line is printed for, by the name the printed lines are headed with.
+ *
+ * GIT BASH TAKES THE `sh` FORM, NOT THE ONE `process.platform` NAMES. The line was PowerShell on every win32 run, and
+ * Git Bash is a shell Sam has and the one Claude Code's own Bash tool runs here: pasted there, bash ran each `;`
+ * statement, the two assignments failed, and `claude mcp add` ran in the acme profile the window sat in, for a line
+ * that named another and for the line that meant `~/.claude` (finding 6 of `loop/research-batch-forty-six-audit.md`).
+ */
+export type Shell = 'PowerShell' | 'Git Bash' | 'sh';
+
+/**
+ * The shell that ran `braindog install`, where the environment can tell it: `MSYSTEM`, or a `SHELL` naming bash, is
+ * Git Bash on win32. NEITHER IS PROOF, which is why every form fails closed in the others and the lines are headed with
+ * the name. Measured in this tree's session: a PowerShell started under Git Bash inherits `MSYSTEM=MINGW64`, so it is
+ * handed the `sh` form. That form is refused whole there, "is not recognized" for a named profile ("missing the
+ * terminator" when its folder holds an apostrophe) and "Missing closing ')'" for the default one, and in `cmd` too,
+ * with a stand-in `claude` first on the PATH never run.
+ */
+export function shellOf(env: Env = process.env, platform: string = process.platform): Shell {
+  if (platform !== 'win32') return 'sh';
+  return env.MSYSTEM || /bash/i.test(env.SHELL ?? '') ? 'Git Bash' : 'PowerShell';
+}
+
 /*
  * A word quoted for the shell the line is printed for: PowerShell doubles a `'`, `sh` closes and reopens around it.
  * POWERSHELL READS FOUR MORE CHARACTERS AS `'`: U+2018, U+2019, U+201A and U+201B. With only the ASCII one doubled,
  * a profile folder named `prof’s` printed a line 5.1 refused whole, "The string is missing the terminator".
  */
-const quote = (word: string, platform: string): string =>
-  platform === 'win32' ? `'${word.replace(/['\u2018\u2019\u201A\u201B]/g, '$&$&')}'` : `'${word.replaceAll("'", "'\\''")}'`;
+const quote = (word: string, shell: Shell): string =>
+  shell === 'PowerShell' ? `'${word.replace(/['\u2018\u2019\u201A\u201B]/g, '$&$&')}'` : `'${word.replaceAll("'", "'\\''")}'`;
 
 /**
- * What registers BrainDog's server in the profile the shell is in, for the shell `platform` names.
+ * What registers BrainDog's server in the profile the shell is in, for the shell `shell` names.
  *
  * `claude mcp add`, NOT `add-json`, BECAUSE NO SHELL HAS TO CARRY JSON. The `add-json` line lost its inner double
  * quotes in Windows PowerShell 5.1, which reached `claude` as `{type:stdio,command:node,...}` and did not parse
@@ -125,14 +148,11 @@ const quote = (word: string, platform: string): string =>
  * puts on the PATH: a stand-in `claude.ps1` was handed no `--`, and `'--'` arrived whole. `claude.exe` from the
  * native installer took the quoted form and wrote exactly `BRAINDOG_SERVER`, plus an empty `env`, in a scratch profile.
  */
-export function handRun(platform: string = process.platform): string {
+export function handRun(shell: Shell = shellOf()): string {
   const [main, ...rest] = BRAINDOG_SERVER.args;
-  const dashes = platform === 'win32' ? "'--'" : '--';
-  return `claude mcp add --scope user braindog ${dashes} ${BRAINDOG_SERVER.command} ${quote(main, platform)} ${rest.join(' ')}`;
+  const dashes = shell === 'PowerShell' ? "'--'" : '--';
+  return `claude mcp add --scope user braindog ${dashes} ${BRAINDOG_SERVER.command} ${quote(main, shell)} ${rest.join(' ')}`;
 }
-
-/** The line for this machine's shell, which main.ts prints bare when a run names only settings files. */
-export const HAND_RUN = handRun();
 
 /**
  * The hand-run line for each profile `installProfiles` left without BrainDog's server, WITH `CLAUDE_CONFIG_DIR` NAMING
@@ -141,19 +161,25 @@ export const HAND_RUN = handRun();
  * is set (see `serversFileOf`), so setting it to `~/.claude` would be read as a named profile and write inside the
  * folder, and leaving the shell's own, as the line once did, wrote into whichever profile the window was in.
  *
- * POWERSHELL ON WIN32, BECAUSE THAT IS WHERE IT IS PASTED. The `sh` form, `CLAUDE_CONFIG_DIR='<dir>' claude ...`, is
- * `CommandNotFoundException` in PowerShell 5.1 and "not recognized" in `cmd`; only Git Bash ran it. The PowerShell form
+ * POWERSHELL ON WIN32 UNLESS THE SHELL SAYS GIT BASH (see `shellOf`). The `sh` form, `CLAUDE_CONFIG_DIR='<dir>'
+ * claude ...`, is `CommandNotFoundException` in PowerShell 5.1 and "not recognized" in `cmd`. The PowerShell form
  * PUTS THE SHELL'S OWN VALUE BACK rather than removing it: his window already sits in a profile, and a line ending in
  * `Remove-Item Env:CLAUDE_CONFIG_DIR` left it unset, so every later `claude` there ran in `~/.claude`. Assigning the
  * saved `$null` back removes the variable, so a shell that had none is left with none.
+ *
+ * AND IT IS ONE SCRIPT BLOCK, `& { ... }`, SO NO OTHER SHELL RUNS ANY OF IT. Written as bare `;` statements, bash ran
+ * them one by one and reached `claude` after both assignments had failed. Measured: bash refuses the block before it
+ * starts, "syntax error near unexpected token `&'", and `cmd` says "& was unexpected at this time", neither running a
+ * stand-in `claude`. In 5.1 the block's `$env:` change is the process's, so `claude` sees it, while `$was` ends with
+ * the block and leaves the window no variable of ours.
  */
-export function byHand(unserved: string[], home: string = homedir(), platform: string = process.platform): string[] {
-  const line = handRun(platform);
+export function byHand(unserved: string[], home: string = homedir(), shell: Shell = shellOf()): string[] {
+  const line = handRun(shell);
   return unserved.map((dir) => {
     const named = serversFileOf(dir, home) !== join(home, '.claude.json');
-    if (platform !== 'win32') return named ? `CLAUDE_CONFIG_DIR=${quote(resolve(dir), platform)} ${line}` : `(unset CLAUDE_CONFIG_DIR; ${line})`;
-    const set = named ? quote(resolve(dir), platform) : '$null';
-    return `$braindogWas = $env:CLAUDE_CONFIG_DIR; $env:CLAUDE_CONFIG_DIR = ${set}; ${line}; $env:CLAUDE_CONFIG_DIR = $braindogWas`;
+    if (shell !== 'PowerShell') return named ? `CLAUDE_CONFIG_DIR=${quote(resolve(dir), shell)} ${line}` : `(unset CLAUDE_CONFIG_DIR; ${line})`;
+    const set = named ? quote(resolve(dir), shell) : '$null';
+    return `& { $was = $env:CLAUDE_CONFIG_DIR; $env:CLAUDE_CONFIG_DIR = ${set}; ${line}; $env:CLAUDE_CONFIG_DIR = $was }`;
   });
 }
 
