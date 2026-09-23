@@ -111,3 +111,47 @@ test('D1: THE DRY RUN OF A when OVER A REF ANSWERS THE SAME FOR EVERY TITLE IN A
   assert.deepEqual([await said(owner, 'Acme Holdings'), await said(owner, 'Bolt Ltd')], ['matches 1 of 1', 'matches 0 of 1']);
   sql.close();
 });
+
+/* AUDIT FORTY, FINDING 8: THE INSTALLED RULES THE CANDIDATE IS RANKED AGAINST LOOKED THE TITLE UP TOO. The candidate's
+   `when` was narrowed to the asker and the installed rules kept the owner's context, and the sample says per row which
+   rule takes it. Measured before the fix, with `rule.acme` (`client is Acme Holdings`, sets `note`) installed after
+   the rows, so it had run on none of them: a member refused Clients read `takenBy: { acme: 1 }` and `billed#1` alone
+   "acme sets note first", which is the Acme row among three, told apart by a title she may not read. */
+test('DR3: THE RULES A DRY RUN RANKS AGAINST ARE ASKED WITH THE READS OF WHOEVER ASKS, so no row is told apart by a title she cannot read', async () => {
+  const CLIENTS = { id: 'register.clients', kind: 'register', body: { id: 'clients', name: 'Clients', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] } };
+  const BILLED = {
+    id: 'register.billed',
+    kind: 'register',
+    body: { id: 'billed', name: 'Billed', title: 'what', fields: [{ id: 'what', type: 'text', required: true }, { id: 'client', type: 'ref', to: 'clients' }, { id: 'note', type: 'text' }] },
+  };
+  const reader: CallContext = { principal: { kind: 'person', id: 'p_m', level: 'write' }, levels: { clients: 'append' } };
+  const candidate = { rule: 'probe', register: 'billed', then: [{ set: { field: 'note', to: 'seen' } }] };
+  type Ran = { ok: true; value: { matches: number; lost: number; takenBy: Record<string, number>; sample: { spoken: string; reason?: string }[] } };
+
+  /* The same record twice, the installed rule naming a client a row has and one no row has. */
+  const ranked = async (client: string, ctx: CallContext) => {
+    const sql = openSqlite();
+    const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+    assert.ok((await api.kernel.install([CLIENTS, BILLED] as never)).ok);
+    const acme = api.kernel.create('clients', { name: 'Acme Holdings' }, { actor: 'p_owner' });
+    const other = api.kernel.create('clients', { name: 'Bolt Ltd' }, { actor: 'p_owner' });
+    assert.ok(acme.ok && other.ok);
+    assert.ok(api.kernel.create('clients', { name: 'Nobody Ltd' }, { actor: 'p_owner' }).ok);
+    assert.ok(api.kernel.create('billed', { what: 'Invoice 7', client: acme.value.id }, { actor: 'p_owner' }).ok);
+    assert.ok(api.kernel.create('billed', { what: 'Invoice 8', client: other.value.id }, { actor: 'p_owner' }).ok);
+    assert.ok(api.kernel.create('billed', { what: 'Invoice 9', client: other.value.id }, { actor: 'p_owner' }).ok);
+    const rule = { rule: 'acme', register: 'billed', when: `client is ${client}`, then: [{ set: { field: 'note', to: 'Acme' } }] };
+    assert.ok((await api.kernel.install([{ id: 'rule.acme', kind: 'rule', body: rule }] as never)).ok);
+    const out = (await api.dryRun({ rule: candidate }, ctx)) as Ran;
+    assert.ok(out.ok, JSON.stringify(out));
+    sql.close();
+    return { matches: out.value.matches, lost: out.value.lost, takenBy: out.value.takenBy, sample: out.value.sample.map((s) => [s.spoken, s.reason ?? null]) };
+  };
+
+  /* The owner, who reads Clients, is told which row the installed rule takes. */
+  assert.deepEqual((await ranked('Acme Holdings', owner)).takenBy, { acme: 1 });
+  /* She is told the same whether the installed rule names the client of a row or a client no row has. */
+  const named = await ranked('Acme Holdings', reader);
+  const nobody = await ranked('Nobody Ltd', reader);
+  assert.deepEqual(named, nobody, `a dry run told which row is Acme's: ${JSON.stringify(named)}`);
+});

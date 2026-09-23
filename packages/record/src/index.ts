@@ -1860,10 +1860,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        diary, its claim, its measure and `baseline: 2`, off `governance` as a member invited to Obligations, while the
        change it grades and that change's decision were held back from her in the same run. `for_decl` is read as the
        `change` branch reads `declaration_id`: a list's declaration asks that list, and anything else (a page, a rule) is
-       about the record as a whole. */
-    if (typeof row.for_decl === 'string') {
-      const list = row.for_decl.startsWith('register.') ? row.for_decl.slice('register.'.length) : '';
-      return list === '' ? !wholeRecord(ctx) : readable(ctx, list) !== null;
+       about the record as a whole.
+
+       AND ABOUT THE FIGURE IT MEASURES, which is what its baseline counts (`loop/research-batch-forty-audit.md` finding
+       2). Held to `for_decl` alone, a prediction counting Omar's Money rows filed on a change to Inbox reached the member
+       invited to Inbox alone with `where: payee is Omar` and `baseline: 2`, and filed on a change to a rule it reached a
+       member held to `append` on Money. So `predictionHeld` asks both, and places a rule or a script as a change to it
+       is placed rather than on the whole record. */
+    if (typeof row.for_decl === 'string') return predictionHeld(ctx, row);
+    /* THE QUESTION A MISSED PREDICTION FILES IS HELD AS THAT PREDICTION IS. The kernel files it as `system` with an
+       `options` body that names nothing, so it went to every whole-record reader with "predicted >=5, observed 3" in
+       it (audit forty, finding 2, E1). The body does not say which prediction it is, so the prediction is found by the
+       words the kernel wrote it in; a question no prediction matches keeps the rule for a question about no list. */
+    if (row.body_kind === 'options' && row.opened_by === 'system') {
+      const graded = missedBy(row);
+      if (graded.length > 0) return graded.some((p) => predictionHeld(ctx, p));
     }
     const body = row.body as Record<string, unknown> | undefined;
     /* A QUESTION FILLED FROM AN ARRIVAL THAT WROTE NO ROW IS HELD AS THE INBOX IS, to the owner reading the whole record
@@ -1892,10 +1903,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        its answer and the owner's reason (*The auditor must not see his salary line*) reached a member invited to
        Obligations through `governance`, `whatsNew` and `recentHistory` (§5), and so did the question a missed prediction
        files, whose body carries only its two options (§3). A `pack` or `settings` proposal is about what the record is,
-       and a `change` to a page is about no one list, so each takes the same rule. A `change` to a rule or a script names
-       the lists its declarations touch, through `changeTouches` (audit thirty-eight, finding 3). */
-    if (row.body_kind === 'change' && named === undefined) {
-      const touched = changeTouches(body);
+       and so takes the same rule. A `change` to a page is too, and to every list it reads besides. A `change` to a rule or a script names
+       the lists its declarations touch, through `changeTouches` (audit thirty-eight, finding 3).
+
+       AND SO DOES A CHANGE UNDER A LIST'S NAME. This asked `changeTouches` only when the name was not a list's, so under
+       `register.inbox` the filing check was the only gate, and it does not read a script's `reads` and `writes` or an
+       arrival rule's door: audit forty's finding 1 filed a script reading Money, one writing it and a rule on the payroll
+       door into Money each beside Inbox's new field, and the member invited to Inbox alone was handed all three, the
+       source that posts Omar's rows to `collector.test` included. The name is still asked first, and then everything
+       the change touches is asked as well, so the read side does not rest on what the filing check happens to read. */
+    if (row.body_kind === 'change') {
+      if (typeof named === 'string' && named !== '' && readable(ctx, named) !== null) return true;
+      const touched = changeTouches(body, typeof row.opened_at === 'string' ? row.opened_at : null);
       if (touched !== null)
         return (
           (touched.whole && !wholeRecord(ctx)) ||
@@ -1921,28 +1940,58 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * touches no list are shown by those reads to a caller who reads every list, and are held to that here (`every`); a
    * declaration of any other kind is about the record as a whole, as it was before (`whole`).
    *
+   * AND A DECLARATION OF ANY OTHER KIND IS ABOUT EVERY LIST IT READS OR WRITES AS WELL. `whole` alone let a page, a door
+   * and a figure through to anybody who reads the whole record, and a member held to `append` on Money is one:
+   * `loop/research-batch-forty-audit.md` finding 4 handed her a page tabling Omar's Money rows, the payroll door into
+   * Money, a figure summing Omar's pay and a bundle under a rule on Inbox carrying that figure, while `page` told her
+   * `PAGE_UNKNOWN` and `metric` told her `METRIC_UNKNOWN`. So those bodies are walked by `listsIn` too. `whole` stays
+   * beside the lists, because a page names a read across the record by a source that is no list (`activity`,
+   * `governance.open`) and a figure nothing here can resolve names no list at all.
+   *
    * AND THE LIVE COPY OF EACH, because accepting a change to a rule on Money changes what Money's rows set off, whatever
    * list the new body names. The filing check asks the replaced declaration the same question (`govern.ts`
    * `replacedAbout`).
+   *
+   * AND THE COPY THAT WAS LIVE WHEN THE CHANGE WAS OPENED, because once it is accepted the live copy is the one it
+   * installed. Audit forty's finding 5 moved `rule.omar-pay` off Money onto Inbox: held from the member invited to Inbox
+   * alone while it was open, the question, the decision and the owner's reason reached her `governance` and `whatsNew`
+   * the moment it was accepted, since the Money body had been superseded and the check no longer read it. A version is
+   * live from its `created_at` until its `superseded_at`, so the ones that were live are those whose span holds
+   * `opened`, ends included, since a change filed and accepted in one millisecond ties the two.
    */
-  const changeTouches = (body: Record<string, unknown> | undefined): { lists: Set<string>; every: boolean; whole: boolean } | null => {
+  const changeTouches = (body: Record<string, unknown> | undefined, opened: string | null = null): { lists: Set<string>; every: boolean; whole: boolean } | null => {
     const to = body?.to as { declarations?: unknown } | undefined;
     const bundle = (Array.isArray(to?.declarations) ? to.declarations : [to]).filter(
       (d): d is { id: string; body?: unknown } => d !== null && typeof d === 'object' && typeof (d as { id?: unknown }).id === 'string',
     );
-    const live = (id: string): unknown => {
-      const found = sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1', id)?.body;
-      return found === undefined ? undefined : JSON.parse(found);
-    };
-    const doorOf = (door: string): unknown => bundle.find((d) => d.id === `ingest.${door}`)?.body ?? live(`ingest.${door}`);
+    /* EVERY VERSION WHOSE LIFE TOUCHES `opened`, and not the newest created by then. The accept installs its body at
+       the decision's instant and supersedes the old one at that same instant, so a change filed and accepted inside
+       one millisecond had its own new body as the newest created by `opened`, and the member invited to Inbox alone
+       read the accepted move and the owner's reason again (the checker's same-millisecond case). In that tie both
+       versions were live at `opened` as far as the record can tell, and both are asked. */
+    const then = (id: string): unknown[] =>
+      opened === null
+        ? []
+        : sql
+            .all<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND created_at <= ? AND (superseded_at IS NULL OR superseded_at >= ?) ORDER BY version', id, opened, opened)
+            .map((v) => parsed(v.body));
+    const proposed = (id: string): unknown => bundle.find((d) => d.id === id)?.body;
+    const figures = (id: string): unknown[] => [proposed(`metric.${id}`), liveBody(`metric.${id}`), ...then(`metric.${id}`)];
     const out = { lists: new Set<string>(), every: false, whole: false };
-    for (const d of bundle)
-      for (const b of [d.body, live(d.id)]) {
+    for (const d of bundle) {
+      /* EACH COPY READS ITS DOOR AS OF ITS OWN TIME: the proposed body the bundle's door or today's, the one that was
+         live when the change was opened the door of that moment. */
+      const copies: [unknown, (id: string) => unknown][] = [
+        [d.body, (id) => proposed(id) ?? liveBody(id)],
+        [liveBody(d.id), liveBody],
+        ...then(d.id).map((b): [unknown, (id: string) => unknown] => [b, (id) => then(id)[0] ?? liveBody(id)]),
+      ];
+      for (const [b, at] of copies) {
         if (b === null || typeof b !== 'object' || Array.isArray(b)) continue;
         const decl = b as Record<string, unknown>;
         if (d.id.startsWith('register.')) out.lists.add(d.id.slice('register.'.length));
         else if (d.id.startsWith('rule.')) {
-          const list = rowRegisterOf(decl as Parameters<typeof rowRegisterOf>[0], doorOf);
+          const list = rowRegisterOf(decl as Parameters<typeof rowRegisterOf>[0], (door) => at(`ingest.${door}`));
           if (list === null) out.every = true;
           else out.lists.add(list);
           for (const reached of listsReached(decl)) out.lists.add(reached.register);
@@ -1950,9 +1999,119 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           const lists = [decl.reads, decl.writes].flatMap((l) => (Array.isArray(l) ? l.filter((x): x is string => typeof x === 'string') : []));
           if (lists.length === 0) out.every = true;
           for (const list of lists) out.lists.add(list);
-        } else out.whole = true;
+        } else {
+          out.whole = true;
+          for (const list of listsIn(decl, d.id.startsWith('page.'), figures)) out.lists.add(list);
+        }
       }
+    }
     return out.lists.size === 0 && !out.every ? null : out;
+  };
+
+  /** A declaration's stored body, parsed, or `undefined` for none. */
+  const parsed = (found: string | undefined): unknown => (found === undefined ? undefined : JSON.parse(found));
+
+  /** The live copy of a declaration, or `undefined`. */
+  const liveBody = (id: string): unknown =>
+    parsed(sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1', id)?.body);
+
+  /** The names a template fills from the run and not from a list: `{{trigger.row.amount}}`, `{{vars.x}}`, `{{each.0}}`. */
+  const RUNNER_SCOPE = new Set(['trigger', 'vars', 'each']);
+
+  /**
+   * Every list a page, a door, a figure, a block or a digest names, with each figure it reads walked through `figures`.
+   *
+   * THE FILING CHECK'S WALK, WHICH THE RECORD CANNOT IMPORT. `listsNamed` in `govern.ts` is the kernel's own and is not
+   * exported, so this reads what it reads: a `register` key or a `register.<id>` string anywhere (a page's `requires`, a
+   * block's `source`, an ingest's `writes.register` and each leg of its route, a metric's `source`), a figure by
+   * `metric.<id>` or a `metric` key, and on a page the `late`, `then` and `each` a forecast and a series name figures by,
+   * and `{{list.field}}` in prose. `{{trigger.row.amount}}` is not a list called `trigger` (audit forty, found on the
+   * way), and a bare `{{figure}}` on a page is read through its metric. A figure `figures` cannot resolve adds nothing,
+   * and the caller keeps `whole` beside these lists for it.
+   */
+  const listsIn = (body: unknown, page: boolean, figures: (id: string) => unknown[]): Set<string> => {
+    const lists = new Set<string>();
+    const seen = new Set<string>();
+    const figure = (said: string): void => {
+      const colon = said.indexOf(':');
+      const id = colon < 0 ? said : said.slice(0, colon);
+      if (seen.has(id)) return;
+      seen.add(id);
+      for (const metric of figures(id)) if (metric !== undefined) visit(metric, undefined);
+    };
+    const visit = (node: unknown, key: string | undefined): void => {
+      if (typeof node === 'string') {
+        const ref = /^register\.([a-z][a-z0-9_]*)$/.exec(node);
+        if (ref) lists.add(ref[1]!);
+        else if (node.startsWith('metric.')) figure(node.slice('metric.'.length));
+        else if (key === 'register') lists.add(node);
+        else if (key === 'metric' || (page && (key === 'late' || key === 'then' || key === 'each'))) figure(node);
+        for (const m of node.matchAll(/\{\{\s*(?:[a-z]+:)?\s*([a-z][a-z0-9_]*)(?:#\d+)?\.[A-Za-z]/g)) if (!RUNNER_SCOPE.has(m[1]!)) lists.add(m[1]!);
+        if (page) for (const m of node.matchAll(/\{\{\s*(?:[a-z]+:\s*)?([a-z][a-z0-9_-]*)\s*\}\}/g)) figure(m[1]!);
+        return;
+      }
+      if (Array.isArray(node)) {
+        for (const n of node) visit(n, undefined);
+        return;
+      }
+      if (node === null || typeof node !== 'object') return;
+      for (const [k, v] of Object.entries(node)) visit(v, k);
+    };
+    visit(body, undefined);
+    return lists;
+  };
+
+  /**
+   * Whether a prediction is about a list this caller cannot read: the declaration it grades, placed as a change to that
+   * declaration is placed, or the figure it measures.
+   *
+   * THE DECLARATION IS READ THROUGH EVERY VERSION OF IT, because a prediction grades the change from one body to the
+   * next and carries no link to the question that proposed it, so the version it replaced is found only among them.
+   * A measure over anything but a list or a resolvable figure is about the record as a whole.
+   */
+  const predictionHeld = (ctx: CallContext, row: Record<string, unknown>): boolean => {
+    const forDecl = String(row.for_decl);
+    let measure: unknown = row.measure;
+    if (typeof measure === 'string')
+      try {
+        measure = JSON.parse(measure) as unknown;
+      } catch {
+        measure = null;
+      }
+    const lists = new Set<string>();
+    let whole = false;
+    let every = false;
+    if (forDecl.startsWith('register.')) lists.add(forDecl.slice('register.'.length));
+    else {
+      const versions = sql.all<{ body: string }>('SELECT body FROM declaration WHERE id = ? ORDER BY version', forDecl);
+      const touched = changeTouches({ to: { declarations: versions.map((v) => ({ id: forDecl, body: parsed(v.body) })) } });
+      if (touched === null) whole = true;
+      else {
+        whole = touched.whole;
+        every = touched.every;
+        for (const list of touched.lists) lists.add(list);
+      }
+    }
+    const source = (measure as { source?: unknown } | null)?.source;
+    if (typeof source === 'string' && (source.startsWith('register.') || source.startsWith('metric.'))) {
+      const counted = listsIn(measure, false, (id) => [liveBody(`metric.${id}`)]);
+      if (counted.size === 0) whole = true;
+      for (const list of counted) lists.add(list);
+    } else whole = true;
+    return (whole && !wholeRecord(ctx)) || (every && !readsEveryList(ctx)) || [...lists].some((list) => readable(ctx, list) !== null);
+  };
+
+  /**
+   * The predictions whose miss filed this question, found by the words `scorePrediction` files it in, since its body
+   * names none. Two predictions with the same claim and target both answer, and the question is held if either is.
+   */
+  const missedBy = (row: Record<string, unknown>): Record<string, unknown>[] => {
+    const question = typeof row.id === 'string' ? kernel.question(row.id) : null;
+    if (question === null) return [];
+    return sql
+      .all<{ id: string; claim: string; target: string }>('SELECT id, claim, target FROM prediction WHERE met = 0')
+      .filter((p) => question.startsWith(`${p.claim}: predicted ${p.target}, observed `))
+      .flatMap((p) => ((found) => (found === null ? [] : [found]))(kernel.governanceRow('prediction', p.id)));
   };
 
   /**
