@@ -25,6 +25,7 @@ import { FORMAT_VERSION, KERNEL_MIGRATION } from '@braindog/kernel';
 import { PRIMITIVES_VERSION } from 'braindog-render';
 
 import { automations, scripts } from './automations.ts';
+import { exportFile, importFile } from './brainfile.ts';
 import { hookEnd, hookStart, readSession, sessionPath } from './hooks.ts';
 import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
 import { importCommand } from './import.ts';
@@ -147,6 +148,11 @@ const usage = () =>
     '  Start an automation now, or stop a run that has not finished. The record lets only a browser session do either, so a token is told so.',
     'braindog scripts resume <id> [--host <host>]',
     '  Start a script paused by three refused runs in a row again. A browser session only, as run and cancel are.',
+    'braindog export [--kek <id> | --redact-grants] [--sections <data,origin,governance>] [-o <file.brainl>] [--key <pubkey|url>] [--host <host>]',
+    '  Take the record as a .brainl file and check it here. A backup carries the sealed bytes and names the key they are wrapped by; with --redact-grants it is a copy to share, and cannot put the keys back.',
+    'braindog import <file.brainl> [--key <pubkey|url>] [--host <host>]',
+    "  Check the file here, then put the record back from it, in place of everything it holds now. The record takes only its own copy.",
+    '  Both ask the owner to approve the one operation in the app, with six digits, unless BRAINDOG_TOKEN is the self-host\'s server key.',
     'braindog import legacy <export.json> [--setup <setup.json>] [--host <host>] [--dry-run] | --draft-setup',
     '  Move a the old tool export into this BrainDog. Running it again updates what it added, and no key value is ever read.',
     'braindog mcp [--agent claude|codex|cursor|other] [--host <host>]',
@@ -317,6 +323,31 @@ async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'pa
   setTimeout(() => process.exit(code), 1_000).unref();
 }
 
+/**
+ * `braindog export` and `braindog import <file.brainl>`, over the real terminal, and the exit code the command decides.
+ *
+ * NOT ONE OF `agentCommand`'s, because these two may run a device flow in the middle: they need the hosts file, and
+ * Ctrl+C, which the others never wait long enough to be given. The six digits go to stderr either way, as `login`'s do.
+ */
+async function brainfileCommand(which: 'export' | 'import', args: string[]): Promise<void> {
+  const stopping = new AbortController();
+  process.on('SIGINT', () => stopping.abort());
+  const io = {
+    env: process.env,
+    cwd: process.cwd(),
+    file: hostsPath(process.env),
+    out: json ? json.out : (line: string) => writeFileSync(1, `${line}\n`),
+    say: json ? json.say : say,
+    answer: json?.answer,
+    signal: stopping.signal,
+  };
+  const code = which === 'export' ? await exportFile(args, io) : await importFile(args, io);
+  if (json) emit(json.envelope(code));
+  /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
+  process.exitCode = code;
+  setTimeout(() => process.exit(code), 1_000).unref();
+}
+
 function selfhost(command: 'init' | 'serve', args: string[]): void {
   const entry = process.env.BRAINDOG_SELFHOST || fileURLToPath(new URL('../../selfhost/src/main.ts', import.meta.url));
   if (!existsSync(entry)) return stop(`braindog ${command} needs the self-host. Set BRAINDOG_SELFHOST to its entry file.`);
@@ -436,7 +467,7 @@ function install(args: string[]): void {
  * left to refuse the flag in its own words, which is the answer a caller deserves rather than an
  * empty document.
  */
-const JSON_COMMANDS = new Set(['--version', '-v', 'help', '--help', '-h', 'login', 'logout', 'skills', 'tools', 'page', 'usecase', 'pack', 'import', 'context', 'session', 'automations', 'scripts', 'install', 'verify']);
+const JSON_COMMANDS = new Set(['--version', '-v', 'help', '--help', '-h', 'login', 'logout', 'skills', 'tools', 'page', 'usecase', 'pack', 'import', 'export', 'context', 'session', 'automations', 'scripts', 'install', 'verify']);
 
 const [command, ...rest] = process.argv.slice(2);
 /* ONE DECISION, TAKEN BEFORE DISPATCH (`48 §4.5`, `json.ts`): the flag is answered here and removed,
@@ -474,6 +505,11 @@ try {
   /* `run` IS `keys exec` UNDER ITS SHORTER NAME (`48 §2`), not a second door: one command opens a key
      into one environment variable, and adding a way to print one would undo the reason it exists. */
   else if (command === 'run') await keysCommand(['exec', ...rest]);
+  else if (command === 'export') await brainfileCommand('export', args);
+  /* `import legacy` IS THE THE OLD TOOL IMPORTER, UNCHANGED, and any other `import` is a .brainl put back. Asked by
+     whether the word is there at all rather than by position, because the importer's own `parseArgs` takes `--host <h>`
+     ahead of it, and a file literally named `legacy` is not a .brainl anybody writes. */
+  else if (command === 'import' && !args.includes('legacy')) await brainfileCommand('import', args);
   else if (command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase' || command === 'pack' || command === 'import' || command === 'context' || command === 'session' || command === 'automations' || command === 'scripts' || command === 'verify') await agentCommand(command, args);
   else if (command === 'hook') await hook(rest);
   else if (command === 'install') install(args);

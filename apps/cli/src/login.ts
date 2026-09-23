@@ -141,24 +141,27 @@ export function sameMachine(origin: string, typed: URL): boolean {
   return isLoopback(typed.hostname) && isLoopback(other.hostname) && other.protocol === typed.protocol && other.port === typed.port;
 }
 
-export async function login(raw: string, io: LoginIo): Promise<number> {
-  const now = io.now ?? Date.now;
+/** The host a flow runs against, as `hostKey` spells it, or the exit code once the reason has been said. */
+function hostOf(raw: string, say: (line: string) => void): { key: string; url: URL } | number {
   let key: string;
   try {
     key = hostKey(raw);
   } catch (e) {
-    io.say(e instanceof Error ? e.message : 'The BrainDog host is not an address.');
+    say(e instanceof Error ? e.message : 'The BrainDog host is not an address.');
     return REFUSED;
   }
   const url = new URL(key);
   if (inTheClear(url)) {
-    io.say(`${key} is http, not https. BrainDog signs in only over https, except on this machine.`);
+    say(`${key} is http, not https. BrainDog signs in only over https, except on this machine.`);
     return REFUSED;
   }
-  /* THE KEY'S PATH IS THE SLUG, and `hostKey` has already taken `/app` off the front of it, so the address the app
-     prints, `brain.dog/app/acme`, posts `acme` and not `app/acme`. */
-  const slug = url.pathname.replace(/^\/+/, '');
-  const where = slug ? { slug } : {};
+  return { key, url };
+}
+
+export async function login(raw: string, io: LoginIo): Promise<number> {
+  const host = hostOf(raw, io.say);
+  if (typeof host === 'number') return host;
+  const { key } = host;
   const vault = io.vault;
   if (vault !== undefined && !SCOPE.test(vault)) {
     io.say('--vault names a project by its spoken id, such as things#3, or * for the keys that belong to no project.');
@@ -176,6 +179,60 @@ export async function login(raw: string, io: LoginIo): Promise<number> {
 
   const label = (io.label ?? `${hostname()} · braindog-cli`).slice(0, 120);
   const again = `Run braindog login ${key}${vault === undefined ? '' : ` --vault ${vault}`} to start again.`;
+  const got = await approve(host, vault === undefined ? { reach: 'login' } : { reach: 'vault', scope: vault }, label, {
+    again,
+    nothing: 'nobody was signed in',
+    stopped: 'Sign-in was stopped before it finished, and nothing was saved.',
+  }, io);
+  if (typeof got === 'number') return got;
+  const { bearer, expires } = got;
+
+  /* READ AGAIN, because minutes have passed and another command may have written the file since. */
+  try {
+    const hosts = readHosts(io.file);
+    const held = hosts.hosts[key];
+    if (vault === undefined) {
+      hosts.hosts[key] = { ...held, token: { value: bearer, expires, label } };
+      hosts.default = key;
+    } else {
+      /* A vault grant sits beside the login and never replaces it, and it makes a host the default only when none is. */
+      hosts.hosts[key] = { ...held, vault: { ...held?.vault, [vault]: { value: bearer, expires } } };
+      hosts.default ??= key;
+    }
+    saveHosts(io.file, hosts);
+  } catch {
+    io.say(`The device was approved and ${io.file} could not be written, so the token was not kept. ${again}`);
+    return REFUSED;
+  }
+  io.say(
+    vault === undefined
+      ? `logged in to ${key} as ${label} · token expires ${expires.slice(0, 10)}`
+      : `vault grant for ${vault} on ${key} kept as ${label} · expires ${expires.slice(0, 10)}`,
+  );
+  io.answer?.({ value: { host: key, label, expires, vault: vault ?? null } });
+  return 0;
+}
+
+/** What one device flow asks the host for: a login, a vault grant over one scope, or one operation. */
+type Asked = { reach: 'login' } | { reach: 'vault'; scope: string } | { reach: 'export' | 'import' };
+
+/** The words a flow ends with that differ by what it asked for: the command that starts it again, and what did not happen. */
+type Words = { again: string; nothing: string; stopped: string };
+
+type FlowIo = Pick<LoginIo, 'say' | 'signal' | 'fetch' | 'now'>;
+
+/**
+ * RFC 8628 against one host: the code asked for, the six digits said, the poll until a bearer or a refusal. The bearer and
+ * its expiry come back, or the exit code once the one sentence has been said.
+ */
+async function approve(host: { key: string; url: URL }, asked: Asked, label: string, words: Words, io: FlowIo): Promise<{ bearer: string; expires: string } | number> {
+  const { key, url } = host;
+  const { again } = words;
+  const now = io.now ?? Date.now;
+  /* THE KEY'S PATH IS THE SLUG, and `hostKey` has already taken `/app` off the front of it, so the address the app
+     prints, `brain.dog/app/acme`, posts `acme` and not `app/acme`. */
+  const slug = url.pathname.replace(/^\/+/, '');
+  const where = slug ? { slug } : {};
 
   /* A REDIRECT IS REFUSED, not followed: the device routes never send one, and following it would hand the poll id
      to an address nobody chose. */
@@ -205,11 +262,11 @@ export async function login(raw: string, io: LoginIo): Promise<number> {
     if (refusal?.code === 'DEVICE_CODE_EXPIRED') return `The code expired before anyone approved it. ${again}`;
     if (refusal?.code === 'DEVICE_CODE_TRIES') return `The request was denied after five wrong codes were typed. ${again}`;
     if (typeof refusal?.fix === 'string' && refusal.fix) return refusal.fix.slice(0, 300);
-    return `${key} answered in a way this command does not recognise, so nobody was signed in.`;
+    return `${key} answered in a way this command does not recognise, so ${words.nothing}.`;
   };
 
   try {
-    const started = await send('/auth/device', { ...where, ...(vault === undefined ? { reach: 'login' } : { reach: 'vault', scope: vault }), label });
+    const started = await send('/auth/device', { ...where, ...asked, label });
     const code = started.body?.ok === true && isObject(started.body.value) ? started.body.value : null;
     if (!code) {
       io.say(refusedLine(started));
@@ -224,13 +281,13 @@ export async function login(raw: string, io: LoginIo): Promise<number> {
       at = '';
     }
     if (at !== url.origin && !sameMachine(at, url)) {
-      io.say(`${key} gave an address on another site to approve this at, so no code was shown and nobody was signed in.`);
+      io.say(`${key} gave an address on another site to approve this at, so no code was shown and ${words.nothing}.`);
       return REFUSED;
     }
     const userCode = typeof code.user_code === 'string' && /^\d{6}$/.test(code.user_code) ? code.user_code : '';
     const deviceCode = typeof code.device_code === 'string' && code.device_code.length <= 512 ? code.device_code : '';
     if (!userCode || !deviceCode) {
-      io.say(`${key} answered in a way this command does not recognise, so nobody was signed in.`);
+      io.say(`${key} answered in a way this command does not recognise, so ${words.nothing}.`);
       return REFUSED;
     }
 
@@ -260,42 +317,44 @@ export async function login(raw: string, io: LoginIo): Promise<number> {
       const bearer = typeof value.bearer === 'string' && BEARER.test(value.bearer) ? value.bearer : '';
       const expires = typeof value.expires === 'string' && !Number.isNaN(Date.parse(value.expires)) ? value.expires : '';
       if (!bearer || !expires) {
-        io.say(`${key} answered in a way this command does not recognise, so nobody was signed in.`);
+        io.say(`${key} answered in a way this command does not recognise, so ${words.nothing}.`);
         return REFUSED;
       }
-
-      /* READ AGAIN, because minutes have passed and another command may have written the file since. */
-      try {
-        const hosts = readHosts(io.file);
-        const held = hosts.hosts[key];
-        if (vault === undefined) {
-          hosts.hosts[key] = { ...held, token: { value: bearer, expires, label } };
-          hosts.default = key;
-        } else {
-          /* A vault grant sits beside the login and never replaces it, and it makes a host the default only when none is. */
-          hosts.hosts[key] = { ...held, vault: { ...held?.vault, [vault]: { value: bearer, expires } } };
-          hosts.default ??= key;
-        }
-        saveHosts(io.file, hosts);
-      } catch {
-        io.say(`The device was approved and ${io.file} could not be written, so the token was not kept. ${again}`);
-        return REFUSED;
-      }
-      io.say(
-        vault === undefined
-          ? `logged in to ${key} as ${label} · token expires ${expires.slice(0, 10)}`
-          : `vault grant for ${vault} on ${key} kept as ${label} · expires ${expires.slice(0, 10)}`,
-      );
-      io.answer?.({ value: { host: key, label, expires, vault: vault ?? null } });
-      return 0;
+      return { bearer, expires };
     }
   } catch {
     if (io.signal?.aborted) {
-      io.say('Sign-in was stopped before it finished, and nothing was saved.');
+      io.say(words.stopped);
       return REFUSED;
     }
     /* The error could quote the request, and the request holds the poll id. */
-    io.say(`${key} did not answer, so nobody was signed in.`);
+    io.say(`${key} did not answer, so ${words.nothing}.`);
     return UNREACHABLE;
   }
+}
+
+/**
+ * A ten-minute operation grant for one `export` or one `import` (`docs/48-SPEC-CLI.md` §13 D1), held by the caller and
+ * never written anywhere, or the exit code once the reason has been said.
+ *
+ * THE LOGIN'S OWN FLOW, AND NOT A SECOND ONE, because every check it makes is one an operation needs as much: the
+ * approval address must be the host's, the six digits go to stderr, a redirect is refused, and the bearer never reaches
+ * a sentence. What differs is what is asked for and where the bearer goes. `login` keeps its bearer in the hosts file;
+ * this hands it back, because the record spends it on first use (`operationGrant` in `packages/kernel/src/device.ts`)
+ * and a copy on disk would be a credential that outlives the one request it was approved for.
+ *
+ * THE REACH IS IN THE LABEL THE APPROVER READS. `deviceStart` takes no subject, so `export` or `import` said in the
+ * label is how the person at the browser knows it is not a sign-in they are approving.
+ */
+export async function approveOperation(raw: string, reach: 'export' | 'import', io: FlowIo & { label?: string | undefined }): Promise<{ bearer: string } | number> {
+  const host = hostOf(raw, io.say);
+  if (typeof host === 'number') return host;
+  /* THE REACH IS APPENDED EVEN TO A LABEL THE CALLER CHOSE, and the machine's name is cut rather than the reach. */
+  const label = `${(io.label ?? `${hostname()} · braindog-cli`).slice(0, 110)} · ${reach}`;
+  const got = await approve(host, { reach }, label, {
+    again: `Run braindog ${reach} again to ask for a new code.`,
+    nothing: 'nothing was approved',
+    stopped: `The approval was stopped before it finished, and nothing was ${reach === 'export' ? 'exported' : 'sent'}.`,
+  }, io);
+  return typeof got === 'number' ? got : { bearer: got.bearer };
 }
