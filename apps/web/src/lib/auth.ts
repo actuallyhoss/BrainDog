@@ -240,9 +240,14 @@ export async function exchangeKey(serverKey: string, io: Io = live()): Promise<S
   return signedIn(call(io, '/auth/token', { serverKey: key }));
 }
 
-/** Ask for a sign-in link. The host answers alike whether or not it knows the address. */
-export async function requestLink(email: string, io: Io = live()): Promise<Said<null>> {
-  return done(call(io, '/auth/magic/start', { email: email.trim() }));
+/**
+ * Ask for a sign-in link. The host answers alike whether or not it knows the address.
+ *
+ * `next` IS THE PAGE HE WAS SENT FROM, so the link in the mail brings him back to it. The host holds it to a path
+ * under the app and drops anything else (`packages/host/src/auth.ts`), so this sends it as it is.
+ */
+export async function requestLink(email: string, next: string | null = null, io: Io = live()): Promise<Said<null>> {
+  return done(call(io, '/auth/magic/start', { email: email.trim(), ...(next ? { next } : {}) }));
 }
 
 /** Spend a link that arrived in the address. */

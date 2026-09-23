@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { Failure, Methods, Said } from './auth.ts';
-import { stateOf, type How, type Seen, type Step } from './signin.ts';
+import { onwardOf, stateOf, type How, type Seen, type Shelf, type Step } from './signin.ts';
 
 const WHO = { person: 'p_01', email: 'ada@example.com', record: 'studio', provedAt: 1 };
 const NOW = 1_757_000_000_000;
@@ -186,4 +186,73 @@ test('what became of adding one, and of signing out', () => {
 test('after signing out the screen says so, calmly', () => {
   const s = stateOf(seen({ step: { at: 'out' } }));
   assert.ok(s.name === 'signed-out' && s.note === 'out');
+});
+
+/* ── where Open BrainDog goes ─────────────────────────────────────────── */
+
+/** `sessionStorage` as far as `onwardOf` touches it, and what it holds. */
+const shelf = (): Shelf & { held: Map<string, string> } => {
+  const held = new Map<string, string>();
+  return {
+    held,
+    getItem: (k) => held.get(k) ?? null,
+    setItem: (k, v) => void held.set(k, v),
+    removeItem: (k) => void held.delete(k),
+  };
+};
+
+const ASKED = '?next=%2Fapp%2Facme%2Fr%2Ftasks';
+
+/* MEASURED FIRST (`loop/research-batch-forty-six-audit.md`, "Found on the way"): pasting a link over
+   `/app/signin?next=...` changes the query, which is a full navigation, so the page mounted again on
+   `/app/signin#magic=...` and "Open BrainDog" read an empty search and went to `/app/`. */
+test('A PASTED LINK KEEPS THE PAGE HE WAS SENT FROM, held in the tab across the navigation', () => {
+  const s = shelf();
+  assert.equal(onwardOf(ASKED, '', s), '/app/acme/r/tasks');
+  assert.equal(onwardOf('', '#magic=t', s), '/app/acme/r/tasks');
+  assert.equal(onwardOf('', '#claim=t', s), '/app/acme/r/tasks');
+});
+
+test('A PLAIN VISIT TO SIGN-IN FORGETS IT, because nothing sent him and nothing arrived', () => {
+  const s = shelf();
+  onwardOf(ASKED, '', s);
+  assert.equal(onwardOf('', '', s), '/app/');
+  assert.equal(s.held.size, 0);
+  assert.equal(onwardOf('', '#magic=t', s), '/app/', 'a link after a plain visit went to an older page');
+});
+
+test('A NEXT THAT COULD LEAVE THE APP IS NEVER KEPT, and a newer one replaces the older', () => {
+  const s = shelf();
+  onwardOf(ASKED, '', s);
+  for (const bad of ['?next=%2F%2Fevil.example', '?next=https%3A%2F%2Fevil.example%2Fapp%2F', '?next=%2Fapp%5C..%5Cevil', '?next=%2Fr%2Ftasks']) {
+    assert.equal(onwardOf(bad, '', s), '/app/', bad);
+    assert.equal(onwardOf('', '#magic=t', s), '/app/', `${bad} left the older next to follow`);
+  }
+  onwardOf(ASKED, '', s);
+  assert.equal(onwardOf('?next=%2Fapp%2Fshop', '', s), '/app/shop');
+  assert.equal(onwardOf('', '#magic=t', s), '/app/shop');
+});
+
+test('WHAT THE TAB HOLDS IS READ AS UNTRUSTED as the address is', () => {
+  const s = shelf();
+  onwardOf(ASKED, '', s);
+  const [key] = [...s.held.keys()];
+  assert.ok(key, 'nothing was kept');
+  for (const planted of ['//evil.example', 'https://evil.example/app/', '/app/\\evil.example', 'javascript:alert(1)']) {
+    s.held.set(key, planted);
+    assert.equal(onwardOf('', '#magic=t', s), '/app/', planted);
+  }
+});
+
+test('NO STORAGE, OR STORAGE THAT THROWS, IS THE ADDRESS ALONE, and never an exception', () => {
+  const refuses: Shelf = {
+    getItem: () => { throw new Error('SecurityError'); },
+    setItem: () => { throw new Error('QuotaExceededError'); },
+    removeItem: () => { throw new Error('SecurityError'); },
+  };
+  for (const s of [null, refuses]) {
+    assert.equal(onwardOf(ASKED, '', s), '/app/acme/r/tasks');
+    assert.equal(onwardOf('', '#magic=t', s), '/app/');
+    assert.equal(onwardOf('', '', s), '/app/');
+  }
 });

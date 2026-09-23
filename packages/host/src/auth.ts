@@ -21,6 +21,8 @@
  *            origin, where `/auth/methods` says `why: 'insecure'`. One opaque id; the record is on the row.
  *   Links    `${origin}/app/signin#magic=<token>` and `#claim=<token>`, redeemed by `POST /auth/magic/redeem`.
  *            A fragment never reaches a server, a log or a link pre-fetcher, and a press is what spends it.
+ *            `/auth/magic/start` also reads `next`, the one field that is the host's and not the call's: a
+ *            path under `/app` on this origin goes in the link as `?next=<path>`, before the fragment.
  *
  * STANDARD `Request`, `Response` AND WEBCRYPTO, like the rest of this package, so the Worker and the
  * self-host run this file unchanged. Neither adds a sign-in route, and neither answers one differently.
@@ -412,8 +414,28 @@ const off = (): Response => refusal(404, { code: 'ROUTE_UNKNOWN', fix: 'This Bra
  * nobody in. A link already mailed at `app.brain.dog/signin#…` still works: that host 308s a page load to
  * `/app/signin`, and a browser keeps the fragment across a redirect whose `Location` carries none.
  */
-const linkOf = (origin: string, mail: Mail): string =>
-  'linkToken' in mail ? `${origin}/app/signin#magic=${mail.linkToken}` : `${origin}/app/signin#claim=${mail.claimToken}`;
+const linkOf = (origin: string, mail: Mail, next: unknown = undefined): string => {
+  const back = mailedNext(next);
+  const page = back ? `${origin}/app/signin?next=${encodeURIComponent(back)}` : `${origin}/app/signin`;
+  return 'linkToken' in mail ? `${page}#magic=${mail.linkToken}` : `${page}#claim=${mail.claimToken}`;
+};
+
+/**
+ * The page a mailed link sends him back to, or `null` for the bare link.
+ *
+ * THE LINK WROTE NO QUERY, AND THE PAGE HE WAS SENT FROM WAS LOST. Sign-in at `/app/signin?next=/app/acme/r/tasks`
+ * mailed `/app/signin#magic=...`, so the tab the mail opened read an empty search and "Open BrainDog" went to `/app/`
+ * (`loop/research-batch-forty-six-audit.md`, "Found on the way"; `test/auth-next.test.ts`).
+ *
+ * `safeNext` FIRST, THEN UNDER `/app` ONLY. The value is whatever query reached the sign-in page, so a scheme, `//`, a
+ * backslash or a control character is dropped before it is ever in a mail with this origin on it; and a path outside
+ * the app is dropped too, because the page's own `onward()` would send it to `/app/` anyway. It is a path and never a
+ * secret, so the query reaching a server or a link scanner costs nothing the fragment was protecting.
+ */
+function mailedNext(next: unknown): string | null {
+  const path = safeNext(next);
+  return path.startsWith('/app/') ? path : null;
+}
 
 const isJson = (request: Request): boolean =>
   (request.headers.get('content-type') ?? '').split(';')[0]?.trim().toLowerCase() === 'application/json';
@@ -571,7 +593,7 @@ export async function serveAuth(request: Request, door: AuthDoor): Promise<Respo
      known address slower to answer than an unknown one. */
   if (out.status === 200 && out.mail && door.mail) {
     try {
-      door.mail(out.mail.to, linkOf(door.origin, out.mail));
+      door.mail(out.mail.to, linkOf(door.origin, out.mail, body.next));
     } catch {
       /* A failed send is the host's to report; the answer is the same either way. */
     }

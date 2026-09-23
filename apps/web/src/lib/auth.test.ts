@@ -218,7 +218,7 @@ test('an empty key is refused without a request', async () => {
 
 test('a link is asked for by email and spent by its own name, magic or claim', async () => {
   const { io, seen } = host({ '/auth/magic/start': () => ok({}), '/auth/magic/redeem': () => ok(WHO) });
-  assert.deepEqual(await requestLink(' ada@example.com ', io), { ok: true, value: null });
+  assert.deepEqual(await requestLink(' ada@example.com ', null, io), { ok: true, value: null });
   assert.deepEqual(await redeemLink({ kind: 'magic', token: 'tok-1' }, io), { ok: true, value: WHO });
   assert.deepEqual(await redeemLink({ kind: 'claim', token: 'tok-2' }, io), { ok: true, value: WHO });
   assert.deepEqual(seen.map((r) => r.body), [{ email: 'ada@example.com' }, { linkToken: 'tok-1' }, { claimToken: 'tok-2' }]);
@@ -274,7 +274,7 @@ test('NOTHING THROWS AND NOTHING LOGS, whatever comes back', async () => {
       passkeySignIn(broken),
       passkeyRegister(broken),
       exchangeKey('k', broken),
-      requestLink('a@b.c', broken),
+      requestLink('a@b.c', null, broken),
       redeemLink({ kind: 'magic', token: 't' }, broken),
       signOut(broken),
       passkeys(broken),

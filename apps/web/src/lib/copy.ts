@@ -2186,7 +2186,10 @@ export const copy = {
   signedInTitle: 'You are signed in',
   /* Every screen reads the record once somebody is signed in; the sample is only for a browser with none. */
   signedInReads: 'Every screen now reads this record.',
-  linkWaitsSignedIn: 'A link arrived. Sign out to use it as someone else.',
+  /* NOT "AS SOMEONE ELSE". The screen cannot tell whose a link is until it is spent, and the owner pasting his own
+     sign-in link into a tab he is already in was told he would be someone else. Spending any link needs this screen
+     signed out first, whoever it belongs to, so that is all it says. */
+  linkWaitsSignedIn: 'A link arrived, and you are already signed in. To use it, sign out first.',
   addPasskeyHere: 'Add a passkey on this device',
   /* SAID BY THE WAY HE CAME IN. "Without the key" is the self-host's server key, and it was said after a claim link
      too, to an owner on the Cloud who had never seen a key (`loop/research-first-sign-in.md` friction 9). `null` is a

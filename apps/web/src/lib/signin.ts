@@ -6,6 +6,7 @@
  * is not in `Ways` at all, so the screen has nothing to grey out (`23 §3.1`).
  */
 
+import { onward } from './at.ts';
 import type { Failure, Link, Methods, Said, Who } from './auth.ts';
 
 /** What a press asked for. */
@@ -148,4 +149,46 @@ export function stateOf(s: Seen): State {
   if (step.at === 'sent') return { name: 'link-sent', ways, email: step.email };
   if (!ways) return { name: 'not-configured' };
   return { name: 'signed-out', ways, note: step.at === 'out' ? 'out' : ways.lead === null ? 'unsupported' : null };
+}
+
+/** `sessionStorage`, as far as `onwardOf` touches it. */
+export type Shelf = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+
+const PENDING = 'bd.signin.next';
+
+/** A storage call that a private window, a blocked site or a full quota refuses, answered as nothing. */
+function quietly<T>(work: () => T): T | null {
+  try {
+    return work();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Where "Open BrainDog" goes: the `next` in the address, or the one this tab was handed before a link replaced it.
+ *
+ * A PASTE LOST IT. Pasting a sign-in link over `/app/signin?next=...` changes the query, which is a full navigation
+ * and not a `hashchange`, so the page mounted again on `/app/signin#magic=...` and `onward()` read an empty search
+ * (`loop/research-batch-forty-six-audit.md`, "Found on the way"). So a `next` in the address is kept for the tab, and
+ * an arrival carrying a link and no `next` takes the kept one. A mailed link now carries its own, which wins.
+ *
+ * A PLAIN VISIT FORGETS IT. Sign-in with neither a `next` nor a link was not sent from anywhere, so an older page is
+ * not where it goes; and a `next` that `onward()` refuses replaces the older one rather than leaving it to be followed.
+ *
+ * THE KEPT VALUE IS CHECKED AGAIN ON THE WAY OUT, by the same `onward()` as the address, because anything on this
+ * origin can write to the tab's storage. Storage that is missing or throws is the address alone.
+ */
+export function onwardOf(search: string, hash: string, shelf: Shelf | null): string {
+  if (new URLSearchParams(search).has('next')) {
+    const to = onward(search);
+    quietly(() => (to === onward('') ? shelf?.removeItem(PENDING) : shelf?.setItem(PENDING, to)));
+    return to;
+  }
+  if (!/^#(magic|claim)=/.test(hash)) {
+    quietly(() => shelf?.removeItem(PENDING));
+    return onward('');
+  }
+  const kept = quietly(() => shelf?.getItem(PENDING)) ?? '';
+  return onward(`?${new URLSearchParams({ next: kept })}`);
 }

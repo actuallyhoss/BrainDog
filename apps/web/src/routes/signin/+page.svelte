@@ -33,10 +33,10 @@
     type Said,
     type Who,
   } from '$lib/auth.ts';
-  import { BASE, onward } from '$lib/at.ts';
+  import { BASE } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { forget } from '$lib/record/boot-live.ts';
-  import { stateOf, type How, type Step, type Ways } from '$lib/signin.ts';
+  import { onwardOf, stateOf, type How, type Shelf, type Step, type Ways } from '$lib/signin.ts';
   import { actable, firstDoor, noDoorYet } from './first-door.ts';
   import { titleOf } from '$lib/title.ts';
   import Button from '$lib/ui/Button.svelte';
@@ -52,6 +52,8 @@
   let link = $state<Link | null>(null);
   let step = $state<Step>({ at: 'idle' });
   let now = $state(Date.now());
+  /** Where the ways on from here go: see `onwardOf`, which is read once on arrival while the fragment is still there. */
+  let goTo = $state(`${BASE}/`);
 
   /* WHAT IS TYPED IS COMPONENT STATE AND NOTHING ELSE. The key is emptied the moment it is handed to
      the request, so it is never on screen, in storage or in the address after the press. */
@@ -169,12 +171,24 @@
     /* THE LINK LEAVES THE ADDRESS BEFORE THE ONE REQUEST MADE ON ARRIVAL. The browser's own
        `replaceState`, with the router's state kept so its history stays whole. SvelteKit's wrapper is
        not used: importing it keeps its shallow-routing code in the entry chunk, which measured 0.8 KB
-       brotli on every screen for one call on this one. */
+       brotli on every screen for one call on this one.
+       WHERE HE GOES AFTERWARDS IS READ FIRST, because it needs to know whether a link came, and `takeLink` is about
+       to clear the fragment that says so. */
+    goTo = onwardOf(location.search, location.hash, tabShelf());
     link = takeLink(location.hash, clearHash);
     void load();
     window.addEventListener('hashchange', arrived);
     return () => window.removeEventListener('hashchange', arrived);
   });
+
+  /** This tab's storage, or `null` where reading the property itself throws, as it does with site data blocked. */
+  function tabShelf(): Shelf | null {
+    try {
+      return window.sessionStorage;
+    } catch {
+      return null;
+    }
+  }
 
   function clearHash() {
     history.replaceState(history.state, '', `${location.pathname}${location.search}`);
@@ -237,7 +251,7 @@
   function send(e: SubmitEvent) {
     e.preventDefault();
     const to = email.trim();
-    void run('send', () => requestLink(to), () => (step = { at: 'sent', email: to }));
+    void run('send', () => requestLink(to, goTo === `${BASE}/` ? null : goTo), () => (step = { at: 'sent', email: to }));
   }
 
   function spend() {
@@ -334,7 +348,7 @@
           <p class="calm-body">{copy.openWhy}</p>
         </div>
         <!-- A FULL PAGE LOAD, like every way on from this screen: see "Open BrainDog" below. -->
-        <div class="doors"><Button weight="primary" href={onward()} data-sveltekit-reload>{copy.openYourRecord}</Button></div>
+        <div class="doors"><Button weight="primary" href={goTo} data-sveltekit-reload>{copy.openYourRecord}</Button></div>
       {:else if view.name === 'not-configured'}
         <div class="said"><Empty kind="no-permission" title={copy.notConfiguredTitle} body={copy.notConfiguredWhy} /></div>
       {:else if view.name === 'insecure'}
@@ -391,7 +405,7 @@
                decided before the sign-in: the sample boot, the switcher's list, the voice. Walked twice, it drew
                The Studio, "Nothing you do here is saved.", with no request made; a reload drew his own record,
                because the Worker answers `/app/` with a 302 to `/app/<slug>/` once there is a session. -->
-          <Button weight={view.lead === 'open' ? 'primary' : 'quiet'} href={onward()} data-sveltekit-reload>{copy.openBrainDog}</Button>
+          <Button weight={view.lead === 'open' ? 'primary' : 'quiet'} href={goTo} data-sveltekit-reload>{copy.openBrainDog}</Button>
           {#if view.lead === 'open'}{@render addDoor(false)}{/if}
           <Button weight="bare" onclick={leave} aria-busy={view.out === 'asking'}>
             {view.out === 'asking' ? copy.signingOut : copy.signOut}
