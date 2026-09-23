@@ -21,6 +21,15 @@
  * owner of the entry, not a second best: it is the file `claude mcp add-json --scope user` writes, and the one this
  * command already rewrites to take the old tool's out.
  *
+ * AND INTO EVERY NAMED PROFILE, WHETHER OR NOT THE OLD TOOL'S WAS IN IT (brief 44-B of `loop/research-switch-left.md`).
+ * Putting it in only where the old tool's came out left the `acme` profile with none, since it reached the old tool
+ * through `C:\Repos\.mcp.json`, and finding 2 there measured why that file cannot stand in: a new name in a
+ * `.mcp.json` stays `Pending approval` wherever a `settings.local.json` approved the old one by name, so a headless
+ * `claude -p` has no brain, while a user-scope entry of the same name is the one started. A profile with no
+ * `.claude.json` gets one holding only the entry. And the `claude mcp add-json` line main.ts prints is owed per
+ * profile, with `CLAUDE_CONFIG_DIR` naming it: it was one answer for the whole run, so the audit's two-profile
+ * `--apply` (`loop/research-batch-forty-two-audit.md` §5) left `.claude-acme` with no server and no line.
+ *
  * A `.mcp.json` ONLY WHEN IT IS NAMED, AND NEVER ONE IN A REPOSITORY. A project's `.mcp.json` is shared through its
  * repository (`loop/research-agent-path.md` question 5), so one inside a git working tree is refused. But the one the
  * cut-over needs, `C:\Repos\.mcp.json`, is in no repository, and leaving it to a hand edit made step 9 one sitting
@@ -73,11 +82,20 @@ export const BRAINDOG_SERVER = {
 
 const ADDS_SERVER = '  + mcpServers.braindog: ';
 
+/** What registers BrainDog's server in the profile the shell is in, which `byHand` prefixes to name another. */
+export const HAND_RUN = `claude mcp add-json braindog '${JSON.stringify(BRAINDOG_SERVER)}' --scope user`;
+
 /**
- * Whether the lines `installEvery` returned put BrainDog's server in, so main.ts can leave out the `claude mcp
- * add-json` line it prints for a profile that still has to be registered by hand.
+ * The hand-run line for each profile `installProfiles` left without BrainDog's server, WITH `CLAUDE_CONFIG_DIR` NAMING
+ * IT, because run bare the line registers the server in whichever profile the shell is in. The default profile is
+ * the one exception: Claude Code keeps its servers in `~/.claude.json` only when no `CLAUDE_CONFIG_DIR` is set (see
+ * `serversFileOf`), so setting it to `~/.claude` would be read as a named profile and write inside the folder.
  */
-export const addsServer = (lines: string[]): boolean => lines.some((line) => line.startsWith(ADDS_SERVER));
+export function byHand(unserved: string[], home: string = homedir()): string[] {
+  return unserved.map((dir) =>
+    serversFileOf(dir, home) === join(home, '.claude.json') ? HAND_RUN : `CLAUDE_CONFIG_DIR='${resolve(dir).replaceAll("'", "'\\''")}' ${HAND_RUN}`,
+  );
+}
 
 /** The profile folders to change: each `--config-dir`, else `CLAUDE_CONFIG_DIR`, else `~/.claude`. */
 export const profilesOf = (named: string[], env: Env): string[] => (named.length > 0 ? named : [env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')]);
@@ -117,7 +135,8 @@ type Options = { apply: boolean; scripts: string; platform?: string; replace?: b
 
 /** One file's change, read and decided before anything is written: the lines to print, and what to write. */
 type Write = { file: string; had: boolean; value: unknown };
-type Plan = { lines: string[]; write: Write | null };
+/* `serves` is set on a profile's servers plan alone: whether the file holds BrainDog's server once the plan is written. */
+type Plan = { lines: string[]; write: Write | null; serves?: boolean };
 
 /**
  * Removes a file this command made, `.tmp` or `.bak`. BOTH TAKE THE ORIGINAL'S MODE, so both can be read-only, and
@@ -235,16 +254,27 @@ const dryTail = (options: Options) => `Nothing was changed. Run braindog install
  * refusal was the only line printed. A file reached twice, a profile's own `settings.json` also named with
  * `--settings`, is planned once, since a second plan from the same reading would overwrite the first.
  */
-export function installEvery(profiles: string[], files: string[], options: Options, mcpFiles: string[] = []): string[] {
+export const installEvery = (profiles: string[], files: string[], options: Options, mcpFiles: string[] = []): string[] => installProfiles(profiles, files, options, mcpFiles).lines;
+
+/**
+ * `installEvery`, and the profiles that end the run without BrainDog's server, for `byHand`. ANSWERED PER PROFILE, not
+ * for the run: main.ts used to withhold the hand-run line when any line of the run added the server, which is how
+ * the audit's `.claude-acme` was left with none and nothing said so. Without `replace` no server is written, so a
+ * profile is owed the line unless its servers file already holds `braindog`.
+ */
+export function installProfiles(profiles: string[], files: string[], options: Options, mcpFiles: string[] = []): { lines: string[]; unserved: string[] } {
   /* Removing servers is the cut-over's, so a `.mcp.json` named without `--replace` would have nothing to do. */
   if (mcpFiles.length > 0 && !options.replace) throw new Error('--mcp-json is read only with --replace, so braindog install changed nothing.');
   const seen = new Set<string>();
   const plans: Plan[] = [];
+  const served = new Map<string, boolean>();
   const add = (file: string, plan: (file: string, options: Options) => Plan) => {
     const key = fold(resolve(file));
     if (seen.has(key)) return;
     seen.add(key);
-    plans.push(plan(file, options));
+    const planned = plan(file, options);
+    plans.push(planned);
+    if (planned.serves !== undefined) served.set(key, planned.serves);
   };
   for (const dir of profiles) {
     add(join(dir, 'settings.json'), planSettings);
@@ -252,7 +282,26 @@ export function installEvery(profiles: string[], files: string[], options: Optio
   }
   for (const file of files) add(file, planSettings);
   for (const file of mcpFiles) add(file, planMcpJson);
-  return commit(plans);
+  const lines = commit(plans);
+  const owed = new Set<string>();
+  const unserved = profiles.filter((dir) => {
+    const file = serversFileOf(dir, options.home);
+    const key = fold(resolve(file));
+    if (owed.has(key)) return false;
+    owed.add(key);
+    return !(served.get(key) ?? holdsBraindog(file));
+  });
+  return { lines, unserved };
+}
+
+/* Read without `readObject`'s refusal, because a plain install never writes this file and must not fail on it. */
+function holdsBraindog(file: string): boolean {
+  try {
+    const config: unknown = JSON.parse(readFileSync(file, 'utf8'));
+    return isObject(config) && isObject(config.mcpServers) && 'braindog' in config.mcpServers;
+  } catch {
+    return false;
+  }
 }
 
 /** What installing into one profile does: its `settings.json`, and with `replace` its MCP servers too. */
@@ -466,22 +515,23 @@ function withoutSam(servers: unknown, where: string, removed: string[]): unknown
 }
 
 /**
- * BrainDog's server added to the top-level `mcpServers` of a file the old tool's were just taken out of, with the line
- * that says so. AT USER SCOPE EVEN WHEN THE OLD TOOL'S WAS ONLY IN ONE PROJECT'S LOCAL SCOPE, because BrainDog's server
- * reads the folder it runs in, so one registration serves every project, where one per project would be copies to
- * keep in step. A `braindog` entry already there is the person's own and is left exactly as it is, never replaced
- * with this checkout's path.
+ * BrainDog's server added to the top-level `mcpServers` of a profile's servers file, or of a `.mcp.json` the old tool's
+ * were just taken out of, with the line that says so, and what became of it. AT USER SCOPE EVEN WHEN THE OLD TOOL'S WAS
+ * ONLY IN ONE PROJECT'S LOCAL SCOPE, because BrainDog's server reads the folder it runs in, so one registration serves
+ * every project, where one per project would be copies to keep in step. A `braindog` entry already there is the
+ * person's own and is left exactly as it is, never replaced with this checkout's path.
  */
-function withBraindog(next: Record<string, unknown>, lines: string[]): void {
+function withBraindog(next: Record<string, unknown>, lines: string[]): 'added' | 'held' | 'refused' {
   const servers = next.mcpServers ?? {};
   /* Claude Code never writes a list or a string here, and an entry forced into one would be read by nothing. */
-  if (!isObject(servers)) return;
+  if (!isObject(servers)) return 'refused';
   if ('braindog' in servers) {
     lines.push('  mcpServers.braindog is registered already, and is left as it is.');
-    return;
+    return 'held';
   }
   next.mcpServers = { ...servers, braindog: BRAINDOG_SERVER };
   lines.push(`${ADDS_SERVER}${JSON.stringify(BRAINDOG_SERVER)}`);
+  return 'added';
 }
 
 /**
@@ -521,11 +571,12 @@ function planMcpJson(named: string, options: Options): Plan {
 /**
  * The the old tool servers in one profile's `.claude.json`: user scope in `mcpServers`, and local scope in each
  * `projects[<folder>].mcpServers`, since a server added without `--scope user` lands there. Everything else in the
- * file, which is most of it, is carried through as it was read.
+ * file, which is most of it, is carried through as it was read. BrainDog's server goes in whether or not any came
+ * out, and a missing file is made holding only it: see the header for what was measured without.
  */
 function planServers(file: string, options: Options): Plan {
-  if (!existsSync(file)) return { lines: [`There is no ${file}, so it registers no the old tool MCP server. Nothing to change.`], write: null };
-  const config = readObject(file, 'a Claude Code configuration object');
+  const had = existsSync(file);
+  const config = had ? readObject(file, 'a Claude Code configuration object') : {};
   const removed: string[] = [];
   const without = (servers: unknown, where: string): unknown => withoutSam(servers, where, removed);
   const next: Record<string, unknown> = { ...config };
@@ -536,14 +587,18 @@ function planServers(file: string, options: Options): Plan {
       projects[folder] = isObject(project) && 'mcpServers' in project ? { ...project, mcpServers: without(project.mcpServers, `projects[${JSON.stringify(folder)}].`) } : project;
     next.projects = projects;
   }
-  if (removed.length === 0) return { lines: [`${file} registers no the old tool MCP server. Nothing to change.`], write: null };
-
-  const lines = [`${options.apply ? 'Changed' : 'braindog install --replace would change'} ${file}:`, ...removed];
-  withBraindog(next, lines);
+  const lines = [`${options.apply ? 'Changed' : 'braindog install --replace would change'} ${file}${had ? '' : ', a new file'}:`, ...removed];
+  const braindog = withBraindog(next, lines);
+  const serves = braindog !== 'refused';
+  if (removed.length === 0 && braindog !== 'added') {
+    const why = braindog === 'refused' ? ` Its mcpServers is not an object, so BrainDog's server is not added to it either.` : '';
+    return { lines: [`${file} registers no the old tool MCP server. Nothing to change.${why}`], write: null, serves };
+  }
   /*
    * NOT MEASURED HERE, AND SAID BECAUSE IT IS CHEAP: Claude Code keeps its running state in this same file (the
    * fixture's `numStartups` is one such field), so a session left open may write back the copy it read.
    */
-  if (!options.apply) return { lines: [...lines, 'Close every Claude Code session on this profile before --apply, since each one rewrites this file.', dryTail(options)], write: null };
-  return { lines, write: { file, had: true, value: next } };
+  const close = had ? ['Close every Claude Code session on this profile before --apply, since each one rewrites this file.'] : [];
+  if (!options.apply) return { lines: [...lines, ...close, dryTail(options)], write: null, serves };
+  return { lines, write: { file, had, value: next }, serves };
 }

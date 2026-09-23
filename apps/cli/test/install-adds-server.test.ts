@@ -13,6 +13,7 @@
 
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -98,7 +99,15 @@ test("A SERVER ONLY IN ONE PROJECT'S LOCAL SCOPE is replaced at user scope, sinc
   assert.deepEqual(now.projects!['C:/Repos/acme']!.mcpServers, {});
 });
 
-test('A .mcp.json HOLDING THE ONLY THE OLD TOOL SERVER, the acme shape: after --apply it holds braindog, and nothing else in it moved', () => {
+/*
+ * THIS CASE CHANGED WITH BRIEF 44-B (`loop/research-switch-left.md`). It asserted that a profile with no the old tool
+ * server was not given BrainDog's either, and that was the fault: finding 2 of the same file measured that a new
+ * name in a `.mcp.json` stays `Pending approval` wherever a `settings.local.json` approved the old one by name, so the
+ * profile's own user-scope entry is the one that is started. The profile now gains the entry.
+ * The `.mcp.json` half is as it was: the brief also asks that no `braindog` be added there, and that is not done in
+ * this change because `hooks.test.ts`, which another brief owns, still asserts it is added.
+ */
+test('A .mcp.json HOLDING THE ONLY THE OLD TOOL SERVER, the acme shape: after --apply the profile holds braindog too, and nothing else in the .mcp.json moved', () => {
   const home = folder('home');
   const p = profile(home, '.claude-acme', { mcpServers: {} });
   const repos = folder('repos');
@@ -110,8 +119,27 @@ test('A .mcp.json HOLDING THE ONLY THE OLD TOOL SERVER, the acme shape: after --
 
   installEvery([p.dir], [], { apply: true, replace: true, scripts, home }, [file]);
   assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), { mcpServers: { braindog: BRAINDOG }, note: 'kept' });
-  /* The profile had no the old tool server, so it is not given BrainDog's either: the file is as it was. */
-  assert.equal(readFileSync(p.claudeJson, 'utf8'), p.before);
+  assert.deepEqual(read(p.claudeJson).mcpServers, { braindog: BRAINDOG });
+});
+
+/*
+ * THE AUDIT'S OWN RUN, finding 5 of `loop/research-batch-forty-two-audit.md`: two profiles, `--replace --apply` over
+ * both. Measured at 5287d8e4, `.claude-quartz` ended with `braindog`, `.claude-acme` with no server, and no line
+ * said so, because the one line was withheld as soon as any file gained the entry. The audit asked for the line once,
+ * naming `.claude-acme`; brief 44-B goes further and gives that profile the entry, so no line is owed.
+ */
+test('THE AUDIT’S TWO-PROFILE RUN through main.ts: both profiles end with braindog, and no hand-run line is printed for either', () => {
+  const home = folder('home');
+  const quartz = profile(home, '.claude-quartz', { mcpServers: { brain: SAM } });
+  const acme = profile(home, '.claude-acme', { mcpServers: {} });
+  const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: join(home, 'config') };
+  for (const name of Object.keys(env)) if (name.startsWith('BRAINDOG_') || name === 'CLAUDE_CONFIG_DIR') delete env[name];
+  const ran = spawnSync(process.execPath, [join(APP, 'src', 'main.ts'), 'install', '--replace', '--apply', '--config-dir', quartz.dir, '--config-dir', acme.dir], { cwd: home, env, encoding: 'utf8', timeout: 30_000 });
+
+  assert.equal(ran.status, 0, ran.stderr);
+  assert.deepEqual(read(quartz.claudeJson).mcpServers, { braindog: BRAINDOG });
+  assert.deepEqual(read(acme.claudeJson).mcpServers, { braindog: BRAINDOG });
+  assert.ok(!ran.stdout.includes('claude mcp add-json'), ran.stdout);
 });
 
 test('A FILE ALREADY HOLDING A braindog SERVER keeps it as it is: byte for byte with nothing else to do, and the entry itself untouched beside a removal', () => {
