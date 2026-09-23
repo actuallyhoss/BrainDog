@@ -7,11 +7,18 @@
 # read it. A person asking Claude "what is BrainDog" got nothing, from the one page written to
 # answer that question.
 #
-# THREE PAGES OF PROSE, NO ACCOUNT, NO DATA. There is nothing here to protect: the record app is a
-# different hostname, it is behind authentication, and it is not in this file's zone of concern.
-# `app.brain.dog` is deliberately absent from the sitemap below for that reason.
+# THE PAGES ARE OPEN, THE APP IS NOT. The site is prose with no account and no data, so every
+# crawler may read it. The record app is moving onto this origin: the Worker is to answer
+# `brain.dog/app/`, `/api/`, `/auth/` and `/account/`, which are an app shell, JSON and sign-in
+# behind authentication, and nothing a search result should point at. Until that route is live those
+# four are this site's 404, so the rule costs nothing now and is already in place the day they
+# start answering. The app is absent from the sitemap for the same reason.
 
 User-agent: *
 Allow: /
+Disallow: /app/
+Disallow: /api/
+Disallow: /auth/
+Disallow: /account/
 
 Sitemap: https://brain.dog/sitemap.xml

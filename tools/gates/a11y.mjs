@@ -477,6 +477,10 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
       for (const scheme of SCHEMES) {
         for (const width of WIDTHS) {
           const context = await browser.newContext({
+            /* THE SITE SHIPS A HASH CSP IN A META TAG, and `addScriptTag` below injects axe as an inline script, which
+               that policy refuses. Bypassing it here changes what the audit can run, not what the page is: the page
+               under test is the one production serves, policy and all. */
+            bypassCSP: true,
             viewport: { width, height: 900 },
             colorScheme: scheme,
             // Motion off: axe reads a mid-animation opacity as the real one, and an entrance animation

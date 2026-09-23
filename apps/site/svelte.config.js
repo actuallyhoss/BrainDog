@@ -26,6 +26,17 @@ export default {
     /* `*` is every route without a parameter. `/legal` is named as well, so the page a licence
        points at is prerendered even on a day nothing on the site links to it. */
     prerender: { entries: ['*', '/legal'] },
+    /* THE SCRIPT POLICY IS HERE AND NOT IN `static/_headers`, because a header cannot name the one
+       script that has to run. Every page carries an inline `<script>` that starts SvelteKit, and a
+       header of `script-src 'self'` blocked it on 23 September: the console logged the violation and
+       pressing "Solo founder" in the hero left "Personal" selected. `mode: 'hash'` writes the
+       sha256 of that script into each prerendered page's `<meta http-equiv>`, so it runs and an
+       injected one does not. `frame-ancestors` is ignored in a meta policy, so it stays a header;
+       `test/one-origin.test.mjs` holds both halves. */
+    csp: {
+      mode: 'hash',
+      directives: { 'script-src': ['self'], 'object-src': ['none'], 'base-uri': ['self'] },
+    },
   },
   compilerOptions: {
     css: 'external',
