@@ -43,7 +43,8 @@
      a mistyped address got a blank white page. `"single-page-application"` would be wrong twice
      over: there is no client router here by default, and answering `index.html` with a 200 for every
      typo makes a site look alive to a crawler and dead to a reader. `test/content.test.ts` holds the
-     setting and the file to each other. */
+     setting and the file to each other. ONE PAGE AT EVERY DEPTH is why the build names its assets from the
+     root (`svelte.config.js` `paths.relative: false`): `./_app/` from `/a/b` asks under `/a/`. */
   "assets": {
     "directory": "build",
     "not_found_handling": "404-page"
