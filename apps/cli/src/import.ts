@@ -4,7 +4,8 @@
  * IT WRITES AS ANY AGENT DOES, over the API, with the token this machine signed in with: `create` and `update` for rows
  * and `propose` for an open question. So it works the same on a self-host and on app.brain.dog, and it can do nothing a
  * signed-in agent could not. Installing Solo founder and Agents is the owner's, in the app; a record without their lists
- * is told which to install, and nothing is written.
+ * is told which to install, and nothing is written. It writes as ONE RUN OF ITS OWN, never the folder's, and ends that
+ * run `done` once the last write has answered: see the headers in `importCommand`.
  *
  * RE-RUNNING UPDATES, IT NEVER ADDS A SECOND ROW. Every row carries its the old tool key in its tags (an agent run in its
  * `client_id`, a question in its body), each list is read once before writing, and a row found by its key is updated
@@ -78,11 +79,30 @@ export type PlannedBank = PlannedPack;
 
 export type Tally = { added: number; updated: number; unchanged: number };
 
+/** A question settled in the old tool and still open on Decide here, as both reports say it: see `settledOf`. */
+export type Waiting = { label: string; question: string | null; answer: string };
+
 export type Report = {
   missing: string[];
   tally: Record<string, Tally>;
   asked: number;
   alreadyAsked: number;
+  /**
+   * Each question this run asked on Decide (or, on a dry run, would ask), by its the old tool id and its words.
+   *
+   * KEPT BY NAME AND NOT ONLY COUNTED, because the morning read is made from what a run remembers and a count says
+   * nothing he can act on: over the shadow week's seven made-up nights a question asked on night 3 was on Decide and
+   * not in `--since last` at all (`loop/research-shadow-week.md` §2 night 3).
+   *
+   * THIS AND `waiting` ARE OPTIONAL ONLY FOR A REPORT WRITTEN OUT BY HAND, which `test/import.test.ts` does to test
+   * `said`; `applyPlan` always sets both, and every reader takes a missing one as empty.
+   */
+  questions?: { label: string; question: string }[];
+  /**
+   * Each question the old tool has answered or put away that an earlier run asked here and nobody has answered on Decide:
+   * `answer` is what the old tool did with it, `decided there as D5` or `dismissed there`. See `Settled`.
+   */
+  waiting?: Waiting[];
   /** Polls filed on Decide, and those already filed or installed. */
   polls: { filed: number; before: number };
   /**
@@ -232,7 +252,7 @@ async function readAll(door: Door, register: string): Promise<Row[]> {
  * The keys of every question already asked, every pack already offered or installed, and every value already proposed
  * to a closed list, as `valueKey` spells one.
  */
-type Decide = { asked: Set<string>; installs: Set<string>; values: Set<string> };
+type Decide = { asked: Set<string>; open: Set<string>; installs: Set<string>; values: Set<string> };
 
 /** One value proposed to one closed list, as `Decide.values` holds it. */
 const valueKey = (register: string, field: string, value: string) => `${register}\n${field}\n${value}`;
@@ -278,16 +298,20 @@ const WRITES_AT_ONCE = 8;
  */
 async function readDecide(door: Door): Promise<Result<Decide>> {
   const asked = new Set<string>();
+  const open = new Set<string>();
   const installs = new Set<string>();
   const values = new Set<string>();
   let cursor: string | undefined;
   for (let pages = 0; pages < 1000; pages++) {
     const got = await door.governance({ register: 'suggestion', status: 'all', limit: DECIDE_PAGE, ...(cursor === undefined ? {} : { cursor }) });
     if (!got.ok) return got;
-    if (!Array.isArray(got.value)) return ok({ asked, installs, values });
+    if (!Array.isArray(got.value)) return ok({ asked, open, installs, values });
     for (const s of got.value)
       if (isObj(s) && isObj(s.body)) {
         if (typeof s.body.from === 'string') asked.add(s.body.from);
+        /* WHICH OF THOSE NOBODY HAS ANSWERED HERE, so a question the old tool has settled since can be said as still
+           waiting on Decide: see `Settled`. */
+        if (typeof s.body.from === 'string' && s.status === 'open') open.add(s.body.from);
         if (typeof s.body.install === 'string') installs.add(s.body.install);
         /* A VALUE PROPOSED BY ANYBODY, IN ANY STATE. An open one is waiting on him, and one he turned down is an answer:
            proposing it again every night is asking a question he has already answered. The record stores an addition as
@@ -297,7 +321,7 @@ async function readDecide(door: Door): Promise<Result<Decide>> {
           for (const [field, more] of Object.entries(add.values))
             for (const value of Array.isArray(more) ? more : []) if (typeof value === 'string') values.add(valueKey(add.register, field, value));
       }
-    if (got.value.length < DECIDE_PAGE) return ok({ asked, installs, values });
+    if (got.value.length < DECIDE_PAGE) return ok({ asked, open, installs, values });
     const last = got.value.at(-1);
     /* A PAGE OF THE LIMIT AND NO ID TO PAGE ON is a read that cannot be finished, and carrying on with what it has is
        the bug this function was written for. */
@@ -364,6 +388,37 @@ export function holdingsOf(exp: Record<string, unknown>): PlannedPack[] {
 }
 
 /**
+ * A question the old tool has answered or put away, by the key the import asked it under: see `settledOf`.
+ */
+export type Settled = { key: string; label: string; question: string | null; status: 'decided' | 'dismissed'; decision: string | null };
+
+/**
+ * THE QUESTIONS HIS EXPORT SAYS ARE SETTLED, so a run can say which of them still wait on Decide here.
+ *
+ * NOTHING ELSE CAN CLOSE THEM. The planner leaves a decided or dismissed question out, the import never asks one twice,
+ * and a token cannot decide, so the twin an earlier night asked stays open here for as long as nobody answers it: over
+ * the shadow week's made-up nights, SG7 decided in the old tool on night 3 was open on Decide here on night 7
+ * (`loop/research-shadow-week.md` §2 night 3). What the run can do is say so, with what to do, which is the answer he
+ * gave there given again here, or a dismissal. Read from the export the way `banksOf` reads it, because the plan keeps
+ * only the questions it asks.
+ */
+export function settledOf(exp: Record<string, unknown>): Settled[] {
+  const db = isObj(exp.db) ? exp.db : null;
+  const out: Settled[] = [];
+  for (const s of db && Array.isArray(db.suggestions) ? db.suggestions : []) {
+    if (!isObj(s) || typeof s.id !== 'string' || (s.status !== 'decided' && s.status !== 'dismissed')) continue;
+    out.push({
+      key: `${KEY_PREFIX}suggestion:${s.id}`,
+      label: s.id,
+      question: typeof s.question === 'string' && s.question.trim() !== '' ? s.question.trim() : null,
+      status: s.status,
+      decision: typeof s.decision === 'string' && s.decision.trim() !== '' ? s.decision.trim() : null,
+    });
+  }
+  return out;
+}
+
+/**
  * A range as a sentence says it: `>=2.0.0` is "2.0.0 or later" and `>=1.8.0 <3.0.0` is "1.8.0 or later, before 3.0.0".
  * A person reads these lines, and `>=1.8.0 <3.0.0` is the grammar's spelling and not an English one. Any other range is
  * printed as it is written, which is at least exact.
@@ -379,9 +434,26 @@ const rangeWords = (range: string): string => {
  * Apply a plan through a door. Refs are resolved to the id of the row they name once it is written; a ref to a row in
  * the same list written later is set in a second pass.
  */
-export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; banks?: PlannedBank[]; packs?: PlannedPack[] }): Promise<Report> {
+export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; banks?: PlannedBank[]; packs?: PlannedPack[]; settled?: Settled[] }): Promise<Report> {
   let plan = given;
-  const report: Report = { missing: [], tally: {}, asked: 0, alreadyAsked: 0, polls: { filed: 0, before: 0 }, changes: [], refused: [], retired: [], clashes: [], examples: 0, outcomes: {}, plan };
+  const questions: NonNullable<Report['questions']> = [];
+  const waiting: Waiting[] = [];
+  const report: Report = {
+    missing: [],
+    tally: {},
+    asked: 0,
+    alreadyAsked: 0,
+    questions,
+    waiting,
+    polls: { filed: 0, before: 0 },
+    changes: [],
+    refused: [],
+    retired: [],
+    clashes: [],
+    examples: 0,
+    outcomes: {},
+    plan,
+  };
   let registers = ORDER.filter((r) => plan.rows.some((row) => row.register === r));
 
   /**
@@ -815,8 +887,20 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
     /* A FIELD THE ROW NAMES IN `onCreate` WAS ITS FIRST VALUE ONLY (`PlannedRow.onCreate`), and a person may have changed
        it since: patched, a one-off date he closed early was reopened by the next night's import. */
     const mine = new Set(row.onCreate ?? []);
+    const differs = (field: string): boolean => stable(found.fields[field]) !== stable(fields[field]);
     const patch: Record<string, unknown> = {};
-    for (const [field, value] of Object.entries(fields)) if (!mine.has(field) && stable(found.fields[field]) !== stable(value)) patch[field] = value;
+    for (const [field, value] of Object.entries(fields)) if (!mine.has(field) && differs(field)) patch[field] = value;
+    /**
+     * UNLESS THE DAY THOSE FIELDS WERE READ FROM HAS MOVED, and then they are the planner's again.
+     *
+     * A one-off's `state` and `done_on` are the planner's reading of its day against the day of the import, so kept
+     * past a change of day they describe a day that is gone. Measured before this (`loop/research-batch-fifty-one-audit.md`
+     * finding 5, `test/import-moved-oneoff.test.ts`): a return dated 2026-09-01 arrived done on the 17th, was moved in
+     * the old tool to 2026-10-15, and the next night patched `by` alone, leaving a task done six weeks before its day and
+     * in no list of what is due. A night on which the day did not move sends none of them, so a state he set holds
+     * until the old tool moves the day it was set against.
+     */
+    if (Object.hasOwn(patch, 'by')) for (const field of mine) if (Object.hasOwn(fields, field) && differs(field)) patch[field] = fields[field];
     if (Object.keys(patch).length === 0) {
       tally.unchanged++;
       report.outcomes[row.key] = 'unchanged';
@@ -955,10 +1039,11 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
    * written by this point, and an exception would take the report with it. Asking again is the harm, so the run
    * stops asking, files no poll, and says which read failed under "Refused by the record".
    */
-  let decide: Decide | null = { asked: new Set(), installs: new Set(), values: new Set() };
+  let decide: Decide | null = { asked: new Set(), open: new Set(), installs: new Set(), values: new Set() };
   const banks = o.banks ?? [];
   const packs = o.packs ?? [];
-  if (plan.asks.length > 0 || plan.polls.length > 0 || banks.length > 0 || packs.length > 0) decide = await readDecideOnce();
+  const settledThere = o.settled ?? [];
+  if (plan.asks.length > 0 || plan.polls.length > 0 || banks.length > 0 || packs.length > 0 || settledThere.length > 0) decide = await readDecideOnce();
   const asked = decide?.asked ?? new Set<string>();
   const installs = decide?.installs ?? new Set<string>();
   if (decide !== null && plan.asks.length > 0) {
@@ -969,6 +1054,7 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
       }
       if (o.dryRun) {
         report.asked++;
+        questions.push({ label: ask.label, question: ask.question });
         continue;
       }
       const done = await door.propose({ question: ask.question, body_kind: 'options', body: ask.body });
@@ -978,8 +1064,14 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
         continue;
       }
       report.asked++;
+      questions.push({ label: ask.label, question: ask.question });
     }
   }
+  /* A QUESTION SETTLED IN THE OLD TOOL THAT IS STILL OPEN HERE, said with what to do: see `settledOf`. Only one this
+     record was asked, because one it never was has no twin here to answer. */
+  if (decide !== null)
+    for (const s of settledThere)
+      if (decide.open.has(s.key)) waiting.push({ label: s.label, question: s.question, answer: s.status === 'decided' ? `decided there${s.decision ? ` as ${s.decision}` : ''}` : 'dismissed there' });
 
   /* A POLL IS A PACK TO INSTALL, filed once. Its project and organisation are the rows this import wrote or found. */
   for (const poll of decide === null ? [] : plan.polls) {
@@ -1096,6 +1188,9 @@ const hostOf = (url: string): string => {
 const and = (items: string[]) => (items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${String(items.at(-1))}`);
 const few = (items: string[], most = 8) => (items.length <= most ? items.join(', ') : `${items.slice(0, most).join(', ')} and ${String(items.length - most)} more`);
 
+/** A question waiting on Decide as both reports name it: its the old tool id, its words, and what the old tool did with it. */
+const waitingSaid = (w: Waiting): string => `${w.label}${w.question ? `, ${w.question}` : ''}, ${w.answer}.`;
+
 /** The report as the lines a person reads. */
 export function said(report: Report, o: { dryRun: boolean; file: string }): string[] {
   const { plan } = report;
@@ -1163,6 +1258,10 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
     lines.push('', o.dryRun ? 'What would be closed, and why:' : 'Closed, and why:');
     for (const [why, items] of by) lines.push(`- ${why} ${few(items)}.`);
   }
+  if ((report.waiting ?? []).length > 0) {
+    lines.push('', 'Answered in the old tool and still open on Decide here:');
+    for (const w of report.waiting ?? []) lines.push(`- ${waitingSaid(w)} ${w.answer.startsWith('decided') ? 'Answer it on Decide the way you answered it in the old tool, or dismiss it.' : 'Dismiss it on Decide too.'}`);
+  }
   if (report.clashes.length > 0) {
     lines.push('', 'Categories this BrainDog already has under that name:');
     for (const c of report.clashes)
@@ -1214,6 +1313,16 @@ export type Run = {
   updated: { register: string; label: string; fields: string[] }[];
   refused: { register: string; label: string; fix: string }[];
   skipped: { reason: string; items: string[] }[];
+  /**
+   * WHAT IT ASKED, WHAT IT CLOSED AND WHAT STILL WAITS ON DECIDE, AND ALL THREE OPTIONAL, because a line written before
+   * they were kept is still a night he ran (`isRun`). Kept because the shadow week's morning read left out Decide
+   * entirely: a question asked in the night was not said, and one answered in the old tool was said only as the planner's
+   * skip line, "Already decided, and carried with its decision", which reads as done while it waited on Decide here
+   * (`loop/research-shadow-week.md` §3).
+   */
+  asked?: { label: string; question: string }[];
+  retired?: { register: string; label: string; why: string }[];
+  waiting?: Waiting[];
 };
 
 /** The run a report describes, as `--since` reads it back. */
@@ -1230,6 +1339,9 @@ export function runOf(report: Report, o: { at: string; host: string; file: strin
     updated: report.changes.filter((c) => !turnedDown.has(`${c.register}\n${c.label}`)).map((c) => ({ register: c.register, label: c.label, fields: c.fields })),
     refused: [...report.refused, ...report.clashes.map((c) => ({ register: 'categories', label: c.label, fix: c.fix }))],
     skipped: report.plan.skipped,
+    asked: report.questions ?? [],
+    retired: report.retired,
+    waiting: report.waiting ?? [],
   };
 }
 
@@ -1287,6 +1399,13 @@ export function sinceSaid(runs: Run[], since: string, offsetOf: (at: Date) => nu
     };
     byList(run.created, (r) => r.label, 'Created in');
     byList(run.updated, (r) => `${r.label} (${r.fields.join(', ')})`, 'Updated in');
+    /* CLOSED BY REASON, AS THE NIGHT'S OWN REPORT SAYS IT, each row under the list it was closed in. */
+    const closed = new Map<string, string[]>();
+    for (const r of run.retired ?? []) closed.set(r.why, [...(closed.get(r.why) ?? []), `${NAMES[r.register] ?? r.register}, ${r.label}`]);
+    for (const [why, items] of closed) lines.push(`- Closed: ${why} ${few(items)}.`);
+    for (const q of run.asked ?? []) lines.push(`- Asked on Decide: ${q.label}, ${q.question}`);
+    for (const w of run.waiting ?? [])
+      lines.push(`- Still open on Decide here, answered in the old tool: ${waitingSaid(w)} ${w.answer.startsWith('decided') ? 'Answer it on Decide the same way, or dismiss it.' : 'Dismiss it on Decide too.'}`);
     for (const r of run.refused) lines.push(`- Not carried, ${NAMES[r.register] ?? r.register}: ${r.label}. ${r.fix}`);
     for (const s of run.skipped) {
       const fresh = s.items.filter((item) => !had.has(`${s.reason}\n${item}`));
@@ -1334,7 +1453,10 @@ function isRun(run: unknown): run is Run {
     itemsHold(run.created, ['register', 'label']) &&
     itemsHold(run.updated, ['register', 'label'], ['fields']) &&
     itemsHold(run.refused, ['register', 'label', 'fix']) &&
-    itemsHold(run.skipped, ['reason'], ['items'])
+    itemsHold(run.skipped, ['reason'], ['items']) &&
+    (run.asked === undefined || itemsHold(run.asked, ['label', 'question'])) &&
+    (run.retired === undefined || itemsHold(run.retired, ['register', 'label', 'why'])) &&
+    (run.waiting === undefined || (itemsHold(run.waiting, ['label', 'answer']) && (run.waiting as { question?: unknown }[]).every((w) => w.question === null || isText(w.question))))
   );
 }
 
@@ -1458,7 +1580,27 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
     io.say(e instanceof Error ? e.message : 'No BrainDog host could be read.');
     return 1;
   }
-  const headers = await io.headers(to.key);
+  /**
+   * THE IMPORT WRITES AS A RUN OF ITS OWN, ONE A NIGHT, AND SENDS NOTHING OF THE FOLDER IT WAS STARTED IN BUT THE
+   * MACHINE'S NAME (`loop/research-shadow-week.md` §4 option A, and the checker's note under it).
+   *
+   * It sent `io.headers(to.key)`, the folder's position and the run its session file names, and measured through this
+   * command on a host over the record (`test/import-own-run.test.ts`) that was 44 runs for the fixture's 44 writes from
+   * a folder with no repository, every one left `active`, and from a folder an agent was working in, the agent's own run
+   * signing every write. A client id of its own is what the ladder finds the same run by on every write, whatever the
+   * folder. And the folder's repository, remote and path go with the run it names, not only the session headers: sent
+   * beside the new client id they placed the import's run in that folder's project, because a run re-attached by its
+   * client id from a place it names is placed there (`packages/kernel/src/index.ts`, `locateRun`), and the skill and
+   * the key belonging to other projects were refused `FORBIDDEN`, exit 1. The import writes to every project at once,
+   * so it has no folder to be placed by. The host is kept because it names the machine the night ran on, and that alone
+   * places nothing.
+   */
+  const folder = await io.headers(to.key);
+  const headers: Record<string, string> = {
+    ...(folder['x-braindog-host'] === undefined ? {} : { 'x-braindog-host': folder['x-braindog-host'] }),
+    'x-braindog-client': `braindog-import-${crypto.randomUUID()}`,
+    'x-braindog-agent': 'other',
+  };
   const ms = budgetOf(io.env);
   /* ONE DEADLINE A REQUEST, not one for the run: an import is hundreds of requests, and each is as quick as any other. */
   const client = createClient({
@@ -1481,7 +1623,7 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
   };
   let report: Report;
   try {
-    report = await applyPlan(plan, door, { dryRun: values['dry-run'] === true, banks: banksOf(read.value), packs: holdingsOf(read.value) });
+    report = await applyPlan(plan, door, { dryRun: values['dry-run'] === true, banks: banksOf(read.value), packs: holdingsOf(read.value), settled: settledOf(read.value) });
   } catch (e) {
     if (e instanceof Unreachable) {
       io.say(`${to.key} stopped answering part way. Run the import again: rows already written are found and not added twice.`);
@@ -1498,6 +1640,34 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
     throw e;
   }
   for (const line of said(report, { dryRun: values['dry-run'] === true, file })) io.out(line);
+  /**
+   * AND ONCE ITS LAST WRITE HAS ANSWERED, THE RUN IS ENDED `done`, named by the export it carried.
+   *
+   * Left alone it stayed `active`, read as live beside the agents actually working until the twelve-hour sweep
+   * abandoned it (`loop/research-shadow-week.md` §1, 8 runs for 8 nights each abandoned the day after). Ending it is
+   * safe only because the run is this command's own: sent with the folder's headers, the same handoff would have ended
+   * the agent's. Only when something was written, because a night that wrote nothing opened no run, and a handoff would
+   * open one only to end it. A refusal or no answer is said and changes nothing else: the rows are in, and the exit is
+   * about the rows.
+   */
+  const wrote =
+    Object.values(report.tally).some((t) => t.added + t.updated > 0) ||
+    report.asked > 0 ||
+    report.retired.length > 0 ||
+    report.polls.filed > 0 ||
+    (report.banks?.filed ?? 0) > 0 ||
+    (report.packs?.filed ?? 0) > 0 ||
+    (report.values?.added.length ?? 0) + (report.values?.filed.length ?? 0) > 0;
+  if (values['dry-run'] !== true && report.missing.length === 0 && wrote) {
+    const t = Object.values(report.tally).reduce((a, b) => ({ added: a.added + b.added, updated: a.updated + b.updated, unchanged: a.unchanged + b.unchanged }), { added: 0, updated: 0, unchanged: 0 });
+    const taken = plan.taken ? (Number.isNaN(Date.parse(plan.taken)) ? plan.taken.slice(0, 10) : localClock(plan.taken, offsetOf).day) : null;
+    const ended = await client.handoff({
+      state: 'done',
+      doing: taken ? `the old tool import, export of ${taken}` : `the old tool import on ${today}`,
+      note: `${String(t.added)} added, ${String(t.updated)} updated, ${String(t.unchanged)} unchanged, ${String(report.asked)} asked on Decide, ${String(report.refused.length)} refused.`,
+    });
+    if (!ended.ok) io.say(`The import's own run could not be ended (${fixOf(ended)}), so it reads as live until the record sweeps it.`);
+  }
   /* A DRY RUN AND A RECORD SHORT OF ITS LISTS WROTE NOTHING, so neither is a night `--since` should report as carried.
      A run the host stopped answering part way returned above, and is not remembered either: what it wrote is found
      again and said as unchanged by the next one, which is the one sentence about it worth reading. */
