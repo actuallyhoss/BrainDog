@@ -78,12 +78,44 @@ test('A QUESTION TO SPARK NAMING A VARIABLE SET FROM A SECRET FIELD IS REFUSED A
     ],
     /* A BRANCH TAKEN BEFORE THE QUESTION may have set it, and the lint cannot tell which arm the row will take. */
     ['inside a branch', [{ if: 'what is Rent', then: [{ set_var: { name: 'p', to: '{{trigger.row.pin}}' } }] }, { ask_spark: { question: 'Rate given {{vars.p}}?', as: 'rate' } }]],
+    /* THE CASES BELOW GUARD THE TWO PLACES THE LINT WAS MADE PRECISE, each one a way the relaxing could go too far. A
+       plain `set_var` inside one arm clears that arm only, so the other arm still reaches the question holding `pin`. */
+    [
+      'cleared in one arm only',
+      [
+        { set_var: { name: 'p', to: '{{trigger.row.pin}}' } },
+        { if: 'what is Rent', then: [{ set_var: { name: 'p', to: '{{trigger.row.note}}' } }] },
+        { ask_spark: { question: 'Rate given {{vars.p}}?', as: 'rate' } },
+      ],
+    ],
+    [
+      'set in the else arm, cleared in the then arm',
+      [
+        { if: 'what is Rent', then: [{ set_var: { name: 'p', to: '{{trigger.row.note}}' } }], else: [{ set_var: { name: 'p', to: '{{trigger.row.pin}}' } }] },
+        { ask_spark: { question: 'Rate given {{vars.p}}?', as: 'rate' } },
+      ],
+    ],
+    /* THE LAST WRITE IS THE ONE THAT COUNTS, both ways: plain then secret is secret. */
+    ['set plain, then from the secret', [{ set_var: { name: 'p', to: '{{trigger.row.note}}' } }, { set_var: { name: 'p', to: '{{trigger.row.pin}}' } }, { ask_spark: { question: 'Rate given {{vars.p}}?', as: 'rate' } }]],
+    /* A SECOND WRITE THAT READS THE FIRST carries it, so a set_var of the same name clears only when it is plain. */
+    ['set again from itself', [{ set_var: { name: 'p', to: '{{trigger.row.pin}}' } }, { set_var: { name: 'p', to: 'again {{vars.p}}' } }, { ask_spark: { question: 'Rate given {{vars.p}}?', as: 'rate' } }]],
+    /* AND AN ARM SEES WHAT WAS SET EARLIER IN THE SAME ARM, however deep the question sits in it. */
+    [
+      'later in the same arm',
+      [{ if: 'what is Rent', then: [{ set_var: { name: 'p', to: '{{trigger.row.pin}}' } }, { if: 'note is plain', then: [{ ask_spark: { question: 'Rate given {{vars.p}}?', as: 'rate' } }] }] }],
+    ],
   ];
   for (const [what, steps] of cases) {
     const out = refusal((await k.install([rule(steps)])) as Result<unknown>);
     assert.equal(out?.code, 'DECLARATION_INVALID', `${what}: ${out?.fix ?? 'installed'}`);
     assert.match(out!.fix, /pin/, what);
-    assert.match(out!.fix, what === 'inside a branch' ? /steps\[0\]\.then\[0\]/ : /steps\[0\]/, `${what}: the refusal does not name the set_var: ${out!.fix}`);
+    const setter: Record<string, RegExp> = {
+      'inside a branch': /steps\[0\]\.then\[0\]/,
+      'later in the same arm': /steps\[0\]\.then\[0\]/,
+      'set in the else arm, cleared in the then arm': /steps\[0\]\.else\[0\]/,
+      'set plain, then from the secret': /steps\[1\]/,
+    };
+    assert.match(out!.fix, setter[what] ?? /steps\[0\]/, `${what}: the refusal does not name the set_var: ${out!.fix}`);
   }
   /* A VARIABLE SET FROM FIELDS THAT MAY LEAVE IS ASKED ABOUT AS ALWAYS, and so is a secret one in a question to a
      person, which stays in the record. */
@@ -95,6 +127,38 @@ test('A QUESTION TO SPARK NAMING A VARIABLE SET FROM A SECRET FIELD IS REFUSED A
     const out = refusal((await k.install([rule(steps)])) as Result<unknown>);
     assert.equal(out, null, out?.fix);
   }
+  sql.close();
+});
+
+test('A QUESTION NO RUN CAN REACH HOLDING THE SECRET INSTALLS: the arm beside the one that set it, and after a plain set_var of the same name', async () => {
+  /* THE LINT REFUSED BOTH UNTIL 23 SEPTEMBER, measured against `flow-lint.ts` as wave forty-seven left it: each read
+     `DECLARATION_INVALID` naming the `set_var` that took `pin`. Neither can leave. A plan has no loops, so an `else` is
+     never taken after its own `then` (`flow.ts`'s `plan`), and the runner takes `p` out of what it keeps when a later
+     `set_var` fills it the same both ways (the test "WHAT WAS KEPT GOES" below measures that one reaching Spark as
+     `plain`). */
+  const { k, sql } = await sparked();
+  const cases: [string, unknown[]][] = [
+    [
+      'the sibling arm',
+      [{ if: 'what is Rent', then: [{ set_var: { name: 'p', to: '{{trigger.row.pin}}' } }], else: [{ ask_spark: { question: 'Rate given {{vars.p}}?', as: 'rate' } }] }],
+    ],
+    ['set again, plainly', [{ set_var: { name: 'p', to: '{{trigger.row.pin}}' } }, { set_var: { name: 'p', to: '{{trigger.row.note}}' } }, { ask_spark: { question: 'Rate given {{vars.p}}?', as: 'rate' } }]],
+    /* BOTH ARMS SET IT PLAINLY, so whichever the row takes, the question after the branch reads a plain value. */
+    [
+      'cleared in both arms',
+      [
+        { set_var: { name: 'p', to: '{{trigger.row.pin}}' } },
+        { if: 'what is Rent', then: [{ set_var: { name: 'p', to: '{{trigger.row.note}}' } }], else: [{ set_var: { name: 'p', to: 'none' } }] },
+        { ask_spark: { question: 'Rate given {{vars.p}}?', as: 'rate' } },
+      ],
+    ],
+  ];
+  const refused: string[] = [];
+  for (const [what, steps] of cases) {
+    const out = refusal((await k.install([rule(steps)])) as Result<unknown>);
+    if (out) refused.push(`${what}: ${out.fix}`);
+  }
+  assert.deepEqual(refused, []);
   sql.close();
 });
 
@@ -179,5 +243,113 @@ test('WHAT WAS KEPT GOES WHEN THE VARIABLE IS SET AGAIN FROM A FIELD THAT MAY LE
   /* THE QUESTION RIDES ON THE `suggest` EVENT the gate writes, not on the suggestion's body. */
   const said = JSON.stringify(sql.all("SELECT * FROM event WHERE actor = 'rule:rate'"));
   assert.match(said, /Pay hunter2\?/, said);
+  sql.close();
+});
+
+test('A VARIABLE SET FROM ITSELF IS ASKED ABOUT AS IT HOLDS, not filled a second time from its own new value', async () => {
+  /* FOUND WHILE WRITING THE REBUILD BELOW, which fills in the order a run took its steps. `set_var` wrote the new value
+     into `vars` before its second fill, so `{{vars.p}}` in its own `to` read the value it was making, the two fills
+     differed, and what was kept for Spark was the text filled twice. Measured against `flow.ts` as wave forty-seven
+     left it: `Given plain more more?` about a variable holding `plain more`. Nothing secret went out, and the question
+     was still wrong. */
+  const { sql, clock } = await sparked(rule([{ set_var: { name: 'x', to: 'y' } }]));
+  const steps = [
+    { set_var: { name: 'p', to: '{{trigger.row.note}}' } },
+    { set_var: { name: 'p', to: '{{vars.p}} more' } },
+    { set_var: { name: 's', to: '{{trigger.row.pin}}' } },
+    { set_var: { name: 's', to: 'again {{vars.s}}' } },
+    { ask_spark: { question: 'Given {{vars.p}}, {{vars.s}}?', as: 'a' } },
+  ];
+  sql.exec("UPDATE declaration SET body = ? WHERE id = 'rule.rate' AND superseded_at IS NULL", JSON.stringify({ rule: 'rate', on: WRITTEN, once_per: ['entry'], steps }));
+  const k = await openRecord(sql, clock, { answersSpark: true });
+  const made = value<Entry>(k.create('obligations', { what: 'Rent', note: 'plain' }, { actor: 'p_1' }));
+  sql.exec("UPDATE entry SET fields = json_set(fields, '$.pin', 'hunter2') WHERE id = ?", made.id);
+  await k.drain();
+  const [job] = k.leaseOutbox(['infer.ask'], 10);
+  assert.ok(job, 'no infer.ask row was queued');
+  assert.equal((JSON.parse(job.payload) as { question: string }).question, 'Given plain more, again —?');
+  sql.close();
+});
+
+/**
+ * A run a build before `-sendable` parked, resumed by a build with it: the rule written into the table past the lint,
+ * the run parked, and the key taken off its stored `vars`, which is the column as the older build left it.
+ */
+async function parkedBefore(steps: unknown[]): Promise<{ k: Kernel; sql: NodeSql; clock: ReturnType<typeof fixedClock> }> {
+  const { sql, clock } = await sparked(rule([{ set_var: { name: 'x', to: 'y' } }]));
+  sql.exec("UPDATE declaration SET body = ? WHERE id = 'rule.rate' AND superseded_at IS NULL", JSON.stringify({ rule: 'rate', on: WRITTEN, once_per: ['entry'], steps }));
+  const k = await openRecord(sql, clock, { answersSpark: true });
+  const made = value<Entry>(k.create('obligations', { what: 'Rent', note: 'plain' }, { actor: 'p_1' }));
+  sql.exec("UPDATE entry SET fields = json_set(fields, '$.pin', 'hunter2') WHERE id = ?", made.id);
+  await k.drain();
+  const r = sql.one<{ state: string; vars: string }>("SELECT state, vars FROM automation_run WHERE rule = 'rate'");
+  assert.equal(r?.state, 'waiting', 'the run did not park');
+  sql.exec(`UPDATE automation_run SET vars = json_remove(vars, '$."-sendable"') WHERE rule = 'rate'`);
+  const stored = JSON.parse(sql.one<{ vars: string }>("SELECT vars FROM automation_run WHERE rule = 'rate'")!.vars) as Record<string, unknown>;
+  assert.equal(stored['-sendable'], undefined);
+  assert.equal(stored.p, 'hunter2');
+  return { k, sql, clock };
+}
+
+test('A RUN PARKED BY A BUILD BEFORE THE KEEPING SENDS THE DASH WHEN IT WAKES, rebuilt from the steps it had taken', async () => {
+  /* THE CHECKER'S FINDING ON WAVE FORTY-SEVEN. A run that parked between the `set_var` and the question kept its `vars`
+     with no `-sendable` beside them, since the build that parked it wrote none, and the build that woke it read nothing
+     kept and filled the question from `vars`. Measured against `flow.ts` as that wave left it, the question went out as
+     `Given hunter2, plain, r hunter2, —?`. `s` is set from `pin` after the wake, so the column has something kept by
+     the time the question is reached: a rebuild done at the question, for a run with nothing kept, found `s` there and
+     asked `Given hunter2, plain, r hunter2, —?` again, measured with the rebuild moved there. */
+  const { k, sql, clock } = await parkedBefore([
+    { set_var: { name: 'p', to: '{{trigger.row.pin}}' } },
+    { set_var: { name: 'n', to: '{{trigger.row.note}}' } },
+    { wait: '1h' },
+    { set_var: { name: 'r', to: 'r {{vars.p}}' } },
+    { set_var: { name: 's', to: '{{trigger.row.pin}}' } },
+    { ask_spark: { question: 'Given {{vars.p}}, {{vars.n}}, {{vars.r}}, {{vars.s}}?', as: 'a' } },
+  ]);
+  clock.advance(3_600_000);
+  await k.drain();
+  const [job] = k.leaseOutbox(['infer.ask'], 10);
+  assert.ok(job, 'no infer.ask row was queued');
+  assert.equal((JSON.parse(job.payload) as { question: string }).question, 'Given —, plain, r —, —?');
+  sql.close();
+});
+
+test('AND ONE PARKED ON A PERSON BY THAT BUILD, where the answer overwrote a variable set from the secret', async () => {
+  /* THE ANSWER'S OWN STEP ROW IS READ IN THE REBUILD, so `a`, set from `pin` and then answered `yes`, is asked about as
+     `yes` and not as the dash. Measured against `flow.ts` as wave forty-seven left it: `Given hunter2 and yes?`. */
+  const { k, sql } = await parkedBefore([
+    { set_var: { name: 'p', to: '{{trigger.row.pin}}' } },
+    { set_var: { name: 'a', to: '{{trigger.row.pin}}' } },
+    { ask_person: { question: 'Pay?', options: ['yes', 'no'], as: 'a' } },
+    { ask_spark: { question: 'Given {{vars.p}} and {{vars.a}}?', as: 'b' } },
+  ]);
+  const [s] = sql
+    .all<{ id: string; body: string }>("SELECT id, body FROM suggestion WHERE status = 'open' AND opened_by = 'rule:rate'")
+    .map((r) => ({ id: r.id, body: JSON.parse(r.body) as { options: { id: string; label: string }[] } }));
+  assert.ok(s, 'no question was put to the person');
+  value(k.decide(s.id, { decide: { option: s.body.options.find((o) => o.label === 'yes')!.id, reason: 'Yes.' } }, 'p_1'));
+  await k.drain();
+  const [job] = k.leaseOutbox(['infer.ask'], 10);
+  assert.ok(job, 'no infer.ask row was queued');
+  assert.equal((JSON.parse(job.payload) as { question: string }).question, 'Given — and yes?');
+  sql.close();
+});
+
+test('A RUN THIS BUILD PARKED IS NOT REBUILT, so a field edited during the wait does not replace what the variable holds', async () => {
+  /* THE CHECKER'S FINDING ON THE REBUILD ABOVE. `pack` wrote no `-sendable` for a run keeping nothing, so every run this
+     build parked with nothing kept read as one an earlier build parked, and was rebuilt from the row as it is now:
+     measured on 23 September, `p` set from `note` while it said `plain`, `note` edited to `changed` during the wait,
+     and Spark was asked `Given changed?` about a variable holding `plain`. No secret in the rule at all, and the
+     question was still about a value the run does not have. */
+  const { k, sql, clock } = await sparked(rule([{ set_var: { name: 'p', to: '{{trigger.row.note}}' } }, { wait: '1h' }, { ask_spark: { question: 'Given {{vars.p}}?', as: 'a' } }]));
+  const made = value<Entry>(k.create('obligations', { what: 'Rent', note: 'plain' }, { actor: 'p_1' }));
+  await k.drain();
+  assert.equal(sql.one<{ state: string }>("SELECT state FROM automation_run WHERE rule = 'rate'")?.state, 'waiting', 'the run did not park');
+  sql.exec("UPDATE entry SET fields = json_set(fields, '$.note', 'changed') WHERE id = ?", made.id);
+  clock.advance(3_600_000);
+  await k.drain();
+  const [job] = k.leaseOutbox(['infer.ask'], 10);
+  assert.ok(job, 'no infer.ask row was queued');
+  assert.equal((JSON.parse(job.payload) as { question: string }).question, 'Given plain?');
   sql.close();
 });

@@ -152,17 +152,69 @@ type Vars = Record<string, string | number | boolean | null>;
 type Kept = Record<string, string>;
 const KEPT = '-sendable';
 
-/** A run's stored `vars`, split into the variables and what a question to Spark reads in their place. */
-function unpack(stored: string): { vars: Vars; kept: Kept } {
+/**
+ * A run's stored `vars`, split into the variables and what a question to Spark reads in their place. `kept` is `null`
+ * when the column has no `-sendable`, which is a run a build before the key parked, or one no step has saved yet.
+ */
+function unpack(stored: string): { vars: Vars; kept: Kept | null } {
   const all = JSON.parse(stored) as Vars & { [KEPT]?: Kept };
-  const kept = all[KEPT] ?? {};
+  const kept = all[KEPT] ?? null;
   delete all[KEPT];
   return { vars: all as Vars, kept };
 }
 
-/** The two again, as the run's column holds them. With nothing kept it is `vars` alone, as it was before this key. */
-function pack(vars: Vars, kept: Kept): string {
-  return JSON.stringify(Object.keys(kept).length === 0 ? vars : { ...vars, [KEPT]: kept });
+/**
+ * What a run would have kept, taken again from the steps it has done: each `set_var` filled a second time as `advance`
+ * fills it, in the order the run took them, over variables replayed from the same rows, and each answer taking off
+ * what was kept under its name as `answerStep` does.
+ *
+ * FOR A RUN A BUILD BEFORE `-sendable` PARKED. That build wrote `vars` alone, so a run it parked on a wait or an ask
+ * between the `set_var` and the question woke under this build with nothing kept, and its question to Spark was filled
+ * from `vars`: measured on 23 September, `Given hunter2, plain, r hunter2?`. This build writes the key on every save,
+ * empty when nothing is kept (`pack`), so a column with none is that build's or a run not yet saved, which has no
+ * step rows and rebuilds to nothing.
+ *
+ * FILLED FROM THE ROW AS IT IS NOW, since the row as it was at the `set_var` is not kept. A variable is kept wherever
+ * the clean fill differs from what its step row recorded, so a text field edited since the `set_var` puts its new
+ * words in the question where its old ones stood. That is a value that may leave in place of another that may, and the
+ * other way round, comparing against the row as it is now, would let `pin` through for a row whose `pin` was cleared
+ * since. A step row holds `VARS_BYTES` and one variable holds `VAR_BYTES`, fewer, so the recorded value is whole.
+ */
+function rebuilt(deps: FlowDeps, run: string, program: Op[], started: Record<string, unknown>, row: Entry | null): Kept {
+  const kept: Kept = {};
+  const vars: Vars = {};
+  const trigger = row ? { ...started, row: sendable(deps, row).fields } : started;
+  for (const done of deps.sql.all<{ n: number; kind: string; answer: string | null }>(
+    "SELECT n, kind, answer FROM automation_step WHERE run = ? AND state = 'done' AND kind IN ('set_var', 'ask_person', 'ask_spark') ORDER BY n",
+    run,
+  )) {
+    const spec = program[done.n]?.step[done.kind] as { name?: string; to?: string; as?: string } | undefined;
+    if (done.kind !== 'set_var') {
+      if (typeof spec?.as !== 'string') continue;
+      vars[spec.as] = done.answer;
+      delete kept[spec.as];
+      continue;
+    }
+    if (typeof spec?.name !== 'string' || typeof spec.to !== 'string') continue;
+    const clean = String(fill(spec.to, { vars: { ...vars, ...kept }, trigger }));
+    vars[spec.name] = done.answer;
+    if (clean === done.answer) delete kept[spec.name];
+    else kept[spec.name] = clean;
+  }
+  return kept;
+}
+
+/**
+ * The two again, as the run's column holds them. `null` is a column a build before the key wrote, and it is written
+ * back as it was, `vars` alone, so that `advance` still rebuilds it.
+ *
+ * WITH NOTHING KEPT THE KEY IS STILL WRITTEN, EMPTY. The key's presence is the only sign this build parked the run.
+ * Leaving it off when nothing was kept made every such run read as an earlier build's and rebuilt from the row as it
+ * is now: measured on 23 September, `p` set from `note` while it said `plain`, `note` edited during the wait, and Spark
+ * asked `Given changed?` about a variable holding `plain`, in a rule with no secret in it.
+ */
+function pack(vars: Vars, kept: Kept | null): string {
+  return JSON.stringify(kept === null ? vars : { ...vars, [KEPT]: kept });
 }
 
 const isObject = (x: unknown): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x);
@@ -492,7 +544,7 @@ export function advance(deps: FlowDeps, id: string): number | null {
 
   const program = plan(decl.steps ?? decl.then);
   const trigger = JSON.parse(run.trigger) as RunTrigger;
-  const { vars, kept } = unpack(run.vars);
+  const { vars, kept: stored } = unpack(run.vars);
   let subject = trigger.entry ? deps.entry(trigger.entry) : null;
   /* WHAT A STEP READS AND WHAT IT WRITES ARE TWO ROWS WHEN A DELETE STARTED THE RUN. Its conditions and templates read
      the row as it was deleted, which is what the rule was written about; its writes get `subject`, which is `null`,
@@ -501,6 +553,12 @@ export function advance(deps: FlowDeps, id: string): number | null {
   const read = (): Entry | null => subject ?? last;
   const actor = `rule:${run.rule}`;
   const scope = () => ({ vars, trigger: context(deps, trigger, read()) });
+  /* A COLUMN WITH NO `-sendable` IS REBUILT BEFORE THE FIRST STEP, not at the question. A `set_var` taken after the wake
+     may keep something of its own, and then the question finds the run keeping something and has no sign that `p`,
+     set before the wake, is missing from it: with the rebuild moved to the question and done only for a run keeping
+     nothing, a run that set `s` from `pin` after the wait asked `Given hunter2, plain, r hunter2, —?`. Only a run with a
+     question to Spark still ahead pays for the replay, since nothing else reads what is kept. */
+  const kept = stored ?? (program.slice(run.step).some((o) => o.verb === 'ask_spark') ? rebuilt(deps, id, program, context(deps, trigger, read()), read()) : {});
   deps.sql.exec("UPDATE automation_run SET state = 'running' WHERE id = ?", id);
 
   /* FINISHED BEFORE THE STEP ROW SAYS FAILED, because `finish` lets go of whatever a `waiting` step row still holds,
@@ -562,16 +620,20 @@ export function advance(deps: FlowDeps, id: string): number | null {
         const spec = step.set_var as { name: string; to: string };
         const value = String(fill(spec.to, scope()));
         if (value.length > VAR_BYTES) return fail(i, 'set_var', `rule.${run.rule} sets ${spec.name} to ${value.length} characters, and one answer holds ${VAR_BYTES}.`);
-        vars[spec.name] = value;
         /* AND FILLED A SECOND TIME, FROM WHAT A QUESTION TO SPARK MAY CARRY: the row `sendable` leaves, and every
            variable already kept here read as it was kept, so one set from another carries the cleaning with it. The
            first fill alone is what audit forty-six measured leaving through a real self-host: `set_var: { to:
            '{{trigger.row.pin}}' }` then `{{vars.p}}` put "given hunter2" in the model's request body, and `to:
            '{{trigger.row}}'` put the row's JSON there with `pin` in it. The lint refuses both at install; this is the
-           second line, for a rule an earlier build let install. */
+           second line, for a rule an earlier build let install.
+
+           BOTH FILLS READ `vars` AS IT WAS BEFORE THIS STEP. The second was taken after the new value went in, so
+           `to: '{{vars.p}} more'` read its own result, the fills differed, and Spark was asked `plain more more` about
+           a variable holding `plain more`. */
         const row = read();
         const now = scope();
         const clean = String(fill(spec.to, { vars: { ...vars, ...kept }, trigger: row ? { ...now.trigger, row: sendable(deps, row).fields } : now.trigger }));
+        vars[spec.name] = value;
         if (clean === value) delete kept[spec.name];
         else kept[spec.name] = clean;
         if (JSON.stringify(vars).length > VARS_BYTES) return fail(i, 'set_var', `rule.${run.rule}'s answers passed ${VARS_BYTES} characters at step ${i + 1}.`);
@@ -823,10 +885,11 @@ export function answerStep(deps: FlowDeps, a: { run: string; step: number; by: s
   }
   if (String(value).length > VAR_BYTES) return stop(`The answer at step ${a.step + 1} of rule.${run.rule} runs to ${String(value).length} characters, and one answer holds ${VAR_BYTES}.`);
   /* AN ANSWER OVERWRITES WHAT WAS KEPT UNDER ITS NAME, since the variable now holds the answer and not the field it was
-     set from, and a later question to Spark reading the kept dash would be asking about a value the run no longer has. */
+     set from, and a later question to Spark reading the kept dash would be asking about a value the run no longer has.
+     A column with no `-sendable` is left with none, and `advance` rebuilds it with this answer's own step row in it. */
   const stored = unpack(run.vars);
   const vars = { ...stored.vars, [spec.as]: value };
-  delete stored.kept[spec.as];
+  if (stored.kept) delete stored.kept[spec.as];
   if (JSON.stringify(vars).length > VARS_BYTES) return stop(`rule.${run.rule}'s answers passed ${VARS_BYTES} characters at step ${a.step + 1}.`);
 
   record(deps, run.id, a.step, row.kind, 'done', String(value));

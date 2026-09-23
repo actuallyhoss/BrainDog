@@ -488,13 +488,25 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
   const row = installed === undefined ? null : rowOf(decl, trigger, installed);
   const fields = row === null ? undefined : ((installed?.get(`register.${row}`) as { fields?: { id?: unknown; type?: unknown }[] } | undefined)?.fields ?? undefined);
   const hidden = new Map((fields ?? []).filter((f) => UNSENDABLE.includes(String(f.type))).map((f) => [String(f.id), String(f.type)]));
-  /* EVERY VARIABLE A `set_var` FILLED FROM A FIELD THAT NEVER LEAVES THE RECORD, by the step that did it. Read in the
-     walk's own order, which is the order the plan takes the steps in, so only a step before the question counts. A
-     `set_var` inside either arm of an `if` counts for every step after the branch, since the lint cannot tell which arm
-     the row will take, and a later `set_var` of the same name does not take it off, since the lint does not follow
-     which of two writes of one name a run took last. */
-  const carried = new Map<string, Carried>();
-  const walk = (list: unknown, at: string, depth: number): Refusal | null => {
+  /* EVERY VARIABLE A `set_var` FILLED FROM A FIELD THAT NEVER LEAVES THE RECORD, by the step that did it, as it stands
+     on the way into each step. Read in the walk's own order, which is the order the plan takes the steps in, so only a
+     step before the question counts.
+
+     ONE MAP PER WAY THROUGH A BRANCH, JOINED AFTER IT. Each arm starts from what held before the `if` and is walked
+     with its own copy, and a variable carried out of either arm is carried after the branch, since the lint cannot
+     tell which arm the row will take. The first form of this kept one map for the whole walk, so `pin` set in a `then`
+     refused a question in its own `else`, which no run reaches after that `then`: a plan has no loops, and `plan` puts
+     a jump past the `else` at the end of every `then` that has one.
+
+     A `set_var` OF THE SAME NAME THAT CARRIES NOTHING TAKES IT OFF, on the way it is on. A run's `vars` holds the last
+     write, and the runner drops what it kept for a name whose second fill matches its first (`flow.ts`'s `set_var`), so
+     the question reads the plain value: `spark-vars-hidden.test.ts` has `r` set from `pin` then `note` asked about as
+     `plain`.
+     Taken off inside one arm, it is still carried out of the other, so a question after the branch is refused unless
+     both arms set it plainly. A write that reads the name it writes, `to: 'again {{vars.p}}'`, carries it, so it is not
+     plain and takes nothing off. An answer written with `as:` is left carried: the runner drops the kept dash for it
+     too, and the lint has not been taught that. */
+  const walk = (list: unknown, at: string, depth: number, carried: Map<string, Carried>): Refusal | null => {
     if (!Array.isArray(list)) return bad('DECLARATION_INVALID', `${id}'s ${at} is a list of steps.`, at);
     for (const [i, step] of list.entries()) {
       const here = `${at}[${i}]`;
@@ -536,6 +548,7 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
         const through = direct ? null : carriedIn(spec.to, carried);
         if (direct) carried.set(spec.name, { at: here, name: spec.name, ...direct });
         else if (through) carried.set(spec.name, through.from);
+        else carried.delete(spec.name);
       }
       if (verb === 'ask_spark') {
         const via = carriedIn(String((step.ask_spark as { question: unknown }).question), carried);
@@ -582,13 +595,18 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
       if (verb === 'if') {
         if (depth >= DEPTH_CEILING)
           return bad('OUT_OF_BOUNDS', `${id} nests a branch ${depth + 1} deep at ${here}, and ${DEPTH_CEILING} is the most. Lift the inner branch into its own step.`, here);
-        const inner = walk(step.then, `${here}.then`, depth + 1) ?? (step.else === undefined ? null : walk(step.else, `${here}.else`, depth + 1));
+        /* AN `if` WITH NO `else` HAS AN EMPTY ONE, so what held before the branch is one of the two ways out of it. */
+        const yes = new Map(carried);
+        const no = new Map(carried);
+        const inner = walk(step.then, `${here}.then`, depth + 1, yes) ?? (step.else === undefined ? null : walk(step.else, `${here}.else`, depth + 1, no));
         if (inner) return inner;
+        carried.clear();
+        for (const [name, from] of [...no, ...yes]) carried.set(name, from);
       }
     }
     return null;
   };
-  const walked = walk(body.steps ?? body.then, body.steps !== undefined ? 'steps' : 'then', 0);
+  const walked = walk(body.steps ?? body.then, body.steps !== undefined ? 'steps' : 'then', 0, new Map());
   if (walked) return walked;
 
   const ceiling = isObject(body.limits) && typeof body.limits.steps_per_run === 'number' ? body.limits.steps_per_run : STEP_CEILING;
