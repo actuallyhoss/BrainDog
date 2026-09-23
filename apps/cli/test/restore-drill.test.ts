@@ -89,7 +89,10 @@ function bucket(): Blobs & { held: Map<string, Uint8Array>; meta: Map<string, Re
  * `temp` IS THE ONLY FOLDER THE DRILL MAY WRITE TO, and each test asserts it is empty after, which is the proof that
  * the plaintext and the restored record are gone.
  */
-async function night(t: { after: (f: () => void) => void }, shape: { drift?: boolean } = {}) {
+type Member = { id: string; email: string; level: 'owner' | 'write'; suspended?: true };
+const ADA: Member = { id: OWNER, email: 'ada@example.com', level: 'owner' };
+
+async function night(t: { after: (f: () => void) => void }, shape: { drift?: boolean; people?: Member[] } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'braindog-drill-test-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const temp = join(dir, 'temp');
@@ -107,6 +110,12 @@ async function night(t: { after: (f: () => void) => void }, shape: { drift?: boo
     'UTC',
     AT,
   );
+  /* THE RECORD HAS PEOPLE, because a copy with nobody on it is a record `init --from` refuses, and the drill now
+     restores the way a host does. */
+  for (const p of shape.people ?? [ADA]) {
+    sql.exec('INSERT INTO person (id, email, name, suspended_at) VALUES (?, ?, ?, ?)', p.id, p.email, p.email.split('@')[0]!, p.suspended ? AT : null);
+    sql.exec("INSERT INTO member (person_id, register, level) VALUES (?, '*', ?)", p.id, p.level);
+  }
   assert.ok((await k.install([register('things', 'Things'), register('tools', 'Tools')])).ok);
   for (const name of ['Kiln', 'Wheel']) assert.ok(k.create('things', { name }, { actor: OWNER }).ok);
   for (const name of ['Rib', 'Wire', 'Sponge']) assert.ok(k.create('tools', { name }, { actor: OWNER }).ok);
@@ -204,7 +213,39 @@ test('A COPY THAT VERIFIES BUT DOES NOT COME BACK WHOLE IS A FAIL, naming the ta
   assert.equal(out.code, 1, `${out.stdout}\n${out.stderr}`);
   assert.match(out.stdout, /manifest hashes match/, 'braindog verify passed it, so the FAIL is the comparison and not the check');
   assert.match(out.stdout, /entry_fts\s+4\s+5\s+✗/);
-  assert.match(out.stdout, /^FAIL .* 1 of the copy's tables and lists did not come back/m);
+  assert.match(out.stdout, /^FAIL .* 1 of the copy's tables, lists and people did not come back/m);
+  assert.doesNotMatch(out.stdout, /^PASS/m);
+  assert.deepEqual(leftIn(n.temp), []);
+});
+
+/* THE DRILL USED TO RESTORE WITH `openRecord(...).import(lines)`, which is neither the Cloud's restore nor `init --from`,
+   and it never asked whether anybody could open what it restored (audit fifty-seven §7). Run on the audit's own copy, a
+   suspended first owner and two more people, it printed PASS while `init --from` turned the same file into a record none
+   of the three could open. These two copies are that shape: the first must restore for everyone it names, person by
+   person, and the second, whose only owner is suspended, is a record nobody could open and must be a FAIL. */
+test('EVERY MEMBER OF THE COPY CAN OPEN WHAT init --from RESTORES, and the drill says so person by person', async (t) => {
+  const people: Member[] = [
+    { id: 'p_01JZ8QK3F7R2M9V4XN6TCB5HA0', email: 'ada@example.com', level: 'owner', suspended: true },
+    { id: 'p_01JZ8QK3F7R2M9V4XN6TCB5HA1', email: 'bea@example.com', level: 'owner' },
+    { id: 'p_01JZ8QK3F7R2M9V4XN6TCB5HA2', email: 'cal@example.com', level: 'write' },
+  ];
+  const n = await night(t, { people });
+  const out = await drill([n.copy, '--identity', n.key], n.temp);
+  assert.equal(out.code, 0, `${out.stdout}\n${out.stderr}`);
+  assert.match(out.stdout, /braindog init drill --from/, 'the restore is not the one a host runs');
+  assert.match(out.stdout, /bea@example\.com\s+owner\s+owner\s+✓/);
+  assert.match(out.stdout, /cal@example\.com\s+write\s+write\s+✓/);
+  assert.match(out.stdout, /ada@example\.com\s+owner\s+suspended/);
+  assert.match(out.stdout, new RegExp(`PASS ${REC}`));
+  assert.deepEqual(leftIn(n.temp), []);
+});
+
+test('A COPY WHOSE ONLY OWNER IS SUSPENDED RESTORES INTO A RECORD NOBODY CAN OPEN, AND THAT IS A FAIL', async (t) => {
+  const n = await night(t, { people: [{ ...ADA, suspended: true }] });
+  const out = await drill([n.copy, '--identity', n.key], n.temp);
+  assert.equal(out.code, 1, `${out.stdout}\n${out.stderr}`);
+  assert.match(out.stdout, /manifest hashes match/, 'braindog verify passed it, so the FAIL is the restore and not the check');
+  assert.match(out.stdout, /^FAIL /m);
   assert.doesNotMatch(out.stdout, /^PASS/m);
   assert.deepEqual(leftIn(n.temp), []);
 });

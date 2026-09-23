@@ -9,8 +9,9 @@
  *
  * SO THE FILE IS THE RECORD. It is checked first, against itself and against `--key` when one is named; a file is
  * migrated to this build's tables and nothing else; the copy is imported into it, its own id and rows and keys; and only
- * then does the Directory name it, for the person the file says owns it, under that person's id. The order is `init`'s
- * for its reason (`51 §13 D21`): a Directory row never points at a record that failed to arrive.
+ * then does the Directory name it, for an owner the file names who is not suspended, and hold every other member under
+ * the id the record knows them by. The order is `init`'s for its reason (`51 §13 D21`): a Directory row never points at
+ * a record that failed to arrive.
  *
  * THE RECORD KEEPS THE NAME INSIDE THE FILE. The name typed here is the Directory's, and the record row is left as the
  * copy wrote it, because the proof that a restore is complete is that the record's next export has the copy's manifest
@@ -35,6 +36,9 @@ import { openSqlite } from './server.ts';
 
 /** What `init --from` did: the sentences to say, or the one sentence that refused. */
 export type Restored = { ok: true; said: string[] } | { ok: false; said: string };
+
+/** One person the copy names, as the Directory would hold them, and whether the record has suspended them. */
+type Person = { id: string; email: string; name: string | null; suspended: boolean };
 
 /** The rows of one table in a `.brainl` file, as objects by column name. `null` when the file has no such table. */
 function rowsOf(lines: readonly string[], table: string): Record<string, unknown>[] | null {
@@ -90,25 +94,45 @@ export async function initFrom(o: {
   if (!checked.ok) return refused(`${o.from} was not restored (${checked.refusal.code}): ${checked.refusal.fix}`);
 
   let record: string;
-  let owner: { id: string; email: string; name: string | null };
+  let owner: Person;
+  /* EVERY OTHER PERSON THE RECORD HAS A `member` ROW FOR, with an address, and the ids of those without one. */
+  let others: Person[];
+  let unaddressed: string[];
   try {
     record = text(rowsOf(lines, 'record')?.[0]?.id);
     const people = new Map((rowsOf(lines, 'person') ?? []).map((p) => [text(p.id), p]));
-    const owners = (rowsOf(lines, 'member') ?? [])
-      .filter((m) => m.register === '*' && m.level === 'owner')
-      .map((m) => people.get(text(m.person_id)))
-      .filter((p): p is Record<string, unknown> => p !== undefined && text(p.email).includes('@'))
-      .map((p) => ({ id: text(p.id), email: text(p.email).trim().toLowerCase(), name: typeof p.name === 'string' ? p.name : null }));
+    const addressed = (id: string): Person | null => {
+      const p = people.get(id);
+      if (p === undefined || !text(p.email).includes('@')) return null;
+      return { id, email: text(p.email).trim().toLowerCase(), name: typeof p.name === 'string' ? p.name : null, suspended: text(p.suspended_at) !== '' };
+    };
+    const members = rowsOf(lines, 'member') ?? [];
+    const owners = [...new Set(members.filter((m) => m.register === '*' && m.level === 'owner').map((m) => text(m.person_id)))]
+      .map(addressed)
+      .filter((p): p is Person => p !== null);
+    /* A SUSPENDED OWNER IS NEVER CHOSEN WHEN NOBODY WAS NAMED. The record refuses every request of theirs, so naming them in
+       the Directory as the owner restored a record whose one named person could not open it (audit fifty-seven §1,
+       where she was `owners[0]` because her id sorted first). */
+    const open = owners.filter((p) => !p.suspended);
     const wanted = o.owner?.trim().toLowerCase();
-    const chosen = wanted === undefined || wanted === '' ? owners[0] : owners.find((p) => p.email === wanted);
+    const chosen = wanted === undefined || wanted === '' ? open[0] : owners.find((p) => p.email === wanted);
     if (!record) return refused(`${o.from} carries no record row, so it cannot say which record it is. Restore from a whole copy.`);
     if (!chosen)
       return refused(
         wanted
           ? `${wanted} is not an owner of the record in ${o.from}. Its owners are ${owners.map((p) => p.email).join(', ') || 'nobody with an address'}.`
-          : `${o.from} names no owner with an address, and a record nobody owns cannot be shared. Restore from a copy of a record somebody owns.`,
+          : owners.length > 0
+            ? `Every owner of the record in ${o.from} is suspended there (${owners.map((p) => p.email).join(', ')}), so nobody could sign in to it. Lift one suspension on the host that made the copy and export it again.`
+            : `${o.from} names no owner with an address, and a record nobody owns cannot be shared. Restore from a copy of a record somebody owns.`,
+      );
+    if (chosen.suspended)
+      return refused(
+        `${chosen.email} is suspended on the record in ${o.from}, so they could not sign in to it. ${open.length > 0 ? `Name an owner who is not: ${open.map((p) => p.email).join(', ')}.` : 'Every other owner is suspended too.'}`,
       );
     owner = chosen;
+    const ids = [...new Set(members.map((m) => text(m.person_id)))].filter((id) => id !== owner.id);
+    others = ids.map(addressed).filter((p): p is Person => p !== null);
+    unaddressed = ids.filter((id) => addressed(id) === null);
   } catch {
     /* `checkBrainl` has read every row against the manifest, so a line that is not JSON here would be a bug in one of
        the two readers, and it is still one sentence rather than a stack. */
@@ -155,60 +179,126 @@ export async function initFrom(o: {
     return refuse(
       `The owner of the record in ${o.from}, ${owner.email}, is already a person here as ${sameId.email}. Restore it into another data directory, or change the address here back to ${owner.email} first.`,
     );
+
+  /* ── EVERYONE ELSE ON THE RECORD, ASKED OF THIS DIRECTORY BEFORE ANYTHING IS WRITTEN ─────────────────────────────
+     MEASURED BEFORE THIS (`test/restore-members.test.ts`, audit fifty-seven §1): only the owner got a `dir_person` row,
+     so a second owner, a writer or a reader of one list who signed in here was minted a new id by `person$`, one no
+     `member` row names, and the record refused them all. Each is written under the id the record knows them by, when
+     this Directory does not already hold their address or their id as somebody else. One it does hold is left as it is
+     and named in the closing sentence: rewriting that row would move every record they already reach here onto an id
+     those records do not name, and refusing the whole restore would keep the record from the people who can open it. */
+  const carried: (Person & { known: boolean })[] = [];
+  const left: string[] = unaddressed.map((id) => `${id} has no address in the copy`);
+  /* ONE ROW PER ADDRESS, AS THE DIRECTORY HOLDS THEM (`dir_person_email`). The record's `person` table can name one
+     address twice, which a restore made before this one leaves behind when a member it could not carry was invited
+     again under a fresh id; the second insert threw `UNIQUE constraint failed` and refused the whole restore
+     (`test/restore-members.test.ts`, measured by the checker). The first is carried and the other is named. */
+  const taken = new Set([owner.email]);
+  for (const p of others) {
+    if (taken.has(p.email)) {
+      left.push(`${p.id} has the address ${p.email}, which the copy names for somebody else too`);
+      continue;
+    }
+    taken.add(p.email);
+    const byAddress = dirSql.one<{ id: string }>('SELECT id FROM dir_person WHERE lower(email) = lower(?)', p.email);
+    const byId = byAddress ? undefined : dirSql.one<{ email: string }>('SELECT email FROM dir_person WHERE id = ?', p.id);
+    if (byAddress && byAddress.id !== p.id) left.push(`${p.email} is already a person here under another id`);
+    else if (byId) left.push(`${p.email} is named by an id that is already ${byId.email} here`);
+    else carried.push({ ...p, known: byAddress !== undefined });
+  }
+
   if (existsSync(dir)) return refuse(`${dir} already exists. A record is restored into a name that holds nothing; move it aside or choose another.`);
 
   /* ── THE RECORD: A FILE MIGRATED TO THIS BUILD'S TABLES, AND THE COPY IMPORTED INTO IT ────────────────────────────
-     Removed whole if anything after this refuses, because this command made every byte of it. */
-  mkdirSync(join(dir, 'blobs'), { mode: 0o700, recursive: true });
-  mkdirSync(join(dir, 'snapshots'), { mode: 0o700, recursive: true });
-  const sql = openSqlite(file);
-  lockDown(file, o.say);
+     Removed whole if anything after this refuses OR THROWS, because this command made every byte of it, and with it
+     every Directory row it wrote. A throw used to leave the folder, and the retry was refused "already exists" by the
+     half a failed run had made (`test/restore-members.test.ts`, with a clock that stops once the file exists). */
+  let sql: ReturnType<typeof openSqlite> | null = null;
+  let provisioned = false;
+  const wrote: string[] = [];
   const undo = (said: string): Restored => {
-    sql.close();
+    try {
+      sql?.close();
+    } catch {
+      /* Already closed by the step that threw; the folder still goes. */
+    }
     rmSync(dir, { recursive: true, force: true });
+    if (provisioned) {
+      /* THE NAME IS DELETED, NOT RELEASED. A tombstone keeps a name from being handed to somebody else after links to it
+         went out, and nothing was ever served under this one: a release would cost the name typed for a restore that
+         never happened. `knows(record)` was false above, so every row for this record id is this command's. */
+      dirSql.exec('DELETE FROM dir_member WHERE record = ?', record);
+      dirSql.exec('DELETE FROM dir_slug WHERE record = ? AND slug = ?', record, o.slug);
+      dirSql.exec('DELETE FROM dir_record WHERE id = ?', record);
+    }
+    /* AND THE PEOPLE IT WROTE GO WITH THE RECORD IT WROTE. Left behind, an address would be a person here with nothing
+       to reach, under the copy's id, and the next restore of a different copy for the same address would be refused as
+       "already a person here under another id" by a row the refused restore made. */
+    for (const id of wrote) dirSql.exec('DELETE FROM dir_person WHERE id = ?', id);
     return refuse(said);
   };
-  const api = await createRecordApi({ sql, clock });
-  const stopped = api.kernel.refused();
-  if (stopped) return undo(`${file} could not be migrated: ${stopped.fix}`);
-  const imported = await api.import({ lines }, { principal: { kind: 'system', id: 'restore' } });
-  if (!imported.ok) return undo(`${o.from} was not restored: ${fixOf(imported)}`);
 
-  /* ── AND THEN THE NAME ──────────────────────────────────────────────────────────────────────────────────────────
-     `person$` mints an id, and the record names its owner by the one in the file, so the Directory's row is written with
-     that id when the address is new here. */
-  if (!known) dirSql.exec('INSERT INTO dir_person (id, email, name, created_at) VALUES (?, ?, ?, ?)', owner.id, owner.email, owner.name, new Date(o.now()).toISOString());
-  const named = directory.provision({ slug: o.slug, email: owner.email, record, plan: 'selfhost' });
-  if (!named.ok) {
-    /* THE PERSON THIS COMMAND WROTE GOES WITH THE RECORD IT WROTE. Left behind, the address would be a person here with
-       nothing to reach, under the copy's id, and the next restore of a different copy for the same address would be
-       refused as "already a person here under another id" by a row the refused restore made. */
-    if (!known) dirSql.exec('DELETE FROM dir_person WHERE id = ?', owner.id);
-    return undo(fixOf(named));
-  }
-
-  /* THE INBOUND TOKEN, as `init` writes it: a record made here takes forwarded mail, and so does one restored here. */
-  const inbound = join(dir, 'inbound.token');
-  writeFileSync(inbound, randomBytes(32).toString('base64url'), { mode: 0o600, flag: 'wx' });
-
-  /* WHICH OF ITS KEYS THIS HOST'S ROOT KEY OPENS. Asked of the rows as they now are, through the same `unwrap` a request
-     uses, so the sentence is the answer a request would get and not a guess from the file's `kek_id`. */
-  const rows = sql.all<{ purpose: Purpose; wrapped: Uint8Array; nonce: Uint8Array; kek_id: string | null; wrapped_by: string }>(
-    "SELECT purpose, wrapped, nonce, kek_id, wrapped_by FROM vault_key WHERE purpose IN ('record', 'signing')",
-  );
+  let rows: { purpose: Purpose; wrapped: Uint8Array; nonce: Uint8Array; kek_id: string | null; wrapped_by: string }[];
   const shut: { purpose: Purpose; kek: string }[] = [];
-  for (const row of rows) {
-    const opened =
-      row.wrapped_by === 'kek' && row.kek_id !== null
-        ? await unwrap(store, record, row.purpose, { wrapped: row.wrapped, nonce: row.nonce, kek_id: row.kek_id, wrapped_by: 'kek' })
-        : null;
-    if (opened) opened.fill(0);
-    else shut.push({ purpose: row.purpose, kek: row.kek_id ?? row.wrapped_by });
+  try {
+    mkdirSync(join(dir, 'blobs'), { mode: 0o700, recursive: true });
+    mkdirSync(join(dir, 'snapshots'), { mode: 0o700, recursive: true });
+    const opened = openSqlite(file);
+    sql = opened;
+    lockDown(file, o.say);
+    const api = await createRecordApi({ sql: opened, clock });
+    const stopped = api.kernel.refused();
+    if (stopped) return undo(`${file} could not be migrated: ${stopped.fix}`);
+    const imported = await api.import({ lines }, { principal: { kind: 'system', id: 'restore' } });
+    if (!imported.ok) return undo(`${o.from} was not restored: ${fixOf(imported)}`);
+
+    /* ── AND THEN THE NAME ────────────────────────────────────────────────────────────────────────────────────────
+       `person$` mints an id, and the record names its people by the ones in the file, so each Directory row is written
+       with that id when the address is new here. */
+    const since = new Date(o.now()).toISOString();
+    if (!known) {
+      dirSql.exec('INSERT INTO dir_person (id, email, name, created_at) VALUES (?, ?, ?, ?)', owner.id, owner.email, owner.name, since);
+      wrote.push(owner.id);
+    }
+    const named = directory.provision({ slug: o.slug, email: owner.email, record, plan: 'selfhost' });
+    if (!named.ok) return undo(fixOf(named));
+    provisioned = true;
+    for (const p of carried) {
+      if (!p.known) {
+        dirSql.exec('INSERT INTO dir_person (id, email, name, created_at) VALUES (?, ?, ?, ?)', p.id, p.email, p.name, since);
+        wrote.push(p.id);
+      }
+      const joined = directory.join(record, p.id);
+      if (!joined.ok) return undo(`${p.email} could not be given the record here: ${fixOf(joined)}`);
+    }
+
+    /* THE INBOUND TOKEN, as `init` writes it: a record made here takes forwarded mail, and so does one restored here. */
+    writeFileSync(join(dir, 'inbound.token'), randomBytes(32).toString('base64url'), { mode: 0o600, flag: 'wx' });
+
+    /* WHICH OF ITS KEYS THIS HOST'S ROOT KEY OPENS. Asked of the rows as they now are, through the same `unwrap` a
+       request uses, so the sentence is the answer a request would get and not a guess from the file's `kek_id`. */
+    rows = opened.all<{ purpose: Purpose; wrapped: Uint8Array; nonce: Uint8Array; kek_id: string | null; wrapped_by: string }>(
+      "SELECT purpose, wrapped, nonce, kek_id, wrapped_by FROM vault_key WHERE purpose IN ('record', 'signing')",
+    );
+    for (const row of rows) {
+      const key =
+        row.wrapped_by === 'kek' && row.kek_id !== null
+          ? await unwrap(store, record, row.purpose, { wrapped: row.wrapped, nonce: row.nonce, kek_id: row.kek_id, wrapped_by: 'kek' })
+          : null;
+      if (key) key.fill(0);
+      else shut.push({ purpose: row.purpose, kek: row.kek_id ?? row.wrapped_by });
+    }
+    opened.close();
+    sql = null;
+  } catch (e) {
+    return undo(`${o.from} was not restored, and nothing this command wrote is left: ${e instanceof Error ? e.message : String(e)}`);
   }
-  sql.close();
   dirSql.close();
 
   const said = [`record ${o.slug} restored from ${o.from} · ${record} · owner ${owner.email}`];
+  if (carried.length > 0)
+    said.push(`  also here as the people the record names: ${carried.map((p) => (p.suspended ? `${p.email} (suspended on the record)` : p.email)).join(', ')}`);
+  if (left.length > 0) said.push(`  not carried, so they cannot open it here: ${left.join('; ')}. Restore it into another data directory to carry them.`);
   if (rows.length === 0)
     said.push(
       '  the copy carries no keys, so on this host the record seals nothing and exports unsigned. Restore from a copy exported with its sealed bytes to keep them.',

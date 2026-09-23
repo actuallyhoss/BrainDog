@@ -15,11 +15,13 @@
  *      tree is caught at the drill and not in a commit. Only the identity's RECIPIENT is printed, which is public and is
  *      what `AGE_RECIPIENT` in `apps/worker/wrangler.jsonc` must equal.
  *   2. runs `braindog verify` on the opened copy, the real command in a child process, with `--key` passed through.
- *   3. restores it into a throwaway record: a fresh SQLite file in a folder under the OS temp directory, migrated to this
- *      build's tables and nothing else, then the kernel's own `import`. Not `init`: a created record is never empty.
- *   4. exports the restored record again and compares its manifest with the copy's, table by table, count and hash,
- *      and counts each list's rows in the copy against the restored record.
- *   5. prints PASS or FAIL and the line for the ops record, and removes the folder, plaintext and record with it.
+ *   3. restores it with `braindog init drill --from`, the command a host runs, into a throwaway data directory under the
+ *      OS temp directory, with a root key of its own made there.
+ *   4. asks, for every person the copy puts on the record, whether the restored Directory and record let them in, as a
+ *      sign-in would. A record whose tables all match and whose people come back as strangers is a FAIL.
+ *   5. exports the restored record again and compares its manifest with the copy's, table by table over the union of
+ *      both, count and hash, and counts each list's rows in the copy against the restored record.
+ *   6. prints PASS or FAIL and the line for the ops record, and removes the folder, plaintext and record with it.
  *
  * NOTHING HERE WRITES TO A NETWORK, and no production record is touched. The copy is a file he fetched himself (the
  * command is in `loop/research-restore.md`, "Drill"); the one request this can make is the GET a `--key` URL asks for.
@@ -376,19 +378,61 @@ async function main() {
     }
 
     // 3 · RESTORE ────────────────────────────────────────────────────────────────────────────────────────────────────
-    const sql = openSql(join(scratch, 'record.brain'));
+    /* WITH `braindog init drill --from`, THE COMMAND A HOST RUNS, into a throwaway data directory. This imported the file
+       into an empty kernel, which no host does, and it said PASS for the audit's copy (a suspended first owner and two
+       more people) while `init --from` turned the same file into a record none of them could open (audit fifty-seven
+       §7). BRAINDOG_KEK_FILE is left out so the child makes a root key of its own in the scratch folder and reads no real
+       one, and BRAINDOG_OWNER is emptied so a value in his shell does not choose the owner for the copy. */
+    const data = join(scratch, 'data');
+    const env = { ...process.env, BRAINDOG_DATA: data, BRAINDOG_OWNER: '' };
+    delete env.BRAINDOG_KEK_FILE;
+    const init = spawnSync(process.execPath, [MAIN, 'init', 'drill', '--from', plainFile], { encoding: 'utf8', cwd: scratch, env });
+    if (init.status !== 0) {
+      for (const line of init.stderr.split(/\r?\n/)) if (line.trim() !== '') say(line);
+      out(`FAIL ${copyPath} · braindog init --from refused it (exit ${init.status}), so no host could serve this copy`);
+      return 1;
+    }
+    out(`  restored   with braindog init drill --from, into a throwaway data directory in ${scratch}, removed when the drill ends`);
+    for (const line of init.stderr.split(/\r?\n/)) if (line.trim() !== '') out(`  ${line.trim()}`);
+
+    const sql = openSql(join(data, 'drill', 'record.brain'));
     let again;
     let lists;
+    let reach;
     try {
       const k = await openRecord(sql, { now: () => Date.now() });
-      const imported = await k.import(lines);
-      if (!imported.ok) {
-        out(`FAIL ${copyPath} · the import refused it: ${imported.refusal?.fix ?? JSON.stringify(imported)}`);
-        return 1;
-      }
-      out(`  restored   into a throwaway record in ${scratch}, removed when the drill ends`);
 
-      // 4 · COUNT ──────────────────────────────────────────────────────────────────────────────────────────────────
+      // 4 · WHO CAN OPEN IT ──────────────────────────────────────────────────────────────────────────────────────────
+      /* EVERY PERSON THE COPY PUTS ON THE RECORD, ASKED AS A SIGN-IN ASKS: the Directory's id for their address, then
+         the record's `access` for that id. A restore whose tables all match and whose people come back as strangers is a
+         record nobody can open, and that was the PASS this step exists to stop. A person the copy suspends is shown and
+         not scored, because the record refusing them is the copy working. */
+      const dir = new DatabaseSync(join(data, 'directory.sqlite'), { readOnly: true });
+      try {
+        const people = tableOf(lines, 'person');
+        const members = tableOf(lines, 'member');
+        const col = (t, name) => t.columns.indexOf(name);
+        const levelIn = new Map();
+        for (const m of members.rows) {
+          const id = m[col(members, 'person_id')];
+          const level = m[col(members, 'register')] === '*' ? m[col(members, 'level')] : 'lists';
+          if (!levelIn.has(id) || level !== 'lists') levelIn.set(id, level);
+        }
+        reach = people.rows
+          .filter((p) => levelIn.has(p[col(people, 'id')]))
+          .map((p) => {
+            const email = String(p[col(people, 'email')] ?? '');
+            const suspended = Boolean(p[col(people, 'suspended_at')]);
+            const known = email.includes('@') ? dir.prepare('SELECT id FROM dir_person WHERE lower(email) = lower(?)').get(email.trim()) : undefined;
+            const held = known ? k.access(known.id) : null;
+            const got = held ? (held.level ?? 'lists') : suspended ? 'suspended' : 'nobody';
+            return { email: email || p[col(people, 'id')], want: levelIn.get(p[col(people, 'id')]), got, ok: held !== null || suspended };
+          });
+      } finally {
+        dir.close();
+      }
+
+      // 5 · COUNT ──────────────────────────────────────────────────────────────────────────────────────────────────
       /* THE RESTORED RECORD IS EXPORTED AGAIN AND ITS MANIFEST IS THE MEASURE, not a `count(*)` per table: the export
          counts what travels and leaves out what does not (its own `export` event among them), which is exactly what the
          copy's manifest counted, and it hashes each table, so equal counts of different rows still fail. */
@@ -414,6 +458,9 @@ async function main() {
     let tables = 0;
     let rows = 0;
     out(row('table', 'manifest', 'restored', ''));
+    /* THE UNION OF BOTH MANIFESTS, not the copy's alone: a table the restored record exports with rows in it and the copy
+       never named is a difference too, and reading only the copy's names left it unread (audit fifty-seven §7). */
+    for (const name of ours.keys()) if (!theirs.has(name) && ours.get(name).n > 0) theirs.set(name, { n: 0, sha: '' });
     for (const [name, want] of theirs) {
       /* THE LINE'S ROWS ARE THE RECORD'S, counted as `dumpOf` counts them for the copy's metadata and for Settings: the
          four `dog_` tables describe the file, and on the first run they were 38 of its 74. */
@@ -439,11 +486,20 @@ async function main() {
       if (got !== n) failed++;
       out(row(list, n, got, got === n ? '✓' : '✗'));
     }
+    out(row('person', 'in copy', 'reaches', ''));
+    for (const p of reach) {
+      if (!p.ok) failed++;
+      out(row(p.email, p.want, p.got, p.got === 'suspended' ? '' : p.ok ? '✓' : '✗'));
+    }
+    if (!reach.some((p) => p.got !== 'suspended' && p.ok)) {
+      failed++;
+      out('  nobody the copy names can open the restored record');
+    }
 
-    // 5 · SAY SO ─────────────────────────────────────────────────────────────────────────────────────────────────────
+    // 6 · SAY SO ─────────────────────────────────────────────────────────────────────────────────────────────────────
     const took = mmss(performance.now() - began);
-    if (failed > 0) out(`FAIL ${record} · ${failed} of the copy's tables and lists did not come back as they were`);
-    else out(`PASS ${record} · ${tables} tables and ${lists.copy.size} lists came back as the copy's manifest says`);
+    if (failed > 0) out(`FAIL ${record} · ${failed} of the copy's tables, lists and people did not come back as they were`);
+    else out(`PASS ${record} · ${tables} tables and ${lists.copy.size} lists came back as the copy's manifest says, and ${reach.filter((p) => p.got !== 'suspended').length} people can open it`);
     out(`drill ${record} · ${rows} rows · ${sealed.length} bytes · restore ${took}`);
     return failed > 0 ? 1 : 0;
   } finally {

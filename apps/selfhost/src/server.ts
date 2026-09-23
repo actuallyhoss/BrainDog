@@ -1775,7 +1775,15 @@ async function answer(
         : json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'The key doors are at /api/vault/, and a grant names its own record.' } }),
     );
 
-  const seen = await contextFor(request, req.headers.host ?? '', site, /^\/+api\/+([A-Za-z]+)\/*$/.exec(path)?.[1]);
+  /* THE DOOR IS NAMED ONLY TO A REQUEST THAT COULD WALK THROUGH IT: a POST, under this record's own name. Reading an
+     operation grant spends it, and it was read for any method under any slug, so `GET /api/export` spent the grant and
+     then `serveApi` answered 405, and `POST /app/not-this-one/api/export` spent it and then the slug was refused 403;
+     either way the right request after it was 401 and the person approved on their phone again for nothing
+     (`test/operation-grant-doors.test.ts`, audit fifty-seven findings 4 and 5). With no door, an operation bearer on
+     those requests is a credential this record does not know, 401, and is still good for the one it was minted for. It
+     is not told 403 under a foreign name, because telling it that would mean spending it to learn it is real. */
+  const door = method === 'POST' && !foreign ? /^\/+api\/+([A-Za-z]+)\/*$/.exec(path)?.[1] : undefined;
+  const seen = await contextFor(request, req.headers.host ?? '', site, door);
   /* A NAME THAT IS NOT THIS RECORD'S, TO A CALLER THIS HOST KNOWS. One record is served here, so no credential reaches
      another, and the sentence is the Directory's for a name that is not yours, whether or not it names anything. A
      caller it does not know falls through to the root's own refusal below, which never reaches the record. */
