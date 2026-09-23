@@ -118,7 +118,17 @@ test('and the Cloud half promises nothing the Worker cannot do', () => {
   assert.ok(opened > 0, 'the Worker no longer builds its record here, so this premise needs measuring again');
   const built = WORKER.slice(opened, WORKER.indexOf('\n      });', opened));
   assert.ok(built.length > 200, 'the call to createRecordApi was not found whole');
-  assert.doesNotMatch(built, /\bsnapshots:/u, 'the Worker hands the record a snapshots port now: re-read what Cloud can do before trusting these sentences');
+  /* THE WORKER HANDS THE RECORD A SNAPSHOTS PORT SINCE W55-7 (`99f8f18a`), and this line used to insist it did not.
+     Re-read as it asked: `apps/worker/src/copies.ts` goes back to a copy by the bookmark that copy recorded, and leaves
+     `getBookmarkForTime` out on purpose, so going back is still "one of those nights and not a moment between two of
+     them". The premise that keeps these sentences true is that no instant between nights is served, and that is what
+     is pinned now. */
+  assert.match(built, /\bsnapshots:/u, 'the Worker no longer hands the record its copies: re-read what Cloud can do before trusting these sentences');
+  const COPIES = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..', 'apps', 'worker', 'src', 'copies.ts'),
+    'utf8',
+  );
+  assert.doesNotMatch(COPIES.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gmu, ''), /getBookmarkForTime\s*\(/u, 'the Cloud goes back to any instant now: the sentences below say nights only');
 
   for (const [key, line] of [
     ['restoreCloud', copy.restoreCloud],
