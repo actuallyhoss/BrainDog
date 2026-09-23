@@ -1,0 +1,11 @@
+{
+  "name": "@braindog/pack-project-brief",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "test": "node --test project-brief.test.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

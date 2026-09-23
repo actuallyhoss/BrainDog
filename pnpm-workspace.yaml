@@ -1,6 +1,11 @@
 packages:
   - packages/*
   - apps/*
+  # A SHARED PACK IS A WORKSPACE, SO `pnpm test` RUNS ITS TEST. `packs/<id>/` holds a feature that is data on
+  # the record's primitives rather than code in the shell (`loop/DIRECTION.md` sections 22 and 24, his pick P1
+  # in `loop/research-legacy-keeps.md` section 9). Without this line a pack's test is a file nothing runs,
+  # and the first time anybody learns that a kernel change broke a pack is when it refuses to install.
+  - packs/*
 minimumReleaseAge: 1440
 linkWorkspacePackages: false
 # WHICH DEPENDENCIES MAY RUN A BUILD SCRIPT, DECIDED RATHER THAN APPROVED.
