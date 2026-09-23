@@ -534,7 +534,7 @@ const unbuilt = (name: string, instead: string): Result<never> => ({
  *
  * ON THE ANSWER AND NOT IN THE TOOL LIST, because the list is paid in every turn of every session and
  * measured 2,565 tokens of a 2,600 ceiling (`budget.test.ts`), while `context` is read once a session.
- * The lane and project sentences are only said when `tasks` is a register the caller may read.
+ * The lane, project and task-note sentences are only said when `tasks` is a register the caller may read.
  */
 const teaching = (briefing: Record<string, unknown>): string[] => {
   const spoken = (at: unknown): string | null =>
@@ -552,6 +552,13 @@ const teaching = (briefing: Record<string, unknown>): string[] => {
           /* NO EXAMPLE ID WHEN THE CALLER IS IN NO PROJECT: `things#1` was taught here once, and on the
              seed it is Kiln, so a copied sentence read 14 of Kiln's tasks as the project asked about. */
           `One project's tasks: list tasks where {"field":"thing","is":"${project ?? "<the project's spoken id>"}"}.`,
+          /* MEASURED ON THE SEED: `update tasks#3 {note}` left the note as the one line sent, and the import's text
+             only in `history`. 89 of the old tool's `brain_task_update` calls were `{id, note}` alone, which is an
+             append there, so an agent carrying the habit over wiped a note each time and nothing said so. */
+          /* NOT "ADDS TO THE NOTE": a `log` leaves `fields.note` as it was and keeps its line in `history`, as
+             `teaching.test.ts` asserts, so a sentence saying it appends to the note field sent an agent to look for its
+             line where it never lands. */
+          `To add a note to a task, log on it, which keeps each line in its history and leaves the note field alone; an update that patches note replaces the whole note.`,
         ]
       : []),
   ];
@@ -751,11 +758,125 @@ export function tools<C>(surface: McpSurface<C>) {
   /* KEPT FOR THE LIFE OF THE SERVER, because a register's prefix is part of its declaration and does not move. A schema
      the caller may not read is not kept, and that register's rows are named `register#number`. */
   const prefixes = new Map<string, string>();
+  /* AND ITS REF FIELDS, READ FROM THE SAME SCHEMA, each `true` where the field is a list of refs. They move no more
+     often than the prefix does, and they are what the naming pass below and the prefixed write in `refsIn` read. */
+  const refFields = new Map<string, Map<string, boolean>>();
   const learnPrefix = async (register: string, ctx: C): Promise<void> => {
     const schema = await surface.schema({ register }, ctx);
     if (!schema.ok) return;
     const said = isObject(schema.value) ? schema.value.seq_prefix : undefined;
     prefixes.set(register, typeof said === 'string' && /^[A-Z]{1,4}$/.test(said) ? said : '');
+    const declared = isObject(schema.value) && Array.isArray(schema.value.fields) ? schema.value.fields : [];
+    const refs = new Map<string, boolean>();
+    for (const f of declared)
+      if (isObject(f) && typeof f.id === 'string' && (f.type === 'ref' || (f.type === 'list' && f.of === 'ref'))) refs.set(f.id, f.type === 'list');
+    refFields.set(register, refs);
+  };
+  const addressOf = async (register: string, seq: number, ctx: C): Promise<string> => {
+    if (!prefixes.has(register)) await learnPrefix(register, ctx);
+    const prefix = prefixes.get(register) ?? '';
+    return prefix ? `${prefix}${String(seq)}` : `${register}#${String(seq)}`;
+  };
+
+  /**
+   * A row id in a ref field, as the spoken id `context` would say for the same row: `things#1`, `LN8`.
+   *
+   * MEASURED ON THE SEED BEFORE THIS: every task on Kiln answered `thing: "01M345FTM0..."`, which changes from run to
+   * run, while `context` named the project `things#1`, so an agent matching a task to its project, or saying which
+   * project a task was on, paid a `get` per id. The record already answers `get` for a row id, so this is that call,
+   * made here once per id.
+   *
+   * ONCE PER ID PER MESSAGE, NOT FOR THE SERVER'S LIFE. `rpc.ts` builds these tools afresh for every message, so this
+   * map, and `prefixes` above it, last one answer. Measured through `handle` on the seed: `list tasks` asked the
+   * surface twice before this pass (`list`, `schema`) and eighteen times with it (`list`, four `schema`, thirteen
+   * `get`), the same on a second call. Over `braindog mcp` each of those is a request to the record.
+   *
+   * A ROW THE CALLER CANNOT READ, OR ONE THAT IS GONE, KEEPS ITS ID, and is not kept, so the next caller is asked for
+   * itself. Only a name that resolved is shared, and the field's own declaration already says which register it is in.
+   */
+  const names = new Map<string, Promise<string | null>>();
+  const nameOf = async (value: unknown, ctx: C): Promise<unknown> => {
+    if (typeof value !== 'string' || !ROW_ID.test(value)) return value;
+    let named = names.get(value);
+    if (!named) {
+      named = surface.get({ spoken: value }, ctx).then((got) =>
+        got.ok && isEntry(got.value) && got.value.seq !== null ? addressOf(got.value.register, got.value.seq, ctx) : null,
+      );
+      names.set(value, named);
+    }
+    const said = await named;
+    if (said === null) names.delete(value);
+    return said ?? value;
+  };
+  const speakRefs = async (row: Entry, ctx: C): Promise<Entry> => {
+    const refs = refFields.get(row.register);
+    if (!refs || refs.size === 0) return row;
+    const fields = { ...row.fields };
+    for (const [id, many] of refs) {
+      /* ONLY A FIELD THE ROW HAS. Writing `owner: undefined` onto a row that has no owner made the round trip refuse
+         it, measured: "owner takes a row id or a spoken id", for a field the agent never sent. */
+      if (!Object.hasOwn(fields, id)) continue;
+      const value = fields[id];
+      if (many && Array.isArray(value)) {
+        const out: unknown[] = [];
+        for (const one of value) out.push(await nameOf(one, ctx));
+        fields[id] = out;
+      } else if (!many) fields[id] = await nameOf(value, ctx);
+    }
+    return { ...row, fields };
+  };
+  /** Every row in an answer, a page's or a conflict's, with its refs spoken. Anything else as it came. */
+  const spokenRefs = async (r: Result<unknown>, ctx: C): Promise<Result<unknown>> => {
+    if (r.ok) {
+      if (isEntry(r.value)) return { ok: true, value: await speakRefs(r.value, ctx) };
+      if (isObject(r.value) && Array.isArray(r.value.rows)) {
+        const rows: unknown[] = [];
+        for (const row of r.value.rows) rows.push(isEntry(row) ? await speakRefs(row, ctx) : row);
+        return { ok: true, value: { ...r.value, rows } };
+      }
+      return r;
+    }
+    const conflict = (r as { conflict?: { current?: unknown } }).conflict;
+    return conflict && isEntry(conflict.current)
+      ? ({ ...r, conflict: { ...conflict, current: await speakRefs(conflict.current, ctx) } } as Result<unknown>)
+      : r;
+  };
+
+  /**
+   * The fields of a write, with each prefixed id in a ref field made the `register#number` the record's write path takes.
+   *
+   * THE NAMING PASS ABOVE HANDS AN AGENT `supersedes: "LN8"`, and measured on the seed the record refuses exactly that
+   * ("supersedes takes a row id or a spoken id like learnings#41"): `coerce.ts` reads `register#number` and a row id,
+   * and only a predicate reads a prefix. So an answer sent straight back would have been refused for a value this
+   * package put in it. `locate` already asks the record which register owns a prefix, and this is the same question
+   * for a field. The `register#number` form, not the row id, so a prefix that names the wrong register is still
+   * refused `REF_REGISTER_MISMATCH` in the record's words; a prefix nobody can read goes on as sent, and is refused
+   * there too.
+   */
+  const refsIn = async (register: string, fields: Args, ctx: C): Promise<Args> => {
+    /* A WRITE WITH NO PREFIXED VALUE IN IT, which is nearly every write, costs nothing more: the schema is asked only
+       when there is something to qualify, so `rpc.test.ts`'s golden `create` and `update` still reach one method. */
+    const prefixed = (v: unknown): v is string => typeof v === 'string' && PREFIXED.test(v.trim());
+    if (!Object.values(fields).some((v) => prefixed(v) || (Array.isArray(v) && v.some(prefixed)))) return fields;
+    if (!prefixes.has(register)) await learnPrefix(register, ctx);
+    const refs = refFields.get(register);
+    if (!refs || refs.size === 0) return fields;
+    const qualify = async (value: unknown): Promise<unknown> => {
+      if (!prefixed(value)) return value;
+      const found = await surface.get({ spoken: value.trim() }, ctx);
+      return found.ok && isEntry(found.value) && found.value.seq !== null ? `${found.value.register}#${String(found.value.seq)}` : value;
+    };
+    const out = { ...fields };
+    for (const [id, many] of refs) {
+      if (!Object.hasOwn(out, id)) continue;
+      const value = out[id];
+      if (many && Array.isArray(value)) {
+        const each: unknown[] = [];
+        for (const one of value) each.push(await qualify(one));
+        out[id] = each;
+      } else if (!many) out[id] = await qualify(value);
+    }
+    return out;
   };
   /**
    * Where a row is, from any way an agent says it: `register#number` as it is, and a prefixed id such as
@@ -937,9 +1058,15 @@ export function tools<C>(surface: McpSurface<C>) {
       const hits = Array.isArray(found.value) ? found.value : isObject(found.value) && Array.isArray(found.value.hits) ? found.value.hits : null;
       if (hits === null) return found;
       const matched = !Array.isArray(found.value) && isObject(found.value) && isObject(found.value.matched) ? (found.value.matched as Record<string, number>) : null;
-      const rows = hits.map((hit: unknown) =>
-        isObject(hit) && typeof hit.register === 'string' && typeof hit.seq === 'number' ? { spoken: `${hit.register}#${String(hit.seq)}`, title: hit.title } : hit,
-      );
+      /* NAMED AS EVERY OTHER TOOL NAMES A ROW. This built `register#seq` itself, so on the seed `create` answered `LN8`
+         and `search` for its words answered `learnings#8`: two names for one row, a line apart in one session. */
+      const rows: unknown[] = [];
+      for (const hit of hits as unknown[])
+        rows.push(
+          isObject(hit) && typeof hit.register === 'string' && typeof hit.seq === 'number'
+            ? { spoken: await addressOf(hit.register, hit.seq, ctx), title: hit.title }
+            : hit,
+        );
       if (matched === null) return { ok: true, value: rows };
       const total = Object.values(matched).reduce((a, b) => a + b, 0);
       return { ok: true, value: { rows, matched: total, showing: rows.length, ...(total > rows.length ? { more: `${String(total)} rows matched and the record answers at most ${String(rows.length)}. Narrow the question.` } : {}) } };
@@ -1052,15 +1179,17 @@ export function tools<C>(surface: McpSurface<C>) {
       return filed;
     },
 
-    create: (args, ctx) =>
-      surface.create(
+    create: async (args, ctx) => {
+      const register = String(args.register);
+      return surface.create(
         {
-          register: String(args.register),
-          fields: (args.fields ?? {}) as Args,
+          register,
+          fields: isObject(args.fields) ? await refsIn(register, args.fields, ctx) : ((args.fields ?? {}) as Args),
           ...(args.note === undefined ? {} : { note: String(args.note) }),
         },
         ctx,
-      ),
+      );
+    },
 
     update: async (args, ctx) => {
       const at = await locate(args.spoken, ctx);
@@ -1068,7 +1197,7 @@ export function tools<C>(surface: McpSurface<C>) {
       return surface.update(
         {
           ...at.value,
-          patch: (args.patch ?? {}) as Args,
+          patch: isObject(args.patch) ? await refsIn(at.value.register, args.patch, ctx) : ((args.patch ?? {}) as Args),
           ...(args.version === undefined ? {} : { version: Number(args.version) }),
           ...(args.note === undefined ? {} : { note: String(args.note) }),
         },
@@ -1258,7 +1387,21 @@ export function tools<C>(surface: McpSurface<C>) {
          names for one row wrote the second into its notes, and the person reads the first. Both are still taken. */
       const answer = await tool(args, ctx);
       for (const register of registersIn(answer)) if (!prefixes.has(register)) await learnPrefix(register, ctx);
-      return shaped(answer, (register) => prefixes.get(register) ?? '');
+      const prefixOf = (register: string) => prefixes.get(register) ?? '';
+      /**
+       * `log` ANSWERS WHAT IT WROTE: the row's name, the version the note left it at, and when. It answered the whole
+       * row, so on the seed a one-line note on Kiln, whose note is its write-up, answered 6,610 bytes for a 5,889-byte
+       * note, and `log` is the most-called tool (211 of the old tool's 837 daily-flow calls). The note changed no field,
+       * so the fields were the one thing in that answer the agent already had. The version stays because the next
+       * `update` needs it, and a refusal passes through whole.
+       */
+      if (name === 'log') {
+        const said = shaped(answer, prefixOf);
+        if (!said.ok || !isObject(said.value)) return said;
+        const { spoken, version, updated_at } = said.value;
+        return { ok: true, value: { spoken, version, ...(updated_at === undefined ? {} : { updated_at }) } };
+      }
+      return shaped(await spokenRefs(answer, ctx), prefixOf);
     },
   };
 }

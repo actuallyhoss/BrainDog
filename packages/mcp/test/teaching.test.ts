@@ -122,3 +122,124 @@ test("outside any project, the project sentence names no row, so copying it read
   const rows = copied.ok ? (copied.value as { rows: Row[] }).rows : [];
   assert.equal(rows.length, 0, `the example in "${project}" is a real project with ${rows.length} tasks`);
 });
+
+/* WHAT AN AGENT READS MOST (`loop/research-agent-first-day.md`, brief 51-A). The survey drove the
+   sixteen tools as the old tool's daily flow uses them, 837 calls over his repos, and these answers were
+   the ones read most and said least. Each test below was red against the code it was written for, and
+   says what it measured then. */
+
+type Shaped = { spoken: string; version: number; updated_at?: string; fields?: Record<string, unknown> };
+const valueOf = <T>(r: { ok: boolean; value?: unknown }): T => {
+  assert.ok(r.ok, JSON.stringify(r));
+  return r.value as T;
+};
+
+test('log answers what was logged, not the row, and its version is one an update then takes', async () => {
+  /* MEASURED BEFORE: `log` answered `surface.update`'s whole row, so a one-line note on Kiln, whose
+     note is its write-up, answered 6,610 bytes for a 5,889-byte note. `log` is the most-called tool
+     (211 of 837 flow calls), so that was the largest answer an agent read in a day. */
+  const mcp = await seeded();
+  const kiln = valueOf<Shaped>(await mcp.call('get', { spoken: 'things#1' }, agent));
+  const writeUp = Array.from({ length: 120 }, (_, i) => `Line ${String(i + 1)} of the write-up, long enough to be a line.`).join('\n');
+  valueOf(await mcp.call('update', { spoken: 'things#1', patch: { note: writeUp }, version: kiln.version }, agent));
+  assert.ok(writeUp.length > 5_000, `the write-up is ${String(writeUp.length)} bytes`);
+
+  const logged = await mcp.call('log', { spoken: 'things#1', note: 'Checked the specimen proofs.' }, agent);
+  const bytes = JSON.stringify(logged).length;
+  assert.ok(bytes < 400, `log answered ${String(bytes)} bytes for a one-line note: ${JSON.stringify(logged).slice(0, 200)}`);
+  const said = valueOf<Shaped>(logged);
+  assert.equal(said.spoken, 'things#1');
+  assert.equal(typeof said.version, 'number');
+  assert.equal(said.fields, undefined, 'the answer still carries the row');
+
+  /* THE VERSION IS THE ROW'S AFTER THE NOTE, so an agent that logs and then patches is not refused
+     for a version it was just handed. */
+  const next = await mcp.call('update', { spoken: 'things#1', patch: { aim: '2026-10-01' }, version: said.version }, agent);
+  assert.ok(next.ok, `the version log answered was refused: ${JSON.stringify(next)}`);
+});
+
+test("a task's refs come back as the ids context speaks, and sent back unchanged they are taken", async () => {
+  /* MEASURED BEFORE: every `thing` on Kiln's tasks answered `01M345FTM0...`, a row id that changes
+     from run to run, while `context` names the same project `things#1`. An agent could not say which
+     project a task was on without a `get` per id. */
+  const mcp = await seeded();
+  const briefing = valueOf<Briefing>(await mcp.call('context', {}, agent));
+  const kiln = briefing.project!.spoken;
+  const rows = rowsOf(await mcp.call('list', { register: 'tasks', where: { field: 'thing', is: kiln }, limit: 500 }, agent));
+  assert.ok(rows.length > 0, 'Kiln has no tasks on the seed');
+  assert.deepEqual([...new Set(rows.map((r) => r.fields.thing))], [kiln]);
+  const tracks = rows.map((r) => r.fields.track).filter((t) => t !== undefined);
+  assert.ok(tracks.length > 0 && tracks.every((t) => typeof t === 'string' && /^tracks#\d+$/.test(t)), `tracks answered ${JSON.stringify(tracks)}`);
+
+  /* THE ROUND TRIP: every row's fields, straight back through `update`. The version moves by one on
+     that write, as it did with the row ids, so what is asserted is that it is taken and that the
+     fields read back as they went out. */
+  for (const row of rows as (Row & { version: number })[]) {
+    const back = await mcp.call('update', { spoken: row.spoken, patch: row.fields, version: row.version }, agent);
+    assert.ok(back.ok, `${row.spoken} refused its own fields: ${JSON.stringify(back)}`);
+    assert.deepEqual(valueOf<Shaped>(back).fields, row.fields, `${row.spoken} changed on the round trip`);
+  }
+});
+
+test("a learning's refs are named by prefix as its rows are, and the prefixed id writes back", async () => {
+  /* `supersedes` POINTS AT A REGISTER WITH A PREFIX, so its value is named `LN<n>` as the row itself
+     is. Measured on the seed: the record's write path takes `learnings#8` and refuses `LN8` in a ref
+     field ("supersedes takes a row id or a spoken id like learnings#41"), so this is the case that
+     proves an answer here is still one an agent can send straight back. */
+  const mcp = await seeded();
+  const base = { lesson: 'A ref comes back as a spoken id.', because: 'Measured on the seed while writing the tests.', kind: 'fact' };
+  const first = valueOf<Shaped>(await mcp.call('create', { register: 'learnings', fields: base }, agent));
+  assert.match(first.spoken, /^LN\d+$/);
+  const second = valueOf<Shaped>(await mcp.call('create', { register: 'learnings', fields: { ...base, supersedes: first.spoken } }, agent));
+  assert.equal(second.fields!.supersedes, first.spoken);
+  assert.equal(second.fields!.project, 'things#1');
+  const back = await mcp.call('update', { spoken: second.spoken, patch: second.fields, version: second.version }, agent);
+  assert.ok(back.ok, `${second.spoken} refused its own fields: ${JSON.stringify(back)}`);
+  assert.deepEqual(valueOf<Shaped>(back).fields, second.fields);
+});
+
+test("a list of refs is named one by one, and the prefixed list writes back", async () => {
+  /* THE CHECKER'S CASE, because no test above reaches a `list` of `ref`: with the list branch of the
+     naming pass cut out, all five still passed. skills#5's `because` is that field on the seed, and it
+     points at learnings, so its values are prefixed and have to be qualified on the way back too. */
+  const mcp = await seeded();
+  const skill = valueOf<Shaped>(await mcp.call('get', { spoken: 'skills#5' }, agent));
+  const because = skill.fields!.because as unknown[];
+  assert.ok(because.length > 0 && because.every((v) => typeof v === 'string' && /^LN\d+$/.test(v)), `because answered ${JSON.stringify(because)}`);
+  const back = await mcp.call('update', { spoken: 'skills#5', patch: { because }, version: skill.version }, agent);
+  assert.ok(back.ok, `skills#5 refused its own because: ${JSON.stringify(back)}`);
+  assert.deepEqual(valueOf<Shaped>(back).fields!.because, because);
+});
+
+test('search names a learning LN<n>, as create and context do', async () => {
+  /* MEASURED BEFORE: `LN8` created, and `search` for its words answered `learnings#8`, because it
+     built `register#seq` itself where every other tool names a row by its register's prefix. */
+  const mcp = await seeded();
+  const fields = { lesson: 'Zeppelin hangars echo.', because: 'Measured in the zeppelin hangar with a stopwatch.', kind: 'fact' };
+  const made = valueOf<Shaped>(await mcp.call('create', { register: 'learnings', fields }, agent));
+  assert.match(made.spoken, /^LN\d+$/);
+  const found = valueOf<{ rows: { spoken: string }[] }>(await mcp.call('search', { q: 'zeppelin hangars' }, agent));
+  assert.deepEqual(found.rows.map((r) => r.spoken), [made.spoken]);
+});
+
+test('context says a note patch replaces the note and log is the append, and both do what it says', async () => {
+  /* MEASURED BEFORE: `update tasks#3 {note}` left `note` as the one line sent, the import's text only
+     in `history`, and nothing an agent reads said so. the old tool's agents sent 89 `brain_task_update`
+     calls that were `{id, note}` alone, which is the append here, not the patch. */
+  const mcp = await seeded();
+  const lines = valueOf<Briefing>(await mcp.call('context', {}, agent)).teach ?? [];
+  const said = lines.find((l) => /\blog\b/.test(l) && /\bnote\b/.test(l) && /replaces/.test(l));
+  assert.ok(said, `nothing says a note patch replaces the note: ${JSON.stringify(lines)}`);
+
+  /* tasks#27 AND NOT THE SURVEY'S tasks#3: the survey ran over an imported export, and on the seed
+     tasks#3 has no note to lose, while tasks#27 carries "Once the first one is live." */
+  const before = valueOf<Shaped>(await mcp.call('get', { spoken: 'tasks#27' }, agent));
+  assert.equal(typeof before.fields!.note, 'string', 'tasks#27 has no note on the seed');
+  valueOf(await mcp.call('log', { spoken: 'tasks#27', note: 'Draft is in docs/annual.md.' }, agent));
+  const logged = valueOf<Shaped>(await mcp.call('get', { spoken: 'tasks#27' }, agent));
+  assert.equal(logged.fields!.note, before.fields!.note, 'log changed the note it was said to leave alone');
+
+  const patch = { note: 'Draft is in docs/annual.md.' };
+  const patched = valueOf<Shaped>(await mcp.call('update', { spoken: 'tasks#27', patch, version: logged.version }, agent));
+  assert.equal(patched.fields!.note, patch.note, 'a note patch did not replace the note');
+});
