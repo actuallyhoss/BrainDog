@@ -69,7 +69,7 @@
 import { refused, type Result } from '@braindog/ports';
 
 import { SCRIPT_GRAMMAR } from '../grammars/script.ts';
-import { AUTOMATION_GRAMMAR } from './automations.ts';
+import { ANSWERED_GRAMMAR, AUTOMATION_GRAMMAR } from './automations.ts';
 
 type Answer<T = unknown> = Promise<Result<T>>;
 type Args = Record<string, unknown>;
@@ -93,7 +93,7 @@ type Row = { state?: string | null; fields: Record<string, unknown> };
  */
 export type McpSurface<C> = {
   boot(ctx: C): Answer<{ registers: { id: string; name: string }[] }>;
-  version(ctx: C): Answer<{ version: number }>;
+  version(ctx: C): Answer<{ version: number; spark?: boolean }>;
   whoami(ctx: C): Answer;
   schema(args: { register: string }, ctx: C): Answer;
   get(args: { register: string; seq: number } | { spoken: string }, ctx: C): Answer;
@@ -1129,10 +1129,13 @@ export function tools<C>(surface: McpSurface<C>) {
       return may.ok ? { ok: true, value: SCRIPT_GRAMMAR } : may;
     }
     /* THE AUTOMATION GRAMMAR IS THIS PACKAGE'S TOO, FOR THE SAME REASON (`automations.ts`), and asked of `version` the same
-       way, so every surface serves it. The list and one automation are the record's `automations`, one method for both. */
+       way, so every surface serves it. The list and one automation are the record's `automations`, one method for both.
+       `version`'s `spark` PICKS WHICH, because it is the one fact about the host this package can read, and the hosts
+       set it and the record's `answersSpark` from the same model. A surface whose `version` carries no `spark`, as
+       `test/stub.ts`'s does not, is served the grammar that lists `ask_spark` as not running. */
     if (head === 'grammar' && rest === 'automations') {
       const may = await surface.version(ctx);
-      return may.ok ? { ok: true, value: AUTOMATION_GRAMMAR } : may;
+      return may.ok ? { ok: true, value: may.value.spark === true ? ANSWERED_GRAMMAR : AUTOMATION_GRAMMAR } : may;
     }
     if ((head === 'automations' && !rest) || (head === 'automation' && NAMED.test(rest)))
       return surface.automations

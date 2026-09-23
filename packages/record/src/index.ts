@@ -3741,7 +3741,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }
       if (flowPath(body) === 'run') {
         if (!Array.isArray(body.steps ?? body.then)) return no('REQUIRED_MISSING', 'An automation says what starts it and the steps it then takes.', { at: 'rule.steps' });
-        return ok(saidOf(body));
+        return ok(saidOf(body, { answersSpark: deps.answersSpark === true }));
       }
       if (!body.register || !Array.isArray(body.then))
         return no('VALUE_MALFORMED', 'A rule names a register and what it would then do.', { at: 'rule' });
@@ -3749,7 +3749,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          finding 1). The guard above cannot see the list a `ref` points at, and the kernel resolved `client is Acme
          Holdings` in Clients for a member refused Clients: `matches 1 of 1`, where a client no row names said `0 of 1`. */
       const rows = kernel.dryRun(body as RuleDecl, args.limit, { reads: (register) => readable(ctx, register) === null });
-      return rows.ok ? ok({ ...rows.value, ...saidOf(body) }) : rows;
+      return rows.ok ? ok({ ...rows.value, ...saidOf(body, { answersSpark: deps.answersSpark === true }) }) : rows;
     },
 
     /**
@@ -4176,7 +4176,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
     /**
      * Someone met in the work: matched by email or handle, or added, with where they were met, and linked to
-     * the project of the caller's run (`loop/research-agent-path.md` §5.6). Needs `propose` on people.
+     * the project of the caller's run (`loop/research-agent-path.md` §5.6). Needs `propose` on the list it writes.
      *
      * THE KERNEL WRITES AS THE CALLER'S RUN, found by the ladder as every token write is, so the person is
      * signed by the run and placed in its project. A person in the app is never a run, and links none.
@@ -4185,10 +4185,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * kernel writes nothing, a run included.
      */
     async meet(args: MeetArgs, ctx: CallContext): Promise<Result<Met>> {
-      /* THE LIST THE KERNEL WILL WRITE, by the kernel's own rule (`kernel.meetsList()`), and `people` as before when no
-         list plays the part. Guarded on `people` alone, a token held to `people` met somebody into `contacts`, which
-         declared `meets:`, and one held to `contacts` was refused at a list the record did not have (`meet-role.test.ts`). */
-      const stop = guard(ctx, 'propose', kernel.meetsList()?.register ?? PEOPLE);
+      /* THE LIST THE KERNEL WILL WRITE, by the kernel's own rule (`kernel.meetsList()`). Guarded on `people` alone, a
+         token held to `people` met somebody into `contacts`, which declared `meets:`, and one held to `contacts` was
+         refused at a list the record did not have (`meet-role.test.ts`).
+         WHEN NO LIST PLAYS THE PART, `propose` ON THE RECORD, and the kernel's `REGISTER_UNKNOWN` answers, writing
+         nothing. The fallback to `people` told a token held to `contacts`, with the `meets:` pack switched off, that it
+         "does not reach people", a list the record did not have, so it was sent to ask for a grant that would not help. */
+      const stop = guard(ctx, 'propose', kernel.meetsList()?.register);
       if (stop) return { ok: false, refusal: stop };
       const said = (args ?? {}) as Record<string, unknown>;
       const wrong = stray(said, MEET);

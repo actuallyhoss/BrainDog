@@ -6,11 +6,15 @@
  * at install, and without the key `meet` into `contacts` was `REGISTER_UNKNOWN`, and into a `people` list without
  * `projects` was `FIELD_UNKNOWN at projects`.
  *
- * THE RECORD'S OWN GUARD STILL NAMES `people`, and the last test holds that as the hole it is. `meet`'s guard in
- * `packages/record/src/index.ts` asks `propose` on the list called `people`, not on the list declaring `meets:`, and that
- * file is held by other work in this wave (`loop/research-shell-next.md` M5). So a token limited to `contacts` is
- * refused at `people`, a list the record may not even have. The follow-up that reads `kernel.meetsList()` there turns
- * that test round.
+ * THE RECORD'S GUARD READS `kernel.meetsList()`, and asks `propose` on the list the kernel will write. It asked on the
+ * list called `people` until `9682722d`, so a token held to `people` met somebody into `contacts` and one held to
+ * `contacts` was refused at a list the record did not have; the third and fourth tests hold both directions. Only the
+ * members' names gate (`namesFor`) still reads `people` by name and pack.
+ *
+ * WHEN NO LIST PLAYS THE PART, THE GUARD ASKS ABOUT THE RECORD, and the kernel's `REGISTER_UNKNOWN` answers. The
+ * fallback asked about `people` whether or not the record had one, so with the `meets:` pack switched off a token held
+ * to `contacts` was told "This token does not reach people. It reaches contacts." and sent to ask for a grant that would
+ * not have helped it (audit forty-seven, finding 5). The last test holds that.
  */
 
 import { test } from 'node:test';
@@ -118,5 +122,30 @@ test('A TOKEN HELD TO people IS REFUSED, and writes nothing into contacts, a lis
   assert.equal(out.ok, false, 'a token scoped to people wrote into contacts');
   assert.equal(out.refusal?.code, 'FORBIDDEN');
   assert.equal(sql.all("SELECT 1 FROM entry WHERE register = 'contacts'").length, 0);
+  sql.close();
+});
+
+test('A TOKEN HELD TO contacts, WITH THE meets: PACK OFF, IS TOLD NO LIST PLAYS THE PART, not that it does not reach people', async () => {
+  /* THE SAME LIST, INSTALLED BY A PACK, because only a pack can be switched off and take its lists out of play. */
+  const { id: _id, ...contacts } = CONTACTS.body as { id: string };
+  const doc = {
+    pack: 'contacts-pack',
+    version: '1.0.0',
+    summary: 'Contacts.',
+    author: 'BrainDog',
+    license: 'MIT',
+    requires: { format: 1, primitives: 1, packs: {} },
+    declarations: [{ register: 'contacts', ...contacts }],
+  };
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const planned = value<{ diff: { planHash: string } }>(await api.planPack({ doc, source: { kind: 'local' } } as never, owner));
+  value(await api.installPack({ doc, source: { kind: 'local' }, planHash: planned.diff.planHash, approve: [] } as never, owner));
+  value(await api.disablePack({ id: 'contacts-pack' }, owner));
+  assert.equal(api.kernel.meetsList(), null);
+
+  const out = (await api.meet({ name: 'Cy', where: 'commit 4464966 in braindog' }, agent(['contacts']))) as { ok: boolean; refusal?: { code: string; fix: string } };
+  assert.equal(out.refusal?.code, 'REGISTER_UNKNOWN', `${out.refusal?.code}: ${out.refusal?.fix}`);
+  assert.equal(sql.all('SELECT 1 FROM entry').length, 0);
   sql.close();
 });

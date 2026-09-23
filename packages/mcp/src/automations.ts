@@ -8,11 +8,12 @@
  * any `src/`. So the numbers below are copies, and `test/automations.test.ts` holds each one to `STEP_CEILING`,
  * `DEPTH_CEILING`, `RUNS_PER_DAY_CEILING`, `VARS_CEILING` and `FLOOR_MS`, and installs both examples on a real record.
  *
- * IT SAYS WHAT DOES NOT RUN YET. A `metric` or `decided` trigger and an `ask_spark` step are refused at install, and a
- * `call` or `script` step installs so the canvas can draw it and fails the run that reaches it. An agent told only the
- * grammar would file a rule with a call in it, and the owner would accept a run that stops there. The same test holds
- * that list to what a real run of the runner does. `ask_person` runs: its question opens in Decide and the answer wakes
- * the run.
+ * IT SAYS WHAT DOES NOT RUN YET. A `metric` or `decided` trigger is refused at install, and so is an `ask_spark` step on
+ * a host that does not answer Spark, and a `call` or `script` step installs so the canvas can draw it and fails the run
+ * that reaches it. An agent told only the grammar would file a rule with a call in it, and the owner would accept a run
+ * that stops there. The same test holds that list to what a real run of the runner does. `ask_person` runs: its question
+ * opens in Decide and the answer wakes the run. On a host that answers Spark, `ask_spark` runs too, and that host is
+ * served `ANSWERED_GRAMMAR` below.
  */
 
 export const AUTOMATION_GRAMMAR = {
@@ -88,4 +89,19 @@ export const AUTOMATION_GRAMMAR = {
       },
     },
   ],
+} as const;
+
+/**
+ * The same grammar on a host that answers Spark, which `version` says as `spark: true`: `ask_spark` is taken out of what
+ * does not run, and the sentence about it goes with it.
+ *
+ * MEASURED BEFORE THIS, ON A RECORD OPENED WITH `answersSpark: true`: a rule asking Spark installed and parked on its
+ * question, and this resource still listed `ask_spark` under `not_in_this_build` and said it "is refused at install". An
+ * agent reading that would not file the one step the host serves (`test/automations.test.ts`, "ON A HOST THAT ANSWERS").
+ */
+export const ANSWERED_GRAMMAR = {
+  ...AUTOMATION_GRAMMAR,
+  not_in_this_build: { triggers: AUTOMATION_GRAMMAR.not_in_this_build.triggers, steps: ['call', 'script'] },
+  not_in_this_build_says:
+    'a metric or decided trigger is refused at install. A call or script step installs, and a run that reaches it fails there with a sentence, after taking every step before it',
 } as const;

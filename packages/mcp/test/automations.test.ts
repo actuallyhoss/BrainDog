@@ -244,6 +244,26 @@ test('WHAT THE DRY RUN SAYS OF A STEP THAT WAITS ON SOMEBODY ELSE IS WHAT A REAL
   sql.close();
 });
 
+test('ON A HOST THAT ANSWERS SPARK, NEITHER THE DRY RUN NOR THE GRAMMAR SAYS ask_spark IS REFUSED, and it installs', async () => {
+  /* THE FLAG-OFF CASE ABOVE, WITH THE HOST'S TWO SWITCHES ON, as `apps/selfhost` sets them from one model: the record's
+     `answersSpark` and `version`'s `spark`. Measured before this: the rule installed, and the dry run still ended the
+     step "refused at install" while the grammar listed `ask_spark` under `not_in_this_build`. */
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW), answersSpark: true, build: { app: '2026-09-23+test', spark: true } });
+  const spark = { rule: 'spark', on: { manual: true }, steps: [{ ask_spark: { question: 'Go?', as: 'go' } }] };
+  const step = value<{ steps: string[] }>(await api.dryRun({ rule: spark as never }, owner)).steps[0]!;
+  assert.doesNotMatch(step, /Not in this build/u, step);
+  assert.match(step, /waits up to 1d for this host's model/u);
+  value(await api.kernel.install([rule(spark)]));
+
+  const grammar = value<{ not_in_this_build: { triggers: string[]; steps: string[] }; not_in_this_build_says: string }>(
+    await tools(api).read('braindog:grammar/automations', owner),
+  );
+  assert.deepEqual(grammar.not_in_this_build, { triggers: ['metric', 'decided'], steps: ['call', 'script'] });
+  assert.doesNotMatch(grammar.not_in_this_build_says, /ask_spark/u, grammar.not_in_this_build_says);
+  sql.close();
+});
+
 test('A DRY RUN OF A BODY NESTED PAST ANY CEILING IS REFUSED, not a blown stack answered INTERNAL', async () => {
   /* `dryRun` is READ+ and runs before the lint, so a read token could send a body nested some 2,000 `if` levels deep
      and `stepLines` recursed until the stack gave out. Measured red first: RangeError, Maximum call stack size exceeded. */
