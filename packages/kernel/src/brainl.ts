@@ -429,7 +429,8 @@ function unb64url(text: string): Uint8Array<ArrayBuffer> {
  */
 async function signatureOf(
   lines: readonly string[],
-): Promise<{ ok: true } | { ok: false; refusal: Refusal }> {
+  pin: string | undefined,
+): Promise<Checked> {
   /* `at` IS THE PART OF `dog_sig` AT FAULT, not the row. Four faults live in that one line and they
      are four repairs (re-export, deploy a build that knows the algorithm, put back a header somebody
      edited, get another copy), and a caller told only `dog_sig` has to read the sentence to
@@ -468,9 +469,28 @@ async function signatureOf(
       'dog_sig.key_id',
     );
 
+  /* A PINNED KEY IS COMPARED BY ITS ID, AND THEN IT, NOT THE FILE'S, IS THE ONE THE SIGNATURE MUST
+     VERIFY UNDER. `loop/research-restore.md` §3.5 measured the hole this closes: one row edited, the
+     manifest recomputed and the file signed again by a stranger's fresh key passed every check above,
+     because every check above asks the file about itself. The id comparison is what names the fault
+     (`dog_sig.key_id`, and both ids in the sentence, because a rotated key and a stranger's key are
+     two different repairs). Verifying under the pinned bytes rather than the file's is what keeps a
+     64-bit id from being the whole of the proof. */
+  let under = key;
+  if (pin !== undefined) {
+    const named = unb64url(pin);
+    const wanted = await keyIdOf(named);
+    if (wanted !== keyId)
+      return no(
+        `This file was signed by key ${keyId}, and the key you named is ${wanted}. It was not produced by the instance that holds that key, or that key has been replaced since.`,
+        'dog_sig.key_id',
+      );
+    under = named;
+  }
+
   let held: Awaited<ReturnType<typeof crypto.subtle.importKey>>;
   try {
-    held = await crypto.subtle.importKey('raw', key, { name: 'Ed25519' }, false, ['verify']);
+    held = await crypto.subtle.importKey('raw', under, { name: 'Ed25519' }, false, ['verify']);
   } catch {
     return no('The public key in this file is not an Ed25519 key.', 'dog_sig.public_key');
   }
@@ -481,8 +501,20 @@ async function signatureOf(
       'The signature does not match this file. It was produced somewhere else, or a row has changed since it was written.',
       'dog_sig.sig',
     );
-  return { ok: true };
+  return { ok: true, pinned: pin !== undefined };
 }
+
+/**
+ * What `checkBrainl` answers.
+ *
+ * `pinned` SAYS WHOSE WORD THE YES IS. Without a key the file vouched for itself, which proves no row
+ * changed since it was signed and nothing about who signed it; `48 §5.6` prints that as "key from the
+ * file, pass --key to pin", and a caller cannot print it without being told which case it is in.
+ */
+export type Checked = { ok: true; pinned: boolean } | { ok: false; refusal: Refusal };
+
+/** The key a file must have been signed by: raw Ed25519 public bytes in base64url, as `03 §4` writes one. */
+export type CheckOptions = { key?: string | undefined };
 
 /**
  * Does this file still say what it said when it was written?
@@ -495,9 +527,7 @@ async function signatureOf(
  * IT ANSWERS BEFORE ANYTHING IS WRITTEN. A half-imported record is worse than a refused one, and the
  * refusal has to be able to name the table so somebody knows what they are looking at.
  */
-export async function checkBrainl(
-  lines: readonly string[],
-): Promise<{ ok: true } | { ok: false; refusal: Refusal }> {
+export async function checkBrainl(lines: readonly string[], options: CheckOptions = {}): Promise<Checked> {
   /* THE FORMAT, FROM LINE ONE. `03 §11`: a file from a newer build is refused rather than read,
      because reading it means writing rows whose columns this build does not know into a record it
      then calls a complete copy. The `dog_meta` check inside the writer finds the same fact later,
@@ -628,7 +658,7 @@ export async function checkBrainl(
   /* AND THE SIGNATURE LAST, over the manifest every one of those hashes is in. The order is the
      cheap check first: a damaged file names its table, and only a file that is internally consistent
      is worth an Ed25519 verify. */
-  return signatureOf(lines);
+  return signatureOf(lines, options.key);
 }
 
 export type ImportReport = { tables: number; rows: number };

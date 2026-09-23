@@ -45,6 +45,7 @@ import { surfaceOver } from './surface.ts';
 import { pack } from './catalogue.ts';
 import { tools } from './tools.ts';
 import { usecase } from './usecase.ts';
+import { verify } from './verify.ts';
 
 /* Synchronous, so the line is out before `exit`: a write to a pipe on Windows is asynchronous, and
    `process.exit` does not wait for it. */
@@ -154,6 +155,8 @@ const usage = () =>
     '  What Claude Code runs when a session starts and ends, with its event on standard input.',
     'braindog install [--apply] [--replace] [--config-dir <folder>] [--settings <file>] [--mcp-json <file>]',
     "  Show the two hooks it would add to Claude Code's settings (a profile folder, or one settings file such as a project's .claude/settings.local.json), and write them only with --apply. With --replace it also takes out the old tool's hooks and MCP servers, and says which, and from a .mcp.json only when it is named with --mcp-json and is outside any repository.",
+    'braindog verify <file> [--key <pubkey|url>]',
+    "  Check a .brainl file on this machine: its format, every table against its manifest, and its signature, against the key you name when you name one. Nothing is sent, but for fetching a key from an address.",
     'braindog init <slug> --owner <email>',
     'braindog serve [<record file>]',
     '  Create or serve a record on this machine, through the self-host.',
@@ -283,14 +286,14 @@ async function keysCommand(args: string[]): Promise<void> {
 }
 
 /**
- * `braindog skills|tools|page|usecase|pack|import|context|session|automations|scripts`, over the real terminal, and the exit
+ * `braindog skills|tools|page|usecase|pack|import|context|session|automations|scripts|verify`, over the real terminal, and the exit
  * code the command decides.
  *
- * `--json` IS DECIDED HERE AND NOWHERE ELSE (`48 §4.5`, `json.ts`). The ten commands below all take
+ * `--json` IS DECIDED HERE AND NOWHERE ELSE (`48 §4.5`, `json.ts`). The eleven commands below all take
  * the same `AgentIo`, so swapping where `out` goes is the whole of the flag: not one line in a command
  * body asks whether it was given.
  */
-async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'pack' | 'import' | 'context' | 'session' | 'automations' | 'scripts', args: string[]): Promise<void> {
+async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'pack' | 'import' | 'context' | 'session' | 'automations' | 'scripts' | 'verify', args: string[]): Promise<void> {
   const cwd = process.cwd();
   const io = {
     env: process.env,
@@ -307,7 +310,7 @@ async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'pa
   };
   const cli = fileURLToPath(new URL('./main.ts', import.meta.url)).replaceAll('\\', '/');
   const code =
-    which === 'context' ? await context(args, io) : which === 'session' ? await session(args, io) : which === 'import' ? await importCommand(args, io) : which === 'skills' ? await skills(args, io) : which === 'tools' ? await tools(args, { ...io, cli }) : which === 'usecase' ? await usecase(args, io) : which === 'pack' ? await pack(args, io) : which === 'automations' ? await automations(args, io) : which === 'scripts' ? await scripts(args, io) : await pageCommand(args, io);
+    which === 'context' ? await context(args, io) : which === 'session' ? await session(args, io) : which === 'import' ? await importCommand(args, io) : which === 'skills' ? await skills(args, io) : which === 'tools' ? await tools(args, { ...io, cli }) : which === 'usecase' ? await usecase(args, io) : which === 'pack' ? await pack(args, io) : which === 'automations' ? await automations(args, io) : which === 'scripts' ? await scripts(args, io) : which === 'verify' ? await verify(args, io) : await pageCommand(args, io);
   if (json) emit(json.envelope(code));
   /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
   process.exitCode = code;
@@ -433,7 +436,7 @@ function install(args: string[]): void {
  * left to refuse the flag in its own words, which is the answer a caller deserves rather than an
  * empty document.
  */
-const JSON_COMMANDS = new Set(['--version', '-v', 'help', '--help', '-h', 'login', 'logout', 'skills', 'tools', 'page', 'usecase', 'pack', 'import', 'context', 'session', 'automations', 'scripts', 'install']);
+const JSON_COMMANDS = new Set(['--version', '-v', 'help', '--help', '-h', 'login', 'logout', 'skills', 'tools', 'page', 'usecase', 'pack', 'import', 'context', 'session', 'automations', 'scripts', 'install', 'verify']);
 
 const [command, ...rest] = process.argv.slice(2);
 /* ONE DECISION, TAKEN BEFORE DISPATCH (`48 §4.5`, `json.ts`): the flag is answered here and removed,
@@ -471,7 +474,7 @@ try {
   /* `run` IS `keys exec` UNDER ITS SHORTER NAME (`48 §2`), not a second door: one command opens a key
      into one environment variable, and adding a way to print one would undo the reason it exists. */
   else if (command === 'run') await keysCommand(['exec', ...rest]);
-  else if (command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase' || command === 'pack' || command === 'import' || command === 'context' || command === 'session' || command === 'automations' || command === 'scripts') await agentCommand(command, args);
+  else if (command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase' || command === 'pack' || command === 'import' || command === 'context' || command === 'session' || command === 'automations' || command === 'scripts' || command === 'verify') await agentCommand(command, args);
   else if (command === 'hook') await hook(rest);
   else if (command === 'install') install(args);
   else if (command === 'init' || command === 'serve') selfhost(command, rest);
