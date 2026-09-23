@@ -755,90 +755,138 @@ export const TEMPLATES = [
  * to keep in step, and the one that drifted would be the one an agent reads.
  */
 export function tools<C>(surface: McpSurface<C>) {
-  /* KEPT FOR THE LIFE OF THE SERVER, because a register's prefix is part of its declaration and does not move. A schema
-     the caller may not read is not kept, and that register's rows are named `register#number`. */
+  /* KEPT FOR THE LIFE OF THESE TOOLS, which is one answer: `rpc.ts` is the one caller outside the tests, and it builds
+     them for each message. A schema the caller may not read is not kept, and that register's rows are named
+     `register#number`. */
   const prefixes = new Map<string, string>();
-  /* AND ITS REF FIELDS, READ FROM THE SAME SCHEMA, each `true` where the field is a list of refs. They move no more
-     often than the prefix does, and they are what the naming pass below reads. */
-  const refFields = new Map<string, Map<string, boolean>>();
+  /* AND ITS REF FIELDS, READ FROM THE SAME SCHEMA: whether each is a list of refs, and the register its `to` names.
+     They move no more often than the prefix does, and they are what the naming pass below reads. */
+  const refFields = new Map<string, Map<string, { many: boolean; to: string | null }>>();
   const learnPrefix = async (register: string, ctx: C): Promise<void> => {
     const schema = await surface.schema({ register }, ctx);
     if (!schema.ok) return;
     const said = isObject(schema.value) ? schema.value.seq_prefix : undefined;
     prefixes.set(register, typeof said === 'string' && /^[A-Z]{1,4}$/.test(said) ? said : '');
     const declared = isObject(schema.value) && Array.isArray(schema.value.fields) ? schema.value.fields : [];
-    const refs = new Map<string, boolean>();
+    const refs = new Map<string, { many: boolean; to: string | null }>();
     for (const f of declared)
-      if (isObject(f) && typeof f.id === 'string' && (f.type === 'ref' || (f.type === 'list' && f.of === 'ref'))) refs.set(f.id, f.type === 'list');
+      if (isObject(f) && typeof f.id === 'string' && (f.type === 'ref' || (f.type === 'list' && f.of === 'ref')))
+        refs.set(f.id, { many: f.type === 'list', to: typeof f.to === 'string' && f.to !== '' ? f.to : null });
     refFields.set(register, refs);
   };
-  const addressOf = async (register: string, seq: number, ctx: C): Promise<string> => {
-    if (!prefixes.has(register)) await learnPrefix(register, ctx);
+  const spokenOf = (register: string, seq: number): string => {
     const prefix = prefixes.get(register) ?? '';
     return prefix ? `${prefix}${String(seq)}` : `${register}#${String(seq)}`;
   };
+  const addressOf = async (register: string, seq: number, ctx: C): Promise<string> => {
+    if (!prefixes.has(register)) await learnPrefix(register, ctx);
+    return spokenOf(register, seq);
+  };
 
   /**
-   * A row id in a ref field, as the spoken id `context` would say for the same row: `things#1`, `LN8`.
+   * The row ids in an answer's ref fields, each as the spoken id `context` would say for the same row: `things#1`, `LN8`.
    *
    * MEASURED ON THE SEED BEFORE THIS: every task on Kiln answered `thing: "01M345FTM0..."`, which changes from run to
    * run, while `context` named the project `things#1`, so an agent matching a task to its project, or saying which
-   * project a task was on, paid a `get` per id. The record already answers `get` for a row id, so this is that call,
-   * made here once per id.
+   * project a task was on, paid a `get` per id.
    *
-   * ONCE PER ID PER MESSAGE, NOT FOR THE SERVER'S LIFE. `rpc.ts` builds these tools afresh for every message, so this
-   * map, and `prefixes` above it, last one answer. Measured through `handle` on the seed: `list tasks` asked the
-   * surface twice before this pass (`list`, `schema`) and eighteen times with it (`list`, four `schema`, thirteen
-   * `get`), the same on a second call. Over `braindog mcp` each of those is a request to the record.
+   * ONE READ PER REGISTER THE REFS POINT INTO, NOT ONE PER ID. This asked `get` for each distinct id, one after another,
+   * so an answer cost a request per ref (audit fifty-two, finding 6): measured through `handle` on the seed with 120
+   * learnings added, each superseding the one before, `list learnings` of 127 rows asked the surface 126 times, 123 of
+   * them `get`. A ref field's declaration names its register in `to`, so every id an answer holds for that register goes
+   * to it in `list` reads where `id` is in them, and the same answer asks six times: the `list`, the `schema` of
+   * `learnings`, two reads of `learnings` and one of `things`, and the `schema` of `things`. `names-cache.test.ts`
+   * holds it.
    *
-   * A ROW THE CALLER CANNOT READ, OR ONE THAT IS GONE, KEEPS ITS ID, and is not kept, so the next caller is asked for
-   * itself. Only a name that resolved is shared, and the field's own declaration already says which register it is in.
+   * IN READS OF AT MOST 64 IDS, BECAUSE THE DURABLE OBJECT BINDS AT MOST 100 PARAMETERS. `where` binds one per id, and
+   * `list` three more of its own. Measured in workerd through Miniflare, a statement of 100 parameters ran and one of
+   * 101 threw `too many SQL variables`, while `node:sqlite` takes tens of thousands. The first cut read 200 ids at a
+   * time, which passed every test here and in production turned the audit's 127 learnings, 119 ids in one read and
+   * 122 parameters, into an internal error for the whole `list`: the answer was lost, not only its names. 64 is the
+   * chunk `where` already slices `in` by (`packages/where/src/index.ts`), and it leaves the ceiling 33 to spare. It
+   * also keeps the GET the command line sends (`packages/client/src/index.ts`) well short of the 16 KiB Node lets a
+   * request's head be: 500 row ids made a 17,598-byte URL, measured, and 200 made 7,098.
+   *
+   * NOTHING IS KEPT PAST THE ANSWER. `rpc.ts` builds these tools for each message, and every read is asked with the
+   * caller's own context, so a register the caller may not read, by its level on that register or by its ceiling, is
+   * refused by the record and its ids stay ids, and a row deleted since the last message is read as it is now. The
+   * attempt held in wave fifty-two kept names across messages keyed by what `whoami` said, which says nothing of
+   * `ctx.levels`, so a token held to `append` on `things` could be told a project's name. With the reads batched, a
+   * cache across messages would save at most the four calls above besides the `list`, which is not worth a key that
+   * has to name every grant a token holds.
+   *
+   * A ROW THE CALLER CANNOT READ, OR ONE THAT IS GONE, KEEPS ITS ID: `list` leaves a deleted row out, as `get` answered
+   * one `null`, measured on the seed. A ref whose declaration names no register is still asked by `get`, one id each.
    */
-  const names = new Map<string, Promise<string | null>>();
-  const nameOf = async (value: unknown, ctx: C): Promise<unknown> => {
-    if (typeof value !== 'string' || !ROW_ID.test(value)) return value;
-    let named = names.get(value);
-    if (!named) {
-      named = surface.get({ spoken: value }, ctx).then((got) =>
-        got.ok && isEntry(got.value) && got.value.seq !== null ? addressOf(got.value.register, got.value.seq, ctx) : null,
-      );
-      names.set(value, named);
+  const NAMES_PER_READ = 64;
+  const namesIn = async (rows: Entry[], ctx: C): Promise<Map<string, string>> => {
+    const wanted = new Map<string | null, Set<string>>();
+    for (const row of rows)
+      for (const [id, { many, to }] of refFields.get(row.register) ?? []) {
+        if (!Object.hasOwn(row.fields, id)) continue;
+        const value = row.fields[id];
+        for (const one of many ? (Array.isArray(value) ? value : []) : [value]) {
+          if (typeof one !== 'string' || !ROW_ID.test(one)) continue;
+          let ids = wanted.get(to);
+          if (!ids) wanted.set(to, (ids = new Set()));
+          ids.add(one);
+        }
+      }
+    const names = new Map<string, string>();
+    /* EACH REGISTER'S PREFIX BEFORE ITS READS, so the reads of one register do not each ask its `schema`. A schema the
+       caller may not read leaves no prefix, and the read of that register is refused the same way. */
+    for (const to of wanted.keys()) if (to !== null && !prefixes.has(to)) await learnPrefix(to, ctx);
+    const reads: Promise<void>[] = [];
+    for (const [to, set] of wanted) {
+      const ids = [...set];
+      if (to === null)
+        for (const id of ids)
+          reads.push(
+            surface.get({ spoken: id }, ctx).then(async (got) => {
+              if (got.ok && isEntry(got.value) && got.value.seq !== null) names.set(id, await addressOf(got.value.register, got.value.seq, ctx));
+            }),
+          );
+      else
+        for (let at = 0; at < ids.length; at += NAMES_PER_READ) {
+          const some = ids.slice(at, at + NAMES_PER_READ);
+          reads.push(
+            surface.list({ register: to, where: { field: 'id', in: some }, limit: some.length }, ctx).then((got) => {
+              if (got.ok) for (const found of got.value.rows) if (isEntry(found) && found.seq !== null) names.set(found.id, spokenOf(found.register, found.seq));
+            }),
+          );
+        }
     }
-    const said = await named;
-    if (said === null) names.delete(value);
-    return said ?? value;
+    await Promise.all(reads);
+    return names;
   };
-  const speakRefs = async (row: Entry, ctx: C): Promise<Entry> => {
+  const speakRefs = (row: Entry, names: Map<string, string>): Entry => {
     const refs = refFields.get(row.register);
     if (!refs || refs.size === 0) return row;
+    const nameOf = (value: unknown): unknown => (typeof value === 'string' ? (names.get(value) ?? value) : value);
     const fields = { ...row.fields };
-    for (const [id, many] of refs) {
+    for (const [id, { many }] of refs) {
       /* ONLY A FIELD THE ROW HAS. Writing `owner: undefined` onto a row that has no owner made the round trip refuse
          it, measured: "owner takes a row id or a spoken id", for a field the agent never sent. */
       if (!Object.hasOwn(fields, id)) continue;
       const value = fields[id];
-      if (many && Array.isArray(value)) {
-        const out: unknown[] = [];
-        for (const one of value) out.push(await nameOf(one, ctx));
-        fields[id] = out;
-      } else if (!many) fields[id] = await nameOf(value, ctx);
+      if (many && Array.isArray(value)) fields[id] = value.map(nameOf);
+      else if (!many) fields[id] = nameOf(value);
     }
     return { ...row, fields };
   };
   /** Every row in an answer, a page's or a conflict's, with its refs spoken. Anything else as it came. */
   const spokenRefs = async (r: Result<unknown>, ctx: C): Promise<Result<unknown>> => {
     if (r.ok) {
-      if (isEntry(r.value)) return { ok: true, value: await speakRefs(r.value, ctx) };
+      if (isEntry(r.value)) return { ok: true, value: speakRefs(r.value, await namesIn([r.value], ctx)) };
       if (isObject(r.value) && Array.isArray(r.value.rows)) {
-        const rows: unknown[] = [];
-        for (const row of r.value.rows) rows.push(isEntry(row) ? await speakRefs(row, ctx) : row);
-        return { ok: true, value: { ...r.value, rows } };
+        const names = await namesIn(r.value.rows.filter(isEntry), ctx);
+        return { ok: true, value: { ...r.value, rows: r.value.rows.map((row) => (isEntry(row) ? speakRefs(row, names) : row)) } };
       }
       return r;
     }
     const conflict = (r as { conflict?: { current?: unknown } }).conflict;
     return conflict && isEntry(conflict.current)
-      ? ({ ...r, conflict: { ...conflict, current: await speakRefs(conflict.current, ctx) } } as Result<unknown>)
+      ? ({ ...r, conflict: { ...conflict, current: speakRefs(conflict.current, await namesIn([conflict.current], ctx)) } } as Result<unknown>)
       : r;
   };
 

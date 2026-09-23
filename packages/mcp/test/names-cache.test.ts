@@ -1,0 +1,196 @@
+/**
+ * What naming an answer's refs costs, and who it is told to.
+ *
+ * A REQUEST PER DISTINCT REF, ONE AFTER ANOTHER (audit fifty-two, finding 6). `nameOf` asked `get` for every row id a
+ * ref field held, so the cost of an answer grew with its page: measured here on the seed with 120 learnings added,
+ * each superseding the one before, `list learnings` answered 127 rows after 126 calls to the surface (`list`, two
+ * `schema`, 123 `get`), the 126 the audit measured. Over `braindog mcp` each call is an HTTP request from the command
+ * line to the host (`apps/cli/src/surface.ts`), in series, before the agent reads a line. Now each register the refs
+ * point into is read with its ids 64 at a time, and the same list asks six times.
+ *
+ * UNDER THE DURABLE OBJECT'S CEILING OF 100 BOUND PARAMETERS, which `node:sqlite` does not have. The first cut read
+ * 200 ids at a time and passed this file on `node:sqlite`, while in workerd, measured through Miniflare, a statement
+ * of 101 parameters threw `too many SQL variables`, so the 127 learnings below were an internal error for the whole
+ * `list` in production. The record here refuses the same way, so a read too wide goes red on a laptop too.
+ *
+ * AND NOTHING IS KEPT PAST THE ANSWER. The attempt held in wave fifty-two kept names across messages keyed by what
+ * `whoami` said, and `whoami` says nothing of `ctx.levels`, so a token held to `append` on one register could be told
+ * the names of its rows. With the reads batched, a cache across messages would save four calls of those five, so
+ * there is none: every read is asked with the caller's own context, and the record decides what it may be told. The
+ * tests below go through `handle` with a copy of the context per message, as every transport builds one.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { createRecordApi, type CallContext } from '@braindog/record';
+
+import { tools, type McpSurface } from '../src/index.ts';
+import { handle, type Reply } from '../src/rpc.ts';
+import { installSeed } from '../../seed/src/index.ts';
+import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
+import { stub, type Ctx } from './stub.ts';
+
+const owner: CallContext = {
+  principal: { kind: 'token', id: 't', scope: 'write', person: 'p_seed', level: 'owner' },
+  session: { client_id: 'names-cache', cwd: '/Users/studio/Code/kiln-type' },
+} as CallContext;
+
+type Row = { spoken: string; version: number; fields: Record<string, unknown> };
+const ROW_ID = /^[0-9A-HJKMNP-TV-Z]{26}$/;
+
+/** `node:sqlite` held to the Durable Object's 100 bound parameters, the one limit a naming read can meet. */
+function doSqlite() {
+  const sql = openSqlite();
+  const held = <A extends unknown[], R>(run: (text: string, ...params: A) => R) => (text: string, ...params: A): R => {
+    if (params.length > 100) throw new Error(`too many SQL variables: ${String(params.length)}, and a Durable Object binds 100`);
+    return run(text, ...params);
+  };
+  return { ...sql, exec: held(sql.exec.bind(sql)), all: held(sql.all.bind(sql)), one: held(sql.one.bind(sql)) } as typeof sql;
+}
+
+/** The seeded record behind a surface that counts every method it is asked, by name. */
+async function counted() {
+  const api = await createRecordApi({ sql: doSqlite(), clock: fixedClock(Date.UTC(2026, 8, 22, 9)) });
+  await installSeed(api.kernel);
+  const asked: string[] = [];
+  const surface = new Proxy(api, {
+    get(target, key, receiver) {
+      const value = Reflect.get(target, key, receiver) as unknown;
+      if (typeof value !== 'function' || typeof key !== 'string') return value;
+      return (...args: unknown[]) => {
+        asked.push(key);
+        return Reflect.apply(value, target, args) as unknown;
+      };
+    },
+  }) as unknown as McpSurface<CallContext>;
+  return { api, surface, asked };
+}
+
+let n = 0;
+/* A COPY OF THE CONTEXT PER MESSAGE, as every transport builds one (`ctxOf()` on stdio, `withSession` on the hosts). */
+const call = async (surface: McpSurface<CallContext>, ctx: CallContext, name: string, args: Record<string, unknown>) => {
+  const message = { jsonrpc: '2.0', id: ++n, method: 'tools/call', params: { name, arguments: args } };
+  const reply = (await handle(message, surface, { ...ctx })) as Reply;
+  assert.ok('result' in reply, JSON.stringify(reply));
+  const out = reply.result as { isError?: boolean; content: { text: string }[] };
+  return { error: out.isError === true, value: JSON.parse(out.content[0]!.text) as Record<string, unknown> };
+};
+const rowsOf = (said: { error: boolean; value: Record<string, unknown> }): Row[] => {
+  assert.ok(!said.error, JSON.stringify(said.value));
+  return said.value.rows as Row[];
+};
+const thingsOf = (rows: Row[]): unknown[] => rows.map((r) => r.fields.thing).filter((t) => t !== undefined);
+
+test('a list of 127 learnings, each superseding the last, reads each register its refs point into and not each ref, and names every ref', async () => {
+  const { api, surface, asked } = await counted();
+  /* THE AUDIT'S SHAPE: 120 learnings through the record, each superseding the one before, beside the seed's seven. */
+  let previous: string | undefined;
+  for (let i = 0; i < 120; i++) {
+    const made = await api.create(
+      { register: 'learnings', fields: { lesson: `Lesson ${String(i)} of the names test.`, because: 'Measured for the names test.', kind: 'fact', ...(previous ? { supersedes: previous } : {}) } },
+      owner,
+    );
+    assert.ok(made.ok, JSON.stringify(made));
+    previous = (made.value as { id: string }).id;
+  }
+  asked.splice(0);
+
+  const rows = rowsOf(await call(surface, owner, 'list', { register: 'learnings', limit: 500 }));
+  const cost = [...asked];
+  assert.equal(rows.length, 127);
+
+  /* EVERY REF IS NAMED, and named as the row it points at: each added learning supersedes the one made before it. */
+  const added = rows.filter((r) => /^Lesson \d+ of the names test\.$/.test(String(r.fields.lesson)));
+  const byLesson = new Map(added.map((r) => [String(r.fields.lesson), r.spoken]));
+  for (const r of added) {
+    const i = Number(/\d+/.exec(String(r.fields.lesson))![0]);
+    assert.equal(r.fields.supersedes, i === 0 ? undefined : byLesson.get(`Lesson ${String(i - 1)} of the names test.`), `Lesson ${String(i)} supersedes ${String(r.fields.supersedes)}`);
+  }
+  const seeded = rows.filter((r) => !byLesson.has(String(r.fields.lesson)));
+  assert.ok(seeded.some((r) => typeof r.fields.project === 'string' && /^things#\d+$/.test(r.fields.project)), 'no seeded learning named its project');
+
+  /* MEASURED BEFORE: 126 (`list`, two `schema`, 123 `get`). The bound is the `list`, the `schema` of `learnings` and
+     of `things`, two reads of the 119 learnings ids at 64 a read, and one of the seeded projects. */
+  assert.ok(!cost.includes('get'), `a ref was named by a get of its own: ${String(cost.filter((m) => m === 'get').length)} of them`);
+  assert.ok(cost.length <= 1 + 2 + 2 + 1, `the list asked the surface ${String(cost.length)} times: ${cost.join(' ')}`);
+});
+
+test('a caller whose level on a register does not read it is told the row id, though the owner was just told the name', async () => {
+  /* THE HELD ATTEMPT'S REFUSAL, AS A TEST. The owner names Kiln first through the same surface, so anything kept
+     across messages and shared between callers would hand the next two `things#1`. `levels` is the per-register
+     override a token is minted with; `registers` is the ceiling. The record refuses both a read of `things`. */
+  const { surface } = await counted();
+  const owned = thingsOf(rowsOf(await call(surface, owner, 'list', { register: 'tasks', limit: 500 })));
+  assert.ok(owned.includes('things#1'), 'the owner was told no project');
+
+  const appends = { ...owner, levels: { things: 'append' } } as CallContext;
+  const held = { ...owner, registers: ['tasks'] } as CallContext;
+  for (const [who, ctx] of [['a token that only appends to things', appends], ['a token held to tasks', held]] as const) {
+    const things = thingsOf(rowsOf(await call(surface, ctx, 'list', { register: 'tasks', limit: 500 })));
+    assert.equal(things.length, owned.length, `${who} read a different page`);
+    assert.ok(things.every((t) => typeof t === 'string' && ROW_ID.test(t)), `${who} was told ${JSON.stringify([...new Set(things)])}`);
+  }
+});
+
+test('a delete is seen on the next message, by the caller who deleted and by another', async () => {
+  /* MEASURED ON THE SEED: `get` of a deleted row's id answers `null`, and `list` leaves a deleted row out, so a fresh
+     naming pass leaves the id as it is. A name kept past the answer would still say `things#1` for a project gone. */
+  const { surface } = await counted();
+  const other = { ...owner, principal: { ...owner.principal, id: 't3' } } as CallContext;
+  const before = rowsOf(await call(surface, other, 'list', { register: 'tasks', where: { field: 'thing', is: 'things#1' } }));
+  assert.ok(before.length > 0 && before.every((r) => r.fields.thing === 'things#1'), 'Kiln has no tasks on the seed');
+
+  const gone = await call(surface, owner, 'update', { spoken: 'things#1', patch: { deleted_at: true } });
+  assert.ok(!gone.error, JSON.stringify(gone.value));
+
+  const kiln = new Set(before.map((r) => r.spoken));
+  for (const ctx of [owner, other]) {
+    const rows = rowsOf(await call(surface, ctx, 'list', { register: 'tasks', limit: 500 }));
+    const still = rows.filter((r) => kiln.has(r.spoken)).map((r) => r.fields.thing);
+    assert.equal(still.length, before.length, "Kiln's tasks were not all listed after the delete");
+    assert.ok(still.every((t) => typeof t === 'string' && ROW_ID.test(t)), `a deleted project was named ${JSON.stringify(still)}`);
+    /* AND THE REST ARE STILL NAMED. The deleted id rides in the same read as the live ones, and a read that refused
+       for the one it cannot find would have unnamed every project on the page. */
+    const rest = thingsOf(rows.filter((r) => !kiln.has(r.spoken)));
+    assert.ok(rest.length > 0 && rest.every((t) => typeof t === 'string' && /^things#\d+$/.test(t)), `the live projects were told ${JSON.stringify([...new Set(rest)])}`);
+  }
+});
+
+test('a page of 450 distinct refs is named in eight reads of 64 ids or fewer, each a statement and a URL a host takes', async () => {
+  /* WHY 64 AND NOT THE 500 A PAGE HOLDS. Each id is a bound parameter, and a Durable Object binds 100, `list`'s own
+     three among them, measured through Miniflare. And the command line sends `list` as a GET with `where` in the query
+     string (`packages/client/src/index.ts`), where a `where` of 500 row ids made a 17,598-byte URL, measured, past the
+     16 KiB Node lets a request's head be. */
+  const ids = Array.from({ length: 450 }, (_, i) => `01M345FTM0${String(i).padStart(16, '0')}`);
+  const { surface, calls } = stub({
+    schema: async ({ register }) => ({
+      ok: true,
+      value: register === 'tasks' ? { seq_prefix: 'T', fields: [{ id: 'thing', type: 'ref', to: 'things' }] } : { seq_prefix: '', fields: [] },
+    }),
+    list: async (args) => {
+      calls.push({ method: 'list', args, ctx: undefined });
+      if (args.register === 'tasks')
+        return { ok: true, value: { rows: ids.map((id, i) => ({ id: `T${id.slice(1)}`, register: 'tasks', seq: i + 1, version: 1, fields: { thing: id } })) } };
+      const asked = (args.where as { in: string[] }).in;
+      return { ok: true, value: { rows: asked.map((id) => ({ id, register: 'things', seq: ids.indexOf(id) + 1, version: 1, fields: {} })) } };
+    },
+  });
+  const r = await tools(surface).call('list', { register: 'tasks', limit: 500 }, { who: 'agent' } satisfies Ctx);
+  assert.ok(r.ok, JSON.stringify(r));
+  assert.equal(calls.filter((c) => c.method === 'get').length, 0, 'a ref was named by a get of its own');
+  const reads = calls.filter((c) => c.method === 'list' && (c.args as { register: string }).register === 'things');
+  assert.equal(reads.length, 8);
+  for (const read of reads) assert.ok((read.args as { where: { in: string[] } }).where.in.length <= 64, 'a read held more ids than a statement binds');
+  const rows = (r.value as { rows: Row[] }).rows;
+  assert.deepEqual(
+    rows.map((row) => row.fields.thing),
+    ids.map((_, i) => `things#${String(i + 1)}`),
+  );
+  for (const read of reads) {
+    const url = new URL('http://127.0.0.1:8787/api/list');
+    for (const [key, value] of Object.entries(read.args as Record<string, unknown>))
+      url.searchParams.set(key, typeof value === 'string' ? value : JSON.stringify(value));
+    assert.ok(url.href.length < 8192, `a read of ids was a ${String(url.href.length)}-byte URL`);
+  }
+});
