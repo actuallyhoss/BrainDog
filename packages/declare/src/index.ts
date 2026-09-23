@@ -127,7 +127,15 @@ export type Installed = {
   format: number;
   primitives: number;
   record_version: number;
-  packs: { id: string; version: string }[];
+  /**
+   * The `pack` rows. `requires` is each one's `requires.packs` as its stored manifest says it: what that pack asks of the
+   * others, which `plan` holds the pack being planned to (`dependents`).
+   *
+   * OPTIONAL, as `used` is, so every caller that hands in `kernel.packs()` keeps compiling. A row without it names no
+   * range, and a plan asked of such a record says nothing about the packs that lean on the one it updates, which is how
+   * a record holding bank-hsbc-eg 1.0.0 on `^1.8.0` took money-core 2.0.0 without a word (`held-pack-range.test.ts`).
+   */
+  packs: { id: string; version: string; requires?: Readonly<Record<string, string>> }[];
   declarations: { id: string; version: number; kind: DeclKind; pack_id: string | null; body: string; checksum: string }[];
   rows: Record<string, number>;
   /**
@@ -203,6 +211,18 @@ export type Diff = {
     primitives: { wanted: number; has: number; ok: boolean };
     packs: { id: string; range: string; installed: string | null; ok: boolean }[];
   };
+  /**
+   * Every held pack whose `requires.packs` names this one: its version, the range it asks for, `ok` whether this plan's
+   * version satisfies that range, and `was` whether the version held now does. Reported here, and refused by `install`
+   * as `PACK_REQUIRED` when this plan turns a true requirement false.
+   *
+   * THE MIRROR OF `requires.packs`, which asks only what the pack being planned needs of the others. Measured on 23
+   * September: a record at money-core 1.8.0 holding bank-hsbc-eg 1.0.0 (`^1.8.0`) planned money-core 2.0.0 with nothing
+   * unmet, installed it, and was left holding a pack whose requirement was false (`held-pack-range.test.ts`).
+   *
+   * EMPTY WHEN `Installed.packs` CARRIES NO `requires`, because there is no range to read.
+   */
+  dependents: { id: string; version: string; range: string; ok: boolean; was: boolean }[];
   /**
    * `handed` IS A DECLARATION ANOTHER PACK HANDED THIS ONE, which is live already, under this pack's name, while this
    * pack is not installed. It is new to the pack and not to the record, so it plants no example rows, and its rows and
@@ -1229,6 +1249,10 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
     const has = installed.packs.find((p) => p.id === id)?.version ?? null;
     return { id, range, installed: has, ok: satisfies(has, range) };
   });
+  const dependents: Diff['dependents'] = installed.packs.flatMap((p) => {
+    const range = p.id === mine ? undefined : p.requires?.[mine];
+    return range === undefined ? [] : [{ id: p.id, version: p.version, range, ok: satisfies(pack.manifest.version, range), was: satisfies(was, range) }];
+  });
 
   const base: Diff['base'] = {
     format: installed.format,
@@ -1253,6 +1277,7 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
     installed_version: was,
     direction: was === null ? 'install' : was === pack.manifest.version ? 'reinstall' : newer(pack.manifest.version, was) > 0 ? 'upgrade' : 'downgrade',
     requires: { format, primitives, packs: needs },
+    dependents,
     adds,
     changes,
     retires,
@@ -2224,6 +2249,20 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
       'OUT_OF_BOUNDS',
       `${diff.pack.id} needs ${missing.id} ${missing.range}, and this record has ${missing.installed ?? 'none'}.`,
       { at: `requires.packs.${missing.id}` },
+    );
+
+  /* AND WHAT THE HELD PACKS ASK OF THIS ONE. money-core 2.0.0 installed under bank-hsbc-eg 1.0.0, whose `^1.8.0` it does
+     not satisfy, and the plan named neither (`held-pack-range.test.ts`). `PACK_REQUIRED` because it is the kernel's code
+     for the same fact from the other side, a pack another pack leans on through `requires.packs` (`disablePack`).
+     REFUSED ONLY WHEN THIS STEP BREAKS IT. A requirement already false stays in `dependents` and refuses nothing: a
+     record that took money-core 2.0.0 before this check would otherwise be refused every later money-core, for a range
+     none of them can meet. The way out named is the order that was driven and installs: the held pack's update, first. */
+  const leaning = diff.dependents.find((d) => d.was && !d.ok);
+  if (leaning)
+    return no<Applied>(
+      'PACK_REQUIRED',
+      `${leaning.id} ${leaning.version} needs ${diff.pack.id} ${leaning.range}, which ${diff.pack.id} ${diff.pack.version} is not, and the ${diff.pack.id} ${diff.installed_version} this record holds is. Update ${leaning.id} to a version that takes ${diff.pack.id} ${diff.pack.version} first, then install ${diff.pack.id} ${diff.pack.version}.`,
+      { at: `dependents.${leaning.id}` },
     );
 
   /* A LIST NOTHING HOLDS IS REFUSED BEFORE ANYTHING IS STAGED. A field pointing at it would be a ref
