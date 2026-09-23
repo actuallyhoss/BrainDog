@@ -1,0 +1,102 @@
+{
+  "pack": "portfolio-bands",
+  "version": "1.0.0",
+  "title": "Revenue bands",
+  "summary": "What your projects take a month now, and the room left in their forecasts next and later, worked out every day and drawn as one bar.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "portfolio": "^1.0.0",
+      "usecase-founder": "^1.0.0"
+    }
+  },
+  "declarations": [
+    {
+      "register": "revenue_bands",
+      "name": "Revenue bands",
+      "one": "band",
+      "holds": "what the projects take a month now, and the room in their forecasts next and later, one row a band and a currency",
+      "title": "band",
+      "fields": [
+        {
+          "id": "band",
+          "label": "Band",
+          "type": "enum",
+          "values": [
+            "now",
+            "next",
+            "later"
+          ],
+          "labels": {
+            "now": "Now",
+            "next": "Next",
+            "later": "Later"
+          },
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "amount",
+          "label": "A month",
+          "type": "money",
+          "required": true
+        },
+        {
+          "id": "at",
+          "label": "Worked out",
+          "type": "instant"
+        }
+      ]
+    },
+    {
+      "script": "portfolio-bands",
+      "title": "Revenue bands, worked out",
+      "runs": {
+        "every": "1d"
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "things",
+        "datapoints",
+        "revenue_bands"
+      ],
+      "writes": [
+        "revenue_bands"
+      ],
+      "source": "/**\n * The revenue bands: what the projects take a month now, and the room left in their forecasts next and later.\n *\n * THE OLD TOOL'S RULE (`loop/research-legacy-keeps.md` section 3). `now` is every project's latest monthly revenue,\n * retired ones that still pay included. A project's headroom is `max(0, base - now)`, where `base` is its base-case\n * forecast of monthly revenue a year out. Headroom on a project being earned from or built is `next`; on one that is\n * parked (the old tool's `explore`) it is `later`; a retired project has none. One amount per currency, because two\n * currencies are never added.\n *\n * WHICH LANE IS WHICH BAND IS THE TABLE BELOW, and it is the one place to change it. the old tool's `maintain` arrives here\n * as `earning` (`LANES` in `apps/cli/src/legacy.ts`), so a maintained project's headroom is counted in `next`, and\n * its `infra` arrives as `building`, where it counts too. the old tool gave neither any headroom.\n *\n * THE READINGS ARE MATCHED BY PROJECT, NOT BY NAME ALONE. The import names each one \"<measure>, <project>\" because the\n * Dashboard draws one tile a name, so the measure is the text before that comma and the project is the `thing` it\n * points at. \"Revenue, next twelve months\" is the import's first label for the base case, and it is the same number:\n * `outlook.rev12[1]` is a monthly figure a year out, not a twelve-month total (section 3 again, measured on his record).\n */\n\nconst NOW = ['Monthly revenue'];\nconst BASE = ['Monthly revenue a year out: base', 'Revenue, next twelve months'];\nconst LANES = { earning: 'next', building: 'next', parked: 'later' };\nconst BANDS = ['now', 'next', 'later'];\nconst REGISTER = 'revenue_bands';\n\n/* THE RECORD ANSWERS ONE PAGE OF FIFTY, most recently written first, and `ctx.record.list` cannot ask for more. So\n   readings are asked for one project and one measure at a time, where the fifty newest hold the latest, and a full page\n   of projects is said in the run's log, because a band summed over the first fifty projects is short by the rest and\n   nothing else would say so. ONE MEASURE A LIST, NOT BOTH: the first cut asked for both in one list, and on a self-host\n   fifty daily Monthly revenue readings written after a base typed once pushed the base off the page, so `later` fell\n   from 1,415,000 to 0 on a run that said `ok` (`bands.test.ts`, the whole path). A `starts` on the bare measure also\n   took the bear and bull cases, three readings an import that are never used, so each name is matched whole or with\n   its \", <project>\" after it. */\nconst PAGE = 50;\nconst named = (measures) => ({ any: measures.flatMap((m) => [{ field: 'name', is: m }, { field: 'name', starts: `${m}, ` }]) });\n\n/* ISO 4217'S MINOR DIGITS, where they are not two. A reading is a decimal in whole units and a band is money in minor\n   units, and the sandbox has no `Intl` to ask. */\nconst DIGITS = { BIF: 0, CLP: 0, DJF: 0, GNF: 0, ISK: 0, JPY: 0, KMF: 0, KRW: 0, PYG: 0, RWF: 0, UGX: 0, UYI: 0, VND: 0, VUV: 0, XAF: 0, XOF: 0, XPF: 0, BHD: 3, IQD: 3, JOD: 3, KWD: 3, LYD: 3, OMR: 3, TND: 3, CLF: 4, UYW: 4 };\nconst minor = (value, currency) => Math.round(value * 10 ** (DIGITS[currency] ?? 2));\n\nconst measureOf = (name, measures) => measures.some((m) => name === m || name.startsWith(`${m}, `));\n\n/** The reading's currency, or `null` when its unit is not three letters and it cannot be money. */\nconst currencyOf = (r) => {\n  const unit = String(r.fields.unit ?? '').trim().toUpperCase();\n  return /^[A-Z]{3}$/.test(unit) ? unit : null;\n};\n\n/** The later of two readings: by when it was true, then by when it was written. */\nconst later = (a, b) => {\n  if (a === undefined) return b;\n  const x = String(a.fields.at ?? '');\n  const y = String(b.fields.at ?? '');\n  return y > x || (y === x && String(b.updated_at) > String(a.updated_at)) ? b : a;\n};\n\n/**\n * The three bands per currency, in minor units, from the projects and their readings, and what could not be counted.\n * Pure, so the rule is one function a reader can check against section 3 without the record around it.\n */\nexport function bandsOf(things, readings) {\n  const latest = new Map();\n  for (const r of readings) {\n    /* THE SEED'S EXAMPLE ROWS ARE LEFT OUT, as every dashboard over datapoints leaves them out. */\n    if (r.fields.source === 'example' || typeof r.fields.value !== 'number') continue;\n    const name = String(r.fields.name ?? '');\n    const kind = measureOf(name, NOW) ? 'now' : measureOf(name, BASE) ? 'base' : null;\n    if (kind === null) continue;\n    const key = `${r.fields.thing}|${kind}`;\n    latest.set(key, later(latest.get(key), r));\n  }\n\n  const bands = {};\n  const said = [];\n  const add = (currency, band, amount) => {\n    bands[currency] ??= { now: 0, next: 0, later: 0 };\n    bands[currency][band] += amount;\n  };\n  for (const t of things) {\n    const name = String(t.fields.name ?? t.id);\n    const now = latest.get(`${t.id}|now`);\n    const base = latest.get(`${t.id}|base`);\n    const nowIn = now === undefined ? null : currencyOf(now);\n    const baseIn = base === undefined ? null : currencyOf(base);\n    if (now !== undefined && nowIn === null) said.push(`${name}'s monthly revenue is in ${JSON.stringify(now.fields.unit ?? '')}, which is not a currency, so it is not counted.`);\n    if (nowIn !== null) add(nowIn, 'now', minor(now.fields.value, nowIn));\n\n    const band = LANES[t.fields.lane];\n    if (band === undefined || base === undefined) continue;\n    if (baseIn === null) {\n      said.push(`${name}'s base case is in ${JSON.stringify(base.fields.unit ?? '')}, which is not a currency, so it adds no headroom.`);\n      continue;\n    }\n    if (nowIn !== null && nowIn !== baseIn) {\n      said.push(`${name} takes ${nowIn} today and is forecast in ${baseIn}, and two currencies are not subtracted, so it adds no headroom.`);\n      continue;\n    }\n    const taking = nowIn === null ? 0 : minor(now.fields.value, nowIn);\n    add(baseIn, band, Math.max(0, minor(base.fields.value, baseIn) - taking));\n  }\n  return { bands, said };\n}\n\nexport default async function run(ctx) {\n  const things = await ctx.record.list('things');\n  if (things.length >= PAGE)\n    ctx.log(`The record answered a full page of ${PAGE} projects and may hold more, so the bands may be short by the rest.`);\n\n  const readings = [];\n  for (const t of things)\n    for (const measures of [NOW, BASE]) readings.push(...(await ctx.record.list('datapoints', { all: [{ field: 'thing', is: t.id }, named(measures)] })));\n\n  const { bands, said } = bandsOf(things, readings);\n  for (const line of said) ctx.log(line);\n\n  /* ONE ROW A BAND AND A CURRENCY, UPDATED IN PLACE, so the split draws today's bar and not every day's bars summed.\n     A band that has not moved is not written again, and a currency no project holds any more goes to zero rather than\n     standing at whatever it last was. */\n  const held = new Map();\n  for (const r of await ctx.record.list(REGISTER)) {\n    const amount = r.fields.amount;\n    if (amount && typeof amount.currency === 'string') held.set(`${amount.currency}|${r.fields.band}`, r);\n  }\n  const currencies = [...new Set([...Object.keys(bands), ...[...held.keys()].map((k) => k.split('|')[0])])].sort();\n  const at = ctx.now();\n  for (const currency of currencies) {\n    for (const band of BANDS) {\n      const amount = { amount: bands[currency]?.[band] ?? 0, currency };\n      const row = held.get(`${currency}|${band}`);\n      if (row === undefined) {\n        if (bands[currency] !== undefined) ctx.write(REGISTER, { band, amount, at });\n      } else if (row.fields.amount.amount !== amount.amount) {\n        ctx.update(`${REGISTER}#${row.seq}`, { amount, at }, row.version);\n      }\n    }\n  }\n}\n"
+    },
+    {
+      "page": "bands",
+      "title": "Revenue bands",
+      "nav": {
+        "section": "Projects",
+        "order": 6
+      },
+      "icon": "thing",
+      "requires": [
+        "register.revenue_bands"
+      ],
+      "blocks": [
+        {
+          "kind": "split",
+          "heading": "A month: now, next and later",
+          "span": 12,
+          "source": "register.revenue_bands",
+          "columns": [
+            {
+              "field": "band"
+            },
+            {
+              "field": "amount"
+            }
+          ],
+          "empty": "Nothing is worked out yet. The bands are worked out once a day from each project's latest Monthly revenue reading and its base-case forecast."
+        }
+      ]
+    }
+  ]
+}
