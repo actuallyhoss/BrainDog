@@ -103,14 +103,50 @@ test('/api, /mcp AND /in/* ON THE OLD HOST ARE SERVED WHERE THEY STAND, BECAUSE 
   assert.equal(legacyRedirect(on('/r/tasks', { method: 'POST', body: 'x' }), LEGACY, PUBLIC), null);
 });
 
-test('UNSET IS THE WORKER AS IT WAS: no legacy host, no public host, or the public host itself is never redirected', () => {
+test('UNSET IS THE WORKER AS IT WAS: no legacy host or no public host, and the public host is never sent to another name', () => {
   assert.equal(legacyRedirect(on('/r/tasks'), undefined, PUBLIC), null);
   assert.equal(legacyRedirect(on('/r/tasks'), '', PUBLIC), null);
   assert.equal(legacyRedirect(on('/r/tasks'), LEGACY, undefined), null);
   assert.equal(legacyRedirect(on('/r/tasks'), LEGACY, ''), null);
-  /* A NAME LISTED AS BOTH would redirect to itself for ever. */
+  assert.equal(legacyRedirect(on('/r/tasks', { headers: html }), LEGACY, ''), null);
+  /* A NAME LISTED AS BOTH is the public host and nothing else. Read as legacy it would be sent to itself; read as the
+     public host its page load goes to `/app` on the same name, and `/app` is never redirected, so it ends there. */
   assert.equal(legacyRedirect(on('/r/tasks'), LEGACY, LEGACY), null);
+  assert.equal(legacyRedirect(on('/r/tasks', { headers: html }), LEGACY, LEGACY)?.headers.get('location'), 'https://app.brain.dog/app/r/tasks');
   assert.equal(legacyRedirect(new Request('https://brain.dog/r/tasks'), LEGACY, PUBLIC), null);
+});
+
+/* ── the public host, before the move reaches it ──────────────────────── */
+
+/* PUSH A OF `loop/research-one-domain-cutover.md` §5: the app built under `/app`, and the Worker still on `app.brain.dog`
+   with nothing listed as legacy. Measured there before this branch: `/`, `/signin` and `/r/tasks` answered a JSON
+   `ROUTE_UNKNOWN` 404, because the build has no root `index.html` any more and `not_found_handling` is `none`. */
+const DARK = 'app.brain.dog';
+const dark = (path: string, init: RequestInit = {}) => legacyRedirect(on(path, init), '', DARK);
+
+test('A PAGE LOAD ON THE PUBLIC HOST OUTSIDE /app IS A 308 TO /app ON THE SAME HOST, query kept, so the front door survives the dark deploy', () => {
+  const home = dark('/', { headers: html });
+  assert.equal(home?.status, 308);
+  assert.equal(home?.headers.get('location'), 'https://app.brain.dog/app/');
+  assert.equal(home?.headers.get('cache-control'), 'no-store');
+  /* THE SITE'S "Sign in" AND AN ALREADY-MAILED MAGIC LINK both land here. The fragment is the browser's to keep. */
+  assert.equal(dark('/signin?next=%2Fr%2Ftasks', { headers: html })?.headers.get('location'), 'https://app.brain.dog/app/signin?next=%2Fr%2Ftasks');
+  assert.equal(dark('/r/tasks', { method: 'HEAD', headers: html })?.headers.get('location'), 'https://app.brain.dog/app/r/tasks');
+  assert.equal(legacyRedirect(new Request('https://APP.Brain.Dog/D41', { headers: html }), '', DARK)?.headers.get('location'), 'https://app.brain.dog/app/D41');
+});
+
+test('ON THE PUBLIC HOST A DOOR, /app ITSELF AND ANYTHING THAT IS NOT A PAGE LOAD ARE NEVER MOVED', () => {
+  /* THE DOORS, asked as a page load on purpose: the Accept header is not what spares them. */
+  for (const path of ['/api/boot', '/mcp', '/in/x', '/in/webhook/rec_01J8ZC0000000000000000000A/bank/tok', '/auth/methods', '/account/records', '/.well-known/braindog-build'])
+    assert.equal(dark(path, { headers: html }), null, path);
+  /* `/app` IS WHERE THE REDIRECT LANDS, so moving it again would be a loop. */
+  for (const path of ['/app', '/app/', '/app/r/tasks', '/app/acme/r/tasks', '/app/_app/version.json'])
+    assert.equal(dark(path, { headers: html }), null, path);
+  /* NOT A PAGE LOAD: a fetch that does not ask for HTML, an old shell's `/_app/version.json` poll, and a write. A 308
+     there would hand a script a redirect it did not ask for, where the router's own 404 says what is true. */
+  assert.equal(dark('/r/tasks'), null);
+  assert.equal(dark('/_app/version.json', { headers: { accept: '*/*' } }), null);
+  assert.equal(dark('/r/tasks', { method: 'POST', headers: html, body: 'x' }), null);
 });
 
 /* ── bare /app ────────────────────────────────────────────────────────── */

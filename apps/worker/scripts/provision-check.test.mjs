@@ -31,25 +31,69 @@ import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { environmentOf, guardsKeylessRecords, plan, readBuild, readMethods, readProvision, wranglerConfig } from './provision-check.mjs';
+import { applyPush, environmentOf, guardsKeylessRecords, plan, pushes, readBuild, readMethods, readProvision, wranglerConfig } from './provision-check.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 test('the host a person names decides which environment, which bucket and which vars are read', () => {
   const config = wranglerConfig(root);
 
+  /* PUSH A OF THE ONE-DOMAIN MOVE (`loop/research-one-domain-cutover.md` §5): production is still
+     `app.brain.dog`, a Custom Domain, and that is the host the owner runs this against before he
+     provisions (the runbook's O3). */
   const production = environmentOf(config, 'app.brain.dog');
   assert.equal(production?.name, 'production');
   assert.equal(production?.bucket, 'braindog-blobs');
   assert.equal(production?.vars.PUBLIC_HOST, 'app.brain.dog');
+  assert.equal(environmentOf(config, 'https://app.brain.dog/')?.name, 'production');
 
   const alpha = environmentOf(config, 'app.alpha.brain.dog');
   assert.equal(alpha?.name, 'alpha');
   assert.equal(alpha?.bucket, 'braindog-blobs-alpha');
+  assert.equal(alpha?.vars.PUBLIC_HOST, 'app.alpha.brain.dog');
+
+  /* `brain.dog` IS THE SITE'S UNTIL A2 ROUTES IT, so in push A it is a host this file does not name,
+     and reading production's facts for it would describe a Worker that is not answering there. */
+  assert.equal(environmentOf(config, 'brain.dog'), null);
 
   /* A HOST THIS FILE DOES NOT NAME IS NOT A GUESS. A rehearsal host on `localhost` is a real thing
      to run this against, and pretending it is production would read production's bucket name. */
   assert.equal(environmentOf(config, 'localhost:8787'), null);
+});
+
+test('once the zone routes land the shared name is production too, by the pattern\'s host part', () => {
+  const staged = Object.fromEntries(pushes(root).map((p) => [p.name, p.config]));
+  for (const push of ['A2', 'B']) {
+    const config = staged[push];
+    /* THIS WORKER HOLDS `brain.dog` ONLY THROUGH ZONE ROUTES. Their patterns are `brain.dog/api/*` and
+       the like, so no pattern equals the host, and the exact comparison this function made before
+       wave thirty-nine answered `null` for production's own name. */
+    assert.equal(environmentOf(config, 'brain.dog')?.name, 'production', push);
+    assert.equal(environmentOf(config, 'brain.dog')?.bucket, 'braindog-blobs', push);
+    assert.equal(environmentOf(config, 'alpha.brain.dog')?.name, 'alpha', push);
+    /* THE OLD NAME IS STILL PRODUCTION. It stays a Custom Domain of this Worker for the doors handed
+       out on it, and a check run against it must read production's bucket and vars, not none. */
+    assert.equal(environmentOf(config, 'app.brain.dog')?.name, 'production', push);
+    /* A HOST THAT ONLY SHARES A PREFIX WITH A ROUTE IS NOT THAT ROUTE'S. Matching on the pattern's
+       host part must compare the whole label, or `brain.dog.evil` would read production's facts. */
+    assert.equal(environmentOf(config, 'brain.dog.evil'), null, push);
+  }
+  assert.equal(environmentOf(staged.A2, 'brain.dog')?.vars.PUBLIC_HOST, 'app.brain.dog');
+  assert.equal(environmentOf(staged.B, 'brain.dog')?.vars.PUBLIC_HOST, 'brain.dog');
+});
+
+test('a staged push that names an environment or a key the file does not have is refused, not ignored', () => {
+  const base = wranglerConfig(root);
+  /* A TYPO IN THE COMMENT WOULD OTHERWISE BE A PUSH THAT CHANGES NOTHING, and the test holding it
+     would go green on the file as it already is. */
+  assert.throws(() => applyPush(base, { staging: { vars: { PUBLIC_HOST: 'x' } } }), /env\.staging/);
+  assert.throws(() => applyPush(base, { production: { route: [] } }), /route/);
+  const moved = applyPush(base, { production: { vars: { PUBLIC_HOST: 'brain.dog' } } });
+  assert.equal(moved.env.production.vars.PUBLIC_HOST, 'brain.dog');
+  /* THE REST OF `vars` IS KEPT, which is what "vars unchanged" means in a fragment that names two. */
+  assert.equal(moved.env.production.vars.RP_ID, base.env.production.vars.RP_ID);
+  /* AND THE FILE'S OWN COPY IS UNTOUCHED. */
+  assert.equal(base.env.production.vars.PUBLIC_HOST, 'app.brain.dog');
 });
 
 test('the two 404s at /auth/provision are told apart by their sentence', () => {
@@ -65,6 +109,13 @@ test('the two 404s at /auth/provision are told apart by their sentence', () => {
   /* THE APP SHELL ANSWERING A POST IS THE FOURTH ANSWER, and it is the one that looks healthiest:
      a 200 with no JSON in it at all, which is `/auth/*` missing from `run_worker_first`. */
   assert.equal(readProvision(200, null).state, 'unreadable');
+
+  /* AND ON ONE SHARED HOSTNAME THERE IS A FIFTH: THE MARKETING SITE. With the zone route for `/auth/*`
+     missing, the site answers a POST there with its own 404 page, HTML and no JSON. Before this case
+     the sentence printed for it blamed `run_worker_first`, which is the right file and the wrong key. */
+  const site = readProvision(404, null);
+  assert.equal(site.state, 'unreadable');
+  assert.match(site.next, /zone route/);
 
   for (const reading of [noKey, noRoute, ready]) assert.ok(reading.next.length > 0, 'every reading says what to do next');
 });

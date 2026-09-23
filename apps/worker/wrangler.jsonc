@@ -25,6 +25,81 @@
      comment blocks at `migrations` and at `env`.
      =========================================================================================== */
 
+  /* ===========================================================================================
+     THE MOVE TO ONE DOMAIN GOES OUT IN THREE PUSHES, AND THIS FILE IS THE FIRST OF THEM.
+     `loop/research-one-domain-cutover.md` section 5 is the runbook; this block is the part of it
+     that is config, kept here so it is parsed and tested rather than remembered.
+
+     PUSH A, THIS FILE: the app under `/app` on `app.brain.dog` and `app.alpha.brain.dog`, still
+     Custom Domains, with no zone route, `LEGACY_HOSTS` empty and `RP_ID` already the parent. A page
+     load outside `/app` on the public host is a 308 to `/app` on the same name (`legacyRedirect` in
+     `src/route.ts`); without it the survey measured `/`, `/signin` and `/r/tasks` answering a JSON
+     `ROUTE_UNKNOWN` 404, because the build has no root `index.html` any more.
+
+     PUSH A2: the zone routes below, and nothing else. It is its own push for two measured reasons.
+     `wrangler deploy` uploads the version, which is live at once, and only then writes the routes
+     (run `35786512090`: "Uploaded", then "Deployed ... triggers"). And the deploy token may not hold
+     Zone > Workers Routes > Edit on `brain.dog`, which only the owner can grant: every deploy so far
+     re-asserted an existing Custom Domain, which needs no more than Editor. So the one push that
+     needs the permission changes nothing else, and if its route write fails the Worker left serving
+     is A's, whole and on its old name.
+
+     PUSH B: the two vars that move people, and no route, so an Editor token is enough. Set the
+     repository variable `DEPLOY_HOST` to `brain.dog` after A2 is green and before B is pushed; with
+     A2's routes live the Parity step's three paths answer the same on both names. Alpha keeps
+     `app.alpha.brain.dog` as a legacy host in B rather than dropping it, because dropping a Custom
+     Domain is a route change too and B must make none; it goes with production's old name later.
+
+     THE ZONE ROUTES WIN ON THE SHARED NAME, AND THAT IS DOCUMENTED RATHER THAN HOPED. "Routes can
+     `fetch()` Custom Domains and take precedence if configured on the same hostname"
+     (developers.cloudflare.com/workers/configuration/routing/routes, read 23 September), so
+     `brain.dog/api/boot` reaches this Worker and `brain.dog/pricing`, which no route names, reaches
+     the site. BUILT DOORS ONLY: `/a`, `/s` and `/ws` are in `run_worker_first` and unbuilt, and are
+     left to the site's 404 page. A route pattern takes a star only at the end of the path, so
+     `/app/*` carries `/app/<slug>/api/...`. A zone route needs `zone_name` or `zone_id`.
+
+     THE FORMAT. Each `STAGE <name>` below is JSON applied on top of the push before it: a `routes`
+     list replaces the environment's list, and `vars` sets the keys it names and keeps the rest.
+     `pushes` in `scripts/provision-check.mjs` reads them, `test/wrangler-routes.test.ts` holds each
+     push to the same route checks as the file, and `scripts/smoke.test.mjs` pins what the smoke
+     step asks after each. To make a push, copy its fragment into the environment blocks below and
+     delete it here.
+
+     STAGE A2 {
+       "production": {
+         "routes": [
+           { "pattern": "app.brain.dog", "custom_domain": true },
+           { "pattern": "brain.dog/app", "zone_name": "brain.dog" },
+           { "pattern": "brain.dog/app/*", "zone_name": "brain.dog" },
+           { "pattern": "brain.dog/api/*", "zone_name": "brain.dog" },
+           { "pattern": "brain.dog/mcp", "zone_name": "brain.dog" },
+           { "pattern": "brain.dog/in/*", "zone_name": "brain.dog" },
+           { "pattern": "brain.dog/auth/*", "zone_name": "brain.dog" },
+           { "pattern": "brain.dog/account/*", "zone_name": "brain.dog" },
+           { "pattern": "brain.dog/.well-known/braindog-build", "zone_name": "brain.dog" }
+         ]
+       },
+       "alpha": {
+         "routes": [
+           { "pattern": "app.alpha.brain.dog", "custom_domain": true },
+           { "pattern": "alpha.brain.dog/app", "zone_name": "brain.dog" },
+           { "pattern": "alpha.brain.dog/app/*", "zone_name": "brain.dog" },
+           { "pattern": "alpha.brain.dog/api/*", "zone_name": "brain.dog" },
+           { "pattern": "alpha.brain.dog/mcp", "zone_name": "brain.dog" },
+           { "pattern": "alpha.brain.dog/in/*", "zone_name": "brain.dog" },
+           { "pattern": "alpha.brain.dog/auth/*", "zone_name": "brain.dog" },
+           { "pattern": "alpha.brain.dog/account/*", "zone_name": "brain.dog" },
+           { "pattern": "alpha.brain.dog/.well-known/braindog-build", "zone_name": "brain.dog" }
+         ]
+       }
+     }
+
+     STAGE B {
+       "production": { "vars": { "PUBLIC_HOST": "brain.dog", "LEGACY_HOSTS": "app.brain.dog" } },
+       "alpha": { "vars": { "PUBLIC_HOST": "alpha.brain.dog", "LEGACY_HOSTS": "app.alpha.brain.dog" } }
+     }
+     =========================================================================================== */
+
   "name": "braindog",
   "main": "src/index.ts",
 
@@ -73,12 +148,27 @@
      has it and `braindog verify` reads `/.well-known/braindog-key` offline (03 §4); the SPA shell
      answering there would break verification of every backup.
 
-     `single-page-application` is what makes `/r/obligations` and `/D41` resolve in the browser
-     with no path list on either host (19 §5, 50 §13 D1). */
+     THE APP IS UNDER `/app` NOW, AND THE WORKER RUNS FIRST THERE (`loop/research-one-domain.md`
+     section 2.2). The app shares `brain.dog` with the marketing site, and `/app/<slug>/...` names the
+     record in the path, which the Worker has to check against the Directory before any id is used, so
+     no file lookup may answer an app navigation before the Worker has seen it. Two negatives take
+     precedence over `/app/*` ("Negative patterns have precedence over non-negative patterns",
+     developers.cloudflare.com/workers/static-assets/binding): `_app` is the build's hashed chunks,
+     and `catalogue` is the bundled catalogue, which `test/bundled-catalogue.test.ts` holds to being
+     answered by the file and never by the Worker. Brief B of that design builds the app under `app/`
+     inside `directory`, so the path and the folder agree and `directory` itself does not move.
+
+     `not_found_handling` IS `none`, AND IT WAS `single-page-application`. That fallback answered
+     every miss with `index.html` and a 200, which on one shared hostname would draw the app shell
+     for a POST under `/app/<slug>/api/` the router has no method for. With `none` a miss reaches the
+     Worker's code, which developers.cloudflare.com/workers/static-assets/routing/worker-script states
+     for a Worker with a script: when no asset is found, the Worker is invoked. The Worker
+     draws the shell for an app navigation itself. `/r/obligations` on the legacy host is also a
+     miss, which is what lets the Worker answer it with the 308 to `brain.dog/app/r/obligations`. */
   "assets": {
     "directory": "../web/build",
     "binding": "ASSETS",
-    "not_found_handling": "single-page-application",
+    "not_found_handling": "none",
     "run_worker_first": [
       "/api/*",
       "/mcp",
@@ -90,7 +180,11 @@
       "/ws/*",
       "/auth/*",
       "/account/*",
-      "/.well-known/*"
+      "/.well-known/*",
+      "/app",
+      "/app/*",
+      "!/app/_app/*",
+      "!/app/catalogue/*"
     ]
   },
 
@@ -180,9 +274,10 @@
 
      `routes` IS INHERITABLE, WHICH IS THE OTHER HALF OF THE SAME TRAP AND THE MORE DANGEROUS ONE.
      A `routes` key at the top level of this file would be inherited by `env.alpha`, and
-     `wrangler deploy --env alpha` would then claim `app.brain.dog`. Two Workers cannot hold one
-     Custom Domain, so the likeliest outcome is a failed deploy — but the outcome that is not
-     ruled out is alpha answering production's hostname. There is deliberately no top-level
+     `wrangler deploy --env alpha` would then claim `app.brain.dog` and production's routes on
+     `brain.dog`. Two Workers cannot hold one Custom Domain, so the likeliest outcome is a failed
+     deploy, but the outcome that is not ruled out is alpha answering production's hostname, and
+     on the shared name that would be alpha answering `brain.dog/api/*`. There is deliberately no top-level
      `routes` key above. Routes are declared here and only here.
 
      AND THERE IS NO NAMELESS DEPLOY. Because every binding lives inside an environment, a bare
@@ -198,25 +293,17 @@
        the script and these are two scripts.
        ----------------------------------------------------------------------------------------- */
     "alpha": {
-      /* TWO LABELS DEEP, AND THE ARGUMENT AGAINST IT WAS TRUE AND IS NOT ANY MORE.
-         This said: "one label deep, and that is a TLS constraint rather than a preference.
-         Universal SSL on a full-setup zone covers the apex and first-level subdomains only, so
-         `app.alpha.brain.dog` has no certificate without Advanced Certificate Manager or Total
-         TLS." Correct about Universal SSL, and wrong about this zone: `brain.dog` already carries
-         two ACTIVE advanced certificates, one for `*.app.brain.dog` and one for
-         `*.alpha.brain.dog`, both managed and both renewing. Checked in the dashboard rather than
-         assumed, because the comment it replaces was also written from a general rule.
+      /* PUSH A: ALPHA STAYS ON `app.alpha.brain.dog`, ITS OWN CUSTOM DOMAIN, WITH NO ZONE ROUTE. It is
+         production's push-A shape on alpha's names, and the zone routes that give it `alpha.brain.dog`
+         beside the alpha site are `STAGE A2` at the top of this file; `test/wrangler-routes.test.ts`
+         holds the two environments to the same paths in every push. Alpha deploys from `deploy.yml`
+         only when `DEPLOY_ALPHA` is set, but a Workers Builds connection may deploy it on any push to
+         master (the cut-over's O4), which is one more reason this block asks for no new permission.
 
-         So the naming is a naming decision again, and the decision is the obvious one: the
-         environment is a label and the surface is a label in front of it.
-
-           brain.dog              app.brain.dog              mcp.brain.dog
-           alpha.brain.dog        app.alpha.brain.dog        mcp.alpha.brain.dog
-
-         The apex and `alpha.brain.dog` are the marketing site; `app.*` is this Worker. `mcp.*` is
-         reserved and deliberately not claimed here: the MCP transport is not built, and pointing
-         that hostname at this script would answer an MCP address with the app's shell, which is the
-         shape of lie this repository spends most of its comments hunting. */
+         TWO LABELS DEEP HAS A CERTIFICATE. Universal SSL covers the apex and first-level names only;
+         `brain.dog` carries an active advanced certificate for `*.alpha.brain.dog`, checked in the
+         dashboard. Once the old name is dropped after B, that certificate covers no live name, and
+         whether to delete it is the owner's call. */
       "routes": [{ "pattern": "app.alpha.brain.dog", "custom_domain": true }],
 
       /* ALPHA'S SHELL IS ITS OWN BUILD, `BRAINDOG_ENV=alpha` into `build-alpha`, so its accent differs
@@ -226,7 +313,7 @@
       "assets": {
         "directory": "../web/build-alpha",
         "binding": "ASSETS",
-        "not_found_handling": "single-page-application",
+        "not_found_handling": "none",
         "run_worker_first": [
           "/api/*",
           "/mcp",
@@ -238,7 +325,11 @@
           "/ws/*",
           "/auth/*",
           "/account/*",
-          "/.well-known/*"
+          "/.well-known/*",
+          "/app",
+          "/app/*",
+          "!/app/_app/*",
+          "!/app/catalogue/*"
         ]
       },
 
@@ -262,6 +353,12 @@
          is an amendment, and REPORT.md §8 names why `/api/version` cannot answer without it. */
       "vars": {
         "PUBLIC_HOST": "app.alpha.brain.dog",
+        /* NO OLD NAME UNTIL B, and declared empty rather than left out: `vars` is not inheritable, and the
+           key existing in both blocks is what lets the Worker read one shape. */
+        "LEGACY_HOSTS": "",
+        /* THE PASSKEY'S RELYING PARTY, the parent of the host from the first deploy, so a passkey made on
+           `app.alpha.brain.dog` is offered on `alpha.brain.dog` after B. Production's comment says why. */
+        "RP_ID": "alpha.brain.dog",
         "AI_GATEWAY": "braindog-alpha",
         "AGE_RECIPIENT": "age1f6rykmshc4zf5y3lf0ecuyzyqr8a4ek29wlmp688gydyxckwjq3s75n58r",
         "SPARK_ENDPOINT": "",
@@ -388,17 +485,48 @@
        one thing to settle before the first run of `deploy.yml`.
        ----------------------------------------------------------------------------------------- */
     "production": {
-      /* THE RECORD IS ON `app.brain.dog` AND THE APEX IS THE MARKETING SITE. 51 §4.6 puts the
-         Worker on `brain.dog` with `PUBLIC_HOST: "brain.dog"`, which cannot hold: `apps/site`
-         serves `/`, `/pricing` and `/changelog` from the same apex (14 §4), and the Worker's
-         `single-page-application` fallback answers every unmatched path with the app shell — so
-         `brain.dog/pricing` would resolve as a spoken id and draw "no such entry". One apex, one
-         owner. REPORT.md §1 sets out the split and the sentences it costs (19 §5's `brain.dog/D41`
-         becomes `app.brain.dog/D41`); amend 51 §4.6 and 19 §5. */
+      /* PUSH A: THE APP IS UNDER `/app` ON `app.brain.dog`, STILL THIS WORKER'S CUSTOM DOMAIN, AND
+         `brain.dog` IS STILL ONLY THE SITE'S. The owner asked on 22 September for the app to leave
+         `app.brain.dog`, and `loop/research-one-domain.md` section 2.2 splits `brain.dog` between two
+         Workers: the site keeps it as its Custom Domain, unchanged, and this Worker takes only the paths
+         it answers, as zone routes. Those routes are `STAGE A2` at the top of this file, with the
+         argument for their shape and for why they are a push of their own.
+
+         A CUSTOM DOMAIN CARRIES EVERY PATH ("Other parts (path, query parameters) of the URL are not
+         considered", developers.cloudflare.com/workers/configuration/routing/custom-domains), so on
+         push A `app.brain.dog/app/...` is the app, `/api/*`, `/mcp` and `/in/*` are where they always
+         were, and a page load anywhere else is the Worker's 308 into `/app` on the same name.
+
+         AFTER B, `app.brain.dog` STAYS A CUSTOM DOMAIN OF THIS WORKER as the legacy host: a browser
+         navigation is a 308 to `https://brain.dog/app<path>`, and `/api/*`, `/mcp` and `/in/*` are
+         served and never redirected, because the CLI refuses redirects, a webhook sender does not
+         follow one, and a 301 or 302 turns a POST into a GET. It stays for at least the 90 days a token
+         lives and until every `/in/` address handed out on it is re-minted. */
       "routes": [{ "pattern": "app.brain.dog", "custom_domain": true }],
 
       "vars": {
+        /* THE CSRF ORIGIN, THE MAGIC LINK'S ORIGIN AND THE DEVICE FLOW'S HOST, ALL AT ONCE, and still
+           `app.brain.dog` until push B changes it to `brain.dog`. That change is the one that makes
+           everybody sign in once more: every cookie-authenticated write must then carry
+           `Origin: https://brain.dog`, so a session cookie minted on `app.brain.dog` is useless there by
+           construction. That is the `__Host-` cookie doing its job. */
         "PUBLIC_HOST": "app.brain.dog",
+        /* THE NAMES THIS WORKER STILL ANSWERS AND NO LONGER LIVES ON, separated by commas: none until B,
+           which lists `app.brain.dog`. Each one must also be a Custom Domain in `routes` above, or
+           nothing reaches the Worker to redirect. */
+        "LEGACY_HOSTS": "",
+        /* THE PASSKEY'S RELYING PARTY IS THE PARENT FROM PUSH A ON, AND THE REASON IT IS NOT SIMPLY
+           `PUBLIC_HOST`. A passkey is offered only where its RP ID is the host or a registrable suffix
+           of it, so one made under RP ID `app.brain.dog` would never be offered on `brain.dog` after B;
+           made under `brain.dog` it works on both. Sign-in links are on in production (`/auth/methods`
+           answered `magic:true` on 23 September, which the comment here used to deny), so a stranded
+           passkey is recoverable by mail, but it is still the owner's first passkey thrown away. This
+           value must not change between pushes: a rollback to a version without it strands every
+           passkey made since (the cut-over's section 6). `relyingParty` in `packages/host/src/auth.ts`
+           switches passkeys off for an RP ID that is neither the host nor a dot-suffix of it, so
+           `rain.dog` here would be a refusal an operator can read rather than a ceremony that fails in
+           the browser (section 3.0 of the design). */
+        "RP_ID": "brain.dog",
         "AI_GATEWAY": "braindog",
         "AGE_RECIPIENT": "age1av0654ll7t2ghrzr7ekervs5hjc9sm0he0569z45cvu92dd43aqql9gm3t",
         "SPARK_ENDPOINT": "",

@@ -1,7 +1,7 @@
 /**
  * `provision-check`: is this host ready to be provisioned, and what is missing.
  *
- *   node apps/worker/scripts/provision-check.mjs app.brain.dog
+ *   node apps/worker/scripts/provision-check.mjs app.brain.dog     (brain.dog once push B of the one-domain move is live)
  *   node apps/worker/scripts/provision-check.mjs http://localhost:8787 --no-account
  *
  * THIS IS THE REHEARSAL IN `loop/research-provision-day.md` TURNED INTO A COMMAND. That document
@@ -82,9 +82,67 @@ export function stripJsonc(text) {
   return out;
 }
 
+const wranglerText = (root) => readFileSync(join(root, 'apps', 'worker', 'wrangler.jsonc'), 'utf8');
+
 /** `apps/worker/wrangler.jsonc`, parsed. It is the only place the bucket names and the vars live. */
 export function wranglerConfig(root = ROOT) {
-  return JSON.parse(stripJsonc(readFileSync(join(root, 'apps', 'worker', 'wrangler.jsonc'), 'utf8')));
+  return JSON.parse(stripJsonc(wranglerText(root)));
+}
+
+/**
+ * One staged push applied to a config: `routes` replaces the environment's list, and `vars` sets the keys it names and
+ * keeps the rest. A copy; the config handed in is not touched.
+ *
+ * ANYTHING ELSE IS REFUSED, NOT IGNORED. A fragment naming `env.staging`, or `route` for `routes`, would otherwise be a
+ * push that changes nothing, and every test that reads it would go green on the file as it already is.
+ */
+export function applyPush(config, change) {
+  const next = structuredClone(config);
+  for (const [name, block] of Object.entries(change)) {
+    const target = next.env?.[name];
+    if (!target) throw new Error(`a staged push names env.${name}, which apps/worker/wrangler.jsonc does not have`);
+    for (const key of Object.keys(block)) {
+      if (key === 'routes') target.routes = structuredClone(block.routes);
+      else if (key === 'vars') target.vars = { ...(target.vars ?? {}), ...block.vars };
+      else throw new Error(`a staged push for env.${name} changes ${key}, and a push here changes only routes and vars`);
+    }
+  }
+  return next;
+}
+
+/**
+ * The one-domain move as the pushes it goes out in: `A`, the file as it deploys, then each `STAGE <name> {...}` fragment
+ * in the file's opening comment applied on top of the one before (`loop/research-one-domain-cutover.md` §5).
+ *
+ * THE FLIP IS KEPT AS DATA IN THE FILE IT CHANGES, AND READ BY THE SAME SCANNER. Left in a note it would be a config
+ * nobody had parsed; here `test/wrangler-routes.test.ts` holds every push to the same route checks as the file, and
+ * `smoke.test.mjs` knows what the smoke step will ask after each one. The fragment is found by its marker and read to
+ * its closing brace with strings respected, because a pattern such as `brain.dog/app/*` sits inside it.
+ */
+export function pushes(root = ROOT) {
+  const text = wranglerText(root);
+  const base = JSON.parse(stripJsonc(text));
+  const out = [{ name: 'A', config: base, change: null }];
+  const marker = /\bSTAGE ([A-Z][A-Z0-9]*) (?=\{)/g;
+  for (let m = marker.exec(text); m !== null; m = marker.exec(text)) {
+    const open = m.index + m[0].length;
+    let depth = 0;
+    let inString = false;
+    let close = -1;
+    for (let i = open; i < text.length && close === -1; i += 1) {
+      const c = text[i];
+      if (inString) {
+        if (c === '\\') i += 1;
+        else if (c === '"') inString = false;
+      } else if (c === '"') inString = true;
+      else if (c === '{') depth += 1;
+      else if (c === '}' && (depth -= 1) === 0) close = i;
+    }
+    if (close === -1) throw new Error(`STAGE ${m[1]} in apps/worker/wrangler.jsonc never closes its brace`);
+    const change = JSON.parse(text.slice(open, close + 1));
+    out.push({ name: m[1], config: applyPush(out[out.length - 1].config, change), change });
+  }
+  return out;
 }
 
 /**
@@ -94,12 +152,19 @@ export function wranglerConfig(root = ROOT) {
  * `localhost` is a real thing to point this at, and guessing production for it would read production's
  * bucket name and production's vars and report them as that host's. The probes below work on any
  * host; only the account questions need to know which environment it is.
+ *
+ * THE PATTERN'S HOST PART, NOT THE WHOLE PATTERN. From push A2 of the one-domain move on, production
+ * holds `brain.dog` through zone routes (`brain.dog/api/*` and seven more), because the marketing site
+ * holds the name as its Custom Domain, so no pattern equals `brain.dog` and an exact comparison
+ * answered `null` for production's own name. The part before the first `/` is compared whole, so
+ * `brain.dog.evil` is not production either. `app.brain.dog` is a Custom Domain in every push and
+ * reads as production in every push, which it is. In push A, `brain.dog` is not named and reads `null`.
  */
 export function environmentOf(config, host) {
   const name = String(host).replace(/^[a-z]+:\/\//i, '').split('/')[0].split(':')[0].toLowerCase();
   for (const [env, block] of Object.entries(config.env ?? {})) {
     const routes = block.routes ?? [];
-    if (routes.some((r) => String(r.pattern ?? '').toLowerCase() === name))
+    if (routes.some((r) => String(r.pattern ?? '').split('/')[0].toLowerCase() === name))
       return { name: env, bucket: block.r2_buckets?.[0]?.bucket_name ?? null, vars: block.vars ?? {} };
   }
   return null;
@@ -288,6 +353,15 @@ export function readProvision(status, body) {
       says: fix,
       next: 'This host has no /auth/provision at all, which is a build older than the route rather than a missing secret. Deploy before anything else.',
     };
+  /* A 404 WITH NO JSON IS THE MARKETING SITE. On `brain.dog` two Workers share the name and the site
+     answers every path no zone route claims, with its own 404 page. Before this branch that answer
+     fell to the sentence below, which blames `run_worker_first` when the missing line is a route. */
+  if (status === 404 && body === null)
+    return {
+      state: 'unreadable',
+      says: fix,
+      next: 'A 404 page with no JSON is the marketing site answering, so the zone route for /auth/* on this host is missing from the deployed Worker. Deploy the routes in apps/worker/wrangler.jsonc, then ask again.',
+    };
   return {
     state: 'unreadable',
     says: fix,
@@ -464,7 +538,9 @@ export default async function provisionCheck(named, { account = true, root = ROO
   }
   const { tuple, sha } = readBuild(build.body?.app);
   console.log(`  build        ${tuple ?? 'null, which is a deploy that was never told which build it is'}`);
-  if (build.status !== 200) console.log(`    the build route answered ${build.status}, which is a version older than the route itself`);
+  if (build.status !== 200 && build.body === null && env && host === env.vars.PUBLIC_HOST)
+    console.log(`    the build route answered ${build.status} with no JSON, which on ${host} is the marketing site: the zone route for /.well-known/braindog-build is not deployed`);
+  else if (build.status !== 200) console.log(`    the build route answered ${build.status}, which is a version older than the route itself`);
 
   const guard = guardsKeylessRecords(sha, root);
   if (guard === 'yes') {

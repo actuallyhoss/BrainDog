@@ -39,6 +39,11 @@
  * AND AFTERWARDS, THE CHECK THAT SWITCHES THE DEMO: `curl -s https://app.brain.dog/api/boot` with no
  * Authorization header answers `"ok":true`. From that deploy on, the sample fallback in
  * `apps/web/src/lib/data/record.ts` is dead code and is deleted, which its own comment says.
+ *
+ * `app.brain.dog` IN BOTH COMMANDS, BECAUSE IT ANSWERS `/api/*` IN EVERY PUSH OF THE ONE-DOMAIN MOVE.
+ * It is the Worker's Custom Domain before the move and its legacy host after, where `/api/*` is served
+ * and never redirected; `brain.dog/api/*` answers only once push A2's zone routes are live, and before
+ * that it is the marketing site's 404 page (`apps/worker/wrangler.jsonc`, the comment at the top).
  */
 
 import { env, exit } from 'node:process';

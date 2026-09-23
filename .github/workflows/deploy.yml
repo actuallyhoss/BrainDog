@@ -124,6 +124,16 @@ jobs:
       # host serves the previous version's assets; 51 §5.17 records three occasions. No
       # `--allow-skip` here: this is the one job where the gate skipping means the deploy went
       # unchecked, so a missing `DEPLOY_HOST` has to be red rather than quiet.
+      #
+      # `DEPLOY_HOST` IS A REPOSITORY VARIABLE, AND IT STAYS `app.brain.dog` THROUGH PUSHES A AND A2
+      # OF THE ONE-DOMAIN MOVE (`loop/research-one-domain-cutover.md` section 5, and the comment at the
+      # top of `apps/worker/wrangler.jsonc`). The gate asks `/app/`, `/app/_app/version.json` and the
+      # build id, and on that name none of the three is redirected in either push. It becomes
+      # `brain.dog` after A2 is green and before B is pushed, when both names answer the three the
+      # same way. Set before A2's routes exist, every deploy goes red here against the site's 404;
+      # set after B's job starts, B goes red here with the flip already live. After B the old value
+      # turns red too, because `app.brain.dog/app/` is then a 308 and this asks with
+      # `redirect: 'manual'`.
       - name: Parity
         run: pnpm gates -- --only deploy-parity
         env:
@@ -131,8 +141,10 @@ jobs:
 
       # AND THE MARKETING SITE, WHICH NOTHING HERE HAS EVER DEPLOYED. `apps/site` is the one surface
       # that is not a property of the Worker version: `apps/worker/wrangler.jsonc` carries
-      # `apps/web/build` into the Worker, so `app.brain.dog` ships with the code, while `brain.dog`
-      # and `alpha.brain.dog` are a separate static deployment with their own file. Until this step
+      # `apps/web/build` into the Worker, so the app under `/app` ships with the code, while
+      # `brain.dog` and `alpha.brain.dog` are a separate static deployment with their own file. From
+      # push A2 of the one-domain move the two share a hostname: the site holds it as a Custom Domain
+      # and the Worker's zone routes take the paths it answers, which Cloudflare runs first. Until this step
       # existed that deployment was only ever made by hand, which is why on the day it was written
       # the apex was serving a build an hour older than the app and nobody had been told.
       #
@@ -154,6 +166,22 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+
+      # AND THEN ASK WHICH WORKER ANSWERED EACH PATH, BECAUSE TWO SHARE `brain.dog` ONCE A2 LANDS.
+      # Parity above proves the Worker's bytes landed on one name; it does not prove its zone routes
+      # did, and a route that did not land looks like the site's 404 page answering `/api/boot`, a
+      # healthy response from the wrong Worker. `apps/worker/scripts/smoke.mjs` reads the names from
+      # `wrangler.jsonc` rather than from `DEPLOY_HOST`, so it asks the names the deploy claimed, and
+      # what it asks follows the push. Push A: four questions on `app.brain.dog`, the shell at `/app/`,
+      # a 401 at `/api/boot`, a 308 from `/r/x` to `/app/r/x` on the same name, and a POST to an `/in/`
+      # door that is served rather than redirected; `brain.dog` is not asked, because nothing of this
+      # Worker's is on it yet. Push A2 adds `brain.dog`'s `/pricing`, `/app/` and `/api/boot`. Push B
+      # is the design's five (`loop/research-one-domain.md` section 3.5).
+      #
+      # AFTER THE SITE, because `/pricing` is the site's answer and asking it before the site deploys
+      # measures the previous site. It writes nothing and sends no credential.
+      - name: Smoke
+        run: node apps/worker/scripts/smoke.mjs production
 
       # ALPHA, LAST, AND OFF UNTIL THE OWNER SETS `DEPLOY_ALPHA` TO `true`. Its own build in alpha's
       # palette (`build-alpha`), after every production step, and `continue-on-error` so an alpha
@@ -187,3 +215,9 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+
+      # THE SAME QUESTIONS ON ALPHA'S NAMES, read from its own block in `wrangler.jsonc`.
+      - name: Smoke alpha
+        if: vars.DEPLOY_ALPHA == 'true'
+        continue-on-error: true
+        run: node apps/worker/scripts/smoke.mjs alpha

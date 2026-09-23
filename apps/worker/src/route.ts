@@ -183,18 +183,33 @@ export function atRoot(request: Request, rest: string): Request {
  * needed to send somebody on. A path already under `/app` is not prefixed twice. The fragment of an already-mailed
  * `…/signin#magic=` survives, because a browser keeps it across a redirect whose `Location` has none. 308 and not 301,
  * because a HEAD stays a HEAD and nothing caches a guess about it.
+ *
+ * AND THE PUBLIC HOST ITSELF, FOR A BROWSER'S PAGE LOAD OUTSIDE `/app`: a 308 to `/app<path>` on the same name, which is
+ * the design's §3.7 promise that "legacy bare paths redirect within the same host" and was not built. It is what makes
+ * the dark deploy dark (`loop/research-one-domain-cutover.md` §2.2). With the app built under `build/app` and the Worker
+ * still on `app.brain.dog`, `/`, `/signin` and `/r/tasks` there were measured answering a JSON `ROUTE_UNKNOWN` 404: the
+ * site's "Open the app" and every magic link already mailed would have landed on it. After the flip this branch does
+ * not fire, because the zone routes on `brain.dog` deliver only the doors and `/app`, and the site answers the rest.
+ *
+ * ONLY WHEN THE BROWSER ASKS FOR HTML, which the old host does not require. A navigation always says `text/html`; an old
+ * shell's poll of `/_app/version.json`, a favicon and a script's GET do not, and for those the router's own 404 is the
+ * true answer where a redirect into the app would be a page handed to something that cannot draw one.
  */
 export function legacyRedirect(request: Request, legacy: string | undefined, publicHost: string | undefined): Response | null {
   const home = (publicHost ?? '').trim().toLowerCase();
   if (home === '' || (request.method !== 'GET' && request.method !== 'HEAD')) return null;
   const url = new URL(request.url);
   const host = url.host.toLowerCase();
-  if (host === home) return null;
-  const hosts = (legacy ?? '').split(',').map((h) => h.trim().toLowerCase()).filter((h) => h !== '');
-  if (!hosts.includes(host)) return null;
   const path = url.pathname;
   if (servesApi(path) || servesMcp(path) || servesIn(path) || servesAuth(path) || servesAccount(path) || servesBuild(path)) return null;
-  const under = /^\/+app(?:\/|$)/.test(path) ? path : `/app${path}`;
+  const inApp = /^\/+app(?:\/|$)/.test(path);
+  if (host === home) {
+    if (inApp || !/text\/html/i.test(request.headers.get('accept') ?? '')) return null;
+    return new Response(null, { status: 308, headers: { location: `https://${home}/app${path}${url.search}`, 'cache-control': 'no-store' } });
+  }
+  const hosts = (legacy ?? '').split(',').map((h) => h.trim().toLowerCase()).filter((h) => h !== '');
+  if (!hosts.includes(host)) return null;
+  const under = inApp ? path : `/app${path}`;
   return new Response(null, { status: 308, headers: { location: `https://${home}${under}${url.search}`, 'cache-control': 'no-store' } });
 }
 
