@@ -180,26 +180,82 @@ export async function afterRestore(
   by: string,
   o: { reset: () => Promise<boolean>; restored: (args: Restored) => Promise<Result<unknown>> },
 ): Promise<Response> {
-  const said = (await out
-    .clone()
-    .json()
-    .catch(() => null)) as Result<{ bookmark?: unknown; kept?: unknown }> | null;
-  const bookmark = out.status === 200 && said?.ok === true && typeof said.value.bookmark === 'string' ? said.value.bookmark : null;
+  const args = await restoredOf(out, by);
   let reset = true;
   try {
     reset = await o.reset();
   } catch {
     /* The object ended, which is what was asked of it. */
   }
-  if (!reset || bookmark === null || said?.ok !== true) return out;
-  const kept = typeof said.value.kept === 'string' ? said.value.kept : null;
-  try {
-    const wrote = await o.restored({ bookmark, kept, by });
-    if (!wrote.ok) console.error(`restore: the record is back at ${bookmark} and restore.pitr was refused: ${fixOf(wrote)}`);
-  } catch (e) {
-    console.error(`restore: the record is back at ${bookmark} and restore.pitr was not written: ${e instanceof Error ? e.message : String(e)}`);
-  }
+  if (reset && args !== null) await written(args, o.restored);
   return out;
+}
+
+/**
+ * What a restore's answer says was restored, as `restored` takes it, or `null` for an answer that restored nothing.
+ *
+ * READ BY BOTH ENDS, AND THAT IS WHY IT IS ONE FUNCTION. The Worker reads it off the answer it is about to hand back, and
+ * `Record$` reads it off the same answer as it leaves, for the case where the Worker never gets as far as the second call
+ * (`recoverRestore` below). Two readers of one body that disagreed would write two different events for one restore.
+ */
+export async function restoredOf(out: Response, by: string): Promise<Restored | null> {
+  const said = (await out
+    .clone()
+    .json()
+    .catch(() => null)) as Result<{ bookmark?: unknown; kept?: unknown }> | null;
+  if (out.status !== 200 || said?.ok !== true || typeof said.value.bookmark !== 'string') return null;
+  return { bookmark: said.value.bookmark, kept: typeof said.value.kept === 'string' ? said.value.kept : null, by };
+}
+
+/** `restore.pitr` on the object that came back, and a line in the tail when it could not be written. */
+async function written(args: Restored, restored: (args: Restored) => Promise<Result<unknown>>): Promise<void> {
+  try {
+    const wrote = await restored(args);
+    if (!wrote.ok) console.error(`restore: the record is back at ${args.bookmark} and restore.pitr was refused: ${fixOf(wrote)}`);
+  } catch (e) {
+    console.error(`restore: the record is back at ${args.bookmark} and restore.pitr was not written: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+/**
+ * What an armed object says when its restore has answered and nobody reset it: what that restore restored, or `null`
+ * when it restored nothing but is still set to go back (a restore called off after it was armed).
+ */
+export type Stranded = { restored: Restored | null };
+
+/**
+ * `51 D15`'s second half, run by whichever request next finds the record armed, when the one that asked for the restore
+ * never ran it. `true` when the object was reset, so the caller can ask the object that came back.
+ *
+ * WHY THE WORKER WAS NOT ENOUGH. `afterRestore` runs in the invocation that forwarded the restore, after the record has
+ * answered, and nothing else ever ran it. Measured in `test/restore-armed.test.ts` with that continuation dropped: the
+ * object stayed armed, every door answered 500 for as long as it lived, and `restore.pitr` was never written, because
+ * the eviction that finally rewound it is not followed by any call. A browser leaving the page mid-restore, a CPU limit
+ * or a deploy is enough to drop it, and a restore is the request most likely to be slow.
+ *
+ * `stranded` IS ASKED FIRST, AND IT SAYS NO WHILE A RESTORE IS STILL RUNNING. Between the arm and the answer the object
+ * is armed on purpose, `copies.ts` is putting its receipt, and a reset there would fail the restore that is running. The
+ * object counts its restores in flight and answers `null` until the last one has answered.
+ *
+ * ONE RESET WRITES THE EVENT, EVEN WHEN TWO RACE. The Worker's own `afterRestore` and a request that arrived between its
+ * two calls can both find the object armed. Only one `reopen` ends it; the other reaches the object that came back,
+ * which is armed with nothing and answers `false`, and a `false` writes nothing, here and in `afterRestore` alike.
+ */
+export async function recoverRestore(o: {
+  stranded: () => Promise<Stranded | null>;
+  reset: () => Promise<boolean>;
+  restored: (args: Restored) => Promise<Result<unknown>>;
+}): Promise<boolean> {
+  const left = await o.stranded();
+  if (left === null) return false;
+  let reset = true;
+  try {
+    reset = await o.reset();
+  } catch {
+    /* The object ended, which is what was asked of it. */
+  }
+  if (reset && left.restored !== null) await written(left.restored, o.restored);
+  return true;
 }
 
 /**

@@ -47,7 +47,7 @@ import { directoryCopies } from './directory-copy.ts';
 import { delivers, leasedOpener, leasedTarget, makeDeliver, type Mail } from './deliver.ts';
 import { fetchPush, pushKeyOf, servesPushKey, vapidKeys } from './vapid.ts';
 import { consume, pump } from './pump.ts';
-import { afterRestore, appPath, asPage, atRoot, cloudIngest, copyAsked, copyRefusal, drained, ingestBudget, inward, isRecordId, legacyRedirect, restoreAsked, servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesKey, servesMcp, type AppPath, type CloudIngestDeps, type Restored } from './route.ts';
+import { afterRestore, appPath, recoverRestore, restoredOf, asPage, atRoot, cloudIngest, copyAsked, copyRefusal, drained, ingestBudget, inward, isRecordId, legacyRedirect, restoreAsked, servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesKey, servesMcp, type AppPath, type CloudIngestDeps, type Restored, type Stranded } from './route.ts';
 import { HEALTHZ, healthz } from './health.ts';
 import { NO_MINT_SESSION, serveInbound, servesInbound } from './inbound.ts';
 import { appEntry, bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
@@ -328,6 +328,18 @@ export class Record$ extends DurableObject<Env> {
    * (`test/restore-in-do.test.ts`, the receipt being put).
    */
   #armed = false;
+
+  /**
+   * How many `/api/restore` requests this object is answering right now, and what the last one that armed it said.
+   *
+   * TOGETHER THEY TELL A RESTORE STILL RUNNING FROM ONE LEFT BEHIND. Armed with a restore in flight is the gap between
+   * the arm and the answer, and the object must stay as it is. Armed with none in flight is an object whose Worker never
+   * made `51 D15`'s second call, and before these two fields nothing could tell it apart: measured in
+   * `test/restore-armed.test.ts`, it answered every door 500 until an eviction rewound it, and `restore.pitr` was never
+   * written. `stranded` answers the next request's Worker with `#left`, which is how the event gets written anyway.
+   */
+  #restoring = 0;
+  #left: Restored | null = null;
 
   /**
    * This object's two PITR methods for `copies.ts`, with `#armed` set before the bookmark is armed. An arm that throws
@@ -783,6 +795,17 @@ export class Record$ extends DurableObject<Env> {
   }
 
   /**
+   * An object armed by a restore that has already answered, and what that restore restored: `recoverRestore` in
+   * `route.ts` asks this before it resets anything. `null` when nothing is armed, or while a restore is still running
+   * and the arm is the one it is in the middle of. AN RPC AND NEVER A ROUTE, like `reopen`, and for its reason.
+   *
+   * NOT THROUGH `#record()`, which rejects on `#armed`, and armed is the one state this is asked about.
+   */
+  async stranded(): Promise<Stranded | null> {
+    return this.#armed && this.#restoring === 0 ? { restored: this.#left } : null;
+  }
+
+  /**
    * `51 D15`'s second call, on the object that started after the reset: `restore.pitr`, written where the rewind cannot
    * take it. AN RPC AND NEVER A ROUTE: `restored` is INTERNAL, and the Worker says who asked and what was kept.
    */
@@ -1107,7 +1130,17 @@ export class Record$ extends DurableObject<Env> {
     this.ctx.waitUntil(sparkLook(api));
     /* A RESTORE THE PORT HAS ARMED ENDS THIS OBJECT, and nothing is written here from the arm on: `#arming` sets `#armed`
        as the bookmark is armed, which is before `restore` answers, and the Worker's `reopen` ends the object after. */
-    return serveApi(request, handlersFor(api), ctx);
+    if (!restoreAsked(request.method, new URL(request.url).pathname)) return serveApi(request, handlersFor(api), ctx);
+    /* AND THE OBJECT KEEPS WHAT ITS RESTORE SAID, in case the Worker never comes back to say it (`#left`). Counted in
+       flight until the answer is read, so `stranded` cannot hand the next request an object this restore is still in. */
+    this.#restoring++;
+    try {
+      const out = await serveApi(request, handlersFor(api), ctx);
+      if (this.#armed) this.#left = await restoredOf(out, actorOf(ctx));
+      return out;
+    } finally {
+      this.#restoring--;
+    }
   }
 }
 
@@ -1478,19 +1511,49 @@ async function drainOutbox(env: Env, id: string): Promise<void> {
  */
 function bearerDeps(env: Env): BearerDeps {
   const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
-  const record = (id: string) => env.RECORD.get(env.RECORD.idFromName(id));
   return {
     knows: (id) => directory.knows(id),
-    verify: (id, bearer, surface) => record(id).verify(bearer, surface),
-    access: (id, person) => record(id).access(person),
+    verify: (id, bearer, surface) => held(env, id, (record) => record.verify(bearer, surface)),
+    access: (id, person) => held(env, id, (record) => record.access(person)),
     /* ASKED ONLY UNDER `/app/<slug>`, to hold the path to the record the bearer names. */
     named: async (slug) => (await directory.resolve(slug))?.record ?? null,
-    /* ASKED ONLY AT THE FOUR PATHS AN OPERATION OPENS, because asking spends it (`session.ts`). */
+    /* ASKED ONLY AT THE FOUR PATHS AN OPERATION OPENS, because asking spends it (`session.ts`). An armed record rejects
+       before its grant is read, so the ask again after a reset spends it once, and a 503 spends nothing. */
     operation: async (id, bearer) => {
-      const out = (await record(id).operationGrant(bearer)) as unknown as Result<OperationGrant>;
+      const out = (await held<unknown>(env, id, (record) => record.operationGrant(bearer))) as Result<OperationGrant>;
       return out.ok ? { method: out.value.method, person: out.value.person } : null;
     },
   };
+}
+
+/** A rejection that is `Record$`'s armed refusal, `RESTORING`, and not a fault. Its sentence is the one thing that crosses. */
+const restoring = (e: unknown): boolean => e instanceof Error && e.message.includes(RESTORING.fix);
+
+/**
+ * One call into a record, from a door that checks a credential there before anything is forwarded: `access`, `verify`,
+ * `operationGrant` and `signingKey`.
+ *
+ * A RECORD LEFT ARMED IS FINISHED HERE, AND THEN ASKED AGAIN. These doors are what every request meets first, so they
+ * are where a restore whose Worker never came back is found (`recoverRestore` in `route.ts`). The ask after the reset
+ * reaches the object that came back and is answered as if nothing had been armed, which is what the caller wanted.
+ * Measured in `test/restore-armed.test.ts`: without this, each of the four answered 500 until an eviction.
+ *
+ * A RECORD ARMED BY A RESTORE STILL RUNNING IS LEFT ALONE, and the rejection goes up to `fetch`, which answers it 503.
+ */
+async function held<T>(env: Env, id: string, call: (record: DurableObjectStub<Record$>) => Promise<T>): Promise<T> {
+  const stub = () => env.RECORD.get(env.RECORD.idFromName(id));
+  try {
+    return await call(stub());
+  } catch (e) {
+    if (!restoring(e)) throw e;
+    const reset = await recoverRestore({
+      stranded: async () => (await stub().stranded()) as Stranded | null,
+      reset: () => stub().reopen(),
+      restored: async (args) => (await stub().restored(args)) as unknown as Result<unknown>,
+    });
+    if (!reset) throw e;
+    return call(stub());
+  }
 }
 
 /**
@@ -1598,6 +1661,11 @@ export default {
     try {
       return await route(request, env, ctx);
     } catch (e) {
+      /* AN ARMED RECORD IS NOT A FAULT, AND 500 TOLD THE CLIENT IT WAS. Every door that checks a credential by RPC reaches
+         `#record()` first, which rejects while a restore is armed, and this answered that 500 `INTERNAL` with the refusal's
+         own sentence inside it (`test/restore-armed.test.ts`). The object's comments promise 503 `RECORD_UNAVAILABLE`,
+         and 503 is what a client waits on and asks again. */
+      if (restoring(e)) return json({ ok: false, refusal: RESTORING }, 503);
       /* THE SENTENCE AND NEVER THE STACK. A trace is a map of this deployment, and a request that
          reached here is one somebody may be probing with. */
       const why = e instanceof Error ? e.message : String(e);
@@ -1763,7 +1831,7 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
       origin: `https://${env.PUBLIC_HOST ?? ''}`,
       demo: env.DEMO_RECORD,
       session: (sid, slug) => directory.auth({ flow: 'session', sid, ...(slug === undefined ? {} : { slug }) }) as unknown as Promise<AuthResult<Who>>,
-      access: (record, person) => env.RECORD.get(env.RECORD.idFromName(record)).access(person),
+      access: (record, person) => held(env, record, (object) => object.access(person)),
     }, slug);
 
     /* THE APP'S OWN KEY DOORS ARE A BROWSER SESSION'S AND NOBODY ELSE'S. `/api/keys/*` is not a record method, so
@@ -1875,7 +1943,7 @@ async function recordKey(request: Request, env: Env, slug: string): Promise<Resp
   const none = json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `No record here publishes a key as ${slug}.`, at: 'slug' } }, 404);
   const found = await env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).resolve(slug);
   if (!found) return none;
-  const key = await env.RECORD.get(env.RECORD.idFromName(found.record)).signingKey();
+  const key = await held(env, found.record, (record) => record.signingKey());
   if (!key) return none;
   const out = json({ key_id: key.key_id, public_key: key.public_key }, 200);
   return request.method === 'HEAD' ? new Response(null, { status: out.status, headers: out.headers }) : out;
