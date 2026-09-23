@@ -30,6 +30,7 @@ import assert from 'node:assert/strict';
 import { KEY_PREFIX } from '../src/legacy.ts';
 import { syntheticExport } from './legacy-export.ts';
 import { liveRows, nights } from './import-nights.ts';
+import { gatedNights, type Wire } from './import-gated.ts';
 
 type Obj = Record<string, unknown>;
 
@@ -148,3 +149,44 @@ test('A TASK HE DELETED HERE UNDER A PROJECT HE DELETED HERE is held back, and i
   const loose = two.lines.filter((l) => /^Written without/u.test(l));
   assert.ok(loose.every((l) => !/#101 \(Tasks\)/u.test(l.split(': ').slice(1).join(': '))), `a row held back was said to be written:\n${loose.join('\n')}`);
 });
+
+/**
+ * A NIGHT THE HOST STOPPED ANSWERING DURING OR AFTER THE RETIRE PASS STILL REMEMBERS WHAT THAT PASS PUT IN THE BIN.
+ *
+ * The gap wave fifty-five's checker left on `48858b72`: `importCommand` returned on `Unreachable` before `rememberRun`,
+ * so a lot the retire pass deleted that night was in no run's `binned`, and the next night read it as his delete.
+ * MEASURED BEFORE THIS: with every request after the retire delete dropped, the third night left no lot at all and
+ * said "Deleted in this BrainDog, so not added again: Gold 24c"; with the delete's own answer dropped, the same.
+ */
+const retireDelete = (w: Wire): boolean => w.method === 'POST' && w.url.startsWith('/api/update') && /"deleted_at":true/u.test(w.body) && /"register":"holdings"/u.test(w.body);
+
+for (const [when, how] of [
+  ['AFTER', 'every request after the retire delete answered'],
+  ['DURING', 'the retire delete landing and its answer lost'],
+] as const)
+  test(`A HOST THAT STOPS ANSWERING ${when} THE RETIRE PASS (${how}) leaves the lot the import binned as the import's`, async (t) => {
+    const h = await gatedNights(t, at('2026-09-15'));
+    assert.equal((await h.night(holding('2026-09-15', 5), at('2026-09-15'))).code, 0);
+
+    let deleted = false;
+    h.cut((w) => {
+      if (deleted) return 'before';
+      if (!retireDelete(w)) return 'no';
+      deleted = true;
+      return when === 'DURING' ? 'after' : 'no';
+    });
+    const two = await h.night(holding('2026-09-16', 6), at('2026-09-16'));
+    assert.equal(two.code, 3, two.text);
+    assert.ok(deleted, `the retire pass never deleted the lot of 5:\n${two.text}`);
+    assert.deepEqual(liveRows(h.sql, 'holdings').map((r) => r.fields.qty), [6], two.text);
+
+    /* THE MORNING SAYS THE NIGHT STOPPED, AND WHAT IT HAD DONE BY THEN. */
+    const morning = await h.morning();
+    assert.match(morning, /Stopped part way/u, morning);
+    if (when === 'AFTER') assert.match(morning, /Closed: .*Holdings, Gold 24c/u, morning);
+
+    h.cut(null);
+    const three = await h.night(holding('2026-09-17', 5), at('2026-09-17'));
+    assert.deepEqual(liveRows(h.sql, 'holdings').map((r) => r.fields.qty), [5], `the lot the old tool holds again is not here:\n${three.text}`);
+    assert.deepEqual(heldBack(three.text), [], `the import called its own delete his:\n${three.text}`);
+  });

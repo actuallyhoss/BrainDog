@@ -56,8 +56,14 @@ export type Door = {
   schema: (register: string) => Promise<Result<unknown>>;
   /**
    * `deleted: true` ASKS FOR THE ROWS HE DELETED AS WELL AS THE LIVE ONES, each with its `deleted_at`, which is how the
-   * import tells a row he threw away from a row nobody has written yet: see `gone` in `applyPlan`. A door that answers
-   * live rows only is safe, and no worse than before: nothing is read as deleted, so nothing is held back.
+   * import tells a row he threw away from a row nobody has written yet: see `gone` in `applyPlan`.
+   *
+   * A DOOR THAT ANSWERS LIVE ROWS ONLY IS NOT SAFE, and this sentence used to say it was. Nothing is read as deleted,
+   * so nothing is held back, and every row he deleted is planned again as new: measured against a host at `19d4c785`
+   * (`test/import-deleted-skew.test.ts`), task 101 and ledger row T1 came back, `Tasks: 1 added` and `Ledger: 1 added`,
+   * exit 0. So the importer's door asks as a POST, which every host decodes (`listWithDeleted`), and `applyPlan`
+   * refuses an answer that holds nothing in the bin when the run before saw rows there that cannot have left it
+   * (`BinUnread`).
    */
   list: (args: { register: string; limit?: number; cursor?: string | null; deleted?: boolean }) => Promise<Result<{ rows: unknown[]; cursor: string | null }>>;
   create: (args: { register: string; fields: Record<string, unknown>; note?: string }) => Promise<Result<unknown>>;
@@ -97,6 +103,21 @@ export type Tally = { added: number; updated: number; unchanged: number };
  * names and never a value (`Run`).
  */
 export type Binned = { id: string; version: number };
+
+/**
+ * A ROW ONE NIGHT'S READ SAW IN THE BIN, whoever put it there: its id, its list and when it was deleted.
+ *
+ * KEPT SO THE NEXT NIGHT CAN TELL AN EMPTY BIN FROM A BIN LEFT OUT OF THE ANSWER, which one answer cannot: a list with
+ * no deleted row in it reads the same whether nothing is deleted or the host dropped `includeDeleted`, and the second
+ * is every row he deleted added back as new (`BinUnread`). A row leaves the bin three ways the import can see or
+ * reckon: put back, and it is live in the answer; deleted again, and it is still there; or swept by the record's purge,
+ * which takes a row thirty days after `since` (`packages/kernel/src/index.ts`, `sweepRecord`). An id and a time name
+ * nothing a stranger could read off him, which is the rule `Run` keeps.
+ */
+export type InBin = { id: string; register: string; since: string };
+
+/** The record's sweep takes a deleted row thirty days on; a day less, so a clock a little apart never refuses a swept bin. */
+const SWEPT_AFTER_MS = 29 * 86_400_000;
 
 /** A row written without the row it names, as both reports say it: see `Report.unfiled`. */
 export type Unfiled = { register: string; label: string; names: { register: string; label: string }[] };
@@ -159,6 +180,8 @@ export type Report = {
    * OPTIONAL FOR THE SAME REASON AS `questions`.
    */
   binned?: Binned[];
+  /** Every row tonight's read saw in the bin (`InBin`). Optional for the same reason as `questions`. */
+  bin?: InBin[];
   /**
    * Each row written without a row it names, because the row named is one he deleted here (`deleted`): the task a new
    * export files under a project he threw away. Optional for the same reason.
@@ -259,6 +282,26 @@ class PartlyRead extends Error {
     super(`${register}: ${fix}`);
     this.register = register;
     this.fix = fix;
+  }
+}
+
+/**
+ * AN ANSWER THAT HELD NOTHING IN THE BIN WHEN THE RUN BEFORE SAW ROWS THERE THAT COULD NOT HAVE LEFT IT (`InBin`).
+ *
+ * The read that asks for deleted rows cannot show by itself that the host honoured the ask. A host at `19d4c785`
+ * answered the GET `dc9ec9e4` sent with live rows alone, 200 (`loop/research-batch-fifty-five-audit.md` section 1),
+ * and the import took that as a bin with nothing in it and planned every row he had deleted as new. So the answer is
+ * held to what the run before saw: when it holds no deleted row at all, and a row the run before saw in the bin is
+ * neither in tonight's answer nor old enough for the sweep to have taken, the host left the bin out. Thrown before any
+ * write, like `PartlyRead`, and for the same reason: every write after it would be working from the wrong list.
+ */
+class BinUnread extends Error {
+  lists: string[];
+  rows: number;
+  constructor(lists: string[], rows: number) {
+    super(`${String(rows)} rows missing from the bin of ${lists.join(', ')}`);
+    this.lists = lists;
+    this.rows = rows;
   }
 }
 
@@ -483,6 +526,19 @@ export async function applyPlan(
     binned?: readonly Binned[];
     /** The newest `taken` of an export an earlier run carried into this record: see `older` below. */
     newest?: string | null;
+    /**
+     * What the last run into this record that kept one saw in the bin (`InBin`), and the instant of tonight's run, which
+     * the sweep's thirty days are counted back from. Without `bin` the answer is taken as it comes (`BinUnread`).
+     */
+    bin?: readonly InBin[];
+    now?: number;
+    /** He says the bin was emptied some way the import cannot see, so an answer with nothing in it is believed. */
+    binEmptied?: boolean;
+    /**
+     * Handed the report as soon as it exists, so a run the host stops answering part way still has what it did by then:
+     * see `Unreachable` in `importCommand`.
+     */
+    progress?: { report: Report | null };
   },
 ): Promise<Report> {
   let plan = given;
@@ -490,6 +546,7 @@ export async function applyPlan(
   const waiting: Waiting[] = [];
   const deleted: NonNullable<Report['deleted']> = [];
   const binned: Binned[] = [];
+  const bin: InBin[] = [];
   const unfiled: Unfiled[] = [];
   const report: Report = {
     missing: [],
@@ -506,10 +563,12 @@ export async function applyPlan(
     examples: 0,
     deleted,
     binned,
+    bin,
     unfiled,
     outcomes: {},
     plan,
   };
+  if (o.progress) o.progress.report = report;
   let registers = ORDER.filter((r) => plan.rows.some((row) => row.register === r));
 
   /**
@@ -849,9 +908,14 @@ export async function applyPlan(
    */
   const gone = new Set<string>();
   const ours = new Map((o.binned ?? []).map((b) => [b.id, b.version]));
-  for (const register of [...new Set([...registers, ...retiring.map((r) => r.register)])])
+  const read = [...new Set([...registers, ...retiring.map((r) => r.register)])];
+  /** Every id tonight's answer holds, live or deleted, which is how a row the run before saw in the bin is accounted for. */
+  const inAnswer = new Set<string>();
+  for (const register of read)
     for (const row of await readAll(door, register)) {
+      inAnswer.add(row.id);
       if (typeof row.deleted_at === 'string' && row.deleted_at !== '') {
+        bin.push({ id: row.id, register, since: row.deleted_at });
         if (ours.get(row.id) === row.version) {
           binned.push({ id: row.id, version: row.version });
           continue;
@@ -869,6 +933,16 @@ export async function applyPlan(
         where.set(key, register);
       }
     }
+  /* NOTHING IN THE BIN IS BELIEVED ONLY WHEN IT CAN BE (`BinUnread`): a row the run before saw there is put back and
+     so in the answer, or old enough for the sweep. A row whose list is not read tonight says nothing either way. Only
+     a whole answer with no deleted row in it is held to this, because a host that drops the argument drops it for
+     every list, and one row he put back beside another still deleted is an answer that plainly holds the bin. */
+  if (bin.length === 0 && o.bin !== undefined && o.binEmptied !== true) {
+    const now = o.now ?? Date.now();
+    const lists = new Set(read);
+    const unread = o.bin.filter((b) => lists.has(b.register) && !inAnswer.has(b.id) && !(Date.parse(b.since) <= now - SWEPT_AFTER_MS));
+    if (unread.length > 0) throw new BinUnread([...new Set(unread.map((b) => NAMES[b.register] ?? b.register))], unread.length);
+  }
 
   const later: { row: PlannedRow; field: string; value: unknown }[] = [];
   /**
@@ -1168,7 +1242,16 @@ export async function applyPlan(
       }
       const done = await door.update({ register: r.register, seq: at.seq as number, patch, version: at.version, note: r.why });
       if (!done.ok) {
-        if (unreachable(done)) throw new Unreachable();
+        /* A DELETE WHOSE ANSWER NEVER CAME MAY HAVE LANDED, and if it did the row is in the bin at the next version,
+           because every write moves a row one version on (`packages/kernel/src/index.ts`, `version = version + 1`).
+           Remembered at that version it is the import's if it landed, and matches nothing if it did not. Measured
+           before this (`test/import-own-deletes.test.ts`, DURING): the delete landed, the run stopped, and the next
+           night read the lot as his delete. A row he deletes himself at exactly that version before the next night is
+           read as the import's, which costs one row the old tool still holds coming back; the other way lost it. */
+        if (unreachable(done)) {
+          if (Object.hasOwn(patch, 'deleted_at') && typeof at.version === 'number') binned.push({ id: at.id, version: at.version + 1 });
+          throw new Unreachable();
+        }
         report.refused.push({ label, register: r.register, fix: fixOf(done) });
         continue;
       }
@@ -1510,8 +1593,16 @@ export type Run = {
    * take them for his. Optional for the reason the four above are: a line written before it binned nothing it knows of.
    */
   binned?: Binned[];
+  /** Every row this run's read saw in the bin (`InBin`), read by the next night to hold its answer to. Optional likewise. */
+  bin?: InBin[];
   /** The rows written without a row he deleted here (`Report.unfiled`). Optional for the same reason. */
   unfiled?: Unfiled[];
+  /**
+   * THE HOST STOPPED ANSWERING PART WAY, and what this line holds is what had answered by then. Such a run used to be
+   * forgotten, which lost the rows its retire pass had put in the bin, and the next night read them as his deletes
+   * (`test/import-own-deletes.test.ts`, the checker's gap on `48858b72`). Optional: a line without it ran to the end.
+   */
+  stopped?: boolean;
 };
 
 /** The run a report describes, as `--since` reads it back. */
@@ -1533,6 +1624,7 @@ export function runOf(report: Report, o: { at: string; host: string; file: strin
     waiting: report.waiting ?? [],
     deleted: report.deleted ?? [],
     binned: report.binned ?? [],
+    bin: report.bin ?? [],
     unfiled: report.unfiled ?? [],
   };
 }
@@ -1588,6 +1680,9 @@ export function sinceSaid(runs: Run[], since: string, offsetOf: (at: Date) => nu
     const taken = run.taken ? (Number.isNaN(Date.parse(run.taken)) ? run.taken.slice(0, 10) : localClock(run.taken, offsetOf).day) : null;
     lines.push(`${local[i]!.day} ${local[i]!.time} ${local[i]!.zone} into ${run.host}${taken ? `, export of ${taken}` : ''}:`);
     const start = lines.length;
+    /* SAID FIRST, because every line under it is only what had answered before the host stopped: a write in flight at
+       that moment may have landed and is in none of them, and the next run finds it by its key. */
+    if (run.stopped === true) lines.push(`- Stopped part way: ${run.host} stopped answering, so this is what it had answered by then; a write that landed after that is found by its key the next night.`);
     const byList = <T extends { register: string }>(rows: T[], say: (row: T) => string, head: string) => {
       const lists = new Map<string, string[]>();
       for (const row of rows) lists.set(row.register, [...(lists.get(row.register) ?? []), say(row)]);
@@ -1663,6 +1758,8 @@ function isRun(run: unknown): run is Run {
     (run.retired === undefined || itemsHold(run.retired, ['register', 'label', 'why'])) &&
     (run.deleted === undefined || itemsHold(run.deleted, ['register', 'label'])) &&
     (run.binned === undefined || (Array.isArray(run.binned) && run.binned.every((b) => isObj(b) && isText(b.id) && typeof b.version === 'number'))) &&
+    (run.bin === undefined || (itemsHold(run.bin, ['id', 'register', 'since']) && (run.bin as { since: string }[]).every((b) => !Number.isNaN(Date.parse(b.since))))) &&
+    (run.stopped === undefined || typeof run.stopped === 'boolean') &&
     (run.unfiled === undefined || (itemsHold(run.unfiled, ['register', 'label']) && (run.unfiled as { names?: unknown }[]).every((u) => itemsHold(u.names, ['register', 'label'])))) &&
     (run.waiting === undefined || (itemsHold(run.waiting, ['label', 'answer']) && (run.waiting as { question?: unknown }[]).every((w) => w.question === null || isText(w.question))))
   );
@@ -1706,16 +1803,69 @@ function rememberRun(home: string, run: Run): number[] {
   return read.passed;
 }
 
+/** Whether a run sent anything that changed the record: a row, a question, a close, a pack or a value. */
+const wroteAny = (report: Report): boolean =>
+  Object.values(report.tally).some((t) => t.added + t.updated > 0) ||
+  report.asked > 0 ||
+  report.retired.length > 0 ||
+  report.polls.filed > 0 ||
+  (report.banks?.filed ?? 0) > 0 ||
+  (report.packs?.filed ?? 0) > 0 ||
+  (report.values?.added.length ?? 0) + (report.values?.filed.length ?? 0) > 0;
+
+/**
+ * One page of a list with the rows he deleted in it, AS A POST, and why it is not `client.list`.
+ *
+ * `client.list` SENDS A READ AS A GET, and a GET's `includeDeleted` is decoded only by a host at `dc9ec9e4` or later,
+ * where `ROUTES` declares it. Wave fifty-four moved this read onto that GET, and against a host at `19d4c785`, the
+ * build production answered on 23 September, it came back with live rows alone, 200, and every row he had deleted
+ * was added back (`loop/research-batch-fifty-five-audit.md` section 1, `test/import-deleted-skew.test.ts`). A POST's
+ * body keeps its JSON types, and the record hands `includeDeleted: true` to the kernel on every host from before
+ * `19d4c785` on, which the audit measured on both builds. So this is the door the import keeps whichever build the
+ * host is at, and it carries the headers, the bearer and the deadline every other request of the run carries.
+ */
+async function listWithDeleted(send: typeof fetch, to: Target, args: { register: string; limit?: number; cursor?: string | null }): Promise<Result<{ rows: unknown[]; cursor: string | null }>> {
+  const lost = (why: string) => no<never>('UNREACHABLE', `The record could not be reached: ${why}`);
+  let res: Response;
+  try {
+    res = await send(`${to.base.replace(/\/+$/u, '')}/api/list`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...(to.token ? { authorization: `Bearer ${to.token}` } : {}) },
+      body: JSON.stringify({ ...args, includeDeleted: true }),
+    });
+  } catch (e) {
+    return lost(e instanceof Error ? e.message : String(e));
+  }
+  let body: unknown;
+  try {
+    body = await res.json();
+  } catch {
+    return lost(`${String(res.status)} with a body that is not JSON`);
+  }
+  /* THE SHAPE IS CHECKED THE WAY THE CLIENT CHECKS IT (`packages/client/src/index.ts`, `answered`): a gateway's own
+     JSON with `ok: 1` read as a success would be a list with no rows, which is the one answer this read must not give. */
+  if (isObj(body) && body.ok === true && isObj(body.value) && Array.isArray(body.value.rows))
+    return ok({ rows: body.value.rows, cursor: typeof body.value.cursor === 'string' ? body.value.cursor : null });
+  if (isObj(body) && body.ok === false && isObj(body.refusal) && typeof body.refusal.code === 'string' && typeof body.refusal.fix === 'string')
+    return no(body.refusal.code, body.refusal.fix);
+  return lost(`${String(res.status)} with an answer this import does not recognise`);
+}
+
 /** `braindog import legacy <file>`, and the exit code: 0 done, 1 refused or partly refused, 3 the host did not answer. */
 export async function importCommand(args: string[], io: AgentIo, given?: string, now: () => Date = () => new Date(), offsetOf: (at: Date) => number = localOffset): Promise<number> {
   /* THE PLAN'S DAY IS THE OWNER'S LOCAL DAY, NOT THE UTC DATE. It was `toISOString().slice(0, 10)`, so a nightly run at
      22:30 at -03:00 planned on tomorrow's UTC date: a date due today was filed as already done, and a run at 01:30 at
      +03:00 planned on yesterday's. Taken from `now` and `offsetOf`, the same clock `--since` reads a run by. */
   const today = given ?? localClock(now().toISOString(), offsetOf).day;
-  let values: { host?: string | undefined; 'dry-run'?: boolean | undefined; setup?: string | undefined; 'draft-setup'?: boolean | undefined; since?: string | undefined };
+  let values: { host?: string | undefined; 'dry-run'?: boolean | undefined; setup?: string | undefined; 'draft-setup'?: boolean | undefined; since?: string | undefined; 'bin-emptied'?: boolean | undefined };
   let positionals: string[];
   try {
-    ({ values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { host: { type: 'string' }, 'dry-run': { type: 'boolean' }, setup: { type: 'string' }, 'draft-setup': { type: 'boolean' }, since: { type: 'string' } } }));
+    ({ values, positionals } = parseArgs({
+      args,
+      allowPositionals: true,
+      strict: true,
+      options: { host: { type: 'string' }, 'dry-run': { type: 'boolean' }, setup: { type: 'string' }, 'draft-setup': { type: 'boolean' }, since: { type: 'string' }, 'bin-emptied': { type: 'boolean' } },
+    }));
   } catch {
     io.say(USAGE);
     return 1;
@@ -1819,7 +1969,7 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
   const client = createClient({ base: to.base, ...(to.token ? { token: to.token } : {}), fetch: send });
   const door: Door = {
     schema: (register) => client.schema(register),
-    list: ({ deleted, ...a }) => client.list(deleted === true ? { ...a, includeDeleted: true } : a),
+    list: ({ deleted, ...a }) => (deleted === true ? listWithDeleted(send, to, a) : client.list(a)),
     create: (a) => client.create(a),
     update: (a) => client.update(a),
     governance: (a) => client.governance(a),
@@ -1835,20 +1985,59 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
    */
   const before = readRuns(io.home).runs.filter((r) => r.host === to.key);
   const newest = before.reduce<string | null>((a, r) => (r.taken && !Number.isNaN(Date.parse(r.taken)) && (a === null || Date.parse(r.taken) > Date.parse(a)) ? r.taken : a), null);
+  /* THE LAST RUN THAT KEPT WHAT IT SAW IN THE BIN, and only the last: an older night's bin has had more time to empty
+     in ways the newer night already saw. */
+  const lastBin = before.findLast((r) => r.bin !== undefined);
+  const dryRun = values['dry-run'] === true;
+  /** Adds the run to `imports.jsonl`, and says so when it cannot or when the rewrite let a line go. */
+  const remember = (report: Report, stopped: boolean) => {
+    let letGo: number[] = [];
+    try {
+      letGo = rememberRun(io.home, { ...runOf(report, { at: now().toISOString(), host: to.key, file }), ...(stopped ? { stopped: true } : {}) });
+    } catch {
+      io.say(`This run was imported but could not be remembered in ${runsFile(io.home)}, so --since will not show it.`);
+    }
+    /* THE REWRITE KEEPS ONLY WHAT READS AS A RUN, so a line passed over each morning is gone after the next night. It is
+       said here too, or a hand-edited line would vanish with nobody told. */
+    for (const n of letGo) io.say(`Line ${String(n)} of ${runsFile(io.home)} was not a run as this command writes one, and was let go when this run was remembered.`);
+  };
+  const progress: { report: Report | null } = { report: null };
   let report: Report;
   try {
     report = await applyPlan(plan, door, {
-      dryRun: values['dry-run'] === true,
+      dryRun,
       banks: banksOf(read.value),
       packs: holdingsOf(read.value),
       settled: settledOf(read.value),
       binned: before.flatMap((r) => r.binned ?? []),
       newest,
+      ...(lastBin?.bin === undefined ? {} : { bin: lastBin.bin }),
+      now: now().getTime(),
+      binEmptied: values['bin-emptied'] === true,
+      progress,
     });
   } catch (e) {
     if (e instanceof Unreachable) {
       io.say(`${to.key} stopped answering part way. Run the import again: rows already written are found and not added twice.`);
+      /* AND WHAT IT DID BEFORE THAT IS REMEMBERED, which it was not. The rows the retire pass put in the bin were then in
+         no run's `binned`, and the next night held back every one of them as a row he had deleted: the lot of 5 that
+         the old tool held again the night after stayed in the bin (`test/import-own-deletes.test.ts`, measured before
+         this). Only a run that wrote or binned something, because one that stopped while reading changed nothing. */
+      const got = progress.report;
+      if (!dryRun && got !== null && got.missing.length === 0 && (wroteAny(got) || (got.binned ?? []).length > 0)) {
+        remember(got, true);
+        io.say('What it did before it stopped is remembered, and braindog import legacy --since last says it.');
+      }
       return 3;
+    }
+    /* NOTHING WAS WRITTEN, FOR THE REASON `PartlyRead` BELOW GIVES, and the one way past it is his to take. */
+    if (e instanceof BinUnread) {
+      const day = lastBin ? localClock(lastBin.at, offsetOf).day : 'the run before';
+      io.say(
+        `${to.key} answered ${e.lists.join(' and ')} with nothing in the bin, and the run on ${day} saw ${e.rows === 1 ? 'a row' : `${String(e.rows)} rows`} deleted there too recently for the record's sweep to have taken ${e.rows === 1 ? 'it' : 'them'}. A host that leaves deleted rows out of its answer would have every row you deleted added back as new, so nothing was written.`,
+      );
+      io.say('If the bin really was emptied, because this BrainDog was put back from a copy or is a new one at the same address, run the import again with --bin-emptied.');
+      return 1;
     }
     /* NOTHING WAS WRITTEN, AND THAT IS THE POINT OF SAYING SO. Every list is read before the first row is sent, so a
        read that stopped part way leaves the record exactly as it was. An import that carried on would be working from
@@ -1871,15 +2060,7 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
    * open one only to end it. A refusal or no answer is said and changes nothing else: the rows are in, and the exit is
    * about the rows.
    */
-  const wrote =
-    Object.values(report.tally).some((t) => t.added + t.updated > 0) ||
-    report.asked > 0 ||
-    report.retired.length > 0 ||
-    report.polls.filed > 0 ||
-    (report.banks?.filed ?? 0) > 0 ||
-    (report.packs?.filed ?? 0) > 0 ||
-    (report.values?.added.length ?? 0) + (report.values?.filed.length ?? 0) > 0;
-  if (values['dry-run'] !== true && report.missing.length === 0 && wrote) {
+  if (!dryRun && report.missing.length === 0 && wroteAny(report)) {
     const t = Object.values(report.tally).reduce((a, b) => ({ added: a.added + b.added, updated: a.updated + b.updated, unchanged: a.unchanged + b.unchanged }), { added: 0, updated: 0, unchanged: 0 });
     const taken = plan.taken ? (Number.isNaN(Date.parse(plan.taken)) ? plan.taken.slice(0, 10) : localClock(plan.taken, offsetOf).day) : null;
     const ended = await client.handoff({
@@ -1890,19 +2071,8 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
     if (!ended.ok) io.say(`The import's own run could not be ended (${fixOf(ended)}), so it reads as live until the record sweeps it.`);
   }
   /* A DRY RUN AND A RECORD SHORT OF ITS LISTS WROTE NOTHING, so neither is a night `--since` should report as carried.
-     A run the host stopped answering part way returned above, and is not remembered either: what it wrote is found
-     again and said as unchanged by the next one, which is the one sentence about it worth reading. */
-  if (values['dry-run'] !== true && report.missing.length === 0) {
-    let letGo: number[] = [];
-    try {
-      letGo = rememberRun(io.home, runOf(report, { at: now().toISOString(), host: to.key, file }));
-    } catch {
-      io.say(`This run was imported but could not be remembered in ${runsFile(io.home)}, so --since will not show it.`);
-    }
-    /* THE REWRITE KEEPS ONLY WHAT READS AS A RUN, so a line passed over each morning is gone after the next night. It is
-       said here too, or a hand-edited line would vanish with nobody told. */
-    for (const n of letGo) io.say(`Line ${String(n)} of ${runsFile(io.home)} was not a run as this command writes one, and was let go when this run was remembered.`);
-  }
+     A run the host stopped answering part way is remembered above, marked `stopped`. */
+  if (!dryRun && report.missing.length === 0) remember(report, false);
   /* A CLASHING CATEGORY IS AN EXIT 1 LIKE A REFUSAL IS, because something he asked for is not in the record and the
      run's next step is his: clear the examples, or rename, and import again. */
   return report.missing.length > 0 || report.refused.length > 0 || report.clashes.length > 0 ? 1 : 0;
