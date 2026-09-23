@@ -62,3 +62,44 @@ test('THE PROPOSAL FORMS AROUND THE TURN THAT NAMED IT, when turn two only heard
   assert.equal(formedFor(podcast.pick!, podcast.from)?.kind, 'podcast');
   assert.deepEqual(podcast.ranked.find((r) => r.usecase === podcast.pick)?.why.map((w) => w.text), ['start a', 'podcast']);
 });
+
+/* EVERY TURN-ONE CHIP AGAINST EVERY TURN-TWO CHIP (`loop/research-batch-forty-six-audit.md` §3). Turn two
+   answers "What is this BrainDog for?" and turn one answers "Who are you?", so where turn two heard a use
+   case it is the one proposed; turn one decides only where turn two heard nothing ("I use Claude or
+   Codex", `null` below). Each chip is one signal of one use case, so a pair of chips that name two
+   different ones is a one-to-one tie, and scoring the two turns as one sentence gave it to the longer
+   phrase and then to catalogue order, whichever turn it came from. Measured before the fix: 6 of these
+   24 failed, "I'm a student" with "Tasks for a small team" proposing Student, "I run a few companies"
+   with "I send invoices" and with "Tasks for a small team" proposing Solo founder, and "I'm starting
+   something new" with "Dashboards for my projects", "I send invoices" and "Tasks for a small team"
+   proposing the guide. */
+const TURN_TWO: Record<string, string | null> = {
+  'My courses and homework': 'student',
+  'Dashboards for my projects': 'founder',
+  'I send invoices': 'business',
+  'Tasks for a small team': 'team',
+  'A new project': 'guide',
+  'I use Claude or Codex': null,
+};
+const TURN_ONE: Record<string, string> = {
+  "I'm a student": 'student',
+  'I run a few companies': 'founder',
+  "I'm part of a team": 'team',
+  "I'm starting something new": 'guide',
+};
+
+test('THE TABLE IS EVERY CHIP, and each column is what that chip alone proposes', () => {
+  assert.deepEqual(Object.keys(TURN_TWO), [...firstRun.shapeChips]);
+  assert.deepEqual(Object.keys(TURN_ONE), [...firstRun.whoChips]);
+  for (const [chip, id] of Object.entries(TURN_TWO)) assert.equal(arrange(chip).pick?.usecase ?? null, id, chip);
+  for (const [chip, id] of Object.entries(TURN_ONE)) assert.equal(arrange(chip).pick?.usecase, id, chip);
+});
+
+for (const one of firstRun.whoChips) {
+  for (const two of firstRun.shapeChips) {
+    const want = TURN_TWO[two] ?? TURN_ONE[one];
+    test(`TURN ONE NEVER DECIDES AGAINST TURN TWO: "${one}" then "${two}" is ${want}`, () => {
+      assert.equal(arrangeTurns(one, two).pick?.usecase, want);
+    });
+  }
+}

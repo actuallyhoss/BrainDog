@@ -26,7 +26,21 @@ export function arrangeTurns(bio: string | null | undefined, about: string): Arr
   const first = bio?.trim() ?? '';
   if (!first) return { ...arrange(about), from: about };
   const lead = `${first}. `;
-  const both = arrange(`${lead}${about}`);
+  const whole = arrange(`${lead}${about}`);
+  /* TURN ONE ADDS WEIGHT, AND A TIE GOES TO TURN TWO (`loop/research-batch-forty-six-audit.md` §3).
+     Every chip is one signal of one use case, so a turn-one chip beside a turn-two chip that names another
+     is a one-to-one tie, and read as one sentence it went to the longer phrase and then to catalogue
+     order: "I run a few companies" then "I send invoices" proposed Solo founder, and 6 of the 24 chip
+     pairs proposed another use case than turn two alone did. A tie on the whole score now goes to the
+     one heard more in turn two's own words, and only then to length and catalogue order, which the sort
+     keeps from `arrange` because it is stable. Where turn two heard nothing every one scores 0 there and
+     the order is untouched, and turn one still adds to a use case turn two named (walk two's founder).
+     A higher whole score still wins whichever turn it came from: "I want to start a podcast" then "I send
+     invoices" is the guide on 2 to 1, and ranking turn two's own count first sent it to Small business. */
+  const inTwo = (r: Arrangement['ranked'][number]): number => r.why.filter((w) => w.at >= lead.length).length;
+  const order = [...whole.ranked].sort((a, b) => b.score - a.score || inTwo(b) - inTwo(a));
+  const top = order[0];
+  const both = { pick: top && top.score > 0 ? top.usecase : null, ranked: order };
   /* THE PICK'S OWN PHRASES DECIDE, not every use case's: turn two hearing only some other use case
      formed the guide for turn one's podcast around "I send invoices", which forms nothing. With no
      pick, nothing was heard anywhere and it is turn one, as it always was. */
