@@ -43,7 +43,7 @@
   import { linkReader, type Linked, type LinkReader } from '$lib/record/links-live.ts';
   import type { FieldDecl, Fields } from '$lib/record/schema.ts';
   import { closed, drew, opened } from '../../../../lib/ui/screen.svelte.ts';
-  import { stateSaid } from './lead.ts';
+  import { choicesOf, stateSaid } from './lead.ts';
 
   const id = $derived(page.params.register ?? '');
   const seq = $derived(Number(page.params.seq));
@@ -663,7 +663,7 @@
                     {:else if f.type === 'enum'}
                       <select class="edit-input" bind:value={draft}>
                         <option value="">{copy.noneChosen}</option>
-                        {#each f.values ?? [] as v}<option value={v}>{v.replace(/_/g, ' ')}</option>{/each}
+                        {#each choicesOf(f) as [v, said]}<option value={v}>{said}</option>{/each}
                       </select>
                     {:else if f.type === 'day'}
                       <div class="field"><input class="field-input" type="date" bind:value={draft} /></div>
@@ -697,7 +697,7 @@
                   {:else if f.type === 'money'}
                     <Money minor={amountOf(value) ?? 0} currency={currencyOf(value) ?? ''} weight="strong" />
                   {:else if f.id === decl.state}
-                    <Chip label={String(value).replace(/_/g, ' ')} {tone} />
+                    <Chip label={stateSaid(decl, String(value))} {tone} />
                   {:else if identityOf(id, f.id, value, names)}
                     <IdentityMark identity={identityOf(id, f.id, value, names)!} size="md" />
                   {:else if f.type === 'day'}

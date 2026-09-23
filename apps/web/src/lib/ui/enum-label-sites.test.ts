@@ -24,6 +24,12 @@
  * over a Status field reading Ongoing (`loop/research-batch-forty-seven-audit.md` §3, all three measured failing). The
  * last tests below run the three with Personal's own labels and read what they say. The row page's lead keeps one
  * source check, that it draws through the function the tests run; a rename there turns it red, never green.
+ *
+ * AND THE LEAD HAD TWO NEIGHBOURS. The same page chipped that project's state "Earning" under a lead reading Ongoing,
+ * and its inline editor offered a person's Role as `registrar` where the People list reads Agency
+ * (`loop/research-batch-forty-eight-audit.md` §6; both tests failed against the page before it changed). The chip
+ * now draws through `stateSaid` and the options through `choicesOf`, the tests run both with Personal's labels, and
+ * each keeps the same single source check that the page calls them.
  */
 
 import { after, test } from 'node:test';
@@ -39,7 +45,7 @@ import { REGISTERS } from '../record/data.ts';
 import { heldBy, plainOf, type Governor } from '../record/governance.ts';
 import { heardLabels, relabelAll } from '../voice.ts';
 import { updatesOf } from '../../routes/decide/[id]/changes.ts';
-import { stateSaid } from '../../routes/r/[register]/[seq]/lead.ts';
+import { choicesOf, stateSaid } from '../../routes/r/[register]/[seq]/lead.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const PAGE = readFileSync(join(here, '../../routes/r/[register]/+page.svelte'), 'utf8');
@@ -144,4 +150,31 @@ test("A ROW'S LEAD SAYS ITS STATE BY ITS LABEL, as its saved field does", () => 
   assert.equal(stateSaid(undefined, 'client_work'), 'Client work');
   /* The one source check: the page's lead draws through the function above, so a rename turns this red. */
   assert.ok(ROW_PAGE.includes('<span class="lead-word">{stateSaid(decl, stateValue)}</span>'), 'the lead no longer draws its state through `stateSaid`');
+});
+
+test("A ROW'S STATE CHIP SAYS ITS STATE BY THE SAME FUNCTION AS ITS LEAD", () => {
+  /* THE CHIP BESIDE THE FIXED LEAD STILL SPELT THE STORED VALUE: a Personal project led with Ongoing over a chip that
+     read Earning, since `Chip` raises the first letter of whatever it is handed (audit forty-eight §6). */
+  relabelAll(REGISTERS, PERSONAL);
+  assert.equal(stateSaid(REGISTERS.things, 'earning'), 'Ongoing');
+  relabelAll(REGISTERS, {});
+  assert.ok(ROW_PAGE.includes('<Chip label={stateSaid(decl, String(value))} {tone} />'), 'the state chip no longer draws through `stateSaid`');
+  assert.equal(ROW_PAGE.split('stateSaid(decl, ').length - 1, 2, 'the lead or the chip draws its state some other way');
+});
+
+test("A ROW'S INLINE EDITOR OFFERS EACH VALUE BY ITS LABEL, in the order the field declares", () => {
+  /* Editing a person's Role offered `registrar` where the People list reads Agency (audit forty-eight §6). */
+  relabelAll(REGISTERS, PERSONAL);
+  const role = REGISTERS.people!.fields.find((f) => f.id === 'role')!;
+  const offered = choicesOf(role);
+  assert.deepEqual(offered.map(([v]) => v), role.values, 'the editor offers other values than the field declares');
+  assert.deepEqual(Object.fromEntries(offered).registrar, 'Agency');
+  assert.deepEqual(Object.fromEntries(offered).client, 'Work contact');
+  /* A record with no labels still reads the value's own words, as the register page's editor does. */
+  relabelAll(REGISTERS, {});
+  assert.equal(Object.fromEntries(choicesOf(REGISTERS.people!.fields.find((f) => f.id === 'role')!)).registrar, 'Registrar');
+  assert.ok(ROW_PAGE.includes('{#each choicesOf(f) as [v, said]}<option value={v}>{said}</option>{/each}'), 'the editor no longer draws its options through `choicesOf`');
+  /* And no value on the row's page is spelt by taking its underscores out, which is how both sites read the value. */
+  const spelt = ROW_PAGE.split('\n').filter((line) => /\.replace\(\/_\/g, ' '\)/u.test(line));
+  assert.deepEqual(spelt, [], 'a value on the row page is still spelt from its stored id');
 });
