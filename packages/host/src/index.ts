@@ -119,8 +119,14 @@ export const ROUTES: readonly Route[] = [
   { name: 'list', group: 'DATA', writes: false, what: 'Rows of one register, narrowed by a predicate, newest first.',
     /* `cursor` IS `text` AND NOT `json`, and it is the one argument where that matters. A keyset
        cursor is `<when>|<id>`, which is not valid JSON, so it survived the guessing by accident;
-       reading it as the text the record minted is the same answer on purpose. */
-    takes: { register: 'text', where: 'json', limit: 'integer', cursor: 'text', order: 'json' } },
+       reading it as the text the record minted is the same answer on purpose.
+
+       `includeDeleted` IS `json` SO A GET CAN ASK FOR DELETED ROWS AT ALL. The kernel reads it as `=== true`, and
+       undeclared it arrived as the four letters "true": measured on afb3b1b2, `GET /api/list?includeDeleted=true`
+       answered the live rows alone, 200, nothing said, while the same read as a POST answered the deleted ones too.
+       The CLI's import sent that POST by hand for want of this line. Decoded, `true` is `true`; a value that is not
+       true or false is the record's to refuse (`record.list`), because read as false it is the same silent answer. */
+    takes: { register: 'text', where: 'json', limit: 'integer', cursor: 'text', order: 'json', includeDeleted: 'json' } },
   { name: 'history', group: 'READ+', writes: false, what: 'The writes that made one row, in order, each with who and when.',
     takes: { register: 'text', seq: 'integer' } },
   { name: 'backlinks', group: 'READ+', writes: false, what: 'What points at one row: the rows of other lists whose reference fields name it, a page at a time.',

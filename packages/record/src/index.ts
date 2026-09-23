@@ -3229,6 +3229,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
            caller could write it without the type complaining. A parameter reachable only by lying
            to the type checker is a parameter nobody uses. */
         order?: { field: string; dir?: 'asc' | 'desc' }[];
+        /* AND THE SAME WAS TRUE OF THE DELETED ROWS, WHICH IS THE SAME LESSON TWICE. The kernel reads
+           `includeDeleted`, the spread below carried it, and this signature did not name it, so the CLI's
+           import reached it by a hand-built POST with no type admitting the argument. A deleted row comes
+           back with `deleted_at` set, which is how a caller tells it from a live one. Naming it widens
+           nothing: the guard below is the same `read`, and a POST carrying the argument already got past
+           it to the kernel's deleted rows on afb3b1b2 (`host/test/list-include-deleted.test.ts`, whose
+           POST case passed before this line existed while its GET case failed). */
+        includeDeleted?: boolean;
       },
       ctx: CallContext,
     ): Promise<Result<Page<Entry>>> {
@@ -3236,6 +3244,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (missing) return { ok: false, refusal: missing };
       const stop = guard(ctx, 'read', args.register);
       if (stop) return { ok: false, refusal: stop };
+      /* TRUE OR FALSE, AND ANYTHING ELSE IS REFUSED RATHER THAN READ AS FALSE. The host decodes it as
+         JSON, so `?includeDeleted=1` arrives as the number 1 and a POST may carry the text "true"; the
+         kernel reads `=== true`, and either was answered with live rows alone and nothing said, which
+         for the import is a row he deleted planned again as new. */
+      if (args.includeDeleted !== undefined && args.includeDeleted !== null && typeof args.includeDeleted !== 'boolean')
+        return no('VALUE_MALFORMED', `includeDeleted is true or false, and ${JSON.stringify(args.includeDeleted) ?? String(args.includeDeleted)} is neither.`, { at: 'includeDeleted' });
       /* A LIMIT BELOW ONE IS REFUSED, NOT READ AS FIFTY OR AS ONE. The kernel coerces what a query
          string cannot parse, and `limit: 0` came back as fifty rows while `limit: -3` came back as
          one. A number that parses and is out of range is a question with an answer, which is

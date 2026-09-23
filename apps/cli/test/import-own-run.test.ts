@@ -87,6 +87,9 @@ async function host(t: TestContext, api: Api, refuse: string[] = []): Promise<st
     req.on('end', () => {
       const args: Record<string, unknown> = text ? (JSON.parse(text) as Record<string, unknown>) : Object.fromEntries(url.searchParams);
       if (typeof args.limit === 'string') args.limit = Number(args.limit);
+      /* THE HOST DECODES `includeDeleted` AS JSON (its `ROUTES` table), and this stub reads the address as text, so it does
+         the same here; the import asks for deleted rows by GET since `client.list` names the argument. */
+      if (typeof args.includeDeleted === 'string') args.includeDeleted = JSON.parse(args.includeDeleted) as unknown;
       const methods = api as unknown as Record<string, (a: unknown, c?: unknown) => Promise<unknown>>;
       const call = methods[method];
       const answer = refuse.includes(method)

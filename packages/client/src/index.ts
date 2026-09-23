@@ -768,6 +768,14 @@ export function createClient(options: ClientOptions) {
       limit?: number;
       cursor?: string | null;
       order?: { field: string; dir?: 'asc' | 'desc' }[];
+      /**
+       * The rows somebody deleted as well, each with its `deleted_at` set. Absent is live rows only.
+       *
+       * THE RECORD HAD THE READ AND THIS SIGNATURE DID NOT, so the CLI's import could not ask for it here and sent its
+       * own POST instead (`apps/cli/src/import.ts`, `listWithDeleted`): a GET carrying it undeclared was answered with
+       * live rows and nothing said. The host's table now decodes it, so it goes in the address like any other read.
+       */
+      includeDeleted?: boolean;
     }) => call<Page<unknown>>('list', args as Record<string, unknown>),
     search: (q: string, limit?: number) =>
       call<{ register: string; seq: number; title: string }[]>('search', { q, ...(limit === undefined ? {} : { limit }) }),

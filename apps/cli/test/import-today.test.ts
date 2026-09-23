@@ -79,6 +79,9 @@ async function host(kernel: Kernel): Promise<{ server: Server; base: string }> {
     req.on('end', () => {
       const args: Record<string, unknown> = text ? (JSON.parse(text) as Record<string, unknown>) : Object.fromEntries(url.searchParams);
       if (typeof args.limit === 'string') args.limit = Number(args.limit);
+      /* THE HOST DECODES `includeDeleted` AS JSON (its `ROUTES` table), and this stub reads the address as text, so it does
+         the same here; the import asks for deleted rows by GET since `client.list` names the argument. */
+      if (typeof args.includeDeleted === 'string') args.includeDeleted = JSON.parse(args.includeDeleted) as unknown;
       const call = method === 'schema' ? () => door.schema(String(args.register)) : (door as unknown as Record<string, (a: unknown) => Promise<unknown>>)[method];
       void (call ? call(args) : Promise.resolve({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: method } })).then((answer) => {
         res.writeHead(200, { 'content-type': 'application/json' });

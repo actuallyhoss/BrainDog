@@ -1050,6 +1050,13 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
          account; `written_off` says a debt was cancelled, and nothing about a key moving list makes the second one
          true. The export's schedule holds only what is still owed, so such a row has no new row double-counting it. */
       if (Object.entries(r.only).some(([field, value]) => stable(at.fields[field]) !== stable(value))) continue;
+      /* A ROW DATED OUTSIDE THE DAYS THE EXPORT SPOKE ABOUT IS NOT ONE IT DROPPED (`Retire.inside`): an opening balance
+         older than a windowed ledger answer was voided here, and so was a row only a newer export carried when an
+         older one was imported after it (`test/import-ledger-window.test.ts`). A row with no day is outside too. */
+      if (r.inside) {
+        const day = at.fields[r.inside.field];
+        if (typeof day !== 'string' || day.slice(0, 10) <= r.inside.after || day.slice(0, 10) >= r.inside.before) continue;
+      }
       const patch = Object.fromEntries(Object.entries(r.patch).filter(([field, value]) => stable(at.fields[field]) !== stable(value)));
       if (Object.keys(patch).length === 0) continue;
       const names = r.titles.map((f) => at.fields[f]).filter((v): v is string => typeof v === 'string');
@@ -1439,7 +1446,11 @@ export function sinceSaid(runs: Run[], since: string, offsetOf: (at: Date) => nu
   for (const i of shown) {
     const run = runs[i]!;
     const before = runs.slice(0, i).findLast((r) => r.host === run.host);
-    const had = new Set((before?.skipped ?? []).flatMap((s) => s.items.map((item) => `${s.reason}\n${item}`)));
+    /* BY THE ITEM ALONE, NOT THE ITEM WITH ITS REASON. A reason is a sentence this code writes, and the first morning
+       after wave fifty-two reworded three of them said every decided and dismissed question and every deleted task once
+       more as "Newly left out" (`test/import-left-out.test.ts`). The item is what the old tool holds, so a new wording is
+       not news and a new item is. An item several reasons used to share, `the ledger`, was split so this holds. */
+    const had = new Set((before?.skipped ?? []).flatMap((s) => s.items));
     if (lines.length > 0) lines.push('');
     /* THE EXPORT'S DAY IN THE SAME ZONE AS THE HEADER IT SITS BESIDE. It was the UTC date, so at +03:00 an export taken
        at 01:30 on the 22nd sat beside a header saying the 22nd and was called an export of the 21st. A `taken` that is
@@ -1468,7 +1479,7 @@ export function sinceSaid(runs: Run[], since: string, offsetOf: (at: Date) => nu
     const newlyHeld = (run.deleted ?? []).filter((r) => !heldBefore.has(`${r.register}\n${r.label}`));
     if (newlyHeld.length > 0) lines.push(`- Deleted in this BrainDog, so not added again: ${deletedSaid(newlyHeld)}.`);
     for (const s of run.skipped) {
-      const fresh = s.items.filter((item) => !had.has(`${s.reason}\n${item}`));
+      const fresh = s.items.filter((item) => !had.has(item));
       if (fresh.length > 0) lines.push(`- Newly left out: ${few(fresh)}. ${s.reason}.`);
     }
     if (lines.length === start) lines.push('- Nothing moved in the old tool since the run before.');
@@ -1557,48 +1568,6 @@ function rememberRun(home: string, run: Run): number[] {
   writeFileSync(`${file}.tmp`, `${kept.map((r) => JSON.stringify(r)).join('\n')}\n`);
   renameSync(`${file}.tmp`, file);
   return read.passed;
-}
-
-/**
- * One page of a list with the rows he deleted in it, AS A POST, and why it is not `client.list`.
- *
- * THE KERNEL HAS THE READ AND THE ROUTE TABLE DOES NOT NAME IT. `kernel.list` takes `includeDeleted`, and the record's
- * `list` hands the kernel every argument it was sent, but the host's table (`packages/host/src/index.ts`, `ROUTES`)
- * declares `register`, `where`, `limit`, `cursor` and `order` alone, and `client.list` sends a read as a GET. Probed on
- * 23 September through `serveApi` over an in-memory record with one live row and one deleted: the GET's
- * `includeDeleted=true` arrived as the text "true", which the kernel does not read as `true`, and the answer was the
- * live row alone with nothing said. A POST's body keeps its JSON types, and the same read answered both rows. So this
- * sends the POST, with the headers, the bearer and the deadline every other request of the run carries.
- *
- * THIS IS THE SECOND DOOR THE IMPORT KNOWS AND IT SHOULD NOT BE. Once `ROUTES` names `includeDeleted` as `json` and
- * `client.list` takes it, this becomes `client.list({ ...args, includeDeleted: true })`. Until then a host that stops
- * passing the argument through answers live rows, which holds nothing back, so it fails back to how the import was.
- */
-async function listWithDeleted(send: typeof fetch, to: Target, args: { register: string; limit?: number; cursor?: string | null }): Promise<Result<{ rows: unknown[]; cursor: string | null }>> {
-  const lost = (why: string) => no<never>('UNREACHABLE', `The record could not be reached: ${why}`);
-  let res: Response;
-  try {
-    res = await send(`${to.base.replace(/\/+$/u, '')}/api/list`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...(to.token ? { authorization: `Bearer ${to.token}` } : {}) },
-      body: JSON.stringify({ ...args, includeDeleted: true }),
-    });
-  } catch (e) {
-    return lost(e instanceof Error ? e.message : String(e));
-  }
-  let body: unknown;
-  try {
-    body = await res.json();
-  } catch {
-    return lost(`${String(res.status)} with a body that is not JSON`);
-  }
-  /* THE SHAPE IS CHECKED THE WAY THE CLIENT CHECKS IT (`packages/client/src/index.ts`, `answered`): a gateway's own
-     JSON with `ok: 1` read as a success would be a list with no rows, which is the one answer this read must not give. */
-  if (isObj(body) && body.ok === true && isObj(body.value) && Array.isArray(body.value.rows))
-    return ok({ rows: body.value.rows, cursor: typeof body.value.cursor === 'string' ? body.value.cursor : null });
-  if (isObj(body) && body.ok === false && isObj(body.refusal) && typeof body.refusal.code === 'string' && typeof body.refusal.fix === 'string')
-    return no(body.refusal.code, body.refusal.fix);
-  return lost(`${String(res.status)} with an answer this import does not recognise`);
 }
 
 /** `braindog import legacy <file>`, and the exit code: 0 done, 1 refused or partly refused, 3 the host did not answer. */
@@ -1714,7 +1683,7 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
   const client = createClient({ base: to.base, ...(to.token ? { token: to.token } : {}), fetch: send });
   const door: Door = {
     schema: (register) => client.schema(register),
-    list: ({ deleted, ...a }) => (deleted === true ? listWithDeleted(send, to, a) : client.list(a)),
+    list: ({ deleted, ...a }) => client.list(deleted === true ? { ...a, includeDeleted: true } : a),
     create: (a) => client.create(a),
     update: (a) => client.update(a),
     governance: (a) => client.governance(a),
