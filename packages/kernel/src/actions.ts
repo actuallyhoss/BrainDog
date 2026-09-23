@@ -1482,6 +1482,37 @@ export function queueCall(
     return { ingest, outcome: 'held', say };
   }
 
+  /* AND A FIELD HOLDING WHAT A SECRET OR A FILE FIELD OF THE SAME ROW HOLDS IS LEFT OUT THE SAME WAY, whatever its own
+     type. A rule's `set` writes a secret into a text field before the call is queued, and the type alone let it through:
+     measured on 23 September, `set: { field: party, to: '{{token}}' }` beside `run: paid_hook` queued `party:
+     'hunter2'`, inline and as a run, through `set_var`, another field, `tags` and a branch, and so did two rules that
+     each install clean, one writing `party` and one running the call, which no lint of one body can see. The lint now
+     refuses the single body at install (`flow-lint.ts`, `sentFrom`); this is the second line, and the only one for the
+     pair. It reads the row's values rather than the steps that wrote them, because the pass hands this function the
+     row and nothing of the rule, so a field holding the secret's words for another reason is left out too, which costs
+     a call a value and sends nothing that should stay.
+
+     RETIRED FIELDS COUNT, SO THE DECLARATION IS READ AND NOT ONLY `typeOf`. The live schema `typeOf` reads drops a
+     retired field, and the rows written before it was retired keep the value, which `fill` still reads: the checker
+     measured on 23 September, with `token` retired, the pair above queueing `party: 'hunter2'` while the lint refused
+     the single body, since `hiddenOf` there reads the declaration too. */
+  const declared = deps.sql.one<{ body: string }>(
+    "SELECT body FROM declaration WHERE id = ? AND kind = 'register' AND superseded_at IS NULL AND retired = 0",
+    `register.${entry.register}`,
+  )?.body;
+  const retiredToo = new Set(
+    ((declared === undefined ? {} : JSON.parse(declared)) as { fields?: { id?: unknown; type?: unknown }[] }).fields
+      ?.filter((f) => f?.type === 'secret' || f?.type === 'file')
+      .map((f) => String(f.id)) ?? [],
+  );
+  const held: string[] = [];
+  for (const [field, v] of Object.entries(entry.fields)) {
+    const type = fired.typeOf(field);
+    if (type !== 'secret' && type !== 'file' && !retiredToo.has(field)) continue;
+    for (const one of Array.isArray(v) ? v : [v]) if (typeof one === 'string' && one !== '') held.push(one);
+  }
+  const holds = (v: unknown): boolean => held.length > 0 && (Array.isArray(v) ? v : [v]).some((one) => held.some((s) => (typeof one === 'string' ? one : JSON.stringify(one) ?? '').includes(s)));
+
   const row: Record<string, unknown> = {};
   for (const said of decl.sends ?? []) {
     const dot = said.indexOf('.');
@@ -1490,6 +1521,7 @@ export function queueCall(
     if (dot < 1 || register !== entry.register) continue;
     const type = fired.typeOf(field);
     if (type === undefined || type === 'secret' || type === 'file') continue;
+    if (holds(entry.fields[field])) continue;
     row[field] = entry.fields[field] ?? null;
   }
   deps.enqueue({ channel: 'call', ingest, grant: key.id, rule, entry: entry.id, row });
