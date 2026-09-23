@@ -73,7 +73,7 @@ test('A PROFILE WHOSE .claude.json RUNS brain-mcp.mjs: the dry run lists + mcpSe
   const p = profile(home, '.claude-quartz', { numStartups: 9, mcpServers: { brain: SAM, figma: { type: 'http', url: 'https://mcp.figma.com/mcp' } } });
 
   const dry = installInto(p.dir, { apply: false, replace: true, scripts, home });
-  assert.ok(dry.includes("  - mcpServers.brain, the old tool's: node C:\\Tools\\legacy\\mcp\\brain-mcp.mjs"), dry.join('\n'));
+  assert.ok(dry.includes("  - mcpServers.brain, the old tool's: node [1 argument hidden]"), dry.join('\n'));
   assert.ok(dry.includes(PLUS), `no + line for BrainDog's server:\n${dry.join('\n')}`);
   assert.equal(readFileSync(p.claudeJson, 'utf8'), p.before, 'the dry run changed the file');
 

@@ -49,7 +49,7 @@ const SHAPES: { name: string; server: Record<string, unknown>; secret: string; s
     name: 'a header named on its own word, then its value',
     server: { command: 'npx', args: ['-y', 'mcp-remote', 'https://brain.example.com/mcp', '--header', 'X-Brain-Token', `hbt${CORE}`] },
     secret: `hbt${CORE}`,
-    shown: 'npx -y mcp-remote https://brain.example.com/mcp --header [hidden]',
+    shown: 'npx [6 arguments hidden]',
   },
   {
     name: 'a short token in the URL path',
@@ -61,19 +61,19 @@ const SHAPES: { name: string; server: Record<string, unknown>; secret: string; s
     name: 'a value after -t',
     server: { command: 'node', args: ['C:/Tools/legacy/brain-mcp.mjs', '-t', `k${CORE}`] },
     secret: `k${CORE}`,
-    shown: 'node C:/Tools/legacy/brain-mcp.mjs -t [hidden]',
+    shown: 'node [3 arguments hidden]',
   },
   {
     name: 'a bearer inside one header string',
     server: { command: 'npx', args: ['mcp-remote', 'https://brain.example.com/mcp', '--header', `Authorization: Bearer b${CORE}`] },
     secret: `b${CORE}`,
-    shown: 'npx mcp-remote https://brain.example.com/mcp --header [hidden]',
+    shown: 'npx [4 arguments hidden]',
   },
   {
     name: 'a letters-only token after a throwaway value that follows --token',
     server: { command: 'node', args: ['C:/Tools/legacy/brain-mcp.mjs', '--token', 'x', 'qwRtzuIopaSdfghjKlyx'] },
     secret: 'qwRtzuIopaSdfghjKlyx',
-    shown: 'node C:/Tools/legacy/brain-mcp.mjs --token [hidden]',
+    shown: 'node [4 arguments hidden]',
   },
 ];
 
@@ -91,6 +91,6 @@ for (const shape of SHAPES)
 test('the words after a hidden value that name the entry are still shown', () => {
   assert.equal(
     lineFor({ command: 'npx', args: ['-y', 'mcp-remote', '--header', `Authorization: Bearer b${CORE}`, 'https://brain.example.com/mcp', '--transport', 'http-only'] }),
-    'npx -y mcp-remote --header [hidden] https://brain.example.com/mcp --transport http-only',
+    'npx [7 arguments hidden]',
   );
 });

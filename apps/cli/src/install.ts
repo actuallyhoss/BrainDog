@@ -374,7 +374,31 @@ const readObject = (file: string, what: string): Record<string, unknown> => {
   return parsed;
 };
 
-const dryTail = (options: Options) => `Nothing was changed. Run braindog install ${options.replace ? '--replace --apply' : '--apply'} to write it.`;
+/**
+ * The dry run's one closing line: THE COMMAND THAT WRITES WHAT IT SHOWED, word for word, quoted for the shell `shellOf`
+ * names. Measured before this (`loop/research-cutover-day.md` §7.1): the line was built from `--replace` alone and
+ * printed after every file, ten times in his dry run of 44 lines, as `Run braindog install --replace --apply`. It named
+ * no `--config-dir` or `--mcp-json`, and `braindog` is on no PATH of his. Run as printed on copies of his profiles, from
+ * a window whose `CLAUDE_CONFIG_DIR` named quartz, it cut over quartz alone and left the default and acme profiles
+ * and `C:\Repos\.mcp.json` on the old tool, the one-profile split brain `--replace` exists to prevent.
+ *
+ * THE RESOLVED PROFILES, NOT THE WORDS TYPED. A run that named no `--config-dir` changed the profile the shell was in,
+ * and the line pins that one, so pasting it into another window writes what was shown and nothing else.
+ */
+function dryTail(profiles: string[], files: string[], mcpFiles: string[], options: Options, shell: Shell = shellOf()): string {
+  const named = (flag: string, paths: string[]) => paths.flatMap((path) => [flag, quote(resolve(path), shell)]);
+  const words = [
+    'node',
+    quote(fileURLToPath(new URL('./main.ts', import.meta.url)), shell),
+    'install',
+    ...(options.replace ? ['--replace'] : []),
+    '--apply',
+    ...named('--config-dir', profiles),
+    ...named('--settings', files),
+    ...named('--mcp-json', mcpFiles),
+  ];
+  return `Nothing was changed. To write it, run this in ${shell}: ${words.join(' ')}`;
+}
 
 /**
  * What installing into every profile and every named file does, as one change: each profile's `settings.json`,
@@ -408,18 +432,35 @@ export function installProfiles(profiles: string[], files: string[], options: Op
   for (const dir of profiles) {
     add(join(dir, 'settings.json'), planSettings);
     if (options.replace) {
-      add(serversFileOf(dir, options.home), planServers);
+      const servers = serversFileOf(dir, options.home);
+      add(servers, planServers);
+      /*
+       * THE DEFAULT PROFILE'S SECOND SERVERS FILE, `~\.claude\.claude.json`, WHEN IT EXISTS. Measured with Claude Code
+       * 2.1.280 in a scratch home (`loop/research-cutover-day.md` §7.2): with `CLAUDE_CONFIG_DIR` unset, `claude mcp
+       * list` read `<home>\.claude.json`; set to `<home>\.claude`, the same folder, it read the file inside and said
+       * "No MCP servers configured". His real `~\.claude` holds such a file, so some launcher starts sessions that way,
+       * and a cut-over of the one file left those with BrainDog's hooks and no server. NEVER MADE when missing, since a
+       * profile nobody starts that way has no use for it, and `serversFileOf` stays the answer `byHand` names.
+       */
+      const inside = join(resolve(dir), '.claude.json');
+      if (fold(inside) !== fold(resolve(servers)) && existsSync(inside)) add(inside, planServers);
       add(join(dir, 'skills'), planSkills);
     }
   }
   for (const file of files) add(file, planSettings);
   for (const file of mcpFiles) add(file, planMcpJson);
   /*
+   * ONE CLOSING LINE FOR THE DRY RUN, after every plan, and only when some plan would change something. The plans are
+   * the same dry or not; `--apply` alone decides whether `commit` runs.
+   */
+  const pending = plans.some((plan) => plan.write !== null || (plan.moves ?? []).length > 0);
+  const planned = options.apply ? commit(plans) : [...plans.flatMap((plan) => plan.lines), ...(pending ? [dryTail(profiles, files, mcpFiles, options)] : [])];
+  /*
    * AFTER THE PLAN, NOT BEFORE IT: a run's first line has always been its first file's heading, and main.ts's own
    * tests read it there. Printed first, it failed two of them whenever the tree held another agent's edit.
    */
   const moving = movingCheckout(options.checkout ?? dirname(fileURLToPath(import.meta.url)));
-  const lines = [...commit(plans), ...(moving ? [moving] : [])];
+  const lines = [...planned, ...(moving ? [moving] : [])];
   const owed = new Set<string>();
   const unserved = profiles.filter((dir) => {
     const file = serversFileOf(dir, options.home);
@@ -517,27 +558,15 @@ function planSettings(named: string, options: Options): Plan {
   const lines = [`${options.apply ? 'Changed' : 'braindog install would change'} ${file}${had ? '' : ', a new file'}:`];
   for (const { event, command } of removed) lines.push(`  - hooks.${event}, the old tool's: ${command}`);
   for (const { event, entry } of added) lines.push(`  + hooks.${event}: ${JSON.stringify(entry)}`);
-  if (!options.apply) return { lines: [...lines, dryTail(options)], write: null };
-
   for (const { event, entry } of added) next[event] = [...((next[event] as unknown[] | undefined) ?? []), entry];
   return { lines, write: { file, had, value: { ...settings, hooks: next } } };
 }
 
 const HIDDEN = '[hidden]';
 /**
- * A word naming a secret, so the word after it is one: `--token`, `--api-key`, `--header`, `Authorization:`,
- * `Bearer`. Loose on purpose, since a word hidden in error costs a reader nothing and one shown costs a key.
- */
-const NAMES_SECRET = /token|key|secret|pass|auth|bearer|basic|credential|cookie|session|sig|header|jwt|pat\b/i;
-const isUrl = (word: string) => /^[a-z][a-z0-9+.-]*:\/\//i.test(word);
-/*
- * A colon anywhere, not only at the end: `Authorization:Bearer` is one word when it is written without the space. A
- * URL is never a name, or the `key=` in its query (which is dropped anyway) hid the `--header` after it.
- */
-const namesSecret = (word: string) => !isUrl(word) && (/^-/.test(word) || /:/.test(word) || /^(?:bearer|basic|token)$/i.test(word)) && NAMES_SECRET.test(word);
-/**
  * A piece of a word that may itself be a token: a known key prefix, or sixteen characters or more that mix letters
- * and digits. `brain-mcp.mjs` and `mcp-remote` pass; `hb_live_SECRET_77`, the audit's, and a UUID do not.
+ * and digits. Asked now only of the program's own path, the one word `describe` still shows, because a program kept
+ * under a folder named for a key is no less a key for being the first word.
  */
 const looksLikeToken = (piece: string) =>
   /^(?:hb|sk|pk|rk|ghp|gho|ghs|ghu|github_pat|glpat|xox[a-z]|rec|AKIA)[_-]/i.test(piece) || piece.length >= 32 || (piece.length >= 16 && /\d/.test(piece) && /[a-z]/i.test(piece));
@@ -566,65 +595,38 @@ function hideUrl(text: string): string {
   }
 }
 
-function hideWord(word: string): string {
-  const bare = word.replace(/^["']+|["']+$/g, '');
-  if (isUrl(bare)) return hideUrl(bare);
-  /* `name=value` and `Name:value` alike, so `Authorization:<key>` hides the key as `--api-key=<key>` does. */
-  const eq = bare.search(/[=:]/);
-  if (eq > 0) {
-    const name = bare.slice(0, eq);
-    const value = bare.slice(eq + 1);
-    /*
-     * A URL AFTER `=` IS STILL A URL. Split into path pieces instead, `--url=https://brain.example.com/mcp?t=qpw12`
-     * printed `mcp?t=qpw12`, because the query was one piece and too short to look like a token.
-     */
-    return `${name}${bare[eq]}${NAMES_SECRET.test(name) ? HIDDEN : isUrl(value) ? hideUrl(value) : hidePieces(value)}`;
-  }
-  return hidePieces(bare);
-}
-
 /**
- * What a server entry runs, to name it by: the command and its arguments, or the URL. NEVER `env` OR `headers`,
- * which is where a registration keeps its token, and NEVER A TOKEN IN WHAT IS SHOWN. Measured before this
- * (`loop/research-batch-twenty-four-audit.md` §4): `--token hb_live_SECRET_77` in the arguments and
- * `/mcp/hb_live_SECRET_88` in the path were printed whole on the dry run and under `--json`. A word after one that
- * names a secret is hidden, and so is every word or path segment shaped like a token, and a run of hidden words
- * is shown once.
+ * What a server entry runs, to name it by: THE PROGRAM AND HOW MANY ARGUMENTS WERE HIDDEN, NEVER AN ARGUMENT, or for an
+ * entry registered by URL, the URL as `hideUrl` shows one. Never `env` or `headers` either, which is where a
+ * registration keeps its token.
  *
- * A WORD NAMING A SECRET HIDES EVERY WORD AFTER IT UP TO THE NEXT FLAG OR URL, not the one word. Measured before this
- * (batch twenty-eight's audit, §5): `--header X-Brain-Token <value>` printed the value, because the header's name was
- * hidden as the flag's value but names nothing by `namesSecret`'s rule, and `--token x <token>` printed a twenty-letter
- * token that followed a throwaway word. A flag or a URL ends the run because either is what tells a reader which
- * entry this is, and neither is a value a secret flag takes as a second word.
+ * INVERTED FROM A LIST OF SHAPES TO HIDE, because the list had no end (backlog SEC-6, audit twenty-eight's §5 brief).
+ * It hid a word after one naming a secret, a word after a short flag, and anything shaped like a token, and each audit
+ * since the twenty-fourth measured a shape outside the three: `--header X-Brain-Token <value>`, a nine-character token
+ * in a URL path, `-t shortpw`, and last `node brain-mcp.mjs q7Rw2xT9` and `node brain-mcp.mjs --hb q7Rw2xT9`, printed
+ * whole on this tree because the token follows no word the rules knew and is too short to look like one. The line is
+ * printed under the entry's own name (`mcpServers.<name>`), which is what tells a reader which entry it is, so the
+ * arguments were never needed to name it.
+ *
+ * ONLY `command` IS SPLIT ON WHITESPACE, as an entry that gives its whole command line there needs, and each of `args`
+ * is one argument however many spaces it holds. Split whole, `--header 'Authorization: Bearer <key>'` was counted as
+ * four. A program path holding a space is counted as a program and one argument more, which says more is hidden than
+ * was, and shows nothing.
+ *
+ * A LEADING `NAME=value` IS AN ASSIGNMENT, NOT THE PROGRAM, and is counted with what is hidden. Measured by this
+ * change's checker: taken as the program, `TOKEN=q7Rw2xT9 node brain-mcp.mjs` printed `TOKEN=q7Rw2xT9`, a token the
+ * word-by-word rules before it had hidden.
  */
 function describe(server: Record<string, unknown>): string {
-  const words = typeof server.url === 'string' ? [server.url] : wordsOf(server);
-  const shown: string[] = [];
-  /* 1 on the word straight after one naming a secret, which is hidden whatever it is; 2 on the words after that. */
-  let secret: 0 | 1 | 2 = 0;
-  let short = false;
-  for (const word of words) {
-    const bare = word.replace(/^["']+|["']+$/g, '');
-    /* After a one-letter flag, a word that is itself a flag is no value, and a URL is shown as `hideUrl` shows one. */
-    const ends = /^-/.test(bare) || isUrl(bare);
-    const hidden: boolean = secret === 1 || ((secret === 2 || short) && !ends);
-    const text = hidden ? HIDDEN : hideWord(word);
-    if (!(text === HIDDEN && shown.at(-1) === HIDDEN)) shown.push(text);
-    /* `Bearer` hidden after `Authorization:` still names a secret, so the key after it is hidden too. */
-    const names = namesSecret(bare);
-    secret = names ? 1 : secret !== 0 && hidden ? 2 : 0;
-    short = !names && isShortFlag(bare);
-  }
-  return shown.join(' ');
+  if (typeof server.url === 'string') return hideUrl(server.url.replace(/^["']+|["']+$/g, ''));
+  const words = typeof server.command === 'string' ? server.command.split(/\s+/).filter(Boolean) : [];
+  const assigned = words.findIndex((word) => !/^["']?[A-Za-z_][\w]*=/.test(word));
+  const [program = '', ...inCommand] = assigned === -1 ? ['', ...words] : [words[assigned] ?? '', ...words.slice(0, assigned), ...words.slice(assigned + 1)];
+  const count = inCommand.length + (Array.isArray(server.args) ? server.args.length : 0);
+  const shown = hidePieces(program.replace(/^["']+|["']+$/g, ''));
+  const hidden = `[${String(count)} argument${count === 1 ? '' : 's'} hidden]`;
+  return count === 0 ? shown : shown === '' ? hidden : `${shown} ${hidden}`;
 }
-
-/**
- * A FLAG TOO SHORT TO SAY WHAT IT TAKES, `-t` or `-p`, so the word after it is treated as a secret. Measured before
- * this (batch twenty-seven's finding): `-t shortpw` printed `shortpw`, which follows no word naming a secret and is
- * too short to look like a token. `-y` is left out because it is npx's `--yes`, which takes nothing, and every proxied
- * registration starts with it: hiding the package after it would hide the one word that says the entry is a proxy.
- */
-const isShortFlag = (word: string) => /^-[a-z]{1,2}$/i.test(word) && word !== '-y';
 
 /* The command and its arguments split into words, since an entry may give the whole command as one string. */
 const wordsOf = (server: Record<string, unknown>): string[] =>
@@ -720,7 +722,6 @@ function planMcpJson(named: string, options: Options): Plan {
   if (removed.length === 0) return { lines: [`${file} registers no the old tool MCP server. Nothing to change.`], write: null };
   /* No `withBraindog` here: a new name in this file is only a prompt, as the header says finding 2 measured. */
   const lines = [`${options.apply ? 'Changed' : 'braindog install --replace would change'} ${file}:`, ...removed];
-  if (!options.apply) return { lines: [...lines, dryTail(options)], write: null };
   return { lines, write: { file, had: true, value: next } };
 }
 
@@ -751,12 +752,14 @@ function planServers(file: string, options: Options): Plan {
     return { lines: [`${file} registers no the old tool MCP server. Nothing to change.${why}`], write: null, serves };
   }
   /*
-   * NOT MEASURED HERE, AND SAID BECAUSE IT IS CHEAP: Claude Code keeps its running state in this same file (the
-   * fixture's `numStartups` is one such field), so a session left open may write back the copy it read.
+   * THE REASON THAT WAS MEASURED, NOT THE ONE THAT WAS GUESSED (`loop/research-cutover-day.md` §4). This said each
+   * open session rewrites the file, and a session held open across `--apply` did not: no top-level key differed after
+   * it exited. What it did do was keep calling the old server 15 s after the install, list the old skill in every
+   * request, and answer "No such tool" for BrainDog's, while its hooks were reloaded within seconds. So the line is
+   * owed where a the old tool server comes out, whether or not the file was there before.
    */
-  const close = had ? ['Close every Claude Code session on this profile before --apply, since each one rewrites this file.'] : [];
-  if (!options.apply) return { lines: [...lines, ...close, dryTail(options)], write: null, serves };
-  return { lines, write: { file, had, value: next }, serves };
+  const close = removed.length > 0 && !options.apply ? ["Close every Claude Code session on this profile before --apply: one left open keeps the old tool's server and skill until it closes, and goes on writing to the old tool through them."] : [];
+  return { lines: [...lines, ...close], write: { file, had, value: next }, serves };
 }
 
 /**
@@ -795,6 +798,5 @@ function planSkills(skills: string, options: Options): Plan {
     `${options.apply ? 'Changed' : 'braindog install --replace would change'} ${skills}:`,
     ...moves.map((move) => `  - skills/${basename(move.from)}, the old tool's skill, set aside as skills/.replaced/${basename(move.to)}`),
   ];
-  if (!options.apply) return { lines: [...lines, dryTail(options)], write: null };
   return { lines, write: null, moves };
 }

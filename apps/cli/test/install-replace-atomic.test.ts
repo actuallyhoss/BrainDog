@@ -161,10 +161,10 @@ test('A TOKEN IN AN ARGUMENT, A PATH OR A QUERY IS NEVER PRINTED, on the dry run
   const text = installInto(a.dir, { apply: false, replace: true, scripts, home }).join('\n');
   for (const secret of SECRETS) assert.ok(!text.includes(secret.slice(0, 12)), `${secret} was printed:\n${text}`);
   /* Still readable: what runs is named, and what was withheld is marked rather than silently dropped. */
-  assert.ok(text.includes("  - mcpServers.token-in-args, the old tool's: node C:\\Tools\\legacy\\mcp\\brain-mcp.mjs --token [hidden]"), text);
+  assert.ok(text.includes("  - mcpServers.token-in-args, the old tool's: node [3 arguments hidden]"), text);
   assert.ok(text.includes("  - mcpServers.token-in-path, the old tool's: https://brain.example.com/mcp/[hidden]"), text);
-  assert.ok(text.includes("  - mcpServers.token-joined, the old tool's: node C:\\Tools\\legacy\\mcp\\brain-mcp.mjs --api-key=[hidden]"), text);
-  assert.ok(text.includes("  - mcpServers.proxied-with-header, the old tool's: npx -y mcp-remote https://brain.example.com/mcp --header [hidden]"), text);
+  assert.ok(text.includes("  - mcpServers.token-joined, the old tool's: node [2 arguments hidden]"), text);
+  assert.ok(text.includes("  - mcpServers.proxied-with-header, the old tool's: npx [5 arguments hidden]"), text);
 
   const ran = cli(['install', '--replace', '--json', '--config-dir', a.dir], home);
   assert.equal(ran.code, 0, ran.stderr);
@@ -188,7 +188,7 @@ test('A SERVER REGISTERED THROUGH A PROXY, npx mcp-remote https://brain.example.
   });
 
   const dry = installInto(a.dir, { apply: false, replace: true, scripts, home });
-  assert.ok(dry.includes("  - mcpServers.remote, the old tool's: npx -y mcp-remote https://brain.example.com/mcp"), dry.join('\n'));
+  assert.ok(dry.includes("  - mcpServers.remote, the old tool's: npx [3 arguments hidden]"), dry.join('\n'));
   assert.ok(dry.some((l) => l.startsWith("  - mcpServers.remote-one-string, the old tool's: ")), dry.join('\n'));
   assert.ok(dry.some((l) => l.startsWith("  - mcpServers.dotted, the old tool's: ")), dry.join('\n'));
   assert.ok(!dry.some((l) => l.includes('mcpServers.other')), dry.join('\n'));

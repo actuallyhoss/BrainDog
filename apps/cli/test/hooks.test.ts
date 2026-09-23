@@ -338,7 +338,7 @@ test('INSTALL IS A DRY RUN BY DEFAULT, and with --apply keeps a copy, keeps othe
   assert.ok(dry.stdout.startsWith(`braindog install would change ${file}:\n`), dry.stdout);
   assert.ok(dry.stdout.includes(`  + hooks.SessionStart: ${JSON.stringify({ hooks: [{ type: 'command', command: start, timeout: 20 }] })}`));
   assert.ok(dry.stdout.includes(`  + hooks.SessionEnd: ${JSON.stringify({ hooks: [{ type: 'command', command: end, timeout: 15 }] })}`));
-  assert.ok(dry.stdout.includes('Nothing was changed. Run braindog install --apply to write it.'));
+  assert.ok(dry.stdout.split('\n').some((l) => l.startsWith('Nothing was changed. To write it, run this in ') && l.includes(` install --apply --config-dir '${profile}'`)), dry.stdout);
   assert.ok(dry.stdout.includes('claude mcp add --scope user braindog'));
   assert.equal(readFileSync(file, 'utf8'), before, 'the dry run changed the settings');
   assert.deepEqual(readdirSync(profile), ['settings.json']);
@@ -468,12 +468,12 @@ test('INSTALL --REPLACE IS A DRY RUN THAT NAMES EVERY THE OLD TOOL HOOK AND MCP 
   }
   assert.equal(lines.filter((l) => l === `  - hooks.SessionStart, the old tool's: ${HB_START}`).length, 2, text);
   assert.equal(lines.filter((l) => l === `  - hooks.SessionEnd, the old tool's: ${HB_END}`).length, 2, text);
-  assert.equal(lines.filter((l) => l === "  - mcpServers.brain, the old tool's: node C:\\Tools\\legacy\\mcp\\brain-mcp.mjs").length, 2, text);
+  assert.equal(lines.filter((l) => l === "  - mcpServers.brain, the old tool's: node [1 argument hidden]").length, 2, text);
   assert.equal(lines.filter((l) => l === "  - mcpServers.brain-http, the old tool's: https://brain.example.com/mcp").length, 2, text);
-  assert.equal(lines.filter((l) => l === "  - projects[\"C:/Repos/acme\"].mcpServers.brain, the old tool's: node C:/Tools/legacy/mcp/brain-mcp.mjs").length, 2, text);
+  assert.equal(lines.filter((l) => l === "  - projects[\"C:/Repos/acme\"].mcpServers.brain, the old tool's: node [1 argument hidden]").length, 2, text);
   assert.ok(!text.includes(OLD_SHIM) && !text.includes(LOOKALIKE) && !text.includes('brainy') && !text.includes('figma'), text);
   assert.ok(!text.includes(HB_SECRET), 'the dry run printed the env of a server it would remove');
-  assert.ok(text.includes('Nothing was changed. Run braindog install --replace --apply to write it.'), text);
+  assert.equal(lines.filter((l) => l.startsWith('Nothing was changed. To write it, run this in ') && l.includes(' install --replace --apply --config-dir ')).length, 2, text);
 
   assert.equal(readFileSync(main.settings, 'utf8'), main.before);
   assert.equal(readFileSync(join(home, '.claude.json'), 'utf8'), main.mcpBefore);
@@ -578,8 +578,8 @@ test('INSTALL --REPLACE --MCP-JSON names the the old tool servers in a .mcp.json
   const dry = await run(['install', '--replace', '--config-dir', profile, '--mcp-json', file], env, '');
   assert.equal(dry.code, 0, dry.stderr);
   assert.ok(dry.stdout.includes(`braindog install --replace would change ${file}:`), dry.stdout);
-  assert.ok(dry.stdout.includes("  - mcpServers.brain, the old tool's: node C:\\Tools\\legacy\\mcp\\brain-mcp.mjs"), dry.stdout);
-  assert.ok(dry.stdout.includes("  - mcpServers.proxied, the old tool's: npx -y mcp-remote https://brain.example.com/mcp"), dry.stdout);
+  assert.ok(dry.stdout.includes("  - mcpServers.brain, the old tool's: node [1 argument hidden]"), dry.stdout);
+  assert.ok(dry.stdout.includes("  - mcpServers.proxied, the old tool's: npx [3 arguments hidden]"), dry.stdout);
   /*
    * BRAINDOG'S SERVER GOES INTO THE PROFILE, NOT THE .mcp.json (brief 44-B of `loop/research-switch-left.md`). This
    * once read the whole stdout for the `+` line, and wave forty-four's builder found it passing only because the
@@ -669,9 +669,9 @@ test('a the old tool URL joined to its flag with = is known, and a short secret 
     }),
   );
   const text = installInto(dir, { apply: false, replace: true, scripts: join(APP, 'hooks'), home }).join('\n');
-  assert.ok(text.includes("  - mcpServers.joined, the old tool's: npx -y mcp-remote --url=https://brain.example.com/mcp"), text);
-  assert.ok(text.includes("  - mcpServers.joined-query, the old tool's: npx -y mcp-remote --url=https://brain.example.com/mcp"), text);
-  assert.ok(text.includes("  - mcpServers.short-flag, the old tool's: node C:\\Tools\\legacy\\mcp\\brain-mcp.mjs -t [hidden] -v --quiet"), text);
+  assert.ok(text.includes("  - mcpServers.joined, the old tool's: npx [3 arguments hidden]"), text);
+  assert.ok(text.includes("  - mcpServers.joined-query, the old tool's: npx [3 arguments hidden]"), text);
+  assert.ok(text.includes("  - mcpServers.short-flag, the old tool's: node [5 arguments hidden]"), text);
   assert.ok(!text.includes('shortpw') && !text.includes('qpw12'), text);
   assert.ok(!text.includes('mcpServers.near'), text);
 });
