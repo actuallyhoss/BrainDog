@@ -15,6 +15,10 @@
  * `set` names a field of its list as written. Once nothing can copy a secret into a field that may leave, no reader in
  * this rule or another has anything to follow, which is why the per-question walk over what a step wrote is gone.
  *
+ * AND SINCE WAVE FIFTY-FIVE THE RUNNER REFUSES THAT WRITE TOO, for a rule stored past the lint, where before it wrote the
+ * copy and held the field back from what leaves. So the test of that holding back now starts from a run an earlier
+ * build took past its write, put in by SQL, and a stored rule is held to writing nothing from the secret.
+ *
  * AND A `list<secret>` IS A SECRET HERE, as the write path already reads it (`index.ts`, `field.of === 'secret'`).
  * `declare.ts` refuses such a field at install, so only a list stored past that lint holds one; the lint and the
  * runner read it by its element type now, as `redacts` does.
@@ -168,15 +172,15 @@ test('A SET NAMES THE FIELD IT WRITES AS ONE OF ITS LIST\'S FIELD IDS, on both p
   sql.close();
 });
 
-test('A RULE STORED PAST THE LINT WITH ITS FIELD IN BRACES HOLDS THE FIELD IT FILLED BACK FROM SPARK', async () => {
-  /* THE SECOND LINE, for L4: `writes()` read the step's `field` as written, so `-unsent` held `{{vars.f}}` and the
-     question read `note` as the step left it. Measured before the repair through this harness: `Rate for hunter2
-     hunter2?` with `about: { note: 'hunter2', what: 'Rent' }`. */
-  const list = [
-    { set_var: { name: 'f', to: 'note' } },
-    { set: { field: '{{vars.f}}', to: '{{pin}}' } },
-    { ask_spark: { question: 'Rate for {{note}} {{trigger.row.note}}?', about: ['note', 'what'], as: 'rate' } },
-  ];
+/** L4 as a step list: `f` is `note`, and the `set` names its field as `{{vars.f}}`. */
+const BRACED = [
+  { set_var: { name: 'f', to: 'note' } },
+  { set: { field: '{{vars.f}}', to: '{{pin}}' } },
+  { ask_spark: { question: 'Rate for {{note}} {{trigger.row.note}}?', about: ['note', 'what'], as: 'rate' } },
+];
+
+/** `rule.rate` written into the table past the lint as `list`, and a row made, with `pin` put in by SQL after it. */
+async function storedRate(list: unknown[]): Promise<{ k: Kernel; sql: NodeSql; made: Entry; run: string }> {
   const { sql, clock } = await opened();
   let k = await openRecord(sql, clock, { answersSpark: true });
   value(await k.install([steps([{ set_var: { name: 'x', to: 'y' } }])]));
@@ -184,15 +188,48 @@ test('A RULE STORED PAST THE LINT WITH ITS FIELD IN BRACES HOLDS THE FIELD IT FI
   k = await openRecord(sql, clock, { answersSpark: true });
   const made = value<Entry>(k.create('obligations', { what: 'Rent', note: 'plain' }, { actor: 'p_1' }));
   sql.exec("UPDATE entry SET fields = json_set(fields, '$.pin', 'hunter2') WHERE id = ?", made.id);
+  const run = sql.one<{ id: string }>("SELECT id FROM automation_run WHERE rule = 'rate'")!.id;
+  return { k, sql, made, run };
+}
+
+test('A RULE STORED PAST THE LINT WITH ITS FIELD IN BRACES IS REFUSED AT THE FIELD THE BRACES FILL TO, at run time', async () => {
+  /* MEASURED AT HEAD `b7409d2d`, BEFORE THIS CHANGE: the run wrote `hunter2` into `note` and held `note` back from the
+     question, and the test that stood here pinned that the row kept it. The runner reads the field the run filled
+     `{{vars.f}}` to, `note`, which every reader of the list sees, so the step is refused and the question after it is
+     never asked. */
+  const { k, sql, made } = await storedRate(BRACED);
+  await k.drain();
+  const run = sql.one<{ state: string; say: string | null }>("SELECT state, say FROM automation_run WHERE rule = 'rate'");
+  assert.equal(run?.state, 'failed', run?.say ?? '');
+  assert.match(run!.say ?? '', /\{\{pin\}\}/);
+  assert.match(run!.say ?? '', /secret or file field/);
+  assert.doesNotMatch(run!.say ?? '', /hunter2/);
+  assert.equal(sql.one<{ v: string }>("SELECT json_extract(fields, '$.note') AS v FROM entry WHERE id = ?", made.id)?.v, 'plain');
+  assert.deepEqual(k.leaseOutbox(['infer.ask'], 10), []);
+  sql.close();
+});
+
+test('A RUN A BUILD BEFORE -unsent TOOK PAST THAT WRITE HOLDS THE FIELD THE BRACES FILLED TO BACK FROM SPARK', async () => {
+  /* THE SECOND LINE, for L4: `writes()` read the step's `field` as written, so `-unsent` held `{{vars.f}}` and the
+     question read `note` as the step left it. Measured before the repair through this harness: `Rate for hunter2
+     hunter2?` with `about: { note: 'hunter2', what: 'Rent' }`.
+
+     THE WRITE IS PUT IN BY SQL, as that build left it, since this build refuses it (the test above): `note` holds
+     `hunter2`, the step rows say the `set_var` answered `note` and the `set` was done, and the column holds `-sendable`
+     alone. This build replays the two steps to rebuild `-unsent` (`flow.ts`'s `rebuilt`), and the replay is where
+     `writes()` reads the field the braces fill to. */
+  const { k, sql, made, run } = await storedRate(BRACED);
+  const at = new Date(NOW).toISOString();
+  sql.exec("UPDATE entry SET fields = json_set(fields, '$.note', 'hunter2') WHERE id = ?", made.id);
+  sql.exec("INSERT INTO automation_step (run, n, kind, state, answer, ms, at) VALUES (?, 0, 'set_var', 'done', 'note', NULL, ?), (?, 1, 'set', 'done', NULL, NULL, ?)", run, at, run, at);
+  sql.exec('UPDATE automation_run SET step = 2, vars = ? WHERE id = ?', JSON.stringify({ f: 'note', '-sendable': {} }), run);
   await k.drain();
   const [job] = k.leaseOutbox(['infer.ask'], 10);
-  assert.ok(job, 'no infer.ask row was queued');
+  assert.ok(job, `no infer.ask row was queued, and the run is ${JSON.stringify(sql.all("SELECT state, say FROM automation_run WHERE rule = 'rate'"))}`);
   assert.doesNotMatch(job.payload, /hunter2/, job.payload);
   const payload = JSON.parse(job.payload) as { question: string; about?: Record<string, unknown> };
   assert.equal(payload.question, 'Rate for — —?');
   assert.deepEqual(payload.about, { what: 'Rent' });
-  /* THE ROW ITSELF WAS WRITTEN, into the field the braces were filled to. */
-  assert.equal(sql.one<{ v: string }>("SELECT json_extract(fields, '$.note') AS v FROM entry WHERE id = ?", made.id)?.v, 'hunter2');
   sql.close();
 });
 

@@ -845,8 +845,10 @@ export function advance(deps: FlowDeps, id: string): number | null {
          stands now. The field it writes is held back from every question to Spark after it when the two differ, and
          given back by a plain `set` of it: a question reads the row as the step left it, and audit forty-nine §7
          measured `set: { field: note, to: '{{pin}}' }` then `{{note}}`, `{{trigger.row.note}}`, `about: [note]` and a
-         `set_var` from `note` each queueing `hunter2` for Spark. The lint refuses those at install; this is the second
-         line, for a rule an earlier build let install. */
+         `set_var` from `note` each queueing `hunter2` for Spark. The lint refuses those at install, and since wave
+         fifty-five the step below is refused at run time as well, so for a secret this now marks only a copy into a
+         field that never leaves either; what it still guards is a run an earlier build took past such a write, whose
+         `-unsent` this column carries on or `rebuilt` replays. */
       const cleanRow = (op.verb === 'set' || op.verb === 'tag') && subject ? sendable(deps, subject, unsent) : null;
       const wrote =
         cleanRow && subject && (op.verb === 'set' || op.verb === 'tag')
@@ -864,9 +866,17 @@ export function advance(deps: FlowDeps, id: string): number | null {
          never the value. */
       const by = paths();
       const handed = handOn(step, by, subject !== null);
-      /* A `set` AND A `tag` OF THE RUN'S OWN ROW ARE WRITTEN AND HELD BACK INSTEAD, as `rules.ts` says of a `set` and
-         for the tests it names; `mark` below is what holds the field back from Spark. */
-      if (handed.secret !== null && op.verb !== 'set' && op.verb !== 'tag')
+      /* A `tag` OF THE RUN'S OWN ROW IS REFUSED WITH THE REST, and a `set` is refused by the pass, which fills its `to`
+         (`rules.ts`). Wave fifty-four wrote both and held the field back from what leaves; measured at HEAD `b7409d2d`,
+         `tag: 'x {{trigger.row.pin}}'` stored past the lint put `x hunter2` in the row's tags, which every reader of
+         the list sees. `mark` below is left holding back only what a `set` copies into a field that never leaves
+         either, and a field no live declaration types.
+
+         AN `untag` IS LET THROUGH, as the lint lets it install (`flow-lint.ts`'s `COPIERS`). At HEAD `b7409d2d` it
+         installed and then failed its run whenever the secret held anything, because this check read every string of
+         the step and exempted `set` and `tag` alone. It writes the row's own tags back less one word and adds none,
+         so what it tells a reader is whether a tag equalled the secret, which an `if` on the field already tells. */
+      if (handed.secret !== null && op.verb !== 'untag')
         return fail(
           i,
           op.verb,

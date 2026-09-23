@@ -381,14 +381,19 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
       } else if ('set' in action) {
         /* THE EARLIER RULE WON, and this one says so rather than overwriting. */
         if (setFields.has(action.set.field)) continue;
-        /* A `set` IS FILLED ONCE AND NOT REFUSED HERE: a copy of a secret into the row is written, and held back from
-           everything that leaves (`queueCall`'s second line, and a run's `-unsent`). The lint refuses it at install.
-           Refusing it here too would be the stronger line, since the list's own readers see the field, and it is the
-           one this file does not draw yet: `secret-out.test.ts`, `call-launder-row.test.ts`,
-           `launder-across-rules.test.ts` and `spark-launder-row.test.ts` each store such a copy to test the lines
-           after it, and pin that the row keeps it. */
+        /* A `set` IS FILLED ONCE AND REFUSED WHERE IT WOULD COPY A SECRET INTO A FIELD THAT MAY LEAVE, as every other
+           text here is (`said`), unless the field it writes never leaves either. The lint refuses it at install
+           (`flow-lint.ts`, `writeFault`); this is the second line, for a rule stored before it did and for a run's
+           step. Wave fifty-four left the `set` out and wrote the copy, holding it back from what leaves (`queueCall`'s
+           second line, a run's `-unsent`), because four test files stored such a copy to reach those lines. Measured at
+           HEAD `b7409d2d`: `set: { field: memo, to: 'x {{pin}}' }` stored past the lint wrote `x hunter2` into `memo`,
+           which every reader of the list sees. The field is left unclaimed, so a later rule may still set it. */
+        const to = sealedHere().has(action.set.field)
+          ? filling(action.set.to, fired.entry, deps.nowMs, fired.run ? { run: fired.run } : {}).text
+          : said(action.set.to, `then[${i}].set.to`, `${action.set.field}, which every reader of ${fired.register} sees`);
+        if (to === null) continue;
         setFields.add(action.set.field);
-        patch[action.set.field] = filling(action.set.to, fired.entry, deps.nowMs, fired.run ? { run: fired.run } : {}).text;
+        patch[action.set.field] = to;
         did.push(`set ${action.set.field}`);
       } else if ('move' in action) {
         /* `move` IS A `set` OF THE STATE FIELD, and claiming the field is what stops two rules

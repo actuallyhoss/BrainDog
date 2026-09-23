@@ -15,8 +15,11 @@
  * A DIGEST'S `webhook.grant` was named on its CALLS OUT line and gated at accept, and the `notify.webhook` it queued
  * carried the url and the body alone, so no deliverer could have signed the post with it.
  *
- * THE COPYING RULES ARE STORED PAST THE LINT, as `call-launder-row.test.ts` stores them: the lint refuses each copy at
- * install now, and a record an earlier build let them into is what the second line is for.
+ * THE COPY IS PUT IN BY SQL, AS A ROW AN EARLIER BUILD WROTE HOLDS IT. These tests stored a rule that copied the key
+ * into `party` past the lint and let it run, and pinned that the row kept the copy. That copy is the leak: every reader
+ * of the list sees `party`. Since wave fifty-five the runner refuses it as the lint does (the first test below), so a
+ * stored rule no longer makes the copy these tests need, and a record that already holds one is what the second line
+ * is for. Where the run's own `-unsent` is the case, the run is put where that build left it, past its write.
  */
 
 import { test } from 'node:test';
@@ -76,15 +79,18 @@ const value = <T>(r: Result<T>): T => {
 
 const SEALED = (label: string) => ({ label, opens: 'the provider', kind: 'api_token' as const, ciphertext: b(4), nonce: b(9), kdf: 'hkdf', wrapped_by: 'kek' as const, kek_id: 'kek_2f' });
 
-/** A record holding `rule.copy` as an earlier build stored it, beside whatever else installs clean. */
-async function record(copy: Declaration, ...clean: Declaration[]): Promise<{ k: Kernel; sql: NodeSql; clock: ReturnType<typeof fixedClock> }> {
+/**
+ * A record holding `rule.copy` as an earlier build stored it, beside whatever else installs clean, or no `rule.copy`
+ * at all where `copy` is `null`.
+ */
+async function record(copy: Declaration | null, ...clean: Declaration[]): Promise<{ k: Kernel; sql: NodeSql; clock: ReturnType<typeof fixedClock> }> {
   const sql = openSqlite();
   const clock = fixedClock(NOW);
   const first = await openRecord(sql, clock, { answersSpark: true });
   assert.ok(first.createRecord({ id: ID, slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1', email: 'ada@example.test', name: 'Ada' } }).ok);
   value(first.bindGrant({ label: 'hook key', opens: 'hooks.example.test', kind: 'api_token', ciphertext: b(1), nonce: b(9), kdf: 'hkdf', wrapped_by: 'kek', kek_id: 'kek_2f' }, 'p_1') as Result<GrantRow>);
-  value(await first.install([INVOICES, HOOK, inline('copy', 'state is open', [{ tag: 'placeholder' }]), ...clean]));
-  sql.exec("UPDATE declaration SET body = ? WHERE id = 'rule.copy' AND superseded_at IS NULL", JSON.stringify(copy.body));
+  value(await first.install([INVOICES, HOOK, ...(copy === null ? [] : [inline('copy', 'state is open', [{ tag: 'placeholder' }])]), ...clean]));
+  if (copy !== null) sql.exec("UPDATE declaration SET body = ? WHERE id = 'rule.copy' AND superseded_at IS NULL", JSON.stringify(copy.body));
   return { k: await openRecord(sql, clock, { answersSpark: true }), sql, clock };
 }
 
@@ -93,17 +99,64 @@ const sent = (sql: NodeSql) =>
 
 const partyOf = (sql: NodeSql, id: string): unknown => sql.one<{ v: string }>("SELECT json_extract(fields, '$.party') AS v FROM entry WHERE id = ?", id)?.v;
 
+const SCAN = { sha256: 'a'.repeat(64), mime: 'application/pdf', bytes: 1200, name: 'contract-signed.pdf' };
+const LATER = { sha256: 'b'.repeat(64), mime: 'application/pdf', bytes: 1300, name: 'contract-v2.pdf' };
+
+/** `party` holding `copy`, written as an earlier build's `rule.copy` wrote it, which no build now does. */
+const seeded = (sql: NodeSql, id: string, copy: string): void => {
+  sql.exec("UPDATE entry SET fields = json_set(fields, '$.party', ?) WHERE id = ?", copy, id);
+};
+
+/* ── the copy itself ──────────────────────────────────────────────────────── */
+
+test('A RULE STORED PAST THE LINT THAT COPIES THE KEY OR THE FILE INTO party IS REFUSED AT RUN TIME, on both paths', async () => {
+  /* MEASURED AT HEAD `b7409d2d`, BEFORE THIS CHANGE: each of these wrote the copy into `party` and finished, and the
+     tests below this one pinned that the row kept it. `rules.ts` held a `set` out of the run-time check it drew for every
+     other verb, and `flow.ts` held a `set` and a `tag` out of its own. */
+  const wrong: string[] = [];
+  /* INLINE, INSIDE THE WRITE THAT PUTS THE GRANT IN. */
+  {
+    const { k, sql } = await record(inline('copy', 'state is open', [{ set: { field: 'party', to: '{{token}}' } }]), POST);
+    const out = value(k.depositGrant({ register: 'invoices', field: 'token', fields: { what: 'Invoice 41', state: 'open' }, grant: SEALED('service key') }, { actor: 'p_1' }));
+    await k.drain();
+    const party = partyOf(sql, out.entry.id);
+    if (party !== null && party !== undefined) wrong.push(`inline {{token}}: party holds ${String(party)}`);
+    const refused = sql.all<{ subject: string }>("SELECT subject FROM observation WHERE kind = 'write.refused' AND subject LIKE 'invoices.rule.copy.then[0].set.to:%'");
+    if (refused.length !== 1) wrong.push(`inline {{token}}: ${refused.length} refusals were observed`);
+    sql.close();
+  }
+  /* AS A RUN, from the key and from each part of a file a call would carry. */
+  for (const [what, to, fields] of [
+    ['run {{trigger.row.token}}', '{{trigger.row.token}}', {}],
+    ['run {{trigger.row.doc.name}}', '{{trigger.row.doc.name}}', { doc: SCAN }],
+    ['run {{trigger.row.doc.sha256}}', '{{trigger.row.doc.sha256}}', { doc: SCAN }],
+  ] as const) {
+    const { k, sql } = await record(onCreate('copy', [{ set: { field: 'party', to } }, { run: 'paid_hook' }]));
+    const made = value<Entry>(k.create('invoices', { what: 'Invoice 41', state: 'open', ...fields }, { actor: 'p_1' }));
+    sql.exec("UPDATE entry SET fields = json_set(fields, '$.token', 'hunter2') WHERE id = ?", made.id);
+    await k.drain();
+    const party = partyOf(sql, made.id);
+    if (party !== null && party !== undefined) wrong.push(`${what}: party holds ${String(party)}`);
+    const run = sql.one<{ state: string; say: string | null }>("SELECT state, say FROM automation_run WHERE rule = 'copy'");
+    if (run?.state !== 'failed' || !/secret or file field/.test(run.say ?? '')) wrong.push(`${what}: the run is ${run?.state} ${run?.say ?? ''}`);
+    /* AND THE CALL AFTER THE WRITE IS NOT TAKEN, since the run stops at the step it refused. */
+    if (sent(sql).length !== 0) wrong.push(`${what}: ${JSON.stringify(sent(sql))}`);
+    sql.close();
+  }
+  assert.deepEqual(wrong, []);
+});
+
 /* ── SEC-2: a copy made before the secret changed ─────────────────────────── */
 
 /**
- * The row is made through the vault door, so `token` holds a real grant id and `rule.copy` copies it into `party` in
- * the same write. What happens to `token` after that is the case.
+ * The row is made through the vault door, so `token` holds a real grant id, and `party` is given that id by SQL, as an
+ * earlier build's `rule.copy` wrote it in the same write. What happens to `token` after that is the case.
  */
 async function copied(): Promise<{ k: Kernel; sql: NodeSql; made: Entry; first: string }> {
-  const { k, sql } = await record(inline('copy', 'state is open', [{ set: { field: 'party', to: '{{token}}' } }]), POST);
+  const { k, sql } = await record(null, POST);
   const out = value(k.depositGrant({ register: 'invoices', field: 'token', fields: { what: 'Invoice 41', state: 'open' }, grant: SEALED('service key') }, { actor: 'p_1' }));
+  seeded(sql, out.entry.id, out.grant.id);
   await k.drain();
-  assert.equal(partyOf(sql, out.entry.id), out.grant.id, 'rule.copy did not copy the grant id into party, so the case below measures nothing');
   return { k, sql, made: out.entry, first: out.grant.id };
 }
 
@@ -134,15 +187,12 @@ test('AND NOT WHEN THE TOKEN IS CLEARED FROM THE ROW after the copy', async () =
 
 /* ── SEC-2: a file field's name and hash ──────────────────────────────────── */
 
-const SCAN = { sha256: 'a'.repeat(64), mime: 'application/pdf', bytes: 1200, name: 'contract-signed.pdf' };
-const LATER = { sha256: 'b'.repeat(64), mime: 'application/pdf', bytes: 1300, name: 'contract-v2.pdf' };
-
 for (const part of ['name', 'sha256'] as const)
   test(`A COPY OF A FILE FIELD'S ${part.toUpperCase()} IS NOT SENT, as a copy of a secret is not`, async () => {
-    const { k, sql } = await record(onCreate('copy', [{ set: { field: 'party', to: `{{trigger.row.doc.${part}}}` } }]), POST);
+    const { k, sql } = await record(null, POST);
     const made = value<Entry>(k.create('invoices', { what: 'Invoice 41', doc: SCAN, state: 'open' }, { actor: 'p_1' }));
+    seeded(sql, made.id, SCAN[part]);
     await k.drain();
-    assert.equal(partyOf(sql, made.id), SCAN[part], 'the run did not copy the file part, so the case measures nothing');
     value(k.update('invoices', made.id, { state: 'paid' }, { actor: 'p_1' }) as Result<unknown>);
     await k.drain();
     assert.deepEqual(sent(sql).map((c) => c.row), [{ what: 'Invoice 41' }]);
@@ -150,8 +200,9 @@ for (const part of ['name', 'sha256'] as const)
   });
 
 test('AND NOT AFTER THE FILE WAS REPLACED: the name it held is in the log, and is held back too', async () => {
-  const { k, sql } = await record(onCreate('copy', [{ set: { field: 'party', to: '{{trigger.row.doc.name}}' } }]), POST);
+  const { k, sql } = await record(null, POST);
   const made = value<Entry>(k.create('invoices', { what: 'Invoice 41', doc: SCAN, state: 'open' }, { actor: 'p_1' }));
+  seeded(sql, made.id, SCAN.name);
   await k.drain();
   value(k.update('invoices', made.id, { doc: LATER }, { actor: 'p_1' }) as Result<unknown>);
   value(k.update('invoices', made.id, { state: 'paid' }, { actor: 'p_1' }) as Result<unknown>);
@@ -165,14 +216,22 @@ test('AND NOT AFTER THE FILE WAS REPLACED: the name it held is in the log, and i
 
 test('A RUN THAT WROTE A FIELD FROM THE SECRET DOES NOT SEND IT after the secret changed under its wait', async () => {
   /* PLAINTEXT, NOT A GRANT ID, so the vault's ids cannot be what holds it back: the only thing left that says `party`
-     came from `token` is the run's `-unsent`. */
+     came from `token` is the run's `-unsent`.
+
+     THE RUN IS PUT PAST ITS WRITE AS HEAD `b7409d2d` LEFT IT, since this build refuses the write: the step row says the
+     `set` was done, `party` holds what it wrote, and the column holds that build's three keys with `party` under
+     `-unsent`. This build then takes the wait itself. */
   const { k, sql, clock } = await record(
     onCreate('copy', [{ set: { field: 'party', to: '{{trigger.row.token}}' } }, { wait: '1h' }, { run: 'paid_hook' }]),
   );
   const made = value<Entry>(k.create('invoices', { what: 'Invoice 41', state: 'open' }, { actor: 'p_1' }));
   sql.exec("UPDATE entry SET fields = json_set(fields, '$.token', 'hunter2') WHERE id = ?", made.id);
+  seeded(sql, made.id, 'hunter2');
+  const run = sql.one<{ id: string }>("SELECT id FROM automation_run WHERE rule = 'copy'")!.id;
+  sql.exec("INSERT INTO automation_step (run, n, kind, state, answer, ms, at) VALUES (?, 0, 'set', 'done', NULL, NULL, ?)", run, new Date(NOW).toISOString());
+  sql.exec('UPDATE automation_run SET step = 1, vars = ? WHERE id = ?', JSON.stringify({ '-sendable': {}, '-unsent': ['party'], '-sealed': [] }), run);
   await k.drain();
-  assert.equal(partyOf(sql, made.id), 'hunter2');
+  assert.equal(sql.one<{ state: string }>('SELECT state FROM automation_run WHERE id = ?', run)?.state, 'waiting');
   assert.equal(sent(sql).length, 0, 'the call went before the wait');
   sql.exec("UPDATE entry SET fields = json_set(fields, '$.token', 'hunter3') WHERE id = ?", made.id);
   clock.advance(2 * 3_600_000);

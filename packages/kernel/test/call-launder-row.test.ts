@@ -13,8 +13,13 @@
  * SINCE AUDIT FIFTY-ONE §3 THE LINT REFUSES THE COPY ITSELF, at the `set` or `tag` that writes the secret into a field
  * that may leave, and no longer the call that sends it (`launder-across-rules.test.ts`). So each refusal below names
  * the step that writes, the bodies that installed because their call did not send the field are refused too, and the
- * pair can no longer be installed: its tests store the writing rule past the lint, as an earlier build let it in, so
- * that `queueCall`'s second line is still what they measure.
+ * pair can no longer be installed.
+ *
+ * AND SINCE WAVE FIFTY-FIVE THE RUNNER REFUSES THE COPY TOO, for a rule stored past the lint. Before it, a stored rule
+ * wrote `hunter2` into `party` and these tests pinned that the row kept it, to reach the call after it. That copy was
+ * the leak, since every reader of the list sees `party`. So the stored rules are now held to writing nothing from the
+ * secret, and `queueCall`'s second line is measured over a row that already holds a copy, put in by SQL as an earlier
+ * build's write left it.
  *
  * `hunter2` IS PUT IN BY SQL AFTER THE ROW IS MADE, as the Spark tests put their pin, because in use a secret field
  * holds a vault grant's id and a plaintext is the plainest way to see whether it left.
@@ -235,26 +240,70 @@ async function stored(decl: Declaration): Promise<{ sql: NodeSql; made: Entry }>
   return { sql, made };
 }
 
-test('A RULE STORED PAST THE LINT SENDS NO VALUE A STEP WROTE FROM A SECRET, and the call still goes with the rest', async () => {
+test('A RULE STORED PAST THE LINT WRITES NO SECRET INTO THE ROW AT RUN TIME, and an inline call still goes with the rest', async () => {
+  /* MEASURED AT HEAD `b7409d2d`, BEFORE THIS CHANGE: every case below wrote `hunter2` into the row and finished, and the
+     call held it back. Now the step that writes is refused where it runs. Inline, the pass leaves that item out and
+     observes it, and the rest of the rule acts, so the call goes with `party` as the row held it. As a run, the run
+     fails at the write, and the call after it is not taken. */
   for (const c of LAUNDERED) {
     const { sql, made } = await stored(c.decl);
     const calls = sent(sql);
-    assert.equal(calls.length, 1, `${c.what}: ${calls.length} calls were queued, and the run is ${JSON.stringify(sql.all("SELECT state, say FROM automation_run"))}`);
     assert.doesNotMatch(JSON.stringify(calls), /hunter2/, `${c.what}: ${JSON.stringify(calls)}`);
+    const held = sql.one<{ v: string | null }>(`SELECT json_extract(fields, '$.${c.field ?? 'party'}') AS v FROM entry WHERE id = ?`, made.id)?.v;
+    assert.doesNotMatch(String(held), /hunter2/, `${c.what}: the row holds ${String(held)}`);
+    if ('then' in (c.decl.body as object)) {
+      const refused = sql.all<{ subject: string }>("SELECT subject FROM observation WHERE kind = 'write.refused' AND subject LIKE 'invoices.rule.paid.%set.to:DECLARATION_INVALID'");
+      assert.equal(refused.length, 1, `${c.what}: ${JSON.stringify(refused)}`);
+      assert.deepEqual(calls.map((one) => one.row), [{ what: 'Invoice 41', party: 'Fenwick' }], c.what);
+    } else {
+      const run = sql.one<{ state: string; say: string | null }>("SELECT state, say FROM automation_run WHERE rule = 'paid'");
+      assert.equal(run?.state, 'failed', `${c.what}: ${run?.say ?? ''}`);
+      assert.match(run!.say ?? '', /secret or file field/, c.what);
+      assert.doesNotMatch(run!.say ?? '', /hunter2/, c.what);
+      assert.deepEqual(calls, [], c.what);
+    }
+    sql.close();
+  }
+});
+
+test('A ROW THAT ALREADY HOLDS A COPY OF THE SECRET SENDS NO PART OF IT, whichever path runs the call', async () => {
+  /* THE SECOND LINE, over the copies the stored rules above made before this change: the whole value, the value inside
+     other words, and a tag. Each is put in by SQL beside `token`, as an earlier build's rule wrote it, and the rule that
+     runs the call writes nothing. */
+  const onPaid = (steps: unknown[]): Declaration => ({
+    id: 'rule.paid',
+    kind: 'rule',
+    body: { rule: 'paid', on: { written: { register: 'invoices', op: ['update'], fields: ['state'] } }, once_per: ['entry'], steps } as never,
+  });
+  const cases: [string, string, unknown, Declaration, string][] = [
+    ['inline, party is the secret', 'party', 'hunter2', inline([{ run: 'paid_hook' }]), 'paid_hook'],
+    ['inline, party holds it in other words', 'party', 'Bearer hunter2', inline([{ run: 'paid_hook' }]), 'paid_hook'],
+    ['a run, party is the secret', 'party', 'hunter2', onPaid([{ run: 'paid_hook' }]), 'paid_hook'],
+    ['a run, a tag of it', 'tags', ['hunter2'], onPaid([{ run: 'tags_hook' }]), 'tags_hook'],
+  ];
+  for (const [what, field, copy, rule, hook] of cases) {
+    const { k, sql } = await record(rule);
+    const made = value<Entry>(k.create('invoices', { what: 'Invoice 41', party: 'Fenwick', state: 'open' }, { actor: 'p_1' }));
+    sql.exec(`UPDATE entry SET fields = json_set(fields, '$.token', 'hunter2', '$.${field}', json(?)) WHERE id = ?`, JSON.stringify(copy), made.id);
+    value(k.update('invoices', made.id, { state: 'paid' }, { actor: 'p_1' }) as Result<unknown>);
+    await k.drain();
+    const calls = sent(sql);
+    assert.equal(calls.length, 1, `${what}: ${calls.length} calls, and the run is ${JSON.stringify(sql.all('SELECT state, say FROM automation_run'))}`);
+    assert.doesNotMatch(JSON.stringify(calls), /hunter2/, `${what}: ${JSON.stringify(calls)}`);
     /* LEFT OUT, AS A SECRET FIELD IS: the key is absent, not sent empty, and `what` goes as it would have. */
-    assert.deepEqual(calls[0]!.row, { what: 'Invoice 41' }, c.what);
-    assert.equal(calls[0]!.ingest, c.hook ?? 'paid_hook', c.what);
-    /* THE ROW ITSELF WAS WRITTEN: the record keeps what the step put there, and only what leaves is cleaned. */
-    const held = sql.one<{ v: string }>(`SELECT json_extract(fields, '$.${c.field ?? 'party'}') AS v FROM entry WHERE id = ?`, made.id)?.v;
-    assert.match(String(held), /hunter2/, c.what);
+    assert.deepEqual(calls[0]!.row, { what: 'Invoice 41' }, what);
+    assert.equal(calls[0]!.ingest, hook, what);
+    /* THE ROW IS NOT CLEANED. Only what leaves is. */
+    assert.match(String(sql.one<{ v: string }>(`SELECT json_extract(fields, '$.${field}') AS v FROM entry WHERE id = ?`, made.id)?.v), /hunter2/, what);
     sql.close();
   }
 });
 
 /**
  * The pair: `rule.post` runs the call, and `rule.copy` writes `party` from `{{token}}`, stored past the lint, which now
- * refuses it at the `set` (`launder-across-rules.test.ts`). A record an earlier build let the pair into still holds it,
- * and `queueCall`'s second line is the only line for that record.
+ * refuses it at the `set` (`launder-across-rules.test.ts`) and whose runner refuses it too (the test above). A record
+ * an earlier build let the pair into still holds the copy it made then, so the tests put that copy in by SQL, and
+ * `queueCall`'s second line is the only line for that record.
  */
 async function pair(): Promise<{ k: Kernel; sql: NodeSql }> {
   const { k: first, sql, clock } = await record(inline([{ tag: 'placeholder' }], 'copy'), inline([{ run: 'paid_hook' }], 'post'));
@@ -269,13 +318,12 @@ test('TWO RULES STORED PAST THE LINT, one writing party from the secret and one 
      second line for a record that holds it from before. */
   const { k, sql } = await pair();
   const made = value<Entry>(k.create('invoices', { what: 'Invoice 41', party: 'Fenwick', state: 'open' }, { actor: 'p_1' }));
-  sql.exec("UPDATE entry SET fields = json_set(fields, '$.token', 'hunter2') WHERE id = ?", made.id);
+  sql.exec("UPDATE entry SET fields = json_set(fields, '$.token', 'hunter2', '$.party', 'hunter2') WHERE id = ?", made.id);
   value(k.update('invoices', made.id, { state: 'paid' }, { actor: 'p_1' }) as Result<unknown>);
   await k.drain();
   const calls = sent(sql);
   assert.equal(calls.length, 1);
   assert.doesNotMatch(JSON.stringify(calls), /hunter2/, JSON.stringify(calls));
-  assert.match(String(sql.one<{ v: string }>("SELECT json_extract(fields, '$.party') AS v FROM entry WHERE id = ?", made.id)?.v), /hunter2/);
   sql.close();
 });
 
@@ -285,7 +333,7 @@ test('AND A RETIRED SECRET, WHICH THE ROWS WRITTEN BEFORE IT STILL HOLD, is left
      pair below queued `party: 'hunter2'`, because `queueCall` asked the live schema which fields were secret. */
   const { k, sql } = await pair();
   const made = value<Entry>(k.create('invoices', { what: 'Invoice 41', party: 'Fenwick', state: 'open' }, { actor: 'p_1' }));
-  sql.exec("UPDATE entry SET fields = json_set(fields, '$.token', 'hunter2') WHERE id = ?", made.id);
+  sql.exec("UPDATE entry SET fields = json_set(fields, '$.token', 'hunter2', '$.party', 'hunter2') WHERE id = ?", made.id);
   const fields = (INVOICES.body as { fields: { id: string }[] }).fields.map((f) => (f.id === 'token' ? { ...f, retired: true } : f));
   value(await k.install([{ ...INVOICES, body: { ...(INVOICES.body as object), fields } as never }]));
   value(k.update('invoices', made.id, { state: 'paid' }, { actor: 'p_1' }) as Result<unknown>);

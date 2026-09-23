@@ -10,8 +10,13 @@
  * AND SINCE AUDIT FIFTY-ONE §3 THE LINT REFUSES THE COPY ITSELF, at the `set` or `tag`, and no longer the question that
  * reads it: a second rule on a later edit read `note` and sent `hunter2`, and no walk of one body could see that
  * (`launder-across-rules.test.ts`). So each refusal below names the step that writes the field, and the bodies that
- * installed because nothing after the write read it are refused now too. The stored cases, which are the runner's
- * second line, are unchanged.
+ * installed because nothing after the write read it are refused now too.
+ *
+ * AND SINCE WAVE FIFTY-FIVE THE RUNNER REFUSES THE COPY TOO. The stored cases let a rule written past the lint copy
+ * `pin` into `note` and pinned that the row kept it, to reach the question after it; that copy is the leak, since every
+ * reader of the list sees `note`. So a stored rule is now held to writing nothing from the secret, and the runner's
+ * second line is measured over a run an earlier build took past its write: the step rows, the field and the run's
+ * column are put in by SQL as that build left them, and this build takes the steps after.
  *
  * `hunter2` IS PUT IN BY SQL AFTER THE ROW IS MADE AND BEFORE THE DRAIN, as `spark-vars-hidden.test.ts` puts it, so the
  * pin is in the row before the run takes its first step. In use a secret field holds a vault grant's id and nothing
@@ -154,28 +159,76 @@ test('A STEP THAT WOULD WRITE A SECRET INTO A FIELD A QUESTION TO SPARK READS IS
   sql.close();
 });
 
-test('A RULE STORED PAST THE LINT SENDS NO VALUE A STEP WROTE FROM A SECRET, in the question or in about:', async () => {
+/**
+ * `rule.rate` written into the table past the lint as `steps`, as an earlier build let it install and as
+ * `spark-vars-hidden.test.ts` writes its stored rule, and a row made, with `pin` put in by SQL after it.
+ */
+async function storedRate(steps: unknown[]): Promise<{ k: Kernel; sql: NodeSql; made: Entry; run: string }> {
+  const { sql, clock } = await sparked(rule([{ set_var: { name: 'x', to: 'y' } }]));
+  sql.exec("UPDATE declaration SET body = ? WHERE id = 'rule.rate' AND superseded_at IS NULL", JSON.stringify({ rule: 'rate', on: WRITTEN, once_per: ['entry'], steps }));
+  const k = await openRecord(sql, clock, { answersSpark: true });
+  const made = value<Entry>(k.create('obligations', { what: 'Rent', note: 'plain' }, { actor: 'p_1' }));
+  sql.exec("UPDATE entry SET fields = json_set(fields, '$.pin', 'hunter2') WHERE id = ?", made.id);
+  return { k, sql, made, run: sql.one<{ id: string }>("SELECT id FROM automation_run WHERE rule = 'rate'")!.id };
+}
+
+/**
+ * The run put where an earlier build left it after taking `steps[0]` to `steps[upTo]`, before this build takes the
+ * next: a done step row for each, a `set_var` answering `hunter2`, the row's `fields` as those steps wrote them, and the
+ * run's column as `vars`. This build refuses the write among those steps, so it cannot take them itself.
+ */
+function tookPast(sql: NodeSql, s: { made: Entry; run: string }, steps: unknown[], upTo: number, fields: Record<string, unknown>, vars: Record<string, unknown>): void {
+  const at = new Date(NOW).toISOString();
+  for (const [n, step] of steps.slice(0, upTo + 1).entries()) {
+    const kind = Object.keys(step as object)[0]!;
+    sql.exec("INSERT INTO automation_step (run, n, kind, state, answer, ms, at) VALUES (?, ?, ?, 'done', ?, NULL, ?)", s.run, n, kind, kind === 'set_var' ? 'hunter2' : null, at);
+  }
+  for (const [field, v] of Object.entries(fields)) sql.exec(`UPDATE entry SET fields = json_set(fields, '$.${field}', json(?)) WHERE id = ?`, JSON.stringify(v), s.made.id);
+  sql.exec('UPDATE automation_run SET step = ?, vars = ? WHERE id = ?', upTo + 1, JSON.stringify(vars), s.run);
+}
+
+test('A RULE STORED PAST THE LINT WRITES NO SECRET INTO THE ROW AT RUN TIME, and asks Spark nothing after the write', async () => {
+  /* MEASURED AT HEAD `b7409d2d`, BEFORE THIS CHANGE: each of these wrote `hunter2` into `note` or `tags`, held the field
+     back from the question and asked it, and the test that stood here pinned that the row kept the copy. The run now
+     fails at the write, says which spelling reached the secret and never the value, and takes no step after it. */
+  for (const c of LAUNDERED) {
+    const { k, sql, made } = await storedRate(c.steps);
+    await k.drain();
+    const run = sql.one<{ state: string; say: string | null }>("SELECT state, say FROM automation_run WHERE rule = 'rate'");
+    assert.equal(run?.state, 'failed', `${c.what}: ${run?.say ?? ''}`);
+    assert.match(run!.say ?? '', /secret or file field/, c.what);
+    assert.doesNotMatch(run!.say ?? '', /hunter2/, c.what);
+    assert.deepEqual(k.leaseOutbox(['infer.ask'], 10), [], c.what);
+    const held = sql.one<{ v: string | null }>(`SELECT json_extract(fields, '$.${c.field ?? 'note'}') AS v FROM entry WHERE id = ?`, made.id)?.v;
+    assert.doesNotMatch(String(held), /hunter2/, `${c.what}: the row holds ${String(held)}`);
+    sql.close();
+  }
+});
+
+test('A RUN AN EARLIER BUILD TOOK PAST ITS WRITE SENDS NO VALUE THAT WRITE COPIED FROM A SECRET, in the question or in about:', async () => {
+  /* THE SECOND LINE: each case's write taken as HEAD `b7409d2d` took it, with the field it wrote under `-unsent`, and a
+     `set_var` from the secret under `-sealed` with the dash kept for Spark. This build takes the steps after it. */
   const sent: string[] = [];
   for (const c of LAUNDERED) {
-    /* THE SECOND LINE: a rule an earlier build let install, written into the table past the lint, as
-       `spark-vars-hidden.test.ts` writes its stored rule. */
-    const { sql, clock } = await sparked(rule([{ set_var: { name: 'x', to: 'y' } }]));
-    sql.exec("UPDATE declaration SET body = ? WHERE id = 'rule.rate' AND superseded_at IS NULL", JSON.stringify({ rule: 'rate', on: WRITTEN, once_per: ['entry'], steps: c.steps }));
-    const k = await openRecord(sql, clock, { answersSpark: true });
-    const made = value<Entry>(k.create('obligations', { what: 'Rent', note: 'plain' }, { actor: 'p_1' }));
-    sql.exec("UPDATE entry SET fields = json_set(fields, '$.pin', 'hunter2') WHERE id = ?", made.id);
-    await k.drain();
-    const [job] = k.leaseOutbox(['infer.ask'], 10);
-    const run = sql.one<{ state: string; say: string | null }>("SELECT state, say FROM automation_run WHERE rule = 'rate'");
+    const upTo = c.steps.findIndex((s) => 'set' in (s as object) || 'tag' in (s as object));
+    const field = c.field ?? 'note';
+    const named = c.steps.slice(0, upTo).map((s) => (s as { set_var: { name: string } }).set_var.name);
+    const s = await storedRate(c.steps);
+    tookPast(s.sql, s, c.steps, upTo, { [field]: field === 'tags' ? ['hunter2'] : 'hunter2' }, {
+      ...Object.fromEntries(named.map((n) => [n, 'hunter2'])),
+      '-sendable': Object.fromEntries(named.map((n) => [n, '—'])),
+      '-unsent': [field],
+      '-sealed': named,
+    });
+    await s.k.drain();
+    const [job] = s.k.leaseOutbox(['infer.ask'], 10);
+    const run = s.sql.one<{ state: string; say: string | null }>("SELECT state, say FROM automation_run WHERE rule = 'rate'");
     assert.ok(job, `${c.what}: no infer.ask row was queued, and the run is ${run?.state} ${run?.say ?? ''}`);
     const payload = JSON.parse(job.payload) as { question: string; about?: Record<string, unknown> };
     sent.push(`${c.what}: ${job.payload}`);
     assert.doesNotMatch(job.payload, /hunter2/, `${c.what}: ${job.payload}`);
     assert.deepEqual({ question: payload.question, ...(payload.about === undefined ? {} : { about: payload.about }) }, c.sends, c.what);
-    /* THE ROW ITSELF WAS WRITTEN: the record keeps what the step put there, and only what leaves is cleaned. */
-    const held = sql.one<{ v: string }>(`SELECT json_extract(fields, '$.${c.field ?? 'note'}') AS v FROM entry WHERE id = ?`, made.id)?.v;
-    assert.match(String(held), /hunter2/, c.what);
-    sql.close();
+    s.sql.close();
   }
   assert.equal(sent.length, LAUNDERED.length);
 });
@@ -187,11 +240,10 @@ test('A PLAIN SET OF THE SAME FIELD PUTS THE FIELD BACK IN THE QUESTION, and a q
     { set: { field: 'note', to: 'cleared' } },
     { ask_spark: { question: 'Rate for {{note}} and {{trigger.row.note}}?', about: ['note'], as: 'rate' } },
   ];
-  const { sql, clock } = await sparked(rule([{ set_var: { name: 'x', to: 'y' } }]));
-  sql.exec("UPDATE declaration SET body = ? WHERE id = 'rule.rate' AND superseded_at IS NULL", JSON.stringify({ rule: 'rate', on: WRITTEN, once_per: ['entry'], steps }));
-  const k = await openRecord(sql, clock, { answersSpark: true });
-  const made = value<Entry>(k.create('obligations', { what: 'Rent', note: 'plain' }, { actor: 'p_1' }));
-  sql.exec("UPDATE entry SET fields = json_set(fields, '$.pin', 'hunter2') WHERE id = ?", made.id);
+  /* THE COPY AS AN EARLIER BUILD WROTE IT, since this build refuses it: `note` holds the secret and `-unsent` says so. */
+  const past = await storedRate(steps);
+  const { k, sql } = past;
+  tookPast(sql, past, steps, 0, { note: 'hunter2' }, { '-sendable': {}, '-unsent': ['note'], '-sealed': [] });
   await k.drain();
   /* THE PERSON IS ASKED ABOUT THE VALUE, since that question stays in the record. It rides on the `suggest` event. */
   const asked = sql.one<{ id: string; body: string }>("SELECT id, body FROM suggestion WHERE status = 'open' AND opened_by = 'rule:rate'");
@@ -220,11 +272,11 @@ test('A RUN PARKED BY A BUILD BEFORE -unsent HOLDS THE FIELD BACK WHEN IT WAKES,
     { ask_person: { question: 'Pay?', options: ['yes', 'no'], as: 'a' } },
     { ask_spark: { question: 'Rate for {{note}}?', about: ['note', 'what'], as: 'rate' } },
   ];
-  const { sql, clock } = await sparked(rule([{ set_var: { name: 'x', to: 'y' } }]));
-  sql.exec("UPDATE declaration SET body = ? WHERE id = 'rule.rate' AND superseded_at IS NULL", JSON.stringify({ rule: 'rate', on: WRITTEN, once_per: ['entry'], steps }));
-  const k = await openRecord(sql, clock, { answersSpark: true });
-  const made = value<Entry>(k.create('obligations', { what: 'Rent', note: 'plain' }, { actor: 'p_1' }));
-  sql.exec("UPDATE entry SET fields = json_set(fields, '$.pin', 'hunter2') WHERE id = ?", made.id);
+  /* THE WRITE AS THAT BUILD TOOK IT, since this build refuses it: the step row and `note`, and a column of `-sendable`
+     alone. This build takes the question to the person and parks, writing its keys, which go again below. */
+  const past = await storedRate(steps);
+  const { k, sql } = past;
+  tookPast(sql, past, steps, 0, { note: 'hunter2' }, { '-sendable': {} });
   await k.drain();
   sql.exec(`UPDATE automation_run SET vars = json_remove(vars, '$."-unsent"', '$."-sealed"') WHERE rule = 'rate'`);
   const stored = JSON.parse(sql.one<{ vars: string }>("SELECT vars FROM automation_run WHERE rule = 'rate'")!.vars) as Record<string, unknown>;
@@ -251,11 +303,9 @@ test('A RUN PARKED BY A BUILD BEFORE -unsent HOLDS THE FIELD BACK WHEN THE SECRE
     { ask_person: { question: 'Pay?', options: ['yes', 'no'], as: 'a' } },
     { ask_spark: { question: 'Rate for {{note}} {{tags}}?', about: ['note', 'what'], as: 'rate' } },
   ];
-  const { sql, clock } = await sparked(rule([{ set_var: { name: 'x', to: 'y' } }]));
-  sql.exec("UPDATE declaration SET body = ? WHERE id = 'rule.rate' AND superseded_at IS NULL", JSON.stringify({ rule: 'rate', on: WRITTEN, once_per: ['entry'], steps }));
-  const k = await openRecord(sql, clock, { answersSpark: true });
-  const made = value<Entry>(k.create('obligations', { what: 'Rent', note: 'plain' }, { actor: 'p_1' }));
-  sql.exec("UPDATE entry SET fields = json_set(fields, '$.pin', 'hunter2') WHERE id = ?", made.id);
+  const past = await storedRate(steps);
+  const { k, sql, made } = past;
+  tookPast(sql, past, steps, 1, { note: 'hunter2', tags: ['hunter2'] }, { '-sendable': {} });
   await k.drain();
   sql.exec(`UPDATE automation_run SET vars = json_remove(vars, '$."-unsent"', '$."-sealed"') WHERE rule = 'rate'`);
   sql.exec("UPDATE entry SET fields = json_remove(fields, '$.pin') WHERE id = ?", made.id);

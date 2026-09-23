@@ -9,8 +9,13 @@
  *     person each installed holding `{{pin}}` or `{{trigger.row.pin}}`, on both paths, and a step crossing `each: [pin]`
  *     installed too. That is SEC-1, and the recorded finding named only the `create`; measuring found all of them.
  *   - At run time, a rule stored past the lint wrote `hunter2` into the note event, a Payments row, the schedule and
- *     the question queue through every one of those verbs, and into the row itself through `set` and `tag`. The last
- *     two are still written, and held back from what leaves; four test files outside this change pin that.
+ *     the question queue through every one of those verbs, and into the row itself through `set` and `tag`. Wave
+ *     fifty-four refused the first set at run time and still wrote the last two, holding the field back from what
+ *     leaves, because four test files stored such a copy to reach the lines after it. Those files now put the copy in
+ *     by SQL, as a row an earlier build wrote, and `set` and `tag` are refused at run time with the rest.
+ *   - An `untag` reading the secret installed, since it adds no word, and then failed its run whenever the secret held
+ *     anything, because the run-time check read every string the run filled and named `set` and `tag` alone as
+ *     exempt. It copies nothing, so it runs now (the untag test below).
  *   - Each text was filled twice. `rules.ts`'s `withEach` wrote a create's tuple in and `fill` then read the row's
  *     fields out of the result, so a `kinds` item `{{pin}}` crossed into `what: 'x {{each.0}}'` wrote `x hunter2`; and a
  *     run wrote its own paths into a step before the pass filled it from the row, so `{{trigger.row.note}}` over a
@@ -107,21 +112,19 @@ type Step = Record<string, unknown>;
  * `copies` IS EVERY PLACE THE VERB PUTS TEXT, as a step with that text in it. `rowFilled` says the pass fills it from the
  * row too, so the row's own `{{pin}}` reaches the secret there as well as the run's `{{trigger.row.pin}}`; `runOnly`
  * names the copies it does not. `atRun` is what the runner does with a rule stored past the lint: `refuses` fails the
- * run at the step; `holds` writes the run's own row and holds the field back from everything that leaves, which
- * `secret-out.test.ts`, `call-launder-row.test.ts`, `launder-across-rules.test.ts` and `spark-launder-row.test.ts` pin
- * and this change could not move (reported); `cleans` asks the question with the dash where the secret was; `asks` is a
- * question to Spark, which `spark-vars-hidden.test.ts` and `flow-waits.test.ts` hold; and `unbuilt` is a step whose
- * runtime is not in this build.
+ * run at the step, a `set` and a `tag` of the run's own row included; `cleans` asks the question with the dash where
+ * the secret was; `asks` is a question to Spark, which `spark-vars-hidden.test.ts` and `flow-waits.test.ts` hold; and
+ * `unbuilt` is a step whose runtime is not in this build.
  * `plain` is the same verb writing into a field that never leaves either. `none` is a verb that copies no text, and why.
  */
 type Fixture =
-  | { copies: ((text: string) => Step)[]; rowFilled: boolean; runOnly?: number[]; atRun: 'refuses' | 'holds' | 'cleans' | 'asks' | 'unbuilt'; plain?: (text: string) => Step }
+  | { copies: ((text: string) => Step)[]; rowFilled: boolean; runOnly?: number[]; atRun: 'refuses' | 'cleans' | 'asks' | 'unbuilt'; plain?: (text: string) => Step }
   | { none: string };
 
 const FIXTURES: Record<string, Fixture> = {
-  tag: { copies: [(t) => ({ tag: t })], rowFilled: false, atRun: 'holds' },
+  tag: { copies: [(t) => ({ tag: t })], rowFilled: false, atRun: 'refuses' },
   untag: { none: 'an untag writes back the words the row already holds, less one, and adds none' },
-  set: { copies: [(t) => ({ set: { field: 'memo', to: t } })], rowFilled: true, atRun: 'holds', plain: (t) => ({ set: { field: 'spare', to: t } }) },
+  set: { copies: [(t) => ({ set: { field: 'memo', to: t } })], rowFilled: true, atRun: 'refuses', plain: (t) => ({ set: { field: 'spare', to: t } }) },
   move: { copies: [(t) => ({ move: t })], rowFilled: false, atRun: 'refuses' },
   link: { copies: [(t) => ({ link: { field: 'memo', to: { register: 'payments', by: 'what', value: t } } })], rowFilled: true, atRun: 'refuses' },
   note: { copies: [(t) => ({ note: t })], rowFilled: true, atRun: 'refuses' },
@@ -334,11 +337,9 @@ test('A RULE STORED PAST THE LINT COPIES THE SECRET THROUGH NO VERB AT RUN TIME:
         ...(f.rowFilled && !f.runOnly?.includes(n) ? [{ spelled: 'x {{pin}}', before: [] as Step[] }] : []),
       ]) {
         const { sql, went, run } = await stored({ on: on('obligations'), once_per: ['entry'], steps: [...before, copy(spelled)] }, { note: 'plain' });
-        /* A WRITE OF THE RUN'S OWN ROW IS WRITTEN AND HELD BACK: the entry, its write's event and its search text. */
-        const allowed = f.atRun === 'holds' ? ['entry', 'event', 'entry_fts'] : [];
-        const extra = went.filter((r) => !allowed.some((a) => r.startsWith(`${a}:`) || r.startsWith(`${a}_`)));
-        if (extra.length) leaked.push(`${verb}#${n} ${spelled}: ${extra.join(' | ')}`);
-        if (f.atRun === 'holds' && run?.state !== 'done') leaked.push(`${verb}#${n} ${spelled}: the run is ${run?.state} ${run?.say ?? ''}`);
+        /* NOTHING NEW HOLDS IT, the run's own row included: a `set` or a `tag` of it wrote the entry, its write's event
+           and its search text before wave fifty-five. */
+        if (went.length) leaked.push(`${verb}#${n} ${spelled}: ${went.join(' | ')}`);
         if (f.atRun === 'refuses') {
           if (run?.state !== 'failed') leaked.push(`${verb}#${n} ${spelled}: the run is ${run?.state}, and a step that copies the secret fails it`);
           else if (!/secret or file field/.test(run.say ?? '') || /hunter2/.test(run.say ?? '')) leaked.push(`${verb}#${n} ${spelled}: ${run.say}`);
@@ -359,7 +360,7 @@ test('A RULE ON THE INLINE PATH STORED PAST THE LINT WRITES THE SECRET NOWHERE, 
   const leaked: string[] = [];
   for (const verb of ACTIONS) {
     const f = FIXTURES[verb];
-    if (f === undefined || 'none' in f || !f.rowFilled || f.atRun === 'holds') continue;
+    if (f === undefined || 'none' in f || !f.rowFilled) continue;
     const { sql, went, made } = await stored({ register: 'obligations', once_per: ['entry', 'memo'], then: [f.copies[0]!('x {{pin}}')] }, { note: 'plain' });
     /* THE PASS RAN INSIDE THE CREATE, before `pin` was put in, so the edit here is what reaches the secret; `once_per`
        names `memo`, which the edit changes, so the rule fires again for it. */
@@ -385,6 +386,44 @@ test('A COPY INTO A FIELD THAT NEVER LEAVES EITHER IS NOT THE COPY CHECK AT RUN 
     if (/reads what a secret|holds what a secret/.test(run?.say ?? '')) wrong.push(`${verb}: ${run?.say}`);
     sql.close();
   }
+  assert.deepEqual(wrong, []);
+});
+
+test('AN UNTAG THAT READS A SECRET INSTALLS AND RUNS, since it writes back only words the row already holds', async () => {
+  /* WAVE FIFTY-FOUR'S CHECKER FOUND INSTALL AND RUN DISAGREEING HERE. The lint lets an untag read the secret, as the
+     fixture above says why; the runner failed the run whenever `pin` held anything, because the check read every
+     string the run filled. The one thing an untag writes is the row's own `tags` less one word, so what it can tell a
+     reader is whether a tag equalled the secret, which an `if` on the field already tells, and nothing it writes is
+     new text. Install is the right one. Each case installs through the lint, not past it. */
+  const wrong: string[] = [];
+  for (const { spelled, before } of [
+    { spelled: '{{trigger.row.pin}}', before: [] as Step[] },
+    { spelled: '{{ trigger.row.pin }}', before: [] as Step[] },
+    { spelled: '{{vars.p}}', before: [{ set_var: { name: 'p', to: '{{trigger.row.pin}}' } }] as Step[] },
+  ])
+    for (const tags of [['late'], ['late', 'hunter2']]) {
+      const { k, sql } = await opened();
+      const out = refusal((await k.install([steps([...before, { untag: spelled }])])) as Result<unknown>);
+      if (out !== null) {
+        wrong.push(`${spelled}: install refused ${out.code} ${out.fix}`);
+        sql.close();
+        continue;
+      }
+      const made = value<Entry>(k.create('obligations', { what: 'Rent', tags }, { actor: 'p_1' }));
+      sql.exec("UPDATE entry SET fields = json_set(fields, '$.pin', 'hunter2') WHERE id = ?", made.id);
+      const was = holding(sql, 'hunter2');
+      await k.drain();
+      const run = sql.one<{ state: string; say: string | null }>("SELECT state, say FROM automation_run WHERE rule = 'copy'");
+      if (run?.state !== 'done') wrong.push(`${spelled} over ${tags.join(', ')}: the run is ${run?.state} ${run?.say ?? ''}`);
+      const now = sql.one<{ v: string }>("SELECT json_extract(fields, '$.tags') AS v FROM entry WHERE id = ?", made.id)?.v;
+      if (now !== '["late"]') wrong.push(`${spelled} over ${tags.join(', ')}: tags are ${now}`);
+      /* A ROW THAT HELD NO SUCH TAG IS LEFT AS IT WAS, and the secret went nowhere it was not. */
+      if (tags.length === 1) {
+        const went = [...holding(sql, 'hunter2')].filter((r) => !was.has(r));
+        if (went.length) wrong.push(`${spelled}: hunter2 went to ${went.join(' | ')}`);
+      }
+      sql.close();
+    }
   assert.deepEqual(wrong, []);
 });
 
