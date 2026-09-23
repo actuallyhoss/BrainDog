@@ -1725,7 +1725,6 @@ export const copy = {
   machines: 'Machines',
   /* `13 §5.2`: an empty list the person fills from a machine carries the command that fills it. */
   noDevices: 'No machine has asked yet.',
-  enrollPrompt: 'braindog login',
   noSources: 'Nothing feeds this record yet.',
   noSourcesWhy: 'A connector pulls rows in on a schedule from a mailbox, a bank feed or a repository, and reports here when it fails.',
   ingestPrompt: 'read my record, then set up a connector for the mailbox I file invoices in',
@@ -2188,7 +2187,15 @@ export const copy = {
   /* Every screen reads the record once somebody is signed in; the sample is only for a browser with none. */
   signedInReads: 'Every screen now reads this record.',
   addPasskeyHere: 'Add a passkey on this device',
-  addPasskeyWhy: 'Add one now, so next time you can sign in without the key.',
+  /* SAID BY THE WAY HE CAME IN. "Without the key" is the self-host's server key, and it was said after a claim link
+     too, to an owner on the Cloud who had never seen a key (`loop/research-first-sign-in.md` friction 9). `null` is a
+     session that was already there when the screen opened, so it cannot say how, and names neither. */
+  addPasskeyWhy: (via: 'passkey' | 'key' | 'link' | null) =>
+    via === 'key'
+      ? 'Add one now, so next time you can sign in without the key.'
+      : via === 'link'
+        ? 'Add one now, so next time you can sign in without a link.'
+        : 'Add one now, so next time this device signs you in on its own.',
   addingPasskey: 'Waiting for your device',
   passkeyAdded: 'Passkey added. Next time, sign in with it.',
   passkeyNotAdded: 'Nothing was added.',

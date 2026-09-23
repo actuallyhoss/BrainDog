@@ -96,7 +96,7 @@
         <Empty heading kind="error" title={sentence(seen)} body={copy.inviteAskNew} />
       {:else if seen && seen.ok && !joined}
         <div class="calm">
-          <span class="glyph"><Icon name="link" size="l" /></span>
+          <span class="door-glyph"><Icon name="link" size="l" /></span>
           <!-- THE PAGE'S ONE LEVEL-ONE HEADING, in every state it can settle into. While this screen
                drew an error card it settled `refused`, so `a11y` skipped it and nothing ever audited
                it; the moment it settled `empty` the gate looked and found no `h1` at four widths. The
@@ -126,7 +126,7 @@
         </div>
       {:else if joined}
         <div class="calm">
-          <span class="glyph ok"><Icon name="check" size="l" /></span>
+          <span class="door-glyph ok"><Icon name="check" size="l" /></span>
           <h1 class="calm-title">{copy.inviteJoined}</h1>
           {#if !keyAdded && here.webauthn && here.secure}<p class="calm-body">{copy.inviteKeepWay}</p>{/if}
         </div>
@@ -195,11 +195,13 @@
     gap: var(--sp-2);
   }
 
-  .glyph {
+  /* NOT `.glyph`, for the reason `/signin` gives: `blocks.css` draws that name as a 6px intent dot, and this set only
+     the colour of it. */
+  .door-glyph {
     color: var(--ink2);
   }
 
-  .glyph.ok {
+  .door-glyph.ok {
     color: var(--earn);
   }
 

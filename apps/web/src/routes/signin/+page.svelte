@@ -35,6 +35,7 @@
   } from '$lib/auth.ts';
   import { BASE, onward } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
+  import { forget } from '$lib/record/boot-live.ts';
   import { stateOf, type How, type Step, type Ways } from '$lib/signin.ts';
   import { actable, firstDoor, noDoorYet } from './first-door.ts';
   import { titleOf } from '$lib/title.ts';
@@ -169,9 +170,29 @@
        `replaceState`, with the router's state kept so its history stays whole. SvelteKit's wrapper is
        not used: importing it keeps its shallow-routing code in the entry chunk, which measured 0.8 KB
        brotli on every screen for one call on this one. */
-    link = takeLink(location.hash, () => history.replaceState(history.state, '', `${location.pathname}${location.search}`));
+    link = takeLink(location.hash, clearHash);
     void load();
+    window.addEventListener('hashchange', arrived);
+    return () => window.removeEventListener('hashchange', arrived);
   });
+
+  function clearHash() {
+    history.replaceState(history.state, '', `${location.pathname}${location.search}`);
+  }
+
+  /**
+   * A LINK PASTED INTO A TAB ALREADY HERE IS TAKEN TOO. A change to the fragment alone is a same-document navigation,
+   * so nothing mounts again: walked on 23 September, a claim link pasted over `/app/signin` changed the address, left
+   * "Sign in to open your record." on screen, made no request, and stayed so until a reload. The owner will very likely
+   * have this page open when he pastes it, from the site's own "Sign in". A press that is out keeps its moment; anything
+   * else on screen gives way to the landing, which needs the step idle to be drawn.
+   */
+  function arrived() {
+    const l = takeLink(location.hash, clearHash);
+    if (!l) return;
+    link = l;
+    if (step.at !== 'asking') step = { at: 'idle' };
+  }
 
   /** One press: the step says it is out, and what came back decides the next one. */
   async function run<T>(how: How, work: () => Promise<Said<T>>, then: (value: T) => void) {
@@ -185,7 +206,15 @@
     else step = { at: 'failed', how, failure: out, when: now };
   }
 
+  /**
+   * SIGNING IN DROPS THE BOOT THIS TAB KEPT. The screen's own load asked `boot` at the bare `/app` with no session, was
+   * refused, and kept the sample for the tab; signing in is a `fetch` that sets a cookie and nothing more. Walked on
+   * 23 September (`loop/research-first-sign-in.md` friction 1), "Open BrainDog" then drew The Studio with no request,
+   * after the claim link and again after the passkey. The onward buttons are full page loads, which is the repair;
+   * this is for any move out of here that is not one, so it at least asks the record rather than drawing the sample.
+   */
   const enter = (via: 'passkey' | 'key' | 'link') => (who: Who) => {
+    forget();
     entered = { who, via };
     link = null;
     step = { at: 'idle' };
@@ -289,17 +318,18 @@
         </div>
       {:else if view.name === 'no-host'}
         <div class="calm">
-          <span class="glyph"><Icon name="info" size="l" /></span>
+          <span class="door-glyph"><Icon name="info" size="l" /></span>
           <p class="calm-title">{copy.noHostTitle}</p>
           <p class="calm-body">{copy.noHostWhy}</p>
         </div>
       {:else if view.name === 'open'}
         <div class="calm">
-          <span class="glyph ok"><Icon name="check" size="l" /></span>
+          <span class="door-glyph ok"><Icon name="check" size="l" /></span>
           <p class="calm-title">{copy.openTitle}</p>
           <p class="calm-body">{copy.openWhy}</p>
         </div>
-        <div class="doors"><Button weight="primary" href={onward()}>{copy.openYourRecord}</Button></div>
+        <!-- A FULL PAGE LOAD, like every way on from this screen: see "Open BrainDog" below. -->
+        <div class="doors"><Button weight="primary" href={onward()} data-sveltekit-reload>{copy.openYourRecord}</Button></div>
       {:else if view.name === 'not-configured'}
         <div class="said"><Empty kind="no-permission" title={copy.notConfiguredTitle} body={copy.notConfiguredWhy} /></div>
       {:else if view.name === 'insecure'}
@@ -320,14 +350,14 @@
         </div>
       {:else if view.name === 'link-sent'}
         <div class="calm" role="status">
-          <span class="glyph ok"><Icon name="check" size="l" /></span>
+          <span class="door-glyph ok"><Icon name="check" size="l" /></span>
           <p class="calm-title">{copy.linkSentTitle}</p>
           <p class="calm-body">{copy.linkSentBody(view.email)}</p>
         </div>
         <div class="doors"><Button onclick={mail}>{copy.useAnotherEmail}</Button></div>
       {:else if view.name === 'link-landing'}
         <div class="calm">
-          <span class="glyph"><Icon name="link" size="l" /></span>
+          <span class="door-glyph"><Icon name="link" size="l" /></span>
           <p class="calm-title">{view.link.kind === 'claim' ? copy.claimLandingTitle : copy.linkLandingTitle}</p>
         </div>
         <div class="doors">
@@ -337,7 +367,7 @@
         </div>
       {:else if view.name === 'signed-in'}
         <div class="calm">
-          <span class="glyph ok"><Icon name="check" size="l" /></span>
+          <span class="door-glyph ok"><Icon name="check" size="l" /></span>
           <p class="calm-title">{copy.signedInTitle}</p>
           <p class="calm-who">{view.who.email}</p>
           <p class="calm-body">{copy.signedInReads}</p>
@@ -346,9 +376,13 @@
         <div class="doors">
           {#if view.lead === 'add'}
             {@render addDoor(true)}
-            <p class="small">{copy.addPasskeyWhy}</p>
+            <p class="small">{copy.addPasskeyWhy(entered?.via ?? null)}</p>
           {/if}
-          <Button weight={view.lead === 'open' ? 'primary' : 'quiet'} href={onward()}>{copy.openBrainDog}</Button>
+          <!-- A FULL PAGE LOAD, AND THAT IS THE REPAIR. A client-side move to `/app/` kept everything this tab
+               decided before the sign-in: the sample boot, the switcher's list, the voice. Walked twice, it drew
+               The Studio, "Nothing you do here is saved.", with no request made; a reload drew his own record,
+               because the Worker answers `/app/` with a 302 to `/app/<slug>/` once there is a session. -->
+          <Button weight={view.lead === 'open' ? 'primary' : 'quiet'} href={onward()} data-sveltekit-reload>{copy.openBrainDog}</Button>
           {#if view.lead === 'open'}{@render addDoor(false)}{/if}
           <Button weight="bare" onclick={leave} aria-busy={view.out === 'asking'}>
             {view.out === 'asking' ? copy.signingOut : copy.signOut}
@@ -443,7 +477,10 @@
         <footer class="demo">
           <!-- THE DEMO IS THE APP WITH NO RECORD NAMED, `/app/`, whatever `next` says: under a slug a stranger is
                asked to sign in and never drawn the sample, so sending the demo there would bring them straight back. -->
-          <Button weight={demoLeads ? 'primary' : 'quiet'} href={`${BASE}/`}>{copy.openTheDemo}</Button>
+          <!-- A FULL PAGE LOAD TOO, so the demo is drawn from what the host answers now and not from whatever this
+               tab kept before: Sign out here drops nothing the tab holds, and the research that named these three
+               buttons (`loop/research-first-sign-in.md` friction 1) named this one with them. -->
+          <Button weight={demoLeads ? 'primary' : 'quiet'} href={`${BASE}/`} data-sveltekit-reload>{copy.openTheDemo}</Button>
           <p class="small">{copy.demoNeedsNothing}</p>
         </footer>
       {/if}
@@ -554,13 +591,16 @@
     text-align: center;
   }
 
-  .glyph {
+  /* NOT `.glyph`, WHICH `blocks.css` DRAWS AS AN INTENT DOT. Under that name this set `display` and `color` and
+     inherited the rest: measured on 23 September, a 6 by 6 grey box around a 20-pixel icon, over "Your record is
+     ready to claim." and "You are signed in" (`loop/research-first-sign-in.md` friction 7). */
+  .door-glyph {
     display: flex;
     margin-block-end: var(--sp-1);
     color: var(--dim);
   }
 
-  .glyph.ok {
+  .door-glyph.ok {
     color: var(--earn);
   }
 
