@@ -27,7 +27,7 @@ import type { Conflict, Refusal, Result } from '@braindog/ports';
 import { no, ok, refused } from '@braindog/ports';
 import { credentialKey as credential, credentialValue, NESTED_MOST, nestedPast } from './credentials.ts';
 import { FIRST_PARTY_LISTS } from './usecase.ts';
-import { KINDS, approvalLines, configReads, configValue, digest, egressChanged, egressOf as egressOfBody, fillConfig, jcs, misread, readConfig, rowRegisterOf, sentencesOver, widens, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
+import { KINDS, approvalLines, configReads, configValue, digest, egressChanged, egressOf as egressOfBody, fillConfig, jcs, misread, readConfig, rowRegisterOf, sentencesOver, validateDeclaration, widens, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
 
 /**
  * What one declaration sends out of the record, or `null` when it sends nothing: every host, how often, the key by label
@@ -456,7 +456,7 @@ export type Host = {
    * transaction could not be joined to the retire, the seeds and the pack row — which is how a
    * refused install left one declaration retired and another live.
    */
-  stage: (batch: readonly { id: string; kind: string; body: Json; pack?: string }[]) => Promise<Result<() => Result<unknown>>>;
+  stage: (batch: readonly StagedDeclaration[]) => Promise<Result<() => Result<unknown>>>;
   /** The caller's transaction. A throw inside it rolls back; a returned value commits. */
   transaction: <T>(fn: () => T) => T;
   /** Rebuild whatever the host caches from the declarations, once the transaction has committed. */
@@ -1336,14 +1336,20 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
      the pattern. So the handed pattern arrived naming a door that was gone, the declaration the kernel's `doorFault`
      refuses at install (`loop/research-batch-forty-two-audit.md` finding 4 (c), `door-follows-patterns.test.ts`). The
      door is handed to the pack its pattern goes to, whatever `used` says of the door itself. */
-  const doorsTo = new Map<string, string>();
+  /* BUT ONLY WHERE `hands` SENDS THE DOOR THERE TOO. Handed to whichever pack a pattern went to, `banky` 1.1.0 handing only
+     `ingest.bank-twin` to `teller` handed `teller` its `ingest.bank-door` as well, and `teller` 1.0.0, which names a door
+     of its own, was then the `{ handed: true }` conflict `install` refuses, and could not install at all
+     (`loop/research-batch-forty-seven-audit.md` finding 4, `hands-names-door.test.ts`). Two patterns going to two packs
+     left the door with whichever was read last. Where `hands` says nothing of the door, or names another pack, the door
+     is not handed here, and `installFault` tells the author the line to add (`handsDoorFault`). */
+  const doorsTo = new Map<string, Set<string>>();
   for (const r of retires)
     if (r.to !== undefined && r.body !== undefined) {
       const door = (JSON.parse(r.body) as { door?: unknown }).door;
-      if (typeof door === 'string') doorsTo.set(`ingest.${door}`, r.to);
+      if (typeof door === 'string') doorsTo.set(`ingest.${door}`, (doorsTo.get(`ingest.${door}`) ?? new Set<string>()).add(r.to));
     }
   for (const [i, r] of retires.entries()) {
-    const to = r.to === undefined ? doorsTo.get(r.id) : undefined;
+    const to = r.to === undefined && Object.hasOwn(hands, r.id) && doorsTo.get(r.id)?.has(hands[r.id]!) === true ? hands[r.id] : undefined;
     const live = to === undefined ? undefined : installed.declarations.find((d) => d.id === r.id);
     const body = to === undefined || live === undefined ? null : handedBody(live.body, to);
     if (to !== undefined && body !== null) retires[i] = { id: r.id, rows: r.rows, to, body };
@@ -2433,6 +2439,38 @@ export function installFault(pack: Pack, diff: Diff): Refusal | null {
   return r !== null && refused(r) ? r.refusal : null;
 }
 
+/**
+ * A pattern this version hands on whose door it also stops declaring, and whose `hands` does not send that door to the
+ * same pack, or `null`.
+ *
+ * THE AUTHOR'S TO SAY, NOT THE PLAN'S TO GUESS. The plan handed such a door with its pattern unasked, and the receiver's
+ * first install then met a declaration its file did not declare, `{ handed: true }`, which `install` refuses
+ * (`loop/research-batch-forty-seven-audit.md` finding 4). Left to retire, the pattern arrives under its new pack naming a
+ * door that is gone, which the kernel's `doorFault` refuses. Either way the file is what is wrong, and one line fixes it,
+ * so the line is what is said. `DECLARATION_INVALID` at `hands.<pattern>`, since it is `hands` that reads wrong.
+ */
+function handsDoorFault(pack: Pack, diff: Diff): Refusal | null {
+  const hands = pack.manifest.hands ?? {};
+  for (const r of diff.retires) {
+    if (r.to === undefined || r.body === undefined) continue;
+    const named = (JSON.parse(r.body) as { door?: unknown }).door;
+    if (typeof named !== 'string') continue;
+    const door = `ingest.${named}`;
+    /* A DOOR THIS VERSION STILL DECLARES, or one another pack holds, stays where it is, and the pattern still reaches it. */
+    if (!diff.retires.some((x) => x.id === door)) continue;
+    const sent = Object.hasOwn(hands, door) ? hands[door] : undefined;
+    if (sent === r.to) continue;
+    return {
+      code: 'DECLARATION_INVALID',
+      fix: `${diff.pack.id} ${diff.pack.version} hands ${r.id} to ${r.to}, and ${door}, the door it arrives through, ${
+        sent === undefined ? 'to nobody, so it would retire from under the pattern' : `to ${sent}`
+      }. A pattern and its door go to one pack: put "${door}": "${r.to}" in hands.`,
+      at: `hands.${r.id}`,
+    };
+  }
+  return null;
+}
+
 function faultOf(pack: Pack, diff: Diff): Result<never> | null {
   /**
    * EACH HAS ITS OWN CODE, and both said `OUT_OF_BOUNDS`.
@@ -2488,6 +2526,9 @@ function faultOf(pack: Pack, diff: Diff): Result<never> | null {
       `${leaning.id} ${leaning.version} needs ${diff.pack.id} ${leaning.range}, which ${diff.pack.id} ${diff.pack.version} is not, and the ${diff.pack.id} ${diff.installed_version} this record holds is. Update ${leaning.id} to a version that takes ${diff.pack.id} ${diff.pack.version} first, then install ${diff.pack.id} ${diff.pack.version}.`,
       { at: `dependents.${leaning.id}` },
     );
+
+  const unpaired = handsDoorFault(pack, diff);
+  if (unpaired) return { ok: false, refusal: unpaired };
 
   /* A LIST NOTHING HOLDS IS REFUSED BEFORE ANYTHING IS STAGED. A field pointing at it would be a ref
      no row can satisfy, and a page requiring it would draw an empty table under a heading that
@@ -2593,6 +2634,92 @@ function faultOf(pack: Pack, diff: Diff): Result<never> | null {
         `${d.id} sets ${painted.at} to ${painted.value} from a setting. A ${d.kind} names an intent (good, warn, bad or info), and the theme names the colour.`,
         { at: `${d.id}.${painted.at}` },
       );
+  }
+  return null;
+}
+
+/** One declaration as `install` hands it to `Host['stage']`: `pack` absent is a row staged with no pack. */
+export type StagedDeclaration = { id: string; kind: string; body: Json; pack?: string };
+
+/**
+ * The batch `install` stages for this plan, in the order it stages it: what the kernel validates at the accept.
+ *
+ * LIFTED OUT OF `install` SO THE ARRANGER LINTS WHAT IS STAGED. `planAll` linted each pack's file bodies, and only when
+ * pages rode along, so an arrangement of two packs the kernel would not hold together was filed and the accept installed
+ * the first and refused the second (`loop/research-batch-forty-seven-audit.md` finding 1). The file is not the batch: a
+ * kept value's body, a rebased list, a handover and what `extends` lays are all staged in its place or beside it.
+ */
+export function stagedBatch(pack: Pack, diff: Diff): StagedDeclaration[] {
+  const filled = filledWith(pack, diff.config);
+  /* WHAT THE OWNER CHANGED IS NOT STAGED, so it stands at its own version with `pack_id` null, and a later uninstall of
+     this pack still cannot take it. */
+  const keep = new Set(diff.kept.filter((k) => k.rebased === undefined).map((k) => k.id));
+  /* A REBASED LIST IS STAGED TWICE IN ONE BATCH: the update's body as the pack's, then the owner's additions over it with
+     no pack. The kernel supersedes the first with the second, so the live row is still the owner's, and `detached()`
+     then reads the pack's newest body as the one the edit started from. Staged once as the owner's, measured through
+     the record: portfolio one step up went through, and the step after it was refused `{ changed: true, field:
+     'launched' }`, because the edit still started from the older body and the first update's own `launched` read as
+     the owner's addition. */
+  const over = diff.kept.flatMap((k) => (k.rebased === undefined ? [] : [{ id: k.id, kind: 'register', body: JSON.parse(k.rebased) as Json }]));
+  /* WHAT THIS VERSION HANDS ON IS STAGED UNDER ITS NEW OWNER IN THE SAME BATCH, so the declaration is never retired: its
+     rows stay readable, and a webhook's path token outlives the move, because `heldDigest` keeps a digest while every
+     version since the mint is live. Retired and declared again, as money-core 1.8.0 first did, the Shortcut's door
+     answered 404 from the update until the new pack was installed, and `none` after it. */
+  const handing = diff.retires.flatMap((r) =>
+    r.to === undefined || r.body === undefined ? [] : [{ id: r.id, kind: r.id.slice(0, r.id.indexOf('.')), body: JSON.parse(r.body) as Json, pack: r.to }],
+  );
+  /* WHAT IT LAYS ON ANOTHER PACK'S LIST IS STAGED WITH NO PACK, as a rebased list is, so the kernel supersedes the owner's
+     row with an ordinary body and `detached()` then says whose list it was. Staged under this pack, the list would change
+     owners, and taking this pack out would retire a list whose rows it never wrote. Staged under the list's own pack, its
+     next update drops what was laid (`Diff['extends']` says what was measured). */
+  const laid = diff.extends.flatMap((e) => (e.body === undefined ? [] : [{ id: e.id, kind: 'register', body: JSON.parse(e.body) as Json }]));
+  /* AND A VALUE THAT STAYS ON A LIST THIS PACK OWNS IS STAGED AS THE PACK'S BODY OF IT, in place of the file's. Staged with
+     no pack after the file's, as it was until audit forty-four's finding 2, the list read as changed in the app from
+     then on: People 2.1.0 was planned as `kept` with a rebased body, and Decide said "Keeps People as you changed it.
+     This update's version of it is not taken" of an update nobody's edit stood in and that installed its `pronouns`.
+     Under the pack, the next update meets the value as the pack's and `laidBack` keeps it again while rows are there. */
+  const staying = new Map(diff.stays.flatMap((s) => (s.body === undefined ? [] : [[s.id, JSON.parse(s.body) as Json] as const])));
+  return [
+    ...filled.declarations.filter((d) => !keep.has(d.id)).map((d) => ({ id: d.id, kind: d.kind, body: staying.get(d.id) ?? d.body, pack: pack.manifest.pack })),
+    ...over,
+    ...handing,
+    ...laid,
+  ];
+}
+
+/**
+ * The first refusal the kernel's `validate` gives `batch` staged over `installed`, with the id it was about, or `null`.
+ *
+ * AGAINST THE RECORD AS PLANNED, NOT AS IT IS. The arranger's lint was `kernel.lint`, which overlays the batch on the live
+ * record, so the second pack of an arrangement was read beside what the first would leave only by laying both batches on
+ * the record together, and a list the first retires was still there to be held against the second. `installed` here is
+ * `plannedState`'s, so each pack meets the record `host.stage` will show it. The kernel's own rules are asked, through
+ * `validateDeclaration`, with the context `stageInstall` builds: every live body with the batch laid over it, and who
+ * put each there.
+ *
+ * `validate` IS NOT ALL OF WHAT `stageInstall` ASKS. Its checks that read the table and not a `Known` (`doorsKept`, a
+ * disabled pack, `unreadable`, `unserved`, `stranded` and the two `tags` rules) take no planned record, and are not
+ * asked here.
+ */
+export function stagedFault(installed: Installed, batch: readonly StagedDeclaration[]): { id: string; refusal: Refusal } | null {
+  const known = new Map<string, Record<string, Json>>();
+  const owners = new Map<string, string | null>();
+  for (const row of installed.declarations) {
+    try {
+      known.set(row.id, JSON.parse(row.body) as Record<string, Json>);
+    } catch {
+      /* A BODY THAT WILL NOT PARSE IS STILL A DECLARATION, as the kernel's `knownTo` keeps it. */
+      known.set(row.id, {});
+    }
+    owners.set(row.id, row.pack_id);
+  }
+  for (const d of batch) {
+    known.set(d.id, d.body as Record<string, Json>);
+    owners.set(d.id, d.pack ?? null);
+  }
+  for (const d of batch) {
+    const refusal = validateDeclaration({ id: d.id, kind: d.kind as DeclKind, body: d.body as Record<string, Json>, pack: d.pack }, known, owners);
+    if (refusal) return { id: d.id, refusal };
   }
   return null;
 }
@@ -2771,40 +2898,9 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
   /* THE SETTINGS ARE WRITTEN IN HERE, from the plan that was approved, so the bodies staged are the
      bodies the plan compared. The colour rule for what a setting filled is asked in `installFault`. */
   const filled = filledWith(pack, diff.config);
-  /* WHAT THE OWNER CHANGED IS NOT STAGED, so it stands at its own version with `pack_id` null, and a later uninstall of
-     this pack still cannot take it. */
   const keep = new Set(diff.kept.filter((k) => k.rebased === undefined).map((k) => k.id));
-  /* A REBASED LIST IS STAGED TWICE IN ONE BATCH: the update's body as the pack's, then the owner's additions over it with
-     no pack. The kernel supersedes the first with the second, so the live row is still the owner's, and `detached()`
-     then reads the pack's newest body as the one the edit started from. Staged once as the owner's, measured through
-     the record: portfolio one step up went through, and the step after it was refused `{ changed: true, field:
-     'launched' }`, because the edit still started from the older body and the first update's own `launched` read as
-     the owner's addition. */
-  const over = diff.kept.flatMap((k) => (k.rebased === undefined ? [] : [{ id: k.id, kind: 'register', body: JSON.parse(k.rebased) as Json }]));
-  /* WHAT THIS VERSION HANDS ON IS STAGED UNDER ITS NEW OWNER IN THE SAME BATCH, so the declaration is never retired: its
-     rows stay readable, and a webhook's path token outlives the move, because `heldDigest` keeps a digest while every
-     version since the mint is live. Retired and declared again, as money-core 1.8.0 first did, the Shortcut's door
-     answered 404 from the update until the new pack was installed, and `none` after it. */
-  const handing = diff.retires.flatMap((r) =>
-    r.to === undefined || r.body === undefined ? [] : [{ id: r.id, kind: r.id.slice(0, r.id.indexOf('.')), body: JSON.parse(r.body) as Json, pack: r.to }],
-  );
-  /* WHAT IT LAYS ON ANOTHER PACK'S LIST IS STAGED WITH NO PACK, as a rebased list is, so the kernel supersedes the owner's
-     row with an ordinary body and `detached()` then says whose list it was. Staged under this pack, the list would change
-     owners, and taking this pack out would retire a list whose rows it never wrote. Staged under the list's own pack, its
-     next update drops what was laid (`Diff['extends']` says what was measured). */
-  const laid = diff.extends.flatMap((e) => (e.body === undefined ? [] : [{ id: e.id, kind: 'register', body: JSON.parse(e.body) as Json }]));
-  /* AND A VALUE THAT STAYS ON A LIST THIS PACK OWNS IS STAGED AS THE PACK'S BODY OF IT, in place of the file's. Staged with
-     no pack after the file's, as it was until audit forty-four's finding 2, the list read as changed in the app from
-     then on: People 2.1.0 was planned as `kept` with a rebased body, and Decide said "Keeps People as you changed it.
-     This update's version of it is not taken" of an update nobody's edit stood in and that installed its `pronouns`.
-     Under the pack, the next update meets the value as the pack's and `laidBack` keeps it again while rows are there. */
-  const staying = new Map(diff.stays.flatMap((s) => (s.body === undefined ? [] : [[s.id, JSON.parse(s.body) as Json] as const])));
-  const staged = await host.stage([
-    ...filled.declarations.filter((d) => !keep.has(d.id)).map((d) => ({ id: d.id, kind: d.kind, body: staying.get(d.id) ?? d.body, pack: pack.manifest.pack })),
-    ...over,
-    ...handing,
-    ...laid,
-  ]);
+  const handing = diff.retires.filter((r) => r.to !== undefined && r.body !== undefined).length;
+  const staged = await host.stage(stagedBatch(pack, diff));
   if (!staged.ok) return staged;
 
   /* ONE TRANSACTION, AND A REFUSAL ROLLS IT BACK. Declarations, retires, seeds and the pack row
@@ -2857,7 +2953,7 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
         declarations: pack.declarations.length - keep.size,
         seeds: planted.length,
         retired: retiring.length,
-        ...(handing.length > 0 ? { handed: handing.length } : {}),
+        ...(handing > 0 ? { handed: handing } : {}),
       });
     });
   } catch (e) {

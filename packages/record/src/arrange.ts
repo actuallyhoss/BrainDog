@@ -19,8 +19,8 @@
 
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
-import { conflictFault, installFault, installOrder, labelsOf, laterVersion, normalise, packIdOf, plan, plannedState, readShared, install, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
-import { configValue, ulids, type ConfigDecl, type Declaration, type Kernel } from '@braindog/kernel';
+import { conflictFault, installFault, installOrder, labelsOf, laterVersion, normalise, packIdOf, plan, plannedState, readShared, install, stagedBatch, stagedFault, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
+import { configValue, ulids, type ConfigDecl, type Kernel } from '@braindog/kernel';
 import type { FormSpec, NextSpec } from './spark.ts';
 
 /**
@@ -336,9 +336,10 @@ export function arranger(d: ArrangeDeps) {
 
   /**
    * `kept` is each declaration an update leaves as the owner changed it, with the name the owner gave it. `order` is the
-   * packs in the order they install, which is the order a proposal files and `apply` runs.
+   * packs in the order they install, which is the order a proposal files and `apply` runs. `state` is the record as the
+   * last of them leaves it, which an arrangement's pages are linted against.
    */
-  type Planned = { order: string[]; plan: Body[]; approve: string[]; batch: Declaration[]; config: Map<string, Record<string, ConfigDecl>>; packs: Map<string, Pack>; kept: Map<string, string> };
+  type Planned = { order: string[]; plan: Body[]; approve: string[]; state: Installed; config: Map<string, Record<string, ConfigDecl>>; packs: Map<string, Pack>; kept: Map<string, string> };
 
   /**
    * A declaration by the name the record holds for it now, which for one the owner changed is theirs and not the pack's.
@@ -375,7 +376,7 @@ export function arranger(d: ArrangeDeps) {
     }
     const ids = installOrder(coming, base);
     let state: Installed = base;
-    const out: Planned = { order: ids, plan: [], approve: [], batch: [], config: new Map(), packs: new Map(), kept: new Map() };
+    const out: Planned = { order: ids, plan: [], approve: [], state: base, config: new Map(), packs: new Map(), kept: new Map() };
     for (const id of ids) {
       const read = await packOf(id, docs, heldBy(state), useCaseFor(ids, id));
       if (!read.ok) return read;
@@ -393,6 +394,14 @@ export function arranger(d: ArrangeDeps) {
       /* AND EVERY OTHER REFUSAL THE ACCEPT WOULD GIVE, from the same function `install` asks, so what is filed installs. */
       const fault = installFault(pack, diff);
       if (fault) return { ok: false, refusal: { ...fault, at: 'body.packs' } };
+      /* AND WHAT THE KERNEL REFUSES AT `host.stage`, which `installFault` cannot see: it reads the diff, and the stage is
+         the kernel's `validate` over the batch with the record laid under it. Two packs each declaring `scopes:`, as one
+         arrangement, were filed, and the accept installed the first and answered "register.things already declares
+         scopes: ... Already applied, and kept: one." (`loop/research-batch-forty-seven-audit.md` finding 1,
+         `test/arrange-kernel-lint.test.ts`). Asked of the batch `install` stages, against `state`, the record as the packs
+         before this one leave it, so a list an earlier update in the same arrangement retires is not held against this one. */
+      const staging = stagedFault(state, stagedBatch(pack, diff));
+      if (staging) return { ok: false, refusal: { ...staging.refusal, at: 'body.packs' } };
       /* A REBASED LIST IS NOT KEPT: its update installs, with what the owner or another pack laid put back on it. Filed
          as `keeps`, Decide said "This update's version of it is not taken" of an update that was (finding 2). */
       const kept = new Set(diff.kept.filter((k) => k.rebased === undefined).map((k) => k.id));
@@ -435,14 +444,12 @@ export function arranger(d: ArrangeDeps) {
       out.approve.push(...diff.approve.filter((line) => !out.approve.includes(line)));
       out.config.set(id, pack.manifest.config ?? {});
       out.packs.set(id, pack);
-      const staged = pack.declarations.filter((decl) => !kept.has(decl.id));
-      for (const decl of staged) out.batch.push({ id: decl.id, kind: decl.kind, body: decl.body, pack: id });
       /* THE RECORD AS THE INSTALL LEAVES IT, from `declare`, which stages it. The fold this replaced carried `{ id,
          version }` with no `requires` and nothing an `extends` laid, so a second pack laying `domain` on the same list
          was planned against a list with none, filed, and refused half-way at the accept (finding 3). */
       state = plannedState(state, pack, diff);
     }
-    return ok(out);
+    return ok({ ...out, state });
   }
 
   /**
@@ -702,10 +709,42 @@ export function arranger(d: ArrangeDeps) {
       const was = installed.find((r) => r.id === raw.id);
       pages.push({ id: raw.id, kind: 'page', body: raw.body, was: was ? was.version : null });
     }
-    if (pages.length > 0) {
-      const fault = kernel.lint([...planned.value.batch, ...pages.map((p) => ({ id: String(p.id), kind: 'page' as const, body: p.body as never }))]);
-      if (fault) return { ok: false, refusal: { ...fault, at: `body.pages${fault.at ? `: ${fault.at}` : ''}` } };
-    }
+    /* THE PAGES AGAINST THE RECORD AS THE PACKS LEAVE IT, and only the pages. This was `kernel.lint` over every pack's file
+       and the pages together, asked only when a page rode along, so the packs' own faults were found by accident and said
+       as the page's: two `scopes:` packs with one page were refused at `body.pages` "register.jobs already declares
+       scopes:", a page nobody wrote wrong. Each pack has met the kernel's `validate` in `planAll` by now, so a fault here
+       is a page's. */
+    const staged = pages.map((p) => ({ id: String(p.id), kind: 'page' as const, body: p.body as never }));
+    const unfit = stagedFault(planned.value.state, staged);
+    if (unfit) return { ok: false, refusal: { ...unfit.refusal, at: `body.pages${unfit.refusal.at ? `: ${unfit.refusal.at}` : ''}` } };
+    /* AND `kernel.lint` STILL, BECAUSE `validate` DOES NOT READ A PAGE WHOLE. A block's `where:` and a column's `sign:` are
+       read against the list's fields by the kernel's `unreadable`, which only `lint` and `stageInstall` ask. Asked of
+       `validate` alone, a page filtering Things on `nosuch` beside the pack declaring Things was filed, and the accept
+       installed the pack and answered "things has no field called nosuch. Already applied, and kept: one." The lists the
+       pages read ride along as the packs leave them, since `unreadable` reads a list from the batch before the table.
+       `lint` lays that batch on the live record, so a list whose live twin an earlier update retires is refused there
+       though it installs: a fault the lists meet alone is theirs and was asked in `planAll`, and is not said here. */
+    const read = new Set(
+      pages.flatMap((p) => {
+        const page = (isMap(p.body) ? p.body : {}) as { requires?: unknown; blocks?: unknown };
+        const blocks = (Array.isArray(page.blocks) ? page.blocks : []) as ({ source?: unknown; kind?: unknown; register?: unknown } | null)[];
+        return [
+          ...(Array.isArray(page.requires) ? (page.requires as unknown[]) : []),
+          ...blocks.map((b) => (b?.kind === 'capture' && typeof b.register === 'string' ? `register.${b.register}` : b?.source)),
+        ];
+      }),
+    );
+    const lists = planned.value.state.declarations.flatMap((r) => {
+      if (r.kind !== 'register' || !read.has(r.id)) return [];
+      try {
+        return [{ id: r.id, kind: 'register' as const, body: JSON.parse(r.body) as never, ...(r.pack_id === null ? {} : { pack: r.pack_id }) }];
+      } catch {
+        /* A body that will not parse is left to the table, which `unreadable` reads a list from when the batch has none. */
+        return [];
+      }
+    });
+    const unread = staged.length === 0 ? null : kernel.lint([...lists, ...staged]);
+    if (unread && kernel.lint(lists) === null) return { ok: false, refusal: { ...unread, at: `body.pages${unread.at ? `: ${unread.at}` : ''}` } };
 
     const settings: Body[] = [];
     for (const [i, raw] of (Array.isArray(body.settings) ? body.settings : []).entries()) {

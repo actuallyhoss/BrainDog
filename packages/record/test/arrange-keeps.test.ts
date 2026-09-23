@@ -98,10 +98,12 @@ test('an update that changes a list the owner changed is said as refused, in the
 test('an update that reads a list its module update adds is offered, as propose files it', async () => {
   const portfolio = structuredClone(firstPartyDocument('portfolio')) as unknown as Doc;
   portfolio.version = '1.5.0';
-  const list = structuredClone(portfolio.declarations.find((x) => x.register === 'things')!);
+  const { scopes: _scopes, ...list } = structuredClone(portfolio.declarations.find((x) => x.register === 'things')!);
   portfolio.declarations.push({ ...list, register: 'extra', name: 'Extra' });
+  /* A METRIC THE KERNEL TAKES, since the arranger now asks it: this one said `value: 'count'` and no target, and was
+     filed only because nothing linted it until the accept. `scopes` is dropped from the clone for the same reason. */
   const money = next((d) => {
-    d.declarations.push({ metric: 'extra-count', name: 'Extra count', source: 'register.extra', value: 'count', format: 'decimal', window: '30d', compare: 'none' });
+    d.declarations.push({ metric: 'extra-count', name: 'Extra count', source: 'register.extra', value: { count: 'id' }, format: 'int', target: { gte: 1 }, window: '30d', compare: 'none' });
   });
   const sql = openSqlite();
   const catalogue = offering(money).map((e) => (e.id === 'portfolio' ? { ...e, version: '1.5.0', doc: () => structuredClone(portfolio) as never } : e));
