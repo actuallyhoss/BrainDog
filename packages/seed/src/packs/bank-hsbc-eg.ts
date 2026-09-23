@@ -46,8 +46,15 @@ import { HOME_CURRENCY, NOT_A_MOVEMENT, SAME_MOVEMENT, smsTwins, type SeedIngest
  * UPDATE YET: this pack is in no catalogue, and the import counts a pack the record holds as already offered, so a record
  * that installed 1.0.0 keeps `^1.8.0` beside money-core 2.0.0 and nothing says so (`test/money-core-major.test.ts`, the
  * last test, drives exactly that). The step lets a record's pack list tell the two ranges apart; it does not reach one.
+ *
+ * 1.1.0: five of the six webhook twins name `bank-from-out-sms` as their `door:` (`HSBC_EG_SMS_INGESTS` below), so one
+ * URL reads every wording. A minor step, because a key is added to five declarations and nothing is taken away: each
+ * twin still reads what it read and still takes its own token. A token minted before the step survives it: measured on
+ * 23 September through `@braindog/record`, a token minted for `bank-ipn-out-sms` without `door:` verified the same
+ * digest after the 1.1.0 body replaced it, because `heldDigest` keeps a digest across versions that stay a webhook
+ * with a path token.
  */
-export const BANK_HSBC_EG_VERSION = '1.0.1';
+export const BANK_HSBC_EG_VERSION = '1.1.0';
 
 /* ── the `From HSBC:` line, shared by the pattern that writes it and the one that holds it ── */
 
@@ -346,8 +353,30 @@ export const HSBC_EG_INGESTS: Record<string, SeedIngest> = {
   },
 };
 
-/** The same six as webhook twins `<id>-sms`, built the way money-core builds its own (`smsTwins`), so the two cannot drift. */
-export const HSBC_EG_SMS_INGESTS: Record<string, SmsIngest> = smsTwins(HSBC_EG_INGESTS);
+/**
+ * The one URL his Shortcut posts every HSBC text to: the debit twin's, which `ingestMint` makes the token for.
+ *
+ * `bank-from-out-sms` BECAUSE IT IS THE DOOR ALREADY DRIVEN, not because the debit is special. It is the twin the old
+ * Shortcut screen minted for (`SHORTCUT_INGEST`, before `apps/web/src/lib/ui/webhook-doors.ts` replaced it) and the one
+ * `packages/host/test/ingest-shortcut.test.ts`, `apps/selfhost/test/shortcut-arrival.test.ts` and
+ * `apps/worker/test/shortcut-in-do.test.ts` post to, so a token minted for it before 1.1.0 opens the same door and
+ * now reads all six wordings behind it. The card wording is the commonest (59 of the 75 movements in his last hundred
+ * texts, `loop/research-switch.md` §5 step 11), and it is read here by the card twin through this door.
+ */
+export const HSBC_EG_SMS_DOOR = 'bank-from-out-sms';
+
+/**
+ * The same six as webhook twins `<id>-sms`, built the way money-core builds its own (`smsTwins`), so the two cannot drift.
+ *
+ * FIVE OF THEM NAME ONE DOOR, SINCE 1.1.0. A named arrival is offered its own twin's pattern and no other, so before
+ * `door:` one URL read one wording and the Shortcut needed six branches chosen by a phrase, where a text sent down the
+ * wrong one was stored `untriaged` and filed as nothing (`loop/research-switch-recheck.md` §3, gap 3). The six `match:`
+ * lists exclude each other, so which twin is offered first changes nothing a text reads as. Each twin keeps its own
+ * `verify:` and so stays a door of its own, and a token already minted for one of the five still opens it.
+ */
+export const HSBC_EG_SMS_INGESTS: Record<string, SmsIngest> = Object.fromEntries(
+  Object.entries(smsTwins(HSBC_EG_INGESTS)).map(([id, twin]) => [id, id === HSBC_EG_SMS_DOOR ? twin : { ...twin, door: HSBC_EG_SMS_DOOR }]),
+);
 
 /**
  * What money-core hands to this pack, as `hands:` in money-core's own document from 1.8.0: each of the twelve ids,

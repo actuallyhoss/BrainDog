@@ -79,11 +79,13 @@ test('bank-hsbc-eg AND MERCURY PLAN CLEAN AND INSTALL on money-core 1.8.0 and on
 });
 
 test('EACH RANGE MOVED WITH A VERSION OF ITS OWN, and neither admits a money-core 3.0.0 nobody has read them against', () => {
-  /* A PATCH STEP, AND THE REASON IS WHAT A RECORD HOLDS. Not one declaration moved in either pack: the bytes a record
-     stages are the bytes it staged, and only which Money they may sit beside is wider. `first-party.ts`'s rule asks a
-     minor step for something added and a major one for something taken away, and this is neither. */
-  assert.equal(BANK_HSBC_EG_VERSION, '1.0.1');
-  assert.equal(bankHsbcEgPack().version, '1.0.1');
+  /* MERCURY'S IS A PATCH STEP, AND THE REASON IS WHAT A RECORD HOLDS. Not one of its declarations moved: the bytes a
+     record stages are the bytes it staged, and only which Money they may sit beside is wider. `first-party.ts`'s rule
+     asks a minor step for something added and a major one for something taken away, and this is neither.
+     bank-hsbc-eg is a minor step instead, 1.1.0, because its five twin doors gained `door:` on top of the wider range
+     (one door, several patterns; wave forty-two). */
+  assert.equal(BANK_HSBC_EG_VERSION, '1.1.0');
+  assert.equal(bankHsbcEgPack().version, '1.1.0');
   assert.equal(mercuryPack(MERCURY).version, '1.0.1');
   for (const [name, doc] of [['bank-hsbc-eg', bankHsbcEgPack()], ['mercury', mercuryPack(MERCURY)]] as const) {
     const range = (doc.requires as { packs: Record<string, string> }).packs['money-core']!;

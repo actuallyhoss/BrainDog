@@ -1440,10 +1440,14 @@ const SKIP_REASON_MOST = 120;
  * brief 2 left the choice open. The list is the better grammar: one declaration per wording, read the same whichever way
  * it arrived. It is also a change to `07 §3`'s `channel:`, which is one word here, in `IngestDecl`, and in `arrive`'s
  * `i.channel === arrival.channel` (`ingest.ts`), and that makes it a `docs/07` row before it is code. A twin changes
- * nothing anybody reads: it is one more declaration of an existing shape, carrying this key. The cost that is not
- * obvious is that the URL's ingest id chooses only the verifier: neither host hands it to `arrive`
- * (`apps/selfhost/src/server.ts` `arrivalDoor`, `apps/worker/src/route.ts` `cloudIngest`), so a verified arrival is
- * offered every webhook pattern on the record, in declaration order, and one twin's URL is the door for all of them.
+ * nothing anybody reads: it is one more declaration of an existing shape, carrying this key.
+ *
+ * THE URL'S INGEST ID CHOOSES THE PATTERN AS WELL AS THE VERIFIER, and this paragraph said the opposite until 23
+ * September. It said neither host handed the id to `arrive`, so a verified arrival was offered every webhook pattern;
+ * both hosts have handed it since 22 September (`arrivalDoor` in `apps/selfhost/src/server.ts`, the spread in the
+ * Worker's `arrivals()`, held by `apps/worker/test/arrive-ingest-handoff.test.ts`), and `arrive` offers a named arrival
+ * its own ingest's pattern and no other. So one twin's URL read one wording, and a phone posting six needed six URLs.
+ * `door:` (`doorFault` below) is how several patterns share one: each names the twin whose URL it reads.
  */
 function verifyFault(id: string, channel: string, verify: unknown): Refusal | null {
   if (verify === undefined) return null;
@@ -1460,8 +1464,42 @@ function verifyFault(id: string, channel: string, verify: unknown): Refusal | nu
   return null;
 }
 
+/**
+ * `door:` on a webhook ingest: the id of another webhook ingest whose URL this pattern also reads (`IngestDecl.door`).
+ *
+ * NOTHING READS AN UNKNOWN KEY ON AN INGEST, SO A DOOR THAT COULD NEVER OPEN INSTALLED. Measured on 23 September with
+ * this call taken out, over the five cases `test/ingest-door.test.ts` refuses: `door: 'ghost'`, a door that is an email
+ * ingest, a door on a webhook with no `verify:`, `door: 7`, and an email pattern naming a real door all installed clean.
+ * Each is a pattern offered nothing for ever, and from outside it looks exactly like a wording that has not arrived yet.
+ *
+ * A DOOR IS AN INSTALLED WEBHOOK THAT TAKES A PATH TOKEN, because that is the only ingest a URL can name with a verdict
+ * attached. Without `verify: { kind: path }` the record answers `none` for it (`ingestVerify`), every arrival there is
+ * stored unverified, and no pattern at it is ever tried. The pattern naming it must be a webhook too: an email pattern
+ * is offered mail, which names no ingest.
+ *
+ * WHETHER THE DOOR EXISTS IS A QUESTION ABOUT TWO DOCUMENTS, so it is asked only when `installed` is given, and the
+ * batch counts as installed: a pack that ships the door and the patterns naming it in one call is not refused for the
+ * order they are listed in. `validate(decl)` with no context checks the shape and nothing else, as `Known` says.
+ */
+function doorFault(id: string, channel: string, door: unknown, installed?: Known): Refusal | null {
+  if (door === undefined) return null;
+  if (typeof door !== 'string' || door === '')
+    return bad('DECLARATION_INVALID', `${id}'s door is the id of a webhook ingest whose URL it reads, and ${JSON.stringify(door)} is not one.`, 'door');
+  if (channel !== 'webhook')
+    return bad('DECLARATION_INVALID', `${id} arrives by ${channel}, and only a webhook pattern is offered what arrives at a door. Take door out, or declare channel: webhook.`, 'door');
+  if (installed === undefined) return null;
+  const named = installed.get(`ingest.${door}`) as { channel?: unknown; verify?: { kind?: unknown } } | undefined;
+  if (named === undefined)
+    return bad('DECLARATION_INVALID', `${id} names ${door} as its door, and no ingest ${door} is installed. Install it first, or in the same batch.`, 'door');
+  if (named.channel !== 'webhook')
+    return bad('DECLARATION_INVALID', `${id} names ${door} as its door, and ${door} arrives by ${String(named.channel)}: a door is a webhook's URL.`, 'door');
+  if (named.verify?.kind !== 'path')
+    return bad('DECLARATION_INVALID', `${id} names ${door} as its door, and ${door} takes no path token, so nothing arriving there is verified and no pattern is tried. Give ${door} verify: { kind: path }.`, 'door');
+  return null;
+}
+
 function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
-  const body = decl.body as { channel?: unknown; match?: unknown; extract?: unknown; map?: unknown; fetch?: unknown; dedupe?: unknown; skip?: unknown; writes?: unknown; verify?: unknown };
+  const body = decl.body as { channel?: unknown; match?: unknown; extract?: unknown; map?: unknown; fetch?: unknown; dedupe?: unknown; skip?: unknown; writes?: unknown; verify?: unknown; door?: unknown };
   const id = decl.id;
 
   if (typeof body.channel !== 'string' || !(CHANNELS_IN as readonly string[]).includes(body.channel))
@@ -1474,6 +1512,9 @@ function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
 
   const unverifiable = verifyFault(id, body.channel, body.verify);
   if (unverifiable) return unverifiable;
+
+  const doorless = doorFault(id, body.channel, body.door, installed);
+  if (doorless) return doorless;
 
   /* THE TREE FORM ONLY. A `match:` may also be the sentence a person writes, and parsing one needs a
      `Schema` and a clock — `parseWhere`'s `SentenceDeps` — neither of which a context-free check

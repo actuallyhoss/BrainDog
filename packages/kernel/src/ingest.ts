@@ -171,6 +171,20 @@ export type IngestDecl = {
    */
   dedupe?: Dedupe;
   on_conflict?: 'skip' | 'update' | 'new';
+  /**
+   * The webhook ingest whose URL this pattern also reads, by its id: an arrival named for that door is offered the
+   * door's own pattern first and then every pattern naming it, in declaration order.
+   *
+   * ONE ADDRESS READ ONE WORDING, and a phone sends several. His Shortcut posts every HSBC text to one URL, and with a
+   * named arrival offered only its own ingest it needed six branches chosen by a phrase, one per wording, where a text
+   * sent down the wrong branch was stored `untriaged` and filed as nothing (`test/ingest-door.test.ts`, measured before).
+   *
+   * THE TOKEN IS STILL THE DOOR'S. The host checks the segment against the named ingest's digest and hands the record
+   * the verdict, so a pattern naming a door buys nothing a stranger could not already reach: it reads bytes that
+   * door's sender vouched for, and is offered nothing when they did not. `declare.ts` refuses a door that is not an
+   * installed webhook taking a path token, since a name nothing can arrive at is a pattern that never fires.
+   */
+  door?: string;
 };
 
 /**
@@ -228,8 +242,8 @@ export type Arrival = {
   /**
    * The one ingest this arrival is for, when the door that took it knows (`/in/webhook/<rec>/<ingest>/<token>`).
    *
-   * NAMED, ONLY THAT INGEST'S PATTERN IS TRIED. The URL's token was checked against this ingest's digest and
-   * no other, and both hosts dropped the name on the way in, so the record offered a verified webhook to every
+   * NAMED, ONLY THAT INGEST'S PATTERN IS TRIED, and then the patterns that declare it as their `door:`. The URL's
+   * token was checked against this ingest's digest and no other, and both hosts dropped the name on the way in, so the record offered a verified webhook to every
    * webhook pattern in declaration order: two ingests that matched one text sent every arrival to the first,
    * written by the first's extraction under a token minted for the second (`test/arrive-ingest.test.ts`).
    *
@@ -702,15 +716,22 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
        match one payload is a thing to notice rather than a thing to merge — merging two extractions
        produces a row neither declaration describes.
 
-       UNLESS THE ARRIVAL NAMES ONE, and then it is that ingest or none. A named ingest whose pattern does
-       not match leaves the payload untriaged rather than handing it to a neighbour that does, because the
-       neighbour's sender never vouched for these bytes. */
-    const matched = unverified
-      ? undefined
-      : deps
-          .ingests()
-          .filter((i) => i.channel === arrival.channel && (arrival.ingest === undefined || i.ingest === arrival.ingest))
-          .find((i) => i.match === undefined || evaluate(i.match, fields, INBOX_RAW));
+       UNLESS THE ARRIVAL NAMES ONE, and then it is that ingest, a pattern naming it as its door, or none. A
+       named ingest whose pattern does not match, where no pattern naming it matches either, leaves the payload
+       untriaged rather than handing it to a neighbour that does, because the neighbour's sender never vouched
+       for these bytes.
+
+       A PATTERN THAT NAMES THE DOOR IS NOT A NEIGHBOUR. `door:` is its author saying these bytes arrive at that URL,
+       so it is offered them after the door's own pattern, which goes first whatever the declaration order: the door's
+       sender is the one the token was minted for. Naming is one step and one way, so a pattern naming `b` where `b`
+       names `a` hears arrivals named `b` and never those named `a`, and an arrival named `b` is never handed to `a`. */
+    const offered = (all: IngestDecl[]): IngestDecl[] => {
+      const here = all.filter((i) => i.channel === arrival.channel);
+      if (arrival.ingest === undefined) return here;
+      const own = here.filter((i) => i.ingest === arrival.ingest);
+      return [...own, ...here.filter((i) => i.ingest !== arrival.ingest && i.door === arrival.ingest)];
+    };
+    const matched = unverified ? undefined : offered(deps.ingests()).find((i) => i.match === undefined || evaluate(i.match, fields, INBOX_RAW));
 
     const store = (state: Arrived['state'], reason: string | null): void => {
       /* A RESCUE MOVES THE ROW IT FOUND. The bytes are the same by their hash and the first `ts` is when they
