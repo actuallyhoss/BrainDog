@@ -119,9 +119,16 @@ type TokenPrincipal = Extract<CallContext['principal'], { kind: 'token' }>;
 /** The four methods an operation grant opens, by the name a path gives them: `export`, `import`, `installPack`, `createToken`. */
 const OPERATIONS: ReadonlySet<string> = new Set(Object.values(OPERATION_METHOD));
 
-/** The method `/api/<method>` names when it is one an operation grant can open, and `null` for every other path. */
-export const operationAsked = (pathname: string): string | null => {
-  const name = /^\/+api\/+([^/]+)\/*$/.exec(pathname)?.[1] ?? '';
+/**
+ * The method a `POST /api/<method>` names when it is one an operation grant can open, and `null` for every other request.
+ *
+ * THE VERB IS PART OF THE QUESTION. All four are `writes: true` in `ROUTES`, so the router answers anything but a POST
+ * with 405, and before this read the method a `GET /api/export` spent the grant first and was answered 405 after it
+ * was gone: the POST that followed was 401 (audit fifty-seven §4, `test/operation-grant-doors.test.ts`).
+ */
+export const operationAsked = (request: Request): string | null => {
+  if (request.method !== 'POST') return null;
+  const name = /^\/+api\/+([^/]+)\/*$/.exec(new URL(request.url).pathname)?.[1] ?? '';
   return OPERATIONS.has(name) ? name : null;
 };
 
@@ -140,10 +147,11 @@ export const operationAsked = (pathname: string): string | null => {
  * AND A BEARER THE TOKEN TABLE DOES NOT KNOW MAY BE AN OPERATION, AT THE FOUR PATHS ONE CAN OPEN AND NOWHERE ELSE.
  * `braindog export` and `braindog import` hold a device grant of reach `export` or `import`, `<rec>.<secret>` like a
  * token, and at 07ba6dbd this answered it 401 because only `verify` was asked (`test/record-doors.test.ts`). Asking
- * `operation` spends the grant, so it is asked only where the path is one of `OPERATIONS`: a CLI that sent its bearer to
- * `/api/boot` by mistake keeps it. A grant for another method is spent and refused, in the record's own sentence, so the
- * record never sees a context it would refuse anyway. The context is `packages/record`'s `CallContext.operation`: the
- * approver, at the level they hold now, and the one method.
+ * `operation` spends the grant, so it is asked only for a POST whose path is one of `OPERATIONS` under no name or the
+ * record's own: a CLI that sent its bearer to `/api/boot`, sent a GET, or sent it under another name keeps it. A grant
+ * for another method is spent and refused, in the record's own sentence, so the record never sees a context it would
+ * refuse anyway. The context is `packages/record`'s `CallContext.operation`: the approver, at the level they hold now,
+ * and the one method.
  */
 export async function bearerOf(request: Request, surface: 'api' | 'mcp', deps: BearerDeps, slug: string | null = null): Promise<Bearer> {
   const authorization = request.headers.get('authorization');
@@ -152,7 +160,13 @@ export async function bearerOf(request: Request, surface: 'api' | 'mcp', deps: B
   const bearer = /^Bearer\s+(.+)$/i.exec(authorization ?? '')?.[1];
   const seen = bearer ? await deps.verify(record, bearer, surface) : null;
   if (!seen) {
-    const asked = surface === 'api' && bearer && deps.operation ? operationAsked(new URL(request.url).pathname) : null;
+    const asked = surface === 'api' && bearer && deps.operation ? operationAsked(request) : null;
+    /* THE PATH'S NAME IS ASKED BEFORE THE GRANT IS READ, BECAUSE READING IT SPENDS IT. `heldBy` below asks it too, but
+       only after `operation` has marked the row used, so a POST under another record's name, or a name nobody holds,
+       was refused 403 with the grant already gone (audit fifty-seven §5). THE ANSWER IS THE UNKNOWN BEARER'S 401 AND NOT
+       `heldBy`'s 403: nothing has checked the secret yet, and a 403 here would tell anybody holding a record id which
+       names are that record's, which is what `heldBy` waits for the secret to prevent. The grant is kept either way. */
+    if (asked !== null && slug !== null && (deps.named === undefined || (await deps.named(slug)) !== record)) return { status: 401 };
     const grant = asked !== null && bearer && deps.operation ? await deps.operation(record, bearer) : null;
     if (!grant) return { status: 401 };
     if (grant.method !== asked)
