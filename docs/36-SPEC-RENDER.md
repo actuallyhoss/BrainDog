@@ -9,7 +9,7 @@ Derives from [05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §1–§7, [34-GRAM
 ## 1 · Purpose and boundary
 
 **Does.** Takes a `document` string in the dialect of 34 §2 and returns segments (`parse`) or HTML (`toHTML`).
-Draws the thirty kinds over the eight primitives. Resolves `{{path}}` through a function the caller supplies.
+Draws the thirty-one kinds over the eight primitives. Resolves `{{path}}` through a function the caller supplies.
 Formats money, dates, quantities and references one way. Never renders nothing: a malformed block becomes a
 visible fence with one line above it (05 §3 invariant 1).
 
@@ -42,7 +42,7 @@ export function render(markdown: string, opts?: RenderOptions): string;      // 
 
 export const PRIMITIVES_VERSION: 1;
 export const PRIMITIVES: readonly ['panel', 'grid', 'rows', 'proportional', 'inline', 'list', 'table', 'media'];
-export const KINDS: Readonly<Record<Kind, KindSpec>>;                          // thirty entries, §4
+export const KINDS: Readonly<Record<Kind, KindSpec>>;                          // thirty-one entries, §4
 export function diffRows(before: string, after: string): string[];           // a `diff` fence's rows, §5.9
 
 export type { Segment, Markdown, Block, Degraded, Row, Inline, Kind, KindSpec, Primitive,
@@ -67,7 +67,7 @@ type LinkRef =
 | `parse` | fence scan, row split, tone, arity, inline tokens | never throws; every string yields a `Segment[]` (fuzz-tested, §9) |
 | `toHTML` | resolves, formats, escapes, emits | throws nothing of its own; an exception from `opts.resolve` or `opts.link` propagates — the host owns them |
 | `render` | `toHTML(parse(s), opts)` | as above |
-| `KINDS` | the thirty kinds as data | — |
+| `KINDS` | the thirty-one kinds as data | — |
 | `diffRows` | two texts as `- `, `+ ` and two-space rows, by a longest-common-run line diff over what differs between their shared head and tail | never throws; past 250,000 cells the changed middle is drawn as taken out and put back whole |
 | `PRIMITIVES` | the eight primitive names, in 05 §1 order | — |
 | `PRIMITIVES_VERSION` | `1` at stage 0 (31 §6) | — |
@@ -136,7 +136,7 @@ interface KindSpec {
 }
 ```
 
-`KINDS`, thirty, counted:
+`KINDS`, thirty-one, counted:
 
 | Kind | Primitive | Cells, in order | Arity | Tone | Row cap | Flags |
 |---|---|---|---|---|---|---|
@@ -159,6 +159,7 @@ interface KindSpec {
 | `steps` | list | title · detail · state | 3 | no | — | ordered |
 | `timeline` | list | date · title · detail | 3 | yes | — | ordered |
 | `board` | grid | column · title · detail | 3 | no | — | |
+| `roadmap` | list | title · by (`YYYY-MM-DD`, or `D Mon YYYY` as `day()` writes it, which is the form a page's reader projects) · effort in days (optional) | 3 | yes | — | a row with an effort is a bar ending on `by`, as many whole days long as the effort rounded up; one with none is a dated stem; a row whose date or effort does not read is named under the drawing, never placed; today's line from `RenderOptions.now`; every mark painted `currentColor` by presentation attributes, which a host rule overrides |
 | `code` | media | — verbatim | 0 | no | — | |
 | `tree` | media | — verbatim | 0 | no | — | |
 | `comparison` | table | the header row's count | n | no | — | |
@@ -203,7 +204,7 @@ type Inline =
 Invariants, each a test in §9:
 
 1. Every non-blank input line belongs to exactly one segment. `Degraded.source` is the block's lines verbatim, both fences included.
-2. `Block.kind` is one of the thirty and is never `table`; it is `cards`, `section` or `feed` only when `parse` was called with `{ page: true }`.
+2. `Block.kind` is one of the thirty-one and is never `table`; it is `cards`, `section` or `feed` only when `parse` was called with `{ page: true }`.
 3. For a split kind, `Row.cells.length ≤ KINDS[kind].cells.length`; for `comparison`, ≤ the header row's count.
 4. `Row.tone === 'hole'` only when `Block.kind === 'bar'`.
 5. `Block.rows.length ≤ KINDS[kind].rows` where a cap is set.

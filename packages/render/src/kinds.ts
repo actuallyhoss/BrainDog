@@ -1,5 +1,5 @@
 /**
- * The eight primitives, the thirty kinds, and the four intent words.
+ * The eight primitives, the thirty-one kinds, and the four intent words.
  *
  * A block set is a SYSTEM, not a catalogue. Every kind draws from the same eight primitives and the
  * same tokens, and no kind introduces a colour, a font or a spacing value (05 §1).
@@ -147,7 +147,7 @@ export type KindSpec = {
 };
 
 /**
- * Twenty-five, counted. `diagram` is post-v1 and arrives as a
+ * Thirty-one, counted. `diagram` is post-v1 and arrives as a
  * pack, which is the whole reason the primitive layer exists (05 §2).
  *
  * The table is written `as const satisfies` so the KEYS derive the `Kind` union and every entry is
@@ -212,6 +212,16 @@ const TABLE = {
   steps: { primitive: 'list', cells: 3, tone: false, ordered: true, minSpan: 4, purpose: 'plan' },
   timeline: { primitive: 'list', cells: 3, tone: true, minSpan: 4, purpose: 'plan' },
   board: { primitive: 'grid', cells: 3, tone: false, minSpan: 6, purpose: 'plan' },
+  /* `title | by | effort`: a task as a bar ending on its due day, as long as its effort in days, and a task
+     with no effort as a dated stem (`src/roadmap.ts`). On `list`, because the README has called a roadmap
+     a list with dates since the primitive table was written, and because a drawer that does not know the
+     kind yet falls back to the list's title, detail and state, which reads as the task, its day and its
+     effort. On `proportional` it would have fallen back to a bar scaled off the date cell, and
+     `magnitudeOfCell` reads `2026-09-10` and `2026-10-05` both as 2026 (measured), so every task would
+     have drawn one identical full-length bar.
+     `optional` lets a date leave the effort off and still take a tone word. Six columns wide, as `board`
+     and `series` are, because a time axis narrower than half a page puts a month in a few pixels. */
+  roadmap: { primitive: 'list', cells: 3, optional: 1, tone: true, minSpan: 6, purpose: 'plan' },
 
   /* Technical */
   code: { primitive: 'media', cells: 0, tone: false, verbatim: true, minSpan: 4, purpose: 'media' },

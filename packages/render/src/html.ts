@@ -11,7 +11,9 @@
  * the cell it is. That is all a host's stylesheet draws against (05 §7.7).
  *
  * ONE escape function, used on every value, and the only inline `style` values in the output are
- * `--cells`, `--magnitude` and `--at`, all numbers this file formats itself.
+ * custom properties holding numbers this file formats itself, never a colour or a length. This said
+ * three of them, `--cells`, `--magnitude` and `--at`, long after `--chars`, `--cols`, `--fill` and
+ * `--limit` had joined; `roadmap` adds `--tracks`, `--track`, `--lines` and `--line`.
  */
 
 import { KINDS, SPARKLINE_POINT, TONES, type Kind } from './kinds.ts';
@@ -33,6 +35,7 @@ import { PROGRESS_NONE, PROGRESS_OF, progressPlan, progressSentence } from './pr
 import { figureLike } from './figure.ts';
 import { FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastModel, forecastPlan, scenario, underNote } from './forecast.ts';
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
+import { ROADMAP_DUE, ROADMAP_FROM, ROADMAP_NONE, ROADMAP_PAINT, ROADMAP_WHAT, roadmapLane, roadmapLines, roadmapPlan, roadmapRow, roadmapSentence, roadmapShare, roadmapSkipped, roadmapToday } from './roadmap.ts';
 import type { Block, Degraded, Markdown, Row, Segment } from './parse.ts';
 
 export type RenderOptions = InlineOptions & {
@@ -388,6 +391,7 @@ function list(b: Block, o: RenderOptions): string {
   if (b.kind === 'feed') return feed(b, o);
   if (b.kind === 'agents') return agents(b, o);
   if (b.kind === 'queue') return queue(b, o);
+  if (b.kind === 'roadmap') return roadmap(b, o);
   const spec = KINDS[b.kind];
   const tag = spec.ordered ? 'ol' : 'ul';
   const body = b.rows
@@ -982,6 +986,68 @@ function forecast(b: Block, o: RenderOptions): string {
   const note = underNote(model, shown);
   const soon = note ? `<p class="forecast-soon">${escape(note)}</p>` : '';
   return `<div class="prop forecast">${said}${chart}${ticks}${soon}${numbers}</div>`;
+}
+
+/**
+ * `roadmap`: tasks on one time axis (`src/roadmap.ts`). A window is a bar on its track and a date is a stem,
+ * over alternate month bands and today's line; the words sit in an HTML layer over the box, placed by `--at`,
+ * because text inside a `preserveAspectRatio="none"` box is stretched with it. Every placed row is said again
+ * as a table, in the order the rows came, which is what a screen reader reads: the drawing's own name is one
+ * sentence and the labels over it are hidden, so nothing is heard twice.
+ *
+ * THE VERTICAL IS THE DRAWING'S, the horizontal the plan's. The plan answers which track and where along the
+ * axis; how tall a track is depends on how many there are (`roadmapLane`), and the host's stylesheet reads
+ * `--tracks` and `--lines` to give the box and the label layer room. Every mark carries `ROADMAP_PAINT`, so a
+ * page with no rule for this kind draws it quiet rather than black.
+ *
+ * A ROW THE PLAN SKIPPED IS NAMED UNDER THE DRAWING, by its title. Drawn nowhere and said nowhere, a task
+ * whose due day did not read would simply be missing from the roadmap, and nobody would know to fix it.
+ * Nothing here is interactive, and `svelte/p/Roadmap.svelte` draws this same tree (`roadmap-parity.test.ts`);
+ * the drag and its undo will be the Svelte twin's alone, as `forecast`'s knobs are.
+ */
+function roadmap(b: Block, o: RenderOptions): string {
+  const said = (r: Row, i: number): string => plain(inline(r.cells[i] ?? '', o));
+  const rows = b.rows.map((r) => roadmapRow(said(r, 0), said(r, 1), said(r, 2), r.tone));
+  const plan = roadmapPlan(rows, roadmapToday(o.now));
+  const skipped = plan.skipped.length
+    ? `<p class="roadmap-skipped">${escape(roadmapSkipped(plan.skipped.map((i) => rows[i]!.title || MISSING)))}</p>`
+    : '';
+  if (plan.empty) return `<div class="roadmap"><p class="roadmap-empty">${escape(ROADMAP_NONE)}</p>${skipped}</div>`;
+
+  const paint = (p: Readonly<Record<string, string>>): string =>
+    Object.entries(p)
+      .map(([k, v]) => ` ${k}="${v}"`)
+      .join('');
+  const line = (cls: string, x: string, tone: string, painted: string): string =>
+    `<path class="${cls}"${tone} d="M${x} 0V100"${painted} vector-effect="non-scaling-stroke"></path>`;
+  const chart = `<svg class="roadmap-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(roadmapSentence(plan))}">${plan.bands
+    .map(
+      (m) =>
+        `<rect class="roadmap-band"${m.odd ? ' data-odd=""' : ''}${paint(m.odd ? ROADMAP_PAINT.band : ROADMAP_PAINT.even)} x="${m.x}" y="0" width="${m.width}" height="100"></rect>`,
+    )
+    .join('')}${plan.bars
+    .map((bar) => {
+      const lane = roadmapLane(bar.track, plan.tracks);
+      return `<rect class="roadmap-bar"${toneAttrs(bar.tone)}${paint(ROADMAP_PAINT.bar)} x="${bar.x}" y="${lane.y}" width="${bar.width}" height="${lane.height}" vector-effect="non-scaling-stroke"></rect>`;
+    })
+    .join('')}${plan.stems.map((s) => line('roadmap-stem', s.x, toneAttrs(s.tone), paint(ROADMAP_PAINT.stem))).join('')}${
+    plan.today === null ? '' : line('roadmap-today', plan.today, '', paint(ROADMAP_PAINT.today))
+  }</svg>`;
+  /* `--at` IS A SHARE OF THE WIDTH, as `blocks-charts.css` reads it for every chart's ticks (`calc(var(--at) * 100%)`),
+     and the plan answers in the box's thousand units, so a label is put where its mark is only after dividing. */
+  const names = `<ol class="roadmap-names" aria-hidden="true">${plan.bars
+    .map((bar) => `<li class="roadmap-name"${toneAttrs(bar.tone)} style="--at:${roadmapShare(bar.x)};--track:${bar.track}">${escape(bar.title)}${toneGlyph(bar.tone)}</li>`)
+    .join('')}${plan.stems
+    .map((s) => `<li class="roadmap-name" data-stem=""${toneAttrs(s.tone)} style="--at:${roadmapShare(s.label.x)};--line:${s.label.line}">${escape(s.title)}${toneGlyph(s.tone)}</li>`)
+    .join('')}</ol>`;
+  const months = `<ol class="roadmap-months" aria-hidden="true">${plan.bands
+    .map((m) => `<li class="roadmap-month"${m.odd ? ' data-odd=""' : ''} style="--at:${roadmapShare(m.x)}">${escape(m.label)}</li>`)
+    .join('')}</ol>`;
+  const table = `<div class="roadmap-numbers"><table class="roadmap-table"><thead><tr><th scope="col">${ROADMAP_WHAT}</th><th scope="col">${ROADMAP_FROM}</th><th scope="col">${ROADMAP_DUE}</th></tr></thead><tbody>${roadmapLines(plan)
+    .map((p) => `<tr><th scope="row">${escape(p.title)}${toneGlyph(p.tone)}</th><td class="num">${escape(p.from)}</td><td class="num">${escape(p.due)}</td></tr>`)
+    .join('')}</tbody></table></div>`;
+
+  return `<div class="roadmap" style="--tracks:${plan.tracks};--lines:${plan.lines}"><div class="roadmap-plot">${chart}${names}</div>${months}${table}${skipped}</div>`;
 }
 
 const PRIMITIVE_RENDERERS ={ panel, grid, rows, proportional, inline: inlinePrimitive, list, table, media } as const;

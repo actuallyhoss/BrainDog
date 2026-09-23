@@ -97,6 +97,12 @@ const SHAPES: Readonly<Record<string, { rows: string[][] }>> = {
      would degrade before the anchor was ever drawn. Everything else about it is still hostile, so
      the `href` that reaches the document is the assertion. */
   queue: { rows: [['q', 's1', HOSTILE, HOSTILE, HOSTILE, HOSTILE], ['opt', 's1', HOSTILE, HOSTILE], ['more', '5', '/' + HOSTILE.replace(/ /gu, '')]] },
+  /* A ROADMAP'S DATES HAVE TO BE DATES OR NOTHING IS DRAWN BUT THE SENTENCE. Under the generic row every
+     cell is `HOSTILE`, so every row was skipped: the block drew its empty line and named the titles under
+     it, which passed this sweep while the bars, the stems and the label layer, the markup that carries a
+     title into an attribute's neighbourhood, were never built (measured before this row was added). The
+     third row stays generic, so the skipped line is still swept too. */
+  roadmap: { rows: [[HOSTILE, '2026-09-10', '5'], [HOSTILE, '2026-09-20'], [HOSTILE, HOSTILE, HOSTILE]] },
 };
 
 /** `table` is bound to a register rather than to authored rows, so it has no fence to be hostile in. */
@@ -136,7 +142,7 @@ test('NO CELL BECOMES MARKUP, on any of the kinds there are', () => {
   /* The count is the guard on the guard: a kind quietly dropped from the loop is a kind nobody
      sweeps, and the number in the comment above would go on reading as though it had been. */
   assert.equal(drew, Object.keys(KINDS).length - NO_FENCE.size);
-  assert.equal(drew, 29);
+  assert.equal(drew, 30);
 });
 
 /** A resolved `{{path}}` is a value the host handed back, and a value is never markup either. */

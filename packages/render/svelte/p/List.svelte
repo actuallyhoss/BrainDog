@@ -25,6 +25,7 @@
   import Agents from '../Agents.svelte';
   import Feed from '../Feed.svelte';
   import Queue from '../Queue.svelte';
+  import Roadmap from './Roadmap.svelte';
   import Text from '../Text.svelte';
 
   let {
@@ -97,13 +98,16 @@
   }
 </script>
 
-<!-- `feed` is on this primitive and groups its rows, so it has a drawer of its own, as `cards` does on `grid`. -->
+<!-- `feed` is on this primitive and groups its rows, so it has a drawer of its own, as `cards` does on `grid`, and so
+     does `roadmap`, which draws its rows on a time axis rather than as a list of them. -->
 {#if block.kind === 'feed'}
 <Feed {block} {opts} />
 {:else if block.kind === 'agents'}
 <Agents {block} {opts} />
 {:else if block.kind === 'queue'}
 <Queue {block} {opts} {onact} />
+{:else if block.kind === 'roadmap'}
+<Roadmap {block} {opts} />
 {:else}
 <svelte:element this={block.kind === 'steps' ? 'ol' : 'ul'} class="list" data-kind={block.kind}>
   {#each block.rows as row, i}

@@ -57,7 +57,7 @@ a theme swap can never break a page, and an agent can never make a page ugly.
 
 ---
 
-## Thirty kinds over eight primitives
+## Thirty-one kinds over eight primitives
 
 Kinds are declarations over primitives, so primitives compose and kinds do not have to. `cards`,
 `section` and `feed` are page-only: a page's evaluator writes their rows and passes
@@ -74,7 +74,7 @@ and never a disabled field.
 | `rows` | label · value · note, one per line | `spec` `params` |
 | `proportional` | rows whose number drives a drawn magnitude | `bar` `gauge` `sparkline` `split` `bridge` `series` `lines` `progress` `forecast` |
 | `inline` | a run of pills | `chips` |
-| `list` | title · detail · optional state marker; on a `todo`, up to two more facts as one quiet line under the title | `todo` `steps` `timeline` `feed` `agents` `queue` |
+| `list` | title · detail · optional state marker; on a `todo`, up to two more facts as one quiet line under the title | `todo` `steps` `timeline` `feed` `agents` `queue` `roadmap` |
 | `table` | real columns, a header, per-column alignment | `comparison` `table` |
 | `media` | a figure with a caption | `code` `tree` `diff` |
 
@@ -84,12 +84,19 @@ and where both are blank there is no span at all, so a two-cell todo draws exact
 did. A fifth cell degrades the block. Placing the line under the title is the host stylesheet's job,
 as every other class here is.
 
+A `roadmap` row is `title | by | effort`: the task, its due day, and its effort in days (`10`, `1.5 d`). The
+due day reads as `2026-10-05` or as `5 Oct 2026`, the form `day()` writes and so the form a page's reader
+projects a `day` field in. A row with an effort is a bar ending on its due day, as many whole days long as the effort rounded up, and a
+row with none is a dated stem. A row whose date or effort does not read is named under the drawing, never placed.
+Each mark carries `currentColor` presentation attributes, so a host with no `roadmap-` rules still draws it
+quietly rather than black, and any rule the host does write wins over them.
+
 A board is a **grid of lists**. A roadmap is a **list with dates**. A risk matrix is a **grid of
 inlines**. Which is why a third party can add a kind without asking a designer: a kind is not code,
 it is a named composition of primitives shipped as data, and `PRIMITIVES_VERSION` is the integer a
 consumer checks.
 
-**The primitive set is the real API surface.** Eight is reviewable; thirty kinds plus unbounded
+**The primitive set is the real API surface.** Eight is reviewable; thirty-one kinds plus unbounded
 third-party kinds is not. Adding a primitive is easy; renaming or removing one breaks every pack ever
 written, so ship fewer than you think you need.
 
