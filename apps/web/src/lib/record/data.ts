@@ -259,6 +259,12 @@ export const ROWS: Record<string, Entry[]> = {
  * The union is the honest type: a record IS on one host or the other, and the screens branch on it.
  * The seed can only be one of them, so the other half is exercised by `deployment.test.ts` rather
  * than by a browser gate — which is the shape the seed-variant harness in the backlog is for.
+ *
+ * IT IS THE SAMPLE'S HOST AND NO OTHER RECORD'S. `VARIANT` is `''` in every shipped bundle, so this
+ * reads `self-host` on the Cloud build too, and a screen that branches on it over a live record is
+ * branching on the build. Billing did, and told a record provisioned on the Worker "This record runs
+ * on your own machine." (`loop/research-first-sign-in.md` friction 5). A live record's host is asked:
+ * `routes/settings/billing.ts` and `inbound-door.ts` say how, and what `boot` does not yet carry.
  */
 export const DEPLOYMENT: { kind: 'self-host' | 'cloud'; since: string } = {
   kind: VARIANT === 'cloud' ? 'cloud' : 'self-host',

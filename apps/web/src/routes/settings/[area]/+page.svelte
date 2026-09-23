@@ -13,7 +13,7 @@
   found across eleven precedents (19 §4).
 -->
 <script lang="ts">
-  import { apiBase, at } from '$lib/at.ts';
+  import { apiBase, at, signinFor } from '$lib/at.ts';
   import { titleOf } from '$lib/title.ts';
   import { page } from '$app/state';
   import { invalidateAll } from '$app/navigation';
@@ -54,6 +54,7 @@
     type ExportKind, type Wrote,
   } from '$lib/record/settings-write.ts';
   import { namesHeld, personSaid, secondSaid } from './people-said.ts';
+  import { billingLine } from '../billing.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
   /* Lane F: backups, putting a copy back, erasing a person and deleting the record. */
   import { backUpNow, deleteRecordNow, downloadSnapshot, erasePerson, readSnapshots, restoreSnapshot } from '$lib/record/settings-write.ts';
@@ -418,6 +419,20 @@
    * the fifteen-minute proof, so this costs one request and has no effect on any host. A host without
    * the door answers 404 `ROUTE_UNKNOWN` from `serveApi` and the two buttons are never drawn.
    */
+  /**
+   * AND BILLING ASKS THE SAME DOOR, because it is the one answer only a self-host gives.
+   *
+   * `billing.ts` says why: `boot` carries no host, and a live Cloud record was told it ran on the
+   * reader's own machine. Only a live record is asked; the sample's sentence is the build's, and
+   * the build is right about the sample. `untrack` for the reason the ingest effect above gives.
+   */
+  $effect(() => {
+    if (area !== 'billing' || !shell.live) return;
+    untrack(() => {
+      if (mintsHere === null) void askMailDoor();
+    });
+  });
+
   async function askMailDoor() {
     const at = opened();
     mintsHere = await mintsMail(apiBase());
@@ -1241,6 +1256,8 @@
   let addSaid = $state<string | null>(null);
   let signingOutNow = $state(false);
   let outSaid = $state<string | null>(null);
+  /* THE SESSION THIS SCREEN ENDED, so the table stops naming who was in it. A later read that finds somebody puts it back. */
+  let signedOut = $state(false);
   const signedInEmail = $derived(hostAuth?.me?.email ?? null);
   /** Somebody is signed in to a host that offers passkeys, so the list and its button are real. */
   const livePasskeys = $derived(hostAuth?.me && hostAuth.passkey ? hostAuth : null);
@@ -1256,6 +1273,7 @@
     const at = opened();
     const answer = await methods();
     hostAuth = answer.ok ? answer.value : null;
+    if (hostAuth?.me) signedOut = false;
     if (hostAuth?.me && hostAuth.passkey) {
       const listed = await passkeys();
       liveKeys = listed.ok ? listed.value : null;
@@ -1301,6 +1319,7 @@
       hostAuth = { ...hostAuth, me: null };
       liveKeys = null;
     }
+    if (out.ok) signedOut = true;
     outSaid = out.ok ? copy.signedOut : copy.signOutFailed;
   }
 
@@ -2167,7 +2186,12 @@
                an address and a join date. `19 §9` bans a word the schema uses about itself, and an
                address is what an invitation binds to and what identifies you across the records
                listed below. -->
-          <li><span class="fact-key">{copy.signedInAs}</span><span class="fact-value">{signedInEmail ?? mine?.email ?? mine?.name ?? me.person}</span></li>
+          <!-- AND NOBODY ONCE THE SESSION IS OVER. The fallbacks below are the record's idea of who
+               you are, so after Sign out this still read "Signed in as owner@example.test" beside
+               "You are signed out." (`research-first-sign-in.md` friction 10). -->
+          {#if !signedOut}
+            <li><span class="fact-key">{copy.signedInAs}</span><span class="fact-value">{signedInEmail ?? mine?.email ?? mine?.name ?? me.person}</span></li>
+          {/if}
           <!-- A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD was told "Can read, cannot change": the shell's
                `read` is a fallback for them, and the Expenses bookkeeper's whole job is changing rows
                (`research-invite-landing.md` finding 3). What they hold is the lists, so the lists are named. -->
@@ -2183,7 +2207,9 @@
           {#if signedInEmail}
             <Button onclick={signOutHere} aria-busy={signingOutNow}>{signingOutNow ? copy.signingOut : copy.signOut}</Button>
           {:else}
-            <Button href="/signin">{copy.signIn}</Button>
+            <!-- WITH A WAY BACK HERE. A bare `/signin` sent the person to the app's front door after
+                 signing in, which is the tab's kept sample (friction 1). -->
+            <Button href={signinFor(page.url)}>{copy.signIn}</Button>
           {/if}
         </div>
         {#if outSaid}<p class="hint" role="status">{outSaid}</p>{/if}
@@ -2285,7 +2311,10 @@
         {#if agentsFrom === 'refused'}
           <Empty kind="error" title={agentsRefusal} />
         {:else if agentsFrom !== 'reading' && machines.length === 0}
-          <Empty kind="no-data-yet" title={copy.noDevices} agentPrompt={copy.enrollPrompt} />
+          <!-- THE LINE THAT WORKS, NOT THE COMMAND'S NAME. This printed `braindog login` with nothing
+               after it, which the CLI refuses without a host (`research-first-sign-in.md` friction
+               6), while "Connect an agent" below already printed `lines.login` naming this record. -->
+          <Empty kind="no-data-yet" title={copy.noDevices} agentPrompt={lines.login} />
         {/if}
         <ul class="whos">
           {#each machines as d (d.handle)}
@@ -2703,7 +2732,11 @@
              offered this button over a list already drawing the record's refusal: pressing it
              answered with three toasts at once, one of them about restoring, which was not pressed.
              The refusal above this is the record's own sentence, so nothing is said twice. -->
-        {#if anOwner}
+        <!-- AND ONLY WHERE THE RECORD ANSWERED WITH ITS COPIES. On the Worker `snapshots` answers
+             `NOT_IN_THIS_BUILD`, and the button sat under that sentence and answered its press with
+             the same refusal as a toast (`research-first-sign-in.md` friction 11). `reading` is not
+             an answer either, or the button flashes before the refusal lands. -->
+        {#if anOwner && (copiesFrom === 'live' || copiesFrom === 'sample')}
         <div class="row-actions">
           <Button weight="primary" disabled={backingUp} aria-busy={backingUp} onclick={backUp}>{copy.snapshotNow}</Button>
         </div>
@@ -2797,7 +2830,10 @@
         on a self-host in the strongest possible way: "At no point is export withheld."
       -->
       <Section title={copy.billing}>
-        <p class="hint">{DEPLOYMENT.kind === 'self-host' ? copy.billingSelfHost : copy.billingCloud}</p>
+        <!-- THE HOST'S ANSWER AND NOT THE BUILD'S. `DEPLOYMENT.kind` reads `self-host` in every shipped
+             bundle, so a live Cloud record was told "This record runs on your own machine."
+             (`research-first-sign-in.md` friction 5). `billing.ts` says what is asked instead. -->
+        <p class="hint">{billingLine({ live: shell.live, mintsMail: mintsHere, sample: DEPLOYMENT.kind })}</p>
         <div class="row-actions">
           <Button weight="quiet" href="/usage"><Icon name="history" size="s" />{actionWords.seeUsage}</Button>
           <!-- AND THE SECOND LINK IS THE OWNER'S, because the screen it leads to is. `export` needs
