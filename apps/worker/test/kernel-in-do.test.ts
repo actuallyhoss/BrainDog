@@ -16,6 +16,10 @@
  * esbuild 0.28.1, and a second copy pinned beside it could only disagree with the one that deploys.
  *
  * SLOW BY THE STANDARDS OF THIS SUITE, about two seconds, nearly all of it workerd starting once.
+ *
+ * THE VAULT CASES AT THE END WERE RED ON 23 SEPTEMBER against the adapter that handed the kernel each BLOB as the
+ * object's `ArrayBuffer`: the export's grant line read `...,"api_token",1,{},{},...`, and the old file imported into a
+ * second object answered `ok` holding `["[object String]","[object Object]"]` where the ciphertext had been.
  */
 
 import { test, before, after } from 'node:test';
@@ -30,7 +34,7 @@ const esbuild = fromWrangler('esbuild') as {
   build(o: object): Promise<{ outputFiles: { text: string }[] }>;
 };
 const { Miniflare, convertV4MiniflareOptions } = (await import(pathToFileURL(fromWrangler.resolve('miniflare')).href)) as {
-  Miniflare: new (o: object) => { dispatchFetch(url: string): Promise<Response>; dispose(): Promise<void> };
+  Miniflare: new (o: object) => { dispatchFetch(url: string, init?: RequestInit): Promise<Response>; dispose(): Promise<void> };
   convertV4MiniflareOptions(o: object): object;
 };
 
@@ -56,6 +60,16 @@ assert.ok(ADAPTER.includes(GUARD) || ADAPTER.includes(FIXED), 'the nesting guard
    test that runs "the adapter as it stands" is the one that stops it going back to `fn()`. */
 const DELEGATING = ADAPTER.replace(GUARD, FIXED);
 
+/**
+ * The adapter as it was before it wrapped each BLOB, handing the kernel the `ArrayBuffer` a Durable Object returns: the
+ * Worker that wrote every export and nightly copy with `{}` for each sealed column. Run here so the claim that such a
+ * copy is refused at import is a measurement on workerd, not only on `node:sqlite`. Loud if the wrap moves, because an
+ * unwrapped variant that matched nothing would be the repaired adapter under the old one's name.
+ */
+const WRAP = '.toArray().map(bytesIn)';
+assert.equal(ADAPTER.split(WRAP).length - 1, 2, 'storageSql no longer wraps its BLOBs in all and one by this text; update the unwrapped variant below');
+const UNWRAPPED = ADAPTER.replaceAll(WRAP, '.toArray()');
+
 const NOW = Date.UTC(2026, 8, 22, 12);
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
 
@@ -66,23 +80,50 @@ import { openRecord } from '@braindog/kernel';
 import { attempt } from '../../../packages/kernel/src/tx.ts';
 import { storageSql as real } from 'adapter:real';
 import { storageSql as delegating } from 'adapter:delegating';
+import { storageSql as unwrapped } from 'adapter:unwrapped';
+import { testSigner } from '../../../packages/kernel/test/signer.ts';
 
 const NOPE = { ok: false, refusal: { code: 'NOPE', fix: 'no' } };
 const GRANT = () => ({ label: 'stats read', opens: 'stats.example.test', kind: 'api_token', ciphertext: new Uint8Array([1, 2, 3]), nonce: new Uint8Array([9, 9]), kdf: 'hkdf', wrapped_by: 'kek', kek_id: 'kek_fake' });
+/* WHAT THE KERNEL READ BACK, by its own tag and its bytes, so an ArrayBuffer and a Uint8Array are told apart. */
+const held = (v) =>
+  v == null ? null
+  : v instanceof ArrayBuffer ? [Object.prototype.toString.call(v), Array.from(new Uint8Array(v))]
+  : ArrayBuffer.isView(v) ? [Object.prototype.toString.call(v), Array.from(new Uint8Array(v.buffer, v.byteOffset, v.byteLength))]
+  : [Object.prototype.toString.call(v), v];
 
 class Rec extends DurableObject {
   adapter = real;
   async fetch(request) {
     const scenario = new URL(request.url).pathname.slice(1);
     const sql = this.adapter(this.ctx.storage);
-    const k = await openRecord(sql, { now: () => ${NOW} });
+    /* A SIGNER ONLY WHERE A FILE IS IMPORTED, because an unsigned file is refused before a row is read. Made inside
+       the request, because workerd refuses to generate a key in the global scope. */
+    const k = await openRecord(sql, { now: () => ${NOW} }, scenario.startsWith('vault-') ? { sign: testSigner() } : {});
+    const outcome = (r) => (r.ok ? 'ok' : r.refusal.code);
+    if (scenario === 'vault-import') {
+      /* INTO AN EMPTY RECORD, so no createRecord here: the file brings the record with it. */
+      const out = await k.import(await request.json());
+      const again = out.ok ? await k.export() : null;
+      return Response.json({
+        out: outcome(out),
+        fix: out.ok ? null : out.refusal.fix,
+        at: out.ok ? null : (out.refusal.at ?? null),
+        held: held(sql.one('SELECT ciphertext FROM grant')?.ciphertext),
+        lines: again && again.ok ? again.value : null,
+      });
+    }
     const made = k.createRecord({ id: '${REC}', slug: 'studio', name: 'Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1', email: 'ada@example.test', name: 'Ada' } });
     if (!made.ok) return Response.json({ threw: made.refusal.fix });
     sql.exec('CREATE TABLE probe (x TEXT)');
     const rows = () => sql.all('SELECT x FROM probe ORDER BY rowid').map((r) => r.x);
-    const outcome = (r) => (r.ok ? 'ok' : r.refusal.code);
     try {
       switch (scenario) {
+        case 'vault-export': {
+          const bound = k.bindGrant(GRANT(), 'p_1');
+          const out = await k.export();
+          return Response.json({ out: outcome(bound), held: held(sql.one('SELECT ciphertext FROM grant')?.ciphertext), lines: out.ok ? out.value : null });
+        }
         case 'bind':
           return Response.json({ out: outcome(k.bindGrant(GRANT(), 'p_1')), grants: k.grants().length });
         case 'invite':
@@ -123,12 +164,16 @@ export class RealRecord extends Rec {}
 export class DelegatingRecord extends Rec {
   adapter = delegating;
 }
+export class UnwrappedRecord extends Rec {
+  adapter = unwrapped;
+}
 
 let n = 0;
 export default {
   fetch(request, env) {
     const url = new URL(request.url);
-    const ns = url.searchParams.get('adapter') === 'delegating' ? env.DELEGATING : env.REAL;
+    const which = url.searchParams.get('adapter');
+    const ns = which === 'delegating' ? env.DELEGATING : which === 'unwrapped' ? env.UNWRAPPED : env.REAL;
     return ns.get(ns.idFromName(url.pathname + ':' + ++n)).fetch(request);
   },
 };
@@ -153,7 +198,7 @@ before(async () => {
         setup(b: { onResolve: Function; onLoad: Function }) {
           b.onResolve({ filter: /^adapter:/ }, (a: { path: string }) => ({ path: a.path, namespace: 'adapter' }));
           b.onLoad({ filter: /.*/, namespace: 'adapter' }, (a: { path: string }) => ({
-            contents: a.path === 'adapter:real' ? ADAPTER : DELEGATING,
+            contents: a.path === 'adapter:real' ? ADAPTER : a.path === 'adapter:unwrapped' ? UNWRAPPED : DELEGATING,
             loader: 'ts',
           }));
         },
@@ -168,7 +213,11 @@ before(async () => {
       modules: true,
       script: built.outputFiles[0]!.text,
       compatibilityDate: '2025-09-01',
-      durableObjects: { REAL: { className: 'RealRecord', useSQLite: true }, DELEGATING: { className: 'DelegatingRecord', useSQLite: true } },
+      durableObjects: {
+        REAL: { className: 'RealRecord', useSQLite: true },
+        DELEGATING: { className: 'DelegatingRecord', useSQLite: true },
+        UNWRAPPED: { className: 'UnwrappedRecord', useSQLite: true },
+      },
     }),
   );
 });
@@ -177,13 +226,24 @@ after(async () => {
   await mf?.dispose();
 });
 
-const run = async (scenario: string, adapter: 'real' | 'delegating' = 'real') =>
-  (await (await mf.dispatchFetch(`http://record.test/${scenario}?adapter=${adapter}`)).json()) as {
-    out?: string;
-    rows?: string[];
-    grants?: number;
-    threw?: string | null;
-  };
+type Answer = {
+  out?: string;
+  rows?: string[];
+  grants?: number;
+  threw?: string | null;
+  fix?: string | null;
+  at?: string | null;
+  held?: [string, number[]] | null;
+  lines?: string[] | null;
+};
+
+const run = async (scenario: string, adapter: 'real' | 'delegating' | 'unwrapped' = 'real', body?: unknown) =>
+  (await (
+    await mf.dispatchFetch(
+      `http://record.test/${scenario}?adapter=${adapter}`,
+      body === undefined ? undefined : { method: 'POST', body: JSON.stringify(body) },
+    )
+  ).json()) as Answer;
 
 test('THE VAULT DEPOSIT ON A DURABLE OBJECT: bindGrant seals and binds, where it answered 500', async () => {
   assert.deepEqual(await run('bind'), { out: 'ok', grants: 1 });
@@ -218,4 +278,40 @@ test('A NESTED REFUSAL ROLLS BACK ONLY ITS OWN WRITES once the adapter hands nes
   assert.deepEqual(await run('bind', 'delegating'), { out: 'ok', grants: 1 });
   assert.deepEqual(await run('bind-nested', 'delegating'), { out: 'ok', grants: 1 });
   assert.deepEqual(await run('throw', 'delegating'), { threw: 'a real error', rows: [] });
+});
+
+/* ── the vault, through export and import ─────────────────────────────────────────────────────────────────────────── */
+
+/* THE EXPORT WROTE EVERY BLOB AS `{}` ON A DURABLE OBJECT, `loop/research-batch-forty-five-audit.md` §1. The object hands a
+   BLOB back as an `ArrayBuffer`, `encode` in `packages/kernel/src/brainl.ts` writes `{ b64 }` only for a `Uint8Array`,
+   and `JSON.stringify` writes an `ArrayBuffer` as `{}`. So the owner's export and the nightly copy (`snapshots.ts`, the
+   same call) held every row and none of the vault, signed over the `{}` and looking whole, and a restore into another
+   object answered `ok` with the text `[object Object]` where each sealed column had been. Every R2 copy made before this
+   repair carries no vault. [1, 2, 3] is `AQID`. */
+const grantLine = (lines: string[] | null | undefined) => (lines ?? []).find((l) => l.includes('stats.example.test'));
+
+test('A SEALED ROW SURVIVES EXPORT AND IMPORT ON A DURABLE OBJECT, written as b64 and read back as the same bytes', async () => {
+  const exported = await run('vault-export');
+  assert.equal(exported.out, 'ok');
+  const line = grantLine(exported.lines);
+  assert.ok(line, 'the export holds no grant line');
+  assert.match(line, /\{"b64":"AQID"\}/, `the grant's ciphertext is not in the export: ${line}`);
+  /* THE KERNEL READS A Uint8Array, the shape `node:sqlite` hands the self-host, so no reader of a BLOB meets two shapes. */
+  assert.deepEqual(exported.held, ['[object Uint8Array]', [1, 2, 3]]);
+
+  const imported = await run('vault-import', 'real', exported.lines);
+  assert.equal(imported.out, 'ok', imported.fix ?? '');
+  assert.deepEqual(imported.held, ['[object Uint8Array]', [1, 2, 3]], 'the restored grant does not hold the bytes that were sealed');
+  /* AND THE SECOND OBJECT'S EXPORT SAYS THE SAME, which is the only evidence the round trip lost nothing. */
+  assert.equal(grantLine(imported.lines), line);
+});
+
+test('A COPY WRITTEN BEFORE THE REPAIR IS REFUSED ON A DURABLE OBJECT, at the column it lost, and not restored as text', async () => {
+  const old = await run('vault-export', 'unwrapped');
+  const line = grantLine(old.lines);
+  assert.ok(line && !line.includes('"b64"'), `the unwrapped adapter no longer writes the old file, so this tests nothing: ${line}`);
+  const imported = await run('vault-import', 'real', old.lines);
+  assert.equal(imported.out, 'FILE_MALFORMED', `a file with no vault in it was restored: ${JSON.stringify(imported)}`);
+  assert.equal(imported.at, 'grant.ciphertext');
+  assert.equal(imported.held, null, 'a refused import left a grant behind');
 });

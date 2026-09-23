@@ -92,7 +92,14 @@ test('with no zone in the body the record is UTC, as every record provisioned be
 
 test('A ZONE THE RUNTIME DOES NOT KNOW IS REFUSED AT tz, before the Directory has written a person', async () => {
   const { provision, made, people } = await host();
-  for (const tz of ['Mars/Olympus', '', 42, '+01:00']) {
+  /* `Etc/GMT-3` IS `+03:00` UNDER A ZONE'S NAME, AND `EST` IS AN OFFSET SPELLED AS A PLACE. `Intl` answers the first
+     back unchanged and the second as `America/Panama`, which has no summer time: for somebody in New York every day
+     from March to November an hour out. Both were 200 and stored (`loop/research-batch-forty-six-audit.md` §8), so the
+     spelling typed is tested as well as the one `Intl` answers, and lower case is the same spelling to `Intl`.
+     `SystemV/EST5` IS THE SAME FAULT UNDER A THIRD PREFIX: measured on Node 24.13 (ICU 77.1), `Intl` knows all twelve
+     `SystemV/` names though the tz database dropped them, answers each back as itself, and `SystemV/EST5` is -05:00 in
+     July and in January. It was 200 and stored after the `Etc/` rule went in. */
+  for (const tz of ['Mars/Olympus', '', 42, '+01:00', 'Etc/GMT-3', 'etc/gmt+5', 'Etc/Zulu', 'EST', 'mst', ' HST ', 'SystemV/EST5', 'systemv/pst8pdt']) {
     const before = people();
     const out = await provision({ slug: 'sam', email: 'owner@example.test', name: 'Sam', tz });
     /* 422, WHICH IS `httpStatus` FOR `VALUE_MALFORMED` everywhere, the slug's own refusal from `prepare` included. */
@@ -107,4 +114,38 @@ test('A ZONE THE RUNTIME DOES NOT KNOW IS REFUSED AT tz, before the Directory ha
   const retried = await provision({ slug: 'sam', email: 'owner@example.test', name: 'Sam', tz: 'Europe/London' });
   assert.equal(retried.status, 200, retried.text);
   assert.equal(made.length, 1);
+});
+
+test('the refusal of an offset names a zone that is a place, so the fix is something to type', async () => {
+  const { provision } = await host();
+  const out = await provision({ slug: 'sam', email: 'owner@example.test', tz: 'EST' });
+  assert.equal(out.status, 422, out.text);
+  assert.match(out.json.refusal?.fix ?? '', /America\/New_York/, 'the refusal of EST does not say which zone New York is');
+});
+
+test('THE TWO SPELLINGS OF UTC UNDER Etc/ ARE STILL UTC, because they are not an offset from anywhere', async () => {
+  const { provision, made } = await host();
+  for (const [slug, tz] of [['utc-a', 'Etc/UTC'], ['utc-b', 'Etc/GMT']] as const) {
+    const out = await provision({ slug, email: `${slug}@example.test`, tz });
+    assert.equal(out.status, 200, `${tz}: ${out.text}`);
+  }
+  assert.deepEqual(made.map((m) => m.tz), ['UTC', 'UTC']);
+});
+
+test('A NAME WITH AN ANGLE BRACKET IS REFUSED AT name, because the checker once printed <your name> to be edited', async () => {
+  /* THE NAME IS FIXED AT PROVISION AND IS THE PASSKEY'S DISPLAY NAME, and the slug and the email each refused their
+     placeholder while this one was taken: `{ name: '<your name>' }` was 200 and the owner's `me` said
+     `"name":"<your name>"` for good (`loop/research-batch-forty-six-audit.md` §7). Nobody is called `<` or `>`. */
+  const { provision, made, people } = await host();
+  for (const name of ['<your name>', 'Sam <sam@example.test>', 'a > b']) {
+    const before = people();
+    const out = await provision({ slug: 'sam', email: 'owner@example.test', name, tz: 'Europe/London' });
+    assert.equal(out.status, 422, `${JSON.stringify(name)} was not refused: ${out.text}`);
+    assert.equal(out.json.refusal?.code, 'VALUE_MALFORMED', out.text);
+    assert.equal(out.json.refusal?.at, 'name', out.text);
+    assert.equal(made.length, 0, `${JSON.stringify(name)} reached the record`);
+    assert.equal(people(), before, `${JSON.stringify(name)} left a person in the Directory with no record behind them`);
+  }
+  const retried = await provision({ slug: 'sam', email: 'owner@example.test', name: 'Sam', tz: 'Europe/London' });
+  assert.equal(retried.status, 200, retried.text);
 });

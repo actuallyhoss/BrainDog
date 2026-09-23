@@ -166,11 +166,29 @@ const refusalOf = (r: Result<unknown>): Refusal => (refused(r) ? r.refusal : { c
 function storageSql(storage: DurableObjectStorage): Sql {
   const sql = storage.sql;
   let depth = 0;
+  /**
+   * A row with each BLOB as a `Uint8Array`, a view over the `ArrayBuffer` the Durable Object hands back and not a copy.
+   *
+   * THE ONE PLACE A BLOB CHANGES SHAPE, BECAUSE EVERY READER IN THE KERNEL TESTS FOR A `Uint8Array`, which is what
+   * `node:sqlite` returns to the self-host. Without it `encode` in `packages/kernel/src/brainl.ts` wrote each
+   * `ArrayBuffer` as `{}`, so every export and every nightly copy this Worker made held the rows and none of the vault:
+   * signed, its manifest hashing the `{}`, and restored into another object as the text `[object Object]` with `ok`.
+   * `base64` in `vault.ts` read `length` off the same buffer and handed a leased connector `""`
+   * (`loop/research-batch-forty-five-audit.md` §1). THE R2 COPIES MADE BEFORE THIS LINE CARRY NO VAULT, and `decode`
+   * now refuses them at import with `FILE_MALFORMED` at the column, rather than restoring them in silence.
+   */
+  const bytesIn = (row: Record<string, unknown>): Row => {
+    for (const key of Object.keys(row)) {
+      const value = row[key];
+      if (value instanceof ArrayBuffer) row[key] = new Uint8Array(value);
+    }
+    return row as Row;
+  };
   return {
     exec: (text: string, ...params: Param[]) => void sql.exec(text, ...(params as never[])),
-    all: <T = Row>(text: string, ...params: Param[]) => sql.exec(text, ...(params as never[])).toArray() as T[],
+    all: <T = Row>(text: string, ...params: Param[]) => sql.exec(text, ...(params as never[])).toArray().map(bytesIn) as T[],
     one: <T = Row>(text: string, ...params: Param[]) =>
-      (sql.exec(text, ...(params as never[])).toArray() as T[])[0],
+      (sql.exec(text, ...(params as never[])).toArray().map(bytesIn) as T[])[0],
     /**
      * `transactionSync`, and a NESTED call goes to the storage's own `transactionSync` too, because
      * on a Durable Object that IS a savepoint: measured on workerd 1.20260903.1, an inner throw undid
@@ -288,6 +306,10 @@ export class Record$ extends DurableObject<Env> {
         build: {
           app: this.env.BRAINDOG_BUILD ?? '',
           spark: sparkModel !== undefined,
+          /* `boot` SAYS WHICH HOST THIS IS, because billing told the Cloud from a self-host by whether
+             `/api/inbound/mint` answered 404 (`loop/research-held-landing.md` friction 5). This Worker is
+             the Cloud and nothing else, so it is a constant and not a binding. */
+          host: 'cloud',
         },
         sparkModel,
         /* WHAT THIS DEPLOYMENT CAN ACTUALLY DELIVER, so the doorbell rings for work somebody can
@@ -1756,10 +1778,24 @@ async function askedZone(copy: Request | null): Promise<unknown> {
  *
  * AN OFFSET IS NOT A ZONE. `Intl` accepts `+01:00` and answers it back unchanged, and a record in `+01:00` is an hour
  * out for the half of the year London is not on summer time. It is refused here rather than stored.
+ *
+ * AND AN OFFSET SPELLED AS A ZONE IS AN OFFSET, SO THE SPELLING TYPED IS READ AS WELL AS THE ONE `Intl` ANSWERS.
+ * Measured on Node 24.13 (ICU 77.1, tz 2025b) and in workerd (`loop/research-batch-forty-six-audit.md` §8): `Etc/GMT-3`
+ * is answered back as itself and is `+03:00` under a zone's name, and `EST` is answered as `America/Panama`, which reads
+ * like any region's zone and has no summer time, so a record typed `EST` from New York is an hour out from March to
+ * November. The answer cannot tell `EST` from somebody who meant Panama, which is why the typed word is the test.
+ * `Etc/UTC` and `Etc/GMT` stay, because UTC is not an offset from anywhere; `Intl` answers both `UTC`.
+ * `SystemV/` goes whole: ICU still knows its twelve names though the tz database dropped them, answers each back as
+ * itself, and `SystemV/EST5` was stored as a fixed -05:00 after the `Etc/` rule went in. The six with a summer rule are
+ * not places either, and a reader outside ICU need not know them.
  */
 function zoneOf(asked: unknown): string | null {
   if (asked === undefined || asked === null) return 'UTC';
   if (typeof asked !== 'string') return null;
+  const typed = asked.trim().toUpperCase();
+  if (OFFSET_NAMES.has(typed)) return null;
+  if (typed.startsWith('ETC/') && typed !== 'ETC/UTC' && typed !== 'ETC/GMT') return null;
+  if (typed.startsWith('SYSTEMV/')) return null;
   try {
     const zone = new Intl.DateTimeFormat('en', { timeZone: asked.trim() }).resolvedOptions().timeZone;
     return /^[+-]/.test(zone) ? null : zone;
@@ -1767,6 +1803,14 @@ function zoneOf(asked: unknown): string | null {
     return null;
   }
 }
+
+/**
+ * The three abbreviations the tz database keeps as fixed offsets under a name of their own, in upper case.
+ *
+ * NOT `EST5EDT` AND ITS KIND, which carry the rule for summer time and are answered as `America/New_York`: those are an
+ * old spelling of a place and arrive at the right arithmetic. These three do not, whatever `Intl` names them.
+ */
+const OFFSET_NAMES: ReadonlySet<string> = new Set(['EST', 'MST', 'HST']);
 
 /** The one letter sign-in sends: plain text, the link on a line of its own, and what it is for. */
 const letter = (link: string): string =>
@@ -1800,7 +1844,28 @@ const letter = (link: string): string =>
 async function provision(env: Env, args: { slug: string; email: string; name?: string; tz?: unknown }): Promise<Result<Provisioned>> {
   const tz = zoneOf(args.tz);
   if (tz === null)
-    return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'tz takes an IANA time zone, such as Europe/London, or is left out for UTC.', at: 'tz' } };
+    return {
+      ok: false,
+      refusal: {
+        code: 'VALUE_MALFORMED',
+        fix: 'tz takes a time zone that is a place, such as Europe/London or America/New_York, and not an offset or an abbreviation such as EST, or is left out for UTC.',
+        at: 'tz',
+      },
+    };
+  /* A NAME HOLDING `<` OR `>` IS A PLACEHOLDER NOBODY EDITED, AND IT IS KEPT FOR GOOD. `provision-check.mjs` printed
+     `name = '<your name>'` to be changed by hand, the slug and the email each refused their placeholder, and this one
+     was taken: `personName` in `packages/host/src/auth.ts` allows angle brackets, so the owner's `me` and his passkey's
+     display name said `<your name>` (`loop/research-batch-forty-six-audit.md` §7). Refused here, before `prepare` writes
+     a person, so the retry with his name is still a first provision. */
+  if (args.name !== undefined && /[<>]/.test(args.name))
+    return {
+      ok: false,
+      refusal: {
+        code: 'VALUE_MALFORMED',
+        fix: 'name is the owner’s name as the passkey will show it, and a name holds no < or >: type the name itself in place of the placeholder.',
+        at: 'name',
+      },
+    };
   const store = await keyStoreOf(env.KEK);
   const keyless = keylessRefusal(store, env.PROVISION_WITHOUT_KEYS);
   if (keyless) return { ok: false, refusal: keyless };

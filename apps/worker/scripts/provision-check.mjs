@@ -392,6 +392,24 @@ export function readProvision(status, body) {
  *
  * THE ZONE IS THIS MACHINE'S, because the machine he provisions from is the one on his desk, and a record made
  * without one is `UTC` for good. An offset or no answer at all falls back to `UTC`, which the Worker takes too.
+ *
+ * EACH FORM ASKS, AND PRINTS NOTHING TO BE EDITED. It printed `name = '<your name>'` to be changed by hand, and the
+ * Worker took that placeholder as the owner's name for good (`loop/research-batch-forty-six-audit.md` §7). So the slug,
+ * the email, the name and the zone are prompts, and the zone's prompt offers this machine's as the answer to Enter.
+ * The bash form has `node` build the body because a name is typed by a person: pasted into a JSON string by the shell,
+ * a double quote in it breaks the body. `apps/worker/scripts/provision-ask.test.mjs` runs that form with
+ * `Zoë "Z" O'Brien` and compares what arrives.
+ *
+ * AND curl READS THE BODY FROM ITS STDIN, NOT FROM AN ARGUMENT. Git for Windows' `curl` is `/mingw64/bin/curl`, a
+ * native program that takes its arguments in the ANSI code page: measured on 23 September against a server on this
+ * machine, `-d "Zoë"` arrived as `5a 6f eb`, Windows-1252, with `LANG=en_US.UTF-8` or without it, and `--data-binary @-`
+ * fed the same bytes by `printf` arrived as `5a 6f c3 ab`. `node` takes its arguments as UTF-16 and was whole either
+ * way, which is why the body is built there and piped. The earlier form, `-d '{...}'` edited by hand, had the same
+ * fault for any name outside ASCII.
+ *
+ * THE CLAIM LINK IS PRINTED ON A LINE OF ITS OWN, because `Format-List` hard-wraps a value: at 80 columns the only copy
+ * came out as two lines with ten spaces before the second (the same audit, "Found on the way"), and a link copied
+ * from that is broken.
  */
 export function provisionCommands(origin, zone = localZone()) {
   const url = `${origin}/auth/provision`;
@@ -399,19 +417,30 @@ export function provisionCommands(origin, zone = localZone()) {
     powershell: [
       "$key = Read-Host 'Operator key' -AsSecureString",
       '$pk = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($key))',
-      `$body = @{ slug = '<slug>'; email = '<your email>'; name = '<your name>'; tz = '${zone}' } | ConvertTo-Json`,
+      "$slug = Read-Host 'Slug'",
+      "$email = Read-Host 'Email'",
+      "$name = Read-Host 'Name, as the passkey will show it'",
+      `$tz = Read-Host 'Time zone [${zone}]'; if (-not $tz) { $tz = '${zone}' }`,
+      '$body = @{ slug = $slug; email = $email; name = $name; tz = $tz } | ConvertTo-Json',
       'try {',
       `  $r = Invoke-RestMethod -Method Post -Uri '${url}' -Headers @{ Authorization = "Bearer $pk" } -ContentType 'application/json; charset=utf-8' -Body $body`,
-      '  $r.value | Format-List',
+      '  $r.value | Select-Object * -ExcludeProperty claim | Format-List',
+      "  'The claim link, the only copy there will be:'",
+      '  $r.value.claim',
       "} catch { 'REFUSED: ' + $_.ErrorDetails.Message }",
       'Remove-Variable pk, key',
     ],
     bash: [
       "read -rs -p 'Operator key: ' PK; echo",
-      `curl -sS -X POST ${url} \\`,
-      "  -H 'content-type: application/json' \\",
+      "read -r -p 'Slug: ' SLUG",
+      "read -r -p 'Email: ' EMAIL",
+      "read -r -p 'Name, as the passkey will show it: ' NAME",
+      `read -r -p 'Time zone [${zone}]: ' ZONE; ZONE=\${ZONE:-${zone}}`,
+      `BODY=$(node -e 'console.log(JSON.stringify({ slug: process.argv[1], email: process.argv[2], name: process.argv[3], tz: process.argv[4] }))' "$SLUG" "$EMAIL" "$NAME" "$ZONE")`,
+      `printf '%s' "$BODY" | curl -sS -X POST ${url} \\`,
+      "  -H 'content-type: application/json; charset=utf-8' \\",
       '  -H "authorization: Bearer $PK" \\',
-      `  -d '{"slug":"<slug>","email":"<your email>","name":"<your name>","tz":"${zone}"}'`,
+      '  --data-binary @-',
       'unset PK',
     ],
   };
@@ -676,7 +705,7 @@ export default async function provisionCheck(named, { account = true, root = ROO
     for (const line of commands.bash) console.log(`    ${line}`);
     console.log('');
     console.log('  Each asks for the operator key at a prompt that echoes nothing and removes it after. This script never reads it.');
-    console.log('  The time zone is this machine\'s. Change it if the record keeps another place\'s hours.');
+    console.log('  Each then asks for the slug, the email, the name and the time zone. Enter at the zone keeps this machine\'s, shown in brackets.');
   } else {
     console.log(`  NOT READY, ${missing.length} thing(s) missing, in the order to repair them:`);
     missing.forEach((item, i) => {

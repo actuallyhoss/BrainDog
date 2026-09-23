@@ -134,10 +134,26 @@ export function encode(value: unknown): unknown {
   return value;
 }
 
-export function decode(value: unknown): string | number | null | Uint8Array {
+/**
+ * One value, as the format reads it, `at` being the `table.column` it goes into.
+ *
+ * AN OBJECT WITHOUT `b64` IS REFUSED, AND IT IS WHAT THE WORKER WROTE FOR EVERY BLOB. A Durable Object hands a BLOB back
+ * as an `ArrayBuffer`, `encode` passed that through, and `JSON.stringify` wrote it as `{}`: every grant's ciphertext and
+ * every wrapped key in every hosted export and nightly copy until the adapter in `apps/worker/src/index.ts` was repaired
+ * (`loop/research-batch-forty-five-audit.md` §1). Those copies are signed and their manifests hash the `{}`, so nothing
+ * before this line can tell them from a whole file. Taken as it stood, a Durable Object stored the text
+ * `[object Object]` where a wrapped key was and answered `ok`, and `node:sqlite` threw a driver's sentence that named
+ * a parameter number. Refused here, both hosts say the same thing and name the column.
+ */
+export function decode(value: unknown, at?: string): string | number | null | Uint8Array {
   if (value === null || value === undefined) return null;
   if (typeof value === 'object' && 'b64' in (value as Record<string, unknown>))
     return unbase64(String((value as { b64: string }).b64));
+  if (typeof value === 'object')
+    throw new BadLine(
+      `${at ?? 'A column'} holds ${JSON.stringify(value)} where the format writes bytes as {"b64": ...}, so the bytes are not in this file. The Cloud wrote every BLOB this way until its export was repaired, and a copy it made before then holds no vault.`,
+      at,
+    );
   return value as string | number;
 }
 
@@ -775,7 +791,7 @@ export function importBrainl(
       const placeholders = known.map(() => '?').join(', ');
       sql.exec(
         `INSERT INTO ${table.name} (${known.join(', ')}) VALUES (${placeholders})`,
-        ...known.map((c) => decode(values[header.indexOf(c)]) as never),
+        ...known.map((c) => decode(values[header.indexOf(c)], `${table!.name}.${c}`) as never),
       );
       touched.add(table.name);
       rows++;
