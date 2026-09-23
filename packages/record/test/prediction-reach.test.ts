@@ -117,3 +117,24 @@ test('E1: THE QUESTION A MISSED PREDICTION FILES GOES WHERE THE PREDICTION GOES'
   assert.deepEqual((await questions(both)).filter((q) => q.includes('observed 3')), missed, 'somebody who reads the lists was not shown the miss');
   sql.close();
 });
+
+/* TWO MISSES IN THE SAME WORDS ARE TWO QUESTIONS, ONE PER PREDICTION. The miss question named no prediction, so the
+   record found the one it grades by its words, and a claim and target shared by a prediction over Money and one over
+   Inbox matched both: the Inbox miss was held from the member invited to Inbox alone as if it were about Money.
+   Measured at `bccc7ea8` (`E1 twins ... actual: 0, expected: 1`). The kernel now puts the prediction's id on the body. */
+test('E1 TWINS: OF TWO MISSES IN THE SAME WORDS, THE ONE OVER INBOX REACHES INBOX AND THE ONE OVER MONEY DOES NOT', async () => {
+  const { sql, api, clock, predict } = await record();
+  const twin = { ...OVER_INBOX, claim: OVER_MONEY.claim, target: OVER_MONEY.target };
+  await predict('Tag the inbox?', 'rule.seen', SEEN, OVER_MONEY);
+  await predict('Tag the inbox again?', 'rule.seen', SEEN, twin);
+  clock.advance(31 * 86_400_000);
+  await api.kernel.drain();
+  const misses = async (ctx: CallContext) =>
+    value<{ question: string; body: { prediction?: string } }[]>(await api.governance({ register: 'suggestion' }, ctx)).filter((q) => q.question.includes('observed'));
+  assert.equal((await misses(owner)).length, 2, 'the precondition: both missed');
+  const over = (id: string | undefined) => (JSON.parse(sql.one<{ measure: string }>('SELECT measure FROM prediction WHERE id = ?', id ?? '')?.measure ?? '{}') as { source?: string }).source;
+  assert.deepEqual((await misses(inboxOnly)).map((q) => over(q.body.prediction)), ['register.inbox'], 'the Inbox miss was held from Inbox, or the Money one reached it');
+  assert.deepEqual((await misses(member)).map((q) => over(q.body.prediction)), ['register.inbox']);
+  assert.equal((await misses(both)).length, 2);
+  sql.close();
+});

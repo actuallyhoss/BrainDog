@@ -234,6 +234,9 @@ export type { FieldDecl, FieldType, Json } from './coerce.ts';
 export { misread, sentencesOver, widens, type TypeShape } from './widen.ts';
 /* FOR `declare`'s PLAN, which asks a widening's readers as `stranded` does and has to place an arrival's rule the same way. */
 export { rowRegisterOf } from './flow-lint.ts';
+/* FOR THE RECORD'S `holds`, which places a proposal by the same walk the filing check refuses it by, so the two stop being
+   copies that disagree (`loop/research-decide-reach.md`). */
+export { ACROSS, ANY_LIST, touches, type Resolve as ReachResolve, type Touched } from './reach.ts';
 /* FOR THE RECORD'S `answersNot`, which has to know which steps a run waiting on a question can still take. A run keeps
    its place as an index into this flat plan (`automation_run.step`), so reading the declared tree instead counted steps
    the run had already taken and arms it had already left (wave thirty-nine's checker, on f7c88f98). */
@@ -897,6 +900,25 @@ function nightOf(iso: string): string {
   const [year, month, dayOfMonth] = iso.split('-');
   const name = /^\d{4}-\d{2}-\d{2}$/u.test(iso) ? NIGHT_MONTHS[Number(month) - 1] : undefined;
   return name === undefined || year === undefined || dayOfMonth === undefined ? iso : `${Number(dayOfMonth)} ${name} ${year}`;
+}
+
+/**
+ * A stored manifest's `requires.packs`, each range a string, or `{}`.
+ *
+ * NOTHING THAT IS NOT TEXT IS PASSED ON AS A RANGE, because `plan` hands each one to `satisfies`, and `satisfies` once
+ * called `.trim()` on a number a pack's `requires.packs` held (`declare`'s `normalise`). A manifest written by hand, or
+ * by a build older than the one reading it, is not trusted to have been normalised.
+ */
+function requiresOf(manifest: string): Record<string, string> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(manifest);
+  } catch {
+    return {};
+  }
+  const packs = (parsed as { requires?: { packs?: unknown } } | null)?.requires?.packs;
+  if (packs === null || typeof packs !== 'object' || Array.isArray(packs)) return {};
+  return Object.fromEntries(Object.entries(packs).filter((e): e is [string, string] => typeof e[1] === 'string'));
 }
 
 export async function openRecord(sql: Sql, clock: Clock, opts: RecordOptions = {}): Promise<Kernel> {
@@ -6395,8 +6417,21 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           ORDER BY d.id`,
       ),
 
-    /** The `pack` rows: what is installed, and at which version. */
-    packs: () => sql.all<{ id: string; version: string }>('SELECT id, version FROM pack ORDER BY id'),
+    /**
+     * The `pack` rows: what is installed, at which version, and what each asks of the others (`requires.packs`).
+     *
+     * `requires` IS READ OFF THE MANIFEST THE ROW STORES, because a plan is built from this and nothing else. It answered
+     * an id and a version, so `plan` had no range to read for any held pack and `f507cff5`'s refusal never fired where a
+     * person installs one: audit forty-two's finding 1 put money-core 2.0.0 over `bank-hsbc-eg` 1.0.0 on `^1.8.0` through
+     * `planPack` and `installPack`, and it planned `dependents: []` and installed. A manifest that does not parse, or
+     * names no pack, gives `{}`: no range is claimed, and a plan says of that pack what it said before.
+     */
+    packs: (): { id: string; version: string; requires: Record<string, string> }[] =>
+      sql.all<{ id: string; version: string; manifest: string }>('SELECT id, version, manifest FROM pack ORDER BY id').map((p) => ({
+        id: p.id,
+        version: p.version,
+        requires: requiresOf(p.manifest),
+      })),
 
     /**
      * Every pack this record has, on or off, with the registers each one holds.

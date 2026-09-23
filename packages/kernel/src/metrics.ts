@@ -1935,7 +1935,11 @@ export function scorePrediction(
   /* AND A MISS GOES IN FRONT OF A PERSON. `supersede` or `keep`, with a reason either way — because
      the interesting half is the second one: a prediction that missed and a decision somebody still
      stands behind is a fact about the world rather than about the change, and the reason is where
-     that gets said. `system` opens it; nobody can answer their own question here. */
+     that gets said. `system` opens it; nobody can answer their own question here.
+
+     AND IT NAMES THE PREDICTION IT GRADES, so the record holds it as it holds that prediction. Without the id the record
+     matched the question's words, and two predictions in the same words, one over Money and one over Inbox, both
+     answered, so the Inbox miss was held from the member who reads Inbox (`loop/research-decide-reach.md`, E1). */
   if (met === false && row.on_miss === 'suggest' && deps.propose)
     deps.propose(
       {
@@ -1947,6 +1951,7 @@ export function scorePrediction(
             { id: 'keep', label: 'Keep it', because: 'the prediction was wrong about the world, not the change' },
           ],
           requires_reason: true,
+          prediction: id,
         },
       },
       'system',

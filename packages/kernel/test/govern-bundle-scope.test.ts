@@ -161,6 +161,79 @@ test('A BUNDLE NAMED FOR OBLIGATIONS THAT CARRIES ANYTHING ABOUT DIARY IS REFUSE
   assert.deepEqual(wrong, []);
 });
 
+/**
+ * What the filing check did not read, and the record held from the list's readers anyway (`loop/research-decide-reach.md`
+ * N1, N2, N4, K7, K8 and K9, from audit forty's finding 1).
+ *
+ * THE CHECK WALKED EVERY BODY AS IF IT WERE A PAGE'S, so a script's `reads` and `writes`, an arrival rule's door, a rule
+ * with no row, a script naming no list and a door that calls out all named nothing but Obligations to it. Measured at
+ * `bccc7ea8`, all six below were filed under `register.obligations` ("N1 kernel half ... AssertionError: filed"), and
+ * Decide then held each one from the member invited to Obligations alone, since `scripts`, `automations` and `actions`
+ * refuse her the same declarations. So the kernel filed them as a change to a list whose readers it would not show.
+ */
+const script = (id: string, reads: string[], writes: string[]): Declaration => ({
+  id: `script.${id}`,
+  kind: 'script',
+  body: {
+    script: id,
+    title: 'Export',
+    runs: { every: '1d' },
+    egress: ['https://collector.test'],
+    keys: [],
+    reads,
+    writes,
+    source: 'export default async function run(ctx) { await ctx.record.list("diary"); }',
+  } as never,
+});
+const OUTSIDE: [string, Declaration[], RegExp, Declaration[]][] = [
+  ['a script that reads Diary', [script('peek', ['diary'], [])], /script\.peek.*diary/, []],
+  ['a script that writes Diary', [script('post', [], ['diary'])], /script\.post.*diary/, []],
+  [
+    'an arrival rule on the door into Diary',
+    [{ id: 'rule.arrived', kind: 'rule', body: { rule: 'arrived', on: { arrival: { ingest: 'letters' } }, steps: [{ notify: { say: 'It came in.' } }] } as never }],
+    /rule\.arrived.*diary/,
+    /* An arrival names its door by an id with no dash (`flow-lint.ts` NAME), so the door is not `ingest('diary')`'s. */
+    [{ ...ingest('diary'), id: 'ingest.letters', body: { ...(ingest('diary').body as object), ingest: 'letters' } as never }],
+  ],
+  ['a rule on a clock, which has no row', [{ id: 'rule.nightly', kind: 'rule', body: { rule: 'nightly', on: { every: '1d' }, steps: [{ notify: { say: 'Night.' } }] } as never }], /rule\.nightly.*across the whole record/, []],
+  ['a script that names no list', [script('ping', [], [])], /script\.ping.*across the whole record/, []],
+  [
+    'a door that polls into Obligations',
+    [{ id: 'ingest.rate', kind: 'ingest', body: { ingest: 'rate', channel: 'poll', url: 'https://api.rate.example.test/v1', every: '1h', extract: { what: { after: 'rate ' } }, writes: { register: 'obligations' } } as never }],
+    /ingest\.rate.*across the whole record/,
+    [],
+  ],
+];
+
+test('A BUNDLE NAMED FOR OBLIGATIONS CARRYING A SCRIPT, AN ARRIVAL RULE, A CLOCK OR A DOOR THAT CALLS OUT IS REFUSED', async () => {
+  const wrong: string[] = [];
+  for (const [what, riders, said, installed] of OUTSIDE) {
+    const { k, sql } = await record();
+    if (installed.length > 0) assert.ok((await k.install(installed)).ok, what);
+    const out = k.propose(change('register.obligations', bundle(...riders)), 'p_1');
+    if (out.ok) wrong.push(`${what}: filed`);
+    else if (codeOf(out) !== 'VALUE_MALFORMED' || (out as { refusal: { at: string } }).refusal.at !== 'body.to' || !said.test(fixOf(out)))
+      wrong.push(`${what}: ${codeOf(out)} ${fixOf(out)}`);
+    else if (filed(sql) !== 0) wrong.push(`${what}: a row was written`);
+    sql.close();
+  }
+  assert.deepEqual(wrong, []);
+});
+
+/* `{{trigger.row.what}}` IS THE RUN'S ROW, NOT A LIST CALLED `trigger`. Measured at `bccc7ea8`: a rule on Obligations
+   saying what came in was refused under `register.obligations` as reading `register.trigger` (K4). */
+test("a rule on Obligations whose step says {{trigger.row.what}} is filed under register.obligations, since trigger is the run's", async () => {
+  const { k, sql } = await record();
+  const says: Declaration = {
+    id: 'rule.says',
+    kind: 'rule',
+    body: { rule: 'says', on: { written: { register: 'obligations', op: ['create'] } }, once_per: ['entry'], steps: [{ notify: { say: '{{trigger.row.what}} came in' } }] } as never,
+  };
+  const made = k.propose(change('register.obligations', bundle(says)), 'p_1');
+  assert.ok(made.ok, fixOf(made));
+  sql.close();
+});
+
 test('AND ONE ALREADY IN THE QUEUE IS REFUSED WHEN IT IS ACCEPTED, installing nothing', async () => {
   const { k, sql } = await record();
   sql.exec(

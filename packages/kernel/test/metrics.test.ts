@@ -1299,6 +1299,27 @@ test('A DECISION THAT PREDICTED NOTHING CANNOT BE WRONG, so the record checks th
   sql.close();
 });
 
+/* THE QUESTION A MISS FILES SAYS WHICH PREDICTION IT GRADES. Its body was the two options and `requires_reason` and
+   nothing else, so the record found the prediction by the words of the question, and two predictions with the same
+   claim and target, one over Money and one over Inbox, both answered: the Inbox miss was held from Inbox's readers
+   because its words matched the Money one too (`loop/research-decide-reach.md`, E1, measured `actual: undefined`). Only
+   `system` opens it, so the record can believe the id it carries. */
+test('A MISSED PREDICTION FILES ITS QUESTION NAMING THE PREDICTION, which only the system can open', async () => {
+  const { k, sql, clock } = await record();
+  predict(sql, '<=400000');
+  sql.exec(
+    "INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts) VALUES ('s_1', ?, 'score', 'pr_1', ?, 'pending', 0)",
+    new Date(NOW).toISOString(),
+    JSON.stringify({ prediction: 'pr_1' }),
+  );
+  clock.set(NOW + 1000);
+  await k.drain();
+  const asked = sql.one<{ body: string; opened_by: string }>("SELECT body, opened_by FROM suggestion WHERE body_kind = 'options'");
+  assert.equal(asked?.opened_by, 'system', 'the precondition: the miss filed its question');
+  assert.equal((JSON.parse(asked!.body) as { prediction?: unknown }).prediction, 'pr_1');
+  sql.close();
+});
+
 test('and a prediction it met says so', async () => {
   const { k, sql, clock } = await record();
   predict(sql, '<=800000');

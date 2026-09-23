@@ -25,6 +25,7 @@ import { clash, no, ok } from '@braindog/ports';
 import { keyNamed, runnerCannotOpen, type Egress } from './actions.ts';
 import { instant } from './migrate.ts';
 import { point } from './metrics.ts';
+import { ACROSS, ANY_LIST, touches, type Resolve } from './reach.ts';
 import { sparkMayWrite } from './spark.ts';
 
 /** The three tables that are read like registers and are not registers. */
@@ -699,7 +700,7 @@ function namesFault(sql: Sql, body: Record<string, unknown>): Refusal | null {
 }
 
 /**
- * A declaration in a bundle filed under a list's name that reads, writes or mails another list.
+ * A declaration in a bundle filed under a list's name that reads, writes or mails another list, or the whole record.
  *
  * A SECOND REGISTER WAS THE ONLY THING KEPT OUT, and `loop/research-batch-nineteen-audit.md` §4 filed a rule over Diary
  * under `register.obligations` from the owner's `propose` token: the member invited to Obligations alone read the rule
@@ -707,30 +708,42 @@ function namesFault(sql: Sql, body: Record<string, unknown>): Refusal | null {
  * writes it and a digest that mails its rows rode in the same way, one declaration each (`govern-bundle-scope.test.ts`
  * filed all eight before this). So each declaration is asked which lists it NAMES, not only which it declares.
  *
+ * AND WHICH IT TOUCHES AS ITS OWN READ PLACES IT, through `touches` (`reach.ts`), which the record asks too. The walk
+ * here was a page's walk over every kind, so it read neither a script's `reads` and `writes` nor an arrival rule's
+ * door, and audit forty's finding 1 filed a script reading Money, one writing it and a rule on the payroll door into
+ * Money, each beside Inbox's new field under `register.inbox` (N1, N2, N4 in `loop/research-decide-reach.md`). A rule
+ * with no row, a script naming no list and a door that polls were filed the same way (K8, K9, K7), and Decide then held
+ * all six from Inbox's readers, since `automations`, `scripts` and `actions` refuse them each: filed as a change to a
+ * list whose readers would never be shown it. Each of those now names `ANY_LIST` or `ACROSS`, and is refused with the
+ * whole-record sentence. The page walk also read `{{trigger.row.what}}` in a rule as a list called `trigger`, and
+ * refused a rule on Inbox under Inbox's own name (K4); a rule's run scope is skipped now.
+ *
  * A FIGURE IS READ THROUGH ITS METRIC, and only a metric the bundle carries can be read here: this runs on the body
  * alone, when it is filed and again when it is accepted. A page of figures names no list itself, which is how the Money
  * page leaked to a one-list reader once (`pages.ts` `registersOf`), so a figure this cannot resolve is refused rather
- * than taken as harmless. Propose that page under its own name.
+ * than taken as harmless. Propose that page under its own name. A door is read from the bundle, then as installed.
  */
 function aboutOthers(sql: Sql, named: string, bundle: { id?: unknown; kind?: unknown; body?: unknown }[]): Refusal | null {
   const list = named.slice('register.'.length);
   const metrics = new Map<string, unknown>();
   for (const d of bundle) if (d?.kind === 'metric' && isMap(d.body) && typeof d.body.metric === 'string') metrics.set(d.body.metric, d.body);
   /* A TEMPLATE PAGE'S `{{what}}` IS ITS ROW'S FIELD, not a figure, and the bundle always carries the list it is named for. */
-  const own = bundle.find((d) => d?.id === named)?.body;
-  const fields = new Set(isMap(own) && Array.isArray(own.fields) ? own.fields.map((f) => (isMap(f) ? f.id : undefined)).filter((f) => typeof f === 'string') : []);
+  const fields = fieldsOf(bundle.find((d) => d?.id === named)?.body);
+  const resolve: Resolve = {
+    figure: (id) => [metrics.get(id)],
+    door: (door) => bundle.find((d) => d?.id === `ingest.${door}`)?.body ?? liveBody(sql, `ingest.${door}`),
+    fields: (of) => (of === list ? fields : fieldsOf(liveBody(sql, `register.${of}`))),
+  };
   for (const d of bundle) {
     if (d?.id === named || d?.kind === 'register') continue;
-    const page = d.kind === 'page' ? { template: isMap(d.body) && d.body.for !== undefined, fields } : null;
-    const { lists, unknown } = listsNamed(d.body, page, (id) => metrics.get(id));
+    const { lists, unknown } = touches(String(d.id), d.body, resolve);
     const other = [...lists].find((l) => l !== list);
     if (other !== undefined)
       return {
         code: 'VALUE_MALFORMED',
-        fix:
-          other === '*'
-            ? `This change is filed as a change to ${named}, and ${String(d.id)} in it reads across the whole record, so whoever reads ${named} would read all of it. Propose ${String(d.id)} as a change of its own.`
-            : `This change is filed as a change to ${named}, and ${String(d.id)} in it reads register.${other}, so whoever reads ${named} would read about ${other}. Propose ${String(d.id)} as a change of its own.`,
+        fix: whole(other)
+          ? `This change is filed as a change to ${named}, and ${String(d.id)} in it reads across the whole record, so whoever reads ${named} would read all of it. Propose ${String(d.id)} as a change of its own.`
+          : `This change is filed as a change to ${named}, and ${String(d.id)} in it reads register.${other}, so whoever reads ${named} would read about ${other}. Propose ${String(d.id)} as a change of its own.`,
         at: 'body.to',
       };
     const figure = [...unknown][0];
@@ -747,7 +760,7 @@ function aboutOthers(sql: Sql, named: string, bundle: { id?: unknown; kind?: unk
         fix:
           was === null
             ? `This change is filed as a change to ${named}, and ${String(d.id)} in it replaces one that reads a figure no live metric declares, which names no list, so nothing here can say whose that is. Propose ${String(d.id)} as a change of its own.`
-            : was === '*'
+            : whole(was)
               ? `This change is filed as a change to ${named}, and ${String(d.id)} in it replaces one that reads across the whole record, so whoever reads ${named} would be asked to change what everybody reads. Propose ${String(d.id)} as a change of its own.`
               : `This change is filed as a change to ${named}, and ${String(d.id)} in it replaces one that reads register.${was}, so whoever reads ${named} would be asked to change what ${was} shows. Propose ${String(d.id)} as a change of its own.`,
         at: 'body.to',
@@ -759,13 +772,32 @@ function aboutOthers(sql: Sql, named: string, bundle: { id?: unknown; kind?: unk
         fix:
           reader.other === undefined
             ? `This change is filed as a change to ${named}, and ${String(d.id)} in it defines a figure ${reader.page} reads, which names no list, so nothing here can say whose page that is. Propose ${String(d.id)} as a change of its own.`
-            : reader.other === '*'
+            : whole(reader.other)
               ? `This change is filed as a change to ${named}, and ${String(d.id)} in it defines a figure ${reader.page} reads, which reads across the whole record, so whoever reads ${named} would be asked to change what everybody reads. Propose ${String(d.id)} as a change of its own.`
               : `This change is filed as a change to ${named}, and ${String(d.id)} in it defines a figure ${reader.page} reads, which reads register.${reader.other}, so whoever reads ${named} would be asked to change what ${reader.other} shows. Propose ${String(d.id)} as a change of its own.`,
         at: 'body.to',
       };
   }
   return null;
+}
+
+/**
+ * Whether a name `touches` gave is a read across the record or of any list rather than one list.
+ *
+ * ONE SENTENCE FOR BOTH, because to the member invited to one list the two say the same thing: what it proposes is not
+ * about her list alone. Read as a list, `ANY_LIST` would have been told as "reads register.?".
+ */
+const whole = (name: string): boolean => name === ACROSS || name === ANY_LIST;
+
+/** The live body of a declaration, parsed, or `undefined` for none. */
+function liveBody(sql: Sql, id: string): unknown {
+  const found = sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1', id)?.body;
+  return found === undefined ? undefined : JSON.parse(found);
+}
+
+/** The field ids of a register body, for a template page's `{{field}}`. */
+function fieldsOf(body: unknown): ReadonlySet<string> {
+  return new Set(isMap(body) && Array.isArray(body.fields) ? body.fields.map((f) => (isMap(f) ? f.id : undefined)).filter((f): f is string => typeof f === 'string') : []);
 }
 
 /**
@@ -786,28 +818,22 @@ function pageOfOthers(
   list: string,
   bundle: { id?: unknown }[],
 ): { page: string; other: string | undefined } | undefined {
-  const live = (at: string) =>
-    sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1', at)?.body;
-  if (live(`metric.${figure}`) !== undefined) return undefined;
+  if (liveBody(sql, `metric.${figure}`) !== undefined) return undefined;
   const replaced = new Set(bundle.map((d) => d?.id));
   /* A DIGEST READS A FIGURE BY NAME TOO, as a `metric.<id>` section (`digest.ts`), and asking only the pages filed a
      Diary digest's retired figure redefined over Obligations. It is walked as the replaced digest is, with no page. */
-  const readers = sql.all<{ id: string; kind: string; body: string }>(
-    "SELECT id, kind, body FROM declaration WHERE kind IN ('page', 'digest') AND superseded_at IS NULL AND retired = 0 ORDER BY id",
+  const readers = sql.all<{ id: string; body: string }>(
+    "SELECT id, body FROM declaration WHERE kind IN ('page', 'digest') AND superseded_at IS NULL AND retired = 0 ORDER BY id",
   );
+  /* A TEMPLATE'S `{{field}}` IS ITS ROW'S, read from the list it is for as installed. */
+  const resolve: Resolve = {
+    figure: (id) => (id === figure ? [] : [liveBody(sql, `metric.${id}`)]),
+    door: (door) => liveBody(sql, `ingest.${door}`),
+    fields: (of) => fieldsOf(liveBody(sql, `register.${of}`)),
+  };
   for (const row of readers) {
     if (replaced.has(row.id)) continue;
-    const body: unknown = JSON.parse(row.body);
-    /* A TEMPLATE'S `{{field}}` IS ITS ROW'S, read from the list it is for as installed. */
-    const forList = isMap(body) && isMap(body.for) && typeof body.for.register === 'string' ? body.for.register : undefined;
-    const shape = forList === undefined ? undefined : live(`register.${forList}`);
-    const own: unknown = shape === undefined ? undefined : JSON.parse(shape);
-    const fields = new Set(isMap(own) && Array.isArray(own.fields) ? own.fields.map((f) => (isMap(f) ? f.id : undefined)).filter((f) => typeof f === 'string') : []);
-    const { lists, unknown } = listsNamed(body, row.kind === 'page' ? { template: forList !== undefined, fields } : null, (id) => {
-      if (id === figure) return undefined;
-      const metric = live(`metric.${id}`);
-      return metric === undefined ? undefined : JSON.parse(metric);
-    });
+    const { lists, unknown } = touches(row.id, JSON.parse(row.body), resolve);
     if (!unknown.has(figure)) continue;
     const other = [...lists].find((l) => l !== list);
     if (other !== undefined || lists.size === 0) return { page: row.id, other };
@@ -823,7 +849,7 @@ function pageOfOthers(
  * `register.obligations`, it was accepted and installed, and every page reading the Diary figure then read Obligations
  * behind a question the queue showed as a change to Obligations. A rule, a page and a digest under a Diary id with an
  * Obligations body were filed the same way (`govern-bundle-scope.test.ts`). The installed body's figures are read
- * through the installed metrics, since those are what it reads now.
+ * through the installed metrics, and its door as installed, since those are what it reads now.
  *
  * AN INSTALLED BODY WHOSE EVERY FIGURE HAS NO LIVE METRIC IS NOBODY'S TO REPLACE, and it answers `null`. This once
  * dropped the figures it could not resolve, so a stat of a retired Diary figure, a stat of one never declared, a note
@@ -834,87 +860,15 @@ function pageOfOthers(
  * list, since the page is already shown to whoever reads it and the dead figure draws nothing.
  */
 function replacedAbout(sql: Sql, id: string, list: string, fields: ReadonlySet<string>): string | null | undefined {
-  const installed = (at: string) =>
-    sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1', at)?.body;
-  const was = installed(id);
+  const was = liveBody(sql, id);
   if (was === undefined) return undefined;
-  const body: unknown = JSON.parse(was);
-  const page = id.startsWith('page.') ? { template: isMap(body) && body.for !== undefined, fields } : null;
-  const { lists, unknown } = listsNamed(body, page, (figure) => {
-    const metric = installed(`metric.${figure}`);
-    return metric === undefined ? undefined : JSON.parse(metric);
+  const { lists, unknown } = touches(id, was, {
+    figure: (figure) => [liveBody(sql, `metric.${figure}`)],
+    door: (door) => liveBody(sql, `ingest.${door}`),
+    fields: (of) => (of === list ? fields : fieldsOf(liveBody(sql, `register.${of}`))),
   });
   if (lists.size === 0 && unknown.size > 0) return null;
   return [...lists].find((l) => l !== list);
-}
-
-/** A register named in full, as a metric's `source`, a table's and a digest section's are. */
-const LIST_REF = /^register\.([a-z][a-z0-9_]*)$/;
-/** A page block's sources that are not a list and not a figure, and read no list outside what its legs name. */
-const PAGE_SOURCES = new Set(['forecast.runway']);
-
-/**
- * Every list a declaration body names, and every figure it reads that `metricOf` cannot resolve.
- *
- * WALKED RATHER THAN READ KIND BY KIND, because a list is named in a dozen places: a rule's `register`, a `create` or a
- * `link` inside its `then`, an ingest's `writes.register` or each leg of its route, a `lookup`, a cash walk's legs, a
- * page's `for`. A `register` key or a `register.<id>` string anywhere is a list. On a page, a source that is neither
- * (`activity`, `actions`, `governance.open`, `sessions.live`) reads across the record or the runs, and is named `*` or
- * `session` as `pages.ts` names it. That walk is not imported: `pages.ts` reads `BODY_KINDS` from here as it loads.
- */
-function listsNamed(
-  body: unknown,
-  page: { template: boolean; fields: ReadonlySet<string> } | null,
-  metricOf: (id: string) => unknown,
-): { lists: Set<string>; unknown: Set<string> } {
-  const lists = new Set<string>();
-  const unknown = new Set<string>();
-  const seen = new Set<string>();
-  const figure = (said: string) => {
-    /* THE FIRST COLON SEPARATES, as `pages.ts` reads a cell: `project-owed:C:\Repos` is one project's figure. */
-    const at = said.indexOf(':');
-    const id = at < 0 ? said : said.slice(0, at);
-    if (seen.has(id)) return;
-    seen.add(id);
-    const metric = metricOf(id);
-    if (metric !== undefined) visit(metric, undefined);
-    else unknown.add(id);
-  };
-  const visit = (node: unknown, key: string | undefined): void => {
-    if (typeof node === 'string') {
-      const ref = LIST_REF.exec(node);
-      if (ref) lists.add(ref[1]!);
-      else if (node.startsWith('metric.')) figure(node.slice('metric.'.length));
-      else if (key === 'register') lists.add(node);
-      else if (key === 'metric') figure(node);
-      /* A FORECAST'S `late:` AND A SERIES LINE'S `then:` AND `each:` ARE FIGURES TOO, which a check reading only `metric`
-         keys let through: a forecast whose late mark counted Diary was filed under `register.obligations`. */
-      else if (page && (key === 'late' || key === 'then' || key === 'each')) figure(node);
-      else if (page && key === 'source' && !PAGE_SOURCES.has(node)) lists.add(node === 'sessions.live' ? 'session' : '*');
-      /* AND A `{{list.count}}` OR `{{list#3.field}}` IN PROSE READS THAT LIST, as the page answer fills it. */
-      for (const m of node.matchAll(/\{\{\s*(?:[a-z]+:)?\s*([a-z][a-z0-9_]*)(?:#\d+)?\.[A-Za-z]/g)) lists.add(m[1]!);
-      /* A BARE `{{diary-count}}` IN A PAGE'S PROSE IS A FIGURE, as `pathOf` reads one, and it named no list here: a note
-         reading an installed Diary figure was filed under `register.obligations`. A code span is text and is skipped, as
-         `pathsOf` skips it, and in a template a field of the row is the row's. So is `{{spoken}}` on a template: `fill`
-         answers it with the row's spoken id before it reads a field or a metric, and `declare.ts` reserves the word as a
-         field id, so there it is never a figure. Read as one, it refused the seed's own `page.skill` (a diff's
-         `row: '{{spoken}}'`) under `register.skills`. Outside a template nothing fills it, and it stays a figure. */
-      if (page)
-        for (const m of node.replace(/`[^`]*`/g, ' ').matchAll(/\{\{\s*(?:[a-z]+:\s*)?([a-z][a-z0-9_-]*)\s*\}\}/g))
-          if (!(page.template && (page.fields.has(m[1]!) || m[1] === 'spoken'))) figure(m[1]!);
-      return;
-    }
-    if (Array.isArray(node)) {
-      for (const n of node) visit(n, undefined);
-      return;
-    }
-    if (!isMap(node)) return;
-    /* A BLOCK THAT MARKS WHICH ROW HAS AN AGENT ON IT READS THE RUNS, as `registersOf` says. */
-    if (page && node.working === true) lists.add('session');
-    for (const [k, v] of Object.entries(node)) visit(v, k);
-  };
-  visit(body, undefined);
-  return { lists, unknown };
 }
 
 /**

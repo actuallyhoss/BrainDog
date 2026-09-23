@@ -94,26 +94,27 @@ test('EACH RANGE MOVED WITH A VERSION OF ITS OWN, and neither admits a money-cor
 });
 
 /**
- * THE HALF OF R5 THAT WAS READ AND NOT DRIVEN, DRIVEN. Only the installing pack's own `requires` is checked
- * (`packages/declare/src/index.ts`, `needs`), so a record already holding a pack that requires money-core `^1.8.0` takes
- * money-core 2.0.0 without a word and is left holding a pack whose requirement is no longer met.
+ * THE HALF OF R5 THAT WAS READ AND NOT DRIVEN, DRIVEN, AND NOW CLOSED. Only the installing pack's own `requires` was
+ * checked (`packages/declare/src/index.ts`, `needs`), so a record already holding a pack that requires money-core
+ * `^1.8.0` took money-core 2.0.0 without a word and was left holding a pack whose requirement was no longer met.
  *
- * MEASURED 23 SEPTEMBER: the update installs, nothing in its plan names `bank-hsbc-eg`, and `^1.8.0` is false of the
- * version the record then holds. The widening above is what keeps the shipped pack's requirement true across this step;
- * it does not close the hole, which is `declare`'s to close, and when it is closed the first assertion here goes red and
- * this test should be turned round to hold the refusal.
+ * MEASURED 23 SEPTEMBER: the update installed, nothing in its plan named `bank-hsbc-eg`, and `^1.8.0` was false of the
+ * version the record then held. `f507cff5` taught `plan` the held packs' ranges (`dependents`), and it still installed
+ * here, because this plan is built from `kernel.packs()` as the record builds it, and that answered each pack's id and
+ * version and no `requires` (audit forty-two, finding 1). With `packs()` reading each range off the stored manifest, the
+ * plan names the dependent it would strand and the update is refused before anything lands.
  */
-test('THE HOLE R5 READ: a record holding a pack on ^1.8.0 takes money-core 2.0.0 without a word about it', async () => {
+test('THE HOLE R5 READ IS CLOSED: a record holding a pack on ^1.8.0 is refused money-core 2.0.0, naming that pack', async () => {
   const { k, sql } = await onMoney(asMoneyCore180);
   const old = { ...bankHsbcEgPack(), version: '1.0.0', requires: { format: 1, primitives: 1, packs: { 'money-core': '^1.8.0' } } };
   await put(k, old);
   const { diff, out } = await attempt(k, asMoneyCore200(firstPartyDocument('money-core')));
-  assert.equal(out.ok, true, 'the update was refused, so the hole is closed: turn this test round to hold the refusal');
-  assert.deepEqual([diff.conflicts, diff.requires.packs], [[], []], 'the plan now names the dependent it strands');
-  assert.equal(k.packs().find((p) => p.id === 'bank-hsbc-eg')?.version, '1.0.0', 'the dependent was taken away rather than stranded');
-  const held = k.packs().find((p) => p.id === 'money-core')?.version ?? null;
-  assert.equal(held, '2.0.0');
-  assert.equal(satisfies(held, '^1.8.0'), false);
+  assert.deepEqual(diff.dependents, [{ id: 'bank-hsbc-eg', version: '1.0.0', range: '^1.8.0', ok: false, was: true }], 'the plan does not name the dependent it strands');
+  assert.equal(out.ok, false, 'money-core 2.0.0 installed under a pack that asks for ^1.8.0');
+  assert.equal(out.refusal?.code, 'PACK_REQUIRED');
+  assert.match(out.refusal?.fix ?? '', /bank-hsbc-eg/);
+  assert.equal(k.packs().find((p) => p.id === 'bank-hsbc-eg')?.version, '1.0.0');
+  assert.equal(k.packs().find((p) => p.id === 'money-core')?.version, '1.8.0', 'the refused update moved money-core');
 
   /* AND THE SHIPPED PACK, INSTALLED BEFORE THE SAME UPDATE, STILL HAS WHAT IT ASKS FOR AFTER IT. */
   const { k: k2, sql: sql2 } = await onMoney(asMoneyCore180);

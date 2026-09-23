@@ -12,8 +12,8 @@
  * satisfies it, and the way out it names (update the held pack first) was driven here and installs.
  *
  * THE RANGES ARE READ FROM THE `pack` ROWS' MANIFESTS, because `Installed.packs` carried only an id and a version. This
- * file builds its `Installed` the way the record would once `kernel.packs()` answers each pack's `requires.packs`; until
- * it does, a plan asked through `@braindog/record` still has no ranges to read, and says what it said before.
+ * file builds its `Installed` the way the record does now that `kernel.packs()` answers each pack's `requires.packs`,
+ * and its blind case strips them to show what a plan with no ranges to read still says.
  */
 
 import { test } from 'node:test';
@@ -123,7 +123,7 @@ test('A REQUIREMENT FALSE BEFORE THE UPDATE IS NAMED IN THE PLAN AND DOES NOT RE
   /* STRANDED THE WAY A RECORD WAS BEFORE THIS CHECK: the update installed with the ranges hidden from the plan. */
   const read = await normalise(two, { kind: 'local' });
   assert.ok(read.ok);
-  const blind = { ...stateOf(k, sql), packs: k.packs() };
+  const blind = { ...stateOf(k, sql), packs: k.packs().map(({ id, version }) => ({ id, version })) };
   const through = await plan(read.value, blind);
   assert.deepEqual(through.dependents, [], 'a plan with no ranges to read names no dependent');
   assert.equal(((await install(read.value, through, hostFor(k), through.planHash, through.approve)) as Out).ok, true);

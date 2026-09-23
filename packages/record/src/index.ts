@@ -87,6 +87,10 @@ import {
   runPlan,
   scriptBody,
   egressOf,
+  /* RENAMED, because `ACROSS` in this file is the set of page sources that read across the record (`page`). */
+  ACROSS as READS_ACROSS,
+  ANY_LIST,
+  touches,
 } from '@braindog/kernel';
 import { parseWhere, type Predicate } from '@braindog/where';
 import type { Json as JsonValue } from '@braindog/kernel';
@@ -1869,10 +1873,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        is placed rather than on the whole record. */
     if (typeof row.for_decl === 'string') return predictionHeld(ctx, row);
     /* THE QUESTION A MISSED PREDICTION FILES IS HELD AS THAT PREDICTION IS. The kernel files it as `system` with an
-       `options` body that names nothing, so it went to every whole-record reader with "predicted >=5, observed 3" in
-       it (audit forty, finding 2, E1). The body does not say which prediction it is, so the prediction is found by the
-       words the kernel wrote it in; a question no prediction matches keeps the rule for a question about no list. */
+       `options` body, so it went to every whole-record reader with "predicted >=5, observed 3" in it (audit forty,
+       finding 2, E1). The body names the prediction it grades (`metrics.ts`, since `loop/research-decide-reach.md`), and
+       only `system` opens one, so the id is believed. A miss filed before that names none, and its prediction is found
+       by the words the kernel wrote it in; a question no prediction matches keeps the rule for a question about no list. */
     if (row.body_kind === 'options' && row.opened_by === 'system') {
+      const named = (row.body as { prediction?: unknown } | undefined)?.prediction;
+      if (typeof named === 'string') {
+        const graded = kernel.governanceRow('prediction', named);
+        return graded === null ? !wholeRecord(ctx) : predictionHeld(ctx, graded);
+      }
       const graded = missedBy(row);
       if (graded.length > 0) return graded.some((p) => predictionHeld(ctx, p));
     }
@@ -1903,50 +1913,45 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        its answer and the owner's reason (*The auditor must not see his salary line*) reached a member invited to
        Obligations through `governance`, `whatsNew` and `recentHistory` (§5), and so did the question a missed prediction
        files, whose body carries only its two options (§3). A `pack` or `settings` proposal is about what the record is,
-       and so takes the same rule. A `change` to a page is too, and to every list it reads besides. A `change` to a rule or a script names
-       the lists its declarations touch, through `changeTouches` (audit thirty-eight, finding 3).
+       and so takes the same rule.
 
-       AND SO DOES A CHANGE UNDER A LIST'S NAME. This asked `changeTouches` only when the name was not a list's, so under
-       `register.inbox` the filing check was the only gate, and it does not read a script's `reads` and `writes` or an
-       arrival rule's door: audit forty's finding 1 filed a script reading Money, one writing it and a rule on the payroll
-       door into Money each beside Inbox's new field, and the member invited to Inbox alone was handed all three, the
-       source that posts Omar's rows to `collector.test` included. The name is still asked first, and then everything
-       the change touches is asked as well, so the read side does not rest on what the filing check happens to read. */
+       A `CHANGE` IS SHOWN TO A CALLER WHO COULD READ EVERY NAME THE KERNEL'S ONE WALK GIVES for every copy of every
+       declaration it carries (`changeTouches`, `loop/research-decide-reach.md`): a list as `list` reads it, `ACROSS` as
+       `wholeRecord` reads it, `ANY_LIST` as `readsEveryList` reads it, and a change that names nothing as a question
+       about the whole record. The list it is filed under is always one of its names, asked first: an addition is stored
+       as `{ add }` with no `id`, so the walk finds nothing in it, and without the name the member held to `append` on
+       Money was shown "Add salary band to Money?" (the wave forty-two checker, with this line removed). And the name is
+       not the only one asked, because the filing check once did not read a script's `reads` and `writes` or an arrival
+       rule's door (audit forty, finding 1), and a row filed before it did is still in the queue. */
     if (row.body_kind === 'change') {
       if (typeof named === 'string' && named !== '' && readable(ctx, named) !== null) return true;
-      const touched = changeTouches(body, typeof row.opened_at === 'string' ? row.opened_at : null);
-      if (touched !== null)
-        return (
-          (touched.whole && !wholeRecord(ctx)) ||
-          (touched.every && !readsEveryList(ctx)) ||
-          [...touched.lists].some((list) => readable(ctx, list) !== null)
-        );
+      const names = changeTouches(body, typeof row.opened_at === 'string' ? row.opened_at : null);
+      if (names.size === 0 && (typeof named !== 'string' || named === '')) return !wholeRecord(ctx);
+      return !readsAll(ctx, names);
     }
     if (typeof named !== 'string' || named === '') return !wholeRecord(ctx);
     return readable(ctx, named) !== null;
   };
 
   /**
-   * The lists a `change` filed under a name that is not a list's touches, read off its declarations as `automations` and
-   * `scripts` read them, or `null` when none of them names one.
+   * Every name the kernel's one walk (`touches`, `packages/kernel/src/reach.ts`) gives for every copy of every
+   * declaration a `change` carries, with `ANY_LIST` for any figure it could not place.
    *
-   * A CHANGE UNDER A RULE'S OR A SCRIPT'S NAME WAS ABOUT NO LIST, SO IT WENT TO EVERY WHOLE-RECORD READER.
-   * `loop/research-batch-thirty-eight-audit.md` finding 3 filed Inbox's new field, `rule.omar-pay` on Money's creates and
-   * `script.peek` reading Money under `rule.omar-pay`, and a member held to `append` on Money, whom `automations` and
-   * `scripts` both refused the rule and the script, was handed the proposal, from which Decide now draws the rule's
-   * condition and the script's whole source. So each declaration names what the read of its kind would ask: a list its
-   * own id, a rule the list of its row (`rowRegisterOf`, which places an arrival's row too) and every list its steps
-   * `link` into or `create` in (`listsReached`), a script its `reads` and `writes`. A rule with no row and a script that
-   * touches no list are shown by those reads to a caller who reads every list, and are held to that here (`every`); a
-   * declaration of any other kind is about the record as a whole, as it was before (`whole`).
+   * EACH KIND IS PLACED AS THE READ OF THAT KIND PLACES IT. Audit thirty-eight's finding 3 handed a member held to
+   * `append` on Money a rule on Money and a script reading it, filed under a rule's name, though `automations` and
+   * `scripts` refused her both; audit forty's finding 4 handed her a page, a door and a figure over Money while `page`
+   * and `metric` answered her as if they did not exist. Both are the walk's rule and script and page branches now.
    *
-   * AND A DECLARATION OF ANY OTHER KIND IS ABOUT EVERY LIST IT READS OR WRITES AS WELL. `whole` alone let a page, a door
-   * and a figure through to anybody who reads the whole record, and a member held to `append` on Money is one:
-   * `loop/research-batch-forty-audit.md` finding 4 handed her a page tabling Omar's Money rows, the payroll door into
-   * Money, a figure summing Omar's pay and a bundle under a rule on Inbox carrying that figure, while `page` told her
-   * `PAGE_UNKNOWN` and `metric` told her `METRIC_UNKNOWN`. So those bodies are walked by `listsIn` too. `whole` stays
-   * beside the lists, because a page names a read across the record by a source that is no list (`activity`,
-   * `governance.open`) and a figure nothing here can resolve names no list at all.
+   * ONE WALK, THE FILING CHECK'S. The record kept its own copy (`listsIn`), which said it read what the kernel's
+   * `listsNamed` read and did not: it had no line for a page source that is no list or a block marked `working: true`
+   * (audit forty-two, finding 2: a member held to `append` on Session was handed the change declaring a page over
+   * `sessions.live` while `page` answered her `PAGE_UNKNOWN`), and it read a template's `{{field}}` as a figure. Its
+   * answer for every page, door, figure and digest was `whole` beside the lists, and that over-held: a bundle under
+   * `register.inbox` carrying a page over Inbox alone (R1 in `loop/research-decide-reach.md`, the wave forty-two
+   * checker's regression) and a bundle under a rule on Inbox carrying the same page (T38-page) were held from the member
+   * invited to Inbox alone, whom `page` shows that page. Measured by the research's probe over 32 proposals and five
+   * callers, the copies answered 138 right at `bccc7ea8` and this answers 156, leaking none either way; the four it still
+   * holds back are a prose page and a page with a log block from members invited to named lists (K1, K5), on purpose.
    *
    * AND THE LIVE COPY OF EACH, because accepting a change to a rule on Money changes what Money's rows set off, whatever
    * list the new body names. The filing check asks the replaced declaration the same question (`govern.ts`
@@ -1959,7 +1964,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * live from its `created_at` until its `superseded_at`, so the ones that were live are those whose span holds
    * `opened`, ends included, since a change filed and accepted in one millisecond ties the two.
    */
-  const changeTouches = (body: Record<string, unknown> | undefined, opened: string | null = null): { lists: Set<string>; every: boolean; whole: boolean } | null => {
+  const changeTouches = (body: Record<string, unknown> | undefined, opened: string | null = null): Set<string> => {
     const to = body?.to as { declarations?: unknown } | undefined;
     const bundle = (Array.isArray(to?.declarations) ? to.declarations : [to]).filter(
       (d): d is { id: string; body?: unknown } => d !== null && typeof d === 'object' && typeof (d as { id?: unknown }).id === 'string',
@@ -1976,8 +1981,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             .all<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND created_at <= ? AND (superseded_at IS NULL OR superseded_at >= ?) ORDER BY version', id, opened, opened)
             .map((v) => parsed(v.body));
     const proposed = (id: string): unknown => bundle.find((d) => d.id === id)?.body;
-    const figures = (id: string): unknown[] => [proposed(`metric.${id}`), liveBody(`metric.${id}`), ...then(`metric.${id}`)];
-    const out = { lists: new Set<string>(), every: false, whole: false };
+    const figure = (id: string): unknown[] => [proposed(`metric.${id}`), liveBody(`metric.${id}`), ...then(`metric.${id}`)];
+    /* A TEMPLATE'S LIST AS THE BUNDLE LEAVES IT, so a field the bundle adds (K3's `from`) is the row's and not a figure. */
+    const fields = (list: string): ReadonlySet<string> => fieldsOf(proposed(`register.${list}`) ?? liveBody(`register.${list}`));
+    const names = new Set<string>();
     for (const d of bundle) {
       /* EACH COPY READS ITS DOOR AS OF ITS OWN TIME: the proposed body the bundle's door or today's, the one that was
          live when the change was opened the door of that moment. */
@@ -1987,26 +1994,25 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ...then(d.id).map((b): [unknown, (id: string) => unknown] => [b, (id) => then(id)[0] ?? liveBody(id)]),
       ];
       for (const [b, at] of copies) {
-        if (b === null || typeof b !== 'object' || Array.isArray(b)) continue;
-        const decl = b as Record<string, unknown>;
-        if (d.id.startsWith('register.')) out.lists.add(d.id.slice('register.'.length));
-        else if (d.id.startsWith('rule.')) {
-          const list = rowRegisterOf(decl as Parameters<typeof rowRegisterOf>[0], (door) => at(`ingest.${door}`));
-          if (list === null) out.every = true;
-          else out.lists.add(list);
-          for (const reached of listsReached(decl)) out.lists.add(reached.register);
-        } else if (d.id.startsWith('script.')) {
-          const lists = [decl.reads, decl.writes].flatMap((l) => (Array.isArray(l) ? l.filter((x): x is string => typeof x === 'string') : []));
-          if (lists.length === 0) out.every = true;
-          for (const list of lists) out.lists.add(list);
-        } else {
-          out.whole = true;
-          for (const list of listsIn(decl, d.id.startsWith('page.'), figures)) out.lists.add(list);
-        }
+        const { lists, unknown } = touches(d.id, b, { figure, door: (door) => at(`ingest.${door}`), fields });
+        for (const name of lists) names.add(name);
+        if (unknown.size > 0) names.add(ANY_LIST);
       }
     }
-    return out.lists.size === 0 && !out.every ? null : out;
+    return names;
   };
+
+  /**
+   * Whether a caller reads every name the kernel's walk gave: a list as `list` reads it, the kernel's `ACROSS` as the `ACROSS` check
+   * on a page block reads it (`wholeRecord`), and `ANY_LIST` as `automations` and `scripts` read a rule with no row and
+   * a script naming no list (`readsEveryList`).
+   *
+   * TWO READINGS AND NOT ONE. With every sentinel read as `readsEveryList`, a member held to `append` on Money was held
+   * from a page with a log block and from a door that polls, both of which `page` and `actions` show her
+   * (`loop/research-decide-reach.md`, K1, K6 and K7).
+   */
+  const readsAll = (ctx: CallContext, names: ReadonlySet<string>): boolean =>
+    [...names].every((name) => (name === READS_ACROSS ? wholeRecord(ctx) : name === ANY_LIST ? readsEveryList(ctx) : readable(ctx, name) === null));
 
   /** A declaration's stored body, parsed, or `undefined` for none. */
   const parsed = (found: string | undefined): unknown => (found === undefined ? undefined : JSON.parse(found));
@@ -2015,59 +2021,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const liveBody = (id: string): unknown =>
     parsed(sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1', id)?.body);
 
-  /** The names a template fills from the run and not from a list: `{{trigger.row.amount}}`, `{{vars.x}}`, `{{each.0}}`. */
-  const RUNNER_SCOPE = new Set(['trigger', 'vars', 'each']);
-
-  /**
-   * Every list a page, a door, a figure, a block or a digest names, with each figure it reads walked through `figures`.
-   *
-   * THE FILING CHECK'S WALK, WHICH THE RECORD CANNOT IMPORT. `listsNamed` in `govern.ts` is the kernel's own and is not
-   * exported, so this reads what it reads: a `register` key or a `register.<id>` string anywhere (a page's `requires`, a
-   * block's `source`, an ingest's `writes.register` and each leg of its route, a metric's `source`), a figure by
-   * `metric.<id>` or a `metric` key, and on a page the `late`, `then` and `each` a forecast and a series name figures by,
-   * and `{{list.field}}` in prose. `{{trigger.row.amount}}` is not a list called `trigger` (audit forty, found on the
-   * way), and a bare `{{figure}}` on a page is read through its metric. A figure `figures` cannot resolve adds nothing,
-   * and the caller keeps `whole` beside these lists for it.
-   */
-  const listsIn = (body: unknown, page: boolean, figures: (id: string) => unknown[]): Set<string> => {
-    const lists = new Set<string>();
-    const seen = new Set<string>();
-    const figure = (said: string): void => {
-      const colon = said.indexOf(':');
-      const id = colon < 0 ? said : said.slice(0, colon);
-      if (seen.has(id)) return;
-      seen.add(id);
-      for (const metric of figures(id)) if (metric !== undefined) visit(metric, undefined);
-    };
-    const visit = (node: unknown, key: string | undefined): void => {
-      if (typeof node === 'string') {
-        const ref = /^register\.([a-z][a-z0-9_]*)$/.exec(node);
-        if (ref) lists.add(ref[1]!);
-        else if (node.startsWith('metric.')) figure(node.slice('metric.'.length));
-        else if (key === 'register') lists.add(node);
-        else if (key === 'metric' || (page && (key === 'late' || key === 'then' || key === 'each'))) figure(node);
-        for (const m of node.matchAll(/\{\{\s*(?:[a-z]+:)?\s*([a-z][a-z0-9_]*)(?:#\d+)?\.[A-Za-z]/g)) if (!RUNNER_SCOPE.has(m[1]!)) lists.add(m[1]!);
-        if (page) for (const m of node.matchAll(/\{\{\s*(?:[a-z]+:\s*)?([a-z][a-z0-9_-]*)\s*\}\}/g)) figure(m[1]!);
-        return;
-      }
-      if (Array.isArray(node)) {
-        for (const n of node) visit(n, undefined);
-        return;
-      }
-      if (node === null || typeof node !== 'object') return;
-      for (const [k, v] of Object.entries(node)) visit(v, k);
-    };
-    visit(body, undefined);
-    return lists;
+  /** The field ids of a register body, for a template page's `{{field}}`. */
+  const fieldsOf = (list: unknown): ReadonlySet<string> => {
+    const declared = (list as { fields?: unknown } | undefined)?.fields;
+    return new Set(Array.isArray(declared) ? declared.map((f) => (f as { id?: unknown } | null)?.id).filter((f): f is string => typeof f === 'string') : []);
   };
 
   /**
-   * Whether a prediction is about a list this caller cannot read: the declaration it grades, placed as a change to that
-   * declaration is placed, or the figure it measures.
+   * Whether a prediction is about a list this caller cannot read: what the declaration it grades names in every version
+   * of it, plus what its measure names, each read as `changeTouches` reads a change.
    *
    * THE DECLARATION IS READ THROUGH EVERY VERSION OF IT, because a prediction grades the change from one body to the
    * next and carries no link to the question that proposed it, so the version it replaced is found only among them.
-   * A measure over anything but a list or a resolvable figure is about the record as a whole.
+   * The measure is asked as a figure (`touches('metric.', ...)`), so one over anything but a list names `ANY_LIST`. No
+   * accepted prediction can carry such a measure today (acceptance refuses `SOURCE_UNKNOWN` for a source that is not
+   * `register.<id>`), so that half is for a row imported or written before that refusal.
    */
   const predictionHeld = (ctx: CallContext, row: Record<string, unknown>): boolean => {
     const forDecl = String(row.for_decl);
@@ -2078,32 +2046,28 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       } catch {
         measure = null;
       }
-    const lists = new Set<string>();
-    let whole = false;
-    let every = false;
-    if (forDecl.startsWith('register.')) lists.add(forDecl.slice('register.'.length));
-    else {
-      const versions = sql.all<{ body: string }>('SELECT body FROM declaration WHERE id = ? ORDER BY version', forDecl);
-      const touched = changeTouches({ to: { declarations: versions.map((v) => ({ id: forDecl, body: parsed(v.body) })) } });
-      if (touched === null) whole = true;
-      else {
-        whole = touched.whole;
-        every = touched.every;
-        for (const list of touched.lists) lists.add(list);
-      }
-    }
-    const source = (measure as { source?: unknown } | null)?.source;
-    if (typeof source === 'string' && (source.startsWith('register.') || source.startsWith('metric.'))) {
-      const counted = listsIn(measure, false, (id) => [liveBody(`metric.${id}`)]);
-      if (counted.size === 0) whole = true;
-      for (const list of counted) lists.add(list);
-    } else whole = true;
-    return (whole && !wholeRecord(ctx)) || (every && !readsEveryList(ctx)) || [...lists].some((list) => readable(ctx, list) !== null);
+    const resolve = {
+      figure: (id: string) => [liveBody(`metric.${id}`)],
+      door: (door: string) => liveBody(`ingest.${door}`),
+      fields: (list: string) => fieldsOf(liveBody(`register.${list}`)),
+    };
+    const names = new Set<string>();
+    const add = (id: string, body: unknown): void => {
+      const { lists, unknown } = touches(id, body, resolve);
+      for (const name of lists) names.add(name);
+      if (unknown.size > 0) names.add(ANY_LIST);
+    };
+    if (forDecl.startsWith('register.')) names.add(forDecl.slice('register.'.length));
+    else for (const v of sql.all<{ body: string }>('SELECT body FROM declaration WHERE id = ? ORDER BY version', forDecl)) add(forDecl, parsed(v.body));
+    add('metric.', measure);
+    return names.size === 0 ? !wholeRecord(ctx) : !readsAll(ctx, names);
   };
 
   /**
-   * The predictions whose miss filed this question, found by the words `scorePrediction` files it in, since its body
-   * names none. Two predictions with the same claim and target both answer, and the question is held if either is.
+   * The predictions whose miss filed this question, found by the words `scorePrediction` files it in, for a miss whose
+   * body names no prediction. That is every miss filed before the kernel put `prediction` on the body
+   * (`loop/research-decide-reach.md`, E1), and only those: two predictions with the same claim and target both answer
+   * here, and the question is held if either is, which held the Inbox twin of a Money miss from Inbox's readers.
    */
   const missedBy = (row: Record<string, unknown>): Record<string, unknown>[] => {
     const question = typeof row.id === 'string' ? kernel.question(row.id) : null;

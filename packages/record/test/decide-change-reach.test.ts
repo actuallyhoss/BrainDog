@@ -80,7 +80,29 @@ async function record() {
     assert.ok(filed.ok, JSON.stringify(filed));
     return filed.value as { id: string };
   };
-  return { sql, api, clock, shown, file };
+  /* What the kernel's filing check answers a proposal it refuses. */
+  const refused = async (question: string, declaration_id: string, to: unknown): Promise<string> => {
+    const out = (await api.propose({ question, body_kind: 'change', body: { declaration_id, to } } as never, owner)) as Out;
+    assert.equal(out.ok, false, `${question} was filed`);
+    return out.refusal!.fix;
+  };
+  /* A proposal put in the queue by hand, as one filed before the filing check refused its shape would be, so the read
+     side is measured on its own (the kernel's `govern-bundle-scope.test.ts` does the same with SG90). */
+  let hand = 0;
+  const insert = (question: string, declaration_id: string, to: unknown): void => {
+    hand += 1;
+    const at = new Date(clock.now()).toISOString();
+    const id = `SG9${String(hand).padStart(2, '0')}`;
+    sql.exec("INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at) VALUES (?, 'change', ?, 'open', 'p_owner', ?)", id, JSON.stringify({ declaration_id, to }), at);
+    sql.exec(
+      "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v) VALUES (?, ?, 'p_owner', 'suggest', ?, 'suggestion', ?)",
+      `01M0000000000000000000${String(hand).padStart(2, '0')}EV`,
+      at,
+      `suggestion:${id}`,
+      question,
+    );
+  };
+  return { sql, api, clock, shown, file, refused, insert };
 }
 
 test("A CHANGE FILED UNDER A RULE'S NAME IS HELD TO THE LISTS ITS RULE AND SCRIPT TOUCH, and the owner still reads it", async () => {
@@ -157,11 +179,12 @@ test('A CHANGE TO A LIVE RULE IS HELD TO THE LISTS OF THE ONE IT REPLACES AS WEL
   sql.close();
 });
 
-/* A PAGE BESIDE THE RULE IS STILL ABOUT THE WHOLE RECORD. `changeTouches` reads lists off rules, scripts and registers
-   and marks anything else `whole`; with that line removed every other case here stayed green, and a bundle under a rule
-   on Inbox that also carries a page went to a member invited to Inbox alone. Before `changeTouches` the whole bundle
-   went only to whole-record readers, and a page is still that. */
-test('A BUNDLE UNDER A RULE THAT ALSO CARRIES A PAGE STILL NEEDS A WHOLE-RECORD READER', async () => {
+/* A PAGE BESIDE THE RULE IS ABOUT THE LISTS IT READS, AND HERE THAT IS INBOX (T38-page in
+   `loop/research-decide-reach.md`). This test once said the opposite: audit thirty-eight marked every page `whole`, and
+   the test was a mutation guard for that line, since removing it left the other cases green. It was never a measured
+   leak. `page` shows this page to the member invited to Inbox alone, so the proposal that declares it is hers too; the
+   same `whole` held a bundle under `register.inbox` carrying a page over Inbox from her (R1, below). */
+test('A BUNDLE UNDER A RULE ON INBOX THAT ALSO CARRIES A PAGE OF INBOX GOES TO INBOX\'S READERS', async () => {
   const { sql, shown, file } = await record();
   const stays = { id: 'rule.seen', kind: 'rule' as const, body: { rule: 'seen', register: 'inbox', then: [{ tag: 'seen' }] } };
   const page = {
@@ -171,7 +194,8 @@ test('A BUNDLE UNDER A RULE THAT ALSO CARRIES A PAGE STILL NEEDS A WHOLE-RECORD 
   };
   await file('Tag the inbox and give it a page?', 'rule.seen', { declarations: [stays, page] });
   assert.equal(await shown(owner, 'Tag the inbox and give it a page?'), true);
-  assert.equal(await shown(inboxOnly, 'Tag the inbox and give it a page?'), false, 'a member invited to Inbox alone was handed a page');
+  assert.equal(await shown(inboxOnly, 'Tag the inbox and give it a page?'), true, 'held from the member invited to Inbox alone');
+  assert.equal(await shown(member, 'Tag the inbox and give it a page?'), true);
   sql.close();
 });
 
@@ -194,9 +218,13 @@ const PAYROLL = {
    about Inbox alone and `changeTouches` was never asked, so the filing check was the only gate, and that check does not
    read a script's `reads` and `writes` or an arrival rule's door. Measured before the fix: all three bundles were filed,
    and the member invited to Inbox alone was shown each one whole, the source that posts Omar's Money rows to
-   `collector.test` included, while `scripts` answered her `[]`. */
+   `collector.test` included, while `scripts` answered her `[]`.
+
+   THE KERNEL NOW REFUSES ALL THREE AT FILING, since the filing check asks the same walk (`govern-bundle-scope.test.ts`),
+   so they are put in the queue by hand here, as a row filed before that check would be, and the read side is measured
+   on its own. */
 test("A BUNDLE UNDER A LIST'S NAME IS HELD TO EVERY LIST ITS SCRIPTS AND RULES TOUCH, not only to the name", async () => {
-  const { sql, api, shown, file } = await record();
+  const { sql, api, shown, file, refused, insert } = await record();
   assert.ok((await api.kernel.install([PAYROLL])).ok);
   const writes = { id: 'script.post', kind: 'script' as const, body: { ...PEEK.body, script: 'post', reads: [], writes: ['money'] } };
   const arrived = {
@@ -205,9 +233,11 @@ test("A BUNDLE UNDER A LIST'S NAME IS HELD TO EVERY LIST ITS SCRIPTS AND RULES T
     body: { rule: 'arrived', on: { arrival: { ingest: 'payroll' } }, steps: [{ notify: { say: 'The payroll came in.' } }] },
   };
   const asked = ['Give the inbox a sender, and read Money?', 'Give the inbox a sender, and write Money?', 'Give the inbox a sender, and watch the payroll?'];
-  await file(asked[0]!, 'register.inbox', { declarations: [INBOX2, PEEK] });
-  await file(asked[1]!, 'register.inbox', { declarations: [INBOX2, writes] });
-  await file(asked[2]!, 'register.inbox', { declarations: [INBOX2, arrived] });
+  const bundles = [{ declarations: [INBOX2, PEEK] }, { declarations: [INBOX2, writes] }, { declarations: [INBOX2, arrived] }];
+  for (const [i, to] of bundles.entries()) {
+    assert.match(await refused(asked[i]!, 'register.inbox', to), /reads register\.money/, asked[i]);
+    insert(asked[i]!, 'register.inbox', to);
+  }
   for (const q of asked) {
     assert.equal(await shown(owner, q), true, q);
     assert.equal(await shown(inboxOnly, q), false, `${q}: a member invited to Inbox alone was handed it`);
@@ -244,9 +274,11 @@ test('A CHANGE TO A PAGE, A DOOR OR A FIGURE IS HELD TO THE LISTS IT READS AND W
     assert.equal(await shown(owner, q), true, q);
     assert.equal(await shown(member, q), false, `${q}: a member held to append on Money was handed it`);
     assert.equal(await shown(inboxOnly, q), false, q);
+    /* AND WHOEVER READS EVERY LIST IT NAMES IS SHOWN IT, as `page pay` and `metric omar` answer her `ok`. Measured at
+       `bccc7ea8`, the member invited to Money and Inbox was refused all four, by the same `whole` that held R1. */
+    assert.equal(await shown(both, q), true, `${q}: held from a member who reads every list it names`);
   }
-  /* A page over Inbox alone is still about the record as a whole, as the case above keeps it, and still goes to a
-     whole-record reader who reads Inbox. */
+  /* A page over Inbox alone goes to a whole-record reader who reads Inbox, the member held on Money included. */
   const inboxPage = { id: 'page.in', kind: 'page' as const, body: { page: 'in', title: 'In', blocks: [{ kind: 'table', source: 'register.inbox', span: 12, empty: 'Nothing in.' }] } };
   await file('A page of the inbox?', 'page.in', inboxPage);
   assert.equal(await shown(member, 'A page of the inbox?'), true);
@@ -305,4 +337,160 @@ test('THE ONE IT REPLACED IS READ WHEN THE CHANGE IS FILED AND ACCEPTED IN THE S
     assert.equal((await all(inboxOnly, 'decision')).includes('Omar is off Money now'), false, `${tie}: the owner's reason reached her`);
     sql.close();
   }
+});
+
+/* ── one rule, the kernel's walk (`loop/research-decide-reach.md`) ─────────────────────────────────────────────────── */
+
+const table = (id: string, list: string, extra: Record<string, unknown> = {}) => ({
+  id: `page.${id}`,
+  kind: 'page' as const,
+  body: { page: id, title: 'Look', blocks: [{ kind: 'table', source: `register.${list}`, span: 12, empty: 'Nothing.', ...extra }] },
+});
+const count = (id: string, list: string) => ({
+  id: `metric.${id}`,
+  kind: 'metric' as const,
+  body: { metric: id, name: 'Count', source: `register.${list}`, value: { count: 'what' }, format: 'int', target: { gte: 0 }, window: '30d' },
+});
+const SEEN = { id: 'rule.seen', kind: 'rule' as const, body: { rule: 'seen', register: 'inbox', then: [{ tag: 'seen' }] } };
+const LETTERS = { id: 'ingest.letters', kind: 'ingest' as const, body: { ingest: 'letters', channel: 'email', extract: { what: { after: 'Re ' } }, writes: { register: 'inbox' } } };
+const TEMPLATE = {
+  id: 'page.each-letter',
+  kind: 'page' as const,
+  body: { page: 'each-letter', title: 'Letter', for: { register: 'inbox' }, blocks: [{ kind: 'note', tone: 'warn', heading: 'From', span: 12, body: '{{from}}' }] },
+};
+const GOLD = {
+  id: 'ingest.gold',
+  kind: 'ingest' as const,
+  body: { ingest: 'gold', channel: 'poll', url: 'https://api.gold.example.test/v1/xau', every: '1h', extract: { what: { after: 'rate ' } }, writes: { register: 'inbox' } },
+};
+/** The kernel test's "every declaration is about Obligations" bundle, over Inbox: a rule, a figure, a table, a stat, a door, a digest, a note and a template. */
+const ALL_INBOX = [
+  SEEN,
+  count('inbox-count', 'inbox'),
+  table('inbox', 'inbox'),
+  { id: 'page.figures', kind: 'page' as const, body: { page: 'figures', title: 'Figures', blocks: [{ kind: 'stat', cells: [{ metric: 'inbox-count' }] }] } },
+  LETTERS,
+  {
+    id: 'digest.inbox-weekly',
+    kind: 'digest' as const,
+    body: { digest: 'inbox-weekly', schedule: { day: 'mon', at: '08:00' }, channels: ['in-app'], sections: [{ heading: 'Rows', source: 'register.inbox', as: 'table', columns: [{ field: 'what' }] }] },
+  },
+  { id: 'page.said', kind: 'page' as const, body: { page: 'said', title: 'Said', blocks: [{ kind: 'note', tone: 'warn', heading: 'Count', span: 12, body: '{{inbox-count}} rows, `{{money-count}}` is text' }] } },
+  TEMPLATE,
+];
+
+/* R1 TO R4, K3 AND C5: A PAGE, A FIGURE, A DOOR OR A DIGEST OVER INBOX ALONE IS INBOX'S. Every page, door, figure and
+   digest was `whole` in `changeTouches`, so each of these was held from the member invited to Inbox alone, whom `page`,
+   `pages` and `metric` show every one of them. Measured at `bccc7ea8` (`R1 ... actual: false, expected: true`), all six
+   were held from her, and R1 is the wave forty-two checker's own regression. K3 was the record's copy reading a
+   template's `{{from}}` as a figure nothing resolved. */
+test('A PROPOSAL OVER INBOX ALONE IS SHOWN TO THE MEMBER INVITED TO INBOX, whatever kinds it carries', async () => {
+  const { sql, shown, file } = await record();
+  const asked: [string, string, unknown][] = [
+    ['R1: give the inbox a page?', 'register.inbox', { declarations: [INBOX2, table('inbox', 'inbox')] }],
+    ['R2: give the inbox a figure?', 'register.inbox', { declarations: [INBOX2, count('inbox-count', 'inbox')] }],
+    ['R3: give the inbox a door and a page?', 'register.inbox', { declarations: [INBOX2, LETTERS, table('inbox', 'inbox')] }],
+    ['R4: give the inbox everything?', 'register.inbox', { declarations: [INBOX2, ...ALL_INBOX] }],
+    ['K3: a page per letter?', 'register.inbox', { declarations: [INBOX2, TEMPLATE] }],
+    ['C5: a table of the inbox?', 'page.inbox', table('inbox', 'inbox')],
+  ];
+  for (const [q, name, to] of asked) await file(q, name, to);
+  const wrong: string[] = [];
+  for (const [q] of asked)
+    for (const [who, ctx] of [['owner', owner], ['inboxOnly', inboxOnly], ['both', both], ['member', member]] as const)
+      if (!(await shown(ctx, q))) wrong.push(`${q} held from ${who}`);
+  assert.deepEqual(wrong, []);
+  sql.close();
+});
+
+/* WHAT THE RULE STILL HOLDS, each passing at `bccc7ea8` and kept: a door that polls and a page with a log block read
+   across the record (`actions` and the log block refuse the member invited to Inbox alone), a prose page names nothing
+   and so is about the record as a whole, and a polling door bundled under Inbox's name, which the kernel now refuses at
+   filing, is still held from her when it is in the queue from before. */
+test('A PROPOSAL THAT READS ACROSS THE RECORD, OR NAMES NOTHING, STAYS WITH WHOEVER READS THE WHOLE RECORD', async () => {
+  const { sql, shown, file, refused, insert } = await record();
+  await file('K6: poll the gold rate?', 'ingest.gold', GOLD);
+  const feed = {
+    id: 'page.feed',
+    kind: 'page' as const,
+    body: { page: 'feed', title: 'Feed', blocks: [{ kind: 'table', source: 'register.inbox', span: 12, empty: 'None.' }, { kind: 'feed', source: 'activity', span: 12 }] },
+  };
+  await file('K1: a feed of the inbox?', 'page.feed', feed);
+  const prose = { id: 'page.about', kind: 'page' as const, body: { page: 'about', title: 'About', blocks: [{ kind: 'note', tone: 'info', heading: 'Hello', span: 12, body: 'Nothing here counts.' }] } };
+  await file('K5: an about page?', 'page.about', prose);
+  assert.match(await refused('K7: give the inbox the gold rate?', 'register.inbox', { declarations: [INBOX2, GOLD] }), /ingest\.gold.*across the whole record/);
+  insert('K7: give the inbox the gold rate?', 'register.inbox', { declarations: [INBOX2, GOLD] });
+  for (const q of ['K6: poll the gold rate?', 'K1: a feed of the inbox?', 'K5: an about page?', 'K7: give the inbox the gold rate?']) {
+    assert.equal(await shown(owner, q), true, q);
+    assert.equal(await shown(member, q), true, `${q}: a whole-record reader who reads Inbox`);
+    assert.equal(await shown(inboxOnly, q), false, `${q}: the member invited to Inbox alone`);
+    assert.equal(await shown(both, q), false, `${q}: invited to two lists is not the whole record`);
+  }
+  sql.close();
+});
+
+/* A FIGURE NOTHING DECLARES MAY COUNT ANY LIST, so a change reading one is held to whoever reads every list. The page
+   counts nothing today, but the figure it names is the one a later change is free to declare over Money, and the page
+   installed from this proposal would then read Money. The checker of this change removed the line in `changeTouches`
+   that adds `ANY_LIST` for such a figure, and every other test in the record stayed green while the member invited to
+   Inbox alone was shown this bundle. */
+test('A BUNDLE CARRYING A PAGE OF A FIGURE NOTHING DECLARES IS HELD FROM WHOEVER DOES NOT READ EVERY LIST', async () => {
+  const { sql, shown, file } = await record();
+  const lost = { id: 'page.lost', kind: 'page' as const, body: { page: 'lost', title: 'Lost', blocks: [{ kind: 'stat', cells: [{ metric: 'nowhere-count' }] }] } };
+  await file('Tag the inbox and count nowhere?', 'rule.seen', { declarations: [SEEN, lost] });
+  assert.equal(await shown(owner, 'Tag the inbox and count nowhere?'), true);
+  assert.equal(await shown(inboxOnly, 'Tag the inbox and count nowhere?'), false, 'the member invited to Inbox alone was shown it');
+  assert.equal(await shown(member, 'Tag the inbox and count nowhere?'), false, 'a member held to append on Money was shown it');
+  sql.close();
+});
+
+/* N1 TO N4 BY HAND. The kernel refuses each at filing now; a row from before is still held from the member invited to
+   Inbox alone and from the member held on Money, as `scripts` and `automations` hold them. */
+test("A SCRIPT OR AN ARRIVAL RULE OVER MONEY IN THE QUEUE FROM BEFORE IS STILL HELD FROM INBOX'S READERS", async () => {
+  const { sql, api, shown, insert } = await record();
+  assert.ok((await api.kernel.install([PAYROLL])).ok);
+  const arrived = { id: 'rule.arrived', kind: 'rule' as const, body: { rule: 'arrived', on: { arrival: { ingest: 'payroll' } }, steps: [{ notify: { say: 'In.' } }] } };
+  const rows: [string, unknown][] = [
+    ['N1?', { declarations: [INBOX2, PEEK] }],
+    ['N2?', { declarations: [INBOX2, { ...PEEK, id: 'script.post', body: { ...PEEK.body, script: 'post', reads: [], writes: ['money'] } }] }],
+    ['N3?', PEEK],
+    ['N4?', { declarations: [INBOX2, arrived] }],
+  ];
+  for (const [q, to] of rows) insert(q, 'register.inbox', to);
+  for (const [q] of rows) {
+    assert.equal(await shown(owner, q), true, q);
+    assert.equal(await shown(inboxOnly, q), false, q);
+    assert.equal(await shown(member, q), false, q);
+  }
+  sql.close();
+});
+
+/* THE NAME A CHANGE IS FILED UNDER IS ALWAYS ONE OF ITS NAMES. An addition is stored as the proposer sent it, `{ add }`
+   with no `id`, so the walk finds no declaration in it; without the name it would be a question about no list, and the
+   member held to `append` on Money would be shown "Add salary band to Money?" (measured by the wave forty-two checker
+   with the name-first line removed). */
+test("AN ADDITION UNDER A LIST'S NAME IS HELD TO THAT LIST, though the walk finds nothing in it", async () => {
+  const { sql, shown, file } = await record();
+  await file('Add salary band to Money?', 'register.money', { add: { fields: [{ id: 'salary_band', type: 'text' }] } });
+  assert.equal(await shown(owner, 'Add salary band to Money?'), true);
+  assert.equal(await shown(member, 'Add salary band to Money?'), false, 'a member held to append on Money was shown it');
+  assert.equal(await shown(inboxOnly, 'Add salary band to Money?'), false);
+  assert.equal(await shown(both, 'Add salary band to Money?'), true);
+  sql.close();
+});
+
+/* AUDIT FORTY-TWO FINDING 2: A PAGE OVER `sessions.live` READS THE RUNS. The record's copy of the walk had no line for a
+   page source that is no list, so the change fell to `whole` alone, which a member held to `append` on Session passes.
+   Measured at `bccc7ea8`: she was handed the change declaring the runs page while `page runs` answered her
+   `PAGE_UNKNOWN`. A block marked `working: true` reads the runs the same way. */
+test('A PAGE OVER THE RUNS IS HELD FROM A MEMBER HELD TO append ON SESSION, as page holds the page', async () => {
+  const { sql, shown, file } = await record();
+  const sessionHeld: CallContext = { principal: { kind: 'person', id: 'p_s', level: 'write' }, levels: { session: 'append' } };
+  await file('A runs page?', 'page.runs', { id: 'page.runs', kind: 'page', body: { page: 'runs', title: 'Runs', blocks: [{ kind: 'table', source: 'sessions.live', span: 12, empty: 'Quiet.' }] } });
+  await file('A working inbox page?', 'page.win', table('win', 'inbox', { working: true }));
+  for (const q of ['A runs page?', 'A working inbox page?']) {
+    assert.equal(await shown(owner, q), true, q);
+    assert.equal(await shown(sessionHeld, q), false, `${q}: a member refused the runs was handed it`);
+  }
+  sql.close();
 });
