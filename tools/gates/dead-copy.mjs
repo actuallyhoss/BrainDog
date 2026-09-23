@@ -81,7 +81,10 @@ const ALLOWED = new Map([
      `copy.rankedBy` left it the same way, and its excuse had been wrong twice over: it read "19 §6's
      For You ordering", and what `19 §8` risk 6 asks for is the queue ranked by cost of being wrong,
      which `/decide` now says over the list it ranks. */
-  ['copy.saveAsView', 'UNBUILT:a saved view is seeded, never created from the grid.'],
+  /* `saveAsView` LEFT THIS LIST IN W59-3, and its excuse was half wrong for as long as it stood. It read "a saved
+     view is seeded, never created from the grid", while `⌥V` on the grid had been creating one through `saveView()`
+     all along. What was missing was the button, and the gate failed on this key alone when the line was taken out
+     before the button existed. */
   ['copy.includesExample', 'UNBUILT. 19 §6 mechanism 2: the example row, marked and deletable in one click.'],
   /* `stale` LEFT THIS LIST IN W56, when the register list began re-asking on the record's version and got a mark to
      wear when more than one page of the old answer is in hand. The three below stayed, each for its own reason now,

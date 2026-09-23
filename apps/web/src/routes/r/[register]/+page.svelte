@@ -1762,8 +1762,7 @@
     }
     if (e.altKey && e.key.toLowerCase() === 'v') {
       e.preventDefault();
-      if (sample) toasts.push(copy.notWritten(copy.viewWouldBeSaved), { intent: 'warn' });
-      else void saveView();
+      askSaveView();
       return;
     }
     if (e.altKey && e.key.toLowerCase() === 'b') {
@@ -2046,6 +2045,16 @@
     }
     const line = landed.length === seqs.length ? copy.writeArchived(named) : copy.writeArchivedSome(landed.length, seqs.length);
     toasts.push(first ? `${line} ${first}` : line, { undo: () => void restoreOnRecord(landed), ...(first ? { intent: 'warn' as const } : {}) });
+  }
+
+  /**
+   * THE CHORD AND THE BUTTONS ASK THE SAME QUESTION, so the sample's answer is written once. `⌥V` was the only way in
+   * until W59-3, and its sample branch lived inline in the key handler while `saveView()` has no sample guard of its
+   * own: a button calling `saveView()` straight would have skipped the sentence the chord says on a sample list.
+   */
+  function askSaveView() {
+    if (sample) toasts.push(copy.notWritten(copy.viewWouldBeSaved), { intent: 'warn' });
+    else void saveView();
   }
 
   /**
@@ -2426,6 +2435,18 @@
            The `?` sheet lists them by reading the registry, and the row menu prints each verb's
            key beside it, which is where somebody learning them is already looking. -->
       <span class="bar-end">
+        <!-- SAVE AS A VIEW WAS `⌥V` AND NOTHING ELSE, which is the same hole Display had: a chord a
+             phone cannot type, over a function that was written and reachable from no surface, and
+             the sentence for the button sat in `copy.ts` with the dead-copy gate excusing it as
+             unbuilt. It is shown only while a filter or a search is on because `saveView()`
+             answers every other press with `viewNeedsFilter`, and `19 §6` has a control that cannot
+             act be absent rather than a button that says no. It stands before Display because both
+             are about the list as a whole, and Display stays last as the one that changes how it
+             looks. On a phone with filters it lives in the filter sheet instead, beside Clear, for
+             the reason Clear does. -->
+        {#if (q || filters.length) && !(rowsAsCards() && enums.length)}
+          <Button weight="bare" onclick={askSaveView}><Icon name="plus" size="s" />{copy.saveAsView}</Button>
+        {/if}
         <Button weight="bare" onclick={() => (displayOpen = true)}>
           <Icon name="settings" size="s" />{copy.display}
         </Button>
@@ -3156,6 +3177,14 @@
         <Button weight="primary" onclick={() => (filterOpen = false)}><Icon name="check" size="s" />{copy.done}</Button>
         {#if q || filters.length}
           <Button weight="bare" href="/r/{id}"><Icon name="close" size="s" />{copy.clearFilters}</Button>
+          <!-- The sheet closes first so the toast and the page it opens are not behind it. -->
+          <Button
+            weight="bare"
+            onclick={() => {
+              filterOpen = false;
+              askSaveView();
+            }}><Icon name="plus" size="s" />{copy.saveAsView}</Button
+          >
         {/if}
       {/snippet}
     </Sheet>
