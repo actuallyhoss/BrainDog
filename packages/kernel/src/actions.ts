@@ -1428,7 +1428,7 @@ type DigestHeader = {
  *
  * WHAT IT CARRIES IS SAID AS THE SECTIONS' SOURCES, in `sends`, so a digest that starts posting another list is a change
  * the owner is asked about again, as a call that sends another field is. `grant` is said when it is declared, as an
- * action's is; `digest.ts` sends the post without reading it today, and the line says what the declaration asks for.
+ * action's is, and `digest.ts` names it on the `notify.webhook` it queues as the key that signs the post (09 §6).
  */
 function digestEgress(d: DigestHeader): Egress | null {
   const channels = Array.isArray(d.channels) ? d.channels : [];
@@ -1559,17 +1559,83 @@ export function queueCall(
     "SELECT body FROM declaration WHERE id = ? AND kind = 'register' AND superseded_at IS NULL AND retired = 0",
     `register.${entry.register}`,
   )?.body;
-  const retiredToo = new Set(
-    ((declared === undefined ? {} : JSON.parse(declared)) as { fields?: { id?: unknown; type?: unknown }[] }).fields
-      ?.filter((f) => f?.type === 'secret' || f?.type === 'file')
-      .map((f) => String(f.id)) ?? [],
-  );
-  const held: string[] = [];
-  for (const [field, v] of Object.entries(entry.fields)) {
+  const fields = ((declared === undefined ? {} : JSON.parse(declared)) as { fields?: { id?: unknown; type?: unknown }[] }).fields ?? [];
+  const declaredAs = (type: string): Set<string> => new Set(fields.filter((f) => f?.type === type).map((f) => String(f.id)));
+  const secrets = declaredAs('secret');
+  const files = declaredAs('file');
+  for (const field of Object.keys(entry.fields)) {
     const type = fired.typeOf(field);
-    if (type !== 'secret' && type !== 'file' && !retiredToo.has(field)) continue;
-    for (const one of Array.isArray(v) ? v : [v]) if (typeof one === 'string' && one !== '') held.push(one);
+    if (type === 'secret') secrets.add(field);
+    if (type === 'file') files.add(field);
   }
+
+  /* A FILE FIELD HOLDS AN OBJECT, AND ITS NAME AND HASH ARE WHAT A COPY OF IT CARRIES. This collected strings only, so
+     a file held nothing back: audit fifty-two §3 (C3c) stored `set: { field: party, to: '{{trigger.row.doc.name}}' }`
+     beside a clean `run: paid_hook` and the call queued `party: 'contract-signed.pdf'`, and the same with `.sha256`
+     queued the hash. The mime and the size are not held, because `application/pdf` or `1200` in a sent field is what
+     a hundred ordinary rows say. */
+  const held: string[] = [];
+  const hold = (v: unknown): void => {
+    for (const one of Array.isArray(v) ? v : [v]) {
+      if (typeof one === 'string') {
+        if (one !== '') held.push(one);
+      } else if (one !== null && typeof one === 'object') {
+        const { name, sha256 } = one as { name?: unknown; sha256?: unknown };
+        for (const part of [name, sha256]) if (typeof part === 'string' && part !== '') held.push(part);
+      }
+    }
+  };
+  for (const [field, v] of Object.entries(entry.fields)) if (secrets.has(field) || files.has(field)) hold(v);
+
+  /* AND EVERY VALUE THE FIELD HAS HELD, NOT ONLY TODAY'S. A copy made before the key changed was sent: with `party`
+     copied from `token` on create and a clean rule posting on paid, a grant revoked and deposited again between the
+     two, and a token cleared from the row, each queued `party: '<the old grant id>'` (measured 23 September,
+     `secret-out.test.ts`, 2 of 2). A SECRET FIELD'S HISTORY IS THE VAULT'S IDS. `coerce.ts` takes a grant id and
+     nothing else and only the vault door writes the field, so whatever it ever held is a row of `grant`, and no row
+     of `grant` is deleted; the ledger cannot say which, because it writes `--redacted--` for a secret. Holding every
+     id the vault has issued is wider than this field's own, and a grant id in a field that leaves is the thing the
+     rule says never leaves, whichever key it names. What this cannot reach is a plaintext an earlier build left in the
+     field and then replaced: nothing kept it. A FILE FIELD'S HISTORY IS IN THE LEDGER, which keeps a file's value on
+     the `create` row and on every edit of it, so a file replaced after the copy is held back by the name it had. */
+  for (const g of deps.sql.all<{ id: string }>('SELECT id FROM grant')) held.push(g.id);
+  if (files.size > 0)
+    for (const e of deps.sql.all<{ field: string | null; from_v: string | null; to_v: string | null }>(
+      "SELECT field, from_v, to_v FROM event WHERE target = ? AND kind IN ('create', 'edit')",
+      `entry:${entry.id}`,
+    ))
+      for (const raw of [e.from_v, e.to_v]) {
+        let was: unknown;
+        try {
+          was = raw === null ? null : JSON.parse(raw);
+        } catch {
+          continue;
+        }
+        if (e.field === null && was !== null && typeof was === 'object') for (const f of files) hold((was as Record<string, unknown>)[f]);
+        else if (e.field !== null && files.has(e.field)) hold(was);
+      }
+
+  /* AND WHAT THE RUN WROTE FROM ONE, BY FIELD. A run that set `party` from `{{trigger.row.token}}`, parked on a wait,
+     and ran the call after `token` changed sent the old value, because the value was all this compared (measured 23
+     September with plaintext, which no grant id can match). The run already knew: `flow.ts` keeps the fields a step
+     wrote from a secret or a file under `-unsent`, and saves it after every step, so the run taking this `run` step
+     holds it in its column now. The pass hands this function the rule's name and the row and not the run, and a run is
+     advanced only inside one drain turn, so the running run of this rule on this row is that run. `-unsent` is
+     `flow.ts`'s `UNSENT`, spelled again here because `flow.ts` imports this file. */
+  const carried = new Set<string>();
+  for (const r of deps.sql.all<{ vars: string }>(
+    "SELECT vars FROM automation_run WHERE state = 'running' AND rule = ? AND json_extract(trigger, '$.entry') = ?",
+    rule,
+    entry.id,
+  )) {
+    let unsent: unknown;
+    try {
+      unsent = (JSON.parse(r.vars) as Record<string, unknown>)['-unsent'];
+    } catch {
+      unsent = undefined;
+    }
+    if (Array.isArray(unsent)) for (const f of unsent) if (typeof f === 'string') carried.add(f);
+  }
+
   const holds = (v: unknown): boolean => held.length > 0 && (Array.isArray(v) ? v : [v]).some((one) => held.some((s) => (typeof one === 'string' ? one : JSON.stringify(one) ?? '').includes(s)));
 
   const row: Record<string, unknown> = {};
@@ -1579,8 +1645,8 @@ export function queueCall(
     const field = said.slice(dot + 1);
     if (dot < 1 || register !== entry.register) continue;
     const type = fired.typeOf(field);
-    if (type === undefined || type === 'secret' || type === 'file') continue;
-    if (holds(entry.fields[field])) continue;
+    if (type === undefined || secrets.has(field) || files.has(field)) continue;
+    if (carried.has(field) || holds(entry.fields[field])) continue;
     row[field] = entry.fields[field] ?? null;
   }
   deps.enqueue({ channel: 'call', ingest, grant: key.id, rule, entry: entry.id, row });

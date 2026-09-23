@@ -242,6 +242,7 @@ export function runDigest(deps: DigestDeps, decl: DigestDecl): Sent {
     channels,
     sections: carrying,
     ...(decl.webhook?.url ? { webhook: decl.webhook.url } : {}),
+    ...(decl.webhook?.url && decl.webhook.grant ? { webhook_grant: decl.webhook.grant } : {}),
   };
 
   /* `prose: spark` STOPS HERE. One `infer.prose` row carrying the assembled digest, and the sending
@@ -290,6 +291,14 @@ export type Assembled = {
    */
   sections: DigestPart[];
   webhook?: string;
+  /**
+   * The vault label the webhook's POST is signed with, as the declaration's `webhook.grant` says it (09 §6).
+   *
+   * ON THE ASSEMBLY AND NOT READ AGAIN AT THE SEND, because the prose path sends from this payload after a model
+   * answers, and nothing on that path reads the declaration: a grant the alarm did not put here never reached the post
+   * (`secret-out.test.ts` measured the `infer.prose` payload with no key for it).
+   */
+  webhook_grant?: string;
 };
 
 /**
@@ -345,11 +354,19 @@ ${sent.text}` : sent.text;
       /* THE ADDRESS IS DECLARED OR THE CHANNEL IS NOT. `install` refuses a `webhook` channel with no
          `webhook: { url }` (09 §6: egress is declared or it does not happen), so reaching here
          without one is a record written by an older build — and posting nowhere while reporting a
-         send is the failure this whole pass is about, not one to repeat quietly. */
+         send is the failure this whole pass is about, not one to repeat quietly.
+
+         AND THE KEY THAT SIGNS IT IS NAMED BESIDE THE BODY, BY ITS LABEL. 09 §6 promises `webhook.grant` is "the vault
+         label of the secret that signs the POST", `install` prints it on the CALLS OUT line and the accept refuses a
+         digest until the vault holds it, and this queued the url and the body alone: measured 23 September, the
+         `notify.webhook` for `grant: 'collector'` held two keys and no deliverer could have signed anything. The label
+         is the reference a host resolves, as a call's `pull.fetch` names its key, and the key's value never enters
+         the record, so it cannot enter the body; the body is what the endpoint reads. */
       if (sent.webhook)
         deps.outbox('notify.webhook', {
           url: sent.webhook,
           body: JSON.stringify({ digest: sent.digest, sections: sent.sections }),
+          ...(sent.webhook_grant ? { grant: sent.webhook_grant } : {}),
         });
       else went.pop();
       continue;
