@@ -90,6 +90,9 @@ const noon = (day: string): number => Date.parse(day.length === 10 ? `${day}T12:
 /** The ten characters a step is labelled by, whichever of the two the field held. */
 const dayOf = (value: string): string => value.slice(0, 10);
 
+/** The last day of the month a `YYYY-MM-DD` day falls in: day zero of the month after it, at noon. */
+const endOfMonth = (day: string): string => iso(Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)), 0, 12));
+
 /**
  * Walk the legs.
  *
@@ -418,6 +421,10 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
  * BY CALENDAR MONTH, CLAMPED. `resolveDay('+3m')` is the same arithmetic the predicate grammar uses,
  * so a monthly charge on the 31st does not drift backwards through the year — and the two places
  * that step a month agree because they are one function.
+ *
+ * EXCEPT AT A MONTH END, where this walk alone moves the day to each later month's last day (below).
+ * `expandRepeat` in `schedule.ts` and the web mock-up's `runway` still step 30 September to
+ * 30 October, so a reminder on such a row fires a day before the charge this walk shows.
  */
 function occurrences(
   deps: ForecastDeps,
@@ -440,6 +447,14 @@ function occurrences(
   const unread = leg.every && cycle !== '' && cycle !== 'none' && !Object.hasOwn(leg.every.months, cycle) ? cycle : null;
   if (!months) return { of: start <= until ? [{ day: first, at: start }] : [], capped: false, unread };
 
+  /* A FIRST DAY THAT IS ITS MONTH'S LAST DAY IS "THE END OF THE MONTH", NOT A DAY NUMBER. The clamp
+     alone stepped a bill due 30 September to 30 October and 30 December, a day short of those
+     months' ends, and one due 28 February to the 28th of every month after it. `resolveDay` still
+     picks the month, so the cycle's length is untouched, and only the day inside it moves to the
+     end. A first day that is not a month end steps exactly as before, and so does an `instant`,
+     whose twenty-four characters never equal the ten `endOfMonth` returns. */
+  const monthEnd = endOfMonth(first) === first;
+
   /* A CYCLE BEFORE TODAY HAS ALREADY BEEN CHARGED. `renews` is an anchor nobody moves on, and the
      walk started at it and clamped every past cycle to today as overdue: a monthly service anchored
      three months back charged four times on day one, and one anchored in 2020 hit the cap on a
@@ -448,7 +463,8 @@ function occurrences(
   const out: { day: string; at: number }[] = [];
   let n = 0;
   for (; out.length < EVERY_CAP && n < SKIP_CAP; n++) {
-    const day = n === 0 ? first : resolveDay(`+${Math.round(months * n)}m`, start);
+    const stepped = n === 0 ? first : resolveDay(`+${Math.round(months * n)}m`, start);
+    const day = stepped && monthEnd ? endOfMonth(stepped) : stepped;
     if (!day) break;
     const at = noon(day);
     if (at > until) break;
