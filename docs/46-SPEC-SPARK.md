@@ -257,11 +257,13 @@ said `glm-5.3-flash` whatever `SPARK_MODEL` said, for a question the endpoint ha
 | What happened | Row written | Counted | What the run does |
 |---|---|---|---|
 | the model answered in the step's shape | `read · ok`, the provider's counts | 1 | carries on with the answer |
-| the endpoint was not reached (a refused connection, a name that did not resolve), or answered with a status that is not 2xx (a 401, a 429, a 5xx) | `read · error · UNREACHABLE` under `-` | 0 | the outbox's ladder asks again, eight attempts over about four hours; the eighth failing ends the run with a sentence |
+| the endpoint was not reached (a refused connection, a name that did not resolve), or answered a status a later attempt may find mended: 408, 425, 429 or any 5xx | `read · error · UNREACHABLE` under `-` | 0 | the outbox's ladder asks again, eight attempts over about four hours; the eighth failing ends the run with a sentence |
+| the endpoint answered any other status that is not 2xx: a 400 (a model name or a `response_format` it refuses), a 401 or 403 (a key it refuses), a 404 (a wrong `SPARK_ENDPOINT` path), a 3xx, since the host follows no redirect | `read · error · PULL_REQUEST_REFUSED` under `-` | 0 | ends, once, naming the status and, for a 401 or a 403, the key: *"rule.<id> asked Spark at step N, and the provider refused the key labelled spark (401), so the run stopped there rather than ask it again."*; for the rest, *"… and the provider answered 404 with no completion, which asking again would not change, so the run stopped there."* |
 | a 200 the host could not read: over 64,000 characters, not JSON, or broken off; or no answer within `SPARK_TIMEOUT_MS`, thirty seconds | `read · error · ANSWER_UNREADABLE`, under the model's name, with the provider's counts where the body held them | 1 | ends, once: *"rule.<id> asked Spark at step N, and the model answered with something Spark could not read: <what the host saw> The run stopped there rather than ask it again."* |
 | the answer was read and was not the shape (not a number, not one of the `choices:`), or was blank | `read · error · PROPOSAL_SCHEMA` | 1 | ends on the sentence saying what was wanted |
 | the month's asks already spent, counted by the package on tier `a` and by the host's `sparkGuardedEngine` on `b` and `byo` | none | 0 | ends on `SPARK_BUDGET_SPENT` and when the asks come back |
 | on the Worker, the vault holds no key labelled `spark` | none, and nothing is posted | 0 | ends on `FORBIDDEN`, naming the label (§5.2) |
+| on the Worker, the vault holds a key labelled `spark` and it will not open (the `KEK` changed under the record, the bytes do not decrypt) | none, and nothing is posted | 0 | ends on `FORBIDDEN`: *"… the key labelled spark in this record's vault would not open on this Worker, so nothing was sent and the run stopped there."* (§5.2) |
 
 **A status is not an answer, and what comes after a 200 is.** A provider's 429 or 503 is the endpoint saying it
 served no completion, and a hosted provider does not bill one; counted, a rate limit spent the owner's allowance and
@@ -272,6 +274,16 @@ question answered with a 200 of 70,000 characters serve four completions of 16,0
 four rows under `-` and `ask_cap` saw none (`loop/research-batch-forty-six-audit.md` finding 4). The host decides
 which throws carry the mark (`SparkAnsweredError` in `packages/host/src/spark.ts`), and the package reads the mark
 and not the class, because it may not import the host (§5.1).
+
+**And a status no retry mends is final, still uncounted.** The rule above was written for a 429 and a 5xx and, until
+September 23rd, applied to every status: `loop/research-batch-forty-nine-audit.md` finding 4 measured a 400, a 401
+and a 404 to a good key on the Worker each asked eight times over about 266 minutes, the owner's key opened eight
+times, and the run ending "Spark could not be reached after 8 attempts" about a provider that answered every one.
+Such a status is the same answer on the next rung, so the host throws it with a `refused` mark carrying the status
+(`SparkRefusedError`), and `answer` settles it under `-` and ends the run. The code is `PULL_REQUEST_REFUSED`,
+borrowed from the connector family, whose `30 §6` row is "a 4xx the declaration did not expect" and which the kernel
+already answers for a scheduled `call`'s unexpected 4xx; Spark has no code of its own for it. The retried set is
+the short list: 408 and 425, which ask to be asked again, 429, and every 5xx.
 
 > **OPEN QUESTION FOR THE OWNER, not settled here.** [23-ASSISTANT-UI](23-ASSISTANT-UI.md) §8 says the unit a person
 > sees is an *ask*, and §14 below says "a second identical ask in the same month increments the meter by one". Under
@@ -600,8 +612,19 @@ held or posted, `workerSparkAnswers` (`apps/worker/src/spark.ts`) refuses a job 
 that label: `FORBIDDEN`, no ledger row, and the run stops on *"rule.<id> asked Spark at step N, and this record's vault
 holds no key labelled spark, so the run stopped there. Put your model key in the vault under spark."* Without the
 check, the survey that set it measured one keyless POST, a 401, and, under the status rule wave 47 had then, an answer
-that blamed the model for a key nobody had put in (`loop/research-worker-spark.md` §3, W2). Under §4.1's rule the same
-401 is `UNREACHABLE`, so each rung of the ladder would be another keyless POST. What each outcome costs is §4.1's table.
+that blamed the model for a key nobody had put in (`loop/research-worker-spark.md` §3, W2). Under §4.1's rule as it
+stood then the same 401 was `UNREACHABLE`, so each rung of the ladder would have been another keyless POST. What each
+outcome costs is §4.1's table.
+
+**And a key that is there and will not open fails the same way.** The check above reads the label, and the key is
+opened on the call, so a grant labelled `spark` that the Worker cannot open (the record wrapped under another `KEK`,
+bytes that do not decrypt) passed it and went out with no `authorization`: `loop/research-batch-forty-nine-audit.md`
+finding 2 measured 8 keyless POSTs of 8 over the ladder after a `KEK` change. The rule's wire now asks the host's
+key path for `keyRequired`, the rule tier `b` keeps (§5.9): a `spark` grant that is missing or will not open is a
+throw before anything is sent, `answer` writes no ledger row for it, and the run stops on `FORBIDDEN`, *"rule.<id>
+asked Spark at step N, and the key labelled spark in this record's vault would not open on this Worker, so nothing was
+sent and the run stopped there."* The self-host passes no such option, because its keyless local model is the product
+working.
 
 `ask_person` is built beside it: it files an `options` question in Decide, and the run waits until that question,
 and only that one, is answered.
@@ -846,12 +869,13 @@ the next propose sent it to `SPARK_ENDPOINT` as the bearer.
 
 | Code | Raised | `fix` a person reads |
 |---|---|---|
-| `FORBIDDEN` (30 §6) | an agent token at any JOBS method, raised by the record and forwarded; a frame on a socket without a runner attachment, raised by this package; a runner posting to a job it does not hold; `seq ≠ job.seq + 1`; a `change` touching a path outside §5.3's table; tier `b` with no open key; the host's vault gate refusing the asker (§5.9); on the Worker, an automation's question on a record whose vault holds no key labelled `spark`, raised by the host (§5.2) | `A job is code execution on a machine; ask the owner to run it from Spark.` · `This job is not yours.` · `Post seq <n>.` · `Spark may not change <path>.` · the 5.5-3 sentence · *"Spark answers here on a key kept in this record's vault, which opens only for the owner signed in within the last fifteen minutes…"* · §5.2's no-key sentence, *"… Put your model key in the vault under spark."* |
+| `FORBIDDEN` (30 §6) | an agent token at any JOBS method, raised by the record and forwarded; a frame on a socket without a runner attachment, raised by this package; a runner posting to a job it does not hold; `seq ≠ job.seq + 1`; a `change` touching a path outside §5.3's table; tier `b` with no open key; the host's vault gate refusing the asker (§5.9); on the Worker, an automation's question on a record whose vault holds no key labelled `spark`, or one that will not open, raised by the host (§5.2) | `A job is code execution on a machine; ask the owner to run it from Spark.` · `This job is not yours.` · `Post seq <n>.` · `Spark may not change <path>.` · the 5.5-3 sentence · *"Spark answers here on a key kept in this record's vault, which opens only for the owner signed in within the last fifteen minutes…"* · §5.2's no-key sentence, *"… Put your model key in the vault under spark."* · §5.2's closed-key sentence, *"… would not open on this Worker, so nothing was sent and the run stopped there."* |
 | `NEEDS_BROWSER_SESSION` (30 §6) | a bearer at `createJob cancelJob listJobs` or any `/api/spark/*` route — the router | `Open this in the app.` |
 | `PROPOSAL_UNCITED` (§13 #5) | a digit outside `{{…}}`; an unknown path or spoken id; a quoted money or day not in a row; a pattern anchor not in a sample; `pct` or `quantity` with a literal | `Name the path this figure comes from, or leave it out.` |
 | `PROPOSAL_NO_ROWS` (§13 #5) | a filed body with zero citations | `A proposal names the rows behind it, or it is not filed.` |
 | `PROPOSAL_SCHEMA` (§13 #5) | the model's JSON fails the kind's schema; a tier-C `end` result fails it (→ status `error`); an automation's answer that is not its step's shape, or is blank | `The output did not match the <kind> schema at <path>.` · for an automation, *"Spark's answer to rule.<id> at step N was not <what it asked for>, so the run stopped there."* |
 | `ANSWER_UNREADABLE` (30 §6) | an automation's question answered with a 200 the host could not read (over 64,000 characters, not JSON, broken off), or not answered within thirty seconds; counted as one ask and never asked again (§4.1) | *"rule.<id> asked Spark at step N, and the model answered with something Spark could not read: <what the host saw> The run stopped there rather than ask it again."* |
+| `PULL_REQUEST_REFUSED` (30 §6), borrowed | an automation's question the endpoint answered with a status no retry mends: not 2xx, and not 408, 425, 429 or 5xx; uncounted and never asked again (§4.1) | for a 401 or a 403, *"rule.<id> asked Spark at step N, and the provider refused the key labelled spark (401), so the run stopped there rather than ask it again."* · otherwise *"… and the provider answered <status> with no completion, which asking again would not change, so the run stopped there."* |
 | `PREDICTION_UNMEASURABLE` (§13 #5) | twelve observations cannot accumulate in thirty days | `This change cannot be scored inside thirty days; it is not proposed.` |
 | `SPARK_BUDGET_SPENT` (§13 #5) | tier `a`, the month's asks ≥ `ask_cap`; tiers `b` and `byo`, the host's count ≥ `ask_cap` (§4.1) | `Spark is out of asks until <date>. Add your own key, or wait.` · on `b` and `byo`, the host's two sentences, each naming this host's model and the date |
 | `VALUE_MALFORMED` (30 §6), raised by the host | a tier `b` save naming a grant that is missing or revoked, not an `api_token`, or labelled `spark` (§5.9) | one sentence per case, at `grant_id` |
@@ -859,7 +883,8 @@ the next propose sent it to `SPARK_ENDPOINT` as the bearer.
 | `declare` codes (30 §6) | an `ingest` or `change` body fails its declaration schema | as `declare` states them |
 
 Six codes of its own, the five of §13 #5 and `ANSWER_UNREADABLE`, which `30 §6` counts in the same family; two
-shared with the record; two families passed through. The host adds `VALUE_MALFORMED`
+shared with the record; one borrowed from the connector family, `PULL_REQUEST_REFUSED`, for want of a code of Spark's
+own for a provider's final status; two families passed through. The host adds `VALUE_MALFORMED`
 at `grant_id` in front of `configure`, and `501 NOT_IN_THIS_BUILD` at `tier` where no key can be opened (§5.2). A refusal never carries a field value, a prompt or a row: `found` is a span or a path, never a projection line (12 §8).
 
 ## 7 · Performance budget

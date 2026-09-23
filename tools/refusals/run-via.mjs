@@ -339,7 +339,9 @@ const DRIVERS = {
   rpc: 'driven for 5 of 30, each by a test beside the file its `raises:` names: `packages/host/test/refusals-rpc.test.ts` (BODY_MALFORMED, ROUTE_UNKNOWN), `apps/selfhost/test/refusals-rpc.test.ts` (UNAUTHORIZED, RECORD_UNAVAILABLE) and `packages/client/test/refusals-rpc.test.ts` (UNREACHABLE). The other 25 need a seeded record with a principal behind it, and `40 §4`\'s seeds are not built. Run: node --test --experimental-strip-types "packages/host/test/refusals-rpc.test.ts" "apps/selfhost/test/refusals-rpc.test.ts" "packages/client/test/refusals-rpc.test.ts"',
   import: 'driven by `packages/kernel/test/refusals-import.test.ts`: all 7, one `tamper:` verb each, against a record the test builds because `40 §4`\'s seeds are not built. Run: node --test --experimental-strip-types "packages/kernel/test/refusals-import.test.ts"',
   pull: 'driven in two halves by the file each fixture\'s `raises:` names: the five raised in `packages/connect` by `packages/connect/test/refusals-pull.test.ts` through `runPull`, and the two raised in `packages/host/src/actions.ts` by `packages/host/test/refusals-pull.test.ts` through `sendAction`. Run: node --test --experimental-strip-types "packages/connect/test/refusals-pull.test.ts" "packages/host/test/refusals-pull.test.ts"',
-  ask: 'driven by `packages/spark/test/refusals-ask.test.ts`: all 4, through the palette\'s two passes against `packages/spark/test/double.ts`. Run: node --test --experimental-strip-types "packages/spark/test/refusals-ask.test.ts"',
+  /* FIVE SINCE SEPTEMBER 23RD 2026, when `ANSWER_UNREADABLE` joined the family with its fixture and its runner learned
+     `answer:`; this sentence kept saying four, through the palette alone, for the fifth nobody drives that way. */
+  ask: 'driven by `packages/spark/test/refusals-ask.test.ts`: all 5, four through the palette\'s two passes and `ANSWER_UNREADABLE` through an automation\'s `answer`, against `packages/spark/test/double.ts`. Run: node --test --experimental-strip-types "packages/spark/test/refusals-ask.test.ts"',
 };
 
 /* ── comparing a claim to an answer ─────────────────────────────────────────────────────────── */

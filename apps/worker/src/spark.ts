@@ -27,6 +27,7 @@
 
 import {
   SPARK_KEY_LABEL,
+  SparkKeyClosedError,
   sparkAskerEngine,
   sparkByokFor,
   sparkFromEnv,
@@ -148,6 +149,14 @@ export async function workerSparkEngine(env: SparkEnv, api: () => RecordApi, dep
  * way it is wrong here, so the job is refused `FORBIDDEN` before the engine is built or anything is held, and nothing is
  * written to the ledger (Q7's default).
  *
+ * AND A KEY THAT IS THERE AND WILL NOT OPEN IS REFUSED TOO, which the check above cannot see: it reads the label, and the
+ * key path reads the opening. `loop/research-batch-forty-nine-audit.md` finding 2 put the owner's key under one `KEK` and
+ * woke the object under another, as a `wrangler secret put KEK` leaves it: 8 POSTs with no `authorization` of 8 over the
+ * ladder, 8 ledger rows under the dash, and a run ending "could not be reached". `keyOpener` answers `null` for that and
+ * for four other ways a grant fails to open (`actions.ts`). So the rule's wire asks for `keyRequired`, the host throws
+ * before `post` sends, and the job is refused `FORBIDDEN` with the same ledger as the no-key case: none.
+ * `test/spark-key-status.test.ts` holds it.
+ *
  * EACH QUESTION IS ASKED ON A WIRE SIGNED `rule:<id>`, so the vault's `grant.read` for the owner's key names the rule that
  * opened it and not `system`. This never calls `sparkByokFor`: a rule has no session for the vault's gate to read, and
  * installing a rule that asks Spark is the owner's consent to its question going to this Worker's endpoint (Q3's default).
@@ -168,11 +177,32 @@ export function workerSparkAnswers(env: SparkEnv, api: () => RecordApi, deps: Sp
       throw e;
     });
     const engine = await built;
-    const inference = sparkInferenceOf(config, wireOf(env, api, deps, `rule:${ask.rule}`));
+    const inference = sparkInferenceOf(config, { ...wireOf(env, api, deps, `rule:${ask.rule}`), keyRequired: true });
     /* NEITHER IS REACHABLE WHILE THE TEST ABOVE HOLDS, and a thrown sentence here becomes the ladder's `failed` ack
        rather than an answer nobody asked for. */
     if (engine === undefined || inference === undefined) throw new Error('Spark has no model on this Worker to answer with.');
-    return engine.answer(ask, inference);
+    /* THE KEY IS OPENED ON THE CALL, SO WHETHER IT OPENS IS LEARNT INSIDE `answer`, and this wrap is how the pass hears
+       it: `SparkKeyClosedError` is thrown by `keyRequired` before `post` sends, and the package, reading its `sent: false`,
+       releases its hold and writes no ledger row. What the package cannot say is where the key lives, so the sentence is
+       this file's, beside the no-key one above it. */
+    let closed = false;
+    const out = await engine.answer(ask, {
+      complete: async (call) => {
+        try {
+          return await inference.complete(call);
+        } catch (e) {
+          closed ||= e instanceof SparkKeyClosedError;
+          throw e;
+        }
+      },
+    });
+    if (closed)
+      return no(
+        'FORBIDDEN',
+        `rule.${ask.rule} asked Spark at step ${ask.step + 1}, and the key labelled ${SPARK_KEY_LABEL} in this record's vault would not open on this Worker, so nothing was sent and the run stopped there.`,
+        { at: 'grant' },
+      );
+    return out;
   };
 }
 

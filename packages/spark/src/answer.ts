@@ -27,6 +27,9 @@ import type { Ask, Inference } from './types.ts';
 
 const SHAPES: readonly string[] = ['text', 'number', 'choice'];
 
+/** The code a status no retry mends is answered with (`stoppedSentence`). */
+const STOPPED = 'PULL_REQUEST_REFUSED';
+
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 /** `2026-12-01T00:00:00.000Z` as `1 December`, the way the run's sentence says it (§4's table). */
@@ -75,6 +78,37 @@ const heardIn = (e: unknown): Heard | null => {
   const tout = count((usage as { out?: unknown }).out);
   return { usage: tin === undefined || tout === undefined ? undefined : { in: tin, out: tout }, model };
 };
+
+/** What a throw out of `complete` said about a status the provider will answer again on every rung. */
+type Stopped = { status: number; key: string | null };
+
+/**
+ * The host's `refused` mark on a thrown error (`SparkRefusedError`, `packages/host/src/spark.ts`), read structurally as
+ * `heardIn` reads `answered`, or `null` for any other throw.
+ *
+ * `key` IS A NAME THE HOST WROTE, `the key labelled spark`, and never the key. Anything that is not a string is read as
+ * no key at all, so a host that leaves it out gets the keyless sentence rather than a sentence with `undefined` in it.
+ */
+const stoppedIn = (e: unknown): Stopped | null => {
+  if (typeof e !== 'object' || e === null) return null;
+  const status = (e as { refused?: unknown }).refused;
+  if (typeof status !== 'number' || !Number.isInteger(status)) return null;
+  const key = (e as { key?: unknown }).key;
+  return { status, key: typeof key === 'string' && key !== '' ? key : null };
+};
+
+/**
+ * The run's sentence for a status the provider will answer the same way on the next rung.
+ *
+ * 401 AND 403 NAME THE KEY, because they are facts about it and the owner's next step is the vault, which is the rule
+ * `packages/kernel/src/actions.ts` `finishAction` keeps for a scheduled action's 401 ("refused the key ... with 401").
+ * Every other status is named bare, since this package cannot tell a wrong model name from a wrong path, and the status
+ * is what the owner can look up.
+ */
+const stoppedSentence = (ask: Ask, step: number, stopped: Stopped): string =>
+  stopped.status === 401 || stopped.status === 403
+    ? `rule.${ask.rule} asked Spark at step ${step}, and the provider refused ${stopped.key ?? 'a request that carried no key'} (${stopped.status}), so the run stopped there rather than ask it again.`
+    : `rule.${ask.rule} asked Spark at step ${step}, and the provider answered ${stopped.status} with no completion, which asking again would not change, so the run stopped there.`;
 
 /** The provider's sentence, ending in one full stop, so the run's sentence can carry on after it. */
 const sentence = (said: string): string => (said === '' ? 'it gave no reason.' : /[.!?]$/u.test(said) ? said : `${said}.`);
@@ -145,6 +179,10 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
          is read here and not in `core.run` because this is the one caller that settles `UNREACHABLE` under `-`: `read`'s
          and `propose`'s rows already keep the model's name whichever way the call went. */
       let heard: Heard | null = null;
+      /* AND WHETHER THE PROVIDER ANSWERED A STATUS NO RETRY MENDS (`stoppedIn`), and whether the host sent anything at all.
+         Both are read off the same throw as `heard`, for the same reason. */
+      let stopped: Stopped | null = null;
+      let unsent = false;
       /* AND THE NAME THE HOST SENT, off a reply that came back. `core.run` keeps the template's (`nameIn`). */
       let sent: string | undefined;
       const watched: Inference = {
@@ -156,6 +194,8 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
           } catch (e) {
             lost = e instanceof Error ? e.message : String(e);
             heard = heardIn(e);
+            stopped = stoppedIn(e);
+            unsent = typeof e === 'object' && e !== null && (e as { sent?: unknown }).sent === false;
             throw e;
           }
         },
@@ -185,13 +225,16 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
       /* THE CASTS ARE FOR THE COMPILER, which narrows both to their first value here because it cannot see the closure
          assign them. */
       const reached = heard as Heard | null;
+      const refusedBy = stopped as Stopped | null;
       const used = (sent as string | undefined) ?? reached?.model ?? ran.model;
       const account = (status: 'ok' | 'error', code?: string): void =>
         core.account({
           id: held,
           kind: 'read',
           tier: s.tier,
-          model: code === 'UNREACHABLE' ? '-' : used,
+          /* `PULL_REQUEST_REFUSED` IS UNDER `-` TOO, for `UNREACHABLE`'s reason: the provider served no completion, so
+             no count may read the row, and it stays so a refusal is still in the ledger. */
+          model: code === 'UNREACHABLE' || code === STOPPED ? '-' : used,
           usage: reached?.usage ?? ran.usage,
           ms: ran.ms,
           status,
@@ -201,6 +244,24 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
 
       if (!ran.out.ok) {
         const code = refused(ran.out) ? ran.out.refusal.code : 'UNREACHABLE';
+        /* NOTHING WAS SENT, SO NOTHING IS WRITTEN: the host found its key would not open before any request left
+           (`SparkKeyClosedError`, which only a host that asked for `keyRequired` throws). Returning here leaves the hold
+           to `finally`, whose `release` deletes it, so the ledger reads as it does for a record with no key at all
+           (`46 §5.2`). `FORBIDDEN` AND NOT `UNREACHABLE`, because the next rung would find the same key closed and open
+           the vault again for nothing. The sentence is the host's, since this package cannot say what the host's vault is
+           called; the Worker, the one host that asks for the throw, answers its own over it (`apps/worker/src/spark.ts`). */
+        if (code === 'UNREACHABLE' && (unsent as boolean))
+          return no('FORBIDDEN', `rule.${ask.rule} asked Spark at step ${step}: ${sentence(lost)}`, { at: 'grant' });
+        /* A STATUS NO RETRY MENDS ENDS THE RUN, UNCOUNTED. `loop/research-batch-forty-nine-audit.md` finding 4 measured
+           a 400, a 401 and a 404 each asked eight times over about four hours on the owner's key, ending "could not be
+           reached" about a provider that answered every time. Any code but `UNREACHABLE` is one `serveAsks` acks `done`.
+           `PULL_REQUEST_REFUSED` IS BORROWED, from the family whose row in `30 §6` reads "a 4xx the declaration did not
+           expect", which is what the kernel's own `finishAction` answers for a scheduled `call`'s 4xx; a code of Spark's
+           own is an amendment to `30 §6`, `REFUSAL_CODES` and a fixture, and none of those is this file. */
+        if (code === 'UNREACHABLE' && refusedBy !== null) {
+          account('error', STOPPED);
+          return no(STOPPED, stoppedSentence(ask, step, refusedBy));
+        }
         /* `ANSWER_UNREADABLE`, A CODE OF ITS OWN IN `30 §6`, where wave 47 borrowed `PROPOSAL_SCHEMA`. That code is
            output that was read and failed its schema, and a caller branching on it would look at the question's shape
            for a fault that is in the size or the framing of the reply: the host never got as far as the schema. Any code

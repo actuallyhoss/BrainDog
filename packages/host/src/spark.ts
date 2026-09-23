@@ -104,6 +104,13 @@ export type EndpointModelOptions = {
   send: (input: URL, init: RequestInit) => Promise<Response>;
   /** What the Spark page says drafted: `endpoint`, or `your key`. */
   name?: string | undefined;
+  /**
+   * The key as a sentence names it, `the key labelled spark`, for a 401 or a 403 the provider answered to it.
+   *
+   * A NAME AND NEVER THE KEY. `key()` answers the key itself, and this is the one field a refusal may quote; left out, a
+   * refusal of a keyed request says "the key it was sent", which is true of every caller.
+   */
+  keyName?: string | undefined;
   timeoutMs?: number | undefined;
 };
 
@@ -148,6 +155,52 @@ export class SparkAnsweredError extends Error {
 }
 
 /**
+ * A status the provider will answer again on every rung, which the package settles as final and uncounted.
+ *
+ * Q8'S DEFAULT WAS WRITTEN FOR 5XX AND APPLIED TO EVERY STATUS. `loop/research-batch-forty-nine-audit.md` finding 4
+ * measured a 400, a 401 and a 404 to a good key on the Worker: each made 8 keyed posts over about 266 minutes, opened the
+ * owner's key 8 times, and ended the run "Spark could not be reached after 8 attempts" about a provider that answered all
+ * eight. A wrong model name, a wrong or expired key and a wrong `SPARK_ENDPOINT` path are the same answer tomorrow, so
+ * asking again spends four hours and says the wrong thing at the end.
+ *
+ * WHICH ARE RETRIED IS THE SHORT LIST: 408 and 425 (the provider asks to be asked again), 429 (a rate limit), and every
+ * 5XX. Every other status that is not `ok` is this, 3xx included, because `post` follows no redirect and the next rung
+ * would be sent to the same one.
+ *
+ * NOT `answered`: no completion was served, so nothing is billed, and the row stays under `-` as `UNREACHABLE`'s does.
+ * `refused` is the status. `key` is `keyName` when the request carried a key, `null` when it carried none, so the
+ * sentence can say which key the provider refused without this class ever holding it. The message is unchanged from the
+ * plain throw, because the record's own model reads any throw as "the rules speak" and `test/spark.test.ts` holds it.
+ */
+export class SparkRefusedError extends Error {
+  readonly refused: number;
+  readonly key: string | null;
+  constructor(status: number, key: string | null) {
+    super(`The Spark endpoint answered ${status}.`);
+    this.name = 'SparkRefusedError';
+    this.refused = status;
+    this.key = key;
+  }
+}
+
+/** The statuses a later rung may find mended. Anything else that is not `ok` is a `SparkRefusedError`. */
+const retried = (status: number): boolean => status === 408 || status === 425 || status === 429 || status >= 500;
+
+/**
+ * A key the vault holds and this host could not open, thrown before anything is sent (`keyRequired`).
+ *
+ * `sent: false` IS THE MARK THE PACKAGE READS, structurally, as it reads `answered`: nothing left this host, so `answer`
+ * releases its hold and writes no ledger row, which is what the Worker's no-key refusal already leaves.
+ */
+export class SparkKeyClosedError extends Error {
+  readonly sent = false;
+  constructor(message: string) {
+    super(message);
+    this.name = 'SparkKeyClosedError';
+  }
+}
+
+/**
  * The provider's own count in a body Spark will not otherwise read, or nothing.
  *
  * THE BODY IS ALREADY IN MEMORY, because `res.text()` read it to measure it, so parsing it for two numbers costs one more
@@ -174,8 +227,9 @@ const usageIn = (text: string): { in: number; out: number } | undefined => {
  *
  * TWO THROWS ARE PLAIN, AND THE PACKAGE SETTLES BOTH UNDER `-` AND THE HOST ASKS BOTH AGAIN: a `send` that never
  * resolved, and not by the clock (a refused connection, a name that did not resolve), which is audit forty-two's finding
- * 6 and stays fixed; and a status that is not `ok`, which is Q8's default (`SparkAnsweredError` says why). Everything
- * after a 200, and the timeout, is a `SparkAnsweredError`, carrying `model`, the name the body was sent with.
+ * 6 and stays fixed; and a 408, 425, 429 or 5xx, which is Q8's default (`SparkAnsweredError` says why). Any other status
+ * that is not `ok` is a `SparkRefusedError`, settled under `-` and not asked again. Everything after a 200, and the
+ * timeout, is a `SparkAnsweredError`, carrying `model`, the name the body was sent with.
  */
 const post = async (url: URL, options: EndpointModelOptions, body: unknown, model?: string): Promise<string> => {
   const headers: Record<string, string> = { 'content-type': 'application/json', accept: 'application/json' };
@@ -203,9 +257,13 @@ const post = async (url: URL, options: EndpointModelOptions, body: unknown, mode
   } catch (e) {
     throw signal.aborted ? timedOut() : e;
   }
-  /* THE STATUS AND NOTHING ELSE. An error body can echo the request, and the request can carry the key. A PLAIN THROW,
-     NOT MARKED: no completion was served, so the package settles it under `-` and the ladder asks again (Q8's default). */
-  if (!res.ok) throw new Error(`The Spark endpoint answered ${res.status}.`);
+  /* THE STATUS AND NOTHING ELSE. An error body can echo the request, and the request can carry the key. NEVER MARKED
+     `answered`: no completion was served, so the package settles either throw under `-`. A status a later rung may find
+     mended is the plain throw the ladder asks again (Q8's default); any other is final (`SparkRefusedError`). */
+  if (!res.ok) {
+    if (retried(res.status)) throw new Error(`The Spark endpoint answered ${res.status}.`);
+    throw new SparkRefusedError(res.status, key ? (options.keyName ?? 'the key it was sent') : null);
+  }
   let text: string;
   try {
     text = await res.text();
@@ -336,7 +394,8 @@ const counted = (value: unknown): number =>
  *
  * EVERY FAILURE IS A THROW, which `core.run` reads as `UNREACHABLE` and accounts for: the ask is refused, the meter still
  * carries the row, and nothing is filed. A throw after a 200 is a `SparkAnsweredError`, which `answer` settles under the
- * model's name, counted, and which the ladder does not ask again. A status that is not `ok` is not one (`post`).
+ * model's name, counted, and which the ladder does not ask again. A status that is not `ok` is not one (`post`), and a
+ * status no retry mends is a `SparkRefusedError`, which the ladder does not ask again either and nothing counts.
  *
  * THE REPLY AND THE THROW BOTH SAY WHICH MODEL WAS SENT, because the package cannot know `SPARK_MODEL` and its row named
  * the routing short name instead: measured on 23 September through the self-host with `SPARK_MODEL=llama3`, the ledger
@@ -402,6 +461,17 @@ export type SparkHostDeps = {
   /** How this host opens a sealed key, or `null` when it cannot open any (a Worker with no `KEK` bound). */
   openKey: ((grant: { id: string; label: string }) => Promise<string | null>) | null;
   send: (input: URL, init: RequestInit) => Promise<Response>;
+  /**
+   * `true` where a call with no `authorization` is never right: a `spark` grant that is missing or will not open is then a
+   * `SparkKeyClosedError` before anything is sent, where without it the call goes out keyless.
+   *
+   * AN OPTION AND NOT THE RULE, because the self-host's keyless local model is the product working: no grant, a server on
+   * the owner's own machine, and a POST with no header. The Worker's endpoint is a hosted provider on the owner's bill, and
+   * `loop/research-batch-forty-nine-audit.md` finding 2 measured what the missing rule cost there: the owner's key put
+   * under one `KEK` and the object woken under another, 8 POSTs with no `authorization` of 8 over the ladder. It is the
+   * rule `sparkByokOf` already keeps for tier `b`, stated once more for the host's own key.
+   */
+  keyRequired?: boolean | undefined;
 };
 
 /**
@@ -431,9 +501,14 @@ function endpointOptionsOf(config: SparkHostConfig | undefined, deps: SparkHostD
   if (!config) return undefined;
   if (config.key === undefined && deps.openKey === null) return undefined;
   const open = deps.openKey;
+  /* THE GRANT IS LOOKED UP AGAIN HERE, ON THE CALL, so a revoke that lands after a caller's own check (the Worker reads
+     the label before it builds the engine) finds nothing, and under `keyRequired` that is the same throw. */
   const own = async (): Promise<string | null> => {
     const grant = deps.grants().find((g) => g.label === SPARK_KEY_LABEL && g.revoked_at === null);
-    return grant && open ? open(grant) : null;
+    const key = grant && open ? await open(grant) : null;
+    if (!key && deps.keyRequired)
+      throw new SparkKeyClosedError(`The key labelled ${SPARK_KEY_LABEL} in this record's vault would not open on this host, so nothing was sent.`);
+    return key;
   };
   return {
     url: config.url,
@@ -441,6 +516,7 @@ function endpointOptionsOf(config: SparkHostConfig | undefined, deps: SparkHostD
     key: config.key !== undefined ? async () => config.key ?? null : own,
     send: deps.send,
     name: 'endpoint',
+    keyName: config.key !== undefined ? "this host's SPARK_KEY" : `the key labelled ${SPARK_KEY_LABEL}`,
   };
 }
 
