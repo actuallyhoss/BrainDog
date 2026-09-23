@@ -41,7 +41,10 @@ test('A RECIPIENT IS READ FROM ITS bech32, AND A PLACEHOLDER IS REFUSED BY NAME'
 
   /* The two strings `wrangler.jsonc` ships with, a one-character typo, and an identity pasted where
      the recipient goes, which is the mistake that would put the private key in a var. */
-  for (const bad of ['age1<alpha-recipient>', 'age1<production-recipient>', `${id.recipient.slice(0, -1)}q`, 'AGE-SECRET-KEY-1QQQQ']) {
+  /* THE TYPO IS A DIFFERENT LAST CHARACTER, NOT A FIXED ONE. It was always `q`, and one random recipient in
+     thirty-two already ends in `q`, so the "typo" was the recipient itself and CI failed on a coin toss. */
+  const typo = `${id.recipient.slice(0, -1)}${id.recipient.endsWith('q') ? 'p' : 'q'}`;
+  for (const bad of ['age1<alpha-recipient>', 'age1<production-recipient>', typo, 'AGE-SECRET-KEY-1QQQQ']) {
     const said = recipientOf(bad);
     assert.equal(typeof said, 'string', `${bad} was accepted`);
     assert.match(String(said), /AGE_RECIPIENT/u);
