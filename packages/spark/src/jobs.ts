@@ -94,6 +94,12 @@ export const patterns = (
         filed,
       });
 
+    /* SETTLED THE MOMENT THE MODEL ANSWERED, as `propose.ts` settles its three sites since `538bc705`. A filing that threw
+       below left no row at all, one model call and zero rows (`test/pattern-settles.test.ts` case 1); every exit below
+       overwrites this one by the call's id. `RECORD_UNAVAILABLE` for `propose.ts`'s reason: the record is all that is left
+       to go wrong. */
+    account('error', 'RECORD_UNAVAILABLE');
+
     if (!ran.out.ok) {
       account('error', refused(ran.out) ? ran.out.refusal.code : 'UNREACHABLE');
       return ran.out;

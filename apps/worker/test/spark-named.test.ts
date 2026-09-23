@@ -164,7 +164,7 @@ test("TIER b REACHES THE ENDPOINT WITH THE GRANT ITS SETTING NAMES AND THE MODEL
  */
 
 const ASK = { run: 'run_1', step: 0, rule: 'rate', question: 'What rate applies?', shape: 'number' as const };
-const NO_SPARK_KEY = "rule.rate asked Spark at step 1, and this record's vault holds no key labelled spark, so the run stopped there. Put your model key in the vault under spark.";
+const NOTE_UNDER_SPARK = "rule.rate asked Spark at step 1, and the key labelled spark in this record's vault is a note, not an API token, so nothing was sent and the run stopped there. Put your model key in the vault under spark as an API token.";
 
 /** A real record with the given grants under `spark`, and this Worker's answer to an automation over it. */
 async function asked(kinds: readonly ('api_token' | 'note' | 'password')[]) {
@@ -196,7 +196,7 @@ async function asked(kinds: readonly ('api_token' | 'note' | 'password')[]) {
   return { api, sql, ids, sent, opened, answer, close: () => (sql.close(), own.close()) };
 }
 
-test("A NOTE UNDER spark IS NO KEY TO THE AUTOMATION'S GATE EITHER: refused as a vault with none, before the engine is built", async () => {
+test("A NOTE UNDER spark IS NO KEY TO THE AUTOMATION'S GATE EITHER: refused by its kind, before the engine is built", async () => {
   const s = await asked(['note']);
   try {
     const out = await s.answer(ASK);
@@ -204,7 +204,7 @@ test("A NOTE UNDER spark IS NO KEY TO THE AUTOMATION'S GATE EITHER: refused as a
        open, `keyRequired` threw, and the run was told the key "would not open on this Worker", which sends an owner to put
        in again a key that was never there. The refusal and the ledger were the same; the sentence and the repair were not. */
     assert.ok(!out.ok && 'refusal' in out, JSON.stringify(out));
-    assert.deepEqual({ code: out.refusal.code, fix: out.refusal.fix }, { code: 'FORBIDDEN', fix: NO_SPARK_KEY });
+    assert.deepEqual({ code: out.refusal.code, fix: out.refusal.fix }, { code: 'FORBIDDEN', fix: NOTE_UNDER_SPARK });
     assert.deepEqual([s.opened, s.sent], [[], []], 'a note was opened or a question was sent');
   } finally {
     s.close();

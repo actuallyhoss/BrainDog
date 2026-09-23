@@ -43,6 +43,7 @@ import {
 } from '@braindog/host/spark';
 import type { OpenKey } from '@braindog/host/actions';
 import { sparkAskDoor, type SparkAskDoor } from '@braindog/host';
+import { grantChosen } from '@braindog/kernel';
 import type { SparkAnswer } from '@braindog/host/spark-answers';
 import { no, type Clock, type Sql } from '@braindog/ports';
 import type { CallContext, RecordApi, SparkModel } from '@braindog/record';
@@ -129,6 +130,18 @@ export async function workerSparkEngine(env: SparkEnv, api: () => RecordApi, dep
 }
 
 /**
+ * The four kinds the vault admits that `sparkGrantOf` passes over, as the gate's sentence names them. The names are the vault
+ * screen's (`apps/web/src/lib/record/vault.ts` `kinds`), with the article a sentence needs. `api_token` is absent on
+ * purpose: a token under `spark` is chosen, so the gate never has one to name.
+ */
+const KIND_NAMED: Partial<Record<string, string>> = {
+  password: 'a password',
+  ssh_key: 'an SSH key',
+  recovery_codes: 'a set of recovery codes',
+  note: 'a note',
+};
+
+/**
  * What answers an automation's question to Spark on this Worker, or nothing: `serveAsks`'s `answer`, one job at a time.
  *
  * `undefined` EXACTLY WHERE `workerSparkEngine` IS, AND DECIDED WITHOUT AN `await`, because `Record$.#open` reads it to set
@@ -171,12 +184,24 @@ export function workerSparkAnswers(env: SparkEnv, api: () => RecordApi, deps: Sp
        and `revoked_at` alone until 23 September, a third chooser beside the kernel's and the host's: a `note` labelled
        `spark` passed it, the key path chose nothing to open, and the run was told the key "would not open on this Worker",
        which sends an owner to put in again a key that was never there (`test/spark-named.test.ts`, the note case). */
-    if (sparkGrantOf(api().kernel.grants()) === undefined)
+    const grants = api().kernel.grants();
+    if (sparkGrantOf(grants) === undefined) {
+      /* AND WHEN AN ENTRY IS THERE UNDER `spark` BUT IS NOT A TOKEN, THE SENTENCE SAYS WHICH KIND IT IS. After the gate
+         moved onto the chooser, a password as the only `spark` entry ended the run on "this record's vault holds no key
+         labelled spark", measured on 23 September through the bundled Worker (`test/spark-worker-chooser.test.ts` W1),
+         while the owner's own vault screen lists that very row as a key of kind Password. The entry named is the one an
+         action naming `spark` would open, the kernel's own `grantChosen` with no kind asked for, so this reads no fourth
+         order of its own. */
+      const held = grantChosen(grants, SPARK_KEY_LABEL);
+      const kind = held === undefined ? undefined : KIND_NAMED[held.kind];
       return no(
         'FORBIDDEN',
-        `rule.${ask.rule} asked Spark at step ${ask.step + 1}, and this record's vault holds no key labelled ${SPARK_KEY_LABEL}, so the run stopped there. Put your model key in the vault under ${SPARK_KEY_LABEL}.`,
+        kind === undefined
+          ? `rule.${ask.rule} asked Spark at step ${ask.step + 1}, and this record's vault holds no key labelled ${SPARK_KEY_LABEL}, so the run stopped there. Put your model key in the vault under ${SPARK_KEY_LABEL}.`
+          : `rule.${ask.rule} asked Spark at step ${ask.step + 1}, and the key labelled ${SPARK_KEY_LABEL} in this record's vault is ${kind}, not an API token, so nothing was sent and the run stopped there. Put your model key in the vault under ${SPARK_KEY_LABEL} as an API token.`,
         { at: 'grant' },
       );
+    }
     built ??= workerSparkEngine(env, api, deps).catch((e: unknown) => {
       built = null;
       throw e;
