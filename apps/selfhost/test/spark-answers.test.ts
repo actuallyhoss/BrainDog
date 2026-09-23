@@ -34,6 +34,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
+import { endpointInference } from '@braindog/host/spark';
 import type { OutboxRow } from '@braindog/kernel';
 
 import { openKeyStore, recordKeys } from '../src/keys.ts';
@@ -87,8 +88,18 @@ const RATE = {
 type Refused = { ok: boolean; refusal?: { code: string; fix: string } };
 const codeOf = (r: Refused): string | null => (r.ok ? null : (r.refusal?.code ?? 'conflict'));
 
-/** A self-host with a model unless `model` is false, and with a deliverer on every kind when `deliver` says so. */
-async function stack(opts: { model?: boolean; deliver?: boolean } = {}) {
+/** The model's usual answer: the number, and a count that bills a few tokens. */
+const RATE_ANSWER = (): Response =>
+  new Response(
+    JSON.stringify({ choices: [{ message: { role: 'assistant', content: '{"answer":4.25}' } }], usage: { prompt_tokens: 300, completion_tokens: 8 } }),
+    { status: 200 },
+  );
+
+/**
+ * A self-host with a model unless `model` is false, and with a deliverer on every kind when `deliver` says so. `answer`
+ * replaces what the model says, and `now` pins the record's and Spark's clock so a case can move it.
+ */
+async function stack(opts: { model?: boolean; deliver?: boolean; answer?: () => Response; now?: () => number } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'braindog-spark-answers-'));
   const sessionKey = new Uint8Array(randomBytes(32));
   const store = await openKeyStore(join(dir, 'kek.key'));
@@ -103,6 +114,7 @@ async function stack(opts: { model?: boolean; deliver?: boolean } = {}) {
     sessionKey,
     keys: store,
     pollMs: 0,
+    ...(opts.now === undefined ? {} : { now: opts.now }),
     ...(opts.model === false
       ? {}
       : {
@@ -111,10 +123,7 @@ async function stack(opts: { model?: boolean; deliver?: boolean } = {}) {
             model: 'llama3',
             send: async (_url: URL, init: RequestInit) => {
               sent.push(init);
-              return new Response(
-                JSON.stringify({ choices: [{ message: { role: 'assistant', content: '{"answer":4.25}' } }], usage: { prompt_tokens: 300, completion_tokens: 8 } }),
-                { status: 200 },
-              );
+              return (opts.answer ?? RATE_ANSWER)();
             },
           },
         }),
@@ -181,9 +190,23 @@ async function stack(opts: { model?: boolean; deliver?: boolean } = {}) {
     await running.drain();
   };
 
+  /* SPARK'S OWN LEDGER, `<dir>/spark.sqlite`, read beside the server and not through it: no door answers a row. */
+  const calls = () => {
+    const db = new DatabaseSync(join(dir, 'spark.sqlite'), { readOnly: true });
+    try {
+      return db
+        .prepare('SELECT model, tokens_in, tokens_out, status, code FROM call ORDER BY rowid')
+        .all()
+        .map((r) => ({ ...r }) as { model: string; tokens_in: number; tokens_out: number; status: string; code: string | null });
+    } finally {
+      db.close();
+    }
+  };
+
   return {
     running,
     owner,
+    calls,
     sent,
     delivered,
     plant,
@@ -318,3 +341,103 @@ for (const model of [true, false]) {
     }
   });
 }
+
+/* ── a model that answered with what this host cannot read ─────────────── */
+
+const HOUR = 60 * MINUTE;
+
+/** The audit's endpoint: a 200 whose completion is 70,000 characters, reporting 16,000 completion tokens. */
+const AT_LENGTH = (): Response =>
+  new Response(
+    JSON.stringify({
+      choices: [{ message: { role: 'assistant', content: JSON.stringify({ answer: 'x'.repeat(70_000) }) } }],
+      usage: { prompt_tokens: 415, completion_tokens: 16_000 },
+    }),
+    { status: 200 },
+  );
+
+/* `loop/research-batch-forty-six-audit.md` FINDING 4, THE AUDIT'S PROBE AS A CASE. The host threw `UNREACHABLE` for a 200
+   it could not read, the package settled that under `-`, which no count reads, and `RETRIED` asked again: measured by the
+   audit, four completions served for one question and four rows under `-` with `tokens_out` 0, until the one-day wait
+   (`ASK_SPARK_WAIT_MS`) ended the run. Forty passes six hours apart are ten days, well past that wait, so a ladder that
+   still asks again is seen asking. RED ON 23 SEPTEMBER before the repair: four completions served, and four rows
+   `{"model":"-","tokens_in":411,"tokens_out":0,"status":"error","code":"UNREACHABLE"}`, the estimate and not the count.
+   THE NAME IS THE PACKAGE'S SHORT NAME AND NOT `llama3`, as the audit's brief expected: `answer` passes no model to
+   `core.run`, so every one of its rows, the answered case above included, is written under the template's model. */
+test('A MODEL THAT ANSWERED AT A LENGTH THIS HOST DOES NOT READ IS ASKED ONCE, and the one row carries its name and its tokens', async () => {
+  let now = Date.parse('2026-09-23T12:00:00.000Z');
+  const s = await stack({ answer: AT_LENGTH, now: () => now });
+  try {
+    assert.ok((await s.running.api.kernel.install([RATE])).ok, 'the rule did not install');
+
+    await s.write('Gold');
+    for (let pass = 1; pass < 40; pass++) {
+      now += 6 * HOUR;
+      await s.running.drain();
+      await s.running.poll();
+      await s.running.drain();
+    }
+
+    assert.equal(s.sent.length, 1, `${s.sent.length} completions the endpoint served for one question`);
+    assert.deepEqual(s.calls(), [{ model: 'glm-5.3-flash', tokens_in: 415, tokens_out: 16_000, status: 'error', code: 'PROPOSAL_SCHEMA' }]);
+    const r = s.run();
+    assert.equal(r?.state, 'failed');
+    assert.equal(
+      r?.say,
+      'rule.rate asked Spark at step 1, and the model answered with something Spark could not read: The Spark endpoint answered more than Spark reads. The run stopped there rather than ask it again.',
+    );
+  } finally {
+    await s.close();
+  }
+});
+
+/* THE MARK ITSELF, ON THE HOST'S REAL `endpointInference`. Every throw after `send` resolved carries `answered: true`, and
+   the timeout does too, because the cap is the bound on spend and a model that ran out the clock may have run to the end.
+   A `send` that never resolved keeps no mark, which is what keeps an outage off the cap. RED ON 23 SEPTEMBER: no throw
+   carried a mark, the body that was not JSON threw the parser's own `SyntaxError`, and the timeout threw "The operation
+   was aborted due to timeout". */
+test('THE HOST MARKS EVERY THROW AFTER THE ENDPOINT ANSWERED, AND THE TIMEOUT, AS ANSWERED, and a refused connection as not', async () => {
+  const call = { model: 'glm-5.3-flash', messages: [{ role: 'user' as const, content: 'q' }], maxTokens: 64, jsonSchema: {} };
+  const thrown = async (send: (url: URL, init: RequestInit) => Promise<Response>) => {
+    try {
+      await endpointInference({ url: 'http://127.0.0.1:11434/v1/chat/completions', send, timeoutMs: 20 }).complete(call);
+    } catch (e) {
+      const { answered, usage } = e as { answered?: unknown; usage?: unknown };
+      return { message: (e as Error).message, answered, usage };
+    }
+    return null;
+  };
+  const cases = {
+    status: await thrown(async () => new Response('busy', { status: 503 })),
+    size: await thrown(async () => AT_LENGTH()),
+    parse: await thrown(async () => new Response('<html>a proxy page</html>', { status: 200 })),
+    /* A 200 WHOSE BODY BREAKS OFF MID-READ, a connection reset after the headers. Without this case the body read's mark
+       could be taken off and every other case here stayed green, measured on 23 September by the checker. */
+    broke: await thrown(
+      async () =>
+        new Response(
+          new ReadableStream({
+            start: (c) => {
+              c.enqueue(new TextEncoder().encode('{"choices":'));
+              c.error(new Error('socket hang up'));
+            },
+          }),
+          { status: 200 },
+        ),
+    ),
+    timeout: await thrown(
+      (_url, init) => new Promise((_resolve, reject) => init.signal?.addEventListener('abort', () => reject(init.signal?.reason))),
+    ),
+    refused: await thrown(async () => {
+      throw new Error('connect ECONNREFUSED 127.0.0.1:11434');
+    }),
+  };
+  assert.deepEqual(cases, {
+    status: { message: 'The Spark endpoint answered 503.', answered: true, usage: undefined },
+    size: { message: 'The Spark endpoint answered more than Spark reads.', answered: true, usage: { in: 415, out: 16_000 } },
+    parse: { message: 'The Spark endpoint answered with a body that is not JSON.', answered: true, usage: undefined },
+    broke: { message: 'The Spark endpoint broke off its answer.', answered: true, usage: undefined },
+    timeout: { message: 'The Spark endpoint did not finish answering within 0.02 seconds.', answered: true, usage: undefined },
+    refused: { message: 'connect ECONNREFUSED 127.0.0.1:11434', answered: undefined, usage: undefined },
+  });
+});

@@ -105,30 +105,92 @@ const endpointUrl = (raw: string): URL => {
 };
 
 /**
+ * A throw after the endpoint answered, which the package reads by its `answered` mark and not by its class.
+ *
+ * `UNREACHABLE` WAS EVERY THROW, AND FOUR OF THEM CAME AFTER A MODEL RAN. `core.run` calls any throw out of `complete`
+ * `UNREACHABLE`, `answer` settles that row under `-`, which no count reads, and `serveAsks`'s `RETRIED` asks it again.
+ * Measured by `loop/research-batch-forty-six-audit.md` finding 4 through the self-host: a model answering one question with
+ * a 200 of 70,000 characters served four completions, the endpoint reporting 16,000 completion tokens each, and the ledger
+ * held four rows under `-` with `tokens_out` 0 (`apps/selfhost/test/spark-answers.test.ts`). The status, the size and the
+ * parse are all read after `send` resolved, so the endpoint was reached and may have billed; the timeout is counted with
+ * them because the cap is the bound on spend and a model that ran out the clock may have run to the end.
+ *
+ * A MARK AND NOT AN IMPORT, because the package may not import this host (`46 §5.1`) and reads the field structurally.
+ * `usage` is the provider's count where the body held one, so the row bills what was reported and not the estimate.
+ */
+export class SparkAnsweredError extends Error {
+  readonly answered = true;
+  readonly usage: { in: number; out: number } | undefined;
+  constructor(message: string, usage?: { in: number; out: number }) {
+    super(message);
+    this.name = 'SparkAnsweredError';
+    this.usage = usage;
+  }
+}
+
+/**
+ * The provider's own count in a body Spark will not otherwise read, or nothing.
+ *
+ * THE BODY IS ALREADY IN MEMORY, because `res.text()` read it to measure it, so parsing it for two numbers costs one more
+ * pass and changes no bound. What is kept is the two counts: none of the content reaches the package.
+ */
+const usageIn = (text: string): { in: number; out: number } | undefined => {
+  try {
+    const usage = (JSON.parse(text) as { usage?: { prompt_tokens?: unknown; completion_tokens?: unknown } } | null)?.usage;
+    /* BOTH OR NEITHER, so a body with no count is billed on the package's estimate and not as zero tokens. */
+    const tin = usage?.prompt_tokens;
+    const tout = usage?.completion_tokens;
+    return typeof tin === 'number' && typeof tout === 'number' ? { in: counted(tin), out: counted(tout) } : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/**
  * One POST to the endpoint, and the body it answered.
  *
  * ONE FUNCTION FOR BOTH PORTS, because the key discipline is the part that must not be written twice: asked for on this call
  * (`key()`), put in a header and nowhere else, and gone when the string this returns is handed back. A second copy of these
  * eight lines is a second place for the key to end up in a request body or an error sentence.
+ *
+ * ONLY A `send` THAT NEVER RESOLVED, AND NOT BY THE CLOCK, IS A PLAIN THROW: a refused connection, a name that did not
+ * resolve. That is the one throw the package still settles under `-` and the host still asks again, which is audit
+ * forty-two's finding 6 and stays fixed. Everything else is a `SparkAnsweredError`.
  */
 const post = async (url: URL, options: EndpointModelOptions, body: unknown): Promise<string> => {
   const headers: Record<string, string> = { 'content-type': 'application/json', accept: 'application/json' };
   const key = options.key ? await options.key() : null;
   if (key) headers.authorization = `Bearer ${key}`;
-  const res = await options.send(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-    /* `manual`, NEVER `error`: workerd refuses `redirect: 'error'` outright ("must be one of follow or manual") before any
-       request leaves, so on the Worker every Spark call was UNREACHABLE and fell to the rules. `manual` still follows
-       nothing: a 3xx, or the opaque redirect a browser-style fetch hands back, is not `ok` and is thrown below. */
-    redirect: 'manual',
-    signal: AbortSignal.timeout(options.timeoutMs ?? SPARK_TIMEOUT_MS),
-  });
+  const ms = options.timeoutMs ?? SPARK_TIMEOUT_MS;
+  const signal = AbortSignal.timeout(ms);
+  /* THE SIGNAL AND NOT THE ERROR'S NAME, because a `send` is anybody's function and what it rejects with on an abort is
+     its own choice: fetch says `TimeoutError`, a fake says whatever it was written to. The signal says whether the clock
+     ran out. */
+  const timedOut = (): SparkAnsweredError => new SparkAnsweredError(`The Spark endpoint did not finish answering within ${ms / 1000} seconds.`);
+  let res: Response;
+  try {
+    res = await options.send(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      /* `manual`, NEVER `error`: workerd refuses `redirect: 'error'` outright ("must be one of follow or manual") before any
+         request leaves, so on the Worker every Spark call was UNREACHABLE and fell to the rules. `manual` still follows
+         nothing: a 3xx, or the opaque redirect a browser-style fetch hands back, is not `ok` and is thrown below. */
+      redirect: 'manual',
+      signal,
+    });
+  } catch (e) {
+    throw signal.aborted ? timedOut() : e;
+  }
   /* THE STATUS AND NOTHING ELSE. An error body can echo the request, and the request can carry the key. */
-  if (!res.ok) throw new Error(`The Spark endpoint answered ${res.status}.`);
-  const text = await res.text();
-  if (text.length > ANSWER_BYTES) throw new Error('The Spark endpoint answered more than Spark reads.');
+  if (!res.ok) throw new SparkAnsweredError(`The Spark endpoint answered ${res.status}.`);
+  let text: string;
+  try {
+    text = await res.text();
+  } catch {
+    throw signal.aborted ? timedOut() : new SparkAnsweredError('The Spark endpoint broke off its answer.');
+  }
+  if (text.length > ANSWER_BYTES) throw new SparkAnsweredError('The Spark endpoint answered more than Spark reads.', usageIn(text));
   return text;
 };
 
@@ -231,7 +293,8 @@ const counted = (value: unknown): number => (typeof value === 'number' && Number
  * than a suggestion.
  *
  * EVERY FAILURE IS A THROW, which `core.run` reads as `UNREACHABLE` and accounts for: the ask is refused, the meter still
- * carries the row, and nothing is filed.
+ * carries the row, and nothing is filed. A throw after the endpoint answered is a `SparkAnsweredError`, which `answer`
+ * settles under the model's name, counted, and which the ladder does not ask again.
  */
 export function endpointInference(options: EndpointModelOptions): SparkInference {
   const url = endpointUrl(options.url);
@@ -244,10 +307,17 @@ export function endpointInference(options: EndpointModelOptions): SparkInference
         response_format: { type: 'json_schema', json_schema: { name: 'answer', schema: call.jsonSchema, strict: true } },
         messages: call.messages.map((m) => ({ role: m.role, content: m.content })),
       });
-      const parsed = JSON.parse(text) as {
+      let parsed: {
         choices?: { message?: { content?: unknown } }[];
         usage?: { prompt_tokens?: unknown; completion_tokens?: unknown };
       };
+      try {
+        parsed = JSON.parse(text) as typeof parsed;
+      } catch {
+        /* A 200 THAT IS NOT JSON, a proxy's page or a stream cut short, came from a reached endpoint, and without the mark
+           the parser's own `SyntaxError` read as a model not reached. There is no count in it to bill. */
+        throw new SparkAnsweredError('The Spark endpoint answered with a body that is not JSON.');
+      }
       const content = parsed?.choices?.[0]?.message?.content;
       /* THE TEXT AND NOT THE PARSE, because the package parses it itself and then checks it against the schema it sent. An
          endpoint that answered the object bare, with no `choices`, is read as having answered the whole body. */

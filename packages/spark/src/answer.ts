@@ -54,6 +54,30 @@ export const answerSchema = (ask: Pick<Ask, 'shape' | 'choices'>): object => ({
   },
 });
 
+/** What a throw out of `complete` said about the model: it was reached, and what it reported spending, if anything. */
+type Heard = { usage: { in: number; out: number } | undefined };
+
+const count = (value: unknown): number | undefined => (typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : undefined);
+
+/**
+ * The host's `answered: true` mark on a thrown error, read structurally, or `null` for a model not reached.
+ *
+ * THE COUNT IS TAKEN ONLY WHOLE. A `usage` with one number missing or not a count is dropped for the prompt estimate
+ * `core.run` already made, because `tokens_in` and `tokens_out` are `INTEGER NOT NULL` and a half-read count billed as
+ * zero would under-bill the half nobody reported.
+ */
+const heardIn = (e: unknown): Heard | null => {
+  if (typeof e !== 'object' || e === null || (e as { answered?: unknown }).answered !== true) return null;
+  const usage = (e as { usage?: unknown }).usage;
+  if (typeof usage !== 'object' || usage === null) return { usage: undefined };
+  const tin = count((usage as { in?: unknown }).in);
+  const tout = count((usage as { out?: unknown }).out);
+  return { usage: tin === undefined || tout === undefined ? undefined : { in: tin, out: tout } };
+};
+
+/** The provider's sentence, ending in one full stop, so the run's sentence can carry on after it. */
+const sentence = (said: string): string => (said === '' ? 'it gave no reason.' : /[.!?]$/u.test(said) ? said : `${said}.`);
+
 const shapeLine = (ask: Ask): string =>
   ask.shape === 'number'
     ? 'a number in "answer", written as a JSON number: no unit, no currency sign, no words.'
@@ -114,12 +138,18 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
       /* THE PROVIDER'S OWN WORDS ARE KEPT for the one sentence that needs them. `core.run` folds them into a sentence
          written for a person at the palette ("ask again"), and a host retrying on the outbox's ladder wants the status. */
       let lost = '';
+      /* AND WHETHER THE MODEL WAS REACHED, read off the same throw. `core.run` calls every throw `UNREACHABLE`, and the
+         host marks the ones that came after its endpoint answered (`SparkAnsweredError`, `packages/host/src/spark.ts`). It
+         is read here and not in `core.run` because this is the one caller that settles `UNREACHABLE` under `-`: `read`'s
+         and `propose`'s rows already keep the model's name whichever way the call went. */
+      let heard: Heard | null = null;
       const watched: Inference = {
         complete: async (call) => {
           try {
             return await engine.complete(call);
           } catch (e) {
             lost = e instanceof Error ? e.message : String(e);
+            heard = heardIn(e);
             throw e;
           }
         },
@@ -142,13 +172,19 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
          fourth `SPARK_BUDGET_SPENT` on tiers `a` and `b`, and the host asks an `UNREACHABLE` again up to the ladder's
          eighth rung. The row stays, so an outage is still in the ledger. `PROPOSAL_SCHEMA` keeps the model's name,
          because there the model did answer and was paid for. */
+      /* AND A MODEL THAT ANSWERED WITH WHAT THE HOST COULD NOT READ KEEPS ITS NAME, with the provider's own count where
+         the body held one. `loop/research-batch-forty-six-audit.md` finding 4 measured the self-host serve four
+         completions of 16,000 tokens each for one question, the ledger holding four rows under `-` with `tokens_out` 0,
+         and `ask_cap` seeing none of them. */
+      /* THE CAST IS FOR THE COMPILER, which narrows `heard` to `null` here because it cannot see the closure assign it. */
+      const reached = heard as Heard | null;
       const account = (status: 'ok' | 'error', code?: string): void =>
         core.account({
           id: held,
           kind: 'read',
           tier: s.tier,
           model: code === 'UNREACHABLE' ? '-' : ran.model,
-          usage: ran.usage,
+          usage: reached?.usage ?? ran.usage,
           ms: ran.ms,
           status,
           code,
@@ -157,6 +193,18 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
 
       if (!ran.out.ok) {
         const code = refused(ran.out) ? ran.out.refusal.code : 'UNREACHABLE';
+        /* `PROPOSAL_SCHEMA` AND NOT A CODE OF ITS OWN, because a code outside `30 §6` is an invented code the refusals
+           gate counts against its budget, and this one says what happened: the model's structured output could not be
+           read. Any code but `UNREACHABLE` is one `serveAsks` acks `done`, so the run stops on this sentence and the
+           ladder does not ask the same model again. */
+        if (code === 'UNREACHABLE' && reached !== null) {
+          account('error', 'PROPOSAL_SCHEMA');
+          return no(
+            'PROPOSAL_SCHEMA',
+            `rule.${ask.rule} asked Spark at step ${step}, and the model answered with something Spark could not read: ${sentence(lost)} The run stopped there rather than ask it again.`,
+            { at: 'answer' },
+          );
+        }
         account('error', code);
         if (code === 'UNREACHABLE')
           return no('UNREACHABLE', `rule.${ask.rule} asked Spark at step ${step}, and the model did not answer${lost === '' ? '' : `: ${lost}`}.`);
