@@ -381,7 +381,34 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
     return ok(null);
   }
 
+  /* A QUESTION WHOSE RUN IS NO LONGER WAITING ON IT IS FINISHED HERE, AND NOT RETRIED. `release()` in `flow.ts` takes a
+     run's Spark job out of the outbox when the run ends, but only while nobody holds it: a job a host had leased is left
+     to this ack. The failed branch read the job and never the run, so a rule retired, switched off or its pack turned off
+     while its question was out armed a `retry` like any other, and the audit's Worker probe (audit forty-nine §1) walked
+     all eight rungs on the owner's key, eight posts and eight `grant.read` events for a run already `cancelled`, and a
+     rung that was answered was billed and counted. `done` and not deleted, because a host did try it.
 
+     THE RUN AND THE STEP ROW BOTH, the pair `answerStep` holds an answer to. `release()` leaves the step row `waiting`
+     after it cancels the run, so the step row alone passed a cancelled run's job straight through; and a run still
+     waiting whose step names another job is not waiting on this one. */
+  if (row.kind === 'infer.ask') {
+    const asked = JSON.parse(row.payload) as { run?: unknown; step?: unknown };
+    const waiting =
+      typeof asked.run === 'string' &&
+      typeof asked.step === 'number' &&
+      sql.one<{ n: number }>(
+        `SELECT 1 AS n FROM automation_run r JOIN automation_step s ON s.run = r.id AND s.n = r.step
+         WHERE r.id = ? AND r.state = 'waiting' AND r.step = ? AND s.state = 'waiting' AND s.answer = ?`,
+        asked.run,
+        asked.step,
+        args.id,
+      ) !== undefined;
+    if (!waiting) {
+      sql.exec("UPDATE outbox SET state = 'done', leased_until = NULL, attempts = attempts + 1 WHERE id = ?", args.id);
+      sql.exec("DELETE FROM schedule WHERE kind = 'retry' AND key = ?", `outbox:${args.id}`);
+      return ok(null);
+    }
+  }
 
   const after = sql.one<{ attempts: number }>(
     "UPDATE outbox SET state = 'failed', leased_until = NULL, attempts = attempts + 1 WHERE id = ? RETURNING attempts",
