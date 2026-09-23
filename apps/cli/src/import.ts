@@ -84,6 +84,23 @@ export type PlannedBank = PlannedPack;
 
 export type Tally = { added: number; updated: number; unchanged: number };
 
+/**
+ * A ROW THE IMPORT'S OWN RETIRE PASS PUT IN THE BIN, BY ITS ID AND THE VERSION THE DELETE LEFT IT AT.
+ *
+ * The holdings retire deletes, because Holdings has no state to close a row with, and a deleted row is what `gone` in
+ * `applyPlan` reads as his. Measured before this (`test/import-own-deletes.test.ts`): a gold lot corrected 5 to 6 and
+ * back to 5 in the old tool left no lot here, and the report said he had deleted it. The row itself does not say who
+ * deleted it, so the run remembers it (`Run.binned`), and a row still in the bin at the version the import's delete
+ * gave it is the import's. A row he put back and deleted again is at a later version, and is his.
+ *
+ * THE ID AND NOT THE KEY, because a holding's key is its kind, label, day, cost and quantity, and `imports.jsonl` keeps
+ * names and never a value (`Run`).
+ */
+export type Binned = { id: string; version: number };
+
+/** A row written without the row it names, as both reports say it: see `Report.unfiled`. */
+export type Unfiled = { register: string; label: string; names: { register: string; label: string }[] };
+
 /** A question settled in the old tool and still open on Decide here, as both reports say it: see `settledOf`. */
 export type Waiting = { label: string; question: string | null; answer: string };
 
@@ -137,6 +154,16 @@ export type Report = {
    * OPTIONAL FOR THE SAME REASON AS `questions`: `applyPlan` always sets it, and a report written by hand may not.
    */
   deleted?: { register: string; label: string }[];
+  /**
+   * Each row the retire pass left in the bin, tonight or on an earlier night, and still in it: see `Binned`.
+   * OPTIONAL FOR THE SAME REASON AS `questions`.
+   */
+  binned?: Binned[];
+  /**
+   * Each row written without a row it names, because the row named is one he deleted here (`deleted`): the task a new
+   * export files under a project he threw away. Optional for the same reason.
+   */
+  unfiled?: Unfiled[];
   /** What happened to each planned row, by its key: the report lists dates, domains and services one by one. */
   outcomes: Record<string, 'added' | 'updated' | 'unchanged' | 'refused' | 'deleted'>;
   plan: Plan;
@@ -444,11 +471,26 @@ const rangeWords = (range: string): string => {
  * Apply a plan through a door. Refs are resolved to the id of the row they name once it is written; a ref to a row in
  * the same list written later is set in a second pass.
  */
-export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; banks?: PlannedBank[]; packs?: PlannedPack[]; settled?: Settled[] }): Promise<Report> {
+export async function applyPlan(
+  given: Plan,
+  door: Door,
+  o: {
+    dryRun: boolean;
+    banks?: PlannedBank[];
+    packs?: PlannedPack[];
+    settled?: Settled[];
+    /** The rows earlier runs into this record put in the bin themselves (`Binned`), as `imports.jsonl` remembers them. */
+    binned?: readonly Binned[];
+    /** The newest `taken` of an export an earlier run carried into this record: see `older` below. */
+    newest?: string | null;
+  },
+): Promise<Report> {
   let plan = given;
   const questions: NonNullable<Report['questions']> = [];
   const waiting: Waiting[] = [];
   const deleted: NonNullable<Report['deleted']> = [];
+  const binned: Binned[] = [];
+  const unfiled: Unfiled[] = [];
   const report: Report = {
     missing: [],
     tally: {},
@@ -463,6 +505,8 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
     clashes: [],
     examples: 0,
     deleted,
+    binned,
+    unfiled,
     outcomes: {},
     plan,
   };
@@ -741,7 +785,37 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
     report.plan = plan;
   }
 
-  const retiring = (plan.retire ?? []).filter((r) => !absent.includes(r.register) && !absent.includes(r.replaces));
+  let retiring = (plan.retire ?? []).filter((r) => !absent.includes(r.register) && !absent.includes(r.replaces));
+  /**
+   * AN EXPORT TAKEN BEFORE ONE AN EARLIER RUN CARRIED INTO THIS RECORD CLOSES NOTHING.
+   *
+   * Every retire reads tonight's export against itself, so a row only a newer export held reads as gone from Sam
+   * Brain. Measured before this (`test/import-older-export.test.ts`, `loop/research-batch-fifty-three-audit.md` section
+   * 3): an export of 2026-09-16 and then a saved one of 2026-09-09 dropped the newer one's task, voided its ledger row
+   * dated inside the older ledger's days, and deleted its gold lot, each said as gone from the old tool. The ledger's own
+   * window (`Retire.inside`) spares only a row dated after the older export's newest day. So the whole pass is skipped,
+   * with one line naming both days, and the rows the older export holds are written as they stand in it.
+   *
+   * COMPARED AS INSTANTS, and only when both are one: a `taken` that is not a date cannot be said to be older than
+   * anything, and a night that cannot say so closes as it did before.
+   */
+  const newest = o.newest ?? null;
+  if (retiring.length > 0 && newest !== null && plan.taken !== null && Date.parse(plan.taken) < Date.parse(newest)) {
+    const sameDay = plan.taken.slice(0, 10) === newest.slice(0, 10);
+    const when = (taken: string) => (sameDay ? `${taken.slice(0, 16).replace('T', ' ')} UTC` : taken.slice(0, 10));
+    plan = {
+      ...plan,
+      skipped: [
+        ...plan.skipped,
+        {
+          reason: `Nothing an earlier import carried was closed tonight in these lists, because this export was taken on ${when(plan.taken)} and an earlier import into this BrainDog carried one taken on ${when(newest)}: a row this one does not hold may only be newer than it. Every row it does hold was written as it stands in this export, so a row changed since reads as it did then until the newest export is imported again`,
+          items: [...new Set(retiring.map((r) => NAMES[r.register] ?? r.register))],
+        },
+      ],
+    };
+    report.plan = plan;
+    retiring = [];
+  }
 
   const ids = new Map<string, string>();
   const existing = new Map<string, Row>();
@@ -768,11 +842,20 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
    * deleted one and the copy the next night added back; that copy is his now, and it is updated as any live row is.
    * And a deleted row takes no example count and no category name, because the record's unique index on a name is on
    * live rows alone (`packages/kernel/src/declare.ts`, `deleted_at IS NULL`).
+   *
+   * AND A ROW THE IMPORT PUT IN THE BIN ITSELF IS NOT ONE HE DELETED (`Binned`): its key is written again the night Sam
+   * Brain holds it again, and the row is remembered once more for as long as it stays in the bin, so a memory older
+   * than the sixty runs `imports.jsonl` keeps does not turn it into his.
    */
   const gone = new Set<string>();
+  const ours = new Map((o.binned ?? []).map((b) => [b.id, b.version]));
   for (const register of [...new Set([...registers, ...retiring.map((r) => r.register)])])
     for (const row of await readAll(door, register)) {
       if (typeof row.deleted_at === 'string' && row.deleted_at !== '') {
+        if (ours.get(row.id) === row.version) {
+          binned.push({ id: row.id, version: row.version });
+          continue;
+        }
         const key = keyOf(register, row.fields);
         if (key) gone.add(key);
         continue;
@@ -1017,9 +1100,27 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
   }
 
   /* THE SECOND PASS: a learning that replaces one written after it. Counted as part of the row already counted. */
+  const byKey = new Map(plan.rows.map((r) => [r.key, r]));
   for (const { row, field, value } of later) {
     const put = resolveValue(value);
     const at = existing.get(row.key);
+    /**
+     * A REF TO A ROW HE DELETED HERE IS NEVER RESOLVED, AND THAT WAS SAID OF THE ROW HE DELETED ONLY.
+     *
+     * Measured before this (`test/import-own-deletes.test.ts`, `loop/research-batch-fifty-four-audit.md` section 6): the
+     * project `lanternly` deleted here, and the next export filing a new task 106 under it. Task 106 arrived with no
+     * project, and the one line was the project's. So the row is named with what it names, and only when the field is
+     * empty on the row as it now stands: task 101, written before the delete, still points at the project's id and lost
+     * nothing. Putting the project back mends it, because the next night resolves the ref and patches the field.
+     *
+     * ONLY A ROW THAT WAS WRITTEN OR FOUND. A row held back or refused still leaves its refs for this pass, and measured
+     * by the checker (the last test there): task 101 deleted here with its project was named as held back and as
+     * "Written without lanternly" on the same night.
+     */
+    const held = [value].flat().filter(isRef).filter((x) => report.outcomes[x.$ref] === 'deleted');
+    const wrote = ['added', 'updated', 'unchanged'].includes(report.outcomes[row.key] ?? '');
+    if (put === undefined && wrote && held.length > 0 && (at?.fields[field] ?? null) === null)
+      unfiled.push({ register: row.register, label: row.label, names: held.map((x) => ({ register: byKey.get(x.$ref)?.register ?? row.register, label: byKey.get(x.$ref)?.label ?? x.$ref })) });
     if (put === undefined || !at || o.dryRun || stable(at.fields[field]) === stable(put)) continue;
     const done = await door.update({ register: row.register, seq: at.seq as number, patch: { [field]: put }, version: at.version, note: 'Imported from the old tool.' });
     if (done.ok) existing.set(row.key, done.value as Row);
@@ -1072,6 +1173,9 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
         continue;
       }
       existing.set(key, done.value as Row);
+      /* A DELETE THIS PASS MADE IS REMEMBERED AS THE IMPORT'S (`Binned`), at the version the record says it left. */
+      const left = done.value as Row;
+      if (typeof left.deleted_at === 'string' && left.deleted_at !== '' && typeof left.version === 'number') binned.push({ id: left.id, version: left.version });
       report.retired.push({ register: r.register, label, why: r.why });
     }
   /* IN A STEADY ORDER, because `where` is in the order the record answered a list in and a run report a person
@@ -1238,6 +1342,22 @@ const few = (items: string[], most = 8) => (items.length <= most ? items.join(',
 /** The rows held back because he deleted them here, as both reports name them: each one's label and its list. */
 const deletedSaid = (rows: { register: string; label: string }[]): string => few(rows.map((r) => `${r.label} (${NAMES[r.register] ?? r.register})`));
 
+/**
+ * The rows written without a row he deleted here, as both reports say them: one sentence for each row he deleted, naming
+ * every row that went without it. BY THE ROW DELETED AND NOT BY THE ROW WRITTEN, because one deleted project is named by
+ * its new task and by each of its readings, and said row by row the project was named five times in one line.
+ */
+const unfiledSaid = (rows: Unfiled[], dryRun = false): string[] => {
+  const by = new Map<string, string[]>();
+  for (const r of rows) {
+    const names = and(r.names.map((n) => `${n.label} (${NAMES[n.register] ?? n.register})`));
+    by.set(names, [...(by.get(names) ?? []), `${r.label} (${NAMES[r.register] ?? r.register})`]);
+  }
+  return [...by].map(
+    ([names, items]) => `${dryRun ? 'Would be written' : 'Written'} without ${names}, which is deleted in this BrainDog: ${few(items)}. Put it back here and the next import files them under it.`,
+  );
+};
+
 /** A question waiting on Decide as both reports name it: its the old tool id, its words, and what the old tool did with it. */
 const waitingSaid = (w: Waiting): string => `${w.label}${w.question ? `, ${w.question}` : ''}, ${w.answer}.`;
 
@@ -1326,6 +1446,7 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
      import updates it. */
   if ((report.deleted ?? []).length > 0)
     lines.push('', `Deleted in this BrainDog, so ${o.dryRun ? 'it would not be' : 'not'} added again: ${deletedSaid(report.deleted ?? [])}. To have one back, put it back here; the import then keeps it up to date.`);
+  if ((report.unfiled ?? []).length > 0) lines.push('', ...unfiledSaid(report.unfiled ?? [], o.dryRun));
   if (report.refused.length > 0) {
     /* A DRY RUN SENT NOTHING, so the record refused nothing yet: these are the rows the kernel's coercion says it will. */
     lines.push('', o.dryRun ? 'Would be refused by the record:' : 'Refused by the record:');
@@ -1384,6 +1505,13 @@ export type Run = {
   waiting?: Waiting[];
   /** The rows held back because he deleted them here (`Report.deleted`). Optional for the reason the three above are. */
   deleted?: { register: string; label: string }[];
+  /**
+   * The rows this run's retire pass left in the bin, by id and version (`Binned`), read by the next night so it does not
+   * take them for his. Optional for the reason the four above are: a line written before it binned nothing it knows of.
+   */
+  binned?: Binned[];
+  /** The rows written without a row he deleted here (`Report.unfiled`). Optional for the same reason. */
+  unfiled?: Unfiled[];
 };
 
 /** The run a report describes, as `--since` reads it back. */
@@ -1404,6 +1532,8 @@ export function runOf(report: Report, o: { at: string; host: string; file: strin
     retired: report.retired,
     waiting: report.waiting ?? [],
     deleted: report.deleted ?? [],
+    binned: report.binned ?? [],
+    unfiled: report.unfiled ?? [],
   };
 }
 
@@ -1478,6 +1608,10 @@ export function sinceSaid(runs: Run[], since: string, offsetOf: (at: Date) => nu
     const heldBefore = new Set((before?.deleted ?? []).map((r) => `${r.register}\n${r.label}`));
     const newlyHeld = (run.deleted ?? []).filter((r) => !heldBefore.has(`${r.register}\n${r.label}`));
     if (newlyHeld.length > 0) lines.push(`- Deleted in this BrainDog, so not added again: ${deletedSaid(newlyHeld)}.`);
+    /* THE SAME FOR A ROW FILED WITHOUT ONE OF THOSE: said the first morning, and again only once it is a different row. */
+    const looseBefore = new Set((before?.unfiled ?? []).map((r) => `${r.register}\n${r.label}`));
+    const newlyLoose = (run.unfiled ?? []).filter((r) => !looseBefore.has(`${r.register}\n${r.label}`));
+    for (const line of unfiledSaid(newlyLoose)) lines.push(`- ${line}`);
     for (const s of run.skipped) {
       const fresh = s.items.filter((item) => !had.has(item));
       if (fresh.length > 0) lines.push(`- Newly left out: ${few(fresh)}. ${s.reason}.`);
@@ -1528,6 +1662,8 @@ function isRun(run: unknown): run is Run {
     (run.asked === undefined || itemsHold(run.asked, ['label', 'question'])) &&
     (run.retired === undefined || itemsHold(run.retired, ['register', 'label', 'why'])) &&
     (run.deleted === undefined || itemsHold(run.deleted, ['register', 'label'])) &&
+    (run.binned === undefined || (Array.isArray(run.binned) && run.binned.every((b) => isObj(b) && isText(b.id) && typeof b.version === 'number'))) &&
+    (run.unfiled === undefined || (itemsHold(run.unfiled, ['register', 'label']) && (run.unfiled as { names?: unknown }[]).every((u) => itemsHold(u.names, ['register', 'label'])))) &&
     (run.waiting === undefined || (itemsHold(run.waiting, ['label', 'answer']) && (run.waiting as { question?: unknown }[]).every((w) => w.question === null || isText(w.question))))
   );
 }
@@ -1690,9 +1826,25 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
     propose: (a) => client.call('propose', a),
     packs: () => client.packs(),
   };
+  /**
+   * WHAT THE NIGHTS BEFORE LEFT IN THIS RECORD, AS THIS MACHINE REMEMBERS THEM: the rows their retire passes put in the
+   * bin (`Binned`), and the newest export they carried, which an older one tonight is measured against (`newest` in
+   * `applyPlan`). Only runs into the same host, because another record's bin and another record's exports say nothing
+   * about this one. A machine with no memory of a night reads the record as it did before: a row in the bin is his, and
+   * an export is closed against itself.
+   */
+  const before = readRuns(io.home).runs.filter((r) => r.host === to.key);
+  const newest = before.reduce<string | null>((a, r) => (r.taken && !Number.isNaN(Date.parse(r.taken)) && (a === null || Date.parse(r.taken) > Date.parse(a)) ? r.taken : a), null);
   let report: Report;
   try {
-    report = await applyPlan(plan, door, { dryRun: values['dry-run'] === true, banks: banksOf(read.value), packs: holdingsOf(read.value), settled: settledOf(read.value) });
+    report = await applyPlan(plan, door, {
+      dryRun: values['dry-run'] === true,
+      banks: banksOf(read.value),
+      packs: holdingsOf(read.value),
+      settled: settledOf(read.value),
+      binned: before.flatMap((r) => r.binned ?? []),
+      newest,
+    });
   } catch (e) {
     if (e instanceof Unreachable) {
       io.say(`${to.key} stopped answering part way. Run the import again: rows already written are found and not added twice.`);
