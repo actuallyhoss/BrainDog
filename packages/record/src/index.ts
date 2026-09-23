@@ -790,6 +790,15 @@ export type RecordDeps = {
   /** The outbox kinds this deployment can deliver. The doorbell rings for those and no others. */
   delivers?: readonly OutboxKind[] | undefined;
   /**
+   * Whether this host answers an automation's question to Spark, passed to the kernel's `RecordOptions.answersSpark`.
+   * Absent is no, and install then refuses an `ask_spark` step with `NOT_IN_THIS_BUILD`.
+   *
+   * THE HOST SETS IT FROM THE SAME MODEL IT REPORTS AS `Build.spark`, beside the pass that leases the job; a host that
+   * set one and not the other would admit a step nothing answers, or offer one the record refuses. It is in `api`'s
+   * `Pick` so the record's own sentences about a step can read it.
+   */
+  answersSpark?: boolean | undefined;
+  /**
    * What signs an exported `.brain`, when this host holds the record's signing key.
    *
    * IT IS A CALLBACK AND NOT A KEY, all the way down. `12 §6` puts the key hierarchy in the host;
@@ -901,6 +910,7 @@ const readDay = (text: string, format: string): string | null => {
 export async function createRecordApi(deps: RecordDeps) {
   const opened = await openRecord(deps.sql, deps.clock, {
     ...(deps.delivers === undefined ? {} : { delivers: deps.delivers }),
+    ...(deps.answersSpark === undefined ? {} : { answersSpark: deps.answersSpark }),
     ...(deps.sign === undefined ? {} : { sign: deps.sign }),
     /* `43 §4.3`'s three number forms, wired where both halves can be reached: the readers are
        rank 9, the record that reads an arrival is rank 7, and this package is 11. Without these
@@ -940,7 +950,7 @@ export async function createRecordApi(deps: RecordDeps) {
   return { ...api(kernel, deps, cursors), kernel };
 }
 
-function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'sparkModel' | 'catalogueOffers' | 'tryScript'>, cursors: HistoryCursors) {
+function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'sparkModel' | 'catalogueOffers' | 'tryScript' | 'answersSpark'>, cursors: HistoryCursors) {
   const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
   /**
    * The page declaration served at a slug, and its version: the one named exactly, or else the one whose name slugs to it

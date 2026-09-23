@@ -144,7 +144,7 @@ import {
   startRun,
   type FlowDeps,
 } from './flow.ts';
-import { pathOf, rowRegisterOf, subjectOf, tagsRefusal, tagsRefusing, tagsShape, triggerOf } from './flow-lint.ts';
+import { pathOf, rowRegisterOf, sparkAskAt, subjectOf, tagsRefusal, tagsRefusing, tagsShape, triggerOf } from './flow-lint.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
 import { arrive, day, exponentOf, propose, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps, type NumberReaders } from './ingest.ts';
 import { analyse, observe, type Analysis, type Observation } from './observe.ts';
@@ -707,6 +707,16 @@ export type RecordOptions = {
    * pass that claimed nothing.
    */
   delivers?: readonly OutboxKind[] | undefined;
+  /**
+   * Whether this host answers an automation's question to Spark: it leases `infer.ask` jobs and runs the pass that
+   * answers them (`@braindog/host/spark-answers`). Absent is no.
+   *
+   * THE HOST'S TO SAY, BECAUSE ONLY THE HOST KNOWS. Whether a model is configured and whether anything leases the job
+   * are facts about the deployment, and a record that guessed would install a step whose question waits its day
+   * unasked and fails. Off, install refuses `ask_spark` with `NOT_IN_THIS_BUILD` (`unserved`) and the runner fails a
+   * run that reaches one before anything is queued.
+   */
+  answersSpark?: boolean | undefined;
   /**
    * What signs an exported file, when this deployment holds a signing key.
    *
@@ -2148,6 +2158,30 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           at: reader.id,
         };
       }
+    }
+    return null;
+  }
+
+  /**
+   * A rule in the batch that asks Spark, on a host that has not said it answers one (`RecordOptions.answersSpark`).
+   *
+   * HERE AND NOT IN THE LINT, for the reason `stranded` is here: `flowFault` is reached only through `declare.ts`'s
+   * `validate`, which is context-free, and `stageDeclarations(batch)` stages a pack with no context at all, so a flag
+   * threaded down to the lint would have crossed four functions and still left a default of off refusing a pack the lint
+   * had passed. Every install path asks this right after `lintBatch`, so a malformed ask is told what is wrong with it
+   * first, and only a well-formed one hears that nothing here would answer it.
+   */
+  function unserved(batch: readonly Declaration[]): Refusal | null {
+    if (opts.answersSpark === true) return null;
+    for (const d of batch) {
+      if (d.kind !== 'rule') continue;
+      const at = sparkAskAt(d.body as unknown as FlowDecl);
+      if (at !== null)
+        return {
+          code: 'NOT_IN_THIS_BUILD',
+          fix: `${d.id} asks Spark at ${at}, and no host in this build answers an automation's question to Spark. Ask a person with ask_person instead.`,
+          at: `${at}.ask_spark`,
+        };
     }
     return null;
   }
@@ -4168,6 +4202,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         },
       }),
     withdraw: (suggestion, actor, why) => void decide(governDeps(), suggestion, { resolved_as: 'wont-fix', reason: why }, actor),
+    answersSpark: opts.answersSpark === true,
   });
 
   /**
@@ -4364,7 +4399,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (batch.length === 0 || batch.length !== listed.length) return ok(null);
       /* EVERY CHANGE IS LINTED WHEN IT IS FILED, with the checks the install runs on acceptance, and not only one that
          sends something out: a page proposed with no blocks was found by the owner who pressed accept. */
-      const fault = unreadable(batch) ?? lintBatch(sql, batch) ?? contradicted(batch) ?? stranded(batch);
+      const fault = unreadable(batch) ?? lintBatch(sql, batch) ?? unserved(batch) ?? contradicted(batch) ?? stranded(batch);
       if (fault) return { ok: false as const, refusal: fault };
       const egress = batch.flatMap((d) => {
         /* A SCRIPT CALLS OUT AS AN ACTION DOES, and its line is how the owner sees where it fetches and with which key. */
@@ -6173,7 +6208,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (refused) return refused;
       /* THE ROWS LAST, after every check about the declarations alone, so a declaration that is wrong in itself is told that
          first rather than how many rows it would also break. */
-      const cannot = unreadable(batch) ?? lintBatch(sql, batch) ?? contradicted(batch) ?? stranded(batch);
+      const cannot = unreadable(batch) ?? lintBatch(sql, batch) ?? unserved(batch) ?? contradicted(batch) ?? stranded(batch);
       if (cannot) return { ok: false as const, refusal: cannot };
       /* THE HISTORY LINE IS WRITTEN IN THE TRANSACTION THAT WRITES THE VERSION, so a change that lands always has one and a
          refused or rolled-back one never does. The wrapper sees only this call's result, which is `Result<Installed[]>`. */
@@ -6241,7 +6276,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          AND ITS LIST HALF (`tagsNarrowed`), which counts rules and not rows, so it is not `plan`'s to ask. Asked by rule
          alone, a pack that narrowed Jobs' `tags` to `list<enum>` of `[chase]`, or to `int`, under an installed `rule.late`
          staged, applied and left the next Rent untagged (`loop/research-batch-thirty-nine-audit.md` finding 5). */
-      const cannot = unreadable(batch) ?? lintBatch(sql, batch) ?? stranded(batch) ?? tagsNarrowed(batch) ?? taggingRefused(batch);
+      const cannot = unreadable(batch) ?? lintBatch(sql, batch) ?? unserved(batch) ?? stranded(batch) ?? tagsNarrowed(batch) ?? taggingRefused(batch);
       if (cannot) return { ok: false as const, refusal: cannot };
       const staged = await stageDeclarations(batch);
       if (!staged.ok) return staged;
@@ -6273,7 +6308,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * linted against that list, and the owner is never the one who finds a page that would not install.
      */
     lint(batch: readonly Declaration[]): Refusal | null {
-      return unreadable(batch) ?? lintBatch(sql, batch);
+      return unreadable(batch) ?? lintBatch(sql, batch) ?? unserved(batch);
     },
 
     /**

@@ -29,8 +29,9 @@ import { actionJitterMs } from './actions.ts';
  *
  * `script.run` IS MIGRATION 12'S: one run of a `script` declaration, leased by a host that runs it in a sandbox.
  *
- * `infer.ask` IS AN AUTOMATION'S QUESTION TO SPARK (`flow.ts`, Brief C): `{ run, step, question, shape, choices?,
- * about? }`, answered by an ack whose `result.text` is the answer. The `CHECK` that admits it is a migration of its own.
+ * `infer.ask` IS AN AUTOMATION'S QUESTION TO SPARK (`flow.ts`, Brief C): `{ run, rule, step, question, shape, choices?,
+ * about? }`, answered by an ack whose `result.text` is the answer, or whose `result.failed` is the sentence the run
+ * ends on when the host refused to ask. The `CHECK` that admits it is a migration of its own.
  */
 export const OUTBOX_KINDS = [
   'notify.email',
@@ -319,15 +320,22 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
 
     /* AN ANSWER TO AN AUTOMATION GOES BACK TO ITS RUN, in this transaction, which is the `infer.draft` branch's shape
        below with a run where that has the gate. A reply with no text is still a reply: the run is told there was no
-       answer and stops with that sentence, rather than the job walking a ladder that would ask the same model again. */
+       answer and stops with that sentence, rather than the job walking a ladder that would ask the same model again.
+
+       `result.failed` FIRST, AS THE RUN'S OWN SENTENCE. It is how the host's pass acks a refusal that no retry mends, a
+       month's asks spent or a job with no rule to ask in the name of (`spark-answers.ts`), and this branch read `text` alone: put
+       through the real kernel, a spent month ended the run on "Spark answered job ... with no text", and the sentence
+       that says what to do was thrown away (`loop/research-infer-ask-next.md` §1.3, A). */
     if (row.kind === 'infer.ask') {
       const asked = JSON.parse(row.payload) as { run?: unknown; step?: unknown };
-      const said = args.result as { text?: unknown } | undefined;
+      const said = args.result as { text?: unknown; failed?: unknown } | undefined;
       if (typeof asked.run === 'string' && typeof asked.step === 'number')
         deps.answerRun?.(
-          typeof said?.text === 'string'
-            ? { run: asked.run, step: asked.step, by: args.id, answer: said.text }
-            : { run: asked.run, step: asked.step, by: args.id, failed: `Spark answered job ${args.id} with no text, so the run stopped at step ${asked.step + 1}.` },
+          typeof said?.failed === 'string' && said.failed.trim() !== ''
+            ? { run: asked.run, step: asked.step, by: args.id, failed: said.failed }
+            : typeof said?.text === 'string'
+              ? { run: asked.run, step: asked.step, by: args.id, answer: said.text }
+              : { run: asked.run, step: asked.step, by: args.id, failed: `Spark answered job ${args.id} with no text, so the run stopped at step ${asked.step + 1}.` },
         );
       return ok(null);
     }

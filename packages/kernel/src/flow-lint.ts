@@ -14,10 +14,12 @@
  *
  * THE RUNNER IS `flow.ts`, AND THIS FILE REFUSES WHAT IT WOULD NOT DO. `ask_person` runs (Brief C), so its shape is
  * held here to what the runner and the gate accept: two options or more, each once, since `propose` refuses a choice
- * of one, and no `to:`, since nothing addresses a question to one person. `ask_spark` is refused as not in this build
- * once its shape is checked, because no host serves the `infer.ask` job it queues and a run would wait its day and
- * fail. `call` and `script` still install and fail at the run with a sentence, which is the answer §4.4 gives a
- * `script` step until its runtime lands, and it is why the lint is strict about everything it CAN know now.
+ * of one, and no `to:`, since nothing addresses a question to one person. `ask_spark` is held to its shape and to what
+ * its question may carry, and no further: whether THIS host answers the `infer.ask` job it queues is a fact about the
+ * host, which a context-free lint cannot know, so that refusal is `unserved` in `index.ts`, beside `stranded`, and
+ * `sparkAskAt` below is what it asks. `call` and `script` still install and fail at the run with a sentence, which is the
+ * answer §4.4 gives a `script` step until its runtime lands, and it is why the lint is strict about everything it CAN
+ * know now.
  */
 
 import type { Refusal } from '@braindog/ports';
@@ -223,6 +225,77 @@ export function rowRegisterOf(decl: FlowDecl, doorOf: (door: string) => unknown)
 const RUN_FILLED = /\{\{\s*(?:vars|trigger)\.[A-Za-z0-9_.]+\s*\}\}/;
 
 /**
+ * The path a run fills from its own context: `{{vars.x}}`, `{{trigger.row.amount}}`, spaces allowed inside the braces.
+ *
+ * `flow.ts`'s `fill` IMPORTS THIS, so the lint that asks what a question reaches and the runner that fills it read the
+ * braces one way. It lives here and not there because `flow.ts` already imports this file, and the lint's own copy is
+ * how `{{ trigger.row.pin }}` with spaces would have been read as naming nothing while the run filled it with `hunter2`.
+ */
+export const RUN_PATH = /\{\{\s*(vars|trigger)\.([A-Za-z0-9_.]+)\s*\}\}/g;
+
+/**
+ * The row's own `{{field}}` and `{{kind:field}}`, as `rules.ts`'s `fill` reads them.
+ *
+ * A COPY, AND THE ONE PLACE THE TWO CAN DRIFT. `fill` writes its pattern inline and exports none, and it is the
+ * pass's own file, so the lint holds this beside it and `flow-waits.test.ts` holds the pair to agreeing on every
+ * spelling the question test names. Whoever next edits `fill` should import this instead.
+ */
+const ROW_FILL = /\{\{(\w+)(?::(\w+))?\}\}/g;
+
+/**
+ * The fields of a row that a question would carry off the record, by the spelling that reaches each: the row's
+ * `{{pin}}` and `{{money:pin}}`, the run's `{{trigger.row.pin}}`, and `{{trigger.row}}`, which names no field and is
+ * written as the JSON of the whole row (`flow.ts`'s `fill`, where a path reaches an object).
+ *
+ * `hidden` IS EVERY FIELD OF THE LIST THAT NEVER LEAVES THE RECORD, retired ones included: a field put away keeps its
+ * type in the declaration, and nothing says the rows written before it was retired forgot their values.
+ */
+function hiddenIn(question: string, hidden: ReadonlyMap<string, string>): { field: string; type: string; spelled: string } | null {
+  for (const m of question.matchAll(ROW_FILL)) {
+    const field = m[2] ?? m[1]!;
+    const type = hidden.get(field);
+    if (type !== undefined) return { field, type, spelled: m[0] };
+  }
+  for (const m of question.matchAll(RUN_PATH)) {
+    if (m[1] !== 'trigger') continue;
+    const [head, field] = m[2]!.split('.');
+    if (head !== 'row') continue;
+    if (field === undefined) {
+      const [first] = hidden;
+      if (first) return { field: first[0], type: first[1], spelled: m[0] };
+      continue;
+    }
+    const type = hidden.get(field);
+    if (type !== undefined) return { field, type, spelled: m[0] };
+  }
+  return null;
+}
+
+/**
+ * Where the first `ask_spark` step of a body sits, as `steps[1]` or `steps[0].then[2]`, or `null` when it asks nothing.
+ *
+ * ITS OWN WALK, BOTH ARMS OF EVERY BRANCH, because `actionsOf` returns only `ACTIONS` and `ask_spark` is a step's verb.
+ * `index.ts`'s `unserved` asks this at every install path, and refuses the step at this place on a host that has not said
+ * it answers one.
+ */
+export function sparkAskAt(decl: FlowDecl): string | null {
+  const walk = (list: unknown, at: string): string | null => {
+    if (!Array.isArray(list)) return null;
+    for (const [i, step] of list.entries()) {
+      if (!isObject(step)) continue;
+      const here = `${at}[${i}]`;
+      if ('ask_spark' in step) return here;
+      if ('if' in step) {
+        const inner = walk(step.then, `${here}.then`) ?? walk(step.else, `${here}.else`);
+        if (inner !== null) return inner;
+      }
+    }
+    return null;
+  };
+  return walk(decl.then, 'then') ?? walk(decl.steps, 'steps');
+}
+
+/**
  * Every `tag` and `untag` of a rule that a list's declared `tags` would refuse, with where it sits and, for a
  * `list<enum>`, the word the enum lacks. Empty when the list takes every one.
  *
@@ -424,12 +497,24 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
               return bad('DECLARATION_INVALID', `${id} sends ${name} to Spark at ${here}, and a ${String(field.type)} field never leaves the record.`, `${here}.ask_spark.about`);
           }
       }
-      /* AND THEN NOT IN THIS BUILD, AFTER EVERY CHECK OF ITS SHAPE, as a `metric` trigger is. The runner queues the
-         question and the ack hands back the answer, but no host leases an `infer.ask` job yet, so a run that asked
-         would wait its day and fail with nobody having been asked. The runner refuses the step too, for a rule an
-         earlier build let install. */
-      if (verb === 'ask_spark')
-        return bad('NOT_IN_THIS_BUILD', `${id} asks Spark at ${here}, and no host in this build answers an automation's question to Spark. Ask a person with ask_person instead.`, `${here}.ask_spark`);
+      /* AND THE QUESTION ITSELF LEAVES THE RECORD, so what it names is held to the rule `about:` is. `about:` was
+         checked and the question was not: over a list whose `pin` is secret, `{{pin}}` in the question installed, and
+         the checker measured on 23 September, through `ask_person`, whose question is filled the same way, that
+         `{{trigger.row.pin}}` and `{{ trigger.row.pin }}` were asked as `hunter2` and `{{trigger.row}}` as the JSON of
+         the whole row, `pin` in it. Each spelling is read with the pattern that fills it (`ROW_FILL`, `RUN_PATH`). */
+      if (verb === 'ask_spark' && !rowless) {
+        const fields = row === null ? undefined : ((installed?.get(`register.${row}`) as { fields?: { id?: unknown; type?: unknown }[] } | undefined)?.fields ?? undefined);
+        const hidden = new Map((fields ?? []).filter((f) => UNSENDABLE.includes(String(f.type))).map((f) => [String(f.id), String(f.type)]));
+        const found = hidden.size === 0 ? null : hiddenIn(String((step.ask_spark as { question: unknown }).question), hidden);
+        if (found)
+          return bad(
+            'DECLARATION_INVALID',
+            found.spelled.replace(/\s/g, '') === '{{trigger.row}}'
+              ? `${id} puts the whole ${row} row in its question to Spark at ${here} with ${found.spelled}, and ${found.field} is a ${found.type} field, which never leaves the record. Name the fields the question needs instead.`
+              : `${id} puts ${found.field} in its question to Spark at ${here} with ${found.spelled}, and a ${found.type} field never leaves the record. Take it out of the question.`,
+            `${here}.ask_spark.question`,
+          );
+      }
       /* A CALL THAT SENDS A ROW NEEDS ONE, AS A STEP OR AS `run:`. `run:` was refused on a clock by `ROW_VERBS` and the
          same call as a step installed on a clock, a button and any arrival (audit thirty-two, section 4): an hourly
          post of a row nobody handed it, and a pattern of sending the owner approved as once per row and never saw.

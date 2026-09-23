@@ -21,9 +21,11 @@
  * the suggestion or the job, and the run's schedule row is armed for the end of the wait: a wake that finds the step
  * still `waiting` is the wait running out, and fails the run with a sentence.
  *
- * ASKING SPARK IS BUILT HERE AND NOT SERVED. No host leases an `infer.ask` job yet, so `advance` fails a run that
- * reaches one with `NOT_IN_THIS_BUILD` before anything is queued, and the lint refuses the step at install. The day a
- * host serves the job, that one check in `advance` and the lint's refusal come out together.
+ * ASKING SPARK IS SERVED ONLY WHERE THE HOST SAYS SO (`FlowDeps.answersSpark`, the record's `answersSpark` option). A
+ * host that leases no `infer.ask` job leaves the question `pending` for its day and the run fails having asked nobody,
+ * so on such a host `advance` fails a run that reaches the step with `NOT_IN_THIS_BUILD` before anything is queued, and
+ * install refuses the step (`unserved` in `index.ts`). A host that serves the job admits both, and its pass acks with
+ * the answer as `result.text` or a refusal's sentence as `result.failed` (`outbox.ts`'s `ack`).
  *
  * `call` AND `script` ARE STILL NOT IN THIS BUILD. A call's answer comes back through `finishAction` and a script's
  * through `finishScript`, and neither carries a run yet; a run that reaches one fails there with a sentence, and the
@@ -36,7 +38,7 @@ import { compile, evaluate, type Predicate, type Schema } from '@braindog/where'
 
 import { meter, type Metered } from './actions.ts';
 import { nextOccurrence } from './digest.ts';
-import { RUNS_PER_DAY_CEILING, pathOf, triggerOf, UNSENDABLE } from './flow-lint.ts';
+import { RUN_PATH, RUNS_PER_DAY_CEILING, pathOf, triggerOf, UNSENDABLE } from './flow-lint.ts';
 import type { Entry } from './index.ts';
 import { instant } from './migrate.ts';
 import { predicateOf, type EvalContext } from './metrics.ts';
@@ -87,6 +89,15 @@ export type FlowDeps = {
   ask: (question: string, options: readonly string[], actor: string, about: { run: string; step: number }) => Result<{ id: string }>;
   /** Close a question nobody will read the answer to, as `wont-fix` with the reason. A question already closed is left. */
   withdraw: (suggestion: string, actor: string, why: string) => void;
+  /**
+   * Whether this host leases `infer.ask` and answers it, as the record was opened with. False fails a run at an
+   * `ask_spark` step before anything is queued.
+   *
+   * HERE AS WELL AS AT INSTALL, because install is not the only way a rule becomes live: `enablePack` restores a
+   * retired rule through `stageDeclarations` alone, which asks no host question, and a rule an earlier build let
+   * install is still in the table.
+   */
+  answersSpark: boolean;
 };
 
 /** A run-path rule as installed: its bare id, the version a run pins, and its body. */
@@ -531,9 +542,9 @@ export function advance(deps: FlowDeps, id: string): number | null {
         continue;
       }
 
-      /* SPARK IS NOT ASKED WHILE NOTHING WOULD ANSWER: a question queued for no host waits its day and fails, having
-         asked nobody. Before anything is queued, for a rule an earlier build let install; the lint refuses it now. */
-      if (op.verb === 'ask_spark')
+      /* SPARK IS NOT ASKED ON A HOST THAT WOULD NOT ANSWER: a question queued for nobody waits its day and fails, having
+         asked nobody. Checked before anything is queued, for a rule that became live without meeting `unserved`. */
+      if (op.verb === 'ask_spark' && !deps.answersSpark)
         return fail(
           i,
           op.verb,
@@ -669,8 +680,17 @@ function ask(
   actor: string,
 ): { ok: true; holds: string; waitMs: number } | { ok: false; say: string } {
   const spec = step[verb] as { question: string; options?: string[]; wait?: string; about?: string[]; shape?: string; choices?: string[] };
-  let question = String(fill(spec.question, scope));
-  if (row) question = fillRow(question, row, deps.nowMs);
+  /* A QUESTION TO SPARK IS FILLED FROM THE ROW WITH ITS SECRET AND FILE FIELDS TAKEN OUT, both fills, since the
+     question leaves the record as surely as `about:` does. The lint refuses a question that names one, and this is the
+     second line, for a rule an earlier build let install or one written into the table. Measured with the switch on
+     and this line off (`flow-waits.test.ts`, "A RULE STORED WITH A SECRET"): the question went out as `Rate for Rent,
+     hunter2, hunter2, hunter2, {"what":"Rent","note":"hunter2","pin":"hunter2"}, hunter2?`. The last is a text field
+     holding the words `{{pin}}`, which the run's fill writes into the question and the row's fill then reads, so the
+     field is taken out of both fills and not only the first. */
+  const facts = verb === 'ask_spark' && row ? sendable(deps, row) : row;
+  const scoped = facts === row ? scope : { ...scope, trigger: { ...(scope.trigger as Record<string, unknown>), row: facts!.fields } };
+  let question = String(fill(spec.question, scoped));
+  if (facts) question = fillRow(question, facts, deps.nowMs);
   if (question.length > VAR_BYTES) return { ok: false, say: `rule.${rule}'s question at step ${n + 1} runs to ${question.length} characters, and a question holds ${VAR_BYTES}.` };
 
   if (verb === 'ask_person') {
@@ -690,8 +710,13 @@ function ask(
     if (UNSENDABLE.includes(String(types?.[field]?.type))) continue;
     about[field] = row?.fields[field] ?? null;
   }
+  /* `rule` IS WHO ASKS. The host's pass refuses a job without it and never calls Spark (`spark-answers.ts` `askOf`),
+     because Spark's ledger row is written as `rule.<id> step <n>` and the owner's key is opened as `rule:<id>`: a job
+     queued without it ended its run on "no text", measured through the real kernel (`loop/research-infer-ask-next.md`
+     §1.3, B). */
   const job = enqueue(deps.sql, deps.mint, deps.nowMs, 'infer.ask', {
     run,
+    rule,
     step: n,
     question,
     shape: spec.shape ?? 'text',
@@ -891,16 +916,25 @@ function context(deps: FlowDeps, trigger: RunTrigger, subject: Entry | null): Re
   return out;
 }
 
-const PATH = /\{\{\s*(vars|trigger)\.([A-Za-z0-9_.]+)\s*\}\}/g;
+/**
+ * The row as a question to Spark may carry it: every field the live list types `secret` or `file` taken out, and every
+ * field the live list does not declare, since a value with no live type has none to ask whether it may leave.
+ */
+function sendable(deps: FlowDeps, row: Entry): Entry {
+  const types = deps.schemaOf(row.register)?.fields ?? {};
+  const fields = Object.fromEntries(Object.entries(row.fields).filter(([id]) => types[id] !== undefined && !UNSENDABLE.includes(String(types[id]!.type))));
+  return { ...row, fields: fields as Entry['fields'] };
+}
 
 /**
  * `{{vars.x}}` and `{{trigger.row.amount}}`, filled in every string of a step, before the pass fills the row's own
  * `{{field}}`s. A path that reaches nothing is an em dash for the same reason `fill` writes one: a sentence with a
- * hole in it reads as a bug.
+ * hole in it reads as a bug. The pattern is `flow-lint.ts`'s `RUN_PATH`, so the lint reads a question's braces as this
+ * fills them.
  */
 function fill(x: unknown, scope: Record<string, unknown>): unknown {
   if (typeof x === 'string')
-    return x.replace(PATH, (_whole, head: string, path: string) => {
+    return x.replace(RUN_PATH, (_whole, head: string, path: string) => {
       let at: unknown = scope[head];
       for (const part of path.split('.')) at = isObject(at) ? at[part] : Array.isArray(at) ? at[Number(part)] : undefined;
       if (at === undefined || at === null || at === '') return '—';
