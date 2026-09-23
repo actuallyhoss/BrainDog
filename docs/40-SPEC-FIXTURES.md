@@ -390,7 +390,7 @@ found: currency                   # optional; asserted when present
 | `import` | 7 | `record:` · `tamper:` — `sig` · `row` · `format` · `not-brainl` · `not-empty` · `migration-text` · `migration-ahead`, one per code | `dog_sig.sig` · `dog_manifest.<table>` · `dogl` · `migration[<n>]`, and none for `IMPORT_NOT_EMPTY` | `packages/kernel/test/refusals-import.test.ts`: export a record the test builds, apply the verb, import |
 | `render` | 2 | `document:` | none, and that is measured: `packages/render/src/parse.ts`’s `Degraded` is `{ type, code, fix, raw, info, start, end }` and has no `at` at all. This column promised `blocks[<i>].rows[<j>]` and `blocks[<i>].kind`, and the row index is out of reach twice over, because a degraded fence never becomes a block. The address the surface does carry is `start` and `end`, a span of source bytes. Growing an `at` is a change to a published MIT package’s envelope, so it is a decision rather than a repair | `apps/web/test`, through `braindog-render` |
 | `pull` | 7 | `declare:` (one connector) · `grant:` (the stored credential, or none) · `answers:` (the provider’s replies, one per request the run makes) | the connector declaration, or the run’s lease: `fetch.auth.token_url` · `fetch.page[<n>]` · `fetch.page.from` · `object` · `lease` | in two halves, by the file each fixture’s `raises:` names: `packages/connect/test/refusals-pull.test.ts` drives the five raised in `packages/connect` through `runPull`, the way the Worker’s alarm does, and `packages/host/test/refusals-pull.test.ts` the two raised in `packages/host/src/actions.ts` through `sendAction`, which answers the same two codes with no `at` |
-| `ask` | 4 | `record:` (a seed record) · `ask:` (the question, trimmed and capped at 400 bytes) · `replies:` (the model’s answers, one per call the ask makes, verbatim) · `settings:` (`tier`, `model`, `ask_cap`, and the month’s asks, which is the meter) · `principal:` | the model’s reply: a span of its own text (`{{pct:-46.3}}`, `about 40%`), a path into the JSON the call pinned (`body_kind`, `schema`), or a path into a proposed `ingest` body; none for the meter, which refuses before any model is called | `packages/spark/test/refusals-ask.test.ts`, driving the palette’s two passes against the inference double of `packages/spark/test/double.ts` |
+| `ask` | 5 | `record:` (a seed record) · `ask:` (the palette’s question, trimmed and capped at 400 bytes) or `answer:` (an automation’s question instead: the `Ask` the kernel’s `infer.ask` row carries, `rule` `step` `question` `shape` and `choices` or `about`) · `replies:` (the model’s answers, one per call the ask makes, verbatim; `{ "answered": "<sentence>" }` is the host’s marked throw rather than a reply) · `settings:` (`tier`, `model`, `ask_cap`, and the month’s asks, which is the meter) · `principal:` | the model’s reply: a span of its own text (`{{pct:-46.3}}`, `about 40%`), a path into the JSON the call pinned (`body_kind`, `schema`), or a path into a proposed `ingest` body; `answer` for an automation’s reply the host could not read; none for the meter, which refuses before any model is called | `packages/spark/test/refusals-ask.test.ts`, driving the palette’s two passes for an `ask:` and `answer` for an `answer:`, against the inference double of `packages/spark/test/double.ts` |
 
 **`ask` is the ninth `via`, minted on September 21st 2026 for the four codes `packages/spark` arrived with.**
 Nothing above it could carry one. A spark refusal happens when a model ANSWERS: the input is a projection plus the
@@ -399,6 +399,18 @@ document or a scheduled connector run. `refusal-fixtures.mjs` reported it as fou
 `PROPOSAL_UNCITED`, `PROPOSAL_NO_ROWS`, `PROPOSAL_SCHEMA` and `SPARK_BUDGET_SPENT` sat in [30-BLUEPRINT](30-BLUEPRINT.md)
 §6 with no file on disk. The alternative was to enumerate those four somewhere else, and there is nowhere else: 30 §6 is
 the registry’s home, and this table is the one place a registered code’s input shape is written down.
+
+**The fifth is `ANSWER_UNREADABLE`, admitted to 30 §6 on September 23rd 2026, and it is the first `ask` the palette
+does not raise.** `packages/spark/src/answer.ts` raises it when an automation’s `ask_spark` step reaches a model and the
+host cannot read the 200 that came back, or the model did not finish in time: the host throws a `SparkAnsweredError`
+marked `answered: true`, and `answer` counts the ask and stops the run. `propose` answers the same throw as
+`UNREACHABLE`, so the runner could not reach the code by giving the palette another reply. The row grew one key rather
+than a tenth `via`: `answer:` names the method that is driven and carries the automation’s question, and a reply of the
+form `{ "answered": "<sentence>" }` is thrown with the mark instead of said, because this package may not import the
+host (46 §5.1) and reads the mark structurally. The runner asserts the count at five, so a sixth arrives red until it
+carries `ask:` or `answer:`, and for an `answer:` it also asserts the ask was metered, which is the half of the code’s
+row in 30 §6 that separates it from `UNREACHABLE`. The code was the one finding `refusal-fixtures` printed that day, and
+`refusal-fixtures.mjs` again needed no edit: the new key is read off this row.
 
 **Every `via` has a runner as of September 22nd 2026, and the Runner column names each one.** This paragraph said
 none of the eight before `ask` existed, which was a day stale when it was written: `e74a563b` had built the `write` and
