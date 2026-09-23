@@ -18,6 +18,8 @@
 import type { Conflict, Refusal, Result } from '@braindog/ports';
 import { conflicted, refused } from '@braindog/ports';
 
+import { crashed } from './crash.ts';
+
 export { HINTS, hintsOf, sessionOf, withSession, type SessionHints } from './session.ts';
 export { serveVault, servesVault, VAULT_HEADERS, vaultReply, type VaultAsk, type VaultDoor, type VaultGrantSeen } from './vault.ts';
 export { keysReply, serveKeys, servesKeys, type KeysAsk, type KeysDoor } from './keys.ts';
@@ -34,6 +36,10 @@ export { serveSpark, servesSpark, sparkAskDoor, sparkReply, type SparkAskDoor, t
    one host can find and the other cannot is exactly the drift this file's header is about. */
 export { messageHeaders, serveIngest, servesIngest, type IngestArrival, type IngestChannel, type IngestDoor, type IngestPath, type IngestVerify } from './ingest.ts';
 export { freshNonce, grantAad, grantKey, NONCE_BYTES, openSealed, recordAad, seal, type Bytes, type DerivedKey } from './sealing.ts';
+/* `crashed` IS EXPORTED FOR THE OTHER TWO DOORS, the Worker's router and the self-host's outer catch (W60-6, W60-7).
+   `serveApi` below is the first of three places a crash is answered, and three answers to one crash is the drift this
+   file's header is about. */
+export { crashed, type CrashLog, type Crashed } from './crash.ts';
 
 /**
  * What one argument IS, so the text a stranger typed becomes the value the handler was written for.
@@ -664,8 +670,19 @@ export async function serveApi(
      fewer thing every reader of it has to know. */
   let args: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
   if (request.method === 'POST') {
+    /* WEIGHED BEFORE IT IS PARSED, AND BEFORE ANY HANDLER RUNS. This was `request.json()`, which reads to the end
+       whatever the end is: on the Cloud the only ceiling was the platform's, and the whole body sat in the record's
+       Durable Object before a byte of it was looked at (`loop/research-hardening.md` §2.2). The method is known by
+       now, so the ceiling is chosen per method here, in one place, for both hosts. */
+    const cap = name === 'import' ? IMPORT_BODY_MOST_BYTES : API_BODY_MOST_BYTES;
+    const text = await textOf(request, cap);
+    if (text === null)
+      return json(413, {
+        ok: false,
+        refusal: { code: 'BODY_MALFORMED', fix: `${name} takes a body of at most ${cap} bytes.`, at: 'body' },
+      });
     try {
-      const body: unknown = await request.json();
+      const body: unknown = JSON.parse(text);
       if (body !== null && typeof body === 'object' && !Array.isArray(body)) args = body as Record<string, unknown>;
       else throw new TypeError('not an object');
     } catch {
@@ -759,15 +776,99 @@ export async function serveApi(
    * socket this catch was written to end. A bigint is not a far-fetched value either: `Param`, what
    * `@braindog/ports` says a driver may hand back, lists it.
    */
+  /**
+   * THE REASON GOES TO THE LOG, AND THE CALLER GETS A REFERENCE TO IT (W60-1).
+   *
+   * This catch wrote the thrown message into the `fix`, and logged nothing. Measured for
+   * `loop/research-hardening.md` §2.1: a handler throwing `SQLITE_AUTH: not authorized, row alice@example.com` answered
+   * that sentence, row and all, to whoever asked, and neither host's log had a line about it. `crashed` logs the reason
+   * under a new reference and answers the reference alone; `test/crash.test.ts` holds the probe's sentence.
+   */
   try {
     const out = await handler(args, ctx);
     return json(httpStatus(out), out);
   } catch (e) {
-    return json(500, {
-      ok: false,
-      refusal: { code: 'INTERNAL', fix: `${name} could not be answered: ${e instanceof Error ? e.message : String(e)}.` },
-    });
+    return json(500, crashed(`/api/${name}`, e));
   }
+}
+
+/**
+ * The most an `/api` body may weigh, for every method but `import`: a mebibyte.
+ *
+ * `51-SPEC-WORKER` HAS SAID 1 MB FOR THE API SINCE IT WAS WRITTEN, and `/mcp` holds exactly this number for the same
+ * surface reached another way (`packages/mcp/src/http.ts`, `MAX_BODY_BYTES`). A method's arguments are a row, a query
+ * or a declaration, and until W60-1 the Cloud read any body to the end, up to the platform's own limit, before
+ * finding out.
+ */
+export const API_BODY_MOST_BYTES = 1_048_576;
+
+/**
+ * The most an `import` body may weigh: sixteen mebibytes, about 147,000 rows.
+ *
+ * `import` IS THE ONE METHOD WHOSE BODY IS A WHOLE FILE, `{ lines, replace }`, and a flat megabyte would have broken
+ * it: a real copy measured 94 rows in 8,941 bytes, 95 bytes a row (`loop/research-restore.md` §3.1), so 1 MiB is about
+ * 11,000 rows, and his own record is larger than that.
+ *
+ * THE NUMBER IS SET BY THE DURABLE OBJECT, NOT BY A GUESS AT RECORD SIZES. On the Cloud this runs inside the record's
+ * object, which has 128 MB (`docs/01-ARCHITECTURE.md`). Measured on 2026-09-24 in Node 24: a body is held three times
+ * over at the peak of reading it, its bytes, the text they decode to, and the parsed lines, each about the body's
+ * size (a 16 MiB body added 15.8 MiB decoding and 16.5 MiB parsing); the lines alone, about one body's worth, are what
+ * the handler keeps. The kernel's import then buffers the whole file again, and `41-SPEC-KERNEL` §10 puts its own
+ * ceiling near 50 MB of `.brainl` in the same 128 MB. So 32 MiB would peak at 96 MiB here before the kernel started,
+ * and 16 MiB peaks at 48 MiB and leaves the kernel room for its part. A `.brainl` sent as `lines` weighs 1.20 times
+ * the file (measured on 6,108 exported lines: 1,277,928 bytes as a file, 1,533,256 as the body), so sixteen mebibytes
+ * of body is about 13.3 MiB of file, which at 95 bytes a row is about 147,000 rows.
+ *
+ * WHAT IT COSTS, ON EACH HOST. On the Cloud, nothing that worked: by the same arithmetic a body past about 40 MiB
+ * already held more than the object has before the kernel began, and the kernel's own ceiling was reached soon after.
+ * On the self-host, `BODY_MOST_BYTES` in `apps/selfhost/src/server.ts` is 100 MiB, weighed at the socket before this,
+ * so an import between 16 and 100 MiB that a Node process with room could have taken is 413 here now. Both hosts
+ * answer it alike, which is this file's first rule, and a self-host record past this size is still put back whole by
+ * `braindog init <slug> --from <file.brainl>` (`apps/selfhost/src/main.ts`), which opens the file itself and never
+ * comes through this door. The number rises when the kernel's two-pass streaming import (`41 §10`) is built.
+ */
+export const IMPORT_BODY_MOST_BYTES = 16 * 1_048_576;
+
+/**
+ * A POST's body as text, or `null` when it weighs more than `cap`.
+ *
+ * COUNTED AS IT ARRIVES, AS `packages/mcp/src/http.ts`'s `bytesOf` COUNTS IT, because `Content-Length` is a claim and a
+ * chunked body makes none. The claim is checked first so a sender announcing ten megabytes is refused before one is
+ * read; the count is the check that holds, and reading stops at the first piece over, so the rest is never held.
+ *
+ * CANCELLED, NOT LEFT UNREAD: a body nobody reads and nobody cancels holds its socket until a timer ends it.
+ *
+ * DECODED THE WAY `request.json()` DECODED IT, UTF-8 with a leading byte-order mark dropped and a bad sequence replaced
+ * rather than refused, so a body that parsed before still parses. The bytes are not returned, so they can be collected
+ * while the text is parsed; the peak `IMPORT_BODY_MOST_BYTES` is argued from is this function's.
+ */
+async function textOf(request: Request, cap: number): Promise<string | null> {
+  if (Number(request.headers.get('content-length') ?? 0) > cap) {
+    await request.body?.cancel().catch(() => undefined);
+    return null;
+  }
+  if (!request.body) return '';
+  const reader = request.body.getReader();
+  const parts: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > cap) {
+      await reader.cancel().catch(() => undefined);
+      return null;
+    }
+    parts.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let at = 0;
+  for (const part of parts) {
+    bytes.set(part, at);
+    at += part.byteLength;
+  }
+  parts.length = 0;
+  return new TextDecoder().decode(bytes);
 }
 
 /**

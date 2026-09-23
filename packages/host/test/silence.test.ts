@@ -43,7 +43,7 @@ test('A VALUE THAT CANNOT BE SERIALISED IS A 500 WITH A SENTENCE, not a request 
   const body = (await res.json()) as Answer;
   assert.equal(body.ok, false);
   assert.equal(body.refusal?.code, 'INTERNAL');
-  assert.match(body.refusal?.fix ?? '', /^boot could not be answered: /);
+  assert.match(body.refusal?.fix ?? '', /^\/api\/boot could not be answered, /);
 });
 
 test('and so is a value that points at itself', async () => {
@@ -65,14 +65,32 @@ test('and so is a handler that answers something that is not a Result at all', a
   }
 });
 
-test('and a handler that throws still answers what it always did', async () => {
-  const res = await asked({
-    boot: () => {
-      throw new Error('the database is on fire');
-    },
-  });
+test('and a handler that throws answers a reference, and the reason goes to the log and nowhere else', async () => {
+  /* THIS TEST USED TO PIN THE LEAK AS CORRECT: it asserted the fix was `boot could not be answered: the database is on
+     fire.`, the thrown message verbatim, so the sentence a driver writes about a row reached whoever asked
+     (`loop/research-hardening.md` §2.1). It now asserts the other half: the same reference in the answer and in the
+     one line logged, and the reason only in the line. `test/crash.test.ts` holds the probe's own sentence. */
+  const lines: unknown[] = [];
+  const was = console.error;
+  console.error = (line: unknown) => void lines.push(line);
+  let res: Response;
+  try {
+    res = await asked({
+      boot: () => {
+        throw new Error('the database is on fire');
+      },
+    });
+  } finally {
+    console.error = was;
+  }
   assert.equal(res.status, 500);
-  assert.equal(((await res.json()) as Answer).refusal?.fix, 'boot could not be answered: the database is on fire.');
+  const fix = ((await res.json()) as Answer).refusal?.fix ?? '';
+  assert.ok(!fix.includes('fire'), `the reason reached the caller: ${fix}`);
+  assert.equal(lines.length, 1);
+  const line = JSON.parse(String(lines[0])) as { op: string; ref: string; error: string };
+  assert.equal(line.op, 'crash');
+  assert.ok(fix.includes(line.ref), `the answer does not carry the logged reference ${line.ref}: ${fix}`);
+  assert.equal(line.error, 'Error: the database is on fire');
 });
 
 test('and every ordinary answer keeps the status and the body it had', async () => {
