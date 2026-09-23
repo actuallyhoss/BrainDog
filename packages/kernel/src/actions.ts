@@ -210,16 +210,55 @@ export function actionJitterMs(recordId: string, pack: string | null, action: st
 
 type Key = { id: string; label: string; sealed_under: 'record' | 'connector' };
 
+/**
+ * A vault row as far as choosing among several needs it: `kernel.grants()` hands every one of these columns.
+ *
+ * `created_at` IS OPTIONAL HERE AND NEVER ABSENT ON A REAL ROW, for the reason `SparkVaultRow` gives in `@braindog/host`:
+ * a test's double that only needed a label would otherwise be a compile error. A row that states none sorts as oldest.
+ */
+export type GrantChoosable = { id: string; label: string; revoked_at: string | null; created_at?: string | undefined };
+
+/**
+ * The live vault entry a name opens, by label or id: the NEWEST, `created_at` and then `id`, both descending.
+ *
+ * ONE ORDER, WRITTEN ONCE, BECAUSE FOUR COPIES OF IT HAD ALREADY LET A FIFTH GO WRONG. The vault admits two live grants
+ * under one label, and at `afb3b1b2` the newest-first clause was spelled out in `keyNamed` and `opensNamed` here, in
+ * `grantNamed` (`@braindog/host/script`) and in `sparkGrantOf` (`@braindog/host/spark`). The audit of wave forty-nine
+ * found Spark's own path taking `grants().find(...)`, which is `listGrants` order and so the OLDEST key, while every action
+ * named `spark` sent the newest. The four that agreed agreed because each author copied the same words; measured on
+ * 23 September, no state `test/grant-chooser.test.ts` or `packages/host/test/grant-named.test.ts` builds made two of them
+ * disagree, so nothing about which key wins moved here. It lives in the kernel beside `opensNamed` for the reason
+ * `hostOpened` below does: the host imports the rule rather than keeping a copy that can drift.
+ *
+ * `fits` IS THE CALLER'S OWN RULE ABOUT WHAT IT CAN SEND, and the order is applied to what it keeps. Spark's key goes out
+ * as a bearer, so it passes over a password or a note; an action and a script take the newest entry of any kind, as they
+ * did before this function existed. The rows are not reordered, and a name that is absent or empty opens nothing.
+ */
+export function grantChosen<G extends GrantChoosable>(grants: readonly G[], name: string | undefined, fits: (grant: G) => boolean = () => true): G | undefined {
+  if (name === undefined || name === '') return undefined;
+  let best: G | undefined;
+  for (const g of grants) {
+    if ((g.label !== name && g.id !== name) || g.revoked_at !== null || !fits(g)) continue;
+    const at = g.created_at ?? '';
+    const was = best?.created_at ?? '';
+    if (best === undefined || at > was || (at === was && g.id > best.id)) best = g;
+  }
+  return best;
+}
+
+/**
+ * The live rows a name could mean, in no order: `grantChosen` orders them. `revoked_at` and `created_at` are read for it.
+ *
+ * THE FILTER STAYS IN SQL, so a vault of many labels hands the chooser the one or two rows under this name and not the lot.
+ */
+const liveNamed = <R>(sql: Sql, columns: string, name: string): (R & GrantChoosable)[] =>
+  sql.all<R & GrantChoosable>(`SELECT ${columns}, id, label, revoked_at, created_at FROM grant WHERE (label = ? OR id = ?) AND revoked_at IS NULL`, name, name);
+
 /** The key a scheduled action names, by label or id, and never one that was revoked. The row, never its bytes. */
 export function keyNamed(sql: Sql, name: string | undefined): Key | null {
   if (name === undefined || name === '') return null;
-  return (
-    sql.one<Key>(
-      'SELECT id, label, sealed_under FROM grant WHERE (label = ? OR id = ?) AND revoked_at IS NULL ORDER BY created_at DESC, id DESC LIMIT 1',
-      name,
-      name,
-    ) ?? null
-  );
+  const found = grantChosen(liveNamed<Key>(sql, 'sealed_under', name), name);
+  return found === undefined ? null : { id: found.id, label: found.label, sealed_under: found.sealed_under };
 }
 
 /**
@@ -228,13 +267,7 @@ export function keyNamed(sql: Sql, name: string | undefined): Key | null {
  */
 export function opensNamed(sql: Sql, name: string): string | null {
   if (name === '') return null;
-  return (
-    sql.one<{ opens: string }>(
-      'SELECT opens FROM grant WHERE (label = ? OR id = ?) AND revoked_at IS NULL ORDER BY created_at DESC, id DESC LIMIT 1',
-      name,
-      name,
-    )?.opens ?? null
-  );
+  return grantChosen(liveNamed<{ opens: string }>(sql, 'opens', name), name)?.opens ?? null;
 }
 
 /**

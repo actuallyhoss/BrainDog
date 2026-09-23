@@ -32,6 +32,7 @@ import {
   sparkByokFor,
   sparkFromEnv,
   sparkGrantIdOf,
+  sparkGrantOf,
   sparkGuardedEngine,
   sparkInferenceOf,
   sparkModelNameOf,
@@ -149,13 +150,13 @@ export async function workerSparkEngine(env: SparkEnv, api: () => RecordApi, dep
  * way it is wrong here, so the job is refused `FORBIDDEN` before the engine is built or anything is held, and nothing is
  * written to the ledger (Q7's default).
  *
- * AND A KEY THAT IS THERE AND WILL NOT OPEN IS REFUSED TOO, which the check above cannot see: it reads the label, and the
- * key path reads the opening. `loop/research-batch-forty-nine-audit.md` finding 2 put the owner's key under one `KEK` and
- * woke the object under another, as a `wrangler secret put KEK` leaves it: 8 POSTs with no `authorization` of 8 over the
- * ladder, 8 ledger rows under the dash, and a run ending "could not be reached". `keyOpener` answers `null` for that and
- * for four other ways a grant fails to open (`actions.ts`). So the rule's wire asks for `keyRequired`, the host throws
- * before `post` sends, and the job is refused `FORBIDDEN` with the same ledger as the no-key case: none.
- * `test/spark-key-status.test.ts` holds it.
+ * AND A KEY THAT IS THERE AND WILL NOT OPEN IS REFUSED TOO, which the check above cannot see: it reads which grant the key
+ * path would choose, and the key path reads the opening. `loop/research-batch-forty-nine-audit.md` finding 2 put the
+ * owner's key under one `KEK` and woke the object under another, as a `wrangler secret put KEK` leaves it: 8 POSTs with no
+ * `authorization` of 8 over the ladder, 8 ledger rows under the dash, and a run ending "could not be reached".
+ * `keyOpener` answers `null` for that and for four other ways a grant fails to open (`actions.ts`). So the rule's wire asks
+ * for `keyRequired`, the host throws before `post` sends, and the job is refused `FORBIDDEN` with the same ledger as the
+ * no-key case: none. `test/spark-key-status.test.ts` holds it.
  *
  * EACH QUESTION IS ASKED ON A WIRE SIGNED `rule:<id>`, so the vault's `grant.read` for the owner's key names the rule that
  * opened it and not `system`. This never calls `sparkByokFor`: a rule has no session for the vault's gate to read, and
@@ -166,7 +167,11 @@ export function workerSparkAnswers(env: SparkEnv, api: () => RecordApi, deps: Sp
   if (sparkInferenceOf(config, wireOf(env, api, deps)) === undefined) return undefined;
   let built: Promise<Spark | undefined> | null = null;
   return async (ask) => {
-    if (!api().kernel.grants().some((g) => g.label === SPARK_KEY_LABEL && g.revoked_at === null))
+    /* THE GATE ASKS THE KEY PATH'S OWN CHOOSER, so the two cannot disagree about whether there is a key. It read the label
+       and `revoked_at` alone until 23 September, a third chooser beside the kernel's and the host's: a `note` labelled
+       `spark` passed it, the key path chose nothing to open, and the run was told the key "would not open on this Worker",
+       which sends an owner to put in again a key that was never there (`test/spark-named.test.ts`, the note case). */
+    if (sparkGrantOf(api().kernel.grants()) === undefined)
       return no(
         'FORBIDDEN',
         `rule.${ask.rule} asked Spark at step ${ask.step + 1}, and this record's vault holds no key labelled ${SPARK_KEY_LABEL}, so the run stopped there. Put your model key in the vault under ${SPARK_KEY_LABEL}.`,

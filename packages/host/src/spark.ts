@@ -48,7 +48,7 @@
  */
 
 import { ok, type Refusal, type Result, type Sql } from '@braindog/ports';
-import { GRANT_KINDS, type Entry, type RegisterDecl } from '@braindog/kernel';
+import { GRANT_KINDS, grantChosen, type Entry, type RegisterDecl } from '@braindog/kernel';
 import type { CallContext, RecordApi, SparkFormInput, SparkModel, SparkModelInput } from '@braindog/record';
 
 import type { SparkAsk } from './spark-answers.ts';
@@ -477,23 +477,12 @@ export type SparkVaultRow = { id: string; label: string; revoked_at: string | nu
  * row the two rules are one, because `bindGrant` refuses a kind outside `GRANT_KINDS`. They differ only on a double: a row
  * that states no kind, or one no vault could hold (`apps/worker/test/spark.test.ts` builds its `spark` grant as `api_key`,
  * and failed its bearer assertion under the stricter rule, measured 23 September). Neither is a password or a note.
+ *
+ * THE ORDER IS THE KERNEL'S `grantChosen`, not a copy of it, so the key Spark opens and the key an action naming `spark`
+ * opens are one answer by construction (`test/grant-named.test.ts` holds every caller to it).
  */
-export const sparkGrantOf = <G extends SparkVaultRow>(grants: readonly G[]): G | undefined => {
-  let best: G | undefined;
-  for (const g of grants) {
-    if (g.label !== SPARK_KEY_LABEL || g.revoked_at !== null) continue;
-    if (g.kind !== undefined && g.kind !== SPARK_GRANT_KIND && GRANT_KINDS.some((k) => k === g.kind)) continue;
-    if (best === undefined || newerThan(g, best)) best = g;
-  }
-  return best;
-};
-
-/** `keyNamed`'s order, `created_at DESC, id DESC`, as a comparison of two rows. */
-const newerThan = (a: SparkVaultRow, b: SparkVaultRow): boolean => {
-  const at = a.created_at ?? '';
-  const bt = b.created_at ?? '';
-  return at === bt ? a.id > b.id : at > bt;
-};
+export const sparkGrantOf = <G extends SparkVaultRow>(grants: readonly G[]): G | undefined =>
+  grantChosen(grants, SPARK_KEY_LABEL, (g) => g.kind === undefined || g.kind === SPARK_GRANT_KIND || !GRANT_KINDS.some((k) => k === g.kind));
 
 export type SparkHostConfig = {
   url: string;

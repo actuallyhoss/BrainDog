@@ -26,7 +26,7 @@
  * NO `node:` IMPORT, and only types from `@braindog/script`, so the Worker can build its runner here too.
  */
 
-import { ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, hostOpened, type ActionRequest, type Entry, type ScriptRunner, type Scripted } from '@braindog/kernel';
+import { ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, grantChosen, hostOpened, type ActionRequest, type Entry, type ScriptRunner, type Scripted } from '@braindog/kernel';
 import { fixOf } from '@braindog/ports';
 import type { CallContext, RecordApi } from '@braindog/record';
 import type { CtxHost, HostRequest, HostResponse, Json, ScriptAnswer, ScriptDecl, ScriptRefusal } from '@braindog/script';
@@ -155,15 +155,13 @@ export function scriptReads(api: Pick<RecordApi, 'kernel' | 'list' | 'get'>): (s
 }
 
 /**
- * The label a script names, resolved the way `keyNamed` resolves an action's `grant:`: by label or id, never a revoked
- * one, the newest first. The same order, so a script and a `call` naming one label open the same key.
+ * The label a script names, resolved by the kernel's own `grantChosen`, the chooser `keyNamed` uses for an action's
+ * `grant:`: by label or id, never a revoked one, the newest first. One function, so a script and a `call` naming one
+ * label cannot open different keys.
  */
 export function grantNamed(grants: () => ReturnType<RecordApi['kernel']['grants']>): GrantOf {
   return (label) => {
-    const live = grants()
-      .filter((g) => (g.label === label || g.id === label) && g.revoked_at === null)
-      .sort((a, b) => (a.created_at === b.created_at ? (a.id < b.id ? 1 : -1) : a.created_at < b.created_at ? 1 : -1));
-    const found = live[0];
+    const found = grantChosen(grants(), label);
     return found === undefined ? null : { id: found.id, label: found.label, opens: found.opens };
   };
 }

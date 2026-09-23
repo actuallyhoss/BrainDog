@@ -28,7 +28,8 @@ import { serveSpark } from '@braindog/host';
 import { createRecordApi } from '@braindog/record';
 
 import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
-import { workerSparkDoor } from '../src/spark.ts';
+import { keyNamed } from '../../../packages/kernel/src/actions.ts';
+import { workerSparkAnswers, workerSparkDoor } from '../src/spark.ts';
 
 const URL_ = 'https://gateway.example.test/v1/chat/completions';
 const ORIGIN = 'https://app.example.test';
@@ -153,4 +154,75 @@ test("TIER b REACHES THE ENDPOINT WITH THE GRANT ITS SETTING NAMES AND THE MODEL
   assert.match(refused.raw, /Your key is not open in this session/u);
   assert.equal(s.net.sent.length, 3, 'a proposal went out on a revoked grant');
   s.close();
+});
+
+/*
+ * THE AUTOMATION'S GATE AND THE KEY PATH, ASKED ABOUT ONE VAULT. `workerSparkAnswers` refuses a rule's question before
+ * anything is built when the vault holds no `spark` key, and the key path opens what `sparkGrantOf` chooses. At
+ * `afb3b1b2` the gate read the label and `revoked_at` alone, a third chooser beside the kernel's and the host's, so the two
+ * could disagree about whether there was a key at all. SPK-3, the Worker's half.
+ */
+
+const ASK = { run: 'run_1', step: 0, rule: 'rate', question: 'What rate applies?', shape: 'number' as const };
+const NO_SPARK_KEY = "rule.rate asked Spark at step 1, and this record's vault holds no key labelled spark, so the run stopped there. Put your model key in the vault under spark.";
+
+/** A real record with the given grants under `spark`, and this Worker's answer to an automation over it. */
+async function asked(kinds: readonly ('api_token' | 'note' | 'password')[]) {
+  const clock = fixedClock(Date.UTC(2026, 8, 22, 9));
+  const sql = openSqlite();
+  const own = openSqlite();
+  const api = await createRecordApi({ sql, clock });
+  const ids = kinds.map((kind) => {
+    clock.advance(86_400_000);
+    const bound = api.kernel.bindGrant(
+      { label: 'spark', opens: 'gateway.example.test', kind, ciphertext: new Uint8Array([1, 2, 3]), nonce: new Uint8Array([9, 8, 7]), kdf: 'hkdf', wrapped_by: 'kek', kek_id: 'kek_2f' },
+      'p_owner',
+    );
+    assert.ok(bound.ok, JSON.stringify(bound));
+    return bound.value.id;
+  });
+  const sent: (string | null)[] = [];
+  const opened: string[] = [];
+  const answer = workerSparkAnswers({ SPARK_ENDPOINT: URL_, KEK: FAKE_KEK }, () => api, {
+    sql: own,
+    clock,
+    send: async (_url, init) => {
+      sent.push(new Headers(init.headers).get('authorization'));
+      return new Response(JSON.stringify({ choices: [{ message: { role: 'assistant', content: '{"answer":4.25}' } }], usage: { prompt_tokens: 3, completion_tokens: 1 } }), { status: 200 });
+    },
+    open: () => async (grant) => (opened.push(grant.id), keyOf(grant.id)),
+  });
+  assert.ok(answer, 'a Worker with an endpoint and a KEK built no answer');
+  return { api, sql, ids, sent, opened, answer, close: () => (sql.close(), own.close()) };
+}
+
+test("A NOTE UNDER spark IS NO KEY TO THE AUTOMATION'S GATE EITHER: refused as a vault with none, before the engine is built", async () => {
+  const s = await asked(['note']);
+  try {
+    const out = await s.answer(ASK);
+    /* RED AT `afb3b1b2`: the gate saw a live row labelled `spark` and let the question by, the key path chose nothing to
+       open, `keyRequired` threw, and the run was told the key "would not open on this Worker", which sends an owner to put
+       in again a key that was never there. The refusal and the ledger were the same; the sentence and the repair were not. */
+    assert.ok(!out.ok && 'refusal' in out, JSON.stringify(out));
+    assert.deepEqual({ code: out.refusal.code, fix: out.refusal.fix }, { code: 'FORBIDDEN', fix: NO_SPARK_KEY });
+    assert.deepEqual([s.opened, s.sent], [[], []], 'a note was opened or a question was sent');
+  } finally {
+    s.close();
+  }
+});
+
+test("TWO TOKENS UNDER spark: THE AUTOMATION'S QUESTION GOES ON THE KEY A SCHEDULED ACTION NAMED spark WOULD SEND", async () => {
+  const s = await asked(['api_token', 'api_token', 'note']);
+  try {
+    const out = await s.answer(ASK);
+    assert.ok(out.ok, JSON.stringify(out));
+    const action = keyNamed(s.sql, 'spark');
+    /* THE NOTE IS THE NEWEST ROW and an action named `spark` would take it, as `packages/host/test/grant-named.test.ts`
+       case 5 holds; among tokens the two agree, and that is the newer token. */
+    assert.equal(action?.id, s.ids[2]);
+    assert.deepEqual(s.opened, [s.ids[1]]);
+    assert.deepEqual(s.sent, [`Bearer ${keyOf(s.ids[1]!)}`]);
+  } finally {
+    s.close();
+  }
 });

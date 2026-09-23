@@ -323,7 +323,7 @@ export type { Fired as PullFired, PullDecl, PullDeps } from './pull.ts';
    what an install would and never runs a body the record could not hold. */
 export { egressChanged, scriptBody } from './script.ts';
 export { finishScript, prepareScript, resumeScript, REFUSED_IN_A_ROW, type ScriptAnswer, type ScriptRunner, type ScriptRunDeps, type ScriptUnrun, type Scripted } from './script-run.ts';
-export { ACTION_KINDS, ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, KEYS_REACH_ALL, RULE_CALLS_PER_DAY, actionJitterMs, answerHash, approvalLines, egressOf, hostOpened, originsOf, reserveFor } from './actions.ts';
+export { ACTION_KINDS, ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, KEYS_REACH_ALL, RULE_CALLS_PER_DAY, actionJitterMs, answerHash, approvalLines, egressOf, grantChosen, hostOpened, originsOf, reserveFor } from './actions.ts';
 export type {
   ActionAnswer, ActionDecl, ActionKind, ActionRequest, ActionRow, ActionsRun, CallQueued, Egress, Execute,
   /* The connector runner's half: what a paging job looks like, and what a host wires to run one. */
@@ -332,6 +332,8 @@ export type {
   Budget,
   /* Why a key cannot carry an approval, and what to do about it. */
   KeyNotReady,
+  /* A vault row as far as choosing the newest live one under a name needs it. */
+  GrantChoosable,
 } from './actions.ts';
 
 /**
