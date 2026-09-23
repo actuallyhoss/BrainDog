@@ -49,6 +49,24 @@ test('THE POWERSHELL FORM ASKS FOR EACH OF THE FOUR, and offers this machine\'s 
   assert.match(text, /@\{ slug = \$slug; email = \$email; name = \$name; tz = \$tz \}/, 'the body is not built from the answers');
 });
 
+test('THE POWERSHELL FORM IS ONE SCRIPT BLOCK, & { on the first line and } on the last, so no Read-Host runs before the paste is whole', () => {
+  /* STANDS IN FOR THE PASTE, WHICH A UNIT TEST CANNOT MAKE. Pasted as twelve bare lines into a 5.1 console, PSReadLine
+     ran line one while the rest was still arriving, and the first Read-Host took the tail of line two as the operator
+     key in 2 of 14 runs: a ParserError, `$pk` never set, UNAUTHORIZED, and the answers typed after it run as commands
+     (`loop/research-batch-forty-eight-audit.md` §3, `paste-answers.ps1`). The same lines inside `& { ... }` were 8 of 8.
+     So the braces are counted as well as the ends: a block that closed on an earlier line would run from there. */
+  const lines = provisionCommands(ORIGIN, ZONE).powershell;
+  assert.equal(lines[0], '& {', `the form opens with ${JSON.stringify(lines[0])}`);
+  assert.equal(lines.at(-1), '}', `the form ends with ${JSON.stringify(lines.at(-1))}`);
+  let depth = 0;
+  lines.forEach((line, i) => {
+    depth += (line.match(/\{/g) ?? []).length - (line.match(/\}/g) ?? []).length;
+    if (i < lines.length - 1) assert.ok(depth > 0, `the block closes at line ${i + 1} of ${lines.length}: ${line}`);
+    if (i > 0 && i < lines.length - 1) assert.match(line, /^ {2,}\S/, `line ${i + 1} is not indented inside the block: ${JSON.stringify(line)}`);
+  });
+  assert.equal(depth, 0, 'the braces of the form do not balance');
+});
+
 test('THE CLAIM LINK IS PRINTED BY ITSELF, so an 80-column window does not break the only copy across two lines', () => {
   const lines = provisionCommands(ORIGIN, ZONE).powershell.map((l) => l.trim());
   assert.ok(lines.includes('$r.value.claim'), `the claim link is not on a line of its own:\n${lines.join('\n')}`);

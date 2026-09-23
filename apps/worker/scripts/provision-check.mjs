@@ -410,25 +410,43 @@ export function readProvision(status, body) {
  * THE CLAIM LINK IS PRINTED ON A LINE OF ITS OWN, because `Format-List` hard-wraps a value: at 80 columns the only copy
  * came out as two lines with ten spaces before the second (the same audit, "Found on the way"), and a link copied
  * from that is broken.
+ *
+ * AND THE POWERSHELL FORM IS ONE SCRIPT BLOCK, `& {` ON THE FIRST LINE AND `}` ON THE LAST, because a paste of bare
+ * lines races the first question. Audit forty-six measured the one-question form pasted whole and found PSReadLine
+ * took the paste into its own queue; that was measured for one `Read-Host`, and this form asks five. Measured again for
+ * this form (`loop/research-batch-forty-eight-audit.md` §3, the lines written into a real 5.1 console's input buffer
+ * with PSReadLine 2.0.0 and each answer typed three seconds apart): the bare lines lost the tail of line two to the
+ * first `Read-Host` in 2 of 14 runs, so `$pk` was never set, the post went as `Bearer ` and answered `UNAUTHORIZED`, and
+ * the answers typed after it ran as commands at the prompt. Inside `& { ... }` it was 8 of 8, because PSReadLine holds
+ * an unclosed block as one incomplete input and runs none of it until the last line. And 8 of 8 again for these exact
+ * lines as this script prints them, four spaces in, pasted by the same harness into 5.1.26100 against an echo server
+ * on this machine: every post carried its own key and every answer whole, `Zoë "Z" O'Brien` included, the key was in
+ * neither the transcript nor PSReadLine's history, and `$pk` was gone at the prompt after. `$pk` and `$key` then die with
+ * the block, so `Remove-Variable` is redundant; it stays, because it costs nothing and holds if the lines are ever run
+ * bare.
  */
 export function provisionCommands(origin, zone = localZone()) {
   const url = `${origin}/auth/provision`;
   return {
     powershell: [
-      "$key = Read-Host 'Operator key' -AsSecureString",
-      '$pk = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($key))',
-      "$slug = Read-Host 'Slug'",
-      "$email = Read-Host 'Email'",
-      "$name = Read-Host 'Name, as the passkey will show it'",
-      `$tz = Read-Host 'Time zone [${zone}]'; if (-not $tz) { $tz = '${zone}' }`,
-      '$body = @{ slug = $slug; email = $email; name = $name; tz = $tz } | ConvertTo-Json',
-      'try {',
-      `  $r = Invoke-RestMethod -Method Post -Uri '${url}' -Headers @{ Authorization = "Bearer $pk" } -ContentType 'application/json; charset=utf-8' -Body $body`,
-      '  $r.value | Select-Object * -ExcludeProperty claim | Format-List',
-      "  'The claim link, the only copy there will be:'",
-      '  $r.value.claim',
-      "} catch { 'REFUSED: ' + $_.ErrorDetails.Message }",
-      'Remove-Variable pk, key',
+      '& {',
+      ...[
+        "$key = Read-Host 'Operator key' -AsSecureString",
+        '$pk = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($key))',
+        "$slug = Read-Host 'Slug'",
+        "$email = Read-Host 'Email'",
+        "$name = Read-Host 'Name, as the passkey will show it'",
+        `$tz = Read-Host 'Time zone [${zone}]'; if (-not $tz) { $tz = '${zone}' }`,
+        '$body = @{ slug = $slug; email = $email; name = $name; tz = $tz } | ConvertTo-Json',
+        'try {',
+        `  $r = Invoke-RestMethod -Method Post -Uri '${url}' -Headers @{ Authorization = "Bearer $pk" } -ContentType 'application/json; charset=utf-8' -Body $body`,
+        '  $r.value | Select-Object * -ExcludeProperty claim | Format-List',
+        "  'The claim link, the only copy there will be:'",
+        '  $r.value.claim',
+        "} catch { 'REFUSED: ' + $_.ErrorDetails.Message }",
+        'Remove-Variable pk, key',
+      ].map((line) => `  ${line}`),
+      '}',
     ],
     bash: [
       "read -rs -p 'Operator key: ' PK; echo",

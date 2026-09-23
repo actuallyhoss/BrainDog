@@ -1849,7 +1849,8 @@ async function askedZone(copy: Request | null): Promise<unknown> {
  * Measured on Node 24.13 (ICU 77.1, tz 2025b) and in workerd (`loop/research-batch-forty-six-audit.md` §8): `Etc/GMT-3`
  * is answered back as itself and is `+03:00` under a zone's name, and `EST` is answered as `America/Panama`, which reads
  * like any region's zone and has no summer time, so a record typed `EST` from New York is an hour out from March to
- * November. The answer cannot tell `EST` from somebody who meant Panama, which is why the typed word is the test.
+ * November. The answer cannot tell `EST` from somebody who meant Panama, which is why the typed word is the test, and
+ * `EST` is one of twenty-eight: see `LEGACY_IDS`.
  * `Etc/UTC` and `Etc/GMT` stay, because UTC is not an offset from anywhere; `Intl` answers both `UTC`.
  * `SystemV/` goes whole: ICU still knows its twelve names though the tz database dropped them, answers each back as
  * itself, and `SystemV/EST5` was stored as a fixed -05:00 after the `Etc/` rule went in. The six with a summer rule are
@@ -1859,7 +1860,7 @@ function zoneOf(asked: unknown): string | null {
   if (asked === undefined || asked === null) return 'UTC';
   if (typeof asked !== 'string') return null;
   const typed = asked.trim().toUpperCase();
-  if (OFFSET_NAMES.has(typed)) return null;
+  if (LEGACY_IDS.has(typed)) return null;
   if (typed.startsWith('ETC/') && typed !== 'ETC/UTC' && typed !== 'ETC/GMT') return null;
   if (typed.startsWith('SYSTEMV/')) return null;
   try {
@@ -1871,12 +1872,75 @@ function zoneOf(asked: unknown): string | null {
 }
 
 /**
- * The three abbreviations the tz database keeps as fixed offsets under a name of their own, in upper case.
+ * ICU's legacy three-letter time zone IDs, in upper case: the twenty-five Java's `TimeZone` kept from JDK 1.1, which the
+ * tz database does not hold, and `EST`, `MST` and `HST`, which it held as fixed offsets.
  *
- * NOT `EST5EDT` AND ITS KIND, which carry the rule for summer time and are answered as `America/New_York`: those are an
- * old spelling of a place and arrive at the right arithmetic. These three do not, whatever `Intl` names them.
+ * EACH IS A CLOCK'S ABBREVIATION THAT `Intl` ANSWERS AS ONE PLACE, AND OFTEN NOT THE PLACE THE TYPIST MEANT. Only
+ * `EST`, `MST` and `HST` were refused at first, the three `loop/research-batch-forty-six-audit.md` §8 named, and the
+ * other twenty-five were stored for good (`loop/research-batch-forty-eight-audit.md` §1, Node 24.13 and workerd alike):
+ * `BST` as `Asia/Dhaka`, five hours ahead of London in the summer and six in the winter; `IST` as
+ * `Asia/Calcutta` for somebody in Dublin; `CST` as `America/Chicago` for somebody in Shanghai; `NST` as
+ * `Pacific/Auckland` and not Newfoundland; `ECT` as `Europe/Paris` and not Ecuador. Some land where the typist meant,
+ * `JST` as `Asia/Tokyo`, and are refused all the same, because the answer cannot tell which typist it has.
+ *
+ * A LIST IS RIGHT HERE, WHERE `createRecord`'S REASON AGAINST ONE IS NOT. A table of zones is wrong the next time a
+ * government moves one; this is a frozen compatibility table no government moves. It is also not written from memory:
+ * `test/provision-tz.test.ts` asks the runtime about every three-letter word, all 17,576 of them, and requires each one
+ * it takes as a zone to be refused here but the ten that stay, and those ten taken. On Node 24.13 (ICU 77.1) it takes
+ * thirty-eight, and the ten kept are `UTC`, `UCT` and `GMT`, which are UTC; `CET`, `EET`, `MET` and `WET`, the tz
+ * database's own names, which carry a summer rule and are answered as a place that keeps it; and `PRC`, `ROC` and
+ * `ROK`, country links like `GB` and `NZ` that name the place they are answered as. `EST5EDT` and its kind stay for the
+ * reason `CET` does.
  */
-const OFFSET_NAMES: ReadonlySet<string> = new Set(['EST', 'MST', 'HST']);
+const LEGACY_IDS: ReadonlySet<string> = new Set([
+  ...['ACT', 'AET', 'AGT', 'ART', 'AST', 'BET', 'BST', 'CAT', 'CNT', 'CST', 'CTT', 'EAT', 'ECT', 'IET', 'IST', 'JST', 'MIT', 'NET', 'NST', 'PLT', 'PNT', 'PRT', 'PST', 'SST', 'VST'],
+  ...['EST', 'MST', 'HST'],
+]);
+
+/**
+ * What a refused zone's fix says. For one of `LEGACY_IDS` it names the word and the place the runtime would have
+ * filed it under, because `BST` refused as "an abbreviation" leaves somebody in London to guess what was wrong with it.
+ */
+function zoneFix(asked: unknown): string {
+  const place = 'Type a zone that is a place, such as Europe/London for British time or America/New_York for Eastern time, or leave tz out for UTC.';
+  const typed = typeof asked === 'string' ? asked.trim().toUpperCase() : '';
+  if (!LEGACY_IDS.has(typed)) return 'tz takes a time zone that is a place, such as Europe/London or America/New_York, and not an offset or an abbreviation such as EST, or is left out for UTC.';
+  /* ASKED UNDER `try` BECAUSE `zoneOf` REFUSES THESE BY THE WORD BEFORE IT ASKS `Intl`, so a runtime that did not know
+     one would still arrive here, and a refusal that throws is a 500 on the one night he provisions. */
+  let filed = '';
+  try {
+    filed = ` and the runtime files it under ${new Intl.DateTimeFormat('en', { timeZone: typed }).resolvedOptions().timeZone}`;
+  } catch {
+    /* the sentence stands without the place */
+  }
+  return `${typed} is an abbreviation, which names a clock and not a place,${filed}. ${place}`;
+}
+
+/**
+ * Whether a provision's name is a placeholder nobody edited, which would be the owner's name for good.
+ *
+ * A NAME HOLDING `<` OR `>` WAS THE FIRST RULE, AND IT HELD ONE SPELLING. `provision-check.mjs` printed
+ * `name = '<your name>'` to be changed by hand, the slug and the email each refused their placeholder, and this one was
+ * taken: `personName` in `packages/host/src/invite.ts` allows brackets, so the owner's `me` and his passkey's display
+ * name said `<your name>` (`loop/research-batch-forty-six-audit.md` §7). The rule was `/[<>]/`, and on a local Worker
+ * `＜your name＞`, `‹your name›`, `[your name]`, `{your name}`, `&lt;your name&gt;`, `YOUR NAME` and `Your Name` were
+ * each 200 and stored (`loop/research-batch-forty-eight-audit.md` §5). The form no longer prints a placeholder at all,
+ * so the rule is for one copied from anywhere else, an older copy of the form among them.
+ *
+ * SO A NAME IS REFUSED WHEN IT OPENS WITH AN OPENING BRACKET AND CLOSES WITH A CLOSING ONE: Unicode's own open and
+ * close punctuation (`\p{Ps}`, `\p{Pe}`), which holds `[]`, `{}`, `()`, `〈〉`, `⟨⟩` and the full-width forms, and the
+ * four angle pairs that are not in it, `<>`, `＜＞`, `‹›` and `«»`. The last two are quotation marks to Unicode, and
+ * `«»` was left out at first, so `‹Name›` was refused and `«Name»` stored. The two need not be a pair, since `(Sam]`
+ * is no more a name than `(Sam)`. BOTH ENDS AND NOT EITHER, so `Sam (work)`, which tells two of his own passkeys
+ * apart, is a name, and so is `Zoë [Z] O’Brien`. And a name holding `<` or `>` anywhere, the entities `&lt;` or
+ * `&gt;`, or the words `your name` in any case. `personName` has trimmed the edges by now; this trims again so the
+ * rule does not lean on it.
+ */
+function placeholderName(name: string): boolean {
+  const trimmed = name.trim();
+  if (/[<>]/u.test(trimmed) || /&[lg]t;/iu.test(trimmed) || /\byour\s+name\b/iu.test(trimmed)) return true;
+  return /^[\p{Ps}<＜‹«]/u.test(trimmed) && /[\p{Pe}>＞›»]$/u.test(trimmed);
+}
 
 /** The one letter sign-in sends: plain text, the link on a line of its own, and what it is for. */
 const letter = (link: string): string =>
@@ -1914,21 +1978,17 @@ async function provision(env: Env, args: { slug: string; email: string; name?: s
       ok: false,
       refusal: {
         code: 'VALUE_MALFORMED',
-        fix: 'tz takes a time zone that is a place, such as Europe/London or America/New_York, and not an offset or an abbreviation such as EST, or is left out for UTC.',
+        fix: zoneFix(args.tz),
         at: 'tz',
       },
     };
-  /* A NAME HOLDING `<` OR `>` IS A PLACEHOLDER NOBODY EDITED, AND IT IS KEPT FOR GOOD. `provision-check.mjs` printed
-     `name = '<your name>'` to be changed by hand, the slug and the email each refused their placeholder, and this one
-     was taken: `personName` in `packages/host/src/auth.ts` allows angle brackets, so the owner's `me` and his passkey's
-     display name said `<your name>` (`loop/research-batch-forty-six-audit.md` §7). Refused here, before `prepare` writes
-     a person, so the retry with his name is still a first provision. */
-  if (args.name !== undefined && /[<>]/.test(args.name))
+  /* REFUSED HERE, BEFORE `prepare` WRITES A PERSON, so the retry with his name is still a first provision. */
+  if (args.name !== undefined && placeholderName(args.name))
     return {
       ok: false,
       refusal: {
         code: 'VALUE_MALFORMED',
-        fix: 'name is the owner’s name as the passkey will show it, and a name holds no < or >: type the name itself in place of the placeholder.',
+        fix: 'name is the owner’s name as the passkey will show it, and this one reads as a placeholder: a word in brackets, a < or a >, or the words your name. Type the name itself.',
         at: 'name',
       },
     };
