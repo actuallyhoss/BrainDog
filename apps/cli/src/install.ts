@@ -556,7 +556,13 @@ function planSettings(named: string, options: Options): Plan {
     return { lines: [`${file} already runs both BrainDog hooks${options.replace ? ' and no the old tool hook' : ''}. Nothing to change.`], write: null };
 
   const lines = [`${options.apply ? 'Changed' : 'braindog install would change'} ${file}${had ? '' : ', a new file'}:`];
-  for (const { event, command } of removed) lines.push(`  - hooks.${event}, the old tool's: ${command}`);
+  /*
+   * A HOOK IS SHOWN AS A SERVER IS, BY ITS PROGRAM AND A COUNT (finding 5 of `loop/research-batch-fifty-four-audit.md`).
+   * SEC-6 inverted `describe` for servers and left this line printing the command whole, so a hook written as
+   * `powershell -File C:/Tools/legacy/hooks/session-start.ps1 -Token <key>` put the key on the line. `SAM_HOOK` has
+   * already said which script it is, and the event heading the line says which of the two.
+   */
+  for (const { event, command } of removed) lines.push(`  - hooks.${event}, the old tool's: ${describe({ command })}`);
   for (const { event, entry } of added) lines.push(`  + hooks.${event}: ${JSON.stringify(entry)}`);
   for (const { event, entry } of added) next[event] = [...((next[event] as unknown[] | undefined) ?? []), entry];
   return { lines, write: { file, had, value: { ...settings, hooks: next } } };
@@ -565,11 +571,24 @@ function planSettings(named: string, options: Options): Plan {
 const HIDDEN = '[hidden]';
 /**
  * A piece of a word that may itself be a token: a known key prefix, or sixteen characters or more that mix letters
- * and digits. Asked now only of the program's own path, the one word `describe` still shows, because a program kept
- * under a folder named for a key is no less a key for being the first word.
+ * and digits, or a run of eight letters and digits with a digit between two letters. Asked now only of the program's
+ * own path, the one word `describe` still shows, because a program kept under a folder named for a key is no less a
+ * key for being the first word.
+ *
+ * THE THIRD TEST IS FINDING 5 OF `loop/research-batch-fifty-four-audit.md`: `C:/keys/q7Rw2xT9/node.exe` printed the
+ * folder, eight characters and no prefix, since only the first two tests were asked. A digit between two letters is
+ * what a key's random characters do and a folder's name does not: `System32`, `Python312`, `v1.0` and `v24.1.0` keep
+ * their digits at the end or apart from the letters, and are still shown. ASKED OF THE WHOLE PIECE, NOT OF EACH RUN
+ * BETWEEN `-`, `_` AND `.`: split that way, as first written, `q7Rw-2xT9` was two runs of four and printed whole, and
+ * the split kept no name shown that the whole piece hides, since a separator already breaks a letter-digit-letter
+ * run. A key of letters alone, eight or more, still shows; nothing in a name's shape tells it from a word, which is
+ * why SEC-6 shows no argument at all.
  */
 const looksLikeToken = (piece: string) =>
-  /^(?:hb|sk|pk|rk|ghp|gho|ghs|ghu|github_pat|glpat|xox[a-z]|rec|AKIA)[_-]/i.test(piece) || piece.length >= 32 || (piece.length >= 16 && /\d/.test(piece) && /[a-z]/i.test(piece));
+  /^(?:hb|sk|pk|rk|ghp|gho|ghs|ghu|github_pat|glpat|xox[a-z]|rec|AKIA)[_-]/i.test(piece) ||
+  piece.length >= 32 ||
+  (piece.length >= 16 && /\d/.test(piece) && /[a-z]/i.test(piece)) ||
+  (piece.length >= 8 && /[a-z]\d+[a-z]/i.test(piece));
 /* Each path segment on its own, so a folder is still named while a token between two slashes is not. */
 const hidePieces = (text: string) => text.split(/([\\/])/).map((piece) => (piece === '/' || piece === '\\' || !looksLikeToken(piece) ? piece : HIDDEN)).join('');
 

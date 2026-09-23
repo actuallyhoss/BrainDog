@@ -466,8 +466,9 @@ test('INSTALL --REPLACE IS A DRY RUN THAT NAMES EVERY THE OLD TOOL HOOK AND MCP 
   for (const file of [join(home, '.claude.json'), join(home, '.claude-acme', '.claude.json')]) {
     assert.ok(text.includes(`braindog install --replace would change ${file}:`), text);
   }
-  assert.equal(lines.filter((l) => l === `  - hooks.SessionStart, the old tool's: ${HB_START}`).length, 2, text);
-  assert.equal(lines.filter((l) => l === `  - hooks.SessionEnd, the old tool's: ${HB_END}`).length, 2, text);
+  /* A hook is named by its program and a count, as a server is (install-hook-tokens.test.ts), so the script path is not on the line. */
+  assert.equal(lines.filter((l) => l === "  - hooks.SessionStart, the old tool's: powershell [5 arguments hidden]").length, 2, text);
+  assert.equal(lines.filter((l) => l === "  - hooks.SessionEnd, the old tool's: powershell [5 arguments hidden]").length, 2, text);
   assert.equal(lines.filter((l) => l === "  - mcpServers.brain, the old tool's: node [1 argument hidden]").length, 2, text);
   assert.equal(lines.filter((l) => l === "  - mcpServers.brain-http, the old tool's: https://brain.example.com/mcp").length, 2, text);
   assert.equal(lines.filter((l) => l === "  - projects[\"C:/Repos/acme\"].mcpServers.brain, the old tool's: node [1 argument hidden]").length, 2, text);
