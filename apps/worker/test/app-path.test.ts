@@ -82,13 +82,37 @@ test('A PAGE LOAD ON THE OLD HOST IS A 308 TO THE SAME PAGE UNDER /app ON THE NE
   assert.equal(moved?.status, 308);
   assert.equal(moved?.headers.get('location'), 'https://brain.dog/app/r/tasks');
   assert.equal(moved?.headers.get('cache-control'), 'no-store');
-  assert.equal(legacyRedirect(on('/'), LEGACY, PUBLIC)?.headers.get('location'), 'https://brain.dog/app/');
-  assert.equal(legacyRedirect(on('/signin?next=%2Fr%2Ftasks'), LEGACY, PUBLIC)?.headers.get('location'), 'https://brain.dog/app/signin?next=%2Fr%2Ftasks');
-  assert.equal(legacyRedirect(on('/D41', { method: 'HEAD' }), LEGACY, PUBLIC)?.headers.get('location'), 'https://brain.dog/app/D41');
+  assert.equal(legacyRedirect(on('/', { headers: html }), LEGACY, PUBLIC)?.headers.get('location'), 'https://brain.dog/app/');
+  assert.equal(legacyRedirect(on('/signin?next=%2Fr%2Ftasks', { headers: html }), LEGACY, PUBLIC)?.headers.get('location'), 'https://brain.dog/app/signin?next=%2Fr%2Ftasks');
+  assert.equal(legacyRedirect(on('/D41', { method: 'HEAD', headers: html }), LEGACY, PUBLIC)?.headers.get('location'), 'https://brain.dog/app/D41');
   /* A PATH ALREADY UNDER /app IS NOT PREFIXED TWICE. */
-  assert.equal(legacyRedirect(on('/app/acme/r/tasks'), LEGACY, PUBLIC)?.headers.get('location'), 'https://brain.dog/app/acme/r/tasks');
+  assert.equal(legacyRedirect(on('/app/acme/r/tasks', { headers: html }), LEGACY, PUBLIC)?.headers.get('location'), 'https://brain.dog/app/acme/r/tasks');
   /* A LIST OF NAMES, and case is not a different name. */
-  assert.equal(legacyRedirect(new Request('https://APP.Brain.Dog/x'), ' other.example , app.brain.dog', PUBLIC)?.status, 308);
+  assert.equal(legacyRedirect(new Request('https://APP.Brain.Dog/x', { headers: html }), ' other.example , app.brain.dog', PUBLIC)?.status, 308);
+});
+
+/* FINDING 7 OF `loop/research-batch-forty-two-audit.md`, AGAINST §2.5'S TWO STATEMENTS. Measured with push B's vars
+   before this test: `GET app.brain.dog/app/acme/api/boot` was a 308 to `brain.dog` with no Accept, with a wildcard one
+   and with `text/html`, and so were `/app/_app/version.json` and `/app/fonts/geist.woff2` under a wildcard. The public
+   host's branch already asked both questions below; the legacy branch asked neither. */
+test('§2.5: "/api/*, /mcp AND /in/* ARE SERVED, NEVER REDIRECTED" ON THE OLD HOST, AND THAT INCLUDES A SLUG’S /api', () => {
+  /* THE WEB'S ONE GET, `hostGet`'s Spark status, is sent under the slug by `apiBase()`. A 308 to another origin carries
+     no CORS header, so a stale tab's same-origin fetch cannot follow it and the palette's Spark line fails. */
+  for (const accept of [undefined, '*/*', 'text/html,application/xhtml+xml'])
+    for (const path of ['/app/acme/api/boot', '/app/acme/api/spark/status', '/app/acme//api/boot'])
+      assert.equal(legacyRedirect(on(path, accept === undefined ? {} : { headers: { accept } }), LEGACY, PUBLIC), null, `${path} ${accept ?? '(no accept)'}`);
+});
+
+test('§2.5: ONLY A "BROWSER NAVIGATION" IS MOVED OFF THE OLD HOST, which is a GET or a HEAD that asks for HTML', () => {
+  /* A STALE SHELL'S VERSION POLL AND ITS FONTS: a 308 to another origin fails the fetch where serving them costs nothing. */
+  for (const path of ['/app/_app/version.json', '/app/fonts/geist.woff2', '/_app/version.json', '/favicon.ico'])
+    assert.equal(legacyRedirect(on(path, { headers: { accept: '*/*' } }), LEGACY, PUBLIC), null, path);
+  /* NO ACCEPT AT ALL IS A SCRIPT OR A PROBE, NOT A BROWSER, which always says `text/html` for a page. */
+  for (const path of ['/', '/r/tasks', '/app/acme/r/tasks']) assert.equal(legacyRedirect(on(path), LEGACY, PUBLIC), null, path);
+  assert.equal(legacyRedirect(on('/r/tasks', { method: 'HEAD' }), LEGACY, PUBLIC), null);
+  /* AND THE SAME PAGES, ASKED AS A PAGE, ARE MOVED, so the check spares the fetch and never the navigation. */
+  for (const path of ['/', '/r/tasks', '/app/acme/r/tasks'])
+    assert.equal(legacyRedirect(on(path, { headers: html }), LEGACY, PUBLIC)?.status, 308, path);
 });
 
 test('/api, /mcp AND /in/* ON THE OLD HOST ARE SERVED WHERE THEY STAND, BECAUSE NOTHING THAT CALLS THEM FOLLOWS A REDIRECT', () => {
@@ -104,16 +128,18 @@ test('/api, /mcp AND /in/* ON THE OLD HOST ARE SERVED WHERE THEY STAND, BECAUSE 
 });
 
 test('UNSET IS THE WORKER AS IT WAS: no legacy host or no public host, and the public host is never sent to another name', () => {
-  assert.equal(legacyRedirect(on('/r/tasks'), undefined, PUBLIC), null);
-  assert.equal(legacyRedirect(on('/r/tasks'), '', PUBLIC), null);
-  assert.equal(legacyRedirect(on('/r/tasks'), LEGACY, undefined), null);
+  /* ASKED AS A PAGE LOAD, BECAUSE NOTHING ELSE IS MOVED ON EITHER HOST NOW. Without the Accept these held whatever the
+     list said: with the `hosts.includes` line deleted, so that every name was legacy, the whole file still passed. */
+  assert.equal(legacyRedirect(on('/r/tasks', { headers: html }), undefined, PUBLIC), null);
+  assert.equal(legacyRedirect(on('/r/tasks', { headers: html }), '', PUBLIC), null);
+  assert.equal(legacyRedirect(on('/r/tasks', { headers: html }), LEGACY, undefined), null);
   assert.equal(legacyRedirect(on('/r/tasks'), LEGACY, ''), null);
   assert.equal(legacyRedirect(on('/r/tasks', { headers: html }), LEGACY, ''), null);
   /* A NAME LISTED AS BOTH is the public host and nothing else. Read as legacy it would be sent to itself; read as the
      public host its page load goes to `/app` on the same name, and `/app` is never redirected, so it ends there. */
   assert.equal(legacyRedirect(on('/r/tasks'), LEGACY, LEGACY), null);
   assert.equal(legacyRedirect(on('/r/tasks', { headers: html }), LEGACY, LEGACY)?.headers.get('location'), 'https://app.brain.dog/app/r/tasks');
-  assert.equal(legacyRedirect(new Request('https://brain.dog/r/tasks'), LEGACY, PUBLIC), null);
+  assert.equal(legacyRedirect(new Request('https://brain.dog/r/tasks', { headers: html }), LEGACY, PUBLIC)?.headers.get('location'), 'https://brain.dog/app/r/tasks');
 });
 
 /* ── the public host, before the move reaches it ──────────────────────── */

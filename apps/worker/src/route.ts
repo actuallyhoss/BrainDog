@@ -191,9 +191,17 @@ export function atRoot(request: Request, rest: string): Request {
  * site's "Open the app" and every magic link already mailed would have landed on it. After the flip this branch does
  * not fire, because the zone routes on `brain.dog` deliver only the doors and `/app`, and the site answers the rest.
  *
- * ONLY WHEN THE BROWSER ASKS FOR HTML, which the old host does not require. A navigation always says `text/html`; an old
- * shell's poll of `/_app/version.json`, a favicon and a script's GET do not, and for those the router's own 404 is the
- * true answer where a redirect into the app would be a page handed to something that cannot draw one.
+ * ONLY WHEN THE BROWSER ASKS FOR HTML, ON EITHER HOST. A navigation always says `text/html`; an old shell's poll of
+ * `/_app/version.json`, a favicon and a script's GET do not, and for those the router's own answer is the true one
+ * where a redirect into the app would be a page handed to something that cannot draw one. The old host asked no
+ * `Accept` until audit forty-two's finding 7: with push B's vars, a stale tab's `/app/_app/version.json` and
+ * `/app/fonts/geist.woff2` under a wildcard `Accept` were measured going to `brain.dog`, another origin, which a
+ * same-origin fetch cannot follow.
+ *
+ * AND A SLUG'S `/api` IS A DOOR TOO, WHICH THE ROOT'S LIST DOES NOT SEE. `/app/<slug>/api/<method>` is none of the six
+ * prefixes, so on the old host it was a 308 whatever the `Accept`, and `hostGet`'s `GET /api/spark/status`, which
+ * `apiBase()` sends under the slug, would have failed in every tab left open across push B. The public host never
+ * showed it only because it spares all of `/app`.
  */
 export function legacyRedirect(request: Request, legacy: string | undefined, publicHost: string | undefined): Response | null {
   const home = (publicHost ?? '').trim().toLowerCase();
@@ -202,9 +210,12 @@ export function legacyRedirect(request: Request, legacy: string | undefined, pub
   const host = url.host.toLowerCase();
   const path = url.pathname;
   if (servesApi(path) || servesMcp(path) || servesIn(path) || servesAuth(path) || servesAccount(path) || servesBuild(path)) return null;
+  const app = appPath(path);
+  if (app !== null && servesApi(app.rest)) return null;
+  if (!/text\/html/i.test(request.headers.get('accept') ?? '')) return null;
   const inApp = /^\/+app(?:\/|$)/.test(path);
   if (host === home) {
-    if (inApp || !/text\/html/i.test(request.headers.get('accept') ?? '')) return null;
+    if (inApp) return null;
     return new Response(null, { status: 308, headers: { location: `https://${home}/app${path}${url.search}`, 'cache-control': 'no-store' } });
   }
   const hosts = (legacy ?? '').split(',').map((h) => h.trim().toLowerCase()).filter((h) => h !== '');
