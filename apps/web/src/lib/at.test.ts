@@ -99,6 +99,20 @@ test('sign-in comes back to the address it was sent from, and never to one somew
     assert.equal(onward(bad), `${BASE}/`, bad);
 });
 
+/* THE SPELLING IS NOT THE ADDRESS. Each of these starts with `/app/` as typed, and each resolves on this origin outside
+   the app (`loop/research-batch-forty-nine-audit.md` §8). Wave 50 caught them in `signin.ts` only, so `onward()` called
+   on its own still handed back every one while its comment said a next that leaves the app is dropped. */
+test('A NEXT IS JUDGED WHERE IT RESOLVES, so a dot segment however spelled cannot carry it out of the app', () => {
+  for (const bad of ['/app/../auth/session', '/app/%2e%2e/api/export', '/app/%2E%2E/api/export', '/app/.%2e/in/x', '/app/..'])
+    assert.equal(onward(`?${new URLSearchParams({ next: bad })}`), `${BASE}/`, bad);
+  /* A TAB OR A NEWLINE IS DELETED BY THE PARSER BEFORE IT READS, so `/\t/[` is `//[` to it: a host, and not a valid one.
+     `new URL` threw on it, and the sign-in page calls this before it reads its link, so the page died on arrival. */
+  for (const bad of ['/\t/[', '/\n/evil.example', '/\r/evil.example/app/x'])
+    assert.equal(onward(`?${new URLSearchParams({ next: bad })}`), `${BASE}/`, JSON.stringify(bad));
+  /* One that resolves inside the app is followed as it resolves, so what is drawn is what the browser will open. */
+  assert.equal(onward(`?${new URLSearchParams({ next: '/app/acme/../shop/./r/tasks?f=a#top' })}`), '/app/shop/r/tasks?f=a#top');
+});
+
 test('THE BASE HERE IS THE BASE THE BUILD WAS GIVEN, and the build lands where the Worker serves it from', async () => {
   /* A PATH IN A VARIABLE, so `svelte-check` does not ask for a declaration file for a config written in JavaScript. */
   const file = '../../svelte.config.js';

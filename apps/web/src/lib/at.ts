@@ -101,13 +101,29 @@ export function signInFirst(code: string, url: { pathname: string; search: strin
   return code === 'UNAUTHORIZED' && parts?.slug && !RECORDLESS.has(word) ? signinFor(url) : null;
 }
 
+/* AN ORIGIN NOBODY SERVES, so a `next` that names any real one resolves off it and is refused, and `onward()` needs no
+   `location` to answer. It is the stand-in the host's `safeNext` resolves against too, so the two halves agree. */
+const HERE = 'https://here.invalid';
+
 /**
- * Where sign-in sends a person once they are in: the `next` it was handed, when that is an address in this app.
+ * Where sign-in sends a person once they are in: the `next` it was handed, resolved as a browser will resolve the
+ * href, when that lands in this app. The resolved address is returned in place of the typed one.
  *
  * ANYTHING ELSE IS THE APP'S FRONT DOOR. A `next` is written by whoever wrote the link, so one that leaves the app, the
  * origin, or reaches a backslash a browser reads as a slash is an open redirect and is dropped rather than followed.
+ *
+ * THE SPELLING PASSED AND THE ADDRESS DID NOT. This checked the string as typed, so `/app/../auth/session`,
+ * `/app/%2e%2e/api/export`, `/app/.%2e/in/x` and `/app/..` each started with `/app/` and each opened on this origin
+ * outside the app (`loop/research-batch-forty-nine-audit.md` §8). Wave 50 resolved them in `signin.ts` alone, which
+ * left this function's own promise false for any other caller; so the rule is here, once, and sign-in calls it.
+ *
+ * A TAB, A NEWLINE OR A RETURN IS REFUSED BEFORE IT IS PARSED. The URL parser deletes them first, so `/\t/[` reads as
+ * `//[`, a host that is not valid, and `new URL` threw; the sign-in page calls this on arrival before it takes its
+ * link, so one crafted `next` stopped the page. Refused here, every value left is a path and the parse cannot throw.
  */
 export function onward(search: string = globalThis.location?.search ?? ''): string {
   const next = new URLSearchParams(search).get('next') ?? '';
-  return split(next) !== null && !next.startsWith('//') && !next.includes('\\') ? next : `${BASE}/`;
+  if (!next.startsWith('/') || next.startsWith('//') || /[\\\t\n\r]/.test(next)) return `${BASE}/`;
+  const url = new URL(next, HERE);
+  return url.origin === HERE && split(url.pathname) !== null ? `${url.pathname}${url.search}${url.hash}` : `${BASE}/`;
 }
