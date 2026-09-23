@@ -100,6 +100,21 @@ export function lease(sql: Sql, deps: AckDeps, kinds: readonly OutboxKind[], n: 
   const nowMs = deps.nowMs;
   const marks = wanted.map(() => '?').join(', ');
 
+  /* AN EXPIRED LEASE ON A QUESTION NO RUN IS WAITING ON IS FINISHED, AND NOT HANDED OUT AGAIN. `release()` leaves a leased
+     Spark job to its ack, and wave fifty taught the ack's failed branch to read the run; a host that never acked came
+     through here instead, where only the clock was read. Wave fifty's checker measured it and
+     `lease-cancelled-run.test.ts` counts it: a job leased, its run cancelled and never acked was handed out seven more
+     times over 24 minutes of clock, each a post on the owner's key in the name of a rule that is gone, and ended `dead`
+     with `attempts` 8, a dead letter addressed to a run that had already stopped. `done` with the expiry counted, as
+     the failed ack counts it, because a host was handed it.
+
+     BEFORE THE DEAD-LETTER SWEEP BELOW, or a job on its last rung is dead-lettered for a run that is over. */
+  for (const row of sql.all<{ id: string; payload: string }>(
+    "SELECT id, payload FROM outbox WHERE kind = 'infer.ask' AND state = 'leased' AND leased_until < ?",
+    iso(nowMs),
+  ))
+    if (!awaited(sql, row.id, row.payload)) finishUnawaited(sql, row.id, 1);
+
   /* AN EXPIRED LEASE THAT HAS RUN OUT OF LADDER IS DEAD, and this runs first so the claim below
      cannot hand it out again. Without it a deliverer that never acks — crashed, or simply slower
      than the sixty-second window — was handed the same job forever: forty deliveries in the probe,
@@ -175,8 +190,21 @@ export const backoffMs = (attempts: number): number => Math.min(2 ** attempts * 
  * FENCED ON THE LEASE, for the reason `Ack` spells out below. A pass that ran long, lost its lease
  * to another host and then released what it thought it held would unclaim a row that host is in
  * the middle of running, and two hosts would fetch one window from one provider.
+ *
+ * A QUESTION NO RUN IS WAITING ON IS FINISHED INSTEAD, with its attempt count as it was. `release()` deletes a pending
+ * Spark job only at the moment its run ends, so one handed back to `pending` after that was a job nothing would ever
+ * delete, and the next lease posted it: one more question asked for a run already `cancelled` (wave fifty's checker).
  */
 export function unlease(sql: Sql, args: { id: string; leasedUntil: string }): void {
+  const row = sql.one<{ kind: string; payload: string }>(
+    "SELECT kind, payload FROM outbox WHERE id = ? AND state = 'leased' AND leased_until = ?",
+    args.id,
+    args.leasedUntil,
+  );
+  if (row?.kind === 'infer.ask' && !awaited(sql, args.id, row.payload)) {
+    finishUnawaited(sql, args.id, 0);
+    return;
+  }
   sql.exec(
     "UPDATE outbox SET state = 'pending', leased_until = NULL WHERE id = ? AND state = 'leased' AND leased_until = ?",
     args.id,
@@ -390,24 +418,11 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
 
      THE RUN AND THE STEP ROW BOTH, the pair `answerStep` holds an answer to. `release()` leaves the step row `waiting`
      after it cancels the run, so the step row alone passed a cancelled run's job straight through; and a run still
-     waiting whose step names another job is not waiting on this one. */
-  if (row.kind === 'infer.ask') {
-    const asked = JSON.parse(row.payload) as { run?: unknown; step?: unknown };
-    const waiting =
-      typeof asked.run === 'string' &&
-      typeof asked.step === 'number' &&
-      sql.one<{ n: number }>(
-        `SELECT 1 AS n FROM automation_run r JOIN automation_step s ON s.run = r.id AND s.n = r.step
-         WHERE r.id = ? AND r.state = 'waiting' AND r.step = ? AND s.state = 'waiting' AND s.answer = ?`,
-        asked.run,
-        asked.step,
-        args.id,
-      ) !== undefined;
-    if (!waiting) {
-      sql.exec("UPDATE outbox SET state = 'done', leased_until = NULL, attempts = attempts + 1 WHERE id = ?", args.id);
-      sql.exec("DELETE FROM schedule WHERE kind = 'retry' AND key = ?", `outbox:${args.id}`);
-      return ok(null);
-    }
+     waiting whose step names another job is not waiting on this one. `lease()` and `unlease()` read the same pair
+     through `awaited`, since a host that never acks and one that hands the job back reach the same run. */
+  if (row.kind === 'infer.ask' && !awaited(sql, args.id, row.payload)) {
+    finishUnawaited(sql, args.id, 1);
+    return ok(null);
   }
 
   const after = sql.one<{ attempts: number }>(
@@ -475,6 +490,42 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
   sql.exec("UPDATE outbox SET state = 'dead' WHERE id = ?", args.id);
   deadLetter(sql, deps, { id: args.id, kind: row.kind, payload: row.payload, attempts, error });
   return ok(null);
+}
+
+/**
+ * Whether an `infer.ask` job is still the one its run waits on: the run `waiting` at the payload's step, and that step's
+ * row holding this job's id, which is the pair `answerStep` in `flow.ts` holds an answer to. A payload without a run
+ * and a step answers nothing, and reads as not awaited.
+ *
+ * THE STEP ROW'S OWN STATE IS NOT READ, BECAUSE THE RUN'S ALREADY SAYS IT. Wave fifty's query also asked for
+ * `s.state = 'waiting'`, and taking it out failed none of the kernel's 1476 tests. Nothing reachable needs it:
+ * `advance` parks a run `waiting` at step i only straight after writing step i's row `waiting`, and every write that
+ * moves that row on moves the run too, either to `pending` at i + 1 (`answerStep`), or to `failed` first (`finish`),
+ * or with the run already `running`, as `advance` marks it before it takes any step. A plan's jumps only go forward,
+ * so no run comes back to a step whose row is already finished, and a finished ask's row holds its answer, never the
+ * job's id. A test of that clause would have to write a step row no code writes.
+ */
+function awaited(sql: Sql, id: string, payload: string): boolean {
+  const asked = JSON.parse(payload) as { run?: unknown; step?: unknown };
+  if (typeof asked.run !== 'string' || typeof asked.step !== 'number') return false;
+  return (
+    sql.one<{ n: number }>(
+      `SELECT 1 AS n FROM automation_run r JOIN automation_step s ON s.run = r.id AND s.n = r.step
+       WHERE r.id = ? AND r.state = 'waiting' AND r.step = ? AND s.answer = ?`,
+      asked.run,
+      asked.step,
+      id,
+    ) !== undefined
+  );
+}
+
+/**
+ * Finish a question nobody is waiting on: `done`, with no `retry`. `tried` is 1 where a host was handed the job and 0
+ * where it handed the job back unrun. `done` and not deleted, because the row is the trace of what was asked.
+ */
+function finishUnawaited(sql: Sql, id: string, tried: 0 | 1): void {
+  sql.exec("UPDATE outbox SET state = 'done', leased_until = NULL, attempts = attempts + ? WHERE id = ?", tried, id);
+  sql.exec("DELETE FROM schedule WHERE kind = 'retry' AND key = ?", `outbox:${id}`);
 }
 
 /**
