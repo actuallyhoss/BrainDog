@@ -1555,15 +1555,14 @@ const matchless = (match: unknown): string => (match === undefined ? 'has no mat
  * against every pattern that will still name it once the batch lands: the batch counts, so a pattern dropping its
  * `door:` in the same call is not counted.
  *
- * RETIRING THE DOOR IS NOT REFUSED HERE OR IN `retireDeclarations`, though the audit's (c) measured the same hole that
- * way. Tried on 23 September, the refusal stopped money-core's own update: its plan handed `bank-ipn-in-sms`, which filed
- * a row, to `bank-hsbc-eg` with its `door: bank-from-out-sms`, and retired the door, which held no token and filed
- * nothing. Tried again the same day with `packages/declare`'s plan change in the working tree, which hands a door with
- * the pattern naming it (`packages/declare/test/door-follows-patterns.test.ts`): the guard then changed nothing that
- * `bank-pack.test.ts` or `plan-handover-shown.test.ts` asserts, measured with every assertion made to log and carry on,
- * and it refused one test outright, `packages/record/test/ingest-verify-digest.test.ts`'s retire of
- * `bank-from-out-sms`, which five of the bank's patterns read. That test has to retire a webhook no pattern names, as
- * its neighbour already does for finding 4 (b), before the guard can land.
+ * RETIRING THE DOOR IS REFUSED IN `retireDeclarations`, NOT HERE, for the audit's (c). Tried first on 23 September, the
+ * refusal stopped money-core's own update: its plan handed `bank-ipn-in-sms`, which filed a row, to `bank-hsbc-eg` with
+ * its `door: bank-from-out-sms`, and retired the door, which held no token and filed nothing. The plan now hands a door
+ * with the pattern naming it (`packages/declare/test/door-follows-patterns.test.ts`), and with that in the tree the
+ * guard changed nothing `bank-pack.test.ts` or `plan-handover-shown.test.ts` asserts, measured with every assertion made
+ * to log and carry on. The one test it refused outright, `packages/record/test/ingest-verify-digest.test.ts`'s retire of
+ * `bank-from-out-sms`, which five of the bank's patterns read, now retires a webhook no pattern names, as its neighbour
+ * already did for finding 4 (b). Without that plan change, this guard is the one that stopped the update.
  *
  * ASKED AFTER EVERY DECLARATION OF THE BATCH HAS PASSED `validate` (`doorsKept`), NOT INSIDE IT. Asked from
  * `ingestBody`, a batch shipping a door with no token and a pattern naming it was answered at the door's `verify` before
@@ -4290,6 +4289,23 @@ export function retireDeclarations(
         'SCOPES_IN_USE',
         `${home.id} holds the projects, and ${scoped.join(', ')} still ${scoped.length === 1 ? 'points' : 'point'} at them. Take out the ${scoped.length === 1 ? 'register that declares that field' : 'registers that declare those fields'} in the same call, or keep ${home.id}.`,
         { at: scoped[0]! },
+      );
+  }
+
+  /* THE DOOR GUARD: a webhook ingest a live pattern names as its `door:` goes with that pattern or not at all. Retired
+     alone it answered `ok` and left the pattern naming a door no text can arrive at, the declaration `doorFault` refuses
+     at install (`loop/research-batch-forty-two-audit.md` finding 4 (c), `test/retire-door.test.ts`). */
+  const going = (id: string): boolean => ids.includes(id) || alsoGoing.includes(id);
+  for (const door of ids.filter((id) => id.startsWith('ingest.'))) {
+    const naming = rows
+      .filter((r) => r.kind === 'ingest' && !going(r.id) && r.body.door === door.slice('ingest.'.length))
+      .map((r) => r.id)
+      .sort();
+    if (naming.length > 0)
+      return no<number>(
+        'DECLARATION_INVALID',
+        `${door} is the door ${listed(naming)} ${naming.length === 1 ? 'reads' : 'read'}, and retiring it would leave ${naming.length === 1 ? 'that pattern' : 'those patterns'} naming a door nothing arrives at. Retire ${naming.length === 1 ? 'it' : 'them'} in the same call, or keep ${door}.`,
+        { at: naming[0]! },
       );
   }
 

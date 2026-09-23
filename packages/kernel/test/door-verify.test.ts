@@ -14,9 +14,9 @@
  * whatever the text (`{ all: [] }`, `{ none: [] }`, or either of them beside a phrase under `any`), and both are refused
  * on either side.
  *
- * (c), THE DOOR RETIRED, IS NOT HELD HERE. Refused in `retireDeclarations` on 23 September, it stopped money-core's own
- * update, whose plan hands a pattern naming the door to `bank-hsbc-eg` and retires the door
- * (`packages/seed/test/bank-pack.test.ts`), so it waits on which of the two that plan should hand.
+ * (c), THE DOOR RETIRED, IS HELD IN `test/retire-door.test.ts`, not here, because it is refused in `retireDeclarations`
+ * rather than at install. Its first attempt stopped money-core's own update, whose plan then handed a pattern naming the
+ * door to `bank-hsbc-eg` and retired the door; the plan now hands the door with it.
  */
 
 import { test } from 'node:test';

@@ -123,19 +123,27 @@ const redeclare = async (api: Awaited<ReturnType<typeof record>>['api'], body: R
 };
 
 test('A TOKEN DOES NOT OUTLIVE ITS DECLARATION: retired and declared again, the id answers none and the digest is gone', async () => {
+  /* A WEBHOOK NO PATTERN NAMES AS ITS DOOR, and not `bank-from-out-sms`, for the same reason as the test below. Five of
+     the bank's patterns read that one, and since `loop/research-batch-forty-two-audit.md` finding 4 (c) retiring it is
+     refused while they do, so this case failed on 23 September at `DECLARATION_INVALID at ingest.bank-card-used-sms`
+     before it reached the digest. The refusal is asserted first; the digest is the same code on either id. */
   const { sql, api } = await record();
-  const minted = await api.ingestMint({ ingest: 'bank-from-out-sms' }, owner);
-  assert.ok(minted.ok);
+  const door = HSBC_EG_SMS_INGESTS['bank-from-out-sms']!;
+  const kept = api.kernel.retire(['ingest.bank-from-out-sms']);
+  assert.equal(!kept.ok && 'refusal' in kept ? kept.refusal.at : JSON.stringify(kept), 'ingest.bank-card-used-sms', 'the bank door was retired while its patterns still name it');
+  await redeclare(api, door, 'lone-sms');
+  const minted = await api.ingestMint({ ingest: 'lone-sms' }, owner);
+  assert.ok(minted.ok, JSON.stringify(minted));
   const held = sha256(minted.value.token);
-  const retired = api.kernel.retire(['ingest.bank-from-out-sms']);
+  const retired = api.kernel.retire(['ingest.lone-sms']);
   assert.ok(retired.ok, JSON.stringify(retired));
-  await redeclare(api, HSBC_EG_SMS_INGESTS['bank-from-out-sms']!);
-  assert.deepEqual(await api.ingestVerify({ ingest: 'bank-from-out-sms' }), { kind: 'none' }, 'the token minted for the retired declaration verifies its successor');
+  await redeclare(api, door, 'lone-sms');
+  assert.deepEqual(await api.ingestVerify({ ingest: 'lone-sms' }), { kind: 'none' }, 'the token minted for the retired declaration verifies its successor');
   assert.deepEqual(holding(sql, held), [], 'the retired declaration left its digest in the record');
   /* AND A NEW MINT IS WHAT MAKES THE NEW DECLARATION A DOOR, which is the only way one should become one. */
-  const again = await api.ingestMint({ ingest: 'bank-from-out-sms' }, owner);
+  const again = await api.ingestMint({ ingest: 'lone-sms' }, owner);
   assert.ok(again.ok);
-  assert.deepEqual(await api.ingestVerify({ ingest: 'bank-from-out-sms' }), { kind: 'path', sha256: sha256(again.value.token) });
+  assert.deepEqual(await api.ingestVerify({ ingest: 'lone-sms' }), { kind: 'path', sha256: sha256(again.value.token) });
   sql.close();
 });
 
