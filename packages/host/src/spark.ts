@@ -111,20 +111,29 @@ const endpointUrl = (raw: string): URL => {
  * `UNREACHABLE`, `answer` settles that row under `-`, which no count reads, and `serveAsks`'s `RETRIED` asks it again.
  * Measured by `loop/research-batch-forty-six-audit.md` finding 4 through the self-host: a model answering one question with
  * a 200 of 70,000 characters served four completions, the endpoint reporting 16,000 completion tokens each, and the ledger
- * held four rows under `-` with `tokens_out` 0 (`apps/selfhost/test/spark-answers.test.ts`). The status, the size and the
- * parse are all read after `send` resolved, so the endpoint was reached and may have billed; the timeout is counted with
- * them because the cap is the bound on spend and a model that ran out the clock may have run to the end.
+ * held four rows under `-` with `tokens_out` 0 (`apps/selfhost/test/spark-answers.test.ts`). The size and the parse are
+ * read after a 200, so a model ran and the provider may have billed; the timeout is counted with them because the cap is
+ * the bound on spend and a model that ran out the clock may have run to the end.
+ *
+ * A STATUS THAT IS NOT `ok` IS NOT ONE OF THEM, AND WAVE 47 HAD IT AS ONE. `loop/research-worker-spark.md` §6 Q8, whose
+ * default is taken here for the owner: marked, a 429, a 502, a 503 or a 401 spent an ask and ended the run on the first
+ * rung, where before wave 47 each was retried uncounted. A status is the endpoint saying no completion was served, so it
+ * is a plain throw again (`post`), and what is marked is what a provider bills: the size, the parse, a body that broke
+ * off, and the timeout.
  *
  * A MARK AND NOT AN IMPORT, because the package may not import this host (`46 §5.1`) and reads the field structurally.
  * `usage` is the provider's count where the body held one, so the row bills what was reported and not the estimate.
+ * `model` is the name this host sent, for the row's `model` column (see `endpointInference`).
  */
 export class SparkAnsweredError extends Error {
   readonly answered = true;
   readonly usage: { in: number; out: number } | undefined;
-  constructor(message: string, usage?: { in: number; out: number }) {
+  readonly model: string | undefined;
+  constructor(message: string, usage?: { in: number; out: number }, model?: string) {
     super(message);
     this.name = 'SparkAnsweredError';
     this.usage = usage;
+    this.model = model;
   }
 }
 
@@ -153,11 +162,12 @@ const usageIn = (text: string): { in: number; out: number } | undefined => {
  * (`key()`), put in a header and nowhere else, and gone when the string this returns is handed back. A second copy of these
  * eight lines is a second place for the key to end up in a request body or an error sentence.
  *
- * ONLY A `send` THAT NEVER RESOLVED, AND NOT BY THE CLOCK, IS A PLAIN THROW: a refused connection, a name that did not
- * resolve. That is the one throw the package still settles under `-` and the host still asks again, which is audit
- * forty-two's finding 6 and stays fixed. Everything else is a `SparkAnsweredError`.
+ * TWO THROWS ARE PLAIN, AND THE PACKAGE SETTLES BOTH UNDER `-` AND THE HOST ASKS BOTH AGAIN: a `send` that never
+ * resolved, and not by the clock (a refused connection, a name that did not resolve), which is audit forty-two's finding
+ * 6 and stays fixed; and a status that is not `ok`, which is Q8's default (`SparkAnsweredError` says why). Everything
+ * after a 200, and the timeout, is a `SparkAnsweredError`, carrying `model`, the name the body was sent with.
  */
-const post = async (url: URL, options: EndpointModelOptions, body: unknown): Promise<string> => {
+const post = async (url: URL, options: EndpointModelOptions, body: unknown, model?: string): Promise<string> => {
   const headers: Record<string, string> = { 'content-type': 'application/json', accept: 'application/json' };
   const key = options.key ? await options.key() : null;
   if (key) headers.authorization = `Bearer ${key}`;
@@ -166,7 +176,8 @@ const post = async (url: URL, options: EndpointModelOptions, body: unknown): Pro
   /* THE SIGNAL AND NOT THE ERROR'S NAME, because a `send` is anybody's function and what it rejects with on an abort is
      its own choice: fetch says `TimeoutError`, a fake says whatever it was written to. The signal says whether the clock
      ran out. */
-  const timedOut = (): SparkAnsweredError => new SparkAnsweredError(`The Spark endpoint did not finish answering within ${ms / 1000} seconds.`);
+  const timedOut = (): SparkAnsweredError =>
+    new SparkAnsweredError(`The Spark endpoint did not finish answering within ${ms / 1000} seconds.`, undefined, model);
   let res: Response;
   try {
     res = await options.send(url, {
@@ -182,15 +193,16 @@ const post = async (url: URL, options: EndpointModelOptions, body: unknown): Pro
   } catch (e) {
     throw signal.aborted ? timedOut() : e;
   }
-  /* THE STATUS AND NOTHING ELSE. An error body can echo the request, and the request can carry the key. */
-  if (!res.ok) throw new SparkAnsweredError(`The Spark endpoint answered ${res.status}.`);
+  /* THE STATUS AND NOTHING ELSE. An error body can echo the request, and the request can carry the key. A PLAIN THROW,
+     NOT MARKED: no completion was served, so the package settles it under `-` and the ladder asks again (Q8's default). */
+  if (!res.ok) throw new Error(`The Spark endpoint answered ${res.status}.`);
   let text: string;
   try {
     text = await res.text();
   } catch {
-    throw signal.aborted ? timedOut() : new SparkAnsweredError('The Spark endpoint broke off its answer.');
+    throw signal.aborted ? timedOut() : new SparkAnsweredError('The Spark endpoint broke off its answer.', undefined, model);
   }
-  if (text.length > ANSWER_BYTES) throw new SparkAnsweredError('The Spark endpoint answered more than Spark reads.', usageIn(text));
+  if (text.length > ANSWER_BYTES) throw new SparkAnsweredError('The Spark endpoint answered more than Spark reads.', usageIn(text), model);
   return text;
 };
 
@@ -246,8 +258,13 @@ export type SparkInferenceCall = {
   jsonSchema: object;
 };
 
-/** What the package reads back. `usage` is the provider's own count, which is what the meter bills (`46 §4.1`). */
-export type SparkInferenceReply = { text: string; usage: { in: number; out: number } };
+/**
+ * What the package reads back. `usage` is the provider's own count, which is what the meter bills (`46 §4.1`).
+ *
+ * `model` IS THE NAME THIS HOST SENT, AND IT IS OPTIONAL. The package's `InferenceReply` has no such field and `answer`
+ * reads it structurally, as it reads `answered` off a throw, so an adapter that leaves it out keeps the template's name.
+ */
+export type SparkInferenceReply = { text: string; usage: { in: number; out: number }; model?: string };
 
 export interface SparkInference {
   complete(call: SparkInferenceCall): Promise<SparkInferenceReply>;
@@ -269,8 +286,15 @@ const ROUTING_NAMES: ReadonlySet<string> = new Set(['llama-3.2-1b', 'glm-5.3-fla
 const modelSent = (asked: string, configured: string | undefined): string =>
   configured !== undefined && ROUTING_NAMES.has(asked) ? configured : asked;
 
-/** A count the endpoint may not have sent. Absent is zero, and zero bills nothing rather than guessing a figure. */
-const counted = (value: unknown): number => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+/**
+ * A count the endpoint may not have sent. Absent is zero, and zero bills nothing rather than guessing a figure.
+ *
+ * WHOLE AND NOT NEGATIVE, because the ledger's `tokens_in` and `tokens_out` are `INTEGER NOT NULL` and SQLite keeps what
+ * it is handed: measured on 23 September, a body reporting `prompt_tokens: -40` and `completion_tokens: 2.5` reached the
+ * package as exactly that, a count that subtracts from the month and a REAL in an integer column. A fraction is rounded
+ * up, as the package's own estimate (`tokens`) rounds, so a count nobody can bill in halves is never billed low.
+ */
+const counted = (value: unknown): number => (typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.ceil(value) : 0);
 
 /**
  * The same endpoint as the package's `Inference` port.
@@ -293,20 +317,31 @@ const counted = (value: unknown): number => (typeof value === 'number' && Number
  * than a suggestion.
  *
  * EVERY FAILURE IS A THROW, which `core.run` reads as `UNREACHABLE` and accounts for: the ask is refused, the meter still
- * carries the row, and nothing is filed. A throw after the endpoint answered is a `SparkAnsweredError`, which `answer`
- * settles under the model's name, counted, and which the ladder does not ask again.
+ * carries the row, and nothing is filed. A throw after a 200 is a `SparkAnsweredError`, which `answer` settles under the
+ * model's name, counted, and which the ladder does not ask again. A status that is not `ok` is not one (`post`).
+ *
+ * THE REPLY AND THE THROW BOTH SAY WHICH MODEL WAS SENT, because the package cannot know `SPARK_MODEL` and its row named
+ * the routing short name instead: measured on 23 September through the self-host with `SPARK_MODEL=llama3`, the ledger
+ * held `glm-5.3-flash` for a completion the endpoint was asked of as `llama3` (`apps/selfhost/test/spark-answers.test.ts`).
+ * `sparkNamedEngine` corrects `status()` the same way and with the same `modelSent`.
  */
 export function endpointInference(options: EndpointModelOptions): SparkInference {
   const url = endpointUrl(options.url);
   return {
     complete: async (call: SparkInferenceCall): Promise<SparkInferenceReply> => {
-      const text = await post(url, options, {
-        model: modelSent(call.model, options.model),
-        temperature: 0,
-        max_tokens: call.maxTokens,
-        response_format: { type: 'json_schema', json_schema: { name: 'answer', schema: call.jsonSchema, strict: true } },
-        messages: call.messages.map((m) => ({ role: m.role, content: m.content })),
-      });
+      const model = modelSent(call.model, options.model);
+      const text = await post(
+        url,
+        options,
+        {
+          model,
+          temperature: 0,
+          max_tokens: call.maxTokens,
+          response_format: { type: 'json_schema', json_schema: { name: 'answer', schema: call.jsonSchema, strict: true } },
+          messages: call.messages.map((m) => ({ role: m.role, content: m.content })),
+        },
+        model,
+      );
       let parsed: {
         choices?: { message?: { content?: unknown } }[];
         usage?: { prompt_tokens?: unknown; completion_tokens?: unknown };
@@ -316,7 +351,7 @@ export function endpointInference(options: EndpointModelOptions): SparkInference
       } catch {
         /* A 200 THAT IS NOT JSON, a proxy's page or a stream cut short, came from a reached endpoint, and without the mark
            the parser's own `SyntaxError` read as a model not reached. There is no count in it to bill. */
-        throw new SparkAnsweredError('The Spark endpoint answered with a body that is not JSON.');
+        throw new SparkAnsweredError('The Spark endpoint answered with a body that is not JSON.', undefined, model);
       }
       const content = parsed?.choices?.[0]?.message?.content;
       /* THE TEXT AND NOT THE PARSE, because the package parses it itself and then checks it against the schema it sent. An
@@ -325,6 +360,7 @@ export function endpointInference(options: EndpointModelOptions): SparkInference
       return {
         text: answered,
         usage: { in: counted(parsed?.usage?.prompt_tokens), out: counted(parsed?.usage?.completion_tokens) },
+        model,
       };
     },
   };

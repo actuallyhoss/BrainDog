@@ -627,8 +627,8 @@ in 41 §5.4 step 3 and its `ponytail:` note.
 
 ### The codes
 
-One hundred and twenty-six, counted, in nine families — 54 pack and declaration · 14 grammar · 19 write path · 8 auth and
-vault · 8 format and lifecycle · 2 dialect · 5 spark · 12 connector · 4 host and client. Every fixture lives at
+One hundred and twenty-seven, counted, in nine families — 54 pack and declaration · 14 grammar · 19 write path · 8 auth and
+vault · 8 format and lifecycle · 2 dialect · 6 spark · 12 connector · 4 host and client. Every fixture lives at
 `fixtures/refusals/<name>.yaml`; the
 name is the code in kebab-case, and each fixture is keyed by the `via` that raises it — `install`, `lint`, `where`,
 `write`, `rpc` and the rest; the split per `via` is the fixtures spec's to count (40 §6), not this table's. *An
@@ -851,6 +851,7 @@ any row is written".*
 | `PROPOSAL_SCHEMA` | structured output that fails its kind's schema — a tier-C `end.result` included | `proposal-schema` |
 | `PREDICTION_UNMEASURABLE` | a `change` body whose prediction names no measurable, or one twelve observations cannot settle in thirty days, 24 §4.6 | `prediction-unmeasurable` |
 | `SPARK_BUDGET_SPENT` | an ask past `ask_cap` this month — the meter, 11 §4 | `spark-budget-spent` |
+| `ANSWER_UNREADABLE` | an automation's question the model answered with a 200 the host could not read (too large, not JSON, broken off) or did not finish within the timeout: counted as an ask, since a provider bills it, and final, so the run stops rather than ask again. A status that is not `ok` is not this code: no completion was served, and it is `UNREACHABLE`, retried and not counted. *(Admitted September 23rd 2026, where it had borrowed `PROPOSAL_SCHEMA`, which is output read and failing its schema.)* | `answer-unreadable` |
 
 **Connector** — a pull run's refusals, raised by `connect` and acked to the outbox; every one ends the run with a reason
 a person reads ([25-CONNECTORS](25-CONNECTORS.md) §5, §7, §9). The five `ACTION_` codes are the scheduled actions'

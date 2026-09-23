@@ -55,9 +55,22 @@ export const answerSchema = (ask: Pick<Ask, 'shape' | 'choices'>): object => ({
 });
 
 /** What a throw out of `complete` said about the model: it was reached, and what it reported spending, if anything. */
-type Heard = { usage: { in: number; out: number } | undefined };
+type Heard = { usage: { in: number; out: number } | undefined; model: string | undefined };
 
 const count = (value: unknown): number | undefined => (typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : undefined);
+
+/**
+ * The name the host says it sent the model under, read structurally off its reply or its throw, or nothing.
+ *
+ * THE PACKAGE ASKS BY ROUTING NAME AND THE HOST MAPS IT, so the name `core.run` holds is the template's and not what ran.
+ * Measured on 23 September through the self-host with `SPARK_MODEL=llama3`: every `answer` row read `glm-5.3-flash`.
+ * The host's `endpointInference` now says `model` on both (`packages/host/src/spark.ts`); an adapter that says nothing
+ * keeps the template's name, which is what every row carried before.
+ */
+const nameIn = (source: unknown): string | undefined => {
+  const model = typeof source === 'object' && source !== null ? (source as { model?: unknown }).model : undefined;
+  return typeof model === 'string' && model.trim() !== '' ? model : undefined;
+};
 
 /**
  * The host's `answered: true` mark on a thrown error, read structurally, or `null` for a model not reached.
@@ -68,11 +81,12 @@ const count = (value: unknown): number | undefined => (typeof value === 'number'
  */
 const heardIn = (e: unknown): Heard | null => {
   if (typeof e !== 'object' || e === null || (e as { answered?: unknown }).answered !== true) return null;
+  const model = nameIn(e);
   const usage = (e as { usage?: unknown }).usage;
-  if (typeof usage !== 'object' || usage === null) return { usage: undefined };
+  if (typeof usage !== 'object' || usage === null) return { usage: undefined, model };
   const tin = count((usage as { in?: unknown }).in);
   const tout = count((usage as { out?: unknown }).out);
-  return { usage: tin === undefined || tout === undefined ? undefined : { in: tin, out: tout } };
+  return { usage: tin === undefined || tout === undefined ? undefined : { in: tin, out: tout }, model };
 };
 
 /** The provider's sentence, ending in one full stop, so the run's sentence can carry on after it. */
@@ -143,10 +157,14 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
          is read here and not in `core.run` because this is the one caller that settles `UNREACHABLE` under `-`: `read`'s
          and `propose`'s rows already keep the model's name whichever way the call went. */
       let heard: Heard | null = null;
+      /* AND THE NAME THE HOST SENT, off a reply that came back. `core.run` keeps the template's (`nameIn`). */
+      let sent: string | undefined;
       const watched: Inference = {
         complete: async (call) => {
           try {
-            return await engine.complete(call);
+            const reply = await engine.complete(call);
+            sent = nameIn(reply);
+            return reply;
           } catch (e) {
             lost = e instanceof Error ? e.message : String(e);
             heard = heardIn(e);
@@ -176,14 +194,16 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
          the body held one. `loop/research-batch-forty-six-audit.md` finding 4 measured the self-host serve four
          completions of 16,000 tokens each for one question, the ledger holding four rows under `-` with `tokens_out` 0,
          and `ask_cap` seeing none of them. */
-      /* THE CAST IS FOR THE COMPILER, which narrows `heard` to `null` here because it cannot see the closure assign it. */
+      /* THE CASTS ARE FOR THE COMPILER, which narrows both to their first value here because it cannot see the closure
+         assign them. */
       const reached = heard as Heard | null;
+      const used = (sent as string | undefined) ?? reached?.model ?? ran.model;
       const account = (status: 'ok' | 'error', code?: string): void =>
         core.account({
           id: held,
           kind: 'read',
           tier: s.tier,
-          model: code === 'UNREACHABLE' ? '-' : ran.model,
+          model: code === 'UNREACHABLE' ? '-' : used,
           usage: reached?.usage ?? ran.usage,
           ms: ran.ms,
           status,
@@ -193,21 +213,24 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
 
       if (!ran.out.ok) {
         const code = refused(ran.out) ? ran.out.refusal.code : 'UNREACHABLE';
-        /* `PROPOSAL_SCHEMA` AND NOT A CODE OF ITS OWN, because a code outside `30 §6` is an invented code the refusals
-           gate counts against its budget, and this one says what happened: the model's structured output could not be
-           read. Any code but `UNREACHABLE` is one `serveAsks` acks `done`, so the run stops on this sentence and the
-           ladder does not ask the same model again. */
+        /* `ANSWER_UNREADABLE`, A CODE OF ITS OWN IN `30 §6`, where wave 47 borrowed `PROPOSAL_SCHEMA`. That code is
+           output that was read and failed its schema, and a caller branching on it would look at the question's shape
+           for a fault that is in the size or the framing of the reply: the host never got as far as the schema. Any code
+           but `UNREACHABLE` is one `serveAsks` acks `done`, so the run stops on this sentence and the ladder does not ask
+           the same model again. */
         if (code === 'UNREACHABLE' && reached !== null) {
-          account('error', 'PROPOSAL_SCHEMA');
+          account('error', 'ANSWER_UNREADABLE');
           return no(
-            'PROPOSAL_SCHEMA',
+            'ANSWER_UNREADABLE',
             `rule.${ask.rule} asked Spark at step ${step}, and the model answered with something Spark could not read: ${sentence(lost)} The run stopped there rather than ask it again.`,
             { at: 'answer' },
           );
         }
         account('error', code);
+        /* `sentence` AND NOT A FULL STOP OF OUR OWN, because the host's status throw ends in one: a 503 read "answered
+           503.." as the run's error once Q8's default made it a plain throw again (`test/spark-status-retried.test.ts`). */
         if (code === 'UNREACHABLE')
-          return no('UNREACHABLE', `rule.${ask.rule} asked Spark at step ${step}, and the model did not answer${lost === '' ? '' : `: ${lost}`}.`);
+          return no('UNREACHABLE', `rule.${ask.rule} asked Spark at step ${step}, and the model did not answer${lost === '' ? '.' : `: ${sentence(lost)}`}`);
         return no('PROPOSAL_SCHEMA', `Spark's answer to rule.${ask.rule} at step ${step} was not ${wanted(ask)}, so the run stopped there.`, {
           at: 'answer',
           ...(ask.shape === 'choice' ? { allowed: [...(ask.choices ?? [])] } : {}),

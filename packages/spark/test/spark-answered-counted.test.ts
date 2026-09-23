@@ -65,12 +65,12 @@ test('(1) A 200 OVER THE SIZE SPARK READS IS SETTLED UNDER THE MODEL, WITH THE T
 
     /* NOT `UNREACHABLE`, which is the one code the host's `RETRIED` asks again. */
     assert.notEqual(codeOf(out), 'UNREACHABLE', fixOf(out));
-    assert.equal(codeOf(out), 'PROPOSAL_SCHEMA');
+    assert.equal(codeOf(out), 'ANSWER_UNREADABLE');
     assert.equal(
       fixOf(out),
       "rule.rate asked Spark at step 1, and the model answered with something Spark could not read: The Spark endpoint answered more than Spark reads. The run stopped there rather than ask it again.",
     );
-    assert.deepEqual(rows(), [{ model: 'glm-5.3-flash', tokens_in: 415, tokens_out: 16_000, status: 'error', code: 'PROPOSAL_SCHEMA' }]);
+    assert.deepEqual(rows(), [{ model: 'glm-5.3-flash', tokens_in: 415, tokens_out: 16_000, status: 'error', code: 'ANSWER_UNREADABLE' }]);
     assert.equal(spark.status().asks.used, 1);
   } finally {
     sql.close();
@@ -82,7 +82,7 @@ test('(2) AN ANSWERED THROW WITH NO COUNT KEEPS THE PROMPT ESTIMATE, UNDER THE M
   try {
     const out = await spark.answer(RATE, throwing(answeredError('The Spark endpoint answered with a body that is not JSON.')).inference);
 
-    assert.equal(codeOf(out), 'PROPOSAL_SCHEMA', fixOf(out));
+    assert.equal(codeOf(out), 'ANSWER_UNREADABLE', fixOf(out));
     const [row] = rows();
     assert.equal(row?.model, 'glm-5.3-flash');
     assert.equal(row?.tokens_out, 0);
@@ -100,7 +100,7 @@ test('(3) AT ask_cap 1, AN ANSWER NOBODY COULD READ SPENDS THE MONTH, and the ne
 
     const said = [codeOf(await spark.answer(RATE, model.inference)), codeOf(await spark.answer(RATE, model.inference))];
 
-    assert.deepEqual(said, ['PROPOSAL_SCHEMA', 'SPARK_BUDGET_SPENT']);
+    assert.deepEqual(said, ['ANSWER_UNREADABLE', 'SPARK_BUDGET_SPENT']);
     assert.equal(model.calls(), 1, `${model.calls()} completions served at ask_cap 1`);
   } finally {
     sql.close();
@@ -129,7 +129,7 @@ test('(5) AN ANSWERED THROW WITH HALF A COUNT KEEPS THE ESTIMATE, and does not b
     const half = Object.assign(new Error('The Spark endpoint answered more than Spark reads.'), { answered: true, usage: { in: 415 } });
     const out = await spark.answer(RATE, throwing(half).inference);
 
-    assert.equal(codeOf(out), 'PROPOSAL_SCHEMA', fixOf(out));
+    assert.equal(codeOf(out), 'ANSWER_UNREADABLE', fixOf(out));
     const [row] = rows();
     assert.equal(row?.model, 'glm-5.3-flash');
     assert.notEqual(row?.tokens_in, 415, 'the half count was billed');

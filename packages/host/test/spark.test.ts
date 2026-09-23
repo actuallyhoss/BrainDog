@@ -169,6 +169,52 @@ test('A MODEL THE OWNER NAMED REACHES THE ENDPOINT, and SPARK_MODEL stands in on
   assert.equal(sentModel(net, 5), 'glm-5.3');
 });
 
+/* A STATUS THAT IS NOT `ok` IS A MODEL THAT DID NOT ANSWER, `loop/research-worker-spark.md` §6 Q8's default taken for the
+   owner. Wave 47 marked it `answered`, so the package settled a 429 as a paid ask that ends the run for good, where before
+   it was retried uncounted: a provider's rate limit or an outage behind a gateway spent the owner's allowance and stopped
+   the automation on the first rung. The mark stays on what comes after a 200, which is what a provider bills. RED ON 23
+   SEPTEMBER against wave 47's `post`: all four statuses carried `answered: true`. */
+test('A STATUS THAT IS NOT ok IS THROWN WITHOUT THE ANSWERED MARK, so the ladder asks again and no ask is spent', async () => {
+  const marks: Record<string, unknown> = {};
+  for (const status of [401, 429, 502, 503]) {
+    const down = endpoint(() => new Response(`slow down ${FAKE_KEY}`, { status }));
+    try {
+      await endpointInference({ url: 'http://localhost:9/v1/chat/completions', key: async () => FAKE_KEY, send: down.send }).complete(ask('glm-5.3-flash'));
+      marks[status] = 'resolved';
+    } catch (e) {
+      const { answered } = e as { answered?: unknown };
+      marks[status] = { message: (e as Error).message, answered };
+    }
+  }
+  assert.deepEqual(marks, {
+    401: { message: 'The Spark endpoint answered 401.', answered: undefined },
+    429: { message: 'The Spark endpoint answered 429.', answered: undefined },
+    502: { message: 'The Spark endpoint answered 502.', answered: undefined },
+    503: { message: 'The Spark endpoint answered 503.', answered: undefined },
+  });
+});
+
+/* THE REPLY SAYS WHICH MODEL THE ENDPOINT WAS SENT, because the package cannot know `SPARK_MODEL` (`46 §2`) and its ledger
+   named the routing short name for a call this host sent as `llama3`. And the provider's count is clamped to a whole count
+   that is not negative: `tokens_in` and `tokens_out` are `INTEGER NOT NULL`, and before this line a body reporting
+   `prompt_tokens: -40` and `completion_tokens: 2.5` was handed on as exactly that, so the row stored a negative count and
+   a REAL in an integer column. RED ON 23 SEPTEMBER: the reply had no `model`, and `usage` read `{ in: -40, out: 2.5 }`. */
+test('THE REPLY NAMES THE MODEL THIS HOST SENT, and a count that is negative or fractional reaches the meter as a whole count', async () => {
+  const net = endpoint(() => usedCompletion('{"answer":4}', { prompt_tokens: -40, completion_tokens: 2.5 }));
+  const reply = (await endpointInference({ url: 'http://localhost:11434/v1/chat/completions', model: 'llama3', send: net.send }).complete(ask('glm-5.3-flash'))) as {
+    usage: unknown;
+    model?: unknown;
+  };
+  assert.equal(sentModel(net, 0), 'llama3');
+  assert.deepEqual({ model: reply.model, usage: reply.usage }, { model: 'llama3', usage: { in: 0, out: 3 } });
+  /* AND A THROW AFTER THE 200 NAMES IT TOO, so the row a model that answered unreadably leaves is under the same name. */
+  const junk = endpoint(() => new Response('<html>a proxy page</html>', { status: 200 }));
+  await assert.rejects(endpointInference({ url: 'http://localhost:11434/v1/chat/completions', model: 'llama3', send: junk.send }).complete(ask('glm-5.3-flash')), (e: unknown) => {
+    assert.deepEqual({ answered: (e as { answered?: unknown }).answered, model: (e as { model?: unknown }).model }, { answered: true, model: 'llama3' });
+    return true;
+  });
+});
+
 test('A TIER a STATUS NAMES THE MODEL THAT ANSWERS, which on a host with SPARK_MODEL is that and not the routing short name', async () => {
   const own = openSqlite();
   const sql = openSqlite();

@@ -362,8 +362,12 @@ const AT_LENGTH = (): Response =>
    (`ASK_SPARK_WAIT_MS`) ended the run. Forty passes six hours apart are ten days, well past that wait, so a ladder that
    still asks again is seen asking. RED ON 23 SEPTEMBER before the repair: four completions served, and four rows
    `{"model":"-","tokens_in":411,"tokens_out":0,"status":"error","code":"UNREACHABLE"}`, the estimate and not the count.
-   THE NAME IS THE PACKAGE'S SHORT NAME AND NOT `llama3`, as the audit's brief expected: `answer` passes no model to
-   `core.run`, so every one of its rows, the answered case above included, is written under the template's model. */
+   THE ROW NAMES `llama3`, THE MODEL THIS HOST SENT, AND NOT THE PACKAGE'S SHORT NAME. As wave 47 landed it the row read
+   `glm-5.3-flash`: `answer` passes no model to `core.run`, which names the template's, and the host maps that name onto
+   `SPARK_MODEL` on the way out, so the ledger named a model nothing was sent. RED ON 23 SEPTEMBER, before the host's
+   reply and its throw said what they sent: `{"model":"glm-5.3-flash",...,"code":"PROPOSAL_SCHEMA"}`, the name and the
+   code both the ones this case no longer expects. The code is `ANSWER_UNREADABLE`, the answered-unreadable failure's own,
+   where wave 47 borrowed `PROPOSAL_SCHEMA`, which `30 §6` files as output that fails its schema, not output never read. */
 test('A MODEL THAT ANSWERED AT A LENGTH THIS HOST DOES NOT READ IS ASKED ONCE, and the one row carries its name and its tokens', async () => {
   let now = Date.parse('2026-09-23T12:00:00.000Z');
   const s = await stack({ answer: AT_LENGTH, now: () => now });
@@ -379,7 +383,7 @@ test('A MODEL THAT ANSWERED AT A LENGTH THIS HOST DOES NOT READ IS ASKED ONCE, a
     }
 
     assert.equal(s.sent.length, 1, `${s.sent.length} completions the endpoint served for one question`);
-    assert.deepEqual(s.calls(), [{ model: 'glm-5.3-flash', tokens_in: 415, tokens_out: 16_000, status: 'error', code: 'PROPOSAL_SCHEMA' }]);
+    assert.deepEqual(s.calls(), [{ model: 'llama3', tokens_in: 415, tokens_out: 16_000, status: 'error', code: 'ANSWER_UNREADABLE' }]);
     const r = s.run();
     assert.equal(r?.state, 'failed');
     assert.equal(
@@ -391,11 +395,13 @@ test('A MODEL THAT ANSWERED AT A LENGTH THIS HOST DOES NOT READ IS ASKED ONCE, a
   }
 });
 
-/* THE MARK ITSELF, ON THE HOST'S REAL `endpointInference`. Every throw after `send` resolved carries `answered: true`, and
-   the timeout does too, because the cap is the bound on spend and a model that ran out the clock may have run to the end.
-   A `send` that never resolved keeps no mark, which is what keeps an outage off the cap. RED ON 23 SEPTEMBER: no throw
-   carried a mark, the body that was not JSON threw the parser's own `SyntaxError`, and the timeout threw "The operation
-   was aborted due to timeout". */
+/* THE MARK ITSELF, ON THE HOST'S REAL `endpointInference`. Every throw after a 200 carries `answered: true`, and the
+   timeout does too, because the cap is the bound on spend and a model that ran out the clock may have run to the end.
+   A `send` that never resolved keeps no mark, which is what keeps an outage off the cap, and so does a status that is
+   not `ok` (`loop/research-worker-spark.md` §6 Q8's default): a 503 is the endpoint saying no model ran, and marked, wave
+   47 spent an ask on it and ended the run on the first rung. RED ON 23 SEPTEMBER, before wave 47: no throw carried a
+   mark, the body that was not JSON threw the parser's own `SyntaxError`, and the timeout threw "The operation was
+   aborted due to timeout". The status case was then red the other way, `answered: true`, until Q8's default. */
 test('THE HOST MARKS EVERY THROW AFTER THE ENDPOINT ANSWERED, AND THE TIMEOUT, AS ANSWERED, and a refused connection as not', async () => {
   const call = { model: 'glm-5.3-flash', messages: [{ role: 'user' as const, content: 'q' }], maxTokens: 64, jsonSchema: {} };
   const thrown = async (send: (url: URL, init: RequestInit) => Promise<Response>) => {
@@ -433,11 +439,87 @@ test('THE HOST MARKS EVERY THROW AFTER THE ENDPOINT ANSWERED, AND THE TIMEOUT, A
     }),
   };
   assert.deepEqual(cases, {
-    status: { message: 'The Spark endpoint answered 503.', answered: true, usage: undefined },
+    status: { message: 'The Spark endpoint answered 503.', answered: undefined, usage: undefined },
     size: { message: 'The Spark endpoint answered more than Spark reads.', answered: true, usage: { in: 415, out: 16_000 } },
     parse: { message: 'The Spark endpoint answered with a body that is not JSON.', answered: true, usage: undefined },
     broke: { message: 'The Spark endpoint broke off its answer.', answered: true, usage: undefined },
     timeout: { message: 'The Spark endpoint did not finish answering within 0.02 seconds.', answered: true, usage: undefined },
     refused: { message: 'connect ECONNREFUSED 127.0.0.1:11434', answered: undefined, usage: undefined },
   });
+});
+
+/* ── a status that is not `ok` is a model that did not answer ─────────────── */
+
+/** An endpoint that answers `statuses` in turn and then the usual answer. */
+const inTurn = (statuses: readonly number[]) => {
+  let i = 0;
+  return (): Response => {
+    const status = statuses[i++];
+    return status === undefined ? RATE_ANSWER() : new Response('{"error":"try again"}', { status });
+  };
+};
+
+/** Forty passes six hours apart after the first write, as the length case above drives the ladder past its one-day wait. */
+const ladder = async (s: Awaited<ReturnType<typeof stack>>, tick: () => void): Promise<void> => {
+  for (let pass = 1; pass < 40; pass++) {
+    tick();
+    await s.running.drain();
+    await s.running.poll();
+    await s.running.drain();
+  }
+};
+
+/* `loop/research-worker-spark.md` §6 Q8, ITS DEFAULT TAKEN FOR THE OWNER: A NON-2xx STATUS IS NOT AN ANSWER. As wave 47
+   landed, the host marked a 503 `answered`, so the package spent an ask on it and `serveAsks` acked the run `done` on
+   the first rung. Before wave 47 a 503 was retried uncounted, and that is what this case holds again. RED ON 23
+   SEPTEMBER against wave 47's `post` and `answer`: the run read `failed` where this expects `done`, after one call. */
+test('A 503 AND THEN A GOOD 200 ENDS THE RUN DONE, on one counted ask, with the 503 settled under the mark for a model not reached', async () => {
+  let now = Date.parse('2026-09-23T12:00:00.000Z');
+  const s = await stack({ answer: inTurn([503]), now: () => now });
+  try {
+    assert.ok((await s.running.api.kernel.install([RATE])).ok, 'the rule did not install');
+
+    await s.write('Gold');
+    await ladder(s, () => (now += 6 * HOUR));
+
+    const r = s.run();
+    assert.equal(r?.state, 'done', r?.say ?? 'no run');
+    assert.deepEqual(JSON.parse(r?.vars ?? '{}'), { rate: 4.25 });
+    assert.equal(s.sent.length, 2, `${s.sent.length} model calls for one 503 and one answer`);
+    assert.deepEqual(
+      s.calls().map(({ model, status, code }) => ({ model, status, code })),
+      [
+        { model: '-', status: 'error', code: 'UNREACHABLE' },
+        { model: 'llama3', status: 'ok', code: null },
+      ],
+    );
+  } finally {
+    await s.close();
+  }
+});
+
+/* THE SAME DEFAULT, AT ITS WORST: A PROVIDER THAT ANSWERS 429 ON EVERY RUNG. Each attempt is a row, so the outage is in
+   the ledger, and every row is under `-`, which neither count reads. RED ON 23 SEPTEMBER against wave 47: one model call
+   in forty passes, the ladder never asking again because the first 429 had already ended the run as a counted ask. */
+test('A 429 ON EVERY RUNG SPENDS NOTHING, and the ladder is seen asking again', async () => {
+  let now = Date.parse('2026-09-23T12:00:00.000Z');
+  const s = await stack({ answer: inTurn(Array.from({ length: 100 }, () => 429)), now: () => now });
+  try {
+    assert.ok((await s.running.api.kernel.install([RATE])).ok, 'the rule did not install');
+
+    await s.write('Gold');
+    await ladder(s, () => (now += 6 * HOUR));
+
+    assert.ok(s.sent.length > 1, `${s.sent.length} model calls: the ladder did not ask again`);
+    const rows = s.calls();
+    assert.equal(rows.length, s.sent.length, 'a call left no row');
+    assert.deepEqual(
+      [...new Set(rows.map(({ model, status, code }) => JSON.stringify({ model, status, code })))],
+      [JSON.stringify({ model: '-', status: 'error', code: 'UNREACHABLE' })],
+      'an attempt was counted',
+    );
+    assert.notEqual(s.run()?.state, 'done', 'a run nobody answered ended done');
+  } finally {
+    await s.close();
+  }
 });
