@@ -62,8 +62,13 @@ const USAGE =
 
 export async function verify(args: string[], io: VerifyIo): Promise<number> {
   let parsed: { values: { key?: string | undefined }; positionals: string[] };
+  /* `--key <value>` IS JOINED INTO `--key=<value>` FIRST, because a key is base64url and one in 64 begins with `-`.
+     `parseArgs` in strict mode reads `--key -Qx…` as an option with no value followed by an unknown flag and throws,
+     so a real key got the usage line. CI 35930451270 drew such a key and went red on `verify.test.ts`'s forgery test,
+     which passed on the desk only because its key happened not to. */
+  const joined = args.flatMap((a, i) => (a === '--key' && i + 1 < args.length ? [] : args[i - 1] === '--key' && i > 0 ? [`--key=${a}`] : [a]));
   try {
-    parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { key: { type: 'string' } } });
+    parsed = parseArgs({ args: joined, allowPositionals: true, strict: true, options: { key: { type: 'string' } } });
   } catch {
     io.say(USAGE);
     return 1;

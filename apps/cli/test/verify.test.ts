@@ -106,6 +106,20 @@ test('VERIFY IS A COMMAND: the real export passes, and its block says the key ca
   assert.match(out.stdout, new RegExp(`produced 2026-09-05T12:00:00.000Z by ${REC}`));
 });
 
+/* A KEY THAT BEGINS WITH `-` IS A KEY, NOT A FLAG. One base64url key in 64 does, and `parseArgs` in strict mode threw on
+   `--key -…`, so the owner got the usage line for a real key: CI 35930451270 drew one at random in the forgery test
+   below. This one always does, and is the wrong key, so the answer must be the refused signature and never the usage. */
+test('A --key THAT BEGINS WITH A DASH IS READ AS THE KEY, and the wrong one refuses the signature rather than the command', async (t) => {
+  const dir = scratch(t);
+  const signer = testSigner();
+  writeFileSync(join(dir, 'copy.brainl'), `${(await exported(signer)).join('\n')}\n`);
+  const key = b64url(await signer.publicKey);
+  const dashed = `-${key.slice(1, 2) === 'A' ? 'B' : 'A'}${key.slice(2)}`;
+  const out = await ran(['verify', 'copy.brainl', '--key', dashed], dir);
+  assert.doesNotMatch(`${out.stdout}${out.stderr}`, /takes one file/u, 'a dashed key was read as a flag');
+  assert.equal(out.code, 1, out.stdout);
+});
+
 test('§3.5 FORGERY: IT PASSES UNPINNED, AND --key WITH THE REAL KEY REFUSES IT, exit 1', async (t) => {
   const dir = scratch(t);
   const signer = testSigner();
