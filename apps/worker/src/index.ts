@@ -43,7 +43,7 @@ import { workerCatalogueOffers } from './catalogue.ts';
 import { DELETED, destroyRecord } from './destroy.ts';
 import { DELIVERS, makeDeliver } from './deliver.ts';
 import { consume, pump } from './pump.ts';
-import { appPath, atRoot, cloudIngest, copyAsked, copyRefusal, drained, ingestBudget, inward, isRecordId, legacyRedirect, servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesMcp, type AppPath, type CloudIngestDeps } from './route.ts';
+import { appPath, asPage, atRoot, cloudIngest, copyAsked, copyRefusal, drained, ingestBudget, inward, isRecordId, legacyRedirect, servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesMcp, type AppPath, type CloudIngestDeps } from './route.ts';
 import { NO_MINT_SESSION, serveInbound, servesInbound } from './inbound.ts';
 import { appEntry, bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
 import { httpFor } from './http.ts';
@@ -1444,7 +1444,10 @@ async function appPage(request: Request, env: Env, app: AppPath): Promise<Respon
     return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A page of the app is read; a record method is at /app/<slug>/api/<method>.' } }, 405, [['allow', 'GET, HEAD']]);
   const assets = env.ASSETS;
   if (!assets) return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'This deployment serves no app, only its API.' } }, 404);
-  const shell = () => assets.fetch(new Request(new URL('/app/', request.url), { method: request.method }));
+  /* EVERY ANSWER THE ASSETS GIVE HERE IS A PAGE OF THE APP, OR A FILE BESIDE ONE, and leaves with `asPage`'s four
+     headers: measured on production, the shell and the sign-in page carried none (`loop/research-push-a-live.md`
+     finding 1). The 302 `appEntry` answers for bare `/app` is not wrapped, because a frame follows it to the shell. */
+  const shell = async () => asPage(await assets.fetch(new Request(new URL('/app/', request.url), { method: request.method })));
   if (app.slug === null && app.rest === '/') {
     const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
     return appEntry(request, {
@@ -1455,7 +1458,7 @@ async function appPage(request: Request, env: Env, app: AppPath): Promise<Respon
   }
   if (app.slug === null) {
     const file = await assets.fetch(request);
-    if (file.status !== 404 || /\.[A-Za-z0-9]+$/.test(app.rest)) return file;
+    if (file.status !== 404 || /\.[A-Za-z0-9]+$/.test(app.rest)) return asPage(file);
   }
   return shell();
 }

@@ -123,6 +123,14 @@ export async function copyRefusal(id: string, list: () => Promise<Result<Snapsho
 }
 
 /**
+ * The Directory's reserved words that no route of the app answers, for `appPath`'s refusal of an API path under one.
+ *
+ * `api` IS REFUSED ON ITS OWN, AND `p`, `r` AND `s` ARE LEFT OUT because each is a page with a parameter under it
+ * (`p/[slug]`, `r/[register]`, `s/[token]`). The rest of the reserved set is the app's own routes, which are pages too.
+ */
+const NOT_A_PAGE = new Set(['auth', 'mcp', 'a', 'in', 'ws', 'admin', 'app', 'assets', 'static', 'www', 'new']);
+
+/**
  * A path under `/app`: the record it names, if any, and the path the app or the record reads once `/app/<slug>` is gone.
  *
  * THE FIRST SEGMENT IS A PAGE OR A RECORD'S NAME, AND THE DIRECTORY'S `badSlug` ALONE SAYS WHICH (`loop/research-one-domain.md`
@@ -152,7 +160,37 @@ export function appPath(pathname: string): AppPath | null {
      `doorOf` and the record's `verify`. The web never renders the address (`apiBase` is the bare origin with no slug). */
   if (segment === 'api') return null;
   if (badSlug(segment) === null) return { slug: segment, rest: tail === '' ? '/' : tail };
+  /* NOR AN API PATH UNDER A WORD THAT CAN ONLY BE A MISTAKE (`loop/research-push-a-live.md` finding 3). Measured on
+     production: `/app/Acme/api/boot`, `/app/admin/api/boot` and `/app/www/api/boot` fell to the line below as pages and
+     answered the shell with a 200, which a JSON client with a mistyped slug reads as success. NOT EVERY WORD THAT IS
+     NOT A NAME: ten of the app's routes take a parameter as their second segment (`r/[register]`, `settings/[area]`
+     and eight more under `apps/web/src/routes/`), so `/app/r/api` is a register page. Only the upper-case spelling of
+     a name and a reserved word the app does not route are certainly not pages. */
+  if (/^\/+api(?:\/|$)/.test(tail) && (NOT_A_PAGE.has(segment) || badSlug(segment.toLowerCase()) === null)) return null;
   return { slug: null, rest: `/${segment}${tail}` };
+}
+
+/**
+ * A page of the app as the static assets gave it, with the four headers that say nobody may frame it or sniff it and
+ * that its links send no referrer off the site (`loop/research-push-a-live.md` finding 1).
+ *
+ * MEASURED ON PRODUCTION ON 23 SEPTEMBER: NONE OF THEM ON ANY ANSWER, the shell and the sign-in page included. They are
+ * set here because this is the only place certain to reach a page: whether `apps/web/static/_headers` survives a
+ * response fetched through the `ASSETS` binding was not measured. `frame-ancestors 'none'` is the whole policy on
+ * purpose, because a `script-src` needs the shell's two inline scripts hashed through `kit.csp` first, and HSTS is a
+ * zone setting whose `max-age` browsers never give back. None of the four touches the passkey ceremony, which runs in
+ * the top-level page and posts to its own origin, where `same-origin` still sends both `Origin` and `Referer`.
+ *
+ * A NEW RESPONSE AND NEVER THE ONE HANDED IN, because the runtime refuses to change the headers of a response a
+ * binding returned ("Can't modify immutable headers"), and `test/shell-headers.test.ts` hands in one that refuses too.
+ */
+export function asPage(out: Response): Response {
+  const page = new Response(out.body, out);
+  page.headers.set('content-security-policy', "frame-ancestors 'none'");
+  page.headers.set('x-frame-options', 'DENY');
+  page.headers.set('x-content-type-options', 'nosniff');
+  page.headers.set('referrer-policy', 'same-origin');
+  return page;
 }
 
 /**

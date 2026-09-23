@@ -53,6 +53,28 @@ test('A SLUG AFTER /app/ IS THE RECORD, A WORD THE APP ROUTES IS ITS PAGE, AND T
   for (const path of ['/', '/api/boot', '/apple', '/application/x', '/r/tasks', '/in/webhook/x']) assert.equal(appPath(path), null, path);
 });
 
+/* FINDING 3 OF `loop/research-push-a-live.md`. Measured on production at 01:08 on 23 September: `/app/Acme/api/boot`,
+   `/app/admin/api/boot` and `/app/www/api/boot` were `200 text/html`, the shell, so a JSON client with a mistyped or
+   upper-case slug read a page as success. It cannot be every word that is not a name, because ten of the app's routes
+   take a parameter as their second segment (`apps/web/src/routes/<word>/[param]/`, counted), and `/app/r/api` is the
+   register page for a register called `api`. */
+test('AN API PATH UNDER THE UPPER-CASE SPELLING OF A NAME, OR UNDER A RESERVED WORD THE APP DOES NOT ROUTE, IS NO APP PATH', () => {
+  for (const path of ['/app/Acme/api/boot', '/app/ACME/api', '/app/Acme/api/', '/app/Ada-At-Home/api/spark/status', '/app/admin/api/boot', '/app/www/api/boot', '/app/mcp/api/boot', '/app/auth//api/boot'])
+    assert.equal(appPath(path), null, path);
+  /* THE SAME WORDS WITHOUT `/api` ARE STILL PAGES, which is what the app's root `[id]` route and its 404 page draw. */
+  assert.deepEqual(appPath('/app/Acme'), { slug: null, rest: '/Acme' });
+  assert.deepEqual(appPath('/app/admin/x'), { slug: null, rest: '/admin/x' });
+  assert.deepEqual(appPath('/app/Acme/apiary'), { slug: null, rest: '/Acme/apiary' });
+  /* AND A ROUTE THAT TAKES A PARAMETER TAKES `api` AS ONE: a register, a settings area, a track, a view. */
+  for (const word of ['automations', 'decide', 'jobs', 'p', 'packs', 'r', 's', 'settings', 't', 'v'])
+    assert.deepEqual(appPath(`/app/${word}/api`), { slug: null, rest: `/${word}/api` }, word);
+  assert.deepEqual(appPath('/app/settings/api/boot'), { slug: null, rest: '/settings/api/boot' });
+  /* A SPOKEN ID IS AN ITEM AND NEVER A NAME, however it is cased. */
+  assert.deepEqual(appPath('/app/D41/api'), { slug: null, rest: '/D41/api' });
+  /* A LOWER-CASE NAME IS UNCHANGED: its API is that record's. */
+  assert.deepEqual(appPath('/app/acme/api/boot'), { slug: 'acme', rest: '/api/boot' });
+});
+
 test('atRoot moves a request to the root path the record reads, and keeps its method, its headers, its query and its body', async () => {
   const moved = atRoot(
     new Request('https://brain.dog/app/acme/api/create?x=1', {
