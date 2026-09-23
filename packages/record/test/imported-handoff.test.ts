@@ -38,7 +38,7 @@ const agent = (session: CallContext['session']): CallContext => ({
  * writes one (`apps/cli/src/legacy.ts:2145` to `:2170`): by a token, naming the repository, with no hints to attach
  * it by. A minute later a second agent attaches in the same repository and asks where it stands.
  */
-async function imported() {
+async function seeded() {
   const sql = openSqlite();
   const clock = fixedClock(NOW);
   const api = await createRecordApi({ sql, clock });
@@ -50,28 +50,27 @@ async function imported() {
   const probe = value<Entry>(await api.create({ register: 'things', fields: { name: 'Probe', lane: 'building' } }, owner));
   value(await api.update({ register: 'things', seq: probe.seq!, patch: { repos: ['probe-repo'] } }, owner));
   clock.advance(5 * MIN);
+  /* A run as the import writes one: by a token with no hints, naming the repository, and no `last_seen`. */
+  const write = async (id: string, fields: Record<string, unknown>) =>
+    value<Entry>(
+      await api.create(
+        { register: 'session', fields: { client_id: `legacy:session:${id}`, agent: 'claude', doing: `the old tool run ${id}`, repo: 'probe-repo', ...fields } },
+        agent({}),
+      ),
+    );
+  const ask = async () => {
+    const said = agent({ host: 'kiln-mbp', repo: 'probe-repo', agent: 'claude', client_id: 'c-1' });
+    value<Attached>(await api.attach({ source: 'startup', client_id: 'c-1' }, said));
+    return { said, here: value<Context>(await api.context({}, said)) };
+  };
+  return { api, sql, clock, write, ask };
+}
 
-  const run = value<Entry>(
-    await api.create(
-      {
-        register: 'session',
-        fields: {
-          client_id: 'legacy:session:S40',
-          agent: 'claude',
-          doing: 'Kerning pass',
-          state: 'handoff',
-          repo: 'probe-repo',
-          next: 'Kern the lowercase pairs',
-          tried: ['Auto-kerning'],
-        },
-      },
-      agent({}),
-    ),
-  );
+async function imported() {
+  const { api, sql, clock, write, ask } = await seeded();
+  const run = await write('S40', { doing: 'Kerning pass', state: 'handoff', next: 'Kern the lowercase pairs', tried: ['Auto-kerning'] });
   clock.advance(MIN);
-  const said = agent({ host: 'kiln-mbp', repo: 'probe-repo', agent: 'claude', client_id: 'c-1' });
-  value<Attached>(await api.attach({ source: 'startup', client_id: 'c-1' }, said));
-  const here = value<Context>(await api.context({}, said));
+  const { said, here } = await ask();
   return { api, sql, said, here, spoken: `S${String(run.seq)}` };
 }
 
@@ -132,5 +131,55 @@ test('a run placed on another project is not the handoff, although it names this
   const here = value<Context>(await api.context({}, second));
   assert.equal(here.project?.name, 'Probe', 'the second agent stands on Probe');
   assert.equal(here.handoff, null, `Other's next step was handed to Probe: ${JSON.stringify(here.handoff)}`);
+  sql.close();
+});
+
+/**
+ * SEVERAL IMPORTED RUNS IN ONE REPOSITORY, AND NONE OF THEM HEARD FROM. The handoff query ordered by `last_seen`, which
+ * no imported run has, so the tie fell to the kernel's `id DESC` and the handoff was whichever run the import wrote
+ * last, `done` and `abandoned` included (wave fifty-one's checker of `f1720e4e`). Here the import writes the run that
+ * asked to be picked up first and two finished runs after it, and the agent asking where it stands was handed the
+ * abandoned one.
+ */
+test('among imported runs, the one waiting to be picked up is the handoff, not the one the import wrote last', async () => {
+  const { sql, write, ask } = await seeded();
+  const waiting = await write('S41', { state: 'handoff', next: 'Kern the lowercase pairs' });
+  await write('S42', { state: 'done', next: 'Ship the specimen page' });
+  await write('S43', { state: 'abandoned', next: 'Try the variable axis' });
+  const { here } = await ask();
+  assert.equal(here.handoff?.from, `S${String(waiting.seq)}`, `the handoff was ${JSON.stringify(here.handoff)}`);
+  assert.equal(here.handoff?.next, 'Kern the lowercase pairs');
+  sql.close();
+});
+
+/* AND WITH NONE WAITING, THE ONE THE IMPORT RECORDED LATEST. A row's `id` says when it was first written, and a later
+   import that changed a run's next step moves its `updated_at` and not its `id`, so `id DESC` handed over the step of
+   the run written second although the first had been changed an hour after it. */
+test('among imported runs none of which waits, the one the import changed latest is the handoff', async () => {
+  const { api, sql, clock, write, ask } = await seeded();
+  const moved = await write('S41', { state: 'done', next: 'Kern the lowercase pairs' });
+  await write('S42', { state: 'done', next: 'Ship the specimen page' });
+  clock.advance(60 * MIN);
+  value(await api.update({ register: 'session', seq: moved.seq!, patch: { next: 'Kern the figures' } }, agent({})));
+  clock.advance(MIN);
+  const { here } = await ask();
+  assert.equal(here.handoff?.from, `S${String(moved.seq)}`, `the handoff was ${JSON.stringify(here.handoff)}`);
+  assert.equal(here.handoff?.next, 'Kern the figures');
+  sql.close();
+});
+
+/* A RUN SOMEBODY HEARD FROM STILL COMES FIRST. `handoff({ next })` with no state leaves an active run active, and nothing
+   moves a `handoff` run on once it is picked up, so preferring the state over every run would hand a months-old imported
+   step to an agent whose colleague left one five minutes ago. The preference is held to runs nobody heard from. */
+test('a run heard from that left a next step outranks an imported run waiting to be picked up', async () => {
+  const { api, sql, clock, write, ask } = await seeded();
+  await write('S41', { state: 'handoff', next: 'Kern the lowercase pairs' });
+  const first = agent({ host: 'forge-mbp', repo: 'probe-repo', agent: 'claude', client_id: 'c-0' });
+  value<Attached>(await api.attach({ source: 'startup', client_id: 'c-0' }, first));
+  const left = value<Entry>(await api.handoff({ next: 'Run the proofing script' }, first));
+  clock.advance(5 * MIN);
+  const { here } = await ask();
+  assert.equal(here.handoff?.from, `S${String(left.seq)}`, `the handoff was ${JSON.stringify(here.handoff)}`);
+  assert.equal(here.handoff?.next, 'Run the proofing script');
   sql.close();
 });

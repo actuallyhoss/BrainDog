@@ -2541,8 +2541,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * Whether what an accept installs is a rule, or a bundle holding one: a `change`'s `to`, or a `pattern`'s `ingest`,
-   * which the kernel's accept installs the same way. What `decide` holds to `admin` at the accept.
+   * Whether what an accept installs runs while nobody is looking, alone or in a bundle: a `change`'s `to`, or a
+   * `pattern`'s `ingest`, which the kernel's accept installs the same way. What `decide` holds to `admin` at the accept.
+   *
+   * EVERY KIND THAT RUNS UNATTENDED, AND NOT ONLY THE ONE ITS AUDIT NAMED. Held to `rule` alone, audit fifty-one
+   * (finding 1) had the same colleague at `decide` file and accept, herself, a script every hour on the owner's key
+   * `goldapi`, a poll on that key as a `change` and as a `pattern`, a digest with `prose: spark`, a digest to her own
+   * webhook that fired carrying the owner's row, and a new `source` for the script the owner had installed: 7 roads of
+   * 7 installed and armed (`test/accept-unattended.test.ts`). A `script`, a `digest` and an `ingest` each arm a clock at
+   * install, and `setDeclaration` asks `admin` for every kind, so the accept is held for all four.
    *
    * BY `kind`, AS THE KERNEL'S `install` READS IT, and not by `declaration_id`: a bundle is filed under whichever id the
    * proposer names, and the audit's colleague could have filed her rule under `register.obligations`.
@@ -2551,13 +2558,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * colleague filed the same rule as a pattern's `ingest`, accepted it, and the next row queued an `infer.ask`
    * (`test/accept-rule-level.test.ts`).
    */
-  const installsRule = (kind: unknown, body: unknown): boolean => {
+  const UNATTENDED = new Set(['rule', 'script', 'digest', 'ingest']);
+  const runsUnattended = (kind: unknown, body: unknown): boolean => {
     const object = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
     if (!object(body)) return false;
     const to = kind === 'change' ? body.to : kind === 'pattern' ? body.ingest : undefined;
     if (!object(to)) return false;
     const members: unknown[] = Array.isArray(to.declarations) ? to.declarations : [to];
-    return members.some((d) => object(d) && d.kind === 'rule');
+    return members.some((d) => object(d) && UNATTENDED.has(d.kind as string));
   };
 
   /**
@@ -2922,16 +2930,30 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       : repo
         ? { field: 'repo', is: repo }
         : null;
-    const left =
+    /* A RUN SOMEBODY HEARD FROM FIRST, BY WHEN; THEN, OF THE RUNS NOBODY HEARD FROM, ONE WAITING TO BE PICKED UP; THEN
+       THE ONE RECORDED LATEST. Ordered by `last_seen` alone, several imported runs in one repository (none has it) tied,
+       the tie fell to the kernel's `id DESC`, and the handoff was whichever run the import wrote last: an `abandoned`
+       run's step was handed over ahead of the run in `handoff` written before it, and a step a later import had
+       replaced on one run lost to the other's (`test/imported-handoff.test.ts`). The state is preferred only among runs
+       nobody heard from, because `handoff({ next })` leaves an active run active and nothing moves a `handoff` run on
+       once it is picked up: preferred over every run, an imported step months old outranked one left five minutes ago.
+       `updated_at` is the time the import recorded; the register holds no time a run ended, and the import writes none.
+       Each read is two rows at most, because the caller's own run is the only one set aside. */
+    const leftBy = (also: Predicate[]) => {
+      const got = kernel.list({
+        register: SESSION,
+        where: { all: [here, { field: 'next', present: true }, ...also] } as Predicate,
+        order: [{ field: 'last_seen', dir: 'desc' }, { field: 'updated_at', dir: 'desc' }],
+        limit: 2,
+      });
+      return got.ok ? got.value.rows.find((row) => row.id !== run?.id) : undefined;
+    };
+    const other =
       runs && here
-        ? kernel.list({
-            register: SESSION,
-            where: { all: [here, { field: 'next', present: true }] } as Predicate,
-            order: [{ field: 'last_seen', dir: 'desc' }],
-            limit: 2,
-          })
-        : null;
-    const other = left?.ok ? left.value.rows.find((row) => row.id !== run?.id) : undefined;
+        ? (leftBy([{ field: 'last_seen', present: true } as Predicate]) ??
+          leftBy([{ field: RUN.state, is: 'handoff' } as Predicate]) ??
+          leftBy([]))
+        : undefined;
     const handoff: Context['handoff'] = other
       ? { from: `${PREFIX}${String(other.seq)}`, age_s: ageOf(other), next: String(other.fields.next), tried: listOf(other.fields.tried), head: text(other.fields.head) }
       : null;
@@ -4410,13 +4432,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           const owner = admin(ctx, 'accept a change to what this record is');
           if (owner) return { ok: false as const, refusal: owner };
         }
-        /* AND A CHANGE OR A PATTERN THAT INSTALLS A RULE, ALONE OR IN A BUNDLE, IS HELD TO THE DOOR `setDeclaration` IS. A
-           rule is what runs while nobody is looking, and installing one that asks Spark is the owner's consent to its
-           question going out on the owner's key. Audit forty-nine (finding 3) had a colleague at `decide` refused `setDeclaration`
-           `LEVEL_REQUIRED`, propose the same rule, accept it herself, and the next row's question went out keyed
-           (`test/accept-rule-level.test.ts`). Held to every rule and not only one that asks or calls out, as ADR-060 states
-           it; a narrower door is a decision for the owner, not for this line. */
-        if (installsRule(kind, asked?.body)) {
+        /* AND A CHANGE OR A PATTERN THAT INSTALLS WHAT RUNS UNATTENDED, ALONE OR IN A BUNDLE, IS HELD TO THE DOOR
+           `setDeclaration` IS. A rule, a script, a digest or an ingest is what runs while nobody is looking, and installing
+           one that asks Spark or calls out is the owner's consent to it going out on the owner's key. Audit forty-nine
+           (finding 3) had a colleague at `decide` refused `setDeclaration` `LEVEL_REQUIRED`, propose the same rule, accept
+           it herself, and the next row's question went out keyed (`test/accept-rule-level.test.ts`); audit fifty-one
+           (finding 1) did the same with the other three kinds once rules were held (`test/accept-unattended.test.ts`).
+           Held to every one and not only one that asks or calls out, as ADR-060 states it; a narrower door is a decision
+           for the owner, not for this line. */
+        if (runsUnattended(kind, asked?.body)) {
           const owner = admin(ctx, 'accept a change to what runs while nobody is looking');
           if (owner) return { ok: false as const, refusal: owner };
         }
