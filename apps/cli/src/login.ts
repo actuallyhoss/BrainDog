@@ -10,9 +10,78 @@
 
 import { hostname } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
+import { fileURLToPath } from 'node:url';
 
-import { hostKey, inTheClear, isLoopback, readHosts, saveHosts } from './http.ts';
+import { hostKey, inTheClear, isLoopback, readHosts, sameHost, saveHosts } from './http.ts';
 import type { Answering } from './json.ts';
+
+/* ── the login this machine keeps, and when it lapses ──────────────────── */
+
+/**
+ * The command that signs this machine in to `host`, written out whole.
+ *
+ * `node <this main.ts>` AND NOT `braindog`, because `braindog` is not on his PATH: he runs `node apps\cli\src\main.ts`
+ * (`loop/research-cutover-day.md` §7 item 1), and the MCP server `install` registers is this same file under `node`. A
+ * line that says `braindog login` is one he has to translate before it runs. Double quotes, and forward slashes as the
+ * server entry has them, because that one spelling of the path is read the same by PowerShell, `cmd` and Git Bash.
+ */
+export function loginCommand(host: string): string {
+  return `node "${fileURLToPath(new URL('./main.ts', import.meta.url)).replaceAll('\\', '/')}" login ${host}`;
+}
+
+/** What to type when no host is known at all: the address the app prints, with the slug left for the person. */
+export const ANY_HOST = 'https://app.brain.dog/app/<slug>';
+
+/**
+ * The host the next command will reach and the expiry of the login this machine keeps for it, found as `target` finds
+ * them: `--host`, then `BRAINDOG_HOST`, then the file's default, matched by `sameHost`, so the two cannot come to name
+ * different entries. `expires` is `null` when the bearer in use is not the file's (`BRAINDOG_TOKEN` beats the file) or
+ * the file keeps none for that host. Throws what `readHosts` and `hostKey` throw.
+ */
+export function heldLogin(flag: string | undefined, env: Record<string, string | undefined>, file: string): { host: string | null; expires: string | null } {
+  const hosts = readHosts(file);
+  const named = flag || env.BRAINDOG_HOST || hosts.default;
+  if (!named) return { host: null, expires: null };
+  const host = hostKey(named);
+  if (env.BRAINDOG_TOKEN) return { host, expires: null };
+  const token = Object.entries(hosts.hosts).find(([written]) => sameHost(written, host))?.[1]?.token;
+  const kept = typeof token?.value === 'string' && token.value !== '' && typeof token.expires === 'string' && !Number.isNaN(Date.parse(token.expires));
+  return { host, expires: kept ? token.expires : null };
+}
+
+/**
+ * How long before the lapse the start hook says so.
+ *
+ * THE LAPSE IS NINETY DAYS AND IT DOES NOT SLIDE. A login is minted for `DEFAULT_DAYS = 90`
+ * (`packages/kernel/src/token.ts:47`, `packages/kernel/src/device.ts:250` to `:261`) and nothing in the kernel moves its
+ * `expires_at` afterwards, however often it is used. The date is read from the hosts file, never counted from ninety,
+ * because it is the host's answer and a host may one day mint a different length. Fourteen days, so a person who opens
+ * a session each working day sees it on ten of them before the day the server has nothing to reach.
+ */
+export const LAPSE_WARN_DAYS = 14;
+const DAY_MS = 86_400_000;
+
+/**
+ * The line the start hook prints above everything else when the kept login lapses within `LAPSE_WARN_DAYS`, or `null`.
+ *
+ * NOTHING ONCE IT HAS LAPSED: `target` throws then, and the hook already says that the login expired and what to run.
+ * Any error is `null` for the same reason: a hosts file that cannot be read is the hook's own line to say, and a hook
+ * never fails a session.
+ */
+export function lapseWarning(env: Record<string, string | undefined>, file: string, now: number = Date.now()): string | null {
+  let held: { host: string | null; expires: string | null };
+  try {
+    held = heldLogin(undefined, env, file);
+  } catch {
+    return null;
+  }
+  if (held.host === null || held.expires === null) return null;
+  const left = Date.parse(held.expires) - now;
+  if (left <= 0 || left > LAPSE_WARN_DAYS * DAY_MS) return null;
+  const days = Math.floor(left / DAY_MS);
+  const when = days === 0 ? 'within a day' : `in ${String(days)} ${days === 1 ? 'day' : 'days'}`;
+  return `BrainDog: the login to ${held.host} lapses on ${held.expires.slice(0, 10)}, ${when}. After that every session starts without BrainDog. Tell the person to sign in again before then: ${loginCommand(held.host)}`;
+}
 
 export type LoginIo = {
   /** The hosts file the token is kept in. */

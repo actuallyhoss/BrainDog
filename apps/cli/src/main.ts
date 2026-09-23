@@ -26,18 +26,20 @@ import { PRIMITIVES_VERSION } from 'braindog-render';
 
 import { automations, scripts } from './automations.ts';
 import { hookEnd, hookStart, readSession, sessionPath } from './hooks.ts';
-import { budgetOf, clientFor, hostsPath, target } from './http.ts';
+import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
 import { importCommand } from './import.ts';
 import { REPLACE_BY_HAND, byHand, handRun, installProfiles, profilesOf, shellOf } from './install.ts';
 import { machine, takeJson, type Machine } from './json.ts';
 import { keys, spawnInherit } from './keys.ts';
-import { login } from './login.ts';
+import { lapseWarning, login } from './login.ts';
 import { logout } from './logout.ts';
+import { openSessions, openSessionsLine } from './open-sessions.ts';
 import { page as pageCommand } from './page.ts';
 import { AGENTS, isAgent, positionOf, sessionHeaders } from './position.ts';
 import { context } from './context.ts';
 import { session } from './session.ts';
 import { skills } from './skills.ts';
+import { signedOutFix, signedOutSurface } from './signed-out.ts';
 import { serveStdio } from './stdio.ts';
 import { surfaceOver } from './surface.ts';
 import { pack } from './catalogue.ts';
@@ -177,7 +179,29 @@ async function mcp(args: string[]): Promise<void> {
   /* Anything that logs with console.log would write into the protocol. */
   console.log = console.info = console.debug = console.error;
 
-  const to = target(values.host, process.env, hostsPath(process.env));
+  let to: Target;
+  try {
+    to = target(values.host, process.env, hostsPath(process.env));
+  } catch (e) {
+    /*
+     * NOT SIGNED IN IS A SERVER THAT REFUSES, NOT ONE THAT IS MISSING (`signed-out.ts`). Exiting here was `/mcp`'s
+     * `braindog failed` and a model with no word to pass on (`loop/research-cutover-day.md` §7 item 4). Any other reason
+     * `target` gives is a setup mistake and still stops the server, below.
+     */
+    const fix = signedOutFix(values.host, process.env, hostsPath(process.env));
+    if (fix === null) throw e;
+    /* THE SAME ONE LINE ON STDERR AS BEFORE, for whoever reads the server's log. */
+    say(e instanceof Error ? e.message : String(e));
+    process.stdout.on('error', () => process.exit(0));
+    await serveStdio(signedOutSurface(fix), () => ({ signal: AbortSignal.timeout(budgetOf(process.env)) }), process.stdin, process.stdout);
+    /* EXIT 1 AT THE END OF INPUT, because the record was never reached, which is what `48 §4.4` spends 1 on, and which
+       `stdio.test.ts` pins for both of these cases. Input ends when the client is done with the server, so the code
+       reaches a person or a script that ran the command by hand and no session that is still asking. Left to end on
+       its own, for the reason given at the end of this function. */
+    process.exitCode = 1;
+    setTimeout(() => process.exit(1), 1_000).unref();
+    return;
+  }
   /* Started now and awaited by the first request, so git runs while the client is still saying hello. */
   const where = positionOf(process.cwd());
   /* READ PER REQUEST, because Claude Code may start this server before the start hook has written the
@@ -308,11 +332,19 @@ function selfhost(command: 'init' | 'serve', args: string[]): void {
  */
 async function hook(args: string[]): Promise<void> {
   const [which, ...more] = args;
-  const write = (text: string) => writeFileSync(1, `${text}\n`);
   if ((which !== 'start' && which !== 'end') || more.length > 0) {
     say('braindog hook takes start or end, and nothing else. Claude Code runs it, with the event on standard input.');
     return process.exit(0);
   }
+  /*
+   * THE LAPSE GOES ABOVE WHATEVER THE START HOOK SAYS, while there is still time to act on it. The login is a ninety-day
+   * bearer that does not slide (`lapseWarning`), and past it the server has nothing to reach, so the first word anyone
+   * had was this hook's line on the morning after (`loop/research-cutover-day.md` §8: "worth a calendar entry until
+   * wave 54's item 4 lands"). First, not last, because the briefing's last line is its next step and `withLines` keeps
+   * it there; and it rides the one write `hookStart` makes, the failure line's included.
+   */
+  const lapse = which === 'start' ? lapseWarning(process.env, hostsPath(process.env)) : null;
+  const write = (text: string) => writeFileSync(1, `${lapse === null ? '' : `${lapse}\n`}${text}\n`);
   try {
     let stdin = '';
     try {
@@ -357,6 +389,17 @@ function install(args: string[]): void {
   const profiles = files.length > 0 && dirs.length === 0 ? [] : profilesOf(dirs, process.env);
   const run = installProfiles(profiles, files, options, mcpFiles);
   lines.push(...run.lines);
+  /*
+   * EVERY SESSION STILL OPEN ON A PROFILE THIS RUN CHANGES, NAMED BY ITS PROCESS ID (brief 53-B). The plan's first
+   * sentence is to close them all, and the survey found three open on the default profile and two on quartz with
+   * nothing in the install's output to say so: its one sentence about open sessions was printed under `.claude.json`
+   * alone and gave a reason that was not observed. A line, never a refusal (see `openSessionsLine`).
+   */
+  const open = profiles.flatMap((dir) => {
+    const said = openSessionsLine(dir, openSessions(dir), options.replace);
+    return said === null ? [] : [said];
+  });
+  if (open.length > 0) lines.push('', ...open);
   /* Named, the .mcp.json is in the run above, and telling the person to do it by hand would be wrong. */
   if (options.replace && mcpFiles.length === 0) lines.push('', REPLACE_BY_HAND);
   /*
