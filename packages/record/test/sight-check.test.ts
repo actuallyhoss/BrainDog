@@ -145,3 +145,82 @@ test('A FIGURE FILLED WITH A CLIENT SHE CANNOT READ ANSWERS ALIKE WHETHER THE CL
   assert.equal((figure.value as { value: unknown }).value, 1);
   sql.close();
 });
+
+/**
+ * THE ONE ANSWER IS NOW `list`'s, AND IT WAS A SENTENCE OF ITS OWN. With no `reads` to hand the kernel's `metric`, the
+ * door above listed twice and answered her `FORBIDDEN`, "worked out for a row of a list you cannot read", for all four
+ * spellings: one answer, and not the one her list of Jobs gives for the same words, which is `ok` with nothing matched.
+ * A tile and the page it links to reading different answers is the drift `metric`'s own header exists to prevent.
+ */
+test('A FIGURE FILLED WITH A CLIENT SHE CANNOT READ COUNTS WHAT HER LIST OF JOBS COUNTS FOR THE SAME WORDS', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  assert.ok((await api.kernel.install([CLIENTS, JOBS, CLIENT_JOBS])).ok);
+  const harrow = (await api.create({ register: 'clients', fields: { name: 'Harrow Divorce Case' } } as never, owner)) as Out;
+  assert.ok((await api.create({ register: 'jobs', fields: { what: 'Draft the petition', client: (harrow.value as { id: string }).id } } as never, owner)).ok);
+  assert.ok((await api.invite({ person: 'p_2', name: 'Wren', registers: { jobs: 'read' } } as never, owner)).ok);
+  const held = api.kernel.access('p_2')!;
+  const wren: CallContext = { principal: { kind: 'person', id: 'p_2', level: held.level }, registers: held.registers ?? '*', levels: held.levels };
+
+  for (const it of ['Harrow Divorce Case', 'Nobody At All', 'clients#1', 'clients#9']) {
+    const listed = (await api.list({ register: 'jobs', where: `client is ${it}` } as never, wren)) as Out;
+    assert.ok(listed.ok, `${it}: ${JSON.stringify(listed)}`);
+    const out = (await api.metric({ metric: `client-jobs:${it}` }, wren)) as Out;
+    assert.ok(out.ok, `${it}: ${JSON.stringify(out)}`);
+    assert.equal((out.value as { value: unknown }).value, (listed.value as { matched: number }).matched, it);
+  }
+  sql.close();
+});
+
+/* ── audit fifty-four, finding 3: a ref written into a list the writer cannot read ── */
+
+/**
+ * WHAT WAS MEASURED BEFORE THE REPAIR (`loop/research-batch-fifty-four-audit.md` §3, probe R1). The write path resolved
+ * a ref against the whole record, so the member invited to Jobs alone at `write`, whose `list` of Clients is refused,
+ * filed a Job at `clients#1` and at `CL1` and was answered `ok`, at `clients#2` and `CL2` was told "which was deleted",
+ * and at `clients#9` and `CL9` "there is no such row": three answers where `list`'s rule gives one.
+ */
+test('A JOB POINTED AT A CLIENT SHE CANNOT READ IS REFUSED IN ONE SENTENCE, LIVE, DELETED OR NEVER THERE, and the owner is told which', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const clients = reg('clients', 'Clients', [], 'name');
+  (clients.body as unknown as { seq_prefix: string }).seq_prefix = 'CL';
+  assert.ok((await api.kernel.install([clients, JOBS])).ok);
+  assert.ok((await api.create({ register: 'clients', fields: { name: 'Harrow Divorce Case' } } as never, owner)).ok);
+  assert.ok((await api.create({ register: 'clients', fields: { name: 'Closed Matter' } } as never, owner)).ok);
+  assert.ok((await api.update({ register: 'clients', seq: 2, patch: { deleted_at: new Date(NOW).toISOString() } } as never, owner)).ok);
+
+  assert.ok((await api.invite({ person: 'p_2', name: 'Wren', registers: { jobs: 'write' } } as never, owner)).ok);
+  const held = api.kernel.access('p_2')!;
+  const wren: CallContext = { principal: { kind: 'person', id: 'p_2', level: held.level }, registers: held.registers ?? '*', levels: held.levels };
+  assert.equal(((await api.list({ register: 'clients' } as never, wren)) as Out).ok, false, 'the probe needs a member who cannot read Clients');
+
+  const filed = async (it: string, ctx: CallContext): Promise<string> => {
+    const out = (await api.create({ register: 'jobs', fields: { what: 'A job', client: it } } as never, ctx)) as Out;
+    return JSON.stringify(out.ok ? 'ok' : out.refusal).split(it).join('<it>');
+  };
+  const answers = new Map<string, string>();
+  for (const it of ['clients#1', 'clients#2', 'clients#9', 'CL1', 'CL2', 'CL9']) answers.set(it, await filed(it, wren));
+  assert.equal(new Set(answers.values()).size, 1, `her answers told the hidden rows apart: ${JSON.stringify([...answers])}`);
+  assert.match(answers.get('clients#1')!, /there is no such row/);
+
+  /* A Job she writes without naming a client is still hers to write. */
+  const own = (await api.create({ register: 'jobs', fields: { what: 'No client yet' } } as never, wren)) as Out;
+  assert.ok(own.ok, JSON.stringify(own));
+
+  /* AND AN UPDATE IS ASKED AS A CREATE IS, which the checker found no test holding: `reads` taken off `update` left
+     every test here green. Her own Job, pointed at each spelling in turn, is answered one sentence for all six. */
+  const seq = (own.value as { seq: number }).seq;
+  const pointed = new Set<string>();
+  for (const it of ['clients#1', 'clients#2', 'clients#9', 'CL1', 'CL2', 'CL9']) {
+    const out = (await api.update({ register: 'jobs', seq, patch: { client: it } } as never, wren)) as Out;
+    pointed.add(JSON.stringify(out.ok ? 'ok' : out.refusal).split(it).join('<it>'));
+  }
+  assert.deepEqual([...pointed], [answers.get('clients#1')], 'her updates told the hidden rows apart');
+
+  /* The owner reads Clients, and is told what is true of each. */
+  assert.equal(await filed('clients#1', owner), '"ok"');
+  assert.match(await filed('clients#2', owner), /which was deleted/);
+  assert.match(await filed('CL9', owner), /there is no such row/);
+  sql.close();
+});

@@ -73,6 +73,7 @@ import {
   type DeviceCode,
   type DeviceRow,
   type Exchanged,
+  type OperationGrant,
   type VaultGrant,
   type Waiting as DeviceWaiting,
   type EventLine as LogLine,
@@ -222,6 +223,16 @@ export type CallContext = {
   credentialed?: boolean;
 
   /**
+   * The one ADMIN method an operation grant opens, when the host built this context from one: `export`, `import`,
+   * `installPack` or `createToken`, as `operationGrant` names it (`OPERATION_METHOD` in the kernel's `device.ts`).
+   *
+   * SET ONLY BY A HOST, AND ONLY AFTER `operationGrant` HAS SPENT THE BEARER, with `principal` the person who approved it
+   * at the level they hold now. `admin` admits it for that method and every other gate refuses it, so a bearer approved
+   * for an import cannot export, list, write or open the vault on the approver's behalf.
+   */
+  operation?: string | undefined;
+
+  /**
    * When this caller last proved who they are, in epoch milliseconds: a passkey, a link or the server key.
    *
    * SET ONLY BY A HOST, AND ONLY FROM A SESSION ROW'S `authed_at`, which rotation never moves. The vault
@@ -264,6 +275,21 @@ const NO_DELETE: Refusal = {
 
 /** `restore`: the copy the record went back to, and the copy of what it was just before. */
 export type Restored = { bookmark: string; at: string; kept: string | null };
+
+/** The `restore.pitr` event's note, one sentence for both the restore that writes it and the `restored` that does. */
+const restoredNote = (bookmark: string, who: string, kept: string | null): string =>
+  kept === null ? `restored to ${bookmark} by ${who}` : `restored to ${bookmark} by ${who}; the record as it was is kept as ${kept}`;
+
+/**
+ * A store of copies whose `restore` does not put rows back into this object but ends it: the Cloud's, where going back
+ * is a PITR bookmark handed to `onNextSessionRestoreBookmark` and the object is aborted and reopened (`51 D15`).
+ *
+ * THE FLAG IS HERE AND NOT ON `Snapshots` because `@braindog/ports` is not this package's to change and the difference
+ * matters only to the record: after such a `restore` returns, anything this object writes is thrown away when it
+ * reopens, `restore.pitr` included. So `restore` writes nothing after the port for one of these, and the host calls
+ * `restored` on the reopened object to write the event where it will stay.
+ */
+export type ReopeningSnapshots = Snapshots & { readonly reopens: true };
 
 /** Device starts one address may make in fifteen minutes before the next waits (`12 §3`, the `device:` key). */
 const STARTS = 10;
@@ -435,6 +461,11 @@ const LEVEL_REACH: Record<Level, Need[]> = {
  * backwards is how a revoked colleague keeps writing through a token they were issued last year.
  */
 export function allows(ctx: CallContext, need: Need, nameOf: (list: string) => string = (list) => list): Refusal | null {
+  /* AN OPERATION GRANT REACHES ITS ONE ADMIN METHOD AND NOTHING THAT ASKS HERE. The context carries the approver as a
+     person at their own level, so without this line it would read, write and reach the vault as they do. `admin` asks
+     this function with `operation` taken off, and only for the method the grant names. */
+  if (ctx.operation !== undefined)
+    return { code: 'FORBIDDEN', fix: `This bearer was approved for one ${ctx.operation} and reaches nothing else. Sign in, or start the device again for this.`, at: 'operation' };
   const p = ctx.principal;
   if (p.kind === 'system') return null;
 
@@ -833,9 +864,9 @@ export type RecordDeps = {
   build?: Build | undefined;
   /**
    * The copies this host keeps of the whole record (`33 §1` port 9). Absent, `snapshot`, `snapshots` and `restore`
-   * refuse `NOT_IN_THIS_BUILD`.
+   * refuse `NOT_IN_THIS_BUILD`. A port that says `reopens` is one whose `restore` ends this object (`ReopeningSnapshots`).
    */
-  snapshots?: Snapshots | undefined;
+  snapshots?: Snapshots | ReopeningSnapshots | undefined;
   /**
    * Remove this record from the host: its storage, its copies and its name (`53 §5.9`). It runs last, after every
    * check, and the record answers nothing afterwards. Absent, `deleteRecord` refuses `NOT_IN_THIS_BUILD`.
@@ -1220,7 +1251,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   /* `reads` IS WHAT A READING METHOD SAYS INSTEAD. Listing the copies a record keeps changes nothing,
      and telling a token it "cannot change what this record is" named a problem the caller did not have. */
-  const admin = (ctx: CallContext, reads?: string): Refusal | null => {
+  /* `method` IS THE DOOR'S OWN NAME, passed by the four doors an operation grant can open (`CallContext.operation`). A
+     context carrying an operation is admitted here only by the door it names, and then held to what its approver holds
+     now: an owner who was moved down since approving has approved nothing. Any other door refuses it, in `allows`. */
+  const admin = (ctx: CallContext, reads?: string, method?: string): Refusal | null => {
+    if (ctx.operation !== undefined) {
+      if (method === undefined || ctx.operation !== method || ctx.principal.kind !== 'person') return allows(ctx, 'owner', listName);
+      const { operation: _spent, ...approver } = ctx;
+      return allows(approver, 'owner', listName);
+    }
     if (ctx.principal.kind === 'token')
       return {
         code: 'NEEDS_BROWSER_SESSION',
@@ -2172,6 +2211,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /** `agent:claude`: a token's name, when its write has no run to sign it (`30 §3`). */
   const agentOf = (ctx: CallContext): string => `agent:${ctx.session?.agent ?? 'other'}`;
+
+  /**
+   * The lists a writer's refs may name, asked as `list` asks it (`readable`), for the two doors that take a caller's
+   * fields: `create` and `update`.
+   *
+   * A REF INTO A LIST THE WRITER CANNOT READ NAMES NO ROW, ON THE WAY IN AS ON THE WAY OUT. Without it the member invited
+   * to Jobs alone filed a Job at `clients#1` and was answered `ok`, at `clients#2` "which was deleted", and at
+   * `clients#9` "there is no such row" (`loop/research-batch-fifty-four-audit.md` §3, `test/sight-check.test.ts`).
+   * Whether she should be able to point a Job at a client she cannot see at all is a question the audit leaves to a
+   * D-number, and until one answers it the sentence does not: every spelling reads as a number nobody was issued. A raw
+   * row id is taken as it is, as it always was, which tells her nothing about whether the row exists.
+   */
+  const refsSeen = (ctx: CallContext) => (register: string): boolean => readable(ctx, register) === null;
 
   /**
    * Who a row write is by, as the kernel's `WriteContext` says it.
@@ -3313,6 +3365,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           args.register,
           kernel.create(args.register, args.fields, {
             ...writerOf(ctx),
+            reads: refsSeen(ctx),
             ...(args.note === undefined ? {} : { note: args.note }),
             ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
             /* A RETRY IS ONE ROW. An agent whose answer was lost sends the same request again, and
@@ -3407,6 +3460,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           args.register,
           kernel.update(args.register, `${args.register}#${args.seq}`, args.patch, {
             ...writerOf(ctx),
+            reads: refsSeen(ctx),
             ...(args.version === undefined ? {} : { version: args.version }),
             ...(args.note === undefined ? {} : { note: args.note }),
             ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
@@ -3832,34 +3886,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          append to answered with the figure, which is the same leak one number wide. */
       if (!filled || (register && readable(ctx, register)))
         return no('METRIC_UNKNOWN', `There is no metric called ${args.metric}.`, { at: 'metric' });
-      /* AND THE CALLER'S OWN WORDS ARE RESOLVED ONLY AGAINST LISTS SHE READS. `kernel.metric` resolves a ref in `where`
-         against the whole record, so the member invited to Jobs alone asking `client-jobs:<title>` was answered `ok` for
-         a client on the Clients list she cannot read and REF_UNKNOWN for a title nobody holds, and the same for
-         `clients#1` against `clients#9` (SEC-10), which `list` had stopped answering by passing `reads`. Only a filled
-         figure is asked: a declared `where` is the author's words, the same for every reader, and a tile over it is
-         answered as `page` answers it. */
-      if (param !== undefined && register !== null && filled.where !== undefined) {
-        /* FIRST, WHICH LISTS HER WORDS LAND ON, asked of the clauses the parameter filled (`within`, which `fill`
-           writes) with every list refused. `lookupRef` asks `reads` of a ref field's target before it looks anything
-           up and stops there when refused, so what this collects is the targets of the ref fields her words fill and
-           nothing about any row, the same for a title that exists and one that does not. */
-        const landed = new Set<string>();
-        const refuseEvery = (list: string): boolean => {
-          landed.add(list);
-          return false;
-        };
-        kernel.list({ register, where: filled.within ?? filled.where, limit: 1, reads: refuseEvery });
-        /* REFUSED, AND IN THE SAME WORDS FOR EVERY WORD SHE SENDS. The kernel's `metric` takes no `reads`, so it cannot
-           count her words as naming no row, which is what `list` answers; a refusal that names neither her words nor
-           the list is the one answer here that is the same whether the row exists or not. */
-        if (!sees(ctx, landed))
-          return no('FORBIDDEN', `${id} is worked out for a row of a list you cannot read, so it is not worked out for you.`, { at: 'metric' });
-        /* THEN HER WORDS AS `list` WOULD READ THEM, one row at most, so a row id or a spoken id of a hidden list is
-           refused as `list` refuses it rather than named as the wrong list's row. */
-        const probe = kernel.list({ register, where: filled.where, limit: 1, reads: (list) => sees(ctx, [list]) });
-        if (!probe.ok && 'refusal' in probe && probe.refusal.code.startsWith('REF_')) return { ok: false as const, refusal: probe.refusal };
-      }
-      return kernel.metric(filled);
+      /* AND THE CALLER'S OWN WORDS ARE RESOLVED ONLY AGAINST LISTS SHE READS, BY THE KERNEL, AS `list` RESOLVES THEM. The
+         member invited to Jobs alone asking `client-jobs:<title>` was answered `ok` for a client on the Clients list she
+         cannot read and REF_UNKNOWN for a title nobody holds, and the same for `clients#1` against `clients#9` (SEC-10).
+         The first repair listed twice here and refused all four `FORBIDDEN` in a sentence of its own, because the
+         kernel's `metric` took no `reads`: one answer, and not the one her list of Jobs gives for the same words, which
+         is `ok` with nothing matched (`test/sight-check.test.ts`). It takes `reads` now, and a ref into a hidden list
+         names no row inside the figure exactly as inside `list`.
+
+         ONLY A FILLED FIGURE IS ASKED: a declared `where` is the author's words, the same for every reader, and a tile
+         over it is answered as `page` answers it. */
+      return param !== undefined && register !== null ? kernel.metric(filled, { reads: (list) => sees(ctx, [list]) }) : kernel.metric(filled);
     },
 
     /**
@@ -4587,7 +4624,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * run actions it does not have yet. An agent's way to an action is `propose`, whose acceptance is this same approval.
      */
     async installPack(args: { doc: unknown; source?: PackSource; planHash: string; approve?: readonly string[] }, ctx: CallContext) {
-      const stop = admin(ctx);
+      const stop = admin(ctx, undefined, 'installPack');
       if (stop) return { ok: false as const, refusal: stop };
       if (!args?.planHash) return no('REQUIRED_MISSING', 'Read the plan first; installing is approving one.', { at: 'planHash' });
       const approve: unknown = args.approve;
@@ -5170,7 +5207,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * removed does not keep writing through a token they were issued last year.
      */
     async createToken(args: { scope: Scope; label?: string; days?: number }, ctx: CallContext) {
-      const stop = admin(ctx);
+      const stop = admin(ctx, undefined, 'createToken');
       if (stop) return { ok: false as const, refusal: stop };
       /* AND MINTING NEEDS A CREDENTIAL OF ITS OWN, which is not true of any other ADMIN method here.
          A self-host with no `BRAINDOG_TOKEN` treats an unauthenticated request as the owner — right
@@ -5348,7 +5385,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * credentials to a machine they did not authorise.
      */
     async export(args: { sections?: readonly string[]; redactGrants?: boolean; kek_id?: string }, ctx: CallContext) {
-      const stop = admin(ctx, 'export this record');
+      const stop = admin(ctx, 'export this record', 'export');
       if (stop) return { ok: false as const, refusal: stop };
 
       /* A SECTION NOBODY HAS IS NOT AN EMPTY EXPORT. `sections: "data"` — the easy JSON mistake —
@@ -5404,15 +5441,23 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * would merge two businesses by primary key, and there is no answer to what that should do that
      * is better than refusing.
      */
-    async import(args: { lines?: readonly string[] }, ctx: CallContext) {
-      const stop = admin(ctx);
+    async import(args: { lines?: readonly string[]; replace?: boolean }, ctx: CallContext) {
+      const stop = admin(ctx, undefined, 'import');
       if (stop) return { ok: false as const, refusal: stop };
       if (!Array.isArray(args?.lines)) return no('REQUIRED_MISSING', 'An import is the lines of a .brain file.', { at: 'lines' });
       /* AND EVERY ONE OF THEM IS A LINE. `[null]` cleared the array check and then threw out of the
          reader — across the boundary this package promises nothing throws over. */
       if (!args.lines.every((line) => typeof line === 'string'))
         return no('VALUE_MALFORMED', 'A .brain file is lines of text, and one of these is not.', { at: 'lines' });
-      return tail(await kernel.import(args.lines));
+      /* `replace` IS THE ONE EXCEPTION TO EMPTY, AND IT IS A RESTORE: the file must be this record, and everything it
+         carries replaces what the record holds (`kernel.import`). A `"true"` from a query string is refused rather than
+         read as either answer, because read as true it replaces a record nobody asked to replace. */
+      if (args.replace !== undefined && typeof args.replace !== 'boolean')
+        return no('VALUE_MALFORMED', 'replace is true or false.', { at: 'replace' });
+      /* AND WHAT IT WAS IS KEPT FIRST, as `restore` keeps it, when this host keeps copies: the kernel takes it once the file
+         has passed and before anything is cleared, so a file that is refused leaves no copy behind. */
+      const before = args.replace === true && snapshots ? () => snapshots.take('before-restore') : undefined;
+      return tail(await kernel.import(args.lines, { replace: args.replace === true, ...(before === undefined ? {} : { before }) }));
     },
 
     /* ── ADMIN: BACKUPS, ERASURE AND DELETION ──────────── */
@@ -5482,11 +5527,31 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       } catch (e) {
         return no('OUT_OF_BOUNDS', e instanceof Error ? e.message : String(e), { at: 'bookmark' });
       }
+      /* A PORT THAT REOPENS THE OBJECT HAS ENDED THIS ONE. Its rows are the ones PITR is about to put back over, so the
+         event written here would be the first thing lost, and the tail would arm an alarm on an object about to go.
+         The host calls `restored` on the object it reopens, which writes the same event there. */
+      if ('reopens' in snapshots && snapshots.reopens === true) return ok({ bookmark: chosen.id, at: chosen.at, kept: before.id });
       kernel.reload();
       kernel.rebuildFts();
       const who = actorOf(ctx);
-      kernel.lifecycle('restore.pitr', who, `restored to ${chosen.id} by ${who}; the record as it was is kept as ${before.id}`, chosen.id);
+      kernel.lifecycle('restore.pitr', who, restoredNote(chosen.id, who, before.id), chosen.id);
       return tail(ok({ bookmark: chosen.id, at: chosen.at, kept: before.id }));
+    },
+
+    /**
+     * The `restore.pitr` event, on the object a reopening restore came back as (`51 D15`'s second call). INTERNAL.
+     *
+     * WRITTEN HERE AND NOT IN `restore`, because for a port that reopens the object `restore` ran in the object PITR
+     * replaced. The host that performed the restore knows who asked and what was kept, and says so; the event is the
+     * one `restore` writes on a host whose restore puts rows back in place, word for word.
+     */
+    async restored(args: { bookmark: string; kept: string | null; by?: string }): Promise<Result<{ event: string }>> {
+      if (typeof args?.bookmark !== 'string' || args.bookmark === '')
+        return no('REQUIRED_MISSING', 'Which copy was the record restored to? Name it as the list of backups does.', { at: 'bookmark' });
+      if (args.kept !== null && typeof args.kept !== 'string') return no('VALUE_MALFORMED', 'kept is the id of the copy taken before, or null.', { at: 'kept' });
+      const who = typeof args.by === 'string' && args.by !== '' ? args.by : 'system';
+      const event = kernel.lifecycle('restore.pitr', who, restoredNote(args.bookmark, who, args.kept), args.bookmark);
+      return tail(ok({ event }));
     },
 
     /**
@@ -5757,6 +5822,22 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /** A vault-grant bearer, checked before the host opens a key for an agent. INTERNAL, and no route reaches it. */
     async vaultGrant(bearer: string): Promise<Result<VaultGrant>> {
       return kernel.vaultGrant(bearer);
+    },
+
+    /**
+     * An operation bearer, checked and spent, before the host builds the context for the one method it opens. INTERNAL.
+     *
+     * WHAT THE HOST DOES WITH THE ANSWER is the whole of the rule: `{ principal: { kind: 'person', id: person, level },
+     * operation: method, credentialed: true }`, with `level` read from the record as for a session, and that context
+     * handed to `method` and to nothing else. `admin` admits it there, and `allows` refuses it everywhere.
+     */
+    async operationGrant(bearer: string): Promise<Result<OperationGrant>> {
+      return kernel.operationGrant(bearer);
+    },
+
+    /** The key this record's exports are signed with, for the hosts' key doors, or `null` with no signer. INTERNAL. */
+    async signingKey(): Promise<{ key_id: string; public_key: string } | null> {
+      return kernel.signingKey();
     },
 
     /**

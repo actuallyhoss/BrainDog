@@ -52,7 +52,7 @@ import {
   type PlannedRecord,
 } from './declare.ts';
 import { project, projectedText, rebuild, search as ftsSearch, searchMatched as ftsSearchMatched, type Hit, type Searched } from './fts.ts';
-import { checkBrainl, exportBrainl, importBrainl, signBrainl, type Section, type Signer } from './brainl.ts';
+import { checkBrainl, exportBrainl, importBrainl, signBrainl, tables as fileTables, type ImportReport, type Section, type Signer } from './brainl.ts';
 import {
   drainSchedule,
   due,
@@ -208,11 +208,13 @@ import {
   deviceRevoke,
   deviceStart,
   deviceSweep,
+  operationGrant,
   vaultGrant,
   type Approved,
   type DeviceCode,
   type DeviceRow,
   type Exchanged,
+  type OperationGrant,
   type VaultGrant,
   type Waiting,
 } from './device.ts';
@@ -230,7 +232,7 @@ export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statemen
 export { checkBrainl, keyIdOf, b64url, manifestBytes, signBrainl, type Signature, type Signer } from './brainl.ts';
 export { SPARK, SPARK_KINDS, sparkMayWrite } from './spark.ts';
 export { KERNEL_WRITTEN, STALE_MS, isStale, provisionalTitle, sessionDeclaration } from './session.ts';
-export { REACHES, type Approved, type DeviceCode, type DeviceRow, type Exchanged, type Reach, type VaultGrant, type Waiting } from './device.ts';
+export { OPERATION_METHOD, REACHES, type Approved, type DeviceCode, type DeviceRow, type Exchanged, type Operation, type OperationGrant, type Reach, type VaultGrant, type Waiting } from './device.ts';
 export type { SessionHints } from './session.ts';
 export type { Resolved, ScopeDecl, ScopesDecl, Whereabouts } from './scope.ts';
 export { coerce, FIELD_TYPES, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, looksLikeCredential, parseSpoken, spoken } from './coerce.ts';
@@ -606,6 +608,15 @@ export type WriteContext = {
   principal?: { kind: 'person' | 'token' | 'system'; token?: string | undefined } | undefined;
   /** What an agent says about its run. Read for a token's write only. */
   session?: SessionHints | undefined;
+  /**
+   * Which registers the writer reads, so a ref she writes into one she cannot is not looked up. Absent is all.
+   *
+   * `list`'s RULE, ON THE WAY IN. The write path resolved a spoken id against the whole record, so the member invited to
+   * Jobs alone filed a Job at `clients#1` and was answered `ok`, at `clients#2` "which was deleted", and at `clients#9`
+   * "there is no such row": three answers about a list whose `list` refuses her (`loop/research-batch-fifty-four-audit.md`
+   * §3). With this, a ref into a list she cannot read names no row, whether the row is live, deleted or never existed.
+   */
+  reads?: ((register: string) => boolean) | undefined;
 };
 
 const RESERVED = new Set(['id', 'seq', 'register', 'created_at', 'updated_at', 'version', 'spoken', 'title']);
@@ -813,6 +824,62 @@ export type RecordOptions = {
    */
   day?: IngestDeps['day'];
 };
+
+/**
+ * What a replacing import throws to roll its clearing back when `importBrainl` refuses the file.
+ *
+ * `importBrainl` ANSWERS A REFUSAL, IT DOES NOT THROW ONE, and inside the replace's own transaction an answer commits
+ * whatever ran before it. So the refusal is carried out by this one value and turned back into the answer outside.
+ */
+const REPLACE_REFUSED = new Error('the replacing import was refused, and what it cleared is rolled back');
+
+/** The bytes `signingKey` asks the host's signer to sign, to learn its public half. Fixed, so no caller chooses them. */
+const KEY_PROBE = new TextEncoder().encode('braindog: which key signs this record');
+
+/**
+ * The record id a file says it is: the `id` of its one `record` row, or `null` for a file that carries none.
+ *
+ * READ BY COLUMN NAME FROM THE FILE'S OWN HEADER LINE, as `importBrainl` reads every table, because a file from an older
+ * build may carry fewer columns and a position fixed here would read the wrong one.
+ */
+function fileRecordId(lines: readonly string[]): string | null {
+  const at = lines.findIndex((l) => l.startsWith('#table record '));
+  if (at < 0) return null;
+  const columns = (lines[at]!.slice('#table record '.length).split(' ')[0] ?? '').split(',');
+  const row = lines.slice(at + 1).find((l) => l.trim() !== '');
+  if (row === undefined || row.startsWith('#')) return null;
+  try {
+    const values: unknown = JSON.parse(row);
+    const id = Array.isArray(values) ? values[columns.indexOf('id')] : undefined;
+    return typeof id === 'string' ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * One column of one table as a file carries it, a value per row, or `null` when the file has no header for that table.
+ *
+ * BY COLUMN NAME, FOR `fileRecordId`'s REASON. A line that is not a JSON array is skipped rather than refused, because
+ * `checkBrainl` has already passed every line against the manifest and this only counts what is there.
+ */
+function fileColumn(lines: readonly string[], table: string, column: string): unknown[] | null {
+  const at = lines.findIndex((l) => l.startsWith(`#table ${table} `));
+  if (at < 0) return null;
+  const index = (lines[at]!.slice(`#table ${table} `.length).split(' ')[0] ?? '').split(',').indexOf(column);
+  const out: unknown[] = [];
+  for (const line of lines.slice(at + 1)) {
+    if (line.startsWith('#')) break;
+    if (line.trim() === '') continue;
+    try {
+      const values: unknown = JSON.parse(line);
+      if (Array.isArray(values)) out.push(index < 0 ? null : values[index]);
+    } catch {
+      continue;
+    }
+  }
+  return out;
+}
 
 /* A SORTED PAGE'S CURSOR: `~` then the order it belongs to, the last row's value under each sort key and its id, as
    base64url JSON. The `~` keeps it apart from the record order's `<when>|<id>`, which can never start with one. */
@@ -3139,15 +3206,23 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
        * refused, now saying it was deleted, because pointing a row at a project somebody removed is a mistake worth a
        * sentence, and a round trip that changes nothing is not.
        */
+      /* AND A LIST THE WRITER CANNOT READ HOLDS NO ROW FOR HER, live, deleted or held, so `coerce` gives the one sentence
+         it gives for a number nobody was ever issued (`WriteContext.reads`). NOT EVEN WHAT THE FIELD ALREADY HOLDS: her
+         reads hand a ref into a hidden list back as the row id (the MCP's `spokenRefs` names only rows she can `get`),
+         which `coerce` takes as it is, so the exception above has no round trip to keep here, and kept it would confirm
+         the number of the hidden row her own row points at, one guess per write. */
+      const hidden = (reg: string): boolean => w.reads !== undefined && !w.reads(reg);
       const lookAt = (key: string) => {
         const held = current?.fields[key];
         const holds = (id: string) => (Array.isArray(held) ? held.includes(id) : held === id);
         return {
           ...look,
           refId: (reg: string, seq: number) => {
+            if (hidden(reg)) return null;
             const row = bySeq(reg, seq, true);
             return row && (!row.deleted_at || holds(row.id)) ? row.id : null;
           },
+          deleted: (reg: string, seq: number) => !hidden(reg) && look.deleted(reg, seq),
         };
       };
 
@@ -5168,7 +5243,12 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * links to read the same rows — the alternative is two definitions of "overdue" that agree until
      * somebody edits one.
      */
-    metric: (decl: MetricDecl): Result<Reading> => evaluateMetric(sql, liveTarget(sql, decl), evalContext()),
+    /* `reads` AS `list` TAKES IT, and for the same reason: a ref in the figure's `where` was resolved against the whole
+       record, so a figure filled with a hidden client's title counted that client's jobs for a member who could not
+       list them, and the record's door made up for it with a second `list` and a refusal of its own (SEC-10,
+       `test/metric-reads.test.ts`). Handed `reads`, a ref into a list she cannot read names no row, as it does there. */
+    metric: (decl: MetricDecl, o: { reads?: (register: string) => boolean } = {}): Result<Reading> =>
+      evaluateMetric(sql, liveTarget(sql, decl), o.reads === undefined ? evalContext() : { ...evalContext(), reads: o.reads }),
 
     /* ── pages ──────────────────────────────────────────────────── */
 
@@ -6008,6 +6088,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /** A vault bearer, checked. INTERNAL. */
     vaultGrant: (bearer: string): Promise<Result<VaultGrant>> => vaultGrant(tokenDeps(), bearer),
 
+    /** An operation bearer, checked and spent: the one ADMIN method it opens and who approved it. INTERNAL. */
+    operationGrant: (bearer: string): Promise<Result<OperationGrant>> => operationGrant(tokenDeps(), bearer),
+
     /* ── the decision gate ─────────────────────────────────── */
 
     /**
@@ -6215,8 +6298,37 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      *
      * The rebuild is here rather than in the import because it depends on the DECLARATIONS the file
      * just brought — a search index built before them would index nothing and look like it worked.
+     *
+     * OR, WITH `replace`, THE FILE OVER THE RECORD IT WAS TAKEN FROM (`loop/research-restore.md` §4, W55-2).
+     *
+     * A RECORD `createRecord` MADE IS NEVER EMPTY. It holds two schedule rows, its owner's person and member rows and the
+     * `create` event before anybody writes, so a copy of a record could not be put back into that record at all: measured,
+     * `IMPORT_NOT_EMPTY` "already holds 2 schedule, 1 person, 1 event, 1 member, 3 vault_key". The Cloud cannot restore
+     * into a new record instead, because each `vault_key` row is wrapped with an AAD bound to the record's id and a bearer
+     * routes by it (§3.4), so the copy has to come back as itself.
+     *
+     * SO `replace` CLEARS WHAT TRAVELS AND KEEPS WHAT DOES NOT, IN THE TRANSACTION THAT READS THE FILE. Every table of the
+     * `data`, `origin` and `governance` sections is emptied and `importBrainl` then finds the empty record it has always
+     * required and fills it; a refusal from it is thrown here so that the clearing rolls back with it rather than leaving
+     * a record with nothing in it. `local` is not touched, so a token minted before still verifies and a device grant is
+     * still listed. `migration` is left as it is, because the ledger is a fact about these bytes and `importBrainl` never
+     * imports it. The header is `importBrainl`'s to replace, as on any import.
+     *
+     * AND THE ROWS OF A TRAVELLING TABLE THAT DO NOT TRAVEL ARE PUT BACK. An `export` event is written to the record and
+     * left out of every file (`brainl.ts`, `LOCAL_ROWS`), so clearing `event` whole would make the record forget every copy
+     * that left it, which is the question those rows exist to answer. They are read out first and written back after the
+     * file, with their own ids and times; their rowids now follow the file's rows.
+     *
+     * REFUSED UNLESS THE FILE IS THIS RECORD. Replacing one record with another's rows is the merge the empty rule refuses,
+     * made total, and the file's own `record` row is what says which record it is.
+     *
+     * `before` RUNS ONCE THE FILE HAS PASSED, and before anything is cleared: a host's `before-restore` copy is taken there,
+     * so a damaged file or another record's file takes no copy, and the copy is of the record as it was.
+     *
+     * NO EVENT IS WRITTEN FOR THE REPLACE. The next export of the record must be the file it came from, manifest for
+     * manifest, because that round trip is the only proof the import is complete, and an event would be one row more.
      */
-    async import(lines: Iterable<string>) {
+    async import(lines: Iterable<string>, opts: { replace?: boolean; before?: () => Promise<unknown> } = {}) {
       /* The one destructive path that was not gated. `migrate.ts` says in bold that the refusal is
          sticky and every `Result`-returning method short-circuits on it; this one wrote seven rows
          into a record whose schema the code cannot read. */
@@ -6232,12 +6344,102 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const sound = await checkBrainl(all);
       if (!sound.ok) return sound;
 
-      const out = importBrainl(sql, transaction, all);
-      if (out.ok) {
-        reload();
-        rebuildFts();
+      if (opts.replace !== true) {
+        const out = importBrainl(sql, transaction, all);
+        if (out.ok) {
+          reload();
+          rebuildFts();
+        }
+        return out;
       }
+
+      const mine = recordIdentity(sql)?.id ?? null;
+      const theirs = fileRecordId(all);
+      if (mine === null || theirs !== mine)
+        return no<ImportReport>(
+          'OUT_OF_BOUNDS',
+          theirs === null
+            ? `This file carries no record row, so it cannot say it is ${mine ?? 'this record'}. A replacing import puts a record back as itself; import a whole copy, or import this into an empty record.`
+            : `This file is ${theirs}, and this record is ${mine ?? 'not yet named'}. A replacing import puts a record back as itself; import the file into an empty record instead.`,
+          { at: 'record.id' },
+        );
+
+      const shapes = fileTables(sql).filter((t) => t.section !== 'header' && t.name !== 'migration');
+
+      /* AND THE FILE MUST BE THE WHOLE RECORD, BECAUSE EVERY TABLE IT DOES NOT FILL IS LEFT EMPTY. The header travels
+         whatever else does, so a `sections: ['data']` export carries the `record` row the check above asks for, and
+         replacing with one answered `ok` with the record's declarations and its owner's `member` row gone, and `list`
+         of a register it held answering REGISTER_UNKNOWN (measured by the checker, `test/file-doors.test.ts`). A section
+         counts as carried when any of its tables has a header in the file, and not only when all of them do, so a copy
+         from an older build, which lacks a table added since, can still put the record back. */
+      const carried = new Set(all.filter((l) => l.startsWith('#table ')).map((l) => l.slice('#table '.length).split(' ')[0]));
+      const leftOut = [...new Set(shapes.map((t) => t.section))].filter((s) => !shapes.some((t) => t.section === s && carried.has(t.name)));
+      if (leftOut.length > 0)
+        return no<ImportReport>(
+          'OUT_OF_BOUNDS',
+          `This file leaves out ${leftOut.join(' and ')}, and a replacing import would leave this record with none of it. Export the whole record and put that back.`,
+          { at: 'sections' },
+        );
+
+      /* NOR THE SEALED BYTES. The export door redacts by default, which leaves `vault_key` out of the file and blanks
+         every grant's `ciphertext` (`brainl.ts`, `SEALED`), so replacing with the file an export hands out unless told
+         otherwise answered `ok` with the record key and the signing key gone, and every credential sealed under them
+         with them (measured by the checker). Refused while the record holds bytes of either kind and the file holds
+         none; a record with no vault loses nothing to a redacted file, and it is still taken. */
+      const keys = Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM vault_key')?.n ?? 0);
+      const sealed = Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM grant WHERE ciphertext IS NOT NULL')?.n ?? 0);
+      const fileKeys = fileColumn(all, 'vault_key', 'purpose')?.length ?? 0;
+      const fileSealed = (fileColumn(all, 'grant', 'ciphertext') ?? []).filter((v) => v !== null).length;
+      if ((keys > 0 && fileKeys === 0) || (sealed > 0 && fileSealed === 0))
+        return no<ImportReport>(
+          'OUT_OF_BOUNDS',
+          'This file was exported without the sealed bytes, and this record holds its keys and credentials in them, so a replacing import would throw them away. Export with the wrapping key named, which carries them, and put that back.',
+          { at: 'vault_key' },
+        );
+
+      await opts.before?.();
+
+      let refusal: Refusal | null = null;
+      let out: { ok: true; value: ImportReport } | null = null;
+      try {
+        out = transaction(() => {
+          const stays = shapes.flatMap((t) =>
+            t.where === undefined ? [] : [{ t, rows: sql.all<Record<string, Param>>(`SELECT ${t.columns.join(', ')} FROM ${t.name} WHERE NOT (${t.where})`) }],
+          );
+          for (const t of shapes) sql.exec(`DELETE FROM ${t.name}`);
+          const done = importBrainl(sql, transaction, all);
+          if (!done.ok) {
+            refusal = done.refusal;
+            throw REPLACE_REFUSED;
+          }
+          for (const { t, rows } of stays)
+            for (const row of rows)
+              sql.exec(`INSERT OR IGNORE INTO ${t.name} (${t.columns.join(', ')}) VALUES (${t.columns.map(() => '?').join(', ')})`, ...t.columns.map((c) => row[c] ?? null));
+          return done;
+        });
+      } catch (e) {
+        if (e !== REPLACE_REFUSED || refusal === null) throw e;
+        return { ok: false as const, refusal: refusal as Refusal };
+      }
+      reload();
+      rebuildFts();
       return out;
+    },
+
+    /**
+     * The key this record's exports are signed with, as `dog_sig` carries it, or `null` on a host that holds none.
+     *
+     * READ BY THE HOSTS' KEY DOORS (`03 §4`'s `/.well-known/braindog-key`), so `braindog verify --key` has somewhere to
+     * fetch the key from other than the file it is checking; nothing served it, measured 404 on the self-host.
+     *
+     * THE `Signer` PORT HANDS OUT THE PUBLIC HALF ONLY BESIDE A SIGNATURE, and the kernel never holds the private one. So
+     * the key is read by signing a fixed string no caller supplies and throwing the signature away: nobody can choose the
+     * bytes, so this is not a way to have the record sign something.
+     */
+    async signingKey(): Promise<{ key_id: string; public_key: string } | null> {
+      if (!signer) return null;
+      const signed = await signer(KEY_PROBE);
+      return signed ? { key_id: signed.keyId, public_key: signed.publicKey } : null;
     },
 
     /**

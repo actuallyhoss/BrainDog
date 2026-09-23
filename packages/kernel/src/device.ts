@@ -44,6 +44,16 @@ export const VAULT_ALL_DAYS = 7;
 /** The reaches that approve one ADMIN operation, spent within the code's ten minutes (`30` §10). */
 const OPERATIONS: readonly Reach[] = ['export', 'import', 'pack', 'token'];
 
+/**
+ * The one record method each operation reach opens, by the name the record's ADMIN gate is asked with.
+ *
+ * TWO OF THE FOUR ARE NOT THEIR REACH'S NAME. `pack` installs one (`installPack`) and `token` mints one (`createToken`),
+ * and the record's gate compares method names, so a table here is what keeps the reach a person approved on the phone
+ * and the door it opens the same thing.
+ */
+export const OPERATION_METHOD = { export: 'export', import: 'import', pack: 'installPack', token: 'createToken' } as const;
+export type Operation = (typeof OPERATION_METHOD)[keyof typeof OPERATION_METHOD];
+
 export type DeviceCode = { device_code: string; user_code: string; expires: string; interval: typeof POLL_INTERVAL };
 export type Waiting = { pending: true; interval: typeof POLL_INTERVAL };
 export type Exchanged = { pending: false; bearer: string; reach: Reach; scope: string | null; expires: string };
@@ -65,6 +75,9 @@ export type DeviceRow = {
 };
 
 export type VaultGrant = { handle: string; scope: string; person: string; expires: string };
+
+/** An operation bearer, checked and spent: which reach, the method it opens, and the person who approved it. */
+export type OperationGrant = { handle: string; reach: 'export' | 'import' | 'pack' | 'token'; method: Operation; person: string };
 
 type Stored = Omit<DeviceRow, 'handle'> & { id: string; code_hash: string; token_hash: string | null };
 
@@ -329,6 +342,47 @@ export async function vaultGrant(deps: TokenDeps, bearer: string): Promise<Resul
 
   deps.sql.exec('UPDATE device_grant SET last_used = ? WHERE id = ?', instant(deps.nowMs), row.id);
   return ok({ handle: await handleOf(deps, row.id), scope: row.scope, person: row.approved_by, expires: row.expires });
+}
+
+/**
+ * An operation bearer, checked and spent. INTERNAL: the host calls it before it builds a context for the one ADMIN method
+ * the reach names (`OPERATION_METHOD`), and the record's gate admits that context for that method and no other.
+ *
+ * NOTHING READ THESE BEARERS BEFORE. `devicePoll` minted one for reach `export` or `import` and gave it ten minutes, and
+ * the only reader of `token_hash` was `vaultGrant`, which matches `reach = 'vault'` alone, so the CLI could be handed a
+ * bearer that no door on either host would take (`loop/research-restore.md` §2.1, `test/operation-grant.test.ts`).
+ *
+ * SPENT ON FIRST USE, IN THE SAME TURN IT IS READ. The digest is awaited first, then the row is read and
+ * marked `expired` with nothing awaited between, so a second request carrying the same bearer finds the row spent even
+ * when the two arrive together. `expires` and `last_used` are both set to now, which is how the device listing tells a
+ * grant that was used from one that ran out.
+ *
+ * ONE SENTENCE FOR EVERY WAY IT FAILS, as `vaultGrant` and `verifyToken` give it: spent, past its ten minutes, for
+ * another record, of another reach, or approved by somebody since suspended. A caller replaying a bearer learns nothing
+ * a caller guessing one does not.
+ */
+export async function operationGrant(deps: TokenDeps, bearer: string): Promise<Result<OperationGrant>> {
+  const cut = typeof bearer === 'string' ? bearer.indexOf('.') : -1;
+  const record = cut < 0 ? '' : bearer.slice(0, cut);
+  const secret = cut < 0 ? '' : bearer.slice(cut + 1);
+  const wrong = no<OperationGrant>('FORBIDDEN', 'That bearer is not an operation this record is waiting for. Ask the device to start again.', {
+    at: 'operation',
+  });
+  if (!record || !secret || record !== deps.recordId()) return wrong;
+
+  const hash = await deps.digest(secret);
+  const row = deps.sql.one<{ id: string; reach: Reach; approved_by: string | null; expires: string; suspended_at: string | null }>(
+    `SELECT d.id AS id, d.reach AS reach, d.approved_by AS approved_by, d.expires AS expires, p.suspended_at AS suspended_at
+     FROM device_grant d LEFT JOIN person p ON p.id = d.approved_by
+     WHERE d.token_hash = ? AND d.status = 'active'`,
+    hash,
+  );
+  const now = instant(deps.nowMs);
+  if (!row || !OPERATIONS.includes(row.reach) || !row.approved_by || row.suspended_at || row.expires <= now) return wrong;
+
+  deps.sql.exec("UPDATE device_grant SET status = 'expired', expires = ?, last_used = ? WHERE id = ? AND status = 'active'", now, now, row.id);
+  const reach = row.reach as OperationGrant['reach'];
+  return ok({ handle: await handleOf(deps, row.id), reach, method: OPERATION_METHOD[reach], person: row.approved_by });
 }
 
 /**

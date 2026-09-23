@@ -239,7 +239,9 @@ export const ROUTES: readonly Route[] = [
      vault whose reads are not audited cannot say whether anything got out — and a GET that mutates
      the record is a GET a proxy may replay and a browser may prefetch. */
   { name: 'export', group: 'ADMIN', writes: true, what: 'The record as a file: line per row, and it imports back.' },
-  { name: 'import', group: 'ADMIN', writes: true, what: 'A file into an EMPTY record. Anything else is a merge nobody asked for.' },
+  /* `replace` IS A RESTORE AND NOT A MERGE: the file must be this record's own copy, and it replaces every row that travels.
+     Anything else into a record that holds rows is still refused `IMPORT_NOT_EMPTY` (`packages/kernel/src/index.ts`, `import`). */
+  { name: 'import', group: 'ADMIN', writes: true, what: 'A file into an EMPTY record, or with replace, the record put back from its own copy, what it was kept first where this host keeps copies. Anything else is a merge nobody asked for.' },
   { name: 'snapshot', group: 'ADMIN', writes: true, what: 'A copy of the whole record, now, kept by this host. A host that keeps none says so.' },
   { name: 'snapshots', group: 'ADMIN', writes: false, what: 'The copies this host keeps, newest first, each with when it was taken and its size.' },
   { name: 'restore', group: 'ADMIN', writes: true, what: 'Put the record back to one kept copy. What it was is kept as a copy first.' },
@@ -298,6 +300,9 @@ export const UNROUTED = [
   /* The key doors' record half: `vault.ts` calls them after `vaultGrant`, with sealed bytes only. */
   'depositGrant',
   'openForGrant',
+  /* `operationGrant`, `signingKey` AND `restored` ARE INTERNAL TOO (W55-2) AND ARE NOT LISTED YET. `router-groups.mjs`
+     refuses a name here that `30 §5`'s INTERNAL row does not carry, and that row has not been amended for them. None of
+     the three is in `ROUTES`, and `packages/record/test/file-doors.test.ts` fails if one is added. */
 ] as const;
 
 const BY_NAME = new Map(ROUTES.map((r) => [r.name, r]));
