@@ -65,6 +65,12 @@ export type State =
       /** Which of the two is the filled button: adding a passkey on first run, opening the app otherwise. */
       lead: 'add' | 'open';
       out: 'idle' | 'asking' | 'failed';
+      /**
+       * A link that arrived while somebody was in, kept for Sign out to hand to the landing. The address no longer
+       * holds it, because `takeLink` clears the fragment before anything else, so this is the only thing on the
+       * screen that can say it came.
+       */
+      link: Link | null;
     };
 
 function waysOf(it: Methods, webauthn: boolean): Ways | null {
@@ -87,7 +93,7 @@ function signedIn(who: Who, it: Methods, s: Seen): State {
     add = step.failure.kind === 'cancelled' ? 'cancelled' : step.failure.kind === 'exists' ? 'exists' : 'failed';
   const out = step.at === 'asking' && step.how === 'out' ? 'asking' : step.at === 'failed' && step.how === 'out' ? 'failed' : 'idle';
   const lead = it.firstRun === true && add !== 'absent' && add !== 'added' ? 'add' : 'open';
-  return { name: 'signed-in', who, add, lead, out };
+  return { name: 'signed-in', who, add, lead, out, link: s.link };
 }
 
 /** A press that came back without a session, or `null` when its moment has passed. */
@@ -133,7 +139,10 @@ export function stateOf(s: Seen): State {
     const after = afterFailure(step.failure, step.how, step.when, s, ways);
     if (after) return after;
   }
-  if (s.link && (step.at === 'idle' || (step.at === 'asking' && step.how === 'link')))
+  /* `out` LANDS TOO, because a link kept through Sign out is the reason somebody pressed it: the signed-in screen
+     said one had arrived and that signing out uses it. Without this the step `leave()` sets drew "You are signed
+     out." over the ways in, and the link sat in state with nothing on screen to spend it. */
+  if (s.link && (step.at === 'idle' || step.at === 'out' || (step.at === 'asking' && step.how === 'link')))
     return { name: 'link-landing', link: s.link, asking: step.at === 'asking' };
   if (step.at === 'asking') return { name: 'asking', ways, how: step.how };
   if (step.at === 'sent') return { name: 'link-sent', ways, email: step.email };

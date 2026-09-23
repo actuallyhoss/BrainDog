@@ -129,13 +129,30 @@ test('A LINK IN THE ADDRESS WAITS FOR A PRESS, and a spent one is link-expired',
   assert.equal(stateOf(seen({ link, methods: host({ passkey: false, magic: false }) })).name, 'link-landing');
 });
 
+/* MEASURED FIRST, BY THE AUDIT'S PROBE (`loop/research-batch-forty-six-audit.md` §9): with somebody signed in, a kept
+   link and an idle step answered `{ name: 'signed-in' }` and nothing else, so the link had left the address bar and
+   the screen had no way to say it arrived. The state carries it now, and Sign out lands on it. */
+test('A LINK PASTED WHILE SOMEBODY IS IN IS CARRIED BY SIGNED IN, and signing out hands it to the landing', () => {
+  const link = { kind: 'claim', token: 't' } as const;
+  assert.deepEqual(stateOf(seen({ methods: host({ me: WHO }), link })), {
+    name: 'signed-in',
+    who: WHO,
+    add: 'offer',
+    lead: 'open',
+    out: 'idle',
+    link,
+  });
+  /* The same link kept through Sign out: `leave()` sets `me` to null and the step to `out`. */
+  assert.deepEqual(stateOf(seen({ link, step: { at: 'out' } })), { name: 'link-landing', link, asking: false });
+});
+
 test('a press that could not reach the host is unreachable', () => {
   assert.equal(stateOf(seen({ step: failed('send', { kind: 'unreachable' }) })).name, 'unreachable');
 });
 
 test('SIGNED IN OFFERS A PASSKEY ON THIS DEVICE, and leads with it on first run', () => {
   const s = stateOf(seen({ methods: host({ me: WHO }) }));
-  assert.deepEqual(s, { name: 'signed-in', who: WHO, add: 'offer', lead: 'open', out: 'idle' });
+  assert.deepEqual(s, { name: 'signed-in', who: WHO, add: 'offer', lead: 'open', out: 'idle', link: null });
 
   const first = stateOf(seen({ methods: host({ key: true, firstRun: true }), entered: { who: WHO, via: 'key' } }));
   assert.ok(first.name === 'signed-in' && first.add === 'offer' && first.lead === 'add');

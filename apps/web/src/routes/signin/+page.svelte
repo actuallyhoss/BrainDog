@@ -186,6 +186,11 @@
    * "Sign in to open your record." on screen, made no request, and stayed so until a reload. The owner will very likely
    * have this page open when he pastes it, from the site's own "Sign in". A press that is out keeps its moment; anything
    * else on screen gives way to the landing, which needs the step idle to be drawn.
+   *
+   * WHERE SOMEBODY IS ALREADY IN, THE LINK IS KEPT AND SAID, NOT LANDED. `stateOf` answers `signed-in` before it looks
+   * at a link, and measured by the audit's probe that drew "You are signed in" with the address emptied and nothing to
+   * say a link had come (`loop/research-batch-forty-six-audit.md` §9). The signed-in state carries the link now, the
+   * screen says so in one line, and Sign out lands on it.
    */
   function arrived() {
     const l = takeLink(location.hash, clearHash);
@@ -373,6 +378,10 @@
           <p class="calm-body">{copy.signedInReads}</p>
         </div>
         {#if added}<p class="status" role="status">{added}</p>{/if}
+        <!-- A LINK PASTED OVER THIS SCREEN IS SAID HERE, because the address no longer says it: `takeLink` cleared the
+             fragment, and before this line the tab read "You are signed in" as if nothing had come. It is kept in
+             state, so Sign out lands on it rather than on the ways in (`stateOf` lands on `out` with a link). -->
+        {#if view.link}<p class="status" role="status">{copy.linkWaitsSignedIn}</p>{/if}
         <div class="doors">
           {#if view.lead === 'add'}
             {@render addDoor(true)}
