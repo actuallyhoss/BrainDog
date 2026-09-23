@@ -3,8 +3,8 @@
  *
  * A `change` carries a declaration, or several (`to.declarations`): a page with its place in the
  * sidebar and its blocks, a list with its fields, a rule for what comes in, a look, an automation with its
- * trigger and steps, a script with where it calls out and its source. A `pattern` carries
- * the rule an arrival suggested. Both were drawn as Accept and Reject under a title and nothing else,
+ * trigger and steps, a script with where it calls out and its source, a summary with where it posts. A `pattern`
+ * carries the rule an arrival suggested. Both were drawn as Accept and Reject under a title and nothing else,
  * so the one question Spark asks most, "shall I arrange this for you", was the one a person could not
  * see the answer to before saying yes (DIRECTION §11, DESIGN-SYSTEM D4).
  *
@@ -60,11 +60,37 @@ function register(id: string, body: Row): Appears {
   return { kind: copy.proposalKind('register'), title: text(body.title) || text(body.name) || named(body.id ?? id), lines };
 }
 
-function ingest(id: string, body: Row): Appears {
+/**
+ * The egress line the record filed for this declaration, or the kernel's reading of its body when it filed none.
+ *
+ * FILED FIRST, for the reason `script` gives: the record works the line out with the vault and the installed copy in
+ * hand, and this screen has neither. The body's own reading is for a declaration whose line was not filed because it
+ * calls out as the installed one already does.
+ */
+function filedLine(filed: readonly unknown[], channel: string, name: unknown, body: Row): { line: string; key_line: string | null } | null {
+  const mine = filed.find((e): e is Row => isRow(e) && e.channel === channel && e.ingest === name && typeof e.line === 'string');
+  if (mine) return { line: text(mine.line), key_line: typeof mine.key_line === 'string' ? mine.key_line : null };
+  const read = egressOf(body);
+  return read ? { line: read.line, key_line: read.key_line } : null;
+}
+
+/** An egress line as the preview says it: its shouted lead dropped, since the label says it. */
+const callsOut = (line: string): string => line.replace(/^CALLS OUT /u, '');
+
+/**
+ * A rule for what comes in: where from, how often, what it calls out with, and the list it files into.
+ *
+ * WHAT IT CALLS OUT WITH IS ITS FILED LINE, which names the key. Audit fifty-one found a pattern polling `api.goldapi.io`
+ * every hour on the owner's `goldapi` drawn as a host and an interval, with no key anywhere on the screen.
+ */
+function ingest(id: string, body: Row, filed: readonly unknown[] = []): Appears {
   const lines: Appears['lines'] = [];
   const from = text(body.url) ? hostOf(text(body.url)) : text(body.channel);
   if (from !== '') lines.push({ label: copy.proposalComesFrom, value: from });
   if (text(body.every) !== '') lines.push({ label: copy.proposalEvery, value: text(body.every) });
+  const egress = filedLine(filed, text(body.channel), body.ingest, body);
+  if (egress) lines.push({ label: copy.proposalCallsOut, value: callsOut(egress.line) });
+  if (egress?.key_line) lines.push({ label: copy.proposalMaySend, value: egress.key_line });
   const writes = isRow(body.writes) ? named(body.writes.register) : '';
   if (writes !== '') lines.push({ label: copy.proposalFilesInto, value: writes });
   return { kind: copy.proposalKind('ingest'), title: named(body.ingest ?? id), lines };
@@ -131,12 +157,28 @@ function rule(id: string, body: Row): Appears {
  * not file, one that calls out as the installed copy already does.
  */
 function script(id: string, body: Row, filed: readonly unknown[]): Appears {
-  const mine = filed.find((e): e is Row => isRow(e) && e.channel === 'script' && e.ingest === body.script && typeof e.line === 'string');
-  const egress = mine ? { line: text(mine.line), key_line: typeof mine.key_line === 'string' ? mine.key_line : null } : egressOf(body);
-  const lines: Appears['lines'] = [{ label: copy.proposalCallsOut, value: egress ? egress.line.replace(/^CALLS OUT /u, '') : copy.proposalCallsNothing }];
+  const egress = filedLine(filed, 'script', body.script, body);
+  const lines: Appears['lines'] = [{ label: copy.proposalCallsOut, value: egress ? callsOut(egress.line) : copy.proposalCallsNothing }];
   if (egress?.key_line) lines.push({ label: copy.proposalMaySend, value: egress.key_line });
   const source = text(body.source);
   return { kind: copy.proposalKind('script'), title: text(body.title) || named(body.script ?? id), lines, ...(source !== '' ? { source } : {}) };
+}
+
+/**
+ * A summary, as the owner approves it: where it posts, when, and what it carries, or that it stays with him.
+ *
+ * IT WAS A TITLE. Every kind this file did not know was drawn as `{ kind, title, lines: [] }`, so accepting a weekly
+ * digest that posts a table of Notes to `https://collector.example.com/in` read "Summary" and a name (audit fifty-one,
+ * section 2). A digest has one channel that leaves the record, its webhook, and the line says it as `script` says its
+ * fetches; one that sends only in-app or by email says it calls nothing out.
+ */
+function digest(id: string, body: Row, filed: readonly unknown[]): Appears {
+  const egress = filedLine(filed, 'digest', body.digest, body);
+  return {
+    kind: copy.proposalKind('digest'),
+    title: text(body.name) || named(body.digest ?? id),
+    lines: [{ label: copy.proposalCallsOut, value: egress ? callsOut(egress.line) : copy.proposalCallsNothing }],
+  };
 }
 
 function hostOf(url: string): string {
@@ -155,10 +197,11 @@ export function appearsOf(decl: unknown, filed: readonly unknown[] = []): Appear
   const body = isRow(decl.body) ? decl.body : {};
   if (kind === 'page') return page(id, body);
   if (kind === 'register') return register(id, body);
-  if (kind === 'ingest') return ingest(id, body);
+  if (kind === 'ingest') return ingest(id, body, filed);
   if (kind === 'theme') return theme(id, body);
   if (kind === 'rule') return rule(id, body);
   if (kind === 'script') return script(id, body, filed);
+  if (kind === 'digest') return digest(id, body, filed);
   if (kind === '') return null;
   return { kind: copy.proposalKind(kind), title: text(body.title) || named(id), lines: [] };
 }
@@ -168,8 +211,14 @@ export function appearsOf(decl: unknown, filed: readonly unknown[] = []): Appear
  * buttons, and `rowset` is `changes.ts`.
  */
 export function proposedOf(kind: string, body: Row): Proposed | null {
+  /* A PATTERN'S INGEST IS A BARE BODY OR A DECLARATION. Spark files the body (`spark/src/jobs.ts`) and an agent files the
+     declaration; drawn as a body, the declaration was read for `ingest`, `channel` and `writes` on its wrapper, and came
+     out as a heading with no title and no lines. A declaration of another kind, queued before the kernel held a pattern
+     to an ingest, is drawn as what it is, since that is what accepting it would have installed. */
   if (kind === 'pattern') {
-    const rule = isRow(body.ingest) ? ingest('', body.ingest) : null;
+    const filed = Array.isArray(body.egress) ? body.egress : [];
+    const held = body.ingest;
+    const rule = !isRow(held) ? null : 'id' in held || 'kind' in held ? appearsOf(held, filed) : ingest('', held, filed);
     return rule ? { appears: [rule], samples: Array.isArray(body.samples) ? body.samples.length : null } : null;
   }
   if (kind !== 'change') return null;

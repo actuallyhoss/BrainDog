@@ -33,6 +33,28 @@ const OBLIGATIONS: Declaration = {
   } as never,
 };
 
+/**
+ * What an accepted pattern installs: an ingest that files a bank's payment alerts into Obligations.
+ *
+ * AN INGEST AND NOT A RULE. These fixtures filed `rule.*` declarations as a pattern's `ingest`, which is the road
+ * `record/test/accept-rule-level.test.ts` measured a colleague taking; `checkBody` now refuses it at filing
+ * (`pattern-kind.test.ts`), so each test below keeps its point with the one thing a pattern is for.
+ */
+const RECEIPTS = (over: Record<string, unknown> = {}) => ({
+  id: 'ingest.receipts',
+  kind: 'ingest',
+  body: {
+    ingest: 'receipts',
+    channel: 'email',
+    match: { all: [{ field: 'body', contains: 'paid' }] },
+    extract: { what: { text: { between: ['You paid ', ' today'] } } },
+    writes: { register: 'obligations', confidence: 'exact' },
+    dedupe: ['what'],
+    on_conflict: 'skip',
+    ...over,
+  },
+});
+
 type Clockish = ReturnType<typeof fixedClock>;
 
 async function record(): Promise<{ k: Kernel; sql: NodeSql; clock: Clockish }> {
@@ -240,23 +262,19 @@ test('AND AN ACCEPTED PATTERN INSTALLS, which is the loop the whole product is f
   /* Three unmatched payloads earn a draft, a draft becomes a proposal, a person approves it once,
      and from then on the shape is deterministic and free. This is the last link of that chain. */
   const { k, sql } = await record();
-  const decl = {
-    id: 'rule.chase',
-    kind: 'rule',
-    body: { rule: 'chase', register: 'obligations', when: 'state is open', once_per: ['entry'], then: [{ tag: 'chased' }] },
-  };
   const made = value<{ id: string }>(
-    k.propose({ question: 'Turn this rule on?', body_kind: 'pattern', body: { ingest: decl, samples: ['r1', 'r2', 'r3'] } }, 'p_1'),
+    k.propose({ question: 'File these alerts?', body_kind: 'pattern', body: { ingest: RECEIPTS(), samples: ['r1', 'r2', 'r3'] } }, 'p_1'),
   );
 
   const out = value<{ install: { id: string } }>(k.decide(made.id, { decide: { option: 'accept', reason: 'it is what we already do by hand' } }, 'p_2'));
-  assert.equal(out.install.id, 'rule.chase', 'the gate did not hand back the declaration to install');
+  assert.equal(out.install.id, 'ingest.receipts', 'the gate did not hand back the declaration to install');
 
   // The kernel hands it back rather than installing it, because installing is asynchronous — and a
   // decision that resolved before its change landed would be a lie.
   assert.ok((await k.install([out.install as never])).ok);
-  assert.equal(value<{ id: string }>(k.create('obligations', { what: 'Invoice 9', state: 'open' }, { actor: 'p_1' }) as never).id.length > 0, true);
-  assert.deepEqual(k.get('obligations#1')?.fields.tags, ['chased']);
+  // And the next alert of that shape is filed by the pattern, with nobody asked.
+  value(k.arrive({ channel: 'email', headers: { From: 'bank@example.com' }, body: 'You paid Invoice 9 today.', sha256: 'm1', verified: true }));
+  assert.equal(k.get('obligations#1')?.fields.what, 'Invoice 9');
   sql.close();
 });
 
@@ -265,16 +283,18 @@ test('and one that will not install puts the question back', async () => {
   const made = value<{ id: string }>(
     k.propose(
       {
-        question: 'Turn this rule on?',
+        question: 'File these alerts?',
         body_kind: 'pattern',
-        body: { ingest: { id: 'rule.bad', kind: 'rule', body: { rule: 'bad', register: 'obligations', when: 'colour is red', then: [] } }, samples: ['r1'] },
+        /* FILED, BECAUSE FILING ASKS WHAT KIND IT IS AND NOT WHETHER IT INSTALLS. `install` asks that, and an arrival holds
+           no `colour` to match on, as Obligations held none for the `when: 'colour is red'` of the rule this replaced. */
+        body: { ingest: RECEIPTS({ match: { all: [{ field: 'colour', is: 'red' }] } }), samples: ['r1'] },
       },
       'p_1',
     ),
   );
   const out = value<{ suggestion: string; install: unknown }>(k.decide(made.id, { decide: { option: 'accept', reason: 'go on' } }, 'p_2'));
   assert.ok(out.install);
-  assert.equal((await k.install([out.install as never])).ok, false, 'a rule nobody can read installed');
+  assert.equal((await k.install([out.install as never])).ok, false, 'an ingest matching on nothing an arrival holds installed');
 
   k.reopen(out.suggestion);
   assert.equal(k.governanceRow('suggestion', out.suggestion)?.status, 'open');
@@ -365,7 +385,7 @@ test('REOPEN IS FOR THE ONE CASE IT EXISTS FOR, and does not apply a decision tw
 test('and a reopened pattern comes back visible, deferral and all', async () => {
   const { k, sql } = await record();
   const made = value<{ id: string }>(
-    k.propose({ question: 'Turn it on?', body_kind: 'pattern', body: { ingest: { id: 'rule.x', kind: 'rule', body: {} }, samples: ['r1'] } }, 'p_1'),
+    k.propose({ question: 'Turn it on?', body_kind: 'pattern', body: { ingest: RECEIPTS(), samples: ['r1'] } }, 'p_1'),
   );
   value(k.decide(made.id, { defer: { until: new Date(NOW + 400 * DAY).toISOString(), why: 'next year' } }, 'p_2'));
   value(k.decide(made.id, { decide: { option: 'accept', reason: 'go on' } }, 'p_2'));
@@ -416,9 +436,8 @@ test('REOPENING LEAVES A TRACE, because a decision is a row and not a side effec
      state, so anybody reading the log saw a suggestion both resolved and open with no account of
      how. The decision stands — somebody did answer — and this is not an undo of it. */
   const { k, sql } = await record();
-  const decl = { id: 'rule.x', kind: 'rule' as const, body: { rule: 'x', register: 'obligations', when: 'state is open', then: [] } };
   const made = value<{ id: string }>(
-    k.propose({ question: 'Turn this rule on?', body_kind: 'pattern', body: { ingest: decl, samples: ['r1'] } }, 'p_1'),
+    k.propose({ question: 'File these alerts?', body_kind: 'pattern', body: { ingest: RECEIPTS(), samples: ['r1'] } }, 'p_1'),
   );
   value(k.decide(made.id, { decide: { option: 'accept', reason: 'yes' } }, 'p_2'));
   value(k.reopen(made.id, 'the declaration named a field that is not there'));
@@ -441,7 +460,7 @@ test('A PATTERN ARRIVES WITH THE ARRIVALS IT WAS DRAWN FROM', async () => {
      declaration with nothing to check it against, which is the shape of proposal that gets approved
      because reading it is the harder option. */
   const { k, sql } = await record();
-  const decl = { id: 'rule.x', kind: 'rule' as const, body: { rule: 'x', register: 'obligations', when: 'state is open', then: [] } };
+  const decl = RECEIPTS();
 
   const bare = refusal(k.propose({ question: 'Turn this on?', body_kind: 'pattern', body: { ingest: decl } }, 'p_1'));
   assert.equal(bare.code, 'REQUIRED_MISSING');

@@ -142,3 +142,60 @@ test('a choice and a rowset have drawings of their own, and a change with nothin
   assert.equal(proposedOf('rowset', { register: 'things', rows: [] }), null);
   assert.equal(proposedOf('change', { declaration_id: 'x', to: {} }), null);
 });
+
+/* ── what a digest and a pattern send out (audit fifty-one, section 2) ── */
+
+const POLL_BODY = { ingest: 'gold', channel: 'poll', url: 'https://api.goldapi.io/v1/xau', every: '1h', grant: 'goldapi', extract: { what: { after: 'rate ' } }, writes: { register: 'notes' } };
+const HOOK_BODY = {
+  digest: 'out',
+  name: 'Weekly out',
+  schedule: { day: 'mon', at: '08:00' },
+  channels: ['webhook'],
+  webhook: { url: 'https://collector.example.com/in' },
+  sections: [{ heading: 'Rows', source: 'register.notes', as: 'table' }],
+};
+
+/* A DIGEST WAS A TITLE AND NOTHING ELSE. `appearsOf` drew every kind it did not know as `{ kind, title, lines: [] }`, so
+   the owner accepting a weekly summary read "Summary · Out" and nothing of the address it posts his rows to. */
+test('a digest that posts out says where, when and what, in the line the record filed', () => {
+  const line = egressOf(HOOK_BODY)!.line;
+  const filed = { to: { id: 'digest.out', kind: 'digest', body: HOOK_BODY }, egress: [{ ingest: 'out', channel: 'digest', line, key_line: null }] };
+  const [digest] = proposedOf('change', filed)?.appears ?? [];
+  assert.deepEqual([digest?.kind, digest?.title], ['Summary', 'Weekly out']);
+  assert.deepEqual(digest?.lines, [{ label: 'Calls out', value: line.slice('CALLS OUT '.length) }]);
+  assert.match(line, /collector\.example\.com/u);
+  /* AND ONE THAT STAYS WITH THE OWNER SAYS SO, as a script that fetches nothing does. */
+  const quiet = proposedOf('change', { to: { id: 'digest.in', kind: 'digest', body: { ...HOOK_BODY, channels: ['email'], webhook: undefined } } });
+  assert.deepEqual(quiet?.appears[0]?.lines, [{ label: 'Calls out', value: 'Nothing outside this record' }]);
+});
+
+/* A PATTERN'S INGEST COMES IN TWO SHAPES, and Decide drew one. `spark/src/jobs.ts` files the bare body; an agent files the
+   declaration, and drawn as a body the declaration read its `ingest`, `channel` and `writes` off the wrapper, where there
+   are none, so the probe's poll was a title-less "Rule for what comes in" with no host and no key. */
+test('a pattern draws its ingest as a bare body or as a declaration, with the line the record filed and its key', () => {
+  /* FOR A PROJECT'S POLL, so the line the record filed and this screen's own reading differ: the record names the project
+     and the screen can only say its row id. Filed with no project, the two were the same string, and drawing the body's
+     reading with the filed lines ignored altogether still passed. */
+  const body = { ...POLL_BODY, project: 'prj_7' };
+  const filed = egressOf(body, () => 'Lanternly')!;
+  const egress = [{ ingest: 'gold', channel: 'poll', line: filed.line, key_line: filed.key_line }];
+  const want = [
+    { label: 'Comes from', value: 'api.goldapi.io' },
+    { label: 'How often', value: '1h' },
+    { label: 'Calls out', value: filed.line.slice('CALLS OUT '.length) },
+    { label: 'May send', value: 'gold runs for the project Lanternly and sends the key "goldapi".' },
+    { label: 'Files into', value: 'Notes' },
+  ];
+  const declared = proposedOf('pattern', { ingest: { id: 'ingest.gold', kind: 'ingest', body }, samples: ['r1'], egress });
+  assert.deepEqual([declared?.appears[0]?.title, declared?.appears[0]?.lines], ['Gold', want]);
+  assert.match(filed.line, /grant "goldapi"/u);
+  const bare = proposedOf('pattern', { ingest: body, samples: ['r1'], egress });
+  assert.deepEqual([bare?.appears[0]?.title, bare?.appears[0]?.lines], ['Gold', want]);
+});
+
+/* A PATTERN QUEUED BEFORE THE KERNEL HELD IT TO AN INGEST can still hold a rule, and the accept refuses it; drawn as an
+   ingest it would say nothing true, so it is drawn as what it is. */
+test('a pattern that holds another kind is drawn as that kind', () => {
+  const out = proposedOf('pattern', { ingest: { id: 'rule.flag', kind: 'rule', body: { rule: 'flag', register: 'invoices', then: [{ tag: 'new' }] } }, samples: ['r1'] });
+  assert.equal(out?.appears[0]?.kind, 'Rule');
+});

@@ -1244,9 +1244,9 @@ export const RULE_CALLS_PER_DAY = 100;
  * `calls_out`, and a proposal that adds or changes an action carries it as the lines approving it would arm.
  */
 export type Egress = {
-  /** The action's ingest id, or a script's own id: the name the line is about. */
+  /** The action's ingest id, or a script's or a digest's own id: the name the line is about. */
   ingest: string;
-  channel: ActionKind | 'script';
+  channel: ActionKind | 'script' | 'digest';
   method: 'GET' | 'POST';
   host: string | null;
   /** The interval it runs on, or `null` for a call only a rule runs. */
@@ -1302,6 +1302,7 @@ const joinedList = (items: readonly string[]): string =>
 export function egressOf(body: unknown, nameOf?: (project: string) => string | null, opensOf?: (label: string) => string | null): Egress | null {
   if (body === null || typeof body !== 'object' || Array.isArray(body)) return null;
   if (typeof (body as { script?: unknown }).script === 'string') return scriptEgress(body as ScriptHeader, opensOf);
+  if (typeof (body as { digest?: unknown }).digest === 'string') return digestEgress(body as DigestHeader);
   const d = body as Partial<ActionDecl> & { ingest?: unknown; channel?: unknown; every?: unknown; project?: unknown };
   const channel = d.channel;
   if (typeof channel !== 'string' || !(ACTION_KINDS as readonly string[]).includes(channel)) return null;
@@ -1405,6 +1406,64 @@ function scriptEgress(d: ScriptHeader, opensOf?: (label: string) => string | nul
     project: null,
     line,
     key_line,
+  };
+}
+
+/** The part of a `digest` body its egress is read from. The whole shape is `DigestDecl` in `digest.ts`. */
+type DigestHeader = {
+  digest: string;
+  schedule?: { day?: unknown; at?: unknown; tz?: unknown };
+  channels?: unknown;
+  sections?: unknown;
+  webhook?: { url?: unknown; grant?: unknown };
+};
+
+/**
+ * A digest's egress, from its `webhook` channel, or `null` when everything it assembles stays with the owner.
+ *
+ * ONLY THE WEBHOOK, because it is the one channel a digest has that posts to an address the declaration chose. In-app,
+ * email and push go to the record's own owners, and `mcp` sends nothing. Audit fifty-one (section 2) filed a digest
+ * posting a table of Notes to `https://collector.example.com/in` and read `approve: null` on the stored proposal: the
+ * owner was asked about a title, and when its clock came `digest.ts` posted the owner's row to that address.
+ *
+ * WHAT IT CARRIES IS SAID AS THE SECTIONS' SOURCES, in `sends`, so a digest that starts posting another list is a change
+ * the owner is asked about again, as a call that sends another field is. `grant` is said when it is declared, as an
+ * action's is; `digest.ts` sends the post without reading it today, and the line says what the declaration asks for.
+ */
+function digestEgress(d: DigestHeader): Egress | null {
+  const channels = Array.isArray(d.channels) ? d.channels : [];
+  const url = typeof d.webhook?.url === 'string' ? d.webhook.url : null;
+  if (!channels.includes('webhook') || url === null) return null;
+  const host = hostOf(url);
+  const key = typeof d.webhook?.grant === 'string' && d.webhook.grant !== '' ? d.webhook.grant : null;
+  const at = typeof d.schedule?.at === 'string' ? d.schedule.at : '';
+  const day = typeof d.schedule?.day === 'string' ? d.schedule.day : null;
+  const tz = typeof d.schedule?.tz === 'string' && d.schedule.tz !== '' ? ` ${d.schedule.tz}` : '';
+  const when = `${day === null ? 'daily' : `weekly on ${day}`} at ${at}${tz}`;
+  const sections = (Array.isArray(d.sections) ? d.sections : []).filter(
+    (s): s is { source: string; as?: unknown } => s !== null && typeof s === 'object' && typeof (s as { source?: unknown }).source === 'string',
+  );
+  /* `table` IS WHAT A SECTION WITH NO `as` IS DRAWN AS, `digest.ts`'s default, so it is what the post carries too. */
+  const carried = sections.map((s) => {
+    const as = typeof s.as === 'string' && s.as !== '' ? s.as : 'table';
+    return `${/^[aeiou]/u.test(as) ? 'an' : 'a'} ${as} of ${s.source}`;
+  });
+  const line = `CALLS OUT ${host ?? 'no host declared'} · ${when} · ${carried.length ? joinedList(carried) : 'no sections'}${key === null ? '' : ` · grant "${key}"`}`;
+
+  return {
+    ingest: d.digest,
+    channel: 'digest',
+    method: 'POST',
+    host,
+    every: when,
+    trigger: 'schedule',
+    per_day: null,
+    key,
+    paged: false,
+    sends: sections.map((s) => s.source),
+    project: null,
+    line,
+    key_line: null,
   };
 }
 

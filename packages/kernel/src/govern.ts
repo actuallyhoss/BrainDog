@@ -22,10 +22,11 @@
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import { clash, no, ok } from '@braindog/ports';
 
-import { keyNamed, runnerCannotOpen, type Egress } from './actions.ts';
+import { approvalLines, egressOf, keyNamed, runnerCannotOpen, type Egress } from './actions.ts';
 import { instant } from './migrate.ts';
 import { point } from './metrics.ts';
 import { ACROSS, ANY_LIST, touches, type Resolve } from './reach.ts';
+import { egressChanged } from './script.ts';
 import { sparkMayWrite } from './spark.ts';
 
 /** The three tables that are read like registers and are not registers. */
@@ -360,11 +361,30 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
       };
     }
     const to = resolveTo(deps.sql, body);
-    if (deps.review && to.ok) {
-      const read = deps.review(to.value.to);
+    if (to.ok) {
+      const read: Result<{ egress: Egress[]; approve: string[] } | null> = deps.review ? deps.review(to.value.to) : ok(null);
       if (!read.ok) return read as Result<{ id: string }>;
-      if (read.value !== null) body = { ...body, egress: read.value.egress, approve: read.value.approve };
+      /* AND A DIGEST'S WEBHOOK, which `review` does not ask `egressOf` about: it reads an ingest or a script and passes
+         every other kind by, so audit fifty-one's digest posting Notes to `collector.example.com` was filed with
+         `approve: null` (`egress-digest-pattern.test.ts`). Worked out here beside it, and a line `review` already said is
+         not said twice, so the day it asks about digests too this adds nothing. */
+      const theirs = read.value?.egress ?? [];
+      const digests = newEgress(deps.sql, declared(to.value.to).filter((d) => d.kind === 'digest')).filter((e) => !theirs.some((t) => t.line === e.line));
+      if (digests.length > 0) body = { ...body, egress: [...theirs, ...digests], approve: approvalLines([...theirs, ...digests]) };
+      else if (read.value !== null) body = { ...body, egress: read.value.egress, approve: read.value.approve };
     }
+  }
+
+  /* A PATTERN INSTALLS AN INGEST, AND AN INGEST CAN POLL. It was filed with no `approve` at all, because the lines above
+     were worked out for a `change` alone: audit fifty-one filed an ingest polling `api.goldapi.io` every hour on the key
+     `goldapi` as a pattern and read `approve: null`, so the owner accepted a clock and a key he was never shown. The
+     proposer's own lines are dropped for the reason they are dropped from a change. */
+  if (p.body_kind === 'pattern') {
+    const { egress: _theirs, approve: _theirLines, ...rest } = body;
+    body = rest;
+    const ingest = body.ingest as Record<string, unknown>;
+    const egress = newEgress(deps.sql, [isDeclaration(ingest) ? { id: ingest.id, kind: 'ingest', body: ingest.body } : { kind: 'ingest', body: ingest }]);
+    if (egress.length > 0) body = { ...body, egress, approve: approvalLines(egress) };
   }
 
   const by = typeof actor === 'function' ? actor() : actor;
@@ -435,6 +455,8 @@ function checkBody(deps: GovernDeps, kind: BodyKind, body: Record<string, unknow
 
   if (kind === 'pattern') {
     if (!body.ingest || typeof body.ingest !== 'object') return missing('ingest');
+    const wrong = ingestFault(body.ingest);
+    if (wrong) return wrong;
     /* AND THE SAMPLES IT WAS DRAWN FROM. 45 §5.4 puts `samples: [raw_id…]` in the body, and 07 §4's
        review counts hits against them — the `3/3 · 2/3 · 0/3` a reviewer reads before accepting. A
        pattern filed without them is a declaration somebody is asked to approve with nothing to check
@@ -484,6 +506,94 @@ function shapeFault(to: unknown): Refusal | null {
       at: 'body.to',
     };
   return null;
+}
+
+/** Whether a pattern's `ingest` is written as a declaration, `{ id, kind, body }`, rather than as an ingest's bare body. */
+const isDeclaration = (ingest: Record<string, unknown>): boolean => 'id' in ingest || 'kind' in ingest;
+
+/** The names a bare body carries when it is another kind's body: a rule, a script and a digest each name themselves. */
+const NAMED_BODIES = ['rule', 'script', 'digest', 'metric'] as const;
+
+/**
+ * What a pattern's `ingest` is when it is not an ingest, in the words the refusal names it by, or `null` when it is one.
+ *
+ * AN INGEST IN EITHER OF ITS TWO SHAPES. Spark's prompt (`spark/src/prompts.ts`) asks for ONE ingest declaration BODY
+ * and `spark/src/jobs.ts` files it bare, `{ match, extract, writes, on_conflict }`; an agent or a person files the whole
+ * declaration, as the probe of audit fifty-one did. Wave fifty-one's check knew only the second, and was held because it
+ * refused every pattern Spark proposes. A bare body is told apart by carrying neither `id` nor `kind`, and no ingest
+ * body carries either: `IngestDecl` and `ActionDecl` have no such key, and name themselves in `ingest`.
+ *
+ * AND A BARE BODY IN A RULE'S SHAPE IS A RULE. Its own name says so, or its steps: `accept-rule-level.test.ts` filed a
+ * rule as a pattern with its `id` and `kind` on, and taking them off must not be the way round this.
+ */
+function notAnIngest(ingest: unknown): string | null {
+  if (Array.isArray(ingest) || (isMap(ingest) && Array.isArray(ingest.declarations))) return 'a bundle of declarations';
+  if (!isMap(ingest)) return 'a value that is not a declaration';
+  if (isDeclaration(ingest)) {
+    /* AN EMPTY KIND IS NO KIND. Asked only to be a string, `kind: ''` was named back as "a  declaration". */
+    if (typeof ingest.kind !== 'string' || ingest.kind === '') return 'a declaration with no kind';
+    if (ingest.kind !== 'ingest') return `a ${ingest.kind}`;
+    if (typeof ingest.id !== 'string' || ingest.id === '') return 'an ingest with no id';
+    if (!isMap(ingest.body)) return 'an ingest with no body';
+    return null;
+  }
+  const named = NAMED_BODIES.find((k) => typeof ingest[k] === 'string');
+  if (named !== undefined) return `a ${named}`;
+  if (Array.isArray(ingest.steps) || Array.isArray(ingest.then)) return 'a rule';
+  return null;
+}
+
+/**
+ * Whether a pattern's `ingest` is one ingest, the only thing a pattern is for, as a refusal that says what it is instead.
+ *
+ * ASKED ONLY TO BE AN OBJECT, IT INSTALLED WHATEVER IT WAS. The accept hands `body.ingest` to `install` as it hands a
+ * change's `body.to`, so a rule filed as a pattern installed as a rule (`record/test/accept-rule-level.test.ts` measured a
+ * colleague doing it), while the review screen, the cost in `weigh.ts` and the sample counts all read it as an ingest.
+ * Anything else a person means to install goes through a `change`, which says what it is (`pattern-kind.test.ts`).
+ */
+function ingestFault(ingest: unknown): Refusal | null {
+  const is = notAnIngest(ingest);
+  if (is === null) return null;
+  const then =
+    is === 'a declaration with no kind'
+      ? 'Give it "kind":"ingest", or file what it is as a change.'
+      : is === 'an ingest with no id'
+        ? 'Give it "id":"ingest.<name>".'
+        : is === 'an ingest with no body'
+          ? 'Put the ingest itself in its "body".'
+          : `File ${is} as a change.`;
+  return {
+    code: 'VALUE_MALFORMED',
+    fix: `A pattern installs one ingest, its body {"match":{...},"extract":{...},"writes":{...}} or its declaration {"id":"ingest.<name>","kind":"ingest","body":{...}}, and this is ${is}. ${then}`,
+    at: 'body.ingest',
+  };
+}
+
+/** The declarations a change's `to` installs, one or a bundle's, each that has a `kind` and a `body` to read. */
+const declared = (to: unknown): { id?: unknown; kind: string; body: unknown }[] => {
+  const listed: unknown[] = isMap(to) && Array.isArray(to.declarations) ? to.declarations : [to];
+  return listed.filter((d): d is { id?: unknown; kind: string; body: unknown } => isMap(d) && typeof d.kind === 'string' && isMap(d.body));
+};
+
+/**
+ * What each declaration sends out that the one installed under its id did not, as `review` answers it for a change.
+ *
+ * AGAINST THE LIVE BODY UNDER THE SAME ID, so an ingest or a digest filed again as it is installed asks the owner nothing
+ * new, and a new host, key or source does. A body with no id (Spark's bare ingest) has nothing installed to compare with,
+ * and says all it sends. `nameOf` and `opensOf` are the kernel's and this file has neither: an ingest says a project by
+ * its row id, and only a script's line reads the vault, which `review` works out.
+ */
+function newEgress(sql: Sql, members: readonly { id?: unknown; kind: string; body: unknown }[]): Egress[] {
+  return members.flatMap((m) => {
+    const e = egressOf(m.body);
+    if (e === null) return [];
+    const live =
+      typeof m.id === 'string'
+        ? sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1', m.id)
+        : undefined;
+    const before = live ? egressOf(JSON.parse(live.body) as unknown) : null;
+    return before === null || egressChanged(before, e) ? [e] : [];
+  });
 }
 
 /** Whether a change's `to` is a field-level addition, `{ add: {...} }`, rather than a whole declaration. */
@@ -1323,6 +1433,23 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
       install = (row.body_kind === 'pattern' ? body.ingest : body.to) as Record<string, unknown>;
       if (!install || typeof install !== 'object')
         return no<Decided>('VALUE_MALFORMED', `${id} carries nothing to install.`, { at: 'body' });
+      /* AND A PATTERN IS HELD AT ACCEPTANCE TO BEING AN INGEST, for the reason a change is held just below: a pattern
+         queued before `ingestFault` existed can hold a rule, and it would install as one on this press. */
+      if (row.body_kind === 'pattern') {
+        const wrong = ingestFault(install);
+        if (wrong) return { ok: false, refusal: wrong };
+        /* AND A BARE BODY HAS NO ID TO INSTALL UNDER. Handed back as it is, Spark's body was decided as D1 and then
+           `install` threw `Cannot read properties of undefined (reading 'writes')`, which the record turns into a reopen
+           naming a register, after a decision that cannot be taken back (`pattern-kind.test.ts`). Asked here, nothing is
+           decided. It is not wrapped into a declaration: it names no channel, and the record's hold on what a colleague
+           may accept reads the `kind` the proposal was filed with. */
+        if (!isDeclaration(install))
+          return no<Decided>(
+            'VALUE_MALFORMED',
+            `${id} is an ingest's body with no id, so there is nothing to install it as. It installs once it is proposed as {"id":"ingest.<name>","kind":"ingest","body":{...}} naming its channel; until then it can be answered no.`,
+            { at: 'body.ingest' },
+          );
+      }
       /* AND A CHANGE IS HELD AT ACCEPTANCE TO WHAT IT IS HELD TO WHEN FILED, before anything is decided: a queue carried
          from an earlier build holds changes filed before those checks existed, and `fits` asks the rows as they are now.
          Refused here, the question stays open with nothing resolved, which a refusal from `install` afterwards could only
@@ -1357,7 +1484,9 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
       }
       /* EVERY KEY IT SENDS IS IN THE VAULT BEFORE ANYTHING IS ARMED. Accepting a call whose key is missing would arm
          it and pause it on its first run, which reads as approved and does nothing. Nothing is written until all are there. */
-      if (row.body_kind === 'change' && Array.isArray(body.egress))
+      /* A PATTERN'S TOO, since it files the same lines: an ingest polling on a key the vault does not hold is the same
+         approved clock that pauses on its first run (`egress-digest-pattern.test.ts`). */
+      if ((row.body_kind === 'change' || row.body_kind === 'pattern') && Array.isArray(body.egress))
         for (const out of body.egress as { key?: unknown; paged?: unknown }[]) {
           const label = typeof out?.key === 'string' ? out.key : null;
           if (label === null) continue;
@@ -1410,7 +1539,7 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
   deps.sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = 'addressed' WHERE id = ?", id);
   /* AND THE LINES THAT PRESS APPROVED, word for word, so "what did I agree to send" has an answer that does not depend
      on the declaration staying as it was. */
-  const approved = option === 'accept' && row.body_kind === 'change' && Array.isArray(body.approve) ? { approved: body.approve } : {};
+  const approved = option === 'accept' && (row.body_kind === 'change' || row.body_kind === 'pattern') && Array.isArray(body.approve) ? { approved: body.approve } : {};
   event(deps, at, actor, 'decide', `decision:${decision}`, 'decision', JSON.stringify({ question, answer: option, ...approved, ...(only === null ? {} : { rows: [...only].sort((a, b) => a - b) }) }));
   event(deps, at, actor, 'resolve', `suggestion:${id}`, 'suggestion', 'addressed', reason);
 

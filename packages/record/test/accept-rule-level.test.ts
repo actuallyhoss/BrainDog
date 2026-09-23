@@ -103,20 +103,23 @@ test('A RULE INSIDE A BUNDLE IS HELD THE SAME, and a bundle with no rule is not'
   sql.close();
 });
 
-/* THE OTHER ROAD TO THE SAME INSTALL. The kernel's accept installs a `pattern`'s `ingest` exactly as it installs a
-   `change`'s `to`, and asks only that it be an object, so the check above, held to `change` alone, left the audit's P4
-   open by one word: measured before the pattern was held, this colleague filed the same rule as a `pattern`'s `ingest`,
-   accepted it herself, it installed, and the next Obligations row queued one `infer.ask`. */
-test('A RULE FILED AS A PATTERN IS HELD THE SAME, and the owner may still accept it', async () => {
-  const { sql, api, accept, asks, installed, open } = await record();
-  const filed = value<{ id: string }>(await api.propose({ question: 'Ask the rate?', body_kind: 'pattern', body: { ingest: RATE, samples: ['raw_1'] } } as never, colleague)).id;
-  const out = await accept(filed, colleague);
-  assert.equal(out.refusal?.code, 'LEVEL_REQUIRED', JSON.stringify(out));
+/* THE OTHER ROAD TO THE SAME INSTALL, AND IT IS CLOSED BEFORE THE ACCEPT NOW. The kernel's accept installs a `pattern`'s
+   `ingest` exactly as it installs a `change`'s `to`, and asked only that it be an object: measured before the pattern was
+   held, this colleague filed the same rule as a `pattern`'s `ingest`, accepted it herself, it installed, and the next
+   Obligations row queued one `infer.ask`. This test held the accept to the owner. A pattern's `ingest` is now held to
+   being an ingest when it is filed (`kernel/test/pattern-kind.test.ts`), so there is no such question for anybody to
+   accept: the colleague's is refused, the owner's is refused the same, and the refusal says to file a rule as a change,
+   which the tests above hold to the owner. */
+test('A RULE FILED AS A PATTERN IS NOT FILED AT ALL, by the colleague or the owner, and nothing asks Spark', async () => {
+  const { sql, api, asks, installed } = await record();
+  for (const by of [colleague, owner]) {
+    const out = (await api.propose({ question: 'Ask the rate?', body_kind: 'pattern', body: { ingest: RATE, samples: ['raw_1'] } } as never, by)) as Out;
+    assert.equal(out.ok, false, 'a rule was filed as a pattern');
+    assert.equal(out.refusal?.code, 'VALUE_MALFORMED', JSON.stringify(out));
+    assert.match(out.refusal?.fix ?? '', /\bas a change\b/u);
+  }
+  assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM suggestion')?.n, 0);
   assert.equal(installed(), false);
-  assert.equal(open(filed), 'open');
   assert.equal(await asks(), 0, 'the rule asked Spark on the owner’s key');
-
-  value(await accept(filed, owner));
-  assert.equal(installed(), true);
   sql.close();
 });
