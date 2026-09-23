@@ -84,9 +84,22 @@ export const HELD_AT_1_8_0: readonly Held[] = [
   { kind: 'policy', label: 'Northwind 5836271', qty: 1, unit_cost: usd(10_105), acquired_on: '2025-12-07', matures_on: '2062-12-07', note: 'Your Way For Protection Investment. USD 24,000.00 sum assured.' },
 ];
 
+/**
+ * Today's money-core document less what 2.1.0 added, which is `available` on `register.transactions`, so the two rebuilds
+ * below stay the releases they name. Without it the 1.8.0 rebuild's fingerprint moved off the one `pack-versions.test.ts`
+ * recorded for 1.8.0, measured when the field landed.
+ */
+function asShipped(doc: unknown): Doc {
+  const d = structuredClone(doc) as Doc;
+  d.declarations = d.declarations.map((x) =>
+    x.register === 'transactions' && Array.isArray(x.fields) ? { ...x, fields: (x.fields as Body[]).filter((f) => f.id !== 'available') } : x,
+  );
+  return d;
+}
+
 /** A money-core document as 1.8.0: `holdings` back after `accounts`, where 1.8.0 carried it, and not handed anywhere. */
 export function asMoneyCore180(doc: unknown): Doc {
-  const d = structuredClone(doc) as Doc;
+  const d = asShipped(doc);
   d.version = '1.8.0';
   const rest = d.declarations.filter((x) => x.register !== 'holdings');
   const at = rest.findIndex((x) => x.register === 'accounts') + 1;
@@ -101,7 +114,7 @@ export function asMoneyCore180(doc: unknown): Doc {
  * and this changes nothing in it; it exists so the same test reads the same record against the tree before the move.
  */
 export function asMoneyCore200(doc: unknown): Doc {
-  const d = structuredClone(doc) as Doc;
+  const d = asShipped(doc);
   d.version = '2.0.0';
   d.declarations = d.declarations.filter((x) => x.register !== 'holdings');
   d.hands = { ...(d.hands ?? {}), 'register.holdings': 'holdings' };

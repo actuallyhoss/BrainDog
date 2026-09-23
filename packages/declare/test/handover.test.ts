@@ -24,7 +24,7 @@ import assert from 'node:assert/strict';
 import { normalise, type Diff } from '../src/index.ts';
 import { createRecordApi, type CallContext } from '../../record/src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
-import { FIRST_PARTY, firstPartyDocument, holdingsPack as shippedHoldings } from '../../seed/src/index.ts';
+import { FIRST_PARTY, FIRST_PARTY_VERSIONS, firstPartyDocument, holdingsPack as shippedHoldings } from '../../seed/src/index.ts';
 import { asMoneyCore180 } from '../../seed/test/money-core-earlier.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
@@ -51,7 +51,7 @@ type Api = Awaited<ReturnType<typeof createRecordApi>>;
  */
 const moneyCore = (to: string | null): Doc => {
   const d = structuredClone(firstPartyDocument('money-core')) as unknown as Doc;
-  assert.equal(d.version, '2.0.0');
+  assert.equal(d.version.split('.')[0], '2', 'money-core left 2.x, so the list it hands is worth reading again');
   assert.ok(!d.declarations.some((x) => x.register === 'holdings'), 'money-core declares holdings again, so nothing here is a handover');
   const { 'register.holdings': _shipped, ...rest } = d.hands ?? {};
   d.hands = to === null ? rest : { ...rest, 'register.holdings': to };
@@ -131,7 +131,7 @@ test('money-core HANDS holdings to a pack of its own, which takes it with the ro
   assert.deepEqual(k.detached().filter((d) => d.id === 'register.holdings').map((d) => d.was), ['holdings']);
   assert.deepEqual(
     k.packs().filter((p) => p.id === 'holdings' || p.id === 'money-core').map((p) => ({ id: p.id, version: p.version })),
-    [{ id: 'holdings', version: '1.0.0' }, { id: 'money-core', version: '2.0.0' }],
+    [{ id: 'holdings', version: '1.0.0' }, { id: 'money-core', version: FIRST_PARTY_VERSIONS['money-core'] }],
   );
   assert.equal(JSON.stringify(k.get(row.id)), was, 'the row moved');
   assert.equal(JSON.stringify(k.history(row.id)), history, 'the row’s history was touched');

@@ -32,6 +32,8 @@ import { scriptBody } from './script.ts';
    `date:` form this file accepted was one `day` could read — and is gone with the list itself:
    the reader a record hands down reads the token set, so there is no shorter list to agree with. */
 import { MAP_TYPES } from './map.ts';
+/* THE LIST `arrive` ANSWERS BY, so a value this file lets through is one the kernel has an answer for. */
+import { ON_CONFLICTS } from './ingest.ts';
 import { HOME_CURRENCY_SETTING, homeFrom } from './fx.ts';
 import { HOLDS, PARTS as ROLE_PARTS, aims, legacyShaped, plays, type RoleField, type RoleKey, type RoleList } from './roles.ts';
 /* THE FUNCTION THE REMINDERS ARE DERIVED WITH, so an offset this file accepts is one `remindersFor`
@@ -1595,7 +1597,7 @@ function doorNamedFault(id: string, body: { channel?: unknown; verify?: unknown;
 }
 
 function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
-  const body = decl.body as { channel?: unknown; match?: unknown; extract?: unknown; map?: unknown; fetch?: unknown; dedupe?: unknown; skip?: unknown; writes?: unknown; verify?: unknown; door?: unknown };
+  const body = decl.body as { channel?: unknown; match?: unknown; extract?: unknown; map?: unknown; fetch?: unknown; dedupe?: unknown; on_conflict?: unknown; skip?: unknown; writes?: unknown; verify?: unknown; door?: unknown };
   const id = decl.id;
 
   if (typeof body.channel !== 'string' || !(CHANNELS_IN as readonly string[]).includes(body.channel))
@@ -1654,6 +1656,29 @@ function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
    */
   const wrongKey = dedupeFault(body.dedupe, id);
   if (wrongKey) return wrongKey;
+
+  /**
+   * `07 §3`'s `on_conflict:`, one of `ON_CONFLICTS`, and nothing read it here. Measured on 23 September: `bogus`
+   * installed clean and then behaved as `new`, because `arrive` asks only whether the value is `skip`, `update` or
+   * `review`, so a misspelt `skip` filed every resend as a second row and said nothing.
+   *
+   * AND `review` IS NOT A PULL'S. It holds one arrival for a person, and a pulled page is up to five hundred rows that
+   * `fetched.ts` applies one by one, asking only for `skip` and `update`: declared on a pull it wrote the near match as a
+   * second row, which is `new` under a name that promises the opposite.
+   */
+  if (body.on_conflict !== undefined && !(ON_CONFLICTS as readonly unknown[]).includes(body.on_conflict))
+    return bad(
+      'ENUM_VALUE_UNKNOWN',
+      `${id}'s on_conflict is ${JSON.stringify(body.on_conflict)}, and it is skip, update, new or review.`,
+      'on_conflict',
+      [...ON_CONFLICTS],
+    );
+  if (body.on_conflict === 'review' && body.channel === 'pull')
+    return bad(
+      'DECLARATION_INVALID',
+      `${id} is pulled a page at a time, and on_conflict: review holds one arrival for a person. Say skip or update, which a page applies row by row.`,
+      'on_conflict',
+    );
 
   /* `writes.register`, WHICH IS A NAME OR `07 §2`'s TABLE. A series ingest writes no register and
      is left to the block below, which is where `series:` is read. */

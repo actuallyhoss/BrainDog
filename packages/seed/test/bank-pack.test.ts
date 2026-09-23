@@ -18,6 +18,7 @@ import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.t
 
 import { FIRST_PARTY, FIRST_PARTY_VERSIONS, NOW, firstPartyDocument } from '../src/index.ts';
 import { BANK_HSBC_EG_VERSION, HSBC_EG_INGESTS, HSBC_EG_SMS_INGESTS, MONEY_CORE_HANDS, bankHsbcEgPack } from '../src/packs/bank-hsbc-eg.ts';
+import { SAME_MOVEMENT, type SeedIngest } from '../src/modules/money.ts';
 import { USE_CASES, useCaseDocument } from '../src/usecases/index.ts';
 import { asMoneyCore180 } from './money-core-earlier.ts';
 
@@ -93,12 +94,24 @@ async function put(k: Kernel, doc: unknown, used?: readonly string[]): Promise<D
  * money-core from 1.5.0 carried. Built from today's, the record below was a 1.7.0 nobody ever had, and the update to
  * 2.0.0 never met the list it hands away.
  */
+/**
+ * One of the twelve as 1.7.0 declared it. `bank-card-used` has read the card's available limit into `available` and
+ * compared it since bank-hsbc-eg 1.2.0, a field `register.transactions` holds only from money-core 2.1.0, so the body as
+ * it is today, planted under a 1.7.0 whose transactions lack the field, sent the one alert below to `review` as
+ * `transactions has no field called available`, measured when the field landed. 1.7.0 read neither.
+ */
+const asRead170 = (i: SeedIngest): SeedIngest => {
+  if (i.extract?.available === undefined) return i;
+  const { available: _limit, ...extract } = i.extract;
+  return { ...i, extract, dedupe: SAME_MOVEMENT };
+};
+
 const v170 = (): Doc => {
   const d = asMoneyCore180(firstPartyDocument('money-core')) as unknown as Doc;
   d.version = '1.7.0';
   /* 1.7.0 handed nothing: the twelve were its own. */
   delete (d as { hands?: unknown }).hands;
-  const hsbc = [...Object.values(HSBC_EG_INGESTS), ...Object.values(HSBC_EG_SMS_INGESTS)].map((i) => ({ ...structuredClone(i), pack: 'money-core' }));
+  const hsbc = [...Object.values(HSBC_EG_INGESTS), ...Object.values(HSBC_EG_SMS_INGESTS)].map((i) => asRead170({ ...structuredClone(i), pack: 'money-core' }));
   d.declarations = [...d.declarations.filter((x) => !HSBC.includes(`ingest.${String(x.ingest)}`)), ...(hsbc as unknown as Body[])];
   return d;
 };
@@ -108,7 +121,7 @@ test('MONEY-CORE DECLARES ONLY THE TWO GENERIC CARD WORDINGS, and still hands th
   /* THE TWELVE LEFT AT 1.8.0, a minor step by `first-party.ts`'s own rule, since no list and no field moved;
      `pack-versions.test.ts` holds that version's fingerprint. 2.0.0 is the major step `holdings` leaving took, which is
      `holdings-pack.test.ts`'s to hold. */
-  assert.equal(FIRST_PARTY_VERSIONS['money-core'], '2.0.0');
+  assert.equal(FIRST_PARTY_VERSIONS['money-core'].split('.')[0], '2');
   /* AND IT STILL HANDS THE TWELVE TO THE BANK PACK rather than retiring them, so a token minted for one survives the move
      even on a record that goes from 1.7.0 to 2.0.0 in one step. Beside them it hands one list, and nothing else. */
   const hands = firstPartyDocument('money-core')!.hands as Record<string, string>;

@@ -111,6 +111,12 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   caret ranges on 1.x, which no 2.0.0 satisfies and which the range grammar cannot widen with `||`
  *   (`loop/research-seed-roles.md` R5), so `bank-hsbc-eg` and every Mercury pack widen to `<3.0.0` in the same change,
  *   each with a version step of its own (`test/money-core-major.test.ts`).
+ * - money-core 2.1.0: a transaction says what the bank said was left after it moved, `available`, as a card alert prints
+ *   its available limit. Two card alerts in a hundred of his texts had the same amount, merchant and day, and the near
+ *   rule skipped the second as already said although their limits differ by exactly the charge
+ *   (`loop/research-bank-real.md`); `bank-hsbc-eg` 1.2.0 reads the limit into this field and names it in its `dedupe:`,
+ *   so two charges file and one alert sent twice files once. One field added and nothing taken away, so the step is a
+ *   minor one, and a new version rather than a reset because 2.0.0 shipped with the deploy of 23 September at 08:02 UTC.
  * - estate 1.2.0: a service carries a note. the old tool's domains carry the reason each name is held and what is
  *   unresolved about it, and Services had no field that holds prose, so the import left every note in the export. One
  *   field added and nothing taken away, so the step is a minor one. It moves the version rather than riding on 1.1.0
@@ -137,7 +143,7 @@ const SUMMARIES: Record<FirstPartyId, string> = {
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.4.0',
   people: '1.0.0',
-  'money-core': '2.0.0',
+  'money-core': '2.1.0',
   estate: '1.2.0',
   work: '1.6.0',
 };

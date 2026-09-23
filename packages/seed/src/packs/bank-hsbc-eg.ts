@@ -53,8 +53,20 @@ import { HOME_CURRENCY, NOT_A_MOVEMENT, SAME_MOVEMENT, smsTwins, type SeedIngest
  * 23 September through `@braindog/record`, a token minted for `bank-ipn-out-sms` without `door:` verified the same
  * digest after the 1.1.0 body replaced it, because `heldDigest` keeps a digest across versions that stay a webhook
  * with a path token.
+ *
+ * 1.2.0: `bank-card-used` reads the available limit its alert prints into `available` and compares it (`SAME_CHARGE`
+ * below), so two charges of one amount at one shop on one day file as two rows and one alert sent twice still files once.
+ * A minor step: one field read and one field compared, nothing taken away. THE RANGE STAYS `>=1.8.0` AND THAT IS A
+ * TRADE, measured on 23 September. `available` is on `register.transactions` only from money-core 2.1.0, and on a record
+ * still at 2.0.0 this pack's card alert came back `review` with `transactions refused what bank-card-used read:
+ * transactions has no field called available.` Nothing is written wrongly and nothing is dropped, but every card alert
+ * waits until money-core is updated. Raising the floor to `>=2.1.0` says so at the plan instead, and it refuses the
+ * install on 1.8.0 that `test/bank-pack.test.ts`, `test/money-core-major.test.ts`, `declare/test/door-hold.test.ts` and
+ * `declare/test/held-pack-range.test.ts` drive on purpose, so it is left for whoever owns that upgrade path to decide.
+ * Laying the field from here through `extends` was measured too, and it is worse: the next money-core update was refused
+ * `PROVIDES_CONFLICT` at `register.transactions`, because the laid field made the list the record's own.
  */
-export const BANK_HSBC_EG_VERSION = '1.1.0';
+export const BANK_HSBC_EG_VERSION = '1.2.0';
 
 /* ── the `From HSBC:` line, shared by the pattern that writes it and the one that holds it ── */
 
@@ -73,6 +85,22 @@ const FROM_HSBC_SKIP: SeedIngest['skip'] = [
 const FROM_HSBC_WHAT = { text: { between: ['From HSBC: ', ' from '] } } as const;
 const FROM_HSBC_DAY = { date: { format: 'DDMONYY', after: 'From HSBC: ' } } as const;
 const FROM_HSBC_ACCOUNT = { lookup: { register: 'accounts', by: 'last4', between: ['***-', ' '] } } as const;
+
+/**
+ * `SAME_MOVEMENT` with the available limit as well, for the card alert, which prints one.
+ *
+ * TWO REAL CHARGES LOOKED LIKE ONE. Two card alerts in a hundred of his texts had the same amount, merchant and day a
+ * few minutes apart, and the near rule skipped the second as `transactions#N already says this.`
+ * (`loop/research-bank-real.md`, *The near-duplicate, which may be two charges*). The limits they print differ by exactly
+ * the charge, so the second was never the first sent again. Measured before this key through `createRecordApi`: the
+ * second of such a pair came back `skipped` and the ledger held one row; with it, two rows, and the same alert forwarded
+ * again is still `skipped` because it prints the same limit (`test/bank-hsbc-eg.test.ts`).
+ *
+ * `skip` STAYS THE ANSWER, because with the limit in the key a match is the same message. A row filed before this key
+ * holds no `available`, so an alert that repeats one of those is filed again rather than skipped: the SQL half of the
+ * near rule compares the stored field, and a missing one equals nothing.
+ */
+const SAME_CHARGE: NonNullable<SeedIngest['dedupe']> = { near: { on: ['amount', 'account', 'available'], day: 'on', prefix: { field: 'what', chars: 12 } } };
 
 export const HSBC_EG_INGESTS: Record<string, SeedIngest> = {
   /**
@@ -111,9 +139,12 @@ export const HSBC_EG_INGESTS: Record<string, SeedIngest> = {
       on: { date: { format: 'DD/MM/YYYY', after: ' on ' } },
       amount: { money: { after: 'used for ', currency: HOME_CURRENCY } },
       account: { lookup: { register: 'accounts', by: 'last4', between: ['*** ', ' has been'] } },
+      /* THE LIMIT, AFTER ITS OWN PHRASE, which is the last figure in the message: `after` reads to the end, and nothing
+         follows it that is money. */
+      available: { money: { after: 'available limit is ', currency: HOME_CURRENCY } },
     },
     writes: { register: 'transactions', confidence: 'exact' },
-    dedupe: SAME_MOVEMENT,
+    dedupe: SAME_CHARGE,
     on_conflict: 'skip',
   },
 

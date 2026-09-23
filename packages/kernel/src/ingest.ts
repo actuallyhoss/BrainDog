@@ -114,6 +114,16 @@ const COMBINATORS = ['first', 'nth', 'default'] as const;
  */
 const NESTING = 3;
 
+/**
+ * `07 §3`'s answers to an arrival the `dedupe:` says is already filed, with `review` after the three it lists.
+ *
+ * EXPORTED FOR THE INSTALL CHECK THAT DOES NOT EXIST YET. Nothing refuses a value outside this list at install: measured
+ * on 23 September, `on_conflict: 'bogus'` installed clean and then behaved as `new`, because `arrive` asks only whether
+ * the value is `skip`, `update` or `review`. The check belongs beside `dedupeFault` in `declare.ts`, and this is the list
+ * it would read, so the type and the check cannot name different sets.
+ */
+export const ON_CONFLICTS = ['skip', 'update', 'new', 'review'] as const;
+
 export type IngestDecl = {
   ingest: string;
   channel: Channel;
@@ -170,7 +180,17 @@ export type IngestDecl = {
    * writes it therefore deduped on nothing, installed clean, fired, and wrote the second row.
    */
   dedupe?: Dedupe;
-  on_conflict?: 'skip' | 'update' | 'new';
+  /**
+   * What an arrival the `dedupe:` says the register already holds does: dropped with a reason, written over the row,
+   * written beside it, or held for a person.
+   *
+   * `review` IS FOR A KEY THAT CANNOT TELL A RESEND FROM A SECOND MOVEMENT. `loop/research-bank-real.md` found two card
+   * alerts in a hundred real texts with the same amount, merchant and day, whose available limits differ by exactly the
+   * charge, and `skip` filed the second as already said with no screen ever asking. Before this value a declaration
+   * carrying it installed clean and behaved as `new` (`test/ingest-review.test.ts`), because nothing checks the value at
+   * install and the write path asked only whether it was `update`.
+   */
+  on_conflict?: (typeof ON_CONFLICTS)[number];
   /**
    * The webhook ingest whose URL this pattern also reads, by its id: an arrival named for that door is offered the
    * door's own pattern first and then every pattern naming it, in declaration order.
@@ -1017,6 +1037,46 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
       return ok<Arrived>({ raw, ingest: matched.ingest, state: 'skipped', wrote: [], reason });
     }
 
+    /**
+     * A NEAR MATCH UNDER `review` IS A QUESTION, NOT A SKIP. The arrival is stored as `review` and the reading goes in
+     * front of a person as a rowset: accepting it files the second row, and declining it leaves the one already there.
+     *
+     * THE REASON NAMES THE ROW AND THE FIELD IDS, and nothing out of the payload (`43 §6`'s leak rule, as the reasons
+     * above keep it). The row it resembles also rides in the suggestion's body as `resembles`, by id, so a screen can
+     * put the two side by side without parsing a sentence.
+     */
+    if (existing && conflict === 'review') {
+      const like = existing.seq === null ? existing.id : `${register}#${existing.seq}`;
+      /**
+       * A `near` KEY IS NOT "THE SAME" ON ITS DAY OR ITS PREFIX, and the sentence said it was. Every field `named` lists
+       * went into one "with the same ..." clause, so the seed's own `SAME_MOVEMENT` key, on two alerts a day apart whose
+       * merchants only started alike, read *"with the same amount, account, on and what"* in front of the person being
+       * asked to tell them apart. Only the `on:` fields are equal; the day is within one, and the prefix starts alike.
+       */
+      const and = (fields: string[]): string => {
+        const once = fields.filter((field, i) => fields.indexOf(field) === i);
+        return once.length < 2 ? once.join('') : `${once.slice(0, -1).join(', ')} and ${once.at(-1)}`;
+      };
+      const dedupe = matched.dedupe!;
+      const equal = Array.isArray(dedupe) ? dedupe : dedupe.near.on;
+      const listed = and([
+        ...(equal.length ? [`the same ${and(equal)}`] : []),
+        ...(Array.isArray(dedupe) ? [] : [`${dedupe.near.day} within a day of it`]),
+        ...(!Array.isArray(dedupe) && dedupe.near.prefix ? [`${dedupe.near.prefix.field} starting the same way`] : []),
+      ]);
+      const reason = `This looks like ${like}, with ${listed}, so ${matched.ingest} held it for a person rather than skip it or file it twice.`;
+      store('review', reason);
+      note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', 'needs-review');
+      const suggestion = openRowset(deps, at, {
+        ingest: matched.ingest,
+        register,
+        rows: [extracted],
+        resembles: existing.id,
+        question: `${reason} Accept it if it is a second one, or reject it if ${like} is this one.`,
+      });
+      return ok<Arrived>({ raw, ingest: matched.ingest, state: 'review', wrote: [], reason, confidence: 'needs-review', suggestion });
+    }
+
     note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', 'exact');
 
     const wrote = deps.write(
@@ -1081,13 +1141,18 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
 function openRowset(
   deps: IngestDeps,
   at: string,
-  item: { ingest: string; register: string; rows: Record<string, unknown>[]; question: string },
+  item: { ingest: string; register: string; rows: Record<string, unknown>[]; question: string; resembles?: string },
 ): string {
   const id = `SG${deps.allocate('suggestion')}`;
   deps.sql.exec(
     "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at) VALUES (?, 'rowset', ?, 'open', ?, ?)",
     id,
-    JSON.stringify({ register: item.register, rows: item.rows, ingest: item.ingest }),
+    JSON.stringify({
+      register: item.register,
+      rows: item.rows,
+      ingest: item.ingest,
+      ...(item.resembles === undefined ? {} : { resembles: item.resembles }),
+    }),
     `ingest:${item.ingest}`,
     at,
   );

@@ -39,10 +39,12 @@ async function onMoney(build: (doc: unknown) => Doc) {
   return { k, sql };
 }
 
-test('money-core IS 2.0.0, DECLARES NO HOLDINGS, AND HANDS THE LIST to the pack of that name', () => {
+test('money-core IS ON 2.x, DECLARES NO HOLDINGS, AND HANDS THE LIST to the pack of that name', () => {
   const doc = firstPartyDocument('money-core') as unknown as Doc;
-  assert.equal(FIRST_PARTY_VERSIONS['money-core'], '2.0.0');
-  assert.equal(doc.version, '2.0.0');
+  /* ON 2.x AND NOT PINNED TO 2.0.0, since 2.1.0 added `available` to `register.transactions`: a minor step takes
+     nothing away, so the holdings half of this test is as true of it as of 2.0.0. */
+  assert.match(FIRST_PARTY_VERSIONS['money-core'], /^2\.\d+\.\d+$/u);
+  assert.equal(doc.version, FIRST_PARTY_VERSIONS['money-core']);
   assert.deepEqual(
     doc.declarations.filter((d) => d.register === 'holdings').map((d) => (d.fields as { id: string; values?: string[] }[]).find((f) => f.id === 'kind')?.values),
     [],
@@ -83,9 +85,10 @@ test('EACH RANGE MOVED WITH A VERSION OF ITS OWN, and neither admits a money-cor
      record stages are the bytes it staged, and only which Money they may sit beside is wider. `first-party.ts`'s rule
      asks a minor step for something added and a major one for something taken away, and this is neither.
      bank-hsbc-eg is a minor step instead, 1.1.0, because its five twin doors gained `door:` on top of the wider range
-     (one door, several patterns; wave forty-two). */
-  assert.equal(BANK_HSBC_EG_VERSION, '1.1.0');
-  assert.equal(bankHsbcEgPack().version, '1.1.0');
+     (one door, several patterns; wave forty-two), and 1.2.0 since `bank-card-used` reads and compares the limit its
+     alert prints; the range did not move with it. */
+  assert.equal(BANK_HSBC_EG_VERSION, '1.2.0');
+  assert.equal(bankHsbcEgPack().version, '1.2.0');
   assert.equal(mercuryPack(MERCURY).version, '1.0.1');
   for (const [name, doc] of [['bank-hsbc-eg', bankHsbcEgPack()], ['mercury', mercuryPack(MERCURY)]] as const) {
     const range = (doc.requires as { packs: Record<string, string> }).packs['money-core']!;

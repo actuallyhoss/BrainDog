@@ -372,6 +372,23 @@ export function snapshotRows(days = 30): Fields[] {
 
 export const SNAPSHOTS: Fields[] = snapshotRows();
 
+/**
+ * WHAT THE BANK SAID WAS LEFT AFTER THIS MOVED, as its alert printed it: a card's available limit, an account's
+ * available balance. Optional, because most ways a row arrives never say, and nothing sums it.
+ *
+ * IT IS THE ONE THING THAT TELLS A SECOND CHARGE FROM A RESEND. Two card alerts in a hundred of his real texts
+ * carried the same amount, merchant and day a few minutes apart, and the near rule skipped the second as already
+ * said, although the limits they print differ by exactly the charge (`loop/research-bank-real.md`). The same alert
+ * sent again prints the same figure, so a pattern that reads this and names it in its `dedupe:` files two charges
+ * and still files one resend once (`test/bank-hsbc-eg.test.ts`). Not indexed: the register is at the ceiling of
+ * eight, and the dedupe that reads it has already narrowed to one account, one amount and three days.
+ *
+ * A CONSTANT, BECAUSE TWO PLACES DECLARE IT. `register.transactions` carries it from money-core 2.1.0, and `bank-hsbc-eg`
+ * lays the same field through `extends` for a record still on 1.8.0 or 2.0.0, which its range admits. Written twice, the
+ * two could disagree about a type, and a record would then hold whichever arrived first.
+ */
+export const AVAILABLE = { id: 'available', label: 'Available after', type: 'money' } as const;
+
 export const MONEY_REGISTERS: Record<string, SeedRegister> = {
   obligations: {
     id: 'obligations',
@@ -603,6 +620,7 @@ export const MONEY_REGISTERS: Record<string, SeedRegister> = {
         required: true,
       },
       { id: 'amount', type: 'money', required: true },
+      { ...AVAILABLE },
       /* REQUIRED, because a movement with no account is a number nobody can reconcile. */
       { id: 'account', type: 'ref', to: 'accounts', index: true, required: true },
       { id: 'category', type: 'ref', to: 'categories', index: true },

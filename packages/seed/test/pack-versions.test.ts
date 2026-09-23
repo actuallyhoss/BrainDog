@@ -274,6 +274,29 @@ const DECLARED: Record<string, Version> = {
       'Raised a major step because `register.holdings` leaves for the `holdings` pack, handed with its rows rather than retired, and `gold` leaves with it; `register.accounts` and every other list stay as 1.8.0 declared them -> 920c66c138d81d3f',
     ],
   },
+  /**
+   * A MINOR STEP AFTER THE FIRST MAJOR ONE, because a field is added and nothing is taken away. The ids are 2.0.0's
+   * exactly; what moved is inside `register.transactions`, which the ids cannot see and the reason below has to.
+   */
+  'money-core@2.1.0': {
+    holds: `
+      ingest.bank-card-in ingest.bank-card-in-sms ingest.bank-card-out ingest.bank-card-out-sms
+      metric.cash-accounts metric.cash-as-of metric.cash-now metric.days-late-in metric.due-30d metric.every-month-by-category
+      metric.every-month-in metric.every-month-out metric.in-30d metric.in-by-month metric.in-due-by-month metric.installments-due-30d
+      metric.installments-left metric.late-in metric.out-30d metric.out-by-month metric.out-due-by-month metric.overdue
+      metric.owed-by-you metric.owed-to-you metric.project-owed metric.received-30d metric.spent-30d metric.txn-uncategorised
+      page.home page.ledger page.money
+      register.accounts register.categories register.fx register.installments register.obligations register.recurring
+      register.snapshots register.transactions
+      rule.cash-stale rule.installment-due-soon rule.invoice-late rule.recurring-ended rule.recurring-missed rule.txn-categorise
+      setting.home_currency setting.most_days_late setting.most_due_30d setting.most_on_one_category setting.most_out_30d
+      setting.most_out_every_month setting.most_owed_to_you
+    `,
+    declares: '99fe861644707f24',
+    history: [
+      '`register.transactions` gains `available`, what the bank said was left after a movement, so the limit a card alert prints can tell a second charge of the same amount from the same alert sent twice -> 99fe861644707f24',
+    ],
+  },
   'work@1.1.0': { declares: 'b49e051fe7c26ac5' },
   'work@1.2.0': { declares: '49a30d2ef8c1d672' },
   'work@1.3.0': { declares: 'fb82e66d80644e3d' },
