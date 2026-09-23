@@ -41,7 +41,7 @@ import { HOLDS, PARTS as ROLE_PARTS, aims, legacyShaped, plays, type RoleField, 
    is what two lists that disagree cost. */
 import { FREQ, shiftFrom } from './schedule.ts';
 import { spanMs } from './vault.ts';
-import { actionsOf, callFault, flowFault, subjectOf } from './flow-lint.ts';
+import { actionsOf, callFault, flowFault, sealedAs, subjectOf } from './flow-lint.ts';
 import type { FlowDecl } from './rules.ts';
 
 /**
@@ -4203,7 +4203,66 @@ function knownTo(sql: Sql, batch: readonly Declaration[], planned?: PlannedRecor
         known.set(row.id, {});
       }
   for (const decl of batch) known.set(decl.id, decl.body);
+  /* A FIELD ANY VERSION OF A LIST TYPED SECRET OR FILE IS HANDED TO THE LINT AS ONE, AFTER THE BATCH IS LAID OVER, so a
+     batch that drops the field and installs a rule naming it is read as the record it leaves. The lint seals what the
+     list's `fields` types so, and a retired field may then leave the list while its rows keep the value
+     (`loop/research-batch-fifty-five-audit.md` §4): the four rules of `retired-secret.test.ts` installed after the drop,
+     and after `pin` came back as text, each of which the lint refuses while `pin` is declared secret. `sealedEver` is
+     the reading `rules.ts`'s `sealedOf` makes at run time, so the two lines cannot come to seal two sets of fields.
+
+     APPENDED AS RETIRED, AND AFTER THE FIELDS THE LIST DECLARES NOW. Every reader that asks whether a field can be
+     written or aggregated passes over a retired one or takes the first entry under an id, so a list that declared `pin`
+     again as text still takes `pin` as text there; `flow-lint.ts`'s `hiddenOf` keys its map by id and keeps the last,
+     which is this entry. A copy, never the body the batch handed in, which is what gets installed. */
+  for (const [id, body] of known) {
+    if (!id.startsWith('register.') || !Array.isArray(body.fields)) continue;
+    const fields = body.fields as { id?: unknown; type?: unknown; of?: unknown }[];
+    const missed = [...sealedEver(sql, id.slice('register.'.length)).values()].filter(
+      (was) => !fields.some((f) => f !== null && typeof f === 'object' && f.id === was.id && sealedAs(f) !== null),
+    );
+    if (missed.length > 0) known.set(id, { ...body, fields: [...body.fields, ...missed.map((was) => ({ ...was, retired: true }))] });
+  }
   return known;
+}
+
+/** A field as the version of its list that first typed it secret or file declared it: all a reader needs to seal it. */
+export type SealedField = { id: string; type: Json; of?: Json };
+
+/**
+ * Every field of `register` that any version of its declaration has typed secret or file (`sealedAs`), retired ones
+ * included, by id.
+ *
+ * EVERY VERSION AND NOT THE STANDING ONE, because a retired field may leave the list and the rows written before keep
+ * its value: `index.ts`'s `contradicted` passes the drop, "its values were put away on purpose". A declaration row is
+ * never edited and each version stays beside its successor with `superseded_at` stamped, so the type every field has
+ * had is already in the table, and a record that dropped a secret before this function existed is read the same way as
+ * one that drops it after.
+ *
+ * ONCE SEALED, SEALED, WHATEVER A LATER VERSION TYPES IT. The kernel refuses `secret` retyped to `text` while a row holds
+ * a value, and passes the same change by way of a retire; the rows written under the secret keep it, and which rows
+ * those are is not known here. A list that wants the name back as text takes a new field, as that refusal says. A field
+ * no version ever declared (`flow-secret-verbs.test.ts`'s `old`) is sealed by none.
+ *
+ * ONE READING FOR BOTH LINES. `rules.ts`'s `sealedOf` asks this at run time and `knownTo` hands it to the lint, so the
+ * install and the run cannot disagree about which fields never leave.
+ */
+export function sealedEver(sql: Sql, register: string): Map<string, SealedField> {
+  const sealed = new Map<string, SealedField>();
+  for (const { body } of sql.all<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'register' ORDER BY version", `register.${register}`)) {
+    let fields: unknown;
+    try {
+      fields = (JSON.parse(body) as { fields?: unknown } | null)?.fields;
+    } catch {
+      continue;
+    }
+    if (!Array.isArray(fields)) continue;
+    for (const f of fields as unknown[]) {
+      if (f === null || typeof f !== 'object') continue;
+      const { id, type, of } = f as { id?: unknown; type?: Json; of?: Json };
+      if (typeof id === 'string' && !sealed.has(id) && sealedAs({ type, of }) !== null) sealed.set(id, { id, type: type!, ...(of === undefined ? {} : { of }) });
+    }
+  }
+  return sealed;
 }
 
 /**

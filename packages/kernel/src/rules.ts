@@ -29,10 +29,11 @@ import { jsonPath, compile, type Predicate, type Schema } from '@braindog/where'
 
 import type { Entry } from './index.ts';
 import { exponentOf } from './ingest.ts';
+import { sealedEver } from './declare.ts';
 import { instant } from './migrate.ts';
 import { spanMs } from './vault.ts';
 import { predicateOf, type EvalContext } from './metrics.ts';
-import { RUN_PATH, inlineFault, sealedAs } from './flow-lint.ts';
+import { RUN_PATH, inlineFault } from './flow-lint.ts';
 import { observe } from './observe.ts';
 
 export type RuleAction =
@@ -645,16 +646,25 @@ export function filling(template: unknown, row: Entry, nowMs: number, by: FillBy
 }
 
 /**
- * The fields of `register` that never leave the record, by the declaration as it stands, retired ones included, and a
- * list of either with them (`sealedAs`).
+ * The fields of `register` that never leave the record, retired ones included, and a list of either with them
+ * (`sealedAs`): every field any version of the list's declaration has typed so.
  *
  * THE DECLARATION AND NOT THE LIVE SCHEMA, which drops a retired field while the rows written before it was retired
  * keep its value. `actions.ts` reads a call's sends the same way, for the same reason.
+ *
+ * AND EVERY VERSION OF IT, NOT ONLY THE ONE STANDING, which is `declare.ts`'s `sealedEver` and says why. Reading only
+ * the standing version lost `pin` the moment it was dropped: `loop/research-batch-fifty-five-audit.md` §4 installed
+ * `note 'x {{pin}}'`, `note 'x {{trigger.row.pin}}'`, `note 'x {{trigger.row}}'` and `set memo to {{pin}}` after the
+ * drop, and each wrote `hunter2`; a field retyped from secret to text by way of a retire wrote it too (measured by the
+ * checker on 23 September). The lint reads the same function now and refuses those rules at install, so this line is
+ * for a rule stored before it did, or before the field was secret at all (`retired-secret.test.ts`).
+ *
+ * THE HISTORY AND NOT A REFUSED DROP. A refusal would guard only the drops still to come, and a record that dropped a
+ * retired secret before this line exists already, its rows holding the value; reading the history closes those too, and
+ * leaves retiring and then dropping the removal it was.
  */
 export function sealedOf(sql: Sql, register: string): Set<string> {
-  const declared = sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'register' AND superseded_at IS NULL AND retired = 0", `register.${register}`)?.body;
-  const fields = ((declared === undefined ? {} : JSON.parse(declared)) as { fields?: { id?: unknown; type?: unknown; of?: unknown }[] }).fields ?? [];
-  return new Set(fields.filter((f) => sealedAs(f) !== null).map((f) => String(f.id)));
+  return new Set(sealedEver(sql, register).keys());
 }
 
 /** One `{{field}}` or `{{kind:field}}` of the row, as `fill` writes it. */

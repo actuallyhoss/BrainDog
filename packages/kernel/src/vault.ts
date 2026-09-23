@@ -23,6 +23,7 @@
 import type { Result, Sql } from '@braindog/ports';
 import { clash, no, ok } from '@braindog/ports';
 
+import { grantChosen, type GrantChoosable } from './actions.ts';
 import { instant } from './migrate.ts';
 import { attempt } from './tx.ts';
 
@@ -32,6 +33,15 @@ const VISIBLE =
 
 export type GrantKind = 'api_token' | 'password' | 'ssh_key' | 'recovery_codes' | 'note';
 export const GRANT_KINDS: readonly GrantKind[] = ['api_token', 'password', 'ssh_key', 'recovery_codes', 'note'];
+
+/**
+ * A kind with its article, as a sentence says it: "an api_token", "an ssh_key", "a password".
+ *
+ * BY HOW THE WORD IS SAID, NOT BY ITS FIRST LETTER. The rotation refusal wrote `is a ${kind}`, so a token read "is a
+ * api_token"; `ssh_key` is said "ess-ess-aitch" and takes "an" too, which a vowel test on the letter would miss.
+ */
+const aKind = (kind: GrantKind): string => `${kind === 'api_token' || kind === 'ssh_key' ? 'an' : 'a'} ${kind}`;
+const upper = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
 
 export type GrantRow = {
   id: string;
@@ -217,7 +227,7 @@ export function bindGrant(
       if (held && held.kind !== args.kind)
         return no<GrantRow>(
           'IMMUTABLE_FIELD',
-          `${id} is a ${held.kind}. A ${args.kind} is a different grant, not a rotation of this one.`,
+          `${id} is ${aKind(held.kind)}. ${upper(aKind(args.kind))} is a different grant, not a rotation of this one.`,
           { at: 'kind', allowed: [held.kind] },
         );
 
@@ -514,16 +524,22 @@ export function sealedGrant(
   /* A POST NAMES ITS KEY BY LABEL AND A CONNECTOR BY ID. `09 §6` makes `webhook.grant` a vault label and `digest.ts`
      copies it as written, so it resolves as `keyNamed` resolves a call's key: label or id, never a revoked grant,
      newest first and the tie on the id. Only when nothing live answers is a revoked row read, so the refusal can say
-     the key was revoked rather than that it never existed. */
-  const row =
-    job.kind === 'notify.webhook'
-      ? (sql.one<Held>(
-          `SELECT ${COLUMNS} FROM grant WHERE (label = ? OR id = ?) AND revoked_at IS NULL ORDER BY created_at DESC, id DESC LIMIT 1`,
-          args.grant,
-          args.grant,
-        ) ??
-        sql.one<Held>(`SELECT ${COLUMNS} FROM grant WHERE label = ? OR id = ? ORDER BY created_at DESC, id DESC LIMIT 1`, args.grant, args.grant))
-      : sql.one<Held>(`SELECT ${COLUMNS} FROM grant WHERE id = ?`, args.grant);
+     the key was revoked rather than that it never existed.
+
+     THE ORDER IS `grantChosen`'s, NOT A CLAUSE OF ITS OWN. `deb5b703` wrote `ORDER BY created_at DESC, id DESC` here
+     twice, one commit before `grantChosen` said the order was written once (the audit of wave fifty-five, §7), and a
+     second copy is the one the next change to the chooser misses. Nor were the two one comparison: SQLite orders text
+     by its UTF-8 bytes and the chooser by UTF-16 code units, so over two ids that tie on `created_at` and differ past
+     U+FFFF the post signed with one key and a call naming the same label sent the other (`vault-webhook-grant.test.ts`).
+     No id the vault mints reaches that, since `bindGrant` holds every id to `g_` and a ULID. The filter stays in SQL,
+     as `liveNamed`'s does, and the revoked fallback asks the same chooser over the same rows read as if live, so the
+     date the refusal names is that of the grant the order would have chosen. */
+  const row = ((): Held | undefined => {
+    if (job.kind !== 'notify.webhook') return sql.one<Held>(`SELECT ${COLUMNS} FROM grant WHERE id = ?`, args.grant) ?? undefined;
+    const named = sql.all<Held & GrantChoosable>(`SELECT ${COLUMNS}, label, created_at FROM grant WHERE label = ? OR id = ?`, args.grant, args.grant);
+    const chosen = grantChosen(named, args.grant) ?? grantChosen(named.map((g) => ({ ...g, revoked_at: null })), args.grant);
+    return chosen === undefined ? undefined : named.find((g) => g.id === chosen.id);
+  })();
   if (!row)
     return no<LeasedSeal>(
       'OUT_OF_BOUNDS',

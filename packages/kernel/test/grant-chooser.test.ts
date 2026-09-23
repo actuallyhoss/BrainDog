@@ -8,7 +8,9 @@
  * `sparkGrantOf` in `@braindog/host/spark` as a loop over `newerThan`. The audit of wave forty-nine found the fifth,
  * Spark's `grants().find(...)`, answering the OLDEST key while every action named `spark` sent the newest, and the only
  * thing that had kept the other four agreeing was that each author copied the same clause. This file holds the kernel's
- * half of one chooser: the two SQL readers filter and `grantChosen` orders.
+ * half of one chooser: the two SQL readers filter and `grantChosen` orders. One more copy of the clause, `sealedGrant`'s for a
+ * signed post, was found by the audit of wave fifty-five (§7) and asks the chooser now too; `vault-webhook-grant.test.ts`
+ * holds it, over a tie that SQL and the chooser would have broken two ways.
  *
  * THE ORDER AS IT STOOD IS WRITTEN OUT BELOW (`BEFORE`), verbatim from `keyNamed` at `afb3b1b2`, and every case asserts the
  * chooser picks what that query picked. The move was to put the order in one place, not to change which key wins, and a

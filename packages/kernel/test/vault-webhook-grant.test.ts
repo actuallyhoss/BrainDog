@@ -20,6 +20,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { grantChosen, keyNamed } from '../src/actions.ts';
 import { openRecord, type GrantRow, type Kernel, type LeasedSeal } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 import { testSigner } from './signer.ts';
@@ -126,6 +127,45 @@ test('THE NEWEST LIVE KEY UNDER THE LABEL, as a call finds it, and a revoked one
   const why = refusal(k.sealedGrant({ outbox: 'ob_1', leasedUntil: LEASE, grant: 'collector' }, 'digest:monday'));
   assert.equal(why.code, 'GRANT_REVOKED');
   assert.equal(why.at, 'grant');
+  sql.close();
+});
+
+/** The grant a leased post naming `collector` opens, by its id, or the refusal's code. */
+const signs = (k: Kernel): string => {
+  const r = k.sealedGrant({ outbox: 'ob_1', leasedUntil: LEASE, grant: 'collector' }, 'digest:monday') as { ok: boolean; value?: LeasedSeal; refusal?: { code: string } };
+  return r.ok ? r.value!.grant.grant_id : r.refusal!.code;
+};
+
+test('A TIE ON created_at IS BROKEN BY THE ID, and the post signs with the key a call naming the label sends', async () => {
+  /* BOUND IN ONE INSTANT, THE LARGER ID FIRST, so a reader that fell back to the order the rows came back in would sign
+     with the smaller. This one passed before `sealedGrant` asked `grantChosen` and passes after: over ids the vault
+     mints, `ORDER BY created_at DESC, id DESC` and the chooser answer alike, as the audit of wave fifty-five said. */
+  const { k, sql } = await record();
+  const larger = value<GrantRow>(k.bindGrant({ ...COLLECTOR, sealed_for: { id: 'g_01JZ8QK3F7R2M9V4XN6TCB5ZZZ', version: 1 } }, 'p_1'));
+  const smaller = value<GrantRow>(k.bindGrant({ ...COLLECTOR, ciphertext: b(30), sealed_for: { id: 'g_01JZ8QK3F7R2M9V4XN6TCB5AAA', version: 1 } }, 'p_1'));
+  assert.equal(larger.created_at, smaller.created_at);
+  leasedPost(sql, 'collector');
+  assert.equal(signs(k), larger.id);
+  assert.equal(keyNamed(sql, 'collector')?.id, larger.id);
+  sql.close();
+});
+
+test('THE POST AND A CALL CHOOSE BY ONE ORDER, even over ids that SQL and the chooser would sort two ways', async () => {
+  /* THE STATE THAT TELLS ONE ORDER FROM TWO. SQLite compares text as UTF-8 bytes and `grantChosen` compares UTF-16 code
+     units, and the two disagree past the surrogates: an id ending U+FFFF is the larger in UTF-16, and one ending
+     U+10000 the larger in UTF-8. No id the vault mints holds either (`bindGrant` holds an id to `g_` and a ULID, and is
+     the one writer of `grant`), so the ids are put in by SQL; what this holds is that the post does not keep an order of
+     its own. Measured before the repair: the post signed with the id ending U+10000 and `keyNamed` sent the one ending
+     U+FFFF. */
+  const { k, sql } = await record();
+  const one = value<GrantRow>(k.bindGrant(COLLECTOR, 'p_1'));
+  const two = value<GrantRow>(k.bindGrant({ ...COLLECTOR, ciphertext: b(30) }, 'p_1'));
+  sql.exec('UPDATE grant SET id = ?, created_at = ? WHERE id = ?', `g_${String.fromCharCode(0xffff)}`, one.created_at, one.id);
+  sql.exec('UPDATE grant SET id = ?, created_at = ? WHERE id = ?', `g_${String.fromCodePoint(0x10000)}`, one.created_at, two.id);
+  leasedPost(sql, 'collector');
+  const call = keyNamed(sql, 'collector')?.id;
+  assert.equal(call, grantChosen(k.grants(), 'collector')?.id);
+  assert.equal(signs(k), call);
   sql.close();
 });
 
