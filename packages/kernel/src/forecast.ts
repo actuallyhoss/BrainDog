@@ -422,9 +422,10 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
  * so a monthly charge on the 31st does not drift backwards through the year — and the two places
  * that step a month agree because they are one function.
  *
- * EXCEPT AT A MONTH END, where this walk alone moves the day to each later month's last day (below).
- * `expandRepeat` in `schedule.ts` and the web mock-up's `runway` still step 30 September to
- * 30 October, so a reminder on such a row fires a day before the charge this walk shows.
+ * EXCEPT AT A MONTH END ON A CYCLE THAT IS NOT WHOLE YEARS, where the day moves to each later
+ * month's last day (below). The web mock-up's `runway` has done the same since `48eeaf4c`, but
+ * `expandRepeat` in `schedule.ts` still steps 30 September to 30 October, so a reminder on such a
+ * row fires a day before the charge this walk shows.
  */
 function occurrences(
   deps: ForecastDeps,
@@ -451,9 +452,20 @@ function occurrences(
      alone stepped a bill due 30 September to 30 October and 30 December, a day short of those
      months' ends, and one due 28 February to the 28th of every month after it. `resolveDay` still
      picks the month, so the cycle's length is untouched, and only the day inside it moves to the
-     end. A first day that is not a month end steps exactly as before, and so does an `instant`,
-     whose twenty-four characters never equal the ten `endOfMonth` returns. */
-  const monthEnd = endOfMonth(first) === first;
+     end. A first day that is not a month end steps exactly as before.
+
+     AN `instant` IS NOT EXEMPT. `runway` hands this function `dayOf(first)`, the instant's first ten
+     characters, so an instant on a month's last day is a month end here exactly as a `day` is.
+
+     EXCEPT ON A CYCLE OF WHOLE YEARS, which never leaves the month it started in. Audit fifty-eight
+     finding 10 walked a yearly bill taken on 28 February 2027 to 29 February 2028: an annual renewal
+     falls on its anniversary, and the anniversary of the 28th is the 28th. February is the only month
+     whose length changes from one year to the next, so it is the only one where the two readings
+     differ, and the clamp in `resolveDay` already gives a leap-day start the reading a person means:
+     28 February in a common year and 29 February again in the next leap year. A cycle that is not a
+     whole number of years does leave February, and there the end of February is still the end of
+     August or May. */
+  const monthEnd = months % 12 !== 0 && endOfMonth(first) === first;
 
   /* A CYCLE BEFORE TODAY HAS ALREADY BEEN CHARGED. `renews` is an anchor nobody moves on, and the
      walk started at it and clamped every past cycle to today as overdue: a monthly service anchored

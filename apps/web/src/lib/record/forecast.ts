@@ -133,8 +133,15 @@ function occurrences(row: Entry, leg: Leg, first: string, until: number): { day:
   /* A FIRST DAY THAT IS ITS MONTH'S LAST DAY STAYS ON THE LAST DAY, as the kernel's walk does since W57-2
      (`packages/kernel/src/forecast.ts`, `f732179d`). The clamp alone stepped a bill due 30 September to 30 October
      and 30 December, and `engines.test.ts` holds the two engines to the same walk, so CI went red on the push that
-     carried the kernel half alone. A first day that is not a month end steps exactly as before. */
-  const monthEnd = endOfMonth(first) === first;
+     carried the kernel half alone. A first day that is not a month end steps exactly as before.
+
+     EXCEPT ON A CYCLE OF WHOLE YEARS, again as the kernel does. Audit fifty-eight finding 10 walked a
+     yearly bill taken on 28 February 2027 to 29 February 2028 in both engines, a day after the
+     anniversary it renews on. A whole-year cycle never leaves the month it started in, February is
+     the only month whose length changes between years, and the clamp in `resolveDay` already walks a
+     leap-day start to 28 February in a common year and back to the 29th in a leap one.
+     `forecast-month-end.test.ts` beside this file walks those rows through both engines. */
+  const monthEnd = months % 12 !== 0 && endOfMonth(first) === first;
   const out: { day: string; at: number }[] = [];
   for (let n = 0; out.length < 64 && n < 64 + 1_200; n++) {
     /* `resolveDay` RATHER THAN `setUTCMonth`, because `setUTCMonth` OVERFLOWS. A monthly charge on
