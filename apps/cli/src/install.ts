@@ -13,6 +13,14 @@
  * names each one first, and is a dry run until `--apply` exactly as install is. An entry it cannot identify is
  * left, because a false match deletes somebody else's tool and a miss is only a line to remove by hand.
  *
+ * AND IT PUTS BRAINDOG'S SERVER IN WHERE IT TAKES THE OLD TOOL'S OUT, in the same file, the same dry run and the same
+ * all-or-none write. Measured before it did (`loop/research-switch-recheck.md` §3, brief 2): the cut-over removed
+ * three servers and added none, and the one line printed for BrainDog's carried no `CLAUDE_CONFIG_DIR`, so run as
+ * printed it registered the server in whichever profile the shell was in. A session that reached the old tool only
+ * through `C:\Repos\.mcp.json` was left with no brain at all, and nothing said so. The `.claude.json` is the right
+ * owner of the entry, not a second best: it is the file `claude mcp add-json --scope user` writes, and the one this
+ * command already rewrites to take the old tool's out.
+ *
  * A `.mcp.json` ONLY WHEN IT IS NAMED, AND NEVER ONE IN A REPOSITORY. A project's `.mcp.json` is shared through its
  * repository (`loop/research-agent-path.md` question 5), so one inside a git working tree is refused. But the one the
  * cut-over needs, `C:\Repos\.mcp.json`, is in no repository, and leaving it to a hand edit made step 9 one sitting
@@ -23,6 +31,7 @@
 import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 type Env = Record<string, string | undefined>;
 type Entry = { hooks: { type: 'command'; command: string; timeout: number }[] };
@@ -50,6 +59,25 @@ const SAM_HOST = 'brain.example.com';
  */
 export const REPLACE_BY_HAND =
   'A .mcp.json is opened only when it is named, so a the old tool server registered in one (C:\\Repos\\.mcp.json had one) stays until you run this again with --mcp-json <file>.';
+
+/**
+ * BrainDog's MCP server as a registration: this checkout's `main.ts` run by Node, the entry main.ts prints for
+ * `claude mcp add-json`. NO `env` AND NO `headers`, so no token is ever written here: the server reads the sign-in
+ * `braindog login` keeps, and the entry it replaces is never copied from, since that is where the old tool kept its key.
+ */
+export const BRAINDOG_SERVER = {
+  type: 'stdio',
+  command: 'node',
+  args: [fileURLToPath(new URL('./main.ts', import.meta.url)).replaceAll('\\', '/'), 'mcp', '--agent', 'claude'],
+} as const;
+
+const ADDS_SERVER = '  + mcpServers.braindog: ';
+
+/**
+ * Whether the lines `installEvery` returned put BrainDog's server in, so main.ts can leave out the `claude mcp
+ * add-json` line it prints for a profile that still has to be registered by hand.
+ */
+export const addsServer = (lines: string[]): boolean => lines.some((line) => line.startsWith(ADDS_SERVER));
 
 /** The profile folders to change: each `--config-dir`, else `CLAUDE_CONFIG_DIR`, else `~/.claude`. */
 export const profilesOf = (named: string[], env: Env): string[] => (named.length > 0 ? named : [env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')]);
@@ -438,6 +466,25 @@ function withoutSam(servers: unknown, where: string, removed: string[]): unknown
 }
 
 /**
+ * BrainDog's server added to the top-level `mcpServers` of a file the old tool's were just taken out of, with the line
+ * that says so. AT USER SCOPE EVEN WHEN THE OLD TOOL'S WAS ONLY IN ONE PROJECT'S LOCAL SCOPE, because BrainDog's server
+ * reads the folder it runs in, so one registration serves every project, where one per project would be copies to
+ * keep in step. A `braindog` entry already there is the person's own and is left exactly as it is, never replaced
+ * with this checkout's path.
+ */
+function withBraindog(next: Record<string, unknown>, lines: string[]): void {
+  const servers = next.mcpServers ?? {};
+  /* Claude Code never writes a list or a string here, and an entry forced into one would be read by nothing. */
+  if (!isObject(servers)) return;
+  if ('braindog' in servers) {
+    lines.push('  mcpServers.braindog is registered already, and is left as it is.');
+    return;
+  }
+  next.mcpServers = { ...servers, braindog: BRAINDOG_SERVER };
+  lines.push(`${ADDS_SERVER}${JSON.stringify(BRAINDOG_SERVER)}`);
+}
+
+/**
  * The git working tree a path sits in, found as git finds one, by a `.git` folder or file in it or any folder above
  * it. A FILE AS WELL AS A FOLDER, because a worktree or a submodule keeps a `.git` file that points elsewhere.
  */
@@ -466,6 +513,7 @@ function planMcpJson(named: string, options: Options): Plan {
   if ('mcpServers' in config) next.mcpServers = withoutSam(config.mcpServers, '', removed);
   if (removed.length === 0) return { lines: [`${file} registers no the old tool MCP server. Nothing to change.`], write: null };
   const lines = [`${options.apply ? 'Changed' : 'braindog install --replace would change'} ${file}:`, ...removed];
+  withBraindog(next, lines);
   if (!options.apply) return { lines: [...lines, dryTail(options)], write: null };
   return { lines, write: { file, had: true, value: next } };
 }
@@ -491,6 +539,7 @@ function planServers(file: string, options: Options): Plan {
   if (removed.length === 0) return { lines: [`${file} registers no the old tool MCP server. Nothing to change.`], write: null };
 
   const lines = [`${options.apply ? 'Changed' : 'braindog install --replace would change'} ${file}:`, ...removed];
+  withBraindog(next, lines);
   /*
    * NOT MEASURED HERE, AND SAID BECAUSE IT IS CHEAP: Claude Code keeps its running state in this same file (the
    * fixture's `numStartups` is one such field), so a session left open may write back the copy it read.

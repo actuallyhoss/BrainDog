@@ -195,6 +195,6 @@ test('A SERVER REGISTERED THROUGH A PROXY, npx mcp-remote https://brain.example.
 
   installInto(a.dir, { apply: true, replace: true, scripts, home });
   const now = JSON.parse(readFileSync(a.claudeJson, 'utf8')) as { mcpServers: Record<string, unknown> };
-  assert.deepEqual(Object.keys(now.mcpServers), ['other']);
+  assert.deepEqual(Object.keys(now.mcpServers), ['other', 'braindog']);
   assert.ok(!existsSync(`${a.claudeJson}.tmp`));
 });

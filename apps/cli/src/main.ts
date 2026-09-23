@@ -28,7 +28,7 @@ import { automations, scripts } from './automations.ts';
 import { hookEnd, hookStart, readSession, sessionPath } from './hooks.ts';
 import { budgetOf, clientFor, hostsPath, target } from './http.ts';
 import { importCommand } from './import.ts';
-import { REPLACE_BY_HAND, installEvery, profilesOf } from './install.ts';
+import { BRAINDOG_SERVER, REPLACE_BY_HAND, addsServer, installEvery, profilesOf } from './install.ts';
 import { machine, takeJson, type Machine } from './json.ts';
 import { keys, spawnInherit } from './keys.ts';
 import { login } from './login.ts';
@@ -354,12 +354,13 @@ function install(args: string[]): void {
   lines.push(...installEvery(files.length > 0 && dirs.length === 0 ? [] : profilesOf(dirs, process.env), files, options, mcpFiles));
   /* Named, the .mcp.json is in the run above, and telling the person to do it by hand would be wrong. */
   if (options.replace && mcpFiles.length === 0) lines.push('', REPLACE_BY_HAND);
-  const cli = fileURLToPath(new URL('./main.ts', import.meta.url)).replaceAll('\\', '/');
-  lines.push(
-    '',
-    'The MCP server is registered once per profile by Claude Code itself, and install does not run it:',
-    `claude mcp add-json braindog '${JSON.stringify({ type: 'stdio', command: 'node', args: [cli, 'mcp', '--agent', 'claude'] })}' --scope user`,
-  );
+  /* Written above wherever the old tool's server came out, so the hand-run line is printed only when no file got it. */
+  if (!addsServer(lines))
+    lines.push(
+      '',
+      'The MCP server is registered once per profile by Claude Code itself, and install does not run it:',
+      `claude mcp add-json braindog '${JSON.stringify(BRAINDOG_SERVER)}' --scope user`,
+    );
   if (json) {
     for (const line of lines) json.out(line);
     emit(json.envelope(0));

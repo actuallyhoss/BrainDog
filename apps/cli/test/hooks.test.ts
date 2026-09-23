@@ -519,7 +519,8 @@ test('INSTALL --REPLACE --APPLY copies each file beside itself, removes only the
 
   const mcp = JSON.parse(readFileSync(claudeJson, 'utf8')) as { numStartups: number; mcpServers: Record<string, unknown>; projects: Record<string, { allowedTools: unknown[]; mcpServers: Record<string, unknown> }> };
   assert.equal(mcp.numStartups, 41);
-  assert.deepEqual(Object.keys(mcp.mcpServers), ['figma', 'brainy']);
+  /* BrainDog's server in where the old tool's came out, once at user scope for the three removed (install-adds-server.test.ts). */
+  assert.deepEqual(Object.keys(mcp.mcpServers), ['figma', 'brainy', 'braindog']);
   assert.deepEqual(mcp.projects['C:/Repos/acme'], { allowedTools: [], mcpServers: {} });
 
   const again = installInto(dir, { apply: true, replace: true, scripts, home });
@@ -578,6 +579,8 @@ test('INSTALL --REPLACE --MCP-JSON names the the old tool servers in a .mcp.json
   assert.ok(dry.stdout.includes(`braindog install --replace would change ${file}:`), dry.stdout);
   assert.ok(dry.stdout.includes("  - mcpServers.brain, the old tool's: node C:\\Tools\\legacy\\mcp\\brain-mcp.mjs"), dry.stdout);
   assert.ok(dry.stdout.includes("  - mcpServers.proxied, the old tool's: npx -y mcp-remote https://brain.example.com/mcp"), dry.stdout);
+  /* Through the command as he runs it, not only the function: the file that loses the old tool's gains BrainDog's. */
+  assert.ok(dry.stdout.includes('  + mcpServers.braindog: {"type":"stdio","command":"node"'), dry.stdout);
   assert.ok(!dry.stdout.includes('figma') && !dry.stdout.includes('brainy') && !dry.stdout.includes(HB_SECRET), dry.stdout);
   /*
    * Named, it is no longer a file to edit by hand, so the sentence saying so is not printed. CHECKED AGAINST THE
@@ -595,7 +598,7 @@ test('INSTALL --REPLACE --MCP-JSON names the the old tool servers in a .mcp.json
   assert.ok(applied.stdout.includes(`The file as it was is kept at ${file}.bak.`), applied.stdout);
   assert.equal(readFileSync(`${file}.bak`, 'utf8'), before);
   const now = JSON.parse(readFileSync(file, 'utf8')) as { mcpServers: Record<string, unknown>; note: string };
-  assert.deepEqual(Object.keys(now.mcpServers), ['figma', 'brainy']);
+  assert.deepEqual(Object.keys(now.mcpServers), ['figma', 'brainy', 'braindog']);
   assert.equal(now.note, 'kept as it was');
   /* The same run wrote the profile's hooks: one change, not two. */
   assert.ok(existsSync(join(profile, 'settings.json')));
