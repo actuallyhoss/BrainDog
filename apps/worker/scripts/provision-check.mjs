@@ -369,6 +369,60 @@ export function readProvision(status, body) {
   };
 }
 
+/**
+ * The provision itself, in the two shells he has, for a host that has just answered READY.
+ *
+ * TWO FORMS BECAUSE ONE OF THEM FAILED IN HIS PRIMARY SHELL, and both failures were measured on 23 September
+ * (`loop/research-first-sign-in.md` friction 2). In Windows PowerShell 5.1 `curl` is `Invoke-WebRequest`, which
+ * refuses curl's flags with "A positional parameter cannot be found", and `curl.exe` with the JSON in single quotes
+ * answers `400 BODY_MALFORMED`, because 5.1 strips the inner double quotes on the way to a native command. So the
+ * PowerShell form builds the body with `ConvertTo-Json` and sends it with `Invoke-RestMethod`, which leaves no quoting
+ * for 5.1 to strip. It is section 4's form, and that form was rehearsed against a local host: the success,
+ * `ALREADY_KNOWN` for a taken slug and `UNAUTHORIZED` for a wrong key all came back.
+ *
+ * THE CONTENT TYPE NAMES ITS CHARSET, which section 4's form did not. Without one, 5.1 encodes a string body as
+ * Latin-1, so a name outside ASCII arrives broken and stays broken, because the name is fixed at provision. Measured
+ * on 23 September from 5.1.26100 to an echo server on this machine: `Zoë Łuk` arrived as `Zo` U+FFFD ` Luk` under
+ * `application/json` and whole under `application/json; charset=utf-8`, which `isJson` in `auth.ts` accepts.
+ *
+ * THE OPERATOR KEY IS THE SHELL'S AND NEVER THIS SCRIPT'S. Each form reads it at a prompt that echoes nothing, keeps
+ * it in that shell's own variable, and removes the variable after, so it is in neither the history nor the screen.
+ * Nothing here reads `PROVISION_KEY` from anywhere, and the test sets it in this process's environment to prove it
+ * reaches no printed line.
+ *
+ * THE ZONE IS THIS MACHINE'S, because the machine he provisions from is the one on his desk, and a record made
+ * without one is `UTC` for good. An offset or no answer at all falls back to `UTC`, which the Worker takes too.
+ */
+export function provisionCommands(origin, zone = localZone()) {
+  const url = `${origin}/auth/provision`;
+  return {
+    powershell: [
+      "$key = Read-Host 'Operator key' -AsSecureString",
+      '$pk = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($key))',
+      `$body = @{ slug = '<slug>'; email = '<your email>'; name = '<your name>'; tz = '${zone}' } | ConvertTo-Json`,
+      'try {',
+      `  $r = Invoke-RestMethod -Method Post -Uri '${url}' -Headers @{ Authorization = "Bearer $pk" } -ContentType 'application/json; charset=utf-8' -Body $body`,
+      '  $r.value | Format-List',
+      "} catch { 'REFUSED: ' + $_.ErrorDetails.Message }",
+      'Remove-Variable pk, key',
+    ],
+    bash: [
+      "read -rs -p 'Operator key: ' PK; echo",
+      `curl -sS -X POST ${url} \\`,
+      "  -H 'content-type: application/json' \\",
+      '  -H "authorization: Bearer $PK" \\',
+      `  -d '{"slug":"<slug>","email":"<your email>","name":"<your name>","tz":"${zone}"}'`,
+      'unset PK',
+    ],
+  };
+}
+
+/** The zone this machine keeps, by `Intl`'s own name for it, or `UTC` when it has none or answers an offset. */
+function localZone() {
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return typeof zone === 'string' && zone.length > 0 && !/^[+-]/.test(zone) ? zone : 'UTC';
+}
+
 /** One probe. Uncached, because a cached answer is a measurement of an edge on the one night it matters. */
 async function ask(origin, path, init = {}) {
   try {
@@ -611,6 +665,18 @@ export default async function provisionCheck(named, { account = true, root = ROO
   if (missing.length === 0) {
     console.log(`  READY. ${host} has its secrets, its route and its bucket, and no record has been made on it yet.`);
     console.log('  The next command is the provision itself, and its answer is the only copy of the claim link there will ever be.');
+    console.log('  The slug, the name and the time zone are fixed at provision. No screen renames the record or moves its zone later,');
+    console.log('  and the Directory never gives a slug out twice, so choose all three before typing it. The name is also the display name on the passkey.');
+    const commands = provisionCommands(origin);
+    console.log('');
+    console.log('  IN WINDOWS POWERSHELL 5.1, where curl is Invoke-WebRequest and curl.exe with quoted JSON answers BODY_MALFORMED:');
+    for (const line of commands.powershell) console.log(`    ${line}`);
+    console.log('');
+    console.log('  IN GIT BASH, OR ANY BASH:');
+    for (const line of commands.bash) console.log(`    ${line}`);
+    console.log('');
+    console.log('  Each asks for the operator key at a prompt that echoes nothing and removes it after. This script never reads it.');
+    console.log('  The time zone is this machine\'s. Change it if the record keeps another place\'s hours.');
   } else {
     console.log(`  NOT READY, ${missing.length} thing(s) missing, in the order to repair them:`);
     missing.forEach((item, i) => {

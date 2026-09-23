@@ -1637,6 +1637,13 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
   const from = env.AUTH_MAIL_FROM;
   const email = env.EMAIL;
   const url = new URL(request.url);
+  /* THE ZONE IS READ FROM A COPY OF THE BODY, because `operated()` in `packages/host/src/auth.ts` hands `provision`
+     the slug, the email and the name and drops every other field, so a `tz` in the body never arrived here and every
+     record was made in `UTC` (`loop/research-first-sign-in.md` friction 12). The copy is read only inside the
+     `provision` callback, which `operated()` calls after it has checked the operator key and parsed the same bytes as
+     a JSON object, so an unauthenticated POST never has its copy read. When `operated()` forwards `tz` itself, this
+     copy and `askedZone` go. */
+  const copy = request.method === 'POST' && url.pathname.replace(/\/+$/, '') === '/auth/provision' ? request.clone() : null;
   return serveAuth(request, {
     on: 'worker',
     origin: `https://${env.PUBLIC_HOST ?? ''}`,
@@ -1656,7 +1663,7 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
             ),
         }
       : {}),
-    operator: { key: env.PROVISION_KEY, provision: (args) => provision(env, args) },
+    operator: { key: env.PROVISION_KEY, provision: async (args) => provision(env, { ...args, tz: await askedZone(copy) }) },
     /* THE NAME THE REQUEST CAME BY, so a device that reached this Worker at another address is not sent to
        `PUBLIC_HOST` to be approved. Devices sign in only where sign-in is on, because approving needs a session. */
     reached: url.host,
@@ -1730,6 +1737,37 @@ function devices(env: Env): DeviceDoor {
   };
 }
 
+/** What a provision body said at `tz`, or nothing: the copy is the request `signIn` cloned, and `null` off that route. */
+async function askedZone(copy: Request | null): Promise<unknown> {
+  if (!copy) return undefined;
+  try {
+    return (JSON.parse(await copy.text()) as { tz?: unknown } | null)?.tz;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * A provision body's zone in the runtime's own spelling, `UTC` when it named none, and `null` when it is not a zone.
+ *
+ * CHECKED BY `Intl` AND NOT BY A LIST, for the reason `createRecord` gives: a table of zones is wrong the next time a
+ * government moves one. `resolvedOptions` answers the canonical name, so `europe/london` is stored as `Europe/London`
+ * and `GB` as `Europe/London` too, measured on Node 24.13.
+ *
+ * AN OFFSET IS NOT A ZONE. `Intl` accepts `+01:00` and answers it back unchanged, and a record in `+01:00` is an hour
+ * out for the half of the year London is not on summer time. It is refused here rather than stored.
+ */
+function zoneOf(asked: unknown): string | null {
+  if (asked === undefined || asked === null) return 'UTC';
+  if (typeof asked !== 'string') return null;
+  try {
+    const zone = new Intl.DateTimeFormat('en', { timeZone: asked.trim() }).resolvedOptions().timeZone;
+    return /^[+-]/.test(zone) ? null : zone;
+  } catch {
+    return null;
+  }
+}
+
 /** The one letter sign-in sends: plain text, the link on a line of its own, and what it is for. */
 const letter = (link: string): string =>
   [
@@ -1753,8 +1791,16 @@ const letter = (link: string): string =>
  *
  * THE STORE IS OPENED FIRST, so a bound value that is not a key refuses before the Directory writes anything, and so
  * the keyless guard decides before `prepare` has minted a person and claimed a slug.
+ *
+ * AND THE ZONE BEFORE EITHER. `createRecord` refuses a zone it cannot read, but it runs inside the record, after
+ * `prepare` has written the owner as a `dir_person` row, so a mistyped zone refused there would leave a person in the
+ * Directory with no record behind them. Measured by moving this check after `prepare`: `test/provision-tz.test.ts`
+ * counted one more `dir_person` on `Mars/Olympus` and failed.
  */
-async function provision(env: Env, args: { slug: string; email: string; name?: string }): Promise<Result<Provisioned>> {
+async function provision(env: Env, args: { slug: string; email: string; name?: string; tz?: unknown }): Promise<Result<Provisioned>> {
+  const tz = zoneOf(args.tz);
+  if (tz === null)
+    return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'tz takes an IANA time zone, such as Europe/London, or is left out for UTC.', at: 'tz' } };
   const store = await keyStoreOf(env.KEK);
   const keyless = keylessRefusal(store, env.PROVISION_WITHOUT_KEYS);
   if (keyless) return { ok: false, refusal: keyless };
@@ -1768,7 +1814,7 @@ async function provision(env: Env, args: { slug: string; email: string; name?: s
     id,
     slug: args.slug,
     name: args.name ?? args.slug,
-    tz: 'UTC',
+    tz,
     locale: 'en',
     owner: { id: owner.id, email: owner.email, name: owner.name },
     ...(store ? { keys: await recordKeys(store, id) } : {}),

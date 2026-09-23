@@ -135,7 +135,7 @@ test('A USAGE MISTAKE NAMES THE ADDRESS THE APP LIVES AT NOW', async (t) => {
   let stderr = '';
   child.stderr.on('data', (chunk: Buffer) => (stderr += chunk.toString('utf8')));
   assert.equal(await new Promise<number | null>((done) => child.on('close', done)), 1);
-  assert.equal(stderr.trim(), 'braindog login takes one host, as in braindog login https://brain.dog/app/<slug>, and --vault <project>, and nothing else.');
+  assert.equal(stderr.trim(), 'braindog login takes one host, as in braindog login https://app.brain.dog/app/<slug>, and --vault <project>, and nothing else.');
 });
 
 test(

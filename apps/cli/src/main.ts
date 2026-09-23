@@ -203,7 +203,10 @@ async function mcp(args: string[]): Promise<void> {
 
 /** `braindog login <host> [--vault <scope>]`: one host, and the exit code `login` decides. */
 async function signIn(args: string[]): Promise<void> {
-  const wrong = 'braindog login takes one host, as in braindog login https://brain.dog/app/<slug>, and --vault <project>, and nothing else.';
+  /* `app.brain.dog` AND NOT `brain.dog`, because the example is the one address a person copies. Until push B of the
+     one-domain move, `brain.dog/app/<slug>` is the marketing site's 404 (`loop/research-first-sign-in.md` friction 6),
+     and after it `app.brain.dog` stays a Custom Domain of the same Worker, so this example signs in on both sides. */
+  const wrong = 'braindog login takes one host, as in braindog login https://app.brain.dog/app/<slug>, and --vault <project>, and nothing else.';
   let parsed: { values: { vault?: string | undefined }; positionals: string[] };
   try {
     parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { vault: { type: 'string' } } });

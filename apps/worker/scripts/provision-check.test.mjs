@@ -20,18 +20,21 @@
  * six tests for it, and `src/index.ts` at that commit holds `async function provision(` without a
  * mention of the guard. A deploy cut there carries the file and provisions keyless records anyway.
  *
- * NOTHING HERE TOUCHES THE NETWORK. Every reading is a pure function of a status and a body, which
+ * NOTHING HERE LEAVES THIS MACHINE. Every reading is a pure function of a status and a body, which
  * is why they are exported at all: the probes themselves are one `fetch` each and are not the part
- * that can be quietly wrong.
+ * that can be quietly wrong. The two tests at the end drive the whole checker, and they do it
+ * against a server on `127.0.0.1` that this file starts and stops, because what READY prints is
+ * decided by all three probes together and no one reading can answer it.
  */
 
 import { strict as assert } from 'node:assert';
 import { execFileSync } from 'node:child_process';
+import { createServer } from 'node:http';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { applyPush, environmentOf, guardsKeylessRecords, plan, pushes, readBuild, readMethods, readProvision, wranglerConfig } from './provision-check.mjs';
+import provisionCheck, { applyPush, environmentOf, guardsKeylessRecords, plan, pushes, readBuild, readMethods, readProvision, wranglerConfig } from './provision-check.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
@@ -194,4 +197,101 @@ test('whether the serving commit refuses a keyless record is decided against the
   /* A SHA THIS CLONE HAS NEVER FETCHED IS NOT A `no`. Saying `no` about a commit nobody here has
      seen would report a host as dangerous on the strength of a `git fetch` somebody did not run. */
   assert.equal(guardsKeylessRecords('0000000', root), 'unknown');
+});
+
+/**
+ * A host on this machine that answers the three probes the way a ready production host does, or with the operator
+ * route switched off. The build it names is this clone's HEAD, which every clone holds however shallow, and which
+ * calls the keyless guard, so the only thing between it and READY is the probe at `/auth/provision`.
+ */
+async function readyHost(t, { ready = true } = {}) {
+  /* `repo` AND NOT `root`, for the reason `holds` gives above. */
+  const repo = root;
+  const sha = execFileSync('git', ['-C', repo, 'rev-parse', '--short=12', 'HEAD'], { encoding: 'utf8' }).trim();
+  const seen = [];
+  const server = createServer((req, res) => {
+    seen.push({ method: req.method, url: req.url, authorization: req.headers.authorization ?? null });
+    const json = (status, body) => {
+      res.writeHead(status, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(body));
+    };
+    if (req.url === '/.well-known/braindog-build') return json(200, { app: `2026.09.23+${sha}` });
+    if (req.url === '/auth/methods') return json(200, { ok: true, value: { passkey: true, magic: false, key: false, open: false, demo: false, me: null, firstRun: true } });
+    if (req.url === '/auth/provision' && ready)
+      return json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'This route takes the operator key.', at: 'authorization' } });
+    if (req.url === '/auth/provision') return json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'This BrainDog does not offer that way to sign in.' } });
+    return json(404, { ok: false });
+  });
+  await new Promise((done) => server.listen(0, '127.0.0.1', done));
+  t.after(() => server.close());
+  const lines = [];
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const run = async () => {
+    const log = t.mock.method(console, 'log', (...args) => lines.push(args.join(' ')));
+    try {
+      return await provisionCheck(origin, { account: false, root });
+    } finally {
+      log.mock.restore();
+    }
+  };
+  return { origin, lines, seen, run };
+}
+
+test('READY prints the provision command for both shells, and the operator key is never in either', async (t) => {
+  /* MEASURED ON 23 SEPTEMBER, `loop/research-first-sign-in.md` friction 2. READY ended at "The next command is the
+     provision itself" and printed no command, so he would have typed the runbook's curl into Windows PowerShell 5.1,
+     his primary shell, where `curl` is `Invoke-WebRequest` and refuses the flags, and `curl.exe` with the JSON in
+     single quotes answers `400 BODY_MALFORMED` because 5.1 strips the inner quotes. Nothing is made either way. */
+  const OPERATOR = 'sentinel-operator-key-0123456789abcdef';
+  const was = process.env.PROVISION_KEY;
+  process.env.PROVISION_KEY = OPERATOR;
+  t.after(() => (was === undefined ? delete process.env.PROVISION_KEY : (process.env.PROVISION_KEY = was)));
+
+  const host = await readyHost(t);
+  const code = await host.run();
+  const out = host.lines.join('\n');
+  assert.equal(code, 0, out);
+  assert.match(out, /READY\./);
+
+  const at = (marker) => host.lines.findIndex((line) => line.toLowerCase().includes(marker));
+  const ps = at('windows powershell');
+  const sh = at('git bash');
+  assert.ok(ps > 0 && sh > ps, `READY does not print the command for both shells:\n${out}`);
+  /* THE HEADING NAMES curl ON PURPOSE, to say why it is absent, so the commands start on the line after it. */
+  const powershell = host.lines.slice(ps + 1, sh).join('\n');
+  const bash = host.lines.slice(sh).join('\n');
+
+  /* THE REHEARSED FORM, `loop/research-first-sign-in.md` section 4: the key at a prompt that echoes nothing, the body
+     built by `ConvertTo-Json` so no quoting is PowerShell's to strip, and the key taken out of the session after. */
+  assert.match(powershell, /Read-Host 'Operator key' -AsSecureString/);
+  assert.match(powershell, /ConvertTo-Json/);
+  assert.match(powershell, new RegExp(`Invoke-RestMethod -Method Post -Uri '${host.origin}/auth/provision'`));
+  assert.match(powershell, /Remove-Variable pk, key/);
+  /* THE CHARSET IS NAMED, because without it Windows PowerShell 5.1 sends a string body as Latin-1. Measured on 23
+     September from 5.1.26100 to an echo server on this machine: the name `Zoë Łuk` arrived as `Zo� Luk` under
+     `application/json` and whole under `application/json; charset=utf-8`, and the name is fixed at provision. */
+  assert.match(powershell, /-ContentType 'application\/json; charset=utf-8'/);
+  assert.doesNotMatch(powershell, /curl/i, 'the PowerShell form names curl, which is Invoke-WebRequest there or curl.exe and BODY_MALFORMED');
+  assert.match(bash, /read -rs -p 'Operator key: ' PK/);
+  assert.match(bash, new RegExp(`curl -sS -X POST ${host.origin}/auth/provision`));
+  assert.match(bash, /unset PK/);
+
+  /* BOTH BODIES CARRY THE ZONE, because a body without one is a record in UTC for good. */
+  for (const form of [powershell, bash]) assert.match(form, /\btz\b/, `a form of the command sends no time zone:\n${form}`);
+
+  /* AND THE THREE THINGS NO SCREEN CHANGES LATER ARE SAID BEFORE HE TYPES THEM. */
+  assert.match(out, /slug, the name and the time zone are fixed at provision/i);
+
+  /* THE KEY IS THE SHELL'S, NEVER THIS SCRIPT'S. With it in this process's environment it is still in no printed
+     line and on no request the checker sent. */
+  assert.ok(!out.includes(OPERATOR), 'the operator key was printed');
+  assert.ok(host.seen.every((r) => r.authorization === null), 'the checker sent an authorization header');
+});
+
+test('NOT READY prints no provision command, because that command is only worth typing on a host that answers ready', async (t) => {
+  const host = await readyHost(t, { ready: false });
+  const code = await host.run();
+  const out = host.lines.join('\n');
+  assert.equal(code, 1, out);
+  assert.doesNotMatch(out, /Invoke-RestMethod|curl -sS/);
 });
