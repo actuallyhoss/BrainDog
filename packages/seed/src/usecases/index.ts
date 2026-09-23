@@ -32,9 +32,10 @@ function checked(doc: unknown): UseCase {
 }
 
 /**
- * In the order a tie is broken: one person's own life first, then the most specific, and the business setup last. Personal
- * leads because a sentence that is as much about a person's budget as their coursework is a person's record with their
- * studies beside it (`alongside`), and the record speaks in the voice of the use case proposed, which onboarding writes down.
+ * In the order a tie is broken when the length of what was heard does not break it (`arrange` below): one person's own
+ * life first, then the most specific, and the business setup last. Either way the other use case for one person is not
+ * lost: "my budget, my running and my uni coursework" is Personal with Student's lists beside it (`alongside`), and the
+ * record speaks in the voice of the use case proposed, which onboarding writes down.
  *
  * EACH ONE'S `version` IS HELD TO WHAT ITS PACK DECLARES by `test/usecase-versions.test.ts`, which fingerprints the
  * declarations and the settings of the document `useCaseDocument` builds below and refuses a word that moved with the
@@ -95,13 +96,26 @@ function heard(said: string, u: UseCase): Span[] {
 
 /**
  * What this BrainDog reads as being for: every use case ranked by how many of its signals were heard,
- * ties in catalogue order, and the first one proposed when anything was heard at all.
+ * a tie to whichever heard more of the sentence, then catalogue order, and the first one proposed when
+ * anything was heard at all.
+ *
+ * A TIE GOES TO THE LONGER THING SAID, because a long phrase is a specific one and a short word is one
+ * any sentence uses. Catalogue order alone gave every one-to-one tie to Personal, and the Solo founder
+ * card's own summary, "The organisations you run, the money across them, and the numbers your projects
+ * report.", typed back, was Personal: "money" against "organisations" (`loop/research-first-sign-in.md`
+ * §3, friction 3). Now it is 13 letters to 5 and Solo founder.
+ *
+ * NOT THE WORD HEARD FIRST, WHICH WAS TRIED. It fixed the summary and sent "I want to start an Etsy shop
+ * and have no idea where to begin" to Small business, because "shop" comes before "where to begin"
+ * (`apps/web/src/lib/shape.test.ts`). By length that is 14 to 4 and the guide, as it was. Catalogue order
+ * still settles a tie of equal length, such as "my budget, my running and my uni coursework" (13 each,
+ * Personal with Student beside it), and ranks everything nothing was heard for.
  */
 export function arrange(said: string, catalogue: readonly UseCase[] = USE_CASES): Arrangement {
   const ranked = catalogue
     .map((usecase, i) => ({ usecase, why: heard(said, usecase), i }))
-    .map(({ usecase, why, i }) => ({ usecase, score: why.length, why, i }))
-    .sort((a, b) => b.score - a.score || a.i - b.i)
+    .map(({ usecase, why, i }) => ({ usecase, score: why.length, why, i, said: why.reduce((n, w) => n + w.text.length, 0) }))
+    .sort((a, b) => b.score - a.score || b.said - a.said || a.i - b.i)
     .map(({ usecase, score, why }) => ({ usecase, score, why }));
   const top = ranked[0];
   return { pick: top && top.score > 0 ? top.usecase : null, ranked };
