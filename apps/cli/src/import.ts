@@ -701,6 +701,17 @@ export async function applyPlan(
     report.plan = plan;
     registers = registers.filter((r) => !absent.includes(r));
   }
+  /* A ROW WITH ANOTHER SHAPE FOR A RECORD THAT DECLARES MORE (`PlannedRow.ifDeclared`): a project brief lands in the
+     project brief pack's own fields where the record has them, and as note prose where it does not (`packs/project-brief`). */
+  plan = {
+    ...plan,
+    rows: plan.rows.map((r) =>
+      r.ifDeclared !== undefined && r.ifDeclared.needs.every((f) => declared.get(r.register)?.has(f))
+        ? (({ lacking: _dropped, ...rest }) => ({ ...rest, fields: { ...r.fields, ...r.ifDeclared!.fields }, ...(r.ifDeclared!.lacking === undefined ? {} : { lacking: r.ifDeclared!.lacking }) }))(r)
+        : r,
+    ),
+  };
+  report.plan = plan;
   /* WHAT A ROW CARRIES ON A RECORD WITHOUT A LIST IT LEANS ON (`PlannedRow.lacking`): a project's note keeps the domains
      that would otherwise have arrived as Services rows, because on this record they arrive as nothing. */
   if (plan.rows.some((r) => r.lacking !== undefined && absent.includes(r.lacking.register))) {

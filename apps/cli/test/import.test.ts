@@ -118,7 +118,7 @@ test('projects keep their lane, mark, repos, plan and their own decisions, and t
   assert.equal(row(p, 'legacy:datapoint:quill:Monthly revenue:2026-09-15')!.fields.value, 2500, 'a revenue written "2,500" is read as a number');
   assert.equal(row(p, 'legacy:datapoint:quill:Monthly revenue:2026-09-15')!.fields.name, 'Monthly revenue, Quill Consulting', 'two projects never share one tile on the Dashboard');
   assert.equal(row(p, 'legacy:datapoint:tidepool:Monthly revenue:2026-09-15')!.fields.value, 0);
-  assert.equal(row(p, 'legacy:datapoint:lanternly:Revenue, next twelve months:2026-09-15')!.fields.value, 24000);
+  assert.equal(row(p, 'legacy:datapoint:lanternly:Monthly revenue a year out: base:2026-09-15')!.fields.value, 24000);
   assert.equal(row(p, 'legacy:datapoint:lanternly:subscribers:2026-09-15')!.fields.value, 312);
   /* A METRIC'S KEY IS SAID IN WORDS, and a percentage keeps its unit. */
   assert.equal(row(p, 'legacy:datapoint:lanternly:subscribers:2026-09-15')!.fields.name, 'Subscribers, Lanternly');
