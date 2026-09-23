@@ -47,7 +47,12 @@
  * `APP` IS THE ONE PLACE THE APP'S ADDRESS IS WRITTEN. Every "Open the app" on the site, the header,
  * the hero, the close, the pricing card and the changelog, and the footer's sign-in, read it from
  * here. It sat below `site` until 22 September, which is why the footer's sign-in was a second
- * literal of the same address; the day the app moves, this line is the whole change.
+ * literal of the same address. The day the app moves, this line is every LINK that changes and not
+ * the whole change: `loop/research-site-now.md` (23 September, section 2) measured `static/robots.txt`,
+ * the comments in `static/sitemap.xml` and the want of a CSP in `static/_headers` all going false with
+ * the move. And an absolute address sends the alpha site's readers to production's app, which a
+ * relative `/app` would not; that waits on push B, because `/app` on `brain.dog` is the site's 404
+ * until the flip.
  *
  * `SOURCE` IS PUBLISHED AHEAD OF THE REPOSITORY GOING PUBLIC, on the owner's word, 2026-09-16. The
  * repository is private until the product launches, and the link is on the site now so it is
@@ -984,14 +989,25 @@ export const site = {
      * `snapshots.ts:30`), and export as a live host-independent call
      * (`apps/web/src/lib/record/settings-write.ts:154-159`).
      *
-     * THE HOSTED BACKUP CELL IS THE ONE THAT WAITS ON A SETTING, NOT ON CODE. The Worker keeps
-     * thirty nightly copies, each sealed to `AGE_RECIPIENT` (`apps/worker/src/snapshots.ts`,
-     * `seal.ts`). Both environments in `apps/worker/wrangler.jsonc` still hold the placeholder
-     * `age1<...-recipient>`, and `sealerOf` refuses a placeholder before the walk starts, so on
-     * 22 September no hosted copy was being written at all. `Nightly, thirty kept` was true of the
-     * code and of no copy. The cell says what a hosted record would get today, and
-     * `src/lib/claims.test.ts` fails if it stops saying so while the placeholder is there. When the
-     * owner sets the recipient, the `None yet.` half goes and the test's condition goes false.
+     * THE HOSTED BACKUP CELL WAITED ON A SETTING, AND THE SETTING IS MADE. The cron in
+     * `apps/worker/wrangler.jsonc` (`17 3 * * *`, 03:17 UTC) walks every record once a night, puts
+     * one copy each in the environment's own R2 bucket and keeps thirty (`KEEP` in
+     * `apps/worker/src/snapshots.ts`), each sealed with age to `AGE_RECIPIENT` (`seal.ts`). Until
+     * 54a16ffb, on 22 September at 20:12, both environments held the placeholder
+     * `age1<...-recipient>`, which `sealerOf` refuses before the walk starts, so no hosted copy was
+     * written and the cell said `None yet`. Since then each environment names a real key of its own,
+     * production's `age1av0654...` and alpha's `age1f6rykm...`. The cell went on waiting for a key
+     * that was already set, for a day, because `claims.test.ts` only spoke while the value was a
+     * placeholder.
+     *
+     * WHAT THE CELL NOW SAYS IS WHAT THE CODE DOES AND NO MORE. `Nightly, thirty kept, sealed to a key
+     * we hold` is the cron, `KEEP` and the recipient; the identity that opens a copy is kept outside
+     * Cloudflare (`seal.ts`'s header, `12 §8`). It does not say a failed night is tried again,
+     * because nothing tries it again: `nightly.ts` counts the failure, and the next copy is the next
+     * night's. It is read from the code; nobody opened the bucket to write it. `claims.test.ts`
+     * holds both directions: `None yet` while production's key is a placeholder, neither `None yet`
+     * nor `once we set` once it is real, and no `seal` if it is ever set empty, which is unsealed on
+     * purpose.
      */
     compareTitle: 'What actually differs',
     compare: {
@@ -1000,7 +1016,7 @@ export const site = {
         ['The software', 'The same build', 'The same build'],
         ['Runs on', 'Your machine, one process, one port', 'Cloudflare, run by us'],
         ['Your record lives in', 'One file on your disk', 'A database of its own, never shared'],
-        ['Backups', 'Nightly, thirty kept', 'None yet. Nightly, thirty kept, once we set the key that seals them'],
+        ['Backups', 'Nightly, thirty kept', 'Nightly, thirty kept, sealed to a key we hold'],
         ['Leaving', 'Copy the file', 'Export the file, whenever you like'],
         ['Price', 'Free', '$12 a month, per record'],
       ],

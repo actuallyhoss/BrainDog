@@ -15,11 +15,32 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import { site } from './copy.ts';
 
 const SITE = new URL('../../', import.meta.url);
 const REPO = new URL('../../', SITE);
+
+/**
+ * Production's `AGE_RECIPIENT`, read off the parsed `apps/worker/wrangler.jsonc` and not off its text.
+ *
+ * THE TEXT WAS READ UNTIL 23 SEPTEMBER, AND FROM fe14e8be ON IT READ ALPHA'S KEY. Both backup checks
+ * sliced the file at its first `"production"` and took the first `AGE_RECIPIENT` after it. That push
+ * put a staged `"production": {` fragment in the comment at the top of the file, so the slice began
+ * there, ran through the whole alpha block, and found `age1f6rykm...` at `:363`, alpha's, where
+ * production's `age1av0654...` is at `:531`. It passed only because both are real keys now.
+ *
+ * THE CHECKER'S OWN PARSER, `wranglerConfig` in `apps/worker/scripts/provision-check.mjs`, so this and
+ * the deploy-time checker cannot disagree about a comment. The specifier is a runtime URL for the
+ * reason `apps/worker/test/wrangler-routes.test.ts` gives: the script has no declaration, and a static
+ * import of it does not typecheck.
+ */
+const checker = new URL('apps/worker/scripts/provision-check.mjs', REPO).href;
+const { wranglerConfig } = (await import(checker)) as {
+  wranglerConfig: (root: string) => { env?: { [name: string]: { vars?: { [key: string]: string } } } };
+};
+const productionRecipient = (): string | undefined => wranglerConfig(fileURLToPath(REPO)).env?.['production']?.vars?.['AGE_RECIPIENT'];
 
 /** Every string anywhere under `site`, so a claim is found by its words rather than by its path. */
 const strings = (v: unknown): string[] =>
@@ -60,9 +81,7 @@ test('the Spark line does not say no screen asks while the palette asks', () => 
 test('the hosted backup cell does not promise copies while the sealing key is a placeholder', () => {
   /* `sealerOf` in `apps/worker/src/snapshots.ts` refuses a placeholder recipient before the walk
      starts, so with `age1<production-recipient>` no hosted copy is written at all. */
-  const wrangler = readFileSync(new URL('apps/worker/wrangler.jsonc', REPO), 'utf8');
-  const production = wrangler.slice(wrangler.indexOf('"production"'));
-  const recipient = /"AGE_RECIPIENT":\s*"([^"]*)"/.exec(production)?.[1];
+  const recipient = productionRecipient();
   assert.ok(recipient !== undefined, 'no AGE_RECIPIENT in the production environment of wrangler.jsonc');
 
   const row = site.pricing.compare.rows.find((r) => r[0] === 'Backups');
@@ -70,6 +89,27 @@ test('the hosted backup cell does not promise copies while the sealing key is a 
   const hosted = row[2] ?? '';
   if (recipient.includes('<')) {
     assert.match(hosted, /\byet\b/, `the key is ${recipient}, so no hosted copy is kept, and the cell says "${hosted}"`);
+  }
+});
+
+test('the hosted backup cell does not still wait on a sealing key once production has one', () => {
+  /* `loop/research-site-now.md`, section 3. Production's `AGE_RECIPIENT` became a real `age1` key on
+     54a16ffb (22 September, 20:12) and the cell went on saying "None yet ... once we set the key"
+     for a day, because the check above only speaks while the value is a placeholder and was green
+     either way. This is the other half: a real recipient means the cell must not wait on one, and an
+     empty one, which `sealerOf` takes as a decision to keep unsealed copies, means it must not say
+     the copies are sealed. */
+  const recipient = productionRecipient();
+  assert.ok(recipient !== undefined, 'no AGE_RECIPIENT in the production environment of wrangler.jsonc');
+
+  const row = site.pricing.compare.rows.find((r) => r[0] === 'Backups');
+  assert.ok(row, 'the pricing table has no Backups row');
+  const hosted = row[2] ?? '';
+  if (recipient !== '' && !recipient.includes('<')) {
+    assert.doesNotMatch(hosted, /once we set|None yet/, `production seals to ${recipient.slice(0, 10)}..., and the cell says "${hosted}"`);
+  }
+  if (recipient === '') {
+    assert.doesNotMatch(hosted, /seal/i, `production's AGE_RECIPIENT is empty, so its copies are unsealed, and the cell says "${hosted}"`);
   }
 });
 
