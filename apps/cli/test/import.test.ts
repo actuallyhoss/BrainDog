@@ -236,7 +236,7 @@ test('money: accounts with their balances, bills and income due from the export 
   const p = plan();
   assert.deepEqual(row(p, 'legacy:account:main')!.fields, { name: 'Main current account', kind: 'bank', balance: { amount: 4250000, currency: 'EGP' }, as_of: '2026-09-15', liquid: true });
   assert.deepEqual(row(p, 'legacy:company:mercury:ops:checking')!.fields.balance, { amount: 1250000, currency: 'USD' });
-  assert.deepEqual(skippedItems(p, /gold, certificates/u), ['Gold']);
+  assert.deepEqual(skippedItems(p, /gold, certificate, policy or broker account/u), ['Gold']);
   assert.deepEqual(skippedItems(p, /pending balances/u), ['Stripe pending']);
 
   /* NOTHING IN THE EXPORT SAYS WHICH WAY HOSTING GOES, so it is read from the sign and the row says as much. */
@@ -759,6 +759,7 @@ test('dates become tasks due that day on their project, domains and services go 
     key: 'legacy:date:EV1',
     label: 'Store review window on 2026-09-30',
     fields: { what: 'Store review window', state: 'open', by: '2026-09-30', note: 'Was EV1 in the old tool, a date (deadline).', thing: { $ref: 'legacy:project:lanternly' } },
+    onCreate: ['state', 'done_on'],
   });
   assert.deepEqual(row(p, 'legacy:domain:lanternly.example')!.fields, { name: 'lanternly.example', kind: 'domain', cycle: 'yearly', state: 'live', renews: '2027-01-01', thing: { $ref: 'legacy:project:lanternly' } });
   assert.deepEqual(row(p, 'legacy:service:vm-1')!.fields, { name: 'Game server', kind: 'hosting', cycle: 'monthly', state: 'live', provider: 'example', cost: { amount: 1200, currency: 'USD' } });

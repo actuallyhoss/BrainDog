@@ -37,7 +37,7 @@ import { budgetOf, hostsPath, target, type Target } from './http.ts';
 import { bankHsbcEgPack, holdingsPack } from '@braindog/seed';
 import { pollPack } from '@braindog/seed/usecases/founder-poll';
 
-import { KEY_PREFIX, OPTIONAL, ORDER, draftSetup, holdsKey, PROVIDED_BY, isRef, planLegacyTool, readLegacyTool, readSetup, type Plan, type PlannedRow, type Setup } from './legacy.ts';
+import { KEY_PREFIX, OPTIONAL, ORDER, draftSetup, holdsKey, PROVIDED_BY, isRef, planLegacyTool, readLegacyTool, readSetup, type Plan, type PlannedRow, type Setup, type Skipped } from './legacy.ts';
 import type { AgentIo } from './skills.ts';
 
 import { createClient } from '@braindog/client';
@@ -399,6 +399,8 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
   const spare: string[] = [...new Set((plan.retire ?? []).flatMap((r) => [r.register, r.replaces]).filter((r) => !held.has(r)))];
 
   const absent: string[] = [];
+  /** The "Left out" line for each list the record has not got, by list, so the pack offers below can reword it. */
+  const leftOut = new Map<string, Skipped>();
   /** The fields each list declares, where the record's answer says: see `unheld` below. */
   const declared = new Map<string, Set<string>>();
   /** Every list the record answered for, so the sentence about a missing one can tell an old pack from no pack. */
@@ -499,10 +501,14 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
            could be retired, and one of those would otherwise print a reason with nothing after it. */
         ...absent
           .filter((register) => out.some((r) => r.register === register))
-          .map((register) => ({
-            reason: `This BrainDog has no ${NAMES[register] ?? register} list. ${lead.get(register) ?? `Install ${PROVIDED_BY[register] ?? register} beside Solo founder`}, then run the import again to bring these in`,
-            items: out.filter((r) => r.register === register).map((r) => r.label),
-          })),
+          .map((register) => {
+            const line = {
+              reason: `This BrainDog has no ${NAMES[register] ?? register} list. ${lead.get(register) ?? `Install ${PROVIDED_BY[register] ?? register} beside Solo founder`}, then run the import again to bring these in`,
+              items: out.filter((r) => r.register === register).map((r) => r.label),
+            };
+            leftOut.set(register, line);
+            return line;
+          }),
       ],
     };
     report.plan = plan;
@@ -806,8 +812,11 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
       return;
     }
 
+    /* A FIELD THE ROW NAMES IN `onCreate` WAS ITS FIRST VALUE ONLY (`PlannedRow.onCreate`), and a person may have changed
+       it since: patched, a one-off date he closed early was reopened by the next night's import. */
+    const mine = new Set(row.onCreate ?? []);
     const patch: Record<string, unknown> = {};
-    for (const [field, value] of Object.entries(fields)) if (stable(found.fields[field]) !== stable(value)) patch[field] = value;
+    for (const [field, value] of Object.entries(fields)) if (!mine.has(field) && stable(found.fields[field]) !== stable(value)) patch[field] = value;
     if (Object.keys(patch).length === 0) {
       tally.unchanged++;
       report.outcomes[row.key] = 'unchanged';
@@ -1021,6 +1030,8 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
   const holding = (banks.length > 0 || packs.length > 0) && decide !== null && door.packs ? await door.packs() : null;
   if (holding !== null && !holding.ok && unreachable(holding)) throw new Unreachable();
   const money = holding?.ok ? (holding.value.find((p) => p.id === 'money-core') ?? null) : undefined;
+  /** The packs that are on Decide once the offers are made, filed by this run or by an earlier one: see `leftOut` below. */
+  const onDecide = new Set<string>();
   const offer = async (list: readonly PlannedPack[]): Promise<{ filed: number; before: number; waiting: string[] }> => {
     const tally = { filed: 0, before: 0, waiting: [] as string[] };
     for (const pack of list) {
@@ -1028,6 +1039,7 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
          which leaves nothing on Decide, and `propose` does not refuse a pack the record already holds: reading Decide
          alone filed a second offer of a pack that was already reading his texts (`test/import-bank-pack.test.ts`). */
       if (installs.has(pack.install) || (holding?.ok === true && holding.value.some((p) => p.id === pack.install))) {
+        if (installs.has(pack.install)) onDecide.add(pack.install);
         tally.before++;
         continue;
       }
@@ -1051,12 +1063,24 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
         else report.refused.push({ label: pack.question, register: 'Decide', fix: fixOf(done) });
         continue;
       }
+      onDecide.add(pack.install);
       tally.filed++;
     }
     return tally;
   };
   if (banks.length > 0 && decide !== null) report.banks = await offer(banks);
   if (packs.length > 0 && decide !== null) report.packs = await offer(packs);
+  /**
+   * A LIST WHOSE PACK IS WAITING ON DECIDE IS APPROVED THERE, NOT INSTALLED. The "Left out" line is written before the
+   * packs are offered, so the first run's report said "Packs: 1 filed on Decide for you to approve" and, under it, "This
+   * BrainDog has no Holdings list. Install Holdings beside Solo founder": two instructions for one step, and the second
+   * is not the one he should take (`loop/research-switch-today.md` brief 50-B, `test/import-holdings-lead.test.ts`).
+   * A dry run files nothing and a Money too old holds the offer back, so neither is on Decide and both keep the install.
+   */
+  for (const [register, line] of leftOut) {
+    const pack = [...banks, ...packs].find((p) => p.name === PROVIDED_BY[register] && onDecide.has(p.install));
+    if (pack) line.reason = `This BrainDog has no ${NAMES[register] ?? register} list. Approve "${pack.question}" on Decide, then run the import again to bring these in`;
+  }
   return report;
 }
 
