@@ -113,7 +113,10 @@ class Rec extends DurableObject {
         lines: again && again.ok ? again.value : null,
       });
     }
-    const made = k.createRecord({ id: '${REC}', slug: 'studio', name: 'Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1', email: 'ada@example.test', name: 'Ada' } });
+    /* A CONNECTOR KEY ONLY FOR THE LEASE, because sealedGrant refuses a record that has none before it reads a BLOB,
+       and the export's lines are compared across tests that were written without one. */
+    const keys = scenario === 'vault-lease' ? { keys: { connector: { wrapped: new Uint8Array([7, 7, 7]), nonce: new Uint8Array([6]), kek_id: 'kek_fake' } } } : {};
+    const made = k.createRecord({ id: '${REC}', slug: 'studio', name: 'Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1', email: 'ada@example.test', name: 'Ada' }, ...keys });
     if (!made.ok) return Response.json({ threw: made.refusal.fix });
     sql.exec('CREATE TABLE probe (x TEXT)');
     const rows = () => sql.all('SELECT x FROM probe ORDER BY rowid').map((r) => r.x);
@@ -123,6 +126,17 @@ class Rec extends DurableObject {
           const bound = k.bindGrant(GRANT(), 'p_1');
           const out = await k.export();
           return Response.json({ out: outcome(bound), held: held(sql.one('SELECT ciphertext FROM grant')?.ciphertext), lines: out.ok ? out.value : null });
+        }
+        case 'vault-lease': {
+          /* THE CONNECTOR'S OWN PATH, by the kernel's calls and no SQL: a job that names the grant, leased the way a
+             runner leases it, then opened on the strength of that lease. */
+          const bound = k.bindGrant({ ...GRANT(), sealed_under: 'connector' }, 'p_1');
+          if (!bound.ok) return Response.json({ out: outcome(bound) });
+          k.outbox('pull.fetch', { channel: 'pull', ingest: 'stats', grant: bound.value.id });
+          const [job] = k.leaseOutbox(['pull.fetch'], 1);
+          if (!job) return Response.json({ threw: 'the pull job was not leased' });
+          const out = k.sealedGrant({ outbox: job.id, leasedUntil: job.leasedUntil, grant: bound.value.id }, 'p_1');
+          return Response.json({ out: outcome(out), ciphertext: out.ok ? out.value.grant.ciphertext : null, dek: out.ok ? out.value.dek.wrapped : null });
         }
         case 'bind':
           return Response.json({ out: outcome(k.bindGrant(GRANT(), 'p_1')), grants: k.grants().length });
@@ -235,6 +249,8 @@ type Answer = {
   at?: string | null;
   held?: [string, number[]] | null;
   lines?: string[] | null;
+  ciphertext?: string | null;
+  dek?: string | null;
 };
 
 const run = async (scenario: string, adapter: 'real' | 'delegating' | 'unwrapped' = 'real', body?: unknown) =>
@@ -314,4 +330,19 @@ test('A COPY WRITTEN BEFORE THE REPAIR IS REFUSED ON A DURABLE OBJECT, at the co
   assert.equal(imported.out, 'FILE_MALFORMED', `a file with no vault in it was restored: ${JSON.stringify(imported)}`);
   assert.equal(imported.at, 'grant.ciphertext');
   assert.equal(imported.held, null, 'a refused import left a grant behind');
+});
+
+/* ── the vault, through a connector's lease ───────────────────────────────────────────────────────────────────────── */
+
+/* THE SAME FAULT ON THE DOOR EVERY POLL OPENS. `sealedGrant` hands a leased connector its key as `base64(row.ciphertext)`,
+   and `base64` in `packages/kernel/src/vault.ts` loops to `bytes.length`, which an `ArrayBuffer` does not have: the loop
+   ran no times and the connector was handed `""` under `ok`, so the refusal a runner would have reported never came.
+   The wrapped connector key went out as `""` the same way. Measured on 23 September with `storageSql` taken from
+   `ed350479^`: this case failed on `{ out: 'ok', ciphertext: '', dek: '' }`, and so did the export case above, on its
+   `{},{}` grant line. [7, 7, 7] is `BwcH`. */
+test('A CONNECTOR\'S LEASE OPENS ITS KEY WHOLE ON A DURABLE OBJECT, where the old adapter handed it an empty string', async () => {
+  /* THE RED THIS TEST CAN SEE, kept as an assertion: were the unwrapped adapter ever to answer the bytes, the case below
+     would pass whether or not the wrap was there. */
+  assert.deepEqual(await run('vault-lease', 'unwrapped'), { out: 'ok', ciphertext: '', dek: '' });
+  assert.deepEqual(await run('vault-lease'), { out: 'ok', ciphertext: 'AQID', dek: 'BwcH' });
 });
