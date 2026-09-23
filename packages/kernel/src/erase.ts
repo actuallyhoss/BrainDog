@@ -181,17 +181,26 @@ export function eraseSubjects(deps: EraseDeps, subjects: readonly string[], pers
   /* ── person and member ── */
   let people = 0;
   let members = 0;
+  let phones = 0;
   for (const person of personIds) {
     const held = sql.one<{ n: number }>('SELECT count(*) AS n FROM member WHERE person_id = ?', person)?.n ?? 0;
     sql.exec('DELETE FROM member WHERE person_id = ?', person);
     /* AND WHAT THEY ARRANGED FOR THEMSELVES, which names them by id and is nobody else's. */
     sql.exec('DELETE FROM pref WHERE person_id = ?', person);
+    /* AND EVERY PHONE THAT ASKED TO BE TOLD ON THEIR BEHALF (`push_sub`, migration 14). The substring scan above never
+       reaches it, because an endpoint is a push service's address and names nobody; kept, it was a live way to ring a
+       person the record had just erased, measured by `push.test.ts` before this line. Counted, because a deleted row
+       is a row the erasure touched. */
+    const rung = sql.one<{ n: number }>('SELECT count(*) AS n FROM push_sub WHERE person_id = ?', person)?.n ?? 0;
+    sql.exec('DELETE FROM push_sub WHERE person_id = ?', person);
+    phones += Number(rung);
     members += Number(held);
     sql.exec('UPDATE person SET email = ?, name = ? WHERE id = ?', ERASED, ERASED, person);
     people++;
   }
   bump('person', people);
   bump('member', members);
+  bump('push_sub', phones);
 
   /* ── metric_point: aggregates only; walked so the count is honest ── */
   bump('metric_point', 0);

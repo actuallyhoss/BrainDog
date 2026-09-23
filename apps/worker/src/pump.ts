@@ -15,10 +15,16 @@
 
 import type { OutboxRow } from '@braindog/kernel';
 
-/** What the pump needs of a record, which is the two methods and not the class. */
+/**
+ * What the pump needs of a record, which is the two methods and not the class.
+ *
+ * `result` IS WHAT THE DELIVERY SAID, passed to `ackOutbox` as it came. A push the service called gone is `{ gone: true }`,
+ * and the record drops that subscription in the ack's transaction (`51 §5`). Absent for every delivery that had nothing
+ * to say, which is every kind but that one.
+ */
 export type Leasable = {
   lease(n?: number): Promise<OutboxRow[]>;
-  ack(done: { id: string; state: 'done' | 'failed'; error?: string; leasedUntil?: string }): Promise<void>;
+  ack(done: { id: string; state: 'done' | 'failed'; error?: string; leasedUntil?: string; result?: unknown }): Promise<void>;
 };
 
 /** What the pump needs of a queue message. Cloudflare's `Message` is a superset of it. */
@@ -33,7 +39,7 @@ export type Pass = { sent: number; failed: number; unacked: number };
  * keeps filling is drained by the doorbell rather than by a `while` nobody can stop — and a
  * consumer that looped would hold one invocation open across a customer's entire backlog.
  */
-export async function pump(record: Leasable, deliver: (job: OutboxRow) => Promise<void>, log = warn): Promise<Pass> {
+export async function pump(record: Leasable, deliver: (job: OutboxRow) => Promise<unknown>, log = warn): Promise<Pass> {
   const out: Pass = { sent: 0, failed: 0, unacked: 0 };
 
   for (const job of await record.lease()) {
@@ -42,8 +48,9 @@ export async function pump(record: Leasable, deliver: (job: OutboxRow) => Promis
        SENT email as failed, armed a retry and sent it again. */
     let sent = false;
     let why = '';
+    let result: unknown;
     try {
-      await deliver(job);
+      result = await deliver(job);
       sent = true;
     } catch (e) {
       /* THE MESSAGE AND NEVER THE PAYLOAD. A digest is somebody's overdue invoices; an error line
@@ -57,7 +64,7 @@ export async function pump(record: Leasable, deliver: (job: OutboxRow) => Promis
          and the first worker's late failure arms a retry for a job that already went. */
       await record.ack(
         sent
-          ? { id: job.id, state: 'done', leasedUntil: job.leasedUntil }
+          ? { id: job.id, state: 'done', leasedUntil: job.leasedUntil, ...(result === undefined ? {} : { result }) }
           : { id: job.id, state: 'failed', error: why, leasedUntil: job.leasedUntil },
       );
       if (sent) out.sent++;

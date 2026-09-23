@@ -363,7 +363,13 @@
            record is given its keys once and the moment is the create. `yes` and nothing else turns
            that off, for a host that seals nothing. Set here or with
            `--var PROVISION_WITHOUT_KEYS:yes` on the deploy, as `DEMO_RECORD` above is set. */
-        "PROVISION_WITHOUT_KEYS": ""
+        "PROVISION_WITHOUT_KEYS": "",
+        /* WEB PUSH'S PUBLIC KEY, AND EMPTY IS NO PUSH. It is a var and not a secret because the app hands it to every
+           browser that subscribes. The private half is the secret `VAPID_PRIVATE` (the note at the end of this file),
+           and `notify.push` is leased only when both are set (`delivers` in `src/deliver.ts`), so one without the
+           other leaves pushes `pending`, as they have always been. His step: the pair is generated once per
+           environment, and never by a session in this repository. */
+        "VAPID_PUBLIC": ""
       },
 
       "durable_objects": {
@@ -527,7 +533,13 @@
            record is given its keys once and the moment is the create. `yes` and nothing else turns
            that off, for a host that seals nothing. Set here or with
            `--var PROVISION_WITHOUT_KEYS:yes` on the deploy, as `DEMO_RECORD` above is set. */
-        "PROVISION_WITHOUT_KEYS": ""
+        "PROVISION_WITHOUT_KEYS": "",
+        /* WEB PUSH'S PUBLIC KEY, AND EMPTY IS NO PUSH. It is a var and not a secret because the app hands it to every
+           browser that subscribes. The private half is the secret `VAPID_PRIVATE` (the note at the end of this file),
+           and `notify.push` is leased only when both are set (`delivers` in `src/deliver.ts`), so one without the
+           other leaves pushes `pending`, as they have always been. His step: the pair is generated once per
+           environment, and never by a session in this repository. */
+        "VAPID_PUBLIC": ""
       },
 
       "durable_objects": {
@@ -604,5 +616,13 @@
      DEK every sealed grant was made under — so the only repair is to throw the Directory name away, and 52 §13 has
      no undo for one. `PROVISION_WITHOUT_KEYS` in `vars` is the deliberate exception. It is deliberately not
      listed under `secrets.required`: that key fails the first deploy of an environment while the secret is unset,
-     and unset is a supported state for every door but that one. `KEK_PREV` is not read yet. */
+     and unset is a supported state for every door but that one. `KEK_PREV` is not read yet.
+
+     `VAPID_PRIVATE` IS THE FIFTH, AND WEB PUSH'S SWITCH TOGETHER WITH THE `VAPID_PUBLIC` VAR. It is the 32-byte P-256
+     private key in base64url, the second of the two strings a VAPID key generator prints, put with
+     `wrangler secret put VAPID_PRIVATE --env <environment>` and its public half set as `VAPID_PUBLIC` in the same
+     environment's `vars`. A different pair per environment, so a subscription made on alpha is refused by production.
+     Unset, pushes stay `pending` and nothing else changes; set with a public key from another run, every push
+     dead-letters with a sentence that names both settings (`vapidKeys` in `src/vapid.ts`). Not under
+     `secrets.required`, for the reason `KEK` is not. */
 }

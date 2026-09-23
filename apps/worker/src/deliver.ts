@@ -26,6 +26,7 @@ import type { LeasedSeal, OutboxKind, OutboxRow } from '@braindog/kernel';
 import { fixOf, type Result } from '@braindog/ports';
 
 import { unwrap, type KeyStore } from './keys.ts';
+import { pushHeaders, type PushSend, type Vapid } from './vapid.ts';
 
 /** One message as Email Service takes it: `to` is one address or up to fifty, and `from` is required. */
 export type Mail = { from: string; to: string | string[]; subject: string; text: string };
@@ -49,6 +50,13 @@ export type Transports = {
   post?: ((url: string, body: string, headers: Record<string, string>) => Promise<{ ok: boolean; status: number }>) | undefined;
   /** How a named signing key is opened. Absent, and a post that names one is refused rather than sent bare. */
   open?: OpenPostKey | undefined;
+  /**
+   * Web Push: the VAPID pair as `vapidKeys` read it, the contact address the token names, the POST, and the endpoint
+   * the leased job rings (`leasedTarget`). Absent when this deployment has no keys, and then `delivers` never leases a
+   * push. A string in place of the pair is the sentence `vapidKeys` refused it with, and every push dead-letters with
+   * that sentence rather than a 403.
+   */
+  push?: { vapid: Vapid | string; subject: string; send: PushSend; target: PushTargetOf } | undefined;
 };
 
 /**
@@ -62,10 +70,32 @@ export const SIGNATURE_HEADER = 'x-braindog-signature';
 /** Email Service's own ceiling for `to`, `cc` and `bcc` together. More owners than this is a dead letter that says so. */
 const MAX_RECIPIENTS = 50;
 
-export type Deliver = (job: OutboxRow) => Promise<void>;
+/**
+ * What a delivered job hands back for its ack, for the one kind that has something to say: a push service that
+ * answered 404 or 410 has no such subscription any more, and `51 §5` has the ack carry `{ gone: true }` so the record
+ * drops the row. Every other delivery resolves with nothing.
+ */
+export type Delivered = { gone: true };
+
+/** A deliverer as `pump` takes it: what the ack should carry, or nothing. */
+export type Deliver = (job: OutboxRow) => Promise<Delivered | undefined>;
 
 /** The kinds this host can actually deliver. A kind absent from it dead-letters with a sentence. */
 export const DELIVERS: OutboxKind[] = ['notify.email', 'notify.webhook'];
+
+/**
+ * `DELIVERS`, plus `notify.push` when this deployment holds both VAPID halves.
+ *
+ * BOTH OR NEITHER, AND NEITHER IS TODAY. The public key is a var declared empty in `wrangler.jsonc` and the private
+ * key is a secret he puts in by hand, so for a while one will be set without the other. Leasing a push then would walk
+ * each one up the ladder to a dead letter; not leasing it leaves the row `pending`, which is what an unkeyed deployment
+ * has always done with a push, and it goes the day the second half is set. Whether the two halves are a pair is
+ * `vapidKeys`' question, asked when a push is delivered, because this answer is read on every pass and costs nothing.
+ */
+export function delivers(env: { VAPID_PUBLIC?: string | undefined; VAPID_PRIVATE?: string | undefined }): OutboxKind[] {
+  const keyed = (env.VAPID_PUBLIC ?? '').trim() !== '' && (env.VAPID_PRIVATE ?? '').trim() !== '';
+  return keyed ? [...DELIVERS, 'notify.push'] : DELIVERS;
+}
 
 /**
  * A URL a webhook may be posted to.
@@ -188,8 +218,40 @@ export function leasedOpener(ask: SealAsk, store: () => Promise<KeyStore | null>
   };
 }
 
+/**
+ * The record's half of addressing a push: the endpoint behind the subscription a leased job names, or `null` when its
+ * person has since unsubscribed. Over RPC on the Worker, as `Record$.pushTargetFor`, because the record holds the lease
+ * and `push_sub`, and the endpoint never travels in the job (`packages/kernel/src/push.ts`).
+ */
+export type PushTargetAsk = (args: { outbox: string; leasedUntil: string }) => Promise<Result<{ id: string; endpoint: string } | null>>;
+
+/** The endpoint one leased push rings, or `null` for nobody. A refusal throws its sentence, which is the dead letter's. */
+export type PushTargetOf = (job: OutboxRow) => Promise<string | null>;
+
+/**
+ * An addresser over the record's `pushTarget`, which checks the lease as `sealedGrant` checks it for a key.
+ *
+ * THE REFUSAL IS A FAILURE AND NOT A SKIP. A lease that lapsed while the Worker held it, or one another pass has since
+ * taken, is a job somebody else may be sending right now, so it is acked as failed and the fence in `ackOutbox` decides
+ * whether that answer still counts. A skip acked `done` would close a job this pass did not send.
+ */
+export function leasedTarget(ask: PushTargetAsk): PushTargetOf {
+  return async (job) => {
+    const out = await ask({ outbox: job.id, leasedUntil: job.leasedUntil });
+    if (!out.ok) throw new Error(fixOf(out));
+    return out.value?.endpoint ?? null;
+  };
+}
+
+/**
+ * The deliverer `pump` takes: each kind this host serves, with what its ack should carry.
+ *
+ * ONE KIND HAS SOMETHING TO SAY, and `pump` passes it to `ackOutbox` as `result`: a push the service answered 404 or 410
+ * for comes back `{ gone: true }`, and the record deletes that subscription in the ack's transaction. Every other kind
+ * resolves with nothing, and its ack is the plain `done` it always was.
+ */
 export function makeDeliver(transports: Transports): Deliver {
-  return async (job: OutboxRow): Promise<void> => {
+  return async (job: OutboxRow): Promise<Delivered | undefined> => {
     const payload = read(job.payload);
     /* A PAYLOAD THIS HOST CANNOT READ IS A DEAD LETTER, not a crash and not a silent success. It
        walks the ladder like any other failure and ends as a suggestion somebody can answer. */
@@ -246,6 +308,42 @@ export function makeDeliver(transports: Transports): Deliver {
          never arrived, and the row would be `done` for ever with nothing on the other end. */
       if (!out.ok) throw new Error(`the endpoint answered ${out.status}`);
       return;
+    }
+
+    if (job.kind === 'notify.push') {
+      if (!transports.push) throw new Error('this deployment has no VAPID keys, so it sends no push: set VAPID_PUBLIC and VAPID_PRIVATE');
+      const { vapid, subject, send, target } = transports.push;
+      if (typeof vapid === 'string') throw new Error(vapid);
+      /* ONE SUBSCRIPTION PER JOB, NAMED BY ID (`51 §5`, `payload.sub`), because the ack says whether THAT phone is gone.
+         The job carries the id and never the endpoint: the outbox travels in every `.brain` file and `push_sub` does
+         not, so the address is asked of the record under this job's lease. W58-3 read `sub.endpoint` here while W58-2's
+         kernel wrote `sub.id`, and every push the kernel queued dead-lettered as an address that was not https
+         (`test/push-deliver.test.ts`, measured before this line). */
+      const sub = payload.sub;
+      /* A PAYLOAD WITH NO `sub` AT ALL IS ONE AN OLDER BUILD QUEUED, `{ title, url }`, and records already hold them:
+         they sat `pending` because nothing leased a push. The kernel reads one as nobody to ring (`pushSubOf`), and so
+         does this. It threw here at first, and `test/push-deliver.test.ts` measured `failed: 1` for one such row, which
+         at the eighth attempt is a "could not be delivered" item in Decide for each of them on the day the keys are set.
+         A `sub` that is there and names no id is not that, and stays the dead letter below. */
+      if (sub === undefined) return;
+      const id = sub && typeof sub === 'object' ? text((sub as Record<string, unknown>).id) : '';
+      if (id === '') throw new Error('a notify.push names the subscription it rings, by id, and this one names none');
+      /* NOBODY LEFT TO RING IS DELIVERED. The person unsubscribed, or was erased, after the job was queued. */
+      const address = await target(job);
+      if (address === null) return;
+      /* The endpoint was written by a browser and stored by the record, so it is data somebody else supplied, and it
+         goes through the same `postable()` as a webhook: a push to the metadata service is still a request to it. */
+      const endpoint = postable(address);
+      if (!endpoint) throw new Error('a push goes to an https address on a public host');
+      /* NOTHING FROM THE PAYLOAD BUT THE ID, AND NOTHING FROM THE RECORD BUT THE ADDRESS: the push has no body (`vapid.ts`). */
+      const { status } = await send(endpoint, await pushHeaders(vapid, endpoint, subject));
+      if (status >= 200 && status < 300) return;
+      /* 404 AND 410 ARE THE SERVICE SAYING THE SUBSCRIPTION IS GONE (RFC 8030 §7.3): the app was removed, the
+         permission revoked, the browser reset. Retrying that eight times is eight requests to be told the same, so it
+         is delivered, with the one fact the record needs to stop asking. A 403, a 429 or a 5xx says nothing about the
+         phone and fails as any other post does. */
+      if (status === 404 || status === 410) return { gone: true };
+      throw new Error(`the push service answered ${status}`);
     }
 
     /* NOTHING HERE DELIVERS THIS KIND, said out loud. Silently acking it would make the outbox

@@ -544,7 +544,7 @@ queue(batch):
 | Kind | Does | Lease |
 |---|---|---|
 | `notify.email` | `cfDispatch.email(payload)` → `EMAIL.send(...)` | 60 s |
-| `notify.push` | `cfDispatch.push(payload.sub, { title, url })` — `@pushforge/builder` signs VAPID, `fetch(endpoint)`; a 404/410 acks `done` with `{ gone: true }` so the record drops the subscription | 60 s |
+| `notify.push` | `payload.sub` is `{ id }` and nothing else: one job per subscription, and the endpoint is asked of the record under the job's lease (`pushTarget`, checked as `sealedGrant` is), because the outbox travels in every `.brain` file and `push_sub` is `local`. A POST with no body, signed with VAPID over WebCrypto (`src/vapid.ts`); a 404/410 acks `done` with `{ gone: true }` so the record drops the subscription in the ack's transaction. Leased only where `VAPID_PUBLIC` and `VAPID_PRIVATE` are both set. *(Amended September 24th 2026, W58: this row read `cfDispatch.push(payload.sub, { title, url })` with `@pushforge/builder` signing, a payload that would have carried the phone's address and the notice's words into every export, and a package that is not in the lockfile.)* | 60 s |
 | `notify.webhook` | `cfDispatch.webhook(url, body, sig)` — `sig` = HMAC-SHA-256 under the grant the payload names, unsealed as §5.4 step 3; `redirect: 'manual'`; a 3xx or ≥ 400 is a failure | 60 s |
 | `pull.fetch` | `ingest(decl, { http: cfHttp(), secret })` from `@braindog/connect` — placeholders, `expect:`, cursors, ≤ 2 MB per body, ≤ 50 pages; every page → `arrive({ channel: 'pull', … })`; an `expect:` failure throws without advancing the cursor (25 §9) | 300 s |
 | `export.r2` | §5.12 | 300 s |

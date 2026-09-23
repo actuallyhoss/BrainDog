@@ -219,11 +219,12 @@ test('A 401 IS NEVER RETRIED: the action pauses, an event says so, the owner is 
   assert.equal(sql.all("SELECT 1 FROM schedule WHERE kind = 'retry'").length, 0, 'a retry was armed');
   assert.equal(meters(sql, 'balance')[0]?.outcome, 'paused');
 
-  /* THE EXISTING NOTIFICATION PATH: a note event, and the push and the email it queues. */
+  /* THE EXISTING NOTIFICATION PATH: a note event, and the email it queues. A push is queued one per owner subscription
+     (W58, `push.test.ts`), and nobody on this record has subscribed a phone, so there is none. */
   const note = sql.one<{ note: string }>("SELECT note FROM event WHERE kind = 'note' AND actor = 'ingest:balance'");
   assert.match(note?.note ?? '', /paused/);
   const told = sql.all<{ kind: string }>("SELECT kind FROM outbox WHERE kind IN ('notify.push', 'notify.email') ORDER BY kind").map((r) => r.kind);
-  assert.deepEqual(told, ['notify.email', 'notify.push']);
+  assert.deepEqual(told, ['notify.email']);
 
   /* Hours later, nothing has run. */
   clock.advance(6 * HOUR);

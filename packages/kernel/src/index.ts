@@ -67,6 +67,7 @@ import {
 } from './schedule.ts';
 import { ack, enqueue, lease, unlease, type Ack, type AckDeps, type OutboxKind } from './outbox.ts';
 import { ERASED, eraseSubjects, subjectsOf, type EraseReport, type EraseRequest } from './erase.ts';
+import { leasedPushTarget, ownersPushSubs, pushSubOf, settlePush, type PushSettled, type PushTarget } from './push.ts';
 import { access, invite, members, remove, type Level as MemberLevel, type Member, type MemberDeps, suspend } from './members.ts';
 import {
   GONE as INVITE_GONE,
@@ -261,6 +262,7 @@ export { OUTBOX_KINDS, backoffMs, summary } from './outbox.ts';
 export type { Ack, OutboxKind, OutboxRow } from './outbox.ts';
 export { ERASED } from './erase.ts';
 export type { EraseReport, EraseRequest } from './erase.ts';
+export type { PushJob, PushSettled, PushTarget } from './push.ts';
 export { SCHEDULE_KINDS, drainSchedule, retryHandler } from './schedule.ts';
 export type { CreateRecordArgs, Provisioned, Purged, WrappedKey } from './provision.ts';
 export { GRANT_KINDS, spanMs } from './vault.ts';
@@ -4321,16 +4323,32 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           )
           .map((r) => String(r.email))
           .filter(Boolean),
-      outbox: (kind, payload) => void enqueue(sql, mint, clock.now(), kind, payload),
+      /* A PUSH IS ONE JOB PER OWNER SUBSCRIPTION, `{ sub: { id } }` AND NOTHING ELSE (`51 §5`, `push.ts`). One per phone
+         because the ack says whether THAT phone is gone; by id because the outbox travels in every `.brain` file and
+         `push_sub` does not, so the endpoint comes out only under the lease (`pushTarget` below). And without the title
+         and url `digest.ts` hands in: the Worker sends a push with no body (`apps/worker/src/vapid.ts`), so the words
+         had nowhere to go but into every backup. A record nobody has subscribed on queues no push at all, where it used
+         to queue one row a keyless host would leave `pending` for ever. */
+      outbox: (kind, payload) => {
+        if (kind !== 'notify.push') return void enqueue(sql, mint, clock.now(), kind, payload);
+        for (const id of ownersPushSubs(sql)) enqueue(sql, mint, clock.now(), 'notify.push', { sub: { id } });
+      },
       note: (actor, text) => noteEvent(sql, mint, clock.now(), actor, text),
       delivers: opts.delivers ?? [],
       /* ONE INTERRUPT AN HOUR, PER RECORD (09 §4). Counted over the outbox rather than over a
          counter somebody has to reset: the row IS the interrupt, so a push that was queued and never
          sent still counts — which is the conservative direction, and the only one that is honest
-         about what the person's phone is going to do when the queue drains. */
+         about what the person's phone is going to do when the queue drains.
+
+         AND THE INTERRUPT'S EMAIL COUNTS TOO, BECAUSE A RECORD NOBODY SUBSCRIBED ON QUEUES NO PUSH. Counted over push rows
+         alone, the limit read "never interrupted" on every such record the day a push became one job per subscription,
+         and `push.test.ts` measured two urgent writes in one minute mailing the owner twice. The email an interrupt
+         queues is marked `interrupt` (`interruptDeps` below) so a digest's own email, which is not one, does not hold
+         back the notice that a payment failed. */
       interrupted: () =>
         sql.one<{ n: number }>(
-          "SELECT count(*) AS n FROM outbox WHERE kind = 'notify.push' AND created > ?",
+          `SELECT count(*) AS n FROM outbox WHERE created > ?
+             AND (kind = 'notify.push' OR (kind = 'notify.email' AND json_extract(payload, '$.interrupt') = 1))`,
           instant(clock.now() - 3_600_000),
         )?.n
           ? true
@@ -4338,6 +4356,21 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       mint,
       nowMs: clock.now(),
       tz: recordIdentity(sql)?.tz ?? 'UTC',
+    };
+  };
+
+  /**
+   * What an urgent notice reads through: `digestDeps`, with the email it queues marked as an interrupt.
+   *
+   * THE MARK IS WHAT THE HOUR'S LIMIT COUNTS WHEN NO PUSH WAS QUEUED (`interrupted` above). An email from a digest and
+   * one from an interrupt were otherwise the same row, and counting every email would let Monday's digest silence a
+   * failed payment for the hour after it. The Worker's mailer reads `to`, `subject` and `text` and nothing else.
+   */
+  const interruptDeps = (): DigestDeps => {
+    const deps = digestDeps();
+    return {
+      ...deps,
+      outbox: (kind, payload) => deps.outbox(kind, kind === 'notify.email' ? { ...(payload as Record<string, unknown>), interrupt: true } : payload),
     };
   };
 
@@ -4351,7 +4384,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     sql,
     /* THE ONE ROUTER. A rule that declares `urgent` shows in the install diff as "interrupts you",
        and until now that diff was the only reader of the key — 09 §4 is what it should have meant. */
-    interrupt: (said) => notify(digestDeps(), { ...said, urgent: true }),
+    interrupt: (said) => notify(interruptDeps(), { ...said, urgent: true }),
     /* AND THE ONE ACTION THAT REACHES FORWARD IN TIME. `ON CONFLICT (kind, key) DO UPDATE` so a rule
        that fires twice on one row moves the date rather than arming a second reminder — the same
        idempotence `once_per` gives the firing, applied to what the firing arms. */
@@ -4598,7 +4631,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     nowMs: clock.now(),
     mint,
     enqueue: (payload) => enqueue(sql, mint, clock.now(), 'pull.fetch', payload),
-    notify: (said) => void notify(digestDeps(), { ...said, urgent: true }),
+    notify: (said) => void notify(interruptDeps(), { ...said, urgent: true }),
     ack: (args) => ack(sql, ackDeps(), args),
     lookup: actionDecl,
     arrive: (decl, body, sha256) =>
@@ -4758,7 +4791,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /* THE ONE ROUTER, HANDED IN. 09 §4's rate limit, 09 §3's split between what a push carries and
        what an email does, and the `note` event, are all one function — and a credential expiring is
        one of the three things 09 §5 makes urgent by default. */
-    interrupt: (said) => notify(digestDeps(), { ...said, urgent: true }),
+    interrupt: (said) => notify(interruptDeps(), { ...said, urgent: true }),
   });
 
   async function tail(scheduler: Scheduler): Promise<void> {
@@ -6285,8 +6318,42 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /** Claim up to `n` jobs of these kinds. One statement, so a double drain finds nothing. */
     leaseOutbox: (kinds: readonly OutboxKind[], n = 10) => transaction(() => lease(sql, ackDeps(), kinds, n)),
 
-    /** Finish one. `failed` walks the ladder; the eighth failure is `dead` and opens an item. */
-    ackOutbox: (args: Ack) => transaction(() => ack(sql, ackDeps(), args)),
+    /**
+     * Finish one. `failed` walks the ladder; the eighth failure is `dead` and opens an item.
+     *
+     * AND A PUSH'S ANSWER GOES BACK TO ITS SUBSCRIPTION, IN THE SAME TRANSACTION. `51 §5`: a 404 or 410 means the browser
+     * threw the subscription away, and the deliverer acks that as `done` with `{ gone: true }`, so the row is deleted and
+     * no later push is sent to it; any other `done` marks the row used. Read before `ack` and applied only once it
+     * answered `ok`, so an ack refused by the fence (a lease that is over) deletes nothing: a stale host's 410 is about
+     * a delivery the record no longer counts. Here and not in `outbox.ts`, which is the queue and knows no table but its
+     * own, for the reason `AckDeps` hands `propose` in.
+     */
+    ackOutbox: (args: Ack) =>
+      transaction(() => {
+        const push =
+          args.state === 'done'
+            ? sql.one<{ payload: string }>("SELECT payload FROM outbox WHERE id = ? AND kind = 'notify.push' AND state = 'leased'", args.id)
+            : undefined;
+        const out = ack(sql, ackDeps(), args);
+        const sub = out.ok && push ? pushSubOf(push.payload) : null;
+        if (sub !== null) {
+          const gone = (args.result as { gone?: unknown } | undefined)?.gone === true;
+          settlePush(sql, gone ? { gone: [sub] } : { sent: [sub] }, instant(clock.now()));
+        }
+        return out;
+      }),
+
+    /**
+     * The address a leased `notify.push` rings, or `null` when its person has since unsubscribed. `push.ts` holds the
+     * three lease checks, which are `sealedGrant`'s, and the reason the caller names no subscription.
+     */
+    pushTarget: (args: { outbox: string; leasedUntil: string }): Result<PushTarget | null> => leasedPushTarget(sql, clock.now(), args),
+
+    /**
+     * What a push service said, by subscription id: `sent` marks rows used and `gone` deletes them. `ackOutbox` does this
+     * for a host that acks through it; this is the same write for one that learns the answer some other way.
+     */
+    settlePush: (settled: PushSettled) => transaction(() => settlePush(sql, settled, instant(clock.now()))),
 
     /**
      * Fire everything that is due, once.

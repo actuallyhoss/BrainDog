@@ -264,19 +264,23 @@ test('A DIGEST WITH NOTHING IN IT IS NOT SENT', async () => {
 
 /* ── the channels ────────────────────────────────────────────────────────── */
 
-test('A PUSH CARRIES NO CONTENT, only how many things and where', async () => {
-  // A lock screen is not a place a person chose to read their business on.
+test('A PUSH CARRIES NO CONTENT, only which phone it rings', async () => {
+  /* A lock screen is not a place a person chose to read their business on, and the outbox travels in every `.brain`
+     file. Since W58 a push is one job per owner subscription naming it by id, and the Worker sends it with no body. */
   const { k, sql, clock } = await record(WEEKLY({ channels: ['push'] }));
+  sql.exec(
+    "INSERT INTO push_sub (id, person_id, endpoint, p256dh, auth, created_at) VALUES ('ps_1', 'p_1', 'https://fcm.googleapis.com/fcm/send/p1', 'k', 'a', ?)",
+    new Date(NOW).toISOString(),
+  );
   arm(sql, NOW);
   clock.set(NOW + 1000);
   await k.drain();
 
   const row = outbox(sql)[0]!;
   assert.equal(row.kind, 'notify.push');
-  const payload = JSON.parse(row.payload) as { title: string; url: string };
-  assert.match(payload.title, /Money, weekly: \d+ items/);
-  assert.equal(payload.url, '/digest/money-weekly');
+  assert.deepEqual(JSON.parse(row.payload), { sub: { id: 'ps_1' } });
   assert.ok(!row.payload.includes('Invoice 41'), 'the push carried the content');
+  assert.ok(!row.payload.includes('fcm.googleapis.com'), 'the push carried the address');
   sql.close();
 });
 
@@ -526,6 +530,11 @@ test('`urgent` INTERRUPTS, and that is what the word was for', async () => {
      row, at most one interrupt per hour per record". */
   const { k, sql } = await record(WEEKLY(), false);
   value(await k.install([RULE_URGENT]));
+  /* THE OWNER'S PHONE, because a push is queued one per owner subscription (W58, `push.test.ts`). */
+  sql.exec(
+    "INSERT INTO push_sub (id, person_id, endpoint, p256dh, auth, created_at) VALUES ('ps_1', 'p_1', 'https://fcm.googleapis.com/fcm/send/p1', 'k', 'a', ?)",
+    new Date(NOW).toISOString(),
+  );
 
   value(k.create('obligations', { what: 'Invoice 41', amount: { amount: 1_000, currency: 'GBP' }, state: 'open' }, { actor: 'p_1' }));
 
@@ -534,7 +543,8 @@ test('`urgent` INTERRUPTS, and that is what the word was for', async () => {
   const mail = rows.filter((r) => r.kind === 'notify.email');
   assert.equal(push.length, 1, 'an urgent rule wrote an event and nothing left the record');
   assert.equal(mail.length, 1, 'a push carries one line and no content — the email is the half with the reason');
-  assert.match(JSON.parse(push[0]!.payload).title as string, /Payment failed/);
+  assert.deepEqual(JSON.parse(push[0]!.payload), { sub: { id: 'ps_1' } });
+  assert.match(JSON.parse(mail[0]!.payload).subject as string, /Payment failed/);
   /* AND THE EVENT TOO, always, because it is the record's own memory of the thing having happened
      and what the unread count is counted over. */
   assert.equal(sql.all("SELECT 1 FROM event WHERE kind = 'note' AND actor = 'rule:urgent'").length, 1);

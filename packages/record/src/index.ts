@@ -115,6 +115,7 @@ import {
 } from './automations.ts';
 import { historyCursors, type HistoryCursors } from './history-cursor.ts';
 import { handleOf, isHandle, spokenOf } from './question-handles.ts';
+import { dropPushSub, readPushSub, savePushSub } from './push.ts';
 import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 
 export type { CatalogueEntry, FigureTest, Grows, RowIo } from './arrange.ts';
@@ -1353,6 +1354,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /* ── the vault doors' half ── */
 
   const mintGrant = ulids(() => clock.now());
+  /* A PHONE'S SUBSCRIPTION IS NAMED BY ID IN A `notify.push` JOB, so it gets one of its own (`push.ts`). */
+  const mintPush = ulids(() => clock.now());
 
   /**
    * The key a caller may reach, by spoken id or by label, or `null`.
@@ -4149,6 +4152,39 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const kept = value === null ? null : [...new Set(value as string[])];
       kernel.setPref(ctx.principal.id, args.key, kept);
       return ok({ key: args.key, value: kept });
+    },
+
+    /**
+     * This browser asks to be told when something needs the person using it: the subscription `PushSubscription.toJSON()`
+     * gives, kept in `push_sub` (migration 14) against the person and nobody else.
+     *
+     * A PERSON, NOT A TOKEN, for `setPref`'s reason: a phone is somebody's, and an agent has no lock screen. Any level
+     * may, since what a push says is one fixed line and what it opens is the record the person could already open.
+     * Not an event, because it is not the record's history, and a file carries none of it (`local`).
+     */
+    async subscribePush(args: unknown, ctx: CallContext): Promise<Result<{ endpoint: string; at: string }>> {
+      const stop = guard(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      if (ctx.principal.kind !== 'person') return no('FORBIDDEN', "A push goes to a person's phone, and a token is not a person.", { at: 'principal' });
+      const sub = readPushSub(args);
+      if (!sub.ok) return sub;
+      const person = ctx.principal.id;
+      return ok(kernel.transaction(() => savePushSub(sql, mintPush, person, sub.value, new Date(clock.now()).toISOString())));
+    },
+
+    /**
+     * This browser stops being told. Only the person's own subscription is taken; an endpoint they do not hold answers
+     * `removed: false`, the same as one nobody holds, so the call cannot be used to learn whether somebody else does.
+     */
+    async unsubscribePush(args: { endpoint?: unknown } | undefined, ctx: CallContext): Promise<Result<{ endpoint: string; removed: boolean }>> {
+      const stop = guard(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      if (ctx.principal.kind !== 'person') return no('FORBIDDEN', "A push goes to a person's phone, and a token is not a person.", { at: 'principal' });
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['endpoint']);
+      if (extra) return { ok: false as const, refusal: extra };
+      const endpoint = args?.endpoint;
+      if (typeof endpoint !== 'string' || endpoint === '') return no('REQUIRED_MISSING', 'endpoint is the address this browser subscribed with.', { at: 'endpoint' });
+      return ok({ endpoint, removed: dropPushSub(sql, ctx.principal.id, endpoint) });
     },
 
     /**

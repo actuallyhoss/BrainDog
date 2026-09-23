@@ -27,6 +27,7 @@ import grantSealedUnder0010 from './migrations/0010_grant_sealed_under.ts';
 import automationRun0011 from './migrations/0011_automation_run.ts';
 import script0012 from './migrations/0012_script.ts';
 import inferAsk0013 from './migrations/0013_infer_ask.ts';
+import push0014 from './migrations/0014_push.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -45,6 +46,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 11, slug: 'automation_run', sql: automationRun0011 },
   { version: 12, slug: 'script', sql: script0012 },
   { version: 13, slug: 'infer_ask', sql: inferAsk0013 },
+  { version: 14, slug: 'push', sql: push0014 },
 ];
 
 /**
@@ -61,6 +63,7 @@ export const MIGRATIONS: readonly Migration[] = [
  * Migration 10 adds one `NOT NULL DEFAULT` column to `grant`, which an older file imports without and reads as
  * `'record'` — which is what those rows are — so the format is still 1.
  * Migration 13 rebuilds `outbox` with one more kind; an older file carries only the ten it still takes.
+ * Migration 14 adds `push_sub`, `local`, so no file carries it.
  */
 export const FORMAT_VERSION = 1 as const;
 

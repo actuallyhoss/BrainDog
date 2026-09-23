@@ -32,15 +32,15 @@ const open = async () => {
 test('an empty database becomes a record', async () => {
   const { sql, result } = await open();
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value, { kernel: 13, format: 1, applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] });
+  assert.deepEqual(result.value, { kernel: 14, format: 1, applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14] });
 
   const tables = sql
     .all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
     .map((r) => r.name)
     .filter((n) => !n.startsWith('sqlite_') && !n.startsWith('entry_fts_'));
   // Thirty-one in `30-BLUEPRINT` §1, `invitation` from migration 6, `view` from migration 7, `pref` and `pack_removed` from 9.
-  // Migration 10 adds a column and no table.
-  assert.equal(tables.length, 37, `tables: ${tables.join(', ')}`);
+  // Migration 10 adds a column and no table. Migration 14 adds `push_sub`.
+  assert.equal(tables.length, 38, `tables: ${tables.join(', ')}`);
   for (const wanted of ['record', 'declaration', 'migration', 'counter', 'entry', 'event', 'schedule', 'outbox'])
     assert.ok(tables.includes(wanted), `${wanted} is missing`);
   sql.close();
@@ -52,9 +52,9 @@ test('applying twice applies nothing twice', async () => {
   const first = await applyMigrations(sql, clock);
   const second = await applyMigrations(sql, clock);
   assert.ok(first.result.ok && second.result.ok);
-  assert.deepEqual(first.result.value.applied, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+  assert.deepEqual(first.result.value.applied, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
   assert.deepEqual(second.result.value.applied, [], 'a second run re-applied a migration');
-  assert.equal(sql.all('SELECT version FROM migration').length, 13);
+  assert.equal(sql.all('SELECT version FROM migration').length, 14);
   sql.close();
 });
 
@@ -120,7 +120,7 @@ test('A RECORD CREATED BEFORE MIGRATION 2 TAKES IT ON OPEN, and everything it he
 
   const { result } = await applyMigrations(sql, fixedClock(NOW));
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+  assert.deepEqual(result.value.applied, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
 
   const after = snapshot(sql);
   assert.deepEqual(after.entry, before.entry, 'a row changed');
@@ -187,7 +187,7 @@ test('every table is placed in a section, and every section holds tables', async
   // in code: a table nobody placed would travel or not travel by accident.
   const { sql } = await open();
   const rows = sql.all<{ table_name: string; section: string }>('SELECT table_name, section FROM dog_section');
-  assert.equal(rows.length, 37);
+  assert.equal(rows.length, 38);
   /* FIVE, not four: `origin` is its own section because a `.brain` can be exported without the raw
      inbound material an ingest kept — an email body is a customer's mail, not their record. */
   assert.deepEqual(
@@ -274,6 +274,7 @@ test('AN APPLIED MIGRATION IS NEVER EDITED, so each checksum is pinned here', as
     '173a692f24bb00387fcfd6907d43a0c9fe1d3d9fbbfc9b3e4ef433a3738be87f',
     'a8d8837345552ba259423346f3cdbe109f6ca73f0d2d0da143e1ef8751f260b2',
     '4f26cd437a0d4d5e454477c5428f57e96b749cfecdf8c08822f3d798e57bd185',
+    '5ed69b795dc9170533c90d3f49108bf0556c362db3524866ab411d7653a25a1a',
   ]);
 });
 
@@ -295,7 +296,7 @@ test('MIGRATION 4 REBUILDS device_grant: every row copied, a seventh reach, and 
 
   const { result } = await applyMigrations(sql, clock);
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+  assert.deepEqual(result.value.applied, [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
   assert.deepEqual(
     { ...sql.one<Record<string, unknown>>('SELECT id, code_hash, status, reach, label, tries, scope FROM device_grant') },
     { id: 'fake-poll-id', code_hash: 'fake-hash', status: 'denied', reach: 'runner', label: 'old-box', tries: 5, scope: null },
@@ -322,7 +323,7 @@ test('MIGRATION 13 REBUILDS outbox: every row copied, and infer.ask admitted', a
 
   const { result } = await applyMigrations(sql, clock);
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [13]);
+  assert.deepEqual(result.value.applied, [13, 14]);
   assert.deepEqual(
     { ...sql.one<Record<string, unknown>>('SELECT id, kind, state, attempts FROM outbox') },
     { id: 'j1', kind: 'script.run', state: 'failed', attempts: 3 },
@@ -330,6 +331,20 @@ test('MIGRATION 13 REBUILDS outbox: every row copied, and infer.ask admitted', a
   sql.exec("INSERT INTO outbox (id, created, kind, payload) VALUES ('j2', 'x', 'infer.ask', '{}')");
   assert.throws(() => sql.exec("INSERT INTO outbox (id, created, kind, payload) VALUES ('j3', 'x', 'infer.guess', '{}')"), /CHECK/);
   assert.equal(sql.all("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'outbox_ready'").length, 1);
+  sql.close();
+});
+
+test('MIGRATION 14 ADDS push_sub IN THE local SECTION, one row per person per endpoint', async () => {
+  const { sql, result } = await open();
+  assert.ok(result.ok, fixOf(result));
+  /* `local` IS THE WHOLE PROMISE that an endpoint never leaves in a `.brain` file: `exportBrainl` reads this row and
+     nothing else to decide, so a table placed anywhere else would travel. */
+  assert.equal(sql.one<{ section: string }>("SELECT section FROM dog_section WHERE table_name = 'push_sub'")?.section, 'local');
+  const add = (id: string, person: string) =>
+    sql.exec("INSERT INTO push_sub (id, person_id, endpoint, p256dh, auth, created_at) VALUES (?, ?, 'https://push.test/one', 'k', 'a', 'x')", id, person);
+  add('s1', 'p_ada');
+  add('s2', 'p_bo');
+  assert.throws(() => add('s3', 'p_ada'), /UNIQUE/, 'one person saved one endpoint twice');
   sql.close();
 });
 

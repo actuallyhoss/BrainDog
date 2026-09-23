@@ -910,6 +910,14 @@ export function createClient(options: ClientOptions) {
     /** The reader's own rail: `nav.order` or `nav.hidden`, a list of addresses, or `null` to take it away. */
     setPref: (key: 'nav.order' | 'nav.hidden', value: string[] | null) =>
       call<{ key: string; value: string[] | null }>('setPref', { key, value }),
+    /**
+     * This browser asks to be told, with what `PushSubscription.toJSON()` gave, passed as it is: the record takes that
+     * shape, `expirationTime` included, so nothing between the browser and the record reshapes a key.
+     */
+    subscribePush: (sub: { endpoint: string; expirationTime?: number | null; keys: { p256dh: string; auth: string } }) =>
+      call<{ endpoint: string; at: string }>('subscribePush', sub as Record<string, unknown>),
+    /** This browser stops being told. `removed` is false for an endpoint the reader does not hold. */
+    unsubscribePush: (endpoint: string) => call<{ endpoint: string; removed: boolean }>('unsubscribePush', { endpoint }),
 
     /* A RUN'S THREE. `attach` and `handoff` are an agent's, and the host reads which run from the session
        headers the caller's own `fetch` sends; `sessionsLive` is anybody's who may read the register. */
