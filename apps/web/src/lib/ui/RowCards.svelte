@@ -28,6 +28,7 @@
   import type { Snippet } from 'svelte';
   import { leadingCode, symbolFigure, TONES } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
+  import { valueSaid } from '$lib/voice.ts';
   import { NOW, REGISTERS, dirOf, display, identityFor, toneOf } from '$lib/record/api.ts';
   import type { Entry } from '$lib/record/schema.ts';
   import type { Names } from '$lib/record/remote.ts';
@@ -119,8 +120,17 @@
 
   /* A declared value is set in sentence case by the stylesheet, as the filter pills are. */
   const isEnum = (field: string) => decl?.fields.find((f) => f.id === field)?.type === 'enum';
-  /* And spelled as a word: the stylesheet can raise a first letter, and it cannot make `saas` SaaS. */
-  const worded = (field: string, said: string) => (isEnum(field) && said ? copy.valueWord(said) : said);
+  /* And spelled as a word: the stylesheet can raise a first letter, and it cannot make `saas` SaaS.
+     FROM THE STORED VALUE AND NOT FROM WHAT `display` SAID, through `valueSaid` as the form draws it. This ran
+     `copy.valueWord` over the label, which is the identity for every value label the seed ships (none starts lower
+     case), so no card drawn today changes. It was not for every label an owner can type: `valueWord` of `iPhone repairs` is `IPhone repairs`,
+     measured, though the `::first-letter` rule below raises that same letter on screen, so only the text changes. What
+     this buys is one function for a value's word on the form and the card, so the two cannot drift
+     (`enum-label-sites.test.ts`). */
+  const worded = (field: string, value: unknown, said: string) => {
+    const f = decl?.fields.find((x) => x.id === field);
+    return f?.type === 'enum' && typeof value === 'string' && said ? valueSaid(f, value) : said;
+  };
 
   /* The tick's accessible name. `copy.ts` holds every sentence (`50 §3`) and this is one. */
   const selectedLabel = copy.selected;
@@ -179,7 +189,7 @@
             {#if toneFor(e)}
               <span class="glyph" role="img" aria-label={TONES[toneFor(e)!].label}>{TONES[toneFor(e)!].glyph}</span>
             {/if}
-            {#each detail.map((f) => [f, worded(f, display(register, f, e.fields[f], now, names) ?? '')] as const).filter(([, said]) => said) as [field, said], i (field)}
+            {#each detail.map((f) => [f, worded(f, e.fields[f], display(register, f, e.fields[f], now, names) ?? '')] as const).filter(([, said]) => said) as [field, said], i (field)}
               {#if i > 0}<span aria-hidden="true">{' · '}</span>{/if}<span dir={dirOf(register, field)} data-enum={isEnum(field) ? '' : undefined}>{@render amount(said)}</span>
             {/each}
           </span>

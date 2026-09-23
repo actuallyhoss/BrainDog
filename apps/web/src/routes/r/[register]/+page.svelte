@@ -22,6 +22,7 @@
   import { Table } from 'braindog-render/svelte';
   import { declaredValue } from '$lib/record/where.ts';
   import { copy } from '$lib/copy.ts';
+  import { valueSaid } from '$lib/voice.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import * as pref from '$lib/pref.ts';
   import { covered, silenced, typing as isTyping } from '$lib/a11y/keys.svelte.ts';
@@ -1133,7 +1134,7 @@
    * it would be rather than claiming the move happened.
    */
   function setRowState(seq: number, state: string) {
-    const said = state.replace(/_/g, ' ');
+    const said = saidInLine(decl?.state ?? '', state);
     const field = decl?.state;
     if (!sample && seq > 0 && field) {
       const was = asked;
@@ -1202,6 +1203,17 @@
 
 
   const fieldOf = (field: string) => decl?.fields.find((f) => f.id === field);
+  /**
+   * A declared value inside a sentence or a state menu: the label the field carries, else the value in lower case, which
+   * is what `display` says for a saved row's.
+   *
+   * THESE SITES SPELT THE STORED VALUE AND READ NO LABEL, so a household's row menu on Things offered "Set to building"
+   * where the list's own rows read Active (Personal's label for `things.lane.building`), and a saved view's title named a value the list never shows (`ui/enum-label-sites.test.ts`). It is
+   * lower case where there is no label because these are the words inside "Set to …" and "rows set to …"; a pill, a
+   * segment or an option says its value alone and draws through `valueSaid`. A title with a label in it still reads
+   * back: `where.ts` `declaredValue` takes a value by its label.
+   */
+  const saidInLine = (field: string, value: string): string => fieldOf(field)?.labels?.[value] ?? value.replace(/_/g, ' ');
   const editableHere = (field: string) => EDITABLE.has(fieldOf(field)?.type ?? '');
 
   /** Why a cell is not the editor, in the reader's words rather than as a type name. */
@@ -1897,7 +1909,7 @@
    * eight racing answers. The toast says how many landed and, when one did not, the first reason.
    */
   async function setPickedState(state: string) {
-    const said = state.replace(/_/g, ' ');
+    const said = saidInLine(decl?.state ?? '', state);
     const field = decl?.state;
     if (sample || !field) {
       toasts.push(copy.notWritten(`${picked.length} rows would be set to ${said}`), { intent: 'warn' });
@@ -1971,7 +1983,7 @@
     }
     const clauses = filters.map((f) => {
       const field = decl.fields.find((d) => d.id === f.field);
-      return copy.filterClause(field ? labelOf(field) : f.field, f.values.map((v) => v.replace(/_/g, ' ')), f.op);
+      return copy.filterClause(field ? labelOf(field) : f.field, f.values.map((v) => saidInLine(f.field, v)), f.op);
     });
     const title = copy.viewTitle(decl.name, copy.filterReads(q ? [...clauses, `"${q}"`] : clauses));
     const back = `${page.url.pathname}${page.url.search}`;
@@ -2231,7 +2243,7 @@
         beside it: two controls that fit any phone, with nothing out of sight.
       -->
       {#if rowsAsCards() && enums.length}
-        {@const chosen = enums.flatMap((f) => (f.values ?? []).filter((value) => isOn(f.id, value)))}
+        {@const chosen = enums.flatMap((f) => (f.values ?? []).filter((value) => isOn(f.id, value)).map((value) => valueSaid(f, value)))}
         <button
           type="button"
           class="sift sift-sheet tap"
@@ -2241,7 +2253,7 @@
         >
           <Icon name="filter" size="s" />
           <span class="sift-name">{copy.filter}</span>
-          {#if chosen.length}<span class="sift-chosen">{chosen.map((value) => copy.valueWord(value)).join(', ')}</span>{/if}
+          {#if chosen.length}<span class="sift-chosen">{chosen.join(', ')}</span>{/if}
         </button>
       {:else if enums.length >= 3}
         {#each enums as f}
@@ -2250,7 +2262,7 @@
             {#snippet trigger()}
               <span class="sift" data-on={chosen.length ? '' : undefined}>
                 <span class="sift-name">{labelOf(f)}</span>
-                {#if chosen.length}<span class="sift-chosen">{chosen.map((value) => copy.valueWord(value)).join(', ')}</span>{/if}
+                {#if chosen.length}<span class="sift-chosen">{chosen.map((value) => valueSaid(f, value)).join(', ')}</span>{/if}
                 <span class="sift-open"><Icon name="chevron" size="s" /></span>
               </span>
             {/snippet}
@@ -2264,7 +2276,7 @@
                 onclick={() => toggleFilter(f.id, value)}
               >
                 <span class="mi-tick">{#if on}<Icon name="check" size="s" />{/if}</span>
-                <span class="mi-name">{copy.valueWord(value)}</span>
+                <span class="mi-name">{valueSaid(f, value)}</span>
                 <span class="segment-n">{facets.get(f.id)?.get(value) ?? 0}</span>
               </button>
             {/each}
@@ -2287,7 +2299,7 @@
                 aria-pressed={on ? 'true' : 'false'}
                 onclick={() => toggleFilter(f.id, value)}
               >
-                <span class="segment-word">{copy.valueWord(value)}</span>
+                <span class="segment-word">{valueSaid(f, value)}</span>
                 <span class="segment-n">{facets.get(f.id)?.get(value) ?? 0}</span>
               </button>
             {/each}
@@ -2415,7 +2427,7 @@
                   type="button"
                   onclick={() => void setPickedState(state)}
                 >
-                  <span class="mi-name">{state.replace(/_/g, ' ')}</span>
+                  <span class="mi-name">{saidInLine(decl?.state ?? '', state)}</span>
                 </button>
               {/each}
             </Menu>
@@ -2617,7 +2629,7 @@
                     }
                   }}
                 >
-                  {#each f.values ?? [] as v}<option value={v}>{v.replace(/_/g, ' ')}</option>{/each}
+                  {#each f.values ?? [] as v}<option value={v}>{valueSaid(f, v)}</option>{/each}
                 </select>
               {:else}
                 <!-- svelte-ignore a11y_autofocus -->
@@ -3043,7 +3055,7 @@
                   onclick={() => toggleFilter(f.id, value)}
                 >
                   <span class="filter-box" aria-hidden="true">{on ? '✓' : ''}</span>
-                  {copy.valueWord(value)}
+                  {valueSaid(f, value)}
                   <span class="filter-n">{facets.get(f.id)?.get(value) ?? 0}</span>
                 </button>
               {/each}
@@ -3102,7 +3114,7 @@
         {#each states.filter((v) => v !== rowAt(seq)?.fields[decl.state ?? '']) as state}
           <button class="mi" role="menuitem" type="button" onclick={() => setRowState(seq, state)}>
             <Icon name="check" size="s" />
-            <span class="mi-name">{copy.setTo(state.replace(/_/g, ' '))}</span>
+            <span class="mi-name">{copy.setTo(saidInLine(decl?.state ?? '', state))}</span>
           </button>
         {/each}
         <hr class="mi-rule" />
