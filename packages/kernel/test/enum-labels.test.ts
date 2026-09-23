@@ -62,7 +62,10 @@ test('A LABEL THAT READS AS ANOTHER VALUE IS REFUSED, because a filter saying it
   assert.equal(blank.ok, false);
 });
 
-test('A LABELLED ENUM SORTS BY THE LABEL THE COLUMN SHOWS, and pages the same way', async () => {
+/* THIS PINNED A TO Z BY LABEL AND NOW PINS THE DECLARED ORDER (W56-3, his call 1 taken as the survey's default). It asserted
+   `'Money in comes before Money out'`, `owed_to_me` first ascending, because Money in is the earlier label; `values` is
+   `['owed_by_me', 'owed_to_me']`, so declared order puts `owed_by_me` first. `enum-order.test.ts` holds the rule. */
+test('A LABELLED ENUM SORTS IN THE ORDER ITS VALUES WERE DECLARED, not by its labels, and pages the same way', async () => {
   const k = await openRecord(openSqlite(), fixedClock(NOW));
   assert.ok((await k.install([money(LABELS)])).ok);
   for (const [what, direction] of [['Rent', 'owed_by_me'], ['Invoice', 'owed_to_me'], ['Tax', 'owed_by_me'], ['Retainer', 'owed_to_me']] as const)
@@ -72,10 +75,10 @@ test('A LABELLED ENUM SORTS BY THE LABEL THE COLUMN SHOWS, and pages the same wa
     assert.ok(out.ok, JSON.stringify(out));
     return out.value.rows.map((r) => r.fields.direction);
   };
-  assert.deepEqual(order('asc'), ['owed_to_me', 'owed_to_me', 'owed_by_me', 'owed_by_me'], 'Money in comes before Money out');
-  assert.deepEqual(order('desc'), ['owed_by_me', 'owed_by_me', 'owed_to_me', 'owed_to_me']);
+  assert.deepEqual(order('asc'), ['owed_by_me', 'owed_by_me', 'owed_to_me', 'owed_to_me'], 'owed_by_me is declared first');
+  assert.deepEqual(order('desc'), ['owed_to_me', 'owed_to_me', 'owed_by_me', 'owed_by_me']);
 
-  /* PAGED TWO AT A TIME, the cursor compares the label too, so no row is lost or repeated. */
+  /* PAGED TWO AT A TIME, the cursor compares the position too, so no row is lost or repeated. */
   const first = k.list({ register: 'money', order: [{ field: 'direction', dir: 'asc' }], limit: 2 });
   assert.ok(first.ok && first.value.cursor);
   const second = k.list({ register: 'money', order: [{ field: 'direction', dir: 'asc' }], limit: 2, cursor: first.value.cursor! });

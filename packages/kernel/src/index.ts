@@ -2744,24 +2744,43 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
             allowed: addressable(schema),
           });
         const dir = o.dir === 'asc' ? 'ASC' : 'DESC';
-        /* AN ENUM WITH LABELS SORTS BY THE LABEL, which is what the column shows: `owed_by_me` is Money out,
-           and ordered by the stored word it came before Money in. The browser's list sorts the same way. */
-        const labels = Object.hasOwn(schema.fields, o.field) ? schema.fields[o.field]?.labels : undefined;
+        /**
+         * AN ENUM SORTS BY ITS POSITION IN `values`, THE ORDER IT WAS DECLARED IN, and it sorted A to Z. By the label
+         * where it had one and by the stored word where it did not, so `tasks.priority`, declared `urgent, high, normal,
+         * low`, answered High, Low, Normal, Urgent ascending, and `tasks.state`, which labels two of its seven values,
+         * put Later between Dropped and Open (`loop/research-living-in-it.md` section 5, measured at 07ba6dbd).
+         *
+         * THIS IS HIS CALL 1 IN THAT SURVEY'S SECTION 8, TAKEN FOR HIM AS ITS DEFAULT, AND IT IS REVERSIBLE. A to Z matched
+         * the words in the column; declared order matches the order the author wrote them in, which for a priority or a
+         * lifecycle is the order a reader means. Going back is this one expression and `compareRows` in
+         * `apps/web/src/lib/record/api.ts`; nothing stored changes either way, because the column keeps the id.
+         *
+         * THE LABELS DO NOT ENTER INTO IT, since they are drawn in the same order. A missing value stays `NULL`, so it
+         * sorts last as every empty value does below; a word outside `values` sorts after every declared one. The
+         * expression is a sort key like any other, so the cursor carries the position and the pages stay gap-free.
+         */
+        const field = Object.hasOwn(schema.fields, o.field) ? schema.fields[o.field] : undefined;
+        const declared = field?.type === 'enum' && field.values?.length ? field.values : null;
         const quote = (v: string) => `'${v.replaceAll("'", "''")}'`;
-        const expr = labels && Object.keys(labels).length
-          ? `(CASE ${fieldSqlIn(schema, o.field)} ${Object.entries(labels).map(([v, l]) => `WHEN ${quote(v)} THEN ${quote(l)}`).join(' ')} ELSE ${fieldSqlIn(schema, o.field)} END)`
-          : fieldSqlIn(schema, o.field);
+        const at = fieldSqlIn(schema, o.field);
+        const expr = declared
+          ? `(CASE WHEN ${at} IS NULL THEN NULL ${declared.map((v, i) => `WHEN ${at} = ${quote(v)} THEN ${i}`).join(' ')} ELSE ${declared.length} END)`
+          : at;
         /* ONE RULE IN BOTH ENGINES (`apps/web/src/lib/record/api.ts` `compareRows`). MONEY GROUPS BY CURRENCY, THEN AMOUNT:
            there is no order between two currencies, and by amount alone GBP 50 sat between two dollar figures. TEXT SORTS
            WITHOUT REGARD TO CASE, the stored text breaking a tie, so a mixed-case column reads in one order here and in the
            sample. Every key is also a cursor key, compared with the same collation, so the pages stay gap-free. */
-        const type = Object.hasOwn(schema.fields, o.field) ? schema.fields[o.field]?.type : undefined;
+        const type = field?.type;
+        /* A POSITION IS A NUMBER, so the enum's case-folded twin key is left off: it would be the same integer twice,
+           carried in every cursor. */
         const exprs =
           type === 'money'
             ? [`json_extract(fields, '${jsonPath(o.field)}.currency')`, expr]
-            : type !== undefined && TEXT_SORTED.has(type)
-              ? [`(${expr} COLLATE NOCASE)`, expr]
-              : [expr];
+            : declared
+              ? [expr]
+              : type !== undefined && TEXT_SORTED.has(type)
+                ? [`(${expr} COLLATE NOCASE)`, expr]
+                : [expr];
         for (const e of exprs) {
           /* AN EMPTY VALUE GOES LAST, IN EITHER DIRECTION. SQLite puts `NULL` first ascending, so a table sorted by an optional
              day led with every row that has none; the sample put them last both ways, and last is the one a reader wants. */

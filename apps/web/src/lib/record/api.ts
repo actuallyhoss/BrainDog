@@ -918,11 +918,26 @@ function compareRows(register: string, a: Entry, b: Entry, field: string, sign: 
    * as any other text, for the same reason.
    */
   const decl = REGISTERS[register]?.fields.find((f) => f.id === field);
-  /* AND AN ENUM WITH LABELS SORTS BY THEM, for the same reason: `owed_by_me` is Money out on screen. */
-  if (decl?.type === 'ref' || (decl?.type === 'enum' && decl.labels)) {
+  if (decl?.type === 'ref') {
     const sx = display(register, field, x, NOW, names) ?? '';
     const sy = display(register, field, y, NOW, names) ?? '';
     return textOrder(sx, sy) * sign;
+  }
+
+  /**
+   * AN ENUM SORTS BY ITS POSITION IN `values`, as the record's `list` does, and it sorted by the label where it had one
+   * and the stored word where it did not. `tasks.priority` read High, Low, Normal, Urgent ascending, and the sample's
+   * tasks by state put Later (`backlog`) after Dropped. Declared order is his call 1 in
+   * `loop/research-living-in-it.md` section 8, taken for him as the survey's default and reversible here and in the
+   * kernel's `list`. A word outside `values` goes after every declared one, and an empty value has gone last above.
+   */
+  const declared = decl?.type === 'enum' ? decl.values : undefined;
+  if (declared?.length) {
+    const at = (v: unknown): number => {
+      const i = declared.indexOf(String(v));
+      return i < 0 ? declared.length : i;
+    };
+    return (at(x) - at(y)) * sign;
   }
 
   /* TEXT SORTS WITHOUT CASE, everything else compares. `<` on strings alone put every capital above every lowercase,

@@ -211,12 +211,22 @@ test('a filter and a query are both applied', () => {
  */
 
 /** What the reader compares, per kind of column. Money is a magnitude; a day is its ISO text; a
-    ref, an enum and a bool are the words drawn in the cell, not the values behind them. */
+    ref and a bool are the words drawn in the cell, not the values behind them. */
 function readerKey(register: string, field: string, e: Entry): number | string | null {
   if (field === 'seq') return e.seq;
   const raw = e.fields[field];
   if (raw === null || raw === undefined) return null;
-  const type = REGISTERS[register]?.fields.find((f) => f.id === field)?.type;
+  const decl = REGISTERS[register]?.fields.find((f) => f.id === field);
+  const type = decl?.type;
+  /* AN ENUM IS ITS POSITION IN `values`, the order its author declared (W56-3). This helper returned the drawn word, so
+     the sweep pinned A to Z and went red in twelve registers, each on an enum column, the moment both engines moved to declared order:
+     `tasks.state` ascending "puts doing after open", which is exactly the order declared. The position is still a
+     function of what is on the screen, since each word stands for one value; a word outside `values` goes after every
+     declared one, as `compareRows` and the kernel's `CASE ... ELSE` put it. */
+  if (decl?.type === 'enum' && decl.values?.length) {
+    const i = decl.values.indexOf(String(raw));
+    return i < 0 ? decl.values.length : i;
+  }
   if (type === 'money') return (raw as { amount: number }).amount;
   if (type === 'int' || type === 'decimal' || type === 'duration') return Number(raw);
   if (type === 'day' || type === 'instant') return String(raw);
