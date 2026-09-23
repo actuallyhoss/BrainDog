@@ -1,13 +1,20 @@
 /**
  * Spark on the Worker: the model hookup and the daily look (`loop/research-spark.md` S15, `docs/46` §5.9).
  *
- * THE PERSON'S OWN KEY, NEVER AN OPERATOR'S. A hosted record has no operator key for Spark: `SPARK_ENDPOINT` and `SPARK_MODEL`
- * name where to ask, and the key is the one the person put in their vault under the label `spark`, opened in the Worker
- * through `KEK` on each call (`actions.ts` `keyOpener`, one `grant.read` event each time) and dropped when the call returns.
- * The builder is `@braindog/host/spark`'s, the one the self-host uses, so the two hosts cannot drift.
+ * TWO WAYS TO A MODEL, AND THE PERSON'S OWN ENDPOINT WINS. Where `SPARK_ENDPOINT` is set, it and `SPARK_MODEL` name where to
+ * ask, and the key is the one the person put in their vault under the label `spark`, opened in the Worker through `KEK` on
+ * each call (`actions.ts` `keyOpener`, one `grant.read` event each time) and dropped when the call returns. A hosted record
+ * has no operator key for that path. The builder is `@braindog/host/spark`'s, the one the self-host uses, so the two hosts
+ * cannot drift. Where it is empty, the model is the INCLUDED one (`includedInference` below): Workers AI through `AI`,
+ * which spends the Cloudflare account's neurons and opens no key at all.
  *
- * NO `KEK`, NO MODEL. Unbound, no vault key can be opened, so no model is built, `/api/version` says `spark: false`, and
- * Spark's own rules draft.
+ * NO `KEK`, NO ENDPOINT MODEL. Unbound, no vault key can be opened, so the endpoint path builds nothing, `/api/version` says
+ * `spark: false`, and Spark's own rules draft. The included model does not read `KEK`.
+ *
+ * THE INCLUDED MODEL IS SWITCHED ON BY `SPARK_INCLUDED`, NOT BY THE BINDING. `AI` is bound in both environments already
+ * (`wrangler.jsonc`, since `src/inference.ts` was written) and `deploy.yml` deploys production on every green `ci`, so a
+ * model keyed on the binding alone would have started spending his account at the first deploy of the commit that built it.
+ * Spending it is his call (`loop/research-living-in-it.md` section 8, call 2), so it takes a var no environment declares.
  *
  * TWO FEATURES SHARE THE NAME AND THIS FILE NOW BUILDS BOTH. `workerSparkModel` is the model behind the RECORD's Spark, which
  * proposes how a BrainDog is ARRANGED; `workerSparkEngine` is `@braindog/spark`, `docs/46`'s engine, which answers a typed
@@ -26,8 +33,12 @@
  */
 
 import {
+  SPARK_INSTRUCTIONS,
   SPARK_KEY_LABEL,
+  SPARK_PLAN_INSTRUCTIONS,
+  SparkAnsweredError,
   SparkKeyClosedError,
+  answerOf,
   sparkAskerEngine,
   sparkByokFor,
   sparkFromEnv,
@@ -40,6 +51,7 @@ import {
   sparkNamedEngine,
   sparkRecord,
   type SparkHostDeps,
+  type SparkInference,
 } from '@braindog/host/spark';
 import type { OpenKey } from '@braindog/host/actions';
 import { sparkAskDoor, type SparkAskDoor } from '@braindog/host';
@@ -50,9 +62,128 @@ import type { CallContext, RecordApi, SparkModel } from '@braindog/record';
 import type { Spark } from '@braindog/spark';
 
 import { keyOpener } from './actions.ts';
+import { aiInference, type AiBinding, type JsonSchema } from './inference.ts';
 import { isBound, type KekBinding } from './keys.ts';
 
-export type SparkEnv = { SPARK_ENDPOINT?: string | undefined; SPARK_MODEL?: string | undefined; KEK?: KekBinding | undefined };
+export type SparkEnv = {
+  SPARK_ENDPOINT?: string | undefined;
+  SPARK_MODEL?: string | undefined;
+  KEK?: KekBinding | undefined;
+  /** Workers AI, and the gateway its calls go through (`inference.ts` `AiEnv`). */
+  AI?: AiBinding | undefined;
+  AI_GATEWAY?: string | undefined;
+  /** `yes` to answer Spark with the included model where no endpoint is set. Anything else, including unset, is off. */
+  SPARK_INCLUDED?: string | undefined;
+};
+
+/* ── the included model ───────────────────────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * The most one included call may spend, in neurons, checked by `aiInference` BEFORE the call against its worst case.
+ *
+ * THE NUMBER IS HIS TO CHANGE (`loop/research-living-in-it.md` section 8, call 2), and this is the survey's default. One
+ * conversational turn on `glm-5.3-flash`, 12,000 tokens in and 1,500 out, is 231.8 neurons or $0.00255 (`inference.ts`,
+ * the rate table's comment). 2,500 is about ten and a half such turns, and 2,500 × $0.011 / 1,000 is $0.0275 at most.
+ *
+ * IT STOPS A RUNAWAY AND NOTHING ELSE. The package caps its own prompts at 12,000 tokens in and 2,048 out, 256.7 neurons at
+ * the most, so no package call comes near it; the package's monthly `ask_cap` is what bounds those. What it does stop is the
+ * record's own `draft`, whose reading has no cap of its own: with 2,048 tokens out (93.1 neurons) it refuses a prompt past
+ * about 176,500 tokens, some 700 KB, and the rules draft instead. That `draft` is not counted by `ask_cap` at all, and the
+ * daily look asks it once a UTC day per record, so this ceiling is the whole bound on that call.
+ */
+export const INCLUDED_NEURONS_PER_CALL = 2_500;
+
+/** The routing name the record's own asks go by: every template of the package asks the same (`prompts.ts`). */
+const INCLUDED_MODEL = 'glm-5.3-flash';
+
+/** The record's `draft` and `form` send no `max_tokens` on the endpoint path; here one is needed, and this is the package's largest. */
+const RECORD_TOKENS = 2_048;
+
+/* THE SCHEMAS THE RECORD'S TWO ASKS ANSWER, TOP LEVEL ONLY, because `aiInference` checks the top level and the record checks
+   the rest (`fromModel`, `formedRows`). Whether `glm-5.3-flash` honours an open object under `strict: true` was not measured
+   here: no test spends a neuron, so the first alpha answer after the switch is the measurement. */
+const DRAFTS: JsonSchema = { type: 'object', properties: { drafts: { type: 'array', items: { type: 'object' } } }, required: ['drafts'] };
+const PLAN: JsonSchema = { type: 'object', properties: { plan: { type: 'object' } }, required: ['plan'] };
+
+/** Nothing reached the binding, which the package reads by this mark and not by the class, as it reads `SparkKeyClosedError`'s. */
+class NotSent extends Error {
+  readonly sent = false;
+}
+
+const counted = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.ceil(v) : 0);
+
+/**
+ * `aiInference` as the package's `SparkInference`, or nothing where the included model is off.
+ *
+ * THE PORTS DIFFER IN THREE WAYS AND THIS IS THE WHOLE ADAPTER: `jsonSchema` is `schema`, a budget is added, and a refusal
+ * becomes a throw, because the package reads every throw as a model not reached and marks tell it otherwise.
+ *
+ * - NO RUN, NO SEND: the ceiling, or a routing name the adapter's table does not carry. `sent: false` lets `answer` release
+ *   its hold and write no ledger row.
+ * - A RUN AND A BAD ANSWER, `PROPOSAL_SCHEMA`: the platform billed it, so it is `SparkAnsweredError` with the counts the
+ *   binding reported. `aiInference` drops them from its refusal, so a wrapped binding, built fresh for each call so two asks
+ *   in flight cannot cross, keeps the last answer to read them off.
+ * - A BINDING THAT THREW is a plain throw, `UNREACHABLE`, which the ladder asks again.
+ *
+ * `model` IN THE REPLY IS THE ROUTING NAME, NOT THE PROVIDER ID `aiInference` answers. The package prices a row by its name
+ * in `MODELS`, which holds `glm-5.3-flash` and not `@cf/zai-org/glm-5.3-flash`: handing the id through billed every row 0
+ * neurons, measured in `test/spark-included.test.ts`'s door case.
+ */
+export function includedInference(env: SparkEnv): SparkInference | undefined {
+  const ai = env.AI;
+  if (ai === undefined || env.SPARK_INCLUDED !== 'yes') return undefined;
+  return {
+    complete: async (call) => {
+      let last: unknown;
+      let ran = false;
+      const port = aiInference({
+        AI: { run: async (model, inputs, options) => ((ran = true), (last = await ai.run(model, inputs, options))) },
+        AI_GATEWAY: env.AI_GATEWAY,
+      });
+      const out = await port.complete({
+        model: call.model,
+        messages: call.messages,
+        maxTokens: call.maxTokens,
+        schema: call.jsonSchema as JsonSchema,
+        budget: { neurons: INCLUDED_NEURONS_PER_CALL },
+      });
+      if (out.ok) return { text: out.value.text, usage: { in: out.value.usage.in, out: out.value.usage.out }, model: call.model };
+      const fix = 'refusal' in out ? out.refusal.fix : 'The included model did not answer.';
+      if (!ran) throw new NotSent(fix);
+      if ('refusal' in out && out.refusal.code === 'PROPOSAL_SCHEMA') {
+        const usage = (last as { usage?: { prompt_tokens?: unknown; completion_tokens?: unknown } } | null)?.usage;
+        throw new SparkAnsweredError(fix, { in: counted(usage?.prompt_tokens), out: counted(usage?.completion_tokens) }, call.model);
+      }
+      throw new Error(fix);
+    },
+  };
+}
+
+/**
+ * The record's own Spark over the included model: `endpointModel`'s two asks, the same instructions and the same input,
+ * read by the same `answerOf`. Every failure is a throw, which the record reads as "the rules speak".
+ */
+export function includedModel(env: SparkEnv): SparkModel | undefined {
+  const inference = includedInference(env);
+  if (inference === undefined) return undefined;
+  const ask = async (instructions: string, input: unknown, schema: JsonSchema): Promise<unknown> => {
+    const reply = await inference.complete({
+      model: INCLUDED_MODEL,
+      maxTokens: RECORD_TOKENS,
+      jsonSchema: schema,
+      messages: [
+        { role: 'system', content: instructions },
+        { role: 'user', content: JSON.stringify(input) },
+      ],
+    });
+    return answerOf(reply.text);
+  };
+  return {
+    name: 'included',
+    draft: (input) => ask(SPARK_INSTRUCTIONS, input, DRAFTS),
+    form: (input) => ask(SPARK_PLAN_INSTRUCTIONS, input, PLAN),
+  };
+}
 
 /**
  * How a request leaves this Worker and how a sealed key is opened. Both are injected so a test needs no network and no KEK.
@@ -83,8 +214,14 @@ const wireOf = (env: SparkEnv, api: () => Pick<RecordApi, 'kernel'>, options: Sp
   };
 };
 
+/**
+ * THE ENDPOINT WHEN ONE IS SET, EVEN WHERE IT BUILDS NOTHING. An endpoint with no `KEK` is no model, and falling through to
+ * the included one there would answer his asks on the account's neurons while he believes they go to his own provider. The
+ * four builders below make the same choice on the same test, so `/api/version`'s `spark` and the engines stay one fact.
+ */
 export function workerSparkModel(env: SparkEnv, api: () => Pick<RecordApi, 'kernel'>, options: SparkWire = {}): SparkModel | undefined {
-  return sparkModelOf(sparkFromEnv(env, { operatorKey: false }), wireOf(env, api, options));
+  const config = sparkFromEnv(env, { operatorKey: false });
+  return config === undefined ? includedModel(env) : sparkModelOf(config, wireOf(env, api, options));
 }
 
 export type SparkEngineDeps = SparkWire & {
@@ -101,11 +238,11 @@ export type SparkEngineDeps = SparkWire & {
 };
 
 /**
- * `@braindog/spark` over this Worker's endpoint and this record's guarded reads, or nothing at all.
+ * `@braindog/spark` over this Worker's endpoint or the included model, and this record's guarded reads, or nothing at all.
  *
- * THE IMPORT IS DYNAMIC AND THE REFUSAL COMES FIRST, in that order, which is the whole of `46 §5.1`: a Worker with no
- * endpoint configured and no way to open a key never evaluates the module, so the bundle a keyless deployment serves does not
- * carry it and the keyless e2e row stays byte-identical. Reversing those two lines would keep the feature working and lose
+ * THE IMPORT IS DYNAMIC AND THE REFUSAL COMES FIRST, in that order, which is the whole of `46 §5.1`: a Worker with neither
+ * an endpoint it can open a key for nor the included model switched on never evaluates the module, so the bundle a keyless
+ * deployment serves does not carry it and the keyless e2e row stays byte-identical. Reversing those two lines would keep the feature working and lose
  * the property the loading rule exists for.
  *
  * `sparkRecord` IS THE BRIDGE AND NOT THE RECORD'S OWN `project`, which does not exist yet: it composes the projection out of
@@ -118,7 +255,7 @@ export type SparkEngineDeps = SparkWire & {
  */
 export async function workerSparkEngine(env: SparkEnv, api: () => RecordApi, deps: SparkEngineDeps): Promise<Spark | undefined> {
   const config = sparkFromEnv(env, { operatorKey: false });
-  const inference = sparkInferenceOf(config, wireOf(env, api, deps));
+  const inference = config === undefined ? includedInference(env) : sparkInferenceOf(config, wireOf(env, api, deps));
   if (inference === undefined) return undefined;
   const { createSpark } = await import('@braindog/spark');
   /* NAMED BY THIS HOST, as on the self-host: the package's tier `a` status says `glm-5.3-flash` whatever `SPARK_MODEL`
@@ -177,8 +314,23 @@ const KIND_NAMED: Partial<Record<string, string>> = {
  */
 export function workerSparkAnswers(env: SparkEnv, api: () => RecordApi, deps: SparkEngineDeps): SparkAnswer | undefined {
   const config = sparkFromEnv(env, { operatorKey: false });
-  if (sparkInferenceOf(config, wireOf(env, api, deps)) === undefined) return undefined;
   let built: Promise<Spark | undefined> | null = null;
+  const engineOf = () =>
+    (built ??= workerSparkEngine(env, api, deps).catch((e: unknown) => {
+      built = null;
+      throw e;
+    }));
+  /* THE INCLUDED MODEL OPENS NO KEY, SO NONE OF THE KEY RULES BELOW IS ITS. There is no vault grant to gate on, no
+     `keyRequired` to ask for and no rule id to sign a `grant.read` with, so the question goes to the engine's own model. */
+  if (config === undefined) {
+    if (includedInference(env) === undefined) return undefined;
+    return async (ask) => {
+      const engine = await engineOf();
+      if (engine === undefined) throw new Error('Spark has no model on this Worker to answer with.');
+      return engine.answer(ask);
+    };
+  }
+  if (sparkInferenceOf(config, wireOf(env, api, deps)) === undefined) return undefined;
   return async (ask) => {
     /* THE GATE ASKS THE KEY PATH'S OWN CHOOSER, so the two cannot disagree about whether there is a key. It read the label
        and `revoked_at` alone until 23 September, a third chooser beside the kernel's and the host's: a `note` labelled
@@ -202,11 +354,7 @@ export function workerSparkAnswers(env: SparkEnv, api: () => RecordApi, deps: Sp
         { at: 'grant' },
       );
     }
-    built ??= workerSparkEngine(env, api, deps).catch((e: unknown) => {
-      built = null;
-      throw e;
-    });
-    const engine = await built;
+    const engine = await engineOf();
     const inference = sparkInferenceOf(config, { ...wireOf(env, api, deps, `rule:${ask.rule}`), keyRequired: true });
     /* NEITHER IS REACHABLE WHILE THE TEST ABOVE HOLDS, and a thrown sentence here becomes the ladder's `failed` ack
        rather than an answer nobody asked for. */
@@ -309,10 +457,12 @@ export function workerSparkDoor(
   /* AND THIS WORKER'S MODEL IS BUILT FOR THE ASKER ON EACH ASK, off the same `wireOf` with the same `actor`: on a hosted
      record that model is always keyed from the vault, so without this every `grant.read` Spark made was signed `system`.
      Per call and as an argument, because a slot would cross two asks in flight and `AsyncLocalStorage` is not here
-     (`sparkAskerEngine`). */
+     (`sparkAskerEngine`). The included model opens no key and so signs nothing, and its engine is handed on as built. */
   const build = async () => {
     const engine = await workerSparkEngine(env, api, deps);
-    return engine === undefined ? engine : sparkAskerEngine(engine, (actor) => sparkInferenceOf(config, wireOf(env, api, deps, actor)));
+    return engine === undefined || config === undefined
+      ? engine
+      : sparkAskerEngine(engine, (actor) => sparkInferenceOf(config, wireOf(env, api, deps, actor)));
   };
   return sparkAskDoor(origins, build, byok);
 }

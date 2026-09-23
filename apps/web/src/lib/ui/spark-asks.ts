@@ -6,9 +6,12 @@
  * Spark work owns this run; the component only draws what these answer.
  *
  * NO `a`/`b` SWITCH, ON PURPOSE. `research-spark-routes.md` F6 measured that on both hosts as built tier `a` already spends
- * the owner's own key (Cloud's included model is not wired), so a control offering *Use your own key* would switch between
- * two ways of spending the same key. The row shows what the host says and lets the owner set the monthly limit. The
- * `a`/`byo` choice that §4 of the same file offers the owner, with the model name `byo` requires, is NOT built here yet:
+ * the owner's own key, so a control offering *Use your own key* would switch between two ways of spending the same key.
+ * That still holds wherever a `SPARK_ENDPOINT` is set. On a Cloud deployment with none, the Worker's included model is built
+ * (`apps/worker/src/spark.ts` `includedInference`) and spends the Cloudflare account's Workers AI, and it answers only once
+ * `SPARK_INCLUDED` is `yes`, which no environment sets yet. From then on, tier `a` on that deployment does not spend the
+ * owner's key, and the premise of this paragraph is gone there. The row shows what the host says and lets the owner set
+ * the monthly limit. The `a`/`byo` choice that §4 of the same file offers the owner, with the model name `byo` requires, is NOT built here yet:
  * that is a gap in this row, not a decision against it.
  */
 
