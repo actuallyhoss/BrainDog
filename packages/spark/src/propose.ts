@@ -195,17 +195,31 @@ type Drafted = {
   q: string | null;
 };
 
-type Read = Drafted & {
+/** What the `read` row for a drafting call says: the draft, what was read under it, and how the call went. */
+type Drew = Drafted & {
   read: ReadTrace[];
-  rows: ProjectionRow[];
-  shown: ProjectionRegister[];
-  allowed: Citable;
   model: string;
   usage: { in: number; out: number };
   ms: number;
   status: 'ok' | 'nothing';
-  code?: string;
+  code?: string | undefined;
 };
+
+type Read = Drew & {
+  rows: ProjectionRow[];
+  shown: ProjectionRegister[];
+  allowed: Citable;
+};
+
+/**
+ * The code a call row settled the moment its model answered carries until the ask finishes and says how it went.
+ *
+ * `RECORD_UNAVAILABLE` BECAUSE THE ONLY THING LEFT TO GO WRONG IS THE RECORD. Once a model has answered, what remains of a
+ * read is the rows projection and what remains of a proposal is the citation check and the filing, and a throw out of any
+ * of them used to reach `finally` with the hold still pending, which `release` deletes (SPK-1, `test/spark-settles.test.ts`).
+ * A code the ports already list, and not one of Spark's own, because a new one is an amendment to `30 §6`.
+ */
+const UNSETTLED = 'RECORD_UNAVAILABLE';
 
 export type Palette = {
   read(question: string, ctx: CallContext, inference?: Inference): Promise<Result<Reading>>;
@@ -241,7 +255,13 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
    * budget twice to arrive back at the same few ids. The registers the rows come back under are the
    * index pass 2 needs, and the projection carries them.
    */
-  const look = async (question: string, ctx: CallContext, host: Inference, stored?: Drafted): Promise<Result<Read>> => {
+  const look = async (
+    question: string,
+    ctx: CallContext,
+    host: Inference,
+    stored: Drafted | undefined,
+    hold: string | undefined,
+  ): Promise<Result<Read>> => {
     let registers: string[];
     let where: Where | null;
     let q: string | null;
@@ -308,6 +328,27 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
       q = usable === null ? (drafted.q ?? question) : drafted.q;
     }
 
+    /* THE DRAFTING CALL IS SETTLED HERE, BEFORE THE ROWS ARE ASKED FOR, and not after they come back. The model has
+       answered and been paid for, and every exit below this line used to leave the hold to `finally`: a projection the
+       record refused was returned before `accountRead` ran, and one that threw never reached it, so `release` deleted the
+       hold and no row said a model was called (`46 §4.1`'s table, last line; `test/spark-settles.test.ts` cases 1 to 4,
+       measured with no row and `asks.used` 0, and at `ask_cap: 1` a second read reaching the model). Settled first, it is
+       a row whatever the record does; the lines below and the caller's `accountRead` overwrite it by the same id with how
+       the ask ended. */
+    const drew = (read: ReadTrace[], ended: string | undefined): Drew => ({
+      registers,
+      where,
+      q,
+      read,
+      model,
+      usage,
+      ms,
+      status: 'nothing',
+      code: code ?? ended,
+    });
+    const drafting = stored === undefined ? hold : undefined;
+    if (drafting !== undefined) accountRead(drew([GRANT], UNSETTLED), question, drafting);
+
     const rows = await record.project(
       {
         registers,
@@ -317,7 +358,12 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
       },
       ctx,
     );
-    if (!rows.ok) return rows;
+    /* THE RECORD'S REFUSAL IS STILL THE ANSWER, and the row says it was what ended the ask. A model's own fault, a
+       predicate that came back ungrammatical, stays the row's code, because the row is about the call. */
+    if (!rows.ok) {
+      if (drafting !== undefined) accountRead(drew([GRANT], refused(rows) ? rows.refusal.code : UNSETTLED), question, drafting);
+      return rows;
+    }
 
     const printed = canon(where);
     const read: ReadTrace[] = registers.map((id) => ({
@@ -352,7 +398,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
    * the meter still balances, because only proposals are metered, but the person reading what Spark
    * did sees one call where two were made.
    */
-  const accountRead = (it: Read, question: string, askId: string): string => {
+  const accountRead = (it: Drew, question: string, askId: string): string => {
     core.account({
       id: askId,
       kind: 'read',
@@ -387,7 +433,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
        the `ask_id`, on every path that called a model, and is given back on the ones that did not. */
     const held = core.reserve('read', core.settings().tier, PROMPTS.predicate.model);
     try {
-      const looked = await look(asked, ctx, inference ?? fallback);
+      const looked = await look(asked, ctx, inference ?? fallback, undefined, held);
       if (!looked.ok) return looked;
       const it = looked.value;
 
@@ -445,7 +491,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
     drafting: string | undefined,
     callId: string,
   ): Promise<Result<Proposal>> => {
-    const looked = await look(asked, ctx, host, stored);
+    const looked = await look(asked, ctx, host, stored, drafting);
     if (!looked.ok) return looked;
     const it = looked.value;
     /* The draft this pass made itself is its own row, settling its hold; a stored one was accounted on pass 1. */
@@ -514,6 +560,11 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
         read: trimmedRead(it.read, kept.rows),
         filed,
       });
+
+    /* SETTLED THE MOMENT THE MODEL ANSWERED, for the drafting call's reason in `look`: a filing that threw after the
+       proposal's model answered left this hold to `finally`, and `release` deleted it (`test/spark-settles.test.ts` case
+       5, measured with the `propose` row missing and `asks.used` one short). Every exit below overwrites it. */
+    account('error', UNSETTLED);
 
     if (!ran.out.ok) {
       account('error', refused(ran.out) ? ran.out.refusal.code : 'UNREACHABLE');

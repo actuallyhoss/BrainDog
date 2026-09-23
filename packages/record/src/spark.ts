@@ -702,7 +702,11 @@ const aKind = (kind: string): string => `${/^[aeiou]/u.test(kind) ? 'an' : 'a'} 
  * to change nothing: with it removed the gold-rate test still found no trace of the model's host in the filed row, and
  * `stableKey` never reads either field, so a model that varies the egress it writes is still asked once.
  */
-function changeBody(body: Record<string, unknown>, n: number): { ok: true; body: Record<string, unknown> } | { ok: false; why: string } {
+function changeBody(
+  body: Record<string, unknown>,
+  n: number,
+  drawn?: (id: string) => number,
+): { ok: true; body: Record<string, unknown> } | { ok: false; why: string } {
   const to = body.to;
   if (to === null || typeof to !== 'object' || Array.isArray(to)) return { ok: false, why: `Proposal ${n} was a change with no declaration in it.` };
   const bundle = (to as { declarations?: unknown }).declarations;
@@ -712,14 +716,46 @@ function changeBody(body: Record<string, unknown>, n: number): { ok: true; body:
   if (stray !== undefined)
     return { ok: false, why: `Proposal ${n} was a change to ${aKind(String(stray?.kind ?? 'unnamed kind')).slice(0, 40)}, and Spark changes only a register, an ingest, a rule or a page.` };
   const named = typeof body.declaration_id === 'string' ? body.declaration_id : String(listed[0]?.id ?? '');
-  return { ok: true, body: { ...body, declaration_id: named } };
+  /* THE VERSION EACH DECLARATION WAS DRAWN FROM IS THE READING'S, AND WHATEVER THE MODEL WROTE IS REPLACED. The reading a
+     model is handed names no version, so a number it writes is a guess, and the likeliest guess is the version live when
+     it answers, which is exactly the stamp that let a stale body land (`drawnVersions`). A bundle names every member, as
+     the kernel reads `{ declarations }` (`govern.ts`, `propose`). With no reading handed in, the model's field is left for
+     the kernel to judge, which is what every call before this did. */
+  const versions =
+    drawn === undefined
+      ? {}
+      : { from_version: Array.isArray(bundle) ? Object.fromEntries(listed.map((d) => [String(d?.id ?? ''), drawn(String(d?.id ?? ''))])) : drawn(named) };
+  return { ok: true, body: { ...body, declaration_id: named, ...versions } };
+}
+
+/**
+ * The version of every declaration live now, kept, for the `change` a model drafts from this reading to land against.
+ *
+ * A SNAPSHOT AND NOT A LOOKUP, because the moment that matters is the reading and the model answers later. Read at filing,
+ * as the kernel reads it when a proposer names none, a Rates drafted at v1 while another change took it to v2 was stamped
+ * v2, and accepting it installed v1's fields over v2's (`packages/host/test/spark-change-drawn.test.ts`). The query is the
+ * kernel's `liveVersion` over every id at once, and an id with no live row answers 0, which is how the kernel spells
+ * "drawn from nothing": a new declaration somebody else declares first is then refused at accept too.
+ */
+export function drawnVersions(sql: Sql): (id: string) => number {
+  const live = new Map(
+    sql
+      .all<{ id: string; version: number }>('SELECT id, max(version) AS version FROM declaration WHERE superseded_at IS NULL AND retired = 0 GROUP BY id')
+      .map((r) => [r.id, Number(r.version)] as const),
+  );
+  return (id) => live.get(id) ?? 0;
 }
 
 /**
  * A model's answer as drafts: `{ drafts: [{ question, body_kind, body }] }` or the bare list. Anything else is dropped, and
  * why is said, so a model that answers nonsense is a line on the Spark page rather than a question on Decide.
  */
-export function fromModel(raw: unknown, name: string, most = SPARK_OPEN_CAP): { drafts: SparkDraft[]; dropped: string[] } {
+export function fromModel(
+  raw: unknown,
+  name: string,
+  most = SPARK_OPEN_CAP,
+  drawn?: (id: string) => number,
+): { drafts: SparkDraft[]; dropped: string[] } {
   const list = Array.isArray(raw) ? raw : Array.isArray((raw as { drafts?: unknown })?.drafts) ? (raw as { drafts: unknown[] }).drafts : null;
   if (list === null) return { drafts: [], dropped: ['The model did not answer a list of proposals.'] };
   const drafts: SparkDraft[] = [];
@@ -740,7 +776,7 @@ export function fromModel(raw: unknown, name: string, most = SPARK_OPEN_CAP): { 
     }
     let body = d.body as Record<string, unknown>;
     if (d.body_kind === 'change') {
-      const built = changeBody(body, i + 1);
+      const built = changeBody(body, i + 1, drawn);
       if (!built.ok) {
         dropped.push(built.why);
         continue;

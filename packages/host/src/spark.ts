@@ -48,7 +48,7 @@
  */
 
 import { ok, type Refusal, type Result, type Sql } from '@braindog/ports';
-import type { Entry, RegisterDecl } from '@braindog/kernel';
+import { GRANT_KINDS, type Entry, type RegisterDecl } from '@braindog/kernel';
 import type { CallContext, RecordApi, SparkFormInput, SparkModel, SparkModelInput } from '@braindog/record';
 
 import type { SparkAsk } from './spark-answers.ts';
@@ -448,6 +448,53 @@ export function endpointInference(options: EndpointModelOptions): SparkInference
 /** The vault label a person's own model key is kept under, on the self-host and on the Worker alike. */
 export const SPARK_KEY_LABEL = 'spark';
 
+/** `46 §5.9` step 1: the grant tier `b` names holds an API token. A password or an SSH key is sent as nobody's bearer. */
+const SPARK_GRANT_KIND = 'api_token';
+
+/**
+ * A vault row as a host reads it off `kernel.grants()`, which hands every column a person may see.
+ *
+ * `kind` AND `created_at` ARE OPTIONAL HERE AND NEVER ABSENT ON A REAL ROW. The kernel's `GrantRow` carries both on every
+ * grant, and a row that says neither is a test's double; requiring them would turn a narrower type into a compile error in
+ * every fixture that only needed a label.
+ */
+export type SparkVaultRow = { id: string; label: string; revoked_at: string | null; kind?: string | undefined; created_at?: string | undefined };
+
+/**
+ * The grant the host's own Spark key is opened from: the NEWEST live grant labelled `spark` that holds an API token.
+ *
+ * NEWEST, BECAUSE THAT IS WHAT A SCHEDULED ACTION NAMING `spark` OPENS. `keyNamed` (`packages/kernel/src/actions.ts`) orders
+ * a label's live entries `created_at DESC, id DESC`, and this path took `grants().find(...)`, the first row in `listGrants`
+ * order, which sorted by label alone and so, within one label, came back oldest first. The vault admits two live entries
+ * under one label, so an owner who put a new key under `spark` without revoking the old had the included model answer on
+ * the old key while every action named `spark` used the new one (`test/spark-grant-chooser.test.ts` case 1, measured
+ * opening the older grant where the kernel's `opensOf('spark')` named the newer).
+ *
+ * AN API TOKEN, BECAUSE THE KEY GOES OUT AS A BEARER. The kind was never read on this path, so a note or a password
+ * labelled `spark` was sent to `SPARK_ENDPOINT` as `authorization` (case 2). Tier `b`'s save already refuses a grant of
+ * another kind (`sparkGuardedEngine`, below); this is the same rule on the host's own key, where there is no save to refuse.
+ * WHAT IS PASSED OVER IS THE FOUR KINDS THE VAULT ADMITS THAT ARE NOT A TOKEN, and not every kind but `api_token`. On a real
+ * row the two rules are one, because `bindGrant` refuses a kind outside `GRANT_KINDS`. They differ only on a double: a row
+ * that states no kind, or one no vault could hold (`apps/worker/test/spark.test.ts` builds its `spark` grant as `api_key`,
+ * and failed its bearer assertion under the stricter rule, measured 23 September). Neither is a password or a note.
+ */
+export const sparkGrantOf = <G extends SparkVaultRow>(grants: readonly G[]): G | undefined => {
+  let best: G | undefined;
+  for (const g of grants) {
+    if (g.label !== SPARK_KEY_LABEL || g.revoked_at !== null) continue;
+    if (g.kind !== undefined && g.kind !== SPARK_GRANT_KIND && GRANT_KINDS.some((k) => k === g.kind)) continue;
+    if (best === undefined || newerThan(g, best)) best = g;
+  }
+  return best;
+};
+
+/** `keyNamed`'s order, `created_at DESC, id DESC`, as a comparison of two rows. */
+const newerThan = (a: SparkVaultRow, b: SparkVaultRow): boolean => {
+  const at = a.created_at ?? '';
+  const bt = b.created_at ?? '';
+  return at === bt ? a.id > b.id : at > bt;
+};
+
 export type SparkHostConfig = {
   url: string;
   model?: string | undefined;
@@ -457,7 +504,7 @@ export type SparkHostConfig = {
 
 export type SparkHostDeps = {
   /** The record's vault rows, read on each call so a key put in or revoked after boot counts. */
-  grants: () => readonly { id: string; label: string; revoked_at: string | null }[];
+  grants: () => readonly SparkVaultRow[];
   /** How this host opens a sealed key, or `null` when it cannot open any (a Worker with no `KEK` bound). */
   openKey: ((grant: { id: string; label: string }) => Promise<string | null>) | null;
   send: (input: URL, init: RequestInit) => Promise<Response>;
@@ -504,7 +551,7 @@ function endpointOptionsOf(config: SparkHostConfig | undefined, deps: SparkHostD
   /* THE GRANT IS LOOKED UP AGAIN HERE, ON THE CALL, so a revoke that lands after a caller's own check (the Worker reads
      the label before it builds the engine) finds nothing, and under `keyRequired` that is the same throw. */
   const own = async (): Promise<string | null> => {
-    const grant = deps.grants().find((g) => g.label === SPARK_KEY_LABEL && g.revoked_at === null);
+    const grant = sparkGrantOf(deps.grants());
     const key = grant && open ? await open(grant) : null;
     if (!key && deps.keyRequired)
       throw new SparkKeyClosedError(`The key labelled ${SPARK_KEY_LABEL} in this record's vault would not open on this host, so nothing was sent.`);
@@ -626,13 +673,14 @@ export type SparkKeyRefused = { ok: false; refusal: Refusal; hostKey?: true };
 export type SparkVaultApi = Pick<RecordApi, 'kernel' | 'listGrants'>;
 
 /**
- * Whether this host's included model is keyed from the vault: no operator key, and a live grant labelled `spark`.
+ * Whether this host's included model is keyed from the vault: no operator key, and a grant `sparkGrantOf` would open.
  *
- * THE SAME TEST `endpointOptionsOf`'s `own` makes, on the same rows, so the gate stands exactly where that path would open a
- * grant and nowhere else. With no such grant the included model is called keyless, which opens nothing to gate.
+ * THE SAME CHOOSER `endpointOptionsOf`'s `own` calls, on the same rows, so the gate stands exactly where that path would open
+ * a grant and nowhere else. With no such grant the included model is called keyless, which opens nothing to gate. A note
+ * labelled `spark` is therefore no longer gated either: nothing opens it.
  */
-const hostKeyedFromVault = (config: SparkHostConfig, grants: () => readonly { label: string; revoked_at: string | null }[]): boolean =>
-  config.key === undefined && grants().some((g) => g.label === SPARK_KEY_LABEL && g.revoked_at === null);
+const hostKeyedFromVault = (config: SparkHostConfig, grants: () => readonly SparkVaultRow[]): boolean =>
+  config.key === undefined && sparkGrantOf(grants()) !== undefined;
 
 /**
  * Tier `b`'s adapter FOR THIS ASKER: the vault's own check on their session first, and every `grant.read` signed by them.
@@ -751,9 +799,6 @@ export type SparkGuardDeps = {
  * reads after the first all answered 200 where the cap allowed one.
  */
 const HOST_DRAFTED: readonly string[] = ['b', 'byo'];
-
-/** `46 §5.9` step 1: the grant tier `b` names holds an API token. A password or an SSH key is sent as nobody's bearer. */
-const SPARK_GRANT_KIND = 'api_token';
 
 /**
  * OPTIONAL `answer`, BECAUSE THE PACKAGE GAINS IT IN A BRIEF BESIDE THIS ONE (`loop/research-infer-ask.md` §6 Brief B), and

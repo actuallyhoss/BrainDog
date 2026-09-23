@@ -97,7 +97,7 @@ import type { Json as JsonValue } from '@braindog/kernel';
 
 import { arranger, carryUpdate, speakingNow, writeVoice, type CatalogueEntry } from './arrange.ts';
 import { useCases, type ExportArgs } from './usecase.ts';
-import { catalogueDrafts, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, noticeUsage, pageShowsAgents, readUsage, SPARK_OPEN_CAP, stableKey, type CatalogueOffer, type Offered, type SparkDraft, type SparkModel } from './spark.ts';
+import { catalogueDrafts, drawnVersions, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, noticeUsage, pageShowsAgents, readUsage, SPARK_OPEN_CAP, stableKey, type CatalogueOffer, type Offered, type SparkDraft, type SparkModel } from './spark.ts';
 import { grammarOf } from './grammar.ts';
 import {
   BODY_DEPTH,
@@ -1533,6 +1533,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const sparkFile = async () => {
     const r = sparkReading();
+    const drawn = drawnVersions(sql);
     let drafts: SparkDraft[] = r.drafts;
     let by = 'rules';
     const dropped: string[] = [];
@@ -1547,7 +1548,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           kinds: ['pack', 'settings', 'arrange', 'change'],
           most: SPARK_OPEN_CAP,
         });
-        const got = fromModel(raw, model.name);
+        const got = fromModel(raw, model.name, SPARK_OPEN_CAP, drawn);
         dropped.push(...got.dropped);
         if (got.drafts.length > 0) {
           drafts = got.drafts;
@@ -1978,7 +1979,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (typeof named === 'string' && named !== '' && readable(ctx, named) !== null) return true;
       const names = changeTouches(body, typeof row.opened_at === 'string' ? row.opened_at : null);
       if (names.size === 0 && (typeof named !== 'string' || named === '')) return !wholeRecord(ctx);
-      return !readsAll(ctx, names);
+      return !sees(ctx, names);
     }
     if (typeof named !== 'string' || named === '') return !wholeRecord(ctx);
     return readable(ctx, named) !== null;
@@ -2054,16 +2055,49 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * Whether a caller reads every name the kernel's walk gave: a list as `list` reads it, the kernel's `ACROSS` as the `ACROSS` check
-   * on a page block reads it (`wholeRecord`), and `ANY_LIST` as `automations` and `scripts` read a rule with no row and
-   * a script naming no list (`readsEveryList`).
+   * WHAT THIS CALLER MAY READ, asked of every name a read would hand back: the caller-sight predicate. A list is read as
+   * `list` reads it (`readable`, which is `guard` with the caller's own level on that list, so `append` does not read
+   * and a member invited to one list reads that one); the kernel's `ACROSS` as the `ACROSS` check on a page block reads
+   * it (`wholeRecord`); and `ANY_LIST`, something that may touch any list, as a rule with no row and a script naming no
+   * list are read (`readsEveryList`, every list she holds at a level of its own).
    *
    * TWO READINGS AND NOT ONE. With every sentinel read as `readsEveryList`, a member held to `append` on Money was held
    * from a page with a log block and from a door that polls, both of which `page` and `actions` show her
    * (`loop/research-decide-reach.md`, K1, K6 and K7).
+   *
+   * ONE PREDICATE BECAUSE THE DOORS THAT EACH ASKED THEIR OWN QUESTION DISAGREED (recurring class 4 in `loop/ROADMAP.md`:
+   * access decided at one door and assumed at the others). Decide asked this of every list a change's rule touches,
+   * and `automations` asked `readable` of the rule's row list alone, so an Inbox rule whose step files a Money row for
+   * Omar at 91000 was held from the member invited to Inbox alone in `governance` and handed to her whole by
+   * `automations`, as it was to the member held to `append` on Money (SEC-4). `metric` asked it of the figure's source
+   * and let the kernel resolve a caller's `{{it}}` against a list she cannot read, so the member invited to Jobs alone
+   * was told `ok` for a hidden client and REF_UNKNOWN for a made-up one (SEC-10). Both now ask this.
+   * `sight-check.test.ts` holds `automations` to the answer Decide gives and `metric` to one answer whatever the row.
+   *
+   * THE DOORS STILL DECIDING SIGHT THEIR OWN WAY, for the next wave to move onto this:
+   *   - `wholeRecord`, which asks the ceiling and not `ctx.levels`, so an appender reads as whole-record (SEC-11), and
+   *     every door that asks it directly: `lineOf` (so `whatsNew` and `recentHistory`), `holds` for a body that is not
+   *     a change, the `ACROSS` block check in `page` and a figure section in `digestToday`.
+   *   - `boot`'s rail and its sessions, `briefing` (so `context`), `page`'s `beyond` and `search`, which each ask
+   *     `readable` over a list of names they built themselves, and `pages`, which shows a page when ANY list it draws
+   *     from is readable where this asks every one.
+   *   - `actions`, which asks `guard` of the record alone, and `sessionsLive`, which asks it of Session alone.
+   *   - `scripts`, which asks `readable` of a script's `reads` and `writes` itself, as `touches` does for `script.`.
+   *   - `dryRun`, which guards the body's subject alone and passes `reads` to the walk.
+   *   - `allows`, which reads the principal's one level and is what `guard` wraps, so a door that calls it bare
+   *     (the `ACROSS` check in `page`) is asking about the record and not about her.
    */
-  const readsAll = (ctx: CallContext, names: ReadonlySet<string>): boolean =>
+  const sees = (ctx: CallContext, names: Iterable<string>): boolean =>
     [...names].every((name) => (name === READS_ACROSS ? wholeRecord(ctx) : name === ANY_LIST ? readsEveryList(ctx) : readable(ctx, name) === null));
+
+  /**
+   * Every name the kernel's one walk gives for a live declaration, `ANY_LIST` among them for a figure it cannot place:
+   * what `sees` is asked about an installed rule, read against today's doors, figures and lists.
+   */
+  const liveTouches = (id: string, body: unknown): Set<string> => {
+    const { lists, unknown } = touches(id, body, liveResolve);
+    return unknown.size > 0 ? new Set([...lists, ANY_LIST]) : lists;
+  };
 
   /** A declaration's stored body, parsed, or `undefined` for none. */
   const parsed = (found: string | undefined): unknown => (found === undefined ? undefined : JSON.parse(found));
@@ -2076,6 +2110,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const fieldsOf = (list: unknown): ReadonlySet<string> => {
     const declared = (list as { fields?: unknown } | undefined)?.fields;
     return new Set(Array.isArray(declared) ? declared.map((f) => (f as { id?: unknown } | null)?.id).filter((f): f is string => typeof f === 'string') : []);
+  };
+
+  /** What `touches` asks to place a name by reference, answered from the live declarations. */
+  const liveResolve = {
+    figure: (id: string) => [liveBody(`metric.${id}`)],
+    door: (door: string) => liveBody(`ingest.${door}`),
+    fields: (list: string) => fieldsOf(liveBody(`register.${list}`)),
   };
 
   /**
@@ -2097,21 +2138,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       } catch {
         measure = null;
       }
-    const resolve = {
-      figure: (id: string) => [liveBody(`metric.${id}`)],
-      door: (door: string) => liveBody(`ingest.${door}`),
-      fields: (list: string) => fieldsOf(liveBody(`register.${list}`)),
-    };
     const names = new Set<string>();
     const add = (id: string, body: unknown): void => {
-      const { lists, unknown } = touches(id, body, resolve);
-      for (const name of lists) names.add(name);
-      if (unknown.size > 0) names.add(ANY_LIST);
+      for (const name of liveTouches(id, body)) names.add(name);
     };
     if (forDecl.startsWith('register.')) names.add(forDecl.slice('register.'.length));
     else for (const v of sql.all<{ body: string }>('SELECT body FROM declaration WHERE id = ? ORDER BY version', forDecl)) add(forDecl, parsed(v.body));
     add('metric.', measure);
-    return names.size === 0 ? !wholeRecord(ctx) : !readsAll(ctx, names);
+    return names.size === 0 ? !wholeRecord(ctx) : !sees(ctx, names);
   };
 
   /**
@@ -3784,6 +3818,33 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          append to answered with the figure, which is the same leak one number wide. */
       if (!filled || (register && readable(ctx, register)))
         return no('METRIC_UNKNOWN', `There is no metric called ${args.metric}.`, { at: 'metric' });
+      /* AND THE CALLER'S OWN WORDS ARE RESOLVED ONLY AGAINST LISTS SHE READS. `kernel.metric` resolves a ref in `where`
+         against the whole record, so the member invited to Jobs alone asking `client-jobs:<title>` was answered `ok` for
+         a client on the Clients list she cannot read and REF_UNKNOWN for a title nobody holds, and the same for
+         `clients#1` against `clients#9` (SEC-10), which `list` had stopped answering by passing `reads`. Only a filled
+         figure is asked: a declared `where` is the author's words, the same for every reader, and a tile over it is
+         answered as `page` answers it. */
+      if (param !== undefined && register !== null && filled.where !== undefined) {
+        /* FIRST, WHICH LISTS HER WORDS LAND ON, asked of the clauses the parameter filled (`within`, which `fill`
+           writes) with every list refused. `lookupRef` asks `reads` of a ref field's target before it looks anything
+           up and stops there when refused, so what this collects is the targets of the ref fields her words fill and
+           nothing about any row, the same for a title that exists and one that does not. */
+        const landed = new Set<string>();
+        const refuseEvery = (list: string): boolean => {
+          landed.add(list);
+          return false;
+        };
+        kernel.list({ register, where: filled.within ?? filled.where, limit: 1, reads: refuseEvery });
+        /* REFUSED, AND IN THE SAME WORDS FOR EVERY WORD SHE SENDS. The kernel's `metric` takes no `reads`, so it cannot
+           count her words as naming no row, which is what `list` answers; a refusal that names neither her words nor
+           the list is the one answer here that is the same whether the row exists or not. */
+        if (!sees(ctx, landed))
+          return no('FORBIDDEN', `${id} is worked out for a row of a list you cannot read, so it is not worked out for you.`, { at: 'metric' });
+        /* THEN HER WORDS AS `list` WOULD READ THEM, one row at most, so a row id or a spoken id of a hidden list is
+           refused as `list` refuses it rather than named as the wrong list's row. */
+        const probe = kernel.list({ register, where: filled.where, limit: 1, reads: (list) => sees(ctx, [list]) });
+        if (!probe.ok && 'refusal' in probe && probe.refusal.code.startsWith('REF_')) return { ok: false as const, refusal: probe.refusal };
+      }
       return kernel.metric(filled);
     },
 
@@ -4624,23 +4685,29 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * Every automation, or one with its last ten runs and each step's outcome (`loop/research-shell-automations.md` §5).
      * READ+, and what the canvas and `braindog:automation/<id>` both draw from.
      *
-     * HELD TO WHAT THE CALLER MAY READ, ONE AUTOMATION AT A TIME. A rule about a list is shown to whoever may read that
-     * list, because its body names the list's fields and its runs carry what its steps wrote. A rule with no row, a
-     * clock, a button or an arrival, may write to any list, so it is shown to a caller who reads every one. One out of
-     * reach is left out of the list and named as missing when asked for, as `views` leaves out a list the caller cannot
-     * see: which automations exist is itself something a caller may not know.
+     * HELD TO WHAT THE CALLER MAY READ, ONE AUTOMATION AT A TIME. A rule is shown to whoever may read every list its body
+     * touches, because its body names those lists' fields and its runs carry what its steps wrote. A rule with no row, a
+     * clock or a button, may write to any list, so it is shown to a caller who reads every one. One out of reach is left
+     * out of the list and named as missing when asked for, as `views` leaves out a list the caller cannot see: which
+     * automations exist is itself something a caller may not know.
+     *
+     * EVERY LIST IT TOUCHES, AND NOT THE LIST ITS ROW LIVES IN. This asked `readable` of that one list, so a rule about
+     * Inbox rows whose step creates a Money row paying Omar 91000 was listed and opened in full for the member invited
+     * to Inbox alone and for the member held to `append` on Money, while `governance` held the change to the same rule
+     * from both (SEC-4). It is `sees` over the kernel's walk now, the question Decide asks, so an arrival rule is placed
+     * by the list its door writes (`rowRegisterOf`), as Decide places it, where this read it as a rule with no row.
      */
     async automations(args: { rule?: string } | undefined, ctx: CallContext) {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       const extra = stray((args ?? {}) as Record<string, unknown>, ['rule']);
       if (extra) return { ok: false as const, refusal: extra };
-      const sees = (register: string | null): boolean => (register === null ? readsEveryList(ctx) : readable(ctx, register) === null);
+      const shown = (id: string, body: Record<string, unknown>): boolean => sees(ctx, liveTouches(id, body));
       const named = args?.rule;
-      if (named === undefined) return ok(listAutomations(sql, clock.now()).filter((a) => sees(a.register)));
+      if (named === undefined) return ok(listAutomations(sql, clock.now(), shown));
       if (typeof named !== 'string' || named === '') return no('VALUE_MALFORMED', 'An automation is named by its id, such as chase or rule.chase.', { at: 'rule' });
       const found = oneAutomation(sql, named, clock.now());
-      if (found === null || !sees(found.register)) {
+      if (found === null || !shown(found.id, found.body)) {
         const id = named.startsWith('rule.') ? named : `rule.${named}`;
         return no('DECLARATION_UNKNOWN', `There is no automation called ${id}${id.endsWith('.') ? '' : '.'}`, { at: 'rule' });
       }

@@ -317,7 +317,12 @@ export type AutomationRow = {
   version: number;
   trigger: string;
   path: 'inline' | 'run';
-  /** The list whose rows start it, or `null` for a clock, a button or an arrival. */
+  /**
+   * The list whose rows start it, or `null` for a clock, a button or an arrival.
+   *
+   * NOT WHO MAY SEE IT: a rule on Inbox may create rows in Money, and the record's `automations` door asks every list
+   * the body touches.
+   */
   register: string | null;
   project: string | null;
   enabled: boolean;
@@ -401,9 +406,17 @@ const LIVE = "kind = 'rule' AND superseded_at IS NULL AND retired = 0";
  *
  * EVERY RULE IS AN AUTOMATION (§2.1): one installed before `on:` existed is one whose trigger is a write, and the canvas
  * opens it like any other. A rule a pack turned off has retired its declaration, so it is not in the list.
+ *
+ * `shown` IS ASKED OF THE WHOLE BODY, BEFORE A RUN IS COUNTED. The record's door filtered the rows afterwards by
+ * `register`, which is the list a rule's row lives in and nothing more, so an Inbox rule whose step creates Money rows
+ * reached the member invited to Inbox alone (SEC-4). Who may see a rule is every list its body touches, which only the
+ * body says, and a rule held back costs no query of its runs.
  */
-export function automations(sql: Sql, nowMs: number): AutomationRow[] {
-  return sql.all<Declared>(`SELECT id, version, body, pack_id FROM declaration WHERE ${LIVE} ORDER BY id`).map((d) => row(sql, d, nowMs).row);
+export function automations(sql: Sql, nowMs: number, shown: (id: string, body: Body) => boolean = () => true): AutomationRow[] {
+  return sql
+    .all<Declared>(`SELECT id, version, body, pack_id FROM declaration WHERE ${LIVE} ORDER BY id`)
+    .filter((d) => shown(d.id, JSON.parse(d.body) as Body))
+    .map((d) => row(sql, d, nowMs).row);
 }
 
 /** One live rule, by `chase` or `rule.chase`, with its body and its last runs, newest first; `null` when there is none. */
