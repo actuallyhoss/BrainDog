@@ -11,8 +11,8 @@
   it sits in, and the bar takes an intent only when the connection has actually taken one.
 
   The offline signal must not cry wolf, which is a detection rule and not a styling one:
-  `navigator.onLine` reports online on a LAN with no internet, so the real signal is a failed write,
-  never the browser's guess. Once it IS detected, it is shown as what it is — writes will fail.
+  `navigator.onLine` reports online on a LAN with no internet, so the real signal is a failed write
+  or a failed poll of `/api/version`, never the browser's guess. Once it IS detected, it is shown as what it is — writes will fail.
 -->
 <script lang="ts">
   import { apiBase, at, here } from '$lib/at.ts';
@@ -51,6 +51,7 @@
      shell's chunk, which is the thing the comment above and `+layout.ts` both refuse to do. The rows
      and the count live in a file that imports types and nothing else. */
   import { anyPending } from '$lib/record/pending-held.svelte.ts';
+  import { follow, live } from '$lib/data/live.svelte.ts';
   /* THE PALETTE AND THE `?` SHEET'S BODY ARRIVE AFTER THE SHELL. Both are closed on every first
      paint, and the palette reads the whole sample record to rank what it lists, so importing them
      here put all of that in front of the first screen and in the entry's preload list. They are
@@ -272,14 +273,13 @@
   }
   const go = new GoPrefix();
 
-  /** `ponytail:` a constant in the mock-up. The live channel is `lib/data/live.ts` in the real app:
-      a hibernatable WebSocket carrying `{ version, registers }` and nothing else. */
-  /* ONE STATE, AND THE HEADER ABOVE DESCRIBED THREE. `polling` and `offline` are what a real
-     transport produces; this app has none, so nothing could ever reassign this and two of the three
-     rules below it could never match. `50 §2.4` is explicit that `offline` is set "only after a
-     failed write or failed poll, never from `navigator.onLine` alone" — there is no write and no
-     poll here yet. Stated as one value rather than described as three. */
-  const live: 'open' | 'polling' | 'offline' = 'open';
+  /* THE HAIRLINE READS THE POLL NOW, AND IT WAS A CONSTANT UNTIL W56. `const live = 'open'` stood here with a comment
+     saying there was no write and no poll yet, so the `polling` and `offline` rules below could never match
+     (`loop/research-living-in-it.md` §1.1). `follow` starts one poll of `/api/version` per tab (`lib/data/live.ts`),
+     on a live record only: the sample is in the browser, nothing else writes to it, and a static host answers
+     `/api/version` with its SPA fallback, which would draw offline on the one record that cannot be. `page.url` and not
+     `location`, so a move from one record to another follows the address being opened. */
+  $effect(() => follow(data.live === true ? apiBase(page.url) : null));
 
   /** Where `g` then a letter lands. `g 1`–`g 9` address the nth item of YOUR nav, in YOUR order. */
   /* `g s` IS HERE NOW. It was removed on the grounds that "search is not a place you go, it is the
@@ -375,11 +375,17 @@
 
 <a class="skip" href="#main">Skip to content</a>
 
-<!-- The record's own state, two pixels, always there. Solid while the socket is open, dashed while
-     polling, solid warn when a write has actually failed — never from `navigator.onLine`, which reports
-     online on a LAN with no internet. And the chip must not cry wolf: one that appears and withdraws
-     on every open is a chip nobody believes the day it is true (19 §6). -->
-<div class="live" data-state={live} aria-hidden="true"></div>
+<!-- The record's own state, two pixels, always there. The boundary colour while the poll answers, solid warn
+     when a poll has failed, and never from `navigator.onLine`, which reports online on a LAN with no internet. And the
+     chip must not cry wolf: one that appears and withdraws on every open is a chip nobody believes the day it is true
+     (19 §6).
+
+     ONE DEPARTURE FROM `50 §2.4`, AND IT IS DELIBERATE. The spec names the state `polling` whenever the fallback runs,
+     and `polling` is drawn dashed in `--warn`. With the poll as the only transport that would put a warning on every
+     screen at all times, which the comment at the top of this file calls a permanent alarm for the state in which
+     nothing is wrong. So a poll that answers is `open`, a poll that fails is `offline`, and `polling` is kept for a
+     socket's fallback once there is a socket to fall back from (`loop/research-living-in-it.md` §1.4). -->
+<div class="live" data-state={live.state} aria-hidden="true"></div>
 
 {#if bare}
   <!-- ITS OWN SCROLL CONTAINER, because `html, body` are `overflow: hidden` — the shell's `.body`

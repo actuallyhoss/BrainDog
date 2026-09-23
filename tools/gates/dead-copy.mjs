@@ -83,11 +83,16 @@ const ALLOWED = new Map([
      which `/decide` now says over the list it ranks. */
   ['copy.saveAsView', 'UNBUILT:a saved view is seeded, never created from the grid.'],
   ['copy.includesExample', 'UNBUILT. 19 §6 mechanism 2: the example row, marked and deletable in one click.'],
-  ['copy.offline', 'UNBUILT:19 §6\'s "Offline and stale" surface.'],
-  ['copy.live', 'UNBUILT:same surface.'],
-  ['copy.polling', 'UNBUILT:same surface.'],
-  ['copy.stale', 'UNBUILT:same surface.'],
-  ['copy.stopped', 'UNBUILT:same surface.'],
+  /* `stale` LEFT THIS LIST IN W56, when the register list began re-asking on the record's version and got a mark to
+     wear when more than one page of the old answer is in hand. The three below stayed, each for its own reason now,
+     because the poll that landed with it draws the hairline and the hairline is `aria-hidden` with no words in it. */
+  ['copy.offline', 'CORRECT. "New records only." promises a write that can still be made offline, and nothing in the web app queues one. It waits for a sentence that says what a failed poll means.'],
+  ['copy.live', 'UNBUILT:the socket\'s word. The poll draws its state as the hairline, which says it without words.'],
+  ['copy.polling', 'UNBUILT:the socket\'s fallback. With the poll as the only transport, `polling` is never set (`+layout.svelte`, the hairline\'s comment).'],
+  /* `stopped` WAS FILED HERE AS THE OFFLINE SURFACE'S, AND `copy.ts` SAYS IT IS NOT. It is the toast `23 §7`'s
+     Escape shows when an answer is cancelled, so it waits on the assistant, which is absent with no model for the
+     reason `askBrainDog` above is. */
+  ['copy.stopped', 'CORRECT. 23 §7: the assistant\'s cancel toast. With no model the assistant is absent (23 §3.1), so the word waits with it.'],
   ['copy.screenshotOn', 'UNBUILT:19 §6\'s screenshot mode.'],
   ['copy.screenshotOff', 'UNBUILT:same.'],
 ]);

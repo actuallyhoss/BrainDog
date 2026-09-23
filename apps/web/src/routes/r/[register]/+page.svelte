@@ -31,6 +31,7 @@
   /* Type only, so the client's route table stays out of this chunk. */
   import { joinNames, type Names } from '$lib/record/remote.ts';
   import { open, read, type Boot, type Refusal } from '$lib/data/record.ts';
+  import { live } from '$lib/data/live.svelte.ts';
   import { searchable } from '$lib/record/find.ts';
   import type { Entry, Fields, RegisterDecl } from '$lib/record/schema.ts';
   import { saidPlainly } from '$lib/record/blocks.ts';
@@ -350,6 +351,7 @@
       counted = new Map();
     }
     refusal = null;
+    stale = false;
     void ask(said, id, filters, q, sort);
     /* AND THE RECEIPTS GO WITH THE ANSWER THEY WERE ABOUT. A chip saying `archived` beside a row
        the reader has just filtered TO is a chip about a different screen: the receipt exists to
@@ -465,6 +467,80 @@
     refusal = said;
     return false;
   };
+
+  /**
+   * THE RECORD CHANGED UNDER THIS LIST, AND UNTIL W56 THE LIST NEVER HEARD. It asked again only when its own question
+   * changed, and an agent writing into the list he has open changes none of the four parts of it, so the row appeared
+   * on his next navigation and not before (`loop/research-living-in-it.md` §1.1). The shell's poll publishes the
+   * record's version (`lib/data/live.svelte.ts`), and a change is this screen's cue to ask its current question again.
+   *
+   * ONE PAGE IS REPLACED WHERE IT STANDS. MORE THAN ONE IS MARKED STALE, and that is `50 §5.4` step 2. Page 1 asked again
+   * is page 1 of the answer as it is now, and pages two to eleven were cut from the answer as it was: splicing a fresh
+   * head onto them would drop or repeat whatever moved across the seam. So the list says it is stale and offers to
+   * start again from the top, which is a decision about the reader's scroll position that is theirs to take.
+   *
+   * WHAT THE READER HAS TYPED IS NOT TOUCHED. `edits` is a patch drawn over `pages` in `result`, and the cell editor
+   * holds its own `editValue`, so replacing the rows leaves both where they were (`50 §5.4` step 5). The receipts and
+   * the holds are keyed by number and survive too, because the question has not changed.
+   *
+   * AND IT IS NOT A `read`. `read` brackets the screen's readiness counters, and a refused call latches `refused` on
+   * `screen.svelte.ts` until the next navigation: a background re-ask that failed would turn a drawn list into
+   * `data-screen="refused"` under the reader, over rows that are all still correct. A failed poll is already the
+   * hairline's to say, so a failed re-ask here says nothing and the next change tries again.
+   */
+  let stale = $state(false);
+  /* The version this list was drawn at. A plain `let`, because it is compared and never drawn. */
+  let drawnAt = untrack(() => live.version);
+
+  $effect(() => {
+    const now = live.version;
+    if (now === null || now === drawnAt) return;
+    drawnAt = now;
+    untrack(() => void recheck());
+  });
+
+  async function recheck() {
+    if (sample || declared?.register !== id) return;
+    if (pages.length > 1) {
+      stale = true;
+      return;
+    }
+    const said = asked;
+    const register = id;
+    const chips = filters;
+    const text = q;
+    const order = sort;
+    const decl = declared.decl;
+    const src = await open();
+    const [answer, facets] = await Promise.all([
+      src.page(register, { filters: chips, q: text, sort: order }, null),
+      counted.size > 0 ? countAll(register, decl, chips, text) : Promise.resolve(counted),
+    ]);
+    if (asked !== said || !answer.ok) return;
+    /* THE READER SCROLLED WHILE THIS WAS OUT, and page 2 is now under page 1: the same seam as above. */
+    if (pages.length > 1) {
+      stale = true;
+      return;
+    }
+    /* THE HEAD'S TOTAL IS `boot`'s COUNT, AND `boot` IS KEPT FOR THE TAB, so a row an agent added would be drawn under a
+       head still counting one fewer. Unfiltered, the answer's size moving is the register's size moving, which is the
+       arithmetic `addLanded` already does by one. Filtered, it says nothing about the rows outside the filter. */
+    if (booted && chips.length === 0 && text === '') {
+      const by = answer.value.matched - matched;
+      if (by !== 0) booted = { ...booted, registers: booted.registers.map((r) => (r.id === register ? { ...r, count: r.count + by } : r)) };
+    }
+    pages = [answer.value.entries];
+    named = answer.value.names;
+    cursor = answer.value.cursor;
+    matched = answer.value.matched;
+    counted = facets;
+  }
+
+  /** The stale mark's control: the question asked again from the top, as a question the reader chose to ask. */
+  function refresh() {
+    stale = false;
+    void ask(asked, id, filters, q, sort);
+  }
 
   /**
    * How many rows hold each value of each pill, under every other chip and the search: the list's
@@ -930,9 +1006,12 @@
    * fact nobody told it. The chip takes the long form where there is room for it and `Added` where there is not.
    */
   function addLanded(entry: Entry, filled: readonly string[] = [], mark?: string) {
-    pages = [[entry, ...(pages[0] ?? [])], ...pages.slice(1)];
-    matched += 1;
-    if (booted) booted = { ...booted, registers: booted.registers.map((r) => (r.id === id ? { ...r, count: r.count + 1 } : r)) };
+    /* THE POLL MAY HAVE BROUGHT IT ALREADY. The record commits before this tab hears back, so a re-ask landing in that
+       gap draws the row, and prepending it again would draw it twice and count it twice. */
+    const already = pages.some((p) => p.some((e) => e.seq === entry.seq));
+    pages = [[entry, ...(pages[0] ?? []).filter((e) => e.seq !== entry.seq)], ...pages.slice(1).map((p) => p.filter((e) => e.seq !== entry.seq))];
+    if (!already) matched += 1;
+    if (booted && !already) booted = { ...booted, registers: booted.registers.map((r) => (r.id === id ? { ...r, count: r.count + 1 } : r)) };
     receipt(entry.seq, {
       mark: mark ?? (filled.length > 0 ? copy.markAddedFilled(filled) : copy.writeMarkAdded),
       short: copy.writeMarkAdded,
@@ -2157,6 +2236,15 @@
     <!-- AND ONLY ONCE THE SAMPLE BAR HAS BEEN PUT AWAY. While the bar stands at the top of the panel
          this printed its first sentence a second time, forty pixels under it. -->
     {#if sample && pref.read().sampleSaid === true}<p class="sample-note">{copy.sampleWhat}</p>{/if}
+    <!-- THE LIST HAS MOVED ON AND MORE THAN ONE PAGE OF IT IS IN HAND, so it says so rather than splicing a new head
+         onto old pages (`recheck` above). `role="status"` because it arrives without the reader doing anything, and a
+         screen reader should hear it once, politely. -->
+    {#if stale}
+      <p class="stale" data-stale role="status">
+        <span>{copy.stale}</span>
+        <Button onclick={refresh}>{copy.tryAgain}</Button>
+      </p>
+    {/if}
     <!--
       CAPTURE, FIRST ON THE PAGE.
 
@@ -3223,6 +3311,18 @@
 
   /* The sample bar's sentence, in the dim ink a note takes: it says where the rows came from. */
   .sample-note {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-xs);
+  }
+
+  /* THE SAME DIM NOTE, WITH ITS ONE CONTROL BESIDE IT. It wraps, for the reason `.seen` below does: at 320px a word and
+     a button on one line is the button leaving the window. */
+  .stale {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-3);
     margin: 0;
     color: var(--ink2);
     font-size: var(--t-xs);

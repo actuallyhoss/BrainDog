@@ -1,0 +1,212 @@
+/**
+ * The poll that tells an open screen the record changed, with its clock and its visibility handed in.
+ *
+ * WHY IT EXISTS. `loop/research-living-in-it.md` §1.1 found one poll in the whole app, `Reporting.svelte`'s report
+ * keys, and a register list that asked again only when its own question changed: an agent writing into the list he
+ * had open changed none of the four parts of that question, so the row appeared on his next navigation and not before.
+ * `/api/version` already answered the change, 0.87 ms a call on a self-host (§1.2), and nothing asked it.
+ *
+ * NO REAL TIMER AND NO DOCUMENT. `every` is a fake clock that fires on `advance`, and visibility is a flag with a
+ * listener, so a fifteen-second interval is tested in no time at all and a hidden tab is a boolean rather than a
+ * browser. What this file cannot prove is that the layout starts the poll or that a list redraws when it answers:
+ * those are the in-browser proof `W56-1` hands to the layout gate.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+import { poller, type LiveState, type Timers, type Visibility } from './live.ts';
+
+/** A clock that only moves when told to, and fires each interval as often as the time it moved covers. */
+function clock(): Timers & { advance(ms: number): void } {
+  let now = 0;
+  const running = new Set<{ fn: () => void; ms: number; next: number }>();
+  return {
+    every(fn, ms) {
+      const t = { fn, ms, next: now + ms };
+      running.add(t);
+      return () => running.delete(t);
+    },
+    advance(ms) {
+      const until = now + ms;
+      for (;;) {
+        const due = [...running].filter((t) => t.next <= until).sort((a, b) => a.next - b.next)[0];
+        if (!due) break;
+        now = due.next;
+        due.next += due.ms;
+        due.fn();
+      }
+      now = until;
+    },
+  };
+}
+
+/** A tab that is hidden or not, and says so to whoever is listening. */
+function tab(hidden: boolean): Visibility & { set(hidden: boolean): void } {
+  const heard = new Set<() => void>();
+  return {
+    hidden: () => hidden,
+    watch(fn) {
+      heard.add(fn);
+      return () => heard.delete(fn);
+    },
+    set(next) {
+      hidden = next;
+      for (const fn of heard) fn();
+    },
+  };
+}
+
+/** An `ask` that answers from a script, one entry per call, and counts the calls. A string is a failure. */
+function asker(script: (number | string)[]) {
+  const out = { calls: 0, ask: async (): Promise<number> => 0 };
+  out.ask = async () => {
+    const said = script[Math.min(out.calls, script.length - 1)];
+    out.calls++;
+    if (typeof said === 'string') throw new Error(said);
+    return said as number;
+  };
+  return out;
+}
+
+/** Let every answer that is due land. */
+const settle = () => new Promise<void>((r) => setImmediate(r));
+
+test('a visible tab asks at once, then once every fifteen seconds', async () => {
+  const timers = clock();
+  const a = asker([1]);
+  const stop = poller({ ask: a.ask, timers, visible: tab(false), onChange: () => {} });
+  await settle();
+  assert.equal(a.calls, 1, 'the first ask is the baseline, and it goes out when the poll starts');
+  for (let i = 0; i < 3; i++) {
+    timers.advance(15_000);
+    await settle();
+  }
+  assert.equal(a.calls, 4, 'forty-five seconds is three more');
+  timers.advance(14_999);
+  await settle();
+  assert.equal(a.calls, 4, 'and not one before the fifteenth second');
+  stop();
+});
+
+test('a hidden tab asks nothing, and asks exactly once when it comes back', async () => {
+  const timers = clock();
+  const t = tab(true);
+  const a = asker([1]);
+  const stop = poller({ ask: a.ask, timers, visible: t, onChange: () => {} });
+  timers.advance(60_000);
+  await settle();
+  assert.equal(a.calls, 0, 'a minute hidden is a minute of no requests');
+  t.set(false);
+  await settle();
+  assert.equal(a.calls, 1, 'coming back is one ask, not a burst of the ones it skipped');
+  timers.advance(15_000);
+  await settle();
+  assert.equal(a.calls, 2, 'and the interval runs again from there');
+  t.set(true);
+  timers.advance(60_000);
+  await settle();
+  assert.equal(a.calls, 2, 'hidden again, and quiet again');
+  stop();
+});
+
+test('onChange hears a different version once, never an equal one, and never an ordering', async () => {
+  const timers = clock();
+  const heard: number[] = [];
+  /* 7 THEN 3 IS THE CASE THAT MATTERS. A member's version is a hash (`Version.version` in `@braindog/client`), so a
+     change can come back smaller; a poller that compared with `>` would sit on the change and say nothing. */
+  const a = asker([7, 7, 3, 3]);
+  const stop = poller({ ask: a.ask, timers, visible: tab(false), onChange: (v) => heard.push(v) });
+  await settle();
+  assert.deepEqual(heard, [], 'the first answer is the baseline: the screen was drawn from this state');
+  timers.advance(15_000);
+  await settle();
+  assert.deepEqual(heard, [], 'an equal version is no change');
+  timers.advance(15_000);
+  await settle();
+  assert.deepEqual(heard, [3], 'a different one is one change, whichever way it moved');
+  timers.advance(15_000);
+  await settle();
+  assert.deepEqual(heard, [3], 'and it is heard once');
+  stop();
+});
+
+test('a failed ask is offline, an answer is open, and each is said once', async () => {
+  const timers = clock();
+  const states: LiveState[] = [];
+  const heard: number[] = [];
+  const a = asker([4, 'down', 'down', 5]);
+  const stop = poller({ ask: a.ask, timers, visible: tab(false), onChange: (v) => heard.push(v), onState: (s) => states.push(s) });
+  await settle();
+  assert.deepEqual(states, [], 'open is where it starts, so the first answer is not a transition');
+  timers.advance(15_000);
+  await settle();
+  assert.deepEqual(states, ['offline']);
+  timers.advance(15_000);
+  await settle();
+  assert.deepEqual(states, ['offline'], 'a second failure changes nothing on screen');
+  timers.advance(15_000);
+  await settle();
+  assert.deepEqual(states, ['offline', 'open']);
+  assert.deepEqual(heard, [5], 'and what was written while it was down is a change like any other');
+  stop();
+});
+
+test('one ask at a time: a slow answer is waited for, not overtaken', async () => {
+  const timers = clock();
+  let calls = 0;
+  let answer: (v: number) => void = () => {};
+  const ask = () => {
+    calls++;
+    return new Promise<number>((r) => (answer = r));
+  };
+  const stop = poller({ ask, timers, visible: tab(false), onChange: () => {} });
+  timers.advance(45_000);
+  await settle();
+  assert.equal(calls, 1, 'three ticks under one slow answer send no second request');
+  answer(1);
+  await settle();
+  timers.advance(15_000);
+  await settle();
+  assert.equal(calls, 2);
+  stop();
+});
+
+test('after stop, nothing is asked and nothing is heard', async () => {
+  const timers = clock();
+  const t = tab(false);
+  const heard: number[] = [];
+  let answer: (v: number) => void = () => {};
+  let calls = 0;
+  const ask = () => {
+    calls++;
+    return calls === 1 ? Promise.resolve(1) : new Promise<number>((r) => (answer = r));
+  };
+  const stop = poller({ ask, timers, visible: t, onChange: (v) => heard.push(v) });
+  await settle();
+  timers.advance(15_000);
+  stop();
+  answer(2);
+  await settle();
+  assert.deepEqual(heard, [], 'an answer landing after stop belongs to nobody');
+  timers.advance(60_000);
+  t.set(true);
+  t.set(false);
+  await settle();
+  assert.equal(calls, 2, 'and the clock and the tab no longer reach it');
+});
+
+/* THE HAIRLINE WAS A CONSTANT, and a constant cannot be reassigned by a poll. `+layout.svelte` held
+   `const live: 'open' | 'polling' | 'offline' = 'open'`, so the `polling` and `offline` rules under it could never match
+   (§1.1). This reads the file because the layout is a component no unit test mounts. */
+test('the layout draws the hairline from the live store, not from a constant', () => {
+  const layout = readFileSync(new URL('../../routes/+layout.svelte', import.meta.url), 'utf8');
+  assert.ok(!layout.includes("const live: 'open' | 'polling' | 'offline' = 'open'"), 'the constant is gone');
+  assert.match(layout, /from '\$lib\/data\/live\.svelte\.ts'/, 'the state comes from the store the poll writes');
+  /* AN IMPORT IS NOT A READ. With only the two lines above, `data-state="open"` written back in beside the import
+     passed, and so did a layout that imported `follow` and never called it: measured by mutating a copy of the layout
+     both ways. So the hairline's attribute and the call that starts the poll are named too. */
+  assert.match(layout, /data-state=\{live\.state\}/, 'the hairline reads the state the poll sets');
+  assert.match(layout, /follow\(data\.live === true \?/, 'and the poll is started, for a live record only');
+});
