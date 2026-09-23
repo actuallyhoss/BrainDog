@@ -13,15 +13,22 @@
  * the tender of Curaçao and Sint Maarten in 2025, and the array did not, so the picker could not offer a currency the
  * record would have accepted. Nothing had drifted the other way, which is luck rather than design.
  *
- * WHAT `Intl` CANNOT ANSWER IS WHAT STAYS HERE, and it is two things: the order a picker offers codes in, and the
+ * WHAT `Intl` CANNOT ANSWER IS WHAT STAYS HERE, and it is two things: which codes a picker offers first, and the
  * judgement that a few of the codes the runtime lists are not money anybody keeps books in. Neither is a membership
  * question, so neither is a fourth list.
  *
  * The call is at module scope in a browser bundle, which `measures.ts` and `shape.ts` in this same app already do.
  */
 
-/** The ones most people hold, in the order the picker offers them. */
-export const COMMON_CURRENCIES = ['EGP', 'USD', 'GBP', 'EUR', 'SAR', 'AED', 'JPY', 'CAD', 'AUD', 'CHF', 'CNY', 'INR'] as const;
+/**
+ * The ones most people hold. A set, because the order a picker offers them in is not this file's to write.
+ *
+ * IT WAS A LIST THAT LED WITH THE EGYPTIAN POUND, `['EGP', 'USD', 'GBP', 'EUR', ...]`, which is the order of the one
+ * person who wrote it, and every picker drew it that way: measured, `currencyChoices` answered `EGP` first for a record
+ * at `GBP`, at `JPY` and with no home currency at all, and the rates form drew it directly. So the order is now asked
+ * of the record (its home currency first, in `currencyChoices`) and, with none, of the runtime.
+ */
+const COMMON = new Set(['AED', 'AUD', 'CAD', 'CHF', 'CNY', 'EGP', 'EUR', 'GBP', 'INR', 'JPY', 'SAR', 'USD']);
 
 /**
  * The codes the runtime lists that the picker does not offer, each with the reason it is not offered.
@@ -49,8 +56,11 @@ export const OFFERED_CURRENCIES: readonly string[] = Intl.supportedValuesOf('cur
   .filter((code) => !(code in NOT_OFFERED))
   .sort();
 
+/** The common ones in the order the runtime lists them, which is code order, so no one person's currency is first. */
+export const COMMON_CURRENCIES: readonly string[] = OFFERED_CURRENCIES.filter((c) => COMMON.has(c));
+
 /** The rest, after the common ones, in code order. */
-export const OTHER_CURRENCIES: readonly string[] = OFFERED_CURRENCIES.filter((c) => !(COMMON_CURRENCIES as readonly string[]).includes(c));
+export const OTHER_CURRENCIES: readonly string[] = OFFERED_CURRENCIES.filter((c) => !COMMON.has(c));
 
 const CODE = /^[A-Z]{3}$/u;
 
@@ -61,9 +71,18 @@ const CODE = /^[A-Z]{3}$/u;
  * THE TEST IS AGAINST WHAT THE PICKER OFFERS AND NOT AGAINST `Intl`, because the two differ on purpose. A record left
  * holding `HRK` is holding a code the runtime still knows and the picker deliberately drops, and asking `Intl` here
  * would leave that setting drawing as empty: the one screen where the wrong answer is invisible.
+ *
+ * AND A HELD CODE THE PICKER OFFERS LEADS THE COMMON GROUP, common or not, and leaves the other group, so a record at
+ * `NZD` is offered `NZD` first and once. Two options with one value is a select that reports whichever it met first.
+ * The settings screen passes the home currency it holds, and the rates form passes the same, so both lead with the
+ * record's own money.
  */
 export function currencyChoices(held: string): { common: readonly string[]; other: readonly string[] } {
   const code = held.trim().toUpperCase();
-  const offered = OFFERED_CURRENCIES.includes(code);
-  return { common: COMMON_CURRENCIES, other: CODE.test(code) && !offered ? [code, ...OTHER_CURRENCIES] : OTHER_CURRENCIES };
+  if (!OFFERED_CURRENCIES.includes(code))
+    return { common: COMMON_CURRENCIES, other: CODE.test(code) ? [code, ...OTHER_CURRENCIES] : OTHER_CURRENCIES };
+  return {
+    common: [code, ...COMMON_CURRENCIES.filter((c) => c !== code)],
+    other: OTHER_CURRENCIES.includes(code) ? OTHER_CURRENCIES.filter((c) => c !== code) : OTHER_CURRENCIES,
+  };
 }

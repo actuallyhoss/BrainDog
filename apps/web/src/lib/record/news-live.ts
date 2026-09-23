@@ -91,6 +91,9 @@ export function tileOf(id: string, r: Reading | null): Metric {
   const empty = (r.held ?? r.rows) === 0;
   const unsaid = unsaidFigure(decl, r);
   const met = empty || unsaid ? null : r.met;
+  /* NO DOOR OVER NO ROWS, AND NONE FOR A FIGURE THAT READS NO LIST: `hrefFor` answers `null` there, where it used to
+     answer Money's page on every record. */
+  const door = decl && !empty && !unsaid ? hrefFor(decl) : null;
   return {
     id,
     label,
@@ -99,7 +102,7 @@ export function tileOf(id: string, r: Reading | null): Metric {
        every such figure satisfies, printed as though something had been checked against it. */
     note: [unsaid ? NO_ROW_SAID : decl && !offTarget(decl, r.unit) ? targetLine(decl) : '', across].filter(Boolean).join(' · '),
     tone: met === null ? undefined : met ? 'good' : 'warn',
-    ...(decl && !empty && !unsaid ? { href: hrefFor(decl) } : {}),
+    ...(door ? { href: door } : {}),
   };
 }
 

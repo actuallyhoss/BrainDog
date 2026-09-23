@@ -262,8 +262,14 @@
                       {#each decl.values ?? [] as v (v)}<option value={v}>{v.replace(/_/g, ' ')}</option>{/each}
                     </select>
                   {:else if key === HOME_CURRENCY_SETTING && decl.type === 'text'}
-                    <!-- A HOME CURRENCY IS CHOSEN, NOT TYPED: the common ones first, then every ISO 4217 code. None is no home currency. -->
-                    {@const choices = currencyChoices(d.text)}
+                    <!-- A HOME CURRENCY IS CHOSEN, NOT TYPED: the common ones first, then every ISO 4217 code. None is no home currency.
+                         THE ORDER IS THE SAVED CURRENCY'S AND NOT THE DRAFT'S. `currencyChoices` moves the code it is
+                         handed to the front, and handed the draft it moved every pick: stepping a closed select from GBP
+                         with the down arrow, measured through `currencyChoices`, went AED, AUD, AED, AUD and never
+                         reached a third code. A saved code the picker does not offer still draws, because the draft
+                         starts as the saved value and every pick is an offered one. -->
+                    {@const saved = settings?.values[key]}
+                    {@const choices = currencyChoices(typeof saved === 'string' ? saved : '')}
                     <select class="setting-select" id="set-{key}" value={d.text.trim().toUpperCase()} onchange={(e) => (d.text = typed(e))}>
                       <option value="">{copy.currencyNone}</option>
                       <optgroup label={copy.currencyCommon}>{#each choices.common as c (c)}<option value={c}>{c}</option>{/each}</optgroup>

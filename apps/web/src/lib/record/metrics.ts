@@ -180,7 +180,8 @@ export type Reading = {
    */
   unmeasured: string | null;
   refusals: string[];
-  href: string;
+  /** The rows the figure was computed over, as an address; absent when the figure reads no list, so it opens nothing. */
+  href?: string;
   /** A grouped figure's parts, as the record's `groupsOf` returns them. */
   groups?: Group[];
   /** The bucket the clock is in, on a figure bucketed by date. */
@@ -593,9 +594,12 @@ export function format(shape: string | undefined, n: number | null): string {
  * when the field declares its values, and a URL that silently lists them is a URL that breaks when
  * a pack adds one.
  */
-export function hrefFor(decl: MetricDecl): string {
+export function hrefFor(decl: MetricDecl): string | null {
   const register = registerOf(decl.source);
-  if (!register) return '/p/money';
+  /* A FIGURE THAT READS NO LIST HAS NO ROWS TO OPEN, SO IT HAS NO DOOR. This answered `/p/money`, which is a page only
+     money-core declares: on a record without Money the door opened nothing, and on one with it the door opened a page
+     about something else. Every caller leaves `href` off on `null`, as they already did for a figure over no rows. */
+  if (!register) return null;
   /* THE SAME BUILDER A PAGE BLOCK USES. It lived here, so a figure's link was derived from its
      predicate and a block's link was not derived from anything — the block just went to the
      register. Two surfaces asking the same question of the same sentence now get the same answer
@@ -969,12 +973,19 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
 
   refusals.push(...groupingFaults(decl, register).map((r) => `${decl.metric}: ${r}`));
 
-  if (refusals.length || !register)
-    return { value: null, shown: '—', rows: 0, held: 0, delta: null, why: refusals[0] ?? '', unmeasured: null, refusals, href: '/p/money' };
+  /* A REFUSED FIGURE OPENS ITS OWN LIST WHEN THE RECORD HAS ONE, as the three refusals below it already did, and nothing
+     when it has none. This path answered `/p/money` for both, so a figure refused for its window linked to Money
+     whatever it counted. */
+  if (refusals.length || !register) {
+    const door = register && REGISTERS[register] ? hrefFor(decl) : null;
+    return { value: null, shown: '—', rows: 0, held: 0, delta: null, why: refusals[0] ?? '', unmeasured: null, refusals, ...(door ? { href: door } : {}) };
+  }
 
   const w = compile(register, decl.where);
   const all = ROWS[register] ?? [];
   const rows = all.filter((e) => matches(e, w, now));
+  /* PAST THE REFUSAL ABOVE THE FIGURE HAS A LIST, so this is `hrefFor`'s answer with the `null` it can no longer give. */
+  const href = registerHref(register, decl.where);
 
   /**
    * THE ROWS THE PREDICATE CHOSE FROM, which is the register's own unless a parameter narrowed it.
@@ -1020,7 +1031,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
   const acrossed = figure.parts !== undefined || figure.fx !== undefined;
   if (seen.size > 1 && !acrossed) {
     const why = `${decl.metric}: ${mixedFix([...seen].sort())}`;
-    return { value: null, shown: '—', rows: rows.length, held: heldRows.length, delta: null, why, unmeasured: null, refusals: [why], href: hrefFor(decl) };
+    return { value: null, shown: '—', rows: rows.length, held: heldRows.length, delta: null, why, unmeasured: null, refusals: [why], href };
   }
 
   /**
@@ -1044,7 +1055,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
    */
   if (!acrossed && declared && figure.unit && !isMoneyFigure(register, decl.value)) {
     const why = `${decl.metric}: the rows are in ${figure.unit} and the format says ${declared}`;
-    return { value: null, shown: '—', rows: rows.length, held: heldRows.length, delta: null, why, unmeasured: null, refusals: [why], href: hrefFor(decl) };
+    return { value: null, shown: '—', rows: rows.length, held: heldRows.length, delta: null, why, unmeasured: null, refusals: [why], href };
   }
 
   /* A FACTOR THE TABLE DOES NOT HOLD IS A REFUSAL, NOT A SMALLER NUMBER. `operand` answered `null`
@@ -1056,7 +1067,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
   const short = missingFactors(rows, decl.value);
   if (short.length) {
     const why = `${decl.metric}: no factor for ${short.slice(0, 3).join(', ')}${short.length > 3 ? ` and ${short.length - 3} more` : ''}`;
-    return { value: null, shown: '—', rows: rows.length, held: heldRows.length, delta: null, why, unmeasured: null, refusals: [why], href: hrefFor(decl) };
+    return { value: null, shown: '—', rows: rows.length, held: heldRows.length, delta: null, why, unmeasured: null, refusals: [why], href };
   }
 
   const value = figure.value;
@@ -1160,7 +1171,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
     why,
     unmeasured,
     refusals: [],
-    href: hrefFor(decl),
+    href,
     unit: figure.unit,
     ...(figure.parts ? { parts: figure.parts } : {}),
     ...(figure.fx ? { fx: figure.fx } : {}),

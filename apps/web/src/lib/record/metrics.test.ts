@@ -24,8 +24,9 @@ import { amountOf } from './money.ts';
 /** The documents that are metrics as they stand. A template is one until it has its parameter. */
 const CONCRETE = Object.entries(METRICS).filter(([, d]) => !isTemplate(d));
 
-/** The rows a href opens, read the way the register route reads it. */
-function opened(href: string): number {
+/** The rows a href opens, read the way the register route reads it. A figure over a list always has one (`shell-defaults.test.ts`). */
+function opened(href: string | undefined): number {
+  assert.ok(href, 'a figure over a list has no door');
   const url = new URL(href, 'http://x');
   const register = url.pathname.split('/')[2] ?? '';
   const filters = url.searchParams.getAll('f').map((raw) => {
@@ -125,7 +126,7 @@ test('EVERY TILE OPENS EXACTLY THE ROWS IT COUNTED', () => {
 test('a negation survives the URL, because the sentence grammar has one', () => {
   // Without `not-in`, `state is not cancelled` had no link that opened its own rows, and the
   // alternative — writing out the enum's complement — breaks when a pack adds a value.
-  const href = hrefFor(METRICS['estate-year']!);
+  const href = hrefFor(METRICS['estate-year']!)!;
   assert.match(href, /not-in/);
   assert.equal(opened(href), read(METRICS['estate-year']!).rows);
 });

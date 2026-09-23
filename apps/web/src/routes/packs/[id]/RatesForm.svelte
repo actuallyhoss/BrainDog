@@ -13,7 +13,7 @@
   import { createClient } from '@braindog/client';
   import { copy } from '$lib/copy.ts';
   import Button from '$lib/ui/Button.svelte';
-  import { COMMON_CURRENCIES, OTHER_CURRENCIES } from '$lib/record/currencies.ts';
+  import { currencyChoices } from '$lib/record/currencies.ts';
   import { RATES_SOURCES, currenciesIn, ratesFault, ratesProposal, rowsFor, type RatesDraft } from '$lib/record/rates-form.ts';
 
   let { home }: { home: string } = $props();
@@ -30,6 +30,10 @@
   /** The currencies the record holds money in, once read. */
   let held = $state<string[]>([]);
 
+  /* BOTH PICKERS' LISTS LEAD WITH THE RECORD'S HOME CURRENCY, as the setting above them does. They drew the common list
+     as written, so on a record at `JPY` both lists began with the Egyptian pound. The base still starts selected at
+     `USD` (`base` above); only the order of what is offered changed here. */
+  const choices = $derived(currencyChoices(home));
   const covers = $derived(RATES_SOURCES.find((s) => s.id === source)?.covers ?? copy.ratesCustomCovers);
   const wanted = (): string[] => [...held, ...(home ? [home] : [])];
 
@@ -108,8 +112,8 @@
 
     <label class="rates-label" for="rates-base">{copy.ratesBase}</label>
     <select class="rates-select" id="rates-base" value={base} onchange={(e) => { base = e.currentTarget.value; repath(); }} aria-describedby="rates-base-note">
-      <optgroup label={copy.currencyCommon}>{#each COMMON_CURRENCIES as c (c)}<option value={c}>{c}</option>{/each}</optgroup>
-      <optgroup label={copy.currencyAll}>{#each OTHER_CURRENCIES as c (c)}<option value={c}>{c}</option>{/each}</optgroup>
+      <optgroup label={copy.currencyCommon}>{#each choices.common as c (c)}<option value={c}>{c}</option>{/each}</optgroup>
+      <optgroup label={copy.currencyAll}>{#each choices.other as c (c)}<option value={c}>{c}</option>{/each}</optgroup>
     </select>
     <p class="rates-note" id="rates-base-note">{copy.ratesBaseNote(base)}</p>
 
@@ -132,8 +136,8 @@
       <div class="rates-do">
         <select class="rates-select" aria-label={copy.ratesAdd} value="" onchange={(e) => add(e.currentTarget)}>
           <option value="">{copy.ratesAdd}</option>
-          <optgroup label={copy.currencyCommon}>{#each COMMON_CURRENCIES as c (c)}<option value={c}>{c}</option>{/each}</optgroup>
-          <optgroup label={copy.currencyAll}>{#each OTHER_CURRENCIES as c (c)}<option value={c}>{c}</option>{/each}</optgroup>
+          <optgroup label={copy.currencyCommon}>{#each choices.common as c (c)}<option value={c}>{c}</option>{/each}</optgroup>
+          <optgroup label={copy.currencyAll}>{#each choices.other as c (c)}<option value={c}>{c}</option>{/each}</optgroup>
         </select>
       </div>
     </fieldset>

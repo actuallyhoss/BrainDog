@@ -684,7 +684,7 @@ test('A URL CARRIES THE VALUE THE FIELD DECLARES, and one spelling reaches the c
     source: 'register.obligations',
     where: 'state is open, direction is owed to me',
     value: { sum: 'amount' },
-  } as never);
+  } as never)!;
   assert.match(href, /direction:in:owed_to_me/, 'a metric handed the reader a spelling its own control does not know');
   assert.ok(!href.includes('%20'), 'a URL carried a spoken value with spaces in it');
 });

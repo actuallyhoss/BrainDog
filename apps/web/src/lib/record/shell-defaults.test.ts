@@ -1,0 +1,130 @@
+/**
+ * Two defaults the shell carried for one owner: a figure with no list linked to Money, and every currency picker led
+ * with the Egyptian pound.
+ *
+ * BOTH WERE DRIVEN BEFORE THIS FILE EXISTED (`loop/research-shell-leftovers.md` L7): `hrefFor` over a figure whose
+ * source names no list answered `/p/money`, and `currencyChoices` answered `["EGP","USD","GBP","EUR", ...]` for a
+ * record at `GBP`, at `JPY` and with no home currency at all. `/p/money` is a page only money-core declares, so on a
+ * record without Money that door opens nothing, and the picker's order was the order of the person who wrote it.
+ *
+ * WHAT A PERSON COULD SEE OF THE FIRST ONE, MEASURED ON 23 SEPTEMBER: nothing yet. Every figure the seed declares names
+ * a list (seven sources, all `register.`), and the sample engine's tile returns before it reads a refused figure's
+ * link. So the `/p/money` fallback was a default waiting for the first figure that reads something other than a list,
+ * and the cases below hand the live tiles such a figure to hold them to the answer before one ships.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+import { COMMON_CURRENCIES, OFFERED_CURRENCIES, OTHER_CURRENCIES, currencyChoices } from './currencies.ts';
+import { METRICS } from './declared.ts';
+import { hrefFor, read, type MetricDecl } from './metrics.ts';
+import { tileOf as homeTile } from './news-live.ts';
+import { tileOf as pageTile } from './page-live.ts';
+
+/** A declared figure moved off its list: the same figure, reading something that is not a register. */
+const unlisted = (id: string): MetricDecl => ({ ...METRICS['estate-year']!, metric: id, source: 'sessions.live' });
+
+/** The build's figures with one more in them for the length of `run`, because both live tiles look a figure up by id. */
+function withFigure<T>(decl: MetricDecl, run: () => T): T {
+  METRICS[decl.metric] = decl;
+  try {
+    return run();
+  } finally {
+    delete METRICS[decl.metric];
+  }
+}
+
+/* ── a figure with no list ─────────────────────────────────────────────── */
+
+test('A FIGURE WHOSE SOURCE NAMES NO LIST HAS NO DOOR, where it used to be handed Money’s page', () => {
+  assert.equal(hrefFor(unlisted('unlisted')), null);
+  /* AND A FIGURE THAT NAMES ONE STILL OPENS IT: the derived link is the whole point of `hrefFor`. */
+  assert.match(hrefFor(METRICS['estate-year']!) ?? '', /^\/r\/services\?/u);
+});
+
+test('A FIGURE REFUSED FOR HAVING NO LIST CARRIES NO LINK, and one refused over a list it has opens that list', () => {
+  const none = read(unlisted('unlisted'));
+  assert.notDeepEqual(none.refusals, [], 'the figure is refused, which is the path that hard-coded Money');
+  assert.equal(none.href, undefined);
+  assert.equal('href' in none, false, 'the key is left off, as the live tiles leave it off an empty figure');
+
+  /* REFUSED FOR ITS WINDOW, OVER A LIST THE RECORD HAS. The four refusals further down `read` already linked to the
+     figure's own rows; this one, the first, linked to Money whatever the figure was about. */
+  const { window: _w, ...windowless } = METRICS['estate-year']!;
+  const refused = read(windowless as MetricDecl);
+  assert.notDeepEqual(refused.refusals, []);
+  assert.equal(refused.href, hrefFor(METRICS['estate-year']!));
+});
+
+test('HOME’S TILE AND A PAGE’S TILE LEAVE THE DOOR OFF A FIGURE WITH NO LIST, and keep it on one that has', () => {
+  const decl = unlisted('unlisted-live');
+  const reading = { value: 1_250_000, unit: 'GBP', rows: 4, held: 4, met: true, refusals: [] };
+  const home = withFigure(decl, () => homeTile(decl.metric, reading));
+  const page = withFigure(decl, () => pageTile({ metric: decl.metric, reading } as never));
+  assert.equal(home.value, 'GBP 12,500.00', 'the figure itself is drawn; only the door goes');
+  assert.equal(home.href, undefined);
+  assert.equal(page.href, undefined);
+
+  const listed = homeTile('estate-year', reading);
+  assert.equal(listed.href, hrefFor(METRICS['estate-year']!));
+});
+
+/* ── the currency picker ───────────────────────────────────────────────── */
+
+test('THE COMMON CURRENCIES LEAD WITH THE RECORD’S OWN, whichever it is', () => {
+  for (const home of ['GBP', 'JPY', 'usd', ' egp ']) {
+    const { common, other } = currencyChoices(home);
+    const code = home.trim().toUpperCase();
+    assert.equal(common[0], code, `a record at ${code} was offered ${common[0]} first`);
+    assert.equal(common.filter((c) => c === code).length, 1, `${code} is offered once`);
+    assert.deepEqual([...common].sort(), [...COMMON_CURRENCIES].sort(), 'leading with it adds and drops nothing');
+    assert.equal(other.includes(code), false);
+  }
+});
+
+test('A HOME CURRENCY OUTSIDE THE COMMON ONES LEADS THEM TOO, and is not offered twice', () => {
+  const { common, other } = currencyChoices('NZD');
+  assert.equal(common[0], 'NZD');
+  assert.equal(other.includes('NZD'), false, 'a code in both groups is two options with one value');
+  assert.equal(common.length + other.length, OFFERED_CURRENCIES.length);
+});
+
+test('WITH NO HOME CURRENCY THE COMMON ONES ARE IN THE RUNTIME’S ORDER, with no one person’s first', () => {
+  const { common } = currencyChoices('');
+  assert.deepEqual(common, OFFERED_CURRENCIES.filter((c) => common.includes(c)));
+  assert.equal(common[0], 'AED', 'the first common code in the order `Intl` lists them');
+  assert.deepEqual(currencyChoices('not a code').common, common);
+  assert.equal(currencyChoices('').other, OTHER_CURRENCIES);
+});
+
+test('THE RATES FORM DRAWS BOTH ITS PICKERS FROM THE RECORD’S HOME CURRENCY, not from the list as written', () => {
+  /* A SOURCE SCAN, BECAUSE NOTHING IN THIS APP RENDERS A ROUTE'S COMPONENT UNDER `node --test`. Before this file the
+     form imported `COMMON_CURRENCIES` and drew it directly in both pickers, so reordering `currencyChoices` alone left
+     the base currency and the add picker leading with `EGP` on a record at `JPY`. */
+  /* Comments blanked, as `at-sites.test.ts` blanks them: the form's own comment says what it used to draw. */
+  const source = readFileSync(fileURLToPath(new URL('../../routes/packs/[id]/RatesForm.svelte', import.meta.url)), 'utf8').replace(/<!--[\s\S]*?-->|\/\*[\s\S]*?\*\//gu, '');
+  assert.equal(/\bCOMMON_CURRENCIES\b|\bOTHER_CURRENCIES\b/u.test(source), false, 'the form reads a currency list other than the one ordered for its record');
+  assert.equal(/currencyChoices\(home\)/u.test(source), true, 'the form does not ask for the choices at its home currency');
+  const groups = [...source.matchAll(/<optgroup[^>]*>\{#each (\S+) as/gu)].map((m) => m[1]);
+  assert.deepEqual(groups, ['choices.common', 'choices.other', 'choices.common', 'choices.other']);
+});
+
+test('THE SETTINGS PICKER IS ORDERED BY THE SAVED CURRENCY, so a pick does not move the list under the next one', () => {
+  /* WHAT WENT WRONG WHEN IT WAS ORDERED BY THE DRAFT. The select writes its draft on every `change`, and a closed select
+     stepped with the down arrow fires one per step, so each step moved the code just picked to the front and the next
+     step landed on the code it had left: from `GBP` it went AED, AUD, AED, AUD. Held at the saved code, the same six
+     steps walk six codes in order. */
+  const { common, other } = currencyChoices('GBP');
+  const order = ['', ...common, ...other];
+  const walked = Array.from({ length: 6 }, (_, i) => order[order.indexOf('GBP') + 1 + i]);
+  assert.equal(new Set(walked).size, 6);
+
+  /* A SOURCE SCAN, as for the rates form above, with the comments blanked for the same reason. */
+  const source = readFileSync(fileURLToPath(new URL('../../routes/packs/[id]/+page.svelte', import.meta.url)), 'utf8').replace(/<!--[\s\S]*?-->|\/\*[\s\S]*?\*\//gu, '');
+  const asked = [...source.matchAll(/currencyChoices\(([^)]*)\)/gu)].map((m) => m[1]);
+  assert.equal(asked.length, 1, 'the settings screen asks for the choices in one place');
+  assert.equal(/\bd\.text\b/u.test(asked[0]!), false, `the settings picker is ordered by its draft: currencyChoices(${asked[0]})`);
+});

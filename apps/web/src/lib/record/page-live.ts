@@ -360,6 +360,9 @@ export function tileOf(cell: NonNullable<Answered['readings']>[number], values?:
    */
   const unsaid = !empty && r.rows === 0 && decl !== undefined && overUnsaidField(decl);
   const met = empty || unsaid ? null : r.met;
+  /* NO DOOR OVER NO ROWS, AND NONE FOR A FIGURE THAT READS NO LIST: `hrefFor` answers `null` there, where it used to
+     answer Money's page on every record. */
+  const door = decl && !empty && !unsaid ? hrefFor(decl) : null;
   /* THE LINE IS THE RECORD'S SERIES, and only numbers and gaps are drawn: anything else is not a day. */
   const trend = Array.isArray(cell.trend) && cell.trend.every((v) => v === null || (typeof v === 'number' && Number.isFinite(v))) ? (cell.trend as (number | null)[]) : undefined;
   return {
@@ -377,7 +380,7 @@ export function tileOf(cell: NonNullable<Answered['readings']>[number], values?:
        figure says as of which day's rates. */
     note: [said(unsaid ? liveWords.unsaid : decl ? targetSaid(decl, r) : ''), across].filter(Boolean).join(' · '),
     tone: met === null ? undefined : met ? 'good' : 'warn',
-    ...(decl && !empty && !unsaid ? { href: hrefFor(decl) } : {}),
+    ...(door ? { href: door } : {}),
   };
 }
 

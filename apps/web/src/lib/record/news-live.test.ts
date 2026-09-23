@@ -102,7 +102,7 @@ test('ONE READING OF ONE FIGURE, THREE ENGINES, ONE ANSWER: no row has filled th
   const page = pageTile({ metric: id, reading: shape } as never);
   /* THE SAMPLE ENGINE BUILDS THE REST OF ITS READING ITSELF, so only the keys it cannot derive from
      the declaration are written here: the figure, its unit, and the two counts the state turns on. */
-  const sample = figureTile(id, decl, { ...shape, shown: money(0, 'GBP'), delta: null, why: '', unmeasured: null, href: hrefFor(decl) });
+  const sample = figureTile(id, decl, { ...shape, shown: money(0, 'GBP'), delta: null, why: '', unmeasured: null, href: hrefFor(decl)! });
 
   const answers = [home, page, sample].map((t) => [t.value, t.tone ?? null, t.href ?? null, t.note]);
   assert.deepEqual(answers[1], answers[0], 'Home and the page answered one reading differently');

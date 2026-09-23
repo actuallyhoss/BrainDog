@@ -42,7 +42,11 @@ test('THE PICKER DROPS ONLY CODES THE RUNTIME STILL LISTS, and every code it doe
 });
 
 test('THE COMMON CURRENCIES COME FIRST, then every other offered code once, in code order', () => {
-  assert.deepEqual(COMMON_CURRENCIES.slice(0, 4), ['EGP', 'USD', 'GBP', 'EUR']);
+  /* IN THE RUNTIME'S ORDER AND NOT ONE PERSON'S. This pinned `EGP, USD, GBP, EUR` first until the order became the
+     record's to set (`currencyChoices`, `shell-defaults.test.ts`). The common ones are now filtered out of the runtime's
+     list, so a common code the runtime stops listing would drop out of the group without a word; twelve holds it. */
+  assert.deepEqual([...COMMON_CURRENCIES].sort(), [...COMMON_CURRENCIES]);
+  assert.equal(COMMON_CURRENCIES.length, 12);
   assert.equal(new Set(OFFERED_CURRENCIES).size, OFFERED_CURRENCIES.length);
   assert.deepEqual([...OFFERED_CURRENCIES].sort(), [...OFFERED_CURRENCIES]);
   assert.equal(COMMON_CURRENCIES.length + OTHER_CURRENCIES.length, OFFERED_CURRENCIES.length);
