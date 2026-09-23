@@ -30,8 +30,9 @@ import type { Proposal } from './govern.ts';
 import { LEGACY, PARTS, plays, type MeetsFields, type Role } from './roles.ts';
 
 /**
- * The list `meet` wrote by name before any list declared `meets:`, and still does while none does. The record's own
- * guard and its members' names gate still name it (`packages/record/src/index.ts`), which is its follow-up to move.
+ * The list `meet` wrote by name before any list declared `meets:`, and still does while none does. The record's `meet`
+ * guard reads `kernel.meetsList()` and not this name; only its members' names gate, `namesFor`
+ * (`packages/record/src/index.ts`), still names `people`, by list and by module.
  */
 export const PEOPLE = LEGACY.meets;
 

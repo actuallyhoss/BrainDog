@@ -5999,8 +5999,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /**
      * The list `meet` writes and the field playing each part, or `null` when there is none.
      *
-     * FOR THE RECORD, whose `meet` guard and members' names gate still name `people` (`packages/record/src/index.ts`),
-     * so that its follow-up can ask here instead of repeating the kernel's rule for which list that is.
+     * FOR THE RECORD, whose `meet` guard asks here instead of repeating the kernel's rule for which list that is
+     * (`packages/record/src/index.ts`). Only its members' names gate, `namesFor`, still names `people`.
      */
     meetsList: (): { register: string; fields: MeetsFields } | null => {
       const role = meetsRole(registers.values());

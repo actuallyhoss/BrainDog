@@ -87,3 +87,35 @@ test('A DISABLE THAT TAKES THE DOOR AND ITS PATTERN IN TWO PACKS GOES, and the d
   assert.deepEqual(both.value.declarations, ['ingest.door', 'ingest.twin']);
   sql.close();
 });
+
+/* ON THE DISABLE ROAD THE FIX IS alsoDisable, NOT A RETIRE. Measured when this test was written, against the guard as
+   wave 47 landed it: `disablePack('door-pack')` was refused "Retire it in the same call, or keep ingest.door.", which
+   names an act a disable caller cannot take, since `disablePack` retires by pack and takes no ids. The refusal now
+   names the pattern's pack for `alsoDisable`, as `PACK_REQUIRED` does, and says to leave the asked pack on. */
+test('A DISABLE REFUSED FOR THE DOOR SAYS TO ADD THE PATTERN\'S PACK TO alsoDisable, and a pattern no pack owns is named to retire', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  assert.ok((await k.install([LINES, { ...DOOR, pack: 'door-pack' }, { ...TWIN, pack: 'twin-pack' }])).ok);
+  for (const id of ['door-pack', 'twin-pack'])
+    k.rememberPack({ id, version: '1.0.0', source: 'local', ref: null, manifest: JSON.stringify({ pack: id, version: '1.0.0', requires: { format: 1, primitives: 1, packs: {} } }), checksum: `sum-${id}` });
+  const alone = k.disablePack('door-pack') as { ok: boolean; refusal?: { code: string; fix: string; at?: string } };
+  assert.equal(alone.refusal?.code, 'DECLARATION_INVALID');
+  assert.equal(alone.refusal?.at, 'ingest.twin');
+  assert.equal(
+    alone.refusal?.fix,
+    'ingest.door is the door ingest.twin reads, and turning door-pack off would leave that pattern naming a door nothing arrives at. Add twin-pack to alsoDisable to turn it off in the same call, or leave door-pack on.',
+  );
+  sql.close();
+
+  /* A PATTERN NO PACK OWNS cannot go in alsoDisable, so it is named to retire first. */
+  const bare = openSqlite();
+  const b = await openRecord(bare, fixedClock(NOW));
+  assert.ok((await b.install([LINES, { ...DOOR, pack: 'door-pack' }, TWIN])).ok);
+  b.rememberPack({ id: 'door-pack', version: '1.0.0', source: 'local', ref: null, manifest: JSON.stringify({ pack: 'door-pack', version: '1.0.0', requires: { format: 1, primitives: 1, packs: {} } }), checksum: 'sum-door-pack' });
+  const loose = b.disablePack('door-pack') as { ok: boolean; refusal?: { code: string; fix: string; at?: string } };
+  assert.equal(
+    loose.refusal?.fix,
+    'ingest.door is the door ingest.twin reads, and turning door-pack off would leave that pattern naming a door nothing arrives at. Retire ingest.twin first, or leave door-pack on.',
+  );
+  bare.close();
+});

@@ -138,10 +138,14 @@ export function aims(part: Part, field: RoleField, self: string, projects?: stri
  * that does not own the list. So only a list shaped like the rates or the people counts, and the other kind blocks
  * nothing; both are driven in `test/roles.test.ts`.
  *
- * ASKED AT INSTALL OF THE DECLARING LIST, which cannot tell a new holder from the live one being updated: `Known` lays
- * the batch over the record. So a keyless, rates-shaped `fx` made by hand AFTER another list declared `rates:` would
- * refuse that list's next update, although `fx` is not the one read. Nobody makes that list by accident, and the
- * refusal says what to do; it is named here rather than guarded, because guarding it needs the live body `Known` drops.
+ * ASKED AT INSTALL OF EITHER LIST. `declare.ts`'s `roleBody` asks it of the list declaring the key, and `keylessBeside`
+ * of the keyless one. This paragraph said a keyless, rates-shaped `fx` arriving AFTER a list declared `rates:` was made
+ * by hand and nobody made it by accident; audit forty-seven (finding 2) made it with an install, and the declaring
+ * list's next update was then refused, told to declare `rates:` on `fx`. It is now refused at the keyless list's own
+ * install. A RECORD THAT REACHED THE PAIR BEFORE THAT GUARD IS REFUSED ON BOTH LISTS' UPDATES, measured by installing
+ * the pair with `keylessBeside` switched off and then updating each with it on: the declaring list is told to declare
+ * `rates:` on `fx`, and `fx` is told to install under another id, which an installed list cannot. Both refusals come
+ * from `Known` laying the batch over the record, which cannot tell the live holder from a new one.
  */
 export function legacyShaped(key: RoleKey, list: RoleList): boolean {
   if (list.id !== LEGACY[key] || list[key] !== undefined) return false;

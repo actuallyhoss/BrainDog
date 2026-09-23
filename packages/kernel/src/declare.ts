@@ -3331,6 +3331,36 @@ function roleBody(key: RoleKey, decl: Declaration, fields: readonly RoleField[],
   return null;
 }
 
+/** What a keyless list shaped like a role would hold beside the list declaring it, for `keylessBeside`'s sentence. */
+const UNREAD: Readonly<Record<RoleKey, string>> = { rates: 'rates no figure converts by', meets: 'people meet never finds' };
+
+/**
+ * `roleBody`'s question asked of the other list: a keyless `fx` or `people` shaped like the role, arriving where a list
+ * already declares the key.
+ *
+ * WITHOUT THIS THE RULE HELD IN ONE INSTALL ORDER. `roleBody` runs only for a list declaring the key, so a list declaring
+ * `rates:` and then a keyless `fx` of money-core's shape both installed (`research-batch-forty-seven-audit.md` finding 2,
+ * driven in `test/roles-keyless-second.test.ts`). A rate written into `fx` was then read by nothing, and cash said
+ * `USD to EGP` was missing; and the declaring list's next update was refused by `roleBody`, telling its owner to declare
+ * `rates:` on a list another pack owns. `meets:` then a People-shaped `people` did the same. Refused here, the keyless
+ * list is the one told, which is the list that caused it. `legacyShaped` decides whether it would hold the role, so an
+ * `fx` of sound effects still installs beside the rates.
+ */
+function keylessBeside(key: RoleKey, decl: Declaration, installed?: Known): Refusal | null {
+  if (decl.kind !== 'register' || decl.body[key] !== undefined) return null;
+  const self = String(ownId(decl));
+  if (!legacyShaped(key, { ...(decl.body as unknown as RoleList), id: self })) return null;
+  for (const [other, body] of installed ?? []) {
+    if (other === decl.id || !other.startsWith('register.') || body[key] === undefined) continue;
+    return bad(
+      'DECLARATION_INVALID',
+      `${other} already holds ${HOLDS[key]}, and a keyless ${self} shaped like them beside it would hold ${UNREAD[key]}. Install ${self} under another id, or keep ${HOLDS[key]} in ${other.slice('register.'.length)}.`,
+      'id',
+    );
+  }
+  return null;
+}
+
 /**
  * An hour offset, which is the one unit `remind:` admits and `where:` does not.
  *
@@ -3950,6 +3980,10 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
     const fault = roleBody(key, decl, fields as unknown as RoleField[], installed, owners);
     if (fault) return fault;
   }
+  for (const key of ['rates', 'meets'] as const) {
+    const fault = keylessBeside(key, decl, installed);
+    if (fault) return fault;
+  }
   /* ONE FIELD SAYS WHERE A ROW APPLIES, or one row could be in two places with two sets of rules. */
   const scoping = (fields as unknown as { id: string; scope?: unknown }[]).filter((f) => f.scope !== undefined);
   if (scoping.length > 1)
@@ -4268,6 +4302,8 @@ export function retireDeclarations(
   transaction: <T>(fn: () => T) => T,
   /** Declarations leaving in the same operation, retired by a later call: a disable turns packs off one at a time. */
   alsoGoing: readonly string[] = [],
+  /** The pack a disable was asked to turn off, when this is its retire: the door guard's fix is then `alsoDisable`. */
+  disabling?: string,
 ): Result<number> {
   /* NOR IS THE KERNEL'S REGISTER RETIRED, for the reason `validate` refuses anyone declaring it:
      every agent write resolves to a row of it, and retiring it would leave the record unable to say
@@ -4301,12 +4337,29 @@ export function retireDeclarations(
       .filter((r) => r.kind === 'ingest' && !going(r.id) && r.body.door === door.slice('ingest.'.length))
       .map((r) => r.id)
       .sort();
-    if (naming.length > 0)
+    if (naming.length === 0) continue;
+    const those = naming.length === 1 ? 'that pattern' : 'those patterns';
+    const reads = `${door} is the door ${listed(naming)} ${naming.length === 1 ? 'reads' : 'read'}`;
+    if (disabling === undefined)
       return no<number>(
         'DECLARATION_INVALID',
-        `${door} is the door ${listed(naming)} ${naming.length === 1 ? 'reads' : 'read'}, and retiring it would leave ${naming.length === 1 ? 'that pattern' : 'those patterns'} naming a door nothing arrives at. Retire ${naming.length === 1 ? 'it' : 'them'} in the same call, or keep ${door}.`,
+        `${reads}, and retiring it would leave ${those} naming a door nothing arrives at. Retire ${naming.length === 1 ? 'it' : 'them'} in the same call, or keep ${door}.`,
         { at: naming[0]! },
       );
+    /* ON THE DISABLE ROAD A RETIRE IS NOT THE CALLER'S TO MAKE: `disablePack` takes packs, and "retire it in the same
+       call" named an act it has no argument for (`test/retire-door.test.ts`, red on that sentence). So the pattern's pack is
+       named for `alsoDisable`, as `PACK_REQUIRED` names a dependent, and a pattern no pack owns is named to retire first,
+       since no `alsoDisable` reaches it. */
+    const ownerOf = (id: string): string | null => rows.find((r) => r.id === id)?.owner ?? null;
+    const packs = [...new Set(naming.map(ownerOf).filter((p): p is string => p !== null))].sort();
+    const loose = naming.filter((id) => ownerOf(id) === null);
+    const add = packs.length === 0 ? '' : `Add ${listed(packs)} to alsoDisable to turn ${packs.length === 1 ? 'it' : 'them'} off in the same call`;
+    const retire = loose.length === 0 ? '' : `${add === '' ? 'Retire' : 'and retire'} ${listed(loose)} first`;
+    return no<number>(
+      'DECLARATION_INVALID',
+      `${reads}, and turning ${disabling} off would leave ${those} naming a door nothing arrives at. ${[add, retire].filter((s) => s !== '').join(' ')}, or leave ${disabling} on.`,
+      { at: naming[0]! },
+    );
   }
 
   return transaction(() => {
@@ -4548,6 +4601,7 @@ export function disablePack(
           ids,
           transaction,
           rows.filter((r) => r.owner !== null && off.has(r.owner)).map((r) => r.id),
+          p,
         );
         if (!done.ok) throw new Rollback(done);
         retired.push(...ids);
