@@ -508,8 +508,8 @@ predicate against the real rows and writes nothing.
 
 *(Added September 22nd 2026 for [DIRECTION §22](../loop/DIRECTION.md)'s automations layer. The design is
 `loop/research-shell-automations.md` §2 to §4; this section is what the lint holds and what the runner does. Of the
-steps that wait on somebody else, asking a person runs; asking Spark is built and refused at install until a host
-serves it; a call and a script are later work, and the section says where a run meets one.)*
+steps that wait on somebody else, asking a person runs; asking Spark runs on a host with a model and is refused at
+install on one without; a call and a script are later work, and the section says where a run meets one.)*
 
 **Not a kind of its own.** [04-PACKS](04-PACKS.md) closes the list of kinds, nine since `script` joined it on
 September 22nd (`KINDS` in `packages/kernel/src/declare.ts`), so an automation is a `rule` body that has
@@ -560,7 +560,8 @@ steps:
 | an `ask_person` with fewer than two `options:`, or the same one twice | the question is opened through the gate's own `propose`, which refuses a choice of one, so it would install and fail at every run |
 | `to:` on an `ask_person` | a question goes to the record's queue, where anyone who decides answers it, and nothing addresses one to a person yet: `NOT_IN_THIS_BUILD` |
 | `about:` on an `ask_spark` that is not a list of field ids, on a trigger with no row, naming a field the row's list does not have (`FIELD_UNKNOWN`), or naming a `secret` or `file` field | `about:` is the fields of the run's row that go with the question, and a secret or a file never leaves the record |
-| `ask_spark`, once its `question:`, `as:`, `shape:`, `choices:` and `about:` are right | no host serves the `infer.ask` job it would queue yet, so a run would wait its day and fail with nobody asked: `NOT_IN_THIS_BUILD` until one does |
+| an `ask_spark` whose `question:` names a `secret` or `file` field of the row (`{{pin}}`, `{{trigger.row.pin}}`), the whole row of a list that has one (`{{trigger.row}}`), or a variable a `set_var` before it filled from one, directly or by way of another variable | the question leaves the record as surely as `about:` does. The refusal names the `set_var` where the field went in |
+| `ask_spark`, once its `question:`, `as:`, `shape:`, `choices:` and `about:` are right, on a host that does not answer one | nothing would lease the `infer.ask` job it queues, so a run would wait its day and fail with nobody asked: `NOT_IN_THIS_BUILD`, *"… no host in this build answers an automation's question to Spark. Ask a person with ask_person instead."* Which hosts answer is under *Who answers a question to Spark*, below |
 
 A `create` inside a branch meets the same bound and the same foreign-register check as one in `then:`, because the
 lint walks every action wherever it sits.
@@ -622,8 +623,37 @@ for in writing.
 | `if` | reads the condition with the sentence builder over the run's row and its answers together; a field of the row wins over an answer of the same name |
 | `wait` | parks the run on its own schedule row and resumes it when the span has passed. A wait whose step row already says `done` is over and is not armed again |
 | `ask_person` | opens an `options` suggestion through the gate, by `rule:<id>`, whose body carries the run and the step, and parks the run until the end of its `wait:` (a week when it names none). A decision on it hands the chosen option's words to the run as `{{vars.<as>}}` and wakes it for the next drain; putting it off changes nothing; closing it unanswered, or the wait running out, fails the run with a sentence, and a question whose run has ended is closed with it |
-| `ask_spark` | refused at install, above. A rule an earlier build let install fails the run there with `NOT_IN_THIS_BUILD` before anything is queued, and the steps before it stand. What runs once a host serves the job is built: one `infer.ask` outbox job, `{ run, step, question, shape, choices?, about? }`, with the run parked for a day; the ack's `result.text` held to the step's `shape:` (a number, or one of its `choices:`) and kept as `{{vars.<as>}}`; and an answer of the wrong shape, no text, or the retry ladder running out failing the run with a sentence instead of opening a dead letter |
+| `ask_spark` | queues one `infer.ask` outbox job, `{ run, rule, step, question, shape, choices?, about? }`, and parks the run for a day. The question is filled from the run's row with every `secret` and `file` field read as the dash, and so is a variable set from one; `about` carries the fields the step names, never one of those two types. `rule` is who asks: the host's pass refuses a job without it and calls no model, because Spark's ledger row is written as `rule.<id> step <n>` and a key is opened as `rule:<id>`. The pass acks each job one of three ways. `done` with `result.text` is the answer, held to the step's `shape:` (a number, or one of its `choices:`) and kept as `{{vars.<as>}}`. `done` with `result.failed` is the sentence of a refusal no retry mends, which ends the run on that sentence: the month's asks spent, an answer the host could not read, an answer of the wrong shape or a blank one, a job queued without its rule, and on the Worker a vault with no key labelled `spark`. `failed` is a model not reached, which the outbox's retry ladder asks again, eight attempts over about four hours, and whose last rung fails the run with a sentence instead of opening a dead letter. A `done` with neither ends the run on *"Spark answered job … with no text"*. On a host that does not answer, a rule an earlier build let install fails the run there with `NOT_IN_THIS_BUILD` before anything is queued, and the steps before it stand |
 | `call`, `script` | fail the run there, with a sentence saying the step is not in this build; the steps before it stand |
+
+**Who answers a question to Spark.** The record is opened with `answersSpark` where its host has a pass that asks
+Spark, and it is the same fact as `/api/version`'s `spark`, because both come out of one builder
+(`endpointOptionsOf` in `packages/host/src/spark.ts`). Off, install refuses the step and the runner fails a run that
+reaches one, as the two tables say. The pass is `serveAsks` (`packages/host/src/spark-answers.ts`), and each host
+calls it from the place it already works its queue:
+
+| Host | Answers where | The pass runs | The key |
+|---|---|---|---|
+| self-host | `SPARK_ENDPOINT` is set | in `poll`, after the scheduled actions | the operator's `SPARK_KEY` where one is set, else the vault's key labelled `spark` opened as `rule:<id>`, else none: a keyless call there is a model on the owner's own machine working |
+| Worker | `SPARK_ENDPOINT` is set and `KEK` is bound | in `alarm()`, after the drain and the scheduled actions | the vault's key labelled `spark`, opened as `rule:<id>`, and never an operator's |
+
+**On the Worker a record with no key labelled `spark` fails the run and posts nothing.** The endpoint there is a
+hosted provider on the owner's own bill, and a call with no `authorization` is an anonymous one: the survey that set
+this rule measured one keyless POST, answered 401 (`loop/research-worker-spark.md` §3, W2). So the pass refuses the job `FORBIDDEN` before anything is held or sent, writes no ledger row,
+and the run stops on *"rule.<id> asked Spark at step N, and this record's vault holds no key labelled spark, so the
+run stopped there. Put your model key in the vault under spark."* A self-host does not make this check, for the
+reason in the table.
+
+**Five questions a pass, and the Worker sets its own alarm for the sixth.** `serveAsks` leases five. On a self-host
+the poll comes round again; on the Worker nothing rings for an `infer.ask`, which is not in `DELIVERS`, so a pass
+that leased its full five sets the alarm for now and the next invocation takes the rest. The alarm's drain is the
+only drain on the Worker, so every question there is queued by it, and the first five are asked in the same invocation. The deployed Worker's
+`SPARK_ENDPOINT` is empty (`apps/worker/wrangler.jsonc`), so the Cloud answers none until one is set.
+
+**Each question is one ask on the owner's `ask_cap`**, the same count a person's read spends, and what a failure
+costs is [46-SPEC-SPARK](46-SPEC-SPARK.md) §4.1's to say: a model not reached, or one that answered with a status that
+is not 2xx, spends nothing and is asked again; a 200 the host cannot read, or no answer within thirty seconds, is
+counted once and ends the run.
 
 **Where the run is, is saved after every step that finishes,** not only at a wait and at the end. A run that stops
 between two steps carries on from the next one and never takes a finished step a second time.
@@ -656,9 +686,9 @@ that counts scheduled actions counts automations beside them: a failed or cancel
 A run can be cancelled while it waits, and its wake is dropped with it.
 
 **Not yet.** Runs are `local`: they do not travel in a `.brain` file, and carrying them means a format revision. A
-`call`'s answer and a script's do not resume a run yet. Kernel migration 13 admits `infer.ask` in the outbox's `CHECK`,
-and no host leases one yet, which is why the lint refuses `ask_spark`; the day a host serves it, that refusal and the
-runner's come out together.
+`call`'s answer and a script's do not resume a run yet. A question to Spark is answered on the two hosts above and
+nowhere else. A record opened without `answersSpark` refuses the step at install and fails it at the run, and both
+read that one switch, so neither can come off without the other.
 
 ---
 

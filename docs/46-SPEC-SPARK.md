@@ -86,9 +86,12 @@ export const PROMPTS: Record<PromptId, PromptTemplate>;   // also exported as '@
 export const MODELS: Record<ModelId, ModelRate>;          // the routing table's rates, 08 §6
 ```
 
-**As built, the surface is five methods and not the whole block above.** `packages/spark/src/types.ts` declares
-`Spark` as `read`, `propose`, `proposePattern`, `configure` and `status`; `triage`, `digestProse`, `embed`,
-`analyseDraft`, `cite` as a method, and `jobs` are not on it. The `inference` argument on `read` and `propose` is
+**As built, the surface is six methods and not the whole block above.** `packages/spark/src/types.ts` declares
+`Spark` as `read`, `propose`, `proposePattern`, `answer`, `configure` and `status`; `triage`, `digestProse`, `embed`,
+`analyseDraft`, `cite` as a method, and `jobs` are not on it. `answer(ask: Ask, inference?: Inference)` is an
+automation's question (§5.2), which the block above does not name: it reads nothing from the record, is handed the
+question the kernel filled and the fields the rule named, and answers `Result<{ text: string }>` in the rule's shape.
+The `inference` argument on `read`, `propose` and `answer` is
 built on both: a host whose included model is keyed from the vault builds that model again for each asker and hands
 it in, so the key it opens is opened in the asker's name (§5.9). It is an argument and not a slot the host sets
 around the call, because two asks awaiting the model together would share a slot, and the Worker has no
@@ -239,6 +242,36 @@ The last row is a gap against the invariant above, and it is the one failure tha
 `propose.ts` returns the record's refusal before `accountRead` runs, so a model call was made and no `call` row says
 so. The same holds for a `propose` with no `ask_id`, which drafts through the same path. The intent stands: every
 `Inference` call has its row.
+
+**An automation's question is one ask, and a model that served nothing is none.** `answer` (§5.2) writes one
+`kind = 'read'` row per call, because the CHECK above admits no kind of its own for it and every count already reads
+`read` correctly; its `question` is `rule.<id> step <n>` and never the question, which the kernel filled with the
+run's row. It is the one caller that settles a row under `-` when the model served nothing, since the ladder asks it
+again and an outage would otherwise spend the month on retries. `model` on every other row `answer` writes is the
+name the host sent the question to: `SPARK_MODEL` where the host maps tier `a`'s routing name to one, the routing name
+where it does not, and the template's name for an adapter that reports none. Before September 23rd an answer's row
+said `glm-5.3-flash` whatever `SPARK_MODEL` said, for a question the endpoint had been asked as `llama3`. A `read` or
+`propose` row on tier `a` still names the routing entry, because `core.run` keeps the template's name and only
+`answer` reads the one the host reports.
+
+| What happened | Row written | Counted | What the run does |
+|---|---|---|---|
+| the model answered in the step's shape | `read · ok`, the provider's counts | 1 | carries on with the answer |
+| the endpoint was not reached (a refused connection, a name that did not resolve), or answered with a status that is not 2xx (a 401, a 429, a 5xx) | `read · error · UNREACHABLE` under `-` | 0 | the outbox's ladder asks again, eight attempts over about four hours; the eighth failing ends the run with a sentence |
+| a 200 the host could not read: over 64,000 characters, not JSON, or broken off; or no answer within `SPARK_TIMEOUT_MS`, thirty seconds | `read · error · ANSWER_UNREADABLE`, under the model's name, with the provider's counts where the body held them | 1 | ends, once: *"rule.<id> asked Spark at step N, and the model answered with something Spark could not read: <what the host saw> The run stopped there rather than ask it again."* |
+| the answer was read and was not the shape (not a number, not one of the `choices:`), or was blank | `read · error · PROPOSAL_SCHEMA` | 1 | ends on the sentence saying what was wanted |
+| the month's asks already spent, counted by the package on tier `a` and by the host's `sparkGuardedEngine` on `b` and `byo` | none | 0 | ends on `SPARK_BUDGET_SPENT` and when the asks come back |
+| on the Worker, the vault holds no key labelled `spark` | none, and nothing is posted | 0 | ends on `FORBIDDEN`, naming the label (§5.2) |
+
+**A status is not an answer, and what comes after a 200 is.** A provider's 429 or 503 is the endpoint saying it
+served no completion, and a hosted provider does not bill one; counted, a rate limit spent the owner's allowance and
+stopped the automation on its first rung, as wave 47 briefly had it (`loop/research-worker-spark.md` §6 Q8, whose
+default was taken). A body that is too large, is not JSON or breaks off came from a model that ran, and one that ran
+out the clock may have run to the end, so each is billed once and never asked again: the self-host measured one
+question answered with a 200 of 70,000 characters serve four completions of 16,000 tokens each while the ledger held
+four rows under `-` and `ask_cap` saw none (`loop/research-batch-forty-six-audit.md` finding 4). The host decides
+which throws carry the mark (`SparkAnsweredError` in `packages/host/src/spark.ts`), and the package reads the mark
+and not the class, because it may not import the host (§5.1).
 
 > **OPEN QUESTION FOR THE OWNER, not settled here.** [23-ASSISTANT-UI](23-ASSISTANT-UI.md) §8 says the unit a person
 > sees is an *ask*, and §14 below says "a second identical ask in the same month increments the meter by one". Under
@@ -538,13 +571,40 @@ itself is keyed from the vault, and otherwise drops what it was given, because t
 The JOBS rows and `/ws/runner` wait on the record's six JOBS methods, which do not exist
 (`packages/spark/src/index.ts`, the header).
 
-**No door answers an automation's question to Spark.** An automation's `ask_spark` step would queue one `infer.ask`
-outbox row for a host to answer (`packages/kernel/src/flow.ts`, migration 13), and no host leases that job, and
-nothing in this package serves it. So the kernel refuses the step at install, after its shape is checked, with
-`NOT_IN_THIS_BUILD`: *"… no host in this build answers an automation's question to Spark. Ask a person with
-ask_person instead."* (`flow-lint.ts`), and a run that reaches one installed by an earlier build fails there with
-the same code before anything is queued. `ask_person` is built: it files an `options` question in Decide, and the
-run waits until that question, and only that one, is answered.
+**An automation's question to Spark is answered by a pass, not a door.** An `ask_spark` step queues one `infer.ask`
+outbox row, `{ run, rule, step, question, shape, choices?, about? }`, and parks its run for a day
+(`packages/kernel/src/flow.ts`, migration 13). No route serves it and no person is behind it: the host's pass,
+`serveAsks` in `packages/host/src/spark-answers.ts`, leases up to five, hands each to `answer`, and acks it with
+`result.text` for an answer, `result.failed` for a refusal that ends the run, or a `failed` ack for `UNREACHABLE`
+alone, which the outbox's ladder asks again. Neither host's delivery pump leases the kind, because a pump acks `done`
+with no `result` and every run would end on *"no text"*. The model answers in the rule's name: the vault's key is
+opened as `rule:<id>`, and `sparkByokFor` is never asked, since a rule has no session for the vault's gate to read and
+installing it was the owner's consent to its question leaving for this host's endpoint.
+
+| Host | Answers where | Where the pass runs |
+|---|---|---|
+| self-host | `SPARK_ENDPOINT` is set | `poll`, after the scheduled actions |
+| Worker | `SPARK_ENDPOINT` is set and `KEK` is bound | `alarm()`, after the drain and the scheduled actions; a pass that leased its full five sets the alarm for now, because nothing else wakes the object for the sixth |
+
+The record's `answersSpark` is set where the host has that pass, and it is the same fact as `/api/version`'s `spark`,
+because both come out of `endpointOptionsOf`. Where it is off the kernel refuses the step at install, after its shape
+is checked, with `NOT_IN_THIS_BUILD`: *"… no host in this build answers an automation's question to Spark. Ask a person
+with ask_person instead."* (`unserved` in `packages/kernel/src/index.ts`), and a run that reaches one installed by an
+earlier build fails there with the same code before anything is queued. The deployed Worker's `SPARK_ENDPOINT` is
+empty (`apps/worker/wrangler.jsonc`), so the Cloud answers none until one is set.
+
+**A Worker record with no key labelled `spark` fails the run and sends nothing.** On a self-host a call with no
+`authorization` is a model on the owner's own machine working, and the host's key path sends one when the vault holds
+no `spark` grant. On the Worker the endpoint is a hosted provider on the owner's bill, so before anything is built,
+held or posted, `workerSparkAnswers` (`apps/worker/src/spark.ts`) refuses a job whose record has no live grant under
+that label: `FORBIDDEN`, no ledger row, and the run stops on *"rule.<id> asked Spark at step N, and this record's vault
+holds no key labelled spark, so the run stopped there. Put your model key in the vault under spark."* Without the
+check, the survey that set it measured one keyless POST, a 401, and, under the status rule wave 47 had then, an answer
+that blamed the model for a key nobody had put in (`loop/research-worker-spark.md` §3, W2). Under §4.1's rule the same
+401 is `UNREACHABLE`, so each rung of the ladder would be another keyless POST. What each outcome costs is §4.1's table.
+
+`ask_person` is built beside it: it files an `options` question in Decide, and the run waits until that question,
+and only that one, is answered.
 
 ### 5.3 · Tier A jobs
 
@@ -786,18 +846,20 @@ the next propose sent it to `SPARK_ENDPOINT` as the bearer.
 
 | Code | Raised | `fix` a person reads |
 |---|---|---|
-| `FORBIDDEN` (30 §6) | an agent token at any JOBS method, raised by the record and forwarded; a frame on a socket without a runner attachment, raised by this package; a runner posting to a job it does not hold; `seq ≠ job.seq + 1`; a `change` touching a path outside §5.3's table; tier `b` with no open key; the host's vault gate refusing the asker (§5.9) | `A job is code execution on a machine; ask the owner to run it from Spark.` · `This job is not yours.` · `Post seq <n>.` · `Spark may not change <path>.` · the 5.5-3 sentence · *"Spark answers here on a key kept in this record's vault, which opens only for the owner signed in within the last fifteen minutes…"* |
+| `FORBIDDEN` (30 §6) | an agent token at any JOBS method, raised by the record and forwarded; a frame on a socket without a runner attachment, raised by this package; a runner posting to a job it does not hold; `seq ≠ job.seq + 1`; a `change` touching a path outside §5.3's table; tier `b` with no open key; the host's vault gate refusing the asker (§5.9); on the Worker, an automation's question on a record whose vault holds no key labelled `spark`, raised by the host (§5.2) | `A job is code execution on a machine; ask the owner to run it from Spark.` · `This job is not yours.` · `Post seq <n>.` · `Spark may not change <path>.` · the 5.5-3 sentence · *"Spark answers here on a key kept in this record's vault, which opens only for the owner signed in within the last fifteen minutes…"* · §5.2's no-key sentence, *"… Put your model key in the vault under spark."* |
 | `NEEDS_BROWSER_SESSION` (30 §6) | a bearer at `createJob cancelJob listJobs` or any `/api/spark/*` route — the router | `Open this in the app.` |
 | `PROPOSAL_UNCITED` (§13 #5) | a digit outside `{{…}}`; an unknown path or spoken id; a quoted money or day not in a row; a pattern anchor not in a sample; `pct` or `quantity` with a literal | `Name the path this figure comes from, or leave it out.` |
 | `PROPOSAL_NO_ROWS` (§13 #5) | a filed body with zero citations | `A proposal names the rows behind it, or it is not filed.` |
-| `PROPOSAL_SCHEMA` (§13 #5) | the model's JSON fails the kind's schema; a tier-C `end` result fails it (→ status `error`) | `The output did not match the <kind> schema at <path>.` |
+| `PROPOSAL_SCHEMA` (§13 #5) | the model's JSON fails the kind's schema; a tier-C `end` result fails it (→ status `error`); an automation's answer that is not its step's shape, or is blank | `The output did not match the <kind> schema at <path>.` · for an automation, *"Spark's answer to rule.<id> at step N was not <what it asked for>, so the run stopped there."* |
+| `ANSWER_UNREADABLE` (30 §6) | an automation's question answered with a 200 the host could not read (over 64,000 characters, not JSON, broken off), or not answered within thirty seconds; counted as one ask and never asked again (§4.1) | *"rule.<id> asked Spark at step N, and the model answered with something Spark could not read: <what the host saw> The run stopped there rather than ask it again."* |
 | `PREDICTION_UNMEASURABLE` (§13 #5) | twelve observations cannot accumulate in thirty days | `This change cannot be scored inside thirty days; it is not proposed.` |
 | `SPARK_BUDGET_SPENT` (§13 #5) | tier `a`, the month's asks ≥ `ask_cap`; tiers `b` and `byo`, the host's count ≥ `ask_cap` (§4.1) | `Spark is out of asks until <date>. Add your own key, or wait.` · on `b` and `byo`, the host's two sentences, each naming this host's model and the date |
 | `VALUE_MALFORMED` (30 §6), raised by the host | a tier `b` save naming a grant that is missing or revoked, not an `api_token`, or labelled `spark` (§5.9) | one sentence per case, at `grant_id` |
 | grammar codes (30 §6) | the drafted predicate fails `where.validate` — never returned; the fallback is `q` | — |
 | `declare` codes (30 §6) | an `ingest` or `change` body fails its declaration schema | as `declare` states them |
 
-Five codes of its own, two shared with the record, two families passed through; the host adds `VALUE_MALFORMED`
+Six codes of its own, the five of §13 #5 and `ANSWER_UNREADABLE`, which `30 §6` counts in the same family; two
+shared with the record; two families passed through. The host adds `VALUE_MALFORMED`
 at `grant_id` in front of `configure`, and `501 NOT_IN_THIS_BUILD` at `tier` where no key can be opened (§5.2). A refusal never carries a field value, a prompt or a row: `found` is a span or a path, never a projection line (12 §8).
 
 ## 7 · Performance budget
