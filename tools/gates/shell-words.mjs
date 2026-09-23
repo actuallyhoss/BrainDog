@@ -73,9 +73,23 @@ const WORKSPACES = ['packages', 'apps'];
  * why `apps/cli/src/install.ts`, which the brief named, is not here: measured on 23 September it
  * holds no word in code, so exempting it would only have hidden the first one.
  *
- * `words`, WHERE AN ENTRY HAS IT, NARROWS THE ENTRY TO THOSE WORDS. `apps/cli/src/main.ts` is the
- * whole command line, and exempting the file for one help line would have exempted every other
- * word written there too.
+ * `words`, WHERE AN ENTRY HAS IT, NARROWS THE ENTRY TO THOSE WORDS, each with its own reason.
+ * `apps/cli/src/main.ts` is the whole command line, and exempting the file for one help line would
+ * have exempted every other word written there too.
+ *
+ * AND AN ENTRY WHOSE REASON IS THE WORDS IT HOLDS HAS TO NAME THEM. The first version narrowed only
+ * `main.ts`, and `apps/site`, `legacy.ts` and `import.ts` each exempted all ten words while their
+ * reasons covered one or three. Measured by audit forty-four (finding 5) on a seeded root, and again
+ * on 23 September over the `apps` half of `negative/shell-words`: `'bank-hsbc-eg'` in
+ * `apps/site/src`, `'acme-payroll'` in `apps/cli/src/import.ts` and three more read green, the
+ * gate saying `12 in the 6 exempted paths` and exit 0. Narrowed, it names all five.
+ * An exempted word that exempts no hit is a finding for the same reason an idle entry is: it is the
+ * hole the next leak of that word walks through.
+ *
+ * TWO ENTRIES STAY OUT WHOLE, ON PURPOSE. `packages/seed` is where a use case is allowed to be
+ * named, so narrowed it would fail the first new pack it ships, which is its job. `apps/web` is
+ * waiting for its own gate, and a list of its words here would be a second reading of the web
+ * disagreeing with the first.
  *
  * `*.test.ts` and any `test` directory are out by rule rather than by entry, because a test asserts
  * on what a record was handed: `packages/record/test/ask-person-reach.test.ts` arrives
@@ -92,17 +106,32 @@ const OUT = {
     why: 'the sample engine, an example prompt and copy name the sample record (11 hits). It is the next gate, with its own reading of what the web may say, and not this one.',
   },
   'apps/site': {
-    why: 'the public site is prose about the product, not code that runs a record; its one hit is the changelog saying `Egyptian pounds` about a fix that shipped.',
+    why: 'the public site is prose about the product, not code that runs a record (1 hit).',
+    words: {
+      egypt: 'the changelog entry at `routes/changelog/entries.ts:199` says `Egyptian pounds` about a currency fix that shipped.',
+    },
   },
   'apps/cli/src/legacy.ts': {
-    why: "the the old tool importer (30 hits), which reads that tool's export by its own field names while the switch out of it is under way.",
+    why: "the the old tool importer (30 hits), which reads that tool's export by its own field names while the switch out of it is under way. It leaves with the importer.",
+    words: {
+      legacy: 'the source is named for itself: `KEY_PREFIX` is `legacy:`, the reader is `readLegacyTool` and the planner `planLegacyTool` (6 hits).',
+      registrar: "the export's `registrar` field and table on a domain, and a person's `registrar` role (12 hits).",
+      gold: "the export's holdings kind `gold`, which the importer maps to a commodity and counts to say so (12 hits).",
+    },
   },
   'apps/cli/src/import.ts': {
-    why: 'the `braindog import` command (25 hits), whose one source is the the old tool export and whose banks are that export\'s. It leaves with the importer.',
+    why: "the `braindog import` command (25 hits), whose one source is the the old tool export and whose one bank is that export's. It leaves with the importer.",
+    words: {
+      hsbc: "the one bank pack the command offers, `bank-hsbc-eg`, found by an account id or name matching `hsbc` in the export (11 hits).",
+      egypt: "the same offer's label and question, `HSBC Egypt` (3 hits).",
+      legacy: 'the one source it reads: the `legacy` subcommand, the key prefix it filters on, and the importer it calls (11 hits).',
+    },
   },
   'apps/cli/src/main.ts': {
-    words: ['legacy'],
-    why: 'the help line for `braindog import legacy`, which names the importer\'s subcommand. It leaves with the importer.',
+    why: "the command line, which names the importer's subcommand. It leaves with the importer.",
+    words: {
+      legacy: 'the help line for `braindog import legacy` (1 hit).',
+    },
   },
 };
 
@@ -352,16 +381,22 @@ export default function shellWords(
 
   const findings = [];
   const exempted = new Map(Object.keys(OUT).map((p) => [p, 0]));
+  /* One count per word an entry names, keyed `path word`, so a word that exempts nothing is seen. */
+  const byWord = new Map(
+    Object.entries(OUT).flatMap(([p, e]) => Object.keys(e.words ?? {}).map((w) => [`${p} ${w}`, 0])),
+  );
   let read = 0;
   for (const file of files) {
     const rel = relative(ROOT, file).replace(/\\/g, '/');
     const hits = hitsIn(readFileSync(file, 'utf8'), file.endsWith('.svelte'));
     const out = outOf(rel);
-    const allowed = out === null ? null : (OUT[out].words ?? WORDS);
+    const allowed = out === null ? null : OUT[out].words ? Object.keys(OUT[out].words) : WORDS;
     if (out === null || OUT[out].words) read++;
     for (const h of hits) {
-      if (allowed !== null && allowed.includes(h.word)) exempted.set(out, exempted.get(out) + 1);
-      else findings.push(`  ${rel}:${h.line}  ${h.word}, in ${h.token}`);
+      if (allowed !== null && allowed.includes(h.word)) {
+        exempted.set(out, exempted.get(out) + 1);
+        if (OUT[out].words) byWord.set(`${out} ${h.word}`, byWord.get(`${out} ${h.word}`) + 1);
+      } else findings.push(`  ${rel}:${h.line}  ${h.word}, in ${h.token}`);
     }
   }
 
@@ -370,6 +405,18 @@ export default function shellWords(
   const idle = [...exempted].filter(([p, n]) => n === 0 && existsSync(join(ROOT, p)));
   for (const [p] of idle)
     findings.push(`  ${p} is exempted and holds no use-case word in code. Take it out of OUT, so the next word there is seen.`);
+
+  /* AND A WORD THAT EXEMPTS NOTHING IS ONE TOO, once its path is not already idle, because then the
+     line above has said it. Measured on a root holding only an `apps/cli/src/legacy.ts` with
+     `legacy` and `gold` in it and no `registrar`: with this block cut out the gate said `2 in
+     the 6 exempted paths` and exit 0, and the next `registrar` written there would have been
+     exempted on a reason nothing in the file still had. */
+  const idlePaths = new Set(idle.map(([p]) => p));
+  for (const [key, n] of byWord) {
+    const [p, w] = key.split(' ');
+    if (n === 0 && !idlePaths.has(p) && existsSync(join(ROOT, p)))
+      findings.push(`  ${p} is exempted for ${w} and holds no ${w} in code. Take ${w} out of its words, so the next one there is seen.`);
+  }
 
   if (findings.length === 0) {
     const held = [...exempted].reduce((sum, [, n]) => sum + n, 0);
