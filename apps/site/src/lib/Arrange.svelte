@@ -33,6 +33,15 @@
   new page's title, so a keyboard is never left on a control that has just been taken away.
   Answering a question on Decide takes its two buttons away too, and focus goes to the page's title
   the same way, while the answer is spoken by a status region that was there, empty, before it.
+
+  WITH SCRIPTING OFF IT IS FIVE PAGES, ONE AFTER ANOTHER. `svelte.config.js` promises the site
+  readable with scripting off, and this window broke that: every panel sits in the one grid cell and
+  only the chosen one is visible, so with nothing to choose another, Chromium with
+  `javaScriptEnabled: false` showed 1 panel of 5 at 1440 and at 390 (`loop/research-site-now.md`,
+  S5). The `<noscript>` rule below is how the five are laid out instead. It hides the tabs, which do
+  nothing without a script, and shows each panel's case name, which is in the markup already and
+  `hidden` there, so a reader with scripting on never meets it. `test/arrange-static.test.ts` holds
+  the rule in the built page.
 -->
 <script lang="ts">
   import { tick } from 'svelte';
@@ -195,7 +204,59 @@
     await tick();
     titles[selected]?.focus();
   }
+
+  /**
+   * WHICH ENDS OF THE TAB STRIP STILL HAVE TABS BEHIND THEM, as `before`, `after`, both or neither.
+   *
+   * At 390 the strip is 340 pixels wide and its tabs are 602, so two of the five start off screen.
+   * The strip used to fade its right end whatever the scroll said: once a reader had scrolled to
+   * the end, the fade still promised more that was not there, and the tabs scrolled away on the
+   * left had nothing to say they were. So the fade and the arrow follow this. It starts as `after`,
+   * which is what every phone width the layout gate drives (320, 360, 390) measures, so the served
+   * page draws the cue before any script has run; a desk, where the five fit, measures neither and
+   * its stylesheet never reads the attribute anyway.
+   */
+  let strip: HTMLDivElement | null = $state(null);
+  let more = $state('after');
+
+  function measure() {
+    if (!strip) return;
+    const x = strip.scrollLeft;
+    const end = strip.scrollWidth - strip.clientWidth;
+    more = [x > 1 ? 'before' : '', x < end - 1 ? 'after' : ''].filter(Boolean).join(' ');
+  }
+
+  /* A ResizeObserver calls back once as soon as it observes, so this is also the first measure. */
+  $effect(() => {
+    if (!strip) return;
+    const seen = new ResizeObserver(measure);
+    seen.observe(strip);
+    return () => seen.disconnect();
+  });
 </script>
+
+<!--
+  THE SCRIPTING-OFF LAYOUT. A `<noscript>` in the head is ignored by any browser running scripts,
+  and Svelte draws it empty on the client, so none of this reaches a reader who has the tabs.
+
+  EVERY SELECTOR CARRIES THREE CLASSES OR ATTRIBUTES because the component's own `.panel.svelte-HASH` and
+  `.on.svelte-HASH` carry two. At two apiece the winner would be whichever stylesheet the browser
+  met last, and that is SvelteKit's choice of order in the head, not this file's.
+
+  THE WHOLE BAR GOES BELOW 1000, where the dots are already hidden and the bar would be an empty
+  strip, and with it the phone's arrow, whose own rule outweighs this one.
+-->
+<svelte:head>
+  <noscript>
+    <style>
+      .window .bar .tabs { display: none; }
+      .window .stack .panel { grid-area: auto; grid-template-rows: auto minmax(0, 1fr); visibility: visible; opacity: 1; }
+      .window .stack .panel + .panel { border-block-start: 1px solid var(--line); }
+      .window .panel .case { display: block; }
+      @media (width < 1000px) { .window[role='group'] > .bar { display: none; } }
+    </style>
+  </noscript>
+</svelte:head>
 
 <!-- ONE TABLE, DRAWN IN TWO PLACES: a list's own page, and the table Home draws under its tiles.
      Every row's name is the button that opens that row's page, wherever the table is. -->
@@ -230,7 +291,7 @@
 <div class="window" role="group" aria-label={app.window}>
   <div class="bar">
     <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
-    <div class="tabs" role="tablist" aria-label={label}>
+    <div class="tabs" role="tablist" aria-label={label} data-more={more} bind:this={strip} onscroll={measure}>
       {#each cases as c, i (c.id)}
         <button
           bind:this={tabs[i]}
@@ -249,6 +310,7 @@
         </button>
       {/each}
     </div>
+    <span class="more" aria-hidden="true"><Icon name="arrow" size="s" /></span>
   </div>
 
   <div class="stack">
@@ -256,6 +318,7 @@
       {@const v = i === selected ? view : HOME}
       {@const count = waiting(c)}
       <div class="panel" class:on={i === selected} role="tabpanel" id="uc-{c.id}-rail" aria-labelledby="uc-{c.id}">
+        <p class="case" hidden>{c.label}</p>
         <div class="rail" role="group" aria-label={app.rail}>
           <p class="record">
             <span class="chip" aria-hidden="true">
@@ -551,6 +614,11 @@
     font-weight: 600;
   }
 
+  /* THE PHONE'S ARROW, and only the phone's: the narrow query below is the one place it is shown. */
+  .more {
+    display: none;
+  }
+
   /* ── The body ─────────────────────────────────────────────────────── */
 
   /* ONE CELL FOR EVERY CASE, so the window is one size whichever is chosen. */
@@ -577,6 +645,19 @@
   .on {
     opacity: 1;
     visibility: visible;
+  }
+
+  /* THE CASE'S NAME OVER ITS PANEL, drawn only by the scripting-off rule at the top of this file.
+     NO `display` IN HERE: the element is `hidden`, and any author `display` would beat the UA's
+     `[hidden]` and put a second copy of the tab's name in front of every reader. */
+  .case {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding: var(--sp-2) var(--sp-2) 0;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: var(--t-base);
+    font-weight: 600;
   }
 
   /* ── The rail ─────────────────────────────────────────────────────── */
@@ -1180,21 +1261,58 @@
    */
   @media (width < 640px) {
     .bar {
+      position: relative;
       padding-inline: var(--sp-2);
     }
 
-    /* THE LAST TAB FADES AT THE EDGE, which is what says there are more. At 390 the row shows three
-       of the five cases and cut Solo founder at the window's edge as if the row simply ended there,
-       so Team and New project were cases a reader had no reason to think existed. The mask reads
-       only alpha, so the colour in it is any opaque one and never shows, and the row's end padding
-       is as wide as the fade so the last case can be scrolled clear of it. */
+    /* THE STRIP FADES AT WHICHEVER END STILL HAS TABS BEHIND IT, and `more` in the script says which.
+       At 390 the row shows three of the five cases and cut Solo founder at the window's edge as if
+       the row simply ended there, so Team and New project were cases a reader had no reason to think
+       existed. A fade alone was the first answer, and a survey on 23 September still recorded that
+       nothing showed the strip scrolls: a word dimming into the edge reads as a word cut short. So
+       the fade now has an arrow in it, below. The mask reads only alpha, so the colour in it is any
+       opaque one and never shows, and the row's end padding is as wide as the fade so the last case
+       can be scrolled clear of the arrow. */
     .tabs {
+      --fade-start: 0px;
+      --fade-end: 0px;
+
       overflow-x: auto;
       overscroll-behavior-inline: contain;
       scroll-snap-type: x mandatory;
       scrollbar-width: none;
-      mask-image: linear-gradient(to right, var(--ink) calc(100% - var(--sp-7)), transparent);
+      mask-image: linear-gradient(
+        to right,
+        transparent calc(var(--fade-start) / 2),
+        var(--ink) var(--fade-start),
+        var(--ink) calc(100% - var(--fade-end)),
+        transparent calc(100% - var(--fade-end) / 2)
+      );
       padding-inline-end: var(--sp-7);
+    }
+
+    .tabs[data-more~='before'] {
+      --fade-start: var(--sp-7);
+    }
+
+    .tabs[data-more~='after'] {
+      --fade-end: var(--sp-7);
+    }
+
+    /* THE ARROW SAYS WHICH WAY THE REST ARE, and goes when the end is reached. The fade above is
+       fully clear over its outer half, and the arrow sits in that half: laid over the whole fade, as
+       first drawn, it met the tail of "Solo founder" at a third of its ink and read as "Solo
+       founde" with an arrow for its last letter. It is drawn and not pressed: a tap on it lands on
+       the tab under it. */
+    .tabs[data-more~='after'] + .more {
+      position: absolute;
+      inset-block: 0;
+      inset-inline-end: var(--sp-2);
+      display: grid;
+      place-items: center;
+      inline-size: calc(var(--sp-7) / 2);
+      color: var(--ink2);
+      pointer-events: none;
     }
 
     .tab {
