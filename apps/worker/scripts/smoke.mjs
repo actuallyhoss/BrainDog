@@ -4,20 +4,19 @@
  *   node apps/worker/scripts/smoke.mjs production
  *   node apps/worker/scripts/smoke.mjs alpha
  *
- * THE ANSWERS IN `loop/research-one-domain.md` SECTION 3.5, ASKED LIVE, FOR WHICHEVER OF THE THREE
- * PUSHES JUST DEPLOYED. Once the zone routes land the app lives on `brain.dog` beside the marketing
- * site: the site holds the name as its Custom Domain and this Worker takes zone routes on it, which
- * Cloudflare runs first ("Routes can `fetch()` Custom Domains and take precedence if configured on the
- * same hostname", developers.cloudflare.com/workers/configuration/routing/routes). `wrangler deploy`
- * says nothing about whether a route landed, and `deploy-parity` asks one host. A route that did not
- * land shows up as the site's 404 page answering an API call, which is a healthy-looking response from
- * the wrong Worker, and every check below is written against that answer as much as against the right
- * one. Before the routes land (push A) the checks are on the Worker's own name, and the one that
- * matters most is that a page load there reaches `/app` rather than `ROUTE_UNKNOWN`.
+ * THE ANSWERS IN `loop/research-one-domain.md` SECTION 3.5, ASKED LIVE, FOR WHICHEVER PUSH OF THE MOVE JUST DEPLOYED.
+ * Once an environment's site binds this Worker, the app lives on the site's name beside the marketing site: the site
+ * holds the name as its Custom Domain, runs its script first on the app's doors (`assets.run_worker_first` in
+ * `apps/site/wrangler.jsonc`) and hands each of those requests to this Worker through its `APP` service binding
+ * (`loop/research-one-domain-binding.md`). `wrangler deploy` says nothing about whether the site hands over every door,
+ * and `deploy-parity` asks one host. A door the site keeps shows up as the site's 404 page answering an API call, which
+ * is a healthy-looking response from the wrong Worker, and every check below is written against that answer as much as
+ * against the right one. Before the site binds this Worker (push A) the checks are on the Worker's own name, and the
+ * one that matters most is that a page load there reaches `/app` rather than `ROUTE_UNKNOWN`.
  *
- * THE HOSTS COME FROM `wrangler.jsonc`, NOT FROM A REPOSITORY VARIABLE. `PUBLIC_HOST`, `LEGACY_HOSTS`
- * and the routes are what the Worker was deployed with, so reading them here asks the names the deploy
- * claimed rather than the name somebody typed into the repository settings.
+ * THE HOSTS COME FROM THE TWO `wrangler.jsonc` FILES, NOT FROM A REPOSITORY VARIABLE. `PUBLIC_HOST`, `LEGACY_HOSTS`, the
+ * Worker's Custom Domains and the site's binding are what the two Workers were deployed with, so reading them here asks
+ * the names the deploys claimed rather than the name somebody typed into the repository settings.
  *
  * IT WRITES NOTHING. GETs with no cookie and no bearer, one GET that must be redirected, and one empty
  * POST to an `/in/` door no record has minted, which `serveIngest` refuses with a 404 before any record
@@ -27,7 +26,7 @@
  * be reached at all.
  */
 
-import { wranglerConfig } from './provision-check.mjs';
+import { hostOf, siteBinding, siteConfig, wranglerConfig } from './provision-check.mjs';
 
 /**
  * `src/route.ts`'s record id shape, copied because this is plain JavaScript and cannot import it.
@@ -40,44 +39,50 @@ const typeOf = (answer) => answer.headers.get('content-type') ?? '';
 const isJson = (answer) => /application\/json/i.test(typeOf(answer));
 const isHtml = (answer) => /text\/html/i.test(typeOf(answer));
 
-/** A route pattern's host: everything before the first `/`, which is the whole pattern for a Custom Domain. */
-const hostOf = (route) => String(route.pattern ?? '').split('/')[0].toLowerCase();
-
 /**
- * The checks for one environment, read off the shape the file deploys.
+ * The checks for one environment, read off the shape the two files deploy.
  *
- * THE NAMES COME FROM THE ROUTES AS WELL AS FROM `PUBLIC_HOST`, BECAUSE THE MOVE GOES OUT IN THREE PUSHES AND EACH ONE
- * PUTS THE WORKER ON A DIFFERENT SET OF NAMES (`loop/research-one-domain-cutover.md` §2.3, §5). Reading `PUBLIC_HOST`
- * alone, as this did, asked `https://app.brain.dog/pricing` after push A: that is the Worker's name, where `/pricing` is
- * the Worker's 308 and not the site, so a good dark deploy went red. Now:
+ * THE NAMES COME FROM THE SITE'S BINDING AS WELL AS FROM `PUBLIC_HOST`, BECAUSE THE MOVE GOES OUT IN PUSHES AND EACH ONE
+ * PUTS THE WORKER ON A DIFFERENT SET OF NAMES (`loop/research-one-domain-binding.md` section 4). Reading `PUBLIC_HOST`
+ * alone, as this once did, asked `https://app.brain.dog/pricing` after push A: that is the Worker's name, where
+ * `/pricing` is the Worker's 308 and not the site, so a good dark deploy went red. Now:
  *
- *   - every name the app is on, `PUBLIC_HOST` and each zone route's host, is asked for the shell and a 401 at `/api/boot`;
- *   - a name held by a zone route is shared with the site, so it is asked `/pricing` first, which is the check that a
- *     route is not wider than the doors. A name held as this Worker's Custom Domain has no site on it to ask;
+ *   - every name the app is on, `PUBLIC_HOST` and each Custom Domain of the site's same environment when that
+ *     environment hands this Worker every door (`siteBinding`), is asked for the shell and a 401 at `/api/boot`;
+ *   - a name the site hands over is shared with the site, so it is asked `/pricing` first, which is the check that the
+ *     site's `run_worker_first` is not wider than the doors. A name held as this Worker's Custom Domain has no site on
+ *     it to ask;
  *   - the old name, `LEGACY_HOSTS`, or before the move the public host itself when it is a Custom Domain, is asked for a
  *     page load's 308 into `/app` on `PUBLIC_HOST`, and for a POST to an `/in/` door that must not be redirected.
  *
- * Push A is four questions on `app.brain.dog`, A2 is seven across both names, and B is the design's five.
+ * Push A is four questions on `app.brain.dog`; an environment whose site binds this Worker before its flip (alpha in
+ * push 1, production in push 3) is seven across both names; and its flip, B1 or B2, is the design's five.
+ *
+ * `site` IS AN INPUT, READ FROM `apps/site/wrangler.jsonc` WHEN IT IS NOT GIVEN, so a test can hand it the site of a
+ * push that has not landed and the deploy step asks the site that did.
  */
-export function checks(config, name) {
+export function checks(config, name, site = siteConfig()) {
   const block = config.env?.[name] ?? {};
   const vars = block.vars ?? {};
   const host = String(vars.PUBLIC_HOST ?? '').toLowerCase();
   if (!host) throw new Error(`env.${name} has no PUBLIC_HOST in apps/worker/wrangler.jsonc`);
-  const routes = block.routes ?? [];
-  const own = new Set(routes.filter((r) => r.custom_domain).map(hostOf));
-  const zoned = new Set(routes.filter((r) => !r.custom_domain).map(hostOf));
-  /* A PUBLIC HOST THE WORKER IS NOT ON is a file that cannot deploy a working app, and every answer asked of it would
-     be some other server's. Refused before anything is asked, so the sentence names the file rather than a status. */
-  if (!own.has(host) && !zoned.has(host))
-    throw new Error(`env.${name}: PUBLIC_HOST ${host} is neither a Custom Domain nor a zone route of this Worker in apps/worker/wrangler.jsonc`);
+  const own = new Set((block.routes ?? []).filter((r) => r.custom_domain).map(hostOf));
+  const binding = siteBinding(config, site, name);
+  const handed = new Set(binding.names.filter((n) => !own.has(n)));
+  /* A PUBLIC HOST THE WORKER IS NOT REACHED ON is a pair of files that cannot deploy a working app, and every answer
+     asked of it would be some other server's. Refused before anything is asked, so the sentence names the file and the
+     missing key rather than a status. */
+  if (!own.has(host) && !handed.has(host))
+    throw new Error(
+      `env.${name}: PUBLIC_HOST ${host} is not a Custom Domain of this Worker in apps/worker/wrangler.jsonc, and the site does not hand it the doors there: ${binding.why ?? `${host} is not a Custom Domain of the site's env.${name}`}`,
+    );
   const legacy = String(vars.LEGACY_HOSTS ?? '').split(/[\s,]+/).map((h) => h.toLowerCase()).filter((h) => h.length > 0)[0] ?? null;
   const old = legacy ?? (own.has(host) ? host : null);
   const demo = REC_ID.test(String(vars.DEMO_RECORD ?? ''));
 
   const list = [];
-  for (const on of new Set([host, ...zoned])) {
-    const shared = zoned.has(on);
+  for (const on of new Set([host, ...handed])) {
+    const shared = handed.has(on);
     if (shared)
       list.push({
         method: 'GET',
@@ -85,7 +90,7 @@ export function checks(config, name) {
         expects: '200 from the site',
         judge: (a) =>
           a.status === 200 && isHtml(a) ? null
-          : isJson(a) ? `answered ${a.status} in JSON, which is this Worker and not the site: a zone route is wider than the doors and has taken a site path`
+          : isJson(a) ? `answered ${a.status} in JSON, which is this Worker and not the site: the site's run_worker_first is wider than the doors and hands a site path to the app`
           : `answered ${a.status}, so the site did not deploy, or ${on} is not its Custom Domain`,
       });
     list.push(
@@ -95,7 +100,7 @@ export function checks(config, name) {
         expects: '200, the app shell',
         judge: (a) =>
           a.status === 200 && isHtml(a) ? null
-          : shared ? `answered ${a.status}${isHtml(a) ? ' as a page' : ''}: the zone route for ${on}/app/* is missing and the site answered, or the Worker is older than the /app shell`
+          : shared ? `answered ${a.status}${isHtml(a) ? ' as a page' : ''}: the deployed site on ${on} does not hand /app/* to this Worker, or the Worker is older than the /app shell`
           : `answered ${a.status}${isHtml(a) ? ' as a page' : ''} on this Worker's own Custom Domain, so the version serving is older than the /app shell or the build it carries has no build/app/index.html`,
       },
       {
@@ -106,7 +111,7 @@ export function checks(config, name) {
           const want = demo ? 200 : 401;
           if (a.status === want && isJson(a)) return null;
           if (a.status === 404 && !isJson(a))
-            return shared ? `answered a 404 page, which is the site answering an API call: the zone route for ${on}/api/* is missing`
+            return shared ? `answered a 404 page, which is the site answering an API call: the deployed site on ${on} does not hand /api/* to this Worker`
             : `answered a 404 page on this Worker's own Custom Domain, which is something other than this Worker answering ${on}`;
           if (a.status === 401 && !isJson(a)) return 'answered 401 without JSON, which is something in front of the Worker refusing rather than the Worker';
           if (demo && a.status === 401) return 'answered 401 where the file pins a demo record, which is a deploy that did not carry DEMO_RECORD';
@@ -128,7 +133,7 @@ export function checks(config, name) {
         const to = a.headers.get('location') ?? '';
         if (a.status === 308 && to === target) return null;
         if (a.status === 308 || a.status === 301 || a.status === 302 || a.status === 307)
-          return `answered ${a.status} to ${to || 'nowhere'}. The move is a 308 to ${target}: a temporary redirect is asked again every time, a Location without /app lands on the site, and one to another name before the move is the flip's vars deployed without its routes`;
+          return `answered ${a.status} to ${to || 'nowhere'}. The move is a 308 to ${target}: a temporary redirect is asked again every time, a Location without /app lands on the site, and one to another name before the move is the flip's vars deployed before the site hands that name the doors`;
         if (old === host)
           return `answered ${a.status}${isJson(a) ? ' in JSON, which is ROUTE_UNKNOWN' : ''}: a page load outside /app on ${host} is not sent into /app on the same name, so the site's "Open the app" and every magic link already mailed land on an error`;
         return `answered ${a.status}, so ${old} still serves the app instead of sending a browser to ${host}. Is LEGACY_HOSTS in the deployed vars?`;
@@ -153,13 +158,13 @@ export function checks(config, name) {
 export const judge = (check, answer) => check.judge(answer);
 
 /** The whole smoke step. */
-export default async function smoke(name, config = wranglerConfig()) {
-  const list = checks(config, name);
+export default async function smoke(name, config = wranglerConfig(), site = siteConfig()) {
+  const list = checks(config, name, site);
   let failed = 0;
   console.log('');
   console.log(`  smoke: ${name}, ${list.length} check(s), read-only`);
   if (!list.some((c) => c.url.endsWith('/pricing')))
-    console.log(`  ${name} has no zone route, so the site is not asked: no name of this Worker's is shared with it yet`);
+    console.log(`  ${name}'s site does not hand this Worker its doors, so the site is not asked: ${siteBinding(config, site, name).why ?? 'no name of the site is one this Worker is not already on'}`);
   for (const check of list) {
     let answer;
     try {

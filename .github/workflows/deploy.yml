@@ -125,15 +125,16 @@ jobs:
       # `--allow-skip` here: this is the one job where the gate skipping means the deploy went
       # unchecked, so a missing `DEPLOY_HOST` has to be red rather than quiet.
       #
-      # `DEPLOY_HOST` IS A REPOSITORY VARIABLE, AND IT STAYS `app.brain.dog` THROUGH PUSHES A AND A2
-      # OF THE ONE-DOMAIN MOVE (`loop/research-one-domain-cutover.md` section 5, and the comment at the
-      # top of `apps/worker/wrangler.jsonc`). The gate asks `/app/`, `/app/_app/version.json` and the
-      # build id, and on that name none of the three is redirected in either push. It becomes
-      # `brain.dog` after A2 is green and before B is pushed, when both names answer the three the
-      # same way. Set before A2's routes exist, every deploy goes red here against the site's 404;
-      # set after B's job starts, B goes red here with the flip already live. After B the old value
-      # turns red too, because `app.brain.dog/app/` is then a 308 and this asks with
-      # `redirect: 'manual'`.
+      # `DEPLOY_HOST` IS A REPOSITORY VARIABLE, AND IT STAYS `app.brain.dog` UNTIL PRODUCTION'S SITE
+      # BINDS THIS WORKER, push 3 of the one-domain move (`loop/research-one-domain-binding.md`
+      # sections 3 and 4, and the comment at the top of `apps/worker/wrangler.jsonc`). The gate asks
+      # `/app/`, `/app/_app/version.json` and the build id; on `app.brain.dog` none of the three is
+      # redirected before the flip, and through the site's binding all three answered the app's own
+      # bytes when measured locally. It becomes `brain.dog` after push 3 is green and before B2 is
+      # pushed, when both names answer the three the same way. Set before push 3, every deploy goes
+      # red here against the site's 404 page; set after B2's job starts, B2 goes red here with the
+      # flip already live. After B2 the old value turns red too, because `app.brain.dog/app/` is then
+      # a 308 and this asks with `redirect: 'manual'`.
       - name: Parity
         run: pnpm gates -- --only deploy-parity
         env:
@@ -142,11 +143,18 @@ jobs:
       # AND THE MARKETING SITE, WHICH NOTHING HERE HAS EVER DEPLOYED. `apps/site` is the one surface
       # that is not a property of the Worker version: `apps/worker/wrangler.jsonc` carries
       # `apps/web/build` into the Worker, so the app under `/app` ships with the code, while
-      # `brain.dog` and `alpha.brain.dog` are a separate static deployment with their own file. From
-      # push A2 of the one-domain move the two share a hostname: the site holds it as a Custom Domain
-      # and the Worker's zone routes take the paths it answers, which Cloudflare runs first. Until this step
-      # existed that deployment was only ever made by hand, which is why on the day it was written
-      # the apex was serving a build an hour older than the app and nobody had been told.
+      # `brain.dog` and `alpha.brain.dog` are a separate deployment with their own file. Once an
+      # environment's site binds the app (push 1 for alpha, push 3 for production), the two share a
+      # hostname: the site holds it as a Custom Domain, runs its script first on the app's doors and
+      # hands those requests to the app through its `APP` service binding. That script and that
+      # binding are part of the site's version, uploaded here with the same token as today and no
+      # route written, so no Zone permission is needed (read from the configs, not asked of
+      # Cloudflare; push 1 on alpha is the measurement). The binding calls whichever version of the
+      # app is live, so an app deploy is visible on `brain.dog` at once with no site deploy. This step
+      # redeploys the site on every run, whether its files changed or not, so a hand `wrangler
+      # rollback` of the site lasts only until the next run, and `git revert` is what keeps one.
+      # Until this step existed that deployment was only ever made by hand, which is why on the day it
+      # was written the apex was serving a build an hour older than the app and nobody had been told.
       #
       # AFTER THE PARITY CHECK RATHER THAN BEFORE IT. The Worker is the critical path and the gate
       # above is the thing that proves it landed. If the app did not deploy, publishing a new
@@ -167,16 +175,18 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
 
-      # AND THEN ASK WHICH WORKER ANSWERED EACH PATH, BECAUSE TWO SHARE `brain.dog` ONCE A2 LANDS.
-      # Parity above proves the Worker's bytes landed on one name; it does not prove its zone routes
-      # did, and a route that did not land looks like the site's 404 page answering `/api/boot`, a
-      # healthy response from the wrong Worker. `apps/worker/scripts/smoke.mjs` reads the names from
-      # `wrangler.jsonc` rather than from `DEPLOY_HOST`, so it asks the names the deploy claimed, and
-      # what it asks follows the push. Push A: four questions on `app.brain.dog`, the shell at `/app/`,
-      # a 401 at `/api/boot`, a 308 from `/r/x` to `/app/r/x` on the same name, and a POST to an `/in/`
-      # door that is served rather than redirected; `brain.dog` is not asked, because nothing of this
-      # Worker's is on it yet. Push A2 adds `brain.dog`'s `/pricing`, `/app/` and `/api/boot`. Push B
-      # is the design's five (`loop/research-one-domain.md` section 3.5).
+      # AND THEN ASK WHICH WORKER ANSWERED EACH PATH, BECAUSE TWO SHARE `brain.dog` ONCE THE SITE
+      # BINDS THE APP. Parity above proves the Worker's bytes landed on one name; it does not prove
+      # the site hands every door over, and a door the site keeps looks like the site's 404 page
+      # answering `/api/boot`, a healthy response from the wrong Worker. `apps/worker/scripts/smoke.mjs`
+      # reads the names from `apps/worker/wrangler.jsonc` and the binding from
+      # `apps/site/wrangler.jsonc` rather than from `DEPLOY_HOST`, so it asks the names the deploys
+      # claimed, and what it asks follows the push. Push A: four questions on `app.brain.dog`, the
+      # shell at `/app/`, a 401 at `/api/boot`, a 308 from `/r/x` to `/app/r/x` on the same name, and
+      # a POST to an `/in/` door that is served rather than redirected; `brain.dog` is not asked,
+      # because the site does not hand it this Worker's doors yet. Once production's site binds this
+      # Worker (push 3) it adds `brain.dog`'s `/pricing`, `/app/` and `/api/boot`, and after B2 it is
+      # the design's five (`loop/research-one-domain.md` section 3.5).
       #
       # AFTER THE SITE, because `/pricing` is the site's answer and asking it before the site deploys
       # measures the previous site. It writes nothing and sends no credential.

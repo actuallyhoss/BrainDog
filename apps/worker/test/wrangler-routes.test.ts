@@ -1,34 +1,29 @@
 /**
- * Which names and paths reach this Worker, in the file as it deploys next and in the two pushes after it, held against
- * the doors the Worker has built.
+ * Which names reach this Worker, and by what, in the file as it deploys next and in the two pushes after it, held
+ * against the doors the Worker has built.
  *
- * THE MOVE TO ONE DOMAIN GOES OUT IN THREE PUSHES, AND THIS FILE HOLDS ALL THREE (`loop/research-one-domain-cutover.md`
- * sections 2 and 5). Push A is `wrangler.jsonc` as it stands: the app under `/app`, the Worker still on `app.brain.dog`
- * alone, no zone route. Push A2 adds the zone routes on `brain.dog` with the vars unchanged, and push B changes the two
- * vars that move the app. A2 and B live as JSON in the comment at the top of `wrangler.jsonc`, and `pushes` in
- * `scripts/provision-check.mjs` applies them, so a fragment that stops parsing or stops routing a door fails here, on a
- * laptop, rather than on the morning of the push.
+ * THE MOVE TO ONE DOMAIN GOES THROUGH THE SITE'S SERVICE BINDING, AND THIS FILE HOLDS EVERY PUSH OF IT THAT TOUCHES
+ * `wrangler.jsonc` (`loop/research-one-domain-binding.md` section 4). Push A is `wrangler.jsonc` as it stands: the app
+ * under `/app`, the Worker on `app.brain.dog` alone, no zone route. B1 flips alpha's two vars and B2 production's. The
+ * two pushes that bind the site (1 and 3) change `apps/site/wrangler.jsonc` and nothing here. B1 and B2 live as JSON in
+ * the comment at the top of `wrangler.jsonc`, and `pushes` in `scripts/provision-check.mjs` applies them, so a fragment
+ * that stops parsing, or flips a name nothing reaches, fails here, on a laptop, rather than on the morning of the push.
  *
- * WHY A IS SEPARATE FROM A2: `wrangler deploy` uploads the version, which is live at once, and only then writes the
- * routes, and the deploy token may not hold Zone > Workers Routes > Edit on `brain.dog`, which only the owner can grant.
- * So the push that needs that permission changes nothing else, and if it fails the Worker already serving is A's.
+ * A NAME THE APP ANSWERS IS REACHED IN ONE OF TWO WAYS, AND THAT IS THE WHOLE OF WHAT IS CHECKED. It is a Custom Domain
+ * of this Worker, which carries every path ("Other parts (path, query parameters) of the URL are not considered",
+ * developers.cloudflare.com/workers/configuration/routing/custom-domains); or it is a Custom Domain of the site whose
+ * same environment runs its script first on every built door and binds `APP` to this Worker's script of that
+ * environment. A built door the site does not run first on is answered by the site's 404 page, to a webhook sender or an
+ * MCP client, and nothing fails at deploy time. A site bound to the other environment's app serves production's record
+ * on alpha's name, or the reverse.
  *
- * TWO WORKERS ANSWER ONE HOSTNAME ONCE A2 LANDS, AND THE ROUTE LIST IS THE ONLY THING THAT DECIDES WHICH. The marketing
- * site holds `brain.dog` as its Custom Domain and answers everything; this Worker takes a handful of zone routes on the
- * same name, and Cloudflare runs a route before a Custom Domain on the same hostname: "Routes can `fetch()` Custom
- * Domains and take precedence if configured on the same hostname"
- * (developers.cloudflare.com/workers/configuration/routing/routes, read 23 September). So a door listed in
- * `run_worker_first` with no zone route beside it is a door the site answers, with its 404 page, to a webhook sender or
- * an MCP client. Nothing fails at deploy time; the first sign is a bank that stops resending.
- *
- * AND THE OTHER DIRECTION MATTERS AS MUCH. A zone route for a door the Worker has not built takes a path away from the
- * site's honest 404 and hands it to `ROUTE_UNKNOWN`, which is also true, but it spends one of the site's names on
- * nothing. `/a`, `/s` and `/ws` are in `run_worker_first` and unbuilt, and the design leaves them unrouted until the day
- * they are built.
+ * THE SITE OF EACH STAGED PUSH IS WRITTEN IN MEMORY (`scripts/site-fixture.mjs`), because `apps/site/wrangler.jsonc`
+ * changes between these pushes on purpose, and a test of B2 that read it would pass or fail with whichever commit is
+ * checked out. The tests that read the real site say so in their names.
  *
  * "BUILT" IS READ FROM `src/route.ts`, NOT WRITTEN HERE. Each `serves*` predicate there is the Worker's own answer to "is
- * this path mine", so a door added to the router and to `run_worker_first` without a route fails this file, and nobody
- * has to remember a third list.
+ * this path mine", so a door added to the router and to `run_worker_first` that the site does not hand over fails this
+ * file, and nobody has to remember a third list.
  */
 
 import { test } from 'node:test';
@@ -39,17 +34,21 @@ import { fileURLToPath } from 'node:url';
 import { servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesMcp } from '../src/route.ts';
 
 type Route = { pattern: string; custom_domain?: boolean; zone_name?: string; zone_id?: string };
+type Assets = { not_found_handling?: string; run_worker_first?: string[] | boolean };
 type Env = {
+  main?: string;
   routes?: Route[];
   vars?: { [name: string]: string };
-  assets?: { not_found_handling?: string; run_worker_first?: string[] };
+  assets?: Assets;
+  services?: { binding: string; service: string }[];
 };
-type Config = { assets?: Env['assets']; env?: { [name: string]: Env } };
+type Config = { name?: string; main?: string; assets?: Assets; services?: Env['services']; env?: { [name: string]: Env } };
 type Push = { name: string; config: Config; change: { [env: string]: Env } | null };
+type Binding = { names: string[]; why: string | null };
 
 /**
- * `stripJsonc` and `pushes` from `scripts/provision-check.mjs`, so the test, the checker and the smoke step read the file
- * and its staged pushes the same way.
+ * `stripJsonc`, `pushes` and `siteBinding` from `scripts/provision-check.mjs`, and the in-memory sites, so the test, the
+ * checker and the smoke step read the files, the staged pushes and the binding the same way.
  *
  * A DYNAMIC IMPORT WITH A WIDENED SPECIFIER, BECAUSE A STATIC ONE DOES NOT TYPECHECK. The script is plain JavaScript with
  * no declaration beside it and this program has no `allowJs`, so `import { stripJsonc } from
@@ -59,7 +58,18 @@ type Push = { name: string; config: Config; change: { [env: string]: Env } | nul
  * the checker about one comment is exactly how a test goes green on a file the checker cannot parse.
  */
 const checker = '../scripts/provision-check.mjs' as string;
-const { stripJsonc, pushes } = (await import(checker)) as { stripJsonc: (text: string) => string; pushes: () => Push[] };
+const { stripJsonc, pushes, siteBinding, DOORS } = (await import(checker)) as {
+  stripJsonc: (text: string) => string;
+  pushes: () => Push[];
+  siteBinding: (config: Config, site: Config, env: string, doors?: string[]) => Binding;
+  DOORS: string[];
+};
+const fixture = '../scripts/site-fixture.mjs' as string;
+const { UNBOUND, boundSite, SITE_DOORS } = (await import(fixture)) as {
+  UNBOUND: Config;
+  boundSite: (bindings: { [env: string]: string }, site?: Config, doors?: string[]) => Config;
+  SITE_DOORS: string[];
+};
 
 const read = (path: string): Config => JSON.parse(stripJsonc(readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8'))) as Config;
 
@@ -78,6 +88,16 @@ const envOf = (config: Config, name: string): Env => {
   assert.ok(block, `no env.${name} block`);
   return block;
 };
+
+/**
+ * THE SITE EACH PUSH IS MADE BESIDE. B1 follows push 1, which binds alpha's site; B2 follows push 3, which binds
+ * production's too. Push A is the file as it deploys and is checked against the real site, whatever it binds today.
+ */
+const SITE_AT: { [push: string]: Config } = {
+  B1: boundSite({ alpha: 'braindog-alpha' }),
+  B2: boundSite({ alpha: 'braindog-alpha', production: 'braindog-production' }),
+};
+const siteAt = (push: Push): Config => SITE_AT[push.name] ?? site;
 
 /**
  * Whether the Worker answers a path itself.
@@ -99,26 +119,6 @@ const served = (path: string): boolean =>
 const TAILS = ['boot', 'braindog-build'];
 const samples = (pattern: string): string[] => (pattern.endsWith('*') ? TAILS.map((tail) => pattern.slice(0, -1) + tail) : [pattern]);
 
-/**
- * Cloudflare's own route matching, as far as these patterns use it.
- *
- * A trailing star is a prefix and anything else is exact, which is the whole of the grammar: "Route patterns may not
- * contain infix wildcards or query parameters" (the routes page above). A Custom Domain matches every path on its host,
- * "Other parts (path, query parameters) of the URL are not considered"
- * (developers.cloudflare.com/workers/configuration/routing/custom-domains).
- */
-const hostOf = (route: Route): string => {
-  const slash = route.pattern.indexOf('/');
-  return (slash === -1 ? route.pattern : route.pattern.slice(0, slash)).toLowerCase();
-};
-const routes = (route: Route, host: string, path: string): boolean => {
-  if (hostOf(route) !== host.toLowerCase()) return false;
-  if (route.custom_domain) return true;
-  const slash = route.pattern.indexOf('/');
-  const want = slash === -1 ? '/' : route.pattern.slice(slash);
-  return want.endsWith('*') ? path.startsWith(want.slice(0, -1)) : path === want;
-};
-
 /** `run_worker_first`'s glob, with negatives winning: "Negative patterns have precedence over non-negative patterns". */
 const workerFirst = (entries: string[], path: string): boolean => {
   const glob = (p: string): boolean => (p.endsWith('*') ? path.startsWith(p.slice(0, -1)) : path === p);
@@ -131,14 +131,38 @@ const workerFirst = (entries: string[], path: string): boolean => {
  * own and deploys the top-level one, alpha declares its own for `build-alpha`. The first draft of this file read
  * `env.production.assets` and found an empty `run_worker_first`.
  */
-const assetsOf = (config: Config, name: string): NonNullable<Env['assets']> => envOf(config, name).assets ?? config.assets ?? {};
+const assetsOf = (config: Config, name: string): Assets => envOf(config, name).assets ?? config.assets ?? {};
+const firstOf = (config: Config, name: string): string[] => {
+  const list = assetsOf(config, name).run_worker_first;
+  return Array.isArray(list) ? list : [];
+};
+
+/** Every door this Worker has built in one environment, one sample path each, with the shell. */
+const builtDoors = (config: Config, name: string): string[] => [
+  ...new Set([...firstOf(config, name).filter((e) => !e.startsWith('!')).flatMap(samples).filter(served), '/app', '/app/']),
+];
 
 const zoneRoutes = (block: Env): Route[] => (block.routes ?? []).filter((r) => !r.custom_domain);
+const customDomains = (block: Env): string[] => (block.routes ?? []).filter((r) => r.custom_domain).map((r) => r.pattern.toLowerCase());
 const hostsOf = (value: string | undefined): string[] => (value ?? '').split(/[\s,]+/).filter((h) => h.length > 0);
-const siteHostsOf = (name: string): string[] => (envOf(site, name).routes ?? []).filter((r) => r.custom_domain).map((r) => r.pattern);
+const siteHostsOf = (name: string): string[] => customDomains(envOf(site, name));
+
+/**
+ * The names an environment answers that nothing reaches, each with the reason, for one config beside one site. Empty is
+ * the answer every push has to give.
+ */
+const unreached = (config: Config, siteConfig: Config, name: string): string[] => {
+  const block = envOf(config, name);
+  const own = customDomains(block);
+  const binding = siteBinding(config, siteConfig, name, builtDoors(config, name));
+  const names = [block.vars?.PUBLIC_HOST ?? '', ...hostsOf(block.vars?.LEGACY_HOSTS)].map((h) => h.toLowerCase());
+  return names
+    .filter((on) => !own.includes(on) && !binding.names.includes(on))
+    .map((on) => `${on} is no Custom Domain of this Worker, and the site does not hand it the doors: ${binding.why ?? `${on} is not a Custom Domain of the site's env.${name}`}`);
+};
 
 test('THE FILE IS PUSH A: the Worker on its own name as a Custom Domain, no zone route, and the passkey already under the parent', () => {
-  assert.deepEqual(PUSHES.map((p) => p.name), ['A', 'A2', 'B']);
+  assert.deepEqual(PUSHES.map((p) => p.name), ['A', 'B1', 'B2']);
   assert.deepEqual(pushNamed('A').config, worker, 'push A is not the file as it deploys');
   const expected = {
     production: { host: 'app.brain.dog', rp: 'brain.dog' },
@@ -150,100 +174,124 @@ test('THE FILE IS PUSH A: the Worker on its own name as a Custom Domain, no zone
     assert.equal(host, expected[name].host, `${name}: PUBLIC_HOST`);
     /* THE WORKER HOLDS ITS NAME AS A CUSTOM DOMAIN, which carries every path, so the dark deploy needs no route it does
        not already have and no permission the token has not already used. */
-    assert.ok((block.routes ?? []).some((r) => r.custom_domain && r.pattern === host), `${name}: ${host} is not a Custom Domain of this Worker`);
-    assert.deepEqual(zoneRoutes(block), [], `${name}: a zone route in push A is a permission the token may not have, spent on the push that must not fail`);
-    /* AND IT DOES NOT TAKE THE SITE'S NAME, which would be the flip without its routes. */
+    assert.ok(customDomains(block).includes(host), `${name}: ${host} is not a Custom Domain of this Worker`);
+    /* AND IT DOES NOT TAKE THE SITE'S NAME, which would be the flip before anything reaches it. */
     assert.ok(!siteHostsOf(name).includes(host), `${name}: PUBLIC_HOST ${host} is the site's own name in push A`);
     assert.equal(block.vars?.LEGACY_HOSTS, '', `${name}: nothing is legacy until the app has moved`);
-    /* THE RP ID IS THE PARENT FROM THE FIRST DEPLOY, so a passkey made during push A is offered on the new name after B. */
+    /* THE RP ID IS THE PARENT FROM THE FIRST DEPLOY, so a passkey made during push A is offered on the new name after the
+       flip. */
     assert.equal(block.vars?.RP_ID, expected[name].rp, `${name}: RP_ID`);
   }
 });
 
-test('A2 ADDS ROUTES AND REMOVES NONE, AND B CHANGES TWO VARS AND NO ROUTE, so each push needs only what it changes', () => {
-  const [a, a2, b] = [pushNamed('A'), pushNamed('A2'), pushNamed('B')];
-  for (const name of ENVIRONMENTS) {
-    const change2 = a2.change?.[name] ?? {};
-    assert.deepEqual(Object.keys(change2), ['routes'], `${name}: A2 changes ${Object.keys(change2).join(', ')}`);
-    const before = envOf(a.config, name).routes ?? [];
-    const after = envOf(a2.config, name).routes ?? [];
-    for (const kept of before) assert.ok(after.some((r) => JSON.stringify(r) === JSON.stringify(kept)), `${name}: A2 drops ${kept.pattern}`);
-    assert.ok(zoneRoutes(envOf(a2.config, name)).length > 0, `${name}: A2 adds no zone route`);
-    assert.deepEqual(envOf(a2.config, name).vars, envOf(a.config, name).vars, `${name}: A2 changes a var`);
-
-    /* B IS THE ONE THAT MOVES PEOPLE, AND IT CHANGES NO ROUTE, so an Editor token is enough and a failed route write
-       cannot leave the flipped vars serving with nothing routed behind them (the cut-over's risk 1). */
-    const changeB = b.change?.[name] ?? {};
-    assert.deepEqual(Object.keys(changeB), ['vars'], `${name}: B changes ${Object.keys(changeB).join(', ')}`);
-    assert.deepEqual(Object.keys(changeB.vars ?? {}).sort(), ['LEGACY_HOSTS', 'PUBLIC_HOST'], `${name}: B`);
-    assert.deepEqual(envOf(b.config, name).routes, envOf(a2.config, name).routes, `${name}: B changes a route`);
-    assert.equal(envOf(b.config, name).vars?.RP_ID, envOf(a.config, name).vars?.RP_ID, `${name}: B moves the RP ID, stranding a passkey made under A`);
+test('B1 FLIPS ALPHA AND B2 FLIPS PRODUCTION, EACH BY TWO VARS AND NO ROUTE, so each push needs only what it changes', () => {
+  const a = pushNamed('A');
+  const flips = [
+    { push: pushNamed('B1'), env: 'alpha', host: 'alpha.brain.dog', old: 'app.alpha.brain.dog' },
+    { push: pushNamed('B2'), env: 'production', host: 'brain.dog', old: 'app.brain.dog' },
+  ];
+  for (const { push, env, host, old } of flips) {
+    /* ONE ENVIRONMENT PER PUSH, so alpha's flip is rehearsed through `deploy.yml` and the alpha smoke before production's
+       exists (the research, section 4), and a fault in one is a rollback of one. */
+    assert.deepEqual(Object.keys(push.change ?? {}), [env], `${push.name} changes ${Object.keys(push.change ?? {}).join(', ')}`);
+    const change = push.change?.[env] ?? {};
+    /* AND IT CHANGES NO ROUTE, so an Editor token is enough and no route write can fail under the flipped vars. */
+    assert.deepEqual(Object.keys(change), ['vars'], `${push.name}: changes ${Object.keys(change).join(', ')}`);
+    assert.deepEqual(Object.keys(change.vars ?? {}).sort(), ['LEGACY_HOSTS', 'PUBLIC_HOST'], push.name);
+    assert.equal(envOf(push.config, env).vars?.PUBLIC_HOST, host, push.name);
+    assert.deepEqual(hostsOf(envOf(push.config, env).vars?.LEGACY_HOSTS), [old], push.name);
+    for (const name of ENVIRONMENTS) {
+      assert.deepEqual(envOf(push.config, name).routes, envOf(a.config, name).routes, `${push.name} ${name}: a flip changes a route`);
+      assert.equal(envOf(push.config, name).vars?.RP_ID, envOf(a.config, name).vars?.RP_ID, `${push.name} ${name}: the flip moves the RP ID, stranding a passkey made under A`);
+    }
   }
-  assert.equal(envOf(b.config, 'production').vars?.PUBLIC_HOST, 'brain.dog');
-  assert.deepEqual(hostsOf(envOf(b.config, 'production').vars?.LEGACY_HOSTS), ['app.brain.dog']);
 });
 
-test('in every push, every door the Worker has built is routed on every name the Worker is on', () => {
+test('in every push, every name the app answers is reached, beside the site that push is made next to', () => {
   for (const push of PUSHES) {
     for (const name of ENVIRONMENTS) {
-      const block = envOf(push.config, name);
-      const host = block.vars?.PUBLIC_HOST ?? '';
-      /* EVERY NAME, NOT ONLY `PUBLIC_HOST`. In A2 the app is still `app.brain.dog`'s and already routed on `brain.dog`,
-         and a door missing there is one the site answers from the moment A2 deploys. In push A the only name is a
-         Custom Domain, which covers every path, and the check is still what fails if that domain is dropped. */
-      const names = [...new Set([host, ...zoneRoutes(block).map(hostOf)])];
-      const first = assetsOf(push.config, name).run_worker_first ?? [];
-      const built = first.filter((e) => !e.startsWith('!')).flatMap(samples).filter(served);
-      assert.ok(built.length > 0, `${push.name} ${name}: run_worker_first names no door the Worker has built`);
-      for (const on of names) {
-        for (const path of [...built, '/app']) {
-          const by = (block.routes ?? []).filter((r) => routes(r, on, path));
-          assert.ok(by.length > 0, `${push.name} ${name}: ${on}${path} is a door the Worker answers and no route sends it there, so the site's 404 page answers it`);
-        }
-      }
+      const built = builtDoors(push.config, name);
+      assert.ok(built.length > 2, `${push.name} ${name}: run_worker_first names no door the Worker has built`);
+      assert.deepEqual(unreached(push.config, siteAt(push), name), [], `${push.name} ${name}`);
     }
   }
 });
 
-test('the one-domain claim itself: after B the Worker is on the name the site holds', () => {
+test('a flip beside a site that does not bind that environment\'s own app is refused, which is what keeps B2 behind push 3', () => {
+  const b2 = pushNamed('B2').config;
+  /* PUSH 1'S SITE, ALPHA BOUND AND PRODUCTION NOT. B2 landing here would move production's sign-in to `brain.dog`, where
+     every door is the site's 404 page. */
+  assert.match(unreached(b2, boundSite({ alpha: 'braindog-alpha' }), 'production').join('\n'), /^brain\.dog .*env\.production/);
+  /* PRODUCTION'S SITE BOUND TO ALPHA'S APP: every door answers, from the wrong record, and nothing else would notice. */
+  const crossed = boundSite({ alpha: 'braindog-alpha', production: 'braindog-alpha' });
+  assert.match(unreached(b2, crossed, 'production').join('\n'), /binds APP to braindog-alpha, and this app there is braindog-production/);
+  /* A SITE THAT KEEPS ONE BUILT DOOR: `/mcp` is the site's 404 page to every MCP client. */
+  const noMcp = boundSite({ alpha: 'braindog-alpha', production: 'braindog-production' }, UNBOUND, SITE_DOORS.filter((d) => d !== '/mcp'));
+  assert.match(unreached(b2, noMcp, 'production').join('\n'), /does not run its script first on \/mcp/);
+  /* A BINDING WITH NO SCRIPT TO CALL IT hands nothing to anyone. */
+  const scriptless = boundSite({ alpha: 'braindog-alpha', production: 'braindog-production' });
+  delete envOf(scriptless, 'production').main;
+  assert.match(unreached(b2, scriptless, 'production').join('\n'), /no main/);
+  /* A SCRIPT WITH NO `APP` TO CALL, AND THE SAME BINDING WRITTEN AT THE SITE'S TOP LEVEL, WHICH WRANGLER DOES NOT
+     INHERIT. Neither case was held by anything here: with the `binds no APP` refusal taken out of `siteBinding`, or with
+     `services` read from the top level as a fallback, every test in this file and in `scripts/*.test.mjs` stayed green
+     (the checker's mutation run on 23 September). */
+  const unbound = boundSite({ alpha: 'braindog-alpha', production: 'braindog-production' });
+  delete envOf(unbound, 'production').services;
+  assert.match(unreached(b2, unbound, 'production').join('\n'), /env\.production binds no APP/);
+  unbound.services = [{ binding: 'APP', service: 'braindog-production' }];
+  assert.match(unreached(b2, unbound, 'production').join('\n'), /env\.production binds no APP/);
+});
+
+test('the real site, whatever it binds today, binds each environment to that environment\'s own app and hands it every built door', () => {
+  /* READS BOTH REAL FILES, AND HOLDS AT EVERY COMMIT OF THE MOVE. Before push 1 the site binds nothing and this is
+     vacuous; from push 1 alpha's site is bound and B1's `alpha.brain.dog` has to be reached through it; from push 3
+     production's too. The flip is taken from the last staged push, so it is always the one still to come, or the file
+     itself once both flips have landed. */
+  const flipped = PUSHES[PUSHES.length - 1]?.config ?? worker;
   for (const name of ENVIRONMENTS) {
-    const host = envOf(pushNamed('B').config, name).vars?.PUBLIC_HOST ?? '';
-    assert.ok(siteHostsOf(name).includes(host), `${name}: PUBLIC_HOST after B is ${host}, and the site's Custom Domains are ${siteHostsOf(name).join(', ')}`);
+    const bound = (envOf(site, name).services ?? []).some((s) => s.binding === 'APP');
+    if (!bound) continue;
+    assert.deepEqual(unreached(flipped, site, name), [], `${name}: the site binds APP, and the flip staged for it would not be reached`);
+    assert.ok(siteHostsOf(name).includes(envOf(flipped, name).vars?.PUBLIC_HOST ?? ''), `${name}: the site's bound name is not where the flip puts the app`);
   }
 });
 
-test('no zone route claims a path the Worker has not built, and each one names its zone', () => {
-  for (const push of PUSHES.filter((p) => p.name !== 'A')) {
+test('the one-domain claim itself: after the flips the Worker is on the name the site holds', () => {
+  const last = PUSHES[PUSHES.length - 1]?.config ?? worker;
+  for (const name of ENVIRONMENTS) {
+    const host = envOf(last, name).vars?.PUBLIC_HOST ?? '';
+    assert.ok(siteHostsOf(name).includes(host), `${name}: PUBLIC_HOST after the flips is ${host}, and the site's Custom Domains are ${siteHostsOf(name).join(', ')}`);
+  }
+});
+
+test('no push has a zone route: the site\'s binding carries the shared name, so no route is written and no Zone permission is needed', () => {
+  for (const push of PUSHES) {
     for (const name of ENVIRONMENTS) {
-      const block = envOf(push.config, name);
-      const zoned = zoneRoutes(block);
-      assert.ok(zoned.length > 0, `${push.name} ${name}: no zone routes at all, so nothing on the shared host reaches the Worker`);
-      for (const route of zoned) {
-        /* EVERY SAMPLE, NOT ANY. With `find(served)` a route of `brain.dog/.well-known/*` passed, because
-           `braindog-build` is one of its tails, and it would take `security.txt` and every other name under
-           `/.well-known/` from the site. Checked by mutating a copy of the config on 23 September: that route and its
-           alpha twin left this file green. A star is a claim on every tail, so every tail has to be one the Worker
-           has built. */
-        const asked = samples(route.pattern.slice(route.pattern.indexOf('/')));
-        const unbuilt = asked.find((p) => !served(p));
-        assert.equal(unbuilt, undefined, `${push.name} ${name}: ${route.pattern} routes ${unbuilt}, a path the Worker has not built, which takes it away from the site's 404 page`);
-        const path = asked[0] ?? '';
-        /* A ROUTE THE WORKER TAKES BUT DOES NOT RUN FIRST ON is a request the asset layer answers before the Worker's
-           code sees it, which for a door is a 404 from a file lookup. `/app/*` is the exception by design: its `_app`
-           chunks are files. */
-        assert.ok(path.startsWith('/app') || workerFirst(assetsOf(push.config, name).run_worker_first ?? [], path), `${push.name} ${name}: ${route.pattern} is routed and not in run_worker_first`);
-        /* WRANGLER NEEDS ONE OF THE TWO ON A ZONE ROUTE: "Add the `zone_name` or `zone_id` option after each route"
-           (the routes page). Without it the deploy stops and asks. */
-        assert.ok(route.zone_name === 'brain.dog' || typeof route.zone_id === 'string', `${push.name} ${name}: ${route.pattern} names no zone`);
-      }
+      assert.deepEqual(zoneRoutes(envOf(push.config, name)), [], `${push.name} ${name}: a zone route is a permission the token may not have, and a part of the move no version rollback removes`);
     }
   }
+});
+
+test('the checker\'s own door list is the doors src/route.ts has built, so the smoke step and this file agree on what reaches the app', () => {
+  /* `DOORS` IN THE CHECKER IS A LIST WRITTEN BY HAND, for the reason its comment gives, and this is what keeps it
+     honest. Every entry has to be a path the Worker serves, and every door family the app's own `run_worker_first` has
+     built (its first path segment) has to have an entry, so a door added to the router is a line here or a red test. */
+  for (const door of DOORS) assert.ok(served(door), `${door} is in the checker's DOORS and is not a door the Worker serves`);
+  const family = (path: string): string => path.split('/')[1] ?? '';
+  for (const name of ENVIRONMENTS) {
+    const missing = builtDoors(worker, name).filter((p) => !DOORS.some((d) => family(d) === family(p)));
+    assert.deepEqual(missing, [], `${name}: built doors the checker's DOORS has no entry for`);
+  }
+  /* AND THE IN-MEMORY SITE HANDS OVER EVERY ONE OF THEM, or the staged pushes above are checked beside a site that could
+     not exist. */
+  for (const door of builtDoors(worker, 'production')) assert.ok(workerFirst(SITE_DOORS, door), `the fixture's site keeps ${door}`);
 });
 
 test('the app runs first under /app and its built chunks and catalogue are files', () => {
   for (const name of ENVIRONMENTS) {
     const assets = assetsOf(worker, name);
-    const first = assets.run_worker_first ?? [];
+    const first = firstOf(worker, name);
     for (const path of ['/app', '/app/acme/r/tasks', '/app/acme/api/boot']) assert.ok(workerFirst(first, path), `${name}: ${path} is not worker-first`);
     for (const path of ['/app/_app/immutable/entry.js', '/app/catalogue/index.json']) assert.ok(!workerFirst(first, path), `${name}: ${path} runs the Worker before the file`);
     /* NOT A SHELL FOR EVERY MISS. The Worker draws the shell for an app navigation itself, and a
@@ -256,15 +304,8 @@ test('the app runs first under /app and its built chunks and catalogue are files
   }
 });
 
-test('the two environments route the same paths in every push, so alpha rehearses the production shape', () => {
-  for (const push of PUSHES) {
-    const paths = (name: string): string[] =>
-      zoneRoutes(envOf(push.config, name))
-        .map((r) => r.pattern.slice(r.pattern.indexOf('/')))
-        .sort();
-    assert.deepEqual(paths('alpha'), paths('production'), push.name);
-    assert.deepEqual(assetsOf(push.config, 'alpha').run_worker_first, assetsOf(push.config, 'production').run_worker_first, push.name);
-  }
+test('the two environments run the Worker first on the same paths in every push, so alpha rehearses the production shape', () => {
+  for (const push of PUSHES) assert.deepEqual(firstOf(push.config, 'alpha'), firstOf(push.config, 'production'), push.name);
 });
 
 test('in every push a legacy host keeps its Custom Domain, and a passkey made on it is offered on the new one', () => {
@@ -279,7 +320,7 @@ test('in every push a legacy host keeps its Custom Domain, and a passkey made on
       /* THE DOORS HANDED OUT ON THE OLD NAME. `/in/*` and `/api/*` there are served, never redirected, so the name has
          to stay bound to this Worker for as long as the var lists it. */
       for (const old of legacy) {
-        assert.ok((block.routes ?? []).some((r) => r.custom_domain && r.pattern === old), `${push.name} ${name}: ${old} is a legacy host with no Custom Domain`);
+        assert.ok(customDomains(block).includes(old), `${push.name} ${name}: ${old} is a legacy host with no Custom Domain`);
         assert.notEqual(old, host);
         /* WEBAUTHN OFFERS A CREDENTIAL WHERE ITS RP ID IS THE HOST OR A REGISTRABLE SUFFIX OF IT, so an RP ID of the
            new host is what lets a passkey made on the old one survive the move. */

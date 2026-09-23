@@ -1,7 +1,7 @@
 /**
  * `provision-check`: is this host ready to be provisioned, and what is missing.
  *
- *   node apps/worker/scripts/provision-check.mjs app.brain.dog     (brain.dog once push B of the one-domain move is live)
+ *   node apps/worker/scripts/provision-check.mjs app.brain.dog     (brain.dog once push B2 of the one-domain move is live)
  *   node apps/worker/scripts/provision-check.mjs http://localhost:8787 --no-account
  *
  * THIS IS THE REHEARSAL IN `loop/research-provision-day.md` TURNED INTO A COMMAND. That document
@@ -112,12 +112,13 @@ export function applyPush(config, change) {
 
 /**
  * The one-domain move as the pushes it goes out in: `A`, the file as it deploys, then each `STAGE <name> {...}` fragment
- * in the file's opening comment applied on top of the one before (`loop/research-one-domain-cutover.md` §5).
+ * in the file's opening comment applied on top of the one before. Today that is `A`, `B1` (alpha's flip) and `B2`
+ * (production's), `loop/research-one-domain-binding.md` section 4.
  *
  * THE FLIP IS KEPT AS DATA IN THE FILE IT CHANGES, AND READ BY THE SAME SCANNER. Left in a note it would be a config
- * nobody had parsed; here `test/wrangler-routes.test.ts` holds every push to the same route checks as the file, and
+ * nobody had parsed; here `test/wrangler-routes.test.ts` holds every push to the same checks as the file, and
  * `smoke.test.mjs` knows what the smoke step will ask after each one. The fragment is found by its marker and read to
- * its closing brace with strings respected, because a pattern such as `brain.dog/app/*` sits inside it.
+ * its closing brace with strings respected, so a brace inside a value cannot end it early.
  */
 export function pushes(root = ROOT) {
   const text = wranglerText(root);
@@ -145,27 +146,83 @@ export function pushes(root = ROOT) {
   return out;
 }
 
+/** `apps/site/wrangler.jsonc`, parsed. The site's config decides which of its names hand the app its doors. */
+export function siteConfig(root = ROOT) {
+  return JSON.parse(stripJsonc(readFileSync(join(root, 'apps', 'site', 'wrangler.jsonc'), 'utf8')));
+}
+
+/** A route pattern's host: everything before the first `/`, which is the whole pattern for a Custom Domain. */
+export const hostOf = (route) => String(route?.pattern ?? '').split('/')[0].toLowerCase();
+
+/** `run_worker_first`'s glob, with negatives winning: "Negative patterns have precedence over non-negative patterns". */
+export const workerFirst = (entries, path) => {
+  const glob = (p) => (p.endsWith('*') ? path.startsWith(p.slice(0, -1)) : path === p);
+  if (entries.some((e) => e.startsWith('!') && glob(e.slice(1)))) return false;
+  return entries.some((e) => !e.startsWith('!') && glob(e));
+};
+
 /**
- * Which environment serves the host he named, read off `routes` rather than off a table here.
+ * One path for each door the app has built, and the shell, which a site has to run its script first on before any of
+ * its names is one of the app's.
+ *
+ * WRITTEN HERE RATHER THAN READ FROM `src/route.ts`, SO THE DEPLOY'S SMOKE STEP DOES NOT LOAD THE WORKER'S MODULE GRAPH.
+ * That is a choice and not a limit: a bare `node` 24.13 imports `route.ts` and `@braindog/host` behind it (measured on
+ * 23 September), but a smoke step that goes red because the router gained an import a runner cannot load is red for a
+ * reason that has nothing to do with the deploy it is judging. So `test/wrangler-routes.test.ts` holds this list to
+ * `route.ts` instead: every entry must be a path the Worker serves, and every door the app's own `run_worker_first` has
+ * built must have an entry here. A door added to the router without a line here fails that test rather than a deploy.
+ */
+export const DOORS = ['/app', '/app/', '/app/acme/api/boot', '/api/boot', '/auth/methods', '/account/usage', '/mcp', '/in/abc', '/.well-known/braindog-build'];
+
+/**
+ * Which of the site's names are this app's in one environment, and when none are, the sentence that says why.
+ *
+ * THE MOVE TO ONE DOMAIN GOES THROUGH THE SITE'S SERVICE BINDING, NOT A ZONE ROUTE (`loop/research-one-domain-binding.md`).
+ * The site keeps `brain.dog` as its Custom Domain and hands the app's doors to it: `assets.run_worker_first` decides
+ * which paths reach the site's script, and `services` decides which app that script calls. So a site name is the app's
+ * when all three hold in the SAME environment: a script to run (`main`, which is inherited), `APP` bound to
+ * `<this app's name>-<env>`, and every door in `doors` worker-first. A site bound to the other environment's app would
+ * serve production's record on alpha's name, and counting that name as either environment's would describe a deploy
+ * nobody intended, so it is neither.
+ *
+ * `services` IS NOT INHERITABLE AND `assets` IS REPLACED WHOLE, so each is read the way wrangler resolves it: `services`
+ * from the environment alone, `assets` from the environment or else the top level.
+ */
+export function siteBinding(config, site, env, doors = DOORS) {
+  const block = site?.env?.[env];
+  if (!block) return { names: [], why: `the site has no env.${env}` };
+  if (!(block.main ?? site.main)) return { names: [], why: `the site's env.${env} has no main, so no script runs to hand the app a door` };
+  const app = `${config?.name ?? 'braindog'}-${env}`;
+  const bound = (block.services ?? []).find((s) => s?.binding === 'APP');
+  if (!bound) return { names: [], why: `the site's env.${env} binds no APP` };
+  if (bound.service !== app) return { names: [], why: `the site's env.${env} binds APP to ${bound.service}, and this app there is ${app}` };
+  const first = (block.assets ?? site.assets ?? {}).run_worker_first;
+  const list = first === true ? ['/*'] : Array.isArray(first) ? first : [];
+  const left = doors.filter((path) => !workerFirst(list, path));
+  if (left.length > 0) return { names: [], why: `the site's env.${env} does not run its script first on ${left.join(', ')}, so its 404 page answers them` };
+  return { names: (block.routes ?? []).filter((r) => r.custom_domain).map(hostOf), why: null };
+}
+
+/**
+ * Which environment serves the host he named, read off the app's `routes` and the site's binding rather than off a
+ * table here.
  *
  * `null` FOR A HOST THIS FILE DOES NOT NAME, AND THAT IS THE USEFUL ANSWER. A rehearsal host on
  * `localhost` is a real thing to point this at, and guessing production for it would read production's
  * bucket name and production's vars and report them as that host's. The probes below work on any
  * host; only the account questions need to know which environment it is.
  *
- * THE PATTERN'S HOST PART, NOT THE WHOLE PATTERN. From push A2 of the one-domain move on, production
- * holds `brain.dog` through zone routes (`brain.dog/api/*` and seven more), because the marketing site
- * holds the name as its Custom Domain, so no pattern equals `brain.dog` and an exact comparison
- * answered `null` for production's own name. The part before the first `/` is compared whole, so
- * `brain.dog.evil` is not production either. `app.brain.dog` is a Custom Domain in every push and
- * reads as production in every push, which it is. In push A, `brain.dog` is not named and reads `null`.
+ * A SITE NAME COUNTS WHEN THE SITE'S SAME ENVIRONMENT HANDS THIS APP EVERY DOOR (`siteBinding` above). After push B2
+ * `brain.dog` is production's `PUBLIC_HOST` and is no Custom Domain of this Worker, so reading `routes` alone, as this did
+ * while the move was to be zone routes, answers `null` for production's own name. A route's host part is compared
+ * whole, so `brain.dog.evil` is not production either. `app.brain.dog` is a Custom Domain in every push and reads as
+ * production in every push, which it is.
  */
-export function environmentOf(config, host) {
+export function environmentOf(config, host, site = siteConfig()) {
   const name = String(host).replace(/^[a-z]+:\/\//i, '').split('/')[0].split(':')[0].toLowerCase();
   for (const [env, block] of Object.entries(config.env ?? {})) {
-    const routes = block.routes ?? [];
-    if (routes.some((r) => String(r.pattern ?? '').split('/')[0].toLowerCase() === name))
-      return { name: env, bucket: block.r2_buckets?.[0]?.bucket_name ?? null, vars: block.vars ?? {} };
+    const names = [...(block.routes ?? []).map(hostOf), ...siteBinding(config, site, env).names];
+    if (names.includes(name)) return { name: env, bucket: block.r2_buckets?.[0]?.bucket_name ?? null, vars: block.vars ?? {} };
   }
   return null;
 }
@@ -353,14 +410,15 @@ export function readProvision(status, body) {
       says: fix,
       next: 'This host has no /auth/provision at all, which is a build older than the route rather than a missing secret. Deploy before anything else.',
     };
-  /* A 404 WITH NO JSON IS THE MARKETING SITE. On `brain.dog` two Workers share the name and the site
-     answers every path no zone route claims, with its own 404 page. Before this branch that answer
-     fell to the sentence below, which blames `run_worker_first` when the missing line is a route. */
+  /* A 404 WITH NO JSON IS THE MARKETING SITE. On `brain.dog` the site holds the name and answers every
+     path it does not hand to the app, with its own 404 page. The sentence below this one blames the
+     app's `run_worker_first`, which on the site's name is the wrong file: the list that is missing a
+     door there is the site's. */
   if (status === 404 && body === null)
     return {
       state: 'unreadable',
       says: fix,
-      next: 'A 404 page with no JSON is the marketing site answering, so the zone route for /auth/* on this host is missing from the deployed Worker. Deploy the routes in apps/worker/wrangler.jsonc, then ask again.',
+      next: "A 404 page with no JSON is the marketing site answering, so the deployed site does not hand /auth/* to the app on this host: its run_worker_first or its APP binding in apps/site/wrangler.jsonc is missing. Deploy the site, then ask again.",
     };
   return {
     state: 'unreadable',
@@ -638,7 +696,7 @@ export default async function provisionCheck(named, { account = true, root = ROO
   console.log(`  host         ${origin}`);
 
   const config = wranglerConfig(root);
-  const env = environmentOf(config, host);
+  const env = environmentOf(config, host, siteConfig(root));
   console.log(`  environment  ${env ? `${env.name}, from apps/worker/wrangler.jsonc` : 'not one this repository names, so only the public probes below apply'}`);
 
   /* THE DEPLOYMENT'S OWN VARS, WHICH ARE THE TWO SILENT ONES. A placeholder recipient is the nightly
@@ -672,7 +730,7 @@ export default async function provisionCheck(named, { account = true, root = ROO
   const { tuple, sha } = readBuild(build.body?.app);
   console.log(`  build        ${tuple ?? 'null, which is a deploy that was never told which build it is'}`);
   if (build.status !== 200 && build.body === null && env && host === env.vars.PUBLIC_HOST)
-    console.log(`    the build route answered ${build.status} with no JSON, which on ${host} is the marketing site: the zone route for /.well-known/braindog-build is not deployed`);
+    console.log(`    the build route answered ${build.status} with no JSON, which on ${host} is the marketing site: the deployed site does not hand /.well-known/braindog-build to the app`);
   else if (build.status !== 200) console.log(`    the build route answered ${build.status}, which is a version older than the route itself`);
 
   const guard = guardsKeylessRecords(sha, root);
