@@ -108,7 +108,13 @@
        configured with it reached the site's 404 page in the survey (section 2.6). The bare `/auth`,
        `/api`, `/in` and `/account` are not listed, as A2's zone routes did not list them. The build
        id is named alone, not `/.well-known/*`, because `security.txt` is the site's.
-       `apps/worker/test/site-binding.test.ts` holds this list to `src/route.ts` in both directions.
+
+       `/healthz` IS THE APP'S LIVENESS ANSWER (deb5b703), matched in its `src/index.ts` ahead of
+       every predicate in `src/route.ts`, and it was off this list for a wave: `alpha.brain.dog/healthz`
+       was this site's 404 page, a monitor's red from the wrong Worker, while
+       `apps/worker/test/site-binding.test.ts` stayed green because it read only six of those
+       predicates (`loop/research-batch-fifty-five-audit.md` section 3). That test now reads every
+       branch the app's `route()` takes on a path and holds this list to them in both directions.
 
        `APP` NAMES THE SAME ENVIRONMENT'S APP. A site bound to the other environment's app would
        serve production's record on alpha's name, and the same test fails on it. */
@@ -118,7 +124,7 @@
       "assets": {
         "directory": "build-alpha",
         "not_found_handling": "404-page",
-        "run_worker_first": ["/app", "/app/*", "/api/*", "/auth/*", "/account/*", "/mcp", "/mcp/", "/in/*", "/.well-known/braindog-build"]
+        "run_worker_first": ["/app", "/app/*", "/api/*", "/auth/*", "/account/*", "/mcp", "/mcp/", "/in/*", "/.well-known/braindog-build", "/healthz"]
       },
       "services": [{ "binding": "APP", "service": "braindog-alpha" }]
     }
