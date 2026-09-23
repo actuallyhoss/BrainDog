@@ -1309,14 +1309,22 @@ export function saidPlainly(register: string, where: string | undefined): string
        * `has` takes ONE value, so there is nothing to split on ` or `; the compiler refuses two.
        */
       const listed = verb === 'has' || verb === 'lacks';
+      /* A DECLARED VALUE IS SAID BY ITS LABEL FIRST, as the rows under the line read it. With Personal's labels on the
+         things list this printed "status is building or earning" over rows reading Active and Ongoing, and the label
+         typed back (`lane is ongoing`) printed "ongoing", the one spelling that is neither the row's nor the value's.
+         The `REGISTERS` this reads are already relabelled, so the label is on the field. */
+      const worded = (v: string): string => {
+        const value = declaredValue(register, decl.id, v);
+        return decl.labels?.[value] ?? value.replace(/_/g, ' ');
+      };
       const values =
         verb === 'before' || verb === 'after'
           ? spokenDay(rest)
           : listed
-            ? (decl.values ? declaredValue(register, decl.id, rest.trim()).replace(/_/g, ' ') : rest.trim())
+            ? (decl.values ? worded(rest.trim()) : rest.trim())
             : rest
                 .split(/\s+or\s+/)
-                .map((v) => declaredValue(register, decl.id, v.trim()).replace(/_/g, ' '))
+                .map((v) => worded(v.trim()))
                 .join(' or ');
       return `${name.toLowerCase()} ${verb} ${values}`;
     })

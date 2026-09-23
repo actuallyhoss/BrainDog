@@ -22,11 +22,20 @@ export const BUSINESS_EXAMPLES = [
   { register: 'services', fields: { name: 'Accounting software', kind: 'saas', state: 'live', cost: gbp(2_400), cycle: 'monthly', renews: '+21d' } },
 ];
 
+/**
+ * THE SUMMARY IS SAID IN WORDS ITS OWN SIGNALS HOLD, because an owner who types a card's words back has chosen it.
+ * "What you are owed and what you owe, what you run on, the people involved and the work." heard no signal of any use
+ * case, so the first run proposed nothing for the card the owner had just read (`loop/research-batch-forty-seven-audit.md`
+ * §6); typed back now, it hears clients, hosting and subscriptions, and no other card hears a word of it
+ * (`test/card-summary-proposes-itself.test.ts`). The summary moved and the signals did not: with "owed" as a signal,
+ * "track what my brother owed me for the holiday", which proposes nothing today, proposed Small business (measured).
+ * Neither is in a pack, since Small business carries none, so the version stays.
+ */
 export const BUSINESS = {
   usecase: 'business',
   version: '1.1.0',
   title: 'Small business',
-  summary: 'What you are owed and what you owe, what you run on, the people involved and the work.',
+  summary: 'What your clients owe you and what you owe, the hosting and subscriptions you run on, the people involved and the work.',
   author: 'BrainDog',
   license: 'MIT',
   audience: 'individual',

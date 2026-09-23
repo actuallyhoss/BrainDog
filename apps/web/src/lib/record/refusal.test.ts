@@ -336,12 +336,12 @@ test('a list that HAS rows and matched none is still the filter’s answer', () 
 test('THE QUOTED QUERY IS THE READER’S WORDS, not the column’s', () => {
   /* `19 §6` asks a `no-results` state to quote the query verbatim, and the register quoted
      `whereOf(filters)` — the sentence the EVALUATOR reads, which spells the stored value. So a
-     reader who pressed a chip labelled "owed to me" was shown `direction is owed_to_me` and asked to
+     reader who pressed a chip labelled "Money in" was shown `direction is owed_to_me` and asked to
      check a filter in a spelling they had never seen. */
   /* `which way`, WHICH IS WHAT THE COLUMN IS CALLED NOW. The printer reads `decl.label`, so the
      sentence follows the label rather than the field id: that is the whole mechanism, and it means
      a pack that renames a field renames every filter sentence about it. */
-  assert.equal(saidPlainly('obligations', 'direction is owed_to_me'), 'which way is owed to me');
+  assert.equal(saidPlainly('obligations', 'direction is owed_to_me'), 'which way is Money in');
   /* `status is paid` AND IT WAS `state is paid`, WHICH IS THE MECHANISM WORKING RATHER THAN
      BREAKING. This field carried no label, so it stood here as the case where the sentence and
      the field id are the same string. Five registers headed the column `State` while `things`

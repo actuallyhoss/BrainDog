@@ -17,17 +17,40 @@
  * nothing that `toRows` has not already changed.
  *
  * HELD BY READING THE SOURCE, as `value-said.test.ts` is, because a Svelte component does not mount under `node --test`.
+ *
+ * THREE SITES FURTHER OUT, AND THESE ARE HELD BY WHAT THEY SAY. With Personal's labels laid on the sample, a block's
+ * filter line read "status is building or earning" over rows reading Active and Ongoing, Decide's diff of a rowset said
+ * a person's role was changing to "registrar" where the row reads Agency, and a project's own page led with Earning
+ * over a Status field reading Ongoing (`loop/research-batch-forty-seven-audit.md` §3, all three measured failing). The
+ * last tests below run the three with Personal's own labels and read what they say. The row page's lead keeps one
+ * source check, that it draws through the function the tests run; a rename there turns it red, never green.
  */
 
-import { test } from 'node:test';
+import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { useCase } from '@braindog/seed/usecases';
+
+import { saidPlainly } from '../record/blocks.ts';
+import { REGISTERS } from '../record/data.ts';
+import { heldBy, plainOf, type Governor } from '../record/governance.ts';
+import { heardLabels, relabelAll } from '../voice.ts';
+import { updatesOf } from '../../routes/decide/[id]/changes.ts';
+import { stateSaid } from '../../routes/r/[register]/[seq]/lead.ts';
+
 const here = dirname(fileURLToPath(import.meta.url));
 const PAGE = readFileSync(join(here, '../../routes/r/[register]/+page.svelte'), 'utf8');
 const CARDS = readFileSync(join(here, 'RowCards.svelte'), 'utf8');
+const ROW_PAGE = readFileSync(join(here, '../../routes/r/[register]/[seq]/+page.svelte'), 'utf8');
+
+const PERSONAL = useCase('personal')!.labels as Record<string, string>;
+after(() => {
+  relabelAll(REGISTERS, {});
+  heardLabels({});
+});
 
 /* The grid's two cells, over `toRows`'s already-labelled text (see the header). */
 const CELL = '<span class="enum">{copy.valueWord(value)}</span>';
@@ -73,4 +96,52 @@ test('A CARD DRAWS THE STORED VALUE BY ITS LABEL, and does not word the label a 
   assert.equal(call.length, 1, call.join('\n'));
   assert.ok(call[0]!.includes("f?.type === 'enum'"), call[0]);
   assert.ok(CARDS.includes('worded(f, e.fields[f], display('), 'the detail line no longer hands `worded` the stored value');
+});
+
+test("A BLOCK'S FILTER LINE SAYS A VALUE BY ITS LABEL, as the rows under it read it", () => {
+  /* Personal's `my-project` page filters `lane is building or earning`, and a Personal record's Projects Overview
+     carries two blocks on `lane is parked or retired` (`portfolio.ts`). */
+  relabelAll(REGISTERS, PERSONAL);
+  assert.equal(saidPlainly('things', 'lane is building or earning'), 'status is Active or Ongoing');
+  assert.equal(saidPlainly('things', 'lane is parked or retired'), 'status is On hold or Finished');
+  /* A label typed back is the same value, so it prints the same word. */
+  assert.equal(saidPlainly('things', 'lane is ongoing'), 'status is Ongoing');
+  /* And a record with no labels still reads the value's own words, underscores out. */
+  relabelAll(REGISTERS, {});
+  assert.equal(saidPlainly('things', 'lane is building or earning'), 'status is building or earning');
+});
+
+test("DECIDE'S DIFF OF A ROWSET SAYS BOTH SIDES BY THE RECORD'S LABELS", async () => {
+  /* THE WHOLE PATH `/decide` TAKES, and not `plainOf` handed a declaration somebody relabelled first: the two Decide
+     screens read the record's declarations through the raw client, which knows no labels, so a `plainOf` that read
+     `labels` would still have said Registrar on the screen. */
+  const bare = { id: 'people', name: 'People', title: 'name', fields: [{ id: 'name', type: 'text' }, { id: 'role', type: 'enum', values: ['client', 'registrar'] }] };
+  const client: Governor = {
+    boot: async () => ({ ok: true, value: {} }),
+    governance: async () => ({ ok: true, value: [] }),
+    call: async () => ({ ok: false, refusal: { code: 'NOPE', fix: '' } }),
+    schema: async () => ({ ok: true, value: bare }),
+    get: async () => ({ ok: true, value: { seq: 3, version: 1, fields: { name: 'Nour', role: 'client' } } }),
+  };
+  const body = { register: 'people', rows: [{ at: 'people#3', patch: { role: 'registrar' } }] };
+  heardLabels(PERSONAL);
+  const held = await heldBy(client, [body]);
+  const [row] = updatesOf(body, held.registers, held.rows, plainOf(held.registers));
+  assert.deepEqual(row?.changes, [{ field: 'role', label: 'Role', long: false, before: 'Work contact', after: 'Agency' }]);
+  /* And a record with no labels reads the value's own words, as the diff always did. */
+  heardLabels({});
+  const plain = await heldBy(client, [body]);
+  const [was] = updatesOf(body, plain.registers, plain.rows, plainOf(plain.registers));
+  assert.deepEqual(was?.changes, [{ field: 'role', label: 'Role', long: false, before: 'client', after: 'registrar' }]);
+});
+
+test("A ROW'S LEAD SAYS ITS STATE BY ITS LABEL, as its saved field does", () => {
+  relabelAll(REGISTERS, PERSONAL);
+  assert.equal(stateSaid(REGISTERS.things, 'earning'), 'Ongoing');
+  assert.equal(stateSaid(REGISTERS.things, 'parked'), 'On hold');
+  relabelAll(REGISTERS, {});
+  assert.equal(stateSaid(REGISTERS.things, 'earning'), 'Earning');
+  assert.equal(stateSaid(undefined, 'client_work'), 'Client work');
+  /* The one source check: the page's lead draws through the function above, so a rename turns this red. */
+  assert.ok(ROW_PAGE.includes('<span class="lead-word">{stateSaid(decl, stateValue)}</span>'), 'the lead no longer draws its state through `stateSaid`');
 });

@@ -43,6 +43,7 @@
   import { linkReader, type Linked, type LinkReader } from '$lib/record/links-live.ts';
   import type { FieldDecl, Fields } from '$lib/record/schema.ts';
   import { closed, drew, opened } from '../../../../lib/ui/screen.svelte.ts';
+  import { stateSaid } from './lead.ts';
 
   const id = $derived(page.params.register ?? '');
   const seq = $derived(Number(page.params.seq));
@@ -623,7 +624,7 @@
               {#if stateValue}
                 <span class="lead-state" data-intent={leadTone}>
                   {#if leadTone}<span class="glyph" role="img" aria-label={TONES[leadTone].label}>{TONES[leadTone].glyph}</span>{/if}
-                  <span class="lead-word">{copy.valueWord(stateValue)}</span>
+                  <span class="lead-word">{stateSaid(decl, stateValue)}</span>
                 </span>
               {/if}
               {#if due && dueField}

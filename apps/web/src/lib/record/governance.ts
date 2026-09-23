@@ -18,6 +18,7 @@ import { money } from 'braindog-render';
 import { costOf, costRank } from '@braindog/kernel';
 
 import { copy } from '../copy.ts';
+import { labels, relabel } from '../voice.ts';
 import { callsOutOf, type CallOut } from './actions.ts';
 import type { RowsetBody } from './data.ts';
 import { noRecord } from './device.ts';
@@ -37,7 +38,7 @@ export type Governor = {
 };
 
 /** A register's declaration, with only the keys a diff reads. */
-export type Decl = { title?: string; fields: readonly { id: string; type: string; label?: string }[] };
+export type Decl = { title?: string; fields: readonly { id: string; type: string; label?: string; labels?: Readonly<Record<string, string>> }[] };
 
 /** A row a proposal would update, as `get` answers it. */
 export type Held = { id?: string; register?: string; seq: number | null; version: number; fields: Record<string, unknown> };
@@ -255,14 +256,19 @@ export function rowsetOf(row: Row): RowsetBody | undefined {
 
 /**
  * A field's value as a diff shows it on a live record. The sample formats through `display`, which reads
- * the sample's declarations; this reads the record's.
+ * the sample's declarations; this reads the record's, as `heldBy` relabelled them.
+ *
+ * AN ENUM IS SAID BY ITS LABEL FIRST, as the row it changes reads it. A Personal record's merge of a person
+ * said the role was changing from "client" to "registrar" over a row that reads Work contact and a form that
+ * offers Agency.
  */
 export function plainOf(registers: Readonly<Record<string, Decl>>) {
   return (register: string, field: string, value: unknown): string | null => {
     if (value === null || value === undefined || value === '') return null;
-    const type = registers[register]?.fields.find((f) => f.id === field)?.type;
+    const f = registers[register]?.fields.find((x) => x.id === field);
+    const type = f?.type;
     if (type === 'bool') return value ? 'yes' : 'no';
-    if (type === 'enum') return String(value).replace(/_/g, ' ');
+    if (type === 'enum') return f?.labels?.[String(value)] ?? String(value).replace(/_/g, ' ');
     if (isRow(value)) return typeof value.amount === 'number' && typeof value.currency === 'string' ? money(value.amount, value.currency) : JSON.stringify(value);
     return String(value);
   };
@@ -277,6 +283,10 @@ const isHeld = (v: unknown): v is Held =>
  * by the number that id ends in, and a row named by its internal id is asked for by that id, which
  * `get` reads the way it reads a spoken one. A row the record will not give back, or that is in
  * another register, draws nothing, which is what `updatesOf` does with it.
+ *
+ * EACH DECLARATION IS RELABELLED WITH THE RECORD'S LABELS, by the holder `data/record.ts`'s `schema` draws a list with.
+ * Both Decide screens hand this the raw `@braindog/client`, whose `schema` knows no labels, so a `plainOf` that read
+ * a field's labels still found none there and the diff said Registrar where the row reads Agency.
  */
 export async function heldBy(client: Governor, bodies: readonly RowsetBody[]): Promise<Rows> {
   const registers: Record<string, Decl> = {};
@@ -284,7 +294,7 @@ export async function heldBy(client: Governor, bodies: readonly RowsetBody[]): P
   for (const body of bodies) {
     if (!(body.register in registers)) {
       const decl = await client.schema(body.register);
-      if (decl.ok && isDecl(decl.value)) registers[body.register] = decl.value;
+      if (decl.ok && isDecl(decl.value)) registers[body.register] = relabel({ ...decl.value, id: body.register }, labels());
     }
     for (const r of body.rows) {
       if (typeof r.at !== 'string' || r.at === '') continue;
