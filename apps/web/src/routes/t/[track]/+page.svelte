@@ -52,6 +52,7 @@
   import Section from '$lib/ui/Section.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
+  import { healthChoices, healthSaid } from './health.ts';
 
   /**
    * ON A LIVE RECORD THIS THREAD IS THE RECORD'S, and nothing of the sample is mixed into it.
@@ -270,7 +271,7 @@
           <div class="c-line">
             <label class="c-label" for="update-health">{healthField ? labelOf(healthField) : ''}</label>
             <select id="update-health" class="c-input" bind:value={draftHealth}>
-              {#each healthField?.values ?? [] as v}<option value={v}>{v.replace(/_/g, ' ')}</option>{/each}
+              {#each healthChoices(REGISTERS.updates) as [v, said]}<option value={v}>{said}</option>{/each}
             </select>
             <Button type="submit" weight="primary" disabled={posting || draft.trim() === ''}>
               {posting ? copy.writeMarkSaving : copy.post}
@@ -294,7 +295,7 @@
                 <Face name={who} you={who === 'you'} />
                 <span class="u-by">{who.charAt(0).toUpperCase() + who.slice(1)}</span>
                 <Chip
-                  label={String(u.fields.health).replace(/_/g, ' ')}
+                  label={healthSaid(REGISTERS.updates, String(u.fields.health))}
                   tone={healthTone(String(u.fields.health) as never)}
                 />
                 <span class="u-at">{since(String(u.fields.at), clock)}</span>

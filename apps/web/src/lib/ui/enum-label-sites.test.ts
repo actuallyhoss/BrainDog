@@ -30,6 +30,10 @@
  * (`loop/research-batch-forty-eight-audit.md` §6; both tests failed against the page before it changed). The chip
  * now draws through `stateSaid` and the options through `choicesOf`, the tests run both with Personal's labels, and
  * each keeps the same single source check that the page calls them.
+ *
+ * AND A THREAD'S PAGE DID THE SAME WITH HEALTH. Each update's chip and the composer's menu spelt the stored value with
+ * its underscores out, so the menu offered "on track" under a header reading "On track" (`loop/research-batch-forty-nine-audit.md`
+ * §6; both tests failed against the page before it changed). They draw through `t/[track]/health.ts` now.
  */
 
 import { after, test } from 'node:test';
@@ -46,11 +50,13 @@ import { heldBy, plainOf, type Governor } from '../record/governance.ts';
 import { heardLabels, relabelAll } from '../voice.ts';
 import { updatesOf } from '../../routes/decide/[id]/changes.ts';
 import { choicesOf, stateSaid } from '../../routes/r/[register]/[seq]/lead.ts';
+import { healthChoices, healthSaid } from '../../routes/t/[track]/health.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const PAGE = readFileSync(join(here, '../../routes/r/[register]/+page.svelte'), 'utf8');
 const CARDS = readFileSync(join(here, 'RowCards.svelte'), 'utf8');
 const ROW_PAGE = readFileSync(join(here, '../../routes/r/[register]/[seq]/+page.svelte'), 'utf8');
+const TRACK_PAGE = readFileSync(join(here, '../../routes/t/[track]/+page.svelte'), 'utf8');
 
 const PERSONAL = useCase('personal')!.labels as Record<string, string>;
 after(() => {
@@ -177,4 +183,33 @@ test("A ROW'S INLINE EDITOR OFFERS EACH VALUE BY ITS LABEL, in the order the fie
   /* And no value on the row's page is spelt by taking its underscores out, which is how both sites read the value. */
   const spelt = ROW_PAGE.split('\n').filter((line) => /\.replace\(\/_\/g, ' '\)/u.test(line));
   assert.deepEqual(spelt, [], 'a value on the row page is still spelt from its stored id');
+});
+
+test("NEITHER A ROW'S PAGE NOR A THREAD'S SPELLS A VALUE WITH ITS UNDERSCORES TAKEN OUT", () => {
+  /* The register page's own check, laid on the two pages that draw one row or one thread, WITHOUT ITS LEADING `\w`.
+     Audit forty-nine §6 asked for that pattern and said it found two lines on each page; measured, it found one, since
+     `String(u.fields.health).replace(...)` puts a bracket before the dot, and so did the row page's chip before
+     `fbf9e708`. Neither page has a helper that reads labels to exempt. Before this held, it found the thread's update
+     chip and its composer's menu; the row page was already clean. */
+  for (const [name, source] of [['the row page', ROW_PAGE], ['the thread page', TRACK_PAGE]] as const) {
+    const spelt = source.split('\n').filter((line) => /\.replace\(\/_\/g, ' '\)/u.test(line));
+    assert.deepEqual(spelt, [], `${name} still spells a stored value:\n${spelt.join('\n')}`);
+  }
+});
+
+test("A THREAD SAYS EACH UPDATE'S HEALTH, AND OFFERS EACH, BY THE RECORD'S LABELS", () => {
+  /* NO SHIPPED USE CASE LABELS A HEALTH, so these are a record's own, written as its settings would write them
+     (`label_updates__health__on_track`). Before, the composer offered "on track" in lower case under a header chip
+     reading "On track", and a labelled record read the stored id on every update. */
+  relabelAll(REGISTERS, { 'updates.health.on_track': 'Fine', 'updates.health.at_risk': 'Wobbling' });
+  assert.equal(healthSaid(REGISTERS.updates, 'on_track'), 'Fine');
+  const offered = healthChoices(REGISTERS.updates);
+  assert.deepEqual(offered.map(([v]) => v), ['on_track', 'at_risk', 'off_track'], 'the composer offers other values than the field declares');
+  assert.deepEqual(offered.map(([, said]) => said), ['Fine', 'Wobbling', 'Off track']);
+  /* A record with no labels reads the value's own words, capital first, as the header chip does. */
+  relabelAll(REGISTERS, {});
+  assert.deepEqual(healthChoices(REGISTERS.updates).map(([, said]) => said), ['On track', 'At risk', 'Off track']);
+  /* The two source checks: the page draws both through the functions above, and keeps writing the stored value. */
+  assert.ok(TRACK_PAGE.includes('{#each healthChoices(REGISTERS.updates) as [v, said]}<option value={v}>{said}</option>{/each}'), "the composer no longer offers a health through `healthChoices`");
+  assert.ok(TRACK_PAGE.includes('label={healthSaid(REGISTERS.updates, String(u.fields.health))}'), "an update's chip no longer says its health through `healthSaid`");
 });
