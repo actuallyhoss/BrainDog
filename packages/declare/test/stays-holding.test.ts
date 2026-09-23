@@ -10,7 +10,8 @@
  * holds it.
  *
  * SO THE PLAN IS HANDED A COUNT PER VALUE (`Installed.holding`), one `GROUP BY` for each list it takes a value off, and
- * keeps a value only where the count is above zero. Taking a value off when nothing holds it is what the update asked
+ * keeps a value only where the count is above zero. A deleted row is a holder: it holds its values until the purge, and
+ * a restore brings it back to be edited. Taking a value off when nothing holds it is what the update asked
  * for. A record that cannot count (`holding` absent, or `null` for a list) keeps every value, as before, because the
  * other side of that line is an edit refused `ENUM_VALUE_UNKNOWN` (`update-keeps-value.test.ts`).
  *
@@ -58,6 +59,9 @@ const DOC = (version: string, fields = FIELDS(), seeds?: unknown[]) => ({
 
 const packOf = async (doc: unknown): Promise<Pack> => said<Pack>(await normalise(doc));
 
+/** A count for one value as `Installed.holding` gives it: `held` rows, `binned` of them deleted. */
+const n = (held: number, binned = 0) => ({ held, binned });
+
 /** mini 1.0.0 installed, with five rows in its list and `holding` as the record would count them. */
 async function recordAt(holding: Installed['holding']): Promise<Installed> {
   const d = (await packOf(DOC('1.0.0'))).declarations[0]!;
@@ -73,13 +77,13 @@ async function recordAt(holding: Installed['holding']): Promise<Installed> {
 }
 
 test('A VALUE NO ROW HOLDS IS TAKEN OFF, as the update asked, though the list holds five rows', async () => {
-  const diff = await plan(await packOf(DOC('1.1.0', WITHOUT_EARNING())), await recordAt(() => ({ lane: { building: 5 } })));
+  const diff = await plan(await packOf(DOC('1.1.0', WITHOUT_EARNING())), await recordAt(() => ({ lane: { building: n(5) } })));
   assert.deepEqual(diff.stays, [], 'earning was kept on the list count alone');
   assert.deepEqual(diff.changes.map((c) => c.id), ['register.things']);
 });
 
 test('A VALUE ONE ROW HOLDS STAYS, and the plan says how many rows hold it beside how many the list has', async () => {
-  const diff = await plan(await packOf(DOC('1.1.0', WITHOUT_EARNING())), await recordAt(() => ({ lane: { building: 4, earning: 1 } })));
+  const diff = await plan(await packOf(DOC('1.1.0', WITHOUT_EARNING())), await recordAt(() => ({ lane: { building: n(4), earning: n(1) } })));
   assert.deepEqual(
     diff.stays.map(({ id, values, rows, holding }) => ({ id, values, rows, holding })),
     [{ id: 'register.things', values: ['lane.earning'], rows: 5, holding: { 'lane.earning': 1 } }],
@@ -88,7 +92,7 @@ test('A VALUE ONE ROW HOLDS STAYS, and the plan says how many rows hold it besid
 
 test('the record is asked once for the list, and only about the fields that lose a value', async () => {
   const asked: [string, readonly string[]][] = [];
-  await plan(await packOf(DOC('1.1.0', WITHOUT_EARNING())), await recordAt((list, fields) => (asked.push([list, fields]), { lane: { earning: 2 } })));
+  await plan(await packOf(DOC('1.1.0', WITHOUT_EARNING())), await recordAt((list, fields) => (asked.push([list, fields]), { lane: { earning: n(2) } })));
   assert.deepEqual(asked, [['things', ['lane']]]);
 });
 
@@ -115,23 +119,28 @@ test('a list this plan seeds cannot be counted from the table, so the state afte
 /* ── a real record: first-party People, and People 2.0.0 without `registrar` ── */
 
 /**
- * How many live rows hold each value of each of `fields` on `list`, by field then value: ONE `GROUP BY` per list. A
- * `list<enum>` field is an array in `fields`, so each element is its own value, counted once per row.
+ * How many rows hold each value of each of `fields` on `list`, by field then value, and how many of those are deleted:
+ * ONE `GROUP BY` per list. A `list<enum>` field is an array in `fields`, so each element is its own value, counted once
+ * per row. THE SAME QUERY AS THE RECORD'S `installedState`, copied and not imported, so this file measures the rule
+ * against a query it can see; the record's own is measured in `record/test/arrange-steps.test.ts`.
+ *
+ * NO `deleted_at IS NULL`. The copy handed off had one, and a registrar row in the bin was then no holder: registrar
+ * went, and the row's restore was `ENUM_VALUE_UNKNOWN` (the tests at the foot of this file).
  */
 const holdingOf =
   (sql: NodeSql) =>
-  (list: string, fields: readonly string[]): Record<string, Record<string, number>> => {
-    const out: Record<string, Record<string, number>> = {};
+  (list: string, fields: readonly string[]): Record<string, Record<string, { held: number; binned: number }>> => {
+    const out: Record<string, Record<string, { held: number; binned: number }>> = {};
     if (fields.length === 0) return out;
-    for (const r of sql.all<{ field: string; v: unknown; n: number }>(
-      `SELECT j.key AS field, k.value AS v, count(DISTINCT entry.id) AS n
+    for (const r of sql.all<{ field: string; v: unknown; n: number; gone: number }>(
+      `SELECT j.key AS field, k.value AS v, count(DISTINCT entry.id) AS n, count(DISTINCT CASE WHEN entry.deleted_at IS NOT NULL THEN entry.id END) AS gone
          FROM entry, json_each(entry.fields) AS j, json_each(CASE WHEN j.type = 'array' THEN j.value ELSE json_array(j.value) END) AS k
-        WHERE entry.register = ? AND entry.deleted_at IS NULL AND j.key IN (${fields.map(() => '?').join(', ')}) AND k.type = 'text'
+        WHERE entry.register = ? AND j.key IN (${fields.map(() => '?').join(', ')}) AND k.type = 'text'
         GROUP BY field, v`,
       list,
       ...fields,
     ))
-      (out[r.field] ??= {})[String(r.v)] = Number(r.n);
+      (out[r.field] ??= {})[String(r.v)] = { held: Number(r.n), binned: Number(r.gone) };
     return out;
   };
 
@@ -168,7 +177,8 @@ const people2 = (): unknown => {
   return d;
 };
 
-async function peopleWith(roles: readonly string[]): Promise<{ k: Kernel; sql: NodeSql; ids: string[]; diff: Diff; next: Pack }> {
+/** People with one row for each of `roles`, the rows at `binned` deleted, and the plan of People 2.0.0 over it. */
+async function peopleWith(roles: readonly string[], binned: readonly number[] = []): Promise<{ k: Kernel; sql: NodeSql; ids: string[]; diff: Diff; next: Pack }> {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 23, 12)) });
   const owner = { principal: { kind: 'person', id: 'p_1', level: 'owner' } } as const;
@@ -180,6 +190,7 @@ async function peopleWith(roles: readonly string[]): Promise<{ k: Kernel; sql: N
   }
   const k = api.kernel;
   const ids = roles.map((role, i) => said<{ id: string }>(k.create('people', { name: `P${i}`, role }, { actor: 'p_1' })).id);
+  for (const i of binned) said(k.update('people', ids[i]!, { deleted_at: 'now' } as never, { actor: 'p_1' }));
   const next = said<Pack>(await normalise(people2(), { kind: 'local' }));
   return { k, sql, ids, diff: await plan(next, stateOf(k, sql)), next };
 }
@@ -206,5 +217,55 @@ test('ONE REGISTRAR ROW OF TWO: registrar stays, counted as one holder of two ro
   said(await install(next, diff, hostFor(k), diff.planHash, diff.approve));
   assert.ok(roleValues(k).includes('registrar'));
   said(k.update('people', ids[0]!, { note: 'Renews in October' }, { actor: 'p_1' }));
+  sql.close();
+});
+
+/* ── a deleted row holds its values until the purge ── */
+
+/* THE QUERY THE BUILDER HANDED OFF LEFT DELETED ROWS OUT, and its checker measured what that costs: the registrar row in
+   the bin was not counted, registrar went, and the row's restore and every edit after it were `ENUM_VALUE_UNKNOWN`. The
+   kernel counts a deleted row as holding what it holds (`orphan-deleted.test.ts`, `WOULD_ORPHAN` "a deleted one a
+   restore brings back"), because a restore brings it back for thirty days. */
+const restores = (k: Kernel, id: string) => {
+  said(k.update('people', id, { deleted_at: null } as never, { actor: 'p_1' }));
+  said(k.update('people', id, { note: 'Renews in October' }, { actor: 'p_1' }));
+};
+
+test('A REGISTRAR ROW IN THE BIN STILL HOLDS IT: registrar stays, said as held in the bin, and the row restores and edits', async () => {
+  const { k, sql, ids, diff, next } = await peopleWith(['registrar', 'client'], [0]);
+  assert.equal(k.census().people, 1);
+  assert.deepEqual(
+    diff.stays.map(({ id, values, rows, holding, binned }) => ({ id, values, rows, holding, binned })),
+    [{ id: 'register.people', values: ['role.registrar'], rows: 1, holding: { 'role.registrar': 1 }, binned: { 'role.registrar': 1 } }],
+  );
+  said(await install(next, diff, hostFor(k), diff.planHash, diff.approve));
+  assert.ok(roleValues(k).includes('registrar'));
+  restores(k, ids[0]!);
+  sql.close();
+});
+
+/* THE LIST'S LIVE COUNT IS NOUGHT HERE, and `rows > 0` was the whole test for laying a value back, so this one went before
+   the record could count at all. */
+test('A LIST WHOSE ONLY ROW IS IN THE BIN keeps the value that row holds, though it has no live rows', async () => {
+  const { k, sql, ids, diff, next } = await peopleWith(['registrar'], [0]);
+  assert.equal(k.census().people ?? 0, 0);
+  assert.deepEqual(
+    diff.stays.map(({ values, rows, holding, binned }) => ({ values, rows, holding, binned })),
+    [{ values: ['role.registrar'], rows: 0, holding: { 'role.registrar': 1 }, binned: { 'role.registrar': 1 } }],
+  );
+  said(await install(next, diff, hostFor(k), diff.planHash, diff.approve));
+  restores(k, ids[0]!);
+  sql.close();
+});
+
+test('A LIVE HOLDER IS NOT SAID AS BINNED, and nothing binned is no `binned` at all', async () => {
+  const { sql, diff } = await peopleWith(['registrar', 'registrar', 'client'], [1]);
+  assert.deepEqual(
+    diff.stays.map(({ rows, holding, binned }) => ({ rows, holding, binned })),
+    [{ rows: 2, holding: { 'role.registrar': 2 }, binned: { 'role.registrar': 1 } }],
+  );
+  const live = await peopleWith(['registrar', 'client']);
+  assert.equal('binned' in live.diff.stays[0]!, false);
+  live.sql.close();
   sql.close();
 });

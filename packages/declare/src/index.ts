@@ -27,7 +27,7 @@ import type { Conflict, Refusal, Result } from '@braindog/ports';
 import { no, ok, refused } from '@braindog/ports';
 import { credentialKey as credential, credentialValue, NESTED_MOST, nestedPast } from './credentials.ts';
 import { FIRST_PARTY_LISTS } from './usecase.ts';
-import { KINDS, approvalLines, configReads, configValue, digest, egressChanged, egressOf as egressOfBody, fillConfig, jcs, misread, readConfig, rowRegisterOf, sentencesOver, validateDeclaration, widens, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
+import { KINDS, approvalLines, configReads, configValue, digest, egressChanged, egressOf as egressOfBody, fillConfig, jcs, misread, readConfig, rowRegisterOf, sentencesOver, widens, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
 
 /**
  * What one declaration sends out of the record, or `null` when it sends nothing: every host, how often, the key by label
@@ -158,8 +158,13 @@ export type Installed = {
   declarations: { id: string; version: number; kind: DeclKind; pack_id: string | null; body: string; checksum: string }[];
   rows: Record<string, number>;
   /**
-   * How many live rows of `list` hold each value of each of `fields`, by field id and then value: one `GROUP BY` over the
-   * list, asked only of a list a plan would take a value off (`laidBack`). `null` when the record cannot say for that list.
+   * How many rows of `list` hold each value of each of `fields`, by field id and then value: one `GROUP BY` over the list,
+   * asked only of a list a plan would take a value off (`laidBack`). `null` when the record cannot say for that list.
+   *
+   * `held` COUNTS A DELETED ROW, AND `binned` SAYS HOW MANY OF THEM ARE. A deleted row holds its values until the purge,
+   * as the kernel's `WOULD_ORPHAN` counts it: wave forty-nine's first query left the bin out, and People 2.0.0 took
+   * `registrar` off a list whose one registrar row was deleted, so the row's restore, and every edit after it, was
+   * `ENUM_VALUE_UNKNOWN` "role has no value registrar" (`test/stays-holding.test.ts`).
    *
    * WHAT DECIDES WHETHER A VALUE AN UPDATE TAKES OFF STAYS. `rows` stood in for it, so a Personal record whose three
    * People rows were all Family was filed as keeping Agency, and Decide said the list "holds 3 rows that may use it"
@@ -168,7 +173,7 @@ export type Installed = {
    * OPTIONAL, as `used` is: a caller that cannot count keeps every value on a list that holds rows, which is the side of
    * the line where no later edit is refused `ENUM_VALUE_UNKNOWN`.
    */
-  holding?: (list: string, fields: readonly string[]) => Record<string, Record<string, number>> | null;
+  holding?: (list: string, fields: readonly string[]) => Record<string, Record<string, { held: number; binned: number }>> | null;
   /**
    * The settings somebody chose, by pack id: `pack.manifest.config_values` for each pack that has any.
    *
@@ -324,7 +329,9 @@ export type Diff = {
    * The enum values this version takes off a list that holds rows, which stay on it: `values` names each as
    * `<field>.<value>`, laid after the update's own values with the label the list had for it.
    *
-   * BY ROW WHERE THE RECORD CAN COUNT, and `holding` is how many live rows hold each kept value, keyed as `values` is.
+   * BY ROW WHERE THE RECORD CAN COUNT, and `holding` is how many rows hold each kept value, keyed as `values` is, the bin's
+   * included, and `binned` how many of those are deleted, absent when none is. `rows` is the list's live count, so a
+   * value may stay on a list whose `rows` is 0 when its only holders are in the bin.
    * A value no row holds goes, as the update asked. Taken off a list whose rows hold it, every later edit of such a row
    * was `ENUM_VALUE_UNKNOWN`, whatever field the edit was about (`update-keeps-value.test.ts`). A record that cannot
    * count (`Installed.holding` absent or `null`) keeps every value by list, as before, and `holding` is absent: kept when
@@ -336,7 +343,7 @@ export type Diff = {
    * app, and every later update of the pack was filed for Decide as keeping the owner's edit. A list the owner added to
    * has no `body` here, because the value is laid into its `kept[].rebased`.
    */
-  stays: { id: string; values: string[]; rows: number; holding?: Record<string, number>; body?: string }[];
+  stays: { id: string; values: string[]; rows: number; holding?: Record<string, number>; binned?: Record<string, number>; body?: string }[];
   /**
    * What this pack lays on each list it `extends`: `adds` names what is new to the list (`domain`, or `role.family` for a
    * value), and `body` is the live list with those laid after its own, as JCS text, absent when the list has them all
@@ -1259,8 +1266,9 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
         /* AND A VALUE THE UPDATE TAKES OFF A LIST THAT HOLDS ROWS STAYS HERE TOO (`laidBack`). A list the owner or another
            pack's `extends` added to is exactly the one this arm sees, so without it Personal's People, which carries
            Personal's roles, would lose `registrar` on the People update that sheds it from a studio's record. */
-        const back = rows > 0 ? laidBack(already.body, JSON.parse(over.body) as Record<string, Json>, holdersOf(installed, decl.id)) : null;
-        if (back !== null) stays.push({ id: decl.id, values: back.values, rows, ...(back.holding === undefined ? {} : { holding: back.holding }) });
+        const holders = holdersOf(installed, decl.id);
+        const back = rows > 0 || holders !== undefined ? laidBack(already.body, JSON.parse(over.body) as Record<string, Json>, rows, holders) : null;
+        if (back !== null) stays.push({ id: decl.id, values: back.values, rows, ...counts(back) });
         const body = back?.body ?? over.body;
         kept.push({ id: decl.id, adds: over.adds, rebased: body });
         /* THE UPDATE'S OWN CHANGES STILL MEET THE ROWS: a field it retypes under rows is refused here as it is for a list
@@ -1289,8 +1297,10 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
       /* AND A VALUE IT TAKES OFF A CLOSED LIST THAT HOLDS ROWS IS LAID BACK, after the update's own (M2). Taken off, a row
          holding it could not be edited at all: People 2.0.0 without `registrar` planned clean, and the next edit to that
          row's `note` was `ENUM_VALUE_UNKNOWN` over a field the edit never touched (`update-keeps-value.test.ts`). */
-      const back = rows > 0 ? laidBack(already.body, decl.body, holdersOf(installed, decl.id)) : null;
-      if (back !== null) stays.push({ id: decl.id, values: back.values, rows, ...(back.holding === undefined ? {} : { holding: back.holding }), body: back.body });
+      /* AND ON A LIST WITH NO LIVE ROWS, WHEN THE RECORD CAN COUNT, because a row in the bin holds its values too. */
+      const holders = holdersOf(installed, decl.id);
+      const back = rows > 0 || holders !== undefined ? laidBack(already.body, decl.body, rows, holders) : null;
+      if (back !== null) stays.push({ id: decl.id, values: back.values, rows, ...counts(back), body: back.body });
       /* A LIST THAT IS ALREADY THE UPDATE WITH ITS KEPT VALUES LAID BACK IS NOT CHANGED BY IT. The kept value lives under
          the pack now (`install`), so the live body and the file's differ by that value on every later plan of the same
          version, and a reinstall of People 2.0.0 was "1 change" that staged the bytes already there. */
@@ -1890,17 +1900,26 @@ function rebased(from: string, mine: string, now: Record<string, Json>): { body:
   return { body, adds: [...added.map((f) => f.id as string), ...[...values].flatMap(([id, v]) => v.values.map((x) => `${id}.${x}`))] };
 }
 
+type Holders = (fields: readonly string[]) => ReturnType<NonNullable<Installed['holding']>>;
+
 /** `Installed.holding` for one list declaration, as `laidBack` asks it; absent when the record cannot count. */
-const holdersOf = (installed: Installed, id: string): ((fields: readonly string[]) => Record<string, Record<string, number>> | null) | undefined =>
+const holdersOf = (installed: Installed, id: string): Holders | undefined =>
   installed.holding === undefined || !id.startsWith('register.') ? undefined : (fields) => installed.holding!(id.slice('register.'.length), fields);
+
+/** A `laidBack`'s counts as `Diff['stays']` carries them: none when the record did not count, `binned` only when any is. */
+const counts = (back: { holding?: Record<string, number>; binned?: Record<string, number> }): { holding?: Record<string, number>; binned?: Record<string, number> } => ({
+  ...(back.holding === undefined ? {} : { holding: back.holding }),
+  ...(back.binned === undefined || Object.keys(back.binned).length === 0 ? {} : { binned: back.binned }),
+});
 
 /**
  * The update's list body with every enum value the live list holds and it takes off laid back after its own values, with
  * the label the live list had for it; `null` when it takes none off, or a body will not parse (`Diff['stays']`).
  *
- * ONLY A VALUE A ROW HOLDS, when `holders` can count them (`Installed.holding`), and `holding` is that count for each one
- * laid back. A value no row holds goes, which is what the update asked; laid back on the list's row count alone, three
- * Family rows kept Agency on Personal's People (audit forty-eight, §4).
+ * ONLY A VALUE A ROW HOLDS, when `holders` can count them (`Installed.holding`), a deleted row included, and `holding`
+ * and `binned` are those counts for each one laid back. A value no row holds goes, which is what the update asked; laid
+ * back on the list's row count alone, three Family rows kept Agency on Personal's People (audit forty-eight, §4).
+ * `rows` is the live count, and a list with none keeps a value only where the record counted a holder in the bin.
  *
  * ONLY ON A FIELD THAT IS STILL A CLOSED LIST OF THE SAME TYPE. A field the update takes off or retypes is `retypes`'
  * question and not this one, and a value laid on a field that is now text would be a value nothing checks.
@@ -1908,8 +1927,9 @@ const holdersOf = (installed: Installed, id: string): ((fields: readonly string[
 function laidBack(
   live: string,
   now: Record<string, Json>,
-  holders?: (fields: readonly string[]) => Record<string, Record<string, number>> | null,
-): { body: string; values: string[]; holding?: Record<string, number> } | null {
+  rows: number,
+  holders?: Holders,
+): { body: string; values: string[]; holding?: Record<string, number>; binned?: Record<string, number> } | null {
   let was: unknown;
   try {
     was = JSON.parse(live);
@@ -1931,10 +1951,14 @@ function laidBack(
   /* ASKED ONCE, AND ONLY WHEN SOMETHING WOULD GO: every plan of every pack passes through here, and a list the update
      takes nothing off has no value to count. */
   const counted = holders?.(lost.map((l) => l.id)) ?? null;
+  /* A LIST WITH NO LIVE ROWS THAT COULD NOT BE COUNTED KEEPS NOTHING, as before the record counted: with no count there is
+     no sign of a holder in the bin, and keeping every value would keep them on every empty list. */
+  if (counted === null && rows === 0) return null;
   const values: string[] = [];
   const holding: Record<string, number> = {};
+  const binned: Record<string, number> = {};
   for (const { id, then, f, gone: taken } of lost) {
-    const gone = counted === null ? taken : taken.filter((v) => (counted[id]?.[v] ?? 0) > 0);
+    const gone = counted === null ? taken : taken.filter((v) => (counted[id]?.[v]?.held ?? 0) > 0);
     if (gone.length === 0) continue;
     f.values = [...(f.values as unknown[]), ...gone];
     const said = isObject(then.labels as Json) ? (then.labels as Record<string, unknown>) : {};
@@ -1942,11 +1966,16 @@ function laidBack(
     const extra = Object.fromEntries(gone.filter((v) => v in said && !(v in labels)).map((v) => [v, said[v]]));
     if (Object.keys(extra).length > 0) f.labels = { ...labels, ...extra };
     values.push(...gone.map((v) => `${id}.${v}`));
-    if (counted !== null) for (const v of gone) holding[`${id}.${v}`] = counted[id]![v]!;
+    if (counted !== null)
+      for (const v of gone) {
+        const { held, binned: bin } = counted[id]![v]!;
+        holding[`${id}.${v}`] = held;
+        if (bin > 0) binned[`${id}.${v}`] = bin;
+      }
   }
   if (values.length === 0) return null;
   const body = canonicalise({ ...now, fields: next } as Json);
-  return body === null ? null : { body, values, ...(counted === null ? {} : { holding }) };
+  return body === null ? null : { body, values, ...(counted === null ? {} : { holding, binned }) };
 }
 
 /** A live body as JCS text with `pack` set to `to`, which is what a handover stages; `null` for one that will not parse. */
@@ -2722,43 +2751,6 @@ export function stagedBatch(pack: Pack, diff: Diff): StagedDeclaration[] {
     ...handing,
     ...laid,
   ];
-}
-
-/**
- * The first refusal the kernel's `validate` gives `batch` staged over `installed`, with the id it was about, or `null`.
- *
- * AGAINST THE RECORD AS PLANNED, NOT AS IT IS. The arranger's lint was `kernel.lint`, which overlays the batch on the live
- * record, so the second pack of an arrangement was read beside what the first would leave only by laying both batches on
- * the record together, and a list the first retires was still there to be held against the second. `installed` here is
- * `plannedState`'s, so each pack meets the record `host.stage` will show it. The kernel's own rules are asked, through
- * `validateDeclaration`, with the context `stageInstall` builds: every live body with the batch laid over it, and who
- * put each there.
- *
- * `validate` IS NOT ALL OF WHAT `stageInstall` ASKS. Its checks that read the table and not a `Known` (`doorsKept`, a
- * disabled pack, `unreadable`, `unserved`, `stranded` and the two `tags` rules) take no planned record, and are not
- * asked here.
- */
-export function stagedFault(installed: Installed, batch: readonly StagedDeclaration[]): { id: string; refusal: Refusal } | null {
-  const known = new Map<string, Record<string, Json>>();
-  const owners = new Map<string, string | null>();
-  for (const row of installed.declarations) {
-    try {
-      known.set(row.id, JSON.parse(row.body) as Record<string, Json>);
-    } catch {
-      /* A BODY THAT WILL NOT PARSE IS STILL A DECLARATION, as the kernel's `knownTo` keeps it. */
-      known.set(row.id, {});
-    }
-    owners.set(row.id, row.pack_id);
-  }
-  for (const d of batch) {
-    known.set(d.id, d.body as Record<string, Json>);
-    owners.set(d.id, d.pack ?? null);
-  }
-  for (const d of batch) {
-    const refusal = validateDeclaration({ id: d.id, kind: d.kind as DeclKind, body: d.body as Record<string, Json>, pack: d.pack }, known, owners);
-    if (refusal) return { id: d.id, refusal };
-  }
-  return null;
 }
 
 /**

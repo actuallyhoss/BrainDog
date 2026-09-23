@@ -463,8 +463,10 @@ export function arranger(d: ArrangeDeps) {
         ...((laid) => (laid.length === 0 ? {} : { extends: laid }))(diff.extends.flatMap((e) => (e.adds.length === 0 || e.refusal !== undefined ? [] : [{ id: e.id, adds: e.adds }]))),
         /* AND THE VALUES AN UPDATE TAKES OFF A LIST HOLDING ROWS, WHICH STAY ON IT. The People update that sheds `registrar`
            from a record holding a registrar row was filed as `changes: ["register.people"]` and nothing else, the same
-           step as an update that did take the choice away. `body` is the install's, not Decide's. */
-        ...(diff.stays.length === 0 ? {} : { stays: diff.stays.map(({ id, values, rows }) => ({ id, values, rows })) }),
+           step as an update that did take the choice away. `body` is the install's, not Decide's. `holding` AND `binned`
+           GO WITH IT, how many rows hold each value and how many of those are deleted, since Decide says both: copied as
+           `{ id, values, rows }`, the count wave forty-nine taught Decide to say never reached it. */
+        ...(diff.stays.length === 0 ? {} : { stays: diff.stays.map(({ body: _install, ...stay }) => stay) }),
         ...(diff.seeds.count === 0 ? {} : { examples: diff.seeds.count }),
       });
       out.approve.push(...diff.approve.filter((line) => !out.approve.includes(line)));

@@ -1,0 +1,122 @@
+/**
+ * Accepting a `change` that installs a rule is held to the door `setDeclaration` is held to: an owner, in a browser
+ * (`loop/research-batch-forty-nine-audit.md` finding 3).
+ *
+ * TWO ROADS TO ONE INSTALL, AND A GATE ON ONE. `setDeclaration` asks `admin(ctx)`, whose comment names ADR-060: a rule is
+ * what runs while nobody is looking. `decide` asked `guard(ctx, 'decide')` and held an accept to `admin` only for `pack`,
+ * `settings` and `arrange`. The audit's P4, a person at `decide` who is not the owner, measured on `36407cc1`:
+ *
+ *     P4 setDeclaration at decide: LEVEL_REQUIRED This needs owner, and you have decide access.
+ *     P4 accept at decide: ok
+ *     P4 filed 1 posts 1 owner key true reads ["rule:rate"]
+ *
+ * The rule a colleague proposed and then accepted herself asked Spark on the owner's key, which `workerSparkAnswers`
+ * and `docs/07` rest on installing being the owner's consent. Here the post is the `infer.ask` job the run queues: the
+ * Worker sends one post for each, so no job is no post.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { createRecordApi, type CallContext } from '../src/index.ts';
+import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
+
+const NOW = Date.UTC(2026, 8, 23, 12);
+const owner: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 'owner' } };
+/** The audit's colleague: at `decide` on the whole record, and not the owner. */
+const colleague: CallContext = { principal: { kind: 'person', id: 'p_c', level: 'decide' } };
+
+const OBLIGATIONS = {
+  id: 'register.obligations',
+  kind: 'register',
+  body: { id: 'obligations', name: 'Obligations', title: 'what', fields: [{ id: 'what', type: 'text', required: true }, { id: 'note', type: 'text' }] },
+};
+const RATE = {
+  id: 'rule.rate',
+  kind: 'rule',
+  body: {
+    rule: 'rate',
+    on: { written: { register: 'obligations', op: ['create'] } },
+    once_per: ['entry'],
+    steps: [{ ask_spark: { question: 'What rate applies to {{what}}?', about: ['what'], as: 'rate', shape: 'number' } }],
+  },
+};
+const WITH_DUE = { ...OBLIGATIONS, body: { ...OBLIGATIONS.body, fields: [...OBLIGATIONS.body.fields, { id: 'due', type: 'day' }] } };
+
+type Out = { ok: boolean; value?: unknown; refusal?: { code: string; fix: string } };
+const value = <T>(r: unknown): T => {
+  const x = r as Out;
+  assert.ok(x.ok, JSON.stringify(x));
+  return x.value as T;
+};
+
+async function record() {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW), answersSpark: true });
+  value(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_owner' } }));
+  value(await api.kernel.install([OBLIGATIONS] as never));
+  const file = async (by: CallContext, declaration_id: string, to: unknown) =>
+    value<{ id: string }>(await api.propose({ question: 'Ask the rate?', body_kind: 'change', body: { declaration_id, to } } as never, by)).id;
+  const accept = async (id: string, by: CallContext) => (await api.decide({ id, decide: { option: 'accept', reason: 'Fine.' } } as never, by)) as Out;
+  /* How many questions to Spark a new Obligations row queues, which is how many posts the Worker makes for it. */
+  const asks = async (): Promise<number> => {
+    value(await api.create({ register: 'obligations', fields: { what: `Rent ${Math.random()}` } }, owner));
+    await api.kernel.drain();
+    return Number(sql.one<{ n: number }>("SELECT count(*) AS n FROM outbox WHERE kind = 'infer.ask'")?.n ?? 0);
+  };
+  const installed = () => api.kernel.declarations().some((d) => d.id === 'rule.rate');
+  const open = (id: string) => sql.one<{ status: string }>('SELECT status FROM suggestion WHERE id = ?', id)?.status;
+  return { sql, api, file, accept, asks, installed, open };
+}
+
+test('P4: A COLLEAGUE AT DECIDE WHO MAY NOT SET A RULE MAY NOT ACCEPT ONE EITHER, and no question goes out', async () => {
+  const { sql, api, file, accept, asks, installed, open } = await record();
+  /* THE ROAD THAT WAS ALREADY HELD, so the two are seen to answer the same. */
+  const set = (await api.setDeclaration({ body: RATE } as never, colleague)) as Out;
+  assert.equal(set.refusal?.code, 'LEVEL_REQUIRED', JSON.stringify(set));
+
+  const id = await file(colleague, 'rule.rate', RATE);
+  const out = await accept(id, colleague);
+  assert.equal(out.ok, false, 'a colleague at decide accepted her own rule into the record');
+  assert.equal(out.refusal?.code, 'LEVEL_REQUIRED', JSON.stringify(out));
+  assert.equal(installed(), false);
+  assert.equal(open(id), 'open', 'the question was decided though nothing was installed');
+  assert.equal(await asks(), 0, 'the rule asked Spark on the owner’s key');
+
+  /* AND THE OWNER'S PRESS ON THE SAME QUESTION INSTALLS IT, so the refusal above is about who pressed. */
+  value(await accept(id, owner));
+  assert.equal(installed(), true);
+  assert.equal(await asks(), 1);
+  sql.close();
+});
+
+test('A RULE INSIDE A BUNDLE IS HELD THE SAME, and a bundle with no rule is not', async () => {
+  const { sql, file, accept, installed } = await record();
+  const bundled = await file(colleague, 'register.obligations', { declarations: [WITH_DUE, RATE] });
+  assert.equal((await accept(bundled, colleague)).refusal?.code, 'LEVEL_REQUIRED');
+  assert.equal(installed(), false);
+
+  /* NOT WIDENED PAST RULES. A change to a list's fields is what `decide` was given for, and stays so until a D-number
+     says otherwise (the audit's brief). */
+  const list = await file(colleague, 'register.obligations', { declarations: [WITH_DUE] });
+  value(await accept(list, colleague));
+  sql.close();
+});
+
+/* THE OTHER ROAD TO THE SAME INSTALL. The kernel's accept installs a `pattern`'s `ingest` exactly as it installs a
+   `change`'s `to`, and asks only that it be an object, so the check above, held to `change` alone, left the audit's P4
+   open by one word: measured before the pattern was held, this colleague filed the same rule as a `pattern`'s `ingest`,
+   accepted it herself, it installed, and the next Obligations row queued one `infer.ask`. */
+test('A RULE FILED AS A PATTERN IS HELD THE SAME, and the owner may still accept it', async () => {
+  const { sql, api, accept, asks, installed, open } = await record();
+  const filed = value<{ id: string }>(await api.propose({ question: 'Ask the rate?', body_kind: 'pattern', body: { ingest: RATE, samples: ['raw_1'] } } as never, colleague)).id;
+  const out = await accept(filed, colleague);
+  assert.equal(out.refusal?.code, 'LEVEL_REQUIRED', JSON.stringify(out));
+  assert.equal(installed(), false);
+  assert.equal(open(filed), 'open');
+  assert.equal(await asks(), 0, 'the rule asked Spark on the owner’s key');
+
+  value(await accept(filed, owner));
+  assert.equal(installed(), true);
+  sql.close();
+});

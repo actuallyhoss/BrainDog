@@ -103,6 +103,29 @@ test('A CHOICE KEPT FOR THE ROWS THAT HOLD IT SAYS HOW MANY OF THE LIST’S ROWS
   ]);
 });
 
+/* A ROW IN THE BIN HOLDS ITS VALUES TOO, and the record counts it (`binned`), because taking the value off made the row's
+   restore `ENUM_VALUE_UNKNOWN`. Said with the sentence above alone, a People whose one registrar row was deleted read
+   "because all 0 of its rows hold it", measured before `binned` was read; beside one live client row it would say "its
+   one row holds it" of a row that holds nothing of the kind. */
+test('A CHOICE KEPT FOR A ROW IN THE BIN SAYS SO, apart from the live rows that hold it', () => {
+  const stays = (s: Record<string, unknown>) =>
+    appearing(arrangedOf('pack', { ...SHEDS, plan: [{ ...SHEDS.plan[0], stays: [{ id: 'register.people', ...s }] }] }, {}))
+      .filter((a) => a.kind === 'Kept')
+      .map((a) => a.title);
+  assert.deepEqual(stays({ values: ['role.registrar'], rows: 0, holding: { 'role.registrar': 1 }, binned: { 'role.registrar': 1 } }), [
+    'People keeps the choice Registrar for Role, which this update takes off, because a deleted row holds it, and the row could not be restored without it.',
+  ]);
+  assert.deepEqual(stays({ values: ['role.registrar'], rows: 1, holding: { 'role.registrar': 1 }, binned: { 'role.registrar': 1 } }), [
+    'People keeps the choice Registrar for Role, which this update takes off, because a deleted row holds it, and the row could not be restored without it.',
+  ]);
+  assert.deepEqual(stays({ values: ['role.registrar'], rows: 3, holding: { 'role.registrar': 3 }, binned: { 'role.registrar': 2 } }), [
+    'People keeps the choice Registrar for Role, which this update takes off, because 1 of its 3 rows holds it, and 2 deleted rows do too.',
+  ]);
+  assert.deepEqual(stays({ values: ['role.registrar', 'role.collaborator'], rows: 2, holding: { 'role.registrar': 3, 'role.collaborator': 1 }, binned: { 'role.registrar': 1 } }), [
+    'People keeps 2 choices, Registrar and Collaborator, for Role, which this update takes off, because all 2 of its rows hold one of them, and 1 deleted row does too.',
+  ]);
+});
+
 test('A FIELD LAID ON A LIST IS SAID AS A FIELD, and a step that lays nothing says nothing of it', () => {
   const field = arrangedOf('pack', {
     install: 'plus',

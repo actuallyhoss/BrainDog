@@ -22,7 +22,7 @@ import { seedCatalogue } from '../../seed/src/usecases/catalogue.ts';
 const owner: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 'owner' } };
 
 type Out = { ok: boolean; value?: unknown; refusal?: { code: string; fix: string; at?: string } };
-type Step = { pack: string; from?: string; version: string; extends?: { id: string; adds: string[] }[]; stays?: { id: string; values: string[]; rows: number }[] };
+type Step = { pack: string; from?: string; version: string; extends?: { id: string; adds: string[] }[]; stays?: { id: string; values: string[]; rows: number; holding?: Record<string, number>; binned?: Record<string, number> }[] };
 type Decl = { register?: string; fields?: { id: string; values?: string[] }[] };
 const value = <T>(r: unknown): T => {
   const x = r as Out;
@@ -47,8 +47,11 @@ async function recordOf() {
             return shedding ? NEXT : e.version;
           },
           doc: (o: Parameters<typeof e.doc>[0]) => {
-            const doc = e.doc(o);
-            if (!shedding || doc === null) return doc;
+            /* A COPY, because the catalogue hands the same document to every record in the process: shed in place, the
+               second record of this file was set up with a People that had no `registrar` to create Ada under. */
+            const given = e.doc(o);
+            if (!shedding || given === null) return given;
+            const doc = structuredClone(given);
             for (const d of doc.declarations as Decl[])
               for (const f of d.register === 'people' ? (d.fields ?? []) : []) if (f.id === 'role') f.values = (f.values ?? []).filter((v) => v !== 'registrar');
             return { ...doc, version: NEXT };
@@ -83,7 +86,26 @@ test('A PEOPLE UPDATE THAT TAKES REGISTRAR OFF A PERSONAL RECORD HOLDING ONE SAY
   const { plan } = await planOf({ install: 'people' }, 'pack');
   const people = plan.find((s) => s.pack === 'people');
   assert.equal(people?.version, NEXT);
-  assert.deepEqual(people?.stays, [{ id: 'register.people', values: ['role.registrar'], rows: 1 }]);
+  assert.deepEqual(people?.stays, [{ id: 'register.people', values: ['role.registrar'], rows: 1, holding: { 'role.registrar': 1 } }]);
   /* AND PERSONAL'S ROLES, ALREADY ON THE LIST, ARE NOT SAID AS ADDED AGAIN: the update lays them back as they were. */
   assert.equal(plan.some((s) => 'extends' in s), false);
+});
+
+/* THE RECORD COUNTS A ROW IN THE BIN AS A HOLDER, as the kernel's `WOULD_ORPHAN` does. Ada deleted, People has no live
+   row, and a count that left the bin out took `registrar` off: her restore was then `ENUM_VALUE_UNKNOWN` "role has no
+   value registrar" (`declare`'s `test/stays-holding.test.ts`). The step says the one holder and that she is in the bin,
+   and the accept keeps the choice she is restored under. */
+test('A REGISTRAR ROW IN THE BIN KEEPS REGISTRAR, said as held in the bin, and the row restores after the accept', async () => {
+  const { api, planOf, accept, shed } = await recordOf();
+  await accept((await planOf({ why: ['x'], usecase: 'personal' }, 'arrange')).id);
+  const ada = value<{ id: string }>(api.kernel.create('people', { name: 'Ada', role: 'registrar' } as never, { actor: 'p_owner' })).id;
+  value(api.kernel.update('people', ada, { deleted_at: 'now' } as never, { actor: 'p_owner' }));
+  shed();
+  const { id, plan } = await planOf({ install: 'people' }, 'pack');
+  assert.deepEqual(plan.find((s) => s.pack === 'people')?.stays, [
+    { id: 'register.people', values: ['role.registrar'], rows: 0, holding: { 'role.registrar': 1 }, binned: { 'role.registrar': 1 } },
+  ]);
+  await accept(id);
+  value(api.kernel.update('people', ada, { deleted_at: null } as never, { actor: 'p_owner' }));
+  value(api.kernel.update('people', ada, { note: 'Renews in October' } as never, { actor: 'p_owner' }));
 });

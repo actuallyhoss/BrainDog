@@ -2477,17 +2477,25 @@ export const copy = {
      owner sees after accepting still offers it. `holding` is how many of the list's `rows` hold it, and both are said:
      the list's count alone read "it holds 3 rows that may use it" on a record where none of the three did (audit
      forty-eight, §4). `null` is a record that could not count holders, which keeps the choice for the list's rows and
-     says so in those words. */
-  arrangeStays: (name: string, field: string, values: readonly string[], rows: number, holding: number | null = null) => {
+     says so in those words.
+     `binned` IS HOW MANY DELETED ROWS HOLD IT, said apart, since `rows` is the live count and a deleted row is in none
+     of it: with the bin left out of the sentence, a People whose one registrar row was deleted read "because all 0 of
+     its rows hold it". A deleted row is a reason of its own, because the choice going would make its restore refused. */
+  arrangeStays: (name: string, field: string, values: readonly string[], rows: number, holding: number | null = null, binned = 0) => {
     const it = values.length === 1 ? 'it' : 'one of them';
+    const deleted = binned === 1 ? 'a deleted row holds' : `${binned} deleted rows hold`;
     const why =
       holding === null
         ? `it holds ${rows} ${rows === 1 ? 'row' : 'rows'} that may use ${values.length === 1 ? 'it' : 'them'}`
-        : holding >= rows
-          ? rows === 1
-            ? `its one row holds ${it}`
-            : `all ${rows} of its rows hold ${it}`
-          : `${holding} of its ${rows} rows ${holding === 1 ? 'holds' : 'hold'} ${it}`;
+        : holding === 0 && binned > 0
+          ? `${deleted} ${it}, and ${binned === 1 ? 'the row' : 'those rows'} could not be restored without ${values.length === 1 ? 'it' : 'them'}`
+          : `${
+              holding >= rows
+                ? rows === 1
+                  ? `its one row holds ${it}`
+                  : `all ${rows} of its rows hold ${it}`
+                : `${holding} of its ${rows} rows ${holding === 1 ? 'holds' : 'hold'} ${it}`
+            }${binned === 0 ? '' : `, and ${binned === 1 ? '1 deleted row does' : `${binned} deleted rows do`} too`}`;
     return `${name} keeps ${values.length === 1 ? `the choice ${values[0]}` : `${values.length} choices, ${list([...values])},`} for ${field}, which this update takes off, because ${why}.`;
   },
   /* WHAT A PACK LAYS ON A LIST ANOTHER PACK OWNS: Personal's roles on People. Named apart from what it adds, because the

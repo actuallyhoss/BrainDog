@@ -202,16 +202,22 @@ function planned(plan: unknown, doc: unknown, ctx: Context, name: (id: string) =
       const bare = text(stay.id).replace(/^register\./u, '');
       const rows = typeof stay.rows === 'number' ? stay.rows : 0;
       const holding = isRow(stay.holding) ? stay.holding : null;
+      const binned = isRow(stay.binned) ? stay.binned : {};
       const ids = strings(stay.values);
+      const sum = (counts: Record<string, unknown>, of: readonly string[]) => of.reduce((n, id) => n + (typeof counts[id] === 'number' ? counts[id] : 0), 0);
       /* ONE SENTENCE PER FIELD, AND ITS HOLDERS SUMMED OVER ITS CHOICES: an `enum` row holds one choice, so the sum is the
          rows. A `list<enum>` row holding two of them is counted twice, so the sum is held to the list's rows; it can still
-         overstate the holders of a `list<enum>`, which only a count per row of the set could say exactly. A step filed before the record counted holders
-         carries no `holding`, and its sentence says the list's rows as it did. */
+         overstate the holders of a `list<enum>`, which only a count per row of the set could say exactly. A step filed
+         before the record counted holders carries no `holding`, and its sentence says the list's rows as it did.
+         `holding` COUNTS THE BIN, `binned` SAYS HOW MUCH OF IT IS, and `rows` is live rows alone, so the live holders are
+         the difference and only they are held to `rows`. Held to `rows` whole, a People whose one registrar row was
+         deleted said "all 0 of its rows hold it". */
       for (const own of new Set(ids.map((id) => id.split('.')[0] ?? ''))) {
         const mine = ids.filter((id) => id.split('.')[0] === own);
-        const held = holding === null ? null : Math.min(rows, mine.reduce((n, id) => n + (typeof holding[id] === 'number' ? holding[id] : 0), 0));
+        const gone = holding === null ? 0 : sum(binned, mine);
+        const held = holding === null ? null : Math.min(rows, Math.max(0, sum(holding, mine) - gone));
         for (const [field, choices] of byField(bare, mine, ctx).values)
-          kept.push({ kind: copy.arrangeKept, title: copy.arrangeStays(listName(bare, ctx), field, choices, rows, held), lines: [] });
+          kept.push({ kind: copy.arrangeKept, title: copy.arrangeStays(listName(bare, ctx), field, choices, rows, held, gone), lines: [] });
       }
     }
     for (const [ids, fresh] of [

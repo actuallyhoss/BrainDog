@@ -1396,6 +1396,28 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     packs: kernel.packs(),
     declarations: kernel.declarations() as Installed['declarations'],
     rows: kernel.census(),
+    /* HOW MANY ROWS HOLD EACH VALUE AN UPDATE WOULD TAKE OFF A LIST, so `declare`'s `laidBack` keeps only a value a row
+       holds. Without it the list's live count stood in, and a Personal record whose three People rows were all Family
+       was filed as keeping Agency, "because it holds 3 rows that may use it" (audit forty-eight, §4). Asked only for a
+       list a plan takes a value off, one `GROUP BY` each. A `list<enum>` is an array, each element its own value.
+       A DELETED ROW IS A HOLDER, and `binned` says how many are. Wave forty-nine's handed-off query had `deleted_at IS
+       NULL`, and its checker measured the cost: a registrar row in the bin was no holder, registrar went, and the row's
+       restore was `ENUM_VALUE_UNKNOWN` "role has no value registrar" (`test/arrange-steps.test.ts`). The kernel's
+       `WOULD_ORPHAN` counts the bin for the same reason: a row holds its values until the purge. */
+    holding: (list, fields) => {
+      const out: Record<string, Record<string, { held: number; binned: number }>> = {};
+      if (fields.length === 0) return out;
+      for (const r of sql.all<{ field: string; v: unknown; n: number; gone: number }>(
+        `SELECT j.key AS field, k.value AS v, count(DISTINCT entry.id) AS n, count(DISTINCT CASE WHEN entry.deleted_at IS NOT NULL THEN entry.id END) AS gone
+           FROM entry, json_each(entry.fields) AS j, json_each(CASE WHEN j.type = 'array' THEN j.value ELSE json_array(j.value) END) AS k
+          WHERE entry.register = ? AND j.key IN (${fields.map(() => '?').join(', ')}) AND k.type = 'text'
+          GROUP BY field, v`,
+        list,
+        ...fields,
+      ))
+        (out[r.field] ??= {})[String(r.v)] = { held: Number(r.n), binned: Number(r.gone) };
+      return out;
+    },
     config: kernel.packSettings(),
     /* WHICH OF THE OWNER'S DECLARATIONS A PACK WROTE FIRST, so a plan keeps an edit of the pack's own declaration rather
        than refusing the whole update as somebody else's (`declare` `plan`). */
@@ -2509,6 +2531,26 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const handle = /^SG[1-9][0-9]*$/u.test(spoken) ? nameOf(ctx, 'suggestion', spoken) : null;
     if (handle === null || !('refusal' in out)) return out;
     return { ...out, refusal: { ...out.refusal, fix: out.refusal.fix.replace(new RegExp(`\\b${spoken}\\b`, 'gu'), handle) } };
+  };
+
+  /**
+   * Whether what an accept installs is a rule, or a bundle holding one: a `change`'s `to`, or a `pattern`'s `ingest`,
+   * which the kernel's accept installs the same way. What `decide` holds to `admin` at the accept.
+   *
+   * BY `kind`, AS THE KERNEL'S `install` READS IT, and not by `declaration_id`: a bundle is filed under whichever id the
+   * proposer names, and the audit's colleague could have filed her rule under `register.obligations`.
+   *
+   * AND A PATTERN TOO. The kernel asks a pattern's `ingest` only to be an object, so held to `change` alone, the same
+   * colleague filed the same rule as a pattern's `ingest`, accepted it, and the next row queued an `infer.ask`
+   * (`test/accept-rule-level.test.ts`).
+   */
+  const installsRule = (kind: unknown, body: unknown): boolean => {
+    const object = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+    if (!object(body)) return false;
+    const to = kind === 'change' ? body.to : kind === 'pattern' ? body.ingest : undefined;
+    if (!object(to)) return false;
+    const members: unknown[] = Array.isArray(to.declarations) ? to.declarations : [to];
+    return members.some((d) => object(d) && d.kind === 'rule');
   };
 
   /**
@@ -4349,6 +4391,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         const kind = asked?.body_kind;
         if (kind === 'pack' || kind === 'settings' || kind === 'arrange') {
           const owner = admin(ctx, 'accept a change to what this record is');
+          if (owner) return { ok: false as const, refusal: owner };
+        }
+        /* AND A CHANGE OR A PATTERN THAT INSTALLS A RULE, ALONE OR IN A BUNDLE, IS HELD TO THE DOOR `setDeclaration` IS. A
+           rule is what runs while nobody is looking, and installing one that asks Spark is the owner's consent to its
+           question going out on the owner's key. Audit forty-nine (finding 3) had a colleague at `decide` refused `setDeclaration`
+           `LEVEL_REQUIRED`, propose the same rule, accept it herself, and the next row's question went out keyed
+           (`test/accept-rule-level.test.ts`). Held to every rule and not only one that asks or calls out, as ADR-060 states
+           it; a narrower door is a decision for the owner, not for this line. */
+        if (installsRule(kind, asked?.body)) {
+          const owner = admin(ctx, 'accept a change to what runs while nobody is looking');
           if (owner) return { ok: false as const, refusal: owner };
         }
         /* THE SCRIPT LINES THE OWNER IS PRESSING ARE WORKED OUT AGAIN, WITH THE VAULT AS IT IS NOW. A script's line names
