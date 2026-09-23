@@ -110,7 +110,26 @@ export type Manifest = {
    * `moves` reads as though the rows move, when they are the one thing that stays exactly where it was.
    */
   hands?: Record<string, string>;
+  /**
+   * Fields and enum values this pack lays on lists other packs own, by list id: `{ 'register.people': { values: { role:
+   * ['family'] } } }`. Absent when it lays nothing.
+   *
+   * WITHOUT IT EVERY FIRST-PARTY LIST WAS THE ONLY PLACE A FIELD COULD LIVE (`loop/research-shell-next.md` M1). A pack
+   * declaring `register.things` with one more field was `PROVIDES_CONFLICT`, rightly, and a pack that carried the same
+   * wish under a key of its own installed `ok` and dropped it without a word, so `domain` was then `FIELD_UNKNOWN` on
+   * the first write. A household's roles, a domain on a project and an importer's fields had nowhere to go.
+   *
+   * `extends` AND NOT `adds`, because `Diff.adds` is already the declarations a pack adds and `kept[].adds` the owner's
+   * additions a rebase kept: a third meaning would make every diff read two ways. The body is the one an agent's
+   * `{ add: { register, fields, values } }` carries (`addTo` in the kernel's `govern.ts`), less `register`, which is the
+   * key. Only an optional field and a value added to a closed list: both leave every row readable and every writer free
+   * to go on writing what it wrote.
+   */
+  extends?: Record<string, Extension>;
 };
+
+/** What one pack lays on one list another pack owns: optional fields after the list's own, values after a closed list's own. */
+export type Extension = { fields?: Record<string, Json>[]; values?: Record<string, string[]> };
 
 export type Pack = {
   manifest: Manifest;
@@ -289,6 +308,36 @@ export type Diff = {
    * the owner's row stays detached from the pack's newest body and the next update is asked the same question.
    */
   kept: { id: string; adds?: string[]; rebased?: string }[];
+  /**
+   * The enum values this version takes off a list that holds rows, which stay on it: `values` names each as
+   * `<field>.<value>`, laid after the update's own values with the label the list had for it.
+   *
+   * BY LIST AND NOT BY ROW, because `rows` is a count per list and nothing here can ask which values rows hold. Kept
+   * when nobody used it, a value costs a word in a picker; taken off a list whose rows hold it, every later edit of
+   * such a row was `ENUM_VALUE_UNKNOWN`, whatever field the edit was about (`update-keeps-value.test.ts`).
+   *
+   * `body` IS THE LIST AS IT WILL BE LIVE, as JCS text, for a list this pack owns: `install` stages the update's body as
+   * the pack's and this one after it with no pack, as it stages a rebased list, so the value reads as the record's own
+   * from then on and the next update is asked the same question through `detached()`. A list the owner added to has no
+   * `body` here, because the value is laid into its `kept[].rebased`.
+   */
+  stays: { id: string; values: string[]; rows: number; body?: string }[];
+  /**
+   * What this pack lays on each list it `extends`: `adds` names what is new to the list (`domain`, or `role.family` for a
+   * value), and `body` is the live list with those laid after its own, as JCS text, absent when the list has them all
+   * already. `refusal` is why `install` will not lay them, which is only ever the list's own shape: a field id it has
+   * in another shape, or a value for a field that is not a closed list or not there.
+   *
+   * `install` STAGES `body` WITH NO PACK, as it stages a rebased list, so the kernel is handed an ordinary register body
+   * and the list reads as the record's own from then on. The owning pack's next update keeps the additions through
+   * `detached()` and `rebased`, the road the owner's own additions already take (`pack-extends.test.ts`).
+   *
+   * WHAT TURNING THE EXTENDING PACK OFF OR TAKING IT OUT DOES: NOTHING TO THE LIST. Its fields and values stay and are
+   * the record's own. Rows hold values in them, and a field taken off the rows that hold it is the break M2 measured for
+   * a value (`loop/research-shell-next.md`): an edit to a row's `note` refused over a field the edit never touched. A
+   * person who wants one gone takes it off the list, which asks the question a pack cannot, whether anything uses it.
+   */
+  extends: { id: string; adds: string[]; body?: string; refusal?: Refusal }[];
   seeds: { count: number; registers: { register: string; rows: number }[] };
   /** Every rule that would generate rows, with the ceiling it declares. */
   spawns: { rule: string; register: string; bound: number; when: string }[];
@@ -528,8 +577,10 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     ...(Object.keys(settings.value).length > 0 ? { config: settings.value } : {}),
   };
 
-  const raw = doc.declarations;
-  if (!Array.isArray(raw) || raw.length === 0)
+  /* A PACK WHOSE ONLY CONTENT IS `extends` CHANGES SOMETHING, so it has no declarations to list and is not refused for
+     it here. Whether it lays anything is asked once `extends` is read, below. */
+  const raw = doc.declarations ?? (doc.extends === undefined ? undefined : []);
+  if (!Array.isArray(raw) || (raw.length === 0 && doc.extends === undefined))
     return malformed(`${id} declares nothing, so installing it would change nothing.`, 'declarations');
 
   const declarations: PackDeclaration[] = [];
@@ -648,6 +699,17 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     }
     if (Object.keys(hands).length > 0) manifest.hands = hands;
   }
+
+  /* WHAT IT LAYS ON OTHER PACKS' LISTS IS READ ONCE WHAT IT DECLARES IS KNOWN, for `hands`' reason: a list this pack
+     declares takes its fields in its own declaration. Kept in the manifest and so in the checksum, since two files that
+     extend differently install differently. */
+  if (doc.extends !== undefined) {
+    const read = readExtends(id, doc.extends, seen);
+    if (!read.ok) return read as Result<Pack>;
+    if (Object.keys(read.value).length > 0) manifest.extends = read.value;
+  }
+  if (declarations.length === 0 && manifest.extends === undefined)
+    return malformed(`${id} declares nothing, so installing it would change nothing.`, 'declarations');
 
   /**
    * EVERY PLACEHOLDER NAMES A SETTING THIS PACK DECLARES, AND THAT SETTING HAS A DEFAULT. The first
@@ -823,6 +885,118 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
   const canonical = canonicalise({ manifest: hashed, declarations: declarations.map((d) => d.body), seeds });
   if (canonical === null) return malformed('This pack holds something the record cannot write down.');
   return ok({ manifest, declarations, seeds, canonical, checksum: await digest(canonical), source });
+}
+
+/** The keys an extension may carry, which are `addTo`'s less `register`, the key it sits under. */
+const EXTENSION_KEYS = ['fields', 'values'];
+
+/** A field key that asks every writer for a value, which a list with rows under it cannot be given by a stranger's pack. */
+const DEMANDS = ['required', 'required_when'];
+
+/**
+ * A pack's `extends`, read: each list it lays fields and values on, or the refusal naming the part that is wrong.
+ *
+ * EVERY KEY IS ASKED FOR, AND ONE NOTHING READS IS REFUSED. The defect this key exists to close was a key that installed
+ * and did nothing (M1), so `{ field: … }` for `fields`, or a list name without its kind, is a sentence and not a no-op.
+ * What the list is like is not asked here, because only the record knows: `plan` asks it, and `install` refuses it.
+ */
+function readExtends(pack: string, raw: unknown, declared: ReadonlySet<string>): Result<Record<string, Extension>> {
+  if (!isObject(raw as Json))
+    return malformed('`extends` maps a list to what this pack lays on it, like register.people: { values: { role: [family] } }.', 'extends');
+  const out: Record<string, Extension> = {};
+  for (const [list, body] of Object.entries(raw as Record<string, Json>)) {
+    const at = `extends.${list}`;
+    if (!list.startsWith('register.') || !REGISTER_NAME.test(list.slice('register.'.length)))
+      return malformed(`${list} is not a list id: register, a full stop and the list's name, like register.people.`, at);
+    if (declared.has(list)) return malformed(`${pack} declares ${list} and extends it. A pack's own list takes its fields in its own declaration.`, at);
+    if (!isObject(body)) return malformed(`${at} is { fields: [...], values: { <field>: [...] } }.`, at);
+    const stray = Object.keys(body).find((k) => !EXTENSION_KEYS.includes(k));
+    if (stray !== undefined)
+      return malformed(`An extension lays fields and values, and nothing else, so ${stray} is not one of them. To take something away or change its type, the list's own pack has to.`, `${at}.${stray}`);
+    const wrong = credential(body) ?? credentialValue(body);
+    if (wrong) return no('SECRET_IN_PACK', `${at} carries what looks like a credential at ${wrong}, and a pack is a file people share.`, { at: `${at}.${wrong}` });
+    const painted = colour(body);
+    if (painted) return no('COLOUR_OUTSIDE_THEME', `${at} sets ${painted.at} to ${painted.value}. A field names an intent, and the theme names the colour.`, { at: `${at}.${painted.at}` });
+    /* NO SETTING FILLS AN EXTENSION, because it is laid on a list as written: a placeholder here would reach the record's
+       list with its braces in it. */
+    if (configReads(body).length > 0) return malformed(`${at} reads a setting, and an extension is laid on the list as it is written.`, at);
+
+    const one: Extension = {};
+    if (body.fields !== undefined) {
+      if (!Array.isArray(body.fields) || body.fields.some((f) => !isObject(f) || typeof f.id !== 'string' || typeof f.type !== 'string'))
+        return malformed(`${at}.fields is a list of fields, each { id: <id>, type: <type> }.`, `${at}.fields`);
+      const ids = new Set<string>();
+      for (const f of body.fields as Record<string, Json>[]) {
+        const field = f.id as string;
+        if (ids.has(field)) return malformed(`${at} lays ${field} twice.`, `${at}.fields.${field}`);
+        ids.add(field);
+        /* ONLY AN OPTIONAL FIELD. A required one refuses every writer that has never heard of this pack, and the rows
+           already in the list have no value for it: `REQUIRED_ON_POPULATED` is the same fact for a pack's own list. */
+        const demand = DEMANDS.find((k) => f[k] !== undefined && f[k] !== false);
+        if (demand !== undefined)
+          return malformed(`${pack} lays ${field} on ${list.slice('register.'.length)} as ${demand === 'required' ? 'required' : 'required sometimes'}. A field laid on another pack's list is one every writer may leave out.`, `${at}.fields.${field}.${demand}`);
+      }
+      if (body.fields.length > 0) one.fields = body.fields as Record<string, Json>[];
+    }
+    if (body.values !== undefined) {
+      if (!isObject(body.values) || Object.values(body.values).some((v) => !Array.isArray(v) || v.some((x) => typeof x !== 'string' || x === '')))
+        return malformed(`${at}.values is { <field>: [<value>, ...] }, the values to add to each closed list.`, `${at}.values`);
+      const values = Object.fromEntries(Object.entries(body.values as Record<string, string[]>).filter(([, v]) => v.length > 0));
+      if (Object.keys(values).length > 0) one.values = values;
+    }
+    if (one.fields === undefined && one.values === undefined) return malformed(`${at} lays nothing: name fields to add, values to add to a closed list, or both.`, at);
+    out[list] = one;
+  }
+  return ok(out);
+}
+
+/**
+ * The live list `live` with `ext` laid after its own, as `Diff.extends` has it, or the refusal for the part of it the list
+ * cannot take. `carried`'s rule: a field the list lacks goes after its fields, and a value a closed list lacks after its
+ * values. A field or a value the list has already, in the same shape, is not laid twice, so installing a pack again
+ * changes nothing.
+ */
+function extended(pack: string, id: string, live: string, ext: Extension): Diff['extends'][number] {
+  const list = id.slice('register.'.length);
+  const at = `extends.${id}`;
+  let was: Record<string, Json>;
+  try {
+    was = JSON.parse(live) as Record<string, Json>;
+  } catch {
+    return { id, adds: [], refusal: { code: 'PACK_MALFORMED', fix: `${list} cannot be read here, so nothing can be laid on it.`, at } };
+  }
+  const fields = listOf(was, 'fields').map((f) => structuredClone(f)) as Record<string, Json>[];
+  const adds: string[] = [];
+  for (const f of ext.fields ?? []) {
+    const held = fields.find((h) => h.id === f.id);
+    if (held === undefined) {
+      fields.push(structuredClone(f));
+      adds.push(String(f.id));
+      continue;
+    }
+    /* THE SAME FIELD IS NOT A SECOND ONE, and another field under the same id is two fields sharing an id: the rows
+       written under the list's own would be read as this pack's. */
+    if (canonicalise(held) !== canonicalise(f))
+      return {
+        id,
+        adds: [],
+        refusal: { code: 'PROVIDES_CONFLICT', fix: `${list} has a field called ${String(f.id)} already, and ${pack} lays one of its own under that id. Two fields cannot share an id, so ${pack} has to lay its field under another id.`, at: `${at}.fields.${String(f.id)}` },
+      };
+  }
+  for (const [field, more] of Object.entries(ext.values ?? {})) {
+    const held = fields.find((h) => h.id === field);
+    if (held === undefined)
+      return { id, adds: [], refusal: { code: 'FIELD_UNKNOWN', fix: `${list} has no field called ${field}, so ${pack} has no values to add to it.`, at: `${at}.values.${field}` } };
+    if (!Array.isArray(held.values))
+      return { id, adds: [], refusal: { code: 'VALUE_MALFORMED', fix: `${field} on ${list} is not a closed list, so there are no values to add to it.`, at: `${at}.values.${field}` } };
+    const values = held.values;
+    const fresh = more.filter((v, i) => !values.includes(v) && more.indexOf(v) === i);
+    held.values = [...values, ...fresh];
+    adds.push(...fresh.map((v) => `${field}.${v}`));
+  }
+  if (adds.length === 0) return { id, adds };
+  const body = canonicalise({ ...was, fields });
+  return body === null ? { id, adds: [], refusal: { code: 'PACK_MALFORMED', fix: `${list} with ${pack}'s additions cannot be written down.`, at } } : { id, adds, body };
 }
 
 /**
@@ -1009,6 +1183,7 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
   const changes: Diff['changes'] = [];
   const conflicts: Diff['conflicts'] = [];
   const kept: Diff['kept'] = [];
+  const stays: Diff['stays'] = [];
   const retypes: Diff['retypes'] = [];
   const newlyRequired: Diff['newly_required'] = [];
   const added: PackDeclaration[] = [];
@@ -1059,11 +1234,17 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
       if (over === null) conflicts.push({ id: decl.id, pack: OWN, changed: true });
       else if ('clash' in over) conflicts.push({ id: decl.id, pack: OWN, changed: true, field: over.clash });
       else {
-        kept.push({ id: decl.id, adds: over.adds, rebased: over.body });
+        const rows = installed.rows[decl.id.slice('register.'.length)] ?? 0;
+        /* AND A VALUE THE UPDATE TAKES OFF A LIST THAT HOLDS ROWS STAYS HERE TOO (`laidBack`). A list the owner or another
+           pack's `extends` added to is exactly the one this arm sees, so without it Personal's People, which carries
+           Personal's roles, would lose `registrar` on the People update that sheds it from a studio's record. */
+        const back = rows > 0 ? laidBack(already.body, JSON.parse(over.body) as Record<string, Json>) : null;
+        if (back !== null) stays.push({ id: decl.id, values: back.values, rows });
+        const body = back?.body ?? over.body;
+        kept.push({ id: decl.id, adds: over.adds, rebased: body });
         /* THE UPDATE'S OWN CHANGES STILL MEET THE ROWS: a field it retypes under rows is refused here as it is for a list
            nobody edited, asked of what will be live, so the owner's additions are never mistaken for the update's. */
-        const rows = installed.rows[decl.id.slice('register.'.length)] ?? 0;
-        if (rows > 0) unreadable({ ...decl, body: JSON.parse(over.body) as Record<string, Json> }, already.body, rows, retypes, newlyRequired);
+        if (rows > 0) unreadable({ ...decl, body: JSON.parse(body) as Record<string, Json> }, already.body, rows, retypes, newlyRequired);
       }
       continue;
     }
@@ -1089,6 +1270,11 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
          type or made one required was reported as "1 change" and installed. */
       const rows = decl.id.startsWith('register.') ? (installed.rows[decl.id.slice('register.'.length)] ?? 0) : 0;
       if (rows > 0) unreadable(decl, already.body, rows, retypes, newlyRequired);
+      /* AND A VALUE IT TAKES OFF A CLOSED LIST THAT HOLDS ROWS IS LAID BACK, after the update's own (M2). Taken off, a row
+         holding it could not be edited at all: People 2.0.0 without `registrar` planned clean, and the next edit to that
+         row's `note` was `ENUM_VALUE_UNKNOWN` over a field the edit never touched (`update-keeps-value.test.ts`). */
+      const back = rows > 0 ? laidBack(already.body, decl.body) : null;
+      if (back !== null) stays.push({ id: decl.id, values: back.values, rows, body: back.body });
     }
   }
 
@@ -1175,6 +1361,9 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
     const was = live.get(change.id)?.body;
     if (decl?.kind !== 'register' || was === undefined) continue;
     const found = movedFields(was, decl.body);
+    /* A VALUE THAT STAYS IS NOT TAKEN OFF, so a declaration asking for it reads what it read before. */
+    const staying = new Set(stays.find((s) => s.id === change.id)?.values ?? []);
+    if (found !== null) found.moved = found.moved.filter((m) => m.value === undefined || !staying.has(`${m.field}.${m.value}`));
     if (found !== null && found.moved.length > 0) moved.set(change.id, found);
   }
   /* A REBASED LIST IS CHANGED TOO, by whatever the update did to the pack's fields, and the owner's other edits may read
@@ -1238,6 +1427,11 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
 
   const misreads = misreadsOf(pack, installed, new Set(kept.filter((k) => k.rebased === undefined).map((k) => k.id)), gone);
   const unresolved = unresolvedOf(pack, installed, retires);
+  /* A LIST THE RECORD LACKS HAS NOTHING TO LAY ON, and `unresolved` names it with the module that declares it. */
+  const extensions: Diff['extends'] = Object.entries(pack.manifest.extends ?? {}).flatMap(([id, ext]) => {
+    const held = live.get(id);
+    return held === undefined || held.kind !== 'register' ? [] : [extended(mine, id, held.body, ext)];
+  });
 
   const format = { wanted: pack.manifest.requires.format, has: installed.format, ok: installed.format >= pack.manifest.requires.format };
   const primitives = {
@@ -1283,6 +1477,8 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
     retires,
     conflicts,
     kept,
+    stays,
+    extends: extensions,
     seeds: { count: seedsFor(pack, adds).length, registers: seedRows(seedsFor(pack, adds)) },
     spawns: spawnsOf(pack),
     calls_out: calls,
@@ -1416,6 +1612,12 @@ function unresolvedOf(pack: Pack, installed: Installed, retires: Diff['retires']
       if (held.has(lean.register) || out.some((u) => u.register === lean.register)) continue;
       out.push({ ...lean, provider: FIRST_PARTY_LISTS.get(lean.register) ?? null });
     }
+  /* AND EVERY LIST IT EXTENDS, which it leans on harder than a page does: there is nothing to lay a field on. */
+  for (const id of Object.keys(pack.manifest.extends ?? {})) {
+    const register = id.slice('register.'.length);
+    if (held.has(register) || out.some((u) => u.register === register)) continue;
+    out.push({ register, at: `extends.${id}`, provider: FIRST_PARTY_LISTS.get(register) ?? null });
+  }
   return out;
 }
 
@@ -1638,6 +1840,42 @@ function rebased(from: string, mine: string, now: Record<string, Json>): { body:
   const body = canonicalise({ ...now, fields: [...next, ...added] });
   if (body === null) return null;
   return { body, adds: [...added.map((f) => f.id as string), ...[...values].flatMap(([id, v]) => v.values.map((x) => `${id}.${x}`))] };
+}
+
+/**
+ * The update's list body with every enum value the live list holds and it takes off laid back after its own values, with
+ * the label the live list had for it; `null` when it takes none off, or a body will not parse (`Diff['stays']`).
+ *
+ * ONLY ON A FIELD THAT IS STILL A CLOSED LIST OF THE SAME TYPE. A field the update takes off or retypes is `retypes`'
+ * question and not this one, and a value laid on a field that is now text would be a value nothing checks.
+ */
+function laidBack(live: string, now: Record<string, Json>): { body: string; values: string[] } | null {
+  let was: unknown;
+  try {
+    was = JSON.parse(live);
+  } catch {
+    return null;
+  }
+  const next = Array.isArray(now.fields) ? (structuredClone(now.fields) as Record<string, unknown>[]) : null;
+  if (next === null) return null;
+  const at = new Map(next.filter((f) => isObject(f as Json)).map((f) => [f.id, f]));
+  const values: string[] = [];
+  for (const [id, then] of fieldsOf(was)) {
+    const f = at.get(id);
+    if (f === undefined || !Array.isArray(then.values) || !Array.isArray(f.values) || typeSaid(then) !== typeSaid(f)) continue;
+    const held = f.values as unknown[];
+    const gone = then.values.filter((v): v is string => typeof v === 'string' && !held.includes(v));
+    if (gone.length === 0) continue;
+    f.values = [...held, ...gone];
+    const said = isObject(then.labels as Json) ? (then.labels as Record<string, unknown>) : {};
+    const labels = isObject(f.labels as Json) ? (f.labels as Record<string, unknown>) : {};
+    const extra = Object.fromEntries(gone.filter((v) => v in said && !(v in labels)).map((v) => [v, said[v]]));
+    if (Object.keys(extra).length > 0) f.labels = { ...labels, ...extra };
+    values.push(...gone.map((v) => `${id}.${v}`));
+  }
+  if (values.length === 0) return null;
+  const body = canonicalise({ ...now, fields: next } as Json);
+  return body === null ? null : { body, values };
 }
 
 /** A live body as JCS text with `pack` set to `to`, which is what a handover stages; `null` for one that will not parse. */
@@ -2271,6 +2509,10 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
   const unheld = unresolvedFault(diff);
   if (unheld) return { ok: false, refusal: unheld };
 
+  /* AND A LIST THAT CANNOT TAKE WHAT THIS PACK LAYS ON IT, in the sentence `plan` wrote for it (`extended`). */
+  const unlaid = diff.extends.find((e) => e.refusal !== undefined);
+  if (unlaid?.refusal) return { ok: false, refusal: unlaid.refusal };
+
   /**
    * A RENAME IS REFUSED BEFORE THE ORPHAN IT ALSO IS, because it is the truer sentence.
    *
@@ -2410,10 +2652,18 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
   const handing = diff.retires.flatMap((r) =>
     r.to === undefined || r.body === undefined ? [] : [{ id: r.id, kind: r.id.slice(0, r.id.indexOf('.')), body: JSON.parse(r.body) as Json, pack: r.to }],
   );
+  /* WHAT IT LAYS ON ANOTHER PACK'S LIST IS STAGED WITH NO PACK, as a rebased list is, so the kernel supersedes the owner's
+     row with an ordinary body and `detached()` then says whose list it was. Staged under this pack, the list would change
+     owners, and taking this pack out would retire a list whose rows it never wrote. */
+  const laid = diff.extends.flatMap((e) => (e.body === undefined ? [] : [{ id: e.id, kind: 'register', body: JSON.parse(e.body) as Json }]));
+  /* AND A VALUE THAT STAYS ON A LIST THIS PACK OWNS, after the pack's own body, for the same reason as a rebased list. */
+  const staying = diff.stays.flatMap((s) => (s.body === undefined ? [] : [{ id: s.id, kind: 'register', body: JSON.parse(s.body) as Json }]));
   const staged = await host.stage([
     ...filled.declarations.filter((d) => !keep.has(d.id)).map((d) => ({ id: d.id, kind: d.kind, body: d.body, pack: pack.manifest.pack })),
     ...over,
     ...handing,
+    ...laid,
+    ...staying,
   ]);
   if (!staged.ok) return staged;
 

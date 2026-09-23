@@ -41,11 +41,17 @@ import { dayOf } from '../src/usecases/install.ts';
 /** A day is fixed so that nothing here reads the clock. It changes only the example rows, which are out of the fingerprint. */
 const TODAY = dayOf(NOW);
 
-type Doc = { version?: unknown; declarations?: unknown; config?: unknown };
+type Doc = { version?: unknown; declarations?: unknown; config?: unknown; extends?: unknown };
 
+/**
+ * AND WHAT IT LAYS ON ANOTHER PACK'S LIST, when it lays anything. Personal 1.5.0's roles are values on People's `role`
+ * (`extends`), which reach every record that holds the use case exactly as a declaration does, and a fingerprint of the
+ * declarations and settings alone did not move when they changed. Left out when absent, so every use case that lays
+ * nothing keeps the value it had.
+ */
 const fingerprint = (d: Doc): string =>
   createHash('sha256')
-    .update(JSON.stringify({ declarations: d.declarations, config: d.config ?? null }))
+    .update(JSON.stringify({ declarations: d.declarations, config: d.config ?? null, ...(d.extends === undefined ? {} : { extends: d.extends }) }))
     .digest('hex')
     .slice(0, 16);
 
@@ -63,6 +69,12 @@ const inventory = (doc: Doc): string[] => [
     return `${kind}.${String(d[kind])}`;
   }),
   ...Object.keys((doc.config ?? {}) as Record<string, unknown>).map((k) => `setting.${k}`),
+  /* EACH FIELD AND VALUE IT LAYS ON ANOTHER PACK'S LIST, as `extends.<list>.<field>` and `extends.<list>.<field>.<value>`:
+     a value appearing there is one a record's picker offers from then on, and one vanishing is not taken back off. */
+  ...Object.entries((doc.extends ?? {}) as Record<string, { fields?: { id: string }[]; values?: Record<string, string[]> }>).flatMap(([list, ext]) => [
+    ...(ext.fields ?? []).map((f) => `extends.${list}.${f.id}`),
+    ...Object.entries(ext.values ?? {}).flatMap(([field, values]) => values.map((v) => `extends.${list}.${field}.${v}`)),
+  ]),
 ].sort();
 
 /** The ids out of a recorded `holds`, which is written over several lines so that a person can read it. */
@@ -133,6 +145,35 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: 'b5a6a277764c0f14',
     history: ['Raised to 1.4.0 in `ad3ebfb6`, which draws how far along a project is from its `project_steps` when nobody typed a number -> b5a6a277764c0f14'],
+  },
+  /**
+   * FIVE LABEL SETTINGS GONE AND FIVE VALUES LAID, which is why this is a version and not a reset: `holds` lost
+   * `label_people__role__*` and gained `extends.register.people.role.*`. Personal read the studio's roles in a person's
+   * words (`client` as Family) and the list could not take the word itself; now the words are People's values.
+   */
+  'personal@1.5.0': {
+    holds: `
+      extends.register.people.role.adviser extends.register.people.role.family extends.register.people.role.friend
+      extends.register.people.role.landlord extends.register.people.role.tradesperson
+      metric.bills-this-week metric.budget-each-month metric.logged-by-goal metric.logged-this-week-by-goal
+      metric.put-by-by-goal metric.saved-toward-goals metric.spent-this-month metric.spent-this-month-by-category
+      page.goals page.home-personal page.my-project page.spending
+      register.budgets register.goal_log register.goals register.project_steps register.put_by register.savings_goals
+      register.spending
+      setting.holds_obligations setting.holds_people setting.holds_things
+      setting.label_budgets setting.label_goal_log setting.label_goals setting.label_obligations
+      setting.label_project_steps setting.label_put_by setting.label_savings_goals setting.label_spending
+      setting.label_things setting.label_things__lane__building setting.label_things__lane__earning
+      setting.label_things__lane__parked setting.label_things__lane__retired setting.label_things__revenue
+      setting.lk_10103af7 setting.lk_1d01726f setting.lk_303a3cce setting.lk_4f9bf906 setting.lk_666e92eb
+      setting.lk_91a285a5 setting.lk_d66e361a setting.lk_f625eca1
+      setting.one_budgets setting.one_obligations setting.one_spending setting.one_things
+      setting.shared_version setting.speaks
+      setting.voice_home setting.voice_lists setting.voice_needs_you setting.voice_nothing_needs_you
+      setting.voice_right_now setting.voice_since_away
+    `,
+    declares: '6307c93218c5ee3a',
+    history: ['Raised to 1.5.0 because Personal lays family, friend, landlord, tradesperson and adviser on `register.people.role.family` and its neighbours through extends, and its relabels of the studio roles went -> 6307c93218c5ee3a'],
   },
   'student@1.2.0': {
     holds: `

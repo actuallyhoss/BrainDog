@@ -3,9 +3,10 @@
  * for the love of it, and the goals and habits they keep (`loop/DIRECTION.md` §11, the owner's first use case).
  *
  * IT BUILDS ON MONEY, NOT BESIDE IT. Money's accounts and bills are the same lists a business keeps, spoken in a
- * person's words through labels ("Bills", not "Money"; "Friend", not "Collaborator"). Money needs Projects and People,
- * so those come too, and Projects is where a passion project lives, its states relabelled Active, Ongoing, On hold and
- * Finished. Nothing here says client, invoice or runway.
+ * person's words through labels ("Bills", not "Money"). Money needs Projects and People, so those come too, and
+ * Projects is where a passion project lives, its states relabelled Active, Ongoing, On hold and Finished. The people in
+ * a life are People's list with Personal's own roles laid on it (`extends` below): family, friend, landlord,
+ * tradesperson and adviser. Nothing here says client, invoice or runway.
  *
  * WHAT MONEY DOES NOT HOLD IS THIS PACK'S. Day-to-day spending carries a person's own categories (groceries, getting
  * around), which Money's closed business categories cannot say and a use case cannot add to another pack's list. So
@@ -128,8 +129,9 @@ const budgetProgress = (heading: string) => ({
 
 export const PERSONAL = {
   usecase: 'personal',
-  /* 1.3.0: the Projects page went, so the rail has one Projects Overview, and its next steps are on Home. */
-  version: '1.4.0',
+  /* 1.3.0: the Projects page went, so the rail has one Projects Overview, and its next steps are on Home.
+     1.5.0: Personal lays its own roles on People through `extends`, and the relabels of the studio's roles went. */
+  version: '1.5.0',
   title: 'Personal',
   summary: 'Your money and bills, what you are saving for, and the projects and goals you care about.',
   author: 'BrainDog',
@@ -155,7 +157,21 @@ export const PERSONAL = {
   /* A PERSON'S WORDS OVER MONEY, PROJECTS AND PEOPLE, and over this pack's own lists so a shared copy can rename them.
      A bill's category is one of Money's closed values, so each value a person's bills fall in is given a person's word:
      rent and energy are Home, a phone and streaming are Subscriptions, the gym is Health, pay is Pay. Those keys are
-     longer than a setting name, and are kept by their hash (`labelSetting`). */
+     longer than a setting name, and are kept by their hash (`labelSetting`).
+
+     THE CATEGORIES STAY RELABELS FOR NOW, AND ON PURPOSE. `obligations.category`'s studio values become a `ref` to a
+     categories list in a later move, which moves the rows with it. Laying Home, Food and Transport on the enum now,
+     as `extends` does for People's roles, would only give that move more values to map.
+
+     PEOPLE'S ROLES ARE NOT RELABELLED ANY MORE. Personal read `client` as Family, `contractor` as Tradesperson,
+     `accountant` as Adviser, `registrar` as Landlord and `collaborator` as Friend, so the screen said Family and the list
+     had no such value: an agent told "family" was refused `ENUM_VALUE_UNKNOWN` (`personal-words.test.ts`). The five words
+     are values of the list now (`extends`), and the relabels went rather than stayed, because kept they would offer
+     each word twice, once under its own value and once over a studio's. The case for keeping them is a Personal record
+     made before 1.5.0 reading as it did, and there is no such record to protect: production has none
+     (`loop/STATUS.md`: `/auth/methods` says `firstRun: true`), and the owner's own record comes from the import, which
+     proposes a founder's setup and not Personal (`loop/research-shell-next.md` Brief V). So no migration moves a
+     `client` row to `family`: there are no rows it would move. */
   labels: {
     obligations: 'Bills',
     'obligations:one': 'bill',
@@ -177,11 +193,6 @@ export const PERSONAL = {
     'things.lane.retired': 'Finished',
     'things.revenue': 'Money made',
     'people:holds': 'the people in your life worth keeping track of: family, friends, a landlord, a plumber',
-    'people.role.client': 'Family',
-    'people.role.contractor': 'Tradesperson',
-    'people.role.accountant': 'Adviser',
-    'people.role.registrar': 'Landlord',
-    'people.role.collaborator': 'Friend',
     spending: 'Spending',
     'spending:one': 'purchase',
     budgets: 'Budget',
@@ -199,6 +210,9 @@ export const PERSONAL = {
   pack: {
     pack: 'usecase-personal',
     requires: { format: 1, primitives: 1, packs: {} },
+    /* THE PEOPLE IN A LIFE, AS VALUES OF PEOPLE'S OWN LIST, after the studio's, so a client a person also has still reads
+       as Client. They stay the record's own if Personal is ever taken out, because rows hold them. */
+    extends: { 'register.people': { values: { role: ['family', 'friend', 'landlord', 'tradesperson', 'adviser'] } } },
     declarations: [
       {
         register: 'spending',

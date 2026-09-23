@@ -194,7 +194,7 @@ test('a relabel under a kept where that names the field by its id is kept, and t
 /* ── (d) an enum value a kept where names, taken out of the field's values ── */
 
 test('a kept where that names an enum value the update removes is refused, naming the value', async () => {
-  const installed = await recordWith({ 'metric.spent-30d': renamed });
+  const installed = { ...(await recordWith({ 'metric.spent-30d': renamed })), rows: { transactions: 0 } };
   const next = await packOf(DOC('1.1.0', with_('direction', { values: ['in', 'outgoing'] }), [], { 'bank-note': { ...INGEST, extract: { ...INGEST.extract, direction: { enum: { map: { debited: 'outgoing' } } } } } }));
   const diff = await plan(next, installed);
   assert.deepEqual(diff.conflicts, [{ id: 'metric.spent-30d', pack: '(this record)', reads: 'register.transactions', field: 'direction', value: 'out' }]);
@@ -207,7 +207,7 @@ test('a kept where that names an enum value the update removes is refused, namin
 test('a value named by its label and a value in a kept ingest’s enum map are both asked', async () => {
   const labelled = FIELDS().map((f) => (f.id === 'direction' ? { ...f, labels: { out: 'money out' } } : f));
   const first = await packOf(DOC('1.0.0', labelled));
-  const installed = await recordWith({});
+  const installed = { ...(await recordWith({})), rows: { transactions: 0 } };
   installed.declarations = installed.declarations.map((d) => (d.id === 'register.transactions' ? { ...d, body: first.declarations[0]!.canonical } : d));
   installed.declarations = installed.declarations.map((d) =>
     d.id === 'metric.spent-30d' ? { ...d, pack_id: null, body: JSON.stringify({ ...JSON.parse(d.body), where: 'which way is money out' }) } : d,
@@ -217,7 +217,7 @@ test('a value named by its label and a value in a kept ingest’s enum map are b
   const diff = await plan(next, installed);
   assert.deepEqual(diff.conflicts.map((c) => [c.id, c.field, c.value]), [['metric.spent-30d', 'direction', 'out']]);
 
-  const ingest = await recordWith({ 'ingest.bank-note': (b) => ({ ...b, match: { field: 'body', contains: 'charged' } }) });
+  const ingest = { ...(await recordWith({ 'ingest.bank-note': (b) => ({ ...b, match: { field: 'body', contains: 'charged' } }) })), rows: { transactions: 0 } };
   const fewer = await plan(await packOf(DOC('1.1.0', with_('direction', { values: ['in'] }))), ingest);
   assert.deepEqual(fewer.conflicts.map((c) => [c.id, c.field, c.value]), [['ingest.bank-note', 'direction', 'out']]);
   assert.match(conflictFault(fewer)?.fix ?? '', /ingest\.bank-note, which you changed, writes it\. Change what ingest\.bank-note writes to direction first/u);
