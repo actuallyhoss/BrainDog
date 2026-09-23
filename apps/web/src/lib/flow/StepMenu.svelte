@@ -14,11 +14,15 @@
   THE PILL SAYS WHEN A DRAG WILL LAND ON IT, `landing`. The row it sits in is the empty list's drop target, and with the
   "Nothing yet" box gone the pill is the only thing there to light up, so it takes the accent edge the landing line
   between two cards is drawn in.
+
+  ASK SPARK IS OFFERED WHERE A MODEL IS, read from the layout's `spark` here rather than passed down through `FlowList`,
+  because every menu on the canvas asks the same question of the same tab and none of the lists between has a use for it.
 -->
 <script lang="ts">
   import Menu from '$lib/ui/Menu.svelte';
   import Icon from '$lib/ui/Icon.svelte';
-  import { STEP_GROUPS, VERB_LABELS, words, type Verb } from './flow.ts';
+  import { page } from '$app/state';
+  import { stepGroups, VERB_LABELS, words, type Verb } from './flow.ts';
 
   let {
     label = words.addStep,
@@ -28,6 +32,7 @@
   }: { label?: string; compact?: boolean; landing?: boolean; onpick: (verb: Verb) => void } = $props();
 
   let open = $state(false);
+  const groups = $derived(stepGroups(page.data.spark === true));
 </script>
 
 <div class="step-menu" data-compact={compact ? '' : undefined} data-landing={landing ? '' : undefined}>
@@ -38,7 +43,7 @@
         <span class={compact ? 'vh' : undefined}>{label}</span>
       </span>
     {/snippet}
-    {#each STEP_GROUPS as group (group.label)}
+    {#each groups as group (group.label)}
       <p class="group" role="none">{group.label}</p>
       {#each group.verbs as verb (verb)}
         <button type="button" class="mi" role="menuitem" onclick={() => onpick(verb)}>{VERB_LABELS[verb]}</button>

@@ -45,7 +45,7 @@
   import { ROOT, VERB_LABELS, callsIn, freshId, sayStart, words, type Verb } from '$lib/flow/flow.ts';
   import { answerWords, openAutomations, type Answer, type AutomationRow, type Source, type Tried as TriedAnswer } from '$lib/flow/source.ts';
 
-  const flow = new FlowDraft();
+  const flow = new FlowDraft({ spark: page.data.spark === true });
 
   /* THE WORDS THIS PAGE ADDS, kept here while `flow.ts` is another brief's file; they can move into `words` there. */
   const say = {

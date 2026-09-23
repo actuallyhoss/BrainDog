@@ -620,18 +620,32 @@ export const VERB_LABELS: Record<Verb, string> = {
   schedule: 'Come back later',
 };
 
-/** Verbs the record reads but refuses at install in this build, so the menu does not offer them. Asking Spark waits on a
-    host that answers `infer.ask` (`packages/kernel/src/flow-lint.ts`); a body an agent wrote with one says so before Send. */
-export const NOT_YET: readonly Verb[] = ['ask_spark'];
+/**
+ * Verbs the record reads but refuses at install on this host, so the menu does not offer them.
+ *
+ * A FACT ABOUT THE HOST, NOT THE BUILD. `ask_spark` was a constant here, "not in this build", and since `eb1a131b` a
+ * self-host with a model installs it: the record's `unserved` refuses the step only where the host has not said it
+ * answers `infer.ask` (`sparkAskAt` in `packages/kernel/src/flow-lint.ts`). So the canvas asks the flag the record
+ * asks, `/api/version`'s `spark`, which the layout reads once for the tab. A body an agent wrote with one on a host
+ * with no model still says so before Send.
+ */
+export const notYet = (spark: boolean): readonly Verb[] => (spark ? [] : ['ask_spark']);
 
-/** §6's five groups, in the order the menu draws them. Every verb the menu offers is in exactly one. */
-export const STEP_GROUPS: readonly { label: string; verbs: readonly Verb[] }[] = [
-  { label: 'Check', verbs: ['if', 'set_var', 'stop'] },
-  { label: 'Change', verbs: ['tag', 'untag', 'set', 'move', 'link', 'note', 'create'] },
-  { label: 'Ask', verbs: ['notify', 'suggest', 'ask_person'] },
-  { label: 'Call out', verbs: ['call', 'run', 'script'] },
-  { label: 'Wait', verbs: ['wait', 'schedule'] },
-];
+/**
+ * §6's five groups, in the order the menu draws them. Every verb the menu offers is in exactly one.
+ *
+ * SPARK AFTER A PERSON in the Ask group, where a model is: a person is the answer that works on every host, and the
+ * fault on a host with none sends somebody there.
+ */
+export function stepGroups(spark: boolean): readonly { label: string; verbs: readonly Verb[] }[] {
+  return [
+    { label: 'Check', verbs: ['if', 'set_var', 'stop'] },
+    { label: 'Change', verbs: ['tag', 'untag', 'set', 'move', 'link', 'note', 'create'] },
+    { label: 'Ask', verbs: spark ? ['notify', 'suggest', 'ask_person', 'ask_spark'] : ['notify', 'suggest', 'ask_person'] },
+    { label: 'Call out', verbs: ['call', 'run', 'script'] },
+    { label: 'Wait', verbs: ['wait', 'schedule'] },
+  ];
+}
 
 /** A new step of one kind, with the arguments it needs present and empty, so the inspector has something to fill. */
 export function blankStep(verb: Verb): Step {
@@ -1121,8 +1135,11 @@ const blank = (v: unknown): boolean =>
  * THE RECORD CHECKS AGAIN, AND ITS WORD IS FINAL. These are the refusals a person would want told before pressing the
  * button, in the lint's terms, so that the first time they hear "a clock is fifteen minutes or longer" is not on Decide.
  * Anything the canvas cannot know (whether a call is declared, whether a register exists) is left to the record.
+ *
+ * `spark` IS WHETHER THIS HOST ANSWERS SPARK, and it defaults to no. The default is the answer this list gave before it
+ * knew, and it is the one that keeps `source.test.ts`'s starter samples, none of which asks Spark, saying nothing.
  */
-export function faultsOf(d: Draft): Fault[] {
+export function faultsOf(d: Draft, { spark }: { spark: boolean } = { spark: false }): Fault[] {
   const out: Fault[] = [];
   const t = d.trigger;
   const kind = Object.keys(t)[0] ?? 'manual';
@@ -1164,7 +1181,7 @@ export function faultsOf(d: Draft): Fault[] {
         out.push({ key: n.key, say: 'This step names no verb this build reads.' });
         continue;
       }
-      if (NOT_YET.includes(verb)) out.push({ key: n.key, say: `"${VERB_LABELS[verb]}" is not in this build yet, so the record would refuse it. Ask a person instead.` });
+      if (notYet(spark).includes(verb)) out.push({ key: n.key, say: 'This BrainDog has no model for Spark to answer with. Ask a person instead.' });
       if (rowless && ROW_VERBS.includes(verb)) out.push({ key: n.key, say: `${sayTrigger(t)} brings no row, and "${sayStep(n.step)}" acts on one.` });
       for (const arg of ARGS[verb]) {
         const v = getAt(n.step, arg.path);

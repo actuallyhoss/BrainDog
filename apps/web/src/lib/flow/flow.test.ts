@@ -15,8 +15,8 @@ import { openRecord } from '@braindog/kernel';
 
 import {
   ARGS,
-  STEP_GROUPS,
-  NOT_YET,
+  stepGroups,
+  notYet,
   VERBS,
   VERB_LABELS,
   blankDraft,
@@ -336,12 +336,25 @@ test('A NUMBER IS COMPARED AS A LEAF, because the sentence grammar has no word f
   assert.equal(sayCondition('state is open'), 'state is open');
 });
 
+/*
+ * ON BOTH KINDS OF HOST, because what the menu leaves out is now a fact about the host. With the flag fixed at false
+ * this was the whole test, and it could not see a host with a model, where the record installs `ask_spark` and the
+ * menu still did not offer it (`research-worker-spark.md` Brief F).
+ */
 test('THE MENU OFFERS EVERY VERB THE RECORD READS AND INSTALLS, ONCE, in the five groups', () => {
-  const offered = STEP_GROUPS.flatMap((g) => g.verbs);
-  assert.deepEqual([...offered, ...NOT_YET].sort(), [...VERBS].sort());
-  assert.ok(!offered.some((v) => NOT_YET.includes(v)), 'a verb the record refuses at install is not offered');
-  assert.equal(new Set(offered).size, offered.length);
-  assert.deepEqual(STEP_GROUPS.map((g) => g.label), ['Check', 'Change', 'Ask', 'Call out', 'Wait']);
+  for (const spark of [false, true]) {
+    const offered = stepGroups(spark).flatMap((g) => g.verbs);
+    assert.deepEqual([...offered, ...notYet(spark)].sort(), [...VERBS].sort(), `spark: ${spark}`);
+    assert.ok(!offered.some((v) => notYet(spark).includes(v)), 'a verb the record refuses at install is not offered');
+    assert.equal(new Set(offered).size, offered.length);
+    assert.deepEqual(stepGroups(spark).map((g) => g.label), ['Check', 'Change', 'Ask', 'Call out', 'Wait']);
+  }
+});
+
+test('WHERE A MODEL IS, THE ASK GROUP OFFERS SPARK AFTER A PERSON, and where there is none it does not', () => {
+  const ask = (spark: boolean) => stepGroups(spark).find((g) => g.label === 'Ask')!.verbs;
+  assert.deepEqual(ask(true), ['notify', 'suggest', 'ask_person', 'ask_spark']);
+  assert.deepEqual(ask(false), ['notify', 'suggest', 'ask_person']);
 });
 
 /* ── what a step may read, and what is wrong before saving ───────────────── */
@@ -365,8 +378,26 @@ test('what the record would refuse is said before saving, in its own terms', () 
   const blank = draftOf('w', { rule: 'w', on: { manual: true }, steps: [{ ask_spark: { question: '', as: '' } }] });
   assert.ok(faultsOf(blank).length >= 1);
   const spark = draftOf('s', { rule: 's', on: { manual: true }, steps: [{ ask_spark: { question: 'Why?', as: 'why' } }] });
-  assert.ok(faultsOf(spark).some((f) => /not in this build/.test(f.say)), 'an ask_spark an agent wrote is named before Send');
   assert.deepEqual(faultsOf(branched()), []);
+});
+
+/*
+ * THE SAME STEP IS RIGHT ON ONE HOST AND REFUSED ON ANOTHER. The record's `unserved` refuses `ask_spark` at install only
+ * where the host has not said it answers one, so the canvas asks the same question of the same flag. Before, every
+ * `ask_spark` read "not in this build", which was false on a self-host with a model since `eb1a131b`.
+ */
+const asksSpark = () => draftOf('s', { rule: 's', on: { manual: true }, steps: [{ ask_spark: { question: 'Why?', as: 'why' } }] });
+
+test('WHERE A MODEL IS, NOTHING IS SAID ABOUT AN ASK_SPARK STEP, because the record installs it', () => {
+  assert.deepEqual(faultsOf(asksSpark(), { spark: true }), []);
+});
+
+test('WHERE THERE IS NO MODEL, AN ASK_SPARK STEP SAYS SO, and not that the build lacks it', () => {
+  const spark = asksSpark();
+  const key = spark.steps[0]!.key;
+  const none = 'This BrainDog has no model for Spark to answer with. Ask a person instead.';
+  assert.deepEqual(faultsOf(spark, { spark: false }), [{ key, say: none }], 'an ask_spark an agent wrote is named before Send');
+  assert.deepEqual(faultsOf(spark), faultsOf(spark, { spark: false }), 'the default is the host with no model');
 });
 
 /*

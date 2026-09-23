@@ -68,6 +68,11 @@ export class FlowDraft {
 
   /** The version it was opened at, or `null` for a new one. What a save is drawn from. */
   version: number | null = null;
+  /**
+   * Whether this host answers Spark, which decides whether an `ask_spark` card is a fault (`faultsOf`). Fixed for the
+   * draft's life because the layout asks `/api/version` once for the tab, and the page reads it from there.
+   */
+  readonly spark: boolean;
   /** State, so that `sent` quietens the button: `dirty` reads it, and a plain field would not tell anything it moved. */
   #opened = $state('');
   #undo = $state.raw<Draft[]>([]);
@@ -80,6 +85,10 @@ export class FlowDraft {
    * wrong is said at once.
    */
   #held = $state.raw<ReadonlySet<string>>(new Set());
+
+  constructor({ spark }: { spark: boolean }) {
+    this.spark = spark;
+  }
 
   /** Open a body. `null` is a new automation, which has no version and nothing to compare against. */
   open(id: string, body: Body | null, version: number | null) {
@@ -104,7 +113,7 @@ export class FlowDraft {
   }
 
   get faults() {
-    return faultsOf(this.draft);
+    return faultsOf(this.draft, { spark: this.spark });
   }
 
   get path() {
