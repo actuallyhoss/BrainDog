@@ -24,9 +24,8 @@ import { no, ok, refused, type Result } from '@braindog/ports';
 
 import type { Core } from './call.ts';
 import { anchorFault, isRecord } from './project.ts';
-import { SPARK_CTX } from './propose.ts';
 import { fenced } from './prompts.ts';
-import { indexLines } from './propose.ts';
+import { indexLines, nameIn, SPARK_CTX } from './propose.ts';
 import type { CallContext, Inference, Proposal, RawPayload, RecordApi } from './types.ts';
 
 /** `12 §5`: the register that holds credentials is not one a derived pattern may write to. */
@@ -51,6 +50,23 @@ export const patterns = (
 
     const callId = core.mint();
     const s = core.settings();
+    /* THE ROW AND THE PROPOSAL NAME WHAT THE HOST SENT, read off the reply or the marked throw as `propose` reads it.
+       `core.run` holds the template's name, so on a self-host with `SPARK_MODEL=llama3` every pattern row read
+       `glm-5.3-flash` (audit fifty §4, `test/pattern-model.test.ts`). `naming` in `propose.ts` is private to that
+       module, so this is the same wrapper over the same exported `nameIn`, as `answer.ts` has its own. */
+    let sent: string | undefined;
+    const engine: Inference = {
+      complete: async (call) => {
+        try {
+          const reply = await fallback.complete(call);
+          sent = nameIn(reply);
+          return reply;
+        } catch (e) {
+          sent = nameIn(e);
+          throw e;
+        }
+      },
+    };
     const ran = await core.run({
       id: 'pattern',
       slots: {
@@ -58,15 +74,16 @@ export const patterns = (
         '%SAMPLES%': samples.map((raw) => fenced(raw.id, sampleText(raw))).join('\n'),
         '%INDEX%': indexLines(known),
       },
-      inference: fallback,
+      inference: engine,
     });
+    const used = sent ?? ran.model;
 
     const account = (status: 'ok' | 'refused' | 'error', code?: string, filed?: string): void =>
       core.account({
         id: callId,
         kind: 'pattern',
         tier: s.tier,
-        model: ran.model,
+        model: used,
         usage: ran.usage,
         ms: ran.ms,
         status,
@@ -142,7 +159,7 @@ export const patterns = (
       verbs: ['decide', 'dismiss'],
       body_kind: 'pattern',
       body: { ingest, samples: ids },
-      model: ran.model,
+      model: used,
       filed: put.value.id,
       read: [{ register: 'inbox_raw', rows: samples.length, predicate: 'shape' }],
     });
