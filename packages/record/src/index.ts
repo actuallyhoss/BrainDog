@@ -4163,7 +4163,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * kernel writes nothing, a run included.
      */
     async meet(args: MeetArgs, ctx: CallContext): Promise<Result<Met>> {
-      const stop = guard(ctx, 'propose', PEOPLE);
+      /* THE LIST THE KERNEL WILL WRITE, by the kernel's own rule (`kernel.meetsList()`), and `people` as before when no
+         list plays the part. Guarded on `people` alone, a token held to `people` met somebody into `contacts`, which
+         declared `meets:`, and one held to `contacts` was refused at a list the record did not have (`meet-role.test.ts`). */
+      const stop = guard(ctx, 'propose', kernel.meetsList()?.register ?? PEOPLE);
       if (stop) return { ok: false, refusal: stop };
       const said = (args ?? {}) as Record<string, unknown>;
       const wrong = stray(said, MEET);

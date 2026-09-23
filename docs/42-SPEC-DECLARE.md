@@ -231,6 +231,8 @@ with every seed inside the same batch · no identifier reaches the kernel withou
 | `pairs` | `{ on: 1–3 of Id \| abs(Id), opposite: Id, across: Id, within: Window, date?: Id, mark: text ≤ 20 }` | no | — | — |
 | `identity` | `{ mark: an enum field, accent: an int field }` | no | — | — |
 | `scopes` | `{ repos?: Id, folders?: Id }`, at least one, each a `list<text>` field of this register; not on a `series`; one active register declares it (`DECLARATION_INVALID`) | no | — | — |
+| `rates` | `{ currency: Id, base: Id, rate: Id, as_of: Id }`, each a field of this register: `currency` and `base` `text` or `enum`, `rate` `decimal` or `int`, `as_of` `day`; one field plays one part; one active register declares it, and a keyless `fx` with those four fields counts as one (`DECLARATION_INVALID`) | no | — | — |
+| `meets` | `{ name: Id, email: Id, met: Id, merged_into: Id, handles?: Id, projects?: Id }`: `name` `text`, `email` `email` or `text`, `met` and `handles` `list<text>`, `merged_into` a `ref` to this register, `projects` a `list<ref>` to the register declaring `scopes`; one field plays one part; one active register declares it, and a keyless `people` with the four required fields counts as one (`DECLARATION_INVALID`) | no | — | — |
 | `predicates` | `{ Id: predicate }`, ≤ 16, each through `where.validate` on this register | no | `{}` | — |
 | `immutable_when` | predicate | no | — | — |
 

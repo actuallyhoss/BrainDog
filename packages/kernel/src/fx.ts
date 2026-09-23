@@ -10,9 +10,10 @@
  * in, and the figure is converted and says as of when, or one does not, and the figure is one amount per currency
  * with every missing pair named. There is no third answer that adds what it can and leaves out the rest.
  *
- * A RATE IS A ROW OF THE `fx` LIST: `currency`, `base`, `rate`, `as_of`. One unit of `currency` is `rate` units of
- * `base`, so `USD, EGP, 48.5` says a dollar is 48.5 pounds. A row the other way round is read as its inverse, because
- * a rate is quoted whichever way a person or a public address happens to quote it.
+ * A RATE IS A ROW OF THE LIST THAT DECLARES `rates:`, whose four parts name the fields playing `currency`, `base`,
+ * `rate` and `as_of` (`roles.ts`); a record older than the key has them under those names on a list called `fx`. One
+ * unit of `currency` is `rate` units of `base`, so `USD, EGP, 48.5` says a dollar is 48.5 pounds. A row the other way
+ * round is read as its inverse, because a rate is quoted whichever way a person or a public address happens to quote it.
  */
 
 import { exponentOf } from './ingest.ts';
@@ -68,14 +69,26 @@ const DAY_MS = 86_400_000;
 export const rateIsStale = (asOf: string, day: string): boolean =>
   Date.parse(`${day}T00:00:00Z`) - Date.parse(`${asOf}T00:00:00Z`) > RATE_STALE_DAYS * DAY_MS;
 
-/** The rates a list's rows hold. A row that is not a whole rate (a code, a code, a positive number and a day) is not one. */
-export function ratesFrom(rows: Iterable<Record<string, unknown>>): Rate[] {
+/** Which field of a row plays each part of a rate. */
+export type RateFields = { currency: string; base: string; rate: string; as_of: string };
+
+/** The parts under their own names, which is how `fx` held them before any list declared `rates:`. */
+const OWN_NAMES: RateFields = { currency: 'currency', base: 'base', rate: 'rate', as_of: 'as_of' };
+
+/**
+ * The rates a list's rows hold. A row that is not a whole rate (a code, a code, a positive number and a day) is not one.
+ *
+ * `names` IS THE LIST'S `rates:`, and it defaults to the parts' own names so the browser's sample, which has no key
+ * until the seed declares one, reads as it did.
+ */
+export function ratesFrom(rows: Iterable<Record<string, unknown>>, names: RateFields = OWN_NAMES): Rate[] {
   const out: Rate[] = [];
   for (const f of rows) {
-    const currency = typeof f.currency === 'string' ? f.currency.trim().toUpperCase() : '';
-    const base = typeof f.base === 'string' ? f.base.trim().toUpperCase() : '';
-    const rate = typeof f.rate === 'number' ? f.rate : Number(f.rate);
-    const asOf = typeof f.as_of === 'string' && DAY.test(f.as_of) ? f.as_of.slice(0, 10) : null;
+    const said = { currency: f[names.currency], base: f[names.base], rate: f[names.rate], as_of: f[names.as_of] };
+    const currency = typeof said.currency === 'string' ? said.currency.trim().toUpperCase() : '';
+    const base = typeof said.base === 'string' ? said.base.trim().toUpperCase() : '';
+    const rate = typeof said.rate === 'number' ? said.rate : Number(said.rate);
+    const asOf = typeof said.as_of === 'string' && DAY.test(said.as_of) ? said.as_of.slice(0, 10) : null;
     if (!CODE.test(currency) || !CODE.test(base) || currency === base || !Number.isFinite(rate) || rate <= 0 || asOf === null) continue;
     out.push({ currency, base, rate, as_of: asOf });
   }

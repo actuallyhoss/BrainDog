@@ -195,7 +195,8 @@ import {
   type VaultDeps,
 } from './vault.ts';
 import { sparkMayWrite } from './spark.ts';
-import { PEOPLE, meet as meetPerson, type MeetArgs, type Met } from './people.ts';
+import { meet as meetPerson, type MeetArgs, type Met } from './people.ts';
+import { meetsRole, ratesRole, type MeetsFields } from './roles.ts';
 import { FINISHED, KERNEL_WRITTEN, REVIVED, SESSION, findSession, opening, owned, provisionalTitle, type Found, type SessionHints } from './session.ts';
 import {
   deviceApprove,
@@ -294,6 +295,7 @@ export type { Bars, SeriesLine } from './series.ts';
 export { ARRANGING, BODY_KINDS, GOVERNANCE, OPEN_ARRANGEMENTS, PACK_VERBS } from './govern.ts';
 export { MET_CAP, PEOPLE } from './people.ts';
 export type { MeetArgs, Met } from './people.ts';
+export type { MeetsFields, RatesFields } from './roles.ts';
 export { SCOPES, DEFAULT_DAYS as TOKEN_DAYS } from './token.ts';
 export { LEVELS as MEMBER_LEVELS, RECORD as WHOLE_RECORD } from './members.ts';
 export type { Member } from './members.ts';
@@ -3825,13 +3827,22 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       return typeof register === 'string' ? register : null;
     },
     /* THE HOME CURRENCY AND THE DATED RATES, read only when a money figure meets a second currency. The rates are the
-       rows of the `fx` list when a pack declares one (`08 §2.5`); a record without it has none. */
-    fx: () => ({
-      home: homeCurrency(sql),
-      rates: registers.has('fx')
-        ? ratesFrom(sql.all<{ fields: string }>("SELECT fields FROM entry WHERE register = 'fx' AND deleted_at IS NULL").map((r) => JSON.parse(r.fields) as Record<string, unknown>))
-        : [],
-    }),
+       rows of the list declaring `rates:`, read by the fields it names, or of `fx` by the old names on a record whose
+       money pack is older than the key (`roles.ts`); a record with neither has none. */
+    fx: () => {
+      const held = ratesRole(registers.values());
+      return {
+        home: homeCurrency(sql),
+        rates: held
+          ? ratesFrom(
+              sql
+                .all<{ fields: string }>('SELECT fields FROM entry WHERE register = ? AND deleted_at IS NULL', held.register)
+                .map((r) => JSON.parse(r.fields) as Record<string, unknown>),
+              held.fields,
+            )
+          : [],
+      };
+    },
   });
 
   /** What the page layer reads through. It runs queries it did not write, so it takes callbacks. */
@@ -5966,20 +5977,34 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         ...(w.principal === undefined ? {} : { principal: w.principal }),
         ...(w.session === undefined ? {} : { session: w.session }),
       };
+      /* THE LIST DECLARING meets:, or `people` on a record older than the key (`roles.ts`). */
+      const role = meetsRole(registers.values());
+      const list = role === null ? undefined : { ...role, declaredFields: registers.get(role.register)?.fields ?? [] };
       return attempt(sql, transaction, () =>
         meetPerson(
           {
             sql,
             nowMs: clock.now(),
-            fields: registers.get(PEOPLE)?.fields,
+            list,
             project: () => (as.principal?.kind === 'token' ? (locateRun(as).project?.id ?? null) : null),
             nameOf,
-            write: (ref, patch, version) => write(PEOPLE, ref, patch, version === undefined ? as : { ...as, version }),
+            write: (ref, patch, version) => write(role?.register ?? '', ref, patch, version === undefined ? as : { ...as, version }),
             propose: (p) => openSuggestion(governDeps(), () => signedBy(as), p),
           },
           args,
         ),
       );
+    },
+
+    /**
+     * The list `meet` writes and the field playing each part, or `null` when there is none.
+     *
+     * FOR THE RECORD, whose `meet` guard and members' names gate still name `people` (`packages/record/src/index.ts`),
+     * so that its follow-up can ask here instead of repeating the kernel's rule for which list that is.
+     */
+    meetsList: (): { register: string; fields: MeetsFields } | null => {
+      const role = meetsRole(registers.values());
+      return role === null ? null : { register: role.register, fields: role.fields };
     },
 
     /* ── the outbox: work that must leave the record ────────────────── */

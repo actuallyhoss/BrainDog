@@ -33,6 +33,7 @@ import { scriptBody } from './script.ts';
    the reader a record hands down reads the token set, so there is no shorter list to agree with. */
 import { MAP_TYPES } from './map.ts';
 import { HOME_CURRENCY_SETTING, homeFrom } from './fx.ts';
+import { HOLDS, PARTS as ROLE_PARTS, aims, legacyShaped, plays, type RoleField, type RoleKey, type RoleList } from './roles.ts';
 /* THE FUNCTION THE REMINDERS ARE DERIVED WITH, so an offset this file accepts is one `remindersFor`
    can read. A copy of its regular expression here would be a second list, and `MATCH_FIELDS` above
    is what two lists that disagree cost. */
@@ -1555,10 +1556,14 @@ const matchless = (match: unknown): string => (match === undefined ? 'has no mat
  * `door:` in the same call is not counted.
  *
  * RETIRING THE DOOR IS NOT REFUSED HERE OR IN `retireDeclarations`, though the audit's (c) measured the same hole that
- * way. Tried on 23 September, the refusal stopped money-core's own update: its plan hands `bank-ipn-in-sms`, which filed
- * a row, to `bank-hsbc-eg` with its `door: bank-from-out-sms`, and retires the door, which holds no token and filed
- * nothing (`packages/seed/test/bank-pack.test.ts`, `packages/declare/test/plan-handover-shown.test.ts`). Which of the two
- * the plan should hand is `packages/declare`'s question, and it is left open there.
+ * way. Tried on 23 September, the refusal stopped money-core's own update: its plan handed `bank-ipn-in-sms`, which filed
+ * a row, to `bank-hsbc-eg` with its `door: bank-from-out-sms`, and retired the door, which held no token and filed
+ * nothing. Tried again the same day with `packages/declare`'s plan change in the working tree, which hands a door with
+ * the pattern naming it (`packages/declare/test/door-follows-patterns.test.ts`): the guard then changed nothing that
+ * `bank-pack.test.ts` or `plan-handover-shown.test.ts` asserts, measured with every assertion made to log and carry on,
+ * and it refused one test outright, `packages/record/test/ingest-verify-digest.test.ts`'s retire of
+ * `bank-from-out-sms`, which five of the bank's patterns read. That test has to retire a webhook no pattern names, as
+ * its neighbour already does for finding 4 (b), before the guard can land.
  *
  * ASKED AFTER EVERY DECLARATION OF THE BATCH HAS PASSED `validate` (`doorsKept`), NOT INSIDE IT. Asked from
  * `ingestBody`, a batch shipping a door with no token and a pattern naming it was answered at the door's `verify` before
@@ -2785,6 +2790,12 @@ function createFault(
  *             `done` is true; a card's ring over an empty field draws the share done (`steps.ts`).
  *   `scopes`  on the one register whose rows are projects, the fields listing their repositories
  *             and folders; `resolveProject` places a run by them.
+ *   `rates` · `meets`  on the one register holding the rates a money figure converts by, and the one
+ *             `meet` writes, each part naming the field that plays it (`roles.ts`, `roleBody` below).
+ *
+ * `rates` AND `meets` ARE NOT IN `42 §4.4` YET, and `declare.test.ts` lists what the code admits
+ * that the document does not publish. They landed with the roles brief (`loop/research-shell-next.md`
+ * Brief R), whose files did not include the document or that test.
  *
  * `pack:` IS ON THIS LIST AND IS NOT READ FROM THE BODY, and that is deliberate rather than an
  * oversight: ownership is `declaration.pack_id`, written from the declaration's own `pack` and read
@@ -2794,7 +2805,7 @@ function createFault(
  */
 const REGISTER_KEYS = [
   'register', 'name', 'one', 'pack', 'series', 'fields', 'search', 'title', 'mobile', 'identity',
-  'id', 'state', 'done', 'finished', 'icon', 'holds', 'seq_prefix', 'scopes', 'steps',
+  'id', 'state', 'done', 'finished', 'icon', 'holds', 'seq_prefix', 'scopes', 'steps', 'rates', 'meets',
 ] as const;
 
 /**
@@ -3233,6 +3244,91 @@ function scopesBody(decl: Declaration, fields: readonly FieldLike[], scopes: unk
   for (const [other, body] of installed ?? [])
     if (other !== decl.id && other.startsWith('register.') && body.scopes !== undefined)
       return bad('DECLARATION_INVALID', `${other} already declares scopes:, and one register holds the projects.`, 'scopes');
+  return null;
+}
+
+/**
+ * A register's `rates:` or `meets:`, which makes it the list the kernel reads that role from (`roles.ts`).
+ *
+ * CHECKED AT INSTALL, NOT AT THE FIRST CALL. Before the keys, a `people` list missing a field `meet` writes installed
+ * clean and the refusal reached the first agent that met somebody, weeks later and to nobody who could fix it
+ * (`loop/research-seed-roles.md` R2). So every part is named, each names a field of this list of a type that plays
+ * it, `merged_into` points at this list, and `projects` at the list declaring `scopes:`, all before anything is
+ * written. The type refusal is `at` the field, as `scopesBody`'s is, and says which part it was named for.
+ *
+ * ONE LIST HOLDS EACH ROLE, as one holds the projects: two rates lists give one pair two answers on one day, and two
+ * people lists make one email two people. AND THE NAMED LIST COUNTS, while it is shaped like the role and declares no
+ * key: otherwise a pack declaring `rates:` beside an older money pack's `fx` would move every figure onto the new list
+ * and leave yesterday's rates unread, and the conversions that worked yesterday would say a pair was missing today.
+ * By shape and not by name alone, because a list called `fx` of sound effects is not anybody's rates and must block
+ * nothing (the checker's hazard in the roles survey, driven in `test/roles.test.ts`). The fix names the pack that owns
+ * the named list when the record knows it, read from the record, so this file names no pack.
+ */
+function roleBody(key: RoleKey, decl: Declaration, fields: readonly RoleField[], installed?: Known, owners?: Owners): Refusal | null {
+  const id = decl.id;
+  const self = String(ownId(decl));
+  const parts = ROLE_PARTS[key];
+  const names = parts.map((p) => p.part);
+  const said = decl.body[key];
+  const shape = `{ ${parts.map((p) => (p.optional ? `${p.part}?` : p.part)).join(', ')} }`;
+  if (said === null || typeof said !== 'object' || Array.isArray(said))
+    return bad('DECLARATION_INVALID', `${id}'s ${key} names the field playing each part, as ${shape}, and this is not.`, key, names);
+  for (const part of Object.keys(said))
+    if (!names.includes(part)) return bad('DECLARATION_INVALID', `${id}'s ${key} declares ${part}, and there is no such part.`, key, names);
+
+  /* THE LIST DECLARING scopes:, from what is installed with the batch laid over it. Unknown without `installed`, and
+     then `projects` is checked for its type alone, as `scopeBody` does. */
+  const projects =
+    installed === undefined
+      ? undefined
+      : ([...installed].find(([other, body]) => other.startsWith('register.') && body.scopes !== undefined)?.[0]?.slice('register.'.length) ?? null);
+  /* ONE FIELD PLAYS ONE PART. Measured by the checker before this map: `meets: { met: handles, handles: handles }`
+     installed clean and the first meet with a handle wrote the line saying where over the handle, and `rates:` naming
+     `currency` for both codes installed clean and converted nothing, because every row's currency was its base. */
+  const taken = new Map<string, string>();
+  for (const part of parts) {
+    const name = (said as Record<string, unknown>)[part.part];
+    if (name === undefined) {
+      if (part.optional) continue;
+      return bad('DECLARATION_INVALID', `${id}'s ${key} names no field for ${part.part}, and every part but the optional ones is named: ${shape}.`, key, names);
+    }
+    const field = fields.find((f) => f.id === name);
+    if (!field)
+      return bad('FIELD_UNKNOWN', `${id}'s ${key} names ${String(name)} for its ${part.part}, and there is no such field.`, key, fields.map((f) => f.id));
+    const first = taken.get(field.id);
+    if (first !== undefined)
+      return bad('DECLARATION_INVALID', `${id}.${field.id} plays ${first} in its ${key}, so it cannot play ${part.part} as well. Name another field for ${part.part}.`, field.id);
+    taken.set(field.id, part.part);
+    if (!plays(part, field))
+      return bad('DECLARATION_INVALID', `${id}.${field.id} plays ${part.part} in its ${key}, so it is ${part.says}, and it is a ${field.type}.`, field.id);
+    if (!aims(part, field, self, projects))
+      return bad(
+        'DECLARATION_INVALID',
+        part.to === 'self'
+          ? `${id}.${field.id} plays ${part.part} in its ${key}, so it points at ${self}, the list itself, and it points at ${String(field.to)}.`
+          : projects === null
+            ? `${id}.${field.id} plays ${part.part} in its ${key}, and no register declares scopes:, so nothing says what a project is.`
+            : `${id}.${field.id} plays ${part.part} in its ${key}, so it points at ${projects}, the register that declares scopes:, and it points at ${String(field.to)}.`,
+        field.id,
+      );
+  }
+
+  for (const [other, body] of installed ?? []) {
+    if (other === id || !other.startsWith('register.')) continue;
+    if (body[key] !== undefined) return bad('DECLARATION_INVALID', `${other} already declares ${key}:, and one list holds ${HOLDS[key]}.`, key);
+    const list = { ...(body as unknown as RoleList), id: other.slice('register.'.length) };
+    if (legacyShaped(key, list)) {
+      const pack = owners?.get(other) ?? null;
+      return bad(
+        'DECLARATION_INVALID',
+        `${other} holds this record's ${key === 'rates' ? 'rates' : 'people'} and declares no ${key}:, and one list holds ${HOLDS[key]}. ` +
+          (pack === null
+            ? `Declare ${key}: on ${list.id} instead, and keep ${HOLDS[key]} there.`
+            : `Update ${pack}, which owns ${list.id}, to a version that declares ${key}: on it, and keep ${HOLDS[key]} there.`),
+        key,
+      );
+    }
+  }
   return null;
 }
 
@@ -3848,6 +3944,11 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
   const scopes = decl.body.scopes;
   if (scopes !== undefined) {
     const fault = scopesBody(decl, fields as unknown as FieldLike[], scopes, installed);
+    if (fault) return fault;
+  }
+  for (const key of ['rates', 'meets'] as const) {
+    if (decl.body[key] === undefined) continue;
+    const fault = roleBody(key, decl, fields as unknown as RoleField[], installed, owners);
     if (fault) return fault;
   }
   /* ONE FIELD SAYS WHERE A ROW APPLIES, or one row could be in two places with two sets of rules. */
