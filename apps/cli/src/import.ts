@@ -241,6 +241,28 @@ const valueKey = (register: string, field: string, value: string) => `${register
 const DECIDE_PAGE = 200;
 
 /**
+ * HOW MANY WRITES OF ONE LIST ARE IN FLIGHT AT ONCE, AND WHY EIGHT.
+ *
+ * His first run is one write per row, about 3,315 of them, and it is the run the freeze waits on. Sent one at a time,
+ * each write waited out its own round trip before the next was sent. Measured on 23 September through the Worker in
+ * workerd with a fixed delay put on every request (`test/import-throughput.test.ts` has the method), for the 44-row
+ * fixture grown by 320 tasks, 400 requests in all:
+ *
+ *   at a time:   1        4        8        16
+ *   0 ms       6.0 s    3.2 s    2.7 s
+ *   50 ms     31.8 s   12.9 s    9.5 s
+ *   150 ms    74.4 s   28.3 s   18.8 s   15.1 s
+ *
+ * A Durable Object serialises its writes, so what this buys is the network's wait and not the record's. The 0 ms row is
+ * what is left with no network, the record's work and the client's, and eight at once takes it from 6.0 s to 2.7 s.
+ * Eight is where the curve bends: sixteen took another 3.7 s off at 150 ms, and doubles what one importer
+ * holds open against one record. What none of this shortens is the 33 requests a run makes around its writes (each
+ * list's schema and rows, Decide, the packs), which stay one at a time, and a second run is nothing but those: 5.9 s at
+ * 150 ms whatever this number is.
+ */
+const WRITES_AT_ONCE = 8;
+
+/**
  * Everything on Decide, A PAGE AT A TIME, because the question this read answers is "has he already been asked this".
  *
  * ONE READ OF 200 WAS THE WHOLE OF IT, AND THE CEILING IS A LIFETIME ONE: every draft Spark filed, every pack offered
@@ -656,11 +678,15 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
     }
 
   const later: { row: PlannedRow; field: string; value: unknown }[] = [];
-  /** A planned value with its refs put as ids, or `undefined` when one names a row that is not written yet. */
-  const resolveValue = (v: unknown): unknown => {
-    if (isRef(v)) return ids.get(v.$ref);
+  /**
+   * A planned value with its refs put as ids, or `undefined` when one names a row that is not written yet. `known` is
+   * the keys a row may resolve against, taken when its write started: see `writeRow`.
+   */
+  const resolveValue = (v: unknown, known?: ReadonlySet<string>): unknown => {
+    const idOf = (key: string) => (known === undefined || known.has(key) ? ids.get(key) : undefined);
+    if (isRef(v)) return idOf(v.$ref);
     if (Array.isArray(v) && v.some(isRef)) {
-      const got = v.map((x) => (isRef(x) ? ids.get(x.$ref) : x));
+      const got = v.map((x) => (isRef(x) ? idOf(x.$ref) : x));
       return got.some((x) => x === undefined) ? undefined : got;
     }
     return v;
@@ -668,12 +694,48 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
   const planned = new Set(plan.rows.map((r) => r.key));
   /** Categories this run could not write because the name is taken, and every row that pointed at one. */
   const lost = new Map<string, { label: string; rows: number; fix: string }>();
+  /** Each row whose write has started, by key, and settled once the record has answered it. */
+  const settled = new Map<string, Promise<void>>();
+  /** Set by the first write the host did not answer, or the first that threw: nothing further is sent. */
+  let stopped = false;
 
-  for (const row of plan.rows) {
+  /**
+   * What one row's write says, held until every row of its list has answered and then added to the report in plan
+   * order: see the loop over `lists` below.
+   */
+  type Said = { changes: Report['changes']; refused: Report['refused']; later: typeof later };
+
+  /** One planned row, written or found and patched, with what it says put in `said`. */
+  const writeRow = async (row: PlannedRow, said: Said): Promise<void> => {
+    /**
+     * WHAT THIS ROW MAY LEAN ON IS FIXED AT THE MOMENT IT STARTS, which is the moment a one-at-a-time run would have
+     * reached it. Every row planned before it has started by then and none planned after it has, so a ref to an
+     * earlier row in the same list waits for that row's answer and is sent resolved, as it was when the rows went one
+     * by one (task 102 names task 101 as its parent). A ref to a later row is still left for the second pass, even when
+     * that row answers first, so which rows are patched afterwards does not depend on which answer came back first.
+     * The row's own key is waited on too: a plan naming one key twice updates the row the first one wrote rather than
+     * racing it to a second create.
+     */
+    const refs = Object.values(row.fields).flatMap((v) => [v].flat().filter(isRef).map((x) => x.$ref));
+    const known = new Set(refs.filter((k) => ids.has(k) || settled.has(k)));
+    const waits = [...new Set([...refs, row.key])].map((k) => settled.get(k)).filter((p) => p !== undefined);
+    let done!: () => void;
+    settled.set(row.key, new Promise<void>((resolve) => (done = resolve)));
+    try {
+      await Promise.all(waits);
+      if (stopped) return;
+      await writeOne(row, known, said);
+    } finally {
+      done();
+    }
+  };
+
+  /** The write itself, the same for every row as when rows were sent one at a time. */
+  const writeOne = async (row: PlannedRow, known: ReadonlySet<string>, said: Said): Promise<void> => {
     const tally = (report.tally[row.register] ??= { added: 0, updated: 0, unchanged: 0 });
     const fields: Record<string, unknown> = {};
     for (const [field, value] of Object.entries(row.fields)) {
-      const put = resolveValue(value);
+      const put = resolveValue(value, known);
       if (put !== undefined) fields[field] = put;
       else {
         const refs = [value].flat().filter(isRef);
@@ -681,13 +743,13 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
         /* A ROW WHOSE CATEGORY COULD NOT BE WRITTEN STILL ARRIVES, uncategorised, and the count is what makes that
            visible: a Where it went chart with a slice missing says nothing about itself. */
         if (gone) gone.rows++;
-        /* A ref to a row planned in this run and not written yet waits for the second pass; one to a row left out is dropped. */ else if (refs.some((x) => planned.has(x.$ref))) later.push({ row, field, value });
+        /* A ref to a row planned in this run and not written yet waits for the second pass; one to a row left out is dropped. */ else if (refs.some((x) => planned.has(x.$ref))) said.later.push({ row, field, value });
       }
     }
     const found = existing.get(row.key);
     if (holdsKey(fields)) {
-      report.refused.push({ label: row.label, register: row.register, fix: 'A field looked like a key itself, so the row was not sent.' });
-      continue;
+      said.refused.push({ label: row.label, register: row.register, fix: 'A field looked like a key itself, so the row was not sent.' });
+      return;
     }
 
     /**
@@ -709,7 +771,7 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
           : `This BrainDog already holds a category called ${row.label}, and one name is one category. Rename one of the two, then run the import again.`,
       });
       report.outcomes[row.key] = 'refused';
-      continue;
+      return;
     }
 
     if (!found) {
@@ -717,28 +779,31 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
       if (o.dryRun) {
         const turned = textRefusal(row.register, create);
         if (turned !== null) {
-          report.refused.push({ label: row.label, register: row.register, fix: turned });
+          said.refused.push({ label: row.label, register: row.register, fix: turned });
           report.outcomes[row.key] = 'refused';
-          continue;
+          return;
         }
         tally.added++;
         report.outcomes[row.key] = 'added';
         ids.set(row.key, `(new ${row.key})`);
-        continue;
+        return;
       }
       const made = await door.create({ register: row.register, fields: create, note: 'Imported from the old tool.' });
       if (!made.ok) {
-        if (unreachable(made)) throw new Unreachable();
-        report.refused.push({ label: row.label, register: row.register, fix: fixOf(made) });
+        if (unreachable(made)) {
+          stopped = true;
+          return;
+        }
+        said.refused.push({ label: row.label, register: row.register, fix: fixOf(made) });
         report.outcomes[row.key] = 'refused';
-        continue;
+        return;
       }
       const value = made.value as Row;
       ids.set(row.key, value.id);
       existing.set(row.key, value);
       tally.added++;
       report.outcomes[row.key] = 'added';
-      continue;
+      return;
     }
 
     const patch: Record<string, unknown> = {};
@@ -746,29 +811,76 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean; b
     if (Object.keys(patch).length === 0) {
       tally.unchanged++;
       report.outcomes[row.key] = 'unchanged';
-      continue;
+      return;
     }
-    report.changes.push({ register: row.register, label: row.label, fields: Object.keys(patch) });
+    said.changes.push({ register: row.register, label: row.label, fields: Object.keys(patch) });
     report.outcomes[row.key] = 'updated';
     if (o.dryRun) {
       const turned = textRefusal(row.register, patch);
       if (turned !== null) {
-        report.refused.push({ label: row.label, register: row.register, fix: turned });
+        said.refused.push({ label: row.label, register: row.register, fix: turned });
         report.outcomes[row.key] = 'refused';
-        continue;
+        return;
       }
       tally.updated++;
-      continue;
+      return;
     }
     const done = await door.update({ register: row.register, seq: found.seq as number, patch, version: found.version, note: 'Imported again from the old tool.' });
     if (!done.ok) {
-      if (unreachable(done)) throw new Unreachable();
-      report.refused.push({ label: row.label, register: row.register, fix: fixOf(done) });
+      if (unreachable(done)) {
+        stopped = true;
+        return;
+      }
+      said.refused.push({ label: row.label, register: row.register, fix: fixOf(done) });
       report.outcomes[row.key] = 'refused';
-      continue;
+      return;
     }
     existing.set(row.key, done.value as Row);
     tally.updated++;
+  };
+
+  /**
+   * ONE LIST AT A TIME, IN `ORDER`, AND UP TO `WRITES_AT_ONCE` OF ITS ROWS IN FLIGHT. A list starts only once every
+   * write of the one before it has answered, so rates are in before the first account and every project before the
+   * task that names it, exactly as when rows went one by one. Within a list the lanes take rows in plan order, and
+   * each row's report lines wait in its slot so the report reads in plan order whatever order the answers came in.
+   *
+   * A HOST THAT STOPS ANSWERING STOPS THE RUN, AND THE RUN WAITS FOR WHAT IS ALREADY OUT. No lane takes another row once
+   * one write has come back `UNREACHABLE`, and the throw waits for the writes already sent, so none of them lands after
+   * the command has said it stopped. They are not reported: the next run finds each one that landed by its key.
+   */
+  const lists: PlannedRow[][] = [];
+  for (const row of plan.rows) {
+    const last = lists.at(-1);
+    if (last !== undefined && last[0]!.register === row.register) last.push(row);
+    else lists.push([row]);
+  }
+  for (const list of lists) {
+    const said: Said[] = list.map(() => ({ changes: [], refused: [], later: [] }));
+    let next = 0;
+    let failed: { error: unknown } | null = null;
+    const lane = async () => {
+      while (!stopped && failed === null && next < list.length) {
+        const at = next++;
+        try {
+          await writeRow(list[at]!, said[at]!);
+        } catch (error) {
+          /* A THROW STOPS THE SENDING TOO, not only the taking. Measured before this line (`test/import-throughput.test.ts`):
+             with task 101's create throwing, task 102, already in a lane and waiting on its parent's answer, was sent
+             afterwards, a write made after the run had failed. */
+          failed ??= { error };
+          stopped = true;
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(WRITES_AT_ONCE, list.length) }, lane));
+    if (failed !== null) throw (failed as { error: unknown }).error;
+    if (stopped) throw new Unreachable();
+    for (const s of said) {
+      report.changes.push(...s.changes);
+      report.refused.push(...s.refused);
+      later.push(...s.later);
+    }
   }
 
   /* THE SECOND PASS: a learning that replaces one written after it. Counted as part of the row already counted. */
