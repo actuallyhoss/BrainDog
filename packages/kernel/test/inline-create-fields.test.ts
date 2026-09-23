@@ -191,3 +191,102 @@ test('A RULE ALREADY INSTALLED WITH A NUMBER IN A set OR A note DOES NOT THROW O
   const jobs = sql.all<{ fields: string }>("SELECT fields FROM entry WHERE register = 'jobs'").map((r) => JSON.parse(r.fields) as Record<string, unknown>);
   assert.deepEqual(jobs.map(({ what, n }) => ({ what, n })), [{ what: 'x', n: 5 }]);
 });
+
+/** A list with a lifecycle, for `move`: the pass writes a move's word into the register's state field as it is. */
+const STATED: Declaration = {
+  id: 'register.jobs',
+  kind: 'register',
+  body: {
+    id: 'jobs',
+    name: 'Jobs',
+    title: 'what',
+    state: 'state',
+    fields: [{ id: 'what', type: 'text', required: true }, { id: 'note', type: 'text' }, { id: 'state', type: 'enum', values: ['open', 'done'] }],
+  } as never,
+};
+
+test('A move WHOSE WORD IS NOT TEXT IS REFUSED AT INSTALL, naming the states the list has', async () => {
+  /* `loop/research-batch-forty-audit.md` finding 11. `fillSites` did not list `move`, since nothing fills it, and so
+     nothing asked what it held. Measured on 23 September, before this check: `then: [{ move: 5 }, { set: note }]`
+     installed over Jobs, and the Water row was written holding `what` alone, the move and the note both lost, because
+     the pass puts the 5 into the enum as it is and the write refuses the rule's whole patch. */
+  const { k } = await open();
+  const five = await k.install([STATED, rule({ register: 'jobs', then: [{ move: 5 }, { set: { field: 'note', to: 'seen' } }] })]);
+  assert.equal(five.ok, false, 'move: 5 installed');
+  assert.equal(codeOf(five), 'DECLARATION_INVALID');
+  assert.equal((five as { refusal?: { at?: string } }).refusal?.at, 'then[0].move');
+  assert.equal(fixOf(five), `rule.late's then[0].move is 5, and a move names one of jobs's states as text: open or done.`);
+  assert.deepEqual((five as { refusal?: { allowed?: string[] } }).refusal?.allowed, ['open', 'done']);
+
+  const list = await k.install([STATED, rule({ register: 'jobs', then: [{ move: ['done'] }] })]);
+  assert.equal(list.ok, false, 'move: ["done"] installed');
+  assert.equal(fixOf(list), `rule.late's then[0].move is ["done"], and a move names one of jobs's states as text: open or done.`);
+
+  /* A STEP ON THE RUN PATH IS HELD THE SAME, inside a branch too, since it acts through the same pass. */
+  const onRun = await k.install([STATED, rule({ on: { written: { register: 'jobs', op: ['create'] } }, steps: [{ if: 'what is x', then: [{ move: true }] }] })]);
+  assert.equal(onRun.ok, false, 'move: true installed on the run path');
+  assert.equal((onRun as { refusal?: { at?: string } }).refusal?.at, 'steps[0].then[0].move');
+
+  /* WHERE THE LIST IS NOT KNOWN, as for a dry run's body, the sentence hands back the quoted form, as a tag's does. */
+  const { inlineFault } = await import('../src/flow-lint.ts');
+  assert.equal(inlineFault('rule.late', { rule: 'late', register: 'jobs', then: [{ move: 5 }] } as never)?.fix, `rule.late's then[0].move is 5, and a move names a state as text. Write "5".`);
+});
+
+test('A move WRITTEN AS TEXT STILL INSTALLS AND MOVES THE ROW, the note beside it kept', async () => {
+  const { k, sql } = await open();
+  const out = await k.install([STATED, rule({ register: 'jobs', then: [{ move: 'done' }, { set: { field: 'note', to: 'seen' } }] })]);
+  assert.ok(out.ok, fixOf(out));
+  assert.ok(k.create('jobs', { what: 'Water', state: 'open' }, { actor: 'p_1' }).ok);
+  const rows = sql.all<{ fields: string }>("SELECT fields FROM entry WHERE register = 'jobs'").map((r) => JSON.parse(r.fields) as Record<string, unknown>);
+  assert.deepEqual(rows, [{ what: 'Water', state: 'done', note: 'seen' }]);
+});
+
+/**
+ * `loop/research-batch-forty-audit.md` FINDING 6, THE DRY RUN'S HALF. Wave forty-one's guard in `rules.ts`'s `fill`
+ * (`7869be84`) stopped every throw the audit measured, L1's and L4's; L4 is the two stored-rule tests above. Measured on
+ * 23 September after it: the kernel's `dryRun` of `note: 5`, `set.to: 5`, `notify.say: true` and `schedule.note: 5`
+ * answered `ok`, each previewing its value as words ("note 5", "notify true"), for bodies `install` refuses. A preview
+ * that promises what the install then refuses is the preview being wrong about the feature it exists to explain, so the
+ * dry run should refuse them in the install's words. `inlineFault` is those words for a body that did not come through
+ * `install`.
+ */
+const L1: [Record<string, unknown>, string][] = [
+  [{ note: 5 }, 'then[0].note'],
+  [{ set: { field: 'n', to: 5 } }, 'then[0].set.to'],
+  [{ notify: { say: true } }, 'then[0].notify.say'],
+  [{ schedule: { in: '14d', note: 5 } }, 'then[0].schedule.note'],
+  [{ link: { field: 'what', to: { register: 'bills', by: 'what', value: 5 } } }, 'then[0].link.to.value'],
+];
+
+test('inlineFault ANSWERS EACH OF L1\'S BODIES WITH THE REFUSAL install GIVES IT, word for word', async () => {
+  const { inlineFault } = await import('../src/flow-lint.ts');
+  for (const [then, at] of L1) {
+    const body = { register: 'jobs', once_per: ['entry'], then: [then] };
+    const installed = await refusal(body);
+    const linted = inlineFault('rule.late', { rule: 'late', ...body } as never);
+    assert.deepEqual({ code: linted?.code, fix: linted?.fix, at: linted?.at }, installed, JSON.stringify(then));
+    assert.equal(linted?.at, at);
+  }
+  assert.equal(inlineFault('rule.late', { rule: 'late', register: 'jobs', then: [{ if: 'what is x', then: [{ note: 'x' }] }] } as never)?.code, 'NOT_IN_THIS_BUILD');
+  assert.equal(inlineFault('rule.late', { rule: 'late', register: 'jobs', then: [{ note: 'Made {{id}}' }] } as never), null);
+  /* A RUN'S then: IS A LIST OF STEPS, AND AN if THERE BRANCHES. Checked on 23 September: this body installs, and the
+     first cut of `inlineFault` refused it "does not branch", so a dry run asking it of a run-path body would have
+     refused what install takes. Its value is still held to text, since a step acts through the same pass. */
+  const run = { rule: 'late', on: { written: { register: 'jobs', op: ['create'] } }, once_per: ['entry'], then: [{ if: 'what is x', then: [{ note: 'seen' }] }] };
+  assert.equal(inlineFault('rule.late', run as never), null);
+  assert.equal(inlineFault('rule.late', { ...run, then: [{ if: 'what is x', then: [{ note: 5 }] }] } as never)?.at, 'then[0].then[0].note');
+});
+
+test(
+  'THE KERNEL\'S DRY RUN REFUSES L1\'S BODIES IN THE INSTALL\'S WORDS, rather than previewing their values as words',
+  async () => {
+    const { k } = await open();
+    assert.ok((await k.install([list('jobs'), list('bills')])).ok);
+    assert.ok(k.create('jobs', { what: 'x' }, { actor: 'p_1' }).ok);
+    for (const [then, at] of L1) {
+      const out = k.dryRun({ rule: 'late', register: 'jobs', once_per: ['entry'], then: [then] } as never);
+      assert.equal(out.ok, false, `previewed ${JSON.stringify(then)}`);
+      assert.equal((out as { refusal?: { at?: string } }).refusal?.at, at);
+    }
+  },
+);

@@ -32,6 +32,7 @@ import { exponentOf } from './ingest.ts';
 import { instant } from './migrate.ts';
 import { spanMs } from './vault.ts';
 import { predicateOf, type EvalContext } from './metrics.ts';
+import { inlineFault } from './flow-lint.ts';
 
 export type RuleAction =
   | { tag: string }
@@ -727,8 +728,16 @@ export type DryRun = {
  * `when` is a title the compiler looks up in the list the ref points at, and with the plain context it looked there
  * whoever asked: `loop/research-batch-thirty-eight-audit.md` finding 1 had a member held to `append` on Clients preview
  * `client is Acme Holdings` over Money as `matches 1 of 1` and `client is Bolt Ltd` as `0 of 1`, one guess per call at
- * which client her rows belong to, while `list` answered 0 rows for both. The rules it is ranked against are installed
- * ones the owner approved, which run on every write whoever makes it, so they keep the context the pass gives them.
+ * which client her rows belong to, while `list` answered 0 rows for both.
+ *
+ * AND THE RULES IT IS RANKED AGAINST ARE ASKED WITH THE SAME `reads`. They were left on the pass's context, on the
+ * grounds that an installed rule runs on every write whoever makes it, but this walk is not a write: it names, row by
+ * row, which rule takes each one. `loop/research-batch-forty-audit.md` finding 8 installed `rule.acme` (`client is Acme
+ * Holdings`, setting `note`) after three Billed rows were written, so it had run on none of them, and a member refused
+ * Clients previewing a rule that sets `note` read `takenBy: { acme: 1 }` and "acme sets note first" on `billed#1`
+ * alone: the Acme row among three, told apart by a title she may not read. Asked with her reads, the installed rule's
+ * `when` answers her what `list` answers her, and the preview says the same whether that title is on a row or on none.
+ * The audit's brief counted such a row as `withheld` instead, and a count of rows withheld is the count of Acme's rows.
  */
 export function dryRun(deps: RulesDeps, candidate: RuleDecl, limit = PREVIEW, reads?: (register: string) => boolean): Result<DryRun> {
   const schema = deps.schemaOf(candidate.register);
@@ -741,6 +750,11 @@ export function dryRun(deps: RulesDeps, candidate: RuleDecl, limit = PREVIEW, re
   const asker: RulesDeps = reads === undefined ? deps : { ...deps, ctx: { ...deps.ctx, reads } };
   const said = predicateOf(candidate.when, schema, asker.ctx);
   if (said.bad.length) return { ok: false, refusal: said.bad[0]! };
+  /* A PREVIEW OF A BODY THE INSTALL REFUSES IS THE PREVIEW BEING WRONG: measured on 23 September after the fill guard,
+     note: 5 and notify.say: true were previewed as "note 5" and "notify true" for bodies install refuses (audit forty,
+     finding 6). */
+  const linted = inlineFault(`rule.${candidate.rule}`, candidate as FlowDecl);
+  if (linted) return { ok: false, refusal: linted };
 
   /* The candidate takes its place among the others by the same ordering the pass uses — replacing a
      rule of its own name, because previewing a CHANGE to a live rule is the common case. */
@@ -782,7 +796,7 @@ export function dryRun(deps: RulesDeps, candidate: RuleDecl, limit = PREVIEW, re
     let why = '';
     for (const r of ranked) {
       if (r.rule === candidate.rule) break;
-      if (!matches(deps, schema, r, entry)) continue;
+      if (!matches(asker, schema, r, entry)) continue;
       /* AN EARLIER `stop` ENDS THE PASS, and a preview that ignored it promised changes that never
          happen — the preview being wrong about the pass it exists to explain. It is checked before
          the field contest, because a rule that stops takes the row whether or not it sets anything. */

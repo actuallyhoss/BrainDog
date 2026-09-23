@@ -349,7 +349,7 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
         return bad('NOT_IN_THIS_BUILD', `${id} runs inside the write, and the inline pass does not read ${key}: yet. Give it a trigger other than a plain write, or drop ${key}:.`, key);
     if (body.enabled === false)
       return bad('NOT_IN_THIS_BUILD', `${id} runs inside the write, and the inline pass does not read enabled: yet. Retire the rule to stop it.`, 'enabled');
-    return fillFault(id, decl);
+    return inlineFault(id, decl, installed);
   }
 
   /* A RUN KEEPS ITS REGISTER IN ITS TRIGGER. A top-level `register` is what the inline pass selects by, so a clock rule
@@ -489,7 +489,55 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
     }
     return null;
   };
-  return choice(body.steps ?? body.then, body.steps !== undefined ? 'steps' : 'then') ?? fillFault(id, decl);
+  return choice(body.steps ?? body.then, body.steps !== undefined ? 'steps' : 'then') ?? fillFault(id, decl, installed);
+}
+
+/**
+ * What the inline path refuses about the items of `then:`, alone: a verb only a step has, then every value the pass
+ * fills or writes that is not text. `flowFault` asks it at install, and it is exported for a caller holding a body that
+ * never came through install, which is the dry run (`loop/research-batch-forty-audit.md` finding 6).
+ *
+ * THE INLINE PASS HAS AN ARM FOR EACH OF `ACTIONS` AND FOR NOTHING ELSE (`rules.ts`'s `runRules`). It walks `then` and
+ * acts on the first action each item carries, so a step's verb there is read as nothing and whatever sits beside it is
+ * acted on. Audit forty, finding 3: `{ if, then: [], set: { to: 5 } }` installed and threw out of every write, and an
+ * `if` whose arm set a field installed and its arm never ran. Measured on 23 September, after the `fill` guard: the
+ * first now sets the field whatever the condition says, `wait: 1h` beside a `set` wrote the note at once, and `set_var`
+ * and `ask_person` did nothing at all. `actionsOf` walks an `if`'s arms and not the verbs beside it, which is why the
+ * fill lint never saw that `set`; refusing the `if` here means nothing on this path is beside one.
+ *
+ * ONLY ON THE INLINE PATH, SINCE A RUN'S `then:` IS A LIST OF STEPS. `flowFault` asks this only once `pathOf` said
+ * `inline`, but a dry run need not: checked on 23 September, `{ on: { written: { register: jobs, op: [create] } },
+ * then: [{ if, then: [...] }] }` installs, and this refused it "does not branch" before the path was asked here.
+ */
+export function inlineFault(id: string, decl: FlowDecl, installed?: Known): Refusal | null {
+  const then: unknown = decl.then;
+  if (Array.isArray(then) && pathOf(decl) === 'inline')
+    for (const [i, item] of then.entries()) {
+      if (!isObject(item)) continue;
+      const verb = (FLOW as readonly string[]).find((v) => v in item);
+      if (verb === undefined) continue;
+      const here = `then[${i}]`;
+      const register = typeof decl.register === 'string' ? decl.register : 'its list';
+      return bad(
+        'NOT_IN_THIS_BUILD',
+        `${id}'s ${here} is ${verb}, and a rule that runs inside the write ${verb === 'if' ? 'does not branch' : `has no ${verb}`}. Move then: into steps: and register: into on: { written: { register: ${register} } }, where it runs as a run after the write.`,
+        `${here}.${verb}`,
+      );
+    }
+  return fillFault(id, decl, installed);
+}
+
+/**
+ * The states a rule's row can be moved to, from its list's `state:` enum, or `null` where the list or its lifecycle is
+ * not known, which is every call without `installed` and an arrival at no named door.
+ */
+function statesOf(decl: FlowDecl, installed?: Known): { register: string; values: string[] } | null {
+  if (installed === undefined) return null;
+  const register = rowRegisterOf(decl, (door) => installed.get(`ingest.${door}`));
+  if (register === null) return null;
+  const list = installed.get(`register.${register}`) as { state?: unknown; fields?: { id?: unknown; values?: unknown }[] } | undefined;
+  const field = typeof list?.state === 'string' && Array.isArray(list.fields) ? list.fields.find((f) => f.id === list.state) : undefined;
+  return Array.isArray(field?.values) && field.values.length > 0 ? { register, values: field.values.map(String) } : null;
 }
 
 /**
@@ -530,8 +578,26 @@ function fillSites(action: Record<string, unknown>, at: string): { where: string
   return out;
 }
 
-function fillFault(id: string, decl: FlowDecl): Refusal | null {
+function fillFault(id: string, decl: FlowDecl, installed?: Known): Refusal | null {
   for (const { action, at } of actionsOf(decl)) {
+    /* AND A MOVE'S WORD, WHICH NO `fill` READS EITHER, so `fillSites` never listed it (`loop/research-batch-forty-audit.md`
+       finding 11). The pass writes the word into the list's state field as it is, the enum refuses a number, and the
+       rule's whole patch goes: measured on 23 September, `then: [{ move: 5 }, { set: note }]` installed over Jobs and the
+       Water row was written holding `what` alone. The states are named where the list is known, since the one word that
+       helps is one of them. */
+    if ('move' in action && typeof action.move !== 'string') {
+      const word = action.move;
+      const where = `${at}.move`;
+      const shown = typeof word === 'number' || typeof word === 'boolean' ? String(word) : word === undefined ? 'missing' : JSON.stringify(word);
+      const states = statesOf(decl, installed);
+      if (states !== null) {
+        const said = states.values.length === 1 ? states.values[0]! : `${states.values.slice(0, -1).join(', ')} or ${states.values.at(-1)!}`;
+        return bad('DECLARATION_INVALID', `${id}'s ${where} is ${shown}, and a move names one of ${states.register}'s states as text: ${said}.`, where, states.values);
+      }
+      return typeof word === 'number' || typeof word === 'boolean'
+        ? bad('DECLARATION_INVALID', `${id}'s ${where} is ${shown}, and a move names a state as text. Write "${shown}".`, where)
+        : bad('DECLARATION_INVALID', `${id}'s ${where} is ${shown}, and a move names one state. Write it as text.`, where);
+    }
     /* AND A TAG'S WORD, WHICH NO `fill` READS BUT WHICH FAILS THE SAME WAY. `tagsRefusing` passed over a word that was
        not a string and nothing else asked (`loop/research-batch-thirty-nine-audit.md` finding 10), so `tag: 5`
        installed; the pass put the 5 into the row's tags as it was, `coerce` refused a number in a `list<enum>` and in
