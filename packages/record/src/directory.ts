@@ -461,6 +461,72 @@ const TO_3 = ['ALTER TABLE dir_person ADD COLUMN suspended_at TEXT'];
 const TO_4 = ["ALTER TABLE dir_record ADD COLUMN plan TEXT NOT NULL DEFAULT 'hosted'"];
 
 /**
+ * The tables a copy of the Directory carries, in the order `dump` writes them and `load` reads them back.
+ * `loop/research-restore.md` §6.
+ *
+ * EVERYTHING THAT SAYS WHO SOMEBODY IS AND WHERE A NAME LEADS. Without these every record survives a lost Directory
+ * and nobody can reach one: `idFromName(rec_id)` still opens the object, and no slug, session or passkey leads there.
+ * The tombstones travel inside `dir_slug`, so a name released before the loss stays released after it. The passkeys
+ * are public halves and `dir_inbound` is digests, so nothing here opens anything on its own; it does hold every
+ * address, which is why the host seals the lines before they are stored (`apps/worker/src/directory-copy.ts`).
+ */
+export const CARRIED = [
+  'dir_person',
+  'dir_record',
+  'dir_slug',
+  'dir_member',
+  'dir_meta',
+  'dir_passkey',
+  'dir_usage_day',
+  'dir_usage_run',
+  'dir_inbound',
+] as const;
+
+/**
+ * The tables a copy leaves out: sessions, sign-in links, WebAuthn challenges and the lockout's strikes.
+ *
+ * CREDENTIALS THAT EXPIRE IN MINUTES TO DAYS. A restore that revived them would sign back in people who had signed out,
+ * and a copy kept thirty nights would hold a session for longer than the session itself lives. Named, and not merely
+ * absent from `CARRIED`, so a table added to `SCHEMA` later has to be put in one list or the other: the test reads
+ * `sqlite_master` and fails for a table in neither.
+ */
+export const LEFT_OUT = ['dir_session', 'dir_link', 'dir_challenge', 'dir_fail'] as const;
+
+type Carried = (typeof CARRIED)[number];
+
+/**
+ * Each carried table's order in a copy.
+ *
+ * `rowid` WHERE THERE IS ONE, BECAUSE TWO READERS ORDER BY IT. `namesOf` lists a record's names by `rowid` and
+ * `recordsOf` a person's records the same way, and a load inserts rows in the order they arrive, so dumping in `rowid`
+ * order is what makes both answer the same after a restore. The three `WITHOUT ROWID` tables have no `rowid` to ask for
+ * and are ordered by their primary key, which makes two dumps of one Directory the same text.
+ */
+const COPY_ORDER: Record<Carried, string> = {
+  dir_person: 'rowid',
+  dir_record: 'rowid',
+  dir_slug: 'rowid',
+  dir_member: 'rowid',
+  dir_meta: 'rowid',
+  dir_passkey: 'rowid',
+  dir_usage_day: 'record, day, scope, action',
+  dir_usage_run: 'record, event',
+  dir_inbound: 'token_sha256',
+};
+
+/** A copy's first line, then its version: `#dogdir 4`. Not `#dogl`, so `checkBrainl` and `verify` never take one for a record. */
+const COPY_HEAD = '#dogdir';
+
+/**
+ * A column name as `load` will put it into SQL, which is why it is checked at all: the name is spliced into the
+ * statement, and a copy is a file somebody could have edited.
+ *
+ * DIGITS INCLUDED. The first version of this was letters and underscores, and the round-trip test refused every copy at
+ * `dir_inbound`, whose key is `token_sha256`.
+ */
+const COLUMN = /^[a-z][a-z0-9_]*$/;
+
+/**
  * Run it, and answer `null` when the driver will not.
  *
  * A NARROW HELPER AND NOT A GENERAL ONE. It wraps exactly the two statements whose availability
@@ -979,6 +1045,156 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
         sql.exec('UPDATE dir_slug SET released_at = ? WHERE record = ? AND released_at IS NULL', now, record);
         return ok(null);
       }),
+
+    /**
+     * The records closed before `cutoff` (epoch milliseconds), a page at a time, for the night's expiry of their final
+     * copies (`apps/worker/src/nightly.ts`).
+     *
+     * THE CUTOFF IS A NUMBER AND THE COMPARISON IS DONE HERE. `closed_at` is `toISOString()` text, which sorts as time
+     * only while both sides are written that way; a caller handing in `2026-09-23` or a local time would compare as a
+     * string and expire the wrong records. So the caller says when, and this writes it in the column's own format.
+     *
+     * THE CURSOR IS THE LAST ID, as `listRecords` pages open ones: a record closed while the walk runs does not shift
+     * an offset and push another record past the page it was on.
+     */
+    closedBefore: (cutoff: number, cursor?: string, limit = 500): { ids: string[]; cursor?: string } => {
+      const before = new Date(cutoff).toISOString();
+      const ids = sql
+        .all<{ id: string }>(
+          'SELECT id FROM dir_record WHERE closed_at IS NOT NULL AND closed_at < ? AND id > ? ORDER BY id LIMIT ?',
+          before,
+          cursor ?? '',
+          limit,
+        )
+        .map((r) => r.id);
+      return ids.length === limit ? { ids, cursor: ids[ids.length - 1] ?? '' } : { ids };
+    },
+
+    /**
+     * The carried tables as lines: `#dogdir <version>`, then a `#table <name>` line per table and one JSON object per row.
+     *
+     * IN ONE TRANSACTION, so the nine tables are one instant of the Directory. A sign-up landing between the read of
+     * `dir_person` and the read of `dir_record` would otherwise be a copy with a record whose owner it does not hold.
+     */
+    dump: (): string[] =>
+      sql.transactionSync(() => {
+        const out = [`${COPY_HEAD} ${String(DIRECTORY_VERSION)}`];
+        for (const table of CARRIED) {
+          out.push(`#table ${table}`);
+          for (const row of sql.all(`SELECT * FROM ${table} ORDER BY ${COPY_ORDER[table]}`)) out.push(JSON.stringify(row));
+        }
+        return out;
+      }),
+
+    /**
+     * A copy's lines, into this Directory, which must be empty. The rows are written in one transaction or not at all.
+     *
+     * EMPTY MEANS NOTHING BUT ITS OWN VERSION ROW, which `createDirectory` writes on the first open. A load over a
+     * Directory anybody has used would merge two tenant maps, and the one failure a routing layer must not have is a
+     * name that means two records. So every table is asked first, the left-out ones included: a Directory holding a
+     * session holds a person somebody signed in as.
+     *
+     * THE SAME VERSION ONLY. A newer copy's columns would load as answers this build does not know the meaning of,
+     * which is what `DIRECTORY_VERSION` exists to stop. An older copy is refused too, because the steps that bring an
+     * old Directory forward run on a file and not on lines; the build that wrote the copy is the one to load it.
+     *
+     * EVERY LINE IS READ BEFORE THE FIRST WRITE, and a line that is not a row of a carried table refuses the whole copy.
+     * A table the copy has no business naming is refused rather than loaded, because a copy that brought a session
+     * with it would sign somebody in.
+     */
+    load: (lines: readonly string[]): Result<{ tables: number; rows: number }> => {
+      type Loaded = { tables: number; rows: number };
+      const head = new RegExp(`^${COPY_HEAD} (\\d+)$`, 'u').exec(lines[0] ?? '');
+      if (!head)
+        return no<Loaded>('FILE_MALFORMED', `This is not a copy of a Directory: its first line is not ${COPY_HEAD} and a version.`, { at: 'line 1' });
+      const version = Number(head[1]);
+      if (version > DIRECTORY_VERSION)
+        return no<Loaded>(
+          'FORMAT_NEWER_THAN_READER',
+          `This copy was written by a newer BrainDog, at Directory version ${String(version)}, and this build reads ${String(DIRECTORY_VERSION)}. Load it with the build that wrote it.`,
+          { at: 'line 1' },
+        );
+      if (version !== DIRECTORY_VERSION)
+        return no<Loaded>(
+          'FILE_MALFORMED',
+          `This copy is at Directory version ${String(version)} and this build loads only version ${String(DIRECTORY_VERSION)}. Load it with the build that wrote it, which brings it forward on its next open.`,
+          { at: 'line 1' },
+        );
+
+      const held = [...CARRIED, ...LEFT_OUT]
+        .map((table) => ({ table, n: Number(sql.one<{ n: number }>(`SELECT COUNT(*) AS n FROM ${table}`)?.n ?? 0) }))
+        .filter((t) => (t.table === 'dir_meta' ? t.n > 1 : t.n > 0));
+      if (held.length > 0)
+        return no<Loaded>(
+          'IMPORT_NOT_EMPTY',
+          `This Directory already holds ${held.map((t) => `${String(t.n)} ${t.table}`).join(', ')}. A copy loads only into a Directory nothing has written to.`,
+        );
+
+      const rows: { table: Carried; row: Record<string, string | number | null>; line: number }[] = [];
+      const seen = new Set<string>();
+      let table: Carried | null = null;
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i] ?? '';
+        const at = `line ${String(i + 1)}`;
+        /* A BLANK LINE IS NOT A ROW, AND IT IS NOT A REASON TO REFUSE. A copy opened with `age -d` and saved usually
+           ends in a newline, and this refused exactly that copy at its last line as "not a row of dir_inbound". The
+           record's reader skips a blank line (`packages/kernel/src/brainl.ts`) and so does this one. */
+        if (line === '') continue;
+        if (line.startsWith('#table ')) {
+          const name = line.slice('#table '.length);
+          if (!(CARRIED as readonly string[]).includes(name) || seen.has(name))
+            return no<Loaded>('FILE_MALFORMED', `A copy of a Directory carries ${CARRIED.join(', ')}, each once, and this one names ${name} here.`, { at });
+          table = name as Carried;
+          seen.add(name);
+          continue;
+        }
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(line);
+        } catch {
+          parsed = undefined;
+        }
+        const row = parsed as Record<string, unknown> | undefined;
+        const scalar = (v: unknown): boolean => v === null || typeof v === 'string' || (typeof v === 'number' && Number.isFinite(v));
+        if (
+          table === null ||
+          row === null ||
+          typeof row !== 'object' ||
+          Array.isArray(row) ||
+          Object.keys(row).length === 0 ||
+          !Object.entries(row).every(([k, v]) => COLUMN.test(k) && scalar(v))
+        )
+          return no<Loaded>('FILE_MALFORMED', `This line is not a row of ${table ?? 'any table'}: a row is one JSON object of column names to text, numbers or null.`, { at });
+        rows.push({ table, row: row as Record<string, string | number | null>, line: i + 1 });
+      }
+      if (seen.size !== CARRIED.length)
+        return no<Loaded>('FILE_MALFORMED', `This copy names ${String(seen.size)} of the ${String(CARRIED.length)} tables a copy carries, so it was cut short.`);
+
+      /* A ROW THE SCHEMA REFUSES IS A THROW OUT OF THE TRANSACTION, which rolls every row before it back, and it is
+         turned into a refusal here because this method's contract is a `Result`: across a Durable Object RPC boundary
+         a thrown `SQLITE_CONSTRAINT` is a bare 500 with no line in it. */
+      let failed = 0;
+      try {
+        sql.transactionSync(() => {
+          for (const { table, row, line } of rows) {
+            failed = line;
+            const columns = Object.keys(row);
+            /* `dir_meta` ALREADY HOLDS THE VERSION ROW this Directory wrote when it opened, and the copy's says the
+               same number, so it is the one table a row may replace. */
+            const upsert = table === 'dir_meta' ? ' ON CONFLICT (key) DO UPDATE SET value = excluded.value' : '';
+            sql.exec(
+              `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})${upsert}`,
+              ...Object.values(row),
+            );
+          }
+        });
+      } catch (e) {
+        return no<Loaded>('FILE_MALFORMED', `The row at line ${String(failed)} would not load, so nothing was: ${e instanceof Error ? e.message : String(e)}`, {
+          at: `line ${String(failed)}`,
+        });
+      }
+      return ok({ tables: seen.size, rows: rows.length });
+    },
 
     /**
      * Every name this record has ever had, oldest first. What a redirect would be built from.

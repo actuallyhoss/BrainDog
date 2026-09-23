@@ -4,14 +4,19 @@
  * THE WALK IS TESTED APART FROM THE PLATFORM for the same reason `alarm.ts` is: a Durable Object
  * cannot be started in a bare Node process, and the half worth testing is not the platform's. What
  * can be wrong here is paging that stops early, one record's failure taking the other twenty-nine
- * with it, and a night that failed reporting nothing — and all three are in the twenty lines the
+ * with it, and a night that failed reporting nothing, and all three are in the twenty lines the
  * walk is, over two injected functions.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { createDirectory } from '@braindog/record/directory';
+
+import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
+import { FINAL_KEPT_DAYS, FINAL_KEPT_MS, expireFinal } from '../src/destroy.ts';
 import { fleetFailure, nightlyWalk } from '../src/nightly.ts';
+import { prefixOf } from '../src/snapshots.ts';
 
 const ids = (n: number, from = 0): string[] => Array.from({ length: n }, (_, i) => `rec_${String(from + i).padStart(4, '0')}`);
 
@@ -98,7 +103,7 @@ test('A NIGHT THAT COPIED NOTHING IS THE DEPLOYMENT, AND IT IS SAID DIFFERENTLY'
   });
   assert.equal(fleetFailure(one), null, 'one record over the ceiling made the whole night red');
 
-  assert.equal(fleetFailure({ records: 0, backups: 0, failed: 0, ms: 1 }), null, 'a deployment with no records is not a failure');
+  assert.equal(fleetFailure({ records: 0, backups: 0, failed: 0, expired: 0, expiryFailed: 0, ms: 1 }), null, 'a deployment with no records is not a failure');
 });
 
 test('A CURSOR THAT DOES NOT MOVE IS STOPPED, rather than paging for ever', async () => {
@@ -112,4 +117,115 @@ test('A CURSOR THAT DOES NOT MOVE IS STOPPED, rather than paging for ever', asyn
     now: () => 0,
   });
   assert.equal(out.records, 4, 'the repeated cursor was followed past the page that repeated it');
+});
+
+/* ── a deleted record's final copy, expired ───────────────────────────── */
+
+/**
+ * The two R2 methods expiry uses, over a sorted Map, paged three keys at a time so a one-page reader is caught. `fail`
+ * names a record whose delete the bucket refuses.
+ */
+function bucket(keys: string[], fail?: string) {
+  const held = new Set(keys);
+  return {
+    held,
+    list(options?: { prefix?: string; cursor?: string }) {
+      const all = [...held].filter((k) => k.startsWith(options?.prefix ?? '')).sort();
+      const from = Number(options?.cursor ?? 0);
+      const objects = all.slice(from, from + 3).map((key) => ({ key, size: 1 }));
+      return Promise.resolve(from + 3 < all.length ? { objects, truncated: true, cursor: String(from + 3) } : { objects, truncated: false });
+    },
+    delete(doomed: string | string[]) {
+      const list = typeof doomed === 'string' ? [doomed] : doomed;
+      if (fail && list.some((k) => k.startsWith(prefixOf(fail)))) return Promise.reject(new Error('the bucket said no'));
+      for (const key of list) held.delete(key);
+      return Promise.resolve();
+    },
+  };
+}
+
+const DAY = 86_400_000;
+const T0 = Date.UTC(2026, 8, 1, 3, 17);
+
+/** Three records on a real Directory: one closed at T0, one closed ten days later, one open, each with a final copy. */
+function deleted() {
+  const clock = fixedClock(T0);
+  const d = createDirectory(openSqlite(), clock);
+  assert.ok(d.person$('ada@example.com').ok);
+  const make = (slug: string): string => {
+    const made = d.provision({ slug, email: 'ada@example.com' });
+    return made.ok ? made.value.record : assert.fail(JSON.stringify(made));
+  };
+  const early = make('early');
+  const late = make('late');
+  const open = make('still-open');
+  assert.ok(d.close(early).ok);
+  clock.advance(10 * DAY);
+  assert.ok(d.close(late).ok);
+  const final = (r: string) => `${prefixOf(r)}final-2026-09-01.brainl.age`;
+  /* AND THE TWO OBJECTS §5 MEASURED A DELETE LEAVING BEHIND, on the early record, because every record deleted before
+     the sweep existed is closed with exactly those in its prefix. */
+  const leftover = [`${prefixOf(early)}nightly-2026-08-31.brainl.age`, `${prefixOf(early)}latest.brainl.age`];
+  return { d, early, late, open, final, leftover, keys: [final(early), final(late), `${prefixOf(open)}latest.brainl.age`, ...leftover] };
+}
+
+test('A RECORD CLOSED MORE THAN THIRTY DAYS AGO LOSES WHAT IS LEFT OF IT, AND ONE CLOSED SINCE KEEPS ITS FINAL COPY', async () => {
+  // `53 §5.9`'s "by day +30 nothing of the record remains anywhere", on the night it becomes true. The early record was
+  // closed 31 days before tonight and the late one 21: the first goes, final copy and pre-sweep leftovers alike, the
+  // second keeps its copy for the nine days it is still owed, and the open record is never asked about.
+  const { d, early, late, open, final, keys } = deleted();
+  const blobs = bucket(keys);
+  const said: string[] = [];
+  const tonight = T0 + (FINAL_KEPT_DAYS + 1) * DAY;
+  const asked: number[] = [];
+
+  const out = await nightlyWalk({
+    records: () => Promise.resolve({ ids: [] }),
+    snapshot: () => assert.fail('no open record was listed'),
+    closed: (cutoff, cursor) => (asked.push(cutoff), Promise.resolve(d.closedBefore(cutoff, cursor, 1))),
+    expire: (record) => expireFinal(blobs, record),
+    say: (line) => said.push(line),
+    now: () => tonight,
+  });
+
+  assert.equal(asked[0], tonight - FINAL_KEPT_MS, 'the cutoff is not tonight less the final copy\'s days');
+  assert.ok(![...blobs.held].some((k) => k.startsWith(prefixOf(early))), 'the early record left something behind');
+  assert.ok(blobs.held.has(final(late)), 'a final copy went before its thirty days were up');
+  assert.ok(blobs.held.has(`${prefixOf(open)}latest.brainl.age`), 'an open record lost a copy');
+  assert.equal(out.expired, 3);
+  assert.equal(out.expiryFailed, 0);
+  assert.match(said.at(-1) ?? '', /expired_objects=3 expiry_failed=0/u);
+});
+
+test('AN EXPIRY THAT FAILS IS LOUD, THE REST STILL EXPIRE, AND IT DOES NOT MAKE THE NIGHT RED', async () => {
+  // The same rule as a copy that failed: counted, named with its reason, repeated in the closing line, and not fatal.
+  // A refused delete leaves a copy a day longer than promised, which is a line to read in the morning; it is not the
+  // deployment failing, and the records that did get their copy must not be reported as a night that copied nothing.
+  const { d, early, late, keys } = deleted();
+  const blobs = bucket(keys, early);
+  const moaned: string[] = [];
+  const out = await nightlyWalk({
+    records: () => Promise.resolve({ ids: ids(1) }),
+    snapshot: (record) => Promise.resolve({ key: record, bytes: 1, rows: 1 }),
+    closed: (cutoff, cursor) => Promise.resolve(d.closedBefore(cutoff, cursor)),
+    expire: (record) => expireFinal(blobs, record),
+    moan: (line) => moaned.push(line),
+    now: () => T0 + 60 * DAY,
+  });
+
+  assert.equal(out.expiryFailed, 1);
+  assert.equal(out.expired, 1, 'the late record was not expired because the early one failed');
+  assert.ok(![...blobs.held].some((k) => k.startsWith(prefixOf(late))));
+  assert.match(moaned[0] ?? '', new RegExp(`${early}.*the bucket said no`, 'u'));
+  assert.match(moaned.at(-1) ?? '', /expiry_failed=1/u);
+  assert.equal(fleetFailure(out), null);
+});
+
+test('A WALK WITH NO EXPIRY WIRED SAYS NOTHING ABOUT EXPIRY, rather than a zero that reads as one that ran', async () => {
+  // The Worker's cron does not pass `closed` until W55-7 wires it. `expired_objects=0` in that line would be read the
+  // morning after as "nothing was due", when the truth is that nothing was asked.
+  const said: string[] = [];
+  const out = await nightlyWalk({ records: () => Promise.resolve({ ids: [] }), snapshot: () => assert.fail('none'), say: (l) => said.push(l), now: () => 0 });
+  assert.doesNotMatch(said.at(-1) ?? '', /expir/u);
+  assert.equal(out.expired, 0);
 });
