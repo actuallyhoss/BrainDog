@@ -51,7 +51,8 @@ function doSqlite() {
 
 /** The seeded record behind a surface that counts every method it is asked, by name. */
 async function counted() {
-  const api = await createRecordApi({ sql: doSqlite(), clock: fixedClock(Date.UTC(2026, 8, 22, 9)) });
+  const sql = doSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 22, 9)) });
   await installSeed(api.kernel);
   const asked: string[] = [];
   const surface = new Proxy(api, {
@@ -64,7 +65,7 @@ async function counted() {
       };
     },
   }) as unknown as McpSurface<CallContext>;
-  return { api, surface, asked };
+  return { api, surface, asked, sql };
 }
 
 let n = 0;
@@ -193,4 +194,48 @@ test('a page of 450 distinct refs is named in eight reads of 64 ids or fewer, ea
       url.searchParams.set(key, typeof value === 'string' ? value : JSON.stringify(value));
     assert.ok(url.href.length < 8192, `a read of ids was a ${String(url.href.length)}-byte URL`);
   }
+});
+
+/* ── what naming a ref tells the observe loop ─────────────────────────────── */
+
+/** Every `query.scan` the record has counted, as `subject n`, and every `register.read` likewise. */
+const observed = (sql: ReturnType<typeof doSqlite>, kind: string): string[] =>
+  sql.all<{ subject: string; n: number }>('SELECT subject, sum(n) AS n FROM observation WHERE kind = ? GROUP BY subject ORDER BY subject', kind).map((r) => `${r.subject} ${String(r.n)}`);
+
+test('ten lists of tasks and ten of learnings count no scan of a primary key', async () => {
+  /* AUDIT FIFTY-FIVE, FINDING 2, ITS N1. `namesIn` reads the rows a page's refs point into as `list` where `id` is in
+     them, and the record counted each read as `query.scan` of `<list>.id`, because the declaration indexes no field
+     named `id`. Measured after fe741dfa on this shape: `things.id 20, learnings.id 10, tasks.id 10, people.id 10,
+     tracks.id 10`, and none of them a scan, since `id` is the row's primary key. */
+  const { surface, sql } = await counted();
+  for (let i = 0; i < 10; i++) {
+    rowsOf(await call(surface, owner, 'list', { register: 'tasks', limit: 500 }));
+    rowsOf(await call(surface, owner, 'list', { register: 'learnings', limit: 500 }));
+  }
+  assert.deepEqual(observed(sql, 'query.scan'), []);
+  /* A NAMING READ STILL COUNTS AS A READ OF THE LIST IT NAMES, and that is kept on purpose. Both readers of
+     `register.read` ask whether a list was read at all in ninety days (`dormant` in the kernel's observe loop, and
+     Spark's untouched pack), and a list whose rows name every ref on an agent's pages is in use: retiring it would
+     turn those names back into row ids. `people`, `things` and `tracks` are reached here only through refs. */
+  assert.deepEqual(observed(sql, 'register.read'), ['learnings 20', 'people 10', 'tasks 20', 'things 20', 'tracks 10']);
+});
+
+test('a hundred lists of each, then the weekly look, drafts no index for things.id', async () => {
+  /* ITS N2. Two hundred naming reads of `things` in a day is the detector's threshold, and it drafted "things.id was
+     scanned 200 times in thirty days, and an index would pay for itself": a model call on a proposal nobody can
+     accept, and three of those marked incorrect suspend the whole analyser. The governors want a record with a habit,
+     so the seed's events are spread over three weeks by SQL, as the audit's probe did. */
+  const { api, surface, sql } = await counted();
+  const events = sql.all<{ rowid: number }>('SELECT rowid FROM event ORDER BY rowid');
+  events.forEach(({ rowid }, i) =>
+    sql.exec('UPDATE event SET ts = ? WHERE rowid = ?', new Date(Date.UTC(2026, 8, 1, 9) + (i % 7) * 86_400_000).toISOString(), rowid),
+  );
+  for (let i = 0; i < 100; i++) {
+    rowsOf(await call(surface, owner, 'list', { register: 'tasks', limit: 500 }));
+    rowsOf(await call(surface, owner, 'list', { register: 'learnings', limit: 500 }));
+  }
+  const looked = api.kernel.analyse();
+  assert.equal(looked.suspended, null, `the governors held the look: ${String(looked.suspended)}`);
+  assert.equal(looked.candidate, null, `the look proposed ${JSON.stringify(looked.candidate)}`);
+  assert.deepEqual(sql.all("SELECT payload FROM outbox WHERE kind = 'infer.draft'"), []);
 });

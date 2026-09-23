@@ -817,6 +817,12 @@ export function tools<C>(surface: McpSurface<C>) {
    *
    * A ROW THE CALLER CANNOT READ, OR ONE THAT IS GONE, KEEPS ITS ID: `list` leaves a deleted row out, as `get` answered
    * one `null`, measured on the seed. A ref whose declaration names no register is still asked by `get`, one id each.
+   *
+   * EACH READ IS A `register.read` OF THE LIST IT NAMES, AND THAT IS MEANT. Audit fifty-five, finding 2 asked whether
+   * these should count as the host's own. Both readers of the signal ask whether a list was read at all in ninety days,
+   * the kernel's `dormant` and Spark's untouched pack, and a list whose rows name the refs on an agent's pages is in use:
+   * retiring it would turn every one of those names back into a row id. What these reads must not count as is a scan,
+   * and `id` is the primary key, so the kernel's `observe` leaves a scan of any of its own columns out.
    */
   const NAMES_PER_READ = 64;
   const namesIn = async (rows: Entry[], ctx: C): Promise<Map<string, string>> => {

@@ -26,6 +26,7 @@
 
 import type { Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
+import { isColumn } from '@braindog/where';
 
 import { instant } from './migrate.ts';
 
@@ -47,6 +48,33 @@ export type Observation = { kind: Signal; subject: string };
 
 /** At most this many in one call. A batch is a request's worth, not a backfill. */
 const BATCH = 200;
+
+/**
+ * Whether an observation is a scan of one of the record's own columns, which no declaration can index.
+ *
+ * A PRIMARY-KEY LOOKUP WAS COUNTED AS A SCAN. The record's `list` asks the declaration which fields carry an index,
+ * and no declaration has a field called `id`, so every `where: { field: 'id', in: [...] }` was `query.scan` of
+ * `<list>.id`. The MCP tools name a page's refs with exactly that read (`namesIn`, fe741dfa), and measured through
+ * `handle` on the seed a hundred lists of tasks and a hundred of learnings counted `things.id` two hundred times in a
+ * day, and the weekly look drafted "things.id was scanned 200 times in thirty days, and an index would pay for
+ * itself" (`loop/research-batch-fifty-five-audit.md` §2). That is a model call on a proposal nobody can accept, and
+ * three of them marked incorrect suspend the whole analyser.
+ *
+ * ALL FIVE, NOT ONLY THE THREE WITH AN INDEX. `id` is the primary key, `seq` is `UNIQUE (register, seq)` and
+ * `updated_at` leads `entry_live`, so those are not scans at all. `created_at` and `version` have no index of their
+ * own, but the remedy the draft proposes is `index: true` on the field, and `declare` refuses all five as field ids
+ * (`RESERVED_FIELD_IDS`), so the proposal could be installed for none of them.
+ *
+ * HERE AND NOT ONLY WHERE THE RECORD COUNTS IT, because this is where every counter meets and the analyser reads
+ * rows already written: a record the tools named refs on since fe741dfa holds `<list>.id` rows for thirty days, and
+ * `findingsFrom` leaves those out too. A subject is `<list>.<field>`, and the column is the whole name after the dot,
+ * so `notes.idle` is still a field.
+ */
+const onColumn = (kind: string, subject: string): boolean => {
+  if (kind !== 'query.scan') return false;
+  const dot = subject.indexOf('.');
+  return dot > 0 && isColumn(subject.slice(dot + 1));
+};
 
 /**
  * Record what happened, pre-aggregated by day.
@@ -74,7 +102,7 @@ export function observe(sql: Sql, nowMs: number, batch: readonly Observation[]):
   const day = new Date(nowMs).toISOString().slice(0, 10);
   let n = 0;
   for (const row of batch) {
-    if (!row.subject) continue;
+    if (!row.subject || onColumn(row.kind, row.subject)) continue;
     sql.exec(
       'INSERT INTO observation (kind, subject, day, n) VALUES (?, ?, ?, 1) ON CONFLICT (kind, subject, day) DO UPDATE SET n = n + 1',
       row.kind,
@@ -373,6 +401,7 @@ export function findingsFrom(counts: readonly Counted[], below = false): Finding
          separate days. A burst is still not a pattern, whichever side of the line it is on. */
       if (
         row.signal === d.signal &&
+        !onColumn(row.signal, row.subject) &&
         row.days >= d.days &&
         (below ? row.total >= Math.ceil(d.n / 2) && row.total < d.n : row.total >= d.n)
       )
