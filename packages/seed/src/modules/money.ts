@@ -14,7 +14,7 @@
  * what the whole position was on a night nobody was looking.
  */
 
-import type { IngestDecl } from '@braindog/kernel';
+import type { IngestDecl, RegisterDecl } from '@braindog/kernel';
 
 import { LOOKUPS, OPEN, day, gbp, type Fields, type SeedMetric, type SeedPage, type SeedRegister, type SeedRule } from './base.ts';
 
@@ -180,7 +180,17 @@ const HAND_TRANSACTIONS: Fields[] = [
   { what: 'HMRC VAT QUARTER TO 31 MAY', on: day(-84), direction: 'out', amount: gbp(688_000), account: 2, category: 6, state: 'cleared', note: 'Out of the reserve, which is what the reserve is for.' },
   { what: 'PELL & VINE, HALF THE YEAR-END FEE', on: day(-72), direction: 'out', amount: gbp(72_500), account: 1, party: 4, category: 7, state: 'cleared', note: 'The other half is owed on the 22nd.' },
   /* ONE TRANSFER, TWO ROWS, ONE DAY. Nothing was earned and nothing was spent; the money is in a
-     different account. Both legs are marked, and every figure on the Ledger page leaves them out. */
+     different account. Both legs are marked, and every figure on the Ledger page leaves them out.
+
+     THE RECORD WOULD PAIR THEM, through `transactions`' `pairs:`, if they arrived unmarked, as a
+     bank's two lines do (`test/money-pairs.test.ts`). THE MARK IS STILL TYPED HERE because a second
+     engine reads these rows with no write path: the browser's sample (`apps/web/src/lib/record/data.ts`,
+     `entriesOf`) fills each field's default, so untyped, both legs were `transfer: false` there
+     while the record held them true, and `test/money-ledger.test.ts`, which counts from this array,
+     expected GBP 12,428.02 spent against the record's GBP 8,428.02. Measured on 24 September.
+     TYPED, THE MARK IS THE SEED'S SAY AND THE KERNEL LEAVES IT: a create carrying a mark other than
+     the default pins it (`packages/kernel/src/pairs.ts`, `markPinned`), so these two carry no
+     `_pair` in the record, and the test says so rather than expecting one. */
   { what: 'TRANSFER TO TAX RESERVE', on: day(-30), direction: 'out', amount: gbp(400_000), account: 1, transfer: true, state: 'cleared', note: '' },
   { what: 'TRANSFER FROM CURRENT', on: day(-30), direction: 'in', amount: gbp(400_000), account: 2, transfer: true, state: 'cleared', note: '' },
   { what: 'COMPANY CARD, AUGUST BILL', on: day(-12), direction: 'out', amount: gbp(96_400), account: 1, transfer: true, state: 'cleared', note: 'Clears the card, so the card is not a second spend of what the card bought.' },
@@ -389,7 +399,15 @@ export const SNAPSHOTS: Fields[] = snapshotRows();
  */
 export const AVAILABLE = { id: 'available', label: 'Available after', type: 'money' } as const;
 
-export const MONEY_REGISTERS: Record<string, SeedRegister> = {
+/**
+ * A register as Money declares it: a seed register that may also say how its rows pair.
+ *
+ * WIDENED HERE AND NOT IN `base.ts`, because `transactions` is the one register any module pairs and the kernel's own
+ * `RegisterDecl` already carries the shape, so the type is the kernel's and cannot drift from what `pairs.ts` checks.
+ */
+type MoneyRegister = SeedRegister & { pairs?: RegisterDecl['pairs'] };
+
+export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
   obligations: {
     id: 'obligations',
     /**
@@ -605,6 +623,32 @@ export const MONEY_REGISTERS: Record<string, SeedRegister> = {
     state: 'state',
     done: ['cleared', 'void'],
     pack: 'money-core',
+    /**
+     * THE TWO LEGS OF A TRANSFER ARE FOUND BY THE RECORD (`packages/kernel/src/pairs.ts`, `02 §5`): the same amount in the
+     * same currency, one leg out and one in, two different accounts, within four days. Both are marked `transfer` and
+     * each names the other in `_pair`, so a person sees why a row stopped counting and can undo it. His import writes a
+     * move between his accounts as two ordinary rows, and until this a person marked both or every Ledger figure counted
+     * the move once as spend and once as income (`test/money-pairs.test.ts`: GBP 4,000.00 spent, before).
+     *
+     * `abs(amount)` AND NO `currency` ENTRY, because the currency is inside the money and this register has no field of
+     * that name: `abs()` on a money compares its size and its currency together.
+     *
+     * `where: state is cleared`, THE SAME CLAUSE EVERY LEDGER FIGURE COUNTS BY, because a row the figures never count
+     * cannot be the other half of a move they do. Without it a void or pending credit paired with the cleared payment
+     * beside it and hid that payment: the audit of the kernel's pairing measured Spent at GBP 0.00 against 250.00 for
+     * both (`loop/research-batch-fifty-eight-audit.md` finding 2), and a pending row is what a bank alert writes first.
+     * `done:` is not the answer, since it holds `void` too. THE TREE AND NOT THE SENTENCE, because the kernel matches it
+     * on every write and takes it only in that form (`pairs.ts`, `pairsFault`). When a pending credit clears, the update
+     * is looked at again and it pairs then.
+     */
+    pairs: {
+      on: ['abs(amount)'],
+      opposite: 'direction',
+      across: 'account',
+      within: '4d',
+      mark: 'transfer',
+      where: { field: 'state', is: 'cleared' },
+    },
     fields: [
       { id: 'what', label: 'Description', type: 'text', required: true, search: true },
       /* `Date` OVER THE COLUMN AND `on` IN A PREDICATE. A transaction has one day and it is never a
@@ -638,10 +682,9 @@ export const MONEY_REGISTERS: Record<string, SeedRegister> = {
        * transfer has no category: it is not for anything. Every figure on the Ledger page says
        * `transfer is false`, and the default is false so a row nobody marks is counted.
        *
-       * A PERSON SETS IT, IN THIS BUILD. `02 §5`'s `pairs: { on, opposite, across, within, mark }` is
-       * the register option that would find the two legs and set it, and it is on the kernel's
-       * published-and-unbuilt list, so declaring it here would be refused. The field is the half that
-       * is real now, and it is the half `pairs:` would write into when it arrives.
+       * THE RECORD SETS IT ON BOTH LEGS OF A MOVE IT CAN SEE, through `pairs:` above, and a person sets
+       * it on the rest: a card bill whose other leg is the card's own statement is one leg in this
+       * ledger, and no pair can be found for it.
        */
       { id: 'transfer', label: 'Between your own accounts', type: 'bool', default: false, index: true },
       /* THE PROMISE THIS PAYMENT DISCHARGED. Reconcile is this field and nothing else. */

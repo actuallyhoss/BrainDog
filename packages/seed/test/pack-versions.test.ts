@@ -292,9 +292,10 @@ const DECLARED: Record<string, Version> = {
       setting.home_currency setting.most_days_late setting.most_due_30d setting.most_on_one_category setting.most_out_30d
       setting.most_out_every_month setting.most_owed_to_you
     `,
-    declares: '99fe861644707f24',
+    declares: 'f10e802c80863429',
     history: [
       '`register.transactions` gains `available`, what the bank said was left after a movement, so the limit a card alert prints can tell a second charge of the same amount from the same alert sent twice -> 99fe861644707f24',
+      'Still before any release, the last successful deploy being `19d4c785` at 15:07 UTC on 23 September: `register.transactions` declares `pairs:`, so the record marks both cleared legs of a move between two accounts as `transfer` rather than counting it once as spent and once as received, and a void or pending row pairs with nothing -> f10e802c80863429',
     ],
   },
   'work@1.1.0': { declares: 'b49e051fe7c26ac5' },

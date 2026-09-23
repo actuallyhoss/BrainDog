@@ -117,6 +117,14 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   (`loop/research-bank-real.md`); `bank-hsbc-eg` 1.2.0 reads the limit into this field and names it in its `dedupe:`,
  *   so two charges file and one alert sent twice files once. One field added and nothing taken away, so the step is a
  *   minor one, and a new version rather than a reset because 2.0.0 shipped with the deploy of 23 September at 08:02 UTC.
+ *   STILL UNDER 2.1.0, because 2.1.0 has not shipped: measured on 24 September with `gh run list --workflow deploy`, the
+ *   last successful deploy is `19d4c785` at 15:07 UTC on the 23rd, and `d1bf796a`, which set 2.1.0, is not behind it.
+ *   `register.transactions` declares `pairs:`, so the record finds a transfer's two legs, the same amount in the same
+ *   currency, one out and one in, two accounts, within four days, both cleared, and marks both `transfer` and each with
+ *   `_pair` naming the other (`test/money-pairs.test.ts`). A void or pending row pairs with nothing, since no figure
+ *   counts it and pairing one hid the cleared payment beside it. Before it, two such rows written by the import were
+ *   GBP 4,000.00 of "Spent, 30 days" until a person marked them. Nothing is added to the ids a record holds and nothing
+ *   is taken away.
  * - estate 1.2.0: a service carries a note. the old tool's domains carry the reason each name is held and what is
  *   unresolved about it, and Services had no field that holds prose, so the import left every note in the export. One
  *   field added and nothing taken away, so the step is a minor one. It moves the version rather than riding on 1.1.0
