@@ -349,8 +349,22 @@ const QUOTES: readonly (readonly [string, string])[] = [
  * match nothing for ever, which is the failure this file's header is written against. The JSON form
  * keeps the operator for a caller who knows the stored value; the sentence refuses and names `is`,
  * which already reads both types in their words.
+ *
+ * A `secret` IS THE THIRD, and the worst of them (`loop/research-batch-fifty-eight-audit.md` §8).
+ * `TEXTUAL` admits it, and its column holds the id of a grant in the vault, never the secret. K4:
+ * `token contains a` compiled to `{ field: token, contains: a }` and a kernel `list` answered `ok`,
+ * matching or missing rows on the letters of an id nobody is shown. It has no `is` to be pointed
+ * at either, since `is` would compare the same id, so its refusal names `is set` and `is empty`,
+ * the two questions a sealed field can answer.
  */
-const SPOKEN_AS_NOT_STORED = new Set(['enum', 'ref']);
+const SPOKEN_AS_NOT_STORED = new Set(['enum', 'ref', 'secret']);
+
+/** What each of those holds instead of the words, and the question the sentence can ask of it. */
+const HELD_INSTEAD: Record<string, string> = {
+  enum: 'It holds a declared value, not the words shown for it. Write is, which reads it in those words.',
+  ref: 'It holds a row id, not the words shown for it. Write is, which reads it in those words.',
+  secret: 'It holds the id of a grant in the vault, not the secret, and a filter never reads the secret. Write is set or is empty.',
+};
 
 /**
  * One sentence into one predicate.
@@ -614,7 +628,7 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
           decl.type === 'list'
             ? ` Write has to ask for one value in a list.`
             : SPOKEN_AS_NOT_STORED.has(decl.type)
-              ? ` It holds ${decl.type === 'ref' ? 'a row id' : 'a declared value'}, not the words shown for it. Write is, which reads it in those words.`
+              ? ` ${HELD_INSTEAD[decl.type]}`
               : '';
         bad.push({ code: 'MATCH_OP_UNSUPPORTED', fix: `${sentence}: ${field} is a ${decl.type}, and contains is about text.${instead}`, at: field });
         continue;
@@ -629,6 +643,30 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
         .split(/(\s+)/)
         .slice(2 * (after + 1))
         .join('');
+
+      /* A QUOTE THAT CLOSES AND THEN HAS MORE WORDS AFTER IT IS TWO TEXTS, NOT ONE HOLDING QUOTE MARKS
+         (audit fifty-eight §9, K3). `what contains "uber" or "lyft"` starts and ends with a straight
+         quote, so the pair below took everything between the outer two and searched for the one text
+         `uber" or "lyft`, which no row holds: parsed, ran, matched nothing. A mark followed by a space
+         is where the quote closed. One followed by a letter closes nothing, so `'Joe's cafe'` still
+         reads whole; `'the Joneses' cat'` does not, and the refusal names the other kind of mark,
+         which holds it. */
+      const opened = QUOTES.find(([open]) => text.startsWith(open));
+      if (opened) {
+        const [open, close] = opened;
+        let shut = text.indexOf(close, open.length);
+        while (shut !== -1 && !/^\s/.test(text.slice(shut + close.length))) shut = text.indexOf(close, shut + 1);
+        const more = shut === -1 ? '' : text.slice(shut + close.length).trim();
+        if (more) {
+          bad.push({
+            code: 'VALUE_MALFORMED',
+            fix: `${sentence}: the quote closes at ${text.slice(0, shut + close.length)} and ${more} comes after it. A condition looks for one text, so write two conditions, one for each; a comma between them asks for rows that hold both. If the mark is part of the text, quote the whole text with the other kind of mark.`,
+            at: field,
+          });
+          continue;
+        }
+      }
+
       const pair = QUOTES.find(([open, close]) => text.length >= 2 && text.startsWith(open) && text.endsWith(close));
 
       if (pair) {
@@ -664,8 +702,11 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
       /* `not` AND `or` ARE THE GRAMMAR'S WORDS EVERYWHERE ELSE IN THIS FILE, and a bare text holding
          one would be searched for literally: `what contains not uber` would answer the rows that say
          "not uber", the opposite of what was meant, and `uber or lyft` would look for all three words
-         in a row. Quoting says the words are text, so the refusal names the quote. */
-      if (bare === 'not' || bare.startsWith('not ')) {
+         in a row. Quoting says the words are text, so the refusal names the quote.
+         IN ANY CASE, as the `or` check below it always was (audit fifty-eight §9, K2): `what contains
+         not uber` was refused while `what contains Not uber` compiled to the text `Not uber` and
+         answered the rows that say it, the opposite of what was meant, from one capital letter. */
+      if (/^not(\s|$)/i.test(bare)) {
         bad.push({
           code: 'MATCH_OP_UNSUPPORTED',
           fix: `${sentence}: contains not is not something a filter can say yet. To look for the words, quote them: ${field} contains "${bare}".`,

@@ -192,6 +192,74 @@ test('A QUOTE THE COMMA CUT OPEN IS REFUSED, not searched for with its quote mar
   assert.match(cut.bad[0]!.fix, /comma/);
 });
 
+/* ── audit fifty-eight, §8 and §9 ────────────────────────────────────────── */
+
+test('A SECRET IS REFUSED LIKE A REF, because its column holds a grant id and not the secret (§8)', () => {
+  /* K4: `token contains a` parsed to `{ field: token, contains: a }` and a kernel `list` answered
+     `ok`, matching or missing rows on the letters of a grant id nobody is ever shown. */
+  const schema: Schema = { register: 'keys', fields: { what: { type: 'text' }, token: { type: 'secret' } } };
+  const out = parseWhere('token contains a', schema, deps);
+  assert.equal(out.predicate, undefined, JSON.stringify(out.predicate));
+  assert.equal(out.bad[0]?.code, 'MATCH_OP_UNSUPPORTED');
+  assert.match(out.bad[0]!.fix, /grant/);
+  /* AND IT DOES NOT SEND THE READER TO A BARE `is`, which would compare the same grant id. The two
+     questions a sealed field can answer are whether it holds one. */
+  assert.doesNotMatch(out.bad[0]!.fix, /Write is, which/);
+  assert.match(out.bad[0]!.fix, /is set or is empty/);
+});
+
+test('THE KERNEL REFUSES `contains` OVER A SECRET where it answered ok (§8)', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  const keys: Declaration = {
+    id: 'register.keys',
+    kind: 'register',
+    body: {
+      id: 'keys',
+      name: 'Keys',
+      title: 'what',
+      fields: [
+        { id: 'what', type: 'text', required: true },
+        { id: 'token', type: 'secret' },
+      ],
+    } as never,
+  };
+  const installed = await k.install([keys]);
+  assert.ok(installed.ok, JSON.stringify(installed));
+  const out = k.list({ register: 'keys', where: 'token contains a' }) as unknown as { ok: boolean; error?: { code: string } };
+  assert.equal(out.ok, false, JSON.stringify(out));
+  sql.close();
+});
+
+test('`not` IS A GRAMMAR WORD IN ANY CASE, as `or` already was (§9)', () => {
+  /* K2: `what contains Not uber` compiled to `{ contains: 'Not uber' }`, the rows that say it, which
+     is the opposite of what was meant, while the lower-case spelling was refused. */
+  for (const text of ['what contains Not uber', 'what contains NOT uber', 'what contains Not']) {
+    const said = refused(text);
+    assert.equal(said.code, 'MATCH_OP_UNSUPPORTED', text);
+    assert.match(said.fix, /quote/i, text);
+  }
+  /* A WORD THAT ONLY STARTS WITH THE LETTERS IS TEXT. */
+  assert.deepEqual(good('what contains Nottingham'), { field: 'what', contains: 'Nottingham' });
+  assert.deepEqual(good('what contains "Not uber"'), { field: 'what', contains: 'Not uber' });
+});
+
+test('A QUOTED TEXT FOLLOWED BY MORE WORDS IS REFUSED, not read as one text holding two quote marks (§9)', () => {
+  /* K3: `what contains "uber" or "lyft"` starts and ends with a straight quote, so it compiled to the
+     one text `uber" or "lyft`, which no row holds. */
+  for (const text of ['what contains "uber" or "lyft"', 'what contains "uber" "lyft"', 'what contains “uber” or lyft', "what contains 'uber' or 'lyft'"]) {
+    const said = refused(text);
+    assert.equal(said.code, 'VALUE_MALFORMED', text);
+    assert.match(said.fix, /two conditions/, text);
+  }
+  /* A MARK THAT IS PART OF THE TEXT STILL READS: a mark not followed by a space closes nothing, and
+     one that is can be held in the other kind of quote, which is what the refusal says. */
+  assert.deepEqual(good(`what contains 'Joe's cafe'`), { field: 'what', contains: "Joe's cafe" });
+  assert.deepEqual(good(`what contains "the Joneses' cat"`), { field: 'what', contains: "the Joneses' cat" });
+  assert.deepEqual(good(`what contains '5" screen'`), { field: 'what', contains: '5" screen' });
+  assert.match(refused('what contains "5" screen"').fix, /other kind/);
+});
+
 test('THE REFUSAL FOR A VERB IT CANNOT READ NOW NAMES `contains`', () => {
   const said = refused('what resembles uber');
   assert.equal(said.code, 'MATCH_OP_UNSUPPORTED');
