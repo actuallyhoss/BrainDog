@@ -256,3 +256,31 @@ test('NO STORAGE, OR STORAGE THAT THROWS, IS THE ADDRESS ALONE, and never an exc
     assert.equal(onwardOf('', '', s), '/app/');
   }
 });
+
+/* MEASURED FIRST (`loop/research-batch-forty-nine-audit.md` §8, by a probe that was never kept in the tree): `onward()`
+   checked the spelling of the path, so a dot segment, plain or percent-encoded, passed as `/app/...` and the drawn
+   href resolved on this origin outside the app, `/auth/signout`, `/api/export`, `/in/x` and `/`. The mail's
+   `safeNext` resolved the same values and dropped every one. */
+test('A NEXT THAT RESOLVES OUTSIDE THE APP IS THE FRONT DOOR, however its dot segments are spelled', () => {
+  const s = shelf();
+  for (const bad of ['/app/../auth/session', '/app/%2e%2e/api/export', '/app/../auth/signout', '/app/%2e%2e/auth/signout', '/app/%2E%2E/api/export', '/app/.%2e/in/x', '/app/..', '/app/../']) {
+    const search = `?${new URLSearchParams({ next: bad })}`;
+    assert.equal(onwardOf(search, '', s), '/app/', bad);
+    assert.equal(s.held.size, 0, `${bad} was kept for the tab`);
+    assert.equal(onwardOf('', '#magic=t', s), '/app/', `${bad} was followed from the tab`);
+  }
+  /* The same planted in the tab's storage, which is read as untrusted as the address is. */
+  onwardOf(ASKED, '', s);
+  const [key] = [...s.held.keys()];
+  assert.ok(key, 'nothing was kept');
+  s.held.set(key, '/app/%2e%2e/api/export');
+  assert.equal(onwardOf('', '#magic=t', s), '/app/');
+});
+
+test('A NEXT THAT RESOLVES INSIDE THE APP IS FOLLOWED AS IT RESOLVES, not as it was typed', () => {
+  const s = shelf();
+  assert.equal(onwardOf(`?${new URLSearchParams({ next: '/app/acme/../shop/./r/tasks?f=a#top' })}`, '', s), '/app/shop/r/tasks?f=a#top');
+  /* What the tab keeps is the resolved address, so the two halves cannot disagree about it later. */
+  assert.deepEqual([...s.held.values()], ['/app/shop/r/tasks?f=a#top']);
+  assert.equal(onwardOf('', '#magic=t', s), '/app/shop/r/tasks?f=a#top');
+});

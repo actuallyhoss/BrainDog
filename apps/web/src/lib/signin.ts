@@ -6,7 +6,7 @@
  * is not in `Ways` at all, so the screen has nothing to grey out (`23 §3.1`).
  */
 
-import { onward } from './at.ts';
+import { BASE, onward, split } from './at.ts';
 import type { Failure, Link, Methods, Said, Who } from './auth.ts';
 
 /** What a press asked for. */
@@ -165,6 +165,25 @@ function quietly<T>(work: () => T): T | null {
   }
 }
 
+/* AN ORIGIN NOBODY SERVES, so a `next` that names any real one resolves off it and is refused. The same stand-in
+   `safeNext` resolves against on the host, and the page needs no `location` to answer. */
+const HERE = 'https://here.invalid';
+
+/**
+ * `onward()`, then resolved as a browser will resolve the href, and the resolved address returned in place of the typed
+ * one.
+ *
+ * THE SPELLING PASSED AND THE ADDRESS DID NOT. `onward()` checks the string as typed, so `/app/../auth/signout`,
+ * `/app/%2e%2e/api/export`, `/app/.%2e/in/x` and `/app/..` each started with `/app/` and each landed on this origin
+ * outside the app (`loop/research-batch-forty-nine-audit.md` §8, measured through `new URL(href, origin)`). The mail's
+ * `mailedNext` already resolved them with `safeNext` and dropped every one; this is the same rule for the page's half:
+ * the same origin, the resolved path under `BASE`, and that path is what is drawn and what the tab keeps.
+ */
+function resolved(search: string): string {
+  const url = new URL(onward(search), HERE);
+  return url.origin === HERE && split(url.pathname) !== null ? `${url.pathname}${url.search}${url.hash}` : `${BASE}/`;
+}
+
 /**
  * Where "Open BrainDog" goes: the `next` in the address, or the one this tab was handed before a link replaced it.
  *
@@ -174,21 +193,21 @@ function quietly<T>(work: () => T): T | null {
  * an arrival carrying a link and no `next` takes the kept one. A mailed link now carries its own, which wins.
  *
  * A PLAIN VISIT FORGETS IT. Sign-in with neither a `next` nor a link was not sent from anywhere, so an older page is
- * not where it goes; and a `next` that `onward()` refuses replaces the older one rather than leaving it to be followed.
+ * not where it goes; and a `next` that `resolved()` refuses replaces the older one rather than leaving it to be followed.
  *
- * THE KEPT VALUE IS CHECKED AGAIN ON THE WAY OUT, by the same `onward()` as the address, because anything on this
+ * THE KEPT VALUE IS CHECKED AGAIN ON THE WAY OUT, by the same `resolved()` as the address, because anything on this
  * origin can write to the tab's storage. Storage that is missing or throws is the address alone.
  */
 export function onwardOf(search: string, hash: string, shelf: Shelf | null): string {
   if (new URLSearchParams(search).has('next')) {
-    const to = onward(search);
-    quietly(() => (to === onward('') ? shelf?.removeItem(PENDING) : shelf?.setItem(PENDING, to)));
+    const to = resolved(search);
+    quietly(() => (to === resolved('') ? shelf?.removeItem(PENDING) : shelf?.setItem(PENDING, to)));
     return to;
   }
   if (!/^#(magic|claim)=/.test(hash)) {
     quietly(() => shelf?.removeItem(PENDING));
-    return onward('');
+    return resolved('');
   }
   const kept = quietly(() => shelf?.getItem(PENDING)) ?? '';
-  return onward(`?${new URLSearchParams({ next: kept })}`);
+  return resolved(`?${new URLSearchParams({ next: kept })}`);
 }
