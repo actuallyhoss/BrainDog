@@ -1,0 +1,392 @@
+/**
+ * `shell-words`: the core packages' code names no use case.
+ *
+ *   node tools/gates/shell-words.mjs [root]
+ *
+ * THE CORE IS A SHELL, AND IT STAYS ONE ONLY WHILE IT KNOWS NOTHING ABOUT WHAT RUNS IN IT. A pack
+ * says what a record is for; the kernel, the record, the host and the rest run whatever a pack
+ * declares. The day `packages/kernel` holds `if (list === 'gold')` or `'bank-hsbc-eg'`, one use case
+ * has a branch nobody else can declare, and removing it is a migration rather than an uninstall.
+ * `loop/research-shell-leftovers.md` measured the twelve core packages on 22 September with comments
+ * stripped and found no such word in code, which is exactly the state that decays unwatched: every
+ * earlier hit had been a comment, and nothing said so the day a real one landed.
+ *
+ * WORDS, NOT SUBSTRINGS. The first version of the word list was a case-folded substring test, and
+ * over `apps/web/src` it went red on `loadingOlder` five times, because `ngOlder` folds to a string
+ * that contains `gold` (`loop/research-shell-next.md` M3). No core package has such an identifier
+ * yet, so the substring gate would have read green here until the first `pendingOlder` in the kernel
+ * failed it on nothing. So every identifier and literal is split into parts at a case change, `_`,
+ * `-`, `.` and `$`, the parts are case-folded, and a word is a hit when one part, or a run of
+ * neighbouring parts joined, STARTS WITH it.
+ *
+ * STARTS WITH, AND NOT EQUALS, AND JOINED, AND NOT ONE PART AT A TIME. Measured by the checker over
+ * `apps/web/src`: a part that had to equal the word found 10 of the 17 real hits, dropping both
+ * `Egyptian` lines because `egyptian` is not `egypt`. A part at a time would miss `legacyTool`, whose
+ * word is two parts. Starting a match only at a part boundary is what keeps `loadingOlder` out: its
+ * parts are `loading` and `older`, and neither run begins `gold`. The negative directory holds one
+ * file for each of those three shapes and one holding `loadingOlder`, so the rule is proved in both
+ * directions every time `self-test` runs it. Run over those four files on 23 September, a
+ * substring match named all four, `loadingOlder` among them, and a part that had to equal the word
+ * named only the `hsbc-eg` one.
+ *
+ * COMMENTS ARE NOT CODE, and they are found by a lexer rather than blanked by a pattern. A comment
+ * that says why the kernel refuses a `gold` list is the kernel explaining itself, and a gate that
+ * went red on it would be measuring the wrong thing. The survey's probe used
+ * `no-declarations-in-kernel`'s `decomment`, which is two regular expressions, and a regular
+ * expression cannot tell a `//` inside a string or a regex literal from the start of a comment.
+ * Measured on 23 September over the core this gate reads: it blanked 268 runs of real code in 31
+ * files, among them the rest of `decoded.startsWith('//') || slippery(decoded))` in
+ * `packages/host/src/auth.ts:288` and of `.split(/[/?#]/)[0]` after an `https?:\/\/` in
+ * `packages/declare/src/index.ts:2070`. None of those runs held a word today, so both readings gave
+ * 0; the difference is that a word written there tomorrow would be invisible to one of them. The
+ * lexer below knows strings, templates, regular expression literals and both comment forms, and
+ * over the same files it blanked nothing that `decomment` kept. The negative directory holds that
+ * case too: `seeded-slashes.ts` names `'mercury'` after a `'//'` on one line, and `decomment` reads
+ * it as green. And it holds the lexer's own first mistake, `seeded-template.ts`, which `uncomment`
+ * explains where it happened.
+ *
+ * `salaries` IS NOT A HIT. `salary` is the word, and `salari...` does not start with it. The brief
+ * offered the stem `salar` as an option; the tree has no `salaries` in scope today, so it is not
+ * added on speculation.
+ */
+
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { skipDir } from './lib.mjs';
+
+/**
+ * The names of use cases, banks, products and people this tree has had to keep out of the core.
+ * Each is the start of a part, case-folded: see the header for why a match must begin at a part
+ * boundary and why it may run on past one.
+ */
+export const WORDS = ['gold', 'hsbc', 'instapay', 'egypt', 'salary', 'payroll', 'mercury', 'registrar', 'acme', 'legacy'];
+
+/** Every package and every app is in scope by default, so a new core package is watched the day it exists. */
+const WORKSPACES = ['packages', 'apps'];
+
+/**
+ * WHAT IS OUT, AND WHY. Every entry is a path under the root, a directory or a file, and every
+ * entry has to go on earning its place: an entry whose path is present and exempts no hit is itself
+ * a finding, because an exemption that exempts nothing is a hole waiting for the next word. That is
+ * why `apps/cli/src/install.ts`, which the brief named, is not here: measured on 23 September it
+ * holds no word in code, so exempting it would only have hidden the first one.
+ *
+ * `words`, WHERE AN ENTRY HAS IT, NARROWS THE ENTRY TO THOSE WORDS. `apps/cli/src/main.ts` is the
+ * whole command line, and exempting the file for one help line would have exempted every other
+ * word written there too.
+ *
+ * `*.test.ts` and any `test` directory are out by rule rather than by entry, because a test asserts
+ * on what a record was handed: `packages/record/test/ask-person-reach.test.ts` arrives
+ * `'Payroll: Omar 91000'` to prove the owner keeps her own question, and it cannot say so in any
+ * other words.
+ *
+ * The hit counts are 23 September's, from this gate's own reading.
+ */
+const OUT = {
+  'packages/seed': {
+    why: 'the first-party packs, the use cases and the sample record (82 hits). The words are its content: it is where a use case is allowed to be named.',
+  },
+  'apps/web': {
+    why: 'the sample engine, an example prompt and copy name the sample record (11 hits). It is the next gate, with its own reading of what the web may say, and not this one.',
+  },
+  'apps/site': {
+    why: 'the public site is prose about the product, not code that runs a record; its one hit is the changelog saying `Egyptian pounds` about a fix that shipped.',
+  },
+  'apps/cli/src/legacy.ts': {
+    why: "the the old tool importer (30 hits), which reads that tool's export by its own field names while the switch out of it is under way.",
+  },
+  'apps/cli/src/import.ts': {
+    why: 'the `braindog import` command (25 hits), whose one source is the the old tool export and whose banks are that export\'s. It leaves with the importer.',
+  },
+  'apps/cli/src/main.ts': {
+    words: ['legacy'],
+    why: 'the help line for `braindog import legacy`, which names the importer\'s subcommand. It leaves with the importer.',
+  },
+};
+
+/**
+ * THE FILES A CORE PACKAGE SHIPS: its `src`, without tests, which is the scope Brief G names.
+ * `.svelte` is read too, with its HTML comments blanked first, because a component's markup is code
+ * a stranger's record runs.
+ *
+ * AND `src` IS NOT ALL A PACKAGE SHIPS. Measured on 23 September: `packages/render/svelte` holds the
+ * renderer's 32 components (0 hits), and `packages/mcp/grammars/script.ts`, which
+ * `packages/mcp/src/index.ts` imports and serves as `braindog:grammar/script`, holds 9, all `gold`,
+ * in its `script.gold-rate` example. Neither directory is read here.
+ */
+const SOURCE = /\.(ts|mts|js|mjs|svelte)$/;
+const TEST = /\.test\.(ts|mts|js|mjs)$/;
+
+function walk(dir, out) {
+  let entries;
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return out;
+  }
+  for (const name of entries) {
+    if (skipDir(name) || name === 'test') continue;
+    const full = join(dir, name);
+    if (statSync(full).isDirectory()) walk(full, out);
+    else if (SOURCE.test(name) && !TEST.test(name)) out.push(full);
+  }
+  return out;
+}
+
+/** Blanked rather than removed, so a finding's line number is the line it names. */
+const blank = (m) => m.replace(/[^\n]/g, ' ');
+
+/**
+ * THE KEYWORDS AFTER WHICH A SLASH OPENS A REGULAR EXPRESSION rather than dividing, beside the
+ * punctuation `uncomment` checks for. A regex read as a division has its body read as code, and a
+ * quote, a backtick or a brace inside it can leave the lexer in a literal that runs on over the
+ * comments after it, which then read as code. The comment above `readTemplate` is the one time that
+ * was measured, and it went red on three comments rather than green on anything.
+ */
+const BEFORE_REGEX = new Set(['return', 'typeof', 'instanceof', 'in', 'of', 'new', 'delete', 'void', 'throw', 'case', 'do', 'else', 'yield', 'await']);
+
+/**
+ * The source with its comments blanked and everything else untouched: code, strings, templates and
+ * regular expression literals all stay, because a literal is exactly where `'bank-hsbc-eg'` lives.
+ */
+export function uncomment(source) {
+  const out = source.split('');
+  const n = source.length;
+  /* A STACK OF BRACE DEPTHS, one per open `${`, so a `}` closes the interpolation it belongs to and
+     a template inside an interpolation inside a template reads correctly. */
+  const braces = [];
+  let i = 0;
+  /* What the last significant thing in code was, which is the whole of the regex-or-division call. */
+  let last = '';
+
+  const blankRange = (from, to) => {
+    for (let k = from; k < to; k++) if (out[k] !== '\n') out[k] = ' ';
+  };
+
+  /* `i` is just past a backtick or the `}` that closes an interpolation. This leaves `i` past the
+     closing backtick, or just inside the next `${` with its depth pushed, and says which by setting
+     `last`, because a slash straight after `${` opens a regular expression and one after a closing
+     backtick divides. Measured: with `last` set to the literal in both cases,
+     `${/^[A-Z]+/.exec(said)}` at `packages/record/src/index.ts:3095` read as a division, the lexer
+     lost its place at the next unmatched brace, and three comments at `:3301` to `:3316` came out as
+     code saying `payroll`. `negative/shell-words/.../seeded-template.ts` is that shape, as a decoy. */
+  const readTemplate = () => {
+    while (i < n) {
+      const c = source[i];
+      if (c === '\\') i += 2;
+      else if (c === '`') {
+        i++;
+        last = 'literal';
+        return;
+      } else if (c === '$' && source[i + 1] === '{') {
+        i += 2;
+        braces.push(0);
+        last = '{';
+        return;
+      } else i++;
+    }
+  };
+
+  while (i < n) {
+    const c = source[i];
+    const d = source[i + 1];
+
+    if (c === '/' && d === '/') {
+      const end = source.indexOf('\n', i);
+      const to = end === -1 ? n : end;
+      blankRange(i, to);
+      i = to;
+      continue;
+    }
+    if (c === '/' && d === '*') {
+      const end = source.indexOf('*/', i + 2);
+      const to = end === -1 ? n : end + 2;
+      blankRange(i, to);
+      i = to;
+      continue;
+    }
+    if (c === "'" || c === '"') {
+      i++;
+      while (i < n && source[i] !== c && source[i] !== '\n') i += source[i] === '\\' ? 2 : 1;
+      i++;
+      last = 'literal';
+      continue;
+    }
+    if (c === '`') {
+      i++;
+      readTemplate();
+      continue;
+    }
+    if (c === '{' && braces.length > 0) {
+      braces[braces.length - 1]++;
+      last = c;
+      i++;
+      continue;
+    }
+    if (c === '}' && braces.length > 0) {
+      if (braces[braces.length - 1] === 0) {
+        braces.pop();
+        i++;
+        readTemplate();
+        continue;
+      }
+      braces[braces.length - 1]--;
+      last = c;
+      i++;
+      continue;
+    }
+    if (c === '/') {
+      const regex = last === '' || /^[(,=:[!&|?{};+\-*%<>~^]$/.test(last) || BEFORE_REGEX.has(last);
+      if (regex) {
+        i++;
+        let inClass = false;
+        while (i < n && source[i] !== '\n') {
+          const r = source[i];
+          if (r === '\\') i += 2;
+          else if (r === '[') (inClass = true), i++;
+          else if (r === ']') (inClass = false), i++;
+          else if (r === '/' && !inClass) {
+            i++;
+            break;
+          } else i++;
+        }
+        last = 'literal';
+        continue;
+      }
+      last = c;
+      i++;
+      continue;
+    }
+    if (/[A-Za-z0-9_$]/.test(c)) {
+      const start = i;
+      while (i < n && /[A-Za-z0-9_$]/.test(source[i])) i++;
+      last = source.slice(start, i);
+      continue;
+    }
+    if (!/\s/.test(c)) last = c;
+    i++;
+  }
+  return out.join('');
+}
+
+/**
+ * THE PARTS OF ONE TOKEN, case-folded. `_`, `-`, `.` and `$` separate; so does a change of case,
+ * both `goldRate` (lower to upper) and `HSBCBank` (the last capital of a run starts the next part).
+ */
+export const partsOf = (token) =>
+  token
+    .split(/[_.$-]+/)
+    .flatMap((piece) => piece.split(/(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])/))
+    .filter(Boolean)
+    .map((p) => p.toLowerCase());
+
+/** The words one token holds: each one that a part, or a run of parts joined from there, starts with. */
+export function wordsIn(token) {
+  const parts = partsOf(token);
+  const found = new Set();
+  for (let i = 0; i < parts.length; i++) {
+    const run = parts.slice(i).join('');
+    for (const word of WORDS) if (run.startsWith(word)) found.add(word);
+  }
+  return [...found];
+}
+
+/** A token is a run of the characters an identifier or a slug is written in, separators included. */
+const TOKEN = /[A-Za-z0-9_$][A-Za-z0-9_$.-]*/g;
+
+/**
+ * Every hit in one file's text, with the line it is on and the token that carried it.
+ *
+ * HTML COMMENTS ARE BLANKED IN MARKUP ONLY. The first version blanked them in every file, and in a
+ * `.ts` file `<!--` and `-->` are only ever string contents: `packages/extract/src/formats.ts:245`
+ * has `'<!--'` on one line and `'-->'` on the next, and the pattern blanked the code between them.
+ * Measured on 23 September with a `goldRate` written on the line between two such strings in a
+ * `.ts` file under `packages/kernel/src`: the gate read green.
+ */
+export function hitsIn(source, markup = false) {
+  const text = uncomment(markup ? source.replace(/<!--[\s\S]*?-->/g, blank) : source);
+  const hits = [];
+  let line = 1;
+  let seen = 0;
+  for (const m of text.matchAll(TOKEN)) {
+    for (; seen < m.index; seen++) if (text[seen] === '\n') line++;
+    for (const word of wordsIn(m[0])) hits.push({ line, word, token: m[0] });
+  }
+  return hits;
+}
+
+const outOf = (rel) => Object.keys(OUT).find((p) => rel === p || rel.startsWith(p + '/')) ?? null;
+
+/**
+ * THE CHECK IS A FUNCTION, imported by `run.mjs` rather than spawned: `52 §5.1` step 3, argued in
+ * the runner's `IMPORTED OR SPAWNED` header. Nothing in this file happens on import.
+ *
+ * THE ROOT IS AN ARGUMENT, defaulting to `BRAINDOG_GATE_ROOT`, which is how `self-test` aims a gate
+ * at its seeded tree, and then to the repository this file sits in.
+ *
+ * IT RETURNS 1 OR 3 AND FALLS OFF THE END FOR A PASS, which is what `self-test`'s `silent-pass`
+ * grep rests on.
+ */
+export default function shellWords(
+  root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..'),
+) {
+  const ROOT = resolve(root);
+  const files = [];
+  for (const workspace of WORKSPACES) {
+    let members;
+    try {
+      members = readdirSync(join(ROOT, workspace), { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const m of members) if (m.isDirectory() && !skipDir(m.name)) walk(join(ROOT, workspace, m.name, 'src'), files);
+  }
+
+  /* A GATE THAT READ NOTHING HAS NOT PASSED. Exit 3 is this directory's word for "could not run". */
+  if (files.length === 0) {
+    console.log(`  shell-words: no packages/*/src or apps/*/src under ${ROOT}, so no code was read`);
+    return 3;
+  }
+
+  const findings = [];
+  const exempted = new Map(Object.keys(OUT).map((p) => [p, 0]));
+  let read = 0;
+  for (const file of files) {
+    const rel = relative(ROOT, file).replace(/\\/g, '/');
+    const hits = hitsIn(readFileSync(file, 'utf8'), file.endsWith('.svelte'));
+    const out = outOf(rel);
+    const allowed = out === null ? null : (OUT[out].words ?? WORDS);
+    if (out === null || OUT[out].words) read++;
+    for (const h of hits) {
+      if (allowed !== null && allowed.includes(h.word)) exempted.set(out, exempted.get(out) + 1);
+      else findings.push(`  ${rel}:${h.line}  ${h.word}, in ${h.token}`);
+    }
+  }
+
+  /* AN EXEMPTION THAT EXEMPTS NOTHING IS A FINDING, for the reason `OUT` gives. Only for a path that
+     is there: a tree without `apps/site` has nothing to say about it. */
+  const idle = [...exempted].filter(([p, n]) => n === 0 && existsSync(join(ROOT, p)));
+  for (const [p] of idle)
+    findings.push(`  ${p} is exempted and holds no use-case word in code. Take it out of OUT, so the next word there is seen.`);
+
+  if (findings.length === 0) {
+    const held = [...exempted].reduce((sum, [, n]) => sum + n, 0);
+    console.log(
+      `  shell-words: 0 use-case words in code over ${read} core files; ${held} in the ${Object.keys(OUT).length} exempted paths`,
+    );
+    return;
+  }
+  for (const f of findings) console.error(f);
+  console.error(
+    `\n  shell-words: ${findings.length} finding(s), each a use case named in the core's code.\n` +
+      '  The core runs whatever a pack declares and knows none of it by name: move the word into the\n' +
+      '  pack that owns it, and let the core read it off the declaration.',
+  );
+  return 1;
+}
+
+/* AND IT IS STILL A SCRIPT, because `self-test` spawns each gate at its seeded fixture and the header
+   documents the command line. `?? 0` because a pass returns nothing. */
+if (import.meta.main) process.exitCode = shellWords(process.argv[2]) ?? 0;

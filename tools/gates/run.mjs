@@ -11,7 +11,7 @@
  * cannot run without, this file reads every declaration before it spawns anything, and a gate whose
  * prerequisite is unmet is refused here rather than asked. See `NEEDS` below for what that fixes.
  *
- * AND TWENTY-TWO OF THEM ARE NOW FUNCTIONS THIS FILE CALLS RATHER THAN SCRIPTS IT SPAWNS. `52 §5.1`
+ * AND TWENTY-THREE OF THEM ARE NOW FUNCTIONS THIS FILE CALLS RATHER THAN SCRIPTS IT SPAWNS. `52 §5.1`
  * step 3: see `IMPORTED OR SPAWNED` below for what it buys, what it costs, and why the other eight
  * keep the dialect they have. Which of the two a gate is in is DECLARED by its entry here, with
  * `call(...)`, and never guessed from the gate's text, which is the trap the first half of that step
@@ -137,6 +137,11 @@ const GATES = [
   /* THE RULE THE WHOLE ADDITIVE STORY RESTS ON (02 §1). A register the kernel ships is a name no
      pack can own, and breaking it is always the shortest path. */
   ['no-declarations-in-kernel', ['node', [join(here, 'no-declarations-in-kernel.mjs')]]],
+  /* AND THE SAME RULE ONE LEVEL UP: the core ships no declaration, and its code names no use case.
+     Measured on 23 September, no core package says `gold`, `hsbc` or `legacy` outside a comment,
+     and nothing held it there. Beside the kernel rule because a `'bank-hsbc-eg'` in the record is
+     that rule broken without a single declaration written. */
+  ['shell-words', call(join(here, 'shell-words.mjs'))],
   ['css-rules', call(join(here, 'css-rules.mjs'))],
   ['colour-grep', call(join(here, 'colour-grep.mjs'))],
   /* `50 §3` says one file holds every sentence so the copy is reviewable in one place. That is true
@@ -176,7 +181,7 @@ const GATES = [
      port, for the reason `passkey` has one. */
   ['queue', call(join(here, 'queue.mjs'))],
   /* AFTER EVERYTHING, BECAUSE IT IS THE ONLY ONE THAT MEASURES SOMETHING OUTSIDE THIS REPOSITORY
-     (52 §3; 51 §5.17). The twenty-seven above ask whether the tree is right; this asks whether the
+     (52 §3; 51 §5.17). The thirty above ask whether the tree is right; this asks whether the
      tree is what the internet is serving, which is a question only `deploy.yml` is in a position to
      ask. Everywhere else it exits 3 and is named in `--allow-skip`. It is last for the same
      reason `layout` and `a11y` are: a run that fails earlier should not have deployed. */
@@ -304,9 +309,9 @@ const omitted = NAMES.filter((n) => !SELECTED.some(([name]) => name === n));
  * its work at module top level RUNS when it is imported, which is precisely what asking before
  * running is for; and reading `needs` off the namespace would mean reading it after the gate had
  * finished, which is not a prerequisite check but an epilogue. That is still true of eight of
- * the thirty gates below, and this reader is for those. The twenty-two registered with `call(...)`
+ * the thirty-one gates below, and this reader is for those. The twenty-three registered with `call(...)`
  * are asked by `importedNeeds` instead, off the module, and none of the eight this reader covers
- * declares anything today: every gate that has a prerequisite is one of the twenty-two, so this reader
+ * declares anything today: every gate that has a prerequisite is one of the twenty-three, so this reader
  * now guards the next script gate that grows one rather than any gate in the table. It stays for that
  * reason, and because a gate may be registered as a script for as long as its author likes:
  * see `IMPORTED OR SPAWNED`. Either way the property step 2
@@ -372,7 +377,7 @@ function declaredNeeds(name, file) {
   if (file === null) return [];
   /* AND A REGISTERED GATE'S FILE CAN BE ABSENT, WHICH READING ONE MADE FATAL. Measured: delete
      `bundle.mjs` and leave its `GATES` line, and `readFileSync` threw `ENOENT` from here, so the run
-     ended in a stack trace with none of the other twenty-nine gates spawned. This file's own rule is
+     ended in a stack trace with none of the other thirty gates spawned. This file's own rule is
      that it reports every failure rather than stopping at the first, and one gate's file going
      missing is the weakest reason there is to stop. So the question is not asked: the gate is spawned
      as it was before any of this existed, and the spawn's own non-zero exit names it. A RENAME is
@@ -403,7 +408,7 @@ function declaredNeeds(name, file) {
 }
 
 /**
- * IMPORTED OR SPAWNED, one gate at a time. `52 §5.1` step 3, on the twenty-two registered with
+ * IMPORTED OR SPAWNED, one gate at a time. `52 §5.1` step 3, on the twenty-three registered with
  * `call(...)`; the other eight are spawned exactly as they were.
  *
  * THE SECOND HALF OF STEP 3 IS THE GATES THAT NEED A BUILD OR A BROWSER, AND THEY ARE THE HALF THAT
@@ -553,7 +558,7 @@ for (const [name, [cmd, argv]] of SELECTED) {
   /* A CALLED GATE'S FILE CAN BE ABSENT, AND THAT IS ONE GATE'S FAILURE RATHER THAN THE RUN'S, which
      is the argument `declaredNeeds` makes about the spawned half: a deletion leaves nothing in the
      directory for the unregistered-gate scan to see, and ending the run here would mean the
-     twenty-nine gates beside it were never asked over one missing file. A spawn gets that for
+     thirty gates beside it were never asked over one missing file. A spawn gets that for
      nothing, because the child's non-zero exit is the report; there is no child here, so the report
      is a gate that says so and returns 1. */
   if (!existsSync(file)) {

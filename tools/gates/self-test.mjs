@@ -277,6 +277,7 @@ const CASES = [
      finding dead ones. */
   { gate: 'flags', expect: /a branch nobody takes/, findings: 1 },
   { gate: 'no-declarations-in-kernel', expect: /declaration written in the kernel/, findings: 1 },
+  { gate: 'shell-words', expect: /a use case named in the core/, findings: 4 },
   /* THE SEEDED FIXTURE HOLDS TWO SENTENCES AND RENDERS ONE, so a gate that named both (or neither)
      is a gate that is counting keys rather than finding dead ones. */
   { gate: 'dead-copy', expect: /nobody reads/, findings: 1 },
