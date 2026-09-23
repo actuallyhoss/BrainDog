@@ -1020,12 +1020,20 @@ export function trackHealth(seq: number): TrackHealth {
 export const healthTone = (h: Health | null): 'good' | 'warn' | 'bad' | undefined =>
   h === 'on_track' ? 'good' : h === 'at_risk' ? 'warn' : h === 'off_track' ? 'bad' : undefined;
 
-/** What a reader sees where a health goes, including when there isn't one. */
-export function healthLabel(t: TrackHealth): string {
+/**
+ * What a reader sees where a health goes, including when there isn't one.
+ *
+ * BY THE LABELS THE `updates` DECLARATION'S HEALTH FIELD CARRIES, when the caller hands it. The thread's header read
+ * only the table below, so a record labelling `updates.health.on_track` as Fine read Fine on every update's chip and
+ * On track in the header above them. The table stays as the words for a health the record does not label, and for a
+ * caller with no declaration to hand.
+ */
+export function healthLabel(t: TrackHealth, updates?: RegisterDecl): string {
   if (t.state === 'not_expected') return 'No update expected';
   if (!t.health) return 'Update missing';
   const words = { on_track: 'On track', at_risk: 'At risk', off_track: 'Off track' } as const;
-  return t.state === 'missing' ? `${words[t.health]}, and stale` : words[t.health];
+  const said = updates?.fields.find((f) => f.id === 'health')?.labels?.[t.health] ?? words[t.health];
+  return t.state === 'missing' ? `${said}, and stale` : said;
 }
 
 /** Every update on a track, newest first, out of the rows a caller hands in. */

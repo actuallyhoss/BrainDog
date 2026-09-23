@@ -247,7 +247,7 @@
     {#snippet actions()}
       <!-- The health, and it is a CLAIM SOMEBODY MADE rather than a computed status: the chip says
            what the newest update said, and the thread below it says who said so and when. -->
-      <Chip label={healthLabel(health)} tone={healthTone(health.health)} />
+      <Chip label={healthLabel(health, REGISTERS.updates)} tone={healthTone(health.health)} />
       <!-- ON A RECORD THIS OPENS THE BOX, AND ON THE SAMPLE IT SAYS WHAT WOULD HAPPEN. Both halves
            are in `startPost`, so the branch is stated once rather than in the markup and again in
            the handler. -->

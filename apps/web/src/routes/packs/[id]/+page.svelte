@@ -24,6 +24,7 @@
   import { HOME_CURRENCY_SETTING } from '@braindog/kernel';
   import { currencyChoices } from '$lib/record/currencies.ts';
   import RatesForm from './RatesForm.svelte';
+  import { settingChoices } from './said.ts';
   import {
     UNITS,
     changesOf,
@@ -244,7 +245,7 @@
                   {:else if segmented}
                     {@const values = decl.values ?? []}
                     <div class="segmented" role="radiogroup" aria-labelledby="set-{key}-label">
-                      {#each values as v, i (v)}
+                      {#each settingChoices(decl) as [v, said], i (v)}
                         <button
                           type="button"
                           class="segment"
@@ -254,12 +255,12 @@
                           aria-checked={d.text === v ? 'true' : 'false'}
                           onclick={() => (d.text = v)}
                           onkeydown={(e) => step(e, values, i, d)}
-                        >{v.replace(/_/g, ' ')}</button>
+                        >{said}</button>
                       {/each}
                     </div>
                   {:else if decl.type === 'enum'}
                     <select class="setting-select" id="set-{key}" value={d.text} onchange={(e) => (d.text = typed(e))}>
-                      {#each decl.values ?? [] as v (v)}<option value={v}>{v.replace(/_/g, ' ')}</option>{/each}
+                      {#each settingChoices(decl) as [v, said] (v)}<option value={v}>{said}</option>{/each}
                     </select>
                   {:else if key === HOME_CURRENCY_SETTING && decl.type === 'text'}
                     <!-- A HOME CURRENCY IS CHOSEN, NOT TYPED: the common ones first, then every ISO 4217 code. None is no home currency.
