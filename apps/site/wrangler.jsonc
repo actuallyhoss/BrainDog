@@ -9,22 +9,35 @@
      pages — `/`, `/pricing`, `/changelog` — built with `strict: true` so a route that quietly
      stopped prerendering fails the build rather than shipping blank (`apps/site/svelte.config.js`).
 
-     A WORKER WITH NO CODE, WHICH IS WHY THERE IS NO `main` KEY. Static assets are served before
-     any Worker code runs, so a `main` here would be a script that never executes on the happy path
-     and executes on every 404 — a place for logic to accumulate in the one part of the product
-     that is allowed to have none. Cloudflare Pages was the other candidate and is the wrong one:
+     A SCRIPT THAT RUNS FOR THE APP'S DOORS AND FOR NOTHING ELSE. This paragraph said the site had
+     no `main` because a script here would never execute on the happy path "and executes on every
+     404", a place for logic to accumulate. The second half is not what happens with
+     `not_found_handling` "404-page": a miss is answered by the asset layer and never reaches the
+     script. Measured through `wrangler dev -c site -c app` on 23 September
+     (`loop/research-one-domain-binding.md` section 2.1): `/nope/deep/er` with and without an
+     `Accept`, a POST and a PUT to it and a POST to `/pricing` answered the 404 page or a 405, and
+     the script's log line appeared for none of them; it appeared for every path in
+     `run_worker_first` and for no other. So `src/worker.ts` is one line that hands those paths to
+     the app through the `APP` service binding, and the rule that the site holds no logic of its own
+     is now a test (`test/forward.test.ts`) instead of an absent key. `main` sits in `env.alpha` and
+     not here because a top-level `main` is inherited: alpha is bound first, production in its own
+     push (`loop/push-3.patch`), and until then production uploads what it uploads today.
+
+     Cloudflare Pages was the other candidate and is the wrong one:
      it is a second deployment system with its own build settings, its own preview semantics and
      its own dashboard, for a directory that `wrangler deploy` already knows how to upload. One
      tool, two configs, and `wrangler rollback` works the same way on both.
 
      THE SITE AND THE APP ROLL BACK INDEPENDENTLY, and that is a feature rather than an oversight:
      a marketing copy change cannot be the reason the record is unavailable, and a Durable Object
-     migration cannot be the reason a price is wrong.
+     migration cannot be the reason a price is wrong. The binding keeps that: it calls whichever
+     version of the app is live, so an app deploy or rollback reaches the site's name with no site
+     deploy, and a site rollback never moves the app.
      =========================================================================================== */
 
   "name": "braindog-site",
 
-  /* Required even with no code, and pinned to the Worker's own date for one reason: two numbers
+  /* Required with or without code, and pinned to the Worker's own date for one reason: two numbers
      that mean "the platform behaviour we deployed against" should not be two numbers. */
   "compatibility_date": "2026-09-01",
 
@@ -75,17 +88,39 @@
        and every one of those is easier to see on a real hostname than in a preview URL nobody
        shares. It also costs nothing: the pages are the same pages in alpha's palette.
 
-       THE APEX, AND `www` IS NOT HERE. A Worker can hold several Custom Domains, but this one has
-       no code, so it cannot redirect, and giving it code to move `www` to the apex would be writing
-       a request handler for a redirect Cloudflare performs at the edge for free. The `www` → apex
+       THE APEX, AND `www` IS NOT HERE. A Worker can hold several Custom Domains, but this one's code
+       runs only for the app's doors, and widening it to move `www` to the apex would be writing a
+       request handler for a redirect Cloudflare performs at the edge for free. The `www` → apex
        redirect is a single dashboard Redirect Rule; REPORT.md §1 has it as a numbered step. */
     "production": {
       "routes": [{ "pattern": "brain.dog", "custom_domain": true }]
     },
 
+    /* ALPHA HANDS ITS APP'S DOORS TO ITS APP, AND PRODUCTION DOES NOT YET (push 1 of
+       `loop/research-one-domain-binding.md` section 4). A service binding in place of zone routes
+       means no route is written, so the deploy token needs no Zone permission, and everything the
+       move adds lives in the site's version, so undoing it is `wrangler rollback`.
+
+       `run_worker_first` IS THE LIST OF DOORS THE APP HAS BUILT, AND ONLY THOSE. A built door left
+       off it answers the site's 404 page on `alpha.brain.dog` and nothing fails at deploy time;
+       `/a`, `/s` and `/ws` are in the app's own list and unbuilt, so they stay the site's 404 page
+       here. `/mcp/` is listed beside `/mcp` because `servesMcp` accepts the slash and an MCP client
+       configured with it reached the site's 404 page in the survey (section 2.6). The bare `/auth`,
+       `/api`, `/in` and `/account` are not listed, as A2's zone routes did not list them. The build
+       id is named alone, not `/.well-known/*`, because `security.txt` is the site's.
+       `apps/worker/test/site-binding.test.ts` holds this list to `src/route.ts` in both directions.
+
+       `APP` NAMES THE SAME ENVIRONMENT'S APP. A site bound to the other environment's app would
+       serve production's record on alpha's name, and the same test fails on it. */
     "alpha": {
       "routes": [{ "pattern": "alpha.brain.dog", "custom_domain": true }],
-      "assets": { "directory": "build-alpha", "not_found_handling": "404-page" }
+      "main": "src/worker.ts",
+      "assets": {
+        "directory": "build-alpha",
+        "not_found_handling": "404-page",
+        "run_worker_first": ["/app", "/app/*", "/api/*", "/auth/*", "/account/*", "/mcp", "/mcp/", "/in/*", "/.well-known/braindog-build"]
+      },
+      "services": [{ "binding": "APP", "service": "braindog-alpha" }]
     }
   }
 }
