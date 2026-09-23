@@ -620,6 +620,15 @@ export type Boot = {
    * one has no sign-in. `false` when the host never said, as `invitations` is off when absent.
    */
   signIn: boolean;
+  /**
+   * Which host is serving this record, copied from `Build.host`.
+   *
+   * THE HOST SETS IT, AND ABSENT MEANS THE HOST DID NOT SAY. Billing told a self-host from the Cloud by whether
+   * `/api/inbound/mint` answered 404 (`loop/research-held-landing.md` friction 5), because this answer named the record
+   * and the caller and nothing about the host. A test, the CLI and a host older than the field say nothing, and a
+   * reader then falls back to whatever it inferred before, rather than being handed a value nobody gave.
+   */
+  host?: 'cloud' | 'self-host';
 };
 
 /** One line of the log as a caller sees it: the event, and what it is about when they may read that. */
@@ -777,7 +786,15 @@ export type Version = {
  * Optional, because a test, the CLI and a self-host started by hand all open a record without one,
  * and a required field here would make every one of them invent a value.
  */
-export type Build = { app: string; spark: boolean };
+export type Build = {
+  app: string;
+  spark: boolean;
+  /**
+   * Which host this is, for `boot` and not for `version`: `33 §4` names `version`'s six keys and a test holds it to them.
+   * Optional, so a build that does not name its host is a record whose `boot` carries no `host` key at all.
+   */
+  host?: 'cloud' | 'self-host';
+};
 
 export type RecordDeps = {
   sql: Sql;
@@ -811,7 +828,9 @@ export type RecordDeps = {
    *
    * THE HOST TELLS THE RECORD, and never the other way round. The build is a fact about the
    * deployment, and the same record code runs under a Worker, a test and the CLI.
+   * It is also where `boot`'s `host` comes from, when the host names one.
    */
+  build?: Build | undefined;
   /**
    * The copies this host keeps of the whole record (`33 §1` port 9). Absent, `snapshot`, `snapshots` and `restore`
    * refuse `NOT_IN_THIS_BUILD`.
@@ -821,7 +840,7 @@ export type RecordDeps = {
    * Remove this record from the host: its storage, its copies and its name (`53 §5.9`). It runs last, after every
    * check, and the record answers nothing afterwards. Absent, `deleteRecord` refuses `NOT_IN_THIS_BUILD`.
    */
-  destroy?: (() => Promise<void>) | undefined;  build?: Build | undefined;
+  destroy?: (() => Promise<void>) | undefined;
   /**
    * Why this host cannot take an invitation, or `null` when it can.
    *
@@ -3024,6 +3043,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           waiting: waitingFor(ctx),
           ...shellFor(ctx),
           signIn: invitations !== undefined && invitations() === null,
+          /* ONLY WHEN THE BUILD NAMES ONE: a key set to `undefined` still reads as `'host' in boot`, which is a host
+             that said something. */
+          ...(build?.host === undefined ? {} : { host: build.host }),
         });
       });
     },

@@ -67,6 +67,13 @@ export type Shell = Omit<Sample, 'me'> & {
    */
   recordsRefused?: string | undefined;
   /**
+   * Which host answered `boot`, when it said: Billing reads it before it falls back to asking the mail door.
+   *
+   * ABSENT ON THE SAMPLE AND ON A HOST OLDER THAN THE FIELD. `DEPLOYMENT.kind` is the sample's variant and reads
+   * `self-host` on the Cloud build, so it is not a stand-in for this (`routes/settings/billing.ts`).
+   */
+  host?: 'cloud' | 'self-host' | undefined;
+  /**
    * WHY THE RECORD ITSELF WOULD NOT ANSWER `boot`, when it would not.
    *
    * AN EMPTY RECORD AND A RECORD YOU MAY NOT READ ARE NOT THE SAME FACT AND MUST NOT DRAW THE SAME
@@ -548,6 +555,8 @@ export function layoutOf(b: Boot): Shell {
     now: Number.isFinite(Date.parse(b.now)) ? Date.parse(b.now) : Date.now(),
     live: true,
     upTo: b.whatsNew?.upTo ?? null,
+    /* ONLY THE TWO WORDS THE RECORD SENDS, as `signsIn` reads only `false`: anything else is a host that did not say. */
+    ...(b.host === 'cloud' || b.host === 'self-host' ? { host: b.host } : {}),
   };
 }
 

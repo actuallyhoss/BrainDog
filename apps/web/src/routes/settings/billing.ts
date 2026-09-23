@@ -17,9 +17,12 @@
  * only one host gives is `mintsMail`'s: 404 `ROUTE_UNKNOWN` at `/api/inbound/mint`, which the
  * self-host's `serveApi` answers and the Worker, whose mail door is real, never does. So a live
  * record keeps the self-host's sentence exactly where its host said it has no Cloud door, and every
- * other live record is told the thing that is true on both hosts. A `host` field on `boot` would
- * make this a read instead of an inference; until it exists, the inference can only err towards the
- * sentence that is true everywhere.
+ * other live record is told the thing that is true on both hosts.
+ *
+ * `host` MAKES IT A READ, AND THE INFERENCE IS NOW THE FALLBACK. `boot` carries the host's own word
+ * (`Build.host` in `@braindog/record`), so a self-host is one before its mail door has been asked,
+ * and a Cloud host is not taken for one because a read of that door failed. A host older than the
+ * field sends none, and is judged by the door as before.
  */
 
 import { copy } from '../../lib/copy.ts';
@@ -32,6 +35,8 @@ export const words = {
 export type Billed = {
   /** The shell's `live`: a record answered `boot`. The sample is the only record `DEPLOYMENT` describes. */
   live: boolean;
+  /** The shell's `host`: what `boot` said the host is, absent when it did not say. It wins over `mintsMail`. */
+  host?: 'cloud' | 'self-host' | undefined;
   /** `mintsMail`'s answer, `null` until the host has been asked. `false` is the self-host saying so. */
   mintsMail: boolean | null;
   /** `DEPLOYMENT.kind`, which is the variant the sample was built as. */
@@ -40,5 +45,6 @@ export type Billed = {
 
 export function billingLine(b: Billed): string {
   if (!b.live) return b.sample === 'self-host' ? copy.billingSelfHost : copy.billingCloud;
-  return b.mintsMail === false ? copy.billingSelfHost : words.notChargedYet;
+  const selfHost = b.host === undefined ? b.mintsMail === false : b.host === 'self-host';
+  return selfHost ? copy.billingSelfHost : words.notChargedYet;
 }

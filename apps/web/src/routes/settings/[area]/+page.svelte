@@ -2833,7 +2833,7 @@
         <!-- THE HOST'S ANSWER AND NOT THE BUILD'S. `DEPLOYMENT.kind` reads `self-host` in every shipped
              bundle, so a live Cloud record was told "This record runs on your own machine."
              (`research-first-sign-in.md` friction 5). `billing.ts` says what is asked instead. -->
-        <p class="hint">{billingLine({ live: shell.live, mintsMail: mintsHere, sample: DEPLOYMENT.kind })}</p>
+        <p class="hint">{billingLine({ live: shell.live, host: shell.host, mintsMail: mintsHere, sample: DEPLOYMENT.kind })}</p>
         <div class="row-actions">
           <Button weight="quiet" href="/usage"><Icon name="history" size="s" />{actionWords.seeUsage}</Button>
           <!-- AND THE SECOND LINK IS THE OWNER'S, because the screen it leads to is. `export` needs

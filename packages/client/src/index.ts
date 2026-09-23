@@ -69,6 +69,11 @@ export type Boot = {
   /** Each person on the record by name, by id: sent only to a caller who may read the membership list or People. */
   names?: Record<string, string>;
   /**
+   * Which host is serving the record, when the host said. ABSENT IS A HOST THAT DID NOT SAY, a test, the CLI or a host
+   * older than the field, and not a guess at either: a reader keeps whatever it inferred before the field existed.
+   */
+  host?: 'cloud' | 'self-host';
+  /**
    * The pages the caller may open, each with its place in the rail when it has one.
    *
    * `about` IS THE ROW THE PAGE CAME OUT OF, and `null` for a page somebody wrote. A declaration

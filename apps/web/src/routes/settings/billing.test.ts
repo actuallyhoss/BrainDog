@@ -30,6 +30,14 @@ test('a live self-host, which said so by having no mail door, keeps its own sent
   assert.equal(billingLine({ live: true, mintsMail: false, sample: 'cloud' }), copy.billingSelfHost);
 });
 
+test('a host that says it is a self-host is one, before anybody has asked its mail door', () => {
+  /* `mintsMail` IS `null` UNTIL THE DOOR ANSWERS, and a live self-host reached straight at Billing was told the Cloud's
+     default for as long as that took. `boot` now carries the host's own word, and the inference is only a fallback. */
+  assert.equal(billingLine({ live: true, host: 'self-host', mintsMail: null, sample: 'cloud' }), copy.billingSelfHost);
+  /* AND THE HOST'S WORD WINS OVER THE INFERENCE: a Cloud host is not a self-host because one read of its mail door failed. */
+  assert.equal(billingLine({ live: true, host: 'cloud', mintsMail: false, sample: 'self-host' }), words.notChargedYet);
+});
+
 test('the sample still says what the record it shows is, because that is the one thing the build knows', () => {
   assert.equal(billingLine({ live: false, mintsMail: null, sample: 'self-host' }), copy.billingSelfHost);
   assert.equal(billingLine({ live: false, mintsMail: true, sample: 'cloud' }), copy.billingCloud);
@@ -43,7 +51,7 @@ test('and the screen asks the shell whether this is a record before it believes 
   assert.ok(from >= 0, 'billing has no arm');
   const arm = page.slice(from, page.indexOf("{:else if area === '", from + 1));
   assert.doesNotMatch(arm, /DEPLOYMENT\.kind === 'self-host' \? copy\.billingSelfHost/u, 'billing still follows the build and not the host');
-  assert.match(arm, /billingLine\(\{ live: shell\.live, mintsMail: mintsHere, sample: DEPLOYMENT\.kind \}\)/u);
+  assert.match(arm, /billingLine\(\{ live: shell\.live, host: shell\.host, mintsMail: mintsHere, sample: DEPLOYMENT\.kind \}\)/u);
 });
 
 test('and Billing asks the mail door itself, or a self-host reached straight at Billing never says what it is', () => {

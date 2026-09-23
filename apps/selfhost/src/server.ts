@@ -1125,12 +1125,14 @@ export async function start(options: {
     sparkModel,
     /* NEWER VERSIONS IN THIS HOST'S CATALOGUE, for Spark to ask about on Decide. */
     ...(catalogueDir === undefined ? {} : { catalogueOffers: catalogueOffersFrom(catalogueDir) }),
+    snapshots: kept,
+    destroy,
     /* WHAT THIS HOST IS, for `/api/version` (`33 §4`). `BRAINDOG_BUILD` is the same variable name
        the Worker's deploy sets, so the answer has the same shape on both hosts; a self-host started
        from a checkout has none, and the record then says `app: null` rather than inventing one.
-       `spark` is whether a model is behind Spark here: an endpoint, and a key to call it with or none needed. */
-    snapshots: kept,
-    destroy,    build: { app: buildApp, spark: sparkModel !== undefined },
+       `spark` is whether a model is behind Spark here: an endpoint, and a key to call it with or none needed.
+       `host` is for `boot`, so Billing reads that this is a self-host rather than inferring it from the mail door's 404. */
+    build: { app: buildApp, spark: sparkModel !== undefined, host: 'self-host' },
   });
 
   const refused = api.kernel.refused();

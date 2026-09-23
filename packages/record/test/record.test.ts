@@ -478,6 +478,26 @@ test('and it says what this build is and what is serving it, which nothing asked
   bare.close();
 });
 
+test('AND `boot` SAYS WHICH HOST IS SERVING IT, when the host said, and nothing when it did not', async () => {
+  /* BILLING INFERRED THE SELF-HOST FROM A 404 ON THE MAIL DOOR (`loop/research-held-landing.md` friction 5), because
+     `boot` named the record and the caller and nothing about the host, and the only host fact the app could read was
+     which routes answered. The field is copied from `Build`, so a host that was not asked has no key at all rather
+     than a value it never gave: `version` answers its six keys exactly, and this is not one of them. */
+  for (const host of ['self-host', 'cloud'] as const) {
+    const sql = openSqlite();
+    const api = await createRecordApi({ sql, clock: fixedClock(NOW), sign: SIGNER, build: { app: '', spark: false, host } });
+    assert.equal(value<{ host?: string }>(await api.boot(owner)).host, host);
+    assert.deepEqual(Object.keys(value<Record<string, unknown>>(await api.version(owner))).sort(), ['app', 'format', 'kernel', 'primitives', 'spark', 'version']);
+    sql.close();
+  }
+  for (const build of [{ app: '', spark: false }, undefined]) {
+    const sql = openSqlite();
+    const api = await createRecordApi({ sql, clock: fixedClock(NOW), sign: SIGNER, ...(build ? { build } : {}) });
+    assert.ok(!('host' in value<object>(await api.boot(owner))), `a host that never said is not a host, build ${JSON.stringify(build)}`);
+    sql.close();
+  }
+});
+
 test('AND `boot` SAYS WHAT INSTANT IT ANSWERED AS OF', async () => {
   /* A record is opened with an injected clock so a fixture can pin one instant, and the sample
      record this product demonstrates itself with is exactly such a fixture: its rows are dated
