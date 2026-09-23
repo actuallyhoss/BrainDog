@@ -8,6 +8,7 @@
     "./actions": "./src/actions.ts",
     "./auth": "./src/auth.ts",
     "./connector": "./src/connector.ts",
+    "./limits": "./src/limits.ts",
     "./script": "./src/script.ts",
     "./script-try": "./src/script-try.ts",
     "./spark": "./src/spark.ts",
