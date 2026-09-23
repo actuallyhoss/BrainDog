@@ -53,12 +53,18 @@ export type Bytes = Uint8Array<ArrayBuffer>;
  * So the check happens here, once, and it is a real check: `buffer instanceof ArrayBuffer` is the thing the
  * DOM's `BufferSource` is asking about, and the cast sits inside the branch that has just proved it.
  *
- * THE OTHER BRANCH COPIES AND IS UNREACHABLE IN BOTH HOSTS, since neither allocates over a
- * `SharedArrayBuffer`. It is a copy rather than a throw because the argument may be key material and a
- * refusal mid-unseal strands a credential, where a copy merely fails to be zeroed on a path nothing takes.
+ * THE COPYING BRANCH IS UNREACHABLE IN BOTH HOSTS, since neither allocates over a `SharedArrayBuffer`. It is
+ * a copy rather than a throw because the argument may be key material and a refusal mid-unseal strands a
+ * credential, where a copy merely fails to be zeroed on a path nothing takes.
+ *
+ * AND A BARE `ArrayBuffer` IS WRAPPED, NOT COPIED, because that is what the Durable Object's SQLite hands back
+ * for a BLOB. Before this branch it fell into `Uint8Array.from`, which makes an `ArrayBuffer` an EMPTY array:
+ * the nonce was zero bytes long, and no value sealed on the Worker ever opened again, every read answering
+ * `WRONG_KEY` (`apps/worker/test/vault-imported-row.test.ts`, measured 23 September). The self-host's
+ * `node:sqlite` hands back a `Uint8Array`, which is why only the Worker lost its keys.
  */
-const view = (bytes: Uint8Array): Bytes =>
-  bytes.buffer instanceof ArrayBuffer ? (bytes as Bytes) : Uint8Array.from(bytes);
+const view = (bytes: Uint8Array | ArrayBuffer): Bytes =>
+  bytes instanceof ArrayBuffer ? new Uint8Array(bytes) : bytes.buffer instanceof ArrayBuffer ? (bytes as Bytes) : Uint8Array.from(bytes);
 
 const UNIT = '\u001f';
 /* `Uint8Array.from`, AND NOT `encode` ALONE: `TextEncoder.encode` is declared to return the wide array under
