@@ -3346,12 +3346,34 @@ const UNREAD: Readonly<Record<RoleKey, string>> = { rates: 'rates no figure conv
  * list is the one told, which is the list that caused it. `legacyShaped` decides whether it would hold the role, so an
  * `fx` of sound effects still installs beside the rates.
  */
-function keylessBeside(key: RoleKey, decl: Declaration, installed?: Known): Refusal | null {
+function keylessBeside(key: RoleKey, decl: Declaration, installed?: Known, owners?: Owners, held?: ReadonlySet<string>): Refusal | null {
   if (decl.kind !== 'register' || decl.body[key] !== undefined) return null;
   const self = String(ownId(decl));
   if (!legacyShaped(key, { ...(decl.body as unknown as RoleList), id: self })) return null;
   for (const [other, body] of installed ?? []) {
     if (other === decl.id || !other.startsWith('register.') || body[key] === undefined) continue;
+    /* A LIST THE RECORD ALREADY HOLDS CANNOT BE INSTALLED UNDER ANOTHER ID. A record that took a keyless `fx` beside
+       `rates` before this guard existed met it on `fx`'s next update, and was told to "install fx under another id", which
+       nothing can do to a declaration that is there: an id is not renamed. What such a list can do is give its rows to
+       the list that holds the role and go, by a retire when it is the owner's and by a version without it when a pack's,
+       so that is the sentence (`test/roles-keyless-held.test.ts`). `held` is what the record held before the batch,
+       since `installed` has the batch laid over it and cannot say. */
+    /* AND ONLY WHEN THE DECLARING LIST WAS HELD TOO. With `fx` held alone and `rates` arriving in the same batch, `fx`
+       first, this said "register.fx has sat beside register.rates ... since before", of a `rates` that was not there
+       yet. The list that caused it is the arriving one, and its own check says so ("Declare rates: on fx instead"), so
+       the pair is left to it (`test/lint-planned.test.ts`). */
+    if (held?.has(decl.id) === true && !held.has(other)) continue;
+    if (held?.has(decl.id) === true) {
+      const pack = owners?.get(decl.id) ?? null;
+      const home = other.slice('register.'.length);
+      return bad(
+        'DECLARATION_INVALID',
+        `${decl.id} has sat beside ${other}, which holds ${HOLDS[key]}, since before one list was held to them, so it holds ${UNREAD[key]}, and this change keeps it there. Move its rows into ${home}, then ${
+          pack === null ? `retire ${decl.id}` : `update ${pack} to a version that leaves ${self} out`
+        }.`,
+        'id',
+      );
+    }
     return bad(
       'DECLARATION_INVALID',
       `${other} already holds ${HOLDS[key]}, and a keyless ${self} shaped like them beside it would hold ${UNREAD[key]}. Install ${self} under another id, or keep ${HOLDS[key]} in ${other.slice('register.'.length)}.`,
@@ -3445,8 +3467,12 @@ function keyFault(
  * `installed` IS OPTIONAL AND ITS ABSENCE IS NOT A FAILURE. Two checks are about a pair of documents
  * rather than about one — a page's registers and a `create`'s axes — and a caller with no view of the
  * record must get the same answer it always got rather than a refusal it cannot act on.
+ *
+ * `held` IS THE IDS THE RECORD HELD BEFORE THIS BATCH, which `installed` cannot say once the batch is laid over it. Only
+ * `keylessBeside` reads it, to tell a list that is already there something it can do; absent, every list is read as
+ * arriving, as it was.
  */
-export function validate(decl: Declaration, installed?: Known, owners?: Owners): Refusal | null {
+export function validate(decl: Declaration, installed?: Known, owners?: Owners, held?: ReadonlySet<string>): Refusal | null {
   /* `KIND_UNKNOWN` IS THE CODE `04 §5` GIVES THIS, and it was emitted by nothing while this line
      answered `DECLARATION_INVALID`. A registry entry no source file produces is a code a caller
      cannot handle and a fixture nobody can write — which is the whole subject of `30 §6`. */
@@ -3981,7 +4007,7 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
     if (fault) return fault;
   }
   for (const key of ['rates', 'meets'] as const) {
-    const fault = keylessBeside(key, decl, installed);
+    const fault = keylessBeside(key, decl, installed, owners, held);
     if (fault) return fault;
   }
   /* ONE FIELD SAYS WHERE A ROW APPLIES, or one row could be in two places with two sets of rules. */
@@ -4064,7 +4090,7 @@ export async function installDeclarations(
 ): Promise<Result<Installed[]>> {
   const off = disabledPackFault(sql, batch);
   if (off) return { ok: false, refusal: off };
-  const staged = await stageDeclarations(batch, knownTo(sql, batch), ownersTo(sql, batch));
+  const staged = await stageDeclarations(batch, knownTo(sql, batch), ownersTo(sql, batch), heldIn(sql));
   /* PASSED THROUGH WHOLE. Rebuilding the envelope by hand dropped whichever arm the rebuild did
      not know about, and there are three of them now. */
   if (!staged.ok) return staged;
@@ -4085,29 +4111,51 @@ export async function installDeclarations(
  */
 /** Who declared what, from the column rather than from the body — see `Owners`. */
 /**
+ * The record a plan leaves, for a check asked before anything is written: what each declaration says, and who put it
+ * there. `Known` and `Owners` with no batch laid over them.
+ *
+ * FOR THE ARRANGER, WHICH PLANS SEVERAL PACKS AND WRITES NONE OF THEM UNTIL THE ACCEPT. The second pack of an arrangement
+ * is staged over the record the first leaves, and a lint that read the table asked it about a record the accept never
+ * shows it: a list the first update retires was still there to be held against it, and a list the first declares was
+ * not there to read a page against (`test/lint-planned.test.ts`).
+ */
+export type PlannedRecord = { known: Known; owners: Owners };
+
+/**
  * Validate a batch against the record as it would be once the batch lands, and write nothing.
  *
  * FOR A PROPOSAL, which is read by a person before it is installed. A declaration the gate would accept and the install
  * would then refuse is a question answered for nothing, so the same checks run when it is filed.
+ *
+ * `planned` IS THE RECORD TO LAY THE BATCH ON IN PLACE OF THE TABLE. The disabled pack is still read from the table: a
+ * plan turns no pack off, and the arranger turns a disabled pack on rather than installing over it (`expand`).
  */
-export function lintBatch(sql: Sql, batch: readonly Declaration[]): Refusal | null {
+export function lintBatch(sql: Sql, batch: readonly Declaration[], planned?: PlannedRecord): Refusal | null {
   const off = disabledPackFault(sql, batch);
   if (off) return off;
-  const known = knownTo(sql, batch);
-  const owners = ownersTo(sql, batch);
+  const known = knownTo(sql, batch, planned);
+  const owners = ownersTo(sql, batch, planned);
+  const held = heldIn(sql, planned);
   for (const decl of batch) {
-    const fault = validate(decl, known, owners);
+    const fault = validate(decl, known, owners, held);
     if (fault) return fault;
   }
   return doorsKept(batch, known);
 }
 
-function ownersTo(sql: Sql, batch: readonly Declaration[]): Owners {
-  const owners = new Map<string, string | null>();
-  for (const row of sql.all<{ id: string; pack_id: string | null }>(
-    'SELECT id, pack_id FROM declaration WHERE superseded_at IS NULL AND retired = 0',
-  ))
-    owners.set(row.id, row.pack_id);
+/** The ids the record holds before a batch lands: the table's live declarations, or the plan's. */
+function heldIn(sql: Sql, planned?: PlannedRecord): ReadonlySet<string> {
+  if (planned !== undefined) return new Set(planned.known.keys());
+  return new Set(sql.all<{ id: string }>('SELECT id FROM declaration WHERE superseded_at IS NULL AND retired = 0').map((r) => r.id));
+}
+
+function ownersTo(sql: Sql, batch: readonly Declaration[], planned?: PlannedRecord): Owners {
+  const owners = new Map<string, string | null>(planned?.owners ?? []);
+  if (planned === undefined)
+    for (const row of sql.all<{ id: string; pack_id: string | null }>(
+      'SELECT id, pack_id FROM declaration WHERE superseded_at IS NULL AND retired = 0',
+    ))
+      owners.set(row.id, row.pack_id);
   /* THE BATCH OVERLAYS THE TABLE, exactly as `knownTo` does — a pack installing a register and a
      rule that writes into it in one call must not refuse itself because the register is not in the
      table yet. */
@@ -4115,19 +4163,20 @@ function ownersTo(sql: Sql, batch: readonly Declaration[]): Owners {
   return owners;
 }
 
-function knownTo(sql: Sql, batch: readonly Declaration[]): Known {
-  const known = new Map<string, Record<string, Json>>();
-  for (const row of sql.all<{ id: string; body: string }>(
-    'SELECT id, body FROM declaration WHERE superseded_at IS NULL AND retired = 0',
-  ))
-    try {
-      known.set(row.id, JSON.parse(row.body) as Record<string, Json>);
-    } catch {
-      /* A ROW THIS PACKAGE CANNOT PARSE STILL EXISTS, and that is the fact the caller needs. An
-         unparseable body is a bug somewhere else; refusing a page because of it would blame the
-         page. */
-      known.set(row.id, {});
-    }
+function knownTo(sql: Sql, batch: readonly Declaration[], planned?: PlannedRecord): Known {
+  const known = new Map<string, Record<string, Json>>(planned?.known ?? []);
+  if (planned === undefined)
+    for (const row of sql.all<{ id: string; body: string }>(
+      'SELECT id, body FROM declaration WHERE superseded_at IS NULL AND retired = 0',
+    ))
+      try {
+        known.set(row.id, JSON.parse(row.body) as Record<string, Json>);
+      } catch {
+        /* A ROW THIS PACKAGE CANNOT PARSE STILL EXISTS, and that is the fact the caller needs. An
+           unparseable body is a bug somewhere else; refusing a page because of it would blame the
+           page. */
+        known.set(row.id, {});
+      }
   for (const decl of batch) known.set(decl.id, decl.body);
   return known;
 }
@@ -4144,9 +4193,10 @@ export async function stageDeclarations(
   batch: readonly Declaration[],
   known?: Known,
   owners?: Owners,
+  held?: ReadonlySet<string>,
 ): Promise<Result<(sql: Sql, now: number, transaction: <T>(fn: () => T) => T, expect?: Expected | Expected[]) => Result<Installed[]>>> {
   for (const decl of batch) {
-    const wrong = validate(decl, known, owners);
+    const wrong = validate(decl, known, owners, held);
     if (wrong) return { ok: false, refusal: wrong };
   }
   const unread = known === undefined ? null : doorsKept(batch, known);

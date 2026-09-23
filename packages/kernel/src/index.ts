@@ -45,8 +45,11 @@ import {
   type Declaration,
   type Expected,
   type Installed,
+  type Known,
+  type Owners,
   type PackConfig,
   type PackToggle,
+  type PlannedRecord,
 } from './declare.ts';
 import { project, projectedText, rebuild, search as ftsSearch, searchMatched as ftsSearchMatched, type Hit, type Searched } from './fts.ts';
 import { checkBrainl, exportBrainl, importBrainl, signBrainl, type Section, type Signer } from './brainl.ts';
@@ -347,7 +350,7 @@ export type { Aggregation, EvalContext, FxRead, Group, Lookups, MetricDecl, Read
 export type { BindGrantArgs, GrantKind, GrantRow, LeasedSeal, SealedGrant } from './vault.ts';
 export type { Claimed, Drained, Handler, ScheduleKind } from './schedule.ts';
 export type { Hit } from './fts.ts';
-export type { ConfigDecl, ConfigType, Declaration, DeclKind, Expected, Installed, PackConfig, PackToggle } from './declare.ts';
+export type { ConfigDecl, ConfigType, Declaration, DeclKind, Expected, Installed, Known, Owners, PackConfig, PackToggle, PlannedRecord } from './declare.ts';
 export { CONFIG_TYPES, configReads, configValue, fillConfig, readConfig } from './declare.ts';
 
 /**
@@ -951,11 +954,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   let prefixes = new Map<string, string>();
 
   function reload(): void {
-    registers = new Map();
-    prefixes = new Map();
-    const rows = sql.all<{ id: string; body: string }>(
-      "SELECT id, body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0",
-    );
+    ({ registers, prefixes } = listsOf(
+      sql.all<{ id: string; body: string }>("SELECT id, body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0"),
+    ));
+  }
+
+  /** The list cache `reload` keeps, built from register bodies: each list by its id, and each spoken prefix to its list. */
+  function listsOf(rows: readonly { body: string }[]): { registers: Map<string, RegisterDecl>; prefixes: Map<string, string> } {
+    const registers = new Map<string, RegisterDecl>();
+    const prefixes = new Map<string, string>();
     for (const row of rows) {
       const decl = JSON.parse(row.body) as RegisterDecl;
       /**
@@ -978,8 +985,64 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       registers.set(decl.id, decl);
       if (decl.seq_prefix !== undefined && decl.seq_prefix !== '#') prefixes.set(decl.seq_prefix, decl.id);
     }
+    return { registers, prefixes };
   }
   reload();
+
+  /**
+   * The record a lint is asking about when it is not the table: set only inside `againstPlan`, and `null` otherwise.
+   *
+   * THE INSTALL CHECKS READ THE RECORD IN TWO PLACES, the table and the list cache, and the arranger needs them to read a
+   * record that is planned and not written. Wave forty-eight asked the planned record `validate` alone, through
+   * `declare`'s `stagedFault`, because nothing else would take one, and five arrangements the accept then refused were
+   * filed (`test/lint-planned.test.ts`, `packages/record/test/arrange-kernel-lint.test.ts`). The checks read the record
+   * through `heldRow` and `heldRows`, which answer from here when it is set, and the cache is swapped for the plan's.
+   */
+  let planned: PlannedRecord | null = null;
+
+  /** A live declaration by id, as the table holds it or as the plan does. A plan's kind is its id's first word. */
+  function heldRow(id: string): { kind: string; body: string; pack_id: string | null } | undefined {
+    if (planned === null)
+      return sql.one<{ kind: string; body: string; pack_id: string | null }>('SELECT kind, body, pack_id FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0', id) ?? undefined;
+    const body = planned.known.get(id);
+    return body === undefined ? undefined : { kind: id.slice(0, id.indexOf('.')), body: JSON.stringify(body), pack_id: planned.owners.get(id) ?? null };
+  }
+
+  /** Every live declaration of these kinds, by id, from the table or the plan. */
+  function heldRows(kinds: readonly string[]): { id: string; kind: string; body: string; pack_id: string | null }[] {
+    if (planned === null)
+      return sql.all<{ id: string; kind: string; body: string; pack_id: string | null }>(
+        `SELECT id, kind, body, pack_id FROM declaration WHERE superseded_at IS NULL AND retired = 0 AND kind IN (${kinds.map(() => '?').join(', ')}) ORDER BY id`,
+        ...kinds,
+      );
+    return [...planned.known.keys()]
+      .filter((id) => kinds.includes(id.slice(0, id.indexOf('.'))))
+      .sort()
+      .map((id) => ({ id, ...heldRow(id)! }));
+  }
+
+  /**
+   * `fn` with the checks reading `plan` in place of the record, and the record put back after, whatever `fn` does.
+   *
+   * THE LIST CACHE IS SWAPPED AND NOT THREADED. `schemaOf`, `evalContext` and every check that reads a list's fields read
+   * `registers`, and a parameter through each would have touched every reader of the cache, the write path's included,
+   * to change what seven checks see. Everything under it is synchronous, so nothing else runs while the plan is in place.
+   */
+  function againstPlan<T>(plan: PlannedRecord | undefined, fn: () => T): T {
+    if (plan === undefined) return fn();
+    const was = { registers, prefixes, planned };
+    ({ registers, prefixes } = listsOf(
+      [...plan.known]
+        .filter(([id, body]) => id.startsWith('register.') && typeof body.id === 'string')
+        .map(([, body]) => ({ body: JSON.stringify(body) })),
+    ));
+    planned = plan;
+    try {
+      return fn();
+    } finally {
+      ({ registers, prefixes, planned } = was);
+    }
+  }
 
   /**
    * One transaction, and a re-entrant call runs inside its caller's.
@@ -1614,7 +1677,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const id = `ingest.${door}`;
       const mine = batch.find((d) => d.id === id);
       if (mine !== undefined) return mine.body;
-      const row = sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0', id);
+      const row = heldRow(id);
       try {
         return row ? (JSON.parse(row.body) as unknown) : undefined;
       } catch {
@@ -1645,8 +1708,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     was: { type?: unknown; of?: unknown; values?: unknown; retired?: unknown } | undefined,
   ): { rule: string; verb: 'tag' | 'untag'; at: string; word?: string } | null {
     const sent = new Map(batch.filter((d) => d.kind === 'rule').map((d) => [d.id, d.body as unknown]));
-    const stored = sql
-      .all<{ id: string; body: string }>("SELECT id, body FROM declaration WHERE kind = 'rule' AND superseded_at IS NULL AND retired = 0 ORDER BY id")
+    const stored = heldRows(['rule'])
       .filter((row) => !sent.has(row.id))
       .flatMap((row) => {
         try {
@@ -1691,7 +1753,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   function taggingRefused(batch: readonly Declaration[]): Refusal | null {
     const doorOf = doorsOf(batch);
     const held = (id: string): unknown => {
-      const row = sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0', id);
+      const row = heldRow(id);
       if (row === undefined || row === null) return undefined;
       try {
         return JSON.parse(row.body) as unknown;
@@ -1715,8 +1777,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       ...batch.filter((d) => d.kind === 'rule').map((d) => ({ id: d.id, body: d.body as unknown })),
       ...(moved.size === 0
         ? []
-        : sql
-            .all<{ id: string; body: string }>("SELECT id, body FROM declaration WHERE kind = 'rule' AND superseded_at IS NULL AND retired = 0 ORDER BY id")
+        : heldRows(['rule'])
             .filter((row) => !sent.has(row.id))
             .flatMap((row) => {
               try {
@@ -2081,7 +2142,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     for (const decl of batch) {
       if (decl.kind !== 'register') continue;
       const register = ownId(decl);
-      const was = sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0', decl.id);
+      const was = heldRow(decl.id);
       if (!was) continue;
       let before: Map<string, Field>;
       try {
@@ -2094,10 +2155,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const opened = [...before].filter(([id, f]) => after.has(id) && widens(f, after.get(id)!)).map(([id]) => id);
       if (gone.length === 0 && opened.length === 0) continue;
 
-      readers ??= sql
-        .all<{ id: string; kind: string; body: string; pack_id: string | null }>(
-          "SELECT id, kind, body, pack_id FROM declaration WHERE superseded_at IS NULL AND retired = 0 AND kind IN ('metric', 'rule', 'page', 'ingest')",
-        )
+      readers ??= heldRows(['metric', 'rule', 'page', 'ingest'])
         .flatMap((row): (Declaration & { rebatched: boolean })[] => {
           /* A READER THE BATCH REWRITES IS ASKED IN THE WORDS THE BATCH SENDS. Passed over as "the batch's, and checked
              with it", a figure resent with only its `name` changed kept `lane is earning money` and went from 1 to 0
@@ -2129,12 +2187,12 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           if (moved) return wordMoved(decl, register, reader, moved);
           continue;
         }
-        const now = unreadable([reader]) ?? lintBatch(sql, [reader]);
+        const now = unreadable([reader]) ?? lintBatch(sql, [reader], planned ?? undefined);
         if (now) continue;
         /* THIS LIST ALONE BESIDE THE READER, not the whole batch. A page over two lists that both change in one batch
            was first blamed on whichever came first in it, and the sentence named the wrong list and every field it
            lost; asked one list at a time, the refusal is about the list that took the field away. */
-        const then = unreadable([decl, reader]) ?? lintBatch(sql, [decl, reader]);
+        const then = unreadable([decl, reader]) ?? lintBatch(sql, [decl, reader], planned ?? undefined);
         const { called, what, list } = spoken(decl, register, reader);
         if (!then) {
           const moved = opened.length === 0 ? null : movedWord(reader, register, opened, after);
@@ -2162,6 +2220,18 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       }
     }
     return null;
+  }
+
+  /**
+   * What `stageInstall` refuses before it stages anything, in its order: every check a pack meets on its path.
+   *
+   * ONE LIST FOR THE STAGE AND THE LINT, so what an arrangement is filed on and what its accept answers cannot drift. The
+   * lint asked three of these six, `unreadable`, `lintBatch` and `unserved`, and the arranger asked none of them of a
+   * planned record. `lintBatch` reads the plan when `againstPlan` has set one, and the others read it through the cache
+   * and `heldRow`.
+   */
+  function stagingFault(batch: readonly Declaration[]): Refusal | null {
+    return unreadable(batch) ?? lintBatch(sql, batch, planned ?? undefined) ?? unserved(batch) ?? stranded(batch) ?? tagsNarrowed(batch) ?? taggingRefused(batch);
   }
 
   /**
@@ -6301,7 +6371,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          AND ITS LIST HALF (`tagsNarrowed`), which counts rules and not rows, so it is not `plan`'s to ask. Asked by rule
          alone, a pack that narrowed Jobs' `tags` to `list<enum>` of `[chase]`, or to `int`, under an installed `rule.late`
          staged, applied and left the next Rent untagged (`loop/research-batch-thirty-nine-audit.md` finding 5). */
-      const cannot = unreadable(batch) ?? lintBatch(sql, batch) ?? unserved(batch) ?? stranded(batch) ?? tagsNarrowed(batch) ?? taggingRefused(batch);
+      const cannot = stagingFault(batch);
       if (cannot) return { ok: false as const, refusal: cannot };
       const staged = await stageDeclarations(batch);
       if (!staged.ok) return staged;
@@ -6327,13 +6397,18 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     },
 
     /**
-     * The checks an install runs, and nothing written: what an arrangement is held to when it is filed.
+     * The checks `stageInstall` runs, and nothing written: what an arrangement is held to when it is filed.
      *
      * THE BATCH OVERLAYS WHAT IS INSTALLED, so a page over a list a pack in the same arrangement declares is
      * linted against that list, and the owner is never the one who finds a page that would not install.
+     *
+     * `known` AND `owners` ARE THE RECORD TO LAY IT OVER IN PLACE OF THE TABLE, with no batch in them: for the arranger,
+     * the record as the packs before this one would leave it (`declare`'s `plannedState`). Absent, the record is the
+     * table. Only the rows are always the table's, since a plan writes none: the counts a figure groups by, and whether a
+     * pack is off. `owners` left out reads every declaration in `known` as the owner's own.
      */
-    lint(batch: readonly Declaration[]): Refusal | null {
-      return unreadable(batch) ?? lintBatch(sql, batch) ?? unserved(batch);
+    lint(batch: readonly Declaration[], known?: Known, owners?: Owners): Refusal | null {
+      return againstPlan(known === undefined ? undefined : { known, owners: owners ?? new Map() }, () => stagingFault(batch));
     },
 
     /**
