@@ -36,6 +36,7 @@ import {
   type SparkHostConfig,
 } from '@braindog/host/spark';
 import { sparkAskDoor, type SparkAskDoor } from '@braindog/host';
+import type { SparkAnswer } from '@braindog/host/spark-answers';
 import type { Clock, Sql } from '@braindog/ports';
 import type { CallContext, RecordApi, SparkModel } from '@braindog/record';
 import type { Spark } from '@braindog/spark';
@@ -112,6 +113,47 @@ export async function sparkEngineFor(
   /* GUARDED BY THIS HOST, because tier `b`'s drafts are on this host's key and the package meters tier `a` alone, and
      because `configure` checks a grant id's shape and never the vault (`sparkGuardedEngine`). */
   return sparkGuardedEngine(engine, { sql: deps.sql, clock: deps.clock, grants: () => api().kernel.grants() });
+}
+
+/**
+ * What answers an automation's question to Spark on this host, or nothing: `serveAsks`'s `answer`, one job at a time.
+ *
+ * `undefined` EXACTLY WHERE `sparkEngineFor` IS, AND DECIDED WITHOUT AN `await`, because `server.ts` reads it to set the
+ * record's `answersSpark` before the record is opened. The test is the builder's own (`sparkInferenceOf`), so the switch
+ * that admits `ask_spark` at install and the engine that answers it cannot come to disagree, and a self-host with no
+ * `SPARK_ENDPOINT` still never evaluates `@braindog/spark` (`46 §5.1`).
+ *
+ * THE ENGINE IS BUILT ONCE, ON THE FIRST QUESTION, THROUGH `sparkEngineFor`, so it is the guarded one: tiers `b` and
+ * `byo` spend the one `ask_cap` a person's read does (Q2's default, built in Brief C). A second engine beside the door's,
+ * over the same Spark SQLite, because both read `settings` and `call` on every ask and hold nothing of their own. A build
+ * that throws is let go, so the next pass builds again rather than every question after it failing on one bad import.
+ *
+ * EACH QUESTION IS ASKED ON A WIRE SIGNED `rule:<id>`, so the vault's `grant.read` for the owner's `spark` key names the
+ * rule that opened it and not `system`, which is what a scheduled action signs. This never calls `sparkByokFor`: a rule
+ * has no session for the vault's gate to read, and installing a rule that asks Spark is the owner's consent to its
+ * question going to this host's model (`loop/research-infer-ask-next.md` §4, Q3's default). Tier `b`'s own key is never
+ * opened here either; the package answers on this host's model on every tier (Q4's default).
+ */
+export function sparkAnswersFor(
+  config: SparkConfig | undefined,
+  api: () => RecordApi,
+  store: KeyStore | undefined,
+  deps: SparkEngineDeps,
+): SparkAnswer | undefined {
+  if (!config || sparkInferenceOf(config, wireOf(config, api, store)) === undefined) return undefined;
+  let built: Promise<Spark | undefined> | null = null;
+  return async (ask) => {
+    built ??= sparkEngineFor(config, api, store, deps).catch((e: unknown) => {
+      built = null;
+      throw e;
+    });
+    const engine = await built;
+    const inference = sparkInferenceOf(config, wireOf(config, api, store, `rule:${ask.rule}`));
+    /* NEITHER IS REACHABLE WHILE THE TEST ABOVE HOLDS, and a thrown sentence here becomes the ladder's `failed` ack
+       rather than an answer nobody asked for. */
+    if (engine === undefined || inference === undefined) throw new Error('Spark has no model on this host to answer with.');
+    return engine.answer(ask, inference);
+  };
 }
 
 /**

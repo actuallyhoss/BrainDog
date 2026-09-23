@@ -67,12 +67,13 @@ import {
   type Send,
 } from './actions.ts';
 import { pagedRunner } from '@braindog/host/connector';
+import { serveAsks } from '@braindog/host/spark-answers';
 import { grantNamed, holdingScript } from '@braindog/host/script';
 import { askerOf, scriptTrial, trialSandbox } from '@braindog/host/script-try';
 import { runInQuickJs } from '@braindog/script/quickjs';
 import { scriptSandbox } from './script.ts';
 import { httpFor } from './http.ts';
-import { sparkDoor, sparkFromEnv, sparkModelFor, type SparkConfig } from './spark.ts';
+import { sparkAnswersFor, sparkDoor, sparkFromEnv, sparkModelFor, type SparkConfig } from './spark.ts';
 import type { KeyStore } from './keys.ts';
 import { shellOf } from './shell.ts';
 import { signerFor } from './sign.ts';
@@ -888,6 +889,10 @@ export async function start(options: {
      time. `destroy` removes it with the record. */
   const sparkFile = options.file === ':memory:' ? null : joinPath(dirOf(options.file), 'spark.sqlite');
   const sparkSql = openSqlite(sparkFile ?? ':memory:');
+  /* WHAT ANSWERS AN AUTOMATION'S QUESTION TO SPARK, from the same config and the same key path as `sparkModel`, so the
+     record's `answersSpark` below and `/api/version`'s `spark` are one fact. Before this, a self-host with a model
+     refused `ask_spark` at install as if it had none (`test/spark-answers.test.ts`). */
+  const answers = sparkAnswersFor(sparkConfig, () => api, options.keys, { sql: sparkSql, clock });
 
   /**
    * Drain everything due, then re-arm.
@@ -908,7 +913,11 @@ export async function start(options: {
 
   /* `pull.fetch` IS THE RUNNER'S WHEN THE RUNNER IS ON. A deliverer handed the same kind would lease a scheduled
      action's job and send it without the origin check, the redirect rule or the cap. */
-  const delivers: readonly OutboxKind[] = options.actions ? (options.delivers ?? []).filter((k) => k !== 'pull.fetch') : (options.delivers ?? []);
+  /* AND `infer.ask` IS NEVER A DELIVERER'S, WITH A MODEL OR WITHOUT ONE. A `Deliver` returns `void`, so the pump acks the
+     job `done` with no `result`, and the run it answers ends on "Spark answered job ... with no text": measured in
+     `test/spark-answers.test.ts`, a deliverer handed every kind was handed the question. Only `serveAsks` in `poll` leases
+     it, and only where there is a model to ask. */
+  const delivers: readonly OutboxKind[] = (options.delivers ?? []).filter((k) => k !== 'infer.ask' && (!options.actions || k !== 'pull.fetch'));
 
   /**
    * One pass of the scheduled actions, never two at once.
@@ -985,6 +994,17 @@ export async function start(options: {
    */
   const poll = async (): Promise<void> => {
     await act();
+    /* THE QUESTIONS TO SPARK, HERE AND NOT IN `act()`, which returns on its first line when `options.actions` is absent,
+       as it is for every embedder and every test that does not pass it; a pass there left a record admitting the step and
+       a host that never asked it (`loop/research-infer-ask-next.md` §5). And before the line below, because production's
+       `start()` passes no `deliver` (`main.ts`). `serveAsks` catches what `answer` throws; this `try` is for the lease. */
+    if (answers && !gone) {
+      try {
+        await serveAsks(api.kernel, answers, scheduler);
+      } catch (e) {
+        console.error('spark answers:', e instanceof Error ? e.message : String(e));
+      }
+    }
     if (!options.deliver) return;
     let jobs: OutboxRow[];
     try {
@@ -1056,7 +1076,13 @@ export async function start(options: {
     sql,
     clock,
     scheduler,
-    delivers: options.actions ? [...delivers, 'pull.fetch'] : delivers,
+    /* `infer.ask` RINGS THE DOORBELL WHERE A MODEL ANSWERS IT, because the doorbell is `poll` and `poll` is where the
+       pass runs; without it a queued question waited for the fifteen-second belt, which a test passing `pollMs: 0` has not
+       got. The pump's own list leaves it out, above. */
+    delivers: [...delivers, ...(options.actions ? (['pull.fetch'] as const) : []), ...(answers ? (['infer.ask'] as const) : [])],
+    /* THE RECORD'S SWITCH FOR `ask_spark`, ON EXACTLY WHERE THE PASS ABOVE HAS SOMETHING TO ASK WITH. Off, install refuses
+       the step with `NOT_IN_THIS_BUILD` (Brief A's `unserved`), which is the honest answer on a host with no model. */
+    answersSpark: answers !== undefined,
     sign,
     invitations: () => invitesOff,
     /* WHAT AN AGENT MAY PROPOSE INSTALLING: the first-party packs and the starter use cases (`catalogue.ts`). */
