@@ -113,7 +113,7 @@ import {
 import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provisioned } from './provision.ts';
 import { dayIn, stampFinished } from './finished.ts';
 import type { StepsDecl } from './steps.ts';
-import { partnerOf, pairsReads, type PairsDecl } from './pairs.ts';
+import { isMechanism, markPinned, neighboursOf, pairsReads, settle, PAIRS_ACTOR, type PairsDecl, type Pairing } from './pairs.ts';
 import { costOf, costRank } from './weigh.ts';
 import { evaluateMetric, predicateOf, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { readBlock, readPage, registersOf, registersOfBlock, resolvePages, type ActivityEvent, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
@@ -3560,7 +3560,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           to: Object.fromEntries(Object.entries(merged).map(([k, v]) => [k, shown(register, k, v) ?? null])) as Json,
           ...(w.opId === undefined ? {} : { opId: w.opId }),
         });
-        const paired = pairUp(entry, decl, w, w.batch ?? batch, now);
+        const paired = settlePairs(entry, null, decl, w.batch ?? batch, now) ? byId(entry.id, true) : null;
         const changed = Object.keys(merged);
         if (paired && decl.pairs && !changed.includes(decl.pairs.mark)) changed.push(decl.pairs.mark);
         return ok(rules(paired ?? entry, register, w, batch, { op: 'create', changed }));
@@ -3645,12 +3645,42 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         if (batch === '') write(first, null, undefined, undefined);
       }
 
-      /* PAIRED ON AN UPDATE THAT COULD MAKE A PAIR, and on no other. A leg whose day was typed wrong and then fixed is
-         looked at again; a note written on a row is not a reason to search the ledger. */
+      /* A MARK A PERSON SENDS AS IT ALREADY WAS IS STILL HIS SAY, and the loop above writes no row for a value that did
+         not move, so nothing would remember it. The audit's P3b: the rent created unmarked, `transfer: false` set on it by
+         `p_1`, and the next bank line of the same size paired it and wrote `true` over his word. The row is written here,
+         signed by him, so `markPinned` finds it. NOT ON A PAIRED ROW, where the only value it can resend is the `true` the
+         pair set, and agreeing with a pair is not a reason to break it. */
+      if (decl.pairs && !deleting) {
+        const mark = decl.pairs.mark;
+        if (
+          touched.includes(mark) &&
+          !isMechanism(w.actor) &&
+          current.fields._pair === undefined &&
+          JSON.stringify(current.fields[mark] ?? null) === JSON.stringify(merged[mark] ?? null)
+        )
+          appendEvent({
+            kind: 'edit',
+            target: current.id,
+            register,
+            actor: w.actor,
+            at: now,
+            batch,
+            field: mark,
+            from: shown(register, mark, current.fields[mark]) ?? null,
+            to: shown(register, mark, merged[mark]) ?? null,
+          });
+      }
+
+      /* SETTLED AGAIN ON AN UPDATE THAT COULD MOVE A PAIR, and on no other. A leg whose day, amount or way was typed wrong
+         and then fixed is looked at again, and so are the rows that stood near it before; a delete and a restore always
+         are; a note written on a row is not a reason to search the ledger. */
       const paired =
-        decl.pairs && !deleting && pairsReads(decl.pairs, decl.fields).some((key) => touched.includes(key)) ? pairUp(entry, decl, w, batch, now) : null;
+        decl.pairs && (deleting || pairsReads(decl.pairs, decl.fields).some((key) => touched.includes(key))) && settlePairs(entry, current, decl, batch, now)
+          ? byId(entry.id, true)
+          : null;
       const changed = touched.filter((key) => JSON.stringify(current.fields[key] ?? null) !== JSON.stringify(merged[key] ?? null));
-      if (paired && decl.pairs && !changed.includes(decl.pairs.mark) && current.fields[decl.pairs.mark] !== true) changed.push(decl.pairs.mark);
+      if (paired && decl.pairs && !changed.includes(decl.pairs.mark) && paired.fields[decl.pairs.mark] !== current.fields[decl.pairs.mark])
+        changed.push(decl.pairs.mark);
       return ok(rules(paired ?? entry, register, w, batch, { op: first === 'delete' ? 'delete' : 'update', changed }));
     });
   }
@@ -3871,36 +3901,51 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   }
 
   /**
-   * Step 6b of the write path (`41 §5.4`): the other leg of a transfer, found and marked on both rows, or `null`.
+   * Step 6b of the write path (`41 §5.4`): every pair this write made or broke, written on both rows. True when the
+   * written row itself changed, so the caller reads it again.
    *
-   * IN THE SAME TRANSACTION AND THE SAME BATCH as the write that made the pair, so the two rows are marked together or
-   * not at all, and "why is this row marked" is answered by the history of the write that caused it. Each leg gets an
-   * `edit` on the mark, when it was not already true, and one on `_pair`: the mark alone would say the row stopped
-   * counting and not which row it was matched to.
+   * IN THE SAME TRANSACTION AND THE SAME BATCH as the write that moved the pair, so two rows are marked or unmarked
+   * together or not at all, and "why is this row marked", or counted again, is answered by the history of the write that
+   * caused it. Each leg gets an `edit` on the mark when it moved and one on `_pair`, from the partner it had to the one
+   * it has: the mark alone would say the row stopped counting and not which row it was matched to.
+   *
+   * UNPAIRING IS THE SAME WRITE AS PAIRING, BACKWARDS. W57-1 only ever paired, and the audit measured what that left:
+   * GBP 400.00 paired and the out leg corrected to 900.00, Spent 0.00; the in leg retyped as out, Spent 0.00 against
+   * 800.00; the in leg deleted, Spent 0.00 against 400.00, and the leg re-imported landed unmarked because its partner
+   * still named the deleted row. An unpaired leg's mark goes back to false, and `_pair` leaves the row, so it is a
+   * candidate again exactly as a row never paired is.
+   *
+   * SIGNED BY THE RECORD, NOT BY THE WRITER (`PAIRS_ACTOR`). The pairing ran in `p_1`'s batch and was signed `p_1`, so the
+   * history said he had marked both legs, and a mark he really did set could not be told from one the kernel set for
+   * him. A mark somebody pinned is never written here: the row is unpaired around it and keeps what he said.
    *
    * THE PARTNER'S VERSION MOVES AND THIS ROW'S DOES NOT. The partner changed under whoever last read it, so a
    * compare-and-set against the old version is refused, as for any other write. This row's change is part of the write
    * that is returning it, and a create answering version 2 would say somebody else had written in between.
    */
-  function pairUp(entry: Entry, decl: RegisterDecl, w: WriteContext, batch: string, now: string): Entry | null {
+  function settlePairs(entry: Entry, before: Entry | null, decl: RegisterDecl, batch: string, now: string): boolean {
     const pairs = decl.pairs;
-    if (!pairs || entry.deleted_at !== null) return null;
-    const partner = partnerOf(sql, entry.register, pairs, decl.fields, entry);
-    const other = partner === null ? null : byId(partner);
-    if (!other) return null;
-    for (const [row, to, moves] of [
-      [entry, other.id, false],
-      [other, entry.id, true],
-    ] as const) {
-      const fields = { ...row.fields, [pairs.mark]: true, _pair: to };
-      if (moves) sql.exec('UPDATE entry SET fields = ?, version = version + 1, updated_at = ? WHERE id = ?', JSON.stringify(fields), now, row.id);
-      else sql.exec('UPDATE entry SET fields = ? WHERE id = ?', JSON.stringify(fields), row.id);
-      const said = { kind: 'edit', target: row.id, register: row.register, actor: w.actor, at: now, batch };
-      if (row.fields[pairs.mark] !== true)
-        appendEvent({ ...said, field: pairs.mark, from: shown(row.register, pairs.mark, row.fields[pairs.mark]) ?? null, to: true });
-      appendEvent({ ...said, field: '_pair', to });
+    if (!pairs) return false;
+    const p: Pairing = { sql, register: entry.register, pairs, fields: decl.fields };
+    const seeds = [entry.id, ...neighboursOf(p, entry), ...(before ? [...neighboursOf(p, before), ...(typeof before.fields._pair === 'string' ? [before.fields._pair] : [])] : [])];
+    let mine = false;
+    for (const { leg, to } of settle(p, seeds)) {
+      const fields: Record<string, unknown> = { ...leg.fields };
+      if (!markPinned(p, leg.id)) fields[pairs.mark] = to !== null;
+      if (to === null) delete fields._pair;
+      else fields._pair = to;
+      if (leg.id === entry.id) {
+        sql.exec('UPDATE entry SET fields = ? WHERE id = ?', JSON.stringify(fields), leg.id);
+        mine = true;
+      } else sql.exec('UPDATE entry SET fields = ?, version = version + 1, updated_at = ? WHERE id = ?', JSON.stringify(fields), now, leg.id);
+      const said = { kind: 'edit', target: leg.id, register: entry.register, actor: PAIRS_ACTOR, at: now, batch };
+      const was = leg.fields[pairs.mark] as Json | undefined;
+      const is = fields[pairs.mark] as Json | undefined;
+      if (JSON.stringify(was ?? null) !== JSON.stringify(is ?? null))
+        appendEvent({ ...said, field: pairs.mark, from: shown(entry.register, pairs.mark, was) ?? null, to: shown(entry.register, pairs.mark, is) ?? null });
+      if ((leg.fields._pair ?? null) !== to) appendEvent({ ...said, field: '_pair', from: (leg.fields._pair as Json | undefined) ?? null, to });
     }
-    return byId(entry.id, true);
+    return mine;
   }
 
   function reproject(entry: Entry): void {

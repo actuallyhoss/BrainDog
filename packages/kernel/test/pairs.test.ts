@@ -127,15 +127,17 @@ test('TWO LEGS ONE DAY APART ARE PAIRED: both marked, each naming the other, and
   sql.close();
 });
 
-test('PAIRED ONCE: a third equal row finds nothing to pair with and stays unmarked', async () => {
+test('PAIRED ONCE: of two equal rows, the nearer takes the leg and the other stays unmarked, whichever arrived first', async () => {
   const { k, sql } = await record();
   const a = leg(k, 'out', DAY(0), 'out', 50_000, 'current');
   const b = leg(k, 'in', DAY(1), 'in', 50_000, 'reserve');
   const c = leg(k, 'in again', DAY(0), 'in', 50_000, 'savings');
-  assert.equal(now(k, a.id).fields._pair, b.id);
-  assert.equal(now(k, b.id).fields._pair, a.id);
-  assert.equal(c.fields.moved, false);
-  assert.equal(c.fields._pair, undefined);
+  /* THIS ASSERTED a WITH b UNTIL AUDIT FIFTY-EIGHT, because b arrived first and a paired row was nobody's candidate.
+     c is on a's own day and b a day off, so c is a's leg, and b, which W57-1 had marked, is given back to Spent. */
+  assert.equal(now(k, a.id).fields._pair, c.id);
+  assert.equal(now(k, c.id).fields._pair, a.id);
+  assert.equal(now(k, b.id).fields.moved, false);
+  assert.equal(now(k, b.id).fields._pair, undefined);
   sql.close();
 });
 
@@ -177,10 +179,14 @@ test('A LEG WRITTEN LATER BY AN UPDATE IS PAIRED, and the nearest candidate is t
   assert.equal(now(k, near.id).fields.moved, true);
   assert.equal(now(k, far.id).fields._pair, undefined);
 
-  /* AN UPDATE TO A PAIRED ROW DOES NOT PAIR IT AGAIN. `far` is a candidate on every count but being unpaired. */
+  /* AN UPDATE TO A PAIRED ROW IS SETTLED AGAIN, as the ledger it leaves stands. This asserted the old pair held, which
+     is the first-come rule audit fifty-eight found hiding the wrong row: a day from `far` and two from `near`, `late`
+     is `far`'s leg now, and `near` is unmarked with the history saying so. */
   made(k.update('ledger', late.id, { on: DAY(1) }, OWNER));
-  assert.equal(now(k, late.id).fields._pair, near.id);
-  assert.equal(now(k, far.id).fields._pair, undefined);
+  assert.equal(now(k, late.id).fields._pair, far.id);
+  assert.equal(now(k, far.id).fields._pair, late.id);
+  assert.equal(now(k, near.id).fields._pair, undefined);
+  assert.equal(now(k, near.id).fields.moved, false);
   sql.close();
 });
 
@@ -189,16 +195,19 @@ test('`02 §5`’S OWN EXAMPLE: a signed amount pairs with its negation, in the 
   const post = (what: string, booked: string, amount: number, currency: string, account: string) =>
     made(k.create('postings', { what, booked, amount, currency, account }, OWNER));
   const a = post('out', DAY(0), -1000, 'EGP', 'cib');
-  /* THE SAME WAY IN ANOTHER ACCOUNT IS NOT A TRANSFER. Before this row the sign test in `partnerOf` could be taken
+  /* THE SAME WAY IN ANOTHER ACCOUNT IS NOT A TRANSFER. Before this row the sign test in `pairs.ts` could be taken
      out and every assertion here still passed, because each candidate was already refused by currency or account. */
   const sameWay = post('out too', DAY(-1), -1000, 'EGP', 'nbe');
   const other = post('in, dollars', DAY(1), 1000, 'USD', 'hsbc');
   const b = post('in', DAY(2), 1000, 'EGP', 'hsbc');
   const c = post('in again', DAY(1), 1000, 'EGP', 'nbe');
-  assert.equal(now(k, a.id).fields._pair, b.id);
-  assert.equal(now(k, b.id).fields.moved, true);
+  /* `c` IS A DAY FROM `a` AND `b` TWO, so `c` is the leg. This asserted `b`, the first to arrive, until audit
+     fifty-eight; the point that stands is that the one not taken stays unmarked. */
+  assert.equal(now(k, a.id).fields._pair, c.id);
+  assert.equal(now(k, c.id).fields.moved, true);
   assert.equal(now(k, other.id).fields._pair, undefined);
-  assert.equal(now(k, c.id).fields._pair, undefined);
+  assert.equal(now(k, b.id).fields._pair, undefined);
+  assert.equal(now(k, b.id).fields.moved, false);
   assert.equal(now(k, sameWay.id).fields._pair, undefined, 'two payments out of two accounts were paired');
   sql.close();
 });
