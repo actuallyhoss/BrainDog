@@ -40,6 +40,7 @@ import { HOLDS, PARTS as ROLE_PARTS, aims, legacyShaped, plays, type RoleField, 
    can read. A copy of its regular expression here would be a second list, and `MATCH_FIELDS` above
    is what two lists that disagree cost. */
 import { FREQ, shiftFrom } from './schedule.ts';
+import { pairsFault } from './pairs.ts';
 import { spanMs } from './vault.ts';
 import { actionsOf, callFault, flowFault, sealedAs, subjectOf } from './flow-lint.ts';
 import type { FlowDecl } from './rules.ts';
@@ -2816,6 +2817,9 @@ function createFault(
  *             and folders; `resolveProject` places a run by them.
  *   `rates` · `meets`  on the one register holding the rates a money figure converts by, and the one
  *             `meet` writes, each part naming the field that plays it (`roles.ts`, `roleBody` below).
+ *   `pairs`   `02 §5`'s transfer detection: the write path finds a row's other leg and marks both
+ *             (`pairs.ts`). It sat on the unbuilt list below until W57-1, refused at install, so his
+ *             ledger counted every move between two of his accounts as spend and as income.
  *
  * `rates` AND `meets` ARE NOT IN `42 §4.4` YET, and `declare.test.ts` lists what the code admits
  * that the document does not publish. They landed with the roles brief (`loop/research-shell-next.md`
@@ -2829,7 +2833,7 @@ function createFault(
  */
 const REGISTER_KEYS = [
   'register', 'name', 'one', 'pack', 'series', 'fields', 'search', 'title', 'mobile', 'identity',
-  'id', 'state', 'done', 'finished', 'icon', 'holds', 'seq_prefix', 'scopes', 'steps', 'rates', 'meets',
+  'id', 'state', 'done', 'finished', 'icon', 'holds', 'seq_prefix', 'scopes', 'steps', 'rates', 'meets', 'pairs',
 ] as const;
 
 /**
@@ -2843,11 +2847,16 @@ const REGISTER_KEYS = [
  *                     is the single failure `02 §5` says `key:` exists to prevent.
  *   `delete`          `refuse_while_referenced`. `DELETE_WHILE_REFERENCED` is registered and
  *                     emitted by nothing, so an account with transactions deletes.
- *   `pairs`           transfer detection, a bounded self-join nothing runs.
  *   `predicates`      named predicates. `where` refuses the `{ predicate: … }` leaf outright, so
  *                     declaring one here installs a name no predicate can reach.
  */
-const REGISTER_UNBUILT = ['key', 'delete', 'pairs', 'predicates', 'immutable_when'] as const;
+const REGISTER_UNBUILT = ['key', 'delete', 'predicates', 'immutable_when'] as const;
+
+/**
+ * The keys of a field's `repeat:` that `schedule.ts`'s `expandRepeat` reads. `42 §4.4` also publishes `byday` and
+ * `bymonthday`, which nothing reads yet, and they are refused by name rather than installed and ignored.
+ */
+const REPEAT_READ = ['freq', 'interval', 'count', 'until', 'workday'] as const;
 
 /**
  * The prefixes the kernel speaks. Governance numbers its decisions `D41` and its suggestions `SG23`,
@@ -3911,6 +3920,19 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
           `${id}.${f.id} repeats every ${typeof freq === 'string' ? freq : JSON.stringify(freq)}, and a frequency is daily, weekly, monthly or yearly.`,
           `${f.id}.repeat`,
         );
+      /* AND EVERY OTHER KEY IS ONE THE WALK READS, which was checked for `freq` alone. `{ freq: monthly, bymonthday:
+         [15, -1] }` installed and walked 09-15, 10-15, 11-15, never the last day; `{ freq: weekly, byday: [TU, TH] }`
+         walked Tuesdays only; `colour: blue` installed beside them (`loop/research-living-in-it.md` section 4.2,
+         `repeat-keys.test.ts`). A salary declared on two days that arms one is found out on the day it is missed, so the
+         key is refused, named, until `expandRepeat` reads it. */
+      const unread = Object.keys(repeat).find((k) => !(REPEAT_READ as readonly string[]).includes(k));
+      if (unread !== undefined)
+        return bad(
+          'DECLARATION_INVALID',
+          `${id}.${f.id}'s repeat says ${unread}, and this build walks a repeat by ${REPEAT_READ.join(', ')} only, so ${unread} would be ignored. Leave it out, or declare one row per day it lands on.`,
+          `${f.id}.repeat.${unread}`,
+          REPEAT_READ,
+        );
     }
   }
 
@@ -3986,6 +4008,13 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
         'steps',
         own.filter((x) => x.type === 'ref' || x.type === 'bool').map((x) => String(x.id)),
       );
+  }
+
+  /* PAIRS NAME FIELDS OF THIS LIST OF THE TYPES THE MATCHING READS, or the write path would set `true` into a text and
+     run a day window over whatever the named field holds. The check is `pairs.ts`'s, beside the reader it guards. */
+  if (decl.body.pairs !== undefined) {
+    const fault = pairsFault(id, fields as unknown as FieldLike[], decl.body.pairs);
+    if (fault) return fault;
   }
 
   /* `state` IS ALWAYS AN ENUM (`02 §1`, `04 §5`). A `state:` naming a `text` field gives the

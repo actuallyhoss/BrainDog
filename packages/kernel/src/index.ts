@@ -112,6 +112,7 @@ import {
 import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provisioned } from './provision.ts';
 import { dayIn, stampFinished } from './finished.ts';
 import type { StepsDecl } from './steps.ts';
+import { partnerOf, pairsReads, type PairsDecl } from './pairs.ts';
 import { costOf, costRank } from './weigh.ts';
 import { evaluateMetric, predicateOf, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { readBlock, readPage, registersOf, registersOfBlock, resolvePages, type ActivityEvent, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
@@ -529,6 +530,8 @@ export type RegisterDecl = {
   scopes?: ScopesDecl;
   /** Its rows are steps of the row a `ref` field points at, done when a `bool` field is true (`steps.ts`). */
   steps?: StepsDecl;
+  /** How two rows are the two legs of one transfer, found by the write path and marked on both (`pairs.ts`). */
+  pairs?: PairsDecl;
 };
 
 export type Entry = {
@@ -3555,7 +3558,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           to: Object.fromEntries(Object.entries(merged).map(([k, v]) => [k, shown(register, k, v) ?? null])) as Json,
           ...(w.opId === undefined ? {} : { opId: w.opId }),
         });
-        return ok(rules(entry, register, w, batch, { op: 'create', changed: Object.keys(merged) }));
+        const paired = pairUp(entry, decl, w, w.batch ?? batch, now);
+        const changed = Object.keys(merged);
+        if (paired && decl.pairs && !changed.includes(decl.pairs.mark)) changed.push(decl.pairs.mark);
+        return ok(rules(paired ?? entry, register, w, batch, { op: 'create', changed }));
       }
 
       sql.exec(
@@ -3637,12 +3643,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         if (batch === '') write(first, null, undefined, undefined);
       }
 
-      return ok(
-        rules(entry, register, w, batch, {
-          op: first === 'delete' ? 'delete' : 'update',
-          changed: touched.filter((key) => JSON.stringify(current.fields[key] ?? null) !== JSON.stringify(merged[key] ?? null)),
-        }),
-      );
+      /* PAIRED ON AN UPDATE THAT COULD MAKE A PAIR, and on no other. A leg whose day was typed wrong and then fixed is
+         looked at again; a note written on a row is not a reason to search the ledger. */
+      const paired =
+        decl.pairs && !deleting && pairsReads(decl.pairs, decl.fields).some((key) => touched.includes(key)) ? pairUp(entry, decl, w, batch, now) : null;
+      const changed = touched.filter((key) => JSON.stringify(current.fields[key] ?? null) !== JSON.stringify(merged[key] ?? null));
+      if (paired && decl.pairs && !changed.includes(decl.pairs.mark) && current.fields[decl.pairs.mark] !== true) changed.push(decl.pairs.mark);
+      return ok(rules(paired ?? entry, register, w, batch, { op: first === 'delete' ? 'delete' : 'update', changed }));
     });
   }
 
@@ -3859,6 +3866,39 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       decl.fields as readonly Remindable[],
       clock.now(),
     );
+  }
+
+  /**
+   * Step 6b of the write path (`41 §5.4`): the other leg of a transfer, found and marked on both rows, or `null`.
+   *
+   * IN THE SAME TRANSACTION AND THE SAME BATCH as the write that made the pair, so the two rows are marked together or
+   * not at all, and "why is this row marked" is answered by the history of the write that caused it. Each leg gets an
+   * `edit` on the mark, when it was not already true, and one on `_pair`: the mark alone would say the row stopped
+   * counting and not which row it was matched to.
+   *
+   * THE PARTNER'S VERSION MOVES AND THIS ROW'S DOES NOT. The partner changed under whoever last read it, so a
+   * compare-and-set against the old version is refused, as for any other write. This row's change is part of the write
+   * that is returning it, and a create answering version 2 would say somebody else had written in between.
+   */
+  function pairUp(entry: Entry, decl: RegisterDecl, w: WriteContext, batch: string, now: string): Entry | null {
+    const pairs = decl.pairs;
+    if (!pairs || entry.deleted_at !== null) return null;
+    const partner = partnerOf(sql, entry.register, pairs, decl.fields, entry);
+    const other = partner === null ? null : byId(partner);
+    if (!other) return null;
+    for (const [row, to, moves] of [
+      [entry, other.id, false],
+      [other, entry.id, true],
+    ] as const) {
+      const fields = { ...row.fields, [pairs.mark]: true, _pair: to };
+      if (moves) sql.exec('UPDATE entry SET fields = ?, version = version + 1, updated_at = ? WHERE id = ?', JSON.stringify(fields), now, row.id);
+      else sql.exec('UPDATE entry SET fields = ? WHERE id = ?', JSON.stringify(fields), row.id);
+      const said = { kind: 'edit', target: row.id, register: row.register, actor: w.actor, at: now, batch };
+      if (row.fields[pairs.mark] !== true)
+        appendEvent({ ...said, field: pairs.mark, from: shown(row.register, pairs.mark, row.fields[pairs.mark]) ?? null, to: true });
+      appendEvent({ ...said, field: '_pair', to });
+    }
+    return byId(entry.id, true);
   }
 
   function reproject(entry: Entry): void {
