@@ -26,7 +26,7 @@ import { REGISTERS } from './data.ts';
 import { currencyOf } from './money.ts';
 import { entryOf, orderOf, refMapOf, targetsOf, treeOf, type RecordRow, type RefMap, type Refs } from './remote.ts';
 import type { Fetch } from './row-live.ts';
-import type { Entry, Fields, Filter } from './schema.ts';
+import type { Entry, Fields, Filter, RegisterDecl } from './schema.ts';
 import { declaredValue } from './where.ts';
 
 export type Wrote =
@@ -140,6 +140,34 @@ export function holdInPlace(entries: readonly Entry[], held: ReadonlyMap<number,
     const now = entries.find((e) => e.seq === hold.entry.seq) ?? hold.entry;
     out.splice(Math.min(hold.at, out.length), 0, now);
   }
+  return out;
+}
+
+/**
+ * THE WAY BACK FROM A CHANGE: each field the change wrote, set to what the row held before it.
+ *
+ * ONLY THE FIELDS THE PATCH NAMES. Sending the whole row back would overwrite whatever somebody else changed since on
+ * fields this screen never touched; the put back goes at the version the write answered with, so a row moved in
+ * between is a conflict the reader is shown, not a quiet revert of two people's work.
+ *
+ * A FIELD THE ROW DID NOT HOLD GOES BACK AS `null`. The record leaves an unset field out of the row altogether, so
+ * `before.fields[key]` is `undefined` for it, and skipping that key would keep the value the write put there while the
+ * chip said it had been put back.
+ *
+ * IN THE SCREEN'S SPELLING, like the row it was read from, so it goes out through `outbound` exactly as the write it
+ * undoes did: a ref as the number a person says, an enum as the address spelled it.
+ *
+ * AND THE FINISHED DAY, WHEN THE CHANGE MOVED THE STATE, because the record wrote it in the same write (the kernel's
+ * `finished.ts`). Measured against a real kernel on 24 September: a task done on 1 September, reopened and put back
+ * with the state alone, came back done on the day of the put back, since a move into done that names no day is dated
+ * today. Naming the day it held, or `null` when it held none, is a day the write says itself, which the record keeps.
+ * A change that left the state alone left the day alone too, so its inverse does not name it.
+ */
+export function inverseOf(before: Entry, patch: Fields, decl: Pick<RegisterDecl, 'state' | 'finished'> | undefined): Fields {
+  const out: Fields = {};
+  for (const key of Object.keys(patch)) out[key] = before.fields[key] ?? null;
+  const day = decl?.finished;
+  if (day && decl.state && decl.state in patch) out[day] = before.fields[day] ?? null;
   return out;
 }
 

@@ -54,7 +54,7 @@
   import Chip from '$lib/ui/Chip.svelte';
   import { drew } from '../../../lib/ui/screen.svelte.ts';
   import * as pending from '$lib/record/pending.svelte.ts';
-  import { capturedFields, holdInPlace, rowWriter, type Held, type RowWriter, type Wrote } from '$lib/record/rows-write.ts';
+  import { capturedFields, holdInPlace, inverseOf, rowWriter, type Held, type RowWriter, type Wrote } from '$lib/record/rows-write.ts';
 
 
   const id = $derived(page.params.register ?? '');
@@ -85,8 +85,14 @@
 
   /* WHAT THE RECORD HAS NOTICED ABOUT THIS REGISTER, if anything crossed a threshold. It is derived
      from the register alone — not from the filters — because a pattern in thirty days of refusals
-     is not a property of the rows currently on screen. */
-  const seen = $derived(noticed(id));
+     is not a property of the rows currently on screen.
+
+     ONLY ON THE SAMPLE, BECAUSE THE SAMPLE IS WHOSE REFUSALS IT COUNTS. `noticed` reads the fixture
+     `OBSERVED`, so a live obligations list with no refusals at all said twelve of its saves had been
+     rejected over four days, and offered to raise them as a question. The kernel records the real
+     ones (`observe.ts`) and no method serves them yet; until one does, a live list draws no strip
+     rather than somebody else's. */
+  const seen = $derived(sample ? noticed(id) : null);
 
   /* URL state: filters and the query define WHICH ROWS YOU ARE LOOKING AT, so they must be
      shareable. View options are about your eyes rather than the data and live in the cookie. */
@@ -227,8 +233,14 @@
      * fields and cannot say it, which is why the card gets the long form and this one does not.
      */
     short?: string | undefined;
-    /** The inverse. Absent when there is nothing to put back, which a receipt still records. */
-    undo?: () => void;
+    /**
+     * The inverse. Absent when there is nothing to put back, which a receipt still records.
+     *
+     * `undefined` IS ALLOWED AS WELL AS ABSENT because a live change builds its inverse from the row as the
+     * screen held it, and a row the screen was not holding has no values to go back to: `putBackOf` answers
+     * `undefined` then, and the chip draws without `Put back` rather than with one that writes nothing.
+     */
+    undo?: (() => void) | undefined;
   };
   let receipts = $state(new Map<number, Receipt>());
 
@@ -1016,10 +1028,21 @@
       mark: mark ?? (filled.length > 0 ? copy.markAddedFilled(filled) : copy.writeMarkAdded),
       short: copy.writeMarkAdded,
       intent: 'good',
+      undo: takeBack(entry),
     });
     fresh = new Map(fresh).set(entry.seq, Date.now());
     void showRow(entry.seq);
   }
+
+  /**
+   * THE WAY BACK FROM A NEW ROW IS AN ARCHIVE, through the path the row's own Archive takes.
+   *
+   * NOT A DELETE, because the record has none: an added row that is put back is a row with `deleted_at` set, which
+   * every list leaves out and `restore` brings back. `archiveOnRecord` holds the row where it is, swaps this chip for
+   * `Archived` and its own `Put back`, and says so in a toast, so a row added by mistake is one press from gone and
+   * one more from here again. Before this, the only way to take back a typed row was to find Archive in its menu.
+   */
+  const takeBack = (entry: Entry) => () => void archiveOnRecord([entry.seq], `${id}#${entry.seq}`);
 
   /**
    * BRING THE ROW INTO VIEW, AND ONLY IF IT IS NOT ALREADY THERE.
@@ -1166,20 +1189,22 @@
    * something. `onBack` is the caller's, because the capture line and the example button put it in different
    * places.
    */
-  async function createRow(said: string, onBack: (back: string) => void, mark?: string) {
+  async function createRow(said: string, onBack: (back: string) => void, mark?: string): Promise<Entry | null> {
     const was = asked;
     const { fields, filled } = capturedFields(id, said, filters, now, result.entries);
     const out = await writes().create(id, fields);
     if (!out.ok) {
       missed(was, out);
       onBack(said);
-      return;
+      return null;
     }
-    if (asked !== was) return;
+    if (asked !== was) return null;
     addLanded(out.entry, filled, mark);
     /* AND THE FILLED FIELDS ARE SAID ONCE, WHERE THEY ARE LOOKING. The chip carries it on the row for as long as
-       the answer is up; this is for the reader whose eye is on the line they just typed in. */
-    if (filled.length > 0) toasts.push(copy.captureFilled(filled));
+       the answer is up; this is for the reader whose eye is on the line they just typed in. The toast carries the
+       chip's own way back, because a row filled in with guesses is the row most likely to be unwanted. */
+    if (filled.length > 0) toasts.push(copy.captureFilled(filled), { undo: takeBack(out.entry) });
+    return out.entry;
   }
 
   /**
@@ -1194,8 +1219,11 @@
       toasts.push(copy.notWritten(copy.exampleWouldBeAdded), { intent: 'warn' });
       return;
     }
-    void createRow(copy.exampleTitle(decl.one.toLowerCase()), () => {}, copy.markExample).then(() => {
-      if (!sample && decl) toasts.push(copy.exampleAdded(decl.one.toLowerCase()));
+    /* "PUT IT BACK IF YOU DO NOT WANT IT", AND THERE WAS NOTHING TO PRESS. The sentence promised a way back that only
+       the row menu's Archive gave, and it was said when the record had REFUSED the example too, over the refusal's own
+       toast: `createRow` answered nothing either way. It answers the row now, and no row is no sentence. */
+    void createRow(copy.exampleTitle(decl.one.toLowerCase()), () => {}, copy.markExample).then((made) => {
+      if (made && decl) toasts.push(copy.exampleAdded(decl.one.toLowerCase()), { undo: takeBack(made) });
     });
   }
 
@@ -1217,16 +1245,18 @@
     const field = decl?.state;
     if (!sample && seq > 0 && field) {
       const was = asked;
+      const before = rowAt(seq);
+      const patch = { [field]: state };
       hold(seq);
       receipt(seq, { mark: copy.writeMarkSaving, intent: 'warn' });
       void writes()
-        .update(id, seq, { [field]: state }, rowAt(seq)?.version)
+        .update(id, seq, patch, before?.version)
         .then((out) => {
           if (asked === was) clearReceipt(seq);
           if (!out.ok) return missed(was, out);
           if (asked !== was) return;
           landRow(out.entry);
-          receipt(seq, { mark: said, intent: 'good' });
+          receipt(seq, { mark: said, intent: 'good', undo: putBackOf(before, patch, out.entry) });
         });
       return;
     }
@@ -1392,11 +1422,14 @@
     if (!sample && at.seq > 0) {
       const was = asked;
       const value = said === '' ? null : said;
+      /* THE ROW AS THE RECORD HELD IT, read before the patch goes over it, since the patch is what `Put back` undoes. */
+      const before = rowAt(at.seq);
+      const patch = { [at.field]: value };
       hold(at.seq);
       setPatch(at.seq, at.field, value);
       receipt(at.seq, { mark: copy.writeMarkSaving, intent: 'warn' });
       void writes()
-        .update(id, at.seq, { [at.field]: value }, rowAt(at.seq)?.version)
+        .update(id, at.seq, patch, before?.version)
         .then((out) => {
           if (asked !== was) {
             if (!out.ok) toasts.push(out.fix, { intent: 'warn' });
@@ -1406,7 +1439,7 @@
           clearReceipt(at.seq);
           if (out.ok) {
             landRow(out.entry);
-            receipt(at.seq, { mark: copy.writeMarkSaved, intent: 'good' });
+            receipt(at.seq, { mark: copy.writeMarkSaved, intent: 'good', undo: putBackOf(before, patch, out.entry) });
             return;
           }
           missed(was, out);
@@ -1998,20 +2031,30 @@
     const rows = picked.filter((e) => e.seq > 0);
     let landedCount = 0;
     let first: string | null = null;
+    const patch = { [field]: state };
+    /* EVERY ROW THAT LANDED, WITH WHAT IT HELD BEFORE, so the toast can put back the whole gesture at once. */
+    const changed: Change[] = [];
     for (const e of rows) receipt(e.seq, { mark: copy.writeMarkSaving, intent: 'warn' });
     for (const e of rows) {
-      const out = await writes().update(id, e.seq, { [field]: state }, e.version);
-      if (out.ok) landedCount += 1;
-      else first ??= out.fix;
+      const out = await writes().update(id, e.seq, patch, e.version);
+      if (out.ok) {
+        landedCount += 1;
+        changed.push({ before: e, patch, answered: out.entry });
+      } else first ??= out.fix;
       if (asked !== was) continue;
       clearReceipt(e.seq);
       if (out.ok) {
         landRow(out.entry);
-        receipt(e.seq, { mark: said, intent: 'good' });
+        receipt(e.seq, { mark: said, intent: 'good', undo: putBackOf(e, patch, out.entry) });
       } else if (out.why === 'conflict' && out.entry) landRow(out.entry);
     }
     const line = copy.writeBulk(landedCount, total, said);
-    toasts.push(first ? `${line} ${first}` : line, landedCount === total ? {} : { intent: 'warn' });
+    /* THE TOAST PUTS BACK THE ROWS THAT MOVED AND NO OTHERS. A row the record refused never changed, and writing
+       its old state over it again would be a write with nothing to undo. */
+    toasts.push(first ? `${line} ${first}` : line, {
+      ...(changed.length > 0 ? { undo: () => void putBack(changed) } : {}),
+      ...(landedCount === total ? {} : { intent: 'warn' as const }),
+    });
   }
 
   /**
@@ -2093,18 +2136,72 @@
     });
   }
 
+  /** A change that landed: the row as it was, what was written over it, and the row the record answered with. */
+  type Change = { before: Entry; patch: Fields; answered: Entry };
+
+  /**
+   * THE WAY BACK FROM A STATE OR A CELL, which is the same write the other way: each field the change wrote, set back
+   * to what the row held, built by `inverseOf`.
+   *
+   * AT THE VERSION THE WRITE ANSWERED WITH, not the version the screen holds now. If anybody has moved the row since,
+   * the record says so and the row is drawn as it now stands; sending the newer version instead would put back this
+   * screen's change by writing over theirs, which is an undo that loses somebody else's edit to recover one's own.
+   *
+   * PUSHED ONLY ONCE THE WRITE HAS LANDED, because the inverse of a write that never happened is a second write
+   * nobody asked for (REWORK §4). A row the screen was not holding has no values to go back to, so it gets none.
+   */
+  const putBackOf = (before: Entry | undefined, patch: Fields, answered: Entry): (() => void) | undefined =>
+    before ? () => void putBack([{ before, patch, answered }]) : undefined;
+
+  /**
+   * WHAT A ROW WEARS WHEN ITS PUT BACK ANSWERS. `putBack` and `restoreOnRecord` mark the row `Saving` before they
+   * write, and this is what replaces that mark: `Restored`, or the chip the row wore before the press.
+   *
+   * A SECOND PRESS WAS A SECOND WRITE. The chip kept `Put back` until the answer came, so pressing it twice sent the
+   * inverse twice, the second at a version the first had already spent. `Saving` carries no undo, so the button goes
+   * with the first press, as archive's does.
+   *
+   * A MISS THAT WAS NOT A CONFLICT GETS ITS PUT BACK AGAIN, because the row did not move and the way back is still
+   * true: a dropped connection must not cost the reader the only button that undoes their change. A conflict clears the
+   * chip instead, since somebody else has moved the row and the inverse would now write over them.
+   */
+  function backAnswered(seq: number, out: Wrote, wore: Receipt | undefined) {
+    if (out.ok) {
+      landRow(out.entry);
+      receipt(seq, { mark: copy.writeMarkRestored, intent: 'good' });
+    } else if (out.why !== 'conflict' && wore) receipt(seq, wore);
+    else {
+      clearReceipt(seq);
+      if (out.why === 'conflict' && out.entry) landRow(out.entry);
+    }
+  }
+
+  /** Put changed rows back, one at a time, and mark each one that landed `Restored`, the mark Put back leaves. */
+  async function putBack(changes: readonly Change[]) {
+    const was = asked;
+    let first: string | null = null;
+    const wore = new Map(changes.map((c) => [c.before.seq, receipts.get(c.before.seq)] as const));
+    for (const { before } of changes) receipt(before.seq, { mark: copy.writeMarkSaving, intent: 'warn' });
+    for (const { before, patch, answered } of changes) {
+      const out = await writes().update(id, before.seq, inverseOf(before, patch, decl), answered.version);
+      if (!out.ok) first ??= out.fix;
+      if (asked !== was) continue;
+      backAnswered(before.seq, out, wore.get(before.seq));
+    }
+    if (first) toasts.push(first, { intent: 'warn' });
+  }
+
   /** Put archived rows back. A row this screen has read since is sent at the version it now holds. */
   async function restoreOnRecord(rows: readonly Entry[]) {
     const was = asked;
     let first: string | null = null;
+    const wore = new Map(rows.map((e) => [e.seq, receipts.get(e.seq)] as const));
+    for (const e of rows) receipt(e.seq, { mark: copy.writeMarkSaving, intent: 'warn' });
     for (const e of rows) {
       const out = await writes().restore(id, e.seq, rowAt(e.seq)?.version ?? e.version);
       if (!out.ok) first ??= out.fix;
       if (asked !== was) continue;
-      if (out.ok) {
-        landRow(out.entry);
-        receipt(e.seq, { mark: copy.writeMarkRestored, intent: 'good' });
-      } else if (out.why === 'conflict' && out.entry) landRow(out.entry);
+      backAnswered(e.seq, out, wore.get(e.seq));
     }
     if (first) toasts.push(first, { intent: 'warn' });
   }
