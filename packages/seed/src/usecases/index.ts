@@ -22,7 +22,6 @@ import { EARLIER_TICKETS, TEAM } from './team.ts';
 
 export type { UseCase } from '@braindog/declare';
 export { pollPack, type PolledMeasure, type PollSpec } from './founder-poll.ts';
-export { ratesPollPack, type RatesSpec } from '../packs/rates-poll.ts';
 export { VOICE_KEYS, labelsOf, voiceOf } from '@braindog/declare';
 
 function checked(doc: unknown): UseCase {

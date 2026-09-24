@@ -1,6 +1,12 @@
 /**
  * Mercury, pulled: the company's bank balances arriving on their own, instead of being typed in.
  *
+ * THE DOCUMENT IS NOW `packs/mercury/mercury.pack.json`, AND THIS BUILDER IS WHAT IT IS CHECKED AGAINST. Brief B7
+ * (`loop/research-m3-dynamic.md` section 3) moves it out of `packages/seed`, and `packs/mercury/mercury.test.ts` fills
+ * the file and holds it equal to what this function builds, byte for byte. The one import left is
+ * `test/money-core-major.test.ts`, which B8 rewrites; when it reads the pack file instead, this file goes, and the
+ * byte comparisons go with it.
+ *
  * WHY A BANK AND WHY THIS ONE. `loop/research-switch.md` lists *Company cash: Mercury and Stripe
  * pulls* as the one money figure the record cannot answer without a person retyping it, and a
  * balance somebody retypes is a balance that is right on the day they did it and wrong every day
@@ -30,7 +36,7 @@
  * a balance that moved moves the row rather than adding one. Mercury's account `name` carries the
  * last four digits of the account number (`Mercury Checking ••1234`), which is what makes it a key
  * rather than a guess. The honest key would be Mercury's own account id, and `accounts` has no
- * field to put one in; that limit is measured in `packages/seed/test/mercury.test.ts` rather than
+ * field to put one in; that limit is measured in `packs/mercury/mercury.test.ts` rather than
  * asserted here.
  *
  * WHAT THIS PACK DOES NOT DO, AND IT IS NOT AN OVERSIGHT. It does not write `transactions`. A
@@ -42,7 +48,7 @@
  * answers are *the field is unreadable and the whole row goes to `needs-review`* and *every row is
  * filed the same way*. The translation table that would do it, `{ enum: { map: { literal: value } } }`,
  * exists only in the `extract:` grammar, and `42 §4.7` forbids `extract:` on a `pull`. The
- * measurement is in `packages/seed/test/mercury.test.ts`, and it is worse than it sounds: the
+ * measurement is in `packs/mercury/mercury.test.ts`, and it is worse than it sounds: the
  * declaration installs clean, the page is fetched and paid for, and `applyPage` answers
  * `{ wrote: 0, kept: 1 }`, so a ledger connector would look like a working connector for ever.
  */

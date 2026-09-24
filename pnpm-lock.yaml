@@ -362,9 +362,13 @@ importers:
         specifier: workspace:*
         version: link:../ports
 
+  packs/mercury: {}
+
   packs/portfolio-bands: {}
 
   packs/project-brief: {}
+
+  packs/rates-poll: {}
 
 packages:
 

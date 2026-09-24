@@ -1,6 +1,13 @@
 /**
  * Exchange rates, polled: one public address, and which number in its answer is which currency.
  *
+ * THE DOCUMENT IS NOW `packs/rates-poll/rates-poll.pack.json`, filled by `packs/rates-poll/fill.ts`, AND THIS BUILDER
+ * IS WHAT IT IS CHECKED AGAINST. Brief B7 (`loop/research-m3-dynamic.md` section 3) moves it out of `packages/seed`, and
+ * `packs/rates-poll/rates-poll.test.ts` holds the filled file equal to what this function builds, byte for byte. It
+ * stays while `apps/web/src/lib/record/rates-form.ts` imports it through this package's `./packs/rates-poll` export
+ * and `test/rates.test.ts` tests it; `fillRates` takes the file and the same spec and throws the same sentences, so
+ * that caller's move is an import and one argument. Then this file goes, and the byte comparisons go with it.
+ *
  * WHAT MONEY IN MORE THAN ONE CURRENCY NEEDS TO BE ADDED UP (`08 §2.5`). A rates address answers the worth of one
  * currency in many others, `{"base_code":"USD","rates":{"EGP":48.52,"GBP":0.74}}`, and each number the owner names
  * becomes a row of Money's `fx` list, dated the day the answer arrived. The figures then convert at the rate as of each

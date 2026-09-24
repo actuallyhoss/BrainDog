@@ -42,6 +42,8 @@ that quoted somebody's record would publish it.
 | --- | --- |
 | `project-brief` | On each project, one line saying what it is, the plan, and what is in the way; and a Briefs page drawing all three over the projects in play. |
 | `portfolio-bands` | A daily script that splits the revenue across projects into now, next and later, one amount per currency, and a split bar that draws the three. |
+| `rates-poll` | Exchange rates fetched on a schedule into the record, for whichever currencies it names. |
+| `mercury` | Balances from a Mercury bank account, pulled on a schedule through a key held in the vault. |
 
 ## What is not here yet
 

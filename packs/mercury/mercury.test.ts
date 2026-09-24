@@ -1,41 +1,189 @@
 /**
- * The Mercury pull, on a real record: the same hour twice, and an hour where the balance moved.
+ * Mercury, pulled, as a pack file: the company's bank balances arriving on their own instead of being typed in
+ * (`loop/research-m3-dynamic.md` section 3, brief B7; `loop/DIRECTION.md` sections 22 and 24).
  *
- * WHAT IS BEING ASSERTED IS THE ROW COUNT, because that is the only thing a connector can get
- * wrong that nobody notices. A run that writes nothing is visible in the meter; a run that writes
- * the same balance a second time looks exactly like a run that worked, and the Money page then
- * adds up two accounts that are one account and reports twice the company's cash.
+ * THE DOCUMENT WAS A FUNCTION IN `packages/seed`. `mercuryPack` in `packages/seed/src/packs/mercury.ts` built it in
+ * code, so the shell carried one bank as TypeScript. It is now `mercury.pack.json`, a legal pack as it stands, with the
+ * four things a person supplies named under `fill`. Nothing in the tree offers a Mercury pull to a record, so the fill
+ * is `fillMercury` below and nowhere else; while the builder is still in the tree, the file filled is held equal to
+ * what it built, byte for byte, through `readPackFile`.
  *
- * THE BYTES DIFFER BETWEEN THE TWO RUNS ON PURPOSE. `inbox_raw` is unique on `(channel, sha256)`,
- * so replaying identical bytes is caught by the raw table and proves nothing about the
- * declaration. Every fixture below carries a `requestId`, which is what a provider that stamps its
- * answers does and what makes the second run a real second write. The only thing standing between
- * it and a duplicate row is `dedupe:`, and the first test here watches it fail without one.
+ * WHY A BANK AND WHY THIS ONE. `loop/research-switch.md` names company cash (Mercury and Stripe pulls) as the one money
+ * figure the record cannot answer without somebody retyping it. A bank answers the Money page's question, what is in
+ * the account today, in one request with no pagination, `GET /api/v1/accounts`, so `read.rows` is `accounts` and there
+ * is no page loop. Mercury publishes 100 requests a minute and this asks once an hour.
+ *
+ * THE KEY IS NAMED AND NEVER CARRIED. `fetch.auth` is `bearer` against a grant LABEL, the only thing about a credential
+ * a pack may hold (`42 §4.7`, `SECRET_IN_PACK`). With no key behind the label the run refuses before a byte leaves:
+ * `packages/connect/test/mercury.test.ts` watches `PULL_AUTH_REJECTED` pause the run with the `Http` port never called.
+ *
+ * WHAT IS ASSERTED BELOW IS THE ROW COUNT, because that is the one thing a connector gets wrong that nobody notices. A
+ * run that writes the same balance a second time looks exactly like a run that worked, and the Money page then adds up
+ * two accounts that are one and reports twice the company's cash. The bytes differ between runs on purpose: `inbox_raw`
+ * is unique on `(channel, sha256)`, so replaying identical bytes proves nothing about the declaration. Every fixture
+ * carries a `requestId`, and the only thing between the second run and a duplicate row is `dedupe:`.
+ *
+ * RED FIRST, MEASURED ON SEPTEMBER 24TH AGAINST `facafeed`: with no pack file every test that fills it failed, and
+ * with the file written the re-export test still failed on `packages/seed/src/packs/index.ts`, the barrel that gave
+ * `mercuryPack` a second name.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
 
-import { openRecord, type Declaration, type Kernel } from '@braindog/kernel';
-import { fixOf } from '@braindog/ports';
-
-import { REGISTERS, declarations } from '../src/index.ts';
-import { MERCURY_BASE, mercuryPack } from '../src/packs/mercury.ts';
-import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
+import { readPackFile } from '../../packages/declare/src/catalogue.ts';
+import { openRecord, type Declaration, type Kernel } from '../../packages/kernel/src/index.ts';
+import { fixOf } from '../../packages/ports/src/index.ts';
+import { createRecordApi, type CallContext } from '../../packages/record/src/index.ts';
+import { fixedClock, openSqlite, type NodeSql } from '../../packages/kernel/test/sqlite.ts';
+import { REGISTERS, declarations, firstPartyDocument } from '../../packages/seed/src/index.ts';
+import { mercuryPack } from '../../packages/seed/src/packs/mercury.ts';
 
 const NOW = Date.UTC(2026, 8, 20, 9);
 const ID = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
-const SPEC = { id: 'quartz', grant: 'Mercury (read only)', base: 'https://api.mercury.example' };
+
+/** The file as it ships, read fresh each time so no test can hand the next one a copy it changed. */
+const PACK_FILE = new URL('./mercury.pack.json', import.meta.url);
+const template = (): Record<string, unknown> => JSON.parse(readFileSync(PACK_FILE, 'utf8')) as Record<string, unknown>;
+
+type MercurySpec = { id: string; grant: string; every?: string; base?: string };
+type Pull = Record<string, unknown> & { fetch: Record<string, unknown> & { auth: Record<string, unknown>; schedule: Record<string, unknown> } };
+
+/** A spec's id as an identifier: lower case, digits, and underscores for everything else. */
+const ident = (text: string): string =>
+  text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, '_')
+    .replace(/^_+|_+$/gu, '')
+    .replace(/_+/gu, '_');
+
+/**
+ * The file filled for one Mercury profile. `base` and `every` default to what the file says, so a spec naming neither
+ * asks Mercury itself once an hour.
+ *
+ * BOTH INTERVALS ARE WRITTEN, BECAUSE TWO SCHEDULERS READ THEM. The record arms the pull off the top-level `every` and
+ * `@braindog/connect` computes the next slot off `fetch.schedule.every`; a file carrying two different numbers fires
+ * on a cadence nothing else agrees with.
+ */
+function fillMercury(file: Record<string, unknown>, spec: MercurySpec): Record<string, unknown> {
+  const { fill: _marks, ...doc } = structuredClone(file);
+  const pull = (doc.declarations as Pull[])[0]!;
+  const base = spec.base ?? (pull.fetch.base as string);
+  const every = spec.every ?? (pull.every as string);
+  doc.pack = `mercury-${spec.id}`;
+  doc.summary = `Reads the balance of every Mercury account from ${new URL(base).host} every ${every}, into Money's accounts.`;
+  pull.ingest = `mercury_${ident(spec.id)}`.slice(0, 32).replace(/_+$/u, '');
+  pull.every = every;
+  pull.fetch.base = base;
+  pull.fetch.auth.grant = spec.grant.trim();
+  pull.fetch.schedule.every = every;
+  return doc;
+}
+
+const SPEC: MercurySpec = { id: 'kiln', grant: 'Mercury (read only)', base: 'https://api.mercury.example' };
 
 type Ingest = Record<string, unknown> & { ingest: string };
 
 /** The pack's one declaration, with whatever a test wants taken off it. */
 const declOf = (over: Record<string, unknown> = {}, drop: string[] = []): Ingest => {
-  const doc = mercuryPack(SPEC) as { declarations: Ingest[] };
+  const doc = fillMercury(template(), SPEC) as { declarations: Ingest[] };
   const body = { ...doc.declarations[0]!, ...over };
   for (const key of drop) delete body[key];
   return body;
 };
+
+/* ── where the pack lives ─────────────────────────────────────────────────────────────────────── */
+
+test('the file reads clean as an add-on somebody opens from disk, and says what a person fills', async () => {
+  const file = await readPackFile(readFileSync(PACK_FILE, 'utf8'));
+  assert.ok(file.ok, fixOf(file));
+  assert.equal(file.value.pack.manifest.pack, 'mercury-company');
+  assert.deepEqual(Object.keys((file.value.doc.fill ?? {}) as object), ['id', 'grant', 'every', 'base']);
+});
+
+test('THE SEED NO LONGER OFFERS THE BUILDER UNDER A SECOND NAME', () => {
+  /* `packages/seed/src/packs/index.ts` WAS A BARREL NOTHING IMPORTED, and it re-exported `mercuryPack` and its three
+     constants beside the rates builder. A second name for a document that is now a file here is a second place a
+     caller finds it in `packages/seed`. */
+  const src = new URL('../../packages/seed/src/', import.meta.url);
+  const offering: string[] = [];
+  for (const rel of readdirSync(src, { recursive: true, encoding: 'utf8' })) {
+    const path = rel.replaceAll('\\', '/');
+    if (!path.endsWith('.ts') || path === 'packs/mercury.ts') continue;
+    if (/export\s*\{[^}]*\b(?:mercuryPack|MercurySpec|MERCURY_[A-Z]+)\b[^}]*\}\s*from/u.test(readFileSync(new URL(path, src), 'utf8'))) offering.push(path);
+  }
+  assert.deepEqual(offering, []);
+});
+
+/* ── nothing moved but the file ───────────────────────────────────────────────────────────────── */
+
+for (const [name, spec] of [
+  ['the file as it ships', { id: 'company', grant: 'Mercury (read only)' }],
+  ['a test host, a key label with spaces round it', { ...SPEC, grant: '  Mercury (read only)  ' }],
+  ['every six hours, an id past what an ingest name holds', { id: 'kiln-and-tallow-holding-company-operating', grant: 'Ops', every: '6h' }],
+] as const satisfies readonly (readonly [string, MercurySpec])[])
+  test(`FILLED, THE FILE IS THE BUILDER'S DOCUMENT BYTE FOR BYTE: ${name}`, async () => {
+    const built = JSON.stringify(mercuryPack(spec));
+    const filled = fillMercury(template(), spec);
+    assert.equal(JSON.stringify(filled), built);
+    const read = await readPackFile(JSON.stringify(filled));
+    assert.ok(read.ok, fixOf(read));
+    assert.equal(JSON.stringify(read.value.doc), built);
+  });
+
+test('the file as it ships, with its marks taken off, is its own example filled', () => {
+  const { fill: _marks, ...shipped } = template();
+  assert.equal(JSON.stringify(shipped), JSON.stringify(fillMercury(template(), { id: 'company', grant: 'Mercury (read only)' })));
+});
+
+/** A record holding Money and what it points at, and the two presses a person makes: read the plan, then install it. */
+async function withMoney(): Promise<{ plan: (doc: unknown) => Promise<{ planHash: string; approve: string[] }>; put: (doc: unknown, approve: boolean) => Promise<{ ok: boolean }>; close: () => void }> {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
+  const plan = async (doc: unknown): Promise<{ planHash: string; approve: string[] }> => {
+    const r = await api.planPack({ doc, source: { kind: 'local' } } as never, owner);
+    assert.ok(r.ok, fixOf(r as never));
+    return (r.value as { diff: { planHash: string; approve: string[] } }).diff;
+  };
+  const put = async (doc: unknown, approve: boolean): Promise<{ ok: boolean }> => {
+    const diff = await plan(doc);
+    return api.installPack({ doc, source: { kind: 'local' }, planHash: diff.planHash, approve: approve ? diff.approve : [] } as never, owner);
+  };
+  for (const id of ['portfolio', 'people', 'money-core']) {
+    const r = await put(firstPartyDocument(id, { seeds: [] }), true);
+    assert.ok(r.ok, fixOf(r as never));
+  }
+  return { plan, put, close: () => sql.close() };
+}
+
+test('INSTALLED THROUGH THE RECORD’S OWN DOOR, once the owner approves the one call out, naming the host and the interval', async () => {
+  const { plan, put, close } = await withMoney();
+  const doc = fillMercury(template(), { id: 'kiln', grant: 'Mercury (read only)' });
+  const approve = (await plan(doc)).approve;
+  assert.equal(approve.length, 1);
+  assert.ok(approve[0]!.startsWith('CALLS OUT api.mercury.com · every 1h · '), approve[0]);
+  assert.equal((await put(doc, false)).ok, false, 'never without approval');
+  assert.ok((await put(doc, true)).ok);
+  close();
+});
+
+test(
+  'AND THE LINE HE APPROVES NAMES THE KEY THE PULL SENDS',
+  {
+    todo: 'egressOf in packages/kernel/src/actions.ts reads the key from a top-level grant, which a pull does not have: its key is fetch.auth.grant, so this plan reads grant "none" for a pull that sends a bearer key every hour',
+  },
+  async () => {
+    /* MEASURED WHILE MOVING THIS PACK, AND NOT THIS PACK'S TO REPAIR. The line printed is
+       `CALLS OUT api.mercury.com · every 1h · grant "none"`, and it is the only line, so the owner approving a bank
+       pull reads that it sends no key while every run sends one. */
+    const { plan, close } = await withMoney();
+    const doc = fillMercury(template(), { id: 'kiln', grant: 'Mercury (read only)' });
+    assert.deepEqual((await plan(doc)).approve, ['CALLS OUT api.mercury.com · every 1h · grant "Mercury (read only)"']);
+    close();
+  },
+);
 
 /**
  * One Mercury account, as `/api/v1/accounts` answers it.
@@ -56,13 +204,12 @@ const account = (name: string, balance: number) => ({
   createdAt: '2024-02-11T10:04:00Z',
 });
 
-const body = (requestId: string, ...accounts: ReturnType<typeof account>[]): string =>
-  JSON.stringify({ requestId, accounts });
+const body = (requestId: string, ...accounts: ReturnType<typeof account>[]): string => JSON.stringify({ requestId, accounts });
 
 async function record(decl: Ingest): Promise<{ k: Kernel; sql: NodeSql; decl: Ingest }> {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
-  assert.ok(k.createRecord({ id: ID, slug: 'quartz', name: 'Quartz', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
+  assert.ok(k.createRecord({ id: ID, slug: 'kiln', name: 'Kiln', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
 
   const decls: Declaration[] = [
     { id: 'register.accounts', kind: 'register', body: REGISTERS.accounts as never },
@@ -200,7 +347,7 @@ test('AN ACCOUNT THAT WAS CLOSED IS NOT DELETED, because a pull that stopped men
 });
 
 test('TWO ACCOUNTS UNDER ONE NAME BECOME ONE ROW, which is the price of keying on a name', async () => {
-  /* THE LIMIT THE HEADER OF `packs/mercury.ts` NAMES, measured here because it is the one way this
+  /* THE PRICE OF KEYING ON A NAME, measured here because it is the one way this
      pack can be wrong without anybody seeing it. `name` is a field a person edits in Mercury, so two
      accounts can end up carrying one name, and then `existingRow` finds the first row for the second
      account and `on_conflict: 'update'` writes over it: the register holds one account, the company's
@@ -222,14 +369,14 @@ test('TWO ACCOUNTS UNDER ONE NAME BECOME ONE ROW, which is the price of keying o
 /* ── what the pack says, before anything runs ────────────────────────────────────────────────── */
 
 test('THE PACK NAMES A KEY AND CARRIES NONE, and both intervals agree', () => {
-  const doc = mercuryPack({ id: 'quartz', grant: 'Mercury (read only)' }) as {
+  const doc = fillMercury(template(), { id: 'kiln', grant: 'Mercury (read only)' }) as {
     pack: string;
     requires: { packs: Record<string, string> };
     declarations: Record<string, unknown>[];
   };
-  assert.equal(doc.pack, 'mercury-quartz');
+  assert.equal(doc.pack, 'mercury-kiln');
   /* BELOW 3.0.0 AND NOT A CARET ON 1.x: money-core 2.0.0 took `holdings` away, which nothing here writes into, and a
-     `^1.0.0` refused this pack beside it (`test/money-core-major.test.ts` plans it on both). The floor is unmoved. */
+     `^1.0.0` refused this pack beside it (`packages/seed/test/money-core-major.test.ts` plans it on both). The floor is unmoved. */
   assert.deepEqual(doc.requires.packs, { 'money-core': '>=1.0.0 <3.0.0' });
 
   const decl = doc.declarations[0] as {
@@ -237,8 +384,8 @@ test('THE PACK NAMES A KEY AND CARRIES NONE, and both intervals agree', () => {
     fetch: { base: string; path: string; auth: Record<string, string>; schedule: { every: string } };
     writes: { register: string };
   };
-  assert.equal(decl.ingest, 'mercury_quartz');
-  assert.equal(decl.fetch.base, MERCURY_BASE);
+  assert.equal(decl.ingest, 'mercury_kiln');
+  assert.equal(decl.fetch.base, 'https://api.mercury.com');
   assert.equal(decl.fetch.path, '/api/v1/accounts');
   assert.deepEqual(decl.fetch.auth, { kind: 'bearer', grant: 'Mercury (read only)' });
   assert.equal(decl.writes.register, 'accounts');
@@ -277,7 +424,7 @@ const TRANSACTION = {
 };
 
 test('A TRANSACTIONS PULL WRITES NOTHING, because a map cannot turn a signed amount into a direction', async () => {
-  /* THIS IS A MEASUREMENT AND NOT A WISH. The claim in `packs/mercury.ts`'s header is that the
+  /* THIS IS A MEASUREMENT AND NOT A WISH. The claim this pack rests on is that the
      ledger cannot be filled by a connector today, and a claim about a grammar is worth nothing
      until somebody has watched the rows fail to land.
      
@@ -293,10 +440,10 @@ test('A TRANSACTIONS PULL WRITES NOTHING, because a map cannot turn a signed amo
      `extract:` on a `pull`. One row in that table and one arm in `mapField` is the whole repair. */
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
-  assert.ok(k.createRecord({ id: ID, slug: 'quartz', name: 'Quartz', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
+  assert.ok(k.createRecord({ id: ID, slug: 'kiln', name: 'Kiln', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
 
   const ledger = {
-    ingest: 'mercury_quartz_txns',
+    ingest: 'mercury_kiln_txns',
     channel: 'pull',
     every: '1h',
     fetch: {
@@ -338,7 +485,7 @@ test('A TRANSACTIONS PULL WRITES NOTHING, because a map cannot turn a signed amo
   /* `undefined` AND NOT `null`: the field is absent from the row rather than present and empty,
      because `mapField`'s enum arm found `externalTransfer` outside `values:` and the declaration
      named no `other:`, so `readRow` counted it as missed and left it off. */
-  assert.equal(got.rows[0]?.fields.direction, undefined, 'the map found a direction after all; read the header of packs/mercury.ts');
+  assert.equal(got.rows[0]?.fields.direction, undefined, 'the map found a direction after all, so a ledger pull can be written now');
   /* AND THAT IS WHAT MAKES THE ROW `needs-review`: one unreadable field is the whole row, and
      `applyPage` counts a `needs-review` row and never writes it (`47 §5.1` step 6.8). */
   assert.equal(got.rows[0]?.confidence, 'needs-review');
