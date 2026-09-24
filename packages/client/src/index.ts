@@ -156,6 +156,13 @@ export type InboxLine = {
 export type InboxPage = { arrivals: InboxLine[]; cursor: number | null };
 
 /**
+ * One figure as `figures` lists it: never its reading, which `metric` answers. `format` is how the declaration says to
+ * write it (`money.GBP`, `int`, `days`) and not the currency its rows are in, which only a reading knows. `param` is a
+ * figure read about one thing, asked as `<id>:<value>`.
+ */
+export type FigureEntry = { id: string; name: string; format: string | null; list: string | null; pack: string | null; param: boolean };
+
+/**
  * One row as `context` shows it: its spoken id, version, scope, state, and its register's mobile fields.
  * A key's secret field is `{ sealed, opened, last_opened, last_by }`, never a value.
  */
@@ -803,6 +810,8 @@ export function createClient(options: ClientOptions) {
     pages: () => call<unknown[]>('pages'),
     page: (slug: string) => call<unknown>('page', { slug }),
     metric: (metric: string) => call<unknown>('metric', { metric }),
+    /** Every figure the caller may read, whichever pack declared it and whether or not a page draws it. */
+    figures: () => call<FigureEntry[]>('figures'),
     packs: () => call<PackState[]>('packs'),
     /* ADMIN, SO A BROWSER SESSION. Nothing cascades: `alsoDisable` names what a `PACK_REQUIRED` listed. */
     disablePack: (args: { id: string; alsoDisable?: string[] }) => call<PackToggle>('disablePack', args as Record<string, unknown>),

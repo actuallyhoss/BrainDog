@@ -34,6 +34,7 @@ import type { EraseReport, EraseRequest } from '@braindog/kernel';
 import type { InvitationRow } from '@braindog/kernel';
 import type { Backlinks } from '@braindog/kernel';
 import type { ViewRow } from '@braindog/kernel';
+import type { MetricDecl } from '@braindog/kernel';
 import {
   fill,
   GRANT_KINDS,
@@ -3989,6 +3990,52 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          ONLY A FILLED FIGURE IS ASKED: a declared `where` is the author's words, the same for every reader, and a tile
          over it is answered as `page` answers it. */
       return param !== undefined && register !== null ? kernel.metric(filled, { reads: (list) => sees(ctx, [list]) }) : kernel.metric(filled);
+    },
+
+    /**
+     * Every figure the record declares that this caller may read: its id, its name, how it is written, the list it is
+     * over, the pack that declared it and whether it takes a parameter after a colon. Never a reading.
+     *
+     * NOTHING LISTED THEM (audit sixty-two finding 2). `metric` answers an id already known, and `pages` and `page` name
+     * a figure only where a block draws it: on a record holding money-core as it ships that was 18 of the 36 declared,
+     * and `late-in`, what is late coming in, was not among the 18. MCP's `record_index` and `resources/list` could name
+     * no more than that, so an agent that had not been told an id could not find it.
+     *
+     * HELD FIGURE BY FIGURE TO `metric`'s OWN CHECK, `readable` on the figure's list, so that a figure listed is one
+     * `metric` answers and one it answers `METRIC_UNKNOWN` is not named here either: that answer exists so that a name
+     * leaks nothing, and a list that named it would hand the name back. `test/figures-list.test.ts` asks both methods
+     * about every declared id as a member invited to one list, and as one who may only add to another.
+     *
+     * AND NOTHING IS EVALUATED, which is why this is the cheap way to learn the ids. It reads the live declarations and
+     * asks one access check per figure; `metric` runs a query per figure, and the drawn list ran every block of every
+     * page. `format` is the declaration's word for how to write the figure (`money.GBP`, `int`, `days`), never the
+     * currency its rows are in: that is the reading's `unit`, and a figure over accounts in two currencies has none.
+     */
+    async figures(ctx: CallContext) {
+      const stop = scoped(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      const rows = kernel.declarations().filter((d) => d.kind === 'metric');
+      /* A FIGURE THE OWNER EDITED IS STILL THE PACK'S. `setDeclaration` writes the edit with `pack_id` null, so the live
+         row alone would say nobody's pack declared a figure somebody renamed; `detached` is where the record keeps whose
+         it was, and it is asked only when such a row is there. */
+      const was = rows.some((d) => d.pack_id === null) ? new Map(kernel.detached().map((d) => [d.id, d.was])) : new Map<string, string>();
+      const out: { id: string; name: string; format: string | null; list: string | null; pack: string | null; param: boolean }[] = [];
+      for (const row of rows) {
+        const decl = JSON.parse(row.body) as MetricDecl;
+        const list = decl.source.startsWith('register.') ? decl.source.slice('register.'.length) : null;
+        if (list !== null && readable(ctx, list)) continue;
+        out.push({
+          id: row.id.slice('metric.'.length),
+          name: decl.name,
+          format: typeof decl.format === 'string' ? decl.format : null,
+          list,
+          pack: row.pack_id ?? was.get(row.id) ?? null,
+          /* A TEMPLATE, READ ABOUT ONE THING. `project-owed` is `thing is {{it}}` and is asked as `project-owed:Kiln`;
+             asked bare, `metric` refuses it `REF_UNKNOWN`, so a caller is told before it asks. */
+          param: row.body.includes('{{it}}'),
+        });
+      }
+      return ok(out);
     },
 
     /**

@@ -166,6 +166,10 @@ export const ROUTES: readonly Route[] = [
     takes: { slug: 'text' } },
   { name: 'metric', group: 'READ+', writes: false, what: 'One figure, with its target and how it compares.',
     takes: { metric: 'text' } },
+  /* EVERY FIGURE, AND NOT ONLY A DRAWN ONE (audit sixty-two finding 2). `metric` reads an id already known and `page`
+     names the figures its blocks draw, which on money-core as it ships was 18 of 36; nothing routed listed the rest, so
+     neither could MCP's `record_index`. It takes nothing and evaluates nothing. */
+  { name: 'figures', group: 'READ+', writes: false, what: 'Every figure you may read: its id, its name, how it is written, its list, its pack and whether it takes a parameter. Never a reading.' },
   { name: 'listGrants', group: 'VAULT', writes: false, what: 'What each credential opens. Never the credential.' },
   { name: 'revokeGrant', group: 'VAULT', writes: true, what: 'Take a credential out of service. The bytes go; the row stays, because what it opened is a fact.' },
   { name: 'dryRun', group: 'READ+', writes: false, what: 'What a rule would do, before anybody turns it on. It writes nothing.',
@@ -440,6 +444,7 @@ export type RecordSurface = {
   pages(ctx: never): Promise<Result<unknown>>;
   page(args: never, ctx: never): Promise<Result<unknown>>;
   metric(args: never, ctx: never): Promise<Result<unknown>>;
+  figures(ctx: never): Promise<Result<unknown>>;
   listGrants(ctx: never): Promise<Result<unknown>>;
   revokeGrant(args: never, ctx: never): Promise<Result<unknown>>;
   dryRun(args: never, ctx: never): Promise<Result<unknown>>;
@@ -541,6 +546,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     pages: (_a, ctx) => api.pages(ctx as never),
     page: (a, ctx) => api.page(a as never, ctx as never),
     metric: (a, ctx) => api.metric(a as never, ctx as never),
+    figures: (_a, ctx) => api.figures(ctx as never),
     listGrants: (_a, ctx) => api.listGrants(ctx as never),
     revokeGrant: (a, ctx) => api.revokeGrant(a as never, ctx as never),
     dryRun: (a, ctx) => api.dryRun(a as never, ctx as never),

@@ -50,6 +50,8 @@
  * figure, and the resource list named only the figures a page draws, 18 of that pack's 36. So `record_index` names
  * the figures the caller may read and `get` reads one by its id, whatever pack declared it, for 16 tokens of the 72
  * the ceiling had left: 2,528 before, 2,544 after, still fifteen tools.
+ * The record then learnt to list them (`figures`), so `record_index` names all 36 and asks three methods, `boot`,
+ * `version` and `figures`, where naming the drawn 18 had run five pages and read eighteen figures.
  *
  * AND AUTOMATIONS COST IT NOTHING (`loop/research-shell-automations.md` §5). `dry_run` went above because only a person
  * installed a rule; an agent now writes automations, so what one would do came back as `dry_run` on `propose`'s answer
@@ -159,14 +161,16 @@ export type McpSurface<C> = {
    */
   inbox?(args: { state?: string }, ctx: C): Answer;
   /**
-   * The id of every figure the record declares, whatever pack declared it. READ+, and optional because no host answers
-   * it yet: the record's methods name a figure only where a page draws it (`pages`, `page`) or by an id already known
-   * (`metric`). Measured by audit sixty-two's M1 on the money pack as it ships, that is 18 of its 36 figures, and one of
-   * the seven the old money tool read by id among the 18 missing. Until a host answers this, `record_index` and
-   * `resources/list` name the drawn ones, and `get` still reads any figure by its id. Each id is read through `metric`
-   * before it is named, so a host that lists more than the caller may read names nothing more.
+   * Every figure the record declares that this caller may read, whatever pack declared it, and whether it is read about
+   * one thing (`param`, asked as `<id>:<value>`). READ+, the record's `figures`. Without it the record's methods name a
+   * figure only where a page draws it (`pages`, `page`) or by an id already known (`metric`): measured by audit
+   * sixty-two's M1 on the money pack as it ships, 18 of its 36 figures, and what is late coming in among the 18 missing.
+   *
+   * OPTIONAL, for a command line built against a host older than the route, which `apps/cli/src/surface.ts` probes for.
+   * Without it `record_index` and `resources/list` name the drawn ones, each read first, and `get` still reads any
+   * figure by its id. With it the list is taken as answered, because the record holds it to `metric`'s own check.
    */
-  figures?(ctx: C): Answer<{ id: string; name?: string }[]>;
+  figures?(ctx: C): Answer<{ id: string; name?: string; param?: boolean }[]>;
 };
 
 /**
@@ -976,27 +980,38 @@ export function tools<C>(surface: McpSurface<C>) {
   };
 
   /**
-   * The figures this caller may read, by id, each read before it is named.
+   * The figures this caller may read: an id, the name the record gave it when it gave one, and whether it takes a
+   * parameter.
    *
    * THE RECORD'S LIST WHEN THE HOST ANSWERS ONE, AND THE DRAWN ONES WHEN IT DOES NOT. Named only when drawn, a figure no
    * page shows could be read by nobody who did not already know its id: audit sixty-two's M1 counted 18 of one pack's
    * 36 so, and nothing a tool answered named any of them.
    *
-   * AND A FIGURE IS READ BEFORE IT IS NAMED, because a reading survives its own refusal. The kernel keeps the id on a
-   * cell it could not fill, so a figure the record says does not exist arrives in a page with the rest. The record
+   * THE RECORD'S LIST IS TAKEN AS ANSWERED. It is held to `metric`'s own check figure by figure
+   * (`packages/record/test/figures-list.test.ts`), so reading each id again here was that check twice, at a query per
+   * figure: on the money pack as it ships with 500 rows of obligations, `record_index` took 67 ms with 36 figures read,
+   * where `boot` and `version` alone take 20 to 30 and the list itself under 1.5. The drawn list, which runs every block
+   * of every page, took 110 to 177. And the second read dropped the one template, what one project is owed, which
+   * `metric` refuses bare as `REF_UNKNOWN` because it is read about one project, so the list said 35 of 36.
+   *
+   * A DRAWN FIGURE IS STILL READ BEFORE IT IS NAMED, because a reading survives its own refusal. The kernel keeps the id
+   * on a cell it could not fill, so a figure the record says does not exist arrives in a page with the rest. The record
    * answers `METRIC_UNKNOWN` for a figure over a register the caller cannot reach, so that a name leaks nothing;
    * naming the id would hand the name back one layer further out.
    */
-  const figuresFor = async (ctx: C, drawnIds: () => Promise<string[]>): Promise<string[]> => {
+  type Named = { id: string; name?: string; param: boolean };
+  const figuresFor = async (ctx: C, drawnIds: () => Promise<string[]>): Promise<Named[]> => {
     const declared = surface.figures ? await surface.figures(ctx) : null;
     /* HELD TO ITS SHAPE, because over the command line it came off the wire: `apps/cli/test/stdio.test.ts` hands the
        tools a surface where every method answers `{ rows: [] }`, and `.map` on that throws out of `resources/list`. */
-    const ids =
-      declared?.ok && Array.isArray(declared.value)
-        ? declared.value.flatMap((f: unknown) => (isObject(f) && typeof f.id === 'string' ? [f.id] : []))
-        : await drawnIds();
-    const out: string[] = [];
-    for (const id of new Set(ids)) if (NAMED.test(id) && (await surface.metric({ metric: id }, ctx)).ok) out.push(id);
+    if (declared?.ok && Array.isArray(declared.value))
+      return declared.value.flatMap((f: unknown): Named[] =>
+        isObject(f) && typeof f.id === 'string' && NAMED.test(f.id)
+          ? [{ id: f.id, ...(typeof f.name === 'string' ? { name: f.name } : {}), param: f.param === true }]
+          : [],
+      );
+    const out: Named[] = [];
+    for (const id of new Set(await drawnIds())) if (NAMED.test(id) && (await surface.metric({ metric: id }, ctx)).ok) out.push({ id, param: false });
     return out;
   };
 
@@ -1011,12 +1026,15 @@ export function tools<C>(surface: McpSurface<C>) {
       const boot = await surface.boot(ctx);
       if (!boot.ok) return boot;
       const version = await surface.version(ctx);
-      /* AND THE FIGURES, BY ID AND NOT WITH THEIR READINGS. Each is read to learn whether this caller may, and the
-         reading is dropped, because `get` of one answers it whole and the answer here is meant to stay small. None is
-         no key, as an empty field goes from `activity`'s lines, so a record with no figures answers what it did.
+      /* AND THE FIGURES, BY ID AND NOT WITH THEIR READINGS, because `get` of one answers it whole and the answer here is
+         meant to stay small. None is no key, as an empty field goes from `activity`'s lines, so a record with no figures
+         answers what it did. A TEMPLATE IS NAMED WITH ITS SLOT, `<id>:<value>`, which is the form `get` takes it
+         in; bare, the record refuses it for want of the thing it is about.
          THE PAGES ARE `boot`'S, already in hand and held by the same filter `pages` runs
-         (`packages/record/src/index.ts`, `shellFor`), so the cheap call asks no third method to find them. */
-      const figures = await figuresFor(ctx, async () => (await drawn(pagesIn(boot.value), ctx)).figures);
+         (`packages/record/src/index.ts`, `shellFor`), so a host with no `figures` asks no third method to find them. */
+      const figures = (await figuresFor(ctx, async () => (await drawn(pagesIn(boot.value), ctx)).figures)).map((f) =>
+        f.param ? `${f.id}:<value>` : f.id,
+      );
       const { record } = boot.value as { record?: unknown };
       /* `.version.version`, BECAUSE `version` ANSWERS `33 §4`'s OBJECT and not a bare number. An
          agent holding the object as its cursor would send it back and get a range scan from nothing. */
@@ -1332,9 +1350,12 @@ export function tools<C>(surface: McpSurface<C>) {
     const pages = await surface.pages(ctx);
     const drew = await drawn(pages.ok ? pages.value : [], ctx);
     out.push(...drew.pages);
-    /* EVERY FIGURE THE CALLER MAY READ, AND NOT ONLY A DRAWN ONE, whenever the host names them (`figuresFor`). */
-    for (const id of await figuresFor(ctx, async () => drew.figures))
-      out.push(resource(`metric/${id}`, `The figure ${id}, with its target and how it compares.`));
+    /* EVERY FIGURE THE CALLER MAY READ, AND NOT ONLY A DRAWN ONE, whenever the host names them (`figuresFor`). A
+       TEMPLATE IS LEFT TO `braindog:metric/{id}`: an address is offered here only if reading it answers, and one read
+       about no project answers `REF_UNKNOWN`. The record's name leads, because it is the words a person used. */
+    for (const f of await figuresFor(ctx, async () => drew.figures))
+      if (!f.param)
+        out.push(resource(`metric/${f.id}`, `${f.name ? `${f.name}: the` : 'The'} figure ${f.id}, with its target and how it compares.`));
 
     /* A SKILL BY NAME, when this caller can read the skills register at all. When to use it is the
        headline, so it is the description. */
