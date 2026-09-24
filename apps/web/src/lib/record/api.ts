@@ -797,10 +797,33 @@ export const chipsOf = (params: URLSearchParams): Filter[] =>
  *
  * A chip is a control and a sentence is a declaration, so both spellings stay — but there is one
  * evaluator underneath, and it is the one with the tests.
+ *
+ * `join` IS THE ADDRESS WORD `join=any`, AND UNDER IT THE CHIPS ARE JOINED WITH `, or`. One word is
+ * the whole of it because both engines refuse a sentence mixing `,` and `, or` (wave two's brief 7),
+ * so a set of chips is all "and" or all "or". NOTHING PASSES IT YET, on either side: `applyFilters`
+ * below calls this with the chips alone, and the register list on a record reads chips through
+ * `treeOf` in `remote.ts`, not through here, and ANDs every one. `chips-compare.test.ts` holds the
+ * record's half, and `registerHref` mints no such address until both carry the word.
  */
-export const whereOf = (filters: Filter[]): string =>
+export const whereOf = (filters: Filter[], join?: 'any'): string =>
   filters
     .map((f) => {
+      /**
+       * THE SIX COMPARE WORDS, SPELLED IN THE CHIP BY THE OPERATOR `compile` GIVES THEM, as `not-on`
+       * is. They fell to the last line here, so `amount:gte:GBP 2400` came back as
+       * `amount is GBP 2400`, which drew none of the 25 obligations `amount at least GBP 2400`
+       * admits, and `what:contains:rent` as `what is rent`, which drew none of three.
+       *
+       * `between` TAKES ITS TWO ENDS AS TWO VALUES, which is what the chip's comma already means, and
+       * one value writes `between 10` for the compiler to refuse by name rather than a range with no
+       * top. A range of days never arrives here: `compile` makes it `gte` and `lte`, two chips.
+       */
+      if (f.op === 'gt' || f.op === 'gte' || f.op === 'lt' || f.op === 'lte') {
+        const word = { gt: 'more than', gte: 'at least', lt: 'less than', lte: 'at most' }[f.op];
+        return `${f.field} ${word} ${f.values[0] ?? ''}`;
+      }
+      if (f.op === 'between') return `${f.field} between ${f.values.join(' and ')}`;
+      if (f.op === 'contains') return `${f.field} contains ${f.values[0] ?? ''}`;
       if (f.op === 'in') return `${f.field} is ${f.values.join(' or ')}`;
       /* `not-in`, so a URL can say everything the SENTENCE can. Without it a declared metric whose
          predicate negates, `state is not cancelled`, had no link that opened its own rows, and the
@@ -846,7 +869,7 @@ export const whereOf = (filters: Filter[]): string =>
       if (f.op === 'has' || f.op === 'lacks') return `${f.field} ${f.op} ${f.values[0] ?? ''}`;
       return `${f.field} is ${f.values[0] ?? ''}`;
     })
-    .join(', ');
+    .join(join === 'any' ? ', or ' : ', ');
 
 export function applyFilters(register: string, entries: Entry[], filters: Filter[], q?: string): Entry[] {
   const w = compile(register, whereOf(filters));

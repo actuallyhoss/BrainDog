@@ -1647,18 +1647,24 @@ const spokenElement = (register: string, field: string, held: string): string =>
 export function registerHref(register: string, where: string | undefined): string {
   const w = compile(register, where);
   if (w.bad.length) return `/r/${register}`;
-  /* AN OR-GROUP OPENS IT WIDE TOO: every chip below is ANDed with the others, so no set of chips can
-     say "or", and chips minted from its members would open the rows that meet all of them. */
-  if (w.any) return `/r/${register}`;
   /**
-   * AND A CLAUSE NO CHIP CAN CARRY BACK OPENS IT WIDE, for the same reason a refusal does.
+   * AN OR-GROUP AND THE SIX COMPARE WORDS OPEN IT WIDE, AND THE READER THAT HOLDS THEM BACK MOVED.
    *
-   * `whereOf` in `api.ts` reads `in`, `not-in`, `before`, `after`, `not-on`, `has` and `lacks`, and a
-   * chip it does not read falls to its last line, `<field> is <value>`. So `amount:gte:GBP 2400` would
-   * come back as `amount is GBP 2400` and `what:contains:rent` as `what is rent`: a list narrowed to
-   * other rows than the block drew, under a link that reads as the block's own filter. The wide
-   * address is the honest one until that reader learns the six words, which is `api.ts`'s to do.
+   * These two guards were written because `whereOf` in `api.ts` read neither: a chip it did not know
+   * fell to `<field> is <value>`, and it joined every chip with a plain comma. It reads the six words
+   * now, by the operator `compile` gives them, and on the sample a compare chip opens the rows its
+   * clause admits (`chips-compare.test.ts` sweeps every ordered and text field in the mirror). It
+   * joins with `, or` when handed `'any'`, and nothing hands it that yet: `applyFilters` does not.
+   *
+   * THE LIST ON A RECORD DOES NOT READ CHIPS THROUGH `whereOf`. `treeOf` in `remote.ts` turns each
+   * chip into a leaf of the record's own, reads neither the six words nor the join, and ANDs every
+   * chip. Measured against the seed installed into a real kernel: `amount:gte:GBP 2400` reached it
+   * as `{ field: 'amount', is: 'GBP 2400' }` and was refused `MONEY_LITERAL_NEEDS_CURRENCY` where
+   * the sentence admits 25 rows, and `what:contains:rent` as `what is rent`, which answered none of
+   * three. So these stay until that reader learns the same words; the test's last case is the
+   * tripwire that fails the day it does.
    */
+  if (w.any) return `/r/${register}`;
   if (w.clauses.some((c) => c.op === 'contains' || c.op === 'gt' || c.op === 'gte' || c.op === 'lt' || c.op === 'lte' || c.op === 'between'))
     return `/r/${register}`;
 
