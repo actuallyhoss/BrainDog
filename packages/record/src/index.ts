@@ -171,6 +171,46 @@ const webhookSecret = (): string => {
 const sha256Hex = async (text: string): Promise<string> =>
   [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))].map((b) => b.toString(16).padStart(2, '0')).join('');
 
+/* ── what one preview may draw ───────────────────────────────────────────── */
+
+/**
+ * The ceilings on one `previewPage` call, beside the ones `page` has for the same body once it is installed.
+ *
+ * A PREVIEW IS A BODY THE CALLER WRITES AND `page` DRAWS ONE THE OWNER INSTALLED, and `page`'s ceilings were set for the
+ * second. At them, a `read`-level caller's 24 cash walks at 3,650 days over 2,000 monthly bills ran 128,000 steps each:
+ * 15.7 s here and 25 to 35 s in the audit, and a 333.8 MB answer (audit sixty-six finding 2, probe `d2-preview-cost`),
+ * past the 30 s a Worker request gets. The shipped Money pages walk 365 days and 30, one walk each, so a year and a
+ * day and two walks draw every page this repository ships. Rows and bytes are measured on what was drawn, since a row
+ * is as long as its list lets it be. The same 24 walks at 366 days now draw two walks of 24,000 steps each and are
+ * refused on rows in 365 ms; 24 tables at `limit: 500` are refused on rows, and four over rows of 4,000 bytes on bytes
+ * (`test/preview-page-guard.test.ts`).
+ *
+ * AND A WALK'S COST IS WHAT IT READS, WHICH NEITHER OF THOSE BOUNDS. A block count and a horizon left the legs and the
+ * currencies free: twenty legs over 2,001 bills ran 480,000 steps in 3.8 s, and one leg over 2,001 bills in forty
+ * currencies, walked once a currency, took 19.1 s at 366 days. Both are counted before a walk runs, with `list`. The
+ * dearest body inside all six ceilings, 4,000 leg rows in eight currencies at 366 days, took 2.0 s and was refused on
+ * rows; the same over one currency 0.4 s.
+ */
+export const PREVIEW_WALKS_MOST = 2;
+/** The furthest ahead a previewed cash walk looks, in days. */
+export const PREVIEW_HORIZON_MOST = 366;
+/** Rows and walk steps one preview answers across its blocks. */
+export const PREVIEW_ROWS_MOST = 5_000;
+/** The bytes of one preview's answer, as JSON. */
+export const PREVIEW_BYTES_MOST = 2_000_000;
+/** The rows a preview's cash walks read across all their legs, counted before any walk runs. */
+export const PREVIEW_WALK_ROWS_MOST = 5_000;
+/** The currencies one previewed cash walk's legs and opening hold, each of which may be a walk of its own. */
+export const PREVIEW_CURRENCIES_MOST = 8;
+
+/* WHAT `page` ALLOWS, SAID IN A PREVIEW'S REFUSALS so a proposal's author knows the installed page draws the block. Copies
+   of the kernel's own, which it does not export: `BLOCK_CEILING` and `LIMIT_MAX` in `packages/kernel/src/declare.ts`,
+   `HORIZON_CAP` and `runway`'s default horizon in `packages/kernel/src/forecast.ts`. */
+const PAGE_BLOCKS_MOST = 24;
+const PAGE_LIMIT_MOST = 500;
+const PAGE_HORIZON_MOST = 3650;
+const WALK_HORIZON_DEFAULT = 180;
+
 /* ── who is asking ───────────────────────────────────────────────────────── */
 
 /** What a token may do. Three, and there is deliberately no `admin` — ADR-060. */
@@ -1848,6 +1888,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        read, while `whatsNew` for the same token read the person's mark. Both now ask `readerOf`. */
     if (!beyond && b.source === 'activity' && 'seen' in b) return { ...b, seen: markOf(readerOf(ctx)) };
     if (!beyond) return b;
+    return shellOf(b, beyond, log !== null);
+  };
+
+  /**
+   * A block blanked to its written shape and the one sentence that says why: what `heldBlock` answers for a block she may
+   * not see, and what `previewPage` answers for a block it holds for a reason `heldBy` cannot see, a `where` whose words
+   * are resolved against a list she cannot read. `log` keeps the source of a block held for reading across the record.
+   */
+  const shellOf = (b: ReturnType<Kernel['block']>, beyond: Refusal, log: boolean) => {
     const kept: Record<string, unknown> = { ...b };
     for (const key of [...DRAWN, ...WRITTEN]) delete kept[key];
     /* AND WHAT IT READS, WHEN THAT IS A LIST OR A FIGURE. A refused Diary block still said `source: register.diary`,
@@ -1922,6 +1971,135 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         .find((said) => said !== null) ??
       null;
     return { log, beyond };
+  };
+
+  /**
+   * A block a caller wrote, with every figure over a list she cannot read renamed to a figure nobody declared, and the
+   * way back from each new name to hers.
+   *
+   * A FIGURE SHE CANNOT READ IS A FIGURE THAT DOES NOT EXIST, AS `metric` SAYS IT. `heldBy` shut a block over such a figure
+   * `FORBIDDEN`, and a name nobody declared was drawn: a `stat` cell's `METRIC_UNKNOWN`, a `series`'
+   * `DECLARATION_INVALID`. So Wren, invited to Notes alone, wrote `diary-count` and `nosuch-count` into a preview and was
+   * told which one this record keeps (audit sixty-six finding 9). Renamed, the kernel draws the hidden figure exactly as
+   * it draws an unknown one, in every place a block names a figure, and the drawing is given her words back, so the two
+   * answers differ only in the name she chose. Her own figures and the owner's are never renamed.
+   *
+   * THE PLACES ARE THE ONES `touches` WALKS FOR A PAGE (`packages/kernel/src/reach.ts`): a `metric`, `late`, `then` or
+   * `each` key, a `source` of `metric.<id>`, and a bare `{{id}}` in prose, which in a template is the row's field when
+   * the list declares one by that name.
+   */
+  const unplaced = (ctx: CallContext, block: unknown, forList: unknown): { block: unknown; back: Map<string, string> } => {
+    const back = new Map<string, string>();
+    const hidden = (id: string): boolean => {
+      const source = kernel.metricDecl(id)?.source;
+      return typeof source === 'string' && source.startsWith('register.') && readable(ctx, source.slice('register.'.length)) !== null;
+    };
+    const fields = typeof forList === 'string' ? fieldsOf(liveBody(`register.${forList}`)) : new Set<string>();
+    const written = JSON.stringify(block) ?? '';
+    /* A NAME NOBODY DECLARED AND NOTHING IN THE BLOCK SAYS, so the way back replaces the new name and nothing else. It
+       fits `METRIC_ID`'s 32 characters, so the lint reads it as the shape of a figure and no more. */
+    const renamed = (id: string): string => {
+      for (const [name, was] of back) if (was === id) return name;
+      let name = '';
+      do name = `unplaced-${crypto.randomUUID().replaceAll('-', '').slice(0, 20)}`;
+      while (kernel.metricDecl(name) !== null || written.includes(name));
+      back.set(name, id);
+      return name;
+    };
+    /* THE FIRST COLON SEPARATES, as `pages.ts` reads a cell: the parameter after it is hers and stays. */
+    const figure = (said: string): string => {
+      const at = said.indexOf(':');
+      const id = at < 0 ? said : said.slice(0, at);
+      return hidden(id) ? renamed(id) + (at < 0 ? '' : said.slice(at)) : said;
+    };
+    const visit = (node: unknown, key: string | undefined): unknown => {
+      if (typeof node === 'string') {
+        const named = key === 'metric' || key === 'late' || key === 'then' || key === 'each' ? figure(node) : key === 'source' && node.startsWith('metric.') ? `metric.${figure(node.slice('metric.'.length))}` : node;
+        return named.replace(/\{\{(\s*(?:[a-z]+:\s*)?)([a-z][a-z0-9_-]*)(\s*)\}\}/gu, (all, lead: string, id: string, tail: string) =>
+          fields.has(id) || id === 'spoken' || !hidden(id) ? all : `{{${lead}${renamed(id)}${tail}}}`,
+        );
+      }
+      if (Array.isArray(node)) return node.map((n) => visit(n, undefined));
+      if (node !== null && typeof node === 'object') return Object.fromEntries(Object.entries(node).map(([k, v]) => [k, visit(v, k)]));
+      return node;
+    };
+    const out = visit(block, undefined);
+    return { block: back.size === 0 ? block : out, back };
+  };
+
+  /**
+   * Why a block a caller wrote may not be drawn by its `where`, or `null`: with `shell` when the block is held as one
+   * over a list she cannot read is held, and without it when the answer is the refusal `list` gives her for the words.
+   *
+   * THE KERNEL DRAWS A BLOCK WITH ITS REFS RESOLVED AGAINST THE WHOLE RECORD, AND `list` RESOLVES THEM WITH `reads`. Wren,
+   * invited to Notes alone, wrote a table over Notes with `client is Acme Redundancy Plan` and was drawn the note about
+   * Acme, while `client is Nobody Ltd` answered `REF_UNKNOWN`, "there is no clients called Nobody Ltd.": an exact-title
+   * oracle into Clients, one guess at a time, where `list` answers 0 rows to both (audit sixty-six finding 1, SEC-10
+   * again). `kernel.block` takes no `reads`, so the words are asked of `list` first, with her `reads`, and whether they
+   * made it ask about a list she cannot read is the answer. A ref field into Clients asks about Clients whatever the
+   * value, so a title that is there and one that is not are the same held block.
+   *
+   * AND A SPOKEN ID INTO A HIDDEN LIST, IN A FIELD SHE READS, IS WORDS. The kernel answered `topic is diary#1` with
+   * `REF_REGISTER_MISMATCH` naming Diary where `topic is nosuch#1` was `REF_UNKNOWN`; `list` calls both a topic nobody
+   * holds. Such words make `list` refuse, and the block is refused in `list`'s sentence, drawn as the kernel draws a block
+   * whose `where` it refused. A leg of a cash walk is held instead, since the walk refuses a leg inside its own answer.
+   *
+   * NOT ASKED OF A CALLER WHO READS EVERY LIST, for whom no list is hidden and `list` would answer as the kernel does.
+   *
+   * A LEG AND A FIGURE'S PARAMETER ARE REFUSED INSIDE THEIR OWN ANSWER, so either is answered in `list`'s sentence
+   * whenever `list` refuses her words, whether or not they asked about a hidden list. Held only when they did, a leg
+   * with `topic is diary#1` was held `FORBIDDEN` and one with `topic is nosuch#1` walked and refused inside the walk,
+   * which said that this record keeps a Diary. And a figure she reads, named with a parameter, is a `where` she wrote:
+   * `notes-for:Acme Redundancy Plan` drew 1 and `notes-for:Nobody Ltd` a reading refused `REF_UNKNOWN`, where `metric`
+   * answers 0 to both, because `metric` fills a parameter with her `reads` and the kernel's block does not. Only a
+   * filled figure is asked, as `metric` asks only a filled one: a declared `where` is the author's words.
+   */
+  const whereHeld = (ctx: CallContext, block: unknown): { refusal: Refusal; shell: boolean } | null => {
+    if (block === null || typeof block !== 'object' || readsEveryList(ctx)) return null;
+    const b = block as { source?: unknown; register?: unknown; where?: unknown; from?: unknown };
+    const own = typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : typeof b.register === 'string' ? b.register : null;
+    const asks: { register: string; where: unknown; inner: boolean }[] = own !== null && b.where !== undefined ? [{ register: own, where: b.where, inner: false }] : [];
+    for (const leg of Array.isArray(b.from) ? (b.from as unknown[]) : [])
+      if (leg !== null && typeof leg === 'object' && typeof (leg as { register?: unknown }).register === 'string' && (leg as { where?: unknown }).where !== undefined)
+        asks.push({ register: (leg as { register: string }).register, where: (leg as { where: unknown }).where, inner: true });
+    /* THE PLACES A BLOCK NAMES A FIGURE ARE `unplaced`'s, and a figure she cannot read was renamed there to one nobody
+       declared, so every figure found here is one she reads. */
+    const named = (node: unknown, key: string | undefined): string[] =>
+      typeof node === 'string'
+        ? key === 'metric' || key === 'late' || key === 'then' || key === 'each'
+          ? [node]
+          : key === 'source' && node.startsWith('metric.')
+            ? [node.slice('metric.'.length)]
+            : []
+        : Array.isArray(node)
+          ? node.flatMap((n) => named(n, undefined))
+          : node !== null && typeof node === 'object'
+            ? Object.entries(node).flatMap(([k, v]) => named(v, k))
+            : [];
+    for (const said of named(block, undefined)) {
+      const at = said.indexOf(':');
+      const decl = at < 0 ? null : kernel.metricDecl(said.slice(0, at));
+      if (!decl || !decl.source.startsWith('register.') || decl.where === undefined) continue;
+      const filled = fill(decl, null, said.slice(at + 1)) as MetricDecl;
+      asks.push({ register: filled.source.slice('register.'.length), where: filled.where, inner: true });
+    }
+    for (const ask of asks) {
+      let asked: string | null = null;
+      const said = kernel.list({
+        register: ask.register,
+        where: ask.where as never,
+        limit: 1,
+        reads: (list) => {
+          const seen = readable(ctx, list) === null;
+          if (!seen) asked ??= list;
+          return seen;
+        },
+      });
+      if (!said.ok && 'refusal' in said && (asked !== null || ask.inner)) return { refusal: said.refusal, shell: false };
+      if (asked === null) continue;
+      return { refusal: { ...readable(ctx, asked)!, at: 'where' }, shell: true };
+    }
+    return null;
   };
 
   /**
@@ -4011,6 +4189,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      *
      * A `for:` BODY IS DRAWN AS WRITTEN AND NOT EXPANDED OVER A ROW, so a `{{name}}` in it is drawn as its placeholder, or
      * refused on the block that filters by it. Which row to draw a template over is a question this method does not ask.
+     *
+     * AND THE BODY IS THE CALLER'S, WHICH A DECLARED PAGE'S IS NOT, so every word in it is a question she chose. A `where`
+     * is answered as `list` answers her (`whereHeld`), a figure as `metric` does (`unplaced`), and what one call may draw
+     * is bounded by `PREVIEW_WALKS_MOST` and the five beside it (audit sixty-six, `test/preview-page-guard.test.ts`).
      */
     async previewPage(args: { body?: unknown } | undefined, ctx: CallContext) {
       const stop = scoped(ctx, 'read');
@@ -4039,26 +4221,165 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          count and the positions the lint names stay the body's, and it is drawn as the held shell from what was written,
          never through `kernel.block`, which is only ever handed what the lint passed. A block too malformed to name its
          lists is left to the lint, whose sentence about its shape names no list. */
-      const written: unknown[] = Array.isArray(b.blocks) ? b.blocks : [];
-      const shut = written.map((block) => {
-        if (block === null || typeof block !== 'object') return false;
+      const forList = b.for !== null && typeof b.for === 'object' ? (b.for as { register?: unknown }).register : undefined;
+      const renamed = (Array.isArray(b.blocks) ? (b.blocks as unknown[]) : []).map((block) => unplaced(ctx, block, forList));
+      const written = renamed.map((r) => r.block);
+      /* WHAT EACH BLOCK IS BEFORE THE LINT: drawn, held as `heldBy` holds it, held by its `where` (`whereHeld`), or
+         refused in `list`'s sentence. A held block is linted as a bare note, and one refused by its `where` without it. */
+      type Plan = { draw: true } | { held: true } | { shell: Refusal } | { refused: Refusal };
+      const plans = written.map((block): Plan => {
+        if (block === null || typeof block !== 'object') return { draw: true };
         try {
-          return heldBy(ctx, block as never).beyond !== null;
+          if (heldBy(ctx, block as never).beyond !== null) return { held: true };
+          const where = whereHeld(ctx, block);
+          return where === null ? { draw: true } : where.shell ? { shell: where.refusal } : { refused: where.refusal };
         } catch {
-          return false;
+          return { draw: true };
         }
       });
-      const linted = shut.includes(true) ? { ...b, blocks: written.map((block, i) => (shut[i] ? { kind: 'note' } : block)) } : b;
+      const bare = (block: unknown): unknown => {
+        const { where: _where, ...rest } = block as Record<string, unknown>;
+        return rest;
+      };
+      const linted = plans.some((p) => !('draw' in p))
+        ? { ...b, blocks: written.map((block, i) => ('held' in plans[i]! || 'shell' in plans[i]! ? { kind: 'note' } : 'refused' in plans[i]! ? bare(block) : block)) }
+        : written.some((block, i) => block !== (b.blocks as unknown[])[i])
+          ? { ...b, blocks: written }
+          : b;
       const fault = kernel.lint([{ id: `page.${String(b.page)}`, kind: 'page', body: linted }] as never);
-      if (fault) return { ok: false as const, refusal: fault };
-      const decl = b as { page: string; blocks: Parameters<Kernel['block']>[0][] };
-      return ok({
+      /* HER NAMES BACK IN THE LINT'S SENTENCE TOO, which quotes what it read. A `series` over `metric.diary-count:q` was
+         refused as reading `metric.unplaced-<hex>:q` and one over `metric.nosuch-count:q` as reading its own words, so the
+         new name said which figure this record keeps. */
+      if (fault) {
+        let text = JSON.stringify(fault);
+        for (const { back } of renamed) for (const [name, was] of back) text = text.replaceAll(name, was);
+        return { ok: false as const, refusal: JSON.parse(text) as typeof fault };
+      }
+
+      /* WHAT ONE PREVIEW MAY COST, ASKED OF THE BLOCKS BEFORE ANY IS DRAWN (audit sixty-six finding 2). The lint holds a
+         preview to `page`'s own ceilings, 24 blocks and a walk of 3,650 days, and at those a `read`-level caller's 24 cash
+         walks over 2,000 monthly bills ran 128,000 steps each: 15.7 s and 333.8 MB for one call. `page` spends that only
+         on a body the owner installed. So a walk past `PREVIEW_HORIZON_MOST` days, or past the first
+         `PREVIEW_WALKS_MOST` walks, is not run, and says so on its own block; the rest of the page is drawn. */
+      let walks = 0;
+      let legRows = 0;
+      const costs = written.map((block, i): Refusal | null => {
+        if (!('draw' in plans[i]!) || block === null || typeof block !== 'object') return null;
+        const w = block as { source?: unknown; horizon?: unknown; from?: unknown; opening?: unknown };
+        if (w.source !== 'forecast.runway') return null;
+        const horizon = typeof w.horizon === 'number' ? w.horizon : WALK_HORIZON_DEFAULT;
+        if (horizon > PREVIEW_HORIZON_MOST)
+          return {
+            code: 'OUT_OF_BOUNDS',
+            fix: `A preview walks cash at most ${PREVIEW_HORIZON_MOST} days ahead, and this walk asks for ${horizon.toLocaleString('en-GB')}. Installed, the page walks up to ${PAGE_HORIZON_MOST.toLocaleString('en-GB')} days, so accepting it draws this walk in full.`,
+            at: 'horizon',
+          };
+        walks += 1;
+        if (walks > PREVIEW_WALKS_MOST)
+          return {
+            code: 'OUT_OF_BOUNDS',
+            fix: `A preview draws at most ${PREVIEW_WALKS_MOST} cash walks, and this is walk ${walks}. Installed, the page draws every block it holds, up to ${PAGE_BLOCKS_MOST} blocks, so accepting it draws this walk.`,
+            at: 'source',
+          };
+        /* AND WHAT THE WALK READS, COUNTED BEFORE IT RUNS. The kernel reads every row each leg matches, up to 2,000 a
+           leg, once for each currency its money is in when no rate joins them, and nothing bounds the legs: held
+           unchecked, twenty legs over 2,001 bills ran 480,000 steps in 3.8 s, and one leg over 2,001 bills in forty
+           currencies took 19.1 s at 366 days, each inside the block and horizon ceilings above. So the rows every leg
+           matches are counted with `list`, as she would count them, and their currencies read, with the opening's. */
+        const currencies = new Set<string>();
+        for (const leg of Array.isArray(w.from) ? (w.from as unknown[]) : []) {
+          const l = leg as { register?: unknown; where?: unknown; amount?: unknown } | null;
+          if (l === null || typeof l !== 'object' || typeof l.register !== 'string') continue;
+          const reads = (list: string): boolean => readable(ctx, list) === null;
+          let page = kernel.list({ register: l.register, where: l.where as never, limit: 500, reads });
+          /* A LEG `list` REFUSES IS REFUSED BY THE WALK IN ITS OWN ANSWER, and reads nothing. */
+          if (!page.ok) continue;
+          legRows += page.value.matched;
+          if (legRows > PREVIEW_WALK_ROWS_MOST)
+            return {
+              code: 'OUT_OF_BOUNDS',
+              fix: `A preview's cash walks read at most ${PREVIEW_WALK_ROWS_MOST.toLocaleString('en-GB')} rows across their legs, and with this walk they read ${legRows.toLocaleString('en-GB')}. Installed, the page reads up to 2,000 rows a leg, so accepting it draws this walk. Preview it with fewer legs, or a narrower where on each.`,
+              at: 'from',
+            };
+          for (;;) {
+            for (const row of page.value.rows) {
+              const money = typeof l.amount === 'string' ? (row.fields[l.amount] as { currency?: unknown } | null | undefined) : undefined;
+              if (money !== null && typeof money === 'object' && typeof money.currency === 'string') currencies.add(money.currency);
+            }
+            if (page.value.cursor === null) break;
+            const next = kernel.list({ register: l.register, where: l.where as never, limit: 500, cursor: page.value.cursor, reads });
+            if (!next.ok) break;
+            page = next;
+          }
+        }
+        /* THE OPENING'S PARTS ARE WALKS TOO, one a currency, when the figure it starts from is a sum in several. Read as
+           `metric` reads it, which is what the block reads first. */
+        const opening = w.opening !== null && typeof w.opening === 'object' ? (w.opening as { metric?: unknown }).metric : undefined;
+        const start = typeof opening === 'string' ? kernel.metricDecl(opening) : null;
+        const reading = start ? kernel.metric(start) : null;
+        if (reading?.ok) for (const part of reading.value.parts ?? []) currencies.add(part.currency);
+        if (currencies.size > PREVIEW_CURRENCIES_MOST)
+          return {
+            code: 'OUT_OF_BOUNDS',
+            fix: `A preview walks cash in at most ${PREVIEW_CURRENCIES_MOST} currencies, and this walk's money is in ${currencies.size}. Installed, the page walks every currency its legs hold, so accepting it draws this walk. Preview it with a where on each leg that keeps fewer currencies.`,
+            at: 'from',
+          };
+        return null;
+      });
+
+      const decl = b as { page: string };
+      const blocks = written.map((block, i) => {
+        const plan = plans[i]!;
+        const cost = costs[i];
+        const drawn =
+          'held' in plan
+            ? heldBlock(ctx, block as never)
+            : 'shell' in plan
+              ? shellOf(block as never, plan.shell, false)
+              : 'refused' in plan
+                ? heldBlock(ctx, { ...(block as ReturnType<Kernel['block']>), rows: [], matched: 0, refusals: [plan.refused] })
+                : cost
+                  ? heldBlock(ctx, { ...(block as ReturnType<Kernel['block']>), rows: [], matched: 0, refusals: [cost] })
+                  : heldBlock(ctx, kernel.block(block as never));
+        /* HER NAMES BACK, in place of the ones nobody declared, so the drawing says the figure she wrote. */
+        const back = renamed[i]!.back;
+        if (back.size === 0) return drawn;
+        let text = JSON.stringify(drawn);
+        for (const [name, was] of back) text = text.replaceAll(name, was);
+        return JSON.parse(text) as typeof drawn;
+      });
+
+      /* AND WHAT THE DRAWN BLOCKS ANSWER, TOGETHER. Each table is inside `page`'s limit of 500 rows, and 24 of them are
+         12,000 rows; a row may be as long as its list lets it be. Rows and a walk's steps are counted, then bytes. */
+      const steps = (walk: unknown): number => {
+        const s = (walk as { steps?: unknown } | undefined)?.steps;
+        return Array.isArray(s) ? s.length : 0;
+      };
+      const answered = blocks.reduce(
+        (n, block) => n + (Array.isArray(block.rows) ? block.rows.length : 0) + steps(block.walk) + (Array.isArray(block.walks) ? block.walks.reduce((m, w) => m + steps(w), 0) : 0),
+        0,
+      );
+      if (answered > PREVIEW_ROWS_MOST)
+        return no(
+          'OUT_OF_BOUNDS',
+          `A preview answers at most ${PREVIEW_ROWS_MOST.toLocaleString('en-GB')} rows and walk steps across its blocks, and this one drew ${answered.toLocaleString('en-GB')}. Installed, the page answers up to ${PAGE_LIMIT_MOST} rows a table across up to ${PAGE_BLOCKS_MOST} blocks. Preview it with lower table limits, shorter walks or fewer blocks.`,
+          { at: 'blocks' },
+        );
+      const answer = {
         ...b,
         page: decl.page,
         /* THE RECORD'S CLOCK, as `page` answers it, so what is late is late against the day the record reads. */
         read_at: new Date(clock.now()).toISOString(),
-        blocks: decl.blocks.map((block, i) => heldBlock(ctx, shut[i] ? (block as never) : kernel.block(block))),
-      });
+        blocks,
+      };
+      const weight = new TextEncoder().encode(JSON.stringify(answer)).length;
+      if (weight > PREVIEW_BYTES_MOST)
+        return no(
+          'OUT_OF_BOUNDS',
+          `A preview answers at most ${PREVIEW_BYTES_MOST.toLocaleString('en-GB')} bytes, and this one came to ${weight.toLocaleString('en-GB')}. Installed, the page has no such ceiling. Preview it with lower table limits or fewer blocks.`,
+          { at: 'blocks' },
+        );
+      return ok(answer);
     },
 
     /** One figure, by the id a `stat` cell names. */
