@@ -27,6 +27,7 @@ import type { Kernel } from '@braindog/kernel';
 import { createRecordApi } from '../../record/src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 import { firstPartyDocument } from '../../seed/src/index.ts';
+import { peopleBefore } from './people-before.ts';
 
 type Out = { ok: boolean; value?: unknown; refusal?: { code: string; fix: string; at?: string } };
 const said = <T>(r: unknown): T => {
@@ -184,7 +185,7 @@ async function peopleWith(roles: readonly string[], binned: readonly number[] = 
   const owner = { principal: { kind: 'person', id: 'p_1', level: 'owner' } } as const;
   /* WITHOUT THEIR EXAMPLES, which are rows too and hold roles of their own: the rows below are the whole list. */
   for (const id of ['portfolio', 'people'] as const) {
-    const doc = { ...(firstPartyDocument(id) as unknown as Record<string, unknown>), seeds: [] };
+    const doc = { ...((id === 'people' ? peopleBefore() : firstPartyDocument(id)) as unknown as Record<string, unknown>), seeds: [] };
     const d = said<{ diff: Diff }>(await api.planPack({ doc, source: { kind: 'local' } } as never, owner)).diff;
     said(await api.installPack({ doc, source: { kind: 'local' }, planHash: d.planHash, approve: d.approve } as never, owner));
   }

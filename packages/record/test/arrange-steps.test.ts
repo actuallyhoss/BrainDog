@@ -50,11 +50,18 @@ async function recordOf() {
             /* A COPY, because the catalogue hands the same document to every record in the process: shed in place, the
                second record of this file was set up with a People that had no `registrar` to create Ada under. */
             const given = e.doc(o);
-            if (!shedding || given === null) return given;
+            if (given === null) return given;
+            /* AND BEFORE `shed()` IT HOLDS `registrar` AGAIN, as People did until 2.0.0 took it out of the shipped document
+               (M3 B9, `814ca32c`): the record this file measures is one made while the value was offered, so Ada's create
+               was `ENUM_VALUE_UNKNOWN` once the shipped People lost it (CI 35938679271). */
             const doc = structuredClone(given);
             for (const d of doc.declarations as Decl[])
-              for (const f of d.register === 'people' ? (d.fields ?? []) : []) if (f.id === 'role') f.values = (f.values ?? []).filter((v) => v !== 'registrar');
-            return { ...doc, version: NEXT };
+              for (const f of d.register === 'people' ? (d.fields ?? []) : [])
+                if (f.id === 'role')
+                  f.values = shedding
+                    ? (f.values ?? []).filter((v) => v !== 'registrar')
+                    : ['client', 'contractor', 'accountant', 'registrar', 'collaborator', 'other'];
+            return shedding ? { ...doc, version: NEXT } : doc;
           },
         },
   );

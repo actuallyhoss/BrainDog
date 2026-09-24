@@ -27,6 +27,7 @@ import { readPackFile } from '../src/catalogue.ts';
 import { createRecordApi, type CallContext } from '../../record/src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { FIRST_PARTY, FIRST_PARTY_VERSIONS, firstPartyDocument } from '../../seed/src/index.ts';
+import { peopleBefore } from './people-before.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
 
@@ -50,7 +51,7 @@ type Api = Awaited<ReturnType<typeof createRecordApi>>;
 async function recordOf(ids: readonly string[] = FIRST_PARTY): Promise<{ api: Api; close: () => void }> {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 23, 12)) });
-  for (const id of ids) said(await put(api, firstPartyDocument(id)));
+  for (const id of ids) said(await put(api, id === 'people' ? peopleBefore() : firstPartyDocument(id)));
   return { api, close: () => sql.close() };
 }
 

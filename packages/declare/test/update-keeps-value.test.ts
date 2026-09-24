@@ -26,6 +26,7 @@ import { install, normalise, plan, type Diff, type Host, type Installed, type Pa
 import { createRecordApi, type CallContext } from '../../record/src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { FIRST_PARTY, firstPartyDocument } from '../../seed/src/index.ts';
+import { peopleBefore } from './people-before.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
 
@@ -75,7 +76,7 @@ const people = (version: string, more: Field[] = []): Doc => {
 };
 
 test('M2: People 2.0.0 without registrar keeps it on a list whose rows may hold it, and a row holding it can still be edited', async () => {
-  const { api, close } = await recordOf(FIRST_PARTY.map((id) => firstPartyDocument(id)));
+  const { api, close } = await recordOf(FIRST_PARTY.map((id) => (id === 'people' ? peopleBefore() : firstPartyDocument(id))));
   const row = said<{ id: string }>(api.kernel.create('people', { name: 'Nordhaven', role: 'registrar' }, { actor: 'p_1' }));
   const diff = await put(api, people('2.0.0'));
   said(api.kernel.update('people', row.id, { note: 'Renews in October' }, { actor: 'p_1' }));
@@ -87,7 +88,7 @@ test('M2: People 2.0.0 without registrar keeps it on a list whose rows may hold 
 });
 
 test('a People list with no rows takes 2.0.0 without registrar, as it always did', async () => {
-  const bare = structuredClone(firstPartyDocument('people')) as unknown as Doc;
+  const bare = structuredClone(peopleBefore()) as unknown as Doc;
   bare.seeds = [];
   const { api, close } = await recordOf([firstPartyDocument('portfolio'), bare]);
   assert.equal(api.kernel.count('people'), 0);
@@ -100,7 +101,7 @@ test('a People list with no rows takes 2.0.0 without registrar, as it always did
 });
 
 test('the value kept stays across the next update of People, which changes the list again', async () => {
-  const { api, close } = await recordOf(FIRST_PARTY.map((id) => firstPartyDocument(id)));
+  const { api, close } = await recordOf(FIRST_PARTY.map((id) => (id === 'people' ? peopleBefore() : firstPartyDocument(id))));
   said(api.kernel.create('people', { name: 'Nordhaven', role: 'registrar' }, { actor: 'p_1' }));
   await put(api, people('2.0.0'));
   const diff = await put(api, people('2.1.0', [{ id: 'pronouns', label: 'Pronouns', type: 'text' }]));
