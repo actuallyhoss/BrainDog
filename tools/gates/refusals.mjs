@@ -315,6 +315,36 @@ export default function refusals(
   const REGISTRY = 'packages/ports/src/index.ts';
 
   const known = new Set(table);
+  /**
+   * AND THE STORAGE ADAPTER'S THIRTEEN ARE NOT REFUSALS, which `30 §6` says in its second paragraph: the adapter
+   * "has its own closed vocabulary (`TOO_MANY_PARAMS` and twelve more, §13); it is a separate list because it names
+   * what the driver refused, not what the format refused". `37 §6` adds that the kernel never shows a `SqlError` to a
+   * person, and a host answers one as a 500 `INTERNAL` whose `code` is not the `SqlError`'s. When `@braindog/ports`
+   * gained `src/sql.ts` (W60-3, 24 September 2026), `new SqlError('TOO_MANY_PARAMS', ...)` matched the constructor arm
+   * above and eight adapter codes read as eight invented refusals, twelve against a budget of four. Registering them
+   * in `30 §6` would have put `SYNTAX` and `UNKNOWN` in the agent contract as things a caller can fix.
+   *
+   * SO THE SECOND LIST IS READ FROM ITS OWN HOME, `30 §13`'s sentence that closes it, and held to the array the code
+   * compares against. A code on both lists (`INT_OUT_OF_RANGE`, refused at write-path step 3 and by the driver) is a
+   * refusal, because `known` is asked first.
+   */
+  const s13At = blueprint.indexOf('## 13 · The storage adapter');
+  const s13 = s13At < 0 ? '' : blueprint.slice(s13At, blueprint.indexOf('\n## 14 ', s13At));
+  const vocabulary = /closed vocabulary of \*\*thirteen\*\*([\s\S]*?)and the list is closed/.exec(s13);
+  const adapter = new Set(vocabulary ? [...vocabulary[1].matchAll(/`([A-Z][A-Z0-9_]*)`/g)].map((m) => m[1]) : []);
+  if (s13At >= 0 && adapter.size !== 13) findings.push(`30 §13's adapter vocabulary reads as ${adapter.size} codes and says thirteen`);
+  let sqlSource = '';
+  try {
+    sqlSource = read('packages', 'ports', 'src', 'sql.ts');
+  } catch {
+    /* a fixture root has no adapter, and nothing below needs one */
+  }
+  const sqlArray = /SQL_ERROR_CODES = \[([\s\S]*?)\] as const;/.exec(sqlSource);
+  if (sqlArray) {
+    const shipped = [...sqlArray[1].matchAll(/'([A-Z][A-Z0-9_]*)'/g)].map((m) => m[1]);
+    for (const code of shipped) if (!adapter.has(code)) findings.push(`SQL_ERROR_CODES has \`${code}\` and 30 §13's vocabulary does not`);
+    for (const code of adapter) if (!shipped.includes(code)) findings.push(`30 §13's vocabulary has \`${code}\` and SQL_ERROR_CODES does not`);
+  }
   const invented = new Map();
   const emitted = new Set();
   const named = new Map();
@@ -380,7 +410,7 @@ export default function refusals(
         for (const code of [m[1], m[2]]) {
           if (code === undefined) continue;
           if (known.has(code)) emitted.add(code);
-          else invented.set(code, [...(invented.get(code) ?? []), where]);
+          else if (!adapter.has(code)) invented.set(code, [...(invented.get(code) ?? []), where]);
         }
     }
   }

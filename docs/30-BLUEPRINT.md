@@ -597,7 +597,10 @@ Refusal {
 A code is `UPPER_SNAKE`, always. The lower-case forms that appear in other documents — `already_known`,
 `wrong_key`, `needs_browser_session`, `human_only` — were the earlier draft, and the table below is the only
 list. The storage adapter has its **own** closed vocabulary (`TOO_MANY_PARAMS` and twelve more, §13); it is a
-separate list because it names what the *driver* refused, not what the *format* refused.
+separate list because it names what the *driver* refused, not what the *format* refused. *None of the thirteen
+reaches a caller as a `code`* (37 §6): a host answers a `SqlError` as a 500 `INTERNAL`, and the one driver fact a caller
+must hear, a SQLite without FTS5, reaches them as `RECORD_UNAVAILABLE` below. So a code on §13's list is not an invented
+refusal code, and `INT_OUT_OF_RANGE`, which is on both, is this table's.
 
 **One vocabulary, four renderings** — the same pattern as one grammar, seven consumers:
 
@@ -895,7 +898,7 @@ registry the list of everything that can appear in a `code`, which is a differen
 |---|---|---|
 | `ROUTE_UNKNOWN` | a path that is not `/api/<method>` for a method in `ROUTES` — 404, and `allowed` carries the method names; also an MCP tool or resource URI that resolves to nothing, 10 §3 (53) | `route-unknown` |
 | `BODY_MALFORMED` | a POST body that is not a JSON object — 400, refused before anything reads an argument off it (53) | `body-malformed` |
-| `RECORD_UNAVAILABLE` | the record cannot be acted on and it is not the caller's fault: every owner suspended — 503, `49 §5.1` step 5.3. **Named for the record and not for a schema**, which is what it said while borrowing the word from `SCHEMA_MISMATCH` to look like something that earns a 503 (53) | `record-unavailable` |
+| `RECORD_UNAVAILABLE` | the record cannot be acted on and it is not the caller's fault: every owner suspended — 503, `49 §5.1` step 5.3; or a SQLite with no `fts5` or no `json`, at `sqlite.fts5` or `sqlite.json`, found by the migration runner's boot probe on a new file and on one already migrated (§13), and sticky like `SCHEMA_NEWER`. **Named for the record and not for a schema**, which is what it said while borrowing the word from `SCHEMA_MISMATCH` to look like something that earns a 503 (53) | `record-unavailable` |
 | `UNREACHABLE` | the client could not reach the record at all — DNS, the socket, a body that is not JSON, an answer carrying neither a refusal nor a conflict. **The one code the record never produces**, and it exists so that a caller told "the record refused" does not go looking for a problem with its arguments while the network is down. It is the inbound half of the same treatment the `Http` vocabulary gets outbound, where four error names map onto the single code `PULL_ORIGIN_REFUSED` (53) | `unreachable` |
 
 And the test that stops the enumeration rotting: **every `code` has a fixture that produces it.** A
@@ -1245,6 +1248,18 @@ On macOS, Bun loads Apple's libsqlite3.dylib and is unsupported. Use Node 24.13+
 **That turns a missing FTS5 from a corruption bug into a refusal at boot** — and there is nothing behind the
 refusal: no degraded mode, no `LIKE` fallback. `json` is required beside `fts5`, and the probe names the driver it
 measured (37). It is the mechanism the FTS5 paragraph in [01-ARCHITECTURE](01-ARCHITECTURE.md) §4 now depends on.
+
+*As built (W60-3, 24 September 2026), the probe is in the kernel's `applyMigrations` and not at the adapter's open,
+because neither host opens through `openNodeSqlite`, and a throw at open is the failure it replaces: measured,
+an adapter refusing `USING fts5` made migration 1 throw `no such module: fts5` and `openRecord` threw with it. It runs
+`SELECT json('{}')` after the ledger and a `LIMIT 0` read of `entry_fts` once the schema is whole, and a missing module
+from either, or from migration 1's `CREATE VIRTUAL TABLE`, is the sticky `RECORD_UNAVAILABLE` of §6 at `sqlite.fts5` or
+`sqlite.json`, 503, whose `fix` is the block above in one sentence with `sqlite_version()` in it. The read is the half
+that matters: a file migrated on one machine and opened on another is not re-migrated, and without it such a file
+opened clean and failed at its first search. On a new file the runner answers the refusal and `openRecord` still
+throws, at `makeKernel`'s unconditional read of `declaration`, a table the refused migration 1 never made; that
+read has to wait on the refusal before a new file opens as one.*
+
 When a self-hoster writes in, the order of diagnosis is fixed too: the version tuple (§11) → the refusal state
 (`SCHEMA_MISMATCH` / `SCHEMA_NEWER`) → `observation` → `event` → the `system` suggestions — and nothing else is asked
 for first (53).

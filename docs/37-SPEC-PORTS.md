@@ -18,7 +18,7 @@ Second in the build order; the first of the three artefacts of 30 §14.
 
 | | |
 |---|---|
-| **Does** | declares the nine ports and `Ingress`; ships `openNodeSqlite`; ships `guard`, `guardScript`, `mapDriverMessage`, `measureCaps` and `bootProbe`, which both `Sql` adapters call so they refuse identically; ships `DO_LIMITS`, `SqlError`, `blobKey`; ships the conformance corpus, its runner and the committed reference trace |
+| **Does** | declares the nine ports and `Ingress`; ships `openNodeSqlite`; ships `guard`, `guardScript`, `mapDriverMessage`, `measureCaps` and `bootProbe`, which both `Sql` adapters call so they refuse identically, and `guarded`, the wrapper that calls them (§2.4.1); ships `DO_LIMITS`, `SqlError`, `blobKey`; ships the conformance corpus, its runner and the committed reference trace |
 | **Refuses to do** | know the kernel's schema; parse SQL; cache statements; fake the other eight ports; implement `better-sqlite3`; import `cloudflare:*`; host the Durable Object adapter (that is `apps/worker`, spec 51) |
 | **Imports** | nothing at runtime. `node:sqlite` appears in exactly one file, behind the `./node-sqlite` subpath, so the main entry runs in workerd, in Node and in a bare test process (31 §1) |
 | **Consumers** | `kernel` and `record` use `{ Sql, Scheduler, Clock }`; `spark` uses `{ Sql, Clock, Inference }`; `apps/selfhost` and `apps/cli` call `openNodeSqlite`; `apps/worker` calls the shared functions from its own adapter (33 §1) |
@@ -227,7 +227,32 @@ function guardScript(sql: string): void;                           // §5.4 step
 function mapDriverMessage(message: string): SqlErrorCode;          // §5.8; never throws
 function measureCaps(run: (sql: string, ...params: Param[]) => Row[]): Capabilities;   // §5.2
 function bootProbe(caps: Capabilities, driver: string): void;      // throws SqlError NO_SUCH_MODULE with §5.1's text
+function guarded<S extends Sql>(sql: S): S;                        // §2.4.1; the wrapper a host returns
 ```
+
+#### 2.4.1 · As built (W60-3, 24 September 2026): the port this tree has, and `guarded`
+
+The tree's `Sql` is not §2.1's. It has `exec(sql, ...params): void`, `all`, `one` and `transactionSync`, and no
+`Cursor`, `execScript` or `caps`; both hosts send a zero-parameter `exec` to the driver's multi-statement entry, so
+that call is the script door. `src/sql.ts` therefore ships the five functions above over that port, plus
+`guarded(sql)`, the wrapper each host returns in place of the port it built: a zero-parameter `exec` is checked by
+`guardScript`, every other call by `guard`, and a driver error whose sentence carries one of §5.8's eleven fragments is
+rethrown as a `SqlError` carrying the same sentence and the driver's error as `cause`. An `UNKNOWN` one passes through
+unchanged, so a caller that reads the driver's own error keeps reading it. `transactionSync` is the host's own.
+`Capabilities` is a standalone type, since the port has no `caps` to hang it on. The hosts adopt `guarded` in W60-6
+(Worker) and W60-7 (self-host).
+
+*The boot probe departs from §5.1 step 4, and this is the amendment.* Nothing in the tree calls `openNodeSqlite`, which
+does not exist, so there is no open for `bootProbe` to throw from, and a throw at open is the failure being replaced:
+measured on 24 September 2026, an adapter refusing `USING fts5` made the kernel's migration 1 throw
+`no such module: fts5` and `openRecord` threw with it. So the probe is the kernel's, at the top of `applyMigrations`
+(`packages/kernel/src/migrate.ts`): `SELECT json('{}')` after the ledger, a `LIMIT 0` read of `entry_fts` once the
+schema is whole, and a missing module from either or from migration 1 is `30 §6`'s `RECORD_UNAVAILABLE` (503) in the
+returned state, sticky like `SCHEMA_NEWER`, at `sqlite.fts5` or `sqlite.json`. It reads `fts5` through
+`mapDriverMessage`, so a guarded port's `SqlError` and a bare driver's `Error` are the same fact. It does not call
+`measureCaps`, which creates and drops two tables in `main` on every open, and it does not read compile options,
+which the DO answers with `not authorized`. `bootProbe` and its four-line text stay here for a host that opens
+through `openNodeSqlite` once one does; `NO_SUCH_MODULE` never reaches a caller either way (§6).
 
 `guard` takes `unknown[]` on purpose: its job is the runtime type check that TypeScript cannot make for a
 JavaScript caller. Both adapters call these five; the Node one in this package, the DO one in spec 51.
@@ -409,6 +434,11 @@ Steps 1–7 are `guard(query, params)`, shared by both adapters. Steps 8–12 ar
 2. **Statement length.** `query.length * 3 > 100_000 && utf8Bytes(query) > 100_000` → `STATEMENT_TOO_LONG`.
    A UTF-16 code unit encodes to at most three UTF-8 bytes, so the cheap test is exact as a filter and
    `TextEncoder` runs only for statements over 33 333 characters.
+   *Measured on local workerd, 24 September 2026:* 99 999 and 100 000 bytes answered, 100 001 refused
+   (`statement too long: SQLITE_TOOBIG`); in two-byte characters 100 000 answered and 100 002 refused. So "over
+   100 000" stands. The hardening survey's "refused at exactly 100 000" (`loop/research-hardening.md` §0 item 6,
+   §2.5) came from a probe whose padding was one byte longer than its label. The built guard counts bytes in a loop
+   rather than encoding, which is the same number without a second copy of the statement.
 3. **Parameter count.** `params.length > 100` → `TOO_MANY_PARAMS`.
 4. **Parameter types**, for each index `i`:
    - `string`, `null`, `Uint8Array` (a `Buffer` is one) — pass;
@@ -418,10 +448,19 @@ Steps 1–7 are `guard(query, params)`, shared by both adapters. Steps 8–12 ar
    - anything else → `SYNTAX` naming `i` and `typeof`. Measured on `node:sqlite`: `true` and `undefined` throw
      `ERR_INVALID_ARG_TYPE`; a `Date` binds as `NULL`; a plain object is read as a named-parameter map. The DO
      rejects all four. The guard makes the direction of each asymmetry irrelevant (§13 D5).
+     *Corrected by measurement on local workerd, 24 September 2026:* the DO rejects none of them. `SELECT ? AS v`
+     answered the TEXT `'true'` for `true`, `NULL` for `undefined`, `new Date(0)`'s `toString()` in the machine's
+     time zone, `'[object Object]'` for `{}`, `''` for `[]`, `NULL` for `NaN`, and a `real` for `2 ** 53 + 2`; a
+     bigint of `5n` threw `Cannot convert a BigInt value to a number`. Every one of those is a wrong row written
+     without a word, which makes this step the most valuable of the seven on the Worker. The built guard names a
+     non-`Param` object by its constructor (`Date`, `Array`, `Object`) rather than `typeof`, which says `object` for all
+     three.
 5. **LIKE pattern length.** Iterate `/(\b(?:LIKE|GLOB)\s*)?\?/gi` over the query counting `?` placeholders; for a
    match whose group 1 is set, the parameter at that index, if a string over 50 UTF-8 bytes →
    `LIKE_TOO_LONG`. Positional, and at bind time (§13 D2). `NOT LIKE ?` is covered; `ESCAPE '\'` after it is
-   irrelevant.
+   irrelevant. *As built:* the regex also captures `?NNN`, which takes index NNN, and a bare `?` takes one past the
+   highest index seen so far, which is SQLite's own rule. `packages/record/src/identity.ts` binds `?1` twice, and
+   counting its placeholders by position would have measured the wrong parameter.
 6. **Compound terms.** `count(/\b(?:UNION|INTERSECT|EXCEPT)\b/gi) + 1 > 5` → `COMPOUND_TOO_LONG` (§13 D6).
 7. **Second statement.** `/;\s*[^\s;]/` on the query → `MULTI_STATEMENT_PARAMS`, with or without parameters
    (§13 D1). A trailing `;` is not a second statement.
@@ -512,8 +551,27 @@ irrelevant. Every fragment below was produced on Node 24.13.0 except the last, w
 | `too many SQL variables` | `TOO_MANY_PARAMS` |
 | `statement too long` | `STATEMENT_TOO_LONG` |
 | `too large to be represented as a JavaScript number` — `node:sqlite` reading an INTEGER past 2⁵³ | `INT_OUT_OF_RANGE` |
-| `cannot execute transaction-related statements` — workerd | `TXN_STATEMENT_FORBIDDEN` |
+| `please use the state.storage.transaction` (workerd, below) | `TXN_STATEMENT_FORBIDDEN` |
 | anything else — `no such table: x`, `no such column: "x" - should this be a string literal in single-quotes?`, `malformed JSON`, `column index out of range`, `statement has been finalized` | `UNKNOWN`, message kept verbatim |
+
+*Measured on local workerd (wrangler 4.129.0), 24 September 2026, and amended here.* The DO's answer to `BEGIN`,
+`END`, `ROLLBACK`, `RELEASE a` and `SAVEPOINT a` is one sentence, "To execute a transaction, please use the
+state.storage.transaction() or state.storage.transactionSync() APIs instead of the SQL BEGIN TRANSACTION or SAVEPOINT
+statements. ...", and not the `cannot execute transaction-related statements` this table had recorded, which no
+statement produced. The DO answers `CREATE VIRTUAL TABLE ... USING nosuch(x)` with `not authorized: SQLITE_AUTH`, not
+`no such module`, so case #17 (`no-such-module`) traces `UNKNOWN` there and `NO_SUCH_MODULE` on Node: a finding for
+spec 51's first conformance run, not a fragment to add, because `not authorized` is also the DO's answer to `PRAGMA
+compile_options` and does not mean a missing module. Its other sentences carried the fragments above:
+`too many columns on c_cols: SQLITE_ERROR`, `too many terms in compound SELECT: SQLITE_ERROR`,
+`LIKE or GLOB pattern too complex: SQLITE_ERROR`, `too many SQL variables at offset 213: SQLITE_ERROR`,
+`statement too long: SQLITE_TOOBIG`, `Expression tree is too large (maximum depth 100): SQLITE_ERROR`.
+
+*For whoever wires the guard (W60-6, W60-7).* `attempt()` in `packages/kernel/src/tx.ts` issues a raw `SAVEPOINT`
+and recognises the DO's refusal by `/storage\.transaction/` on its message, then falls back to a nested
+`transactionSync`. Step 1 refuses `SAVEPOINT` on both hosts before the driver, with this spec's sentence, which that
+test does not match, so `attempt()` rethrows. The kernel needs to recognise `TXN_STATEMENT_FORBIDDEN` by code, and the
+self-host's nested `transactionSync`, which today runs `fn()` with no savepoint, needs to become one, or a refusal
+inside `attempt()` keeps its writes on the self-host.
 
 ---
 

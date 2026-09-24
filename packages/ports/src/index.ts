@@ -12,26 +12,12 @@
  * async port would have bought nothing and cost the guarantee.
  */
 
-/** What a bound parameter may be. Everything else is coerced before it reaches the driver. */
-export type Param = string | number | bigint | null | Uint8Array;
-
-/** One row, as the driver returns it: column name to value. */
-export type Row = Record<string, Param>;
-
-/**
- * The storage port.
- *
- * Four methods, and the fourth is the one the whole write path is built on. `exec` is for statements
- * with no result; `all` and `one` read. A driver that cannot do `transactionSync` cannot host a
- * record, because a write that is half applied is a record that has to be repaired by hand.
+/*
+ * The storage port, its guard and its boot probe (`37 §2.4`). `Param`, `Row` and `Sql` moved there from here with
+ * the guard, so the port and the checks every adapter runs in front of it are read in one file.
  */
-export interface Sql {
-  exec(sql: string, ...params: Param[]): void;
-  all<T = Row>(sql: string, ...params: Param[]): T[];
-  one<T = Row>(sql: string, ...params: Param[]): T | undefined;
-  /** Runs `fn` in a transaction, rolls back on a throw, and rethrows. Never nested by the driver. */
-  transactionSync<T>(fn: () => T): T;
-}
+export { DO_LIMITS, SQL_ERROR_CODES, SqlError, bootProbe, guard, guardScript, guarded, mapDriverMessage, measureCaps } from './sql.ts';
+export type { Capabilities, Param, Row, Sql, SqlErrorCode } from './sql.ts';
 
 /**
  * The clock, as a port, because a record's tests are about dates and a test that waits is a test

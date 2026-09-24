@@ -12,7 +12,7 @@
  */
 
 import type { Clock, Refusal, Result, Sql } from '@braindog/ports';
-import { ok } from '@braindog/ports';
+import { mapDriverMessage, ok } from '@braindog/ports';
 
 import kernel0001 from './migrations/0001_kernel.ts';
 import session0002 from './migrations/0002_session.ts';
@@ -114,6 +114,37 @@ const FORMAT_BUMP = /^-- format-bump (\d+)$/m;
 export const instant = (ms: number): string => new Date(ms).toISOString();
 
 /**
+ * The refusal a SQLite without `fts5` or `json` opens as: `30 §13`'s boot-probe block, in one sentence.
+ *
+ * `RECORD_UNAVAILABLE` AND NOT THE ADAPTER'S `NO_SUCH_MODULE`, because this is what a caller reads and `30 §6` maps
+ * it to 503: the request was fine and a deploy fixes it. Measured on 24 September 2026 before this existed: an
+ * adapter refusing `USING fts5` made `applyMigrations` throw out of migration 1, so `openRecord` threw and the host
+ * answered nothing with a code in it.
+ *
+ * THE VERSION IS READ HERE, not remembered, because the operator's next move is to find out which SQLite they are
+ * running, and `sqlite_version()` answers on every build including the ones this refuses. A throw from it is not
+ * caught: a SQLite that cannot say its own version is not a missing module.
+ */
+const unhostable = (sql: Sql, module: 'fts5' | 'json'): Refusal => ({
+  code: 'RECORD_UNAVAILABLE',
+  at: `sqlite.${module}`,
+  fix: `SQLite ${String(sql.one<{ v: string }>('SELECT sqlite_version() AS v')?.v)} has no ${module}, which a .brain file cannot open without; run Node 24.13 or later, which bundles its own SQLite, and not Bun, which loads Apple's on macOS.`,
+});
+
+/**
+ * Whether a throw means the module is missing, and nothing wider.
+ *
+ * `fts5` GOES THROUGH `mapDriverMessage`, the one table both adapters share (`37 §5.8`), so a guarded port's
+ * `SqlError` and a bare driver's `Error` read the same. `json` has no row there, because SQLite says `no such
+ * function: json` and that sentence is not one of the thirteen. A full disk or a locked file is a real failure and
+ * keeps its own sentence, which is the line `measureCaps` draws for the same reason.
+ */
+const lacks = (e: unknown, module: 'fts5' | 'json'): boolean => {
+  const message = e instanceof Error ? e.message : String(e);
+  return module === 'fts5' ? mapDriverMessage(message) === 'NO_SUCH_MODULE' : message.includes('no such function: json');
+};
+
+/**
  * Apply what has not been applied, and refuse what disagrees.
  *
  * The two refusals are different failures and the fix is different for each, so they are two codes:
@@ -129,6 +160,20 @@ export async function applyMigrations(
   sql.exec(LEDGER);
   const rows = sql.all<{ version: number; checksum: string }>('SELECT version, checksum FROM migration ORDER BY version');
   const sums = await Promise.all(MIGRATIONS.map((m) => checksum(m.sql)));
+
+  /* THE BOOT PROBE, HALF ONE: `json` before anything is applied, because every register's fields are a JSON column
+     and a record that cannot read one cannot read anything. It cannot read compile options instead: the Durable
+     Object answers `PRAGMA compile_options` with `not authorized` (`37 §5.8`, measured). */
+  const unavailable = (refusal: Refusal, applied: number[]) => ({
+    result: { ok: false as const, refusal },
+    state: { applied: [...rows.map((r) => r.version), ...applied], refusal },
+  });
+  try {
+    sql.one("SELECT json('{}') AS v");
+  } catch (e) {
+    if (!lacks(e, 'json')) throw e;
+    return unavailable(unhostable(sql, 'json'), []);
+  }
 
   for (const row of rows) {
     const at = MIGRATIONS.find((m) => m.version === row.version);
@@ -162,6 +207,36 @@ export async function applyMigrations(
 
   for (const [i, m] of MIGRATIONS.entries()) {
     if (m.version <= highest) continue;
+    /* A NEW FILE MEETS A MISSING `fts5` HERE, at migration 1's `CREATE VIRTUAL TABLE entry_fts`, and not at the read
+       below. The migration's transaction has already rolled back when this catches it, so the refusal leaves no half
+       of migration 1 behind, and the ones applied before it stay applied and are reported. */
+    try {
+      applyOne(m, i);
+    } catch (e) {
+      if (!lacks(e, 'fts5')) throw e;
+      return unavailable(unhostable(sql, 'fts5'), applied);
+    }
+    applied.push(m.version);
+  }
+
+  /* HALF TWO: a read of `entry_fts` that returns nothing, once the schema is whole. A file whose migrations were
+     applied on another machine is not re-applied here, so without this read it opened clean on a SQLite that cannot
+     search it, answered every method, and failed at the first search with a driver sentence and no code (measured,
+     `boot-probe.test.ts`). `LIMIT 0` compiles the statement, which is where the module is looked up, and reads no row. */
+  try {
+    sql.all('SELECT rowid FROM entry_fts LIMIT 0');
+  } catch (e) {
+    if (!lacks(e, 'fts5')) throw e;
+    return unavailable(unhostable(sql, 'fts5'), applied);
+  }
+
+  return {
+    result: ok({ kernel: MIGRATIONS.length, format: FORMAT_VERSION, applied }),
+    state: { applied: [...rows.map((r) => r.version), ...applied], refusal: null },
+  };
+
+  /** One migration and its ledger row, in one transaction: the body the loop above catches around. */
+  function applyOne(m: Migration, i: number): void {
     sql.transactionSync(() => {
       execScript(sql, m.sql);
       sql.exec('INSERT INTO migration (version, applied_at, checksum) VALUES (?, ?, ?)', m.version, instant(clock.now()), sums[i]!);
@@ -190,13 +265,7 @@ export async function applyMigrations(
         );
       }
     });
-    applied.push(m.version);
   }
-
-  return {
-    result: ok({ kernel: MIGRATIONS.length, format: FORMAT_VERSION, applied }),
-    state: { applied: [...rows.map((r) => r.version), ...applied], refusal: null },
-  };
 }
 
 /**
