@@ -19,9 +19,10 @@
      the script's log line appeared for none of them; it appeared for every path in
      `run_worker_first` and for no other. So `src/worker.ts` is one line that hands those paths to
      the app through the `APP` service binding, and the rule that the site holds no logic of its own
-     is now a test (`test/forward.test.ts`) instead of an absent key. `main` sits in `env.alpha` and
-     not here because a top-level `main` is inherited: alpha is bound first, production in its own
-     push (`loop/push-3.patch`), and until then production uploads what it uploads today.
+     is now a test (`test/forward.test.ts`) instead of an absent key. `main` is at the top level now
+     that both environments are bound, and it was in `env.alpha` alone for one push because a
+     top-level `main` is inherited: alpha rehearsed the token, the binding and a version rollback
+     while production still uploaded its assets-only `no-op-worker.js`.
 
      Cloudflare Pages was the other candidate and is the wrong one:
      it is a second deployment system with its own build settings, its own preview semantics and
@@ -36,6 +37,11 @@
      =========================================================================================== */
 
   "name": "braindog-site",
+
+  /* Inherited by both environments. `services` is not inheritable, so each environment names its
+     own app below, and the top level, which `deploy.yml` never deploys, binds
+     none. */
+  "main": "src/worker.ts",
 
   /* Required with or without code, and pinned to the Worker's own date for one reason: two numbers
      that mean "the platform behaviour we deployed against" should not be two numbers. */
@@ -57,10 +63,15 @@
      over: there is no client router here by default, and answering `index.html` with a 200 for every
      typo makes a site look alive to a crawler and dead to a reader. `test/content.test.ts` holds the
      setting and the file to each other. ONE PAGE AT EVERY DEPTH is why the build names its assets from the
-     root (`svelte.config.js` `paths.relative: false`): `./_app/` from `/a/b` asks under `/a/`. */
+     root (`svelte.config.js` `paths.relative: false`): `./_app/` from `/a/b` asks under `/a/`.
+
+     `run_worker_first` IS THE APP'S BUILT DOORS, for the reasons at `env.alpha`, whose own
+     `assets` replaces this block and so repeats the list. `apps/worker/test/site-binding.test.ts`
+     fails if the two lists differ. */
   "assets": {
     "directory": "build",
-    "not_found_handling": "404-page"
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/app", "/app/*", "/api/*", "/auth/*", "/account/*", "/mcp", "/mcp/", "/in/*", "/.well-known/braindog-build", "/healthz"]
   },
 
   /* Two environments for symmetry with `apps/worker/wrangler.jsonc`, and because the alternative
@@ -93,13 +104,14 @@
        request handler for a redirect Cloudflare performs at the edge for free. The `www` → apex
        redirect is a single dashboard Redirect Rule; REPORT.md §1 has it as a numbered step. */
     "production": {
-      "routes": [{ "pattern": "brain.dog", "custom_domain": true }]
+      "routes": [{ "pattern": "brain.dog", "custom_domain": true }],
+      "services": [{ "binding": "APP", "service": "braindog-production" }]
     },
 
-    /* ALPHA HANDS ITS APP'S DOORS TO ITS APP, AND PRODUCTION DOES NOT YET (push 1 of
-       `loop/research-one-domain-binding.md` section 4). A service binding in place of zone routes
-       means no route is written, so the deploy token needs no Zone permission, and everything the
-       move adds lives in the site's version, so undoing it is `wrangler rollback`.
+    /* EACH ENVIRONMENT HANDS ITS APP'S DOORS TO ITS OWN APP, alpha from push 1 and production
+       from push 3 (`loop/research-one-domain-binding.md` section 4). A service binding in place of
+       zone routes means no route is written, so the deploy token needs no Zone permission, and
+       everything the move adds lives in the site's version, so undoing it is `wrangler rollback`.
 
        `run_worker_first` IS THE LIST OF DOORS THE APP HAS BUILT, AND ONLY THOSE. A built door left
        off it answers the site's 404 page on `alpha.brain.dog` and nothing fails at deploy time;
@@ -120,7 +132,6 @@
        serve production's record on alpha's name, and the same test fails on it. */
     "alpha": {
       "routes": [{ "pattern": "alpha.brain.dog", "custom_domain": true }],
-      "main": "src/worker.ts",
       "assets": {
         "directory": "build-alpha",
         "not_found_handling": "404-page",

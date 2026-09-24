@@ -11,12 +11,10 @@
  * app's own bytes, and `/mcp/`, `/auth` and `/account`, which the survey's list did not carry and `src/route.ts` accepts,
  * answered the site's 404 page (sections 2.1 and 2.6).
  *
- * ALPHA IS BOUND FIRST AND PRODUCTION IS NOT, AND THAT IS HELD HERE RATHER THAN HOPED FOR. Push 1 binds alpha alone, so
- * the token, the binding and a version rollback are rehearsed on `alpha.brain.dog` before `brain.dog` changes at all
- * (section 4 of the research). `BOUND` names the environments this push binds; `loop/push-3.patch` adds production to it
- * in the same diff that binds production, so a production binding that arrives any other way fails the fourth test
- * below. `wrangler deploy --dry-run --env production` measured the shape this holds: production uploads the same
- * assets-only `no-op-worker.js` it uploads today and says "No bindings found", while alpha binds `env.APP (braindog-alpha)`.
+ * BOTH ENVIRONMENTS ARE BOUND, ALPHA SINCE PUSH 1 AND PRODUCTION SINCE PUSH 3 (section 4 of the research). Push 1 held
+ * production unbound with a fourth test, so the token, the binding and a version rollback were rehearsed on
+ * `alpha.brain.dog` before `brain.dog` changed at all. With every environment bound that test had nothing left to read,
+ * and a check with nothing to read is the same silence as no check, so it went with this push.
  *
  * THE DOORS ARE THE ROUTER'S OWN BRANCHES, ENUMERATED, AND NOT A SAMPLE WRITTEN HERE. This file used to hold the site to
  * a hand-written `DOORS` and to a `served` built from six `serves*` predicates, and its header said a door the router
@@ -48,7 +46,7 @@ const read = (path: string): Config => JSON.parse(stripJsonc(readFileSync(fileUR
 
 const site = read('../../site/wrangler.jsonc');
 const ENVIRONMENTS = ['production', 'alpha'] as const;
-const BOUND: readonly string[] = ['alpha'];
+const BOUND: readonly string[] = ENVIRONMENTS;
 
 /* EVERY BRANCH `route()` TAKES ON THE PATH, READ FROM ITS SOURCE. The function runs to the first line that is a lone
    closing brace, which is how the file writes the end of a top-level function, and a line may end in `\r\n`: an
@@ -171,12 +169,4 @@ test('the site hands the app nothing the app has not built, and keeps its own pa
   }
   const [first, ...rest] = BOUND;
   for (const name of rest) assert.deepEqual(siteFirst(name), siteFirst(first ?? name), `${name} forwards other paths than ${first}, so one rehearses nothing for the other`);
-});
-
-test('an environment this push does not bind has no script, no binding and no worker-first list', () => {
-  for (const name of ENVIRONMENTS.filter((e) => !BOUND.includes(e))) {
-    assert.equal(mainOf(name), undefined, `${name}: the site has a main in a push that does not bind ${name}`);
-    assert.deepEqual(site.env?.[name]?.services ?? [], [], `${name}: the site binds an app in a push that does not bind ${name}`);
-    assert.equal(assetsOf(name)?.run_worker_first, undefined, `${name}: the site sends paths to a script in a push that does not bind ${name}`);
-  }
 });
