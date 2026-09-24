@@ -159,7 +159,11 @@ const monthOf = (ms: number, add: number): string => {
   return new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth() + add, 1)).toISOString();
 };
 
-export const core = (sql: Sql, clock: Clock, fallback: Inference): Core => {
+/**
+ * `priced` IS THE HOST'S ANSWER TO WHOSE NEURONS EACH TIER SPENDS, and `['a']` is `46 §4.1`'s. See `SparkOptions` in
+ * `index.ts` for the host that answers otherwise.
+ */
+export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readonly Tier[] = ['a']): Core => {
   const now = (): string => new Date(clock.now()).toISOString();
 
   const settings = (): Settings => {
@@ -184,10 +188,14 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference): Core => {
     /* NEURONS ARE ZERO OFF TIER `a` BECAUSE IT IS NOT OUR MONEY (`46 §4.1`). A customer's own key and
        a self-host endpoint are billed by whoever owns them, and a meter that invented a figure for
        them would be reporting a cost nobody is paying. An unknown model name is the same case: the
-       rate table holds the four the corpus routes to, and a BYO name is not one of them. */
+       rate table holds the four the corpus routes to, and a BYO name is not one of them.
+       AND "OFF TIER `a`" IS THE HOST'S TO WIDEN, because "not our money" was false on one host. On the Worker with no
+       endpoint every call goes to Workers AI on the operator's account, `byo` included, and
+       `loop/research-batch-sixty-audit.md` finding 4 read `{ tier: byo, tokens_in: 700, tokens_out: 60, neurons: 0 }`
+       there for a call the platform billed. That host passes the tiers it pays for (`priced`); every other keeps `a`. */
     const rate = Object.hasOwn(MODELS, row.model) ? MODELS[row.model as ModelId] : undefined;
     const neurons =
-      row.tier === 'a' && rate !== undefined
+      priced.includes(row.tier) && rate !== undefined
         ? Math.round((row.usage.in * rate.in) / 1e6 + (row.usage.out * rate.out) / 1e6)
         : 0;
     /* OR REPLACE, BECAUSE A HELD ASK IS SETTLED BY ITS OWN ID. The row `reserve` wrote is overwritten by the outcome, so a
@@ -255,7 +263,8 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference): Core => {
       /* A PROVIDER THAT DID NOT ANSWER IS NOT A REFUSAL ABOUT THE ASK, and saying `PROPOSAL_SCHEMA`
          here would send a person looking at their question for a fault that is in the network. The
          estimate is billed as `tokens_in` so a month of outages is visible in the meter. `answer`
-         settles that row under `-`, so there it keeps `tokens_in` and no neurons (`asksUsed`). */
+         settles that row under `-`, so there it keeps `tokens_in` and no neurons (`asksUsed`), unless the
+         host marked the throw `reached`, and then `answer` settles it as `read` does, under the model's name. */
       return {
         model,
         ms: clock.now() - t0,

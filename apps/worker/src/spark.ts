@@ -57,7 +57,7 @@ import type { OpenKey } from '@braindog/host/actions';
 import { sparkAskDoor, type SparkAskDoor } from '@braindog/host';
 import { grantChosen } from '@braindog/kernel';
 import type { SparkAnswer } from '@braindog/host/spark-answers';
-import { no, type Clock, type Sql } from '@braindog/ports';
+import { no, type Clock, type Result, type Sql } from '@braindog/ports';
 import type { CallContext, RecordApi, SparkModel } from '@braindog/record';
 import type { Spark } from '@braindog/spark';
 
@@ -74,6 +74,8 @@ export type SparkEnv = {
   AI_GATEWAY?: string | undefined;
   /** `yes` to answer Spark with the included model where no endpoint is set. Anything else, including unset, is off. */
   SPARK_INCLUDED?: string | undefined;
+  /** The most one record's asks may spend of the included model in a UTC month, in neurons. See `INCLUDED_MONTH_NEURONS`. */
+  SPARK_INCLUDED_MONTH_NEURONS?: string | undefined;
 };
 
 /* ── the included model ───────────────────────────────────────────────────────────────────────────────────────────── */
@@ -93,6 +95,40 @@ export type SparkEnv = {
  */
 export const INCLUDED_NEURONS_PER_CALL = 2_500;
 
+/**
+ * The most one record's Spark asks may spend of the included model in a UTC month, in neurons, where
+ * `SPARK_INCLUDED_MONTH_NEURONS` does not say otherwise. The var is the operator's; `ask_cap` is the record owner's and
+ * can only lower what this allows (`operatorCeiling` below).
+ *
+ * WHY A CEILING OF THE OPERATOR'S AT ALL. `loop/research-batch-sixty-audit.md` finding 1, severity 1: once `4e701b15`
+ * switched the included model on, the only monthly bound on the operator's neurons was `ask_cap`, which any record owner
+ * types, with no upper limit. Its probe S1 saved `ask_cap: 1_000_000_000` through the door and 200 reads all reached the
+ * binding, and the audit put 100,000 proposes from one owner with a cookie at about $283.
+ *
+ * WHY 900,000. At $0.011 a thousand neurons that is $9.90, about ten dollars a record a month. The package's own caps put
+ * the default month (80 asks) at about 20,600 neurons at the very worst, some $0.23, so this is some forty times what an
+ * owner who never touches the setting could spend, and room for one who raises it to use Spark every day. It is counted
+ * in asks at the package's worst call, 232 neurons (`worstAsk`), which is 3,879 asks, so the bound holds whatever mix of
+ * reads and proposes spends it; a read's worst is 25.5, so in practice a month at the ceiling costs far less.
+ *
+ * IT IS PER RECORD AND NOT PER ACCOUNT. Each record's ledger is in its own Durable Object, and no count here sees another
+ * record's. A thousand records at the ceiling is $9,900; bounding the account needs a counter every record shares, which
+ * this file has not got.
+ */
+export const INCLUDED_MONTH_NEURONS = 900_000;
+
+/**
+ * `SPARK_INCLUDED_MONTH_NEURONS` read whole, or the default.
+ *
+ * A VALUE THAT IS NOT A WHOLE COUNT IS THE DEFAULT AND NEVER "NO CEILING". `Number('')` is 0 and `Number('1e9')` is a
+ * billion, so the var is held to digits: an empty or mistyped var costs the operator the default, which is a number he
+ * chose, rather than switching Spark off or lifting the bound. `0` is a count, and turns every ask away.
+ */
+export const includedMonthNeurons = (env: SparkEnv): number => {
+  const v = env.SPARK_INCLUDED_MONTH_NEURONS?.trim();
+  return v !== undefined && /^[0-9]+$/u.test(v) ? Number(v) : INCLUDED_MONTH_NEURONS;
+};
+
 /** The routing name the record's own asks go by: every template of the package asks the same (`prompts.ts`). */
 const INCLUDED_MODEL = 'glm-5.3-flash';
 
@@ -110,6 +146,24 @@ class NotSent extends Error {
   readonly sent = false;
 }
 
+/**
+ * The binding was called and threw: a call the platform may have billed, which the package reads by this mark.
+ *
+ * IT WAS A PLAIN `Error` UNTIL `loop/research-batch-sixty-audit.md` finding 5, and the package read a plain throw two ways.
+ * Its probe S4 put one `AI.run` that threw through both paths: a read kept `glm-5.3-flash`, priced the prompt estimate at
+ * 9 neurons and counted the ask, and an automation's answer settled it under `-`, priced 0, uncounted, and was asked
+ * again up to the ladder's eighth rung. With the mark both settle it under the model's name, priced and counted.
+ * `model` is the routing name, for the reason `includedInference` gives.
+ */
+class Reached extends Error {
+  readonly reached = true;
+  readonly model: string;
+  constructor(message: string, model: string) {
+    super(message);
+    this.model = model;
+  }
+}
+
 const counted = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.ceil(v) : 0);
 
 /**
@@ -123,7 +177,8 @@ const counted = (v: unknown): number => (typeof v === 'number' && Number.isFinit
  * - A RUN AND A BAD ANSWER, `PROPOSAL_SCHEMA`: the platform billed it, so it is `SparkAnsweredError` with the counts the
  *   binding reported. `aiInference` drops them from its refusal, so a wrapped binding, built fresh for each call so two asks
  *   in flight cannot cross, keeps the last answer to read them off.
- * - A BINDING THAT THREW is a plain throw, `UNREACHABLE`, which the ladder asks again.
+ * - A BINDING THAT THREW is `Reached`: `UNREACHABLE`, which the ladder asks again, but settled under the model's name,
+ *   priced on the prompt estimate and counted as an ask, on a read and on an automation's answer alike.
  *
  * `model` IN THE REPLY IS THE ROUTING NAME, NOT THE PROVIDER ID `aiInference` answers. The package prices a row by its name
  * in `MODELS`, which holds `glm-5.3-flash` and not `@cf/zai-org/glm-5.3-flash`: handing the id through billed every row 0
@@ -154,7 +209,7 @@ export function includedInference(env: SparkEnv): SparkInference | undefined {
         const usage = (last as { usage?: { prompt_tokens?: unknown; completion_tokens?: unknown } } | null)?.usage;
         throw new SparkAnsweredError(fix, { in: counted(usage?.prompt_tokens), out: counted(usage?.completion_tokens) }, call.model);
       }
-      throw new Error(fix);
+      throw new Reached(fix, call.model);
     },
   };
 }
@@ -257,13 +312,113 @@ export async function workerSparkEngine(env: SparkEnv, api: () => RecordApi, dep
   const config = sparkFromEnv(env, { operatorKey: false });
   const inference = config === undefined ? includedInference(env) : sparkInferenceOf(config, wireOf(env, api, deps));
   if (inference === undefined) return undefined;
-  const { createSpark } = await import('@braindog/spark');
+  const spark = await import('@braindog/spark');
+  /* EVERY TIER IS PRICED ON THE INCLUDED MODEL, because every call this engine makes there is Workers AI on the operator's
+     account. `byo` has no address of the owner's to go to, and the audit's S3 read it `neurons: 0` (finding 4); tier `b`
+     is refused at the settings door on a Worker that can open no key, and a `b` stored before that still drafts here. */
+  const options = config === undefined ? { priced: ['a', 'b', 'byo'] as const } : {};
   /* NAMED BY THIS HOST, as on the self-host: the package's tier `a` status says `glm-5.3-flash` whatever `SPARK_MODEL`
      sends (`loop/research-spark-routes.md` F2), and one wrap here is what every door over this engine reads. */
-  const engine = sparkNamedEngine(createSpark({ sql: deps.sql, clock: deps.clock, inference, record: sparkRecord(api()) }), sparkModelNameOf(config));
+  const engine = sparkNamedEngine(
+    spark.createSpark({ sql: deps.sql, clock: deps.clock, inference, record: sparkRecord(api()) }, options),
+    sparkModelNameOf(config),
+  );
   /* GUARDED BY THIS HOST, as on the self-host: tier `b`'s drafts are on this Worker's endpoint and the package meters tier
      `a` alone, and `configure` checks a grant id's shape and never the vault (`sparkGuardedEngine`). */
-  return sparkGuardedEngine(engine, { sql: deps.sql, clock: deps.clock, grants: () => api().kernel.grants() });
+  const guarded = sparkGuardedEngine(engine, { sql: deps.sql, clock: deps.clock, grants: () => api().kernel.grants() });
+  if (config !== undefined) return guarded;
+  /* AND ON THE INCLUDED MODEL, HELD UNDER THE OPERATOR'S CEILING, outermost so its check runs before either count below
+     it and with no `await` between them and the package's hold. */
+  return operatorCeiling(guarded, deps, Math.floor(includedMonthNeurons(env) / worstAsk(spark)));
+}
+
+/**
+ * The most one package call can spend on the included model, in neurons: every template at its own input cap and its own
+ * output ceiling, at its own model's rate. 232 today, a `propose` of 12,000 tokens in and 1,500 out.
+ *
+ * READ OFF THE PACKAGE AND NOT WRITTEN HERE, so a template whose caps grow moves the ceiling's count of asks with it. It
+ * takes the module as an argument because `46 §5.1` has this Worker import it only once an engine is being built.
+ */
+const worstAsk = (spark: Pick<typeof import('@braindog/spark'), 'PROMPTS' | 'MODELS'>): number =>
+  Math.max(
+    ...Object.values(spark.PROMPTS).map((t) => {
+      const rate = spark.MODELS[t.model];
+      return Math.ceil((t.capIn * rate.in + t.maxTokens * rate.out) / 1_000_000);
+    }),
+  );
+
+/** `2026-10-01T00:00:00.000Z` for a clock in September, and `1 October` for the run's sentence. UTC, as the package's month. */
+const monthOf = (ms: number, add: number): string => {
+  const at = new Date(ms);
+  return new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth() + add, 1)).toISOString();
+};
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const grouped = (n: number): string => String(n).replace(/\B(?=([0-9]{3})+(?![0-9]))/gu, ',');
+
+/**
+ * The engine, with the operator's monthly ceiling over every call it makes on the included model (`INCLUDED_MONTH_NEURONS`).
+ *
+ * IT COUNTS CALLS AND NOT NEURONS, AND THAT IS WHAT MAKES IT EXACT. The package writes a hold row for each call before its
+ * first `await` (`core.reserve`), with the model's name and 0 neurons, and a call settled under `-` reached no model. So
+ * `model <> '-'` this month is every call already made and every call in flight, whatever the tier and whatever the kind,
+ * and a check taken synchronously before the engine's own sees them all: the lesson of
+ * `packages/spark/test/cap-concurrent.test.ts`, where a check and a count with a model between them let ten asks through
+ * a cap of two. A sum of `neurons` would miss every hold in flight, which is priced 0 until it settles.
+ *
+ * AN OWNER'S `ask_cap` ONLY LOWERS IT. A save above the ceiling is refused in the owner's settings sentence, and a cap
+ * stored above it before this check existed stops nothing: the count here refuses first. `status` says the lower of the
+ * two, so a person is not told of a billion asks this host will not answer.
+ *
+ * ONE PROPOSE CAN END ONE CALL OVER, as the package's own cap can (`46 §5.5`): it is checked once and may draft and then
+ * propose. That is one call of at most 232 neurons past a ceiling counted at 232 a call.
+ */
+function operatorCeiling(engine: Spark, deps: { sql: Sql; clock: Clock }, asks: number): Spark {
+  const made = (): number =>
+    deps.sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM call WHERE model <> '-' AND ts >= ?", monthOf(deps.clock.now(), 0))?.n ?? 0;
+  const spent = (): boolean => made() >= asks;
+  const until = (): string => monthOf(deps.clock.now(), 1);
+  const refused = <T>(): Result<T> =>
+    no('SPARK_BUDGET_SPENT', `Spark has asked this host's model as often as one record may in a month, so it is out of asks until ${until().slice(0, 10)}.`);
+
+  const capped = Object.create(engine) as Spark;
+  capped.read = (question, ctx, inference) => (spent() ? Promise.resolve(refused()) : engine.read(question, ctx, inference));
+  capped.propose = (question, ctx, byok, askId, inference) =>
+    spent() ? Promise.resolve(refused()) : engine.propose(question, ctx, byok, askId, inference);
+  capped.proposePattern = (samples, ctx) => (spent() ? Promise.resolve(refused()) : engine.proposePattern(samples, ctx));
+  /* THE RUN'S OWN SENTENCE, NAMING THE RULE AND THE STEP, as the package's own cap refusal does. Any code but
+     `UNREACHABLE` is one `serveAsks` acks `done`, so the run stops here and the ladder does not ask again. */
+  capped.answer = (ask, inference) => {
+    if (!spent()) return engine.answer(ask, inference);
+    const next = new Date(until());
+    return Promise.resolve(
+      no(
+        'SPARK_BUDGET_SPENT',
+        `rule.${ask.rule} asked Spark at step ${ask.step + 1}, and this record has used every ask this host's model allows one record in a month, so the run stopped there. Asks start again on ${next.getUTCDate()} ${MONTHS[next.getUTCMonth()]}.`,
+      ),
+    );
+  };
+  capped.configure = (patch, ctx) => {
+    const owner = ctx.principal.kind === 'person' && ctx.principal.level === 'owner';
+    if (owner && typeof patch.ask_cap === 'number' && patch.ask_cap > asks)
+      return no(
+        'VALUE_MALFORMED',
+        asks === 0
+          ? "This host's included model answers no asks, so the monthly ask limit here is 0."
+          : `This host's included model answers at most ${grouped(asks)} asks a month for one record, so the monthly ask limit is ${grouped(asks)} or lower.`,
+        { at: 'ask_cap' },
+      );
+    return engine.configure(patch, ctx);
+  };
+  /* AND WHERE THE CEILING IS THAT CAP, THE COUNT UNDER IT IS THE CEILING'S. The package counts tier `a` and the guard
+     counts `b` and `byo`, so an owner who moved from `a` to `byo` mid-month read `{ used: 2, cap: 10 }` from a host that
+     was refusing every ask (`test/spark-operator-cap.test.ts` case 9). The ceiling's count holds every row either of those
+     does, so where it binds it is never the smaller number. */
+  capped.status = () => {
+    const status = engine.status();
+    if (status.asks.cap < asks) return status;
+    return { ...status, asks: { ...status.asks, used: made(), cap: asks } };
+  };
+  return capped;
 }
 
 /**

@@ -183,6 +183,10 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
          Both are read off the same throw as `heard`, for the same reason. */
       let stopped: Stopped | null = null;
       let unsent = false;
+      /* AND WHETHER THE HOST SAYS ITS MODEL WAS CALLED AND THEN THREW, `reached: true` on the throw. That is a call a
+         platform may have billed and one `read` already settles under the model's name, so it is settled here the same
+         way (see `account` below). A throw without the mark is still a model not reached. */
+      let touched = false;
       /* AND THE NAME THE HOST SENT, off a reply that came back. `core.run` keeps the template's (`nameIn`). */
       let sent: string | undefined;
       const watched: Inference = {
@@ -196,6 +200,7 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
             heard = heardIn(e);
             stopped = stoppedIn(e);
             unsent = typeof e === 'object' && e !== null && (e as { sent?: unknown }).sent === false;
+            touched = typeof e === 'object' && e !== null && (e as { reached?: unknown }).reached === true;
             throw e;
           }
         },
@@ -227,6 +232,13 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
       const reached = heard as Heard | null;
       const refusedBy = stopped as Stopped | null;
       const used = (sent as string | undefined) ?? reached?.model ?? ran.model;
+      /* ONE BINDING THROW HAD TWO PRICES UNTIL THIS LINE. `loop/research-batch-sixty-audit.md` finding 5, its probe S4:
+         the Worker's included model threw after `AI.run` was called, and a person's read settled it under
+         `glm-5.3-flash`, priced 9 neurons on the prompt estimate and counted, while this path settled the same throw
+         under `-`, priced 0 and uncounted, and the host's ladder asked it again up to the eighth rung with nobody
+         counting what the platform may have billed on each. A throw the host marks `reached` is now settled as `read`
+         settles it, and each rung is an ask the month's cap and the operator's ceiling both see. */
+      const unreached = (code: string | undefined): boolean => (code === 'UNREACHABLE' && !(touched as boolean)) || code === STOPPED;
       const account = (status: 'ok' | 'error', code?: string): void =>
         core.account({
           id: held,
@@ -234,7 +246,7 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
           tier: s.tier,
           /* `PULL_REQUEST_REFUSED` IS UNDER `-` TOO, for `UNREACHABLE`'s reason: the provider served no completion, so
              no count may read the row, and it stays so a refusal is still in the ledger. */
-          model: code === 'UNREACHABLE' || code === STOPPED ? '-' : used,
+          model: unreached(code) ? '-' : used,
           usage: reached?.usage ?? ran.usage,
           ms: ran.ms,
           status,

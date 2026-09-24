@@ -76,6 +76,17 @@ export { VERBS } from './types.ts';
 const TIERS: readonly Tier[] = ['a', 'b', 'byo'];
 
 /**
+ * What a host says about its own money, beside the ports.
+ *
+ * `priced` NAMES THE TIERS WHOSE CALLS THE HOST PAYS FOR IN NEURONS, and the ledger prices those rows and no others.
+ * Unset is `['a']`, which is `46 §4.1`: a customer's key and a self-host endpoint are billed by whoever owns them. The
+ * package cannot see that for itself, because what answers tier `byo` is whatever `SparkDeps.inference` is, and on the
+ * Worker with no endpoint that is Workers AI on the operator's account (`loop/research-batch-sixty-audit.md` finding 4).
+ * It is an argument and not a field of `SparkDeps` because `SparkDeps` is the ports, and this is not a port.
+ */
+export type SparkOptions = { priced?: readonly Tier[] | undefined };
+
+/**
  * A grant id and not a key: `g_` and a 26-character ULID (`34 §4`).
  *
  * THIS IS THE ONLY DOOR A CREDENTIAL COULD WALK IN THROUGH, so it is the one place that checks. An
@@ -99,7 +110,7 @@ const GRANT_ID = /^g_[0-9A-HJKMNP-TV-Z]{26}$/u;
  * month. It is written down here rather than left as a silent assumption, and it is the line to
  * change when `project` grows a way to ask.
  */
-export function createSpark(deps: SparkDeps): Spark {
+export function createSpark(deps: SparkDeps, options: SparkOptions = {}): Spark {
   for (const statement of DDL) deps.sql.exec(statement);
   /* BEST EFFORT, BECAUSE A DURABLE OBJECT REFUSES IT. Measured in workerd on 22 September: the two
      `CREATE TABLE IF NOT EXISTS` run, and this statement throws `not authorized: SQLITE_AUTH` out of
@@ -122,7 +133,7 @@ export function createSpark(deps: SparkDeps): Spark {
     new Date(deps.clock.now()).toISOString(),
   );
 
-  const core = makeCore(deps.sql, deps.clock, deps.inference);
+  const core = makeCore(deps.sql, deps.clock, deps.inference, options.priced);
   const asking = palette(core, deps.record, deps.inference);
   const pattern = patterns(core, deps.record, deps.inference);
   const automation = answering(core, deps.inference);
