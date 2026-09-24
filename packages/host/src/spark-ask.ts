@@ -72,7 +72,9 @@
  * imports `@braindog/spark` nowhere, and cannot, because `packages/host` does not depend on it.
  */
 
-import type { Refusal, Result } from '@braindog/ports';
+import { ulids } from '@braindog/kernel';
+import type { Refusal, Result, Sql } from '@braindog/ports';
+import type { SparkMeter } from '@braindog/record';
 
 import { httpStatus } from './index.ts';
 import { VAULT_HEADERS } from './vault.ts';
@@ -400,4 +402,113 @@ function unsettled(patch: Record<string, unknown>, byok: boolean): Response | nu
   if (patch['tier'] === 'b' && !byok)
     return refusal(501, { code: 'NOT_IN_THIS_BUILD', fix: 'Spark cannot use a key of your own on this host yet.', at: 'tier' });
   return null;
+}
+
+/* ── the record's own two asks, on the ledger every other ask settles in ─────────────────────────────── */
+
+export type SparkLedgerDeps = {
+  /** Spark's own SQLite, the one the app handed `createSpark`, holding the `settings` and `call` tables of `46 §4.1`. */
+  sql: Sql;
+  clock: { now(): number };
+  /**
+   * The engine every other ask is held by, the one the door and the automations are built over, built here if no ask has
+   * built it yet. Its `status()` is the count and the cap this meter refuses on, so an ask the record makes and an ask a
+   * person makes at the palette are spent from one number, whatever that engine's wraps make of it.
+   */
+  engine: () => Promise<{ status(): unknown } | undefined>;
+  /** The routing name the record's model answers under, which the row is written with: `glm-5.3-flash` for the included model. */
+  model: string;
+  /** Neurons per million tokens where this host's own account pays for that model. Absent, the row is priced at 0. */
+  rate?: { in: number; out: number } | undefined;
+};
+
+/**
+ * Spark's press and first plan held and settled in the package's own ledger (`@braindog/record` `SparkMeter`).
+ *
+ * THEY WERE THE TWO ASKS NOTHING COUNTED. `loop/research-batch-sixty-audit.md` finding 2 measured the audit's S2 probe, a
+ * record 20 days old over the Worker's included model: 25 presses, 25 included calls, and neither a `call` row nor a look
+ * at `ask_cap` anywhere, because the record's model is built beside the engine and not through it. The record now asks
+ * this before it asks its model, and `packages/record/test/spark-press-cap.test.ts` drives the same 25 presses at
+ * `ask_cap: 3` through the real engine: 3 model calls, `status()` reading 3 used, and the read after them refused.
+ *
+ * THE ROW IS `kind = 'read'` WITH NO PREDICATE, which is how the package already settles an ask that is not the palette's
+ * (`answer.ts`, an automation's question), and the tier is the settings' tier as that row's is. So whichever count the
+ * engine's `status()` reads, the package's own on tier `a` or the host's `drafted()` on `b` and `byo`, already sees it, and
+ * `46 §4.1`'s CHECK needs no new kind. A `draft` kind of its own is the package's to add, with the version row
+ * `createSpark` says the first schema change needs; until then `question` says which ask a row was.
+ *
+ * NO `await` BETWEEN THE CHECK AND THE HOLD, for the reason `packages/spark/src/call.ts` `reserve` gives: the hold is the
+ * row the next ask's count includes, so two presses in flight cannot both pass the last ask of the month. The engine is
+ * awaited first, and then `status()`, the check and the insert run in one synchronous step.
+ *
+ * THE COUNTS ARE THE RECORD'S ESTIMATE, bytes over three as the package's `tokens` counts a prompt, of what it sent and
+ * what came back. The record's `SparkModel` answers the parsed plan and not the provider's usage, so this is the figure
+ * the package itself bills a model it could not read a count from (`core.run`'s `UNREACHABLE` arm). IT BILLS LOW, AND BY
+ * A LOT: the instructions and the schema are the host's and never reach the record. Measured on 24 September through the
+ * Worker's own `workerSparkModel` over a binding reporting 700 tokens in and 60 out, the row held 176 and 5, 3 neurons
+ * where the provider's count is 12. The COUNT against `ask_cap` is exact; the price waits on a `SparkModel` that hands
+ * back the provider's usage, which is `packages/record/src/spark.ts` and each host's builder and not this file.
+ */
+export function sparkRecordMeter(deps: SparkLedgerDeps): SparkMeter {
+  const mint = ulids(() => deps.clock.now());
+  return {
+    async hold(kind) {
+      const engine = await deps.engine();
+      /* NO ENGINE IS NO LEDGER, AND NO LEDGER IS NO SPEND: the record reads a refusal as "the rules draft". */
+      if (engine === undefined) return { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'Spark has no ledger on this host to count the ask in.' } };
+      const asks = (engine.status() as { asks?: { used?: unknown; cap?: unknown; resets?: unknown } } | undefined)?.asks;
+      if (typeof asks?.used !== 'number' || typeof asks.cap !== 'number')
+        return { ok: false, refusal: { code: 'INTERNAL', fix: "Spark's count of this month's asks could not be read, so its model was not asked." } };
+      if (asks.used >= asks.cap)
+        return {
+          ok: false,
+          refusal: {
+            code: 'SPARK_BUDGET_SPENT',
+            fix: `This month's Spark asks are spent until ${typeof asks.resets === 'string' ? asks.resets.slice(0, 10) : 'next month'}.`,
+          },
+        };
+      const tier = deps.sql.one<{ tier: string }>('SELECT tier FROM settings WHERE singleton = 1')?.tier ?? 'a';
+      const id = mint();
+      const at = () => new Date(deps.clock.now()).toISOString();
+      const t0 = deps.clock.now();
+      deps.sql.exec(
+        `INSERT INTO call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, question)
+         VALUES (?, ?, 'read', ?, ?, 0, 0, 0, 0, 'error', 'SPARK_PENDING', ?)`,
+        id,
+        at(),
+        tier,
+        deps.model,
+        kind === 'draft' ? "Spark's press" : "Spark's first plan",
+      );
+      let done = false;
+      return {
+        ok: true,
+        value: {
+          settle: ({ usage, code }) => {
+            if (done) return;
+            done = true;
+            const rate = deps.rate;
+            const neurons = rate === undefined ? 0 : Math.round((usage.in * rate.in) / 1e6 + (usage.out * rate.out) / 1e6);
+            deps.sql.exec(
+              'UPDATE call SET ts = ?, tokens_in = ?, tokens_out = ?, neurons = ?, ms = ?, status = ?, code = ? WHERE id = ?',
+              at(),
+              usage.in,
+              usage.out,
+              neurons,
+              deps.clock.now() - t0,
+              code === undefined ? 'ok' : 'error',
+              code ?? null,
+              id,
+            );
+          },
+          /* NOTHING LEFT THIS HOST, SO NOTHING IS WRITTEN, as `answer` releases its hold for a call never sent. */
+          release: () => {
+            if (done) return;
+            done = true;
+            deps.sql.exec("DELETE FROM call WHERE id = ? AND code = 'SPARK_PENDING'", id);
+          },
+        },
+      };
+    },
+  };
 }

@@ -833,6 +833,25 @@ export type Build = {
   host?: 'cloud' | 'self-host';
 };
 
+/**
+ * One ask of `sparkModel`, held in Spark's ledger before the model is asked and settled once it answered or threw.
+ *
+ * A HOLD AND NOT A CHECK, because a check and a count with a model between them is no cap: `packages/spark/src/call.ts`
+ * `reserve` records ten asks at `ask_cap: 2` making ten calls before its hold was a row. The host writes the row in the
+ * step that checks the count, so a press in flight is already counted by the next one.
+ */
+export type SparkMeter = {
+  /** `draft` for a press or the daily look, `form` for a first plan. A refusal's `fix` is the sentence the owner is shown. */
+  hold(kind: 'draft' | 'form'): Promise<{ ok: true; value: SparkHeld } | { ok: false; refusal: Refusal }>;
+};
+
+/** A held ask. Exactly one of the two is called: `settle` for a call that left this host, `release` for one that never did. */
+export type SparkHeld = {
+  /** `code` is absent for an answer, `UNREACHABLE` for a model that threw, `PROPOSAL_SCHEMA` for one that answered unreadably. */
+  settle(outcome: { usage: { in: number; out: number }; code?: string | undefined }): void;
+  release(): void;
+};
+
 export type RecordDeps = {
   sql: Sql;
   clock: Clock;
@@ -905,6 +924,13 @@ export type RecordDeps = {
    * validation, and only an owner's press applies it.
    */
   sparkModel?: SparkModel | undefined;
+  /**
+   * The ledger `sparkModel`'s asks are held and settled in: Spark's own monthly cap and `call` rows, the ones a person's read
+   * at the palette and an automation's question are spent from (`packages/host/src/spark-ask.ts` `sparkRecordMeter`).
+   * Asked before every press's draft and every first plan; a refusal means the model is not asked. Absent, the model is
+   * asked unmetered, as it was on every host before `loop/research-batch-sixty-audit.md` finding 2.
+   */
+  sparkMeter?: SparkMeter | undefined;
   /**
    * Newer versions of what this record holds, found in the host's catalogue, verified and read there (`spark.ts`
    * `catalogueDrafts`). Spark asks about each on Decide through the same `prepare`; absent, it asks about none.
@@ -1006,7 +1032,7 @@ export async function createRecordApi(deps: RecordDeps) {
   return { ...api(kernel, deps, cursors), kernel };
 }
 
-function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'sparkModel' | 'catalogueOffers' | 'tryScript' | 'answersSpark'>, cursors: HistoryCursors) {
+function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'sparkModel' | 'sparkMeter' | 'catalogueOffers' | 'tryScript' | 'answersSpark'>, cursors: HistoryCursors) {
   const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
   /**
    * The page declaration served at a slug, and its version: the one named exactly, or else the one whose name slugs to it
@@ -1571,6 +1597,51 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
+   * `sparkModel` asked once, held and settled in Spark's ledger when the host gave one (`deps.sparkMeter`). The press and
+   * the first plan both ask through this and nothing else asks the record's model.
+   *
+   * THEY WERE THE TWO UNMETERED ASKS ON THE OPERATOR'S ACCOUNT. `loop/research-batch-sixty-audit.md` finding 2, the S2
+   * probe: a record 20 days old over the Worker's included model, 25 presses, 25 model calls, and no `call` row or look at
+   * `ask_cap` anywhere, while a person's read at the palette was held to both. A plan that answered something unusable
+   * was asked again on every try. `test/spark-press-cap.test.ts` drives both at a cap: 3 calls of 25 presses, 2 of 5 plans.
+   *
+   * `spent` IS THE METER'S REFUSAL, and the model is not asked. A throw is settled and thrown on, so each caller keeps its
+   * own sentence for a model that did not answer: `UNREACHABLE` with the reading's estimate, as the package bills a model
+   * it did not hear from; `PROPOSAL_SCHEMA` with the host's count where the host marked the throw as coming after an answer
+   * (`SparkAnsweredError`); and released, nothing written, where the host marked the call as never sent (`sent: false`).
+   *
+   * THE COUNTS ARE BYTES OVER THREE, the package's own `tokens`, because a `SparkModel` answers the plan it parsed and not
+   * the provider's usage. The instructions are the host's and not in `input`, so this counts low: 176 in and 5 out for a
+   * call the Worker's binding reported as 700 and 60, measured in `packages/host/src/spark-ask.ts` `sparkRecordMeter`'s
+   * note. The ask is counted exactly; its price is an estimate until `SparkModel` answers usage too.
+   */
+  const sparkTokens = (value: unknown): number => Math.ceil(new TextEncoder().encode(JSON.stringify(value) ?? '').length / 3);
+  const sparkAsked = async <I>(kind: 'draft' | 'form', input: I, ask: (input: I) => Promise<unknown>): Promise<{ raw: unknown } | { spent: string }> => {
+    let held: SparkHeld | undefined;
+    if (deps.sparkMeter) {
+      /* A LEDGER THAT CANNOT BE READ IS A CAP THAT CANNOT BE CHECKED, so the model is not asked: the side a spend errs on. */
+      const hold = await deps.sparkMeter.hold(kind).catch(() => ({ ok: false as const, refusal: { code: 'INTERNAL', fix: "Spark's ledger could not be read, so its model was not asked." } }));
+      if (!hold.ok) return { spent: hold.refusal.fix };
+      held = hold.value;
+    }
+    const sent = sparkTokens(input);
+    let raw: unknown;
+    try {
+      raw = await ask(input);
+    } catch (e) {
+      const mark = (typeof e === 'object' && e !== null ? e : {}) as { sent?: unknown; answered?: unknown; usage?: { in?: unknown; out?: unknown } };
+      const count = (n: unknown): number | undefined => (typeof n === 'number' && Number.isFinite(n) && n >= 0 ? Math.ceil(n) : undefined);
+      if (mark.sent === false) held?.release();
+      else if (mark.answered === true)
+        held?.settle({ usage: { in: count(mark.usage?.in) ?? sent, out: count(mark.usage?.out) ?? 0 }, code: 'PROPOSAL_SCHEMA' });
+      else held?.settle({ usage: { in: sent, out: 0 }, code: 'UNREACHABLE' });
+      throw e;
+    }
+    held?.settle({ usage: { in: sent, out: sparkTokens(raw) } });
+    return { raw };
+  };
+
+  /**
    * Spark's proposals filed on Decide: the model's, when one is configured and answers something valid, else the rules'.
    * The one filing path, for the owner's press and for the daily run alike.
    *
@@ -1587,20 +1658,27 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const model = deps.sparkModel;
     if (model && r.quiet === null) {
       try {
-        const raw = await model.draft({
-          usage: r.usage,
-          noticed: r.noticed,
-          rules: r.drafts.map(({ question, body_kind, body }) => ({ question, body_kind, body })),
-          offered: r.offered.map(({ id, kind, title }) => ({ id, kind, title })),
-          kinds: ['pack', 'settings', 'arrange', 'change'],
-          most: SPARK_OPEN_CAP,
-        });
-        const got = fromModel(raw, model.name, SPARK_OPEN_CAP, drawn);
-        dropped.push(...got.dropped);
-        if (got.drafts.length > 0) {
-          drafts = got.drafts;
-          by = model.name;
-        } else dropped.push("The model proposed nothing Spark could use, so Spark's own rules drafted these.");
+        const asked = await sparkAsked<Parameters<SparkModel['draft']>[0]>(
+          'draft',
+          {
+            usage: r.usage,
+            noticed: r.noticed,
+            rules: r.drafts.map(({ question, body_kind, body }) => ({ question, body_kind, body })),
+            offered: r.offered.map(({ id, kind, title }) => ({ id, kind, title })),
+            kinds: ['pack', 'settings', 'arrange', 'change'],
+            most: SPARK_OPEN_CAP,
+          },
+          (input) => model.draft(input),
+        );
+        if ('spent' in asked) dropped.push(`${asked.spent} Spark's own rules drafted these.`);
+        else {
+          const got = fromModel(asked.raw, model.name, SPARK_OPEN_CAP, drawn);
+          dropped.push(...got.dropped);
+          if (got.drafts.length > 0) {
+            drafts = got.drafts;
+            by = model.name;
+          } else dropped.push("The model proposed nothing Spark could use, so Spark's own rules drafted these.");
+        }
       } catch {
         dropped.push("The model did not answer, so Spark's own rules drafted these.");
       }
@@ -3603,10 +3681,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const id = args.usecase.startsWith('usecase-') ? args.usecase : `usecase-${args.usecase}`;
       const spec = (deps.catalogue ?? []).find((e) => e.id === id)?.forms;
       if (!spec) return no('DECLARATION_UNKNOWN', `${args.usecase} forms no plan here.`, { at: 'usecase' });
-      const not = (why: 'no-model' | 'off' | 'asked' | 'failed' | 'invalid', detail?: string) =>
+      const not = (why: 'no-model' | 'off' | 'asked' | 'failed' | 'invalid' | 'spent', detail?: string) =>
         ok({ formed: false as const, why, ...(detail === undefined ? {} : { detail }) });
       const model = deps.sparkModel;
       if (!model?.form) return not('no-model');
+      const form = model.form.bind(model);
       if (!kernel.packStates().some((p) => p.id === id && p.disabled_at === null) || spec.lists.some((l) => !kernel.register(l.register))) return not('off');
       const key = stableKey({ rows: spec.lists.map((l) => ({ register: l.register })) });
       const asked = sql.all<{ body: string }>("SELECT body FROM suggestion WHERE body_kind = 'arrange' AND opened_by = ?", SPARK).some((r) => {
@@ -3618,9 +3697,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       });
       if (asked) return not('asked');
       const today = new Date(clock.now()).toISOString().slice(0, 10);
+      /* HELD LIKE THE PRESS, AND THAT IS WHAT BOUNDS A RETRY. `asked` above is true only once a plan was filed, so a model
+         answering something `formedRows` refuses was asked again on every try, each one unmetered. `spent` is the month's
+         asks gone, and the caller keeps the use case's own plan as it does for `failed`. */
       let raw: unknown;
       try {
-        raw = await model.form({ what: spec.what, said: args.said.trim(), today, lists: spec.lists });
+        const asked = await sparkAsked('form', { what: spec.what, said: args.said.trim(), today, lists: spec.lists }, form);
+        if ('spent' in asked) return not('spent', asked.spent);
+        raw = asked.raw;
       } catch {
         return not('failed');
       }
