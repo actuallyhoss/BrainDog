@@ -64,6 +64,8 @@ test('a rule is what starts it and each step as a sentence, with a branch read a
     { tag: 'late' },
     { if: { field: 'amount', gt: 70 }, then: [{ notify: { say: 'A big one is late' } }], else: [{ note: 'Small, left alone' }] },
     { call: { ingest: 'dunning', as: 'sent' } },
+    { script: { id: 'tidy', as: 'queued' } },
+    { script: { id: 'tidy' } },
   ];
   const on = { written: { register: 'invoices', op: ['update' as const], fields: ['state'] } };
   const out = proposedOf('change', {
@@ -82,6 +84,18 @@ test('a rule is what starts it and each step as a sentence, with a branch read a
     { label: `Step 2, ${words.otherwise.toLowerCase()} 1`, value: 'Add a note: Small, left alone' },
     /* A CALL INSTALLS AND DOES NOT RUN in this build, and the record's dry run says so; the owner reads it before accepting. */
     { label: 'Step 3', value: `${sayStep(steps[2]!)}. Not in this build: a run stops here, after the steps before it.` },
+    /* A SCRIPT STEP RUNS SINCE `e6010208`, and this screen still ended it "Not in this build: a run stops here", as the
+       call above, where the record's dry run says the run goes on. Measured red first on that sentence. What the owner
+       reads instead is the dry run's: the run does not wait, what `as:` keeps is the queued run's id (the canvas's
+       sentence says "the answer"), and the three things that stop it. */
+    {
+      label: 'Step 4',
+      value: `${sayStep(steps[3]!)}. The run goes on without waiting for it: what the script writes lands when this host runs it. What is kept as queued is the id of its queued run, not what the script answers. The run stops here if the script is not installed, does not say runs: { rule: true }, or is paused.`,
+    },
+    {
+      label: 'Step 5',
+      value: `${sayStep(steps[4]!)}. The run goes on without waiting for it: what the script writes lands when this host runs it. The run stops here if the script is not installed, does not say runs: { rule: true }, or is paused.`,
+    },
   ]);
 });
 

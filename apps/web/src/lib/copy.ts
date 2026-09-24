@@ -2420,9 +2420,15 @@ export const copy = {
   /** Where a step sits: `Step 2`, and inside a branch `Step 2, if so 1` or `Step 2, if not 1`, in the canvas's arm words. */
   proposalStep: (at: readonly string[]) => `Step ${at.join(', ')}`,
   proposalArmStep: (arm: string, n: number) => `${arm.toLowerCase()} ${n}`,
-  /* `packages/record` `automations.ts` says it in these words in the dry run: a `call` or a `script` step installs, and a
-     run that reaches one fails there (`NOT_IN_THIS_BUILD` in the kernel's `flow.ts`). */
+  /* `packages/record` `automations.ts` says it in these words in the dry run: a `call` step installs, and a run that
+     reaches one fails there (`NOT_IN_THIS_BUILD` in the kernel's `flow.ts`). */
   proposalNotBuilt: 'Not in this build: a run stops here, after the steps before it.',
+  /* A `script` STEP RUNS SINCE `e6010208` (`flow.ts` `startScript` queues the script and the run goes on), and Decide
+     went on ending it with `proposalNotBuilt` where the dry run had stopped. These are the dry run's facts in the
+     owner's order: the canvas's sentence before it says "keeping the answer as", and what `as:` keeps is the id of the
+     queued run, so that is said only where the step names one. */
+  proposalScriptGoesOn: (as: string) =>
+    `The run goes on without waiting for it: what the script writes lands when this host runs it.${as === '' ? '' : ` What is kept as ${as} is the id of its queued run, not what the script answers.`} The run stops here if the script is not installed, does not say runs: { rule: true }, or is paused.`,
   proposalCallsOut: 'Calls out',
   proposalCallsNothing: 'Nothing outside this record',
   proposalMaySend: 'May send',

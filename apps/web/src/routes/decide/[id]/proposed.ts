@@ -119,7 +119,11 @@ function stepLines(list: unknown, at: readonly string[], arm: string, out: Appea
     const here = [...at, arm === '' ? String(i + 1) : copy.proposalArmStep(arm, i + 1)];
     const said = isRow(step) ? sayStep(step) : sayStep({});
     const verb = isRow(step) ? verbOf(step) : null;
-    out.push({ label: copy.proposalStep(here), value: verb === 'call' || verb === 'script' ? `${said}. ${copy.proposalNotBuilt}` : said });
+    /* A `call` STILL STOPS THE RUN AND A `script` DOES NOT (`flow.ts`: `startScript` queues it and goes on, a call fails
+       with NOT_IN_THIS_BUILD), so each gets the record dry run's sentence for it, not one sentence for both. */
+    const as = isRow(step) && isRow(step.script) ? text(step.script.as) : '';
+    const tail = verb === 'call' ? copy.proposalNotBuilt : verb === 'script' ? copy.proposalScriptGoesOn(as) : '';
+    out.push({ label: copy.proposalStep(here), value: tail === '' ? said : `${said}. ${tail}` });
     if (verb === 'if' && isRow(step)) {
       stepLines(step.then, here, canvas.then, out);
       stepLines(step.else, here, canvas.otherwise, out);

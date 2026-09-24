@@ -9,11 +9,17 @@
  * `DEPTH_CEILING`, `RUNS_PER_DAY_CEILING`, `VARS_CEILING` and `FLOOR_MS`, and installs both examples on a real record.
  *
  * IT SAYS WHAT DOES NOT RUN YET. A `metric` or `decided` trigger is refused at install, and so is an `ask_spark` step on
- * a host that does not answer Spark, and a `call` or `script` step installs so the canvas can draw it and fails the run
- * that reaches it. An agent told only the grammar would file a rule with a call in it, and the owner would accept a run
- * that stops there. The same test holds that list to what a real run of the runner does. `ask_person` runs: its question
- * opens in Decide and the answer wakes the run. On a host that answers Spark, `ask_spark` runs too, and that host is
- * served `ANSWERED_GRAMMAR` below.
+ * a host that does not answer Spark, and a `call` step installs so the canvas can draw it and fails the run that reaches
+ * it. An agent told only the grammar would file a rule with a call in it, and the owner would accept a run that stops
+ * there. The same test holds that list to what a real run of the runner does. `ask_person` runs: its question opens in
+ * Decide and the answer wakes the run. On a host that answers Spark, `ask_spark` runs too, and that host is served
+ * `ANSWERED_GRAMMAR` below.
+ *
+ * `script` LEFT THAT LIST WITH `e6010208`, which made `flow.ts`'s `startScript` queue the script's run and go on, and
+ * this file still listed it and said the run "fails there": an agent reading it would not file the step
+ * Work's `rule.close_follow_ups` is built on. Its entry below says what the record's dry run says (`said` in
+ * `packages/record/src/automations.ts`): the run does not wait, `as:` is the queued run's id and not the script's
+ * answer, and the three things that stop it are each on the script's own row.
  */
 
 export const AUTOMATION_GRAMMAR = {
@@ -45,7 +51,8 @@ export const AUTOMATION_GRAMMAR = {
     set_var: '{"set_var":{"name":"<answer>","to":"<text>"}}: keep a value as an answer',
     wait: '{"wait":"2h"}: a number and one of m, h, d or w',
     call: '{"call":{"ingest":"<declared call>","as":"<answer>"}}: a declared call, never an address',
-    script: '{"script":{"id":"<script>","input":{"<name>":"<text>"},"as":"<answer>"}}',
+    script:
+      '{"script":{"id":"<script>","input":{"<name>":"<text>"},"as":"<answer>"}}: starts the script and goes on without waiting for it; what it writes lands when this host runs it. as keeps the id of its queued run, never what the script answers. The run stops here if the script is not installed, does not say runs: { rule: true }, or is paused',
     ask_spark: '{"ask_spark":{"question":"<text>","as":"<answer>","shape":"text"}}: shape is text, number or choice, and choice needs choices',
     ask_person: '{"ask_person":{"question":"<text>","options":["yes","no"],"as":"<answer>","wait":"2d"}}: two options or more, each once. The question opens in Decide, where anyone who decides answers it; the run waits 7d when wait is left out, and stops if nobody answers',
     actions:
@@ -54,10 +61,10 @@ export const AUTOMATION_GRAMMAR = {
   context: 'any text in a step may read {{trigger.row.<field>}}, {{trigger.body.<path>}} of a JSON arrival, {{trigger.kind}} and {{vars.<answer>}}',
   not_in_this_build: {
     triggers: ['metric', 'decided'],
-    steps: ['call', 'script', 'ask_spark'],
+    steps: ['call', 'ask_spark'],
   },
   not_in_this_build_says:
-    'a metric or decided trigger, and an ask_spark step, are refused at install. A call or script step installs, and a run that reaches it fails there with a sentence, after taking every step before it',
+    'a metric or decided trigger, and an ask_spark step, are refused at install. A call step installs, and a run that reaches it fails there with a sentence, after taking every step before it',
   limits: {
     steps: 50,
     depth: 3,
@@ -112,7 +119,7 @@ export const ANSWERED_GRAMMAR = {
     ask_spark:
       '{"ask_spark":{"question":"<text>","about":["<field>"],"as":"<answer>","shape":"text"}}: shape is text, number or choice, and choice needs choices. about is optional: the fields of the run\'s row that go with the question, so it needs a trigger with a row, and a secret or file field is refused in about and in the question alike. The run waits 1d for this host\'s model to answer, and stops if none comes',
   },
-  not_in_this_build: { triggers: AUTOMATION_GRAMMAR.not_in_this_build.triggers, steps: ['call', 'script'] },
+  not_in_this_build: { triggers: AUTOMATION_GRAMMAR.not_in_this_build.triggers, steps: ['call'] },
   not_in_this_build_says:
-    'a metric or decided trigger is refused at install. A call or script step installs, and a run that reaches it fails there with a sentence, after taking every step before it',
+    'a metric or decided trigger is refused at install. A call step installs, and a run that reaches it fails there with a sentence, after taking every step before it',
 } as const;

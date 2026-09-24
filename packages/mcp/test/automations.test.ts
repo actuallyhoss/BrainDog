@@ -244,6 +244,44 @@ test('WHAT THE DRY RUN SAYS OF A STEP THAT WAITS ON SOMEBODY ELSE IS WHAT A REAL
   sql.close();
 });
 
+test('A script STEP RUNS ON IN THIS BUILD, so the grammar no longer lists it with call and says what the runner does with it', async () => {
+  /* THE GRAMMAR WAS LEFT BEHIND BY `e6010208`, which made the runner queue the script and go on (`flow.ts`
+     `startScript`) and the record's dry run say so. This resource still listed `script` under `not_in_this_build` and
+     said a run that reaches one "fails there", so an agent reading it would not file the step a pack ships (Work's
+     `rule.close_follow_ups`). Measured red first: the run below reached `done` with one `script.run` queued, and the
+     grammar's list read ["call","script","ask_spark"]. A `call` stays listed: `flow.ts` still fails a run that
+     reaches one with NOT_IN_THIS_BUILD. */
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const tidy = { id: 'script.tidy', kind: 'script' as const, body: { script: 'tidy', runs: { rule: true }, egress: [], keys: [], reads: [], writes: [], source: 'export default async function run(ctx) {}' } as never };
+  const starts = { rule: 'starts', on: { manual: true }, steps: [{ script: { id: 'tidy', as: 'queued' } }, { notify: { say: 'Tidied' } }] };
+  value(await api.kernel.install([tidy, rule(starts)]));
+  const { run } = value<{ run: string }>(await api.automationRun({ rule: 'starts' }, owner));
+  await api.kernel.drain();
+  const row = sql.one<{ state: string; say: string | null }>('SELECT state, say FROM automation_run WHERE id = ?', run)!;
+  assert.equal(row.state, 'done', row.say ?? '');
+  assert.equal(sql.one<{ n: number }>("SELECT count(*) AS n FROM outbox WHERE kind = 'script.run'")?.n, 1, 'no script run was queued');
+
+  const grammar = value<{ steps: Record<string, string>; not_in_this_build: { steps: string[] }; not_in_this_build_says: string }>(
+    await tools(api).read('braindog:grammar/automations', owner),
+  );
+  assert.deepEqual(grammar.not_in_this_build.steps, ['call', 'ask_spark']);
+  assert.doesNotMatch(grammar.not_in_this_build_says, /script/u, grammar.not_in_this_build_says);
+  assert.match(grammar.not_in_this_build_says, /A call step installs, and a run that reaches it fails there/u);
+  /* WHAT THE STEP DOES, IN THE DRY RUN'S TERMS: it goes on without waiting, `as:` holds the queued run's id and not the
+     script's answer, and the three things that stop it are each on the script's own row. */
+  assert.match(grammar.steps.script!, /goes on without waiting/u);
+  assert.match(grammar.steps.script!, /id of its queued run/u);
+  assert.match(grammar.steps.script!, /runs: \{ rule: true \}/u);
+
+  /* AND THE STEP AS THE GRAMMAR WRITES IT INSTALLS, with its placeholders filled, for the `ask_person` test's reason. */
+  const written = grammar.steps.script!;
+  const step = JSON.parse(written.slice(0, written.lastIndexOf('}}') + 2).replace(/<[a-z]+>/g, 'tidy')) as Record<string, unknown>;
+  const put = await api.kernel.install([rule({ rule: 'copied', on: { manual: true }, steps: [step] })]);
+  assert.ok(put.ok, JSON.stringify(put));
+  sql.close();
+});
+
 test('ON A HOST THAT ANSWERS SPARK, NEITHER THE DRY RUN NOR THE GRAMMAR SAYS ask_spark IS REFUSED, and it installs', async () => {
   /* THE FLAG-OFF CASE ABOVE, WITH THE HOST'S TWO SWITCHES ON, as `apps/selfhost` sets them from one model: the record's
      `answersSpark` and `version`'s `spark`. Measured before this: the rule installed, and the dry run still ended the
@@ -259,7 +297,7 @@ test('ON A HOST THAT ANSWERS SPARK, NEITHER THE DRY RUN NOR THE GRAMMAR SAYS ask
   const grammar = value<{ not_in_this_build: { triggers: string[]; steps: string[] }; not_in_this_build_says: string }>(
     await tools(api).read('braindog:grammar/automations', owner),
   );
-  assert.deepEqual(grammar.not_in_this_build, { triggers: ['metric', 'decided'], steps: ['call', 'script'] });
+  assert.deepEqual(grammar.not_in_this_build, { triggers: ['metric', 'decided'], steps: ['call'] });
   assert.doesNotMatch(grammar.not_in_this_build_says, /ask_spark/u, grammar.not_in_this_build_says);
   sql.close();
 });
@@ -450,7 +488,7 @@ test('braindog:grammar/automations IS LISTED FOR ANY CALLER WHO READS, and its n
     answers: VARS_CEILING,
     shortest_clock: `${FLOOR_MS / 60_000}m`,
   });
-  assert.deepEqual(grammar.not_in_this_build, { triggers: ['metric', 'decided'], steps: ['call', 'script', 'ask_spark'] });
+  assert.deepEqual(grammar.not_in_this_build, { triggers: ['metric', 'decided'], steps: ['call', 'ask_spark'] });
 
   /* A STUB ANSWERS IT TOO, since it is this package's own text asked of `version`, which every surface has. */
   assert.ok((await tools(stub().surface).resources({ who: 'agent' })).some((r) => r.uri === 'braindog:grammar/automations'));
