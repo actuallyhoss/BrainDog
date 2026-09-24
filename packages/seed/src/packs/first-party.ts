@@ -155,13 +155,18 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   sections 22 and 24). Taking a value away is a major step. A record whose rows hold it keeps it as its own word.
  * - work 1.7.0: `updates.by` opens from a closed list of four agent vendors to text, a widening, so an update by any
  *   author lands (M3 B9). Nothing is taken away, so the step is a minor one.
+ * - work 1.8.0: a task's follow-ups close with it and start in its project (W59-1). Two rules and the two scripts they
+ *   start (`WORK_AUTOMATIONS` in `modules/work.ts`): moving a task to done closes every step `Part of` it still open,
+ *   doing or blocked, and a step created with a parent and no project takes the parent's project and thread. Four ids
+ *   are added and nothing is taken away, so the step is a minor one. A version and not a reset because 1.7.0 is on
+ *   `origin/master` (`814ca32c`), and an id gained is a declaration a record on 1.7.0 could never be told about.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.4.0',
   people: '2.0.0',
   'money-core': '2.2.0',
   estate: '1.2.0',
-  work: '1.7.0',
+  work: '1.8.0',
 };
 
 type Body = Record<string, unknown>;
@@ -197,7 +202,11 @@ const idOf = (d: Body): string =>
       ? `page.${d.page}`
       : typeof d.metric === 'string'
         ? `metric.${d.metric}`
-        : '';
+        : /* A SCRIPT, SINCE WORK 1.8.0 SHIPS TWO. Without this arm both were filed under the empty string, so Work's
+             manifest provided `''` twice and `pack-versions.test.ts` read "work@1.7.0 gained , , rule.close_follow_ups". */
+          typeof d.script === 'string'
+          ? `script.${d.script}`
+          : '';
 
 /** Every register a body leans on: a field's `to:`, a page's `requires`, a metric's `source`. The `links` fields are not counted. */
 function leansOn(d: Body, links: readonly string[] = []): Set<string> {

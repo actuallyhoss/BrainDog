@@ -509,7 +509,8 @@ predicate against the real rows and writes nothing.
 *(Added September 22nd 2026 for [DIRECTION §22](../loop/DIRECTION.md)'s automations layer. The design is
 `loop/research-shell-automations.md` §2 to §4; this section is what the lint holds and what the runner does. Of the
 steps that wait on somebody else, asking a person runs; asking Spark runs on a host with a model and is refused at
-install on one without; a call and a script are later work, and the section says where a run meets one.)*
+install on one without; a script step starts the script and does not wait for it, since September 24th; a call is
+later work, and the section says where a run meets one.)*
 
 **Not a kind of its own.** [04-PACKS](04-PACKS.md) closes the list of kinds, nine since `script` joined it on
 September 22nd (`KINDS` in `packages/kernel/src/declare.ts`), so an automation is a `rule` body that has
@@ -574,7 +575,8 @@ rule in the seed, the packs, the docs or the fixtures carried, so any other word
 
 An arrival trigger with a `when:` is refused as `NOT_IN_THIS_BUILD`: the runner does not read one, and a filter that
 filters nothing is worse than none. A `script` step is checked for shape only, because `script.<id>` is the scripts
-brief's declaration.
+brief's declaration: whether the script is installed, says `runs: { rule: true }` and is not paused is asked when a
+run reaches the step, as the table below says.
 
 ### What the runner does
 
@@ -624,7 +626,8 @@ for in writing.
 | `wait` | parks the run on its own schedule row and resumes it when the span has passed. A wait whose step row already says `done` is over and is not armed again |
 | `ask_person` | opens an `options` suggestion through the gate, by `rule:<id>`, whose body carries the run and the step, and parks the run until the end of its `wait:` (a week when it names none). A decision on it hands the chosen option's words to the run as `{{vars.<as>}}` and wakes it for the next drain; putting it off changes nothing; closing it unanswered, or the wait running out, fails the run with a sentence, and a question whose run has ended is closed with it |
 | `ask_spark` | queues one `infer.ask` outbox job, `{ run, rule, step, question, shape, choices?, about? }`, and parks the run for a day. The question is filled from the run's row with every `secret` and `file` field read as the dash, and so is a variable set from one; `about` carries the fields the step names, never one of those two types. `rule` is who asks: the host's pass refuses a job without it and calls no model, because Spark's ledger row is written as `rule.<id> step <n>` and a key is opened as `rule:<id>`. The pass acks each job one of three ways. `done` with `result.text` is the answer, held to the step's `shape:` (a number, or one of its `choices:`) and kept as `{{vars.<as>}}`. `done` with `result.failed` is the sentence of a refusal no retry mends, which ends the run on that sentence: the month's asks spent, an answer the host could not read, an answer of the wrong shape or a blank one, a job queued without its rule, and on the Worker a vault with no key labelled `spark`. `failed` is a model not reached, which the outbox's retry ladder asks again, eight attempts over about four hours, and whose last rung fails the run with a sentence instead of opening a dead letter. A `done` with neither ends the run on *"Spark answered job … with no text"*. On a host that does not answer, a rule an earlier build let install fails the run there with `NOT_IN_THIS_BUILD` before anything is queued, and the steps before it stand |
-| `call`, `script` | fail the run there, with a sentence saying the step is not in this build; the steps before it stand |
+| `script` | queues one `script.run` outbox job, the one a script's clock queues, `{ script, version, input }`, pinned to the version active now, and the run goes on to its next step without waiting. `input` is the row's `id`, `register` and `seq` and what the step's `input:` says, filled from the run; the row's fields are not copied, and a script reads them through its own `reads:`. An `input:` that reaches a `secret` or `file` field fails the run and queues nothing. `as:` keeps the job's id. The run fails there, with a sentence and nothing queued, when the script is not installed or retired or its pack is off, when it does not say `runs: { rule: true }`, and when it is paused, until somebody resumes it. When a job for the same script with the same input is still unfinished, nothing more is queued and `as:` keeps that job's id. What the script writes lands through the ordinary write path as `script:<id>@v<n>`, when a host has run it |
+| `call` | fails the run there, with a sentence saying the step is not in this build; the steps before it stand |
 
 **Who answers a question to Spark.** The record is opened with `answersSpark` where its host has a pass that asks
 Spark, and it is the same fact as `/api/version`'s `spark`, because both come out of one builder
@@ -667,6 +670,15 @@ twelve hours, and a run with no wait ended `running` for ever, outside the ninet
 `trigger` carries the kind, the row's fields as `row`, the arrival's `channel` and `ingest`, and for an arrival its
 body, parsed when it is JSON.
 
+`{{metric.<id>}}` is a figure, read when the step is taken, as a page reads it. **A figure is filled only where
+everybody who reads the run's row may read it.** When somebody on the record reads the run's row's list, or a list
+one of its `create` steps writes into, and does not read the list the figure adds up, every `{{metric.<id>}}` in
+that run is the dash, in a variable too, since a variable is written into the row later. This is asked at the run
+and not at install, because an invitation after the rule is in changes who reads the list. Measured before it on
+24 September (audit sixty-two, finding 4): a member invited to Inbox alone was refused the figure Payroll, and an
+owner's rule writing `filed; payroll {{metric.payroll}}` into each new Inbox row put `GBP 5200.00` in her list. A
+run with no row and nothing to create writes where only the owner reads, and reads every figure.
+
 **Ceilings.** `limits.runs_per_day` (at most 1,000) is counted over the last twenty-four hours, and a run past it is
 refused with a sentence and not started. A rule with `enabled: false` starts no runs.
 
@@ -686,7 +698,8 @@ that counts scheduled actions counts automations beside them: a failed or cancel
 A run can be cancelled while it waits, and its wake is dropped with it.
 
 **Not yet.** Runs are `local`: they do not travel in a `.brain` file, and carrying them means a format revision. A
-`call`'s answer and a script's do not resume a run yet. A question to Spark is answered on the two hosts above and
+`call` step fails the run, and a script's answer does not come back into the run that started it: the step hands off
+and the run goes on. A question to Spark is answered on the two hosts above and
 nowhere else. A record opened without `answersSpark` refuses the step at install and fails it at the run, and both
 read that one switch, so neither can come off without the other.
 

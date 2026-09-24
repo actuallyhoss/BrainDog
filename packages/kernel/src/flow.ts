@@ -27,9 +27,11 @@
  * install refuses the step (`unserved` in `index.ts`). A host that serves the job admits both, and its pass acks with
  * the answer as `result.text` or a refusal's sentence as `result.failed` (`outbox.ts`'s `ack`).
  *
- * `call` AND `script` ARE STILL NOT IN THIS BUILD. A call's answer comes back through `finishAction` and a script's
- * through `finishScript`, and neither carries a run yet; a run that reaches one fails there with a sentence, and the
- * lint lets them install so that the canvas can draw them.
+ * A `script` STEP STARTS A SCRIPT AND DOES NOT WAIT FOR IT (`startScript`). It queues the same `script.run` row a clock
+ * queues, for a script that says `runs: { rule: true }`, and the run goes on to its next step; what the script writes
+ * lands through `finishScript` when a host has run it, and its answer does not come back into the run. A `call` STEP IS
+ * STILL NOT IN THIS BUILD: a run that reaches one fails there with a sentence, and the lint lets it install so that the
+ * canvas can draw it.
  */
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
@@ -40,6 +42,7 @@ import { meter, type Metered } from './actions.ts';
 import { nextOccurrence } from './digest.ts';
 import { RUN_PATH, RUNS_PER_DAY_CEILING, passFilled, pathOf, sealedAs, triggerOf } from './flow-lint.ts';
 import type { Entry } from './index.ts';
+import { access } from './members.ts';
 import { instant } from './migrate.ts';
 import { predicateOf, type EvalContext } from './metrics.ts';
 import { FIGURE } from './figure.ts';
@@ -234,7 +237,7 @@ function rebuilt(deps: FlowDeps, run: string, program: Op[], started: Record<str
   const kept: Kept = {};
   const vars: Vars = {};
   const unsent = new Set<string>();
-  const metric = figures(deps);
+  const metric = figures(deps, () => landsOf(program, row));
   const clean = (): Entry | null => (row ? sendable(deps, row, unsent) : null);
   for (const done of deps.sql.all<{ n: number; kind: string; answer: string | null }>(
     "SELECT n, kind, answer FROM automation_step WHERE run = ? AND state = 'done' AND kind IN ('set_var', 'ask_person', 'ask_spark', 'set', 'tag') ORDER BY n",
@@ -694,7 +697,7 @@ export function advance(deps: FlowDeps, id: string): number | null {
   const last = subject === null && trigger.deleted === true && trigger.entry ? deletedRow(deps.sql, trigger.entry) : null;
   const read = (): Entry | null => subject ?? last;
   const actor = `rule:${run.rule}`;
-  const metric = figures(deps);
+  const metric = figures(deps, () => landsOf(program, read()));
   const scope = () => ({ vars, trigger: context(deps, trigger, read()), metric });
   /* A COLUMN WITH NO `-sendable` IS REBUILT BEFORE THE FIRST STEP, not at the question. A `set_var` taken after the wake
      may keep something of its own, and then the question finds the run keeping something and has no sign that `p`,
@@ -838,12 +841,25 @@ export function advance(deps: FlowDeps, id: string): number | null {
         return deps.nowMs + asked.waitMs;
       }
 
-      if (op.verb === 'call' || op.verb === 'script')
-        return fail(
-          i,
-          op.verb,
-          `rule.${run.rule} reached a ${op.verb} step, and a step that waits on ${op.verb === 'call' ? 'a call' : 'a script'} is not in this build (NOT_IN_THIS_BUILD). The steps before it were taken.`,
-        );
+      if (op.verb === 'call')
+        return fail(i, op.verb, `rule.${run.rule} reached a call step, and a step that waits on a call is not in this build (NOT_IN_THIS_BUILD). The steps before it were taken.`);
+
+      if (op.verb === 'script') {
+        const started = startScript(deps, run.rule, step, i, read(), paths());
+        if (!started.ok) return fail(i, op.verb, started.say);
+        /* THE JOB ID TAKES THE NAME OFF WHATEVER IT HELD, as an answer does in `answerStep`. Left in `kept` and
+           `sealedVars`, a name first set from a secret still read as one: the checker measured `set_var: job` from `pin`,
+           then `script: { as: job }`, then `set: { what: 'queued {{vars.job}}' }` failing the run as a secret copy. */
+        const spec = step.script as { as?: unknown };
+        if (typeof spec.as === 'string') {
+          vars[spec.as] = started.job;
+          delete kept[spec.as];
+          sealedVars.delete(spec.as);
+        }
+        record(deps, id, i, 'script', 'done', started.job);
+        i = saved(i + 1);
+        continue;
+      }
 
       /* A WRITE TO THE ROW IS FILLED BOTH WAYS TOO, before it is taken, since the row it is filled from is the row as it
          stands now. The field it writes is held back from every question to Spark after it when the two differ, and
@@ -965,6 +981,90 @@ function act(
   const call = out.calls[0];
   if (call && call.outcome !== 'queued') return { ok: false, say: call.say };
   return { ok: true, stop: out.stopped, answer: call ? call.outcome : null };
+}
+
+/**
+ * A `script` step: queue one run of the script, pinned to the version that is active now, and answer the job's id.
+ *
+ * ONE `script.run` OUTBOX ROW, THE SHAPE A CLOCK'S FIRE WRITES (`script.ts`'s `ScriptRun`), so the host that already
+ * leases a scheduled run leases this one with no code of its own, and `finishScript` applies what it wrote through the
+ * ordinary write path. The record never runs the source. What the script hands back does not resume this run, so the
+ * step does not wait: it is done when the row is queued.
+ *
+ * MEASURED BEFORE THIS ARM (`packages/kernel/test/rule-script.test.ts`, and W59-1's stop on 24 September at `8a489d4c`):
+ * every run that reached a script step failed with "a step that waits on a script is not in this build", and a script
+ * declaring `runs: { rule: true }` was read by the egress line that tells the owner about it and by nothing that
+ * started one. So a rule could not close a task's follow-ups, and the Work pack declared no cascade.
+ *
+ * ONLY A SCRIPT THAT SAYS `runs: { rule: true }`. The owner approved each script's header at install, and `runs:` is the
+ * part of it that says when it may start; a script written for a clock is not handed a row because a rule named it.
+ *
+ * THE INPUT IS THE ROW'S IDENTITY AND WHAT THE STEP'S `input:` SAYS, never the row. `id`, `register` and `seq` are what a
+ * script needs to read the row and its neighbours through its own `reads:`, which is where a secret field is taken off
+ * (`scriptReads` in `@braindog/host`). `input:` is filled from the run as every other step text is, and one that reaches
+ * a secret or file field fails the step, as `handOn` fails a note: the lint refuses it at install (`copyFault`), and this
+ * is the second line for a rule stored before it did.
+ *
+ * AND EVERY GATE A CLOCK'S FIRE PASSES, because a rule is a second way into the same queue and the owner's controls are
+ * the script's, not the clock's. The first attempt read the declaration and nothing else, and the checker refused it on
+ * 24 September: a script paused after three refused runs (`pauseAfterRefusals` in `script-run.ts`) was queued again by
+ * the next write that fired the rule, so "it will not run again until somebody resumes it" was not true, and each of
+ * those runs would have been refused a fourth, fifth and sixth time. `rule-script.test.ts` measured it: the run finished
+ * `done` with one row queued for a paused script. The gates, in the order a fire meets them:
+ *   - installed and active, which is `activeScript`'s query and so also refuses one retired or whose pack is off;
+ *   - its schedule row not paused, which `drainSchedule` honours for the clock by firing only a pending row. A record
+ *     with no row for the script (installed before migration 12 armed one) has nothing paused to honour;
+ *   - no unfinished run already queued for the same work (`fireScript`'s busy check). For the clock that is any
+ *     unfinished run, since every one carries `input: null`; for a rule it is one with the same input, since two rows
+ *     done in the same minute are two runs, and keyed on the name alone the second row's run would never be queued.
+ *     The step then answers the job already queued, which is the one that will do the work.
+ */
+function startScript(
+  deps: FlowDeps,
+  rule: string,
+  step: Record<string, unknown>,
+  n: number,
+  row: Entry | null,
+  by: RunFill,
+): { ok: true; job: string } | { ok: false; say: string } {
+  const spec = step.script as { id?: unknown; input?: unknown };
+  const name = typeof spec?.id === 'string' ? spec.id : '';
+  const found = deps.sql.one<{ version: number; body: string }>(
+    "SELECT version, body FROM declaration WHERE id = ? AND kind = 'script' AND superseded_at IS NULL AND retired = 0",
+    `script.${name}`,
+  );
+  if (!found) return { ok: false, say: `rule.${rule} starts a script at step ${n + 1}, and there is no script called ${name || '(no name)'} in this record.` };
+  const runs = (JSON.parse(found.body) as { runs?: { rule?: unknown } }).runs;
+  if (runs?.rule !== true)
+    return {
+      ok: false,
+      say: `rule.${rule} starts script.${name} at step ${n + 1}, and script.${name} does not say runs: { rule: true }, so no rule may start it. Nothing was queued.`,
+    };
+  const paused = deps.sql.one<{ state: string }>("SELECT state FROM schedule WHERE kind = 'script' AND key = ?", name)?.state === 'paused';
+  if (paused)
+    return {
+      ok: false,
+      say: `rule.${rule} starts script.${name} at step ${n + 1}, and script.${name} is paused, so nothing was queued. It starts again once somebody resumes it; the steps before it were taken.`,
+    };
+  const handed = handOn(isObject(spec.input) ? spec.input : {}, by, false);
+  if (handed.secret !== null)
+    return {
+      ok: false,
+      say: `rule.${rule}'s script at step ${n + 1} hands on ${handed.secret}, which holds what a secret or file field holds, and a script's input never carries one. Nothing was queued; the steps before it were taken.`,
+    };
+  const input = { ...(row ? { id: row.id, register: row.register, seq: row.seq } : {}), ...handed.action };
+  /* COMPARED AS JSON TEXT IN THIS PROCESS, not by `json_extract` in SQL: both sides are `JSON.stringify` of an object
+     this function built in the same key order, and SQLite's own rendering of an object is not promised to match it. */
+  const same = JSON.stringify(input);
+  const waiting = deps.sql
+    .all<{ id: string; payload: string }>(
+      `SELECT id, payload FROM outbox WHERE kind = 'script.run' AND state IN ('pending', 'leased', 'failed')
+       AND json_extract(payload, '$.script') = ? ORDER BY rowid`,
+      name,
+    )
+    .find((r) => JSON.stringify((JSON.parse(r.payload) as { input?: unknown }).input) === same);
+  if (waiting) return { ok: true, job: waiting.id };
+  return { ok: true, job: enqueue(deps.sql, deps.mint, deps.nowMs, 'script.run', { script: name, version: found.version, input }) };
 }
 
 /**
@@ -1288,10 +1388,71 @@ const RUN_READ = new RegExp(`${RUN_PATH.source}|${FIGURE.source}`, 'g');
  * plainest form of it: a second row of 3 beside a first of 12, and the second run's step writes 15. A figure put into a
  * variable is kept, as the words it was when the variable was set.
  */
-const figures =
-  (deps: FlowDeps) =>
-  (id: string): string =>
-    figureText(deps.rules(), id);
+const figures = (deps: FlowDeps, lands: () => ReadonlySet<string>) => {
+  /* ONE ANSWER PER FIGURE PER RUN TURN, since whether it is hidden depends on who is on the record and not on the rows,
+     and a step that fills the same figure three times would otherwise walk the members three times. The value is still
+     read each time, for the reason above. */
+  const hidden = new Map<string, boolean>();
+  return (id: string): string => {
+    if (!hidden.has(id)) hidden.set(id, hiddenFigure(deps.sql, id, lands()));
+    return hidden.get(id) ? '—' : figureText(deps.rules(), id);
+  };
+};
+
+/**
+ * The lists a run's fills may land in: its own row's list, and every list one of its `create` steps writes into.
+ *
+ * EVERY STEP OF THE RUN, NOT THE ONE BEING FILLED, because a figure kept by a `set_var` is written into the row by a
+ * later step, and a question answered by a person or by Spark comes back as a variable the same way. So a figure the
+ * row's readers may not see is the dash wherever this run fills it, a `notify` included: with the row, a `notify` is
+ * also a note on the row's history, which its readers see. A run with no row and nothing to create writes nowhere
+ * anybody but the owner reads, and reads every figure.
+ */
+const landsOf = (program: readonly Op[], row: Entry | null): Set<string> => {
+  const out = new Set<string>(row ? [row.register] : []);
+  for (const op of program) {
+    const made = op.verb === 'create' && isObject(op.step.create) ? op.step.create.register : undefined;
+    if (typeof made === 'string') out.add(made);
+  }
+  return out;
+};
+
+/**
+ * Whether somebody who reads one of `lands` does not read the list figure `id` adds up (audit sixty-two, finding 4).
+ *
+ * MEASURED BEFORE THIS (`figure-privacy.test.ts`, the audit's probe F1): an owner's rule on each new Inbox row set its
+ * note to `filed; payroll {{metric.payroll}}`, over a figure summing Salaries. A member invited to Inbox alone is
+ * refused `payroll` by the record as a figure that does not exist, and her own Inbox read `filed; payroll GBP 5200.00`.
+ * The figure was read with the run's context and nobody was asked who would read where it landed.
+ *
+ * THE SAME QUESTION THE RECORD ASKS HER, ONE FIGURE WIDE. Its `metric` refuses a figure over a list she does not read
+ * (`packages/record/src/index.ts`, "the same leak one number wide"), and reads nothing else of it, so this asks of the
+ * figure's `source` alone. A figure over no list, a `series.`, is read by whoever reads a page, and is not hidden.
+ *
+ * AT THE RUN AND NOT AT INSTALL, because who reads a list is changed by an invitation after the rule is in; a rule
+ * checked once at install would write Payroll into a bookkeeper's Inbox from the day she was invited. The kernel's
+ * `member` rows are the authority (`members.ts`'s `access`), and a level is read as the record's `guard` reads one for
+ * `list`: the level held on that list or else on the record, inside the ceiling, and `append` never reads.
+ */
+function hiddenFigure(sql: Sql, id: string, lands: ReadonlySet<string>): boolean {
+  if (lands.size === 0) return false;
+  const found = sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'metric' AND superseded_at IS NULL AND retired = 0", `metric.${id}`);
+  const source = found ? (JSON.parse(found.body) as { source?: unknown }).source : undefined;
+  if (typeof source !== 'string' || !source.startsWith('register.')) return false;
+  const over = source.slice('register.'.length);
+  for (const { person } of sql.all<{ person: string }>('SELECT DISTINCT person_id AS person FROM member')) {
+    const held = access(sql, person);
+    if (held !== null && [...lands].some((list) => readsList(held, list)) && !readsList(held, over)) return true;
+  }
+  return false;
+}
+
+/** Whether a member's `access` reads `list`: inside the ceiling, at the level held there or on the record, and not `append`. */
+const readsList = (held: NonNullable<ReturnType<typeof access>>, list: string): boolean => {
+  if (held.registers !== null && !held.registers.includes(list)) return false;
+  const level = Object.hasOwn(held.levels, list) ? held.levels[list] : held.level;
+  return level !== null && level !== undefined && level !== 'append';
+};
 
 /**
  * `{{vars.x}}`, `{{trigger.row.amount}}` and `{{metric.total}}`, filled in a string that no fill of the row reads after: a condition, a

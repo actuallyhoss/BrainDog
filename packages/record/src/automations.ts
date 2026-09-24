@@ -53,16 +53,22 @@ export function subjectOf(body: Body): string | null {
 
 /**
  * The steps that hand off to somebody else and do not come back in this build. `flow.ts` fails a run that reaches a
- * `call` or a `script` with `NOT_IN_THIS_BUILD`, after taking every step before it, and on a host that does not answer
- * Spark the lint refuses `ask_spark` at install, because nothing there serves the question it would queue. `ask_person`
- * is not here: it opens its question in Decide and the decision wakes the run (Brief C). Nor is `ask_spark` where the
- * host answers it (`said`'s `answersSpark`): the run parks on the step and the model's answer wakes it.
+ * `call` with `NOT_IN_THIS_BUILD`, after taking every step before it, and on a host that does not answer Spark the lint
+ * refuses `ask_spark` at install, because nothing there serves the question it would queue. `ask_person` is not here: it
+ * opens its question in Decide and the decision wakes the run (Brief C). Nor is `ask_spark` where the host answers it
+ * (`said`'s `answersSpark`): the run parks on the step and the model's answer wakes it.
  *
- * SAID IN THE DRY RUN BECAUSE THE DRY RUN IS NOT THE LINT. `call` and `script` install so that the canvas can draw
- * them, and an agent told only "would call" files the rule, the owner accepts it, and the first run fails at that step
- * while its author reads the dry run as a promise. The test that holds this list runs a real one.
+ * NOR IS `script`, SINCE 24 SEPTEMBER. `flow.ts`'s `startScript` queues the script's run and the run goes on, and this
+ * list still named it after the runner stopped failing it: the dry run of Work's `rule.close_follow_ups` ended its one
+ * step with "Not in this build: a run stops here", on a record where the same rule ran to `done` and closed the task's
+ * follow-ups (`apps/selfhost/test/follow-ups.test.ts`). An owner reading that would have refused the one automation
+ * the pack ships.
+ *
+ * SAID IN THE DRY RUN BECAUSE THE DRY RUN IS NOT THE LINT. `call` installs so that the canvas can draw it, and an agent
+ * told only "would call" files the rule, the owner accepts it, and the first run fails at that step while its author
+ * reads the dry run as a promise. The test that holds this list runs a real one.
  */
-export const WAITS_ON_OTHERS: readonly string[] = ['call', 'script', 'ask_spark'];
+export const WAITS_ON_OTHERS: readonly string[] = ['call', 'ask_spark'];
 
 const NOT_BUILT = ' Not in this build: a run stops here, after the steps before it.';
 const NOT_INSTALLED = ' Not in this build: a rule with this step is refused at install.';
@@ -243,7 +249,16 @@ function stepLines(step: unknown, depth: number, out: string[], spark: boolean):
     const as = spec('call').as === undefined ? '' : `, and keep its answer as ${words(spec('call').as)}`;
     return line(`Call ${words(spec('call').ingest)}, a declared call${as}.${NOT_BUILT}`);
   }
-  if ('script' in s) return line(`Run script.${words(spec('script').id)}, and keep its answer as ${words(spec('script').as)}.${NOT_BUILT}`);
+  if ('script' in s) {
+    /* WHAT THE RUNNER DOES, NOT WHAT THE STEP'S NAME PROMISES. The first cut of this line said "keep its answer", and
+       `as:` holds the id of the queued job: the script's answer never comes back into the run (`startScript`). And the
+       three ways the step fails are said, because each one is a thing the owner controls from the script's own row. */
+    const run = spec('script');
+    const as = run.as === undefined ? '' : `, keep the id of its queued run as ${words(run.as)},`;
+    return line(
+      `Start script.${words(run.id)}${as} and go on without waiting for it: what it writes lands when this host runs it. The run stops here if the script is not installed, does not say runs: { rule: true }, or is paused.`,
+    );
+  }
   if ('ask_spark' in s) {
     const ask = spec('ask_spark');
     const asked = `Ask Spark ${JSON.stringify(words(ask.question))}, and keep the answer as ${words(ask.as)}.`;

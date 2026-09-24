@@ -396,6 +396,26 @@ const DECLARED: Record<string, Version> = {
       '`register.updates` opens `by` from a closed list of four vendors to text, a widening, so an update by any author lands -> ea8dd09cbe41f705',
     ],
   },
+  /**
+   * A VERSION AND NOT A RESET, because 1.7.0 is on `origin/master` (`814ca32c`) and four ids are gained, which the guard
+   * refuses under a released label whatever the hash says. Nothing inside a declaration 1.7.0 held moved: the ids below
+   * are 1.7.0's plus the four, pasted from `scripts/fingerprint.mjs` unedited.
+   */
+  'work@1.8.0': {
+    holds: `
+      metric.open-tasks metric.project-done-7d metric.project-due-soon metric.project-in-review metric.project-open
+      metric.tasks-done-7d metric.tasks-done-7d-agents metric.tasks-done-by-week metric.tasks-due-7d metric.tasks-due-by-week
+      metric.tasks-later metric.tasks-overdue metric.tasks-waiting metric.tasks-with-agents
+      page.work page.work-board
+      register.tasks register.tracks register.updates
+      rule.close_follow_ups rule.start_with_parent
+      script.close_follow_ups script.start_with_parent
+    `,
+    declares: 'e4126747e977dddd',
+    history: [
+      'A task\'s follow-ups close with it and start in its project (W59-1): `rule.close_follow_ups` starts `script.close_follow_ups` when a task moves to done, which closes every step `Part of` it still open, doing or blocked, and `rule.start_with_parent` starts `script.start_with_parent` when a task is created with a parent, which gives it the parent\'s project and thread -> e4126747e977dddd',
+    ],
+  },
   'people@2.0.0': {
     holds: ` page.people register.people `,
     declares: 'a197d208773e19c1',

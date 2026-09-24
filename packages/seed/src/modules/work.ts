@@ -443,6 +443,103 @@ export const WORK_METRICS: Record<string, SeedMetric> = {
   },
 };
 
+/* ── follow-ups ───────────────────────────────────────────────────────────── */
+
+/**
+ * The script that closes a task's follow-ups when the task is done: every step `Part of` it that is still open, doing
+ * or blocked moves to done, with a line in its note naming the task it closed with.
+ *
+ * MEASURED BEFORE IT (`loop/research-living-in-it.md` §5, `probe-cascade.test.ts`, and on a self-host with Work in
+ * `apps/selfhost/test/follow-ups.test.ts`): a parent moved to done left its child open, so the Overview kept drawing a
+ * step of work that was over. A dropped step is left alone, because somebody decided it was not worth doing, and a step
+ * in review is left alone, because it waits on a person who has not looked yet.
+ *
+ * THE PARENT IS READ AGAIN BEFORE ANYTHING MOVES. The rule queues the run and a host runs it later, so a task done and
+ * reopened in between is open by the time this reads it, and closing its steps then would undo the reopening. So a
+ * reopened task brings nothing back and closes nothing either.
+ */
+const CLOSE_FOLLOW_UPS = `export default async function run(ctx) {
+  const parent = await ctx.record.get(ctx.input.id);
+  if (!parent || parent.fields.state !== 'done') return;
+  const steps = await ctx.record.list('tasks', { all: [{ field: 'parent', is: parent.id }, { field: 'state', in: ['open', 'doing', 'blocked'] }] });
+  const line = 'Closed with ' + parent.fields.what + ' (tasks#' + parent.seq + ').';
+  for (const step of steps) {
+    const note = typeof step.fields.note === 'string' && step.fields.note.trim() !== '' ? step.fields.note + '\\n\\n' + line : line;
+    ctx.update('tasks#' + step.seq, { state: 'done', note }, step.version);
+  }
+}`;
+
+/**
+ * The script that starts a new follow-up where its parent is: a task created `Part of` another and on no project takes
+ * the parent's project, and its thread when it names none.
+ *
+ * ONE LEVEL, AS `parent` HOLDS ONE. The copy is made once, at the create, and never again: moving the parent to another
+ * project later does not move its steps, because by then somebody may have placed a step somewhere on purpose.
+ *
+ * `thing` MAY NOT BE A FIELD AT ALL. Work installs without Projects and leaves the field out (`LINKS` in
+ * `packs/first-party.ts`), so the script copies only what the parent holds and the list declares; on such a record a
+ * follow-up still takes its parent's thread.
+ */
+const START_WITH_PARENT = `export default async function run(ctx) {
+  const task = await ctx.record.get(ctx.input.id);
+  if (!task || !task.fields.parent || task.fields.thing) return;
+  const parent = await ctx.record.get(task.fields.parent);
+  if (!parent) return;
+  const patch = {};
+  if (parent.fields.thing) patch.thing = parent.fields.thing;
+  if (!task.fields.track && parent.fields.track) patch.track = parent.fields.track;
+  if (Object.keys(patch).length > 0) ctx.update('tasks#' + task.seq, patch, task.version);
+}`;
+
+/** A script of Work's, as a pack document writes it: no egress, no keys, reading and writing tasks, started by a rule. */
+const workScript = (script: string, title: string, source: string): Record<string, unknown> => ({
+  script,
+  title,
+  pack: 'work',
+  runs: { rule: true },
+  egress: [],
+  keys: [],
+  reads: ['tasks'],
+  writes: ['tasks'],
+  source,
+});
+
+/**
+ * WORK'S AUTOMATIONS: two rules and the two scripts they start, in the pack document's own form (the kind first).
+ *
+ * A RULE STARTS A SCRIPT THROUGH A `script` STEP, and nothing about tasks is in the kernel (`loop/DIRECTION.md`
+ * section 22): the kernel queues the script's run (`startScript` in `packages/kernel/src/flow.ts`), the host runs it in
+ * its sandbox, and its writes land through the ordinary write path as `script:<id>@v<n>`. `32-PARITY §5` wrote the
+ * cascade as one rule on the child that hops to its parent with `via:`, which this build refuses at install
+ * (`MATCH_OP_UNSUPPORTED`), and a rule on the child is evaluated when the child is written, not when its parent is.
+ *
+ * NOT INTO `RULES`, which holds the older `register:` and `then:` form that `installSeed` runs over rows already
+ * written (`applyRule`). These go into the pack document and into `installSeed` as `AUTOMATIONS` in `../index.ts`, and
+ * both halves always arrive in one call, because a rule whose script is missing fails every run it starts.
+ *
+ * `op: [update]` AND `fields: [state]` ON THE FIRST, so a task created already done closes nothing and an edit to a
+ * done task's words does not close its steps a second time. Reopening is an update of `state` too, and the rule's
+ * `when:` leaves it out, so reopening starts nothing.
+ */
+export const WORK_AUTOMATIONS: Record<string, unknown>[] = [
+  {
+    rule: 'close_follow_ups',
+    pack: 'work',
+    on: { written: { register: 'tasks', op: ['update'], fields: ['state'] } },
+    when: 'state is done',
+    steps: [{ script: { id: 'close_follow_ups', as: 'closing' } }],
+  },
+  {
+    rule: 'start_with_parent',
+    pack: 'work',
+    on: { written: { register: 'tasks', op: ['create'] } },
+    when: 'parent is set',
+    steps: [{ script: { id: 'start_with_parent', as: 'placing' } }],
+  },
+  workScript('close_follow_ups', 'Close the follow-ups of a finished task', CLOSE_FOLLOW_UPS),
+  workScript('start_with_parent', 'Start a follow-up in the project of its parent', START_WITH_PARENT),
+];
+
 /* ── the pages ────────────────────────────────────────────────────────────── */
 
 /* NO LABEL: a column over a list's title is headed by what one row of the list is called, so a record whose tasks are

@@ -60,7 +60,7 @@ export { MONEY_HOME_SETTING, MONEY_TARGET_SETTINGS, targetConfigOf } from './mod
 import { ESTATE_METRICS, ESTATE_PAGES, ESTATE_REGISTERS, SERVICES } from './modules/estate.ts';
 import { PORTFOLIO_PAGES, PORTFOLIO_REGISTERS, PORTFOLIO_RULES, PROJECTS_SAID, PROJECT_METRICS, THINGS } from './modules/portfolio.ts';
 import { PEOPLE, PEOPLE_PAGES, PEOPLE_REGISTERS } from './modules/people.ts';
-import { RUNS, TASKS, TRACKS, UPDATES, WORK_METRICS, WORK_PAGES, WORK_REGISTERS } from './modules/work.ts';
+import { RUNS, TASKS, TRACKS, UPDATES, WORK_AUTOMATIONS, WORK_METRICS, WORK_PAGES, WORK_REGISTERS } from './modules/work.ts';
 
 /* ── registers ────────────────────────────────────────────────────────────── */
 
@@ -221,6 +221,29 @@ export const ruleDeclarations = (): Declaration[] =>
   Object.values(RULES).map((body) => ({ id: `rule.${body.rule}`, kind: 'rule' as const, body: body as never }));
 
 /**
+ * The automations the modules ship with: a rule that starts a script, and the script, as one list (`WORK_AUTOMATIONS`).
+ *
+ * NOT IN `RULES`, because a `SeedRule` is the older `register:` and `then:` form that `applyRule` reads over the rows
+ * already written, and these are automations that start on a write (`on: written`) and hand off to a script. And not
+ * installed by anything that takes one half without the other: a rule whose script is missing fails every run it
+ * starts, so both halves go in one call.
+ *
+ * THEY ARE IN `packDocument()` AND SO ARE HERE. The Work pack is split out of `packDocument()` (`packs/first-party.ts`),
+ * so that is the only place Work can declare them, and `test/pack.test.ts` holds `installSeed` and `packDocument()` to
+ * installing the same declarations. Added to the document alone on 24 September, three of its tests went red: the
+ * document held 93 declarations where the seed's own lists count 89, and the record the pack made held
+ * `rule.close_follow_ups`, `rule.start_with_parent` and their two scripts where the one the seed made did not.
+ */
+export const AUTOMATIONS: readonly Record<string, unknown>[] = WORK_AUTOMATIONS;
+
+export const automationDeclarations = (): Declaration[] =>
+  AUTOMATIONS.map((body) =>
+    typeof body.script === 'string'
+      ? { id: `script.${body.script}`, kind: 'script' as const, body: body as never }
+      : { id: `rule.${String(body.rule)}`, kind: 'rule' as const, body: body as never },
+  );
+
+/**
  * How a forwarded message becomes a row: the patterns the modules ship with.
  *
  * DECLARED, VALID, TESTED, AND INSTALLED BY NOTHING, which is the hole this closes. `MONEY_INGESTS`
@@ -326,6 +349,8 @@ export function packDocument(): Record<string, unknown> {
          declaration's kind off its FIRST key, and `MONEY_INGESTS` already writes `ingest:` first,
          so the document form and the stored form of an ingest are the same object. */
       ...Object.values(INGESTS),
+      /* A RULE AND THE SCRIPT IT STARTS, each already in the document form with its kind first. */
+      ...AUTOMATIONS,
     ],
     /* THE SETTINGS MONEY'S TARGETS ARE HELD TO, which a person changes later, and the currency it adds up in. */
     config: { ...MONEY_HOME_SETTING, ...targetConfigOf(Object.values(METRICS) as unknown as Record<string, unknown>[]) },
@@ -487,7 +512,10 @@ export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Res
 
   /* THE RULES GO IN AFTER THE QUESTIONS, and are read once over the rows already there, so what they ask
      is numbered after the sample's own questions rather than in the middle of the rows being written. */
-  const ruled = await kernel.install(ruleDeclarations());
+  /* THE AUTOMATIONS GO IN WITH THEM, after the rows too. Two of the sample's tasks are written with a `parent`, and
+     `rule.start_with_parent` installed before them would queue a script run for each while the seed is still writing,
+     for rows the sample already places by hand. */
+  const ruled = await kernel.install([...ruleDeclarations(), ...automationDeclarations()]);
   if (!ruled.ok) return ruled as Result<Seeded>;
   for (const rule of Object.values(RULES)) {
     const applied = kernel.applyRule(rule.rule);

@@ -18,7 +18,7 @@ import { install, normalise, plan, type Diff, type Host, type Installed, type Pa
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
-import { AGENTS_REGISTERS, INGESTS, METRICS, PAGES, REGISTERS, RULES, declarations, ingestDeclarations, installSeed, metricDeclarations, packDocument, pageDeclarations, ruleDeclarations } from '../src/index.ts';
+import { AGENTS_REGISTERS, AUTOMATIONS, INGESTS, METRICS, PAGES, REGISTERS, RULES, declarations, ingestDeclarations, automationDeclarations, installSeed, metricDeclarations, packDocument, pageDeclarations, ruleDeclarations } from '../src/index.ts';
 
 const NOW = Date.UTC(2026, 8, 3, 12);
 
@@ -66,7 +66,7 @@ test('THE PRODUCT’S OWN SHAPE IS A LEGAL PACK, which is the test the format mo
      line exists to catch. */
   assert.equal(
     pack.declarations.length,
-    Object.keys(REGISTERS).length + Object.keys(PAGES).length + Object.keys(METRICS).length + Object.keys(RULES).length + Object.keys(INGESTS).length,
+    Object.keys(REGISTERS).length + Object.keys(PAGES).length + Object.keys(METRICS).length + Object.keys(RULES).length + Object.keys(INGESTS).length + AUTOMATIONS.length,
   );
   assert.equal(pack.manifest.provides.length, pack.declarations.length, 'two declarations share an id');
 
@@ -87,8 +87,10 @@ test('AND INSTALLING IT PRODUCES THE RECORD THE SEED DOES', async () => {
      rather than what made it pass. The pack document gained the arrival patterns; the direct call
      here still named four of the five kinds, so the two sides installed different records and the
      test correctly said so. The point of the test is that the two ways agree, which means this
-     list has to be the whole of what the seed installs, not most of it. */
-  value(await direct.k.install([...declarations(), ...pageDeclarations(), ...metricDeclarations(), ...ruleDeclarations(), ...ingestDeclarations()]));
+     list has to be the whole of what the seed installs, not most of it.
+     `automationDeclarations()` JOINED IT FOR THE SAME REASON when Work 1.8.0 put two rules and their scripts in the
+     document: with it left out, the pack side held `rule.close_follow_ups` and the direct side did not. */
+  value(await direct.k.install([...declarations(), ...pageDeclarations(), ...metricDeclarations(), ...ruleDeclarations(), ...ingestDeclarations(), ...automationDeclarations()]));
 
   const viaPack = await record();
   const pack = value<Pack>(await normalise(packDocument()));
@@ -119,7 +121,7 @@ test('and its plan says what it would do before anybody has to read the file', a
   assert.equal(diff.direction, 'install');
   assert.equal(
     diff.adds.length,
-    Object.keys(REGISTERS).length + Object.keys(PAGES).length + Object.keys(METRICS).length + Object.keys(RULES).length + Object.keys(INGESTS).length,
+    Object.keys(REGISTERS).length + Object.keys(PAGES).length + Object.keys(METRICS).length + Object.keys(RULES).length + Object.keys(INGESTS).length + AUTOMATIONS.length,
   );
   assert.deepEqual(diff.conflicts, []);
   assert.equal(diff.orphans, 0);

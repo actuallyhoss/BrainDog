@@ -17,9 +17,11 @@
  * of one, and no `to:`, since nothing addresses a question to one person. `ask_spark` is held to its shape and to what
  * its question may carry, and no further: whether THIS host answers the `infer.ask` job it queues is a fact about the
  * host, which a context-free lint cannot know, so that refusal is `unserved` in `index.ts`, beside `stranded`, and
- * `sparkAskAt` below is what it asks. `call` and `script` still install and fail at the run with a sentence, which is the
- * answer §4.4 gives a `script` step until its runtime lands, and it is why the lint is strict about everything it CAN
- * know now.
+ * `sparkAskAt` below is what it asks. A `script` step runs since 24 September: `flow.ts`'s `startScript` queues the
+ * script's run and the run goes on, and whether the script is installed, says `runs: { rule: true }` and is not paused
+ * is asked there, when a run reaches the step, because a pause is a fact of the moment and no install can know it. A
+ * `call` step still installs and fails at the run with a sentence, which is why the lint is strict about everything it
+ * CAN know now.
  */
 
 import type { Refusal } from '@braindog/ports';
@@ -1236,8 +1238,10 @@ function stepFault(
       return named(spec.name, `${at}.set_var.name`) ?? (typeof spec.to === 'string' ? null : bad('DECLARATION_INVALID', `${id}'s ${at}.set_var.to is text.`, `${at}.set_var.to`));
     }
     case 'script': {
-      /* THE SCRIPT ITSELF IS NOT LOOKED UP. `script.<id>` is the scripts brief's ninth kind and its runtime; until it
-         lands, a run reaching this step fails with a sentence (§4.4), so the id is checked for shape only. */
+      /* THE SCRIPT ITSELF IS NOT LOOKED UP HERE. A run reaching this step asks whether `script.<id>` is active, says
+         `runs: { rule: true }` and is not paused (`startScript` in `flow.ts`), and fails with a sentence when not. Two
+         of those three change after install, by a pause or a pack turned off, so the run has to ask them anyway, and
+         the id is checked here for shape only. What `input:` copies is held below, by `copyFault`. */
       if (!isObject(spec) || typeof spec.id !== 'string' || !NAME.test(spec.id))
         return bad('DECLARATION_INVALID', `${id}'s ${at}.script names the id of a script.`, `${at}.script.id`);
       if (spec.input !== undefined && (!isObject(spec.input) || Object.values(spec.input).some((v) => typeof v !== 'string')))

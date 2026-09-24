@@ -62,7 +62,10 @@ const idOf = (d: Body): string =>
     : d.register ? `register.${d.register}`
       : d.page ? `page.${d.page}`
         : d.ingest ? `ingest.${d.ingest}`
-          : `metric.${d.metric}`;
+          : /* AND A SCRIPT IS ONE, since Work 1.8.0 ships two: both answered `metric.undefined` here, and the check below
+               read 91 distinct ids against 92 declarations, the same false "in two packs" the ingests once caused. */
+            d.script ? `script.${d.script}`
+            : `metric.${d.metric}`;
 const byId = (list: readonly Body[]): [string, string][] => list.map((d) => [idOf(d), JSON.stringify(d)] as [string, string]).sort((a, b) => a[0].localeCompare(b[0]));
 
 /* ── each one ───────────────────────────────────────────────────────────── */
