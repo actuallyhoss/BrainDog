@@ -86,15 +86,17 @@ test('a rule is what starts it and each step as a sentence, with a branch read a
     { label: 'Step 3', value: `${sayStep(steps[2]!)}. Not in this build: a run stops here, after the steps before it.` },
     /* A SCRIPT STEP RUNS SINCE `e6010208`, and this screen still ended it "Not in this build: a run stops here", as the
        call above, where the record's dry run says the run goes on. Measured red first on that sentence. What the owner
-       reads instead is the dry run's: the run does not wait, what `as:` keeps is the queued run's id (the canvas's
-       sentence says "the answer"), and the three things that stop it. */
+       reads instead is the dry run's: the run does not wait, and the things that stop it.
+       WHAT `as:` KEEPS IS SAID ONCE, BY THE CANVAS. Decide carried a second sentence, "What is kept as queued is the id
+       of its queued run, not what the script answers", because the canvas's line before it said "keeping the answer
+       as queued". The canvas says the id now (`flow-script-as.test.ts`), and the line read both. */
     {
       label: 'Step 4',
-      value: `${sayStep(steps[3]!)}. The run goes on without waiting for it: what the script writes lands when this host runs it. What is kept as queued is the id of its queued run, not what the script answers. The run stops here if the script is not installed, does not say runs: { rule: true }, or is paused.`,
+      value: `Run the script tidy, keeping the id of its queued run as queued. The run goes on without waiting for it: what the script writes lands when this host runs it. The run stops here if the script is not installed, does not say runs: { rule: true }, or is paused, or if its input hands on what a secret or file field holds.`,
     },
     {
       label: 'Step 5',
-      value: `${sayStep(steps[4]!)}. The run goes on without waiting for it: what the script writes lands when this host runs it. The run stops here if the script is not installed, does not say runs: { rule: true }, or is paused.`,
+      value: `${sayStep(steps[4]!)}. The run goes on without waiting for it: what the script writes lands when this host runs it. The run stops here if the script is not installed, does not say runs: { rule: true }, or is paused, or if its input hands on what a secret or file field holds.`,
     },
   ]);
 });

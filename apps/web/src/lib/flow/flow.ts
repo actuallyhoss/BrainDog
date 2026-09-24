@@ -754,9 +754,21 @@ export const ARGS: Record<Verb, readonly Arg[]> = {
     { path: ['call', 'as'], label: 'Keep the answer as', kind: 'name' },
   ],
   run: [{ path: ['run'], label: 'The declared call', kind: 'text', required: true, missing: 'Say which call to run on this row.' }],
+  /* A SCRIPT STEP KEEPS NO ANSWER. `startScript` in `packages/kernel/src/flow.ts` queues a `script.run` job and goes on,
+     and `as:` holds that job's id; what the script returns never comes back into the run. The field said "Keep the
+     answer as" and its absence said `NAME_IT`, so a person named a value no step would ever see.
+     STILL REQUIRED, THOUGH THE RUNNER DOES NOT NEED IT: the lint (`flow-lint.ts`, the `script` case) refuses a step with
+     no `as`, measured on 24 September, and an optional box here would pass a step the record then refuses on Decide.
+     `flow-script-as.test.ts` fails the day the lint lets it through, which is the day this can drop `required`. */
   script: [
     { path: ['script', 'id'], label: 'The script', kind: 'text', required: true, missing: 'Say which script to run.' },
-    { path: ['script', 'as'], label: 'Keep the answer as', kind: 'name', required: true, missing: NAME_IT },
+    {
+      path: ['script', 'as'],
+      label: 'Keep the queued run id as',
+      kind: 'name',
+      required: true,
+      missing: 'Name the id of the queued run. The record asks for a name here even when no later step reads it.',
+    },
   ],
   wait: [{ path: ['wait'], label: 'For', kind: 'span', required: true, missing: 'Say how long to wait.', hint: '2h' }],
   schedule: [
@@ -1049,8 +1061,10 @@ function saying(step: Step): string {
       return at('ingest') === '' ? 'Call a service' : `Call ${at('ingest')}${at('as') ? `, keeping the answer as ${at('as')}` : ''}`;
     case 'run':
       return aloud(a) === '' ? 'Run a call on this row' : `Run ${aloud(a)} on this row`;
+    /* THE ID OF ITS QUEUED RUN, NOT "THE ANSWER": the runner queues the script and goes on (`startScript`), and Decide
+       had to follow this line with a sentence taking "keeping the answer as" back. Worded as the record's dry run is. */
     case 'script':
-      return at('id') === '' ? 'Run a script' : `Run the script ${at('id')}${at('as') ? `, keeping the answer as ${at('as')}` : ''}`;
+      return at('id') === '' ? 'Run a script' : `Run the script ${at('id')}${at('as') ? `, keeping the id of its queued run as ${at('as')}` : ''}`;
     case 'wait':
       return aloud(a) === '' ? 'Wait' : `Wait ${spanWords(aloud(a))}`;
     case 'schedule':
@@ -1187,7 +1201,12 @@ export function faultsOf(d: Draft, { spark }: { spark: boolean } = { spark: fals
         const v = getAt(n.step, arg.path);
         if (arg.required && blank(v)) out.push({ key: n.key, say: arg.missing });
         else if (arg.kind === 'name' && !blank(v) && (typeof v !== 'string' || !NAME.test(v) || RESERVED.includes(v)))
-          out.push({ key: n.key, say: `${String(v)} is not a name an answer can have. Use lower-case letters, digits and underscores.` });
+          /* A SCRIPT'S `as:` HOLDS THE ID OF ITS QUEUED RUN (`startScript`), so its bad-name line says that, as its label
+             and its missing-value line do; it still said "an answer" after both were corrected. */
+          out.push({
+            key: n.key,
+            say: `${String(v)} is not a name ${verb === 'script' ? 'the id of a queued run' : 'an answer'} can have. Use lower-case letters, digits and underscores.`,
+          });
         else if (arg.kind === 'span' && !blank(v) && (typeof v !== 'string' || everyMs(v) === null))
           out.push({ key: n.key, say: `${String(v)} is not a span. Write 30m, 2h, 3d or 1w.` });
         else if (arg.kind === 'later' && !blank(v) && (typeof v !== 'string' || !/^\d+[dwmy]$/u.test(v.trim())))

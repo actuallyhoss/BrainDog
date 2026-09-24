@@ -256,7 +256,7 @@ function stepLines(step: unknown, depth: number, out: string[], spark: boolean):
     const run = spec('script');
     const as = run.as === undefined ? '' : `, keep the id of its queued run as ${words(run.as)},`;
     return line(
-      `Start script.${words(run.id)}${as} and go on without waiting for it: what it writes lands when this host runs it. The run stops here if the script is not installed, does not say runs: { rule: true }, or is paused.`,
+      `Start script.${words(run.id)}${as} and go on without waiting for it: what it writes lands when this host runs it. The run stops here if the script is not installed, does not say runs: { rule: true }, or is paused, or if its input hands on what a secret or file field holds.`,
     );
   }
   if ('ask_spark' in s) {
