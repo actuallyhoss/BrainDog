@@ -377,9 +377,10 @@
         /* WEB PUSH'S PUBLIC KEY, AND EMPTY IS NO PUSH. It is a var and not a secret because the app hands it to every
            browser that subscribes. The private half is the secret `VAPID_PRIVATE` (the note at the end of this file),
            and `notify.push` is leased only when both are set (`delivers` in `src/deliver.ts`), so one without the
-           other leaves pushes `pending`, as they have always been. His step: the pair is generated once per
-           environment, and never by a session in this repository. */
-        "VAPID_PUBLIC": ""
+           other leaves pushes `pending`, as they have always been. Generated on 24 September at his word ("you set up
+           VAPID keys"), one pair per environment; the private half lives only in the Worker secret and in his secrets
+           folder, never in this repository. */
+        "VAPID_PUBLIC": "BOG2T44cb4AumYSqEj5lD1-MyUYp3nD4iABd3Z5oEe_CoivSr_c6dyRmu02G_bAwlhnp6ZPJW5_wmZlNkJJclS0"
       },
 
       "durable_objects": {
@@ -554,9 +555,10 @@
         /* WEB PUSH'S PUBLIC KEY, AND EMPTY IS NO PUSH. It is a var and not a secret because the app hands it to every
            browser that subscribes. The private half is the secret `VAPID_PRIVATE` (the note at the end of this file),
            and `notify.push` is leased only when both are set (`delivers` in `src/deliver.ts`), so one without the
-           other leaves pushes `pending`, as they have always been. His step: the pair is generated once per
-           environment, and never by a session in this repository. */
-        "VAPID_PUBLIC": ""
+           other leaves pushes `pending`, as they have always been. Generated on 24 September at his word ("you set up
+           VAPID keys"), one pair per environment; the private half lives only in the Worker secret and in his secrets
+           folder, never in this repository. */
+        "VAPID_PUBLIC": "BDFva-xw8GzY6aZWJ56lUpaec3IFwe545q2VcuYgEW6QgWkXeGiBUn2WPouNTuJx-_6lPyAcd9KezHlV8DbOE1k"
       },
 
       "durable_objects": {
