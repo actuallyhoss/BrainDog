@@ -42,9 +42,11 @@ import { RUN_PATH, RUNS_PER_DAY_CEILING, passFilled, pathOf, sealedAs, triggerOf
 import type { Entry } from './index.ts';
 import { instant } from './migrate.ts';
 import { predicateOf, type EvalContext } from './metrics.ts';
+import { FIGURE } from './figure.ts';
 import { enqueue } from './outbox.ts';
 import { intervalMs } from './pull.ts';
 import {
+  figureText,
   filling,
   marker,
   onceKey,
@@ -232,6 +234,7 @@ function rebuilt(deps: FlowDeps, run: string, program: Op[], started: Record<str
   const kept: Kept = {};
   const vars: Vars = {};
   const unsent = new Set<string>();
+  const metric = figures(deps);
   const clean = (): Entry | null => (row ? sendable(deps, row, unsent) : null);
   for (const done of deps.sql.all<{ n: number; kind: string; answer: string | null }>(
     "SELECT n, kind, answer FROM automation_step WHERE run = ? AND state = 'done' AND kind IN ('set_var', 'ask_person', 'ask_spark', 'set', 'tag') ORDER BY n",
@@ -241,7 +244,7 @@ function rebuilt(deps: FlowDeps, run: string, program: Op[], started: Record<str
     const trigger = cleaned ? { ...started, row: cleaned.fields } : started;
     if (done.kind === 'set' || done.kind === 'tag') {
       const step = program[done.n]?.step;
-      const w = step && row && cleaned ? writes(deps, done.kind, step, { vars, trigger: started }, { vars: { ...vars, ...kept }, trigger }, row, cleaned) : null;
+      const w = step && row && cleaned ? writes(deps, done.kind, step, { vars, trigger: started, metric }, { vars: { ...vars, ...kept }, trigger, metric }, row, cleaned) : null;
       /* AND A FIELD THAT DOES NOT HOLD WHAT THE CLEAN FILL WOULD HAVE WRITTEN IS HELD BACK TOO. Two fills of the row as it
          is now agree once the secret is cleared during the wait, while the field still holds what the step wrote from
          it: measured on 23 September, `pin` removed while the run waited on a person and the question went out as
@@ -260,7 +263,7 @@ function rebuilt(deps: FlowDeps, run: string, program: Op[], started: Record<str
       continue;
     }
     if (typeof spec?.name !== 'string' || typeof spec.to !== 'string') continue;
-    const again = String(fill(spec.to, { vars: { ...vars, ...kept }, trigger }));
+    const again = String(fill(spec.to, { vars: { ...vars, ...kept }, trigger, metric }));
     vars[spec.name] = done.answer;
     if (again === done.answer) delete kept[spec.name];
     else kept[spec.name] = again;
@@ -691,7 +694,8 @@ export function advance(deps: FlowDeps, id: string): number | null {
   const last = subject === null && trigger.deleted === true && trigger.entry ? deletedRow(deps.sql, trigger.entry) : null;
   const read = (): Entry | null => subject ?? last;
   const actor = `rule:${run.rule}`;
-  const scope = () => ({ vars, trigger: context(deps, trigger, read()) });
+  const metric = figures(deps);
+  const scope = () => ({ vars, trigger: context(deps, trigger, read()), metric });
   /* A COLUMN WITH NO `-sendable` IS REBUILT BEFORE THE FIRST STEP, not at the question. A `set_var` taken after the wake
      may keep something of its own, and then the question finds the run keeping something and has no sign that `p`,
      set before the wake, is missing from it: with the rebuild moved to the question and done only for a run keeping
@@ -784,7 +788,7 @@ export function advance(deps: FlowDeps, id: string): number | null {
            a variable holding `plain more`. */
         const row = read();
         const now = scope();
-        const clean = String(fill(spec.to, { vars: { ...vars, ...kept }, trigger: row ? { ...now.trigger, row: sendable(deps, row, unsent).fields } : now.trigger }));
+        const clean = String(fill(spec.to, { vars: { ...vars, ...kept }, trigger: row ? { ...now.trigger, row: sendable(deps, row, unsent).fields } : now.trigger, metric }));
         /* AND WHETHER IT TOOK A SECRET, read from where its paths go before the value goes in (`sealedPaths`), for the
            steps after it that write. */
         const secret = sealedIn(spec.to, paths());
@@ -852,7 +856,7 @@ export function advance(deps: FlowDeps, id: string): number | null {
       const cleanRow = (op.verb === 'set' || op.verb === 'tag') && subject ? sendable(deps, subject, unsent) : null;
       const wrote =
         cleanRow && subject && (op.verb === 'set' || op.verb === 'tag')
-          ? writes(deps, op.verb, step, scope(), { vars: { ...vars, ...kept }, trigger: { ...scope().trigger, row: cleanRow.fields } }, subject, cleanRow)
+          ? writes(deps, op.verb, step, scope(), { vars: { ...vars, ...kept }, trigger: { ...scope().trigger, row: cleanRow.fields }, metric }, subject, cleanRow)
           : null;
       /* A STEP THAT WRITES ANYWHERE BUT THE RUN'S OWN ROW COPIES NO SECRET, unless into a field that never leaves
          either. The lint refuses such a step at install (`flow-lint.ts`, `copyFault`); this is the second line, for a
@@ -1006,7 +1010,7 @@ function ask(
      to Spark gets the dash where `{{vars.p}}` held `pin`. */
   const vars = scope.vars as Vars;
   const cleanVars = verb === 'ask_spark' ? { ...vars, ...kept } : { ...vars, ...Object.fromEntries([...tainted].filter((n) => n in vars).map((n) => [n, '—'])) };
-  const scoped = { vars: cleanVars, trigger: facts ? { ...(scope.trigger as Record<string, unknown>), row: facts.fields } : scope.trigger };
+  const scoped = { vars: cleanVars, trigger: facts ? { ...(scope.trigger as Record<string, unknown>), row: facts.fields } : scope.trigger, metric: scope.metric };
   /* FILLED ONCE (`rules.ts`'s `filling`), the run's paths and the row's fields in one pass. It was the run's fill and
      then the row's over what it had made, so a text field holding the words `{{pin}}`, put in by
      `{{trigger.row.note}}`, was read a second time as a field of the row. Both fills read the cleaned row, so for
@@ -1270,21 +1274,45 @@ function withoutSealed(deps: FlowDeps, row: Entry): Entry {
 }
 
 /**
- * `{{vars.x}}` and `{{trigger.row.amount}}`, filled in a string that no fill of the row reads after: a condition, a
+ * The run's paths and a figure's `{{metric.<id>}}` (`figure.ts`), in one pattern, so that a figure is filled in the
+ * same `replace` as the paths beside it and nothing one wrote is read again as the other. Groups 1 and 2 are a path's
+ * head and path, 3 and 4 a figure's head and id.
+ */
+const RUN_READ = new RegExp(`${RUN_PATH.source}|${FIGURE.source}`, 'g');
+
+/**
+ * What a run reads a figure through: `rules.ts`'s `figureText`, asked each time a step is filled.
+ *
+ * READ AT THE STEP AND NEVER KEPT, because a `set` or a `create` earlier in the same run may change the rows the figure
+ * adds up, and a run parked on a wait for a week wakes to the figure as it is then. `step-reads-figure.test.ts` holds the
+ * plainest form of it: a second row of 3 beside a first of 12, and the second run's step writes 15. A figure put into a
+ * variable is kept, as the words it was when the variable was set.
+ */
+const figures =
+  (deps: FlowDeps) =>
+  (id: string): string =>
+    figureText(deps.rules(), id);
+
+/**
+ * `{{vars.x}}`, `{{trigger.row.amount}}` and `{{metric.total}}`, filled in a string that no fill of the row reads after: a condition, a
  * `set_var`, and a question with no row. A text the pass fills is filled in the same `replace` as the row's own
  * `{{field}}`s instead (`handOn`, `rules.ts`'s `filling`). A path that reaches nothing is an em dash for the same
- * reason `fill` writes one: a sentence with a hole in it reads as a bug. The pattern is `flow-lint.ts`'s `RUN_PATH`,
- * so the lint reads a question's braces as this fills them.
+ * reason `fill` writes one: a sentence with a hole in it reads as a bug. The pattern is `flow-lint.ts`'s `RUN_PATH` with
+ * `figure.ts`'s `FIGURE` beside it, so the lint reads a question's braces as this fills them.
  */
 function fill(x: unknown, scope: Record<string, unknown>): unknown {
-  if (typeof x === 'string') return x.replace(RUN_PATH, (_whole, head: string, path: string) => pathValue(scope, head, path));
+  if (typeof x === 'string') return x.replace(RUN_READ, (_whole, head?: string, path?: string, figHead?: string, id?: string) => pathValue(scope, head ?? figHead!, path ?? id!));
   if (Array.isArray(x)) return x.map((v) => fill(v, scope));
   if (isObject(x)) return Object.fromEntries(Object.entries(x).map(([k, v]) => [k, fill(v, scope)]));
   return x;
 }
 
-/** What one `{{vars.…}}` or `{{trigger.…}}` path is written as. */
+/**
+ * What one `{{vars.…}}`, `{{trigger.…}}` or `{{metric.…}}` path is written as. A figure's id is one word with hyphens in
+ * it and no dots, so it is handed to the scope's reader whole rather than walked; a scope with no reader writes the dash.
+ */
 function pathValue(scope: Record<string, unknown>, head: string, path: string): string {
+  if (head === 'metric') return typeof scope.metric === 'function' ? (scope.metric as (id: string) => string)(path) : '—';
   let at: unknown = scope[head];
   for (const part of path.split('.')) at = isObject(at) ? at[part] : Array.isArray(at) ? at[Number(part)] : undefined;
   if (at === undefined || at === null || at === '') return '—';
@@ -1331,7 +1359,8 @@ function handOn(step: Record<string, unknown>, by: RunFill, passes: boolean): { 
   const walk = (v: unknown, at: string[]): unknown => {
     if (typeof v === 'string') {
       if (passes && passFilled(at)) return v;
-      return v.replace(RUN_PATH, (whole: string, head: string, p: string) => {
+      return v.replace(RUN_READ, (whole: string, runHead?: string, runPath?: string, figHead?: string, id?: string) => {
+        const [head, p] = runHead !== undefined ? [runHead, runPath!] : [figHead!, id!];
         if (by.sealed(head, p)) secret ??= whole;
         return by.value(head, p);
       });
@@ -1346,7 +1375,7 @@ function handOn(step: Record<string, unknown>, by: RunFill, passes: boolean): { 
 
 /** The first run path in `text` that reaches a secret, or `null`: what a `set_var` taking it would carry. */
 function sealedIn(text: string, by: RunFill): string | null {
-  for (const m of text.matchAll(RUN_PATH)) if (by.sealed(m[1]!, m[2]!)) return m[0];
+  for (const m of text.matchAll(RUN_READ)) if (by.sealed(m[1] ?? m[3]!, m[2] ?? m[4]!)) return m[0];
   return null;
 }
 

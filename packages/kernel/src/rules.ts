@@ -32,8 +32,9 @@ import { exponentOf } from './ingest.ts';
 import { sealedEver } from './declare.ts';
 import { instant } from './migrate.ts';
 import { spanMs } from './vault.ts';
-import { predicateOf, type EvalContext } from './metrics.ts';
+import { evaluateMetric, predicateOf, type Aggregation, type EvalContext, type MetricDecl } from './metrics.ts';
 import { RUN_PATH, inlineFault } from './flow-lint.ts';
+import { FIGURE } from './figure.ts';
 import { observe } from './observe.ts';
 
 export type RuleAction =
@@ -588,8 +589,9 @@ export function fill(template: string, row: Entry, nowMs = Date.now()): string {
 }
 
 /**
- * The run's own paths, as a run hands them to the pass: what `{{vars.x}}` or `{{trigger.row.note}}` is written as, and
- * whether that path reaches a value a secret or file field gave it. `flow.ts` builds one for each step it acts.
+ * The run's own paths, as a run hands them to the pass: what `{{vars.x}}`, `{{trigger.row.note}}` or `{{metric.total}}`
+ * is written as, and whether that path reaches a value a secret or file field gave it. `flow.ts` builds one for each
+ * step it acts. A figure's head is `metric` and its path is the figure's id.
  */
 export type RunFill = { value: (head: string, path: string) => string; sealed: (head: string, path: string) => boolean };
 
@@ -602,9 +604,10 @@ export type FillBy = { sealed?: ReadonlySet<string>; each?: readonly string[]; r
 
 /**
  * Every spelling a text can be filled from, in one pattern: the run's `{{vars.x}}` and `{{trigger.row.pin}}`
- * (`flow-lint.ts`'s `RUN_PATH`), a create's `{{each.0}}`, and the row's `{{field}}` and `{{kind:field}}`.
+ * (`flow-lint.ts`'s `RUN_PATH`), a figure's `{{metric.total}}` (`figure.ts`), a create's `{{each.0}}`, and the row's
+ * `{{field}}` and `{{kind:field}}`.
  */
-const SPELLED = new RegExp(`${RUN_PATH.source}|\\{\\{each\\.(\\d)\\}\\}|\\{\\{(\\w+)(?::(\\w+))?\\}\\}`, 'g');
+const SPELLED = new RegExp(`${RUN_PATH.source}|${FIGURE.source}|\\{\\{each\\.(\\d)\\}\\}|\\{\\{(\\w+)(?::(\\w+))?\\}\\}`, 'g');
 
 /** Whether a field holds anything a fill would write as more than the dash: an empty list holds nothing either. */
 export const present = (value: unknown): boolean => value !== null && value !== undefined && value !== '' && !(Array.isArray(value) && value.length === 0);
@@ -628,11 +631,14 @@ export const present = (value: unknown): boolean => value !== null && value !== 
 export function filling(template: unknown, row: Entry, nowMs: number, by: FillBy = {}): { text: string; secret: string | null } {
   if (typeof template !== 'string') return { text: wordsOf(template), secret: null };
   let secret: string | null = null;
-  const text = template.replace(SPELLED, (whole: string, runHead?: string, runPath?: string, each?: string, head?: string, tail?: string) => {
-    if (runHead !== undefined) {
+  const text = template.replace(SPELLED, (whole: string, runHead?: string, runPath?: string, figHead?: string, figId?: string, each?: string, head?: string, tail?: string) => {
+    /* A FIGURE IS THE RUN'S TO READ, and the inline pass has no run, so there the braces stay as typed and the lint
+       refuses them (`figure.ts`): a figure read inside a write would be read over the row that write is still making. */
+    if (runHead !== undefined || figHead !== undefined) {
       if (by.run === undefined) return whole;
-      if (by.run.sealed(runHead, runPath!)) secret ??= whole;
-      return by.run.value(runHead, runPath!);
+      const [h, p] = runHead !== undefined ? [runHead, runPath!] : [figHead!, figId!];
+      if (by.run.sealed(h, p)) secret ??= whole;
+      return by.run.value(h, p);
     }
     if (each !== undefined) {
       if (by.each === undefined) return whole;
@@ -678,7 +684,7 @@ function rowValue(head: string, tail: string | undefined, row: Entry, nowMs: num
   if (kind === 'money' || (!kind && isMoney(value)))
     /* THE CURRENCY'S OWN DECIMALS. It was `amount / 100` to two places for every code, so JPY 129,900
        was written `JPY 1299.00` and KWD 1.500 was `KWD 15.00`, into patches, notes and questions. */
-    return isMoney(value) ? `${value.currency} ${(value.amount / 10 ** exponentOf(value.currency)).toFixed(exponentOf(value.currency))}` : String(value);
+    return isMoney(value) ? moneyWords(value) : String(value);
   if (kind === 'quantity' && isQuantity(value)) return `${value.value} ${value.unit}`;
   if (kind === 'until' || kind === 'ago') {
     const at = Date.parse(`${String(value).slice(0, 10)}T12:00:00Z`);
@@ -690,6 +696,54 @@ function rowValue(head: string, tail: string | undefined, row: Entry, nowMs: num
   if (kind === 'pct') return `${(Number(value) * 100).toFixed(0)}%`;
   if (Array.isArray(value)) return value.map(String).join(', ');
   return String(value);
+}
+
+/** Money as a sentence writes it, in the currency's own decimals: `GBP 1234.50`, `JPY 129900`. */
+const moneyWords = (m: { amount: number; currency: string }): string => `${m.currency} ${(m.amount / 10 ** exponentOf(m.currency)).toFixed(exponentOf(m.currency))}`;
+
+/**
+ * `{{metric.<id>}}` as a run's fill writes it: the figure read as a page reads it (`evaluateMetric` with the record's
+ * rates), in its own unit, or the dash where the record holds no such figure or the figure refuses to be read.
+ *
+ * MONEY IS WRITTEN AS A MONEY FIELD IS, `GBP 1234.50`, so a sentence holding `{{amount}}` and `{{metric.cash-now}}`
+ * says both the same way. The survey's brief wrote `1234.50 GBP`; that is the quantity order (`3 h`), and a note that
+ * put the currency first for the row and last for the figure would read as two kinds of number. Money in several
+ * currencies that no rate adds up is each amount, as a page writes it (`pages.ts`'s `valueAt`).
+ *
+ * WHETHER THE UNIT IS A CURRENCY IS ASKED OF THE FIELD THE FIGURE ADDS UP, never of the unit's spelling.
+ * `metrics.ts`'s `isMoneyFigure` says why: `KGS` is a weight in one list and the Kyrgyz som in another, and a quantity
+ * written through `exponentOf` would be a hundredth of itself.
+ *
+ * THE AGGREGATE ONLY, NEVER A ROW. `value` and its unit are the whole figure; `groups` is never read, so a figure grouped
+ * by a field hands no row's word into a run. Over a list with a secret field, measured on 24 September, `sum`, `min`,
+ * `max` and `avg` of the secret are refused at install ("max reads a number, and pin is a secret"), and `count` and
+ * `distinct` of it install, which are numbers of rows. So the run's `sealed` answers `false` for a figure: the number of
+ * keys a vault holds is not a key. `group_by` a secret field installs too, and is why `groups` stays unread here.
+ */
+export function figureText(deps: Pick<RulesDeps, 'sql' | 'ctx'>, id: string): string {
+  const row = deps.sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'metric' AND superseded_at IS NULL AND retired = 0", `metric.${id}`);
+  if (!row) return '—';
+  const decl = JSON.parse(row.body) as MetricDecl;
+  const read = evaluateMetric(deps.sql, decl, deps.ctx);
+  if (!read.ok) return '—';
+  const { value, unit, parts } = read.value;
+  if (parts?.length) return parts.map(moneyWords).join(', ');
+  if (value === null) return '—';
+  if (unit === null) return String(value);
+  return addsMoney(decl, deps.ctx) ? moneyWords({ amount: value, currency: unit }) : `${value} ${unit}`;
+}
+
+/** Whether any field the figure adds up is typed money in its list, both halves of a ratio or a difference included. */
+function addsMoney(decl: MetricDecl, ctx: EvalContext): boolean {
+  const schema = decl.source.startsWith('register.') ? ctx.schemaOf(decl.source.slice('register.'.length)) : null;
+  if (!schema) return false;
+  const v = decl.value;
+  const halves: Aggregation[] = 'ratio' in v ? [v.ratio.of, v.ratio.per] : 'diff' in v ? [v.diff.of, v.diff.per] : [v];
+  return halves.some((agg) => {
+    const operand: unknown = Object.values(agg)[0];
+    const field = typeof operand === 'string' ? operand : (operand as { product?: unknown[] } | undefined)?.product?.[0];
+    return typeof field === 'string' && schema.fields[field]?.type === 'money';
+  });
 }
 
 /** A value that is not text, as `fill` would write it had it been a field: a dash for nothing, a list by its items. */
