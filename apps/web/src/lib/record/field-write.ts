@@ -34,7 +34,8 @@ import { REGISTERS } from './data.ts';
 import { noRecord } from './device.ts';
 import { fieldWords } from './field-words.ts';
 import { learn } from './remote.ts';
-import type { FieldType, Fields } from './schema.ts';
+import { inverseOf } from './rows-write.ts';
+import type { FieldType, Fields, RegisterDecl } from './schema.ts';
 
 export const ADDABLE = ['text', 'document', 'day', 'int', 'decimal', 'bool', 'url', 'email'] as const satisfies readonly FieldType[];
 export type Addable = (typeof ADDABLE)[number];
@@ -202,9 +203,16 @@ export async function addValue(base: string, register: string, field: string, va
  * A FIELD THE ROW DID NOT CARRY GOES BACK AS `null`, which is how the record is told to drop it. Left `undefined`, it
  * vanishes from the JSON, the patch is empty for that key, and the edit stands while the toast says it was put back.
  * It is sent at the version the edit answered with, so a write from somebody else in between is a conflict rather
- * than something this quietly reverts. Brief 1 builds the list's `inverseOf` in `rows-write.ts` to the same rule; the
- * two can be one once both have landed.
+ * than something this quietly reverts.
+ *
+ * IT IS THE LIST'S `inverseOf` NOW, and not a copy of it, because the copy missed the finished day. A state edit moves
+ * that day in the same write (the kernel's `finished.ts`), and a put back that named the state alone was a move into
+ * `done` with no day, which the record dates today. Measured against a kernel on 24 September (audit sixty-five,
+ * section 2, probe B1): a task done on 1 September, edited to `open` and put back, read `done on 2026-09-24`.
+ * `finished-day-rest.test.ts` holds it. `decl` is the list's declaration, which names the state and the day; without
+ * it nothing here knows which key is the state, and the put back is the fields the edit touched and nothing else.
  */
-export function putBackOf(before: Fields, patch: Fields): Fields {
-  return Object.fromEntries(Object.keys(patch).map((key) => [key, before[key] ?? null]));
+export function putBackOf(before: Fields, patch: Fields, decl?: Pick<RegisterDecl, 'state' | 'finished'>): Fields {
+  /* `inverseOf` READS ONLY THE ROW'S FIELDS, so the rest of the entry it is typed over is left empty. */
+  return inverseOf({ seq: 0, version: 0, created: '', by: '', fields: before }, patch, decl);
 }
