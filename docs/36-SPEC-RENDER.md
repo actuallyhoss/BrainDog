@@ -9,7 +9,7 @@ Derives from [05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §1–§7, [34-GRAM
 ## 1 · Purpose and boundary
 
 **Does.** Takes a `document` string in the dialect of 34 §2 and returns segments (`parse`) or HTML (`toHTML`).
-Draws the thirty-one kinds over the eight primitives. Resolves `{{path}}` through a function the caller supplies.
+Draws the thirty-three kinds over the eight primitives. Resolves `{{path}}` through a function the caller supplies.
 Formats money, dates, quantities and references one way. Never renders nothing: a malformed block becomes a
 visible fence with one line above it (05 §3 invariant 1).
 
@@ -42,7 +42,7 @@ export function render(markdown: string, opts?: RenderOptions): string;      // 
 
 export const PRIMITIVES_VERSION: 1;
 export const PRIMITIVES: readonly ['panel', 'grid', 'rows', 'proportional', 'inline', 'list', 'table', 'media'];
-export const KINDS: Readonly<Record<Kind, KindSpec>>;                          // thirty-one entries, §4
+export const KINDS: Readonly<Record<Kind, KindSpec>>;                          // thirty-three entries, §4
 export function diffRows(before: string, after: string): string[];           // a `diff` fence's rows, §5.9
 
 export type { Segment, Markdown, Block, Degraded, Row, Inline, Kind, KindSpec, Primitive,
@@ -67,7 +67,7 @@ type LinkRef =
 | `parse` | fence scan, row split, tone, arity, inline tokens | never throws; every string yields a `Segment[]` (fuzz-tested, §9) |
 | `toHTML` | resolves, formats, escapes, emits | throws nothing of its own; an exception from `opts.resolve` or `opts.link` propagates — the host owns them |
 | `render` | `toHTML(parse(s), opts)` | as above |
-| `KINDS` | the thirty-one kinds as data | — |
+| `KINDS` | the thirty-three kinds as data | — |
 | `diffRows` | two texts as `- `, `+ ` and two-space rows, by a longest-common-run line diff over what differs between their shared head and tail | never throws; past 250,000 cells the changed middle is drawn as taken out and put back whole |
 | `PRIMITIVES` | the eight primitive names, in 05 §1 order | — |
 | `PRIMITIVES_VERSION` | `1` at stage 0 (31 §6) | — |
@@ -136,7 +136,7 @@ interface KindSpec {
 }
 ```
 
-`KINDS`, thirty-one, counted:
+`KINDS`, thirty-three, counted:
 
 | Kind | Primitive | Cells, in order | Arity | Tone | Row cap | Flags |
 |---|---|---|---|---|---|---|
@@ -153,12 +153,14 @@ interface KindSpec {
 | `lines` | proportional | the header row's count: point · up to four lines, a `was:` line being the same measure over the period before, dashed | n | no | — | header; the first current line is the one accent series, and the lead is its last value with the change against the first `was:` line at the same point |
 | `progress` | proportional | label · value · target · note (optional) | 4 | yes | — | forms `budget`; a goal is `good` once reached, a budget `warn` from 90% and `bad` past its limit, the part over marked; a tone written on the row wins |
 | `forecast` | proportional | mark (`opening` `past` `step` `horizon` `knobs`) · day · label · amount | 4 | no | — | page-only; knobs and scrub only with `RenderOptions.scenario` |
+| `ring` | proportional | label · value · target on one row, a note on two to five (optional) | 3 | yes | 5 | one row is progress through `progressPlan`, so a ring and a `progress` track over one row agree; two to five are parts through `splitPlan`, in its four steps; the centre is the share, or the parts' sum when they share one unit and empty when they do not; a value that does not read draws no dial, only the words; every circle painted `currentColor` by presentation attributes, which a host rule overrides |
 | `spec` | rows | label · value · note | 3 | no | — | |
 | `params` | rows | label · value · note | 3 | no | — | |
 | `todo` | list | title · detail · fact · fact (the two facts optional) | 4 | no | — | marker; the two facts are one quiet line under the title, joined by ` · `, and a row with both blank draws no line, so a two-cell row draws as it did before the facts existed |
 | `steps` | list | title · detail · state | 3 | no | — | ordered |
 | `timeline` | list | date · title · detail | 3 | yes | — | ordered |
 | `board` | grid | column · title · detail | 3 | no | — | |
+| `heat` | grid | day (`YYYY-MM-DD`) · value (optional, one when left off) | 2 | no | — | twelve weeks by weekday ending on the week of `RenderOptions.now`, over `days.ts`'s `heatGrid` and `washSteps`; rows on one day added; a gap is not a zero; a row whose day or value does not read is named under the grid, one outside the weeks counted and said; no tone, because the wash is the reading |
 | `roadmap` | list | title · by (`YYYY-MM-DD`, or `D Mon YYYY` as `day()` writes it, which is the form a page's reader projects) · effort in days (optional) | 3 | yes | — | a row with an effort is a bar ending on `by`, as many whole days long as the effort rounded up; one with none is a dated stem; a row whose date or effort does not read is named under the drawing, never placed; today's line from `RenderOptions.now`; every mark painted `currentColor` by presentation attributes, which a host rule overrides |
 | `code` | media | — verbatim | 0 | no | — | |
 | `tree` | media | — verbatim | 0 | no | — | |
@@ -204,7 +206,7 @@ type Inline =
 Invariants, each a test in §9:
 
 1. Every non-blank input line belongs to exactly one segment. `Degraded.source` is the block's lines verbatim, both fences included.
-2. `Block.kind` is one of the thirty-one and is never `table`; it is `cards`, `section` or `feed` only when `parse` was called with `{ page: true }`.
+2. `Block.kind` is one of the thirty-three and is never `table`; it is `cards`, `section` or `feed` only when `parse` was called with `{ page: true }`.
 3. For a split kind, `Row.cells.length ≤ KINDS[kind].cells.length`; for `comparison`, ≤ the header row's count.
 4. `Row.tone === 'hole'` only when `Block.kind === 'bar'`.
 5. `Block.rows.length ≤ KINDS[kind].rows` where a cap is set.
@@ -387,6 +389,7 @@ in the kind's order; an absent cell renders as an empty span — columns never s
 | `sparkline` | `<div class="prop"><div class="spark-row"[ data-intent]><span class="spark-label"> <svg class="spark-line" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="label: 18, 20, 19, 24"><path class="trend-line"><path class="trend-end"></svg> <span class="spark-figure num"> glyph?</div>…</div>`; under two points there is no `svg`. A stat row's trend is the same `svg` with `class="cell-trend"`, after the figure. `stat lead` puts `data-form="lead"` on the `figure` |
 | `split` | `<div class="prop split">`, then `<svg class="split-track" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="Payroll 60%, Rent 30%">` with `<rect class="split-seg" data-step="0-3"[ data-intent] x width>` per part and `<path class="split-cut">` where parts meet, or `<p class="split-empty">` when all are zero; `<ul class="split-legend"><li class="split-item"[ data-intent]><span class="split-dot"[ data-step] aria-hidden="true"> <span class="split-label"> <span class="split-value num"> <span class="split-share num">`, when a part `<span class="split-note"> glyph?</li>…</ul>`; then the hole row, `<button type="button" class="split-hole" data-hole>` when the host passes `hole`, else a `div`. `src/split.ts` holds the plan |
 | `bridge` | `<div class="prop bridge" style="--cells:N">`, `<svg class="bridge-chart" … role="img" aria-label="Start £9,000, Coming in +£2,000, …">` with `<path class="bridge-zero">` when the walk crosses zero and `<rect class="bridge-bar" data-move="start\|up\|down\|end">`, then `<ol class="bridge-rows"><li class="bridge-row"[ data-move]><span class="bridge-label"> <svg class="bridge-inline" aria-hidden="true"><rect class="bridge-bar"></svg> <span class="bridge-value num"> <span class="bridge-note"></li>…</ol>`, then `<p class="bridge-warn" data-intent="warn">` glyph and sentence when the rows do not add up or a row has no number. `src/bridge.ts` holds the plan and `signedOf` |
+| `ring` | `<div class="prop ring" data-form="progress\|parts">`, then when there is a dial `<div class="ring-dial"><svg class="ring-mark" viewBox="0 0 36 36" role="img" aria-label="Holiday: £1,200.00 of £3,000.00, 40%">` with `<circle class="ring-track">` and `<circle class="ring-arc" data-step="0-3"[ data-intent] stroke-dasharray stroke-dashoffset>` per arc against `pathLength="100"`, `</svg><span class="ring-figure num" aria-hidden="true">` `</div>`; on progress `<div class="ring-row"[ data-intent]><span class="ring-label"> <span class="ring-figures num"><span class="ring-value">`, with a target `<span class="ring-of">of</span><span class="ring-target">`, `</span> <span class="ring-left num"> glyph?</div>`; on parts `<ul class="ring-legend"><li class="ring-item"[ data-intent]><span class="ring-dot"[ data-step] aria-hidden="true"> <span class="ring-label"> <span class="ring-value num">`, when a part `<span class="ring-share num">`, when written `<span class="ring-note"> glyph?</li>…</ul>`. No rows, `<p class="ring-empty">`. `src/ring.ts` holds the plan |
 | `gauge` | `<div class="gauge[ tone-x]" style="--magnitude:0.70"><span class="label"> <span class="figure">value</span> <span class="target">target</span></div>` |
 | `chips` | `<ul class="chips"><li class="chip[ tone-x]"><span class="glyph" data-glyph="G" aria-hidden="true"></span><span class="figure"> <span class="word"></li>…</ul>`; a row with an empty figure or an empty word is not drawn (05 §7.4) |
 | `spec` · `params` | `<dl><div class="row"><dt>label</dt><dd class="value">value</dd><dd class="note">note</dd></div>…</dl>` |
@@ -394,6 +397,7 @@ in the kind's order; an absent cell renders as an empty span — columns never s
 | `steps` | `<ol class="steps"><li class="step" data-state="S"><span class="title"> <span class="detail"> <span class="state">S</span></li>…</ol>` |
 | `timeline` | `<ol class="timeline"><li class="event[ tone-x]"><time datetime="2026-09-02">2 Sep 2026</time> <span class="title"> <span class="detail"></li>…</ol>`; a date cell that is not `YYYY-MM-DD` → `<span class="date">` |
 | `board` | `<div class="columns"><section class="column"><h4>column</h4><ul><li class="card"><span class="title"> <span class="detail"></li>…</ul></section>…</div>` — columns in order of first appearance |
+| `heat` | `<div class="heat" style="--weeks:12"><div class="heat-grid" role="img" aria-label="12 weeks to 22 Sep 2026, 2 days counted, the busiest 14 Sep 2026 with 3.">` with one `<span class="heat-day"[ data-today=""][ data-future=""][ data-wash="0-4"][ title="14 Sep 2026: 3"]>` a day, week by week and Monday first, so the host flows them into seven rows and no cell carries a position; `</div>`, then `<div class="heat-numbers"><table class="heat-table">` with a row per counted day, then `<p class="heat-skipped">` and `<p class="heat-outside">` when there are such rows. Nothing in view, `<p class="heat-empty">` and the same two lines. `src/heat.ts` holds the plan |
 | `code` | `<pre><code class="language-L">verbatim</code></pre>`; `L` = the heading when it matches `^[A-Za-z0-9_+#.-]+$`; no `<figcaption>` |
 | `tree` | `<pre class="tree"><code>verbatim</code></pre>` |
 | `comparison` | `<table><thead><tr><th scope="col">…</th></tr></thead><tbody><tr[ class="tone-x"]><td>…</td></tr></tbody></table>`; a short row is padded with empty `<td>` to the header count |

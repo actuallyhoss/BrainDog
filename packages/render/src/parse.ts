@@ -278,7 +278,7 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
         type: 'degraded',
         code: 'DIALECT_KIND_UNKNOWN',
         fix: written
-          ? `"${written}" is not one of the thirty-one kinds. The block is shown as you wrote it.`
+          ? `"${written}" is not one of the thirty-three kinds. The block is shown as you wrote it.`
           : 'A fence with no kind is shown as you wrote it.',
         raw,
         info,

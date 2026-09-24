@@ -1,6 +1,6 @@
 /**
- * The chart kinds' half of the markup contract: sparkline, split, bridge, series, lines, forecast
- * and progress.
+ * The chart kinds' half of the markup contract: sparkline, split, bridge, series, lines, forecast,
+ * progress, ring and heat.
  *
  * NOT IN `blocks.css`, WHICH EVERY SCREEN PAYS FOR. The root layout imports that file, so it lands
  * in the stylesheet the shell waits on before anything draws. These kinds grew from nothing to most
@@ -1333,6 +1333,246 @@
 
     .forecast-readout {
       max-inline-size: 12rem;
+    }
+  }
+
+  /* ── ring: a 64px dial with its figure in the centre, the rows beside it ──
+     The same colour rule as `split`: a part is a neutral step, darkest first, and only a row with a tone is drawn in
+     its intent, so four parts are told apart by their place and their dot rather than by a hue. One row of progress
+     is the quiet ink a card's ring fills in. The circles carry presentation attributes from `src/ring.ts` so a page
+     without these rules still draws an outline; every rule here wins over them. */
+  .ring {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-3) var(--sp-5);
+    padding-inline: var(--sp-2);
+  }
+
+  .ring-dial {
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: 64px;
+    block-size: 64px;
+  }
+
+  .ring-mark,
+  .ring-figure {
+    grid-area: 1 / 1;
+  }
+
+  .ring-mark {
+    inline-size: 64px;
+    block-size: 64px;
+  }
+
+  .ring-track {
+    stroke: var(--s2);
+    stroke-opacity: 1;
+  }
+
+  .ring-arc,
+  .ring-dot {
+    stroke: var(--ink);
+    stroke-opacity: 1;
+    background: var(--ink);
+  }
+
+  .ring[data-form='progress'] .ring-arc {
+    stroke: var(--ink2);
+  }
+
+  .ring-arc[data-step='1'],
+  .ring-dot[data-step='1'] {
+    stroke: var(--ink2);
+    background: var(--ink2);
+  }
+
+  .ring-arc[data-step='2'],
+  .ring-dot[data-step='2'] {
+    stroke: var(--dim);
+    background: var(--dim);
+  }
+
+  .ring-arc[data-step='3'],
+  .ring-dot[data-step='3'] {
+    stroke: var(--faint);
+    background: var(--faint);
+  }
+
+  .ring .ring-arc[data-intent],
+  .ring-item[data-intent] > .ring-dot {
+    stroke: var(--tone-fill);
+    background: var(--tone-fill);
+  }
+
+  /* A part with no number keeps its place in the legend, and its dot is an empty ring, as a split's is. */
+  .ring-dot:not([data-step]) {
+    background: none;
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+
+  .ring-figure {
+    color: var(--ink);
+    font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+
+  .ring-row,
+  .ring-legend {
+    display: grid;
+    flex: 1 1 12rem;
+    gap: var(--sp-1);
+    min-inline-size: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--t-sm);
+  }
+
+  .ring-item {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+  }
+
+  .ring-dot {
+    flex: none;
+    align-self: center;
+    inline-size: 7px;
+    block-size: 7px;
+    border-radius: var(--r-pill);
+  }
+
+  /* The dot already carries the intent, so the glyph keeps its name for a screen reader and draws nothing. */
+  .ring-item > .glyph {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .ring-label {
+    color: var(--ink2);
+  }
+
+  .ring-value,
+  .ring-target {
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+
+  .ring-of {
+    margin-inline: var(--sp-1);
+    color: var(--dim);
+  }
+
+  .ring-share,
+  .ring-note,
+  .ring-left,
+  .ring-empty {
+    color: var(--dim);
+  }
+
+  .ring-share,
+  .ring-left {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── heat: twelve weeks by weekday, four washes of the info role ──────────
+     The cells arrive week by week, Monday first, and flow down seven rows and across `--weeks` columns, so no cell
+     carries a position. A GAP AND A ZERO ARE NOT THE SAME DAY (`days.ts`): a day nobody wrote is an outline, a day
+     counted empty is the second surface, and a busy day is one of four washes of `--info` over the page, the last
+     the role itself. A day still to come is not drawn at all. Today is outlined in the ink. */
+  .block[data-kind='heat'] {
+    container-type: inline-size;
+  }
+
+  .heat {
+    display: grid;
+    gap: var(--sp-2);
+  }
+
+  .heat-grid {
+    display: grid;
+    grid-template-columns: repeat(var(--weeks), minmax(0, 1fr));
+    grid-template-rows: repeat(7, auto);
+    grid-auto-flow: column;
+    gap: var(--sp-1);
+    /* A wide slot would otherwise make each day a tile; past this the grid keeps its size and the slot keeps the rest. */
+    max-inline-size: calc(var(--weeks) * 1.5rem);
+  }
+
+  .heat-day {
+    aspect-ratio: 1;
+    border-radius: calc(var(--r-sm) / 3);
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+
+  .heat-day[data-future] {
+    box-shadow: none;
+  }
+
+  .heat-day[data-wash] {
+    box-shadow: none;
+  }
+
+  .heat-day[data-wash='0'] {
+    background: var(--s2);
+  }
+
+  .heat-day[data-wash='1'] {
+    background: color-mix(in srgb, var(--info) 25%, transparent);
+  }
+
+  .heat-day[data-wash='2'] {
+    background: color-mix(in srgb, var(--info) 50%, transparent);
+  }
+
+  .heat-day[data-wash='3'] {
+    background: color-mix(in srgb, var(--info) 75%, transparent);
+  }
+
+  .heat-day[data-wash='4'] {
+    background: var(--info);
+  }
+
+  .heat-day[data-today] {
+    outline: 1px solid var(--ink);
+    outline-offset: 1px;
+  }
+
+  /* The counted days are said again for a screen reader, as a split's parts are: the grid is one picture with one name. */
+  .heat-numbers {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .heat-empty,
+  .heat-skipped,
+  .heat-outside {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /* EIGHT WEEKS ON A PHONE, the last eight of the twelve: the first four columns are the first twenty-eight cells,
+     because the cells come week by week. The plan does not change, so a day keeps the wash the twelve weeks gave it. */
+  @container (inline-size < 30rem) {
+    .heat-grid {
+      --weeks: 8;
+    }
+
+    .heat-day:nth-child(-n + 28) {
+      display: none;
     }
   }
 

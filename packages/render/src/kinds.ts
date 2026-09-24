@@ -1,5 +1,5 @@
 /**
- * The eight primitives, the thirty-one kinds, and the four intent words.
+ * The eight primitives, the thirty-three kinds, and the four intent words.
  *
  * A block set is a SYSTEM, not a catalogue. Every kind draws from the same eight primitives and the
  * same tokens, and no kind introduces a colour, a font or a spacing value (05 §1).
@@ -147,7 +147,7 @@ export type KindSpec = {
 };
 
 /**
- * Thirty-one, counted. `diagram` is post-v1 and arrives as a
+ * Thirty-three, counted. `diagram` is post-v1 and arrives as a
  * pack, which is the whole reason the primitive layer exists (05 §2).
  *
  * The table is written `as const satisfies` so the KEYS derive the `Kind` union and every entry is
@@ -188,6 +188,13 @@ const TABLE = {
      line, with knobs where the host asks for them (`src/forecast.ts`). Page-only, because its rows are
      a walk the record computed. */
   forecast: { primitive: 'proportional', cells: 4, tone: false, pageOnly: true, minSpan: 8, purpose: 'figure' },
+  /* `label | value | target`: one row is progress toward the target, and two to five rows are the parts of a whole,
+     the third cell then a note (`src/ring.ts`). A 64px dial with the figure in its centre, so it sits beside a stat
+     in a third of a page. FIVE AND NO MORE, because a sixth arc is a sliver nobody can find by its step: the four
+     neutral steps already make a fifth part share the last, and past that the ring is a pie chart pretending to be
+     a gauge. A sixth row degrades as an arity, as a seventh `stat` does. `optional` lets a proportion written as
+     `3/5` or `60%` leave the target off and still take a tone word. */
+  ring: { primitive: 'proportional', cells: 3, optional: 1, tone: true, rows: 5, minSpan: 3, purpose: 'figure' },
 
   /* Rows — `spec` is the workhorse: 194 of 7,138 rendered lines in the predecessor's census, and
      no writing guide said so (05 §7.4). */
@@ -212,6 +219,12 @@ const TABLE = {
   steps: { primitive: 'list', cells: 3, tone: false, ordered: true, minSpan: 4, purpose: 'plan' },
   timeline: { primitive: 'list', cells: 3, tone: true, minSpan: 4, purpose: 'plan' },
   board: { primitive: 'grid', cells: 3, tone: false, minSpan: 6, purpose: 'plan' },
+  /* `day | value`: twelve weeks by weekday ending on this one, each day washed by how busy it was (`src/heat.ts`,
+     over `src/days.ts`'s grid). On `grid`, because a day is a cell to read and point at and not a magnitude along a
+     track, and a drawer that does not know the kind yet falls back to the grid's label and figure, which reads as the
+     day and its count. The value may be left off, and a row with none is one of something, as a register's row on a
+     day is. No tone: the wash is the reading, and a tone on one day would be a fifth colour in a scale of four. */
+  heat: { primitive: 'grid', cells: 2, optional: 1, tone: false, minSpan: 4, purpose: 'figure' },
   /* `title | by | effort`: a task as a bar ending on its due day, as long as its effort in days, and a task
      with no effort as a dated stem (`src/roadmap.ts`). On `list`, because the README has called a roadmap
      a list with dates since the primitive table was written, and because a drawer that does not know the

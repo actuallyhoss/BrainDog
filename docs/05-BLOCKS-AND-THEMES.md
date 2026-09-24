@@ -67,21 +67,21 @@ an agent gets it right first time because there is nothing to nest. The row shap
 strong, em, code spans and links; a blockquote, a table, an image or raw HTML is text
 ([36-SPEC-RENDER](36-SPEC-RENDER.md) §13 D12).
 
-### Kinds, thirty-one
+### Kinds, thirty-three
 
 | Group | Kinds |
 |---|---|
 | Prose and emphasis | `note` · `quote` |
-| Figures | `stat` (with a `lead` form) · `bar` · `gauge` · `chips` · `sparkline` · `split` · `bridge` · `series` (with a `net` form) · `lines`, a measure over time with the period before it dashed beside it · `progress` (with a `budget` form), one track a row filled toward a target (typed on the row, or `toward:` a figure of what was logged against it), or spending against a limit (`spent:`, in the limit's currency or refused `MIXED_CURRENCY`) with the overspend marked · `forecast`, a cash walk as a line, **page-only** |
+| Figures | `stat` (with a `lead` form) · `bar` · `gauge` · `chips` · `sparkline` · `split` · `bridge` · `series` (with a `net` form) · `lines`, a measure over time with the period before it dashed beside it · `progress` (with a `budget` form), one track a row filled toward a target (typed on the row, or `toward:` a figure of what was logged against it), or spending against a limit (`spent:`, in the limit's currency or refused `MIXED_CURRENCY`) with the overspend marked · `forecast`, a cash walk as a line, **page-only** · `ring`, a 64px dial with its figure in the centre, one row toward a target or two to five parts of a whole · `heat`, twelve weeks by weekday, each day washed by how busy it was, today outlined |
 | Rows | `spec` · `params` |
 | Work | `todo` · `steps` · `timeline` · `board` · `roadmap`, dated work on one time axis: a task with an effort is a bar ending on its due day, one with none a dated stem, overlapping windows packed into tracks, over month bands and today's line |
 | Technical | `code` (annotated) · `tree` · `comparison` · `diff`, how a text changed from one version to the next, before and after |
 | Register-bound | `table` — rows from a `source:` register with declared `columns:`; bound to a register rather than to authored rows, and **page-only** |
 | Page-bound | `cards` — one card per row of a `source:` register, each column given a role by `as:`; `section` — a heading for the blocks after it, with a count and `fold:`; `feed`, what agents, rules and you did since you last looked, grouped by who did it; `agents`, what each agent did, one group per agent; `queue`, what is waiting on you — one card per open question, who opened it, why, what it would cost to get wrong, and the ways to answer it, dearest to get wrong first, the recommendation a label beside its option and never a selection; `capture`, the one-line add, a field whose Add appears inside its edge once there is text, writing into `register:` with what its `where:` pins, and drawn only where the host can write. All six **page-only** |
 
-Thirty-one, counted: the sixteen of v1, the four kinds of the agent path
+Thirty-three, counted: the sixteen of v1, the four kinds of the agent path
 (`loop/research-agent-path.md` steps 20 and 21), `sparkline`, `split` and `bridge` (`loop/research-modules.md` S9 and S10), `series` and `forecast` (S13 and S11), `agents` (`loop/research-spark.md`, Team board's Agent work page), `lines` (the Solo founder's dashboards), `progress` (the Personal use case's savings goals, goals and budget), `queue` (`loop/research-modules.md` S21, the
-Decide shape as a block any page may carry), `capture` (S16, the add line Work leads with) and `roadmap` (S17, Work's plan on a time axis), which sit on existing primitives so
+Decide shape as a block any page may carry), `capture` (S16, the add line Work leads with), `roadmap` (S17, Work's plan on a time axis), `heat` (S18) and `ring` (S30, the dial `cards` already drew inside a card), which sit on existing primitives so
 `PRIMITIVES_VERSION` does not move. *An earlier draft counted fifteen and left `table` out while every declared page in the
 corpus used it.* `diagram` — a **constrained shape set** of boxes, arrows and lanes, never
 arbitrary SVG — is **post-v1**, and everything after it
@@ -109,6 +109,7 @@ The EBNF is [34-GRAMMARS](34-GRAMMARS.md) §2. This is what an author needs of i
 | `forecast` | page-only. mark \| day \| label \| amount, the mark one of `opening` (today, what the figure is called, the balance; once), `past` (a remembered daily balance before today), `step` (a signed movement), `horizon` (days walked, in the day cell) and `knobs` (any of `horizon late spend leave`, in the day cell). The remembered balance solid and the walk dashed in the accent, a zero rule always in view, stems from it for every movement worth a twentieth of the range (up in `earn`, down neutral), the first day under zero as a warn dot with its date, the lowest point as a dim dot, a sentence over the chart and every movement in a fold. With `RenderOptions.scenario` the Svelte drawer adds the knobs (horizon 3, 6 or 12 months within the walk; clients paying late by 0 to 60 days; spending the record does not know, 0 to 5,000 a month; leaving out the five heaviest movements) and a scrub, in memory only, with the untouched walk drawn faint beside it. No opening row, a sentence |
 | `bar` | label \| number \| note \| *tone* |
 | `gauge` | label \| value \| target \| *tone* |
+| `ring` | label \| value \| *target* \| *tone*, one to five rows. One row is progress: the arc is the value's share of the target, read as `progress` reads a goal, with the share in the centre and what is left beside it; a value written `3/5` or `60%` needs no target. Two to five rows are parts, the third cell a note: arcs end to end in `split`'s four neutral steps (a toned row in its intent), the whole in the centre when every part is in one unit and nothing there when they are not, and a legend of dots with each figure and share. A sixth row degrades under `DIALECT_ARITY`. A value that does not read draws no ring at all, only the words, because an empty dial reads as zero |
 | `chips` | glyph \| figure \| word \| *tone* — one row is one run |
 | `spec` | label \| value \| note |
 | `params` | label \| value \| note |
@@ -116,6 +117,7 @@ The EBNF is [34-GRAMMARS](34-GRAMMARS.md) §2. This is what an author needs of i
 | `steps` | title \| detail \| state |
 | `timeline` | date \| title \| detail \| *tone* |
 | `board` | column \| title \| detail |
+| `heat` | day \| *value*. `day` is `YYYY-MM-DD`; a row with no value counts one, and rows on one day are added. Twelve weeks by weekday, Monday first, ending on the week that holds today: a day nobody wrote is a gap, a day counted empty a zero, a busy one of four washes of `--info` against the busiest day in view, today outlined, a day still to come not drawn. Eight weeks on a phone, the last eight, washed as the twelve were. A row whose day or value does not read is named under the grid; one dated outside the weeks is counted and said, never placed. The counted days are said again as a table; nothing in view, a sentence |
 | `roadmap` | title \| by \| *effort* \| *tone*. `by` is the due day, `2026-10-05`, or `5 Oct 2026` as a page writes a day; `effort` is days, `3`, `1.5 d` or `3d`, rounded up to whole days. A row with an effort is a bar that many days long ending on `by`, and a row with none, or `0`, is a stem on its day. A row whose day or effort does not read is named under the drawing and never placed. Bound to a register, the block's `columns:` name the three fields: `[{ field: what }, { field: by }, { field: effort }]` on Tasks. Every placed row is said again as a table; with nothing dated, a sentence |
 | `code` | heading = the language; rows verbatim, not split |
 | `tree` | indentation-significant, two spaces per level; rows not split |

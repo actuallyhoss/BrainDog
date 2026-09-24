@@ -103,6 +103,13 @@ const SHAPES: Readonly<Record<string, { rows: string[][] }>> = {
      title into an attribute's neighbourhood, were never built (measured before this row was added). The
      third row stays generic, so the skipped line is still swept too. */
   roadmap: { rows: [[HOSTILE, '2026-09-10', '5'], [HOSTILE, '2026-09-20'], [HOSTILE, HOSTILE, HOSTILE]] },
+  /* A RING'S PARTS HAVE TO BE NUMBERS OR IT DRAWS NO RING. Under the generic row every value is `HOSTILE`, so the
+     block drew its legend as words and never built the dial, whose accessible name is the one place a label is
+     written into an attribute. Two parts with numbers draw it; the note cell stays hostile. */
+  ring: { rows: [[HOSTILE, '3', HOSTILE], [HOSTILE, '5']] },
+  /* A HEAT GRID IS DRAWN ONLY AROUND A DAY IN ITS TWELVE WEEKS, and the sweep renders with this machine's clock,
+     so the first row is today. The second stays generic, which is the row named under the grid as unread. */
+  heat: { rows: [[new Date().toISOString().slice(0, 10), '3'], [HOSTILE, HOSTILE]] },
 };
 
 /** `table` is bound to a register rather than to authored rows, so it has no fence to be hostile in. */
@@ -142,7 +149,7 @@ test('NO CELL BECOMES MARKUP, on any of the kinds there are', () => {
   /* The count is the guard on the guard: a kind quietly dropped from the loop is a kind nobody
      sweeps, and the number in the comment above would go on reading as though it had been. */
   assert.equal(drew, Object.keys(KINDS).length - NO_FENCE.size);
-  assert.equal(drew, 30);
+  assert.equal(drew, 32);
 });
 
 /** A resolved `{{path}}` is a value the host handed back, and a value is never markup either. */

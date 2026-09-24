@@ -1,5 +1,6 @@
 <!--
-  `grid` — n cells of label and figure, row-aligned. Kinds: `stat`, `board`.
+  `grid` — n cells of label and figure, row-aligned. Kinds: `stat`, `board`, and `cards` and `heat`, which have
+  a drawer of their own (`Cards.svelte`, `p/Heat.svelte`).
 
   `--cells` is set from the DECLARATION, never inferred from the space available. A three-tile stat
   in a 962px column once drew seven auto-fit tracks, four of them holding nothing but the block's
@@ -18,6 +19,7 @@
   import { valueWord } from '../../src/format.ts';
   import Text from '../Text.svelte';
   import Cards from '../Cards.svelte';
+  import Heat from './Heat.svelte';
   import Trend from '../Trend.svelte';
 
   let {
@@ -268,6 +270,8 @@
 
 {#if block.kind === 'cards'}
   <Cards {block} {opts} />
+{:else if block.kind === 'heat'}
+  <Heat {block} {opts} />
 {:else if block.kind === 'board'}
   <!--
     HTML DRAG AND DROP, NOT POINTER EVENTS. The gesture is the platform's: it brings its own drag

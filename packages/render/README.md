@@ -57,7 +57,7 @@ a theme swap can never break a page, and an agent can never make a page ugly.
 
 ---
 
-## Thirty-one kinds over eight primitives
+## Thirty-three kinds over eight primitives
 
 Kinds are declarations over primitives, so primitives compose and kinds do not have to. `cards`,
 `section` and `feed` are page-only: a page's evaluator writes their rows and passes
@@ -70,9 +70,9 @@ and never a disabled field.
 | Primitive | Is | Kinds |
 |---|---|---|
 | `panel` | a bounded region with a tone and a nested document | `note` `quote` `section` `capture` |
-| `grid` | *n* cells of label and figure | `stat` `board` `cards` |
+| `grid` | *n* cells of label and figure | `stat` `board` `cards` `heat` |
 | `rows` | label · value · note, one per line | `spec` `params` |
-| `proportional` | rows whose number drives a drawn magnitude | `bar` `gauge` `sparkline` `split` `bridge` `series` `lines` `progress` `forecast` |
+| `proportional` | rows whose number drives a drawn magnitude | `bar` `gauge` `sparkline` `split` `bridge` `series` `lines` `progress` `forecast` `ring` |
 | `inline` | a run of pills | `chips` |
 | `list` | title · detail · optional state marker; on a `todo`, up to two more facts as one quiet line under the title | `todo` `steps` `timeline` `feed` `agents` `queue` `roadmap` |
 | `table` | real columns, a header, per-column alignment | `comparison` `table` |
@@ -91,12 +91,23 @@ row with none is a dated stem. A row whose date or effort does not read is named
 Each mark carries `currentColor` presentation attributes, so a host with no `roadmap-` rules still draws it
 quietly rather than black, and any rule the host does write wins over them.
 
+A `ring` is one to five rows of `label | value | target`. One row is progress toward the target, read by the
+same plan `progress` uses, so the two never disagree about how far along a goal is; `3/5` or `60%` needs no
+target. Two to five rows are the parts of a whole, the third cell a note, cut as `split` cuts its track. A value
+that does not read draws no dial, only the words, because an empty dial in a 64px square reads as zero. Its
+circles carry `currentColor` presentation attributes, as a roadmap's marks do.
+
+A `heat` row is `day | value`, the value one when left off and rows on one day added. The grid is twelve weeks
+by weekday ending on the week of `RenderOptions.now`, the cells written week by week, Monday first, with no
+position of their own: the host flows them into seven rows and `--weeks` columns, and on a phone hides the first
+four weeks. A day nobody wrote is a gap and never a zero, and a day still to come carries `data-future` and no wash.
+
 A board is a **grid of lists**. A roadmap is a **list with dates**. A risk matrix is a **grid of
 inlines**. Which is why a third party can add a kind without asking a designer: a kind is not code,
 it is a named composition of primitives shipped as data, and `PRIMITIVES_VERSION` is the integer a
 consumer checks.
 
-**The primitive set is the real API surface.** Eight is reviewable; thirty-one kinds plus unbounded
+**The primitive set is the real API surface.** Eight is reviewable; thirty-three kinds plus unbounded
 third-party kinds is not. Adding a primitive is easy; renaming or removing one breaks every pack ever
 written, so ship fewer than you think you need.
 

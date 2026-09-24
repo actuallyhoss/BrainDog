@@ -20,11 +20,24 @@ const NOW = Date.UTC(2026, 8, 3, 12); // 2026-09-03
    always has: the number below moves when a kind lands, and the words beside it do not. So the count
    lives in one place now, and the title says what the test is for rather than how many there are. */
 test('every kind sits on a primitive that exists, and a new one is a deliberate edit here', () => {
-  assert.equal(Object.keys(KINDS).length, 31);
+  assert.equal(Object.keys(KINDS).length, 33);
   assert.equal(PRIMITIVES.length, 8);
   assert.equal(PRIMITIVES_VERSION, 1);
   for (const [kind, spec] of Object.entries(KINDS))
     assert.ok(PRIMITIVES.includes(spec.primitive), `${kind} names ${spec.primitive}, which is not a primitive`);
+});
+
+/* A RING AND A HEAT GRID ARE KINDS NOW, and until they were a fence naming either was refused as a word the
+   dialect did not know: `DIALECT_KIND_UNKNOWN`, the author's rows echoed back in a `<pre>` (measured before
+   `kinds.ts` held them). Both sit on primitives that already exist, so the version does not move. */
+test('a ring fence and a heat fence answer their kind, on the primitives they draw with', () => {
+  const [ring] = parse('```ring | Saved\nHoliday | 1200 | 3000\n```');
+  assert.equal(ring?.type, 'block', ring?.type === 'degraded' ? ring.fix : '');
+  assert.equal(ring?.type === 'block' && ring.kind, 'ring');
+  const [heat] = parse('```heat | Done\n2026-09-14 | 3\n```');
+  assert.equal(heat?.type === 'block' && heat.kind, 'heat');
+  assert.equal(KINDS.ring.primitive, 'proportional');
+  assert.equal(KINDS.heat.primitive, 'grid');
 });
 
 test('every primitive is reachable from at least one kind', () => {
@@ -292,7 +305,7 @@ test('A CAPITALISED KIND IS TOLD ABOUT ITS CAPITAL, NOT TOLD IT WROTE NO KIND', 
 
   // And the three sentences that were already right stay right: a word that is not a kind in any
   // case, a fence with no kind at all, and a kind that is spelled correctly and page-bound.
-  assert.match(fixFor('```Reactor | H\nA\n```'), /is not one of the thirty-one kinds/u);
+  assert.match(fixFor('```Reactor | H\nA\n```'), /is not one of the thirty-three kinds/u);
   assert.equal(fixFor('```\nA\n```'), 'A fence with no kind is shown as you wrote it.');
   assert.match(fixFor('```table | Open\n```'), /draws a register on a page/u);
 });

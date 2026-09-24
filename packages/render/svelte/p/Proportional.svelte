@@ -1,6 +1,7 @@
 <!--
   `proportional` — rows whose number drives a drawn magnitude. Kinds: `bar`, `gauge`, `sparkline`,
-  and `split` and `bridge`, which have a drawer of their own (`Split.svelte`, `Bridge.svelte`).
+  and `split`, `bridge` and `ring`, which have a drawer of their own (`Split.svelte`, `Bridge.svelte`,
+  `p/Ring.svelte`).
 
   A `sparkline` row is a label, a small line in the quiet ink ending in a dot, and the figure it ends
   at. Fewer than two points draw no line, and the figure is still said.
@@ -24,6 +25,7 @@
   import Lines from '../Lines.svelte';
   import Progress from '../Progress.svelte';
   import Forecast from '../Forecast.svelte';
+  import Ring from './Ring.svelte';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
 
@@ -70,6 +72,8 @@
   <Progress {block} {opts} />
 {:else if block.kind === 'forecast'}
   <Forecast {block} {opts} />
+{:else if block.kind === 'ring'}
+  <Ring {block} {opts} />
 {:else}
 <div class="prop">
   {#if block.kind === 'sparkline'}

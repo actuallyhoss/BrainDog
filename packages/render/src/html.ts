@@ -13,7 +13,7 @@
  * ONE escape function, used on every value, and the only inline `style` values in the output are
  * custom properties holding numbers this file formats itself, never a colour or a length. This said
  * three of them, `--cells`, `--magnitude` and `--at`, long after `--chars`, `--cols`, `--fill` and
- * `--limit` had joined; `roadmap` adds `--tracks`, `--track`, `--lines` and `--line`.
+ * `--limit` had joined; `roadmap` adds `--tracks`, `--track`, `--lines` and `--line`, and `heat` adds `--weeks`.
  */
 
 import { KINDS, SPARKLINE_POINT, TONES, type Kind } from './kinds.ts';
@@ -36,6 +36,8 @@ import { figureLike } from './figure.ts';
 import { FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastModel, forecastPlan, scenario, underNote } from './forecast.ts';
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
 import { ROADMAP_DUE, ROADMAP_FROM, ROADMAP_NONE, ROADMAP_PAINT, ROADMAP_WHAT, roadmapLane, roadmapLines, roadmapPlan, roadmapRow, roadmapSentence, roadmapShare, roadmapSkipped, roadmapToday } from './roadmap.ts';
+import { RING_NONE, RING_OF, RING_PAINT, RING_STEP_OPACITY, ringPlan } from './ring.ts';
+import { HEAT_DAY, HEAT_NONE, HEAT_VALUE, heatLines, heatOutside, heatPlan, heatSkipped, heatTitle } from './heat.ts';
 import type { Block, Degraded, Markdown, Row, Segment } from './parse.ts';
 
 export type RenderOptions = InlineOptions & {
@@ -253,6 +255,7 @@ function numbersFold(kind: string, heads: readonly string[], rows: readonly (rea
 
 function grid(b: Block, o: RenderOptions): string {
   if (b.kind === 'cards') return cards(b, o);
+  if (b.kind === 'heat') return heat(b, o);
   if (b.kind === 'board') {
     const columns = [...new Set(b.rows.map((r) => r.cells[0] ?? ''))];
     const body = columns
@@ -342,6 +345,7 @@ function proportional(b: Block, o: RenderOptions): string {
   if (b.kind === 'lines') return lines(b, o);
   if (b.kind === 'progress') return progress(b, o);
   if (b.kind === 'forecast') return forecast(b, o);
+  if (b.kind === 'ring') return ring(b, o);
 
   if (b.kind === 'gauge') {
     const r = b.rows[0] ?? { cells: [] };
@@ -1048,6 +1052,94 @@ function roadmap(b: Block, o: RenderOptions): string {
     .join('')}</tbody></table></div>`;
 
   return `<div class="roadmap" style="--tracks:${plan.tracks};--lines:${plan.lines}"><div class="roadmap-plot">${chart}${names}</div>${months}${table}${skipped}</div>`;
+}
+
+/**
+ * `ring`: a small dial with its figure in the centre, beside the rows as words (`src/ring.ts`). One row is progress
+ * toward a target and says its value of the target and what is left; two to five are parts, said as a legend of dots
+ * in the arcs' steps, as `split` says its parts. `svelte/p/Ring.svelte` draws this same tree (`ring.test.ts`).
+ *
+ * THE CENTRE FIGURE IS HIDDEN FROM A SCREEN READER, because the dial's own name already says it and the words
+ * beside the dial say every figure again; heard three times it would be noise. A row whose value does not read
+ * draws no dial at all, and the words stay.
+ */
+function ring(b: Block, o: RenderOptions): string {
+  const said = (r: Row, i: number): string => plain(inline(r.cells[i] ?? '', o));
+  const drawn = (v: string | undefined): string => renderInline(inline(v ?? '', o), o);
+  const plan = ringPlan(b.rows.map((r) => ({ label: said(r, 0), value: said(r, 1), third: said(r, 2), ...(r.tone ? { tone: r.tone } : {}) })));
+  if (plan.empty) return `<div class="prop ring"><p class="ring-empty">${escape(RING_NONE)}</p></div>`;
+
+  const paint = (p: Readonly<Record<string, string>>): string =>
+    Object.entries(p)
+      .map(([k, v]) => ` ${k}="${v}"`)
+      .join('');
+  const circle = (cls: string, attrs: string): string => `<circle class="${cls}"${attrs} cx="18" cy="18" r="16" pathLength="100"></circle>`;
+  const dial = plan.ring
+    ? `<div class="ring-dial"><svg class="ring-mark" viewBox="0 0 36 36" role="img" aria-label="${escape(plan.name)}">${circle('ring-track', paint(RING_PAINT.track))}${plan.arcs
+        .map((a) =>
+          circle(
+            'ring-arc',
+            ` data-step="${a.step}"${toneAttrs(a.tone)}${paint(RING_PAINT.arc)} stroke-opacity="${RING_STEP_OPACITY[a.step]}" stroke-dasharray="${a.dash}" stroke-dashoffset="${a.offset}" transform="rotate(-90 18 18)"`,
+          ),
+        )
+        .join('')}</svg>${plan.centre ? `<span class="ring-figure num" aria-hidden="true">${escape(plan.centre)}</span>` : ''}</div>`
+    : '';
+
+  if (plan.form === 'progress') {
+    const r = b.rows[0]!;
+    const target = r.cells[2] ? `<span class="ring-of">${RING_OF}</span><span class="ring-target">${drawn(r.cells[2])}</span>` : '';
+    return `<div class="prop ring" data-form="progress">${dial}<div class="ring-row"${toneAttrs(plan.intent)}><span class="ring-label">${drawn(r.cells[0])}</span><span class="ring-figures num"><span class="ring-value">${drawn(r.cells[1] || MISSING)}</span>${target}</span>${
+      plan.left ? `<span class="ring-left num">${escape(plan.left)}</span>` : ''
+    }${toneGlyph(plan.intent)}</div></div>`;
+  }
+
+  const legend = `<ul class="ring-legend">${b.rows
+    .map((r, i) => {
+      const arc = plan.arcs.find((a) => a.row === i);
+      const share = plan.shares[i];
+      return `<li class="ring-item"${toneAttrs(r.tone)}><span class="ring-dot"${arc ? ` data-step="${arc.step}"` : ''} aria-hidden="true"></span><span class="ring-label">${drawn(r.cells[0])}</span><span class="ring-value num">${drawn(r.cells[1] || MISSING)}</span>${
+        share ? `<span class="ring-share num">${escape(share)}</span>` : ''
+      }${r.cells[2] ? `<span class="ring-note">${drawn(r.cells[2])}</span>` : ''}${toneGlyph(r.tone)}</li>`;
+    })
+    .join('')}</ul>`;
+  return `<div class="prop ring" data-form="parts">${dial}${legend}</div>`;
+}
+
+/**
+ * `heat`: twelve weeks by weekday, each day a cell washed by how busy it was (`src/heat.ts` over `src/days.ts`).
+ * The cells come week by week, Monday first, and the host's stylesheet flows them into seven rows, so no cell
+ * carries its own position; `--weeks` is how many columns there are. `svelte/p/Heat.svelte` is this function's twin.
+ *
+ * THE GRID IS ONE PICTURE WITH ONE NAME, and each day says its date and count only as a hover: eighty-four named
+ * cells would be eighty-four stops for a screen reader to walk through to learn one sentence. The counted days are
+ * said again as a table under it, which is what that reader reads, as every other chart here does.
+ */
+function heat(b: Block, o: RenderOptions): string {
+  const said = (r: Row, i: number): string => plain(inline(r.cells[i] ?? '', o));
+  const plan = heatPlan(
+    b.rows.map((r) => ({ day: said(r, 0), value: said(r, 1) })),
+    roadmapToday(o.now),
+  );
+  const skipped = plan.skipped.length
+    ? `<p class="heat-skipped">${escape(heatSkipped(plan.skipped.map((i) => said(b.rows[i]!, 0) || MISSING)))}</p>`
+    : '';
+  const outside = plan.outside ? `<p class="heat-outside">${escape(heatOutside(plan.outside))}</p>` : '';
+  if (plan.empty) return `<div class="heat"><p class="heat-empty">${escape(HEAT_NONE)}</p>${skipped}${outside}</div>`;
+
+  const cells = plan.cells
+    .map((c) => {
+      const title = heatTitle(c);
+      return `<span class="heat-day"${c.today ? ' data-today=""' : ''}${c.future ? ' data-future=""' : ''}${c.wash === null ? '' : ` data-wash="${c.wash}"`}${
+        title === null ? '' : ` title="${escape(title)}"`
+      }></span>`;
+    })
+    .join('');
+  const table = numbersFold(
+    'heat',
+    [HEAT_DAY, HEAT_VALUE],
+    heatLines(plan).map((l) => [l.day, l.count]),
+  );
+  return `<div class="heat" style="--weeks:${plan.weeks}"><div class="heat-grid" role="img" aria-label="${escape(plan.name)}">${cells}</div>${table}${skipped}${outside}</div>`;
 }
 
 const PRIMITIVE_RENDERERS ={ panel, grid, rows, proportional, inline: inlinePrimitive, list, table, media } as const;

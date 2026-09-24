@@ -558,7 +558,7 @@ function metricFieldFault(id: string, source: unknown, value: unknown, groupBy: 
 const BLOCK_KINDS = [
   'note', 'quote', 'stat', 'bar', 'gauge', 'chips', 'spec', 'params',
   'todo', 'steps', 'timeline', 'board', 'code', 'tree', 'comparison', 'table', 'cards', 'section', 'feed', 'diff',
-  'sparkline', 'split', 'bridge', 'series', 'forecast', 'agents', 'lines', 'progress', 'queue', 'capture', 'roadmap',
+  'sparkline', 'split', 'bridge', 'series', 'forecast', 'agents', 'lines', 'progress', 'queue', 'capture', 'roadmap', 'ring', 'heat',
 ] as const;
 
 /** A register id as a block names one on its own, with no `register.` in front: the half `SOURCE` checks after the dot. */
