@@ -277,6 +277,13 @@ const DECLARED: Record<string, Version> = {
   /**
    * A MINOR STEP AFTER THE FIRST MAJOR ONE, because a field is added and nothing is taken away. The ids are 2.0.0's
    * exactly; what moved is inside `register.transactions`, which the ids cannot see and the reason below has to.
+   *
+   * THE SECOND LINE BELOW IS WRONG, AND IT STAYS because a history is appended to and never edited. 2.1.0 shipped with
+   * the deploy of `bab716a5` at 23:27 UTC on 23 September (`gh run list --workflow deploy.yml`, read on the 24th), and
+   * that tree declared `99fe861644707f24`, the first line's value. `baf7048a` added `pairs:` eleven minutes later and read
+   * the deploy before that one as the last. So a record on 2.1.0 holds `99fe861644707f24`, `f10e802c80863429` is a
+   * label no deploy ever carried, and `pairs:` is 2.2.0's. Setting `declares` back is refused here, since a value may not
+   * be listed twice.
    */
   'money-core@2.1.0': {
     holds: `
@@ -296,6 +303,29 @@ const DECLARED: Record<string, Version> = {
     history: [
       '`register.transactions` gains `available`, what the bank said was left after a movement, so the limit a card alert prints can tell a second charge of the same amount from the same alert sent twice -> 99fe861644707f24',
       'Still before any release, the last successful deploy being `19d4c785` at 15:07 UTC on 23 September: `register.transactions` declares `pairs:`, so the record marks both cleared legs of a move between two accounts as `transfer` rather than counting it once as spent and once as received, and a void or pending row pairs with nothing -> f10e802c80863429',
+    ],
+  },
+  /**
+   * A VERSION AND NOT A RESET, because 2.1.0 shipped with `bab716a5` (above). The ids are 2.1.0's exactly: `pairs:` is
+   * inside `register.transactions`, where the ids cannot see it.
+   */
+  'money-core@2.2.0': {
+    holds: `
+      ingest.bank-card-in ingest.bank-card-in-sms ingest.bank-card-out ingest.bank-card-out-sms
+      metric.cash-accounts metric.cash-as-of metric.cash-now metric.days-late-in metric.due-30d metric.every-month-by-category
+      metric.every-month-in metric.every-month-out metric.in-30d metric.in-by-month metric.in-due-by-month metric.installments-due-30d
+      metric.installments-left metric.late-in metric.out-30d metric.out-by-month metric.out-due-by-month metric.overdue
+      metric.owed-by-you metric.owed-to-you metric.project-owed metric.received-30d metric.spent-30d metric.txn-uncategorised
+      page.home page.ledger page.money
+      register.accounts register.categories register.fx register.installments register.obligations register.recurring
+      register.snapshots register.transactions
+      rule.cash-stale rule.installment-due-soon rule.invoice-late rule.recurring-ended rule.recurring-missed rule.txn-categorise
+      setting.home_currency setting.most_days_late setting.most_due_30d setting.most_on_one_category setting.most_out_30d
+      setting.most_out_every_month setting.most_owed_to_you
+    `,
+    declares: '4640c85c0ef44586',
+    history: [
+      '`register.transactions` declares `pairs:`, the move `baf7048a` put under the shipped 2.1.0: both cleared legs of a move between two accounts are marked `transfer`, and a leg naming who it was with (`party`) or the obligation it paid (`settles`) pairs with nothing, so rent and a client paying the same sum a day later stay in Spent and Received (audit sixty-one, M4 and M5) -> 4640c85c0ef44586',
     ],
   },
   'work@1.1.0': { declares: 'b49e051fe7c26ac5' },
@@ -351,6 +381,26 @@ const DECLARED: Record<string, Version> = {
          not behind it. Every deploy since was skipped. */
       'Still before any release: `page.work` gains a seventh list, No due day, `state is open or doing, agent is empty, by is empty`, because a task of yours with no due day was under none of the six and `by is empty or after +7d` is refused. Done lately goes back to the full width to make room -> bc6a8f4d4c3319ab',
       'Still before any release, since every deploy since 1.6.0 was skipped: Waiting on you on `page.work` declares `what, note, by, changed`, so a todo row carries its due day and who changed it last as the third and fourth cells `c6e2a331` widened the kind to (`loop/research-batch-twenty-eight-audit.md` finding 3) -> 1e1996952c4dce03',
+    ],
+  },
+  'work@1.7.0': {
+    holds: `
+      metric.open-tasks metric.project-done-7d metric.project-due-soon metric.project-in-review metric.project-open
+      metric.tasks-done-7d metric.tasks-done-7d-agents metric.tasks-done-by-week metric.tasks-due-7d metric.tasks-due-by-week
+      metric.tasks-later metric.tasks-overdue metric.tasks-waiting metric.tasks-with-agents
+      page.work page.work-board
+      register.tasks register.tracks register.updates
+    `,
+    declares: 'ea8dd09cbe41f705',
+    history: [
+      '`register.updates` opens `by` from a closed list of four vendors to text, a widening, so an update by any author lands -> ea8dd09cbe41f705',
+    ],
+  },
+  'people@2.0.0': {
+    holds: ` page.people register.people `,
+    declares: 'a197d208773e19c1',
+    history: [
+      'Raised a major step because `register.people` stops offering `registrar` on `role`; a record whose rows hold it keeps it as its own value -> a197d208773e19c1',
     ],
   },
   'estate@1.1.0': {

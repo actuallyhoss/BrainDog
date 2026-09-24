@@ -640,6 +640,35 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
      * `done:` is not the answer, since it holds `void` too. THE TREE AND NOT THE SENTENCE, because the kernel matches it
      * on every write and takes it only in that form (`pairs.ts`, `pairsFault`). When a pending credit clears, the update
      * is looked at again and it pairs then.
+     *
+     * `party is empty` AND `settles is empty`, BECAUSE A MOVE BETWEEN YOUR OWN ACCOUNTS HAS NOBODY ON THE OTHER SIDE AND
+     * DISCHARGES NO PROMISE. Without them a coincidence of amount was a transfer: rent out of CIB and a client paying the
+     * same EGP 15,000.00 into HSBC a day later both left Spent and Received, and so did a friend's InstaPay repaying a
+     * dinner and a refund landing on another account (`loop/research-batch-sixty-one-audit.md` findings 1 and 6, M4 and
+     * M5). A row that names who it was with, or the obligation it paid, is a payment to or from somebody, and one such leg
+     * keeps the pair apart. Both are fields the kernel reads again on an update, so naming Omar on a repayment the record
+     * had paired undoes the pair (`test/money-pairs.test.ts`).
+     *
+     * NOT `category is empty`, which the audit proposed. the old tool's ledger, read on 24 September through the route his
+     * import reads, files both legs of both his real moves since 13 July under a category called Transfers (EGP 63,313.46
+     * on 2 August, EGP 48,000.27 on 24 and 25 August), and the import carries the category over, so that clause would
+     * have unpaired every move he has. "A category whose direction is `both`" is what a category could say, and it needs
+     * a hop through the ref that `where` refuses (`via`, `packages/where/src/index.ts`). On that ledger the declaration
+     * as it was paired those two moves and nothing else, so what this adds is a way for a person to say no, not a change
+     * to what his import pairs tonight.
+     *
+     * WHAT STILL PAIRS WRONGLY: two rows that name nobody, whose amounts agree. His import never writes `party` (the payee
+     * goes into the note) and a bank text never does, and his real moves read "Internet Banking Transfer" and "IPN
+     * outward transfer to ..." while a friend's repayment reads "IPN inward transfer from ...", so no field this register
+     * holds, the description included, tells the rent and the client from a move until a person names one side. That
+     * is the M4 and M5 rows as the audit wrote them, and the M5 test holds the bare dinner and repayment paired on
+     * purpose, so the day that changes is seen. `within` stays 4d: the coincidences measured sit one and two days apart, his card is paid off with the
+     * card's leg a day before the bank's, and a window short enough to part M4 would lose that move and any sent before
+     * a weekend.
+     *
+     * WHAT CANNOT PAIR: a move between currencies, his most common one (dollars out of Payoneer, pounds into CIB, finding
+     * 5, M3). `abs(amount)` compares the currency as well as the size, and nothing in `pairs:` can say "the same value at
+     * the day's rate", so both legs are counted until a person marks them.
      */
     pairs: {
       on: ['abs(amount)'],
@@ -647,7 +676,13 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
       across: 'account',
       within: '4d',
       mark: 'transfer',
-      where: { field: 'state', is: 'cleared' },
+      where: {
+        all: [
+          { field: 'state', is: 'cleared' },
+          { field: 'party', empty: true },
+          { field: 'settles', empty: true },
+        ],
+      },
     },
     fields: [
       { id: 'what', label: 'Description', type: 'text', required: true, search: true },

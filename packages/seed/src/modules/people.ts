@@ -14,7 +14,7 @@ export const PEOPLE: Fields[] = [
   { name: 'Ravensworth Ltd', role: 'client', rate: null, email: 'accounts@ravensworth.example', note: '' },
   { name: 'J. Okonkwo', role: 'contractor', rate: gbp(45_000), email: 'jo@okonkwo.example', note: 'Illustration, invoices monthly', handles: ['git:jokonkwo'], met: ['2026-08-20 · commit 3f2a91c in kiln-site'] },
   { name: 'Pell & Vine', role: 'accountant', rate: null, email: 'hello@pellvine.example', note: 'Year end is 31 March' },
-  { name: 'Nordhaven Registry', role: 'registrar', rate: null, email: 'support@nordhaven.example', note: '' },
+  { name: 'Nordhaven Registry', role: 'other', rate: null, email: 'support@nordhaven.example', note: '' },
   { name: 'S. Marchetti', role: 'contractor', rate: gbp(62_000), email: 'sm@marchetti.example', note: 'Backend, two days a week', handles: ['git:smarchetti'], met: ['2026-08-27 · commit 8b1e4d0 in portage', '2026-09-02 · commit c47d19e in portage'] },
 ];
 
@@ -30,8 +30,12 @@ export const PEOPLE_REGISTERS: Record<string, SeedRegister> = {
     pack: 'people',
     fields: [
       { id: 'name', type: 'text', required: true, search: true },
-      /* Optional, because a person an agent meets in a commit has no role until somebody gives one. */
-      { id: 'role', type: 'enum', values: ['client', 'contractor', 'accountant', 'registrar', 'collaborator', 'other'], index: true },
+      /* Optional, because a person an agent meets in a commit has no role until somebody gives one.
+         NO `registrar`, AND THERE WAS ONE until People 2.0.0: a role only a studio that holds domains has, shipped to every
+         record, and the Personal use case had to relabel it Agency before a household could read it. A record whose rows
+         hold it keeps it as its own word when it updates, because the plan lays back a value a row was written under
+         (`test/lists-opened.test.ts` drives one), and a record that never used it is no longer offered it. */
+      { id: 'role', type: 'enum', values: ['client', 'contractor', 'accountant', 'collaborator', 'other'], index: true },
       { id: 'rate', type: 'money' },
       /* Unique, because an email is how a person met twice is known to be one person. */
       { id: 'email', type: 'email', unique: true, index: true },

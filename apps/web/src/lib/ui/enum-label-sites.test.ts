@@ -136,7 +136,7 @@ test("DECIDE'S DIFF OF A ROWSET SAYS BOTH SIDES BY THE RECORD'S LABELS", async (
   /* THE WHOLE PATH `/decide` TAKES, and not `plainOf` handed a declaration somebody relabelled first: the two Decide
      screens read the record's declarations through the raw client, which knows no labels, so a `plainOf` that read
      `labels` would still have said Registrar on the screen. */
-  const bare = { id: 'people', name: 'People', title: 'name', fields: [{ id: 'name', type: 'text' }, { id: 'role', type: 'enum', values: ['client', 'registrar'] }] };
+  const bare = { id: 'people', name: 'People', title: 'name', fields: [{ id: 'name', type: 'text' }, { id: 'role', type: 'enum', values: ['client', 'accountant'] }] };
   const client: Governor = {
     boot: async () => ({ ok: true, value: {} }),
     governance: async () => ({ ok: true, value: [] }),
@@ -144,16 +144,16 @@ test("DECIDE'S DIFF OF A ROWSET SAYS BOTH SIDES BY THE RECORD'S LABELS", async (
     schema: async () => ({ ok: true, value: bare }),
     get: async () => ({ ok: true, value: { seq: 3, version: 1, fields: { name: 'Nour', role: 'client' } } }),
   };
-  const body = { register: 'people', rows: [{ at: 'people#3', patch: { role: 'registrar' } }] };
+  const body = { register: 'people', rows: [{ at: 'people#3', patch: { role: 'accountant' } }] };
   heardLabels(PERSONAL);
   const held = await heldBy(client, [body]);
   const [row] = updatesOf(body, held.registers, held.rows, plainOf(held.registers));
-  assert.deepEqual(row?.changes, [{ field: 'role', label: 'Role', long: false, before: 'Work contact', after: 'Agency' }]);
+  assert.deepEqual(row?.changes, [{ field: 'role', label: 'Role', long: false, before: 'Work contact', after: 'Tax and accounts' }]);
   /* And a record with no labels reads the value's own words, as the diff always did. */
   heardLabels({});
   const plain = await heldBy(client, [body]);
   const [was] = updatesOf(body, plain.registers, plain.rows, plainOf(plain.registers));
-  assert.deepEqual(was?.changes, [{ field: 'role', label: 'Role', long: false, before: 'client', after: 'registrar' }]);
+  assert.deepEqual(was?.changes, [{ field: 'role', label: 'Role', long: false, before: 'client', after: 'accountant' }]);
 });
 
 test("A ROW'S LEAD SAYS ITS STATE BY ITS LABEL, as its saved field does", () => {
@@ -178,16 +178,17 @@ test("A ROW'S STATE CHIP SAYS ITS STATE BY THE SAME FUNCTION AS ITS LEAD", () =>
 });
 
 test("A ROW'S INLINE EDITOR OFFERS EACH VALUE BY ITS LABEL, in the order the field declares", () => {
-  /* Editing a person's Role offered `registrar` where the People list reads Agency (audit forty-eight §6). */
+  /* Editing a person's Role offered `registrar` where the People list read Agency (audit forty-eight §6). Asked of
+     `accountant` since People 2.0.0 took `registrar` away (M3 B9): the same relabel, Tax and accounts. */
   relabelAll(REGISTERS, PERSONAL);
   const role = REGISTERS.people!.fields.find((f) => f.id === 'role')!;
   const offered = choicesOf(role);
   assert.deepEqual(offered.map(([v]) => v), role.values, 'the editor offers other values than the field declares');
-  assert.deepEqual(Object.fromEntries(offered).registrar, 'Agency');
+  assert.deepEqual(Object.fromEntries(offered).accountant, 'Tax and accounts');
   assert.deepEqual(Object.fromEntries(offered).client, 'Work contact');
   /* A record with no labels still reads the value's own words, as the register page's editor does. */
   relabelAll(REGISTERS, {});
-  assert.equal(Object.fromEntries(choicesOf(REGISTERS.people!.fields.find((f) => f.id === 'role')!)).registrar, 'Registrar');
+  assert.equal(Object.fromEntries(choicesOf(REGISTERS.people!.fields.find((f) => f.id === 'role')!)).accountant, 'Accountant');
   assert.ok(ROW_PAGE.includes('{#each choicesOf(f) as [v, said]}<option value={v}>{said}</option>{/each}'), 'the editor no longer draws its options through `choicesOf`');
   /* And no value on the row's page is spelt by taking its underscores out, which is how both sites read the value. */
   const spelt = ROW_PAGE.split('\n').filter((line) => /\.replace\(\/_\/g, ' '\)/u.test(line));

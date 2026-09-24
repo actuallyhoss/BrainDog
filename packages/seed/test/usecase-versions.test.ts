@@ -205,6 +205,34 @@ const DECLARED: Record<string, Version> = {
     declares: 'b9dd1fb6bdf96673',
     history: ['Raised to 1.6.0 because Personal relabels the studio roles, `setting.label_people__role__client` and its four neighbours, in words a household uses, none of them one of its own five -> b9dd1fb6bdf96673'],
   },
+  'personal@1.7.0': {
+    holds: `
+      extends.register.people.role.adviser extends.register.people.role.family extends.register.people.role.friend
+      extends.register.people.role.landlord extends.register.people.role.tradesperson
+      metric.bills-this-week metric.budget-each-month metric.logged-by-goal metric.logged-this-week-by-goal
+      metric.put-by-by-goal metric.saved-toward-goals metric.spent-this-month metric.spent-this-month-by-category
+      page.goals page.home-personal page.my-project page.spending
+      register.budgets register.goal_log register.goals register.project_steps register.put_by register.savings_goals
+      register.spending
+      setting.holds_obligations setting.holds_people setting.holds_things
+      setting.label_budgets setting.label_goal_log setting.label_goals setting.label_obligations
+      setting.label_people__role__accountant setting.label_people__role__client setting.label_people__role__collaborator
+      setting.label_people__role__contractor
+      setting.label_project_steps setting.label_put_by setting.label_savings_goals setting.label_spending
+      setting.label_things setting.label_things__lane__building setting.label_things__lane__earning
+      setting.label_things__lane__parked setting.label_things__lane__retired setting.label_things__revenue
+      setting.lk_10103af7 setting.lk_1d01726f setting.lk_303a3cce setting.lk_4f9bf906 setting.lk_666e92eb
+      setting.lk_91a285a5 setting.lk_d66e361a setting.lk_f625eca1
+      setting.one_budgets setting.one_obligations setting.one_spending setting.one_things
+      setting.shared_version setting.speaks
+      setting.voice_home setting.voice_lists setting.voice_needs_you setting.voice_nothing_needs_you
+      setting.voice_right_now setting.voice_since_away
+    `,
+    declares: 'a50db125a0a2beb1',
+    history: [
+      'The studio roles Personal relabels, `setting.label_people__role__client` and its siblings, lose their fifth: the `registrar` label went, because People 2.0.0 no longer offers the value (M3 B9) -> a50db125a0a2beb1',
+    ],
+  },
   'student@1.2.0': {
     holds: `
       page.home-student page.studies register.assignments register.courses register.study_sessions

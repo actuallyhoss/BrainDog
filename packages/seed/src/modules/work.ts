@@ -205,7 +205,12 @@ export const WORK_REGISTERS: Record<string, SeedRegister> = {
       { id: 'body', label: 'Update', type: 'document', required: true, search: true },
       { id: 'health', type: 'enum', values: ['on_track', 'at_risk', 'off_track'], index: true, required: true },
       { id: 'track', label: 'Thread', type: 'ref', to: 'tracks', index: true, required: true },
-      { id: 'by', type: 'enum', values: ['claude', 'codex', 'cursor', 'you'], index: true, required: true },
+      /* TEXT, AND IT WAS A CLOSED LIST OF FOUR VENDORS until Work 1.7.0: `claude`, `codex`, `cursor` and `you` were the only
+         authors an update could have, so one written by Gemini, a teammate or a script was refused `ENUM_VALUE_UNKNOWN` at
+         the write, while `tasks.agent` beside it was already text. Which agents exist is a record's business, not the
+         core's. Opening an `enum` to `text` is a widening (`packages/kernel/src/widen.ts`): every stored word reads back
+         unchanged, which `test/lists-opened.test.ts` drives over a row written under the closed list. */
+      { id: 'by', type: 'text', index: true, required: true },
       { id: 'at', label: 'When', type: 'instant', index: true, required: true },
       { id: 'supersedes', label: 'Replaces', type: 'ref', to: 'updates' },
     ],

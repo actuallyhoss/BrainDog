@@ -9,8 +9,9 @@
  * tradesperson and adviser.
  *
  * THE STUDIO'S ROLES ARE STILL ON THE LIST, IN A HOUSEHOLD'S WORDS. People's picker offers client, contractor,
- * accountant, registrar and collaborator first, because `extends` lays values after a list's own, and Personal reads
- * them as Work contact, Hired help, Tax and accounts, Agency and Project partner (`labels` below). Relabelled and not
+ * accountant and collaborator first, because `extends` lays values after a list's own, and Personal reads them as Work
+ * contact, Hired help, Tax and accounts and Project partner (`labels` below). There was a fifth, `registrar` read as
+ * Agency, until People 2.0.0 stopped offering it and Personal 1.7.0 dropped its label. Relabelled and not
  * hidden, by the owner's call: a hidden value leaves a row that holds one with a word the form no longer offers. The
  * form reads the label since 1.6.0 (`RowForm.svelte`, `valueSaid`); before, it drew every value raw, and a household
  * was offered Client and Registrar (`personal-words.test.ts`).
@@ -138,8 +139,9 @@ export const PERSONAL = {
   usecase: 'personal',
   /* 1.3.0: the Projects page went, so the rail has one Projects Overview, and its next steps are on Home.
      1.5.0: Personal lays its own roles on People through `extends`, and the relabels of the studio's roles went.
-     1.6.0: the studio's roles are relabelled in a household's words that are not its own five. */
-  version: '1.6.0',
+     1.6.0: the studio's roles are relabelled in a household's words that are not its own five.
+     1.7.0: the `registrar` label went, because People 2.0.0 no longer offers the value it read. */
+  version: '1.7.0',
   title: 'Personal',
   summary: 'Your money and bills, what you are saving for, and the projects and goals you care about.',
   author: 'BrainDog',
@@ -204,11 +206,15 @@ export const PERSONAL = {
     'people:holds': 'the people in your life worth keeping track of: family, friends, a landlord, a plumber',
     /* THE STUDIO'S ROLES IN A HOUSEHOLD'S WORDS, and none of them one of the five Personal lays, so no word is offered
        twice. Relabelled and not hidden, by the owner's call: a hidden value leaves a row that holds one reading a word
-       the form no longer offers. */
+       the form no longer offers.
+       NO `registrar` LABEL SINCE 1.7.0, AND THERE WAS ONE reading it Agency: People 2.0.0 no longer offers the value
+       (`test/lists-opened.test.ts`), so the label named a value Personal does not install and S8 in
+       `test/usecases.test.ts` went red on exactly this line. A PERSONAL RECORD CAN HOLD ONE: the picker offered the
+       value raw as Registrar before 1.6.0 and as Agency in 1.6.0. Such a record keeps the value on its list and the row
+       keeps its word, because the plan lays back a value a row holds, but from 1.7.0 that row reads the raw word. */
     'people.role.client': 'Work contact',
     'people.role.contractor': 'Hired help',
     'people.role.accountant': 'Tax and accounts',
-    'people.role.registrar': 'Agency',
     'people.role.collaborator': 'Project partner',
     spending: 'Spending',
     'spending:one': 'purchase',

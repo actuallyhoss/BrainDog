@@ -117,14 +117,18 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   (`loop/research-bank-real.md`); `bank-hsbc-eg` 1.2.0 reads the limit into this field and names it in its `dedupe:`,
  *   so two charges file and one alert sent twice files once. One field added and nothing taken away, so the step is a
  *   minor one, and a new version rather than a reset because 2.0.0 shipped with the deploy of 23 September at 08:02 UTC.
- *   STILL UNDER 2.1.0, because 2.1.0 has not shipped: measured on 24 September with `gh run list --workflow deploy`, the
- *   last successful deploy is `19d4c785` at 15:07 UTC on the 23rd, and `d1bf796a`, which set 2.1.0, is not behind it.
- *   `register.transactions` declares `pairs:`, so the record finds a transfer's two legs, the same amount in the same
- *   currency, one out and one in, two accounts, within four days, both cleared, and marks both `transfer` and each with
- *   `_pair` naming the other (`test/money-pairs.test.ts`). A void or pending row pairs with nothing, since no figure
- *   counts it and pairing one hid the cleared payment beside it. Before it, two such rows written by the import were
- *   GBP 4,000.00 of "Spent, 30 days" until a person marked them. Nothing is added to the ids a record holds and nothing
- *   is taken away.
+ *   2.1.0 SHIPPED AS THAT AND NOTHING MORE, with the deploy of `bab716a5` at 23:27 UTC on 23 September. `baf7048a` put
+ *   `pairs:` under 2.1.0 eleven minutes later, reading the deploy before that one as the last; a record on the shipped
+ *   2.1.0 would never have been offered it, so it moved to 2.2.0 below.
+ * - money-core 2.2.0: the record finds a transfer's two legs. `register.transactions` declares `pairs:`: the same amount
+ *   in the same currency, one out and one in, two accounts, within four days, both cleared, and neither naming who it
+ *   was with or the obligation it paid. Both are marked `transfer` and each names the other in `_pair`
+ *   (`test/money-pairs.test.ts`). A void or pending row pairs with nothing, since no figure counts it and pairing one
+ *   hid the cleared payment beside it; a row with a Who or a Settles pairs with nothing, since rent and a client's
+ *   payment of the same sum a day apart were paired and left both Spent and Received
+ *   (`loop/research-batch-sixty-one-audit.md` findings 1 and 6). Before any of it, two such rows written by the import
+ *   were GBP 4,000.00 of "Spent, 30 days" until a person marked them. Nothing is added to the ids a record holds and
+ *   nothing is taken away, so the step is a minor one.
  * - estate 1.2.0: a service carries a note. the old tool's domains carry the reason each name is held and what is
  *   unresolved about it, and Services had no field that holds prose, so the import left every note in the export. One
  *   field added and nothing taken away, so the step is a minor one. It moves the version rather than riding on 1.1.0
@@ -147,13 +151,17 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   on 21 September at 16:23 UTC, came after `79f17031` set it. Still under 1.6.0, because nothing has deployed since:
  *   a seventh list, No due day, holds a task of yours with no due day, which none of the six could, so every task in
  *   play is under exactly one list.
+ * - people 2.0.0: `role` stops offering `registrar`, a role only a studio that holds domains has (M3 B9, DIRECTION
+ *   sections 22 and 24). Taking a value away is a major step. A record whose rows hold it keeps it as its own word.
+ * - work 1.7.0: `updates.by` opens from a closed list of four agent vendors to text, a widening, so an update by any
+ *   author lands (M3 B9). Nothing is taken away, so the step is a minor one.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.4.0',
-  people: '1.0.0',
-  'money-core': '2.1.0',
+  people: '2.0.0',
+  'money-core': '2.2.0',
   estate: '1.2.0',
-  work: '1.6.0',
+  work: '1.7.0',
 };
 
 type Body = Record<string, unknown>;

@@ -85,10 +85,11 @@ export const HELD_AT_1_8_0: readonly Held[] = [
 ];
 
 /**
- * Today's money-core document less what 2.1.0 added, which is `available` and `pairs:` on `register.transactions`, so the
- * two rebuilds below stay the releases they name. Without either the 1.8.0 rebuild's fingerprint moved off the one
- * `pack-versions.test.ts` recorded for 1.8.0, measured when each landed: `pairs:` alone read `7e991afc1e7d11aa` against
- * `8bcd20187c61cf1b` on 24 September.
+ * Today's money-core document less what 2.1.0 and 2.2.0 added, which is `available` and `pairs:` on
+ * `register.transactions`, so the two rebuilds below stay the releases they name. Without either the 1.8.0 rebuild's
+ * fingerprint moved off the one `pack-versions.test.ts` recorded for 1.8.0, measured when each landed: `pairs:` alone read
+ * `7e991afc1e7d11aa` against `8bcd20187c61cf1b` on 24 September. `pairs:` is taken off whole, so its `where:` gaining
+ * `party` and `settles` at 2.2.0 needs nothing here.
  */
 function asShipped(doc: unknown): Doc {
   const d = structuredClone(doc) as Doc;

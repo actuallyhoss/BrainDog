@@ -49,16 +49,12 @@ test('A RECORD MADE AT 1.0.0 IS OFFERED ONLY THE PACKS THAT CHANGED, and updatin
 
   /* WHAT IS OFFERED: exactly the packs whose version went up. */
   const changed = FIRST_PARTY.filter((id) => FIRST_PARTY_VERSIONS[id] !== '1.0.0');
-  assert.deepEqual([...changed].sort(), ['estate', 'money-core', 'portfolio', 'work']);
+  assert.deepEqual([...changed].sort(), ['estate', 'money-core', 'people', 'portfolio', 'work']);
   const read = said<{ updates?: { id: string; from: string; to: string }[] }>(await api.arrangement({}, agent));
   assert.deepEqual(
     [...(read.updates ?? [])].sort((a, b) => a.id.localeCompare(b.id)),
     changed.sort().map((id) => ({ id, from: '1.0.0', to: FIRST_PARTY_VERSIONS[id] })),
   );
-
-  /* A PACK THAT DID NOT CHANGE HAS NOTHING TO UPDATE, and asking says so. */
-  const same = await api.propose({ question: 'Update People?', body_kind: 'pack', body: { install: 'people' } } as never, agent);
-  assert.equal((same as { ok: boolean }).ok, false);
 
   /* TAKING THE UPDATES, as the owner accepts them. */
   for (const id of changed) {
@@ -70,6 +66,13 @@ test('A RECORD MADE AT 1.0.0 IS OFFERED ONLY THE PACKS THAT CHANGED, and updatin
   const packs = said<{ packs: { id: string; version?: string }[]; updates?: unknown }>(await api.arrangement({}, agent));
   for (const id of FIRST_PARTY) assert.equal(packs.packs.find((p) => p.id === id)?.version, FIRST_PARTY_VERSIONS[id], id);
   assert.equal(packs.updates, undefined, 'nothing is offered once the updates are in');
+
+  /* A PACK ALREADY AT ITS VERSION HAS NOTHING TO UPDATE, and asking says so. This was asked before the updates of a
+     pack still at 1.0.0, People, until People 2.0.0 (M3 B9) left no first-party pack at 1.0.0; asked after them it is
+     the same question of a pack with nothing new. */
+  const same = await api.propose({ question: 'Update People?', body_kind: 'pack', body: { install: 'people' } } as never, agent);
+  assert.equal((same as { ok: boolean }).ok, false);
+
 
   /* EVERY ROW IS STILL THERE, and the new fields are there to fill. */
   assert.deepEqual(lists(), before);
