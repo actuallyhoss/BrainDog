@@ -35,6 +35,8 @@
   import Chip from '$lib/ui/Chip.svelte';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import AddField from '$lib/ui/AddField.svelte';
+  import AddValue from './AddValue.svelte';
+  import { putBackOf, valueWords } from '$lib/record/field-write.ts';
   import { ownsRecord, type Me } from '../../../settings/levels.ts';
   import { Table } from 'braindog-render/svelte';
   import { readHistory, readNames, type Told } from '$lib/record/history-live.ts';
@@ -341,16 +343,21 @@
     const register = id;
     const n = seq;
     const key = `${register}#${n}`;
+    /* THE ROW AS IT WAS, READ BEFORE THE WRITE: once it lands `row` is the answer, and the way back is built from
+       what the row held when the person pressed Save. */
+    const before = { ...row.fields };
+    const patch = patchOf(f);
     saving = true;
     problem = null;
     writer ??= rowWriter(apiBase());
-    const out = await writer.update(register, n, patchOf(f), row.version);
+    const out = await writer.update(register, n, patch, row.version);
     saving = false;
     if (askedFor !== key) return;
     if (out.ok) {
       got = { from: 'live', entry: out.entry, names: names ?? new Map() };
       stopEdit();
-      toasts.push(copy.writeMarkSaved);
+      const version = out.entry.version;
+      toasts.push(copy.writeMarkSaved, { undo: () => void putBack(register, n, labelOf(f), putBackOf(before, patch), version) });
       void refreshHistory(register, n);
       return;
     }
@@ -366,6 +373,38 @@
     /* A REFUSAL KEEPS THE TYPED TEXT and says what the record said, under the box it was typed in.
        Clearing it would be this screen deciding the words were worthless because the record said no. */
     problem = out.fix;
+  }
+
+  /**
+   * PUT BACK, FROM THE SAVED EDIT'S TOAST: the field as it was, sent at the version the edit answered with.
+   *
+   * A SAVED EDIT HAD NO WAY BACK. The title and every field saved from this page landed with a bare "Saved", so a slip
+   * of the menu meant opening the field again and remembering what it held. Held to the answered version, a write from
+   * somebody else in between is a conflict the toast says, never a quiet revert of their change
+   * (`field-write.test.ts`). It runs for the row it was pressed on even after the screen has moved to another, and only
+   * redraws when this is still that row.
+   */
+  async function putBack(register: string, n: number, label: string, patch: Fields, version: number | undefined) {
+    const key = `${register}#${n}`;
+    writer ??= rowWriter(apiBase());
+    saving = true;
+    const out = await writer.update(register, n, patch, version);
+    saving = false;
+    const current = askedFor === key;
+    if (!out.ok) {
+      if (current && out.why === 'conflict' && out.entry) got = { from: 'live', entry: out.entry, names: names ?? new Map() };
+      toasts.push(out.fix, { intent: 'warn' });
+      return;
+    }
+    /* ONLY AN EDITOR ON THE FIELD PUT BACK IS CLOSED. The toast stays up for ten seconds, long enough to have opened
+       another field and started typing in it, and a bare `stopEdit()` here threw that typing away for a press about a
+       different field. */
+    if (current) {
+      got = { from: 'live', entry: out.entry, names: names ?? new Map() };
+      if (editing !== null && editing in patch) stopEdit();
+    }
+    toasts.push(valueWords.putBack(label));
+    if (current) void refreshHistory(register, n);
   }
 
   /** Archive the row, or put it back: the same verb the list offers on the same row. */
@@ -691,6 +730,20 @@
                     </div>
                   </form>
                   {#if problem}<p class="edit-why">{problem}</p>{/if}
+                  <!-- A VALUE THE MENU DOES NOT HOLD, added to the list under the menu. Once an owner's lands the list
+                       is learnt again, `got` is handed back new so `f` is the field that holds it, and it is chosen in
+                       the menu for the ordinary Save. -->
+                  {#if f.type === 'enum'}
+                    <AddValue
+                      register={id}
+                      field={f}
+                      {owner}
+                      onadded={(v) => {
+                        got = got && { ...got };
+                        draft = v;
+                      }}
+                    />
+                  {/if}
                 {:else}
                   {#if unsetValue(value)}
                     <span class="missing">{copy.editNotSet}</span>

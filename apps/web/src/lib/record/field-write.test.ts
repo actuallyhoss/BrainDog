@@ -19,9 +19,10 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord, type Kernel } from '@braindog/kernel';
 
 import { display, readableFields, REGISTERS } from './api.ts';
-import { ADDABLE, addField, additionOf, fieldOf, idOf } from './field-write.ts';
+import { ADDABLE, addField, additionOf, addValue, fieldOf, idOf, putBackOf, valueAdditionOf, valueOf } from './field-write.ts';
 import { pageReader } from './page-live.ts';
 import { rowReader, type Fetch } from './row-live.ts';
+import { rowWriter } from './rows-write.ts';
 import { FIELD_TYPES, type RegisterDecl } from './schema.ts';
 
 const BASE = 'http://record.test';
@@ -95,6 +96,10 @@ function served(k: Kernel, page?: unknown): { io: Fetch; asked: string[] } {
     if (method === 'get') return json(200, { ok: true, value: k.get({ register, seq: Number(args.seq) }) });
     if (method === 'list') return answer(k.list({ register, limit: Number(args.limit ?? 50) } as never) as { ok: boolean });
     if (method === 'page' && page) return json(200, { ok: true, value: page });
+    if (method === 'update') {
+      const version = typeof args.version === 'number' ? { version: args.version } : {};
+      return answer(k.update(register, `${register}#${Number(args.seq)}`, args.patch as never, { actor: 'p_1', ...version }) as { ok: boolean });
+    }
     if (method === 'propose') return answer(k.propose(args as never, 'p_1'));
     if (method === 'decide') {
       const out = k.decide(String(args.id), args as never, 'p_1');
@@ -226,4 +231,108 @@ test('A RECORD THAT WILL NOT SAY LEAVES THE BUILD’S OWN LIST WHERE IT WAS', as
   const { createClient } = await import('@braindog/client');
   await learn(createClient({ base: BASE, fetch: io }).schema, 'things', new Map());
   assert.equal(REGISTERS.things, BUNDLED);
+});
+
+/* ── a new value for a closed list (loop/research-m4-app.md brief 4) ── */
+
+test('A NEW VALUE IS FILED AS AN ADDITION TO ONE CLOSED LIST, naming that value and nothing else', () => {
+  /* THE BRIEF'S SHAPE, PLUS `declaration_id`. The brief wrote the body as `{ to: ... }` alone; `propose` refuses a
+     change with no `declaration_id` (`kernel/src/govern.ts`, `missing('declaration_id')`), so the field's own body
+     carries it and this one does too. */
+  assert.deepEqual(valueAdditionOf('things', 'lane', 'paused'), {
+    declaration_id: 'register.things',
+    to: { add: { register: 'things', values: { lane: ['paused'] } } },
+  });
+});
+
+test('A VALUE THE LIST HOLDS ALREADY, BY ITS SPELLING OR BY ITS LABEL, IS REFUSED BEFORE ANYTHING IS SENT', () => {
+  fresh();
+  assert.deepEqual(valueOf('things', 'lane', '  Paused  '), { ok: true, value: 'Paused' });
+  assert.equal(valueOf('things', 'lane', 'Building').ok, false, 'a value the list holds in another case was offered');
+  /* `on_track` IS READ AS "On track" everywhere a person sees it, so typing what they read is not a new value. */
+  assert.equal(valueOf('things', 'health', 'on track').ok, false, 'a value typed as its label was offered');
+  /* AND A LABEL THAT IS NOT THE VALUE RE-SPELLED. `on_track` folds to "on track" by itself, so the line above passed
+     with the label comparison deleted (measured); a field that labels `building` as "In progress" is the case that
+     comparison exists for. */
+  const lane = BUNDLED.fields.find((f) => f.id === 'lane')!;
+  REGISTERS.things = { ...BUNDLED, fields: BUNDLED.fields.map((f) => (f === lane ? { ...lane, labels: { building: 'In progress' } } : f)) };
+  assert.equal(valueOf('things', 'lane', 'in progress').ok, false, 'a value typed as a label unlike its spelling was offered');
+  fresh();
+  assert.equal(valueOf('things', 'lane', '   ').ok, false);
+  /* ONLY A CLOSED LIST TAKES VALUES: the kernel refuses `values` on any other field, so this does first. */
+  assert.equal(valueOf('things', 'name', 'x').ok, false);
+  assert.equal(valueOf('things', 'nope', 'x').ok, false);
+});
+
+test('THE OWNER ADDS A VALUE IN ONE PRESS, the record then takes it on a row, and this tab offers it', async () => {
+  fresh();
+  const k = await projects();
+  const { io, asked } = served(k);
+  assert.deepEqual(await addValue(BASE, 'things', 'lane', 'paused', true, io), { from: 'added' });
+  assert.deepEqual(asked.slice(0, 2), ['propose', 'decide']);
+  const lane = (k.register('things') as unknown as { fields: readonly { id: string; values?: readonly string[] }[] }).fields.find((f) => f.id === 'lane');
+  assert.deepEqual(lane?.values?.slice(-1), ['paused']);
+  assert.ok(k.update('things', 'things#1', { lane: 'paused' }, { actor: 'p_1', version: 1 }).ok, 'the record still refuses the value');
+  /* AND THE EDITOR'S MENU, which reads `REGISTERS`, has it with no reload. */
+  assert.ok(REGISTERS.things!.fields.find((f) => f.id === 'lane')?.values?.includes('paused'), 'this tab did not learn the value it added');
+  fresh();
+});
+
+test('SOMEBODY WHO IS NOT AN OWNER FILES THE VALUE, and the list refuses it until an owner accepts', async () => {
+  fresh();
+  const k = await projects();
+  const { io, asked } = served(k);
+  const out = await addValue(BASE, 'things', 'lane', 'paused', false, io);
+  assert.equal(out.from, 'filed');
+  assert.deepEqual(asked, ['propose'], 'a member accepted their own value');
+  assert.equal(k.update('things', 'things#1', { lane: 'paused' }, { actor: 'p_1', version: 1 }).ok, false);
+  fresh();
+});
+
+/* ── Put back after an edit on the row page ── */
+
+test('PUT BACK IS THE FIELD AS IT WAS, an unset one included, and names only what the edit touched', () => {
+  assert.deepEqual(putBackOf({ lane: 'building', due: null, name: 'Kiln' }, { lane: 'earning' }), { lane: 'building' });
+  /* A FIELD THE ROW DID NOT CARRY GOES BACK AS `null`, which is how the record is told to drop it; `undefined` would
+     be left out of the JSON and the edit would stand. */
+  assert.deepEqual(putBackOf({ name: 'Kiln' }, { launched: '2026-09-01' }), { launched: null });
+});
+
+test('AN EDIT PUT BACK AT THE VERSION IT ANSWERED LEAVES THE ROW AS IT WAS, and a second tab’s write is not overwritten', async () => {
+  fresh();
+  const k = await projects();
+  const writer = rowWriter(BASE, served(k).io);
+  const read = await rowReader(BASE, served(k).io).read('things', 1);
+  assert.ok(read.from === 'live' && read.entry);
+  const before = read.entry;
+
+  const edit = { lane: 'earning' };
+  const saved = await writer.update('things', 1, edit, before.version);
+  assert.ok(saved.ok, JSON.stringify(saved));
+  const back = await writer.update('things', 1, putBackOf(before.fields, edit), saved.entry.version);
+  assert.ok(back.ok, JSON.stringify(back));
+  assert.equal(back.entry.fields.lane, 'building');
+
+  /* HELD TO THE ANSWERED VERSION: once somebody else has written since, the put back is a conflict and not a quiet
+     revert of their change. */
+  const again = await writer.update('things', 1, edit, back.entry.version);
+  assert.ok(again.ok);
+  assert.ok(k.update('things', 'things#1', { lane: 'parked' }, { actor: 'p_2', version: again.entry.version }).ok);
+  const late = await writer.update('things', 1, putBackOf(back.entry.fields, edit), again.entry.version);
+  assert.equal(late.ok, false);
+  assert.equal(late.ok ? '' : late.why, 'conflict');
+  assert.equal(k.get({ register: 'things', seq: 1 })?.fields.lane, 'parked');
+  fresh();
+});
+
+test('THE ROW PAGE’S SAVED EDIT CARRIES ITS PUT BACK, and the enum editor offers a value the list does not hold', async () => {
+  /* A SOURCE SWEEP, because a Svelte page does not mount under `node --test` (`lead.ts` says the same). It holds the
+     one receipt a saved edit or title edit lands with, which had no way back, and the one editor that could not take a
+     value the list lacks. */
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../../routes/r/[register]/[seq]/+page.svelte', import.meta.url), 'utf8');
+  const saved = src.split('toasts.push(copy.writeMarkSaved').slice(1);
+  assert.ok(saved.length > 0, 'the saved edit no longer lands with a receipt');
+  for (const rest of saved) assert.match(rest.slice(0, rest.indexOf(');') + 2), /undo:/u, 'a saved edit lands with no Put back');
+  assert.match(src, /<AddValue\b/u, 'the enum editor has no way to add a value');
 });

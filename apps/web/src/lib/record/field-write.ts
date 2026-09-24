@@ -27,12 +27,14 @@
 
 import { createClient } from '@braindog/client';
 
+import { valueSaid } from '../voice.ts';
+import { labelOf } from './api.ts';
 import { forget, type Fetch } from './boot-live.ts';
 import { REGISTERS } from './data.ts';
 import { noRecord } from './device.ts';
 import { fieldWords } from './field-words.ts';
 import { learn } from './remote.ts';
-import type { FieldType } from './schema.ts';
+import type { FieldType, Fields } from './schema.ts';
 
 export const ADDABLE = ['text', 'document', 'day', 'int', 'decimal', 'bool', 'url', 'email'] as const satisfies readonly FieldType[];
 export type Addable = (typeof ADDABLE)[number];
@@ -100,13 +102,18 @@ export type Added =
  * already answered this list for this tab: without it the field was on the record and on no screen until a reload.
  */
 export async function addField(base: string, register: string, field: NewField, owner: boolean, io?: Fetch): Promise<Added> {
-  const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   const list = REGISTERS[register]?.name ?? register;
-  const filed = await client.call<{ id?: unknown }>('propose', {
-    question: fieldWords.question(field.label, list),
-    body_kind: 'change',
-    body: additionOf(register, field),
-  });
+  return fileAddition(base, register, fieldWords.question(field.label, list), additionOf(register, field), owner, io);
+}
+
+/**
+ * The one path every addition to a list takes from the app: filed, then accepted at once when the person owns the
+ * record. A field and a value go the same way because the record reads them as one kind of change (`govern.ts`
+ * `addTo`), and two copies of the accept would be two places for the list's re-read to be forgotten.
+ */
+async function fileAddition(base: string, register: string, question: string, body: object, owner: boolean, io?: Fetch): Promise<Added> {
+  const client = createClient({ base, ...(io ? { fetch: io } : {}) });
+  const filed = await client.call<{ id?: unknown }>('propose', { question, body_kind: 'change', body });
   if (!filed.ok) {
     if ('refusal' in filed) return noRecord(filed.refusal.code) ? { from: 'gone', fix: filed.refusal.fix } : { from: 'refused', fix: filed.refusal.fix };
     return { from: 'refused', fix: fieldWords.changed };
@@ -121,4 +128,83 @@ export async function addField(base: string, register: string, field: NewField, 
   forget();
   await learn(client.schema, register, new Map());
   return { from: 'added' };
+}
+
+/* ── a new value for a closed list ── */
+
+/**
+ * The words for adding a value to a closed list and for putting an edit back, kept here beside the calls they describe,
+ * as `fieldWords` is, because nobody owns `copy.ts` in this wave (`loop/research-m4-app.md`, rules for the wave).
+ */
+export const valueWords = {
+  add: 'Another value',
+  label: 'New value',
+  save: 'Add',
+  saving: 'Adding',
+  cancel: 'Cancel',
+  ownerNote: 'Every row of the list can hold it from now on.',
+  memberNote: 'The owner is asked first, on Decide.',
+  empty: 'Type the value to add.',
+  held: (said: string, field: string) => `${field} already has ${said}. Pick it from the list.`,
+  notClosed: (field: string) => `${field} is not a closed list, so it takes any value.`,
+  question: (value: string, field: string, list: string) => `Add ${value} to ${field} on ${list}?`,
+  added: (value: string, field: string) => `${value} is one of ${field}'s values now.`,
+  filed: (value: string) => `${value} is waiting on Decide for the owner.`,
+  putBack: (field: string) => `${field} is back to what it was.`,
+} as const;
+
+/* ONE SPELLING FOR COMPARING: case, and the underscore a stored value is read aloud without (`copy.valueWord`). */
+const fold = (s: string): string => s.normalize('NFKC').toLowerCase().replace(/[_\s]+/gu, ' ').trim();
+
+/**
+ * The value a press asks for, or the sentence saying why it is not a new one.
+ *
+ * A VALUE THE LIST HOLDS BY ANOTHER SPELLING IS REFUSED, and so is one typed as the words a person reads for a held value.
+ * `health` stores `on_track` and every screen says "On track", so somebody who types what they read means the value that
+ * is there. The kernel would take `On track` as a fifth value beside `on_track`, since it compares exact strings
+ * (`addTo`), and the list would then offer the same word twice.
+ */
+export function valueOf(register: string, field: string, typed: string): { ok: true; value: string } | { ok: false; fix: string } {
+  const f = REGISTERS[register]?.fields.find((x) => x.id === field);
+  const name = f ? labelOf(f) : field;
+  if (f?.type !== 'enum') return { ok: false, fix: valueWords.notClosed(name) };
+  const value = typed.trim().replace(/\s+/gu, ' ');
+  if (value === '') return { ok: false, fix: valueWords.empty };
+  const held = (f.values ?? []).find((v) => fold(v) === fold(value) || fold(valueSaid(f, v)) === fold(value));
+  if (held !== undefined) return { ok: false, fix: valueWords.held(valueSaid(f, held), name) };
+  return { ok: true, value };
+}
+
+/** The change `propose` files: one value appended to one closed list, and nothing else on it. */
+export const valueAdditionOf = (register: string, field: string, value: string) => ({
+  declaration_id: `register.${register}`,
+  to: { add: { register, values: { [field]: [value] } } },
+});
+
+/**
+ * File one value for a closed list, and accept it at once when the person filing owns the record.
+ *
+ * ADDITIVE AND NOTHING MORE. Retiring a value or reordering them is a whole-list change, which `addTo` refuses to read
+ * as an addition, so it is not offered here.
+ */
+export async function addValue(base: string, register: string, field: string, value: string, owner: boolean, io?: Fetch): Promise<Added> {
+  const decl = REGISTERS[register];
+  const f = decl?.fields.find((x) => x.id === field);
+  const question = valueWords.question(value, f ? labelOf(f) : field, decl?.name ?? register);
+  return fileAddition(base, register, question, valueAdditionOf(register, field, value), owner, io);
+}
+
+/* ── Put back after an edit ── */
+
+/**
+ * The patch that undoes `patch` on a row that held `before`: each field it touched, as it was.
+ *
+ * A FIELD THE ROW DID NOT CARRY GOES BACK AS `null`, which is how the record is told to drop it. Left `undefined`, it
+ * vanishes from the JSON, the patch is empty for that key, and the edit stands while the toast says it was put back.
+ * It is sent at the version the edit answered with, so a write from somebody else in between is a conflict rather
+ * than something this quietly reverts. Brief 1 builds the list's `inverseOf` in `rows-write.ts` to the same rule; the
+ * two can be one once both have landed.
+ */
+export function putBackOf(before: Fields, patch: Fields): Fields {
+  return Object.fromEntries(Object.keys(patch).map((key) => [key, before[key] ?? null]));
 }
