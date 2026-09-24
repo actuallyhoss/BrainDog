@@ -424,10 +424,16 @@ function inside(within: string, a: number, b: number): boolean {
   return lo !== null && hi !== null && b >= lo && b <= hi;
 }
 
-/** Whether two rows are the two legs of one transfer by every part of the declaration but `where` and the pin. */
-function mirrors(p: Pairing, a: Leg, b: Leg): boolean {
-  const x = shapeOf(p, a);
-  const y = shapeOf(p, b);
+type Shape = NonNullable<ReturnType<typeof shapeOf>>;
+
+/**
+ * Whether two rows are the two legs of one transfer by every part of the declaration but `where` and the pin.
+ *
+ * `shape` IS HOW A ROW'S SHAPE IS READ, `shapeOf` unless a pass over the whole list has read each one already (`Ledger`).
+ */
+function mirrors(p: Pairing, a: Leg, b: Leg, shape: (leg: Leg) => Shape | null = (leg) => shapeOf(p, leg)): boolean {
+  const x = shape(a);
+  const y = shape(b);
   if (x === null || y === null) return false;
   const agrees = p.pairs.on.every((said) => {
     const e = entryOf(said)!;
@@ -515,8 +521,9 @@ function waiting(p: Pairing, leg: Leg): boolean {
  * Measured, a pass over 5,000 rows of three shapes leaves the same ledger with the size in the SQL as without it.
  *
  * NOT FOUND BY AN INDEX ON ITS OWN. With no statistics SQLite plans this through `entry_state` on the list alone, even
- * with the register written in as a literal beside a declared index on the day: 8.5 ms a window on 10,000 rows. A pass
- * over a whole ledger builds its own index for as long as it runs (`windowSql`); a write asks a few windows.
+ * with the register written in as a literal beside a declared index on the day: 8.5 ms a window on 10,000 rows. A write
+ * asks a few windows; a pass over a whole ledger reads the list once and asks none (`Ledger`), unless its rule reads its
+ * own mark, and then it builds an index for as long as it runs (`index.ts`, `settleRedeclared`).
  *
  * A PAIRED ROW IS STILL A CANDIDATE. Whether it stays paired is `partnerOf`'s question, and leaving it out here is what
  * let the first row to arrive keep a leg a nearer one was the real partner of.
@@ -530,9 +537,10 @@ function candidatesOf(p: Pairing, leg: Leg): { leg: Leg; gap: number }[] {
 
 /**
  * The two expressions `around` asks the window by, a row's day and its size, as SQL over `entry.fields`, or `null` when
- * the declaration has no day to run a window over. Exported so an index built for a pass over the whole ledger
- * (`index.ts`, `settleRedeclared`) is on these very expressions: SQLite uses an index on an expression only when the
- * query spells the same one.
+ * the declaration has no day to run a window over. Exported so a pass over the whole ledger (`index.ts`,
+ * `settleRedeclared`) orders its seeds and counts its sizes by the very reading the window takes, and where it still asks
+ * a query per window builds its index on these expressions: SQLite uses an index on an expression only when the query
+ * spells the same one.
  */
 export function windowSql(p: Pairing): { day: string; size: string } | null {
   const date = dateField(p.pairs, p.fields);
@@ -541,35 +549,112 @@ export function windowSql(p: Pairing): { day: string; size: string } | null {
   return { day: `json_extract(fields, '$.${date}')`, size: `abs(coalesce(json_extract(fields, '$.${sized}.amount'), json_extract(fields, '$.${sized}')))` };
 }
 
-/** `candidatesOf`, and whether a row that mirrors `leg` is `waiting`: one query over the window answers both. */
-function around(p: Pairing, leg: Leg): { near: { leg: Leg; gap: number }[]; waits: boolean } {
+/**
+ * `candidatesOf`, and whether a row that mirrors `leg` is `waiting`: one query over the window answers both.
+ *
+ * WITH A `Ledger` THE WINDOW IS READ FROM THE LIST ALREADY IN HAND, the rows of this size between the window's two ends,
+ * found by halving. That is `inside` asked one way, so it lets through every row `mirrors` would, and `mirrors` still
+ * decides each one; the SQL's `BETWEEN` on the stored day says the same of every day the kernel stores.
+ */
+function around(p: Pairing, leg: Leg, ledger: Ledger | null = null): { near: { leg: Leg; gap: number }[]; waits: boolean } {
   const none = { near: [], waits: false };
   const window = windowSql(p);
-  const shape = shapeOf(p, leg);
+  const read = ledger === null ? (l: Leg) => shapeOf(p, l) : (l: Leg) => shapeIn(p, ledger, l);
+  const shape = read(leg);
   if (window === null || shape === null) return none;
   const lo = shiftFrom(shape.at, `-${p.pairs.within}`);
   const hi = shiftFrom(shape.at, `+${p.pairs.within}`);
   if (lo === null || hi === null) return none;
-  const toDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
-  const { day, size } = window;
-  const rows = p.sql.all<LegRow>(
-    `SELECT ${LEG_COLUMNS} FROM entry WHERE register = ? AND deleted_at IS NULL AND id <> ?
-       AND ${day} BETWEEN ? AND ? AND ${size} = ?`,
-    p.register,
-    leg.id,
-    toDay(lo),
-    toDay(hi),
-    shape.amount.size,
-  );
+  let rows: Leg[];
+  if (ledger === null) {
+    const toDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+    const { day, size } = window;
+    rows = p.sql
+      .all<LegRow>(
+        `SELECT ${LEG_COLUMNS} FROM entry WHERE register = ? AND deleted_at IS NULL AND id <> ?
+           AND ${day} BETWEEN ? AND ? AND ${size} = ?`,
+        p.register,
+        leg.id,
+        toDay(lo),
+        toDay(hi),
+        shape.amount.size,
+      )
+      .map(legOf);
+  } else rows = inWindow(ledger.bySize.get(shape.amount.size) ?? [], lo, hi).filter((other) => other.id !== leg.id);
   const out: { leg: Leg; gap: number }[] = [];
   let waits = false;
-  for (const r of rows) {
-    const other = legOf(r);
-    if (!mirrors(p, leg, other)) continue;
-    if (pairable(p, other)) out.push({ leg: other, gap: Math.abs(shapeOf(p, other)!.at - shape.at) });
-    else waits ||= waiting(p, other);
+  for (const other of rows) {
+    if (!mirrors(p, leg, other, read)) continue;
+    if (canPair(p, other, ledger)) out.push({ leg: other, gap: Math.abs(read(other)!.at - shape.at) });
+    else waits ||= waitsIn(p, other, ledger);
   }
   return { near: out, waits };
+}
+
+/**
+ * THE WHOLE LIST, READ ONCE FOR A PASS OVER IT (`passOf`): every live row parsed and shaped, the rows grouped by size in
+ * day order, and what `pairable` and `waiting` say of each row, asked the first time it is needed.
+ *
+ * AUDIT SIXTY-FIVE'S FINDING 3. The window was a query per row, each row it returned parsed and asked `markPinned`, and
+ * on 200 rows of one amount packed into a week that was 622,665 questions to the event table for one pass. Each of
+ * those answers is a fact about one row, and the pass writes nothing any of them reads: it writes the mark and `_pair`,
+ * and a row whose mark a person pinned keeps it (`index.ts`, `writeLeg`), so its pin stands. `passOf` refuses a
+ * `Ledger` to a declaration whose own rule reads the mark, the one case where that would not hold.
+ */
+type Ledger = {
+  bySize: Map<number, { at: number; leg: Leg }[]>;
+  shapes: Map<string, Shape | null>;
+  can: Map<string, boolean>;
+  waits: Map<string, boolean>;
+};
+
+function ledgerOf(p: Pairing): Ledger {
+  const bySize = new Map<number, { at: number; leg: Leg }[]>();
+  const shapes = new Map<string, Shape | null>();
+  for (const r of p.sql.all<LegRow>(`SELECT ${LEG_COLUMNS} FROM entry WHERE register = ? AND deleted_at IS NULL ORDER BY rowid`, p.register)) {
+    const leg = legOf(r);
+    const shape = shapeOf(p, leg);
+    shapes.set(leg.id, shape);
+    /* A ROW WITH NO SHAPE MIRRORS NOTHING, so it is in no window. */
+    if (shape === null) continue;
+    let group = bySize.get(shape.amount.size);
+    if (group === undefined) bySize.set(shape.amount.size, (group = []));
+    group.push({ at: shape.at, leg });
+  }
+  for (const group of bySize.values()) group.sort((a, b) => a.at - b.at);
+  return { bySize, shapes, can: new Map(), waits: new Map() };
+}
+
+/** The legs of one size group whose day is between `lo` and `hi`, both included. */
+function inWindow(group: readonly { at: number; leg: Leg }[], lo: number, hi: number): Leg[] {
+  let from = 0;
+  let to = group.length;
+  while (from < to) {
+    const mid = (from + to) >>> 1;
+    if (group[mid]!.at < lo) from = mid + 1;
+    else to = mid;
+  }
+  const out: Leg[] = [];
+  for (let i = from; i < group.length && group[i]!.at <= hi; i++) out.push(group[i]!.leg);
+  return out;
+}
+
+/* A ROW'S SHAPE, PAIRABILITY AND WAITING, read from the `Ledger` when there is one. By id, since the pass reads a row
+   again before writing it, and that copy differs from the one in hand only in the mark and `_pair`. */
+const shapeIn = (p: Pairing, ledger: Ledger, leg: Leg): Shape | null => (ledger.shapes.has(leg.id) ? ledger.shapes.get(leg.id)! : shapeOf(p, leg));
+
+function canPair(p: Pairing, leg: Leg, ledger: Ledger | null): boolean {
+  if (ledger === null) return pairable(p, leg);
+  let can = ledger.can.get(leg.id);
+  if (can === undefined) ledger.can.set(leg.id, (can = pairable(p, leg)));
+  return can;
+}
+
+function waitsIn(p: Pairing, leg: Leg, ledger: Ledger | null): boolean {
+  if (ledger === null) return waiting(p, leg);
+  let waits = ledger.waits.get(leg.id);
+  if (waits === undefined) ledger.waits.set(leg.id, (waits = waiting(p, leg)));
+  return waits;
 }
 
 /** The one candidate nearest in time, or `null` when there is none or two are equally near. */
@@ -583,11 +668,12 @@ function nearestIn(near: readonly { leg: Leg; gap: number }[]): Leg | null {
 }
 
 function nearestOf(p: Pairing, leg: Leg, windows: Windows): Leg | null {
-  return pairable(p, leg) ? nearestIn(windowOf(p, leg, windows).near) : null;
+  return canPair(p, leg, windows.ledger) ? nearestIn(windowOf(p, leg, windows).near) : null;
 }
 
-/** What `around` answered for each leg, by id, for as long as one question about the ledger lasts. */
-type Windows = Map<string, ReturnType<typeof around>>;
+/** What `around` answered for each leg, by id, for as long as one question about the ledger lasts, and the list it reads. */
+type Windows = { seen: Map<string, ReturnType<typeof around>>; ledger: Ledger | null };
+const windowsOf = (ledger: Ledger | null = null): Windows => ({ seen: new Map(), ledger });
 
 /**
  * `around`, asked once per leg for as long as the ledger does not change: one `partnerOf`, or one `settle`, which
@@ -598,8 +684,8 @@ type Windows = Map<string, ReturnType<typeof around>>;
  * of fifty round amounts in one year, the install pass asked 159,018 windows for 10,000 rows.
  */
 function windowOf(p: Pairing, leg: Leg, windows: Windows): ReturnType<typeof around> {
-  let w = windows.get(leg.id);
-  if (w === undefined) windows.set(leg.id, (w = around(p, leg)));
+  let w = windows.seen.get(leg.id);
+  if (w === undefined) windows.seen.set(leg.id, (w = around(p, leg, windows.ledger)));
   return w;
 }
 
@@ -822,13 +908,13 @@ function answersOf(p: Pairing, set: Map<string, Near>): Map<string, string | nul
  * nearest candidate is nearer to somebody else stays unpaired and counted; that is the side a mistake should fall on.
  */
 export function partnerOf(p: Pairing, leg: Leg): string | null {
-  return answerOf(p, leg, new Map(), new Map()).to;
+  return answerOf(p, leg, new Map(), windowsOf()).to;
 }
 
 /** `partnerOf`, with the legs of the set it read, and every answer that set gave kept in `known` for the next leg asked. */
 function answerOf(p: Pairing, leg: Leg, known: Map<string, string | null>, windows: Windows): { to: string | null; set: string[] } {
   if (known.has(leg.id)) return { to: known.get(leg.id)!, set: [] };
-  if (leg.deleted_at !== null || !pairable(p, leg)) return { to: null, set: [] };
+  if (leg.deleted_at !== null || !canPair(p, leg, windows.ledger)) return { to: null, set: [] };
   const { set, whole } = setOf(p, leg, windows);
   if (whole) {
     for (const [id, to] of answersOf(p, set)) known.set(id, to);
@@ -856,30 +942,66 @@ const SETTLE_MOST = 256;
  * neighbour nor a `_pair` leads there (`pairs-ties.test.ts`, the chain). A set the write broke apart is reached the same
  * way, since each piece of it holds a row that stood next to the written one.
  *
- * `answered` COLLECTS EVERY ROW WHOSE PARTNER WAS ASKED, changed or not, for a caller settling a whole ledger one seed
- * at a time (`index.ts`, `settleRedeclared`): a row asked once has had its answer written, and asking it again as a
- * seed of its own only read its set a second time. Measured on 10,000 rows of fifty round amounts in one year, the pass
- * asked 59,194 rows before it kept this.
+ * `pass` IS A CALLER SETTLING A WHOLE LEDGER ONE SEED AT A TIME (`index.ts`, `settleRedeclared`, and `passOf`). Its
+ * `answered` collects every row whose partner was asked, changed or not: a row asked once has had its answer written,
+ * and asking it again as a seed of its own only read its set a second time. Measured on 10,000 rows of fifty round
+ * amounts in one year, the pass asked 59,194 rows before it kept this.
  */
-export function settle(p: Pairing, seeds: readonly string[], answered?: Set<string>): { leg: Leg; to: string | null }[] {
+export function settle(p: Pairing, seeds: readonly string[], pass?: Pass): { leg: Leg; to: string | null }[] {
   const want = new Map<string, { leg: Leg; to: string | null }>();
-  const known = new Map<string, string | null>();
-  const windows: Windows = new Map();
+  const known = pass?.known ?? new Map<string, string | null>();
+  const windows = pass?.windows ?? windowsOf();
   const queue = [...seeds];
   while (queue.length > 0 && want.size < SETTLE_MOST) {
     const id = queue.shift()!;
     if (want.has(id)) continue;
+    /* A ROW AN EARLIER CALL OF THE SAME PASS ANSWERED IS NOT WALKED AGAIN, when the pass keeps its answers (`passOf`):
+       its answer is written, and whatever it leads to is a seed of the pass or was answered with it. Walked again, as
+       it was, each new seed on 200 rows of one amount in a week led back through the same 140 rows for one new answer. */
+    if (pass?.known !== undefined && pass.answered.has(id)) continue;
     const leg = loadLeg(p, id);
     if (!leg) continue;
     const { to, set } = answerOf(p, leg, known, windows);
     want.set(id, { leg, to });
-    answered?.add(id);
+    pass?.answered.add(id);
     const held = leg.fields._pair;
     for (const next of [typeof held === 'string' ? held : null, to, ...set]) if (next !== null && !want.has(next)) queue.push(next);
   }
   /* AND A PAIRED ROW WHOSE MARK IS NOT TRUE, which only a mechanism can leave behind: a rule's `false` is not a pin
      (`isMechanism`), so the pair it contradicts still stands and the mark is put back to what the pair says. */
   return [...want.values()].filter(({ leg, to }) => (leg.fields._pair ?? null) !== to || (to !== null && leg.fields[p.pairs.mark] !== true));
+}
+
+/**
+ * One pass over a whole list, one `settle` per seed: which rows it has answered, and, when they hold for the length of
+ * the pass, the answers, the windows and the list read once (`Ledger`).
+ *
+ * AUDIT SIXTY-FIVE'S FINDING 3. Each `settle` read its own windows and answered its own rows, so a pass over a list
+ * where most rows share a size read the same windows once per seed: 10,000 rows of three amounts in one year took 80 to
+ * 146 s, one amount did not finish in 20 minutes, and a Durable Object request gets 30. Nothing the pass writes moves an
+ * answer, since a row's partner is read from the fields `pairsReads` names other than the mark, and from whether a
+ * person pinned the mark, and the pass writes only the mark and `_pair`, signed by the record. So one answer, one window
+ * and one reading of each row serve the whole pass, and the ledger it leaves is the one each `settle` answering afresh
+ * left (`pairs-settle-speed.test.ts`, `pairs-on-update.test.ts`).
+ *
+ * NOT WHERE THE DECLARATION READS ITS OWN MARK, in `on`, `opposite`, `across`, `date` or `where`: there each write of the
+ * pass moves the answers after it, and every `settle` still answers afresh, as all of them did before.
+ *
+ * MEASURED on 10,000 rows in one year, a third of them the legs of moves, the audit's ledger (`pairs-settle-speed.test.ts`),
+ * in the install's transaction on this machine with other work running on it: every amount one of 1, 3 or 50 round ones
+ * took 2.8 s, 1.4 s and 1.4 s, where the pass took more than 20 minutes, 80 to 146 s, and 2.9 s before. 2,000 rows of one
+ * amount in 73 days, as densely packed as the first, took 1,659.5 s before; 500 rows in 18 days 279.5 s before and 0.13 s
+ * now. Sixteen ledgers of 200 to 2,000 rows with pending, void, named and ticked rows, installed over no `pairs:` and
+ * over a looser one, came out the same row for row and event for event before and after, and three more under a `where`
+ * that reads the mark.
+ */
+export type Pass = { answered: Set<string>; known?: Map<string, string | null>; windows?: Windows };
+
+export function passOf(p: Pairing): Pass {
+  const date = dateField(p.pairs, p.fields);
+  const reads = [...p.pairs.on.map((x) => entryOf(x)?.field ?? x), p.pairs.opposite, p.pairs.across, ...(date === null ? [] : [date]), ...readBy(p.pairs.where)];
+  if (reads.includes(p.pairs.mark)) return { answered: new Set() };
+  return { answered: new Set(), known: new Map(), windows: windowsOf(ledgerOf(p)) };
 }
 
 /** The rows that could be `leg`'s partner, by id: `settle`'s seeds for a row as it was, or as it is. */

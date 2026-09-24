@@ -113,7 +113,7 @@ import {
 import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provisioned } from './provision.ts';
 import { dayIn, stampFinished } from './finished.ts';
 import type { StepsDecl } from './steps.ts';
-import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, settle, windowSql, PAIRS_ACTOR, type Leg as PairLeg, type PairsDecl, type Pairing } from './pairs.ts';
+import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, passOf, settle, windowSql, PAIRS_ACTOR, type Leg as PairLeg, type PairsDecl, type Pairing } from './pairs.ts';
 import { costOf, costRank } from './weigh.ts';
 import { evaluateMetric, predicateOf, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { readBlock, readPage, registersOf, registersOfBlock, resolvePages, type ActivityEvent, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
@@ -4006,12 +4006,14 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * agree row for row.
    *
    * NOTHING IS CAPPED, because a cap is this finding again for the rows past it, so the cost is bounded by the ledger.
-   * MEASURED on 10,000 rows, a third of them the legs of 1,666 moves, in one transaction on this machine: 1.8 s over five
-   * years of varied amounts, 2.0 s when every amount is one of fifty round ones, and 2.9 s with those packed into one
-   * year, 27 rows a day; for 1,000 rows 0.12 s, 0.19 s and 0.17 s. The first attempt took 3.3 s, 7.6 s and 251 s: the
-   * packed ledger read each window of 250 rows whole, asked 159,018 windows for 10,000 rows, and ran longer than a
-   * Durable Object lets a request run. Now each row's window is asked about once (`pairs.ts`, `windowOf` and `answered`)
-   * and holds only the rows of its size (`around`).
+   * The first attempt took 3.3 s, 7.6 s and 251 s on 10,000 rows of varied amounts, fifty round ones, and fifty packed
+   * into one year: each window of 250 rows was read whole and 159,018 windows were asked. The second asked each row's
+   * window once per `settle` and only the rows of its size, 1.8 s to 2.9 s on those three, and audit sixty-five's finding
+   * 3 then measured it where most rows share a size: 10,000 rows of three amounts in one year 80 to 146 s, one amount
+   * more than 20 minutes, against the 30 s a Durable Object request gets. Every `settle` walked the same rows again for
+   * one new seed and read their windows afresh. Now the pass reads the list once, and one answer, one window and one
+   * reading of each row serve every `settle` in it (`pairs.ts`, `passOf`): 2.8 s, 1.4 s and 1.4 s for one, three and
+   * fifty amounts in one year, measured with other work running, and the same ledger row for row and event for event.
    */
   function settleRedeclared(): void {
     const is = listsOf(sql.all<{ id: string; body: string }>("SELECT id, body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0")).registers;
@@ -4043,22 +4045,24 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       );
       const alike = new Map<number, number>();
       for (const r of rows) if (r.size) alike.set(r.size, (alike.get(r.size) ?? 0) + 1);
-      /* AN INDEX THE WINDOW'S QUERY IS PLANNED ON, FOR THE LENGTH OF THE PASS, on the list, the size and the day, the
-         three things `pairs.ts` asks a window by (`windowSql`). With no statistics SQLite reads a window of a list
-         through `entry_state` and every row of the list with it: 8.5 ms a question on 10,000 rows, against 0.19 ms on the
-         list and the day and 0.03 ms on all three, measured. It is dropped in the transaction that made it, and a
-         rollback takes it too. */
-      const index = `entry_settle_${id}`;
-      if (window) sql.exec(`CREATE INDEX IF NOT EXISTS ${index} ON entry (register, ${window.size}, ${window.day}) WHERE deleted_at IS NULL`);
+      /* THE PASS READS THE LIST ONCE and answers each window from it (`pairs.ts`, `passOf`), asking SQL only for a row by
+         id and for a row's history. EVERY ROW `settle` ASKED, changed or not, is not a seed again: its answer is written
+         (`pass.answered`). */
+      const pass = passOf(p);
+      /* AN INDEX FOR THE ONE PASS THAT STILL ASKS A QUERY PER WINDOW, a declaration whose own rule reads its mark
+         (`passOf` shares nothing with it), on the list, the size and the day, the three things a window is asked by
+         (`windowSql`). With no statistics SQLite reads a window of a list through `entry_state` and every row of the list
+         with it: 8.5 ms a question on 10,000 rows, against 0.19 ms on the list and the day and 0.03 ms on all three,
+         measured. It is dropped in the transaction that made it, and a rollback takes it too. */
+      const index = window && pass.windows === undefined ? `entry_settle_${id}` : null;
+      if (index && window) sql.exec(`CREATE INDEX IF NOT EXISTS ${index} ON entry (register, ${window.size}, ${window.day}) WHERE deleted_at IS NULL`);
       try {
-        /* EVERY ROW `settle` ASKED, changed or not, is not a seed again: its answer is written (`answered`). */
-        const answered = new Set<string>();
         for (const r of rows) {
-          if (answered.has(r.id) || (!r.paired && (r.size === null || (alike.get(r.size) ?? 0) < 2))) continue;
-          for (const { leg, to } of settle(p, [r.id], answered)) writeLeg(p, leg, to, true, batch, now, note);
+          if (pass.answered.has(r.id) || (!r.paired && (r.size === null || (alike.get(r.size) ?? 0) < 2))) continue;
+          for (const { leg, to } of settle(p, [r.id], pass)) writeLeg(p, leg, to, true, batch, now, note);
         }
       } finally {
-        if (window) sql.exec(`DROP INDEX IF EXISTS ${index}`);
+        if (index) sql.exec(`DROP INDEX IF EXISTS ${index}`);
       }
     }
   }
