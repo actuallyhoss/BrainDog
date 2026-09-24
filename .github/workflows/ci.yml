@@ -58,9 +58,11 @@ jobs:
     # SELF-HOSTED, BECAUSE THE ACCOUNT RAN OUT OF ACTIONS MINUTES (September 17th, the owner's call).
     # Self-hosted minutes are free. Set the repository variable CI_RUNNER to ubuntu-24.04 to go back.
     runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
-    # 52 §7 budgets this workflow at 20 minutes. It runs in about five; the budget is the ceiling at
-    # which a hung browser or a wedged install is killed rather than left to burn six hours.
-    timeout-minutes: 20
+    # 52 §7 budgets this workflow at 20 minutes, and it is a ceiling for a hang, not a budget. It no longer runs in about
+    # five: on GitHub's runners the test step and the gates took 19 min 13 s in run 35931879146 on 24 September, and the
+    # next run (35934713449, two packs and their tests added) was killed at 20 minutes in the middle of the gates with
+    # nothing hung. So the ceiling is 30, still far short of the six hours it exists to stop.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
