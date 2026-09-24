@@ -1,5 +1,6 @@
 <!--
-  Draws one glyph from `icons.ts`, inline, `currentColor` only.
+  Draws one glyph, inline, `currentColor` only: the app's own from `icons.ts`, or any of the 251 in
+  `braindog-render/glyphs`, resolved in that order by `pathOf`.
 
   There is no icon component that accepts a `color` prop, because that would be a colour-writing
   component and CI must reject it (22 §9). Size is one of four names, never a number: a literal that
@@ -12,7 +13,7 @@
   /* The paths live in `icons.ts` so non-component code can read them; see the note there. Imported
      AND re-exported, not bare re-exported: a pass-through `export ... from` puts the names in the
      module's public surface without putting them in its scope, and the markup below needs them. */
-  import { PATHS, type IconName } from './icons.ts';
+  import { PATHS, glyphSet, glyphSetNow, pathOf, type IconName } from './icons.ts';
 
   export { PATHS, type IconName };
 </script>
@@ -23,6 +24,17 @@
     size = 'm',
     title,
   }: { name: IconName; size?: 's' | 'm' | 'l' | 'xl'; title?: string } = $props();
+
+  /* A NAME ONLY THE SET HOLDS DRAWS NOTHING UNTIL THE SET ARRIVES, then its path. The set is a chunk
+     of its own (`glyphs/index.ts` says why), so the first `Icon` to need it starts the fetch and every
+     one mounted after it finds the set in hand through `glyphSetNow`. Before this, any name outside
+     the app's own map drew `<path>` with no `d`, an empty box, and kept drawing it. */
+  let set = $state(glyphSetNow());
+  const d = $derived(pathOf(name, set));
+
+  $effect(() => {
+    if (d === undefined && set === undefined) void glyphSet().then((arrived) => (set = arrived));
+  });
 </script>
 
 <svg
@@ -38,7 +50,7 @@
   aria-label={title}
   aria-hidden={title ? undefined : 'true'}
 >
-  <path d={PATHS[name]} />
+  {#if d}<path {d} />{/if}
   {#if name === 'vault'}<circle cx="12" cy="10.5" r="1.6" fill="currentColor" stroke="none" />{/if}
   {#if name === 'settings'}
     <circle cx="14.5" cy="7" r="1.7" />

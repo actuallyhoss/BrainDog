@@ -15,7 +15,7 @@ import { agentDoing, day as fmtDay, diffRows, money, relative, shortDay, since, 
 import { amountOf, currencyOf, homeOf, mixedFix } from './money.ts';
 import type { Column, TableRow } from 'braindog-render/svelte';
 import { answers, terms, tokensOf, why } from './find.ts';
-import { PATHS, type IconName } from '../ui/icons.ts';
+import { isGlyph, type IconName } from '../ui/icons.ts';
 import { copy } from '../copy.ts';
 import { ruleName, useCaseName } from '@braindog/seed/usecases/names';
 import {
@@ -1556,9 +1556,13 @@ export type NavEntry = {
  * it asks for may be one this build has never heard of, and the answer to that is the fallback
  * glyph for the kind of row, never an empty box and never a thrown error: a rail is not allowed to
  * fail to render because someone spelled `obligations` where the set says `obligation`.
+ *
+ * "THE SET" IS ALL 251, not the 63 the app drew for itself. This checked `PATHS` alone until
+ * 24 September, so `icon: rocket`, a name `braindog-render/glyphs` ships, drew a document. The answer is
+ * still synchronous: `isGlyph` knows every name up front and only the paths arrive late.
  */
 export const iconFor = (declared: string | undefined, fallback: IconName): IconName =>
-  declared && Object.hasOwn(PATHS, declared) ? (declared as IconName) : fallback;
+  declared && isGlyph(declared) ? declared : fallback;
 
 /** The frozen hue of a declared identity, or undefined when the page is not about a row. */
 export const hueOf = (id: { register: string; seq: number } | undefined): number | undefined => {
