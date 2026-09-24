@@ -367,6 +367,164 @@ const HELD_INSTEAD: Record<string, string> = {
 };
 
 /**
+ * `more than`, `at least`, `less than`, `at most` and `between`: the five words for the five ordered
+ * operators, and the ones no sentence could say.
+ *
+ * `compile` and `evaluate` have answered `gt gte lt lte between` since the grammar was written, and
+ * `operatorAllowed` orders seven types by them. Measured through a kernel `list` on 24 September
+ * (`loop/research-m4-app.md`, brief 6): `n is at least 100` over an `int` was `VALUE_MALFORMED`, the
+ * words handed to `resolve` as the value of an `is`; `n more than 100` and `n between 1 and 5` were
+ * `MATCH_OP_UNSUPPORTED`; and over a `money` field the first came back `MONEY_LITERAL_NEEDS_CURRENCY`
+ * for a sentence that had never got as far as a number. So "is this bill past a hundred pounds", the
+ * question a number is asked most, was the one a page, a rule's `when:` and a step's `if` could not
+ * put, and `kernel/src/figure.ts` records a flow step failing on exactly this.
+ *
+ * THE WORDS ARE THE ONES THE APP ALREADY PRINTS the tree in: `sparkOps` in the app's copy and the flow
+ * canvas's `COMPARE` write `gte` as "is at least" and `between` as "is between X and Y". A clause a
+ * screen prints from the tree has to read back as that tree, so `is` is taken before each word as
+ * well as left out.
+ */
+const RANKED: Record<string, 'gt' | 'gte' | 'lt' | 'lte'> = { 'more than': 'gt', 'at least': 'gte', 'less than': 'lt', 'at most': 'lte' };
+
+/**
+ * The word for the other side of each, WHICH IS NOT THE NEGATION.
+ *
+ * `n is not at least 3` is every row under three AND every row with no `n`, since `34 §6` makes every
+ * positive operator false on a missing value and a negation true on it; `n less than 3` is the first
+ * half only. Compiling one as the other drops the empty rows without a word, so the sentence refuses
+ * and names the word that asks for the other side, saying what it leaves out.
+ */
+const OTHER_SIDE = { gt: 'at most', gte: 'less than', lt: 'at least', lte: 'more than' } as const;
+
+/**
+ * Minor-unit exponents, where a currency's is not two. `braindog-render`'s table and the kernel's
+ * `ingest.ts` table, key for key.
+ *
+ * A THIRD COPY, AND THE COST OF `where ⇏ kernel`. `EGP 100` in a sentence is what every screen here
+ * prints for `{ amount: 10000, currency: 'EGP' }`, so the literal is read in the currency's own units
+ * and the exponent turns it into the minor units the column holds. `Intl`'s digits are CLDR's and
+ * give `IQD` 0 where ISO gives 3 (`kernel/src/coerce.ts` has the argument), so the runtime cannot
+ * stand in for the table. `test/sentence-compare.test.ts` holds this against the kernel's, which the
+ * kernel's own tests hold against the renderer's: a copy is only a copy while something compares it.
+ */
+export const EXPONENT: Readonly<Record<string, number>> = {
+  CLF: 4, UYW: 4,
+  BHD: 3, IQD: 3, JOD: 3, KWD: 3, LYD: 3, OMR: 3, TND: 3,
+  BIF: 0, CLP: 0, DJF: 0, GNF: 0, ISK: 0, JPY: 0, KMF: 0, KRW: 0,
+  PYG: 0, RWF: 0, UGX: 0, UYI: 0, VND: 0, VUV: 0, XAF: 0, XOF: 0, XPF: 0,
+};
+
+/** The list `coerce` checks a currency against, so a filter and a write agree on what one is. */
+const CURRENCIES: ReadonlySet<string> = new Set(Intl.supportedValuesOf('currency'));
+
+const NUMBER = /^[+-]?\d+(?:\.\d+)?$/;
+/* THE CODE AT EITHER END, because `GBP 960.00` is what every surface prints and `960.00 GBP` is how
+   half the people who type one write it. A space between the two is optional. */
+const MONEY_WORDS = /^([A-Za-z]{3})\s*([+-]?\d+(?:\.\d+)?)$|^([+-]?\d+(?:\.\d+)?)\s*([A-Za-z]{3})$/;
+const QUANTITY_WORDS = /^([+-]?\d+(?:\.\d+)?)\s*(\D.*)$/;
+
+type Ranked = { op: 'gt' | 'gte' | 'lt' | 'lte' | 'between'; word: string; negated: boolean; operand: string };
+
+/**
+ * The ordered word a clause's tail opens with, after an optional `is` or `is not`, or `null`.
+ *
+ * `tail` is every word after the field's name. The words are folded, as `before` and `after` are
+ * not, because a page prints `is at least` and a person shouting it back in capitals means the same.
+ */
+function rankedOf(tail: readonly string[]): Ranked | null {
+  const w = tail.map((t) => t.toLowerCase());
+  let at = 0;
+  let negated = false;
+  if (w[0] === 'is') {
+    at = 1;
+    if (w[1] === 'not') {
+      at = 2;
+      negated = true;
+    }
+  }
+  const pair = `${w[at] ?? ''} ${w[at + 1] ?? ''}`;
+  if (Object.hasOwn(RANKED, pair)) return { op: RANKED[pair]!, word: pair, negated, operand: tail.slice(at + 2).join(' ') };
+  if (w[at] === 'between') return { op: 'between', word: 'between', negated, operand: tail.slice(at + 1).join(' ') };
+  return null;
+}
+
+/** A bound as the column holds it, or the refusal for the words that could not be one. */
+type Bound = { value: string | number | { amount: number; currency: string } | { value: number; unit: string } } | { code: string; fix: string };
+
+/**
+ * One bound of an ordered clause, read in the type of the field it is compared with.
+ *
+ * A NUMBER IS READ AS `resolve` READS ONE for `is`, so `n at least 3` and `n is 3` accept the same
+ * spellings; a day is `resolveDay`'s. A money and a quantity have no `is` literal in this grammar at
+ * all, and these are theirs: the number with its currency or its unit, because `compile` refuses a
+ * bare one (`MONEY_LITERAL_NEEDS_CURRENCY`, `QUANTITY_LITERAL_NEEDS_UNIT`) and would go on refusing
+ * it after the words were taught. The refusal is given HERE, with the compiler's code, because a
+ * rule's lint reads only what the parser says: a bare number that parsed would install a condition
+ * `evaluate` answers false for ever.
+ */
+function boundOf(sentence: string, field: string, decl: FieldSpec, said: string, nowMs: number): Bound {
+  const cannot = { code: 'VALUE_MALFORMED', fix: `${sentence}: ${said} is not a value ${field} can hold.` };
+  switch (decl.type) {
+    case 'int':
+    case 'duration': {
+      const n = Number(said);
+      return /^[+-]?\d+$/.test(said) && Number.isSafeInteger(n) ? { value: n } : cannot;
+    }
+    case 'decimal': {
+      const n = Number(said);
+      return said.trim() !== '' && Number.isFinite(n) ? { value: n } : cannot;
+    }
+    case 'day':
+    case 'instant': {
+      const day = resolveDay(said, nowMs);
+      return day === null
+        ? { code: 'VALUE_MALFORMED', fix: `${sentence}: ${said} is not a date. Write 2026-10-01, +30d, or one of ${WORDS.join(', ')}.` }
+        : { value: day };
+    }
+    case 'money': {
+      if (NUMBER.test(said))
+        return {
+          code: 'MONEY_LITERAL_NEEDS_CURRENCY',
+          fix: `${sentence}: ${field} is money, and ${said} with no currency is not an amount of money. Write it with its currency, as GBP 960.00.`,
+        };
+      const m = MONEY_WORDS.exec(said);
+      if (!m) return cannot;
+      const code = (m[1] ?? m[4] ?? '').toUpperCase();
+      const written = m[2] ?? m[3] ?? '';
+      if (!CURRENCIES.has(code)) return { code: 'CURRENCY_UNKNOWN', fix: `${sentence}: ${code} is not a currency ISO 4217 assigns.` };
+      /* PRECISION PAST THE CURRENCY'S IS NOT A NUMBER IT HOLDS, which is `kernel/src/map.ts`'s rule for
+         the same literal arriving from a feed: `JPY 12.5` is between two amounts a yen can be, and
+         rounding to either answers a question nobody asked. */
+      const places = EXPONENT[code] ?? 2;
+      const minor = Number(written) * 10 ** places;
+      if (Math.abs(minor - Math.round(minor)) > 1e-6)
+        return { code: 'VALUE_MALFORMED', fix: `${sentence}: ${code} is counted to ${places} decimal places, and ${written} has more.` };
+      if (!Number.isSafeInteger(Math.round(minor))) return cannot;
+      return { value: { amount: Math.round(minor), currency: code } };
+    }
+    case 'quantity': {
+      if (NUMBER.test(said))
+        return {
+          code: 'QUANTITY_LITERAL_NEEDS_UNIT',
+          fix: `${sentence}: ${field} is a quantity, and ${said} with no unit is not one. Write it with its unit, as 5 kg.`,
+        };
+      const m = QUANTITY_WORDS.exec(said);
+      return m ? { value: { value: Number(m[1]), unit: (m[2] ?? '').trim() } } : cannot;
+    }
+    default:
+      return cannot;
+  }
+}
+
+/** The number a bound is ordered by, which for a day is the day itself. */
+const rankOf = (v: unknown): string | number =>
+  typeof v === 'object' && v !== null ? ((v as { amount?: number; value?: number }).amount ?? (v as { value: number }).value) : (v as string | number);
+
+/** The half of a compound bound that is not its number, or `null` for a plain one. */
+const qualifierOf = (v: unknown): string | null =>
+  typeof v === 'object' && v !== null ? ((v as { currency?: string }).currency ?? (v as { unit?: string }).unit ?? null) : null;
+
+/**
  * One sentence into one predicate.
  *
  * An empty sentence is `undefined` — every row — rather than an empty `all`, because the caller
@@ -472,6 +630,114 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
 
     const verb = words[after] ?? '';
     const rest = words.slice(after + 1).join(' ');
+
+    /* ── more than · at least · less than · at most · between ─────────────── */
+    const ranked = rankedOf(words.slice(after));
+    /**
+     * THE DECLARED VALUES COME FIRST HERE TOO, for the reason the `is empty` branch below gives: an
+     * enum free to declare `more_than_one` must not become unfilterable on that value because this
+     * grammar learned a word. The bare form, `n more than 3`, was never anything but a refusal, so
+     * only the `is` spelling is asked whether it names a value the field declares, and the words
+     * asked are the ones after `is` or `is not`, so that the negation of a declared value is still
+     * that negation.
+     *
+     * AND A FIELD NO ORDER APPLIES TO KEEPS THE WORDS AFTER `is` AS ITS VALUE, whatever they are.
+     * The first version of this branch refused `what is more than coffee` over a text as an order a
+     * text cannot be asked, and before the words were taught it was `{ field: 'what', is: 'more than
+     * coffee' }`: a merchant or a note may begin with any words, so the grammar learning five of them
+     * took a working filter away. Only an enum and a ref are asked what they declare, because a word
+     * they do not declare is not a value they can hold either, and the order's refusal is the one
+     * that says what was meant. Over a number, a money or a day the spelling is the order.
+     */
+    const isValue =
+      ranked !== null && verb === 'is'
+        ? decl.type === 'enum' || decl.type === 'ref'
+          ? ![null, NO_ROW].includes(resolve(schema, field, decl, `${ranked.word} ${ranked.operand}`.trim(), deps) as string | null)
+          : !operatorAllowed(ranked.op, decl.type)
+        : false;
+    if (ranked && !isValue) {
+      const { op, word, negated, operand } = ranked;
+      /* ASKED OF THE STRUCTURED COMPILER'S OWN TABLE, as `has` and `is empty` are, and with the code
+         that table's refusal carries. `between` stands for all five: the table orders them together. */
+      if (!operatorAllowed(op, decl.type)) {
+        bad.push({
+          code: 'MATCH_OP_UNSUPPORTED',
+          fix: `${sentence}: ${field} is a ${decl.type}, and ${word} is not something a ${decl.type} can be asked. Order is about numbers, money and dates.`,
+          at: field,
+        });
+        continue;
+      }
+      if (negated) {
+        bad.push({
+          code: 'MATCH_OP_UNSUPPORTED',
+          fix:
+            op === 'between'
+              ? `${sentence}: a filter cannot say is not between.`
+              : `${sentence}: a filter cannot say is not ${word}. ${field} ${OTHER_SIDE[op]} ${operand} asks for the other side, and leaves out the rows with no ${field}.`,
+          at: field,
+        });
+        continue;
+      }
+      if (!operand.trim()) {
+        bad.push({ code: 'REQUIRED_MISSING', fix: `${sentence}: ${word} what?`, at: field });
+        continue;
+      }
+
+      if (op !== 'between') {
+        const bound = boundOf(sentence, field, decl, operand, deps.nowMs);
+        if ('code' in bound) {
+          bad.push({ ...bound, at: field });
+          continue;
+        }
+        clauses.push({ field, [op]: bound.value } as Predicate);
+        continue;
+      }
+
+      /* TWO VALUES JOINED BY `and`, AND NOTHING ELSE. `n between 1` or `n between 1 and` would
+         otherwise hand `resolve` a word it has to refuse for the wrong reason. */
+      const ends = operand.split(/\s+and\s+/i);
+      if (ends.length !== 2 || ends.some((e) => !e.trim())) {
+        bad.push({ code: 'VALUE_MALFORMED', fix: `${sentence}: between takes two values joined by and, the low value first.`, at: field });
+        continue;
+      }
+      const lo = boundOf(sentence, field, decl, ends[0]!.trim(), deps.nowMs);
+      const hi = boundOf(sentence, field, decl, ends[1]!.trim(), deps.nowMs);
+      if ('code' in lo || 'code' in hi) {
+        bad.push({ ...('code' in lo ? lo : (hi as { code: string; fix: string })), at: field });
+        continue;
+      }
+      /* ONE CURRENCY AND ONE UNIT, with the codes `compile` and the metrics already give for it. */
+      if (qualifierOf(lo.value) !== qualifierOf(hi.value)) {
+        bad.push(
+          decl.type === 'money'
+            ? { code: 'MIXED_CURRENCY', fix: `${sentence}: between takes one currency, and this range has two.`, at: field }
+            : { code: 'QUANTITY_MIXED_UNIT', fix: `${sentence}: between takes one unit, and this range has two.`, at: field },
+        );
+        continue;
+      }
+      /* LOW FIRST. `between 5 and 1` compiles in the tree and matches no row whatever the register
+         holds: a clause that parses, runs and answers nothing, which this file is written against. */
+      if (rankOf(lo.value) > rankOf(hi.value)) {
+        bad.push({ code: 'VALUE_MALFORMED', fix: `${sentence}: between takes the low value first, and ${ends[0]!.trim()} is past ${ends[1]!.trim()}.`, at: field });
+        continue;
+      }
+      /**
+       * A RANGE OF DAYS IS SAID AS ITS TWO ENDS, NOT AS `between`, and an instant is why.
+       *
+       * `gte` and `lte` cut a stored instant to its day when the bound is a bare day (`asDay` in
+       * `index.ts`), and `between` does not: it compares `2026-09-03T11:57:00.000Z` with `2026-09-03`,
+       * which sorts after it, so `seen between 2026-09-01 and 2026-09-03` left out everything seen on
+       * the third, in `compile` and `evaluate` alike (`sentence-compare.test.ts` measures it). The
+       * two ends answer what the sentence says on an instant and are the same rows as `between` on a
+       * day, so both dated types take them and a reader of either sees one shape.
+       */
+      clauses.push(
+        decl.type === 'day' || decl.type === 'instant'
+          ? ({ all: [{ field, gte: lo.value }, { field, lte: hi.value }] } as Predicate)
+          : ({ field, between: [lo.value, hi.value] } as Predicate),
+      );
+      continue;
+    }
 
     /* ── before · after · on ─────────────────────────────────────────────── */
     /* `Object.hasOwn`, NOT `in`, AND FOR THE REASON THE FIELD LOOKUP ABOVE USES IT. `ORDERED` is

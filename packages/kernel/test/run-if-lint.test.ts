@@ -55,21 +55,35 @@ test('AN if THE RUN CANNOT READ IS REFUSED AT INSTALL, in the words the run woul
      this check holds it. Measured before the check: the same body installed through `install` as well. */
   const { k, sql } = await open();
   assert.ok((await k.install([check([{ if: 'what is Rent', then: TOLD }])])).ok);
-  sql.exec("UPDATE declaration SET body = json_set(body, '$.steps', json(?)) WHERE id = 'rule.check'", JSON.stringify([{ if: 'amount more than 1000', then: TOLD }]));
+  sql.exec("UPDATE declaration SET body = json_set(body, '$.steps', json(?)) WHERE id = 'rule.check'", JSON.stringify([{ if: 'amount over 1000', then: TOLD }]));
   const again = await openRecord(sql, fixedClock(NOW));
   assert.ok(again.create('bills', { what: 'Rent', amount: '1200' }, { actor: 'p_1' }).ok);
   await again.drain();
   const run = sql.one<{ state: string; say: string }>("SELECT state, say FROM automation_run WHERE rule = 'check'");
   assert.equal(run?.state, 'failed');
   const said = run!.say.replace(/^rule\.check could not read its condition at step 1: /, '');
-  assert.equal(said, 'amount more than 1000: more is not something a filter can say. Write is, is not, before, after, on, has, lacks or contains.');
+  assert.equal(said, 'amount over 1000: over is not something a filter can say. Write is, is not, before, after, on, has, lacks or contains.');
 
   const fresh = await open();
-  const out = await fresh.k.install([check([{ if: 'amount more than 1000', then: TOLD }])]);
+  const out = await fresh.k.install([check([{ if: 'amount over 1000', then: TOLD }])]);
   assert.equal(out.ok, false, 'a run-path if the run cannot read installed');
   assert.equal(codeOf(out), 'MATCH_OP_UNSUPPORTED');
   assert.equal(fixOf(out), `rule.check cannot read its condition at steps[0]: ${said}`);
   assert.equal((out as { refusal?: { at?: string } }).refusal?.at, 'steps[0].if');
+});
+
+test('AND THE if THIS FILE WAS FOUND ON IS READ NOW, at install and at the run', async () => {
+  /* `amount more than 1000` WAS THIS FILE'S UNREADABLE CONDITION UNTIL M4 brief 6 taught the sentence the five ordered
+     words, and the two tests above went red on it: it installed, and the run answered `done`. They ask `over` now, which
+     neither grammar reads. This is the other half, so the lint is seen passing the words it used to refuse and the run
+     is seen finishing on the step it used to fail at. */
+  const { k, sql } = await open();
+  const out = await k.install([check([{ if: 'amount more than 1000', then: TOLD }])]);
+  assert.ok(out.ok, fixOf(out));
+  assert.ok(k.create('bills', { what: 'Rent', amount: '1200' }, { actor: 'p_1' }).ok);
+  await k.drain();
+  const run = sql.one<{ state: string; say: string | null }>("SELECT state, say FROM automation_run WHERE rule = 'check'");
+  assert.equal(run?.state, 'done', run?.say ?? '');
 });
 
 test('INSIDE A BRANCH TOO, and a name that is neither a field of the row nor an answer the rule gives', async () => {
@@ -91,11 +105,11 @@ test('AN if ABOUT AN ANSWER IS REFUSED ONLY FOR WHAT NO ANSWER COULD MAKE READAB
   for (const cond of ['n is late', 'n is 5', 'what is Rent, n is 3'])
     assert.ok((await k.install([check([asked, { if: cond, then: TOLD }])])).ok, cond);
   /* A VERB NO TYPE TAKES IS REFUSED ABOUT AN ANSWER AS ABOUT A FIELD. */
-  const verb = await k.install([check([asked, { if: 'n more than 3', then: TOLD }])]);
+  const verb = await k.install([check([asked, { if: 'n over 3', then: TOLD }])]);
   assert.equal(codeOf(verb), 'MATCH_OP_UNSUPPORTED');
   assert.equal((verb as { refusal?: { at?: string } }).refusal?.at, 'steps[1].if');
 
-  const templated = await k.install([check([{ set_var: { name: 'w', to: 'x' } }, { if: '{{vars.w}} more than 3', then: TOLD }])]);
+  const templated = await k.install([check([{ set_var: { name: 'w', to: 'x' } }, { if: '{{vars.w}} over 3', then: TOLD }])]);
   assert.ok(templated.ok, fixOf(templated));
 });
 

@@ -187,11 +187,16 @@ test('an operator the build does not read is named as an operator, not matched a
      `UNIMPLEMENTED` because this engine reads them: they are the two published operators that take
      no operand, the kernel beside it has compiled both since its first draft, and refusing the
      sentence for a predicate the JSON form accepts is the two-languages failure both files are
-     held against. The rest of the list is still published and still unread. */
+     held against. The rest of the list is still published and still unread.
+     AND THE FIVE ORDERED WORDS CAME OFF IT WITH M4 brief 6, which taught both engines them. The first
+     row is an order now, refused for the currency it lacks rather than read as a value, and the
+     text row went with them: `note is more than 10` is a text value again, as it was before the
+     words were taught (`where-compare.test.ts` holds that against the record). `starts with` is still
+     published and still unread, and is the row that keeps this test about an unread word. */
   for (const [text, word] of [
     ['amount is at least 10000', 'at least'],
-    ['note is more than 10', 'more than'],
     ['amount is between 1 and 2', 'between'],
+    ['amount is starts with 10', 'starts with'],
   ] as const) {
     const w = compile('obligations', text);
     assert.ok(w.bad.length, `${text} was accepted`);
@@ -215,9 +220,14 @@ test('an unparseable clause says which operators exist, in the words to type', (
      `lacks`; and `on` was omitted from both spellings while the record answered it, so the refusal
      was teaching an agent that an operator it had just read in the published grammar and the record
      beside it answers does not exist. The order is the record's own `allowed` array at
-     `packages/where/src/sentence.ts:466`, which has listed all seven since `on` was read there. */
-  const said = compile('obligations', 'what contains invoice').bad[0] ?? '';
-  assert.match(said, /Write is, is not, before, after, on, has or lacks\./);
+     `packages/where/src/sentence.ts:466`, which has listed all seven since `on` was read there.
+     THIRTEEN NOW, AND A DIFFERENT CLAUSE. `what contains invoice` was this test's unreadable clause
+     and both engines read it since brief 6, so it would have tested nothing but its own acceptance;
+     `over` is a word a person reaches for and neither grammar has. The five ordered words follow the
+     record's eight in `RANKED`'s order, and the record's own sentence still says eight, for the
+     reason `cannotSay` gives. */
+  const said = compile('obligations', 'what over invoice').bad[0] ?? '';
+  assert.match(said, /Write is, is not, before, after, on, has, lacks, contains, more than, at least, less than, at most or between\.$/);
   assert.ok(!/This build/.test(said), 'the software is describing itself in a refusal');
 });
 
@@ -1010,8 +1020,11 @@ test('and the widenings that were built against a measured failure are still the
     assert.deepEqual(compile(register, sentence).bad, [], `${sentence} was refused`);
 
   /* An operator in the value slot is still named as an operator rather than reported as a value the
-     field cannot hold, on a money field as much as on a text one. */
-  assert.match(compile('obligations', 'amount is at least 10000').bad[0] ?? '', /"at least" is not an operator/);
+     field cannot hold. `at least` IS AN OPERATOR BOTH ENGINES READ since brief 6, so over money it is
+     the order, refused in the record's words for the currency it lacks; `starts with` is still the
+     word neither reads. */
+  assert.match(compile('obligations', 'amount is at least 10000').bad[0] ?? '', /amount is money, and 10000 with no currency is not an amount of money/);
+  assert.match(compile('obligations', 'amount is starts with 10').bad[0] ?? '', /"starts with" is not an operator/);
 });
 
 test('A LABELLED VALUE IS FOUND BY ITS LABEL, as the record finds it, and by its id and words as before', () => {
@@ -1288,7 +1301,9 @@ test('and the refusals say the same thing, because a refusal is the teacher', as
      exist. The record's own sentence is still six words at `packages/where/src/sentence.ts:464`
      while its `allowed` array beside it is seven, so this one word is the one place the two
      refusals differ on purpose, and it differs towards what both engines actually accept. */
-  assert.match(compile('services', 'nonsense here').bad[0] ?? '', /Write is, is not, before, after, on, has or lacks/);
+  /* AND THIRTEEN SINCE BRIEF 6, BY THE SAME RULE: `contains` and the five ordered words are answered
+     by both engines now, and the record's sentence still names eight of them. */
+  assert.match(compile('services', 'nonsense here').bad[0] ?? '', /Write is, is not, before, after, on, has, lacks, contains, more than, at least, less than, at most or between\./);
 });
 
 test('an operand that is not there is a question back, on every operator that takes one', async () => {

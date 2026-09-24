@@ -39,6 +39,11 @@
  *                                       those two and `is not set` is the first
  *     tags has urgent                   a LIST holds the value
  *     tags lacks urgent                 and it does not. `has not` is the second of those two
+ *     what contains uber                a TEXT holds the words, in any case; quoted, exactly as written
+ *     n at least 3                      also at most, more than and less than, with or without `is`
+ *     n between 1 and 5                 both ends kept
+ *     amount at least GBP 960.00        money carries its currency, in the currency's own units
+ *     due between today and +30d        a range of days, both ends kept
  *     state is live, cycle is monthly   clauses are ANDed on the comma
  *
  * VALUES ARE MATCHED AGAINST WHAT THE UI SHOWS, not against what the column stores. `display()`
@@ -50,9 +55,11 @@
  * The temporal literals are the set `02-DATA-MODEL` §6 already settled on, not a set invented here.
  */
 
+import { exponentOf } from 'braindog-render';
+
 import { display, labelOf } from './api.ts';
-import { REGISTERS, ROWS } from './data.ts';
-import type { Entry, FieldDecl } from './schema.ts';
+import { NOW, REGISTERS, ROWS } from './data.ts';
+import { isMoney, type Entry, type FieldDecl } from './schema.ts';
 
 export type Clause =
   | { field: string; op: 'is' | 'is not'; values: string[] }
@@ -119,7 +126,37 @@ export type Clause =
    * that reported no delta over a register with a real minus fifty percent reports the delta. What is
    * left of the note is the line above it, which is why the element keeps its word here.
    */
-  | { field: string; op: 'has' | 'lacks'; values: [string] };
+  | { field: string; op: 'has' | 'lacks'; values: [string] }
+  /**
+   * AN ORDER OVER A DAY, WHICH KEEPS ITS WORD AND IS RESOLVED IN `matches`, as `before` and `on` are.
+   *
+   * THE SAME SHAPE AS THEM, `day` AND NO `values`, because `metrics.ts`'s `dayAt` reads a clause with
+   * no `values` as one that turns on a day and resolves it against the clock it is handed, so a tile
+   * over `due at least -30d` moves with the clock as one over `due after -30d` does. Not all the way:
+   * `endedAt` there gives an end to a window started by `after` alone, and a `gte` start gets none
+   * until that file reads it. A range of days is two of these, `gte` and `lte`, for the reason
+   * `compile` gives where it makes them.
+   */
+  | { field: string; op: Rank; day: string }
+  /**
+   * AN ORDER OVER A NUMBER OR A MONEY, with the bounds already read into the column's units.
+   *
+   * `values` IS THE WORDS AS WRITTEN, and it is there for the reader that tests the shape: `dayAt`
+   * reads a clause carrying `values` as one that turns on no day, which is true of a number. `bounds`
+   * is what `matches` compares, so a money bound is its minor units and its currency once, here.
+   */
+  | { field: string; op: Rank | 'between'; values: string[]; bounds: Bound[] }
+  /** A text holding the words, in the record's fold: ASCII letters in either case, nothing else. */
+  | { field: string; op: 'contains'; values: [string] };
+
+/** The four one-bound orders, by the operator the record's tree spells them with. */
+type Rank = 'gt' | 'gte' | 'lt' | 'lte';
+
+/**
+ * One bound as the column holds it: a number, a money's minor units with the currency beside them,
+ * or a quantity's number with its unit.
+ */
+type Bound = { n: number; currency?: string; unit?: string };
 
 export type Where = {
   /** The register it was compiled against. A value means nothing without one. */
@@ -269,7 +306,13 @@ export function resolveDay(word: string, now: number): string | null {
  * which is asserted by driving the pair over the record in `where.test.ts` rather than by saying so
  * here.
  */
-const CLAUSE = /^\s*([a-z][a-z0-9_ ]*?)\s+(is not|is|before|after|on|has|lacks)(?:\s+(.+?))?\s*$/i;
+/**
+ * AND `contains` AND THE FIVE ORDERED WORDS, which the record has read since brief 6 of
+ * `loop/research-m4-app.md` taught its sentence them (`contains` since `2023a1c0`). A two-word operator
+ * takes any run of spaces between its words, because the record splits a clause on `\s+` and reads the
+ * words, and `op` below folds the run to one space.
+ */
+const CLAUSE = /^\s*([a-z][a-z0-9_ ]*?)\s+(is not|is|before|after|on|has|lacks|contains|more\s+than|at\s+least|less\s+than|at\s+most|between)(?:\s+(.+?))?\s*$/i;
 
 /**
  * THE SAME CLAUSE, WITH THE FIELD'S OWN NAME ALLOWED TO END IN THE WORD `on`.
@@ -305,7 +348,7 @@ const CLAUSE = /^\s*([a-z][a-z0-9_ ]*?)\s+(is not|is|before|after|on|has|lacks)(
  * refuses it as an operator it cannot read. Both refuse, and neither invents a clause, which is the
  * property that matters here.
  */
-const NAMED_ON = /^\s*([a-z][a-z0-9_ ]*?\s+on)\s+(is not|is|before|after|on|has|lacks)(?:\s+(.+?))?\s*$/i;
+const NAMED_ON = /^\s*([a-z][a-z0-9_ ]*?\s+on)\s+(is not|is|before|after|on|has|lacks|contains|more\s+than|at\s+least|less\s+than|at\s+most|between)(?:\s+(.+?))?\s*$/i;
 
 /**
  * The operators `21-AUTHORING` §4.2 publishes and this build does not read.
@@ -322,7 +365,10 @@ const NAMED_ON = /^\s*([a-z][a-z0-9_ ]*?\s+on)\s+(is not|is|before|after|on|has|
 /* AND `has` AND `lacks` WERE NEVER ON IT, which is how they went unnoticed longest: a word in the
    value slot is caught by the sweep below, and these two are VERBS. `tags has urgent` never reached
    this list — it failed the grammar itself and got the sentence about the whole clause. */
-const UNIMPLEMENTED = ['at least', 'at most', 'more than', 'less than', 'contains', 'starts', 'starts with', 'ends', 'ends with', 'between', 'in', 'not in'];
+/* AND THE FIVE ORDERED WORDS AND `contains` CAME OFF IT TOGETHER, because both engines read them now.
+   `amount is at least 10000` is the example above, and it is an order now rather than a value: over
+   money it is refused for having no currency, in the record's words, and with one it is a clause. */
+const UNIMPLEMENTED = ['starts', 'starts with', 'ends', 'ends with', 'in', 'not in'];
 
 const norm = (v: string): string => v.toLowerCase().replace(/_/g, ' ').trim();
 
@@ -539,9 +585,15 @@ const WRONG_SHAPE = 'where: takes a sentence like `state is open, due before +30
    `allowed: ['is', 'is not', 'before', 'after', 'on', 'has', 'lacks']` two lines below writes seven,
    and that line is the record's to correct. Of the two ways to disagree with it, naming an operator
    both engines answer is the one that leaves an agent able to write a filter. The order is the
-   record's `allowed` order, so the day that sentence is widened the two read the same. */
+   record's `allowed` order, so the day that sentence is widened the two read the same.
+
+   AND IT NAMES THIRTEEN NOW, FIVE MORE THAN THE RECORD'S, by the same rule. The record's sentence was
+   widened for `contains` and says eight; the five ordered words were taught to both engines with
+   brief 6 and the record's sentence was not widened for them, because two tests outside that change
+   pin it word for word (`sentence-contains.test.ts`, `run-if-lint.test.ts`). The order is the
+   record's eight and then the five in the order its `RANKED` table gives them. */
 const cannotSay = (text: string): string =>
-  `${text}: that is not something a filter can say. Write is, is not, before, after, on, has or lacks.`;
+  `${text}: that is not something a filter can say. Write is, is not, before, after, on, has, lacks, contains, more than, at least, less than, at most or between.`;
 
 /**
  * One element of a list as the record would STORE it, from the value somebody wrote, or `null`.
@@ -692,6 +744,167 @@ const refuseElement = (text: string, register: string, field: string, of: string
   return `${text}: ${said} is not a value ${field} can hold`;
 };
 
+/* ── more than · at least · less than · at most · between ─────────────────── */
+
+/**
+ * The record's `RANKED`, `OTHER_SIDE`, `ORDERED` and exponent table, copied because `@braindog/where`
+ * is not a dependency of this app, and held to it by `where-compare.test.ts` driving both engines over
+ * the seed, refusal for refusal and word for word.
+ *
+ * THE EXPONENT IS `braindog-render`'S, which is the table `money()` prints every amount on this screen
+ * with and the one the record's copy is held against. `amount at least GBP 960.00` is typed in the
+ * units a person reads, and the column holds minor units: `GBP 960.00` is 96000.
+ */
+const RANKED: Record<string, Rank> = { 'more than': 'gt', 'at least': 'gte', 'less than': 'lt', 'at most': 'lte' };
+const OTHER_SIDE = { gt: 'at most', gte: 'less than', lt: 'at least', lte: 'more than' } as const;
+const ORDERED = new Set(['int', 'decimal', 'duration', 'money', 'quantity', 'day', 'instant']);
+const TEMPORAL_WORDS = 'today, tomorrow, yesterday, bow, bom, eom, boy, eoy';
+const CURRENCIES: ReadonlySet<string> = new Set(Intl.supportedValuesOf('currency'));
+const NUMBER = /^[+-]?\d+(?:\.\d+)?$/;
+const MONEY_WORDS = /^([A-Za-z]{3})\s*([+-]?\d+(?:\.\d+)?)$|^([+-]?\d+(?:\.\d+)?)\s*([A-Za-z]{3})$/;
+const QUANTITY_WORDS = /^([+-]?\d+(?:\.\d+)?)\s*(\D.*)$/;
+
+type Ranked = { op: Rank | 'between'; word: string; negated: boolean; operand: string };
+
+/** The ordered word a clause's tail opens with, after an optional `is` or `is not`: the record's `rankedOf`. */
+function rankedOf(tail: readonly string[]): Ranked | null {
+  const w = tail.map((t) => t.toLowerCase());
+  let at = 0;
+  let negated = false;
+  if (w[0] === 'is') {
+    at = 1;
+    if (w[1] === 'not') {
+      at = 2;
+      negated = true;
+    }
+  }
+  const pair = `${w[at] ?? ''} ${w[at + 1] ?? ''}`;
+  if (Object.hasOwn(RANKED, pair)) return { op: RANKED[pair]!, word: pair, negated, operand: tail.slice(at + 2).join(' ') };
+  if (w[at] === 'between') return { op: 'between', word: 'between', negated, operand: tail.slice(at + 1).join(' ') };
+  return null;
+}
+
+/**
+ * One bound, read in the field's type: a number, a money's minor units, or a day's word kept for
+ * `matches` to resolve. The record's `boundOf`, sentence for sentence.
+ *
+ * A DAY KEEPS ITS WORD, because this compiler has no clock and `matches` does: `due at least today`
+ * resolved here would answer against the wall clock while the rows are matched against the record's,
+ * which `elementValue` above records measuring once already. It is checked here, against the wall
+ * clock, only for being a day at all.
+ */
+function boundOf(text: string, field: string, type: string, said: string): { bound: Bound | null; day: string | null } | { fix: string } {
+  const cannot = { fix: `${text}: ${said} is not a value ${field} can hold.` };
+  switch (type) {
+    case 'int':
+    case 'duration': {
+      const n = Number(said);
+      return /^[+-]?\d+$/.test(said) && Number.isSafeInteger(n) ? { bound: { n }, day: null } : cannot;
+    }
+    case 'decimal': {
+      const n = Number(said);
+      return said.trim() !== '' && Number.isFinite(n) ? { bound: { n }, day: null } : cannot;
+    }
+    case 'day':
+    case 'instant':
+      return resolveDay(said, Date.now()) === null
+        ? { fix: `${text}: ${said} is not a date. Write 2026-10-01, +30d, or one of ${TEMPORAL_WORDS}.` }
+        : { bound: null, day: said };
+    case 'money': {
+      if (NUMBER.test(said))
+        return { fix: `${text}: ${field} is money, and ${said} with no currency is not an amount of money. Write it with its currency, as GBP 960.00.` };
+      const m = MONEY_WORDS.exec(said);
+      if (!m) return cannot;
+      const code = (m[1] ?? m[4] ?? '').toUpperCase();
+      const written = m[2] ?? m[3] ?? '';
+      if (!CURRENCIES.has(code)) return { fix: `${text}: ${code} is not a currency ISO 4217 assigns.` };
+      const places = exponentOf(code);
+      const minor = Number(written) * 10 ** places;
+      if (Math.abs(minor - Math.round(minor)) > 1e-6) return { fix: `${text}: ${code} is counted to ${places} decimal places, and ${written} has more.` };
+      if (!Number.isSafeInteger(Math.round(minor))) return cannot;
+      return { bound: { n: Math.round(minor), currency: code }, day: null };
+    }
+    /* A QUANTITY IS ITS NUMBER AND ITS UNIT, read as the record reads the words. The first version
+       of this function had no case here while `ORDERED` above named the type, so the browser told a
+       person `weight at least 5 kg` was a value the field cannot hold while the record answered it.
+       No register the mirror draws declares a quantity today, which is how it went unseen; the unit
+       is trimmed and not folded, because the record does not fold one either (`m` is not `M`). */
+    case 'quantity': {
+      if (NUMBER.test(said)) return { fix: `${text}: ${field} is a quantity, and ${said} with no unit is not one. Write it with its unit, as 5 kg.` };
+      const m = QUANTITY_WORDS.exec(said);
+      return m ? { bound: { n: Number(m[1]), unit: (m[2] ?? '').trim() }, day: null } : cannot;
+    }
+    default:
+      return cannot;
+  }
+}
+
+/* ── contains ─────────────────────────────────────────────────────────────── */
+
+/**
+ * The record's `contains`, which it has read since `2023a1c0` and this compiler named as an operator
+ * "this build" does not read. The constants are `sentence.ts`'s, and so is every sentence below; the
+ * reasons for each are written there, beside the measurements that produced them, and are not copied.
+ */
+const TEXTUAL = new Set(['text', 'document', 'url', 'email']);
+const HELD_INSTEAD: Record<string, string> = {
+  enum: 'It holds a declared value, not the words shown for it. Write is, which reads it in those words.',
+  ref: 'It holds a row id, not the words shown for it. Write is, which reads it in those words.',
+  secret: 'It holds the id of a grant in the vault, not the secret, and a filter never reads the secret. Write is set or is empty.',
+};
+const QUOTES: readonly (readonly [string, string])[] = [
+  ['"', '"'],
+  ["'", "'"],
+  ['“', '”'],
+  ['‘', '’'],
+];
+/** `compile`'s own ceiling on a `contains` needle, in UTF-8 bytes, and its sentence. */
+const CONTAINS_MAX = 40;
+const bytesOf = (s: string): number => new TextEncoder().encode(s).length;
+
+/** The needle a `contains` clause looks for, or the record's refusal for the words. */
+function needleOf(text: string, field: string, type: string, said: string): { needle: string } | { fix: string } {
+  if (!TEXTUAL.has(type)) {
+    const instead = type === 'list' ? ' Write has to ask for one value in a list.' : HELD_INSTEAD[type] ? ` ${HELD_INSTEAD[type]}` : '';
+    return { fix: `${text}: ${field} is a ${type}, and contains is about text.${instead}` };
+  }
+  const opened = QUOTES.find(([open]) => said.startsWith(open));
+  if (opened) {
+    const [open, close] = opened;
+    let shut = said.indexOf(close, open.length);
+    while (shut !== -1 && !/^\s/.test(said.slice(shut + close.length))) shut = said.indexOf(close, shut + 1);
+    const more = shut === -1 ? '' : said.slice(shut + close.length).trim();
+    if (more)
+      return {
+        fix: `${text}: the quote closes at ${said.slice(0, shut + close.length)} and ${more} comes after it. A condition looks for one text, so write two conditions, one for each; a comma between them asks for rows that hold both. If the mark is part of the text, quote the whole text with the other kind of mark.`,
+      };
+  }
+  const pair = QUOTES.find(([open, close]) => said.length >= 2 && said.startsWith(open) && said.endsWith(close));
+  let needle: string;
+  if (pair) {
+    needle = said.slice(pair[0].length, said.length - pair[1].length);
+    if (!needle) return { fix: `${text}: contains what? The quotes hold nothing.` };
+  } else {
+    if (QUOTES.some(([open]) => said.startsWith(open)))
+      return {
+        fix: `${text}: the quote is not closed. A comma ends a clause, so text holding one cannot be written here; ask in the structured form, as {"field": "${field}", "contains": "..."}.`,
+      };
+    needle = said.trim();
+    if (!needle) return { fix: `${text}: contains what?` };
+    if (/^not(\s|$)/i.test(needle))
+      return { fix: `${text}: contains not is not something a filter can say yet. To look for the words, quote them: ${field} contains "${needle}".` };
+    if (/ or /i.test(needle))
+      return { fix: `${text}: contains takes one text to look for. To look for these words together, quote them: ${field} contains "${needle}".` };
+  }
+  /* THE RECORD'S COMPILER REFUSES A NEEDLE PAST FORTY BYTES, after the sentence has parsed, and the
+     sentence it gives names the field and not the clause. */
+  if (bytesOf(needle) > CONTAINS_MAX) return { fix: `${field} contains takes at most ${CONTAINS_MAX} bytes, and this one is ${bytesOf(needle)}.` };
+  return { needle };
+}
+
+/** ASCII case folding, which is SQLite's `lower()` and the record's `evaluate`, and nothing wider. */
+const asciiFold = (s: string): string => s.replace(/[A-Z]/g, (c) => c.toLowerCase());
+
 export function compile(register: string, where: string | undefined): Where {
   const clauses: Clause[] = [];
   const bad: string[] = [];
@@ -733,7 +946,7 @@ export function compile(register: string, where: string | undefined): Where {
        `i`, and `STATE IS NOT Live` did not: `'IS NOT' === 'is not'` is false, so the negation fell
        to the `is` branch and the clause meant the opposite of the sentence. A negation that does
        not invert is the one defect this grammar keeps being bitten by. */
-    const op = said.toLowerCase();
+    const op = said.toLowerCase().replace(/\s+/g, ' ');
 
     const field = fieldOf(register, name);
     if (!field) {
@@ -746,6 +959,106 @@ export function compile(register: string, where: string | undefined): Where {
        looked it up at all, which is the next paragraph. */
     const decl = REGISTERS[register]?.fields.find((f) => f.id === field);
     const dated = decl?.type === 'day' || decl?.type === 'instant';
+    const type = decl?.type ?? 'field';
+
+    /* ── more than · at least · less than · at most · between ─────────────── */
+    /* THE RECORD'S BRANCH, IN ITS ORDER: the words read the way `rankedOf` reads them, a value the
+       field declares taken first, then the type, the negation, the missing operand and the bounds,
+       each refused in the record's sentence. `where-compare.test.ts` asks both engines every one. */
+    const ranked = rankedOf(`${said} ${rest}`.trim().split(/\s+/));
+    /* AND A FIELD NO ORDER APPLIES TO KEEPS THE WORDS AFTER `is` AS ITS VALUE, which is the record's
+       rule and its reason: `what is more than coffee` was a text value before the words were taught,
+       and the first version of this branch refused it. Only an enum and a ref are asked what they
+       declare; a word they do not declare gets the order's refusal, as in the record. */
+    const isValue =
+      ranked !== null &&
+      (op === 'is' || op === 'is not') &&
+      (type === 'enum' || type === 'ref'
+        ? (allowed(register, field) ?? []).includes(norm(`${ranked.word} ${ranked.operand}`))
+        : !ORDERED.has(type));
+    if (ranked && !isValue) {
+      const { op: rank, word, negated, operand: wrote } = ranked;
+      if (!ORDERED.has(type)) {
+        bad.push(`${text}: ${field} is a ${type}, and ${word} is not something a ${type} can be asked. Order is about numbers, money and dates.`);
+        continue;
+      }
+      if (negated) {
+        bad.push(
+          rank === 'between'
+            ? `${text}: a filter cannot say is not between.`
+            : `${text}: a filter cannot say is not ${word}. ${field} ${OTHER_SIDE[rank]} ${wrote} asks for the other side, and leaves out the rows with no ${field}.`,
+        );
+        continue;
+      }
+      if (!wrote.trim()) {
+        bad.push(`${text}: ${word} what?`);
+        continue;
+      }
+      if (rank !== 'between') {
+        const one = boundOf(text, field, type, wrote);
+        if ('fix' in one) {
+          bad.push(one.fix);
+          continue;
+        }
+        clauses.push(one.day !== null ? { field, op: rank, day: one.day } : { field, op: rank, values: [wrote], bounds: [one.bound!] });
+        continue;
+      }
+      const ends = wrote.split(/\s+and\s+/i);
+      if (ends.length !== 2 || ends.some((e) => !e.trim())) {
+        bad.push(`${text}: between takes two values joined by and, the low value first.`);
+        continue;
+      }
+      const [low, high] = [ends[0]!.trim(), ends[1]!.trim()];
+      const lo = boundOf(text, field, type, low);
+      const hi = boundOf(text, field, type, high);
+      if ('fix' in lo || 'fix' in hi) {
+        bad.push('fix' in lo ? lo.fix : (hi as { fix: string }).fix);
+        continue;
+      }
+      if (lo.bound?.currency !== hi.bound?.currency) {
+        bad.push(`${text}: between takes one currency, and this range has two.`);
+        continue;
+      }
+      if (lo.bound?.unit !== hi.bound?.unit) {
+        bad.push(`${text}: between takes one unit, and this range has two.`);
+        continue;
+      }
+      /* THE DAYS PUT IN ORDER AT THE MIRROR'S CLOCK, `NOW`, which `api.ts`, `forecast.ts` and
+         `metrics.ts` hand `matches`. The first version used the wall clock, reasoning that two relative
+         words move together, and one written-out day with one relative word does not: with `NOW` on
+         3 September and the wall clock on the 24th, `due between today and 2026-09-20` was refused
+         here and answered by the record, and the reverse the other way round (`where-compare.test.ts`
+         holds both). The flow canvas's sample matches at the wall clock by default, so on that one
+         surface a mixed range can still be put in order at one clock and matched at another; the
+         whole cure is a clock handed to `compile`, which is a wider change than this branch. */
+      const rankOf = (b: { bound: Bound | null; day: string | null }): string | number =>
+        b.day !== null ? (resolveDay(b.day, NOW) ?? b.day) : (b.bound?.n ?? 0);
+      if (rankOf(lo) > rankOf(hi)) {
+        bad.push(`${text}: between takes the low value first, and ${low} is past ${high}.`);
+        continue;
+      }
+      /* A RANGE OF DAYS IS ITS TWO ENDS, AS THE RECORD SAYS IT: `between` there compares a whole
+         instant with a bare day and drops the last day of the range, and `gte` and `lte` cut the
+         instant to its day. `matches` below cuts every dated value to its day, so this engine keeps
+         the last day either way; the shape is the record's so the two cannot drift on it. */
+      if (lo.day !== null && hi.day !== null) {
+        clauses.push({ field, op: 'gte', day: lo.day }, { field, op: 'lte', day: hi.day });
+        continue;
+      }
+      clauses.push({ field, op: 'between', values: [low, high], bounds: [lo.bound!, hi.bound!] });
+      continue;
+    }
+
+    /* ── contains ─────────────────────────────────────────────────────────── */
+    if (op === 'contains') {
+      const found = needleOf(text, field, type, rest);
+      if ('fix' in found) {
+        bad.push(found.fix);
+        continue;
+      }
+      clauses.push({ field, op: 'contains', values: [found.needle] });
+      continue;
+    }
 
     if (op === 'before' || op === 'after' || op === 'on') {
       /**
@@ -1024,9 +1337,9 @@ export function compile(register: string, where: string | undefined): Where {
     );
     if (reach) {
       bad.push(
-        /* SEVEN HERE TOO, for the reason `cannotSay` gives above: two recitations of one list in one
-           file, and a reader who meets the shorter one learns the same wrong thing. */
-        `${text}: "${UNIMPLEMENTED.filter((w) => reach.toLowerCase().startsWith(w)).sort((a, b) => b.length - a.length)[0]}" is not an operator this build reads. It reads is · is not · before · after · on · has · lacks`,
+        /* THIRTEEN HERE TOO, for the reason `cannotSay` gives above: two recitations of one list in
+           one file, and a reader who meets the shorter one learns the same wrong thing. */
+        `${text}: "${UNIMPLEMENTED.filter((w) => reach.toLowerCase().startsWith(w)).sort((a, b) => b.length - a.length)[0]}" is not an operator this build reads. It reads is, is not, before, after, on, has, lacks, contains, more than, at least, less than, at most and between`,
       );
       continue;
     }
@@ -1102,6 +1415,38 @@ export function matches(entry: Entry, w: Where, now: number): boolean {
       return c.op === 'has' ? holds : !holds;
     }
 
+    /* THE RECORD'S FOLD, which is ASCII and nothing wider: `instr(lower(..), lower(..))` in its SQL
+       and a `[A-Z]` replace in its `evaluate`. A row with nothing in the field holds no text. */
+    if (c.op === 'contains') return typeof raw === 'string' && asciiFold(raw).includes(asciiFold(c.values[0]));
+
+    /**
+     * AN ORDER OVER A NUMBER OR A MONEY, AND A MONEY IN ANOTHER CURRENCY IS NOT PAST ANY LINE.
+     *
+     * The record's SQL compares the amount AND requires the currency (`qualifier`), so a row in
+     * euros is neither above nor below a line drawn in pounds. A value that is not a number, or a
+     * money that is not a money, is past nothing, which is `34 §6`'s rule for a missing value too.
+     */
+    if ('bounds' in c) {
+      const [lo, hi] = c.bounds;
+      if (!lo) return false;
+      let x: number;
+      if (lo.currency !== undefined) {
+        if (!isMoney(raw) || raw.currency !== lo.currency) return false;
+        x = raw.amount;
+      } else if (lo.unit !== undefined) {
+        /* THE SAME RULE FOR A QUANTITY'S UNIT, which is the record's other `qualifier`: five pounds
+           is not past a line drawn at four kilograms, and is not short of it either. */
+        const q = raw as { value?: unknown; unit?: unknown } | null | undefined;
+        if (typeof q !== 'object' || q === null || typeof q.value !== 'number' || q.unit !== lo.unit) return false;
+        x = q.value;
+      } else {
+        if (typeof raw !== 'number' || !Number.isFinite(raw)) return false;
+        x = raw;
+      }
+      if (c.op === 'between') return hi !== undefined && x >= lo.n && x <= hi.n;
+      return c.op === 'gt' ? x > lo.n : c.op === 'gte' ? x >= lo.n : c.op === 'lt' ? x < lo.n : x <= lo.n;
+    }
+
     /* `'values' in c` rather than a check on `op`: the discriminant is spread across two literals
        per member, and the `in` operator narrows a union on the property that actually differs. */
     if ('values' in c) {
@@ -1125,7 +1470,25 @@ export function matches(entry: Entry, w: Where, now: number): boolean {
        today` say what it looks like it says. An instant is compared by its date, because a person
        asking for today means the day and not the second. */
     const at = raw.slice(0, 10);
-    return c.op === 'before' ? at < day : c.op === 'after' ? at > day : c.op === 'on' ? at === day : at !== day;
+    /* AND THE FOUR ORDERS BY THE SAME DAY, which is the record's `asDay` cut: `gte` and `lte` against
+       a bare day compare an instant's date, so `seen at most 2026-09-03` keeps what was seen that
+       afternoon. `more than` is `after` and `less than` is `before`, spelled by the tree's name. */
+    switch (c.op) {
+      case 'gt':
+      case 'after':
+        return at > day;
+      case 'gte':
+        return at >= day;
+      case 'lt':
+      case 'before':
+        return at < day;
+      case 'lte':
+        return at <= day;
+      case 'on':
+        return at === day;
+      default:
+        return at !== day;
+    }
   });
 }
 
@@ -1189,6 +1552,17 @@ const spokenElement = (register: string, field: string, held: string): string =>
 export function registerHref(register: string, where: string | undefined): string {
   const w = compile(register, where);
   if (w.bad.length) return `/r/${register}`;
+  /**
+   * AND A CLAUSE NO CHIP CAN CARRY BACK OPENS IT WIDE, for the same reason a refusal does.
+   *
+   * `whereOf` in `api.ts` reads `in`, `not-in`, `before`, `after`, `not-on`, `has` and `lacks`, and a
+   * chip it does not read falls to its last line, `<field> is <value>`. So `amount:gte:GBP 2400` would
+   * come back as `amount is GBP 2400` and `what:contains:rent` as `what is rent`: a list narrowed to
+   * other rows than the block drew, under a link that reads as the block's own filter. The wide
+   * address is the honest one until that reader learns the six words, which is `api.ts`'s to do.
+   */
+  if (w.clauses.some((c) => c.op === 'contains' || c.op === 'gt' || c.op === 'gte' || c.op === 'lt' || c.op === 'lte' || c.op === 'between'))
+    return `/r/${register}`;
 
   /* A NEGATION BECOMES `not-in` RATHER THAN THE ENUM'S COMPLEMENT: the complement is only writable
      when the field declares its values, and a URL that silently lists them is a URL that breaks the
