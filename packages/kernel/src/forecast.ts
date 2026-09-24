@@ -40,6 +40,21 @@ export type Leg = {
   incoming?: { field: string; is: string };
   /** A movement that recurs: a field naming a cycle, and a table of months per cycle. */
   every?: { field: string; months: Record<string, number> };
+  /**
+   * The field holding the last day a row's money moves on. Nothing after it is walked; a step on the day itself is.
+   *
+   * A LEG HAD NO END, SO A REPEATING ROW WALKED FOR EVER UNTIL SOMETHING CLOSED IT. The the old tool import closes a line
+   * the night after its `ends_on` passes, and until then a salary ending on 20 October walked 15 November, 15 December
+   * and every month to the horizon: measured in `test/forecast-ends.test.ts`, a USD 1,000.00 monthly line read
+   * USD 12,000.00 over a 365-day walk where the old tool itself counts one cheque. A runway too high is the one direction
+   * this walk must never be wrong in.
+   *
+   * THE LAST PAYDAY, NOT THE LAST DAY WORKED, because that is what the old tool means by the value it is set from.
+   * `payDays` in its `app/src/lib/derive/money.js` drops a payday strictly after `ends_on` and keeps one on it, its
+   * money sheet labels the field "Until", and nothing there adds a final cheque after the day. So the end is inclusive
+   * and it bounds the day money moves, which is the only day this walk knows about. An empty value is no end.
+   */
+  ends?: string;
 };
 
 export type Runway = {
@@ -202,6 +217,7 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
     }
 
     let unreadable = 0;
+    let unreadableEnd = 0;
     /* A LEG WHOSE AMOUNT IS NOT MONEY MUST SAY SO. `amount === null → continue` skipped the row in
        silence and only unreadable DATES were counted, so a leg pointing at an `int` or a `duration`
        field produced no steps and no refusals — and the page said nothing crosses zero, which is
@@ -231,11 +247,18 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
         unreadable++;
         continue;
       }
+      /* AN END THIS WALK CANNOT READ IS COUNTED AND THE ROW LEFT OUT, the way an unreadable first day is. Walked with no
+         end it would be the repeating-for-ever this field exists to stop, and nothing on the screen would say so. */
+      const last = leg.ends ? String(entry.fields[leg.ends] ?? '') : '';
+      if (last && !Number.isFinite(noon(last))) {
+        unreadableEnd++;
+        continue;
+      }
       const incoming = leg.incoming ? entry.fields[leg.incoming.field] === leg.incoming.is : false;
       const label = String(entry.fields[title] ?? entry.id);
       const spoken = entry.seq === null ? entry.id : `${leg.register}#${entry.seq}`;
 
-      const recurs = occurrences(deps, entry, leg, dayOf(first), until, iso(deps.ctx.nowMs));
+      const recurs = occurrences(deps, entry, leg, dayOf(first), until, iso(deps.ctx.nowMs), last ? dayOf(last) : null);
       if (recurs.capped) truncated++;
       /* ONLY A ROW WITH A STEP INSIDE THE WINDOW: one whose first day is past the horizon is missing
          nothing from this walk, whatever its cycle. The browser's walk counts the same rows. */
@@ -268,6 +291,12 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
         code: 'VALUE_MALFORMED',
         fix: `${unreadable} ${unreadable === 1 ? 'row' : 'rows'} of ${leg.register} have a ${leg.on} this walk could not read, and their money is not in it.`,
         at: 'on',
+      });
+    if (unreadableEnd)
+      refusals.push({
+        code: 'VALUE_MALFORMED',
+        fix: `${unreadableEnd} ${unreadableEnd === 1 ? 'row' : 'rows'} of ${leg.register} ${unreadableEnd === 1 ? 'has an end in' : 'have ends in'} ${leg.ends} that this walk could not read, and ${unreadableEnd === 1 ? 'its' : 'their'} money is not in it.`,
+        at: 'ends',
       });
     if (notMoney)
       refusals.push({
@@ -434,9 +463,13 @@ function occurrences(
   first: string,
   until: number,
   today: string,
+  last: string | null,
 ): { of: { day: string; at: number }[]; capped: boolean; unread: string | null } {
   const start = noon(first);
   if (!Number.isFinite(start)) return { of: [], capped: false, unread: null };
+  /* A ROW ENDED BEFORE ITS FIRST DAY WALKS NOTHING, one-off or not: see `Leg.ends`. The import writes a monthly row due
+     1 October for a line that ends on 28 September when the next payday is past the end, and that row is no cheque. */
+  if (last !== null && first > last) return { of: [], capped: false, unread: null };
   const cycle = leg.every ? String(entry.fields[leg.every.field] ?? '') : '';
   const months = leg.every && Object.hasOwn(leg.every.months, cycle) ? leg.every.months[cycle]! : 0;
   /* A ONE-OFF, AND SAID WHEN IT IS ONLY A ONE-OFF BECAUSE THE TABLE HAS NO ROW FOR THE VALUE. `?? 0`
@@ -479,7 +512,9 @@ function occurrences(
     const day = stepped && monthEnd ? endOfMonth(stepped) : stepped;
     if (!day) break;
     const at = noon(day);
-    if (at > until) break;
+    /* PAST THE ROW'S LAST DAY IS THE SAME STOP AS PAST THE HORIZON, and it is a stop and not the cap, so `capped` below
+       stays false for a line that simply ended. */
+    if (at > until || (last !== null && day > last)) break;
     if (day < today) continue;
     out.push({ day, at });
   }

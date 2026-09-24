@@ -111,9 +111,11 @@ function unreadCycle(row: Entry, leg: Leg): string | null {
  * renewed last month. Reading only the stored date would count each once and make every horizon
  * beyond a month wrong in the same direction: too cheap.
  */
-function occurrences(row: Entry, leg: Leg, first: string, until: number): { day: string; at: number }[] {
+function occurrences(row: Entry, leg: Leg, first: string, until: number, last: string | null): { day: string; at: number }[] {
   const start = noon(first);
   if (!Number.isFinite(start)) return [];
+  /* A ROW ENDED BEFORE ITS FIRST DAY WALKS NOTHING, one-off or not, as the kernel's (`Leg.ends` there). */
+  if (last !== null && first > last) return [];
   const cycle = leg.every ? String(row.fields[leg.every.field] ?? '') : '';
   const months = leg.every && Object.hasOwn(leg.every.months, cycle) ? leg.every.months[cycle]! : 0;
   /* A CYCLE THIS TABLE HAS NO FACTOR FOR IS A ONE-OFF, and a FRACTIONAL one is not. `!months` used
@@ -156,7 +158,8 @@ function occurrences(row: Entry, leg: Leg, first: string, until: number): { day:
     const day = stepped && n > 0 && monthEnd ? endOfMonth(stepped) : stepped;
     if (!day) break;
     const at = noon(day);
-    if (!Number.isFinite(at) || at > until) break;
+    /* PAST THE ROW'S LAST DAY IS THE SAME STOP AS PAST THE HORIZON, as in the kernel. */
+    if (!Number.isFinite(at) || at > until || (last !== null && day > last)) break;
     if (day < today) continue;
     out.push({ day, at });
   }
@@ -181,6 +184,13 @@ export type Leg = {
   where?: string;
   incoming?: { field: string; is: string };
   every?: { field: string; months: Readonly<Record<string, number>> };
+  /**
+   * The field holding the last day a row's money moves on: nothing after it is walked, and a step on the day itself is.
+   * Inclusive because the old tool's `ends_on`, which the import sets it from, is the last payday and not the last day
+   * worked; the argument and the measurement are on the kernel's `Leg.ends`, and `forecast-ends.test.ts` beside this
+   * file walks the same ended rows through both engines.
+   */
+  ends?: string;
 };
 
 /**
@@ -260,6 +270,7 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180, onl
     const decl = REGISTERS[leg.register];
     /** Each cycle value the leg's table does not name, and how many walked rows carry it. */
     const unread = new Map<string, number>();
+    let unreadableEnd = 0;
     for (const row of ROWS[leg.register] ?? []) {
       /* THE SAME PREDICATE EVERY OTHER READ USES, compiled from the leg's own sentence — so a leg
          saying `state is open or part` means what the same words mean on a page. */
@@ -291,6 +302,13 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180, onl
 
       const on = String(row.fields[leg.on] ?? '').slice(0, 10);
       if (!on) continue;
+      /* AN END THIS WALK CANNOT READ IS SAID AND THE ROW LEFT OUT, in the kernel's words: walked with no end it would
+         repeat for ever, which is the fault the field exists to stop. */
+      const last = leg.ends ? String(row.fields[leg.ends] ?? '').slice(0, 10) : '';
+      if (last && !Number.isFinite(noon(last))) {
+        unreadableEnd++;
+        continue;
+      }
 
       /* WHICH VALUES MEAN MONEY ARRIVING is on the leg. Absent, every row of it is an outgoing \u2014
          which is what a subscription is, and what made the second leg readable as a declaration. */
@@ -300,7 +318,7 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180, onl
       /* COUNTED WHERE THE KERNEL COUNTS IT: a row that reached the walk with money, a date and a
          step inside the window. A row with no amount, or one whose first day is past the horizon,
          is missing nothing from this walk whatever its cycle. */
-      const walked = occurrences(row, leg, on, until);
+      const walked = occurrences(row, leg, on, until, last || null);
       const cycle = unreadCycle(row, leg);
       if (cycle !== null && walked.length) unread.set(cycle, (unread.get(cycle) ?? 0) + 1);
 
@@ -331,6 +349,10 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180, onl
        step of minus 10,000 and an empty list, where a 60-day window holds eight or nine of it.
        `forecast-unknown-cycle.test.ts` holds this string against the kernel's, so the two cannot
        drift apart the way the fractional-cycle sentence did. */
+    if (unreadableEnd)
+      refusals.push(
+        `${unreadableEnd} ${unreadableEnd === 1 ? 'row' : 'rows'} of ${leg.register} ${unreadableEnd === 1 ? 'has an end in' : 'have ends in'} ${leg.ends} that this walk could not read, and ${unreadableEnd === 1 ? 'its' : 'their'} money is not in it.`,
+      );
     for (const [value, n] of [...unread].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
       refusals.push(
         `${n} ${n === 1 ? 'row' : 'rows'} of ${leg.register} ${n === 1 ? 'has' : 'have'} ${leg.every!.field} set to ${value}, which this walk has no cycle for, and ${n === 1 ? 'its' : 'their'} money is in the walk once rather than every time it recurs. Give ${value} a whole number of months on this leg, or set the ${n === 1 ? 'row' : 'rows'} to a cycle the leg has.`,
