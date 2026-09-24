@@ -77,6 +77,8 @@
 
   type Writes = typeof import('$lib/record/page-write.ts');
   type Change = (m: Writes, ref: RowRef, decl: Declared | null) => Record<string, unknown> | null;
+  /* A WAY BACK MAY LOAD WHAT IT NEEDS when it is pressed, as a tick's does, so nothing is fetched for an undo never used. */
+  type Back = (m: Writes, ref: RowRef, decl: Declared | null) => Record<string, unknown> | null | Promise<Record<string, unknown> | null>;
 
   /**
    * The write module once a gesture has loaded it. The rows are drawn through its `keepInPlace`, and a hold exists only
@@ -131,7 +133,7 @@
     ref: RowRef | undefined,
     change: Change,
     title: string,
-    hold: { at: number; before: readonly Row[]; what: Kept; back: Change; undone: Kept; said: (w: Writes['words']) => string },
+    hold: { at: number; before: readonly Row[]; what: Kept; back: Back; undone: Kept; said: (w: Writes['words']) => string },
   ) {
     if (!ref) return void toasts.push(copy.pageRowUnknown, { intent: 'warn' });
     /* THE PAGE THE GESTURE WAS MADE ON. A write that lands after the reader has opened another page holds nothing,
@@ -154,8 +156,8 @@
   }
 
   /** The receipt's undo: the opposite write at the version the first one made, with the row held where it still is. */
-  async function putBack(m: Writes, ref: RowRef, decl: Declared | null, title: string, hold: { at: number; back: Change; undone: Kept }) {
-    const patch = hold.back(m, ref, decl);
+  async function putBack(m: Writes, ref: RowRef, decl: Declared | null, title: string, hold: { at: number; back: Back; undone: Kept }) {
+    const patch = await hold.back(m, ref, decl);
     if (!patch) return;
     const out = await m.updateRow(apiBase(), ref, patch, title);
     if (out.from !== 'written') toasts.push(out.fix, { intent: 'warn' });
@@ -227,14 +229,22 @@
     await reread();
   }
 
-  function tickTask(row: Row, done: boolean, at: number, before: readonly Row[]) {
+  /**
+   * A task ticked done or not done, with a receipt whose undo puts the row back as it was.
+   *
+   * THE UNDO SENDS WHAT THE ROW HELD, read off the block's `entries` at the version the tick is sent at, and not the
+   * list's default not-done state: a task in `doing` ticked and undone came back `open` (audit sixty-four, section 3).
+   * `tickBackOf` says why, and why a held row the re-read left out still falls back to the default.
+   */
+  function tickTask(block: LiveBlock, row: Row, done: boolean, at: number, before: readonly Row[]) {
     const title = row.cells[0] ?? copy.cardFallback;
     if (!live) return void toasts.push(copy.taskTicked(title, done), { intent: 'warn' });
+    const held = block.entries.find((e) => e.seq === row.ref?.seq && e.version === row.ref.version);
     void writeRow(row.ref, (m, ref, decl) => m.tickPatch(ref, done, decl), title, {
       at,
       before,
       what: { done },
-      back: (m, ref, decl) => m.tickPatch(ref, !done, decl),
+      back: async (_m, ref, decl) => (await import('./tick-undo.ts')).tickBackOf(ref, done, decl, held),
       undone: { done: !done },
       said: (w) => w.ticked(title, done),
     });
@@ -917,7 +927,7 @@
                     block={shown}
                     opts={{ ...optsFor(block), cellHref: (i: number) => block.metrics?.[i]?.href ?? null }}
                     onmove={(row, to) => moveCard(block, row, to, slot.i, shown.rows)}
-                    ontick={(row, done) => tickTask(row, done, slot.i, shown.rows)}
+                    ontick={(row, done) => tickTask(block, row, done, slot.i, shown.rows)}
                     onact={(row, option) => askGate(row, option)}
                     oncapture={capturable(block) ? captureLine : undefined}
                   />{:else if segment.type === 'degraded'}<Degraded {segment} />{:else if segment.type === 'markdown'}<div class="document"><Markdown {segment} opts={{ href: inApp }} /></div>{/if}
