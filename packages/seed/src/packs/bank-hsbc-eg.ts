@@ -3,9 +3,15 @@
  *
  * ONE PERSON'S BANK IS NOT IN THE CORE (`loop/DIRECTION.md` section 22). These six wordings and their six webhook
  * twins were declared by money-core from 1.6.0 to 1.7.0, so every record set up as Personal, Founder or Small business
- * carried twelve patterns written against `From HSBC:`, InstaPay and a card that prints `*** 6180`, whether or not the
- * person had ever held an account in Egypt (`loop/research-shell-seed.md` M2). They are moved here unchanged, reading
- * for reading, so a record that had them reads the same messages the same way after the move; only `pack:` differs.
+ * carried twelve patterns written against `From HSBC:`, InstaPay and a card alert that prints four digits after three
+ * stars, whether or not the person had ever held an account in Egypt (`loop/research-shell-seed.md` M2). They are moved
+ * here unchanged, reading for reading, so a record that had them reads the same messages the same way after the move;
+ * only `pack:` differs.
+ *
+ * AND THEY ARE A FILE NOW, `packs/bank-hsbc-eg/bank-hsbc-eg.pack.json` (`loop/research-legacy-parity.md` brief B1).
+ * This builder stays only until the the old tool import resolves the pack by id rather than importing it from here (brief
+ * B2), and `packs/bank-hsbc-eg/bank-hsbc-eg.test.ts` holds the file to what it builds until then. A wording changed here
+ * is changed in the file too, or that test fails.
  *
  * NO STARTER USE CASE INSTALLS IT. Whoever banks with HSBC Egypt installs it, or an agent proposes it on Decide with
  * `{ install: 'bank-hsbc-eg' }`, which is also the road the the old tool import has to take.
@@ -98,7 +104,7 @@ const FROM_HSBC_ACCOUNT = { lookup: { register: 'accounts', by: 'last4', between
  * (`loop/research-bank-real.md`, *The near-duplicate, which may be two charges*). The limits they print differ by exactly
  * the charge, so the second was never the first sent again. Measured before this key through `createRecordApi`: the
  * second of such a pair came back `skipped` and the ledger held one row; with it, two rows, and the same alert forwarded
- * again is still `skipped` because it prints the same limit (`test/bank-hsbc-eg.test.ts`).
+ * again is still `skipped` because it prints the same limit (`packs/bank-hsbc-eg/bank-hsbc-eg.test.ts`).
  *
  * `skip` STAYS THE ANSWER, because with the limit in the key a match is the same message. A row filed before this key
  * holds no `available`, so an alert that repeats one of those is filed again rather than skipped: the SQL half of the
@@ -110,7 +116,7 @@ export const HSBC_EG_INGESTS: Record<string, SeedIngest> = {
   /**
    * HSBC'S CREDIT-CARD ALERT, AND IT WAS UNTRIAGED: `test/money-bank.test.ts` forwarded the shape
    * the old tool parses, with invented values, and it matched nothing. It says *"Your Credit Card
-   * ending with *** 6180 has been used for EGP 1,284.50 on 14/08/2026 at CEDAR LANE BAKERY. Your
+   * ending with *** 2291 has been used for EGP 1,284.50 on 14/08/2026 at CEDAR LANE BAKERY. Your
    * available limit is EGP 23,715.50"*: no `debited`, a four-digit year, and the merchant AFTER the
    * date and ended by a full stop, so not one of `bank-card-out`'s reads lands on it.
    *
@@ -153,18 +159,18 @@ export const HSBC_EG_INGESTS: Record<string, SeedIngest> = {
   },
 
   /**
-   * AN INSTAPAY TRANSFER OUT, AND THE PURCHASE THAT IS WORDED THE SAME WAY. *"Your HSBC Account ***327
+   * AN INSTAPAY TRANSFER OUT, AND THE PURCHASE THAT IS WORDED THE SAME WAY. *"Your HSBC Account ***918
    * was debited with IPN outward transfer for EGP 3,250.00 on 07-08-2026 16:42 to MARLOW JOINERY with
    * reference 9c4e1f7a2b"*, and `IPN purchase` in place of `IPN outward transfer` for a shop. It says
    * `debited` and not `card ending`, which is why `bank-card-out` never claimed it.
    *
-   * THE ACCOUNT IS THREE DIGITS. The bank prints `***327`, and `accounts.last4` is text, so the suffix
+   * THE ACCOUNT IS THREE DIGITS. The bank prints `***918`, and `accounts.last4` is text, so the suffix
    * it prints is what a person types there; the lookup is boxed between the stars and ` was ` for the
    * same reason as the card's.
    *
    * THE DATE IS `DD-MM-YYYY`, WHICH A BARE KERNEL CANNOT READ. `ingest.ts`'s own `day` holds four
    * formats and this is not one; a record reads it through `@braindog/extract`'s `scanDates`, which
-   * `@braindog/record` hands down. Measured in `test/money-bank.test.ts` on a bare kernel: the right
+   * `@braindog/record` hands down. Measured on a bare kernel (`packs/bank-hsbc-eg/bank-hsbc-eg.test.ts`): the right
    * pattern claims the message and names `on` as the one field it could not read, which is `review`
    * and no row. The time after the date is not read at all, because `transactions.on` is a day.
    */
@@ -234,7 +240,7 @@ export const HSBC_EG_INGESTS: Record<string, SeedIngest> = {
 
   /**
    * THE THIRD WORDING, AND ONLY ITS DEBIT. *"From HSBC: 16AUG26 ATM Cash Withdrawal from
-   * 042-118***-327 EGP 2500.00- Your available balance is EGP 31,040.25"*. It had no pattern until
+   * 310-554***-918 EGP 2500.00- Your available balance is EGP 31,040.25"*. It had no pattern until
    * `43 §4.3` grew `MON`: `DDMMMYY` was two month tokens and refused at install, measured.
    *
    * THE SIGN IS A HYPHEN GLUED TO THE FIGURE, AND THE HYPHEN IS IN `match:` AND NOT IN `enum`. `enum`
@@ -258,9 +264,9 @@ export const HSBC_EG_INGESTS: Record<string, SeedIngest> = {
    * by a sign of its own, so its `match:` asks for that sign and never for an absence.
    *
    * THE AMOUNT IS THE SECOND FIGURE AFTER THE STARS, and it has to be counted. Between `***-` and the
-   * hyphen sit the account's own digits and the code: `scanMoney` over `327 EGP 2500.00` answers EGP
-   * 327.00 and then EGP 2,500.00, because `327 EGP` is a figure with a code after it. With the code
-   * against the figure (`327 EGP2500.00`) it answered EGP 327.00 and then GBP 0.00, the tail after the
+   * hyphen sit the account's own digits and the code: `scanMoney` over `918 EGP 2500.00` answers EGP
+   * 918.00 and then EGP 2,500.00, because `918 EGP` is a figure with a code after it. With the code
+   * against the figure (`918 EGP2500.00`) it answered EGP 918.00 and then GBP 0.00, the tail after the
    * point in the fallback currency, until `scanMoney` read a code touching its figure as that figure's
    * code (`packages/extract/test/money-glued.test.ts`). No literal separates
    * the digits from the code except the code itself, and anchoring on `EGP` is the defect `movement`
@@ -301,7 +307,7 @@ export const HSBC_EG_INGESTS: Record<string, SeedIngest> = {
 
   /**
    * THE CREDIT HALF OF THE SAME LINE, OFF THE `+` THE BANK GLUES TO THE FIGURE. *"From HSBC: 01AUG26 Deposit
-   * Interest 042-118***-327 EGP 418.62+ Your available balance is EGP 33,540.25"*, invented values in the shape
+   * Interest 310-554***-918 EGP 418.62+ Your available balance is EGP 33,540.25"*, invented values in the shape
    * `loop/research-bank-real.md` measured. Before this pattern it landed `untriaged` with nothing claiming it,
    * so interest and deposits never reached the ledger however often he forwarded them.
    *
@@ -313,7 +319,7 @@ export const HSBC_EG_INGESTS: Record<string, SeedIngest> = {
    * THE DESCRIPTION ENDS AT THE STARS, AND KEEPS THE BRANCH CODE. The real credit has no `from` or `to` before
    * the account, so `FROM_HSBC_WHAT`'s closing ` from ` is not there and `what` would be unread. Nothing but
    * digits sits between the words and the account, so `***-` is the first literal after them and the value is
-   * `01AUG26 Deposit Interest 042-118`: the date at the front as the debit has it, and the account's public
+   * `01AUG26 Deposit Interest 310-554`: the date at the front as the debit has it, and the account's public
    * half at the back. Both are what the bank printed, and a person reading the row can still tell what it was.
    *
    * THE SKIP LIST HOLDS ONLY THE PIN REMINDER. `FROM_HSBC_SKIP`'s refund line says *"this pattern reads a
@@ -362,7 +368,7 @@ export const HSBC_EG_INGESTS: Record<string, SeedIngest> = {
    * when it touches the digits, so the figure is read as a size and never as a signed amount.
    *
    * `none:` HOLDS `SIGNED_DEBIT` AND `SIGNED_CREDIT`, so a line carrying a real glued sign as well as a stray
-   * hyphen belongs to that sign's pattern and never to two. `test/money-bank.test.ts` asks every pattern of every wording.
+   * hyphen belongs to that sign's pattern and never to two. `packs/bank-hsbc-eg/bank-hsbc-eg.test.ts` asks every pattern of every wording.
    */
   'bank-from-unsure': {
     ingest: 'bank-from-unsure',
@@ -432,7 +438,7 @@ const NOT_A_BANK_MOVEMENT = { none: BANK_MOVEMENT_WORDS.map((contains) => ({ fie
  * (`loop/research-legacy-keeps.md` section 1). The `skip:` lists above hang off their patterns, so they reach only
  * a text some pattern already matched, and an arrival nothing matches is `untriaged` by rule. Measured before this
  * pattern with four such bodies posted to the door: four `untriaged`, a badge of four for texts nobody has to read
- * (`test/bank-not-mine.test.ts`). With it, four `skipped`, each saying why.
+ * (`packs/bank-hsbc-eg/bank-hsbc-eg.test.ts`). With it, four `skipped`, each saying why.
  *
  * THE KERNEL HAS NO PRIORITY, SO THIS IS NOT LAST BY POSITION. An arrival named for the door is offered the door's own
  * pattern and then every pattern naming it in the order their declaration rows were written, and a pattern a later
@@ -440,7 +446,7 @@ const NOT_A_BANK_MOVEMENT = { none: BANK_MOVEMENT_WORDS.map((contains) => ({ fie
  * alert at the door filed on the first install, and after a 1.3.1 that changed only `bank-card-used-sms`'s description
  * the next card alert was claimed by this pattern and held in `review`. So its `match:` refuses `BANK_MOVEMENT_WORDS`,
  * a phrase each of the six twins requires, and the two sets are disjoint whatever order they are offered in: the same
- * update with this `match:` filed the alert. `test/bank-not-mine.test.ts` holds the phrase for every twin.
+ * update with this `match:` filed the alert. `packs/bank-hsbc-eg/bank-hsbc-eg.test.ts` holds the phrase for every twin.
  *
  * AND A LINE IN THE BANK'S OWN WORDING THAT NOTHING READS STAYS A PERSON'S. `bank-from-out` says a `From HSBC:` line no
  * sign pattern takes goes to a person as `untriaged`, and a catch-all that skipped it would call a real movement a

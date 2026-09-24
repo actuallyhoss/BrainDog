@@ -368,7 +368,14 @@ export function firstPartyDocument(id: string, options: DocumentOptions = {}): R
     ...(Object.keys(configOf(id, pack.declarations)).length > 0 ? { config: configOf(id, pack.declarations) } : {}),
     /* THE TWELVE HSBC EGYPT DOORS ARE HANDED, NOT RETIRED, so a token minted for one survives the move (`bank-hsbc-eg.ts`),
        and so is `holdings`, so its rows do (`holdings.ts`). The twelve are still handed at 2.0.0, because a record on
-       1.7.0 may take this update without ever having taken 1.8.0. */
+       1.7.0 may take this update without ever having taken 1.8.0.
+       THIS IS THE LAST PLACE money-core NAMES ANOTHER PACK, and brief B1 of `loop/research-legacy-parity.md` drops it.
+       It stays for now because it is what eleven tests outside this package's bank files drive: measured on
+       25 September with the line taken out, `test/hands-first-party.test.ts` 2, `test/money-core-major.test.ts` 1,
+       `packages/declare/test/door-hold.test.ts` 2, `packages/declare/test/plan-handover-shown.test.ts` 4 and
+       `packages/record/test/handover-used.test.ts` 2 went red, each asserting the handover this line makes. Taking it
+       out changes no id a record on 2.4.0 holds (`pack-versions.test.ts` fingerprints declarations and settings, and
+       `hands` is neither), so it needs no version step, only those tests moved to a `hands` of their own making. */
     ...(id === 'money-core' ? { hands: { ...MONEY_CORE_HANDS, ...MONEY_CORE_HOLDINGS_HANDS } } : {}),
   };
 }

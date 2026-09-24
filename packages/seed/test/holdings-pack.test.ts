@@ -5,11 +5,11 @@
  * use case §22 named by name (`loop/DIRECTION.md` section 22, `loop/research-seed-roles.md` Brief H). So the list leaves
  * money-core for a pack of its own, and ships without `gold`. `packages/declare/test/handover.test.ts` drives the
  * handover over one gold row and a pack body made up for that test; this file drives it with the pack this product ships
- * and the fourteen rows a real record holds, which is the case the brief asks to be true before anything else.
+ * and the rows an imported record holds, which is the case the brief asks to be true before anything else.
  *
  * WHAT A RECORD THAT HELD GOLD KEEPS. The pack cannot see a row, so the handover keeps everything the record's list had
- * that the pack does not declare, as the record's own addition: on his record `gold` stays a kind, every lot keeps it,
- * and nobody is asked to relabel eleven rows. A record that never held the list is offered no `gold` at all.
+ * that the pack does not declare, as the record's own addition: where rows were written under it, `gold` stays a kind,
+ * every lot keeps it, and nobody is asked to relabel a row. A record that never held the list is offered no `gold`.
  */
 
 import { test } from 'node:test';
@@ -28,7 +28,7 @@ type Field = { id: string; type: string; values?: string[] };
 const live = (k: Kernel, id: string) => k.declarations().find((d) => d.id === id);
 const kinds = (k: Kernel): string[] => (JSON.parse(live(k, 'register.holdings')!.body) as { fields: Field[] }).fields.find((f) => f.id === 'kind')?.values ?? [];
 
-/** Every first-party pack installed with money-core at 1.8.0, and the fourteen rows written into its `holdings`. */
+/** Every first-party pack installed with money-core at 1.8.0, and the export's rows written into its `holdings`. */
 async function on180(rows: number = HELD_AT_1_8_0.length) {
   const { k, sql } = await record();
   for (const id of FIRST_PARTY) await put(k, id === 'money-core' ? asMoneyCore180(firstPartyDocument('money-core')) : firstPartyDocument(id));
@@ -63,11 +63,11 @@ test('THE PACK DECLARES ONE LIST, UNDER ITS OWN NAME, AND NO GOLD: four kinds, c
   assert.ok(!(FIRST_PARTY as readonly string[]).includes('holdings'), 'holdings became a first-party module, which every Money record would get');
 });
 
-test('A RECORD ON 1.8.0 HOLDING FOURTEEN ROWS UPDATES TO 2.0.0 AND TAKES THE PACK, every row as it was and gold its own', async () => {
+test('A RECORD ON 1.8.0 HOLDING ROWS UPDATES TO 2.0.0 AND TAKES THE PACK, every row as it was and gold its own', async () => {
   const { k, sql, ids } = await on180();
   const before = snapshot(k, ids);
 
-  /* THE UPDATE HANDS THE LIST, AND THE PLAN SAYS WHERE IT GOES. Fourteen rows, so it is used whatever `used` says. */
+  /* THE UPDATE HANDS THE LIST, AND THE PLAN SAYS WHERE IT GOES. It has rows, so it is used whatever `used` says. */
   const update = await put(k, firstPartyDocument('money-core'), []);
   assert.deepEqual(update.retires.map(({ id, rows, to }) => ({ id, rows, to })), [{ id: 'register.holdings', rows: 14, to: 'holdings' }]);
   assert.equal(update.orphans, 0);

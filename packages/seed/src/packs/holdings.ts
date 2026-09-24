@@ -1,8 +1,8 @@
 /**
  * What a person holds rather than spends: a pack of its own, not part of Money.
  *
- * WHY IT LEFT MONEY. `holdings` arrived in money-core 1.5.0 for fourteen rows in the old tool that had nowhere to go, and
- * every record set up with Money carried it from then on, with `gold` first among its kinds. What one person holds is
+ * WHY IT LEFT MONEY. `holdings` arrived in money-core 1.5.0 for rows in the the old tool export that had nowhere to go,
+ * and every record set up with Money carried it from then on, with `gold` first among its kinds. What one person holds is
  * not what everybody's Money is for, and gold was the use case `loop/DIRECTION.md` section 22 named by name: the code
  * ships primitives, and a person's gold is something built on them. So money-core 2.0.0 stops declaring the list and
  * HANDS it here (`MONEY_CORE_HOLDINGS_HANDS`, spread into money-core's own `hands`), and a record that held rows in it
@@ -11,8 +11,14 @@
  * `gold` IS NOT SHIPPED, AND A RECORD THAT HELD IT KEEPS IT. The kinds are four with no metal among them: a lot of gold
  * is a `commodity`, which is how a count and a cost each is read. When this pack takes over a list that already holds
  * `gold`, the handover keeps what the record's list has and this body lacks as the record's own addition, as a rebase
- * keeps any value an owner added (`packages/declare/src/index.ts`, `carried`), so his eleven lots go on reading as gold
- * and nobody is asked to relabel them. A record that never held the list is offered no `gold` at all.
+ * keeps any value an owner added (`packages/declare/src/index.ts`, `carried`), so rows written under `gold` go on
+ * reading as gold and nobody is asked to relabel them. A record that never held the list is offered no `gold` at all.
+ *
+ * THE PACK IS A FILE NOW, `packs/holdings/holdings.pack.json`, at 1.1.0 (`loop/research-legacy-parity.md` brief B1):
+ * the list below, plus what a holding cost in all (`cost`, written by a script as `qty` times `unit_cost`), a
+ * `Holdings value` figure over it and a Holdings page. This builder stays at 1.0.0 only until the the old tool import
+ * resolves the pack by id rather than importing it from here (brief B2), and `packs/holdings/holdings.test.ts` holds
+ * the file's list to this one until then.
  *
  * IT NEEDS money-core 2.0.0 OR LATER, AND THAT IS ABOUT ORDER, NOT ABOUT WHAT IT READS. No field here points at another
  * list. But up to 1.8.0 money-core declares `register.holdings` itself, and this pack beside it is refused
@@ -34,35 +40,32 @@ export const HOLDINGS_VERSION = '1.0.0';
 /**
  * WHAT A PERSON HOLDS, WHICH IS THE ONE KIND OF ROW THIS RECORD HAD NO HOME FOR.
  *
- * MEASURED, LIVE, BEFORE THE REGISTER WAS WRITTEN: the old tool's `money.assets` holds fourteen rows,
- * being 80 units of gold at EGP 555,435.00 of cost across 11 lots bought between May 2025 and July
- * 2026, a EGP 100,000.00 saving certificate maturing 2028-11-05, and two Northwind policies of
- * USD 202.10 and USD 101.05 of monthly premium against USD 48,000.00 and USD 24,000.00 of sum
- * assured, maturing in 2052 and 2062. `apps/cli/src/legacy.ts` named every one of them in a skip
- * line and said why it was skipped: the nearest list here was an account with a BALANCE, and filing a
- * policy there would count it as cash he could spend. That is the reason it is a register of its own
- * rather than a fourth `accounts.kind`.
+ * MEASURED, LIVE, BEFORE THE REGISTER WAS WRITTEN: the the old tool export's `money.assets` held lots
+ * of a metal bought on different days, a saving certificate with a maturity, and insurance policies
+ * paid monthly in another currency. `apps/cli/src/legacy.ts` named every one of them in a skip line
+ * and said why it was skipped: the nearest list here was an account with a BALANCE, and filing a
+ * policy there would count it as cash somebody could spend. That is the reason it is a register of
+ * its own rather than a fourth `accounts.kind`.
  *
- * `test/holdings.test.ts` DRIVES THAT CLAIM RATHER THAN REPEATING IT: it reads `cash-now` over the
- * seeded record, writes all fourteen rows, and reads it again. The figure sums `accounts.balance`
- * where `liquid is true`, so a holding is invisible to it by construction, and the EGP 655,435.00 and
- * USD 287.15 that an accounts-shaped import would have added to the money he has stay out of it.
+ * `packs/holdings/holdings.test.ts` DRIVES THAT CLAIM RATHER THAN REPEATING IT: it reads `cash-now`,
+ * writes a lot, a certificate and a policy, and reads it again. The figure sums `accounts.balance`
+ * where `liquid is true`, so a holding is invisible to it by construction.
  *
- * NO FIGURE, NO PAGE AND NO SEED ROW YET, deliberately. The sample record is a London studio that
- * holds nothing of the kind, so since this left Money the sample does not carry the list at all
- * (`holdingsDeclarations` in `../index.ts` adds it for a test); the rows that fill it are an
- * import's. A tile over an empty list would read EGP 0.00 as a fact.
+ * NO FIGURE, NO PAGE AND NO SEED ROW IN THIS BUILDER, deliberately. The sample record is a London
+ * studio that holds nothing of the kind, so since this left Money the sample does not carry the list
+ * at all (`holdingsDeclarations` in `../index.ts` adds it for a test); the rows that fill it are an
+ * import's. The figure and the page are the pack file's, from 1.1.0.
  *
- * AND NO `state:`. Nothing in the fourteen rows says a holding was sold, surrendered or cashed in: the
- * export has a kind, a cost, a day and a maturity and no status at all, so a status here would be one
- * value every row wore, which is a column that says nothing and a `done:` list that hides nothing. It
- * is a field a later version adds when somebody sells a lot, and that is a minor step for the pack.
+ * AND NO `state:`. Nothing in the export says a holding was sold, surrendered or cashed in: it has a
+ * kind, a cost, a day and a maturity and no status at all, so a status here would be one value every
+ * row wore, which is a column that says nothing and a `done:` list that hides nothing. It is a field
+ * a later version adds when somebody sells a lot, and that is a minor step for the pack.
  *
- * WHAT THE EXPORT CARRIES AND THIS DOES NOT. The two policies keep a sum assured, an accumulated
- * value and a term in years under `meta_json`, and the certificate a term. None of them is a cost and
- * none of them is a quantity, so each would be a column only policies fill and no figure reads; they
- * go in the note, where a person reads them beside the row. A field added later is a minor step for
- * the pack, and a field nobody fills is one nobody can take away.
+ * WHAT THE EXPORT CARRIES AND THIS DOES NOT. A policy keeps a sum assured, an accumulated value and a
+ * term in years under `meta_json`, and a certificate a term. None of them is a cost and none of them
+ * is a quantity, so each would be a column only policies fill and no figure reads; they go in the
+ * note, where a person reads them beside the row. A field added later is a minor step for the pack,
+ * and a field nobody fills is one nobody can take away.
  */
 export const HOLDINGS: SeedRegister = {
   id: 'holdings',
@@ -77,10 +80,10 @@ export const HOLDINGS: SeedRegister = {
   title: 'label',
   /**
    * `qty` ON THE CARD, AND NOT `kind`, because a cost each with no count beside it is a WRONG number
-   * rather than an incomplete one: the dearest lot in the export reads EGP 8,336.00 on a card and the
-   * lot cost EGP 83,360.00, and nothing else on the card says which of the two it is. The kind is the
-   * fact a reader can recover, and in all fourteen real rows it is recoverable from the label itself:
-   * "Gold 24c", "Saving Certificate", "Northwind 5820614".
+   * rather than an incomplete one: a lot of ten reads its cost each on a card while the lot cost ten
+   * times that, and nothing else on the card says which of the two it is. The kind is the fact a
+   * reader can recover, and in every row the export held it is recoverable from the label itself: a
+   * metal and its purity, the word certificate, or an insurer's name and a policy number.
    */
   mobile: ['label', 'qty', 'unit_cost'],
   pack: 'holdings',
@@ -101,10 +104,10 @@ export const HOLDINGS: SeedRegister = {
      * core naming one person's holdings, which is what this pack left Money for.
      *
      * `search: true` ON AN ENUM, which nothing else in this seed does, and it earns it here. A hit
-     * carries the row's title and the two policies are titled `Northwind 5820614` and `Northwind 5836271`,
-     * so without this the word *policy* reaches neither of them. `projectedText` indexes every
-     * searchable field whatever its type and `declare`'s SEARCHABLE list holds `enum`; the test
-     * searches for `policy` and counts two rather than taking that on trust.
+     * carries the row's title and a policy is titled with its insurer and its number, so without this
+     * the word *policy* reaches none of them. `projectedText` indexes every searchable field whatever
+     * its type and `declare`'s SEARCHABLE list holds `enum`; the pack's test searches for `policy` on
+     * a row whose label does not say it rather than taking that on trust.
      */
     { id: 'kind', label: 'Type', type: 'enum', values: ['certificate', 'policy', 'commodity', 'other'], index: true, required: true, search: true },
     /**
@@ -112,7 +115,7 @@ export const HOLDINGS: SeedRegister = {
      *
      * A `quantity` is a number AND a unit, and the kernel refuses one without a unit in as many words:
      * *"unit names what the number counts, and a quantity without one is a number."* Nothing in the
-     * source says what a unit of gold is: all 11 lots carry `meta_json: null`, so an importer
+     * source says what a unit of gold is: every lot carries `meta_json: null`, so an importer
      * declaring `quantity` would have to invent grams or coins for every row, and an invented unit is
      * worse than a stated count with none. `decimal` and not `int` because half a gram is a holding.
      *
@@ -122,17 +125,17 @@ export const HOLDINGS: SeedRegister = {
      */
     { id: 'qty', label: 'How many', type: 'decimal', min: 0, required: true, qualifies: 'unit_cost' },
     /* WHAT ONE OF THEM COST, WITH ITS OWN CURRENCY, and the currency is the field's rather than the
-       register's: eleven of his fourteen rows are in Egyptian pounds and two are in dollars, and a
-       total over the list is therefore two totals. Nothing here is a valuation. A holding's worth
-       today is a rate away and `fx` is where a rate lives; this is what was paid. */
+       register's: the export's rows were in two currencies, and a total over the list is therefore
+       two totals. Nothing here is a valuation. A holding's worth today is a rate away and `fx` is
+       where a rate lives; this is what was paid. */
     { id: 'unit_cost', label: 'Cost each', type: 'money', required: true },
     /* THE DAY IT WAS BOUGHT. Indexed, because what a lot cost is only a cost with the day beside it:
-       the same 24 carat gold cost EGP 5,373.00 a unit in May 2025 and EGP 8,336.00 in April 2026. Not
+       the same metal bought a year apart cost half as much again a unit on the later day. Not
        required, for `services`' measured reason: an imported row whose date the source never knew is
        still a row, and a blank day sends somebody to find out where a guessed one stops them. */
     { id: 'acquired_on', type: 'day', index: true },
     /**
-     * WHEN IT ENDS, FOR THE THINGS THAT END. Eleven of the fourteen rows have no maturity at all, so
+     * WHEN IT ENDS, FOR THE THINGS THAT END. Most of the export's rows have no maturity at all, so
      * this is nullable and a register that required it could not hold a single gold lot.
      *
      * NO `deadline:` AND NO `remind:`, though both were considered. A maturity that has passed is

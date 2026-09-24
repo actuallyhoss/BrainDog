@@ -274,6 +274,13 @@ export const ingestDeclarations = (): Declaration[] =>
  * went red, every one of them a `From HSBC:`, InstaPay or card-used line arriving at a record with no pattern for it.
  * They are installed as the pack declares them, `pack: 'bank-hsbc-eg'` in the body, so a sample exported and opened
  * elsewhere says whose they are.
+ *
+ * THIS PACKAGE'S OWN BANK TESTS NO LONGER NEED THEM. They moved to `packs/bank-hsbc-eg/bank-hsbc-eg.test.ts` on
+ * 25 September, where the record is the first-party packs and the pack file (`loop/research-legacy-parity.md` B1).
+ * Measured with these left out after the move: `test/seed.test.ts` 1, `packages/kernel/test/ingest-door.test.ts` 1,
+ * `packages/record/test/money-ipn.test.ts` 10, `packages/record/test/ingest-verify-digest.test.ts` 1 and
+ * `packages/host/test/ingest-shortcut.test.ts` 2 went red, each forwarding a bank line into `installSeed`. Once those
+ * install the pack file on their record instead, this goes, and so does the last `hsbc` in this file but the exports.
  */
 const sampleBankDeclarations = (): Declaration[] =>
   [...Object.values(HSBC_EG_INGESTS), ...Object.values(HSBC_EG_SMS_INGESTS)].map((body) => ({ id: `ingest.${body.ingest}`, kind: 'ingest' as const, body: body as never }));

@@ -2,8 +2,8 @@
  * One bank's wordings as a pack of their own (`packs/bank-hsbc-eg.ts`), and money-core without them.
  *
  * WHY THIS FILE EXISTS. money-core 1.7.0 declared sixteen ingests and twelve of them read one bank in one country:
- * `From HSBC:` lines, InstaPay transfers, a credit card alert that prints `*** 6180`. Every record set up as Personal,
- * Founder or Small business therefore carried them (`loop/research-shell-seed.md` M2), which is what
+ * `From HSBC:` lines, InstaPay transfers, a credit card alert that prints four digits after three stars. Every record set
+ * up as Personal, Founder or Small business therefore carried them (`loop/research-shell-seed.md` M2), which is what
  * `loop/DIRECTION.md` section 22 says the core must not ship. The tests below hold the three things the move has to
  * get right at once: money-core stops declaring them, the pack declares exactly them, and a record that already had
  * them from money-core reaches the same readings through the update and one install, with nothing refused.
@@ -182,7 +182,7 @@ test('A RECORD ON 1.7.0 UPDATES WITHOUT A REFUSAL, then takes the pack, and ends
 
   /* AND A LINE FROM THE BANK IS STILL CLAIMED BY ITS PATTERN, which is what the owner notices if this goes wrong. */
   const out = value<{ ingest: string | null }>(
-    k.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example' }, body: 'From HSBC: 16AUG26 ATM Cash Withdrawal from 042-118***-327 EGP 2500.00- Your available balance is EGP 31,040.25', sha256: 'bank-pack-1' }),
+    k.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example' }, body: 'From HSBC: 16AUG26 ATM Cash Withdrawal from 310-554***-918 EGP 2500.00- Your available balance is EGP 31,040.25', sha256: 'bank-pack-1' }),
   );
   assert.equal(out.ingest, 'bank-from-out');
   sql.close();
@@ -228,9 +228,9 @@ test('A DOOR THE RECORD USES IS HANDED, WITH THE DOOR IT NAMES, AND NOTHING ELSE
   const { k, sql } = await record();
   for (const id of FIRST_PARTY) await put(k, id === 'money-core' ? v170() : firstPartyDocument(id));
   /* THE ACCOUNT THE LINE NAMES, so the arrival files a row. Without it the line waits in review and has filed nothing. */
-  value(k.create('accounts', { name: 'Cairo credit card', kind: 'card', balance: { amount: 0, currency: 'EGP' }, as_of: '2026-08-01', liquid: false, last4: '6180' }, { actor: 'p_seed' }));
+  value(k.create('accounts', { name: 'Cairo credit card', kind: 'card', balance: { amount: 0, currency: 'EGP' }, as_of: '2026-08-01', liquid: false, last4: '2291' }, { actor: 'p_seed' }));
   const out = value<{ ingest: string | null; state: string; reason?: string }>(
-    k.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example', Subject: 'HSBC' }, body: 'Your Credit Card ending with *** 6180 has been used for EGP 1,284.50 on 14/08/2026 at CEDAR LANE BAKERY. Your available limit is EGP 23,715.50', sha256: 'bank-pack-used-1' }),
+    k.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example', Subject: 'HSBC' }, body: 'Your Credit Card ending with *** 2291 has been used for EGP 1,284.50 on 14/08/2026 at CEDAR LANE BAKERY. Your available limit is EGP 23,715.50', sha256: 'bank-pack-used-1' }),
   );
   assert.deepEqual([out.ingest, out.state], ['bank-card-used', 'matched'], out.reason);
   const used = usedOf(sql, ['ingest.bank-ipn-in-sms']);
