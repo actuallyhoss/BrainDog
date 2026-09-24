@@ -287,6 +287,30 @@ const CASES = [
      the real record, named only by a component that had never been mounted. A grep over source said
      it was rendered. */
   { gate: 'dead-copy-orphan', run: 'dead-copy', expect: /nobody reads/, findings: 1 },
+
+  /* `packs/`, THE THIRD WORKSPACE ROOT, ONE FIXTURE PER TEXT GATE THAT READS IT. Each tree holds a
+     violation under `packs/` and nothing a gate reading only `packages` and `apps` could find, so
+     dropping `packs` from a gate's list turns its case red here. That is the defect audit sixty-one
+     found (finding 9): all four text gates had the pair written in, and read green over four shipped
+     packs they had never opened. `tools/gates/test/packs-read.test.mjs` proves the same four under
+     `node --test`; this is the copy `run.mjs` runs, so it cannot be skipped by a run that does not
+     reach the unit tests. Measured on 24 September by deleting `packs` from each gate's list in a
+     scratch copy: `em-dash-packs` went red with exit 3 (nothing read), `secret-grep-packs` and
+     `graph-packs` each passed their seeded violation.
+
+     THE DECOYS ARE THE PACK'S TEST, which sits beside the file it ships rather than under `test/`.
+     `em-dash` and `graph` must leave it alone and it carries the same sentence and the same climb as
+     the seeded file, so `packs/seeded/` named twice is the gate reading the test. `secret-grep` reads
+     tests on purpose, so its decoy is a line logging the key's label beside the one logging its value.
+
+     NO `shell-words-packs`, AND THAT IS THE GATE'S DECISION RATHER THAN A GAP. Its words are the use
+     cases the core must not name, and a pack is where a use case belongs, so it leaves `packs` out on
+     purpose (its `WORKSPACES` header) and `packs-read.test.mjs` pins the pair: a use-case word in a
+     pack stays green, the same word in `packages/kernel` goes red. A negative here would be a fixture
+     asserting the opposite of the rule. */
+  { gate: 'em-dash-packs', run: 'em-dash', expect: /used as punctuation/, findings: 1 },
+  { gate: 'secret-grep-packs', run: 'secret-grep', expect: /a plaintext reaches a log/, findings: 1 },
+  { gate: 'graph-packs', run: 'graph', expect: /cross-package relative import/, findings: 1 },
 ];
 
 /** How many lines of a gate's output name the seeded file. One per seeded violation. */

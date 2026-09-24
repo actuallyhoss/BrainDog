@@ -1,0 +1,5 @@
+{
+  "pack": "seeded",
+  "summary": "Reads the balance — every hour, and says so on the plan.",
+  "empty": "—"
+}
