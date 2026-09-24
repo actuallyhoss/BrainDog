@@ -697,10 +697,12 @@ export type InboxState = (typeof INBOX_STATES)[number];
 export const INBOX_WAITING: readonly InboxState[] = ['untriaged', 'review'];
 
 /**
- * What filing or archiving an arrival did: the arrival, the state it is in now, the row it became when it was filed,
- * and whether it was already so, in which case nothing was written.
+ * What filing, archiving or returning an arrival did: the arrival, the state it is in now, the row it became when it
+ * was filed (or the row a return archived), and whether it was already so, in which case nothing was written.
+ *
+ * `untriaged` AND `review` ARE HERE FOR `returnArrival`, which puts an arrival back in the one of the two it left from.
  */
-export type ArrivalSettled = { id: string; state: 'matched' | 'ignored'; entry: Entry | null; already: boolean };
+export type ArrivalSettled = { id: string; state: 'matched' | 'ignored' | 'untriaged' | 'review'; entry: Entry | null; already: boolean };
 
 /** A page's place in the rail, when its declaration gives one in the shape `{ section, order }`. */
 const navOf = (nav: unknown): { section: string; order: number } | null => {
@@ -5441,7 +5443,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * THE EVENT IS NOT ABOUT A ROW, so it carries its own target kind rather than `appendEvent`'s `entry:`, the way the
    * ingest's `match` and `extract` events do.
    */
-  const settleArrival = (id: string, from: string, to: 'matched' | 'ignored', actor: string, note: string, batch: string): void => {
+  const settleArrival = (id: string, from: string, to: ArrivalSettled['state'], actor: string, note: string, batch: string): void => {
     sparkMayWrite(actor, 'state');
     sql.exec('UPDATE inbox_raw SET state = ? WHERE id = ?', to, id);
     sql.exec(
@@ -5457,13 +5459,34 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     );
   };
 
-  /** The row a person filed this arrival as, found through the batch its `state` event shares with the row's `create`. */
-  const filedAs = (id: string): Entry | null => {
-    const settled = sql.one<{ batch: string | null }>(
-      "SELECT batch FROM event WHERE target = ? AND kind = 'state' AND to_v = ? ORDER BY rowid DESC LIMIT 1",
+  /**
+   * The person's settlement that put this arrival in `state`: its NEWEST `state` event, and only when that event's `to_v`
+   * is `state`. `undefined` when the arrival is where it is for some other reason.
+   *
+   * THE NEWEST EVENT AND NOT THE NEWEST ONE ENDING IN `state`, because the ingest moves an arrival without writing one.
+   * Its `store` sets the state with an `INSERT`, or an `UPDATE` on a rescue (`ingest.ts:761`), and the rescue runs again
+   * on an `untriaged` row whose `reason` is `UNVERIFIED` (`ingest.ts:669-673`), which a return makes possible. So a
+   * person filed an unverified arrival, returned it, and a verified redelivery filed it again through the pattern: the
+   * newest event ending in `matched` was still the person's old filing, and reading it handed the return a row it had
+   * already archived and `fileArrival` that dead row as the "already filed" answer
+   * (`test/arrival-return.test.ts`, the last case). An event that did not put the arrival where it is now says nothing
+   * about how it got there.
+   */
+  const settledBy = (id: string, state: string): { from: string; batch: string | null } | undefined => {
+    const last = sql.one<{ from_v: string | null; to_v: string | null; batch: string | null }>(
+      "SELECT from_v, to_v, batch FROM event WHERE target = ? AND kind = 'state' ORDER BY rowid DESC LIMIT 1",
       `inbox_raw:${id}`,
-      written('matched'),
     );
+    if (!last || last.to_v !== written(state) || last.from_v === null) return undefined;
+    return { from: JSON.parse(last.from_v) as string, batch: last.batch };
+  };
+
+  /**
+   * The row a person filed this arrival as, found through the batch its `state` event shares with the row's `create`.
+   * Only while that filing is what the arrival is still in (`settledBy`): after a return and a rescue it is `null`.
+   */
+  const filedAs = (id: string): Entry | null => {
+    const settled = settledBy(id, 'matched');
     if (!settled?.batch) return null;
     const made = sql.one<{ target: string }>(
       "SELECT target FROM event WHERE batch = ? AND kind = 'create' AND target LIKE 'entry:%' ORDER BY rowid LIMIT 1",
@@ -6168,8 +6191,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * marked `matched` with a `state` event in the same batch, in one transaction.
      *
      * `matched` AND NOT A NEW STATE. The DDL's seven already say what happened: something claimed the arrival and a row
-     * came of it. A person claiming it is told apart from an ingest by the event's actor, not by a word the ingest does
-     * not use.
+     * came of it. A person claiming it is told apart from an ingest by the `state` event this writes and the ingest never
+     * does (`settledBy`), not by a word the ingest does not use. It said "by the event's actor", which would have needed
+     * a list of every mechanism's name to read.
      *
      * AGAIN IS THE SAME ANSWER. An arrival a person already filed answers with the row it became and writes nothing, so a
      * retry whose answer was lost is one row and not two. An arrival in any state the inbox does not show is refused.
@@ -6215,6 +6239,56 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           });
         settleArrival(id, raw.state, 'ignored', actor, 'Archived from the inbox.', mint());
         return ok<ArrivalSettled>({ id, state: 'ignored', entry: null, already: false });
+      }),
+
+    /**
+     * Take back a person's filing or archiving: the arrival goes back to the state its settling `state` event came
+     * `from`, with a `state` event of its own, and a filed arrival's row is archived in the same batch, in one
+     * transaction.
+     *
+     * THE ROW IS ARCHIVED THROUGH `write` WITH `version`, the way the app archives any row (`deleted_at`, compare-and-set).
+     * A row somebody edited since the filing answers the kernel's conflict, the 409 with the row as it stands, and
+     * nothing moves: the edit was somebody's work, and putting the arrival back would bury it in an archived row. An
+     * archived arrival has no row, so `version` is not read.
+     *
+     * ONLY A PERSON'S SETTLEMENT IS TAKEN BACK, which is the one `settledBy` finds. An ingest's filing writes no `state`
+     * event, so it is refused rather than undone: its row came from a rule, and it is edited or archived in its list.
+     *
+     * AGAIN IS THE SAME ANSWER. An arrival already waiting answers as it is and writes nothing, so a retry whose answer
+     * was lost does not write a second event.
+     */
+    returnArrival: (id: string, version: number, w: WriteContext): Result<ArrivalSettled> =>
+      transaction(() => {
+        const raw = sql.one<{ state: string }>('SELECT state FROM inbox_raw WHERE id = ?', id);
+        if (!raw) return no<ArrivalSettled>('OUT_OF_BOUNDS', 'There is no arrival with that id in this inbox.', { at: 'id' });
+        if (raw.state === 'untriaged' || raw.state === 'review')
+          return ok<ArrivalSettled>({ id, state: raw.state, entry: null, already: true });
+        const settled = settledBy(id, raw.state);
+        if (raw.state === 'matched' && !settled)
+          return no<ArrivalSettled>(
+            'OUT_OF_BOUNDS',
+            'A rule filed this arrival, not a person, so there is no filing here to take back. Its row is edited or archived in its list. Nothing was changed.',
+            { at: 'id' },
+          );
+        const back = settled?.from;
+        if (!settled || (back !== 'untriaged' && back !== 'review'))
+          return no<ArrivalSettled>('OUT_OF_BOUNDS', `This arrival left the inbox as ${raw.state} by a rule, not by a person, so it has nowhere to go back to. Nothing was changed.`, {
+            at: 'id',
+          });
+        const batch = w.batch ?? mint();
+        let entry: Entry | null = null;
+        if (raw.state === 'matched') {
+          const filed = filedAs(id);
+          if (!filed)
+            return no<ArrivalSettled>('OUT_OF_BOUNDS', 'The row this arrival was filed as is no longer in this record, so the filing cannot be taken back. Nothing was changed.', {
+              at: 'id',
+            });
+          const out = write(filed.register, filed.id, { deleted_at: true }, { ...w, version, batch, note: w.note ?? 'Put back in the inbox.' });
+          if (!out.ok) return out as unknown as Result<ArrivalSettled>;
+          entry = out.value;
+        }
+        settleArrival(id, raw.state, back, w.actor, raw.state === 'matched' ? 'Filing taken back; in the inbox again.' : 'Archive taken back; in the inbox again.', batch);
+        return ok<ArrivalSettled>({ id, state: back, entry, already: false });
       }),
 
     /* `seenAt()` WAS HERE AND IS GONE. Its only caller was `markRead`'s own return — it wrote the
