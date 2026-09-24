@@ -145,6 +145,60 @@ const lacks = (e: unknown, module: 'fts5' | 'json'): boolean => {
 };
 
 /**
+ * Whether the probe's read failed because the index ITSELF is damaged, on a SQLite that has FTS5.
+ *
+ * THE TWO SENTENCES ARE THE TWO MEASURED, and nothing wider (audit sixty-four, finding 4): a file with
+ * `entry_fts_config` dropped says `vtable constructor failed: entry_fts`, and one whose `entry_fts` schema row was
+ * removed says `no such table: entry_fts`. A guarded port keeps the driver's sentence verbatim, so both read the same
+ * through it. `disk I/O error` names no table and is the file's failure, not the index's, so it still throws.
+ */
+const damagedIndex = (e: unknown): boolean =>
+  /(?:vtable constructor failed|no such table): entry_fts$/.test(e instanceof Error ? e.message : String(e));
+
+/** Migration 1's `CREATE VIRTUAL TABLE entry_fts`, as it ran, so a rebuilt index has the DDL a new file gets. */
+const INDEX_DDL = (): string => {
+  const ddl = statements(kernel0001).find((s) => s.startsWith('CREATE VIRTUAL TABLE entry_fts '));
+  if (!ddl) throw new TypeError('migration 1 no longer creates entry_fts, and the index cannot be rebuilt without it');
+  return ddl;
+};
+
+/** FTS5's five shadow tables for a contentful table, which is what `entry_fts` is. */
+const SHADOWS = ['data', 'idx', 'content', 'docsize', 'config'] as const;
+
+/**
+ * Drop whatever is left of a damaged `entry_fts` and build it again, refilled from the lines it held. One transaction.
+ *
+ * REFILLED FROM `entry_fts_content`, THE INDEX'S OWN COPY OF EVERY LINE, and not projected again from `entry`, because
+ * the projection needs each list's declaration normalised the way `makeKernel`'s `listsOf` does it, and a second copy of
+ * that rule here is the defect its own comment describes. Both measured damages leave the content table whole, and a
+ * damaged index takes no writes (every write to a searchable list throws on it), so its lines are still the rows'.
+ * A file that lost the content table as well opens with an empty index: its rows read and export, and search finds
+ * only what is written after, until an import's `rebuildFts` projects the rest.
+ *
+ * THE CONFIG ROW IS PUT BACK FIRST, because FTS5 connects to a table before it drops one, and with the config table
+ * gone `DROP TABLE entry_fts` throws the same `vtable constructor failed` the probe did (measured). Version 4 is what
+ * SQLite 3.50.4 writes there; the table is dropped one statement later, so it only has to connect.
+ */
+function rebuildIndex(sql: Sql): void {
+  sql.transactionSync(() => {
+    const held = sql.one("SELECT 1 AS x FROM sqlite_master WHERE type = 'table' AND name = 'entry_fts_content'")
+      ? sql.all<{ rowid: number; id: string; register: string; text: string }>(
+          'SELECT id AS rowid, c0 AS id, c1 AS register, c2 AS text FROM entry_fts_content ORDER BY id',
+        )
+      : [];
+    sql.exec('CREATE TABLE IF NOT EXISTS entry_fts_config (k PRIMARY KEY, v) WITHOUT ROWID');
+    sql.exec("INSERT OR REPLACE INTO entry_fts_config (k, v) VALUES ('version', 4)");
+    sql.exec('DROP TABLE IF EXISTS entry_fts');
+    /* A SCHEMA ROW REMOVED LEAVES ITS FIVE SHADOWS BEHIND as ordinary tables, and `CREATE VIRTUAL TABLE` refuses a name
+       that is taken, so they go too. After the drop above they are already gone for the other damage. */
+    for (const shadow of SHADOWS) sql.exec(`DROP TABLE IF EXISTS entry_fts_${shadow}`);
+    sql.exec(INDEX_DDL());
+    for (const line of held)
+      sql.exec('INSERT INTO entry_fts (rowid, id, register, text) VALUES (?, ?, ?, ?)', line.rowid, line.id, line.register, line.text);
+  });
+}
+
+/**
  * Apply what has not been applied, and refuse what disagrees.
  *
  * The two refusals are different failures and the fix is different for each, so they are two codes:
@@ -222,12 +276,24 @@ export async function applyMigrations(
   /* HALF TWO: a read of `entry_fts` that returns nothing, once the schema is whole. A file whose migrations were
      applied on another machine is not re-applied here, so without this read it opened clean on a SQLite that cannot
      search it, answered every method, and failed at the first search with a driver sentence and no code (measured,
-     `boot-probe.test.ts`). `LIMIT 0` compiles the statement, which is where the module is looked up, and reads no row. */
+     `boot-probe.test.ts`). `LIMIT 0` compiles the statement, which is where the module is looked up, and reads no row.
+
+     WHAT A SELF-HOSTER WITHOUT FTS5 NOW GETS, Bun on macOS loading Apple's SQLite being the one `30 §13` names: the
+     sticky `RECORD_UNAVAILABLE` at `sqlite.fts5` from every method that answers a `Result`, `export` among them, with
+     the fix naming their SQLite. That is `30 §13`'s intent, no degraded mode. Before daef0898 the same file opened, a
+     row read by id, and `export` threw `no such module: fts5` with no code (measured); a row by id still reads now,
+     because `get` does not consult the refusal, so what changed is that the export says why it will not run.
+
+     AND A DAMAGED INDEX IS NOT A MISSING MODULE, so it is rebuilt here and the record opens (audit sixty-four,
+     finding 4). This read rethrew every other failure, so a file with `entry_fts_config` dropped, or with the table's
+     schema row removed, threw out of `openRecord` and no method answered, where every row was intact and the index is
+     derived from them. `boot-damaged-index.test.ts` has both damages. */
   try {
     sql.all('SELECT rowid FROM entry_fts LIMIT 0');
   } catch (e) {
-    if (!lacks(e, 'fts5')) throw e;
-    return unavailable(unhostable(sql, 'fts5'), applied);
+    if (lacks(e, 'fts5')) return unavailable(unhostable(sql, 'fts5'), applied);
+    if (!damagedIndex(e)) throw e;
+    rebuildIndex(sql);
   }
 
   return {
