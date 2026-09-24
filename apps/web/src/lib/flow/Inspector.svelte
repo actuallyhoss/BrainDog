@@ -4,8 +4,9 @@
   A FORM, NEVER CODE (§6). Every argument is a field with a label, drawn from `ARGS` in `flow.ts`, so there is one list
   of what each verb takes and the menu, the card's sentence, the fault list and this form all read it. A template is
   filled from chips, the answers the steps before can certainly read and what the trigger hands a run, so nobody types
-  braces; a condition is the `where` sentence every list and block already speaks, or, for a number, a field, a test
-  and a value, because the sentence grammar has no word for "more than" (`flow.ts` `COMPARE`).
+  braces; a condition is the `where` sentence every list and block already speaks, "amount is more than 500" among it
+  since `3187be5a`, or, for a number, a field picked from what the step can read, a test and a value, which files the
+  tree those same words read as (`flow.ts` `COMPARE`, held to the record by `flow-words.test.ts`).
 
   EVERY KEYSTROKE GOES INTO THE DRAFT, AND NOTHING LEAVES IT. The sheet has no Save of its own: the draft is sent whole
   from the editor's footer, once, so closing this is never a question of whether something was lost.
@@ -42,6 +43,7 @@
     ARGS,
     CHANNELS,
     COMPARE,
+    CONDITION_HINT,
     DAYS,
     EVERY,
     TRIGGER_KINDS,
@@ -288,7 +290,7 @@
         <p class="help">{(t.written.op ?? []).length === 0 ? 'None picked is added or changed.' : ''}</p>
         <label class="label" for="flow-when">{words.condition}</label>
         <div class="field">
-          <input id="flow-when" class="field-input" value={flow.draft.when ?? ''} placeholder="state is open, due before today" spellcheck="false" oninput={(e) => flow.setWhen(e.currentTarget.value)} />
+          <input id="flow-when" class="field-input" value={flow.draft.when ?? ''} placeholder={CONDITION_HINT} spellcheck="false" oninput={(e) => flow.setWhen(e.currentTarget.value)} />
         </div>
         {#each whenFaults as f (f)}<p class="fault"><span class="fault-glyph"><Icon name="alert" /></span>{f}</p>{/each}
       {:else if 'arrival' in t}

@@ -710,8 +710,19 @@ export type Arg = (ArgBase & { required?: false }) | (ArgBase & { required: true
 /** One sentence, for every step that keeps an answer, because the reason to name it is the same each time. */
 const NAME_IT = 'Name the answer, so later steps can use it.';
 
+/**
+ * The example shown wherever a condition is written in words: a branch's "Only when" and the trigger's.
+ *
+ * IT SHOWS A NUMBER COMPARED, because that is the test a person reaches for first and the one the example used to
+ * leave out. It read "state is open, due before today", typed twice (here and as a literal on the trigger's field in
+ * `Inspector.svelte`), from when the sentence had no ordered words; since `3187be5a` it reads more than, at least,
+ * less than, at most and between, and an example that never showed one taught that the "A number" builder was the only
+ * way to ask. One constant, so the two fields cannot drift apart again.
+ */
+export const CONDITION_HINT = 'amount is more than EGP 500, due before today';
+
 export const ARGS: Record<Verb, readonly Arg[]> = {
-  if: [{ path: ['if'], label: 'Only when', kind: 'condition', required: true, missing: 'Write what has to be true for this branch.', hint: 'state is open, due before today' }],
+  if: [{ path: ['if'], label: 'Only when', kind: 'condition', required: true, missing: 'Write what has to be true for this branch.', hint: CONDITION_HINT }],
   set_var: [
     { path: ['set_var', 'name'], label: 'Call it', kind: 'name', required: true, missing: 'Name the value, so later steps can use it.' },
     { path: ['set_var', 'to'], label: 'Value', kind: 'text', template: true },
@@ -909,11 +920,19 @@ const cap = (s: string): string => (s === '' ? s : s[0]!.toUpperCase() + s.slice
 /**
  * The tests a number is compared with, in words, and the predicate operator each writes.
  *
- * THE SENTENCE GRAMMAR HAS NO WORD FOR "MORE THAN". `packages/where/src/sentence.ts` reads is, before, after, empty,
- * set, has and lacks, which is every test a list's filter needs and none a gold price does; `gt` and its three
- * siblings exist only in the structured form. So a condition about an answer that is a number is written as a leaf,
- * `{ field: rate, gt: 70 }`, which the runner's `test` reads over the run's answers exactly as it reads a sentence
- * (`packages/kernel/src/flow.ts`), and the canvas draws it back in these words.
+ * THE SENTENCE READS THESE WORDS, AND THIS COMMENT ONCE SAID IT COULD NOT. It said `packages/where/src/sentence.ts`
+ * read is, before, after, empty, set, has and lacks and nothing that orders, which was true until `3187be5a` taught it
+ * more than, at least, less than, at most and between, taking `is` before each or leaving it out. Those four words are
+ * these four, so what a card says a leaf is, "rate is more than 70", reads back through the record as that same leaf:
+ * `flow-words.test.ts` lists a real record's rows by each and holds them to one list.
+ *
+ * SO THE "A NUMBER" BUILDER IS A PICKER NOW, NOT THE ONLY WAY TO ASK. It still writes the leaf,
+ * `{ field: rate, gt: 70 }`, because it chooses the field from the answers and fields a step can read and a tree needs
+ * no name typed right, and the runner's `test` (`packages/kernel/src/flow.ts`) reads the leaf and the sentence through
+ * one schema, where an answer holding a number is a decimal. Measured over `parseWhere` on 24 September: over an answer
+ * held as text, "rate is more than 70" is an `is` of the whole phrase and the leaf is a `gt` on a text, and both answer
+ * false, so the two forms do not disagree about a run. `between` is in the sentence and not here, since the builder has
+ * one value box and a range needs two.
  */
 export const COMPARE = [
   { op: 'gt', said: 'is more than' },
