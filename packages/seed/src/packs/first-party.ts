@@ -137,6 +137,13 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   added and nothing is taken away, so the step is a minor one. A version and not a reset because 2.2.0 is on
  *   `origin/master` (`814ca32c`): CI run `35940058225` for `e0e98bbe` passed, and deploy run `35941293759` was carrying
  *   it out at 01:04 UTC on 24 September, while this was written.
+ * - money-core 2.4.0: a repeating row in Money says the last day it moves money on. `obligations` gains `ends`, a day,
+ *   and the obligations leg of both walks on `page.money` names it, so a line the old tool says ends on 10 November stops
+ *   walking on the 10th instead of every month to the horizon (`test/money-ends.test.ts`). The engines learned the end in
+ *   `5d4bbf8b`, and the import writes it only where the list declares it, so until this step it wrote it nowhere. One
+ *   field added and nothing taken away, so the step is a minor one. A version and not a reset because 2.3.0 is on
+ *   `origin/master` (`5dc5a7c6`) and deploy run `36010768543`, for `6da640cc`, carried it out at 14:09 UTC on
+ *   24 September.
  * - estate 1.2.0: a service carries a note. the old tool's domains carry the reason each name is held and what is
  *   unresolved about it, and Services had no field that holds prose, so the import left every note in the export. One
  *   field added and nothing taken away, so the step is a minor one. It moves the version rather than riding on 1.1.0
@@ -172,7 +179,7 @@ const SUMMARIES: Record<FirstPartyId, string> = {
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.4.0',
   people: '2.0.0',
-  'money-core': '2.3.0',
+  'money-core': '2.4.0',
   estate: '1.2.0',
   work: '1.8.0',
 };

@@ -500,6 +500,17 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
       { id: 'settled', label: 'Paid on', type: 'day' },
       /* HOW OFTEN IT COMES ROUND. The cash walk reads it, so a monthly bill is spent every month. */
       { id: 'repeats', type: 'enum', values: ['none', 'monthly', 'quarterly', 'yearly'] },
+      /**
+       * THE LAST DAY A REPEATING ROW MOVES MONEY ON, SINCE money-core 2.4.0, and the cash walk takes nothing after it.
+       *
+       * Both engines learned to stop a leg on an end in `5d4bbf8b` (`Leg.ends` in `packages/kernel/src/forecast.ts`),
+       * and the the old tool import writes one only where this list declares the field. Until it did, a bill the old tool
+       * says ends on 10 November walked 10 December and every month to the horizon on `/p/money`, and the only thing
+       * that ever closed it was the import's retire pass the night after the day went by
+       * (`test/money-ends.test.ts`). Inclusive, and a day rather than a month, because the old tool's `ends_on` is the
+       * last payday. Empty is no end, which is every row a person writes by hand.
+       */
+      { id: 'ends', label: 'Ends', type: 'day' },
     ],
   },
   accounts: {
@@ -1818,6 +1829,10 @@ const CASH_LEGS = [
     where: 'state is open or part',
     incoming: { field: 'direction', is: 'owed_to_me' },
     every: { field: 'repeats', months: { monthly: 1, quarterly: 3, yearly: 12 } },
+    /* THE ROW'S OWN END, SO THE WALK STOPS WHERE THE LINE DOES (money-core 2.4.0). Named here and not only declared on
+       the list, because a field no leg names is a field no walk reads: the kernel stops on `ends` only when the leg
+       says which field holds it. Both blocks on `/p/money` read this one array, so both stop on the same day. */
+    ends: 'ends',
   },
   {
     register: 'services',

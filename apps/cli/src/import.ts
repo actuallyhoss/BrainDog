@@ -1105,7 +1105,16 @@ export async function applyPlan(
     /* A FIELD THE ROW NAMES IN `onCreate` WAS ITS FIRST VALUE ONLY (`PlannedRow.onCreate`), and a person may have changed
        it since: patched, a one-off date he closed early was reopened by the next night's import. */
     const mine = new Set(row.onCreate ?? []);
-    const differs = (field: string): boolean => stable(found.fields[field]) !== stable(fields[field]);
+    /**
+     * A PLANNED `null` AND A FIELD THE ROW DOES NOT HOLD ARE ONE VALUE, so nothing is sent between them.
+     *
+     * The kernel leaves a field with no value off the row, so compared as JSON a planned `null` read `null` against
+     * `undefined` and differed every night: measured in `test/import-null-clears.test.ts`, a steady export patched
+     * `ends` on every repeating Money row with no end, night after night. That is why the planner sent an end only when
+     * the old tool had one, and so an end the old tool later took away stayed on the row and stopped the forecast early. A
+     * planned `null` over a field the row does hold still differs, and is the patch that clears it.
+     */
+    const differs = (field: string): boolean => stable(found.fields[field] ?? null) !== stable(fields[field] ?? null);
     const patch: Record<string, unknown> = {};
     for (const [field, value] of Object.entries(fields)) if (!mine.has(field) && differs(field)) patch[field] = value;
     /**

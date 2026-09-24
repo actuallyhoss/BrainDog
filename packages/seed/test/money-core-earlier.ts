@@ -90,15 +90,46 @@ export const HELD_AT_1_8_0: readonly Held[] = [
  * fingerprint moved off the one `pack-versions.test.ts` recorded for 1.8.0, measured when each landed: `pairs:` alone read
  * `7e991afc1e7d11aa` against `8bcd20187c61cf1b` on 24 September. `pairs:` is taken off whole, so its `where:` gaining
  * `party` and `settles` at 2.2.0, and `settles` loosened to `settles is empty or transfer is true` at 2.3.0, needs
- * nothing here: `money-core-major.test.ts` still read `8bcd20187c61cf1b` off the 1.8.0 rebuild after 2.3.0 landed.
+ * nothing here: `money-core-major.test.ts` still read `8bcd20187c61cf1b` off the 1.8.0 rebuild after 2.3.0 landed. What
+ * 2.4.0 added is taken off first, by `before240` below.
  */
 function asShipped(doc: unknown): Doc {
-  const d = structuredClone(doc) as Doc;
+  const d = before240(doc);
   d.declarations = d.declarations.map((x) => {
     if (x.register !== 'transactions' || !Array.isArray(x.fields)) return x;
     const { pairs: _pairs, ...earlier } = x;
     return { ...earlier, fields: (x.fields as Body[]).filter((f) => f.id !== 'available') };
   });
+  return d;
+}
+
+/**
+ * Today's money-core document less what 2.4.0 added: the `ends` field on `register.obligations`, and `ends: 'ends'` on
+ * the obligations leg of each walk `page.money` draws. Every release before 2.4.0 is built on top of this.
+ *
+ * TAKEN OFF BY ID AND KEY, NOT BY POSITION, so the fields and the leg's keys keep the order the release carried them in,
+ * which is what the fingerprint hashes. Measured on 24 September: `asMoneyCore230` read `8ad733c726f4fd0b` after 2.4.0
+ * landed, the value `pack-versions.test.ts` holds for 2.3.0, and the 1.8.0 rebuild still read `8bcd20187c61cf1b`.
+ */
+function before240(doc: unknown): Doc {
+  const d = structuredClone(doc) as Doc;
+  d.declarations = d.declarations.map((x) => {
+    if (x.register === 'obligations' && Array.isArray(x.fields)) return { ...x, fields: (x.fields as Body[]).filter((f) => f.id !== 'ends') };
+    if (x.page !== 'money' || !Array.isArray(x.blocks)) return x;
+    return {
+      ...x,
+      blocks: (x.blocks as Body[]).map((b) =>
+        Array.isArray(b.from) ? { ...b, from: (b.from as Body[]).map((leg) => (leg.register === 'obligations' ? (({ ends: _ends, ...rest }) => rest)(leg) : leg)) } : b,
+      ),
+    };
+  });
+  return d;
+}
+
+/** A money-core document as 2.3.0, the release before `ends`: see `before240`. */
+export function asMoneyCore230(doc: unknown): Doc {
+  const d = before240(doc);
+  d.version = '2.3.0';
   return d;
 }
 
