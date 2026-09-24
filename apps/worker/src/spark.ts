@@ -87,11 +87,11 @@ export type SparkEnv = {
  * conversational turn on `glm-5.3-flash`, 12,000 tokens in and 1,500 out, is 231.8 neurons or $0.00255 (`inference.ts`,
  * the rate table's comment). 2,500 is about ten and a half such turns, and 2,500 × $0.011 / 1,000 is $0.0275 at most.
  *
- * IT STOPS A RUNAWAY AND NOTHING ELSE. The package caps its own prompts at 12,000 tokens in and 2,048 out, 256.7 neurons at
- * the most, so no package call comes near it; the package's monthly `ask_cap` is what bounds those. What it does stop is the
- * record's own `draft`, whose reading has no cap of its own: with 2,048 tokens out (93.1 neurons) it refuses a prompt past
- * about 176,500 tokens, some 700 KB, and the rules draft instead. That `draft` is not counted by `ask_cap` at all, and the
- * daily look asks it once a UTC day per record, so this ceiling is the whole bound on that call.
+ * IT STOPS A RUNAWAY AND NOTHING ELSE, AND ONLY ON THE ENGINE'S CALLS NOW. The package caps its own prompts at 12,000 tokens
+ * in and 2,048 out, 256.7 neurons at the most, so no package call comes near it; the package's monthly `ask_cap` is what
+ * bounds those. It was once the whole bound on the record's own `draft` too, whose reading has no cap of its own, and that
+ * let a press on a large record spend more than the one ask the ceiling counted it as (`loop/research-batch-sixty-two-audit.md`
+ * finding 3). The record's two asks are held to `worstAsk` instead (`includedModel`).
  */
 export const INCLUDED_NEURONS_PER_CALL = 2_500;
 
@@ -109,7 +109,9 @@ export const INCLUDED_NEURONS_PER_CALL = 2_500;
  * the default month (80 asks) at about 20,600 neurons at the very worst, some $0.23, so this is some forty times what an
  * owner who never touches the setting could spend, and room for one who raises it to use Spark every day. It is counted
  * in asks at the package's worst call, 232 neurons (`worstAsk`), which is 3,879 asks, so the bound holds whatever mix of
- * reads and proposes spends it; a read's worst is 25.5, so in practice a month at the ceiling costs far less.
+ * reads, proposes, presses and first plans spends it; a read's worst is 25.5, so in practice a month at the ceiling costs
+ * far less. The press and the first plan hold to it only because `includedModel` refuses either past 232 before sending:
+ * their input is the record's and has no `capIn`, and at 300 lists a press's worst case was 272.
  *
  * IT IS PER RECORD AND NOT PER ACCOUNT. Each record's ledger is in its own Durable Object, and no count here sees another
  * record's. A thousand records at the ceiling is $9,900; bounding the account needs a counter every record shares, which
@@ -180,11 +182,14 @@ const counted = (v: unknown): number => (typeof v === 'number' && Number.isFinit
  * - A BINDING THAT THREW is `Reached`: `UNREACHABLE`, which the ladder asks again, but settled under the model's name,
  *   priced on the prompt estimate and counted as an ask, on a read and on an automation's answer alike.
  *
+ * `most` IS THE LARGEST WORST CASE ONE CALL MAY HAVE, read when the call is made. The engine's calls keep the runaway guard,
+ * `INCLUDED_NEURONS_PER_CALL`; the record's own asks pass the call the operator's ceiling counts them as (`includedModel`).
+ *
  * `model` IN THE REPLY IS THE ROUTING NAME, NOT THE PROVIDER ID `aiInference` answers. The package prices a row by its name
  * in `MODELS`, which holds `glm-5.3-flash` and not `@cf/zai-org/glm-5.3-flash`: handing the id through billed every row 0
  * neurons, measured in `test/spark-included.test.ts`'s door case.
  */
-export function includedInference(env: SparkEnv): SparkInference | undefined {
+export function includedInference(env: SparkEnv, most: () => number | Promise<number> = () => INCLUDED_NEURONS_PER_CALL): SparkInference | undefined {
   const ai = env.AI;
   if (ai === undefined || env.SPARK_INCLUDED !== 'yes') return undefined;
   return {
@@ -200,7 +205,7 @@ export function includedInference(env: SparkEnv): SparkInference | undefined {
         messages: call.messages,
         maxTokens: call.maxTokens,
         schema: call.jsonSchema as JsonSchema,
-        budget: { neurons: INCLUDED_NEURONS_PER_CALL },
+        budget: { neurons: await most() },
       });
       if (out.ok) return { text: out.value.text, usage: { in: out.value.usage.in, out: out.value.usage.out }, model: call.model };
       const fix = 'refusal' in out ? out.refusal.fix : 'The included model did not answer.';
@@ -217,9 +222,19 @@ export function includedInference(env: SparkEnv): SparkInference | undefined {
 /**
  * The record's own Spark over the included model: `endpointModel`'s two asks, the same instructions and the same input,
  * read by the same `answerOf`. Every failure is a throw, which the record reads as "the rules speak".
+ *
+ * EACH ASK IS HELD TO THE ONE CALL THE OPERATOR'S CEILING COUNTS IT AS, `worstAsk`, AND NOT TO `INCLUDED_NEURONS_PER_CALL`.
+ * The record's meter writes one `call` row a press, and `operatorCeiling` turns the month's neurons into asks at 232 each,
+ * so a press that may spend more than 232 spends past the ceiling. The package's templates never do, because each trims
+ * its input to `capIn`; the press's input is the record's own reading, which has no cap and grows with the record.
+ * `loop/research-batch-sixty-two-audit.md` finding 3 measured it at 300 lists: 52,310 bytes, a worst case of 272
+ * neurons, and 274 through the bundle with the instructions counted (`test/spark-ceiling-all.test.ts`). Checked here,
+ * by `aiInference`'s own worst case and before the call, a press past it is never sent: the record releases its hold,
+ * writes no row, and its rules draft. A record of 150 lists is 186 and is still asked. The package is imported only
+ * when the record's model is asked, by which time the meter has imported it already (`spark-meter.ts`).
  */
 export function includedModel(env: SparkEnv): SparkModel | undefined {
-  const inference = includedInference(env);
+  const inference = includedInference(env, recordAskMost);
   if (inference === undefined) return undefined;
   const ask = async (instructions: string, input: unknown, schema: JsonSchema): Promise<unknown> => {
     const reply = await inference.complete({
@@ -346,6 +361,15 @@ const worstAsk = (spark: Pick<typeof import('@braindog/spark'), 'PROMPTS' | 'MOD
       return Math.ceil((t.capIn * rate.in + t.maxTokens * rate.out) / 1_000_000);
     }),
   );
+
+/**
+ * `worstAsk`, for the record's own asks on the included model (`includedModel`), read on each ask.
+ *
+ * THE IMPORT IS HERE AND NOT INLINE IN `includedModel` because `test/spark.test.ts` reads this file as text and holds every
+ * `import('@braindog/spark')` below the first refusal, which is how `46 §5.1`'s loading rule is kept checkable. It is
+ * reached only once the record asks its model, which needs the included model switched on, and the module is cached.
+ */
+const recordAskMost = async (): Promise<number> => worstAsk(await import('@braindog/spark'));
 
 /** `2026-10-01T00:00:00.000Z` for a clock in September, and `1 October` for the run's sentence. UTC, as the package's month. */
 const monthOf = (ms: number, add: number): string => {

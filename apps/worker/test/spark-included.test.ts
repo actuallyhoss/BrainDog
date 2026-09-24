@@ -162,7 +162,7 @@ test('THE PER-CALL CEILING REFUSES A RUNAWAY BEFORE THE RUN: a reading too large
   const model = workerSparkModel(switchedOn(ai), noGrants);
   assert.ok(model);
   /* ABOUT 200,000 TOKENS IN, which at 13,636 neurons a million is some 2,700 before a token comes out. */
-  await assert.rejects(model.draft({ usage: { note: 'x'.repeat(800_000) } } as never), /neurons and its ceiling is 2500/u);
+  await assert.rejects(model.draft({ usage: { note: 'x'.repeat(800_000) } } as never), /neurons and its ceiling is 232/u);
   assert.equal(ai.runs.length, 0, 'a call over the ceiling reached the binding');
 });
 
