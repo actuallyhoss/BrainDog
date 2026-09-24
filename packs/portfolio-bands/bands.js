@@ -1,24 +1,26 @@
 /**
  * The revenue bands: what the projects take a month now, and the room left in their forecasts next and later.
  *
- * THE OLD TOOL'S RULE (`loop/research-legacy-keeps.md` section 3). `now` is every project's latest monthly revenue,
- * retired ones that still pay included. A project's headroom is `max(0, base - now)`, where `base` is its base-case
- * forecast of monthly revenue a year out. Headroom on a project being earned from or built is `next`; on one that is
- * parked (the old tool's `explore`) it is `later`; a retired project has none. One amount per currency, because two
- * currencies are never added.
+ * THE RULE (`loop/research-legacy-keeps.md` section 3). `now` is every project's latest monthly revenue, retired
+ * ones that still pay included. A project's headroom is `max(0, base - now)`, where `base` is its base-case forecast
+ * of monthly revenue a year out. Headroom on a project being earned from or built is `next`; on one that is parked it
+ * is `later`; a retired project has none. One amount per currency, because two currencies are never added.
  *
- * WHICH LANE IS WHICH BAND IS THE TABLE BELOW, and it is the one place to change it. the old tool's `maintain` arrives here
- * as `earning` (`LANES` in `apps/cli/src/legacy.ts`), so a maintained project's headroom is counted in `next`, and
- * its `infra` arrives as `building`, where it counts too. the old tool gave neither any headroom.
+ * WHICH LANE IS WHICH BAND IS THE TABLE BELOW, and it is the one place to change it. The lanes are Portfolio's own
+ * four (`packages/seed/src/modules/portfolio.ts`), so the table names nothing a particular record or import brought.
  *
- * THE READINGS ARE MATCHED BY PROJECT, NOT BY NAME ALONE. The import names each one "<measure>, <project>" because the
- * Dashboard draws one tile a name, so the measure is the text before that comma and the project is the `thing` it
- * points at. "Revenue, next twelve months" is the import's first label for the base case, and it is the same number:
- * `outlook.rev12[1]` is a monthly figure a year out, not a twelve-month total (section 3 again, measured on his record).
+ * WHICH READING IS `now` AND WHICH IS `base` IS THE FILL'S, NOT THIS FILE'S. The first cut compiled in the two labels
+ * one importer wrote, so a record whose readings were named anything else ran every day and wrote three zeros, and a
+ * shared pack carried one person's wording (`loop/research-legacy-parity.md` row 34, brief B5). `MEASURES` is the
+ * one line `fill.ts` writes: each side is a list, because one number can arrive under an old name and a new one, and a
+ * reading is matched on the name whole or on the name followed by ", " and the project, which is how a record names a
+ * reading when the Dashboard draws one tile a name. The project itself is the `thing` the reading points at.
  */
 
-const NOW = ['Monthly revenue'];
-const BASE = ['Monthly revenue a year out: base', 'Revenue, next twelve months'];
+const MEASURES = {"now":["Monthly recurring revenue"],"base":["Monthly recurring revenue in a year"]};
+
+const NOW = MEASURES.now;
+const BASE = MEASURES.base;
 const LANES = { earning: 'next', building: 'next', parked: 'later' };
 const BANDS = ['now', 'next', 'later'];
 const REGISTER = 'revenue_bands';
@@ -27,10 +29,10 @@ const REGISTER = 'revenue_bands';
    readings are asked for one project and one measure at a time, where the fifty newest hold the latest, and a full page
    of projects is said in the run's log, because a band summed over the first fifty projects is short by the rest and
    nothing else would say so. ONE MEASURE A LIST, NOT BOTH: the first cut asked for both in one list, and on a self-host
-   fifty daily Monthly revenue readings written after a base typed once pushed the base off the page, so `later` fell
-   from 1,415,000 to 0 on a run that said `ok` (`bands.test.ts`, the whole path). A `starts` on the bare measure also
-   took the bear and bull cases, three readings an import that are never used, so each name is matched whole or with
-   its ", <project>" after it. */
+   fifty daily readings of `now` written after a base typed once pushed the base off the page, so `later` fell to 0 on
+   a run that said `ok` (`bands.test.ts`, the whole path). A `starts` on the bare measure also took the bear and bull
+   cases an import writes beside the base, which are never used, so each name is matched whole or with its
+   ", <project>" after it. */
 const PAGE = 50;
 const named = (measures) => ({ any: measures.flatMap((m) => [{ field: 'name', is: m }, { field: 'name', starts: `${m}, ` }]) });
 

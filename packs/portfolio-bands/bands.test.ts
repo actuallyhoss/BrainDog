@@ -1,11 +1,11 @@
 /**
  * The Products bands as a pack (`loop/research-legacy-keeps.md` section 8, K5; `loop/DIRECTION.md` section 24).
  *
- * THE OLD TOOL'S RULE, AS THE SURVEY READ IT (section 3 of the same file). One bar in three bands. `now` is what every
- * project takes today, retired ones that still pay included. `next` is the headroom `max(0, base - now)` on projects
- * being earned from or shipped, and `later` is the same headroom on projects being explored. A retired project adds
- * no headroom. The commit that drew it gave its own figures, $14,818 / $7,252 / $14,150 a month, and the four fixture
- * projects below are built to land on exactly those, so a wrong band is a wrong number and not a wrong shape.
+ * THE RULE, AS THE SURVEY READ IT (section 3 of the same file). One bar in three bands. `now` is what every project
+ * takes today, retired ones that still pay included. `next` is the headroom `max(0, base - now)` on projects being
+ * earned from or shipped, and `later` is the same headroom on projects being explored. A retired project adds no
+ * headroom. The four fixture projects below are invented and built to land on $11,000 / $6,250 / $8,000 a month, one
+ * project per kind of band, so a wrong band is a wrong number and not a wrong shape.
  *
  * WHY A SCRIPT AND NOT A FIGURE. A declared figure is one aggregation over one field (`AGGREGATIONS` in
  * `packages/kernel/src/metrics.ts`: sum, count, avg, min, max, distinct), so a `sum` over `revenue` says `now` and
@@ -16,12 +16,19 @@
  * RED FIRST, MEASURED ON SEPTEMBER 24TH AGAINST `bab716a5`. With no `bands.js` the file failed at its first read,
  * ENOENT. Then with a `bands.js` that did only what a declared figure can, a sum of every project's monthly revenue,
  * four of five failed, and the whole path said exactly why: the pack installed, the run was `ok`, and the record held
- * `now` at 1,481,800 cents and no `next` and no `later`, because nothing summed over one field can say them.
+ * `now` and no `next` and no `later`, because nothing summed over one field can say them.
  *
- * THE LAST TEST IS THE WHOLE PATH on a self-host: the pack planned and installed as the owner would install it, beside
- * Portfolio and the founder's lists, then due, leased, run in QuickJS, and its writes applied by the record. The fixture
- * tests before it hand the script a double, which is enough for the arithmetic and says nothing about whether the
- * predicate trees it sends are ones the record accepts.
+ * AND RED AGAIN ON SEPTEMBER 25TH AGAINST `772c0be1`, for brief B5 of `loop/research-legacy-parity.md` (row 34): the pack compiled in
+ * the two labels one importer writes and required that importer's use case. Three probes were run against the file
+ * as it stood, and all three failed: its text held the import's label for the base case; on a record holding Portfolio and a
+ * `datapoints` list from a pack of somebody else's, it was refused `OUT_OF_BOUNDS`, "portfolio-bands needs
+ * usecase-founder ^1.0.0, and this record has none"; and `./fill.ts` was `ERR_MODULE_NOT_FOUND`. The tests under
+ * "The fill" and "What it leans on" are those probes, grown.
+ *
+ * THE LAST TEST IS THE WHOLE PATH on a self-host: the pack filled, planned and installed as the owner would install
+ * it, beside Portfolio and the founder's lists, then due, leased, run in QuickJS, and its writes applied by the record.
+ * The fixture tests before it hand the script a double, which is enough for the arithmetic and says nothing about
+ * whether the predicate trees it sends are ones the record accepts.
  */
 
 import { test } from 'node:test';
@@ -30,23 +37,37 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { readPackFile } from '../../packages/declare/src/catalogue.ts';
+import { fixOf } from '../../packages/ports/src/index.ts';
+import { createRecordApi, type CallContext } from '../../packages/record/src/index.ts';
+import { fixedClock, openSqlite } from '../../packages/kernel/test/sqlite.ts';
+import { firstPartyDocument } from '../../packages/seed/src/index.ts';
 import type { CtxHost, Json, ScriptAnswer, ScriptDecl, ScriptWrite } from '../../packages/script/src/index.ts';
 import { runInQuickJs } from '../../packages/script/src/quickjs.ts';
 
+import { fillBands, MEASURES_LINE, type BandsSpec } from './fill.ts';
+
 const HERE = new URL('./', import.meta.url);
 const SOURCE = readFileSync(new URL('bands.js', HERE), 'utf8');
-const PACK = JSON.parse(readFileSync(new URL('portfolio-bands.pack.json', HERE), 'utf8')) as {
-  pack: string;
-  declarations: Record<string, unknown>[];
-};
-const SCRIPT = PACK.declarations.find((d) => typeof d.script === 'string') as {
-  script: string;
-  reads: string[];
-  writes: string[];
-  egress: string[];
-  keys: string[];
-  source: string;
-};
+const PACK_FILE = new URL('portfolio-bands.pack.json', HERE);
+
+type ScriptBody = { script: string; reads: string[]; writes: string[]; egress: string[]; keys: string[]; source: string };
+type PackDoc = { pack: string; requires: { packs: Record<string, string> }; declarations: Record<string, unknown>[] };
+
+/** The file as it ships, read fresh each time so no test can hand the next one a copy it changed. */
+const template = (): Record<string, unknown> => JSON.parse(readFileSync(PACK_FILE, 'utf8')) as Record<string, unknown>;
+const scriptOf = (doc: Record<string, unknown>): ScriptBody => (doc as PackDoc).declarations.find((d) => typeof d.script === 'string') as ScriptBody;
+const SCRIPT = scriptOf(template());
+
+/** What the file itself says, filled: one name a side, neither of them anybody's import. */
+const EXAMPLE: BandsSpec = { now: ['Monthly recurring revenue'], base: ['Monthly recurring revenue in a year'] };
+
+/**
+ * THE MEASURES THE FIXTURES ARE NAMED BY, and a second name for the forecast, because a record that has been fed for a
+ * while holds one number under an old name and a new one, and the bands must take either.
+ */
+const SPEC: BandsSpec = { now: 'Takings a month', base: ['Takings a month in a year', 'Forecast takings'] };
+const FILLED = fillBands(template(), SPEC);
 
 const NOW = '2026-09-24T06:00:00.000Z';
 
@@ -60,19 +81,19 @@ const row = (register: string, fields: Record<string, Json>, version = 1): Row =
   return { id: `01K5FIXTURE${String(minted).padStart(15, '0')}`, register, seq: minted, fields, version, updated_at: NOW };
 };
 
-/** A project and its readings, named the way the the old tool import names them: the measure, a comma, the project. */
+/** A project and its readings, each named the measure, a comma, the project. `baseSaid` is the forecast's other name. */
 type Project = { name: string; lane: string; monthly?: [number, string]; base?: [number, string]; baseSaid?: string };
 
 /**
  * FOUR PROJECTS, ONE PER KIND OF BAND. Earning with headroom (Ledger), shipping (Kiln), exploring (Tessel) and retired
  * (Halden). Halden still pays, so it is in `now`, and its base is well above what it takes, so a retired project that
- * leaked headroom into `next` would show as $5,000 too much there.
+ * leaked headroom into `next` would show as $4,300 too much there.
  */
-const SAM: Project[] = [
-  { name: 'Ledger', lane: 'earning', monthly: [12_000, 'USD'], base: [16_000, 'USD'] },
-  { name: 'Kiln', lane: 'building', monthly: [2_318, 'USD'], base: [5_570, 'USD'], baseSaid: 'Revenue, next twelve months' },
-  { name: 'Tessel', lane: 'parked', monthly: [100, 'USD'], base: [14_250, 'USD'] },
-  { name: 'Halden', lane: 'retired', monthly: [400, 'USD'], base: [5_400, 'USD'] },
+const STUDIO: Project[] = [
+  { name: 'Ledger', lane: 'earning', monthly: [9_000, 'USD'], base: [12_500, 'USD'] },
+  { name: 'Kiln', lane: 'building', monthly: [1_250, 'USD'], base: [4_000, 'USD'], baseSaid: 'Forecast takings' },
+  { name: 'Tessel', lane: 'parked', monthly: [50, 'USD'], base: [8_050, 'USD'] },
+  { name: 'Halden', lane: 'retired', monthly: [700, 'USD'], base: [5_000, 'USD'] },
 ];
 
 /**
@@ -80,7 +101,7 @@ const SAM: Project[] = [
  * older monthly figure for the first project, dated a month back and written last so it is not first by accident, and
  * an example row the seed wrote, which every dashboard in the record already leaves out.
  */
-function recordOf(projects: Project[]): { things: Row[]; datapoints: Row[] } {
+function recordOf(projects: Project[], now = 'Takings a month', base = 'Takings a month in a year'): { things: Row[]; datapoints: Row[] } {
   const things: Row[] = [];
   const datapoints: Row[] = [];
   const reading = (measure: string, thing: Row, [value, unit]: [number, string], at = '2026-09-20T10:00:00.000Z', source = 'typed') =>
@@ -88,36 +109,29 @@ function recordOf(projects: Project[]): { things: Row[]; datapoints: Row[] } {
   for (const p of projects) {
     const thing = row('things', { name: p.name, lane: p.lane });
     things.push(thing);
-    if (p.monthly) reading('Monthly revenue', thing, p.monthly);
-    if (p.base) reading(p.baseSaid ?? 'Monthly revenue a year out: base', thing, p.base);
+    if (p.monthly) reading(now, thing, p.monthly);
+    if (p.base) reading(p.baseSaid ?? base, thing, p.base);
   }
   const first = things[0];
   if (first) {
-    reading('Monthly revenue', first, [9_000, 'USD'], '2026-08-20T10:00:00.000Z');
-    reading('Monthly revenue', first, [999_999, 'USD'], '2026-09-23T10:00:00.000Z', 'example');
+    reading(now, first, [7_000, 'USD'], '2026-08-20T10:00:00.000Z');
+    reading(now, first, [999_999, 'USD'], '2026-09-23T10:00:00.000Z', 'example');
   }
   return { things, datapoints };
 }
 
 /** A host double. `where` is ignored, so the script's own filtering is what is under test; the last test sends it. */
-const hostOf = (rows: Record<string, Row[]>): CtxHost & { asked: string[] } => {
-  const asked: string[] = [];
-  return {
-    asked,
-    fetch: async () => {
-      throw new Error('the bands fetch nothing');
-    },
-    list: async (register) => {
-      asked.push(register);
-      return (rows[register] ?? []) as unknown as Json[];
-    },
-    now: () => NOW,
-    tz: 'UTC',
-    input: null,
-  };
-};
+const hostOf = (rows: Record<string, Row[]>): CtxHost => ({
+  fetch: async () => {
+    throw new Error('the bands fetch nothing');
+  },
+  list: async (register) => (rows[register] ?? []) as unknown as Json[],
+  now: () => NOW,
+  tz: 'UTC',
+  input: null,
+});
 
-const declOf = (source = SCRIPT.source): ScriptDecl => ({
+const declOf = (source = scriptOf(FILLED).source): ScriptDecl => ({
   id: SCRIPT.script,
   version: 1,
   egress: SCRIPT.egress,
@@ -148,13 +162,98 @@ test('THE PACK CARRIES bands.js AS ITS SOURCE, byte for byte, so the file a pers
   assert.deepEqual(SCRIPT.writes, ['revenue_bands']);
 });
 
+/* ── The fill ──────────────────────────────────────────────────────────────────────────────────── */
+
+test('the file reads clean as an add-on somebody opens from disk, says what a person fills, and names nobody’s import', async () => {
+  const text = readFileSync(PACK_FILE, 'utf8');
+  const file = await readPackFile(text);
+  assert.ok(file.ok, fixOf(file));
+  assert.equal(file.value.pack.manifest.pack, 'portfolio-bands');
+  assert.deepEqual(Object.keys((file.value.doc.fill ?? {}) as object), ['now', 'base']);
+  /* THE FIRST CUT COMPILED IN TWO LABELS, the the old tool import's names for the base case, as `git grep` found them at
+     `772c0be1`. They are not quoted here, so the same grep over `packs/` now answers nothing. What holds the file to
+     naming no measure of its own is the next test: the shipped file is its example filled, and the example's names are
+     the only ones in it. */
+  assert.deepEqual(JSON.parse(SOURCE.split('\n').find((l) => l.startsWith(MEASURES_LINE))!.slice(MEASURES_LINE.length, -1)), EXAMPLE);
+});
+
+test('the file as it ships, with its marks taken off, is its own example filled', () => {
+  const { fill: _marks, ...shipped } = template();
+  assert.equal(JSON.stringify(shipped), JSON.stringify(fillBands(template(), EXAMPLE)));
+});
+
+test('FILLED, THE FILE CHANGES IN THE ONE LINE AND NOWHERE ELSE, and a name is a string whatever it holds', async () => {
+  const { fill: _marks, ...shipped } = template();
+  const blanked = (doc: Record<string, unknown>): string => {
+    const d = structuredClone(doc);
+    const s = scriptOf(d);
+    s.source = s.source.split('\n').filter((line) => !line.startsWith(MEASURES_LINE)).join('\n');
+    return JSON.stringify(d);
+  };
+  assert.equal(blanked(FILLED), blanked(shipped));
+  assert.ok(scriptOf(FILLED).source.includes(`${MEASURES_LINE}{"now":["Takings a month"],"base":["Takings a month in a year","Forecast takings"]};`));
+
+  /* A QUOTE, A BACKSLASH AND A LINE BREAK, the three things that end a string written by hand, and the run still
+     matches the reading by its name rather than failing to parse. */
+  const odd = 'Kiln\'s "take"\\a\nmonth';
+  const doc = fillBands(template(), { now: odd, base: 'Forecast' });
+  const { things, datapoints } = recordOf([{ name: 'Kiln', lane: 'building', monthly: [10, 'USD'], base: [30, 'USD'] }], odd, 'Forecast');
+  const a = await runInQuickJs(declOf(scriptOf(doc).source), hostOf({ things, datapoints, revenue_bands: [] }));
+  assert.deepEqual(writesOf(a).slice(0, 2), [created('now', 1_000, 'USD'), created('next', 2_000, 'USD')]);
+});
+
+test('A FILL THAT WOULD DRAW THE WRONG BAR IS REFUSED BEFORE ANYBODY INSTALLS IT', () => {
+  const refused = (spec: BandsSpec, why: RegExp) => assert.throws(() => fillBands(template(), spec), why);
+  refused({ now: [], base: 'Forecast' }, /at least one now measure/);
+  refused({ now: 'Takings', base: '   ' }, /at least one base measure/);
+  refused({ now: ['Takings', 'Forecast'], base: 'Forecast' }, /named as both now and base/);
+  refused({ now: 'Takings', base: 'Takings, forecast' }, /begins with Takings and a comma/);
+  refused({ now: 'Takings, today', base: 'Takings' }, /begins with Takings and a comma/);
+  /* AND BOTH TRAPS IN ANOTHER CASE, because the record's `starts` folds case (`fold` in `packages/where/src/index.ts`),
+     so a list asked for `takings` answers every reading of `Takings` too. Measured on a record with the fill's checks
+     comparing exact text: a forecast typed once under `takings` and fifty daily readings of `Takings` after it, and
+     `later` fell from 800,000 to 0 on a run that wrote without a word, the page-of-fifty failure `bands.js` describes,
+     reached again through the case of one letter. The same with `TAKINGS, today` and `takings`. */
+  refused({ now: 'Takings', base: 'takings' }, /one name to the record/);
+  refused({ now: 'TAKINGS, today', base: 'takings' }, /begins with takings and a comma/);
+  /* A repeat on one side is one name, not a refusal: it matches the same readings either way. */
+  assert.ok(scriptOf(fillBands(template(), { now: ['Takings', ' Takings '], base: 'Forecast' })).source.includes('{"now":["Takings"],'));
+
+  /* AND A SOURCE WITH NO LINE TO FILL, OR TWO, IS NOT FILLED SOMEWHERE ELSE. */
+  const without = template();
+  scriptOf(without).source = SOURCE.replace(MEASURES_LINE, 'const MEASURED = ');
+  assert.throws(() => fillBands(without, EXAMPLE), /0 lines starting const MEASURES =/);
+  const twice = template();
+  scriptOf(twice).source = `${SOURCE}\n${MEASURES_LINE}{};`;
+  assert.throws(() => fillBands(twice, EXAMPLE), /2 lines starting const MEASURES =/);
+});
+
+test('WHAT THE TWO NAME CHECKS STOP, run with the checks taken off: the forecast is read as today, and the headroom is gone', async () => {
+  /* THE LINE WRITTEN BY HAND, as a fill without its checks would write it, over one project that takes $1,250 and is
+     forecast at $4,000. The honest split is $1,250 now and $2,750 next. */
+  const bypass = (now: string[], base: string[]) => SOURCE.split('\n').map((l) => (l.startsWith(MEASURES_LINE) ? `${MEASURES_LINE}${JSON.stringify({ now, base })};` : l)).join('\n');
+  const kiln = (base: string) => {
+    const { things, datapoints } = recordOf([{ name: 'Kiln', lane: 'building', monthly: [1_250, 'USD'] }], 'Takings');
+    datapoints.push(row('datapoints', { name: `${base}, Kiln`, value: 4_000, unit: 'USD', thing: things[0]!.id, at: '2026-09-21T10:00:00.000Z', source: 'typed' }));
+    return { things, datapoints, revenue_bands: [] };
+  };
+  /* ONE NAME ON BOTH SIDES: both readings are `now`, the later one (the forecast) wins, and there is no base. */
+  const same = await runInQuickJs(declOf(bypass(['Takings'], ['Takings'])), hostOf(kiln('Takings')));
+  assert.deepEqual(writesOf(same), [created('now', 400_000, 'USD'), created('next', 0, 'USD'), created('later', 0, 'USD')]);
+  /* A FORECAST NAMED AFTER TODAY AND A COMMA: `Takings, forecast, Kiln` begins `Takings, `, so it is the same. */
+  const comma = await runInQuickJs(declOf(bypass(['Takings'], ['Takings, forecast'])), hostOf(kiln('Takings, forecast')));
+  assert.deepEqual(writesOf(comma), [created('now', 400_000, 'USD'), created('next', 0, 'USD'), created('later', 0, 'USD')]);
+  /* AND FILLED THROUGH THE CHECKS, the same record under two names that cannot be confused splits as it should. */
+  const honest = await runInQuickJs(declOf(bypass(['Takings'], ['Forecast'])), hostOf(kiln('Forecast')));
+  assert.deepEqual(writesOf(honest), [created('now', 125_000, 'USD'), created('next', 275_000, 'USD'), created('later', 0, 'USD')]);
+});
+
 /* ── The arithmetic, in QuickJS ────────────────────────────────────────────────────────────────── */
 
-test("FOUR PROJECTS GIVE THE OLD TOOL'S SPLIT: $14,818 now, $7,252 next, $14,150 later", async () => {
-  const { things, datapoints } = recordOf(SAM);
-  const h = hostOf({ things, datapoints, revenue_bands: [] });
-  const a = await runInQuickJs(declOf(), h);
-  assert.deepEqual(writesOf(a), [created('now', 1_481_800, 'USD'), created('next', 725_200, 'USD'), created('later', 1_415_000, 'USD')]);
+test('FOUR PROJECTS GIVE THE SPLIT: $11,000 now, $6,250 next, $8,000 later, with the forecast under either of its names', async () => {
+  const { things, datapoints } = recordOf(STUDIO);
+  const a = await runInQuickJs(declOf(), hostOf({ things, datapoints, revenue_bands: [] }));
+  assert.deepEqual(writesOf(a), [created('now', 1_100_000, 'USD'), created('next', 625_000, 'USD'), created('later', 800_000, 'USD')]);
   assert.equal(a.usage.fetches, 0);
 });
 
@@ -180,25 +279,95 @@ test('ONE AMOUNT PER CURRENCY, headroom never below zero, and a base in another 
 });
 
 test('A SECOND RUN UPDATES THE BANDS IN PLACE: an unchanged band is left alone, and a currency no project holds goes to zero', async () => {
-  const { things, datapoints } = recordOf(SAM);
+  const { things, datapoints } = recordOf(STUDIO);
   const bands = [
-    row('revenue_bands', { band: 'now', amount: { amount: 1_481_800, currency: 'USD' }, at: '2026-09-23T06:00:00.000Z' }, 3),
+    row('revenue_bands', { band: 'now', amount: { amount: 1_100_000, currency: 'USD' }, at: '2026-09-23T06:00:00.000Z' }, 3),
     row('revenue_bands', { band: 'next', amount: { amount: 1, currency: 'USD' }, at: '2026-09-23T06:00:00.000Z' }, 4),
     row('revenue_bands', { band: 'now', amount: { amount: 500, currency: 'EUR' }, at: '2026-09-23T06:00:00.000Z' }, 2),
   ];
   const a = await runInQuickJs(declOf(), hostOf({ things, datapoints, revenue_bands: bands }));
   assert.deepEqual(writesOf(a), [
     { op: 'update', spoken: `revenue_bands#${bands[2]!.seq}`, patch: { amount: { amount: 0, currency: 'EUR' }, at: NOW }, version: 2 },
-    { op: 'update', spoken: `revenue_bands#${bands[1]!.seq}`, patch: { amount: { amount: 725_200, currency: 'USD' }, at: NOW }, version: 4 },
-    created('later', 1_415_000, 'USD'),
+    { op: 'update', spoken: `revenue_bands#${bands[1]!.seq}`, patch: { amount: { amount: 625_000, currency: 'USD' }, at: NOW }, version: 4 },
+    created('later', 800_000, 'USD'),
   ]);
+});
+
+/* ── What it leans on ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * A pack of somebody else's that declares `datapoints`, invented for this file: readings typed in by hand, with no
+ * use case, no organisations and no dashboard. It is what "whichever pack declares it" means, measured.
+ */
+const DIARY = {
+  pack: 'numbers-diary',
+  version: '1.0.0',
+  summary: 'Readings about each project, typed in by hand.',
+  author: 'Example',
+  license: 'MIT',
+  requires: { format: 1, primitives: 1, packs: { portfolio: '^1.0.0' } },
+  declarations: [
+    {
+      register: 'datapoints',
+      name: 'Readings',
+      one: 'reading',
+      holds: 'one number about one project at one moment',
+      title: 'name',
+      fields: [
+        { id: 'name', label: 'Measure', type: 'text', required: true, index: true, search: true },
+        { id: 'value', label: 'Value', type: 'decimal', required: true },
+        { id: 'unit', label: 'Unit', type: 'text' },
+        { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
+        { id: 'at', label: 'When', type: 'instant', index: true },
+        { id: 'source', label: 'Source', type: 'text' },
+      ],
+    },
+  ],
+};
+
+type Planned = { ok: boolean; refusal?: { code: string; fix: string; at?: string } };
+
+async function recordWith(...docs: unknown[]): Promise<{ put: (doc: unknown) => Promise<Planned>; close: () => void }> {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(Date.parse(NOW)) });
+  const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
+  const put = async (doc: unknown): Promise<Planned> => {
+    const p = (await api.planPack({ doc, source: { kind: 'local' } } as never, owner)) as Planned & { value?: { diff: { planHash: string; approve: string[] } } };
+    if (!p.ok) return p;
+    return (await api.installPack({ doc, source: { kind: 'local' }, planHash: p.value!.diff.planHash, approve: p.value!.diff.approve } as never, owner)) as Planned;
+  };
+  for (const doc of docs) {
+    const r = await put(doc);
+    assert.ok(r.ok, JSON.stringify(r.refusal));
+  }
+  return { put, close: () => sql.close() };
+}
+
+test('IT REQUIRES PORTFOLIO, AND DATAPOINTS FROM WHICHEVER PACK DECLARES THEM, and names no use case', async () => {
+  assert.deepEqual((template() as PackDoc).requires.packs, { portfolio: '^1.0.0' });
+
+  const diary = await recordWith(firstPartyDocument('portfolio', { seeds: [] }), DIARY);
+  const r = await diary.put(template());
+  assert.ok(r.ok, JSON.stringify(r.refusal));
+  diary.close();
+
+  /* WITHOUT A DATAPOINTS LIST IT IS REFUSED, NAMING THE LIST. A script's `reads` is not a list the plan checks
+     (`pointsAt` in `packages/declare/src/index.ts` reads fields, pages and figures), so the page's `requires` is what
+     says it: with `register.datapoints` taken off the page, this install went through on a record that has nowhere
+     for a reading to be, and the bands ran every day over nothing. */
+  const bare = await recordWith(firstPartyDocument('portfolio', { seeds: [] }));
+  const refused = await bare.put(template());
+  assert.equal(refused.ok, false);
+  assert.equal(refused.refusal?.code, 'REGISTER_UNRESOLVED');
+  assert.match(refused.refusal?.fix ?? '', /points at the datapoints list/);
+  bare.close();
 });
 
 /* ── The whole path ────────────────────────────────────────────────────────────────────────────── */
 
-test('THE WHOLE PATH ON A SELF-HOST: installed from the pack file, due, run, applied, and drawn as one split', async () => {
+test('THE WHOLE PATH ON A SELF-HOST: filled, installed, due, run, applied, and drawn as one split', async () => {
   const { start } = await import('../../apps/selfhost/src/server.ts');
-  const { FIRST_PARTY, firstPartyDocument } = await import('../../packages/seed/src/index.ts');
+  const { FIRST_PARTY } = await import('../../packages/seed/src/index.ts');
   const { useCaseDocument } = await import('../../packages/seed/src/usecases/index.ts');
 
   const dir = mkdtempSync(join(tmpdir(), 'braindog-bands-'));
@@ -235,17 +404,24 @@ test('THE WHOLE PATH ON A SELF-HOST: installed from the pack file, due, run, app
     const before = api.kernel.declarations().map((d) => d.id);
     assert.ok(before.includes('register.datapoints') && before.includes('register.things'));
     assert.equal(before.includes('register.revenue_bands') || before.includes(`script.${SCRIPT.script}`), false, 'the bands are already declared');
-    await put(PACK);
+    await put(FILLED);
 
-    for (const p of SAM) {
+    for (const p of STUDIO) {
       const thing = said(await api.create({ register: 'things', fields: { name: p.name, lane: p.lane } }, owner)) as { id: string };
       const reading = async (measure: string, [value, unit]: [number, string]) =>
         said(await api.create({ register: 'datapoints', fields: { name: `${measure}, ${p.name}`, value, unit, thing: thing.id, at: '2026-09-20T10:00:00Z', source: 'typed' } }, owner));
-      if (p.monthly) await reading('Monthly revenue', p.monthly);
-      if (p.base) await reading(p.baseSaid ?? 'Monthly revenue a year out: base', p.base);
+      if (p.monthly) await reading('Takings a month', p.monthly);
+      if (p.base) await reading(p.baseSaid ?? 'Takings a month in a year', p.base);
     }
 
-    running.sql.exec("UPDATE schedule SET due_at = ? WHERE kind = 'script' AND key = ?", new Date(Date.now() - 1_000).toISOString(), SCRIPT.script);
+    const due = () => running.sql.exec("UPDATE schedule SET due_at = ? WHERE kind = 'script' AND key = ?", new Date(Date.now() - 1_000).toISOString(), SCRIPT.script);
+    const stored = () =>
+      running.sql
+        .all<{ fields: string }>("SELECT fields FROM entry WHERE register = 'revenue_bands' AND deleted_at IS NULL ORDER BY seq")
+        .map((r) => JSON.parse(r.fields) as { band: string; amount: { amount: number; currency: string } })
+        .map((b) => [b.band, b.amount.amount, b.amount.currency]);
+
+    due();
     await running.poll();
 
     const [event] = running.sql.all<{ to_v: string | null; note: string }>(
@@ -254,18 +430,11 @@ test('THE WHOLE PATH ON A SELF-HOST: installed from the pack file, due, run, app
     );
     const outcome = JSON.parse(event?.to_v ?? '{}') as { outcome?: string; log?: string };
     assert.equal(outcome.outcome, 'ok', `${event?.note ?? 'no run event'} ${outcome.log ?? ''}`);
-
-    const stored = running.sql
-      .all<{ fields: string }>("SELECT fields FROM entry WHERE register = 'revenue_bands' AND deleted_at IS NULL ORDER BY seq")
-      .map((r) => JSON.parse(r.fields) as { band: string; amount: { amount: number; currency: string } });
-    assert.deepEqual(
-      stored.map((b) => [b.band, b.amount.amount, b.amount.currency]),
-      [
-        ['now', 1_481_800, 'USD'],
-        ['next', 725_200, 'USD'],
-        ['later', 1_415_000, 'USD'],
-      ],
-    );
+    assert.deepEqual(stored(), [
+      ['now', 1_100_000, 'USD'],
+      ['next', 625_000, 'USD'],
+      ['later', 800_000, 'USD'],
+    ]);
 
     const page = said(await api.page({ slug: 'bands' }, owner)) as { blocks: { kind: string; rows?: unknown[]; refusals?: unknown[] }[] };
     const split = page.blocks.find((b) => b.kind === 'split');
@@ -276,43 +445,31 @@ test('THE WHOLE PATH ON A SELF-HOST: installed from the pack file, due, run, app
     /* TOMORROW'S RUN, WITH ONE PROJECT GROWN: the band it moved is updated and nothing is added, so the split still
        draws one day's bar rather than two days summed. */
     const ledger = running.sql.one<{ id: string }>("SELECT id FROM entry WHERE register = 'things' AND json_extract(fields, '$.name') = 'Ledger'");
-    said(await api.create({ register: 'datapoints', fields: { name: 'Monthly revenue, Ledger', value: 13_000, unit: 'USD', thing: ledger!.id, at: '2026-09-23T10:00:00Z', source: 'typed' } }, owner));
-    running.sql.exec("UPDATE schedule SET due_at = ? WHERE kind = 'script' AND key = ?", new Date(Date.now() - 1_000).toISOString(), SCRIPT.script);
+    said(await api.create({ register: 'datapoints', fields: { name: 'Takings a month, Ledger', value: 10_000, unit: 'USD', thing: ledger!.id, at: '2026-09-23T10:00:00Z', source: 'typed' } }, owner));
+    due();
     await running.poll();
-    const again = running.sql
-      .all<{ fields: string }>("SELECT fields FROM entry WHERE register = 'revenue_bands' AND deleted_at IS NULL ORDER BY seq")
-      .map((r) => JSON.parse(r.fields) as { band: string; amount: { amount: number } });
-    assert.deepEqual(
-      again.map((b) => [b.band, b.amount.amount]),
-      [
-        ['now', 1_581_800],
-        ['next', 625_200],
-        ['later', 1_415_000],
-      ],
-    );
+    assert.deepEqual(stored(), [
+      ['now', 1_200_000, 'USD'],
+      ['next', 525_000, 'USD'],
+      ['later', 800_000, 'USD'],
+    ]);
 
     /* A MONTH AND A HALF OF DAILY FIGURES ON A FORECAST TYPED ONCE. The record answers fifty rows, most recently
-       written first, and the first cut of this script asked for both measures in one list, so fifty Monthly revenue
-       readings written after Tessel's base pushed the base off the page. Measured before the repair: `later` went from
-       1,415,000 to 0, the run said `ok`, and the log said nothing. */
+       written first, and the first cut of this script asked for both measures in one list, so fifty readings of today
+       written after Tessel's base pushed the base off the page. Measured before the repair: `later` went to 0, the
+       run said `ok`, and the log said nothing. */
     const tessel = running.sql.one<{ id: string }>("SELECT id FROM entry WHERE register = 'things' AND json_extract(fields, '$.name') = 'Tessel'");
     for (let d = 1; d <= 50; d += 1) {
       const at = new Date(Date.parse('2026-09-21T10:00:00Z') + d * 3_600_000).toISOString();
-      said(await api.create({ register: 'datapoints', fields: { name: 'Monthly revenue, Tessel', value: 100, unit: 'USD', thing: tessel!.id, at, source: 'typed' } }, owner));
+      said(await api.create({ register: 'datapoints', fields: { name: 'Takings a month, Tessel', value: 50, unit: 'USD', thing: tessel!.id, at, source: 'typed' } }, owner));
     }
-    running.sql.exec("UPDATE schedule SET due_at = ? WHERE kind = 'script' AND key = ?", new Date(Date.now() - 1_000).toISOString(), SCRIPT.script);
+    due();
     await running.poll();
-    const flooded = running.sql
-      .all<{ fields: string }>("SELECT fields FROM entry WHERE register = 'revenue_bands' AND deleted_at IS NULL ORDER BY seq")
-      .map((r) => JSON.parse(r.fields) as { band: string; amount: { amount: number } });
-    assert.deepEqual(
-      flooded.map((b) => [b.band, b.amount.amount]),
-      [
-        ['now', 1_581_800],
-        ['next', 625_200],
-        ['later', 1_415_000],
-      ],
-    );
+    assert.deepEqual(stored(), [
+      ['now', 1_200_000, 'USD'],
+      ['next', 525_000, 'USD'],
+      ['later', 800_000, 'USD'],
+    ]);
   } finally {
     await running.close();
     rmSync(dir, { recursive: true, force: true });

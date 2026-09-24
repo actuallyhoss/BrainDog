@@ -1,0 +1,71 @@
+{
+  "pack": "feed-example",
+  "version": "1.0.0",
+  "summary": "Polls stats.example.com every 1h for Monthly recurring revenue, Active users.",
+  "fill": {
+    "id": "A name for the feed, lower case, digits and hyphens. The pack is feed-<id> and its poll feed_<id>, cut to 32 characters.",
+    "url": "The whole https:// address that answers the numbers as JSON, written out and never computed. Its host is what the owner approves.",
+    "every": "How often it is asked. 1h for numbers that move within a day, 1d for numbers that do not.",
+    "grant": "The label of the key in the vault, which the request sends as a bearer token. A label and never the key itself. Leave it out for an address that answers anybody.",
+    "project": "The project the numbers are about, as its row id or spoken id (things#1), so each reading lands on it. Optional.",
+    "organisation": "The organisation the numbers are about, as its row id or spoken id (organisations#1). Optional, and only for a readings list that has an organisation field.",
+    "measures": "Each number and where it is in the answer: a name as the Dashboard shows it, a path (data.mrr), a unit (USD, users) and int when a fraction is wrong. One map each, twenty at most, no name twice."
+  },
+  "author": "BrainDog",
+  "license": "MIT",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {}
+  },
+  "declarations": [
+    {
+      "ingest": "feed_example",
+      "channel": "poll",
+      "url": "https://stats.example.com/v1/numbers",
+      "every": "1h",
+      "grant": "Example stats (read only)",
+      "map": [
+        {
+          "name": {
+            "value": "Monthly recurring revenue"
+          },
+          "value": {
+            "path": "data.mrr",
+            "type": "decimal"
+          },
+          "unit": {
+            "value": "USD"
+          },
+          "source": {
+            "value": "polled"
+          },
+          "at": {
+            "arrived": true
+          }
+        },
+        {
+          "name": {
+            "value": "Active users"
+          },
+          "value": {
+            "path": "data.users",
+            "type": "int"
+          },
+          "unit": {
+            "value": "users"
+          },
+          "source": {
+            "value": "polled"
+          },
+          "at": {
+            "arrived": true
+          }
+        }
+      ],
+      "writes": {
+        "register": "datapoints"
+      }
+    }
+  ]
+}
