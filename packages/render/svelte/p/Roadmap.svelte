@@ -6,8 +6,17 @@
 
   IT IS ON `list` AND HAD NO ARM THERE, so the app drew a roadmap as the generic list: the title, the due day as
   its detail and the effort as its state, three words where the mirror drew a chart (measured by the parity test,
-  which failed on every shape before this file). The pointer drag and its undo are the next wave's, and will live
-  here, not in the mirror, as `forecast`'s knobs do.
+  which failed on every shape before this file).
+
+  THE POINTER DRAG LIVES HERE AND NOT IN THE MIRROR, as `forecast`'s knobs do, and only where the host hands
+  `onreschedule`. A window's middle moves it, its first or last few pixels move that end, and a date moves whole. The
+  bar follows the pointer in whole days, and when the pointer lets go the host is handed the row and the drop, which
+  carries `dragPatch` bound to the gesture (`roadmap-drag.ts` says why the drawer never works out the patch itself).
+  One drop is one write, and its undo is the host's, because only the host knows what the row held.
+
+  WITH NO CALLBACK THERE IS NOTHING TO TAKE: no grip, no cursor and no hit stroke, so the chart is the picture
+  `toHTML` draws and `roadmap-parity.test.ts` still compares like with like. That is `19 §6`: a control that cannot
+  act is absent. A keyboard does not drag a bar; the row's own page sets the same two fields.
 -->
 <script lang="ts">
   import { inline, text, TONES, type Block, type RenderOptions, type Row } from '../../src/index.ts';
@@ -26,9 +35,22 @@
     roadmapShare,
     roadmapSkipped,
     roadmapToday,
+    type DragMode,
+    type RoadmapBar,
+    type RoadmapStem,
   } from '../../src/roadmap.ts';
+  import { dragDays, dragDrawn, dragModeAt, dropOf, type RoadmapDrop } from './roadmap-drag.ts';
 
-  let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
+  let {
+    block,
+    opts = {},
+    onreschedule,
+  }: {
+    block: Block;
+    opts?: RenderOptions;
+    /** Where a drop goes. Its absence is what keeps every bar a picture. */
+    onreschedule?: ((row: Row, drop: RoadmapDrop) => void) | undefined;
+  } = $props();
 
   const said = (r: Row, i: number): string => text(inline(r.cells[i] ?? '', opts));
   const rows = $derived(block.rows.map((r) => roadmapRow(said(r, 0), said(r, 1), said(r, 2), r.tone)));
@@ -37,7 +59,76 @@
   /* The glyph only for a word `TONES` owns, as `toneGlyph` in the mirror checks: the parser has let
      `Object.prototype`'s names into the tone slot before, and a lookup on one of those is not a tone. */
   const glyph = (tone?: string) => (tone && Object.hasOwn(TONES, tone) ? TONES[tone as keyof typeof TONES] : null);
+
+  /* ── the drag ─────────────────────────────────────────────────────────────── */
+
+  /** The drag in hand: the row by its index, the part taken, where the pointer went down, the box's width, the days. */
+  let drag = $state<{ row: number; mode: DragMode; from: number; box: number; days: number } | null>(null);
+  /** The part of a bar a pointer is over and not yet pressing, so the cursor says which end a press would take. */
+  let hover = $state<{ row: number; mode: DragMode } | null>(null);
+
+  /* A DRAG IS ABOUT ONE DRAWING. The host reads the page again after a write and hands a new block, and a drag held
+     over it by index would draw a different row where the old one was. */
+  let drawnFrom = '';
+  $effect(() => {
+    if (block.raw === drawnFrom) return;
+    drawnFrom = block.raw;
+    drag = null;
+    hover = null;
+  });
+
+  const partOf = (e: PointerEvent, stem: boolean): DragMode => {
+    if (stem) return 'move';
+    const r = (e.currentTarget as Element).getBoundingClientRect();
+    return dragModeAt(e.clientX - r.left, r.width);
+  };
+
+  function grab(e: PointerEvent, row: number, stem: boolean) {
+    if (!onreschedule || !e.isPrimary || e.button !== 0) return;
+    const mark = e.currentTarget as SVGGraphicsElement;
+    /* THE BOX'S WIDTH, TAKEN ONCE, because what a day is worth in pixels is the box's and not the bar's. */
+    const box = mark.ownerSVGElement?.getBoundingClientRect().width ?? 0;
+    mark.setPointerCapture(e.pointerId);
+    drag = { row, mode: partOf(e, stem), from: e.clientX, box, days: 0 };
+    e.preventDefault();
+  }
+
+  function slide(e: PointerEvent, row: number, stem: boolean) {
+    if (drag) {
+      if (drag.row === row) drag = { ...drag, days: dragDays(e.clientX - drag.from, drag.box, plan) };
+      return;
+    }
+    hover = { row, mode: partOf(e, stem) };
+  }
+
+  /* A PRESS THAT DID NOT MOVE A WHOLE DAY IS NO DROP, so a click on a bar writes nothing and spends no undo. */
+  function letGo() {
+    const d = drag;
+    drag = null;
+    const row = d ? block.rows[d.row] : undefined;
+    if (d && row && d.days !== 0) onreschedule?.(row, dropOf(d.mode, d.days));
+  }
+
+  /* ESCAPE PUTS THE BAR BACK, as it cancels a drag on every desktop, and nothing is written. */
+  const escape = (e: KeyboardEvent) => {
+    if (drag && e.key === 'Escape') drag = null;
+  };
+
+  /** Where a bar is drawn: under the pointer while it is dragged, where the plan put it otherwise. */
+  const barAt = (bar: RoadmapBar): { x: string; width: string } =>
+    drag?.row === bar.row ? dragDrawn(bar, drag.mode, drag.days, plan) : { x: bar.x, width: bar.width };
+  const stemAt = (s: RoadmapStem): string => (drag?.row === s.row ? dragDrawn({ start: '', end: s.day }, 'move', drag.days, plan).x : s.x);
+
+  /** The cursor a grip wears: an end's resize arrow over an end, a closed hand while held, an open one over the rest. */
+  const cursorOf = (row: number): string => {
+    const part = drag?.row === row ? drag.mode : hover?.row === row ? hover.mode : 'move';
+    return part !== 'move' ? 'ew-resize' : drag?.row === row ? 'grabbing' : 'grab';
+  };
+  /* A PHONE SCROLLS THROUGH A ROADMAP UP AND DOWN and drags across it, so only the horizontal is the grip's. */
+  const GRIP = 'touch-action: pan-y';
 </script>
+
+<svelte:window onkeydown={onreschedule ? escape : undefined} />
 
 {#snippet mark(tone?: string)}{@const g = glyph(tone)}{#if g}<span class="glyph" role="img" aria-label={g.label}>{g.glyph}</span>{/if}{/snippet}
 
@@ -55,20 +146,69 @@
         {/each}
         {#each plan.bars as bar}
           {@const lane = roadmapLane(bar.track, plan.tracks)}
-          <rect class="roadmap-bar" data-intent={bar.tone} {...ROADMAP_PAINT.bar} x={bar.x} y={lane.y} width={bar.width} height={lane.height} vector-effect="non-scaling-stroke"></rect>
+          {#if onreschedule}
+            {@const at = barAt(bar)}
+            <rect
+              class="roadmap-bar"
+              data-intent={bar.tone}
+              data-grip=""
+              data-dragging={drag?.row === bar.row ? '' : undefined}
+              {...ROADMAP_PAINT.bar}
+              x={at.x}
+              y={lane.y}
+              width={at.width}
+              height={lane.height}
+              vector-effect="non-scaling-stroke"
+              cursor={cursorOf(bar.row)}
+              style={GRIP}
+              onpointerdown={(e) => grab(e, bar.row, false)}
+              onpointermove={(e) => slide(e, bar.row, false)}
+              onpointerup={letGo}
+              onpointercancel={() => (drag = null)}
+              onpointerleave={() => (hover = null)}
+            ></rect>
+          {:else}
+            <rect class="roadmap-bar" data-intent={bar.tone} {...ROADMAP_PAINT.bar} x={bar.x} y={lane.y} width={bar.width} height={lane.height} vector-effect="non-scaling-stroke"></rect>
+          {/if}
         {/each}
         {#each plan.stems as s}
-          <path class="roadmap-stem" data-intent={s.tone} {...ROADMAP_PAINT.stem} d="M{s.x} 0V100" vector-effect="non-scaling-stroke"></path>
+          {@const x = stemAt(s)}
+          <path class="roadmap-stem" data-intent={s.tone} {...ROADMAP_PAINT.stem} d="M{x} 0V100" vector-effect="non-scaling-stroke"></path>
+          {#if onreschedule}
+            <!-- A STEM IS A HAIRLINE, which no finger lands on and few pointers do, so it is taken by a stroke twelve
+                 pixels wide over the same line, painted nothing and hit on its stroke alone. No role, because it is
+                 inside a drawing whose role is `img` and whose table below says every date; the linter asks for one
+                 on the path and not on the bar's `rect` beside it, which takes the same handlers. -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <path
+              class="roadmap-grip"
+              data-dragging={drag?.row === s.row ? '' : undefined}
+              d="M{x} 0V100"
+              fill="none"
+              stroke="transparent"
+              stroke-width="12"
+              pointer-events="stroke"
+              vector-effect="non-scaling-stroke"
+              cursor={cursorOf(s.row)}
+              style={GRIP}
+              onpointerdown={(e) => grab(e, s.row, true)}
+              onpointermove={(e) => slide(e, s.row, true)}
+              onpointerup={letGo}
+              onpointercancel={() => (drag = null)}
+              onpointerleave={() => (hover = null)}
+            ></path>
+          {/if}
         {/each}
         {#if plan.today !== null}
           <path class="roadmap-today" {...ROADMAP_PAINT.today} d="M{plan.today} 0V100" vector-effect="non-scaling-stroke"></path>
         {/if}
       </svg>
       <!-- The words over the box, placed by `--at`: text inside a `preserveAspectRatio="none"` box is stretched with
-           it. Hidden, because the table below says every row and the drawing's name says the whole. -->
+           it. Hidden, because the table below says every row and the drawing's name says the whole. A dragged mark's
+           name goes with it, so the word under the pointer is the row being moved. -->
       <ol class="roadmap-names" aria-hidden="true">
         {#each plan.bars as bar}
-          <li class="roadmap-name" data-intent={bar.tone} style="--at:{roadmapShare(bar.x)};--track:{bar.track}">{bar.title}{@render mark(bar.tone)}</li>
+          <li class="roadmap-name" data-intent={bar.tone} style="--at:{roadmapShare(onreschedule ? barAt(bar).x : bar.x)};--track:{bar.track}">{bar.title}{@render mark(bar.tone)}</li>
         {/each}
         {#each plan.stems as s}
           <li class="roadmap-name" data-stem="" data-intent={s.tone} style="--at:{roadmapShare(s.label.x)};--line:{s.label.line}">{s.title}{@render mark(s.tone)}</li>
