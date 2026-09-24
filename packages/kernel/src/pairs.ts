@@ -19,10 +19,18 @@
  * away, because it was the only candidate when the credit arrived. So two rows are paired when, and only while, each is
  * the other's one nearest candidate (`partnerOf`), and every write that could move that answer settles it again for the
  * rows around it (`settle`). A tie is not broken by id or by arrival: two legs equally near leave the row unpaired, which
- * counts the money rather than guessing which move hid it.
+ * counts the money rather than guessing which move hid it, UNLESS NO MATCHING OF THE TIED ROWS COULD HIDE THE WRONG
+ * MONEY (`matchedOf`): as many alike legs one way as the other are matched in day order.
  *
  * A MARK A PERSON SET IS HIS (`41 §5.4` step 6b, `§13 #10`). The kernel never writes over it and never pairs the row, and
  * a person unmarking one leg of a pair unpairs the other, which is the undo the header of W57-1 promised and did not have.
+ * HIS `true` IS KEPT OUT AS HIS `false` IS, and that has a cost audit sixty measured (X2): a transfer he typed and ticked
+ * before the savings statement arrived leaves the statement's leg counted, GBP 4,000.00 read as received, until he ticks
+ * that one too. Letting his `true` take a partner was tried (held61) and was refused, because a ticked card bill is the
+ * same write and took a REFUND that was nobody's transfer (`pairs-undo.test.ts`, P3b), and the sample record's two typed
+ * legs paired each other (`packages/seed/test/money-pairs.test.ts`). The spec says both are kept out; changing that is the
+ * owner's call and not the kernel's. What a person did NOT say is not a pin: a whole row sent back with the mark as it
+ * was is not his word on the mark (the write path in `index.ts` decides, audit sixty's X2b).
  *
  * IN THE KERNEL'S WRITE PATH AND NOT IN A RULE, because a `where:` cannot say "a row of this register that mirrors me",
  * and because the import writes through `create` and so will the bank door after the cut-over: one build serves both.
@@ -31,6 +39,7 @@
 import type { Refusal, Sql } from '@braindog/ports';
 import { compile, evaluate, type Predicate, type Schema } from '@braindog/where';
 
+import { isCurrencyCode } from './coerce.ts';
 import { atMs, shiftFrom } from './schedule.ts';
 
 export type PairsDecl = {
@@ -54,9 +63,21 @@ type FieldShape = { id: string; type: string; values?: unknown; of?: unknown; to
 
 const PAIRS_KEYS = ['on', 'opposite', 'across', 'within', 'date', 'mark', 'where'] as const;
 const NUMERIC = new Set(['money', 'int', 'decimal']);
-/* WHAT CAN SAY WHICH CURRENCY A BARE NUMBER IS IN. Not a field name: the kernel is a shell, and one ledger's `currency`
-   is another's `ccy` or a ref to a list of them. */
-const UNIT = new Set(['text', 'enum', 'ref']);
+/* THREE LETTERS ISO ASSIGNS, in either case, since a text field is not upper-cased on the way in as a money is. */
+const CODE = /^[A-Za-z]{3}$/;
+const isCode = (v: unknown): v is string => typeof v === 'string' && CODE.test(v) && isCurrencyCode(v.toUpperCase());
+
+/**
+ * Whether a field can say which currency a bare number is in: a `text`, or an `enum` whose every value is a currency.
+ *
+ * NOT A FIELD NAME, because the kernel is a shell and one ledger's `currency` is another's `ccy`. AND NOT ANY TEXT, ENUM
+ * OR REF, which is what this was: audit sixty's X1 put `state` in `on`, an enum of pending and cleared that every counted
+ * row holds alike, and EGP -1000 paired with USD +1000. An enum says its values at install, so it is checked there. A text
+ * can hold anything, so it is taken at its word here and each row is held to it in `currencyOf`. A `ref` holds a row id,
+ * and nothing here can read the row it names, so it is refused rather than trusted.
+ */
+const holdsCurrency = (f: FieldShape): boolean =>
+  f.type === 'text' || (f.type === 'enum' && Array.isArray(f.values) && f.values.length > 0 && f.values.every(isCode));
 /* `42 §2`'s `Window`, the offset grammar `schedule.ts` steps by, without a sign. */
 const WINDOW = /^[1-9]\d{0,3}[dwm]$/;
 const ABS = /^abs\(([a-z][a-z0-9_]*)\)$/;
@@ -199,14 +220,15 @@ export function pairsFault(id: string, fields: readonly FieldShape[], pairs: unk
 
   /* A BARE NUMBER CARRIES NO CURRENCY, so the declaration has to compare the field that does. A money is compared by the
      currency inside it (`amountOf`); an `int` is not, and the audit's P7 installed `on: [abs(amount)]` over an `int` and
-     paired EGP -1000 out of one bank with USD +1000 into another. */
+     paired EGP -1000 out of one bank with USD +1000 into another, and audit sixty's X1 did the same with `state` named
+     beside it, so the field named has to be one that can hold a currency (`holdsCurrency`). */
   const sized = field(entries.find((e) => e.abs)?.field ?? opposite.id)!;
-  if (sized.type !== 'money' && !entries.some((e) => !e.abs && UNIT.has(field(e.field)!.type)))
+  if (sized.type !== 'money' && !entries.some((e) => !e.abs && holdsCurrency(field(e.field)!)))
     return bad(
       'DECLARATION_INVALID',
-      `${id}'s pairs compares ${sized.id}, a bare ${sized.type} with no currency in it, so 1000 in one currency would pair with 1000 in another. Name the field that says the currency in on, as on: [currency, abs(${sized.id})], or make ${sized.id} a money.`,
+      `${id}'s pairs compares ${sized.id}, a bare ${sized.type} with no currency in it, so 1000 in one currency would pair with 1000 in another. Name the field that says the currency in on, a text or an enum of currency codes, as on: [currency, abs(${sized.id})], or make ${sized.id} a money.`,
       'pairs.on',
-      live.filter((f) => UNIT.has(f.type)).map((f) => f.id),
+      live.filter(holdsCurrency).map((f) => f.id),
     );
 
   /* ── across, within, date, mark ── */
@@ -320,6 +342,11 @@ export function loadLeg(p: Pairing, id: string): Leg | null {
  * field's default: its `to_v` is the whole row with every default filled in, so a create that said nothing about the mark
  * holds `false` exactly as one that said `false`, and a form that sends every field it shows would otherwise pin every
  * row a person typed in and none of them would ever pair.
+ *
+ * NOT HERE: WHETHER AN UNCHANGED MARK WAS HIS WORD. held61 read it from the history, passing over a resent mark that
+ * shared its batch with an edit of another field, and the checker found the case it cannot see: a row sent back with
+ * nothing changed leaves one bare event and the mark's resend, the same two rows as his lone `{ moved: false }`. Only the
+ * patch knows which it was, so `index.ts` writes the resend event only for a patch naming the mark alone.
  */
 export function markPinned(p: Pairing, id: string): boolean {
   const mark = p.pairs.mark;
@@ -342,6 +369,22 @@ export function markPinned(p: Pairing, id: string): boolean {
   return value !== undefined && value !== null && !same(value, declared);
 }
 
+/**
+ * The currency a row's `on` says its bare number is in, or `null` when no field it names holds one on this row.
+ *
+ * THE ROW IS HELD TO WHAT THE DECLARATION CLAIMED. A text in `on` was let through at install on its word, and a text
+ * holding `cleared` on both legs agrees exactly as a text holding `EGP` does, so the value itself has to be a code.
+ */
+function currencyOf(p: Pairing, leg: Leg): string | null {
+  for (const said of p.pairs.on) {
+    const e = entryOf(said);
+    const f = e && !e.abs ? p.fields.find((x) => x.id === e.field) : undefined;
+    const v = f && holdsCurrency(f) ? leg.fields[f.id] : undefined;
+    if (isCode(v)) return v.toUpperCase();
+  }
+  return null;
+}
+
 /** The parts of a row the matching compares, or `null` when it has none to compare: no day, no amount, or zero. */
 function shapeOf(p: Pairing, leg: Leg): { at: number; day: string; amount: Amount; way: unknown; across: unknown } | null {
   const date = dateField(p.pairs, p.fields);
@@ -353,6 +396,9 @@ function shapeOf(p: Pairing, leg: Leg): { at: number; day: string; amount: Amoun
   const amount = amountOf(leg.fields[sized]);
   /* ZERO NEVER MATCHES. Two zero rows in two accounts on one day are not a movement of anything. */
   if (amount === null || amount.size === 0) return null;
+  /* A BARE NUMBER WITH NO CURRENCY ON ITS ROW IS NOBODY'S PARTNER, because 1000 of nothing in particular cannot be told
+     from 1000 of anything else. */
+  if (amount.currency === null && currencyOf(p, leg) === null) return null;
   const way = leg.fields[p.pairs.opposite];
   const across = leg.fields[p.pairs.across];
   if (way === undefined || way === null || across === undefined || across === null) return null;
@@ -444,31 +490,143 @@ function candidatesOf(p: Pairing, leg: Leg): { leg: Leg; gap: number }[] {
 }
 
 /** The one candidate nearest in time, or `null` when there is none or two are equally near. */
-function nearestOf(p: Pairing, leg: Leg): Leg | null {
-  if (!pairable(p, leg)) return null;
-  const all = candidatesOf(p, leg);
-  if (all.length === 0) return null;
-  const least = Math.min(...all.map((c) => c.gap));
-  const at = all.filter((c) => c.gap === least);
+function nearestIn(near: readonly { leg: Leg; gap: number }[]): Leg | null {
+  if (near.length === 0) return null;
+  const least = Math.min(...near.map((c) => c.gap));
+  const at = near.filter((c) => c.gap === least);
   /* A TIE IS NOT GUESSED. The lower id won before, which is the order rows were minted in, so which of two equal credits
      hid the payment depended on which line the bank printed first. */
   return at.length === 1 ? at[0]!.leg : null;
 }
 
+function nearestOf(p: Pairing, leg: Leg): Leg | null {
+  return pairable(p, leg) ? nearestIn(candidatesOf(p, leg)) : null;
+}
+
+/** A leg and the rows that could be its partner, as `candidatesOf` answers them. */
+type Near = { leg: Leg; near: { leg: Leg; gap: number }[] };
+
+/* HOW MANY ALIKE LEGS ARE ANSWERED AS ONE SET. A move split in halves, or one top-up a day for a week, is a handful; past
+   this the set is answered leg by leg, nearest to nearest, as it was before sets were read at all. */
+const SET_MOST = 32;
+
 /**
- * The row this one is paired with in the ledger as it stands, or `null`: each must be the other's one nearest candidate.
+ * The legs alike enough to be one another's partner, followed from `leg` through every candidate of every candidate.
+ *
+ * `whole` IS FALSE PAST `SET_MOST`, and `set` then holds the legs read before it stopped. Every leg of a whole set finds
+ * the same set, because a candidate is one both ways (`mirrors` checks the window from each side, and every leg in it
+ * passed `pairable`), so the answer it gives each leg is the same from wherever it was asked.
+ */
+function setOf(p: Pairing, leg: Leg): { set: Map<string, Near>; whole: boolean } {
+  const set = new Map<string, Near>();
+  const queue = [leg];
+  while (queue.length > 0) {
+    const next = queue.shift()!;
+    if (set.has(next.id)) continue;
+    if (set.size === SET_MOST) return { set, whole: false };
+    const near = candidatesOf(p, next);
+    set.set(next.id, { leg: next, near });
+    for (const c of near) if (!set.has(c.leg.id)) queue.push(c.leg);
+  }
+  return { set, whole: true };
+}
+
+/**
+ * A whole set's legs matched in day order, each to one of the other way, or `null` when that is a guess or not needed.
+ *
+ * AUDIT SIXTY-ONE'S FINDING 2. The tie rule refused M1, one EGP 100,000.00 move sent as two halves of 50,000.00 on one day,
+ * and M2, two top-ups of 5,000.00 each landing the next day, and both figures counted money that only moved: every
+ * candidate was tied, though any way of matching those legs hides exactly the same money. The legs of a set agree on
+ * every `on` entry and so on size and currency (`mirrors`), so when as many go one way as the other every leg is one
+ * half of a move, and which half it is paired with changes no figure. Matched in day order, first out with first in,
+ * the days are as near as any matching can make them in total, which is what the nearest rule asks one leg at a time.
+ *
+ * STILL A GUESS WHEN THE COUNTS DIFFER, because some leg is left over and nothing in the ledger says which. AND NOT USED
+ * WHERE NOTHING IS TIED: there each leg's nearest answers it, and a set matched in day order can differ from that (an
+ * out on day 0 and 1, an in on day 1 and 5, pairs the day-1 legs by nearness and all four by order), which is a change to
+ * rows no tie ever held and not this repair. A matching that pairs two legs in one account, or two out of each other's
+ * window, is no matching, and the set is answered leg by leg.
+ *
+ * LEGS ON ONE DAY GO IN `across` ORDER, AND ONLY THEN IN `seq` ORDER. `seq` is the order the bank listed them, the
+ * arrival order the tie rule refused to break by, and ordering one day by it alone let that order decide whether a set
+ * paired at all: a CIB out and an NBE out against an HSBC in and a CIB in, all one day, paired all four when the HSBC in
+ * was listed first and none when the CIB in was, since first with first then put the CIB legs together and the matching
+ * was refused (`pairs-ties.test.ts`, ONE ANSWER IN EVERY ORDER). With the account first, `seq` only says which of two
+ * legs alike in everything names which, and the rows paired and the figures are the same in every order (M1).
+ */
+function matchedOf(p: Pairing, set: Map<string, Near>): Map<string, string> | null {
+  const members = [...set.values()];
+  if (!members.some((m) => m.near.length > 0 && nearestIn(m.near) === null)) return null;
+  const sides = new Map<string, { leg: Leg; at: number; across: string }[]>();
+  for (const m of members) {
+    const shape = shapeOf(p, m.leg)!;
+    const sign = signOf(shape.way);
+    const side = sign === null ? JSON.stringify(shape.way) : String(sign);
+    sides.set(side, [...(sides.get(side) ?? []), { leg: m.leg, at: shape.at, across: JSON.stringify(shape.across) }]);
+  }
+  if (sides.size !== 2) return null;
+  const [one, other] = [...sides.values()].map((legs) =>
+    legs.sort(
+      (a, b) =>
+        a.at - b.at ||
+        (a.across < b.across ? -1 : a.across > b.across ? 1 : 0) ||
+        (a.leg.seq ?? Infinity) - (b.leg.seq ?? Infinity) ||
+        (a.leg.id < b.leg.id ? -1 : 1),
+    ),
+  );
+  if (one!.length !== other!.length) return null;
+  const matched = new Map<string, string>();
+  for (const [i, a] of one!.entries()) {
+    const b = other![i]!;
+    if (!set.get(a.leg.id)!.near.some((c) => c.leg.id === b.leg.id)) return null;
+    matched.set(a.leg.id, b.leg.id);
+    matched.set(b.leg.id, a.leg.id);
+  }
+  return matched;
+}
+
+/** Every leg of a whole set with its partner: matched in day order when `matchedOf` says so, else nearest to nearest. */
+function answersOf(p: Pairing, set: Map<string, Near>): Map<string, string | null> {
+  const matched = matchedOf(p, set);
+  const out = new Map<string, string | null>();
+  for (const [id, m] of set) {
+    if (matched) {
+      out.set(id, matched.get(id) ?? null);
+      continue;
+    }
+    const near = nearestIn(m.near);
+    out.set(id, near !== null && nearestIn(set.get(near.id)!.near)?.id === id ? near.id : null);
+  }
+  return out;
+}
+
+/**
+ * The row this one is paired with in the ledger as it stands, or `null`: each must be the other's one nearest candidate,
+ * or the two matched in day order in a set of alike legs that ties and holds as many each way (`matchedOf`).
  *
  * MUTUAL, SO THE ANSWER IS THE SAME FROM EITHER SIDE and does not depend on which leg was written last. A row whose
  * nearest candidate is nearer to somebody else stays unpaired and counted; that is the side a mistake should fall on.
  */
 export function partnerOf(p: Pairing, leg: Leg): string | null {
-  const near = nearestOf(p, leg);
-  if (near === null) return null;
-  return nearestOf(p, near)?.id === leg.id ? near.id : null;
+  return answerOf(p, leg, new Map()).to;
 }
 
-/* A BOUND ON ONE WRITE'S RESETTLING. The rows a write can move are its neighbours old and new and their partners, a
-   handful on any ledger a bank writes; the bound is against a runaway, not a budget anything should reach. */
+/** `partnerOf`, with the legs of the set it read, and every answer that set gave kept in `known` for the next leg asked. */
+function answerOf(p: Pairing, leg: Leg, known: Map<string, string | null>): { to: string | null; set: string[] } {
+  if (known.has(leg.id)) return { to: known.get(leg.id)!, set: [] };
+  if (leg.deleted_at !== null || !pairable(p, leg)) return { to: null, set: [] };
+  const { set, whole } = setOf(p, leg);
+  if (whole) {
+    for (const [id, to] of answersOf(p, set)) known.set(id, to);
+    return { to: known.get(leg.id) ?? null, set: [...set.keys()] };
+  }
+  const near = nearestOf(p, leg);
+  return { to: near !== null && nearestOf(p, near)?.id === leg.id ? near.id : null, set: [...set.keys()] };
+}
+
+/* A BOUND ON ONE WRITE'S RESETTLING. The rows a write can move are its neighbours old and new, their partners and the
+   set of alike legs they stand in, a handful on any ledger a bank writes; the bound is against a runaway, not a budget
+   anything should reach. */
 const SETTLE_MOST = 256;
 
 /**
@@ -478,19 +636,25 @@ const SETTLE_MOST = 256;
  * candidates; so `seeds` are the written row, the rows that stood near it before the write, and the rows near it now.
  * Each one's partner is asked again, and so is every row it was paired with or now pairs with, until nothing new comes
  * up. A row outside that set has the same candidates it had, so it has the same answer.
+ *
+ * AND EVERY LEG OF THE SET EACH ONE STANDS IN, because a set matched in day order moves as one: the last leg of three
+ * moves arriving pairs the first move too, which is five days from it and was paired with nothing, so neither a
+ * neighbour nor a `_pair` leads there (`pairs-ties.test.ts`, the chain). A set the write broke apart is reached the same
+ * way, since each piece of it holds a row that stood next to the written one.
  */
 export function settle(p: Pairing, seeds: readonly string[]): { leg: Leg; to: string | null }[] {
   const want = new Map<string, { leg: Leg; to: string | null }>();
+  const known = new Map<string, string | null>();
   const queue = [...seeds];
   while (queue.length > 0 && want.size < SETTLE_MOST) {
     const id = queue.shift()!;
     if (want.has(id)) continue;
     const leg = loadLeg(p, id);
     if (!leg) continue;
-    const to = leg.deleted_at === null ? partnerOf(p, leg) : null;
+    const { to, set } = answerOf(p, leg, known);
     want.set(id, { leg, to });
     const held = leg.fields._pair;
-    for (const next of [typeof held === 'string' ? held : null, to]) if (next !== null && !want.has(next)) queue.push(next);
+    for (const next of [typeof held === 'string' ? held : null, to, ...set]) if (next !== null && !want.has(next)) queue.push(next);
   }
   /* AND A PAIRED ROW WHOSE MARK IS NOT TRUE, which only a mechanism can leave behind: a rule's `false` is not a pin
      (`isMechanism`), so the pair it contradicts still stands and the mark is put back to what the pair says. */

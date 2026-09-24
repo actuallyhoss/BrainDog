@@ -3661,11 +3661,19 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          not move, so nothing would remember it. The audit's P3b: the rent created unmarked, `transfer: false` set on it by
          `p_1`, and the next bank line of the same size paired it and wrote `true` over his word. The row is written here,
          signed by him, so `markPinned` finds it. NOT ON A PAIRED ROW, where the only value it can resend is the `true` the
-         pair set, and agreeing with a pair is not a reason to break it. */
+         pair set, and agreeing with a pair is not a reason to break it.
+
+         AND ONLY WHEN THE PATCH NAMES THE MARK ALONE. An agent that reads a row and sends it back whole carries the mark
+         along as it was, and audit sixty's X2b measured that pin: the bank's out leg categorised and returned with
+         `moved: false`, the in leg arriving next, `{ pair: null, received: 4000 }`. Sent back with nothing changed at all
+         it pinned the same way, and the history cannot tell that write from his lone `{ moved: false }`, since both leave
+         one bare event and this one; only the patch can. A person who names the mark beside other fields and changes it is
+         still heard, by the loop above, which writes an `edit` for any value that moved. */
       if (decl.pairs && !deleting) {
         const mark = decl.pairs.mark;
         if (
           touched.includes(mark) &&
+          Object.keys(patch).every((key) => key === mark) &&
           !isMechanism(w.actor) &&
           current.fields._pair === undefined &&
           JSON.stringify(current.fields[mark] ?? null) === JSON.stringify(merged[mark] ?? null)
