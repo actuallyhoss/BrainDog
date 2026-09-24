@@ -221,6 +221,16 @@ export type Scope = (typeof SCOPES)[number];
 export const LEVELS = ['read', 'append', 'write', 'decide', 'owner'] as const;
 export type Level = (typeof LEVELS)[number];
 
+/**
+ * A read an owner may hand one token beside its scope. One, and it is not a rung: `inbox` opens the inbox and nothing
+ * else, and it does not lift the token to `owner` anywhere.
+ *
+ * NOT A FOURTH SCOPE, because a scope is a prefix of the ladder and this is one door off it. An owner's agents triage the
+ * arrivals no rule filed (`loop/DIRECTION.md` section 30, P2), and every other thing `owner` guards stays a person's.
+ */
+export const TOKEN_REACHES = ['inbox'] as const;
+export type TokenReach = (typeof TOKEN_REACHES)[number];
+
 export type Principal =
   /**
    * `level` IS NULLABLE, and that is a state rather than an absence of information.
@@ -233,7 +243,11 @@ export type Principal =
    * it.
    */
   | { kind: 'person'; id: string; level: Level | null }
-  | { kind: 'token'; id: string; scope: Scope; person: string; level: Level | null }
+  /**
+   * `reach` IS WHAT THE OWNER NAMED WHEN THEY MINTED IT, set by a host from the token's own row and never from anything
+   * the caller sent. Absent is no reach, which is every token minted before it existed.
+   */
+  | { kind: 'token'; id: string; scope: Scope; person: string; level: Level | null; reach?: readonly TokenReach[] | undefined }
   | { kind: 'system'; id: string };
 
 export type CallContext = {
@@ -6662,9 +6676,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /**
      * What arrived and no rule filed, newest first, a page at a time: the list `counts.inbox` counts.
      *
-     * AN OWNER'S, AND NO TOKEN'S. The inbox holds whatever was sent in, about any register or none, so it cannot be held
-     * to a register the way the log is: a caller who may not read the whole record reads none of it. The refusal is
-     * `FORBIDDEN` for all of them, and the sentence says which of the three it was.
+     * AN OWNER'S, AND A TOKEN'S ONLY WHEN ITS OWNER SAID SO. The inbox holds whatever was sent in, about any register or
+     * none, so it cannot be held to a register the way the log is: a caller who may not read the whole record reads none
+     * of it. The refusal is `FORBIDDEN` for all of them, and the sentence says which of the three it was.
+     *
+     * THE `inbox` REACH IS THE ONE WAY PAST `owner` (pick P2, `loop/DIRECTION.md` section 30). Measured before it: a
+     * token for the whole record, minted by the owner for an agent, was refused "This needs owner, and no token reaches
+     * it" in every state, so arrivals an agent was meant to triage had no reader but the owner in a browser. It admits
+     * a token and nothing else, whose person is an owner TODAY, since a token never outlives its holder's access, and the
+     * whole-record check below still refuses one held to a list. It reads: `fileArrival` and `archiveArrival` ask `admin`,
+     * which answers every token `NEEDS_BROWSER_SESSION` and never looks at a reach.
      *
      * `state` PICKS WHICH ARRIVALS, AND THE DEFAULT IS WHAT WAITS ON A PERSON. It took no state and checked no key, so
      * `{ state: 'skipped' }` was answered as the default pair and read as "nothing was skipped", when what a pattern
@@ -6679,7 +6700,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     ): Promise<Result<InboxPage>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
-      const owner = allows(ctx, 'owner', listName);
+      const p = ctx.principal;
+      /* `Array.isArray`, BECAUSE `includes` IS ALSO A STRING'S. Measured: a reach of "no-inbox" was admitted as a substring
+         and a reach of 1 threw a TypeError out of this gate. */
+      const granted = p.kind === 'token' && p.level === 'owner' && Array.isArray(p.reach) && p.reach.includes('inbox');
+      const owner = granted ? null : allows(ctx, 'owner', listName);
       if (owner) return { ok: false, refusal: { ...owner, code: 'FORBIDDEN' } };
       if (!wholeRecord(ctx))
         return no('FORBIDDEN', 'The inbox belongs to the whole record, and this caller is held to part of it.', { at: 'principal' });

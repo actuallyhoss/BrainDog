@@ -284,7 +284,9 @@ test('THE INBOX IS WHAT ARRIVED AND NO RULE FILED, newest first, a page at a tim
   sql.close();
 });
 
-test('ONLY AN OWNER READS THE INBOX: a scoped token, a record-wide token, a writer and a stranger are each refused FORBIDDEN', async () => {
+/* A RECORD-WIDE TOKEN HERE CARRIES NO `inbox` REACH. The one that does, and what it still may not do, is
+   `inbox-grant.test.ts`. */
+test('ONLY AN OWNER READS THE INBOX: a scoped token, a record-wide token without the inbox reach, a writer and a stranger are each refused FORBIDDEN', async () => {
   const { api, sql } = await inboxRecord();
   const token: CallContext = { principal: { kind: 'token', id: 't_2', scope: 'write', person: 'p_1', level: 'owner' } };
   const writer: CallContext = { principal: { kind: 'person', id: 'p_2', level: 'write' } };

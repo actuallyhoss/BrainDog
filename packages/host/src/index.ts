@@ -151,8 +151,10 @@ export const ROUTES: readonly Route[] = [
     takes: {} },
   { name: 'recentHistory', group: 'READ+', writes: false, what: 'Every change to this record, newest first, a page at a time, held to what you may see.',
     takes: { limit: 'integer' } },
-  { name: 'inbox', group: 'READ+', writes: false, what: 'What arrived and no rule filed, newest first, a page at a time. An owner reads it, and no token does.',
-    takes: { cursor: 'integer', limit: 'integer' } },
+  /* `state` IS DECLARED BECAUSE THE RECORD TAKES IT. It was missing, so the table told a reader the inbox answered only
+     what waits on a person, when `?state=skipped` and `?state=all` already reached the record as undeclared text. */
+  { name: 'inbox', group: 'READ+', writes: false, what: 'What arrived and no rule filed, newest first, a page at a time, in one state or all of them, with a count for each. An owner reads it, and so does a token for the whole record that its owner gave the inbox reach. No other token does.',
+    takes: { state: 'text', cursor: 'integer', limit: 'integer' } },
   { name: 'search', group: 'DATA', writes: false, what: 'Rows whose text matches, across every register you can see, best first.',
     takes: { q: 'text', limit: 'integer' } },
   { name: 'version', group: 'READ+', writes: false, what: "The record's version, to tell whether anything you may see has changed. An owner who reads every list gets the newest event's rowid and may ask what changed since; anybody else gets a number that is only equal or not, never larger or smaller." },
@@ -183,10 +185,10 @@ export const ROUTES: readonly Route[] = [
      also carry the whole source in a query string, and a prefetched link could run it. */
   { name: 'scriptTry', group: 'READ+', writes: true, what: 'Run a draft script now and answer the writes it would make, its log and any refusal. It writes nothing, and it is counted as a run.' },
   /* A PROPOSED PAGE, DRAWN BEFORE ANYBODY ACCEPTS IT (M4 wave two brief 5). READ+ beside `page`, since it draws what
-     `page` draws and holds each block to the caller the same way. `writes: true` ALTHOUGH IT WRITES NOTHING, for two of
-     `scriptTry`'s reasons: a page body of up to twenty blocks is no query string, and a GET is a read the Cloud's demo
-     record answers to anybody (`apps/worker/src/route.ts` `DEMO_READS`), where a caller-written body that walks a
-     list has no place, for the reason `dryRun` is kept out of it. */
+     `page` draws and holds each block to the caller the same way. `writes: true` ALTHOUGH IT WRITES NOTHING, for one of
+     `scriptTry`'s reasons: a page body of up to twenty blocks is no query string. It also kept a caller-written body
+     that walks a list off the Cloud's public demo, which answered any GET to anybody; that door is gone
+     (`loop/research-no-sample.md` A1), and the flag stays for the first reason. */
   { name: 'previewPage', group: 'READ+', writes: true, what: 'Draw a page body nobody has installed, as page would draw it, each block held to what you may read. It installs nothing and writes nothing.' },
   { name: 'governance', group: 'READ+', writes: false, what: 'What has been proposed, what was decided, and what was predicted.',
     takes: { register: 'text', id: 'text', status: 'text', limit: 'integer', cursor: 'text' } },
