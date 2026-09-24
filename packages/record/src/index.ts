@@ -629,8 +629,18 @@ export type Boot = {
     /** What this person arranged for themselves (`setPref`): the rail's order and the pages hidden from it. A person only. */
     prefs?: Prefs;
   };
-  /** The pages the caller may open, as `pages` lists them, each with its place in the rail when it has one. */
-  pages: { slug: string; title: string; nav: { section: string; order: number } | null; icon: string | null; list: string | null }[];
+  /**
+   * The pages the caller may open, as `pages` lists them, each with its place in the rail when it has one, and the row a
+   * page made from a template is about (`null` for a page somebody wrote).
+   */
+  pages: {
+    slug: string;
+    title: string;
+    nav: { section: string; order: number } | null;
+    icon: string | null;
+    list: string | null;
+    about: { register: string; seq: number | null } | null;
+  }[];
   /**
    * How many questions wait on a person, and how many arrivals wait in the inbox.
    *
@@ -1822,6 +1832,97 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * `test/scoped-audit.test.ts` finds that block by it; the test has to find it another way before `source` can go.
    */
   const WRITTEN = ['from', 'cells', 'opening'] as const;
+
+  /**
+   * One drawn block as this caller may see it: whole, or blanked with the one sentence that says why.
+   *
+   * ONE FUNCTION FOR `page` AND `previewPage`, so a block an agent proposes is held back from a member exactly as the same
+   * block is once it is installed. The arguments below were written for `page`, and they are the reason it is shared.
+   */
+  const heldBlock = (ctx: CallContext, b: ReturnType<Kernel['block']>) => {
+    const { log, beyond } = heldBy(ctx, b);
+    /* WHERE THIS READER LAST LOOKED. The kernel does not know who is reading, so a feed that marks what is new came back
+       with `seen: null` and drew every line as unread; it is the caller's own read mark, the one Home's list moves.
+       AND A TOKEN'S IS ITS PERSON'S. This looked the mark up by `principal.id`, which for a token is the token's
+       own id and no member row has it, so a person's agent drew every line as unread however far the person had
+       read, while `whatsNew` for the same token read the person's mark. Both now ask `readerOf`. */
+    if (!beyond && b.source === 'activity' && 'seen' in b) return { ...b, seen: markOf(readerOf(ctx)) };
+    if (!beyond) return b;
+    const kept: Record<string, unknown> = { ...b };
+    for (const key of [...DRAWN, ...WRITTEN]) delete kept[key];
+    /* AND WHAT IT READS, WHEN THAT IS A LIST OR A FIGURE. A refused Diary block still said `source: register.diary`,
+       the id `boot` leaves out of her rail, and `columns` with Diary's field ids, which is the schema `schema`
+       refuses her; a figure's said `source: metric.diary-count` (`loop/research-scoped-leftovers.md` §1). The web
+       reads neither off a refused block: `blockOf` draws the shell, headed from `refusals`, the moment one is
+       there. A source that names a view and no list stays, since it says nothing she could not guess: the `log`
+       ones, and the two below, which are the kernel's computed sources that `ACROSS` does not hold. */
+    if (!log && typeof b.source === 'string' && b.source !== 'forecast.runway' && b.source !== 'sessions.live') {
+      delete kept.source;
+      delete kept.columns;
+    }
+    return {
+      ...(kept as typeof b),
+      rows: [],
+      matched: 0,
+      ...(b.readings ? { readings: [] } : {}),
+      ...(b.measures ? { measures: [] } : {}),
+      ...(b.values ? { values: {} } : {}),
+      ...(b.feed ? { feed: [] } : {}),
+      ...(b.queue ? { queue: [] } : {}),
+      refusals: [beyond],
+    };
+  };
+
+  /**
+   * Why this caller may not see a block, or `null`: `log` when it reads across the record, `beyond` for whatever it is
+   * held on, that or the first list it reads that she cannot. `heldBlock` asks it of a drawn block, and `previewPage`
+   * of a block nobody has drawn yet, since the lists a block reads are named by what was written and not by the drawing.
+   */
+  const heldBy = (ctx: CallContext, b: Parameters<Kernel['blockRegisters']>[0]): { log: Refusal | null; beyond: Refusal | null } => {
+    /**
+     * EVERY REGISTER THE BLOCK DRAWS FROM, AND IT USED TO BE `b.source` ALONE.
+     *
+     * `05 §1` makes `table` the page-only kind that takes `source:`. A `stat` block has
+     * `cells:` instead, and each cell names a metric whose own declaration carries the
+     * register, so a block made of figures had no `source`, matched no register, and was
+     * handed back to anybody who could open the page. Driven over HTTP with a read token
+     * whose ceiling is one register: `list` refuses, `metric` refuses, `boot` shows one
+     * register, and then `page` returned `{"value":4200000,"unit":"GBP"}` from another.
+     * The shipped seed's Money page is exactly that shape.
+     *
+     * THE KERNEL RESOLVES THEM, because a metric id is a name and the declaration behind it
+     * lives in the record. `readings` is emptied with `rows`, because a `stat` block's
+     * content is its readings and blanking the rows of a block that has none is blanking
+     * nothing.
+     *
+     * THE LEVEL AND NOT ONLY THE CEILING, for the reason `readable` gives: a block over a
+     * register somebody may only append to used to draw its rows.
+     */
+    /* WHAT HAPPENED ACROSS THE RECORD IS FOR WHOEVER MAY READ ALL OF IT. A `feed` or `agents` block reads the
+       whole log and names rows of every list, so somebody invited to named lists is refused the block, as
+       `whatsNew` holds a line about the record as a whole back from them. */
+    /* AND THE OPEN QUESTIONS AND THE SCHEDULED ACTIONS ARE THE SAME KIND OF READ (`ACROSS`). */
+    const log: Refusal | null =
+      typeof b.source === 'string' && ACROSS.has(b.source) && (!wholeRecord(ctx) || allows(ctx, 'read') !== null)
+        ? {
+            code: 'FORBIDDEN',
+            fix:
+              b.source === 'activity'
+                ? 'What happened across this BrainDog is shown to people who can read all of it.'
+                : b.source === 'actions'
+                  ? 'What this BrainDog does on a schedule is shown to people who can read all of it.'
+                  : 'The questions open across this BrainDog are shown to people who can read all of it.',
+            at: 'source',
+          }
+        : null;
+    const beyond =
+      log ??
+      [...kernel.blockRegisters(b), ...alsoReads(b)]
+        .map((register) => readable(ctx, register))
+        .find((said) => said !== null) ??
+      null;
+    return { log, beyond };
+  };
 
   /**
    * The `example` marker, which IS the value `example` in a register's own `tags` field.
@@ -3019,6 +3120,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           nav: page.nav,
           icon: page.icon,
           list: page.registers.length === 1 && /^[a-z]/u.test(page.registers[0]!) && !readable(ctx, page.registers[0]!) ? page.registers[0]! : null,
+          /* AND WHICH ROW IT GREW OUT OF, the key the rail's cap is written against (`railRoom`, M4 wave two brief 5). This
+             map copied four keys and dropped the kernel's fifth, so on his record 72 of 72 rail pages arrived with no
+             `about` and the shell drew one entry per project, service and skill where the sample, which has the key,
+             draws 15. It names no row the caller cannot read: `seesPage` above already drops a page about one. */
+          about: page.about,
         })),
       counts: {
         decide: open.ok ? open.value.filter((row) => !holds(ctx, row)).length : 0,
@@ -3883,79 +3989,75 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       return ok({
         ...out.value,
         ...(declared ? { declared_version: declared.version } : {}),
-        blocks: out.value.blocks.map((b) => {
-          /**
-           * EVERY REGISTER THE BLOCK DRAWS FROM, AND IT USED TO BE `b.source` ALONE.
-           *
-           * `05 §1` makes `table` the page-only kind that takes `source:`. A `stat` block has
-           * `cells:` instead, and each cell names a metric whose own declaration carries the
-           * register, so a block made of figures had no `source`, matched no register, and was
-           * handed back to anybody who could open the page. Driven over HTTP with a read token
-           * whose ceiling is one register: `list` refuses, `metric` refuses, `boot` shows one
-           * register, and then `page` returned `{"value":4200000,"unit":"GBP"}` from another.
-           * The shipped seed's Money page is exactly that shape.
-           *
-           * THE KERNEL RESOLVES THEM, because a metric id is a name and the declaration behind it
-           * lives in the record. `readings` is emptied with `rows`, because a `stat` block's
-           * content is its readings and blanking the rows of a block that has none is blanking
-           * nothing.
-           *
-           * THE LEVEL AND NOT ONLY THE CEILING, for the reason `readable` gives: a block over a
-           * register somebody may only append to used to draw its rows.
-           */
-          /* WHAT HAPPENED ACROSS THE RECORD IS FOR WHOEVER MAY READ ALL OF IT. A `feed` or `agents` block reads the
-             whole log and names rows of every list, so somebody invited to named lists is refused the block, as
-             `whatsNew` holds a line about the record as a whole back from them. */
-          /* AND THE OPEN QUESTIONS AND THE SCHEDULED ACTIONS ARE THE SAME KIND OF READ (`ACROSS`). */
-          const log: Refusal | null =
-            typeof b.source === 'string' && ACROSS.has(b.source) && (!wholeRecord(ctx) || allows(ctx, 'read') !== null)
-              ? {
-                  code: 'FORBIDDEN',
-                  fix:
-                    b.source === 'activity'
-                      ? 'What happened across this BrainDog is shown to people who can read all of it.'
-                      : b.source === 'actions'
-                        ? 'What this BrainDog does on a schedule is shown to people who can read all of it.'
-                        : 'The questions open across this BrainDog are shown to people who can read all of it.',
-                  at: 'source',
-                }
-              : null;
-          const beyond =
-            log ??
-            [...kernel.blockRegisters(b), ...alsoReads(b)]
-              .map((register) => readable(ctx, register))
-              .find((said) => said !== null);
-          /* WHERE THIS READER LAST LOOKED. The kernel does not know who is reading, so a feed that marks what is new came back
-             with `seen: null` and drew every line as unread; it is the caller's own read mark, the one Home's list moves.
-             AND A TOKEN'S IS ITS PERSON'S. This looked the mark up by `principal.id`, which for a token is the token's
-             own id and no member row has it, so a person's agent drew every line as unread however far the person had
-             read, while `whatsNew` for the same token read the person's mark. Both now ask `readerOf`. */
-          if (!beyond && b.source === 'activity' && 'seen' in b) return { ...b, seen: markOf(readerOf(ctx)) };
-          if (!beyond) return b;
-          const kept: Record<string, unknown> = { ...b };
-          for (const key of [...DRAWN, ...WRITTEN]) delete kept[key];
-          /* AND WHAT IT READS, WHEN THAT IS A LIST OR A FIGURE. A refused Diary block still said `source: register.diary`,
-             the id `boot` leaves out of her rail, and `columns` with Diary's field ids, which is the schema `schema`
-             refuses her; a figure's said `source: metric.diary-count` (`loop/research-scoped-leftovers.md` §1). The web
-             reads neither off a refused block: `blockOf` draws the shell, headed from `refusals`, the moment one is
-             there. A source that names a view and no list stays, since it says nothing she could not guess: the `log`
-             ones, and the two below, which are the kernel's computed sources that `ACROSS` does not hold. */
-          if (!log && typeof b.source === 'string' && b.source !== 'forecast.runway' && b.source !== 'sessions.live') {
-            delete kept.source;
-            delete kept.columns;
+        blocks: out.value.blocks.map((b) => heldBlock(ctx, b)),
+      });
+    },
+
+    /**
+     * A page body nobody has installed, drawn as `page` would draw it once it were: what an agent's proposed page holds,
+     * shown on Decide before anybody accepts it (M4 wave two brief 5).
+     *
+     * DECIDE DREW A PROPOSED PAGE AS LINES, its place in the sidebar, the headings of its blocks and the lists it reads,
+     * because `page` draws only a declared page and accepting was the one way to see what the blocks would hold. This
+     * draws the body instead and installs nothing.
+     *
+     * THE INSTALL'S OWN CHECK FIRST, `kernel.lint`, which is what a `change` is held to when it is filed and when it is
+     * accepted, so a body the record would refuse is refused here in the same sentence and never drawn. Each block then
+     * runs through `kernel.block` and is held to the caller by `heldBlock`, the function `page` holds a declared block
+     * with, so a member reads of a proposed page exactly what she would read of it installed.
+     *
+     * AND NOTHING IS WRITTEN, NOT EVEN `page`'s `page.render` LINE: that line counts opens of a page the record declares,
+     * and this one it does not. `test/preview-page.test.ts` holds the connection's `total_changes()` still across a call.
+     *
+     * A `for:` BODY IS DRAWN AS WRITTEN AND NOT EXPANDED OVER A ROW, so a `{{name}}` in it is drawn as its placeholder, or
+     * refused on the block that filters by it. Which row to draw a template over is a question this method does not ask.
+     */
+    async previewPage(args: { body?: unknown } | undefined, ctx: CallContext) {
+      const stop = scoped(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      const said = (args ?? {}) as Record<string, unknown>;
+      const extra = stray(said, ['body']);
+      if (extra) return { ok: false as const, refusal: extra };
+      const body = said.body;
+      if (body === null || typeof body !== 'object' || Array.isArray(body))
+        return no('REQUIRED_MISSING', "body is a page declaration's body, as braindog:grammar/page says.", { at: 'body' });
+      const b = body as Record<string, unknown>;
+      /* A LIST SHE CANNOT READ IS ANSWERED BEFORE THE LINT, IN `readable`'s SENTENCE, whether or not the record holds it.
+         The lint refuses a `requires` naming a list nobody installed and passes one that is installed, so asked in that
+         order, somebody invited to one list could learn which others this record keeps one guess at a time. The owner
+         reads every list, so `readable` passes her and the lint tells her which of them is not there. */
+      if (Array.isArray(b.requires))
+        for (const want of b.requires)
+          if (typeof want === 'string' && want.startsWith('register.')) {
+            const held = readable(ctx, want.slice('register.'.length));
+            if (held) return { ok: false as const, refusal: { ...held, at: 'requires' } };
           }
-          return {
-            ...(kept as typeof b),
-            rows: [],
-            matched: 0,
-            ...(b.readings ? { readings: [] } : {}),
-            ...(b.measures ? { measures: [] } : {}),
-            ...(b.values ? { values: {} } : {}),
-            ...(b.feed ? { feed: [] } : {}),
-            ...(b.queue ? { queue: [] } : {}),
-            refusals: [beyond],
-          };
-        }),
+      /* AND A BLOCK SHE MAY NOT SEE IS HELD BEFORE THE LINT READS IT, FOR THE SAME REASON. The lint reads a block's
+         `where` against its list, so Wren, invited to Notes alone, sent a table over Tasks filtered by `nosuch is x` and
+         was answered `FIELD_UNKNOWN` with every field of Tasks in `allowed`, while `register.nosuch` drew a blanked block:
+         which lists exist and the schema `schema` refuses her. Such a block is linted as a bare note in its place, so the
+         count and the positions the lint names stay the body's, and it is drawn as the held shell from what was written,
+         never through `kernel.block`, which is only ever handed what the lint passed. A block too malformed to name its
+         lists is left to the lint, whose sentence about its shape names no list. */
+      const written: unknown[] = Array.isArray(b.blocks) ? b.blocks : [];
+      const shut = written.map((block) => {
+        if (block === null || typeof block !== 'object') return false;
+        try {
+          return heldBy(ctx, block as never).beyond !== null;
+        } catch {
+          return false;
+        }
+      });
+      const linted = shut.includes(true) ? { ...b, blocks: written.map((block, i) => (shut[i] ? { kind: 'note' } : block)) } : b;
+      const fault = kernel.lint([{ id: `page.${String(b.page)}`, kind: 'page', body: linted }] as never);
+      if (fault) return { ok: false as const, refusal: fault };
+      const decl = b as { page: string; blocks: Parameters<Kernel['block']>[0][] };
+      return ok({
+        ...b,
+        page: decl.page,
+        /* THE RECORD'S CLOCK, as `page` answers it, so what is late is late against the day the record reads. */
+        read_at: new Date(clock.now()).toISOString(),
+        blocks: decl.blocks.map((block, i) => heldBlock(ctx, shut[i] ? (block as never) : kernel.block(block))),
       });
     },
 

@@ -12,11 +12,14 @@
  * declaration calls itself; a person sees a page, a list, a rule and a look, and nothing here assumes
  * what kind of record it is.
  */
+import { createClient } from '@braindog/client';
 import { egressOf } from '@braindog/kernel';
 import { ruleName } from '@braindog/seed/usecases/names';
 
 import { copy } from '../../../lib/copy.ts';
 import { pathOf, sayCondition, sayStep, sayTrigger, triggerOfBody, verbOf, words as canvas } from '../../../lib/flow/flow.ts';
+import { blockOf, type Fetch, type LiveBlock } from '../../../lib/record/page-live.ts';
+import { learn, refMapOf, targetsOf, type RecordRow, type RefMap } from '../../../lib/record/remote.ts';
 
 type Row = Record<string, unknown>;
 
@@ -29,6 +32,8 @@ export type Appears = {
   accent?: string;
   /** A script's source, whole, to be read before it is accepted: code keeps its lines, so it is not one of `lines`. */
   source?: string;
+  /** A page's body, as proposed, for the record to draw (`drawnOf`): the lines name its blocks, the drawing fills them. */
+  page?: Row;
 };
 
 export type Proposed = { appears: Appears[]; samples: number | null };
@@ -231,6 +236,74 @@ export function proposedOf(kind: string, body: Row): Proposed | null {
   const to = body.to;
   const decls = isRow(to) && Array.isArray(to.declarations) ? to.declarations : [to];
   const filed = Array.isArray(body.egress) ? body.egress : [];
-  const appears = decls.map((d) => appearsOf(d, filed)).filter((a): a is Appears => a !== null);
+  /* A PAGE CARRIES ITS BODY HERE AND NOT IN `appearsOf`, which `arranged.ts` also draws an arrangement's pages with: a
+     proposed `change` is the one screen that asks the record to draw the page (`drawnOf`), so it is the one that holds it. */
+  const appears = decls.flatMap((d) => {
+    const a = appearsOf(d, filed);
+    if (!a) return [];
+    return [isRow(d) && d.kind === 'page' && isRow(d.body) ? { ...a, page: d.body } : a];
+  });
   return appears.length ? { appears, samples: null } : null;
+}
+
+/**
+ * WHAT THE DRAWING OF A PROPOSED PAGE IS CALLED ON THE SCREEN. Here and not in `copy.ts`, which nobody owns this wave
+ * (`loop/research-m4-wave-two.md`, the wave's rules): new words go in a `words` object in the module that says them.
+ */
+export const words = {
+  /** Over the drawing, so it is not read as a page that is already there. */
+  drawnHead: 'As it would look now',
+  /** The group's name for a screen reader, which hears the drawing apart from the lines above it. */
+  drawn: (title: string) => `${title}, as it would look now`,
+} as const;
+
+/**
+ * A proposed page as the record draws it: `live` with its blocks, `refused` with the record's sentence for a body it
+ * would not install, or `none` from a host older than the method, which leaves the lines above as the whole preview.
+ */
+export type Drawn = { from: 'live'; now: number; blocks: LiveBlock[] } | { from: 'refused'; fix: string } | { from: 'none' };
+
+/** A refusal that says the host has no such method, or no record here, rather than anything about this page. */
+const UNSERVED = new Set(['ROUTE_UNKNOWN', 'NOT_IN_THIS_BUILD', 'UNREACHABLE', 'UNAUTHORIZED']);
+
+/**
+ * WHAT ACCEPTING THE PAGE WOULD DRAW, drawn by the record before anybody accepts it (M4 wave two brief 5).
+ *
+ * THE LINES NAMED THE BLOCKS AND NOTHING FILLED THEM. "Shows: Open, Notes" was the whole preview of a page, so what an
+ * agent's page would hold was found out by accepting it. `previewPage` draws the body as `page` draws an installed one,
+ * each block held to the reader, and writes nothing; this turns its answer into the blocks `PageView` already draws.
+ *
+ * THE SAME CONVERSION AS A LIVE PAGE'S, `blockOf`, and the same two reads before it, for `pageReader`'s reasons: a list
+ * this build does not ship is learnt through `schema` before its block is drawn, or every block over it says it cannot be
+ * drawn, and a list a ref points at is walked once, so a ref draws as the row's title and not its id. A block the record
+ * held back carries its refusal and is drawn as that, never filled from the sample.
+ */
+export async function drawnOf(body: Row, base: string, io?: Fetch): Promise<Drawn> {
+  const client = createClient({ base, ...(io ? { fetch: io } : {}) });
+  const out = await client.call<{ read_at?: unknown; blocks?: unknown }>('previewPage', { body });
+  if (!out.ok) {
+    if (!('refusal' in out)) return { from: 'none' };
+    return UNSERVED.has(out.refusal.code) ? { from: 'none' } : { from: 'refused', fix: out.refusal.fix };
+  }
+  type Answered = Parameters<typeof blockOf>[0];
+  const blocks = (Array.isArray(out.value.blocks) ? out.value.blocks : []) as Answered[];
+  const said = typeof out.value.read_at === 'string' ? Date.parse(out.value.read_at) : Number.NaN;
+  const now = Number.isFinite(said) ? said : Date.now();
+  const lists = [...new Set(blocks.flatMap((b) => (!b.refusals?.length && b.source?.startsWith('register.') ? [b.source.slice('register.'.length)] : [])))];
+  const asked = new Map<string, Promise<void>>();
+  for (const list of lists) await learn(client.schema, list, asked);
+  const refs = new Map<string, RefMap>();
+  for (const target of new Set(lists.flatMap(targetsOf))) {
+    await learn(client.schema, target, asked);
+    const rows: RecordRow[] = [];
+    let cursor: string | null = null;
+    do {
+      const page = await client.list({ register: target, limit: 500, ...(cursor === null ? {} : { cursor }) });
+      if (!page.ok) break;
+      rows.push(...(page.value.rows as RecordRow[]));
+      cursor = page.value.cursor;
+    } while (cursor !== null);
+    refs.set(target, refMapOf(target, rows));
+  }
+  return { from: 'live', now, blocks: blocks.map((b) => blockOf(b, refs, now)) };
 }

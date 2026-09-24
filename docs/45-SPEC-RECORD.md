@@ -64,6 +64,7 @@ export type RecordApi = {
   meet(args: MeetArgs, ctx: CallContext): Promise<Result<Met>>;                                         // someone met in the work, matched or added, as the run
   // READ+ — 16
   page(args: { slug: string }, ctx: CallContext): Promise<Result<PageData>>;
+  previewPage(args: { body: Record<string, unknown> }, ctx: CallContext): Promise<Result<PageData>>;   // added September 24th 2026: a body installed nowhere, drawn as `page` draws one; writes nothing
   metric(args: { id: string }, ctx: CallContext): Promise<Result<MetricResult>>;
   schema(args: { register: string }, ctx: CallContext): Promise<Result<unknown>>;
   dialect(args: Record<string, never>, ctx: CallContext): Promise<Result<DialectLine[]>>;
@@ -295,7 +296,7 @@ type WhatsNew    = { events: EventLine[]; upTo: Cursor | null; sinceCapped: bool
 type HistoryPage = { events: EventLine[]; cursor: Cursor | null };                                     // newest first
 type Boot        = { registers: RegisterCount[]; now: string; sessions: LiveRun[]; waiting: Waiting[];
                      record: { slug; name; locale } | null; me: { kind; person; name; level };
-                     pages: { slug; title; nav; icon }[]; counts: { decide: number; inbox: number | null };
+                     pages: { slug; title; nav; icon; list; about: { register; seq } | null }[]; counts: { decide: number; inbox: number | null };
                      whatsNew: WhatsNew };
 type Whoami      = { principal: CallContext['principal']; levels: { register: string; level: Level }[]; registers: '*' | string[] };
 type SessionsLive = { sessions: { spoken: string; title: string | null; repo: string | null; host: string | null; state: string; last_seen: string | null; stale: boolean }[]; same_repo: string[] };
@@ -1032,6 +1033,8 @@ ok; `httpStatus` over one `Result` per row of §4.2; `kernel.refused()` set → 
 | `attach` · `handoff` | in `test/session.test.ts`: attach opens a run signed by itself and resumes it for the same client; a person is never a run; re-attaching never overwrites the handoff and brings a finished run back; a handoff appends `tried` and `note`, keeps the last fifty of each, and moves `state` along the transitions; a token hands off only its own run |
 | `meet` | in `test/meet.test.ts`: somebody new is added, signed by the run and linked to its project; somebody already there is matched and gains the line and the handle and nothing else; with People switched off it is `REGISTER_UNKNOWN` and nothing is written, a run included; a stray key is `FIELD_UNKNOWN`, a `read` token and a token that does not reach `people` are `FORBIDDEN`, and a person in the app links no project |
 | `page` | `share` on its slug → ok; a `when: false` block → no rows; `empty` filled |
+| `previewPage` | in `test/preview-page.test.ts`: over three task rows a proposed `table` of `register.tasks` answers three rows; a member invited to another list gets that block with no rows, no `source` and one `FORBIDDEN`, and her own list's block drawn; an unknown block kind is the lint's `KIND_UNKNOWN`, an unknown `requires` its `DEPENDENCY_UNRESOLVED`, and to the member a list she cannot read and one nobody declared are one answer, in `requires` and in a block's `source` alike, where a `where` over a field Tasks lacks draws the same held block as one over a field it has; `total_changes()`, the declaration count and the observation count are the same before and after; routed as a POST |
+| `boot` pages | in `test/boot-about.test.ts`: a `for:` page over two projects is two pages, each with `about: { register: 'projects', seq }`; a written page has `about: null`; a member who cannot read Projects is sent no page about one |
 | `project` budget | `budget.tokens: 500` → `used ≤ 500`, cut at the first row that does not fit; no `document` body; a `series` register contributes no rows; `{ metric }` → `rows: []` and the metric |
 | `whoami` | a token → its person's `levels` and `registers`; no session row is opened |
 

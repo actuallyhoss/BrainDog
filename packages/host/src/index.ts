@@ -182,6 +182,12 @@ export const ROUTES: readonly Route[] = [
      is not safe to repeat: it spends a run of the plan and may send a POST of its own to a provider. As a GET it would
      also carry the whole source in a query string, and a prefetched link could run it. */
   { name: 'scriptTry', group: 'READ+', writes: true, what: 'Run a draft script now and answer the writes it would make, its log and any refusal. It writes nothing, and it is counted as a run.' },
+  /* A PROPOSED PAGE, DRAWN BEFORE ANYBODY ACCEPTS IT (M4 wave two brief 5). READ+ beside `page`, since it draws what
+     `page` draws and holds each block to the caller the same way. `writes: true` ALTHOUGH IT WRITES NOTHING, for two of
+     `scriptTry`'s reasons: a page body of up to twenty blocks is no query string, and a GET is a read the Cloud's demo
+     record answers to anybody (`apps/worker/src/route.ts` `DEMO_READS`), where a caller-written body that walks a
+     list has no place, for the reason `dryRun` is kept out of it. */
+  { name: 'previewPage', group: 'READ+', writes: true, what: 'Draw a page body nobody has installed, as page would draw it, each block held to what you may read. It installs nothing and writes nothing.' },
   { name: 'governance', group: 'READ+', writes: false, what: 'What has been proposed, what was decided, and what was predicted.',
     takes: { register: 'text', id: 'text', status: 'text', limit: 'integer', cursor: 'text' } },
   { name: 'propose', group: 'DATA', writes: true, what: 'Put a question in front of a person. It changes nothing by itself.' },
@@ -454,6 +460,7 @@ export type RecordSurface = {
    * truth, where calling a method that is not there would be a 500.
    */
   scriptTry?(args: never, ctx: never): Promise<Result<unknown>>;
+  previewPage(args: never, ctx: never): Promise<Result<unknown>>;
   whoami(ctx: never): Promise<Result<unknown>>;
   digestToday(args: never, ctx: never): Promise<Result<unknown>>;
   markRead(args: { upTo?: number | string } | undefined, ctx: never): Promise<Result<unknown>>;
@@ -554,6 +561,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
       api.scriptTry
         ? api.scriptTry(a as never, ctx as never)
         : { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog cannot try a script yet, so nothing ran. Propose it, and the owner reads the source in Decide.' } },
+    previewPage: (a, ctx) => api.previewPage(a as never, ctx as never),
     whoami: (_a, ctx) => api.whoami(ctx as never),
     digestToday: (a, ctx) => api.digestToday(a as never, ctx as never),
     markRead: (a, ctx) => api.markRead(a as { upTo?: number | string } | undefined, ctx as never),

@@ -6,10 +6,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { egressOf } from '@braindog/kernel';
+import { DatabaseSync } from 'node:sqlite';
+
+import { egressOf, openRecord } from '@braindog/kernel';
 
 import { sayStep, sayTrigger, words } from '../../../lib/flow/flow.ts';
-import { proposedOf } from './proposed.ts';
+import { REGISTERS } from '../../../lib/record/api.ts';
+import type { Fetch } from '../../../lib/record/page-live.ts';
+import { drawnOf, proposedOf } from './proposed.ts';
 
 test('a page says where it lands in the sidebar and what it shows', () => {
   const out = proposedOf('change', {
@@ -214,4 +218,121 @@ test('a pattern draws its ingest as a bare body or as a declaration, with the li
 test('a pattern that holds another kind is drawn as that kind', () => {
   const out = proposedOf('pattern', { ingest: { id: 'rule.flag', kind: 'rule', body: { rule: 'flag', register: 'invoices', then: [{ tag: 'new' }] } }, samples: ['r1'] });
   assert.equal(out?.appears[0]?.kind, 'Rule');
+});
+
+/* ── the page itself, drawn by the record before anybody accepts it (M4 wave two brief 5) ── */
+
+const CLOCK = Date.UTC(2026, 8, 24, 9);
+const BASE = 'http://record.test';
+const reply = (status: number, body: unknown): Response => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+
+function sqlite(): Parameters<typeof openRecord>[0] {
+  const db = new DatabaseSync(':memory:');
+  let depth = 0;
+  return {
+    exec: (text: string, ...params: unknown[]) => (params.length === 0 ? db.exec(text) : db.prepare(text).run(...(params as never[]))),
+    all: (text: string, ...params: unknown[]) => db.prepare(text).all(...(params as never[])),
+    one: (text: string, ...params: unknown[]) => db.prepare(text).get(...(params as never[])),
+    transactionSync<T>(fn: () => T): T {
+      if (depth > 0) return fn();
+      db.exec('BEGIN');
+      depth++;
+      try {
+        const value = fn();
+        db.exec('COMMIT');
+        return value;
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      } finally {
+        depth--;
+      }
+    },
+  } as unknown as Parameters<typeof openRecord>[0];
+}
+
+/**
+ * THE RECORD'S `previewPage`, OVER A REAL KERNEL. This package does not depend on `@braindog/record`, so the stub does
+ * what that method does for an owner who reads every list: the install's lint, then each block through `kernel.block`.
+ * The blocks drawn here are therefore the shapes a record sends, not shapes typed out to match the drawing.
+ */
+async function drawing(): Promise<{ io: Fetch; asked: { method: string; verb: string; args: Record<string, unknown> }[] }> {
+  const k = await openRecord(sqlite(), { now: () => CLOCK });
+  const { scopes: _scopes, pack: _pack, ...body } = JSON.parse(JSON.stringify(REGISTERS.things)) as Record<string, unknown>;
+  const fields = (body.fields as { id: string }[]).filter((f) => f.id !== 'repos' && f.id !== 'folders');
+  const put = await k.install([{ id: 'register.things', kind: 'register', body: { ...body, fields } } as never]);
+  assert.ok(put.ok, JSON.stringify(put));
+  for (const name of ['Kiln', 'Portage', 'Ledger']) assert.ok(k.create('things', { name, lane: 'building' }, { actor: 'p_1' }).ok);
+  const asked: { method: string; verb: string; args: Record<string, unknown> }[] = [];
+  const io = (async (url: string | URL | Request, init?: RequestInit) => {
+    const at = new URL(String(url));
+    const method = at.pathname.slice('/api/'.length);
+    const args = (init?.body ? JSON.parse(String(init.body)) : Object.fromEntries(at.searchParams)) as Record<string, unknown>;
+    asked.push({ method, verb: init?.method ?? 'GET', args });
+    if (method === 'schema') {
+      const decl = k.register(String(args.register));
+      return reply(decl ? 200 : 404, decl ? { ok: true, value: decl } : { ok: false, refusal: { code: 'REGISTER_UNKNOWN', fix: 'No such list.' } });
+    }
+    if (method === 'list') return reply(200, k.list({ register: String(args.register), limit: Number(args.limit ?? 50) } as never));
+    if (method === 'previewPage') {
+      const page = args.body as { page: string; blocks: unknown[] };
+      const fault = k.lint([{ id: `page.${page.page}`, kind: 'page', body: page } as never]);
+      if (fault) return reply(400, { ok: false, refusal: fault });
+      return reply(200, { ok: true, value: { ...page, read_at: new Date(CLOCK).toISOString(), blocks: page.blocks.map((b) => k.block(b as never)) } });
+    }
+    return reply(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `There is no method called ${method}.` } });
+  }) as Fetch;
+  return { io, asked };
+}
+
+const PAGE = { page: 'building', title: 'Building', nav: { section: 'Work', order: 5 }, blocks: [{ kind: 'table', source: 'register.things', heading: 'Being built' }] };
+
+test('A PROPOSED PAGE CARRIES ITS BODY, so the screen can ask the record to draw it and not only to name it', () => {
+  const out = proposedOf('change', { declaration_id: 'page.building', to: { id: 'page.building', kind: 'page', body: PAGE } });
+  assert.deepEqual(out?.appears[0]?.page, PAGE);
+  /* AND ONLY A PAGE DOES: a list or a rule has no drawing of its own to ask for. */
+  const list = proposedOf('change', { declaration_id: 'register.books', to: { id: 'register.books', kind: 'register', body: { title: 'Books', fields: [] } } });
+  assert.equal(list?.appears[0]?.page, undefined);
+});
+
+test('THE RECORD DRAWS THE PROPOSED PAGE: a table over three things arrives as three rows, asked once, as a POST', async () => {
+  const { io, asked } = await drawing();
+  const drawn = await drawnOf(PAGE, BASE, io);
+  assert.equal(drawn.from, 'live', JSON.stringify(drawn));
+  if (drawn.from !== 'live') return;
+  assert.equal(drawn.blocks.length, 1);
+  const [table] = drawn.blocks;
+  assert.equal(table?.cannot, undefined);
+  assert.deepEqual(table?.refusals, []);
+  assert.equal(table?.rows.length, 3);
+  assert.equal(drawn.now, CLOCK);
+  const previews = asked.filter((a) => a.method === 'previewPage');
+  assert.deepEqual(
+    previews.map((a) => [a.verb, a.args]),
+    [['POST', { body: PAGE }]],
+  );
+});
+
+test("A BODY THE RECORD REFUSES IS SAID IN THE RECORD'S SENTENCE, and a host older than the method draws the lines alone", async () => {
+  const { io } = await drawing();
+  const refused = await drawnOf({ ...PAGE, blocks: [{ kind: 'nosuch' }] }, BASE, io);
+  assert.equal(refused.from, 'refused');
+  assert.match(refused.from === 'refused' ? refused.fix : '', /nosuch/u);
+  /* A HOST THAT DOES NOT ROUTE IT is not a refusal of this page: the lines above say what they always said. */
+  const older = (async () => reply(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'There is no method called previewPage.' } })) as unknown as Fetch;
+  assert.deepEqual(await drawnOf(PAGE, BASE, older), { from: 'none' });
+});
+
+test('A BLOCK THE RECORD HELD BACK IS DRAWN AS ITS REFUSAL, never filled from the sample', async () => {
+  const held = (async () =>
+    reply(200, {
+      ok: true,
+      value: { ...PAGE, read_at: new Date(CLOCK).toISOString(), blocks: [{ kind: 'table', heading: 'Being built', rows: [], matched: 0, refusals: [{ code: 'FORBIDDEN', fix: 'You cannot read Things.', at: 'source' }] }] },
+    })) as unknown as Fetch;
+  const drawn = await drawnOf(PAGE, BASE, held);
+  assert.equal(drawn.from, 'live');
+  if (drawn.from !== 'live') return;
+  assert.deepEqual(drawn.blocks[0]?.rows, []);
+  /* THE RECORD'S SENTENCE, which is what the page's drawing reads off a refused block (`blockOf` keeps each `fix`). */
+  assert.deepEqual(drawn.blocks[0]?.refusals, ['You cannot read Things.']);
 });
