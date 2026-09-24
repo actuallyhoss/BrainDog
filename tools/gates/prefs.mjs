@@ -38,18 +38,19 @@
  * `Pref` field is in neither `CASES` nor `EXCUSED`, and red again when either of those names a
  * field the type no longer has. `sampleSaid` was the first kind and `previewDismissed` was the
  * second; one check catches both, and what follows is a description of its answer rather than the
- * record it is kept in.
+ * record it is kept in. `sampleSaid` then went the other way: the sample bar it put away went with
+ * the sample (`loop/DIRECTION.md` 26), and the check was red on this file's case for it until the
+ * case went too.
  *
- * `Pref` holds fifteen: `scheme`, `text`, `density`, `theme`, `contrast`, `sidebar`, `navShape`,
- * `chars`, `suggestPages`, `seen`, `columns`, `nav`, `defined`, `sampleSaid`, `railShut`. Ten are
- * covered here: `text`, `density`, `scheme`, `contrast`, `sidebar`, `navShape`, `suggestPages`,
- * `nav`, `sampleSaid` and `railShut`, which is everything a page LOAD can settle. `suggestPages` joined the type after this
+ * `Pref` holds fourteen: `scheme`, `text`, `density`, `theme`, `contrast`, `sidebar`, `navShape`,
+ * `chars`, `suggestPages`, `seen`, `columns`, `nav`, `defined`, `railShut`. Nine are covered
+ * here: `text`, `density`, `scheme`, `contrast`, `sidebar`, `navShape`, `suggestPages`, `nav` and
+ * `railShut`, which is everything a page LOAD can settle. `suggestPages` joined the type after this
  * file had spent a paragraph excusing itself from covering a field the type did not have; it is
- * covered now, on the load, because turning it off empties a list. `sampleSaid` and `railShut`
- * arrived later still and were measured by nothing and excused by nothing, which is the hole the
- * derived check exists to close: both are settled by a load exactly the way `sidebar` is, one
- * taking an `<aside>` out of `#main` and the other folding a section of the rail. The other five
- * each need something a fixture cannot do by loading a URL:
+ * covered now, on the load, because turning it off empties a list. `railShut` arrived later still
+ * and was measured by nothing and excused by nothing, which is the hole the derived check exists to
+ * close: it is settled by a load exactly the way `sidebar` is, folding a section of the rail. The
+ * other five each need something a fixture cannot do by loading a URL:
  *
  *   - `theme`   an accent is chosen by pressing a swatch, and the difference is a palette rather
  *               than one token. **A duplicate swatch that repainted nothing lived here for months**
@@ -260,33 +261,6 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
     },
     {
       /**
-       * `sampleSaid`: the bar saying this is somebody else's company, and the way out of it.
-       *
-       * MEASURED BY NOTHING AND EXCUSED BY NOTHING, which is the state `contrast` was in three cases
-       * above and for the same reason: this list is hand-written, so a preference nobody adds a case
-       * for is a preference nobody measures. It is not even one of the hard ones. The dismissal is a
-       * boolean the shell reads before the screen draws and the bar is an `<aside>` inside `#main`,
-       * so a cookie and a URL settle it exactly the way they settle `sidebar`.
-       *
-       * THE ELEMENT AND NOT THE SENTENCE. Probing for the copy would compare two strings `dead-copy`
-       * already guards, and would come back the same on a bar that is present and empty; what the
-       * preference does is take the node out of the document, so the node is what is counted.
-       */
-      name: 'sampleSaid',
-      what: 'whether the sample bar is in the page',
-      route: '/',
-      /* `undefined` is "not yet put away", which is what a first visit is, so the two values are
-         "unset" and `true` rather than `true` and `false`. */
-      values: [{}, { sampleSaid: true }],
-      /* ON THE SAMPLE, WHICH IS THE ONLY RECORD THE BAR IS FOR. `214f7b9` hid it on a live record,
-         correctly, and this gate reads a live one, so both values came back 0. The record is taken
-         away for this case: `readBoot` answers a record that cannot be reached with the sample, which
-         is what a static host with no record behind it opens. */
-      sample: true,
-      probe: () => String(document.querySelectorAll('#main aside.sample').length),
-    },
-    {
-      /**
        * `railShut`: thirty-four items of navigation, and the heading somebody folded away.
        *
        * THE OTHER ONE NOTHING MEASURED, and the one of the two where a lazy probe would lie. Folding
@@ -490,7 +464,6 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
         await context.addCookies([
           { name: 'bd_pref', value: encodeURIComponent(JSON.stringify(value)), url: `http://localhost:${PORT}` },
         ]);
-        if (test.sample) await context.route(/\/(?:api|auth)(?:\/|$)/, (route) => route.abort());
         const page = await context.newPage();
         await page.goto(`http://localhost:${PORT}${APP_BASE}${test.route}`, { waitUntil: 'networkidle' });
         const unmeasured = ready.check(`${test.name} ${JSON.stringify(value)}`, test.route, await ready.settled(page));

@@ -57,17 +57,16 @@
   import { copy } from '../copy.ts';
   import { terms, tokensOf } from '../record/find.ts';
   import { BINDINGS, overlays } from '../a11y/keys.svelte.ts';
-  import { METRICS } from '../record/declared.ts';
-  import { isTemplate, unreadable } from '../record/metrics.ts';
-  import { AUDIT, NOW, QUESTIONS, REGISTERS, entry, iconFor, metric, search, type NavEntry } from '../record/api.ts';
+  /* `REGISTERS` IS THE DECLARATION CACHE, not the sample: it names a list the rail has not, and `learn` fills it from the
+     record (it still starts with the seed's declarations, which wave B's `held.ts` brief takes away). */
+  import { REGISTERS, type NavEntry } from '../record/api.ts';
   import { toasts } from '../ui/toast.svelte.ts';
   import Kbd from '../ui/Kbd.svelte';
   import Icon from '../ui/Icon.svelte';
   import type { IconName } from '../ui/Icon.svelte';
   import { commands, type Act, type Creation } from './admit.ts';
   import { addRow, creation, offered, words as createWords } from './create.ts';
-  import { savedViews } from '../record/views.ts';
-  import { listsOf, type List, type Recent } from '../record/palette.ts';
+  import type { List, Recent } from '../record/palette.ts';
   import type { Hits, Reader } from '../record/palette-live.ts';
   import type { Metric } from '../record/api.ts';
   import { latest } from './latest.ts';
@@ -117,11 +116,16 @@
   let cursor = $state(0);
 
   /**
-   * THE RECORD WHEN THERE IS ONE, AND THE SAMPLE WHEN THERE IS NOT.
+   * THE RECORD, OR NOTHING OF ONE.
    *
    * The lists, their counts and the questions waiting come from the shell, which read them from `boot`. What `boot`
    * does not carry, the record's search, the rows changed last and the figures, is asked of the record through
-   * `record/palette-live.ts`, loaded the first time a live palette needs it. The sample's palette never loads it.
+   * `record/palette-live.ts`, loaded the first time a live palette needs it.
+   *
+   * WITH NO RECORD THE PALETTE IS ITS COMMANDS AND PAGES. It searched the studio's rows, listed its figures, its last
+   * changes and its questions, and offered to add a row it then said was not saved; that went with the sample
+   * (DIRECTION 26). A refused shell has `live: true` (`layoutOf` sets it), so every branch below that was the sample's
+   * had been unreachable since wave A: a search there is the record's refusal, said under the box.
    */
   const shell = $derived(
     page.data as {
@@ -136,7 +140,7 @@
     },
   );
   const isLive = $derived(shell.live === true);
-  /** Whether a model is behind Spark on this host, which the shell asked `/api/version` once. The sample's is never `true`. */
+  /** Whether a model is behind Spark on this host, which the shell asked `/api/version` once. A refused shell's never is. */
   const sparkHere = $derived(isLive && shell.spark === true);
 
   /**
@@ -227,10 +231,11 @@
     }
     input?.focus();
   }
-  const lists = $derived(listsOf(isLive, shell.index?.registers ?? []));
+  const lists = $derived<List[]>(isLive ? [...(shell.index?.registers ?? [])] : []);
   const listNamed = $derived(new Map(lists.map((l) => [l.id, l])));
-  /* NOT THE RAIL'S LISTS, which leave out an empty one, and none at all for a caller the record would refuse the press. */
-  const addLists = $derived(offered(shell));
+  /* NOT THE RAIL'S LISTS, which leave out an empty one, and none at all for a caller the record would refuse the press,
+     or where no record answered. */
+  const addLists = $derived(isLive ? offered(shell) : []);
   const addNamed = $derived(new Map(addLists.map((l) => [l.id, l.name])));
 
   let reading: Promise<Reader> | null = null;
@@ -377,18 +382,16 @@
   const searching = $derived((parsed.prefix === null || parsed.prefix === '#' || parsed.prefix === '@') && parsed.text.length > 1);
 
   /**
-   * What the search answered for the text in the box, or `null` while the record has not answered it yet.
-   *
-   * THE SAMPLE ANSWERS AT ONCE, as it always has, so a demo never waits a frame for its own rows.
+   * What the search answered for the text in the box, or `null` while the record has not answered it yet, and always
+   * with no record to ask.
    */
   const hits = $derived.by((): Hits | null => {
-    if (!searching) return null;
-    if (!isLive) return { value: search(parsed.text, RECORD_CAP), fix: null };
+    if (!searching || !isLive) return null;
     return found?.text === parsed.text ? found.hits : null;
   });
 
   /** A live query the record has not answered yet. The panel stays quiet rather than saying nothing matched. */
-  const pending = $derived(searching && hits === null);
+  const pending = $derived(searching && isLive && hits === null);
 
   $effect(() => {
     if (!open || !isLive || !searching) {
@@ -539,28 +542,9 @@
       for (const entry of nav)
         if (starts(entry.title))
           out.push({ id: `p-${entry.id}`, title: entry.title, detail: `${entry.section} page`, href: entry.href, group: copy.pages, icon: entry.icon, complete: entry.title });
-      /* THE SAVED VIEWS. `/v/<key>` is a real route with two real views on it and NOTHING in the
-         app produced that address: 356 lines and eight copy keys behind a door with no handle. A
-         view is a named list, which is what this section of the panel is for. */
-      /* A LIVE RECORD'S VIEWS ARE PAGES, and the loop over `nav` above has already listed them; the sample's are its own. */
-      for (const v of savedViews({ live: page.data.live === true, nav })) {
-        const over = v.register === null ? undefined : REGISTERS[v.register];
-        /* THE STANDING RULE, ON A SAVED VIEW. A view over a register this record does not hold is a
-           door onto nothing: `/v/<key>` has no list to filter and no rows to draw. It was built
-           anyway, wearing the register's raw id where its name should have been, which is a row
-           that both cannot run and says so in the app's private vocabulary. */
-        if (!over) continue;
-        if (!starts(v.name) && !starts(over.name)) continue;
-        out.push({
-          id: `v-${v.key}`,
-          title: v.name,
-          detail: `${over.name} · saved view`,
-          href: v.href,
-          group: copy.pages,
-          icon: 'filter',
-          complete: v.name,
-        });
-      }
+      /* THE SAVED VIEWS ARE PAGES ON A RECORD, and the loop over `nav` above has already listed them. A loop here built
+         rows from `savedViews`, whose record half names no list, so every one was skipped: only the sample's views were
+         ever drawn by it, and it went with the sample (DIRECTION 26). */
       for (const r of lists)
         if (starts(r.name))
           /* The count, not a definition of the word "register". A row that explains the app's own
@@ -586,16 +570,6 @@
       for (const read of extra?.figures ?? [])
         if (starts(read.label) && read.href)
           out.push({ id: `m-${read.id}`, title: read.label, value: read.value, detail: read.note, tone: read.tone, href: read.href, group: FIGURES, icon: 'observe', complete: read.label });
-    } else if (prefix === null || prefix === '/') {
-      for (const [id, decl] of Object.entries(METRICS)) {
-        if (!starts(decl.name)) continue;
-        if (isTemplate(decl) || unreadable(decl).length > 0) continue;
-        const from = decl.source.startsWith('register.') ? decl.source.slice('register.'.length) : null;
-        if (from !== null && !REGISTERS[from]) continue;
-        const read = metric(id);
-        if (!read.href) continue;
-        out.push({ id: `m-${id}`, title: read.label, value: read.value, detail: read.note, tone: read.tone, href: read.href, group: FIGURES, icon: 'observe', complete: read.label });
-      }
     }
 
     /**
@@ -607,9 +581,9 @@
      * `loop/REWORK.md` phase 3 item 5 describes: a surface that reaches the screens objects live on
      * rather than the objects.
      *
-     * NOTHING NEW IS STORED TO DO IT. The ledger already knows: `AUDIT` is newest first, and every
-     * write against a row carries `register#seq` as its target, which is the same sentence the query
-     * box takes. A visit is not a write and this build records none, so this is what was changed
+     * NOTHING NEW IS STORED TO DO IT. The record's log already knows (`recentHistory`, read through
+     * `palette-live.ts`): it is newest first, and every write against a row names its list and number,
+     * which is the same sentence the query box takes. A visit is not a write and this build records none, so this is what was changed
      * rather than what was looked at, and the heading says so.
      *
      * AND THE STANDING RULE DECIDES WHICH ONES. A target is a row id, a declaration id
@@ -624,35 +598,6 @@
     if (prefix === null && text === '' && isLive) {
       for (const r of extra?.recent ?? [])
         out.push({ id: `n-${r.target}`, title: r.title, detail: `${r.list} · ${since(r.at, shell.now ?? Date.now())}`, href: r.href, group: RECENT, spoken: r.spoken, icon: r.icon, complete: r.title });
-    } else if (prefix === null && text === '') {
-      const seen = new Set<string>();
-      for (const event of AUDIT) {
-        if (seen.size >= RECENT_CAP) break;
-        /* THE REGEX THE QUERY BOX ALREADY USES. A ledger target and a typed `tasks#125` are the
-           same sentence, so reading them two ways would be two grammars for one thing. */
-        const [target, register, seq] = QUALIFIED.exec(event.target ?? '') ?? [];
-        if (target === undefined || register === undefined || seq === undefined) continue;
-        if (seen.has(target)) continue;
-        const held = REGISTERS[register];
-        const row = entry(register, Number(seq));
-        if (!held || !row) continue;
-        const title = String(row.fields[held.title] ?? '').trim();
-        if (!title) continue;
-        seen.add(target);
-        out.push({
-          id: `n-${target}`,
-          title,
-          /* WHEN, IN THE UNIT `/audit` SAYS IT IN. The ledger's own screen reads `since(e.at, NOW)`
-             over the same events, and a row that said "3d ago" here and "2d ago" there would be two
-             stories about one write. */
-          detail: `${held.name} · ${since(event.at, NOW)}`,
-          href: `/r/${register}/${seq}`,
-          group: RECENT,
-          spoken: `#${seq}`,
-          icon: iconFor(held.icon, 'rows'),
-          complete: title,
-        });
-      }
     }
 
     /**
@@ -667,7 +612,7 @@
      * source for the same rows would draw each of them twice.
      */
     if (prefix === null && text === '')
-      for (const question of (isLive ? (shell.questions ?? []) : QUESTIONS).slice(0, OPEN_CAP))
+      for (const question of (isLive ? (shell.questions ?? []) : []).slice(0, OPEN_CAP))
         out.push({ id: `q-${question.id}`, title: question.title, detail: OPEN_QUESTION, href: `/decide/${question.id}`, group: copy.decide, spoken: question.id, icon: 'decide', complete: question.title });
 
     /* `@` IS PEOPLE, AND IT MATCHED NOTHING. The footer of this palette prints `@ people` and this
@@ -933,14 +878,16 @@
   /**
    * THE ADD ROW, PRESSED: one row in the list the sentence named, and a receipt that can put it back.
    *
-   * THE SAMPLE SAYS NOTHING WAS SAVED, as every other write on it does, in the same `notWritten` sentence. On a live
-   * record `addRow` writes the list's own capture line with nothing pinned and no amount, so what it filled in is said
-   * the way the list says it, and the receipt's Put back archives the row at the version the write answered. The shell
-   * is read again after each, so the rail's count follows the row in and out.
+   * `addRow` writes the list's own capture line with nothing pinned and no amount, so what it filled in is said the way
+   * the list says it, and the receipt's Put back archives the row at the version the write answered. The shell is read
+   * again after each, so the rail's count follows the row in and out.
+   *
+   * WITH NO RECORD THE ROW IS NOT OFFERED (`addLists` is empty), where it used to toast that the row "would be added"
+   * and nothing was saved. The guard stays for a press that raced a refusal.
    */
   async function add(c: Creation) {
     const list = addNamed.get(c.register) ?? REGISTERS[c.register]?.name ?? c.register;
-    if (!isLive) return void toasts.push(copy.notWritten(createWords.would(list, c.title)), { intent: 'warn' });
+    if (!isLive) return;
     let out: Awaited<ReturnType<typeof addRow>>;
     try {
       out = await addRow(c, Date.now(), apiBase(page.url));

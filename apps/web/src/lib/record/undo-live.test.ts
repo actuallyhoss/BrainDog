@@ -100,19 +100,8 @@ test('every live write that lands on the list carries its way back', () => {
   );
 });
 
-test('the seen strip is read only on the sample, whose refusals are the ones it counts', () => {
-  const reads = callsOf(SCREEN, 'noticed');
-  assert.ok(reads.length >= 1, 'the screen no longer reads noticed(), so this sweep proves nothing');
-  const lines = SCREEN.split('\n');
-  const ungated = reads.filter((c) => {
-    const line = lines[c.line - 1] ?? '';
-    return !/\bsample\b/u.test(line.slice(0, line.indexOf('noticed(')));
-  });
-  assert.deepEqual(
-    ungated.map((c) => `:${c.line} ${lines[c.line - 1]?.trim()}`),
-    [],
-    'noticed() reads the fixture OBSERVED, so on a live record it draws rejected saves nobody made',
-  );
+test('the seen strip went with the sample: nothing on the list reads noticed()', () => {
+  assert.equal(callsOf(SCREEN, 'noticed').length, 0, 'noticed() reads the fixture OBSERVED, so on a live record it draws rejected saves nobody made');
 });
 
 /* ── a list that declares the day a row was finished ─────────────────────────────────────────────────────────────── */

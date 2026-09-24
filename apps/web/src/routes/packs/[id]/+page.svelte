@@ -94,7 +94,7 @@
     signin = false;
     drafts = {};
     const at = opened();
-    const chosen = await openSettings(createClient({ base: apiBase() }), want, !page.data.live);
+    const chosen = await openSettings(createClient({ base: apiBase() }), want);
     /* An answer for an add-on somebody has already navigated away from draws nothing. */
     if (String(page.params.id) !== want) return closed(true, at);
     source = chosen.source;
@@ -146,9 +146,7 @@
     show(out.value, Object.keys(values));
     const names = out.value.changed.map((k) => labelOf(k, out.value.config[k] as ConfigDecl));
     if (names.length === 0) return;
-    /* THE DEMO SAYS NOTHING WAS SAVED, in the sentence every unwritten action in the product uses. */
-    if (source.sample) toasts.push(out.value.said, { intent: 'warn' });
-    else toasts.push(words.saved(names), { intent: 'good' });
+    toasts.push(words.saved(names), { intent: 'good' });
   }
 
   function submit(e?: Event) {

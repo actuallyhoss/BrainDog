@@ -151,21 +151,6 @@ export type Pref = {
    */
   defined?: string[] | undefined;
   /**
-   * Whether the bar saying this is a sample record has been put away.
-   *
-   * A STRANGER LANDED ON SOMEBODY ELSE'S COMPANY WITH NO EXPLANATION. The app boots into a complete
-   * synthetic business, which is the right decision: an empty product demonstrates nothing, and
-   * `loop/REWORK.md` records that the sample is the most nearly finished part of the onboarding.
-   * What was missing was the sentence saying so and the way out of it. Without them the first
-   * screen reads as a product that has decided who you are.
-   *
-   * A DISMISSAL AND NOT A TIMER. `19 §3` puts dismissals in the set that must survive a change of
-   * device and this cookie is per device, which is the same honest deviation every other key here
-   * carries. The bar is put away once, by the person, and it is the record's own emptiness that
-   * takes it away for good.
-   */
-  sampleSaid?: boolean | undefined;
-  /**
    * Which rail sections this person has folded away.
    *
    * THIRTY-FOUR ITEMS OF NAVIGATION ON EVERY SCREEN, in a nested scroller that cut one of them in
@@ -211,7 +196,6 @@ const SHAPE: Record<string, (v: unknown) => boolean> = {
   navShape: (v) => v === 'rail' || v === 'bar' || v === 'menu',
   chars: (v) => typeof v === 'boolean',
   suggestPages: (v) => typeof v === 'boolean',
-  sampleSaid: (v) => typeof v === 'boolean',
   seen: (v) => typeof v === 'string',
   nav: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
   defined: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),

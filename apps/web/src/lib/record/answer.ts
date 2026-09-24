@@ -16,9 +16,9 @@
  * undo that leaves a neighbour's answer behind. So they are functions with a test file rather than
  * expressions inside a `{#each}`.
  *
- * NOTHING HERE WRITES. `apps/web` is a synchronous mock over `@braindog/seed`; an `Answer` is the
- * shape a write WOULD take, which is why `wouldRecord` exists and says so in as many words. The day
- * there is a record behind this screen, this file is what gets handed to it.
+ * NOTHING HERE WRITES. An `Answer` is the shape a press takes before `decide-write.ts` sends it to the
+ * record. It was also the sample's receipt: `wouldRecord` said what the record "would" have gained,
+ * toasted on a Decide drawn from the sample, and went when the sample did (DIRECTION 26).
  */
 
 import type { Question } from './schema.ts';
@@ -150,8 +150,8 @@ export function withdraw(answers: ReadonlyMap<string, Answer>, question: string)
  * Write the reason onto an answer that already exists, and do nothing at all when it does not.
  *
  * UNTRIMMED, DELIBERATELY. This is bound to a field somebody is typing in, and a helper that trimmed
- * on the way in would eat the space between two words the moment it was pressed. `reasonState` and
- * `wouldRecord` trim when they read.
+ * on the way in would eat the space between two words the moment it was pressed. `reasonState` trims
+ * when it reads.
  */
 export function setReason(
   answers: ReadonlyMap<string, Answer>,
@@ -161,20 +161,4 @@ export function setReason(
   const held = answers.get(question);
   if (!held) return new Map(answers);
   return new Map(answers).set(question, { ...held, reason });
-}
-
-/**
- * What the record WOULD have gained, in the sentence the toast says.
- *
- * `copy.notWritten` supplies the second half, ", but nothing was saved yet.", so this is a clause
- * and not a sentence, and it never ends in a full stop.
- *
- * IT NAMES THE MISSING REASON RATHER THAN OMITTING IT. An answer with no prose behind it is a real
- * answer and this product will keep it; what it will not do is let the receipt read as though the
- * record got something it did not. The one act worth describing is the one that has to describe
- * itself most exactly.
- */
-export function wouldRecord(a: Answer): string {
-  const carried = a.reason.trim() === '' ? 'with your name and no reason' : 'with your reason and your name';
-  return `${a.title} would be recorded as the decision on ${a.question}, ${carried}, and the question closed`;
 }

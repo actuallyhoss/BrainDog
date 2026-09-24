@@ -131,6 +131,19 @@ test('AND NEITHER IS ONE THAT PARSES AND HOLDS THE WRONG TYPE, which used to be 
   assert.deepEqual(pref.read() as Record<string, unknown>, { scheme: 'dark', fromTheFuture: 42 });
 });
 
+test('THE SAMPLE BAR’S DISMISSAL IS NOT A PREFERENCE ANY MORE, and a cookie still carrying one is left alone', () => {
+  /**
+   * `sampleSaid` put away the bar that said "this is a sample record". The sample went in DIRECTION 26 and
+   * the bar with it, so the key is read by nothing and checked by nothing: a value this build does not
+   * know, exactly like a key from a newer build, and kept for the reason the test above gives.
+   *
+   * THE WRONG TYPE IS WHAT TELLS THE TWO APART. While `SHAPE` still named the key, `"yes"` was a bad
+   * boolean and was dropped; once it is gone, nothing here has an opinion about it.
+   */
+  jar(`bd_pref=${encodeURIComponent('{"scheme":"dark","sampleSaid":"yes"}')}`);
+  assert.deepEqual(pref.read() as Record<string, unknown>, { scheme: 'dark', sampleSaid: 'yes' });
+});
+
 test('and an absent document reads empty rather than throwing', () => {
   delete (globalThis as { document?: unknown }).document;
   assert.deepEqual(pref.read(), {});

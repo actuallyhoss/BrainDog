@@ -57,15 +57,12 @@ const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is
 
 /* ── reading a file in ─────────────────────────────────────────────────── */
 
-/** The most an address is read to, a little over what a shared use case may weigh, so the record's refusal is the one said. */
-export const URL_MOST_BYTES = 300 * 1024;
-
 /**
  * The text at an https address, read by the record's host (`fetchUseCase`), or the sentence to say instead.
  *
- * ON A LIVE RECORD THE HOST READS IT, because most sites send no CORS header and a tab may not read them. The host sends
- * nothing of the record's and refuses a private or local address, so what an owner pastes cannot point this server at
- * its own network. The tab's own read (`readAddress`) is left for the sample, which has no host.
+ * THE HOST READS IT, because most sites send no CORS header and a tab may not read them. The host sends nothing of the
+ * record's and refuses a private or local address, so what an owner pastes cannot point this server at its own network.
+ * The tab read an address itself only for the sample, which had no host, and went with it (DIRECTION 26).
  */
 export async function readOnHost(client: Pick<SharingClient, 'fetchUseCase'>, address: string): Promise<{ ok: true; text: string } | { ok: false; fix: string; code: string | null }> {
   let url: URL;
@@ -82,50 +79,6 @@ export async function readOnHost(client: Pick<SharingClient, 'fetchUseCase'>, ad
   }
   const v = out.value;
   return isMap(v) && typeof v.text === 'string' ? { ok: true, text: v.text } : { ok: false, fix: copy.writeRaced, code: null };
-}
-
-/**
- * The text at an https address, or the sentence to say instead. Nothing is sent with the request: no cookie, no key.
- * An address that does not let this page read it (most sites do not) is said as that, with the way round it.
- */
-export async function readAddress(address: string, fetcher: typeof fetch = fetch): Promise<{ ok: true; text: string } | { ok: false; fix: string }> {
-  let url: URL;
-  try {
-    url = new URL(address.trim());
-  } catch {
-    return { ok: false, fix: copy.shareAddressNotOne };
-  }
-  if (url.protocol !== 'https:') return { ok: false, fix: copy.shareAddressHttps };
-  let res: Response;
-  try {
-    res = await fetcher(url, { credentials: 'omit', redirect: 'follow', signal: AbortSignal.timeout(10_000) });
-  } catch {
-    return { ok: false, fix: copy.shareAddressUnread(url.host) };
-  }
-  if (!res.ok) return { ok: false, fix: copy.shareAddressAnswered(url.host, res.status) };
-  const said = Number(res.headers.get('content-length') ?? '0');
-  if (said > URL_MOST_BYTES) return { ok: false, fix: copy.shareTooBig(Math.ceil(said / 1024)) };
-  const reader = res.body?.getReader();
-  if (!reader) return { ok: true, text: await res.text() };
-  const chunks: Uint8Array[] = [];
-  let bytes = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    bytes += value.byteLength;
-    if (bytes > URL_MOST_BYTES) {
-      await reader.cancel();
-      return { ok: false, fix: copy.shareTooBig(Math.ceil(bytes / 1024)) };
-    }
-    chunks.push(value);
-  }
-  const all = new Uint8Array(bytes);
-  let at = 0;
-  for (const c of chunks) {
-    all.set(c, at);
-    at += c.byteLength;
-  }
-  return { ok: true, text: new TextDecoder().decode(all) };
 }
 
 /* ── the plan ──────────────────────────────────────────────────────────── */

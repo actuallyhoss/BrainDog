@@ -1,7 +1,7 @@
 /**
  * Scheduled actions, as "Runs on" and `/usage` draw them.
  *
- * What is tested is what each screen draws after each answer: no record draws the sample, a record
+ * What is tested is what each screen draws after each answer: no record draws the refusal that says so, a record
  * without the read draws no list, any other refusal is the record's own sentence, a paused action says
  * why and offers Resume, a held one says the Directory's sentence and points at usage, and the usage
  * page reads the ledger first and the record's own events after a 404.
@@ -26,7 +26,6 @@ import {
   openActions,
   countsOf,
   readUsage,
-  sample,
   stateOf,
   usageFromLedger,
   reconnectHref,
@@ -37,9 +36,10 @@ import {
   type ActionRow,
   type Fetch,
 } from './actions.ts';
-import { ACTION_SAMPLE, PACKS } from './data.ts';
+import { PACKS } from './data.ts';
 import { packDiff } from './api.ts';
 import { signInFor } from './packs.ts';
+import { copy } from '../copy.ts';
 
 const NOW_MS = Date.parse('2026-09-15T12:00:00.000Z');
 
@@ -152,24 +152,30 @@ test('no sentence this screen says carries an em dash', () => {
 
 /* ── the read ─────────────────────────────────────────────────────────── */
 
-test('NO RECORD DRAWS THE SAMPLE: nothing listening, a static 404 page, or a 401', async () => {
-  for (const answers of [{}, { '/api/actions': () => new Response('<html>not found</html>', { status: 404 }) }, { '/api/actions': () => new Response('', { status: 401 }) }]) {
-    const { io } = host(answers);
-    const opened = await openActions(io);
-    assert.equal(opened.source.sample, true);
+/* NO RECORD DREW THE SAMPLE'S FIVE ACTIONS UNDER "Runs on", one of them paused with a Resume that changed the tab and
+   said nothing was saved, on a project page nobody could read. Each of the three ways of there being no record is now
+   the sentence for it (DIRECTION 26), and the one that said "the demo has no account" says the record was not reached. */
+test('NO RECORD DRAWS WHY: nothing listening, a static 404 page, or a 401', async () => {
+  const cases: [Record<string, () => Response>, { code: string; fix: string }][] = [
+    [{}, { code: 'UNREACHABLE', fix: copy.recordNotReached }],
+    [{ '/api/actions': () => new Response('<html>not found</html>', { status: 404 }) }, { code: 'UNREACHABLE', fix: copy.recordNotReached }],
+    [{ '/api/actions': () => new Response('', { status: 401 }) }, { code: 'UNAUTHORIZED', fix: copy.signInAgain }],
+  ];
+  for (const [answers, refusal] of cases) {
+    const opened = await openActions(host(answers).io);
     assert.equal(opened.absent, false);
-    assert.ok(opened.first.ok && opened.first.value.length > 0);
+    assert.deepEqual(opened.first.ok ? null : opened.first.refusal, refusal);
   }
+  const actions: Record<string, unknown> = await import('./actions.ts');
+  assert.equal('sample' in actions, false, 'the sample source is still exported');
 });
 
 test('A RECORD WITHOUT THE READ DRAWS NO LIST, and any other refusal is the record\'s own sentence', async () => {
   const absent = await openActions(host({ '/api/actions': () => json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'There is no method called actions.' } }) }).io);
   assert.equal(absent.absent, true);
-  assert.equal(absent.source.sample, false);
 
   const fix = 'This token reads projects, and actions are the owner\'s.';
   const refused = await openActions(host({ '/api/actions': () => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix } }) }).io);
-  assert.equal(refused.source.sample, false);
   assert.deepEqual(refused.first, { ok: false, refusal: { code: 'FORBIDDEN', fix } });
 });
 
@@ -179,26 +185,12 @@ test('Resume sends resumeAction with the action, and a refusal that needs a brow
     '/api/resumeAction': () => json(403, { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Resuming an action needs a sign-in from this browser.' } }),
   });
   const opened = await openActions(io);
-  assert.equal(opened.source.sample, false);
   const out = await opened.source.resume('stripe-balance');
   const post = sent.at(-1);
   assert.equal(post?.url, '/api/resumeAction');
   assert.equal(post?.init?.method, 'POST');
   assert.deepEqual(JSON.parse(String(post?.init?.body)), { ingest: 'stripe-balance' });
   assert.ok(!out.ok && signInFor(out.refusal));
-});
-
-test('THE DEMO HOLDS ONE PAUSED ACTION, and resuming it changes this tab only, once', async () => {
-  const paused = ACTION_SAMPLE().filter((r) => r.state === 'paused');
-  assert.equal(paused.length, 1);
-  const source = sample(() => NOW_MS);
-  const first = await source.resume(paused[0]!.ingest);
-  assert.ok(first.ok);
-  const again = await source.resume(paused[0]!.ingest);
-  assert.ok(!again.ok && again.refusal.code === 'OUT_OF_BOUNDS');
-  const rows = await source.actions();
-  assert.ok(rows.ok && rows.value.every((r) => r.state !== 'paused'));
-  assert.equal(ACTION_SAMPLE().filter((r) => r.state === 'paused').length, 1, 'a fresh sample is paused again');
 });
 
 /* ── usage ────────────────────────────────────────────────────────────── */
@@ -254,14 +246,17 @@ test("UNDER A SLUG THE RECORD'S EVENTS ARE THAT RECORD'S, and the ledger and sig
     '/account/usage': () => json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'There is no route here.' } }),
     '/app/acme/api/actions': () => json(200, { ok: true, value: [row({ days: [{ day: '2026-09-02', ...totals, runs: 7 }] })] }),
   });
-  const read = await readUsage(io, NOW_MS, '', NOW_MS, '/app/acme');
+  const read = await readUsage(io, NOW_MS, '', '/app/acme');
   assert.ok(read.ok === true && read.view.from === 'events' && read.view.weeks[0]?.runs === 7);
   assert.deepEqual(sent.map((x) => x.url.split('?')[0]), ['/auth/methods', '/account/usage', '/app/acme/api/actions']);
 });
 
-test('no host at all draws the sample usage; a ledger refusal is its sentence; a record with neither read draws none', async () => {
-  const none = await readUsage(host({}).io, NOW_MS, '', Date.parse('2026-09-03T12:00:00.000Z'));
-  assert.ok(none.ok === true && none.view.from === 'sample' && none.view.totals.runs > 0 && none.view.records.length === 0);
+test('no host at all says so; a ledger refusal is its sentence; a record with neither read draws none', async () => {
+  /* IT DREW THE SAMPLE'S MONTH, 3 September's, with runs counted against projects nobody has. */
+  const none = await readUsage(host({}).io, NOW_MS);
+  assert.deepEqual(none, { ok: false, refusal: { code: 'UNREACHABLE', fix: copy.recordNotReached } });
+  const out = await readUsage(host({ '/account/usage': () => new Response('', { status: 401 }), '/api/actions': () => new Response('', { status: 401 }) }).io, NOW_MS);
+  assert.deepEqual(out, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: copy.signInAgain } }, 'nobody signed in was shown a month of runs');
 
   const refused = await readUsage(host({ '/account/usage': () => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Usage is the owner\'s.' } }) }).io, NOW_MS);
   assert.deepEqual(refused, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Usage is the owner\'s.' } });
@@ -341,7 +336,7 @@ test('an estimate says less than 1%, says when runs would wait, and is absent wh
   assert.equal(HOSTED_RUNS, 15_000);
 });
 
-test('the sample pack that is not installed draws its calls in the diff', () => {
+test('a catalogue entry that calls out draws its calls in the diff', () => {
   const pack = PACKS.find((p) => p.id === 'freelancer-uk');
   assert.ok(pack);
   const d = packDiff(pack);
@@ -372,10 +367,9 @@ test('a call only a rule runs keeps its line, its daily ceiling and the key note
   assert.equal(estimateOf(calls.slice(0, 1), true), null, 'a rule-only call was counted as runs a month');
 });
 
-test('installing a pack that calls out says it asks once, and accepting a proposal says what the press does', () => {
-  assert.equal(installWords.wouldAsk('Studio shop', 1), 'Studio shop would ask you once to approve the call it makes, shown in its plan');
-  assert.equal(installWords.wouldAsk('Studio shop', 3), 'Studio shop would ask you once to approve the 3 calls it makes, shown in its plan');
-  for (const said of [installWords.asksOnce, installWords.acceptApproves, installWords.wouldAsk('A', 2)]) assert.doesNotMatch(said, /—/u);
+test('installing a pack that calls out says it asks once, and accepting a proposal says what the press does, with no "would" left', () => {
+  for (const said of [installWords.asksOnce, installWords.acceptApproves]) assert.doesNotMatch(said, /—/u);
+  assert.equal('wouldAsk' in installWords, false, 'the sample install sentence is still here');
 });
 
 test('A 401 CANCELS ITS BODY rather than leaving the request pending', async () => {

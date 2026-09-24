@@ -23,18 +23,31 @@ import {
   packDocument,
   planInstall,
   type Installer,
-  sample,
   signInFor,
-  words,
   type Caller,
+  type ConfigDecl,
   type Draft,
   type PackConfig,
-  type PackState,
 } from './packs.ts';
 import { copy } from '../copy.ts';
-import { firstPartyDocument, MONEY_TARGET_SETTINGS } from '@braindog/seed';
+import { firstPartyDocument } from '@braindog/seed';
 
-const AT = '2026-09-15T12:00:00.000Z';
+/** The client's methods, each answering what the test hands it, and remembering what it was sent. */
+function recordOf(answers: Partial<{ [K in keyof Caller]: Awaited<ReturnType<Caller[K]>> }>, sent: { name: string; args: unknown }[] = []): Caller {
+  const said = <K extends keyof Caller>(name: K) =>
+    (async (args?: unknown) => {
+      sent.push({ name, args });
+      return answers[name] ?? { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `${name} was not stubbed.` } };
+    }) as unknown as Caller[K];
+  return {
+    packs: said('packs'),
+    disablePack: said('disablePack'),
+    enablePack: said('enablePack'),
+    packConfig: said('packConfig'),
+    setPackConfig: said('setPackConfig'),
+    uninstallPack: said('uninstallPack'),
+  };
+}
 
 const value = <T>(r: { ok: true; value: T } | { ok: false; refusal: { code: string; fix: string } }): T => {
   assert.ok(r.ok, r.ok ? '' : `${r.refusal.code}: ${r.refusal.fix}`);
@@ -86,41 +99,35 @@ test('INSTALLING PLANS FIRST, SENDS THE PLAN THAT WAS SHOWN, AND PLANS AGAIN WHE
   assert.ok(!no.ok && no.refusal.fix === 'Only an owner can install.');
 });
 
-test('THE SAMPLE LISTS EVERY INSTALLED ADD-ON, AND ONE TURNED OFF IS STILL LISTED', async () => {
-  const s = sample(() => AT);
-  const first = value(await s.packs());
-  assert.deepEqual(first.map((p) => p.id), ['money-core', 'estate', 'people', 'work', 'portfolio', 'agents']);
-  assert.ok(first.every((p) => p.disabled_at === null));
-
-  assert.deepEqual(value(await s.disable('people')).packs, ['people']);
-  const after = value(await s.packs());
-  assert.equal(after.length, first.length, 'an add-on turned off left the list');
-  assert.equal(after.find((p) => p.id === 'people')?.disabled_at, AT);
-  assert.deepEqual(after.find((p) => p.id === 'people')?.registers, ['people'], 'its lists are still named');
-  assert.equal(value(await s.disable('people')).changed, false);
-});
-
-test('A REFUSED SWITCH NAMES WHO LEANS ON IT, AND THE SECOND PRESS TURNS THEM OFF TOGETHER', async () => {
-  const s = sample(() => AT);
-  const refused = await s.disable('portfolio');
+/* THE CASCADE IS THE RECORD'S, AND ONLY ITS. The sample kept a copy of which pack leans on which and refused a switch
+   with it, so the screen was tested against a second rulebook; what is tested now is what the screen does with the
+   record's own refusal, word for word as `packages/record` sends it. */
+test('A REFUSED SWITCH NAMES WHO LEANS ON IT, AND THE SECOND PRESS SENDS THEM TOGETHER', async () => {
+  const sent: { name: string; args: unknown }[] = [];
+  const record = recordOf(
+    {
+      disablePack: { ok: false, refusal: { code: 'PACK_REQUIRED', fix: 'portfolio is required by agents, work, still on.', at: 'alsoDisable', allowed: ['agents', 'work'] } },
+      enablePack: { ok: false, refusal: { code: 'PACK_DISABLED', fix: 'tasks belongs to portfolio, which is turned off. Enable portfolio first.', at: 'pack', allowed: ['portfolio'] } },
+    },
+    sent,
+  );
+  const { source } = await choose(record);
+  const refused = await source.disable('portfolio');
   assert.ok(!refused.ok);
   const b = blocked('portfolio', refused.refusal);
-  assert.deepEqual(b, { kind: 'required', id: 'portfolio', also: ['agents', 'estate', 'money-core', 'people', 'work'] });
-  assert.ok(value(await s.packs()).every((p: PackState) => p.disabled_at === null), 'a refused switch turned something off');
+  assert.deepEqual(b, { kind: 'required', id: 'portfolio', also: ['agents', 'work'] });
   assert.equal(copy.packOffTogether(4), 'Turn all 5 off');
   assert.equal(copy.packOffTogether(1), 'Turn both off');
   assert.equal(copy.packNeededBy(['Money', 'Work']), 'Needed by Money and Work');
 
   assert.ok(b.kind === 'required');
-  assert.deepEqual(value(await s.disable('portfolio', b.also)).packs, ['portfolio', 'agents', 'estate', 'money-core', 'people', 'work']);
+  await source.disable('portfolio', b.also);
+  assert.deepEqual(sent.at(-1), { name: 'disablePack', args: { id: 'portfolio', alsoDisable: ['agents', 'work'] } });
 
   /* BACK ON IN ORDER. The dependent first points at the one it needs. */
-  const early = await s.enable('work');
+  const early = await source.enable('work');
   assert.ok(!early.ok);
   assert.deepEqual(blocked('work', early.refusal), { kind: 'off', id: 'work', pack: 'portfolio' });
-  value(await s.enable('portfolio'));
-  value(await s.enable('work'));
-  assert.equal(value(await s.packs()).find((p) => p.id === 'work')?.disabled_at, null);
 });
 
 test('EVERY OTHER REFUSAL IS READ AS WHAT THE SCREEN CAN SAY', () => {
@@ -142,6 +149,21 @@ test('EVERY OTHER REFUSAL IS READ AS WHAT THE SCREEN CAN SAY', () => {
   assert.deepEqual(blocked('work', { code: 'FORBIDDEN', fix: 'Only an owner.' }), { kind: 'other', id: 'work', fix: 'Only an owner.' });
 });
 
+test('WITH NO RECORD THE SCREEN DRAWS THE RECORD’S OWN REFUSAL, and there is no sample left to draw instead', async () => {
+  /* THE SHELL SAYING THERE IS NO RECORD USED TO MEAN NOTHING WAS ASKED, and six add-ons nobody installed were listed as
+     this record's, switchable, with settings in sterling. Now the record is asked whatever the shell said, and a 401 or
+     a dead network is its sentence on the screen (DIRECTION 26). Start and browse still pass the shell's answer; it is
+     heard and not obeyed. */
+  const signIn = { ok: false as const, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } };
+  const nobody = await choose(recordOf({ packs: signIn }), true);
+  assert.deepEqual(nobody.first, signIn);
+  assert.equal(nobody.source.sample, false);
+  const settings = await openSettings(recordOf({ packs: signIn, packConfig: signIn }), 'money-core');
+  assert.deepEqual(settings.first, signIn, 'the settings of a pack nobody installed were drawn from the sample');
+  const packs: Record<string, unknown> = await import('./packs.ts');
+  assert.equal('sample' in packs || 'LEANS_ON' in packs, false, 'the sample source is still exported');
+});
+
 test('THE SHELL SAYS WHICH RECORD THIS IS, AND EVERY ANSWER AFTER THAT IS THAT SOURCE’S', async () => {
   const sent: unknown[] = [];
   const caller = (packs: Awaited<ReturnType<Caller['packs']>>): Caller => ({
@@ -153,27 +175,15 @@ test('THE SHELL SAYS WHICH RECORD THIS IS, AND EVERY ANSWER AFTER THAT IS THAT S
     uninstallPack: async (args) => (sent.push(args), { ok: true, value: { id: args.id } }),
   });
 
-  /* THE SHELL SAID THERE IS NO RECORD HERE, SO NOTHING IS ASKED OF ONE. */
-  let asked = 0;
-  const counting: Caller = { ...caller({ ok: true, value: [] }), packs: async () => ((asked += 1), { ok: true, value: [] }) };
-  const none = await choose(counting, true);
-  assert.equal(none.source.sample, true);
-  assert.ok(none.first.ok);
-  assert.equal(asked, 0, 'a record the shell said was not there was asked anyway');
-
-  /* AND ON A RECORD EVERY ANSWER IS THE RECORD'S, INCLUDING THE ONE THAT USED TO MEAN "NO RECORD".
-     The shell has already established that there is a record here to refuse, and falling back to
-     the sample on a transient failure is what let this screen and the list disagree. */
-  const gone = await choose(caller({ ok: false, refusal: { code: 'UNREACHABLE', fix: 'x' } }), false);
-  assert.equal(gone.source.sample, false);
+  /* EVERY ANSWER IS THE RECORD'S, INCLUDING THE ONE THAT USED TO MEAN "NO RECORD". Falling back to the sample on a
+     transient failure is what let this screen and the list disagree. */
+  const gone = await choose(caller({ ok: false, refusal: { code: 'UNREACHABLE', fix: 'x' } }));
   assert.equal(gone.first.ok ? '' : gone.first.refusal.code, 'UNREACHABLE');
 
-  const no = await choose(caller({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'Only an owner.' } }), false);
-  assert.equal(no.source.sample, false);
+  const no = await choose(caller({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'Only an owner.' } }));
   assert.equal(no.first.ok ? '' : no.first.refusal.code, 'FORBIDDEN');
 
-  const yes = await choose(caller({ ok: true, value: [{ id: 'agents', version: '1.0.0', disabled_at: null, registers: ['skills'] }] }), false);
-  assert.equal(yes.source.sample, false);
+  const yes = await choose(caller({ ok: true, value: [{ id: 'agents', version: '1.0.0', disabled_at: null, registers: ['skills'] }] }));
   await yes.source.disable('portfolio');
   await yes.source.disable('portfolio', ['work']);
   const raced = await yes.source.enable('work');
@@ -183,7 +193,18 @@ test('THE SHELL SAYS WHICH RECORD THIS IS, AND EVERY ANSWER AFTER THAT IS THAT S
 
 /* ── settings ───────────────────────────────────────────────────────────── */
 
-const settingsOf = async (): Promise<PackConfig> => value(await sample(() => AT).config('money-core'));
+/**
+ * Money's settings as a record answers `packConfig` for them: what the pack's document declares, each at its default,
+ * and the home currency chosen as sterling.
+ *
+ * FROM THE DOCUMENT A RECORD INSTALLS, NOT FROM THE SAMPLE'S COPY OF IT. The sample held its own table of these and a
+ * test had to insist the two were the same; there is one table now.
+ */
+async function settingsOf(): Promise<PackConfig> {
+  const config = (firstPartyDocument('money-core') as { config: Record<string, ConfigDecl> }).config;
+  const values = Object.fromEntries(Object.entries(config).map(([k, d]) => [k, d.default ?? null]));
+  return { id: 'money-core', version: '1.0.0', config, values: { ...values, home_currency: 'GBP' } };
+}
 const draftsOf = (s: PackConfig): Record<string, Draft> =>
   Object.fromEntries(Object.entries(s.config).map(([k, d]) => [k, draftOf(d, s.values[k])]));
 
@@ -201,20 +222,6 @@ const EVERY_TYPE: PackConfig = {
   },
   values: { heading: 'Money', reminders: 'monthly', chase_overdue: true, late_fee: { amount: 4000, currency: 'GBP' }, year_end: '2027-04-05', lead_time: 604_800 },
 };
-
-test("THE SAMPLE'S MONEY DECLARES THE HOME CURRENCY AND THE SIX TARGETS THE REAL PACK DOES, AND THE OTHERS NONE", async () => {
-  const s = sample(() => AT);
-  const money = value(await s.config('money-core'));
-  const doc = firstPartyDocument('money-core') as { config: Record<string, unknown> };
-  assert.deepEqual(money.config, doc.config, 'the sample and the pack a record installs declare different settings');
-  assert.deepEqual(Object.keys(money.config).sort(), ['home_currency', ...Object.values(MONEY_TARGET_SETTINGS).map((t) => t.setting)].sort());
-  assert.deepEqual(money.values.most_out_30d, { amount: 5_000_000, currency: 'GBP' });
-  assert.equal(money.values.most_days_late, 14);
-  assert.equal(money.values.home_currency, 'GBP', "the sample's money is sterling, so its home currency is chosen");
-  assert.deepEqual(value(await s.config('people')).config, {});
-  const none = await s.config('no-such-pack');
-  assert.equal(none.ok ? '' : none.refusal.code, 'DECLARATION_UNKNOWN');
-});
 
 test('EACH CONTROL STARTS FROM ITS VALUE, AND SAVE SENDS ONLY WHAT MOVED', async () => {
   const money = await settingsOf();
@@ -251,30 +258,25 @@ test('EACH CONTROL STARTS FROM ITS VALUE, AND SAVE SENDS ONLY WHAT MOVED', async
   assert.deepEqual(wrong, { values: { heading: 'Cash' }, wrong: { late_fee: copy.moneyPlaces(2) } });
 });
 
-test('THE DEMO SAVES IN THE TAB AND SAYS NOTHING WAS SAVED; RESET PUTS THE DEFAULT BACK', async () => {
-  const s = sample(() => AT);
-  const saved = value(await s.setConfig('money-core', { most_days_late: 7, most_out_30d: { amount: 100_000, currency: 'GBP' } }));
-  assert.deepEqual(saved.changed, ['most_out_30d', 'most_days_late']);
-  assert.equal(saved.said, copy.notWritten(words.changed(['Most owed by you in 30 days', 'Most days money in may be late'])));
-  assert.equal(value(await s.config('money-core')).values.most_days_late, 7);
-  assert.ok(!isDefault(saved.config.most_days_late!, saved.values.most_days_late));
-
-  const reset = value(await s.setConfig('money-core', { most_days_late: null }));
-  assert.deepEqual(reset.changed, ['most_days_late']);
-  assert.equal(reset.values.most_days_late, 14);
-  assert.ok(isDefault(reset.config.most_days_late!, reset.values.most_days_late));
-  assert.deepEqual(reset.values.most_out_30d, { amount: 100_000, currency: 'GBP' }, 'a reset of one setting moved another');
+test('A SETTING AT ITS DEFAULT HAS NOTHING TO RESET, and one moved off it has', async () => {
+  const money = await settingsOf();
+  assert.ok(isDefault(money.config.most_days_late!, money.values.most_days_late));
+  assert.ok(!isDefault(money.config.most_days_late!, 7));
 });
 
 test('A REFUSAL NAMES ITS SETTING, AND THE SESSION RULES ARE ANSWERED BY SIGNING IN AGAIN', async () => {
-  const s = sample(() => AT);
-  const unnamed = await s.setConfig('money-core', { reminders: 'hourly' });
+  const { source } = await openSettings(
+    recordOf({
+      packs: { ok: true, value: [] },
+      packConfig: { ok: true, value: await settingsOf() },
+      setPackConfig: { ok: false, refusal: { code: 'FIELD_UNKNOWN', fix: 'money-core has no setting called reminders.', at: 'values.reminders' } },
+    }),
+    'money-core',
+  );
+  const unnamed = await source.setConfig('money-core', { reminders: 'hourly' });
   assert.ok(!unnamed.ok);
   assert.equal(unnamed.refusal.code, 'FIELD_UNKNOWN');
   assert.equal(fieldAt(unnamed.refusal), 'reminders');
-  const unknown = await s.setConfig('people', { colour: 'dark' });
-  assert.ok(!unknown.ok);
-  assert.deepEqual([unknown.refusal.code, unknown.refusal.fix], ['FIELD_UNKNOWN', 'people declares no settings.']);
   assert.equal(fieldAt({ code: 'REQUIRED_MISSING', fix: 'x', at: 'values' }), null);
 
   assert.equal(signInFor({ code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app.' }), true);
@@ -282,7 +284,7 @@ test('A REFUSAL NAMES ITS SETTING, AND THE SESSION RULES ARE ANSWERED BY SIGNING
   assert.equal(signInFor({ code: 'ENUM_VALUE_UNKNOWN', fix: 'x' }), false);
 });
 
-test('WITH NO RECORD THE SETTINGS ARE THE SAMPLE’S, AND A LIVE SAVE SENDS setPackConfig WITH ONLY THE VALUES', async () => {
+test('A SAVE SENDS setPackConfig WITH ONLY THE VALUES, and says whether this use case is the only one on', async () => {
   const sent: { name: string; args: unknown }[] = [];
   const session = { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; a token cannot change what this record is.' } };
   const caller = (config: Awaited<ReturnType<Caller['packConfig']>>): Caller => ({
@@ -294,13 +296,8 @@ test('WITH NO RECORD THE SETTINGS ARE THE SAMPLE’S, AND A LIVE SAVE SENDS setP
     uninstallPack: async (args) => (sent.push({ name: 'uninstallPack', args }), session),
   });
 
-  const none = await openSettings(caller({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'x' } }), 'money-core', true);
-  assert.equal(none.source.sample, true);
-  assert.ok(none.first.ok && Object.keys(none.first.value.config).length === 7);
-
   const live: PackConfig = { id: 'ledger', version: '1.0.0', config: { cadence: { type: 'enum', values: ['weekly', 'monthly'] } }, values: { cadence: 'monthly' } };
-  const yes = await openSettings(caller({ ok: true, value: live }), 'ledger', false);
-  assert.equal(yes.source.sample, false);
+  const yes = await openSettings(caller({ ok: true, value: live }), 'ledger');
   const refused = await yes.source.setConfig('ledger', { cadence: 'weekly' });
   assert.deepEqual(sent.at(-1), { name: 'setPackConfig', args: { id: 'ledger', values: { cadence: 'weekly' } } });
   assert.ok(!refused.ok && signInFor(refused.refusal));
@@ -310,23 +307,15 @@ test('WITH NO RECORD THE SETTINGS ARE THE SAMPLE’S, AND A LIVE SAVE SENDS setP
     ...caller({ ok: true, value: live }),
     packs: async () => ({ ok: true, value: ids.map((id) => ({ id, version: '1.0.0', disabled_at: null, registers: [] })) as never }),
   });
-  assert.equal((await openSettings(held(['usecase-founder', 'work']), 'usecase-founder', false)).alone, true);
-  assert.equal((await openSettings(held(['usecase-founder', 'usecase-student']), 'usecase-founder', false)).alone, false);
-  assert.equal((await openSettings(held(['usecase-founder']), 'work', false)).alone, false);
+  assert.equal((await openSettings(held(['usecase-founder', 'work']), 'usecase-founder')).alone, true);
+  assert.equal((await openSettings(held(['usecase-founder', 'usecase-student']), 'usecase-founder')).alone, false);
+  assert.equal((await openSettings(held(['usecase-founder']), 'work')).alone, false);
 
-  const no = await openSettings(caller({ ok: false, refusal: { code: 'DECLARATION_UNKNOWN', fix: 'ledger is not a pack this record has installed.' } }), 'ledger', false);
-  assert.equal(no.source.sample, false);
+  const no = await openSettings(caller({ ok: false, refusal: { code: 'DECLARATION_UNKNOWN', fix: 'ledger is not a pack this record has installed.' } }), 'ledger');
   assert.equal(no.first.ok ? '' : no.first.refusal.fix, 'ledger is not a pack this record has installed.');
 });
 
-test('UNINSTALLING ON THE SAMPLE SAYS WHAT WOULD GO AND KEEPS IT; ON A RECORD IT SENDS uninstallPack', async () => {
-  const s = sample(() => AT);
-  const said = value(await s.uninstall('people'));
-  assert.equal(said.said, copy.notWritten(copy.uninstallWould('People')));
-  assert.ok(value(await s.packs()).some((p) => p.id === 'people'), 'the sample took an add-on out');
-  const none = await s.uninstall('no-such-pack');
-  assert.equal(none.ok ? '' : none.refusal.code, 'DECLARATION_UNKNOWN');
-
+test('UNINSTALLING SENDS uninstallPack, and a refusal is the record’s sentence', async () => {
   const sent: unknown[] = [];
   const caller: Caller = {
     packs: async () => ({ ok: true, value: [] }),
@@ -336,7 +325,7 @@ test('UNINSTALLING ON THE SAMPLE SAYS WHAT WOULD GO AND KEEPS IT; ON A RECORD IT
     setPackConfig: async () => ({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'x' } }),
     uninstallPack: async (args) => (sent.push(args), { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Only an owner can take an add-on out.' } }),
   };
-  const { source } = await choose(caller, false);
+  const { source } = await choose(caller);
   const refused = await source.uninstall('work');
   assert.deepEqual(sent, [{ id: 'work' }]);
   assert.equal(refused.ok ? '' : refused.refusal.fix, 'Only an owner can take an add-on out.');
@@ -381,7 +370,7 @@ test("MONEY'S SUMS ARE TYPED IN THE HOME CURRENCY once one is chosen, and one st
   const sterling = await settingsOf();
   const money: PackConfig = { ...sterling, values: { ...sterling.values, home_currency: 'EGP' } };
   assert.equal(currencyOf(money, 'most_out_30d'), 'EGP');
-  assert.equal(currencyOf(sterling, 'most_out_30d'), 'GBP', 'the sample is at home in sterling, as its sums are');
+  assert.equal(currencyOf(sterling, 'most_out_30d'), 'GBP', 'a record whose home is sterling types its sums in sterling');
   assert.equal(currencyOf(EVERY_TYPE, 'late_fee'), 'GBP', 'an add-on with no home currency types a sum in its own');
   const drafts = Object.fromEntries(Object.entries(money.config).map(([k, d]) => [k, draftOf(d, money.values[k], currencyOf(money, k))]));
   assert.equal(drafts.most_out_30d?.text, '', 'a sterling sum is not drawn as pounds');

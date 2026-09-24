@@ -23,7 +23,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { registerHooks, stripTypeScriptTypes } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { compileModule } from 'svelte/compiler';
@@ -149,7 +149,7 @@ function record(name: string, params: URLSearchParams): Response {
 test('a record that answers boot is the source, and boot is not asked a second time to say so', async () => {
   tab(record);
   const source = await open();
-  assert.equal(source.sample, false);
+  assert.ok(!('sample' in source), 'the source still says whether it is the sample, and there is no sample to be');
   assert.deepEqual(value(await source.boot(), 'boot'), BOOT, 'the screen re-asked rather than reading the answer the shell already had');
   assert.equal(asked('boot'), 1);
 });
@@ -162,7 +162,7 @@ for (const [what, answer, code] of [
   test(`${what}: there is no record here, so every call repeats the refusal and the host is asked nothing more`, async () => {
     tab(answer === null ? null : () => answer());
     const source = await open();
-    assert.equal(source.sample, false, 'a record that could not be read was drawn as the sample, and there is no sample any more');
+    assert.ok(!('sample' in source), 'a record that could not be read still carries the flag that once drew it as the sample');
 
     for (const [call, out] of [
       ['boot', await source.boot()],
@@ -181,7 +181,7 @@ for (const [what, answer, code] of [
 test('any other refusal is the record’s own answer, and every call on the screen repeats it rather than guessing', async () => {
   tab(() => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Ask the owner for access.' } }));
   const source = await open();
-  assert.equal(source.sample, false, 'a record that refused was drawn as the sample, which is a claim about someone else’s data');
+  assert.ok(!('sample' in source), 'a record that refused still carries the flag that once drew it as the sample, which was a claim about someone else’s data');
 
   for (const [what, out] of [
     ['boot', await source.boot()],
@@ -210,7 +210,7 @@ test('THE SOURCE IS HELD WHILE THE SHELL’S ANSWER IS HELD, promise and all', a
 test('and it is not rebuilt merely because the record changed its mind underneath', async () => {
   tab(record);
   const held = await open();
-  assert.equal(held.sample, false);
+  assert.ok(!('sample' in held));
 
   /* The record now refuses, and nothing has told this tab so. */
   host = () => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Ask the owner for access.' } });
@@ -253,7 +253,7 @@ test('a refusal is not kept by the shell either, so the next screen lands here w
   host = record;
   const next = await open();
   assert.notEqual(next, refusing, 'the refusal was held for the tab, so access granted since would never be noticed');
-  assert.equal(next.sample, false);
+  assert.ok(!('sample' in next));
   assert.equal(asked('boot'), 2);
 });
 
@@ -409,4 +409,41 @@ test("a list this build does not ship draws a link by the linked row's name, and
   const answer = value(await source.page('rs_meetings', EMPTY, null), 'the page');
   assert.equal(answer.entries[0]?.fields.book, 2);
   assert.equal(answer.names?.get('rs_books#2'), 'The Remains of the Day');
+});
+
+/* ── 4. what the sample left behind on the screens that read this ────────── */
+
+/**
+ * NO SCREEN HOLDS A ROW THE RECORD WAS NOT GIVEN, BECAUSE THERE IS NO SAMPLE TO HOLD ONE AGAINST.
+ *
+ * `pending` kept the rows a person typed while the tab was drawing the in-browser sample, marked them
+ * `Not saved`, and gave them negative numbers so they could not collide with the record's. Wave A of
+ * `loop/research-no-sample.md` took the sample away, so every caller passed `false` for "was this typed
+ * against the sample" and the module held nothing reachable: the list, the row page, the shell's
+ * banner and `/start` were each still drawing, counting and branching on rows that could no longer
+ * exist. Brief B1 deletes the module, and this is what keeps it deleted.
+ *
+ * A SOURCE READ, AS `list-chips.test.ts` AND `undo-live.test.ts` READ THIS SAME ROUTE. The claim is
+ * about what the four screens import and draw, and no browser is needed to see an import.
+ */
+test('NO SCREEN READS THE SAMPLE OR HOLDS A ROW THE RECORD WAS NOT GIVEN', () => {
+  const src = (at: string): string => readFileSync(fileURLToPath(new URL(at, import.meta.url)), 'utf8');
+  for (const gone of ['../record/pending.svelte.ts', '../record/pending-held.svelte.ts'])
+    assert.ok(!existsSync(fileURLToPath(new URL(gone, import.meta.url))), `${gone} is back, and nothing can put a row in it`);
+
+  const screens: [string, string][] = [
+    ['the register list', '../../routes/r/[register]/+page.svelte'],
+    ['the row page', '../../routes/r/[register]/[seq]/+page.svelte'],
+    ['the shell', '../../routes/+layout.svelte'],
+    ['the first run', '../../routes/start/+page.svelte'],
+  ];
+  for (const [what, at] of screens)
+    assert.doesNotMatch(src(at), /record\/pending(?:-held)?\.svelte/u, `${what} imports the rows the record was not given`);
+
+  /* THE LIST'S OWN SAMPLE ARMS: the flag it read off the source, the note it drew under the sample bar, and
+     the toasts that said what a press would have written. Each one is a branch no record can reach. */
+  const list = src('../../routes/r/[register]/+page.svelte');
+  assert.doesNotMatch(list, /\bsrc\.sample\b|let sample = \$state/u, 'the list still asks its source whether it is the sample');
+  assert.doesNotMatch(list, /copy\.sampleWhat|sampleSaid/u, 'the list still draws the sample bar’s sentence');
+  assert.doesNotMatch(list, /copy\.notWritten\(/u, 'a press on the list still answers with what it would have written');
 });

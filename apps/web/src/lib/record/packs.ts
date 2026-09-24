@@ -1,9 +1,10 @@
 /**
  * Turning an add-on off and on, for `/packs` (`loop/research-modular.md` §4 step 6).
  *
- * ONE SHAPE FOR BOTH RECORDS. The screen reads a `Source`: the record over HTTP when there is one,
- * and the sample below when there is not. The sample answers the way the record does, refusals
- * included, so the screen has one code path for each state it draws.
+ * THE RECORD OR ITS REFUSAL. The screen reads a `Source`, which is the record over HTTP. There was a
+ * second one, a sample of six installed add-ons held in the tab with its own copy of which leans on
+ * which, drawn when no record answered; it went with DIRECTION 26, and with no record the screen
+ * draws the record's own sentence for why.
  *
  * PURE, AND THEREFORE TESTABLE, for the reason `device.ts` gives: `node --test` cannot import a
  * `.svelte.ts` file, so the state and the reading of a refusal live here and the screen only assigns.
@@ -13,7 +14,6 @@ import { exponentOf } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import { callsOutOf, type CallOut } from './actions.ts';
-import { PACKS, PACK_SETTINGS } from './data.ts';
 import { planOf, type Plan } from './vault.ts';
 
 /** A refusal as the record writes one, with only the keys this screen reads. */
@@ -40,20 +40,23 @@ export type PackConfig = { id: string; version: string | null; config: Record<st
 export type ConfigSaved = PackConfig & { changed: string[]; said: string };
 
 export type Source = {
-  /** True while this tab is drawing the sample. */
-  sample: boolean;
+  /**
+   * ALWAYS `false`, AND KEPT ONLY FOR THE SCREENS THAT STILL ASK. `/start` and the catalogue under `/packs/browse` read
+   * it and are other briefs' to change (`loop/research-no-sample.md` section 5); drop it when neither does.
+   */
+  sample: false;
   packs(): Promise<Answer<PackState[]>>;
   disable(id: string, alsoDisable?: readonly string[]): Promise<Answer<PackToggle>>;
   enable(id: string): Promise<Answer<PackToggle>>;
   config(id: string): Promise<Answer<PackConfig>>;
   /** Only the settings that changed. `null` puts one back to its default. */
   setConfig(id: string, values: Record<string, unknown>): Promise<Answer<ConfigSaved>>;
-  /** Take an add-on back out. Its declarations go and its rows stay. The sample says what would happen. */
+  /** Take an add-on back out. Its declarations go and its rows stay. */
   uninstall(id: string): Promise<Answer<Uninstalled>>;
 };
 
-/** What `uninstallPack` answers, with only the key read here. The sample's carries the sentence it toasts. */
-export type Uninstalled = { id: string; said?: string };
+/** What `uninstallPack` answers, with only the key read here. */
+export type Uninstalled = { id: string };
 
 /** What a refused switch draws, and what its one button would send. */
 export type Blocked =
@@ -138,7 +141,7 @@ export type Offer = { id: string; doc: Record<string, unknown>; plan: Plan; call
  * FOR THE RECORD IT GOES INTO, WHEN THE SCREEN KNOWS WHICH PACKS THAT RECORD HOLDS. People sent whole pointed at
  * Projects, so installing People alone was refused on a record without them; a link to a list the record will not
  * hold is left out, the way onboarding leaves it out (`install.ts` `moduleDocument`). And the examples are the record's
- * use case's, or none: a module added here never brings the sample studio's rows into somebody's record.
+ * use case's, or none: a module added here never brings the seed's studio rows into somebody's record.
  */
 export async function packDocument(id: string, installed?: readonly PackState[], usecase?: string): Promise<Record<string, unknown> | null> {
   const seed = await import('@braindog/seed');
@@ -224,29 +227,27 @@ export async function installPlanned(
 }
 
 /**
- * Which source these screens read, and IT IS NOT DECIDED HERE ANY MORE.
+ * The source these screens read, and its first answer.
  *
- * `sampled` IS THE SHELL'S ANSWER, WHICH IS `boot`'s. The root layout asks `readBoot` once for the
- * tab and hands every screen the result as `data.live`. This module used to ask its own first call
- * the same question, against its own copy of the two refusals that mean there is no record here, so
- * there were two answers in the product to one question about one record. Nothing had to be broken
- * for them to differ: a single transient `UNREACHABLE` on `packs` was enough for `/start` to believe
- * it was on the demo while the list that draws its rows was live, and a row typed against one is not
- * a row the other will show.
+ * THE RECORD IS ASKED WHATEVER THE SHELL SAID. `choose` took the shell's `boot` answer and drew the sample when it said
+ * there was no record, so a signed-out `/packs` listed six add-ons nobody installed with switches that moved in the tab.
+ * With no sample, the record's own refusal is the answer: a 401 says to sign in, a dead network says it was not reached.
  *
- * A REFUSAL IS STILL THE RECORD'S OWN, AND NOW ALL OF THEM ARE. On a record the first answer is
- * whatever the record said, `UNREACHABLE` included, because the shell has already established that
- * there is a record there to refuse. Falling back to the sample on that code would be this module
- * overruling the one call that is entitled to decide it.
+ * `_shell` IS HEARD AND NOT OBEYED. `/start` and `/packs/browse` still pass `!page.data.live`, and they are other briefs'
+ * files; it can go once neither does. It was never a witness anyway: the refused shell is built by `layoutOf`, which sets
+ * `live: true`, so since wave A every caller passed `false`.
+ *
+ * A REFUSAL IS THE RECORD'S OWN, ALL OF THEM. Falling back on `UNREACHABLE` is what once let `/start` believe it was on
+ * the demo while the list that draws its rows was live, and a row typed against one is not a row the other will show.
  */
-export async function choose(client: Caller, sampled: boolean): Promise<{ source: Source; first: Answer<PackState[]> }> {
-  const source = sampled ? sample() : live(client);
+export async function choose(client: Caller, _shell?: boolean): Promise<{ source: Source; first: Answer<PackState[]> }> {
+  const source = live(client);
   return { source, first: await source.packs() };
 }
 
-/** The same source for one add-on's settings, from the same answer and never from a second probe. */
-export async function openSettings(client: Caller, id: string, sampled: boolean): Promise<{ source: Source; first: Answer<PackConfig>; alone: boolean }> {
-  const source = sampled ? sample() : live(client);
+/** The same source for one add-on's settings. */
+export async function openSettings(client: Caller, id: string): Promise<{ source: Source; first: Answer<PackConfig>; alone: boolean }> {
+  const source = live(client);
   const first = await source.config(id);
   /* WHETHER THIS USE CASE IS THE ONLY ONE ON, because "Speaks for this BrainDog" is only written down once two are
      (`voice.ts` `voiceWrites`), and drawn off it said the opposite of what the rail says. */
@@ -264,7 +265,6 @@ export const words = {
   save: 'Save',
   reset: 'Reset',
   saved: (names: readonly string[]) => `Saved ${names.join(', ')}.`,
-  changed: (names: readonly string[]) => `${names.join(', ')} changed`,
   speaksAlone: 'It is the only use case on, so the record speaks in its words. This becomes a choice when a second one is on.',
   unit: 'Unit',
   units: { days: 'days', hours: 'hours', minutes: 'minutes', seconds: 'seconds' },
@@ -412,122 +412,3 @@ export const fieldAt = (refusal: Refusal): string | null => (refusal.at?.startsW
  * owner's. The same two the Agents settings and the Vault offer the button for.
  */
 export const signInFor = (refusal: Refusal): boolean => refusal.code === 'NEEDS_BROWSER_SESSION' || refusal.code === 'FORBIDDEN';
-
-/* ── the sample ─────────────────────────────────────────────────────────── */
-
-/**
- * Which sample packs lean on which, as the seed's do: every first-party list points at a project, so
- * Portfolio is the one that cannot go off alone.
- */
-export const LEANS_ON: Readonly<Record<string, readonly string[]>> = {
-  agents: ['portfolio'],
-  estate: ['portfolio'],
-  'money-core': ['portfolio'],
-  people: ['portfolio'],
-  work: ['portfolio'],
-};
-
-const refuse = (code: string, fix: string, extra: Omit<Refusal, 'code' | 'fix'> = {}): Answer<never> => ({
-  ok: false,
-  refusal: { code, fix, ...extra },
-});
-
-const unchanged = (id: string, state: PackToggle['state']): Answer<PackToggle> => ({
-  ok: true,
-  value: { id, state, changed: false, packs: [], declarations: [], said: `${id} is already ${state}, so nothing changed.` },
-});
-
-/** The installed sample packs, in memory for this tab. Nothing is written anywhere, and every row stays. */
-export function sample(at: () => string = () => new Date().toISOString()): Source {
-  const installed = PACKS.filter((p) => p.installed);
-  const off = new Map<string, string>();
-  const known = (id: string) => installed.find((p) => p.id === id);
-  const declarations = (ids: readonly string[]) => ids.flatMap((id) => (known(id)?.registers ?? []).map((r) => `register.${r}`));
-  const unknown = (id: string, where: string) => refuse('DECLARATION_UNKNOWN', `${id} is not a pack this record has installed.`, { at: where });
-  /* WHAT SOMEBODY CHOSE IN THIS TAB, by add-on. A setting that is absent holds its default. */
-  /* AND THE SAMPLE'S MONEY IS STERLING, so its home currency is chosen as sterling rather than reading "None chosen" over a
-     record that adds everything up in pounds. */
-  const chosen = new Map<string, Record<string, unknown>>([['money-core', { home_currency: 'GBP' }]]);
-  const settingsOf = (id: string): PackConfig => {
-    const config = (PACK_SETTINGS[id] ?? {}) as Record<string, ConfigDecl>;
-    const set = chosen.get(id) ?? {};
-    const values = Object.fromEntries(Object.entries(config).map(([k, d]) => [k, k in set ? set[k] : (d.default ?? null)]));
-    return { id, version: known(id)?.version ?? null, config, values };
-  };
-
-  return {
-    sample: true,
-
-    /* NOTHING LEAVES THE SAMPLE. It answers with the sentence the screen has always shown, so the demo says what an
-       uninstall would do rather than acting one out. */
-    uninstall: async (id) =>
-      known(id)
-        ? { ok: true, value: { id, said: copy.notWritten(copy.uninstallWould(known(id)?.name ?? id)) } }
-        : unknown(id, 'id'),
-
-    config: async (id) => (known(id) ? { ok: true, value: settingsOf(id) } : unknown(id, 'id')),
-
-    /* THE RECORD'S OWN CHECKS, the ones a form cannot make for itself: the names, and an enum's values. */
-    setConfig: async (id, values) => {
-      if (!known(id)) return unknown(id, 'id');
-      if (Object.keys(values).length === 0) return refuse('REQUIRED_MISSING', 'values is a map of setting names to the value each should hold.', { at: 'values' });
-      const current = settingsOf(id);
-      const declared = Object.keys(current.config);
-      const set = { ...(chosen.get(id) ?? {}) };
-      for (const [key, value] of Object.entries(values)) {
-        const decl = current.config[key];
-        if (!decl)
-          return refuse('FIELD_UNKNOWN', declared.length === 0 ? `${id} declares no settings.` : `${id} has no setting called ${key}. It has ${declared.join(', ')}.`, {
-            at: `values.${key}`,
-            allowed: declared,
-          });
-        if (value === null) delete set[key];
-        else if (decl.type === 'enum' && !decl.values?.includes(String(value)))
-          return refuse('ENUM_VALUE_UNKNOWN', `The setting ${key} is one of ${decl.values?.join(', ')}, and ${JSON.stringify(value)} is not.`, {
-            at: `values.${key}`,
-            allowed: decl.values ?? [],
-          });
-        else set[key] = value;
-      }
-      chosen.set(id, set);
-      const next = settingsOf(id);
-      const changed = declared.filter((k) => JSON.stringify(next.values[k]) !== JSON.stringify(current.values[k]));
-      const names = changed.map((k) => labelOf(k, next.config[k] as ConfigDecl));
-      return { ok: true, value: { ...next, changed, said: copy.notWritten(words.changed(names)) } };
-    },
-    packs: async () => ({
-      ok: true,
-      value: installed.map((p) => ({ id: p.id, version: p.version, disabled_at: off.get(p.id) ?? null, registers: [...p.registers] })),
-    }),
-
-    disable: async (id, alsoDisable = []) => {
-      for (const p of [id, ...alsoDisable]) if (!known(p)) return unknown(p, p === id ? 'pack' : 'alsoDisable');
-      if (off.has(id)) return unchanged(id, 'disabled');
-      const turning = [...new Set([id, ...alsoDisable])].filter((p) => !off.has(p));
-      const dependents = installed
-        .filter((p) => !off.has(p.id) && !turning.includes(p.id) && (LEANS_ON[p.id] ?? []).some((d) => turning.includes(d)))
-        .map((p) => p.id)
-        .sort();
-      if (dependents.length > 0)
-        return refuse('PACK_REQUIRED', `${id} is required by ${dependents.join(', ')}, still on.`, { at: 'alsoDisable', allowed: dependents });
-      const when = at();
-      for (const p of turning) off.set(p, when);
-      return {
-        ok: true,
-        value: { id, state: 'disabled', changed: true, packs: turning, declarations: declarations(turning), said: `Disabled ${turning.join(', ')}.` },
-      };
-    },
-
-    enable: async (id) => {
-      if (!known(id)) return unknown(id, 'pack');
-      if (!off.has(id)) return unchanged(id, 'enabled');
-      const still = (LEANS_ON[id] ?? []).find((d) => off.has(d));
-      if (still !== undefined) {
-        const register = known(still)?.registers[0] ?? still;
-        return refuse('PACK_DISABLED', `${register} belongs to ${still}, which is turned off. Enable ${still} first.`, { at: 'pack', allowed: [still] });
-      }
-      off.delete(id);
-      return { ok: true, value: { id, state: 'enabled', changed: true, packs: [id], declarations: declarations([id]), said: `Enabled ${id}.` } };
-    },
-  };
-}

@@ -1,5 +1,5 @@
 /**
- * The canvas's wire and its sample.
+ * The canvas's wire.
  *
  * THE SAVE IS THE ONE AN AGENT MAKES. The test that matters most here reads the request the canvas sends and holds it
  * to `proposalOf`: a POST to `/api/propose` whose body is a `change` to `rule.<id>`. A canvas that wrote through
@@ -15,8 +15,58 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { bodyOf, draftOf, faultsOf, proposalOf } from './flow.ts';
-import { NOW, ROWS } from '../record/data.ts';
-import { SAMPLE_AUTOMATIONS, answerWords, live, openAutomations, rowLine, rowOf, rowTrigger, rowsOf, sample, type Fetch } from './source.ts';
+import type { Body } from './flow.ts';
+import { answerWords, live, openAutomations, rowLine, rowOf, rowTrigger, rowsOf, type Fetch } from './source.ts';
+import { copy } from '../copy.ts';
+
+/**
+ * Four bodies, one for each trigger the canvas offers: a change (inline), a clock that calls out and branches, an
+ * arrival that asks a person, and a button.
+ *
+ * TEST DATA, AND ONLY HERE. They were the sample's four automations, drawn on the list when no record answered; the
+ * sample is gone (DIRECTION 26) and they stay as the bodies the round trip and the wire are tested on.
+ *
+ * `friday-review` ASKS A PERSON AND NOT SPARK, because `ask_spark` is a fault on a host with no model (`flow-lint.ts`
+ * `sparkAskAt`), and a starter body that opened with a fault on its first card failed the round trip below until it
+ * was changed.
+ */
+const BODIES: Record<'chase' | 'gold' | 'phone' | 'friday', Body> = {
+  chase: {
+    rule: 'obligation-late',
+    name: 'Chase late payments',
+    register: 'obligations',
+    when: 'due before today, state is open',
+    then: [{ tag: 'late' }, { notify: { say: '{{trigger.row.what}} is past due' } }],
+    once_per: ['entry', 'due'],
+  },
+  gold: {
+    rule: 'gold-rate',
+    name: 'Gold rate',
+    on: { every: '1h' },
+    steps: [
+      { call: { ingest: 'gold_rate', as: 'rate' } },
+      { if: { field: 'rate', gt: 70 }, then: [{ notify: { say: 'Gold is {{vars.rate}} a gram' } }], else: [{ set_var: { name: 'quiet', to: 'yes' } }] },
+    ],
+  },
+  phone: {
+    rule: 'shortcut-spend',
+    name: 'Spending from the phone',
+    on: { arrival: { ingest: 'shortcut' } },
+    steps: [
+      { ask_person: { question: 'File {{trigger.arrival.body}} as spending?', options: ['File it', 'Leave it'], as: 'file', wait: '7d' } },
+      { if: 'file is File it', then: [{ notify: { say: 'Filed the spending from the phone' } }] },
+    ],
+  },
+  friday: {
+    rule: 'friday-review',
+    name: 'Friday review',
+    on: { manual: true },
+    steps: [
+      { ask_person: { question: 'Did everything due this week go out?', options: ['All of it', 'Not yet'], as: 'sent' } },
+      { notify: { say: 'Friday review: {{vars.sent}}' } },
+    ],
+  },
+};
 
 const answer = (status: number, value: unknown): Response => new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json' } });
 
@@ -76,7 +126,7 @@ test('A SAVE IS A POST TO propose WITH THE CHANGE AN AGENT WOULD FILE, and nothi
     sent.push({ url, body: init?.body ? JSON.parse(String(init.body)) : null });
     return answer(200, { ok: true, value: { id: 'SG41' } });
   };
-  const d = draftOf('gold-rate', SAMPLE_AUTOMATIONS(0)[1]!.body!);
+  const d = draftOf('gold-rate', BODIES.gold);
   const p = proposalOf(d, 2);
   const out = await live(io).propose(p);
   assert.deepEqual(out, { ok: true, value: { id: 'SG41' } });
@@ -99,7 +149,10 @@ test('Run now and Stop name the rule and the run the way the record methods take
   ]);
 });
 
-test('A RECORD WITHOUT THE READ DRAWS NO LIST, and no record at all draws the sample', async () => {
+/* NO RECORD DREW THE SAMPLE'S FOUR AUTOMATIONS, and a flow drawn and "sent" on it was kept for the tab and filed nowhere.
+   Each way of there being no record is now its sentence (DIRECTION 26); the one for a dead network said "The demo has no
+   account", which was about a door that is gone. */
+test('A RECORD WITHOUT THE READ DRAWS NO LIST, and no record at all draws why', async () => {
   const unknown: Fetch = async () => answer(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'no such method' } });
   const absent = await openAutomations(unknown);
   assert.equal(absent.absent, true);
@@ -108,15 +161,22 @@ test('A RECORD WITHOUT THE READ DRAWS NO LIST, and no record at all draws the sa
   const nobody: Fetch = async () => {
     throw new TypeError('offline');
   };
-  const drawn = await openAutomations(nobody, '', () => 0);
-  assert.equal(drawn.source.sample, true);
-  assert.ok(drawn.first.ok && drawn.first.value.length === 4);
-  assert.ok(drawn.first.ok && drawn.first.value.every((r) => r.body === null), "the sample's list has no bodies either");
+  const drawn = await openAutomations(nobody);
+  assert.equal(drawn.source.sample, false);
+  assert.equal(drawn.absent, false);
+  assert.deepEqual(drawn.first, { ok: false, refusal: { code: 'UNREACHABLE', fix: copy.recordNotReached } });
+
+  const signedOut: Fetch = async () => new Response('', { status: 401 });
+  const out = await openAutomations(signedOut);
+  assert.deepEqual(out.first, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: copy.signInAgain } });
 
   const refused: Fetch = async () => answer(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'An owner reads this.' } });
   const said = await openAutomations(refused);
   assert.equal(said.source.sample, false, "any other refusal is the record's own sentence, not a sample");
   assert.equal(said.first.ok, false);
+
+  const source: Record<string, unknown> = await import('./source.ts');
+  assert.equal('sample' in source || 'SAMPLE_AUTOMATIONS' in source, false, 'the sample source is still exported');
 });
 
 test('a row is read defensively: no id is no row, and a run in a state the record does not have is not drawn', () => {
@@ -128,34 +188,15 @@ test('a row is read defensively: no id is no row, and a run in a state the recor
   assert.equal(row.path, 'run');
 });
 
-test('EVERY SAMPLE AUTOMATION ROUND-TRIPS UNCHANGED AND HAS NOTHING TO FIX, so opening and saving one changes nothing', () => {
-  for (const row of SAMPLE_AUTOMATIONS(0)) {
-    const d = draftOf(row.id, row.body!);
-    assert.deepEqual(bodyOf(d), row.body, row.id);
-    /* ON A HOST WITH NO MODEL, said out loud rather than left to the default: the sample is drawn whatever the host
-       said of a model, and an Ask Spark card in it would be a fault on every host that has none. */
-    assert.deepEqual(faultsOf(d, { spark: false }), [], row.id);
+test('EVERY STARTER BODY ROUND-TRIPS UNCHANGED AND HAS NOTHING TO FIX, so opening and saving one changes nothing', () => {
+  for (const body of Object.values(BODIES)) {
+    const id = String(body.rule);
+    const d = draftOf(id, body);
+    assert.deepEqual(bodyOf(d), body, id);
+    /* ON A HOST WITH NO MODEL, said out loud rather than left to the default: an Ask Spark card would be a fault on
+       every host that has none. */
+    assert.deepEqual(faultsOf(d, { spark: false }), [], id);
   }
-});
-
-test('the sample runs only a button, stops only a run that has not finished, and keeps a save for the tab', async () => {
-  const s = sample(() => Date.UTC(2026, 8, 22));
-  assert.equal((await s.run('gold-rate')).ok, false, 'a clock is not started by a button');
-  const ran = await s.run('friday-review');
-  assert.ok(ran.ok);
-  assert.equal((await s.cancel('R3')).ok, false, 'R3 is done');
-  assert.ok((await s.cancel(ran.value.run)).ok);
-
-  const d = draftOf('friday-review', { rule: 'friday-review', name: 'Friday review, shorter', on: { manual: true }, steps: [{ notify: { say: 'Done' } }] });
-  const filed = await s.propose(proposalOf(d, 1));
-  assert.deepEqual(filed, { ok: true, value: { id: null } }, 'nothing is filed on the sample');
-  const listed = await s.automations();
-  assert.ok(listed.ok);
-  assert.equal(listed.value.find((r) => r.id === 'friday-review')!.name, 'Friday review, shorter');
-  const one = await s.automation('friday-review');
-  assert.ok(one.ok);
-  assert.equal(one.value.version, 2);
-  assert.equal(one.value.runs[0]!.state, 'cancelled', 'a save keeps the runs it had');
 });
 
 /* ── Try it: the record's own dry run, before anything is sent ──────────── */
@@ -166,7 +207,7 @@ test("TRY IT ASKS THE RECORD'S dryRun WITH THE WHOLE BODY IN THE QUERY, as JSON 
     asked.push({ url, method: init?.method });
     return answer(200, { ok: true, value: { path: 'run', trigger: 'Every 1h.', steps: ['Call gold_rate.'] } });
   };
-  const body = SAMPLE_AUTOMATIONS(0)[1]!.body!;
+  const body = BODIES.gold;
   const out = await live(io).dryRun(body);
   assert.equal(asked.length, 1);
   assert.equal(asked[0]!.method, 'GET', 'dryRun is a READ+ route, so it is not a POST');
@@ -176,49 +217,6 @@ test("TRY IT ASKS THE RECORD'S dryRun WITH THE WHOLE BODY IN THE QUERY, as JSON 
      so what arrives is exactly what this parse gives back. */
   assert.deepEqual(JSON.parse(url.searchParams.get('rule')!), body);
   assert.deepEqual(out, { ok: true, value: { path: 'run', trigger: 'Every 1h.', steps: ['Call gold_rate.'], matches: null, rows: null, sample: [] } });
-});
-
-test('THE SAMPLE TRIES "Chase late payments" OVER ITS OWN ROWS, and answers how many match and what each would get', async () => {
-  const s = sample(() => NOW);
-  const body = SAMPLE_AUTOMATIONS(NOW)[0]!.body!;
-  const out = await s.dryRun(body);
-  assert.ok(out.ok, 'the sample answers a dry run');
-  assert.equal(out.value.path, 'inline');
-  assert.ok(typeof out.value.matches === 'number' && out.value.matches > 0, 'the sample has open obligations past due');
-  assert.equal(out.value.sample.length, Math.min(out.value.matches, 20));
-  /* COUNTED BY HAND FROM THE ROWS, NOT BY `where.ts` AGAIN. With the walk's `matches` filter removed, every assertion
-     above still passed: forty rows "matched" a condition three of them meet, and the test said nothing. */
-  const today = new Date(NOW).toISOString().slice(0, 10);
-  const late = ROWS.obligations!.filter((e) => e.fields.state === 'open' && String(e.fields.due) < today);
-  assert.ok(late.length < ROWS.obligations!.length, 'the sample has obligations that are not late, or this proves nothing');
-  assert.equal(out.value.matches, late.length);
-  assert.equal(out.value.rows, ROWS.obligations!.length);
-  assert.deepEqual(
-    out.value.sample.map((r) => r.spoken),
-    late.slice(0, 20).map((e) => `obligations#${e.seq}`),
-  );
-  const first = out.value.sample[0]!;
-  assert.match(first.spoken, /^obligations#\d+$/u, "a row is named the way the record's dry run names it");
-  assert.equal(first.would[0], 'tag late');
-  /* THROUGH THE KERNEL'S OWN FILL, so it reads as the inline pass will send it (`source.ts` `triedOnSample` says what
-     that is today). */
-  assert.match(first.would[1]!, /^notify .* is past due$/u);
-  assert.ok(out.value.steps.length === 2, 'and the steps are said, as the record says them beside the walk');
-});
-
-test('the sample says a run as its trigger and step lines, with a branch indented, and matches nothing because it walks no rows', async () => {
-  const out = await sample(() => 0).dryRun(SAMPLE_AUTOMATIONS(0)[1]!.body!);
-  assert.ok(out.ok);
-  assert.equal(out.value.path, 'run');
-  assert.equal(out.value.matches, null);
-  assert.ok(out.value.steps.some((l) => l.startsWith('  ')), 'the arms are indented under the branch');
-  assert.ok(out.value.steps.includes('Otherwise:'));
-});
-
-test("a condition the sample's lists cannot read is refused with the compiler's own sentence, as the record refuses it", async () => {
-  const out = await sample(() => NOW).dryRun({ rule: 'x', register: 'obligations', when: 'colour is mauve', then: [{ tag: 'x' }] });
-  assert.equal(out.ok, false);
-  assert.ok(!out.ok && /colour/u.test(out.refusal.fix), 'the sentence names what it could not read');
 });
 
 test("A STEP'S ANSWER IS SAID AS NAME AND VALUE, not printed as the JSON the runner kept", () => {

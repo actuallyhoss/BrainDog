@@ -13,11 +13,7 @@
  * about one module. This is the same place, addressed by what reads it.
  */
 
-import type { Methods, Said } from './auth.ts';
 import type { IconName } from './ui/icons.ts';
-
-/** Why the row a person typed on `/start` was not saved, as `keptNothingFor` says it. */
-export type KeptCause = 'noDoor' | 'signIn' | 'noRecord' | 'noHost';
 
 export const firstRun = {
   /* FIRST RUN, TURN 1 (`loop/research-modular.md` §2). A question, a field and four chips; what was
@@ -32,8 +28,8 @@ export const firstRun = {
   gotYou: (name: string) => `Got it, you're ${name}.`,
   gotIt: 'Got it.',
   whoEdit: 'Edit your answer',
-  /* TURN 3, beside the row they typed. Said only when the People row was actually made. */
-  youArePending: (name: string, mark: string) => `${name} is in People too, marked ${mark}.`,
+  /* TURN 3, beside the row they typed. Said only when the People row was actually made. The sentence for a row the
+     sample held in the tab, marked, went with the sample (DIRECTION 26). */
   youAreKnown: (name: string) => `${name} is in People too.`,
 
   /* TURN 2 (`loop/research-modules.md` §5). A question, a field and six chips; what was heard and what
@@ -206,106 +202,24 @@ export const firstRun = {
   secondPacks: 'A pack is a list somebody already worked out, with its figures and pages. Nothing installs until you have read what it changes.',
   secondBrowse: 'Browse packs',
 
-  /**
-   * SCREEN 2b: WHAT HAPPENED TO THE ROW THEY JUST TYPED.
-   *
-   * There was no screen here. `commit` pushed the honest toast and navigated in the same tick, and
-   * the toast did not survive the navigation: measured on the deployed build, at 700ms the sentence
-   * is in the DOM and the URL is still `/start`, and at 2,200ms the URL has changed and the live
-   * region is present and empty. So the highest-stakes control in the product reported nothing at
-   * all, and what it reported nothing about was landing on thirty-eight rows of a fictional studio
-   * under a four-paragraph lesson about lists.
-   *
-   * THE FIX IS NOT A LONGER-LIVED TOAST. A screen must not navigate away from its own outcome; that
-   * is what made the receipt losable, and it is also what made the answer confusing even when the
-   * toast worked. The form stays exactly where it is with everything they typed still in it, which
-   * IS the receipt, and the outcome is a sentence under the button they pressed.
-   *
-   * IT SAYS WHAT IS TRUE AND NOT WHAT STAGE THE BUILD IS AT (`19 §9`). "Nothing was saved yet" is
-   * the same sentence forty other controls give, so a person meets one product rather than one
-   * product and one apology.
-   */
-  keptNothing: 'Nothing was saved yet.',
-  /* `the row lasts until this tab is closed or reloaded`, AND IT SAID "what you typed is still on
-     this screen and nowhere else. It is safe to leave it and come back." Measured on the build of
-     September 10th, neither half was true. The row was also on the list the button under it opens,
-     and leaving and coming back found this form empty with no outcome under it, while a reload
-     took the row off the list as well. How long `pending` holds a row is the true part, so it is
-     what this says. The second `yet` went too: the sentence before it already has one.
-
-     AND ITS CAUSE WAS FALSE ON THE ONLY HOSTS A STRANGER CAN REACH. It read "This record cannot be
-     written to from the browser", and this same screen writes the row from the browser whenever
-     `boot` answers with a record. Driven against brain.dog and app.brain.dog, what the stranger
-     lacked was a way to sign in at all: `/auth/methods` answered `passkey: true, magic: false, key: false, me: null,
-     firstRun: true`, so there was no passkey to assert with, no sign-in email to send, no server key,
-     and `/auth/provision` was 404 because `PROVISION_KEY` is unset, so no claim link could be minted.
-     The screen is drawn from the sample whenever `boot` answers `UNAUTHORIZED` or `UNREACHABLE`
-     (`noRecord` in `record/device.ts`), and the one fact true of both is that no record of the
-     person's own is open. That is what this says while `/auth/methods` has not answered, and
-     `keptNothingFor` below says the cause once it has. */
-  keptNothingWhy: 'No record of your own is open here, so the row lasts until this tab is closed or reloaded.',
-  /* ONE CAUSE PER STATE THE SAMPLE IS DRAWN IN, chosen by `keptNothingCause` from `/auth/methods`.
-     Each says only what the host can do in that state: the one for the live hosts offers no sign-in,
-     because there is none to offer, and the one for a page with no host behind it offers nothing,
-     because there is nowhere to go. */
-  keptNothingFor: {
-    noDoor: 'This host offers no way to sign in yet, so there is no record of your own for the row to go to, and it lasts until this tab is closed or reloaded.',
-    signIn: 'You are not signed in, so the row lasts until this tab is closed or reloaded.',
-    noRecord: 'You are signed in, and no record of your own is open on this host yet, so the row lasts until this tab is closed or reloaded.',
-    noHost: 'No record answered this page, so it shows the worked example, and the row lasts until this tab is closed or reloaded.',
-  } as Record<KeptCause, string>,
   /* AND THE WAY ONWARD IS AN OFFER, NAMED FOR WHAT IS THERE. It used to be the only path and it was
      taken without asking: a list of somebody else's invoices, arrived at with no explanation, reads
      as the row having been written and gone somewhere strange. Named, it reads as what it is.
      "See Money as it comes" named it and then hedged; the verb is the whole offer. */
   seeTheList: (label: string) => `Open ${label}`,
   /**
-   * AND THE ROW THEY TYPED IS IN IT.
+   * THE SENTENCES FOR A RECORD THAT TOOK THE ROW, WHICH ARE THE ONLY ONES NOW.
    *
-   * IT USED TO SAY THE LISTS ARRIVE WITH AN EXAMPLE IN THEM, which is true and was the wrong thing
-   * to say here: it explains what somebody else's rows are doing on the screen and says nothing
-   * about the one thing the person just did. A friction pass ranked that exact gap first of ten,
-   * measured as four clicks, twenty-five keystrokes and zero rows. The row is now at the top of the
-   * list, marked, and this sentence is what tells them to look for it.
-   *
-   * AND IT WAS THE LAST THING THE OUTCOME SAID, AFTER THREE WAYS OF SAYING NOTHING WAS SAVED. A
-   * fresh-eyes pass on the build of September 10th measured 61 words under the button, with a
-   * 13-word toast lying across them at y 713 to 776 on a 390px phone, and 43 of those 74 words said
-   * one fact. The thing that did happen came fourth. It leads now, the row is named as what the
-   * person typed rather than as "it", and the list is named, because "the list" on a screen that
-   * shows none is a list the reader has to guess at. The half about the other rows is
-   * `keptExamples`.
-   */
-  rowIsThere: (thing: string, list: string, mark: string) => `${thing} is at the top of the ${list} list, marked ${mark}.`,
-  /* THE HALF OF THAT SENTENCE ABOUT EVERYBODY ELSE'S ROWS, kept on its own: it is what stops a list
-     of a fictional studio's rows reading as the record having taken the person's row somewhere. */
-  keptExamples: 'The other rows are the worked examples the lists arrive with.',
-  /**
-   * WHAT A SECOND PRESS SAYS, which is a correction rather than another row.
-   *
-   * IT WAS "the first row in Money would be changed, but nothing was saved yet.", starting in lower
-   * case, stacked under the first press's toast still saying the row "would be written". The row
-   * HAD been changed. This press is the one that keeps a toast, because nothing else on the screen
-   * moves when it lands: the outcome under the button is already there from the first press.
-   */
-  rowChanged: (thing: string, list: string) => `${thing} on the ${list} list was changed`,
-
-  /**
-   * AND THE SAME THREE SENTENCES FOR A RECORD THAT CAN BE WRITTEN TO.
-   *
-   * THE FOUR ABOVE ARE THE DEMO'S AND ONLY THE DEMO'S. They say the row is waiting, marked, and
-   * that nothing was saved, which is true of a tab holding a row in `pending` and false of a record
-   * that has just taken one. The screen used to say them whatever it was looking at, so the person
-   * most likely to have a record of their own was told their first row went nowhere.
+   * The demo's said the row was waiting, marked, and that nothing was saved, which was true of a tab
+   * holding a row in `pending` and false of a record that has just taken one. The screen used to say
+   * them whatever it was looking at, so the person most likely to have a record of their own was told
+   * their first row went nowhere. The sample is gone (DIRECTION 26), and so are they.
    *
    * WHAT WAS SAVED AND WHERE IT NOW LIVES, in that order, because the row is the thing they did and
-   * the list is where they will find it again. The demo's sentence names the mark to look for; this
-   * one has no mark to name, so it says the durable fact instead.
+   * the list is where they will find it again.
    */
   rowSaved: (thing: string, list: string) => `${thing} is saved to your record, at the top of the ${list} list.`,
-  /* THE OTHER HALF OF `keptNothingWhy`, and the opposite fact. That one says how long a waiting row
-     lasts, because the honest answer is until the tab closes. This one answers the same question
-     for a row the record holds, and the answer is the reason somebody typed it. */
+  /* HOW LONG THE ROW LASTS, which for a row the record holds is the reason somebody typed it. */
   keptSaved: 'It is in the record now, so it is there when you come back.',
   /**
    * AND A FIRST ROW THE RECORD WOULD NOT TAKE SAYS WHY, IN THE RECORD'S OWN WORDS.
@@ -315,8 +229,7 @@ export const firstRun = {
    * does not hold. The shape is `shapeRefused`'s, one turn up, for the same reason.
    */
   rowNotSaved: (thing: string, fix: string) => `${thing} was not saved. ${fix}`,
-  /* WHAT A SECOND PRESS SAYS ON A RECORD. `rowChanged` is the demo's fragment, and it is a fragment
-     because `copy.notWritten` finishes it with the half that is not true here. */
+  /* WHAT A SECOND PRESS SAYS, a correction rather than another row. */
   rowChangedSaved: (thing: string, list: string) => `${thing} on the ${list} list was changed.`,
 
   /** The label above the first field. Written per choice, because "Your first money" is not English. */
@@ -517,28 +430,4 @@ export function addedIn(added: readonly { name: string; rows: AddedRows }[]): { 
     const names = added.filter((a) => a.rows === rows).map((a) => a.name);
     return names.length > 0 ? [{ rows, names: firstRun.shapeAnd(names) }] : [];
   });
-}
-
-/**
- * WHICH OF `keptNothingFor` IS TRUE OF THE HOST BEHIND THIS PAGE, read off `/auth/methods`, or `null`
- * while that has not answered and `keptNothingWhy` is the sentence to draw.
- *
- * A WAY IN IS ONE SOMEBODY COULD PRESS, which is `waysOf` in `signin.ts` and not the raw flags. The
- * live hosts answer `passkey: true` with `firstRun: true`, and a passkey that has never been made
- * signs nobody in, so `passkey` alone would have told a stranger to sign in on a host with no door.
- * The server key counts, because the operator of a self-host holds it and can sign in with it.
- *
- * `open` IS A HOST THAT LETS ANYBODY IN, so a sample drawn over one is a `boot` that did not answer,
- * which is the same fact as no host at all.
- *
- * IT HOLDS NO SENTENCE, for the reason `addedIn` gives: the screen maps the answer to its key.
- */
-export function keptNothingCause(said: Said<Methods> | null): KeptCause | null {
-  if (said === null) return null;
-  if (!said.ok) return 'noHost';
-  const it = said.value;
-  if (it.me) return 'noRecord';
-  if (it.open) return 'noHost';
-  const passkey = it.passkey && it.firstRun !== true;
-  return passkey || it.magic || it.key ? 'signIn' : 'noDoor';
 }

@@ -36,6 +36,7 @@
   const EXAMPLES_MOST = 8;
 
   let client = $state.raw<ReturnType<typeof createClient> | null>(null);
+  /** True once the record answered. Download is only pressed then: the record writes the file. */
   let live = $state(false);
   let refused = $state<string | null>(null);
   let states = $state<PackState[]>([]);
@@ -71,17 +72,19 @@
   onMount(() => {
     void read(async () => {
       client = createClient({ base: apiBase() });
-      const chosen = await choose(client, !page.data.live);
-      live = !chosen.source.sample;
+      /* WITH NO RECORD THIS SAID "This is the sample, so the file is made from a record of your own" over a form whose
+         Download could not be pressed. The record's refusal is the page now (DIRECTION 26). */
+      const chosen = await choose(client);
       if (!chosen.first.ok) {
         refused = chosen.first.refusal.fix;
         return false;
       }
       /* WHO SPEAKS IS WHO WAS CHOSEN TO, when two use cases are on, so the file is made from that one. */
-      states = live ? await speakingStates(client, chosen.first.value) : chosen.first.value;
+      states = await speakingStates(client, chosen.first.value);
+      live = true;
       const id = speakingOf(states);
       if (id !== null) title = useCaseName(id);
-      if (live && states.some((s) => s.registers.includes('skills') && s.disabled_at === null)) {
+      if (states.some((s) => s.registers.includes('skills') && s.disabled_at === null)) {
         const listed = await client.list({ register: 'skills', limit: 50 });
         skillRows = listed.ok
           ? (listed.value.rows as { seq: number | null; fields: Record<string, unknown> }[]).flatMap((r) =>
@@ -89,7 +92,7 @@
             )
           : [];
       }
-      if (live && own) {
+      if (own) {
         const config = await client.packConfig({ id: own.id });
         const values = config.ok ? ((config.value as { values?: Record<string, unknown> }).values ?? {}) : {};
         lastShared = typeof values.shared_version === 'string' && values.shared_version !== '' ? values.shared_version : null;
@@ -166,7 +169,6 @@
   {#if refused}
     <Empty kind="error" title={refused} />
   {:else}
-    {#if !live}<p class="note" role="status">{copy.shareSampleNote}</p>{/if}
     {#if live && speaking === null}<p class="note">{copy.shareNoUseCase}</p>{/if}
 
     <form

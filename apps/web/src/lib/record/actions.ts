@@ -2,16 +2,15 @@
  * Scheduled actions on screen: a project's "Runs on" list and the account's usage page (`loop/DIRECTION.md`
  * §0b, `loop/research-scheduled-actions.md` §6).
  *
- * ONE SHAPE FOR EVERY RECORD, as `packs.ts` does it. A screen reads a `Source`: the record over HTTP when
- * there is one, and the sample below when there is not. The sample answers the way the record does, so a
- * screen has one code path for each state it draws.
+ * THE RECORD OR ITS REFUSAL, as `packs.ts` does it. A screen reads a `Source`, which is the record over HTTP.
+ * With no record it drew the sample's five actions, one of them paused with a Resume that changed only the tab;
+ * that went with DIRECTION 26, and no record is now the sentence for it.
  *
  * TWO READS, AND WHAT EACH FALLS BACK TO.
  *
  *   · `actions` on the record: every scheduled action the caller may read, with its state, its last run,
- *     its next run and this month's counts from its own `pull` events. No record (`UNREACHABLE` or
- *     `UNAUTHORIZED`) draws the sample. A record that has no such method yet (`ROUTE_UNKNOWN`) draws no
- *     list, because a sample list on a real record's page would be a list of things that do not run.
+ *     its next run and this month's counts from its own `pull` events. A record that has no such method yet
+ *     (`ROUTE_UNKNOWN`) draws no list; any other refusal, `UNREACHABLE` and `UNAUTHORIZED` among them, is said.
  *   · `GET /account/usage` on the host: the Directory's ledger, billing-grade, with each record's month
  *     against its plan's allowance. A 404, or no host, falls back to `actions`, which says nothing about
  *     limits because the record cannot see them.
@@ -27,7 +26,6 @@
 import { bytes as fmtBytes, since } from 'braindog-render';
 
 import { copy } from '../copy.ts';
-import { ACTION_SAMPLE } from './data.ts';
 
 /* ── the shapes ─────────────────────────────────────────────────────────── */
 
@@ -91,7 +89,9 @@ export type AccountUsage = {
 
 export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 
-const unreachable = (): Answer<never> => ({ ok: false, refusal: { code: 'UNREACHABLE', fix: copy.notOnDemo } });
+/* A DEAD NETWORK SAID "The demo has no account, so nothing here can be approved, revoked or connected", which was about a
+   door that no longer exists and told nobody to try again. */
+const unreachable = (): Answer<never> => ({ ok: false, refusal: { code: 'UNREACHABLE', fix: copy.recordNotReached } });
 const unauthorized = (): Answer<never> => ({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: copy.signInAgain } });
 
 const isAnswer = (v: unknown): v is Answer<unknown> =>
@@ -129,19 +129,16 @@ async function send<T>(io: Fetch, url: string, body?: Record<string, unknown>): 
   return res.status === 404 ? { ...out, notFound: true } : out;
 }
 
-/** The two answers that mean there is no record here, the same two `packs.ts` falls back on. */
-const SAMPLE_WHEN: ReadonlySet<string> = new Set(['UNREACHABLE', 'UNAUTHORIZED']);
+/** The two ledger answers that leave the question of a record to the record: nobody reached, or nobody signed in. */
+const ASK_THE_RECORD: ReadonlySet<string> = new Set(['UNREACHABLE', 'UNAUTHORIZED']);
 
 export type Source = {
-  /** True while this tab is drawing the sample. */
-  sample: boolean;
   actions(): Promise<Answer<ActionRow[]>>;
   resume(ingest: string): Promise<Answer<Resumed>>;
 };
 
 export function live(io: Fetch, base = ''): Source {
   return {
-    sample: false,
     actions: () => send<ActionRow[]>(io, `${base}/api/actions`),
     resume: (ingest) => send<Resumed>(io, `${base}/api/resumeAction`, { ingest }),
   };
@@ -150,15 +147,16 @@ export function live(io: Fetch, base = ''): Source {
 /** What a screen draws from the first read: the rows, no list at all, or the record's fix. */
 export type Opened = { source: Source; first: Answer<ActionRow[]>; absent: boolean };
 
-/** Which source this screen reads, decided by its first `actions` call. */
-export async function openActions(io: Fetch, base = '', at?: () => number): Promise<Opened> {
+/**
+ * The record's actions, and whether it has the read at all.
+ *
+ * `_at` WAS THE SAMPLE'S CLOCK. `Inspector.svelte` and `/automations/<id>` still pass `() => NOW` and are other briefs'
+ * files; it can go once neither does.
+ */
+export async function openActions(io: Fetch, base = '', _at?: () => number): Promise<Opened> {
   const source = live(io, base);
   const first = await source.actions();
-  if (first.ok) return { source, first, absent: false };
-  if (first.refusal.code === 'ROUTE_UNKNOWN') return { source, first, absent: true };
-  if (!SAMPLE_WHEN.has(first.refusal.code)) return { source, first, absent: false };
-  const kept = sample(at);
-  return { source: kept, first: await kept.actions(), absent: false };
+  return { source, first, absent: !first.ok && first.refusal.code === 'ROUTE_UNKNOWN' };
 }
 
 /* ── one row, said ──────────────────────────────────────────────────────── */
@@ -305,7 +303,7 @@ export type Named = { name: string; faint: boolean } & Totals;
 export type Allowed = { name: string; used: number; allowance: number | null; resets: string; waiting: boolean };
 
 export type UsageView = {
-  from: 'ledger' | 'events' | 'sample';
+  from: 'ledger' | 'events';
   month: string;
   totals: Totals;
   projects: Named[];
@@ -339,7 +337,7 @@ export function weeksOf(days: readonly ({ day: string } & Pick<Totals, 'runs'>)[
 const sortNamed = (rows: Named[]): Named[] => rows.sort((a, b) => Number(a.faint) - Number(b.faint) || b.runs - a.runs || a.name.localeCompare(b.name));
 
 /** The record's own events, summed: what `/usage` draws when there is no ledger. Nothing about limits. */
-export function usageFromActions(rows: readonly ActionRow[], month: string, from: 'events' | 'sample', through?: string): UsageView {
+export function usageFromActions(rows: readonly ActionRow[], month: string, from: 'events', through?: string): UsageView {
   const totals = zero();
   const projects = new Map<string, Named>();
   const days = new Map<string, number>();
@@ -418,31 +416,30 @@ export const monthWords = (month: string): string => MONTHS[Number(month.slice(5
 export type UsageRead = { ok: true; view: UsageView } | { ok: false; refusal: Refusal } | { ok: 'none' };
 
 /**
- * `/usage`'s one read: the ledger first, then the record's own events, then the sample.
+ * `/usage`'s one read: the ledger first, then the record's own events.
  *
  * A 404 FROM THE LEDGER IS A HOST WITHOUT ONE, and so is no host at all; a 401 is a person not signed in
  * to one, and the record read after it decides whether there is a record here at all. Any other refusal
- * from either is the record's own sentence.
+ * from either is the record's own sentence, and so is the record's 401 or dead network: those drew the
+ * sample's month of 3 September, counted against projects nobody has, until DIRECTION 26.
  *
  * TWO BASES SINCE THE RECORD IS IN THE ADDRESS. `base` is the bare host, where `/account/usage` and `/auth/methods` are the
  * person's; `api` is where the record answers, `/app/<slug>` under a slug, so the events counted are the record on screen.
  */
-export async function readUsage(io: Fetch, now: number, base = '', sampleNow: number = now, api: string = base): Promise<UsageRead> {
+export async function readUsage(io: Fetch, now: number, base = '', api: string = base): Promise<UsageRead> {
   const range = monthRange(now);
   /* NOBODY SIGNED IN IS NO LEDGER TO ASK. An open self-host, or a browser with no session, would only be told 401, and
      the browser logs that as an error; `/auth/methods` says so without one. A host that cannot say is asked as before. */
   if (!(await nobodySignedIn(io, base))) {
     const ledger = await send<AccountUsage>(io, `${base}/account/usage?from=${range.from}&to=${range.to}`);
     if (ledger.ok) return { ok: true, view: usageFromLedger(ledger.value, range.month, range.to) };
-    if (!ledger.notFound && !SAMPLE_WHEN.has(ledger.refusal.code)) return { ok: false, refusal: ledger.refusal };
+    if (!ledger.notFound && !ASK_THE_RECORD.has(ledger.refusal.code)) return { ok: false, refusal: ledger.refusal };
   }
 
   const events = await live(io, api).actions();
   if (events.ok) return { ok: true, view: usageFromActions(events.value, range.month, 'events', range.to) };
   if (events.refusal.code === 'ROUTE_UNKNOWN') return { ok: 'none' };
-  if (!SAMPLE_WHEN.has(events.refusal.code)) return { ok: false, refusal: events.refusal };
-  const sample = monthRange(sampleNow);
-  return { ok: true, view: usageFromActions(ACTION_SAMPLE(), sample.month, 'sample', sample.to) };
+  return { ok: false, refusal: events.refusal };
 }
 
 /** Whether `/auth/methods` answers that nobody is signed in here. `false` when it cannot say. */
@@ -566,8 +563,8 @@ export const installWords = {
   /* THE ONE APPROVAL (`research-scheduled-actions.md` §5): said under the lines, before the press. */
   asksOnce: 'Installing asks you to approve these once, and none of them runs until you do.',
   acceptApproves: 'Accepting approves these, and they start running. Declining runs none of them.',
-  wouldAsk: (name: string, calls: number) =>
-    `${name} would ask you once to approve the ${calls === 1 ? 'call it makes' : `${calls} calls it makes`}, shown in its plan`,
+  /* `wouldAsk` SAID WHAT AN INSTALL ON THE SAMPLE "would" ask, under a toast that nothing was saved; `/packs` plans on the
+     record now and draws the record's own lines (DIRECTION 26). */
 } as const;
 
 /** How often one runs: its interval, when a rule runs it, or both. */
@@ -598,22 +595,4 @@ export function estimateOf(calls: readonly CallOut[], hosted: boolean): string |
   if (counted.length === 0) return null;
   const runs = counted.reduce((a, b) => a + b, 0);
   return hosted ? installWords.estimate(runs, HOSTED_RUNS) : installWords.noLimit(runs);
-}
-
-/* ── the sample ─────────────────────────────────────────────────────────── */
-
-/** The sample's actions, in memory for this tab. A resume changes the row here and is written nowhere. */
-export function sample(at: () => number = () => Date.now()): Source {
-  let rows = ACTION_SAMPLE();
-  return {
-    sample: true,
-    actions: async () => ({ ok: true, value: rows }),
-    resume: async (ingest) => {
-      const row = rows.find((r) => r.ingest === ingest);
-      if (!row || row.state !== 'paused')
-        return { ok: false, refusal: { code: 'OUT_OF_BOUNDS', fix: `${ingest} is not paused, so there is nothing to resume.`, at: 'ingest' } };
-      rows = afterResume(rows, ingest, new Date(at()).toISOString());
-      return { ok: true, value: { ingest, kind: row.channel } };
-    },
-  };
 }

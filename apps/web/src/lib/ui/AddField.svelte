@@ -9,11 +9,12 @@
   so a member is not surprised by a field that has not appeared. The record decides again either way. The rules, the
   kinds offered and the calls are `field-write.ts`, which the tests hold; this file draws them.
 
-  ON THE SAMPLE IT SAYS WHAT WOULD HAPPEN, as every write on the row page does, and sends nothing.
+  NOT DRAWN UNTIL THE ROW IS THE RECORD'S. `live` is the row page's own answer, and until the record has answered, or
+  after it refused, there is no list to add a field to. It drew a button whose only answer was "A field would be added to
+  every row, but nothing was saved yet." on the sample, which is gone (DIRECTION 26).
 -->
 <script lang="ts">
   import { apiBase } from '../at.ts';
-  import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { ADDABLE, addField, fieldOf, type Addable } from '$lib/record/field-write.ts';
   import { fieldWords, KIND_WORDS } from '$lib/record/field-words.ts';
@@ -29,10 +30,6 @@
   let problem = $state<string | null>(null);
 
   function start() {
-    if (!live) {
-      toasts.push(copy.notWritten(fieldWords.sample), { intent: 'warn' });
-      return;
-    }
     open = true;
     problem = null;
   }
@@ -90,7 +87,7 @@
     </div>
     <p class="add-note">{problem ?? (owner ? fieldWords.ownerNote : fieldWords.memberNote)}</p>
   </form>
-{:else}
+{:else if live}
   <p class="add-open"><Button weight="quiet" onclick={start}>{fieldWords.add}</Button></p>
 {/if}
 

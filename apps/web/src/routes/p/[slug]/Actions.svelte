@@ -16,7 +16,6 @@
   import { TONES } from 'braindog-render';
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
-  import { NOW } from '$lib/record/api.ts';
   import { afterResume, forProject, openActions, stateOf, whatOf, words, type ActionRow, type Source } from '$lib/record/actions.ts';
   import { signInFor } from '$lib/record/packs.ts';
   import { reprove } from '$lib/record/vault.ts';
@@ -34,22 +33,20 @@
   let rows = $state<ActionRow[]>([]);
   let fix = $state('');
   let source: Source | null = null;
-  /** Whether the rows are the sample's, where there is no vault to reconnect a key in. */
-  let sample = $state(false);
   let busy = $state(false);
   /** The last refused resume: which action, the record's sentence, and whether signing in again answers it. */
   let failed = $state<{ ingest: string; fix: string; signin: boolean } | null>(null);
   let reproving = $state(false);
 
-  /* THE SAMPLE IS DRAWN AT THE RECORD'S CLOCK, as every other sample date on the page is. */
-  const now = (): number => (source?.sample ? NOW : Date.now());
+  /* THE WALL CLOCK, AND ONLY IT. The sample's five actions were drawn at its own clock, 3 September, and said "Last ran"
+     against that; with no sample every row is the record's, dated by the record, and read against now (DIRECTION 26). */
+  const now = (): number => Date.now();
 
   async function load() {
     const at = opened();
-    const out = await openActions((url, init) => fetch(url, init), apiBase(), () => NOW);
+    const out = await openActions((url, init) => fetch(url, init), apiBase());
     closed(out.first.ok || out.absent, at);
     source = out.source;
-    sample = Boolean(source?.sample);
     if (out.absent) from = 'absent';
     else if (out.first.ok) {
       rows = out.first.value;
@@ -80,11 +77,6 @@
       return;
     }
     rows = afterResume(rows, row.ingest, new Date(now()).toISOString());
-    /* THE DEMO SAYS NOTHING WAS SAVED, in the sentence every unwritten action in the product uses. */
-    if (source.sample) {
-      toasts.push(copy.notWritten(words.resumed(row.ingest).slice(0, -1)), { intent: 'warn' });
-      return;
-    }
     toasts.push(words.resumed(row.ingest), { intent: 'good' });
     const again = await source.actions();
     if (again.ok) rows = again.value;
@@ -116,7 +108,7 @@
     </p>
     {#if said.resume || said.usage || failed?.ingest === row.ingest}
       <div class="action-do">
-        {#if said.reconnect && !sample}<Button weight="quiet" href={said.reconnect.href}>{said.reconnect.label}</Button>{/if}
+        {#if said.reconnect}<Button weight="quiet" href={said.reconnect.href}>{said.reconnect.label}</Button>{/if}
         {#if said.resume}
           <Button weight="quiet" disabled={busy} aria-label="{words.resume} {row.ingest}" onclick={() => void resume(row)}>{words.resume}</Button>
         {/if}

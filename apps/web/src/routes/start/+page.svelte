@@ -30,7 +30,7 @@
   import { SPEAKS, voiceBatch, voiceWrites, withSpeaks, type SpeakingState } from '$lib/voice.ts';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
-  import { addedIn, firstModules, firstRun, keptNothingCause, onwardFrom, type AddedRows, type KeptCause } from '$lib/first-run.ts';
+  import { addedIn, firstModules, firstRun, onwardFrom, type AddedRows } from '$lib/first-run.ts';
   import { heardFor, INSTALL_ORDER, LEANS_ON, shape, titleOfRow, toTurnOn, type PackId, type Shape } from '$lib/shape.ts';
   import { USE_CASES, alongside, listsOf, modulesFor, pagesOf, type UseCase } from '@braindog/seed/usecases';
   import { arrangeTurns } from '$lib/arrange.ts';
@@ -39,7 +39,7 @@
   import { linkExamples } from '@braindog/seed/usecases/links';
   import { PACKS } from '$lib/record/data.ts';
   import { REGISTERS } from '$lib/record/api.ts';
-  import { choose as recordOrSample } from '$lib/record/packs.ts';
+  import { choose as readPacks } from '$lib/record/packs.ts';
   import { methods } from '$lib/auth.ts';
   import { addKey } from '$lib/start.ts';
   import { hear, introduce, personRow, withChip, type Heard } from '$lib/who.ts';
@@ -54,7 +54,6 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { drew } from '../../lib/ui/screen.svelte.ts';
-  import * as pending from '$lib/record/pending.svelte.ts';
   import { landing } from '$lib/record/landing.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import type { Fields } from '$lib/record/schema.ts';
@@ -72,25 +71,6 @@
     own: firstRun.shapeAddedPlain,
     empty: firstRun.shapeAddedEmpty,
   };
-
-  /**
-   * WHETHER THERE IS A RECORD BEHIND THIS SCREEN, AND THE SHELL IS WHAT SAYS SO.
-   *
-   * `data.live` is the root layout's one answer to `boot`, asked once and kept for the tab. It is
-   * the same signal the list draws its waiting rows against and the shell counts them with, so
-   * reading it here is what makes the screen that TAKES a row and the screen that SHOWS it one
-   * record. This screen used to ask `packs` and work the answer out again from that call's own
-   * refusal, which is a second answer to a question that has one.
-   */
-  const sampled = $derived(!page.data.live);
-
-  /* WHY NOTHING TYPED HERE WAS KEPT, said per host once `/auth/methods` answers. Until it does, and on a
-     host it cannot reach, `keptNothingWhy` is the sentence, because it is true in every state. */
-  let cause = $state<KeptCause | null>(null);
-  $effect(() => {
-    if (sampled) void methods().then((m) => (cause = keptNothingCause(m)));
-  });
-  const keptWhy = $derived(cause === null ? firstRun.keptNothingWhy : firstRun.keptNothingFor[cause]);
 
   /**
    * AND A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD IS NEVER ASKED TO SET ONE UP.
@@ -127,27 +107,16 @@
   let problems = $state<string[]>([]);
   /** What the form holds, so the submit can put the row somewhere rather than describing it. */
   let taken = $state<Fields>({});
-  /**
-   * The sequence the pending row was given.
-   *
-   * IT WAS WRITTEN AND READ NOWHERE, and what that cost is one row per press. This screen does not
-   * navigate away from its own outcome, so the form is still on screen with everything still in it
-   * and the button still live: correcting a typo and pressing again is the ordinary thing to do,
-   * and it left a second row rather than a corrected one. Holding the sequence is what lets the
-   * second press mean what somebody meant by it.
-   */
-  let made = $state<number | null>(null);
-
   /** What the record did with the typed row: the sequence it got, or why it did not land. */
   type Saved = { ok: true; seq: number | null } | { ok: false; why: string };
 
   /**
-   * What the record did with it, and `null` while the demo is holding the row instead.
+   * What the record did with it, and `null` until the first press.
    *
-   * THE SEQUENCE IS HELD FOR THE REASON `made` IS HELD. This screen does not navigate away from its
-   * own outcome, so the form is still on screen with everything in it and the button still live:
-   * correcting a typo and pressing again is the ordinary thing to do, and on a record that press
-   * has to change the row it wrote rather than leave a second one behind.
+   * THE SEQUENCE IS HELD BECAUSE THIS SCREEN DOES NOT NAVIGATE AWAY FROM ITS OWN OUTCOME. The form is
+   * still on screen with everything in it and the button still live: correcting a typo and pressing
+   * again is the ordinary thing to do, and on a record that press has to change the row it wrote
+   * rather than leave a second one behind.
    */
   let saved = $state<Saved | null>(null);
 
@@ -372,7 +341,7 @@
 
   /* `added` CARRIES WHAT EACH LIST HOLDS AND NOT ONLY ITS NAME, because the one sentence this screen had
      for all of them claimed example rows in lists that arrived empty (`addedIn`). */
-  type Outcome = { made: { name: string; list: string; register: string }[]; onward: { register: string; list: string } | null; on: string[]; added: { name: string; rows: AddedRows }[]; absent: string[]; refused: string[]; waiting: boolean; plan: string | null; as: string | null };
+  type Outcome = { made: { name: string; list: string; register: string }[]; onward: { register: string; list: string } | null; on: string[]; added: { name: string; rows: AddedRows }[]; absent: string[]; refused: string[]; plan: string | null; as: string | null };
   let outcome = $state<Outcome | null>(null);
   let making = $state(false);
 
@@ -383,10 +352,9 @@
    * the suggestion card, the six use-case chips and an enabled "Make my record" were drawn exactly as
    * before the press, as if nothing had been made yet (`loop/research-first-sign-in.md` §3, friction
    * 4). So once it is made the suggestion folds to one line saying what it was made as, and the button
-   * goes. Not on the sample, where nothing was kept, and not after a refusal, where pressing again is
-   * how somebody tries once more.
+   * goes. Not after a refusal, where pressing again is how somebody tries once more.
    */
-  const settledMade = $derived(outcome !== null && !outcome.waiting && outcome.refused.length === 0);
+  const settledMade = $derived(outcome !== null && outcome.refused.length === 0);
   /* A SENTENCE TYPED HERE AND NOT IN `first-run.ts`, where every other sentence on this screen is,
      only because the change that wrote this line could not write that file. It belongs there as
      `useMade`, and moving it changes no word. */
@@ -396,10 +364,10 @@
    * THE EXAMPLES ARE CLEARED FROM THE OUTCOME, because clearing them is the next thing a person moving
    * a real record in does, and Home was the only place that offered it. The same record calls and the
    * same words Home uses (`$lib/record/examples.ts`), asked once more with the count because it deletes
-   * rows. `null` on the sample and for anyone who is not the owner, since the record refuses to count.
+   * rows. `null` for anyone who is not the owner, since the record refuses to count.
    */
   let examples = $state<Examples | null>(null);
-  const clearOffer = $derived(outcome && !outcome.waiting ? offerOf(examples) : null);
+  const clearOffer = $derived(outcome ? offerOf(examples) : null);
   let clearAsking = $state(false);
   let clearing = $state(false);
   let clearedSaid = $state<string | null>(null);
@@ -431,12 +399,11 @@
   /**
    * Make my record: turn the lists on, write the rows the sentence filled, and meet the person.
    *
-   * THE SAME SOURCE `/packs` READS, so a live record and the demo take one path. A pack that is off
-   * is turned on. A first-party pack a live record does not hold is added from its own document,
-   * planned and then installed with that plan's hash, in the order `toTurnOn` gives, which puts
-   * every list after the ones it points at. A plan or an install that is refused is said in one
-   * sentence and nothing is made in that list. The demo holds every first-party pack, so a pack it
-   * lacks is only named.
+   * THE SAME SOURCE `/packs` READS. A pack that is off is turned on. A first-party pack the record
+   * does not hold is added from its own document, planned and then installed with that plan's hash,
+   * in the order `toTurnOn` gives, which puts every list after the ones it points at. A plan or an
+   * install that is refused is said in one sentence and nothing is made in that list. A record that
+   * does not answer at all refuses each of those in its own words, which is the sentence drawn.
    */
   async function make() {
     understand();
@@ -446,11 +413,13 @@
     making = true;
     try {
       const client = createClient({ base: apiBase() });
-      const chosen = await recordOrSample(client, sampled);
+      /* `false`, WHICH WAS `sampled`: whether to read the in-browser sample instead of the record. There is no sample
+         (`loop/DIRECTION.md` 26); the argument goes from `packs.ts` with the sample's own source there. */
+      const chosen = await readPacks(client, false);
       const installed = chosen.first.ok ? chosen.first.value : [];
-      const out: Outcome = { made: [], onward: null, on: [], added: [], absent: [], refused: [], waiting: chosen.source.sample, plan: null, as: u?.title ?? null };
+      const out: Outcome = { made: [], onward: null, on: [], added: [], absent: [], refused: [], plan: null, as: u?.title ?? null };
       /* WHETHER A MODEL IS BEHIND SPARK HERE, so a use case that forms a plan asks it before planting its own (`sparkForm`). */
-      const modelHere = !chosen.source.sample && (await client.version().then((v) => v.ok && v.value.spark).catch(() => false));
+      const modelHere = await client.version().then((v) => v.ok && v.value.spark).catch(() => false);
 
       /* The lists this record holds with their pack on, so a pack is added only after what it points at. */
       const held = new Set(installed.filter((p) => p.disabled_at === null).flatMap((p) => p.registers));
@@ -459,7 +428,7 @@
         const state = installed.find((p) => p.id === id);
         if (!state) {
           /* ANY OF THE SIX MODULES, the agents pack among them: a sentence that mentions agents adds it on a record. */
-          const doc = chosen.source.sample ? null : moduleManifest(id);
+          const doc = moduleManifest(id);
           if (!doc) {
             out.absent.push(packName(id));
             continue;
@@ -521,8 +490,7 @@
         const state = installed.find((p) => p.id === id);
         const names = listsOf(one).map((l) => l.name);
         const lacking = one.modules.filter((m) => !usable.has(m));
-        if (chosen.source.sample) out.absent.push(...names);
-        else if (lacking.length > 0) out.refused.push(firstRun.shapeNeedsFirst(one.title, firstRun.shapeAnd(lacking.map(packName))));
+        if (lacking.length > 0) out.refused.push(firstRun.shapeNeedsFirst(one.title, firstRun.shapeAnd(lacking.map(packName))));
         else if (state && state.disabled_at !== null) {
           const on = await chosen.source.enable(id);
           if (!on.ok) out.refused.push(firstRun.shapeRefused(one.title, on.refusal.fix));
@@ -582,7 +550,7 @@
 
       /* THE VOICE RULE, WRITTEN DOWN (`voice.ts` `voiceWrites`): the use case proposed speaks, and every other one on, those
          the sentence put beside it included, is set not to, so no use case added later moves the voice by how its id sorts. */
-      if (u && !chosen.source.sample) {
+      if (u) {
         const packs = await client.packs();
         if (packs.ok) {
           const states = await withSpeaks(packs.value as SpeakingState[], async (id) => {
@@ -604,16 +572,6 @@
         const list = REGISTERS[row.register]?.name ?? row.register;
         const key = `${row.register}:${title}`;
         const had = madeRows.get(key);
-
-        if (chosen.source.sample) {
-          /* NO `party` ON THE DEMO: a waiting row cannot point at another waiting row, because the
-             demo resolves a ref against the seed's rows and would print `people#-1`. */
-          const fields: Fields = { ...row.fields };
-          if (had === undefined || !pending.replace(row.register, had, fields)) madeRows.set(key, pending.add(row.register, fields, chosen.source.sample));
-          out.made.push({ name: title, list, register: row.register });
-          continue;
-        }
-
         if (had !== undefined) {
           seqs[i] = had;
           continue;
@@ -648,9 +606,9 @@
       const ownFirst = u ? listsOf(u).at(-1) : undefined;
       out.onward = onwardFrom(out, ownFirst, ownHeld, firstOn ? { register: firstOn, list: REGISTERS[firstOn]?.name ?? firstOn } : null);
       /* THE SHELL READS THE RECORD AGAIN, so the rail shows the new lists and pages and speaks in the new voice. */
-      if (!chosen.source.sample) (await import('$lib/record/boot-live.ts')).forget();
+      (await import('$lib/record/boot-live.ts')).forget();
       /* COUNTED BEFORE THE OUTCOME IS DRAWN, so the offer arrives with it and the status is read once. */
-      examples = chosen.source.sample ? null : await readExamples(client as unknown as ExamplesClient);
+      examples = await readExamples(client as unknown as ExamplesClient);
       clearAsking = false;
       clearedSaid = null;
       outcome = out;
@@ -698,7 +656,7 @@
    * `addPack` the sentence path uses, with whatever the pack points at added ahead of it. Answers the
    * sentence to show when the list could not be made ready, and `null` when it is.
    */
-  async function ensure(client: ReturnType<typeof createClient>, chosen: Awaited<ReturnType<typeof recordOrSample>>, register: string): Promise<string | null> {
+  async function ensure(client: ReturnType<typeof createClient>, chosen: Awaited<ReturnType<typeof readPacks>>, register: string): Promise<string | null> {
     const installed = chosen.first.ok ? chosen.first.value : [];
     const held = new Set(installed.filter((p) => p.disabled_at === null).flatMap((p) => p.registers));
     if (held.has(register)) return null;
@@ -729,33 +687,23 @@
 
   /* ── turn 3: the person's own People row ─────────────────────────────── */
 
-  let known = $state<{ name: string; waiting: boolean } | null>(null);
-  /** The demo's waiting People row, so a second press corrects it rather than adding another. */
-  let me: number | null = null;
+  let known = $state<{ name: string } | null>(null);
   /** Who a live record has already met from this screen, so a second press does not meet them twice. */
   let met: string | null = null;
 
   /**
    * Meet the person who answered turn 1.
    *
-   * THE SAME SOURCE `/packs` READS: the record when there is one, which also says whether People is
-   * on, and the sample when there is not. A refusal is not drawn. The row they typed is this
-   * screen's outcome, and a People row that could not be made is not a failure of it.
+   * THE SAME SOURCE `/packs` READS, which also says whether People is on. A refusal is not drawn. The
+   * row they typed is this screen's outcome, and a People row that could not be made is not a failure
+   * of it.
    */
   async function remember() {
     const now = heard;
     if (!now?.name) return;
     const client = createClient({ base: apiBase() });
-    const chosen = await recordOrSample(client, sampled);
+    const chosen = await readPacks(client, false);
     const packs = chosen.first.ok ? chosen.first.value : null;
-    if (chosen.source.sample) {
-      const asked = introduce(now, null, packs);
-      if (!asked) return;
-      const row = personRow(asked, now.bio);
-      if (me === null || !pending.replace('people', me, row)) me = pending.add('people', row, chosen.source.sample);
-      known = { name: asked.name, waiting: true };
-      return;
-    }
     const signed = await methods();
     const asked = introduce(now, signed.ok ? (signed.value.me?.email ?? null) : null, packs);
     if (!asked || met === asked.name) return;
@@ -764,7 +712,7 @@
        fields), so the person is written as a plain row instead, and is in People like anybody else's. */
     if (!out.ok && !(await client.create({ register: 'people', fields: personRow(asked, now.bio) }).catch(() => null))?.ok) return;
     met = asked.name;
-    known = { name: asked.name, waiting: false };
+    known = { name: asked.name };
   }
 
   /* THE FORM PUTS ITS OWN CARET IN. This screen used to hold a `field` binding nothing ever bound —
@@ -851,14 +799,9 @@
        on somebody else's outcome, which is the same bug the `picked === null` guard above had in a
        different place. */
     said = false;
-    /* AND THE ROW GOES WITH IT. `made` is a sequence inside ONE register's waiting list, so carrying
-       it across a change of choice would point the next press's `replace` at a row in a list nobody
-       is looking at. The row already added stays where it is and keeps its own `Put back`. */
-    made = null;
-    /* AND THE WRITTEN ROW GOES WITH IT TOO, for the same reason one list further along: `saved`
-       holds a sequence inside one register, so carrying it across a change of choice would point
-       the next press's update at a row in a list nobody is looking at. The row that was written
-       stays in the record, where it belongs. */
+    /* AND THE WRITTEN ROW GOES WITH IT. `saved` holds a sequence inside one register, so carrying it
+       across a change of choice would point the next press's update at a row in a list nobody is
+       looking at. The row that was written stays in the record, where it belongs. */
     saved = null;
   });
 
@@ -877,24 +820,14 @@
   /**
    * The first row.
    *
-   * IT IS A WRITE NOW, WHEREVER THERE IS A RECORD TO TAKE IT. This function had no live branch at
-   * all: it put the row in `pending` and said "Nothing was saved yet." whatever it was looking at.
-   * So the person most likely to have a record of their own pressed the most consequential button
-   * in the product, on the screen `19 §6` is written around, and was told the one true fact they
-   * had typed went nowhere. It had gone nowhere, and they had to type it again somewhere else.
+   * IT IS A WRITE, AND ONLY A WRITE. This function had no live branch at all once: it put the row in
+   * `pending` and said "Nothing was saved yet." whatever it was looking at. So the person most likely
+   * to have a record of their own pressed the most consequential button in the product, on the screen
+   * `19 §6` is written around, and was told the one true fact they had typed went nowhere.
    *
-   * THE DEMO IS UNCHANGED, AND SO IS THE ARGUMENT FOR IT. There is no record behind the sample, so
-   * the row waits in `pending` and wears `Not saved` on the list, which is what that half of this
-   * function has always said and is still the truth about it.
-   *
-   * WHICH ONE IS THE SHELL'S ANSWER, AND IT USED TO BE THIS SCREEN'S OWN. `recordOrSample` asked
-   * `packs` and read "there is no record here" out of that call's refusal, while every other screen
-   * reads it out of `boot`. One transient `UNREACHABLE` on either call was then enough for the
-   * screen that TAKES the row and the list that DRAWS it to disagree, with nothing broken and no
-   * state flipped: the row waited against the sample under a live list, which holds none of the
-   * sample's rows, and the sentence below said it was at the top of a list it was not on. `sampled`
-   * is the shell's one answer, so the three presses here and every screen after them read the same
-   * record.
+   * THE DEMO HALF WENT WITH THE SAMPLE (`loop/DIRECTION.md` 26, `loop/research-no-sample.md` B1). It
+   * held the row in `pending` for a tab with no record behind it; every tab has one now, and a record
+   * that does not answer says so through `write`, in the record's own sentence.
    */
   async function commit(event: SubmitEvent) {
     event.preventDefault();
@@ -907,43 +840,9 @@
     writing = true;
     try {
       const client = createClient({ base: apiBase() });
-      const chosen = await recordOrSample(client, sampled);
-      if (chosen.source.sample) {
-        /**
-         * AND THE ROW IS THE ROW THEY THEN SEE, which it was not.
-         *
-         * A friction pass ranked this first of the ten things costing a person the most, and the
-         * measurement is the whole argument: four clicks, twenty-five keystrokes, six decisions,
-         * three screens, **zero rows**. The list this screen offers to open holds thirty-eight rows
-         * belonging to a fictional studio and the one thing the person typed is nowhere in it, with
-         * nothing on either screen saying why.
-         *
-         * IT IS NOT A WRITE AND IT DOES NOT CLAIM TO BE. `pending` holds it for the life of the
-         * tab, the list draws it where it will be, and it wears `Not saved` on the row: the same
-         * receipt every other verb in this product leaves, so a person meets one product rather
-         * than one product and one exception. The sentence under this form already says nothing was
-         * saved; what changes is that the row exists to be looked at while that is true.
-         */
-        /* PRESSING AGAIN CORRECTS THE ROW, it does not add another. `replace` answers `false` when the
-           row is no longer waiting, which is what happens after `Put back` on the list, and then this
-           adds one as it did the first time rather than quietly restoring a row somebody removed. */
-        /* THE FIRST PRESS DOES NOT TOAST ANY MORE, AND THE SECOND ONE DOES. Both used to, and the first
-           read "the first row in Money would be written, but nothing was saved yet.": lower case, and
-           drawn at y 713 to 776 on a 390px phone straight across the outcome below, whose first line
-           said the same thing. That outcome IS this screen's answer, for the reason written over it, so
-           a toast on top was one fact twice with one copy hiding the other. A second press moves
-           nothing on the screen, because the outcome is already there, so it keeps a toast, and the
-           toast says what happened: the row was changed. */
-        if (made !== null && pending.replace(choice.key, made, taken)) {
-          toasts.push(copy.notWritten(firstRun.rowChanged(thing, list)));
-        } else {
-          made = pending.add(choice.key, taken, chosen.source.sample);
-        }
-        saved = null;
-      } else {
-        const missing = await ensure(client, chosen, choice.key);
-        saved = missing === null ? await write(client, choice.key) : { ok: false, why: missing };
-      }
+      const chosen = await readPacks(client, false);
+      const missing = await ensure(client, chosen, choice.key);
+      saved = missing === null ? await write(client, choice.key) : { ok: false, why: missing };
       said = true;
       void remember();
       /* THE OUTCOME IS BELOW THE FOLD ON A PHONE, and it holds the way onward. */
@@ -963,10 +862,9 @@
    * none of the five tiles requires a `ref`, which is the one field type that would need another
    * row looked up before this could be sent.
    *
-   * A SECOND PRESS CHANGES THE ROW IT WROTE, the way a second press on the demo corrects the row
-   * `pending` is holding. Without it the ordinary act of fixing a typo and pressing again leaves
-   * two rows in somebody's record on their first minute, and this screen stays put with the form
-   * still filled in, which is an invitation to do exactly that.
+   * A SECOND PRESS CHANGES THE ROW IT WROTE. Without it the ordinary act of fixing a typo and pressing
+   * again leaves two rows in somebody's record on their first minute, and this screen stays put with
+   * the form still filled in, which is an invitation to do exactly that.
    *
    * WHY IT DID NOT LAND IS THE RECORD'S OWN SENTENCE, read the three ways `rows-write.ts` reads
    * one: the refusal's `fix`, the calm sentence when nothing answered at all, and the raced one
@@ -977,8 +875,8 @@
     const done = at === null ? await client.create({ register, fields: taken }) : await client.update({ register, seq: at, patch: taken });
     if (!done.ok)
       return { ok: false, why: 'refusal' in done ? (done.refusal.code === 'UNREACHABLE' ? copy.writeNotReached : done.refusal.fix) : copy.writeRaced };
-    /* THE SECOND PRESS IS THE ONE THAT TOASTS, for the reason the demo's second press does: the
-       outcome under the button is already there from the first, so nothing else on screen moves. */
+    /* THE SECOND PRESS IS THE ONE THAT TOASTS: the outcome under the button is already there from the
+       first, so nothing else on screen moves. */
     if (at !== null) toasts.push(firstRun.rowChangedSaved(thing, list), { intent: 'good' });
     return { ok: true, seq: (done.value as { seq?: number | null }).seq ?? at };
   }
@@ -1178,12 +1076,12 @@
           <div class="kept" role="status" bind:this={kept}>
             {#if outcome.made.length > 0}
               {@const items = firstRun.shapeAnd(outcome.made.map((m) => firstRun.shapeIn(m.name, m.list)))}
-              <p class="kept-what">{outcome.waiting ? firstRun.shapeMadeWaiting(items, copy.markNotWritten) : firstRun.shapeMade(items)}</p>
+              <p class="kept-what">{firstRun.shapeMade(items)}</p>
             {:else if outcome.absent.length === 0 && outcome.refused.length === 0}
               <p class="kept-what">{firstRun.shapeReady}</p>
             {/if}
             {#if known}
-              <p class="kept-what">{known.waiting ? firstRun.youArePending(known.name, copy.markNotWritten) : firstRun.youAreKnown(known.name)}</p>
+              <p class="kept-what">{firstRun.youAreKnown(known.name)}</p>
             {/if}
             {#if outcome.on.length > 0}<p class="kept-why">{firstRun.shapeTurnedOn(firstRun.shapeAnd(outcome.on))}</p>{/if}
             <!-- ONE SENTENCE PER KIND OF LIST, because one sentence for all of them said every list had
@@ -1197,7 +1095,6 @@
                 <Button weight="quiet" href={`/decide/${outcome.plan}`}>{firstRun.usePlanSee}</Button>
               </div>
             {/if}
-            {#if outcome.waiting}<p class="kept-why">{firstRun.keptNothing} {keptWhy}</p>{/if}
             {#if clearedSaid}<p class="kept-why">{clearedSaid}</p>{/if}
             {#if outcome.onward || clearOffer}
               <div class="actions">
@@ -1315,7 +1212,7 @@
           <!-- ONE FILLED CONTROL. Once the row has landed the filled one is the way onward, below, and
                this steps down to a correction. -->
           <Button
-            weight={said && (saved === null || saved.ok) ? 'quiet' : 'primary'}
+            weight={said && saved?.ok ? 'quiet' : 'primary'}
             type="submit"
             disabled={problems.length > 0 || writing}
             aria-describedby={problems.length > 0 ? 'first-why' : undefined}>{copy.addTheRow}</Button
@@ -1345,33 +1242,26 @@
                  twice more before it said where the row was, so the one thing that had happened
                  came last. That it is not saved is now said once as a sentence and once as the name
                  of the mark the reader will find on the row. -->
-            <!-- AND WHAT HAPPENED DEPENDS ON WHICH RECORD THIS IS. Every sentence below the first
-                 was written about the demo, and all three of them are false of a record that has
-                 just taken the row: it is saved, it is not marked, and the rows around it are the
-                 person's own rather than a fictional studio's. `saved` is `null` on the demo. -->
-            {#if saved === null}
-              <p class="kept-what">{firstRun.rowIsThere(thing, list, copy.markNotWritten)}</p>
-            {:else if saved.ok}
+            <!-- AND WHAT HAPPENED IS THE RECORD'S ANSWER. The demo's three sentences, that the row was
+                 waiting, marked and among a fictional studio's rows, went with the sample. -->
+            {#if saved?.ok}
               <p class="kept-what">{firstRun.rowSaved(thing, list)}</p>
-            {:else}
+            {:else if saved}
               <!-- THE RECORD'S OWN SENTENCE, WHICH IS THE ONLY ONE THAT SAYS WHAT TO DO NEXT. The
                    form is still on screen with everything in it, so a refusal a person can read is
                    a refusal they can answer by changing a field and pressing again. -->
               <p class="kept-what">{firstRun.rowNotSaved(thing, saved.why)}</p>
             {/if}
             {#if known}
-              <p class="kept-what">{known.waiting ? firstRun.youArePending(known.name, copy.markNotWritten) : firstRun.youAreKnown(known.name)}</p>
+              <p class="kept-what">{firstRun.youAreKnown(known.name)}</p>
             {/if}
-            {#if saved === null}
-              <p class="kept-why">{firstRun.keptNothing} {keptWhy}</p>
-              <p class="kept-why">{firstRun.keptExamples}</p>
-            {:else if saved.ok}
+            {#if saved?.ok}
               <p class="kept-why">{firstRun.keptSaved}</p>
             {/if}
             <!-- AND THE WAY ONWARD IS OFFERED ONLY WHERE THERE IS A ROW AT THE END OF IT. A refused
                  row is not on that list, so sending somebody to look for it would be the screen
                  undoing the sentence above. -->
-            {#if saved === null || saved.ok}
+            {#if saved?.ok}
               <div class="actions">
                 <Button weight="primary" href={`/r/${choice.key}?first=1`}>{firstRun.seeTheList(list)}</Button>
               </div>

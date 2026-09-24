@@ -13,7 +13,7 @@
 
 import { createClient, type Boot } from '@braindog/client';
 
-import { heldBy, list, NOW, PAGE, REGISTERS, sortRows } from '../record/api.ts';
+import { PAGE, sortRows } from '../record/api.ts';
 import { readBoot, type Booted } from '../record/boot-live.ts';
 import { declOf, entryOf, learn, namesOf, orderOf, refMapOf, targetsOf, treeOf, type Names, type RecordRow, type RefMap } from '../record/remote.ts';
 import type { Entry, Filter, RegisterDecl } from '../record/schema.ts';
@@ -33,8 +33,8 @@ export type Said<T> = { ok: true; value: T } | { ok: false; refusal: Refusal };
  * What the list is asked: the chips, the box and the order, exactly as the address carries them.
  *
  * `join` IS THE ADDRESS WORD `join=any` (`joinOf` in `api.ts`): the chips joined by "or" rather than
- * "and". Absent is "and", which is every address written before the word existed. Both sources read
- * it, the sample through `list` and a record through `treeOf`, so one link opens one set of rows.
+ * "and". Absent is "and", which is every address written before the word existed. `treeOf` reads it
+ * into the `where` the record is asked, so one link opens one set of rows for whoever opens it.
  */
 export type Ask = {
   filters: readonly Filter[];
@@ -46,15 +46,14 @@ export type Ask = {
 /**
  * One page of the answer, and where the next one starts. `matched` is the whole answer's size.
  *
- * `names` IS WHAT THIS RECORD CALLS THE ROWS THESE ONES POINT AT, and `null` is the sample saying it
- * has none to give: the screen then draws a ref the way it always did, out of the sample's own rows.
+ * `names` IS WHAT THIS RECORD CALLS THE ROWS THESE ONES POINT AT, read in the same walk that turns a
+ * stored id into a number. It was `null` where the in-browser sample drew the list out of its own rows;
+ * the sample is gone (`loop/DIRECTION.md` 26), so every answer carries the record's names.
  */
-export type Answer = { entries: Entry[]; matched: number; cursor: string | null; names: Names | null };
+export type Answer = { entries: Entry[]; matched: number; cursor: string | null; names: Names };
 
 /** Where this tab's list comes from. One code path on the screen, whichever this is. */
 export type Source = {
-  /** True while this tab is drawing the in-browser sample. See `open`. */
-  sample: boolean;
   boot(): Promise<Said<Boot>>;
   schema(register: string): Promise<Said<RegisterDecl>>;
   page(register: string, ask: Ask, cursor: string | null): Promise<Said<Answer>>;
@@ -173,7 +172,6 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
   }
 
   return {
-    sample: false,
     boot: async () => ({ ok: true, value: booted }),
     /* THE RECORD'S OWN WORDS OVER THE DECLARATION'S (`loop/research-spark.md` S8): a use case's labels for this list,
        its fields and its states, drawn at every read so a label changed at `/packs` shows on the next boot. */
@@ -211,52 +209,8 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
 /** Every call answering the one refusal `boot` gave, so the screen draws it rather than guessing. */
 const refusing = (refusal: Refusal): Source => {
   const no = async <T>(): Promise<Said<T>> => ({ ok: false, refusal });
-  return { sample: false, boot: no, schema: no, page: no, count: no };
+  return { boot: no, schema: no, page: no, count: no };
 };
-
-/* ─────────────────────────────────────────────────────────────────────────────────────────────
-   THE SAMPLE, WHICH NOTHING CHOOSES ANY MORE. DELETE THIS BLOCK AND `sample` ON `Source` (wave B1 of
-   `loop/research-no-sample.md`).
-
-   `open` used to hand it out when `boot` found no record this tab could read. The app now shows only a
-   real record (`loop/DIRECTION.md` 26): `readBoot` has no sample answer, so a record that does not
-   answer is a refusal on this screen like any other, and this block is left unreached until B1 removes it.
-
-   IT IS A SECOND IMPLEMENTATION ON THE ONE SCREEN MEANT TO BE EVIDENCE, and that is why it is
-   fenced here rather than threaded through the route: the route has one code path, which is
-   `Source`, and does not know which one it was handed except to say so.
-   ───────────────────────────────────────────────────────────────────────────────────────────── */
-
-const ok = <T>(value: T): Said<T> => ({ ok: true, value });
-
-const SAMPLE: Source = {
-  sample: true,
-  boot: async () =>
-    ok({
-      registers: Object.values(REGISTERS).map((r) => ({ id: r.id, name: r.name, count: heldBy(r.id) })),
-      now: new Date(NOW).toISOString(),
-    }),
-  schema: async (register) => {
-    const decl = REGISTERS[register];
-    return decl
-      ? ok(decl)
-      : { ok: false, refusal: { code: 'REGISTER_UNKNOWN', fix: `There is no register called ${register}.`, allowed: Object.keys(REGISTERS) } };
-  },
-  page: async (register, a, cursor) => {
-    const out = list(register, {
-      filters: [...a.filters],
-      q: a.q,
-      ...(a.sort ? { sort: a.sort } : {}),
-      ...(a.join ? { join: a.join } : {}),
-      limit: PAGE,
-      ...(cursor === null ? {} : { cursor }),
-    });
-    return ok({ entries: out.entries, matched: out.matched, cursor: out.cursor, names: null });
-  },
-  count: async (register, a) => ok(list(register, { filters: [...a.filters], q: a.q, ...(a.join ? { join: a.join } : {}) }).matched),
-};
-
-/* ───────────────────────────────────── end of the sample ───────────────────────────────────── */
 
 /** The source this tab reads, beside the answer it was built from. See `open`. */
 let chosen: { from: Promise<Booted>; source: Promise<Source> } | null = null;

@@ -44,7 +44,9 @@
   let catalogueNames = $state.raw<Map<string, string>>(new Map());
   /* A USE CASE'S PACK BY ITS USE CASE, "Solo founder", and a module by the name it goes by, never `usecase-founder`. */
   const nameOf = (id: string) => byId.get(id)?.name ?? catalogueNames.get(id) ?? moduleName(id);
-  /* A LIST BY THE NAME THIS RECORD GIVES IT: a use case's own lists are not in the sample, and read `datapoints` without this. */
+  /* A LIST BY THE NAME THIS RECORD GIVES IT: `REGISTERS` holds what this tab has learnt of the record's declarations (it
+     is still filled with the seed's before that, which wave B's `held.ts` brief takes away), and a use case's own lists
+     read `datapoints` without the shell's names. */
   const listName = (r: string): string =>
     REGISTERS[r]?.name ??
     ((page.data.lists ?? []) as { id: string; name: string }[]).find((l) => l.id === r)?.name ??
@@ -58,12 +60,12 @@
   let busy = $state<string | null>(null);
   let source: Source | null = null;
   let client = $state.raw<ReturnType<typeof createClient> | null>(null);
-  /** True once the record answered, so Install plans and installs instead of saying what it would do. */
-  let live = $state(false);
+  /** True once the record answered. Until then, and after a refusal, nothing below the refusal is drawn. */
+  const live = $derived(states !== null);
 
   const installed = $derived(states ?? []);
-  /* ON A RECORD, ONLY WHAT THIS BUILD SHIPS: the sample's two pictured add-ons were offered there with star counts (`browseable.ts`). */
-  const available = $derived(browseable(PACKS, live, installed));
+  /* ONLY WHAT THIS BUILD SHIPS, and only once the record has said what it holds (`browseable.ts`). */
+  const available = $derived(states ? browseable(PACKS, states) : []);
 
   let diff = $state<string | null>(null);
 
@@ -89,13 +91,13 @@
 
   /**
    * Install, first press: the record's plan for this add-on, drawn under it. An entry nothing ships a document for is
-   * said as not installable yet, on a record as on the sample.
+   * said as not installable yet.
    */
   async function offerInstall(pack: PackInfo) {
     if (!client || busy !== null) return;
     busy = pack.id;
     try {
-      const doc = await packDocument(pack.id, live ? installed : undefined);
+      const doc = await packDocument(pack.id, installed);
       if (!doc) {
         toasts.push(copy.packNotInstallable(pack.name), { intent: 'warn' });
         return;
@@ -166,7 +168,8 @@
   }
 
   /**
-   * THE LIST IS THE RECORD'S NOW, READ ONCE, and the sample's when there is no record to read.
+   * THE LIST IS THE RECORD'S, READ ONCE, and with no record to read it is the record's refusal and nothing else. It
+   * was the sample's six add-ons, with switches that moved in the tab, until DIRECTION 26.
    *
    * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
    * from a shell that has fetched nothing. The read is bracketed by `read()`, so the attribute stays
@@ -178,11 +181,8 @@
     });
     void read(async () => {
       client = createClient({ base: apiBase() });
-      /* WHICH RECORD THIS IS IS THE SHELL'S ANSWER TO `boot`, not a second reading of this screen's
-         own first call. See `choose`. */
-      const chosen = await choose(client, !page.data.live);
+      const chosen = await choose(client);
       source = chosen.source;
-      live = !chosen.source.sample;
       if (!chosen.first.ok) {
         refused = chosen.first.refusal;
         return false;
@@ -244,8 +244,8 @@
 
 
   /**
-   * Uninstall one. The sample keeps the sentence it always toasted; a record takes it out, and the list is read
-   * again, so what is drawn is what the record now holds. A refusal is the record's sentence, and a race reads again.
+   * Uninstall one. The record takes it out, and the list is read again, so what is drawn is what the record now holds.
+   * A refusal is the record's sentence, and a race reads again.
    */
   async function uninstall(pack: PackInfo) {
     const { id, name } = pack;
@@ -253,10 +253,6 @@
     busy = id;
     try {
       const out = await source.uninstall(id);
-      if (source.sample) {
-        toasts.push(out.ok ? (out.value.said ?? copy.notWritten(copy.uninstallWould(name))) : out.refusal.fix, { intent: 'warn' });
-        return;
-      }
       /* NOT ASKED FIRST: the record keeps its settings and schedules for thirty days, so Undo installs it again. */
       if (out.ok) toasts.push(copy.uninstalled(name), { intent: 'good', undo: () => void reinstall(pack) });
       else toasts.push(out.refusal.code === 'VERSION_STALE' ? copy.writeRaced : out.refusal.fix, { intent: 'warn' });
@@ -454,7 +450,9 @@
   </Section>
 
   <!-- USE CASES: a whole arrangement as one file, browsed, shared and installed through the same plan as an add-on
-       (`loop/research-spark.md` S14). -->
+       (`loop/research-spark.md` S14). NOT UNDER A REFUSAL: a record that would not list its add-ons will not plan a
+       file either, and the sentence above is the one thing to read. -->
+  {#if !refused}
   <Section title={copy.useCases}>
     <p class="blurb">{copy.useCasesBlurb}</p>
     <div class="usecase-links">
@@ -464,7 +462,6 @@
     <h3 class="usecase-sub">{copy.installFromFile}</h3>
     <InstallShared
       {client}
-      {live}
       {installed}
       oninstalled={async () => {
         const again = await source?.packs();
@@ -472,12 +469,17 @@
       }}
     />
   </Section>
+  {/if}
 
   <!-- AND THIS HALF HAD NONE, eleven lines under the half that does it right. A record that has
        installed everything got the heading, a `0` and a hole where the list had been, which is the
        failure `19 §6` names and the fix was one branch away in the same file. It is `cleared` and
        not `no-data-yet`: having them all is finishing rather than not having started, and there is
-       no action on it, because what fills this list is somebody else publishing to it. -->
+       no action on it, because what fills this list is somebody else publishing to it.
+
+       AND ONLY ONCE THE RECORD HAS SAID WHAT IT HOLDS. Before that, and under a refusal, this list was the sample's two
+       pictured add-ons with their star counts, which nobody wrote and nothing installs. -->
+  {#if live}
   <Section title={copy.browse} count={available.length}>
     {#if available.length === 0}
       <Empty kind="cleared" title={copy.allInstalled} body={copy.allInstalledWhy} />
@@ -496,42 +498,16 @@
               </span>
               <span class="line-when">
                 <Button weight="bare" onclick={() => (diff = diff === pack.id ? null : pack.id)}>{copy.installDiff}</Button>
-                <!-- A PACK THAT COLLIDES CANNOT BE INSTALLED, and the button says so rather than
-                     promising a transaction that would be refused. `02 §5` warns that a disabled
-                     control "invites a question the UI cannot answer" — this one is answered directly
-                     below it, in the CONFLICTS section the button points at, which is the same shape
-                     the row form uses for its own disabled submit. -->
+                <!-- THE RECORD'S PLAN IS WHAT SAYS A PACK COLLIDES, in its conflicts, under this row and
+                     before Install can be pressed. The sample's own conflicts, and the toast saying what an
+                     install "would" do, went with the sample. -->
                 <Button
                   weight="quiet"
-                  disabled={(!live && Boolean(pack.conflicts?.length)) || busy !== null || offer?.id === pack.id}
-                  aria-describedby={!live && pack.conflicts?.length ? `conflict-${pack.id}` : undefined}
-                  onclick={() => {
-                    if (live) return void offerInstall(pack);
-                    /* A PACK THAT CALLS OUT ASKS ONCE, and the lines it asks about are opened under it. The sample
-                       saves nothing either way, and says so. */
-                    const calls = packDiff(pack).calls.length;
-                    if (calls > 0) diff = pack.id;
-                    toasts.push(
-                      copy.notWritten(
-                        calls > 0
-                          ? installWords.wouldAsk(pack.name, calls)
-                          : `${pack.name} would be installed all at once, after you have seen what it adds`,
-                      ),
-                      { intent: 'warn' },
-                    );
-                  }}
+                  disabled={busy !== null || offer?.id === pack.id}
+                  onclick={() => void offerInstall(pack)}
                 >{busy === pack.id && offer?.id !== pack.id ? copy.packPlanning : copy.install}</Button>
               </span>
             </div>
-            <!-- THE REASON IS BESIDE THE BUTTON, NOT INSIDE THE DISCLOSURE. `02 §5`'s objection to a
-                 disabled control is that it "invites a question the UI cannot answer" — which is
-                 exactly what it would be if the answer lived behind a panel that is closed by
-                 default. One sentence, always, next to the control it disables. -->
-            {#if !live && pack.conflicts?.length}
-              <p class="pack-refused" id="conflict-{pack.id}">
-                {copy.diffRefused(pack.conflicts.map(listName))}
-              </p>
-            {/if}
             {#if offer?.id === pack.id}{@render offered(pack)}
             {:else if diff === pack.id}{@render plan(pack)}{/if}
           </li>
@@ -539,6 +515,7 @@
       </ul>
     {/if}
   </Section>
+  {/if}
 </div>
 
 <style>
@@ -818,13 +795,6 @@
     flex-wrap: wrap;
     gap: var(--sp-2);
     padding: 0 var(--sp-3) var(--sp-3);
-  }
-
-  .pack-refused {
-    margin: 0 0 var(--sp-2);
-    padding-inline: var(--sp-3);
-    color: var(--dim);
-    font-size: var(--t-sm);
   }
 
   .diff-note {

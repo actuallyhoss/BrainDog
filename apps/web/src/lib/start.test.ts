@@ -130,55 +130,24 @@ test('THE FIRST ROW REPORTS WHERE THE PERSON IS STANDING, and does not navigate'
      line that had not moved. A slice measured in bytes is a slice that fails on prose. */
   const at = startPage.indexOf('function commit(');
   const commit = startPage.slice(at, startPage.indexOf(BODY_END, at));
-  assert.match(commit, /toasts\.push\(copy\.notWritten/u, 'the honest toast is gone');
+  assert.doesNotMatch(commit, /copy\.notWritten/u, 'the first row says nothing was saved again, with a record to save it in');
   assert.doesNotMatch(commit, /goto\(/u, 'commit navigates away from its own outcome again');
 
   /**
-   * AND THE ROW IS MADE, which is the whole of what a friction pass ranked first of ten.
-   *
-   * Four clicks, twenty-five keystrokes, six decisions, three screens, and zero rows: this screen
-   * asks for one true fact about somebody's own business, takes it, and the list it then offers
-   * holds thirty-eight rows belonging to a fictional studio with theirs nowhere in it. It is not a
-   * write and it does not claim to be. `pending` holds it for the life of the tab and the list
-   * draws it wearing `Not saved`, which is the same receipt every other verb in this product
-   * leaves.
-   *
-   * AND THAT IS THE DEMO, WHICH IS WHAT THIS ASSERTION NOW SAYS.
-   *
-   * THE ARGUMENT ABOVE RESTS ON A PREMISE THAT WAS TRUE OF THE WHOLE APP AND IS NOW TRUE OF HALF OF
-   * IT. "It is not a write" was never a ruling that the first row must not be written; it was the
-   * honest description of a build with no write path, and `pending.svelte.ts` says so in as many
-   * words: "THE HONEST FIX IS NOT A WRITE PATH, WHICH DOES NOT EXIST YET." It exists now. `make`
-   * and `remember`, fifty lines up this same file, branch on `chosen.source.sample` and write
-   * through `client.create`, and the list screen writes this same form's output through
-   * `rows-write.ts`.
-   *
-   * SO THE SENTENCE SURVIVES WHERE ITS PREMISE DOES. There is no record behind the sample, so the
-   * row waits in `pending` and wears `Not saved`, exactly as before and for the reason given above.
-   * On a record there is somewhere to put it, and a screen that answered a person's first true fact
-   * with "Nothing was saved yet." while holding a record that would have taken it was reporting the
-   * state of the build rather than the state of their row, which is what `19 §9` bans.
-   *
-   * THE ASSERTION IS SCOPED RATHER THAN DELETED, so the demo half cannot quietly become a write on
-   * some later pass without this going red: the waiting row has to come after the sample branch
-   * opens. What the other half does is the test below.
+   * AND THE ROW IS MADE, which is the whole of what a friction pass ranked first of ten. There is
+   * no sample to hold it apart from any more (research-no-sample B1): the first row is a write to
+   * the record, and `pending` and the sample branch are gone, which this holds.
    */
-  assert.match(
-    commit,
-    /chosen\.source\.sample[\s\S]*pending\.add\(choice\.key, taken, chosen\.source\.sample\)/u,
-    'the demo row no longer waits in `pending`, or it waits for a record that could have taken it',
-  );
+  assert.doesNotMatch(commit, /pending\.|chosen\.source\.sample/u, 'the first row waits in a tab again instead of the record');
+  assert.match(commit, /saved = /u, 'the first row is no longer written');
   assert.match(startPage, /bind:taken/u, 'the form holds what was typed and hands out nothing');
 
   /* AND THE OUTCOME IS ON THE SCREEN, not only in a toast that a later navigation can take with it. */
-  assert.match(startPage, /firstRun\.keptNothing[^A-Za-z]/u, 'the outcome is not rendered');
+  assert.match(startPage, /firstRun\.rowSaved\(/u, 'the outcome is not rendered');
   assert.match(startPage, /role="status"/u, 'the outcome is not announced');
 
   /* THE WAY ONWARD IS OFFERED AND NOT TAKEN. The list is still reachable; it is a control now. */
   assert.match(startPage, /firstRun\.seeTheList\(/u, 'there is no way onward');
-  /* AND IT SAYS WHAT IS THERE. The sentence used to explain why somebody else's rows are on the
-     screen and said nothing about the one thing the person had just done. */
-  assert.match(startPage, /firstRun\.rowIsThere/u, 'the outcome does not say where the row went');
   assert.match(startPage, /\/r\/\$\{choice\.key\}\?first=1/u, 'the way onward lost its address');
 });
 

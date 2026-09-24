@@ -157,7 +157,6 @@ test('a flag name is never also a preference', () => {
     columns: true,
     nav: true,
     defined: true,
-    sampleSaid: true,
     railShut: true,
   };
   for (const [name] of entries)

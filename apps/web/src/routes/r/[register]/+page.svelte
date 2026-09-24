@@ -27,7 +27,7 @@
   import * as pref from '$lib/pref.ts';
   import { covered, silenced, typing as isTyping } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { chipsOf, columnsFor, currencyFor, seqWidth, dirOf, display, DOM_CAP, iconFor, identityFor, identityOf, inheritedFrom, labelOf, noticed, PAGES, readableFields, toRows, unansweredBy, type Filter, whereOf } from '$lib/record/api.ts';
+  import { chipsOf, columnsFor, currencyFor, seqWidth, dirOf, display, DOM_CAP, iconFor, identityFor, identityOf, labelOf, readableFields, toRows, type Filter, whereOf } from '$lib/record/api.ts';
   /* Type only, so the client's route table stays out of this chunk. */
   import { joinNames, type Names } from '$lib/record/remote.ts';
   import { open, read, type Boot, type Refusal } from '$lib/data/record.ts';
@@ -53,7 +53,6 @@
   import Kbd from '$lib/ui/Kbd.svelte';
   import Chip from '$lib/ui/Chip.svelte';
   import { drew } from '../../../lib/ui/screen.svelte.ts';
-  import * as pending from '$lib/record/pending.svelte.ts';
   import { capturedFields, holdInPlace, inverseOf, rowWriter, type Held, type RowWriter, type Wrote } from '$lib/record/rows-write.ts';
   import { draftOf, editable, patchOf, unchanged, unitOf, wrongMoney } from '$lib/record/field-draft.ts';
   import { spentPutBacks, type Change } from './put-back.ts';
@@ -82,20 +81,6 @@
    * against their own clock would put every band some number of days out with nothing saying so.
    */
   const now = $derived(booted ? Date.parse(booted.now) : Date.now());
-
-  /** Whether this list is the in-browser sample, because there is no record to read. See `open`. */
-  let sample = $state(false);
-
-  /* WHAT THE RECORD HAS NOTICED ABOUT THIS REGISTER, if anything crossed a threshold. It is derived
-     from the register alone — not from the filters — because a pattern in thirty days of refusals
-     is not a property of the rows currently on screen.
-
-     ONLY ON THE SAMPLE, BECAUSE THE SAMPLE IS WHOSE REFUSALS IT COUNTS. `noticed` reads the fixture
-     `OBSERVED`, so a live obligations list with no refusals at all said twelve of its saves had been
-     rejected over four days, and offered to raise them as a question. The kernel records the real
-     ones (`observe.ts`) and no method serves them yet; until one does, a live list draws no strip
-     rather than somebody else's. */
-  const seen = $derived(sample ? noticed(id) : null);
 
   /* URL state: filters and the query define WHICH ROWS YOU ARE LOOKING AT, so they must be
      shareable. View options are about your eyes rather than the data and live in the cookie. */
@@ -283,22 +268,14 @@
     receipts = new Map(receipts).set(seq, r);
   };
   /**
-   * What this row is wearing, which is not always something that happened on this screen.
+   * What this row is wearing, which is something that happened on this screen.
    *
-   * A PENDING ROW CARRIES ITS MARK WHETHER OR NOT ANYBODY IS STILL LOOKING AT THE PRESS THAT MADE
-   * IT. `receipts` is cleared whenever the question changes, because a chip saying `archived` beside
-   * a row somebody has just filtered TO is a chip about a different screen. A row that has not been
-   * written is not like that: it is unwritten on every screen, for as long as the tab is open, and
-   * the one place it is drawn is the one place that has to say so. A person who typed a row on the
-   * first run, went to the list, filtered it, and found their row wearing nothing would have been
-   * told it was saved by the absence of the sentence saying it was not.
-   *
-   * NEGATIVE SEQUENCES ARE THE TEST, because that is what `pending` mints and what nothing else in
-   * the record can be.
+   * IT ALSO ANSWERED FOR A ROW NOBODY HAD PRESSED HERE: a row typed against the sample waited in
+   * `pending` under a negative number and wore `Not saved` on every screen for the life of the tab.
+   * The sample went in DIRECTION 26 and `pending` with it (`loop/research-no-sample.md` B1), so every
+   * row on this list is one the record holds and the receipts are the only marks there are.
    */
-  const receiptFor = (seq: number): Receipt | undefined =>
-    receipts.get(seq) ??
-    (seq < 0 ? { mark: copy.markNotWritten, intent: 'warn' as const, undo: () => pending.drop(id, seq) } : undefined);
+  const receiptFor = (seq: number): Receipt | undefined => receipts.get(seq);
 
   const clearReceipt = (seq: number) => {
     const next = new Map(receipts);
@@ -328,7 +305,7 @@
   /** The whole answer's size, as the record counted it. The rows in hand are `pages`. */
   let matched = $state(0);
   /**
-   * WHAT THIS RECORD CALLS THE ROWS THESE ONES POINT AT, and `null` where the sample drew the list.
+   * WHAT THIS RECORD CALLS THE ROWS THESE ONES POINT AT, and `null` until the first answer lands.
    *
    * A `ref` is stored as another row's id and drawn as that row's NAME, and the only names this
    * screen had were the built-in sample's — so a live list printed the sample's row for every
@@ -425,7 +402,7 @@
       pages = [...pages, next.value.entries];
       /* A LATER PAGE MAY NAME ROWS THE FIRST ONE DID NOT, and it must not take away the names the
          rows already on screen are drawn with. The two are added together, newest last. */
-      named = next.value.names === null ? named : joinNames(named, next.value.names);
+      named = joinNames(named, next.value.names);
       cursor = next.value.cursor;
       return true;
     });
@@ -454,7 +431,6 @@
       const src = await open();
       const [b, s] = await Promise.all([src.boot(), src.schema(register)]);
       if (asked !== said) return true;
-      sample = src.sample;
       if (!b.ok) return refuse(b.refusal);
       booted = b.value;
       if (!s.ok) return refuse(s.refusal);
@@ -515,7 +491,7 @@
   });
 
   async function recheck() {
-    if (sample || declared?.register !== id) return;
+    if (declared?.register !== id) return;
     if (pages.length > 1) {
       stale = true;
       return;
@@ -627,14 +603,11 @@
     /* AND A ROW SOMEBODY HAS JUST ACTED ON IS WHERE THEY LEFT IT. `holdInPlace` pins each held row to the index it
        was read at and brings back one the answer has since dropped — the reopened row that no longer matches the
        chip it was found under. The hold is released when the question changes, with the receipt it belongs to. */
-    entries: holdInPlace(
-      [...pending.of(id, sample), ...pages.flat()],
-      held,
-    ).map((e) => {
+    entries: holdInPlace(pages.flat(), held).map((e) => {
       const patch = edits.get(e.seq);
       return patch ? { ...e, fields: { ...e.fields, ...patch } } : e;
     }),
-    matched: matched + pending.of(id, sample).length,
+    matched,
     names: named,
   });
 
@@ -790,12 +763,7 @@
    * of them is wrong wherever they are both visible — which is exactly at the cap, the one place the
    * cap line exists for.
    */
-  /* AND THE PENDING ROWS ARE IN IT, because they are in the numerator. `drawn` counts what the list
-     draws, which includes a row somebody has just typed, while `result.total` is the record's count
-     and does not: so every successful add printed a numerator larger than its denominator, "39 of
-     38" on Money after a first row and "15 of 14" on Tasks after one capture. A person who has just
-     added something is the last reader who should be shown arithmetic that looks broken. */
-  const denominator = $derived(filters.length || q ? result.matched : result.total + pending.of(id, sample).length);
+  const denominator = $derived(filters.length || q ? result.matched : result.total);
 
   /**
    * AND WHAT IS ACTUALLY DRAWN, WHICH IS NEITHER OF THE OTHER TWO.
@@ -896,8 +864,8 @@
     io.observe(el);
     return () => io.disconnect();
   });
-  /* NAMED BY WHICHEVER RECORD DREW THEM. `result.names` is the record's own title for every row a
-     ref on this list points at, and `null` is the sample, which names them out of its own rows. */
+  /* NAMED BY THE RECORD THAT DREW THEM. `result.names` is the record's own title for every row a
+     ref on this list points at, and `null` only before the first answer has landed. */
   const rows = $derived(toRows(id, result.entries.slice(0, DOM_CAP), columns, now, result.names ?? undefined));
 
   /**
@@ -938,15 +906,7 @@
    * The toast stays for the archive done from the keyboard with the row off screen.
    */
   function archive(seq: number) {
-    if (!sample && seq > 0) {
-      void archiveOnRecord([seq], `${id}#${seq}`);
-      return;
-    }
-    /* `warn`, LIKE EVERY OTHER RECEIPT ON THIS SCREEN. This was the one drawn with no tone, beside
-       four that pass one, and it says `Archived` over a row nothing happened to: the toast beside
-       it says "would be archived. Nothing was saved yet." Same fact, two registers. */
-    receipt(seq, { mark: copy.markArchived, intent: 'warn', undo: () => clearReceipt(seq) });
-    toasts.push(copy.archived(`${id}#${seq}`), { undo: () => clearReceipt(seq) });
+    void archiveOnRecord([seq], `${id}#${seq}`);
   }
 
   /* ── capture: one line, first on the page, with no decisions attached ────── */
@@ -967,34 +927,11 @@
    */
   let capture = $state('');
 
-  /**
-   * What the filter answers on the reader's behalf, and what it cannot.
-   *
-   * BOTH LIVE IN `record/api.ts` AND NOT HERE. They are the piece of this screen that can write a
-   * WRONG VALUE rather than an ugly one: the URL carries the readable form of a value and the record
-   * stores the declared one, so an inheritance that reconciled the two spellings loosely would put
-   * a reader's prose in a field and nothing would say so. That is a thing to have a test for, and a
-   * `$derived` inside a component is not reachable from one.
-   */
-  const inherited = $derived(inheritedFrom(id, filters));
-  const unanswered = $derived(unansweredBy(id, inherited));
+  /* ── writes ───────────────────────────────────────────────────────────────── */
 
   /**
-   * The row the sheet was filled in with.
-   *
-   * IT CLOSED THE SHEET AND SAID `Nothing was saved yet.` AFTER THE SHEET WAS GONE, with no mention
-   * of what would have been written. A friction pass called it out as the one write control in the
-   * app using the bare string where forty others use the descriptive one, and it is the most
-   * expensive control on the screen to reach: a press, a dialog, a form, a submit.
-   *
-   * THE SAME PLACE THE CAPTURE LINE AND THE FIRST-RUN SCREEN PUT A ROW. Three surfaces in this
-   * product take a row from a person and none of them can write one yet; holding the answer in
-   * three different ways would be three things to change on the day one of them can.
-   */
-  /* ── writes, when the list is a live record ───────────────────────────────── */
-
-  /**
-   * ON A LIVE RECORD EVERY GESTURE BELOW WRITES, and on the sample each says `notWritten` as before.
+   * EVERY GESTURE BELOW WRITES. On the sample each said `notWritten` instead, and the sample is gone
+   * (`loop/DIRECTION.md` 26), so there is one path and it is the record's.
    *
    * THE ROW THE RECORD HANDS BACK IS DRAWN WHERE THE OLD ONE WAS. A changed row that jumped to where
    * its new state sorts is the row the reader has to go and find again; a new row goes at the top.
@@ -1091,93 +1028,30 @@
   function addTypedRow() {
     if (problems.length > 0 || !decl) return;
     /* THE SHEET STAYS OPEN UNTIL THE RECORD HAS THE ROW, so a refusal leaves everything typed where it was. */
-    if (!sample) {
-      if (writing) return;
-      writing = true;
-      const was = asked;
-      void writes()
-        .create(id, taken)
-        .then((out) => {
-          writing = false;
-          if (!out.ok) return missed(was, out);
-          if (asked === was) addLanded(out.entry);
-          closeCreate();
-        });
-      return;
-    }
-    const named = display(id, decl.title, taken[decl.title]) ?? '';
-    const seq = pending.add(id, taken, sample);
-    receipt(seq, { mark: copy.markNotWritten, intent: 'warn', undo: () => pending.drop(id, seq) });
-    closeCreate();
-    /* THE NAME, NOT THE NOUN AND THE NAME. `${decl.one} ${named}` read "item Deposit for the print
-       run, but nothing was saved yet": the register's singular in front of a title that is already
-       a noun phrase. The noun is only worth saying when the row has no name to say instead. */
-    toasts.push(copy.notWritten(named || decl.one), { intent: 'warn' });
+    if (writing) return;
+    writing = true;
+    const was = asked;
+    void writes()
+      .create(id, taken)
+      .then((out) => {
+        writing = false;
+        if (!out.ok) return missed(was, out);
+        if (asked === was) addLanded(out.entry);
+        closeCreate();
+      });
   }
 
   function captureRow() {
     const said = capture.trim();
     if (!said) return;
-    /* NEGATIVE SEQUENCES, so a draft can never collide with a row the record has. The spoken id is
-       what every other thing on this screen addresses a row by, and two rows answering to
-       `obligations#7` is the one collision that would make the receipt point at the wrong row. */
-    const title = decl?.title;
-    if (!title) return;
-    /* ON A LIVE RECORD THE LINE EMPTIES AT ONCE, and what was typed goes back into it if the record says no. */
-    if (!sample) {
-      capture = '';
-      void createRow(said, (back) => {
-        /* WHAT WAS TYPED GOES BACK IN THE BOX, and only if nothing else has been typed since. Overwriting a
-           second line somebody has already started would lose the newer one to report the older. */
-        if (capture === '') capture = back;
-      });
-      return;
-    }
-    /* THE SAME PLACE THE FIRST-RUN SCREEN PUTS ITS ROW. A row typed here and a row typed on `/start`
-       are the same kind of thing, waiting on the same missing write path, and holding one of them
-       in this component and the other in a module would be two answers to one question: the second
-       screen to need it would have found the wrong one. */
-    const seq = pending.add(id, { ...inherited, [title]: said }, sample);
-    /**
-     * THE ROW IS ADDED EVEN WHEN THE REGISTER WANTS MORE, and the chip says what it wants.
-     *
-     * THE FIRST VERSION BOUNCED TO THE FULL FORM instead, which is the modal this line exists to
-     * replace arriving one keystroke later. Obligations require a direction, an amount, a due date
-     * and a state beyond the title, so on the register a person opens most often the fast path
-     * never ran once.
-     *
-     * IT IS LINEAR'S GRACE WINDOW, WHICH `loop/REWORK.md` NAMES AS THE HIGHEST-VALUE SINGLE STEAL
-     * for this product: a row is allowed to be incomplete for the minutes right after it is
-     * captured, because the alternative is that the thing in somebody's head has to survive a form
-     * before it can be written down. The row is here, it is named, and what it still needs is on
-     * it, so the form is a place to go rather than a gate to pass.
-     */
-    receipt(seq, {
-      mark: unanswered.length > 0 ? copy.markNeeds(unanswered.map((f) => f.label.toLowerCase()).join(', ')) : copy.markNotWritten,
-      short: copy.markNotWritten,
-      intent: 'warn',
-      undo: () => {
-        pending.drop(id, seq);
-        clearReceipt(seq);
-      },
-    });
-    /**
-     * AND IT SAYS THE ROW IS NOT SAVED, WHICH THE CHIP ABOVE CANNOT ALWAYS SAY.
-     *
-     * The mark is `markNeeds` OR `markNotWritten`, one or the other, and the argument for that is
-     * good: what a row still needs is the actionable half and a chip has room for one sentence.
-     * The cost is that the register a person opens most often wants four fields beyond the title,
-     * so on that register the fast path ALWAYS takes the `markNeeds` branch and the words "not
-     * saved" are never printed anywhere at all. `pending.svelte.ts`'s own header calls that the
-     * failure it exists to prevent: "a row that comes back tomorrow looking saved is worse than
-     * one that is honestly gone."
-     *
-     * `addTypedRow` twenty lines above, which is the same act through the full form, has always
-     * pushed this toast. The capture line pushed nothing, so the cheapest write in the product
-     * was also the only one that answered a person with silence.
-     */
-    toasts.push(copy.notWritten(said), { intent: 'warn' });
+    if (!decl?.title) return;
+    /* THE LINE EMPTIES AT ONCE, and what was typed goes back into it if the record says no. */
     capture = '';
+    void createRow(said, (back) => {
+      /* WHAT WAS TYPED GOES BACK IN THE BOX, and only if nothing else has been typed since. Overwriting a
+         second line somebody has already started would lose the newer one to report the older. */
+      if (capture === '') capture = back;
+    });
   }
 
   /**
@@ -1213,15 +1087,11 @@
   /**
    * The empty state's offer, made good: one real row, named as an example.
    *
-   * ON THE SAMPLE IT SAYS WHAT IT WOULD HAVE DONE, exactly as it always has — there is no record behind that
-   * screen and `notWritten` is the honest answer. On a live record it writes, through the same path as the
-   * capture line, so an example row and a typed row are the same kind of thing and are put back the same way.
+   * IT WRITES, through the same path as the capture line, so an example row and a typed row are the same kind of
+   * thing and are put back the same way. On the sample it said what it would have done; the sample is gone.
    */
   function addExample() {
-    if (sample || !decl) {
-      toasts.push(copy.notWritten(copy.exampleWouldBeAdded), { intent: 'warn' });
-      return;
-    }
+    if (!decl) return;
     /* "PUT IT BACK IF YOU DO NOT WANT IT", AND THERE WAS NOTHING TO PRESS. The sentence promised a way back that only
        the row menu's Archive gave, and it was said when the record had REFUSED the example too, over the refusal's own
        toast: `createRow` answered nothing either way. It answers the row now, and no row is no sentence. */
@@ -1238,33 +1108,27 @@
    * verb a person reaches for most on a list of obligations, and it was the one the row menu did
    * not carry.
    *
-   * THE RECEIPT IS THE ANSWER AND THE TOAST IS THE BACKUP, the same way `archive` works: the chip
-   * is on the row, beside what the row says, and the toast is for the reader whose row has scrolled
-   * away. Nothing is written until the record is behind this screen, and the chip says which state
-   * it would be rather than claiming the move happened.
+   * THE RECEIPT IS THE ANSWER: the chip is on the row, beside what the row says, reads `Saving` while
+   * the write is out and the state it landed on after, with the way back on it.
    */
   function setRowState(seq: number, state: string) {
     const said = saidInLine(decl?.state ?? '', state);
     const field = decl?.state;
-    if (!sample && seq > 0 && field) {
-      const was = asked;
-      const before = rowAt(seq);
-      const patch = { [field]: state };
-      hold(seq);
-      receipt(seq, { mark: copy.writeMarkSaving, intent: 'warn' });
-      void writes()
-        .update(id, seq, patch, before?.version)
-        .then((out) => {
-          if (asked === was) clearReceipt(seq);
-          if (!out.ok) return missed(was, out);
-          if (asked !== was) return;
-          landRow(out.entry);
-          receipt(seq, { mark: said, intent: 'good', undo: putBackOf(before, patch, out.entry) });
-        });
-      return;
-    }
-    receipt(seq, { mark: said, intent: 'warn', undo: () => clearReceipt(seq) });
-    toasts.push(copy.notWritten(`${id}#${seq} would be set to ${said}`), { intent: 'warn' });
+    if (!field) return;
+    const was = asked;
+    const before = rowAt(seq);
+    const patch = { [field]: state };
+    hold(seq);
+    receipt(seq, { mark: copy.writeMarkSaving, intent: 'warn' });
+    void writes()
+      .update(id, seq, patch, before?.version)
+      .then((out) => {
+        if (asked === was) clearReceipt(seq);
+        if (!out.ok) return missed(was, out);
+        if (asked !== was) return;
+        landRow(out.entry);
+        receipt(seq, { mark: said, intent: 'good', undo: putBackOf(before, patch, out.entry) });
+      });
   }
 
   /* ── editing a value where it is drawn ───────────────────────────────────── */
@@ -1336,28 +1200,17 @@
     copy.cellWhy[fieldOf(field)?.type ?? ''] ?? copy.cellWhyElse;
 
   /**
-   * THE VALUE THE READER IS LOOKING AT, which is not the value the record holds.
+   * THE VALUE THE READER IS LOOKING AT, which is not always the value the record holds.
    *
-   * The grid draws `pending` rows and the record's rows with `edits` patched over the top, and the
-   * editor read `entry()` alone. Three things followed from that one line, all of them silent:
-   *
-   * A SECOND EDIT OF THE SAME CELL OPENED ON THE ORIGINAL. Change a title, press `e` on it again,
-   * and the box holds what the record still says rather than what the row on screen says. Anybody
-   * who then pressed Enter without retyping had quietly reverted their own change.
-   *
-   * A PENDING ROW OPENED EMPTY. `entry()` reads `ROWS` and a row somebody typed into the capture
-   * line is not in `ROWS`, so every cell of the row they had just created offered a blank box.
-   *
-   * AND TYPING THE RECORD'S VALUE BACK WAS READ AS "nothing changed". `commitEdit` compared against
-   * the record too, so undoing an edit BY HAND returned early with the patch still in the map: the
-   * cell went on showing the edited value, and the row went on wearing `Not saved` for a change the
-   * person had just typed away.
+   * The grid draws the record's rows with `edits` patched over the top while a write is out, and the
+   * editor read `entry()` alone. A SECOND EDIT OF THE SAME CELL OPENED ON THE ORIGINAL: change a title,
+   * press `e` on it again, and the box held what the record still said rather than what the row on
+   * screen said. Anybody who then pressed Enter without retyping had quietly reverted their own change.
    */
   const shownValue = (seq: number, field: string): unknown => {
     const patch = edits.get(seq);
     if (patch && Object.hasOwn(patch, field)) return patch[field];
-    const held = rowAt(seq) ?? pending.of(id, sample).find((r) => r.seq === seq);
-    return held?.fields[field];
+    return rowAt(seq)?.fields[field];
   };
 
   function openEditor(seq: number, field: string) {
@@ -1471,79 +1324,38 @@
     const made = patchOf(f, typed, shown, currency)[at.field] ?? null;
     const value = made === '' ? null : made;
 
-    /* ON A LIVE RECORD THE CELL SHOWS WHAT WAS TYPED WHILE IT SAVES. A refused value goes back into the
-       cell's editor, so it is corrected rather than typed again; a conflict draws the row as it now
-       stands first, so the retry is against the latest version. */
-    if (!sample && at.seq > 0) {
-      const was = asked;
-      /* THE ROW AS THE RECORD HELD IT, read before the patch goes over it, since the patch is what `Put back` undoes. */
-      const before = rowAt(at.seq);
-      const patch = { [at.field]: value };
-      hold(at.seq);
-      setPatch(at.seq, at.field, value);
-      receipt(at.seq, { mark: copy.writeMarkSaving, intent: 'warn' });
-      void writes()
-        .update(id, at.seq, patch, before?.version)
-        .then((out) => {
-          if (asked !== was) {
-            if (!out.ok) toasts.push(out.fix, { intent: 'warn' });
-            return;
-          }
-          dropPatch(at.seq, at.field);
-          clearReceipt(at.seq);
-          if (out.ok) {
-            landRow(out.entry);
-            receipt(at.seq, { mark: copy.writeMarkSaved, intent: 'good', undo: putBackOf(before, patch, out.entry) });
-            return;
-          }
-          missed(was, out);
-          if (editing === null) {
-            editing = at;
-            editValue = String(typed);
-            editTicked = typed === true;
-          }
-        });
-      return;
-    }
-
-    /* AND TYPING THE ORIGINAL BACK IS NOT AN EDIT EITHER, IT IS AN UNDO. The comparison above is
-       against what is on screen, so this one is against what the record holds: reaching the record's
-       own value by hand drops the patch and takes the receipt with it, rather than recording a
-       change from a value to itself. */
-    const held = rowAt(at.seq);
-    const next = new Map(edits);
-    const patch = { ...(next.get(at.seq) ?? {}) };
-    if (held && unchanged(f, typed, held.fields[at.field], currency)) {
-      delete patch[at.field];
-      if (Object.keys(patch).length === 0) next.delete(at.seq);
-      else next.set(at.seq, patch);
-      edits = next;
-      if (!next.has(at.seq)) clearReceipt(at.seq);
-      return;
-    }
-
-    next.set(at.seq, { ...patch, [at.field]: value });
-    edits = next;
-    receipt(at.seq, {
-      mark: copy.markNotWritten,
-      intent: 'warn',
-      undo: () => {
-        const back = new Map(edits);
-        const left = { ...(back.get(at.seq) ?? {}) };
-        delete left[at.field];
-        if (Object.keys(left).length === 0) back.delete(at.seq);
-        else back.set(at.seq, left);
-        edits = back;
-        /* AND ONLY WHEN THERE IS NOTHING LEFT TO REPORT. Undoing one cell of a row that has two
-           unsaved cells on it cleared the row's whole receipt, so the second change stayed in the
-           map and on the screen with nothing marking it: an unsaved value wearing the record's
-           face, which is the one thing the receipt exists to prevent. */
-        if (!back.has(at.seq)) clearReceipt(at.seq);
-      },
-    });
-    toasts.push(copy.notWritten(`${id}#${at.seq} ${labelOf(f).toLowerCase()} would be ${display(id, at.field, value) ?? 'cleared'}`), {
-      intent: 'warn',
-    });
+    /* THE CELL SHOWS WHAT WAS TYPED WHILE IT SAVES. A refused value goes back into the cell's editor, so
+       it is corrected rather than typed again; a conflict draws the row as it now stands first, so the
+       retry is against the latest version. The branch that held the value unsaved and toasted what it
+       would have written was the sample's, and went with it. */
+    const was = asked;
+    /* THE ROW AS THE RECORD HELD IT, read before the patch goes over it, since the patch is what `Put back` undoes. */
+    const before = rowAt(at.seq);
+    const patch = { [at.field]: value };
+    hold(at.seq);
+    setPatch(at.seq, at.field, value);
+    receipt(at.seq, { mark: copy.writeMarkSaving, intent: 'warn' });
+    void writes()
+      .update(id, at.seq, patch, before?.version)
+      .then((out) => {
+        if (asked !== was) {
+          if (!out.ok) toasts.push(out.fix, { intent: 'warn' });
+          return;
+        }
+        dropPatch(at.seq, at.field);
+        clearReceipt(at.seq);
+        if (out.ok) {
+          landRow(out.entry);
+          receipt(at.seq, { mark: copy.writeMarkSaved, intent: 'good', undo: putBackOf(before, patch, out.entry) });
+          return;
+        }
+        missed(was, out);
+        if (editing === null) {
+          editing = at;
+          editValue = String(typed);
+          editTicked = typed === true;
+        }
+      });
   }
 
   const copyId = (seq: number) => clipboard.putSpoken(id, seq);
@@ -1592,16 +1404,13 @@
    * THE KEY IS `seq`, WHICH IS THE STABLE ONE. `focus.row` is an index into whatever is on screen
    * and moves when a filter does; `#7` is `#7` under every sort this list has.
    */
-  /* AND A ZERO IS THE ONLY NUMBER THAT IS NOT A ROW. This read `said > 0`, which was right on the
-     day it was written and wrong the day `pending` started minting NEGATIVE sequences for rows
-     somebody has typed and the record has not been given. Pressing `p` on an unwritten row wrote
-     `?row=-1` into the URL, made a real history entry, and opened nothing; the row menu's Peek item
-     was equally dead, and the `?` sheet advertises the key with no condition on it. The detail
-     route learnt about pending rows and this drawer did not, so `/r/obligations/-1` opened and `p`
-     on the same row did nothing at all. */
+  /* A ROW'S NUMBER IS ONE OR MORE, which is what the record hands out. This read `said !== 0` for as
+     long as `pending` minted NEGATIVE numbers for rows typed against the sample, so `?row=-1` could
+     open the drawer on one; `pending` went with the sample (`loop/research-no-sample.md` B1), and a
+     negative number in an address now names no row anywhere. */
   const peeked = $derived.by(() => {
     const said = Number(page.url.searchParams.get('row'));
-    return Number.isInteger(said) && said !== 0 ? said : null;
+    return Number.isInteger(said) && said > 0 ? said : null;
   });
 
   const peek = (seq: number | null) =>
@@ -1610,9 +1419,7 @@
       else p.set('row', String(seq));
     });
 
-  const peekedEntry = $derived(
-    peeked === null ? undefined : (rowAt(peeked) ?? pending.of(id, sample).find((r) => r.seq === peeked)),
-  );
+  const peekedEntry = $derived(peeked === null ? undefined : rowAt(peeked));
 
   /** Only INDEXED fields are offered, in declaration order, at most eight. A filter on an unindexed
       field is a promise the storage cannot keep at 5,000 rows. */
@@ -1631,8 +1438,8 @@
    *
    * A facet count: the rows holding the value under every OTHER filter and the search, so a pill
    * says what it holds whether or not its own field is filtered yet. The record counts them, one
-   * `limit: 1` list per value, while the bar is on screen (`ask`). Rows typed here and edits made
-   * here are added on top, because the list below draws them and the record has not been told.
+   * `limit: 1` list per value, while the bar is on screen (`ask`). Edits made here are added on top
+   * while they are out, because the list below draws them and the record has not answered yet.
    *
    * AN EDIT MOVES ITS ROW FROM ONE PILL TO ANOTHER, and only a row in hand can have been edited.
    * Every row in hand answers the whole question, so it answers the pill's question too, and moving
@@ -1646,7 +1453,6 @@
     };
     for (const [field, held] of counted) {
       const n = new Map(held);
-      for (const e of pending.of(id, sample)) bump(n, e.fields[field], 1);
       for (const e of pages.flat()) {
         const patch = edits.get(e.seq);
         if (!patch || !Object.hasOwn(patch, field)) continue;
@@ -1850,7 +1656,7 @@
     }
     if (e.altKey && e.key.toLowerCase() === 'v') {
       e.preventDefault();
-      askSaveView();
+      void saveView();
       return;
     }
     if (e.altKey && e.key.toLowerCase() === 'b') {
@@ -2077,13 +1883,10 @@
   async function setPickedState(state: string) {
     const said = saidInLine(decl?.state ?? '', state);
     const field = decl?.state;
-    if (sample || !field) {
-      toasts.push(copy.notWritten(`${picked.length} rows would be set to ${said}`), { intent: 'warn' });
-      return;
-    }
+    if (!field) return;
     const was = asked;
-    const total = picked.length;
-    const rows = picked.filter((e) => e.seq > 0);
+    const rows = [...picked];
+    const total = rows.length;
     let landedCount = 0;
     let first: string | null = null;
     const patch = { [field]: state };
@@ -2115,8 +1918,8 @@
   /**
    * Archive rows on the record, one at a time, and give each one back from where it is drawn.
    *
-   * THE ROW STAYS WHERE IT WAS, wearing `Archived` and `Put back`, the receipt the sample has always drawn; the record
-   * leaves it out of the next read. Put back and the toast's undo are the same write the other way: `deleted_at` null,
+   * THE ROW STAYS WHERE IT WAS, wearing `Archived` and `Put back`, the receipt the sample drew before this wrote; the
+   * record leaves it out of the next read. Put back and the toast's undo are the same write the other way: `deleted_at` null,
    * at the version the archive answered with. No dialog, because an undo says what happened and a dialog asks first.
    */
   async function archiveOnRecord(seqs: readonly number[], named: string) {
@@ -2146,17 +1949,7 @@
   }
 
   /**
-   * THE CHORD AND THE BUTTONS ASK THE SAME QUESTION, so the sample's answer is written once. `⌥V` was the only way in
-   * until W59-3, and its sample branch lived inline in the key handler while `saveView()` has no sample guard of its
-   * own: a button calling `saveView()` straight would have skipped the sentence the chord says on a sample list.
-   */
-  function askSaveView() {
-    if (sample) toasts.push(copy.notWritten(copy.viewWouldBeSaved), { intent: 'warn' });
-    else void saveView();
-  }
-
-  /**
-   * `⌥V` on a live record: what is on screen, saved as a page under Views, and that page opened.
+   * `⌥V`, and the two buttons that say it: what is on screen, saved as a page under Views, and that page opened.
    *
    * NO NAMING DIALOG. The address already says which rows these are, so the name is the list and its filter in the
    * list's own words, and the toast's undo retires the page and comes back here. See `viewPage` for why it is a page.
@@ -2274,38 +2067,11 @@
 
   function archiveSelected() {
     const seqs = picked.map((e) => e.seq);
-    if (!sample && seqs.every((seq) => seq > 0)) {
-      selected = new Set();
-      void archiveOnRecord(seqs, `${seqs.length} ${(seqs.length === 1 ? decl?.one : decl?.name)?.toLowerCase() ?? 'rows'}`);
-      return;
-    }
-    /* AND EACH ROW GETS ITS OWN `Put back`, WHICH THE BULK PATH DID NOT GIVE IT. Archiving one row
-       writes a receipt carrying an undo, so the row keeps a way back for as long as it is drawn.
-       Archiving eight wrote eight receipts with no undo on any of them and put the only way back in
-       a toast that expires after ten seconds: same verb, same rows, one of the two reversible after
-       a pause. The toast keeps its own undo for all of them at once, which is the thing a person
-       reaches for immediately; the row keeps the one they find later. */
-    const next = new Map(receipts);
-    for (const seq of seqs)
-      next.set(seq, { mark: copy.markArchived, intent: 'warn' as const, undo: () => clearReceipt(seq) });
-    receipts = next;
     selected = new Set();
-    /* ONE ROW IS NOT "1 obligations". The register declares both spellings — `name` for the list
-       and `one` for a row of it — and this read only the first, so every single-row bulk archive
+    /* ONE ROW IS NOT "1 obligations". The register declares both spellings, `name` for the list and
+       `one` for a row of it, and the bulk archive read only the first, so every single-row bulk archive
        said the plural. The keyboard path next door has always said `obligations#1`. */
-    toasts.push(
-      copy.archived(
-        `${seqs.length} ${(seqs.length === 1 ? decl?.one : decl?.name)?.toLowerCase() ?? 'rows'}`,
-      ),
-      {
-        undo: () => {
-          const back = new Map(receipts);
-          for (const seq of seqs) back.delete(seq);
-          receipts = back;
-          selected = new Set(seqs);
-        },
-      },
-    );
+    void archiveOnRecord(seqs, `${seqs.length} ${(seqs.length === 1 ? decl?.one : decl?.name)?.toLowerCase() ?? 'rows'}`);
   }
 
   /** The register's own states, so the menu is the vocabulary rather than a list typed here. */
@@ -2401,13 +2167,6 @@
   </PageHead>
 
   <div class="page" aria-busy={busy ? 'true' : undefined}>
-    <!-- THE SAMPLE SAYS SO, in the sample bar's own sentence and no louder. There is no record for
-         this tab to read, so these rows are the in-browser sample every other screen draws; that is
-         where they came from, not something that went wrong. See `open` in `lib/data/record.ts`,
-         which is also where this stops being reachable. -->
-    <!-- AND ONLY ONCE THE SAMPLE BAR HAS BEEN PUT AWAY. While the bar stands at the top of the panel
-         this printed its first sentence a second time, forty pixels under it. -->
-    {#if sample && pref.read().sampleSaid === true}<p class="sample-note">{copy.sampleWhat}</p>{/if}
     <!-- THE LIST HAS MOVED ON AND MORE THAN ONE PAGE OF IT IS IN HAND, so it says so rather than splicing a new head
          onto old pages (`recheck` above). `role="status"` because it arrives without the reader doing anything, and a
          screen reader should hear it once, politely. -->
@@ -2608,7 +2367,7 @@
              looks. On a phone with filters it lives in the filter sheet instead, beside Clear, for
              the reason Clear does. -->
         {#if (q || filters.length) && !(rowsAsCards() && enums.length)}
-          <Button weight="bare" onclick={askSaveView}><Icon name="plus" size="s" />{copy.saveAsView}</Button>
+          <Button weight="bare" onclick={() => void saveView()}><Icon name="plus" size="s" />{copy.saveAsView}</Button>
         {/if}
         <Button weight="bare" onclick={() => (displayOpen = true)}>
           <Icon name="settings" size="s" />{copy.display}
@@ -2657,11 +2416,10 @@
             <!-- NO "Add the first row" HERE ANY MORE. The capture line sits directly above and the New
                  button beside the title, so an empty list drew three ways to add a row and two filled
                  buttons. The one offer only this state can make is the example. -->
-            <!-- ON A LIVE RECORD IT ADDS THE EXAMPLE ROW, through the same `create` and the same inference the
-                 capture line uses: an empty list offering to show you what a row looks like, and answering with a
-                 sentence about what it would have done, is the defect this phase exists to remove. It is a REAL
-                 row, named as an example and wearing `Put back`, so nobody has to wonder which of these they
-                 typed. On the sample it says `notWritten` exactly as it always has. -->
+            <!-- IT ADDS THE EXAMPLE ROW, through the same `create` and the same inference the capture line
+                 uses: an empty list offering to show you what a row looks like, and answering with a sentence
+                 about what it would have done, is the defect this phase exists to remove. It is a REAL row,
+                 named as an example and wearing `Put back`, so nobody has to wonder which of these they typed. -->
             <Button onclick={addExample}>{copy.showExample}</Button>
           {/if}
         {/snippet}
@@ -2718,16 +2476,11 @@
           <!--
             THE RECEIPT, ON THE ARM THAT IS THE ONLY ONE A PHONE EVER SEES.
 
-            `receiptFor` has been drawn by the grid since it was written, under a paragraph
-            arguing that a pending row "is unwritten on every screen, for as long as the tab is
-            open, and the one place it is drawn is the one place that has to say so". Below 640px
-            the grid is `display: none` and the cards are the one place, and they drew none of it.
-
-            Measured: type a row into the capture line on a phone and press Enter. The row appears
-            at the top of the list wearing `#-1` and nothing else. No chip, no `Put back`, and no
-            sentence anywhere saying the thing you just typed has not been kept. The module that
-            mints it says in its own header that a row which "comes back tomorrow looking saved is
-            worse than one that is honestly gone", and on a phone it looked saved immediately.
+            `receiptFor` has been drawn by the grid since it was written. Below 640px the grid is
+            `display: none` and the cards are the one place, and they drew none of it: a row typed
+            into the capture line on a phone appeared at the top of the list with no chip and no
+            `Put back`, so the receipt that says what just happened to it was on the one body
+            nobody was looking at.
 
             The same `Chip` and the same `undo` the grid renders, so there is one receipt and not
             a touch copy of one.
@@ -3014,17 +2767,9 @@
             {:else if ident}
               <IdentityMark identity={ident} />
             {:else if column.field === 'seq'}
-              <!--
-                A ROW THAT HAS NO ID PRINTS NO ID, and it used to print `#-1`.
-
-                `pending` mints a NEGATIVE sequence so a row somebody typed can never collide with
-                one the record has, which is right and is argued for in that module's header. What
-                was never decided is what the column shows: `toRows` writes `#${seq}` for every
-                row, so the sentinel went straight to the screen. `#-1` is not a spoken id, it is
-                an implementation detail with a minus sign in front of it, and the column it
-                appears in is the one whose whole job is to give a person something they can say
-                out loud. The receipt beside it already says what the row is.
-              -->{#if seq >= 0}<span class="row-seq">{value}</span>{/if}
+              <!-- EVERY ROW HERE HAS A NUMBER THE RECORD GAVE IT. The guard that hid the `#-1` a row
+                   typed against the sample wore went with `pending` (`loop/research-no-sample.md` B1).
+              --><span class="row-seq">{value}</span>
             {:else if value === null}
               <!-- AN EMPTY CELL DRAWS NOTHING. A dash in every gap was a column of marks that meant
                    nothing; only a title says so, because a row with no name needs words to be found. -->
@@ -3097,7 +2842,7 @@
       person's own row landed at y 944 on an 844px screen whose usable area ends at 788 above the tab
       bar. `19 §6` calls this screen "the register, with their one row in it", and the one row was
       the one thing on it they could not see. The panel is the second step, so it sits after the
-      first; the note below moved under the rows for the same reason and says so.
+      first.
 
       ON THE ARRIVAL ITSELF, THE ONLY LIST WITH ANYTHING IN IT IS THIS ONE. `?first=1` is a claim
       about the moment: somebody has just written their first row and been sent here, so on a
@@ -3108,72 +2853,6 @@
       <!-- AND THE LISTS IT ALREADY HAS WITH ROWS IN THEM. A list added on the way to this one (Services
            brings Projects) was offered again as a card for something already done. -->
       <Second held={[id, ...(page.data.index?.registers ?? []).map((r: { id: string }) => r.id)]} register={id} first />
-    {/if}
-
-    <!-- AND UNDER THE ROWS, NOT OVER THEM.
-
-         Measured on the built app at 390px: the sample bar, the header, the filter bar, its note,
-         this and the capture line put the first row at 865px of an 844px viewport, so somebody
-         opening their list of money saw no rows at all without scrolling. This note is 152px of
-         that, and it is the one piece of it that is not about the rows: its own paragraph below
-         says it is not an alarm, that nothing is broken and nothing is urgent, and that it is
-         addressed to whoever maintains the declaration rather than to whoever came to look at
-         their invoices. A thing that is not urgent does not go above the thing a person came for.
-
-         UNDER THE ROWS AND NOT BEHIND A WIDTH, because `13 §10` is that a phone shows a DECLARED
-         subset rather than a media-queried one, and because the argument holds at every width: it
-         was 152px over the rows on a desktop too.
-
-         WHAT THE RECORD NOTICED, ON THE SCREEN IT IS ABOUT.
-
-         The observe loop is the most careful mechanism in this product — nine signals, four
-         detectors whose counts come from the rule of three, a dispersion requirement on every one
-         because a burst is not a pattern — and none of it had ever reached a person. It went here
-         and not on a findings page because `write.refused` carries `<register>.<field>:<code>`,
-         which IS this screen: the grid somebody keeps being refused at.
-
-         IT IS A NOTE, NOT AN ALARM. Nothing is broken and nothing is urgent; a thing has been
-         happening for weeks and the record is the only one that counted. `role="note"` and no
-         intent colour, because the day it looks like an error is the day it gets dismissed
-         unread. -->
-    <!-- AND NOT ON SOMEBODY'S FIRST MINUTE. This reports a pattern over thirty days on a register
-         that has been written to repeatedly — it is addressed to whoever maintains the declaration,
-         and it was the largest thing on the screen a person landed on after typing their first row,
-         reading "12 writes to Direction were refused … ENUM_VALUE_UNKNOWN · 30d". -->
-    <!-- AND NOT OVER AN EMPTY RESULT EITHER. It is a note about a register somebody writes to, and
-         a screen showing no rows is not the moment to read it. -->
-    {#if seen && !arriving && result.entries.length > 0}
-      <aside class="seen" role="note">
-        <Icon name="observe" size="s" />
-        <p class="seen-said">
-          <!-- `saves` AND `rejected`, WHICH WERE `writes` AND `refused`. Both are this product's own
-               words for the mechanism, and this banner sits on the front of the busiest list in the
-               product: a friction pass counted it as three tax words in one sentence, met by
-               somebody who came to look at their invoices. A write is a save and a refusal is a
-               rejection, in every product a person has used before this one. The error code that
-               followed the sentence is gone too: the sentence already says what was rejected. -->
-          <strong>{seen.n} saves</strong> to
-          <!-- A NAME AND NOT A LINK. The writes were REFUSED, so there are no rows to filter to and
-               nowhere in this build that shows a field's own declaration; a link that went to a
-               filter matching nothing would be worse than the plain word. -->
-          {#if seen.field}<em class="seen-field">{seen.field.label}</em>{:else}{copy.thisList}{/if}
-          were rejected over {seen.days} days: {seen.fix}.
-        </p>
-        <Button
-          weight="quiet"
-          onclick={() =>
-            /* `rejected saves` AND NOT `refused writes`. The banner three lines up deliberately says
-               the first pair, because a friction pass counted the second as two tax words on the
-               front of the busiest list in the product, and this toast kept saying the old ones: one
-               screen, one gesture apart, two vocabularies for the same fact. */
-            toasts.push(
-              copy.notWritten(
-                `${seen?.field?.label ?? id} would be raised as a question on /decide, with the ${seen?.n} rejected saves attached`,
-              ),
-              { intent: 'warn' },
-            )}
-        >{copy.raiseIt}</Button>
-      </aside>
     {/if}
   </div>
 
@@ -3198,7 +2877,7 @@
   <Sheet
     open={peeked !== null}
     title={String(peekedEntry?.fields[decl.title] ?? '')}
-    id={peeked !== null && peeked > 0 ? `#${peeked}` : undefined}
+    id={peeked !== null ? `#${peeked}` : undefined}
     onclose={() => peek(null)}
   >
     {#if peekedEntry}
@@ -3219,12 +2898,6 @@
       </dl>
     {/if}
     {#snippet footer()}
-      <!-- AN UNWRITTEN ROW SAYS SO HERE TOO, and it does not get a number. `#-1` is the sequence
-           `pending` hands out to keep it from colliding with a real row; it is machinery, and the
-           header printed it. The row itself opens, because the detail route now finds it. -->
-      {#if peeked !== null && peeked < 0}
-        <Chip label={copy.markNotWritten} tone="warn" />
-      {/if}
       <Button weight="primary" href="/r/{id}/{peeked}"><Icon name="external" size="s" />{copy.openRow}</Button>
       <Button weight="bare" onclick={() => peek(null)}><Icon name="close" size="s" />{copy.close}</Button>
     {/snippet}
@@ -3240,13 +2913,6 @@
     register={id}
     predicate={whereOf(filters) || q || copy.everything}
     says={saidPlainly(id, whereOf(filters)) || (q ? `matching “${q}”` : copy.everything)}
-    onbind={(toPage, kind) =>
-      toasts.push(
-        copy.notWritten(
-          `A ${(copy.kindNames[kind] ?? kind).toLowerCase()} would be added to ${PAGES[toPage]?.title ?? toPage}, reading ${decl.name.toLowerCase()}`,
-        ),
-        { intent: 'warn' },
-      )}
   />
 
   <!-- Display options: what YOU see, never what the record says. `v`. -->
@@ -3374,7 +3040,7 @@
             weight="bare"
             onclick={() => {
               filterOpen = false;
-              askSaveView();
+              void saveView();
             }}><Icon name="plus" size="s" />{copy.saveAsView}</Button
           >
         {/if}
@@ -3530,15 +3196,9 @@
     padding: var(--sp-4) var(--gutter) var(--sp-9);
   }
 
-  /* The sample bar's sentence, in the dim ink a note takes: it says where the rows came from. */
-  .sample-note {
-    margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-xs);
-  }
-
-  /* THE SAME DIM NOTE, WITH ITS ONE CONTROL BESIDE IT. It wraps, for the reason `.seen` below does: at 320px a word and
-     a button on one line is the button leaving the window. */
+  /* A DIM NOTE, WITH ITS ONE CONTROL BESIDE IT. It wraps, because at 320px a word and a button on one line is the button
+     leaving the window: measured on the strip that said what the record had noticed, which went with the sample, the
+     button sat eleven pixels past the edge. */
   .stale {
     display: flex;
     flex-wrap: wrap;
@@ -3548,43 +3208,6 @@
     color: var(--ink2);
     font-size: var(--t-xs);
   }
-
-  /* A NOTE READS AS A NOTE. One hairline, the page's own paper, no intent colour and no fill: it
-     sits above the grid the way a margin annotation sits beside a paragraph. */
-  .seen {
-    display: flex;
-    /* IT WRAPS, because at 320px a sentence and a button do not fit on one line and the button was
-       the thing that left the window — pushed eleven pixels past the edge, where the last thing a
-       person can do about a refusal sits half off the screen. `align-items: center` is right for one
-       line and wrong for two, so the wrapped case aligns to the start. */
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-3);
-    padding: var(--sp-3) var(--sp-4);
-    background: var(--s1);
-    border-radius: var(--r-md);
-    color: var(--ink2);
-  }
-
-  .seen-said {
-    /* `flex: 1` ALONE DOES NOT LET IT SHRINK. A flex child's floor is its content, so a long
-       sentence held the row at its own width and the button went over the side rather than under.
-
-       AND 16ch WAS A FLOOR IT COULD SIT AT. At 390px the sentence took 141px beside a fixed-width
-       button and wrapped into eight ragged lines, 182px tall, above the first row — `13 §6` calls
-       the refusal the main teaching surface and this was the least readable text on the screen.
-       32ch is wider than the row can give it on a phone, so the button wraps to its own line and
-       the sentence gets the width; on a desktop there is room for both and nothing changes. */
-    flex: 1 1 32ch;
-    min-inline-size: 0;
-    margin: 0;
-    font-size: var(--t-sm);
-    line-height: 1.5;
-    text-wrap: pretty;
-  }
-
-  .seen-said strong { color: var(--ink); font-weight: 500; }
-  .seen-field { color: var(--ink); font-style: normal; font-weight: 500; }
 
   /* THE SAME WRAP `/audit` TOOK, in a commit whose comment names the measurement — "Five of those
      in one unwrapping track reached 335px inside a 320px screen". The register's bar has the

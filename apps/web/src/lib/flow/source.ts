@@ -2,18 +2,17 @@
  * Automations on the wire: the record's `automations` read, `automationRun`, `cancelRun`, and `propose` for a save
  * (`loop/research-shell-automations.md` §5 and §6, Brief E against Brief D's methods).
  *
- * ONE SHAPE FOR EVERY RECORD, as `record/actions.ts` does it for scheduled actions. A screen reads a `Source`: the
- * record over HTTP when there is one, and the sample below when there is not, and the sample answers the way the
- * record does, so the canvas has one code path for each state it draws.
+ * THE RECORD OR ITS REFUSAL, as `record/actions.ts` does it for scheduled actions. A screen reads a `Source`, which is
+ * the record over HTTP. With no record it drew the sample's four automations, and a flow drawn and "sent" there was
+ * kept for the tab and filed nowhere; that went with DIRECTION 26, and no record is now the sentence for it.
  *
  * THE THREE READS AND WHAT EACH FALLS BACK TO.
  *
- *   · `automations` answers the list. No record (`UNREACHABLE` or `UNAUTHORIZED`) draws the sample. A record with no
- *     such method yet (`ROUTE_UNKNOWN`, which is every record built before Brief D) draws no list, because a sample
- *     list on a real record would be a list of things that do not run; the canvas still opens, because saving goes
- *     through `propose`, which every record has.
+ *   · `automations` answers the list. A record with no such method yet (`ROUTE_UNKNOWN`, which is every record built
+ *     before Brief D) draws no list; the canvas still opens, because saving goes through `propose`, which every record
+ *     has. Any other refusal, `UNREACHABLE` and `UNAUTHORIZED` among them, is said.
  *   · `automationRun` and `cancelRun` are ADMIN and a browser session's. A refusal is the record's own sentence.
- *   · `propose` files the `change`. On the sample nothing is filed, and the screen says so rather than pretending.
+ *   · `propose` files the `change`.
  *
  * NOT THROUGH `@braindog/client`, FOR `actions.ts`'s REASON: the client refuses a method missing from its own route
  * table before sending anything, and "this build has no such read" and "there is no record here" are two answers this
@@ -26,13 +25,10 @@
  * from a body what the record left out, and leaves out only a row with no id.
  */
 
-import { fillTemplate } from '@braindog/kernel';
 import { since } from 'braindog-render';
 
 import { copy } from '../copy.ts';
-import { NOW, ROWS } from '../record/data.ts';
-import { compile, matches } from '../record/where.ts';
-import { pathOf, sayStep, sayTrigger, triggerKind, triggerOfBody, words, type Body } from './flow.ts';
+import { pathOf, sayTrigger, triggerKind, triggerOfBody, words, type Body } from './flow.ts';
 
 /* ── the shapes ─────────────────────────────────────────────────────────── */
 
@@ -73,7 +69,7 @@ export type AutomationRow = {
   runs: RunRow[];
 };
 
-/** `propose`'s answer: the suggestion's id, or `null` on the sample, where nothing is filed. */
+/** `propose`'s answer: the suggestion's id, or `null` when the record filed it without saying which. */
 export type Filed = { id: string | null };
 
 /** One row an inline rule's dry run walked: the row as the record names it, what it would get, and why not if nothing. */
@@ -116,7 +112,7 @@ function runOf(raw: unknown): RunRow | null {
 
 /**
  * One row of either answer. What the record said wins; what it left out is worked out from the body when there is one,
- * so a row the record summarised and a row the sample built from a body read the same.
+ * so a row the record summarised and a row it answered with its body read the same.
  */
 export function rowOf(r: unknown): AutomationRow | null {
   if (!isObject(r)) return null;
@@ -237,7 +233,8 @@ export function rowLine(row: AutomationRow, now: number): string {
 
 export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 
-const unreachable = (): Answer<never> => ({ ok: false, refusal: { code: 'UNREACHABLE', fix: copy.notOnDemo } });
+/* A DEAD NETWORK SAID "The demo has no account", as `actions.ts` did, about a door that is gone. */
+const unreachable = (): Answer<never> => ({ ok: false, refusal: { code: 'UNREACHABLE', fix: copy.recordNotReached } });
 const unauthorized = (): Answer<never> => ({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: copy.signInAgain } });
 
 const isAnswer = (v: unknown): v is Answer<unknown> =>
@@ -268,8 +265,11 @@ async function send<T>(io: Fetch, url: string, body?: Record<string, unknown>): 
 export type Proposal = { question: string; body_kind: 'change'; body: Record<string, unknown> };
 
 export type Source = {
-  /** True while this tab is drawing the sample. */
-  sample: boolean;
+  /**
+   * ALWAYS `false`, AND KEPT ONLY FOR THE SCREENS THAT STILL ASK. `/automations` and `/automations/<id>` read it and are
+   * other briefs' to change (`loop/research-no-sample.md` section 5); drop it when neither does.
+   */
+  sample: false;
   /** Every automation, summarised, with no bodies. */
   automations(): Promise<Answer<AutomationRow[]>>;
   /** One, with its body and its last ten runs. What the editor opens. */
@@ -315,256 +315,17 @@ export function live(io: Fetch, base = ''): Source {
   };
 }
 
-/** The two answers that mean there is no record here, the same two `actions.ts` and `packs.ts` fall back on. */
-const SAMPLE_WHEN: ReadonlySet<string> = new Set(['UNREACHABLE', 'UNAUTHORIZED']);
-
 /** What a screen draws from the first read: the rows, no list at all, or the record's fix. */
 export type Opened = { source: Source; first: Answer<AutomationRow[]>; absent: boolean };
 
 /**
- * THE SAMPLE IS KEPT FOR THE TAB, because the list and the editor are two routes and each opens its own source. Made
- * fresh on each, a flow drawn and "sent" in the editor was gone from the list one click later, which reads as the save
- * having failed rather than as a sample that writes nowhere.
+ * The record's automations, and whether it has the read at all.
+ *
+ * `_at` WAS THE SAMPLE'S CLOCK, and a sample was kept for the tab so the list and the editor agreed about a flow that had
+ * been filed nowhere. Both routes still pass `() => NOW` and are other briefs' files; it can go once neither does.
  */
-let kept: Source | null = null;
-
-/** Which source this screen reads, decided by its first `automations` call. */
-export async function openAutomations(io: Fetch, base = '', at?: () => number): Promise<Opened> {
+export async function openAutomations(io: Fetch, base = '', _at?: () => number): Promise<Opened> {
   const source = live(io, base);
   const first = await source.automations();
-  if (first.ok) return { source, first, absent: false };
-  if (first.refusal.code === 'ROUTE_UNKNOWN') return { source, first, absent: true };
-  if (!SAMPLE_WHEN.has(first.refusal.code)) return { source, first, absent: false };
-  kept ??= sample(at);
-  return { source: kept, first: await kept.automations(), absent: false };
-}
-
-/* ── the sample ─────────────────────────────────────────────────────────── */
-
-const HOUR = 3_600_000;
-
-/**
- * Four automations over the sample record's own lists, one for each trigger the canvas offers: a change (inline, the
- * kind every record already has), a clock that calls out and branches, an arrival that asks a person, and a button.
- *
- * WRITTEN IN THE RECORD'S OWN SHAPE AND READ THROUGH `rowOf`, so the sample cannot answer in a shape the record does
- * not: `rule` for the bare id, `started_at` on a run, `failed` in the month.
- */
-export function SAMPLE_AUTOMATIONS(now: number): AutomationRow[] {
-  const iso = (ms: number) => new Date(now + ms).toISOString();
-  const run = (id: string, ago: number, state: RunState, kinds: string[], say: string | null = null) => ({
-    id,
-    state,
-    started_at: iso(-ago),
-    finished_at: state === 'done' || state === 'failed' ? iso(-ago + 2_000) : null,
-    say,
-    steps: kinds.map((kind, n) => ({
-      n,
-      kind,
-      state: state === 'failed' && n === kinds.length - 1 ? 'failed' : state === 'waiting' && n === kinds.length - 1 ? 'waiting' : 'done',
-      answer: kind === 'call' ? '{"rate": 71.4}' : null,
-      at: iso(-ago + n * 500),
-    })),
-  });
-  return rowsOf([
-    {
-      rule: 'obligation-late',
-      version: 3,
-      body: {
-        rule: 'obligation-late',
-        name: 'Chase late payments',
-        register: 'obligations',
-        when: 'due before today, state is open',
-        then: [{ tag: 'late' }, { notify: { say: '{{trigger.row.what}} is past due' } }],
-        once_per: ['entry', 'due'],
-      },
-      last: { at: iso(-26 * HOUR), state: 'done', say: null },
-      month: { runs: 4, failed: 0 },
-    },
-    {
-      rule: 'gold-rate',
-      version: 2,
-      body: {
-        rule: 'gold-rate',
-        name: 'Gold rate',
-        on: { every: '1h' },
-        steps: [
-          { call: { ingest: 'gold_rate', as: 'rate' } },
-          { if: { field: 'rate', gt: 70 }, then: [{ notify: { say: 'Gold is {{vars.rate}} a gram' } }], else: [{ set_var: { name: 'quiet', to: 'yes' } }] },
-        ],
-      },
-      next: iso(40 * 60_000),
-      runs: [run('R3', 1 * HOUR, 'done', ['call', 'if', 'notify']), run('R2', 2 * HOUR, 'failed', ['call'], 'gold_rate did not answer, so the run stopped there.')],
-      month: { runs: 518, failed: 3 },
-    },
-    {
-      rule: 'shortcut-spend',
-      version: 1,
-      body: {
-        rule: 'shortcut-spend',
-        name: 'Spending from the phone',
-        on: { arrival: { ingest: 'shortcut' } },
-        steps: [
-          { ask_person: { question: 'File {{trigger.arrival.body}} as spending?', options: ['File it', 'Leave it'], as: 'file', wait: '7d' } },
-          { if: 'file is File it', then: [{ notify: { say: 'Filed the spending from the phone' } }] },
-        ],
-      },
-      runs: [run('R1', 3 * HOUR, 'waiting', ['ask_person'])],
-      month: { runs: 1, failed: 0 },
-    },
-    {
-      rule: 'friday-review',
-      version: 1,
-      body: {
-        rule: 'friday-review',
-        name: 'Friday review',
-        on: { manual: true },
-        /* NOT `ask_spark`, WHICH A HOST WITH NO MODEL REFUSES AT INSTALL (`sparkAskAt` in the kernel's `flow-lint.ts`),
-           and the canvas says so as a fault on the card wherever the layout has not read `spark: true` (`flow.ts`
-           `notYet(spark)`). The sample is drawn when the record is unreachable or refuses the caller, whatever the host
-           said of a model, so it is held to no model and opens clean on either. It asked Spark once, and from `6ec8011d`, which
-           made the refusal, the one button in it opened with a fault on its first card and could not be sent, and the
-           test that every sample has nothing to fix failed until the step was changed. */
-        steps: [
-          { ask_person: { question: 'Did everything due this week go out?', options: ['All of it', 'Not yet'], as: 'sent' } },
-          { notify: { say: 'Friday review: {{vars.sent}}' } },
-        ],
-      },
-    },
-  ]);
-}
-
-/**
- * The sample, in memory for this tab. A run, a cancel or a save changes the rows here and is written nowhere.
- *
- * THE LIST ANSWERS WITHOUT BODIES, AS THE RECORD'S DOES, so a screen that drew from a body the list never carries would
- * work on the sample and show nothing on a real record. Only `automation` hands one over.
- */
-export function sample(at: () => number = () => Date.now()): Source {
-  let rows = SAMPLE_AUTOMATIONS(at());
-  let n = 10;
-  const refuse = (code: string, fix: string, where: string): Answer<never> => ({ ok: false, refusal: { code, fix, at: where } });
-  return {
-    sample: true,
-    automations: async () => ({ ok: true, value: rows.map((r) => ({ ...r, body: null, runs: [] })) }),
-    automation: async (rule) => {
-      const row = rows.find((r) => r.id === bare(rule));
-      return row ? { ok: true, value: row } : refuse('DECLARATION_UNKNOWN', `There is no automation called rule.${bare(rule)}.`, 'rule');
-    },
-    run: async (rule) => {
-      const row = rows.find((r) => r.id === bare(rule));
-      if (!row) return refuse('DECLARATION_UNKNOWN', `There is no automation called rule.${bare(rule)}.`, 'rule');
-      if (row.trigger !== 'manual')
-        return refuse('DECLARATION_INVALID', `rule.${row.id} is started by ${row.trigger}, not by a button. Give it on: { manual: true }.`, 'on');
-      const id = `R${(n += 1)}`;
-      const started = new Date(at()).toISOString();
-      rows = rows.map((r) => (r === row ? { ...r, runs: [{ id, state: 'pending', started, finished: null, say: null, steps: [] }, ...r.runs] } : r));
-      return { ok: true, value: { run: id } };
-    },
-    cancel: async (id) => {
-      const owner = rows.find((r) => r.runs.some((x) => x.id === id && (x.state === 'pending' || x.state === 'running' || x.state === 'waiting')));
-      if (!owner) return refuse('OUT_OF_BOUNDS', `${id} has finished, so there is nothing to stop.`, 'run');
-      rows = rows.map((r) =>
-        r === owner ? { ...r, runs: r.runs.map((x) => (x.id === id ? { ...x, state: 'cancelled' as const, finished: new Date(at()).toISOString() } : x)) } : r,
-      );
-      return { ok: true, value: { run: id } };
-    },
-    /* NOTHING IS FILED, AND THE ROW IN THIS TAB TAKES THE BODY, so the list shows what was drawn when the person goes
-       back to it. The screen says in words that nothing was sent. */
-    propose: async (p) => {
-      const to = isObject(p.body.to) ? p.body.to : null;
-      const id = to && typeof to.id === 'string' ? bare(to.id) : null;
-      const body = to && isObject(to.body) ? to.body : null;
-      if (id && body) {
-        const had = rows.find((r) => r.id === id);
-        const made = rowOf({ rule: id, version: had ? had.version + 1 : 1, body })!;
-        rows = had ? rows.map((r) => (r === had ? { ...made, runs: had.runs, last: had.last, month: had.month, next: had.next } : r)) : [...rows, made];
-      }
-      return { ok: true, value: { id: null } };
-    },
-    dryRun: async (body) => triedOnSample(body),
-  };
-}
-
-/**
- * The record's `said`, from the canvas's own sentences: the sample cannot import `packages/record`, so the words are
- * `flow.ts`'s and the shape is the record's, a branch's line ending in a colon and its arms indented two spaces under it.
- */
-function saidOnSample(body: Body): Pick<Tried, 'path' | 'trigger' | 'steps'> {
-  const out: string[] = [];
-  const stop = (s: string): string => (/[.?!:]$/u.test(s) ? s : `${s}.`);
-  const walk = (list: unknown, pad: string): void => {
-    for (const step of Array.isArray(list) ? list : []) {
-      if (!isObject(step)) continue;
-      if (!('if' in step)) {
-        out.push(`${pad}${stop(sayStep(step))}`);
-        continue;
-      }
-      out.push(`${pad}${sayStep(step)}:`);
-      walk(step.then, `${pad}  `);
-      if (step.else === undefined) continue;
-      out.push(`${pad}Otherwise:`);
-      walk(step.else, `${pad}  `);
-    }
-  };
-  walk(body.steps ?? body.then, '');
-  const when = typeof body.when === 'string' && body.when.trim() !== '' ? `, if ${body.when.trim()}` : '';
-  return { path: pathOf(body), trigger: stop(`${sayTrigger(triggerOfBody(body))}${when}`), steps: out };
-}
-
-/**
- * An inline body walked over the sample's own rows, as the kernel's `dryRun` walks a record's (`rules.ts`).
- *
- * THE SAME FILL AS THE RECORD, IMPORTED AND NOT COPIED. `would` goes through the kernel's own `fill`, so a template the
- * inline pass cannot fill shows here the way it will land. Measured on the day: the sample's "Chase late payments"
- * says `{{trigger.row.what}} is past due`, and the kernel's inline `fill` reads only `{{field}}`, so it writes the braces
- * as they are; a sample that filled them would promise a sentence the record does not send.
- *
- * WHAT IT LEAVES OUT: the kernel also ranks the candidate among the list's other rules and counts the rows an earlier
- * rule took or a `once_per` key already spent. The sample installs no rules of its own, so every match is the
- * candidate's and `reason` is always `null`.
- *
- * AT THE MIRROR'S CLOCK, `NOW`, AND NEVER THE SAMPLE'S `at`. `compile` puts the two ends of a range of days in order at
- * `NOW` (its `between` branch in `record/where.ts`), and the rows walked here are the mirror's, dated around `NOW`. This
- * walked them at `at()`, the wall clock unless a caller said otherwise, so `due between today and 2026-09-20` was
- * ordered from 3 September and matched from whatever day it was: on the 24th it answered 0 of the four obligations the
- * mirror holds in that range (`source-clock.test.ts`). `at` still dates the sample's own runs; it has no say here.
- */
-function triedOnSample(body: Body): Answer<Tried> {
-  const now = NOW;
-  const said = saidOnSample(body);
-  if (said.path === 'run') return { ok: true, value: { ...said, matches: null, rows: null, sample: [] } };
-  const register = subjectOfBody(body);
-  if (register === null || !Object.hasOwn(ROWS, register))
-    return { ok: false, refusal: { code: 'REGISTER_UNKNOWN', fix: `There is no register called ${register ?? '(none)'}.`, at: 'register' } };
-  const w = compile(register, typeof body.when === 'string' ? body.when : undefined);
-  if (w.bad.length > 0) return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: w.bad[0]!, at: 'when' } };
-  const then = Array.isArray(body.then) ? body.then.filter(isObject) : [];
-  const rows = ROWS[register]!;
-  const sample: TriedRow[] = [];
-  let hits = 0;
-  for (const entry of rows) {
-    if (!matches(entry, w, now)) continue;
-    hits += 1;
-    if (sample.length >= 20) continue;
-    const spoken = `${register}#${entry.seq}`;
-    const row = { id: spoken, seq: entry.seq, register, fields: entry.fields } as unknown as Parameters<typeof fillTemplate>[1];
-    const fill = (v: unknown): string => fillTemplate(typeof v === 'string' ? v : '', row, now);
-    const arg = (a: Record<string, unknown>, verb: string, key: string): unknown => (isObject(a[verb]) ? (a[verb] as Record<string, unknown>)[key] : undefined);
-    const would = then.flatMap((a): string[] => {
-      if ('tag' in a) return [`tag ${String(a.tag)}`];
-      if ('untag' in a) return [`untag ${String(a.untag)}`];
-      if ('set' in a) return [`set ${String(arg(a, 'set', 'field'))} to ${fill(arg(a, 'set', 'to'))}`];
-      if ('move' in a) return [`move to ${String(a.move)}`];
-      if ('note' in a) return [`note ${fill(a.note)}`];
-      if ('notify' in a) return [`notify ${fill(arg(a, 'notify', 'say'))}`];
-      if ('schedule' in a) return [`in ${String(arg(a, 'schedule', 'in'))}, ${fill(arg(a, 'schedule', 'note'))}`];
-      if ('stop' in a) return ['stop'];
-      if ('run' in a) return [`run ${String(a.run)}, which a rule applied to rows already there does not send`];
-      if ('link' in a) return [`link ${String(arg(a, 'link', 'field'))}`];
-      return [];
-    });
-    sample.push({ spoken, would, reason: null });
-  }
-  return { ok: true, value: { ...said, matches: hits, rows: rows.length, sample } };
+  return { source, first, absent: !first.ok && first.refusal.code === 'ROUTE_UNKNOWN' };
 }

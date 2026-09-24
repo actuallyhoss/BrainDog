@@ -3,10 +3,14 @@
 
   THE FILE IS READ HERE AND PLANNED BY THE RECORD. `readShared` runs in this tab first, so a file too large, a
   credential in it or a block kind nothing draws is said at once; the record then reads it through the same door and
-  plans it, and what is drawn is that plan. On the sample nothing is planned, and the sentence says so.
+  plans it, and what is drawn is that plan.
 
-  AN ADDRESS IS READ BY THE HOST on a live record (`fetchUseCase`), so a site with no CORS header still installs, and a
-  private or local address is refused there. A refusal is said in a sentence, with its code beneath it.
+  AN ADDRESS IS READ BY THE HOST (`fetchUseCase`), so a site with no CORS header still installs, and a private or local
+  address is refused there. A refusal is said in a sentence, with its code beneath it.
+
+  NOTHING IS READ IN THE TAB ALONE ANY MORE. With no record the sample read the file itself and said it "would" install,
+  and read an address straight from the browser, where most sites refuse it; with no sample (DIRECTION 26) the record
+  is the one reader, and a record that cannot be reached says so in its own sentence.
 
   AFTER THE INSTALL, the two steps onboarding takes: the example rows linked, and the rail order the file carries kept.
 -->
@@ -20,17 +24,15 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { packDocument, relabelDocument, type PackState } from '$lib/record/packs.ts';
   import SharedPlan from './SharedPlan.svelte';
-  import { afterInstall, installShared, keepVoice, planShared, readAddress, readOnHost, speakingStates, useCaseTitle, voiceQuestion, type SharedPlan as Plan } from './sharing.ts';
+  import { afterInstall, installShared, keepVoice, planShared, readOnHost, speakingStates, useCaseTitle, voiceQuestion, type SharedPlan as Plan } from './sharing.ts';
 
   let {
     client,
-    live,
     installed,
     oninstalled,
     given = null,
   }: {
     client: ReturnType<typeof createClient> | null;
-    live: boolean;
     installed: readonly PackState[];
     oninstalled: () => void;
     /** A file already fetched and checked elsewhere (a catalogue's), planned at once with no picker drawn. */
@@ -55,13 +57,7 @@
     code = null;
     plan = null;
     last = { text, source, ...(ref === undefined ? {} : { ref }) };
-    if (!live || !client) {
-      const { readShared } = await import('@braindog/declare');
-      const read = await readShared(text);
-      said = read.ok ? copy.notWritten(copy.shareInstall(read.value.usecase.title)) : 'refusal' in read ? read.refusal.fix : copy.writeRaced;
-      code = !read.ok && 'refusal' in read ? read.refusal.code : null;
-      return;
-    }
+    if (!client) return;
     const out = await planShared(client, { text, source, ...(ref === undefined ? {} : { ref }) }, installed, (id, held, usecase) => packDocument(id, held, usecase), (id, held, usecase) => relabelDocument(id, held, usecase));
     if (out.ok) {
       heard = await speakingStates(client, installed);
@@ -97,13 +93,13 @@
   });
 
   async function fromAddress() {
-    if (busy || address.trim() === '') return;
+    if (busy || !client || address.trim() === '') return;
     busy = true;
     try {
-      const read = live && client ? await readOnHost(client, address) : await readAddress(address);
+      const read = await readOnHost(client, address);
       if (!read.ok) {
         said = read.fix;
-        code = (read as { code?: string | null }).code ?? null;
+        code = read.code;
         plan = null;
       } else await planText(read.text, 'url', address.trim());
     } finally {

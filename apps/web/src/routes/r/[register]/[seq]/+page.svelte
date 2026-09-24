@@ -18,13 +18,11 @@
   import { relative, since, TONES } from 'braindog-render';
   import { Document } from 'braindog-render/svelte';
   import { page } from '$app/state';
-  import { goto } from '$app/navigation';
-  import * as pending from '$lib/record/pending.svelte.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
-  import { currencyFor, dirOf, display, iconFor, identityOf, labelOf, NOW, readableFields, REGISTERS, spokenRow, toneOf, whoDid } from '$lib/record/api.ts';
+  import { currencyFor, dirOf, display, iconFor, identityOf, labelOf, readableFields, REGISTERS, spokenRow, toneOf, whoDid } from '$lib/record/api.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import Face from '$lib/ui/Face.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -52,17 +50,13 @@
   const seq = $derived(Number(page.params.seq));
 
   /**
-   * THE ROW MAY NOT BE IN THE RECORD YET, AND THIS SCREEN USED TO SAY IT DID NOT EXIST.
+   * THE ROW IS THE RECORD'S ANSWER TO `get`, AND NOTHING ELSE.
    *
-   * A written row is the record's answer to `get`, and nothing else: the sample's row of the same
-   * number was drawn here when there was no record, and there is no sample now (DIRECTION 26). A row
-   * somebody typed into the capture line is in `pending` instead, wearing a NEGATIVE sequence so it can never collide with a real
-   * one, and the list draws it with `Not saved` on it. Opening that row landed on "There is no
-   * obligation #-1" - the product telling somebody the thing they had just typed, and could see one
-   * screen back, was not there. The list and the detail were reading two different sets of rows.
-   *
-   * They are read in that order because a written row is the truth: if the same number ever
-   * answered from both, the record wins.
+   * It had two other sources. The sample's row of the same number was drawn here when there was no
+   * record, and a row somebody typed into the capture line against the sample waited in `pending`
+   * under a NEGATIVE sequence, drawn here with `Not saved` on it. The sample went in DIRECTION 26 and
+   * `pending` with it (`loop/research-no-sample.md` B1): the capture line writes to the record, so the
+   * row it makes has a number the record gave it and opens here like any other.
    */
   let got = $state<Got | null>(null);
   /* READ AGAIN ONCE THE ROW IS: every list is declared by the record, and `rowReader` learns it on the way
@@ -80,10 +74,7 @@
   /* NOTHING IS DRAWN UNTIL THE ROW HAS BEEN READ. */
   const waiting = $derived(Number.isInteger(seq) && seq >= 1 && got === null);
   const written = $derived(got?.from === 'live' ? (got.entry ?? undefined) : undefined);
-  /* `false` BECAUSE A ROW TYPED IN THIS TAB WAS TYPED AGAINST THE RECORD: there is no sample for it to have been typed
-     against. The argument goes when wave B takes `pending` away (`loop/research-no-sample.md` B1). */
-  const unwritten = $derived(written ? undefined : pending.of(id, false).find((r) => r.seq === seq));
-  const row = $derived(written ?? unwritten);
+  const row = $derived(written);
 
   /* WHAT POINTS AT THIS ROW. A `ref` declares `to:` and nothing declared the other direction, so a
      person's page could not show the invoices that are theirs — which is the half somebody opens a
@@ -106,12 +97,11 @@
   const incoming = $derived(linked?.from === 'live' ? linked.groups : []);
 
   /* THE ROW AND ITS HISTORY, IN ONE BRACKET, so `data-screen` never appears between the two reads. An
-     answer for a row somebody has already left is dropped. `clock` is the reader's once a row has
-     been read. It starts at `NOW` only for a row typed in this tab, which `pending` stamps with that
-     same frozen instant, so "added just now" is not read against today as months ago; both go in
-     wave B (`loop/research-no-sample.md` B1, B3). */
+     answer for a row somebody has already left is dropped. `clock` is the reader's, taken again as
+     each row is read. It started at the sample's frozen `NOW` for the row `pending` stamped with that
+     instant; nothing is drawn before a read now, so the wall clock is the only one it needs. */
   let told = $state<Told | null>(null);
-  let clock = $state(NOW);
+  let clock = $state(Date.now());
   let askedFor = '';
   let reader: RowReader | null = null;
 
@@ -162,7 +152,7 @@
   async function addNote(e: SubmitEvent) {
     e.preventDefault();
     const said = noteText.trim();
-    if (!said || noting || !row || unwritten || !live) return;
+    if (!said || noting || !row || !live) return;
     const register = id;
     const n = seq;
     const key = `${register}#${n}`;
@@ -225,7 +215,7 @@
 
   function startEdit(f: FieldDecl) {
     /* ONLY A ROW THE RECORD HOLDS OPENS A BOX. The sample's toast, "the row would open for editing", went with the
-       sample (DIRECTION 26), and a row typed in this tab draws no edit control to press. */
+       sample (DIRECTION 26), and a row the record refused to show draws no edit control to press. */
     if (!row || !live) return;
     problem = null;
     editing = f.id;
@@ -460,16 +450,8 @@
     if (covered()) return;
     if (typing() || silenced(e) || e.metaKey || e.ctrlKey || e.altKey) return;
     if (!row) return;
-    /* NOT ON A ROW THE RECORD HAS NOT GOT. `obligations#-1` is not a number anybody can say, and a
-       link to it resolves for as long as this tab is open and no longer, so copying either would
-       hand somebody a reference that is already wrong. The keys say why rather than doing nothing,
-       because a key that is silent is the drift `19 §4` exists to prevent. */
     if (e.key === 'y' || e.key === 'Y') {
       e.preventDefault();
-      if (unwritten) {
-        toasts.push(copy.notWritten('This row has no number to copy'), { intent: 'warn' });
-        return;
-      }
       void (e.key === 'y' ? clipboard.putSpoken(id, row.seq) : clipboard.putLink(id, row.seq));
     }
   }
@@ -511,7 +493,7 @@
     <Empty
       kind="error"
       heading
-      title={decl ? (seq < 0 ? copy.neverSaved(decl.one) : copy.noSuchNumber(decl.one, seq)) : copy.noSuch('list', id)}
+      title={decl ? copy.noSuchNumber(decl.one, seq) : copy.noSuch('list', id)}
     >
       {#snippet actions()}<Button href="/r/{id}">Back to {decl?.name ?? id}</Button>{/snippet}
     </Empty>
@@ -521,49 +503,22 @@
     icon={iconFor(decl?.icon, 'rows')}
     kicker={decl.name}
     title={String(row.fields[decl.title] ?? '')}
-    id={unwritten ? undefined : `#${row.seq}`}
+    id={`#${row.seq}`}
   >
     {#snippet actions()}
-      <!-- THE NUMBER IS THE FIRST THING THIS HEADER SAYS, and for an unwritten row there is no
-           number, so it says what the row IS instead. `#-1` is the sequence `pending` hands out to
-           keep an unwritten row from colliding with a real one; it is machinery and it was never
-           meant to be read out. -->
-      {#if unwritten}
-        <Chip label={copy.markNotWritten} tone="warn" />
-      {/if}
       <!-- `Copy id` WAS THE FIRST ACTION IN THIS HEADER, AND IT LIVES BESIDE THE ID NOW. A row's page
            led with a developer verb: the first control a person saw on an invoice was the one that
            puts `obligations#1` on the clipboard, ahead of anything that does something to the
            invoice. It is in Details, next to the id it copies, and it keeps its key. -->
-      <!-- `Put back` AND NOT `Archive`, because there is nothing to archive: the row is in this tab
-           and nowhere else. It is the same verb the list offers on the same row, which is the point
-           — a row that can be taken back in one place and not the other is two products. -->
-      {#if unwritten}
-        <Button
-          weight="quiet"
-          onclick={() => {
-            /* THE NAME IS READ BEFORE THE ROW GOES, and the row goes after the navigation rather
-               than before it. Dropping first makes `row` undefined on this screen for as long as
-               `goto` takes, which draws "There is no obligation #-1" over the top of the press that
-               was working: the error this whole change exists to remove, flashed on the way out. */
-            const named = String(row.fields[decl.title] ?? decl.one.toLowerCase());
-            void goto(at(`/r/${id}`)).then(() => {
-              pending.drop(id, seq);
-              toasts.push(copy.undoneRow(named));
-            });
-          }}>{copy.undoRow}</Button
-        >
+      <Button weight="quiet" onclick={editTitle}>{copy.editRow}</Button>
+      <!-- ARCHIVE IS THE LIST'S OWN VERB, on the row itself: a row that can be archived in one
+           place and not the other is two products. `Put back` stands where `Archive` was for as
+           long as this tab holds the row it just archived: see `archived` for why that moment is
+           the only one it can be offered in. -->
+      {#if archived}
+        <Button weight="quiet" disabled={saving} onclick={() => void setArchived(false)}>{copy.rowRestore}</Button>
       {:else}
-        <Button weight="quiet" onclick={editTitle}>{copy.editRow}</Button>
-        <!-- ARCHIVE IS THE LIST'S OWN VERB, on the row itself: a row that can be archived in one
-             place and not the other is two products. `Put back` stands where `Archive` was for as
-             long as this tab holds the row it just archived — see `archived` for why that moment is
-             the only one it can be offered in. -->
-        {#if archived}
-          <Button weight="quiet" disabled={saving} onclick={() => void setArchived(false)}>{copy.rowRestore}</Button>
-        {:else}
-          <Button weight="quiet" disabled={saving} onclick={() => void setArchived(true)}>{copy.rowArchive}</Button>
-        {/if}
+        <Button weight="quiet" disabled={saving} onclick={() => void setArchived(true)}>{copy.rowArchive}</Button>
       {/if}
     {/snippet}
   </PageHead>
@@ -709,11 +664,8 @@
             <span class="unset-names">{#each unsetFields as f, i (f.id)}{#if live && editable(f)}<button type="button" class="unset-name tap" aria-label={copy.editValue(labelOf(f))} onclick={() => startEdit(f)}>{labelOf(f)}</button>{:else}<span class="unset-name">{labelOf(f)}</span>{/if}{#if i < unsetFields.length - 1}<span class="unset-sep" aria-hidden="true">·</span>{/if}{/each}</span>
           </p>
         {/if}
-        <!-- A FIELD THIS LIST DOES NOT HAVE YET, added to every row of it. Not on a row the record has not got: the
-             press changes the list, and a row only this tab holds is not yet on it. -->
-        {#if !unwritten}
-          <AddField register={id} {live} {owner} onadded={() => (got = got && { ...got })} />
-        {/if}
+        <!-- A FIELD THIS LIST DOES NOT HAVE YET, added to every row of it. -->
+        <AddField register={id} {live} {owner} onadded={() => (got = got && { ...got })} />
 
         <!-- A `document` field is the dialect, drawn by the same interpreter a declared page uses.
              The read view IS the renderer, so what you are looking at is the artefact (22 §8). -->
@@ -802,17 +754,12 @@
           <!-- THE NUMBER YOU SAY, AND THE BUTTON THAT COPIES THE WHOLE ID. `#12` is what the header
                prints and what a person reads out; `obligations#12` is what lands on the clipboard,
                because pasted into a message it has to name the list too. `y` still copies it, and
-               the `?` sheet lists the key rather than a chip beside the button. An unsaved row has
-               no number, so it says so rather than printing the `#-1` that stands in for one. -->
+               the `?` sheet lists the key rather than a chip beside the button. -->
           <dd class="id-line">
-            {#if unwritten}
-              <span class="missing">{copy.markNotWritten}</span>
-            {:else}
-              <span class="number">#{row.seq}</span>
-              <button type="button" class="copy-id tap" onclick={() => clipboard.putSpoken(id, row.seq)}>
-                <Icon name="copy" size="s" /><span>{copy.copyId}</span>
-              </button>
-            {/if}
+            <span class="number">#{row.seq}</span>
+            <button type="button" class="copy-id tap" onclick={() => clipboard.putSpoken(id, row.seq)}>
+              <Icon name="copy" size="s" /><span>{copy.copyId}</span>
+            </button>
           </dd>
           <dt>Added</dt>
           <!-- IN WORDS, like the other two surfaces that answer "who changed my record". `actorOf`
@@ -821,15 +768,13 @@
           <dd>{#if addedWho}{copy.rowAddedBy(since(row.created, clock), addedWho.you ? copy.rowByYou : addedWho.person && addedWho.name === copy.feedSomeone ? copy.rowBySomeone : addedWho.name)}{:else}{since(row.created, clock)}{/if}</dd>
         </dl>
 
-        {#if !unwritten}
-          <form class="note-form" onsubmit={addNote}>
-            <label class="note-label" for="row-note">{copy.noteLabel}</label>
-            <div class="note-line">
-              <input id="row-note" class="note-input" type="text" maxlength="280" autocomplete="off" placeholder={copy.notePlaceholder} bind:value={noteText} />
-              {#if noteText.trim()}<Button type="submit">{copy.noteAdd}</Button>{/if}
-            </div>
-          </form>
-        {/if}
+        <form class="note-form" onsubmit={addNote}>
+          <label class="note-label" for="row-note">{copy.noteLabel}</label>
+          <div class="note-line">
+            <input id="row-note" class="note-input" type="text" maxlength="280" autocomplete="off" placeholder={copy.notePlaceholder} bind:value={noteText} />
+            {#if noteText.trim()}<Button type="submit">{copy.noteAdd}</Button>{/if}
+          </div>
+        </form>
 
         {#if told?.from === 'refused'}
           <h2 class="side-title">History</h2>
@@ -1147,10 +1092,6 @@
 
   .document-slot :global(.document > h1:first-child) {
     margin-block-start: 0;
-  }
-
-  .side-title + * + .side-title {
-    margin-block-start: var(--sp-5);
   }
 
   .meta {

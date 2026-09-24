@@ -7,7 +7,8 @@
   THE LEDGER FIRST. `GET /account/usage` is the Directory's count, and on a plan with a limit this draws
   the month against it with the `gauge` kind, and says plainly when actions are waiting for next month.
   A host without the route (404), or no host, falls back to the record's own run events, which say
-  nothing about limits because the record cannot see them. No record at all draws the sample.
+  nothing about limits because the record cannot see them. No record at all is the record's refusal:
+  it drew the sample's month, counted against projects nobody has, until DIRECTION 26.
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
@@ -16,7 +17,6 @@
   import { Block } from 'braindog-render/svelte';
   import '$lib/blocks-charts.css';
   import { titleOf } from '$lib/title.ts';
-  import { NOW } from '$lib/record/api.ts';
   import { countsOf, monthWords, readUsage, words, type Named, type UsageView } from '$lib/record/actions.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
@@ -29,7 +29,7 @@
 
   async function load() {
     const at = opened();
-    const out = await readUsage((url, init) => fetch(url, init), Date.now(), '', NOW, apiBase());
+    const out = await readUsage((url, init) => fetch(url, init), Date.now(), '', apiBase());
     closed(out.ok !== false, at);
     if (out.ok === true) {
       view = out.view;

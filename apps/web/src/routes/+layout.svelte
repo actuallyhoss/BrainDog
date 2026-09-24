@@ -46,11 +46,6 @@
   import TopBar from '$lib/ui/TopBar.svelte';
   import Toasts from '$lib/ui/Toasts.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  /* `pending-held` AND NOT `pending`, AND THE DIFFERENCE IS 27 KB. `pending.svelte.ts` stamps a row
-     with the sample's clock, so importing it here would put the whole synthetic record in the
-     shell's chunk, which is the thing the comment above and `+layout.ts` both refuse to do. The rows
-     and the count live in a file that imports types and nothing else. */
-  import { anyPending } from '$lib/record/pending-held.svelte.ts';
   import { follow, live } from '$lib/data/live.svelte.ts';
   /* THE PALETTE AND THE `?` SHEET'S BODY ARRIVE AFTER THE SHELL. Both are closed on every first
      paint, and the palette reads the whole sample record to rank what it lists, so importing them
@@ -232,11 +227,6 @@
   /* CLEARED ON EVERY NAVIGATION, or `data-screen` is the PREVIOUS screen's answer for exactly as
      long as this one takes to arrive, which is the window every browser gate measures in. */
   beforeNavigate(leaving);
-
-  /* HOW MANY ROWS ARE WAITING, ANYWHERE. A row typed on the first run and left behind was known only
-     to the list it belongs to, which is the one screen the person is no longer on. This is the read
-     that makes it true from every other one, and it tracks because the rows are in a `SvelteMap`. */
-  const unsaved = $derived(anyPending(!data.live));
 
   /* One function, because the chord and the restore control are the same act and a second copy of
      two lines is a second place for the preference to be written differently. */
@@ -428,19 +418,6 @@
     -->
     {#key page.url.pathname}
     <main id="main" class="body" data-screen={settled()}>
-      <!-- WHAT IS WAITING, WHEREVER YOU ARE, ABOVE THE SCREEN AND INSIDE THE SCROLLER, so it is the
-           first thing read and the first to leave when the reader scrolls. The sample bar stood above
-           it until DIRECTION 26 took the sample away. It is a note and never an alarm: no intent
-           colour, no control, and nothing is broken. Only the one screen it belongs to can put it
-           right, and it says which. -->
-      {#if unsaved > 0}
-        <aside class="unsaved" role="note">
-          <p class="unsaved-said">
-            <strong>{copy.unsavedRows(unsaved)}</strong>
-            <span class="unsaved-why">{copy.unsavedRowsWhy}</span>
-          </p>
-        </aside>
-      {/if}
       {@render children()}
     </main>
     {/key}
@@ -678,34 +655,6 @@
     background: var(--s2);
   }
 
-  /* THE SAME TREATMENT THE REGISTER SCREEN GIVES WHAT THE RECORD NOTICED: a line, not a wash, and no
-     intent colour. The day a standing note looks like an error is the day it is dismissed unread,
-     and this one stands on every screen for as long as the rows are unwritten. */
-  .unsaved {
-    margin: var(--sp-4) var(--sp-6) 0;
-    padding: var(--sp-2) var(--sp-4);
-    border: 1px solid var(--line);
-    border-radius: var(--r-lg);
-  }
-
-  .unsaved-said {
-    margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
-    line-height: 1.55;
-  }
-
-  .unsaved-said strong {
-    color: var(--ink);
-  }
-
-  @media (width < 640px) {
-    .unsaved {
-      margin: var(--sp-3) var(--sp-4) 0;
-      padding: var(--sp-2) var(--sp-3);
-    }
-  }
-
   /**
    * MOVEMENT ONLY, AND IT USED TO FADE.
    *
@@ -843,12 +792,6 @@
       inset-inline-end: calc(max(env(safe-area-inset-left), env(safe-area-inset-right)) + var(--sp-3));
       inline-size: 40px;
       block-size: 40px;
-    }
-
-    /* What is waiting is the first thing at the top of a phone, which is where that button floats,
-       so it ends before it, as the page head already does. */
-    .unsaved {
-      margin-inline-end: calc(var(--sp-3) + 40px + var(--sp-2));
     }
   }
 

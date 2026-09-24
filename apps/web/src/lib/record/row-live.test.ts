@@ -238,9 +238,9 @@ test('the row page draws the live row and its refusal, and nothing of the sample
   assert.match(page, /\{:else if got\?\.from === 'refused'\}/u);
   assert.match(page, /title=\{got\.fix\}/u);
   assert.match(page, /const written = \$derived\(got\?\.from === 'live' \? \(got\.entry \?\? undefined\) : undefined\)/u, 'a row that is not there falls back to the sample again');
-  /* A ROW TYPED ON THIS TAB IS ASKED FOR AS A LIVE ONE until wave B takes `pending` away: there is no sample for it to
-     have been typed against. `entry(` was the sample's reader and `values()` the sample's hole answers. */
-  assert.match(page, /pending\.of\(id, false\)/u);
+  /* NO ROW THIS TAB TYPED IS HELD APART FROM THE RECORD: `pending` went with the sample (research-no-sample B1), and
+     `entry(` was the sample's reader and `values()` the sample's hole answers. */
+  assert.doesNotMatch(page, /record\/pending|pending\.of\(/u, 'the row page draws a row the record was not given again');
   assert.doesNotMatch(page, /\bentry\(id, seq\)|\bvalues\(\)|from === 'sample'/u, 'the row page reads the sample again');
 });
 

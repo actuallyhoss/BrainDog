@@ -74,7 +74,11 @@
 
   /**
    * ANOTHER RECORD OPENS IN THIS BROWSER: the session moves to it, and the app starts again at Home, reading only that record.
-   * A host with no second record to open (the sample) says what would have opened, as it did; a refusal is the host's sentence.
+   * A refusal is the host's sentence.
+   *
+   * A HOST WITH NO SWITCH DOOR (`absent`) SAYS THE RECORD WAS NOT OPENED. It toasted "Kiln would open, with its own lists
+   * and pages, but nothing was saved yet.", the sample's receipt for a press that did nothing, on a static host or a
+   * self-host nobody signs in to; there is no sample now to have opened anything in (DIRECTION 26).
    */
   let opening = false;
   async function openOther(r: { slug: string; name: string }) {
@@ -85,7 +89,7 @@
     /* A WHOLE NAVIGATION AND NOT `goto`. Every answer this tab kept (the record's `boot`, its voice, the rail's prefs) was
        read from the record being left, and a load is the one thing that forgets all of them at once. */
     if (out.from === 'opened') return location.assign(out.to);
-    toasts.push(out.from === 'absent' ? copy.notWritten(copy.otherRecord(r.name)) : out.fix, out.from === 'absent' ? {} : { intent: 'warn' });
+    toasts.push(out.from === 'absent' ? copy.recordNotOpened : out.fix, { intent: 'warn' });
   }
 
   /**
@@ -347,8 +351,8 @@
       <!-- THE ONE CONTROL THAT ASSERTS THIS PRODUCT HOLDS MORE THAN ONE BUSINESS could not reach the
            second one: every row was `href="/"`, so choosing another record left you in this one with
            the name unchanged and no toast. On a record the other row opens that record now, through
-           `/auth/switch`; on the sample there is nothing to open, so the row says so instead of pretending — a control that silently does nothing is the failure this
-           app's own rule is written about. -->
+           `/auth/switch`, and a host that cannot says so instead of pretending: a control that silently does nothing is the
+           failure this app's own rule is written about. -->
       <!--
         AND THE RECORD YOU ARE ALREADY IN TOOK YOU SOMEWHERE ELSE.
 

@@ -12,7 +12,6 @@
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
-  import { toasts } from '$lib/ui/toast.svelte.ts';
   import { ROWS, job as jobById, runName, spokenRow } from '$lib/record/api.ts';
   import { page as route } from '$app/state';
   import Empty from '$lib/ui/Empty.svelte';
@@ -75,7 +74,14 @@
      in `copy.ts` so the next rename reaches them. -->
 <svelte:head><title>{titleOf(named, copy.run)}</title></svelte:head>
 
-{#if !JOB}
+{#if route.data.refused}
+  <!-- A REFUSED SHELL IS NOT A RUN TO SHOW. The transcript below is written into the app, so it drew the same six steps
+       under a record that had just refused the reader, as though that record held them (DIRECTION 26). The record's
+       sentence is the page, as it is on Home. -->
+  <div class="page">
+    <Empty kind="error" heading title={route.data.refused.fix} />
+  </div>
+{:else if !JOB}
   <div class="page">
     <!-- A URL NAMING SOMETHING THIS RECORD DOES NOT HAVE IS A REFUSAL, and the record already has
          the sentence for it. Nothing failed, so there is no request id to quote (`50 §13 D11`), and
@@ -91,7 +97,9 @@
 <PageHead icon="session" kicker={copy.run} title={named} id={JOB.id}>
   {#snippet actions()}
     <Chip label={JOB.status} tone={JOB.status === 'failed' ? 'bad' : JOB.status === 'running' ? 'info' : 'good'} />
-    <Button weight="quiet" onclick={() => toasts.push(copy.notWritten(copy.runWouldStop), { intent: 'warn' })}><Icon name="stop" size="s" />{copy.stopRun}</Button>
+    <!-- NO STOP. It toasted "The run would stop at its next step, but nothing was saved yet." and stopped nothing: there
+         is no method that stops a run, and a control whose only answer is that it did nothing is not drawn (DIRECTION 26,
+         `loop/research-no-sample.md` 1e). It comes back with the write it needs. -->
   {/snippet}
 </PageHead>
 
@@ -166,15 +174,17 @@
     {/each}
   </ol>
 
-  <!-- WHOSE RUN THIS IS, ON A RECORD THAT HAS ONE.
+  <!-- WHOSE RUN THIS IS, WHICH IS NOBODY'S.
 
        The transcript above is written into the app rather than read from a record: there is no
        method that answers with a run's tool calls, so the same six steps are drawn whichever record
-       the reader is signed in to. On the sample that is what the whole screen is and the bar at the
-       top of the page already says so. On a live record it is somebody being shown invented steps
-       under their own record's chrome, which is worse than an empty screen, because nothing tells
-       them what they are looking at. So the screen says which it is, once, in a note. -->
-  {#if route.data.live}<p class="note" role="note">{copy.exampleRun}</p>{/if}
+       the reader is signed in to. That is somebody being shown invented steps under their own
+       record's chrome, which is worse than an empty screen, because nothing tells them what they are
+       looking at. So the screen says which it is, once, in a note.
+
+       ALWAYS, NOW. It was drawn only when `data.live`, to leave the sample's own bar to say it; the
+       refused shell carries `live: true` too (`layoutOf`), and a refusal no longer reaches here. -->
+  <p class="note" role="note">{copy.exampleRun}</p>
 
   <p class="note">
     <!-- AND NOT HOW IT IS BUILT. "A real run polls every 700 ms while it is live and stops on a

@@ -4,7 +4,7 @@
  * WHAT IS CHECKED IS WHAT WOULD BE SILENTLY WRONG. Every assertion here is a case that draws
  * correctly and means the wrong thing: an option pressed on a settled question, a key that is not on
  * the card, an undo that clears a neighbour, a reason field bound to a question with no answer, a
- * receipt claiming a reason the record would not have. None of them throws and none of them looks
+ * reason that is only whitespace. None of them throws and none of them looks
  * broken in a screenshot, which is why they are here rather than in a browser gate.
  *
  * The markup is not tested and is not testable here: `optionsOf` says which buttons exist, and
@@ -22,7 +22,6 @@ import {
   record,
   setReason,
   withdraw,
-  wouldRecord,
   type Answer,
 } from './answer.ts';
 import { DECIDED, QUESTIONS } from './data.ts';
@@ -95,7 +94,6 @@ test('AN ANSWER WITH NO REASON IS STILL AN ANSWER', () => {
   assert.ok(a);
   assert.equal(a.reason, '');
   assert.equal(reasonState(a.reason), 'missing');
-  assert.match(wouldRecord(a), /with your name and no reason/);
 });
 
 test('a key the question does not offer answers nothing', () => {
@@ -104,27 +102,6 @@ test('a key the question does not offer answers nothing', () => {
   assert.equal(answerFor(q, 'defer', AT), null);
   assert.equal(answerFor(q, '', AT), null);
   assert.equal(answerFor(q, 'PRESS', AT), null);
-});
-
-test('the receipt names the reason only when there is one', () => {
-  const a = answerFor(q, 'press', AT);
-  assert.ok(a);
-  assert.equal(
-    wouldRecord(a),
-    'Press them would be recorded as the decision on SG99, with your name and no reason, and the question closed',
-  );
-  assert.equal(
-    wouldRecord({ ...a, reason: 'The options read as controls and behaved as decoration.' }),
-    'Press them would be recorded as the decision on SG99, with your reason and your name, and the question closed',
-  );
-  // A clause, not a sentence: `copy.notWritten` finishes it with ", but nothing was saved yet."
-  assert.doesNotMatch(wouldRecord(a), /\.$/);
-});
-
-test('whitespace is not a reason', () => {
-  const a = answerFor(q, 'press', AT);
-  assert.ok(a);
-  assert.match(wouldRecord({ ...a, reason: '   \n  ' }), /no reason/);
 });
 
 /* ── the reason, weighed and never refused ────────────────────────────────── */

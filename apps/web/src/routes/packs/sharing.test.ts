@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import { copy } from '../../lib/copy.ts';
 import type { PackState } from '../../lib/record/packs.ts';
-import { afterInstall, drawnOrder, installShared, moduleTitle, movesOf, nothingElse, oneOf, relabelled, keepVoice, offerFor, olderThan, offeredVersion, planShared, readAddress, readOnHost, rowTitle, sharedPlanOf, speakingStates, switchTo, voiceQuestion, type SharingClient } from './sharing.ts';
+import { afterInstall, drawnOrder, installShared, moduleTitle, movesOf, nothingElse, oneOf, relabelled, keepVoice, offerFor, olderThan, offeredVersion, planShared, readOnHost, rowTitle, sharedPlanOf, speakingStates, switchTo, voiceQuestion, type SharingClient } from './sharing.ts';
 import { speaking } from '../../lib/voice.ts';
 
 const COURSES_DOC = {
@@ -144,24 +144,6 @@ test('A MODULE THE RECORD LACKS IS SENT AS THE APP BUILDS IT', async () => {
   const out = await planShared(client, { text, source: 'local' }, [state('work')], async (id) => ({ pack: id }));
   assert.equal(out.ok, true);
   assert.deepEqual(calls[0]?.[1].modules, { people: { pack: 'people' } });
-});
-
-test('AN ADDRESS IS READ ONLY OVER HTTPS, WITH NOTHING SENT, AND NO FURTHER THAN THE SIZE', async () => {
-  assert.deepEqual(await readAddress('http://example.com/a.json'), { ok: false, fix: copy.shareAddressHttps });
-  assert.deepEqual(await readAddress('not an address'), { ok: false, fix: copy.shareAddressNotOne });
-  let sent: RequestInit | undefined;
-  const fetcher = (async (_url: URL, init?: RequestInit) => {
-    sent = init;
-    return new Response('{"usecase":"x"}');
-  }) as typeof fetch;
-  assert.deepEqual(await readAddress('https://example.com/a.json', fetcher), { ok: true, text: '{"usecase":"x"}' });
-  assert.equal(sent?.credentials, 'omit');
-  const big = (async () => new Response('x'.repeat(400 * 1024))) as typeof fetch;
-  assert.equal((await readAddress('https://example.com/a.json', big)).ok, false);
-  const blocked = (async () => {
-    throw new TypeError('Failed to fetch');
-  }) as typeof fetch;
-  assert.deepEqual(await readAddress('https://example.com/a.json', blocked), { ok: false, fix: copy.shareAddressUnread('example.com') });
 });
 
 test('THE SHARE FORM OFFERS A PATCH OR A MINOR ON FROM THE LATER OF INSTALLED AND LAST SHARED, AND NAMES A ROW BY ITS TITLE', () => {
