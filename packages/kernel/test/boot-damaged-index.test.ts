@@ -40,9 +40,20 @@ const OBLIGATIONS: Declaration = {
   } as never,
 };
 
-/** B1's two damages, statement for statement. */
+/**
+ * B1's two damages, statement for statement, and the four audit sixty-five found past them (finding 5, probe B2).
+ *
+ * THE FOUR OPENED WITHOUT A REBUILD, because the boot probe's `LIMIT 0` read compiles against the config table and
+ * nothing else, and then a write to a searchable list threw: `database disk image is malformed` with `data` or
+ * `docsize` gone, `cannot rollback - no transaction is active` with `idx` gone, and `no such table:
+ * main.entry_fts_content` with `content` gone. Every search threw the same.
+ */
 const DAMAGES = {
   'the config shadow table dropped': ['DROP TABLE entry_fts_config'],
+  'the data shadow table dropped': ['DROP TABLE entry_fts_data'],
+  'the idx shadow table dropped': ['DROP TABLE entry_fts_idx'],
+  'the content shadow table dropped': ['DROP TABLE entry_fts_content'],
+  'the docsize shadow table dropped': ['DROP TABLE entry_fts_docsize'],
   'the index table gone from the schema': [
     'PRAGMA writable_schema = ON',
     "DELETE FROM sqlite_master WHERE name = 'entry_fts'",
@@ -50,8 +61,11 @@ const DAMAGES = {
   ],
 } as const;
 
+/** How many rows the record holds, which no repair of the index may change. */
+const rows = (sql: NodeSql): number => sql.one<{ n: number }>('SELECT count(*) AS n FROM entry')!.n;
+
 /** A file with one searchable row, damaged, closed, and handed back unopened. */
-async function damaged(statements: readonly string[]): Promise<{ file: string; id: string; done: () => void }> {
+async function damaged(statements: readonly string[]): Promise<{ file: string; id: string; held: number; done: () => void }> {
   const dir = mkdtempSync(join(tmpdir(), 'bd-damaged-index-'));
   const file = join(dir, 'r.brain');
   const sql = openSqlite(file);
@@ -61,19 +75,21 @@ async function damaged(statements: readonly string[]): Promise<{ file: string; i
   const row = k.create('obligations', { what: 'Invoice 41', party: 'Halden' } as never, { actor: 'p_1' });
   assert.ok(row.ok);
   assert.equal(k.search('Halden').length, 1, 'the row was findable before the damage');
+  const held = rows(sql);
   for (const s of statements) sql.exec(s);
   sql.close();
-  return { file, id: row.value.id, done: () => rmSync(dir, { recursive: true, force: true }) };
+  return { file, id: row.value.id, held, done: () => rmSync(dir, { recursive: true, force: true }) };
 }
 
 for (const [label, statements] of Object.entries(DAMAGES)) {
   test(`WITH ${label.toUpperCase()}, THE RECORD OPENS AND ITS SEARCH IS REBUILT`, async () => {
-    const { file, id, done } = await damaged(statements);
+    const { file, id, held, done } = await damaged(statements);
     const sql: NodeSql = openSqlite(file);
     try {
       const { result, state } = await applyMigrations(sql, clock);
       assert.equal(state.refusal, null, `a damaged index is not a refusal: ${JSON.stringify(state.refusal)}`);
       assert.ok(result.ok);
+      assert.equal(rows(sql), held, 'the repair touched the index and not one row');
 
       const k = await openRecord(sql, clock);
       assert.equal(k.get(id)?.fields.what, 'Invoice 41', 'the row reads');
@@ -95,16 +111,18 @@ for (const [label, statements] of Object.entries(DAMAGES)) {
   });
 }
 
-test('AN INDEX THAT LOST ITS OWN LINES TOO STILL OPENS, AND FINDS WHAT IS WRITTEN NEXT', async () => {
-  /* THE REFILL READS `entry_fts_content`, so with that gone as well there is nothing to refill from. The rows are the
-     record and they still read and export; the index starts again empty rather than keep the record shut. */
-  const { file, id, done } = await damaged(['DROP TABLE entry_fts_content', 'DROP TABLE entry_fts_config']);
+test('AN INDEX THAT LOST ITS OWN LINES TOO OPENS AND STILL FINDS EVERY ROW WRITTEN BEFORE', async () => {
+  /* THE INDEX IS PROJECTED FROM `entry`, NOT REFILLED FROM ITS OWN COPY. Before audit sixty-five's fix the rebuild read
+     `entry_fts_content`, so with that dropped beside the config it opened with an empty index and this search answered
+     nothing for a row that was there (measured, the audit's section 5 table). */
+  const { file, id, held, done } = await damaged(['DROP TABLE entry_fts_content', 'DROP TABLE entry_fts_config']);
   const sql = openSqlite(file);
   try {
     const k = await openRecord(sql, clock);
+    assert.equal(rows(sql), held);
     assert.equal(k.get(id)?.fields.what, 'Invoice 41');
     assert.ok((await k.export()).ok);
-    assert.deepEqual(k.search('Halden'), [], 'nothing was left to refill from');
+    assert.deepEqual(k.search('Halden').map((h) => h.id), [id], 'the row written before the damage is found');
     const next = k.create('obligations', { what: 'Invoice 42', party: 'Mirren' } as never, { actor: 'p_1' });
     assert.ok(next.ok);
     assert.deepEqual(k.search('Mirren').map((h) => h.id), [next.value.id]);
@@ -114,24 +132,111 @@ test('AN INDEX THAT LOST ITS OWN LINES TOO STILL OPENS, AND FINDS WHAT IS WRITTE
   }
 });
 
-test('A REBUILT INDEX IS WHOLE, SO THE NEXT OPEN HAS NOTHING TO DO', async () => {
-  const { file, done } = await damaged(DAMAGES['the config shadow table dropped']);
-  const shape = (sql: NodeSql) =>
-    sql.all<{ name: string; sql: string }>("SELECT name, sql FROM sqlite_master WHERE name LIKE 'entry_fts%' ORDER BY name");
-  const first = openSqlite(file);
-  await applyMigrations(first, clock);
-  const repaired = shape(first);
-  first.close();
+/** Every statement `applyMigrations` ran that drops an `entry_fts` table, which only a rebuild does. */
+async function drops(sql: NodeSql): Promise<string[]> {
+  const ran: string[] = [];
+  const exec = sql.exec.bind(sql);
+  sql.exec = (text, ...params) => {
+    if (/^DROP TABLE (IF EXISTS )?entry_fts/.test(text)) ran.push(text);
+    exec(text, ...params);
+  };
+  assert.ok((await applyMigrations(sql, clock)).result.ok);
+  sql.exec = exec;
+  return ran;
+}
 
-  /* THE SAME FIVE SHADOW TABLES AND THE SAME DDL a fresh file gets, and not a second, different index beside them. */
-  const fresh = openSqlite();
-  await applyMigrations(fresh, clock);
-  assert.deepEqual(repaired, shape(fresh));
-  fresh.close();
+const shape = (sql: NodeSql) =>
+  sql.all<{ name: string; sql: string }>("SELECT name, sql FROM sqlite_master WHERE name LIKE 'entry_fts%' ORDER BY name");
 
-  const second = openSqlite(file);
-  assert.ok((await applyMigrations(second, clock)).result.ok);
-  assert.deepEqual(shape(second), repaired);
-  second.close();
-  done();
+for (const [label, statements] of Object.entries(DAMAGES)) {
+  test(`WITH ${label.toUpperCase()}, THE REBUILT INDEX IS WHOLE, SO THE NEXT OPEN HAS NOTHING TO DO`, async () => {
+    const { file, done } = await damaged(statements);
+    const first = openSqlite(file);
+    assert.notDeepEqual(await drops(first), [], 'the first open rebuilt');
+    const repaired = shape(first);
+    first.close();
+
+    /* THE SAME FIVE SHADOW TABLES AND THE SAME DDL a fresh file gets, and not a second, different index beside them. */
+    const fresh = openSqlite();
+    await applyMigrations(fresh, clock);
+    assert.deepEqual(repaired, shape(fresh));
+    fresh.close();
+
+    /* AND THE PROBE DOES NOT FIRE ON A WHOLE INDEX: it runs on every open, so a false alarm is a rebuild on every open. */
+    const second = openSqlite(file);
+    assert.deepEqual(await drops(second), []);
+    assert.deepEqual(shape(second), repaired);
+    second.close();
+    done();
+  });
+}
+
+test('A LIST THAT NAMES ITS SEARCHED FIELDS AT THE TOP IS FOUND BY THEM AFTER A REBUILD', async () => {
+  /* `02 §1`'S OTHER SPELLING, `search: [field]` on the list and no flag on the field. The rebuild projects from the
+     declarations before `makeKernel` folds that spelling in, so it folds it itself; without that the rebuilt line held
+     the title alone and a search by the party answered nothing (checked by taking the fold out). */
+  const dir = mkdtempSync(join(tmpdir(), 'bd-damaged-index-'));
+  const file = join(dir, 'r.brain');
+  const made = openSqlite(file);
+  const k0 = await openRecord(made, clock);
+  const declared: Declaration = {
+    id: 'register.debts',
+    kind: 'register',
+    body: {
+      id: 'debts',
+      name: 'Debts',
+      title: 'what',
+      search: ['party'],
+      fields: [
+        { id: 'what', type: 'text', required: true },
+        { id: 'party', type: 'text' },
+      ],
+    } as never,
+  };
+  assert.ok((await k0.install([declared])).ok);
+  const row = k0.create('debts', { what: 'Loan', party: 'Halden' } as never, { actor: 'p_1' });
+  assert.ok(row.ok);
+  assert.deepEqual(k0.search('Halden').map((h) => h.id), [row.value.id], 'found by the party before the damage');
+  made.exec('DROP TABLE entry_fts_content');
+  made.close();
+
+  const sql = openSqlite(file);
+  try {
+    const k = await openRecord(sql, clock);
+    assert.deepEqual(k.search('Halden').map((h) => h.id), [row.value.id]);
+  } finally {
+    sql.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('A SERIES STAYS OUT OF A REBUILT INDEX, AS IT STAYS OUT OF A WRITTEN ONE', async () => {
+  /* THE REBUILD READS THE SERIES FLAG FROM THE DECLARATION ITSELF, and the write path skips a series row (`reproject`).
+     With that flag read as false, every test above still passed and the rebuilt index held the series row's line,
+     so a search answered a point on a line that no write would ever have indexed (checked by forcing it false). */
+  const dir = mkdtempSync(join(tmpdir(), 'bd-damaged-index-'));
+  const file = join(dir, 'r.brain');
+  const made = openSqlite(file);
+  const k0 = await openRecord(made, clock);
+  const points: Declaration = {
+    id: 'register.points',
+    kind: 'register',
+    body: { id: 'points', name: 'Points', title: 'at', series: true, fields: [{ id: 'at', type: 'text', search: true }] } as never,
+  };
+  assert.ok((await k0.install([OBLIGATIONS, points])).ok);
+  const kept = k0.create('obligations', { what: 'Invoice 41', party: 'Halden' } as never, { actor: 'p_1' });
+  assert.ok(kept.ok);
+  assert.ok(k0.create('points', { at: 'Halden reading' } as never, { actor: 'p_1' }).ok);
+  assert.deepEqual(k0.search('Halden').map((h) => h.id), [kept.value.id], 'the series row was never indexed');
+  made.exec('DROP TABLE entry_fts_content');
+  made.close();
+
+  const sql = openSqlite(file);
+  try {
+    const k = await openRecord(sql, clock);
+    assert.deepEqual(k.search('Halden').map((h) => h.id), [kept.value.id]);
+  } finally {
+    sql.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

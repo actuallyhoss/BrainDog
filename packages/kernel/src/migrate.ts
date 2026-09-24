@@ -14,6 +14,9 @@
 import type { Clock, Refusal, Result, Sql } from '@braindog/ports';
 import { mapDriverMessage, ok } from '@braindog/ports';
 
+import { rebuild } from './fts.ts';
+import type { RegisterDecl } from './index.ts';
+
 import kernel0001 from './migrations/0001_kernel.ts';
 import session0002 from './migrations/0002_session.ts';
 import packDisabled0003 from './migrations/0003_pack_disabled.ts';
@@ -165,15 +168,59 @@ const INDEX_DDL = (): string => {
 /** FTS5's five shadow tables for a contentful table, which is what `entry_fts` is. */
 const SHADOWS = ['data', 'idx', 'content', 'docsize', 'config'] as const;
 
+/** The index and its five shadows, the six names a whole index has in `sqlite_master`. */
+const INDEX_TABLES = ['entry_fts', ...SHADOWS.map((s) => `entry_fts_${s}`)];
+
 /**
- * Drop whatever is left of a damaged `entry_fts` and build it again, refilled from the lines it held. One transaction.
+ * Whether every table the index is made of is in the schema: the half of the damage probe the `LIMIT 0` read cannot see.
  *
- * REFILLED FROM `entry_fts_content`, THE INDEX'S OWN COPY OF EVERY LINE, and not projected again from `entry`, because
- * the projection needs each list's declaration normalised the way `makeKernel`'s `listsOf` does it, and a second copy of
- * that rule here is the defect its own comment describes. Both measured damages leave the content table whole, and a
- * damaged index takes no writes (every write to a searchable list throws on it), so its lines are still the rows'.
- * A file that lost the content table as well opens with an empty index: its rows read and export, and search finds
- * only what is written after, until an import's `rebuildFts` projects the rest.
+ * FOUR OF SIX DAMAGES GOT PAST THE READ (audit sixty-five, finding 5). Compiling `SELECT rowid FROM entry_fts` connects
+ * to the table, which reads `entry_fts_config` and no other shadow, so a file with `data`, `idx`, `content` or
+ * `docsize` dropped opened without a rebuild, and then every search and every write to a searchable list threw
+ * (`database disk image is malformed`, or `no such table: main.entry_fts_content`). A missing table is what all four
+ * are, and the schema says so without touching the index.
+ *
+ * WHAT IT COSTS ON EVERY OPEN: one read of `sqlite_master`, which has no index on `name` and so is a scan of the schema,
+ * 103 rows on a record with one list installed, whatever the number of rows. Measured on 24 September 2026 over the
+ * test port on a file record holding 2,000 rows, 10,000 probes, statement prepared each time as the port does: 15 to 17
+ * microseconds each, against 5 for the `LIMIT 0` read beside it. FTS5's own `integrity-check` was the other candidate
+ * and it reads every line of the index: 1.0 to 1.2 milliseconds on the same file, growing with the record. Not taken.
+ */
+const indexWhole = (sql: Sql): boolean =>
+  sql.one<{ n: number }>(
+    `SELECT count(*) AS n FROM sqlite_master WHERE type = 'table' AND name IN (${INDEX_TABLES.map(() => '?').join(', ')})`,
+    ...INDEX_TABLES,
+  )?.n === INDEX_TABLES.length;
+
+/**
+ * Each live list's searchable fields, title and series flag, read from the declarations: what `rebuild` projects by.
+ *
+ * THE REGISTER-LEVEL `search: [field, ...]` IS FOLDED INTO EACH FIELD'S OWN FLAG, the one rule `makeKernel`'s `listsOf`
+ * applies (`index.ts`, "TWO SPELLINGS OF ONE FLAG"). It is repeated here because `listsOf` lives inside `makeKernel`,
+ * which runs after this does, and without it a list declared the documented way rebuilds with nothing of it indexed but
+ * its title. `boot-damaged-index.test.ts` declares one that way, so a copy that drifts from `listsOf` fails there.
+ */
+function searchedLists(sql: Sql): Map<string, { fields: RegisterDecl['fields']; title?: string; series: boolean }> {
+  const lists = new Map<string, { fields: RegisterDecl['fields']; title?: string; series: boolean }>();
+  for (const { body } of sql.all<{ body: string }>(
+    "SELECT body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0",
+  )) {
+    const decl = JSON.parse(body) as RegisterDecl & { search?: unknown };
+    const named = Array.isArray(decl.search) ? (decl.search as string[]) : null;
+    const fields = named ? decl.fields.map((f) => (named.includes(f.id) ? { ...f, search: true } : f)) : decl.fields;
+    lists.set(decl.id, { fields, ...(typeof decl.title === 'string' ? { title: decl.title } : {}), series: Boolean(decl.series) });
+  }
+  return lists;
+}
+
+/**
+ * Drop whatever is left of a damaged `entry_fts` and build it again, projected from the rows. One transaction.
+ *
+ * PROJECTED FROM `entry`, WHICH IS THE RECORD, and not refilled from `entry_fts_content`, the index's own copy of each
+ * line. The refill was what 151295ca shipped, and a file that lost the content table opened with an empty index: every
+ * row read and exported and none was found by search until an import (audit sixty-five, finding 5, measured). The index
+ * is derived, so the rows are the only copy worth rebuilding from, and `rebuild` is the projection an import runs.
+ * No row is written: the transaction touches `entry_fts` and its shadows and nothing else.
  *
  * THE CONFIG ROW IS PUT BACK FIRST, because FTS5 connects to a table before it drops one, and with the config table
  * gone `DROP TABLE entry_fts` throws the same `vtable constructor failed` the probe did (measured). Version 4 is what
@@ -181,20 +228,15 @@ const SHADOWS = ['data', 'idx', 'content', 'docsize', 'config'] as const;
  */
 function rebuildIndex(sql: Sql): void {
   sql.transactionSync(() => {
-    const held = sql.one("SELECT 1 AS x FROM sqlite_master WHERE type = 'table' AND name = 'entry_fts_content'")
-      ? sql.all<{ rowid: number; id: string; register: string; text: string }>(
-          'SELECT id AS rowid, c0 AS id, c1 AS register, c2 AS text FROM entry_fts_content ORDER BY id',
-        )
-      : [];
     sql.exec('CREATE TABLE IF NOT EXISTS entry_fts_config (k PRIMARY KEY, v) WITHOUT ROWID');
     sql.exec("INSERT OR REPLACE INTO entry_fts_config (k, v) VALUES ('version', 4)");
     sql.exec('DROP TABLE IF EXISTS entry_fts');
     /* A SCHEMA ROW REMOVED LEAVES ITS FIVE SHADOWS BEHIND as ordinary tables, and `CREATE VIRTUAL TABLE` refuses a name
-       that is taken, so they go too. After the drop above they are already gone for the other damage. */
+       that is taken, so they go too. After the drop above they are already gone for the other damages. */
     for (const shadow of SHADOWS) sql.exec(`DROP TABLE IF EXISTS entry_fts_${shadow}`);
     sql.exec(INDEX_DDL());
-    for (const line of held)
-      sql.exec('INSERT INTO entry_fts (rowid, id, register, text) VALUES (?, ?, ?, ?)', line.rowid, line.id, line.register, line.text);
+    const lists = searchedLists(sql);
+    rebuild(sql, (register) => lists.get(register), (register) => lists.get(register)?.series ?? false);
   });
 }
 
@@ -287,14 +329,17 @@ export async function applyMigrations(
      AND A DAMAGED INDEX IS NOT A MISSING MODULE, so it is rebuilt here and the record opens (audit sixty-four,
      finding 4). This read rethrew every other failure, so a file with `entry_fts_config` dropped, or with the table's
      schema row removed, threw out of `openRecord` and no method answered, where every row was intact and the index is
-     derived from them. `boot-damaged-index.test.ts` has both damages. */
+     derived from them. The read sees only those two damages; `indexWhole` sees the other four (audit sixty-five,
+     finding 5), and `boot-damaged-index.test.ts` has all six. */
+  let damaged = false;
   try {
     sql.all('SELECT rowid FROM entry_fts LIMIT 0');
   } catch (e) {
     if (lacks(e, 'fts5')) return unavailable(unhostable(sql, 'fts5'), applied);
     if (!damagedIndex(e)) throw e;
-    rebuildIndex(sql);
+    damaged = true;
   }
+  if (damaged || !indexWhole(sql)) rebuildIndex(sql);
 
   return {
     result: ok({ kernel: MIGRATIONS.length, format: FORMAT_VERSION, applied }),
