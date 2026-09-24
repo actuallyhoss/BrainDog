@@ -5,11 +5,15 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+import type { Row } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import { REGISTERS } from './data.ts';
 import type { Fetch as ClientFetch } from './pages-live.ts';
-import { arrangedBody, movePatch, saveArrangement, schemaOf, tickPatch, updateRow, type Fetch } from './page-write.ts';
+import { arrangedBody, keepInPlace, movePatch, rowKey, saveArrangement, schemaOf, tickPatch, updateRow, type Fetch } from './page-write.ts';
 
 const BASE = 'http://record.test';
 
@@ -103,7 +107,7 @@ test('A LIST THIS BUILD HAS NEVER HEARD OF IS TICKED AND MOVED BY THE STATES THE
 test('the change is one update of that row at the version the page read, with the session', async () => {
   const { io, sent } = host(() => json(200, { ok: true, value: { id: 'e_1', seq: 4, version: 9 } }));
   const out = await updateRow(BASE, { register: 'tasks', seq: 4, version: 8 }, { state: 'done' }, 'Send the invoice', io);
-  assert.deepEqual(out, { from: 'written' });
+  assert.deepEqual(out, { from: 'written', version: 9 });
   assert.equal(sent[0]!.url, `${BASE}/api/update`);
   assert.equal(sent[0]!.init?.method, 'POST');
   assert.equal(sent[0]!.init?.credentials, 'same-origin');
@@ -210,4 +214,90 @@ test('DONE WRITES AGAINST THE VERSION THE SCREEN DREW, and a page arranged by so
   /* Moved between the read and the write: the record's conflict says the same. */
   answer = { ok: false, conflict: { version: 5, current: null, actor: 'in-app' } };
   assert.deepEqual(await saveArrangement(BASE, 'money', 3, [{ i: 0, span: 12 }], [], io, 4), { from: 'refused', fix: copy.arrangeMoved });
+});
+
+/* ── a ticked task and a moved card stay where they were ──────────────── */
+
+const ROW = (seq: number, title: string, extra: Partial<Row> = {}): Row => ({ cells: [title], ref: { register: 'tasks', seq, version: 1 }, ...extra });
+
+/**
+ * THE ROW THE READER JUST TICKED WAS GONE BEFORE THEY COULD SEE THE TICK. `writeRow` read the page again after the
+ * write, and a `todo` whose `where:` leaves out done rows answers without the row it just ticked: no mark, no receipt,
+ * and nothing on screen to press. REWORK §1 counted 13 of 85 human writes reversed within five seconds for exactly this
+ * shape. Before the repair this file failed to import, because nothing exported `keepInPlace`.
+ */
+test('A TICKED TASK THE RE-READ LEAVES OUT IS DRAWN WHERE IT WAS, done', () => {
+  const [a, b, c] = [ROW(1, 'a'), ROW(2, 'b'), ROW(3, 'c')];
+  const out = keepInPlace([a, b, c], [a, c], new Map([[rowKey(b.ref!), { done: true, version: 2 }]]));
+  assert.deepEqual(out.map((r) => r.cells[0]), ['a', 'b', 'c']);
+  assert.equal(out[1]!.done, true, 'the held row came back without the tick it was held for');
+  assert.equal(out[1]!.ref?.version, 2, 'a second tick on the held row would be sent at the version before the first');
+});
+
+test('A HELD ROW STILL IN THE ANSWER IS DRAWN FROM THE ANSWER, at the place it was found', () => {
+  const [a, b, c] = [ROW(1, 'a'), ROW(2, 'b'), ROW(3, 'c')];
+  /* The record answers newest write first, so the ticked row comes back at the head. */
+  const now = ROW(2, 'b, renamed elsewhere', { done: true, ref: { register: 'tasks', seq: 2, version: 7 } });
+  const out = keepInPlace([a, b, c], [now, a, c], new Map([[rowKey(b.ref!), { done: true, version: 2 }]]));
+  assert.deepEqual(out, [a, now, c]);
+});
+
+const card = (seq: number, lane: string, version = 1): Row => ({ cells: [lane, `card ${seq}`], ref: { register: 'tasks', seq, version } });
+const drawnAs = (rows: readonly Row[]) => rows.map((r) => r.cells.join(' '));
+
+/**
+ * A MOVED CARD PUT BACK AT ITS OLD INDEX REORDERED THE BOARD. A board's columns are the order its rows first name them
+ * (`columnsOf` in `packages/render/src/board.ts`), so a card moved from Open to Done and spliced back at index 1 made
+ * the columns read Open, Done, Doing, with the card at the head of Done. Measured against the first version of
+ * `keepInPlace`: columns `[open, done, doing]` from a board that had read `[open, doing, done]` before and after.
+ */
+test('A MOVED CARD WEARS ITS NEW COLUMN at the foot of it, and the board keeps its columns in their order', () => {
+  const before = [card(1, 'Open'), card(2, 'Open'), card(3, 'Doing'), card(4, 'Done')];
+  /* The record answers newest write first, so the moved card comes back at the head of its new column. */
+  const out = keepInPlace(before, [before[0]!, before[2]!, card(2, 'Done', 2), before[3]!], new Map([[rowKey(before[1]!.ref!), { to: 'Done', version: 2 }]]));
+  assert.deepEqual(drawnAs(out), ['Open card 1', 'Doing card 3', 'Done card 4', 'Done card 2']);
+  /* A column this board never drew goes last, where `boardOrder` puts a value the enum does not declare. */
+  const parked = keepInPlace(before, [before[0]!, before[2]!, before[3]!], new Map([[rowKey(before[1]!.ref!), { to: 'Parked' }]]));
+  assert.deepEqual(drawnAs(parked), ['Open card 1', 'Doing card 3', 'Done card 4', 'Parked card 2']);
+});
+
+test('TWO CARDS THE ANSWER LEFT OUT land at the foot of their columns in the order they were found', () => {
+  const before = [card(1, 'Open'), card(2, 'Open'), card(3, 'Doing'), card(4, 'Done')];
+  const held = new Map([
+    [rowKey(before[1]!.ref!), { to: 'Done', version: 3 }],
+    [rowKey(before[0]!.ref!), { to: 'Doing', version: 4 }],
+  ]);
+  const out = keepInPlace(before, [before[2]!, before[3]!], held);
+  assert.deepEqual(drawnAs(out), ['Doing card 3', 'Doing card 1', 'Done card 4', 'Done card 2']);
+  assert.deepEqual(out.map((r) => r.ref?.version), [1, 4, 1, 3]);
+});
+
+test('A PLACE PAST THE END IS CLAMPED, and a hold on a row this block never drew leaves it alone', () => {
+  const [a, b, c, d] = [ROW(1, 'a'), ROW(2, 'b'), ROW(3, 'c'), ROW(4, 'd')];
+  assert.deepEqual(keepInPlace([a, b, c, d], [a], new Map([[rowKey(d.ref!), { done: true }]])).map((r) => r.cells[0]), ['a', 'd']);
+  /* OLDEST HOLD FIRST, or two rows the answer both left out come back swapped. */
+  const both = new Map([[rowKey(c.ref!), { done: true }], [rowKey(b.ref!), { done: true }]]);
+  assert.deepEqual(keepInPlace([a, b, c], [], both).map((r) => r.cells[0]), ['b', 'c']);
+  const loose = { cells: ['no ref'] };
+  const after = [a, loose, c];
+  assert.deepEqual(keepInPlace([a, b, c], after, new Map([['tasks#99', { done: true }]])), after);
+  assert.deepEqual(keepInPlace([a, b, c], after, new Map()), after);
+});
+
+test('A WRITE THAT LANDS SAYS THE VERSION IT MADE, which is the version Put back is sent at', async () => {
+  const { io } = host(() => json(200, { ok: true, value: { id: 'e_1', seq: 4, version: 9 } }));
+  assert.deepEqual(await updateRow(BASE, { register: 'tasks', seq: 4, version: 8 }, { state: 'done' }, 'x', io), { from: 'written', version: 9 });
+  const silent = host(() => json(200, { ok: true, value: {} }));
+  assert.deepEqual(await updateRow(BASE, { register: 'tasks', seq: 4, version: 8 }, { state: 'done' }, 'x', silent.io), { from: 'written' });
+});
+
+/**
+ * THE SCREEN HALF, swept from the source because it is a component. A live tick or move that lands is held in place and
+ * answered by a receipt carrying its way back; before the repair `writeRow` pushed a toast only on a refusal and nothing
+ * in `PageView.svelte` named `keepInPlace`.
+ */
+test('ON A LIVE PAGE THE ROWS GO THROUGH keepInPlace AND A LANDED WRITE PUSHES A RECEIPT WITH AN UNDO', () => {
+  const view = readFileSync(fileURLToPath(new URL('../page/PageView.svelte', import.meta.url)), 'utf8');
+  assert.match(view, /\.keepInPlace\(/);
+  assert.match(view, /toasts\.push\(hold\.said\(m\.words\), \{ intent: 'good', undo:/);
 });

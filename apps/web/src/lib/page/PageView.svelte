@@ -28,6 +28,7 @@
   import { KINDS, holeLabel, isKind, type Row, type RowRef } from 'braindog-render';
   import { Block, Degraded, Markdown, Table } from 'braindog-render/svelte';
   import '$lib/blocks-charts.css';
+  import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
@@ -53,6 +54,7 @@
   import { COLUMNS, dropIndex, spanOf as declaredSpan } from '$lib/record/arrange.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { resolverOf, type LiveBlock, type LivePageDecl, type Opened } from '$lib/record/page-live.ts';
+  import type { Declared, Kept } from '$lib/record/page-write.ts';
   import ActionRows from '../../routes/p/[slug]/ActionRows.svelte';
 
   let {
@@ -73,32 +75,111 @@
 
   const live = $derived(got?.from === 'live' ? got : null);
 
+  type Writes = typeof import('$lib/record/page-write.ts');
+  type Change = (m: Writes, ref: RowRef, decl: Declared | null) => Record<string, unknown> | null;
+
+  /**
+   * The write module once a gesture has loaded it. The rows are drawn through its `keepInPlace`, and a hold exists only
+   * after a gesture, so a page nobody has touched never pulls it in.
+   */
+  let writes = $state.raw<Writes | null>(null);
+
+  /**
+   * THE ROWS SOMEBODY HAS JUST TICKED OR MOVED, per block, and the block as it was drawn when they did.
+   *
+   * A HOLD IS ABOUT ONE PAGE, so it carries the slug it was taken on and a page opened after it reads none of it. That
+   * is the register screen dropping its holds when the question changes, one layer up: a row pinned to an index on
+   * Work would otherwise be spliced into the block at the same index on Money.
+   */
+  let kept = $state.raw<{ slug: string; blocks: Map<number, { before: Row[]; held: Map<string, Kept> }> }>({ slug: '', blocks: new Map() });
+
+  /* AND THEY GO WHEN THE PAGE DOES. `/p/[slug]` keeps this component across slugs, so without this a reader who left
+     Work for Money and came back found Work's holds still standing, over rows the record has since moved on from. */
+  $effect.pre(() => {
+    const on = slug;
+    untrack(() => {
+      if (kept.slug !== on) kept = { slug: on, blocks: new Map() };
+    });
+  });
+
+  /** A block's segment with its held rows where they were. Untouched until something on this page is held. */
+  function keptSegment<S extends { rows: Row[] }>(at: number, segment: S): S {
+    const hold = kept.slug === slug ? kept.blocks.get(at) : undefined;
+    return writes && hold ? { ...segment, rows: writes.keepInPlace(hold.before, segment.rows, hold.held) } : segment;
+  }
+
+  /** Holds `ref` in block `at`, wearing `what`. `before` is the block as drawn now, which is the frame every place is read off. */
+  function holdRow(m: Writes, at: number, before: readonly Row[], ref: RowRef, what: Kept) {
+    const blocks = new Map(kept.slug === slug ? kept.blocks : []);
+    const prior = blocks.get(at);
+    blocks.set(at, { before: [...before], held: new Map(prior?.held).set(m.rowKey(ref), what) });
+    kept = { slug, blocks };
+  }
+
   /**
    * ON A LIVE PAGE A MOVED CARD AND A TICKED TASK ARE WRITES to the row each came from, named by the `ref` the page
    * answer carried. A refusal is the record's own sentence. A write that landed, or one that met a row changed first,
    * reads the page again without blanking it, so the card's mark goes once the row agrees with it. The sample keeps its
    * toasts.
+   *
+   * A WRITE THAT LANDS HOLDS ITS ROW AND SAYS SO WITH A WAY BACK. The re-read can leave the row out: a `todo` whose
+   * `where:` leaves out done rows answers without the row it just ticked (`loop/research-m4-app.md`, brief 3), and a
+   * tick with no row and no receipt is a tick somebody reverses to check. The row stays where it was, wearing `what`; the receipt's undo sends `back` at the version the write made,
+   * and the row stays put through that too, wearing `undone`.
    */
   async function writeRow(
     ref: RowRef | undefined,
-    change: (m: typeof import('$lib/record/page-write.ts'), ref: RowRef, decl: import('$lib/record/page-write.ts').Declared | null) => Record<string, unknown> | null,
+    change: Change,
     title: string,
+    hold: { at: number; before: readonly Row[]; what: Kept; back: Change; undone: Kept; said: (w: Writes['words']) => string },
   ) {
     if (!ref) return void toasts.push(copy.pageRowUnknown, { intent: 'warn' });
+    /* THE PAGE THE GESTURE WAS MADE ON. A write that lands after the reader has opened another page holds nothing,
+       because its place was read off a block that page does not have. */
+    const on = slug;
     const m = await import('$lib/record/page-write.ts');
+    writes = m;
     /* THE REGISTER AS THE RECORD DECLARES IT, so a list a pack brought is ticked and moved by its own states. */
-    const patch = change(m, ref, await m.schemaOf(apiBase(), ref.register));
+    const decl = await m.schemaOf(apiBase(), ref.register);
+    const patch = change(m, ref, decl);
     if (!patch) return void toasts.push(copy.pageRowNoState, { intent: 'warn' });
     const out = await m.updateRow(apiBase(), ref, patch, title);
     if (out.from !== 'written') toasts.push(out.fix, { intent: 'warn' });
+    if (out.from === 'written') {
+      if (on === slug) holdRow(m, hold.at, hold.before, ref, { ...hold.what, version: out.version });
+      const made: RowRef = { ...ref, version: out.version ?? ref.version };
+      toasts.push(hold.said(m.words), { intent: 'good', undo: () => void putBack(m, made, decl, title, hold) });
+    }
     if (out.from === 'written' || out.from === 'conflict') await reread();
   }
 
-  function moveCard(block: LiveBlock, row: Row, to: string) {
+  /** The receipt's undo: the opposite write at the version the first one made, with the row held where it still is. */
+  async function putBack(m: Writes, ref: RowRef, decl: Declared | null, title: string, hold: { at: number; back: Change; undone: Kept }) {
+    const patch = hold.back(m, ref, decl);
+    if (!patch) return;
+    const out = await m.updateRow(apiBase(), ref, patch, title);
+    if (out.from !== 'written') toasts.push(out.fix, { intent: 'warn' });
+    else {
+      const prior = kept.slug === slug ? kept.blocks.get(hold.at) : undefined;
+      if (prior) holdRow(m, hold.at, prior.before, ref, { ...hold.undone, version: out.version });
+    }
+    if (out.from === 'written' || out.from === 'conflict') await reread();
+  }
+
+  function moveCard(block: LiveBlock, row: Row, to: string, at: number, before: readonly Row[]) {
     const title = row.cells[1] ?? copy.cardFallback;
     if (!live) return void toasts.push(copy.cardMovedTo(title, to), { intent: 'warn' });
     const field = block.columns[0]?.field;
-    void writeRow(row.ref, (m, ref, decl) => (field ? m.movePatch(ref, field, to, decl) : null), title);
+    /* WHERE IT CAME FROM, in the screen's spelling, which is what `movePatch` takes and what the held card wears. */
+    const from = row.cells[0] ?? '';
+    void writeRow(row.ref, (m, ref, decl) => (field ? m.movePatch(ref, field, to, decl) : null), title, {
+      at,
+      before,
+      what: { to },
+      back: (m, ref, decl) => (field && from ? m.movePatch(ref, field, from, decl) : null),
+      undone: { to: from },
+      said: (w) => w.moved(title, to),
+    });
   }
 
   /**
@@ -146,10 +227,17 @@
     await reread();
   }
 
-  function tickTask(row: Row, done: boolean) {
+  function tickTask(row: Row, done: boolean, at: number, before: readonly Row[]) {
     const title = row.cells[0] ?? copy.cardFallback;
     if (!live) return void toasts.push(copy.taskTicked(title, done), { intent: 'warn' });
-    void writeRow(row.ref, (m, ref, decl) => m.tickPatch(ref, done, decl), title);
+    void writeRow(row.ref, (m, ref, decl) => m.tickPatch(ref, done, decl), title, {
+      at,
+      before,
+      what: { done },
+      back: (m, ref, decl) => m.tickPatch(ref, !done, decl),
+      undone: { done: !done },
+      said: (w) => w.ticked(title, done),
+    });
   }
   /* A LIVE PAGE IS THE RECORD'S BLOCKS AND NOTHING ELSE; the sample is read only when there is no record. */
   const result = $derived<{ page: LivePageDecl; blocks: LiveBlock[] } | undefined>(
@@ -821,11 +909,15 @@
                   this screen yet, and both primitives say so on the thing that moved rather than
                   only in a message at the other end of the screen.
                 -->
-                {#if segment.type === 'block'}<Block
-                    block={segment}
+                {#if segment.type === 'block'}
+                  <!-- A ROW SOMEBODY JUST TICKED OR MOVED IS WHERE THEY LEFT IT, and each gesture is handed the rows
+                       as drawn, because that is the list its place is found in. -->
+                  {@const shown = keptSegment(slot.i, segment)}
+                  <Block
+                    block={shown}
                     opts={{ ...optsFor(block), cellHref: (i: number) => block.metrics?.[i]?.href ?? null }}
-                    onmove={(row, to) => moveCard(block, row, to)}
-                    ontick={(row, done) => tickTask(row, done)}
+                    onmove={(row, to) => moveCard(block, row, to, slot.i, shown.rows)}
+                    ontick={(row, done) => tickTask(row, done, slot.i, shown.rows)}
                     onact={(row, option) => askGate(row, option)}
                     oncapture={capturable(block) ? captureLine : undefined}
                   />{:else if segment.type === 'degraded'}<Degraded {segment} />{:else if segment.type === 'markdown'}<div class="document"><Markdown {segment} opts={{ href: inApp }} /></div>{/if}

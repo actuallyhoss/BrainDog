@@ -15,7 +15,7 @@
  */
 
 import { createClient } from '@braindog/client';
-import type { RowRef } from 'braindog-render';
+import type { Row, RowRef } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import { REGISTERS } from './data.ts';
@@ -24,8 +24,12 @@ import { declaredValue } from './where.ts';
 
 export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 
+/**
+ * `version` IS THE ONE THE WRITE MADE, when the record says it. Put back is sent at it: a row the re-read no longer
+ * carries has nothing else to name its version by, and the version the page read it at is now a conflict.
+ */
 export type Updated =
-  | { from: 'written' }
+  | { from: 'written'; version?: number }
   | { from: 'refused'; fix: string }
   | { from: 'conflict'; fix: string }
   | { from: 'unreachable'; fix: string };
@@ -116,13 +120,106 @@ export async function updateRow(base: string, ref: RowRef, patch: Record<string,
   if (res.status === 401) return { from: 'refused', fix: copy.signInAgain };
   const said: unknown = await res.json().catch(() => undefined);
   if (typeof said !== 'object' || said === null || !('ok' in said)) return { from: 'unreachable', fix: copy.recordNotReached };
-  if ((said as { ok: unknown }).ok === true) return { from: 'written' };
+  if ((said as { ok: unknown }).ok === true) {
+    const made = (said as { value?: { version?: unknown } }).value?.version;
+    return Number.isInteger(made) ? { from: 'written', version: made as number } : { from: 'written' };
+  }
 
   const refusal = (said as { refusal?: { code?: unknown; fix?: unknown } }).refusal;
   /* A CONFLICT CARRIES NO REFUSAL, and a stale version is the same fact said as one. */
   if ('conflict' in said || refusal?.code === 'VERSION_STALE') return { from: 'conflict', fix: copy.pageRowConflict(title) };
   if (refusal?.code === 'UNREACHABLE') return { from: 'unreachable', fix: copy.recordNotReached };
   return { from: 'refused', fix: typeof refusal?.fix === 'string' && refusal.fix !== '' ? refusal.fix : copy.recordNotReached };
+}
+
+/* ── a ticked task and a moved card stay where they were ─────────────────── */
+
+/**
+ * The receipt's words. Past tense with the row named, as `toast.svelte.ts` asks, and never a claim beyond the write that
+ * landed. Kept here rather than in `copy.ts`, which no builder in this wave owns.
+ */
+export const words = {
+  ticked: (title: string, done: boolean) => `Marked ${title} ${done ? 'done' : 'not done'}.`,
+  moved: (title: string, to: string) => `Moved ${title} to ${to}.`,
+};
+
+/** Which row a drawn row is, by what the page answer named it with. A page's rows carry no other identity. */
+export const rowKey = (ref: RowRef): string => `${ref.register}#${ref.seq}`;
+
+/**
+ * What happened to a held row: the tick it now wears, or the column it now sits in as the screen spells it, and the
+ * version the write answered with when the record said one.
+ */
+export type Kept = { done?: boolean | undefined; to?: string | undefined; version?: number | undefined };
+
+/** The remembered copy of a row, wearing what happened to it. A board's column is its first cell, as `columnOf` reads it. */
+function wear(row: Row, kept: Kept): Row {
+  return {
+    ...row,
+    ...(kept.done === undefined ? {} : { done: kept.done }),
+    ...(kept.to === undefined ? {} : { cells: [kept.to, ...row.cells.slice(1)] }),
+    ...(row.ref && kept.version !== undefined ? { ref: { ...row.ref, version: kept.version } } : {}),
+  };
+}
+
+/**
+ * THE BLOCK'S ROWS AFTER A RE-READ, with every held row where the reader last saw it.
+ *
+ * A TICK WAS FOLLOWED BY THE ROW LEAVING. `writeRow` reads the page again once a write lands, and a `todo` whose
+ * `where:` leaves out done rows answers without the row it just ticked, so the mark the reader was checking went with
+ * it and the only way to see whether they had hit the right one was to tick it back and look. REWORK §1 counted 13 of
+ * 85 writes reversed within five seconds on the register list for the same reason. A board moved a card to the head of
+ * its new column for the same cause one step removed: the record answers newest write first.
+ *
+ * A MOVED CARD IS HELD AT THE FOOT OF ITS NEW COLUMN, NOT AT ITS OLD INDEX. A board's columns are the order its rows
+ * first name them (`columnsOf` in `packages/render/src/board.ts`), so the first version of this, which spliced every
+ * held row back at its index, turned a board reading Open, Doing, Done into Open, Done, Doing the moment a card left
+ * Open for Done, with the card at the head of Done. The foot is where `lanes` drew the card when it was dropped, so it
+ * is also where the reader last saw it. A column the board never drew goes last, as `boardOrder` sorts an undeclared
+ * value last.
+ *
+ * `holdInPlace` in `rows-write.ts` IS THE SAME ANSWER over the register screen's `Entry`, and these are its rules over
+ * the renderer's `Row` rather than a third set:
+ *
+ *   A HELD ROW STILL IN THE ANSWER IS DRAWN FROM THE ANSWER, so a change somebody else made shows; only its place is
+ *   the remembered one. A held row the answer left out comes back from `before`, wearing what happened to it.
+ *
+ *   THE PLACE IS CLAMPED, because an index found in a longer list may not exist in a shorter one.
+ *
+ *   HOLDS LAND IN THE ORDER THEY SIT IN `before`. `holdInPlace` says "oldest hold first" and sorts by index; the index
+ *   is what makes a splice put each row back where it was, so this sorts the same way.
+ *
+ * `before` IS THE BLOCK AS DRAWN AT THE LATEST GESTURE, earlier holds already in their places, so every place is read
+ * off one list. `held` is keyed by `rowKey`; a hold on a row `before` never drew belongs to some other block and is
+ * left alone, so one map can serve every block on the page.
+ */
+export function keepInPlace(before: readonly Row[], after: readonly Row[], held: ReadonlyMap<string, Kept>): Row[] {
+  if (held.size === 0) return [...after];
+  const keyOf = (row: Row): string | null => (row.ref ? rowKey(row.ref) : null);
+  const places = before
+    .map((row, at) => ({ row, at, kept: held.get(keyOf(row) ?? '') }))
+    .filter((p): p is { row: Row; at: number; kept: Kept } => p.kept !== undefined);
+  if (places.length === 0) return [...after];
+  const pinned = new Set(places.map((p) => keyOf(p.row)));
+  const out = after.filter((row) => !pinned.has(keyOf(row)));
+  const lanes = [...new Set(before.map((row) => row.cells[0] ?? ''))];
+  for (const p of places) {
+    const now = after.find((row) => keyOf(row) === keyOf(p.row)) ?? wear(p.row, p.kept);
+    out.splice(p.kept.to === undefined ? Math.min(p.at, out.length) : footOf(out, lanes, now.cells[0] ?? ''), 0, now);
+  }
+  return out;
+}
+
+/** Just after the last row in `lane` or any column before it, which is the foot of `lane` on a board grouped in `lanes` order. */
+function footOf(rows: readonly Row[], lanes: readonly string[], lane: string): number {
+  const rank = lanes.indexOf(lane);
+  if (rank === -1) return rows.length;
+  let foot = 0;
+  rows.forEach((row, i) => {
+    const at = lanes.indexOf(row.cells[0] ?? '');
+    if (at !== -1 && at <= rank) foot = i + 1;
+  });
+  return foot;
 }
 
 /* ── arranging a page ────────────────────────────────────────────────────── */
