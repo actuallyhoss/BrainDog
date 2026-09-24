@@ -192,20 +192,28 @@ export default function graph(
    * THE DIRECTORY IS THE IDENTITY, NOT THE `name` FIELD, because `packages/render` publishes as
    * `braindog-render` and `31 §2` calls it `render`. Deriving the short name from the manifest would
    * mean the one package whose boundary has a legal consequence is the one the order cannot find.
+   *
+   * AND `packs/*`, THE THIRD LINE OF THAT FILE, which this list did not read for the day the four
+   * packs arrived (audit sixty-one, finding 9). So nothing could see the core come to import a pack,
+   * which is the core knowing a use case by name, `loop/DIRECTION.md` section 22's one refusal. A PACK
+   * IS NAMED BY ITS MANIFEST, NOT ITS DIRECTORY: it has no row in `31 §2` for the directory to match,
+   * and `packs/mercury` is `@braindog/pack-mercury`, so the name an import spells is the only one an
+   * edge can be resolved by.
    */
   function readWorkspaces() {
     const out = [];
-    for (const group of ['packages', 'apps']) {
+    for (const group of ['packages', 'apps', 'packs']) {
       let names;
       try {
         names = readdirSync(join(root, group));
       } catch {
         continue;
       }
-      for (const short of names.sort()) {
-        if (skipDir(short)) continue;
-        const dir = join(root, group, short);
-        const manifest = `${group}/${short}/package.json`;
+      for (const folder of names.sort()) {
+        if (skipDir(folder)) continue;
+        const dir = join(root, group, folder);
+        const home = `${group}/${folder}`;
+        const manifest = `${home}/package.json`;
         let text;
         try {
           if (!statSync(dir).isDirectory()) continue;
@@ -222,7 +230,8 @@ export default function graph(
           add(`${manifest}:1`, 'unreadable manifest', `does not parse as JSON: ${e.message}`);
           continue;
         }
-        out.push({ short, group, dir, manifest, text, json, npm: json.name ?? short });
+        const short = group === 'packs' ? shortOf(json.name ?? `pack-${folder}`) : folder;
+        out.push({ short, group, home, dir, manifest, text, json, npm: json.name ?? short });
       }
     }
     return out;
@@ -231,8 +240,13 @@ export default function graph(
   const ws = readWorkspaces();
   const byShort = new Map(ws.map((w) => [w.short, w]));
 
-  /** A name in the tree knows where it lives; one only the order knows is placed by the order. */
-  const groupOf = (short) => byShort.get(short)?.group ?? (APPS.has(short) ? 'apps' : 'packages');
+  /**
+   * A name in the tree knows where it lives; one only the order knows is placed by the order. A
+   * name spelt `@braindog/pack-*` and absent from the tree is still a pack, so the core importing a
+   * pack that has since been deleted is refused for what it is and not as an unranked package.
+   */
+  const groupOf = (short) =>
+    byShort.get(short)?.group ?? (APPS.has(short) ? 'apps' : short.startsWith('pack-') ? 'packs' : 'packages');
 
   /* ── The edges ──────────────────────────────────────────────────────────────────────────────── */
 
@@ -369,6 +383,33 @@ export default function graph(
     return out;
   }
 
+  /**
+   * A PACK HAS NO `src`, so its files are its root: `fill.ts`, a script such as `bands.js`, and the
+   * test. THE TEST IS LEFT OUT, and that is the same line as a package's rather than an exemption: a
+   * package's tests live in `test/`, outside the `src` this gate walks, and a pack's sit beside the
+   * files it ships. They are also where every relative climb in `packs/` is today. All four open
+   * `../../packages/record/src/index.ts` or its like to build a record and install the pack file
+   * through its own door, which is a test driving the core, not the pack depending on it.
+   *
+   * `.js` IS READ HERE AND NOT FOR A PACKAGE, because a pack's script is written in it
+   * (`packs/README.md`) and an import in the script is an edge like any other.
+   */
+  function walkPack(dir, out = []) {
+    let entries;
+    try {
+      entries = readdirSync(dir);
+    } catch {
+      return out;
+    }
+    for (const name of entries) {
+      if (skipDir(name) || name === 'test') continue;
+      const full = join(dir, name);
+      if (statSync(full).isDirectory()) walkPack(full, out);
+      else if (/\.(ts|js|svelte)$/.test(name) && !name.endsWith('.d.ts') && !/\.test\.[jt]s$/.test(name)) out.push(full);
+    }
+    return out;
+  }
+
   /** Inside the package, or out of it. `''` is the package root itself. */
   const within = (target, dir) => {
     const r = relative(dir, target);
@@ -378,7 +419,7 @@ export default function graph(
   let scanned = 0;
 
   for (const w of ws) {
-    for (const file of walk(join(w.dir, 'src'))) {
+    for (const file of w.group === 'packs' ? walkPack(w.dir) : walk(join(w.dir, 'src'))) {
       scanned++;
       const text = decomment(readFileSync(file, 'utf8'));
       const at = (index) => `${posix(relative(root, file))}:${lineAt(text, index)}`;
@@ -399,7 +440,7 @@ export default function graph(
               add(
                 at(hit.index),
                 'cross-package relative import',
-                `'${spec}' resolves to ${posix(relative(root, target))}, outside ${w.group}/${w.short}. 31 §3 layer 3: this one works fine under pnpm, which is why nothing but a gate can see it.`,
+                `'${spec}' resolves to ${posix(relative(root, target))}, outside ${w.home}. 31 §3 layer 3: this one works fine under pnpm, which is why nothing but a gate can see it.`,
               );
             continue;
           }
@@ -497,6 +538,27 @@ export default function graph(
 
   const name = (short) => byShort.get(short)?.npm ?? `@braindog/${short}`;
 
+  /**
+   * THE ONE EDGE INTO A PACK THIS TREE HOLDS, NAMED, WITH WHY AND UNTIL WHEN. `from to`, by short name.
+   *
+   * Measured the first time this gate read `packs/`, on 24 September: one finding in the whole tree,
+   * `apps/web` declaring and importing `@braindog/pack-rates-poll`, and it was being written that
+   * morning. It is the move `272e5681` announced (M3 B7): the rates form had built its poll with
+   * `ratesPollPack`, a function in `packages/seed`, which is the shell carrying a use case as code,
+   * and it now reads the pack's own file as data and fills it with the pack's `fillRates`. That is
+   * nearer the rule than what it replaced and still not the rule, because the web knows one pack by
+   * name. It leaves when a pack's form is drawn from its `fill` marks rather than written for it.
+   *
+   * AN ENTRY WHOSE EDGE IS GONE IS A FINDING, for `shell-words`' reason: an exemption that exempts
+   * nothing is the hole the next edge walks through. Only while both ends are in the tree, so a seeded
+   * fixture without them has nothing to say about it.
+   */
+  const PACK_EDGES_HELD = {
+    'web pack-rates-poll':
+      "the rates form fills `packs/rates-poll/rates-poll.pack.json` with the pack's `fillRates`, replacing the seed builder it called before (M3 B7).",
+  };
+  const held = new Set();
+
   for (const e of [...edges.values()].sort((a, b) => `${a.from}${a.to}`.localeCompare(`${b.from}${b.to}`))) {
     const from = rankOf(e.from);
     const to = rankOf(e.to);
@@ -512,9 +574,30 @@ export default function graph(
       const kind =
         groupOf(e.from) === 'apps'
           ? "31 §2: apps import packages and never each other; web's build/ is an asset directory, never an import."
-          : '31 §1: packages/* may name a capability, only apps/* may name a runtime. This package now names one.';
+          : groupOf(e.from) === 'packs'
+            ? 'A pack is data on the record and runs in whichever host installs it, so it names none of them.'
+            : '31 §1: packages/* may name a capability, only apps/* may name a runtime. This package now names one.';
       add(e.where, 'edge into an app', `${name(e.from)} → ${name(e.to)}, ${evidence(e)}. ${kind}`);
     }
+
+    /* THE CORE NEVER DEPENDS ON A PACK. `loop/DIRECTION.md` section 22: the code ships primitives and
+       never a use case, and a use case lives in a record or a shared pack. An edge from a package or an
+       app into `packs/` is a use case the core cannot run without, which makes uninstalling it a
+       release. A pack on a pack is left to the cycle check: that is one use case built on another,
+       which `requires.packs` says in data already. */
+    if (groupOf(e.to) === 'packs' && groupOf(e.from) !== 'packs' && PACK_EDGES_HELD[`${e.from} ${e.to}`]) held.add(`${e.from} ${e.to}`);
+    else if (groupOf(e.to) === 'packs' && groupOf(e.from) !== 'packs')
+      add(
+        e.where,
+        'edge into a pack',
+        `${name(e.from)} → ${name(e.to)}, ${evidence(e)}. The core ships primitives and never a use case (DIRECTION section 22), so a pack reaches the core as a file it installs, never as an import.`,
+      );
+
+    /* AND A PACK HAS NO RANK TO CHECK. It sits above the whole order, as a record's own content does,
+       so an edge with a pack at either end is answered by the two checks above and the cycle check,
+       and asking `31 §2` for a row would be a finding per pack with nothing to repair it but a row that
+       means nothing. */
+    if (groupOf(e.from) === 'packs' || groupOf(e.to) === 'packs') continue;
 
     if (from === 0) noteUnranked(e.from, byShort.get(e.from) ? `${byShort.get(e.from).manifest}:1` : e.where);
     if (to === 0) noteUnranked(e.to, byShort.get(e.to) ? `${byShort.get(e.to).manifest}:1` : e.where);
@@ -538,8 +621,18 @@ export default function graph(
   /* A WORKSPACE WITH NO EDGES AT ALL IS STILL DRIFT, and the loop above cannot see it. `31 §2` is
      the total order the build order is read from, so a directory absent from it is a package
      `pnpm -r run build` sequences by luck. */
+  for (const key of Object.keys(PACK_EDGES_HELD)) {
+    const [from, to] = key.split(' ');
+    if (!held.has(key) && byShort.has(from) && byShort.has(to))
+      add(
+        `${byShort.get(from).manifest}:1`,
+        'held edge not seen',
+        `${name(from)} → ${name(to)} is held in PACK_EDGES_HELD and the tree no longer has it. Take it out, so the next edge into a pack is seen.`,
+      );
+  }
+
   for (const w of ws)
-    if (rankOf(w.short) === 0 && !unranked.has(w.short))
+    if (w.group !== 'packs' && rankOf(w.short) === 0 && !unranked.has(w.short))
       add(
         `${w.manifest}:1`,
         'unknown package',
@@ -557,7 +650,7 @@ export default function graph(
    * gate that had nothing to read.
    */
   if (ws.length === 0) {
-    console.log('  graph: no packages/* or apps/* to read, so nothing was checked.');
+    console.log('  graph: no packages/*, apps/* or packs/* to read, so nothing was checked.');
     return 3;
   }
 

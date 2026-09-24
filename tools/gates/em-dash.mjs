@@ -55,6 +55,20 @@ const DASH = '\u2014';
 const WORKSPACES = ['packages', 'apps'];
 
 /**
+ * AND `packs`, THE THIRD WORKSPACE ROOT, READ AS A PACK IS SHAPED RATHER THAN AS A PACKAGE IS.
+ *
+ * A pack has no `src`. It is `<id>.pack.json`, a script beside it and a test (`packs/README.md`), so
+ * a member walked for `src` is a member that ships nothing, and that is how this gate read the four
+ * packs the day they arrived: not at all (audit sixty-one, finding 9). THE PACK FILE IS THE PROSE.
+ * Its `summary`, its `fill` hints and its labels are what a stranger reads on the plan before pressing
+ * install, which is this rule's reader exactly. So the member is walked from its root, and a
+ * `.pack.json` and a `.js` script are read beside `.ts` and `.svelte`. Measured on 24 September over
+ * the four packs: 6 files (the corpus went from 519 to 525), and not one em dash in any of them.
+ */
+const PACKS = 'packs';
+const PACK_FILE = /\.(ts|js|svelte)$|\.pack\.json$/;
+
+/**
  * AND THE README OF ANY PACKAGE THAT IS ACTUALLY PUBLISHED, which is one file today.
  *
  * `packages/render` ships to npm as `braindog-render` under MIT, and its README is the page a
@@ -134,15 +148,15 @@ const holdsSql = (lit) => /(?:^|\\n|\n)\s*(?:CREATE|INSERT|SELECT|UPDATE|DELETE|
 const blankSqlComments = (lit) =>
   lit.replace(/(^|\\n|\n|\s)--[^\n]*?(?=\\n|\n|$)/g, (m, lead) => lead + blank(m.slice(lead.length)));
 
-async function walk(dir, out) {
+async function walk(dir, out, read = /\.(ts|svelte)$/) {
   for (const e of await readdir(dir, { withFileTypes: true })) {
     /* `test` IS NOT THIS GATE'S SUBJECT. A test asserts on the sentence a stranger reads; it is not
        itself read by one, and holding it to the rule would mean a test could not quote the prose
        it is checking. `.test.ts` beside a source file is the same statement. */
     if (skipDir(e.name) || e.name === 'test') continue;
     const at = join(dir, e.name);
-    if (e.isDirectory()) await walk(at, out);
-    else if (/\.(ts|svelte)$/.test(e.name) && !/\.test\.ts$/.test(e.name)) out.push(at);
+    if (e.isDirectory()) await walk(at, out, read);
+    else if (read.test(e.name) && !/\.test\.[jt]s$/.test(e.name)) out.push(at);
   }
 }
 
@@ -184,10 +198,18 @@ export default async function emDash(root = process.env.BRAINDOG_GATE_ROOT ?? pr
     }
   }
 
+  let packs = [];
+  try {
+    packs = await readdir(join(ROOT, PACKS), { withFileTypes: true });
+  } catch {
+    /* A tree with no `packs` has no pack prose, which is every seeded fixture older than the directory. */
+  }
+  for (const p of packs) if (p.isDirectory() && !skipDir(p.name)) await walk(join(ROOT, PACKS, p.name), files, PACK_FILE);
+
   /* A GATE THAT READ NOTHING HAS NOT PASSED. Exit 3 is this directory's word for "could not run",
      and it is the difference between a clean tree and a root aimed at the wrong place. */
   if (files.length === 0) {
-    console.log(`  em-dash: no packages/*/src or apps/*/src under ${ROOT}, so no prose was read`);
+    console.log(`  em-dash: no packages/*/src, apps/*/src or packs/* under ${ROOT}, so no prose was read`);
     return 3;
   }
 
@@ -201,6 +223,11 @@ export default async function emDash(root = process.env.BRAINDOG_GATE_ROOT ?? pr
     let text;
     if (file.endsWith('.md')) {
       text = blankMarkdown(source);
+    } else if (file.endsWith('.json')) {
+      /* JSON HAS NO COMMENTS, SO NOTHING IS BLANKED. The comment patterns are not harmless on it: a
+         `"src/**\/*.ts"` in a value holds a `/*` and a `*\/`, and the `/* *\/` pattern would blank
+         the characters between them as though they were a comment. */
+      text = source;
     } else {
       text = blankComments(source);
       text = text.replace(LITERAL, (lit) => (holdsSql(lit) ? blankSqlComments(lit) : lit));

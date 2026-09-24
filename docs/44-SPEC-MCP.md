@@ -1,6 +1,6 @@
 # 44 · packages/mcp: specification
 
-The agent surface of [10-MCP](10-MCP.md), typed to the file: sixteen fixed tools, nineteen kinds of resource (thirteen
+The agent surface of [10-MCP](10-MCP.md), typed to the file: fifteen fixed tools, nineteen kinds of resource (thirteen
 fixed addresses and six templates), the server `instructions`, and the JSON-RPC 2.0 core that carries them,
 hand-rolled over the `Result` envelope of [33-CONTRACTS](33-CONTRACTS.md) §2, with the token budget of 10 §4 asserted
 by a test. Two transports wrap the core: stdio in `apps/cli` and streamable HTTP at `POST /mcp` on both hosts
@@ -15,7 +15,7 @@ ponytail.
 parsed JSON-RPC 2.0 message and returns one reply, or `null` for a notification, which is never answered and never
 runs anything. It answers `initialize` with the instructions and a negotiated protocol version; `server/discover` with the
 versions, the capabilities and the instructions; `ping`; `tools/list`
-with the sixteen tools and the instructions again; `tools/call`; `resources/list`, `resources/templates/list` and
+with the fifteen tools and the instructions again; `tools/call`; `resources/list`, `resources/templates/list` and
 `resources/read`; and `prompts/list`, which is empty for now. The tools and resources are `tools(surface)` in
 `src/index.ts`, over `McpSurface<C>`, a structural type naming only the record methods the tools call. A `Result`
 becomes an MCP result: a value as its JSON, a refusal as an error result carrying the refusal, a conflict as
@@ -40,7 +40,7 @@ they say (`loop/research-agent-path.md` §1.1):
 | Authorise a call against scope, level or ceiling | the record, in one place (30 §10). The tools hand `ctx` on and never read it |
 | Touch a database, a port, a `node:` module or `process` | it holds `surface` and `ctx` and nothing else; the `stack` and `graph` gates hold it to that |
 | Speak the legacy HTTP+SSE transport | not carried (ADR-054) |
-| Reach VAULT, JOBS or ADMIN | no tool names one. Any other name is `ROUTE_UNKNOWN` with the sixteen in `allowed`, and the record refuses every token at those groups in any case (10 §8). The named refusals of §6.2 are not built |
+| Reach VAULT, JOBS or ADMIN | no tool names one. Any other name is `ROUTE_UNKNOWN` with the fifteen in `allowed`, and the record refuses every token at those groups in any case (10 §8). The named refusals of §6.2 are not built |
 | Decide | there is no `decide` tool, and no token holds `decide` (30 §10) |
 | Hand over a credential | there is no vault tool. `context` names a key by its label and what it opens, never its value (§8) |
 
@@ -80,7 +80,7 @@ export type McpSurface<C> = {
   update(args: { register: string; seq: number; patch: Args; version?: number; note?: string }, ctx: C): Answer;
   pages(ctx: C): Answer<{ slug: string; title: string }[]>;
   page(args: { slug: string }, ctx: C): Answer;
-  metric(args: { metric: string }, ctx: C): Answer;                // also the money tool's seven reads
+  metric(args: { metric: string }, ctx: C): Answer;                // braindog:metric/{id}, §4.7
   digestToday(args: { digest?: string }, ctx: C): Answer;
   context?(args: Record<string, never>, ctx: C): Answer;        // build step 8
   handoff?(args: Args, ctx: C): Answer;                          // build step 6
@@ -97,9 +97,8 @@ export type McpSurface<C> = {
 export type Tool = { name: string; description: string; input: Record<string, unknown>; writes: boolean };
 export type Resource = { uri: string; name: string; description: string; ttlMs: number };
 
-export const TOOLS: readonly Tool[];                  // sixteen, §4.4
+export const TOOLS: readonly Tool[];                  // fifteen, §4.4
 export const TEMPLATES: readonly { uriTemplate: string; name: string; description: string }[];   // six, §4.7
-export const MONEY_FIGURES: readonly ['cash-now', 'received-30d', 'spent-30d', 'in-30d', 'out-30d', 'late-in', 'overdue'];
 export const HOUR = 3_600_000;
 export const MINUTE = 60_000;
 export function ttlOf(uri: string): number;           // §4.7's ttl column, by the address's first segment
@@ -175,7 +174,7 @@ packages/mcp/
 │                        scripts: test = node --test test/*.test.ts · typecheck = tsc --noEmit -p tsconfig.json
 ├── tsconfig.json        extends ../../tsconfig.base.json; includes src/ and test/
 ├── src/
-│   ├── index.ts         McpSurface, TOOLS, TEMPLATES, MONEY_FIGURES, ttlOf, compact, tools(): the sixteen, the resource list, the read
+│   ├── index.ts         McpSurface, TOOLS, TEMPLATES, ttlOf, compact, tools(): the fifteen, the resource list, the read
 │   ├── rpc.ts           handle(): framing, version negotiation, the result renderer
 │   ├── http.ts          serveMcp(), gate(), unauthorized(): POST /mcp, §5.1
 │   ├── instructions.ts  INSTRUCTIONS, §4.6
@@ -190,7 +189,7 @@ packages/mcp/
     ├── index.test.ts     every advertised tool and resource reaches a method, and what a bare surface darkens
     ├── budget.test.ts    tokenBudget (§5.8) over the rendered tools/list, the ceilings of §7, plain ASCII
     ├── activity.test.ts  the activity tool
-    ├── money.test.ts     the money tool, in one currency and in three
+    ├── money-out.test.ts no money tool, no figure id of one pack in the source, and a pack's figures read as metrics
     ├── list-ref.test.ts  list filtered by a ref, every way an agent writes one
     ├── teaching.test.ts  the sentences context adds
     ├── actions.test.ts   braindog:actions
@@ -206,7 +205,7 @@ type-checked, because `tsc` follows the import from `src/index.ts`.
 The transports' own halves live with their hosts. The stdio loop is `apps/cli/src/stdio.ts`, over the surface
 `apps/cli/src/surface.ts` builds on `@braindog/client`, and each host's `/mcp` branch calls `serveMcp`
 (`apps/worker/src/index.ts`, `apps/selfhost/src/server.ts`). There is no `mcp-budget` gate and no generated schema
-file: the budget is `budget.test.ts` (§7), and the sixteen input schemas are written by hand in `index.ts` (§4.4).
+file: the budget is `budget.test.ts` (§7), and the fifteen input schemas are written by hand in `index.ts` (§4.4).
 
 ---
 
@@ -314,7 +313,7 @@ record answers, which is every result above but one, and `public` for `server/di
 reads nothing and is the same for every caller. The resource list is held for a minute rather than an hour because it
 names pages, and a page appears when its row does.
 
-### 4.4 · The sixteen tools, and what each reaches
+### 4.4 · The fifteen tools, and what each reaches
 
 | Tool | Reaches | Arguments | Writes |
 |---|---|---|---|
@@ -326,7 +325,6 @@ names pages, and a page appears when its row does.
 | `search` | `search({ q, limit? })` | the same | no |
 | `history` | `history({ register, seq })` | `spoken`, qualified or prefixed | no |
 | `activity` | `recentHistory({ limit? })` | `limit?` | no |
-| `money` | `metric({ metric })`, seven times at once, one for each of `MONEY_FIGURES` | none | no |
 | `governance` | `governance(args)` | `register?`, `id?`, `status?`, `limit?`, `cursor?` | no |
 | `propose` | `propose(args)`; `dryRun` after a rule change is filed; `scriptTry` instead of filing, for a script change carrying `try` | `question`, `body_kind`, `body` | yes |
 | `create` | `create({ register, fields, note? })` | the same | yes |
@@ -338,7 +336,7 @@ names pages, and a page appears when its row does.
 Fourteen of these are the fourteen of `loop/research-agent-path.md` §1.5. Five tools left to pay for the three that
 plan added (`context`, `handoff`, `meet`): `pages`, `page` and `metric` were already resources (§4.7); `credentials`
 could never answer a token, because the vault refuses every one; and `dry_run` previews a rule, and has come back as
-part of `propose`'s answer rather than as a tool (below). Two joined after, each paid for inside the ceiling of §7 by
+part of `propose`'s answer rather than as a tool (below). One joined after, paid for inside the ceiling of §7 by
 cutting descriptions that repeated their own schema or the instructions (the arithmetic is in the comment at the head
 of `src/index.ts`):
 
@@ -347,14 +345,16 @@ of `src/index.ts`):
   picking up after another does not yet know which row to ask about. It takes a `limit` and no cursor, and answers
   `{ events }` with the record's cursor taken off, because an argument the tool does not take is one a model will try
   to send. It cost 117 tokens.
-- **`money`** (`4da40586`) is how money stands: the seven figures of `MONEY_FIGURES` that the money pack already
-  declares, read at once through `metric`, so the number an agent reads is the number the Money page draws. Each comes
-  back as `{ currency, amount }`, or as `parts` with `missing` naming the currency pair a rate would join, with
-  `rows`, `list_rows` (the register's own row count, so a zero over an empty list is told apart from a zero over paid
-  invoices), `rate_as_of`, `rate_forward`, `met` and `delta` when the record gave them. It adds nothing up. A figure the
-  record has not got is left out; one that refused for any other reason keeps its place and its refusal. When none of
-  the seven answers, the tool refuses `METRIC_UNKNOWN` naming the money-core add-on, or relays the record's own
-  refusal when that was something else. It cost 91 tokens.
+
+A second, **`money`** (`4da40586`), joined and then left in `48ac43a1` (`loop/research-m3-dynamic.md` section 3,
+B6). It read the seven figures that money-core declares, by id, through `metric`, and when none answered it refused
+`METRIC_UNKNOWN` naming that pack. So the one server every record speaks carried one pack's vocabulary, and a record
+keeping its money in any other pack could only be told to install ours. Nothing replaced it by name: a page that
+draws a pack's figures is `braindog:page/<slug>`, each figure it draws is `braindog:metric/<id>` (§4.7), and both
+answer the record's whole reading, where the tool relayed eight keys of it. Two currencies with no rate between them
+still come back as one amount each and no sum, because that was always the kernel's doing and never the tool's
+(`test/money-out.test.ts`). The first rule of the instructions now says to read the Home page for what leads (§4.6).
+The 91 tokens it cost stay paid: the list measured 2,597 with it and 2,520 without.
 
 The tool layer holds no checks of its own beyond addressing:
 
@@ -369,7 +369,7 @@ The tool layer holds no checks of its own beyond addressing:
   `index.ts`, with `additionalProperties: false` and `required` left out when empty. The record refuses a wrong field
   by name (`FIELD_UNKNOWN`, `ENUM_VALUE_UNKNOWN`, with `allowed`), which teaches better than a protocol error would.
 - **A tool the surface does not answer** is `NOT_IN_THIS_BUILD` with a sentence saying what to do instead (§2).
-- **Any other name** is `ROUTE_UNKNOWN`, with the sixteen in `allowed`. The lookup is `Object.hasOwn`, because the
+- **Any other name** is `ROUTE_UNKNOWN`, with the fifteen in `allowed`. The lookup is `Object.hasOwn`, because the
   name comes from the caller and every name on `Object.prototype` would otherwise be found and called.
 - **A note** is an `update` with an empty patch, so it answers to the same permission and lands in the same history.
   An empty note is `REQUIRED_MISSING` at `note`.
@@ -441,8 +441,6 @@ search        Rows whose text matches, across every register you can see. Every 
 history       The writes that made one row, in order, each with who and when.
 activity      What has changed in the whole record lately, newest first: each write, the row it touched, and who made it. Read
               it to pick up after another session.
-money         How money stands: cash now, what moved in 30 days, what is due in and out, and what is late each way. One amount
-              per currency.
 governance    What has been proposed and not yet answered, what was decided and why, and what was predicted. Ask by id for a
               body.
 propose       Put a question to the person, with what you would do about it. It changes nothing by itself.
@@ -464,7 +462,7 @@ send the `from_version` it read, and that `pack`, `settings` and `arrange` are r
 ### 4.6 · `INSTRUCTIONS`, the exact text
 
 ```
-BrainDog is one person's record of their work, projects, money and whatever else they keep in it, shared by every agent that works for them. Call context first: it names your session, your project, and what applies here.
+BrainDog is one person's record of their work, projects, money and whatever else they keep in it, shared by every agent that works for them. Call context first: it names your session, your project, and what applies here. Read the Home page for what leads.
 Money is an integer in minor units with its currency. Shift it by the decimals of that currency before saying a number (GBP 2, JPY 0, KWD 3), and never add two currencies.
 Writes are compare-and-set. On VERSION_STALE, re-read the row and re-apply your change to the new copy. Never resend the copy you held.
 An agent never decides. Lay out options with propose; the person chooses in their app. To change something you may not change yourself, such as a skill's text or where a key applies, propose it.
@@ -476,9 +474,9 @@ A refusal names the field and the fix. Correct the call; never retry it unchange
 Everything you write is read on a phone. Keep it short and plain.
 ```
 
-Ten lines, 257 words, 1,402 bytes, **392 tokens** by `tokenBudget`. No `o200k_base` count has been taken of this text,
+Ten lines, 264 words, 1,437 bytes, **400 tokens** by `tokenBudget`, which is the whole of their ceiling. No `o200k_base` count has been taken of this text,
 because the calibration of §9 is not built. It carries the rules every tool would otherwise repeat: call `context`
-first; minor units, shifted by the currency's own decimals; re-read on `VERSION_STALE`; never decide, propose; never a
+first, and read the Home page for what leads; minor units, shifted by the currency's own decimals; re-read on `VERSION_STALE`; never decide, propose; never a
 credential, and how to deposit one; the handoff and `tried`; when a learning is worth recording; `meet`; the refusal
 teaches; read on a phone. It is returned in `initialize`, in `server/discover`, and again with every `tools/list`,
 because a client that skipped the first still reads the others.
@@ -600,8 +598,8 @@ nothing is streamed.
 
 1. Nothing is read from the record. The list is the same for every record and every caller, so it always arrives,
    and a caller who can read nothing still learns what it could call.
-2. `tools = TOOLS.map(listed)`: for each of the sixteen, in §4.4's order, `{ name, description, inputSchema }`, where
-   `inputSchema` is the tool's `input`, plus `annotations: { readOnlyHint: true }` on the ten that never write.
+2. `tools = TOOLS.map(listed)`: for each of the fifteen, in §4.4's order, `{ name, description, inputSchema }`, where
+   `inputSchema` is the tool's `input`, plus `annotations: { readOnlyHint: true }` on the nine that never write.
 3. Result `{ tools, instructions: INSTRUCTIONS, ttlMs: 3_600_000, cacheScope: 'private' }`.
 
 The `inputSchema` objects are constants written by hand in `index.ts` with three helpers: `obj()` adds
@@ -611,17 +609,17 @@ what `budget.test.ts` counts (§5.9).
 
 ### 5.3 · `tools/call`
 
-1. A `params.name` that is not a string is `-32602`, with the sixteen in `data.allowed`. `params.arguments`, `{}` when
+1. A `params.name` that is not a string is `-32602`, with the fifteen in `data.allowed`. `params.arguments`, `{}` when
    absent, that is not an object is `-32602`. Neither reaches a tool.
 2. `tools(surface).call(name, args, ctx)` looks the name up with `Object.hasOwn`. A name that is not one of the
-   sixteen is an error result, `ROUTE_UNKNOWN` with the sixteen in `allowed`, and nothing runs. That covers every
+   fifteen is an error result, `ROUTE_UNKNOWN` with the fifteen in `allowed`, and nothing runs. That covers every
    VAULT, JOBS and ADMIN method name, and every name on `Object.prototype` (§6.2).
 3. The tool addresses the call (§4.4). It parses `spoken` into `{ register, seq }`, or hands a prefixed id or a row id
    to the record, or refuses `VALUE_MALFORMED` at `spoken`; `log` refuses an empty note `REQUIRED_MISSING` at `note`;
    a tool whose method the surface does not offer refuses `NOT_IN_THIS_BUILD` with what to do instead; a `propose` of
    a script change that carries `try` goes to `scriptTry` and never to `propose` (§4.4).
 4. The surface method runs with `ctx` as the transport handed it. `record_index` calls `boot`, then `version`;
-   `money` calls `metric` seven times at once; `propose` of a rule change calls `dryRun` after the filing. The
+   `propose` of a rule change calls `dryRun` after the filing. The
    arguments are not checked against the published schema: the record refuses a wrong field by name, with `allowed`
    (§13 D7).
 5. The answer is shaped as §4.4 says (a compact row, a spoken id), then rendered by §5.4 and answered as the JSON-RPC
@@ -676,7 +674,7 @@ drops its cursor.
 
 Neither notification is sent, and the capabilities declare `tools: {}` and `resources: {}` with no `listChanged`.
 The transport has no session and no server-initiated stream, and nothing is remembered between messages (§4.1), so
-there is nobody to tell. Nothing needs telling about the tools: the sixteen do not change on an install, and no
+there is nobody to tell. Nothing needs telling about the tools: the fifteen do not change on an install, and no
 description names a register (§4.5), so a client may hold `tools/list` for its hour without holding anything stale.
 
 What an install does change is read, never pushed:
@@ -733,7 +731,7 @@ export function tokenBudget(text: string): number {
 `REGISTER_UNKNOWN` is 9 and not the 8 an earlier revision of this note said: the underscore is punctuation, so the
 word halves are counted apart and the underscore is a token of its own. `budget.test.ts` asserts 9.
 
-Why not `bytes / 4`: on the `tools/list` of §7 it gives 2,207 (8,828 bytes) against this estimator's 2,597. It
+Why not `bytes / 4`: on the `tools/list` of §7 it gives 2,148 (8,590 bytes) against this estimator's 2,528. It
 under-counts minified JSON, whose punctuation clusters tokenise at about three bytes a token, and a budget that
 under-counts is a budget that passes in CI and fails in the context window. Why `_` is punctuation: `op_id` is two
 tokens in o200k (`op`, `_id`) and would be one under a word rule that absorbed the underscore. Stated bias: about
@@ -758,9 +756,9 @@ nothing to vary.
 
 Two vocabularies, never mixed: JSON-RPC's numeric codes for the protocol layer (a request that never reached a
 method), and 30 §6's `UPPER_SNAKE` codes inside results (a call the record, or this package on its behalf, refused).
-This package raises five corpus codes itself: `ROUTE_UNKNOWN`, `VALUE_MALFORMED`, `REQUIRED_MISSING` and
-`NOT_IN_THIS_BUILD`, each named in §5.3 and §5.5, and `METRIC_UNKNOWN`, which the `money` tool answers when none of
-its seven figures does (§4.4). It also writes `VERSION_STALE` as the code of a rendered conflict (§5.4). Every other
+This package raises four corpus codes itself: `ROUTE_UNKNOWN`, `VALUE_MALFORMED`, `REQUIRED_MISSING` and
+`NOT_IN_THIS_BUILD`, each named in §5.3 and §5.5. A fifth, `METRIC_UNKNOWN`, left with the `money` tool (§4.4); a
+figure the record has not got is now the record's own refusal, relayed. It also writes `VERSION_STALE` as the code of a rendered conflict (§5.4). Every other
 code is relayed from the record unchanged.
 
 ### 6.1 · The protocol layer
@@ -779,13 +777,13 @@ code is relayed from the record unchanged.
 
 Plus the HTTP answers with an empty body: `405` (not `POST`), `403` (an `Origin`), `413` (over `maxBodyBytes`) and
 `415` (not JSON), and `202` for a notification. An unknown tool is not a protocol error. It is an error result
-carrying `ROUTE_UNKNOWN`, with the sixteen in `allowed` (§4.4), because a result is what the model reads to correct
+carrying `ROUTE_UNKNOWN`, with the fifteen in `allowed` (§4.4), because a result is what the model reads to correct
 the call.
 
 ### 6.2 · The corpus codes this package raises before any call
 
 **Not built.** There is no `REFUSED` table in `index.ts`. A VAULT, JOBS or ADMIN method name sent to `tools/call` is
-`ROUTE_UNKNOWN`, with the sixteen in `allowed` (§5.3), and the record refuses a token at those groups in any case
+`ROUTE_UNKNOWN`, with the fifteen in `allowed` (§5.3), and the record refuses a token at those groups in any case
 (30 §10). The table below is an earlier revision's design, kept as that.
 
 > **The ADMIN row is about a direct write, not about metadata (September 22nd 2026,
@@ -835,16 +833,17 @@ counted once for this revision, by the same estimator over the same result.
 
 | Item | Ceiling | Measured | How |
 |---|---|---|---|
-| `tools/list` result: `tools[]`, `instructions`, `ttlMs`, `cacheScope` | **≤ 2,600** | **2,597**, 8,828 bytes | `budget.test.ts` |
-| The sixteen tool objects alone, the `tools` array serialised by itself | reported | 2,191 | the same count over `tools` |
-| One tool description | < 200 | 12 (`update`) to 60 (`context`) | `budget.test.ts` asserts the ceiling for each of the sixteen |
+| `tools/list` result: `tools[]`, `instructions`, `ttlMs`, `cacheScope` | **≤ 2,600** | **2,528**, 8,590 bytes | `budget.test.ts` |
+| The fifteen tool objects alone, the `tools` array serialised by itself | reported | 2,114 | the same count over `tools` |
+| One tool description | < 200 | 12 (`update`) to 60 (`context`) | `budget.test.ts` asserts the ceiling for each of the fifteen |
 | One tool object: name, description, `inputSchema`, `annotations` | reported | 75 (`record_index`) to 295 (`propose`) | |
-| `INSTRUCTIONS` | ≤ 400 | 392 | `budget.test.ts` |
+| `INSTRUCTIONS` | ≤ 400 | 400 | `budget.test.ts` |
 | `record_index` response | ≤ 500 | 256, 780 bytes, over the seed's sixteen registers | a real record with `@braindog/seed`'s declarations installed; no test asserts it |
 | A `list` page, the default of 50 rows | ≤ 2,000 | **5,380**, 14,517 bytes, for fifty `obligations` rows: over | the same record with seventy `obligations` rows; no test asserts it |
 | `resources/list` | none | not in any turn; fetched when wanted | |
 
-*Measured on 22 September 2026. The headroom under 2,600 is 3 tokens, and under 400 for the instructions it is 8.*
+*The first five rows measured on 24 September 2026, after `money` left and the Home sentence joined the instructions;
+the rest on 22 September. The headroom under 2,600 is 72 tokens, and under 400 for the instructions it is none.*
 
 **The `list` row is a target this build does not meet.** 10 §4 set 2,000 for "25 rows, projected, not whole
 documents". The record's default page is 50 rows, not 25 (`kernel.list` clamps to 1 to 500 with 50 as the default,
@@ -856,9 +855,10 @@ wants a short answer passes a `limit`.
 because `context`, `handoff` and `meet` are what an agent does every session (`loop/research-agent-path.md` §1.5),
 and those three cost 500 tokens with their schemas. The instructions grew from 268 to 352 for the same reason, and to
 392 since, as the money line learned each currency's decimals, the key line named the real command, the first line
-stopped naming one use case and the handoff line asked for `doing`. Their own ceiling moved from 300 to 400. Two more tools joined without moving the ceiling. The list measured 2,555 before
+stopped naming one use case and the handoff line asked for `doing`, and to 400 when the first line said to read the
+Home page for what leads. Their own ceiling moved from 300 to 400. Two more tools joined without moving the ceiling. The list measured 2,555 before
 `activity`, which cost 117, and 2,565 after it, once four descriptions gave back what they said twice; `money` cost
-91, and nine descriptions gave that back. Automations and `script_try` cost the list nothing, because the one rides
+91, nine descriptions gave that back, and its leaving took the list from 2,597 to 2,520. Automations and `script_try` cost the list nothing, because the one rides
 on `propose`'s answer and the other on its body, and their grammars are resources. One more clause in a description is
 a clause out of another, and the test is the arbiter. The instructions are counted inside the figure, because every
 token of them sits in the context every turn.
@@ -878,13 +878,13 @@ level.
 | Arguments | the record's: it refuses a wrong field by name, with `allowed`. The tool layer checks addresses and nothing else (§4.4) |
 | Body size | 1 MB, on `Content-Length` and again on the bytes as they arrive (§5.1 step 5) |
 | Header agreement | a mirrored header must equal the body whenever it is sent, so a check an intermediary makes on the header is a check on the call (§5.1 step 7) |
-| Code generation | none. The sixteen input schemas are constants written by hand |
+| Code generation | none. The fifteen input schemas are constants written by hand |
 | A script trial | `propose` with `try` runs a draft in the host's sandbox, with the caller's reads and no key opened for a token (§4.4). It writes nothing and files nothing, and the record checks the draft as an install would before it runs |
 | Error text | a 401 is one word; a throw is `internal` and a UUID; a refusal carries the record's `code`, `fix`, `at` and `allowed`. No stack, no SQL and no path crosses the wire (12 §8) |
 | Logging | a throw writes one line to the host's log, or to standard error under stdio: the reference, the method and the error, and never an argument |
 | Credentials | no tool names a VAULT method, and the record refuses every token there. `context` names a key by its label and what it opens, and shows its secret field as `{ sealed, opened, last_opened, last_by }`: never the grant, the sealed bytes or a value (ADR-010). `braindog:actions` names a key by its vault label |
 | Deciding | there is no `decide` tool, and no token reaches `decide` (30 §10) |
-| Completeness | the tool list is fixed at sixteen, and any other name is `ROUTE_UNKNOWN`, looked up with `Object.hasOwn` |
+| Completeness | the tool list is fixed at fifteen, and any other name is `ROUTE_UNKNOWN`, looked up with `Object.hasOwn` |
 
 **What never travels:** a plaintext credential, a stack trace, an exception message, a SQL string, a file path, a
 principal identifier the client did not already hold.
@@ -898,11 +898,11 @@ and each case is named for what it holds.
 
 | File | Holds |
 |---|---|
-| `packages/mcp/test/rpc.test.ts` | `handle` over `stub.ts`. `initialize` negotiates, and an older client gets the newest version at or below its own. `server/discover` answers without reading the record, with `cacheScope: 'public'`. `ping`, and `prompts/list` as an empty list. `tools/list` is the sixteen, with the instructions and the read-only ones marked, and reads nothing. Each tool reaches its method with the transport's context. A value is compact JSON, a refusal is carried whole, and a conflict carries the current row and who changed it. An unknown tool, or a name off `Object.prototype`, runs nothing. A throw is `-32603` and a reference, with no exception text. A notification returns `null`, and the id is echoed exactly. A batch or a malformed message is `-32600`, an unknown method `-32601`, and parameters of the wrong shape `-32602`. Resources are listed, templated and read with their `ttlMs`, and an address that is not there, or is refused, is `-32002` |
-| `packages/mcp/test/mcp.test.ts` | the tools and resources over a real record. The count is sixteen, and there is no vault tool. Each tool says whether it writes. A row is addressed as a person says it, by `register#number`, by a prefixed id or by the row id a ref holds, and `S1` is the run; `update`, `log` and `history` take a prefixed id. A row is compact. `record_index` is the registers and the version. `governance` lists without bodies. A change takes its `declaration_id` from `to`, and a rowset names its register from `at` and raises a skill's `rev`. A refusal names what to send instead, and a stale write comes back as a conflict. `context` and `handoff` answer through the record, and so does `meet`; what a host does not answer is `NOT_IN_THIS_BUILD`. The five tools that left answer as any unknown name does. A `read` token reads through every tool and writes through none. Every resource listed reads, and what a surface cannot answer is not listed. A page is withheld for the level held, no metric is advertised that the record says does not exist, and a skill is read by its name |
-| `packages/mcp/test/index.test.ts` | every advertised tool reaches a method, asked over the wire; a surface with nothing optional darkens exactly `context`, `activity`, `handoff` and `meet`, and the resources go the same way; `credentials` is not a tool; the refusal for a name that is not a tool lists the sixteen |
+| `packages/mcp/test/rpc.test.ts` | `handle` over `stub.ts`. `initialize` negotiates, and an older client gets the newest version at or below its own. `server/discover` answers without reading the record, with `cacheScope: 'public'`. `ping`, and `prompts/list` as an empty list. `tools/list` is the fifteen, with the instructions and the read-only ones marked, and reads nothing. Each tool reaches its method with the transport's context. A value is compact JSON, a refusal is carried whole, and a conflict carries the current row and who changed it. An unknown tool, or a name off `Object.prototype`, runs nothing. A throw is `-32603` and a reference, with no exception text. A notification returns `null`, and the id is echoed exactly. A batch or a malformed message is `-32600`, an unknown method `-32601`, and parameters of the wrong shape `-32602`. Resources are listed, templated and read with their `ttlMs`, and an address that is not there, or is refused, is `-32002` |
+| `packages/mcp/test/mcp.test.ts` | the tools and resources over a real record. The count is fifteen, and there is no vault tool. Each tool says whether it writes. A row is addressed as a person says it, by `register#number`, by a prefixed id or by the row id a ref holds, and `S1` is the run; `update`, `log` and `history` take a prefixed id. A row is compact. `record_index` is the registers and the version. `governance` lists without bodies. A change takes its `declaration_id` from `to`, and a rowset names its register from `at` and raises a skill's `rev`. A refusal names what to send instead, and a stale write comes back as a conflict. `context` and `handoff` answer through the record, and so does `meet`; what a host does not answer is `NOT_IN_THIS_BUILD`. The five tools that left answer as any unknown name does. A `read` token reads through every tool and writes through none. Every resource listed reads, and what a surface cannot answer is not listed. A page is withheld for the level held, no metric is advertised that the record says does not exist, and a skill is read by its name |
+| `packages/mcp/test/index.test.ts` | every advertised tool reaches a method, asked over the wire; a surface with nothing optional darkens exactly `context`, `activity`, `handoff` and `meet`, and the resources go the same way; `credentials` is not a tool; the refusal for a name that is not a tool lists the fifteen |
 | `packages/mcp/test/activity.test.ts` | `activity` is a tool; its `limit` is the record's; a line's address replaces its parts and empty fields do not travel; a line about no row keeps `target`; a caller held to one register sees only its lines; a host without `recentHistory` says so |
-| `packages/mcp/test/money.test.ts` | seven figures in one call, each the record's; two currencies are never added; a forward rate says so; a record with no money names the add-on, and a caller who cannot reach the money registers is told the same; a caller who may not read at all gets the record's sentence; movement comes through; `list_rows` tells an empty list from a paid one; a figure refused for its own reason keeps its place; an older pack answers the five it has; every figure is one the money pack declares |
+| `packages/mcp/test/money-out.test.ts` | there is no `money` tool: fifteen tools, no `MONEY_FIGURES` export, and a call by that name is refused `ROUTE_UNKNOWN` without reading the record; the source names no figure id of money-core, in code or in a comment; a pack's page and each figure it draws are offered as resources, and a figure over two currencies with no rate answers one amount per currency and no sum |
 | `packages/mcp/test/list-ref.test.ts` | `list` filtered by a ref reads the spoken id, the name and the row id alike; a ref that names nothing is refused |
 | `packages/mcp/test/teaching.test.ts` | the three sentences `context` teaches, the same on the resource, and no example row outside a project |
 | `packages/mcp/test/actions.test.ts` | `braindog:actions` is listed on a real record with each key by label only; a surface without `actions` does not list it |
@@ -994,6 +994,7 @@ pass left open (`loop/BACKLOG.md`).
 | `e0197096` | `braindog:arrangement`, `declaration/{slug}` and the page and proposal grammars, and `pack`, `settings` and `arrange` bodies on `propose` |
 | `7b6fd267` | the `activity` tool, over `recentHistory`: fifteen tools |
 | `4da40586`, `ed4d421c` | the `money` tool, and `list_rows`: sixteen tools |
+| `48ac43a1` | the `money` tool leaves the core, and `MONEY_FIGURES` with it: fifteen tools again (§4.4) |
 | `d7fb19bf` | the sentences `context` teaches |
 | `837b01c7`, `6ec8011d` | `braindog:automations`, `automation/{id}` and `grammar/automations`, and the dry run on a rule change |
 | `eafe8c20` | `braindog:grammar/script` |
@@ -1041,11 +1042,11 @@ the documents that still cite the earlier decision.
 
 - [x] `packages/mcp` holds the five source files, the grammar file, the test helper and the fourteen test files of
       §3, and `src/` imports only `@braindog/ports` and this package's own files.
-- [x] `TOOLS` has sixteen entries in §4.4's order, each input schema written by hand.
+- [x] `TOOLS` has fifteen entries in §4.4's order, each input schema written by hand.
 - [x] `handle` answers the nine methods of `METHODS`; `server/discover` carries `cacheScope: 'public'` and
       `tools/list` carries `cacheScope: 'private'`.
-- [x] `budget.test.ts` holds `tools/list` at or under 2,600 tokens by `tokenBudget` (measured at 2,597), each
-      description under 200 and `INSTRUCTIONS` at or under 400, all in plain ASCII.
+- [x] `budget.test.ts` holds `tools/list` at or under 2,600 tokens by `tokenBudget` (measured at 2,528), each
+      description under 200 and `INSTRUCTIONS` at or under 400 (measured at 400), all in plain ASCII.
 - [x] stdio in `apps/cli` and `POST /mcp` on both hosts serve the same `handle`; every HTTP answer carries
       `Cache-Control: no-store`, and no body carries an exception message.
 - [x] The record answers `context`, `handoff` and `sessionsLive`, so their tools and resources are live.
@@ -1053,7 +1054,8 @@ the documents that still cite the earlier decision.
 - [x] The command line's surface offers every optional method its client routes, `actions` among them.
 - [ ] The tokenizer calibration of §9 is built.
 - [ ] A default `list` page is at or under 10 §4's 2,000 tokens (§7 measured 5,380).
-- [x] 45 agrees with this document: its §2 counts the sixteen tools (45-SPEC-RECORD:159).
+- [ ] 45 agrees with this document. Its §2 still counts sixteen tools (45-SPEC-RECORD:159), and so does 10-MCP
+      (lines 72, 97 and 129); both predate `48ac43a1`.
 
 ---
 

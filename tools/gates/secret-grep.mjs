@@ -387,8 +387,14 @@ export default function secretGrep(
 
   /* `packages/fixtures/**` IS IN SCOPE TOO (52 §6's table): a fixture that carried a real credential
      would be one committed to a public repository, which is the failure this gate is for at its
-     worst. Everything under `packages` and `apps` is walked, tests included. */
-  for (const top of ['packages', 'apps'])
+     worst. Everything under `packages` and `apps` is walked, tests included.
+
+     AND `packs`, THE THIRD WORKSPACE ROOT, which this list did not have for the day the four packs
+     arrived (audit sixty-one, finding 9). A pack's script is the file nearest a key: `mercury` names
+     a grant that the host opens and sends as a bearer token, and a script that logged what it pulled
+     with is the leak this gate exists for, in the one directory it was not reading. Measured on 24
+     September: 6 more files, two scripts and four tests, and 0 findings in them. */
+  for (const top of ['packages', 'apps', 'packs'])
     for (const file of walk(join(root, top))) {
       scanned++;
       const rel = relative(root, file);

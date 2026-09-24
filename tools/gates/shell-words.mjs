@@ -63,7 +63,20 @@ import { skipDir } from './lib.mjs';
  */
 export const WORDS = ['gold', 'hsbc', 'instapay', 'egypt', 'salary', 'payroll', 'mercury', 'registrar', 'acme', 'legacy'];
 
-/** Every package and every app is in scope by default, so a new core package is watched the day it exists. */
+/**
+ * Every package and every app is in scope by default, so a new core package is watched the day it exists.
+ *
+ * `packs` IS THE THIRD WORKSPACE ROOT AND IS LEFT OUT ON PURPOSE, the one text gate that does not read
+ * it (audit sixty-one, finding 9, which found all four reading only these two). These words are the
+ * use cases the core must not name, and a pack is exactly where a use case goes: `loop/DIRECTION.md`
+ * section 22 says a gold rate or a bank's pattern lives in a record or a shared pack, never in
+ * `packages/`. It is `packages/seed`'s exemption below, for the directory that took over its job.
+ * Measured on 24 September with `hitsIn` over `packs/`: read as this gate reads, 2 files and 0 hits,
+ * so adding it would have cost nothing today; and `packs/mercury/mercury.pack.json` names `mercury`
+ * 11 times, so the first script that pack grows would have gone red for naming itself.
+ * `tools/gates/test/packs-read.test.mjs` holds the decision: `'mercury'` in a pack is green, the same
+ * line in a core package is red.
+ */
 const WORKSPACES = ['packages', 'apps'];
 
 /**
