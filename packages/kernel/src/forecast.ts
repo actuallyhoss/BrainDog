@@ -55,6 +55,15 @@ export type Leg = {
    * and it bounds the day money moves, which is the only day this walk knows about. An empty value is no end.
    */
   ends?: string;
+  /**
+   * The field naming what a row's movement is part of: the plan an instalment belongs to. Each step then says it
+   * (`Step.of`), so the forecast's control that counts a plan in or out moves every part of it together.
+   *
+   * A LABEL COULD NOT DO THIS, because the parts of one plan are titled `Proofing press, 3 of 8` and every part is a
+   * different word. Only a non-empty text value is a name: a number or an empty field groups nothing, rather than
+   * putting every such row into one plan called nothing.
+   */
+  group?: string;
 };
 
 export type Runway = {
@@ -81,6 +90,14 @@ export type Step = {
   balance: number;
   source: string;
   spoken: string;
+  /**
+   * The currency the movement was written in, set only when it was converted into the walk's: `USD` on a salary walked
+   * in EGP. The forecast's rate drift moves exactly these steps and no others: measured before it existed, a 10% drift
+   * on USD to EGP could not tell a USD salary from EGP rent, and moved neither.
+   */
+  from?: string;
+  /** What the movement is part of, from the leg's `group` field, set only when the leg names one and the row fills it. */
+  of?: string;
 };
 
 export type ForecastDeps = {
@@ -257,6 +274,8 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
       const incoming = leg.incoming ? entry.fields[leg.incoming.field] === leg.incoming.is : false;
       const label = String(entry.fields[title] ?? entry.id);
       const spoken = entry.seq === null ? entry.id : `${leg.register}#${entry.seq}`;
+      const part = leg.group ? entry.fields[leg.group] : undefined;
+      const of = typeof part === 'string' && part.trim() !== '' ? part.trim() : null;
 
       const recurs = occurrences(deps, entry, leg, dayOf(first), until, iso(deps.ctx.nowMs), last ? dayOf(last) : null);
       if (recurs.capped) truncated++;
@@ -278,6 +297,7 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
             delta: incoming ? amount : -amount,
             source: leg.register,
             spoken,
+            ...(of !== null ? { of } : {}),
           },
         });
       }
@@ -359,7 +379,7 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
         missing.add(`${m.currency} to ${into}`);
         continue;
       }
-      m.step = { ...m.step, delta: convertMinor(m.step.delta, m.currency, into, r.rate) };
+      m.step = { ...m.step, delta: convertMinor(m.step.delta, m.currency, into, r.rate), from: m.currency };
       /* THE OLDEST, not the newest: a runway is only as current as the stalest rate under it.
          See `Across.converted` in `fx.ts` for why all three folds had this the wrong way round. */
       if (asOf === '' || r.as_of < asOf) asOf = r.as_of;

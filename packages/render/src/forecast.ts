@@ -9,6 +9,13 @@
  * moves every incoming step; spending the record does not know about takes a little every day; a
  * movement left out is every occurrence of it. The walk the host made is the baseline, and a knob
  * never reaches the record or the address.
+ *
+ * AND THE FIVE THE OLD TOOL'S FORECAST HAD THAT THIS ONE DID NOT (brief B6 of `loop/research-legacy-parity.md`) ARE
+ * THE SAME KIND OF ARITHMETIC, which is what keeps them equal in both engines: the kernel's walk and the browser's
+ * both reach this file as rows, so a control applied here is applied to either. Spending and money in grow by a
+ * percentage a year from today; a converted step moves with a yearly drift in its pair; a stream or a plan is counted
+ * in or out whole; and holdings the host sends a figure for arrive on a day a reader picks. What a control needs to
+ * know about a step beyond its day and amount comes on an `of` row under it, written only when the host knows it.
  */
 
 import { MISSING } from './format.ts';
@@ -19,12 +26,25 @@ const at = (n: number): string => String(Math.round(n * 100) / 100);
 const DAY_MS = 86_400_000;
 const ISO = /^\d{4}-\d{2}-\d{2}$/u;
 const MONTH_DAYS = 30.4375;
+const YEAR_DAYS = MONTH_DAYS * 12;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const PAIR = /^[A-Z]{3} to [A-Z]{3}$/u;
 
-export const FORECAST_KNOBS = ['horizon', 'late', 'spend', 'leave'] as const;
+export const FORECAST_KNOBS = ['horizon', 'late', 'spend', 'leave', 'grow', 'drift', 'count', 'sell'] as const;
 export type ForecastKnob = (typeof FORECAST_KNOBS)[number];
 
-export type ForecastStep = { day: string; label: string; delta: number };
+export type ForecastStep = {
+  day: string;
+  label: string;
+  delta: number;
+  /** The pair a converted step came through, `USD to EGP`, which the drift knob moves it by. Absent on money never converted. */
+  pair?: string;
+  /** What the step is part of, a plan, when that is not its label: the parts of one plan are counted in or out together. */
+  of?: string;
+};
+
+/** Money a reader may count as sold on a day: what it is called and what it is worth, in the walk's own money. */
+export type ForecastSell = { label: string; value: number };
 
 export type ForecastModel = {
   today: string;
@@ -48,10 +68,30 @@ export type ForecastModel = {
    * The walks of a group move together under one set of knobs, which the walk that names `knobs` draws.
    */
   group: { id: string; key: string } | null;
+  /** What the sell knob may count as sold, from the `sell` rows written in this walk's money. */
+  sells: ForecastSell[];
 };
 
-/** What a group of walks holds between them: the knobs every walk reads, and spending by each walk's key. */
-export type GroupKnobs = { horizon: number | null; late: number; spend: Record<string, number>; leave: string[] };
+/** Growth a year, in percent, of money going out and of money coming in. */
+export type Growth = { in: number; out: number };
+
+/**
+ * What a group of walks holds between them: the knobs every walk reads, and spending by each walk's key.
+ *
+ * THE FOUR LATER KNOBS ARE OPTIONAL BECAUSE A GROUP IS MADE ELSEWHERE (`svelte/forecast-group.svelte.ts`) with the first
+ * four only, and a group that holds none of them is a group where none has moved.
+ */
+export type GroupKnobs = {
+  horizon: number | null;
+  late: number;
+  spend: Record<string, number>;
+  leave: string[];
+  grow?: Growth;
+  /** Drift a year, in percent, by pair: `{ 'USD to EGP': 10 }` is one dollar buying ten percent more pounds a year from now. */
+  drift?: Record<string, number>;
+  /** The day holdings are counted as sold, or `null` for not sold. */
+  sell?: string | null;
+};
 
 /** One walk's knobs, read from what its group holds. */
 export const knobsIn = (model: ForecastModel, held: GroupKnobs, key: string): Knobs => ({
@@ -59,9 +99,20 @@ export const knobsIn = (model: ForecastModel, held: GroupKnobs, key: string): Kn
   late: held.late,
   spend: held.spend[key] ?? 0,
   leave: held.leave,
+  ...(held.grow !== undefined ? { grow: held.grow } : {}),
+  ...(held.drift !== undefined ? { drift: held.drift } : {}),
+  ...(held.sell !== undefined ? { sell: held.sell } : {}),
 });
 
-export type Knobs = { horizon: number; late: number; spend: number; leave: readonly string[] };
+export type Knobs = {
+  horizon: number;
+  late: number;
+  spend: number;
+  leave: readonly string[];
+  grow?: Growth;
+  drift?: Readonly<Record<string, number>>;
+  sell?: string | null;
+};
 
 export type Scenario = {
   horizon: number;
@@ -107,18 +158,66 @@ export function forecastModel(rows: readonly (readonly string[])[]): ForecastMod
       const d = r[1]?.trim() ?? '';
       return r[0]?.trim() === 'past' && ISO.test(d) && d < today && Number.isFinite(v) ? [{ day: d, value: v }] : [];
     }),
-    steps: rows.flatMap((r) => {
-      const v = signedOf(r[3] ?? '');
-      const d = r[1]?.trim() ?? '';
-      return r[0]?.trim() === 'step' && ISO.test(d) && Number.isFinite(v) ? [{ day: d < today ? today : d, label: r[2]?.trim() ?? '', delta: v }] : [];
-    }),
+    steps: stepsOf(rows, today),
     horizon: Number.isInteger(horizonCell) && horizonCell > 0 ? horizonCell : 180,
     knobs: FORECAST_KNOBS.filter((k) => knobWords.includes(k)),
     late: whole(rows.find((r) => r[0]?.trim() === 'late')?.[1]),
     lateName: rows.find((r) => r[0]?.trim() === 'late')?.[2]?.trim() || null,
     under: whole(rows.find((r) => r[0]?.trim() === 'under')?.[1], 1),
     group: groupOf(rows.find((r) => r[0]?.trim() === 'group')),
+    sells: sellsOf(rows, opening[3]!),
   };
+}
+
+/**
+ * The `step` rows, each with what the `of` row directly under it says: `of | plan | pair |`.
+ *
+ * DIRECTLY UNDER, AND NOT MATCHED BY DAY AND LABEL, because a label is not an identity: one row on one day can be written
+ * in two currencies, and a pair matched to the wrong one drifts money that was never converted. A row can only have one
+ * row under it, so the position cannot be wrong. And A FIFTH CELL ON THE STEP ROW WAS THE OBVIOUS PLACE and is refused:
+ * `forecast` takes four cells (`kinds.ts`), and a step row with five degrades the whole block to its source text.
+ */
+function stepsOf(rows: readonly (readonly string[])[], today: string): ForecastStep[] {
+  const out: ForecastStep[] = [];
+  let above: ForecastStep | null = null;
+  for (const r of rows) {
+    const kind = r[0]?.trim();
+    if (kind === 'of' && above) {
+      const of = r[1]?.trim() ?? '';
+      const pair = r[2]?.trim() ?? '';
+      if (of) above.of = of;
+      if (PAIR.test(pair)) above.pair = pair;
+      above = null;
+      continue;
+    }
+    above = null;
+    const v = signedOf(r[3] ?? '');
+    const d = r[1]?.trim() ?? '';
+    if (kind !== 'step' || !ISO.test(d) || !Number.isFinite(v)) continue;
+    above = { day: d < today ? today : d, label: r[2]?.trim() ?? '', delta: v };
+    out.push(above);
+  }
+  return out;
+}
+
+/** What a figure is written in, with its number taken out: `£` of `−£1,200.00`, `EGP` of `EGP 5,000.00`. */
+const unitOf = (figure: string): string => figure.replace(/[\d.,\s−+-]/gu, '');
+
+/**
+ * The `sell | | label | figure` rows whose figure is written in the walk's own money.
+ *
+ * A FIGURE IN ANOTHER MONEY IS LEFT OUT, NEVER ADDED. `signedOf` reads the number and drops the sign it is written in, so
+ * holdings of $900.00 beside a walk in pounds read as 900 and would have walked as £900.00. The host converts what it
+ * can before it writes the row; what reaches here in another unit is a figure this walk cannot add.
+ */
+function sellsOf(rows: readonly (readonly string[])[], template: string): ForecastSell[] {
+  const unit = unitOf(template);
+  return rows.flatMap((r) => {
+    const cell = r[3]?.trim() ?? '';
+    const v = signedOf(cell);
+    const label = r[2]?.trim() ?? '';
+    return r[0]?.trim() === 'sell' && label && Number.isFinite(v) && v > 0 && unitOf(cell) === unit ? [{ label, value: v }] : [];
+  });
 }
 
 /** A `group` row's id and this walk's key in it, or `null` when either is blank. */
@@ -132,35 +231,82 @@ function groupOf(row: readonly string[] | undefined): ForecastModel['group'] {
 export const baseKnobs = (model: ForecastModel): Knobs => ({ horizon: model.horizon, late: 0, spend: 0, leave: [] });
 
 export const knobsMoved = (model: ForecastModel, k: Knobs): boolean =>
-  k.horizon !== model.horizon || k.late !== 0 || k.spend !== 0 || k.leave.length > 0;
+  k.horizon !== model.horizon ||
+  k.late !== 0 ||
+  k.spend !== 0 ||
+  k.leave.length > 0 ||
+  (k.grow?.in ?? 0) !== 0 ||
+  (k.grow?.out ?? 0) !== 0 ||
+  Object.values(k.drift ?? {}).some((n) => n !== 0) ||
+  Boolean(k.sell);
 
 const cents = (n: number): number => Math.round(n * 100) / 100;
+
+/**
+ * An amount scaled and rounded to the cent on its size, with its sign put back after.
+ *
+ * `cents` ON THE SIGNED VALUE ROUNDS A HALF CENT UP FOR MONEY IN AND DOWN FOR MONEY OUT, because `Math.round(-0.5)` is
+ * `-0`: the same rent grown by the same percentage would come out a cent apart as a cost and as a refund.
+ */
+const scaled = (v: number, by: number): number => (by === 1 ? v : Math.sign(v) * cents(Math.abs(v) * by));
+
+/**
+ * What a percentage a year comes to by a day, compounded from today: `10` over half a year is `1.1 ** 0.5`.
+ *
+ * FROM TODAY AND NEVER BEFORE IT, so an overdue step, which the model already puts on today, is today's money and has
+ * not grown. The year is `MONTH_DAYS` twelve times, so a year of the spend knob's drip and a year of growth agree.
+ */
+const grownBy = (percent: number, today: string, day: string): number =>
+  percent === 0 ? 1 : (1 + percent / 100) ** (Math.max(0, daysBetween(today, day)) / YEAR_DAYS);
 
 /** The walk with the knobs applied. */
 export function scenario(model: ForecastModel, knobs: Knobs): Scenario {
   const horizon = Math.max(1, Math.min(model.horizon, Math.round(knobs.horizon)));
   const end = addDays(model.today, horizon);
   const leave = new Set(knobs.leave);
+  const grow = knobs.grow ?? { in: 0, out: 0 };
+  const drift = knobs.drift ?? {};
+  /* HOLDINGS SOLD ON A DAY ALREADY GONE ARE SOLD TODAY, as an overdue step is walked today: the money has not arrived. */
+  const soldOn = knobs.sell && ISO.test(knobs.sell) ? (knobs.sell < model.today ? model.today : knobs.sell) : null;
+  const sold: ForecastStep[] = soldOn ? model.sells.map((s) => ({ day: soldOn, label: s.label, delta: s.value })) : [];
   const steps = model.steps
-    .filter((s) => !leave.has(s.label))
-    .map((s) => (s.delta > 0 && knobs.late > 0 ? { ...s, day: addDays(s.day, knobs.late) } : s))
+    /* A PLAN LEFT OUT IS EVERY PART OF IT, whose labels all differ, so the knob holds the plan's name as `of` says it. */
+    .filter((s) => !leave.has(s.label) && !(s.of !== undefined && leave.has(s.of)))
+    .map((s) => {
+      /* GROWTH BY THE DAY THE MONEY WAS DUE, AND DRIFT BY THE DAY IT ARRIVES. An invoice paid ten days late is not ten
+         days bigger, but the dollars in it are changed into pounds on the day they come. */
+      const grown = grownBy(s.delta > 0 ? grow.in : grow.out, model.today, s.day);
+      const day = s.delta > 0 && knobs.late > 0 ? addDays(s.day, knobs.late) : s.day;
+      const drifted = s.pair ? grownBy(drift[s.pair] ?? 0, model.today, day) : 1;
+      return grown === 1 && drifted === 1 && day === s.day ? s : { ...s, day, delta: scaled(s.delta, grown * drifted) };
+    })
+    .concat(sold)
     .filter((s) => s.day <= end)
     .map((s, i) => ({ s, i }))
     .sort((a, b) => (a.s.day < b.s.day ? -1 : a.s.day > b.s.day ? 1 : a.i - b.i))
     .map(({ s }) => s);
   const perDay = knobs.spend / MONTH_DAYS;
+  /* SPENDING THE RECORD DOES NOT KNOW IS SPENDING, so it grows with the rest of it, a day's worth at a time. Without
+     growth it stays `perDay * d`, the same arithmetic as before this knob, to the float. */
+  let dripped = 0;
+  const drip = (d: number, day: string): number => {
+    if (grow.out === 0) return perDay * d;
+    if (d > 0) dripped += perDay * grownBy(grow.out, model.today, day);
+    return dripped;
+  };
   const days: Scenario['days'] = [];
   const after: Scenario['steps'] = [];
   let moved = 0;
   let k = 0;
   for (let d = 0; d <= horizon; d++) {
     const day = addDays(model.today, d);
+    const spent = drip(d, day);
     while (k < steps.length && steps[k]!.day <= day) {
       moved += steps[k]!.delta;
-      after.push({ ...steps[k]!, balance: cents(model.opening + moved - perDay * d) });
+      after.push({ ...steps[k]!, balance: cents(model.opening + moved - spent) });
       k++;
     }
-    days.push({ day, balance: cents(model.opening + moved - perDay * d) });
+    days.push({ day, balance: cents(model.opening + moved - spent) });
   }
   const crossed = days.find((p) => p.balance < 0) ?? null;
   const lowest = days.reduce((low, p) => (p.balance < low.balance ? p : low), days[0]!);
@@ -190,6 +336,32 @@ export function largest(model: ForecastModel, most = 5): { label: string; amount
     .slice(0, most)
     .map(([label, g]) => ({ label, amount: figureLike(model.template, g.sum) }));
 }
+
+/**
+ * The streams and the plans a reader may count in or out: every movement that happens more than once, by the plan it
+ * is part of when the host said so and by its label when not, money in apart from money out and the heaviest first.
+ *
+ * MORE THAN ONCE, because that is what a stream or a plan is without naming either: a salary comes every month and a
+ * plan has parts. A movement that happens once is a one-off, which `largest` offers under Leave out when it weighs.
+ */
+export function streamsOf(model: ForecastModel): { in: { label: string; amount: string }[]; out: { label: string; amount: string }[] } {
+  const by = new Map<string, { sum: number; weight: number; n: number }>();
+  for (const s of model.steps) {
+    const key = s.of ?? s.label;
+    if (key === '') continue;
+    const g = by.get(key) ?? { sum: 0, weight: 0, n: 0 };
+    g.sum += s.delta;
+    g.weight += Math.abs(s.delta);
+    g.n += 1;
+    by.set(key, g);
+  }
+  const all = [...by.entries()].filter(([, g]) => g.n > 1).sort((a, b) => b[1].weight - a[1].weight);
+  const said = ([label, g]: [string, { sum: number }]) => ({ label, amount: figureLike(model.template, g.sum) });
+  return { in: all.filter(([, g]) => g.sum > 0).map(said), out: all.filter(([, g]) => g.sum <= 0).map(said) };
+}
+
+/** Every pair a step of this walk was converted through, which the drift knob offers one slider each. */
+export const pairsOf = (model: ForecastModel): string[] => [...new Set(model.steps.flatMap((s) => (s.pair ? [s.pair] : [])))].sort();
 
 /** How the scenario compares with the baseline, in words, or '' when nothing moved. */
 export function against(base: Scenario, shown: Scenario, moved: boolean): string {
@@ -350,6 +522,22 @@ export const FORECAST_LATE = 'Money in arrives late by';
 export const FORECAST_SPEND = "Spending the record doesn't know";
 export const FORECAST_SPEND_NOTE = "the record only knows bills you've entered";
 export const FORECAST_LEAVE = 'Leave out';
+export const FORECAST_GROW_OUT = 'Spending grows by';
+export const FORECAST_GROW_IN = 'Money in grows by';
+export const FORECAST_COUNT = 'What counts';
+export const FORECAST_COUNT_IN = 'Money in';
+export const FORECAST_COUNT_OUT = 'Money out';
+export const FORECAST_SELL_NOTE = 'empty keeps them';
+export const forecastPerYear = (n: number): string => `${n}% a year`;
+/** The drift knob for one pair: `The USD to EGP rate moves by`. */
+export const forecastDrift = (pair: string): string => `The ${pair} rate moves by`;
+/** What the drift knob's number means, from the pair: `how much more EGP one USD buys each year`. */
+export const forecastDriftNote = (pair: string): string => {
+  const [from, to] = pair.split(' to ');
+  return `how much more ${to ?? ''} one ${from ?? ''} buys each year`;
+};
+/** The sell knob, naming what it sells as the host called it: `Gold, Bonds sold on`. */
+export const forecastSold = (labels: readonly string[]): string => `${labels.join(', ')} sold on`;
 export const FORECAST_RESET = 'Reset';
 export const FORECAST_SAME = 'Goes under on the same day as before';
 export const FORECAST_NO_LONGER = 'No longer goes under';

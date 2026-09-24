@@ -6,6 +6,10 @@
   THE KNOBS AND THE SCRUB EXIST ONLY WHERE THE HOST ASKS FOR THEM (`opts.scenario`). They live in
   this component's memory and never in the address, and without them the drawing is the walk the
   host made, which is exactly what `toHTML` draws, so the parity tests hold the two equal.
+
+  A KNOB WITH NOTHING TO MOVE IS NOT DRAWN: drift with no converted step, What counts with no stream or
+  plan, and the sell day with no holdings figure in this walk's money. A slider that changes nothing
+  reads as a forecast that ignored it.
 -->
 <script lang="ts">
   import { inline, text, TONES, type Block, type RenderOptions } from '../src/index.ts';
@@ -13,7 +17,21 @@
   import { day } from '../src/format.ts';
   import {
     FORECAST_BALANCE,
+    FORECAST_COUNT,
+    FORECAST_COUNT_IN,
+    FORECAST_COUNT_OUT,
+    FORECAST_GROW_IN,
+    FORECAST_GROW_OUT,
     FORECAST_HORIZON,
+    FORECAST_SELL_NOTE,
+    addDays,
+    forecastDrift,
+    forecastDriftNote,
+    forecastPerYear,
+    forecastSold,
+    pairsOf,
+    streamsOf,
+    type Growth,
     FORECAST_LATE,
     FORECAST_LEAVE,
     FORECAST_MOVE,
@@ -50,7 +68,7 @@
 
   /* A WALK ON ITS OWN HOLDS ITS KNOBS HERE; A WALK OF A GROUP (one a currency) READS THE GROUP'S, so one set of controls,
      under the walk that names `knobs`, moves every walk of the declaration at once. Spending is held by currency. */
-  const own: GroupKnobs = $state({ horizon: null, late: 0, spend: {}, leave: [] });
+  const own: GroupKnobs = $state({ horizon: null, late: 0, spend: {}, leave: [], grow: { in: 0, out: 0 }, drift: {}, sell: null });
   let group = $state.raw<Group | null>(null);
   /* THE GROUP'S NAME AND THIS WALK'S KEY AS WORDS, so a walk redrawn with new rows stays in the group it was in. */
   const groupId = $derived(opts.scenario ? model?.group?.id : undefined);
@@ -72,6 +90,9 @@
     group ? [...new Map(members.flatMap(([, m]) => m.heavy).map((h) => [h.label, h] as const)).values()] : heavy,
   );
   const spends = $derived<[string, string][]>(group ? members.map(([k, m]) => [k, m.template]) : [['', model?.template ?? '']]);
+  const pairs = $derived(model ? pairsOf(model) : []);
+  const streams = $derived(model ? streamsOf(model) : { in: [], out: [] });
+  const sellEnd = $derived(model && shown ? addDays(model.today, shown.horizon) : '');
   const soon = $derived(model && shown ? underNote(model, shown) : '');
   const readout = $derived(model && shown && plan && scrub !== null ? readoutAt(model, shown, plan, scrub) : null);
 
@@ -95,6 +116,23 @@
     held.late = 0;
     held.spend = {};
     held.leave = [];
+    held.grow = { in: 0, out: 0 };
+    held.drift = {};
+    held.sell = null;
+  };
+  /* THE LATER KNOBS ARE SET BY REPLACING THE WHOLE VALUE, because a group made before them holds none of them and a
+     `bind:` on a field of nothing has nowhere to write. */
+  const growOf = (side: keyof Growth): number => held.grow?.[side] ?? 0;
+  const setGrow = (side: keyof Growth, e: Event) => {
+    held.grow = { in: 0, out: 0, ...held.grow, [side]: Number((e.currentTarget as HTMLInputElement).value) };
+  };
+  const driftOf = (pair: string): number => held.drift?.[pair] ?? 0;
+  const setDrift = (pair: string, e: Event) => {
+    held.drift = { ...held.drift, [pair]: Number((e.currentTarget as HTMLInputElement).value) };
+  };
+  const setSell = (e: Event) => {
+    const v = (e.currentTarget as HTMLInputElement).value;
+    held.sell = v === '' ? null : v;
   };
   const toggle = (label: string) => {
     held.leave = held.leave.includes(label) ? held.leave.filter((l) => l !== label) : [...held.leave, label];
@@ -201,6 +239,49 @@
               {/each}
             </div>
           </div>
+        {/if}
+        {#if model.knobs.includes('grow')}
+          {#each [['out', FORECAST_GROW_OUT], ['in', FORECAST_GROW_IN]] as const as [side, name] (side)}
+            <label class="forecast-knob">
+              <span class="forecast-knob-name">{name}</span>
+              <input class="forecast-range" type="range" min="-50" max="50" step="1" value={growOf(side)} oninput={(e) => setGrow(side, e)} />
+              <span class="forecast-knob-value num">{forecastPerYear(growOf(side))}</span>
+            </label>
+          {/each}
+        {/if}
+        {#if model.knobs.includes('drift')}
+          {#each pairs as pair (pair)}
+            <label class="forecast-knob">
+              <span class="forecast-knob-name">{forecastDrift(pair)}</span>
+              <input class="forecast-range" type="range" min="-50" max="50" step="1" value={driftOf(pair)} oninput={(e) => setDrift(pair, e)} />
+              <span class="forecast-knob-value num">{forecastPerYear(driftOf(pair))}</span>
+              <span class="forecast-knob-note">{forecastDriftNote(pair)}</span>
+            </label>
+          {/each}
+        {/if}
+        <!-- PRESSED IS COUNTED, the opposite of Leave out, because the question here is "what counts". Both write one list. -->
+        {#if model.knobs.includes('count') && (streams.in.length || streams.out.length)}
+          <div class="forecast-knob" role="group" aria-label={FORECAST_COUNT}>
+            <span class="forecast-knob-name" aria-hidden="true">{FORECAST_COUNT}</span>
+            {#each [[FORECAST_COUNT_IN, streams.in], [FORECAST_COUNT_OUT, streams.out]] as const as [side, list] (side)}
+              {#if list.length}
+                <div class="forecast-chips" role="group" aria-label={side}>
+                  {#each list as h (h.label)}
+                    <button type="button" class="forecast-chip" aria-pressed={!held.leave.includes(h.label)} onclick={() => toggle(h.label)}
+                      ><span class="forecast-chip-label">{h.label}</span><span class="forecast-chip-amount num">{h.amount}</span></button
+                    >
+                  {/each}
+                </div>
+              {/if}
+            {/each}
+          </div>
+        {/if}
+        {#if model.knobs.includes('sell') && model.sells.length}
+          <label class="forecast-knob">
+            <span class="forecast-knob-name">{forecastSold(model.sells.map((s) => s.label))}</span>
+            <input class="forecast-date" type="date" min={model.today} max={sellEnd} value={held.sell ?? ''} onchange={setSell} />
+            <span class="forecast-knob-note">{FORECAST_SELL_NOTE}</span>
+          </label>
         {/if}
         {#if moved}
           <button type="button" class="forecast-reset" onclick={reset}>{FORECAST_RESET}</button>
