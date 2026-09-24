@@ -358,6 +358,16 @@ export function loadLeg(p: Pairing, id: string): Leg | null {
  * patch knows which it was, so `index.ts` writes the resend event only for a patch naming the mark alone.
  */
 export function markPinned(p: Pairing, id: string): boolean {
+  return pinnedBy(p, id) !== null;
+}
+
+/**
+ * Who pinned this row's mark (`markPinned`), or `null` when nobody has.
+ *
+ * THE ACTOR AND NOT ONLY THE ANSWER, because an update that renames the mark carries his word to the new field
+ * (`index.ts`, `settleRedeclared`) and the history has to say whose word it still is.
+ */
+export function pinnedBy(p: Pairing, id: string): string | null {
   const mark = p.pairs.mark;
   const said = p.sql.one<{ actor: string; kind: string; to_v: string | null }>(
     `SELECT actor, kind, to_v FROM event WHERE target = ? AND ((kind = 'edit' AND field = ?) OR (kind = 'create' AND field IS NULL))
@@ -365,17 +375,17 @@ export function markPinned(p: Pairing, id: string): boolean {
     `entry:${id}`,
     mark,
   );
-  if (!said || isMechanism(said.actor)) return false;
-  if (said.kind === 'edit') return true;
+  if (!said || isMechanism(said.actor)) return null;
+  if (said.kind === 'edit') return said.actor;
   let row: unknown;
   try {
     row = said.to_v === null ? null : JSON.parse(said.to_v);
   } catch {
-    return false;
+    return null;
   }
   const value = row !== null && typeof row === 'object' ? (row as Record<string, unknown>)[mark] : undefined;
   const declared = p.fields.find((f) => f.id === mark)?.default;
-  return value !== undefined && value !== null && !same(value, declared);
+  return value !== undefined && value !== null && !same(value, declared) ? said.actor : null;
 }
 
 /**
@@ -471,8 +481,8 @@ function matchesWhere(p: Pairing, leg: Leg): boolean {
 }
 
 /**
- * Whether a live row that is nobody's partner today may still be one leg of a move: `where` refuses it, or a person
- * ticked it as a transfer.
+ * Whether a live row that is nobody's partner today may still be one leg of a move: `where` refuses it, and it may yet
+ * clear into one `where` lets through.
  *
  * AUDIT SIXTY-THREE'S FINDING 2. A bank alert writes a credit pending before it clears, and a pending half left the set
  * around it two outs and two ins with a client's payment of the same size as the second in: day order matched the
@@ -480,9 +490,14 @@ function matchesWhere(p: Pairing, leg: Leg): boolean {
  * like this one is not in the set, so the set cannot say which of its legs this row's partner is, and it is matched
  * leg by leg until it can be (`matchedOf`).
  *
- * HIS `false` IS NOT ONE. He said the row is not a transfer, so no leg is waiting for it, and held back like a pending
- * row his unticking a client's payment left the halves beside it counted, Spent EGP 40,000.00 high, measured. His `true`
- * is: it says the row is one leg of a move, and nothing says which row is the other.
+ * A ROW WHOSE MARK A PERSON PINNED IS NOT ONE, WHICHEVER WAY HE PINNED IT. His `false` says the row is not a transfer,
+ * so no leg is waiting for it, and held back like a pending row his unticking a client's payment left the halves beside
+ * it counted, Spent EGP 40,000.00 high, measured. His `true` waited once, on the reading that it says a move landed and
+ * not which row is the other leg, and held66's checker measured what that cost: he typed EGP 20,000.00 out of CIB and
+ * ticked it, the bank then sent the real CIB out and HSBC in the same day, and the bank's two legs stayed apart for good,
+ * Spent and Received 20,000.00 each where they read 0. A pinned row is never a partner (`pairable`), so a wait on it
+ * never ends. The owner's call (DIRECTION 25): only a row that clears on its own holds a pair back
+ * (`pairs-followups.test.ts`, FOUR).
  *
  * A ROW NO FINAL STATE WOULD LET THROUGH IS NOT ONE EITHER, and neither is a row already in one. The first attempt
  * took every row `where` refuses for one that may clear, and the kernel handed it no `done`, so under Money's clause a
@@ -490,7 +505,16 @@ function matchesWhere(p: Pairing, leg: Leg): boolean {
  * Spent and Received each EGP 40,000.00 high, for good, measured. A row whose `state` is one of the register's `done:`
  * values is where it will stay. Any other is asked what `where` would say were it in each of them, since that is the
  * move a bank makes to it, and waits only if one lets it through: a bare pending half does, and a pending payment that
- * names its party does not. A register with no `state`, or no `done:`, has no row that clears, so none waits.
+ * names its party does not.
+ *
+ * A REGISTER THAT DECLARES NO `done:` HAS SAID NO STATE IS FINAL, AND ONE WITH NO `state:` HAS NAMED NO LIFECYCLE, and
+ * both used to have no row that waits. The checker of `56b35c41` measured what that left: audit sixty-three's F2 as it
+ * was before the repair, the pending half's set matched in day order and the client hidden as its second in, Received
+ * 0.00 against 20,000.00 (`pairs-followups.test.ts`, TWO). So without `done:` a row may move to any value its state
+ * declares, and without `state:` any enum `where` reads is a field that may move so; a text, a number or a ref is what
+ * the row says and stays, so a payment refused for the party it names still waits for nothing. The cost falls on the
+ * counted side: a void half there is a row that may be put back, and holds a tied set back until the register says
+ * void is final or the row goes.
  *
  * AN UNRELATED PENDING ROW OF THE SAME SIZE IN THE WINDOW HOLDS A SET BACK TOO, until it clears: measured, a pending
  * credit three days after a split move left all four halves counted, EGP 40,000.00 each way. Nothing in the rows says
@@ -498,12 +522,16 @@ function matchesWhere(p: Pairing, leg: Leg): boolean {
  */
 function waiting(p: Pairing, leg: Leg): boolean {
   if (leg.deleted_at !== null || shapeOf(p, leg) === null) return false;
-  if (markPinned(p, leg.id)) return leg.fields[p.pairs.mark] === true;
-  const { state, done } = p;
-  if (state === undefined || done === undefined) return false;
-  const now = leg.fields[state];
-  if (typeof now === 'string' && done.includes(now)) return false;
-  return done.some((to) => matchesWhere(p, { ...leg, fields: { ...leg.fields, [state]: to } }));
+  if (p.pairs.where === undefined || markPinned(p, leg.id)) return false;
+  const moving = p.state !== undefined ? [p.state] : [...new Set(readBy(p.pairs.where))].filter((id) => id !== p.pairs.mark);
+  return moving.some((id) => {
+    const f = p.fields.find((x) => x.id === id && x.retired !== true);
+    const final = id === p.state ? p.done : undefined;
+    const now = leg.fields[id];
+    if (final !== undefined && typeof now === 'string' && final.includes(now)) return false;
+    const values = final ?? (f?.type === 'enum' && Array.isArray(f.values) ? (f.values as unknown[]) : []);
+    return values.some((to) => !same(to, now) && matchesWhere(p, { ...leg, fields: { ...leg.fields, [id]: to } }));
+  });
 }
 
 /**
@@ -550,14 +578,18 @@ export function windowSql(p: Pairing): { day: string; size: string } | null {
 }
 
 /**
- * `candidatesOf`, and whether a row that mirrors `leg` is `waiting`: one query over the window answers both.
+ * `candidatesOf`, and how near the nearest row that mirrors `leg` and is `waiting` stands (`Infinity` for none): one
+ * query over the window answers both.
+ *
+ * HOW NEAR, NOT ONLY WHETHER, because a leg nothing ties is answered by its nearest (`heldIn`), and a waiting row
+ * nearer than that is the partner it may yet have.
  *
  * WITH A `Ledger` THE WINDOW IS READ FROM THE LIST ALREADY IN HAND, the rows of this size between the window's two ends,
  * found by halving. That is `inside` asked one way, so it lets through every row `mirrors` would, and `mirrors` still
  * decides each one; the SQL's `BETWEEN` on the stored day says the same of every day the kernel stores.
  */
-function around(p: Pairing, leg: Leg, ledger: Ledger | null = null): { near: { leg: Leg; gap: number }[]; waits: boolean } {
-  const none = { near: [], waits: false };
+function around(p: Pairing, leg: Leg, ledger: Ledger | null = null): { near: { leg: Leg; gap: number }[]; waitsAt: number } {
+  const none = { near: [], waitsAt: Infinity };
   const window = windowSql(p);
   const read = ledger === null ? (l: Leg) => shapeOf(p, l) : (l: Leg) => shapeIn(p, ledger, l);
   const shape = read(leg);
@@ -582,13 +614,14 @@ function around(p: Pairing, leg: Leg, ledger: Ledger | null = null): { near: { l
       .map(legOf);
   } else rows = inWindow(ledger.bySize.get(shape.amount.size) ?? [], lo, hi).filter((other) => other.id !== leg.id);
   const out: { leg: Leg; gap: number }[] = [];
-  let waits = false;
+  let waitsAt = Infinity;
   for (const other of rows) {
     if (!mirrors(p, leg, other, read)) continue;
-    if (canPair(p, other, ledger)) out.push({ leg: other, gap: Math.abs(read(other)!.at - shape.at) });
-    else waits ||= waitsIn(p, other, ledger);
+    const gap = Math.abs(read(other)!.at - shape.at);
+    if (canPair(p, other, ledger)) out.push({ leg: other, gap });
+    else if (gap < waitsAt && waitsIn(p, other, ledger)) waitsAt = gap;
   }
-  return { near: out, waits };
+  return { near: out, waitsAt };
 }
 
 /**
@@ -667,8 +700,25 @@ function nearestIn(near: readonly { leg: Leg; gap: number }[]): Leg | null {
   return at.length === 1 ? at[0]!.leg : null;
 }
 
+/**
+ * A leg's nearest candidate (`nearestIn`), or `null` when a row that may yet be one of its legs (`waiting`) stands at
+ * least as near.
+ *
+ * THE CHECK FOR A LEG STILL TO COME GUARDED ONLY A TIED SET (`matchedOf`), and a leg nothing ties never reached it. The
+ * checker of `56b35c41` measured it: EGP 20,000.00 out of CIB, its in to HSBC still pending, and a client's 20,000.00
+ * into HSBC the next day. The client was the out's one candidate, so the two paired, Spent 0.00 and Received 0.00
+ * against 20,000.00 each until the bank cleared the in (`pairs-followups.test.ts`, THREE, and audit sixty-five's
+ * finding 1). NEARER OR AS NEAR, NOT ANYWHERE IN THE WINDOW: cleared, a waiting row farther off than the nearest
+ * candidate would still be the farther, so the pair made now is the one that would be made then, and holding it back
+ * would only count the move meanwhile.
+ */
+function heldIn(w: { near: readonly { leg: Leg; gap: number }[]; waitsAt: number }): Leg | null {
+  const leg = nearestIn(w.near);
+  return leg !== null && w.near.find((c) => c.leg === leg)!.gap < w.waitsAt ? leg : null;
+}
+
 function nearestOf(p: Pairing, leg: Leg, windows: Windows): Leg | null {
-  return canPair(p, leg, windows.ledger) ? nearestIn(windowOf(p, leg, windows).near) : null;
+  return canPair(p, leg, windows.ledger) ? heldIn(windowOf(p, leg, windows)) : null;
 }
 
 /** What `around` answered for each leg, by id, for as long as one question about the ledger lasts, and the list it reads. */
@@ -689,8 +739,8 @@ function windowOf(p: Pairing, leg: Leg, windows: Windows): ReturnType<typeof aro
   return w;
 }
 
-/** A leg, the rows that could be its partner, and whether a row that may yet be one is `waiting` (`around`). */
-type Near = { leg: Leg; near: { leg: Leg; gap: number }[]; waits: boolean };
+/** A leg, the rows that could be its partner, and how near the nearest row that may yet be one stands (`around`). */
+type Near = { leg: Leg; near: { leg: Leg; gap: number }[]; waitsAt: number };
 
 /* HOW MANY ALIKE LEGS ARE ANSWERED AS ONE SET. A move split in halves, or one top-up a day for a week, is a handful; past
    this the set is answered leg by leg, nearest to nearest, as it was before sets were read at all. */
@@ -710,8 +760,8 @@ function setOf(p: Pairing, leg: Leg, windows: Windows): { set: Map<string, Near>
     const next = queue.shift()!;
     if (set.has(next.id)) continue;
     if (set.size === SET_MOST) return { set, whole: false };
-    const { near, waits } = windowOf(p, next, windows);
-    set.set(next.id, { leg: next, near, waits });
+    const { near, waitsAt } = windowOf(p, next, windows);
+    set.set(next.id, { leg: next, near, waitsAt });
     for (const c of near) if (!set.has(c.leg.id)) queue.push(c.leg);
   }
   return { set, whole: true };
@@ -756,7 +806,7 @@ function setOf(p: Pairing, leg: Leg, windows: Windows): { set: Map<string, Near>
 function matchedOf(p: Pairing, set: Map<string, Near>): Map<string, string> | null {
   const members = [...set.values()];
   if (!members.some((m) => m.near.length > 0 && nearestIn(m.near) === null)) return null;
-  if (members.some((m) => m.waits)) return null;
+  if (members.some((m) => m.waitsAt !== Infinity)) return null;
   const sides = new Map<string, { leg: Leg; at: number; across: string }[]>();
   for (const m of members) {
     const shape = shapeOf(p, m.leg)!;
@@ -893,8 +943,8 @@ function answersOf(p: Pairing, set: Map<string, Near>): Map<string, string | nul
       out.set(id, matched.get(id) ?? null);
       continue;
     }
-    const near = nearestIn(m.near);
-    out.set(id, near !== null && nearestIn(set.get(near.id)!.near)?.id === id ? near.id : null);
+    const near = heldIn(m);
+    out.set(id, near !== null && heldIn(set.get(near.id)!)?.id === id ? near.id : null);
   }
   return out;
 }

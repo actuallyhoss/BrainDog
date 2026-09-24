@@ -233,19 +233,20 @@ test("A CLEARED PAYMENT THAT NAMES ITS PARTY DOES NOT HOLD A SPLIT MOVE BACK, un
   for (const [what, to] of Object.entries(partners(k, ids))) assert.equal(to, null, `${what} was paired while a half was pending`);
 });
 
-test('HIS `true` ON A LEG BESIDE A SPLIT MOVE HOLDS THE SET BACK, because it says the row is one leg and not which row is the other', async () => {
-  /* A third EGP 20,000.00 into HSBC the same day, which he typed and ticked. His mark is kept out of every pair
-     (`markPinned`), so without this the set is two outs and two ins and day order pairs them all; but his row says a
-     move of that size landed in HSBC, so one of the two outs may be its other leg and one of the halves somebody
-     else's money. Nothing says which, so the set is answered leg by leg, every row tied, and counted. */
+test('HIS `true` ON A LEG BESIDE A SPLIT MOVE DOES NOT HOLD THE SET BACK (DIRECTION 25): the bank legs pair, his leg counts as moved', async () => {
+  /* A third EGP 20,000.00 into HSBC the same day, which he typed and ticked. Until 25 September his ticked row held the
+     set back, since one of the outs might be its other leg; but a pinned row is never a partner, so the wait never
+     resolved and the move was counted twice for good. DIRECTION 25: only a row the pairing's `where` refuses (pending)
+     holds a pair back, because it clears on its own. */
   const k = await ledger();
   const ids = write(k, [...HALVES, { what: 'HSBC TYPED', on: DAY(0), direction: 'in', account: 'hsbc', moved: true }]);
   const got = partners(k, ids);
-  for (const [what, to] of Object.entries(got)) assert.equal(to, null, `${what} was paired beside his ticked leg, ${JSON.stringify(got)}`);
+  assert.equal(got['HSBC TYPED'], null, 'his ticked leg is a partner of nothing');
+  for (const what of ['CIB OUT 1', 'CIB OUT 2', 'HSBC IN 1', 'HSBC IN 2']) assert.notEqual(got[what], null, `${what} was held back by his ticked leg, ${JSON.stringify(got)}`);
   assert.equal(k.get(ids['HSBC TYPED']!)!.fields.moved, true, 'his mark is his');
-  assert.equal(total(k, 'out'), 40_000);
-  assert.equal(total(k, 'in'), 40_000, 'the halves counted, his ticked leg not');
-  /* HE UNTICKS IT, so it is a leg of nothing and waits for nobody: the halves pair. */
+  assert.equal(total(k, 'out'), 0, 'the move read as spent');
+  assert.equal(total(k, 'in'), 0, 'the move, or his ticked leg, read as received');
+  /* HE UNTICKS IT, so it is income he typed, and the halves stay paired. */
   made(k.update('ledger', ids['HSBC TYPED']!, { moved: false }, PERSON));
   const after = partners(k, ids);
   assert.equal(after['HSBC TYPED'], null);
