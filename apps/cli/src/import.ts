@@ -1127,7 +1127,7 @@ export async function applyPlan(
      * in no list of what is due. A night on which the day did not move sends none of them, so a state he set holds
      * until the old tool moves the day it was set against.
      */
-    if (Object.hasOwn(patch, 'by')) for (const field of mine) if (Object.hasOwn(fields, field) && differs(field)) patch[field] = fields[field];
+    if (Object.hasOwn(patch, 'by') || Object.hasOwn(patch, 'due')) for (const field of mine) if (Object.hasOwn(fields, field) && differs(field)) patch[field] = fields[field];
     if (Object.keys(patch).length === 0) {
       tally.unchanged++;
       report.outcomes[row.key] = 'unchanged';
@@ -1269,6 +1269,9 @@ export async function applyPlan(
       const label = names.length > 0 ? names.join(' ') : key;
       if (o.dryRun) {
         report.retired.push({ register: r.register, label, why: r.why });
+        /* A DRY RUN READS ON AS THE REAL ONE WOULD: a later pass sees the row as this pass leaves it, so a half kept
+           owed by one pass is not then listed as written off by the next (`test/legacy-part.test.ts`). */
+        existing.set(key, { ...at, fields: { ...at.fields, ...patch } } as Row);
         continue;
       }
       const done = await door.update({ register: r.register, seq: at.seq as number, patch, version: at.version, note: r.why });
