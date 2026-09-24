@@ -40,6 +40,7 @@ import { serveAsks, type SparkAnswer } from '@braindog/host/spark-answers';
 
 import { alarmScheduler } from './alarm.ts';
 import { sparkLook, workerSparkAnswers, workerSparkDoor, workerSparkModel } from './spark.ts';
+import { workerSparkMeter } from './spark-meter.ts';
 import { workerCatalogueOffers } from './catalogue.ts';
 import { cloudSnapshots, type Pitr } from './copies.ts';
 import { DELETED, destroyRecord, expireFinal } from './destroy.ts';
@@ -477,6 +478,10 @@ export class Record$ extends DurableObject<Env> {
           host: 'cloud',
         },
         sparkModel,
+        /* AND THE LEDGER ITS PRESS AND FIRST PLAN ARE SPENT FROM, the one a read at the palette and an automation's question
+           are, under the owner's `ask_cap` and the operator's ceiling alike (`spark-meter.ts`). Without it the record asks
+           `sparkModel` unmetered: 5 presses and the daily look were 6 binding calls under a ceiling of three, and no row. */
+        sparkMeter: workerSparkMeter(this.env, () => api, { sql, clock: { now: () => Date.now() } }),
         /* WHAT THIS DEPLOYMENT CAN ACTUALLY DELIVER, so the doorbell rings for work somebody can
            do. A kind with no deliverer sits `pending` for ever — which is honest — and without
            this every write afterwards rang the queue about it. `notify.push` is among them only where both VAPID halves

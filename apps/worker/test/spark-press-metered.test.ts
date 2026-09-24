@@ -1,0 +1,114 @@
+/**
+ * Spark's press on the Worker, held and settled in the ledger every other ask is spent from, and under the operator's
+ * ceiling (`loop/research-batch-sixty-audit.md` finding 2, carried from the record to the host that ships it).
+ *
+ * WHY THIS FILE EXISTS AFTER `packages/record/test/spark-press-cap.test.ts`. `d16d9d35` taught the record to hold a press
+ * and a first plan through a `sparkMeter`, and proved it with the host's `sparkRecordMeter` over the package's own
+ * ledger. But the record asks the meter only when the host passes one, and neither host did: `grep -rn sparkMeter apps`
+ * found nothing. So on the Worker as it shipped a press was still asked of the operator's Workers AI with no `call` row
+ * and no look at `ask_cap` or `SPARK_INCLUDED_MONTH_NEURONS` (`1cdc6721`), which is the audit's S2 probe exactly.
+ *
+ * DRIVEN THROUGH THE BUNDLE, `src/index.ts` as it ships, over the cloud harness: the owner signs in, presses at
+ * `/api/sparkPropose`, and the rows are read out of the object's own storage. A test of `sparkRecordMeter` alone would
+ * be green while `Record$.#open` still handed the record nothing, which is the gap this file is for.
+ *
+ * THE CLOCK IS MOCKED, because a press on a record younger than two weeks asks no model at all (`noticeUsage`'s `quiet`),
+ * and the Worker's clock is `Date.now()`. The binding is a local function and no test here spends a neuron.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { cloud } from './cloud-harness.ts';
+
+const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAE';
+const OWNER = 'ada@example.test';
+const SLUG = 'pressing';
+const DAY = 86_400_000;
+const T0 = Date.UTC(2026, 8, 1, 9);
+
+/* 232 NEURONS IS THE PACKAGE'S WORST CALL (`spark-operator-cap.test.ts`), so 696 is a ceiling of three asks. */
+const THREE_ASKS = '696';
+
+type Out = { ok: boolean; value?: unknown; refusal?: { code: string; fix: string } };
+type Filed = { by: string; dropped: string[] };
+
+/** Workers AI's `run` in the chat shape, answering an empty draft every time, and counted. */
+const fakeAi = () => {
+  let runs = 0;
+  return {
+    runs: () => runs,
+    AI: {
+      run: async () => {
+        runs++;
+        return { choices: [{ message: { role: 'assistant', content: '{"drafts":[]}' }, finish_reason: 'stop' }], usage: { prompt_tokens: 700, completion_tokens: 60 } };
+      },
+    },
+  };
+};
+
+const TASKS = {
+  register: 'tasks',
+  name: 'Tasks',
+  title: 'what',
+  search: ['what'],
+  fields: [
+    { id: 'what', type: 'text', required: true },
+    { id: 'state', type: 'enum', values: ['open', 'done'] },
+  ],
+  state: 'state',
+  done: ['done'],
+};
+
+test('A PRESS ON THE WORKER WRITES A LEDGER ROW AND IS REFUSED PAST THE OPERATOR CEILING, and a read after it is refused too', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: T0 });
+  const ai = fakeAi();
+  const c = await cloud({ SPARK_ENDPOINT: '', AI: ai.AI, AI_GATEWAY: 'braindog', SPARK_INCLUDED: 'yes', SPARK_INCLUDED_MONTH_NEURONS: THREE_ASKS });
+  await c.provision(REC, SLUG, OWNER);
+  const post = async (method: string, body: object, cookie: string): Promise<Out> =>
+    (await (await c.ask(`/api/${method}`, { method: 'POST', cookie, body: JSON.stringify(body) })).json()) as Out;
+
+  /* THE AUDIT'S S2 RECORD: one list and one open row, written on day one. */
+  const early = await c.signIn(OWNER);
+  const declared = await post('setDeclaration', { body: TASKS }, early);
+  assert.ok(declared.ok, JSON.stringify(declared));
+  const made = await post('create', { register: 'tasks', fields: { what: 'Invoice Acme', state: 'open' } }, early);
+  assert.ok(made.ok, JSON.stringify(made));
+
+  /* AND THE CLOCK PAST SPARK'S FIRST FORTNIGHT, with a fresh sign-in, because a press is an owner's write. */
+  t.mock.timers.setTime(T0 + 20 * DAY);
+  const cookie = await c.signIn(OWNER);
+  const presses: Filed[] = [];
+  for (let i = 0; i < 5; i++) {
+    const out = await post('sparkPropose', {}, cookie);
+    assert.ok(out.ok, JSON.stringify(out));
+    presses.push(out.value as Filed);
+  }
+
+  /* SIX ASKS AND NOT FIVE: the first request past the fortnight also wakes Spark's daily look (`sparkLook` beside every
+     answer), which drafts through the same `sparkFile` and so is the same unmetered call. RED BEFORE THE METER WAS
+     PASSED, measured on 24 September: 6 binding calls under a ceiling of 3, one per press and one for the look, and the
+     `call` table not even created, because nothing had built the engine that owns it. */
+  assert.equal(ai.runs(), 3, `5 presses and the daily look under a ceiling of three asks made ${ai.runs()} included calls`);
+  const rows = c.storages
+    .get(REC)!
+    .sql.exec('SELECT kind, model, tokens_in, tokens_out, neurons, status, code, question FROM call ORDER BY id')
+    .toArray() as { kind: string; model: string; tokens_in: number; tokens_out: number; neurons: number; status: string; code: string | null; question: string }[];
+  assert.equal(rows.length, 3, JSON.stringify(rows));
+  for (const r of rows) {
+    assert.deepEqual([r.kind, r.model, r.status, r.code, r.question], ['read', 'glm-5.3-flash', 'ok', null, "Spark's press"]);
+    /* PRICED AT THE INCLUDED MODEL'S RATE, the one the package prices the door's asks at, never 0. */
+    assert.ok(r.tokens_in > 0 && r.tokens_out > 0, JSON.stringify(r));
+    assert.equal(r.neurons, Math.round((r.tokens_in * 13_636) / 1e6 + (r.tokens_out * 45_455) / 1e6));
+  }
+
+  /* THE PRESS PAST THE CEILING STILL ANSWERS, drafted by the rules, and says why the model was not asked. */
+  const last = presses.at(-1)!;
+  assert.equal(last.by, 'rules');
+  assert.ok(last.dropped.some((d) => d.startsWith("This month's Spark asks are spent until 2026-10-01.")), JSON.stringify(last.dropped));
+
+  /* AND ONE NUMBER FOR BOTH: the presses spent the month a person's read at the palette is spent from. */
+  const read = (await (await c.ask('/api/spark/read', { method: 'POST', cookie, body: JSON.stringify({ question: 'What is still open?' }) })).json()) as Out;
+  assert.equal(read.refusal?.code, 'SPARK_BUDGET_SPENT', JSON.stringify(read));
+  assert.equal(ai.runs(), 3, 'the read after the presses reached the binding');
+});

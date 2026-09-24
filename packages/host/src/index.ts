@@ -29,6 +29,11 @@ export { keysReply, serveKeys, servesKeys, type KeysAsk, type KeysDoor } from '.
    ingest doors are: both hosts import one module to get the whole surface, and a door one host can find and the other cannot
    is the drift this file's header is about. */
 export { serveSpark, servesSpark, sparkAskDoor, sparkReply, type SparkAskDoor, type SparkAskEngine } from './spark-ask.ts';
+/* `sparkRecordMeter` IS HERE FOR THE SAME REASON, AND IT WAS MISSING FROM HERE FOR A BATCH. `d16d9d35` built the meter
+   that holds the record's press and first plan in Spark's ledger and exported it from `spark-ask.ts` alone, which no
+   app imports, so both hosts built the record without it and every press stayed unmetered (`loop/research-batch-sixty-audit.md`
+   finding 2). `apps/worker/test/spark-press-metered.test.ts` is the press on the Worker that shows it wired. */
+export { sparkRecordMeter, type SparkLedgerDeps } from './spark-ask.ts';
 /* `/in/*` IS NOT IN `ROUTES` AND BELONGS HERE ANYWAY. The table below is the record's methods, every one
    of them behind the auth gate at `/api/<name>`; an arrival is above that gate by design (`33 §4`), takes
    no principal, and answers 202 rather than a `Result`. It is exported from this file for the same reason

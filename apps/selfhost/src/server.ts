@@ -19,7 +19,7 @@ import { env } from 'node:process';
 
 import {
   grantAad, grantKey, openSealed,
-  handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveKeys, serveSpark, serveVault, servesKeys, servesSpark, servesVault, sessionOf, withSession,
+  handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveKeys, serveSpark, serveVault, servesKeys, servesSpark, servesVault, sessionOf, sparkRecordMeter, withSession,
   type Handler, type IngestDoor, type KeysDoor, type SparkAskDoor, type VaultDoor,
 } from '@braindog/host';
 import {
@@ -74,7 +74,7 @@ import { askerOf, scriptTrial, trialSandbox } from '@braindog/host/script-try';
 import { runInQuickJs } from '@braindog/script/quickjs';
 import { scriptSandbox } from './script.ts';
 import { httpFor } from './http.ts';
-import { sparkAnswersFor, sparkDoor, sparkFromEnv, sparkModelFor, type SparkConfig } from './spark.ts';
+import { sparkAnswersFor, sparkDoor, sparkEngineFor, sparkFromEnv, sparkModelFor, type SparkConfig } from './spark.ts';
 import { unwrap, type KeyStore } from './keys.ts';
 import { shellOf } from './shell.ts';
 import { signerFor } from './sign.ts';
@@ -1059,6 +1059,24 @@ export async function start(options: {
      record's `answersSpark` below and `/api/version`'s `spark` are one fact. Before this, a self-host with a model
      refused `ask_spark` at install as if it had none (`test/spark-answers.test.ts`). */
   const answers = sparkAnswersFor(sparkConfig, () => api, options.keys, { sql: sparkSql, clock });
+  /* AND THE LEDGER THE RECORD'S OWN TWO ASKS ARE SPENT FROM, the press and the first plan, in the same Spark SQLite and
+     under the same `ask_cap` a read and an automation's question are (`@braindog/host` `sparkRecordMeter`). Without it
+     the record asks `sparkModel` unmetered, which it did on both hosts until `loop/research-batch-sixty-audit.md` finding 2
+     was wired. The engine is `sparkEngineFor`'s, the guarded one `answers` builds, built on the first press and kept;
+     a build that throws is let go, and the record reads that hold as a ledger it could not read and lets its rules draft.
+     NO RATE, because this host's endpoint is its owner's and not an account this host pays neurons on: the row is
+     counted against the cap and priced 0. The name is the package's routing name, the one its own tier `a` rows carry. */
+  let meterEngine: ReturnType<typeof sparkEngineFor> | null = null;
+  const sparkMeter = sparkRecordMeter({
+    sql: sparkSql,
+    clock,
+    engine: () =>
+      (meterEngine ??= sparkEngineFor(sparkConfig, () => api, options.keys, { sql: sparkSql, clock }).catch((e: unknown) => {
+        meterEngine = null;
+        throw e;
+      })),
+    model: 'glm-5.3-flash',
+  });
 
   /**
    * Drain everything due, then re-arm.
@@ -1312,6 +1330,7 @@ export async function start(options: {
           },
     /* SPARK'S MODEL, when this host points at one; the record files what it drafts through the proposal door or not at all. */
     sparkModel,
+    sparkMeter,
     /* NEWER VERSIONS IN THIS HOST'S CATALOGUE, for Spark to ask about on Decide. */
     ...(catalogueDir === undefined ? {} : { catalogueOffers: catalogueOffersFrom(catalogueDir) }),
     snapshots: kept,
