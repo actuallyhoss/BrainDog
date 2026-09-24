@@ -27,11 +27,20 @@
  * RED FIRST, MEASURED ON SEPTEMBER 24TH AGAINST `facafeed`: with no pack file every test that fills it failed, and
  * with the file written the re-export test still failed on `packages/seed/src/packs/index.ts`, the barrel that gave
  * `mercuryPack` a second name.
+ *
+ * THE LEDGER CAME ON SEPTEMBER 25TH (`loop/research-legacy-parity.md` brief B4, row 56). The balances were half of
+ * what Mercury answers; the transactions, the part a person reads to know what the company spent on, stayed typed in,
+ * because a pull cannot read a sign (the last section below, which still holds). `ledger.js` is a script beside the
+ * pull, carried in the pack file byte for byte. Measured before it was in the file, against `772c0be1`: all six ledger
+ * tests below failed at their first read of the pack, "mercury.pack.json declares no script, so nothing in the pack
+ * can write a transaction", the whole path on a self-host included.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { readPackFile } from '../../packages/declare/src/catalogue.ts';
 import { openRecord, type Declaration, type Kernel } from '../../packages/kernel/src/index.ts';
@@ -39,6 +48,8 @@ import { fixOf } from '../../packages/ports/src/index.ts';
 import { createRecordApi, type CallContext } from '../../packages/record/src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from '../../packages/kernel/test/sqlite.ts';
 import { REGISTERS, declarations, firstPartyDocument } from '../../packages/seed/src/index.ts';
+import type { CtxHost, HostRequest, Json, ScriptAnswer, ScriptDecl, ScriptWrite } from '../../packages/script/src/index.ts';
+import { runInQuickJs } from '../../packages/script/src/quickjs.ts';
 
 const NOW = Date.UTC(2026, 8, 20, 9);
 const ID = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
@@ -49,6 +60,12 @@ const template = (): Record<string, unknown> => JSON.parse(readFileSync(PACK_FIL
 
 type MercurySpec = { id: string; grant: string; every?: string; base?: string };
 type Pull = Record<string, unknown> & { fetch: Record<string, unknown> & { auth: Record<string, unknown>; schedule: Record<string, unknown> } };
+type Script = Record<string, unknown> & { script: string; runs: { every: string }; egress: string[]; keys: string[]; reads: string[]; writes: string[]; limits?: Record<string, number>; source: string };
+
+/** The source's two lines a fill rewrites. Written as JSON so a label with a quote in it stays one string. */
+const API_LINE = (base: string): string => `const API = ${JSON.stringify(base)};`;
+const KEY_LINE = (grant: string): string => `const KEY = ${JSON.stringify(grant)};`;
+const scriptOf = (doc: Record<string, unknown>): Script => (doc.declarations as Record<string, unknown>[]).find((d) => typeof d.script === 'string') as Script;
 
 /** A spec's id as an identifier: lower case, digits, and underscores for everything else. */
 const ident = (text: string): string =>
@@ -72,12 +89,30 @@ function fillMercury(file: Record<string, unknown>, spec: MercurySpec): Record<s
   const base = spec.base ?? (pull.fetch.base as string);
   const every = spec.every ?? (pull.every as string);
   doc.pack = `mercury-${spec.id}`;
-  doc.summary = `Reads the balance of every Mercury account from ${new URL(base).host} every ${every}, into Money's accounts.`;
+  doc.summary = `Reads the balance of every Mercury account from ${new URL(base).host} every ${every}, into Money's accounts, and its last thirty days of transactions into the ledger.`;
   pull.ingest = `mercury_${ident(spec.id)}`.slice(0, 32).replace(/_+$/u, '');
   pull.every = every;
   pull.fetch.base = base;
   pull.fetch.auth.grant = spec.grant.trim();
   pull.fetch.schedule.every = every;
+
+  /* THE LEDGER SCRIPT ASKS THE SAME HOST WITH THE SAME KEY ON THE SAME CLOCK, and its source cannot read its own
+     declaration, so the two constants it fetches with are rewritten in the source as well as in the header. A fill
+     that set `keys` and left the source naming the shipped label would install, and every run would be refused as a
+     key the script does not declare. The name is its own because two profiles on one record are two scripts. */
+  const script = scriptOf(doc);
+  if (script !== undefined) {
+    const shipped = scriptOf(file);
+    script.script = `mercury_ledger_${ident(spec.id)}`.slice(0, 32).replace(/_+$/u, '');
+    script.runs.every = every;
+    script.egress = [new URL(base).origin];
+    script.keys = [spec.grant.trim()];
+    script.source = script.source
+      .split(API_LINE(shipped.egress[0]!))
+      .join(API_LINE(new URL(base).origin))
+      .split(KEY_LINE(shipped.keys[0]!))
+      .join(KEY_LINE(spec.grant.trim()));
+  }
   return doc;
 }
 
@@ -120,25 +155,30 @@ test('THE SEED NO LONGER OFFERS THE BUILDER UNDER A SECOND NAME', () => {
 
 /**
  * Each spec the byte comparison held, with what the builder answered for it on the day it was deleted: the pack's
- * name, the summary, the pull's name, both intervals, the host and the key label.
+ * name, the summary, the pull's name, both intervals, the host and the key label. The last four values are the ledger
+ * script's, added on September 25th with it: its name, its clock, its one origin and its one key, which its source
+ * fetches with too.
  *
  * WRITTEN OUT AND NOT RECOMPUTED, because a table computed by a second copy of `fillMercury` agrees with it by
  * construction. Checked the other way on September 24th: with `.trim()` taken off the grant in `fillMercury`, the
  * spaced label's row went red here and nowhere else in this file.
  */
 for (const [name, spec, want] of [
-  ['the file as it ships', { id: 'company', grant: 'Mercury (read only)' }, ['mercury-company', 'api.mercury.com', 'mercury_company', '1h', 'https://api.mercury.com', 'Mercury (read only)']],
-  ['a test host, a key label with spaces round it', { ...SPEC, grant: '  Mercury (read only)  ' }, ['mercury-kiln', 'api.mercury.example', 'mercury_kiln', '1h', 'https://api.mercury.example', 'Mercury (read only)']],
-  ['every six hours, an id past what an ingest name holds', { id: 'kiln-and-tallow-holding-company-operating', grant: 'Ops', every: '6h' }, ['mercury-kiln-and-tallow-holding-company-operating', 'api.mercury.com', 'mercury_kiln_and_tallow_holding', '6h', 'https://api.mercury.com', 'Ops']],
-] as const satisfies readonly (readonly [string, MercurySpec, readonly [string, string, string, string, string, string]])[])
+  ['the file as it ships', { id: 'company', grant: 'Mercury (read only)' }, ['mercury-company', 'api.mercury.com', 'mercury_company', '1h', 'https://api.mercury.com', 'Mercury (read only)', 'mercury_ledger_company']],
+  ['a test host, a key label with spaces round it', { ...SPEC, grant: '  Mercury (read only)  ' }, ['mercury-kiln', 'api.mercury.example', 'mercury_kiln', '1h', 'https://api.mercury.example', 'Mercury (read only)', 'mercury_ledger_kiln']],
+  ['every six hours, an id past what an ingest name holds', { id: 'kiln-and-tallow-holding-company-operating', grant: 'Ops', every: '6h' }, ['mercury-kiln-and-tallow-holding-company-operating', 'api.mercury.com', 'mercury_kiln_and_tallow_holding', '6h', 'https://api.mercury.com', 'Ops', 'mercury_ledger_kiln_and_tallow_h']],
+] as const satisfies readonly (readonly [string, MercurySpec, readonly [string, string, string, string, string, string, string]])[])
   test(`FILLED, THE FILE CHANGES WHERE THE SPEC SAYS AND NOWHERE ELSE: ${name}`, async () => {
     const filled = fillMercury(template(), spec);
     const pull = (filled.declarations as Pull[])[0]!;
-    const [pack, host, ingest, every, base, grant] = want;
+    const [pack, host, ingest, every, base, grant, ledger] = want;
     assert.deepEqual(
       [filled.pack, filled.summary, pull.ingest, pull.every, pull.fetch.schedule.every, pull.fetch.base, pull.fetch.auth],
-      [pack, `Reads the balance of every Mercury account from ${host} every ${every}, into Money's accounts.`, ingest, every, every, base, { kind: 'bearer', grant }],
+      [pack, `Reads the balance of every Mercury account from ${host} every ${every}, into Money's accounts, and its last thirty days of transactions into the ledger.`, ingest, every, every, base, { kind: 'bearer', grant }],
     );
+    const script = scriptOf(filled);
+    assert.deepEqual([script.script, script.runs.every, script.egress, script.keys], [ledger, every, [base], [grant]]);
+    assert.ok(script.source.includes(API_LINE(base)) && script.source.includes(KEY_LINE(grant)), "the ledger fetches with a host or a key its header does not name");
 
     /* AND EVERYTHING THE SPEC DOES NOT NAME IS THE FILE'S, key order included, which is what the byte comparison
        held and the fields above do not: the version, the range on Money, the path, the map, the dedupe key. */
@@ -146,6 +186,10 @@ for (const [name, spec, want] of [
       const d = structuredClone(doc);
       const p = (d.declarations as Pull[])[0]!;
       d.pack = d.summary = p.ingest = p.every = p.fetch.base = p.fetch.auth.grant = p.fetch.schedule.every = '';
+      const s = scriptOf(d);
+      s.source = s.source.replace(/^const API = .*;$/mu, '').replace(/^const KEY = .*;$/mu, '');
+      s.script = s.runs.every = '';
+      s.egress = s.keys = [];
       return JSON.stringify(d);
     };
     const { fill: _marks, ...shipped } = template();
@@ -161,8 +205,21 @@ test('the file as it ships, with its marks taken off, is its own example filled'
   assert.equal(JSON.stringify(shipped), JSON.stringify(fillMercury(template(), { id: 'company', grant: 'Mercury (read only)' })));
 });
 
+/**
+ * A vault entry as a row: a label and the host it opens, and no bytes, because a test's `openKey` is the key store.
+ *
+ * NEEDED SINCE THE LEDGER: install refuses a script whose key is not in the vault ("Add the key called ... to the
+ * vault, then install."), where the pull alone installed without one and was refused on its first run instead.
+ */
+const grantFor = (sql: Pick<NodeSql, 'exec'>, label: string): void =>
+  sql.exec(
+    "INSERT INTO grant (id, label, opens, kind, kdf, wrapped_by, kek_id, created_at) VALUES ('g_mercury', ?, 'api.mercury.com', 'api_token', 'none', 'kek', 'k_test', ?)",
+    label,
+    new Date(NOW).toISOString(),
+  );
+
 /** A record holding Money and what it points at, and the two presses a person makes: read the plan, then install it. */
-async function withMoney(): Promise<{ plan: (doc: unknown) => Promise<{ planHash: string; approve: string[] }>; put: (doc: unknown, approve: boolean) => Promise<{ ok: boolean }>; close: () => void }> {
+async function withMoney(): Promise<{ sql: NodeSql; plan: (doc: unknown) => Promise<{ planHash: string; approve: string[] }>; put: (doc: unknown, approve: boolean) => Promise<{ ok: boolean }>; close: () => void }> {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
@@ -179,15 +236,28 @@ async function withMoney(): Promise<{ plan: (doc: unknown) => Promise<{ planHash
     const r = await put(firstPartyDocument(id, { seeds: [] }), true);
     assert.ok(r.ok, fixOf(r as never));
   }
-  return { plan, put, close: () => sql.close() };
+  return { sql, plan, put, close: () => sql.close() };
 }
 
-test('INSTALLED THROUGH THE RECORD’S OWN DOOR, once the owner approves the one call out, naming the host and the interval', async () => {
-  const { plan, put, close } = await withMoney();
+/** What the owner reads for the ledger script, once the key is in the vault: the host, the key, and what it could carry out. */
+const LEDGER_LINES = [
+  'CALLS OUT api.mercury.com · every 1h · key "Mercury (read only)" to api.mercury.com',
+  'mercury_ledger_kiln reads accounts, transactions and categories and may send what it reads to api.mercury.com.',
+  'Keys are not kept per project yet, so any action in this record can send any key it names.',
+];
+
+test('INSTALLED THROUGH THE RECORD’S OWN DOOR, once the key is in the vault and the owner approves the call out and the ledger script', async () => {
+  const { sql, plan, put, close } = await withMoney();
   const doc = fillMercury(template(), { id: 'kiln', grant: 'Mercury (read only)' });
+  /* NOT BEFORE THE KEY IS IN THE VAULT. The pull alone installed without one and was refused on its first run; a
+     script naming a key is refused at install, so since the ledger the key goes in first. */
+  const early = await put(doc, true);
+  assert.equal(early.ok, false, 'installed with no key in the vault');
+  assert.equal(fixOf(early as never), 'Add the key called "Mercury (read only)" to the vault, then install.');
+  grantFor(sql, 'Mercury (read only)');
   const approve = (await plan(doc)).approve;
-  assert.equal(approve.length, 1);
   assert.ok(approve[0]!.startsWith('CALLS OUT api.mercury.com · every 1h · '), approve[0]);
+  assert.deepEqual(approve.slice(1), LEDGER_LINES);
   assert.equal((await put(doc, false)).ok, false, 'never without approval');
   assert.ok((await put(doc, true)).ok);
   close();
@@ -200,11 +270,13 @@ test(
   },
   async () => {
     /* MEASURED WHILE MOVING THIS PACK, AND NOT THIS PACK'S TO REPAIR. The line printed is
-       `CALLS OUT api.mercury.com · every 1h · grant "none"`, and it is the only line, so the owner approving a bank
-       pull reads that it sends no key while every run sends one. */
-    const { plan, close } = await withMoney();
+       `CALLS OUT api.mercury.com · every 1h · grant "none"`, so the owner approving a bank pull reads that it sends
+       no key while every run sends one. Since the ledger the script's own line below it names the same key, which
+       makes the pull's line read as a contradiction rather than a promise. */
+    const { sql, plan, close } = await withMoney();
+    grantFor(sql, 'Mercury (read only)');
     const doc = fillMercury(template(), { id: 'kiln', grant: 'Mercury (read only)' });
-    assert.deepEqual((await plan(doc)).approve, ['CALLS OUT api.mercury.com · every 1h · grant "Mercury (read only)"']);
+    assert.deepEqual((await plan(doc)).approve, ['CALLS OUT api.mercury.com · every 1h · grant "Mercury (read only)"', ...LEDGER_LINES]);
     close();
   },
 );
@@ -427,7 +499,7 @@ test('THE PACK NAMES A KEY AND CARRIES NONE, and both intervals agree', () => {
   for (const forbidden of ['Authorization', 'Bearer ', 'secret_', 'sk_live_', 'api_key']) assert.equal(text.includes(forbidden), false, forbidden);
 });
 
-/* ── the half that cannot be built, measured ─────────────────────────────────────────────────── */
+/* ── why the ledger is a script: a pull cannot say it, measured ──────────────────────────────── */
 
 /**
  * One Mercury transaction, as `/api/v1/account/<id>/transactions` answers it.
@@ -448,10 +520,10 @@ const TRANSACTION = {
 };
 
 test('A TRANSACTIONS PULL WRITES NOTHING, because a map cannot turn a signed amount into a direction', async () => {
-  /* THIS IS A MEASUREMENT AND NOT A WISH. The claim this pack rests on is that the
-     ledger cannot be filled by a connector today, and a claim about a grammar is worth nothing
+  /* THIS IS A MEASUREMENT AND NOT A WISH. The claim `ledger.js` rests on is that the
+     ledger cannot be filled by a pull today, and a claim about a grammar is worth nothing
      until somebody has watched the rows fail to land.
-     
+
      THE DECLARATION BELOW IS THE BEST ONE AVAILABLE. `map:`'s `enum` arm writes the provider's own
      value through when it is listed in `values:` and falls back to `other:` otherwise
      (`packages/kernel/src/map.ts`), so there are exactly two things `direction` can be told to do
@@ -526,4 +598,296 @@ test('A TRANSACTIONS PULL WRITES NOTHING, because a map cannot turn a signed amo
   assert.deepEqual(out.value, { wrote: 0, kept: 1 });
   assert.equal(sql.one<{ n: number }>("SELECT count(*) AS n FROM entry WHERE register = 'transactions'")?.n, 0);
   sql.close();
+});
+
+/* ── the ledger, as a script ─────────────────────────────────────────────────────────────────── */
+
+const LEDGER_SOURCE = readFileSync(new URL('./ledger.js', import.meta.url), 'utf8');
+
+/** The ledger script as the file ships it, or a failure that says the pack does not carry one. */
+const ledger = (doc: Record<string, unknown> = template()): Script => {
+  const s = scriptOf(doc);
+  assert.ok(s !== undefined, 'mercury.pack.json declares no script, so nothing in the pack can write a transaction');
+  return s;
+};
+
+test('THE PACK CARRIES ledger.js AS ITS SOURCE, byte for byte, beside the pull, on the same host, key and clock', () => {
+  const doc = template();
+  const s = ledger(doc);
+  const pull = (doc.declarations as Pull[])[0]!;
+  assert.equal(s.source, LEDGER_SOURCE, 'mercury.pack.json and ledger.js disagree; copy ledger.js into the source');
+  assert.deepEqual(s.runs, { every: pull.every });
+  assert.deepEqual(s.egress, [pull.fetch.base]);
+  assert.deepEqual(s.keys, [pull.fetch.auth.grant]);
+  assert.deepEqual([...s.reads].sort(), ['accounts', 'categories', 'transactions']);
+  assert.deepEqual(s.writes, ['transactions']);
+  /* THE SCRIPT STOPS QUEUING AT ITS OWN LIMIT, so the two numbers are one. A limit lower than the script's constant
+     would refuse the whole run past it, and every row with it. */
+  assert.ok(s.source.includes(`const WRITES = ${s.limits?.writes};`), `limits.writes is ${s.limits?.writes} and ledger.js stops at another number`);
+  /* AND IT LAYS THE ONE FIELD IT FINDS A TRANSACTION AGAIN BY. */
+  assert.deepEqual((doc.extends as Record<string, { fields: { id: string }[] }>)['register.transactions']?.fields.map((f) => f.id), ['mercury_id']);
+});
+
+type Row = { id: string; register: string; seq: number; fields: Record<string, Json>; version: number; updated_at: string };
+let minted = 0;
+const rowOf = (register: string, fields: Record<string, Json>, version = 1): Row => {
+  minted += 1;
+  return { id: `01K5LEDGER${String(minted).padStart(16, '0')}`, register, seq: minted, fields, version, updated_at: '2026-09-19T09:00:00.000Z' };
+};
+
+/**
+ * Mercury's transactions for one account, as `/api/v1/account/<id>/transactions` answers them. What is read and what
+ * is deliberately not: `kind` rides along and says nothing about direction; a pending one has no `postedAt`.
+ */
+const txn = (id: string, amount: number, status: string, counterpartyName: string, createdAt: string, postedAt: string | null, mercuryCategory?: string) => ({
+  id,
+  amount,
+  kind: amount < 0 ? 'externalTransfer' : 'incomingDomesticWire',
+  status,
+  counterpartyName,
+  bankDescription: counterpartyName.toUpperCase(),
+  createdAt,
+  postedAt,
+  ...(mercuryCategory === undefined ? {} : { mercuryCategory }),
+});
+
+const OPS_TXNS = [
+  txn('txn_1', -1240.75, 'sent', 'Fenwick Cloud', '2026-09-19T14:02:00Z', '2026-09-19T18:30:00Z', 'Software'),
+  txn('txn_2', 5000, 'pending', 'Halden Studio', '2026-09-20T08:00:00Z', null),
+  /* NEVER WENT THROUGH AND NEVER HELD: not worth a row. */
+  txn('txn_3', -60, 'cancelled', 'Coffee Stall', '2026-09-20T09:00:00Z', null),
+];
+
+/** A host double: Mercury's two addresses, and the three lists the script reads, filtered as the record filters them. */
+function mercuryHost(state: { accounts: Row[]; transactions: Row[]; categories: Row[]; txns?: unknown[]; status?: number }): CtxHost & { asked: HostRequest[] } {
+  const asked: HostRequest[] = [];
+  const matches = (row: Row, where: Json): boolean => {
+    const w = where as { field?: string; in?: Json[]; is?: Json; all?: Json[] } | null;
+    if (w === null) return true;
+    if (Array.isArray(w.all)) return w.all.every((x) => matches(row, x));
+    const value = row.fields[w.field ?? ''];
+    if (w.in !== undefined) return w.in.includes(value as Json);
+    return value === w.is;
+  };
+  return {
+    asked,
+    fetch: async (request) => {
+      asked.push(request);
+      const url = new URL(request.url);
+      const body =
+        url.pathname === '/api/v1/accounts'
+          ? { accounts: [{ ...OPS, id: 'acc_ops' }, { ...RESERVE, id: 'acc_res' }] }
+          : url.pathname === '/api/v1/account/acc_ops/transactions'
+            ? { total: (state.txns ?? OPS_TXNS).length, transactions: state.txns ?? OPS_TXNS }
+            : { total: 0, transactions: [] };
+      return { status: state.status ?? 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
+    },
+    list: async (register, where) => {
+      const rows = register === 'accounts' ? state.accounts : register === 'transactions' ? state.transactions : register === 'categories' ? state.categories : [];
+      return rows.filter((r) => matches(r, where)) as unknown as Json[];
+    },
+    now: () => new Date(NOW).toISOString(),
+    tz: 'UTC',
+    input: null,
+  };
+}
+
+const ledgerDecl = (s: Script = ledger()): ScriptDecl => ({
+  id: s.script,
+  version: 1,
+  egress: s.egress,
+  keys: s.keys,
+  reads: s.reads,
+  writes: s.writes,
+  ...(s.limits === undefined ? {} : { limits: s.limits }),
+  source: s.source,
+});
+
+const writesOf = (a: ScriptAnswer): ScriptWrite[] => {
+  assert.ok('writes' in a, `the run was refused: ${JSON.stringify(a)}`);
+  return a.writes;
+};
+
+test('EACH TRANSACTION IS ONE LEDGER ROW, WITH ITS DIRECTION FROM THE SIGN, on the account the balances pull wrote', async () => {
+  /* ONLY THE CHECKING ACCOUNT IS IN THE RECORD, so the savings account is said and never asked about. */
+  const ops = rowOf('accounts', { name: OPS.name, kind: 'bank' });
+  const software = rowOf('categories', { name: 'Software', direction: 'out', state: 'live' });
+  const h = mercuryHost({ accounts: [ops], transactions: [], categories: [software] });
+  const a = await runInQuickJs(ledgerDecl(), h);
+  assert.deepEqual(writesOf(a), [
+    {
+      op: 'create',
+      register: 'transactions',
+      /* MINUS 1,240.75 IS 124,075 CENTS OUT, dated the day it posted and not the day it was started, and filed under
+         Mercury's own category because the record has a live one of that name facing out. */
+      fields: { what: 'Fenwick Cloud', on: '2026-09-19', direction: 'out', amount: { amount: 124_075, currency: 'USD' }, account: ops.id, state: 'cleared', mercury_id: 'txn_1', category: software.id },
+    },
+    {
+      op: 'create',
+      register: 'transactions',
+      /* PENDING HAS NO POSTED DAY, so it is dated the day it was started, and it is not counted as cleared. */
+      fields: { what: 'Halden Studio', on: '2026-09-20', direction: 'in', amount: { amount: 500_000, currency: 'USD' }, account: ops.id, state: 'pending', mercury_id: 'txn_2' },
+    },
+  ]);
+  assert.deepEqual(
+    h.asked.map((r) => [new URL(r.url).pathname, r.key]),
+    [
+      ['/api/v1/accounts', 'Mercury (read only)'],
+      ['/api/v1/account/acc_ops/transactions', 'Mercury (read only)'],
+    ],
+  );
+  assert.equal(new URL(h.asked[1]!.url).searchParams.get('start'), '2026-08-21', 'thirty days back from the run');
+  assert.match(a.log, /Mercury Savings ••9002 is not in accounts yet/);
+});
+
+test('A CATEGORY SOMEBODY PINNED IS KEPT: the next hour moves the bank’s facts and nothing a person set', async () => {
+  const ops = rowOf('accounts', { name: OPS.name, kind: 'bank' });
+  const software = rowOf('categories', { name: 'Software', direction: 'out', state: 'live' });
+  /* FILED BY MERCURY'S CATEGORY WHILE PENDING, THEN REFILED BY HAND to a category Mercury has never heard of, with a
+     description the person tidied. */
+  const fenwick = rowOf(
+    'transactions',
+    { what: 'Fenwick hosting', on: '2026-09-19', direction: 'out', amount: { amount: 124_075, currency: 'USD' }, account: ops.id, state: 'pending', mercury_id: 'txn_1', category: 'cat_hosting' },
+    4,
+  );
+  const halden = rowOf('transactions', { what: 'Halden Studio', on: '2026-09-20', direction: 'in', amount: { amount: 500_000, currency: 'USD' }, account: ops.id, state: 'pending', mercury_id: 'txn_2' }, 1);
+  const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [ops], transactions: [fenwick, halden], categories: [software] }));
+  /* ONE WRITE. The Fenwick payment cleared, so its state moves; its category, its description and everything else
+     a person set are not in the patch. Halden is unchanged and is not written at all.
+
+     CHECKED THE OTHER WAY ON SEPTEMBER 25TH. With `ledger.js` changed to look Mercury's category up for every
+     transaction and restate it on an update, this test and the whole path both went red: the patch carried
+     `category: <Software>` here, and on the self-host the row the person had moved to Hosting was back under Software
+     an hour later. A first attempt at that check changed only the update and left the lookup to new rows, and both
+     stayed green, because the category a restatement needs was never looked up. */
+  assert.deepEqual(writesOf(a), [{ op: 'update', spoken: `transactions#${fenwick.seq}`, patch: { state: 'cleared' }, version: 4 }]);
+});
+
+test('A TRANSACTION MERCURY CANCELS AFTER IT WAS HELD IS VOID, and a status nobody has heard of is said, not guessed', async () => {
+  const ops = rowOf('accounts', { name: OPS.name, kind: 'bank' });
+  const held = rowOf('transactions', { what: 'Coffee Stall', on: '2026-09-20', direction: 'out', amount: { amount: 6_000, currency: 'USD' }, account: ops.id, state: 'pending', mercury_id: 'txn_3' }, 2);
+  const txns = [OPS_TXNS[2], txn('txn_9', -10, 'blocked', 'Tollgate', '2026-09-21T09:00:00Z', null)];
+  const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [ops], transactions: [held], categories: [], txns }));
+  assert.deepEqual(writesOf(a), [{ op: 'update', spoken: `transactions#${held.seq}`, patch: { state: 'void' }, version: 2 }]);
+  assert.match(a.log, /Mercury says txn_9 is "blocked", which this pack does not know/);
+});
+
+test('A TRANSACTION A PERSON VOIDED STAYS VOID, because Mercury never sends one it cancelled and only a person voids a sent one', async () => {
+  /* THE CHECKER'S BREAK, MEASURED ON SEPTEMBER 25TH ON THE SELF-HOST PATH BELOW. A person voided the Fenwick payment,
+     which he had already typed in by hand before the pack arrived, and the next hour put it back to `cleared`, so the
+     duplicate he had just taken out of every Ledger figure was counted again, and would be every hour for thirty days.
+     `cancelled` and `failed` are the end of a Mercury transaction, so a held row that is void was made void either by
+     this script, which Mercury will not contradict, or by a person, whom it must not. The rest of the bank's facts
+     still move. */
+  const ops = rowOf('accounts', { name: OPS.name, kind: 'bank' });
+  const voided = rowOf('transactions', { what: 'Fenwick Cloud', on: '2026-09-19', direction: 'out', amount: { amount: 124_000, currency: 'USD' }, account: ops.id, state: 'void', mercury_id: 'txn_1' }, 3);
+  const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [ops], transactions: [voided], categories: [], txns: [OPS_TXNS[0]] }));
+  assert.deepEqual(writesOf(a), [{ op: 'update', spoken: `transactions#${voided.seq}`, patch: { amount: { amount: 124_075, currency: 'USD' } }, version: 3 }]);
+});
+
+test('A KEY MERCURY REFUSES STOPS THE RUN WITH A SENTENCE AND WRITES NOTHING', async () => {
+  const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [], transactions: [], categories: [], status: 401 }));
+  assert.ok('refused' in a, JSON.stringify(a));
+  assert.equal(a.refused.code, null);
+  assert.match(a.refused.why, /Mercury refused the key labelled "Mercury \(read only\)" \(401\)/);
+});
+
+test('THE WHOLE PATH ON A SELF-HOST: installed from the file, run on the hour, and the ledger holds one row a transaction', async () => {
+  const { start } = await import('../../apps/selfhost/src/server.ts');
+  const dir = mkdtempSync(join(tmpdir(), 'braindog-mercury-'));
+  const sent: { path: string; auth: string | null }[] = [];
+  let txns: unknown[] = OPS_TXNS;
+  const running = await start({
+    file: join(dir, 'record.brain'),
+    directory: join(dir, 'directory.sqlite'),
+    port: 0,
+    host: '127.0.0.1',
+    pollMs: 0,
+    actions: {
+      /* NOT A KEY: a word that names whose it is, so a leak would say where it came from. */
+      openKey: async (grant) => (grant.label === 'Mercury (read only)' ? 'KEY-OF-mercury' : null),
+      send: async (url, init) => {
+        sent.push({ path: url.pathname, auth: new Headers(init.headers).get('authorization') });
+        const body = url.pathname === '/api/v1/accounts' ? { accounts: [{ ...OPS, id: 'acc_ops' }] } : { total: txns.length, transactions: txns };
+        return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+      },
+      resolve: async (host) => (host === 'api.mercury.com' ? [{ address: '203.0.113.10', family: 4 }] : []),
+    },
+  });
+  try {
+    const person = running.directory.person$('ada@example.test', 'Ada');
+    assert.ok(person.ok);
+    const api = running.api;
+    assert.ok((await api.createRecord({ id: ID, slug: 'kiln', name: 'Kiln', tz: 'UTC', locale: 'en', owner: { id: person.value.id, email: 'ada@example.test', name: 'Ada' } })).ok);
+    const owner: CallContext = { principal: { kind: 'person', id: person.value.id, level: 'owner' } };
+    const said = <T>(r: unknown): T => {
+      const x = r as { ok: boolean; value: T };
+      assert.ok(x.ok, fixOf(x as never));
+      return x.value;
+    };
+    const put = async (doc: unknown) => {
+      const planned = said<{ diff: { planHash: string; approve: string[] } }>(await api.planPack({ doc, source: { kind: 'local' } } as never, owner));
+      said(await api.installPack({ doc, source: { kind: 'local' }, planHash: planned.diff.planHash, approve: planned.diff.approve } as never, owner));
+    };
+    for (const id of ['portfolio', 'people', 'money-core']) await put(firstPartyDocument(id, { seeds: [] }));
+    grantFor(running.sql, 'Mercury (read only)');
+    const doc = fillMercury(template(), { id: 'kiln', grant: 'Mercury (read only)' });
+    await put(doc);
+    const s = ledger(doc);
+
+    /* THE ACCOUNT, AS THE BALANCES PULL WRITES IT, and the pull itself held off so that this hour runs the ledger and
+       nothing else. The pull's own rows are the tests above. */
+    said(await api.create({ register: 'accounts', fields: { name: OPS.name, kind: 'bank', balance: { amount: 1_842_050, currency: 'USD' }, as_of: '2026-09-20', liquid: true } }, owner));
+    said(await api.create({ register: 'categories', fields: { name: 'Software', direction: 'out' } }, owner));
+    const hosting = said<{ id: string }>(await api.create({ register: 'categories', fields: { name: 'Hosting', direction: 'out' } }, owner));
+    running.sql.exec("UPDATE schedule SET due_at = '2099-01-01T00:00:00.000Z' WHERE kind = 'pull'");
+    const hour = async () => {
+      running.sql.exec("UPDATE schedule SET due_at = ? WHERE kind = 'script' AND key = ?", new Date(Date.now() - 1_000).toISOString(), s.script);
+      await running.poll();
+    };
+    await hour();
+
+    const [event] = running.sql.all<{ to_v: string | null; note: string }>(
+      'SELECT note, to_v FROM event WHERE target = ? AND to_v IS NOT NULL ORDER BY rowid',
+      `declaration:script.${s.script}`,
+    );
+    const outcome = JSON.parse(event?.to_v ?? '{}') as { outcome?: string; log?: string };
+    assert.equal(outcome.outcome, 'ok', `${event?.note ?? 'no run event'} ${outcome.log ?? ''}`);
+    assert.ok(sent.length > 0 && sent.every((r) => r.auth === 'Bearer KEY-OF-mercury'), JSON.stringify(sent));
+
+    type Txn = { seq: number; what: string; direction: string; amount: number; state: string; mercury_id: string; category: string | null };
+    const ledgerRows = (): Txn[] =>
+      running.sql
+        .all<Txn>(
+          `SELECT seq, json_extract(fields, '$.what') AS what, json_extract(fields, '$.direction') AS direction, json_extract(fields, '$.amount.amount') AS amount,
+                  json_extract(fields, '$.state') AS state, json_extract(fields, '$.mercury_id') AS mercury_id, json_extract(fields, '$.category') AS category
+           FROM entry WHERE register = 'transactions' AND deleted_at IS NULL ORDER BY json_extract(fields, '$.mercury_id')`,
+        )
+        .map((r) => ({ ...r }));
+    const software = running.sql.one<{ id: string }>("SELECT id FROM entry WHERE register = 'categories' AND json_extract(fields, '$.name') = 'Software'")!.id;
+    const first = ledgerRows();
+    assert.deepEqual(
+      first.map(({ seq: _seq, ...r }) => r),
+      [
+        { what: 'Fenwick Cloud', direction: 'out', amount: 124_075, state: 'cleared', mercury_id: 'txn_1', category: software },
+        { what: 'Halden Studio', direction: 'in', amount: 500_000, state: 'pending', mercury_id: 'txn_2', category: null },
+      ],
+    );
+
+    /* A PERSON REFILES THE FENWICK PAYMENT, AND THE NEXT HOUR HALDEN'S MONEY CLEARS. Two rows still, Halden cleared,
+       and Fenwick where the person put it. */
+    said(await api.update({ register: 'transactions', seq: first[0]!.seq, patch: { category: hosting.id } }, owner));
+    txns = [OPS_TXNS[0], txn('txn_2', 5000, 'sent', 'Halden Studio', '2026-09-20T08:00:00Z', '2026-09-21T10:00:00Z'), OPS_TXNS[2]];
+    await hour();
+    assert.deepEqual(
+      ledgerRows().map((r) => [r.mercury_id, r.state, r.category]),
+      [
+        ['txn_1', 'cleared', hosting.id],
+        ['txn_2', 'cleared', null],
+      ],
+    );
+  } finally {
+    await running.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

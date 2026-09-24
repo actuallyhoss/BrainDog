@@ -365,6 +365,14 @@ importers:
         specifier: workspace:*
         version: link:../ports
 
+  packs/bank-hsbc-eg: {}
+
+  packs/count-cash: {}
+
+  packs/holdings: {}
+
+  packs/live-feed: {}
+
   packs/mercury: {}
 
   packs/portfolio-bands: {}
@@ -372,6 +380,10 @@ importers:
   packs/project-brief: {}
 
   packs/rates-poll: {}
+
+  packs/roadmap: {}
+
+  packs/stripe: {}
 
 packages:
 
