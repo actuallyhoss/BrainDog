@@ -600,12 +600,17 @@ export type PackInfo = {
  * The kinds that ADD THEIR ROWS UP, and are therefore wrong when they are handed a page of the answer.
  *
  * `bar` groups and counts, `chips` groups and counts, `gauge` sums against a target, `split` shares
- * one total out between its groups, `progress` measures what was spent against what was budgeted:
- * each one is arithmetic over every row the predicate admitted, because a sum of the first page is
- * a wrong number rather than a short list. `limit:` cuts their GROUPS, never their rows.
+ * one total out between its groups, `progress` measures what was spent against what was budgeted,
+ * `heat` adds the rows on one day together into that day's square: each one is arithmetic over
+ * every row the predicate admitted, because a sum of the first page is a wrong number rather than a
+ * short list. `limit:` cuts their GROUPS, never their rows.
+ *
+ * `heat` JOINED THE RECORD'S LIST AFTER IT LANDED, and this one with it. Measured through the kernel
+ * on sixty rows on sixty days before either: fifty rows, `matched: 60`, no refusal, so ten busy days
+ * drew as gaps, and this app's `page-live.ts`, reading this set, let the short answer through too.
  *
  * IT IS HERE, AND NOT IMPORTED FROM THE RECORD THAT ALSO HOLDS IT, for the reason `REACHES` and
- * `SCOPES` are written out further down: `packages/kernel/src/pages.ts` declares the same five as
+ * `SCOPES` are written out further down: `packages/kernel/src/pages.ts` declares the same six as
  * its own `SUMS` and `index.ts` does not publish that name, so there is nothing to import. Same
  * argument, same remedy: `block-kinds.test.ts` holds this list against the record's, through the
  * one set both packages do publish, and a kind added to one and not the other is a red test rather
@@ -625,7 +630,7 @@ export type PackInfo = {
  * `section` IS NOT ONE OF THESE AND IS IN `REDUCES` BELOW. The two questions are not the same
  * question, and one set answering both is what let the three copies disagree.
  */
-export const SUMS: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge', 'progress', 'split']);
+export const SUMS: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge', 'heat', 'progress', 'split']);
 
 /**
  * `SUMS` and `section`: the kinds whose count on screen is the whole match rather than the page drawn.
@@ -647,7 +652,7 @@ export const SUMS: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge', 'prog
  * this file exported these six, both `ReadonlySet<string>`, and `page-live.ts` imports one of them:
  * adding `import { REDUCES } from '@braindog/kernel'` to that file would have compiled and given a
  * silently different answer about the one kind they differ on. Two sets under one name is worse
- * than the duplication it was meant to end, so the kernel now names the refusing five `SUMS` and
+ * than the duplication it was meant to end, so the kernel now names the refusing kinds `SUMS` and
  * derives `REDUCES` from them, and this line reads it rather than writing a sixth copy of the
  * vocabulary. `EventKind` above came in for the same reason, in the same words: a new kind is a
  * kernel migration, so the kernel is where the list lives and everything else reads it.

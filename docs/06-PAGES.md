@@ -188,6 +188,25 @@ scheduled actions, one row each and the same list as the `actions` read: its `wh
 `last_status`, `last_note`, `runs` and `failures`, a key is its label, and it takes no `order`. All four
 sources are computed by the kernel (`pages.ts`), alongside `forecast.runway`.
 
+**A kind that adds its rows up reads the whole match, or refuses.** `bar`, `chips`, `gauge`, `heat`,
+`progress` and `split` over a register read up to 200 rows whatever their `limit` (on these, `limit`
+cuts the groups drawn, never the rows read), and a `where` matching more is refused `OUT_OF_BOUNDS`
+with both numbers in the sentence, because a total over part of the rows is a wrong number rather than
+a short list. A `heat` reads `columns: [{ field: <a day> }, { field: <a number> }]` and adds the rows on
+one day together; measured before it joined the list, sixty rows on sixty days answered fifty and drew
+ten busy days as gaps. A `ring` over a register is progress: one row the kernel counts, answered with
+its own columns `label | value | target` and `matched: 1`. The whole is every row the block's scope
+admits: the page's project and the rows that apply everywhere when it has `inherit: true`, and the list
+otherwise. The `where` is the part, counted inside the whole. A ring that wants another whole says so in
+its own `of:` sentence over the same list, so `where: state is done` with `of: list is work` draws the
+work list's done share, where `where: list is work, state is done` alone draws that share of every row
+(2 of 100 on a list of 4 work chores, 2 done, and 96 home ones, against 2 of 4 with the `of:`). The
+label is the block's `heading`, or the list's id when it has none, never the sentence. `of:` on any other
+block, or on a ring that is not over a list, is refused at `of`. A ring reads no row, so it has no
+ceiling; `limit: 0` draws nothing, as it does on every block; and a `ring` over a register that names
+`columns:` is refused, because the row it draws is not made of the register's fields. Written out in its
+fence, a `ring` is still the rows its author wrote: one is progress, two to five are parts.
+
 **A live figure comes with the answer.** Outside a template, every `{{path}}` in a block's `heading`,
 `body`, `empty` and authored cells that the record holds a value for is on the block as `values`, keyed
 by the path as written ([05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §7.1): a metric's reading

@@ -129,6 +129,12 @@ export type PageBlock = {
   /** A `cards` block's: a row whose day in `field` is older than `after` is drawn as out of date. */
   stale?: { field: string; after: string };
   /**
+   * A `ring` over a register's: the rows its dial is set against, as a sentence over the same list. Without it the
+   * whole is every row the block's scope admits, the page's project when it inherits and the list otherwise, and
+   * the `where` is always the part (`DIRECTION.md` §25).
+   */
+  of?: string;
+  /**
    * A `progress` block's: the figure, grouped by a word, that says what was spent against each row's limit. The record
    * reads it beside the rows and the host sets each row against the part whose key is that row's value.
    */
@@ -190,6 +196,8 @@ const READS = new Set([
   'document', 'fx',
   /* A `capture`'s list, and what a new row in it is filled with. */
   'register', 'fills',
+  /* The whole a `ring` over a list is set against, when it is not the block's scope. */
+  'of',
 ]);
 
 export type PageDecl = {
@@ -415,7 +423,12 @@ const WHOLE: ReadonlySet<string> = new Set(['activity', 'actions', 'governance.o
 /* `ReadonlySet` BECAUSE IT LEAVES THE PACKAGE, which `SPARK_KINDS` in `spark.ts` is declared as for
    the same reason: a bare `new Set` exported hands every caller `add` and `delete` on the set the
    kernel refuses by. */
-export const SUMS: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge', 'progress', 'split']);
+/* `heat` IS ONE OF THEM BECAUSE IT ADDS THE ROWS ON ONE DAY TOGETHER (`render/src/heat.ts`), and it was left out
+   when the kind landed. Measured over a register of sixty rows on sixty days: fifty rows, `matched: 60`, no
+   refusal, so ten busy days were drawn as gaps. `ring` IS NOT, though the brief that added this line named it:
+   over a register it draws one row it counts (`ringOf`), two `matched` figures and never a row read, so a
+   ceiling would refuse a ring over 201 tasks for a limit it never meets. */
+export const SUMS: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge', 'heat', 'progress', 'split']);
 
 /**
  * `SUMS` and `section`: the kinds whose count on screen is the WHOLE MATCH rather than the page drawn.
@@ -707,6 +720,15 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
   const unread = Object.keys(block)
     .filter((key) => !READS.has(key))
     .map((key): Refusal => ({ code: 'DECLARATION_INVALID', fix: `${key}: is not a key this record reads.`, at: key }));
+  /* `of:` IS READ BY ONE KIND OVER ONE KIND OF SOURCE, and anywhere else it would be a sentence the block drew
+     without, which is the misspelt key above by another route. */
+  if (block.of !== undefined && !(block.kind === 'ring' && typeof block.source === 'string' && block.source.startsWith('register.')))
+    unread.push({
+      code: 'DECLARATION_INVALID',
+      /* A RING AN AUTHOR WROTE OUT WAS TOLD "a ring has none", which reads as if no ring could take the key. */
+      fix: `of: names the whole a ring over a list is set against, ${block.kind === 'ring' ? 'and this ring is not over a list' : `and a ${block.kind} has none`}.`,
+      at: 'of',
+    });
 
   const base: BlockResult = { ...block, rows: [], matched: 0, refusals: unread };
 
@@ -980,6 +1002,13 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
      a block declaring it wanted no rows and getting one is a block nobody can write. */
   const limit = SUMS.has(block.kind) ? READ_WHOLE : block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
   if (limit === 0) return { ...base, matched: 0 };
+
+  /* A RING OVER A REGISTER IS PROGRESS, one row it counts rather than the rows it matched. IT IS ASKED HERE, AFTER
+     THE SCOPE AND THE LIMIT, because the first cut asked it straight after the `where` and so skipped both: a ring
+     with `inherit: true` counted Kiln's own done jobs against every job of every project (2 of 16 where Kiln and
+     the jobs that apply everywhere are 3 of 6), one over a list with no scope field drew the list instead of
+     saying so, and `limit: 0` drew the dial. */
+  if (block.kind === 'ring') return ringOf(deps, block, register, schema, said.predicate, inherit ? scope : null, base, also);
   /* THE ORDER GOES TO THE QUERY, not to the page after it. Sorting the rows that came back is
      sorting a page that was already chosen: "the five largest" would be five arbitrary rows put in
      order, which is a different answer and an invisible one. */
@@ -1266,6 +1295,98 @@ function metricBlock(deps: PageDeps, block: PageBlock, id: string, base: BlockRe
   if (!read.ok) return { ...base, refusals: refused(read) ? also(read.refusal) : also() };
   if (read.value.refusals.length) return { ...base, refusals: also(...read.value.refusals) };
   return { ...base, readings: [{ metric: id, reading: read.value }], matched: read.value.groups?.length ?? 0 };
+}
+
+/** The cells of the row a ring over a register counts, in the order `ringPlan` reads one row: `label | value | target`. */
+const RING_COLUMNS = [{ field: 'label' }, { field: 'value' }, { field: 'target' }];
+
+/**
+ * A `ring` over a register: ONE ROW OF PROGRESS, the rows its `where` matches against the rows its scope admits.
+ *
+ * THE WHOLE IS THE BLOCK'S SCOPE AND THE `where` IS THE PART, which is the owner's call (`DIRECTION.md` §25) on
+ * the question the checker refused the first cut over. That cut set every ring against every row of the list, so
+ * `list is work, state is done` over 4 work chores (2 done) and 96 home ones drew 2%, where the work list is half
+ * done. The sentence does not say which of its clauses is the whole, so the record does not guess: without `of:`
+ * the whole is the list, or the page's project and the rows that apply everywhere when the block inherits, and
+ * 2 of 100 is the right answer to the block as written. `of: list is work` says the other whole and draws 2 of 4.
+ * The part is counted inside the whole, `where` and `of` together, so a part can never be larger than its whole.
+ *
+ * THE LIST READ WAS THE WRONG QUESTION. Measured on ten tasks with three done, `where: state is done` answered the
+ * three done rows, and `ringPlan` reads two to five rows as PARTS of a whole, so the dial set the done tasks
+ * against each other and the seven open ones were nowhere on it. What a person means by a ring over a list is how
+ * far along it is, and the whole it is set against is not a row to draw.
+ *
+ * TWO COUNTS AND NO ROWS, so it has no ceiling. Both come from `matched`, which `list` answers over the whole
+ * predicate whatever the page it hands back, which is why `ring` is not in `SUMS` and a ring over 250 tasks draws.
+ *
+ * THE ROW'S COLUMNS ARE THE RECORD'S, answered on the block, because no field of the register holds a count. A
+ * block that names columns of its own is refused rather than drawn with them ignored: they would say the ring
+ * reads fields it never looks at.
+ *
+ * THE LABEL IS THE BLOCK'S TITLE. The first cut wrote the raw `where` into it, so the words beside the dial and the
+ * dial's spoken name read `list is work, state is done: 2 of 100`. A block with no heading is labelled with the
+ * list's id, which is at least a name the author wrote.
+ */
+function ringOf(
+  deps: PageDeps,
+  block: PageBlock,
+  register: string,
+  schema: Schema,
+  predicate: Predicate | undefined,
+  scope: { field: string; to: string } | null,
+  base: BlockResult,
+  also: (...r: Refusal[]) => Refusal[],
+): BlockResult {
+  if (block.columns?.length)
+    return {
+      ...base,
+      refusals: also({
+        code: 'DECLARATION_INVALID',
+        fix: `A ring over ${register} draws one row it counts, the rows where: matches against all of them, so it takes no columns:.`,
+        at: 'columns',
+      }),
+    };
+  /* A NUMBER OR A LIST IN `of:` WAS REFUSED AT `where`. `predicateOf` passes anything that is not a string on as a
+     predicate, the list read then refused `of: 5` as `VALUE_MALFORMED`, and the key it read that refusal from was
+     the `where`, which was fine. A group or a leaf is let through, as `where` lets one through. */
+  const shape = block.of as unknown;
+  if (shape !== undefined && typeof shape !== 'string' && (typeof shape !== 'object' || shape === null || Array.isArray(shape)))
+    return {
+      ...base,
+      refusals: also({ code: 'VALUE_MALFORMED', fix: `of: is a sentence over ${register}, such as list is work.`, at: 'of' }),
+    };
+  const whole = predicateOf(block.of, schema, deps.ctx);
+  if (whole.bad.length) return { ...base, refusals: also(...whole.bad.map((r) => ({ ...r, at: 'of' }))) };
+
+  const clauses = (p: Predicate | undefined): Predicate[] =>
+    p === undefined ? [] : Array.isArray((p as { all?: unknown }).all) ? (p as { all: Predicate[] }).all : [p];
+  const joined = (cs: Predicate[]): Predicate | undefined => (cs.length === 0 ? undefined : cs.length === 1 ? cs[0] : { all: cs });
+  const wanted = clauses(whole.predicate);
+  const said = clauses(predicate);
+  /* THE PROJECT CLAUSE IS THE SCOPE, so an inheriting ring's whole keeps it and drops the rest of the `where`.
+     `listInherited` refuses a `where` that names no project, which is the sentence a table that inherits gets. */
+  const home = scope ? said.find((n) => (n as Leaf).field === scope.field && typeof (n as Leaf).is === 'string') : undefined;
+  const count = (cs: Predicate[]): Result<Listed> =>
+    scope ? listInherited(deps, register, scope, joined(cs), 1, undefined) : deps.list({ register, ...(cs.length ? { where: joined(cs) } : {}), limit: 1 });
+
+  const done = count([...said, ...wanted]);
+  if (!done.ok) return { ...base, refusals: refused(done) ? also(done.refusal) : also() };
+  const all = count([...(home ? [home] : []), ...wanted]);
+  if (!all.ok) return { ...base, refusals: refused(all) ? also(all.refusal) : also() };
+  const at = new Date(deps.ctx.nowMs).toISOString();
+  const row: Entry = {
+    id: `${register}#ring`,
+    register,
+    seq: null,
+    fields: { label: block.heading?.trim() || register, value: done.value.matched, target: all.value.matched },
+    state: null,
+    version: 0,
+    created_at: at,
+    updated_at: at,
+    deleted_at: null,
+  };
+  /* `matched` IS THE ONE ROW DRAWN, so a drawer that prints "Showing 1 of 3" under a slice sees no slice here. */
+  return { ...base, columns: RING_COLUMNS, rows: [row], matched: 1 };
 }
 
 /**

@@ -3,11 +3,11 @@
  *
  * Two different questions get asked about a kind, and they have two different answers:
  *
- *   ADDS ITS ROWS UP  `bar`, `chips`, `gauge`, `progress` and `split` do arithmetic over every row
- *                     the predicate admitted, so a page of the answer is a wrong number rather than
- *                     a short list. The record refuses one past what a single read holds, and this
- *                     app refuses a live answer that came back short of its own `matched`.
- *   DRAWS NO SLICE    those five and `section`. The count over them is the whole match, so there is
+ *   ADDS ITS ROWS UP  `bar`, `chips`, `gauge`, `heat`, `progress` and `split` do arithmetic over
+ *                     every row the predicate admitted, so a page of the answer is a wrong number
+ *                     rather than a short list. The record refuses one past what a single read
+ *                     holds, and this app refuses a live answer that came back short of `matched`.
+ *   DRAWS NO SLICE    those six and `section`. The count over them is the whole match, so there is
  *                     no "Showing 5 of 38" line to draw. A section is here and not above because it
  *                     adds nothing up: it draws no row of its own and its count is `total`.
  *
@@ -125,7 +125,7 @@ const of = (blocks: Answered[], heading: string): Answered => {
   return found;
 };
 
-test('ONE NAME, ONE SET: the record and this app mean the same six kinds by REDUCES', () => {
+test('ONE NAME, ONE SET: the record and this app mean the same seven kinds by REDUCES', () => {
   /**
    * TWO SETS OF DIFFERENT MEMBERSHIP UNDER ONE NAME is worse than the duplication it was meant to
    * end, because the two names give no hint that they disagree: a file that imported one and
@@ -137,7 +137,9 @@ test('ONE NAME, ONE SET: the record and this app mean the same six kinds by REDU
      slice without adding anything up. Written out rather than derived, so that a kind added to one
      and not the other is a red test rather than a set that quietly follows. */
   assert.deepEqual([...REDUCES].sort(), [...SUMS, 'section'].sort());
-  assert.deepEqual([...SUMS].sort(), ['bar', 'chips', 'gauge', 'progress', 'split']);
+  /* `heat` WAS ADDED TO THE RECORD'S LIST FIRST, and this test went red on the first line above with
+     the record's seven against the app's six, which is the kind-added-to-one case it was written for. */
+  assert.deepEqual([...SUMS].sort(), ['bar', 'chips', 'gauge', 'heat', 'progress', 'split']);
   assert.ok(!SUMS.has('section'), 'a section adds nothing up, so a short answer is not a wrong figure');
 });
 
