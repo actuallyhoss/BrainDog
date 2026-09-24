@@ -1650,19 +1650,19 @@ export function registerHref(register: string, where: string | undefined): strin
   /**
    * AN OR-GROUP AND THE SIX COMPARE WORDS OPEN IT WIDE, AND THE READER THAT HOLDS THEM BACK MOVED.
    *
-   * These two guards were written because `whereOf` in `api.ts` read neither: a chip it did not know
-   * fell to `<field> is <value>`, and it joined every chip with a plain comma. It reads the six words
-   * now, by the operator `compile` gives them, and on the sample a compare chip opens the rows its
-   * clause admits (`chips-compare.test.ts` sweeps every ordered and text field in the mirror). It
-   * joins with `, or` when handed `'any'`, and nothing hands it that yet: `applyFilters` does not.
+   * These two guards were written because neither reader of a chip knew the words: `whereOf` in
+   * `api.ts` on the sample and `treeOf` in `remote.ts` on a record both sent a chip they did not know
+   * to `<field> is <value>`, and both ANDed every chip. Both read the six words now, and both read the
+   * address word `join=any` (`joinOf`) as "or". `remote-compare.test.ts` holds every compare chip over
+   * every ordered and text field on `ORDER`, and an or-group, to the same rows on a real kernel as on
+   * the sample, and to the rows the sentence itself admits there.
    *
-   * THE LIST ON A RECORD DOES NOT READ CHIPS THROUGH `whereOf`. `treeOf` in `remote.ts` turns each
-   * chip into a leaf of the record's own, reads neither the six words nor the join, and ANDs every
-   * chip. Measured against the seed installed into a real kernel: `amount:gte:GBP 2400` reached it
-   * as `{ field: 'amount', is: 'GBP 2400' }` and was refused `MONEY_LITERAL_NEEDS_CURRENCY` where
-   * the sentence admits 25 rows, and `what:contains:rent` as `what is rent`, which answered none of
-   * three. So these stay until that reader learns the same words; the test's last case is the
-   * tripwire that fails the day it does.
+   * SO WHAT HOLDS THE GUARDS NOW IS NOT A READER. The register route builds its `Ask` from `chipsOf`
+   * alone and never reads `join`, so an or-group's address would open the chips ANDed on both
+   * sources; and `where-compare.test.ts`, `where-any.test.ts` and `chips-compare.test.ts` each pin
+   * the wide address. Minting both, with `&join=any` after an or-group's chips, was measured against
+   * `apps/web`'s unit tests and those pins were its only failures. The route passing
+   * `joinOf(page.url.searchParams)` and the pins flipping are what let these go.
    */
   if (w.any) return `/r/${register}`;
   if (w.clauses.some((c) => c.op === 'contains' || c.op === 'gt' || c.op === 'gte' || c.op === 'lt' || c.op === 'lte' || c.op === 'between'))

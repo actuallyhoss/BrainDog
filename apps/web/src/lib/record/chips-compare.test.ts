@@ -11,21 +11,21 @@
  * THE CHIPS ARE READ THROUGH `chipsOf`, the route's own parser, never through a copy of it, which is
  * the rule `list-chips.test.ts` gives its reasons for.
  *
- * AND `registerHref` STILL HANDS OVER THE WIDE ADDRESS FOR THESE, ON PURPOSE, which the last test holds.
- * The brief that taught this reader (`loop/research-m4-wave-three.md` §4) had it mint the narrow one
- * next, and that was measured against a real record before it was done: the list on a record does
- * not read chips through `whereOf` at all. `treeOf` in `remote.ts` turns each chip into one of the
- * record's leaves on its own, reads neither the six words nor the join, and ANDs every chip. So the
- * minted `amount:gte:GBP 2400` reached the record as `{ field: 'amount', is: 'GBP 2400' }`, refused
- * `MONEY_LITERAL_NEEDS_CURRENCY`, and `what:contains:rent` as `what is rent`, which answered no rows
- * where the sentence answers three. A link that reads as the block's filter and opens something else
- * is the failure `registerHref` exists to prevent, so it waits for that reader.
+ * THE LIST ON A RECORD DOES NOT READ CHIPS THROUGH `whereOf`, which is why this file's last test was
+ * a tripwire. `treeOf` in `remote.ts` turns each chip into one of the record's leaves on its own,
+ * and it read neither the six words nor the join: the minted `amount:gte:GBP 2400` reached the record
+ * as `{ field: 'amount', is: 'GBP 2400' }` and was refused `MONEY_LITERAL_NEEDS_CURRENCY`. It reads
+ * both now, and `remote-compare.test.ts` holds it to the sample's rows on a real kernel.
+ *
+ * AND `registerHref` STILL HANDS OVER THE WIDE ADDRESS FOR THESE, which the last test holds, for the
+ * reasons written above its guards in `where.ts`: the register route never reads `join`, and two
+ * other test files pin the wide address.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { chipsOf, list, whereOf } from './api.ts';
+import { chipsOf, joinOf, list, whereOf } from './api.ts';
 import { NOW, REGISTERS, ROWS } from './data.ts';
 import { treeOf } from './remote.ts';
 import { compile, matches, registerHref, type Clause } from './where.ts';
@@ -125,17 +125,22 @@ test('UNDER join=any THE CHIPS ARE JOINED WITH ", or", and read back as the or-g
   assert.notDeepEqual(opened('tasks', query).seqs, any.seqs, 'the seed answers the same rows either way, so this test cannot tell "and" from "or"');
 });
 
-test('AND registerHref STAYS WIDE FOR BOTH while the record’s own reader turns them into other questions', () => {
-  /* THE TRIPWIRE. When `treeOf` in `remote.ts` reads the six words and the join, these two
-     assertions fail, and the guards in `registerHref` can come out in the same commit. Until then a
-     narrow address would open one list on the sample and another on a record. */
-  assert.deepEqual(
-    treeOf('obligations', chipsOf(new URLSearchParams('f=amount:gte:GBP%202400')), '', new Map()),
-    { field: 'amount', is: 'GBP 2400' },
-    'the record reads a compare chip now: mint it in registerHref',
-  );
-  const both = treeOf('tasks', chipsOf(new URLSearchParams('f=state:in:open&f=due:before:today&join=any')), '', new Map());
-  assert.ok(both && 'all' in both, 'the record reads join=any now: mint it in registerHref');
+test('THE RECORD’S READER HOLDS BOTH NOW, and registerHref stays wide until the route reads the join', () => {
+  /* THE TRIPWIRE, FLIPPED. These two held the old answers, `{ field: 'amount', is: 'GBP 2400' }` and
+     an `all` group, and failed the day `treeOf` learnt the words, as they were written to. What they
+     hold now is the record's own literal, the money in minor units with its currency, and an `any`. */
+  assert.deepEqual(treeOf('obligations', chipsOf(new URLSearchParams('f=amount:gte:GBP%202400')), '', new Map()), {
+    field: 'amount',
+    gte: { amount: 240000, currency: 'GBP' },
+  });
+  assert.deepEqual(treeOf('obligations', chipsOf(new URLSearchParams('f=what:contains:rent')), '', new Map()), { field: 'what', contains: 'rent' });
+  const params = new URLSearchParams('f=state:in:open&f=by:before:today&join=any');
+  assert.deepEqual(treeOf('tasks', chipsOf(params), '', new Map(), joinOf(params)), {
+    any: [
+      { field: 'state', is: 'open' },
+      { field: 'by', before: 'today' },
+    ],
+  });
 
   assert.equal(registerHref('obligations', 'amount at least GBP 2400'), '/r/obligations');
   assert.equal(registerHref('obligations', 'what contains rent'), '/r/obligations');

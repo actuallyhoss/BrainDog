@@ -783,6 +783,15 @@ export const chipsOf = (params: URLSearchParams): Filter[] =>
   });
 
 /**
+ * The address word that joins the chips with "or", read one way wherever an address is read.
+ *
+ * ANY OTHER SPELLING IS THE PLAIN "and" EVERY ADDRESS WRITTEN BEFORE IT MEANT, so `join=all`, a
+ * typo, or no word at all open the list they always opened rather than a refusal on a link that
+ * worked yesterday. `whereOf` below and `treeOf` in `remote.ts` take what this answers.
+ */
+export const joinOf = (params: URLSearchParams): 'any' | undefined => (params.get('join') === 'any' ? 'any' : undefined);
+
+/**
  * The URL's filter chips, as a `where` sentence.
  *
  * There were two filter languages in this product and they disagreed. `where.ts` resolves dates,
@@ -800,10 +809,11 @@ export const chipsOf = (params: URLSearchParams): Filter[] =>
  *
  * `join` IS THE ADDRESS WORD `join=any`, AND UNDER IT THE CHIPS ARE JOINED WITH `, or`. One word is
  * the whole of it because both engines refuse a sentence mixing `,` and `, or` (wave two's brief 7),
- * so a set of chips is all "and" or all "or". NOTHING PASSES IT YET, on either side: `applyFilters`
- * below calls this with the chips alone, and the register list on a record reads chips through
- * `treeOf` in `remote.ts`, not through here, and ANDs every one. `chips-compare.test.ts` holds the
- * record's half, and `registerHref` mints no such address until both carry the word.
+ * so a set of chips is all "and" or all "or". `applyFilters` and `list` below pass it on the
+ * sample, and on a record `treeOf` in `remote.ts` reads the same word into an `any` group, because
+ * the list there never reads chips through this sentence. `remote-compare.test.ts` holds the two to
+ * the same rows. The address is read by `joinOf` above, and the register route does not read it
+ * yet, which is why `registerHref` still mints no such address.
  */
 export const whereOf = (filters: Filter[], join?: 'any'): string =>
   filters
@@ -871,8 +881,8 @@ export const whereOf = (filters: Filter[], join?: 'any'): string =>
     })
     .join(join === 'any' ? ', or ' : ', ');
 
-export function applyFilters(register: string, entries: Entry[], filters: Filter[], q?: string): Entry[] {
-  const w = compile(register, whereOf(filters));
+export function applyFilters(register: string, entries: Entry[], filters: Filter[], q?: string, join?: 'any'): Entry[] {
+  const w = compile(register, whereOf(filters, join));
   let out = filters.length ? entries.filter((e) => matches(e, w, NOW)) : entries;
 
   /**
@@ -2349,7 +2359,7 @@ function drawnWhen(b: PageBlock): boolean {
  */
 const READS = new Set([
   'kind', 'heading', 'span', 'source', 'where', 'columns', 'cells', 'order', 'limit',
-  'target', 'authored', 'empty', 'tone', 'body', 'drawn', 'when', 'opening', 'from', 'horizon',
+  'target', 'authored', 'empty', 'tone', 'body', 'drawn', 'when', 'opening', 'from', 'horizon', 'of',
   /* A section's two keys: `fold` starts it shut, `icon` names the glyph beside its heading. */
   'fold', 'icon',
   /* A feed's and a diff's keys, so a page may declare them before their bindings land. */
@@ -3136,6 +3146,8 @@ export function list(
     filters?: Filter[];
     q?: string;
     sort?: { field: string; dir: 'asc' | 'desc' };
+    /** `'any'` joins the chips with "or", as the address word `join=any` does. See `whereOf`. */
+    join?: 'any';
     /** Rows per page. Clamped to `33 §2`'s ceiling of 200. Absent means the whole answer. */
     limit?: number;
     /** The `seq` of the last row of the previous page. */
@@ -3143,7 +3155,7 @@ export function list(
   } = {},
 ) {
   const all = ROWS[register] ?? [];
-  const filtered = applyFilters(register, all, opts.filters ?? [], opts.q);
+  const filtered = applyFilters(register, all, opts.filters ?? [], opts.q, opts.join);
   const sorted = opts.sort ? sortRows(register, filtered, opts.sort.field, opts.sort.dir) : filtered;
   const key = questionKey(register, opts);
 
@@ -3207,7 +3219,7 @@ export function list(
  */
 const questionKey = (
   register: string,
-  opts: { filters?: Filter[]; q?: string; sort?: { field: string; dir: 'asc' | 'desc' } },
+  opts: { filters?: Filter[]; q?: string; sort?: { field: string; dir: 'asc' | 'desc' }; join?: 'any' },
 ): string => {
   const said = JSON.stringify([
     register,
@@ -3216,6 +3228,9 @@ const questionKey = (
       .sort((x, y) => (x[0] === y[0] ? x[1].localeCompare(y[1]) : x[0].localeCompare(y[0]))),
     opts.q ?? '',
     opts.sort ? [opts.sort.field, opts.sort.dir] : null,
+    /* THE SAME CHIPS JOINED BY "or" ARE ANOTHER QUESTION, so a cursor from the "and" list is stale
+       under it. Appended only when present, so every cursor minted before the word still resolves. */
+    ...(opts.join === 'any' ? ['any'] : []),
   ]);
   let h = 5381;
   for (let i = 0; i < said.length; i++) h = ((h * 33) ^ said.charCodeAt(i)) >>> 0;

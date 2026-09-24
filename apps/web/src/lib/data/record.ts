@@ -29,11 +29,18 @@ export type Refusal = { code: string; fix: string; allowed?: readonly string[] |
 /** An answer: a value, or a refusal. A conflict cannot reach a read, and is read as a refusal. */
 export type Said<T> = { ok: true; value: T } | { ok: false; refusal: Refusal };
 
-/** What the list is asked: the chips, the box and the order, exactly as the address carries them. */
+/**
+ * What the list is asked: the chips, the box and the order, exactly as the address carries them.
+ *
+ * `join` IS THE ADDRESS WORD `join=any` (`joinOf` in `api.ts`): the chips joined by "or" rather than
+ * "and". Absent is "and", which is every address written before the word existed. Both sources read
+ * it, the sample through `list` and a record through `treeOf`, so one link opens one set of rows.
+ */
 export type Ask = {
   filters: readonly Filter[];
   q: string;
   sort?: { field: string; dir: 'asc' | 'desc' } | undefined;
+  join?: 'any' | undefined;
 };
 
 /**
@@ -145,7 +152,7 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
   async function ask(register: string, a: Ask, cursor: string | null, limit: number): Promise<Said<Answer>> {
     const refs = await refsFor(register);
     if (!refs.ok) return refs;
-    const where = treeOf(register, a.filters, a.q, refs.value);
+    const where = treeOf(register, a.filters, a.q, refs.value, a.join);
     const order = orderOf(a.sort);
     const out = said(
       await client.list({
@@ -195,7 +202,7 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
     async count(register, a) {
       /* ONE ROW, BECAUSE ONLY THE COUNT IS READ. `matched` is the whole answer's size whatever the
          page holds, and a page of one is the smallest the record will send. */
-      const out = await ask(register, { filters: a.filters, q: a.q }, null, 1);
+      const out = await ask(register, { filters: a.filters, q: a.q, join: a.join }, null, 1);
       return out.ok ? { ok: true, value: out.value.matched } : out;
     },
   };
@@ -246,12 +253,13 @@ const SAMPLE: Source = {
       filters: [...a.filters],
       q: a.q,
       ...(a.sort ? { sort: a.sort } : {}),
+      ...(a.join ? { join: a.join } : {}),
       limit: PAGE,
       ...(cursor === null ? {} : { cursor }),
     });
     return ok({ entries: out.entries, matched: out.matched, cursor: out.cursor, names: null });
   },
-  count: async (register, a) => ok(list(register, { filters: [...a.filters], q: a.q }).matched),
+  count: async (register, a) => ok(list(register, { filters: [...a.filters], q: a.q, ...(a.join ? { join: a.join } : {}) }).matched),
 };
 
 /* ───────────────────────────────────── end of the sample ───────────────────────────────────── */

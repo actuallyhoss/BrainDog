@@ -13,11 +13,11 @@
  * that pin holds for a fresh seed and for no record in which somebody has added a field since.
  */
 
-import { identityOfRow, type Identity } from './api.ts';
+import { identityOfRow, whereOf, type Identity } from './api.ts';
 import { REGISTERS, ROWS } from './data.ts';
 import { searchable, terms } from './find.ts';
 import type { Entry, Fields, Filter, RegisterDecl } from './schema.ts';
-import { declaredValue } from './where.ts';
+import { compile, declaredValue } from './where.ts';
 import { labels, relabelInto } from '../voice.ts';
 
 /** One register's rows, by the ULID the record stores a ref as, and back again. */
@@ -213,12 +213,59 @@ function declares(register: string, field: string, word: string): boolean {
   return false;
 }
 
+/** The six chip operators the sentence spells `more than`, `at least`, `less than`, `at most`, `between` and `contains`. */
+const COMPARE = new Set(['gt', 'gte', 'lt', 'lte', 'between', 'contains']);
+
+/**
+ * A compare chip as the record's leaf, read by the sentence's own compiler and not by a second one.
+ *
+ * THEY ALL FELL TO THE LAST LINE OF `leafOf` AND BECAME `is`. Measured against the seed in a real
+ * kernel over every ordered and text field `ORDER` declares (`remote-compare.test.ts`): 189 of 241
+ * compare chips opened other rows on the record than on the sample. A money bound went over as the
+ * text `GBP 2400` and was refused `MONEY_LITERAL_NEEDS_CURRENCY`, since the record takes
+ * `{ amount, currency }`; an int or a decimal went over as a string and was refused
+ * `VALUE_MALFORMED`; and a day or a `contains` became `is`, which answered no rows, the one answer
+ * indistinguishable from a filter that worked.
+ *
+ * `compile` ALREADY READS THE WORDS INTO THE COLUMN'S UNITS: a money bound is its minor units with
+ * the currency beside them, a quantity its number with the unit, and those are the halves the
+ * record's literal is made of. Parsing `GBP 2400.50` a second time here would be a third reader of
+ * the same words, and this file exists because two readers of one address disagreed.
+ *
+ * A DAY KEEPS ITS WORD (`today`, `+30d`), as `before` and `after` above do, because the record
+ * resolves it against its own clock. A typed `due:between:today,+30d` compiles to two clauses, and
+ * goes over as both of them under `all`.
+ *
+ * A CHIP THE SENTENCE REFUSES GOES OVER AS IT WAS TYPED, so the record refuses it in its own words
+ * rather than this file quietly dropping the clause and opening a wider list than the chip says.
+ */
+function comparedOf(register: string, f: Filter): Tree {
+  const w = compile(register, whereOf([f]));
+  if (w.bad.length || w.clauses.length === 0) return { field: f.field, [f.op]: f.op === 'between' ? f.values : (f.values[0] ?? '') };
+  /* THE BOUND SAYS WHICH LITERAL IT IS, not the declaration: this app's field types stop short of
+     `quantity`, and a list the record declares may still hold one. */
+  const literal = (b: { n: number; currency?: string; unit?: string }): unknown =>
+    b.currency !== undefined ? { amount: b.n, currency: b.currency } : b.unit !== undefined ? { value: b.n, unit: b.unit } : b.n;
+  const leaves: Tree[] = w.clauses.map((c) => {
+    if ('day' in c) return { field: c.field, [c.op]: c.day };
+    if ('bounds' in c) return { field: c.field, [c.op]: c.op === 'between' ? c.bounds.map(literal) : literal(c.bounds[0]!) };
+    return { field: c.field, [c.op]: c.values[0] };
+  });
+  return leaves.length === 1 ? leaves[0]! : { all: leaves };
+}
+
 /**
  * One chip, as one leaf.
  *
  * THE OPERATORS ARE `whereOf`'S, read the same way. `in` of one value is `is`, `not-in` of one is
- * `not`, and `before` and `after` take their first value. Anything else is `is` with its first
- * value, which is how `whereOf` reads an operator it does not name.
+ * `not`, `before` and `after` take their first value, and the six compare words go through
+ * `comparedOf` above. Anything else is `is` with its first value, which is how `whereOf` reads an
+ * operator it does not name.
+ *
+ * `not-on` IS `not` OF ITS FIRST VALUE, AND IT USED TO FALL TO THAT LAST LINE AND BECOME `is`.
+ * `registerHref` mints it for `due is not today`, and `whereOf` reads it back as `is not`, so the
+ * sample was right and a record drew the complement: measured on the seed, the sentence and the
+ * sample drew all 40 obligations and the chip on a record drew none, because nothing is due today.
  *
  * A LONE WORD THE FIELD DOES NOT HOLD MAY BE THE QUESTION ABOUT ABSENCE: `is empty`, `is set`, and
  * their negations, in the order `where.ts` checks them, declared values first.
@@ -234,10 +281,11 @@ function declares(register: string, field: string, word: string): boolean {
  */
 function leafOf(register: string, f: Filter, refs: Refs): Tree {
   const one = f.values[0] ?? '';
+  if (COMPARE.has(f.op)) return comparedOf(register, f);
   if (f.op === 'before' || f.op === 'after') return { field: f.field, [f.op]: one };
   if (f.op === 'has' || f.op === 'lacks') return { field: f.field, [f.op]: valueOf(register, f.field, one, refs) };
 
-  const negated = f.op === 'not-in';
+  const negated = f.op === 'not-in' || f.op === 'not-on';
   const single = f.op !== 'in' && f.op !== 'not-in' ? true : f.values.length === 1;
   const absence = single ? ABSENCE[norm(one)] : undefined;
   if (absence && !declares(register, f.field, norm(one)))
@@ -245,6 +293,7 @@ function leafOf(register: string, f: Filter, refs: Refs): Tree {
 
   const values = f.values.map((v) => valueOf(register, f.field, v, refs));
   const first = values[0] ?? '';
+  if (f.op === 'not-on') return { field: f.field, not: first };
   if (f.op === 'in') return values.length === 1 ? { field: f.field, is: first } : { field: f.field, in: values };
   if (negated) return values.length === 1 ? { field: f.field, not: first } : { field: f.field, not_in: values };
   return { field: f.field, is: first };
@@ -258,9 +307,16 @@ function leafOf(register: string, f: Filter, refs: Refs): Tree {
  * A word found inside another word therefore matches here and did not in the mock, and
  * `remote.test.ts` pins the case. The words are `terms(q)`, the same folding the mock and the
  * record's full-text index use, so punctuation separates words on both sides.
+ *
+ * `join` IS THE ADDRESS WORD `join=any` (`joinOf` in `api.ts`), AND UNDER IT THE CHIPS ARE ONE
+ * `any` GROUP. It was not read here, so an or-group's chips reached the record ANDed: measured on the
+ * seed, `state is open, or due before today` admits other tasks than the two chips ANDed, and the
+ * record drew the AND. The search box's words stay outside the group and ANDed with it, which is
+ * what `applyFilters` does on the sample: it filters the chips' answer by the box afterwards.
  */
-export function treeOf(register: string, filters: readonly Filter[], q: string, refs: Refs): Tree | undefined {
-  const nodes: Tree[] = filters.map((f) => leafOf(register, f, refs));
+export function treeOf(register: string, filters: readonly Filter[], q: string, refs: Refs, join?: 'any'): Tree | undefined {
+  const chips: Tree[] = filters.map((f) => leafOf(register, f, refs));
+  const nodes: Tree[] = join === 'any' && chips.length > 1 ? [{ any: chips }] : chips;
   const words = terms(q);
   if (words) {
     const fields = searchable(register);
