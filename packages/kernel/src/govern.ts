@@ -325,7 +325,8 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
        other change's fields (`loop/research-batch-thirty-two-audit.md` section 2, `record/test/change-drawn.test.ts`).
        So the proposer's version is kept when it names one that has been live, and the live one stands in when it is
        absent. One ABOVE the live version is a guess at what will be live when the owner presses, which is the race B1
-       closed, so it is the live one too. An `add` needs none: it is merged onto whatever is live at the press.
+       closed, so it is the live one too. An `add` needs none: it is merged onto whatever is live at the press, and a
+       `retire` is merged the same way.
 
        AND EVERY MEMBER OF A BUNDLE GETS ONE, stored as `{ "<id>": n }`. Stamped for `declaration_id` alone, the rest of
        `{ declarations: [...] }` installed with no version at all: a change filed under a metric carrying Projects as read
@@ -333,7 +334,7 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
        stale metric over somebody else's edit to it (`loop/research-batch-thirty-four-audit.md` finding 2,
        `govern-bundle-version.test.ts`). The proposer may send the map, and a plain number still means the member the
        change is filed under; every member it says nothing about is stamped live, as an absent number is. */
-    if (!isAdd(body.to)) {
+    if (!fieldLevel(body.to)) {
       const named = String(body.declaration_id);
       const members = membersOf(body.to);
       const stamp = (id: string, theirs: unknown): number => {
@@ -599,6 +600,18 @@ function newEgress(sql: Sql, members: readonly { id?: unknown; kind: string; bod
 /** Whether a change's `to` is a field-level addition, `{ add: {...} }`, rather than a whole declaration. */
 const isAdd = (to: unknown): to is { add: unknown } => isMap(to) && 'add' in to;
 
+/** Whether a change's `to` retires fields of a live list, `{ retire: {...} }`, rather than being a whole declaration. */
+const isRetire = (to: unknown): to is { retire: unknown } => isMap(to) && 'retire' in to && !('add' in to);
+
+/**
+ * Whether a change's `to` names fields rather than a list, and is merged onto the list live at the press.
+ *
+ * ONE QUESTION FOR BOTH SHAPES, because every place that asked `isAdd` was asking this: whether there is a whole body to
+ * stamp a version on at filing, and whether the id installed is the resolved one. A retire asked `isAdd` there would be
+ * stamped as a whole body drawn at filing, which is the race resolving at the press exists to end.
+ */
+const fieldLevel = (to: unknown): boolean => isAdd(to) || isRetire(to);
+
 /** The ids a bundle installs, in its order, or `null` when `to` is one declaration. */
 const membersOf = (to: unknown): string[] | null => {
   const listed = (to as { declarations?: unknown } | null)?.declarations;
@@ -641,7 +654,115 @@ function movedFrom<T>(sql: Sql, id: string, version: number): Result<T> | null {
 function resolveTo(sql: Sql, body: Record<string, unknown>): Result<{ to: Record<string, unknown>; version?: number }> {
   /* ANYTHING ELSE IS PASSED ON AS IT IS, for `shapeFault` to refuse in its own words: an array is not a declaration, and
      "needs to" would be a wrong answer to a proposer who sent one. */
-  return isAdd(body.to) ? addTo(sql, body.to, body.declaration_id) : ok({ to: body.to as Record<string, unknown> });
+  if (isAdd(body.to)) return addTo(sql, body.to, body.declaration_id);
+  if (isRetire(body.to)) return retireIn(sql, body.to, body.declaration_id);
+  return ok({ to: body.to as Record<string, unknown> });
+}
+
+/** The list a field-level change is about: its own `register`, or the list it is filed under. `null` when neither says. */
+function listNamed(said: unknown, named: unknown): string | null {
+  const list = said ?? (typeof named === 'string' && named.startsWith('register.') ? named : undefined);
+  if (typeof list !== 'string') return null;
+  return list.startsWith('register.') ? list.slice('register.'.length) : list;
+}
+
+/** The live body and version of `register.<list>`, or `null` when no list of that name is installed. */
+function liveList(sql: Sql, list: string): { version: number; body: Record<string, unknown> } | null {
+  const live = sql.one<{ version: number; body: string }>(
+    "SELECT version, body FROM declaration WHERE id = ? AND kind = 'register' AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1",
+    `register.${list}`,
+  );
+  const body = live ? parse(live.body) : null;
+  return live && body ? { version: live.version, body } : null;
+}
+
+const RETIRE_KEYS = ['register', 'fields'];
+
+/** The keys of a list's body that name one of its fields, and how the refusal says each. */
+const LIST_ROLES = ['title', 'state', 'finished'] as const;
+const ROLE_SAID: Record<(typeof LIST_ROLES)[number], string> = { title: 'title', state: 'state', finished: 'finished day' };
+
+/**
+ * The first move of an enum staying on the list that needs `id` filled, or `null` when no move does. An enum retired in
+ * the same change is not asked, whichever order the two are named in.
+ */
+function movesNeeding(fields: readonly Record<string, unknown>[], id: string, going: ReadonlySet<string>): { field: string; from: string } | null {
+  for (const f of fields) {
+    if (f.retired === true || going.has(String(f.id)) || !isMap(f.transitions)) continue;
+    for (const [from, move] of Object.entries(f.transitions))
+      if (isMap(move) && Array.isArray(move.requires) && move.requires.includes(id)) return { field: String(f.id), from };
+  }
+  return null;
+}
+
+/**
+ * Fields of a live list marked `retired: true`, and nothing else about the list changed.
+ *
+ * THE APP HAD NO WAY TO TAKE A FIELD AWAY. `addTo` sends anyone removing something to "propose the whole list", and the
+ * app cannot: `schema` answers the relabelled copy the screens draw from and no version, so a whole body built from it
+ * writes display labels into the declaration and drops whatever somebody else added since the tab read it
+ * (`field-write.ts` says why at length). This is `addTo`'s other half, and it is read the same way: stored as asked, and
+ * resolved onto the list as it is live when it is filed (to check it) and when it is accepted (to install it), with the
+ * version it was read at, before every check a whole body gets.
+ *
+ * RETIRED, NEVER REMOVED, AND NO ROW TOUCHED. `retired` is the record's honest form of removal: the install takes it
+ * over rows that hold the field, the value stays in each row, and every reader passes over it (`field-drop.test.ts`).
+ * Leaving the field out instead is `WOULD_ORPHAN` while any row holds it, so a retire that dropped the entry would be
+ * refused at the press for the very rows it exists to keep.
+ *
+ * AND IT ALWAYS WAITS. It is not an `add`, so `additiveFault` holds it and the record's `byRule` never sends it: DIRECTION
+ * §22 has removing wait for the owner's press, the owner's own filing included.
+ */
+function retireIn(sql: Sql, to: { retire: unknown }, named: unknown): Result<{ to: Record<string, unknown>; version: number }> {
+  const retire = to.retire;
+  if (!isMap(retire)) return no('VALUE_MALFORMED', 'retire is {"register":"<list>","fields":["<field>",...]}.', { at: 'body.to.retire' });
+  const extra = Object.keys(to).find((k) => k !== 'retire') ?? Object.keys(retire).find((k) => !RETIRE_KEYS.includes(k));
+  if (extra !== undefined)
+    return no('FIELD_UNKNOWN', `A retire takes register and fields, and nothing else, so ${extra} is not one of them. To change a field rather than retire it, propose the whole list.`, {
+      at: `body.to.retire.${extra}`,
+      allowed: RETIRE_KEYS,
+    });
+  const list = listNamed(retire.register, named);
+  if (list === null) return no('REQUIRED_MISSING', 'A retire names the list it retires from, as register, or is filed under "declaration_id":"register.<list>".', { at: 'body.to.retire.register' });
+  const live = liveList(sql, list);
+  if (!live) return no('REGISTER_UNKNOWN', `There is no list called ${list} to retire a field from.`, { at: 'body.to.retire.register' });
+
+  const retiring = retire.fields;
+  if (!Array.isArray(retiring) || !retiring.every((f) => typeof f === 'string'))
+    return no('VALUE_MALFORMED', 'fields is a list of field ids, ["<field>",...].', { at: 'body.to.retire.fields' });
+  if (retiring.length === 0) return no('REQUIRED_MISSING', 'A retire names at least one field.', { at: 'body.to.retire.fields' });
+
+  const name = typeof live.body.name === 'string' ? live.body.name : list;
+  const fields = (Array.isArray(live.body.fields) ? live.body.fields : []).map((f) => (isMap(f) ? { ...f } : f)) as Record<string, unknown>[];
+  /* ONCE EACH, because the mark below lands on this copy: a field named twice read its own mark on the second pass and
+     was refused as "already retired" while the live list held it as live as ever. */
+  const going = new Set(retiring as string[]);
+  for (const id of going) {
+    const held = fields.find((f) => f.id === id);
+    if (!held) return no('FIELD_UNKNOWN', `${name} has no field called ${id}.`, { at: 'body.to.retire.fields' });
+    /* REFUSED BY NAME, NOT PASSED AS A NO-OP. Two retires of one field filed from one reading both look fine on their
+       own; the second, accepted, would install a version identical to the first and say it retired something. */
+    if (held.retired === true) return no('VALUE_MALFORMED', `${id} is already retired on ${name}.`, { at: 'body.to.retire.fields' });
+    /* AND NOT A FIELD THE LIST ITSELF IS READ BY. Measured before this line: a retire of Projects' title field `name` was
+       filed, accepted and installed at version 3, and the next `create` with a name was refused `FIELD_UNKNOWN`, so the
+       list could take no row with a title again. The install's lint lets a whole body do the same; one press on a row's
+       label should not be the way to reach it. The state and the finished day are read by name the same way. */
+    const role = LIST_ROLES.find((k) => live.body[k] === id);
+    if (role !== undefined)
+      return no('OUT_OF_BOUNDS', `${id} is the ${ROLE_SAID[role]} of ${name}, so it cannot be retired. Propose the whole list to name another first.`, {
+        at: 'body.to.retire.fields',
+      });
+    /* NOR ONE A MOVE REQUIRES. Measured before this line: `note` retired from a list whose move out of `open` requires
+       it, and a row in `open` could never leave. The move without it was refused `REQUIRED_MISSING` and with it
+       `FIELD_UNKNOWN`, since the write path asks `requires` of the declaration and passes over no retired field there. */
+    const move = movesNeeding(fields, id, going);
+    if (move !== null)
+      return no('OUT_OF_BOUNDS', `${id} is what ${move.field} needs filled to leave ${move.from} on ${name}, so it cannot be retired. Propose the whole list to change that move first.`, {
+        at: 'body.to.retire.fields',
+      });
+    held.retired = true;
+  }
+  return ok({ to: { id: `register.${list}`, kind: 'register', body: { ...live.body, fields } }, version: live.version });
 }
 
 const ADD_KEYS = ['register', 'fields', 'values'];
@@ -670,16 +791,12 @@ function addTo(sql: Sql, to: { add: unknown }, named: unknown): Result<{ to: Rec
   /* THE LIST IS THE ONE THE CHANGE IS FILED UNDER unless it says otherwise, so the example agents are taught in every
      turn does not spend tokens saying it twice (`mcp/src/index.ts`, measured against the 2,600 ceiling). A `register`
      that disagrees with `declaration_id` is still refused, by `namesFault`, for the reason it gives. */
-  const said = add.register ?? (typeof named === 'string' && named.startsWith('register.') ? named : undefined);
-  if (typeof said !== 'string') return no('REQUIRED_MISSING', 'An addition names the list it adds to, as register, or is filed under "declaration_id":"register.<list>".', { at: 'body.to.add.register' });
-  const list = said.startsWith('register.') ? said.slice('register.'.length) : said;
+  const list = listNamed(add.register, named);
+  if (list === null) return no('REQUIRED_MISSING', 'An addition names the list it adds to, as register, or is filed under "declaration_id":"register.<list>".', { at: 'body.to.add.register' });
   const id = `register.${list}`;
-  const live = sql.one<{ version: number; body: string }>(
-    "SELECT version, body FROM declaration WHERE id = ? AND kind = 'register' AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1",
-    id,
-  );
-  const was = live ? parse(live.body) : null;
-  if (!live || !was) return no('REGISTER_UNKNOWN', `There is no list called ${list} to add to. To make one, propose it whole.`, { at: 'body.to.add.register' });
+  const live = liveList(sql, list);
+  if (!live) return no('REGISTER_UNKNOWN', `There is no list called ${list} to add to. To make one, propose it whole.`, { at: 'body.to.add.register' });
+  const was = live.body;
 
   const fields = (Array.isArray(was.fields) ? was.fields : []).map((f) => (isMap(f) ? { ...f } : f)) as Record<string, unknown>[];
   const adding = add.fields ?? [];
@@ -745,6 +862,9 @@ const HELD_AS: Record<(typeof HELD_KEYS)[number], string> = {
  * the install's lint is the one that decides what `required: "yes"` means, and it should do so with the owner watching.
  */
 export function additiveFault(body: Record<string, unknown> | null): string | null {
+  /* A RETIRE IS SAID AS ONE. It fell to the line below and was told "a whole list is proposed", which is not what was
+     filed, and the owner reading why his question waited would look for a list that is not there. */
+  if (body && isRetire(body.to)) return 'It retires a field, and taking anything away waits for the owner.';
   if (!body || !isAdd(body.to)) return 'Only an addition lands by rule. A whole list is proposed, and waits for the owner.';
   const add = body.to.add;
   if (!isMap(add)) return 'The addition cannot be read.';
@@ -1465,7 +1585,7 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
         /* A WHOLE BODY IS HELD TO THE VERSION IT WAS FILED AGAINST. A change filed before the stamp existed carries none,
            and is installed as it always was rather than refused for a number nobody wrote. */
         const from = resolved.value.version ?? body.from_version;
-        const named = String(isAdd(body.to) ? install.id : body.declaration_id);
+        const named = String(fieldLevel(body.to) ? install.id : body.declaration_id);
         if (typeof from === 'number') expect = { id: named, version: from };
         /* A BUNDLE IS HELD MEMBER BY MEMBER, and every member but the named one is asked HERE, at the press. `install`
            takes one `expect`, so handed only that, the rest of the bundle installed over whatever had moved them
