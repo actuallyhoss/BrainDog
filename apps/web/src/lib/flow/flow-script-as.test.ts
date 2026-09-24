@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 
 import { validateDeclaration } from '@braindog/kernel';
 
-import { ARGS, draftOf, faultsOf, sayStep, type Arg } from './flow.ts';
+import { ARGS, blankStep, draftOf, faultsOf, sayStep, type Arg } from './flow.ts';
 
 const scriptAs = (): Arg | undefined => ARGS.script.find((a) => a.path.join('.') === 'script.as');
 
@@ -23,13 +23,11 @@ test('a script step says it keeps the id of its queued run, not an answer', () =
   assert.equal(sayStep({ script: { id: 'tidy' } }), 'Run the script tidy');
 });
 
-test('the inspector names the field and its absence in the same terms, with no answer in either', () => {
+test('the inspector names the field as the id of the queued run, with no answer in it', () => {
   const as = scriptAs();
   assert.ok(as);
   assert.equal(as.label, 'Keep the queued run id as');
   assert.doesNotMatch(as.label, /answer/u);
-  assert.ok(as.required);
-  assert.doesNotMatch(as.missing, /answer/u);
 });
 
 /* THE OTHER SENTENCE THE SAME FIELD CAN SAY. The label and the missing-value line were corrected and the bad-name line
@@ -44,24 +42,24 @@ test('a bad name on a script step is refused as the id of its queued run, not as
   assert.ok(faultsOf(draftOf('one', asked)).some((f) => /^Job is not a name an answer can have\./u.test(f.say)));
 });
 
-/* THE FIELD STAYS REQUIRED BECAUSE THE RECORD STILL REQUIRES IT. The task that opened this file asked for it to be made
-   optional, since the runner writes `vars[as]` only when `as` is a string. Measured on 24 September before touching
-   anything: `validateDeclaration` refuses `{ script: { id: 'tidy' } }` with "steps[0].script.as is undefined, and an
-   answer's name is lower-case letters, digits and underscores" (`flow-lint.ts`, `named(spec.as, ...)` with no
-   `undefined` escape, where `call` has one). An optional box on the canvas would let a person press Send on a step the
-   record then refuses on Decide, in a sentence about an answer. This pair holds the canvas to the lint, both ways: when
-   the lint lets the step through, this fails, and the field can be made optional in the same change. */
-test('a script step with no name is faulted on the canvas exactly while the record refuses it', () => {
+/* THE CANVAS AND THE LINT BOTH TAKE A SCRIPT STEP WITH NO NAME, and a new step starts without one. Until 24 September
+   the lint refused `{ script: { id: 'tidy' } }` ("steps[0].script.as is undefined, and an answer's name is ...") though
+   the runner writes `vars[as]` only when `as` is a string, so this test used to pin the canvas to that refusal. The lint
+   now escapes `undefined` as `call` does (`packages/kernel/test/flow-lint-script-as.test.ts` runs such a step), and
+   this held red on the canvas's own `required` and on `blankStep` seeding `as: ''` until both were dropped. A seeded ''
+   matters on its own: the inspector drops an emptied optional box, but a step never opened keeps what it was born with,
+   and the lint refuses ''. */
+test('a script step with no name is accepted by the record and by the canvas, and a new one starts without one', () => {
   const body = { rule: 'one', on: { manual: true }, steps: [{ script: { id: 'tidy' } }] };
-  const refused = validateDeclaration({ id: 'rule.one', kind: 'rule', body } as never);
-  assert.equal(refused?.code, 'DECLARATION_INVALID');
-  const as = scriptAs();
-  assert.ok(as?.required);
-  assert.deepEqual(
-    faultsOf(draftOf('one', body)).map((f) => f.say),
-    [as.missing],
-  );
+  assert.equal(validateDeclaration({ id: 'rule.one', kind: 'rule', body } as never), null);
+  assert.equal(scriptAs()?.required, undefined);
+  assert.deepEqual(faultsOf(draftOf('one', body)), []);
   const named = { ...body, steps: [{ script: { id: 'tidy', as: 'job' } }] };
   assert.equal(validateDeclaration({ id: 'rule.one', kind: 'rule', body: named } as never), null);
   assert.deepEqual(faultsOf(draftOf('one', named)), []);
+
+  const fresh = blankStep('script');
+  assert.deepEqual(fresh, { script: { id: '' } });
+  const filled = { ...body, steps: [{ script: { ...(fresh.script as object), id: 'tidy' } }] };
+  assert.equal(validateDeclaration({ id: 'rule.one', kind: 'rule', body: filled } as never), null, 'a new step with its script chosen installs');
 });

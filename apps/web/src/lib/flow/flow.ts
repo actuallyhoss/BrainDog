@@ -679,7 +679,9 @@ export function blankStep(verb: Verb): Step {
     case 'call':
       return { call: { ingest: '' } };
     case 'script':
-      return { script: { id: '', as: '' } };
+      /* NO `as: ''`. The inspector leaves an emptied optional box out, but a step nobody opened keeps what it was born
+         with, and the lint refuses '' as a name where it takes no `as` at all. */
+      return { script: { id: '' } };
     case 'wait':
       return { wait: '1h' };
     case 'schedule':
@@ -757,18 +759,12 @@ export const ARGS: Record<Verb, readonly Arg[]> = {
   /* A SCRIPT STEP KEEPS NO ANSWER. `startScript` in `packages/kernel/src/flow.ts` queues a `script.run` job and goes on,
      and `as:` holds that job's id; what the script returns never comes back into the run. The field said "Keep the
      answer as" and its absence said `NAME_IT`, so a person named a value no step would ever see.
-     STILL REQUIRED, THOUGH THE RUNNER DOES NOT NEED IT: the lint (`flow-lint.ts`, the `script` case) refuses a step with
-     no `as`, measured on 24 September, and an optional box here would pass a step the record then refuses on Decide.
-     `flow-script-as.test.ts` fails the day the lint lets it through, which is the day this can drop `required`. */
+     OPTIONAL, AS `call.as` IS. It was required here only because the lint (`flow-lint.ts`, the `script` case) refused a
+     step with none until 24 September, though the runner never needed it; the lint and this dropped it together, and
+     `flow-script-as.test.ts` holds the two in step. */
   script: [
     { path: ['script', 'id'], label: 'The script', kind: 'text', required: true, missing: 'Say which script to run.' },
-    {
-      path: ['script', 'as'],
-      label: 'Keep the queued run id as',
-      kind: 'name',
-      required: true,
-      missing: 'Name the id of the queued run. The record asks for a name here even when no later step reads it.',
-    },
+    { path: ['script', 'as'], label: 'Keep the queued run id as', kind: 'name' },
   ],
   wait: [{ path: ['wait'], label: 'For', kind: 'span', required: true, missing: 'Say how long to wait.', hint: '2h' }],
   schedule: [

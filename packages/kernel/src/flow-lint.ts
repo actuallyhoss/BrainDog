@@ -1246,7 +1246,10 @@ function stepFault(
         return bad('DECLARATION_INVALID', `${id}'s ${at}.script names the id of a script.`, `${at}.script.id`);
       if (spec.input !== undefined && (!isObject(spec.input) || Object.values(spec.input).some((v) => typeof v !== 'string')))
         return bad('DECLARATION_INVALID', `${id}'s ${at}.script.input is a map of names to text.`, `${at}.script.input`);
-      return named(spec.as, `${at}.script.as`);
+      /* `as:` IS OPTIONAL, AS `call`'S IS. It holds the id of the queued job, `startScript` writes it only when it is a
+         string, and until 24 September this refused a step with none, so the canvas had to require a name the run never
+         needed (`flow-lint-script-as.test.ts`). An `as` that is present is still held to the name rules. */
+      return spec.as === undefined ? null : named(spec.as, `${at}.script.as`);
     }
     case 'call': {
       if (!isObject(spec)) return bad('DECLARATION_INVALID', `${id}'s ${at}.call is { ingest, as }.`, `${at}.call`);

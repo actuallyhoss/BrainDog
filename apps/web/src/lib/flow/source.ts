@@ -30,7 +30,7 @@ import { fillTemplate } from '@braindog/kernel';
 import { since } from 'braindog-render';
 
 import { copy } from '../copy.ts';
-import { ROWS } from '../record/data.ts';
+import { NOW, ROWS } from '../record/data.ts';
 import { compile, matches } from '../record/where.ts';
 import { pathOf, sayStep, sayTrigger, triggerKind, triggerOfBody, words, type Body } from './flow.ts';
 
@@ -482,7 +482,7 @@ export function sample(at: () => number = () => Date.now()): Source {
       }
       return { ok: true, value: { id: null } };
     },
-    dryRun: async (body) => triedOnSample(body, at()),
+    dryRun: async (body) => triedOnSample(body),
   };
 }
 
@@ -523,8 +523,15 @@ function saidOnSample(body: Body): Pick<Tried, 'path' | 'trigger' | 'steps'> {
  * WHAT IT LEAVES OUT: the kernel also ranks the candidate among the list's other rules and counts the rows an earlier
  * rule took or a `once_per` key already spent. The sample installs no rules of its own, so every match is the
  * candidate's and `reason` is always `null`.
+ *
+ * AT THE MIRROR'S CLOCK, `NOW`, AND NEVER THE SAMPLE'S `at`. `compile` puts the two ends of a range of days in order at
+ * `NOW` (its `between` branch in `record/where.ts`), and the rows walked here are the mirror's, dated around `NOW`. This
+ * walked them at `at()`, the wall clock unless a caller said otherwise, so `due between today and 2026-09-20` was
+ * ordered from 3 September and matched from whatever day it was: on the 24th it answered 0 of the four obligations the
+ * mirror holds in that range (`source-clock.test.ts`). `at` still dates the sample's own runs; it has no say here.
  */
-function triedOnSample(body: Body, now: number): Answer<Tried> {
+function triedOnSample(body: Body): Answer<Tried> {
+  const now = NOW;
   const said = saidOnSample(body);
   if (said.path === 'run') return { ok: true, value: { ...said, matches: null, rows: null, sample: [] } };
   const register = subjectOfBody(body);
