@@ -3,12 +3,20 @@
  * (`loop/research-m3-dynamic.md` §3, B1).
  *
  * A HEAD IN THE FILL AND NOT A NEW VERB. A `read_metric: { id, as }` step would put every figure into a variable before
- * it could be used, so an `if` on a threshold or a `notify` that says the total would each cost a step, and the run's
- * sixty-four names would fill with copies of numbers the record already answers. Every text a run fills already goes
- * through one pattern (`flow.ts`'s `fill`, `rules.ts`'s `filling`), so a third head beside `vars` and `trigger` reaches
- * the condition, the note, the question and the create at once. Measured before it, on 24 September: the survey's
- * `read_metric` step was refused "names no step", and `{{metric.total}}` in a `set_var` installed, ran `done` and wrote
- * the braces into the row, which is the one failure in that survey nobody was told about.
+ * it could be used, so a `notify` that says the total would cost a step, and the run's sixty-four names would fill with
+ * copies of numbers the record already answers. Every text a run fills already goes through one pattern (`flow.ts`'s
+ * `fill`, `rules.ts`'s `filling`), so a third head beside `vars` and `trigger` reaches the note, the question, the
+ * create's fields, a `set_var` and an `if` at once. Measured before it, on 24 September: the survey's `read_metric`
+ * step was refused "names no step", and `{{metric.total}}` in a `set_var` installed, ran `done` and wrote the braces
+ * into the row, which is the one failure in that survey nobody was told about.
+ *
+ * AN `if` CAN ASK WHETHER A VALUE EQUALS A FIGURE, AND NOT WHETHER IT IS PAST ONE. The figure is filled in as text
+ * before the condition is read, and the condition is a list's filter sentence, which has `is` and `is not` for a
+ * number and no ordering. Measured on 24 September over a figure summing `n`: `n is {{metric.total}}` and
+ * `n is not {{metric.total}}` ran `done` and took the right arm; `n lt {{metric.total}}` failed the run with "lt is
+ * not something a filter can say", `n is more than {{metric.total}}` with "more than 5 is not a value n can hold", and
+ * `n after {{metric.total}}` with "after is about dates". A threshold on a figure is the trigger's
+ * `metric: { id, crosses }`, which fires when the figure crosses it; a step cannot say it until the filter can.
  *
  * THIS FILE HOLDS THE SPELLING AND THE LINT, AND IMPORTS NO VALUE. `flow-lint.ts` imports only light modules so that
  * `declare.ts`, which imports it, is not pulled into a cycle; the reading itself is `rules.ts`'s `figureText`, which
@@ -30,6 +38,12 @@ export const FIGURE = /\{\{\s*(metric)\.([A-Za-z0-9_-]+)\s*\}\}/g;
 
 /** Every spelling that looks like a figure, the colon and a bad id included, so that the lint can say which it is. */
 const LOOSE = /\{\{\s*metric\s*([.:])\s*([^{}]*?)\s*\}\}/g;
+
+/**
+ * One figure spelled exactly as `FIGURE` fills it. `LOOSE` lets space round the mark so that it can name the spelling,
+ * and `{{ metric . total }}` then passed the id check and installed, and the run wrote it into the row as typed.
+ */
+const EXACT = new RegExp(`^${FIGURE.source}$`);
 
 /** `declare.ts`'s `METRIC_ID`: a figure's id as it is installed. */
 const METRIC_ID = /^[a-z][a-z0-9_-]{0,31}$/;
@@ -66,6 +80,8 @@ export function figureFault(id: string, body: Record<string, unknown>, path: 'in
           found = bad('DECLARATION_INVALID', `${id} reads ${spelled} at ${where}, and a figure is read as {{metric.${name}}}, with a dot. With a colon it names a field of the row, which is written as a dash.`, where);
         else if (!METRIC_ID.test(name))
           found = bad('DECLARATION_INVALID', `${id} reads ${spelled} at ${where}, and a figure is named by its id: lower-case letters, digits, _ and -.`, where);
+        else if (!EXACT.test(spelled))
+          found = bad('DECLARATION_INVALID', `${id} reads ${spelled} at ${where}, and a figure is read as {{metric.${name}}}, with no space around the dot.`, where);
         else if (path === 'inline')
           found = bad(
             'NOT_IN_THIS_BUILD',

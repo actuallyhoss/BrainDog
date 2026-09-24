@@ -26,6 +26,7 @@ import type { Refusal } from '@braindog/ports';
 
 import type { Known } from './declare.ts';
 import { nextOccurrence } from './digest.ts';
+import { figureFault } from './figure.ts';
 import { FLOOR_MS, intervalMs } from './pull.ts';
 import type { FlowDecl } from './rules.ts';
 
@@ -665,7 +666,12 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
         return bad('NOT_IN_THIS_BUILD', `${id} runs inside the write, and the inline pass does not read ${key}: yet. Give it a trigger other than a plain write, or drop ${key}:.`, key);
     if (body.enabled === false)
       return bad('NOT_IN_THIS_BUILD', `${id} runs inside the write, and the inline pass does not read enabled: yet. Retire the rule to stop it.`, 'enabled');
-    return inlineFault(id, decl, installed);
+    /* THE FIGURE LINT IS ASKED HERE AND NOT INSIDE `inlineFault`, so that it runs at install and nowhere else.
+       `rules.ts` also asks `inlineFault` of each item the inline pass acts, and skips the item on NOT_IN_THIS_BUILD,
+       so putting it there would change what the pass does to a body stored before this lint, which is a separate
+       decision. Before this line the inline rule installed and wrote `{{metric.total}}` into the row as typed, since
+       the inline pass fills no figure. */
+    return inlineFault(id, decl, installed) ?? figureFault(id, body, 'inline', installed);
   }
 
   /* A RUN KEEPS ITS REGISTER IN ITS TRIGGER. A top-level `register` is what the inline pass selects by, so a clock rule
@@ -879,7 +885,10 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
     }
     return null;
   };
-  return choice(body.steps ?? body.then, body.steps !== undefined ? 'steps' : 'then') ?? fillFault(id, decl, installed);
+  /* A FIGURE IS NAMED AT INSTALL, as a trigger's `metric.id` is. Measured on 24 September before this was asked:
+     `{{metric.nope}}` installed and wrote `x —`, and `{{metric:total}}` wrote the same dash, into a row nobody would
+     trace back to the rule. */
+  return choice(body.steps ?? body.then, body.steps !== undefined ? 'steps' : 'then') ?? fillFault(id, decl, installed) ?? figureFault(id, body, 'run', installed);
 }
 
 /**

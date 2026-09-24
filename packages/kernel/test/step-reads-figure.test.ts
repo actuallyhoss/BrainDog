@@ -193,14 +193,55 @@ test('THE LINT REFUSES A FIGURE NO INSTALLED METRIC IS, the colon spelling, and 
   assert.equal(figureFault('rule.a', { on: onItems, steps: [{ set: { field: 'note', to: '{{metric.nope}}' } }] }, 'run'), null, 'with nothing installed to read, only the spelling is checked');
 });
 
-test(
-  'INSTALL REFUSES A RULE NAMING {{metric.nope}} rather than writing the braces',
-  {
-    todo:
-      "`figureFault` is asked by `flow-lint.ts`'s `flowFault`, which this change does not own: after `inlineFault` on the inline branch and after `fillFault` on the run's. Not inside `inlineFault`, which `rules.ts` asks of every step a run acts and would refuse each figure there.",
-  },
-  () => {
-    const said = validateDeclaration(rule({ rule: 'a', on: onItems, steps: [{ set: { field: 'note', to: 'x {{metric.nope}}' } }] }), known);
-    assert.equal(said?.code, 'DECLARATION_UNKNOWN');
-  },
-);
+/* WHAT THE THREE BELOW MEASURED BEFORE `flowFault` ASKED THE LINT, on 24 September: all three were `null` and the
+   record took each rule. `{{metric.nope}}` then wrote `x —` into the row, the colon wrote the dash as well, and the
+   inline rule wrote `x {{metric.total}}` as typed, since the inline pass fills no figure. */
+
+test('INSTALL REFUSES A RULE NAMING {{metric.nope}} rather than writing the braces', async () => {
+  const body = { rule: 'a', on: onItems, steps: [{ set: { field: 'note', to: 'x {{metric.nope}}' } }] };
+  const said = validateDeclaration(rule(body), known);
+  assert.equal(said?.code, 'DECLARATION_UNKNOWN');
+  assert.equal(said?.at, 'steps[0].set.to');
+  assert.deepEqual(said?.allowed, ['cash-now', 'total']);
+
+  /* THROUGH THE RECORD AS WELL AS THE FUNCTION, since install is what hands the lint the figures it knows. */
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  assert.ok((await k.install([ITEMS, SPENT, KEYS, TOTAL, CASH, HELD])).ok);
+  const refused = await k.install([rule(body)]);
+  assert.equal(refused.ok, false, 'a rule naming a figure the record does not hold is not installed');
+  assert.match(why(refused), /DECLARATION_UNKNOWN: rule\.a reads \{\{metric\.nope\}\}/);
+});
+
+test('INSTALL REFUSES THE COLON SPELLING on a run and ANY FIGURE on the inline path', () => {
+  const colon = validateDeclaration(rule({ rule: 'a', on: onItems, once_per: ['entry'], steps: [{ notify: { say: 'x {{metric:total}}' } }] }), known);
+  assert.equal(colon?.code, 'DECLARATION_INVALID');
+  assert.equal(colon?.at, 'steps[0].notify.say');
+
+  /* A SPACE AROUND THE DOT IS A SPELLING THE FILL DOES NOT READ. The lint took `{{ metric . total }}` as `total` and
+     let it install, and the run wrote `x {{ metric . total }}` into the row as typed: measured by the checker on 24
+     September. */
+  const spaced = validateDeclaration(rule({ rule: 'a', on: onItems, steps: [{ set: { field: 'note', to: 'x {{ metric . total }}' } }] }), known);
+  assert.equal(spaced?.code, 'DECLARATION_INVALID');
+  assert.equal(spaced?.at, 'steps[0].set.to');
+
+  const inline = validateDeclaration(rule({ rule: 'a', register: 'items', then: [{ set: { field: 'note', to: 'x {{metric.total}}' } }] }), known);
+  assert.equal(inline?.code, 'NOT_IN_THIS_BUILD');
+  assert.equal(inline?.at, 'then[0].set.to');
+});
+
+test('A FIGURE THE RECORD HOLDS STILL INSTALLS, in a step, in a nested arm and in a condition', () => {
+  const said = validateDeclaration(
+    rule({
+      rule: 'a',
+      once_per: ['entry'],
+      on: onItems,
+      steps: [
+        { set: { field: 'note', to: '{{metric.cash-now}} {{ metric.total }}' } },
+        { if: 'n is {{metric.total}}', then: [{ notify: { say: 'all {{metric.total}}' } }] },
+      ],
+    }),
+    known,
+  );
+  assert.equal(said, null, JSON.stringify(said));
+});
