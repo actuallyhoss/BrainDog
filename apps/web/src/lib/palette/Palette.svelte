@@ -65,7 +65,7 @@
   import Icon from '../ui/Icon.svelte';
   import type { IconName } from '../ui/Icon.svelte';
   import { commands, type Act, type Creation } from './admit.ts';
-  import { addable, addRow, creation, words as createWords } from './create.ts';
+  import { addRow, creation, offered, words as createWords } from './create.ts';
   import { savedViews } from '../record/views.ts';
   import { listsOf, type List, type Recent } from '../record/palette.ts';
   import type { Hits, Reader } from '../record/palette-live.ts';
@@ -123,7 +123,18 @@
    * does not carry, the record's search, the rows changed last and the figures, is asked of the record through
    * `record/palette-live.ts`, loaded the first time a live palette needs it. The sample's palette never loads it.
    */
-  const shell = $derived(page.data as { live?: boolean; now?: number; index?: { registers?: List[] }; questions?: { id: string; title: string }[]; spark?: boolean });
+  const shell = $derived(
+    page.data as {
+      live?: boolean;
+      now?: number;
+      index?: { registers?: List[] };
+      /* EVERY LIST, THE EMPTY ONES TOO, and who is asking: what the add row is offered on, and to whom (`create.ts`). */
+      lists?: { id: string; name: string }[];
+      me?: { level: string; lists: string[] | null };
+      questions?: { id: string; title: string }[];
+      spark?: boolean;
+    },
+  );
   const isLive = $derived(shell.live === true);
   /** Whether a model is behind Spark on this host, which the shell asked `/api/version` once. The sample's is never `true`. */
   const sparkHere = $derived(isLive && shell.spark === true);
@@ -218,6 +229,9 @@
   }
   const lists = $derived(listsOf(isLive, shell.index?.registers ?? []));
   const listNamed = $derived(new Map(lists.map((l) => [l.id, l])));
+  /* NOT THE RAIL'S LISTS, which leave out an empty one, and none at all for a caller the record would refuse the press. */
+  const addLists = $derived(offered(shell));
+  const addNamed = $derived(new Map(addLists.map((l) => [l.id, l.name])));
 
   let reading: Promise<Reader> | null = null;
   const reader = (): Promise<Reader> =>
@@ -354,9 +368,9 @@
    */
   const live = $derived({
     undoable: toasts.items.some((t) => t.undo !== undefined),
-    /* THE ROW THE QUERY WOULD ADD, in the modes that draw commands. Only a list this build can title a row in is
-       offered, which is `addable`; any other name leaves the sentence as a query like any other. */
-    creation: parsed.prefix === null || parsed.prefix === '>' ? creation(parsed.text, addable(lists)) : null,
+    /* THE ROW THE QUERY WOULD ADD, in the modes that draw commands. Only a list this build can title a row in, and this
+       caller may add to, is offered, which is `offered`; any other name leaves the sentence as a query like any other. */
+    creation: parsed.prefix === null || parsed.prefix === '>' ? creation(parsed.text, addLists) : null,
   });
 
   /** Whether this query is one the record's search answers: `#`, `@` or no prefix, and two characters or more. */
@@ -497,7 +511,7 @@
       const adding = every.find((c) => c.act === 'add');
       if (adding && live.creation) {
         const made = live.creation;
-        const list = listNamed.get(made.register)?.name ?? REGISTERS[made.register]?.name ?? made.register;
+        const list = addNamed.get(made.register) ?? REGISTERS[made.register]?.name ?? made.register;
         out.push({ id: adding.id, title: createWords.row(list, made.title), href: null, group: createWords.group, icon: adding.icon, act: adding.act, creation: made });
       }
       const exact = admitted.filter((c) => starts(c.title) && c.title.toLowerCase().startsWith(needle));
@@ -920,12 +934,12 @@
    * THE ADD ROW, PRESSED: one row in the list the sentence named, and a receipt that can put it back.
    *
    * THE SAMPLE SAYS NOTHING WAS SAVED, as every other write on it does, in the same `notWritten` sentence. On a live
-   * record `addRow` writes the list's own capture line with nothing pinned, so what it filled in for the reader is said
+   * record `addRow` writes the list's own capture line with nothing pinned and no amount, so what it filled in is said
    * the way the list says it, and the receipt's Put back archives the row at the version the write answered. The shell
    * is read again after each, so the rail's count follows the row in and out.
    */
   async function add(c: Creation) {
-    const list = listNamed.get(c.register)?.name ?? REGISTERS[c.register]?.name ?? c.register;
+    const list = addNamed.get(c.register) ?? REGISTERS[c.register]?.name ?? c.register;
     if (!isLive) return void toasts.push(copy.notWritten(createWords.would(list, c.title)), { intent: 'warn' });
     let out: Awaited<ReturnType<typeof addRow>>;
     try {

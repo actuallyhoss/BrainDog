@@ -12,6 +12,11 @@
  * would have written. Writing only the title was the obvious shape, and the record refuses it on any list that
  * requires more than a title, which is most of them.
  *
+ * LESS EVERY AMOUNT. The sentence has nowhere to type one, and the line's emptiest amount reads its currency off the rows
+ * it is handed, which here were none, so it fell back to the SAMPLE's: audit sixty-six (probe c3) pressed "Add to Money
+ * owed: rent" on a record imported in USD and wrote GBP 0.00, and "Owed by you, 30 days" went from USD 45.00 to no value,
+ * two parts in two currencies. A list that requires an amount is refused by the record, which names the field.
+ *
  * `rows-write.ts` IS LOADED ON THE PRESS, NOT WITH THE PALETTE. The client carries the route table as a value, and the
  * palette is in the layout, so a static import would put it in the chunk every screen waits for. This file's own
  * imports are the fixture declarations the palette already loads, and types.
@@ -20,8 +25,8 @@
 import { REGISTERS } from '../record/api.ts';
 import type { List } from '../record/palette.ts';
 import type { Fetch } from '../record/row-live.ts';
-import type { Wrote } from '../record/rows-write.ts';
-import type { Entry } from '../record/schema.ts';
+import type { Captured, Wrote } from '../record/rows-write.ts';
+import type { Entry, Fields } from '../record/schema.ts';
 import type { Creation } from './admit.ts';
 
 /** Kept here rather than in `copy.ts`, which no builder in this wave owns. */
@@ -74,6 +79,49 @@ export function addable<T extends Pick<List, 'id'>>(lists: readonly T[]): T[] {
   return lists.filter((l) => Boolean(REGISTERS[l.id]?.title));
 }
 
+/** The rungs `create`'s `guard(ctx, 'append', ...)` lets through: `append` itself, and every rung above it. */
+const ADDS: ReadonlySet<string> = new Set(['append', 'write', 'decide', 'owner']);
+
+/** What the shell says about the lists and the caller, and only that. */
+export type Offer<T> = { lists?: readonly T[]; me?: { level: string; lists: readonly string[] | null } };
+
+/**
+ * The lists the add row may name for this caller.
+ *
+ * EVERY LIST, THE EMPTY ONES TOO. The palette read the rail's lists, and the rail drops a list with no rows, so "Add to
+ * Tasks: buy milk" on an empty Tasks drew nothing (audit sixty-six, probe c1), which is the one moment the row helps
+ * most. `shell.lists` is the one the shell keeps for putting something into a list.
+ *
+ * AND ONLY TO A CALLER WHO MAY ADD. The same probe drew the row for a `read` member, and `create` then refused the press:
+ * a row that cannot run is absent (`admit.ts`), not drawn to fail. A colleague held to named lists arrives with the
+ * shell's `read` as a fallback and the lists in `me.lists`, and is offered those: `boot` does not say the level they
+ * hold on each one, and taking the row from a bookkeeper given `write` on the one list they were asked to fill would be
+ * the fallback deciding again what the record never said. Nobody in the shell, a refused `boot`, is offered nothing.
+ */
+export function offered<T extends Pick<List, 'id'>>(shell: Offer<T>): T[] {
+  const { me, lists = [] } = shell;
+  if (!me) return [];
+  const held = me.lists;
+  return addable(held !== null ? lists.filter((l) => held.includes(l.id)) : ADDS.has(me.level) ? lists : []);
+}
+
+/**
+ * The fields a press writes, and what it says it filled in: the list's own capture line, less every money field.
+ *
+ * THE LINE SAYS ITS FILLS IN THE ORDER THE DECLARATION HOLDS THEM, and with no filter every field after the title is one
+ * it filled, so the two walk together and an amount leaves both the write and the receipt.
+ */
+export async function addedFields(register: string, said: string, now: number): Promise<Captured> {
+  const { capturedFields } = await import('../record/rows-write.ts');
+  const line = capturedFields(register, said, [], now);
+  const decl = REGISTERS[register];
+  if (!decl) return line;
+  const wrote = decl.fields.filter((f) => f.id !== decl.title && Object.hasOwn(line.fields, f.id));
+  const fields: Fields = {};
+  for (const [id, value] of Object.entries(line.fields)) if (decl.fields.find((f) => f.id === id)?.type !== 'money') fields[id] = value;
+  return { fields, filled: line.filled.filter((_, i) => wrote[i]?.type !== 'money') };
+}
+
 /** What a press answered: the row, what was filled in for the reader, and its way back; or the record's sentence. */
 export type Added = { ok: true; entry: Entry; filled: readonly string[]; back: () => Promise<Wrote> } | { ok: false; fix: string };
 
@@ -85,8 +133,8 @@ export type Added = { ok: true; entry: Entry; filled: readonly string[]; back: (
  * function rather than run here, because it is the toast's to offer and the reader's to press.
  */
 export async function addRow(c: Creation, now: number, base: string, io?: Fetch): Promise<Added> {
-  const { capturedFields, rowWriter } = await import('../record/rows-write.ts');
-  const { fields, filled } = capturedFields(c.register, c.title, [], now);
+  const { rowWriter } = await import('../record/rows-write.ts');
+  const { fields, filled } = await addedFields(c.register, c.title, now);
   const writer = rowWriter(base, io);
   const out = await writer.create(c.register, fields);
   if (!out.ok) return { ok: false, fix: out.fix };
