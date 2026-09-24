@@ -45,6 +45,12 @@
  * doing and never the tool's (`test/money-out.test.ts`). The list measured 2,597 tokens with the
  * tool and 2,520 without it, which leaves 80 of the ceiling free and spends none of them here.
  *
+ * AND THAT LEFT A CLIENT WITH TOOLS ALONE NO FIGURE AT ALL (audit sixty-two finding 2). Probe M1 called each of the
+ * nine reads with its most helpful arguments over a record with a money pack installed and not one answer named a
+ * figure, and the resource list named only the figures a page draws, 18 of that pack's 36. So `record_index` names
+ * the figures the caller may read and `get` reads one by its id, whatever pack declared it, for 16 tokens of the 72
+ * the ceiling had left: 2,528 before, 2,544 after, still fifteen tools.
+ *
  * AND AUTOMATIONS COST IT NOTHING (`loop/research-shell-automations.md` §5). `dry_run` went above because only a person
  * installed a rule; an agent now writes automations, so what one would do came back as `dry_run` on `propose`'s answer
  * for a rule change rather than as a tool, and the definitions, one automation with its runs, and the grammar are
@@ -73,7 +79,7 @@
  * attempt works.
  */
 
-import type { Result } from '@braindog/ports';
+import { codeOf, type Result } from '@braindog/ports';
 
 import { SCRIPT_GRAMMAR } from '../grammars/script.ts';
 import { ANSWERED_GRAMMAR, AUTOMATION_GRAMMAR } from './automations.ts';
@@ -152,6 +158,15 @@ export type McpSurface<C> = {
    * is the owner and no token, and optional for the command line's reason above: its surface is a fixed list.
    */
   inbox?(args: { state?: string }, ctx: C): Answer;
+  /**
+   * The id of every figure the record declares, whatever pack declared it. READ+, and optional because no host answers
+   * it yet: the record's methods name a figure only where a page draws it (`pages`, `page`) or by an id already known
+   * (`metric`). Measured by audit sixty-two's M1 on the money pack as it ships, that is 18 of its 36 figures, and one of
+   * the seven the old money tool read by id among the 18 missing. Until a host answers this, `record_index` and
+   * `resources/list` name the drawn ones, and `get` still reads any figure by its id. Each id is read through `metric`
+   * before it is named, so a host that lists more than the caller may read names nothing more.
+   */
+  figures?(ctx: C): Answer<{ id: string; name?: string }[]>;
 };
 
 /**
@@ -210,7 +225,10 @@ const obj = (properties: Record<string, unknown>, required: string[] = []) => ({
 export const TOOLS: readonly Tool[] = [
   {
     name: 'record_index',
-    description: 'What this record holds: its registers, how many rows in each, and its version. The cheap way to learn register names.',
+    /* AND ITS FIGURES, BECAUSE NOTHING ELSE AN AGENT CALLS NAMES ONE (audit sixty-two finding 2). With the one tool
+       that read figures gone, the probe called all nine reads with their most helpful arguments and not one answer
+       named a figure the record holds; they were resources, and a client that reads no resources had none. */
+    description: 'What this record holds: its registers, how many rows in each, its figures, and its version. The cheap way to learn register names.',
     input: obj({}),
     writes: false,
   },
@@ -234,8 +252,11 @@ export const TOOLS: readonly Tool[] = [
     /* THE GRAMMAR IS SAID ONCE, in the argument that takes it. It was in both, and a client shows a
        model the description and the schema together, so the three forms were read twice for 27
        tokens in every turn of every session. */
-    description: 'One row, by the id a person says out loud.',
-    input: obj({ spoken: str('register#number, a prefixed id such as S42, or a row id from a ref field.') }, ['spoken']),
+    /* AND ONE FIGURE, WHICH PAID FOR ITSELF IN A CLAUSE AND NOT A TOOL. The count is fifteen and a sixteenth cost
+       91 to 117 tokens each time one was measured; this clause, the one in `spoken` and `record_index`'s cost 16, and
+       the list measured 2,528 before and 2,544 after. A figure's id is a bare lowercase name, which no row form is. */
+    description: 'One row or figure, by the id a person says out loud.',
+    input: obj({ spoken: str('register#number, a prefixed id such as S42, a row id from a ref field, or a figure from record_index.') }, ['spoken']),
     writes: false,
   },
   {
@@ -420,6 +441,12 @@ const ROW_OR_ID = 'A row is addressed as register#number, like tasks#41, or by i
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 
+/** The pages `boot` lists, when it lists them: a host older than its shell, and a stub, answer none. */
+const pagesIn = (boot: unknown): { slug: string; title: string }[] =>
+  isObject(boot) && Array.isArray(boot.pages)
+    ? boot.pages.filter((p): p is { slug: string; title: string } => isObject(p) && typeof p.slug === 'string' && typeof p.title === 'string')
+    : [];
+
 /** A row as the record answers it, before it is made compact. */
 type Entry = { id: string; register: string; seq: number | null; version: number; state?: string | null; fields: Record<string, unknown> };
 const isEntry = (x: unknown): x is Entry =>
@@ -592,6 +619,11 @@ const split = (uri: string) => {
 /* The argument grammar. `schema/../../x` reaching the method would be refused there too, but by a
    sentence about a register nobody has, which reads like a fact about the record. */
 const NAMED = /^[a-z][a-z0-9_-]{0,63}$/;
+/**
+ * A figure as `get` takes it: a name, and a parameter after the first colon, which is where the record splits it.
+ * The parameter is anything, because one is a project's path (`C:\Repos`) and the record reads it as said.
+ */
+const FIGURE = /^[a-z][a-z0-9_-]{0,63}(?::[\s\S]+)?$/;
 /** A skill's folder name, the grammar the command line writes files under. */
 const SKILL = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
@@ -918,6 +950,56 @@ export function tools<C>(surface: McpSurface<C>) {
     return tried.ok ? { ok: true, value: { script_try: tried.value, proposed: false } } : tried;
   };
 
+  /**
+   * The pages this caller may open, and the figures they draw. `resources/list` offers the first, and the second is
+   * where a figure's id is found while no host answers `figures`.
+   *
+   * A PAGE IS HELD TO THE LEVEL TOO. Its rows are withheld either way, but a slug and a title are information:
+   * "Payroll, monthly" in a listing tells a caller what a register they cannot read is called.
+   */
+  const drawn = async (listed: readonly { slug: string; title: string }[], ctx: C): Promise<{ pages: Resource[]; figures: string[] }> => {
+    const out: Resource[] = [];
+    const seen: string[] = [];
+    for (const page of listed) {
+      if (!NAMED.test(page.slug)) continue;
+      const drew = await surface.page({ slug: page.slug }, ctx);
+      if (!drew.ok) continue;
+      const blocks =
+        (drew.value as { blocks?: { refusals?: { code: string }[]; readings?: { metric: string }[] }[] }).blocks ?? [];
+      if (blocks.length > 0 && blocks.every((b) => (b.refusals ?? []).some((r) => WITHHELD.has(r.code)))) continue;
+      /* The figures a page names, taken from what it drew rather than a second read of its
+         declaration, so a figure offered is one this page really carries. */
+      for (const block of blocks) for (const reading of block.readings ?? []) seen.push(reading.metric);
+      out.push(resource(`page/${page.slug}`, `${page.title}, with every block run: rows and figures, never markup.`));
+    }
+    return { pages: out, figures: seen };
+  };
+
+  /**
+   * The figures this caller may read, by id, each read before it is named.
+   *
+   * THE RECORD'S LIST WHEN THE HOST ANSWERS ONE, AND THE DRAWN ONES WHEN IT DOES NOT. Named only when drawn, a figure no
+   * page shows could be read by nobody who did not already know its id: audit sixty-two's M1 counted 18 of one pack's
+   * 36 so, and nothing a tool answered named any of them.
+   *
+   * AND A FIGURE IS READ BEFORE IT IS NAMED, because a reading survives its own refusal. The kernel keeps the id on a
+   * cell it could not fill, so a figure the record says does not exist arrives in a page with the rest. The record
+   * answers `METRIC_UNKNOWN` for a figure over a register the caller cannot reach, so that a name leaks nothing;
+   * naming the id would hand the name back one layer further out.
+   */
+  const figuresFor = async (ctx: C, drawnIds: () => Promise<string[]>): Promise<string[]> => {
+    const declared = surface.figures ? await surface.figures(ctx) : null;
+    /* HELD TO ITS SHAPE, because over the command line it came off the wire: `apps/cli/test/stdio.test.ts` hands the
+       tools a surface where every method answers `{ rows: [] }`, and `.map` on that throws out of `resources/list`. */
+    const ids =
+      declared?.ok && Array.isArray(declared.value)
+        ? declared.value.flatMap((f: unknown) => (isObject(f) && typeof f.id === 'string' ? [f.id] : []))
+        : await drawnIds();
+    const out: string[] = [];
+    for (const id of new Set(ids)) if (NAMED.test(id) && (await surface.metric({ metric: id }, ctx)).ok) out.push(id);
+    return out;
+  };
+
   const run: Record<string, (args: Args, ctx: C) => Answer> = {
     /**
      * THE REGISTERS AND THE VERSION, AND NOTHING ELSE `boot` CARRIES. `boot` is the app's first screen in one
@@ -929,6 +1011,12 @@ export function tools<C>(surface: McpSurface<C>) {
       const boot = await surface.boot(ctx);
       if (!boot.ok) return boot;
       const version = await surface.version(ctx);
+      /* AND THE FIGURES, BY ID AND NOT WITH THEIR READINGS. Each is read to learn whether this caller may, and the
+         reading is dropped, because `get` of one answers it whole and the answer here is meant to stay small. None is
+         no key, as an empty field goes from `activity`'s lines, so a record with no figures answers what it did.
+         THE PAGES ARE `boot`'S, already in hand and held by the same filter `pages` runs
+         (`packages/record/src/index.ts`, `shellFor`), so the cheap call asks no third method to find them. */
+      const figures = await figuresFor(ctx, async () => (await drawn(pagesIn(boot.value), ctx)).figures);
       const { record } = boot.value as { record?: unknown };
       /* `.version.version`, BECAUSE `version` ANSWERS `33 §4`'s OBJECT and not a bare number. An
          agent holding the object as its cursor would send it back and get a range scan from nothing. */
@@ -937,6 +1025,7 @@ export function tools<C>(surface: McpSurface<C>) {
         value: {
           ...(record === undefined ? {} : { record }),
           registers: boot.value.registers,
+          ...(figures.length === 0 ? {} : { figures }),
           version: version.ok ? version.value.version : null,
         },
       };
@@ -957,7 +1046,21 @@ export function tools<C>(surface: McpSurface<C>) {
       if (at) return surface.get(at, ctx);
       const said = typeof args.spoken === 'string' ? args.spoken.trim() : '';
       /* A ROW ID TOO, because a ref field holds one: `thing: 01M2...` was a value no tool could follow. */
-      return PREFIXED.test(said) || ROW_ID.test(said) ? surface.get({ spoken: said }, ctx) : badSpoken(ROW_OR_ID);
+      if (PREFIXED.test(said) || ROW_ID.test(said)) return surface.get({ spoken: said }, ctx);
+      if (!FIGURE.test(said)) return badSpoken(ROW_OR_ID);
+      /**
+       * A FIGURE IS READ AS `braindog:metric/<id>` READS IT, through the record's `metric`, so its answer is the record's
+       * whole reading and its permission is the record's. Two currencies with no rate between them are one amount each
+       * and `value: null`, which is the kernel's doing and not this line's (`test/figures.test.ts`).
+       *
+       * A FIGURE THE RECORD DOES NOT ANSWER IS AN ID THAT NAMES NOTHING. The record says `METRIC_UNKNOWN` both for a name
+       * nobody declared and for one over a list the caller cannot read, so that a name leaks nothing, and this keeps the
+       * two one answer. It says it about `spoken`, with the row forms, because a bare lowercase word here is as often a
+       * register typed without its number as a figure misspelt, and "there is no metric called tasks" teaches neither.
+       */
+      const figure = await surface.metric({ metric: said }, ctx);
+      if (figure.ok || codeOf(figure) !== 'METRIC_UNKNOWN') return figure;
+      return badSpoken(`${ROW_OR_ID} A figure is named by its id, and record_index lists them; ${said} is not one you can read.`);
     },
 
     list: (args, ctx) =>
@@ -1226,33 +1329,12 @@ export function tools<C>(surface: McpSurface<C>) {
       if (NAMED.test(register.id))
         out.push(resource(`schema/${register.id}`, `What ${register.name} holds: its fields, their types, and what each may take.`));
 
-    /* A PAGE IS HELD TO THE LEVEL TOO. Its rows are withheld either way, but a slug and a title are
-       information: "Payroll, monthly" in a listing tells a caller what a register they cannot read
-       is called. */
-    const seen: string[] = [];
     const pages = await surface.pages(ctx);
-    if (pages.ok)
-      for (const page of pages.value) {
-        if (!NAMED.test(page.slug)) continue;
-        const drawn = await surface.page({ slug: page.slug }, ctx);
-        if (!drawn.ok) continue;
-        const blocks =
-          (drawn.value as { blocks?: { refusals?: { code: string }[]; readings?: { metric: string }[] }[] }).blocks ?? [];
-        if (blocks.length > 0 && blocks.every((b) => (b.refusals ?? []).some((r) => WITHHELD.has(r.code)))) continue;
-        /* The figures a page names, taken from what it drew rather than a second read of its
-           declaration, so a figure offered is one this page really carries. */
-        for (const block of blocks) for (const reading of block.readings ?? []) seen.push(reading.metric);
-        out.push(resource(`page/${page.slug}`, `${page.title}, with every block run: rows and figures, never markup.`));
-      }
-
-    /**
-     * AND A FIGURE IS READ BEFORE IT IS OFFERED, because a reading survives its own refusal. The
-     * kernel keeps the id on a cell it could not fill, so a figure the record says does not exist
-     * arrives here with the rest. The record answers `METRIC_UNKNOWN` for a figure over a register
-     * the caller cannot reach, so that a name leaks nothing; advertising the id would hand the name
-     * back one layer further out.
-     */
-    for (const id of new Set(seen)) await offer(resource(`metric/${id}`, `The figure ${id}, with its target and how it compares.`));
+    const drew = await drawn(pages.ok ? pages.value : [], ctx);
+    out.push(...drew.pages);
+    /* EVERY FIGURE THE CALLER MAY READ, AND NOT ONLY A DRAWN ONE, whenever the host names them (`figuresFor`). */
+    for (const id of await figuresFor(ctx, async () => drew.figures))
+      out.push(resource(`metric/${id}`, `The figure ${id}, with its target and how it compares.`));
 
     /* A SKILL BY NAME, when this caller can read the skills register at all. When to use it is the
        headline, so it is the description. */

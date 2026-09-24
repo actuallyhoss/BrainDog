@@ -92,6 +92,8 @@ export type McpSurface<C> = {
   automations?(args: { rule?: string }, ctx: C): Answer;         // braindog:automations and automation/{id}
   dryRun?(args: { rule: Record<string, unknown>; limit?: number }, ctx: C): Answer;   // a rule change's preview, §4.4
   scriptTry?(args: { body: Record<string, unknown>; input?: unknown }, ctx: C): Answer;   // propose with "try", §4.4
+  inbox?(args: { state?: string }, ctx: C): Answer;              // braindog:inbox and inbox/{state}
+  figures?(ctx: C): Answer<{ id: string; name?: string }[]>;     // every declared figure, §4.4; no host answers it yet
 };
 
 export type Tool = { name: string; description: string; input: Record<string, unknown>; writes: boolean };
@@ -190,6 +192,7 @@ packages/mcp/
     ├── budget.test.ts    tokenBudget (§5.8) over the rendered tools/list, the ceilings of §7, plain ASCII
     ├── activity.test.ts  the activity tool
     ├── money-out.test.ts no money tool, no figure id of one pack in the source, and a pack's figures read as metrics
+    ├── figures.test.ts   a figure named by record_index and read by get, with tools alone, whatever pack declared it
     ├── list-ref.test.ts  list filtered by a ref, every way an agent writes one
     ├── teaching.test.ts  the sentences context adds
     ├── actions.test.ts   braindog:actions
@@ -317,10 +320,10 @@ names pages, and a page appears when its row does.
 
 | Tool | Reaches | Arguments | Writes |
 |---|---|---|---|
-| `record_index` | `boot`, then `version` | none | no |
+| `record_index` | `boot`, then `version`, then `figures` or each page `boot` lists, then `metric` for each figure found | none | no |
 | `context` | `context({})` | none | no |
 | `schema` | `schema({ register })` | `register` | no |
-| `get` | `get({ register, seq })`, or `get({ spoken })` for a prefixed id or a row id | `spoken`: `obligations#41`, a prefixed id such as `S42`, or the row id a ref field holds | no |
+| `get` | `get({ register, seq })`, or `get({ spoken })` for a prefixed id or a row id, or `metric({ metric })` for a figure's id | `spoken`: `obligations#41`, a prefixed id such as `S42`, the row id a ref field holds, or a figure's id | no |
 | `list` | `list({ register, where?, limit?, cursor? })` | the same | no |
 | `search` | `search({ q, limit? })` | the same | no |
 | `history` | `history({ register, seq })` | `spoken`, qualified or prefixed | no |
@@ -356,11 +359,22 @@ still come back as one amount each and no sum, because that was always the kerne
 (`test/money-out.test.ts`). The first rule of the instructions now says to read the Home page for what leads (§4.6).
 The 91 tokens it cost stay paid: the list measured 2,597 with it and 2,520 without.
 
+**AND THAT LEFT A CLIENT WITH TOOLS ALONE NO FIGURE AT ALL** (`loop/research-batch-sixty-two-audit.md` section 2,
+probe M1). Over a record with money-core installed as it ships, the nine reads, each called with its most helpful
+arguments, answered nothing that named a figure, and `resources/list` offered a figure only where a page drew it: 18
+of money-core's 36. So two tools carry figures, generically and with no pack's ids: `record_index` names the figures
+the caller may read, and `get` reads one by its id through `metric`, whatever pack declared it. It cost 16 tokens and
+no tool: the list measured 2,528 before and 2,544 after (`test/figures.test.ts`). **The half not closed yet** is the
+record's: no method lists the figures it declares, so until a host answers the optional `figures` (§3), both lists
+name the drawn figures, and a figure no page draws is read by `get` only by an id the agent already has.
+
 The tool layer holds no checks of its own beyond addressing:
 
-- **Addresses.** `get` takes `register#number`, a prefixed id, or a row id (a 26-character ULID, which is what a ref
-  field holds); `history`, `update` and `log` take `register#number` or a prefixed id. Anything else is
-  `VALUE_MALFORMED` at `spoken`, and the sentence shows the forms that work. A prefixed id or a row id goes to the
+- **Addresses.** `get` takes `register#number`, a prefixed id, a row id (a 26-character ULID, which is what a ref
+  field holds), or a figure's id, a lowercase name with any parameter after its first colon; `history`, `update` and
+  `log` take `register#number` or a prefixed id. Anything else is `VALUE_MALFORMED` at `spoken`, and the sentence
+  shows the forms that work. So is a figure's id the record answers `METRIC_UNKNOWN`, whether nobody declared it or
+  it reads a list the caller cannot, so the two stay one answer and the sentence also names `record_index`. A prefixed id or a row id goes to the
   record as spoken, `get({ spoken })`, in one call. The record resolves it against the installed prefixes, and answers
   a prefix that no register the caller reads holds with `REGISTER_UNKNOWN`, whose sentence sends `SG` and `D` to
   `governance`. For `history`, `update` and `log`, a prefixed id is first looked up that way to find its register and
@@ -384,8 +398,10 @@ What the tools do to an answer, which is the other thing this layer does. Each i
   schema the caller may not read keeps `register#number`. A conflict's `current` is made compact the same way. A line
   of `activity` gets the same address in place of `register` and `seq`, keeps `target` only when it names no row, and
   drops its empty fields.
-- **`record_index`** answers `{ record?, registers, version }`, with `version` as a number or `null`, and nothing
-  else `boot` carries.
+- **`record_index`** answers `{ record?, registers, figures?, version }`, with `version` as a number or `null`, and
+  nothing else `boot` carries. `figures` is ids only, each read through `metric` before it is named, and is left out
+  when there are none. The ids are the surface's `figures` when it answers one, and otherwise those drawn on the
+  pages `boot` lists, which `boot` holds to the same filter `pages` runs.
 - **`search`** answers each hit as `{ spoken, title }`, and, over a record that counts its matches, as
   `{ rows, matched, showing, more? }`, where `more` is a sentence whenever fewer rows came back than matched: past the
   default `limit` of twenty as well as at the record's cap of a hundred, since `matched` counts every live match
@@ -430,11 +446,12 @@ three it reads: `suggestion`, `decision` and `prediction`. Plain ASCII, with no 
 sentence break; `budget.test.ts` asserts both. `index.ts` is the source, and these are copied from it:
 
 ```
-record_index  What this record holds: its registers, how many rows in each, and its version. The cheap way to learn register names.
+record_index  What this record holds: its registers, how many rows in each, its figures, and its version. The cheap way to learn
+              register names.
 context       Your session, your project, its open work, questions waiting on the person, people, the keys and servers you may
               use (by name, never a value), skills and learnings, and everything global. Call it again after a long pause.
 schema        The fields of one register, their types and what each may take. Read before writing.
-get           One row, by the id a person says out loud.
+get           One row or figure, by the id a person says out loud.
 list          Rows of one register, newest first, narrowed by a predicate. The predicate is a tree: {"field":"state","is":"open"},
               or {"all":[...]}.
 search        Rows whose text matches, across every register you can see. Every word is a prefix.
@@ -505,7 +522,7 @@ ladder still decides who reads them and a surface of any age can serve them.
 | 13 | `braindog:grammar/automations` | `version()`, then `AUTOMATION_GRAMMAR` | 3,600,000 | `version` reads |
 | 14 | `braindog:schema/{register}` | `schema({ register })` | 3,600,000 | once for each register `boot` lists |
 | 15 | `braindog:page/{slug}` | `page({ slug })` | 60,000 | the page draws and not every block came back `FORBIDDEN` or `LEVEL_REQUIRED` |
-| 16 | `braindog:metric/{id}` | `metric({ metric: id })` | 60,000 | a listed page drew the figure and it reads |
+| 16 | `braindog:metric/{id}` | `metric({ metric: id })` | 60,000 | the surface's `figures` names it, or without `figures` a listed page drew it; and it reads |
 | 17 | `braindog:skill/{name}` | `list({ register: 'skills', where: { field: 'name', is: name }, limit: 1 })` | 3,600,000 | the caller can read `skills` and the row is not retired |
 | 18 | `braindog:declaration/{slug}` | `arrangement({ page: slug })` | 60,000 | never one by one: a template only |
 | 19 | `braindog:automation/{id}` | `automations({ rule: id })`, the definition and its last ten runs | 60,000 | never one by one: a template only |
@@ -615,10 +632,11 @@ what `budget.test.ts` counts (§5.9).
    fifteen is an error result, `ROUTE_UNKNOWN` with the fifteen in `allowed`, and nothing runs. That covers every
    VAULT, JOBS and ADMIN method name, and every name on `Object.prototype` (§6.2).
 3. The tool addresses the call (§4.4). It parses `spoken` into `{ register, seq }`, or hands a prefixed id or a row id
-   to the record, or refuses `VALUE_MALFORMED` at `spoken`; `log` refuses an empty note `REQUIRED_MISSING` at `note`;
+   to the record, or hands a figure's id to `metric`, or refuses `VALUE_MALFORMED` at `spoken`; `log` refuses an empty note `REQUIRED_MISSING` at `note`;
    a tool whose method the surface does not offer refuses `NOT_IN_THIS_BUILD` with what to do instead; a `propose` of
    a script change that carries `try` goes to `scriptTry` and never to `propose` (§4.4).
-4. The surface method runs with `ctx` as the transport handed it. `record_index` calls `boot`, then `version`;
+4. The surface method runs with `ctx` as the transport handed it. `record_index` calls `boot`, then `version`, then
+   `figures` or `page` for each page `boot` lists, then `metric` for each figure found;
    `propose` of a rule change calls `dryRun` after the filing. The
    arguments are not checked against the published schema: the record refuses a wrong field by name, with `allowed`
    (§13 D7).
@@ -648,7 +666,8 @@ drops its cursor.
 1. `resources/list`: `tools(surface).resources(ctx)`, which never fails. In order: the thirteen fixed resources of
    §4.7, rows 1 to 13, each read first and listed only when the read is `ok`; `schema/<id>` for each register `boot`
    lists; `page/<slug>` for each page that draws and whose blocks did not all come back `FORBIDDEN` or
-   `LEVEL_REQUIRED`; `metric/<id>` for each figure a listed page drew, read first; and `skill/<name>`, once for each
+   `LEVEL_REQUIRED`; `metric/<id>` for each figure the surface's `figures` names, or without it each figure a listed
+   page drew, read first; and `skill/<name>`, once for each
    name, for every skill that is not retired, when `boot` lists `skills`. No `declaration/<slug>` or
    `automation/<id>` is listed one by one; they are reached through their templates. Each carries
    `mimeType: 'application/json'`, and the list carries `ttlMs: 60_000` and `cacheScope: 'private'`. Listing costs a
@@ -833,17 +852,19 @@ counted once for this revision, by the same estimator over the same result.
 
 | Item | Ceiling | Measured | How |
 |---|---|---|---|
-| `tools/list` result: `tools[]`, `instructions`, `ttlMs`, `cacheScope` | **≤ 2,600** | **2,528**, 8,590 bytes | `budget.test.ts` |
-| The fifteen tool objects alone, the `tools` array serialised by itself | reported | 2,114 | the same count over `tools` |
+| `tools/list` result: `tools[]`, `instructions`, `ttlMs`, `cacheScope` | **≤ 2,600** | **2,544**, 8,641 bytes | `budget.test.ts` |
+| The fifteen tool objects alone, the `tools` array serialised by itself | reported | 2,130 | the same count over `tools` |
 | One tool description | < 200 | 12 (`update`) to 60 (`context`) | `budget.test.ts` asserts the ceiling for each of the fifteen |
-| One tool object: name, description, `inputSchema`, `annotations` | reported | 75 (`record_index`) to 295 (`propose`) | |
+| One tool object: name, description, `inputSchema`, `annotations` | reported | 79 (`record_index`) to 295 (`propose`) | |
 | `INSTRUCTIONS` | ≤ 400 | 400 | `budget.test.ts` |
-| `record_index` response | ≤ 500 | 256, 780 bytes, over the seed's sixteen registers | a real record with `@braindog/seed`'s declarations installed; no test asserts it |
+| `record_index` response | ≤ 500 | 450, 1,318 bytes, over the seed's nineteen registers and the 25 figures its pages draw | a real record with `@braindog/seed`'s declarations installed; no test asserts it |
 | A `list` page, the default of 50 rows | ≤ 2,000 | **5,380**, 14,517 bytes, for fifty `obligations` rows: over | the same record with seventy `obligations` rows; no test asserts it |
 | `resources/list` | none | not in any turn; fetched when wanted | |
 
-*The first five rows measured on 24 September 2026, after `money` left and the Home sentence joined the instructions;
-the rest on 22 September. The headroom under 2,600 is 72 tokens, and under 400 for the instructions it is none.*
+*The first six rows measured on 24 September 2026, after `get` and `record_index` learned figures (audit sixty-two
+finding 2); the rest on 22 September. The headroom under 2,600 is 56 tokens, and under 400 for the instructions it is
+none. The `record_index` row is the one to watch: its figures are ids, but a record whose pages draw a hundred of
+them, or a host answering `figures` for a pack of many, takes it past 500.*
 
 **The `list` row is a target this build does not meet.** 10 §4 set 2,000 for "25 rows, projected, not whole
 documents". The record's default page is 50 rows, not 25 (`kernel.list` clamps to 1 to 500 with 50 as the default,
@@ -858,7 +879,8 @@ and those three cost 500 tokens with their schemas. The instructions grew from 2
 stopped naming one use case and the handoff line asked for `doing`, and to 400 when the first line said to read the
 Home page for what leads. Their own ceiling moved from 300 to 400. Two more tools joined without moving the ceiling. The list measured 2,555 before
 `activity`, which cost 117, and 2,565 after it, once four descriptions gave back what they said twice; `money` cost
-91, nine descriptions gave that back, and its leaving took the list from 2,597 to 2,520. Automations and `script_try` cost the list nothing, because the one rides
+91, nine descriptions gave that back, and its leaving took the list from 2,597 to 2,520. Figures came back in
+clauses on `record_index` and `get` and not as a tool, for 16 tokens, 2,528 to 2,544. Automations and `script_try` cost the list nothing, because the one rides
 on `propose`'s answer and the other on its body, and their grammars are resources. One more clause in a description is
 a clause out of another, and the test is the arbiter. The instructions are counted inside the figure, because every
 token of them sits in the context every turn.
@@ -903,6 +925,7 @@ and each case is named for what it holds.
 | `packages/mcp/test/index.test.ts` | every advertised tool reaches a method, asked over the wire; a surface with nothing optional darkens exactly `context`, `activity`, `handoff` and `meet`, and the resources go the same way; `credentials` is not a tool; the refusal for a name that is not a tool lists the fifteen |
 | `packages/mcp/test/activity.test.ts` | `activity` is a tool; its `limit` is the record's; a line's address replaces its parts and empty fields do not travel; a line about no row keeps `target`; a caller held to one register sees only its lines; a host without `recentHistory` says so |
 | `packages/mcp/test/money-out.test.ts` | there is no `money` tool: fifteen tools, no `MONEY_FIGURES` export, and a call by that name is refused `ROUTE_UNKNOWN` without reading the record; the source names no figure id of money-core, in code or in a comment; a pack's page and each figure it draws are offered as resources, and a figure over two currencies with no rate answers one amount per currency and no sum |
+| `packages/mcp/test/figures.test.ts` | audit sixty-two's M1 over money-core as it ships: `get` of a figure's id answers the record's reading, one amount per currency and no sum, for every figure the removed `money` tool read; `record_index` names figures and `get` answers each one it names; a figure's id goes to `metric` and a row to `get`; a figure the record refuses is `VALUE_MALFORMED` at `spoken` naming the row forms and `record_index`; a surface answering `figures` is listed whole, less what `metric` refuses; still fifteen tools. One case is a `todo`: every declared figure named, which waits on the record's `figures` |
 | `packages/mcp/test/list-ref.test.ts` | `list` filtered by a ref reads the spoken id, the name and the row id alike; a ref that names nothing is refused |
 | `packages/mcp/test/teaching.test.ts` | the three sentences `context` teaches, the same on the resource, and no example row outside a project |
 | `packages/mcp/test/actions.test.ts` | `braindog:actions` is listed on a real record with each key by label only; a surface without `actions` does not list it |
@@ -912,7 +935,7 @@ and each case is named for what it holds.
 | `packages/mcp/test/script-try.test.ts` | a trial writes nothing and is counted as one run; a held one starts nothing; a caller given no keys has none opened and one given keys has them opened by label and scrubbed; `pin` before any socket; the reads are the caller's; `scriptTry` routed as READ+ and a POST; a sandbox that throws is the host's; a script change without `try` is filed and never run, and with it is tried and filed nowhere; `try` refused on anything else; end to end on a real record, no row written and nothing waiting in Decide |
 | `packages/mcp/test/http.test.ts` | `serveMcp` in §5.1's order: 405 with `Allow: POST`; 403 for any `Origin`; 415; 401 before a byte of the body; 413 on the claim and on the bytes; 400 with `-32700` for bytes that are not JSON or not UTF-8, and `-32600` for a batch; 202 for a notification; no session minted, and one a client sends ignored; 404 for a method this server does not have; the mirrored headers held to the body, required of a 2026-07-28 request and not of an older one; `-32022` for an unsupported version, `initialize` exempt; 500 for a throw; `no-store` on every answer, and no CORS or session header |
 | `packages/mcp/test/budget.test.ts` | §5.8's estimator on its worked examples, the ceilings of §7, plain ASCII in everything a client shows a model, and money shifted by its currency's decimals (§5.9) |
-| `apps/cli/test/stdio.test.ts` | `braindog mcp` spawned against a stub `/api`. `initialize` and `tools/list` answer without touching the host. A list call carries the bearer and the session headers. The token comes from the hosts file when the environment has none. A line that is not JSON is a parse error, and the server keeps serving. A host that does not answer, or has nothing listening, gets the unreachable sentence. Calls in flight are answered when stdin ends. A startup failure is one line on stderr. The token is never printed |
+| `apps/cli/test/stdio.test.ts` | `braindog mcp` spawned against a stub `/api`. `initialize` and `tools/list` answer without touching the host. A list call carries the bearer and the session headers, and `get` of a figure's id goes to `/api/metric`. The token comes from the hosts file when the environment has none. A line that is not JSON is a parse error, and the server keeps serving. A host that does not answer, or has nothing listening, gets the unreachable sentence. Calls in flight are answered when stdin ends. A startup failure is one line on stderr. The token is never printed |
 | `apps/cli/test/http.test.ts` | the hosts file, its path and its whole-file write; where the host and the token come from; the budget from `BRAINDOG_TIMEOUT_MS`; the bearer and the session headers on a request; no redirect followed; a header outside its grammar dropped |
 | `apps/selfhost/test/mcp.test.ts` | a real socket. 401 before the body, and a session cookie is not a bearer. Open mode is nobody at `/mcp`. 405, 415 and 413, a chunked body included. `initialize` then a tool call, with nothing minted. An agent reaches the same things through `/mcp` as through `/api`, at the same levels |
 | `apps/selfhost/test/session.test.ts` | `_meta.session` names the run, over the header hints key by key |

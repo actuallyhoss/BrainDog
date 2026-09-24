@@ -84,8 +84,9 @@ test('THE COUNT IS THE DESIGN: fifteen, and each is named by the plan', () => {
      Brain (`brain_audit`) and nowhere here: see `activity.test.ts` for the rest of that comparison.
 
      `money` WAS THE SIXTEENTH UNTIL 24 SEPTEMBER, and it read seven of money-core's figure ids by name, so the
-     core knew one use case (`loop/research-m3-dynamic.md` B6, DIRECTION sections 22 and 24). A pack's figures are read
-     through `metric` and its pages through the resources, like any other pack's. */
+     core knew one use case (`loop/research-m3-dynamic.md` B6, DIRECTION sections 22 and 24). A pack's figures are named
+     by `record_index` and read by `get`, whatever pack declared them, and its pages through the resources, like any
+     other pack's (`figures.test.ts`, audit sixty-two finding 2). */
   assert.deepEqual(
     TOOLS.map((t) => t.name),
     ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance', 'propose', 'create', 'update', 'log', 'handoff', 'meet'],

@@ -57,11 +57,15 @@ export async function surfaceOver(clientFor: (ctx: Ctx) => Client): Promise<McpS
   const allowed = refused(probe) ? (probe.refusal as { allowed?: unknown }).allowed : undefined;
   const routed = new Set(Array.isArray(allowed) ? allowed : []);
 
-  const later: Pick<McpSurface<Ctx>, (typeof LATER)[number] | 'actions'> = {};
+  const later: Pick<McpSurface<Ctx>, (typeof LATER)[number] | 'actions' | 'figures'> = {};
   for (const name of LATER) if (routed.has(name)) later[name] = (args: object, ctx: Ctx) => ask<unknown>(ctx, name, args);
   /* `actions` TAKES NO ARGUMENTS, so it is written out rather than folded into the loop above: the surface declares it
      as `(ctx)` alone, and giving it the loop's `(args, ctx)` shape is a compile error, not a harmless widening. */
   if (routed.has('actions')) later.actions = (ctx: Ctx) => ask<unknown>(ctx, 'actions');
+  /* AND `figures` FOR THE SAME REASON, ON THIS LIST BEFORE ANY HOST ROUTES IT, for `recentHistory`'s lesson (audit
+     sixty-two finding 2). Without it `record_index` names only the figures a page draws; the probe keeps it off until
+     the client's table carries the name, so no call goes out for a route that is not there. */
+  if (routed.has('figures')) later.figures = (ctx: Ctx) => ask<{ id: string; name?: string }[]>(ctx, 'figures');
 
   return {
     boot: (ctx) => ask(ctx, 'boot'),

@@ -397,6 +397,24 @@ test('A LIST CALL goes to /api/list with the bearer and the session headers, and
   assert.equal((await s.end()).code, 0);
 });
 
+/**
+ * A FIGURE IS READ BY `get` OVER THE PIPE AS IN PROCESS (audit sixty-two finding 2). A client with tools and no resources
+ * had no figure at all once the money tool left, and the command line is where Claude Code meets this server, so the
+ * route is driven here and not only in `packages/mcp/test/figures.test.ts`: the id goes to the host's `metric`, never
+ * its `get`, and the reading comes back as the host answered it.
+ */
+test('A FIGURE BY ITS ID goes to /api/metric and comes back as the reading', async (t) => {
+  const host = await stubHost(t, ANSWERS);
+  const s = launch({ BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
+
+  const reply = await s.ask('tools/call', { name: 'get', arguments: { spoken: 'owed' } });
+  assert.notEqual(reply.result.isError, true, reply.result.content[0].text);
+  assert.deepEqual(said(reply), ANSWERS.metric);
+  assert.deepEqual(host.seen.map((x) => x.method).filter((m) => m === 'metric' || m === 'get'), ['metric']);
+
+  assert.equal((await s.end()).code, 0);
+});
+
 test('the token comes from the hosts file when the environment has none', async (t) => {
   const host = await stubHost(t);
   const config = join(scratch, 'signed-in');
