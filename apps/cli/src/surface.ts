@@ -40,8 +40,23 @@ const reachable = <T>(r: Result<T>): Result<T> =>
  *
  * `scriptTry` IS ON IT FROM THE DAY IT WAS ROUTED, for `recentHistory`'s lesson: it backs `propose` with `"try"` on a
  * script change, and a stdio agent left off this list would be told this record cannot try a script when its host can.
+ * `previewPage` JOINED WITH ITS BRANCH (M4 wave three brief 3) for the same reason: before it, a host that routed the
+ * method still left `surfaceOver`'s answer without it, measured, so `propose` with `try` on a page change would have
+ * answered `NOT_IN_THIS_BUILD` over stdio and drawn the page over HTTP.
  */
-const LATER = ['context', 'handoff', 'meet', 'sessionsLive', 'arrangement', 'recentHistory', 'automations', 'dryRun', 'scriptTry', 'inbox'] as const;
+const LATER = [
+  'context',
+  'handoff',
+  'meet',
+  'sessionsLive',
+  'arrangement',
+  'recentHistory',
+  'automations',
+  'dryRun',
+  'scriptTry',
+  'previewPage',
+  'inbox',
+] as const;
 
 export async function surfaceOver(clientFor: (ctx: Ctx) => Client): Promise<McpSurface<Ctx>> {
   const ask = async <T>(ctx: Ctx, name: string, args: unknown = {}): Promise<Result<T>> =>

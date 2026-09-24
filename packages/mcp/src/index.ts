@@ -71,6 +71,11 @@
  * because a trial writes nothing and files nothing. Filing nothing is also what lets an agent iterate: a trial per
  * attempt, and one question in Decide for the draft that works.
  *
+ * AND A PAGE IS SEEN DRAWN THE SAME WAY (M4 wave three brief 3). A page change whose body carries `"try": true` is
+ * answered `page_preview`, the record's `previewPage` of it, and filed nowhere, so an agent sees what its blocks hold
+ * before the owner is asked. It is a branch of `propose`'s, not a tool, for `script_try`'s reason, so the list costs
+ * what it did; `budget.test.ts` holds that.
+ *
  * AND THE RESOURCES ARE NOT TOOLS, which is the other half of the same argument. A resource list is
  * fetched when it is wanted, so the per-register variability, one `schema/<register>` each, costs
  * nothing in a turn that does not ask for it.
@@ -155,6 +160,13 @@ export type McpSurface<C> = {
    * without it answers that `NOT_IN_THIS_BUILD`.
    */
   scriptTry?(args: { body: Record<string, unknown>; input?: unknown }, ctx: C): Answer;
+  /**
+   * A page body nobody has installed, drawn as `page` would draw it and held to what the caller may read, installing and
+   * writing nothing (the record's `previewPage`). READ+, and optional for `scriptTry`'s reason: it backs only `propose`'s
+   * `try` on a page change, and a surface without it answers that `NOT_IN_THIS_BUILD`. Both hosts hand the record's own
+   * api to `serveMcp`, so over HTTP it is there without a line in either host.
+   */
+  previewPage?(args: { body: Record<string, unknown> }, ctx: C): Answer;
   /**
    * What arrived and no rule filed, in one state or all of them, with a count for each. The record's own rung, which today
    * is the owner and no token, and optional for the command line's reason above: its surface is a fixed list.
@@ -934,21 +946,54 @@ export function tools<C>(surface: McpSurface<C>) {
     return to.kind === 'script' || (to.kind === undefined && id.startsWith('script.')) ? to.body : null;
   };
 
+  /** The page body a change installs, or `null` for a change to anything else. The same reading again, for `page.`. */
+  const pageIn = (body: Record<string, unknown>): Record<string, unknown> | null => {
+    const to = body.to;
+    if (!isObject(to) || !isObject(to.body)) return null;
+    const id = typeof to.id === 'string' ? to.id : typeof body.declaration_id === 'string' ? body.declaration_id : '';
+    return to.kind === 'page' || (to.kind === undefined && id.startsWith('page.')) ? to.body : null;
+  };
+
+  /**
+   * A page change drawn now and filed nowhere: `propose` with `"try": true` beside `to` (M4 wave three brief 3).
+   *
+   * AN AGENT'S DRAFT PAGE WAS SEEN DRAWN ONLY BY THE OWNER, in Decide, which calls `previewPage` on a filed change
+   * (`apps/web/src/routes/decide/[id]/proposed.ts`). The agent filed a page it had never seen hold a row, and each wrong
+   * `where` became one more question in front of the owner. This is the same method, so the agent and the owner read one
+   * drawing of it, and its refusals, the install's lint and a list the caller may not read among them, come back in the
+   * record's own words.
+   *
+   * `try` IS `true` AND NOTHING ELSE HERE. A script's `{"input": ...}` stands in for what a door would hand it, and a page
+   * has no door, so an input would be a value the preview dropped without saying so.
+   */
+  const preview = async (body: Record<string, unknown>, page: Record<string, unknown>, ctx: C): Answer => {
+    if (body.try !== true)
+      return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'try is true on a page change: a page has no input to hand it.', at: 'body.try' } };
+    if (!surface.previewPage) return unbuilt('a preview', 'Send the change without try, and the owner sees the page drawn in Decide.');
+    const drawn = await surface.previewPage({ body: page }, ctx);
+    return drawn.ok ? { ok: true, value: { page_preview: drawn.value, proposed: false } } : drawn;
+  };
+
   /**
    * A script change run now in the host's sandbox and filed nowhere: `propose` with `"try": true`, or `"try": {"input":
    * ...}` to hand it what a door would have, beside `to` (`loop/research-shell-scripts.md` section 7).
    *
    * NOTHING IS FILED, SO NOBODY IS ASKED. The answer is the trial, `script_try`, and `proposed: false`; the agent sends the
    * change again without `try` to put it in front of the owner. The record checks the draft as it would at install
-   * before anything runs, and refuses in its own words.
+   * before anything runs, and refuses in its own words. A page change is handed to `preview` above before any of this.
    */
   const trial = async (body: Record<string, unknown>, ctx: C): Answer => {
+    const page = pageIn(change(body));
+    if (page !== null) return preview(body, page, ctx);
     const said = body.try;
     if (said !== true && !(isObject(said) && Object.keys(said).every((k) => k === 'input')))
       return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'try is true, or {"input": ...} to hand the script what a door would.', at: 'body.try' } };
     const script = scriptIn(change(body));
     if (script === null)
-      return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'Only a script change can be tried. Send this one without try to propose it.', at: 'body.try' } };
+      return {
+        ok: false,
+        refusal: { code: 'VALUE_MALFORMED', fix: 'Only a script or a page change can be tried. Send this one without try to propose it.', at: 'body.try' },
+      };
     if (!surface.scriptTry) return unbuilt('a trial', 'Send the change without try, and the owner reads the source in Decide.');
     const tried = await surface.scriptTry({ body: script, ...(isObject(said) && said.input !== undefined ? { input: said.input } : {}) }, ctx);
     return tried.ok ? { ok: true, value: { script_try: tried.value, proposed: false } } : tried;
@@ -1174,7 +1219,8 @@ export function tools<C>(surface: McpSurface<C>) {
      * record refuses is refused in the record's words and never previewed.
      *
      * AND A SCRIPT CHANGE THAT SAYS `"try"` IS TRIED INSTEAD OF FILED (`trial` below), and one that does not is filed
-     * and never run: a trial fetches and is counted as a run, so it happens only when the agent asks for it.
+     * and never run: a trial fetches and is counted as a run, so it happens only when the agent asks for it. A PAGE
+     * CHANGE THAT SAYS `"try"` IS DRAWN INSTEAD OF FILED by the same branch (`preview` above), answered `page_preview`.
      */
     propose: async (args, ctx) => {
       if (args.body_kind === 'change' && isObject(args.body) && args.body.try !== undefined) return trial(args.body, ctx);
