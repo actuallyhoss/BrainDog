@@ -53,6 +53,7 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import BindBlock from '$lib/ui/BindBlock.svelte';
+  import { saidPlainly } from '$lib/record/blocks.ts';
   import RowCards from '$lib/ui/RowCards.svelte';
   import { rowsAsCards } from '$lib/ui/body.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -297,8 +298,8 @@
   <BindBlock
     bind:open={binding}
     {register}
-    predicate={name}
-    says={filters ? whereOf(filters) : ''}
+    predicate={filters?.length ? whereOf(filters) : copy.everything}
+    says={filters?.length ? saidPlainly(register, whereOf(filters)) : copy.everything}
     onbind={(target, kind) =>
       toasts.push(copy.bound(copy.kindNames[kind] ?? kind, PAGES[target]?.title ?? target), { intent: 'warn' })}
   />

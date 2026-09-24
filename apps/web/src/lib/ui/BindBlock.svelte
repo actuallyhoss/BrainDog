@@ -21,16 +21,26 @@
   Findlater & McGrenere measured static menus faster than adaptive ones, Microsoft shipped
   Personalized Menus and withdrew them, and WCAG 3.2.3 is normative against it. A block joins a page
   you already have; the page's own position is yours.
+
+  ON A LIVE RECORD THE PRESS WRITES THE BLOCK. The sheet asks `boot` which side it is on when it opens (`readBoot` keeps
+  its answer per base, so this costs no request), and on the sample it calls `onbind` as it always did, so the screens
+  that open it say what would have been added. On a live record it offers the record's own pages that require the list,
+  adds the block through `bind-write.ts`, and the toast's Put back sets the page body the write read. It used to offer
+  the sample's pages whatever record was behind it, so a real list was offered the fictional studio's pages, and the
+  press put the block on none of them.
 -->
 <script lang="ts">
   import { KINDS, isKind } from 'braindog-render';
 
+  import { apiBase } from '../at.ts';
   import { copy } from '../copy.ts';
   import { REGISTERS, pages } from '../record/api.ts';
-  import { BINDABLE, seedBlock } from '../record/seed.ts';
+  import type { Destination, ListDecl } from '../record/bind-write.ts';
+  import { BINDABLE } from '../record/seed.ts';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
   import Sheet from './Sheet.svelte';
+  import { toasts } from './toast.svelte.ts';
 
   let {
     open = $bindable(false),
@@ -41,37 +51,117 @@
   }: {
     open?: boolean;
     register: string;
-    /** The saved view's name — becomes the block's heading, because it is what you called it. */
+    /**
+     * What the view filters by, which on a live record becomes the block's `where`: a sentence about the list, the search
+     * text when there is no filter, or `copy.everything`, which writes none.
+     */
     predicate: string;
+    /** The same filter in the words a person reads, which the block's heading carries after the list's name. */
     says: string;
+    /** The sample's answer to the press. A live record never calls it. */
     onbind: (page: string, kind: string) => void;
   } = $props();
 
-  /**
-   * The pages this could go on: the ones that already require this register.
-   *
-   * 06 §7 — *"a page cannot read a register it did not declare"*. A page that does not require the
-   * register is not a page this block can live on, so it is not offered. That is the same rule as
-   * the query builder's: there is no invalid state because the invalid choice is absent.
-   */
-  const destinations = $derived(
-    /* `pages()`, not `PAGES`: the declared set holds TEMPLATES, so this offered a destination
-       called `{{name}}` — a page that does not exist, while the three that do sat in the rail
-       beside it. A template is not somewhere you can put a block; the pages it resolves to are. */
-    Object.values(pages()).filter((p) => p.requires.includes(`register.${register}`) && p.nav),
-  );
+  /** Which record the sheet is over, and what it offers there. Nothing until `boot` has answered. */
+  type Side =
+    | { from: 'sample'; name: string; destinations: { slug: string; title: string }[]; kinds: string[] }
+    | { from: 'live'; name: string; destinations: Destination[]; kinds: string[]; declared: ListDecl | null }
+    | { from: 'refused'; fix: string };
 
+  let side = $state<Side | null>(null);
   let toPage = $state('');
   let kind = $state('table');
+  let busy = $state(false);
+  /* THE RECORD'S SENTENCE FOR A PRESS IT REFUSED, said in the sheet and not in a toast, because the sheet is still open
+     on the choice that was refused: a search text that is not a filter, or a page that moved. */
+  let problem = $state<string | null>(null);
 
-  const kinds = $derived(BINDABLE.filter((k) => isKind(k)));
+  /**
+   * THE SAMPLE'S SIDE, AND THE ONLY PLACE THIS FILE READS THE BUILD'S OWN PAGES AND LISTS. `bind-write.test.ts` sweeps the
+   * rest of the file for either, so a live record is never offered the fictional studio's pages again.
+   *
+   * 06 §7, *"a page cannot read a register it did not declare"*: a page that does not require the register is not a page
+   * this block can live on, so it is not offered.
+   */
+  function sampleSide(): Side {
+    /* `pages()`, not `PAGES`: the declared set holds TEMPLATES, so this offered a destination called `{{name}}`, a page
+       that does not exist, while the three that do sat in the rail beside it. A template is not somewhere you can put a
+       block; the pages it resolves to are. */
+    const destinations = Object.values(pages())
+      .filter((p) => p.requires.includes(`register.${register}`) && p.nav)
+      .map((p) => ({ slug: p.page, title: p.title }));
+    return { from: 'sample', name: REGISTERS[register]?.name ?? register, destinations, kinds: BINDABLE.filter((k) => isKind(k)) };
+  }
 
-  /* The list by the name a person gave it, never its id. */
-  const listName = $derived(REGISTERS[register]?.name ?? register);
+  /** Ask `boot` which side this is, then what that side offers. Asked on every opening, so a page added since is there. */
+  async function look(list: string) {
+    const { readBoot } = await import('../record/boot-live.ts');
+    const booted = await readBoot(apiBase());
+    let next: Side;
+    if (booted.from === 'sample') next = sampleSide();
+    else if (booted.from === 'refused') next = { from: 'refused', fix: booted.fix };
+    else {
+      const m = await import('../record/bind-write.ts');
+      const sheet = await m.liveSheet(apiBase(), list);
+      next = sheet.from === 'live' ? { ...sheet, kinds: [...m.LIVE_KINDS] } : sheet;
+    }
+    side = next;
+    if (next.from === 'refused') return;
+    if (!next.destinations.some((d) => d.slug === toPage)) toPage = next.destinations[0]?.slug ?? '';
+    if (!next.kinds.includes(kind)) kind = next.kinds[0] ?? 'table';
+  }
 
   $effect(() => {
-    if (open && !toPage) toPage = destinations[0]?.page ?? '';
+    if (!open) return;
+    problem = null;
+    void look(register);
   });
+
+  const destinations = $derived(side && side.from !== 'refused' ? side.destinations : []);
+  const kinds = $derived(side && side.from !== 'refused' ? side.kinds : []);
+
+  /* The list by the name a person gave it, never its id. */
+  const listName = $derived(side && side.from !== 'refused' ? side.name : '');
+
+  const kindName = $derived(copy.kindNames[kind] ?? kind);
+
+  /* THE BLOCK'S HEADING IS THE LIST, AND THE FILTER WHEN THERE IS ONE, in the shape a seeded block's is (`seed.ts`,
+     "Obligations: owed to me"), so two blocks bound from one list onto one page are told apart by what they hold. */
+  const heading = $derived(predicate === copy.everything || says === '' ? listName : `${listName}: ${says}`);
+
+  async function bind() {
+    if (!side || side.from === 'refused' || busy) return;
+    if (side.from === 'sample') {
+      onbind(toPage, kind);
+      open = false;
+      return;
+    }
+    const to = side.destinations.find((d) => d.slug === toPage);
+    if (!to) return;
+    busy = true;
+    problem = null;
+    const base = apiBase();
+    const m = await import('../record/bind-write.ts');
+    const out = await m.bindTo(base, to, m.boundBlock(register, predicate, kind, heading, side.declared));
+    busy = false;
+    if (out.from !== 'written') {
+      problem = out.fix;
+      return;
+    }
+    open = false;
+    const { before, version } = out;
+    /* PUT BACK SETS THE BODY THE WRITE READ, at the version the write made, as arrange mode's undo does. A page somebody
+       changed in between is refused rather than overwritten, and that refusal is said. */
+    toasts.push(m.words.bound(kindName, to.title), {
+      intent: 'good',
+      undo: () =>
+        void import('../record/page-write.ts')
+          .then((w) => w.setBody(base, before, undefined, version))
+          .then((back) => {
+            if (back.from !== 'written') toasts.push(back.fix, { intent: 'warn' });
+          }),
+    });
+  }
 </script>
 
 <Sheet bind:open title={copy.bindBlock}>
@@ -97,31 +187,27 @@
     <label class="row">
       <span class="row-label">{copy.onPage}</span>
       <select class="row-input" bind:value={toPage}>
-        {#each destinations as d}<option value={d.page}>{d.title}</option>{/each}
+        {#each destinations as d}<option value={d.slug}>{d.title}</option>{/each}
       </select>
     </label>
 
-    {#if destinations.length === 0}
+    {#if side?.from === 'refused'}
+      <p class="none">{side.fix}</p>
+    {:else if side && destinations.length === 0}
       <p class="none">{copy.noDestination(listName)}</p>
-    {:else}
+    {:else if side}
       <!-- What will exist afterwards, spelled out. A2: nothing applies without a diff, and the
            smallest honest diff for one added block is the sentence describing it. -->
       <p class="preview">
         <Icon name="plus" size="s" />
-        {copy.willAdd(copy.kindNames[kind] ?? kind, isKind(kind) ? KINDS[kind].minSpan : 4)}
+        {copy.willAdd(kindName, isKind(kind) ? KINDS[kind].minSpan : 4)}
       </p>
     {/if}
+    {#if problem}<p class="none" role="status">{problem}</p>{/if}
   </div>
 
   {#snippet footer()}
-    <Button
-      weight="primary"
-      disabled={destinations.length === 0}
-      onclick={() => {
-        onbind(toPage, kind);
-        open = false;
-      }}
-    >
+    <Button weight="primary" disabled={destinations.length === 0 || busy} onclick={() => void bind()}>
       {copy.bindBlock}
     </Button>
     <Button weight="bare" onclick={() => (open = false)}>{copy.close}</Button>
