@@ -14,7 +14,7 @@
  * and the predicate is data.
  */
 
-import { money, yesno } from 'braindog-render';
+import { exponentOf, yesno } from 'braindog-render';
 import type { Reading, SparkProposal, SparkStatus, SparkWhere } from '@braindog/client';
 
 import { copy } from '../copy.ts';
@@ -35,15 +35,27 @@ export function offersSpark(a: { spark: boolean; prefix: string | null; text: st
   return question.length < 2 ? null : question;
 }
 
-/** A value inside a predicate, as the record's own screens would print it. */
+/**
+ * A value inside a predicate, as a person would type it into a filter.
+ *
+ * NO THOUSANDS COMMA, BECAUSE BOTH ENGINES READ A COMMA AS THE END OF A CONDITION. This printed a number through
+ * `toLocaleString('en')` and a money through `money()`, the record's screens' spellings, and every clause over a value past
+ * a thousand stopped typing back: `amount is at least GBP 1,500.00` was `FIELD_UNKNOWN` for a field called `500.00` in the
+ * record and a refusal in the browser, and `money()`'s minus is U+2212, which neither reads as a sign (audit sixty-five,
+ * finding 4, and `spark-print.test.ts`). So a number is its digits, and a money is its code and its amount in the
+ * currency's own places, which is the literal the grammar was written to read.
+ */
 const valueWords = (v: unknown): string => {
   if (typeof v === 'string') return v;
-  if (typeof v === 'number') return v.toLocaleString('en');
+  if (typeof v === 'number') return String(v);
   if (typeof v === 'boolean') return yesno(v);
   if (v !== null && typeof v === 'object') {
     const o = v as Record<string, unknown>;
-    if (typeof o['amount'] === 'number' && typeof o['currency'] === 'string') return money(o['amount'], o['currency']);
-    if (typeof o['value'] === 'number' && typeof o['unit'] === 'string') return `${o['value'].toLocaleString('en')} ${o['unit']}`;
+    if (typeof o['amount'] === 'number' && typeof o['currency'] === 'string') {
+      const places = exponentOf(o['currency']);
+      return `${o['currency']} ${(o['amount'] / 10 ** places).toFixed(places)}`;
+    }
+    if (typeof o['value'] === 'number' && typeof o['unit'] === 'string') return `${String(o['value'])} ${o['unit']}`;
   }
   return JSON.stringify(v) ?? String(v);
 };

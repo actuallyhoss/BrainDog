@@ -50,7 +50,7 @@ test('A PREDICATE COMES OUT AS WORDS, the way the rows it matched would be descr
   assert.equal(whereWords({ all: [{ field: 'state', is: 'open' }, { field: 'due', before: '2026-10-01' }] }), 'state is open and due is before 2026-10-01');
   assert.equal(whereWords({ any: [{ field: 'state', in: ['open', 'doing', 'waiting'] }, { field: 'owner', empty: true }] }), 'state is one of open, doing, waiting or owner is empty');
   assert.equal(whereWords({ none: [{ field: 'state', is: 'done' }] }), 'not (state is done)');
-  assert.equal(whereWords({ field: 'amount', gte: { amount: 500500, currency: 'EGP' } }), 'amount is at least EGP 5,005.00');
+  assert.equal(whereWords({ field: 'amount', gte: { amount: 500500, currency: 'EGP' } }), 'amount is at least EGP 5005.00');
   assert.equal(whereWords({ field: 'due', between: ['2026-10-01', '2026-10-31'] }), 'due is between 2026-10-01 and 2026-10-31');
   /* A GROUP INSIDE A GROUP IS BRACKETED, or `a and b or c` would be read either way. */
   assert.equal(

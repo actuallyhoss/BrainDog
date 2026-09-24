@@ -18,6 +18,7 @@
  *     what contains uber                a TEXT holds the words, in any case
  *     what contains "uber or lyft"      quoted, the text is taken exactly as written
  *     state is live, cycle is monthly   clauses are ANDed on the comma
+ *     state is open, or due before today   and ORed on a comma and `or`; never both in one sentence
  *
  * IT COMPILES TO THE SAME PREDICATE THE STRUCTURED FORM PRODUCES, and that is the whole reason it
  * is here rather than in whatever renders a page. A declaration is written once and read by the
@@ -555,9 +556,15 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
     };
   if (!filter.trim()) return { predicate: undefined, bad };
 
-  for (const raw of filter.split(',')) {
-    const sentence = raw.trim();
-    if (!sentence) continue;
+  const split = conditionsOf(filter);
+  if ('fix' in split) return { predicate: undefined, bad: [{ code: 'VALUE_MALFORMED', fix: split.fix, at: 'where' }] };
+
+  for (const { text: sentence, or } of split.conditions) {
+    /* `or` WITH NOTHING AFTER IT asks for the condition, as `is` with nothing after it asks for the value. */
+    if (or && !sentence) {
+      bad.push({ code: 'REQUIRED_MISSING', fix: `${filter.trim()}: or what?`, at: 'where' });
+      continue;
+    }
 
     const words = sentence.split(/\s+/);
     /**
@@ -1122,7 +1129,60 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
          to no clause is the second half of that sentence as much as the first. */
       bad: [{ code: 'VALUE_MALFORMED', fix: `${filter} says nothing a register can answer.`, at: 'where' }],
     };
-  return { predicate: clauses.length === 1 ? clauses[0] : { all: clauses }, bad };
+  if (clauses.length === 1) return { predicate: clauses[0], bad };
+  return { predicate: split.any ? { any: clauses } : { all: clauses }, bad };
+}
+
+/** One condition of a sentence, and whether `, or` joined it to the one before. */
+type Condition = { text: string; or: boolean };
+
+/**
+ * A sentence cut into its conditions, and whether they are ORed, or the refusal for one that says both.
+ *
+ * `, or` IS THE SEPARATOR AND `or` ALONE IS NOT. Between one field's values `or` has always meant `in`
+ * (`state is open or doing`), and a value may hold the word, so the comma is what says a new condition
+ * starts and the `or` after it is what says it is an alternative. Probed before this was written:
+ * `state is open, or due before today` was `FIELD_UNKNOWN`, the words `or due` taken for a field name.
+ *
+ * BOTH SEPARATORS IN ONE SENTENCE IS A REFUSAL, NOT A PRECEDENCE. `a, b, or c` is `(a and b) or c` to
+ * somebody who reads the comma as tighter and `a and (b or c)` to somebody who reads the `or` as
+ * tighter, and a filter that picks one silently answers the other person's question with rows that
+ * look right. A sentence has no brackets to say which, so the refusal writes out both and sends the
+ * nesting to the structured form, where `all` and `any` hold each other.
+ *
+ * A LEADING `or` IS LEFT AS WORDS, as it was: with no condition before it there is nothing for it to
+ * join, and the field lookup refuses it by name.
+ */
+function conditionsOf(filter: string): { conditions: Condition[]; any: boolean } | { fix: string } {
+  const conditions: Condition[] = [];
+  for (const raw of filter.split(',')) {
+    const text = raw.trim();
+    if (!text) continue;
+    const joined = conditions.length > 0 ? /^or(?:\s+|$)/i.exec(text) : null;
+    conditions.push(joined ? { text: text.slice(joined[0].length).trim(), or: true } : { text, or: false });
+  }
+  const ors = conditions.slice(1).filter((c) => c.or).length;
+  if (ors === 0 || ors === conditions.length - 1) return { conditions, any: ors > 0 };
+  return { fix: bothReadings(filter.trim(), conditions) };
+}
+
+/**
+ * The refusal for a sentence joined by both `,` and `, or`, naming the two things it could mean.
+ *
+ * EACH READING BRACKETS THE RUN ITS TIGHTER SEPARATOR JOINS, and only a run of more than one: the first
+ * takes the comma as tighter, the second the `or`. `apps/web/src/lib/record/where.ts` writes this sentence byte for
+ * byte, which `where-any.test.ts` holds against the record over the seed.
+ */
+function bothReadings(filter: string, conditions: readonly Condition[]): string {
+  const reading = (tight: boolean, inner: string, outer: string): string => {
+    const runs: string[][] = [];
+    for (const c of conditions) {
+      if (runs.length === 0 || c.or !== tight) runs.push([c.text]);
+      else runs[runs.length - 1]!.push(c.text);
+    }
+    return runs.map((r) => (r.length > 1 ? `(${r.join(` ${inner} `)})` : r[0])).join(` ${outer} `);
+  };
+  return `${filter}: this joins its conditions with a comma and with a comma and or, so it reads two ways: ${reading(false, 'and', 'or')}; or ${reading(true, 'or', 'and')}. A sentence cannot put one inside the other. Keep one of the two separators, or ask in the structured form, where all and any nest.`;
 }
 
 /** One written value as the record stores it, or `null` when the register cannot mean it. */

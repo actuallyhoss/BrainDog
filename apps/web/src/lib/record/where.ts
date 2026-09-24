@@ -45,6 +45,7 @@
  *     amount at least GBP 960.00        money carries its currency, in the currency's own units
  *     due between today and +30d        a range of days, both ends kept
  *     state is live, cycle is monthly   clauses are ANDed on the comma
+ *     state is open, or due before today   and ORed on a comma and `or`, into `any`; never both at once
  *
  * VALUES ARE MATCHED AGAINST WHAT THE UI SHOWS, not against what the column stores. `display()`
  * turns `owed_to_me` into "owed to me" and a ref into the title of the row it points at, so
@@ -161,7 +162,28 @@ type Bound = { n: number; currency?: string; unit?: string };
 export type Where = {
   /** The register it was compiled against. A value means nothing without one. */
   register: string;
+  /** Every one of these holds of a row the predicate admits. ALWAYS A CONJUNCTION, whatever `any` holds. */
   clauses: Clause[];
+  /**
+   * The conditions a sentence joined with `, or`, of which a row the predicate admits meets at least one.
+   *
+   * BESIDE `clauses` AND NOT A FLAG OVER IT, because nine lines outside this file read `clauses` as a
+   * conjunction and three would say something wrong about an "or" read through them:
+   * `endedAt` in `metrics.ts` would OR a window's end into the predicate, so every row dated before it
+   * counts; `api.ts`'s inheriting block would take one disjunct for its project; and a new row would be
+   * filled from both sides of the "or". Out here they see no clause, and refuse, fill nothing and add
+   * no bound, as they do for a predicate with none. `matches` reads it, and so do `resolvedAt` and
+   * `timeless` in `metrics.ts` through `everyClause` below, which would otherwise call a dated group
+   * undated.
+   *
+   * A MEMBER IS A LIST, NOT ONE CLAUSE, because one condition can compile to two here: a range of days
+   * is its `gte` and `lte` ends, as the record spells it (`all` of the two inside its `any`). As one
+   * clause each, `due between today and +30d, or state is part` would put both ends into the group
+   * and admit every row due after today and every row due before a month out, which is all of them.
+   *
+   * ABSENT WHEN THE SENTENCE HAS NO `, or`, so every predicate written before this reads as it did.
+   */
+  any?: Clause[][];
   /** Everything that could not be resolved, in words somebody can act on. */
   bad: string[];
 };
@@ -917,9 +939,18 @@ export function compile(register: string, where: string | undefined): Where {
   if (where !== undefined && typeof where !== 'string')
     return { register, clauses, bad: [WRONG_SHAPE] };
 
-  for (const raw of (where ?? '').split(',')) {
-    const text = raw.trim();
-    if (!text) continue;
+  const split = conditionsOf(where ?? '');
+  if ('fix' in split) return { register, clauses, bad: [split.fix] };
+  /* WHERE EACH CONDITION'S CLAUSES START, so an or-group can be cut into its members after the loop:
+     every branch below ends in `continue`, and a range of days pushes two. */
+  const starts: number[] = [];
+
+  for (const { text, or } of split.conditions) {
+    starts.push(clauses.length);
+    if (or && !text) {
+      bad.push(`${(where ?? '').trim()}: or what?`);
+      continue;
+    }
 
     /* THE LONGEST FIELD NAME WINS, WHICH IS ONE LINE AND IS THE RECORD'S RULE. `NAMED_ON`'s own
        paragraph has the four fields in the shipped mirror this is about and what they did without it. */
@@ -1361,135 +1392,199 @@ export function compile(register: string, where: string | undefined): Where {
     clauses.push({ field, op: op === 'is not' ? 'is not' : 'is', values });
   }
 
-  return { register, clauses, bad };
+  if (!split.any) return { register, clauses, bad };
+  const any = starts.map((from, i) => clauses.slice(from, starts[i + 1] ?? clauses.length));
+  return { register, clauses: [], any, bad };
 }
 
-/** Does one row satisfy every clause? */
+/** One condition of a sentence, and whether `, or` joined it to the one before. */
+type Condition = { text: string; or: boolean };
+
+/**
+ * A sentence cut into its conditions, and whether they are ORed, or the refusal for one that says both.
+ *
+ * THE RECORD'S `conditionsOf` IN `packages/where/src/sentence.ts`, where the reasons are written: `, or`
+ * is the separator and `or` alone stays one field's `in`; both separators in one sentence is a refusal
+ * naming the two readings, never a precedence; a leading `or` is left as words for the field lookup to
+ * refuse. The refusal is the record's sentence byte for byte, and `where-any.test.ts` compares them.
+ */
+function conditionsOf(where: string): { conditions: Condition[]; any: boolean } | { fix: string } {
+  const conditions: Condition[] = [];
+  for (const raw of where.split(',')) {
+    const text = raw.trim();
+    if (!text) continue;
+    const joined = conditions.length > 0 ? /^or(?:\s+|$)/i.exec(text) : null;
+    conditions.push(joined ? { text: text.slice(joined[0].length).trim(), or: true } : { text, or: false });
+  }
+  const ors = conditions.slice(1).filter((c) => c.or).length;
+  if (ors === 0 || ors === conditions.length - 1) return { conditions, any: ors > 0 };
+  const reading = (tight: boolean, inner: string, outer: string): string => {
+    const runs: string[][] = [];
+    for (const c of conditions) {
+      if (runs.length === 0 || c.or !== tight) runs.push([c.text]);
+      else runs[runs.length - 1]!.push(c.text);
+    }
+    return runs.map((r) => (r.length > 1 ? `(${r.join(` ${inner} `)})` : r[0])).join(` ${outer} `);
+  };
+  return {
+    fix: `${where.trim()}: this joins its conditions with a comma and with a comma and or, so it reads two ways: ${reading(false, 'and', 'or')}; or ${reading(true, 'or', 'and')}. A sentence cannot put one inside the other. Keep one of the two separators, or ask in the structured form, where all and any nest.`,
+  };
+}
+
+/**
+ * Every clause a predicate names, the conjunction and each member of its or-group together.
+ *
+ * FOR A READER ASKING WHAT THE PREDICATE MENTIONS, NOT WHAT IT ADMITS. `metrics.ts` asks whether any
+ * clause turns on a day, and that is the same question of `due before today` whether it is a condition
+ * of its own or one side of an "or". Flattened, the "or" is gone, so nothing that decides which rows
+ * match may read this.
+ */
+export const everyClause = (w: Where): Clause[] => [...w.clauses, ...(w.any ?? []).flat()];
+
+/**
+ * Does a sentence join any of its conditions with `, or`, alone or beside a plain comma?
+ *
+ * FOR A READER THAT CUTS A SENTENCE ON ITS COMMAS BEFORE `compile` SEES IT, and there is one: `metrics.ts`'s `withParam`
+ * keeps the clauses holding `{{it}}` as a figure's scope, which is only a scope under a conjunction. It is `conditionsOf`
+ * itself rather than a second reading of the separator, so the two cannot disagree about `state is open or paid`, which
+ * joins nothing. A sentence mixing both separators answers yes: `compile` refuses it whole, so a reader that stands aside
+ * for it loses nothing.
+ */
+export function joinsWithOr(where: string): boolean {
+  const split = conditionsOf(where);
+  return 'fix' in split || split.any;
+}
+
+/** Does one row satisfy every clause, and at least one member of the or-group when there is one? */
 export function matches(entry: Entry, w: Where, now: number): boolean {
   // Anything unresolved matches NOTHING. An empty block is a question; a full one is a wrong answer
   // that looks right.
   if (w.bad.length) return false;
+  const holds = (c: Clause): boolean => satisfies(entry, w.register, c, now);
+  /* A MEMBER HOLDS WHEN EVERY CLAUSE IN IT DOES, which is the record's `all` inside its `any`. */
+  return w.clauses.every(holds) && (w.any === undefined || w.any.some((member) => member.every(holds)));
+}
 
-  return w.clauses.every((c) => {
-    const raw = entry.fields[c.field];
+/** Does one row satisfy one clause? */
+function satisfies(entry: Entry, register: string, c: Clause, now: number): boolean {
+  const raw = entry.fields[c.field];
 
-    /**
-     * THE THREE WAYS A VALUE IS ABSENT, and they are the kernel's three rather than a rule invented
-     * here: `null`, the empty string and the empty list, which its compiler spells out as
-     * `(expr IS NULL OR expr = '' OR expr = '[]')` and its evaluator answers with the same three.
-     * A write stores none of them, but an import carries whatever the other record held, and the
-     * shipped record's services hold `points_at: ''` rather than nothing at all. Reading only
-     * `null` would have missed exactly the rows somebody asking this question is looking for.
-     *
-     * `34 §6` is the other half: every positive operator is false on a missing value. `present` is
-     * a positive operator, so it is false on all three; `empty` is the question about absence
-     * itself, so it is the only clause here a row with nothing in the field can satisfy.
-     */
-    if (c.op === 'empty' || c.op === 'present') {
-      const absent = raw === undefined || raw === null || raw === '' || (Array.isArray(raw) && raw.length === 0);
-      return c.op === 'empty' ? absent : !absent;
+  /**
+   * THE THREE WAYS A VALUE IS ABSENT, and they are the kernel's three rather than a rule invented
+   * here: `null`, the empty string and the empty list, which its compiler spells out as
+   * `(expr IS NULL OR expr = '' OR expr = '[]')` and its evaluator answers with the same three.
+   * A write stores none of them, but an import carries whatever the other record held, and the
+   * shipped record's services hold `points_at: ''` rather than nothing at all. Reading only
+   * `null` would have missed exactly the rows somebody asking this question is looking for.
+   *
+   * `34 §6` is the other half: every positive operator is false on a missing value. `present` is
+   * a positive operator, so it is false on all three; `empty` is the question about absence
+   * itself, so it is the only clause here a row with nothing in the field can satisfy.
+   */
+  if (c.op === 'empty' || c.op === 'present') {
+    const absent = raw === undefined || raw === null || raw === '' || (Array.isArray(raw) && raw.length === 0);
+    return c.op === 'empty' ? absent : !absent;
+  }
+
+  /**
+   * WHAT A LIST HOLDS, AND IT IS THE ELEMENTS RATHER THAN THE LINE THEY PRINT AS.
+   *
+   * `formsOf` below reads a list through `display()`, which is `listLine`: the elements joined with
+   * a comma and a space, with the record's own tags left out. That is the right string for a cell
+   * and the wrong one for a question — a row holding two repositories would answer `has` on neither
+   * of them and on the joined line nobody wrote. So this reads the array itself, one element at a
+   * time, and the clause carries the element as the column stores it.
+   *
+   * `String(v)` BECAUSE A LIST IS NOT ALL TEXT. A `list<ref>` in this mirror holds the target's
+   * `seq` as a number and a `list<bool>` holds a boolean, and `elementValue` resolved the written
+   * word to the same spelling; comparing the two as strings is what makes one comparison serve
+   * every element type. Case-sensitively, which is what the record does: `json_each.value = ?` is
+   * not `NOCASE` and its evaluator compares with `===`, so `repos has Portage` finds no row.
+   *
+   * A ROW WITH NOTHING IN THE FIELD `lacks` EVERYTHING, which is the record's line for line:
+   * `!Array.isArray(raw) || !raw.some(...)`. `has` is a positive operator and is false on it, and
+   * the negation is where a person means "and the ones with none".
+   */
+  if (c.op === 'has' || c.op === 'lacks') {
+    const wanted = elementWanted(register, c.field, c.values[0], now);
+    const holds = Array.isArray(raw) && raw.some((v) => String(v) === wanted);
+    return c.op === 'has' ? holds : !holds;
+  }
+
+  /* THE RECORD'S FOLD, which is ASCII and nothing wider: `instr(lower(..), lower(..))` in its SQL
+     and a `[A-Z]` replace in its `evaluate`. A row with nothing in the field holds no text. */
+  if (c.op === 'contains') return typeof raw === 'string' && asciiFold(raw).includes(asciiFold(c.values[0]));
+
+  /**
+   * AN ORDER OVER A NUMBER OR A MONEY, AND A MONEY IN ANOTHER CURRENCY IS NOT PAST ANY LINE.
+   *
+   * The record's SQL compares the amount AND requires the currency (`qualifier`), so a row in
+   * euros is neither above nor below a line drawn in pounds. A value that is not a number, or a
+   * money that is not a money, is past nothing, which is `34 §6`'s rule for a missing value too.
+   */
+  if ('bounds' in c) {
+    const [lo, hi] = c.bounds;
+    if (!lo) return false;
+    let x: number;
+    if (lo.currency !== undefined) {
+      if (!isMoney(raw) || raw.currency !== lo.currency) return false;
+      x = raw.amount;
+    } else if (lo.unit !== undefined) {
+      /* THE SAME RULE FOR A QUANTITY'S UNIT, which is the record's other `qualifier`: five pounds
+         is not past a line drawn at four kilograms, and is not short of it either. */
+      const q = raw as { value?: unknown; unit?: unknown } | null | undefined;
+      if (typeof q !== 'object' || q === null || typeof q.value !== 'number' || q.unit !== lo.unit) return false;
+      x = q.value;
+    } else {
+      if (typeof raw !== 'number' || !Number.isFinite(raw)) return false;
+      x = raw;
     }
+    if (c.op === 'between') return hi !== undefined && x >= lo.n && x <= hi.n;
+    return c.op === 'gt' ? x > lo.n : c.op === 'gte' ? x >= lo.n : c.op === 'lt' ? x < lo.n : x <= lo.n;
+  }
 
-    /**
-     * WHAT A LIST HOLDS, AND IT IS THE ELEMENTS RATHER THAN THE LINE THEY PRINT AS.
-     *
-     * `formsOf` below reads a list through `display()`, which is `listLine`: the elements joined with
-     * a comma and a space, with the record's own tags left out. That is the right string for a cell
-     * and the wrong one for a question — a row holding two repositories would answer `has` on neither
-     * of them and on the joined line nobody wrote. So this reads the array itself, one element at a
-     * time, and the clause carries the element as the column stores it.
-     *
-     * `String(v)` BECAUSE A LIST IS NOT ALL TEXT. A `list<ref>` in this mirror holds the target's
-     * `seq` as a number and a `list<bool>` holds a boolean, and `elementValue` resolved the written
-     * word to the same spelling; comparing the two as strings is what makes one comparison serve
-     * every element type. Case-sensitively, which is what the record does: `json_each.value = ?` is
-     * not `NOCASE` and its evaluator compares with `===`, so `repos has Portage` finds no row.
-     *
-     * A ROW WITH NOTHING IN THE FIELD `lacks` EVERYTHING, which is the record's line for line:
-     * `!Array.isArray(raw) || !raw.some(...)`. `has` is a positive operator and is false on it, and
-     * the negation is where a person means "and the ones with none".
-     */
-    if (c.op === 'has' || c.op === 'lacks') {
-      const wanted = elementWanted(w.register, c.field, c.values[0], now);
-      const holds = Array.isArray(raw) && raw.some((v) => String(v) === wanted);
-      return c.op === 'has' ? holds : !holds;
-    }
+  /* `'values' in c` rather than a check on `op`: the discriminant is spread across two literals
+     per member, and the `in` operator narrows a union on the property that actually differs. */
+  if ('values' in c) {
+    const forms = formsOf(register, c.field, raw);
+    const hit = c.values.map(norm).some((v) => forms.includes(v));
+    return c.op === 'is' ? hit : !hit;
+  }
 
-    /* THE RECORD'S FOLD, which is ASCII and nothing wider: `instr(lower(..), lower(..))` in its SQL
-       and a `[A-Z]` replace in its `evaluate`. A row with nothing in the field holds no text. */
-    if (c.op === 'contains') return typeof raw === 'string' && asciiFold(raw).includes(asciiFold(c.values[0]));
+  /* A missing date is not "before" anything. Counting it would put rows with no due date into an
+     overdue list, which is a list somebody acts on.
 
-    /**
-     * AN ORDER OVER A NUMBER OR A MONEY, AND A MONEY IN ANOTHER CURRENCY IS NOT PAST ANY LINE.
-     *
-     * The record's SQL compares the amount AND requires the currency (`qualifier`), so a row in
-     * euros is neither above nor below a line drawn in pounds. A value that is not a number, or a
-     * money that is not a money, is past nothing, which is `34 §6`'s rule for a missing value too.
-     */
-    if ('bounds' in c) {
-      const [lo, hi] = c.bounds;
-      if (!lo) return false;
-      let x: number;
-      if (lo.currency !== undefined) {
-        if (!isMoney(raw) || raw.currency !== lo.currency) return false;
-        x = raw.amount;
-      } else if (lo.unit !== undefined) {
-        /* THE SAME RULE FOR A QUANTITY'S UNIT, which is the record's other `qualifier`: five pounds
-           is not past a line drawn at four kilograms, and is not short of it either. */
-        const q = raw as { value?: unknown; unit?: unknown } | null | undefined;
-        if (typeof q !== 'object' || q === null || typeof q.value !== 'number' || q.unit !== lo.unit) return false;
-        x = q.value;
-      } else {
-        if (typeof raw !== 'number' || !Number.isFinite(raw)) return false;
-        x = raw;
-      }
-      if (c.op === 'between') return hi !== undefined && x >= lo.n && x <= hi.n;
-      return c.op === 'gt' ? x > lo.n : c.op === 'gte' ? x >= lo.n : c.op === 'lt' ? x < lo.n : x <= lo.n;
-    }
-
-    /* `'values' in c` rather than a check on `op`: the discriminant is spread across two literals
-       per member, and the `in` operator narrows a union on the property that actually differs. */
-    if ('values' in c) {
-      const forms = formsOf(w.register, c.field, raw);
-      const hit = c.values.map(norm).some((v) => forms.includes(v));
-      return c.op === 'is' ? hit : !hit;
-    }
-
-    /* A missing date is not "before" anything. Counting it would put rows with no due date into an
-       overdue list, which is a list somebody acts on.
-
-       AND IT IS NOT THE NAMED DAY EITHER, so it IS in the negation. `34 §6`: every positive operator
-       is false on a missing value, and `not` is how a person says "and the empty ones". That was the
-       behaviour before `not on` existed, because `is not` went through the value branch where a row
-       with nothing in the field matches no value and the negation therefore keeps it. */
-    if (typeof raw !== 'string' || !raw) return c.op === 'not on';
-    const day = resolveDay(c.day, now);
-    if (day === null) return false;
-    /* THE DAY THE VALUE FALLS ON, for all three. `before` and `after` are exclusive of the day named
-       — `34 §6` — and `on` is the day itself, which is what makes `due before today or due is
-       today` say what it looks like it says. An instant is compared by its date, because a person
-       asking for today means the day and not the second. */
-    const at = raw.slice(0, 10);
-    /* AND THE FOUR ORDERS BY THE SAME DAY, which is the record's `asDay` cut: `gte` and `lte` against
-       a bare day compare an instant's date, so `seen at most 2026-09-03` keeps what was seen that
-       afternoon. `more than` is `after` and `less than` is `before`, spelled by the tree's name. */
-    switch (c.op) {
-      case 'gt':
-      case 'after':
-        return at > day;
-      case 'gte':
-        return at >= day;
-      case 'lt':
-      case 'before':
-        return at < day;
-      case 'lte':
-        return at <= day;
-      case 'on':
-        return at === day;
-      default:
-        return at !== day;
-    }
-  });
+     AND IT IS NOT THE NAMED DAY EITHER, so it IS in the negation. `34 §6`: every positive operator
+     is false on a missing value, and `not` is how a person says "and the empty ones". That was the
+     behaviour before `not on` existed, because `is not` went through the value branch where a row
+     with nothing in the field matches no value and the negation therefore keeps it. */
+  if (typeof raw !== 'string' || !raw) return c.op === 'not on';
+  const day = resolveDay(c.day, now);
+  if (day === null) return false;
+  /* THE DAY THE VALUE FALLS ON, for all three. `before` and `after` are exclusive of the day named
+     — `34 §6` — and `on` is the day itself, which is what makes `due before today or due is
+     today` say what it looks like it says. An instant is compared by its date, because a person
+     asking for today means the day and not the second. */
+  const at = raw.slice(0, 10);
+  /* AND THE FOUR ORDERS BY THE SAME DAY, which is the record's `asDay` cut: `gte` and `lte` against
+     a bare day compare an instant's date, so `seen at most 2026-09-03` keeps what was seen that
+     afternoon. `more than` is `after` and `less than` is `before`, spelled by the tree's name. */
+  switch (c.op) {
+    case 'gt':
+    case 'after':
+      return at > day;
+    case 'gte':
+      return at >= day;
+    case 'lt':
+    case 'before':
+      return at < day;
+    case 'lte':
+      return at <= day;
+    case 'on':
+      return at === day;
+    default:
+      return at !== day;
+  }
 }
 
 /**
@@ -1552,6 +1647,9 @@ const spokenElement = (register: string, field: string, held: string): string =>
 export function registerHref(register: string, where: string | undefined): string {
   const w = compile(register, where);
   if (w.bad.length) return `/r/${register}`;
+  /* AN OR-GROUP OPENS IT WIDE TOO: every chip below is ANDed with the others, so no set of chips can
+     say "or", and chips minted from its members would open the rows that meet all of them. */
+  if (w.any) return `/r/${register}`;
   /**
    * AND A CLAUSE NO CHIP CAN CARRY BACK OPENS IT WIDE, for the same reason a refusal does.
    *

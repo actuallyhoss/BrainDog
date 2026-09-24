@@ -54,7 +54,7 @@ import { day as longDay, integer, money, shortDay } from 'braindog-render';
 import { copy } from '../copy.ts';
 import { LOOKUPS, NOW, REGISTERS, ROWS } from './data.ts';
 import { BARE, amountOf, currencyOf, mixedFix } from './money.ts';
-import { compile, explain, matches, registerHref, resolveDay } from './where.ts';
+import { compile, everyClause, explain, joinsWithOr, matches, registerHref, resolveDay } from './where.ts';
 import type { Clause, Where } from './where.ts';
 import type { Entry } from './schema.ts';
 
@@ -646,9 +646,16 @@ const dayAt = (register: string, c: Clause, now: number): string | null => {
   return resolveDay(c.values[0], now) ?? c.values[0];
 };
 
-/** The predicate as it RESOLVES at one clock: the same clauses, each beside the day it turns on. */
+/**
+ * The predicate as it RESOLVES at one clock: the same clauses, each beside the day it turns on.
+ *
+ * AND THE OR-GROUP'S CLAUSES WITH THEM, read through `everyClause`. Reading `clauses` alone, a tile over
+ * `state is open, or due before today` resolved to `[]` at both clocks, because an or-group leaves
+ * `clauses` empty, so the window was judged to move nothing and the person was told nothing here is
+ * dated about a predicate whose second half names today (`where-any.test.ts`).
+ */
 const resolvedAt = (w: Where, now: number): string =>
-  JSON.stringify(w.clauses.map((c) => ({ ...c, at: dayAt(w.register, c, now) })));
+  JSON.stringify(everyClause(w).map((c) => ({ ...c, at: dayAt(w.register, c, now) })));
 
 /** Does this predicate say anything different at the moved clock? Without that, the two sets are one set. */
 const moves = (w: Where, now: number, then: number): boolean => resolvedAt(w, now) !== resolvedAt(w, then);
@@ -713,8 +720,8 @@ const endedAt = (w: Where, now: number, then: number): Where => {
   return { ...w, clauses: [...w.clauses, ...ends] };
 };
 
-/** Does the predicate mention time at all? Read for the sentence under a tile that has no comparison. */
-const timeless = (w: Where, now: number): boolean => w.clauses.every((c) => dayAt(w.register, c, now) === null);
+/** Does the predicate mention time at all, in either half? Read for the sentence under a tile that has no comparison. */
+const timeless = (w: Where, now: number): boolean => everyClause(w).every((c) => dayAt(w.register, c, now) === null);
 
 /**
  * The same clock, one year earlier.
@@ -933,10 +940,16 @@ const PARAM = '{{it}}';
  * here are the clauses that grammar would have built — the same rule the kernel's `scopeOf` applies
  * to the same sentence, one level up. A predicate with no `{{it}}` in any clause cuts nothing, and
  * `within` is then left off so `held` stays the whole register it has always been.
+ *
+ * AND NOTHING IS CUT FROM A SENTENCE WITH A `, or`, which is the kernel's `scopeOf` again. `compile` reads `a, or b` as an
+ * or-group since M4 wave two brief 7, and a parameter under an "or" widens the rows rather than naming which rows the
+ * figure is about. Split on the comma regardless, `state is paid, or thing is {{it}}` kept ` or thing is Kiln` as its
+ * scope, which compiled to no row, and read `held: 0` beside eighteen matched rows on the seed; the other order read
+ * `held: 10` under the same eighteen (`where-any.test.ts`).
  */
 export function withParam(decl: MetricDecl, it: string): MetricDecl {
   if (decl.where === undefined) return decl;
-  const scope = decl.where.split(',').filter((clause) => clause.includes(PARAM));
+  const scope = joinsWithOr(decl.where) ? [] : decl.where.split(',').filter((clause) => clause.includes(PARAM));
   return {
     ...decl,
     metric: `${decl.metric}:${it}`,

@@ -36,7 +36,7 @@
   import { NOW, REGISTERS, heldBy, homeCurrency, hueOf, iconFor, page as readPage, pages as readPages, values, type BlockResult } from '$lib/record/api.ts';
   import { symbolText } from '$lib/record/money.ts';
   import { draw, saidPlainly, walkTables } from '$lib/record/blocks.ts';
-  import { registerHref } from '$lib/record/where.ts';
+  import { joinsWithOr, registerHref } from '$lib/record/where.ts';
   import type { PageBlock } from '$lib/record/schema.ts';
   import { PAGES } from '$lib/record/data.ts';
   import { dogName, dogText, saveDog, type DogPage } from '$lib/dog/source.ts';
@@ -174,11 +174,15 @@
     const field = block.columns[0]?.field;
     /* WHERE IT CAME FROM, in the screen's spelling, which is what `movePatch` takes and what the held card wears. */
     const from = row.cells[0] ?? '';
+    /* AND THE ROW IT WAS, because the column alone put a done card back dated today: the record re-dates a move into
+       `done` that names no day, so a task finished on 1 September came back finished on the day of the undo (audit
+       sixty-five, section 2). `moveBackOf` names the day the row held, as a tick's undo does. */
+    const held = block.entries.find((e) => e.seq === row.ref?.seq && e.version === row.ref.version);
     void writeRow(row.ref, (m, ref, decl) => (field ? m.movePatch(ref, field, to, decl) : null), title, {
       at,
       before,
       what: { to },
-      back: (m, ref, decl) => (field && from ? m.movePatch(ref, field, from, decl) : null),
+      back: async (_m, ref, decl) => (field ? (await import('./move-undo.ts')).moveBackOf(ref, field, to, from, decl, held) : null),
       undone: { to: from },
       said: (w) => w.moved(title, to),
     });
@@ -334,10 +338,12 @@
     block.register ? registerHref(block.register, block.where) : null;
 
   const param = $derived(result?.page.param);
+  /* A SENTENCE JOINED BY `, or` IS SAID WHOLE: taking the page's subject out of an or-group would leave a dangling
+     "or" and read as a narrower filter than the block draws. */
   const whereOf = (block: { register?: string | undefined; where?: string | undefined }): string =>
     saidPlainly(
       block.register ?? '',
-      (block.where ?? '')
+      joinsWithOr(block.where ?? '') ? (block.where ?? '') : (block.where ?? '')
         .split(',')
         .map((c) => c.trim())
         /* The page's own subject, in either spelling: by name through a `thing` ref, or by spoken id

@@ -2121,7 +2121,12 @@ function readsField(body: string, list: string, fields: Map<string, Record<strin
   const walk = (v: unknown, key: string | null, on: string | null): void => {
     if (typeof v === 'string') {
       if (on !== name || key === null || NOT_A_FIELD.has(key)) return;
-      if (SENTENCES.has(key)) for (const c of v.split(',')) clause(c);
+      /* A CONDITION AFTER THE FIRST MAY OPEN WITH `or`, which `parseWhere` reads as the separator `, or` and not as words.
+         Handed to `clause` whole, `direction is out, or transfer is true` began with `or`, named no field, and a pack update
+         taking `transfer` off planned no conflict (`reads-field-any.test.ts`). The first condition keeps its words, as the
+         grammar keeps them there: a leading `or` joins nothing and is refused by name. */
+      if (SENTENCES.has(key))
+        for (const [i, c] of v.split(',').map((s) => s.trim()).filter(Boolean).entries()) clause(i === 0 ? c : c.replace(/^or(?:\s+|$)/iu, ''));
       else if (fields.has(v)) read.add(v);
       return;
     }

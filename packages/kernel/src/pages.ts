@@ -1784,9 +1784,18 @@ const PARAM = '{{it}}';
  * down, it widens or inverts it, so there is no slice to count and this answers nothing, which leaves
  * `held` the whole register it has always been. Narrowing on a disjunct would be a smaller number
  * than the truth, and a `held` under `rows` is a reading that contradicts itself.
+ *
+ * AND A SENTENCE WITH A `, or` IS THAT `any`, SO IT ANSWERS NOTHING TOO. `parseWhere` reads `a, or b` as `{ any: [a, b] }`
+ * since M4 wave two brief 7, and this went on splitting it on the comma. Measured over five obligations with Halden as the
+ * parameter: `party is {{it}}, or state is paid` read `rows: 2, held: 1`, and `state is paid, or party is {{it}}` kept
+ * ` or party is Halden` as its scope and was refused `FIELD_UNKNOWN` for a field called `or` (`scope-any.test.ts`). The
+ * test is `parseWhere`'s own: a condition after the first that begins with the word `or`. A sentence that mixes the two
+ * separators is refused whole by the grammar, so answering nothing for it here loses nothing.
  */
 function scopeOf(where: unknown): Predicate | string | undefined {
   if (typeof where === 'string') {
+    const conditions = where.split(',').map((clause) => clause.trim()).filter(Boolean);
+    if (conditions.slice(1).some((clause) => /^or(?:\s|$)/i.test(clause))) return undefined;
     const kept = where.split(',').filter((clause) => clause.includes(PARAM));
     return kept.length === 0 ? undefined : kept.join(',');
   }
