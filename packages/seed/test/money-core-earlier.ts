@@ -89,7 +89,8 @@ export const HELD_AT_1_8_0: readonly Held[] = [
  * `register.transactions`, so the two rebuilds below stay the releases they name. Without either the 1.8.0 rebuild's
  * fingerprint moved off the one `pack-versions.test.ts` recorded for 1.8.0, measured when each landed: `pairs:` alone read
  * `7e991afc1e7d11aa` against `8bcd20187c61cf1b` on 24 September. `pairs:` is taken off whole, so its `where:` gaining
- * `party` and `settles` at 2.2.0 needs nothing here.
+ * `party` and `settles` at 2.2.0, and `settles` loosened to `settles is empty or transfer is true` at 2.3.0, needs
+ * nothing here: `money-core-major.test.ts` still read `8bcd20187c61cf1b` off the 1.8.0 rebuild after 2.3.0 landed.
  */
 function asShipped(doc: unknown): Doc {
   const d = structuredClone(doc) as Doc;

@@ -129,6 +129,14 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   (`loop/research-batch-sixty-one-audit.md` findings 1 and 6). Before any of it, two such rows written by the import
  *   were GBP 4,000.00 of "Spent, 30 days" until a person marked them. Nothing is added to the ids a record holds and
  *   nothing is taken away, so the step is a minor one.
+ * - money-core 2.3.0: a reconciled card bill stays a move. At 2.2.0 setting `settles` on the bank leg of a card bill,
+ *   which is what Reconcile does, parted a pair the record had made, and EGP 9,500.00 read as spent and as received on
+ *   top of the purchases the bill paid (`loop/research-batch-sixty-three-audit.md` finding 3). `pairs.where` now lets a
+ *   leg that settles something stay paired while it holds the mark, and still refuses it as the start of a new pair, so
+ *   rent written already reconciled is not paired with a client's payment (`test/money-card-bill.test.ts`). Nothing is
+ *   added and nothing is taken away, so the step is a minor one. A version and not a reset because 2.2.0 is on
+ *   `origin/master` (`814ca32c`): CI run `35940058225` for `e0e98bbe` passed, and deploy run `35941293759` was carrying
+ *   it out at 01:04 UTC on 24 September, while this was written.
  * - estate 1.2.0: a service carries a note. the old tool's domains carry the reason each name is held and what is
  *   unresolved about it, and Services had no field that holds prose, so the import left every note in the export. One
  *   field added and nothing taken away, so the step is a minor one. It moves the version rather than riding on 1.1.0
@@ -164,7 +172,7 @@ const SUMMARIES: Record<FirstPartyId, string> = {
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.4.0',
   people: '2.0.0',
-  'money-core': '2.2.0',
+  'money-core': '2.3.0',
   estate: '1.2.0',
   work: '1.8.0',
 };

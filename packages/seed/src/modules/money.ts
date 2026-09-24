@@ -649,6 +649,28 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
      * keeps the pair apart. Both are fields the kernel reads again on an update, so naming Omar on a repayment the record
      * had paired undoes the pair (`test/money-pairs.test.ts`).
      *
+     * `settles is empty` OR `transfer is true`, SINCE 2.3.0, BECAUSE A CARD BILL IS A PROMISE AND A MOVE AT ONCE. A founder
+     * keeps the bill in Obligations so the forecast holds it, the import writes its two legs bare and the record pairs
+     * them, and then Reconcile sets `settles` on the bank leg. At 2.2.0 that one field parted the pair: Spent and
+     * Received each read EGP 9,500.00 high, on top of the purchases the bill paid, already in Spent on the card
+     * (`loop/research-batch-sixty-three-audit.md` finding 3, F4; `test/money-card-bill.test.ts`). So a leg that settles
+     * something is still a leg while the record holds it as one. `transfer` is read on the stored row, the mark the
+     * pairing itself wrote, so the clause keeps a pair and never starts one.
+     *
+     * WHY NOT THE CARD ITSELF. The bank leg of a card bill and a rent payment that settles its obligation are the same row
+     * field for field, and so are their partners; what differs is the obligation's payee or the kind of the account the
+     * money went to, and both are a hop through a ref that `where` here cannot take (`pairs.ts`, `pairsFault`). Dropping
+     * `settles` from the clause altogether would pair the rent that M4 writes already reconciled with the client beside
+     * it (`test/money-pairs.test.ts`).
+     *
+     * WHAT THE CLAUSE COSTS, measured on 24 September and held in `test/money-card-bill.test.ts`: which was written first
+     * decides. A bank leg reconciled while it holds no pair never gains one, as at 2.2.0: reconciled before the card's
+     * leg arrives, reconciled on the bank alert while still pending and cleared afterwards, or reconciled and then parted
+     * for a moment by a mistyped amount on the card's leg or a third row of the same sum, and each leaves the bill counted
+     * both ways after the ledger is back as it was. And two bare rows
+     * the record paired by coincidence, rent and a client's payment of the same sum, no longer part when the rent is
+     * reconciled; naming the client still parts them, as it parts the dinner and the repayment in M5.
+     *
      * NOT `category is empty`, which the audit proposed. the old tool's ledger, read on 24 September through the route his
      * import reads, files both legs of both his real moves since 13 July under a category called Transfers (EGP 63,313.46
      * on 2 August, EGP 48,000.27 on 24 and 25 August), and the import carries the category over, so that clause would
@@ -680,7 +702,7 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
         all: [
           { field: 'state', is: 'cleared' },
           { field: 'party', empty: true },
-          { field: 'settles', empty: true },
+          { any: [{ field: 'settles', empty: true }, { field: 'transfer', is: true }] },
         ],
       },
     },
