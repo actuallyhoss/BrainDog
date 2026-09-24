@@ -4,6 +4,108 @@
   "entries": [
     {
       "kind": "pack",
+      "id": "mercury-company",
+      "title": "mercury-company",
+      "summary": "Reads the balance of every Mercury account from api.mercury.com every 1h, into Money's accounts.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "addon",
+      "latest": "1.0.1",
+      "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "3d377d9a05c479bc893786ef5c45a26ebac8ce66ec3ef4e2a5b28b477967c155",
+          "bytes": 2198,
+          "published_at": "2026-09-24T21:59:39.555Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "api.mercury.com",
+                "line": "CALLS OUT api.mercury.com · every 1h · grant \"none\"",
+                "key": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "kind": "pack",
+      "id": "project-brief",
+      "title": "Project brief",
+      "summary": "A line on what each project is, the plan for it, and what is in the way.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "e9703347c9ca2b523bcf1d59111fcd44825635d5b9f57b397aa46dc556551bcc",
+          "bytes": 3329,
+          "published_at": "2026-09-24T21:59:39.555Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "portfolio"
+            ],
+            "lists": [],
+            "pages": [
+              "Briefs"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          }
+        }
+      ]
+    },
+    {
+      "kind": "pack",
+      "id": "rates-open-er-api-com",
+      "title": "rates-open-er-api-com",
+      "summary": "Polls open.er-api.com every 1d for what one USD is worth in EGP, GBP.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "7895187e0a02f96f21112edc772696cd10ff48000df5e115c0a4cc2050db1642",
+          "bytes": 1973,
+          "published_at": "2026-09-24T21:59:39.555Z",
+          "bump": null,
+          "reach": {
+            "modules": [],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "open.er-api.com",
+                "line": "CALLS OUT open.er-api.com · every 1d · grant \"none\"",
+                "key": null
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "kind": "pack",
       "id": "reading-list",
       "title": "Reading list",
       "summary": "Books and articles to read, what you are reading now, and a line on each one you finish.",

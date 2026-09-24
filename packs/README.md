@@ -45,7 +45,25 @@ that quoted somebody's record would publish it.
 | `rates-poll` | Exchange rates fetched on a schedule into the record, for whichever currencies it names. |
 | `mercury` | Balances from a Mercury bank account, pulled on a schedule through a key held in the vault. |
 
-## What is not here yet
+## How a pack here reaches a record
 
-The catalogue still reads the first-party packs from `packages/seed`. Moving them, and reading the catalogue from this
-folder, is its own piece of work; until then a pack here is installed from its file.
+`node tools/catalogue/from-packs.mjs` publishes every `packs/<folder>/<folder>.pack.json` into
+`apps/web/static/catalogue/`, the catalogue the app ships and every host serves under `/app/catalogue/`. It goes
+through `publishTo`, the door `braindog pack publish` uses, so the file is read the way a record reads it and its
+index line says what it reaches. From there:
+
+- **The app** lists it on Browse, and asks the owner on Decide to install it.
+- **The CLI** installs it by id, `braindog pack install project-brief`, from the host's catalogue, or from the file
+  itself, `braindog pack install packs/project-brief/project-brief.pack.json`. `--dry-run` says what it would ask and
+  sends nothing.
+
+The catalogue id is the one the file gives itself, not its folder's: `packs/mercury` is `mercury-company`.
+
+**A published version never changes.** A record that installed 1.0.0 is held to its checksum, so a pack edited
+without a later `version` stops the tool, and a version that takes a list, page or field away must be a major. Run
+the tool after a pack's change is committed, never over one still being written: a version it publishes is fixed.
+
+**A pack with no test stops the tool.** Any `*.test.ts`, `*.test.mjs` or `*.test.js` beside the pack file counts. A folder with no
+`<folder>.pack.json`, such as an import adapter, is passed over.
+
+The first-party modules are still read from `packages/seed`, and moving them here is its own piece of work.

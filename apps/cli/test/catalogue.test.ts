@@ -11,6 +11,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import type { Trust } from '@braindog/declare/catalogue';
 
@@ -21,13 +22,23 @@ import type { AgentIo } from '../src/skills.ts';
 const TOKEN = ['rec_01TESTTESTTESTTESTTESTTEST', 'stub-bearer-for-tests-only-44ab'].join('.');
 const CONTEXT = { session: null, ambiguous: [], handoff: null, live: { same_repo: [], elsewhere: [] }, waiting: [], people: [], faded: 0, project: null, registers: [], next: '' };
 
-async function setup(t: { after: (fn: () => void | Promise<void>) => void }, answers: Record<string, unknown> = {}) {
+/** The catalogue the web app ships and every host serves under `/app/catalogue/`, as committed. */
+const SHIPPED = fileURLToPath(new URL('../../web/static/catalogue/', import.meta.url));
+
+async function setup(t: { after: (fn: () => void | Promise<void>) => void }, answers: Record<string, unknown> = {}, catalogue?: string) {
   const seen: { method: string; args: Record<string, unknown> }[] = [];
   const server: Server = createServer((req, res) => {
+    const path = new URL(req.url ?? '/', 'http://stub').pathname;
+    /* THE HOST'S STATIC CATALOGUE, answered as a host answers it: the folder's file, or a 404. Never counted as a call. */
+    if (catalogue !== undefined && path.startsWith('/app/catalogue/')) {
+      const file = join(catalogue, ...path.slice('/app/catalogue/'.length).split('/'));
+      if (!existsSync(file)) return void res.writeHead(404).end();
+      return void res.writeHead(200, { 'content-type': 'application/json' }).end(readFileSync(file));
+    }
     const chunks: Buffer[] = [];
     req.on('data', (c: Buffer) => chunks.push(c));
     req.on('end', () => {
-      const method = new URL(req.url ?? '/', 'http://stub').pathname.replace(/^\/api\//, '');
+      const method = path.replace(/^\/api\//, '');
       const raw = Buffer.concat(chunks).toString('utf8');
       seen.push({ method, args: raw ? (JSON.parse(raw) as Record<string, unknown>) : {} });
       res.writeHead(200, { 'content-type': 'application/json' });
@@ -319,4 +330,63 @@ test("install <file>, preview, list and install <id> print a use case's words wi
   const proposed = h.seen.filter((s) => s.method === 'propose');
   assert.deepEqual(dirty(proposed.map((s) => String(s.args.question))), []);
   assert.ok(String((proposed[0]?.args.body as { file: string }).file).includes('\\u001b]0;owned'));
+});
+
+/* ── a pack in packs/, installed from the CLI ───────────────────────────── */
+
+/*
+ * BRIEF B3 OF `loop/research-legacy-parity.md`. Four packs sat in `packs/` that nothing could install: `pack install`
+ * took only `<id> --from <catalogue>`, and the catalogue every host serves listed `reading-list` alone. Run against the
+ * tree before this, `braindog pack install packs/project-brief/project-brief.pack.json --dry-run` printed the whole usage
+ * line and sent nothing, and `pack install project-brief` said it "takes one id and --from <catalogue>".
+ */
+const PROJECT_BRIEF = fileURLToPath(new URL('../../../packs/project-brief/project-brief.pack.json', import.meta.url));
+
+test('pack install <file> --dry-run says the plan and sends nothing; without it the owner is asked, with the document', async (t) => {
+  const { pack } = await import('../src/catalogue.ts');
+  const h = await setup(t);
+  assert.equal(await pack(['install', PROJECT_BRIEF, '--dry-run'], h.io), 0, h.said.join('\n'));
+  assert.equal(h.seen.length, 0, 'a dry run sent something');
+  assert.match(h.out[0] ?? '', /^Project brief 1\.0\.0 reads as an add-on/u);
+  assert.ok(h.out.includes('  Installs first: portfolio'), h.out.join('\n'));
+  assert.ok(h.out.includes('  Adds lists: none; pages: Briefs; rules: none'), h.out.join('\n'));
+  assert.match(h.out.at(-1) ?? '', /^Would ask the owner: Install Project brief 1\.0\.0\? Nothing was sent\.$/u);
+
+  h.out.length = 0;
+  assert.equal(await pack(['install', PROJECT_BRIEF], h.io), 0, h.said.join('\n'));
+  const asked = h.seen.filter((s) => s.method === 'propose');
+  assert.equal(asked.length, 1);
+  const body = asked[0]?.args.body as { install: string; doc: Record<string, unknown> };
+  assert.equal(body.install, 'project-brief');
+  assert.deepEqual(body.doc, JSON.parse(readFileSync(PROJECT_BRIEF, 'utf8')));
+  assert.match(h.out.at(-1) ?? '', /^Asked the owner: Install Project brief 1\.0\.0\? .*\/decide\/SG7$/u);
+
+  /* A USE CASE IS NOT AN ADD-ON, and a file that is neither is refused before anything is sent. */
+  assert.equal(await usecase(['new', 'club', '--author', 'Halden'], h.io), 0);
+  const before = h.seen.length;
+  assert.equal(await pack(['install', 'club-1.0.0.usecase.json'], h.io), 1);
+  assert.match(h.said.at(-1) ?? '', /is a use case, not an add-on/u);
+  assert.equal(h.seen.length, before);
+});
+
+test('pack install <id> with no --from resolves the id in the catalogue the host serves, which lists every pack in packs/', async (t) => {
+  const { pack } = await import('../src/catalogue.ts');
+  const h = await setup(t, {}, SHIPPED);
+  assert.equal(await pack(['install', 'project-brief', '--dry-run'], h.io), 0, h.said.join('\n'));
+  assert.equal(h.seen.filter((s) => s.method === 'propose').length, 0, 'a dry run asked');
+  assert.match(h.out.join('\n'), /Unsigned: nothing says who published it/u);
+  assert.match(h.out.at(-1) ?? '', /^Would ask the owner: Install Project brief 1\.0\.0 from a catalogue\?.* Nothing was sent\.$/u);
+
+  assert.equal(await pack(['install', 'project-brief'], h.io), 0, h.said.join('\n'));
+  const asked = h.seen.filter((s) => s.method === 'propose');
+  assert.equal(asked.length, 1);
+  assert.equal((asked[0]?.args.body as { install: string }).install, 'project-brief');
+
+  /* EVERY ADD-ON THE HOST LISTS RESOLVES, by the id its file gives itself and not its folder's: `packs/mercury` is
+     `mercury-company`. That the list holds every pack in `packs/` is the web app's test, beside the folder it ships. */
+  const listed = (JSON.parse(readFileSync(join(SHIPPED, 'index.json'), 'utf8')) as { entries: { kind: string; id: string }[] }).entries.filter((e) => e.kind === 'pack');
+  assert.ok(listed.some((e) => e.id === 'mercury-company'), listed.map((e) => e.id).join(', '));
+  for (const { id } of listed) assert.equal(await pack(['install', id, '--dry-run'], h.io), 0, `${id}: ${h.said.join('\n')}`);
+  assert.equal(await pack(['install', 'nothing-here', '--dry-run'], h.io), 1);
+  assert.match(h.said.at(-1) ?? '', /There is no add-on called nothing-here in this catalogue\. It has: .*project-brief/u);
 });

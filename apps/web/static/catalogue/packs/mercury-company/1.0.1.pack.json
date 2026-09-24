@@ -1,0 +1,84 @@
+{
+  "pack": "mercury-company",
+  "version": "1.0.1",
+  "summary": "Reads the balance of every Mercury account from api.mercury.com every 1h, into Money's accounts.",
+  "fill": {
+    "id": "A name for the Mercury profile, lower case, digits and hyphens. The pack is mercury-<id> and its pull mercury_<id>, cut to 32 characters.",
+    "grant": "The label of the key in the vault, which the request sends as a bearer token. A label and never the key itself: a pack that carries a key is refused.",
+    "every": "How often it asks, written in both places a schedule reads it. 1h is four orders of magnitude inside what Mercury publishes.",
+    "base": "Where it asks. Mercury itself unless a test points it somewhere that is not a bank."
+  },
+  "author": "BrainDog",
+  "license": "MIT",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "money-core": ">=1.0.0 <3.0.0"
+    }
+  },
+  "declarations": [
+    {
+      "ingest": "mercury_company",
+      "channel": "pull",
+      "every": "1h",
+      "fetch": {
+        "base": "https://api.mercury.com",
+        "path": "/api/v1/accounts",
+        "method": "GET",
+        "auth": {
+          "kind": "bearer",
+          "grant": "Mercury (read only)"
+        },
+        "schedule": {
+          "every": "1h"
+        },
+        "read": {
+          "rows": "accounts"
+        },
+        "page": {
+          "kind": "none"
+        },
+        "expect": [
+          {
+            "path": "accounts",
+            "present": true
+          }
+        ],
+        "limits": {
+          "rows_per_run": 200,
+          "max_pages": 1,
+          "timeout": "10s"
+        }
+      },
+      "map": {
+        "name": {
+          "path": "name",
+          "type": "text"
+        },
+        "kind": {
+          "value": "bank"
+        },
+        "balance": {
+          "path": "currentBalance",
+          "type": "money",
+          "currency": "USD"
+        },
+        "as_of": {
+          "arrived": true
+        },
+        "liquid": {
+          "value": true
+        }
+      },
+      "writes": {
+        "register": "accounts",
+        "confidence": "exact"
+      },
+      "dedupe": [
+        "name"
+      ],
+      "on_conflict": "update"
+    }
+  ]
+}

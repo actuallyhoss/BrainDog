@@ -20,6 +20,12 @@
  * plan says what it adds, changes and takes away. Which key signed it is said, and whether this machine has seen that key
  * for its author before (trust on first use, kept beside the hosts file), or that its old key named it in a rotation.
  *
+ * AN ADD-ON IS INSTALLED BY ID OR BY FILE (brief B3 of `loop/research-legacy-parity.md`). `pack install <id>` with no
+ * `--from` finds the id in the catalogue the host serves, which `tools/catalogue/from-packs.mjs` fills from `packs/`, and
+ * `pack install <file>` reads a `.pack.json` through the add-on door. Before this, `install` took only `<id> --from`, and
+ * the four packs in `packs/` could be installed by nobody, from the app or from here. `--dry-run` says what the owner
+ * would be asked and what the file adds, and sends nothing.
+ *
  * `key rotate <old> <new> --to <folder>` writes a statement signed by the old key naming the new one into the catalogue's
  * index; `key revoke <key> --to <folder> --reason <why> [--successor <key id>]` writes one signed by the key itself. Only
  * the public halves and the signature are written. A version signed by a revoked key is said as untrusted and never asked for.
@@ -76,7 +82,7 @@ import {
 import { refused, type Result } from '@braindog/ports';
 
 import { oneLine, printable } from './clip.ts';
-import { hostsPath } from './http.ts';
+import { hostsPath, target } from './http.ts';
 import { refuse } from './json.ts';
 import type { AgentIo } from './skills.ts';
 import { proposeFile, readSource } from './usecase.ts';
@@ -603,8 +609,33 @@ async function diff(args: string[], io: AgentIo, kind: EntryKind): Promise<numbe
 
 /* ── install from a catalogue ───────────────────────────────────────────── */
 
-/** `install <id> --from <catalogue> [--version x.y.z]`: the file held to its checksum and signature, then asked for on Decide. */
-export async function installFromCatalogue(id: string, from: string, version: string | undefined, host: string | undefined, io: AgentIo, kind: EntryKind = 'usecase'): Promise<number> {
+/**
+ * The catalogue a host serves, as an address: `/app/catalogue/` on its origin, the folder the Worker's static assets and a
+ * self-host both answer there (`apps/web/static/catalogue`, filled from `packs/` by `tools/catalogue/from-packs.mjs`).
+ *
+ * THE HOST THE CLI ALREADY TALKS TO, so `pack install project-brief` needs no `--from`, and the import resolves a pack it
+ * offers by id in the same place the app's Browse lists it. No token goes with the read: the catalogue is static and public.
+ */
+export function hostCatalogue(host: string | undefined, io: AgentIo): string {
+  return new URL('/app/catalogue/', target(host, io.env, hostsPath(io.env)).base).href;
+}
+
+/** What installing a file would ask, said without asking: what it needs first and what it adds, from its own declarations. */
+function planLines(file: CatalogueFile): string[] {
+  const { title, version } = file.kind === 'usecase' ? printable(file.shared.usecase) : printable({ title: file.file.title, version: file.file.pack.manifest.version });
+  return [`${title} ${version} reads as ${NOUN[file.kind].a}, and this is what installing it would ask.`, ...reachLines(reachOf(file))];
+}
+
+/** `install <id> --from <catalogue> [--version x.y.z]`: the file held to its checksum and signature, then asked for on Decide, or with `dryRun` only said. */
+export async function installFromCatalogue(
+  id: string,
+  from: string,
+  version: string | undefined,
+  host: string | undefined,
+  io: AgentIo,
+  kind: EntryKind = 'usecase',
+  dryRun = false,
+): Promise<number> {
   const at = await catalogueAt(from, io);
   if (typeof at === 'string') {
     io.say(at);
@@ -672,10 +703,16 @@ export async function installFromCatalogue(id: string, from: string, version: st
   }
   const said = trustLine(trust, entry.author);
   io.out(said);
+  const question = `Install ${title} ${chosen.version} from a catalogue? ${said}`;
+  /* A DRY RUN REMEMBERS NO KEY: nothing was asked for, so nothing was trusted. */
+  if (dryRun) {
+    for (const line of planLines(read.value)) io.out(line);
+    io.out(`Would ask the owner: ${question} Nothing was sent.`);
+    return 0;
+  }
   /* THE KEY IS REMEMBERED ON FIRST USE, OR WHEN A KEY ALREADY TRUSTED NAMED IT. A different key is said on Decide and never replaces the one seen before. */
   const keep = keyToKeep(trust);
   if (keep !== null) remember(io, trustSubject(entry), keep);
-  const question = `Install ${title} ${chosen.version} from a catalogue? ${said}`;
   if (read.value.kind === 'usecase') return proposeFile(text, read.value.shared.usecase, host, io, question);
   return proposePack(read.value.file.pack.manifest.pack, read.value.file.doc, question, host, io);
 }
@@ -781,27 +818,70 @@ export function sdkVerb(verb: string | undefined, kind: EntryKind = 'usecase'): 
 }
 
 const PACK_USAGE =
-  'braindog pack takes new <id>, check <file>, diff <a> <b>, key <file> --author <name>, key rotate <old key file> <new key file> --to <folder>, key revoke <key file> --to <folder> --reason <why> [--successor <key id>], publish <file> --to <folder> [--sign <key file>], search [words] --from <catalogue>, or install <id> --from <catalogue> [--version <x.y.z>] [--host <host>].';
+  'braindog pack takes new <id>, check <file>, diff <a> <b>, key <file> --author <name>, key rotate <old key file> <new key file> --to <folder>, key revoke <key file> --to <folder> --reason <why> [--successor <key id>], publish <file> --to <folder> [--sign <key file>], search [words] --from <catalogue>, or install <id|file> [--from <catalogue>] [--version <x.y.z>] [--host <host>] [--dry-run].';
+
+/**
+ * `pack install <file>`: a `.pack.json` from a path or an address, read through the add-on door here first, then asked for
+ * on Decide with its document, the proposal the app's Browse files. With `dryRun` the plan is said and nothing is sent.
+ *
+ * NO CATALOGUE STANDS BEHIND A FILE, so nothing is said about who signed it: the person named the file themselves.
+ */
+async function installPackFile(given: string, host: string | undefined, io: AgentIo, dryRun: boolean): Promise<number> {
+  const read = await readFileAs(given, io, 'pack');
+  if (typeof read === 'number') return read;
+  if (read.file.kind !== 'pack') return 1;
+  const { title, version } = printable({ title: read.file.file.title, version: read.file.file.pack.manifest.version });
+  const question = `Install ${title} ${version}?`;
+  if (dryRun) {
+    for (const line of planLines(read.file)) io.out(line);
+    io.out(`Would ask the owner: ${question} Nothing was sent.`);
+    return 0;
+  }
+  return proposePack(read.file.file.pack.manifest.pack, read.file.file.doc, question, host, io);
+}
 
 /** `braindog pack …`: the add-on half of the SDK. */
 export async function pack(args: string[], io: AgentIo): Promise<number> {
   const [verb, ...rest] = args;
   if (verb === 'check') return checkPack(rest, io);
   if (verb === 'install') {
-    let values: { host?: string | undefined; from?: string | undefined; version?: string | undefined };
+    let values: { host?: string | undefined; from?: string | undefined; version?: string | undefined; 'dry-run'?: boolean | undefined };
     let positionals: string[];
     try {
-      ({ values, positionals } = parseArgs({ args: rest, allowPositionals: true, strict: true, options: { host: { type: 'string' }, from: { type: 'string' }, version: { type: 'string' } } }));
+      ({ values, positionals } = parseArgs({
+        args: rest,
+        allowPositionals: true,
+        strict: true,
+        options: { host: { type: 'string' }, from: { type: 'string' }, version: { type: 'string' }, 'dry-run': { type: 'boolean' } },
+      }));
     } catch {
       io.say(PACK_USAGE);
       return 1;
     }
-    const [id, ...more] = positionals;
-    if (!id || more.length > 0 || !ID.test(id) || values.from === undefined) {
-      io.say('braindog pack install takes one id and --from <catalogue>, as in braindog pack install bookshelf --from ./catalogue.');
+    const [given, ...more] = positionals;
+    if (!given || more.length > 0) {
+      io.say('braindog pack install takes one id or one .pack.json file, as in braindog pack install project-brief or braindog pack install packs/project-brief/project-brief.pack.json.');
       return 1;
     }
-    return installFromCatalogue(id, values.from, values.version, values.host, io, 'pack');
+    const dryRun = values['dry-run'] === true;
+    if (!ID.test(given)) {
+      if (values.from !== undefined || values.version !== undefined) {
+        io.say('--from and --version pick an add-on from a catalogue by its id, so they do not go with a file.');
+        return 1;
+      }
+      return installPackFile(given, values.host, io, dryRun);
+    }
+    /* NO --from IS THE HOST'S OWN CATALOGUE, which lists every pack in `packs/`. */
+    let from = values.from;
+    if (from === undefined) {
+      try {
+        from = hostCatalogue(values.host, io);
+      } catch (e) {
+        io.say(e instanceof Error ? e.message : 'No BrainDog host is set, so there is no catalogue to find the id in. Pass --from <catalogue>.');
+        return 1;
+      }
+    }
+    return installFromCatalogue(given, from, values.version, values.host, io, 'pack', dryRun);
   }
   const sdk = verb === 'preview' ? null : sdkVerb(verb, 'pack');
   if (sdk) return sdk(rest, io);

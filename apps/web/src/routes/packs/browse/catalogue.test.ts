@@ -5,9 +5,14 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { exportUseCase } from '@braindog/declare';
-import { emptyCatalogue, newAuthorKey, publishTo, type AuthorKey, type CatalogueIndex } from '@braindog/declare/catalogue';
+import { emptyCatalogue, newAuthorKey, publishTo, type AuthorKey, type CatalogueEntry, type CatalogueIndex, type CatalogueVersion } from '@braindog/declare/catalogue';
 
 import {
   askForVersion,
@@ -344,4 +349,117 @@ test('a file whose own id is not the entry it is listed under is not asked for',
   const asked = await askForVersion(moved, async (name) => (calls.push(name), { ok: true, value: { id: '1' } }), other, bare, null);
   assert.ok(!asked.ok && /is listed as Other 1\.1\.0 and the file inside is bookshelf 1\.1\.0/u.test(asked.fix), JSON.stringify(asked));
   assert.deepEqual(calls, []);
+});
+
+/* ── the packs in packs/, in the catalogue this app ships ───────────────── */
+
+/*
+ * BRIEF B3 OF `loop/research-legacy-parity.md`. Before it, `static/catalogue/index.json` listed one add-on,
+ * `reading-list`, and none of the four packs in `packs/`, so Browse had nothing of theirs to draw and a host could
+ * resolve none of their ids. `tools/catalogue/from-packs.mjs` publishes each one into this folder through `publishTo`,
+ * the door `braindog pack publish` uses, so a version is never rewritten under readers who hold it to its checksum.
+ */
+const ROOT = new URL('../../../../../../', import.meta.url);
+const TOOL = fileURLToPath(new URL('tools/catalogue/from-packs.mjs', ROOT));
+const SHIPPED = new URL('apps/web/static/catalogue/', ROOT);
+
+/** Each `packs/<folder>/<folder>.pack.json`, as its text. */
+function packFiles(dir: string): { folder: string; text: string }[] {
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && existsSync(join(dir, d.name, `${d.name}.pack.json`)))
+    .map((d) => ({ folder: d.name, text: readFileSync(join(dir, d.name, `${d.name}.pack.json`), 'utf8') }));
+}
+
+test('the catalogue this app ships lists every pack in packs/, at its version, byte for byte', async () => {
+  const { catalogueFile, fileChecksum, readCatalogue } = await import('@braindog/declare/catalogue');
+  const index = readCatalogue(JSON.parse(readFileSync(new URL('index.json', SHIPPED), 'utf8')));
+  assert.ok(index.ok, JSON.stringify(index));
+  const packs = packFiles(fileURLToPath(new URL('packs/', ROOT)));
+  assert.ok(packs.some((p) => p.folder === 'project-brief'), 'packs/project-brief is gone, so this test proves nothing');
+  for (const { folder, text } of packs) {
+    const { pack, version } = JSON.parse(text) as { pack: string; version: string };
+    const entry: CatalogueEntry | undefined = index.value.entries.find((e) => e.kind === 'pack' && e.id === pack);
+    assert.ok(entry, `packs/${folder} (${pack}) is not in the shipped catalogue, which lists ${index.value.entries.map((e) => e.id).join(', ')}. Run node tools/catalogue/from-packs.mjs.`);
+    const listed: CatalogueVersion | undefined = entry.versions.find((v) => v.version === version);
+    assert.ok(listed, `packs/${folder} is at ${version} and the catalogue has ${entry.versions.map((v) => v.version).join(', ')}. Run node tools/catalogue/from-packs.mjs.`);
+    assert.equal(listed.checksum, await fileChecksum(text), `packs/${folder} changed after ${version} was published. Give it a later version.`);
+    assert.equal(readFileSync(new URL(catalogueFile(pack, version, 'pack'), SHIPPED), 'utf8'), text);
+  }
+});
+
+/** The tool run over a folder of packs into a catalogue folder: its exit code and everything it said. */
+function run(packs: string, to: string): { code: number; said: string } {
+  try {
+    return { code: 0, said: execFileSync(process.execPath, [TOOL, '--packs', packs, '--to', to], { encoding: 'utf8', stdio: 'pipe' }) };
+  } catch (e) {
+    const x = e as { status?: number; stdout?: string; stderr?: string };
+    return { code: x.status ?? 1, said: `${x.stdout ?? ''}${x.stderr ?? ''}` };
+  }
+}
+
+test('from-packs publishes a pack once, leaves it alone after, and refuses one with no test or one changed under its version', (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'braindog-from-packs-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const packs = join(dir, 'packs');
+  const to = join(dir, 'catalogue');
+  const shelf = (version: string, summary: string) =>
+    `${JSON.stringify({ pack: 'shelf', version, title: 'Shelf', summary, author: 'Halden', license: 'MIT', requires: { format: 1, primitives: 1, packs: {} }, declarations: [READING] }, null, 2)}\n`;
+  mkdirSync(join(packs, 'shelf'), { recursive: true });
+  writeFileSync(join(packs, 'shelf', 'shelf.pack.json'), shelf('1.0.0', 'Books.'));
+  writeFileSync(join(packs, 'shelf', 'shelf.test.ts'), '');
+  /* A FOLDER WITH NO PACK FILE IN IT is not a pack, and is passed over: an import adapter lives in `packs/` too. */
+  mkdirSync(join(packs, 'adapter'));
+
+  const first = run(packs, to);
+  assert.equal(first.code, 0, first.said);
+  assert.equal(readFileSync(join(to, 'packs', 'shelf', '1.0.0.pack.json'), 'utf8'), shelf('1.0.0', 'Books.'));
+  const index = readFileSync(join(to, 'index.json'), 'utf8');
+  assert.match(index, /"id": "shelf"/u);
+
+  /* THE SAME FILE AGAIN WRITES NOTHING, so the index does not take a new date on every build. */
+  const again = run(packs, to);
+  assert.equal(again.code, 0, again.said);
+  assert.equal(readFileSync(join(to, 'index.json'), 'utf8'), index);
+
+  writeFileSync(join(packs, 'shelf', 'shelf.pack.json'), shelf('1.0.0', 'Books, and more.'));
+  const changed = run(packs, to);
+  assert.equal(changed.code, 1);
+  assert.match(changed.said, /packs\/shelf.*a published version never changes/u);
+  assert.equal(readFileSync(join(to, 'index.json'), 'utf8'), index);
+
+  writeFileSync(join(packs, 'shelf', 'shelf.pack.json'), shelf('1.0.1', 'Books, and more.'));
+  rmSync(join(packs, 'shelf', 'shelf.test.ts'));
+  const untested = run(packs, to);
+  assert.equal(untested.code, 1);
+  assert.match(untested.said, /packs\/shelf has no test/u);
+  assert.equal(readFileSync(join(to, 'index.json'), 'utf8'), index);
+
+  writeFileSync(join(packs, 'shelf', 'bands.test.ts'), '');
+  const later = run(packs, to);
+  assert.equal(later.code, 0, later.said);
+  assert.match(readFileSync(join(to, 'index.json'), 'utf8'), /"latest": "1\.0\.1"/u);
+});
+
+/*
+ * NOTHING IS WRITTEN UNLESS EVERY PACK PASSES. The test above has one pack, so a refusal there is always the first pack
+ * and a tool that wrote each pack as it passed would leave the same folder behind. Checked by writing each file and the
+ * index inside the loop: every assertion above still held. Here a good pack sorts before a refused one.
+ */
+test('from-packs writes nothing when a later pack is refused, not even the good pack before it', (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'braindog-from-packs-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const packs = join(dir, 'packs');
+  const to = join(dir, 'catalogue');
+  const pack = (id: string) =>
+    `${JSON.stringify({ pack: id, version: '1.0.0', title: id, summary: 'Books.', author: 'Halden', license: 'MIT', requires: { format: 1, primitives: 1, packs: {} }, declarations: [READING] }, null, 2)}\n`;
+  for (const id of ['aisle', 'shelf']) {
+    mkdirSync(join(packs, id), { recursive: true });
+    writeFileSync(join(packs, id, `${id}.pack.json`), pack(id));
+  }
+  writeFileSync(join(packs, 'aisle', 'aisle.test.ts'), '');
+
+  const refused = run(packs, to);
+  assert.equal(refused.code, 1, refused.said);
+  assert.match(refused.said, /packs\/shelf has no test/u);
+  assert.equal(existsSync(to), false, 'the refused run wrote into the catalogue');
 });

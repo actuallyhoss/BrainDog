@@ -1,0 +1,68 @@
+{
+  "pack": "rates-open-er-api-com",
+  "version": "1.0.0",
+  "summary": "Polls open.er-api.com every 1d for what one USD is worth in EGP, GBP.",
+  "fill": {
+    "id": "A name for the address, lower case, digits and hyphens. The pack is rates-<id> and its poll rates_<id>, cut to 32 characters.",
+    "url": "The whole https:// address, written out and never computed. Its host goes in the summary and is the source of every row.",
+    "every": "How often it is asked. 1d is plenty, because a rate is read as of a day.",
+    "base": "The three-letter code the answer quotes against. It is the currency of every map, because one of it is worth each number.",
+    "rates": "Each other currency and where its number is in the answer, one map each, shaped as the first. A repeat and the base itself are left out; twenty is the most one poll fills."
+  },
+  "author": "BrainDog",
+  "license": "MIT",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {}
+  },
+  "declarations": [
+    {
+      "ingest": "rates_open_er_api_com",
+      "channel": "poll",
+      "url": "https://open.er-api.com/v6/latest/USD",
+      "every": "1d",
+      "map": [
+        {
+          "currency": {
+            "value": "USD"
+          },
+          "base": {
+            "value": "EGP"
+          },
+          "rate": {
+            "path": "rates.EGP",
+            "type": "decimal"
+          },
+          "as_of": {
+            "arrived": true
+          },
+          "source": {
+            "value": "open.er-api.com"
+          }
+        },
+        {
+          "currency": {
+            "value": "USD"
+          },
+          "base": {
+            "value": "GBP"
+          },
+          "rate": {
+            "path": "rates.GBP",
+            "type": "decimal"
+          },
+          "as_of": {
+            "arrived": true
+          },
+          "source": {
+            "value": "open.er-api.com"
+          }
+        }
+      ],
+      "writes": {
+        "register": "fx"
+      }
+    }
+  ]
+}
