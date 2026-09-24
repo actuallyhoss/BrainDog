@@ -13,9 +13,9 @@
   import { apiBase, at } from '$lib/at.ts';
   import { untrack } from 'svelte';
   import { titleOf } from '$lib/title.ts';
-  import { listFromDraft, listLine } from '$lib/record/tags.ts';
+  import { listLine } from '$lib/record/tags.ts';
   import { amountOf, currencyOf } from '$lib/record/money.ts';
-  import { exponentOf, holeLabel, relative, since, TONES } from 'braindog-render';
+  import { holeLabel, relative, since, TONES } from 'braindog-render';
   import { Document } from 'braindog-render/svelte';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
@@ -37,6 +37,7 @@
   import AddField from '$lib/ui/AddField.svelte';
   import AddValue from './AddValue.svelte';
   import { putBackOf, valueWords } from '$lib/record/field-write.ts';
+  import { draftOf, editable, patchOf, unitOf, wrongMoney } from '$lib/record/field-draft.ts';
   import { ownsRecord, type Me } from '../../../settings/levels.ts';
   import { Table } from 'braindog-render/svelte';
   import { readHistory, readNames, type Told } from '$lib/record/history-live.ts';
@@ -224,20 +225,9 @@
    */
   let archived = $state(false);
 
-  /* A secret is never drawn and never edited: a credential does not go in a row (the vault is a
-     different surface with different rules), and `readableFields` has already left it out. */
-  const editable = (f: FieldDecl): boolean => f.type !== 'secret';
-
-  /** The value as a box holds it: money in major units, everything else as the record stores it. */
-  function draftOf(f: FieldDecl, value: unknown): string {
-    if (value === null || value === undefined) return '';
-    /* A LIST IS TYPED AS ITS TAGS WITH COMMAS, and the tags the record keeps for itself are not in the box (`tags.ts`). */
-    if (Array.isArray(value)) return listLine(value) ?? '';
-    if (f.type !== 'money') return String(value);
-    const minor = amountOf(value);
-    if (minor === null) return '';
-    return String(minor / 10 ** exponentOf(currencyOf(value) ?? currencyFor(id, f.id) ?? 'GBP'));
-  }
+  /* THE CURRENCY A MONEY BOX IS TYPED IN WHEN THE ROW SAYS NONE: what the list's rows hold. The three below are
+     `field-draft.ts`'s, which the grid saves through too, so a value changed in either place is the same value. */
+  const listCurrency = (f: FieldDecl): string | null => currencyFor(id, f.id);
 
   function startEdit(f: FieldDecl) {
     if (!row) return;
@@ -249,7 +239,7 @@
     }
     problem = null;
     editing = f.id;
-    draft = draftOf(f, row.fields[f.id]);
+    draft = draftOf(f, row.fields[f.id], listCurrency(f));
     ticked = row.fields[f.id] === true;
     was = draft;
     wasTicked = ticked;
@@ -274,48 +264,6 @@
 
   const changed = (f: FieldDecl): boolean => (f.type === 'bool' ? ticked !== wasTicked : draft.trim() !== was.trim());
 
-  /**
-   * What the record would refuse about a money box, said where it was typed rather than at the save.
-   *
-   * THE EXPONENT IS THE CURRENCY'S: two decimals is most currencies and not all of them, and a field
-   * that assumed two would refuse `KWD 1.250` and quietly mangle `JPY 1250`.
-   */
-  function wrongMoney(f: FieldDecl): string | null {
-    if (f.type !== 'money') return null;
-    const raw = draft.trim();
-    if (raw === '') return null;
-    if (!/^-?\d+(\.\d+)?$/.test(raw)) return copy.moneyShape;
-    const exp = exponentOf(currencyOf(row?.fields[f.id]) ?? currencyFor(id, f.id) ?? 'GBP');
-    const places = raw.includes('.') ? raw.length - raw.indexOf('.') - 1 : 0;
-    return places > exp ? copy.moneyPlaces(exp) : null;
-  }
-
-  /**
-   * The one field, in the shape the record stores.
-   *
-   * A MONEY IS AN AMOUNT AND A CURRENCY and the box holds only the amount, so it is put back
-   * together here, beside the exponent that took it apart. Everything else goes as it was typed and
-   * `outbound` converts it: an empty box is `null`, which is how the record is told the row no
-   * longer carries that field.
-   */
-  function patchOf(f: FieldDecl): Fields {
-    if (f.type === 'bool') return { [f.id]: ticked };
-    const raw = draft.trim();
-    /* THE CAST IS GONE BECAUSE THE TYPE ARRIVED, and this was the last one in the tree. `FieldType`
-       named fifteen of the record's eighteen and `list` was not among them, so this line read
-       `(f.type as string) === 'list'` — a cast that launders a missing member, which is how a whole
-       type goes unhandled quietly, because the next reader writes the same cast instead of the same
-       question. `schema.ts` names `list` now, and `blocks.ts` lost its copy when `where.ts` learned
-       `has` and `lacks`. The `Array.isArray` beside it stays: it is about the ROW rather than the
-       declaration, and a register that has since stopped declaring a field as a list still has rows
-       holding an array in it. */
-    if (f.type === 'list' || Array.isArray(row?.fields[f.id])) return { [f.id]: listFromDraft(raw, row?.fields[f.id]) };
-    if (f.type !== 'money') return { [f.id]: raw };
-    if (raw === '') return { [f.id]: null };
-    const currency = currencyOf(row?.fields[f.id]) ?? currencyFor(id, f.id) ?? 'GBP';
-    return { [f.id]: { amount: Math.round(Number(raw) * 10 ** exponentOf(currency)), currency } };
-  }
-
   /** The history again, so the change somebody just made is in the list beside the row. */
   async function refreshHistory(register: string, n: number) {
     const key = `${register}#${n}`;
@@ -328,7 +276,7 @@
 
   async function saveEdit(f: FieldDecl) {
     if (!row || saving || !live) return;
-    const bad = wrongMoney(f);
+    const bad = wrongMoney(f, draft, row.fields[f.id], listCurrency(f));
     if (bad) {
       problem = bad;
       return;
@@ -346,7 +294,9 @@
     /* THE ROW AS IT WAS, READ BEFORE THE WRITE: once it lands `row` is the answer, and the way back is built from
        what the row held when the person pressed Save. */
     const before = { ...row.fields };
-    const patch = patchOf(f);
+    /* THE LIST AS IT WAS AT THE SAVE, so Put back names the finished day this list declared then (`putBackOf`). */
+    const heldDecl = decl;
+    const patch = patchOf(f, f.type === 'bool' ? ticked : draft, row.fields[f.id], listCurrency(f));
     saving = true;
     problem = null;
     writer ??= rowWriter(apiBase());
@@ -357,7 +307,7 @@
       got = { from: 'live', entry: out.entry, names: names ?? new Map() };
       stopEdit();
       const version = out.entry.version;
-      toasts.push(copy.writeMarkSaved, { undo: () => void putBack(register, n, labelOf(f), putBackOf(before, patch), version) });
+      toasts.push(copy.writeMarkSaved, { undo: () => void putBack(register, n, labelOf(f), putBackOf(before, patch, heldDecl), version) });
       void refreshHistory(register, n);
       return;
     }
@@ -714,7 +664,9 @@
                     {:else if f.type === 'int' || f.type === 'decimal' || f.type === 'duration'}
                       <div class="field">
                         <input class="field-input num" type="text" inputmode="decimal" bind:value={draft} />
-                        {#if f.unit}<span class="edit-unit">{f.unit}</span>{/if}
+                        <!-- A DURATION IS TYPED IN THE UNIT IT IS SAID IN, and one that names none is said in seconds, so
+                             its box says `s` rather than nothing. This drew `h` beside a box holding 7200 seconds. -->
+                        {#if f.type === 'duration'}<span class="edit-unit">{unitOf(f)}</span>{:else if f.unit}<span class="edit-unit">{f.unit}</span>{/if}
                       </div>
                     {:else if f.type === 'ref'}
                       <div class="field">

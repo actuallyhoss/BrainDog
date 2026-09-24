@@ -27,7 +27,7 @@
   import * as pref from '$lib/pref.ts';
   import { covered, silenced, typing as isTyping } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { chipsOf, columnsFor, seqWidth, dirOf, display, DOM_CAP, iconFor, identityFor, identityOf, inheritedFrom, labelOf, noticed, PAGES, readableFields, toRows, unansweredBy, type Filter, whereOf } from '$lib/record/api.ts';
+  import { chipsOf, columnsFor, currencyFor, seqWidth, dirOf, display, DOM_CAP, iconFor, identityFor, identityOf, inheritedFrom, labelOf, noticed, PAGES, readableFields, toRows, unansweredBy, type Filter, whereOf } from '$lib/record/api.ts';
   /* Type only, so the client's route table stays out of this chunk. */
   import { joinNames, type Names } from '$lib/record/remote.ts';
   import { open, read, type Boot, type Refusal } from '$lib/data/record.ts';
@@ -55,6 +55,9 @@
   import { drew } from '../../../lib/ui/screen.svelte.ts';
   import * as pending from '$lib/record/pending.svelte.ts';
   import { capturedFields, holdInPlace, inverseOf, rowWriter, type Held, type RowWriter, type Wrote } from '$lib/record/rows-write.ts';
+  import { draftOf, editable, patchOf, unchanged, unitOf, wrongMoney } from '$lib/record/field-draft.ts';
+  import { spentPutBacks, type Change } from './put-back.ts';
+  import { currencyOf } from '$lib/record/money.ts';
 
 
   const id = $derived(page.params.register ?? '');
@@ -1279,26 +1282,24 @@
    * already drawn in a box of exactly the right width, and the cheapest possible edit is that box
    * becoming writable where it sits. Enter commits, Escape cancels, and the caret is put in it.
    *
-   * FOUR TYPES AND NOT ALL OF THEM, said out loud rather than half-built. `text`, `enum`, `day` and
-   * the plain numbers are one value in one box and are editable here. A `money` is an amount AND a
-   * currency and a `ref` is a row in another register: both are two decisions, and a cell that took
-   * one of the two would write half a value. Those open the row, which is where the second decision
-   * has somewhere to go.
+   * EVERY TYPE BUT `secret`, WHICH IS WHAT THE ROW PAGE EDITS. This said four types and argued that a money and a
+   * ref were two decisions each, so a cell that took one of them would write half a value. The row page had already
+   * answered both: a money box is the amount alone and goes back in the currency the row held, and a ref is typed as
+   * the number a person says. Its three closures could not be called from here, so the grid refused twelve types for a
+   * problem solved one screen away. They are `field-draft.ts` now, and a cell save goes through the same three, so a
+   * money cell refuses a third decimal on EGP where it was typed, exactly as the row page does.
    *
    * WHICH IS WHICH IS DRAWN AND NOT EXPLAINED. The pencil appears on an editable cell and on no
    * other, so the answer is in front of the reader at the moment they are looking at that cell. A
-   * sentence under the grid listing four type names would be a legend about a mechanism, read once
+   * sentence under the grid listing type names would be a legend about a mechanism, read once
    * and never again, for a question the cell can answer itself.
    */
-  /* `pct` WAS IN THIS SET AND IS NOT A TYPE. `FieldType` is text, document, money, day, instant,
-     int, decimal, enum, bool, ref, secret and duration; a percentage is a `decimal` with a format on
-     it. The entry matched nothing, so it neither added a type nor took one away, which is exactly
-     why it sat here unread: a set with a word in it that no field can ever carry reads as a
-     decision somebody made and is not one. */
-  const EDITABLE = new Set(['text', 'enum', 'day', 'int', 'decimal']);
 
   let editing = $state<{ seq: number; field: string } | null>(null);
   let editValue = $state('');
+  /* A YES OR NO IS TICKED, NOT TYPED: the cell's toggle holds this, and a box holding the word `true` would be a
+     second spelling of a value the record keeps as a boolean. */
+  let editTicked = $state(false);
 
   /**
    * ESCAPE HAPPENED, SO THE BLUR THAT FOLLOWS IT IS NOT A COMMIT.
@@ -1323,7 +1324,12 @@
    * back: `where.ts` `declaredValue` takes a value by its label.
    */
   const saidInLine = (field: string, value: string): string => fieldOf(field)?.labels?.[value] ?? value.replace(/_/g, ' ');
-  const editableHere = (field: string) => EDITABLE.has(fieldOf(field)?.type ?? '');
+  const editableHere = (field: string) => {
+    const f = fieldOf(field);
+    return f !== undefined && editable(f);
+  };
+  /* THE CURRENCY A MONEY CELL IS TYPED IN WHEN ITS ROW SAYS NONE, the fallback the row page passes too. */
+  const listCurrency = (field: string): string | null => currencyFor(id, field);
 
   /** Why a cell is not the editor, in the reader's words rather than as a type name. */
   const notEditableBecause = (field: string): string =>
@@ -1354,25 +1360,28 @@
     return held?.fields[field];
   };
 
-  const asText = (v: unknown) => (v === null || v === undefined ? '' : String(v));
-
   function openEditor(seq: number, field: string) {
     if (!editableHere(field)) {
       /* A BOUND KEY DOES NOT ANSWER WITH SILENCE. `19 §4`'s sheet advertises `e` for the grid with
-         no condition on it, and `money` and `ref` are deliberately not editable here because each is
-         two decisions and a cell that took one of them would write half a value. That argument is
-         sound and it was never said out loud: the press did nothing, drew nothing and reported
-         nothing, on the two types where a person is most likely to try. */
+         no condition on it, and when this refused money and refs the press did nothing, drew nothing
+         and reported nothing, on the two types where a person was most likely to try. A quantity, a
+         file, a json and a secret are refused now, on this screen and the row's alike, and the
+         sentence says why without sending the reader to the row, which would refuse them too. */
       const f = fieldOf(field);
       /* AND A COLUMN THAT IS NOT A FIELD STILL ANSWERS. The picker and the row's verbs carry no
          declaration, so `fieldOf` is undefined for them and this returned in silence: a printed key
          doing nothing, which is the drift `19 §4` exists to prevent. It became reachable the day
          clicking a cell started moving the caret to that cell. */
-      toasts.push(f ? copy.cellOpensRow(labelOf(f), notEditableBecause(field)) : copy.cellNoValue, { intent: 'warn' });
+      toasts.push(f ? copy.cellNotEdited(labelOf(f), notEditableBecause(field)) : copy.cellNoValue, { intent: 'warn' });
       return;
     }
+    /* THE BOX OPENS ON WHAT THE ROW PAGE'S BOX WOULD HOLD: a money in major units rather than `[object Object]`,
+       which is what `String` made of it, and a list as its tags with commas. */
+    const f = fieldOf(field)!;
+    const shown = shownValue(seq, field);
     editing = { seq, field };
-    editValue = asText(shownValue(seq, field));
+    editValue = draftOf(f, shown, listCurrency(field));
+    editTicked = shown === true;
   }
 
   /**
@@ -1394,6 +1403,34 @@
     commitEdit();
   }
 
+  /**
+   * WHICH BOX A TYPE TAKES IN A CELL. The types this grid already edited keep the boxes they had; the ones it gains
+   * take the row page's, so a value new to the grid is typed here the way it is typed there.
+   *
+   * A MONEY AND A DURATION ARE TEXT WITH A DECIMAL KEYPAD, not `number`, because a number box hands back an empty
+   * string for anything it cannot parse and `wrongMoney` would then be judging nothing. A ref is the number a person
+   * says, so a numeric keypad. A url and an email take the browser's own box for the keyboard it brings, where the
+   * row page types both as plain text; the value either box hands back is the text as typed, so the patch is the same.
+   */
+  function boxOf(type: string | undefined): { type: string; inputmode: 'decimal' | 'numeric' | undefined } {
+    if (type === 'day') return { type: 'date', inputmode: undefined };
+    if (type === 'int' || type === 'decimal') return { type: 'number', inputmode: undefined };
+    if (type === 'money' || type === 'duration') return { type: 'text', inputmode: 'decimal' };
+    if (type === 'ref') return { type: 'text', inputmode: 'numeric' };
+    if (type === 'url' || type === 'email') return { type, inputmode: undefined };
+    return { type: 'text', inputmode: undefined };
+  }
+
+  /** The editor's keys. Escape cancels; Enter commits where Enter is not a new line, and ⌘Enter commits everywhere. */
+  function cellKeys(e: KeyboardEvent, enterCommits: boolean) {
+    e.stopPropagation();
+    if (e.key === 'Enter' && (enterCommits || e.metaKey || e.ctrlKey)) commitEdit();
+    else if (e.key === 'Escape') {
+      cancelled = true;
+      editing = null;
+    }
+  }
+
   function commitEdit() {
     const at = editing;
     if (!at) return;
@@ -1411,17 +1448,34 @@
       return;
     }
     editing = null;
-    const said = editValue.trim();
+    const f = fieldOf(at.field);
+    if (!f) return;
+    const typed = f.type === 'bool' ? editTicked : editValue;
+    const currency = listCurrency(at.field);
+    const shown = shownValue(at.seq, at.field);
     /* NOTHING CHANGED IS NOT AN EDIT. A receipt for a value somebody looked at and left alone is a
        row wearing `Not saved` for no reason, and after three of those the chip stops being read. */
-    if (said === asText(shownValue(at.seq, at.field))) return;
+    if (unchanged(f, typed, shown, currency)) return;
+    /* WHAT THE ROW PAGE REFUSES UNDER ITS BOX IS REFUSED HERE BEFORE ANY WRITE, and the typing goes back into the cell
+       so it is corrected rather than typed again. `EGP 1.234` sent to the record would be rounded by `patchOf` into an
+       amount nobody typed, which is worse than the record refusing it. */
+    const bad = wrongMoney(f, String(typed), shown, currency);
+    if (bad) {
+      toasts.push(bad, { intent: 'warn' });
+      editing = at;
+      editValue = String(typed);
+      return;
+    }
+    /* THE ROW PAGE'S PATCH: a money back with its currency, a list with the record's own tags kept, a toggle as a
+       boolean. An emptied box is `null` here as it always was, so the cell draws nothing rather than an empty string. */
+    const made = patchOf(f, typed, shown, currency)[at.field] ?? null;
+    const value = made === '' ? null : made;
 
     /* ON A LIVE RECORD THE CELL SHOWS WHAT WAS TYPED WHILE IT SAVES. A refused value goes back into the
        cell's editor, so it is corrected rather than typed again; a conflict draws the row as it now
        stands first, so the retry is against the latest version. */
     if (!sample && at.seq > 0) {
       const was = asked;
-      const value = said === '' ? null : said;
       /* THE ROW AS THE RECORD HELD IT, read before the patch goes over it, since the patch is what `Put back` undoes. */
       const before = rowAt(at.seq);
       const patch = { [at.field]: value };
@@ -1445,7 +1499,8 @@
           missed(was, out);
           if (editing === null) {
             editing = at;
-            editValue = said;
+            editValue = String(typed);
+            editTicked = typed === true;
           }
         });
       return;
@@ -1458,7 +1513,7 @@
     const held = rowAt(at.seq);
     const next = new Map(edits);
     const patch = { ...(next.get(at.seq) ?? {}) };
-    if (held && said === asText(held.fields[at.field])) {
+    if (held && unchanged(f, typed, held.fields[at.field], currency)) {
       delete patch[at.field];
       if (Object.keys(patch).length === 0) next.delete(at.seq);
       else next.set(at.seq, patch);
@@ -1467,7 +1522,7 @@
       return;
     }
 
-    next.set(at.seq, { ...patch, [at.field]: said === '' ? null : said });
+    next.set(at.seq, { ...patch, [at.field]: value });
     edits = next;
     receipt(at.seq, {
       mark: copy.markNotWritten,
@@ -1486,7 +1541,7 @@
         if (!back.has(at.seq)) clearReceipt(at.seq);
       },
     });
-    toasts.push(copy.notWritten(`${id}#${at.seq} ${labelOf(fieldOf(at.field)!) .toLowerCase()} would be ${said || 'cleared'}`), {
+    toasts.push(copy.notWritten(`${id}#${at.seq} ${labelOf(f).toLowerCase()} would be ${display(id, at.field, value) ?? 'cleared'}`), {
       intent: 'warn',
     });
   }
@@ -2136,8 +2191,9 @@
     });
   }
 
-  /** A change that landed: the row as it was, what was written over it, and the row the record answered with. */
-  type Change = { before: Entry; patch: Fields; answered: Entry };
+  /* EVERY PUT BACK PRESSED ON THIS SCREEN, so a row's chip and the toast over the same rows write each change once
+     (`put-back.ts`). One for the life of the screen and not `$state`: nothing draws it. */
+  const spent = spentPutBacks();
 
   /**
    * THE WAY BACK FROM A STATE OR A CELL, which is the same write the other way: each field the change wrote, set back
@@ -2176,14 +2232,24 @@
     }
   }
 
-  /** Put changed rows back, one at a time, and mark each one that landed `Restored`, the mark Put back leaves. */
+  /**
+   * Put changed rows back, one at a time, and mark each one that landed `Restored`, the mark Put back leaves.
+   *
+   * A ROW ALREADY PUT BACK IS LEFT OUT, whichever of its two buttons did it. The bulk toast holds every row it moved,
+   * and a row whose own chip had been pressed first was sent again at the spent version, answered conflict, and lost
+   * its `Restored` to a sentence about somebody else's change that was in fact the reader's own press.
+   */
   async function putBack(changes: readonly Change[]) {
+    const owed = spent.take(changes);
+    if (owed.length === 0) return;
     const was = asked;
     let first: string | null = null;
-    const wore = new Map(changes.map((c) => [c.before.seq, receipts.get(c.before.seq)] as const));
-    for (const { before } of changes) receipt(before.seq, { mark: copy.writeMarkSaving, intent: 'warn' });
-    for (const { before, patch, answered } of changes) {
+    const wore = new Map(owed.map((c) => [c.before.seq, receipts.get(c.before.seq)] as const));
+    for (const { before } of owed) receipt(before.seq, { mark: copy.writeMarkSaving, intent: 'warn' });
+    for (const change of owed) {
+      const { before, patch, answered } = change;
       const out = await writes().update(id, before.seq, inverseOf(before, patch, decl), answered.version);
+      spent.answered(change, out);
       if (!out.ok) first ??= out.fix;
       if (asked !== was) continue;
       backAnswered(before.seq, out, wore.get(before.seq));
@@ -2837,24 +2903,53 @@
                 >
                   {#each f.values ?? [] as v}<option value={v}>{valueSaid(f, v)}</option>{/each}
                 </select>
-              {:else}
+              {:else if f?.type === 'bool'}
+                <!-- A YES OR NO IS A TOGGLE, and the press is the edit: it commits on change, as the menu above does,
+                     so there is nothing to type and nothing to confirm. Escape before the press still leaves it. -->
                 <!-- svelte-ignore a11y_autofocus -->
                 <input
-                  class="cell-edit"
+                  class="cell-tick"
+                  type="checkbox"
                   autofocus
-                  type={f?.type === 'day' ? 'date' : f?.type === 'text' ? 'text' : 'number'}
+                  aria-label={labelOf(f)}
+                  bind:checked={editTicked}
+                  onclick={(e) => e.stopPropagation()}
+                  onchange={commitEdit}
+                  onfocusout={leftTheRow}
+                  onkeydown={(e) => cellKeys(e, true)}
+                />
+              {:else if f?.type === 'document'}
+                <!-- A DOCUMENT KEEPS ITS LINE BREAKS. A one-line box drops every newline in the value it is handed,
+                     so the prose would be flattened by opening it; here Enter is a new line and ⌘Enter commits. -->
+                <!-- svelte-ignore a11y_autofocus -->
+                <textarea
+                  class="cell-edit"
+                  rows="1"
+                  autofocus
                   bind:value={editValue}
                   onclick={(e) => e.stopPropagation()}
                   onfocusout={leftTheRow}
-                  onkeydown={(e) => {
-                    e.stopPropagation();
-                    if (e.key === 'Enter') commitEdit();
-                    else if (e.key === 'Escape') {
-                      cancelled = true;
-                      editing = null;
-                    }
-                  }}
-                />
+                  onkeydown={(e) => cellKeys(e, false)}
+                ></textarea>
+              {:else}
+                {@const box = boxOf(f?.type)}
+                <span class="cell-box">
+                  <!-- THE CURRENCY THE AMOUNT GOES BACK IN, drawn beside the box because the box holds the amount alone. -->
+                  {#if f?.type === 'money'}<span class="cell-unit">{currencyOf(shownValue(seq, column.field)) ?? listCurrency(column.field) ?? 'GBP'}</span>{/if}
+                  <!-- svelte-ignore a11y_autofocus -->
+                  <input
+                    class="cell-edit"
+                    autofocus
+                    type={box.type}
+                    inputmode={box.inputmode}
+                    bind:value={editValue}
+                    onclick={(e) => e.stopPropagation()}
+                    onfocusout={leftTheRow}
+                    onkeydown={(e) => cellKeys(e, true)}
+                  />
+                  <!-- AND THE UNIT A DURATION IS TYPED IN, after the number as the cell draws it: `2 h` opens on `2` beside `h`. -->
+                  {#if f?.type === 'duration'}<span class="cell-unit">{unitOf(f)}</span>{/if}
+                </span>
               {/if}
             {:else if column.field === 'act'}
               <!--
@@ -3789,10 +3884,30 @@
      and never needs a focus ring; the keyboard path is `x`, which the `?` sheet advertises. */
   /* ── editing a value where it is drawn ────────────────────────────────── */
 
+  /* A MONEY'S CURRENCY BESIDE ITS BOX, and the box takes what is left of the cell. */
+  .cell-box {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+    min-inline-size: 0;
+  }
+
+  .cell-unit {
+    flex: none;
+    color: var(--ink2);
+    font-size: var(--t-ui);
+  }
+
+  .cell-tick {
+    margin: 0;
+    accent-color: var(--accent);
+  }
+
   /* THE EDITOR IS THE CELL, so it takes the cell's box and none of its own. A control that grew the
      row would push every row below it down the instant somebody started typing, which is the one
      thing a list must not do while a person is reading it. */
   .cell-edit {
+    resize: none;
     inline-size: 100%;
     min-inline-size: 0;
     padding: 0 2px;

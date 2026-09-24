@@ -398,24 +398,24 @@ export const copy = {
      looking at that cell with a pointer. `e` is a keyboard binding on a sheet that advertises it
      for every cell, so pressing it on a money or a ref did nothing at all and said nothing: the
      silence a bound key is never allowed to answer with (19 §4). */
-  cellOpensRow: (field: string, why: string) =>
-    `${field} is ${why}, so it is changed on the row rather than in the list. Open the row to change it.`,
-  /* ONE REASON PER TYPE, AND THERE WERE TWO REASONS FOR SIX TYPES. The first version of this
-     branched on `money` and gave everything else "a row in another list", so pressing `e` on an
-     update's `When` answered *When is a row in another list*, which is not true of an instant and
-     is not true of a document either. A wrong sentence is worse than the silence it replaced,
-     because silence is not a claim. Anything not named here falls back to the shape of the value,
-     which is the one thing that is true of all of them. */
+  /* SAID WITHOUT SENDING ANYBODY ANYWHERE. This was "Open the row to change it", which was true while the row page
+     edited types the grid did not. The two now ask the same `editable` (`field-draft.ts`), so a cell the grid refuses
+     is a field the row refuses too, and a sentence sending the reader there sent them to a second refusal. */
+  cellNotEdited: (field: string, why: string) => `${field} is ${why}, so neither this list nor its row can change it.`,
+  /* ONE REASON PER TYPE THE GRID REFUSES, AND ONLY THOSE. The first version gave two reasons for six types, so `e`
+     on an update's `When` answered *When is a row in another list*, which was not true of an instant: a wrong sentence
+     is worse than the silence it replaced, because silence is not a claim. The grid then learnt to edit money, ref,
+     document, instant, duration and yes or no, and their reasons stayed behind as sentences explaining a refusal that
+     no longer happens. What is left is the four `editable` answers no to, which `field-draft.test.ts` holds equal. */
   cellWhy: {
-    money: 'an amount and a currency',
-    ref: 'a row in another list',
-    document: 'a piece of writing rather than a value',
-    instant: 'a moment down to the second',
-    duration: 'a length of time with its own unit',
-    bool: 'a yes or no with nothing to type',
+    quantity: 'an amount and a unit held together',
+    file: 'a file rather than something typed',
+    json: 'structured data rather than one value',
     secret: 'held by the vault and never drawn in full',
   } as Record<string, string | undefined>,
-  cellWhyElse: 'more than one value',
+  /* FOR A REFUSED TYPE `cellWhy` DOES NOT NAME. Every type `editable` refuses today is named above, so this is said
+     only if that list grows and this one does not, and it is written to be true of any value a box cannot hold. */
+  cellWhyElse: 'a kind of value no box here holds',
   /* AND A COLUMN THAT IS NOT A FIELD AT ALL. The picker and the row's verbs are controls rather
      than values, and `e` on one of them did nothing and said nothing: `19 §4` is that the sheet
      documents the bindings by reading them, so a key it prints for the grid has to answer wherever
