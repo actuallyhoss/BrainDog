@@ -188,20 +188,25 @@ test('an operator the build does not read is named as an operator, not matched a
      no operand, the kernel beside it has compiled both since its first draft, and refusing the
      sentence for a predicate the JSON form accepts is the two-languages failure both files are
      held against. The rest of the list is still published and still unread.
-     AND THE FIVE ORDERED WORDS CAME OFF IT WITH M4 brief 6, which taught both engines them. The first
-     row is an order now, refused for the currency it lacks rather than read as a value, and the
-     text row went with them: `note is more than 10` is a text value again, as it was before the
+     AND THE FIVE ORDERED WORDS CAME OFF IT WITH M4 brief 6, which taught both engines them. The `at
+     least` and `between` rows became orders, refused for the currency they lack rather than read as
+     values, and the text row went with them: `note is more than 10` is a text value again, as it was before the
      words were taught (`where-compare.test.ts` holds that against the record). `starts with` is still
-     published and still unread, and is the row that keeps this test about an unread word. */
+     published and still unread, and is the row that keeps this test about an unread word.
+     AND THE TWO ORDERED ROWS WENT, because they had stopped testing this. Both passed on a refusal
+     that happened to contain their word and `is not`: "amount is money, and 10000 with no currency is
+     not an amount of money". With the refusal asked for by its own sentence they failed. `in` and
+     `ends with` are two more of the published words `UNIMPLEMENTED` still holds, and `in` is the one
+     whose operand is shaped like a value, which is the case this test was written for. */
   for (const [text, word] of [
-    ['amount is at least 10000', 'at least'],
-    ['amount is between 1 and 2', 'between'],
+    ['amount is in 10', 'in'],
+    ['amount is ends with 10', 'ends with'],
     ['amount is starts with 10', 'starts with'],
   ] as const) {
     const w = compile('obligations', text);
     assert.ok(w.bad.length, `${text} was accepted`);
-    assert.match(w.bad[0] ?? '', new RegExp(word));
-    assert.match(w.bad[0] ?? '', /is not/, 'the refusal has to say what does work');
+    assert.match(w.bad[0] ?? '', new RegExp(`"${word}" is not an operator this build reads`), `${text} was not refused as an unread operator`);
+    assert.match(w.bad[0] ?? '', /It reads is, is not/, 'the refusal has to say what does work');
   }
 });
 
@@ -1430,6 +1435,42 @@ test('a field whose own name ends in the operator is still that field, in both e
   assert.match(askBrowser('tools', 'seen on has kiln-mbp').refused ?? '', /has kiln-mbp is not a date/);
   /* AND THE LIST IS STILL REACHABLE BY ITS ID, which is what a page that wants those rows writes. */
   assert.deepEqual((await agree('tools', 'hosts has kiln-mbp')).seqs, [1, 3, 5]);
+});
+
+test('a SHOUTED verb is the same verb in the record as in the browser', async () => {
+  /**
+   * THIS ENGINE HAS FOLDED ITS OPERATOR SINCE `STATE IS NOT Live` COMPILED TO ITS OWN OPPOSITE, and the
+   * record folded only the ordered words. Measured over the seed before the record folded its verb:
+   * every sentence below drew rows here and was refused there, `number IS 3` and `state IS open` as
+   * "IS is not something a filter can say", and `what IS more than coffee` as "more than is not
+   * something a text can be asked", a refusal about an order nobody wrote. The negation is in the list
+   * because folding the verb without it would have made `what IS NOT coffee` mean `is "NOT coffee"`.
+   */
+  for (const [register, sentence] of [
+    ['installments', 'number IS 3'],
+    ['installments', 'number IS NOT 3'],
+    ['installments', 'number IS more than 3'],
+    ['obligations', 'state IS open'],
+    ['obligations', 'what IS more than coffee'],
+    ['obligations', 'what IS NOT more than coffee'],
+    ['obligations', 'due BEFORE today'],
+    ['obligations', 'what CONTAINS rent'],
+    ['tools', 'needs HAS BRAINDOG_TOKEN'],
+  ] as const) {
+    const answer = await agree(register, sentence);
+    assert.equal(answer.refused, null, `the record refused "${sentence}": ${answer.refused}`);
+  }
+  /* AND THE ROWS ARE THE ROWS THE QUIET SPELLING DRAWS, since two engines misreading one word alike
+     would agree as well. */
+  for (const [register, loud, quiet] of [
+    ['installments', 'number IS 3', 'number is 3'],
+    ['installments', 'number IS NOT 3', 'number is not 3'],
+    ['obligations', 'what IS NOT more than coffee', 'what is not more than coffee'],
+  ] as const) {
+    const said = await askRecord(register, loud);
+    assert.deepEqual(said.seqs, (await askRecord(register, quiet)).seqs, `${loud} and ${quiet} drew different rows in the record`);
+    assert.ok(said.seqs.length > 0, `${loud} found nothing in the seed, so it proves nothing about rows`);
+  }
 });
 
 test('a list filter mints the narrow address now, and it opens the rows the block drew', () => {

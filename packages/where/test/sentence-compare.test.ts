@@ -115,6 +115,37 @@ test('A TEXT THAT STARTS WITH AN ORDERED WORD IS STILL A TEXT, after `is`', () =
   assert.deepEqual(good('n is more than 3'), { field: 'n', gt: 3 });
 });
 
+test('A SHOUTED VERB IS THE SAME VERB, as the ordered words after it already were', () => {
+  /* `rankedOf` FOLDED `IS` AND THE VERB TEST BESIDE IT DID NOT. So `n IS more than 3` was `gt 3` while
+     `what IS more than coffee` skipped the text branch and was refused "more than is not something a
+     text can be asked", which is not what anyone wrote; and `n IS 3`, `state IS open` and `due BEFORE
+     today` were refused "IS is not something a filter can say", naming the one word every refusal
+     then tells them to write. The browser's `compile` folds its operator once and has read all of them
+     since `STATE IS NOT Live` compiled to its own opposite there. Measured before this: each of the
+     sentences below refused. */
+  assert.deepEqual(good('what IS more than coffee'), { field: 'what', is: 'more than coffee' });
+  assert.deepEqual(good('n IS 3'), { field: 'n', is: 3 });
+  assert.deepEqual(good('state IS open'), { field: 'state', is: 'open' });
+  assert.deepEqual(good('due BEFORE 2026-09-30'), { field: 'due', before: '2026-09-30' });
+  assert.deepEqual(good('tags HAS x'), { field: 'tags', has: 'x' });
+  assert.deepEqual(good('what CONTAINS rent'), { field: 'what', contains: 'rent' });
+  /* AND THE NEGATION IS FOLDED WITH IT, or folding the verb alone would have turned `what IS NOT
+     coffee` from a refusal into `what is "NOT coffee"`: a clause that answers the opposite question.
+     `what is NOT coffee` was that clause already, before any of this, and the browser negated it. */
+  assert.deepEqual(good('what IS NOT coffee'), { field: 'what', not: 'coffee' });
+  assert.deepEqual(good('what is NOT coffee'), { field: 'what', not: 'coffee' });
+  assert.deepEqual(good('n Is Not 3'), { field: 'n', not: 3 });
+  assert.deepEqual(good('what IS NOT more than coffee'), { field: 'what', not: 'more than coffee' });
+  /* AND THE `not` AFTER `has` AND `lacks`, WHICH HAS ITS OWN TEST OF THE WORD. Folding the verb with
+     only the `is` branch's `not` folded took `tags HAS NOT x` from "HAS is not something a filter can
+     say" to `has "NOT x"`, and `tags HAS NOT` to a search for a tag called `NOT`, where `tags has not`
+     asks "has not what?". Measured against the first version of this change. */
+  assert.deepEqual(good('tags HAS NOT x'), { field: 'tags', lacks: 'x' });
+  assert.deepEqual(good('tags has NOT x'), { field: 'tags', lacks: 'x' });
+  assert.deepEqual(good('tags LACKS NOT x'), { field: 'tags', has: 'x' });
+  assert.equal(refused('tags HAS NOT').fix, 'tags HAS NOT: has not what?');
+});
+
 test('A NEGATED ORDER IS REFUSED, BECAUSE ITS OPPOSITE WORD IS NOT ITS NEGATION', () => {
   /* `n is not at least 3` is every row under three AND every row with no `n`, and `n less than 3`
      is only the first of those. Reading it as the second would drop the empty rows without a word. */

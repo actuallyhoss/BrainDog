@@ -628,7 +628,13 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
       continue;
     }
 
-    const verb = words[after] ?? '';
+    /* THE VERB FOLDED ONCE, as `rankedOf` folds the words after it and the browser's `compile` folds
+       its operator. Only `rankedOf` folded, so `n IS more than 3` was `gt 3` while `what IS more than
+       coffee` missed the `verb === 'is'` below and was refused as an order a text cannot be asked,
+       and `n IS 3`, `state IS open` and `due BEFORE today` were refused "IS is not something a filter
+       can say", naming the word the refusal then tells them to write. The browser drew rows for every
+       one of them (`apps/web/src/lib/record/where.test.ts`, the shouted verb). */
+    const verb = (words[after] ?? '').toLowerCase();
     const rest = words.slice(after + 1).join(' ');
 
     /* ── more than · at least · less than · at most · between ─────────────── */
@@ -794,7 +800,9 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
       /* `has not` READ THE SAME WAY `is not` IS, because somebody who learned one writes the other,
          and a trailing bare `not` is not a search for the word. It inverts both ways: a clause that
          answers the opposite of the question is worse than one that refuses. */
-      const no = rest === 'not' || rest.startsWith('not ');
+      /* FOLDED AS THE `is` BRANCH'S `not` IS, since the verb before it is folded: without it
+         `tags HAS NOT x` became `has "NOT x"` and `tags HAS NOT` a search for a tag called `NOT`. */
+      const no = /^not(?:\s|$)/i.test(rest);
       const wanted = (no ? rest.slice(3) : rest).trim();
       if (!wanted) {
         bad.push({ code: 'REQUIRED_MISSING', fix: `${sentence}: ${verb}${no ? ' not' : ''} what?`, at: field });
@@ -1015,7 +1023,11 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
     /* `is not` WITH NOTHING AFTER IT IS NOT A SEARCH FOR THE WORD `not`. `startsWith('not ')` needs
        the space, so a bare trailing `not` fell through and became `note is 'not'` — a clause that
        parses, runs, and quietly means something nobody wrote. */
-    const negated = rest === 'not' || rest.startsWith('not ');
+    /* AND `not` FOLDED WITH IT. Unfolded, `what is NOT coffee` was already the clause `what is "NOT
+       coffee"`, the opposite of the sentence, where the browser read the negation; and folding the verb
+       alone would have made `what IS NOT coffee`, a refusal until then, the same inverted clause.
+       `rankedOf` folds its `not` for the same reason. */
+    const negated = /^not(?:\s|$)/i.test(rest);
     const said = (negated ? rest.slice(3) : rest).trim();
     if (!said) {
       bad.push({ code: 'REQUIRED_MISSING', fix: `${sentence}: is${negated ? ' not' : ''} what?`, at: field });

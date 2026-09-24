@@ -679,20 +679,33 @@ const dayAfter = (iso: string): string => new Date(Date.parse(`${iso.slice(0, 10
  * A field with a written end is left alone, because that end already moved, and so is a field with no
  * start: `due before today` is a balance at a moment. `packages/kernel/src/metrics.ts` `endedAt` is the
  * same rule over the record's predicate tree, and the two test files hold both to the same rows.
+ *
+ * `more than` AND `at least` START A WINDOW AS `after` DOES, and the kernel's `LOWER` list has read
+ * them since the sentence could say them. This read `after` alone, so `on more than -30d` and
+ * `on at least -29d`, the same thirty days as `on after -30d`, were set beside a window before with
+ * no end: sixty days holding the thirty. Over seven rows in `metrics-window.test.ts` the browser read
+ * `delta` -0.053 for both where the kernel read +17 for all three spellings. `less than` and
+ * `at most` are written ends, as `before` is, and a range of days compiles to `gte` and `lte`.
  */
+const STARTS: ReadonlySet<string> = new Set(['after', 'gt', 'gte']);
+const ENDS: ReadonlySet<string> = new Set(['before', 'on', 'lt', 'lte']);
+
 const endedAt = (w: Where, now: number, then: number): Where => {
   const dated = w.clauses.filter((c): c is Extract<Clause, { day: string }> => 'day' in c);
-  const started = new Set(dated.filter((c) => c.op === 'after').map((c) => c.field));
-  for (const c of dated) if (c.op === 'before' || c.op === 'on') started.delete(c.field);
+  const started = new Set(dated.filter((c) => STARTS.has(c.op)).map((c) => c.field));
+  for (const c of dated) if (ENDS.has(c.op)) started.delete(c.field);
   if (started.size === 0) return w;
   const clock = dayAfter(new Date(then).toISOString());
   const ends = [...started].map((field): Clause => {
-    /* The latest start is where the current window begins, when a field is given two. */
+    /* The latest start is where the current window begins, when a field is given two. THE FIRST DAY
+       A WINDOW HOLDS: `gte` names it, and `after` and `gt` name the day before it. */
     const begins = dated
-      .filter((c) => c.field === field && c.op === 'after')
-      .map((c) => resolveDay(c.day, now))
+      .filter((c) => c.field === field && STARTS.has(c.op))
+      .map((c) => {
+        const d = resolveDay(c.day, now);
+        return d === null ? null : c.op === 'gte' ? d.slice(0, 10) : dayAfter(d);
+      })
       .filter((d): d is string => d !== null)
-      .map(dayAfter)
       .sort()
       .at(-1);
     return { field, op: 'before', day: begins !== undefined && begins < clock ? begins : clock };

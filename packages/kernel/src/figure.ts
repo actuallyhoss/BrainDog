@@ -10,13 +10,16 @@
  * step was refused "names no step", and `{{metric.total}}` in a `set_var` installed, ran `done` and wrote the braces
  * into the row, which is the one failure in that survey nobody was told about.
  *
- * AN `if` CAN ASK WHETHER A VALUE EQUALS A FIGURE, AND NOT WHETHER IT IS PAST ONE. The figure is filled in as text
- * before the condition is read, and the condition is a list's filter sentence, which has `is` and `is not` for a
- * number and no ordering. Measured on 24 September over a figure summing `n`: `n is {{metric.total}}` and
- * `n is not {{metric.total}}` ran `done` and took the right arm; `n lt {{metric.total}}` failed the run with "lt is
- * not something a filter can say", `n is more than {{metric.total}}` with "more than 5 is not a value n can hold", and
- * `n after {{metric.total}}` with "after is about dates". A threshold on a figure is the trigger's
- * `metric: { id, crosses }`, which fires when the figure crosses it; a step cannot say it until the filter can.
+ * AN `if` CAN ASK WHETHER A VALUE IS PAST A FIGURE, AS WELL AS WHETHER IT EQUALS ONE. The figure is filled in as text
+ * before the condition is read, and the condition is a list's filter sentence, which has said `more than`,
+ * `at least`, `less than`, `at most` and `between` since `3187be5a`. Before that it had `is` and `is not` for a number
+ * and no ordering, and `n is more than {{metric.total}}` failed the run with "more than 5 is not a value n can hold".
+ * Measured again on 24 September after it, over a figure summing `n` and two rows written with `n` 2 and 10 (the
+ * figure then 2 and 12): `more than`, `is more than`, `less than`, `at most`, `is at least` and `between 1 and` each
+ * ran `done` and took the arm the numbers call for. The operator's own spellings are still not words: `n lt
+ * {{metric.total}}` fails the run with "lt is not something a filter can say", and `n after {{metric.total}}` with
+ * "after is about dates". A step asks about the figure as it stands when the step runs; the trigger's
+ * `metric: { id, crosses }` is the other question, which fires once when the figure crosses a line.
  *
  * THIS FILE HOLDS THE SPELLING AND THE LINT, AND IMPORTS NO VALUE. `flow-lint.ts` imports only light modules so that
  * `declare.ts`, which imports it, is not pulled into a cycle; the reading itself is `rules.ts`'s `figureText`, which
