@@ -48,6 +48,14 @@ const LOOSE = /\{\{\s*metric\s*([.:])\s*([^{}]*?)\s*\}\}/g;
  */
 const EXACT = new RegExp(`^${FIGURE.source}$`);
 
+/**
+ * What a run writes in a row where a figure over another list would have gone (`hiddenFigure` in `flow.ts`).
+ *
+ * NOT THE EM DASH IT WAS. That is the character this tree's prose rule keeps out of anything a stranger reads, written
+ * into a row a stranger reads, and it read as a hole in the sentence rather than as a number held back on purpose.
+ */
+export const WITHHELD = '--withheld--';
+
 /** `declare.ts`'s `METRIC_ID`: a figure's id as it is installed. */
 const METRIC_ID = /^[a-z][a-z0-9_-]{0,31}$/;
 
@@ -68,11 +76,27 @@ const isObject = (x: unknown): x is Record<string, unknown> => x !== null && typ
  *
  * THE INLINE PATH READS NO FIGURE. It runs inside the write, before the write commits, and a figure over the list being
  * written would be read over a row that is half there. The pass leaves the braces as typed there, so they are refused.
+ *
+ * AND A FIGURE OVER ANOTHER LIST IN A RUN THAT WRITES INTO A ROW IS REFUSED, since the run would write it as `WITHHELD`
+ * (audit sixty-four, finding 1, as the owner decided it on 24 September: `loop/DIRECTION.md` section 25). He asked to
+ * be told when the rule goes in, so that he learns it from the lint and not from a placeholder in a row a week later.
+ * A REFUSAL AND NOT A WARNING, because install has no channel for one: it answers `Result<Installed[]>`, whose value is
+ * each declaration's `{ id, version, changed }`, and a warning carried beside it would have to be threaded through
+ * `declare.ts`, `index.ts`, the record's install and the app that shows it. Nothing is lost by refusing: which lists
+ * the run lands in is written in the rule, so the run would withhold the figure every time, a `notify` and an `if`
+ * included (`landsOf` in `flow.ts` withholds every fill in the run), and a rule that always writes `--withheld--`
+ * is one step the owner has to take out again.
+ *
+ * WHAT THE LINT SEES AND THE RUN STILL CATCHES. The lint reads the rule's `written` list and its `create` steps. The
+ * run also reads the row an arrival wrote, which is the ingest's list and not written in the rule, and a figure
+ * re-pointed at another list after the rule went in, which is a batch with no rule in it for this lint to read. The
+ * run's withholding (`hiddenFigure` in `flow.ts`) stays for those two.
  */
 export function figureFault(id: string, body: Record<string, unknown>, path: 'inline' | 'run', installed?: Known): Refusal | null {
   const figures = installed === undefined ? null : [...installed.keys()].filter((k) => k.startsWith('metric.')).map((k) => k.slice('metric.'.length)).sort();
   const register = typeof body.register === 'string' ? body.register : 'its list';
   const at = body.steps !== undefined ? 'steps' : 'then';
+  const lands = path === 'run' && installed !== undefined ? landsOf(body, body[at]) : [];
   let found: Refusal | null = null;
   const walk = (v: unknown, where: string): void => {
     if (found !== null) return;
@@ -93,6 +117,16 @@ export function figureFault(id: string, body: Record<string, unknown>, path: 'in
           );
         else if (figures !== null && !figures.includes(name))
           found = { ...bad('DECLARATION_UNKNOWN', `${id} reads ${spelled} at ${where}, and there is no metric called ${name}.`, where), allowed: figures };
+        else if (lands.length > 0) {
+          const over = overOf(installed?.get(`metric.${name}`));
+          const into = over === null ? undefined : lands.find((list) => list !== over);
+          if (into !== undefined)
+            found = bad(
+              'DECLARATION_INVALID',
+              `${id} reads ${spelled} at ${where} in a run that writes into ${into}, and ${name} adds up ${over}. A figure written into a row stays there for whoever reads ${into} later, so a run writes one only into the list it adds up, and this run would write ${WITHHELD} wherever it reads ${name}. Read a figure over ${into}, or say ${spelled} in a notify on a clock, which writes no row.`,
+              where,
+            );
+        }
         if (found !== null) return;
       }
       return;
@@ -105,3 +139,29 @@ export function figureFault(id: string, body: Record<string, unknown>, path: 'in
 }
 
 const bad = (code: string, fix: string, at: string): Refusal => ({ code, fix, at });
+
+/**
+ * The lists a run of this rule writes into, as far as the rule itself says: the list its `written` trigger is on, and
+ * every list a `create` step makes a row in, however deep in an `if`. `flow.ts`'s `landsOf` is the same question asked
+ * of the run, with the row in hand.
+ */
+function landsOf(body: Record<string, unknown>, steps: unknown): string[] {
+  const out = new Set<string>();
+  const written = isObject(body.on) ? body.on.written : undefined;
+  if (isObject(written) && typeof written.register === 'string') out.add(written.register);
+  const walk = (v: unknown): void => {
+    if (Array.isArray(v)) v.forEach(walk);
+    else if (isObject(v)) {
+      if (isObject(v.create) && typeof v.create.register === 'string') out.add(v.create.register);
+      Object.values(v).forEach(walk);
+    }
+  };
+  walk(steps);
+  return [...out];
+}
+
+/** The list a figure adds up, or `null` for one over no list (a `series.`), which a run writes wherever it lands. */
+function overOf(metric: Record<string, unknown> | undefined): string | null {
+  const source = metric?.source;
+  return typeof source === 'string' && source.startsWith('register.') ? source.slice('register.'.length) : null;
+}

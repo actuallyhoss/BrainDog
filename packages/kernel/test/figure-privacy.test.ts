@@ -1,21 +1,23 @@
 /**
- * A figure a run fills into a row is read only when everybody who reads that row may read the figure (audit sixty-two,
- * finding 4, probe F1: `loop/research-batch-sixty-two-audit.md` §4).
+ * A figure a run fills into a row is read only where it adds up the list the row is in (audit sixty-two, finding 4,
+ * probe F1: `loop/research-batch-sixty-two-audit.md` §4; audit sixty-four, finding 1, as the owner decided it on 24
+ * September: `loop/DIRECTION.md` section 25).
  *
- * WHAT WAS MEASURED BEFORE THE REPAIR. Lists `salaries` and `inbox`, a figure `payroll` summing salaries, an owner's rule
- * on each new inbox row that sets `note` to `filed; payroll {{metric.payroll}}`, and a member invited to Inbox alone.
- * The record refuses her `payroll` as a figure that does not exist (`metric` in `packages/record/src/index.ts`, over
- * the figure's `source`), and her own Inbox then read `note: "filed; payroll GBP 5200.00"`. `figureText` read with the
- * run's context and asked nobody. The first test below failed on that note, `filed; payroll GBP 5200.00` where the dash
- * was expected.
+ * WHAT WAS MEASURED BEFORE THE FIRST REPAIR. Lists `salaries` and `inbox`, a figure `payroll` summing salaries, an
+ * owner's rule on each new inbox row that sets `note` to `filed; payroll {{metric.payroll}}`, and a member invited to
+ * Inbox alone. The record refuses her `payroll` as a figure that does not exist (`metric` in
+ * `packages/record/src/index.ts`, over the figure's `source`), and her own Inbox then read
+ * `note: "filed; payroll GBP 5200.00"`. `figureText` read with the run's context and asked nobody.
  *
- * AT THE RUN AND NOT ONLY AT INSTALL, because who reads a list changes after the rule is in: the owner invites a
- * bookkeeper to Inbox a month later, and a rule checked once at install would be writing Payroll into her list from
- * that day on. The test that invites her after the rule is installed holds that.
+ * THE FIRST REPAIR ASKED THE `member` ROWS AT THE RUN, AND THE ROW OUTLIVES THE RUN. A note written before she was
+ * invited kept the payroll (`figure-privacy-before.test.ts`), and a script reading Inbox was never asked. So who is a
+ * member no longer decides it: a figure over another list is `--withheld--` for everyone, the owner alone included,
+ * and the tests here that once proved the member rows were read now prove they are not.
  *
- * THE KERNEL ASKS ITS OWN `member` ROWS, which are the authority (`members.ts`'s `access`), and reads a level exactly as
- * the record's `guard` does for `list`: the level held on that list or else on the record, inside the ceiling, and
- * `append` does not read.
+ * HOW THESE RULES REACH A RUN AT ALL. Install now refuses F1's rule (`figure-install-warning.test.ts`), so each rule
+ * here goes in while `payroll` reads a series, and `payroll` is then pointed at Salaries. That install carries no rule,
+ * so the lint never reads one, and it is the way a record comes to hold a rule whose figure is over another list:
+ * measured here, it installs, and the run is the line that holds.
  */
 
 import { test } from 'node:test';
@@ -27,7 +29,7 @@ import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 const NOW = Date.UTC(2026, 8, 24, 12);
 const ID = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
 const DAY = 86_400_000;
-const DASH = 'filed; payroll —';
+const WITHHELD = 'filed; payroll --withheld--';
 const FILLED = 'filed; payroll GBP 5200.00';
 
 const list = (id: string, name: string, fields: Record<string, unknown>[]): Declaration => ({
@@ -36,15 +38,23 @@ const list = (id: string, name: string, fields: Record<string, unknown>[]): Decl
   body: { id, name, title: 'what', fields: [{ id: 'what', type: 'text', required: true }, ...fields] } as never,
 });
 
-const SALARIES = list('salaries', 'Salaries', [{ id: 'pay', type: 'money' }]);
+const SALARIES = list('salaries', 'Salaries', [{ id: 'pay', type: 'money' }, { id: 'note', type: 'text' }]);
 const INBOX = list('inbox', 'Inbox', [{ id: 'note', type: 'text' }]);
 const DIARY = list('diary', 'Diary', [{ id: 'note', type: 'text' }]);
 
-const PAYROLL: Declaration = {
+const figure = (source: string): Declaration => ({
   id: 'metric.payroll',
   kind: 'metric',
-  body: { metric: 'payroll', name: 'Payroll', source: 'register.salaries', value: { sum: 'pay' }, format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' } as never,
-};
+  body: { metric: 'payroll', name: 'Payroll', source, value: { sum: 'pay' }, format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' } as never,
+});
+
+const PAYROLL = figure('register.salaries');
+/**
+ * What `payroll` reads while a rule goes in that install would refuse over Salaries: a series, which is over no list and
+ * so is written wherever a run lands. First written as a count of Inbox, and install refused the Diary rule below all
+ * the same, since that run lands in Inbox and Diary both and no figure over one list is over both.
+ */
+const OVER_NO_LIST = figure('series.payroll');
 
 const rule = (rule: string, steps: unknown[], on: unknown = { written: { register: 'inbox', op: ['create'] } }, extra: Record<string, unknown> = {}): Declaration => ({
   id: `rule.${rule}`,
@@ -60,19 +70,22 @@ const why = (r: unknown): string => {
   return x.ok ? '' : `${x.refusal?.code}: ${x.refusal?.fix}`;
 };
 
+/** The record, with `decls` installed while `payroll` reads a series and `payroll` then pointed at Salaries. */
 async function record(...decls: Declaration[]): Promise<{ k: Kernel; sql: NodeSql; clock: ReturnType<typeof fixedClock> }> {
   const sql = openSqlite();
   const clock = fixedClock(NOW);
   const k = await openRecord(sql, clock);
   assert.ok(k.createRecord({ id: ID, slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
-  const out = await k.install([SALARIES, INBOX, DIARY, PAYROLL, ...decls]);
-  assert.ok(out.ok, why(out));
+  const before = await k.install([SALARIES, INBOX, DIARY, OVER_NO_LIST, ...decls]);
+  assert.ok(before.ok, why(before));
+  const moved = await k.install([PAYROLL]);
+  assert.ok(moved.ok, `pointing payroll at Salaries under an installed rule was refused: ${why(moved)}`);
   assert.ok(k.create('salaries', { what: 'Ada', pay: { amount: 520000, currency: 'GBP' } }, { actor: 'p_1' }).ok);
   return { k, sql, clock };
 }
 
-const invite = (k: Kernel, args: { level?: 'read' | 'write' | 'owner'; registers?: Record<string, 'read' | 'append' | 'write'> }): void => {
-  const out = k.invite('p_1', { person: 'p_bea', email: 'bea@example.test', name: 'Bea', ...args });
+const invite = (k: Kernel, args: { level?: 'read' | 'write' | 'owner'; registers?: Record<string, 'read' | 'append' | 'write'> }, name = 'Bea'): void => {
+  const out = k.invite('p_1', { person: `p_${name.toLowerCase()}`, email: `${name.toLowerCase()}@example.test`, name, ...args });
   assert.ok(out.ok, why(out));
 };
 
@@ -86,68 +99,68 @@ const noteOf = async (k: Kernel, register: string, what: string): Promise<unknow
 const runsOf = (sql: NodeSql, rule: string): { state: string; say: string | null }[] =>
   sql.all<{ state: string; say: string | null }>('SELECT state, say FROM automation_run WHERE rule = ? ORDER BY started_at, rowid', rule).map((r) => ({ ...r }));
 
-test('F1: A MEMBER INVITED TO INBOX ALONE READS THE DASH WHERE THE PAYROLL WOULD BE, and the run still finishes', async () => {
+test('F1: A MEMBER INVITED TO INBOX ALONE READS --withheld-- WHERE THE PAYROLL WOULD BE, and the run still finishes', async () => {
   const { k, sql } = await record(FILE);
   invite(k, { registers: { inbox: 'read' } });
-  assert.equal(await noteOf(k, 'inbox', 'Invoice from the printer'), DASH);
+  assert.equal(await noteOf(k, 'inbox', 'Invoice from the printer'), WITHHELD);
   assert.deepEqual(runsOf(sql, 'file'), [{ state: 'done', say: null }]);
   sql.close();
 });
 
-test('THE CONTROLS: the owner alone, and a member who reads Salaries too, read the figure', async () => {
-  const alone = await record(FILE);
-  assert.equal(await noteOf(alone.k, 'inbox', 'Invoice from the printer'), FILLED);
-  alone.sql.close();
-
-  const both = await record(FILE);
-  invite(both.k, { registers: { inbox: 'read', salaries: 'read' } });
-  assert.equal(await noteOf(both.k, 'inbox', 'Invoice from the printer'), FILLED);
-  both.sql.close();
+/* WHAT THE MEMBER ROWS ONCE DECIDED, AND DO NOT NOW. The owner alone, a member who reads Salaries too, a member of Diary
+   alone, one held to `append` on Salaries and one invited after the rule went in were five answers under the first
+   repair: filled, filled, filled, the dash, the dash. Each is now the placeholder, since the row is read later by
+   whoever reads Inbox then. */
+test('WHO IS A MEMBER NO LONGER DECIDES IT: nobody, Salaries too, Diary alone, append on Salaries and a late invitation all write --withheld--', async () => {
+  const cases: [string, Parameters<typeof invite>[1] | null][] = [
+    ['the owner alone', null],
+    ['a member of Inbox and Salaries', { registers: { inbox: 'read', salaries: 'read' } }],
+    ['a member of Diary alone', { registers: { diary: 'read' } }],
+    ['a writer held to append on Salaries', { level: 'write', registers: { salaries: 'append' } }],
+  ];
+  for (const [who, args] of cases) {
+    const { k, sql } = await record(FILE);
+    if (args) invite(k, args);
+    assert.equal(await noteOf(k, 'inbox', 'First'), WITHHELD, who);
+    invite(k, { registers: { inbox: 'read' } }, 'Cy');
+    assert.equal(await noteOf(k, 'inbox', 'Second'), WITHHELD, `${who}, then Cy invited to Inbox`);
+    sql.close();
+  }
 });
 
-/* THE OTHER HALF OF THE QUESTION: SHE MUST READ WHERE IT LANDS. The checker took `lands` out of `hiddenFigure`, so any
-   member who could not read Salaries hid the figure from every run, and all seven tests in this file still passed. A
-   member of Diary alone reads neither Inbox nor Salaries, and the owner's own Inbox keeps the figure. */
-test('A MEMBER WHO DOES NOT READ THE LIST THE RUN WRITES INTO hides nothing: invited to Diary alone, the Inbox note keeps the figure', async () => {
-  const { k, sql } = await record(FILE);
-  invite(k, { registers: { diary: 'read' } });
-  assert.equal(await noteOf(k, 'inbox', 'Invoice from the printer'), FILLED);
+test('THE CONTROL: a figure over the list it is written into is filled, with a member who reads that list alone', async () => {
+  const own = rule('own', [{ set: { field: 'note', to: 'filed; payroll {{metric.payroll}}' } }], { written: { register: 'salaries', op: ['create'] } });
+  const { k, sql } = await record(own);
+  invite(k, { registers: { salaries: 'read' } });
+  const made = k.create('salaries', { what: 'Bo', pay: { amount: 0, currency: 'GBP' } }, { actor: 'p_1' });
+  assert.ok(made.ok, why(made));
+  await k.drain();
+  assert.equal(k.get(made.value.id)?.fields.note, FILLED);
   sql.close();
 });
 
-test('A MEMBER OF THE WHOLE RECORD HELD TO append ON SALARIES does not read it, so the figure is the dash for her too', async () => {
-  const { k, sql } = await record(FILE);
-  invite(k, { level: 'write', registers: { salaries: 'append' } });
-  assert.equal(await noteOf(k, 'inbox', 'Invoice from the printer'), DASH);
-  sql.close();
-});
-
-test('A MEMBER INVITED AFTER THE RULE WAS INSTALLED is asked about at the run, and the next row reads the dash', async () => {
-  const { k, sql } = await record(FILE);
-  assert.equal(await noteOf(k, 'inbox', 'First'), FILLED);
-  invite(k, { registers: { inbox: 'read' } });
-  assert.equal(await noteOf(k, 'inbox', 'Second'), DASH);
-  sql.close();
-});
-
-test('A FIGURE KEPT IN A VARIABLE FIRST is the dash too, since the variable is written into the row later', async () => {
+test('A FIGURE KEPT IN A VARIABLE FIRST is withheld too, since the variable is written into the row later', async () => {
   const { k, sql } = await record(rule('file', [{ set_var: { name: 'pay', to: '{{metric.payroll}}' } }, { set: { field: 'note', to: 'filed; payroll {{vars.pay}}' } }]));
-  invite(k, { registers: { inbox: 'read' } });
-  assert.equal(await noteOf(k, 'inbox', 'Invoice from the printer'), DASH);
+  assert.equal(await noteOf(k, 'inbox', 'Invoice from the printer'), WITHHELD);
   sql.close();
 });
 
 /* A `create` NEEDS THE RUN'S ROW IN THIS BUILD: first written as a clock, the run failed "rule.tally's create step acts
-   on a row, and this run has none to act on", so the rule is on Inbox and she reads Diary alone. What is measured is
-   that the list created into is asked about, and not only the run's own row's list, which she does not read. */
-test('A ROW THE RUN CREATES IN ANOTHER LIST counts that list: an Inbox rule writing into Diary, which she reads, writes the dash', async () => {
-  const { k, sql } = await record(rule('tally', [{ create: { register: 'diary', bound: 1, fields: { what: 'Payroll today', note: 'payroll {{metric.payroll}}' } } }], undefined, { once_per: ['entry'] }));
-  invite(k, { registers: { diary: 'read' } });
-  assert.ok(k.create('inbox', { what: 'Invoice from the printer' }, { actor: 'p_1' }).ok);
+   on a row, and this run has none to act on". What is measured is that the list created into is asked about, and not
+   only the run's own row's list.
+
+   ON SALARIES, THE LIST THE FIGURE ADDS UP, AND NOT ON INBOX. Written on Inbox, the run's own row was already a list
+   other than Salaries, so the note was withheld whether or not Diary was counted: the checker took `create` out of
+   `landsOf` in `flow.ts` and every test in this file still passed. On Salaries, Diary is the only other list. */
+test('A ROW THE RUN CREATES IN ANOTHER LIST counts that list: a Salaries rule writing into Diary writes --withheld--', async () => {
+  const { k, sql } = await record(
+    rule('tally', [{ create: { register: 'diary', bound: 1, fields: { what: 'Payroll today', note: 'payroll {{metric.payroll}}' } } }], { written: { register: 'salaries', op: ['create'] } }, { once_per: ['entry'] }),
+  );
+  assert.ok(k.create('salaries', { what: 'Bo', pay: { amount: 0, currency: 'GBP' } }, { actor: 'p_1' }).ok);
   await k.drain();
   const row = sql.one<{ fields: string }>("SELECT fields FROM entry WHERE register = 'diary' ORDER BY rowid DESC LIMIT 1");
   assert.ok(row, `the run wrote no diary row: ${JSON.stringify(runsOf(sql, 'tally'))}`);
-  assert.equal((JSON.parse(row.fields) as { note?: string }).note, 'payroll —');
+  assert.equal((JSON.parse(row.fields) as { note?: string }).note, 'payroll --withheld--');
   sql.close();
 });
 

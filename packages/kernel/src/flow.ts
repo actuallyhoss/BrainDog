@@ -42,10 +42,9 @@ import { meter, type Metered } from './actions.ts';
 import { nextOccurrence } from './digest.ts';
 import { RUN_PATH, RUNS_PER_DAY_CEILING, passFilled, pathOf, sealedAs, triggerOf } from './flow-lint.ts';
 import type { Entry } from './index.ts';
-import { access } from './members.ts';
 import { instant } from './migrate.ts';
 import { predicateOf, type EvalContext } from './metrics.ts';
-import { FIGURE } from './figure.ts';
+import { FIGURE, WITHHELD } from './figure.ts';
 import { enqueue } from './outbox.ts';
 import { intervalMs } from './pull.ts';
 import {
@@ -66,6 +65,18 @@ import {
 
 /** Three, as §4.1 says: a run started by a rule's write carries its depth plus one, and the fourth is not started. */
 export const CHAIN_CEILING = 3;
+/**
+ * How deep a chain through rule-started scripts goes: a run at depth eight still starts its script, and a write that
+ * script makes starts nothing. Nine levels of follow-ups close under the task somebody finished.
+ *
+ * NOT `CHAIN_CEILING`, BECAUSE WORK'S CASCADE IS ONE LEVEL PER RUN. `close_follow_ups` closes a task's own follow-ups,
+ * and the write to each starts the rule on that follow-up, so under a ceiling of three a tree five levels deep stopped
+ * closing at its fifth, and `from_rules` is not something the pack asks for. A loop over rows that already exist is
+ * ended by `Chain.seen` at the first row it comes back to, so this bound is met only by a chain that keeps reaching new
+ * rows, a script that creates a row per run: measured before it (`script-chain.test.ts`), one create started fifteen
+ * runs in fifteen rounds and was still going.
+ */
+export const SCRIPT_CHAIN_CEILING = 8;
 /** §3's `RunContext`: one answer is at most 4 KB and all of them together 64 KB. */
 const VAR_BYTES = 4096;
 const VARS_BYTES = 65_536;
@@ -139,7 +150,97 @@ export type RunTrigger = {
    * finished run for the ninety days one is kept. `deletedRow` reads the row from `entry`, where an erasure reaches it.
    */
   deleted?: true;
+  /**
+   * The runs before this one in a chain through scripts, as `Chain.seen` holds them, when a rule-started script's write
+   * started it. Kept on the trigger because the trigger is the one thing a run keeps about what started it, and the
+   * run's own script step hands it on. Not something `{{trigger.…}}` reads (`context` leaves it out).
+   */
+  chain?: readonly string[];
 };
+
+/**
+ * Where a write a rule-started script makes sits in the chain that started the script (audit sixty-four, finding 2).
+ *
+ * MEASURED BEFORE THIS (`script-chain.test.ts`, the audit's probe L1): `onWritten` stops a rule's own write unless the
+ * trigger says `from_rules`, and stops a chain past `CHAIN_CEILING`, but it knows a rule's write by the actor, and a
+ * script writes as `script:<id>@v<n>`. So a rule whose script wrote the row that fired it started itself again on every
+ * run, at depth 0: one update ran the script twelve times in twelve rounds and was still going, each run a sandbox and
+ * each a row version. The only stop was `runs_per_day`.
+ *
+ * `depth` is the depth of the run whose script step queued the job, and a write under the chain is one deeper.
+ * `seen` is each run on the chain as `<rule>@<row>`, the run that queued the job last: a rule never starts again on a
+ * row it has already run for in the same chain. That is what ends L1 at its first run, and two rows that each write
+ * the other at their second, where a check on the queuing run's own row alone let the pair go on to the ceiling.
+ *
+ * `stopped` is filled while the script's writes go through, one line per rule a write would have started had the chain
+ * not reached `SCRIPT_CHAIN_CEILING`, so that the script's run can say which row the chain stopped at and why. Without
+ * it the tenth level of a follow-up tree stayed open and nothing anywhere said so: the seed's `follow-ups.test.ts`
+ * found the row open, and the run that closed the ninth read "ran and wrote one row" like every run before it.
+ */
+export type Chain = { depth: number; seen: readonly string[]; stopped: string[] };
+
+const link = (rule: string, entry: string): string => `${rule}@${entry}`;
+
+/**
+ * The chain whose script's writes are going through the write path right now, per record.
+ *
+ * HELD HERE AND NOT PASSED, for the reason `flowDepth` in `index.ts` gives for a run's depth: the write path hands
+ * `onWritten` an actor and nothing else of who asked, and a script's writes are made synchronously inside
+ * `finishScript`'s one transaction, so while they are being made they are the only writes this record is making.
+ * Keyed by the record's `Sql` so that two records open in one process never read each other's.
+ */
+const chains = new WeakMap<Sql, Chain>();
+
+/** Make `fn`'s writes under `chain`, or as a stranger's when there is none (a clock's script, or a job queued before this). */
+export function underChain<R>(sql: Sql, chain: Chain | null, fn: () => R): R {
+  if (chain === null) return fn();
+  const was = chains.get(sql);
+  chains.set(sql, chain);
+  try {
+    return fn();
+  } finally {
+    if (was === undefined) chains.delete(sql);
+    else chains.set(sql, was);
+  }
+}
+
+/**
+ * The chain a `script.run` job was queued in, or `null` for a job no rule's step queued (a clock's script, or a run
+ * the ninety days have taken): that job's writes are a stranger's, as every script's were before this.
+ *
+ * READ FROM THE STEP THAT QUEUED IT, NOT CARRIED IN THE JOB. A `script` step's `automation_step` row answers the job's
+ * id (`advance`), so the runs that queued a job are found by it, with their depth and trigger. The first form of this
+ * repair wrote the chain into the job's payload, and `rule-script.test.ts`, which pins the payload the host hands the
+ * sandbox, failed on the extra key: the payload is the sandbox's, and the chain is the record's. It also answers
+ * the case `startScript` shares a job in without a merge: two runs whose steps queued the same job both answer it, and
+ * the chain is the deeper depth and both lists of runs.
+ *
+ * NO INDEX ON `answer`, so this reads every script step the record keeps, once per finished script run. The checker
+ * measured 8.7 ms a finished script at 90,000 runs, beside a sandbox (a Dynamic Worker on the Worker) that the same
+ * finish waits on, and the steps are pruned with their runs after ninety days. The index wants a migration, and the
+ * list of migrations is `migrate.ts`'s, which this change did not reach.
+ */
+export function chainOfJob(sql: Sql, job: string): Chain | null {
+  const runs = sql.all<{ rule: string; trigger: string; depth: number }>(
+    "SELECT r.rule AS rule, r.trigger AS trigger, r.depth AS depth FROM automation_step s JOIN automation_run r ON r.id = s.run WHERE s.kind = 'script' AND s.answer = ?",
+    job,
+  );
+  if (runs.length === 0) return null;
+  let depth = 0;
+  const seen = new Set<string>();
+  for (const run of runs) {
+    depth = Math.max(depth, run.depth);
+    let trigger: RunTrigger;
+    try {
+      trigger = JSON.parse(run.trigger) as RunTrigger;
+    } catch {
+      continue;
+    }
+    for (const s of Array.isArray(trigger.chain) ? trigger.chain : []) if (typeof s === 'string') seen.add(s);
+    if (typeof trigger.entry === 'string') seen.add(link(run.rule, trigger.entry));
+  }
+  return { depth, seen: [...seen], stopped: [] };
+}
 
 type RunRow = {
   id: string;
@@ -566,29 +667,50 @@ export function startRun(
  * A WRITE MADE BY A RULE STARTS NOTHING unless the trigger says `from_rules: true`, and then at the writer's depth plus
  * one, refused past three. Rules have never chained; this keeps that as the default and makes a chain a thing somebody
  * asked for in writing (§8, question 1).
+ *
+ * A WRITE MADE BY A RULE-STARTED SCRIPT IS NEITHER A STRANGER'S NOR A RULE'S (`Chain`). It starts rules without
+ * `from_rules`, because a cascade through a script is what the owner approved when they installed a script that says
+ * `runs: { rule: true }`, and Work's follow-ups close that way. But it never starts a rule on a row that rule already
+ * ran for in the chain, and it starts at the chain's depth plus one, refused past `SCRIPT_CHAIN_CEILING`.
  */
 export function onWritten(
   deps: FlowDeps,
   rules: readonly Installed[],
   w: { entry: Entry; register: string; op: 'create' | 'update' | 'delete'; changed: readonly string[]; byRule: boolean; depth: number; actor: string },
 ): void {
+  const chain = chains.get(deps.sql) ?? null;
+  const depth = chain === null ? w.depth : Math.max(w.depth, chain.depth + 1);
   for (const rule of rules) {
     if (triggerOf(rule.body) !== 'written') continue;
     const spec = (rule.body.on as Extract<Trigger, { written: unknown }>).written;
     if (spec.register !== w.register) continue;
     if (w.byRule && spec.from_rules !== true) continue;
     if (w.depth > CHAIN_CEILING) continue;
+    if (chain !== null && chain.seen.includes(link(rule.id, w.entry.id))) continue;
     if (spec.op !== undefined && !spec.op.includes(w.op)) continue;
     if (spec.fields !== undefined && w.op !== 'delete' && !spec.fields.some((f) => w.changed.includes(f))) continue;
     if (rule.body.project !== undefined && deps.projectOf(w.entry) !== rule.body.project) continue;
     if (rule.body.when !== undefined && !holds(deps, rule.body.when, w.entry)) continue;
+    /* THE BOUND IS ASKED LAST, after everything else that decides whether the rule is for this write, so that what the
+       script's run says it stopped is a run that would have started, and not every rule on the list. */
+    if (depth > SCRIPT_CHAIN_CEILING) {
+      chain?.stopped.push(`rule.${rule.id} on ${w.entry.seq === null ? w.entry.id : `${w.register}#${w.entry.seq}`}`);
+      continue;
+    }
     const key = rule.body.once_per?.length ? onceKey({ rule: rule.id, once_per: rule.body.once_per } as RuleDecl, w.entry) : null;
     if (key !== null && !marker(deps.sql, deps.mint, deps.nowMs, key, { rule: rule.id, entry: w.entry.id }, false)) continue;
     /* A REFUSAL HERE IS THE DAY'S CEILING OR A SWITCHED-OFF RULE, and neither is the writer's fault: the write stands.
        The marker goes back, as the inline pass gives one back for a rule that did nothing, or the row would be
        counted as run for ever by a run that never started. */
-    const trigger: RunTrigger = { kind: 'written', entry: w.entry.id, register: w.register, op: w.op, ...(w.op === 'delete' ? { deleted: true as const } : {}) };
-    const started = startRun(deps, rule, trigger, { actor: w.actor, depth: w.depth });
+    const trigger: RunTrigger = {
+      kind: 'written',
+      entry: w.entry.id,
+      register: w.register,
+      op: w.op,
+      ...(w.op === 'delete' ? { deleted: true as const } : {}),
+      ...(chain !== null && chain.seen.length > 0 ? { chain: chain.seen } : {}),
+    };
+    const started = startRun(deps, rule, trigger, { actor: w.actor, depth });
     if (!started.ok && key !== null) deps.sql.exec("DELETE FROM schedule WHERE kind = 'rule' AND key = ?", key);
   }
 }
@@ -1336,7 +1458,8 @@ function deletedRow(sql: Sql, id: string): Entry | null {
 
 /** `{{trigger.…}}`: what started the run, the row's fields, and an arrival's JSON body where it has one. */
 function context(deps: FlowDeps, trigger: RunTrigger, subject: Entry | null): Record<string, unknown> {
-  const out: Record<string, unknown> = { ...trigger };
+  const { chain: _chain, ...said } = trigger;
+  const out: Record<string, unknown> = { ...said };
   if (subject) out.row = subject.fields;
   if (trigger.arrival) {
     const raw = deps.sql.one<{ body: string | null }>('SELECT body FROM inbox_raw WHERE id = ?', trigger.arrival);
@@ -1389,13 +1512,13 @@ const RUN_READ = new RegExp(`${RUN_PATH.source}|${FIGURE.source}`, 'g');
  * variable is kept, as the words it was when the variable was set.
  */
 const figures = (deps: FlowDeps, lands: () => ReadonlySet<string>) => {
-  /* ONE ANSWER PER FIGURE PER RUN TURN, since whether it is hidden depends on who is on the record and not on the rows,
-     and a step that fills the same figure three times would otherwise walk the members three times. The value is still
-     read each time, for the reason above. */
+  /* ONE ANSWER PER FIGURE PER RUN TURN, since whether it is withheld depends on the figure's declaration and the run's
+     steps and not on the rows, and a step that fills the same figure three times would otherwise read the declaration
+     three times. The value is still read each time, for the reason above. */
   const hidden = new Map<string, boolean>();
   return (id: string): string => {
     if (!hidden.has(id)) hidden.set(id, hiddenFigure(deps.sql, id, lands()));
-    return hidden.get(id) ? '—' : figureText(deps.rules(), id);
+    return hidden.get(id) ? WITHHELD : figureText(deps.rules(), id);
   };
 };
 
@@ -1403,10 +1526,10 @@ const figures = (deps: FlowDeps, lands: () => ReadonlySet<string>) => {
  * The lists a run's fills may land in: its own row's list, and every list one of its `create` steps writes into.
  *
  * EVERY STEP OF THE RUN, NOT THE ONE BEING FILLED, because a figure kept by a `set_var` is written into the row by a
- * later step, and a question answered by a person or by Spark comes back as a variable the same way. So a figure the
- * row's readers may not see is the dash wherever this run fills it, a `notify` included: with the row, a `notify` is
- * also a note on the row's history, which its readers see. A run with no row and nothing to create writes nowhere
- * anybody but the owner reads, and reads every figure.
+ * later step, and a question answered by a person or by Spark comes back as a variable the same way. So a figure is
+ * withheld wherever this run fills it, a `notify` included, unless every one of these lists is the list it adds up:
+ * with the row, a `notify` is also a note on the row's history, which its readers see. A run with no row and nothing to
+ * create writes nowhere anybody but the owner reads, and reads every figure.
  */
 const landsOf = (program: readonly Op[], row: Entry | null): Set<string> => {
   const out = new Set<string>(row ? [row.register] : []);
@@ -1418,7 +1541,8 @@ const landsOf = (program: readonly Op[], row: Entry | null): Set<string> => {
 };
 
 /**
- * Whether somebody who reads one of `lands` does not read the list figure `id` adds up (audit sixty-two, finding 4).
+ * Whether one of `lands` is a list other than the one figure `id` adds up, so that the figure is withheld (audit
+ * sixty-two, finding 4, and audit sixty-four, finding 1).
  *
  * MEASURED BEFORE THIS (`figure-privacy.test.ts`, the audit's probe F1): an owner's rule on each new Inbox row set its
  * note to `filed; payroll {{metric.payroll}}`, over a figure summing Salaries. A member invited to Inbox alone is
@@ -1429,10 +1553,28 @@ const landsOf = (program: readonly Op[], row: Entry | null): Set<string> => {
  * (`packages/record/src/index.ts`, "the same leak one number wide"), and reads nothing else of it, so this asks of the
  * figure's `source` alone. A figure over no list, a `series.`, is read by whoever reads a page, and is not hidden.
  *
- * AT THE RUN AND NOT AT INSTALL, because who reads a list is changed by an invitation after the rule is in; a rule
- * checked once at install would write Payroll into a bookkeeper's Inbox from the day she was invited. The kernel's
- * `member` rows are the authority (`members.ts`'s `access`), and a level is read as the record's `guard` reads one for
- * `list`: the level held on that list or else on the record, inside the ceiling, and `append` never reads.
+ * NOT WHO IS A MEMBER AT THE RUN, WHICH WAS THE FIRST REPAIR, BECAUSE THE ROW OUTLIVES THE RUN (audit sixty-four,
+ * finding 1). The first form asked the `member` rows when the figure was filled, and that held for every note written
+ * after an invitation and for none written before it: V1 (`figure-privacy-before.test.ts`) filed one Inbox row, invited
+ * Bea to Inbox alone, and she read `filed; payroll GBP 5200.00` in it. A script whose `reads:` names Inbox and not
+ * Salaries was never asked either, and it may send what it reads out through its `egress:`.
+ *
+ * SO THE FIGURE IS WRITTEN ONLY WHERE IT ADDS UP THE LIST IT LANDS IN. That is the one rule that holds for a reader who
+ * does not exist yet: whoever reads a row of Salaries, today or after next month's invitation, a person or a script,
+ * reads Salaries, and so reads anything a figure over Salaries could tell them. A figure over any other list is
+ * `WITHHELD` wherever a run with a row fills it, the owner alone on the record included, since nothing the record holds
+ * says that a list no member reads today is one nobody will be invited to.
+ *
+ * WHY NOT ASK AT EACH INVITATION INSTEAD. The other rule that holds for later readers is to refuse the invitation, or
+ * the script, that would read Inbox without Salaries while a rule writes Payroll into Inbox. It keeps the owner's
+ * cross-list note, but it has to be kept at every door a reader comes in by (an invitation, a level changed, a script
+ * installed, an agent's grant), and it still says nothing about the rows a rule removed since wrote. This is one check,
+ * in the one place a figure is written.
+ *
+ * THE RUN IS THE SECOND LINE, NOT THE FIRST. Install refuses a rule whose own words land a figure over another list
+ * (`figureFault` in `figure.ts`), so the owner is told there. What reaches this is what the rule's words do not show:
+ * the row an arrival wrote, which is the ingest's list, and a figure re-pointed at another list after the rule went in,
+ * which `figure-privacy.test.ts` installs to reach this line at all.
  */
 function hiddenFigure(sql: Sql, id: string, lands: ReadonlySet<string>): boolean {
   if (lands.size === 0) return false;
@@ -1440,19 +1582,8 @@ function hiddenFigure(sql: Sql, id: string, lands: ReadonlySet<string>): boolean
   const source = found ? (JSON.parse(found.body) as { source?: unknown }).source : undefined;
   if (typeof source !== 'string' || !source.startsWith('register.')) return false;
   const over = source.slice('register.'.length);
-  for (const { person } of sql.all<{ person: string }>('SELECT DISTINCT person_id AS person FROM member')) {
-    const held = access(sql, person);
-    if (held !== null && [...lands].some((list) => readsList(held, list)) && !readsList(held, over)) return true;
-  }
-  return false;
+  return [...lands].some((list) => list !== over);
 }
-
-/** Whether a member's `access` reads `list`: inside the ceiling, at the level held there or on the record, and not `append`. */
-const readsList = (held: NonNullable<ReturnType<typeof access>>, list: string): boolean => {
-  if (held.registers !== null && !held.registers.includes(list)) return false;
-  const level = Object.hasOwn(held.levels, list) ? held.levels[list] : held.level;
-  return level !== null && level !== undefined && level !== 'append';
-};
 
 /**
  * `{{vars.x}}`, `{{trigger.row.amount}}` and `{{metric.total}}`, filled in a string that no fill of the row reads after: a condition, a

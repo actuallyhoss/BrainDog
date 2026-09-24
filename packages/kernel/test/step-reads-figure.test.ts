@@ -58,6 +58,7 @@ const KEYS: Declaration = {
     fields: [
       { id: 'what', type: 'text', required: true },
       { id: 'pin', type: 'secret' },
+      { id: 'note', type: 'text' },
     ],
   } as never,
 };
@@ -123,12 +124,16 @@ test('A TEXT THE PASS FILLS READS THE FIGURE IN THE SAME PASS as the row and the
   assert.equal(noteOf(sql, 'Glaze'), 'Glaze of 15', 'the figure is read when the step is taken, over the rows as they are then');
 });
 
+/* ON A CLOCK, WHICH WRITES NO ROW. First written as a note on each new Items row, which a figure over Spent is not
+   written into since 24 September (`figure-install-warning.test.ts`): install refused it. What is measured is the
+   money's spelling and the hyphen, which a notify fills exactly as it fills a note. */
 test('A MONEY FIGURE IS WRITTEN IN ITS CURRENCY AS A MONEY FIELD IS, and an id with a hyphen is read', async () => {
-  const { k, sql } = await record(rule({ rule: 'cash', on: onItems, steps: [{ set: { field: 'note', to: 'cash {{metric.cash-now}} and {{ metric.total }}' } }] }));
+  const { k, sql, clock } = await record(rule({ rule: 'cash', on: { every: '15m' }, steps: [{ notify: { say: 'cash {{metric.cash-now}} and {{ metric.total }}' } }] }));
   assert.ok(k.create('spent', { what: 'Rent', amount: { amount: 123450, currency: 'GBP' } }, { actor: 'p_1' }).ok);
   assert.ok(k.create('items', { what: 'Kiln', n: 2 }, { actor: 'p_1' }).ok);
+  clock.advance(15 * MIN);
   await k.drain();
-  assert.equal(noteOf(sql, 'Kiln'), 'cash GBP 1234.50 and 2');
+  assert.deepEqual(notes(sql, 'rule:cash'), ['cash GBP 1234.50 and 2'], JSON.stringify(runs(sql, 'cash')));
 });
 
 test('AN if AND A notify READ IT WITH NO EXTRA STEP, on a clock that has no row', async () => {
@@ -149,16 +154,23 @@ test('AN if AND A notify READ IT WITH NO EXTRA STEP, on a clock that has no row'
   assert.deepEqual(notes(sql, 'rule:watch'), ['Items add up to 7.']);
 });
 
+/* INTO A ROW OF KEYS, THE LIST THE FIGURE COUNTS. First written into each new Items row, which install refuses since 24
+   September (`figure-install-warning.test.ts`); a note on Keys is read only by whoever reads Keys, who reads the count
+   already, and what is measured is still that the secret list's aggregate is not taken for a copy of the secret. */
 test('A FIGURE OVER A LIST WITH A SECRET IS ITS AGGREGATE: the count goes into a note and the step is not refused as a copy', async () => {
-  const { k, sql } = await record(rule({ rule: 'count', on: onItems, steps: [{ set_var: { name: 'c', to: '{{metric.held}}' } }, { set: { field: 'note', to: '{{vars.c}} keys' } }] }));
+  const { k, sql } = await record(
+    rule({ rule: 'count', on: { written: { register: 'keys', op: ['create'] } }, steps: [{ set_var: { name: 'c', to: '{{metric.held}}' } }, { set: { field: 'note', to: '{{vars.c}} keys' } }] }),
+  );
   /* THE SECRET IS PUT IN BY SQL, as `flow-secret-verbs.test.ts` puts it: a secret field written through the record holds
      a vault grant's id, and a plaintext is the plainest way to see that it went nowhere. */
   assert.ok(k.create('keys', { what: 'Bank' }, { actor: 'p_1' }).ok);
   sql.exec("UPDATE entry SET fields = json_set(fields, '$.pin', 'hunter2') WHERE register = 'keys'");
-  assert.ok(k.create('items', { what: 'Kiln', n: 1 }, { actor: 'p_1' }).ok);
   await k.drain();
-  assert.deepEqual(runs(sql, 'count'), [{ state: 'done', say: null }]);
-  assert.equal(noteOf(sql, 'Kiln'), '1 keys');
+  assert.ok(k.create('keys', { what: 'Door' }, { actor: 'p_1' }).ok);
+  await k.drain();
+  assert.deepEqual(runs(sql, 'count'), [{ state: 'done', say: null }, { state: 'done', say: null }]);
+  const door = sql.one<{ fields: string }>("SELECT fields FROM entry WHERE register = 'keys' AND json_extract(fields, '$.what') = 'Door'")!;
+  assert.equal((JSON.parse(door.fields) as { note?: unknown }).note, '2 keys');
 });
 
 test('A FIGURE THE RECORD DOES NOT HOLD, stored past the lint, is written as the dash a missing field is', async () => {
@@ -189,7 +201,7 @@ test('THE LINT REFUSES A FIGURE NO INSTALLED METRIC IS, the colon spelling, and 
   const inline = figureFault('rule.a', { register: 'items', then: [{ set: { field: 'note', to: 'x {{metric.total}}' } }] }, 'inline', known);
   assert.equal(inline?.code, 'NOT_IN_THIS_BUILD');
 
-  assert.equal(figureFault('rule.a', { on: onItems, steps: [{ set: { field: 'note', to: '{{metric.cash-now}} {{ metric.total }}' } }] }, 'run', known), null);
+  assert.equal(figureFault('rule.a', { on: { every: '15m' }, steps: [{ notify: { say: '{{metric.cash-now}} {{ metric.total }}' } }] }, 'run', known), null);
   assert.equal(figureFault('rule.a', { on: onItems, steps: [{ set: { field: 'note', to: '{{metric.nope}}' } }] }, 'run'), null, 'with nothing installed to read, only the spelling is checked');
 });
 
@@ -237,7 +249,7 @@ test('A FIGURE THE RECORD HOLDS STILL INSTALLS, in a step, in a nested arm and i
       once_per: ['entry'],
       on: onItems,
       steps: [
-        { set: { field: 'note', to: '{{metric.cash-now}} {{ metric.total }}' } },
+        { set: { field: 'note', to: '{{metric.total}} {{ metric.total }}' } },
         { if: 'n is {{metric.total}}', then: [{ notify: { say: 'all {{metric.total}}' } }] },
       ],
     }),

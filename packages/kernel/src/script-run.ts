@@ -25,6 +25,7 @@ import type { Result } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
 import { meter, pause, type ActionDeps, type Metered } from './actions.ts';
+import { SCRIPT_CHAIN_CEILING, chainOfJob, underChain } from './flow.ts';
 import { instant } from './migrate.ts';
 import type { OutboxRow } from './outbox.ts';
 import { activeScript, type ScriptBody } from './script.ts';
@@ -306,7 +307,11 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
   const note = `Written by ${actor}.`;
   let lost = false;
   let failedAt = -1;
-  const applied = attempt<unknown>(deps.sql, deps.transaction, () => {
+  /* UNDER THE CHAIN THAT QUEUED THE JOB, when a rule's step queued it (`Chain` in `flow.ts`). Without it the writes below
+     reached the rules as a stranger's, at depth 0, and a rule whose script wrote the row that fired it started itself
+     again on every run: audit sixty-four's L1 ran the script twelve times from one update and was still going. */
+  const chain = chainOfJob(deps.sql, job.id);
+  const applied = underChain(deps.sql, chain, () => attempt<unknown>(deps.sql, deps.transaction, () => {
     /* THE ACK GOES FIRST AND INSIDE. A lease that lapsed while the sandbox ran belongs to whoever reclaimed it, and
        writing this run's rows as well would be the same run landing twice. */
     const acked = done();
@@ -332,7 +337,7 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
       }
     }
     return ok(null);
-  });
+  }));
 
   if (lost)
     return keepLog(
@@ -348,9 +353,17 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
     return refuse(`${script} wrote nothing: write ${failedAt + 1} of ${answer.writes.length} was refused; its log says why.`, why);
   }
   const n = answer.writes.length;
+  /* AND WHERE THE CHAIN STOPPED, IN THE SAME LINE, since this line is the run as the script's history shows it. The
+     first stop is named and the rest counted: the line is cut at 280 characters (`meter`), and a name for every row a
+     wide close stopped on would push the sentence that says why past the cut. */
+  const stopped = chain?.stopped ?? [];
+  const stop =
+    stopped.length === 0
+      ? ''
+      : ` Its writes started no ${stopped[0]}${stopped.length > 1 ? ` or ${stopped.length - 1} more` : ''}: ${stopped.length > 1 ? 'those runs' : 'that run'} would be at depth ${SCRIPT_CHAIN_CEILING + 1} of one chain of rules and scripts, and a chain stops at depth ${SCRIPT_CHAIN_CEILING} so that it cannot run for ever. A person's own write starts it again.`;
   return keepLog(
     deps,
-    meter(deps, { ...base, ...spent, outcome: 'ok', failures: 0 }, `${script} ran and wrote ${n === 0 ? 'nothing' : n === 1 ? 'one row' : `${n} rows`}.`),
+    meter(deps, { ...base, ...spent, outcome: 'ok', failures: 0 }, `${script} ran and wrote ${n === 0 ? 'nothing' : n === 1 ? 'one row' : `${n} rows`}.${stop}`),
     answer.log,
     decl,
   );
