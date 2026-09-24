@@ -59,6 +59,40 @@ test('reading and asking go to the two record methods, and a refusal is said in 
   assert.equal(((await askSpark(none)) as { said: string }).said, words.filedNone);
 });
 
+/* A PRESS THE INCLUDED MODEL TURNED AWAY UNSENT (`loop/research-batch-sixty-four-audit.md` finding 5). The record says
+   `large` (`packages/record/test/spark-declined.test.ts`), and before this the screen kept "Spark drafts with a model
+   (included)" under the title, on a record where every press will be the rules'. */
+test('a record too large for the included model is said plainly, under the title and once in the press, with no fix he cannot apply', async () => {
+  const included: Reading = { ...READING, model: 'included' };
+  /* THE RECORD'S OWN ANSWER, DROPPED LINE AND ALL. A mock with `dropped: []` beside `large: true` is a press no record
+     returns, and it hid that the screen already draws `asked.dropped` under "Not put on Decide": with the sentence added
+     to the toast as well, one press said it verbatim twice on one screen, and a third time under the title. */
+  const why = "This BrainDog is too large for the included model to read, so Spark's own rules drafted these.";
+  const large = client({ sparkPropose: { ok: true, value: { by: 'rules', filed: [{ id: 'SG5', question: 'x', by: 'rules' }], skipped: [], dropped: [why], large: true } } });
+  const out = await askSpark(large);
+  assert.ok(out.ok);
+  assert.equal(out.said, 'One suggestion is on Decide.');
+  assert.ok(!out.asked.dropped.some((d) => out.said.includes(d)), out.said);
+  assert.equal(draftedBy(included, out.asked), words.byLarge);
+  assert.match(words.byLarge, /too large for the included model/u);
+  assert.doesNotMatch(words.byLarge, /ceiling|neuron|raise|fewer/iu);
+
+  /* A PRESS THE MODEL ANSWERED, or one that did not say `large`, leaves the frame as the reading has it. */
+  const fine = client({ sparkPropose: { ok: true, value: { by: 'included', filed: [], skipped: [], dropped: [], large: false } } });
+  const said = await askSpark(fine);
+  assert.ok(said.ok);
+  assert.equal(said.said, words.filedNone);
+  assert.equal(draftedBy(included, said.asked), words.byModel('included'));
+  assert.equal(draftedBy(included), words.byModel('included'));
+
+  /* THE SCREEN HANDS THE PRESS'S ANSWER TO THE LINE UNDER THE TITLE, or the line never changes, and draws the press's
+     dropped lines, which is where the too-large sentence is said. */
+  const { readFileSync } = await import('node:fs');
+  const screen = readFileSync(new URL('../../routes/spark/+page.svelte', import.meta.url), 'utf8');
+  assert.match(screen, /draftedBy\(reading, asked/u);
+  assert.match(screen, /#each asked\.dropped/u);
+});
+
 test('the daily switch says what on and off mean and when Spark last looked, and sends only the choice', async () => {
   assert.equal(dailySaid({ on: true, last: null }), words.dailyOn);
   assert.equal(dailySaid({ on: false, last: '2026-09-17' }), `${words.dailyOff} It last looked on 17 September 2026.`);

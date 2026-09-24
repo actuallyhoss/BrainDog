@@ -1656,6 +1656,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     let drafts: SparkDraft[] = r.drafts;
     let by = 'rules';
     const dropped: string[] = [];
+    let large = false;
     const model = deps.sparkModel;
     if (model && r.quiet === null) {
       try {
@@ -1680,8 +1681,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             by = model.name;
           } else dropped.push("The model proposed nothing Spark could use, so Spark's own rules drafted these.");
         }
-      } catch {
-        dropped.push("The model did not answer, so Spark's own rules drafted these.");
+      } catch (e) {
+        /* A PRESS THE INCLUDED MODEL'S CEILING TURNED AWAY WAS NEVER ASKED, and said "did not answer" it read as a model
+           that might answer next time. `loop/research-batch-sixty-four-audit.md` finding 5: at 300 lists the prompt is
+           51,152 bytes and the Worker's `NotSent` refuses it before the binding, on this press and every one after, until
+           the record shrinks. The refusal's own fix is the operator's ceiling, which the owner cannot raise, so he is told
+           only what is true for him. `sent: false` alone is not enough: the endpoint's `SparkKeyClosedError` carries it
+           too, and a key that would not open is not a record too large (`test/spark-declined.test.ts`). */
+        large = model.name === 'included' && typeof e === 'object' && e !== null && (e as { sent?: unknown }).sent === false;
+        dropped.push(large ? "This BrainDog is too large for the included model to read, so Spark's own rules drafted these." : "The model did not answer, so Spark's own rules drafted these.");
       }
     }
     if (deps.catalogueOffers) {
@@ -1735,7 +1743,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       r.asked.set(key, { id: put.value.id, status: 'open' });
       filed.push({ id: put.value.id, question: d.question, by: d.by });
     }
-    return { by, filed, skipped, dropped };
+    return { by, filed, skipped, dropped, large };
   };
 
   /**

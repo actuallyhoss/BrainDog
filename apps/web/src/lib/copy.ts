@@ -2425,10 +2425,10 @@ export const copy = {
   proposalNotBuilt: 'Not in this build: a run stops here, after the steps before it.',
   /* A `script` STEP RUNS SINCE `e6010208` (`flow.ts` `startScript` queues the script and the run goes on), and Decide
      went on ending it with `proposalNotBuilt` where the dry run had stopped. These are the dry run's facts in the
-     owner's order: the canvas's sentence before it says "keeping the answer as", and what `as:` keeps is the id of the
-     queued run, so that is said only where the step names one. */
-  proposalScriptGoesOn: (as: string) =>
-    `The run goes on without waiting for it: what the script writes lands when this host runs it.${as === '' ? '' : ` What is kept as ${as} is the id of its queued run, not what the script answers.`} The run stops here if the script is not installed, does not say runs: { rule: true }, or is paused.`,
+     owner's order, all four ways `startScript` stops a run included. What `as:` keeps, the id of the queued run, is
+     said by the canvas's sentence before it. */
+  proposalScriptGoesOn:
+    'The run goes on without waiting for it: what the script writes lands when this host runs it. The run stops here if the script is not installed, does not say runs: { rule: true }, or is paused, or if its input hands on what a secret or file field holds.',
   proposalCallsOut: 'Calls out',
   proposalCallsNothing: 'Nothing outside this record',
   proposalMaySend: 'May send',

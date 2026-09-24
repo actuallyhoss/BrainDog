@@ -18,7 +18,8 @@ export type Draft = { question: string; body_kind: string; asked: { id: string; 
 /** Whether Spark looks once a day on its own, and the day it last did. */
 export type Daily = { on: boolean; last: string | null };
 export type Reading = { model: string | null; quiet: string | null; noticed: Noticed[]; drafts: Draft[]; waiting: { id: string; question: string }[]; cap: number; daily?: Daily };
-export type Asked = { by: string; filed: { id: string; question: string; by: string }[]; skipped: { question: string; why: string }[]; dropped: string[] };
+/** `large`: the included model turned this press away unsent, because the record's reading is past what one ask may spend. */
+export type Asked = { by: string; filed: { id: string; question: string; by: string }[]; skipped: { question: string; why: string }[]; dropped: string[]; large?: boolean };
 
 /** One suggestion as the screen draws it: its question, and where it stands. */
 export type Suggestion = { question: string; state: 'new' | 'waiting' | 'answered'; href: string | null; said: string };
@@ -33,6 +34,7 @@ export const words = {
   lede: 'Spark looks at how you use this BrainDog and suggests ways to fit it better. Nothing changes until you say yes on Decide.',
   byRules: 'Spark is using its own rules. A model can draft for it when this host is set up with one.',
   byModel: (name: string) => `Spark drafts with a model (${name}), and checks every suggestion the same way before it reaches you.`,
+  byLarge: 'Spark is using its own rules, because this BrainDog is now too large for the included model to read.',
   noticed: 'What Spark noticed',
   noticedNone: 'Nothing stands out yet. Spark keeps an eye on which lists grow, which pages you open and what agents do.',
   suggests: 'What Spark suggests',
@@ -81,8 +83,16 @@ export function suggestionsOf(reading: Reading): Suggestion[] {
 export const canAsk = (reading: Reading): boolean =>
   reading.quiet === null && reading.waiting.length < reading.cap && reading.drafts.some((d) => d.asked === null);
 
-/** The line under the title: who drafts. */
-export const draftedBy = (reading: Reading): string => (reading.model === null ? words.byRules : words.byModel(reading.model));
+/**
+ * The line under the title: who drafts.
+ *
+ * THE LAST PRESS OUTRANKS THE READING, because the reading names the model the host has and not whether it will be asked.
+ * `loop/research-batch-sixty-four-audit.md` finding 5: at 300 lists the included model turns every press away unsent, and
+ * this line went on saying it drafts. A fresh reading still says the model's name until a press says `large`: the record
+ * learns it only by asking, and keeps no note of it between loads.
+ */
+export const draftedBy = (reading: Reading, asked?: Asked | null): string =>
+  asked?.large === true ? words.byLarge : reading.model === null ? words.byRules : words.byModel(reading.model);
 
 const fixOf = (r: Refused): string => ('refusal' in r ? r.refusal.fix : 'Something changed while this was open. Try again.');
 
@@ -97,6 +107,8 @@ export async function readSpark(client: SparkClient): Promise<{ ok: true; readin
 export async function askSpark(client: SparkClient): Promise<{ ok: true; asked: Asked; said: string } | { ok: false; fix: string }> {
   const out = await client.call<Asked>('sparkPropose', {});
   if (!out.ok) return { ok: false, fix: fixOf(out) };
+  /* THE TOAST SAYS HOW MANY AND NOT WHY THE RULES DREW THEM. The why is the record's dropped line, which the screen draws
+     under "Not put on Decide"; repeating it here put the same too-large sentence on one screen twice after one press. */
   return { ok: true, asked: out.value, said: out.value.filed.length === 0 ? words.filedNone : words.filed(out.value.filed.length) };
 }
 

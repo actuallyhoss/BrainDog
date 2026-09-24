@@ -87,7 +87,7 @@
   {:else if phase === 'ready' && reading}
     <div class="spark-intro">
       <p class="spark-lede">{words.lede}</p>
-      <p class="spark-by">{draftedBy(reading)}</p>
+      <p class="spark-by">{draftedBy(reading, asked)}</p>
     </div>
 
     {#if nothingYet(reading)}
