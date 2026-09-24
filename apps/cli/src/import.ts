@@ -2,7 +2,7 @@
  * `braindog import legacy <export.json>`: move a the old tool record into this BrainDog (`loop/research-switch.md` §4).
  *
  * IT WRITES AS ANY AGENT DOES, over the API, with the token this machine signed in with: `create` and `update` for rows
- * and `propose` for an open question. So it works the same on a self-host and on app.brain.dog, and it can do nothing a
+ * and `propose` for an open question. So it works the same on a self-host and on brain.dog, and it can do nothing a
  * signed-in agent could not. Installing Solo founder and Agents is the owner's, in the app; a record without their lists
  * is told which to install, and nothing is written. It writes as ONE RUN OF ITS OWN, never the folder's, and ends that
  * run `done` once the last write has answered: see the headers in `importCommand`.

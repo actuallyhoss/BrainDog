@@ -29,8 +29,13 @@ export function loginCommand(host: string): string {
   return `node "${fileURLToPath(new URL('./main.ts', import.meta.url)).replaceAll('\\', '/')}" login ${host}`;
 }
 
-/** What to type when no host is known at all: the address the app prints, with the slug left for the person. */
-export const ANY_HOST = 'https://app.brain.dog/app/<slug>';
+/**
+ * What to type when no host is known at all: the address the app prints, with the slug left for the person.
+ *
+ * ON `brain.dog` SINCE PUSH B2, for the reason at `signIn` in `main.ts`: the old name refuses a device start, so an
+ * agent that passed on `app.brain.dog` would be handing the person a login that answers 403.
+ */
+export const ANY_HOST = 'https://brain.dog/app/<slug>';
 
 /**
  * The host the next command will reach and the expiry of the login this machine keeps for it, found as `target` finds

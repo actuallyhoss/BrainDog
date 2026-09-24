@@ -75,7 +75,7 @@
           sentence above the plans already says neither plan is open yet.
         -->
         {#if i === 1}
-          <a class="btn btn-primary btn-lg" href={APP}>{plan.cta}<Icon name="arrow" size="s" /></a>
+          <a class="btn btn-primary btn-lg" href={APP} rel="external">{plan.cta}<Icon name="arrow" size="s" /></a>
         {:else if BUILD}
           <a class="btn btn-lg" href={BUILD}>{plan.cta}</a>
         {/if}

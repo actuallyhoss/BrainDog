@@ -5,10 +5,9 @@
   from being left out of this file, which is what happened to `/agents` from 6ef2193e until
   22 September; `src/lib/claims.test.ts` reads the route directories and fails on one missing here.
 
-  NO APP. The record app moves onto this origin at `/app/`, with `/api/`, `/auth/` and `/account/`
+  NO APP. The record app is on this origin at `/app/`, with `/api/`, `/auth/` and `/account/`
   beside it, all behind authentication, and `robots.txt` disallows the four: a sitemap naming one
-  would be asking a crawler for an address the same site forbids it. Until then the app is
-  `app.brain.dog`, another host, which a sitemap for `brain.dog` cannot list in any case.
+  would be asking a crawler for an address the same site forbids it.
 -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://brain.dog/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>

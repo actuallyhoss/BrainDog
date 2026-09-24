@@ -82,7 +82,7 @@
       <div class="hero-do">
         <div class="actions">
           <!-- THE PAGE'S ONE FILLED PRIMARY above the close. -->
-          <a class="btn btn-primary btn-lg" href={APP}>{site.hero.primary}<Icon name="arrow" size="s" /></a>
+          <a class="btn btn-primary btn-lg" href={APP} rel="external">{site.hero.primary}<Icon name="arrow" size="s" /></a>
           <a class="quiet" href="/pricing">{site.hero.secondary}</a>
         </div>
         <p class="note">{site.hero.note}</p>
@@ -173,7 +173,7 @@
     <div class="close-row">
       <p class="close-body">{site.closing.body}</p>
       <div class="actions">
-        <a class="btn btn-primary btn-lg" href={APP}>{site.closing.primary}<Icon name="arrow" size="s" /></a>
+        <a class="btn btn-primary btn-lg" href={APP} rel="external">{site.closing.primary}<Icon name="arrow" size="s" /></a>
         <a class="quiet" href="/pricing">{site.closing.secondary}</a>
       </div>
     </div>

@@ -110,8 +110,9 @@ them are built.
 
 ## Running it
 
-`app.brain.dog` is production and `alpha.brain.dog` is the deployment this repository builds on every
-push to `master`. They run the same Worker and the same frontend; alpha wears a different accent and
+`brain.dog/app` is production and `alpha.brain.dog/app` is the deployment this repository builds on
+every push to `master`, each handed over by its own site on the same name (the old `app.brain.dog` and
+`app.alpha.brain.dog` still answer, and send a page load there). They run the same Worker and the same frontend; alpha wears a different accent and
 says its name in the tab, so nobody confuses the two windows.
 [DEPLOYMENT.md](DEPLOYMENT.md) records every build setting both of them run under, including the one
 environment variable the whole deployment identity hangs on, because otherwise that lives in a

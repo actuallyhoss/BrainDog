@@ -9,13 +9,21 @@ One label per surface, with the environment in front of it.
 
 | Host | What runs there | Deployed by | State |
 |---|---|---|---|
-| **`brain.dog`** | `apps/site`, the marketing site | `wrangler deploy --env production`, by hand for now | **live** |
+| **`brain.dog`** | `apps/site`, the marketing site; and the app, `apps/worker`, under `/app` and on its doors, handed over by the site's `APP` service binding | `wrangler deploy --env production`, by hand for now | **live** |
 | **`www.brain.dog`** | nothing: a 301 to the apex | a Redirect Rule, not a Worker | live |
-| **`app.brain.dog`** | `apps/worker` with `apps/web`'s `build/` as its asset directory | Workers Builds `braindog-production`, on every push to `release` | live |
+| **`app.brain.dog`** | `apps/worker` with `apps/web`'s `build/` as its asset directory, as the legacy host since push 4: a page load is a 308 to `brain.dog/app`, and `/api/*`, `/mcp` and `/in/*` are served where they stand | Workers Builds `braindog-production`, on every push to `release` | live, legacy |
 | **`mcp.brain.dog`** | reserved | nothing | not claimed |
-| **`alpha.brain.dog`** | `apps/site`, the same bytes | `braindog-site-alpha`, deployed by hand for now | live |
-| **`app.alpha.brain.dog`** | the record, built as **BrainDog Alpha** | Workers Builds `braindog-alpha`, on every push to `master` | live |
+| **`alpha.brain.dog`** | `apps/site`, the same bytes; and alpha's app under `/app` and on its doors, through the alpha site's `APP` binding | `braindog-site-alpha`, deployed by hand for now | live |
+| **`app.alpha.brain.dog`** | the record, built as **BrainDog Alpha**, as the legacy host since push 2, the same way | Workers Builds `braindog-alpha`, on every push to `master` | live, legacy |
 | **`mcp.alpha.brain.dog`** | reserved | nothing | not claimed |
+
+**The app lives on `brain.dog` since push 4 of the one-domain move** (`loop/research-one-domain-binding.md`
+section 4, `loop/research-push-4.md`). The site keeps `brain.dog` as its Custom Domain and runs its
+script first on the app's doors, which it hands to `braindog-production` through a service binding,
+so no zone route is written. `PUBLIC_HOST` is `brain.dog`, so sign-in, the CSRF origin and the device
+flow are all there; `app.brain.dog` stays the app Worker's Custom Domain for the tokens and `/in/`
+addresses handed out on it, and a device start there is refused. Alpha is the same on its own names
+since push 2.
 
 `mcp.*` is deliberately unclaimed, and both names now resolve to nothing, which is the honest
 answer for a service that is not built. `mcp.brain.dog` used to answer 525: a `*.brain.dog` CNAME
@@ -128,9 +136,10 @@ Durable Object migrations are in `wrangler.jsonc` and apply themselves on deploy
 ## Checking a deployment without opening a browser
 
 ```
-curl -s -o /dev/null -w '%{http_code}\n' https://app.brain.dog/           # 200, the shell
-curl -s https://app.brain.dog/api/health                                   # a typed refusal, not a 500
-curl -s -H 'authorization: Bearer rec_0000000000000000000000000.x' https://app.brain.dog/api/boot
+curl -s -o /dev/null -w '%{http_code}\n' https://brain.dog/app/           # 200, the shell
+curl -s https://brain.dog/healthz                                          # {"ok":true,"app":...}
+curl -s https://brain.dog/api/health                                       # a typed refusal, not a 500
+curl -s -H 'authorization: Bearer rec_0000000000000000000000000.x' https://brain.dog/api/boot
 ```
 
 The API answering `{"ok":false,"refusal":{"code":"UNAUTHORIZED","fix":"…"}}` with a 401 is the

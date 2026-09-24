@@ -47,12 +47,18 @@
  * `APP` IS THE ONE PLACE THE APP'S ADDRESS IS WRITTEN. Every "Open the app" on the site, the header,
  * the hero, the close, the pricing card and the changelog, and the footer's sign-in, read it from
  * here. It sat below `site` until 22 September, which is why the footer's sign-in was a second
- * literal of the same address. The day the app moves, this line is every LINK that changes and not
+ * literal of the same address. The day the app moved, this line was every LINK that changed and not
  * the whole change: `loop/research-site-now.md` (23 September, section 2) measured `static/robots.txt`,
  * the comments in `static/sitemap.xml` and the want of a CSP in `static/_headers` all going false with
- * the move. And an absolute address sends the alpha site's readers to production's app, which a
- * relative `/app` would not; that waits on push B, because `/app` on `brain.dog` is the site's 404
- * until the flip.
+ * the move.
+ *
+ * `/app` AND NOT AN ADDRESS, SINCE PUSH B2 PUT THE APP ON THIS SITE'S OWN NAME. The site's script
+ * hands `/app` and everything under it to its own environment's app (`wrangler.jsonc`,
+ * `run_worker_first` and `services`), so the alpha site's readers reach alpha's app, where the old
+ * absolute `https://app.brain.dog` sent them to production's. It stayed absolute until the flip
+ * because until then `/app` on `brain.dog` refused every sign-in at `origin`, and after it the old
+ * name refuses a device start (`loop/research-one-domain-binding.md` section 2.4).
+ * `test/one-origin.test.mjs` reads production's `PUBLIC_HOST` and says which of the two this must be.
  *
  * `SOURCE` IS PUBLISHED AHEAD OF THE REPOSITORY GOING PUBLIC, on the owner's word, 2026-09-16. The
  * repository is private until the product launches, and the link is on the site now so it is
@@ -62,7 +68,7 @@
  * written for a stranger yet. `null` and not a different URL, so every call site has to decide what
  * to draw when there is no address, and the type makes it decide.
  */
-export const APP = 'https://app.brain.dog';
+export const APP = '/app';
 export const SOURCE: string | null = 'https://github.com/actuallyhoss/BrainDog';
 export const DOCS: string | null = null;
 /** The build instructions, which is what a self-hoster is actually sent to. */
@@ -1179,8 +1185,9 @@ export const site = {
           { label: 'GitHub', href: 'https://github.com/actuallyhoss/BrainDog' },
           /* THE FOOTER AND NOT THE HEADER: the hero says there is no sign-up, and a sign-in beside
              it would contradict the sentence a reader has just been given. Built from `APP`, so the
-             app's address is written once. */
-          { label: 'Sign in', href: `${APP}/signin` },
+             app's address is written once, and `external` for the reason at the header's link in
+             `+layout.svelte`: `/app/signin` is the app's, on this site's name. */
+          { label: 'Sign in', href: `${APP}/signin`, rel: 'external' },
         ],
       },
       {

@@ -16,7 +16,21 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { readHosts } from '../src/http.ts';
-import { login, sameMachine } from '../src/login.ts';
+import { ANY_HOST, login, sameMachine } from '../src/login.ts';
+
+/**
+ * Production's `PUBLIC_HOST`, read off `apps/worker/wrangler.jsonc` with the deploy checker's own parser.
+ *
+ * THE LOGIN EXAMPLE IS THE ONE ADDRESS A PERSON COPIES, AND ONLY ONE HOST STARTS A DEVICE THERE. `POST /auth/device`
+ * checks that the name a request came by is `PUBLIC_HOST` (`packages/host/src/device.ts`), and with push B2's vars
+ * `app.brain.dog` answered 403 "This BrainDog signs devices in at https://brain.dog, so start there"
+ * (`loop/research-one-domain-binding.md` section 2.4). The example said `app.brain.dog` and promised it "signs in on
+ * both sides", and nothing here read the file that made that false, so the tests stayed green through the flip. A
+ * runtime specifier, because the script has no declaration and a static import of it does not typecheck.
+ */
+const checker = new URL('../../worker/scripts/provision-check.mjs', import.meta.url).href;
+const { wranglerConfig } = (await import(checker)) as { wranglerConfig: () => { env?: { [name: string]: { vars?: { [key: string]: string } } } } };
+const PRODUCTION = wranglerConfig().env?.['production']?.vars?.['PUBLIC_HOST'] ?? '';
 
 const MAIN = fileURLToPath(new URL('../src/main.ts', import.meta.url));
 const TOKEN = 'rec_01TESTTESTTESTTESTTESTTEST.stub-bearer-never-printed-4c1d';
@@ -128,14 +142,22 @@ test('THE OLD SHAPE, <host>/<slug>, STILL POSTS THE SLUG', async (t) => {
   assert.equal(readHosts(out.file).default, `${host.base}/acme`);
 });
 
-test('A USAGE MISTAKE NAMES THE ADDRESS THE APP LIVES AT NOW', async (t) => {
+test('A USAGE MISTAKE NAMES THE ADDRESS THE APP LIVES AT NOW, on the host production starts a device on', async (t) => {
   const config = mkdtempSync(join(tmpdir(), 'braindog-login-'));
   t.after(() => rmSync(config, { recursive: true, force: true }));
   const child = spawn(process.execPath, [MAIN, 'login'], { env: { ...process.env, XDG_CONFIG_HOME: config, APPDATA: config }, stdio: ['ignore', 'pipe', 'pipe'] });
   let stderr = '';
   child.stderr.on('data', (chunk: Buffer) => (stderr += chunk.toString('utf8')));
   assert.equal(await new Promise<number | null>((done) => child.on('close', done)), 1);
-  assert.equal(stderr.trim(), 'braindog login takes one host, as in braindog login https://app.brain.dog/app/<slug>, and --vault <project>, and nothing else.');
+  assert.ok(PRODUCTION.length > 0, 'apps/worker/wrangler.jsonc has no PUBLIC_HOST for production');
+  assert.equal(stderr.trim(), `braindog login takes one host, as in braindog login https://${PRODUCTION}/app/<slug>, and --vault <project>, and nothing else.`);
+});
+
+test('THE ADDRESS A SIGNED-OUT AGENT PASSES ON IS ON THAT HOST TOO', () => {
+  /* `ANY_HOST` is what the MCP server's refusal tells a person to run `login` with (`src/signed-out.ts`), so it is the
+     same example in a second place, and it was the same `app.brain.dog`. */
+  assert.equal(new URL(ANY_HOST.replace('<slug>', 'acme')).host, PRODUCTION);
+  assert.equal(new URL(ANY_HOST.replace('<slug>', 'acme')).pathname, '/app/acme');
 });
 
 test(

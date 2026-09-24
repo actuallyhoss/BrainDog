@@ -29,12 +29,15 @@
 
 import { strict as assert } from 'node:assert';
 import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import provisionCheck, { applyPush, environmentOf, guardsKeylessRecords, plan, pushes, readBuild, readMethods, readProvision, wranglerConfig } from './provision-check.mjs';
+import { unflipped } from './flip-fixture.mjs';
 import { UNBOUND, boundSite } from './site-fixture.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -42,23 +45,28 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 test('the host a person names decides which environment, which bucket and which vars are read', () => {
   const config = wranglerConfig(root);
 
-  /* PUSH A OF THE ONE-DOMAIN MOVE (`loop/research-one-domain-cutover.md` §5): production is still
-     `app.brain.dog`, a Custom Domain, and that is the host the owner runs this against before he
-     provisions (the runbook's O3). */
+  /* PRODUCTION HAS FLIPPED (push 4), AND ITS OLD NAME IS STILL PRODUCTION'S. `app.brain.dog` was the host the owner
+     ran this against before he provisioned (`loop/research-one-domain-cutover.md` §5, the runbook's O3); it stays a
+     Custom Domain of this Worker as the legacy host, so a check run against it reads production's bucket and
+     production's vars, which now name `brain.dog`. */
   /* THE SITE IS HANDED IN, UNBOUND, as it was before push 1, so what this test says about `brain.dog` does not change
      with the commit that binds a site. The one call without it reads the real site, which `app.brain.dog` does not
      depend on in any push. */
   const production = environmentOf(config, 'app.brain.dog', UNBOUND);
   assert.equal(production?.name, 'production');
   assert.equal(production?.bucket, 'braindog-blobs');
-  assert.equal(production?.vars.PUBLIC_HOST, 'app.brain.dog');
+  assert.equal(production?.vars.PUBLIC_HOST, 'brain.dog');
   assert.equal(environmentOf(config, 'https://app.brain.dog/', UNBOUND)?.name, 'production');
   assert.equal(environmentOf(config, 'app.brain.dog')?.name, 'production');
 
+  /* ALPHA HAS FLIPPED (push 2), AND ITS OLD NAME IS STILL ALPHA'S. `app.alpha.brain.dog` stays a Custom Domain of this
+     Worker as the legacy host, so a check run against it reads alpha's bucket and alpha's vars, which now name
+     `alpha.brain.dog`; the new name is alpha's only through the site, in the next test. */
   const alpha = environmentOf(config, 'app.alpha.brain.dog', UNBOUND);
   assert.equal(alpha?.name, 'alpha');
   assert.equal(alpha?.bucket, 'braindog-blobs-alpha');
-  assert.equal(alpha?.vars.PUBLIC_HOST, 'app.alpha.brain.dog');
+  assert.equal(alpha?.vars.PUBLIC_HOST, 'alpha.brain.dog');
+  assert.equal(environmentOf(config, 'alpha.brain.dog', UNBOUND), null);
 
   /* `brain.dog` IS THE SITE'S UNTIL THE SITE HANDS IT THE DOORS, so beside an unbound site it is a host this file does
      not name, and reading production's facts for it would describe a Worker that is not answering there. */
@@ -70,9 +78,11 @@ test('the host a person names decides which environment, which bucket and which 
 });
 
 test('once the site hands this app its doors, the site\'s name is that environment\'s too, and only through its own environment', () => {
-  const staged = Object.fromEntries(pushes(root).map((p) => [p.name, p.config]));
+  /* B1 IS NO LONGER IN THE LADDER, so it is the file with production's flip taken back out (`flip-fixture.mjs`), which is
+     also what a rollback of push 4 lands on behind push 3's site. */
+  const staged = { ...Object.fromEntries(pushes(root).map((p) => [p.name, p.config])), B1: unflipped(wranglerConfig(root), ['production']) };
   const both = boundSite({ alpha: 'braindog-alpha', production: 'braindog-production' });
-  for (const push of ['A', 'B1', 'B2']) {
+  for (const push of Object.keys(staged)) {
     const config = staged[push];
     /* THIS WORKER HOLDS `brain.dog` ONLY THROUGH THE SITE'S BINDING. No route of this Worker names it, so reading
        `routes` alone, as this function did while the move was to be zone routes, answered `null` for production's own
@@ -87,13 +97,13 @@ test('once the site hands this app its doors, the site\'s name is that environme
        `brain.dog.evil` would read production's facts. */
     assert.equal(environmentOf(config, 'brain.dog.evil', both), null, push);
   }
-  assert.equal(environmentOf(staged.A, 'brain.dog', both)?.vars.PUBLIC_HOST, 'app.brain.dog');
+  assert.equal(environmentOf(staged.B1, 'brain.dog', both)?.vars.PUBLIC_HOST, 'app.brain.dog');
   assert.equal(environmentOf(staged.B2, 'brain.dog', both)?.vars.PUBLIC_HOST, 'brain.dog');
 
   /* PUSH 1'S SITE: alpha's name is alpha's, and `brain.dog` is still only the site's. */
   const first = boundSite({ alpha: 'braindog-alpha' });
-  assert.equal(environmentOf(staged.A, 'alpha.brain.dog', first)?.name, 'alpha');
-  assert.equal(environmentOf(staged.A, 'brain.dog', first), null);
+  assert.equal(environmentOf(staged.B1, 'alpha.brain.dog', first)?.name, 'alpha');
+  assert.equal(environmentOf(staged.B1, 'brain.dog', first), null);
   /* A SITE BOUND TO THE OTHER ENVIRONMENT'S APP IS NEITHER ENVIRONMENT'S NAME. Production's facts would describe a
      Worker that is not answering there, and alpha's would describe a deploy nobody meant to make. */
   const crossed = boundSite({ alpha: 'braindog-alpha', production: 'braindog-alpha' });
@@ -106,12 +116,38 @@ test('a staged push that names an environment or a key the file does not have is
      would go green on the file as it already is. */
   assert.throws(() => applyPush(base, { staging: { vars: { PUBLIC_HOST: 'x' } } }), /env\.staging/);
   assert.throws(() => applyPush(base, { production: { route: [] } }), /route/);
-  const moved = applyPush(base, { production: { vars: { PUBLIC_HOST: 'brain.dog' } } });
-  assert.equal(moved.env.production.vars.PUBLIC_HOST, 'brain.dog');
+  /* A NAME THE FILE HAS IN NO PUSH, so the copy left untouched cannot be told from one that was written. With
+     `brain.dog` here, the value B2 moved into the file, the untouched check read the file's own `brain.dog` where it
+     had `app.brain.dog` written in, and failed on push 4 while saying nothing about `applyPush`. */
+  const was = base.env.production.vars.PUBLIC_HOST;
+  const moved = applyPush(base, { production: { vars: { PUBLIC_HOST: 'moved.brain.dog' } } });
+  assert.equal(moved.env.production.vars.PUBLIC_HOST, 'moved.brain.dog');
   /* THE REST OF `vars` IS KEPT, which is what "vars unchanged" means in a fragment that names two. */
   assert.equal(moved.env.production.vars.RP_ID, base.env.production.vars.RP_ID);
   /* AND THE FILE'S OWN COPY IS UNTOUCHED. */
-  assert.equal(base.env.production.vars.PUBLIC_HOST, 'app.brain.dog');
+  assert.equal(base.env.production.vars.PUBLIC_HOST, was);
+  assert.notEqual(was, 'moved.brain.dog');
+});
+
+test('the file is named by its own opening comment, exactly once, or the pushes are refused', () => {
+  /* THE NAME USED TO BE `'A'` IN `pushes`, and moving `STAGE B1` into the file left a B1 called A. A second sentence, a
+     stale one left in another comment, would decide what every test calls the file, so two are refused as firmly as none. */
+  const text = readFileSync(join(root, 'apps', 'worker', 'wrangler.jsonc'), 'utf8');
+  const named = (body) => {
+    const dir = mkdtempSync(join(tmpdir(), 'push-name-'));
+    mkdirSync(join(dir, 'apps', 'worker'), { recursive: true });
+    writeFileSync(join(dir, 'apps', 'worker', 'wrangler.jsonc'), body);
+    try {
+      return pushes(dir).map((p) => p.name);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  };
+  assert.deepEqual(named(text), pushes(root).map((p) => p.name));
+  /* AND THE NAME IS READ, NOT MERELY COUNTED: a `'B1'` constant beside the count passed every line above and below. */
+  assert.equal(named(text.replace(/THIS FILE IS PUSH [A-Z][A-Z0-9]*/, 'THIS FILE IS PUSH Z9'))[0], 'Z9');
+  assert.throws(() => named(text.replace(/THIS FILE IS PUSH /, 'THIS FILE WAS PUSH ')), /exactly once, and it says it 0 times/);
+  assert.throws(() => named(text.replace(/("name": "braindog",)/, '/* THIS FILE IS PUSH A */\n  $1')), /exactly once, and it says it 2 times/);
 });
 
 test('the two 404s at /auth/provision are told apart by their sentence', () => {

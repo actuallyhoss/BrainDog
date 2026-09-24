@@ -149,7 +149,23 @@ test('no backtick reaches the reader', when(NO_BUILD), () => {
  * only one in the changelog's status block. `SOURCE`, `DOCS` and `BUILD` are `null` so that every
  * call site has to decide what to draw when there is no address; this is what checks that each one
  * still draws nothing rather than the word `null`.
+ *
+ * A PATH THE SITE HANDS TO THE APP GOES TO THE APP, NOT TO `build/`. Since push B2 "Open the app" is
+ * `/app` on this site's own name, and this failed on it with "index.html has href="/app", and build/
+ * holds none of app, app.html, app/index.html", which is true and beside the point: the site's
+ * `run_worker_first` sends `/app` to its script and the script to the app. So a path on that list is
+ * checked for the one thing the site owes it, `rel="external"`, without which the prerender crawler
+ * follows it and the build stops at a 404. The list is read from `wrangler.jsonc` with the deploy
+ * checker's own parser, by a runtime specifier because the script has no declaration.
  */
+const checker = new URL('../../worker/scripts/provision-check.mjs', import.meta.url).href;
+const { siteConfig, workerFirst } = (await import(checker)) as {
+  siteConfig: () => { assets?: { run_worker_first?: string[] | boolean } };
+  workerFirst: (entries: string[], path: string) => boolean;
+};
+const handed = siteConfig().assets?.run_worker_first;
+const toApp = (path: string): boolean => Array.isArray(handed) && workerFirst(handed, path);
+
 test('every href goes somewhere', when(NO_BUILD), () => {
   for (const page of PAGES) {
     const html = read(page);
@@ -171,6 +187,12 @@ test('every href goes somewhere', when(NO_BUILD), () => {
       }
 
       const bare = (href.split('#')[0] ?? '').split('?')[0] ?? '';
+      if (bare.startsWith('/') && toApp(bare)) {
+        const text = uncommented(html);
+        const tag = text.slice(text.lastIndexOf('<', m.index), text.indexOf('>', m.index) + 1);
+        assert.match(tag, /\srel="[^"]*\bexternal\b/, `${where}, which is the app's, and the tag is not marked rel="external"`);
+        continue;
+      }
       const rel = bare.replace(/^\.\//, '').replace(/^\//, '');
       const tries = rel === '' ? ['index.html'] : [rel, `${rel}.html`, `${rel.replace(/\/$/, '')}/index.html`];
       const found = tries.some((candidate) => existsSync(new URL(candidate, BUILD)));

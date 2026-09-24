@@ -168,7 +168,7 @@
       <!-- ONE ACTION WHILE THE REPOSITORY IS PRIVATE, and it is this page's filled primary: the
            status says the app is live, and this is how you see that it is. -->
       <p class="status-links">
-        <a class="btn btn-primary" href={APP}>{site.nav.open}<Icon name="arrow" size="s" /></a>
+        <a class="btn btn-primary" href={APP} rel="external">{site.nav.open}<Icon name="arrow" size="s" /></a>
         {#if SOURCE}<a class="btn" href={SOURCE}>{site.nav.source}</a>{/if}
       </p>
       </div>

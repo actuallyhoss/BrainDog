@@ -3,11 +3,13 @@
  * against the doors the Worker has built.
  *
  * THE MOVE TO ONE DOMAIN GOES THROUGH THE SITE'S SERVICE BINDING, AND THIS FILE HOLDS EVERY PUSH OF IT THAT TOUCHES
- * `wrangler.jsonc` (`loop/research-one-domain-binding.md` section 4). Push A is `wrangler.jsonc` as it stands: the app
- * under `/app`, the Worker on `app.brain.dog` alone, no zone route. B1 flips alpha's two vars and B2 production's. The
- * two pushes that bind the site (1 and 3) change `apps/site/wrangler.jsonc` and nothing here. B1 and B2 live as JSON in
- * the comment at the top of `wrangler.jsonc`, and `pushes` in `scripts/provision-check.mjs` applies them, so a fragment
- * that stops parsing, or flips a name nothing reaches, fails here, on a laptop, rather than on the morning of the push.
+ * `wrangler.jsonc` (`loop/research-one-domain-binding.md` section 4). Push A put the app under `/app` with the Worker on
+ * `app.brain.dog` alone and no zone route. B1 flipped alpha's two vars (push 2) and B2 production's (push 4), and
+ * `wrangler.jsonc` as it stands is B2: both environments on the site's names, their old names legacy. The two pushes
+ * that bind the site (1 and 3) change `apps/site/wrangler.jsonc` and nothing here. Nothing is staged in the comment at
+ * the top of `wrangler.jsonc` now; `pushes` in `scripts/provision-check.mjs` reads the file's own name from that
+ * comment and would apply a fragment staged there, so one that stops parsing, or flips a name nothing reaches, fails
+ * here, on a laptop, rather than on the morning of the push.
  *
  * A NAME THE APP ANSWERS IS REACHED IN ONE OF TWO WAYS, AND THAT IS THE WHOLE OF WHAT IS CHECKED. It is a Custom Domain
  * of this Worker, which carries every path ("Other parts (path, query parameters) of the URL are not considered",
@@ -19,7 +21,8 @@
  *
  * THE SITE OF EACH STAGED PUSH IS WRITTEN IN MEMORY (`scripts/site-fixture.mjs`), because `apps/site/wrangler.jsonc`
  * changes between these pushes on purpose, and a test of B2 that read it would pass or fail with whichever commit is
- * checked out. The tests that read the real site say so in their names.
+ * checked out. THE FILE ITSELF IS HELD TO THE REAL SITE, because the two deploy together from the same commit. The tests
+ * that read the real site say so in their names.
  *
  * "BUILT" IS READ FROM `src/route.ts`, NOT WRITTEN HERE. Each `serves*` predicate there is the Worker's own answer to "is
  * this path mine", so a door added to the router and to `run_worker_first` that the site does not hand over fails this
@@ -91,13 +94,21 @@ const envOf = (config: Config, name: string): Env => {
 
 /**
  * THE SITE EACH PUSH IS MADE BESIDE. B1 follows push 1, which binds alpha's site; B2 follows push 3, which binds
- * production's too. Push A is the file as it deploys and is checked against the real site, whatever it binds today.
+ * production's too.
+ *
+ * THE FILE AS IT DEPLOYS IS CHECKED AGAINST THE REAL SITE, WHATEVER ITS PUSH IS CALLED. This was keyed by name alone,
+ * which was harmless while the file was A and had no entry. Once the file is B1 it is checked beside the fixture and
+ * never beside the site it deploys with. Measured in the clone of push 2 on 23 September, with `STAGE B2` also moved into
+ * `env.production.vars` and `apps/site/wrangler.jsonc` left without push 3: keyed by name, the reachability test below
+ * passed, and the only failure in this file was the one that names the file's push; read from the real site, it failed
+ * on "brain.dog is no Custom Domain of this Worker, and the site does not hand it the doors: the site's env.production
+ * has no main". That is the guard that push 4 cannot land before push 3, held against the files that deploy.
  */
 const SITE_AT: { [push: string]: Config } = {
   B1: boundSite({ alpha: 'braindog-alpha' }),
   B2: boundSite({ alpha: 'braindog-alpha', production: 'braindog-production' }),
 };
-const siteAt = (push: Push): Config => SITE_AT[push.name] ?? site;
+const siteAt = (push: Push): Config => (push.change === null ? site : SITE_AT[push.name] ?? site);
 
 /**
  * Whether the Worker answers a path itself.
@@ -161,49 +172,38 @@ const unreached = (config: Config, siteConfig: Config, name: string): string[] =
     .map((on) => `${on} is no Custom Domain of this Worker, and the site does not hand it the doors: ${binding.why ?? `${on} is not a Custom Domain of the site's env.${name}`}`);
 };
 
-test('THE FILE IS PUSH A: the Worker on its own name as a Custom Domain, no zone route, and the passkey already under the parent', () => {
-  assert.deepEqual(PUSHES.map((p) => p.name), ['A', 'B1', 'B2']);
-  assert.deepEqual(pushNamed('A').config, worker, 'push A is not the file as it deploys');
-  const expected = {
-    production: { host: 'app.brain.dog', rp: 'brain.dog' },
-    alpha: { host: 'app.alpha.brain.dog', rp: 'alpha.brain.dog' },
-  };
-  for (const name of ENVIRONMENTS) {
-    const block = envOf(worker, name);
-    const host = block.vars?.PUBLIC_HOST ?? '';
-    assert.equal(host, expected[name].host, `${name}: PUBLIC_HOST`);
-    /* THE WORKER HOLDS ITS NAME AS A CUSTOM DOMAIN, which carries every path, so the dark deploy needs no route it does
-       not already have and no permission the token has not already used. */
-    assert.ok(customDomains(block).includes(host), `${name}: ${host} is not a Custom Domain of this Worker`);
-    /* AND IT DOES NOT TAKE THE SITE'S NAME, which would be the flip before anything reaches it. */
-    assert.ok(!siteHostsOf(name).includes(host), `${name}: PUBLIC_HOST ${host} is the site's own name in push A`);
-    assert.equal(block.vars?.LEGACY_HOSTS, '', `${name}: nothing is legacy until the app has moved`);
-    /* THE RP ID IS THE PARENT FROM THE FIRST DEPLOY, so a passkey made during push A is offered on the new name after the
-       flip. */
-    assert.equal(block.vars?.RP_ID, expected[name].rp, `${name}: RP_ID`);
-  }
-});
+/**
+ * Each flip of the move: the environment it moves, the name it moves the app to, and the name that stays as the legacy
+ * host. The old name is also the one Custom Domain the Worker held in push A, so "no route changed" is "the Worker still
+ * holds exactly its old name".
+ */
+const FLIPS: { [push: string]: { env: (typeof ENVIRONMENTS)[number]; host: string; old: string } } = {
+  B1: { env: 'alpha', host: 'alpha.brain.dog', old: 'app.alpha.brain.dog' },
+  B2: { env: 'production', host: 'brain.dog', old: 'app.brain.dog' },
+};
+const RP = { production: 'brain.dog', alpha: 'alpha.brain.dog' };
 
-test('B1 FLIPS ALPHA AND B2 FLIPS PRODUCTION, EACH BY TWO VARS AND NO ROUTE, so each push needs only what it changes', () => {
-  const a = pushNamed('A');
-  const flips = [
-    { push: pushNamed('B1'), env: 'alpha', host: 'alpha.brain.dog', old: 'app.alpha.brain.dog' },
-    { push: pushNamed('B2'), env: 'production', host: 'brain.dog', old: 'app.brain.dog' },
-  ];
-  for (const { push, env, host, old } of flips) {
-    /* ONE ENVIRONMENT PER PUSH, so alpha's flip is rehearsed through `deploy.yml` and the alpha smoke before production's
-       exists (the research, section 4), and a fault in one is a rollback of one. */
-    assert.deepEqual(Object.keys(push.change ?? {}), [env], `${push.name} changes ${Object.keys(push.change ?? {}).join(', ')}`);
-    const change = push.change?.[env] ?? {};
-    /* AND IT CHANGES NO ROUTE, so an Editor token is enough and no route write can fail under the flipped vars. */
-    assert.deepEqual(Object.keys(change), ['vars'], `${push.name}: changes ${Object.keys(change).join(', ')}`);
-    assert.deepEqual(Object.keys(change.vars ?? {}).sort(), ['LEGACY_HOSTS', 'PUBLIC_HOST'], push.name);
-    assert.equal(envOf(push.config, env).vars?.PUBLIC_HOST, host, push.name);
-    assert.deepEqual(hostsOf(envOf(push.config, env).vars?.LEGACY_HOSTS), [old], push.name);
-    for (const name of ENVIRONMENTS) {
-      assert.deepEqual(envOf(push.config, name).routes, envOf(a.config, name).routes, `${push.name} ${name}: a flip changes a route`);
-      assert.equal(envOf(push.config, name).vars?.RP_ID, envOf(a.config, name).vars?.RP_ID, `${push.name} ${name}: the flip moves the RP ID, stranding a passkey made under A`);
-    }
+test('THE FILE IS PUSH B2: both environments on the site name through its binding, the old names legacy, no route changed, and the passkey still under the parent', () => {
+  assert.deepEqual(PUSHES.map((p) => p.name), ['B2']);
+  assert.deepEqual(pushNamed('B2').config, worker, 'push B2 is not the file as it deploys');
+  for (const name of ENVIRONMENTS) {
+    const flip = Object.values(FLIPS).find((f) => f.env === name);
+    assert.ok(flip, `${name}: no flip names this environment`);
+    const block = envOf(worker, name);
+    assert.equal(block.vars?.PUBLIC_HOST, flip.host, `${name}: PUBLIC_HOST`);
+    assert.deepEqual(hostsOf(block.vars?.LEGACY_HOSTS), [flip.old], `${name}: LEGACY_HOSTS`);
+    /* THE NEW NAME IS THE SITE'S, AND THE REAL SITE HANDS IT THE DOORS. This is the check that push 4 is not made before
+       push 3, and, with B2 in the file, that the site is never rolled back past push 3 while the app stays flipped: read
+       from `apps/site/wrangler.jsonc` as it is at this commit, not from the fixture. */
+    assert.deepEqual(siteBinding(worker, site, name, builtDoors(worker, name)), { names: [flip.host], why: null }, `${name}: the site does not hand ${flip.host} to this app`);
+    /* THE WORKER HOLDS ITS OLD NAME AS A CUSTOM DOMAIN AND NOTHING ELSE, as in push A: a flip writes no route, so an
+       Editor token was enough and no route write could fail under the flipped vars. This and the RP ID below are what
+       the test of a staged flip held while one was staged. With both landed it had no fragment to read, and a check with
+       nothing to read is the same silence as no check, so it went with push 4. */
+    assert.deepEqual(customDomains(block), [flip.old], `${name}: this Worker's Custom Domains`);
+    /* THE RP ID IS THE PARENT FROM THE FIRST DEPLOY, and a flip does not move it, so a passkey made on the old name is
+       offered on the new one. */
+    assert.equal(block.vars?.RP_ID, RP[name], `${name}: RP_ID`);
   }
 });
 
@@ -220,7 +220,8 @@ test('in every push, every name the app answers is reached, beside the site that
 test('a flip beside a site that does not bind that environment\'s own app is refused, which is what keeps B2 behind push 3', () => {
   const b2 = pushNamed('B2').config;
   /* PUSH 1'S SITE, ALPHA BOUND AND PRODUCTION NOT. B2 landing here would move production's sign-in to `brain.dog`, where
-     every door is the site's 404 page. */
+     every door is the site's 404 page. With B2 in the file this is also the rollback the research's section 5 calls the
+     one full outage: the site taken back to a version from before push 3 while the app stays flipped. */
   assert.match(unreached(b2, boundSite({ alpha: 'braindog-alpha' }), 'production').join('\n'), /^brain\.dog .*env\.production/);
   /* PRODUCTION'S SITE BOUND TO ALPHA'S APP: every door answers, from the wrong record, and nothing else would notice. */
   const crossed = boundSite({ alpha: 'braindog-alpha', production: 'braindog-alpha' });

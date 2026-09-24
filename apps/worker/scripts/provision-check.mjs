@@ -1,7 +1,7 @@
 /**
  * `provision-check`: is this host ready to be provisioned, and what is missing.
  *
- *   node apps/worker/scripts/provision-check.mjs app.brain.dog     (brain.dog once push B2 of the one-domain move is live)
+ *   node apps/worker/scripts/provision-check.mjs brain.dog     (app.brain.dog, the legacy host since push B2, reads as production too)
  *   node apps/worker/scripts/provision-check.mjs http://localhost:8787 --no-account
  *
  * THIS IS THE REHEARSAL IN `loop/research-provision-day.md` TURNED INTO A COMMAND. That document
@@ -111,19 +111,29 @@ export function applyPush(config, change) {
 }
 
 /**
- * The one-domain move as the pushes it goes out in: `A`, the file as it deploys, then each `STAGE <name> {...}` fragment
- * in the file's opening comment applied on top of the one before. Today that is `A`, `B1` (alpha's flip) and `B2`
- * (production's), `loop/research-one-domain-binding.md` section 4.
+ * The one-domain move as the pushes it goes out in: the file as it deploys, under the name its opening comment gives it
+ * (`THIS FILE IS PUSH <name>`), then each `STAGE <name> {...}` fragment in that comment applied on top of the one before.
+ * Today that is `B1`, the file, with alpha flipped, and `B2`, production's flip, still staged
+ * (`loop/research-one-domain-binding.md` section 4).
  *
  * THE FLIP IS KEPT AS DATA IN THE FILE IT CHANGES, AND READ BY THE SAME SCANNER. Left in a note it would be a config
  * nobody had parsed; here `test/wrangler-routes.test.ts` holds every push to the same checks as the file, and
  * `smoke.test.mjs` knows what the smoke step will ask after each one. The fragment is found by its marker and read to
  * its closing brace with strings respected, so a brace inside a value cannot end it early.
+ *
+ * THE FILE'S OWN NAME IS READ FROM THE FILE TOO, AND IT WAS A CONSTANT HERE. With `'A'` written in this function, moving
+ * `STAGE B1` into `env.alpha.vars` (push 2) left a file that was B1 still called A: the test that names the file's push
+ * went red on `[ 'A', 'B2' ]`, and the only repair on offer was to edit this script at every push. A file that names
+ * itself is renamed in the same hunk that changes it. Exactly one such sentence, or the file is refused: two would let
+ * a stale comment decide what the tests call the file.
  */
 export function pushes(root = ROOT) {
   const text = wranglerText(root);
   const base = JSON.parse(stripJsonc(text));
-  const out = [{ name: 'A', config: base, change: null }];
+  const named = [...text.matchAll(/\bTHIS FILE IS PUSH ([A-Z][A-Z0-9]*)\b/g)].map((m) => m[1]);
+  if (named.length !== 1)
+    throw new Error(`apps/worker/wrangler.jsonc must say "THIS FILE IS PUSH <name>" exactly once, and it says it ${named.length} times`);
+  const out = [{ name: named[0], config: base, change: null }];
   const marker = /\bSTAGE ([A-Z][A-Z0-9]*) (?=\{)/g;
   for (let m = marker.exec(text); m !== null; m = marker.exec(text)) {
     const open = m.index + m[0].length;
@@ -831,7 +841,7 @@ if (import.meta.main) {
   const args = process.argv.slice(2);
   const host = args.find((a) => !a.startsWith('--'));
   if (!host) {
-    console.error('  provision-check takes the host to ask, and has no default: node apps/worker/scripts/provision-check.mjs app.brain.dog [--no-account]');
+    console.error('  provision-check takes the host to ask, and has no default: node apps/worker/scripts/provision-check.mjs brain.dog [--no-account]');
     process.exitCode = 2;
   } else {
     process.exitCode = await provisionCheck(host, { account: !args.includes('--no-account') });

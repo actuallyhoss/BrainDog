@@ -236,10 +236,13 @@ async function mcp(args: string[]): Promise<void> {
 
 /** `braindog login <host> [--vault <scope>]`: one host, and the exit code `login` decides. */
 async function signIn(args: string[]): Promise<void> {
-  /* `app.brain.dog` AND NOT `brain.dog`, because the example is the one address a person copies. Until push B of the
-     one-domain move, `brain.dog/app/<slug>` is the marketing site's 404 (`loop/research-first-sign-in.md` friction 6),
-     and after it `app.brain.dog` stays a Custom Domain of the same Worker, so this example signs in on both sides. */
-  const wrong = 'braindog login takes one host, as in braindog login https://app.brain.dog/app/<slug>, and --vault <project>, and nothing else.';
+  /* `brain.dog` AND NOT `app.brain.dog`, because the example is the one address a person copies and only production's
+     `PUBLIC_HOST` starts a device. This said `app.brain.dog` and that it "signs in on both sides" because the old name
+     stays a Custom Domain of the same Worker; with push B2's vars a device start there answered 403 "This BrainDog signs
+     devices in at https://brain.dog, so start there" (`loop/research-one-domain-binding.md` section 2.4). Tokens minted
+     on the old name keep working there, but a new login does not. `test/login.test.ts` reads the host from
+     `apps/worker/wrangler.jsonc`, so a later move fails there rather than in somebody's terminal. */
+  const wrong = 'braindog login takes one host, as in braindog login https://brain.dog/app/<slug>, and --vault <project>, and nothing else.';
   let parsed: { values: { vault?: string | undefined }; positionals: string[] };
   try {
     parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { vault: { type: 'string' } } });

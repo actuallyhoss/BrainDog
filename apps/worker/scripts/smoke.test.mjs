@@ -10,8 +10,10 @@
  * call reaches the marketing site. So each judgement below is held against the answer the other Worker would give, not
  * only against the one it should.
  *
- * THE SAME STEP RUNS AFTER EVERY PUSH, AND THE TWO FILES DECIDE WHAT IT ASKS. Push A is `wrangler.jsonc` as it stands,
- * and B1 and B2 are the fragments in that file's opening comment, applied by `pushes`. The site each push is made beside
+ * THE SAME STEP RUNS AFTER EVERY PUSH, AND THE TWO FILES DECIDE WHAT IT ASKS. `wrangler.jsonc` as it stands is B2, both
+ * environments flipped, and `pushes` names it so. B1, production still in push A's shape, is the file with production's
+ * flip taken back out (`flip-fixture.mjs`), because that is what a rollback of push 4 deploys behind push 3's site, and
+ * the smoke step still has to judge it. The site each push is made beside
  * is built in memory (`site-fixture.mjs`), so these tests say the same thing before and after the commit that binds a
  * site; the one test that reads the real site says so in its name. The wave-thirty-nine version of this step asked
  * `https://<PUBLIC_HOST>/pricing`, which in push A is `app.brain.dog/pricing`: the Worker's page, not the site, so a
@@ -24,6 +26,7 @@ import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 
 import { pushes, siteBinding, siteConfig, wranglerConfig } from './provision-check.mjs';
+import { unflipped } from './flip-fixture.mjs';
 import { UNBOUND, boundSite } from './site-fixture.mjs';
 import { checks, judge } from './smoke.mjs';
 
@@ -40,37 +43,37 @@ const asked = (list) => list.map((c) => `${c.method} ${c.url}`);
 /* THE SITE AFTER PUSH 1 (alpha bound) AND AFTER PUSH 3 (both). */
 const ALPHA_BOUND = boundSite({ alpha: 'braindog-alpha' });
 const BOTH_BOUND = boundSite({ alpha: 'braindog-alpha', production: 'braindog-production' });
+/* B1: ALPHA FLIPPED AND PRODUCTION NOT, which the file was from push 2 to push 4 and a rollback of push 4 lands on. */
+const B1 = unflipped(wranglerConfig(), ['production']);
 
-test('push A beside an unbound site asks the app on its own name, and asks nothing of brain.dog, which is still only the site', () => {
-  assert.deepEqual(asked(checks(wranglerConfig(), 'production', UNBOUND)), [
+test('production in push A\'s shape beside a site that does not bind it asks the app on its own name, and asks nothing of brain.dog, which is still only the site', () => {
+  assert.deepEqual(asked(checks(B1, 'production', UNBOUND)), [
     'GET https://app.brain.dog/app/',
     'GET https://app.brain.dog/api/boot',
     'GET https://app.brain.dog/r/x',
     'POST https://app.brain.dog/in/anything',
   ]);
-  assert.deepEqual(asked(checks(wranglerConfig(), 'alpha', UNBOUND)), [
-    'GET https://app.alpha.brain.dog/app/',
-    'GET https://app.alpha.brain.dog/api/boot',
-    'GET https://app.alpha.brain.dog/r/x',
-    'POST https://app.alpha.brain.dog/in/anything',
-  ]);
+  /* PUSH 1'S SITE BINDS ALPHA ALONE, and production is asked exactly what it was asked beside no binding at all. */
+  assert.deepEqual(asked(checks(B1, 'production', ALPHA_BOUND)), asked(checks(B1, 'production', UNBOUND)));
 });
 
-test('once alpha\'s site binds alpha\'s app (push 1), alpha is asked the site and the doors on alpha.brain.dog as well, and production is not', () => {
-  assert.deepEqual(asked(checks(wranglerConfig(), 'alpha', ALPHA_BOUND)), [
-    'GET https://app.alpha.brain.dog/app/',
-    'GET https://app.alpha.brain.dog/api/boot',
-    'GET https://alpha.brain.dog/pricing',
-    'GET https://alpha.brain.dog/app/',
-    'GET https://alpha.brain.dog/api/boot',
-    'GET https://app.alpha.brain.dog/r/x',
-    'POST https://app.alpha.brain.dog/in/anything',
+test('once production\'s site binds production\'s app (push 3), production is asked the site and the doors on brain.dog as well, before its flip', () => {
+  /* THE WINDOW ALPHA WAS IN BETWEEN PUSH 1 AND PUSH 2, and production is in it between push 3 and push 4: the app on
+     both names, its own name still the public host, and `brain.dog` shared with the site, so `/pricing` is asked there
+     first. */
+  assert.deepEqual(asked(checks(B1, 'production', BOTH_BOUND)), [
+    'GET https://app.brain.dog/app/',
+    'GET https://app.brain.dog/api/boot',
+    'GET https://brain.dog/pricing',
+    'GET https://brain.dog/app/',
+    'GET https://brain.dog/api/boot',
+    'GET https://app.brain.dog/r/x',
+    'POST https://app.brain.dog/in/anything',
   ]);
-  assert.deepEqual(asked(checks(wranglerConfig(), 'production', ALPHA_BOUND)), asked(checks(wranglerConfig(), 'production', UNBOUND)));
 });
 
 test('each flip is asked the five answers of the design, on the two names it holds', () => {
-  assert.deepEqual(asked(checks(staged('B1'), 'alpha', ALPHA_BOUND)), [
+  assert.deepEqual(asked(checks(B1, 'alpha', ALPHA_BOUND)), [
     'GET https://alpha.brain.dog/pricing',
     'GET https://alpha.brain.dog/app/',
     'GET https://alpha.brain.dog/api/boot',
@@ -120,7 +123,7 @@ test('each check refuses the answer the wrong Worker would give', () => {
 });
 
 test('push A: the front door is a 308 into /app on the same name, and the Worker before that fix is told apart', () => {
-  const [shell, boot, front, door] = checks(wranglerConfig(), 'production', UNBOUND);
+  const [shell, boot, front, door] = checks(B1, 'production', UNBOUND);
   assert.equal(front.headers?.accept, 'text/html', 'a page load says it wants a page, or the Worker rightly leaves it alone');
   assert.equal(judge(front, answer(308, { location: 'https://app.brain.dog/app/r/x' })), null);
   /* THE WORKER WITHOUT THE SAME-HOST REDIRECT answers `ROUTE_UNKNOWN` in JSON here, which is the site's "Open the app"
@@ -144,9 +147,12 @@ test('push A: the front door is a 308 into /app on the same name, and the Worker
 });
 
 test('a public host nothing reaches is refused before anything is asked, and the sentence says which key is missing', () => {
-  const config = structuredClone(wranglerConfig());
+  const config = structuredClone(B1);
   config.env.production.routes = [];
   assert.throws(() => checks(config, 'production', UNBOUND), /app\.brain\.dog/);
+  /* B1 BESIDE A SITE THAT DOES NOT BIND ALPHA: push 2 landing before push 1, which is every door on `alpha.brain.dog`
+     answering the alpha site's 404 page. */
+  assert.throws(() => checks(wranglerConfig(), 'alpha', UNBOUND), /alpha\.brain\.dog .*env\.alpha has no main/);
   /* B2 BESIDE PUSH 1'S SITE: production's flip before production's site is bound, which is every door on `brain.dog`
      answering the site's 404 page. */
   assert.throws(() => checks(staged('B2'), 'production', ALPHA_BOUND), /brain\.dog .*env\.production has no main/);

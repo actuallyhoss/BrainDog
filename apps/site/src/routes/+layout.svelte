@@ -76,8 +76,14 @@
 
     <!-- A QUIET PILL AND NOT A FILLED ONE. Every page has its own filled primary (the hero, the
          hosted plan, the changelog's status), and a filled button up here made two answers to
-         "what do I do" in the first screen of each. -->
-    <a class="btn btn-sm cta" href={APP}>{site.nav.open}</a>
+         "what do I do" in the first screen of each.
+
+         `rel="external"` ON EVERY LINK TO `APP`, because `/app` is on this site's name and is not a
+         page of this site: the site's script hands it to the app. Without it the prerender crawler
+         followed the link and the build stopped at "404 /app (linked from /)" (measured when `APP`
+         became `/app`). SvelteKit's crawler skips a link marked `external` (`crawl.js` tests `rel`
+         for it) and its router leaves the click to the browser, so it is an ordinary page load. -->
+    <a class="btn btn-sm cta" href={APP} rel="external">{site.nav.open}</a>
 
     <!-- THE PHONE'S BAR IS ONE ROW. It was two: the brand and the action, then the links on a line
          of their own, over a hundred pixels before the first word of the page. The links live in
@@ -95,7 +101,7 @@
             onclick={() => (menuOpen = false)}>{link.label}<Icon name="arrow" size="s" /></a
           >
         {/each}
-        <a class="btn menu-app" href={APP}>{site.nav.open}</a>
+        <a class="btn menu-app" href={APP} rel="external">{site.nav.open}</a>
       </nav>
     </details>
   </div>
@@ -116,7 +122,7 @@
     {#each site.footer.columns as column}
       <nav class="foot-col" aria-label={column.title}>
         <h2 class="foot-title">{column.title}</h2>
-        {#each column.links as link}<a href={link.href}>{link.label}</a>{/each}
+        {#each column.links as link}<a href={link.href} rel={'rel' in link ? link.rel : undefined}>{link.label}</a>{/each}
       </nav>
     {/each}
   </div>

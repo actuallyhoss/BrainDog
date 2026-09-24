@@ -8,11 +8,10 @@
 # answer that question.
 #
 # THE PAGES ARE OPEN, THE APP IS NOT. The site is prose with no account and no data, so every
-# crawler may read it. The record app is moving onto this origin: the Worker is to answer
-# `brain.dog/app/`, `/api/`, `/auth/` and `/account/`, which are an app shell, JSON and sign-in
-# behind authentication, and nothing a search result should point at. Until that route is live those
-# four are this site's 404, so the rule costs nothing now and is already in place the day they
-# start answering. The app is absent from the sitemap for the same reason.
+# crawler may read it. The record app lives on this origin: the site hands `brain.dog/app/`,
+# `/api/`, `/auth/` and `/account/` to the app's Worker, and they are an app shell, JSON and sign-in
+# behind authentication, nothing a search result should point at. The rule was in place before they
+# started answering here. The app is absent from the sitemap for the same reason.
 
 User-agent: *
 Allow: /
