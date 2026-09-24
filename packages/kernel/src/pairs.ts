@@ -20,7 +20,8 @@
  * the other's one nearest candidate (`partnerOf`), and every write that could move that answer settles it again for the
  * rows around it (`settle`). A tie is not broken by id or by arrival: two legs equally near leave the row unpaired, which
  * counts the money rather than guessing which move hid it, UNLESS NO MATCHING OF THE TIED ROWS COULD HIDE THE WRONG
- * MONEY (`matchedOf`): as many alike legs one way as the other are matched in day order.
+ * MONEY (`matchedOf`): alike legs are matched in day order, and a leg left over only when no other could be left over
+ * at as few days' cost, and never while a row outside the set may yet be one of its legs.
  *
  * A MARK A PERSON SET IS HIS (`41 §5.4` step 6b, `§13 #10`). The kernel never writes over it and never pairs the row, and
  * a person unmarking one leg of a pair unpairs the other, which is the undo the header of W57-1 promised and did not have.
@@ -321,8 +322,16 @@ export type Leg = {
   fields: Record<string, unknown>;
 };
 
-/** One register's `pairs:`, with what the matching needs to read the ledger. */
-export type Pairing = { sql: Sql; register: string; pairs: PairsDecl; fields: readonly FieldShape[] };
+/**
+ * One register's `pairs:`, with what the matching needs to read the ledger.
+ *
+ * `state` AND `done` ARE THE REGISTER'S OWN, and every `Pairing` says them, `undefined` where the register has none: they
+ * tell a row `where` refuses for good from one it refuses until the bank clears it (`waiting`). They were optional in
+ * the first attempt at audit sixty-three's finding 2, the kernel built its `Pairing` without them, and every refused row
+ * was taken for one that may clear: a client's cleared EGP 20,000.00 that names its party held a split move back, and
+ * Spent and Received each read EGP 40,000.00 high. Required, a caller that leaves them out does not compile.
+ */
+export type Pairing = { sql: Sql; register: string; pairs: PairsDecl; fields: readonly FieldShape[]; state: string | undefined; done: readonly string[] | undefined };
 
 const LEG_COLUMNS = 'id, seq, version, created_at, updated_at, deleted_at, fields';
 type LegRow = Omit<Leg, 'fields'> & { fields: string };
@@ -385,6 +394,9 @@ function currencyOf(p: Pairing, leg: Leg): string | null {
   return null;
 }
 
+/** The field a row's size is read from: the first `abs(...)` in `on`, else the signed `opposite`. */
+const sizedField = (p: Pairing): string => p.pairs.on.map((x) => entryOf(x)!).find((e) => e.abs)?.field ?? p.pairs.opposite;
+
 /** The parts of a row the matching compares, or `null` when it has none to compare: no day, no amount, or zero. */
 function shapeOf(p: Pairing, leg: Leg): { at: number; day: string; amount: Amount; way: unknown; across: unknown } | null {
   const date = dateField(p.pairs, p.fields);
@@ -392,8 +404,7 @@ function shapeOf(p: Pairing, leg: Leg): { at: number; day: string; amount: Amoun
   const day = leg.fields[date];
   const at = typeof day === 'string' ? atMs(day) : null;
   if (at === null || typeof day !== 'string') return null;
-  const sized = p.pairs.on.map((x) => entryOf(x)!).find((e) => e.abs)?.field ?? p.pairs.opposite;
-  const amount = amountOf(leg.fields[sized]);
+  const amount = amountOf(leg.fields[sizedField(p)]);
   /* ZERO NEVER MATCHES. Two zero rows in two accounts on one day are not a movement of anything. */
   if (amount === null || amount.size === 0) return null;
   /* A BARE NUMBER WITH NO CURRENCY ON ITS ROW IS NOBODY'S PARTNER, because 1000 of nothing in particular cannot be told
@@ -444,19 +455,68 @@ function mirrors(p: Pairing, a: Leg, b: Leg): boolean {
  */
 function pairable(p: Pairing, leg: Leg): boolean {
   if (leg.deleted_at !== null || shapeOf(p, leg) === null) return false;
-  if (p.pairs.where !== undefined) {
-    const row = { id: leg.id, seq: leg.seq, version: leg.version, created_at: leg.created_at, updated_at: leg.updated_at };
-    if (!evaluate(p.pairs.where, leg.fields, schemaOf(p.register, p.fields), row)) return false;
-  }
-  return !markPinned(p, leg.id);
+  return matchesWhere(p, leg) && !markPinned(p, leg.id);
+}
+
+function matchesWhere(p: Pairing, leg: Leg): boolean {
+  if (p.pairs.where === undefined) return true;
+  const row = { id: leg.id, seq: leg.seq, version: leg.version, created_at: leg.created_at, updated_at: leg.updated_at };
+  return evaluate(p.pairs.where, leg.fields, schemaOf(p.register, p.fields), row);
+}
+
+/**
+ * Whether a live row that is nobody's partner today may still be one leg of a move: `where` refuses it, or a person
+ * ticked it as a transfer.
+ *
+ * AUDIT SIXTY-THREE'S FINDING 2. A bank alert writes a credit pending before it clears, and a pending half left the set
+ * around it two outs and two ins with a client's payment of the same size as the second in: day order matched the
+ * client with the second out, EGP 20,000.00 read as received 0.00, and once the half cleared all five unpaired. A row
+ * like this one is not in the set, so the set cannot say which of its legs this row's partner is, and it is matched
+ * leg by leg until it can be (`matchedOf`).
+ *
+ * HIS `false` IS NOT ONE. He said the row is not a transfer, so no leg is waiting for it, and held back like a pending
+ * row his unticking a client's payment left the halves beside it counted, Spent EGP 40,000.00 high, measured. His `true`
+ * is: it says the row is one leg of a move, and nothing says which row is the other.
+ *
+ * A ROW NO FINAL STATE WOULD LET THROUGH IS NOT ONE EITHER, and neither is a row already in one. The first attempt
+ * took every row `where` refuses for one that may clear, and the kernel handed it no `done`, so under Money's clause a
+ * client's cleared EGP 20,000.00 that names Nile Design held a split move back, and so did a void half that bounced:
+ * Spent and Received each EGP 40,000.00 high, for good, measured. A row whose `state` is one of the register's `done:`
+ * values is where it will stay. Any other is asked what `where` would say were it in each of them, since that is the
+ * move a bank makes to it, and waits only if one lets it through: a bare pending half does, and a pending payment that
+ * names its party does not. A register with no `state`, or no `done:`, has no row that clears, so none waits.
+ *
+ * AN UNRELATED PENDING ROW OF THE SAME SIZE IN THE WINDOW HOLDS A SET BACK TOO, until it clears: measured, a pending
+ * credit three days after a split move left all four halves counted, EGP 40,000.00 each way. Nothing in the rows says
+ * whose leg a pending credit is, and the side this falls on is the counted one.
+ */
+function waiting(p: Pairing, leg: Leg): boolean {
+  if (leg.deleted_at !== null || shapeOf(p, leg) === null) return false;
+  if (markPinned(p, leg.id)) return leg.fields[p.pairs.mark] === true;
+  const { state, done } = p;
+  if (state === undefined || done === undefined) return false;
+  const now = leg.fields[state];
+  if (typeof now === 'string' && done.includes(now)) return false;
+  return done.some((to) => matchesWhere(p, { ...leg, fields: { ...leg.fields, [state]: to } }));
 }
 
 /**
  * The rows that could be the other leg of `leg`, each with how far its day is from `leg`'s.
  *
- * THE WINDOW IS THE SQL AND THE REST IS READ HERE. The rows are the live ones whose day falls inside `within` of this
- * one, which is one range over a field a ledger indexes; what they then have to agree on is a handful of comparisons on
- * a handful of rows, and a JSON path per `on` entry built into SQL would be the same rule said twice.
+ * THE WINDOW AND THE SIZE ARE THE SQL AND THE REST IS READ HERE. The rows are the live ones whose day falls inside
+ * `within` of this one and whose size is this one's; what they then have to agree on is a handful of comparisons on a
+ * handful of rows, and a JSON path per `on` entry built into SQL would be the same rule said twice.
+ *
+ * THE SIZE IS IN THE SQL BECAUSE A BUSY WINDOW WAS PARSED WHOLE. Measured on 10,000 rows of fifty round amounts packed
+ * into one year, 27 a day: the install pass that settles a ledger under a new `pairs:` took 251 s, 21 of them in this
+ * function, most of that parsing the 250 rows of each window in JS to keep the five of its size. It narrows and never
+ * widens: two legs of one move are the same size whatever else `on` compares (`mirrors`), the size is read the way
+ * `amountOf` reads it, a money's `amount` or a bare number, and `mirrors` still decides every row it lets through.
+ * Measured, a pass over 5,000 rows of three shapes leaves the same ledger with the size in the SQL as without it.
+ *
+ * NOT FOUND BY AN INDEX ON ITS OWN. With no statistics SQLite plans this through `entry_state` on the list alone, even
+ * with the register written in as a literal beside a declared index on the day: 8.5 ms a window on 10,000 rows. A pass
+ * over a whole ledger builds its own index for as long as it runs (`windowSql`); a write asks a few windows.
  *
  * A PAIRED ROW IS STILL A CANDIDATE. Whether it stays paired is `partnerOf`'s question, and leaving it out here is what
  * let the first row to arrive keep a leg a nearer one was the real partner of.
@@ -465,28 +525,51 @@ function pairable(p: Pairing, leg: Leg): boolean {
  * was before a write, whatever the write did to it.
  */
 function candidatesOf(p: Pairing, leg: Leg): { leg: Leg; gap: number }[] {
+  return around(p, leg).near;
+}
+
+/**
+ * The two expressions `around` asks the window by, a row's day and its size, as SQL over `entry.fields`, or `null` when
+ * the declaration has no day to run a window over. Exported so an index built for a pass over the whole ledger
+ * (`index.ts`, `settleRedeclared`) is on these very expressions: SQLite uses an index on an expression only when the
+ * query spells the same one.
+ */
+export function windowSql(p: Pairing): { day: string; size: string } | null {
   const date = dateField(p.pairs, p.fields);
+  if (date === null) return null;
+  const sized = sizedField(p);
+  return { day: `json_extract(fields, '$.${date}')`, size: `abs(coalesce(json_extract(fields, '$.${sized}.amount'), json_extract(fields, '$.${sized}')))` };
+}
+
+/** `candidatesOf`, and whether a row that mirrors `leg` is `waiting`: one query over the window answers both. */
+function around(p: Pairing, leg: Leg): { near: { leg: Leg; gap: number }[]; waits: boolean } {
+  const none = { near: [], waits: false };
+  const window = windowSql(p);
   const shape = shapeOf(p, leg);
-  if (date === null || shape === null) return [];
+  if (window === null || shape === null) return none;
   const lo = shiftFrom(shape.at, `-${p.pairs.within}`);
   const hi = shiftFrom(shape.at, `+${p.pairs.within}`);
-  if (lo === null || hi === null) return [];
+  if (lo === null || hi === null) return none;
   const toDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+  const { day, size } = window;
   const rows = p.sql.all<LegRow>(
     `SELECT ${LEG_COLUMNS} FROM entry WHERE register = ? AND deleted_at IS NULL AND id <> ?
-       AND json_extract(fields, '$.${date}') BETWEEN ? AND ?`,
+       AND ${day} BETWEEN ? AND ? AND ${size} = ?`,
     p.register,
     leg.id,
     toDay(lo),
     toDay(hi),
+    shape.amount.size,
   );
   const out: { leg: Leg; gap: number }[] = [];
+  let waits = false;
   for (const r of rows) {
     const other = legOf(r);
-    if (!mirrors(p, leg, other) || !pairable(p, other)) continue;
-    out.push({ leg: other, gap: Math.abs(shapeOf(p, other)!.at - shape.at) });
+    if (!mirrors(p, leg, other)) continue;
+    if (pairable(p, other)) out.push({ leg: other, gap: Math.abs(shapeOf(p, other)!.at - shape.at) });
+    else waits ||= waiting(p, other);
   }
-  return out;
+  return { near: out, waits };
 }
 
 /** The one candidate nearest in time, or `null` when there is none or two are equally near. */
@@ -499,12 +582,29 @@ function nearestIn(near: readonly { leg: Leg; gap: number }[]): Leg | null {
   return at.length === 1 ? at[0]!.leg : null;
 }
 
-function nearestOf(p: Pairing, leg: Leg): Leg | null {
-  return pairable(p, leg) ? nearestIn(candidatesOf(p, leg)) : null;
+function nearestOf(p: Pairing, leg: Leg, windows: Windows): Leg | null {
+  return pairable(p, leg) ? nearestIn(windowOf(p, leg, windows).near) : null;
 }
 
-/** A leg and the rows that could be its partner, as `candidatesOf` answers them. */
-type Near = { leg: Leg; near: { leg: Leg; gap: number }[] };
+/** What `around` answered for each leg, by id, for as long as one question about the ledger lasts. */
+type Windows = Map<string, ReturnType<typeof around>>;
+
+/**
+ * `around`, asked once per leg for as long as the ledger does not change: one `partnerOf`, or one `settle`, which
+ * writes nothing until it has answered every row.
+ *
+ * MEASURED, THE SAME WINDOW WAS READ AGAIN AND AGAIN. A set past `SET_MOST` is answered leg by leg, and `settle` then
+ * asks each of its legs, and each of those read the same 32 windows to find the same set was not whole: on 10,000 rows
+ * of fifty round amounts in one year, the install pass asked 159,018 windows for 10,000 rows.
+ */
+function windowOf(p: Pairing, leg: Leg, windows: Windows): ReturnType<typeof around> {
+  let w = windows.get(leg.id);
+  if (w === undefined) windows.set(leg.id, (w = around(p, leg)));
+  return w;
+}
+
+/** A leg, the rows that could be its partner, and whether a row that may yet be one is `waiting` (`around`). */
+type Near = { leg: Leg; near: { leg: Leg; gap: number }[]; waits: boolean };
 
 /* HOW MANY ALIKE LEGS ARE ANSWERED AS ONE SET. A move split in halves, or one top-up a day for a week, is a handful; past
    this the set is answered leg by leg, nearest to nearest, as it was before sets were read at all. */
@@ -517,22 +617,23 @@ const SET_MOST = 32;
  * the same set, because a candidate is one both ways (`mirrors` checks the window from each side, and every leg in it
  * passed `pairable`), so the answer it gives each leg is the same from wherever it was asked.
  */
-function setOf(p: Pairing, leg: Leg): { set: Map<string, Near>; whole: boolean } {
+function setOf(p: Pairing, leg: Leg, windows: Windows): { set: Map<string, Near>; whole: boolean } {
   const set = new Map<string, Near>();
   const queue = [leg];
   while (queue.length > 0) {
     const next = queue.shift()!;
     if (set.has(next.id)) continue;
     if (set.size === SET_MOST) return { set, whole: false };
-    const near = candidatesOf(p, next);
-    set.set(next.id, { leg: next, near });
+    const { near, waits } = windowOf(p, next, windows);
+    set.set(next.id, { leg: next, near, waits });
     for (const c of near) if (!set.has(c.leg.id)) queue.push(c.leg);
   }
   return { set, whole: true };
 }
 
 /**
- * A whole set's legs matched in day order, each to one of the other way, or `null` when that is a guess or not needed.
+ * A whole set's legs matched in day order, each to one of the other way or left over, or `null` when that is a guess
+ * or not needed.
  *
  * AUDIT SIXTY-ONE'S FINDING 2. The tie rule refused M1, one EGP 100,000.00 move sent as two halves of 50,000.00 on one day,
  * and M2, two top-ups of 5,000.00 each landing the next day, and both figures counted money that only moved: every
@@ -541,11 +642,23 @@ function setOf(p: Pairing, leg: Leg): { set: Map<string, Near>; whole: boolean }
  * half of a move, and which half it is paired with changes no figure. Matched in day order, first out with first in,
  * the days are as near as any matching can make them in total, which is what the nearest rule asks one leg at a time.
  *
- * STILL A GUESS WHEN THE COUNTS DIFFER, because some leg is left over and nothing in the ledger says which. AND NOT USED
- * WHERE NOTHING IS TIED: there each leg's nearest answers it, and a set matched in day order can differ from that (an
- * out on day 0 and 1, an in on day 1 and 5, pairs the day-1 legs by nearness and all four by order), which is a change to
- * rows no tie ever held and not this repair. A matching that pairs two legs in one account, or two out of each other's
- * window, is no matching, and the set is answered leg by leg.
+ * WHEN THE COUNTS DIFFER, THE LEGS LEFT OVER ARE THE ONES THAT COST THE FEWEST DAYS, AND ONLY WHEN NO OTHER CHOICE COSTS
+ * AS FEW. Audit sixty-three's F1 put a client's EGP 20,000.00 into HSBC two days after a move split in two halves of that
+ * size, and refusing the set whole left both halves counted: Spent and Received each EGP 40,000.00 high. Leaving the
+ * client over costs no day and leaving either half over costs two, so which leg is spare is in the ledger. Three alike
+ * outs against two ins on one day cost the same whichever out is spare, so that stays refused, as a tie of one does.
+ * Every matching the accounts allow is counted, and the rest are matched in day order, so it stays one answer in every
+ * order the rows arrived in (`sparesOf`).
+ *
+ * NOT WHILE A ROW OUTSIDE THE SET IS `waiting` to be one of its legs. The set is then not the whole of the moves in it,
+ * so a count that looks even is short of the partner a leg is waiting for, and the leg matched in its place is somebody
+ * else's money (audit sixty-three's F2). Such a set is answered leg by leg until the row clears, as it was before sets
+ * were read at all.
+ *
+ * AND NOT USED WHERE NOTHING IS TIED: there each leg's nearest answers it, and a set matched in day order can differ
+ * from that (an out on day 0 and 1, an in on day 1 and 5, pairs the day-1 legs by nearness and all four by order), which
+ * is a change to rows no tie ever held and not this repair. A matching that pairs two legs in one account, or two out of
+ * each other's window, is no matching, and the set is answered leg by leg.
  *
  * LEGS ON ONE DAY GO IN `across` ORDER, AND ONLY THEN IN `seq` ORDER. `seq` is the order the bank listed them, the
  * arrival order the tie rule refused to break by, and ordering one day by it alone let that order decide whether a set
@@ -557,6 +670,7 @@ function setOf(p: Pairing, leg: Leg): { set: Map<string, Near>; whole: boolean }
 function matchedOf(p: Pairing, set: Map<string, Near>): Map<string, string> | null {
   const members = [...set.values()];
   if (!members.some((m) => m.near.length > 0 && nearestIn(m.near) === null)) return null;
+  if (members.some((m) => m.waits)) return null;
   const sides = new Map<string, { leg: Leg; at: number; across: string }[]>();
   for (const m of members) {
     const shape = shapeOf(p, m.leg)!;
@@ -574,15 +688,114 @@ function matchedOf(p: Pairing, set: Map<string, Near>): Map<string, string> | nu
         (a.leg.id < b.leg.id ? -1 : 1),
     ),
   );
-  if (one!.length !== other!.length) return null;
+  const [few, many] = one!.length <= other!.length ? [one!, other!] : [other!, one!];
+  const can = (i: number, j: number) => set.get(few[i]!.leg.id)!.near.some((c) => c.leg.id === many[j]!.leg.id);
+  const spare = sparesOf(
+    few.map((x) => x.at),
+    many.map((x) => x.at),
+    can,
+  );
+  if (spare === null) return null;
+  /* THE REST FIRST WITH FIRST, as equal counts always were. On a line that costs no more days than any other matching of
+     the same legs, and where it would pair two legs in one account the set is refused, as it was before: a matching
+     that finds the one valid crossing is a larger change than this one (`pairs-ties.test.ts`, ONE ANSWER). */
+  const kept = [...many.keys()].filter((j) => !spare.has(j));
   const matched = new Map<string, string>();
-  for (const [i, a] of one!.entries()) {
-    const b = other![i]!;
-    if (!set.get(a.leg.id)!.near.some((c) => c.leg.id === b.leg.id)) return null;
-    matched.set(a.leg.id, b.leg.id);
-    matched.set(b.leg.id, a.leg.id);
+  for (const [i, a] of few.entries()) {
+    const j = kept[i]!;
+    if (!can(i, j)) return null;
+    matched.set(a.leg.id, many[j]!.leg.id);
+    matched.set(many[j]!.leg.id, a.leg.id);
   }
   return matched;
+}
+
+/* WHAT A PAIR THAT IS NO CANDIDATE COSTS, in days: more than every leg of the largest set a whole window apart, since
+   `within` is at most 9999 months (`WINDOW`), about 304,000 days, and a side holds at most `SET_MOST` legs. */
+const NO_PAIR = 1e9;
+const DAY_MS = 86_400_000;
+
+/**
+ * The legs of the longer side left over when every leg of the shorter is matched to one of them at the fewest days in
+ * total, by index; `null` when no matching exists or when two matchings of that least cost leave different legs over.
+ * Exported for its test, which holds it to every matching counted by hand.
+ *
+ * EVERY FEASIBLE MATCHING IS COUNTED, NOT ONLY THOSE TAKEN IN ORDER. The first attempt walked both sides first with first
+ * and counted the choices of legs to skip, which is every matching of least cost only when any pair may be made. The
+ * account rule (`can`) forbids some, and then a matching that crosses costs as few days as one in order and leaves a
+ * different leg over: outs from x and y and ins into x, y and z on one day, where the one in-order matching left x's in
+ * over and three matchings of no days exist, one per in. It paired four rows, and which account's in counted as income
+ * was decided by how the account names sort (`pairs-pending.test.ts`, E).
+ *
+ * WHICH LEGS PAIR WITH WHICH DOES NOT MOVE A FIGURE, WHICH ARE LEFT OVER DOES. Every leg of a set is the same size in the
+ * same currency, so two matchings with one set of legs over hide the same money, and M1's two halves each way have two
+ * matchings of no days and are not a guess. So the answer is refused only when the legs over differ. Any matching of
+ * least cost leaving other legs over than `best` does must use one of the legs `best` matched, so it is enough to ask,
+ * for each of those, what the least cost is with that leg taken out: equal to `best`'s, and another choice exists.
+ *
+ * BOUNDED BY THE SET. A whole set holds at most `SET_MOST` legs, so when the counts differ the shorter side holds at most
+ * 15 and the longer at most 31, and this is at most 16 assignments, each about 15 x 15 x 31 steps (`leastOf`).
+ */
+export function sparesOf(few: readonly number[], many: readonly number[], can: (i: number, j: number) => boolean): Set<number> | null {
+  if (few.length === many.length) return new Set();
+  const cost = few.map((a, i) => many.map((b, j) => (can(i, j) ? Math.round(Math.abs(a - b) / DAY_MS) : NO_PAIR)));
+  const best = leastOf(cost, many.length);
+  if (best.total >= NO_PAIR) return null;
+  for (const j of best.to) if (leastOf(cost.map((row) => row.map((c, k) => (k === j ? NO_PAIR : c))), many.length).total === best.total) return null;
+  const used = new Set(best.to);
+  return new Set([...many.keys()].filter((j) => !used.has(j)));
+}
+
+/**
+ * A matching of every row of `cost` to its own column at the least total, and the column each row took: the Hungarian
+ * method with potentials, rows one at a time along the cheapest augmenting path, which is `O(rows² x columns)`.
+ * `cost` holds whole days, so every sum is exact.
+ */
+function leastOf(cost: readonly (readonly number[])[], columns: number): { total: number; to: number[] } {
+  const n = cost.length;
+  const u = new Array<number>(n + 1).fill(0);
+  const v = new Array<number>(columns + 1).fill(0);
+  /* `row[j]` is the row (from 1) holding column j (from 1), 0 for none; column 0 is where each new row starts. */
+  const row = new Array<number>(columns + 1).fill(0);
+  const back = new Array<number>(columns + 1).fill(0);
+  for (let i = 1; i <= n; i++) {
+    row[0] = i;
+    let j0 = 0;
+    const least = new Array<number>(columns + 1).fill(Infinity);
+    const seen = new Array<boolean>(columns + 1).fill(false);
+    do {
+      seen[j0] = true;
+      const i0 = row[j0]!;
+      let delta = Infinity;
+      let j1 = 0;
+      for (let j = 1; j <= columns; j++) {
+        if (seen[j]) continue;
+        const cur = cost[i0 - 1]![j - 1]! - u[i0]! - v[j]!;
+        if (cur < least[j]!) {
+          least[j] = cur;
+          back[j] = j0;
+        }
+        if (least[j]! < delta) {
+          delta = least[j]!;
+          j1 = j;
+        }
+      }
+      for (let j = 0; j <= columns; j++)
+        if (seen[j]) {
+          u[row[j]!] = u[row[j]!]! + delta;
+          v[j] = v[j]! - delta;
+        } else least[j] = least[j]! - delta;
+      j0 = j1;
+    } while (row[j0] !== 0);
+    do {
+      const j1 = back[j0]!;
+      row[j0] = row[j1]!;
+      j0 = j1;
+    } while (j0 !== 0);
+  }
+  const to = new Array<number>(n).fill(0);
+  for (let j = 1; j <= columns; j++) if (row[j] !== 0) to[row[j]! - 1] = j - 1;
+  return { total: to.reduce((sum, j, i) => sum + cost[i]![j]!, 0), to };
 }
 
 /** Every leg of a whole set with its partner: matched in day order when `matchedOf` says so, else nearest to nearest. */
@@ -602,26 +815,27 @@ function answersOf(p: Pairing, set: Map<string, Near>): Map<string, string | nul
 
 /**
  * The row this one is paired with in the ledger as it stands, or `null`: each must be the other's one nearest candidate,
- * or the two matched in day order in a set of alike legs that ties and holds as many each way (`matchedOf`).
+ * or the two matched in day order in a set of alike legs that ties, is whole, and leaves over only the legs that cost
+ * the fewest days (`matchedOf`).
  *
  * MUTUAL, SO THE ANSWER IS THE SAME FROM EITHER SIDE and does not depend on which leg was written last. A row whose
  * nearest candidate is nearer to somebody else stays unpaired and counted; that is the side a mistake should fall on.
  */
 export function partnerOf(p: Pairing, leg: Leg): string | null {
-  return answerOf(p, leg, new Map()).to;
+  return answerOf(p, leg, new Map(), new Map()).to;
 }
 
 /** `partnerOf`, with the legs of the set it read, and every answer that set gave kept in `known` for the next leg asked. */
-function answerOf(p: Pairing, leg: Leg, known: Map<string, string | null>): { to: string | null; set: string[] } {
+function answerOf(p: Pairing, leg: Leg, known: Map<string, string | null>, windows: Windows): { to: string | null; set: string[] } {
   if (known.has(leg.id)) return { to: known.get(leg.id)!, set: [] };
   if (leg.deleted_at !== null || !pairable(p, leg)) return { to: null, set: [] };
-  const { set, whole } = setOf(p, leg);
+  const { set, whole } = setOf(p, leg, windows);
   if (whole) {
     for (const [id, to] of answersOf(p, set)) known.set(id, to);
     return { to: known.get(leg.id) ?? null, set: [...set.keys()] };
   }
-  const near = nearestOf(p, leg);
-  return { to: near !== null && nearestOf(p, near)?.id === leg.id ? near.id : null, set: [...set.keys()] };
+  const near = nearestOf(p, leg, windows);
+  return { to: near !== null && nearestOf(p, near, windows)?.id === leg.id ? near.id : null, set: [...set.keys()] };
 }
 
 /* A BOUND ON ONE WRITE'S RESETTLING. The rows a write can move are its neighbours old and new, their partners and the
@@ -641,18 +855,25 @@ const SETTLE_MOST = 256;
  * moves arriving pairs the first move too, which is five days from it and was paired with nothing, so neither a
  * neighbour nor a `_pair` leads there (`pairs-ties.test.ts`, the chain). A set the write broke apart is reached the same
  * way, since each piece of it holds a row that stood next to the written one.
+ *
+ * `answered` COLLECTS EVERY ROW WHOSE PARTNER WAS ASKED, changed or not, for a caller settling a whole ledger one seed
+ * at a time (`index.ts`, `settleRedeclared`): a row asked once has had its answer written, and asking it again as a
+ * seed of its own only read its set a second time. Measured on 10,000 rows of fifty round amounts in one year, the pass
+ * asked 59,194 rows before it kept this.
  */
-export function settle(p: Pairing, seeds: readonly string[]): { leg: Leg; to: string | null }[] {
+export function settle(p: Pairing, seeds: readonly string[], answered?: Set<string>): { leg: Leg; to: string | null }[] {
   const want = new Map<string, { leg: Leg; to: string | null }>();
   const known = new Map<string, string | null>();
+  const windows: Windows = new Map();
   const queue = [...seeds];
   while (queue.length > 0 && want.size < SETTLE_MOST) {
     const id = queue.shift()!;
     if (want.has(id)) continue;
     const leg = loadLeg(p, id);
     if (!leg) continue;
-    const { to, set } = answerOf(p, leg, known);
+    const { to, set } = answerOf(p, leg, known, windows);
     want.set(id, { leg, to });
+    answered?.add(id);
     const held = leg.fields._pair;
     for (const next of [typeof held === 'string' ? held : null, to, ...set]) if (next !== null && !want.has(next)) queue.push(next);
   }

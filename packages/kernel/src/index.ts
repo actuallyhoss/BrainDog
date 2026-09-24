@@ -113,7 +113,7 @@ import {
 import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provisioned } from './provision.ts';
 import { dayIn, stampFinished } from './finished.ts';
 import type { StepsDecl } from './steps.ts';
-import { isMechanism, markPinned, neighboursOf, pairsReads, settle, PAIRS_ACTOR, type PairsDecl, type Pairing } from './pairs.ts';
+import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, settle, windowSql, PAIRS_ACTOR, type Leg as PairLeg, type PairsDecl, type Pairing } from './pairs.ts';
 import { costOf, costRank } from './weigh.ts';
 import { evaluateMetric, predicateOf, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { readBlock, readPage, registersOf, registersOfBlock, resolvePages, type ActivityEvent, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
@@ -3921,6 +3921,16 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   }
 
   /**
+   * The matching's view of one register's `pairs:`, WITH THE REGISTER'S `state` AND `done`, which `pairs.ts` needs to
+   * tell a row that may still clear from one that never will (`waiting`). The first attempt at audit sixty-three's
+   * finding 2 built its `Pairing` without them, and a client's cleared EGP 20,000.00 that names its party held a split
+   * move back under Money's clause: Spent and Received each EGP 40,000.00 high. Every `Pairing` here comes from this.
+   */
+  function pairingOf(register: string, decl: RegisterDecl, pairs: PairsDecl): Pairing {
+    return { sql, register, pairs, fields: decl.fields, state: decl.state, done: decl.done };
+  }
+
+  /**
    * Step 6b of the write path (`41 §5.4`): every pair this write made or broke, written on both rows. True when the
    * written row itself changed, so the caller reads it again.
    *
@@ -3946,7 +3956,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   function settlePairs(entry: Entry, before: Entry | null, decl: RegisterDecl, batch: string, now: string): boolean {
     const pairs = decl.pairs;
     if (!pairs) return false;
-    const p: Pairing = { sql, register: entry.register, pairs, fields: decl.fields };
+    const p = pairingOf(entry.register, decl, pairs);
     const seeds = [entry.id, ...neighboursOf(p, entry), ...(before ? [...neighboursOf(p, before), ...(typeof before.fields._pair === 'string' ? [before.fields._pair] : [])] : [])];
     let mine = false;
     for (const { leg, to } of settle(p, seeds)) {
@@ -3966,6 +3976,106 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if ((leg.fields._pair ?? null) !== to) appendEvent({ ...said, field: '_pair', from: (leg.fields._pair as Json | undefined) ?? null, to });
     }
     return mine;
+  }
+
+  /**
+   * Step 6b over every row of each list whose `pairs:` an install has just changed: added, changed or taken away.
+   *
+   * AUDIT SIXTY-THREE'S FINDING 4. The pairing ran in the write path and nowhere else, only for a write touching a field
+   * `pairsReads` names, and an install writes no ledger row. So a record updated from money-core 2.1.0, which had no
+   * `pairs:`, to 2.2.0 read Spent EGP 29,500.00 before and after, every mark false, and still after a note was written on
+   * one leg (U1); his import does not rewrite a row whose fields did not change, so a move already imported stayed
+   * counted until a neighbour arrived within four days. And the 2.1.0 that deployed at 00:22 UTC paired rent with a named
+   * client's payment, which 2.2.0 refuses, and both stayed marked after the update: Spent 0.00 and Received 0.00 against
+   * EGP 15,000.00 each (U2). `test/pairs-on-update.test.ts` holds both, through `install` and through a pack's path.
+   *
+   * RUN WHERE THE NEW DECLARATION IS IN THE TABLE AND THE OLD ONE STILL IN `registers`: inside `install`'s transaction,
+   * and inside the host's around a pack's staged write, before either reloads. That pair of readings is the only place
+   * "what did this install change about pairing" can be answered without a diff being handed in, and it is the same
+   * transaction as the declaration, so an update that rolls back takes its marks with it.
+   *
+   * THE OLD DECLARATION UNPAIRS FIRST WHEN THE NEW ONE MARKS ANOTHER FIELD, OR NONE. A `true` the kernel put on `transfer`
+   * is the kernel's to take back, and nothing under the new declaration reads that field to do it. A mark a person set,
+   * by the old declaration's reading of the history, is his and is left.
+   *
+   * EVERY LIVE ROW THAT COULD PAIR IS A SEED, IN DAY ORDER, ONE AT A TIME. `settle` stops at `SETTLE_MOST` rows visited
+   * and does not say which seeds it reached, so a whole ledger handed to it in one call settled its first 256 rows and
+   * dropped the rest without a word. One seed per call is always reached, and a row any call has asked is not a seed
+   * again. The ledger this leaves is the one pairing each row as it arrived would have: `test/pairs-on-update.test.ts`
+   * writes one stream into a record updated to the new `pairs:` and into one that had it from the start, and the two
+   * agree row for row.
+   *
+   * NOTHING IS CAPPED, because a cap is this finding again for the rows past it, so the cost is bounded by the ledger.
+   * MEASURED on 10,000 rows, a third of them the legs of 1,666 moves, in one transaction on this machine: 1.8 s over five
+   * years of varied amounts, 2.0 s when every amount is one of fifty round ones, and 2.9 s with those packed into one
+   * year, 27 rows a day; for 1,000 rows 0.12 s, 0.19 s and 0.17 s. The first attempt took 3.3 s, 7.6 s and 251 s: the
+   * packed ledger read each window of 250 rows whole, asked 159,018 windows for 10,000 rows, and ran longer than a
+   * Durable Object lets a request run. Now each row's window is asked about once (`pairs.ts`, `windowOf` and `answered`)
+   * and holds only the rows of its size (`around`).
+   */
+  function settleRedeclared(): void {
+    const is = listsOf(sql.all<{ id: string; body: string }>("SELECT id, body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0")).registers;
+    const now = instant(clock.now());
+    for (const [id, decl] of is) {
+      const was = registers.get(id);
+      if (jcs((was?.pairs ?? null) as Json) === jcs((decl.pairs ?? null) as Json)) continue;
+      const batch = mint();
+      const note = decl.pairs ? `${decl.name} pairs its rows another way from this install.` : `${decl.name} no longer pairs its rows.`;
+      if (was?.pairs && was.pairs.mark !== decl.pairs?.mark) {
+        const old = pairingOf(id, was, was.pairs);
+        /* A MARK THE NEW DECLARATION RETIRED IS LEFT AS IT STANDS, since no reader counts by it; `_pair` still goes. */
+        const live = decl.fields.some((f) => f.id === was.pairs!.mark && f.retired !== true);
+        for (const r of sql.all<{ id: string }>("SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '$._pair') IS NOT NULL", id))
+          writeLeg(old, loadLeg(old, r.id)!, null, live, batch, now, note);
+      }
+      if (!decl.pairs) continue;
+      const p = pairingOf(id, decl, decl.pairs);
+      const window = windowSql(p);
+      /* ONLY A ROW THAT COULD HAVE A PARTNER, OR HAS ONE, IS ASKED. Two legs of one move are the same size, whatever else
+         `on` compares (`mirrors`), so a row whose size no other row shares, and which holds no `_pair`, answers `null`
+         now as it did before. On five years of varied amounts this asked 5,112 rows of 10,000 and halved the pass; where
+         every amount is shared it asks them all, and costs one read of the list. A declaration with no day to run a
+         window over pairs nothing, and only a row holding a `_pair` is asked, to take it back. */
+      const rows = sql.all<{ id: string; size: number | null; paired: number }>(
+        `SELECT id, ${window?.size ?? 'NULL'} AS size, json_extract(fields, '$._pair') IS NOT NULL AS paired FROM entry
+          WHERE register = ? AND deleted_at IS NULL ORDER BY ${window?.day ?? 'NULL'}, rowid`,
+        id,
+      );
+      const alike = new Map<number, number>();
+      for (const r of rows) if (r.size) alike.set(r.size, (alike.get(r.size) ?? 0) + 1);
+      /* AN INDEX THE WINDOW'S QUERY IS PLANNED ON, FOR THE LENGTH OF THE PASS, on the list, the size and the day, the
+         three things `pairs.ts` asks a window by (`windowSql`). With no statistics SQLite reads a window of a list
+         through `entry_state` and every row of the list with it: 8.5 ms a question on 10,000 rows, against 0.19 ms on the
+         list and the day and 0.03 ms on all three, measured. It is dropped in the transaction that made it, and a
+         rollback takes it too. */
+      const index = `entry_settle_${id}`;
+      if (window) sql.exec(`CREATE INDEX IF NOT EXISTS ${index} ON entry (register, ${window.size}, ${window.day}) WHERE deleted_at IS NULL`);
+      try {
+        /* EVERY ROW `settle` ASKED, changed or not, is not a seed again: its answer is written (`answered`). */
+        const answered = new Set<string>();
+        for (const r of rows) {
+          if (answered.has(r.id) || (!r.paired && (r.size === null || (alike.get(r.size) ?? 0) < 2))) continue;
+          for (const { leg, to } of settle(p, [r.id], answered)) writeLeg(p, leg, to, true, batch, now, note);
+        }
+      } finally {
+        if (window) sql.exec(`DROP INDEX IF EXISTS ${index}`);
+      }
+    }
+  }
+
+  /** One leg of `settleRedeclared`'s pass written as `settlePairs` writes a partner: a new version, signed by the record. */
+  function writeLeg(p: Pairing, leg: PairLeg, to: string | null, mark: boolean, batch: string, now: string, note: string): void {
+    const fields: Record<string, unknown> = { ...leg.fields };
+    if (mark && !markPinned(p, leg.id)) fields[p.pairs.mark] = to !== null;
+    if (to === null) delete fields._pair;
+    else fields._pair = to;
+    sql.exec('UPDATE entry SET fields = ?, version = version + 1, updated_at = ? WHERE id = ?', JSON.stringify(fields), now, leg.id);
+    const said = { kind: 'edit', target: leg.id, register: p.register, actor: PAIRS_ACTOR, at: now, batch, note };
+    const was = leg.fields[p.pairs.mark] as Json | undefined;
+    const is = fields[p.pairs.mark] as Json | undefined;
+    if (JSON.stringify(was ?? null) !== JSON.stringify(is ?? null))
+      appendEvent({ ...said, field: p.pairs.mark, from: shown(p.register, p.pairs.mark, was) ?? null, to: shown(p.register, p.pairs.mark, is) ?? null });
+    if ((leg.fields._pair ?? null) !== to) appendEvent({ ...said, field: '_pair', from: (leg.fields._pair as Json | undefined) ?? null, to });
   }
 
   function reproject(entry: Entry): void {
@@ -6756,6 +6866,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         transaction(() => {
           const done = fn() as Result<Installed[]>;
           if (done.ok) declared(done.value, by);
+          /* AND THE ROWS OF A LIST WHOSE `pairs:` THIS CHANGED, before `reload` below, while `registers` is the old one. */
+          if (done.ok) settleRedeclared();
           /* A VERSION THAT SAYS `enabled: false` STOPS THE RUNS ALREADY GOING, in the transaction that installs it. A
              plain edit leaves them on the version they started under. `cancelRunsOf` reads the body now live rather than
              the batch, and an install that rolls back takes its cancellations with it. */
@@ -6822,6 +6934,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (!staged.ok) return staged;
       return ok(() => {
         const out = staged.value(sql, clock.now(), transaction);
+        /* AND THE LEDGER SETTLED UNDER A `pairs:` THE PACK CHANGED, which is where audit sixty-three's U1 and U2 arrived:
+           money-core 2.2.0 installed over 2.1.0 paired nothing already there and kept a pair it refuses. Here and not in
+           the caller, because only here is the cache still the old declaration; the host's transaction around this
+           makes it one install with the declarations, and its own `transaction` here is then a no-op. */
+        if (out.ok) transaction(() => settleRedeclared());
         /* AND THE SAME ON A PACK'S PATH, WHEN IT LANDS. `applyDeclarations` refuses and rolls back —
            a clashing unique field, a missing dependency — and this armed the rows anyway: the caller
            got a refusal and the schedule held a `digest` row for a declaration that does not exist.
