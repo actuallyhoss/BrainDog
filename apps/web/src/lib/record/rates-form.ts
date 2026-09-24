@@ -3,8 +3,13 @@
  * and where each currency's number is in its answer (`routes/packs/[id]/RatesForm.svelte`).
  *
  * THE FORM FILES A PROPOSAL AND INSTALLS NOTHING, like the poll form on an organisation's page (`poll-form.ts`). The
- * pack is `ratesPollPack`'s, an ordinary `poll`, so it goes in front of the owner on Decide with the host and how often
- * printed, and is fetched only once approved. The browser never calls the address.
+ * pack is `packs/rates-poll/rates-poll.pack.json` filled by that pack's `fillRates`, an ordinary `poll`, so it goes in
+ * front of the owner on Decide with the host and how often printed, and is fetched only once approved. The browser
+ * never calls the address.
+ *
+ * THE FILE IS IMPORTED AS DATA AND THE FORM HOLDS NO COPY OF IT. Until September 24th the document was a function in
+ * `packages/seed`, so the shell carried one use case as code; the pack's own test now holds the file, the fill and
+ * the run, and this form is a caller like any other.
  *
  * THE ADDRESSES OFFERED ARE PUBLIC AND NEED NO KEY, and each is written down here with the shape of its answer, so the
  * path of a currency's number is known rather than guessed (`docs/08` §2.5, "Rates by poll"):
@@ -26,7 +31,7 @@
  * settings load or `boot-live.ts` calling `propose` with `ratesProposalFor(home, held)` when no rates pack is
  * installed and no such proposal is open. Filing is not fetching: the proposal sits on Decide with the host and the
  * interval printed, and the address is called only once he approves it, which is argued in full in
- * `packages/seed/src/packs/rates-poll.ts`.
+ * `packs/rates-poll/fill.ts`.
  *
  * THE BASE IS THE HOME CURRENCY, because that is the one currency every figure is converted into, and a rate quoted
  * straight into it is not read through a third. `rateFor` will go through a currency both are quoted against, and a
@@ -35,7 +40,8 @@
  * dollar and the euro is an ordinary base to it.
  */
 
-import { RATES_CURRENCIES_MOST, ratesPollPack } from '@braindog/seed/packs/rates-poll';
+import { RATES_CURRENCIES_MOST, fillRates } from '@braindog/pack-rates-poll/fill';
+import ratesPollFile from '@braindog/pack-rates-poll/rates-poll.pack.json' with { type: 'json' };
 
 import { copy } from '../copy.ts';
 
@@ -133,7 +139,7 @@ export function addressOf(d: RatesDraft): string {
 /**
  * The rows the poll would actually fill, which is the one notion of the row set this file has.
  *
- * IT IS `ratesPollPack`'s `quoted` JUDGEMENT, MADE ON THE FORM'S SIDE, because two of them disagreeing is what a
+ * IT IS `fillRates`'s `quoted` JUDGEMENT, MADE ON THE FORM'S SIDE, because two of them disagreeing is what a
  * caller reads. The pack drops the base and drops a repeat; the form did neither, so a draft naming EGP twice was
  * measured to file a pack of one map under a Decide line reading "worth in EGP, EGP", and twenty-one rows naming
  * twenty currencies were refused for being twenty-one when the pack would have built twenty. The repeat is matched
@@ -247,7 +253,7 @@ export function ratesIdOf(url: string): string {
 export function ratesProposal(d: RatesDraft) {
   const url = addressOf(d);
   const rows = ratesRows(d);
-  const doc = ratesPollPack({ id: ratesIdOf(url), url, every: '1d', base: d.base, rates: rows });
+  const doc = fillRates(ratesPollFile, { id: ratesIdOf(url), url, every: '1d', base: d.base, rates: rows });
   return {
     question: copy.ratesQuestion(new URL(url).host, d.base, rows.map((r) => r.currency).join(', ')),
     body_kind: 'pack' as const,

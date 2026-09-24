@@ -16,14 +16,26 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 
 import { satisfies } from '@braindog/declare';
 
 import { BANK_HSBC_EG_VERSION, FIRST_PARTY, FIRST_PARTY_VERSIONS, bankHsbcEgPack, firstPartyDocument } from '../src/index.ts';
-import { mercuryPack } from '../src/packs/mercury.ts';
 import { asMoneyCore180, asMoneyCore200, attempt, planOf, put, record, type Doc } from './money-core-earlier.ts';
 
-const MERCURY = { id: 'studio', grant: 'Mercury read-only', base: 'https://mercury.test' };
+/**
+ * The Mercury pack as it ships, with the marks that say what a person fills taken off.
+ *
+ * THE FILE AND NOT A BUILDER, SINCE THE BUILDER IS GONE. Mercury was a function in `src/packs/mercury.ts` until
+ * September 24th (`loop/research-m3-dynamic.md` B7), and this test asked it for a document. What is planned below is
+ * now the file a person installs, `packs/mercury/mercury.pack.json`, so the range and version asserted here are the
+ * ones a record is actually handed. Its fill changes the names, the host and the key label and never the range or the
+ * version, so the file as it ships answers every question this test asks.
+ */
+const mercuryFile = (): Record<string, unknown> => {
+  const { fill: _marks, ...doc } = JSON.parse(readFileSync(new URL('../../../packs/mercury/mercury.pack.json', import.meta.url), 'utf8')) as Record<string, unknown>;
+  return doc;
+};
 
 /** `pack-versions.test.ts`'s fingerprint, asked of a document built here. */
 const fingerprint = (d: Doc): string =>
@@ -68,7 +80,7 @@ test('THE 1.8.0 THIS FILE BUILDS IS THE 1.8.0 THAT SHIPPED, by the fingerprint `
 
 test('bank-hsbc-eg AND MERCURY PLAN CLEAN AND INSTALL on money-core 1.8.0 and on 2.0.0', async () => {
   for (const [at, build] of [['1.8.0', asMoneyCore180], ['2.0.0', asMoneyCore200]] as const) {
-    for (const [name, doc] of [['bank-hsbc-eg', bankHsbcEgPack()], ['mercury', mercuryPack(MERCURY)]] as const) {
+    for (const [name, doc] of [['bank-hsbc-eg', bankHsbcEgPack()], ['mercury', mercuryFile()]] as const) {
       const { k, sql } = await onMoney(build);
       const { diff } = await planOf(k, doc);
       assert.deepEqual(diff.requires.packs.filter((p) => !p.ok), [], `${name} on money-core ${at}`);
@@ -89,8 +101,8 @@ test('EACH RANGE MOVED WITH A VERSION OF ITS OWN, and neither admits a money-cor
      alert prints; the range did not move with it. */
   assert.equal(BANK_HSBC_EG_VERSION, '1.3.0');
   assert.equal(bankHsbcEgPack().version, '1.3.0');
-  assert.equal(mercuryPack(MERCURY).version, '1.0.1');
-  for (const [name, doc] of [['bank-hsbc-eg', bankHsbcEgPack()], ['mercury', mercuryPack(MERCURY)]] as const) {
+  assert.equal(mercuryFile().version, '1.0.1');
+  for (const [name, doc] of [['bank-hsbc-eg', bankHsbcEgPack()], ['mercury', mercuryFile()]] as const) {
     const range = (doc.requires as { packs: Record<string, string> }).packs['money-core']!;
     assert.deepEqual(['1.7.0', '1.8.0', '2.0.0', '2.9.0', '3.0.0'].filter((v) => satisfies(v, range)), name === 'mercury' ? ['1.7.0', '1.8.0', '2.0.0', '2.9.0'] : ['1.8.0', '2.0.0', '2.9.0'], name);
   }

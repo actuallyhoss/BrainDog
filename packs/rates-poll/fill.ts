@@ -9,8 +9,11 @@
  * PROPOSED AND NEVER ARMED, WHICH WAS WEIGHED RATHER THAN ASSUMED. The only writer of `fx` is this pack, so arming it
  * the day a home currency is declared has a real argument: every mixed figure answers MIXED_CURRENCY until somebody
  * approves something. It was refused, because a poll is the one declaration that keeps calling a third party after
- * everybody has forgotten it is there, and it would be calling one we chose before the owner had read the host. The
- * proposal a record would file for itself is `ratesProposalFor` in `apps/web/src/lib/record/rates-form.ts`.
+ * everybody has forgotten it is there, and it would be calling one we chose before the owner had read the host.
+ * Arming it installs a schedule row (`packages/kernel/src/index.ts`, `arm(body.channel as 'call' | 'poll', ...)`)
+ * that calls out daily from the owner's record. What was wrong was never that approval is required; it was that
+ * nobody filed the proposal, so the approval never came up. The proposal a record would file for itself is `ratesProposalFor` in
+ * `apps/web/src/lib/record/rates-form.ts`, built from the currencies it already holds, and approving it stays a tap.
  *
  * THE FILL CHECKS THE SPEC BECAUSE THE PLAN CANNOT SHOW IT. The approval line is `CALLS OUT open.er-api.com · every
  * 1d · grant "none"` and says nothing about the map. Measured against a real record while this was still a builder in
@@ -19,9 +22,12 @@
  * ordinary line and was refused by `install` only after the owner had approved it. This is the last place that can
  * tell him before he presses the button, so it throws rather than answering a document.
  *
- * THE OUTPUT IS THE OLD BUILDER'S, BYTE FOR BYTE, and `rates-poll.test.ts` holds it there for as long as the builder
- * is in the tree to compare against: the file's key order is the document's, the `fill` marks come off, and the map
- * is the file's first entry repeated once a currency.
+ * THE OUTPUT WAS THE OLD BUILDER'S, BYTE FOR BYTE, for as long as the builder was in the tree to compare against: the
+ * file's key order is the document's, the `fill` marks come off, and the map is the file's first entry repeated once a
+ * currency. The builder went on September 24th, and `rates-poll.test.ts` holds what it answered that day as values.
+ *
+ * `apps/web` READS THIS FILE AND THE PACK FILE, AND NOTHING ELSE HERE, which is why nothing here may reach for Node:
+ * the rates form runs in the browser and imports `fillRates` beside `rates-poll.pack.json` as JSON.
  */
 
 /**

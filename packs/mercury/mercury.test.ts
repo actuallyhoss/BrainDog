@@ -5,8 +5,9 @@
  * THE DOCUMENT WAS A FUNCTION IN `packages/seed`. `mercuryPack` in `packages/seed/src/packs/mercury.ts` built it in
  * code, so the shell carried one bank as TypeScript. It is now `mercury.pack.json`, a legal pack as it stands, with the
  * four things a person supplies named under `fill`. Nothing in the tree offers a Mercury pull to a record, so the fill
- * is `fillMercury` below and nowhere else; while the builder is still in the tree, the file filled is held equal to
- * what it built, byte for byte, through `readPackFile`.
+ * is `fillMercury` below and nowhere else. While the builder was in the tree, the file filled was held equal to what
+ * it built, byte for byte; it went on September 24th, and what each spec changes was printed from it that day, before
+ * it was deleted, and is written out below as values.
  *
  * WHY A BANK AND WHY THIS ONE. `loop/research-switch.md` names company cash (Mercury and Stripe pulls) as the one money
  * figure the record cannot answer without somebody retyping it. A bank answers the Money page's question, what is in
@@ -38,7 +39,6 @@ import { fixOf } from '../../packages/ports/src/index.ts';
 import { createRecordApi, type CallContext } from '../../packages/record/src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from '../../packages/kernel/test/sqlite.ts';
 import { REGISTERS, declarations, firstPartyDocument } from '../../packages/seed/src/index.ts';
-import { mercuryPack } from '../../packages/seed/src/packs/mercury.ts';
 
 const NOW = Date.UTC(2026, 8, 20, 9);
 const ID = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
@@ -110,7 +110,7 @@ test('THE SEED NO LONGER OFFERS THE BUILDER UNDER A SECOND NAME', () => {
   const offering: string[] = [];
   for (const rel of readdirSync(src, { recursive: true, encoding: 'utf8' })) {
     const path = rel.replaceAll('\\', '/');
-    if (!path.endsWith('.ts') || path === 'packs/mercury.ts') continue;
+    if (!path.endsWith('.ts')) continue;
     if (/export\s*\{[^}]*\b(?:mercuryPack|MercurySpec|MERCURY_[A-Z]+)\b[^}]*\}\s*from/u.test(readFileSync(new URL(path, src), 'utf8'))) offering.push(path);
   }
   assert.deepEqual(offering, []);
@@ -118,18 +118,42 @@ test('THE SEED NO LONGER OFFERS THE BUILDER UNDER A SECOND NAME', () => {
 
 /* ── nothing moved but the file ───────────────────────────────────────────────────────────────── */
 
-for (const [name, spec] of [
-  ['the file as it ships', { id: 'company', grant: 'Mercury (read only)' }],
-  ['a test host, a key label with spaces round it', { ...SPEC, grant: '  Mercury (read only)  ' }],
-  ['every six hours, an id past what an ingest name holds', { id: 'kiln-and-tallow-holding-company-operating', grant: 'Ops', every: '6h' }],
-] as const satisfies readonly (readonly [string, MercurySpec])[])
-  test(`FILLED, THE FILE IS THE BUILDER'S DOCUMENT BYTE FOR BYTE: ${name}`, async () => {
-    const built = JSON.stringify(mercuryPack(spec));
+/**
+ * Each spec the byte comparison held, with what the builder answered for it on the day it was deleted: the pack's
+ * name, the summary, the pull's name, both intervals, the host and the key label.
+ *
+ * WRITTEN OUT AND NOT RECOMPUTED, because a table computed by a second copy of `fillMercury` agrees with it by
+ * construction. Checked the other way on September 24th: with `.trim()` taken off the grant in `fillMercury`, the
+ * spaced label's row went red here and nowhere else in this file.
+ */
+for (const [name, spec, want] of [
+  ['the file as it ships', { id: 'company', grant: 'Mercury (read only)' }, ['mercury-company', 'api.mercury.com', 'mercury_company', '1h', 'https://api.mercury.com', 'Mercury (read only)']],
+  ['a test host, a key label with spaces round it', { ...SPEC, grant: '  Mercury (read only)  ' }, ['mercury-kiln', 'api.mercury.example', 'mercury_kiln', '1h', 'https://api.mercury.example', 'Mercury (read only)']],
+  ['every six hours, an id past what an ingest name holds', { id: 'kiln-and-tallow-holding-company-operating', grant: 'Ops', every: '6h' }, ['mercury-kiln-and-tallow-holding-company-operating', 'api.mercury.com', 'mercury_kiln_and_tallow_holding', '6h', 'https://api.mercury.com', 'Ops']],
+] as const satisfies readonly (readonly [string, MercurySpec, readonly [string, string, string, string, string, string]])[])
+  test(`FILLED, THE FILE CHANGES WHERE THE SPEC SAYS AND NOWHERE ELSE: ${name}`, async () => {
     const filled = fillMercury(template(), spec);
-    assert.equal(JSON.stringify(filled), built);
+    const pull = (filled.declarations as Pull[])[0]!;
+    const [pack, host, ingest, every, base, grant] = want;
+    assert.deepEqual(
+      [filled.pack, filled.summary, pull.ingest, pull.every, pull.fetch.schedule.every, pull.fetch.base, pull.fetch.auth],
+      [pack, `Reads the balance of every Mercury account from ${host} every ${every}, into Money's accounts.`, ingest, every, every, base, { kind: 'bearer', grant }],
+    );
+
+    /* AND EVERYTHING THE SPEC DOES NOT NAME IS THE FILE'S, key order included, which is what the byte comparison
+       held and the fields above do not: the version, the range on Money, the path, the map, the dedupe key. */
+    const blanked = (doc: Record<string, unknown>): string => {
+      const d = structuredClone(doc);
+      const p = (d.declarations as Pull[])[0]!;
+      d.pack = d.summary = p.ingest = p.every = p.fetch.base = p.fetch.auth.grant = p.fetch.schedule.every = '';
+      return JSON.stringify(d);
+    };
+    const { fill: _marks, ...shipped } = template();
+    assert.equal(blanked(filled), blanked(shipped));
+
     const read = await readPackFile(JSON.stringify(filled));
     assert.ok(read.ok, fixOf(read));
-    assert.equal(JSON.stringify(read.value.doc), built);
+    assert.equal(JSON.stringify(read.value.doc), JSON.stringify(filled));
   });
 
 test('the file as it ships, with its marks taken off, is its own example filled', () => {

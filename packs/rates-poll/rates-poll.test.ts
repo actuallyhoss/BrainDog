@@ -9,10 +9,11 @@
  * `fill.ts` is the one place that puts them in, and it keeps the builder's judgements because they are about the spec,
  * not the document: a poll that could never write a rate is refused before anybody is asked to approve its call out.
  *
- * NOTHING MOVED BUT THE FILE, AND THAT IS PROVED RATHER THAN CLAIMED. While the builder is still in the tree, every
- * spec below is filled from the file and built by the builder, and the two are held equal byte for byte, through
- * `readPackFile` as a person pasting the filled file would read it. The day the builder goes, those comparisons go
- * with it and the judgements and the run below are what hold the file.
+ * NOTHING MOVED BUT THE FILE, AND THAT WAS PROVED RATHER THAN CLAIMED. While the builder was in the tree, every spec
+ * below was filled from the file and built by the builder, and the two were held equal byte for byte. The builder
+ * went on September 24th, once `apps/web/src/lib/record/rates-form.ts` filled this file instead. What each spec
+ * changes was printed from the builder that day, before it was deleted, and is written out below as values, so the
+ * comparison outlived the thing it compared against.
  *
  * RED FIRST, MEASURED ON SEPTEMBER 24TH AGAINST `facafeed`: with no pack file and no `fill.ts` this file did not load,
  * ERR_MODULE_NOT_FOUND, and with both written the re-export test failed on `packages/seed/src/packs/index.ts` and
@@ -29,7 +30,6 @@ import { convertMinor, validateDeclaration } from '../../packages/kernel/src/ind
 import { createRecordApi, type CallContext } from '../../packages/record/src/index.ts';
 import { fixedClock, openSqlite } from '../../packages/kernel/test/sqlite.ts';
 import { firstPartyDocument } from '../../packages/seed/src/index.ts';
-import { ratesPollPack } from '../../packages/seed/src/packs/rates-poll.ts';
 
 import { fillRates, RATES_CURRENCIES_MOST, type RatesSpec } from './fill.ts';
 
@@ -84,43 +84,132 @@ test('THE SEED NO LONGER OFFERS THE BUILDER UNDER A SECOND NAME', () => {
   const src = new URL('../../packages/seed/src/', import.meta.url);
   const offering: string[] = [];
   for (const rel of readdirSync(src, { recursive: true, encoding: 'utf8' })) {
-    if (!rel.endsWith('.ts') || rel.replaceAll('\\', '/') === 'packs/rates-poll.ts') continue;
+    if (!rel.endsWith('.ts')) continue;
     const text = readFileSync(new URL(rel.replaceAll('\\', '/'), src), 'utf8');
     if (/export\s*\{[^}]*\b(?:ratesPollPack|RatesSpec|RATES_CURRENCIES_MOST)\b[^}]*\}\s*from/u.test(text)) offering.push(rel.replaceAll('\\', '/'));
   }
   assert.deepEqual(offering, []);
 });
 
-test(
-  "B7's DIRECTORY: packages/seed/src/packs holds only what a record is built from",
-  {
-    todo: 'the builders stay until four files this run did not own stop importing them: apps/web/src/lib/record/rates-form.ts (and the ./packs/rates-poll export in packages/seed/package.json), packages/seed/test/rates.test.ts and packages/seed/test/money-core-major.test.ts',
-  },
-  () => {
-    const here = readdirSync(new URL('../../packages/seed/src/packs/', import.meta.url)).sort();
-    /* `bank-hsbc-eg` AND `holdings` ARE B8's, and leave in the wave after this one. */
-    assert.deepEqual(here, ['agents.ts', 'bank-hsbc-eg.ts', 'first-party.ts', 'holdings.ts']);
-  },
-);
+test("B7's DIRECTORY: packages/seed/src/packs holds only what a record is built from", () => {
+  const here = readdirSync(new URL('../../packages/seed/src/packs/', import.meta.url)).sort();
+  /* `bank-hsbc-eg` AND `holdings` ARE B8's, and leave in the wave after this one. */
+  assert.deepEqual(here, ['agents.ts', 'bank-hsbc-eg.ts', 'first-party.ts', 'holdings.ts']);
+});
 
 /* ── nothing moved but the file ───────────────────────────────────────────────────────────────── */
 
-const SPECS: readonly [string, RatesSpec][] = [
-  ['the file as it ships', EXAMPLE],
-  ['a repeat and the base dropped, a code in lower case', { ...EXAMPLE, rates: [{ currency: 'USD', path: 'rates.USD' }, { currency: 'egp', path: ' rates.EGP ' }, { currency: 'EGP', path: 'rates.X' }] }],
-  ['another address, another base, every day', { id: 'frankfurter', url: 'https://api.frankfurter.app/latest?from=EUR', every: '12h', base: ' eur ', rates: [{ currency: 'GBP', path: 'rates.GBP' }] }],
-  ['an id past what an ingest name holds', { ...EXAMPLE, id: 'a-very-long-name-that-runs-well-past-thirty-two', rates: many(RATES_CURRENCIES_MOST) }],
-  ['a url that is not one', { ...EXAMPLE, url: 'not an address' }],
+/** What a spec may change in the file: the pack's name, the summary, and the poll's name, address, interval and map. */
+type Filled = { pack: string; summary: string; ingest: string; url: string; every: string; map: [unknown, unknown, unknown, unknown][] };
+
+/**
+ * Each spec the byte comparison held, with what the builder answered for it on the day it was deleted.
+ *
+ * WRITTEN OUT AND NOT RECOMPUTED, because a table computed by a second copy of `fill.ts` agrees with `fill.ts` by
+ * construction. Checked the other way on September 24th: with `.slice(0, 32)` taken off the ingest name in `fill.ts`,
+ * the long id's row went red here and nowhere else in this file.
+ */
+const FILLED: readonly [string, RatesSpec, Filled][] = [
+  [
+    'the file as it ships',
+    EXAMPLE,
+    {
+      pack: 'rates-open-er-api-com',
+      summary: 'Polls open.er-api.com every 1d for what one USD is worth in EGP, GBP.',
+      ingest: 'rates_open_er_api_com',
+      url: 'https://open.er-api.com/v6/latest/USD',
+      every: '1d',
+      map: [
+        ['USD', 'EGP', 'rates.EGP', 'open.er-api.com'],
+        ['USD', 'GBP', 'rates.GBP', 'open.er-api.com'],
+      ],
+    },
+  ],
+  [
+    'a repeat and the base dropped, a code in lower case, a path with spaces round it',
+    { ...EXAMPLE, rates: [{ currency: 'USD', path: 'rates.USD' }, { currency: 'egp', path: ' rates.EGP ' }, { currency: 'EGP', path: 'rates.X' }] },
+    {
+      pack: 'rates-open-er-api-com',
+      summary: 'Polls open.er-api.com every 1d for what one USD is worth in EGP.',
+      ingest: 'rates_open_er_api_com',
+      url: 'https://open.er-api.com/v6/latest/USD',
+      every: '1d',
+      map: [['USD', 'EGP', 'rates.EGP', 'open.er-api.com']],
+    },
+  ],
+  [
+    'another address, another base, every twelve hours',
+    { id: 'frankfurter', url: 'https://api.frankfurter.app/latest?from=EUR', every: '12h', base: ' eur ', rates: [{ currency: 'GBP', path: 'rates.GBP' }] },
+    {
+      pack: 'rates-frankfurter',
+      summary: 'Polls api.frankfurter.app every 12h for what one EUR is worth in GBP.',
+      ingest: 'rates_frankfurter',
+      url: 'https://api.frankfurter.app/latest?from=EUR',
+      every: '12h',
+      map: [['EUR', 'GBP', 'rates.GBP', 'api.frankfurter.app']],
+    },
+  ],
+  [
+    'an id past what an ingest name holds, and the most currencies a poll fills',
+    { ...EXAMPLE, id: 'a-very-long-name-that-runs-well-past-thirty-two', rates: many(RATES_CURRENCIES_MOST) },
+    {
+      pack: 'rates-a-very-long-name-that-runs-well-past-thirty-two',
+      summary: `Polls open.er-api.com every 1d for what one USD is worth in ${many(RATES_CURRENCIES_MOST).map((r) => r.currency).join(', ')}.`,
+      ingest: 'rates_a_very_long_name_that_runs',
+      url: 'https://open.er-api.com/v6/latest/USD',
+      every: '1d',
+      map: many(RATES_CURRENCIES_MOST).map((r) => ['USD', r.currency, r.path, 'open.er-api.com']),
+    },
+  ],
+  [
+    'a url that is not one, which names itself as the host rather than throwing',
+    { ...EXAMPLE, url: 'not an address' },
+    {
+      pack: 'rates-open-er-api-com',
+      summary: 'Polls not an address every 1d for what one USD is worth in EGP, GBP.',
+      ingest: 'rates_open_er_api_com',
+      url: 'not an address',
+      every: '1d',
+      map: [
+        ['USD', 'EGP', 'rates.EGP', 'not an address'],
+        ['USD', 'GBP', 'rates.GBP', 'not an address'],
+      ],
+    },
+  ],
 ];
 
-for (const [name, spec] of SPECS)
-  test(`FILLED, THE FILE IS THE BUILDER'S DOCUMENT BYTE FOR BYTE: ${name}`, async () => {
-    const built = JSON.stringify(ratesPollPack(spec));
-    const filled = fillRates(template(), spec);
-    assert.equal(JSON.stringify(filled), built);
+for (const [name, spec, want] of FILLED)
+  test(`FILLED, THE FILE CHANGES WHERE THE SPEC SAYS AND NOWHERE ELSE: ${name}`, async () => {
+    const filled = fillRates(template(), spec) as Record<string, unknown> & { declarations: (Record<string, unknown> & { map: Record<string, { value?: unknown; path?: unknown }>[] })[] };
+    const poll = filled.declarations[0]!;
+    assert.deepEqual(
+      {
+        pack: filled.pack,
+        summary: filled.summary,
+        ingest: poll.ingest,
+        url: poll.url,
+        every: poll.every,
+        map: poll.map.map((m) => [m.currency?.value, m.base?.value, m.rate?.path, m.source?.value]),
+      },
+      want,
+    );
+
+    /* AND EVERYTHING THE SPEC DOES NOT NAME IS THE FILE'S, key order included, which is what the byte comparison
+       held and the fields above do not: the version, the licence, what it requires, the register it writes, and
+       each map entry's shape past the four values a spec fills. */
+    const { fill: _marks, ...shipped } = template() as typeof filled & { fill?: unknown };
+    const shape = (doc: typeof filled): string =>
+      JSON.stringify({
+        ...doc,
+        pack: '',
+        summary: '',
+        declarations: doc.declarations.map((d) => ({ ...d, ingest: '', url: '', every: '', map: d.map.map((m) => ({ ...m, currency: '', base: '', rate: { ...m.rate, path: '' }, source: '' })).slice(0, 1) })),
+      });
+    assert.equal(shape(filled), shape(shipped));
+
     /* AND READ AS SOMEBODY PASTING IT WOULD READ IT, which is the door a filled file goes through. `readPackFile`
-       answers the document it read, so a key it dropped or reordered would show here and not in the line above. */
-    if (spec.url.startsWith('https://')) assert.equal(JSON.stringify(said<{ doc: unknown }>(await readPackFile(JSON.stringify(filled))).doc), built);
+       answers the document it read, so a key it dropped or reordered would show here. */
+    if (spec.url.startsWith('https://')) assert.equal(JSON.stringify(said<{ doc: unknown }>(await readPackFile(JSON.stringify(filled))).doc), JSON.stringify(filled));
   });
 
 test('the file as it ships, with its marks taken off, is its own example filled', () => {
@@ -173,6 +262,10 @@ test('AND THE MOST IT FILLS IS THE RECORD’S NUMBER, asked of the record rather
   const declaredAt = async (maps: number): Promise<Parameters<typeof validateDeclaration>[0]> => {
     const doc = fillRates(template(), { ...EXAMPLE, rates: many(RATES_CURRENCIES_MOST) });
     const map = mapOf(doc);
+    /* THE FILL'S OWN TWENTY, COUNTED BEFORE ANY PADDING, moved from `packages/seed/test/rates.test.ts`. Without it
+       the padding below would quietly make up a fill that wrote nineteen, and the record would be asked about a
+       declaration the fill never wrote. */
+    assert.equal(map.length, RATES_CURRENCIES_MOST, 'the fill wrote fewer maps than the currencies it was given');
     while (map.length < maps) map.push({ ...structuredClone(map[0]!), base: { value: `XY${map.length}` } });
     return said<{ declarations: Parameters<typeof validateDeclaration>[0][] }>(await normalise(doc, { kind: 'local' })).declarations[0]!;
   };
