@@ -20,6 +20,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord, type Kernel } from '@braindog/kernel';
 
 import { copy } from '../copy.ts';
+import * as bind from './bind-write.ts';
 import { bindTo, boundBlock, liveSheet, words } from './bind-write.ts';
 import { pageReader } from './page-live.ts';
 import { setBody } from './page-write.ts';
@@ -224,7 +225,13 @@ test('EVERYTHING WRITES NO FILTER, because every row is what leaving the key off
   assert.equal(block.source, 'register.tasks');
 });
 
-test('A SEARCH TEXT THE PAGE CHECK REFUSES COMES BACK AS A SENTENCE, and the page is not written', async () => {
+/**
+ * THE KERNEL'S SENTENCE IS FOR AN AGENT, AND THE SHEET SAID IT TO A PERSON. Measured against this record before the
+ * repair: the press answered `page.work.blocks[1] cannot be read: kiln: tasks has no field called kiln.`, a declaration
+ * address, an array index and the list's id, in the sheet under a list the person knows as Tasks. The record is still
+ * asked, because it is the only judge of what it can read; only the sentence it answers is put into the owner's words.
+ */
+test('A FILTER THE RECORD CANNOT READ IS REFUSED BY THE RECORD, and said without its ids', async () => {
   const k = await record();
   const { io, asked } = served(k);
   const sheet = await liveSheet(BASE, 'tasks', io);
@@ -234,10 +241,94 @@ test('A SEARCH TEXT THE PAGE CHECK REFUSES COMES BACK AS A SENTENCE, and the pag
 
   const out = await bindTo(BASE, sheet.destinations[0]!, boundBlock('tasks', 'kiln', 'table', 'Tasks: matching kiln', sheet.declared), io);
   assert.equal(out.from, 'refused', JSON.stringify(out));
-  assert.match(out.from === 'refused' ? out.fix : '', /cannot be read/, 'refused, but not by the page check reading the filter');
+  const fix = out.from === 'refused' ? out.fix : '';
+  assert.equal(fix, bind.words.unread, fix);
+  assert.doesNotMatch(fix, /page\.\w|blocks\[|has no field called/, 'the kernel sentence reached the sheet as it was');
   assert.ok(asked.includes('setDeclaration'), 'the refusal was guessed here rather than asked of the record');
   assert.equal(versionOf(k, 'work'), before, 'a refused search text was written onto the page');
   assert.equal(blocksOf(k, 'work').length, 1);
+});
+
+/**
+ * ANY OTHER SENTENCE CARRYING THE RECORD'S ADDRESSES IS TRANSLATED TOO, and a sentence already written for a person is
+ * left as it is. The record answers these for blocks that were there before the press (a list that lost a field since),
+ * and for a page's own `requires`, so "the list cannot read this filter" would name the wrong block: the page's title
+ * does instead.
+ */
+test("A REFUSAL NAMING THE RECORD'S IDS IS SAID IN THE PAGE'S NAME, and a plain one passes through", async () => {
+  const k = await record();
+  const real = served(k).io;
+  let answer: { code: string; fix: string } = { code: 'DECLARATION_INVALID', fix: 'page.work.blocks[0] cannot be read: state: tasks has no field called state.' };
+  const io = (async (url: string | URL | Request, init?: RequestInit) =>
+    String(url).endsWith('/api/setDeclaration') ? json(400, { ok: false, refusal: answer }) : real(url, init)) as Fetch;
+  const sheet = await liveSheet(BASE, 'tasks', io);
+  if (sheet.from !== 'live') return assert.fail(JSON.stringify(sheet));
+  const work = sheet.destinations[0]!;
+  const block = boundBlock('tasks', 'state is open', 'table', 'Open', sheet.declared);
+
+  assert.deepEqual(await bindTo(BASE, work, block, io), { from: 'refused', fix: bind.words.notTaken('Work') }, 'another block');
+  answer = { code: 'DECLARATION_INVALID', fix: 'page.work reads register.tasks, which it does not require.' };
+  assert.deepEqual(await bindTo(BASE, work, block, io), { from: 'refused', fix: bind.words.notTaken('Work') }, 'an address');
+  answer = { code: 'DECLARATION_INVALID', fix: 'A page holds at most forty blocks.' };
+  assert.deepEqual(await bindTo(BASE, work, block, io), { from: 'refused', fix: 'A page holds at most forty blocks.' }, 'plain');
+});
+
+/* ── a search is not a filter ── */
+
+/**
+ * THE REGISTER SCREEN HANDS THE SHEET ITS SEARCH TEXT WHEN THERE IS NO FILTER, as `predicate`, and says it as
+ * `matching “<text>”`. The sheet then offered the press, and every press was refused (the test above). A search is
+ * what somebody typed to look, and a page shows its blocks to everyone who opens it; a filter is a sentence about the
+ * list, which is what a block's `where` holds. So the sheet says so before anything is pressed.
+ *
+ * THE TWO SPELLINGS ARE THE ROUTE'S, built here the way `r/[register]/+page.svelte` builds them, and the test after this
+ * one reads the route to hold it to that.
+ */
+test('A SEARCH TEXT IS SAID BEFORE THE PRESS, and a filter and everything are not', () => {
+  const says = (where: string, q: string): [string, string] => [where || q || copy.everything, where || (q ? `matching “${q}”` : copy.everything)];
+
+  const search = bind.unkept?.(...says('', 'kiln'), 'Tasks');
+  assert.equal(typeof search, 'string', 'a search text was offered as a block');
+  assert.match(search ?? '', /search/i);
+  assert.match(search ?? '', /filter/i, 'it says what can be kept instead');
+  assert.match(search ?? '', /Tasks/, 'it names the list by the name a person gave it');
+  assert.doesNotMatch(search ?? '', /kiln|register\.\w|page\.\w/, 'it quotes machinery or the typed text back');
+
+  assert.equal(bind.unkept?.(...says('state is open', ''), 'Tasks'), null, 'a filter was refused');
+  assert.equal(bind.unkept?.(...says('state is open', 'kiln'), 'Tasks'), null, 'a filter with a search typed beside it was refused');
+  assert.equal(bind.unkept?.(...says('', ''), 'Tasks'), null, 'every row was refused');
+});
+
+test('THE ROUTE STILL SPELLS A SEARCH THE WAY THE SHEET READS IT', () => {
+  const route = readFileSync(new URL('../../routes/r/[register]/+page.svelte', import.meta.url), 'utf8');
+  /* IF THIS GOES RED THE ROUTE CHANGED HOW IT HANDS A SEARCH OVER, and `unkept` no longer recognises one: the sheet would
+     offer the press again and the record's refusal, translated, would be all that is left. Change both together. */
+  assert.match(route, /predicate=\{whereOf\(filters\) \|\| q \|\| copy\.everything\}/);
+  assert.ok(route.includes('(q ? `matching “${q}”` : copy.everything)'), 'the route no longer says a search as matching “…”');
+});
+
+/* ── the press ── */
+
+/**
+ * A THROWN PRESS LEFT THE BUTTON DEAD UNTIL THE SHEET WAS REMOUNTED. `bind()` set `busy`, awaited a dynamic import and
+ * `bindTo`, and cleared `busy` on the line after: a chunk that failed to load (the deploy after the tab opened replaces
+ * every hashed file) threw past it, the button stayed disabled, and nothing was said. `bindTo` itself answers a network
+ * failure rather than throwing (measured: a rejecting fetch answers `recordNotReached`), so the import is the live case.
+ *
+ * READ FROM THE SOURCE, as the sweep above is, because this app has no DOM to press a button in. The shape asked for is
+ * the one that cannot leak: `busy` cleared in a `finally`, and a `catch` that puts a sentence in the sheet.
+ */
+test('A PRESS THAT THROWS CLEARS BUSY AND SAYS SO', () => {
+  const svelte = readFileSync(new URL('../ui/BindBlock.svelte', import.meta.url), 'utf8');
+  const start = svelte.indexOf('async function bind(');
+  assert.ok(start > 0, 'no bind() in the sheet');
+  const body = svelte.slice(start, svelte.indexOf('\n  }\n', start));
+  assert.match(body, /finally\s*\{\s*busy = false;?\s*\}/, 'busy is not cleared in a finally');
+  assert.match(body, /catch\s*\{[^}]*problem = [^}]*failed/, 'a thrown press is not said in the sheet');
+  assert.equal(body.match(/busy = false/g)?.length, 1, 'busy is cleared somewhere a throw can skip');
+  /* THE SENTENCE IS THE SHEET'S OWN, not this module's: the module is the dynamic import that failed, so a sentence
+     kept in it is a sentence nobody can reach on the one press that needs it. */
+  assert.match(svelte, /const failed =\s*'[^']+'/, 'the sheet has no sentence of its own for a press that threw');
 });
 
 test('A PAGE THAT CHANGED SINCE THE SHEET READ IT IS REFUSED, never written over', async () => {

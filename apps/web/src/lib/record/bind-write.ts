@@ -27,7 +27,46 @@ export const words = {
   moved: 'This page changed while the sheet was open. Open the sheet again to see it as it is now.',
   emptyAll: 'Nothing in this list yet.',
   emptyFiltered: 'Nothing here matches this view right now.',
+  /* The typed text is not quoted back: the sentence above this one in the sheet already shows it. */
+  searchNotKept: (list: string) =>
+    `A search cannot be kept as a block, because a page shows the same rows to everyone who opens it. A filter can: narrow ${list} by one of its fields, then put that on a page.`,
+  unread: 'The list cannot read this filter, so the block was not added and the page is as it was. Narrow the list by one of its fields, then put that on a page.',
+  notTaken: (page: string) => `${page} did not take the block, so nothing on it changed.`,
 } as const;
+
+/**
+ * WHY THIS VIEW CANNOT BECOME A BLOCK, or `null` when it can: the sheet says it before the press, and offers no press.
+ *
+ * A SEARCH IS NOT A FILTER. The register screen hands the sheet its search text as `predicate` when no filter is set, and
+ * the record reads a block's `where` as a sentence about the list's fields, so `kiln` was refused on every press with
+ * `page.work.blocks[1] cannot be read: kiln: tasks has no field called kiln.` A search is what one person typed to look;
+ * a block is what everybody who opens the page sees.
+ *
+ * TOLD APART BY THE SENTENCE THE ROUTE SAYS IT IN, `matching “<text>”`, because the route passes nothing else that says
+ * which of the two it handed over, and this file does not own the route. `bind-write.test.ts` reads the route to hold it
+ * to that spelling. A filter is the route's `whereOf`, which never reads that way.
+ */
+export function unkept(predicate: string, says: string, list: string): string | null {
+  if (predicate === copy.everything || predicate.trim() === '') return null;
+  return says === `matching “${predicate}”` ? words.searchNotKept(list) : null;
+}
+
+/**
+ * The record's refusal of a page write, in the owner's words when the record's are its own.
+ *
+ * THE KERNEL WRITES FOR AN AGENT: a declaration's address, the block's index and the list's id, `page.work.blocks[1]
+ * cannot be read: kiln: tasks has no field called kiln.` That is the right sentence in an MCP answer and the wrong one
+ * in a sheet under a list somebody knows as Tasks. A refusal at the block this press added is a filter the list cannot
+ * read; any other sentence that names an address or an index is about something else on the page (a block that was
+ * there already, the page's own `requires`), so it is said by the page's title. A sentence with neither was written for
+ * a person already and is kept.
+ */
+function owned(fix: string, to: Destination): string {
+  const at = /^page\.\S+?\.blocks\[(\d+)\] cannot be read: /.exec(fix);
+  if (at && Number(at[1]) === to.drawn) return words.unread;
+  if (at || /\b(page|register|view|metric|rule)\.[\w-]+|\[\d+\]/.test(fix)) return words.notTaken(to.title);
+  return fix;
+}
 
 /**
  * THE KINDS THE LIVE SHEET OFFERS: the ones whose every cell can be any readable field.
@@ -78,9 +117,9 @@ export function columnsOf(kind: string, decl: ListDecl): { field: string }[] {
  *
  * `predicate` IS WHAT THE REGISTER SCREEN HANDS THE SHEET: its filter as a sentence, or the search text when there is no
  * filter, or `copy.everything` when there is neither. `everything` writes no `where`, since leaving the key off is how a
- * declaration says every row, and the kernel refuses an empty one. A search text is written as it came and the record's
- * page check answers for it: a word that is not a sentence about the list is refused there, and the sheet says the
- * refusal instead of the page carrying it.
+ * declaration says every row, and the kernel refuses an empty one. A search text never gets this far from the sheet,
+ * which asks `unkept` first and offers no press; one that arrives anyway is written as it came, the record's page check
+ * refuses it, and `bindTo` says that refusal in the owner's words instead of the page carrying it.
  *
  * `decl` IS THE RECORD'S OWN DECLARATION of the list, which is where the columns come from. Without it the block names
  * none, and the kernel still answers its rows, but the app draws each row with nothing in it.
@@ -127,7 +166,7 @@ export async function liveSheet(base: string, register: string, io?: Fetch): Pro
  * back to prove it is unchanged.
  *
  * A PAGE THAT MOVED SINCE THE SHEET READ IT is `saveArrangement`'s refusal, said here in the sheet's own terms rather than
- * arrange mode's.
+ * arrange mode's, and every other refusal the record answers goes through `owned`.
  */
 export async function bindTo(base: string, to: Destination, block: Added, io?: Fetch): Promise<Arranged> {
   const placed: Placed[] = [
@@ -135,5 +174,6 @@ export async function bindTo(base: string, to: Destination, block: Added, io?: F
     { i: to.drawn, span: typeof block.span === 'number' ? block.span : 12 },
   ];
   const out = await saveArrangement(base, to.slug, to.drawn, placed, [block], io, to.version);
-  return out.from === 'refused' && out.fix === copy.arrangeMoved ? { from: 'refused', fix: words.moved } : out;
+  if (out.from !== 'refused') return out;
+  return { from: 'refused', fix: out.fix === copy.arrangeMoved ? words.moved : owned(out.fix, to) };
 }

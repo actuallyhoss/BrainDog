@@ -65,8 +65,13 @@
   /** Which record the sheet is over, and what it offers there. Nothing until `boot` has answered. */
   type Side =
     | { from: 'sample'; name: string; destinations: { slug: string; title: string }[]; kinds: string[] }
-    | { from: 'live'; name: string; destinations: Destination[]; kinds: string[]; declared: ListDecl | null }
+    | { from: 'live'; name: string; destinations: Destination[]; kinds: string[]; declared: ListDecl | null; unkept: string | null }
     | { from: 'refused'; fix: string };
+
+  /* A PRESS OR AN OPENING THAT THREW, said here and not in `bind-write.ts`, because the throw that happens is that module
+     failing to load (a deploy after the tab opened replaces every hashed chunk), and a sentence kept in it cannot be
+     reached on the one press that needs it. */
+  const failed = 'Nothing was added, because part of this screen could not be loaded. Reload the page and try again.';
 
   let side = $state<Side | null>(null);
   let toPage = $state('');
@@ -93,17 +98,27 @@
     return { from: 'sample', name: REGISTERS[register]?.name ?? register, destinations, kinds: BINDABLE.filter((k) => isKind(k)) };
   }
 
-  /** Ask `boot` which side this is, then what that side offers. Asked on every opening, so a page added since is there. */
-  async function look(list: string) {
-    const { readBoot } = await import('../record/boot-live.ts');
-    const booted = await readBoot(apiBase());
+  /**
+   * Ask `boot` which side this is, then what that side offers. Asked on every opening, so a page added since is there.
+   *
+   * `predicate` and `says` are passed in rather than read after the first `await`, so the effect that calls this tracks
+   * them and a filter changed under an open sheet is asked about again.
+   */
+  async function look(list: string, predicate: string, says: string) {
     let next: Side;
-    if (booted.from === 'sample') next = sampleSide();
-    else if (booted.from === 'refused') next = { from: 'refused', fix: booted.fix };
-    else {
-      const m = await import('../record/bind-write.ts');
-      const sheet = await m.liveSheet(apiBase(), list);
-      next = sheet.from === 'live' ? { ...sheet, kinds: [...m.LIVE_KINDS] } : sheet;
+    try {
+      const { readBoot } = await import('../record/boot-live.ts');
+      const booted = await readBoot(apiBase());
+      if (booted.from === 'sample') next = sampleSide();
+      else if (booted.from === 'refused') next = { from: 'refused', fix: booted.fix };
+      else {
+        const m = await import('../record/bind-write.ts');
+        const sheet = await m.liveSheet(apiBase(), list);
+        next = sheet.from === 'live' ? { ...sheet, kinds: [...m.LIVE_KINDS], unkept: m.unkept(predicate, says, sheet.name) } : sheet;
+      }
+    } catch {
+      /* The same chunk failure as a press, one step earlier: the sheet sat empty with a disabled button and no reason. */
+      next = { from: 'refused', fix: failed };
     }
     side = next;
     if (next.from === 'refused') return;
@@ -114,8 +129,11 @@
   $effect(() => {
     if (!open) return;
     problem = null;
-    void look(register);
+    void look(register, predicate, says);
   });
+
+  /* THE SEARCH THE ROUTE HANDED OVER AS A FILTER, said before the press and in place of it (`unkept`). */
+  const unkept = $derived(side?.from === 'live' ? side.unkept : null);
 
   const destinations = $derived(side && side.from !== 'refused' ? side.destinations : []);
   const kinds = $derived(side && side.from !== 'refused' ? side.kinds : []);
@@ -137,13 +155,24 @@
       return;
     }
     const to = side.destinations.find((d) => d.slug === toPage);
-    if (!to) return;
+    if (!to || side.unkept) return;
+    const declared = side.declared;
     busy = true;
     problem = null;
     const base = apiBase();
-    const m = await import('../record/bind-write.ts');
-    const out = await m.bindTo(base, to, m.boundBlock(register, predicate, kind, heading, side.declared));
-    busy = false;
+    /* `busy` IS CLEARED IN A `finally` because it was cleared on the line after two awaits, and a chunk that failed to
+       load threw past it: the button stayed disabled until the sheet was remounted, and nothing said why. */
+    let m: typeof import('../record/bind-write.ts');
+    let out: Awaited<ReturnType<typeof m.bindTo>>;
+    try {
+      m = await import('../record/bind-write.ts');
+      out = await m.bindTo(base, to, m.boundBlock(register, predicate, kind, heading, declared));
+    } catch {
+      problem = failed;
+      return;
+    } finally {
+      busy = false;
+    }
     if (out.from !== 'written') {
       problem = out.fix;
       return;
@@ -175,41 +204,49 @@
     </p>
     <p class="says">{says}</p>
 
-    <label class="row">
-      <span class="row-label">{copy.asA}</span>
-      <select class="row-input" bind:value={kind}>
-        {#each kinds as k}
-          <option value={k}>{copy.kindNames[k] ?? k}</option>
-        {/each}
-      </select>
-    </label>
+    <!-- A SEARCH ASKS NOTHING. The kind and the page are choices about a block, and there is no block to make, so the
+         sheet says why and what can be kept instead, where the two choices and the press would have been. -->
+    {#if unkept}
+      <p class="none" role="status">{unkept}</p>
+    {:else}
+      <label class="row">
+        <span class="row-label">{copy.asA}</span>
+        <select class="row-input" bind:value={kind}>
+          {#each kinds as k}
+            <option value={k}>{copy.kindNames[k] ?? k}</option>
+          {/each}
+        </select>
+      </label>
 
-    <label class="row">
-      <span class="row-label">{copy.onPage}</span>
-      <select class="row-input" bind:value={toPage}>
-        {#each destinations as d}<option value={d.slug}>{d.title}</option>{/each}
-      </select>
-    </label>
+      <label class="row">
+        <span class="row-label">{copy.onPage}</span>
+        <select class="row-input" bind:value={toPage}>
+          {#each destinations as d}<option value={d.slug}>{d.title}</option>{/each}
+        </select>
+      </label>
 
-    {#if side?.from === 'refused'}
-      <p class="none">{side.fix}</p>
-    {:else if side && destinations.length === 0}
-      <p class="none">{copy.noDestination(listName)}</p>
-    {:else if side}
-      <!-- What will exist afterwards, spelled out. A2: nothing applies without a diff, and the
-           smallest honest diff for one added block is the sentence describing it. -->
-      <p class="preview">
-        <Icon name="plus" size="s" />
-        {copy.willAdd(kindName, isKind(kind) ? KINDS[kind].minSpan : 4)}
-      </p>
+      {#if side?.from === 'refused'}
+        <p class="none">{side.fix}</p>
+      {:else if side && destinations.length === 0}
+        <p class="none">{copy.noDestination(listName)}</p>
+      {:else if side}
+        <!-- What will exist afterwards, spelled out. A2: nothing applies without a diff, and the
+             smallest honest diff for one added block is the sentence describing it. -->
+        <p class="preview">
+          <Icon name="plus" size="s" />
+          {copy.willAdd(kindName, isKind(kind) ? KINDS[kind].minSpan : 4)}
+        </p>
+      {/if}
     {/if}
     {#if problem}<p class="none" role="status">{problem}</p>{/if}
   </div>
 
   {#snippet footer()}
-    <Button weight="primary" disabled={destinations.length === 0 || busy} onclick={() => void bind()}>
-      {copy.bindBlock}
-    </Button>
+    {#if !unkept}
+      <Button weight="primary" disabled={destinations.length === 0 || busy} onclick={() => void bind()}>
+        {copy.bindBlock}
+      </Button>
+    {/if}
     <Button weight="bare" onclick={() => (open = false)}>{copy.close}</Button>
   {/snippet}
 </Sheet>
