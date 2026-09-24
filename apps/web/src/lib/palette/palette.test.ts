@@ -93,12 +93,38 @@ test('A ROW THAT CANNOT RUN RIGHT NOW IS ABSENT, NOT GREYED OUT', () => {
   /* Undo is the worked example, and it is the whole of the mechanism: with nothing to reverse the
      row is not built, so nobody reads a dead line asking them to work out what the app thinks they
      last did. There is no disabled state to assert against, which is the point. */
-  const idle = commands({ undoable: false }).map((c) => c.id);
-  const armed = commands({ undoable: true }).map((c) => c.id);
+  const idle = commands({ undoable: false, creation: null }).map((c) => c.id);
+  const armed = commands({ undoable: true, creation: null }).map((c) => c.id);
   assert.ok(!idle.includes('c-undo'), 'undo is offered with nothing to undo');
   assert.ok(armed.includes('c-undo'), 'undo is not offered when there is something to undo');
   /* And nothing else moved: the standing rule takes one row away, not the list. */
   assert.deepEqual(armed.filter((id) => id !== 'c-undo'), idle);
+});
+
+test('THE ROW THAT MAKES SOMETHING is declared, admitted, and there only while the query is a whole sentence', () => {
+  /* FOURTEEN, and it was thirteen: every row went somewhere or undid something until `Add to <list>: <text>`. The count
+     is exact on purpose, because a row added or lost here is a change to what every screen can reach, and it should
+     arrive with the line that says so. */
+  assert.equal(COMMANDS.length, 14, `the palette declares ${COMMANDS.length} rows`);
+  const add = COMMANDS.find((c) => c.id === 'c-add');
+  assert.ok(add, 'no row adds anything');
+  assert.equal(admits(add), null, `the add row is refused: ${admits(add)}`);
+  assert.equal(add.act, 'add');
+  /* THE STANDING RULE, ON A ROW WITH AN ARGUMENT. With nothing to add there is nothing to press, so the row is absent,
+     and the moment the box holds a list and a title it is there. Nothing else moves either way. */
+  const idle = commands({ undoable: false, creation: null }).map((c) => c.id);
+  const armed = commands({ undoable: false, creation: { register: 'tasks', title: 'buy milk' } }).map((c) => c.id);
+  assert.ok(!idle.includes('c-add'), 'the add row is offered with nothing to add');
+  assert.ok(armed.includes('c-add'), 'the add row is not offered for a whole sentence');
+  assert.deepEqual(armed.filter((id) => id !== 'c-add'), idle);
+});
+
+test('an act that names no binding passes test 2 only when it carries its own target', () => {
+  /* Undo means the same thing from every screen because the keymap binds it at the document. Add means the same thing
+     because the list is in its own words: `Add to Tasks` is Tasks from the inbox and from a page. An act with neither is
+     a remote control for the screen underneath, and is still refused. */
+  assert.equal(admits({ ...good, href: null, act: 'undo' }), 'not-everywhere');
+  assert.equal(admits({ ...good, href: null, act: 'add' }), null);
 });
 
 test('the standing rule reaches the objects too, not only the commands', () => {
@@ -232,7 +258,7 @@ test('AND IT REACHES THE ROWS YOU CHANGED LAST, off a ledger the record was alre
 test('every act the palette can perform is a named one, so no row smuggles in an argument', () => {
   /* A closure hanging off a declaration would let the next acting row take an object, and test 1
      would stop being checkable. The list is closed and the palette switches on the name. */
-  assert.deepEqual([...ACTS], ['undo']);
+  assert.deepEqual([...ACTS], ['undo', 'add']);
   for (const c of COMMANDS) {
     if (c.href !== null) continue;
     assert.ok(c.act !== undefined && (ACTS as readonly string[]).includes(c.act), `${c.id} acts, and does not say what it does`);

@@ -38,6 +38,7 @@
   import { answerFor, optionsOf, reasonState, record, setReason, withdraw, wouldRecord, type Answer } from '$lib/record/answer.ts';
   import { mayAnswer, whyNotAnswering } from './answering.ts';
   import { spoken } from './spoken.ts';
+  import { groupedAddress, groupingOf, type Grouping } from './grouping.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { keepDecided, olderDecisions, plainOf, readQueue, type Queue } from '$lib/record/governance.ts';
   import { answerQuestion } from '$lib/record/decide-write.ts';
@@ -207,8 +208,13 @@
   }
 
   /* GROUPED BY WHAT IT IS ABOUT, when asked. The rank still orders the groups, by their first question,
-     and the questions about nothing in particular come last. */
-  let grouping = $state<'none' | 'about'>('none');
+     and the questions about nothing in particular come last.
+
+     THE ADDRESS HOLDS IT, NOT THIS FILE. It was a local `$state`, so a grouped queue could not be sent to anybody
+     and a reload undid it (REWORK §5). `grouping.ts` reads and writes the parameter; a press replaces the address
+     rather than pushing one, because a grouping arranges this queue and is not somewhere Back should return to. */
+  const grouping = $derived(groupingOf(route.url));
+  const groupBy = (next: Grouping) => void goto(at(groupedAddress(route.url, next)), { replaceState: true, noScroll: true, keepFocus: true });
   const groups = $derived.by(() => {
     if (grouping === 'none') return [{ key: '', name: '', items: open }];
     const out = new Map<string, Question[]>();
@@ -719,14 +725,14 @@
               class="segment"
               aria-pressed={grouping === 'none'}
               data-on={grouping === 'none' ? '' : undefined}
-              onclick={() => (grouping = 'none')}>{copy.decideGroupNone}</button
+              onclick={() => groupBy('none')}>{copy.decideGroupNone}</button
             >
             <button
               type="button"
               class="segment"
               aria-pressed={grouping === 'about'}
               data-on={grouping === 'about' ? '' : undefined}
-              onclick={() => (grouping = 'about')}>{copy.decideGroupList}</button
+              onclick={() => groupBy('about')}>{copy.decideGroupList}</button
             >
           </div>
           <Chip label={copy.aimFor(target.note)} tone={aimTone} />

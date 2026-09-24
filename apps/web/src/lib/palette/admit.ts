@@ -40,6 +40,7 @@ import { BINDINGS } from '../a11y/bindings.ts';
 import { copy } from '../copy.ts';
 import { terms, tokensOf } from '../record/find.ts';
 import type { IconName } from '../ui/icons.ts';
+import { words } from './create.ts';
 
 /**
  * The verbs the palette can perform in place rather than travel to.
@@ -48,14 +49,35 @@ import type { IconName } from '../ui/icons.ts';
  * argument, so there is nothing for a reader to have chosen first. It is also why the act is a
  * name and not a closure hanging off the declaration: a closure would let the next row smuggle in
  * an argument, and the rule would stop being checkable.
+ *
+ * `add` IS THE ONE WITH AN ARGUMENT, AND THE ARGUMENT IS THE QUERY. `Add to Tasks: buy milk` is
+ * typed, not chosen: the list and the title are words in the box, read by `creation()` in
+ * `create.ts`, so there is still no object somebody has to pick on a screen before the row can
+ * run, which is what test 1 asks. What it takes is `Live.creation`, which the palette computes
+ * and this file only asks about, so the declaration stays a name.
  */
-export const ACTS = ['undo'] as const;
+export const ACTS = ['undo', 'add'] as const;
 export type Act = (typeof ACTS)[number];
+
+/**
+ * THE ACTS THAT CARRY THEIR OWN TARGET, which is the third way to pass test 2.
+ *
+ * Undo means the same thing from every screen because the keymap binds it at the document. Add
+ * means the same thing because the list it writes to is named in its own words: `Add to Tasks` is
+ * Tasks from the inbox, from a page and from Settings. No binding is needed to prove that, and
+ * inventing one to satisfy the test would put a key in the `?` sheet that does nothing.
+ */
+const NAMES_ITS_TARGET: readonly Act[] = ['add'];
+
+/** A row a query can make: the list it goes in and the words it is titled with. `create.ts` reads it. */
+export type Creation = { register: string; title: string };
 
 /** What the palette knows about right now, so the standing rule has something to ask. */
 export type Live = {
   /** True while a toast is still holding an offer to reverse something. */
   undoable: boolean;
+  /** The row the query would add, or `null` while the query is not the whole sentence. */
+  creation: Creation | null;
 };
 
 export type Command = {
@@ -128,7 +150,8 @@ export function admits(c: Command): Refusal | null {
   if (c.href === null ? !acts : PLACEHOLDER.test(c.href)) return 'object-first';
 
   // 2. It means the same thing from every screen.
-  if (c.href === null ? c.binding === undefined : !c.href.startsWith('/')) return 'not-everywhere';
+  const carries = c.act !== undefined && NAMES_ITS_TARGET.includes(c.act);
+  if (c.href === null ? c.binding === undefined && !carries : !c.href.startsWith('/')) return 'not-everywhere';
 
   // 3. It has a name somebody would type.
   if (!typeable(c.title)) return 'unsayable';
@@ -191,5 +214,25 @@ export const COMMANDS: readonly Command[] = [
     group: copy.commands,
     icon: 'back',
     when: (live) => live.undoable,
+  },
+  /**
+   * AND THE FIRST ROW THAT MAKES SOMETHING. Every other row went somewhere or undid something, so
+   * the one surface reachable from every screen could not take down the thing a person had just
+   * thought of: a task meant leaving for `/r/tasks`, finding its line, and coming back.
+   *
+   * THE TITLE HERE IS THE DECLARATION'S, NOT THE ROW'S. What the palette draws is the sentence the
+   * query makes, `Add to Tasks: buy milk`, and it draws it only while `creation()` reads one out of
+   * the box, which is the standing rule: half a sentence has nothing to add, so there is no row.
+   * The write is `create.ts`'s, the list's own capture line, so the palette makes the row the list
+   * would have made.
+   */
+  {
+    id: 'c-add',
+    title: words.declared,
+    href: null,
+    act: 'add',
+    group: copy.commands,
+    icon: 'plus',
+    when: (live) => live.creation !== null,
   },
 ];

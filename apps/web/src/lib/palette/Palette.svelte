@@ -50,8 +50,8 @@
   complete. Losing a half-typed query to a chat is a real cost.
 -->
 <script lang="ts">
-  import { at } from '../at.ts';
-  import { goto } from '$app/navigation';
+  import { apiBase, at } from '../at.ts';
+  import { goto, invalidateAll } from '$app/navigation';
   import { page } from '$app/state';
   import { TONES, since } from 'braindog-render';
   import { copy } from '../copy.ts';
@@ -64,7 +64,8 @@
   import Kbd from '../ui/Kbd.svelte';
   import Icon from '../ui/Icon.svelte';
   import type { IconName } from '../ui/Icon.svelte';
-  import { commands, type Act } from './admit.ts';
+  import { commands, type Act, type Creation } from './admit.ts';
+  import { addable, addRow, creation, words as createWords } from './create.ts';
   import { savedViews } from '../record/views.ts';
   import { listsOf, type List, type Recent } from '../record/palette.ts';
   import type { Hits, Reader } from '../record/palette-live.ts';
@@ -106,6 +107,8 @@
     complete?: string | undefined;
     /** The question Spark's row asks. Only that row carries it, and running it keeps the panel open. */
     ask?: string | undefined;
+    /** The row the add row writes, read out of the query. Only that row carries it. */
+    creation?: Creation | undefined;
   };
 
   let el = $state<HTMLDialogElement>();
@@ -278,6 +281,10 @@
    * a fallback rather than by the key that is sitting right there. It says `copy.pages` now.
    */
   const RANK: Record<string, number> = {
+    /* THE ADD ROW ABOVE EVERYTHING, because it is drawn only for a whole sentence of intent, `Add to Tasks: buy milk`,
+       and a sentence that names its list and its title is not a query about anything else in the record. Under the
+       rows it would be the row a reader typed out in full and then had to arrow down to. */
+    [createWords.group]: -1,
     [copy.records]: 0,
     [RECENT]: 2,
     [copy.decide]: 3,
@@ -345,7 +352,12 @@
    * the row appears and goes with it. That is the whole mechanism: nothing is disabled, the list is
    * simply built again.
    */
-  const live = $derived({ undoable: toasts.items.some((t) => t.undo !== undefined) });
+  const live = $derived({
+    undoable: toasts.items.some((t) => t.undo !== undefined),
+    /* THE ROW THE QUERY WOULD ADD, in the modes that draw commands. Only a list this build can title a row in is
+       offered, which is `addable`; any other name leaves the sentence as a query like any other. */
+    creation: parsed.prefix === null || parsed.prefix === '>' ? creation(parsed.text, addable(lists)) : null,
+  });
 
   /** Whether this query is one the record's search answers: `#`, `@` or no prefix, and two characters or more. */
   const searching = $derived((parsed.prefix === null || parsed.prefix === '#' || parsed.prefix === '@') && parsed.text.length > 1);
@@ -475,7 +487,19 @@
 
          `commands(live)` and never `COMMANDS`: the admission rule and the standing rule are both
          applied in there, so no row this file draws can have skipped them. */
-      const admitted = commands(live);
+      const every = commands(live);
+      const admitted = every.filter((c) => c.act !== 'add');
+      /* THE ADD ROW IS NOT FOUND BY ITS TITLE, it is made out of the query. `commands(live)` holds it only while
+         `live.creation` does, so asking for it is asking the standing rule, and it is drawn as the sentence it will
+         write rather than as its declaration's name. No `complete`: the box already says exactly what `⇥` would.
+         IT IS A PLACE TO SPARK'S ROW, and so no question is offered under it, because a sentence that names a list
+         and a title is a thing to write rather than a thing to ask about. */
+      const adding = every.find((c) => c.act === 'add');
+      if (adding && live.creation) {
+        const made = live.creation;
+        const list = listNamed.get(made.register)?.name ?? REGISTERS[made.register]?.name ?? made.register;
+        out.push({ id: adding.id, title: createWords.row(list, made.title), href: null, group: createWords.group, icon: adding.icon, act: adding.act, creation: made });
+      }
       const exact = admitted.filter((c) => starts(c.title) && c.title.toLowerCase().startsWith(needle));
       const rest = admitted.filter((c) => !exact.includes(c) && starts(c.title));
       out.push(
@@ -885,7 +909,43 @@
       if (!toasts.undoLast()) toasts.push(copy.nothingToUndo);
       return;
     }
+    if (row.act === 'add') {
+      if (row.creation) void add(row.creation);
+      return;
+    }
     if (row.href !== null) goto(at(row.href));
+  }
+
+  /**
+   * THE ADD ROW, PRESSED: one row in the list the sentence named, and a receipt that can put it back.
+   *
+   * THE SAMPLE SAYS NOTHING WAS SAVED, as every other write on it does, in the same `notWritten` sentence. On a live
+   * record `addRow` writes the list's own capture line with nothing pinned, so what it filled in for the reader is said
+   * the way the list says it, and the receipt's Put back archives the row at the version the write answered. The shell
+   * is read again after each, so the rail's count follows the row in and out.
+   */
+  async function add(c: Creation) {
+    const list = listNamed.get(c.register)?.name ?? REGISTERS[c.register]?.name ?? c.register;
+    if (!isLive) return void toasts.push(copy.notWritten(createWords.would(list, c.title)), { intent: 'warn' });
+    let out: Awaited<ReturnType<typeof addRow>>;
+    try {
+      out = await addRow(c, Date.now(), apiBase(page.url));
+    } catch {
+      /* THE WRITE MODULE IS LOADED ON THE PRESS, so a dropped connection can fail the import before any request. */
+      return void toasts.push(copy.writeNotReached, { intent: 'warn' });
+    }
+    if (!out.ok) return void toasts.push(out.fix, { intent: 'warn' });
+    const said = createWords.added(list, c.title);
+    const back = out.back;
+    toasts.push(out.filled.length > 0 ? `${said} ${copy.captureFilled(out.filled)}` : said, {
+      intent: 'good',
+      undo: () =>
+        void back().then((undone) => {
+          toasts.push(undone.ok ? copy.writeArchived(`“${c.title}”`) : undone.fix, undone.ok ? {} : { intent: 'warn' });
+          if (undone.ok) void invalidateAll();
+        }),
+    });
+    void invalidateAll();
   }
 
   function onkeydown(e: KeyboardEvent) {
