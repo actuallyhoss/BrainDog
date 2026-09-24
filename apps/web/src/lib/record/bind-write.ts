@@ -60,12 +60,21 @@ export function unkept(predicate: string, says: string, list: string): string | 
  * read; any other sentence that names an address or an index is about something else on the page (a block that was
  * there already, the page's own `requires`), so it is said by the page's title. A sentence with neither was written for
  * a person already and is kept.
+ *
+ * THE PAGE'S OWN ADDRESS AS THE SUBJECT IS NOT AN ID TO TRANSLATE AWAY, it is the page's name spelled for an agent. The
+ * block ceiling reads `page.work declares 25 blocks. The ceiling is 24: a page longer than that is a report.`, and every
+ * sentence naming `page.<slug>` used to become "Work did not take the block", which threw away the reason and the number
+ * she needed to take a block off first (audit sixty-six, 10). So the leading address becomes the title, and the sentence
+ * is kept when nothing else in it is an id; one that still names another address or an index is translated as before.
  */
 function owned(fix: string, to: Destination): string {
   const at = /^page\.\S+?\.blocks\[(\d+)\] cannot be read: /.exec(fix);
   if (at && Number(at[1]) === to.drawn) return words.unread;
-  if (at || /\b(page|register|view|metric|rule)\.[\w-]+|\[\d+\]/.test(fix)) return words.notTaken(to.title);
-  return fix;
+  if (at) return words.notTaken(to.title);
+  const lead = `page.${to.slug}`;
+  const named = fix.startsWith(lead) && !/^[\w.[-]/.test(fix.slice(lead.length)) ? to.title + fix.slice(lead.length) : fix;
+  if (/\b(page|register|view|metric|rule)\.[\w-]+|\[\d+\]/.test(named)) return words.notTaken(to.title);
+  return named;
 }
 
 /**

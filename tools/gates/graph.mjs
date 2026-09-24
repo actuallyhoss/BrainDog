@@ -648,9 +648,14 @@ export default function graph(
    * Exit 3 is a SKIP and not a pass (`run.mjs`), and the order matters: a fixture tree that seeds a
    * violation in a manifest and carries no `src/` must go RED for it, not amber for the half of the
    * gate that had nothing to read.
+   *
+   * AND THE SKIP NAMES THE ROOT IT LOOKED UNDER. It said only "no packages/*, apps/* or packs/* to
+   * read", so a mistyped `BRAINDOG_GATE_ROOT` was a skip with nothing in it pointing at the mistake
+   * (audit sixty-six, finding 11); `em-dash` and `secret-grep` name theirs, and `self-test`'s
+   * `graph-empty` holds all three to it.
    */
   if (ws.length === 0) {
-    console.log('  graph: no packages/*, apps/* or packs/* to read, so nothing was checked.');
+    console.log(`  graph: no packages/*, apps/* or packs/* under ${resolve(root)}, so nothing was checked.`);
     return 3;
   }
 

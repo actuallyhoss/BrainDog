@@ -25,7 +25,7 @@
  */
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { skipDir } from './lib.mjs';
@@ -376,7 +376,7 @@ function enclosing(text, at) {
  * the root it derived from its own location, because an imported gate shares the runner's working
  * directory and that is wherever the operator was standing.
  *
- * IT RETURNS 1 AND FALLS OFF THE END FOR A PASS, which is what `self-test`'s `silent-pass` grep
+ * IT RETURNS 1 OR 3 AND FALLS OFF THE END FOR A PASS, which is what `self-test`'s `silent-pass` grep
  * rests on: a pass is the end of the function and never a statement inside it.
  */
 export default function secretGrep(
@@ -443,6 +443,17 @@ export default function secretGrep(
           text: (SOURCE.exec(text) ?? [''])[0],
         });
     }
+
+  /* A GATE THAT READ NOTHING HAS NOT PASSED, and this one said it had. Over a root holding no
+     `packages`, `apps` or `packs` it printed "0 plaintexts reach a sink, over 0 files" and exited 0
+     (audit sixty-six, finding 11), so a mistyped `BRAINDOG_GATE_ROOT` read green in the one gate that
+     guards the product's founding promise. Exit 3 is `run.mjs`'s skip, as `em-dash` answers the same
+     tree, and the line names the root so the reader can see which one was wrong. After the findings
+     check, not before it: a finding is an answer whatever else is missing. */
+  if (findings.length === 0 && scanned === 0) {
+    console.log(`  secret-grep: no packages/*, apps/* or packs/* source under ${resolve(root)}, so no file was read`);
+    return 3;
+  }
 
   if (findings.length === 0) {
     console.log(`  secret-grep: 0 plaintexts reach a sink, over ${scanned} files`);

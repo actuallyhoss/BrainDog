@@ -273,6 +273,34 @@ test("A REFUSAL NAMING THE RECORD'S IDS IS SAID IN THE PAGE'S NAME, and a plain 
   assert.deepEqual(await bindTo(BASE, work, block, io), { from: 'refused', fix: 'A page holds at most forty blocks.' }, 'plain');
 });
 
+/**
+ * A PAGE AT ITS BLOCK CEILING SAYS WHY, not only that it refused. The kernel answers a twenty-fifth block with
+ * `page.long declares 25 blocks. The ceiling is 24: a page longer than that is a report.` (`declare.ts`, `BLOCK_CEILING`),
+ * a sentence written for a person whose only id is the page's own address as its subject. `owned` saw `page.long` and
+ * answered "Long did not take the block, so nothing on it changed", which is the one thing the person could not act on:
+ * the reason, and the number that would have let her take a block off first, were thrown away.
+ *
+ * AGAINST THE REAL KERNEL, with a page installed at twenty-four blocks, so the sentence is the record's and not one
+ * typed here to match the repair. If the ceiling moves, the press is written and the first assertion says so.
+ */
+test("A PAGE AT ITS CEILING KEEPS THE RECORD'S REASON, said by the page's name", async () => {
+  const k = await record();
+  const full = Array.from({ length: 24 }, (_, i) => ({ kind: 'table', heading: `Part ${i + 1}`, source: 'register.tasks', columns: [{ field: 'what' }] }));
+  const put = await k.install([{ id: 'page.long', kind: 'page', body: { page: 'long', title: 'Long', requires: ['register.tasks'], blocks: full } } as never]);
+  assert.ok(put.ok, JSON.stringify(put));
+  const { io } = served(k);
+  const sheet = await liveSheet(BASE, 'tasks', io);
+  if (sheet.from !== 'live') return assert.fail(JSON.stringify(sheet));
+  const long = sheet.destinations.find((d) => d.slug === 'long')!;
+  assert.equal(long.drawn, 24);
+
+  const out = await bindTo(BASE, long, boundBlock('tasks', 'state is open', 'table', 'Open', sheet.declared), io);
+  assert.equal(out.from, 'refused', JSON.stringify(out));
+  const fix = out.from === 'refused' ? out.fix : '';
+  assert.equal(fix, 'Long declares 25 blocks. The ceiling is 24: a page longer than that is a report.', fix);
+  assert.equal(blocksOf(k, 'long').length, 24);
+});
+
 /* ── a search is not a filter ── */
 
 /**

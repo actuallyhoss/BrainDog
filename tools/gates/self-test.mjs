@@ -311,6 +311,21 @@ const CASES = [
   { gate: 'em-dash-packs', run: 'em-dash', expect: /used as punctuation/, findings: 1 },
   { gate: 'secret-grep-packs', run: 'secret-grep', expect: /a plaintext reaches a log/, findings: 1 },
   { gate: 'graph-packs', run: 'graph', expect: /cross-package relative import/, findings: 1 },
+
+  /* AN EMPTY ROOT, ONE PER TEXT GATE, AND THE ANSWER IS A SKIP. Each fixture holds nothing but its
+     `expect.txt`, so no `packages/`, `apps/` or `packs/` at all, which is what a mistyped
+     `BRAINDOG_GATE_ROOT` looks like from inside a gate. Audit sixty-six (finding 11) measured the
+     three on such a tree: `em-dash` exited 3, `graph` exited 3 without saying where it had looked, and
+     `secret-grep` exited 0, "0 plaintexts reach a sink, over 0 files", which `run.mjs` counts as a
+     pass. A gate that read nothing has not passed, and a gate that read nothing somewhere it does not
+     name leaves the reader to guess which root was wrong.
+
+     `skip: true` ASKS FOR EXIT 3 EXACTLY, not only for red. Exit 1 here would be a finding over a
+     tree that holds no file, which is a different defect wearing the same colour. The seeded name is
+     the fixture's own directory, so "named once" is the skip line saying which root it read. */
+  { gate: 'em-dash-empty', run: 'em-dash', skip: true, expect: /no prose was read/, findings: 1 },
+  { gate: 'secret-grep-empty', run: 'secret-grep', skip: true, expect: /no file was read/, findings: 1 },
+  { gate: 'graph-empty', run: 'graph', skip: true, expect: /nothing was checked/, findings: 1 },
 ];
 
 /** How many lines of a gate's output name the seeded file. One per seeded violation. */
@@ -480,7 +495,7 @@ function seededBrowser({ gate, seed, names, blind, red }) {
 
 let ran = 0;
 
-for (const { gate, expect, findings, run } of CASES) {
+for (const { gate, expect, findings, run, skip } of CASES) {
   const fixture = join(negatives, gate);
   if (!existsSync(fixture)) {
     console.error(`  ${gate}: no negative fixture at tools/gates/negative/${gate}/`);
@@ -499,7 +514,15 @@ for (const { gate, expect, findings, run } of CASES) {
      which is a different failure wearing the same colour. */
   const seeded = readFileSync(join(fixture, 'expect.txt'), 'utf8').trim();
   if (r.status === 0) {
-    console.error(`  ${gate}: PASSED its own seeded violation. It is checking nothing.`);
+    console.error(
+      skip
+        ? `  ${gate}: PASSED a root with nothing in it. A mistyped root would read green.`
+        : `  ${gate}: PASSED its own seeded violation. It is checking nothing.`,
+    );
+    failed.push(gate);
+  } else if (skip && r.status !== 3) {
+    console.error(`  ${gate}: exited ${r.status} over a root with nothing in it, and a gate that read nothing exits 3.`);
+    console.error(said.split('\n').slice(0, 6).map((l) => `      ${l}`).join('\n'));
     failed.push(gate);
   } else if (!said.includes(seeded)) {
     console.error(`  ${gate}: went red but never named ${seeded}.`);
@@ -526,7 +549,7 @@ for (const { gate, expect, findings, run } of CASES) {
     failed.push(gate);
   } else {
     ran++;
-    console.log(`  ${gate}: red on its seeded violation, naming ${seeded}`);
+    console.log(skip ? `  ${gate}: a skip over an empty root, naming ${seeded}` : `  ${gate}: red on its seeded violation, naming ${seeded}`);
   }
 }
 
