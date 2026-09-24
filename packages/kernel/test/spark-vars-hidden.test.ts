@@ -120,7 +120,7 @@ test('A QUESTION TO SPARK NAMING A VARIABLE SET FROM A SECRET FIELD IS REFUSED A
   /* A VARIABLE SET FROM FIELDS THAT MAY LEAVE IS ASKED ABOUT AS ALWAYS. */
   for (const steps of [
     [{ set_var: { name: 'p', to: '{{trigger.row.what}}, {{trigger.row.note}}' } }, { ask_spark: { question: 'Rate given {{vars.p}}?', as: 'rate' } }],
-    [{ set_var: { name: 'p', to: '{{trigger.row.pin}}' } }, { ask_spark: { question: 'Rate given {{vars.q}}?', as: 'rate' } }],
+    [{ set_var: { name: 'p', to: '{{trigger.row.pin}}' } }, { set_var: { name: 'q', to: '{{trigger.row.note}}' } }, { ask_spark: { question: 'Rate given {{vars.q}}?', as: 'rate' } }],
     [{ set_var: { name: 'p', to: '{{trigger.row.note}}' } }, { ask_person: { question: 'Pay {{vars.p}}?', options: ['yes', 'no'], as: 'a' } }],
   ]) {
     const out = refusal((await k.install([rule(steps)])) as Result<unknown>);
@@ -145,7 +145,7 @@ test('A QUESTION NO RUN CAN REACH HOLDING THE SECRET INSTALLS: the arm beside th
   const cases: [string, unknown[]][] = [
     [
       'the sibling arm',
-      [{ if: 'what is Rent', then: [{ set_var: { name: 'p', to: '{{trigger.row.pin}}' } }], else: [{ ask_spark: { question: 'Rate given {{vars.p}}?', as: 'rate' } }] }],
+      [{ if: 'what is Rent', then: [{ set_var: { name: 'p', to: '{{trigger.row.pin}}' } }], else: [{ set_var: { name: 'p', to: '{{trigger.row.note}}' } }, { ask_spark: { question: 'Rate given {{vars.p}}?', as: 'rate' } }] }],
     ],
     ['set again, plainly', [{ set_var: { name: 'p', to: '{{trigger.row.pin}}' } }, { set_var: { name: 'p', to: '{{trigger.row.note}}' } }, { ask_spark: { question: 'Rate given {{vars.p}}?', as: 'rate' } }]],
     /* BOTH ARMS SET IT PLAINLY, so whichever the row takes, the question after the branch reads a plain value. */

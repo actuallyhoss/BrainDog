@@ -171,7 +171,8 @@ test('A STEP IS ONE OF THE CLOSED VERBS, and its answer lands under a name a tem
   assert.equal(one({ ask_person: { question: 'Pay it?', options: [], as: 'answer' } }), 'DECLARATION_INVALID');
   assert.equal(one({ ask_person: { question: 'Pay it?', options: ['yes', 'no'], as: 'answer', wait: 'a week' } }), 'DECLARATION_INVALID');
   assert.equal(one({ wait: '2 hours' }), 'DECLARATION_INVALID');
-  assert.equal(one({ set_var: { name: 'total', to: '{{vars.rate}}' } }), null);
+  /* A name read must be kept by an earlier step (`unkeptIn`), so this one reads the trigger. */
+  assert.equal(one({ set_var: { name: 'total', to: '{{trigger.at}}' } }), null);
   assert.equal(one({ script: { id: 'gold_rate', as: 'rate' } }), null);
 });
 

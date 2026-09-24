@@ -518,6 +518,63 @@ function copyFault(
 }
 
 /**
+ * The name a step keeps its answer under, or `null` when it keeps none: `set_var`'s `name`, or the `as:` of a `script`,
+ * a `call` or either ask. `stepFault` has already held each to `NAME` by the time the walk asks this.
+ */
+function keptBy(verb: string, step: Record<string, unknown>): string | null {
+  const spec = step[verb];
+  if (!isObject(spec)) return null;
+  const name = verb === 'set_var' ? spec.name : verb === 'script' || verb === 'call' || verb === 'ask_spark' || verb === 'ask_person' ? spec.as : undefined;
+  return typeof name === 'string' ? name : null;
+}
+
+/**
+ * The first `{{vars.x}}` a step reads whose `x` no step before it certainly kept, as the refusal, or `null`.
+ *
+ * NOTHING ASKED THIS FOR ANY KIND UNTIL 24 SEPTEMBER. `stepFault` held a name to `NAME` where it was kept and nothing
+ * looked at a name where it was read, so `{{vars.nope}}` with no step keeping `nope`, a read after a `call` with no
+ * `as:`, and (once `db7074ad` made its `as:` optional) a read after a `script` with none, each linted clean, installed
+ * and ran `done`, and `fill` wrote a dash where the name was (`flow.ts`'s `pathValue`). Audit sixty-six, finding 7,
+ * measured the note reading "queued as —" (`flow-lint-as-read.test.ts`).
+ *
+ * EVERY STRING OF THE STEP IS A READ, because on the run path `fill` fills every one from the run before the step acts,
+ * a condition's included; an `if`'s arms are its children and are walked as their own steps. Only the first segment is
+ * the name: `{{vars.r.value}}` reads `r`.
+ *
+ * `kept` IS WHAT CERTAINLY RAN, which is why the refusal says which of two things went wrong: a name no step keeps is
+ * missing an `as:`, and one kept only later or in one arm of a branch is in the wrong place.
+ */
+function unkeptIn(id: string, verb: string, step: Record<string, unknown>, here: string, kept: ReadonlySet<string>, anywhere: ReadonlySet<string>): Refusal | null {
+  const texts: string[] = [];
+  const collect = (v: unknown): void => {
+    if (typeof v === 'string') texts.push(v);
+    else if (Array.isArray(v)) v.forEach(collect);
+    else if (isObject(v)) Object.values(v).forEach(collect);
+  };
+  collect(step[verb]);
+  for (const text of texts)
+    for (const m of text.matchAll(RUN_PATH)) {
+      if (m[1] !== 'vars') continue;
+      const name = m[2]!.split('.')[0]!;
+      if (kept.has(name)) continue;
+      return anywhere.has(name)
+        ? bad(
+            'DECLARATION_INVALID',
+            `${id} reads ${m[0]} at ${here}, and ${name} is kept only by a step that does not certainly run before it: a later step, or one arm of a branch. Keep ${name} before this step on every way to it, or take ${m[0]} out.`,
+            here,
+            kept.size === 0 ? undefined : [...kept],
+          )
+        : bad(
+            'DECLARATION_INVALID',
+            `${id} reads ${m[0]} at ${here}, and no step keeps an answer called ${name}, so the run would write a dash in its place. Keep it with as: ${name} on the step that makes it, or take ${m[0]} out.`,
+            here,
+            kept.size === 0 ? undefined : [...kept],
+          );
+    }
+  return null;
+}
+
+/**
  * Where the first `ask_spark` step of a body sits, as `steps[1]` or `steps[0].then[2]`, or `null` when it asks nothing.
  *
  * ITS OWN WALK, BOTH ARMS OF EVERY BRANCH, because `actionsOf` returns only `ACTIONS` and `ask_spark` is a step's verb.
@@ -740,7 +797,28 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
      NO FIELD OF THE ROW IS CARRIED THIS WAY, because no step may write one from a secret (`writeFault`). A second map
      held the fields a step wrote from one, for the questions and calls later in the same list, and it could see no
      further than that list. */
-  const walk = (list: unknown, at: string, depth: number, carried: Map<string, Carried>): Refusal | null => {
+  /* EVERY NAME THE BODY KEEPS ANYWHERE, so that `unkeptIn` can tell a missing `as:` from a name kept in the wrong place.
+     `names` is filled as the walk goes, and so does not yet hold a name kept by a later step. */
+  const anywhere = new Set<string>();
+  const keptAnywhere = (list: unknown): void => {
+    if (!Array.isArray(list)) return;
+    for (const step of list) {
+      if (!isObject(step)) continue;
+      for (const verb of FLOW) {
+        const name = verb in step ? keptBy(verb, step) : null;
+        if (name !== null) anywhere.add(name);
+      }
+      if ('if' in step) {
+        keptAnywhere(step.then);
+        keptAnywhere(step.else);
+      }
+    }
+  };
+  keptAnywhere(body.steps ?? body.then);
+  /* `kept` IS THE NAMES A RUN CERTAINLY HOLDS ON THE WAY INTO EACH STEP, walked per arm as `carried` is, but joined the
+     other way after a branch: a variable is carried out of a branch if EITHER arm carried it, since either may run, and
+     a name is kept after one only if BOTH arms kept it, since either may not. */
+  const walk = (list: unknown, at: string, depth: number, carried: Map<string, Carried>, kept: Set<string>): Refusal | null => {
     if (!Array.isArray(list)) return bad('DECLARATION_INVALID', `${id}'s ${at} is a list of steps.`, at);
     for (const [i, step] of list.entries()) {
       const here = `${at}[${i}]`;
@@ -838,21 +916,32 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
             here,
           );
       }
+      /* A READ OF A NAME NOTHING KEPT YET, asked before this step's own name is added, since a step reads before it keeps.
+         AFTER THE SECRET CHECKS AT THE SAME STEP, so that a question reading a variable set from `pin` in one arm is
+         told about `pin`, which is the refusal that matters more, and `spark-vars-hidden.test.ts` holds that sentence. */
+      const unkept = unkeptIn(id, verb, step, here, kept, anywhere);
+      if (unkept) return unkept;
+      const keeps = keptBy(verb, step);
+      if (keeps !== null) kept.add(keeps);
       if (verb === 'if') {
         if (depth >= DEPTH_CEILING)
           return bad('OUT_OF_BOUNDS', `${id} nests a branch ${depth + 1} deep at ${here}, and ${DEPTH_CEILING} is the most. Lift the inner branch into its own step.`, here);
         /* AN `if` WITH NO `else` HAS AN EMPTY ONE, so what held before the branch is one of the two ways out of it. */
         const yes = new Map(carried);
         const no = new Map(carried);
-        const inner = walk(step.then, `${here}.then`, depth + 1, yes) ?? (step.else === undefined ? null : walk(step.else, `${here}.else`, depth + 1, no));
+        const keptYes = new Set(kept);
+        const keptNo = new Set(kept);
+        const inner =
+          walk(step.then, `${here}.then`, depth + 1, yes, keptYes) ?? (step.else === undefined ? null : walk(step.else, `${here}.else`, depth + 1, no, keptNo));
         if (inner) return inner;
         carried.clear();
         for (const [name, from] of [...no, ...yes]) carried.set(name, from);
+        for (const name of keptYes) if (keptNo.has(name)) kept.add(name);
       }
     }
     return null;
   };
-  const walked = walk(body.steps ?? body.then, body.steps !== undefined ? 'steps' : 'then', 0, new Map());
+  const walked = walk(body.steps ?? body.then, body.steps !== undefined ? 'steps' : 'then', 0, new Map(), new Set());
   if (walked) return walked;
 
   const ceiling = isObject(body.limits) && typeof body.limits.steps_per_run === 'number' ? body.limits.steps_per_run : STEP_CEILING;

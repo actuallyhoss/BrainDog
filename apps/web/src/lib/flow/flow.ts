@@ -1236,5 +1236,71 @@ export function faultsOf(d: Draft, { spark }: { spark: boolean } = { spark: fals
     }
   };
   walk(d.steps, 0);
+  if (pathOf(bodyOf(d)) === 'run') out.push(...unkept(d.steps));
+  return out;
+}
+
+/** A `{{vars.x}}` as `fill` reads it, spaces allowed inside the braces. `flow-lint.ts`'s `RUN_PATH`, less `trigger`. */
+const VARS_READ = /\{\{\s*vars\.([A-Za-z0-9_.]+)\s*\}\}/gu;
+
+/**
+ * Every card that reads `{{vars.x}}` where no card before it certainly kept `x`, one line each, as the record refuses it
+ * (`unkeptIn` in `packages/kernel/src/flow-lint.ts`).
+ *
+ * `varsBefore` ONLY DECIDED WHICH CHIPS TO OFFER, and so a chip already in a card outlived the name it read. Audit
+ * sixty-six, finding 7: a script step's `as:` deleted in the inspector took `job` off the chips, left `{{vars.job}}` in
+ * the `set` after it, and this list said nothing; the record installed it and the run wrote "queued as —". Now the
+ * record refuses it, and this says so first, on the card that reads the name.
+ *
+ * NOT `varsBefore`, WHICH IS STRICTER THAN THE RECORD. It drops what either arm kept, and the record keeps a name kept in
+ * both, since whichever arm ran kept it; offering fewer chips costs nothing, but a fault the record would not raise
+ * stops a person sending a body it would take. `flow-as-read.test.ts` holds this list to the lint over the same bodies.
+ *
+ * ONLY ON THE RUN PATH, as the lint asks it: the inline pass has no answers and reads no `{{vars.x}}` at all.
+ */
+function unkept(nodes: readonly Node[]): Fault[] {
+  const out: Fault[] = [];
+  const anywhere = new Set<string>();
+  const every = (list: readonly Node[]): void => {
+    for (const n of list) {
+      const name = keeps(n.step);
+      if (name) anywhere.add(name);
+      if (isBranch(n)) {
+        every(n.then ?? []);
+        every(n.else ?? []);
+      }
+    }
+  };
+  every(nodes);
+  const walk = (list: readonly Node[], kept: Set<string>): void => {
+    for (const n of list) {
+      const verb = verbOf(n.step);
+      const texts: string[] = [];
+      const collect = (v: unknown): void => {
+        if (typeof v === 'string') texts.push(v);
+        else if (Array.isArray(v)) v.forEach(collect);
+        else if (isObject(v)) Object.values(v).forEach(collect);
+      };
+      if (verb !== null) collect(n.step[verb]);
+      const name = texts.flatMap((t) => [...t.matchAll(VARS_READ)].map((m) => m[1]!.split('.')[0]!)).find((x) => !kept.has(x));
+      if (name !== undefined)
+        out.push({
+          key: n.key,
+          say: anywhere.has(name)
+            ? `"${sayStep(n.step)}" reads ${name}, and ${name} is kept only by a step that may not run before it: a later step, or one arm of an If. Keep ${name} before this step on every way to it, or take ${name} out.`
+            : `"${sayStep(n.step)}" reads ${name}, and no step keeps a value called ${name}, so the run would write a dash in its place. Name it ${name} on the step that makes it, or take ${name} out.`,
+        });
+      const own = keeps(n.step);
+      if (own) kept.add(own);
+      if (isBranch(n)) {
+        const yes = new Set(kept);
+        const no = new Set(kept);
+        walk(n.then ?? [], yes);
+        walk(n.else ?? [], no);
+        for (const x of yes) if (no.has(x)) kept.add(x);
+      }
+    }
+  };
+  walk(nodes, new Set());
   return out;
 }
