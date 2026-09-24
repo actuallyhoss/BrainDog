@@ -73,7 +73,6 @@ const ASK: Record<string, (fx: Fixture) => Record<string, unknown>[]> = {
   search: () => [{ q: 'project that goes' }],
   history: (fx) => [{ spoken: fx.onDoomed.spoken }],
   activity: () => [{ limit: 20 }],
-  money: () => [{}],
   governance: () => [{}],
   propose: () => [{ question: 'Is this a question?', body_kind: 'options', body: { options: [{ id: 'a', label: 'A', because: 'a' }, { id: 'b', label: 'B', because: 'b' }] } }],
   create: () => [{ register: 'tasks', fields: { what: 'Made to be read back', thing: 'things#1' } }],

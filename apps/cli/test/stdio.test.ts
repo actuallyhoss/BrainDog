@@ -244,7 +244,6 @@ const CALLS: Record<string, Record<string, unknown>> = {
   search: { q: 'rent' },
   history: { spoken: 'obligations#1' },
   activity: { limit: 5 },
-  money: {},
   governance: {},
   propose: {
     question: 'Keep it?',

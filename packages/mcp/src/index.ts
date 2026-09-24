@@ -1,5 +1,5 @@
 /**
- * The sixteen tools, which are the whole of what an agent sees.
+ * The fifteen tools, which are the whole of what an agent sees.
  *
  * THE COUNT IS THE DESIGN. `10-MCP` §4 puts a budget on it: the tool list is in every turn of every
  * session, so one more tool costs every conversation for ever. So the record's own vocabulary
@@ -21,13 +21,10 @@
  * their own schema and the instructions say, and `meet` listed the examples the instructions list.
  * The list measured 2,555 tokens before and 2,565 after, against a ceiling of 2,600.
  *
- * AND `money` IS THE SIXTEENTH, AND IT PAID FOR ITSELF THE SAME WAY. A money ledger arrived in
- * money-core 1.2.0 with transactions, categories, recurring items, instalments and snapshots, and
- * the thing a person asks most days, "how am I doing this month", had no verb: an agent had to know
- * the register names, write a predicate for each, and add the rows up itself, once per currency,
- * which is the one piece of arithmetic this record refuses to do by guess. It cost 91 tokens of the
- * 35 the ceiling had left, and nine descriptions gave them back by stopping saying what the
- * instructions or the schema beside them already say. The instructions are ten rules
+ * A SIXTEENTH, `money`, CAME AND WENT, AND WHAT IT PAID STAYS PAID. It arrived with the first money
+ * ledger, to answer "how am I doing this month" by reading seven figures that one pack declares, by
+ * id. It cost 91 tokens of the 35 the ceiling had left, and nine descriptions gave them back by
+ * stopping saying what the instructions or the schema beside them already say. The instructions are ten rules
  * (`loop/research-agent-path.md` §1.4) and a client shows them in the same payload as this list, so
  * `propose` carried two of them word for word ("an agent never decides" and "to change what you may
  * not"), `context` opened on the first rule's "where you are", and `handoff`'s `tried` repeated the
@@ -38,6 +35,16 @@
  * after the word cursor.
  * The list measured 2,565 before, 2,656 with the tool, and 2,565 again after.
  *
+ * IT LEFT BECAUSE IT WAS THE ONE USE CASE IN THE CORE (`loop/research-m3-dynamic.md` section 3, B6).
+ * A tool that knows one pack's figure ids is a tool that answers a record keeping its money in any
+ * other pack with "install ours", and its own refusal said exactly that. Nothing replaced it by name:
+ * a page that draws the figures is `braindog:page/<slug>`, each figure it draws is offered at
+ * `braindog:metric/<id>`, and both answer the record's whole reading, where the tool relayed eight
+ * keys of it and had to be taught `held` and `delta` one bug at a time. Two currencies with no rate
+ * between them still come back as one amount each and no sum, because that was always the kernel's
+ * doing and never the tool's (`test/money-out.test.ts`). The list measured 2,597 tokens with the
+ * tool and 2,520 without it, which leaves 80 of the ceiling free and spends none of them here.
+ *
  * AND AUTOMATIONS COST IT NOTHING (`loop/research-shell-automations.md` §5). `dry_run` went above because only a person
  * installed a rule; an agent now writes automations, so what one would do came back as `dry_run` on `propose`'s answer
  * for a rule change rather than as a tool, and the definitions, one automation with its runs, and the grammar are
@@ -45,7 +52,7 @@
  *
  * AND SO DID `script_try`, BY THE SAME ROUTE (`loop/research-shell-scripts.md` section 7). The design asked for a tool,
  * and the smallest one that says what it does, a name, a sentence and one `body` argument, measured 102 tokens by
- * `budget.test.ts`'s estimator against the 3 the ceiling had left. Nothing that size can be taken out of sixteen
+ * `budget.test.ts`'s estimator against the 3 the ceiling had left. Nothing that size could be taken out of sixteen
  * descriptions that three passes have already cut to what the schema and the instructions do not say. So a trial is
  * asked on `propose`: a script change whose body also carries `"try"` is run now and filed nowhere, and the one place
  * that says so is `braindog:grammar/script`, a resource, so the list measured 2,597 after it.
@@ -66,7 +73,7 @@
  * attempt works.
  */
 
-import { refused, type Result } from '@braindog/ports';
+import type { Result } from '@braindog/ports';
 
 import { SCRIPT_GRAMMAR } from '../grammars/script.ts';
 import { ANSWERED_GRAMMAR, AUTOMATION_GRAMMAR } from './automations.ts';
@@ -192,7 +199,7 @@ export type Tool = {
 
 const str = (description: string) => ({ type: 'string', description });
 const int = (description: string) => ({ type: 'integer', description });
-/* `required` is left out when empty: it is sixteen tools' worth of tokens that say nothing. */
+/* `required` is left out when empty: it is fifteen tools' worth of tokens that say nothing. */
 const obj = (properties: Record<string, unknown>, required: string[] = []) => ({
   type: 'object',
   properties,
@@ -278,14 +285,6 @@ export const TOOLS: readonly Tool[] = [
     description:
       'What has changed in the whole record lately, newest first: each write, the row it touched, and who made it. Read it to pick up after another session.',
     input: obj({ limit: int('1 to 200. Default 50.') }),
-    writes: false,
-  },
-  {
-    name: 'money',
-    /* ONE AMOUNT PER CURRENCY IS SAID ONCE, in the instructions, which say it about every tool
-       (`never add two currencies`). What is left here is what this tool alone is for. */
-    description: 'How money stands: cash now, what moved in 30 days, what is due in and out, and what is late each way. One amount per currency.',
-    input: obj({}),
     writes: false,
   },
   {
@@ -572,104 +571,6 @@ const teaching = (briefing: Record<string, unknown>): string[] => {
 /** The record's briefing with the teaching on it. A refusal, or an answer that is not an object, passes through. */
 const taught = (answer: Result<unknown>): Result<unknown> =>
   answer.ok && isObject(answer.value) ? { ok: true, value: { ...answer.value, teach: teaching(answer.value) } } : answer;
-
-/**
- * The money figures the `money` tool relays, in the order an answer reads in.
- *
- * EVERY ONE IS A FIGURE THE MONEY PACK ALREADY DECLARES (`packages/seed/src/modules/money.ts`), so
- * the number an agent reads here is the number the Money page draws and `metric` answers by id.
- * Adding the rows up in the tool instead would be a second engine over the same registers, and the
- * two would part company the first time a predicate moved: `spent-30d` leaves out a transfer between
- * your own accounts and a payment the bank has not settled, and a tool that summed
- * `transactions.amount` would count both.
- *
- * SEVEN, BECAUSE EACH ONE IS A READ OF THE RECORD. They are what "how am I doing this month" asks:
- * where the money is, what has moved in thirty days, what is due to move in thirty more, and what is
- * late in each direction. The pack declares twenty-five, and the other eighteen are one `metric`
- * call away by id, which is what keeps this list short enough to read in one go.
- */
-export const MONEY_FIGURES = ['cash-now', 'received-30d', 'spent-30d', 'in-30d', 'out-30d', 'late-in', 'overdue'] as const;
-
-/** A figure as the record answers it, with only what an overview reads. Structural, in the manner of `McpSurface`. */
-type Figure = {
-  value?: unknown;
-  unit?: unknown;
-  rows?: unknown;
-  held?: unknown;
-  met?: unknown;
-  delta?: unknown;
-  parts?: unknown;
-  fx?: { asOf?: unknown; forward?: unknown; missing?: unknown };
-};
-
-/**
- * One figure as an agent reads it: an amount with the currency it is in, or one amount per currency.
- *
- * THIS IS THE WHOLE ARGUMENT FOR THE TOOL OVER `list`. An agent given the rows adds them up itself,
- * and nothing in a list of rows stops it adding EGP 5,200,000 to USD 3,400.50 and reading the sum as
- * a position. The record holds that line in three places: `where/src/index.ts:1165` answers
- * `MIXED_CURRENCY` to a range with two currencies in it, `kernel/src/fx.ts` `across` hands back one
- * part per currency when no rate reaches the home currency, and `kernel/src/metrics.ts:970` refuses
- * where the amounts cannot be read one at a time at all. `fx.ts` itself emits no refusal code, which
- * is worth saying because parts are not a refusal: they are the answer, and the missing pair is the
- * repair. So this relays what the record answered and adds nothing: `parts` when the
- * record kept them apart, with `missing` naming the pair of currencies a rate would join, and
- * otherwise the one amount with its currency.
- *
- * A CONVERTED FIGURE NAMES THE DAY OF THE RATE IT USED, because "GBP 9,850" built from dollars at
- * last Tuesday's rate and the same figure at today's are different numbers, and an agent writing
- * either into a note should be able to say which. `rate_forward` is the case the kernel marks for
- * the same reason: no rate on or before the amount's day existed, so a later one stood in.
- *
- * AND A ZERO SAYS WHETHER THE LIST UNDER IT IS EMPTY. `rows` is what the predicate matched, and
- * measured over a record with two obligations on it, both paid, `{"currency":"GBP","amount":0,
- * "rows":0,"met":true}` was the answer for `overdue` there AND for `received-30d` over a ledger
- * nobody has written a line in. The first is the good news the figure exists to deliver and the
- * second is no news at all, and the two went out key for key the same. The kernel carries `held`
- * for exactly that distinction and the whitelist here dropped it, so an agent asking how money
- * stands was told its target was met on the strength of no data whatsoever. A person has a screen
- * that says "Nothing in Obligations yet"; an agent has this payload and nothing else, which makes
- * it the worse half of the same defect.
- * `list_rows` rather than `held`, because the key travels without the field note beside it, and the
- * product calls a register a list wherever a person can see one.
- */
-const figureOf = (answered: unknown): Record<string, unknown> => {
-  const read = (isObject(answered) ? answered : {}) as Figure;
-  const fx = isObject(read.fx) ? (read.fx as Figure['fx'] & object) : {};
-  const missing = Array.isArray(fx.missing) ? fx.missing : [];
-  return {
-    ...(Array.isArray(read.parts)
-      ? { parts: read.parts, ...(missing.length > 0 ? { missing } : {}) }
-      : { currency: read.unit ?? null, amount: read.value ?? null }),
-    ...(typeof read.rows === 'number' ? { rows: read.rows } : {}),
-    ...(typeof read.held === 'number' ? { list_rows: read.held } : {}),
-    ...(typeof fx.asOf === 'string' ? { rate_as_of: fx.asOf } : {}),
-    ...(fx.forward === true ? { rate_forward: true } : {}),
-    ...(typeof read.met === 'boolean' ? { met: read.met } : {}),
-    ...(typeof read.delta === 'number' ? { delta: read.delta } : {}),
-  };
-};
-
-/**
- * A record that keeps no money at all, refused by naming what would give it some.
- *
- * `METRIC_UNKNOWN` IS WHAT ALL SEVEN SAID, and this is those seven collapsed into one rather than a
- * code of the tool's own for the same fact. The sentence names the add-on because "there is no
- * metric called cash-now" is true and useless: an agent cannot install anything, and what it can do
- * is say which add-on the person is missing and carry on.
- *
- * AND IT IS THE SAME SENTENCE FOR A CALLER WHO MAY NOT READ THE MONEY REGISTERS, deliberately. The
- * record answers `METRIC_UNKNOWN` for a figure over a register outside the caller's ceiling so that a
- * probe cannot enumerate what a business keeps (`record/src/index.ts`), and a tool that told those
- * two cases apart would hand the list back one layer further out.
- */
-const NO_MONEY: Result<never> = {
-  ok: false,
-  refusal: {
-    code: 'METRIC_UNKNOWN',
-    fix: 'This record keeps no money figures. Install the money-core add-on, which declares them, or call record_index for what it does hold.',
-  },
-};
 
 const nowhere = (uri: string): Result<never> => ({
   ok: false,
@@ -1121,41 +1022,6 @@ export function tools<C>(surface: McpSurface<C>) {
          does not take is an argument a model will try to send: the second call would be refused for
          a field the first answer offered it. `limit` is the whole of the dial here. */
       return out.ok && isObject(out.value) && Array.isArray(out.value.events) ? { ok: true, value: { events: out.value.events } } : out;
-    },
-
-    /**
-     * HOW MONEY STANDS, AND NOT ONE FIGURE OF THIS TOOL'S OWN.
-     *
-     * SEVEN READS AT ONCE, BECAUSE THEY DO NOT DEPEND ON EACH OTHER. Over the command line each is a
-     * request to the host, and in the app each is a query; done one after another the tool would be
-     * as slow as its slowest seven added together for no reason.
-     *
-     * A FIGURE THIS RECORD HAS NOT GOT IS LEFT OUT AND NOT REPORTED, because a record with the pack
-     * and an older version of it is the ordinary case: `spent-30d` and `received-30d` arrived with
-     * the ledger in money-core 1.2.0, and an agent on a record from before it should read the five
-     * that are there rather than five figures and two apologies.
-     *
-     * A FIGURE THAT REFUSED FOR ANY OTHER REASON KEEPS ITS PLACE AND ITS SENTENCE, because a gap
-     * where a figure was is read as a zero. Measured on a record with sterling and dollars in it,
-     * two currencies with no rate between them are NOT a refusal: `evaluateMetric` always hands the
-     * aggregation an fx context, so the answer is one amount per currency with the pair named, which
-     * is what `money.test.ts` asserts. What can still refuse here is narrower, a `MIXED_CURRENCY` or
-     * a `LOOKUP_MISSING` from a figure whose declaration and rows have parted company, and that is
-     * a sentence somebody has to see in order to fix.
-     */
-    money: async (_args, ctx) => {
-      const read = await Promise.all(MONEY_FIGURES.map(async (id) => [id, await surface.metric({ metric: id }, ctx)] as const));
-      /* NOTHING ANSWERED IS EITHER NO MONEY PACK OR ONE REFUSAL SAID SEVEN TIMES, such as a caller
-         outside the read ceiling. The record's own sentence goes back where there is one, because
-         "install the money-core add-on" to somebody who cannot read what is already installed is an
-         instruction that cannot work. */
-      if (!read.some(([, got]) => got.ok)) return read.find(([, got]) => refused(got) && got.refusal.code !== 'METRIC_UNKNOWN')?.[1] ?? NO_MONEY;
-      const figures: Record<string, unknown> = {};
-      for (const [id, got] of read) {
-        if (got.ok) figures[id] = figureOf(got.value);
-        else if (refused(got) && got.refusal.code !== 'METRIC_UNKNOWN') figures[id] = { refusal: got.refusal };
-      }
-      return { ok: true, value: { figures } };
     },
 
     /**

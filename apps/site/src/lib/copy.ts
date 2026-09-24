@@ -94,7 +94,7 @@ export const site = {
       title: 'For agents and services · BrainDog',
       description:
         'What an agent reaches over MCP, what a project reports with a key of its own, and the ' +
-        'limits on both. Sixteen tools, ten of which only read.',
+        'limits on both. Fifteen tools, nine of which only read.',
     },
     notFound: {
       title: 'Page not found · BrainDog',
@@ -1115,11 +1115,12 @@ export const site = {
 
     mcp: {
       tag: 'Over MCP',
-      /* `packages/mcp/src/index.ts`: `TOOLS` holds sixteen entries, ten carrying `writes: false`. */
-      title: 'Sixteen tools, and ten of them only read.',
+      /* `packages/mcp/src/index.ts`: `TOOLS` holds fifteen entries, nine carrying `writes: false`. It held sixteen until
+         the `money` tool left the core (B6), since one pack's figures are an address like every other pack's. */
+      title: 'Fifteen tools, and nine of them only read.',
       lead: 'An agent reads the record the way a person does, and what it writes lands as an event carrying its name. Nothing here is a separate copy of your data.',
       readsTitle: 'Read',
-      reads: ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'money', 'governance'],
+      reads: ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance'],
       writesTitle: 'Write',
       writes: ['propose', 'create', 'update', 'log', 'handoff', 'meet'],
       /* `TEMPLATES` in the same file: six `uriTemplate` entries. This said five and named `RESOURCES`,

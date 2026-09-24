@@ -10,7 +10,7 @@
  *
  * SO EVERY TOOL IS CALLED, THROUGH THE SAME `handle` STDIO SERVES, over a real record. The table is
  * exhaustive against `TOOLS` on purpose: a tool added without a case here is red, which is the only
- * way a list of sixteen stays true. What is asserted is narrow and is the whole of the claim: the
+ * way a list of fifteen stays true. What is asserted is narrow and is the whole of the claim: the
  * name reached a method, so the answer is not `ROUTE_UNKNOWN` and not `NOT_IN_THIS_BUILD`. Whether
  * each tool then does what it says is `mcp.test.ts`.
  *
@@ -65,7 +65,6 @@ const CALLS: Record<string, Record<string, unknown>> = {
   search: { q: 'invoice' },
   history: { spoken: 'obligations#1' },
   activity: { limit: 5 },
-  money: {},
   governance: {},
   propose: {
     question: 'Keep it?',
@@ -128,8 +127,7 @@ const narrowOver = (api: Awaited<ReturnType<typeof record>>['api']): McpSurface<
 
 test('AND A SURFACE WITH NOTHING OPTIONAL ON IT DARKENS FOUR OF THEM, which is the list a transport has to route', async () => {
   /* THE COMMAND LINE BUILDS ITS SURFACE FROM A FIXED LIST (`apps/cli/src/surface.ts`), and a name
-     missing from it is a tool that refuses for ever. `money` is not among them: it reads `metric`,
-     which every surface has, which is why it needed no name added anywhere to work over stdio. */
+     missing from it is a tool that refuses for ever. */
   const { sql, api } = await record();
   const narrow = narrowOver(api);
 
@@ -183,7 +181,7 @@ test('THE SURVEY WAS RIGHT ABOUT BOTH: credentials is not a tool, and skill is a
   sql.close();
 });
 
-test('AND THE REFUSAL FOR A NAME THAT IS NOT A TOOL LISTS THE SIXTEEN, so the second attempt works', async () => {
+test('AND THE REFUSAL FOR A NAME THAT IS NOT A TOOL LISTS THE FIFTEEN, so the second attempt works', async () => {
   const { sql, api } = await record();
   const reply = (await handle({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'money_overview', arguments: {} } }, api, owner)) as Reply;
   assert.ok('result' in reply);
