@@ -75,7 +75,7 @@ export type Door = {
    * OPTIONAL BECAUSE A DOOR WITHOUT IT STILL WORKS. The pack is then proposed unchecked, and a record that cannot take
    * it answers with its own refusal, which lands under "Refused by the record" like any other.
    */
-  packs?: () => Promise<Result<{ id: string; version: string | null }[]>>;
+  packs?: () => Promise<Result<{ id: string; version: string | null; disabled_at?: string | null }[]>>;
 };
 
 /**
@@ -702,11 +702,22 @@ export async function applyPlan(
     registers = registers.filter((r) => !absent.includes(r));
   }
   /* A ROW WITH ANOTHER SHAPE FOR A RECORD THAT DECLARES MORE (`PlannedRow.ifDeclared`): a project brief lands in the
-     project brief pack's own fields where the record has them, and as note prose where it does not (`packs/project-brief`). */
+     project brief pack's own fields where the record has them, and as note prose where it does not (`packs/project-brief`).
+     WHERE THE ROW NAMES THE PACK, THE PACK IS ASKED FOR TOO, because its fields stay declared after it is uninstalled
+     and nothing draws them then (`ifDeclared.pack`). Off counts as not held: its pages are gone as well. A door that
+     cannot answer, answers with a refusal, or answers something other than a list leaves the fields alone to decide, as
+     they did before: the stub host in `test/import.test.ts` answers `{}` to every route it does not know, and reading
+     that as a list threw and ended three runs. */
+  let on: Set<string> | null = null;
+  if (door.packs && plan.rows.some((r) => r.ifDeclared?.pack !== undefined)) {
+    const got = await door.packs();
+    if (!got.ok && unreachable(got)) throw new Unreachable();
+    if (got.ok && Array.isArray(got.value)) on = new Set(got.value.filter((p) => isObj(p) && typeof p.id === 'string' && !p.disabled_at).map((p) => p.id));
+  }
   plan = {
     ...plan,
     rows: plan.rows.map((r) =>
-      r.ifDeclared !== undefined && r.ifDeclared.needs.every((f) => declared.get(r.register)?.has(f))
+      r.ifDeclared !== undefined && (r.ifDeclared.pack === undefined || on === null || on.has(r.ifDeclared.pack)) && r.ifDeclared.needs.every((f) => declared.get(r.register)?.has(f))
         ? (({ lacking: _dropped, ...rest }) => ({ ...rest, fields: { ...r.fields, ...r.ifDeclared!.fields }, ...(r.ifDeclared!.lacking === undefined ? {} : { lacking: r.ifDeclared!.lacking }) }))(r)
         : r,
     ),
@@ -1239,7 +1250,7 @@ export async function applyPlan(
       /* A ROW DATED OUTSIDE THE DAYS THE EXPORT SPOKE ABOUT IS NOT ONE IT DROPPED (`Retire.inside`): an opening balance
          older than a windowed ledger answer was voided here, and so was a row only a newer export carried when an
          older one was imported after it (`test/import-ledger-window.test.ts`). A row with no day is outside too. */
-      if (r.inside) {
+      if (r.inside && !(r.spoken ?? []).some((p) => key.startsWith(p))) {
         const day = at.fields[r.inside.field];
         if (typeof day !== 'string' || day.slice(0, 10) <= r.inside.after || day.slice(0, 10) >= r.inside.before) continue;
       }
