@@ -28,17 +28,16 @@
   import type { Shell } from '$lib/record/boot-live.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
-  import {
-    AUTH_METHODS, DEPLOYMENT, DEVICES, NOW, PACKS, PAGES, PASSKEYS, PEOPLE_ACCESS,
-    REGISTERS, SIGNING_KEY, SNAPSHOTS, SNAPSHOTS_KEPT, SOURCES, TOKENS, pages,
-  } from '$lib/record/api.ts';
+  /* THE DECLARATION CACHE AND THE PAGE READER, AND NOTHING ELSE OF THE SAMPLE'S. `REGISTERS` is what `learn` fills from
+     a live record (`research-no-sample.md` 1d) and `pages` reads it; both move out of `api.ts` in wave B. */
+  import { REGISTERS, pages } from '$lib/record/api.ts';
   import { LEVELS, type Level, type Person } from '$lib/record/schema.ts';
   /* WHETHER THE PERSON READING THIS MAY USE WHAT IS ON IT, which nothing here asked. `../levels.ts`
      carries what was measured: seven colleagues, every area, the owner's controls in all of them. */
   import { ownsRecord, words as levelWords } from '../levels.ts';
   import {
-    CODE_DIGITS, LABEL_MAX, TOKEN_DAYS, connectLines, noRecord, reachKey, revocable, sampleMachines,
-    reportKeyOf, sampleTokens, standing, type Answer, type DeviceRow, type TokenRow,
+    CODE_DIGITS, LABEL_MAX, TOKEN_DAYS, connectLines, reachKey, revocable,
+    reportKeyOf, standing, type Answer, type DeviceRow, type TokenRow,
   } from '$lib/record/device.ts';
   /* THE APPROVAL `/vault` SENDS TOO, from one module, so the two screens cannot drift apart. */
   import { answerLine as lineOf, approve, planOf, reprove, revoke, words as vaultWords, type Plan } from '$lib/record/vault.ts';
@@ -46,7 +45,7 @@
   /* THE FORWARDING ADDRESS, which the Worker minted and nothing in this app asked for. See the Ingest area. */
   import { mailUrl, mintInbound, revokeInbound, words as mailWords, type Said as MailSaid } from '$lib/record/inbound-write.ts';
   /* AND WHETHER THE HOST ANSWERING HAS THAT DOOR AT ALL, which is the question the two buttons were
-     drawn without asking. `inbound-door.ts` says why it is a request and not `DEPLOYMENT.kind`. */
+     drawn without asking. `inbound-door.ts` says why it is a request and not the build's variant. */
   import { mintsMail } from '$lib/record/inbound-door.ts';
   /* THE WRITES THIS SCREEN MAKES, and the one reading of what the record answered to each. */
   import {
@@ -80,9 +79,8 @@
    * what the record is called, on every record. So on a live record it said the sample's level
    * beside your address, counted the sample's records under "Records you can open", decided whose
    * row was yours in People by a sample id, and asked somebody to type the SAMPLE's slug to delete
-   * a record that is not it. The layout already asked `boot` once and kept the answer: it is the
-   * record's on a record and the sample's where there is none, which is exactly the one source
-   * every other screen reads.
+   * a record that is not it. The layout already asked `boot` once and kept the answer, which is
+   * exactly the one source every other screen reads.
    */
   const shell = $derived(page.data as unknown as Shell);
   const RECORD = $derived(shell.index.name);
@@ -100,10 +98,6 @@
    * ONE DERIVED AND NOT A CHECK PER CONTROL. `loop/research-second-person.md` finding 7: "It is one
    * predicate on `AREAS` and one per section … rather than eleven times." The predicate itself is in
    * `../levels.ts` with what it costs, and `levels.test.ts` holds this file to it.
-   *
-   * THE SAMPLE IS UNTOUCHED, and that is deliberate rather than lucky: `api.ts` gives the demo's `me`
-   * `level: 'owner'` and `owner: true`, so every screenshot, gate and demo visit draws exactly what
-   * it drew before.
    */
   const anOwner = $derived(ownsRecord(me));
 
@@ -124,18 +118,22 @@
   /* The slug, typed to confirm (`02 §9`); the button is disabled until it matches. */
   let typedSlug = $state('');
 
-  /* ── agents: the live record's machines and tokens, or the sample's where there is no record ── */
+  /* ── agents: the record's machines and tokens ── */
 
   /**
-   * WHERE THIS AREA'S ROWS CAME FROM. `sample` is a host with no record behind it, the public demo,
-   * where nothing can be approved; `refused` is a record that answered no, and its sentence is shown.
+   * WHERE THIS AREA'S ROWS CAME FROM. `refused` is a host that answered no, and its sentence is shown.
+   *
+   * THERE WAS A `sample` STATE, for a host with no record behind it, which drew machines and tokens
+   * out of `data.ts` that nobody had connected and dated them by the sample's `NOW`. With no sample
+   * (DIRECTION 26) a signed-out or unreached host is a refusal like any other, in the client's words.
    */
-  let agentsFrom = $state<'reading' | 'live' | 'sample' | 'refused'>('reading');
+  let agentsFrom = $state<'reading' | 'live' | 'refused'>('reading');
   let agentsRefusal = $state('');
   let machines = $state<DeviceRow[]>([]);
   let tokens = $state<TokenRow[]>([]);
   let agentClient: ReturnType<typeof createClient> | null = null;
-  const agentsNow = () => (agentsFrom === 'sample' ? NOW : Date.now());
+  /* WHAT A PRESS SAYS WHEN THERE IS NO RECORD TO SEND IT TO: the host's refusal, or, before one arrives, that it was not reached. */
+  const agentsCannot = () => agentsRefusal || copy.recordNotReached;
 
   let typed = $state('');
   let approving = $state(false);
@@ -170,15 +168,8 @@
     agentClient ??= createClient({ base: apiBase() });
     const listed = await agentClient.listDevices();
     if (!listed.ok) {
-      const refusal = 'refusal' in listed ? listed.refusal : { code: 'VERSION_STALE', fix: '' };
-      if (noRecord(refusal.code)) {
-        machines = sampleMachines(DEVICES);
-        tokens = sampleTokens(TOKENS);
-        agentsFrom = 'sample';
-      } else {
-        agentsRefusal = refusal.fix;
-        agentsFrom = 'refused';
-      }
+      agentsRefusal = 'refusal' in listed ? listed.refusal.fix : copy.writeRaced;
+      agentsFrom = 'refused';
       closed(true, at);
       return;
     }
@@ -200,7 +191,7 @@
     if (approving) return;
     approving = true;
     const at = opened();
-    answer = await approve(typed, agentsFrom === 'sample' ? null : agentClient);
+    answer = await approve(typed, agentClient);
     closed(true, at);
     approving = false;
     /* THE CODE STAYS IN THE FIELD ON A REFUSAL: six digits with one wrong is a thing to correct. */
@@ -226,7 +217,7 @@
 
   async function revokeMachine(row: DeviceRow) {
     if (agentsFrom !== 'live' || !agentClient) {
-      toasts.push(copy.notOnDemo, { intent: 'warn' });
+      toasts.push(agentsCannot(), { intent: 'warn' });
       return;
     }
     const at = opened();
@@ -238,7 +229,7 @@
 
   async function revokeTokenRow(row: TokenRow) {
     if (agentsFrom !== 'live' || !agentClient) {
-      toasts.push(copy.notOnDemo, { intent: 'warn' });
+      toasts.push(agentsCannot(), { intent: 'warn' });
       return;
     }
     const at = opened();
@@ -257,7 +248,7 @@
     const label = mintLabel.trim().slice(0, LABEL_MAX);
     if (!label || minting) return;
     if (agentsFrom !== 'live' || !agentClient) {
-      mintRefusal = copy.notOnDemo;
+      mintRefusal = agentsCannot();
       return;
     }
     minting = true;
@@ -332,7 +323,7 @@
     } else offerSaid = out.fix;
   }
 
-  /* THE LOGIN LINE NAMES THIS RECORD, which the Cloud device flow needs; the sample names none, because it has no host. */
+  /* THE LOGIN LINE NAMES THIS RECORD, which the Cloud device flow needs; a shell with no record names none. */
   const lines = $derived(connectLines(origin, shell.live ? SLUG : null));
 
   /* ── ingest: where this record takes forwarded mail ────────────────────── */
@@ -361,10 +352,10 @@
    * fresh record cannot honour: on a self-host both presses answered 404 `ROUTE_UNKNOWN`, the good
    * sentence about `inbound.token` arrived only after the press, and a reload put both buttons back.
    *
-   * IT IS NOT `DEPLOYMENT.kind`, WHICH WOULD HAVE TAKEN THE FEATURE OFF THE CLOUD. That constant
-   * follows `__BRAINDOG_VARIANT__`, substituted at build time and empty in every shipped bundle, so
-   * it reads `self-host` on the Cloud build too: it says which RECORD this build shows and knows
-   * nothing about which host answered. `mintsMail` asks the door instead.
+   * IT IS NOT THE SAMPLE'S `DEPLOYMENT.kind`, WHICH WOULD HAVE TAKEN THE FEATURE OFF THE CLOUD. That
+   * constant followed `__BRAINDOG_VARIANT__`, substituted at build time and empty in every shipped
+   * bundle, so it read `self-host` on the Cloud build too: it said which record the build drew and
+   * knew nothing about which host answered. `mintsMail` asks the door instead.
    *
    * AND THE ANSWER IS KEPT FOR AS LONG AS THIS SCREEN IS, because it is a fact about the host rather
    * than about the record: the `area !== 'ingest'` arm above empties `mailSaid` and leaves this
@@ -422,9 +413,9 @@
   /**
    * AND BILLING ASKS THE SAME DOOR, because it is the one answer only a self-host gives.
    *
-   * `billing.ts` says why: `boot` carries no host, and a live Cloud record was told it ran on the
-   * reader's own machine. Only a live record is asked; the sample's sentence is the build's, and
-   * the build is right about the sample. `untrack` for the reason the ingest effect above gives.
+   * `billing.ts` says why: a host older than `boot`'s `host` names none, and a live Cloud record was
+   * told it ran on the reader's own machine. Only a live record is asked, because a shell with no
+   * record has no door to ask. `untrack` for the reason the ingest effect above gives.
    */
   $effect(() => {
     if (area !== 'billing' || !shell.live) return;
@@ -444,8 +435,9 @@
   /**
    * The line under the two buttons, and the tone it carries.
    *
-   * EVERY ARM IS A SENTENCE. `sample` is the demo, which has no account to mint on, and the rest is
-   * the door's own `fix` rendered verbatim (`13 §6`).
+   * EVERY ARM IS A SENTENCE, and the rest is the door's own `fix` rendered verbatim (`13 §6`). The
+   * `sample` arm said the demo had no account to mint on; a host with no record behind it is
+   * `refused` now, with `recordNotReached`, and draws that like any other refusal.
    *
    * `unrouted` IS NOT AN ARM HERE ANY MORE, AND THAT IS THE POINT OF FINDING 16. A host whose
    * forwarding address is a file rather than a door has not refused a press; it has answered the
@@ -460,9 +452,7 @@
         ? mailWords.lost
         : mailSaid.kind === 'revoked'
           ? mailWords.revoked
-          : mailSaid.kind === 'sample'
-            ? copy.notOnDemo
-            : mailSaid.fix,
+          : mailSaid.fix,
   );
   const mailTone = $derived(mailSaid === null || mailSaid.kind === 'minted' || mailSaid.kind === 'revoked' ? undefined : 'bad');
 
@@ -590,27 +580,6 @@
    * a sentence a reader can see is wrong, which is the failure that produced it.
    */
   const KEEPS = new Set(['appearance', 'keyboard', 'navigation']);
-
-  /**
-   * THE AREAS WITH NOTHING TO CHANGE, and the notice at the foot of this page is not about them.
-   *
-   * "Nothing you do here is saved yet." rendered on all twelve, three of which offer nothing to do.
-   * `notifications` is four stated facts and two hints and `copy.muteAtSource` says out loud that
-   * nothing there mutes one of them. Its one switch, Web Push for this device, is kept by the
-   * browser and the record the moment it is pressed, so the notice would be false there too;
-   * `billing` is one sentence and a link to Export; `identity` reports
-   * who you are and which records you hold, and `33 §10` is why it cannot do more than report:
-   * login is account-level, so identity lives outside the record.
-   *
-   * A DISCLAIMER ON A SCREEN WITH NO CONTROL IS NOT CAUTIOUS, IT IS NOISE. It teaches a reader to
-   * skip the sentence on the nine screens where it is the difference between a mock and a promise,
-   * which is the same failure `06 §1` names about a warning that does not apply.
-   *
-   * A LIST AND NOT A PREDICATE, for the reason `KEEPS` above gives: there is nothing on an area
-   * object to ask, and the join between an area and what it draws lives in this file's markup and
-   * nowhere else. The day one of these three grows a control, this is the line that changes.
-   */
-  const REPORTS = new Set(['identity', 'notifications', 'billing']);
 
   let rail = $state<HTMLElement | undefined>(undefined);
 
@@ -765,16 +734,13 @@
   const levelSaid = (level: string | null) => (level === null ? copy.noRecordLevel : (LEVEL_SAID[level] ?? level));
 
   /**
-   * WHAT `invite({ person, levels, why })` WOULD WRITE, said in the words it would write it in.
+   * One level change, sent as `invite({ person, levels, why })`.
    *
    * `45 §5.6`: one method does all three. It reads the old rows, deletes every `member` row for the
    * person, re-inserts from `levels`, and appends an `access.grant` per register raised or added and
    * an `access.revoke` per register lowered or removed — each carrying `why` as its note. So
    * invitation, level change and removal are not three operations with three confirmations; they are
    * one call, and `levels: []` is the removal.
-   *
-   * THE MOCK SAYS THE SENTENCE THAT WOULD BE WRITTEN rather than "saved". A toast reading "Saved"
-   * over a call that also revokes eleven registers is the shape of thing somebody trusts once.
    */
   const levelChange = (who: Person, to: Level | null) => {
     /**
@@ -790,48 +756,31 @@
      * Pressing the level somebody already holds changes nothing, so nothing is what it says.
      */
     if (to === who.level) return;
-    if (peopleFrom === 'live') {
-      void settle(() => moveLevel(apiBase(), who, to), copy.levelMoved(who.name, levelSaid(to)));
-      return;
-    }
-    /**
-     * THE DIRECTION IS THE EVENT'S, AND IT IS NO LONGER THE SENTENCE'S.
-     *
-     * This line ended `with one access.grant per list` or `with one access.revoke per list`,
-     * chosen by comparing the two levels' places in `LEVELS`, with `null` held at `-1` so that
-     * taking the record level away read as a revoke rather than as a grant — which it does: it is
-     * `access.revoke` on `'*'`, and it leaves whatever exceptions they hold.
-     *
-     * All of that is still true of what the record would write, and none of it belonged in the
-     * toast. Those are two of `30 §2`'s closed forty kinds, read out to somebody deciding what a
-     * colleague may see, and the half of the sentence naming where the level moves FROM and TO has
-     * already said which way it goes. What the second half is for is how much would happen, and
-     * that is one per list in either direction. The kinds are untouched in the log and the API.
-     */
-    cannotWrite(copy.levelWouldMove(who.name, levelSaid(who.level), levelSaid(to)));
+    if (peopleFrom === 'live') void settle(() => moveLevel(apiBase(), who, to), copy.levelMoved(who.name, levelSaid(to)));
+    else cannotWrite();
   };
 
   /* A RECORD KEEPS AT LEAST ONE OWNER — `LEVEL_REQUIRED`, and its fix sentence verbatim (45 §5.6).
      The check is here rather than in the control because it is a fact about the whole list. */
   /**
-   * THE PEOPLE AREA'S ROWS: the record's members, or the sample's where there is no record.
+   * THE PEOPLE AREA'S ROWS: the record's members, and nobody else's.
    *
    * `reading` draws no list, so a live record never flashes somebody else's colleagues. A record that says no, or a
-   * host with no such read, draws its sentence in place of the list.
+   * host with no such read, draws its sentence in place of the list. There was a `sample` state that drew
+   * `PEOPLE_ACCESS`, four colleagues nobody invited, where no record answered; that answer is a refusal now.
    */
-  let people = $state<Person[]>([...PEOPLE_ACCESS]);
-  let peopleFrom = $state<'reading' | 'live' | 'sample' | 'unrouted' | 'refused'>('reading');
+  let people = $state<Person[]>([]);
+  let peopleFrom = $state<'reading' | 'live' | 'unrouted' | 'refused'>('reading');
   let peopleRefusal = $state('');
   let peopleBusy = $state(false);
-  const peopleNow = () => (peopleFrom === 'live' ? Date.now() : NOW);
 
-  /* ON A RECORD EVERY OWNER COUNTS: `members` has no acceptance date, so `since` says nothing there. */
-  const owners = $derived(people.filter((p) => p.level === 'owner' && (peopleFrom === 'live' || p.since)).length);
+  /* EVERY OWNER COUNTS: `members` has no acceptance date, so an invitation still out is not a row here to discount. */
+  const owners = $derived(people.filter((p) => p.level === 'owner').length);
   const lastOwner = (who: Person) => who.level === 'owner' && owners <= 1;
 
   /* IDENTITY READS THE SAME LIST, because it draws a person too: the address it prints beside
-     "Signed in as" is a fact about a member of this record, and it was being read out of the
-     sample while the record sat one call away. */
+     "Signed in as" is a fact about a member of this record, and it was being read out of a
+     fixture while the record sat one call away. */
   $effect(() => {
     if (area !== 'people' && area !== 'identity') return;
     untrack(() => void readPeopleNow());
@@ -840,9 +789,7 @@
   async function readPeopleNow() {
     const at = opened();
     const out = await readPeople(apiBase());
-    if (out.from === 'live') people = out.people;
-    else if (out.from === 'sample') people = [...PEOPLE_ACCESS];
-    else people = [];
+    people = out.from === 'live' ? out.people : [];
     peopleRefusal = out.from === 'refused' ? out.fix : out.from === 'unrouted' ? copy.peopleUnrouted : '';
     peopleFrom = out.from;
     closed(true, at);
@@ -859,12 +806,13 @@
    * are not the owner. Measured as a `read` colleague on a self-host, on the form under a section
    * already drawing the record's refusal four inches above.
    *
-   * `sample` IS THE ONLY ARM THAT MAY SAY "YET". It is the public demo, where there is no record and
-   * nothing anybody presses is saved. Every other arm is a record that answered, so the record's own
-   * sentence is what is said (`13 §6`), and `readPeople` has already put it in `peopleRefusal`.
+   * AND NOW THERE IS ONE CASE. The sample was the only arm allowed to say "yet", and it took a
+   * sentence saying what each press would have done; there is no sample now (DIRECTION 26), so every
+   * press that cannot be sent is a host that answered no. What is said is its own sentence (`13 §6`),
+   * which `readPeople` has already put in `peopleRefusal`, or that the record was not reached.
    */
-  function cannotWrite(would: string): void {
-    toasts.push(peopleFrom === 'sample' ? copy.notWritten(would) : peopleRefusal || copy.recordNotReached, { intent: 'warn' });
+  function cannotWrite(): void {
+    toasts.push(peopleRefusal || copy.recordNotReached, { intent: 'warn' });
   }
 
   /**
@@ -883,7 +831,7 @@
     return out.ok;
   }
 
-  /* THE LISTS AN EXCEPTION CAN BE ON: the shell's, which are the record's on a record and the sample's otherwise. */
+  /* THE LISTS AN EXCEPTION CAN BE ON: the shell's, which are the record's. `REGISTERS` is the declaration cache, until wave B. */
   const lists = $derived(
     ((page.data as { lists?: readonly { id: string; name: string }[] }).lists ??
       Object.entries(REGISTERS).map(([id, r]) => ({ id, name: r.name }))),
@@ -911,7 +859,7 @@
 
   function startException(p: Person) {
     if (peopleFrom !== 'live') {
-      cannotWrite(copy.exceptionWouldBeAdded(p.name));
+      cannotWrite();
       return;
     }
     picking = p.id;
@@ -928,13 +876,13 @@
   }
 
   function takeAway(p: Person) {
-    if (peopleFrom !== 'live') cannotWrite(copy.accessWouldGo(p.name));
+    if (peopleFrom !== 'live') cannotWrite();
     else void settle(() => removeAccess(apiBase(), p), copy.accessRemoved(p.name));
   }
 
   function backToLevel(p: Person, register: string) {
     const list = REGISTERS[register]?.name ?? lists.find((l) => l.id === register)?.name ?? register;
-    if (peopleFrom !== 'live') cannotWrite(copy.exceptionWouldGo(list, levelSaid(p.level)));
+    if (peopleFrom !== 'live') cannotWrite();
     else void settle(() => dropException(apiBase(), p, register), copy.exceptionRemoved(list, levelSaid(p.level)));
   }
 
@@ -956,7 +904,7 @@
     untrack(() => void readInvitesNow());
   });
 
-  /** Every invitation still waiting. A host older than invitations, or one with no record, lists none. */
+  /** Every invitation still waiting. A host older than invitations, or one that refused, lists none. */
   async function readInvitesNow() {
     const out = await readInvites(apiBase());
     waitingInvites = out.from === 'live' ? out.invites : [];
@@ -968,7 +916,7 @@
     const email = inviteTo.trim();
     if (!email || inviting) return;
     if (peopleFrom !== 'live') {
-      cannotWrite('A single-use link would be made, bound to that one address and good for 24 hours');
+      cannotWrite();
       return;
     }
     inviting = true;
@@ -993,7 +941,7 @@
   /** Withdraw one. Its link stops working at once, and the list is read again. */
   async function withdraw(inv: Invitation) {
     if (peopleFrom !== 'live') {
-      cannotWrite(copy.inviteWithdrawn(inv.email));
+      cannotWrite();
       return;
     }
     const done = await settle(() => withdrawInvite(apiBase(), inv.id), copy.inviteWithdrawn(inv.email));
@@ -1003,8 +951,8 @@
   /* ── export: the record as a file, where there is a record to take it from ── */
   let exporting = $state<ExportKind | null>(null);
 
-  /** The sample keeps the sentence it always said; a record hands the browser a `.brainl` file. */
-  async function takeCopy(kind: ExportKind, sampleSaid: string) {
+  /** A record hands the browser a `.brainl` file, and a host that refuses says why in its own words. */
+  async function takeCopy(kind: ExportKind) {
     if (exporting) return;
     exporting = kind;
     const at = opened();
@@ -1012,8 +960,7 @@
     closed(true, at);
     exporting = null;
     if (!out.ok) {
-      if (out.from === 'sample') toasts.push(copy.notWritten(sampleSaid));
-      else toasts.push(out.fix, { intent: 'warn' });
+      toasts.push(out.fix, { intent: 'warn' });
       return;
     }
     const url = URL.createObjectURL(new Blob([out.value.text], { type: 'application/x-ndjson' }));
@@ -1051,10 +998,13 @@
     }
   }
 
-  /* ── backups, erasure and deletion: the live record's answer, and the sample's toast where there is no record ── */
+  /* ── backups, erasure and deletion: the record's answer, or the host's refusal ── */
 
-  /** Where the backups list came from. `refused` is a host that keeps no copies, and its sentence is drawn instead. */
-  let copiesFrom = $state<'reading' | 'live' | 'sample' | 'refused'>('reading');
+  /**
+   * Where the backups list came from. `refused` is a host that keeps no copies, or no record at all, and its sentence
+   * is drawn instead. There was a `sample` state here too, which drew `SNAPSHOTS`, thirty nights nobody backed up.
+   */
+  let copiesFrom = $state<'reading' | 'live' | 'refused'>('reading');
   let copiesSaid = $state('');
   let liveCopies = $state<KeptCopy[]>([]);
   let backingUp = $state(false);
@@ -1065,11 +1015,17 @@
   let deletedSaid = $state('');
 
   type CopyLine = { id: string; at: string; bytes: number; rows: number | null; failed: string | null };
-  /* A LIVE RECORD IS NEVER DRAWN THE SAMPLE'S COPIES: a host that keeps none shows its sentence over an empty list. */
-  const copyLines = $derived<CopyLine[]>(
-    copiesFrom === 'live' ? liveCopies.map((c) => ({ ...c, rows: null, failed: null })) : copiesFrom === 'refused' ? [] : SNAPSHOTS,
-  );
-  const copiesNow = () => (copiesFrom === 'live' ? Date.now() : NOW);
+  /* A RECORD IS DRAWN ITS OWN COPIES OR NONE: a host that keeps none shows its sentence over an empty list. */
+  const copyLines = $derived<CopyLine[]>(copiesFrom === 'live' ? liveCopies.map((c) => ({ ...c, rows: null, failed: null })) : []);
+  /**
+   * HOW MANY NIGHTS A HOST KEEPS, which the answer to `snapshots` does not say.
+   *
+   * IT WAS `SNAPSHOTS_KEPT` FROM `data.ts`, the sample's constant. The number is the hosts' own:
+   * `apps/selfhost/src/snapshots.ts` and `apps/worker/src/snapshots.ts` each export `KEEP = 30`,
+   * and neither is a package this app may import. So it is written once here, beside the one
+   * sentence that says it, and it is the line to change the day either host keeps a different number.
+   */
+  const KEPT_NIGHTS = 30;
 
   /* A COPY IS NAMED BY ITS DAY, AND A DAY READS AS THE REST OF THE PRODUCT WRITES ONE: `3 Sep 2026`,
      not `2026-09-03` (DESIGN-SYSTEM APPENDIX C14). An id that is not a day is shown as it is. */
@@ -1106,9 +1062,7 @@
     if (out.ok) {
       toasts.push(copy.backedUp(out.value.id), { intent: 'good' });
       await readCopies();
-    } else if (out.from === 'sample')
-      toasts.push(copy.notWritten('A backup of the whole record would be written now, and counted against the thirty'), { intent: 'warn' });
-    else toasts.push(out.fix, { intent: 'warn' });
+    } else toasts.push(out.fix, { intent: 'warn' });
   }
 
   async function downloadCopy(id: string) {
@@ -1116,8 +1070,7 @@
     const out = await downloadSnapshot(apiBase(), id);
     closed(true, at);
     if (!out.ok) {
-      if (out.from === 'sample') toasts.push(copy.notWritten(`${id} would be downloaded exactly as it sits on disk, signed`), { intent: 'warn' });
-      else toasts.push(out.fix, { intent: 'warn' });
+      toasts.push(out.fix, { intent: 'warn' });
       return;
     }
     const url = URL.createObjectURL(out.value.blob);
@@ -1144,29 +1097,15 @@
     } else toasts.push(out.fix, { intent: 'warn' });
   }
 
-  /** Cloud's "restore to a time": the sample's toast, or the record's own answer, which on Cloud today says it cannot yet. */
-  async function restoreToTime() {
-    const at = opened();
-    const out = await restoreSnapshot(apiBase(), '');
-    closed(true, at);
-    if (out.ok) await readCopies();
-    else if (out.from === 'sample')
-      toasts.push(
-        copy.notWritten('A time would be picked, and the record put back to it, with every write after it gone, and the history ends there, with one line saying you went back'),
-        { intent: 'warn' },
-      );
-    else toasts.push(out.fix, { intent: 'warn' });
-  }
-
   let eraseOpen = $state(false);
   let eraseWho = $state('');
   let eraseBasis = $state('');
   let erasePersonId = $state('');
   let eraseBusy = $state(false);
 
-  /* THE FORM OPENS ONLY ON A RECORD. The sample keeps the sentence it always said. */
+  /* THE FORM OPENS ONLY ON A RECORD THAT ANSWERED WITH ITS PEOPLE; anywhere else the press says why it cannot. */
   function startErase() {
-    if (peopleFrom !== 'live') cannotWrite('Erasing asks which person, and on what basis, before anything is removed');
+    if (peopleFrom !== 'live') cannotWrite();
     else eraseOpen = true;
   }
 
@@ -1185,8 +1124,7 @@
       eraseBasis = '';
       erasePersonId = '';
       await readPeopleNow();
-    } else if (out.from === 'sample') toasts.push(copy.notWritten('Erasing asks which person, and on what basis, before anything is removed'), { intent: 'warn' });
-    else toasts.push(out.fix, { intent: 'warn' });
+    } else toasts.push(out.fix, { intent: 'warn' });
   }
 
   async function deleteNow() {
@@ -1199,9 +1137,7 @@
     if (out.ok) {
       deletedSaid = copy.recordDeleted(RECORD);
       toasts.push(deletedSaid, { intent: 'good' });
-    } else if (out.from === 'sample')
-      toasts.push(copy.notWritten(`You would be asked to sign in again, and then ${RECORD} and every copy of it would be gone`), { intent: 'warn' });
-    else toasts.push(out.fix, { intent: 'warn' });
+    } else toasts.push(out.fix, { intent: 'warn' });
   }
 
   /**
@@ -1239,18 +1175,17 @@
   /**
    * The signed-in person's own row, which is where their name and address live.
    *
-   * FROM WHICHEVER LIST WAS DRAWN, AND NEVER THE SAMPLE'S OVER A LIVE RECORD. It read
-   * `PEOPLE_ACCESS` directly, so a live record printed a sample address beside your name if the two
-   * happened to share an id, and nothing at all if they did not. On a record the answer is the
-   * record's members or it is nothing yet.
+   * FROM THE RECORD'S MEMBERS, AND NEVER A FIXTURE'S. It read `PEOPLE_ACCESS` directly, so a live
+   * record printed a sample address beside your name if the two happened to share an id, and nothing
+   * at all if they did not. The answer is the record's members or it is nothing yet.
    */
-  const mine = $derived(shell.live && peopleFrom !== 'live' ? undefined : people.find((p) => p.id === me.person));
+  const mine = $derived(peopleFrom === 'live' ? people.find((p) => p.id === me.person) : undefined);
 
   /**
    * WHAT THE HOST SAYS ABOUT SIGNING IN, read only on the two areas that draw it.
    *
-   * `null` until it answers, and where there is no host at all, which is the public demo: those two
-   * areas then draw the sample, and no control that would need a session.
+   * `null` until it answers, and where there is no host at all: those two areas then draw no
+   * passkey and no control that would need a session.
    */
   const webauthnHere = support();
   let hostAuth = $state<Methods | null>(null);
@@ -1281,7 +1216,6 @@
       const listed = await passkeys();
       liveKeys = listed.ok ? listed.value : null;
     }
-    /* A host without sign-in means the sample, drawn, and not a refusal of this screen. */
     closed(true, at);
   }
 
@@ -1351,12 +1285,8 @@
     /* THE STEP IS TEN, as the seeded pages are spaced, so there is room to move a page between two without renumbering. */
     const nav = { section, order: shell.nav.reduce((n, e) => (e.section === section ? Math.max(n, e.order) : n), 0) + 10 };
 
-    /* No record behind this host means there is no declaration to set, and the sample says what it would have done. */
-    if (!shell.live) {
-      toasts.push(copy.notWritten(`${decl.title} would be placed at the end of ${section} in your nav`), { intent: 'warn' });
-      return;
-    }
-
+    /* A HOST WITH NO RECORD BEHIND IT IS ASKED LIKE ANY OTHER, and its refusal is the toast below. It had an arm of
+       its own that answered with the sample's "nothing was saved yet" and asked nothing (DIRECTION 26). */
     placing = decl.page;
     const at = opened();
     const [write, read] = await Promise.all([import('$lib/record/page-write.ts'), import('$lib/record/pages-live.ts')]);
@@ -1799,12 +1729,8 @@
                        ONLY FOR SOMEBODY WHO HAS ACCEPTED. An invitation still out has also never been
                        looked at, and saying so twice in one line is saying nothing. -->
                   <span class="who-detail">
-                    {#if peopleFrom === 'live'}
-                      <!-- A RECORD KEEPS NO ACCEPTANCE DATE, so it says when they last looked and nothing it cannot know. -->
-                      {#if secondSaid(p, said(p))}{secondSaid(p, said(p))}{' · '}{/if}{p.seen ? copy.lastLooked(since(p.seen, peopleNow())) : copy.neverLooked}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, peopleNow()))}{/if}
-                    {:else}
-                    {#if secondSaid(p, said(p))}{secondSaid(p, said(p))}{' · '}{/if}{p.since ? copy.sinceWhen(relative(p.since, NOW)) : copy.inviteOut}{#if p.since}{' · '}{p.seen ? copy.lastLooked(since(p.seen, NOW)) : copy.neverLooked}{/if}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, NOW))}{/if}
-                    {/if}
+                    <!-- A RECORD KEEPS NO ACCEPTANCE DATE, so it says when they last looked and nothing it cannot know. -->
+                    {#if secondSaid(p, said(p))}{secondSaid(p, said(p))}{' · '}{/if}{p.seen ? copy.lastLooked(since(p.seen, Date.now())) : copy.neverLooked}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, Date.now()))}{/if}
                   </span>
                   <span class="who-do">
                   <Button
@@ -1953,7 +1879,7 @@
         under a section already saying *"This needs owner, and you have read access"*, to every
         colleague at every level. Driven again here as a `read` colleague: the address field, the
         five-option level select and `Invite a person`, none of them disabled, and the press answered
-        with the sample's "nothing was saved yet".
+        with the demo's "nothing was saved yet".
 
         NOTHING IS SAID IN ITS PLACE, because the section above it is already saying it. The record's
         own refusal is on this screen, in the record's own words, over the list this form adds to.
@@ -2121,49 +2047,24 @@
           {/if}
           {#if addSaid}<p class="hint" role="status">{addSaid}</p>{/if}
         </Section>
-      {:else}
-      <!-- THE SAMPLE'S PASSKEYS, where nobody is signed in or the host offers none. There is no
-           "Add a passkey" here: without a session there is nobody to add one for. -->
-      <Section title={copy.passkeys} count={PASSKEYS.length}>
+      {:else if hostAuth}
+      <!-- NOBODY SIGNED IN, OR A HOST THAT OFFERS NO PASSKEYS, AND NO LIST OF KEYS NOBODY MADE.
+           This arm drew the sample's `PASSKEYS`, two keys on two devices that never existed, with a
+           Remove that said what it would have done. What is true where the host has answered and
+           there is no session to list keys for is that there is no passkey here, and how that
+           person gets back in without one, which the host's own `magic` decides. There is no "Add
+           a passkey": without a session there is nobody to add one for. -->
+      <Section title={copy.passkeys}>
         <p class="hint">{copy.passkeyHow}</p>
-        {#if PASSKEYS.length === 0}
-          <Empty kind="no-data-yet" title={copy.noPasskeys} body={copy.noPasskeysWhy(AUTH_METHODS.magic)} />
-        {:else}
-          <ul class="ledger ledger-glyph">
-            {#each PASSKEYS as k}
-              <li>
-                <div class="line">
-                  <span class="seq"><Icon name="key" size="s" /></span>
-                  <span class="line-main">
-                    <span class="line-title">{k.label}</span>
-                    <span class="line-detail">{copy.addedWhen(relative(k.added, NOW))}</span>
-                  </span>
-                  <span class="line-amount"></span>
-                  <span class="line-when">
-                    <!-- LAST USED IS THE COLUMN THAT MATTERS. A key you have not used in a year is
-                         the one on the laptop you sold. -->
-                    {k.lastUsed ? copy.usedWhen(relative(k.lastUsed, NOW)) : copy.neverUsed}
-                    <Button
-                      weight="bare"
-                      tone="bad"
-                      disabled={PASSKEYS.length <= 1}
-                      aria-describedby={PASSKEYS.length <= 1 ? 'last-key' : undefined}
-                      onclick={() => toasts.push(copy.notWritten(`${k.label} would stop being a way into this record`), { intent: 'warn' })}
-                    >{copy.remove}</Button>
-                  </span>
-                </div>
-              </li>
-            {/each}
-          </ul>
-          {#if PASSKEYS.length <= 1}<p class="hint" id="last-key">{copy.lastPasskey}</p>{/if}
-        {/if}
+        <Empty kind="no-data-yet" title={copy.noPasskeys} body={copy.noPasskeysWhy(hostAuth.magic)} />
       </Section>
       {/if}
 
       <!-- AND THE ONE THAT IS OFFERED ONLY WHERE IT EXISTS. `49 §5.6`: on a self-host with no SMTP
            `GET /auth/methods` answers `magic: false` "so the screen never offers it". A recovery
-           screen offering a link that cannot be sent is worse than one offering nothing. -->
-      {#if (hostAuth ?? AUTH_METHODS).magic}
+           screen offering a link that cannot be sent is worse than one offering nothing. Until the
+           host answers, it is not offered: the fallback was the sample's `AUTH_METHODS`. -->
+      {#if hostAuth?.magic}
         <Section title={copy.magicLink}>
           <p class="hint">{copy.magicHow}</p>
         </Section>
@@ -2331,7 +2232,7 @@
                 <span class="who-name">{d.label ?? copy.unnamedMachine}</span>
                 <!-- `since`, because `last_used` is an instant and `relative` takes a day. -->
                 <span class="who-detail">
-                  {copy.deviceState[d.status] ?? d.status} · {d.last_used ? copy.usedWhen(since(d.last_used, agentsNow())) : copy.neverUsed}
+                  {copy.deviceState[d.status] ?? d.status} · {d.last_used ? copy.usedWhen(since(d.last_used, Date.now())) : copy.neverUsed}
                 </span>
                 <span class="who-detail who-reach">{copy.reachMeans[reachKey(d.reach, d.scope)] ?? d.reach}</span>
                 <span class="who-do">
@@ -2347,10 +2248,8 @@
 
       <!-- `12 §3`: what can act as you, with a revoke button, and never the secret itself. -->
       <Section title={copy.tokens} count={tokens.length}>
-        {#if agentsFrom === 'live' || agentsFrom === 'sample'}
-          {#if tokens.length === 0}
-            <Empty kind="no-data-yet" title={copy.noKeys} />
-          {/if}
+        {#if agentsFrom === 'live' && tokens.length === 0}
+          <Empty kind="no-data-yet" title={copy.noKeys} />
         {/if}
         <ul class="whos">
           {#each tokens as t (t.id)}
@@ -2364,7 +2263,7 @@
                 <span class="who-name">{report ? copy.reportKeyNamed(report.name) : (t.label ?? copy.unnamedToken)}</span>
                 <span class="who-detail">{report ? copy.reportKeyCan(report.register ? (REGISTERS[report.register]?.name ?? report.register) : '') : (copy.keyCan[t.scope] ?? t.scope)}</span>
                 <span class="who-detail">
-                  {t.last_used_at ? copy.usedWhen(since(t.last_used_at, agentsNow())) : copy.neverUsed}{#if t.expires_at}{' · '}{copy.endsWhen(relative(t.expires_at.slice(0, 10), agentsNow()))}{/if}
+                  {t.last_used_at ? copy.usedWhen(since(t.last_used_at, Date.now())) : copy.neverUsed}{#if t.expires_at}{' · '}{copy.endsWhen(relative(t.expires_at.slice(0, 10), Date.now()))}{/if}
                 </span>
                 <span class="who-do">
                   <Button weight="bare" tone="bad" onclick={() => void revokeTokenRow(t)}>{copy.revokeKey}</Button>
@@ -2474,82 +2373,20 @@
         only. `47 §12` gives the composition: one row per connector, from `PullResult` via the
         receipts and the schedule row.
       -->
-      <Section title={copy.sources} {...shell.live ? {} : { count: SOURCES.length }}>
+      <Section title={copy.sources}>
         <p class="hint">{copy.sourcesHow}</p>
-        <!-- A LIVE RECORD LISTS ITS OWN SCHEDULED ACTIONS, with Resume and Reconnect that write. The
-             connectors below are the sample's, and their buttons only say what would happen. -->
+        <!-- A RECORD LISTS ITS OWN SCHEDULED ACTIONS, with Resume and Reconnect that write.
+
+             AND A SHELL WITH NO RECORD LISTS NOTHING. This arm drew the sample's `SOURCES`, three
+             connectors nobody set up, one of them paused on a credential nobody holds, with
+             Reconnect and Retry now buttons that only said what would have happened. The shell's
+             own refusal is already on the screen, so nothing here repeats it. -->
         {#if shell.live}
           <Actions project={null} />
-        {:else}
-        <!-- AND THE HINT ABOVE IS ABOUT MEMBERS OF THIS SET. "A figure fed by one of these shows a
-             gap…" is a sentence about connectors, on a screen with none — so the state has to say
-             there are none before that line makes sense. -->
-        {#if SOURCES.length === 0}
-          <Empty kind="no-data-yet" title={copy.noSources} body={copy.noSourcesWhy} agentPrompt={copy.ingestPrompt} />
         {/if}
-<ul class="whos">
-          {#each SOURCES as src}
-            <li class="who" data-intent={src.state === 'ok' ? undefined : src.state === 'paused' ? 'bad' : 'warn'}>
-              <div class="who-head">
-                {#if src.state === 'ok'}<Icon name="inbox" size="s" />
-                {:else}
-                  {@const t = src.state === 'paused' ? 'bad' : 'warn'}
-                  <span class="glyph" role="img" aria-label={TONES[t].label}>{TONES[t].glyph}</span>
-                {/if}
-                <span class="who-name">{src.name}</span>
-                <span class="who-detail">
-                  {copy.sourceState[src.state]} · {copy.lastRan(relative(src.lastAt, NOW))} ·
-                  {src.nextAt ? copy.nextRun(relative(src.nextAt, NOW)) : copy.noNextRun} ·
-                  {copy.pointsIn(src.points)}
-                </span>
-                <span class="who-do">
-                  <!-- THE FAILING ROW HAD NO CONTROL AT ALL, and it is the row with the warning
-                       glyph on it. Only `paused` got Reconnect and Retry now, so a source flagged
-                       `failing` with zero rows in offered the reader nothing to do about it. The
-                       two states want different things and neither wants nothing: a paused
-                       connector needs its credential back, and a failing one needs to be asked
-                       again, which is the whole of what "it retries on its own" leaves a person
-                       able to hurry. -->
-                  {#if src.state === 'paused'}
-                    <Button
-                      weight="primary"
-                      onclick={() => toasts.push(copy.notWritten(`${src.error?.credential ?? src.name} would be reconnected, and the schedule started again`), { intent: 'warn' })}
-                    >{copy.reconnect}</Button>
-                  {/if}
-                  {#if src.state !== 'ok'}
-                    <Button
-                      weight="bare"
-                      onclick={() => toasts.push(copy.notWritten(`${src.name} would run once, now`), { intent: 'warn' })}
-                    >{copy.retryNow}</Button>
-                  {/if}
-                </span>
-              </div>
-              <!-- THE SERVER'S `fix` SENTENCE, VERBATIM (13 §6), ON ITS OWN LINE SO IT WRAPS.
-                   In the five-column ledger it was a `.line-detail` — one line, `overflow: hidden`,
-                   ellipsis — so the sentence that says what to DO about a broken connector read
-                   "Reconnect the credential: the provider rejected it, and the connector is…". A `fix`
-                   rendered verbatim and then cut is not rendered verbatim.
-
-                   And the credential by the LABEL the vault indexes it under. A pull failure names
-                   what to reconnect; naming the value would put a secret on a settings screen. -->
-              <!-- THE CREDENTIAL NAMES WHAT TO RECONNECT, WHICH ONLY AN AUTH FAILURE HAS. The
-                   suffix was unconditional, so a 429 read "The provider answered 429 three times.
-                   It retries on its own. — Kestrel ingest" and pointed the reader at a credential
-                   that is fine. `25 §9`'s own drawn mock names one on exactly one row — the 401 —
-                   and gives the failing row its try count instead. It is right for
-                   `PULL_AUTH_REJECTED` and wrong for the other six codes in the family. -->
-              {#if src.error}
-                <p class="who-why">
-                  {src.error.fix}{#if src.error.code === 'PULL_AUTH_REJECTED'}{' · '}{src.error.credential}{/if}
-                </p>
-              {/if}
-            </li>
-          {/each}
-        </ul>
         <!-- `25 §9`'s own blockquote, and it outranks the screen: "every chart fed by a stale series
              shows a gap and a stale badge. A dashboard that keeps yesterday's number on screen as if
              it were today's is the failure that actually costs somebody money." -->
-        {/if}
         <p class="hint">{copy.staleShows}</p>
       <!-- THERE WAS NO WAY TO ADD ONE, and inventing a button would be worse: `25 §9` draws this
              screen without one, because a source is a declaration and arrives the way every
@@ -2695,7 +2532,7 @@
              `latest`"* and runs at `17 3 * * *` UTC; `49 §5.13`: a self-host keeps 30 files and runs
              at 02:00 UTC plus `hash(slug) mod 60` minutes. It said "nightly, at 03:00. The 30 newest
              are kept" on both, which is right on neither. -->
-        <p class="hint">{DEPLOYMENT.kind === 'self-host' ? copy.keptSelfHost(SNAPSHOTS_KEPT) : copy.keptCloud(SNAPSHOTS_KEPT)}</p>
+        <p class="hint">{shell.host === 'cloud' ? copy.keptCloud(KEPT_NIGHTS) : copy.keptSelfHost(KEPT_NIGHTS)}</p>
         {/if}
         <ul class="ledger ledger-glyph">
           {#each copyLines as snap (snap.id)}
@@ -2710,7 +2547,7 @@
                   <span class="line-title">{copyDay(snap.id)}</span>
                   <!-- THE REASON BESIDE ITS DATE. It sat at the far end of the row, 900px from the night it
                        explains, where it read as a note about some other line. -->
-                  <span class="line-detail">{relative(snap.at, copiesNow())}{#if snap.failed}{' · '}<span class="why-failed">{snap.failed}</span>{/if}</span>
+                  <span class="line-detail">{relative(snap.at, Date.now())}{#if snap.failed}{' · '}<span class="why-failed">{snap.failed}</span>{/if}</span>
                 </span>
                 <!-- A NIGHT THAT PRODUCED NOTHING SAYS SO, AND SAYS WHY. `12 §8`: "A backup that
                      silently gave up is worse than none" — which is the argument for these two
@@ -2725,10 +2562,8 @@
                          `Content-Disposition: attachment`. A self-host's only way back is putting a
                          copy back by hand, so the copy has to be reachable. Cloud's prefix is not
                          served to a browser, so there is nothing to offer. -->
-                    {#if copiesFrom === 'live' || (copiesFrom !== 'refused' && DEPLOYMENT.kind === 'self-host')}
-                      <Button weight="bare" onclick={() => downloadCopy(snap.id)}>{copy.download}</Button>
-                    {/if}
                     {#if copiesFrom === 'live'}
+                      <Button weight="bare" onclick={() => downloadCopy(snap.id)}>{copy.download}</Button>
                       <Button weight="bare" onclick={() => (restoring = snap.id)}>{copy.restoreThis}</Button>
                     {/if}
                   {/if}
@@ -2745,7 +2580,7 @@
              `NOT_IN_THIS_BUILD`, and the button sat under that sentence and answered its press with
              the same refusal as a toast (`research-first-sign-in.md` friction 11). `reading` is not
              an answer either, or the button flashes before the refusal lands. -->
-        {#if anOwner && (copiesFrom === 'live' || copiesFrom === 'sample')}
+        {#if anOwner && copiesFrom === 'live'}
         <div class="row-actions">
           <Button weight="primary" disabled={backingUp} aria-busy={backingUp} onclick={backUp}>{copy.snapshotNow}</Button>
         </div>
@@ -2777,25 +2612,22 @@
         backups → restore to a time — `POST /api/restore { at }`"* — and this area held the sentence
         and not the button, which is the one thing a person comes to a backups screen to do.
 
-        AND ON A HOSTED RECORD THE BUTTON WAS AN APOLOGY. `apps/worker/src/index.ts` passes the
-        record no `snapshots` port, so `restore` answers `NOT_IN_THIS_BUILD` and `restoreToTime`'s
-        whole act was that refusal as a toast — under a sentence promising any point in thirty days,
-        four lines below the Kept section drawing the same refusal instead of a list. So the control
-        now follows the record's own answer, exactly as the count and the list above it do: it is
-        drawn where a restore is being demonstrated and not where one has been refused.
+        AND ON A HOSTED RECORD THE BUTTON WAS AN APOLOGY. `apps/worker/src/index.ts` then passed the
+        record no `snapshots` port, so `restore` answered `NOT_IN_THIS_BUILD` and the button's whole
+        act was that refusal as a toast, under a sentence promising any point in thirty days, four
+        lines below the Kept section drawing the same refusal instead of a list. It then followed the
+        record's own answer and was drawn only for the sample, and with the sample gone it is not
+        drawn at all: a restore is to one of the copies listed above, or it is asked for.
       -->
       <Section title={copy.restore}>
-        <!-- FOUR ANSWERS AND THE RECORD'S OWN COMES FIRST. A refusal is a fact about this record,
-             so it outranks which host the build thinks it is on. -->
-        <p class="hint" role={copiesFrom === 'refused' ? 'status' : undefined}>
-          {copiesFrom === 'refused'
-            ? copy.restoreNotHere
-            : copiesFrom === 'live'
-              ? copy.restoreLive
-              : DEPLOYMENT.kind === 'self-host'
-                ? copy.restoreSelfHost
-                : copy.restoreCloud}
-        </p>
+        <!-- THE RECORD'S OWN ANSWER, AND NOTHING UNTIL IT ARRIVES. There were four answers, and the
+             two that were not the record's came from the sample's `DEPLOYMENT.kind`: which host the
+             build thought it was on, drawn for as long as the read took and for the sample always. -->
+        {#if copiesFrom !== 'reading'}
+          <p class="hint" role={copiesFrom === 'refused' ? 'status' : undefined}>
+            {copiesFrom === 'refused' ? copy.restoreNotHere : copy.restoreLive}
+          </p>
+        {/if}
         {#if restoring}
           <div class="danger">
             <p class="danger-title">{copy.restoreConfirm(restoring)}</p>
@@ -2805,26 +2637,11 @@
             </div>
           </div>
         {/if}
-        <!-- AND `reading` IS NOT `sample` EITHER. This guard read `copiesFrom !== 'live'`, so on a
-             hosted record the control was drawn for the whole of the read and then taken away when
-             the refusal landed. A button that flashes is a button somebody presses. -->
-        {#if DEPLOYMENT.kind !== 'self-host' && copiesFrom === 'sample'}
-          <ul class="facts">
-            <!-- WHAT IT COSTS, BEFORE THE PRESS. `53 §5.5`: a restore rewinds the record, so every
-                 write after the copy is gone, and what the record held is kept as a copy first, so
-                 the rewind is itself something to go back from. `45 §5.6` makes it two phases for
-                 exactly that reason. A control this destructive that says nothing until afterwards
-                 is a control nobody should press. -->
-            <li><span class="fact-key">{copy.restoreLoses}</span><span class="fact-value">{copy.restoreLosesWhat}</span></li>
-            <li><span class="fact-key">{copy.restoreBack}</span><span class="fact-value">{copy.restoreBackHow}</span></li>
-          </ul>
-          <div class="row-actions">
-            <Button onclick={restoreToTime}>{copy.restoreTo}</Button>
-            <!-- `53 §5.5`'s precondition: *"the owner knows the last good instant — `/audit` shows
-                 every write with its time"*. The control that answers it is one link away. -->
-            <Button weight="bare" href="/audit">{copy.findTheMoment}</Button>
-          </div>
-        {/if}
+        <!-- AND NO "RESTORE TO A TIME". It was drawn only where `copiesFrom === 'sample'` on the Cloud
+             build, because every record that answered, on either host, either listed its copies above
+             or refused, and no host serves a restore to an instant: `apps/worker/src/copies.ts` goes
+             back to a copy by the bookmark that copy recorded and leaves `getBookmarkForTime` out on
+             purpose. Going back is `Restore this` on one of the copies listed above. -->
       </Section>
     {:else if area === 'billing'}
       <!--
@@ -2839,10 +2656,10 @@
         on a self-host in the strongest possible way: "At no point is export withheld."
       -->
       <Section title={copy.billing}>
-        <!-- THE HOST'S ANSWER AND NOT THE BUILD'S. `DEPLOYMENT.kind` reads `self-host` in every shipped
-             bundle, so a live Cloud record was told "This record runs on your own machine."
-             (`research-first-sign-in.md` friction 5). `billing.ts` says what is asked instead. -->
-        <p class="hint">{billingLine({ live: shell.live, host: shell.host, mintsMail: mintsHere, sample: DEPLOYMENT.kind })}</p>
+        <!-- THE HOST'S ANSWER AND NOT THE BUILD'S. The sample's `DEPLOYMENT.kind` read `self-host` in
+             every shipped bundle, so a live Cloud record was told "This record runs on your own
+             machine." (`research-first-sign-in.md` friction 5). `billing.ts` says what is asked instead. -->
+        <p class="hint">{billingLine({ host: shell.host, mintsMail: mintsHere })}</p>
         <div class="row-actions">
           <Button weight="quiet" href="/usage"><Icon name="history" size="s" />{actionWords.seeUsage}</Button>
           <!-- AND THE SECOND LINK IS THE OWNER'S, because the screen it leads to is. `export` needs
@@ -2967,7 +2784,7 @@
           <Button
             disabled={exporting !== null}
             aria-busy={exporting === 'record'}
-            onclick={() => takeCopy('record', 'The whole record would be written to one .brain file, a SQLite database you can open with sqlite3')}
+            onclick={() => takeCopy('record')}
           >{copy.export}</Button>
           {/if}
           <!-- A REAL CHECK, IN THIS BROWSER. It said what it would do, on a record as on the sample; it runs the
@@ -3010,13 +2827,13 @@
             weight="quiet"
             disabled={exporting !== null}
             aria-busy={exporting === 'pack'}
-            onclick={() => takeCopy('pack', 'Your lists, pages, metrics and rules would be written as one readable pack, with none of your rows in it')}
+            onclick={() => takeCopy('pack')}
           >{copy.exportPack}</Button>
           <Button
             weight="bare"
             disabled={exporting !== null}
             aria-busy={exporting === 'rows'}
-            onclick={() => takeCopy('rows', 'The rows would be written without where each one came from, which is a clean handover')}
+            onclick={() => takeCopy('rows')}
           >{copy.exportRows}</Button>
           {/if}
           <!-- THE ARRANGEMENT, NOT THE ROWS: a use case somebody else can install (`loop/research-spark.md` S14). -->
@@ -3035,47 +2852,19 @@
         what a key opens and never the key, and that rule is about SECRETS; the whole mechanism here
         is publication.
 
-        AND THE KEY BELOW IS THE SAMPLE'S, WHICH WAS BEING SHOWN TO EVERY RECORD. `SIGNING_KEY` sits
-        in `data.ts` with the rest of the synthetic record: no keypair ever produced it, and its two
-        halves were made to agree, so `key_id` really is `sha256(raw)[0:16]` of the value beside it.
-        That is the right shape for an illustration and the wrong thing to print under "How anybody
-        checks a copy is yours" on a record that has a key of its own. A reader cannot tell by
-        looking, and the only caveat near it is `mockNotice`, which is about controls that save
-        nothing rather than about the value above them: invented data, presented as a fact about
-        their data, on the one screen whose job is proving a file is theirs.
+        AND THE ONLY KEY THIS BLOCK EVER DREW WAS THE SAMPLE'S. `SIGNING_KEY` sat in `data.ts` with the
+        rest of the synthetic record: no keypair ever produced it, and its two halves were made to
+        agree, so `key_id` really was `sha256(raw)[0:16]` of the value beside it. It was drawn where
+        `shell.live` was false, the public demo, and there is no demo now (DIRECTION 26), so the arm
+        went with it: a shell with no record is not handed an invented key either.
 
-        SO IT IS DRAWN WHERE IT IS TRUE AND NOWHERE ELSE. `shell.live` is the question this block
-        needs and the rest of the screen already asks: `false` is the public demo with no record
-        behind it, and a record that refused `boot` is still a record, so it is never handed the
-        sample's key by accident. `agentsFrom`, `peopleFrom` and `copiesFrom` are each one area's own
-        read of its own rows, and this block has no rows to read.
-
-        AND A RECORD IS NOT SHOWN A BLANK. What is true on a record today is that its exports and its
-        backups are signed and that this screen has nowhere to get the public half from: `boot` does
-        not carry it, and `03 §4`'s well-known URL is served by none of the three apps. The sentence
-        says that much, and the value, the copy button and `verifyHow`'s advice go with the key they
-        depend on rather than standing over nothing.
+        SO EVERY SHELL IS TOLD THE SAME TRUE THING. Its exports and its backups are signed, and this
+        screen has nowhere to get the public half from: `boot` does not carry it, and `03 §4`'s
+        well-known URL is served by none of the three apps. The value, a copy button and advice on
+        verifying come back together, the day there is a real key to stand beside them.
       -->
       <Section title={copy.theSignature}>
-        {#if shell.live}
-          <p class="hint">{copy.theSignatureNotHere}</p>
-        {:else}
-          <p class="hint">{copy.theSignatureIs}</p>
-          <ul class="facts">
-            <li>
-              <span class="fact-key">{copy.keyFingerprint}</span>
-              <span class="fact-value mono">{SIGNING_KEY.keyId}</span>
-            </li>
-            <li>
-              <span class="fact-key">{copy.keyPublic}</span>
-              <span class="fact-value mono wrap">{SIGNING_KEY.publicKey}</span>
-            </li>
-          </ul>
-          <div class="row-actions">
-            <Button weight="bare" onclick={() => void clipboard.put(SIGNING_KEY.publicKey, copy.keyPublic, copy.keyCopied)}>{copy.copyKey}</Button>
-          </div>
-          <p class="hint">{copy.verifyHow}</p>
-        {/if}
+        <p class="hint">{copy.theSignatureNotHere}</p>
       </Section>
 
     {/if}
@@ -3093,16 +2882,13 @@
          offer nothing, so a sentence telling their reader that their changes are not saved is
          about changes they cannot make. It is the last thing on three screens where it means
          nothing, which is how a reader learns to skip it on the nine where it means something. -->
-    <!-- Not under the live passkeys: adding and removing one there is really kept, by the host. -->
-    <!-- Nor on Agents: a live record keeps what is done there, and the demo says in its own sentence that nothing can be. -->
-    <!-- Nor anywhere on a live record: People, Backups, Ingest, Export and Delete write to it, and the one
-         control that still only says what it would do (checking a file on Export) says so in its own toast.
-         Recovery keeps it where the host offers no passkeys, because that screen is still the sample's. -->
-    {#if shell.live && !(area === 'recovery' && !livePasskeys)}
-      {#if KEEPS.has(area)}<p class="mock">{copy.keptOnDevice}</p>{/if}
-    {:else if !REPORTS.has(area) && area !== 'agents' && !(area === 'recovery' && livePasskeys)}
-      <p class="mock">{KEEPS.has(area) ? copy.mockNoticeSome : copy.mockNotice}</p>
-    {/if}
+    <!-- AND NOW ONLY THE HALF THAT IS TRUE EVERYWHERE. The other half, "Nothing you do here is saved
+         yet.", was the sample's footer: it was drawn wherever `shell.live` was false, which was the
+         demo, and on Recovery wherever the host offered no passkeys, because that area drew the
+         sample's keys. Neither is drawn now (DIRECTION 26). A shell with no record says so in its
+         own refusal, and every press on it answers with the host's sentence, so a footer that said
+         nothing was saved would be a second, vaguer copy of a refusal already on the screen. -->
+    {#if KEEPS.has(area)}<p class="mock">{copy.keptOnDevice}</p>{/if}
   </div>
 </div>
 {/if}

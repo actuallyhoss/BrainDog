@@ -331,13 +331,31 @@ test('A RECORD THAT REFUSES THE ADDRESS TAKES THE BROWSER\'S SUBSCRIPTION BACK, 
   assert.equal(m.made[0]?.dropped, true);
 });
 
-test('A STALE SIGN-IN IS THE RECORD\'S OWN SENTENCE, and the demo with no record behind it is the sample', async () => {
+test('A STALE SIGN-IN IS THE RECORD\'S OWN SENTENCE, and so is no sign-in at all', async () => {
   const { key } = await vapidPublic();
   const fix = 'Sign in again to do this.';
   const stale = await turnOn(ports('granted', manager(null), caller({ subscribePush: { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix } } }).call), keyBytes(key)!);
   assert.deepEqual(stale, { kind: 'signin', fix });
-  const demo = await turnOn(ports('granted', manager(null), caller({ subscribePush: { ok: false, refusal: { code: 'UNREACHABLE', fix: 'Nothing answered.' } } }).call), keyBytes(key)!);
-  assert.deepEqual(demo, { kind: 'sample' });
+  /* A 401 WITH NO SLUG IN THE ADDRESS WAS THE SAMPLE, and the row answered it with the demo's sentence about having no
+     account. There is no sample now (`DIRECTION.md` §26): a 401 is a person who is not signed in, wherever they are. */
+  const m = manager(null);
+  const none = await turnOn(ports('granted', m, caller({ subscribePush: { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in to this record first.' } } }).call), keyBytes(key)!);
+  assert.deepEqual(none, { kind: 'signin', fix: 'Sign in to this record first.' });
+  assert.equal(m.made[0]?.dropped, true, 'a refused address leaves the browser subscribed');
+});
+
+test('A RECORD THAT WAS NOT REACHED SAYS SO, in the row\'s own sentence and not the client\'s status line', async () => {
+  /* The client's `UNREACHABLE` sentence names a status and a parse ("200 with a body that is not JSON"), which is true
+     and says nothing a person can act on. `pushNotSent` is the sentence the row already said for a call that threw. */
+  const { key } = await vapidPublic();
+  const said = await turnOn(ports('granted', manager(null), caller({ subscribePush: { ok: false, refusal: { code: 'UNREACHABLE', fix: 'The record could not be reached: 200 with a body that is not JSON' } } }).call), keyBytes(key)!);
+  assert.deepEqual(said, { kind: 'refused', fix: copy.pushNotSent });
+});
+
+test('THE ROW SAYS NOTHING ABOUT A DEMO, because there is none', () => {
+  const source = readFileSync(join(HERE, 'PushToggle.svelte'), 'utf8');
+  assert.doesNotMatch(source, /notOnDemo|'sample'/u);
+  assert.doesNotMatch(readFileSync(join(HERE, 'push.ts'), 'utf8'), /'sample'|noRecord/u);
 });
 
 test('A CALL THAT THROWS IS STILL A SENTENCE, and the subscription goes back', async () => {

@@ -1,5 +1,9 @@
 /**
- * Settings' writes against the record: what each gesture sends, and the three answers the screen can get back.
+ * Settings' writes against the record: what each gesture sends, and the answers the screen can get back.
+ *
+ * NO RECORD IS A REFUSAL, AND NOT THE SAMPLE. Every expectation here that read `from: 'sample'` for a host with no
+ * record behind it (`UNREACHABLE`, `UNAUTHORIZED`) now reads the refusal that sample stood in for, carrying the
+ * sentence the client wrote for it (DIRECTION 26, `loop/research-no-sample.md` brief A4).
  */
 
 import { test } from 'node:test';
@@ -71,7 +75,13 @@ test("the people are the record's members, drawn as the screen's persons", async
   ]);
   assert.deepEqual(sent.map((s) => [s.path, s.method]), [['/api/members', 'GET']]);
 
-  assert.deepEqual(await readPeople(BASE, host(null).io), { from: 'sample' });
+  const off = await readPeople(BASE, host(null).io);
+  assert.equal(off.from, 'refused', 'a host with no record behind it is drawn the sample');
+  assert.match(off.from === 'refused' ? off.fix : '', /could not be reached/u);
+  assert.deepEqual(
+    await readPeople(BASE, host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in first.' } })).io),
+    { from: 'refused', fix: 'Sign in first.' },
+  );
   assert.deepEqual(await readPeople(BASE, host(() => json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'x' } })).io), { from: 'unrouted' });
   assert.deepEqual(
     await readPeople(BASE, host(() => json(403, { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app.' } })).io),
@@ -116,7 +126,7 @@ test('an exception is added or taken back inside the same invitation', async () 
   );
 });
 
-test("a refusal is the record's sentence, a race says so, and no record is the sample", async () => {
+test("a refusal is the record's sentence, a race says so, and no record is a refusal too", async () => {
   const refused = await removeAccess(BASE, bo, host(() => json(422, { ok: false, refusal: { code: 'LEVEL_REQUIRED', fix: 'A record keeps one owner.' } })).io);
   assert.deepEqual(refused, { ok: false, from: 'refused', code: 'LEVEL_REQUIRED', fix: 'A record keeps one owner.', raced: false });
 
@@ -124,8 +134,12 @@ test("a refusal is the record's sentence, a race says so, and no record is the s
   assert.equal(forbidden.ok ? '' : forbidden.fix, 'Only an owner can do this.');
 
   const unreachable = await removeAccess(BASE, bo, host(null).io);
-  assert.equal(unreachable.ok ? '' : unreachable.from, 'sample');
+  assert.equal(unreachable.ok ? '' : unreachable.from, 'refused');
+  assert.equal(!unreachable.ok && unreachable.from === 'refused' && unreachable.code, 'UNREACHABLE');
   assert.match(unreachable.ok ? '' : unreachable.fix, /could not be reached/);
+
+  const signedOut = await removeAccess(BASE, bo, host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in first.' } })).io);
+  assert.deepEqual(signedOut, { ok: false, from: 'refused', code: 'UNAUTHORIZED', fix: 'Sign in first.', raced: false });
 
   assert.deepEqual(wrote({ ok: false, conflict: {} }), { ok: false, from: 'refused', code: 'VERSION_STALE', fix: copy.writeRaced, raced: true });
 });
@@ -146,7 +160,7 @@ test('an export is the record as a .brainl file, cut to the sections each copy c
     ],
   );
   const none = await exportFile(BASE, 'record', 'studio', host(() => new Response('<html>', { status: 404 })).io);
-  assert.equal(none.ok ? '' : none.from, 'sample');
+  assert.equal(none.ok ? '' : none.from, 'refused');
 });
 
 test('backups, erasure and deletion send what each gesture names, and read the three answers', async () => {
@@ -165,12 +179,14 @@ test('backups, erasure and deletion send what each gesture names, and read the t
     ['/api/deleteRecord', 'POST', { slug: 'the-studio' }],
   ]);
 
-  assert.deepEqual(await readSnapshots(BASE, host(null).io), { from: 'sample' });
+  const unread = await readSnapshots(BASE, host(null).io);
+  assert.equal(unread.from, 'refused', "a host with no record behind it is drawn the sample's copies");
+  assert.equal(unread.from === 'refused' && unread.code, 'UNREACHABLE');
   const worker = host(() => json(501, { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'Export a copy from Settings.' } })).io;
   assert.deepEqual(await readSnapshots(BASE, worker), { from: 'refused', code: 'NOT_IN_THIS_BUILD', fix: 'Export a copy from Settings.' });
   assert.deepEqual(await backUpNow(BASE, worker), { ok: false, from: 'refused', code: 'NOT_IN_THIS_BUILD', fix: 'Export a copy from Settings.', raced: false });
   const gone = await deleteRecordNow(BASE, 'the-studio', host(null).io);
-  assert.equal(!gone.ok && gone.from, 'sample');
+  assert.equal(!gone.ok && gone.from, 'refused');
 });
 
 test('a kept copy downloads as the file the host named, and a refusal is read the one way', async () => {
@@ -186,9 +202,12 @@ test('a kept copy downloads as the file the host named, and a refusal is read th
   const refused = await downloadSnapshot(BASE, 'x', host(() => json(422, { ok: false, refusal: { code: 'OUT_OF_BOUNDS', fix: 'x is not one of the copies this record keeps.' } })).io);
   assert.deepEqual(refused, { ok: false, from: 'refused', code: 'OUT_OF_BOUNDS', fix: 'x is not one of the copies this record keeps.', raced: false });
   const off = await downloadSnapshot(BASE, 'x', host(null).io);
-  assert.equal(!off.ok && off.from, 'sample');
+  assert.equal(!off.ok && off.from, 'refused');
+  /* AND IT SAYS SO. This arm handed the screen an empty sentence, which only the sample's toast ever covered. */
+  assert.equal(!off.ok && off.fix, copy.recordNotReached);
   const html = await downloadSnapshot(BASE, 'x', host(() => new Response('<html>', { status: 404 })).io);
-  assert.equal(!html.ok && html.from, 'sample');
+  assert.equal(!html.ok && html.from, 'refused');
+  assert.equal(!html.ok && html.fix, copy.recordNotReached);
 });
 
 test('an invitation is minted for one address, handed back once as a link, listed and withdrawn', async () => {
@@ -216,10 +235,15 @@ test('an invitation is minted for one address, handed back once as a link, liste
   /* UNDER THE APP, AND WITH NO SLUG: the token names its record, and the person opening it may be on no record yet. */
   assert.equal(inviteLink('http://record.test/', made.token), 'http://record.test/app/invite#rec_1.thesecret');
 
-  /* A HOST OLDER THAN INVITATIONS, AND ONE WITH NO RECORD BEHIND IT, BOTH LIST NONE rather than draw a refusal. */
+  /* A HOST OLDER THAN INVITATIONS LISTS NONE rather than draw a refusal: it is a record, with no such list to read. */
   const old = host(() => json(422, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'This record has no such method.' } })).io;
-  assert.deepEqual(await readInvites(BASE, old), { from: 'sample' });
-  assert.deepEqual(await readInvites(BASE, host(null).io), { from: 'sample' });
+  assert.deepEqual(await readInvites(BASE, old), { from: 'unrouted' });
+  /* AND ONE WITH NO RECORD BEHIND IT IS A REFUSAL. Both read `sample`, so a signed-out reader and a host older than the
+     method were answered alike, and neither answer was true. */
+  const signedOut = host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in first.' } })).io;
+  assert.deepEqual(await readInvites(BASE, signedOut), { from: 'refused', fix: 'Sign in first.' });
+  const unreached = await readInvites(BASE, host(null).io);
+  assert.equal(unreached.from, 'refused');
   const said = host(() => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Only an owner sees invitations.' } })).io;
   assert.deepEqual(await readInvites(BASE, said), { from: 'refused', fix: 'Only an owner sees invitations.' });
 });

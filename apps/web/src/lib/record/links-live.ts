@@ -12,14 +12,14 @@
  * `backlinks()` answers and the shape this page already draws: two fields of one register can point
  * at the same place and mean different things, and collapsing them loses which.
  *
- * `UNREACHABLE` and `UNAUTHORIZED` mean there is no record here, and the page reads the sample as it
- * always did. Any other refusal is the record's own sentence.
+ * EVERY REFUSAL IS THE RECORD'S OWN SENTENCE. `UNREACHABLE` and `UNAUTHORIZED` with no slug used to mean "draw
+ * the sample's backlinks", which were another business's rows pointing at the row in the address; there is no sample
+ * now (DIRECTION 26).
  */
 
 import { createClient, type ClientOptions } from '@braindog/client';
 
 import { columnsFor, iconFor, labelOf, REGISTERS, toRows, type Backlink } from './api.ts';
-import { noRecord } from './device.ts';
 import { entryOf, learn, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
@@ -31,10 +31,7 @@ export type Fetch = NonNullable<ClientOptions['fetch']>;
  * relation whose rows are all drawn carries the walk into the next, so a row named by two fields of
  * two lists pages through both without the screen knowing how many relations there are.
  */
-export type Linked =
-  | { from: 'live'; groups: Backlink[]; cursor: string | null }
-  | { from: 'sample' }
-  | { from: 'refused'; fix: string };
+export type Linked = { from: 'live'; groups: Backlink[]; cursor: string | null } | { from: 'refused'; fix: string };
 
 export type LinkReader = { read(register: string, seq: number, cursor?: string): Promise<Linked> };
 
@@ -43,8 +40,7 @@ export const LINKS_PAGE = 24;
 
 function missed(out: object): Linked {
   if (!('refusal' in out)) return { from: 'refused', fix: 'The row changed while it was being read.' };
-  const refusal = out.refusal as { code: string; fix: string };
-  return noRecord(refusal.code) ? { from: 'sample' } : { from: 'refused', fix: refusal.fix };
+  return { from: 'refused', fix: (out.refusal as { fix: string }).fix };
 }
 
 /**
@@ -88,8 +84,8 @@ export function linkReader(base: string, io?: Fetch): LinkReader {
 
   return {
     async read(register, seq, cursor) {
-      /* A PENDING ROW HAS NO NUMBER THE RECORD COULD HOLD, so nothing is asked. */
-      if (!Number.isInteger(seq) || seq < 1) return { from: 'sample' };
+      /* A PENDING ROW HAS NO NUMBER THE RECORD COULD HOLD, so nothing is asked, and nothing on the record can point at it. */
+      if (!Number.isInteger(seq) || seq < 1) return { from: 'live', groups: [], cursor: null };
       const out = await client.backlinks({ register, seq, limit: LINKS_PAGE, ...(cursor === undefined ? {} : { cursor }) });
       if (!out.ok) return missed(out);
 

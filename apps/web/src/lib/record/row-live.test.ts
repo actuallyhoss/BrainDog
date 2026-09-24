@@ -1,7 +1,6 @@
 /**
- * One row against the record: the live row drawn with its refs as numbers, the sample when there is
- * no record, the record's sentence for any other refusal, a row the record does not hold as no row,
- * and nothing sent for a pending one.
+ * One row against the record: the live row drawn with its refs as numbers, the record's sentence for
+ * every refusal, a row the record does not hold as no row, and nothing sent for a pending one.
  *
  * AND WHAT A ROW THAT IS NOT THERE COSTS, counted against a real kernel at the bottom of this file,
  * because a count taken against a host written in the same file as its own assertion is a count of
@@ -193,14 +192,21 @@ test('a list the record will not declare still says the list is not there, becau
   assert.equal(sentence(register, 390), 'There is no list called rl_nope.');
 });
 
+/* NO RECORD IS A REFUSAL NOW, NOT THE SAMPLE (DIRECTION 26). Under these three the page drew `entry('services', 2)`,
+   the sample business's row, under the address of a row in no record at all. */
+test("a 401 at no slug is the record's sentence, not the sample's row", async () => {
+  const { io } = host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } }));
+  assert.deepEqual(await rowReader(BASE, io).read('services', 2), { from: 'refused', fix: 'Sign in again.' });
+});
+
 for (const [what, answer] of [
   ['nothing answers', null],
-  ['the record says UNAUTHORIZED', () => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } })],
   ['a static host answers a 404 page', () => new Response('<!doctype html><title>Not found</title>', { status: 404 })],
 ] as const)
-  test(`the sample is read when ${what}`, async () => {
-    const { io } = host(answer);
-    assert.deepEqual(await rowReader(BASE, io).read('services', 2), { from: 'sample' });
+  test(`a refusal, and no sample row, when ${what}`, async () => {
+    const out = await rowReader(BASE, host(answer).io).read('services', 2);
+    assert.equal(out.from, 'refused');
+    assert.ok(out.from === 'refused' && out.fix.trim() !== '', 'a refusal with no sentence says nothing to the reader');
   });
 
 test("any other refusal is the record's own sentence", async () => {
@@ -209,19 +215,18 @@ test("any other refusal is the record's own sentence", async () => {
   assert.deepEqual(await rowReader(BASE, io).read('services', 2), { from: 'refused', fix });
 });
 
-test('a pending row sends nothing', async () => {
+test('a pending row sends nothing, and the record holds no row for it', async () => {
   const { io, sent } = host(record);
-  for (const seq of [-1, 0, Number.NaN]) assert.deepEqual(await rowReader(BASE, io).read('services', seq), { from: 'sample' });
+  for (const seq of [-1, 0, Number.NaN]) assert.deepEqual(await rowReader(BASE, io).read('services', seq), { from: 'live', entry: null, names: new Map() });
   assert.equal(sent.length, 0);
 });
 
-test('the row page draws the live row, its refusal, and no sample backlinks when live', () => {
+test('the row page draws the live row and its refusal, and nothing of the sample', () => {
   const page = readFileSync(new URL('../../routes/r/[register]/[seq]/+page.svelte', import.meta.url), 'utf8');
   assert.match(page, /from '\$lib\/record\/row-live\.ts'/u);
-  /* THE SAMPLE'S BACKLINKS ARE STILL THE SAMPLE'S, and a live row now draws the record's own. The
-     live groups win where there are any, because on a record the sample's would be another record's
-     rows pointing at this one. */
-  assert.match(page, /const incoming = \$derived\(\s*linked\?\.from === 'live' \? linked\.groups : row && !live \? backlinks\(id, seq\) : \[\],?\s*\)/u);
+  /* WHAT POINTS HERE IS THE RECORD'S OR NOTHING. The sample's walk filled this for any row that was not live, which
+     after DIRECTION 26 is only ever a row the record does not hold. */
+  assert.match(page, /const incoming = \$derived\(linked\?\.from === 'live' \? linked\.groups : \[\]\)/u);
   /* THE READ THAT MAKES THE LEARNED DECLARATION VISIBLE, and it is one `void` away from silence. The
      register table is a plain object, so `$derived(REGISTERS[id])` would depend on `id` alone and
      never notice that `read` has just learned the list; `void got` is the whole reason the sentence
@@ -232,7 +237,11 @@ test('the row page draws the live row, its refusal, and no sample backlinks when
   assert.match(page, /const decl = \$derived\.by\(\(\) => \(void got, REGISTERS\[id\]\)\)/u, 'the page must re-read the register table once the row has been read');
   assert.match(page, /\{:else if got\?\.from === 'refused'\}/u);
   assert.match(page, /title=\{got\.fix\}/u);
-  assert.match(page, /got\?\.from === 'live' \? \(got\.entry \?\? undefined\)/u, 'a live row that is not there falls back to the sample again');
+  assert.match(page, /const written = \$derived\(got\?\.from === 'live' \? \(got\.entry \?\? undefined\) : undefined\)/u, 'a row that is not there falls back to the sample again');
+  /* A ROW TYPED ON THIS TAB IS ASKED FOR AS A LIVE ONE until wave B takes `pending` away: there is no sample for it to
+     have been typed against. `entry(` was the sample's reader and `values()` the sample's hole answers. */
+  assert.match(page, /pending\.of\(id, false\)/u);
+  assert.doesNotMatch(page, /\bentry\(id, seq\)|\bvalues\(\)|from === 'sample'/u, 'the row page reads the sample again');
 });
 
 test("a row on a list this build does not ship draws its link by the linked row's name, not as club_books#2", async () => {

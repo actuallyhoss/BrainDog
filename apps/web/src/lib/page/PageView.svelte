@@ -25,7 +25,7 @@
   /* `at` IS THE BLOCK INDEX IN THIS FILE'S EACH BLOCKS, so the address helper goes by another name here. */
   import { apiBase, at as inApp } from '../at.ts';
   import { titleOf } from '$lib/title.ts';
-  import { KINDS, holeLabel, isKind, type Row, type RowRef } from 'braindog-render';
+  import { KINDS, isKind, type Row, type RowRef } from 'braindog-render';
   import { Block, Degraded, Markdown, Table } from 'braindog-render/svelte';
   import '$lib/blocks-charts.css';
   import { untrack } from 'svelte';
@@ -33,12 +33,11 @@
   import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
-  import { NOW, REGISTERS, heldBy, homeCurrency, hueOf, iconFor, page as readPage, pages as readPages, values, type BlockResult } from '$lib/record/api.ts';
+  import { REGISTERS, homeCurrency, hueOf, iconFor, type BlockResult } from '$lib/record/api.ts';
   import { symbolText } from '$lib/record/money.ts';
   import { draw, saidPlainly, walkTables } from '$lib/record/blocks.ts';
   import { joinsWithOr, registerHref } from '$lib/record/where.ts';
   import type { PageBlock } from '$lib/record/schema.ts';
-  import { PAGES } from '$lib/record/data.ts';
   import { dogName, dogText, saveDog, type DogPage } from '$lib/dog/source.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -67,7 +66,7 @@
     slug: string;
     /** Whether the declaration is drawn in place of the blocks (`?src=1`). */
     showSource: boolean;
-    /** The record's answer, the sample, a page it lacks or its refusal; `null` until it answers. */
+    /** The record's answer, a page it lacks or its refusal; `null` until it answers. */
     got: Opened | null;
     /** Reads the page again after a write, without blanking it. The route's, because the route knows the address. */
     reread: () => Promise<void>;
@@ -121,8 +120,7 @@
   /**
    * ON A LIVE PAGE A MOVED CARD AND A TICKED TASK ARE WRITES to the row each came from, named by the `ref` the page
    * answer carried. A refusal is the record's own sentence. A write that landed, or one that met a row changed first,
-   * reads the page again without blanking it, so the card's mark goes once the row agrees with it. The sample keeps its
-   * toasts.
+   * reads the page again without blanking it, so the card's mark goes once the row agrees with it.
    *
    * A WRITE THAT LANDS HOLDS ITS ROW AND SAYS SO WITH A WAY BACK. The re-read can leave the row out: a `todo` whose
    * `where:` leaves out done rows answers without the row it just ticked (`loop/research-m4-app.md`, brief 3), and a
@@ -170,7 +168,10 @@
 
   function moveCard(block: LiveBlock, row: Row, to: string, at: number, before: readonly Row[]) {
     const title = row.cells[1] ?? copy.cardFallback;
-    if (!live) return void toasts.push(copy.cardMovedTo(title, to), { intent: 'warn' });
+    /* A PAGE IS DRAWN ONLY OVER A LIVE ANSWER, so there is no card to move without one. This toasted "would move, and
+       nothing was saved" over the sample until DIRECTION 26; the guard now only narrows `live`, here and in the tick and
+       the capture below. */
+    if (!live) return;
     const field = block.columns[0]?.field;
     /* WHERE IT CAME FROM, in the screen's spelling, which is what `movePatch` takes and what the held card wears. */
     const from = row.cells[0] ?? '';
@@ -218,11 +219,9 @@
    * writes for the same line under the same filter, required fields and all, and `rowWriter` is the client that
    * list writes through. What was filled on the reader's behalf is said once, as the grid says it. A refusal is the
    * record's sentence; a landed row reads the page again, so a list of tasks below the field draws it.
-   *
-   * THE SAMPLE SAYS NOTHING WAS SAVED, as a ticked task and a moved card do on it.
    */
   async function captureLine(register: string, text: string, inherited: Record<string, string>) {
-    if (!live) return void toasts.push(copy.notWritten(text), { intent: 'warn' });
+    if (!live) return;
     const now = live.now;
     const [{ captureRow }, { rowWriter }] = await Promise.all([import('./capture.ts'), import('$lib/record/rows-write.ts')]);
     const row = captureRow(register, text, inherited, now);
@@ -242,7 +241,7 @@
    */
   function tickTask(block: LiveBlock, row: Row, done: boolean, at: number, before: readonly Row[]) {
     const title = row.cells[0] ?? copy.cardFallback;
-    if (!live) return void toasts.push(copy.taskTicked(title, done), { intent: 'warn' });
+    if (!live) return;
     const held = block.entries.find((e) => e.seq === row.ref?.seq && e.version === row.ref.version);
     void writeRow(row.ref, (m, ref, decl) => m.tickPatch(ref, done, decl), title, {
       at,
@@ -253,31 +252,19 @@
       said: (w) => w.ticked(title, done),
     });
   }
-  /* A LIVE PAGE IS THE RECORD'S BLOCKS AND NOTHING ELSE; the sample is read only when there is no record. */
-  const result = $derived<{ page: LivePageDecl; blocks: LiveBlock[] } | undefined>(
-    got?.from === 'live' ? got.page : got?.from === 'sample' ? (readPage(slug) ?? undefined) : undefined,
-  );
-  const sampleValues = $derived<Record<string, string>>(got?.from === 'sample' ? values() : {});
+  /* A PAGE IS THE RECORD'S BLOCKS AND NOTHING ELSE. It was the sample's page of the same slug when no record answered,
+     until DIRECTION 26; a record that does not answer is its refusal, drawn below. */
+  const result = $derived<{ page: LivePageDecl; blocks: LiveBlock[] } | undefined>(got?.from === 'live' ? got.page : undefined);
 
-  /* A `{{path}}` IS ANSWERED BY THE RECORD on the block's `values`, or by the sample's figures when
-     there is no record; a missing value is `—`. `now` is the clock the rows were read against: the
-     reader's for a live page, the sample's own `NOW` otherwise, so `{{ago:}}` agrees with the dates
-     beside it. `hole` is what makes a hole pressable; this screen owns what pressing one does. On a
-     live record a value the record cannot answer is not pressable: nobody can supply a declared
-     figure from this screen, so it is marked and left alone. */
-  const pressHole = (path: string | null) =>
-    toasts.push(
-      copy.notWritten(
-        path ? `${holeLabel(path)} would be opened for whoever can supply it` : 'The unknown would be opened for whoever can supply it',
-      ),
-      { intent: 'warn' },
-    );
+  /* A `{{path}}` IS ANSWERED BY THE RECORD on the block's `values`; a missing value is `—`. `now` is the clock the rows
+     were read against, so `{{ago:}}` agrees with the dates beside it. No `hole` is handed over, so a value the record
+     cannot answer is marked and not pressable: nobody can supply a declared figure from this screen. The sample's
+     pressable hole toasted what would have been opened, and went with the sample. */
   /* A FIGURE IN A SENTENCE READS AS MONEY, `£7,200.00` and not `GBP 7,200.00`, as the cells beside it do. */
   const said = (text: string | null): string | null => (text === null ? null : symbolText(text, homeCurrency()));
   const optsFor = (block: LiveBlock) => ({
-    resolve: live ? (path: string) => said(resolverOf(block.values)(path)) : (path: string) => said(sampleValues[path] ?? null),
-    now: live ? live.now : NOW,
-    ...(live ? {} : { hole: pressHole }),
+    resolve: (path: string) => said(resolverOf(block.values)(path)),
+    now: live?.now ?? Date.now(),
     /* A forecast's knobs and its readout: arithmetic over the walk already on the page, kept in memory. */
     scenario: true,
     /* EVERY LINK THE RENDERER DRAWS, under the app: the record writes `/decide`, and the tab is on `/app/<slug>`. */
@@ -380,7 +367,7 @@
   /**
    * A block added here is resolved through the SAME page read as a declared one.
    *
-   * `readPage` answers per block against live rows, so a seeded block gets real data the moment it
+   * The record's page answer carries live rows per block, so a seeded block gets real data the moment it
    * exists — which is what makes "already bound and already drawing" (21 §3.3) true rather than a
    * promise the picker makes and the page breaks.
    */
@@ -391,7 +378,7 @@
       { i: (result?.blocks.length ?? 0) + extra.length - 1, span: block.span ?? 12 },
     ];
     const named = copy.kindNames[block.kind] ?? block.kind;
-    toasts.push(live ? copy.blockAddedLive(named) : copy.blockAdded(named), { intent: live ? undefined : 'warn' });
+    toasts.push(copy.blockAddedLive(named));
   }
 
   /**
@@ -408,36 +395,30 @@
       toasts.push(copy.arrangeNothing);
       return;
     }
-    /* ON A LIVE PAGE DONE SETS THE DECLARATION, whole, and the page is read again from the record. A refusal leaves the
-       mode open with the draft in it, so Cancel still means cancel. Undo sets the body that was there before. */
-    if (live) {
-      if (saving) return;
-      saving = true;
-      const title = result?.page.title ?? slug;
-      const m = await import('$lib/record/page-write.ts');
-      const placed = arrangement.body.map((b) => ({ i: b.block, span: b.span }));
-      const out = await m.saveArrangement(apiBase(), slug, result?.blocks.length ?? 0, placed, extra, undefined, result?.page.declared_version);
-      saving = false;
-      if (out.from !== 'written') return void toasts.push(out.fix, { intent: 'warn' });
-      arrangement.commit();
-      await reread();
-      extra = [];
-      arrangement.slots = null;
-      const before = out.before;
-      toasts.push(copy.arranged(title), {
-        undo: () =>
-          void m.setBody(apiBase(), before, undefined, out.version).then(async (back) => {
-            if (back.from !== 'written') toasts.push(back.fix, { intent: 'warn' });
-            await reread();
-          }),
-      });
-      return;
-    }
-    const undo = arrangement.commit();
-    /* The layout STAYS. On a live page the branch above set the declaration; on the sample the
-       toast says plainly that nothing was written, because a mock that pretends to have saved is a
-       mock that will be believed. */
-    toasts.push(copy.arrangedNotSaved(result?.page.title ?? slug), { intent: 'warn', undo });
+    /* DONE SETS THE DECLARATION, whole, and the page is read again from the record. A refusal leaves the mode open with
+       the draft in it, so Cancel still means cancel. Undo sets the body that was there before. The sample's arrangement
+       was kept in memory under a toast saying nothing was written; with no sample there is no page to arrange without a
+       record, so `live` is only narrowed here. */
+    if (!live || saving) return;
+    saving = true;
+    const title = result?.page.title ?? slug;
+    const m = await import('$lib/record/page-write.ts');
+    const placed = arrangement.body.map((b) => ({ i: b.block, span: b.span }));
+    const out = await m.saveArrangement(apiBase(), slug, result?.blocks.length ?? 0, placed, extra, undefined, result?.page.declared_version);
+    saving = false;
+    if (out.from !== 'written') return void toasts.push(out.fix, { intent: 'warn' });
+    arrangement.commit();
+    await reread();
+    extra = [];
+    arrangement.slots = null;
+    const before = out.before;
+    toasts.push(copy.arranged(title), {
+      undo: () =>
+        void m.setBody(apiBase(), before, undefined, out.version).then(async (back) => {
+          if (back.from !== 'written') toasts.push(back.fix, { intent: 'warn' });
+          await reread();
+        }),
+    });
   }
 
   /** Held while a handle is down, so the drop target knows what is moving. */
@@ -619,7 +600,7 @@
   }
 
   /**
-   * THE DECLARATION THE RECORD HOLDS, AND THE APP'S ONLY WHERE THERE IS NO RECORD.
+   * THE DECLARATION THE RECORD HOLDS, AND NOTHING ELSE.
    *
    * This read `PAGES` — the web app's own built-in declarations — for every page, so somebody
    * opening "How this is built" on their own record was shown the demo's copy of it. A page the
@@ -635,22 +616,12 @@
    * with the row this page is about. That is the record's own declaration, read from the record;
    * the app's copy of the same template is not, and this no longer reaches for it.
    *
-   * THE FALLBACK IS FOR A RECORD THAT GENUINELY HAS NONE: the sample, where `PAGES` IS the record,
-   * and a live answer with nothing declared on it.
+   * AND THERE IS NO FALLBACK. A live answer with no blocks on it fell back to `PAGES`, so a real page
+   * the record held empty printed the seeded studio's declaration of the same slug as its source,
+   * which is the demo's copy again by a narrower door. It prints the record's page with no blocks,
+   * which is what the record holds.
    */
-  const recorded = $derived<DogPage | undefined>(
-    live && live.page.blocks.length ? ({ ...live.page.page, blocks: live.page.blocks } as unknown as DogPage) : undefined,
-  );
-  const source = $derived<DogPage | undefined>(
-    recorded ?? (result ? ((result.page.param ? PAGES[templateOf(result.page)] : PAGES[result.page.page]) ?? { ...result.page, blocks: result.blocks }) : undefined),
-  );
-
-  /** Which declaration a resolved page came from: the one template whose expansion produced it. */
-  function templateOf(page: LivePageDecl): string {
-    for (const [key, decl] of Object.entries(PAGES))
-      if (decl.for && decl.for.register === page.param?.register) return key;
-    return page.page;
-  }
+  const source = $derived<DogPage | undefined>(result ? ({ ...result.page, blocks: result.blocks } as unknown as DogPage) : undefined);
 
   const declaration = $derived(source ? dogText(source) : '');
 
@@ -669,7 +640,7 @@
 <svelte:window {onkeydown} />
 
 {#if got === null}
-  <!-- Bars until the record answers: a sample page drawn and then swapped is two pages. -->
+  <!-- Bars until the record answers. -->
   <Waiting head />
 {:else if got.from === 'refused'}
   <div class="page said">
@@ -688,7 +659,7 @@
       kind="error"
       heading
       title={copy.noSuch('page', slug)}
-      body={copy.theseExist('Pages', got.from === 'missing' ? got.held : Object.entries(readPages()).map(([slug, p]) => ({ address: slug, title: p.title })))}
+      body={copy.theseExist('Pages', got.from === 'missing' ? got.held : [])}
     >
       {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
     </Empty>
@@ -776,13 +747,13 @@
                states and says collapsing them into one is the failure; a filter that matched nothing
                and a register with nothing in it are different facts, and the second is the one
                somebody can act on. -->
-          <!-- On a live page the register's size is known only when the block reads all of it. -->
-          {@const held = block.register && !(live && block.where) ? REGISTERS[block.register] : undefined}
+          <!-- The register's size is known only when the block reads all of it. -->
+          {@const held = block.register && !block.where ? REGISTERS[block.register] : undefined}
           {@const drawn = draw(
             block,
             held
               ? {
-                  rows: live ? block.total : heldBy(block.register!),
+                  rows: block.total,
                   name: held.name,
                   ...(held.holds ? { holds: held.holds } : {}),
                   /* WHERE THE FIRST ROW WOULD GO, and `19 §6` says the action for this state is
@@ -884,7 +855,7 @@
             {#if block.cannot}
               <p class="block-cannot">{block.cannot}</p>
             {:else if block.actions?.length && !block.refusals.length}
-              <ActionRows rows={block.actions} now={live?.now ?? NOW} />
+              <ActionRows rows={block.actions} now={live?.now ?? Date.now()} />
             {:else if drawn.refusal}
               {@const act = drawn.refusal.action}
               <Empty

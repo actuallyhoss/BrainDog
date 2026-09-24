@@ -28,7 +28,7 @@ import { registerHooks, stripTypeScriptTypes } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { compileModule } from 'svelte/compiler';
 
-import { heldBy, REGISTERS } from '../record/api.ts';
+import { REGISTERS } from '../record/api.ts';
 import { forget } from '../record/boot-live.ts';
 import type { Ask, Refusal, Said } from './record.ts';
 
@@ -144,7 +144,7 @@ function record(name: string, params: URLSearchParams): Response {
   return json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `Nothing here answers ${name}.` } });
 }
 
-/* ── 1. the live versus sample decision ──────────────────────────────────── */
+/* ── 1. the record, or its refusal ───────────────────────────────────────── */
 
 test('a record that answers boot is the source, and boot is not asked a second time to say so', async () => {
   tab(record);
@@ -154,32 +154,26 @@ test('a record that answers boot is the source, and boot is not asked a second t
   assert.equal(asked('boot'), 1);
 });
 
-for (const [what, answer] of [
-  ['nothing answers at all', null],
-  ['a static host serves its fallback page', () => new Response('<!doctype html><title>Not found</title>', { status: 404 })],
-  ['the record says UNAUTHORIZED', () => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } })],
+for (const [what, answer, code] of [
+  ['nothing answers at all', null, 'UNREACHABLE'],
+  ['a static host serves its fallback page', () => new Response('<!doctype html><title>Not found</title>', { status: 404 }), 'UNREACHABLE'],
+  ['the record says UNAUTHORIZED', () => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } }), 'UNAUTHORIZED'],
 ] as const) {
-  test(`${what}: there is no record here, so the tab draws the sample and asks the host for nothing more`, async () => {
+  test(`${what}: there is no record here, so every call repeats the refusal and the host is asked nothing more`, async () => {
     tab(answer === null ? null : () => answer());
     const source = await open();
-    assert.equal(source.sample, true, 'the screen drew an error where the public demo draws the sample');
+    assert.equal(source.sample, false, 'a record that could not be read was drawn as the sample, and there is no sample any more');
 
-    const boot = value(await source.boot(), 'the sample boot');
-    assert.deepEqual(
-      boot.registers.map((r) => [r.id, r.count]).slice(0, 1),
-      [['obligations', heldBy('obligations')]],
-      'the sample bar counted something other than the rows the sample holds',
-    );
+    for (const [call, out] of [
+      ['boot', await source.boot()],
+      ['schema', await source.schema('obligations')],
+      ['page', await source.page('obligations', EMPTY, null)],
+      ['count', await source.count('obligations', EMPTY)],
+    ] as const) {
+      assert.equal(refused(out, call).code, code, `${call} answered with a different code from the one boot gave`);
+    }
 
-    const drawn = value(await source.page('obligations', EMPTY, null), 'the sample page');
-    assert.equal(drawn.matched, heldBy('obligations'));
-    assert.equal(drawn.names, null, 'the sample claimed to know what its refs are called, and it has no record to know it from');
-
-    const unknown = refused(await source.schema('no-such-register'), 'the sample schema');
-    assert.equal(unknown.code, 'REGISTER_UNKNOWN');
-    assert.deepEqual(unknown.allowed, Object.keys(REGISTERS), 'the refusal did not say which lists there are');
-
-    assert.equal(sent.length, 1, 'the sample went to the network');
+    assert.equal(sent.length, 1, 'a refused screen went on asking the record');
     assert.equal(sent[0]?.name, 'boot');
   });
 }
@@ -214,13 +208,13 @@ test('THE SOURCE IS HELD WHILE THE SHELL’S ANSWER IS HELD, promise and all', a
 });
 
 test('and it is not rebuilt merely because the record changed its mind underneath', async () => {
-  tab(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } }));
-  const sample = await open();
-  assert.equal(sample.sample, true);
+  tab(record);
+  const held = await open();
+  assert.equal(held.sample, false);
 
-  /* The record has become reachable, and nothing has told this tab so. */
-  host = record;
-  assert.equal(await open(), sample, 'the memo rebuilt on its own, so it is paying for the walk again on every read');
+  /* The record now refuses, and nothing has told this tab so. */
+  host = () => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Ask the owner for access.' } });
+  assert.equal(await open(), held, 'the memo rebuilt on its own, so it is paying for the walk again on every read');
   assert.equal(asked('boot'), 1);
 });
 
@@ -228,27 +222,26 @@ test('and it is not rebuilt merely because the record changed its mind underneat
  * THE TEST THE REPAIR WAS MADE FOR.
  *
  * The memo is keyed on the identity of `readBoot`'s promise, so `forget()` clears it without knowing
- * it exists. A tab that read the sample once used to go on drawing the sample on `/r/<register>` for
- * as long as it was open, even after the record had become reachable.
+ * it exists. A tab that read one answer once used to go on drawing it on `/r/<register>` for as long
+ * as it was open, even after the record had answered something else.
  *
  * IT WOULD FAIL AGAIN IF THE KEY WENT BACK TO A BOOLEAN. `chosen !== null`, a `built` flag or any
- * module-level latch is true for the rest of the tab's life, so `open` would hand back the sample
- * source below and `after.sample` would be `true`. The assertion on identity fails first, which is
- * the same fault said more precisely. The test above is the other half of the pin: together they
- * allow exactly one rebuild, the one the shell asked for.
+ * module-level latch is true for the rest of the tab's life, so `open` would hand back the source
+ * below and `after.boot()` would still answer. The assertion on identity fails first, which is the
+ * same fault said more precisely. The test above is the other half of the pin: together they allow
+ * exactly one rebuild, the one the shell asked for.
  */
 test('A WRITE FORGETS THE SHELL’S ANSWER, AND THE NEXT READ ARRIVES SOMEWHERE ELSE', async () => {
-  tab(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } }));
+  tab(record);
   const before = await open();
-  assert.equal(before.sample, true);
+  assert.deepEqual(value(await before.boot(), 'boot'), BOOT);
 
   forget();
-  host = record;
+  host = () => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Ask the owner for access.' } });
 
   const after = await open();
-  assert.notEqual(after, before, 'the memo survived the forget, so this tab is still drawing the sample over a record it can read');
-  assert.equal(after.sample, false);
-  assert.deepEqual(value(await after.boot(), 'boot'), BOOT);
+  assert.notEqual(after, before, 'the memo survived the forget, so this tab is still drawing an answer the record has since changed');
+  assert.equal(refused(await after.boot(), 'boot').code, 'FORBIDDEN');
   assert.equal(asked('boot'), 2, 'the record was asked again, once');
 });
 

@@ -229,32 +229,9 @@
     return () => window.removeEventListener('bdpref', reread);
   });
 
-  /**
-   * The bar saying this is a sample record, and the way out of it.
-   *
-   * A STRANGER LANDED ON SOMEBODY ELSE'S COMPANY WITH NO EXPLANATION. Booting into a complete
-   * synthetic business is the right decision, because an empty product demonstrates nothing: the
-   * missing half was the sentence saying what it is. Without it the first screen reads as a product
-   * that has already decided who you are, which `loop/REWORK.md` names as the single largest piece
-   * of the onboarding friction.
-   *
-   * IT GOES AWAY WHEN THE RECORD IS SOMEBODY'S. Every record this build can open is the sample, so
-   * the test is the dismissal and not a property of the data. When a real record can be opened the
-   * test becomes whether this one is it, and the bar disappears on its own for everybody who has
-   * one, which is the state that needs no dismissal at all.
-   */
   /* CLEARED ON EVERY NAVIGATION, or `data-screen` is the PREVIOUS screen's answer for exactly as
      long as this one takes to arrive, which is the window every browser gate measures in. */
   beforeNavigate(leaving);
-
-  let dismissed = $state(pref.read().sampleSaid === true);
-  /* AND A LIVE RECORD IS NOT THE SAMPLE: the bar told somebody reading their own record that nothing they did was saved. */
-  const sampleSaid = $derived(dismissed || data.live === true);
-
-  function putSampleAway() {
-    dismissed = true;
-    pref.write({ sampleSaid: true });
-  }
 
   /* HOW MANY ROWS ARE WAITING, ANYWHERE. A row typed on the first run and left behind was known only
      to the list it belongs to, which is the one screen the person is no longer on. This is the read
@@ -276,10 +253,11 @@
   /* THE HAIRLINE READS THE POLL NOW, AND IT WAS A CONSTANT UNTIL W56. `const live = 'open'` stood here with a comment
      saying there was no write and no poll yet, so the `polling` and `offline` rules below could never match
      (`loop/research-living-in-it.md` §1.1). `follow` starts one poll of `/api/version` per tab (`lib/data/live.ts`),
-     on a live record only: the sample is in the browser, nothing else writes to it, and a static host answers
-     `/api/version` with its SPA fallback, which would draw offline on the one record that cannot be. `page.url` and not
-     `location`, so a move from one record to another follows the address being opened. */
-  $effect(() => follow(data.live === true ? apiBase(page.url) : null));
+     on a record that answered only. NOT OVER A REFUSAL, though its shell says `live`: `version` is `READ+`, so on the
+     signed-out sign-in screen every tick was a 401 and the hairline went to `offline`, which the sample's shell had
+     hidden by saying `live: false` until DIRECTION 26 took it away. `page.url` and not `location`, so a move from one
+     record to another follows the address being opened. */
+  $effect(() => follow(data.live === true ? (data.refused ? null : apiBase(page.url)) : null));
 
   /** Where `g` then a letter lands. `g 1`–`g 9` address the nth item of YOUR nav, in YOUR order. */
   /* `g s` IS HERE NOW. It was removed on the grounds that "search is not a place you go, it is the
@@ -450,28 +428,11 @@
     -->
     {#key page.url.pathname}
     <main id="main" class="body" data-screen={settled()}>
-      <!-- ABOVE THE SCREEN AND INSIDE THE SCROLLER, so it is the first thing read and the first
-           thing to leave when the reader scrolls. A fixed strip across the top of every screen is a
-           permanent tax on the height of every screen, and this is a sentence somebody reads once. -->
-      {#if !sampleSaid}
-        <aside class="sample" role="note">
-          <p class="sample-said">
-            <strong>{copy.sampleWhat}</strong>
-            <span class="sample-why">{copy.sampleWhy}</span>
-          </p>
-          <span class="sample-acts">
-            <a class="sample-go" href={at('/start')}>{copy.sampleStart}</a>
-            <button type="button" class="sample-away" aria-label={copy.samplePutAway} title={copy.samplePutAway} onclick={putSampleAway}>
-              <span class="sample-away-word">{copy.samplePutAway}</span>
-              <span class="sample-away-glyph"><Icon name="close" size="m" /></span>
-            </button>
-          </span>
-        </aside>
-      {/if}
-      <!-- AND WHAT IS WAITING, WHEREVER YOU ARE. It sits under the sample bar rather than above it
-           because that bar is read once and dismissed, and this is a fact about the last thing the
-           person did. It is a note and never an alarm: no intent colour, no control, and nothing is
-           broken. Only the one screen it belongs to can put it right, and it says which. -->
+      <!-- WHAT IS WAITING, WHEREVER YOU ARE, ABOVE THE SCREEN AND INSIDE THE SCROLLER, so it is the
+           first thing read and the first to leave when the reader scrolls. The sample bar stood above
+           it until DIRECTION 26 took the sample away. It is a note and never an alarm: no intent
+           colour, no control, and nothing is broken. Only the one screen it belongs to can put it
+           right, and it says which. -->
       {#if unsaved > 0}
         <aside class="unsaved" role="note">
           <p class="unsaved-said">
@@ -717,52 +678,6 @@
     background: var(--s2);
   }
 
-  /* THE SAMPLE BAR. A note, not an alarm: nothing is wrong and nothing is urgent, and the day it
-     looks like an error is the day it gets dismissed unread. It is the same treatment the register
-     screen gives what the record noticed, for the same reason. */
-  /* A page-level banner (DESIGN-BRIEF 4.9): a full-width strip at the top of the panel, `s1` and a
-     bottom hairline only. Not a floating card, and no accent wash. */
-  /* ONE LINE ON A LAPTOP (DESIGN-SYSTEM 4.9, APPENDIX C2). It wrapped to two at 1440, so the bar was
-     taller than the page head's own gap on every screen; the sentence now truncates before it wraps. */
-  .sample {
-    display: flex;
-    flex-wrap: nowrap;
-    gap: var(--sp-1) var(--sp-5);
-    align-items: center;
-    justify-content: space-between;
-    min-block-size: 40px;
-    padding: var(--sp-1) var(--sp-4) var(--sp-1) var(--sp-6);
-    background: var(--s1);
-    border-block-end: 1px solid var(--line);
-  }
-
-  .sample-said {
-    flex: 1 1 0;
-    min-inline-size: 0;
-    margin: 0;
-    overflow: hidden;
-    color: var(--ink2);
-    font-size: var(--t-sm);
-    line-height: var(--lh-body);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .sample-away-glyph {
-    display: none;
-  }
-
-  .sample-said strong {
-    color: var(--ink);
-    font-weight: 500;
-  }
-
-  .sample-acts {
-    display: inline-flex;
-    gap: var(--sp-1);
-    align-items: center;
-  }
-
   /* THE SAME TREATMENT THE REGISTER SCREEN GIVES WHAT THE RECORD NOTICED: a line, not a wash, and no
      intent colour. The day a standing note looks like an error is the day it is dismissed unread,
      and this one stands on every screen for as long as the rows are unwritten. */
@@ -788,124 +703,6 @@
     .unsaved {
       margin: var(--sp-3) var(--sp-4) 0;
       padding: var(--sp-2) var(--sp-3);
-    }
-  }
-
-  /* `--ctl-h`, WHICH IS 44 ON A COARSE POINTER AND 32 ON A FINE ONE. `05 §6` and `13 §7`: density
-     follows the POINTER and never the width. These were `padding` alone and measured 122x38 and
-     102x36 on a phone, on every screen in the product at once, which is the only reason the number
-     was small enough to notice. `min-block-size` and not `block-size`, because a label that wraps
-     grows and 44 is the floor rather than the size. */
-  .sample-go,
-  .sample-away {
-    display: inline-flex;
-    align-items: center;
-    min-block-size: var(--ctl-h-sm);
-    padding: 0 var(--sp-3);
-    border: 1px solid transparent;
-    border-radius: var(--r-sm);
-    font-size: var(--t-sm);
-    font-weight: 500;
-    text-decoration: none;
-    white-space: nowrap;
-    cursor: pointer;
-    transition:
-      background var(--d-state) var(--ease-out),
-      color var(--d-state) var(--ease-out);
-  }
-
-  /* The page's one primary: ink fill, never a pill. */
-  .sample-go {
-    background: var(--ink);
-    color: var(--bg);
-  }
-
-  .sample-go:hover {
-    background: var(--primary-hover);
-  }
-
-  .sample-away {
-    background: none;
-    color: var(--ink2);
-  }
-
-  .sample-away:hover {
-    background: var(--s2);
-    color: var(--ink);
-  }
-
-  @media (pointer: coarse) {
-    .sample-go,
-    .sample-away {
-      min-block-size: var(--ctl-h);
-    }
-  }
-
-  /**
-   * ON A PHONE IT IS ONE LINE, because at 390 by 844 it was a hundred and ninety pixels.
-   *
-   * Measured: the sentence wrapped to five lines, the two controls dropped to a sixth, and the
-   * card took the top quarter of the first screen of the product. On `/r/obligations` that pushed
-   * the heading, the count, the filter bar and the capture field down with it, and the first row
-   * of the register began at 700px. The first thing a person saw on their phone was a paragraph
-   * explaining that what they could not yet see was made up.
-   *
-   * THE FIRST SENTENCE IS THE ONE THAT DOES THE WORK. "This is a sample record" is the whole fact;
-   * the rest is the reassurance, and reassurance is what a small screen can afford to lose. It is
-   * still on the page for a screen reader rather than removed from the markup, because the reader
-   * who cannot see the layout is not the one short of room.
-   *
-   * The comment above this bar says it is "a sentence somebody reads once". A sentence read once
-   * that costs a quarter of every screen until it is dismissed is being charged for by the day.
-   */
-  @media (width < 640px) {
-    .sample {
-      gap: var(--sp-2) var(--sp-3);
-      align-items: center;
-      /* 56px AT THE END, THE SAME ROOM `PageHead` LEAVES, because the search button is fixed in that
-         corner at this width and sat on top of the bar's sentence. */
-      padding: var(--sp-1) 56px var(--sp-1) var(--gutter);
-      /* It still WRAPS, because "Start your own" and "Put this away" beside a bold sentence do not
-         fit 390px and shrinking either below the 44px floor is the one thing a small screen may
-         not trade. Two rows instead of six is the whole of the fix. */
-      justify-content: flex-start;
-    }
-
-    .sample-said {
-      flex: 1 1 auto;
-      min-inline-size: 0;
-    }
-
-    .sample-why {
-      position: absolute;
-      inline-size: 1px;
-      block-size: 1px;
-      margin: -1px;
-      padding: 0;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
-    }
-
-    .sample-acts {
-      flex: 0 0 auto;
-      gap: 0;
-    }
-
-    /* ONE ROW OF 52, NOT TWO OF 80 (APPENDIX C2). The dismiss keeps its name for a screen reader and
-       its 44px target, and draws the close glyph instead of three words the row had no room for. */
-    .sample-away {
-      justify-content: center;
-      min-inline-size: var(--ctl-h);
-      padding: 0;
-    }
-
-    .sample-away-word {
-      display: none;
-    }
-
-    .sample-away-glyph {
-      display: inline-flex;
     }
   }
 
@@ -1048,14 +845,10 @@
       block-size: 40px;
     }
 
-    /* The sample bar is the first thing at the top of a phone, which is where that button floats,
+    /* What is waiting is the first thing at the top of a phone, which is where that button floats,
        so it ends before it, as the page head already does. */
     .unsaved {
       margin-inline-end: calc(var(--sp-3) + 40px + var(--sp-2));
-    }
-
-    .sample {
-      padding-inline-end: calc(var(--sp-3) + 40px + var(--sp-2));
     }
   }
 

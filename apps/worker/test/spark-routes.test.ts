@@ -22,13 +22,17 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { DEMO_CONTEXT } from '../src/route.ts';
 import { bundled, objectStorage } from './bundled-worker.ts';
 
 const HOST = 'app.example.test';
 const ORIGIN = `https://${HOST}`;
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
 const URL_ = 'https://gateway.example.test/v1/chat/completions';
+/* A PERSON CONTEXT NO SIGN-IN BUILT, the shape the public demo forwarded until it went (`loop/research-no-sample.md` A1).
+   The demo is gone and the object's lock is not, so the lock is held here to a context a forged or mis-wired door could
+   still hand it. */
+const UNCREDENTIALED = { principal: { kind: 'person', id: 'p_demo', level: 'read' }, credentialed: false };
+
 /* NOT A SECRET: the fake KEK `spark-demo.test.ts` binds, so the Worker has a key path and builds an engine at all. */
 const FAKE_KEK = '0'.repeat(64);
 
@@ -73,29 +77,29 @@ const door = (route: 'status' | 'settings', headers: Record<string, string>, bod
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 
-/* ── the demo, at the object ─────────────────────────────────────────────────────────────────────────────────────────── */
+/* ── somebody who never signed in, at the object ─────────────────────────────────────────────────────────────────────── */
 
 /* THE OBJECT'S TWO LOCKS RUN ON `servesSpark`'s TRUTH, before the door is asked which route it is, so they cover a path
    only once the function names it. Measured with the old door bundled: the demo's status GET went past both locks to
    `serveApi` and answered 404 `ROUTE_UNKNOWN`, "There is no method called spark/status." That was harmless only because
    nothing answered the path; the day a door did, a lock that had not been widened with it would have let the demo in. */
-test("THE PUBLIC DEMO'S CONTEXT IS REFUSED AT STATUS AND AT SETTINGS, as it is at read, and the setting does not move", async () => {
+test('AN UNCREDENTIALED PERSON IS REFUSED AT STATUS AND AT SETTINGS, as at read, and the setting does not move', async () => {
   const { object, owner } = await hostedRecord();
-  const demo = { 'x-braindog-ctx': JSON.stringify(DEMO_CONTEXT) };
+  const stranger = { 'x-braindog-ctx': JSON.stringify(UNCREDENTIALED) };
 
-  const status = await read(await object.fetch(door('status', demo)));
-  assert.equal(status.status, 403, `the demo read Spark's status: ${JSON.stringify(status.body)}`);
+  const status = await read(await object.fetch(door('status', stranger)));
+  assert.equal(status.status, 403, `somebody who never signed in read Spark's status: ${JSON.stringify(status.body)}`);
   assert.equal(status.body.refusal?.code, 'NEEDS_BROWSER_SESSION');
   assert.equal(status.body.refusal?.at, 'principal');
 
-  const settings = await read(await object.fetch(door('settings', demo, { ask_cap: 1000 })));
-  assert.equal(settings.status, 403, `the demo configured Spark: ${JSON.stringify(settings.body)}`);
+  const settings = await read(await object.fetch(door('settings', stranger, { ask_cap: 1000 })));
+  assert.equal(settings.status, 403, `somebody who never signed in configured Spark: ${JSON.stringify(settings.body)}`);
   assert.equal(settings.body.refusal?.code, 'NEEDS_BROWSER_SESSION');
 
   /* A SIGNED-IN OWNER STILL GETS THROUGH, and reads the default cap, so the refusal above wrote nothing. */
   const seen = await read(await object.fetch(door('status', { 'x-braindog-ctx': JSON.stringify(owner) })));
   assert.equal(seen.status, 200, JSON.stringify(seen.body));
-  assert.equal(seen.body.value?.asks?.cap, 80, 'the demo patch was written anyway');
+  assert.equal(seen.body.value?.asks?.cap, 80, 'the refused patch was written anyway');
 });
 
 /* ── a bearer, at the router ─────────────────────────────────────────────────────────────────────────────────────────── */

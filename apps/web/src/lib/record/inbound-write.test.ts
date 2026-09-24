@@ -19,6 +19,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { Fetch } from './boot-live.ts';
+import { copy } from '../copy.ts';
 import { mailUrl, mintInbound, revokeInbound, words } from './inbound-write.ts';
 
 const BASE = 'https://app.brain.dog';
@@ -116,15 +117,23 @@ test('A HOST WITH NO MINT DOOR SAYS SO, and does not read as a record that said 
   assert.match(words.unrouted, /inbound\.token/u, 'it does not say where the self-host keeps it');
 });
 
-test('no record behind the screen is the sample, however the host failed to answer', async () => {
-  /* A static host answers the SPA shell to a POST it does not route, so the body is HTML and not JSON. */
-  const shell = host(() => new Response('<!doctype html>', { status: 200, headers: { 'content-type': 'text/html' } }));
-  assert.deepEqual(await mintInbound(BASE, shell.io), { kind: 'sample' });
-  /* And no answer at all is the same: there is no record here to mint on. */
-  assert.deepEqual(await revokeInbound(BASE, host(null).io), { kind: 'sample' });
-  /* `UNAUTHORIZED` is the Worker with no record behind the session, which `noRecord` already names. */
+test('NO SIGN-IN IS signin, and a host that answered nothing a record says is a record not reached', async () => {
+  /* ALL THREE WERE THE SAMPLE when the address named no record, and the screen answered them with the demo's sentence
+     about having no account. There is no sample now (`DIRECTION.md` §26). A 401 is a person who is not signed in, and
+     the screen already has the state for that: the sign-in button, then the same press again. */
   const bare = host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in.' } }));
-  assert.deepEqual(await mintInbound(BASE, bare.io), { kind: 'sample' });
+  assert.deepEqual(await mintInbound(BASE, bare.io), { kind: 'signin', fix: 'Sign in.' });
+  /* A static host answers the SPA shell to a POST it does not route, so the body is HTML and not JSON: nothing that
+     could mint was reached, and that is the sentence every other write on Settings says for it. */
+  const shell = host(() => new Response('<!doctype html>', { status: 200, headers: { 'content-type': 'text/html' } }));
+  assert.deepEqual(await mintInbound(BASE, shell.io), { kind: 'refused', fix: copy.recordNotReached });
+  /* And no answer at all is the same. */
+  assert.deepEqual(await revokeInbound(BASE, host(null).io), { kind: 'refused', fix: copy.recordNotReached });
+  /* JSON THAT CARRIES NO REFUSAL IS NOT A REFUSAL EITHER. Deleting the arm that says so left every test above green,
+     and `null` threw out of the press altogether, which left the Settings button busy and said nothing. */
+  assert.deepEqual(await mintInbound(BASE, host(() => json(200, { ok: false })).io), { kind: 'refused', fix: copy.recordNotReached });
+  assert.deepEqual(await mintInbound(BASE, host(() => json(200, null)).io), { kind: 'refused', fix: copy.recordNotReached });
+  assert.doesNotMatch(readFileSync(join(HERE, 'inbound-write.ts'), 'utf8'), /'sample'|noRecord/u);
 });
 
 test('a success carrying no token is not a token', async () => {

@@ -79,21 +79,24 @@ test('the way on always offers somewhere, and the next question only when one wa
   assert.match(snippet, /href="\/inbox"/u, 'the inbox the list page offers is not offered here');
 });
 
-test('a defer with nothing after it leaves for the queue instead of redrawing what it parked', () => {
+test('a defer leaves for the next question or the queue instead of redrawing what it parked', () => {
+  /* ONE PLACE NOW, WHERE THERE WERE TWO. The sample's defer, which sent nothing, kept its own copy of this
+     line, and it went with the sample (DIRECTION 26); the defer that sends `decide` is what is left, and it
+     must still leave. */
   const guard = /void goto\(at\(onwardTo \? `\/decide\/\$\{onwardTo\}` : '\/decide'\)\);/gu;
-  assert.equal([...page.matchAll(guard)].length, 2, 'a defer still stays on a page that draws the parked question open');
+  assert.equal([...page.matchAll(guard)].length, 1, 'a defer still stays on a page that draws the parked question open');
+  const deferAt = page.indexOf('async function deferIt() {');
+  assert.ok(deferAt >= 0, 'deferIt no longer reads the way this test assumes');
+  assert.ok(page.slice(deferAt).search(guard) >= 0, 'the defer that sends `decide` does not leave the page');
 });
 
-test('a record that refuses this question does not offer a sample question as the next one', () => {
+test('a record that refuses this question offers only its own queue as the way on', () => {
   /* FOUND BY THE CHECKER ON 22 SEPTEMBER. The refused state used to draw only `Back to Decide`; it now
      draws the shared way on, and `openIds` fell back to the SAMPLE queue for every state but `live`,
-     so a live record that refused one question offered `Next question` to a sample id it never held. */
-  const expr = /const openIds = \$derived\((.+)\);/u.exec(page)?.[1];
-  assert.ok(expr, 'the open queue is no longer one derived expression, so this test cannot read it');
-  const openIds = new Function('from', 'queue', 'QUEUE', `return ${expr};`) as (from: string, queue: string[], sample: { id: string }[]) => string[];
-  const sample = [{ id: 'sample-1' }];
-  assert.deepEqual(openIds('refused', ['live-1'], sample), ['live-1']);
-  assert.deepEqual(openIds('refused', [], sample), []);
-  assert.deepEqual(openIds('live', ['live-1'], sample), ['live-1']);
-  assert.deepEqual(openIds('sample', [], sample), ['sample-1']);
+     so a live record that refused one question offered `Next question` to a sample id it never held.
+     The sample is gone (DIRECTION 26): every way on reads the record's own queue, which is empty when
+     that read was refused too, and nothing here reads the fixture module. */
+  assert.doesNotMatch(page, /from '\$lib\/record\/data\.ts'/u, 'the screen reads the fixture module again');
+  for (const read of ['const here = $derived(queue.indexOf(', 'nextOpen(queue, ', 'stillWaiting(queue, '])
+    assert.ok(page.includes(read), `the way on no longer reads the record's queue: ${read}`);
 });

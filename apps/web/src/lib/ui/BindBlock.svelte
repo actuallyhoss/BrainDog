@@ -22,21 +22,19 @@
   Personalized Menus and withdrew them, and WCAG 3.2.3 is normative against it. A block joins a page
   you already have; the page's own position is yours.
 
-  ON A LIVE RECORD THE PRESS WRITES THE BLOCK. The sheet asks `boot` which side it is on when it opens (`readBoot` keeps
-  its answer per base, so this costs no request), and on the sample it calls `onbind` as it always did, so the screens
-  that open it say what would have been added. On a live record it offers the record's own pages that require the list,
-  adds the block through `bind-write.ts`, and the toast's Put back sets the page body the write read. It used to offer
-  the sample's pages whatever record was behind it, so a real list was offered the fictional studio's pages, and the
-  press put the block on none of them.
+  THE PRESS WRITES THE BLOCK. The sheet asks `boot` whether the record answered when it opens (`readBoot` keeps its
+  answer per base, so this costs no request), offers the record's own pages that require the list, adds the block
+  through `bind-write.ts`, and the toast's Put back sets the page body the write read. A record that refused is its
+  sentence in the sheet. It used to offer the sample's pages whatever record was behind it, so a real list was offered
+  the fictional studio's pages and the press put the block on none of them; after that it kept a sample side, which
+  offered them only when no record answered and toasted "nothing was saved". DIRECTION 26 removed that side.
 -->
 <script lang="ts">
   import { KINDS, isKind } from 'braindog-render';
 
   import { apiBase } from '../at.ts';
   import { copy } from '../copy.ts';
-  import { REGISTERS, pages } from '../record/api.ts';
   import type { Destination, ListDecl } from '../record/bind-write.ts';
-  import { BINDABLE } from '../record/seed.ts';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
   import Sheet from './Sheet.svelte';
@@ -47,7 +45,6 @@
     register,
     predicate,
     says,
-    onbind,
   }: {
     open?: boolean;
     register: string;
@@ -58,13 +55,16 @@
     predicate: string;
     /** The same filter in the words a person reads, which the block's heading carries after the list's name. */
     says: string;
-    /** The sample's answer to the press. A live record never calls it. */
-    onbind: (page: string, kind: string) => void;
+    /**
+     * CALLED BY NOTHING. It was the sample's answer to the press, and the sheet has no sample side now. It stays optional
+     * in the type because `/r/[register]` still passes one and that screen belongs to the register list's own change
+     * (wave B1 of `loop/research-no-sample.md`); drop it there, then here.
+     */
+    onbind?: (page: string, kind: string) => void;
   } = $props();
 
-  /** Which record the sheet is over, and what it offers there. Nothing until `boot` has answered. */
+  /** What the record offers, or its refusal. Nothing until `boot` has answered. */
   type Side =
-    | { from: 'sample'; name: string; destinations: { slug: string; title: string }[]; kinds: string[] }
     | { from: 'live'; name: string; destinations: Destination[]; kinds: string[]; declared: ListDecl | null; unkept: string | null }
     | { from: 'refused'; fix: string };
 
@@ -82,24 +82,7 @@
   let problem = $state<string | null>(null);
 
   /**
-   * THE SAMPLE'S SIDE, AND THE ONLY PLACE THIS FILE READS THE BUILD'S OWN PAGES AND LISTS. `bind-write.test.ts` sweeps the
-   * rest of the file for either, so a live record is never offered the fictional studio's pages again.
-   *
-   * 06 §7, *"a page cannot read a register it did not declare"*: a page that does not require the register is not a page
-   * this block can live on, so it is not offered.
-   */
-  function sampleSide(): Side {
-    /* `pages()`, not `PAGES`: the declared set holds TEMPLATES, so this offered a destination called `{{name}}`, a page
-       that does not exist, while the three that do sat in the rail beside it. A template is not somewhere you can put a
-       block; the pages it resolves to are. */
-    const destinations = Object.values(pages())
-      .filter((p) => p.requires.includes(`register.${register}`) && p.nav)
-      .map((p) => ({ slug: p.page, title: p.title }));
-    return { from: 'sample', name: REGISTERS[register]?.name ?? register, destinations, kinds: BINDABLE.filter((k) => isKind(k)) };
-  }
-
-  /**
-   * Ask `boot` which side this is, then what that side offers. Asked on every opening, so a page added since is there.
+   * Ask `boot` whether the record answered, then what it offers. Asked on every opening, so a page added since is there.
    *
    * `predicate` and `says` are passed in rather than read after the first `await`, so the effect that calls this tracks
    * them and a filter changed under an open sheet is asked about again.
@@ -109,8 +92,7 @@
     try {
       const { readBoot } = await import('../record/boot-live.ts');
       const booted = await readBoot(apiBase());
-      if (booted.from === 'sample') next = sampleSide();
-      else if (booted.from === 'refused') next = { from: 'refused', fix: booted.fix };
+      if (booted.from === 'refused') next = { from: 'refused', fix: booted.fix };
       else {
         const m = await import('../record/bind-write.ts');
         const sheet = await m.liveSheet(apiBase(), list);
@@ -149,11 +131,6 @@
 
   async function bind() {
     if (!side || side.from === 'refused' || busy) return;
-    if (side.from === 'sample') {
-      onbind(toPage, kind);
-      open = false;
-      return;
-    }
     const to = side.destinations.find((d) => d.slug === toPage);
     if (!to || side.unkept) return;
     const declared = side.declared;

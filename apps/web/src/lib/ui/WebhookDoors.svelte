@@ -44,10 +44,9 @@
 
   const doors = $derived(listed?.kind === 'doors' ? listed.doors : []);
 
-  /* EVERY ARM IS A SENTENCE: `sample` is the demo's one line for every act that needs an account, and the rest is the
-     record's own `fix`, verbatim (`13 §6`). */
+  /* EVERY ARM IS A SENTENCE: the record's own `fix`, verbatim (`13 §6`). */
   const lineOf = (s: Said | Listed | null | undefined): string =>
-    !s || s.kind === 'minted' || s.kind === 'doors' ? (s?.kind === 'minted' ? copy.doorsMade : '') : s.kind === 'sample' ? copy.notOnDemo : s.fix;
+    !s || s.kind === 'minted' || s.kind === 'doors' ? (s?.kind === 'minted' ? copy.doorsMade : '') : s.fix;
   const toneOf = (s: Said | Listed | null | undefined): 'bad' | undefined =>
     !s || s.kind === 'minted' || s.kind === 'doors' ? undefined : 'bad';
 

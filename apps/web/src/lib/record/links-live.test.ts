@@ -1,7 +1,6 @@
 /**
  * What points at one row, against the record: the record's groups drawn as the page's sections, the
- * sample when there is no record, the record's sentence for any other refusal, and nothing sent for
- * a row the record could not hold.
+ * record's sentence for every refusal, and nothing sent for a row the record could not hold.
  */
 
 import { test } from 'node:test';
@@ -99,14 +98,21 @@ test('a row nothing points at draws no sections', async () => {
   assert.deepEqual(await linkReader(BASE, io).read('things', 4), { from: 'live', groups: [], cursor: null });
 });
 
+/* NO RECORD IS A REFUSAL NOW, NOT THE SAMPLE (DIRECTION 26): the page drew the sample's backlinks under these three,
+   which were another business's rows pointing at whatever row the address named. */
+test("a 401 at no slug is the record's sentence, not the sample's backlinks", async () => {
+  const { io } = host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } }));
+  assert.deepEqual(await linkReader(BASE, io).read('things', 4), { from: 'refused', fix: 'Sign in again.' });
+});
+
 for (const [what, answer] of [
   ['nothing answers', null],
-  ['the record says UNAUTHORIZED', () => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } })],
   ['a static host answers a 404 page', () => new Response('<!doctype html><title>Not found</title>', { status: 404 })],
 ] as const)
-  test(`the sample is read when ${what}`, async () => {
-    const { io } = host(answer);
-    assert.deepEqual(await linkReader(BASE, io).read('things', 4), { from: 'sample' });
+  test(`a refusal, and no sample, when ${what}`, async () => {
+    const out = await linkReader(BASE, host(answer).io).read('things', 4);
+    assert.equal(out.from, 'refused');
+    assert.match(out.from === 'refused' ? out.fix : '', /\S/u);
   });
 
 test("any other refusal is the record's own sentence", async () => {
@@ -115,16 +121,17 @@ test("any other refusal is the record's own sentence", async () => {
   assert.deepEqual(await linkReader(BASE, io).read('things', 4), { from: 'refused', fix });
 });
 
-test('a pending row sends nothing', async () => {
+test('a pending row sends nothing, and nothing on the record points at it', async () => {
   const { io, sent } = host(record);
-  for (const seq of [-1, 0, Number.NaN]) assert.deepEqual(await linkReader(BASE, io).read('things', seq), { from: 'sample' });
+  for (const seq of [-1, 0, Number.NaN]) assert.deepEqual(await linkReader(BASE, io).read('things', seq), { from: 'live', groups: [], cursor: null });
   assert.equal(sent.length, 0);
 });
 
-test('the row page draws what points at the row from the record, and the sample only when there is none', () => {
+test('the row page draws what points at the row from the record, and never the sample walk', () => {
   const page = readFileSync(new URL('../../routes/r/[register]/[seq]/+page.svelte', import.meta.url), 'utf8');
   assert.match(page, /from '\$lib\/record\/links-live\.ts'/u);
   assert.match(page, /linked\?\.from === 'live'/u, 'the live groups are what the page draws when there are any');
+  assert.doesNotMatch(page, /\bbacklinks\(/u, "the sample's backlinks are drawn under a row again");
 });
 
 test("a pack's own list that points here is drawn under its declared name and labelled columns, not dropped", async () => {

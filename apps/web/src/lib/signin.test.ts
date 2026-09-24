@@ -16,7 +16,7 @@ const NOW = 1_757_000_000_000;
 
 const host = (m: Partial<Methods> = {}): Said<Methods> => ({
   ok: true,
-  value: { passkey: true, magic: true, key: false, open: false, demo: false, me: null, ...m },
+  value: { passkey: true, magic: true, key: false, open: false, me: null, ...m },
 });
 
 const seen = (over: Partial<Seen> = {}): Seen => ({

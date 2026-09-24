@@ -113,9 +113,13 @@ test('THE KEY IS THE TOKEN, THE PERSON, OR THE ADDRESS', () => {
   /* A bearer that an operation grant turned into its approver is that person, as a session would be. */
   assert.equal(limits.limitKey({ door: 'bearer', record: 'r', ctx: { principal: { kind: 'person', id: 'p_1' } } }, ip), 'person:p_1');
   assert.equal(limits.limitKey({ door: 'session', record: 'r', ctx: { principal: { kind: 'person', id: 'p_1' } } }, ip), 'person:p_1');
-  /* Every visitor to the demo is the same principal, so the principal cannot tell one of them from another. */
-  assert.equal(limits.limitKey({ door: 'demo', record: 'r', ctx: { principal: { kind: 'person', id: 'p_demo' } } }, ip), `ip:${ip}`);
+  /* NO DOOR IS THE ADDRESS, and it is the only keyless request left now the public demo is gone
+     (`loop/research-no-sample.md` A1). The demo was keyed by address too, because every visitor to it was the one
+     `p_demo`; a door that is no longer a `LimitDoor` cannot be handed in at all, which the typecheck holds. */
   assert.equal(limits.limitKey(null, ip), `ip:${ip}`);
+  // @ts-expect-error `demo` is not a door any host has.
+  const gone: limits.LimitDoor = { door: 'demo', ctx: { principal: { kind: 'person', id: 'p_demo' } } };
+  assert.ok(gone);
 });
 
 test('AN /mcp REQUEST IS A READ AT THE DOOR, AND SO IS A NAME NO ROUTE HAS', () => {

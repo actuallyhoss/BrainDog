@@ -14,19 +14,17 @@
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
   import { titleOf } from '$lib/title.ts';
-  import { MISSING, relative, since } from 'braindog-render';
+  import { MISSING, since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { homePage, said } from '$lib/voice.svelte.ts';
   import { homeSlugOf } from '$lib/voice.ts';
-  import * as pref from '$lib/pref.ts';
-  import { homeCurrency, identityFor, NOW, ROWS, actorOf, metric, type Metric } from '$lib/record/api.ts';
+  import { homeCurrency, actorOf, type Metric } from '$lib/record/api.ts';
   import type { News } from '$lib/record/news-live.ts';
   import type { LiveBlock } from '$lib/record/page-live.ts';
   import { landing } from '$lib/record/landing.ts';
-  import { amountOf, currencyOf, drawn, symbolText } from '$lib/record/money.ts';
+  import { drawn, symbolText } from '$lib/record/money.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
-  import Money from '$lib/ui/Money.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -42,22 +40,9 @@
   /**
    * THE DAY WHERE THE PERSON IS, on a live record: Home read Wednesday 16 September at two in the morning of the 17th,
    * because it named the day in UTC. The record's own `tz` is not read, because every host provisions `UTC` and nobody
-   * sets it, so it cannot be told from a zone somebody chose. The sample's frozen day stays in UTC, so it reads the
-   * same everywhere.
+   * sets it, so it cannot be told from a zone somebody chose.
    */
-  const today = $derived(
-    new Date(data.now).toLocaleDateString('en-GB', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      ...(data.live ? {} : { timeZone: 'UTC' }),
-    }),
-  );
-
-  const days = (iso: unknown) =>
-    typeof iso === 'string' ? (Date.parse(`${iso}T12:00:00Z`) - NOW) / 86_400_000 : Infinity;
-
-  const NEEDS_CAP = 6;
+  const today = $derived(new Date(data.now).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }));
 
   /**
    * "Since you were away" grows with WRITES rather than with rows, so on a record anybody uses it is
@@ -66,14 +51,8 @@
    */
   const NEWS_CAP = 8;
 
-  /**
-   * THE MARK IS AN INSTANT, NOT A FLAG. A timestamp is one string, it survives a new arrival
-   * correctly, and it is what the real record already uses (`member.seen_at`). Unset means
-   * everything is new, which is what a first visit should be.
-   */
-  let seen = $state(pref.read().seen);
-
-  /* ON A LIVE RECORD THE MARK IS THE RECORD'S, and `whatsNew` answers only what is after it. */
+  /* THE MARK IS THE RECORD'S (`member.seen_at`), and `whatsNew` answers only what is after it. A mark kept on this
+     device filtered the sample's feed, which had no record to keep one; it went with the sample (DIRECTION 26). */
   let feed = $state<News | null>(null);
   let tiles = $state<Metric[] | null>(null);
 
@@ -81,26 +60,26 @@
    * HOME AS THE RECORD'S USE CASE DECLARES IT (`loop/research-spark.md` S13). A use case names its Home as the page
    * `home-<use case>`, and that page is drawn here in place of the house figures, which read Money and asked a
    * student's record for three figures it refuses. A record with no use case draws the house Home's own page, `home`,
-   * which Money declares. `null` is the sample, which draws the Home below unchanged; a record that holds neither page
-   * draws the Home below too. Nothing is drawn in its place until the record has said which.
+   * which Money declares. A record that holds neither page draws the Home below. Nothing is drawn in its place until
+   * the record has said which.
    *
    * ONLY A PAGE THE RECORD HOLDS IS ASKED FOR. A use case may declare no Home page (a reading club shared as a file), and
    * asking for `home-<use case>` anyway logged a refusal on every Home load. `boot` names every page, so the use case's
    * page is asked for when it is there, then the house one when that is, and otherwise none.
    */
-  const declares = $derived(data.live ? homeSlugOf(homePage(), data.pages) : null);
+  const declares = $derived(homeSlugOf(homePage(), data.pages));
   let declared = $state<{ blocks: LiveBlock[]; now: number } | null>(null);
   let asking = $state(false);
-  const news = $derived(data.live ? (feed ?? { items: data.whatsNew, upTo: data.upTo, sinceCapped: data.sinceCapped }) : null);
+  const news = $derived(feed ?? { items: data.whatsNew, upTo: data.upTo, sinceCapped: data.sinceCapped });
 
-  const fresh = $derived(news ? news.items : data.whatsNew.filter((item) => !seen || item.at > seen));
-  const capped = $derived(news ? news.sinceCapped : data.sinceCapped);
+  const fresh = $derived(news.items);
+  const capped = $derived(news.sinceCapped);
 
   $effect(() => {
     /* A RECORD THAT REFUSED `boot` REFUSES THESE TOO, and each of them is a refusal written into its
        log. Home asked for the declared page, the figures and the feed on every load a refused
        reader gave it, and threw all three answers away. */
-    if (!data.live || data.refused) return;
+    if (data.refused) return;
     const me = data.me.person;
     const slug = declares;
     const lists = data.lists;
@@ -126,41 +105,22 @@
   });
 
   function markRead() {
-    if (news) {
-      /* Cleared here at once; a mark that did not land leaves the record's where it was, so the same
-         lines come back on the next visit rather than being lost. */
-      const upTo = news.upTo;
-      feed = { items: [], upTo, sinceCapped: false };
-      void import('$lib/record/news-live.ts').then((m) => m.markAll(apiBase(), upTo));
-      return;
-    }
-    /* The newest item's own instant, not the wall clock, so an arrival written a second later is
-       not swallowed by the mark. */
-    const newest = data.whatsNew.reduce((a, item) => (item.at > a ? item.at : a), '');
-    if (!newest) return;
-    seen = newest;
-    pref.write({ seen: newest });
+    /* Cleared here at once; a mark that did not land leaves the record's where it was, so the same
+       lines come back on the next visit rather than being lost. */
+    const upTo = news.upTo;
+    feed = { items: [], upTo, sinceCapped: false };
+    void import('$lib/record/news-live.ts').then((m) => m.markAll(apiBase(), upTo));
   }
 
-  /* NOT YET READ FROM A LIVE RECORD: the obligations due this week and the services lapsing are the
-     sample's rows, so a live Home draws neither rather than somebody else's. */
-  const dueSoon = $derived(
-    data.live
-      ? []
-      : (ROWS.obligations ?? [])
-          .filter((e) => (e.fields.state === 'open' || e.fields.state === 'part') && days(e.fields.due) <= 7)
-          .sort((a, b) => String(a.fields.due).localeCompare(String(b.fields.due))),
-  );
+  /* WHAT NEEDS YOU IS THE QUESTIONS WAITING. The obligations due this week and the services lapsing were drawn here from
+     the sample's rows and never from a record's, so with the sample gone (DIRECTION 26) Home draws neither until it
+     reads them from the record. */
+  const needCount = $derived(data.questions.length);
 
-  const lapsing = $derived(data.live ? [] : (ROWS.services ?? []).filter((e) => e.fields.state === 'lapsing'));
-  const shown = $derived(dueSoon.slice(0, NEEDS_CAP));
-  const hidden = $derived(dueSoon.length - shown.length);
-  const needCount = $derived(data.questions.length + lapsing.length + dueSoon.length);
-
-  const cells = $derived(data.live ? (tiles ?? []) : ['owed-to-you', 'due-30d', 'overdue'].map((id) => metric(id)));
+  const cells = $derived(tiles ?? []);
 
   /* WHERE A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD LANDS (`landing.ts`), and `null` for everybody else. */
-  const lands = $derived(data.live ? landing(data) : null);
+  const lands = $derived(landing(data));
 
   /**
    * A QUALIFIER'S STATE PHRASE, and only that phrase, takes the metric's tone.
@@ -177,10 +137,6 @@
       ? { before: text.slice(0, m.index), phrase: m[0], after: text.slice(m.index + m[0].length) }
       : { before: text, phrase: '', after: '' };
   }
-
-  /* Home writes a row's second line from what the row already holds, never from a new store. */
-  const nameOf = (register: string, fields: Readonly<Record<string, unknown>>) => identityFor(register, fields)?.name ?? '';
-  const joined = (...parts: unknown[]) => parts.filter((p) => typeof p === 'string' && p !== '').join(' · ');
 
   /**
    * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so, through `data-screen` on
@@ -264,7 +220,7 @@
     <!-- A DECLARED HOME SAYS WHAT IS DUE ITSELF, so this is only the questions waiting, and only when there are some. -->
     {#if !asking && (!declared || data.questions.length > 0)}
     <Section title={said('needs_you')} count={needCount}>
-      {#if data.questions.length === 0 && shown.length === 0 && lapsing.length === 0 && lands}
+      {#if data.questions.length === 0 && lands}
         <!--
           A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD IS TOLD WHICH LIST IS THEIRS, and is never told the
           record is empty. Measured through the real seed (`loop/research-invite-landing.md` finding 1): a
@@ -285,11 +241,8 @@
             {/if}
           {/snippet}
         </Empty>
-      {:else if data.questions.length === 0 && shown.length === 0 && lapsing.length === 0}
-        {@const anything =
-          (data.live
-            ? data.index.registers.reduce((n, r) => n + r.count, 0)
-            : Object.values(ROWS).reduce((n, list) => n + list.length, 0)) + data.open}
+      {:else if data.questions.length === 0}
+        {@const anything = data.index.registers.reduce((n, r) => n + r.count, 0) + data.open}
         <!-- Two nothings: a record never started, and a record worked through. Only the first gets
              an action, because on the second there is nothing to do and that is the message. -->
         <Empty
@@ -303,9 +256,9 @@
         </Empty>
       {:else}
         <!--
-          THREE KINDS OF ROW IN ONE LIST: a decision, a lapsing service and an obligation. The faint
-          kind icon says which before the words do, and it is the same ink for all of them; the shape
-          says the kind. Ids are not printed here: `y` copies one and the row's own screen shows it.
+          THE QUESTIONS WAITING, each with the faint kind icon the lapsing services and the obligations
+          due beside it once had, when those were the sample's rows. Ids are not printed here: `y`
+          copies one and the row's own screen shows it.
         -->
         <ul class="ledger needs">
           {#each data.questions as q}
@@ -322,50 +275,7 @@
               </a>
             </li>
           {/each}
-
-          {#each lapsing as s}
-            <li>
-              <a class="line need" href={at(`/r/services/${s.seq}`)}>
-                <span class="need-kind"><Icon name="service" size="m" /></span>
-                <span class="line-title">{s.fields.name} is lapsing</span>
-                <span class="need-amount"><Money minor={amountOf(s.fields.cost) ?? 0} currency={currencyOf(s.fields.cost) ?? ''} /></span>
-                <!-- A lapse is a warning and not a failure: the service still runs and there is time
-                     to renew it. The dot and the word carry it together, never the colour alone. -->
-                <span class="need-when num" data-intent="warn">
-                  <span class="dot" aria-hidden="true"></span>{relative(String(s.fields.renews), NOW)}
-                </span>
-                <span class="need-detail">{joined(nameOf('services', s.fields), s.fields.note)}</span>
-              </a>
-            </li>
-          {/each}
-
-          {#each shown as e}
-            {@const late = days(e.fields.due) < 0}
-            {@const owed = e.fields.direction === 'owed_to_me'}
-            <li>
-              <a class="line need" href={at(`/r/obligations/${e.seq}`)}>
-                <span class="need-kind"><Icon name="obligation" size="m" /></span>
-                <span class="line-title">{e.fields.what}</span>
-                <span class="need-amount">
-                  <Money minor={amountOf(e.fields.amount) ?? 0} currency={currencyOf(e.fields.amount) ?? ''} />
-                </span>
-                <span class="need-when num" data-intent={late ? 'bad' : undefined}>
-                  {#if late}<span class="dot" aria-hidden="true"></span>{/if}{relative(String(e.fields.due), NOW)}
-                </span>
-                <span class="need-detail">
-                  {joined(owed ? copy.owedToYou : copy.youOwe, nameOf('obligations', e.fields), e.fields.note)}
-                </span>
-              </a>
-            </li>
-          {/each}
         </ul>
-
-        {#if hidden > 0}
-          <a class="more tap" href={at('/r/obligations?f=state:in:open,part&f=due:before:today')}>
-            {hidden} more past their date
-            <Icon name="arrow" size="s" />
-          </a>
-        {/if}
       {/if}
     </Section>
     {/if}
@@ -615,20 +525,6 @@
     font-size: var(--t-xs);
     text-align: end;
     white-space: nowrap;
-  }
-
-  .need-when[data-intent='bad'] {
-    --tone: var(--danger);
-    color: var(--danger);
-  }
-
-  .need-when[data-intent='warn'] {
-    --tone: var(--warn);
-    color: var(--warn);
-  }
-
-  .need-when .dot {
-    margin-inline-end: var(--sp-1);
   }
 
   .need-detail {

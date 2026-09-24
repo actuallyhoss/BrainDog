@@ -20,7 +20,6 @@
 
 import { createClient } from '@braindog/client';
 import type { Fetch } from '../record/boot-live.ts';
-import { noRecord } from '../record/device.ts';
 import { copy } from '../copy.ts';
 
 type Refusal = { code: string; fix: string };
@@ -54,7 +53,6 @@ export type Door = { id: string; name: string; register: string | null; mintable
 /** What the list says. Every arm but `doors` is a sentence rather than a failure. */
 export type Listed =
   | { kind: 'doors'; doors: Door[] }
-  | { kind: 'sample' }
   | { kind: 'signin'; fix: string }
   | { kind: 'refused'; fix: string };
 
@@ -66,14 +64,15 @@ const verifiedByPath = (verify: unknown): boolean =>
 const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
 
 /** A refusal as either screen says it. */
-function refusedAs(out: Answered): { kind: 'sample' } | { kind: 'signin'; fix: string } | { kind: 'refused'; fix: string } {
+function refusedAs(out: Answered): { kind: 'signin'; fix: string } | { kind: 'refused'; fix: string } {
   /* A conflict cannot come back from either method, which read no row; it is here so the type is whole. */
   const refusal: Refusal = !out.ok && 'refusal' in out ? out.refusal : { code: 'VALUE_MALFORMED', fix: copy.doorsNoToken };
-  /* NO RECORD BEHIND THE PAGE, the demo and a static host's SPA fallback, is the sample and not a failure. */
-  if (noRecord(refusal.code)) return { kind: 'sample' };
   /* THE RECORD'S OWN SENTENCE, VERBATIM (`13 §6`). It says whether the sign-in is stale or the host was started without
-     `BRAINDOG_TOKEN`, and a paraphrase here would say that worse. */
-  if (refusal.code === 'NEEDS_BROWSER_SESSION') return { kind: 'signin', fix: refusal.fix };
+     `BRAINDOG_TOKEN`, and a paraphrase here would say that worse. A 401 WITH NO SLUG IN THE ADDRESS was the sample, and
+     the screen drew the demo's sentence about having no account; there is no sample now (`DIRECTION.md` §26), so it is a
+     person not signed in, and the section's sign-in button is the way forward wherever they are. An unreachable host
+     falls through to `refused` with the client's sentence, as it already did under a slug. */
+  if (refusal.code === 'UNAUTHORIZED' || refusal.code === 'NEEDS_BROWSER_SESSION') return { kind: 'signin', fix: refusal.fix };
   return { kind: 'refused', fix: refusal.fix };
 }
 
@@ -117,7 +116,6 @@ export const doorUrl = (base: string, path: string): string => `${base.replace(/
 export type Said =
   | { kind: 'minted'; token: string; url: string | null }
   | { kind: 'signin'; fix: string }
-  | { kind: 'sample' }
   | { kind: 'refused'; fix: string };
 
 /** One answer to `ingestMint`, as the screen says it. The answer is `{ ingest, token, rec, path }`. */

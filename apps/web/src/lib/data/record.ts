@@ -215,18 +215,12 @@ const refusing = (refusal: Refusal): Source => {
 };
 
 /* ─────────────────────────────────────────────────────────────────────────────────────────────
-   THE SAMPLE, WHEN THERE IS NO RECORD TO READ. TEMPORARY, AND THIS IS THE ONE PLACE IT IS DECIDED.
+   THE SAMPLE, WHICH NOTHING CHOOSES ANY MORE. DELETE THIS BLOCK AND `sample` ON `Source` (wave B1 of
+   `loop/research-no-sample.md`).
 
-   DELETE THIS BLOCK, `SAMPLE_WHEN` AND THE ONE LINE IN `open` THAT READS IT once the demo record is
-   provisioned and the Worker's `DEMO_RECORD` is set, which is the day
-   `curl -s https://app.brain.dog/api/boot` with no Authorization answers `"ok":true`. From then on a
-   record that does not answer is a refusal on this screen like any other.
-
-   UNTIL THEN THE PUBLIC DEMO MUST NOT BREAK. A static host answers `/api/boot` with its SPA
-   fallback, which the client reads as `UNREACHABLE`, and the Worker with no `DEMO_RECORD` answers
-   `UNAUTHORIZED`. Either one means there is no record this tab can read, so the list draws the
-   in-browser sample it drew before, every other screen draws the same sample, and the screen says
-   so in the sample bar's words rather than drawing an error.
+   `open` used to hand it out when `boot` found no record this tab could read. The app now shows only a
+   real record (`loop/DIRECTION.md` 26): `readBoot` has no sample answer, so a record that does not
+   answer is a refusal on this screen like any other, and this block is left unreached until B1 removes it.
 
    IT IS A SECOND IMPLEMENTATION ON THE ONE SCREEN MEANT TO BE EVIDENCE, and that is why it is
    fenced here rather than threaded through the route: the route has one code path, which is
@@ -297,7 +291,6 @@ export function open(): Promise<Source> {
       source: (async (): Promise<Source> => {
         const booted = await from;
         if (booted.from === 'live') return remote(createClient({ base: apiBase() }), booted.boot);
-        if (booted.from === 'sample') return SAMPLE;
         /* A refusal is not kept by `readBoot` either, so the next screen asks the record again and
            lands here with a different promise in hand. */
         return refusing({ code: booted.code, fix: booted.fix });

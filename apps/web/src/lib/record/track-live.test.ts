@@ -1,6 +1,6 @@
 /**
- * One thread against the record: the record's rows with their refs as numbers, the sample when there
- * is no record, and the record's own sentence for any other refusal.
+ * One thread against the record: the record's rows with their refs as numbers, and the record's own
+ * sentence for every refusal.
  *
  * THE PROPERTY UNDER TEST IS WHOSE ROWS THEY ARE. `/t/<track>` drew the built-in sample whatever
  * record was open, so the assertions that matter are the ones where the two records DISAGREE: this
@@ -112,14 +112,21 @@ test('a register two refs point at is walked once', async () => {
   assert.equal(things.length, 1, 'both `tracks` and `tasks` point at things, and it is read once');
 });
 
+/* NO RECORD IS A REFUSAL NOW, NOT THE SAMPLE (DIRECTION 26): under these three the screen drew the studio's own
+   thread, updates and runs under the thread number in the address. */
+test("a 401 at no slug is the record's sentence, not the sample's thread", async () => {
+  const { io } = host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } }));
+  assert.deepEqual(await trackReader(BASE, io).read(), { from: 'refused', fix: 'Sign in again.' });
+});
+
 for (const [what, answer] of [
   ['nothing answers', null],
-  ['the record says UNAUTHORIZED', () => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } })],
   ['a static host answers a 404 page', () => new Response('<!doctype html><title>Not found</title>', { status: 404 })],
 ] as const)
-  test(`the sample is read when ${what}`, async () => {
-    const { io } = host(answer);
-    assert.deepEqual(await trackReader(BASE, io).read(), { from: 'sample' });
+  test(`a refusal, and no sample thread, when ${what}`, async () => {
+    const out = await trackReader(BASE, host(answer).io).read();
+    assert.equal(out.from, 'refused');
+    assert.ok(out.from === 'refused' && out.fix.trim() !== '', 'a refusal with no sentence says nothing to the reader');
   });
 
 test("any other refusal is the record's own sentence, and the sample is not drawn under it", async () => {
@@ -131,12 +138,13 @@ test("any other refusal is the record's own sentence, and the sample is not draw
 test('the thread screen reads the record, and draws no sample under a refusal', () => {
   const page = readFileSync(new URL('../../routes/t/[track]/+page.svelte', import.meta.url), 'utf8');
   assert.match(page, /from '\$lib\/record\/track-live\.ts'/u);
-  /* THE SAMPLE IS THE FALLBACK AND NEVER THE OVERLAY: rows come from the record whenever it answered. */
-  assert.match(page, /fromRecord && got\?\.from === 'live' \? got\.thread : ROWS/u);
+  /* THE RECORD'S ROWS OR NONE: the sample's `ROWS` were the fallback here, and there is no sample to fall back to. */
+  assert.match(page, /got\?\.from === 'live' \? got\.thread : \{\}/u);
   /* A REFUSAL IS THE RECORD'S SENTENCE, drawn before anything else and with no rows under it. */
   assert.match(page, /\{#if refused !== null\}/u);
   /* AND NOTHING IS DRAWN WHILE THE READ IS STILL OUT. */
   assert.match(page, /\{:else if !answered\}/u);
-  /* A LIVE RUN HAS NO WORKED-EXAMPLE TRANSCRIPT TO OPEN. */
-  assert.match(page, /const job = fromRecord \? null : jobOf\(s\)/u);
+  /* NOR ANY OF THE SAMPLE: its rows, its frozen clock, its worked-example transcripts, or a toast saying nothing was
+     posted where the post could have been written. */
+  assert.doesNotMatch(page, /\bROWS\b|\bNOW\b|\bjobOf\b|notWritten/u, 'the thread screen reads the sample again');
 });

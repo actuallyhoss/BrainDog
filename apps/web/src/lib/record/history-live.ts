@@ -1,16 +1,16 @@
 /**
- * A row's history on `/r/<register>/<seq>`, read from the record, with the sample when there is none.
+ * A row's history on `/r/<register>/<seq>`, read from the record.
  *
  * A ROUTE-ONLY MODULE, like `search-live.ts`: the client carries the route table as a value.
  *
- * `UNREACHABLE` and `UNAUTHORIZED` mean there is no record here, and the sample's ledger is read the
- * way the page always read it. Any other refusal is the record's own sentence.
+ * EVERY REFUSAL IS THE RECORD'S OWN SENTENCE. `UNREACHABLE` and `UNAUTHORIZED` at an address with no slug used to
+ * read the sample's ledger instead, which put another business's history beside whatever row the address named; there
+ * is no sample now (DIRECTION 26), so a host that did not answer says so and a 401 says to sign in.
  */
 
 import { createClient, type ClientOptions } from '@braindog/client';
 
-import { AUDIT, display, labelOf, NOW, REGISTERS } from './api.ts';
-import { noRecord } from './device.ts';
+import { display, labelOf, REGISTERS } from './api.ts';
 import { readBoot } from './boot-live.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
@@ -18,8 +18,8 @@ export type Fetch = NonNullable<ClientOptions['fetch']>;
 /** One line of a row's history: who, what, and when, newest first. */
 export type Line = { by: string; note: string; at: string };
 
-/** `now` is the clock `since` reads against: the reader's for the record, the sample's own otherwise. */
-export type Told = { from: 'live' | 'sample'; lines: Line[]; now: number } | { from: 'refused'; fix: string };
+/** `now` is the clock `since` reads against: the reader's, since every line is the record's. */
+export type Told = { from: 'live'; lines: Line[]; now: number } | { from: 'refused'; fix: string };
 
 /** An event as the record's `history` sends it, and only the keys read here. */
 export type Event = {
@@ -31,9 +31,6 @@ export type Event = {
   to?: unknown;
   note?: string | null;
 };
-
-export const sampleLines = (register: string, seq: number): Line[] =>
-  AUDIT.filter((e) => e.target === `${register}#${seq}`).map((e) => ({ by: e.by, note: e.note, at: e.at }));
 
 /**
  * An event in words, when it carries no note of its own.
@@ -67,7 +64,7 @@ export const linesOf = (register: string, events: readonly Event[]): Line[] =>
 /**
  * The names of the people on this record, by id, for saying who did what. `boot` sends them to the owner and to a member
  * who may read People, and the shell keeps that answer, so this costs no call. A host older than `names` is asked
- * `members`, which is the owner's. Anybody else, a refusal and the sample get an empty map, and each person is said as
+ * `members`, which is the owner's. Anybody else and a refusal get an empty map, and each person is said as
  * You or Someone on this record.
  */
 export async function readNames(base: string, io?: Fetch): Promise<ReadonlyMap<string, string>> {
@@ -83,12 +80,16 @@ export async function readNames(base: string, io?: Fetch): Promise<ReadonlyMap<s
   );
 }
 
-/** One row's history. A row with no number the record could hold (a pending one) asks nothing. */
+/**
+ * One row's history.
+ *
+ * A ROW WITH NO NUMBER THE RECORD COULD HOLD (a pending one) ASKS NOTHING, and its answer is the true one: the record
+ * holds no events for it. It was `sample` with no lines, a word that now names nothing.
+ */
 export async function readHistory(base: string, register: string, seq: number, io?: Fetch): Promise<Told> {
-  if (!Number.isInteger(seq) || seq < 1) return { from: 'sample', lines: [], now: NOW };
+  if (!Number.isInteger(seq) || seq < 1) return { from: 'live', lines: [], now: Date.now() };
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   const out = await client.history(register, seq);
   if (out.ok) return { from: 'live', lines: linesOf(register, out.value as Event[]), now: Date.now() };
-  if ('refusal' in out && noRecord(out.refusal.code)) return { from: 'sample', lines: sampleLines(register, seq), now: NOW };
   return { from: 'refused', fix: 'refusal' in out ? out.refusal.fix : 'The row changed while it was being read.' };
 }

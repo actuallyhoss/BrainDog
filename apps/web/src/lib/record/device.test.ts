@@ -1,6 +1,6 @@
 /**
- * `/settings/agents`: what counts as a code, what each answer from `deviceApprove` says, and the sample
- * drawn in the kernel's shape.
+ * `/settings/agents`: what counts as a code, what each answer from `deviceApprove` says, and which rows
+ * a revoke still changes.
  *
  * THE ARITHMETIC OF A WRONG GUESS IS NOT HERE. The kernel spends the tries and denies the rows, and
  * tests that itself; this screen's part is refusing a malformed entry before it can spend one, and
@@ -12,13 +12,11 @@ import assert from 'node:assert/strict';
 
 import {
   reportKeyOf, CODE_DIGITS, LABEL_MAX, TOKEN_DAYS, answerOf, codeOf, connectLines, noRecord, normalise, reachKey, revocable,
-  sampleMachines, sampleTokens, standing, type DeviceRow, type TokenRow,
+  standing, type DeviceRow, type TokenRow,
 } from './device.ts';
-import { DEVICES, TOKENS } from './data.ts';
-import type { Device } from './schema.ts';
+import * as device from './device.ts';
 import { REACHES, SCOPES } from '@braindog/kernel';
 import { copy } from '../copy.ts';
-import { NOW } from '@braindog/seed';
 
 const STATUSES: DeviceRow['status'][] = ['pending', 'approved', 'active', 'expired', 'denied', 'revoked'];
 
@@ -86,15 +84,15 @@ test('the sentences for the refusals say what to do, and none prints a count of 
   assert.equal(copy.codeWrong, 'No machine is waiting with that code.');
   assert.match(copy.codeShort(5), /5 digits/);
   assert.match(copy.codeLong(7), /7 digits/);
-  assert.doesNotMatch(copy.notOnDemo, /\.\s+\S/, 'the demo says it in one sentence');
 });
 
-test('no-record refusals draw the sample, and a record that refuses for a reason does not', () => {
+/* `noRecord` STAYS UNTIL ITS LAST CALLER GOES (wave C of `loop/research-no-sample.md`), and it answers what it always did. */
+test('no-record refusals are 401 and UNREACHABLE with no slug, and a record that refuses for a reason is not one', () => {
   assert.equal(noRecord('UNREACHABLE'), true);
   assert.equal(noRecord('UNAUTHORIZED'), true);
   assert.equal(noRecord('FORBIDDEN'), false);
   assert.equal(noRecord('NEEDS_BROWSER_SESSION'), false);
-  /* UNDER A SLUG THERE IS ALWAYS A RECORD MEANT, so neither refusal is the sample: it would be drawn dressed as acme. */
+  /* UNDER A SLUG THERE IS ALWAYS A RECORD MEANT, so neither refusal means there is none. */
   assert.equal(noRecord('UNAUTHORIZED', '/app/acme/r/tasks'), false);
   assert.equal(noRecord('UNREACHABLE', '/app/acme/'), false);
   assert.equal(noRecord('UNAUTHORIZED', '/app/r/tasks'), true);
@@ -126,7 +124,7 @@ test('the words on this screen carry no em dash and no schema word', () => {
   const words = [
     ...Object.values(copy.deviceState), ...Object.values(copy.reachMeans), ...Object.values(copy.keyCan),
     copy.approveTitle, copy.codeLabel, copy.codeGo, copy.codeEmpty, copy.codeOther, copy.codeWrong, copy.codeTries,
-    copy.codeExpired, copy.signInAgainWhy, copy.signInAgain, copy.notOnDemo, copy.machines, copy.noDevices,
+    copy.codeExpired, copy.signInAgainWhy, copy.signInAgain, copy.machines, copy.noDevices,
     copy.tokens, copy.noKeys, copy.connectTitle, copy.connectLabel, copy.connectGo, copy.tokenOnce, copy.copyToken,
     copy.onNewMachine, copy.inClaudeCode, copy.connectDone, copy.unnamedMachine, copy.unnamedToken,
   ];
@@ -136,58 +134,34 @@ test('the words on this screen carry no em dash and no schema word', () => {
   }
 });
 
-/* ── the sample, in the record's shape ── */
+/* ── the rows, as the record lists them ── */
 
-test('the sample machines are rows listDevices could return', () => {
-  const rows = sampleMachines(DEVICES);
-  assert.equal(rows.length, DEVICES.length);
-  for (const [i, r] of rows.entries()) {
-    const d = DEVICES[i]!;
-    assert.ok(STATUSES.includes(r.status), r.status);
-    assert.ok((REACHES as readonly string[]).includes(r.reach), r.reach);
-    assert.equal(r.label, d.name);
-    assert.equal(r.last_used, d.lastSeen);
-    assert.ok(!Number.isNaN(Date.parse(r.expires)));
-  }
-});
-
-test('a sample row is named by a handle, never by its id', () => {
-  const rows = sampleMachines(DEVICES);
-  for (const [i, r] of rows.entries()) {
-    assert.match(r.handle, /^[0-9a-f]{16}$/);
-    assert.ok(!r.handle.includes(DEVICES[i]!.id));
-  }
-  assert.equal(new Set(rows.map((r) => r.handle)).size, rows.length, 'handles are distinct');
-  assert.equal(sampleMachines(DEVICES)[0]!.handle, rows[0]!.handle, 'and stable');
-});
-
-test('a locked sample row becomes denied, which is what five wrong codes leave in the kernel', () => {
-  const locked: Device = { ...DEVICES[0]!, id: 'dg_locked', state: 'locked' };
-  assert.equal(sampleMachines([locked])[0]!.status, 'denied');
-});
-
-test('the sample keeps its denied and its waiting rows, and only the live ones can be revoked', () => {
-  const rows = sampleMachines(DEVICES);
-  assert.ok(rows.some((r) => r.status === 'denied'));
-  assert.ok(rows.some((r) => r.status === 'pending'));
-  for (const r of rows) assert.equal(revocable(r), r.status === 'pending' || r.status === 'approved' || r.status === 'active');
-});
-
-test('the sample tokens are rows listTokens could return, with nothing shaped like a bearer', () => {
-  const rows = sampleTokens(TOKENS);
-  assert.equal(rows.length, TOKENS.length);
-  for (const t of rows) {
-    assert.ok((SCOPES as readonly string[]).includes(t.scope));
-    assert.equal(t.revoked_at, null);
-    for (const v of Object.values(t)) if (typeof v === 'string') assert.ok(v.length < 40, v);
+test('only a waiting, approved or working grant can be revoked; a finished one keeps saying what it said', () => {
+  for (const status of STATUSES) {
+    const row: DeviceRow = {
+      handle: 'h1', status, reach: 'runner', scope: null, label: 'Build box', ua: null, tries: 0,
+      expires: '2026-09-15T12:10:00.000Z', approved_by: null, approved_at: null, last_used: null,
+    };
+    assert.equal(revocable(row), status === 'pending' || status === 'approved' || status === 'active', status);
   }
 });
 
 test('a revoked token is not listed as standing', () => {
-  const [first] = sampleTokens(TOKENS);
-  assert.ok(first);
-  const gone: TokenRow = { ...first, id: 'tk_gone', revoked_at: new Date(NOW).toISOString() };
+  const first: TokenRow = {
+    id: 'tk_1', person_id: 'p_1', scope: 'write', label: 'Laptop', created_at: '2026-09-01T00:00:00Z',
+    last_used_at: null, last_surface: null, expires_at: null, revoked_at: null,
+  };
+  const gone: TokenRow = { ...first, id: 'tk_gone', revoked_at: '2026-09-02T00:00:00Z' };
   assert.deepEqual(standing([first, gone]).map((t) => t.id), [first.id]);
+});
+
+/*
+ * THE SAMPLE IS GONE FROM THIS MODULE (DIRECTION 26). `sampleMachines` and `sampleTokens` turned the fixture's
+ * machines and keys into the record's rows so `/settings/agents` could draw them to a visitor with no record;
+ * with no sample, nothing on that screen is drawn from anything but `listDevices` and `listTokens`.
+ */
+test('nothing here builds machines or keys that are not the record', () => {
+  assert.deepEqual(Object.keys(device).filter((k) => /^sample/i.test(k)), []);
 });
 
 /* ── connect an agent ── */

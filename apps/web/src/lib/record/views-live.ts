@@ -1,5 +1,5 @@
 /**
- * A saved view on `/v/<key>`, read from the record, with the sample when there is none.
+ * A saved view on `/v/<key>`, read from the record, and only from the record.
  *
  * A ROUTE-ONLY MODULE, like `row-live.ts`: the client carries the route table as a value.
  *
@@ -12,8 +12,9 @@
  * file reads it there. The page declarations `rows-write.ts` writes are a SECOND store, and the
  * screens disagreeing about which one holds a view is the thing to fix next.
  *
- * `UNREACHABLE` and `UNAUTHORIZED` mean there is no record here, and the route reads the sample as
- * it always did. `VIEW_UNKNOWN` is a view this record does not hold, carrying the addresses it does
+ * `UNREACHABLE` and `UNAUTHORIZED` are refusals like any other, said in their own words. They
+ * answered with the sample until DIRECTION 26, and the route drew the seeded studio's view of
+ * the same key over rows from the in-browser fixture. `VIEW_UNKNOWN` is a view this record does not hold, carrying the addresses it does
  * hold, so the answer ends the search instead of starting one. THAT SENTENCE WAS HALF TRUE UNTIL
  * `everyAddress` BELOW: the record builds `allowed` from `kernel.views(register)`, which is
  * `WHERE register = ?` (`packages/kernel/src/index.ts`), so a key naming a register with no views at
@@ -23,19 +24,18 @@
  * the record's sentence about that field is the only thing on the screen that can explain a view
  * that used to work.
  *
- * `<register>.<id>` IS THE ADDRESS, split at the last dot, because that is the shape the sample's own
- * keys already have (`obligations.overdue`) and the shape the record's key is in: a view belongs to
+ * `<register>.<id>` IS THE ADDRESS, split at the last dot, because that is the shape every link to a
+ * view already has (`obligations.overdue`) and the shape the record's key is in: a view belongs to
  * one register, and `VIEW_ID` in the kernel is lower case with no dot in it.
  *
  * THE DECLARATION IS THE SEED'S COPY, as it is for the row and the list (`remote.ts` says why), and
- * the rows come back through `entryOf`, so every helper the route already calls reads a live row the
- * way it reads a sample one.
+ * the rows come back through `entryOf`, so a live row reaches the route in the shape the list's own
+ * helpers already read.
  */
 
 import { createClient, type ClientOptions } from '@braindog/client';
 
 import { DOM_CAP, PAGE, REGISTERS } from './api.ts';
-import { noRecord } from './device.ts';
 import {
   entryOf,
   learn,
@@ -88,13 +88,12 @@ export type LiveView = {
 /**
  * What the route drew from.
  *
- * `missing` CARRIES THE RECORD'S SENTENCE AND THE RECORD'S ADDRESSES, not the sample's names: on a
- * record, listing the sample's two views under "There is no saved view called x" would answer the
- * question with two links that open somebody else's list.
+ * `missing` CARRIES THE RECORD'S SENTENCE AND THE RECORD'S ADDRESSES, and the route lists nothing
+ * else: it once listed the seeded studio's two views under "There is no saved view called x", which
+ * answered the question with two links that open somebody else's list.
  */
 export type Viewed =
   | { from: 'live'; view: LiveView; entries: Entry[]; matched: number; total: number; names: Names }
-  | { from: 'sample' }
   | { from: 'missing'; said: string; addresses: string[] }
   | { from: 'refused'; fix: string; register?: string };
 
@@ -216,7 +215,6 @@ export function keptColumns<C extends { field: string }>(all: readonly C[], kept
 function missed(out: object, register?: string): Viewed {
   if (!('refusal' in out)) return { from: 'refused', fix: liveWords.changed, ...(register === undefined ? {} : { register }) };
   const refusal = out.refusal as Said;
-  if (noRecord(refusal.code)) return { from: 'sample' };
   if (refusal.code === 'VIEW_UNKNOWN')
     return { from: 'missing', said: refusal.fix, addresses: (refusal.allowed ?? []).map((id) => `${register ?? ''}.${id}`) };
   return { from: 'refused', fix: refusal.fix, ...(register === undefined ? {} : { register }) };
@@ -352,8 +350,8 @@ export function viewReader(base: string, io?: Fetch): ViewReader {
        * is different, because the columns, the field labels and the name in the header all come
        * from it. A live view over a register the record would not declare therefore came back
        * `from: 'live'` with nothing to draw it with, and the route fell past every state it has
-       * into its 404: "There is no saved view called shipments.lapsing", over the sample's two view
-       * names, on a record that had just answered with the view. Both halves of that screen were
+       * into its 404: "There is no saved view called shipments.lapsing", over the seeded studio's two
+       * view names, on a record that had just answered with the view. Both halves of that screen were
        * wrong, and the second is the fictional studio on a real record.
        *
        * The record is asked once more, on this path only, because `learn` keeps no sentence and the

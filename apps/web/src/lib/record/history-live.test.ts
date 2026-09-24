@@ -1,15 +1,16 @@
 /**
- * A row's history against the record: the live events drawn newest first and in words, the sample
- * when there is no record, the record's sentence for any other refusal, and nothing sent for a row
- * the record could not hold.
+ * A row's history against the record: the live events drawn newest first and in words, the record's
+ * sentence for every refusal including the two that used to mean "draw the sample", and nothing sent
+ * for a row the record could not hold.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { display, NOW, REGISTERS, whoDid } from './api.ts';
-import { noteOf, readHistory, readNames, sampleLines, type Fetch } from './history-live.ts';
+import { display, REGISTERS, whoDid } from './api.ts';
+import * as history from './history-live.ts';
+import { noteOf, readHistory, readNames, type Fetch } from './history-live.ts';
 
 const BASE = 'http://record.test';
 
@@ -54,17 +55,27 @@ test("the record's events are drawn newest first, each with who and what", async
   assert.equal(url.searchParams.get('seq'), '2');
 });
 
+/* THERE IS NO SAMPLE BEHIND A REFUSAL ANY MORE (DIRECTION 26). These three answers, at an address with no slug, drew
+   the sample's ledger for services #2, which is another business's history under whatever row the address named. Each
+   is now the refusal it is: the record's sentence for a 401, and the client's own for a host that did not answer. */
+test("a 401 at no slug is the record's sentence, not the sample's lines", async () => {
+  const { io } = host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } }));
+  assert.deepEqual(await readHistory(BASE, 'services', 2, io), { from: 'refused', fix: 'Sign in again.' });
+});
+
 for (const [what, answer] of [
   ['nothing answers', null],
-  ['the record says UNAUTHORIZED', () => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } })],
   ['a static host answers a 404 page', () => new Response('<!doctype html><title>Not found</title>', { status: 404 })],
 ] as const)
-  test(`the sample's history is drawn when ${what}`, async () => {
-    const { io } = host(answer);
-    const out = await readHistory(BASE, 'services', 2, io);
-    assert.deepEqual(out, { from: 'sample', lines: sampleLines('services', 2), now: NOW });
-    assert.ok(sampleLines('services', 2).length > 0, 'the sample row has no history, so this proves nothing');
+  test(`a refusal, and no sample lines, when ${what}`, async () => {
+    const out = await readHistory(BASE, 'services', 2, host(answer).io);
+    assert.equal(out.from, 'refused');
+    assert.match(out.from === 'refused' ? out.fix : '', /\S/u, 'a refusal with no sentence says nothing to the reader');
   });
+
+test('the sample ledger is not exported for a screen to reach for', () => {
+  assert.equal('sampleLines' in history, false);
+});
 
 test("any other refusal is the record's own sentence", async () => {
   const fix = 'There is no register called services.';
@@ -72,9 +83,13 @@ test("any other refusal is the record's own sentence", async () => {
   assert.deepEqual(await readHistory(BASE, 'services', 2, io), { from: 'refused', fix });
 });
 
-test('a row the record could not hold, a pending one, sends nothing', async () => {
+test('a row the record could not hold, a pending one, sends nothing and has no history on the record', async () => {
   const { io, sent } = host(() => json(200, { ok: true, value: [] }));
-  for (const seq of [-1, 0, Number.NaN]) assert.deepEqual(await readHistory(BASE, 'services', seq, io), { from: 'sample', lines: [], now: NOW });
+  for (const seq of [-1, 0, Number.NaN]) {
+    const out = await readHistory(BASE, 'services', seq, io);
+    assert.equal(out.from, 'live');
+    assert.deepEqual(out.from === 'live' ? out.lines : null, []);
+  }
   assert.equal(sent.length, 0);
 });
 

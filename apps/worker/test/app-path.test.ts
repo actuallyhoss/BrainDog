@@ -47,7 +47,7 @@ test('A SLUG AFTER /app/ IS THE RECORD, A WORD THE APP ROUTES IS ITS PAGE, AND T
   assert.equal(appPath('/app/_app/x.js'), null);
   assert.equal(appPath('/app/_app/immutable/entry/start.js'), null);
   /* NOR IS `/app/api/*`, which names no record and no page: read as a page it was a second copy of the root `/api`,
-     the demo and the key doors included, and `slug-api.test.ts` runs that through the bundle. */
+     the key door included, and `slug-api.test.ts` runs that through the bundle. */
   for (const path of ['/app/api', '/app/api/', '/app/api/boot', '/app//api/vault/deposit']) assert.equal(appPath(path), null, path);
   /* AND NOTHING THAT MERELY STARTS WITH THOSE LETTERS. */
   for (const path of ['/', '/api/boot', '/apple', '/application/x', '/r/tasks', '/in/webhook/x']) assert.equal(appPath(path), null, path);
@@ -216,7 +216,7 @@ function entry(o: { session?: AuthResult<Who>; slug?: string | null } = {}) {
 const bare = (headers: Record<string, string> = {}) => new Request('https://brain.dog/app', { headers });
 const cookie = { cookie: `__Host-bd_s=${SID}` };
 
-test('GET /app WITH NO COOKIE IS THE SHELL, which draws the sample for a stranger, and the Directory is not asked', async () => {
+test('GET /app WITH NO COOKIE IS THE SHELL, and the app sends a stranger on to sign-in, and the Directory is not asked', async () => {
   const { deps, asked } = entry();
   const out = await appEntry(bare(), deps);
   assert.equal(out.status, 200);

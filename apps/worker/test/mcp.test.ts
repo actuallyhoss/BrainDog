@@ -90,7 +90,7 @@ test('and index.ts routes /mcp before any door, checks the headers before the be
   const src = readFileSync(fileURLToPath(new URL('../src/index.ts', import.meta.url)), 'utf8');
   const route = src.indexOf('async function route(');
   assert.ok(route > 0 && src.indexOf('servesMcp(url.pathname)', route) > 0, 'route() does not branch on /mcp');
-  assert.ok(src.indexOf('servesMcp(url.pathname)', route) < src.indexOf('doorOf(request', route), 'a cookie or the demo is decided before /mcp is');
+  assert.ok(src.indexOf('servesMcp(url.pathname)', route) < src.indexOf('doorOf(request', route), 'a cookie is decided before /mcp is');
   const agent = src.indexOf('async function agent(');
   assert.ok(agent > 0, 'there is no /mcp branch');
   assert.ok(src.indexOf('gate(request)', agent) < src.indexOf("bearerOf(request, 'mcp'", agent), 'the bearer is checked before the headers are');

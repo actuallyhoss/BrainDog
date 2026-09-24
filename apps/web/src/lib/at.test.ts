@@ -122,11 +122,23 @@ test('THE BASE HERE IS THE BASE THE BUILD WAS GIVEN, and the build lands where t
   assert.equal(config.kit.appDir ?? '_app', '_app');
 });
 
-test('A 401 UNDER A SLUG IS SENT TO SIGN-IN, and without a slug it is left to draw the sample', () => {
+/**
+ * A 401 IS SENT TO SIGN-IN WHEREVER IT LANDS, slug or not (DIRECTION 26, `loop/research-no-sample.md` brief A2).
+ *
+ * `/app/` WITH NOBODY SIGNED IN WAS THE SAMPLE, and this test used to hold that it was left alone to draw it. The app
+ * only ever shows a real record now, so the bare address asks for sign-in exactly as `/app/acme/` does, and `/start`
+ * with it: it needs a record to install into, and a stranger has none.
+ */
+test('A 401 IS SENT TO SIGN-IN, UNDER A SLUG OR NOT, and only the three addresses with no record are spared', () => {
+  assert.equal(signInFirst('UNAUTHORIZED', { pathname: '/app/', search: '' }), '/app/signin?next=%2Fapp%2F');
+  assert.equal(signInFirst('UNAUTHORIZED', { pathname: '/app', search: '' }), '/app/signin?next=%2Fapp');
   assert.equal(signInFirst('UNAUTHORIZED', { pathname: '/app/acme/r/tasks', search: '' }), '/app/signin?next=%2Fapp%2Facme%2Fr%2Ftasks');
-  assert.equal(signInFirst('UNAUTHORIZED', { pathname: '/app/r/tasks', search: '' }), null);
-  /* Any other refusal is the record's own sentence, drawn where it was asked. */
+  assert.equal(signInFirst('UNAUTHORIZED', { pathname: '/app/r/tasks', search: '?f=a' }), '/app/signin?next=%2Fapp%2Fr%2Ftasks%3Ff%3Da');
+  assert.equal(signInFirst('UNAUTHORIZED', { pathname: '/app/start', search: '' }), '/app/signin?next=%2Fapp%2Fstart');
+  /* Any other refusal is the record's own sentence, drawn where it was asked, and so is a host nobody reached. */
   assert.equal(signInFirst('FORBIDDEN', { pathname: '/app/acme/', search: '' }), null);
-  /* And sign-in itself is never sent to sign-in. */
-  assert.equal(signInFirst('UNAUTHORIZED', { pathname: '/app/acme/signin', search: '' }), null);
+  assert.equal(signInFirst('UNREACHABLE', { pathname: '/app/', search: '' }), null);
+  /* And sign-in itself is never sent to sign-in, nor an invitation, nor a shared page, with a slug or without. */
+  for (const pathname of ['/app/signin', '/app/acme/signin', '/app/invite', '/app/s/tok_1'])
+    assert.equal(signInFirst('UNAUTHORIZED', { pathname, search: '' }), null, pathname);
 });

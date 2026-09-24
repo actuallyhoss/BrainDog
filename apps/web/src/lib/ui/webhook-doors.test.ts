@@ -160,10 +160,23 @@ test('A DOOR THE RECORD NO LONGER DECLARES IS THE RECORD\'S OWN SENTENCE, which 
   assert.deepEqual(saidOf({ ok: false, refusal: { code: 'DECLARATION_UNKNOWN', fix } }, BASE), { kind: 'refused', fix });
 });
 
-test('NO RECORD BEHIND THE PAGE IS THE SAMPLE, the demo\'s one sentence and not a failure', async () => {
-  assert.deepEqual(await mintDoor(callerAt(BASE, host(null).io), BASE, 'stripe-events'), { kind: 'sample' });
-  assert.deepEqual(saidOf({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in.' } }, BASE), { kind: 'sample' });
-  assert.deepEqual(doorsOf({ ok: false, refusal: { code: 'UNREACHABLE', fix: 'Nothing answered.' } }), { kind: 'sample' });
+test('NO SIGN-IN IS signin AND NO HOST IS A REFUSAL, with no slug in the address as with one', async () => {
+  /* BOTH WERE THE SAMPLE when the address named no record, and the screen drew the demo's sentence about having no
+     account. There is no sample now (`DIRECTION.md` §26), so the answer no longer depends on the address. */
+  const fix = 'Sign in to this record first.';
+  assert.deepEqual(saidOf({ ok: false, refusal: { code: 'UNAUTHORIZED', fix } }, BASE), { kind: 'signin', fix });
+  assert.deepEqual(doorsOf({ ok: false, refusal: { code: 'UNAUTHORIZED', fix } }), { kind: 'signin', fix });
+  assert.deepEqual(doorsOf({ ok: false, refusal: { code: 'UNREACHABLE', fix: 'Nothing answered.' } }), { kind: 'refused', fix: 'Nothing answered.' });
+  /* Through the real client: a fetch that throws is its `UNREACHABLE`, and the sentence it writes is the one shown. */
+  const thrown = await mintDoor(callerAt(BASE, host(null).io), BASE, 'stripe-events');
+  assert.equal(thrown.kind, 'refused');
+  assert.match(thrown.kind === 'refused' ? thrown.fix : '', /could not be reached/u);
+});
+
+test('THE SCREEN SAYS NOTHING ABOUT A DEMO, because there is none', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  assert.doesNotMatch(readFileSync(join(here, 'WebhookDoors.svelte'), 'utf8'), /notOnDemo|'sample'/u);
+  assert.doesNotMatch(readFileSync(join(here, 'webhook-doors.ts'), 'utf8'), /'sample'|noRecord/u);
 });
 
 test('THE MODULE HOLDING THE ONLY COPY OF THE TOKEN NEITHER LOGS NOR KEEPS IT', () => {

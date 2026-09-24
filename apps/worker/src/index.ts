@@ -145,12 +145,6 @@ type Env = {
   /** The model name the Spark endpoint expects, when it expects one. The key is the person's own, from the vault (`spark.ts`). */
   SPARK_MODEL?: string;
   /**
-   * The one record an anonymous GET reads, for the public demo, or empty for none. `demoRecord` in
-   * `route.ts` is the whole of what it opens. Declared empty in `wrangler.jsonc`, like
-   * `BRAINDOG_BUILD`, so the key exists and an unset deploy is `""` rather than a missing binding.
-   */
-  DEMO_RECORD?: string;
-  /**
    * The Directory's MAC key: a secret, `wrangler secret put SESSION_SECRET --env <environment>`, 32 random
    * bytes or more and a different value per environment. Unset or shorter, and sign-in is off:
    * `/auth/methods` says `not-configured` and every other `/auth` route is 404. Changing it signs everybody out.
@@ -1116,12 +1110,12 @@ export class Record$ extends DurableObject<Env> {
          the only thing this object is told about the caller, and `inward()` has already taken the header the door
          would look for, so a token context forwarded here by any other branch would be answered as a person. */
       if (ctx.principal.kind !== 'person') return json({ ok: false, refusal: NO_SPARK_TOKEN }, 403);
-      /* AND A SIGNED-IN PERSON, NOT THE DEMO. `DEMO_CONTEXT` is a person too, `p_demo` at `read`, and this lock
-         answered it 200 with one model call, which on a live host opens the owner's `spark` key and spends the
-         record's `ask_cap` for somebody who never signed in (`loop/research-batch-seventeen-audit.md` finding 5,
-         `test/spark-demo.test.ts`). Only the router's GET-only `demoRecord` stood in the way. A session's context
-         says `credentialed: true` and the demo's says `false`, so anything short of `true` is not a session. */
-      if (ctx.credentialed !== true) return json({ ok: false, refusal: NO_SPARK_DEMO }, 403);
+      /* AND A SIGNED-IN PERSON, NOT MERELY A PERSON. The public demo's context was a person too, `p_demo` at `read`,
+         and this lock answered it 200 with one model call, which on a live host opens the owner's `spark` key and
+         spends the record's `ask_cap` for somebody who never signed in (`loop/research-batch-seventeen-audit.md`
+         finding 5, `test/spark-demo.test.ts`). The demo is gone and the lock stays: the object is where the record
+         decides who is asking, and a session's context says `credentialed: true`, so anything short of it is not one. */
+      if (ctx.credentialed !== true) return json({ ok: false, refusal: NO_SPARK_UNSIGNED }, 403);
       this.#spark ??= workerSparkDoor(
         this.env,
         () => api,
@@ -1774,10 +1768,10 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     /* SIGN-IN FIRST, AND IT IS THE DIRECTORY'S: nothing under `/auth/` reaches a record. */
     if (servesAuth(url.pathname)) return signIn(request, env, ctx);
     if (servesAccount(url.pathname)) return account(request, env);
-    /* AN AGENT'S MCP CLIENT, BEFORE ANY DOOR IS ASKED, so neither the cookie nor the demo is ever read for it. */
+    /* AN AGENT'S MCP CLIENT, BEFORE ANY DOOR IS ASKED, so the cookie is never read for it. */
     if (servesMcp(url.pathname)) return agent(request, env);
     /* `/in/*`: SOMETHING ARRIVES FROM OUTSIDE AND NOBODY IS ASKED WHO IT IS (`33 §4`, `51 §5.4`, `12 §3`).
-       BEFORE EVERY DOOR, so neither the cookie nor the public demo is read for it: an arrival is above the
+       BEFORE EVERY DOOR, so the cookie is never read for it: an arrival is above the
        auth gate by design, and what stands in for a principal is whether the payload was verified, which
        decides only whether the stored row may match. It is also before `servesApi`'s `ROUTE_UNKNOWN`, which
        returns for everything it does not recognise, and before the app shell, which would answer a bank's
@@ -1809,7 +1803,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
  *
  * ONE BODY FOR BOTH ADDRESSES, so the slug is one more argument to the same doors rather than a second router that
  * could drift from the first. Under a slug a cookie means that record once the Directory says it is theirs, a bearer
- * must name the same record, and the demo never answers.
+ * must name the same record, and nothing presented is 401 at either.
  */
 async function recordApi(request: Request, env: Env, slug: string | null): Promise<Response> {
     const url = new URL(request.url);
@@ -1830,11 +1824,10 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
 
     const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
 
-    /* WHICH DOOR, in `session.ts`'s order and nowhere else: a bearer, the session cookie, the public demo,
-       or none. A cookie that names no session is a 401 that clears it, and never the demo. */
+    /* WHICH DOOR, in `session.ts`'s order and nowhere else: a bearer, the session cookie, or none. A cookie that
+       names no session is a 401 that clears it. */
     const door = await doorOf(request, {
       origin: `https://${env.PUBLIC_HOST ?? ''}`,
-      demo: env.DEMO_RECORD,
       session: (sid, slug) => directory.auth({ flow: 'session', sid, ...(slug === undefined ? {} : { slug }) }) as unknown as Promise<AuthResult<Who>>,
       access: (record, person) => held(env, record, (object) => object.access(person)),
     }, slug);
@@ -1849,18 +1842,6 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
        be a record method however much its path looks like one. It is here rather than above `doorOf` because
        a mint needs to know who is asking, which is precisely what `/in/*` three branches up does not. */
     const mintAsked = servesInbound(url.pathname) !== null;
-
-    /* THE PUBLIC DEMO: nothing the caller sent names it, and `demoRecord` says everything it opens. It skips
-       the Directory on purpose. The Directory answers which record a NAME means, and this has no name,
-       only the deployment's constant. */
-    if (door.door === 'demo') {
-      if (keysAsked) return noSession();
-      /* AND THE DEMO MINTS NOTHING. `demoRecord` admits only a GET whose name is in `ROUTES`, and a mint is
-         neither, so this is unreachable today and written anyway: the demo record is the one surface somebody
-         reaches without signing in, and an address minted on it would be a live door into the sample. */
-      if (mintAsked) return json({ ok: false, refusal: NO_MINT_SESSION }, 403);
-      return env.RECORD.get(env.RECORD.idFromName(door.record)).fetch(inward(request, door.ctx));
-    }
 
     /* A PERSON, on the record their session names, and a rotation rides back on the record's answer. The
        record authorises exactly as it does for a bearer: every check is inside `createRecordApi`. */
@@ -1917,7 +1898,7 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
  * comes here too so the rule does not depend on which door a restore arrived by.
  *
  * `inner` IS ALREADY `inward`'s, and the caller makes it: the context is set in each door's own line, which is where
- * `test/demo.test.ts` counts them. `ctx` comes along for the one thing the second call needs, who asked.
+ * `test/route.test.ts` counts them. `ctx` comes along for the one thing the second call needs, who asked.
  */
 async function forward(inner: Request, env: Env, record: string, ctx: CallContext): Promise<Response> {
   const stub = () => env.RECORD.get(env.RECORD.idFromName(record));
@@ -2079,8 +2060,8 @@ const noSession = (): Response =>
 
 /** What a token gets at `/api/spark/read`, from the router and from the object. The sentence is `serveSpark`'s own. */
 const NO_SPARK_TOKEN: Refusal = { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this in the app; a token cannot ask Spark about this record.', at: 'principal' };
-/** What the public demo, or any context that is not a signed-in session, gets at `/api/spark/read` from the object. */
-const NO_SPARK_DEMO: Refusal = { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in to ask Spark about a record.', at: 'principal' };
+/** What any context that is not a signed-in session gets at `/api/spark/*` from the object. */
+const NO_SPARK_UNSIGNED: Refusal = { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in to ask Spark about a record.', at: 'principal' };
 
 /**
  * `/api/keys/*`: the app's own key doors, for the browser session `doorOf` has already resolved.
@@ -2126,9 +2107,9 @@ function mailAddress(request: Request, env: Env, id: string, ctx: CallContext): 
 /**
  * `POST /mcp`: what the headers can refuse, then the bearer, then the record's object reads the body.
  *
- * A BEARER AND NOTHING ELSE. This is reached before `doorOf`, so a session cookie is never read and the demo
- * never answers: an agent carries its own credential, and a person in a browser has the app. `gate` is the
- * transport's own, so the order is the self-host's: 405, 403, 415, then 401.
+ * A BEARER AND NOTHING ELSE. This is reached before `doorOf`, so a session cookie is never read: an agent carries its
+ * own credential, and a person in a browser has the app. `gate` is the transport's own, so the order is the
+ * self-host's: 405, 403, 415, then 401.
  */
 async function agent(request: Request, env: Env): Promise<Response> {
   const early = gate(request);
@@ -2176,7 +2157,6 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
     origin: `https://${env.PUBLIC_HOST ?? ''}`,
     auth: ((call: AuthCall) => directory.auth(call)) as unknown as Auth,
     ip: request.headers.get('cf-connecting-ip') ?? '',
-    demo: isRecordId(env.DEMO_RECORD ?? ''),
     /* MAIL ONLY WHEN BOTH ARE SET, AND NEVER AWAITED. `waitUntil` keeps the send alive after the answer has
        gone, so a known address and an unknown one answer in the same time. A failure is logged as a fact
        and never with the address or the link. */

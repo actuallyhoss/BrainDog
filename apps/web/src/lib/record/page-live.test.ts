@@ -1,5 +1,5 @@
 /**
- * A declared page against the record: the record's blocks drawn from its answer, the sample when there
+ * A declared page against the record: the record's blocks drawn from its answer, a refusal when there
  * is no record, a page it lacks said so, any other refusal in its own words, and a block this build
  * cannot draw from a live answer saying that in one line rather than borrowing the sample's.
  */
@@ -140,15 +140,32 @@ test("the record's page is drawn from its answer, and only its answer", async ()
   assert.equal(refused!.rows.length, 0);
 });
 
-test('no record here reads the sample, and does not ask again in this tab', async () => {
+/* NO RECORD HERE IS THE RECORD'S REFUSAL, AND IT IS ASKED AGAIN (DIRECTION 26). It answered `{ from: 'sample' }` and
+   remembered that for the tab, so `PageView` drew the seeded studio's Desk under a real record's address, and a person
+   who then signed in in another tab kept reading the studio until they reloaded. */
+test('no record here is refused in its own words, and the next page asks again', async () => {
   const { io, sent } = host(() => refusal(401, 'UNAUTHORIZED', 'Sign in to read this record.'));
   const reader = pageReader(BASE, io);
-  assert.deepEqual(await reader.read('desk'), { from: 'sample' });
+  assert.deepEqual(await reader.read('desk'), { from: 'refused', fix: 'Sign in to read this record.' });
   const before = sent.length;
-  assert.deepEqual(await reader.read('money'), { from: 'sample' });
-  assert.equal(sent.length, before);
+  assert.deepEqual(await reader.read('money'), { from: 'refused', fix: 'Sign in to read this record.' });
+  assert.ok(sent.length > before, 'the tab stopped asking the record after one refusal');
 
-  assert.deepEqual(await pageReader(BASE, host(null).io).read('desk'), { from: 'sample' });
+  const nothing = await pageReader(BASE, host(null).io).read('desk');
+  assert.equal(nothing.from, 'refused');
+  if (nothing.from === 'refused') assert.match(nothing.fix, /^The record could not be reached: /u);
+});
+
+test('the page draws only a live answer, and reads nothing of the sample', () => {
+  /* COMMENTS LEFT OUT, so the paragraph saying where the source view once fell back to `PAGES` is not a read of it. */
+  const view = readFileSync(new URL('../page/PageView.svelte', import.meta.url), 'utf8').replace(/<!--[\s\S]*?-->|\/\*[\s\S]*?\*\//gu, '');
+  /* THE SEEDED STUDIO'S DECLARATIONS AND FIGURES, which a page read with no record behind it was drawn from. */
+  assert.doesNotMatch(view, /\bPAGES\b|\bvalues\(\)|\breadPages?\b|'sample'|\bNOW\b|\bheldBy\b/u);
+  /* A GESTURE ON A PAGE IS A WRITE OR IT IS NOTHING: a page is drawn only over a live record, so these said "nothing
+     was saved" about a page nobody could be looking at. */
+  assert.doesNotMatch(view, /copy\.(?:cardMovedTo|taskTicked|blockAdded|arrangedNotSaved)\(/u);
+  assert.doesNotMatch(view, /\bpressHole\b/u);
+  assert.doesNotMatch(readFileSync(new URL('./page-live.ts', import.meta.url), 'utf8'), /'sample'|\bnoRecord\b/u);
 });
 
 test('nothing is put on a live page that the record did not send', async () => {

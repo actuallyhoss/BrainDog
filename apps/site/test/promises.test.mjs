@@ -8,17 +8,20 @@
  * `braindog`, `braindog-render`, `braindog-mcp`, `@braindog/mcp`, `@braindog/render` and
  * `@braindog/selfhost`: nothing this repository builds is on the registry. `POST /auth/provision`
  * answers 404 on both hosts until the owner sets `PROVISION_KEY` and binds `KEK`, so nobody can make
- * a record of their own. What a stranger CAN have is the sample: `https://app.brain.dog/api/boot`
- * answers 401 `UNAUTHORIZED`, `apps/web/src/lib/record/device.ts:143` counts that as no record, and
- * the app draws its built-in sample under the bar that says `This is a sample record.` The live
- * bundle carries that sentence.
+ * a record of their own. On that date what a stranger COULD have was the sample: `/api/boot` answered
+ * 401 `UNAUTHORIZED`, `apps/web/src/lib/record/device.ts` counted that as no record, and the app drew
+ * its built-in sample under a bar saying `This is a sample record.`
  *
  * SO THE SITE SAID THREE THINGS THAT WERE WRONG IN OPPOSITE DIRECTIONS. It offered a self-hosted
  * record as something an agent reaches today, which nobody outside this repository can install; it
  * called the product open source in the present tense while the code is private; and it told the
- * reader there was no demo and no record to look at, when the one thing the app does for a stranger
- * is show them one. The old comments argued the last from `DEMO_RECORD` being empty, which is true
- * of the server and says nothing about the sample the browser draws for itself.
+ * reader there was no demo and no record to look at, when the one thing the app did for a stranger
+ * was show them one.
+ *
+ * THE THIRD TURNED OVER ON 25 SEPTEMBER. `loop/DIRECTION.md` §26 removed the sample and demo mode
+ * together: the app only ever shows a real record, and without a session it is the sign-in screen
+ * (`loop/research-no-sample.md`, brief A9 for this site). So the rule that required the site to name
+ * the sample now refuses it, and the first screen has to say sign-in instead.
  *
  * THE GITHUB LINK STAYS, ON THE OWNER'S WORD, AND THIS FILE DOES NOT FIGHT IT. `loop/DIRECTION.md`
  * §10 records it verbatim: "link the github repo on the brain.dog site, even though it's private rn".
@@ -146,8 +149,13 @@ test('while the repository is linked, the legal page says it is private', () => 
  * than by its exact words, so a rewording that keeps the claim still fails.
  */
 const FALSE_TODAY = [
-  /* The app draws a sample for anybody signed out. */
-  [/\bno demo\b|\bnothing to look at\b|\bno record to look at\b/i, 'says there is nothing to look at, and the app opens on a sample record'],
+  /* THIS SHAPE FLIPPED ON 25 SEPTEMBER. It refused `no demo`, because the app drew a sample for
+     anybody signed out; `loop/DIRECTION.md` §26 took the sample out ("get rid of that whole sample
+     record stuff please"), so a signed-out reader now lands on sign-in and `no demo` is simply true.
+     What would be false is the old sentence: four of them on this site named the sample as the
+     thing a stranger could open. `entries.ts` still says the app once opened `rather than the
+     sample`, which is history and matches neither half. */
+  [/\bsample record\b|made-up sample/i, 'offers a sample record, and the app shows only a real record, behind sign-in'],
   /* Nobody outside this repository can install a self-host. */
   [/self-host[^.]*\btoday\b|\btoday\b[^.]*self-host/i, 'offers a self-hosted record today, and the self-hosted build is not published'],
   /* The code is private, so "open source" is a plan and not a state. */
@@ -169,10 +177,13 @@ test('no sentence promises what a stranger cannot have today', () => {
 });
 
 /**
- * AND THE THING A STRANGER CAN HAVE IS SAID, on the first screen. Taking the false sentences out is
- * not enough on its own: a page that only lists what is closed reads as a product that is not there,
- * and the sample is there.
+ * AND WHAT THE BUTTON OPENS IS SAID, on the first screen, under it. Until 25 September that was the
+ * sample and this test required the word. With the sample gone the button opens sign-in, and a note
+ * that still promised a sample would send a stranger to a screen asking for a session they cannot
+ * have, with the page having told them otherwise. So the note has to name sign-in and must not name
+ * the sample.
  */
-test('the first screen says what a stranger can open today', () => {
-  assert.match(site.hero.note, /\bsample\b/, 'hero.note does not say the app opens on a sample record');
+test('the first screen says the app opens to sign-in, and names no sample', () => {
+  assert.doesNotMatch(site.hero.note, /\bsample\b/i, 'hero.note still says the app opens on a sample record');
+  assert.match(site.hero.note, /\bsign-?in\b/i, 'hero.note does not say what the button opens');
 });

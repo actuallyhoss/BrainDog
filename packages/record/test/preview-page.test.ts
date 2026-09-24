@@ -164,9 +164,8 @@ test('A BLOCK OVER A LIST SHE CANNOT READ IS HELD BEFORE THE LINT READS IT, or i
 });
 
 test('AND IT IS ROUTED: the client posts it to the host, READ+, and gets what the record answers', async () => {
-  /* A POST AND NOT A GET, as `scriptTry` is, for two reasons: a page body is not a query string, and a GET is a read
-     the Cloud's demo record answers to anybody at all (`apps/worker/src/route.ts` `DEMO_READS`), which is a place for no
-     caller-written body that walks a list. */
+  /* A POST AND NOT A GET, as `scriptTry` is: a page body is not a query string, and a caller-written body that walks a
+     list is not a read to leave in a URL. (The Cloud's public demo, which once answered GET reads to anybody, is gone.) */
   const { sql, api } = await record();
   const handlers = handlersFor(api);
   const sent: string[] = [];

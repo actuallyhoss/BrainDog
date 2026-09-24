@@ -23,7 +23,8 @@ export type Methods = {
   key: boolean;
   /** The host lets anyone in without a session: a self-host started without a key. */
   open: boolean;
-  demo: boolean;
+  /* NO `demo`. The host said whether it pinned a public record for anonymous reads, and there is no such record to open
+     any more (DIRECTION 26), so the field is read past like any other this screen has no use for. */
   /** Why nothing is offered: no key to check sessions with, or an origin no cookie can be set on. */
   why?: 'not-configured' | 'insecure' | undefined;
   me: Who | null;
@@ -173,7 +174,6 @@ function methodsOf(v: unknown): Methods | null {
     magic: v.magic,
     key: v.key,
     open: v.open === true,
-    demo: v.demo === true,
     me: whoOf(v.me),
     ...(v.why === 'not-configured' || v.why === 'insecure' ? { why: v.why } : {}),
     ...(typeof v.firstRun === 'boolean' ? { firstRun: v.firstRun } : {}),

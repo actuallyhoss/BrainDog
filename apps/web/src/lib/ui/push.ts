@@ -17,7 +17,6 @@
  */
 
 import { copy } from '../copy.ts';
-import { noRecord } from '../record/device.ts';
 import type { Call } from './webhook-doors.ts';
 
 /**
@@ -28,7 +27,7 @@ import type { Call } from './webhook-doors.ts';
  * not the Worker's route, and since every miss below is `null`, the row was drawn for nobody and nothing said so.
  *
  * `{ key: string | null }` IS THE WHOLE ANSWER, and `null` is a host whose keys are not set (his call 6). A 404 is a host
- * that predates the route, a thrown fetch is no host reached, and a 200 that is not JSON is the static demo, where
+ * that predates the route, a thrown fetch is no host reached, and a 200 that is not JSON is a static host, where
  * `adapter-static`'s fallback answers every address with the shell. All of them draw no row, so none is told apart.
  *
  * A STRING AND NOT A CHECKED KEY. Whether it is a P-256 point is `keyBytes`'s question, asked by `offerOf`, so a host
@@ -139,7 +138,6 @@ export type Said =
   | { kind: 'off' }
   | { kind: 'denied'; line: string }
   | { kind: 'failed'; line: string }
-  | { kind: 'sample' }
   | { kind: 'signin'; fix: string }
   | { kind: 'refused'; fix: string };
 
@@ -217,12 +215,21 @@ export async function turnOff(ports: Ports): Promise<Said> {
 
 type Refused = Exclude<Awaited<ReturnType<Call>>, { ok: true }>;
 
-/** A refusal as this row says it, in `webhook-doors.ts`'s three arms, and `ROUTE_UNKNOWN` as a host that predates it. */
+/**
+ * A refusal as this row says it, in `webhook-doors.ts`'s two arms, and `ROUTE_UNKNOWN` as a host that predates it.
+ *
+ * A 401 IS A PERSON NOT SIGNED IN, WHATEVER THE ADDRESS. With no slug it used to be the sample, and the row answered it
+ * with the demo's sentence about having no account; there is no sample now (`DIRECTION.md` §26), so it is `signin` with
+ * the record's own sentence, as a stale sign-in already was.
+ *
+ * `UNREACHABLE` IS `pushNotSent`, THE SENTENCE A THROWN CALL ALREADY SAID. The client's own is a status and a parse
+ * ("200 with a body that is not JSON"), which is true and gives a person nothing to do.
+ */
 function refusedAs(out: Refused): Said {
   if (!('refusal' in out)) return { kind: 'refused', fix: copy.pushNotSent };
   const { code, fix } = out.refusal;
   if (code === 'ROUTE_UNKNOWN') return { kind: 'refused', fix: copy.pushNoRoute };
-  if (noRecord(code)) return { kind: 'sample' };
-  if (code === 'NEEDS_BROWSER_SESSION') return { kind: 'signin', fix };
+  if (code === 'UNREACHABLE') return { kind: 'refused', fix: copy.pushNotSent };
+  if (code === 'UNAUTHORIZED' || code === 'NEEDS_BROWSER_SESSION') return { kind: 'signin', fix };
   return { kind: 'refused', fix };
 }

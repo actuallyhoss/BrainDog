@@ -1,11 +1,11 @@
 /**
- * One row on `/r/<register>/<seq>`, read from the record, with the sample when there is none.
+ * One row on `/r/<register>/<seq>`, read from the record.
  *
  * A ROUTE-ONLY MODULE, like `history-live.ts`: the client carries the route table as a value.
  *
- * `UNREACHABLE` and `UNAUTHORIZED` mean there is no record here, and the page reads the sample as it
- * always did. Any other refusal is the record's own sentence. A row the record does not hold is
- * `entry: null`, never the sample's row of the same number, and the LIST's declaration is learned
+ * EVERY REFUSAL IS THE RECORD'S OWN SENTENCE. `UNREACHABLE` and `UNAUTHORIZED` with no slug used to draw the
+ * sample's row of the address's number, another business's row; there is no sample now (DIRECTION 26). A row the
+ * record does not hold is `entry: null`, and the LIST's declaration is learned
  * even then, because the screen that says the row is not there has to name the list it is not in.
  *
  * THE DECLARATION IS THE SEED'S COPY, as it is for the list (`remote.ts` says why and what pins it).
@@ -15,7 +15,6 @@
 
 import { createClient, type ClientOptions } from '@braindog/client';
 
-import { noRecord } from './device.ts';
 import { entryOf, learn, namesOf, refMapOf, targetsOf, type Names, type RecordRow, type RefMap } from './remote.ts';
 import type { Entry } from './schema.ts';
 
@@ -26,15 +25,11 @@ export type Fetch = NonNullable<ClientOptions['fetch']>;
  * the page draws every field through `display`: without it a live `ref` was drawn as the sample's
  * row of the same number, which is another record's name under this record's field.
  */
-export type Got =
-  | { from: 'live'; entry: Entry | null; names: Names }
-  | { from: 'sample' }
-  | { from: 'refused'; fix: string };
+export type Got = { from: 'live'; entry: Entry | null; names: Names } | { from: 'refused'; fix: string };
 
 function missed(out: object): Got {
   if (!('refusal' in out)) return { from: 'refused', fix: 'The row changed while it was being read.' };
-  const refusal = out.refusal as { code: string; fix: string };
-  return noRecord(refusal.code) ? { from: 'sample' } : { from: 'refused', fix: refusal.fix };
+  return { from: 'refused', fix: (out.refusal as { fix: string }).fix };
 }
 
 export type RowReader = { read(register: string, seq: number): Promise<Got> };
@@ -70,8 +65,9 @@ export function rowReader(base: string, io?: Fetch): RowReader {
 
   return {
     async read(register, seq) {
-      /* A PENDING ROW HAS NO NUMBER THE RECORD COULD HOLD, so nothing is asked and the tab's own row is drawn. */
-      if (!Number.isInteger(seq) || seq < 1) return { from: 'sample' };
+      /* A PENDING ROW HAS NO NUMBER THE RECORD COULD HOLD, so nothing is asked: the record holds no row for it, and the
+         page draws the tab's own row from `pending` instead. */
+      if (!Number.isInteger(seq) || seq < 1) return { from: 'live', entry: null, names: new Map() };
       const got = await client.get(register, seq);
       if (!got.ok) return missed(got);
       /* A USE CASE'S OWN LISTS ARE DECLARED BY THE RECORD ALONE, AND THE ROW'S LIST IS LEARNED WHETHER OR NOT THE ROW IS

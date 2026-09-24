@@ -1,18 +1,22 @@
 /**
- * Which door a request came in by: a bearer, the session cookie, the public demo, or none.
+ * Which door a request came in by: a bearer, the session cookie, or none.
  *
  * ITS OWN FILE, AND FREE OF `cloudflare:`, for the reason `route.ts` is: this decides whose record a request
  * reads, and a decision that can only run inside workerd is a decision nobody tests. The Worker supplies the
  * two calls it needs, the Directory's `session` and the record's `access`, and this file is the order.
  *
- * THE ORDER IS BEARER, COOKIE, DEMO, NOTHING. A bearer is an agent and answers for itself. A cookie is a
- * person, and one that names no session is a 401 that clears it, NEVER THE DEMO: somebody who believes they
- * are signed in and is shown the sample instead is being shown somebody else's numbers as their own. Only a
- * request carrying no credential at all may be the demo, and only for a read.
+ * THE ORDER IS BEARER, COOKIE, NOTHING. A bearer is an agent and answers for itself. A cookie is a person, and
+ * one that names no session is a 401 that clears it. A request carrying no credential at all is the same 401 with
+ * no cookie to clear, whatever it asks for and whichever path names it.
+ *
+ * THERE WAS A FOURTH DOOR, THE PUBLIC DEMO, AND IT IS GONE (`loop/DIRECTION.md` 26, `loop/research-no-sample.md` A1).
+ * A request with nothing on it read one record the deployment pinned in its `vars`, as `p_demo` at `read`. The app
+ * now shows only a real record, so no variable names one any more, and a deploy that still sets it opens nothing
+ * (`test/spark-demo.test.ts`, which answered 200 from the pinned record before this).
  *
  * AND A REQUEST MAY NOW NAME ITS RECORD IN THE PATH, `/app/<slug>/api/…` (`loop/research-one-domain.md` §2.4).
  * The slug is a claim like a bearer's record id: the Directory says whether it is this person's before anything
- * is addressed, one 403 answers every name that is not, and the demo never answers under one.
+ * is addressed, and one 403 answers every name that is not.
  */
 
 import { clearCookie, readSid, sameOrigin, sessionContext, sessionCookie } from '@braindog/host/auth';
@@ -20,7 +24,7 @@ import { OPERATION_METHOD } from '@braindog/kernel';
 import type { AuthResult, Refusal, Who } from '@braindog/ports';
 import type { CallContext } from '@braindog/record';
 
-import { DEMO_CONTEXT, demoRecord, recordOf } from './route.ts';
+import { recordOf } from './route.ts';
 
 /** What the record says a person holds in it. The same shape `Record$.access` answers. */
 export type Held = { level: string | null; registers: string[] | null; levels: Record<string, string> };
@@ -28,8 +32,6 @@ export type Held = { level: string | null; registers: string[] | null; levels: R
 export type Deps = {
   /** `https://<PUBLIC_HOST>`, the one origin a cookie write may come from. */
   origin: string;
-  /** `DEMO_RECORD`, or nothing. */
-  demo: string | undefined;
   /** The Directory's `session` flow, with the path's slug when the request named one. */
   session: (sid: string, slug?: string) => Promise<AuthResult<Who>>;
   access: (record: string, person: string) => Promise<Held | null>;
@@ -38,7 +40,6 @@ export type Deps = {
 export type Door =
   | { door: 'bearer' }
   | { door: 'session'; record: string; ctx: CallContext; cookie?: string }
-  | { door: 'demo'; record: string; ctx: CallContext }
   /** `refusal` absent on a 401 is the Worker's own sentence for "nothing presented"; a 429 has `retryAfter`. */
   | { door: 'refused'; status: 401 | 403 | 429 | 503; refusal?: Refusal; retryAfter?: number; cookie?: string };
 
@@ -78,10 +79,8 @@ export async function doorOf(request: Request, deps: Deps, slug: string | null =
     return { door: 'session', record, ctx: sessionContext(out.body, held) as CallContext, ...carried };
   }
 
-  /* NEVER UNDER A SLUG. The sample at `/app/acme/…` would be the demo's numbers drawn as acme's, which is the thing
-     this whole order exists to prevent; a stranger there is a 401, and the app sends a 401 under a slug to sign-in. */
-  const pinned = slug === null ? demoRecord(request, deps.demo) : null;
-  if (pinned) return { door: 'demo', record: pinned, ctx: DEMO_CONTEXT };
+  /* NOTHING PRESENTED IS A 401, AT THE ROOT AND UNDER A SLUG ALIKE. The Directory is not asked: a stranger has no name to
+     check, and the app sends a 401 to sign-in. */
   return { door: 'refused', status: 401 };
 }
 
@@ -233,9 +232,9 @@ export type EntryDeps = {
  * `GET /app`: the record this browser was last on, or the shell.
  *
  * ONE DIRECTORY READ AND NO PICKER (`loop/research-one-domain.md` §2.4). A session holding a record is a 302 to
- * `/app/<slug>/`, a session on no record yet is sent to `/app/start`, and no cookie is the shell, which draws the
- * sample for a stranger exactly as `app.brain.dog` did. The last record is the session row's, which only
- * `/auth/switch` moves, and the switcher is the picker.
+ * `/app/<slug>/`, a session on no record yet is sent to `/app/start`, and no cookie is the shell. The shell asks
+ * `/api/boot`, which answers a stranger 401 now there is no demo record behind it, and the app sends a 401 to sign-in.
+ * The last record is the session row's, which only `/auth/switch` moves, and the switcher is the picker.
  *
  * A DEAD COOKIE IS THE SHELL WITH THE COOKIE CLEARED, NEVER A REDIRECT INTO A RECORD, so the next load is a stranger's
  * and the shell does not spend a round trip finding out. A lockout or a failed store is the shell with the cookie

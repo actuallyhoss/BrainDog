@@ -26,16 +26,16 @@
  * page about one row, quietly deleting the other rows' pages. Those are named separately and kept
  * out of the bodies, so a caller cannot pick one up by accident.
  *
- * AND THERE IS NO SAMPLE HERE. Every other live reader falls back to the built-in sample when there
- * is no record, because a screen with no rows on it is worse than a screen carrying somebody else's.
- * A DECLARATION BODY IS THE OPPOSITE CASE: the sample's pages are the fictional studio's, and handing
- * one back under a real record's slug is the precise write this read exists to make unnecessary. No
- * record means there is nothing here to read, and that is what it says.
+ * AND THERE WAS NEVER A SAMPLE HERE. When the other readers still fell back to the built-in sample,
+ * this one alone would not: the sample's pages were the fictional studio's, and handing one back
+ * under a real record's slug is the precise write this read exists to make unnecessary. It answered
+ * `absent` for `UNREACHABLE` and `UNAUTHORIZED` instead, and every caller turned that into "the
+ * record could not be reached", which was untrue of a 401: the record was reached and said to sign
+ * in. With the sample gone (DIRECTION 26) those two codes carry no second meaning, so they are the
+ * record's or the client's sentence like any other refusal.
  */
 
 import { createClient, type ClientOptions } from '@braindog/client';
-
-import { noRecord } from './device.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 
@@ -76,6 +76,11 @@ export type DeclaredPage = { slug: string; title: string; body: PageBody; versio
 /** A page whose answer is an expansion rather than a stored body, and why it is being withheld. */
 export type Expanded = { slug: string; title: string; why: string };
 
+/**
+ * `absent` IS ANSWERED BY NOTHING NOW, and stays in both unions only because `bind-write.ts`,
+ * `page-write.ts` and the settings screen still ask for it by name: a comparison against an arm the
+ * union lacks is a compile error there, in files this change does not own. Drop it with those checks.
+ */
 export type Opened =
   | { from: 'live'; pages: DeclaredPage[]; expanded: Expanded[] }
   | { from: 'absent' }
@@ -150,10 +155,9 @@ const isExpanded = (answered: Record<string, unknown>): boolean =>
   answered.for !== undefined || answered.param !== undefined;
 
 /** What a failed call means here. A refusal is the record's own sentence and is never rewritten. */
-function missed(out: object): { from: 'absent' } | { from: 'refused'; fix: string } {
+function missed(out: object): { from: 'refused'; fix: string } {
   if (!('refusal' in out)) return { from: 'refused', fix: declWords.changed };
-  const refusal = out.refusal as { code: string; fix: string };
-  return noRecord(refusal.code) ? { from: 'absent' } : { from: 'refused', fix: refusal.fix };
+  return { from: 'refused', fix: (out.refusal as { fix: string }).fix };
 }
 
 export type PagesReader = {
@@ -176,7 +180,7 @@ export function pagesReader(base: string, io?: Fetch): PagesReader {
 
   type Got =
     | { ok: true; value: Record<string, unknown> }
-    | { ok: false; miss: { from: 'absent' } | { from: 'refused'; fix: string } };
+    | { ok: false; miss: { from: 'refused'; fix: string } };
 
   async function answerOf(slug: string): Promise<Got> {
     const held = kept.get(slug);

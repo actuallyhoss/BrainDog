@@ -44,7 +44,7 @@ export type Limiter = { limit(key: string, cls: LimitClass): Promise<Verdict> };
  * STRUCTURAL, as `index.ts`'s `RecordSurface` is, so `host` names no type of `@braindog/record`'s here.
  */
 export type LimitDoor = {
-  door: 'bearer' | 'session' | 'demo';
+  door: 'bearer' | 'session';
   /**
    * Accepted and never read.
    *
@@ -57,10 +57,11 @@ export type LimitDoor = {
 };
 
 /**
- * Who a limit counts: the token for a bearer, the person for a session, the address for the demo and for no door.
+ * Who a limit counts: the token for a bearer, the person for a session, and the address for no door.
  *
- * THE DEMO IS KEYED BY ADDRESS BECAUSE ITS PRINCIPAL IS EVERYBODY. Every visitor to the demo record is the same
- * `p_demo`, so a key built from the principal would give the whole internet one budget and let one visitor spend it.
+ * THERE WAS A THIRD DOOR, THE PUBLIC DEMO, AND IT WAS KEYED BY ADDRESS because every visitor to it was the same
+ * `p_demo`: a key built from that principal would have given the whole internet one budget. The demo is gone
+ * (`loop/research-no-sample.md` A1), so every door left names somebody who signed in or holds a token.
  *
  * A BEARER CAN BE A PERSON. An operation grant resolves to the person who approved it, not to a token, and it is
  * counted as that person, who is the one spending it.
@@ -68,7 +69,7 @@ export type LimitDoor = {
  * NO DOOR AT ALL is a request the host could not attribute to anybody, and the address is all it has.
  */
 export function limitKey(door: LimitDoor | null, ip: string): string {
-  if (door === null || door.door === 'demo') return `ip:${ip}`;
+  if (door === null) return `ip:${ip}`;
   const { kind, id } = door.ctx.principal;
   return `${kind}:${id}`;
 }

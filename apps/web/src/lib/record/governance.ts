@@ -5,9 +5,10 @@
  * PURE, SO `node --test` CAN IMPORT IT, for the reason `vault.ts` gives: the client is handed in, so
  * every branch is testable against an object literal, and the client stays out of the entry chunk.
  *
- * LIVE OR THE SAMPLE IS THE FIRST READ'S TO SAY. `UNREACHABLE` and `UNAUTHORIZED` mean there is no record
- * here (`noRecord`, as `/settings/agents` and `/vault` read it), and the screen draws its sample. Any other
- * refusal is a record that answered no, and its own sentence is what the screen shows.
+ * LIVE OR REFUSED, AND NOTHING IN BETWEEN. A refusal is drawn in the host's own sentence, whatever its code. This
+ * used to read `UNREACHABLE` and `UNAUTHORIZED` at an address with no slug as "no record here" and answer
+ * `sample`, so both screens drew fixture questions nobody had asked; the sample is gone (DIRECTION 26), and a 401
+ * is sent to sign-in by the layout before this is ever asked.
  */
 
 import { money } from 'braindog-render';
@@ -21,7 +22,6 @@ import { copy } from '../copy.ts';
 import { labels, relabel } from '../voice.ts';
 import { callsOutOf, type CallOut } from './actions.ts';
 import type { RowsetBody } from './data.ts';
-import { noRecord } from './device.ts';
 import type { Question } from './schema.ts';
 
 type Refusal = { code: string; fix: string };
@@ -95,7 +95,7 @@ export const words = {
 } as const;
 
 /** Where a screen's rows came from. */
-export type Read<T> = { from: 'live'; value: T } | { from: 'sample' } | { from: 'refused'; fix: string };
+export type Read<T> = { from: 'live'; value: T } | { from: 'refused'; fix: string };
 
 /** What a `decide` call came back with: done, or the sentence to show. */
 export type Sent = { ok: true } | { ok: false; fix: string };
@@ -255,8 +255,9 @@ export function rowsetOf(row: Row): RowsetBody | undefined {
 }
 
 /**
- * A field's value as a diff shows it on a live record. The sample formats through `display`, which reads
- * the sample's declarations; this reads the record's, as `heldBy` relabelled them.
+ * A field's value as a diff shows it: from the record's own declarations, as `heldBy` relabelled them, and not
+ * through `display`, which reads the shell's declaration cache (`REGISTERS`) and falls back to the seed's for a
+ * register it has not learnt.
  *
  * AN ENUM IS SAID BY ITS LABEL FIRST, as the row it changes reads it. A Personal record's merge of a person
  * said the role was changing from "client" to "registrar" over a row that reads Work contact and a form that
@@ -320,9 +321,9 @@ export async function pagesStanding(client: Governor, pages: unknown): Promise<R
   return out;
 }
 
-/** A read that did not answer: no record here, or the record's own sentence. */
+/** A read that did not answer, in the host's own sentence. */
 function missed(out: Wire<unknown>): Read<never> {
-  if ('refusal' in out) return noRecord(out.refusal.code) ? { from: 'sample' } : { from: 'refused', fix: out.refusal.fix };
+  if ('refusal' in out) return { from: 'refused', fix: out.refusal.fix };
   return { from: 'refused', fix: copy.changedSince };
 }
 

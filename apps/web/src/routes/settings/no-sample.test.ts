@@ -1,0 +1,54 @@
+/**
+ * Settings draws a real record or a refusal, and nothing from the sample (DIRECTION 26).
+ *
+ * WHAT WAS THERE, READ AT f5145fa0. Eighteen lines of `settings/[area]/+page.svelte` branched on an
+ * area's rows having come `from: 'sample'` (agents, people, backups), and ten fixture constants
+ * reached the screen through `api.ts`: machines and tokens nobody connected, colleagues nobody
+ * invited, thirty backups nobody took, passkeys nobody made, connectors that were never set up and a
+ * signing key no keypair ever produced. `loop/research-no-sample.md` brief A4 is the list.
+ *
+ * A TEXT TEST OVER MARKUP, for the reason `levels.test.ts` gives: these are `{#if}` arms in a
+ * `.svelte` file and this tree has no component test. Comments are stripped first, so a comment
+ * that says what the sample did cannot fail or pass a check.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+const PAGE = readFileSync(new URL('./[area]/+page.svelte', import.meta.url), 'utf8')
+  .replaceAll(/<!--[\s\S]*?-->/gu, '')
+  .replaceAll(/\/\*[\s\S]*?\*\//gu, '');
+
+/** The fixture constants the brief names, every one of which is the sample's and none of which a record answers. */
+const FIXTURES = [
+  'AUTH_METHODS', 'DEPLOYMENT', 'DEVICES', 'PASSKEYS', 'PEOPLE_ACCESS',
+  'SIGNING_KEY', 'SNAPSHOTS', 'SNAPSHOTS_KEPT', 'TOKENS', 'SOURCES',
+];
+
+test('the screen reads none of the sample fixtures', () => {
+  for (const name of FIXTURES)
+    assert.doesNotMatch(PAGE, new RegExp(`\\b${name}\\b`, 'u'), `Settings still reads ${name}, which is the sample's`);
+  /* AND NOT THROUGH THE HELPERS THAT DRESSED TWO OF THEM AS A RECORD'S ROWS either. */
+  assert.doesNotMatch(PAGE, /\bsample(Machines|Tokens)\b/u);
+});
+
+test('no area keeps a sample state to fall back on', () => {
+  /* EVERY `*From` WAS FOUR OR FIVE STATES, and `sample` was the one no record ever answers. */
+  assert.doesNotMatch(PAGE, /'sample'/u, 'an area still has a sample arm');
+  assert.doesNotMatch(PAGE, /\b(agents|people|copies)Now\(\)/u, "an area still dates its rows by the sample's NOW");
+});
+
+test('and nothing on it says the demo sentence', () => {
+  /* `copy.notOnDemo` STAYS IN copy.ts FOR NOW, because flow/source.ts and actions.ts still render it (brief A4), and
+     Settings renders it nowhere. `mockNotice` was the sample's footer: "Nothing you do here is saved yet." */
+  assert.doesNotMatch(PAGE, /copy\.notOnDemo\b/u);
+  assert.doesNotMatch(PAGE, /copy\.mockNotice(Some)?\b/u);
+});
+
+test('the signing key is said to be out of reach on every shell, because the only key this screen ever drew was invented', () => {
+  const from = PAGE.indexOf("area === 'export'}");
+  assert.ok(from >= 0, 'export has no arm');
+  const arm = PAGE.slice(from);
+  assert.match(arm, /<Section title=\{copy\.theSignature\}>\s*<p class="hint">\{copy\.theSignatureNotHere\}<\/p>\s*<\/Section>/u);
+});

@@ -1,8 +1,12 @@
 /**
  * `/vault`, and the approval it shares with `/settings/agents`: what the two screens decide, with no runes.
  *
- * PURE, SO `node --test` CAN IMPORT IT, for the reason `device.ts` gives. The client, the sign-in helpers
- * and the sample are handed in, so every branch is testable against an object literal.
+ * PURE, SO `node --test` CAN IMPORT IT, for the reason `device.ts` gives. The client and the sign-in helpers
+ * are handed in, so every branch is testable against an object literal.
+ *
+ * AND NOTHING HERE DRAWS A VAULT THAT IS NOT THE RECORD. This module turned the sample's grants and keys into
+ * the record's rows for a visitor with no record; the sample went on 25 September (DIRECTION 26), and the
+ * screen now draws only what `listDevices`, `list` and `listGrants` answer.
  *
  * ONE APPROVAL, TWO SCREENS. A machine asking to open keys prints `/settings/agents`, and the Vault
  * shows the same request at the top. Both send the six digits through `approve` and say what came back
@@ -91,13 +95,16 @@ type Wire<T> = { ok: true; value: T } | { ok: false; refusal: Refusal } | { ok: 
 export type Approver = { deviceApprove(args: { user_code: string }): Promise<Wire<DeviceApproved>> };
 
 /**
- * The six digits, sent or refused. Nothing malformed is sent, and with no record behind the screen the
- * answer is that the demo cannot approve, which is said rather than acted out.
+ * The six digits, sent or refused. Nothing malformed is sent.
+ *
+ * NO CLIENT IS NOBODY SIGNED IN TO APPROVE AS, so the answer is `signin`: the one refusal with a way forward on
+ * this screen, drawn with its Sign in again button. It answered `demo` while `/app` with no session was the sample
+ * record, and "The demo has no account" would now be said to a person whose only problem is a missing sign-in.
  */
 export async function approve(typed: string, client: Approver | null): Promise<Answer> {
   const entry = codeOf(typed);
   if (!entry.ok) return { kind: 'malformed', why: entry.why, digits: entry.digits };
-  if (!client) return { kind: 'demo' };
+  if (!client) return { kind: 'signin' };
   const out = await client.deviceApprove({ user_code: entry.code });
   /* `deviceApprove` carries no version, so a conflict cannot come back; it is read as a miss rather than drawn blank. */
   return 'conflict' in out ? { kind: 'wrong' } : answerOf(out);
@@ -122,8 +129,6 @@ export function answerLine(a: Answer | null): { tone: 'good' | 'bad'; line: stri
       return { tone: 'bad', line: copy.codeExpired };
     case 'signin':
       return { tone: 'bad', line: copy.signInAgainWhy };
-    case 'demo':
-      return { tone: 'bad', line: copy.notOnDemo };
     default:
       return { tone: 'bad', line: a.fix };
   }
@@ -156,11 +161,16 @@ export async function reprove(auth: Auth, go: (href: string) => void): Promise<b
 /** The one client method a revoke calls. */
 export type Revoker = { revokeDevice(args: { handle: string }): Promise<Wire<DeviceRow>> };
 
-/** The rows after revoking one, or the record's sentence for why not. */
+/**
+ * The rows after revoking one, or the record's sentence for why not.
+ *
+ * A CONFLICT CARRIES NO SENTENCE OF ITS OWN, and it used to borrow the demo's, so a live record that raced would
+ * have been told it was the demo. It borrows the one every other write on this screen says for a race.
+ */
 export async function revoke(client: Revoker, rows: readonly DeviceRow[], handle: string): Promise<{ ok: true; rows: DeviceRow[] } | { ok: false; fix: string }> {
   const out = await client.revokeDevice({ handle });
   if (out.ok) return { ok: true, rows: rows.map((m) => (m.handle === handle ? out.value : m)) };
-  return { ok: false, fix: 'refusal' in out ? out.refusal.fix : copy.notOnDemo };
+  return { ok: false, fix: 'refusal' in out ? out.refusal.fix : copy.writeRaced };
 }
 
 /* ── the machines ─────────────────────────────────────────────────────── */
@@ -238,61 +248,6 @@ export function keysOf(
         sealed: known ? known.sealed : grant ? grant.revoked_at === null : typeof value === 'string',
         opened: known?.opened ?? grant?.opened ?? 0,
         lastOpened: known?.last_opened ?? grant?.last_opened ?? null,
-      };
-    })
-    .sort((a, b) => a.label.localeCompare(b.label));
-}
-
-/* ── the sample ───────────────────────────────────────────────────────── */
-
-/** A sample vault grant, as `data.ts` holds it: the project by name, or null for global. */
-export type SampleGrant = { id: string; name: string; state: 'pending' | 'active'; project: string | null; at: string; lastSeen: string | null };
-
-/** A sample key's grant, by credential id. */
-export type SampleOpened = { project: string | null; sealed: boolean; opened: number; lastOpened: string | null };
-
-const TEN_MINUTES = 10 * 60_000;
-
-/**
- * The sample's vault grants as `listDevices` would return them. The scope is the project's NAME, and
- * `sampleNames` maps it to itself, so the screen reads both records one way.
- */
-export function sampleGrants(rows: readonly SampleGrant[]): DeviceRow[] {
-  return rows.map((g): DeviceRow => {
-    const scope = g.project ?? GLOBAL;
-    const asked = Date.parse(g.at);
-    return {
-      handle: g.id,
-      status: g.state,
-      reach: 'vault',
-      scope,
-      label: g.name,
-      ua: null,
-      tries: 0,
-      expires: new Date(asked + (g.state === 'active' ? daysFor(scope) * 86_400_000 : TEN_MINUTES)).toISOString(),
-      approved_by: null,
-      approved_at: null,
-      last_used: g.lastSeen,
-    };
-  });
-}
-
-export const sampleNames = (rows: readonly SampleGrant[], opened: Readonly<Record<string, SampleOpened>>): Map<string, string> =>
-  new Map(
-    [...rows.map((g) => g.project), ...Object.values(opened).map((o) => o.project)]
-      .filter((p): p is string => p !== null)
-      .map((p) => [p, p]),
-  );
-
-/** The sample's credentials as the index draws them. */
-export function sampleKeys(vault: readonly { id: string; label: string; opens: string }[], opened: Readonly<Record<string, SampleOpened>>): KeyRow[] {
-  return vault
-    .map((c): KeyRow => {
-      const o = opened[c.id];
-      /* THE SAMPLE NAMES NO GRANT: there is no record behind it to take one out of service. */
-      return {
-        id: c.id, label: c.label, opens: c.opens, project: o?.project ?? null,
-        sealed: o?.sealed ?? false, opened: o?.opened ?? 0, lastOpened: o?.lastOpened ?? null, grant: null,
       };
     })
     .sort((a, b) => a.label.localeCompare(b.label));

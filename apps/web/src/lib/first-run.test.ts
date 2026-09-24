@@ -125,7 +125,7 @@ const shown = (said: Said<Methods> | null): string => {
 
 const host = (over: Partial<Methods>): Said<Methods> => ({
   ok: true,
-  value: { passkey: true, magic: false, key: false, open: false, demo: false, me: null, firstRun: true, ...over },
+  value: { passkey: true, magic: false, key: false, open: false, me: null, firstRun: true, ...over },
 });
 
 test('A HOST NOBODY CAN SIGN IN TO SAYS SO, and does not blame the browser', () => {

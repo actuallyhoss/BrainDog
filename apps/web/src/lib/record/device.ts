@@ -2,21 +2,20 @@
  * `/settings/agents`, the address every device code points at: what the screen decides, with no runes.
  *
  * PURE, SO `node --test` CAN IMPORT IT. A `.svelte.ts` file needs the compiler, and the parts with
- * consequences are here: what counts as a code, what each answer from `deviceApprove` means to the
- * person, and how the sample's rows become the record's.
+ * consequences are here: what counts as a code and what each answer from `deviceApprove` means to the
+ * person.
  *
- * THE RECORD'S SHAPE, NOT THE MOCK'S. The kernel names a grant by a handle and never by its poll id,
+ * THE RECORD'S SHAPE AND NOTHING ELSE. The kernel names a grant by a handle and never by its poll id,
  * and five wrong codes leave rows `denied`. The screen draws `listDevices` and `listTokens` as they
- * come back, so the sample is converted into those rows rather than drawn from its own.
+ * come back. It also drew the sample's machines and keys, converted into those rows, until the sample
+ * went on 25 September (DIRECTION 26).
  *
- * NO APPROVAL IS SIMULATED. The kernel owns the arithmetic of a wrong guess and tests it; the demo has
- * no account, so approving there says it cannot be done instead of acting it out.
+ * NO APPROVAL IS SIMULATED. The kernel owns the arithmetic of a wrong guess and tests it.
  */
 
 import type { DeviceApproved, DeviceRow } from '@braindog/client';
 
 import { BASE, slugOf } from '../at.ts';
-import type { Device, Token } from './schema.ts';
 
 export type { DeviceRow };
 
@@ -91,8 +90,9 @@ export function codeOf(typed: string): Entry {
  * What the screen says after a press.
  *
  * `signin` IS ITS OWN KIND because it is the one refusal with a way forward on this screen: a sign-in
- * older than fifteen minutes cannot approve, and signing in again is the fix. `refused` carries the
- * record's own sentence for anything else, a host that could not be reached included.
+ * older than fifteen minutes cannot approve, and neither can no sign-in at all, and signing in is the fix
+ * for both. `refused` carries the record's own sentence for anything else, a host that could not be
+ * reached included. There is no `demo` kind: with no sample there is no screen a stranger approves on.
  */
 export type Answer =
   | { kind: 'approved'; label: string | null; reach: DeviceRow['reach']; scope: string | null }
@@ -101,7 +101,6 @@ export type Answer =
   | { kind: 'tries' }
   | { kind: 'expired' }
   | { kind: 'signin' }
-  | { kind: 'demo' }
   | { kind: 'refused'; fix: string };
 
 export function answerOf(out: { ok: true; value: DeviceApproved } | { ok: false; refusal: Refusal }): Answer {
@@ -138,64 +137,17 @@ export const revocable = (row: DeviceRow): boolean => row.status === 'pending' |
 export const standing = (rows: readonly TokenRow[]): TokenRow[] => rows.filter((t) => t.revoked_at === null);
 
 /**
- * The two refusals that mean there is no record here to read, as `lib/data/record.ts` decides it: a
- * static host's SPA fallback, or a Worker with no record behind it. The screen then draws the sample.
+ * The two refusals that meant there was no record here to read, as `lib/data/record.ts` decides it: a
+ * static host's SPA fallback, or a Worker with no record behind it. Screens drew the sample on it.
  *
  * NEVER UNDER A SLUG. `/app/acme/…` names a record, so a 401 there is a person who must sign in and an unreachable host
- * is a host that did not answer; the sample drawn in either case would be dressed as acme (`research-one-domain.md` §2.4).
+ * is a host that did not answer (`research-one-domain.md` §2.4).
+ *
+ * KEPT ONLY WHILE SOMETHING STILL CALLS IT. The sample is going screen by screen (`loop/research-no-sample.md`), and
+ * other shipped files still asked this on 25 September; wave C deletes it with the last of them.
  */
 export const noRecord = (code: string, pathname: string = globalThis.location?.pathname ?? ''): boolean =>
   (code === 'UNREACHABLE' || code === 'UNAUTHORIZED') && slugOf(pathname) === null;
-
-/** A handle for a sample row, derived from its id the way the kernel derives one, and never printed. */
-function handleOf(id: string): string {
-  let h = 5381;
-  for (const c of `device:${id}`) h = (h * 33) ^ c.charCodeAt(0);
-  return (h >>> 0).toString(16).padStart(16, '0');
-}
-
-const TEN_MINUTES = 10 * 60_000;
-const NINETY_DAYS = 90 * 86_400_000;
-
-/**
- * The sample's machines as `listDevices` would return them.
- *
- * `locked` BECOMES `denied`, because that is what the kernel writes when the fifth wrong code turns
- * every waiting machine away. `expires` is the code's ten minutes, or ninety days from the ask for a
- * grant that went on to work.
- */
-export function sampleMachines(devices: readonly Device[]): DeviceRow[] {
-  return devices.map((d): DeviceRow => {
-    const asked = Date.parse(d.at);
-    return {
-      handle: handleOf(d.id),
-      status: d.state === 'locked' ? 'denied' : d.state,
-      reach: d.reach,
-      scope: null,
-      label: d.name,
-      ua: d.ua,
-      tries: d.tries,
-      expires: new Date(asked + (d.state === 'active' ? NINETY_DAYS : TEN_MINUTES)).toISOString(),
-      approved_by: null,
-      approved_at: null,
-      last_used: d.lastSeen,
-    };
-  });
-}
-
-/** The sample's tokens as `listTokens` would return them. */
-export const sampleTokens = (tokens: readonly Token[]): TokenRow[] =>
-  tokens.map((t): TokenRow => ({
-    id: t.id,
-    person_id: 'you',
-    scope: t.scope,
-    label: t.label,
-    created_at: t.created,
-    last_used_at: t.lastUsed,
-    last_surface: t.surface,
-    expires_at: t.expires,
-    revoked_at: null,
-  }));
 
 /**
  * The two lines a person copies after connecting an agent. NEITHER CARRIES THE BEARER: `braindog login`

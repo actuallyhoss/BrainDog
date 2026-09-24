@@ -10,10 +10,11 @@
   The one exception is the display default `#`: `#125` NEVER resolves bare, because every register
   has a `#1`. Type `tasks#125`.
 
-  THE RECORD FIRST, AND THE SAMPLE ONLY WHEN THERE IS NO RECORD. It looked ids up in the in-browser
-  sample alone, so on a live record `/SG5` answered "Nothing answers to SG5" for a question that
-  exists. A question is read through `governance` as `/decide` reads it, a row through `get` with the
-  spoken id, and `UNREACHABLE` or `UNAUTHORIZED` is what sends it to the sample.
+  THE RECORD, AND ONLY THE RECORD. It looked ids up in the in-browser sample alone, so on a live record
+  `/SG5` answered "Nothing answers to SG5" for a question that exists. A question is read through
+  `governance` as `/decide` reads it and a row through `get` with the spoken id. `UNREACHABLE` and
+  `UNAUTHORIZED` then sent it to the sample's question or row of the same id, a fictional studio's,
+  until DIRECTION 26 removed the sample.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -25,8 +26,6 @@
   import { createClient } from '@braindog/client';
   import { copy } from '$lib/copy.ts';
   import { openPalette } from '$lib/palette/open.svelte.ts';
-  import { DECIDED, QUESTIONS, REGISTERS, entry } from '$lib/record/api.ts';
-  import { noRecord } from '$lib/record/device.ts';
   import Empty from '$lib/ui/Empty.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -38,23 +37,21 @@
   const PREFIXED = /^[A-Za-z]{1,3}\d+$/;
   const QUALIFIED = /^([a-z][a-z0-9_]*)#(\d+)$/;
 
-  /** Where an id goes in the sample. */
-  function sampled(said: string): string | null {
-    if (PREFIXED.test(said)) {
-      const id = said.toUpperCase();
-      return [...QUESTIONS, ...DECIDED].some((q) => q.id === id) ? `/decide/${id}` : null;
-    }
-    const q = QUALIFIED.exec(said);
-    return q && REGISTERS[q[1]!] && entry(q[1]!, Number(q[2])) ? `/r/${q[1]}/${q[2]}` : null;
-  }
-
   type Wire = { ok: true; value: unknown } | { ok: false; refusal: { code: string; fix: string } } | { ok: false; conflict: unknown };
 
-  /** No record here is the sample; any other refusal of a question is the record's own sentence. */
-  const missed = (out: Wire, said: string, quote: boolean): { to: string | null; fix: string } =>
-    'refusal' in out && noRecord(out.refusal.code)
-      ? { to: sampled(said), fix: '' }
-      : { to: null, fix: quote && 'refusal' in out ? out.refusal.fix : '' };
+  /**
+   * A refusal of a question is the record's own sentence, and so is a record that could not be asked at all.
+   *
+   * A ROW'S OTHER REFUSALS ARE "NOTHING ANSWERS", which is what `get` refusing a spoken id nobody can name means. But
+   * `UNAUTHORIZED` and `UNREACHABLE` are not an answer about the id: nothing was looked up, so "Nothing answers to
+   * tasks#3" would be a claim about a row nobody asked about. They drew the sample's row until DIRECTION 26; now they
+   * are said, like any refusal of a question.
+   */
+  const unasked = (code: string): boolean => code === 'UNAUTHORIZED' || code === 'UNREACHABLE';
+  const missed = (out: Wire, quote: boolean): { to: null; fix: string } => ({
+    to: null,
+    fix: 'refusal' in out && (quote || unasked(out.refusal.code)) ? out.refusal.fix : '',
+  });
 
   /** Where an id goes on the record behind this host. */
   async function resolved(said: string): Promise<{ to: string | null; fix: string }> {
@@ -62,13 +59,13 @@
     if (/^(?:SG|D)\d+$/iu.test(said)) {
       const id = said.toUpperCase();
       const out = await client.governance({ register: id.startsWith('D') ? 'decision' : 'suggestion', id });
-      if (!out.ok) return missed(out, said, true);
+      if (!out.ok) return missed(out, true);
       return { to: out.value ? `/decide/${id}` : null, fix: '' };
     }
     if (!PREFIXED.test(said) && !QUALIFIED.test(said)) return { to: null, fix: '' };
     /* A ROW THE READER CANNOT NAME is not found, in the words this page already has for that. */
     const out = await client.call<{ register?: string; seq?: number | null } | null>('get', { spoken: said });
-    if (!out.ok) return missed(out, said, false);
+    if (!out.ok) return missed(out, false);
     const row = out.value;
     return { to: row?.register && typeof row.seq === 'number' ? `/r/${row.register}/${row.seq}` : null, fix: '' };
   }
@@ -110,7 +107,9 @@
   });
 </script>
 
-<svelte:head><title>{titleOf(done ? `Nothing answers to “${raw}”` : raw)}</title></svelte:head>
+<!-- A REFUSAL IS NOT "NOTHING ANSWERS" IN THE TAB EITHER. With the sample gone a 401 draws the record's sentence
+     in the body, and the title still claimed `Nothing answers to “tasks#3”` over it, about a row nobody looked up. -->
+<svelte:head><title>{titleOf(done && !fix ? `Nothing answers to “${raw}”` : raw)}</title></svelte:head>
 
 {#if done && fix}
   <div class="page">

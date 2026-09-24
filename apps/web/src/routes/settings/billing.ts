@@ -23,10 +23,15 @@
  * (`Build.host` in `@braindog/record`), so a self-host is one before its mail door has been asked,
  * and a Cloud host is not taken for one because a read of that door failed. A host older than the
  * field sends none, and is judged by the door as before.
+ *
+ * AND THERE IS NO THIRD CASE FOR THE SAMPLE ANY MORE (DIRECTION 26). A shell with no record behind it
+ * was answered from `DEPLOYMENT.kind`, the variant the sample was built as: "This record runs on your
+ * own machine" in every shipped bundle, and on the gates' Cloud build `copy.billingCloud`, "Payment is
+ * up to date", over no record and no payment. A refused shell names no host and Billing never asks its
+ * door, so it is told the one sentence true on both hosts, as a record that has said nothing is.
  */
 
 import { copy } from '../../lib/copy.ts';
-import { DEPLOYMENT } from '../../lib/record/data.ts';
 
 export const words = {
   /* TRUE ON BOTH HOSTS, which is why it is the default: a self-host is not charged either. */
@@ -34,18 +39,15 @@ export const words = {
 };
 
 export type Billed = {
-  /** The shell's `live`: a record answered `boot`. The sample is the only record `DEPLOYMENT` describes. */
+  /** The shell's `live`: a record answered `boot`. */
   live: boolean;
   /** The shell's `host`: what `boot` said the host is, absent when it did not say. It wins over `mintsMail`. */
   host?: 'cloud' | 'self-host' | undefined;
   /** `mintsMail`'s answer, `null` until the host has been asked. `false` is the self-host saying so. */
   mintsMail: boolean | null;
-  /** `DEPLOYMENT.kind`, which is the variant the sample was built as. */
-  sample: 'self-host' | 'cloud';
 };
 
-export function billingLine(b: Billed): string {
-  if (!b.live) return b.sample === 'self-host' ? copy.billingSelfHost : copy.billingCloud;
+export function billingLine(b: Pick<Billed, 'host' | 'mintsMail'>): string {
   const selfHost = b.host === undefined ? b.mintsMail === false : b.host === 'self-host';
   return selfHost ? copy.billingSelfHost : words.notChargedYet;
 }
@@ -63,7 +65,11 @@ export function billingLine(b: Billed): string {
  * older than the field, and telling it about an allowance it does not have would be the same mistake the other way.
  * The mail door `billingLine` falls back to is not asked here either: the only host that sends no `host` is a
  * self-host, and the door could only say so again.
+ *
+ * AND A SHELL WITH NO RECORD IS NOT HOSTED EITHER. It was answered from the build, `DEPLOYMENT.kind`, so the gates'
+ * Cloud variant counted calls against an allowance on a screen with no record to hold one. What was asked of the build
+ * is asked of the host now, and a host that did not answer `boot` has said nothing.
  */
-export function hostedHere(shell: Pick<Billed, 'live' | 'host'>, sample: Billed['sample'] = DEPLOYMENT.kind): boolean {
-  return shell.live ? shell.host === 'cloud' : sample === 'cloud';
+export function hostedHere(shell: Pick<Billed, 'live' | 'host'>): boolean {
+  return shell.live && shell.host === 'cloud';
 }

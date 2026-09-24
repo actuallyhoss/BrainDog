@@ -1,6 +1,6 @@
 /**
- * `/decide` on a live record: which rows it draws, the sample when there is no record, the record's own
- * sentence when it refuses, and the `decide` call an answer sends.
+ * `/decide` on a live record: which rows it draws, the host's own sentence when it refuses (with no record
+ * behind it too), and the `decide` call an answer sends.
  */
 
 import { test } from 'node:test';
@@ -93,7 +93,7 @@ test('the queue is the record’s open suggestions, in its order, each with the 
   assert.equal(d1?.options.find((o) => o.key === d1.decided?.option)?.title, 'Nordhaven Registry');
 });
 
-test('a rowset update draws the same diff as the sample, from the record’s own rows and declaration', async () => {
+test('a rowset update draws its diff from the record’s own rows and declaration', async () => {
   const calls: Calls = [];
   const out = await readQueue(client({}, calls));
   assert.equal(out.from, 'live');
@@ -161,10 +161,24 @@ test('decisions pair with the suggestions they name, and one that names none or 
   assert.deepEqual([...paired].map(([k, v]) => [k, v.id]), [['D3', 'SG1']]);
 });
 
-test('no record here is the sample, and any other refusal is the record’s own sentence', async () => {
+/**
+ * NO RECORD HERE IS A REFUSAL LIKE ANY OTHER, AND NEVER THE SAMPLE (DIRECTION 26).
+ *
+ * `node --test` has no `location`, so `noRecord` read an empty pathname as "no slug" and this is the
+ * no-slug case exactly: before the sample went, a 401 or an unreachable host at `/app/decide` answered
+ * `{ from: 'sample' }` and both screens drew fixture questions nobody had asked. The layout sends a 401
+ * to sign-in; a reader that is asked anyway says the host's own sentence.
+ */
+test('no record here is the host’s own sentence, the same as any other refusal', async () => {
   for (const code of ['UNREACHABLE', 'UNAUTHORIZED']) {
-    const out = await readQueue(client({ governance: async () => refused(code, 'No record.') }));
-    assert.deepEqual(out, { from: 'sample' });
+    const wall = client({ governance: async () => refused(code, 'Sign in to open this record.') });
+    assert.deepEqual(await readQueue(wall), { from: 'refused', fix: 'Sign in to open this record.' }, `the queue on ${code}`);
+    assert.deepEqual(await readOne(wall, 'SG2'), { from: 'refused', fix: 'Sign in to open this record.' }, `one question on ${code}`);
+    assert.deepEqual(
+      await olderDecisions(wall, { cursor: 'D1', total: 2, suggestions: new Map(), after: null, read: false }),
+      { from: 'refused', fix: 'Sign in to open this record.' },
+      `older decisions on ${code}`,
+    );
   }
   const out = await readQueue(client({ governance: async () => refused('FORBIDDEN', 'You may not read the queue.') }));
   assert.deepEqual(out, { from: 'refused', fix: 'You may not read the queue.' });

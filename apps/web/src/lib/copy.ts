@@ -163,8 +163,6 @@ export const copy = {
      A disabled control tells you a thing exists and refuses to say why it will not work. */
   /** What to do with something the record noticed: put it where things get decided. */
   raiseIt: 'Open a question',
-  /** The way from a session to the run behind it: the tool calls, in order, with their answers. */
-  watchRun: 'Watch the run',
   /**
    * TWO SCREENS DRAW WORKED EXAMPLES AND NEITHER OF THEM SAID SO.
    *
@@ -205,9 +203,7 @@ export const copy = {
    */
   willAdd: (name: string, span: number) =>
     `Adds a ${name} to the end of the page, ${span === 12 ? 'the full width' : `${span} twelfths wide`}.`,
-  bound: (name: string, page: string) => `Added a ${name} to ${page}. Nothing was saved yet.`,
   blockLink: 'a link to this block',
-  blockAdded: (name: string) => `Added a ${name}. Nothing was saved yet.`,
 
   /* The picker groups by PURPOSE, because somebody adding a block knows they want to show a list
      and does not know that `todo` and `timeline` share a primitive while `chips` does not. */
@@ -282,8 +278,6 @@ export const copy = {
     split: 'one total cut into its parts',
     bridge: 'how a start became an end, step by step',
   } as Record<string, string>,
-  arrangedNotSaved: (title: string) =>
-    `${title} rearranged here. Nothing was saved yet.`,
   arrangeNothing: 'Nothing moved.',
   arranged: (title: string) => `${title} rearranged.`,
   arrangeTemplate: 'This page is drawn once for each row from one shared layout, so it cannot be rearranged from one of those rows.',
@@ -318,7 +312,6 @@ export const copy = {
   deferHint: 'What has to happen first',
   deferAction: 'Park it',
   wakeOn: 'Wake me on',
-  deferred: (on: string) => `Parked until ${on}. Nothing was saved yet.`,
   required: 'required',
   nothingToUndo: 'Nothing to undo.',
   /**
@@ -359,16 +352,7 @@ export const copy = {
   sourcesAdd: 'New sources arrive the way new lists do: with an add-on, or set up by your assistant.',
   sourcesAddGo: 'Browse add-ons',
   densityPreviewRows: ['Invoice 2026-041, brand system', 'Studio insurance, annual', 'VAT quarter to 31 Aug'],
-  sampleWhy: 'A small business, made up, so you can see what a record holds. Nothing you do here is saved.',
-  sampleStart: 'Start your own',
-  samplePutAway: 'Put this away',
 
-  /* What a board and a checklist say when they move something the record has not been given yet.
-     The mark on the card or the row is the answer; this is for the reader whose card has scrolled
-     away, which is the same division `archive` makes on the register list. */
-  cardMovedTo: (title: string, to: string) => `${title} would move to ${to}, and nothing was saved yet.`,
-  taskTicked: (title: string, done: boolean) =>
-    `${title} would be marked ${done ? 'done' : 'not done'}, and nothing was saved yet.`,
   cardFallback: 'The card',
 
   /* Answering a question where it is drawn. The options used to be a printed span inside the card's
@@ -380,15 +364,11 @@ export const copy = {
      back" said out loud reaches the control a person is looking at (WCAG 2.5.3). */
   takeItBackOf: (title: string) => `Take it back: ${title}`,
   whyForLater: 'Why, for whoever reads this in six weeks',
-  reasonMissing: 'No reason yet. The answer is kept either way, and in six weeks it will say what was chosen and not why.',
   reasonThinNudge: 'That will not mean much in six weeks. It is kept either way.',
 
   /* What the record would do, appended to a decision's second line on Home, so "what needs you"
      shows its thinking rather than four questions and none. */
   suggestedAnswer: 'Suggested:',
-  /* Which way an obligation runs, on the second line of its row on Home. */
-  owedToYou: 'Owed to you',
-  youOwe: 'You owe',
   toDecide: 'to decide',
 
   rowActions: 'What you can do here',
@@ -866,11 +846,10 @@ export const copy = {
      of the product had stopped using. They are here so the next rename reaches them. */
   threadNoUpdate: 'An update is a sentence, a health and a date. It is the only thing on a thread that says how it is actually going.',
   threadNoTasks: 'No open tasks on this thread.',
-  /* POSTING ONE. The button's own word and the sample's clause were both typed into the route, so
+  /* POSTING ONE. The button's own word was typed into the route, so
      the one control in the product that writes an update kept its words where no review of this
      file could see them, which is the whole reason this file exists. */
   postUpdate: 'Post an update',
-  updateWouldBePosted: 'An update would be posted',
   post: 'Post',
   select: 'Select',
   deselect: 'Deselect',
@@ -929,44 +908,11 @@ export const copy = {
      missed said the same thing — and the empty record has not been asked anything. */
   auditNone: 'Nothing in the log yet.',
   olderEntries: 'Show older entries',
-  /* THE INBOX. `pattern` and `claimed` are the schema's words for a thing a person would call a
-     rule, and what they are being offered is not a pattern — it is what happens to the NEXT one. */
-  ruleOffer: 'A rule that would have filed this, and the next one like it',
-  makeRule: 'Make it a rule',
-  notThisOne: 'Leave it for another rule',
   fileIt: 'File it as a row',
   /* `Archive this` AND IT WAS `Archive the arrival`. An `arrival` is what the record calls a thing
      that came in through an ingest, and the inbox is the one screen where the reader is looking at
      an email. Naming it after the mechanism that carried it is naming it after the plumbing. */
   archiveArrival: 'Archive this',
-  /**
-   * AND THE THREE SENTENCES BEHIND THE THREE BUTTONS, WHICH DID NOT GET THE MEMO.
-   *
-   * The note above renamed `arrival` off the button and gave the reason: the inbox is the one
-   * screen where the reader is looking at an email, and naming it after the mechanism that carried
-   * it is naming it after the plumbing. All three toasts under those buttons still said it, and
-   * one of them said `pattern` as well, three words away from a button reading "Leave it for
-   * another rule". They were literals in the route, which is why the rename could not reach them.
-   */
-  inboxLeaveIt: 'This email would be left for a different rule',
-  inboxFileIt: 'A row would be created from this email',
-  inboxArchiveIt: 'This email would be archived, and its bytes kept',
-  /**
-   * THE INBOX AT ZERO IS TWO STATES, AND IT WAS DRAWN AS ONE, in a literal typed into the route.
-   *
-   * `kind="cleared"` is the check glyph, which means YOU FINISHED, and it was drawn on a record
-   * with no connector: nothing has ever come in there and nothing can until one exists, and the
-   * screen that makes one was not linked. The body asserted a history besides, "every arrival
-   * since you last looked became a row", on a record that has never had an arrival. `19 §6`
-   * separates *nothing yet* from *nothing matched* for exactly this reason.
-   *
-   * AND IT SAID `arrival`, which is the word the note above argues against and renamed out of the
-   * button below it. That literal lived in the route rather than in this file, which is why the
-   * rename could not reach it. Both sentences are here now.
-   */
-  inboxNothingYet: 'Nothing arrives here yet.',
-  inboxNothingYetWhy:
-    'The inbox holds email that came in and matched no rule, so you can file it yourself or make the rule that files the next one like it. A connector is what brings it in.',
   inboxConnect: 'Set up a connector',
   inboxClear: 'Nothing waits in the inbox',
   inboxClearWhy: 'Anything that comes in without a rule to file it waits here.',
@@ -1516,10 +1462,6 @@ export const copy = {
   addException: 'Different on one list',
   removeException: 'Back to their level',
   suspendedSince: (ago: string) => `stopped ${ago}`,
-  sinceWhen: (ago: string) => `joined ${ago}`,
-  /* AN INVITATION OUT IS NOT ACCESS, and the two were one row. Somebody who had invited a
-     bookkeeper could not tell whether the link had been used. */
-  inviteOut: 'invited, not accepted yet',
   /* THE READ MARK, WHICH `20 §6` PUTS ON THE *WORTH BUILDING* SIDE of its table: "who has seen the
      thing that binds them", against live cursors and avatar stacks on the other. A decision binds
      people who were not in the room, so whether they have looked is the question a record can
@@ -1538,26 +1480,6 @@ export const copy = {
      signal, and labelling the normal case trains people to stop reading the label. */
   alpha: 'Alpha',
   removeAccess: 'Remove',
-  /**
-   * THE FOUR SENTENCES THIS SCREEN SAYS WHEN YOU PRESS SOMETHING, AND ALL FOUR PRINTED AN EVENT
-   * KIND.
-   *
-   * `access.grant` and `access.revoke` are two of `30 §2`'s forty kinds, closed by a `CHECK` the
-   * database enforces, and they belong in the log and in the API. They were being read out to a
-   * person on the screen that decides who can see their business, in a sentence whose whole job is
-   * to say how much would happen. How much is one per list; which direction it is has already been
-   * said by the half of the sentence naming where the level moves from and to.
-   *
-   * THE KINDS ARE UNTOUCHED, which is the trade `19 §9` already ran once for the vault: the word on
-   * the screen changes and the schema keeps its own, because a kind is spoken by the record.
-   * They were four literals in the route, which is why one rename never reached all four.
-   */
-  levelWouldMove: (name: string, from: string, to: string) =>
-    `${name} would move from ${from} to ${to} across this record, with one change per list`,
-  accessWouldGo: (name: string) => `Every one of ${name}'s access rows would be removed, with one change per list`,
-  exceptionWouldGo: (list: string, to: string) => `${list} would go back to ${to}, with one change naming that list`,
-  exceptionWouldBeAdded: (name: string) =>
-    `One list would be picked, and ${name} given a different level on it, which takes one invitation and one change naming that list`,
   /* `LEVEL_REQUIRED`'s own fix sentence, verbatim (45 §5.6). */
   lastOwner: 'A record keeps at least one owner.',
   /* THE ONE ACTION THAT REMOVES YOUR OWN WAY BACK. `45 §5.6` gives every level change one method,
@@ -1813,13 +1735,6 @@ export const copy = {
   /* ingest — `25 §9` draws this screen */
   sources: 'Where rows come in from',
   sourcesHow: 'Each of these fetches on its own schedule. Everything they add is logged.',
-  sourceState: { ok: 'working', failing: 'failing', paused: 'paused' } as Record<string, string>,
-  lastRan: (ago: string) => `last ran ${ago}`,
-  nextRun: (ago: string) => `next ${ago}`,
-  noNextRun: 'nothing scheduled',
-  pointsIn: (n: number) => `${n.toLocaleString('en')} in`,
-  reconnect: 'Reconnect',
-  retryNow: 'Retry now',
   /* `25 §9`'s own blockquote, and it outranks the screen it is on. */
   staleShows: 'A figure fed by one of these shows a gap and says it is stale rather than holding yesterday’s number.',
 
@@ -1913,16 +1828,6 @@ export const copy = {
 
   /* the signing key — `53 §4` puts the public half on the export screen, and `03 §4` says why */
   theSignature: 'How anybody checks a copy is yours',
-  /* IT SAID ANYBODY COULD FETCH IT AT `/.well-known/braindog-key`, and there is no such route in
-     any of the three apps — the one sentence on this screen asserting a live endpoint, where every
-     other unwritten action goes through `notWritten`. `03 §4` specifies the URL; the product has not
-     got it yet, and the sentence says what is true today. */
-  theSignatureIs: 'Every export and every backup is signed. This is the public half of the key that signs them. It opens nothing, which is why it is safe to hand to anybody checking a copy.',
-  keyFingerprint: 'Fingerprint',
-  keyPublic: 'Public key',
-  copyKey: 'Copy the key',
-  keyCopied: 'Public key copied',
-  verifyHow: 'Hand it to somebody with a copy of your record and they can prove it came from here and that no row has changed since. Without it they can prove the file is whole, but not where it came from.',
   /* AND ON A RECORD THERE IS NO KEY TO SHOW YET. The value under this heading is the sample's, kept
      in `data.ts` with the rest of the synthetic record, and it was drawn on every record: an
      invented key presented as that record's own, which no reader could tell by looking. `boot` does
@@ -1965,23 +1870,6 @@ export const copy = {
   keptSelfHost: (n: number) => `A backup of the whole record every night, on this machine. The ${n} newest are kept.`,
   snapshotFailed: 'Nothing kept',
   download: 'Download',
-  restoreTo: 'Restore to a time',
-  findTheMoment: 'Find the moment',
-  restoreLoses: 'What it costs',
-  restoreLosesWhat: 'Every change made after the moment you pick. There is no way to bring them back except restoring forward again.',
-  restoreBack: 'If it was wrong',
-  /**
-   * IT OFFERED AN INSTANT, AND THE ONLY ROLLBACK IN THE BUILD IS A COPY.
-   *
-   * It read *"Restore to the instant just before. That is a point in time too, for thirty days"*,
-   * which is `53 §5.5`'s rollback for a PITR bookmark. The one `restore` that exists is
-   * `packages/record/src/index.ts`: it calls `snapshots.take('before-restore')` before it replaces
-   * anything, so what the record held comes back as a copy in the same list, with a name. There is
-   * no instant to return to and no thirty-day clock on it: the copy is kept the way every other
-   * copy is, and in `apps/selfhost/src/snapshots.ts` taking a `before-restore` prunes nothing, so
-   * the copy being restored cannot be the one the take throws away.
-   */
-  restoreBackHow: 'What the record held is kept as a copy first, so going back is itself something you can go back from.',
   rowsAndSize: (rows: number, size: string) => `${rows.toLocaleString('en')} rows · ${size}`,
   snapshotNow: 'Back up now',
   theKey: 'The key',
@@ -2003,24 +1891,6 @@ export const copy = {
   theKeyWhere:
     'On a self-host it is the key file you made when you set the record up. Copy that file somewhere else, or these backups cannot be opened.',
   restore: 'Going back',
-  restoreSelfHost: 'This record is self-hosted, so going back means restoring one of the copies above by hand.',
-  /**
-   * IT PROMISED A RESTORE TO ANY INSTANT, AND NOTHING IN THIS BUILD PERFORMS ONE.
-   *
-   * It read *"Any point in the last thirty days, not only the nightly copies"*, and the test beside
-   * it asserted `/thirty days/` on the strength of `53 §5.5`, so the document was checked against
-   * itself. Measured in the code: `apps/worker/src/index.ts` builds the hosted record with
-   * `createRecordApi({…})` and passes no `snapshots` port, so `snapshot`, `snapshots` and `restore`
-   * all answer `NOT_IN_THIS_BUILD` — which is what `packages/ports/src/index.ts` says the Worker
-   * does, in the port's own comment. The only bookmark the Worker reads is `getCurrentBookmark()`,
-   * filed in the nightly object's metadata for a restore path nobody has built.
-   *
-   * WHAT THE CLOUD REALLY HAS IS NIGHTS. `apps/worker/src/snapshots.ts` keeps thirty dated keys in
-   * R2 plus `latest`, written by the cron alone; `53 §5.5(b)` is the runbook for putting one back,
-   * and it is an operator with a bucket rather than anybody pressing anything here. So the sentence
-   * says a night, and says that the thing between two nights is not on offer.
-   */
-  restoreCloud: 'The Cloud takes a copy of the whole record every night, so going back means one of those nights and not a moment between two of them.',
   /**
    * AND WHERE THE RECORD ITSELF REFUSED, THE SCREEN SAID IT COULD DO THE MOST DESTRUCTIVE THING ON IT.
    *
@@ -2040,7 +1910,6 @@ export const copy = {
   /* billing — nothing to bill on a self-host (23 §8: one line in Settings) */
   billing: 'Billing',
   billingSelfHost: 'This record runs on your own machine. There is nothing to bill and no subscription to lapse.',
-  billingCloud: 'Payment is up to date. If it ever lapses the record turns read-only, and export keeps working.',
 
   /** Names the source block so tabbing into it says which page it is the workings of. */
   declarationOf: (page: string) => `How ${page} is built`,
@@ -2116,20 +1985,6 @@ export const copy = {
    * reader asked for. What they need is whether their typing survives.
    */
   mockNotice: 'Nothing you do here is saved yet.',
-  /**
-   * AND THE FOUR AREAS WHERE THAT SENTENCE IS FALSE.
-   *
-   * `mockNotice` was rendered outside the area branch, so it appeared on all twelve — including the
-   * three where every control genuinely persists. On `/settings/navigation` it sat four lines under
-   * `perDevice`'s *"This setting is remembered on this device"*: two sentences, one screen, one
-   * scroll, saying opposite things. Measured on the deployed build: accent, colour scheme, text
-   * size, density, character keys and page suggestions all write `bd_pref` and all survive a
-   * reload, under a footer telling the reader they do not.
-   *
-   * The one blanket disclaimer that exists to protect the mock had become the thing teaching people
-   * not to trust the half that works.
-   */
-  mockNoticeSome: 'The settings above are kept on this device. Nothing else here is saved yet.',
   /* On a live record the rest of Settings writes to it, so only the device half is said. */
   keptOnDevice: 'The settings above are kept on this device.',
 
@@ -2199,13 +2054,13 @@ export const copy = {
   openWhy: 'It was started without a key, so anyone on this computer can open the record.',
   openYourRecord: 'Open your record',
   /* What the hosted app says until its sign-in is switched on, to whoever opens it: a fact and a
-     promise, and the demo underneath as the one thing to press. */
+     promise. */
   notConfiguredTitle: 'Sign-in is not open here yet.',
   notConfiguredWhy: 'When it opens, this is where you will sign in to your record.',
   insecureTitle: 'Sign-in needs a secure address.',
   insecureWhy: "Open this page over https, or at localhost on the server's own computer.",
   signedInTitle: 'You are signed in',
-  /* Every screen reads the record once somebody is signed in; the sample is only for a browser with none. */
+  /* Every screen reads the record once somebody is signed in. */
   signedInReads: 'Every screen now reads this record.',
   /* NOT "AS SOMEONE ELSE". The screen cannot tell whose a link is until it is spent, and the owner pasting his own
      sign-in link into a tab he is already in was told he would be someone else. Spending any link needs this screen
@@ -2231,9 +2086,6 @@ export const copy = {
   signingOut: 'Signing out',
   signedOut: 'You are signed out.',
   signOutFailed: 'You are still signed in. Try again.',
-  /* The marketing site's own line, because the app must not imply an account to look around. */
-  demoNeedsNothing: 'The demo record needs no sign-in. There is no sign-up and no billing.',
-  openTheDemo: 'Open the demo record',
   /* THE AIM FOR THE DECIDE QUEUE, AS A SENTENCE. `/decide` printed the metric's note by itself,
      `no more than 3`, at the end of its heading row: a fragment with no subject, beside a count of
      4 it was failing. The words are here; the tone and its glyph come from the metric. */
@@ -2263,7 +2115,6 @@ export const copy = {
   noteLabel: 'Add a note',
   notePlaceholder: 'Write a note…',
   noteAdd: 'Add note',
-  noteWouldBeAdded: "The note would be added to this row's history",
   /* Settings, vault and packs writes (lane C) */
   writeRaced: 'The record changed while this was sent, so it has been read again.',
   levelMoved: (name: string, to: string) => `${name} is set to ${to} across this record.`,
@@ -2377,8 +2228,6 @@ export const copy = {
   /* Archive and put back, on the row itself, in the words the list already uses for the same verb. */
   rowArchive: 'Archive',
   rowRestore: 'Put back',
-  rowArchiveWould: 'The row would be archived',
-  rowRestoreWould: 'The row would be put back',
   rowRestored: (what: string) => `${what} is back.`,
   /* The row is archived: said on the row, because every list leaves it out and nothing else here would. */
   rowArchivedNote: 'This row is archived. It is left out of every list until it is put back.',
@@ -2455,9 +2304,6 @@ export const copy = {
   inboxArchiveSelected: (n: number) => `Archive ${n}`,
   inboxBatchFiled: (n: number) => `${n} filed. They have left the inbox.`,
   inboxBatchArchived: (n: number) => `${n} archived. They are kept, and they have left the inbox.`,
-  inboxWouldFile: (n: number) => `${n} ${n === 1 ? 'row' : 'rows'} would be created from these`,
-  inboxWouldArchive: (n: number) => `${n} would be archived, and their bytes kept`,
-  decideWouldAnswer: (n: number) => `${n} would be answered with what is suggested`,
   /* A PROPOSAL THAT ARRANGES THIS BRAINDOG (DESIGN-SYSTEM D11): a pack, its settings, or several at once. Why, what it
      calls out, the packs, what appears, the words that change, the rest; then what was applied, or how far it got. */
   arrangeLeadUseCase: (name: string) => `Sets this BrainDog up for ${name}`,

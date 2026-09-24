@@ -6,15 +6,16 @@
   share link, in one keystroke, because THE URL IS THE SERIALISATION. There is no "save this
   search" dialog and nothing to publish (19 §1).
 
-  `order` stays URL state on the sample and is part of the saved object on a record: `saveView`
-  stores the sort somebody was looking at, so a live view reopens the way it was left.
+  `order` is part of the saved object on the record: `saveView` stores the sort somebody was looking
+  at, so a view reopens the way it was left.
 
   IT DREW THE SAMPLE'S TWO VIEWS ON EVERY RECORD, and it was the last data screen left that way.
-  `VIEWS` at `data.ts:833` is a fictional studio's pair, and the key a person opens is matched
+  `VIEWS` at `data.ts:833` is a fictional studio's pair, and the key a person opens was matched
   against that object alone: no `createClient`, no `*-live` import, so `/v/services.lapsing` on a
   real record drew a filter somebody else wrote over rows from a register this record may not even
-  declare. `views-live.ts` is the live half, built on the record's own `view` table, and the sample
-  stays exactly where it was: the answer when there is no record to ask.
+  declare. `views-live.ts` is built on the record's own `view` table. The sample then stayed on as
+  the answer when no record answered, and DIRECTION 26 removed that too: a record that does not
+  answer is a refusal, drawn in its own words, and nothing on this screen comes from a fixture.
 
   AND THERE IS NO `+page.ts` IN FRONT OF IT ANY MORE, which is why any of the above runs in a
   browser. `88572488` put one here holding `redirect(307, viewMovedTo(...))`, so on a live record
@@ -33,9 +34,8 @@
   not do.
 
   What the redirect was for was the sample's fictional views appearing on a real record, and that is
-  what `viewReader` now prevents by asking: `from: 'sample'` comes back for `UNREACHABLE` and
-  `UNAUTHORIZED` alone. A record that holds no view of that key gets its own sentence and its own
-  addresses. `views.ts` still exports `viewMovedTo` with nobody left to call it.
+  what `viewReader` now prevents by asking. A record that holds no view of that key gets its own
+  sentence and its own addresses. `views.ts` still exports `viewMovedTo` with nobody left to call it.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -46,7 +46,7 @@
   import { page } from '$app/state';
   import { CapLine, Table } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
-  import { DOM_CAP, NOW, VIEWS, iconFor, REGISTERS, columnsFor, seqWidth, display, labelOf, list, toRows, whereOf, type Filter } from '$lib/record/api.ts';
+  import { DOM_CAP, iconFor, REGISTERS, columnsFor, seqWidth, display, labelOf, toRows, whereOf, type Filter } from '$lib/record/api.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -56,8 +56,6 @@
   import { saidPlainly } from '$lib/record/blocks.ts';
   import RowCards from '$lib/ui/RowCards.svelte';
   import { rowsAsCards } from '$lib/ui/body.svelte.ts';
-  import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { PAGES } from '$lib/record/data.ts';
   import { keptColumns, viewReader, type ViewReader, type Viewed } from '$lib/record/views-live.ts';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
 
@@ -102,17 +100,17 @@
   const narrowed = $derived(Boolean(q) || extra.length > 0);
 
   /**
-   * THE RECORD'S ANSWER, AND THE SAMPLE ONLY WHERE THERE IS NO RECORD.
+   * THE RECORD'S ANSWER, AND NOTHING ELSE.
    *
    * One read per address, bracketed by `opened()` and `closed()`, so `data-screen` is away while it
    * is out. The whole URL goes into the read: an extra clause is a narrower question about the same
    * view, so it is ANDed onto the record's own predicate rather than being applied to a second list
-   * afterwards, which is what the sample path does in memory.
+   * afterwards, which is what the sample path used to do in memory.
    *
    * AN ANSWER FOR AN ADDRESS SOMEBODY HAS ALREADY LEFT IS DROPPED, the way the row screen drops one.
    */
   let got = $state<Viewed | null>(null);
-  let clock = $state(NOW);
+  let clock = $state(Date.now());
   let reader: ViewReader | null = null;
   let askedFor = '';
 
@@ -126,9 +124,9 @@
     const current = askedFor === asked;
     closed(!current || out.from !== 'refused', at);
     if (!current) return;
-    /* A LIVE ROW IS READ AGAINST TODAY AND A SAMPLE ROW AGAINST THE SAMPLE'S OWN DAY, since a
-       fixture date read against today is wrong by months. */
-    clock = out.from === 'live' ? Date.now() : NOW;
+    /* THE ROWS ARE READ AGAINST THE MOMENT THEY ARRIVED, so a date cell's "in 3 days" is about the
+       answer on screen and not about when the tab was opened. */
+    clock = Date.now();
     got = out;
   }
 
@@ -140,31 +138,26 @@
   });
 
   const live = $derived(got?.from === 'live' ? got.view : undefined);
-  const sample = $derived(got?.from === 'sample' ? VIEWS[key] : undefined);
   /* THE TWO REFUSALS AS VALUES, because a `{#snippet}` is a scope of its own and the narrowing a
      `{:else if got?.from === 'refused'}` gives the markup does not reach inside one. */
   const refused = $derived(got?.from === 'refused' ? got : undefined);
   const missing = $derived(got?.from === 'missing' ? got : undefined);
-  const register = $derived(live?.register ?? sample?.register);
-  const name = $derived(live?.name ?? sample?.name);
+  const register = $derived(live?.register);
+  const name = $derived(live?.name);
   /* READ AGAIN ONCE THE VIEW IS: a use case's own list is declared by the record, and `viewReader`
      learns it on the way (`remote.ts` `learn`), which a plain read of `REGISTERS` would not notice. */
   const decl = $derived.by(() => (void got, register ? REGISTERS[register] : undefined));
-  const filters = $derived(live ? live.filters : (sample?.filters ?? null));
+  const filters = $derived(live ? live.filters : null);
   /* THE COLUMNS THE VIEW KEPT, and the register's own where it kept none. The spoken id ends the
      row either way, as it does on the list this view narrows (DESIGN-SYSTEM rule 7). */
   const columns = $derived(register ? keptColumns(columnsFor(register), live?.columns ?? []) : []);
 
-  const sampled = $derived(
-    sample && register ? list(register, { filters: [...sample.filters, ...extra], ...(q ? { q } : {}) }) : undefined,
-  );
-  const entries = $derived(got?.from === 'live' ? got.entries : (sampled?.entries ?? []));
-  const matched = $derived(got?.from === 'live' ? got.matched : (sampled?.matched ?? 0));
-  const total = $derived(got?.from === 'live' ? got.total : (sampled?.total ?? 0));
-  /* WHAT THIS RECORD CALLS THE ROWS THESE ONES POINT AT. Undefined on the sample, where `display`
-     names a ref out of the sample's own rows as it always has. */
+  const entries = $derived(got?.from === 'live' ? got.entries : []);
+  const matched = $derived(got?.from === 'live' ? got.matched : 0);
+  const total = $derived(got?.from === 'live' ? got.total : 0);
+  /* WHAT THIS RECORD CALLS THE ROWS THESE ONES POINT AT, so a ref is named by this record's row. */
   const names = $derived(got?.from === 'live' ? got.names : undefined);
-  /* NOTHING IS DRAWN UNTIL THE VIEW HAS BEEN READ, so the sample never shows over a live one. */
+  /* NOTHING IS DRAWN UNTIL THE VIEW HAS BEEN READ, so no half-drawn screen stands in for the answer. */
   const waiting = $derived(got === null);
 
   /**
@@ -219,7 +212,7 @@
   }
 
   /**
-   * DRAWN ONCE THE VIEW HAS BEEN READ, from the record or the sample.
+   * DRAWN ONCE THE RECORD HAS ANSWERED, whatever it answered.
    *
    * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
    * from a shell that has fetched nothing. Four browser gates waited on `#main` having a child,
@@ -242,7 +235,7 @@
 <svelte:window {onkeydown} />
 
 {#if waiting}
-  <!-- Bars until the view has been read, never the sample's view of the same key. -->
+  <!-- Bars until the record answers. -->
   <Waiting head rows={8} />
 {:else if refused}
   <div class="page">
@@ -261,8 +254,8 @@
 {:else if missing}
   <div class="page">
     <!-- A VIEW THIS RECORD DOES NOT HOLD, IN THE RECORD'S OWN WORDS AND WITH THE RECORD'S OWN
-         ADDRESSES. Listing the sample's two names here would answer the question with two links
-         that open somebody else's list. -->
+         ADDRESSES. Listing the seeded studio's two names here once answered the question with two
+         links that open somebody else's list. -->
     <Empty kind="error" heading title={missing.said} body={copy.theseExist('Saved views', missing.addresses)}>
       {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
     </Empty>
@@ -272,14 +265,13 @@
     <!-- A URL NAMING SOMETHING THIS RECORD DOES NOT HAVE IS A REFUSAL, and the record already has
          the sentence for it. Nothing failed, so there is no request id to quote (`50 §13 D11`), and
          no filter ran, so "nothing matched" is about something that did not happen. It names the
-         thing, says it is not here, and lists what is — `10 §7`'s fourth rule: the refusal is the
-         teacher. -->
-    <Empty
-      kind="error"
-      heading
-      title={copy.noSuch('saved view', key)}
-      body={copy.theseExist('Saved views', Object.entries(VIEWS).map(([address, v]) => ({ address, title: v.name })))}
-    >
+         thing and says it is not here.
+
+         IT LISTED THE SEEDED STUDIO'S VIEWS AS WHAT IS, from `VIEWS`, on every record. The record's
+         own addresses come with `missing` above; this branch is a view the record answered over a
+         list it will not describe, where there is no list of anything true to offer, so it offers
+         none. -->
+    <Empty kind="error" heading title={copy.noSuch('saved view', key)}>
       {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
     </Empty>
   </div>
@@ -300,8 +292,6 @@
     {register}
     predicate={filters?.length ? whereOf(filters) : copy.everything}
     says={filters?.length ? saidPlainly(register, whereOf(filters)) : copy.everything}
-    onbind={(target, kind) =>
-      toasts.push(copy.bound(copy.kindNames[kind] ?? kind, PAGES[target]?.title ?? target), { intent: 'warn' })}
   />
 
   <div class="page">

@@ -28,10 +28,17 @@
  * THE DRAWINGS ARE COPY TOO. The home page draws two working things rather than pictures of them: an
  * agent's proposal that a person decides, landing in the history under the agent's name, and a
  * switcher that rearranges the page as you pick who the record is for. Every name, figure and time
- * in both is below, read off the demo record (`apps/web/src/lib/record/data.ts` and
- * `packages/seed`). Nothing in a drawing is invented: when the seed's sample changes, these change
- * with it, not before it. Where a drawing takes a liberty with the sample, the comment beside it
- * names the liberty. A key that nothing renders is deleted rather than kept for later.
+ * in both is below, read off `packages/seed`, which is the record the gates install and serve. The
+ * app no longer draws a sample of its own (`loop/DIRECTION.md` §26), so the seed is the one source
+ * left; the drawings stay, with every number. Nothing in a drawing is invented: when the seed
+ * changes, these change with it, not before it. Where a drawing takes a liberty with the seed, the
+ * comment beside it names the liberty. ONE EXCEPTION, MEASURED ON 25 SEPTEMBER: the decision
+ * scene's history is in no file under `packages/seed`. All three rows, the two older ones
+ * (`seq 4160`, and `seq 4188` by `rule.reply`) and Claude's landing row (`seq 4192` and `4191`,
+ * creating `services#6` and `services#7`), are the app's fixture ledger in
+ * `apps/web/src/lib/record/data.ts`, which wave C of `loop/research-no-sample.md` moves to
+ * test-only fixtures. The seed holds the question and the two services, not the rows that record
+ * them. The comments beside the rows still cite the ledger by that name. A key that nothing renders is deleted rather than kept for later.
  *
  * WHY THERE ARE FEWER SECTIONS THAN THERE WERE. `typed` and `agents` were two bands of their own and
  * are now three sentences inside one. The page used to open on typed rows, registers and the MCP
@@ -116,7 +123,8 @@ export const site = {
       title: 'Changelog · BrainDog',
       /* `live on a synthetic record` IS THE SAME FALSE CLAIM `STATUS.body` CARRIED, one layer out,
          and a meta description is read by every person a search result or a shared link reaches.
-         `DEMO_RECORD` is empty in both environments, so there is no record to be live on. */
+         There is no demo record, and since `loop/DIRECTION.md` §26 no anonymous door either, so there is
+         no record to be live on. */
       description:
         "What shipped in BrainDog and when, in the repository's own words. The app is live, " +
         'signing in works, and nothing is for sale yet.',
@@ -176,18 +184,18 @@ export const site = {
      * `Open the app` AND NOT `Open the demo`, WHICH IS THE VERB THIS SITE ALREADY USES for the same
      * address in the nav and on the pricing page.
      *
-     * The server has no demo record to serve: `apps/worker/wrangler.jsonc` sets `DEMO_RECORD: ""` in
-     * both environments, so its anonymous door never opens. The label stays `Open the app` because
+     * The server has no demo record to serve: its anonymous door went with the sample
+     * (`loop/DIRECTION.md` §26), so a stranger is sent to sign in. The label stays `Open the app` because
      * the app is what opens, and what it opens on is said in the note under the button.
      *
-     * THE NOTE SAID ONLY `Neither plan is open yet.`, AND THAT HID THE ONE THING A STRANGER GETS.
-     * The comment above it argued there was nothing behind the button, from `DEMO_RECORD` alone, and
-     * that is true of the server and false of the browser. Measured on 22 September:
-     * `https://app.brain.dog/api/boot` answers 401 `UNAUTHORIZED`, `apps/web/src/lib/record/device.ts:143`
-     * counts that as no record, and the app draws its built-in sample under a bar that says `This is
-     * a sample record.` The live bundle carries that sentence. So the note now says what the button
-     * opens first and what is closed second, and `test/promises.test.mjs` fails if it stops naming
-     * the sample.
+     * THE NOTE SAID ONLY `Neither plan is open yet.`, AND THAT HID WHAT THE BUTTON OPENS. From 22
+     * September it said `The app opens on a sample record.`, because `/api/boot` answered a stranger
+     * 401 and the browser drew a built-in sample for anybody with no record.
+     *
+     * THEN THE SAMPLE WENT, ON 25 SEPTEMBER (`loop/DIRECTION.md` §26: "get rid of that whole sample
+     * record stuff please"). Without a session the app is its sign-in screen and nothing else, so
+     * that is what the note says the button opens, and what is closed still comes second.
+     * `test/promises.test.mjs` fails if the note names the sample again or stops naming sign-in.
      */
     primary: 'Open the app',
     /**
@@ -204,7 +212,7 @@ export const site = {
      * repetition `closing.title` refuses in the paragraph above it for the same reason.
      */
     secondary: 'See what it costs',
-    note: 'The app opens on a sample record. Neither plan is open yet.',
+    note: 'The app opens to sign-in. Neither plan is open yet.',
     /* THE HERO HAS NO PHOTOGRAPH, AND SO NO CAPTION AND NO ALT. On 22 September the owner said of
        the screenshots on this page *i hate those screenshots. they look terrible*, and asked for the
        drawn app to take their place, overlapping the hero. That drawing is `arrange` below, and
@@ -223,14 +231,14 @@ export const site = {
    * app's `decide` screen, and `agents.cannot` states the rule under it (*no token reaches it. A
    * person has to do it, signed in*).
    *
-   * EVERY WORD IS THE SAMPLE RECORD'S, and there is one liberty, named here. `SG33` in
-   * `packages/seed/src/index.ts` and `apps/web/src/lib/record/data.ts` asks *Add the two services on
-   * the Fenwick invoice?*, recommends *Add both* with this `change` as its body, is decided by you,
-   * and is followed by Claude creating `services#6` and `services#7`, three hours before the sample
-   * is opened. THE LIBERTY: in the sample the question is opened by the record's own reader of the
-   * arriving invoice, not by Claude. An agent proposing over MCP is real (`propose` is one of the six
-   * writes `agents.mcp.writes` lists), so the scene draws a thing the product does, compressed into
-   * one agent where the sample has two actors.
+   * EVERY WORD IS THE SEED'S OR THE FIXTURE LEDGER'S, and there is one liberty, named here. `SG33`
+   * in `packages/seed/src/index.ts` asks *Add the two services on the Fenwick invoice?*, recommends
+   * *Add both* with this `change` as its body, and is decided by you; the fixture ledger in
+   * `apps/web/src/lib/record/data.ts` follows it with Claude creating `services#6` and `services#7`,
+   * three hours before its clock. THE LIBERTY: in the seed the question is opened by the record's own
+   * reader of the arriving invoice, not by Claude. An agent proposing over MCP is real (`propose` is
+   * one of the six writes `agents.mcp.writes` lists), so the scene draws a thing the product does,
+   * compressed into one agent where the seed has two actors.
    *
    * `history` IS OLDEST FIRST, and its LAST ROW IS THE LANDING POINT: the scene ends when Claude's
    * row arrives under the two that were already there, which is the ledger's append-only thesis kept
@@ -256,13 +264,13 @@ export const site = {
       { who: 'Codex', what: 'Opened a question about the Kiln licensing model', when: '1d ago' },
       /* `seq 4188` in `data.ts`, at `stamp(-9)`, and it is `by: 'rule.reply'`, not the late-invoice
          rule. This row credited it to *Chase late payments*, the name `names.ts` gives
-         `invoice-late`, which wrote no row in the sample's ledger at all. `reply` is in no
+         `invoice-late`, which wrote no row in the fixture ledger at all. `reply` is in no
          `RULE_NAMES` entry, so the app draws it through `actorOf`'s fallback as `reply rule`, and
-         that is the name a reader who opens the sample sees on this row. The note it added reads
+         that is the name the app puts on this row. The note it added reads
          *Chased twice. 45-day terms expired 3 August.* on `obligations#1`. */
       { who: 'reply rule', what: 'Added a note to an invoice that is late', when: '9h ago' },
       /* `seq 4192` and `4191` in `data.ts`: Object storage and the Workers plan, each `from the
-         Fenwick invoice`. THE TIME IS NOT THE SAMPLE'S `stamp(-3)`, AND THAT IS DELIBERATE. This row
+         Fenwick invoice`. THE TIME IS NOT THE LEDGER'S `stamp(-3)`, AND THAT IS DELIBERATE. This row
          lands the moment the reader presses Accept, and it said `3h ago` while doing so: a row
          written a second ago under a time three hours old. The app's word for a row under a minute
          old is `just now` (`packages/render/src/format.ts`, `since`), and `decide-copy.test.ts`
@@ -375,7 +383,7 @@ export const site = {
            the word survives only as a heading in the rail, which is not what `holds` lists. */
         label: 'Personal',
         glyph: 'house',
-        /* The two groceries rows in the sample week (6,420 and 2,135 pence) against the 30,000 the
+        /* The two groceries rows in the seeded week (6,420 and 2,135 pence) against the 30,000 the
            groceries budget allows, the two `PUT_BY` rows toward Lisbon (20,000 and 22,000) against
            its 90,000 target, and the first of the habits, all in `personal.ts` `seeds`. THE LISBON
            TILE SAID `GBP 900.00, saving towards it`, which is the target drawn where the groceries
@@ -848,7 +856,7 @@ export const site = {
            * asks through the client's `sparkRead` (`Palette.svelte`), which is why the grep above
            * stopped measuring the screen: the address lives in `packages/client`, not in
            * `apps/web`. The row appears only when `/api/version` reports a model and the record is
-           * live (`apps/web/src/routes/+layout.ts`); the sample is never live, and `SPARK_ENDPOINT`
+           * live (`apps/web/src/routes/+layout.ts`); a stranger has no live record, and `SPARK_ENDPOINT`
            * is still `""` in both environments. So a stranger still cannot ask, and the line says
            * why in terms that stay true the day a model is configured somewhere.
            * `src/lib/claims.test.ts` fails if the palette asks and this line says no screen does.
@@ -861,14 +869,15 @@ export const site = {
              an inbox, and what does land has to be forwarded there by a person. */
           'Mail does not arrive by itself. Nothing reaches into your inbox, and a message has to be forwarded in.',
           /* THE DEMO BELONGS IN THIS COLUMN and was in none of them, which is how the page came
-             to point its one filled button at it. `DEMO_RECORD` is empty in both environments.
+             to point its one filled button at it. There is no demo record, and no anonymous door since §26.
 
-             BUT `there is no demo to open yet` WAS FALSE OF THE SCREEN, which is the thing a reader
-             opens. With no session the app draws its own sample record (`/api/boot` answers 401 and
-             `apps/web/src/lib/record/device.ts:143` reads that as no record), under a bar saying
-             nothing done there is saved. What is not built is a record of one's own, so that is
-             what this line says is missing, and the sample is named as what there is instead. */
-          'A record of your own. Neither plan is open yet, so the app shows a made-up sample, and nothing typed into it is saved.',
+             BUT `there is no demo to open yet` WAS FALSE OF THE SCREEN from 22 September, when the
+             app drew its own sample for anybody with no session, and this line named that sample
+             for three days. `loop/DIRECTION.md` §26 took the sample out on 25 September: with no
+             session the app is its sign-in screen. What is not open is a record of one's own, so
+             that is what this line says is missing, and sign-in is named as what the button opens
+             instead. */
+          'A record of your own. Neither plan is open yet, so the app opens to sign-in and there is no way to sign up.',
         ],
       },
       {
@@ -927,11 +936,16 @@ export const site = {
        better sentence anyway: making a record is two answers long. `/start` asks who you are and
        what the record is for, and arranges the rest from those (`packages/seed/src/usecases`).
 
-       AND IT SAID SO IN THE PRESENT TENSE, under a button that opens a sample. Nobody can make a
-       record yet: `loop/STATUS.md` §7.A.2 records `POST /auth/provision` answering 404 on both
-       hosts while `PROVISION_KEY` is unset and `KEK` unbound. The two answers are still the
-       argument; the sentence now says what the button opens today and when the rest applies. */
-    body: 'Open the app to walk around a sample record. Once sign-up opens, yours starts with two answers: who you are, and what it is for.',
+       AND IT SAID SO IN THE PRESENT TENSE. Nobody can make a record yet: `loop/STATUS.md` §7.A.2
+       records `POST /auth/provision` answering 404 on both hosts while `PROVISION_KEY` is unset and
+       `KEK` unbound. The two answers are still the argument; the sentence says what the button
+       opens today and when the rest applies.
+
+       WHAT THE BUTTON OPENS CHANGED ON 25 SEPTEMBER. It said `Open the app to walk around a sample
+       record.`, and `loop/DIRECTION.md` §26 removed the sample, so a signed-out reader lands on
+       sign-in. Saying why comes first, because a reader who presses the button and meets a sign-in
+       form should already know there is nothing to sign up for. */
+    body: 'Sign-up is not open yet, so the app opens to sign-in. Once it opens, your record starts with two answers: who you are, and what it is for.',
     primary: 'Open the app',
     secondary: 'See the pricing',
   },
@@ -948,9 +962,11 @@ export const site = {
     /* `No sign-up and no billing yet` WAS ONLY EVER ABOUT THE HOSTED PLAN. The self-hosted plan has
        no sign-up to open: what it lacks is the code, which is private, and a package, which `npm view`
        answers E404 for under every name this repository could publish. So each plan gets its own
-       reason, and the sample is named because it is the one thing on this page a reader can open. */
+       reason. The last sentence named a sample record as the one thing a reader could open, until
+       `loop/DIRECTION.md` §26 took the sample out on 25 September; what the app opens now is
+       sign-in, so that is what it names. */
     status:
-      'Neither plan is open yet. The code to self-host is published when the product launches, and hosted sign-up and billing are not switched on. Until then the app shows a sample record.',
+      'Neither plan is open yet. The code to self-host is published when the product launches, and hosted sign-up and billing are not switched on. Until then the app opens to sign-in.',
     self: {
       name: 'Self-hosted',
       price: 'Free',
@@ -1086,7 +1102,7 @@ export const site = {
       title: 'Terms and privacy',
       /* THE LAST CLAUSE PROMISED SOMETHING ABOUT A DEMO THAT DOES NOT EXIST. It read *the demo
          keeps nothing you type into it*, which is a data-handling promise about a surface no
-         visitor can reach: `DEMO_RECORD` is empty in both environments. A promise nobody can test
+         visitor can reach: there is no demo record. A promise nobody can test
          is the kind a legal page must not make, so it says the true and smaller thing. */
       body: 'The Terms of Service and the Privacy policy are not published yet. Both will be published here before hosted sign-up opens. Until then there is no sign-up and no billing, so there is nothing to collect.',
     },

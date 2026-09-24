@@ -26,7 +26,7 @@ import { createDirectory, type Directory } from '@braindog/record/directory';
 import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
 
 import { serveInbound, servesInbound, type InboundDoor } from '../src/inbound.ts';
-import { cloudIngest, demoRecord, servesApi, servesAuth, servesIn, servesMcp, type CloudIngestDeps, type InboundIndex } from '../src/route.ts';
+import { cloudIngest, inward, servesApi, servesAuth, servesIn, servesMcp, type CloudIngestDeps, type InboundIndex } from '../src/route.ts';
 
 const SOURCE = readFileSync(fileURLToPath(new URL('../src/index.ts', import.meta.url)), 'utf8');
 
@@ -46,11 +46,11 @@ test('THE ARRIVAL DOOR IS ANSWERED BEFORE ANY DOOR IS ASKED, because an arrival 
   const at = SOURCE.indexOf('servesIn(url.pathname)');
   assert.ok(at > 0, 'route() does not branch on /in/*, so the app shell answers a webhook with a 200');
 
-  /* THE COOKIE IS NEVER READ FOR IT AND THE PUBLIC DEMO NEVER APPLIES. `doorOf` is where a request
+  /* THE COOKIE IS NEVER READ FOR IT. `doorOf` is where a request
      acquires a principal, and an arrival is above that gate by design (`33 §4`): what stands in for
      a principal is whether the payload was verified, which decides only whether the stored row may
      match (`12 §3`). */
-  assert.ok(at < SOURCE.indexOf('doorOf(request'), 'a cookie or the demo is read for a path that takes neither');
+  assert.ok(at < SOURCE.indexOf('doorOf(request'), 'a cookie is read for a path that takes none');
   /* AND BEFORE THE `ROUTE_UNKNOWN` THAT GUARDS `/api/`, which returns for everything it does not
      recognise. A branch after it is a branch that never runs. */
   assert.ok(at < SOURCE.indexOf('servesApi(url.pathname)'), '/in/* is decided after the route that refuses everything else');
@@ -491,11 +491,6 @@ test('THE WORKER HAS A DOOR THAT MINTS AN ADDRESS, AND IT IS DECIDED AFTER THE P
      `ROUTE_UNKNOWN` before any door is asked. */
   assert.equal(servesApi('/api/inbound/mint'), true);
   assert.equal(servesIn('/api/inbound/mint'), false);
-
-  /* AND THE PUBLIC DEMO CANNOT REACH IT, decided where the demo is decided rather than by the order
-     of two branches: `DEMO_READS` is built from `ROUTES`, and a mint is not a record method, so no
-     name in the table spells this path. */
-  assert.equal(demoRecord(new Request('https://app.brain.dog/api/inbound/mint'), REC), null);
 });
 
 const ORIGIN = 'https://app.brain.dog';
@@ -980,4 +975,36 @@ test('AN ADDRESS MINTED OVER THE RPC SURFACE A DEPLOYED WORKER HAS TAKES MAIL AT
   /* THE FACADE IS LOAD-BEARING, asserted rather than assumed: a method the class does not declare throws
      the way the platform throws at a stub, and that throw is what the 404 above was made of. */
   assert.throws(() => asStub(d, new Set(['knows'])).inbound$(record, TOKEN_SHA), /Directory\$ declares no inbound\$/u);
+});
+
+/* ── the context the record is told ──────────────────────────────────────── */
+
+/* THESE TWO WERE IN `demo.test.ts`, which went with the public demo (`loop/research-no-sample.md` A1). They were never
+   about the demo: `inward` is how every door hands the record its caller, and `Record$.fetch` reads the header it writes
+   as the whole of who is asking, so a caller who could set it would be whoever they said. */
+test('A CONTEXT THE CALLER SENT IS OVERWRITTEN, NOT TRUSTED, and the bearer goes no further', () => {
+  const forged = new Request('https://brain.dog/api/listGrants', {
+    headers: {
+      'x-braindog-ctx': JSON.stringify({ principal: { kind: 'person', id: 'p_owner', level: 'owner' } }),
+      authorization: 'Bearer rec_x.y',
+    },
+  });
+  const decided: CallContext = { principal: { kind: 'person', id: 'p_reader', level: 'read' }, credentialed: true };
+  const inner = inward(forged, decided);
+  assert.deepEqual(JSON.parse(inner.headers.get('x-braindog-ctx') ?? 'null'), decided);
+  assert.equal(inner.headers.get('authorization'), null);
+  assert.equal(new URL(inner.url).pathname, '/api/listGrants', 'the path did not travel unchanged');
+});
+
+test('AND THE WORKER SETS THE CONTEXT IN ONE PLACE, for every door', () => {
+  /* A SECOND PLACE THAT SET IT is a second chance to set it after something the caller controls, which is A9 in
+     `loop/research-anon-read.md`. */
+  assert.doesNotMatch(SOURCE, /headers\.set\(\s*'x-braindog-ctx'/u, 'index.ts sets the context itself again');
+  /* THREE DOORS NOW: a session, a bearer on `/api` and a bearer on `/mcp`, and each reaches the record through `inward`.
+     There were four while the public demo was a door. A count that drops means a door stopped going through it, and
+     one that rises means a door nobody listed here. */
+  assert.equal((SOURCE.match(/inward\(request, /gu) ?? []).length, 3, 'a door does not go through inward');
+  /* AND THE DOOR IS DECIDED BEFORE THE BEARER IS READ, in `session.ts`. */
+  assert.ok(SOURCE.includes('doorOf(request'), 'index.ts no longer asks session.ts which door');
+  assert.ok(SOURCE.indexOf('doorOf(request') < SOURCE.indexOf("bearerOf(request, 'api'"), 'the door is not decided before the bearer is read');
 });

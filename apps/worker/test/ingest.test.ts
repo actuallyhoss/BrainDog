@@ -1,7 +1,7 @@
 /**
  * The Cloud's `/in/*` door: which record a stranger's POST reaches, and what it costs to guess.
  *
- * THE DECISION IS IN `route.ts` SO IT CAN BE TESTED AT ALL, for the reason `demo.test.ts` gives:
+ * THE DECISION IS IN `route.ts` SO IT CAN BE TESTED AT ALL, for the reason `route.ts` is free of `cloudflare:`:
  * `src/index.ts` imports `cloudflare:workers` and cannot be loaded by `node --test`. What is asserted
  * here is the half that decides a tenant boundary with no credential in the request at all, so it is
  * written against four functions rather than against a Durable Object namespace.

@@ -166,7 +166,6 @@ test('an invitation that is out is a different fact from access', () => {
      had been used. `12 §3`: single-use, twenty-four hours, bound to one address. */
   const pending = PEOPLE_ACCESS.filter((p) => p.since === null);
   assert.equal(pending.length, 1, 'no pending invitation in the seed, so that state never renders');
-  assert.notEqual(copy.inviteOut, copy.sinceWhen('3mo ago'));
   assert.match(copy.inviteHow, /24 hours/);
 });
 
@@ -344,8 +343,7 @@ test('and the two areas that report rather than offer say which deployment this 
      fact is stated where somebody would go looking for the control, rather than the control being
      drawn and then refusing — and `50 §2.2` admits all twelve areas with no per-host conditional. */
   assert.ok(['self-host', 'cloud'].includes(DEPLOYMENT.kind));
-  assert.notEqual(copy.restoreSelfHost, copy.restoreCloud);
-  assert.notEqual(copy.billingSelfHost, copy.billingCloud);
+  assert.notEqual(copy.keptSelfHost(30), copy.keptCloud(30));
   /* `49 §8` asks for this, here, and names the reason: the key "is what a self-hoster must back up
      separately". A copy sealed with a key that is only inside the copy cannot be opened.
 
@@ -467,17 +465,12 @@ test('THE RECORD PUBLISHES THE KEY THAT MAKES A YEAR-OLD BACKUP CHECKABLE', () =
   assert.doesNotMatch(SIGNING_KEY.publicKey, /public|key|studio|stamped/iu, 'the key is a sentence rather than a key');
   assert.ok(SIGNING_KEY.since, 'the key has no date, so nobody can tell a rotation from the original');
 
-  /* AND THE SENTENCE SAYS WHY IT IS SAFE TO SHOW. This product's first promise is that the record
-     indexes what a key opens and never the key, so a screen printing one has to say which kind. */
-  assert.match(copy.theSignatureIs, /opens nothing/iu);
-  /* AND IT ASSERTS NO ROUTE THIS PRODUCT HAS NOT GOT. It used to name
-     `/.well-known/braindog-key` — `03 §4` specifies it and no app serves it — which made this the one
-     sentence on the screen claiming a live endpoint, where every other unwritten action goes
-     through `notWritten`. */
-  assert.doesNotMatch(copy.theSignatureIs, /well-known|https?:/iu, 'the sentence promises an endpoint again');
-  assert.match(copy.theSignatureIs, /safe to hand/iu, 'it does not say why a key belongs on a screen');
-  /* `48 §5.6`'s two answers, so somebody knows what they lose by not passing it. */
-  assert.match(copy.verifyHow, /where it came from/iu);
+  /* THE SCREEN DRAWS NO KEY YET, AND SAYS SO. The only key it ever drew was the sample's, so the sentences that
+     explained a drawn key went with it, and what is left says the files are signed and the key is not shown. */
+  assert.match(copy.theSignatureNotHere, /not shown here/iu, 'the screen implies a key it does not draw');
+  /* AND IT ASSERTS NO ROUTE THIS PRODUCT HAS NOT GOT. `/.well-known/braindog-key` is specified in `03 §4` and
+     served by no app. */
+  assert.doesNotMatch(copy.theSignatureNotHere, /well-known|https?:/iu, 'the sentence promises an endpoint again');
 });
 
 test('and the delete control is the confirmation rather than a sentence about one', () => {

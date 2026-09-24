@@ -116,19 +116,6 @@
   /** How many ways in are drawn: after one is refused, "another" is only true when there is more than one. */
   const wayCount = (ways: Ways | null): number => (ways ? [ways.passkey, ways.magic, ways.key].filter(Boolean).length : 0);
 
-  /* AND IT IS RIGHT NOT TO READ `methods.demo`, which was checked and nearly changed: see `first-door.ts`. */
-  const demo = $derived(view.name !== 'loading' && view.name !== 'signed-in' && view.name !== 'open');
-  /**
-   * The demo is the filled button where it is the only thing on the screen that can be pressed.
-   *
-   * `noDoor` BELONGS IN THIS LIST BY THE RULE THE LIST ALREADY STATES. A record with no way into it
-   * yet draws a sentence and no control, so the pill under it is the one thing there is to press.
-   */
-  const demoLeads = $derived(
-    !doors &&
-      (noDoor || view.name === 'no-host' || view.name === 'not-configured' || view.name === 'insecure' || view.name === 'locked'),
-  );
-
   /* `noDoor` TAKES THE NOTE AWAY, and that is the repair. `stateOf` says `unsupported` whenever no
      way can act, and on the first run it said so about a browser that was working perfectly. The
      only note it can swallow is that one: `noDoorYet` refuses `out`, so the confirmation somebody
@@ -229,8 +216,9 @@
    * SIGNING IN DROPS THE BOOT THIS TAB KEPT. The screen's own load asked `boot` at the bare `/app` with no session, was
    * refused, and kept the sample for the tab; signing in is a `fetch` that sets a cookie and nothing more. Walked on
    * 23 September (`loop/research-first-sign-in.md` friction 1), "Open BrainDog" then drew The Studio with no request,
-   * after the claim link and again after the passkey. The onward buttons are full page loads, which is the repair;
-   * this is for any move out of here that is not one, so it at least asks the record rather than drawing the sample.
+   * after the claim link and again after the passkey. The onward buttons are full page loads, which is the repair.
+   * That refusal is not kept any more, since the sample went (DIRECTION 26); this stays for a tab that came here from
+   * a record it had read, so a move out that is not a full load asks the record again rather than drawing the old one.
    */
   const enter = (via: 'passkey' | 'key' | 'link') => (who: Who) => {
     forget();
@@ -402,7 +390,7 @@
             <p class="small">{copy.addPasskeyWhy(entered?.via ?? null)}</p>
           {/if}
           <!-- A FULL PAGE LOAD, AND THAT IS THE REPAIR. A client-side move to `/app/` kept everything this tab
-               decided before the sign-in: the sample boot, the switcher's list, the voice. Walked twice, it drew
+               decided before the sign-in: the boot (the sample, then), the switcher's list, the voice. Walked twice, it drew
                The Studio, "Nothing you do here is saved.", with no request made; a reload drew his own record,
                because the Worker answers `/app/` with a 302 to `/app/<slug>/` once there is a session. -->
           <Button weight={view.lead === 'open' ? 'primary' : 'quiet'} href={goTo} data-sveltekit-reload>{copy.openBrainDog}</Button>
@@ -494,19 +482,8 @@
         </div>
       {/if}
 
-      <!-- THE WAY IN THAT NEEDS NOTHING, drawn as a pill rather than a footnote, because it is the one
-           most people who reach this screen want. Filled only where nothing else can be pressed. -->
-      {#if demo}
-        <footer class="demo">
-          <!-- THE DEMO IS THE APP WITH NO RECORD NAMED, `/app/`, whatever `next` says: under a slug a stranger is
-               asked to sign in and never drawn the sample, so sending the demo there would bring them straight back. -->
-          <!-- A FULL PAGE LOAD TOO, so the demo is drawn from what the host answers now and not from whatever this
-               tab kept before: Sign out here drops nothing the tab holds, and the research that named these three
-               buttons (`loop/research-first-sign-in.md` friction 1) named this one with them. -->
-          <Button weight={demoLeads ? 'primary' : 'quiet'} href={`${BASE}/`} data-sveltekit-reload>{copy.openTheDemo}</Button>
-          <p class="small">{copy.demoNeedsNothing}</p>
-        </footer>
-      {/if}
+      <!-- NO DEMO PILL. It opened the sample business at `/app/` for anybody not signed in, and there is no
+           sample now (DIRECTION 26): `/app/` with no session is this screen, so the pill led back here. -->
     </div>
   </div>
 </div>
@@ -744,15 +721,6 @@
 
   .own .form {
     margin-block-start: var(--sp-3);
-  }
-
-  .demo {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-3);
-    margin-block-start: var(--sp-3);
-    padding-block-start: var(--sp-5);
-    border-block-start: 1px solid var(--line);
   }
 
   /* ON A PHONE THE COLUMN FILLS THE SCREEN: the brand keeps the top, everything to press sits at the

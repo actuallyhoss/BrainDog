@@ -15,7 +15,7 @@
   import { titleOf } from '$lib/title.ts';
   import { listLine } from '$lib/record/tags.ts';
   import { amountOf, currencyOf } from '$lib/record/money.ts';
-  import { holeLabel, relative, since, TONES } from 'braindog-render';
+  import { relative, since, TONES } from 'braindog-render';
   import { Document } from 'braindog-render/svelte';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
@@ -24,7 +24,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
-  import { backlinks, currencyFor, dirOf, display, entry, iconFor, identityOf, labelOf, NOW, readableFields, REGISTERS, spokenRow, toneOf, values, whoDid } from '$lib/record/api.ts';
+  import { currencyFor, dirOf, display, iconFor, identityOf, labelOf, NOW, readableFields, REGISTERS, spokenRow, toneOf, whoDid } from '$lib/record/api.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import Face from '$lib/ui/Face.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -54,9 +54,9 @@
   /**
    * THE ROW MAY NOT BE IN THE RECORD YET, AND THIS SCREEN USED TO SAY IT DID NOT EXIST.
    *
-   * A written row is the record's answer to `get`, or `entry()` over the sample when there is no
-   * record here. A row somebody typed into the capture
-   * line is in `pending` instead, wearing a NEGATIVE sequence so it can never collide with a real
+   * A written row is the record's answer to `get`, and nothing else: the sample's row of the same
+   * number was drawn here when there was no record, and there is no sample now (DIRECTION 26). A row
+   * somebody typed into the capture line is in `pending` instead, wearing a NEGATIVE sequence so it can never collide with a real
    * one, and the list draws it with `Not saved` on it. Opening that row landed on "There is no
    * obligation #-1" - the product telling somebody the thing they had just typed, and could see one
    * screen back, was not there. The list and the detail were reading two different sets of rows.
@@ -73,26 +73,25 @@
      of these read again: the field is on the row with no second read of the row. */
   const readable = $derived.by(() => (void got, readableFields(id)));
   const live = $derived(got?.from === 'live');
-  /* WHAT THIS RECORD CALLS THE ROWS THIS ONE POINTS AT. Undefined on the sample, where `display`
-     names a ref out of the sample's own rows as it always has; on a record it is the only source,
-     so a ref the record did not name is drawn as `<list>#<number>` and never as a sample row. */
+  /* WHAT THIS RECORD CALLS THE ROWS THIS ONE POINTS AT, and the only source, so a ref the record did
+     not name is drawn as `<list>#<number>` and never as a sample row. Undefined for a row the record
+     does not hold. */
   const names = $derived(got?.from === 'live' ? got.names : undefined);
-  /* NOTHING IS DRAWN UNTIL THE ROW HAS BEEN READ, so the sample never shows over a live row. */
+  /* NOTHING IS DRAWN UNTIL THE ROW HAS BEEN READ. */
   const waiting = $derived(Number.isInteger(seq) && seq >= 1 && got === null);
-  const written = $derived(
-    got?.from === 'live' ? (got.entry ?? undefined) : got?.from === 'sample' ? entry(id, seq) : undefined,
-  );
-  const unwritten = $derived(written ? undefined : pending.of(id, got?.from === 'sample').find((r) => r.seq === seq));
+  const written = $derived(got?.from === 'live' ? (got.entry ?? undefined) : undefined);
+  /* `false` BECAUSE A ROW TYPED IN THIS TAB WAS TYPED AGAINST THE RECORD: there is no sample for it to have been typed
+     against. The argument goes when wave B takes `pending` away (`loop/research-no-sample.md` B1). */
+  const unwritten = $derived(written ? undefined : pending.of(id, false).find((r) => r.seq === seq));
   const row = $derived(written ?? unwritten);
 
   /* WHAT POINTS AT THIS ROW. A `ref` declares `to:` and nothing declared the other direction, so a
      person's page could not show the invoices that are theirs — which is the half somebody opens a
      person for. Nothing was added to the data model: the inverse of every ref is already stated
      once, on the field that declares it. */
-  /* AND ON A LIVE RECORD IT IS THE RECORD'S OWN READ, which it was not: the section was left out
-     entirely, because the sample's backlinks would be another record's rows pointing at this one.
-     `backlinks` on the record walks the same `to:` declarations this sample walk does, so the live
-     groups win wherever there are any and the sample keeps the screen it always had. */
+  /* AND IT IS THE RECORD'S OWN READ, which it was not: the section was left out on a live record,
+     because the sample's backlinks would be another record's rows pointing at this one, and drawn
+     from the sample's walk everywhere else. That walk is gone with the sample (DIRECTION 26). */
   let linked = $state<Linked | null>(null);
   let links: LinkReader | null = null;
   /* A ROW THAT POINTS HERE LEADS WITH WHAT IT IS, NOT ITS NUMBER (DESIGN-SYSTEM rule 7, appendix C7). The
@@ -104,13 +103,13 @@
     return { ...rel, columns: moved(rel.columns), rows: rel.rows.map((r) => ({ ...r, cells: moved(r.cells) })) };
   };
 
-  const incoming = $derived(
-    linked?.from === 'live' ? linked.groups : row && !live ? backlinks(id, seq) : [],
-  );
+  const incoming = $derived(linked?.from === 'live' ? linked.groups : []);
 
   /* THE ROW AND ITS HISTORY, IN ONE BRACKET, so `data-screen` never appears between the two reads. An
-     answer for a row somebody has already left is dropped. `clock` is the reader's on a live record
-     and the sample's own otherwise, since a sample date read against today is wrong by months. */
+     answer for a row somebody has already left is dropped. `clock` is the reader's once a row has
+     been read. It starts at `NOW` only for a row typed in this tab, which `pending` stamps with that
+     same frozen instant, so "added just now" is not read against today as months ago; both go in
+     wave B (`loop/research-no-sample.md` B1, B3). */
   let told = $state<Told | null>(null);
   let clock = $state(NOW);
   let askedFor = '';
@@ -138,7 +137,7 @@
     const current = askedFor === key;
     closed(!current || (r.from !== 'refused' && h.from !== 'refused'), at);
     if (!current) return;
-    clock = r.from === 'live' ? Date.now() : NOW;
+    clock = Date.now();
     got = r;
     told = h;
     linked = l;
@@ -155,7 +154,6 @@
    *
    * THE BOX IS EMPTIED ONLY ONCE THE RECORD HAS THE NOTE, so a refusal leaves the words where they were
    * typed. The history is read again after, and the new line in it is the answer, so there is no toast.
-   * On the sample it says what would have happened, like every other write there.
    */
   let noteText = $state('');
   let noting = false;
@@ -164,11 +162,7 @@
   async function addNote(e: SubmitEvent) {
     e.preventDefault();
     const said = noteText.trim();
-    if (!said || noting || !row || unwritten) return;
-    if (!live) {
-      toasts.push(copy.notWritten(copy.noteWouldBeAdded), { intent: 'warn' });
-      return;
-    }
+    if (!said || noting || !row || unwritten || !live) return;
     const register = id;
     const n = seq;
     const key = `${register}#${n}`;
@@ -230,13 +224,9 @@
   const listCurrency = (f: FieldDecl): string | null => currencyFor(id, f.id);
 
   function startEdit(f: FieldDecl) {
-    if (!row) return;
-    /* ON THE SAMPLE, THE TOAST THIS SCREEN HAS ALWAYS SHOWN. There is no record to write to, and a
-       box that takes what you type and drops it is worse than one that says so. */
-    if (!live) {
-      toasts.push(copy.notWritten('The row would open for editing'), { intent: 'warn' });
-      return;
-    }
+    /* ONLY A ROW THE RECORD HOLDS OPENS A BOX. The sample's toast, "the row would open for editing", went with the
+       sample (DIRECTION 26), and a row typed in this tab draws no edit control to press. */
+    if (!row || !live) return;
     problem = null;
     editing = f.id;
     draft = draftOf(f, row.fields[f.id], listCurrency(f));
@@ -253,10 +243,7 @@
 
   /** The header's own control: the row's title is the field somebody means by "edit the row". */
   function editTitle() {
-    if (!live) {
-      toasts.push(copy.notWritten('The row would open for editing'), { intent: 'warn' });
-      return;
-    }
+    if (!live) return;
     const fields = readableFields(id);
     const f = fields.find((x) => x.id === decl?.title) ?? fields.find(editable);
     if (f) startEdit(f);
@@ -359,11 +346,7 @@
 
   /** Archive the row, or put it back: the same verb the list offers on the same row. */
   async function setArchived(to: boolean) {
-    if (!row || saving) return;
-    if (!live) {
-      toasts.push(copy.notWritten(to ? copy.rowArchiveWould : copy.rowRestoreWould), { intent: 'warn' });
-      return;
-    }
+    if (!row || saving || !live) return;
     const named = String(row.fields[decl?.title ?? ''] ?? decl?.one.toLowerCase() ?? '');
     const register = id;
     const n = seq;
@@ -448,16 +431,10 @@
   const unsetFields = $derived(row ? listed.filter((f) => unsetValue(row.fields[f.id]) && editing !== f.id) : []);
   const shownFields = $derived(unsetFields.length >= 2 ? listed.filter((f) => !unsetFields.includes(f)) : listed);
 
-  const resolved = values();
-  /* THE SAMPLE'S VALUES ARE NOT THIS RECORD'S, so on a live row every value is a hole until pages read them. */
-  const resolve = (path: string) => (live ? null : (resolved[path] ?? null));
+  /* EVERY VALUE IN A ROW'S PROSE IS A HOLE UNTIL PAGES READ THEM. The sample's own values answered them off the
+     row, and pressing one said what would have happened; neither has a record behind it (DIRECTION 26). */
+  const resolve = (): null => null;
   /** A link the host cannot resolve is plain text, never a dead anchor (36 §13 D16). */
-  /** What closing a hole would do. Named, because "nothing was written" alone says nothing. */
-  const holeFix = (path: string | null): string =>
-    path
-      ? `${holeLabel(path)} would be opened for whoever can supply it`
-      : 'The unknown would be opened for whoever can supply it';
-  const pressHole = (path: string | null) => toasts.push(copy.notWritten(holeFix(path)), { intent: 'warn' });
 
   const link = (spoken: string) => {
     const m = /^([a-z][a-z0-9_]*)#(\d+)$/.exec(spoken);
@@ -498,7 +475,7 @@
   }
 
   /**
-   * DRAWN ONCE THE ROW HAS BEEN READ, from the record or the sample.
+   * DRAWN ONCE THE ROW HAS BEEN READ.
    *
    * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
    * from a shell that has fetched nothing. Four browser gates waited on `#main` having a child,
@@ -517,7 +494,7 @@
 <svelte:head><title>{titleOf(row && decl && String(row.fields[decl.title] ?? ""), decl?.name)}</title></svelte:head>
 
 {#if waiting}
-  <!-- Bars until the row has been read, never the sample's row. -->
+  <!-- Bars until the row has been read. -->
   <Waiting head rows={6} />
 {:else if got?.from === 'refused'}
   <div class="page">
@@ -768,14 +745,11 @@
                      span rather than a `<button>` nobody wrote a handler for; with it, this screen
                      owns what pressing one does. No `dayHref`: there is no calendar in this build,
                      and a date that links to one is an anchor to the error page.
-                     On a live record a value the record cannot answer is not pressable: nobody can
-                     supply a declared figure from this screen, so it is marked and left alone. That
-                     is the rule the page screen states beside its own `opts`, and a hole in a row's
-                     prose is the same hole in the same dialect. -->
-                <Document
-                  src={String(row.fields[f.id])}
-                  opts={{ resolve, link, now: clock, href: at, ...(live ? {} : { hole: pressHole }) }}
-                />
+                     A value the record cannot answer is not pressable: nobody can supply a declared
+                     figure from this screen, so it is marked and left alone. That is the rule the
+                     page screen states beside its own `opts`, and a hole in a row's prose is the
+                     same hole in the same dialect. -->
+                <Document src={String(row.fields[f.id])} opts={{ resolve, link, now: clock, href: at }} />
               {:else}
                 <p class="missing">{copy.editNotSet}</p>
               {/if}

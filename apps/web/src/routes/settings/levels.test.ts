@@ -72,7 +72,7 @@ const OFFERED: Record<string, string[]> = {
 
 test('an owner is an owner by either half of what the record said', () => {
   assert.equal(ownsRecord({ level: 'owner', owner: true }), true);
-  /* THE SAMPLE CARRIES BOTH, so the demo is untouched by every gate this file holds. */
+  /* EITHER HALF IS ENOUGH: a host that names the level and not the flag still has an owner reading it. */
   assert.equal(ownsRecord({ level: 'owner', owner: false }), true);
   for (const level of ['read', 'append', 'write', 'decide'])
     assert.equal(ownsRecord({ level, owner: false }), false, `${level} is not an owner`);
@@ -179,14 +179,12 @@ test('the invitation form no longer tells a refused colleague that nothing was s
      link would be made, bound to that one address and good for 24 hours, but nothing was saved
      yet."* The two cases are told apart by name now. */
   for (const m of PAGE.matchAll(/peopleFrom !== 'live'/gu))
-    assert.doesNotMatch(
-      PAGE.slice(m.index, m.index + 160),
-      /notWritten/u,
-      "a refusal is not a sample: say copy.notWritten only where peopleFrom === 'sample', and the record's own sentence otherwise",
-    );
-  /* AND THE OTHER ARM IS THE RECORD'S OWN WORDS, which `readPeople` has already put in hand. */
-  assert.match(PAGE, /function cannotWrite\(/u, 'the two cases are told apart in one place');
-  assert.match(PAGE, /peopleFrom === 'sample' \? copy\.notWritten\(would\) : peopleRefusal/u);
+    assert.doesNotMatch(PAGE.slice(m.index, m.index + 160), /notWritten/u, 'a refusal is answered with the sample\'s "nothing was saved yet"');
+  /* AND NOW THERE IS ONE CASE, NOT TWO. The sample was the only arm allowed to say "yet", and DIRECTION 26 took it
+     away: a press the People area cannot send is always a record, or a host, that answered no, so what is said is
+     the record's own sentence, which `readPeople` has already put in hand, or that the record was not reached. */
+  assert.match(PAGE, /function cannotWrite\(\): void \{\s*toasts\.push\(peopleRefusal \|\| copy\.recordNotReached/u, 'a press that cannot be sent says something other than the refusal');
+  assert.doesNotMatch(PAGE, /peopleFrom === 'sample'/u, 'the People area still has a sample to fall back on');
 });
 
 test('the mail door is asked once, out of the effect that would otherwise ask again', () => {

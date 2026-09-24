@@ -371,7 +371,7 @@ export function guardsKeylessRecords(sha, root = ROOT) {
 export function readMethods(value) {
   const why = typeof value?.why === 'string' ? value.why : null;
   const state = why === 'not-configured' ? 'not-configured' : why === 'insecure' ? 'insecure' : value?.passkey ? 'configured' : 'unexpected';
-  return { state, why, magic: value?.magic === true, firstRun: value?.firstRun === true, demo: value?.demo === true, me: value?.me ?? null };
+  return { state, why, magic: value?.magic === true, firstRun: value?.firstRun === true, me: value?.me ?? null };
 }
 
 /** The sentence `off()` writes, copied from `packages/host/src/auth.ts:391` rather than paraphrased. */

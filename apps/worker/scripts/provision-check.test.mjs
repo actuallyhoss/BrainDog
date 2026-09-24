@@ -176,15 +176,18 @@ test('the two 404s at /auth/provision are told apart by their sentence', () => {
 });
 
 test('what /auth/methods reports is the session secret and the passkey count, and never the key store', () => {
-  const configured = readMethods({ passkey: true, magic: false, key: false, open: false, demo: false, me: null, firstRun: true });
+  const configured = readMethods({ passkey: true, magic: false, key: false, open: false, me: null, firstRun: true });
   assert.equal(configured.state, 'configured');
   assert.equal(configured.firstRun, true);
   assert.equal(configured.magic, false);
+  /* AND NOTHING ABOUT A DEMO. `/auth/methods` stopped sending the key when the public demo went
+     (`loop/research-no-sample.md` A1), and a reading that still reported one would print `false` for a door no host has. */
+  assert.equal('demo' in configured, false, 'the reading still reports a demo');
 
-  const bare = readMethods({ passkey: false, magic: false, key: false, open: false, demo: false, me: null, why: 'not-configured' });
+  const bare = readMethods({ passkey: false, magic: false, key: false, open: false, me: null, why: 'not-configured' });
   assert.equal(bare.state, 'not-configured');
 
-  const insecure = readMethods({ passkey: false, magic: false, key: false, open: false, demo: false, me: null, why: 'insecure' });
+  const insecure = readMethods({ passkey: false, magic: false, key: false, open: false, me: null, why: 'insecure' });
   assert.equal(insecure.state, 'insecure');
 });
 
@@ -268,7 +271,7 @@ async function readyHost(t, { ready = true } = {}) {
       res.end(JSON.stringify(body));
     };
     if (req.url === '/.well-known/braindog-build') return json(200, { app: `2026.09.23+${sha}` });
-    if (req.url === '/auth/methods') return json(200, { ok: true, value: { passkey: true, magic: false, key: false, open: false, demo: false, me: null, firstRun: true } });
+    if (req.url === '/auth/methods') return json(200, { ok: true, value: { passkey: true, magic: false, key: false, open: false, me: null, firstRun: true } });
     if (req.url === '/auth/provision' && ready)
       return json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'This route takes the operator key.', at: 'authorization' } });
     if (req.url === '/auth/provision') return json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'This BrainDog does not offer that way to sign in.' } });

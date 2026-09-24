@@ -1,5 +1,5 @@
 /**
- * A saved view against the record: the record's own view and rows, the sample when there is no
+ * A saved view against the record: the record's own view and rows, a refusal when there is no
  * record, the record's sentence for a view it does not hold and for a filter it cannot read, the
  * URL's extra clauses ANDed on, and no printed predicate where the chips cannot say one.
  */
@@ -185,9 +185,14 @@ for (const [what, answer] of [
   ['the record says UNAUTHORIZED', () => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } })],
   ['a static host answers a 404 page', () => new Response('<!doctype html><title>Not found</title>', { status: 404 })],
 ] as const)
-  test(`the sample is read when ${what}`, async () => {
+  /* NO RECORD IS A REFUSAL NOW, carrying the sentence the record or the client gave (DIRECTION 26). It answered
+     `{ from: 'sample' }` and the route drew the seeded studio's `services.lapsing` over whatever address was open. */
+  test(`a view is refused when ${what}, never read from the sample`, async () => {
     const { io } = host(answer);
-    assert.deepEqual(await viewReader(BASE, io).read('services.lapsing'), { from: 'sample' });
+    const out = await viewReader(BASE, io).read('services.lapsing');
+    assert.equal(out.from, 'refused', `answered ${JSON.stringify(out)}`);
+    if (out.from !== 'refused') return;
+    assert.match(out.fix, /^(Sign in again\.|The record could not be reached: .+)$/u);
   });
 
 test("any other refusal on the view itself is the record's own sentence", async () => {
@@ -268,8 +273,10 @@ test('the view page draws the record’s view, its refusal and the view it does 
   assert.match(page, /<Waiting head/u);
   assert.match(page, /got\?\.from === 'refused'/u);
   assert.match(page, /got\?\.from === 'missing'/u);
-  /* AND THE SAMPLE IS STILL THE FALLBACK: its `VIEWS` are read only where the record answered with none. */
-  assert.match(page, /got\?\.from === 'sample' \? VIEWS\[key\] : undefined/u);
+  /* AND NO SAMPLE UNDER ANY OF THEM: the seeded studio's `VIEWS` and `PAGES`, and `list` over its rows, were the
+     fallback for a record that did not answer, and a person signed out of their own record was shown them. */
+  const code = page.replace(/<!--[\s\S]*?-->|\/\*[\s\S]*?\*\//gu, '');
+  assert.doesNotMatch(code, /\bVIEWS\b|\bPAGES\b|'sample'|\blist\(/u);
   /* THE SAVED SEARCH IS ON SCREEN AS WELL AS IN THE `where`: a word narrowing the list with nothing
      saying so is the same unreadable state as a dropped `?q=`, which this route's header is about. */
   assert.match(page, /\{#if live\?\.search\}/u);
@@ -296,8 +303,8 @@ test('nothing stands in front of the route: /v/<key> is drawn on a record, never
    * page called services.lapsing" with a list of pages: the wrong question answered confidently.
    *
    * The redirect was added to stop `/v/<key>` drawing the sample's fictional views on a real
-   * record. That is what `viewReader` does now, and it does it by asking the record: `from: 'sample'`
-   * comes back only for `UNREACHABLE` and `UNAUTHORIZED`, which the three tests above pin.
+   * record. That is what `viewReader` does now, and it does it by asking the record; and since
+   * DIRECTION 26 there is no sample left to draw even when nothing answers, which the three tests above pin.
    */
   const dir = new URL('../../routes/v/[view]/', import.meta.url);
   const files = readdirSync(dir);

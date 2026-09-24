@@ -22,18 +22,16 @@
   browser history and in URL-bar autocomplete (19 §5).
 -->
 <script lang="ts">
-  import { apiBase } from '$lib/at.ts';
+  import { apiBase, signInFirst } from '$lib/at.ts';
   import { onDestroy, onMount } from 'svelte';
   import { createClient } from '@braindog/client';
   import { since, relative } from 'braindog-render';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
-  import { NOW, VAULT } from '$lib/record/api.ts';
-  import { VAULT_GRANTS, VAULT_OPENED } from '$lib/record/data.ts';
-  import { CODE_DIGITS, noRecord, type Answer, type DeviceRow } from '$lib/record/device.ts';
+  import { CODE_DIGITS, type Answer, type DeviceRow } from '$lib/record/device.ts';
   import {
-    answerLine, approve, asks, daysFor, holders, keysOf, namesOf, reconnectOf, reprove, revoke, sampleGrants, sampleKeys, sampleNames,
-    scopeName, words, type GrantState, type KeyRow,
+    answerLine, approve, asks, daysFor, holders, keysOf, namesOf, reconnectOf, reprove, revoke, scopeName, words, type GrantState,
+    type KeyRow,
   } from '$lib/record/vault.ts';
   import { words as actionWords } from '$lib/record/actions.ts';
   import { read } from '$lib/data/record.ts';
@@ -49,8 +47,12 @@
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
   import { countSaid, machinesTellOf, mayAct, saidOf, tellOf, words as tells, type Said } from './said.ts';
 
-  /** Where the rows came from: the record, or the sample on a host with no record. */
-  let from = $state<'reading' | 'live' | 'sample'>('reading');
+  /**
+   * Whether the record has answered yet. THERE IS NO THIRD STATE: this screen drew the sample's grants and keys,
+   * dated by the sample's clock, wherever a 401 or an unreachable host came back with no slug, and the sample went
+   * on 25 September (DIRECTION 26). Those two refusals are now said like any other.
+   */
+  let from = $state<'reading' | 'live'>('reading');
   let machines = $state<DeviceRow[]>([]);
   let keys = $state<KeyRow[]>([]);
   let names = $state(new Map<string, string>());
@@ -74,21 +76,24 @@
 
   const waiting = $derived(asks(machines));
   const holding = $derived(holders(machines));
-  const now = () => (from === 'sample' ? NOW : Date.now());
+  /** Adding, replacing, revealing, retiring and approving: the acts, which the machines read stands for. */
+  const acts = $derived(from === 'live' && mayAct(devices));
   /**
-   * Adding, replacing, revealing, retiring and approving: the acts, which the machines read stands for.
-   *
-   * THE SAMPLE KEEPS ITS CONTROLS. It is the record a stranger presses things on, and every one of them
-   * answers with `copy.notOnDemo`, which is a sentence rather than a missing button.
-   */
-  const acts = $derived(from === 'sample' || (from === 'live' && mayAct(devices)));
-  /**
-   * The sentence for an act that is not this person's: the record's own where there is one, the demo's otherwise.
+   * The sentence for an act that is not this person's: the record's own, or nothing.
    *
    * THE INDEX'S REFUSAL IS ASKED SECOND, because an owner refused nothing is still refused a key form
    * over a register the record does not hold, and `devices` has no sentence about that half.
+   *
+   * NOTHING IS WHAT A PRESS BEFORE THE RECORD ANSWERED GETS. The fallback was the demo's sentence, and with the
+   * sample gone the only way to reach it is a control pressed while both reads are still `held` from the start,
+   * which is a screen still reading and not a refusal; that sentence there would have told an owner their record
+   * was the demo.
    */
-  const cannot = (): string => (devices.kind !== 'held' ? devices.fix : index.kind !== 'held' ? index.fix : copy.notOnDemo);
+  const cannot = (): string | null => (devices.kind !== 'held' ? devices.fix : index.kind !== 'held' ? index.fix : null);
+  function refuse() {
+    const line = cannot();
+    if (line) toasts.push(line, { intent: 'warn' });
+  }
   const indexTell = $derived(tellOf(index));
   const machinesTell = $derived(machinesTellOf(devices));
   /** Whether `listGrants` answered, so a row may say how often it was opened rather than guessing never. */
@@ -98,14 +103,13 @@
     void read(async () => {
       client = createClient({ base: apiBase() });
       const listed = await client.listDevices();
-      /* NO RECORD BEHIND THE SCREEN AT ALL is the one answer that replaces the page, because there is
-         nothing else to ask. Every other refusal is about one half of this screen and is said there. */
-      if (!listed.ok && 'refusal' in listed && noRecord(listed.refusal.code)) {
-        machines = sampleGrants(VAULT_GRANTS);
-        keys = sampleKeys(VAULT, VAULT_OPENED);
-        names = sampleNames(VAULT_GRANTS, VAULT_OPENED);
-        from = 'sample';
-        return true;
+      /* A SIGN-IN THAT LAPSED SINCE THE SHELL BOOTED goes where the shell would have sent it, by the shell's own
+         rule, rather than drawing the sample as it did or a page of refusals nobody can act on. Every other
+         refusal is about one half of this screen and is said there. */
+      const signIn = !listed.ok && 'refusal' in listed ? signInFirst(listed.refusal.code, location) : null;
+      if (signIn) {
+        location.assign(signIn);
+        return false;
       }
       /**
        * THE INDEX IS READ WHATEVER THE MACHINES SAID. `listDevices` is about who may open keys and is
@@ -152,7 +156,7 @@
     if (approving) return;
     approving = true;
     const at = opened();
-    answer = await approve(typed, from === 'live' ? client : null);
+    answer = await approve(typed, client);
     closed(true, at);
     approving = false;
     /* THE CODE STAYS IN THE FIELD ON A REFUSAL: six digits with one wrong is a thing to correct. */
@@ -172,8 +176,8 @@
   }
 
   async function revokeRow(row: DeviceRow) {
-    if (!acts || from !== 'live' || !client) {
-      toasts.push(cannot(), { intent: 'warn' });
+    if (!acts || !client) {
+      refuse();
       return;
     }
     const at = opened();
@@ -189,8 +193,8 @@
    * THE INDEX IS READ AGAIN rather than patched here, so the line a person reads is the record and not a guess.
    */
   async function retireKey(k: KeyRow) {
-    if (!acts || from !== 'live' || !client || !k.grant) {
-      toasts.push(cannot(), { intent: 'warn' });
+    if (!acts || !client || !k.grant) {
+      refuse();
       return;
     }
     const at = opened();
@@ -266,8 +270,8 @@
    * the record would refuse. The guard is here as well as on the button, so both doors answer alike.
    */
   function openAdd() {
-    if (!acts || from !== 'live' || !client || index.kind !== 'held') {
-      toasts.push(cannot(), { intent: 'warn' });
+    if (!acts || !client || index.kind !== 'held') {
+      refuse();
       return;
     }
     sheetSaid = '';
@@ -291,8 +295,8 @@
   }
 
   function openReplace(row: KeyRow) {
-    if (!acts || from !== 'live' || !client) {
-      toasts.push(cannot(), { intent: 'warn' });
+    if (!acts || !client) {
+      refuse();
       return;
     }
     sheetSaid = '';
@@ -309,8 +313,8 @@
   async function saveKey(e?: SubmitEvent) {
     e?.preventDefault();
     if (sheet === null || saving) return;
-    if (!acts || from !== 'live' || !client) {
-      toasts.push(cannot(), { intent: 'warn' });
+    if (!acts || !client) {
+      refuse();
       return;
     }
     const mode = sheet.mode;
@@ -346,8 +350,8 @@
    * nothing here is reachable by a URL, nothing is written into the query string, and nothing is kept.
    */
   async function revealKey(k: KeyRow) {
-    if (!acts || from !== 'live' || !client) {
-      toasts.push(cannot(), { intent: 'warn' });
+    if (!acts || !client) {
+      refuse();
       return;
     }
     if (revealing !== '') return;
@@ -390,8 +394,6 @@
 <PageHead icon="vault" title={copy.vault} />
 
 <div class="page">
-  {#if from === 'sample'}<p class="demo" role="note">{copy.notOnDemo}</p>{/if}
-
   {#if waiting.length}
     <Section title={words.waiting} count={waiting.length}>
       <ul class="whos">
@@ -454,7 +456,7 @@
       <Empty kind="no-data-yet" title={words.noKeys} body={words.noKeysHow} />
     {/if}
     <!-- AND NO FORM OVER A LIST THAT IS NOT THERE: an eight-field sheet whose save the record would refuse. -->
-    {#if from !== 'reading' && acts && index.kind === 'held'}
+    {#if acts && index.kind === 'held'}
       <div class="row-actions">
         <Button weight="primary" onclick={openAdd}>{words.addKey}</Button>
       </div>
@@ -467,7 +469,7 @@
             <span class="who-name">{k.label}</span>
             <Chip label={k.project ?? words.global} />
             <span class="who-detail">
-              {k.sealed ? words.sealed : words.indexOnly}{#if k.sealed}{' · '}{counts ? words.opened(k.opened) : countSaid(counted)}{#if counts && k.lastOpened}{', '}{words.lastOpened(since(k.lastOpened, now()))}{/if}{/if}
+              {k.sealed ? words.sealed : words.indexOnly}{#if k.sealed}{' · '}{counts ? words.opened(k.opened) : countSaid(counted)}{#if counts && k.lastOpened}{', '}{words.lastOpened(since(k.lastOpened, Date.now()))}{/if}{/if}
             </span>
           </div>
           {#if k.opens}<p class="who-why">{k.opens}</p>{/if}
@@ -517,7 +519,7 @@
             <span class="who-name">{d.label ?? copy.unnamedMachine}</span>
             <Chip label={scopeName(d.scope, names)} />
             <span class="who-detail">
-              {d.last_used ? copy.usedWhen(since(d.last_used, now())) : copy.neverUsed} · {copy.endsWhen(relative(d.expires.slice(0, 10), now()))}
+              {d.last_used ? copy.usedWhen(since(d.last_used, Date.now())) : copy.neverUsed} · {copy.endsWhen(relative(d.expires.slice(0, 10), Date.now()))}
             </span>
             {#if acts}
               <span class="who-do">
@@ -585,12 +587,6 @@
     gap: var(--sp-5);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
     max-inline-size: 1000px;
-  }
-
-  .demo {
-    margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-ui);
   }
 
   /* The rows are Settings' rows: unboxed, a hairline between them, the controls at the end of the line. */

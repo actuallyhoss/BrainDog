@@ -74,7 +74,7 @@ export type AuthFlow = AuthCall['flow'];
  */
 export type Who = { person: string; email: string; record: string | null; provedAt: number };
 
-/** What `/auth/methods` needs from the Directory. The host adds what only it knows: open mode, the demo, and why. */
+/** What `/auth/methods` needs from the Directory. The host adds what only it knows: open mode, and why. */
 export type Methods = {
   /** False when the host gave the Directory no MAC key: nothing but this answer is served. */
   configured: boolean;

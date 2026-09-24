@@ -1,27 +1,53 @@
 /**
- * The public demo at Spark's door, driven into a real `Record$`. `loop/research-batch-seventeen-audit.md` finding 5.
+ * Nobody reaches a record without a credential: not through the router, and not at Spark's door inside the object.
  *
- * THE OBJECT'S SECOND LOCK ASKED ONLY `principal.kind`. `DEMO_CONTEXT` (`src/route.ts`) is `p_demo` at `read`, and it
- * is a person, so the audit's context was answered 200 with a Reading and one call to the model: on a live host, one
- * opening of the owner's own `spark` key and one ask off the record's `ask_cap`, spent by somebody who never signed in.
- * What kept it shut was the router, because `demoRecord` admits a GET alone and the ask is a POST. That is one method
- * away from open, and the object is where the record decides who is asking, so it answers for itself.
+ * THERE WAS A PUBLIC DEMO, AND IT IS GONE (`loop/DIRECTION.md` 26, `loop/research-no-sample.md` A1). `DEMO_RECORD` named
+ * one record that any GET with no `Authorization` header read as `p_demo` at `read`, uncredentialed. Production shipped
+ * it empty, so the door was dark, but it was one `--var` away from open, and the app now shows only a real record. The
+ * first test here is the one that went red against the Worker that still had it: a deployment that sets `DEMO_RECORD` to
+ * a well-formed id answered `GET /api/boot` with no credential 200, from that record. Now it is the ordinary 401 and no
+ * record is addressed, whatever the variable says, so an old deploy command that still carries it opens nothing.
  *
- * `credentialed` IS THE FIELD THAT SAYS IT. A session's context is `credentialed: true` (`packages/host/src/auth.ts`),
- * the demo's says `false` out loud, and `createToken` already refuses on it. A person context that leaves it out is
- * refused too: the two people the Worker forwards both say, so a context that says neither was not built by this host.
+ * THE OBJECT'S OWN LOCK STAYS, because it was never only about the demo. It asked only `principal.kind` once, and the
+ * demo's context, a person, was answered 200 with a Reading and one model call: on a live host, one opening of the
+ * owner's `spark` key and one ask off the record's `ask_cap`, spent by somebody who never signed in
+ * (`loop/research-batch-seventeen-audit.md` finding 5). `credentialed` is the field that says it. A session's context
+ * is `credentialed: true` (`packages/host/src/auth.ts`), and a person context that says `false`, or leaves it out, was
+ * not built by a sign-in and is refused before the model is called.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { DEMO_CONTEXT } from '../src/route.ts';
 import { bundled, objectStorage } from './bundled-worker.ts';
 
 const HOST = 'app.example.test';
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
 const URL_ = 'https://gateway.example.test/v1/chat/completions';
 const FAKE_KEK = '0'.repeat(64);
+
+/** A person context that no sign-in built: the shape the demo door used to forward, `p_demo` at `read`. */
+const UNCREDENTIALED = { principal: { kind: 'person', id: 'p_demo', level: 'read' }, credentialed: false };
+
+test('A DEPLOYMENT THAT STILL SETS DEMO_RECORD OPENS NOTHING: a GET with no credential is 401 and no record is addressed', async () => {
+  const { default: worker } = await bundled();
+  const addressed: string[] = [];
+  const records = {
+    idFromName: (n: string) => (addressed.push(n), n),
+    get: () => ({ fetch: async () => new Response('{"ok":true,"value":{}}', { headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } }) }),
+  };
+  /* NO COOKIE AND NO BEARER, SO THE DIRECTORY HAS NOTHING TO BE ASKED, and a call to it would be a door this test does not know about. */
+  const directory = new Proxy({}, { get: (_, name) => () => assert.fail(`the Directory was asked ${String(name)} for a request with no credential`) });
+  const env = { PUBLIC_HOST: HOST, DEMO_RECORD: REC, RECORD: records, DIRECTORY: { idFromName: (n: string) => n, get: () => directory } };
+  const answered: string[] = [];
+  for (const path of ['/api/boot', '/api/list?register=tasks', '/api/schema?register=tasks']) {
+    const out = await worker.fetch(new Request(`https://${HOST}${path}`), env, { waitUntil: () => {} });
+    const code = /"code":"([A-Z_]+)"/.exec(await out.text())?.[1] ?? '-';
+    answered.push(`${path} ${out.status} ${code}`);
+  }
+  assert.deepEqual(answered, ['/api/boot 401 UNAUTHORIZED', '/api/list?register=tasks 401 UNAUTHORIZED', '/api/schema?register=tasks 401 UNAUTHORIZED']);
+  assert.deepEqual(addressed, [], 'a record was addressed for a request that carried no credential');
+});
 
 const hostedRecord = async () => {
   const { Record$ } = await bundled();
@@ -58,13 +84,13 @@ const withModel = async (run: () => Promise<Response>): Promise<{ status: number
   }
 };
 
-test("THE PUBLIC DEMO'S CONTEXT IS REFUSED AT THE OBJECT, and the model is not called", async () => {
+test('A PERSON CONTEXT THAT SAYS IT IS NOT CREDENTIALED IS REFUSED AT THE OBJECT, and the model is not called', async () => {
   const object = await hostedRecord();
-  const out = await withModel(() => object.fetch(ask(DEMO_CONTEXT)));
-  assert.equal(out.status, 403, `the demo asked Spark and was answered ${out.status}: ${JSON.stringify(out.body)}`);
+  const out = await withModel(() => object.fetch(ask(UNCREDENTIALED)));
+  assert.equal(out.status, 403, `an uncredentialed person asked Spark and was answered ${out.status}: ${JSON.stringify(out.body)}`);
   assert.equal(out.body.refusal?.code, 'NEEDS_BROWSER_SESSION');
   assert.equal(out.body.refusal?.at, 'principal');
-  assert.equal(out.calls, 0, 'the model was called for the demo');
+  assert.equal(out.calls, 0, 'the model was called for somebody who never signed in');
 });
 
 test('A PERSON CONTEXT THAT DOES NOT SAY IT IS CREDENTIALED is refused the same way', async () => {

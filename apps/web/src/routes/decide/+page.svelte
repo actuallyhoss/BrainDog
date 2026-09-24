@@ -5,7 +5,7 @@
   one nobody has needed to answer. Ranking by what deciding late costs puts the expensive one first
   and makes the order arguable, which is the point (19 §2).
 
-  THE OPTIONS ON A CARD ARE THE ANSWER. One press records it, and the reason is asked for after it.
+  THE OPTIONS ON A CARD ARE THE ANSWER. One press picks it, and the reason that sends it is asked for after it.
   A card cannot hold a button inside its link, so the anchor and the verbs are SIBLINGS under one
   item, as `RowCards.svelte` does for the register.
 
@@ -26,8 +26,7 @@
   import { goto, invalidateAll } from '$app/navigation';
   import { queueCost, since, symbolText } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
-  import { DECIDED as SAMPLE_DECIDED, DOM_CAP, NOW, REGISTERS, ROWS, display, metric } from '$lib/record/api.ts';
-  import { PROPOSALS, QUEUE, ROWSETS } from '$lib/record/data.ts';
+  import { DOM_CAP, metric } from '$lib/record/api.ts';
   import Changes from './[id]/Changes.svelte';
   import Proposed from './[id]/Proposed.svelte';
   import Arranged from './[id]/Arranged.svelte';
@@ -35,7 +34,7 @@
   import { updatesOf } from './[id]/changes.ts';
   import { proposedOf } from './[id]/proposed.ts';
   import { appliedLines, arrangedOf, isArranging, partialOf, type Partial } from './[id]/arranged.ts';
-  import { answerFor, optionsOf, reasonState, record, setReason, withdraw, wouldRecord, type Answer } from '$lib/record/answer.ts';
+  import { answerFor, optionsOf, reasonState, record, setReason, withdraw, type Answer } from '$lib/record/answer.ts';
   import { mayAnswer, whyNotAnswering } from './answering.ts';
   import { spoken } from './spoken.ts';
   import { groupedAddress, groupingOf, type Grouping } from './grouping.ts';
@@ -61,12 +60,12 @@
   let { data } = $props();
 
   /**
-   * WHERE THE QUEUE CAME FROM. `live` is the record's open suggestions, through `governance`; `sample`
-   * is a host with no record behind it, and it draws the sample questions; `refused` is a record that
-   * answered no, and its own sentence is what is drawn. Nothing is drawn while the first read is out,
-   * so the sample never shows over a live record.
+   * WHERE THE QUEUE CAME FROM. `live` is the record's open suggestions, through `governance`; `refused`
+   * is a host that answered no, and its own sentence is what is drawn. Nothing is drawn while the first
+   * read is out. There was a third, `sample`, for a host with no record behind it, which drew fixture
+   * questions and let them be answered with nothing sent; it went with the sample record (DIRECTION 26).
    */
-  let from = $state<'reading' | 'live' | 'sample' | 'refused'>('reading');
+  let from = $state<'reading' | 'live' | 'refused'>('reading');
   let live = $state<Queue | null>(null);
   let refusal = $state('');
   let client: ReturnType<typeof createClient> | null = null;
@@ -103,8 +102,9 @@
     }
   }
 
-  /** The clock a band is read against: the reader's on a live record, the sample's own otherwise. */
-  const now = $derived(from === 'live' ? Date.now() : NOW);
+  /* THE CLOCK A BAND IS READ AGAINST, taken when the read answers. Nothing reads it before then: the
+     queue, the ledger and every press are drawn only once `from` is `live`. */
+  const now = $derived(from === 'live' ? Date.now() : 0);
 
   /**
    * WHETHER THIS READER MAY ANSWER, WHICH THIS SCREEN NEVER ASKED.
@@ -115,19 +115,14 @@
    * arrived from the record after a press, a typed reason and a second press. `shell.me` has carried
    * the answer since `boot`, and one grep across the app found exactly one line of markup reading
    * `me.level` anywhere, on `/settings/identity`. This is the second.
-   *
-   * THE SAMPLE IS UNTOUCHED BY THIS, and that is the shell's doing rather than a special case here:
-   * `api.ts` gives the sample reader `owner`, so a host with no record behind it draws what it drew.
    */
   const me = $derived((route.data as unknown as Shell).me);
   const answerable = $derived(mayAnswer(me.level, me.owner));
   const whyNot = $derived(whyNotAnswering(me.level, me.lists));
 
-  const open = $derived(
-    from === 'live' ? (live?.open ?? []) : from === 'sample' ? QUEUE : [],
-  );
-  /* Every decision ever taken: the record's, or the sample's. The name is the one the cap test reads. */
-  const DECIDED = $derived(from === 'live' ? (live?.decided ?? []) : from === 'sample' ? SAMPLE_DECIDED : []);
+  const open = $derived(from === 'live' ? (live?.open ?? []) : []);
+  /* Every decision ever taken on the record. The name is the one the cap test reads. */
+  const DECIDED = $derived(from === 'live' ? (live?.decided ?? []) : []);
   /* EVERY DECISION ON THE RECORD, read or not yet, so the heading says how many there are and not how many were read. */
   const decidedTotal = $derived(from === 'live' && live?.older ? Math.max(live.older.total, DECIDED.length) : DECIDED.length);
   const target = metric('open-questions');
@@ -143,22 +138,17 @@
   let settledHere = $state(new Map<string, string>());
   const waiting = $derived(open.filter((q) => !settledHere.has(q.id)));
 
-  /* The same aim on a live record, with its tone taken from the record's own count. */
-  const aimTone = $derived(from === 'live' ? (waiting.length > 3 ? ('warn' as const) : ('good' as const)) : target.tone);
+  /* THE AIM'S TONE IS THE RECORD'S OWN COUNT. Its words still come from `metric`, the mock reader in `api.ts`,
+     whose note turns on the fixture queue being empty; the chip is drawn only over live questions, where that
+     note is always the same target line, and wave B moves `metric` out of shipped code. */
+  const aimTone = $derived(waiting.length > 3 ? ('warn' as const) : ('good' as const));
 
-  const rowsetOf = (q: Question) => (from === 'live' ? live?.rowsets[q.id] : ROWSETS[q.id]);
+  const rowsetOf = (q: Question) => live?.rowsets[q.id];
 
-  /* THE ROWS A PROPOSAL WOULD CHANGE, drawn on its card, because one press here answers it. One drawing
-     for both: the live record's rows and declarations, or the sample's. */
+  /* THE ROWS A PROPOSAL WOULD CHANGE, drawn on its card, because one press here answers it, from the
+     record's own rows and declarations. `open` is empty until the read is live, so `live` is here. */
   const changed = $derived(
-    new Map(
-      open.map((q) => [
-        q.id,
-        from === 'live' && live
-          ? updatesOf(live.rowsets[q.id], live.registers, live.rows, plainOf(live.registers))
-          : updatesOf(ROWSETS[q.id], REGISTERS, ROWS, (r, f, v) => display(r, f, v)),
-      ]),
-    ),
+    new Map(open.map((q) => [q.id, live ? updatesOf(live.rowsets[q.id], live.registers, live.rows, plainOf(live.registers)) : []])),
   );
 
   /* WHAT A PAGE, A LIST, A RULE OR A LOOK WOULD PUT ON THE SCREEN, for a proposal that arranges the
@@ -172,8 +162,8 @@
     ),
   );
 
-  /** What a question was filed as: the record's body, or the sample's proposal. */
-  const aboutFor = (q: Question) => (from === 'live' ? live?.about?.[q.id] : from === 'sample' ? PROPOSALS[q.id] : undefined);
+  /** What a question was filed as: the record's body. */
+  const aboutFor = (q: Question) => live?.about?.[q.id];
   const arranging = (q: Question) => isArranging(aboutFor(q)?.kind);
 
   /* A PACK, A SETTINGS CHANGE OR A WHOLE ARRANGEMENT, as the story `arranged.ts` tells, folded for the queue. */
@@ -296,19 +286,19 @@
     putBack: copy.takeItBack,
     putBackOf: copy.takeItBackOf,
     whyLabel: copy.whyForLater,
-    reasonMissing: copy.reasonMissing,
     reasonThin: copy.reasonThinNudge,
   } as const;
 
   /**
-   * ANSWERS MADE HERE, KEYED BY QUESTION.
+   * ANSWERS PICKED HERE AND NOT SENT YET, KEYED BY QUESTION.
    *
-   * A `Map` rather than a field on the question, because the seed is the record and this screen has
-   * no business editing it. Re-assigned rather than mutated on every change: Svelte 5 proxies
+   * A `Map` rather than a field on the question, because the question is the record's and this screen
+   * has no business editing it. Re-assigned rather than mutated on every change: Svelte 5 proxies
    * objects and arrays and not `Map`.
    *
-   * IT DOES NOT SURVIVE LEAVING THE SCREEN, and that is deliberate. An answer here is not a write, so
-   * carrying it across a navigation would be this screen remembering something the record does not know.
+   * IT DOES NOT SURVIVE LEAVING THE SCREEN, and that is deliberate. A pick is not a write until its
+   * reason sends it, so carrying it across a navigation would be this screen remembering something the
+   * record does not know.
    */
   let answers = $state(new Map<string, Answer>());
 
@@ -334,23 +324,9 @@
     answers = record(answers, a);
     cursor = order.findIndex((x) => x.id === q.id);
 
-    /* ON A LIVE RECORD THE PRESS PICKS AND THE REASON SENDS IT, so focus goes to the reason. */
-    if (from === 'live') {
-      await tick();
-      document.getElementById(`why-${q.id}`)?.focus();
-      return;
-    }
-
-    /* THE UNDO IS OFFERED IMMEDIATELY, WHICH IS ONLY HONEST BECAUSE NOTHING IS OUT: the sample sends no
-       request, so there is no window in which the inverse could race a write. */
-    toasts.push(copy.notWritten(wouldRecord(a)), {
-      intent: 'warn',
-      undo: () => (answers = withdraw(answers, q.id)),
-    });
-
-    /* THE PRESSED CONTROL IS GONE, SO FOCUS HAS TO BE PUT SOMEWHERE: on its inverse. */
+    /* THE PRESS PICKS AND THE REASON SENDS IT, so focus goes to the reason. */
     await tick();
-    document.getElementById(`undo-${q.id}`)?.focus();
+    document.getElementById(`why-${q.id}`)?.focus();
   }
 
   /** And taking it back puts the focus on the option that was pressed. */
@@ -387,11 +363,10 @@
     /* A KEY THE SHELL ALREADY TOOK is not this page's too: `g` then `d` goes to Decide, and must not
        also defer the question under the cursor. */
     if (e.defaultPrevented || covered()) return;
-    if (from !== 'live' && from !== 'sample') return;
+    if (from !== 'live') return;
     const mod = e.metaKey || e.ctrlKey;
 
-    /* INSIDE A REASON: the chord sends it on a live record, and Esc goes back to the list with the
-       answer kept. */
+    /* INSIDE A REASON: the chord sends it, and Esc goes back to the list with the answer kept. */
     const field = e.target instanceof HTMLTextAreaElement ? e.target.dataset.why : undefined;
     if (field !== undefined) {
       const q = open.find((x) => x.id === field);
@@ -399,8 +374,7 @@
       if (mod && e.key === 'Enter') {
         e.preventDefault();
         const a = answers.get(q.id);
-        if (from === 'live' && a && a.reason.trim()) void commit(q, a);
-        else if (from !== 'live') void advanceFrom(q);
+        if (a && a.reason.trim()) void commit(q, a);
       } else if (e.key === 'Escape') {
         e.preventDefault();
         void place(order.findIndex((x) => x.id === q.id));
@@ -488,8 +462,8 @@
    * EVERY SELECTED QUESTION WITH A SUGGESTED ANSWER, ANSWERED WITH IT, AND ONE REASON FOR ALL.
    *
    * A question with no suggestion is left for its own press, and the button's count says how many it
-   * will answer. On a live record each is sent in turn; one that is refused keeps the record's
-   * sentence on its card and the rest carry on.
+   * will answer. Each is sent in turn; one that is refused keeps the record's sentence on its card
+   * and the rest carry on.
    */
   async function answerPicked() {
     /* THE SAME GATE ON THE BATCH, and not only on its button: one answer to eight questions is eight
@@ -501,20 +475,7 @@
     if (batching || approvable.length === 0) return;
     const at = new Date(now).toISOString();
     const reason = batchReason.trim();
-    if (from !== 'live') {
-      const had = answers;
-      let next = answers;
-      for (const q of approvable) {
-        const a = answerFor(q, approveKey(q)!, at);
-        if (a) next = setReason(record(next, a), q.id, reason);
-      }
-      answers = next;
-      toasts.push(copy.notWritten(copy.decideWouldAnswer(approvable.length)), { intent: 'warn', undo: () => (answers = had) });
-      picked = new Set();
-      batchReason = '';
-      return;
-    }
-    if (reason === '' || !client) return;
+    if (from !== 'live' || reason === '' || !client) return;
     batching = true;
     let done = 0;
     const settled = new Map(settledHere);
@@ -539,11 +500,11 @@
   }
 
   /**
-   * DRAWN ONCE THE FIRST READ HAS ANSWERED, live or the sample. The read is bracketed by `opened()` and
-   * `closed()`, so a call still out takes `data-screen` away whatever this says.
+   * DRAWN ONCE THE FIRST READ HAS ANSWERED LIVE. The read is bracketed by `opened()` and `closed()`, so a
+   * call still out takes `data-screen` away whatever this says.
    */
   $effect(() => {
-    if (from === 'live' || from === 'sample') drew('ready');
+    if (from === 'live') drew('ready');
   });
 </script>
 
@@ -626,8 +587,6 @@
         {#if said}
           {@const state = reasonState(said.reason)}
           <div class="said">
-            <!-- NOT SAVED, SAID ON THE CARD, on the sample, where nothing is. -->
-            {#if from !== 'live'}<Chip label={copy.markNotWritten} tone="warn" />{/if}
             <span class="said-what">{SAY.answered(said.title)}</span>
             <!-- THE ROW STAYS AND OFFERS THE WAY BACK (REWORK §1, §4). -->
             <Button
@@ -654,18 +613,16 @@
             <!-- THE ARGUMENT, STANDING RATHER THAN BLOCKING, until there is a sentence worth reading. -->
             {#if state !== 'written'}
               <p class="why-note" id="why-note-{q.id}">
-                {state === 'missing' ? (from === 'live' ? copy.reasonRequired : SAY.reasonMissing) : SAY.reasonThin}
+                {state === 'missing' ? copy.reasonRequired : SAY.reasonThin}
               </p>
             {/if}
-            <!-- A LIVE RECORD SENDS IT, from the button or from the field. -->
-            {#if from === 'live'}
-              <div class="send">
-                <Button weight="primary" disabled={!said.reason.trim() || sending !== null} onclick={() => commit(q, said)}>
-                  {copy.commit}
-                </Button>
-                <span class="keys"><Kbd keys="⌘↵" />{copy.decideToSend}<Kbd keys="Esc" />{copy.decideToLeave}</span>
-              </div>
-            {/if}
+            <!-- SENT FROM THE BUTTON OR FROM THE FIELD. -->
+            <div class="send">
+              <Button weight="primary" disabled={!said.reason.trim() || sending !== null} onclick={() => commit(q, said)}>
+                {copy.commit}
+              </Button>
+              <span class="keys"><Kbd keys="⌘↵" />{copy.decideToSend}<Kbd keys="Esc" />{copy.decideToLeave}</span>
+            </div>
           </div>
         {:else}
           <!-- Named by the question, because "Per seat" repeated down a queue is three words with no subject.
@@ -715,7 +672,7 @@
       {/snippet}
     </Empty>
   {:else}
-    <!-- THE COUNT IS WHAT STILL WAITS. On the sample nothing is written, so nothing leaves it. -->
+    <!-- THE COUNT IS WHAT STILL WAITS: a question decided here leaves it and keeps its line. -->
     <Section title={copy.openQuestions} count={waiting.length}>
       {#snippet aside()}
         <div class="head-aside">

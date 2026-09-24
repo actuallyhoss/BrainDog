@@ -20,7 +20,7 @@
   import { since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { DOM_CAP, INBOX as SAMPLE, NOW, SOURCES } from '$lib/record/api.ts';
+  import { DOM_CAP } from '$lib/record/api.ts';
   import { AGENTS_REGISTERS } from '@braindog/seed';
   import type { InboxItem } from '$lib/record/schema.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
@@ -33,30 +33,28 @@
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
 
   /**
-   * ON A LIVE RECORD THE INBOX IS THE RECORD'S, its newest page, and nothing of the sample is mixed
-   * into it. Until the page arrives the screen draws no rows and no empty state, and a refusal is
-   * the record's own sentence.
+   * THE INBOX IS THE RECORD'S, its newest page, and nothing of the sample is mixed into it. Until the
+   * page arrives the screen draws no rows and no empty state, and a refusal is the record's own
+   * sentence: a read that found no record drew the sample's arrivals here until DIRECTION 26, and
+   * says so in the record's words now.
    *
-   * `sampled` IS A LIVE SHELL WHOSE READ FOUND NO RECORD, which draws the sample as before.
-   * `unrouted` IS A HOST OLDER THAN THIS READ: there is a record, so the sample would be a lie about
-   * it, and there is no list to draw from it either.
+   * `unrouted` IS A HOST OLDER THAN THIS READ: there is a record, and no list to draw from it.
    */
   let live = $state<{ items: InboxItem[]; cursor: number | null } | null>(null);
   let refused = $state<string | null>(null);
   let unrouted = $state(false);
-  let sampled = $state(false);
-  const fromRecord = $derived(route.data.live && !sampled);
-  const INBOX = $derived(fromRecord ? (live?.items ?? []) : SAMPLE);
+  const INBOX = $derived(live?.items ?? []);
   const shown = $derived(INBOX.slice(0, DOM_CAP));
-  const clock = $derived(fromRecord ? Date.now() : NOW);
-  const answered = $derived(!fromRecord || live !== null);
+  const clock = $derived(Date.now());
+  const answered = $derived(live !== null);
 
-  let open = $state<string | null>(route.data.live ? null : (SAMPLE[0]?.id ?? null));
+  let open = $state<string | null>(null);
 
   $effect(() => {
     /* UNTRACKED, ALL OF IT. The effect read `route.data.live`, so the `invalidateAll` after every filing re-ran the
-       read and put the open row and the cursor back on the first arrival. And it reads the pending count it writes. */
-    if (!untrack(() => route.data.live)) return;
+       read and put the open row and the cursor back on the first arrival. And it reads the pending count it writes.
+       It reads no `route.data.live` at all now: a shell that was not live was the sample's, and asking regardless is
+       how any shell's Inbox ends in the record's answer or its sentence rather than in bars that never stop. */
     const at = untrack(opened);
     let ok = false;
     void import('$lib/record/inbox-live.ts')
@@ -65,10 +63,6 @@
         if (out.from === 'live') {
           live = { items: out.items, cursor: out.cursor };
           open = out.items[0]?.id ?? null;
-          ok = true;
-        } else if (out.from === 'sample') {
-          sampled = true;
-          open = SAMPLE[0]?.id ?? null;
           ok = true;
         } else if (out.from === 'unrouted') {
           unrouted = true;
@@ -131,7 +125,7 @@
    * ON A LIVE RECORD THE TWO GESTURES WRITE. Filing puts the arrival in the chosen list, titled by its
    * subject; archiving keeps its bytes. Either way it leaves the list here, the next one takes its
    * place under the cursor, and the next one opens if this one was open. A refusal is the record's own
-   * sentence, and the arrival stays where it is. The sample says what would happen.
+   * sentence, and the arrival stays where it is.
    */
   let busy = $state(false);
 
@@ -161,10 +155,6 @@
   async function settle(item: InboxItem, gesture: 'file' | 'archive') {
     if (busy) return;
     if (gesture === 'file' && target === '') return void toasts.push(copy.inboxNoLists, { intent: 'warn' });
-    if (!fromRecord) {
-      toasts.push(gesture === 'file' ? copy.notWritten(copy.inboxFileIt) : copy.notWritten(copy.inboxArchiveIt), gesture === 'file' ? { intent: 'warn' } : {});
-      return;
-    }
     busy = true;
     try {
       const out = await write(item, gesture);
@@ -209,11 +199,6 @@
     const items = shown.filter((i) => picked.has(i.id));
     if (busy || items.length === 0) return;
     if (gesture === 'file' && target === '') return void toasts.push(copy.inboxNoLists, { intent: 'warn' });
-    if (!fromRecord) {
-      toasts.push(copy.notWritten(gesture === 'file' ? copy.inboxWouldFile(items.length) : copy.inboxWouldArchive(items.length)), { intent: 'warn' });
-      picked = new Set();
-      return;
-    }
     busy = true;
     const gone = new Set<string>();
     try {
@@ -264,9 +249,8 @@
   const firstWords = (body: string) => body.replace(/\s+/gu, ' ').trim();
 
   /**
-   * THE SAMPLE COMPUTES ITS CONTENT SYNCHRONOUSLY, AND A LIVE RECORD DOES NOT. On a live record the
-   * read above is bracketed with `opened()` and `closed()`, and a call still out takes the attribute
-   * away whatever this line says, so the claim is only made once the answer is in.
+   * THE READ ABOVE IS BRACKETED WITH `opened()` AND `closed()`, and a call still out takes the
+   * attribute away whatever this line says, so the claim is only made once the answer is in.
    */
   $effect(() => drew('ready'));
 </script>
@@ -277,7 +261,7 @@
 <PageHead icon="inbox"
   title={copy.inbox}
   count={answered && !unrouted && !refused ? INBOX.length : undefined}
-  atLeast={fromRecord && live !== null && live.cursor !== null}
+  atLeast={live !== null && live.cursor !== null}
 />
 
 {#snippet fileInto()}
@@ -302,24 +286,16 @@
   {:else if INBOX.length === 0}
     <!--
       AN EMPTY INBOX IS TWO DIFFERENT FACTS. A record with no connector has never had anything arrive,
-      and a record that has one has cleared it. A live record cannot tell these apart from the inbox
-      alone, so it says what is true in both, with the door to a connector; and where something waits
-      on Decide, the door there too.
+      and a record that has one has cleared it. A record cannot tell these apart from the inbox alone,
+      so it says what is true in both, with the door to a connector; and where something waits on
+      Decide, the door there too. Only the sample knew its own sources and drew the two apart.
     -->
-    {#if fromRecord}
-      <Empty kind="no-data-yet" glyph="inbox" title={copy.inboxClear} body={copy.inboxClearWhy}>
-        {#snippet actions()}
-          {#if Number(route.data.open ?? 0) > 0}<Button weight="primary" href="/decide">{copy.inboxOpenDecide}</Button>{/if}
-          <Button href="/settings/ingest">{copy.inboxConnect}</Button>
-        {/snippet}
-      </Empty>
-    {:else if SOURCES.length === 0}
-      <Empty kind="no-data-yet" glyph="inbox" title={copy.inboxNothingYet} body={copy.inboxNothingYetWhy}>
-        {#snippet actions()}<Button href="/settings/ingest">{copy.inboxConnect}</Button>{/snippet}
-      </Empty>
-    {:else}
-      <Empty kind="cleared" title={copy.inboxClear} body={copy.inboxClearWhy} />
-    {/if}
+    <Empty kind="no-data-yet" glyph="inbox" title={copy.inboxClear} body={copy.inboxClearWhy}>
+      {#snippet actions()}
+        {#if Number(route.data.open ?? 0) > 0}<Button weight="primary" href="/decide">{copy.inboxOpenDecide}</Button>{/if}
+        <Button href="/settings/ingest">{copy.inboxConnect}</Button>
+      {/snippet}
+    </Empty>
   {:else}
     <ul class="ledger arrivals" data-picking={picked.size > 0 ? '' : undefined}>
       {#each shown as item, i (item.id)}
@@ -360,40 +336,21 @@
 
               <!-- FILING IS THE PRIMARY, and the rule offer follows it at the ordinary weight. -->
               <div class="actions">
-                {#if fromRecord}{@render fileInto()}{/if}
+                {@render fileInto()}
                 <Button weight="primary" disabled={busy} onclick={() => settle(item, 'file')}>{copy.fileIt}</Button>
                 <Button weight="bare" disabled={busy} onclick={() => settle(item, 'archive')}>{copy.archiveArrival}</Button>
               </div>
-
-              <!--
-                THIS BLOCK IS THE SAMPLE'S, AND IT CANNOT BE WIRED UP YET. A live arrival carries no
-                `suggestion`, so on a real record this never draws. Making a rule needs a pattern the
-                record does not derive yet, a declaration write through the same lint a pack gets, and
-                something to decline against. The honest half is live beside it: filing and archiving.
-              -->
-              {#if item.suggestion}
-                <div class="pattern">
-                  <p class="pattern-head">
-                    <Icon name="filter" size="s" />
-                    {copy.ruleOffer}
-                  </p>
-                  <p class="pattern-said">{item.suggestion}</p>
-                  <div class="pattern-actions">
-                    <Button onclick={() => toasts.push(copy.notWritten('The rule would be written and tested against the last 30 days'), { intent: 'warn' })}>{copy.makeRule}</Button>
-                    <Button
-                      weight="bare"
-                      onclick={() => toasts.push(copy.notWritten(copy.inboxLeaveIt))}
-                    >{copy.notThisOne}</Button>
-                  </div>
-                </div>
-              {/if}
+              <!-- NO RULE OFFER. Only the sample's arrivals carried a `suggestion`, and its two buttons
+                   could only say nothing was saved: making a rule needs a pattern the record does not
+                   derive yet and a declaration write through the same lint a pack gets. It is not
+                   drawn until it can write (`loop/research-no-sample.md` 1e). -->
             </div>
           {/if}
         </li>
       {/each}
     </ul>
     <CapLine shown={Math.min(INBOX.length, DOM_CAP)} total={INBOX.length} />
-    {#if fromRecord && live && live.cursor !== null}
+    {#if live && live.cursor !== null}
       <div class="older">
         <Button weight="quiet" onclick={loadOlder} disabled={older}>{copy.olderEntries}</Button>
       </div>
@@ -404,7 +361,7 @@
       <!-- THE SELECTION'S BAR, stuck to the foot of the view after the list, so opening it moves nothing. -->
       <div class="batch" role="region" aria-label={copy.inboxSelected(picked.size)}>
         <span class="batch-n">{copy.inboxSelected(picked.size)}</span>
-        {#if fromRecord}{@render fileInto()}{/if}
+        {@render fileInto()}
         <Button weight="primary" disabled={busy} onclick={() => settlePicked('file')}>{copy.inboxFileSelected(picked.size)}</Button>
         <Button disabled={busy} onclick={() => settlePicked('archive')}>{copy.inboxArchiveSelected(picked.size)}</Button>
         <Button weight="bare" onclick={() => (picked = new Set())}>{copy.clearSelection}</Button>
@@ -528,31 +485,6 @@
     overflow-wrap: anywhere;
   }
 
-  /* THE RULE OFFER, AS A FOLLOW-UP UNDER A HAIRLINE, and not a bordered box inside a slab (rule 6). */
-  .pattern {
-    max-inline-size: var(--measure);
-    margin-block-start: var(--sp-4);
-    padding-block-start: var(--sp-3);
-    border-block-start: 1px solid var(--line-soft);
-  }
-
-  .pattern-head {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-xs);
-  }
-
-  /* A sentence, set as one: ink, not the accent and not monospace. */
-  .pattern-said {
-    display: block;
-    margin-block: var(--sp-2);
-    color: var(--ink);
-    font-size: var(--t-ui);
-    line-height: 1.55;
-  }
-
   /* The list a filed email goes into sits beside the button that files it, at the height of every control here. */
   .file-into {
     display: inline-flex;
@@ -586,7 +518,6 @@
   }
 
   /* THEY WRAP. A row of actions that does not fit is wrapped, never cut. */
-  .pattern-actions,
   .actions {
     flex-wrap: wrap;
     align-items: center;

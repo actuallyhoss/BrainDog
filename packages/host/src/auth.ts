@@ -149,14 +149,17 @@ export type Why = 'not-configured' | 'insecure';
  * What `/auth/methods` answers. The Directory says what it can do; the host adds what only it knows.
  *
  * `open` IS A SELF-HOST WITH NO SERVER KEY, where a request carrying nothing is the owner and there is no
- * session to have. `demo` is a Worker with a pinned public record. `firstRun` is there whenever sign-in is.
+ * session to have. `firstRun` is there whenever sign-in is.
+ *
+ * NO `demo`. A Worker with a pinned public record said so here, and the app offered a way into it; the public demo is
+ * gone (`loop/research-no-sample.md` A1), so there is nothing to offer and the key is not sent. The web reads an absent
+ * key as `false`, so an app older than this host draws the same screen.
  */
 export type MethodsBody = {
   passkey: boolean;
   magic: boolean;
   key: boolean;
   open: boolean;
-  demo: boolean;
   why?: Why;
   me: Who | null;
   firstRun?: boolean;
@@ -369,7 +372,6 @@ export type AuthDoor = {
   auth: Auth;
   ip: string;
   open?: boolean;
-  demo?: boolean;
   mail?: ((to: string, link: string) => void) | undefined;
   operator?:
     | {
@@ -611,15 +613,14 @@ async function methods(door: AuthDoor, mode: CookieMode | null, sid: string | un
   const out = await door.auth({ flow: 'methods', ...(sid === undefined ? {} : { sid }) });
   if (out.status !== 200) return mode === null ? reply(503, { ok: false }) : answered(out, mode);
 
-  const demo = door.demo === true;
-  const nothing: MethodsBody = { passkey: false, magic: false, key: false, open: door.open === true, demo, me: null };
+  const nothing: MethodsBody = { passkey: false, magic: false, key: false, open: door.open === true, me: null };
   const clear: Header[] = mode === null || sid === undefined ? [] : [['set-cookie', clearCookie(mode)]];
   if (door.open) return reply(200, { ok: true, value: nothing }, clear);
   if (mode === null) return reply(200, { ok: true, value: { ...nothing, why: 'insecure' } satisfies MethodsBody });
 
   const m = out.body as Methods;
   if (!m.configured) return reply(200, { ok: true, value: { ...nothing, why: 'not-configured' } satisfies MethodsBody }, clear);
-  const body: MethodsBody = { passkey: m.passkey, magic: m.magic, key: m.key, open: false, demo, me: m.me, firstRun: m.firstRun };
+  const body: MethodsBody = { passkey: m.passkey, magic: m.magic, key: m.key, open: false, me: m.me, firstRun: m.firstRun };
   return answered({ ...out, body }, mode);
 }
 

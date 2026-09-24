@@ -1,5 +1,5 @@
 /**
- * One thread on `/t/<track>`, read from the record, with the sample when there is none.
+ * One thread on `/t/<track>`, read from the record.
  *
  * A ROUTE-ONLY MODULE, like `row-live.ts`: the client carries the route table as a value.
  *
@@ -9,19 +9,17 @@
  * and `things` are declared registers and `session` is the kernel's own, so all five are already
  * readable through `list`.
  *
- * `UNREACHABLE` and `UNAUTHORIZED` mean there is no record here, and the screen reads the sample as
- * it always did. Any other refusal is the record's own sentence: a record without the work pack has
- * no `tracks` at all, and being told so is the honest answer to an address that names one.
+ * EVERY REFUSAL IS THE RECORD'S OWN SENTENCE: a record without the work pack has no `tracks` at all, and being told
+ * so is the honest answer to an address that names one. `UNREACHABLE` and `UNAUTHORIZED` with no slug used to draw
+ * the sample's thread instead; there is no sample now (DIRECTION 26).
  *
- * THE ROWS ARE HANDED BACK WHOLE AND FILTERED ON THE SCREEN, through the same helpers the sample
- * goes through (`healthOf`, `updatesIn`, `runsIn`). One derivation serves both sources, which is the
- * only way the `not_expected` rule and the newest-wins ordering cannot drift between them. Filtering
- * here instead would be a second implementation of the thing `tracks.test.ts` exists to protect.
+ * THE ROWS ARE HANDED BACK WHOLE AND FILTERED ON THE SCREEN, through the helpers `tracks.test.ts` pins
+ * (`healthOf`, `updatesIn`, `runsIn`). Filtering here instead would be a second implementation of the
+ * `not_expected` rule and the newest-wins ordering, free to drift from the one that is tested.
  */
 
 import { createClient, type ClientOptions } from '@braindog/client';
 
-import { noRecord } from './device.ts';
 import { entryOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
 import type { Entry } from './schema.ts';
 
@@ -39,18 +37,14 @@ export type Thread = {
   session: Entry[];
 };
 
-export type Opened =
-  | { from: 'live'; thread: Thread; now: number }
-  | { from: 'sample' }
-  | { from: 'refused'; fix: string };
+export type Opened = { from: 'live'; thread: Thread; now: number } | { from: 'refused'; fix: string };
 
 /** As many rows as the record will send in one page. The walk pages to the end. */
 const PER_PAGE = 500;
 
 function missed(out: object): Opened {
   if (!('refusal' in out)) return { from: 'refused', fix: 'The thread changed while it was being read.' };
-  const refusal = out.refusal as { code: string; fix: string };
-  return noRecord(refusal.code) ? { from: 'sample' } : { from: 'refused', fix: refusal.fix };
+  return { from: 'refused', fix: (out.refusal as { fix: string }).fix };
 }
 
 export type TrackReader = { read(): Promise<Opened> };
@@ -112,8 +106,7 @@ export function trackReader(base: string, io?: Fetch): TrackReader {
         }
         thread[register] = rows.map((r) => entryOf(register, r, refs));
       }
-      /* THE READER'S CLOCK, because these are this record's rows and not the sample's frozen day. An
-         update's age and whether a run is working now are both measured from it. */
+      /* THE READER'S CLOCK. An update's age and whether a run is working now are both measured from it. */
       return { from: 'live', thread, now: Date.now() };
     },
   };

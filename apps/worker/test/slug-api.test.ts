@@ -11,7 +11,8 @@
  *
  * AND `/app/api/<method>`, WHICH NAMES NO RECORD AND NO PAGE. `api` is a word the Directory never hands out, so the
  * first segment was read as one of the app's pages, the rest was `/api/boot`, and the Worker served it as a second
- * copy of the root `/api`: the demo to a caller with no credential, and the key doors past their own check, which
+ * copy of the root `/api`: the public demo to a caller with no credential (the demo is gone since,
+ * `loop/research-no-sample.md` A1), a cookie's record to a signed-in caller, and the key doors past their own check, which
  * reads the slug and saw none (the checker's finding in wave forty-one). The web never renders that address, so it
  * is refused, as `ROUTE_UNKNOWN`, the way any other path this Worker does not serve is.
  */
@@ -26,7 +27,6 @@ const ORIGIN = `https://${HOST}`;
 const STUDIO = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
 const HOME = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAE';
 const BOOKS = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAF';
-const DEMO = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAG';
 const ADA = 'ada@example.test';
 
 type Reached = { record: string; path: string; method: string; body: string };
@@ -51,7 +51,7 @@ async function world() {
     fetch: async (request: Request) =>
       new URL(request.url).pathname === '/app/' ? new Response('<!doctype html>', { headers: { 'content-type': 'text/html' } }) : new Response(null, { status: 404 }),
   };
-  const env: Record<string, unknown> = { PUBLIC_HOST: HOST, SESSION_SECRET: 'fake-session-secret-for-tests-only-0123456789', DEMO_RECORD: DEMO, RECORD: records, ASSETS };
+  const env: Record<string, unknown> = { PUBLIC_HOST: HOST, SESSION_SECRET: 'fake-session-secret-for-tests-only-0123456789', RECORD: records, ASSETS };
   /* THE KEY IS DERIVED UNDER THE BLOCK, asynchronously, so the test waits for it as the platform would. */
   const blocked: Promise<unknown>[] = [];
   const state = { storage: objectStorage(), id: { toString: () => 'directory' }, blockConcurrencyWhile: (f: () => Promise<unknown>) => (blocked.push(f()), blocked.at(-1)), waitUntil: () => {} };
@@ -107,12 +107,15 @@ test('A SLUG SHE IS NOT ON AND ONE NOBODY HOLDS ARE THE SAME 403, AND NO RECORD 
   assert.deepEqual(reached, []);
 });
 
-test('/app/api/<method> IS NOT A SECOND /api: no demo, no session record, and the key doors are not reached by it', async () => {
+test('/app/api/<method> IS NOT A SECOND /api: no session record, and the key doors are not reached by it', async () => {
   const { ask, cookie, addressed, reached, clear } = await world();
-  /* THE ROOT STILL ANSWERS THE DEMO, so the refusals below are the path's and not a demo switched off. */
-  const root = await ask('/api/boot');
-  assert.equal(root.status, 200);
-  assert.deepEqual(reached.map((r) => r.record), [DEMO]);
+  /* THE ROOT STILL ANSWERS THE SAME COOKIE, so the refusals below are the path's and not a session that stopped working.
+     Nothing presented at the root is 401 and reaches no record, which is what the root answers a stranger now. */
+  const root = await ask('/api/boot', { headers: cookie });
+  assert.equal(root.status, 200, await root.clone().text());
+  assert.equal(reached.length, 1, 'the root did not reach the session record');
+  assert.equal((await ask('/api/boot')).status, 401);
+  assert.equal(reached.length, 1, 'a request with no credential reached a record');
   clear();
 
   const asks: [string, RequestInit][] = [

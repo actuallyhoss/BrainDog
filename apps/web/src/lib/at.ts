@@ -90,15 +90,16 @@ export const signinFor = (url: { pathname: string; search: string }): string =>
 /**
  * Where a refused `boot` sends the page instead of drawing it, or `null` to draw it.
  *
- * ONLY A 401 UNDER A SLUG. `/app` with nobody signed in is the sample, which is the demo the marketing site links to;
- * `/app/acme/…` names a record, so the sample there would be dressed as acme, and the answer is the same 401 whether
- * acme exists or not, so the redirect says nothing about which names are taken. Sign-in and the other addresses with
- * no record are never sent, or sign-in would be sent to itself.
+ * EVERY 401, UNDER A SLUG OR NOT. It was a 401 under a slug only, because `/app` with nobody signed in drew the sample
+ * record the marketing site linked to. The sample is gone (DIRECTION 26), so the bare address asks for sign-in as
+ * `/app/acme/…` always did, and `/start` with it: making a record needs somebody to own it. The answer is the same 401
+ * whether acme exists or not, so the redirect says nothing about which names are taken. Sign-in and the other addresses
+ * with no record are never sent, or sign-in would be sent to itself.
  */
 export function signInFirst(code: string, url: { pathname: string; search: string }): string | null {
   const parts = split(url.pathname);
   const word = /^\/([^/?#]*)/.exec(parts?.rest ?? '')?.[1] ?? '';
-  return code === 'UNAUTHORIZED' && parts?.slug && !RECORDLESS.has(word) ? signinFor(url) : null;
+  return code === 'UNAUTHORIZED' && parts !== null && !RECORDLESS.has(word) ? signinFor(url) : null;
 }
 
 /* AN ORIGIN NOBODY SERVES, so a `next` that names any real one resolves off it and is refused, and `onward()` needs no

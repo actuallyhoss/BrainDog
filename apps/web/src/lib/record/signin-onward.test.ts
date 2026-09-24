@@ -14,8 +14,8 @@
  *   9. After the claim link the screen said a passkey lets him sign in "without the key", a key he never used.
  *
  * WHY 1, 7 AND 8 ARE HELD BY READING THE PAGE'S SOURCE. A Svelte route does not mount under `node --test`, and the
- * browser gates that could drive it share ports with a full run. What can be held here is the mechanism (the kept
- * sample, and what `forget` does to it, driven through the real `readBoot`) and the page's own wiring, read as text.
+ * browser gates that could drive it share ports with a full run. What can be held here is the mechanism (what
+ * `readBoot` keeps across a sign-in, driven for real) and the page's own wiring, read as text.
  * The source checks are narrow on purpose: they name the four buttons, the two functions and the one class.
  *
  * THE INVITATION HOLDS FRICTION 1 AS WELL. `/invite` is the first screen a colleague meets, it signs them in on
@@ -30,11 +30,12 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { copy } from '../copy.ts';
-import { forget, readBoot, type Fetch } from './boot-live.ts';
+import { forget, readBoot, refusedShell, type Fetch } from './boot-live.ts';
 
 const ROUTES = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'routes');
 const SIGNIN = readFileSync(join(ROUTES, 'signin', '+page.svelte'), 'utf8');
 const INVITE = readFileSync(join(ROUTES, 'invite', '+page.svelte'), 'utf8');
+const LAYOUT = readFileSync(join(ROUTES, '+layout.svelte'), 'utf8');
 
 const json = (status: number, body: unknown): Response =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -54,25 +55,44 @@ function host(): { io: Fetch; signIn: () => void; asked: () => number } {
   return { io, signIn: () => (signed = true), asked: () => asked };
 }
 
-/* ── 1 · the kept sample ─────────────────────────────────────────────── */
+/* ── 1 · the kept sample, now gone ───────────────────────────────────── */
 
-test('THE SAMPLE KEPT ON THE SIGN-IN SCREEN IS STILL THE ANSWER AFTER SIGNING IN, until somebody drops it', async () => {
-  /* The sign-in screen's own load asks `boot` at the bare `/app` with no session, is refused, and keeps the sample for
-     the tab. Signing in is a `fetch` that sets a cookie. The next load for `/app/` asks the same base and is handed
-     what was kept, with no request: the walk's "no request is made" and The Studio, reproduced here. */
+/**
+ * THE 401 ON THE SIGN-IN SCREEN IS NOT KEPT, SO THE FIRST LOAD AFTER SIGNING IN ASKS THE RECORD.
+ *
+ * THIS TEST HELD FRICTION 1 AS IT WAS. The sign-in screen's own load asked `boot` at the bare `/app` with no session,
+ * was refused, and kept the sample for the tab; signing in is a `fetch` that sets a cookie, so the next load was
+ * handed The Studio with no request made, and only `forget` put it right. With the sample gone (DIRECTION 26) that
+ * 401 is a refusal like any other, and a refusal is never kept, so the read after the cookie asks and answers his
+ * record without anybody dropping anything. `forget` in `enter` and the full page loads below stay: the switcher's
+ * list and the voice are still kept for the tab.
+ */
+test('THE 401 ON THE SIGN-IN SCREEN IS NOT KEPT, so the first read after signing in answers his record', async () => {
   forget();
   const { io, signIn, asked } = host();
-  assert.deepEqual(await readBoot('https://localhost:4403/app', io), { from: 'sample' });
+  assert.deepEqual(await readBoot('https://localhost:4403/app', io), { from: 'refused', code: 'UNAUTHORIZED', fix: 'Sign in again.' });
   signIn();
-  assert.deepEqual(await readBoot('https://localhost:4403/app', io), { from: 'sample' });
-  assert.equal(asked(), 1);
-
-  /* And `forget` is what makes the next read ask the record, which then answers as his. */
-  forget();
   const after = await readBoot('https://localhost:4403/app', io);
-  assert.equal(after.from, 'live');
+  assert.equal(after.from, 'live', 'the refusal from before the sign-in was handed back after it');
   assert.equal(asked(), 2);
   forget();
+});
+
+/**
+ * AND THE SIGN-IN SCREEN DOES NOT POLL A RECORD NOBODY IS SIGNED IN TO.
+ *
+ * THE SAMPLE WAS WHAT KEPT IT QUIET. The layout polls `/api/version` whenever `data.live` is true, and the sample's
+ * shell was the one that said false, so a stranger on the bare `/app/signin` was never polled. The shell over a
+ * refusal says true, and `version` is `READ+`: with the sample gone every stranger's sign-in screen asked it, was
+ * answered 401, and turned the hairline across the top of the screen to `offline`, a solid warning bar on the first
+ * thing a new person sees, with another 401 on every tick after it.
+ */
+test('THE SHELL OVER A REFUSAL IS NOT POLLED, so a signed-out sign-in screen draws no offline bar', () => {
+  const shell = refusedShell({ code: 'UNAUTHORIZED', fix: 'Sign in again.' });
+  assert.equal(shell.live, true, 'the premise moved: `live` alone now tells a refusal apart');
+  const poll = /\$effect\(\(\) => follow\(([^\n]*)\)\);/u.exec(LAYOUT)?.[1] ?? '';
+  assert.ok(poll, 'no `follow` effect in the root layout');
+  assert.match(poll, /\bdata\.refused \? null : apiBase\(/u, `the layout polls a record that refused it: follow(${poll})`);
 });
 
 /** The whole opening tag of the `Button` whose label is `copy.<key>`, or null when there is none. */
@@ -88,7 +108,6 @@ function buttonFor(src: string, key: string): string | null {
 for (const [where, src, key] of [
   ['sign-in', SIGNIN, 'openBrainDog'],
   ['sign-in', SIGNIN, 'openYourRecord'],
-  ['sign-in', SIGNIN, 'openTheDemo'],
   ['invite', INVITE, 'openBrainDog'],
 ] as const) {
   test(`"${copy[key]}" ON THE ${where.toUpperCase()} SCREEN IS A FULL PAGE LOAD, so nothing the tab kept before signing in is drawn after it`, () => {
@@ -112,7 +131,7 @@ test('ACCEPTING AN INVITATION FORGETS THE KEPT BOOT, and only once the host has 
   const accept = /async function accept\(\) \{[\s\S]*?\n {2}\}/u.exec(INVITE)?.[0] ?? '';
   assert.ok(accept, 'no `accept` on the invite screen');
   /* ON SUCCESS, NOT BEFORE THE ANSWER. A refused Accept leaves the stranger exactly as signed out as before, and the
-     kept sample is still the right answer for a tab with no session, so dropping it there only asks for it again. */
+     tab's kept answers are still right for a tab with no session, so dropping them there only asks for them again. */
   assert.match(accept, /if \(out\.ok\) \{[^}]*\bforget\(\)/u, `accept() does not call forget() on success:\n${accept}`);
 });
 

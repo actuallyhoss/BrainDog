@@ -81,6 +81,5 @@ test('friction 11: Back up now is drawn only where the record answered with its 
   assert.match(when, /\banOwner\b/u, 'the button is drawn to a colleague');
   /* `reading` IS NOT AN ANSWER EITHER: a button that is drawn and then taken away is one somebody presses. */
   assert.match(when, /copiesFrom === 'live'/u, 'Back up now is drawn without asking whether the record answered');
-  assert.match(when, /copiesFrom === 'sample'/u, 'the demo no longer shows what the button does');
   assert.doesNotMatch(when, /copiesFrom !== 'live'|copiesFrom !== 'sample'/u);
 });

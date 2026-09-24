@@ -72,9 +72,9 @@
      * `For now it draws a made-up record` WAS FALSE, AND IT CONTRADICTED TWO OTHER PAGES OF THIS
      * SAME SITE.
      *
-     * `loop/research-site-copy.md` settles it: `DEMO_RECORD` is empty in both environments
-     * (`apps/worker/wrangler.jsonc:270` and the equivalent production line), so
-     * `apps/worker/src/route.ts` never opens its anonymous-read door. That is the exact fact
+     * `loop/research-site-copy.md` settled it: the Worker's demo variable was empty in both
+     * environments, so `apps/worker/src/route.ts` never opened its anonymous-read door (and since
+     * `loop/DIRECTION.md` §26 neither the variable nor the door exists). That is the exact fact
      * `copy.ts` already cites on the home page to justify saying *there is no demo to open yet*,
      * and on the pricing page to say neither plan is open. This page was the one that had not been
      * brought along, so a reader who opened the app from here expected a populated demo and got
@@ -84,16 +84,18 @@
      * both hosts and there is nothing behind it yet (the 2026-09-16 entry below says so in its own
      * words), which is a real thing to know about a product that ships in slices.
      *
-     * AND `no record to look at yet` WAS THE SAME MISTAKE MADE THE OTHER WAY ROUND. `DEMO_RECORD`
-     * governs the server's anonymous door and nothing else. The browser draws a sample of its own
-     * when the record refuses it, and measured on 22 September `https://app.brain.dog/api/boot`
-     * answers 401 to a stranger, `apps/web/src/lib/record/device.ts:143` reads that as no record,
-     * and the live bundle carries `This is a sample record.` There is something to look at; what
-     * there is not is a record of one's own.
+     * AND `no record to look at yet` WAS THE SAME MISTAKE MADE THE OTHER WAY ROUND, on 22 September.
+     * The demo variable governed the server's anonymous door and nothing else, and the browser then drew a
+     * sample of its own for a stranger, so this line said the app showed a made-up sample record.
+     *
+     * ON 25 SEPTEMBER THE SAMPLE WENT (`loop/DIRECTION.md` §26), and this is the one sentence here
+     * that described it. With no session the app is its sign-in screen, so the line says that, and
+     * it stays two sentences. `test/promises.test.mjs` now refuses `sample record` anywhere on the
+     * site, this page included.
      */
     body:
-      'The record app deploys from this repository on every green build, and you can open it. ' +
-      'It shows a made-up sample record; signing in works, and sign-up and billing are not open yet.',
+      'The record app deploys from this repository on every green build, and opens to sign-in. ' +
+      'Signing in works, and sign-up and billing are not open yet.',
   };
 
   const LABEL = { shipped: 'shipped', changed: 'changed', fixed: 'fixed' } as const;

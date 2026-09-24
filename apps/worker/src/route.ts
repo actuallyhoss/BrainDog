@@ -19,7 +19,7 @@
  * minted for another record. Reading it here costs no hop and claims no URL.
  */
 
-import { ROUTES, sessionOf, withSession, type IngestArrival, type IngestDoor, type IngestVerify } from '@braindog/host';
+import { sessionOf, withSession, type IngestArrival, type IngestDoor, type IngestVerify } from '@braindog/host';
 import { fixOf, type Result, type Snapshot } from '@braindog/ports';
 import type { CallContext } from '@braindog/record';
 import { badSlug } from '@braindog/record/directory';
@@ -79,8 +79,8 @@ export const servesMcp = (pathname: string): boolean => /^\/+mcp\/*$/.test(pathn
  * routing it to the app instead would answer `index.html` and a 200, which a sender's retry logic
  * reads as delivered.
  *
- * IT IS BEFORE EVERY DOOR AND CARRIES NO CREDENTIAL. The cookie is never read here and the demo
- * never applies: an arrival is above the auth gate by design, and what stands in for a principal is
+ * IT IS BEFORE EVERY DOOR AND CARRIES NO CREDENTIAL. The cookie is never read here and no bearer is
+ * asked for: an arrival is above the auth gate by design, and what stands in for a principal is
  * whether the payload was verified, which decides only whether the stored row may match (`12 §3`).
  */
 export const servesIn = (pathname: string): boolean => /^\/+in(?:\/|$)/.test(pathname);
@@ -291,7 +291,8 @@ export function appPath(pathname: string): AppPath | null {
   /* `/app/api/*` NAMES NO RECORD AND NO PAGE, SO IT IS NOT AN APP PATH, and the router's own `ROUTE_UNKNOWN` answers it.
      `api` is a word the Directory never hands out, so it fell to the line below as a page, the rest was `/api/boot`,
      and the Worker served a second copy of the root `/api`. Measured through the bundle in `test/slug-api.test.ts`: a
-     GET with no credential answered 200 from the demo record, a cookie reached its session's record, and
+     GET with no credential answered 200 from the public demo's record (the demo is gone since, `loop/research-no-sample.md`
+     A1), a cookie reached its session's record, and
      `/app/api/vault/deposit` with a grant went past the key doors' own check, which reads the slug and saw none, into
      `doorOf` and the record's `verify`. The web never renders the address (`apiBase` is the bare origin with no slug). */
   if (segment === 'api') return null;
@@ -400,51 +401,6 @@ export function legacyRedirect(request: Request, legacy: string | undefined, pub
 
 /** Whether a string has the shape of a record id. A shape and not a record: nothing is asked. */
 export const isRecordId = (x: string): boolean => REC_ID.test(x);
-
-/**
- * THE ONE DOOR WITHOUT A KEY: the public demo, read-only, from one record the deployment names.
- *
- * `DEMO_RECORD` IS A CONSTANT THE REQUEST CANNOT TOUCH. With no bearer, nothing in a request names a
- * record, and every way of letting a request name one is a way to read somebody else's: a header, a
- * query parameter, a path segment. So the id comes from the deployment's own `vars` and is compared
- * against nothing the caller sent (`loop/research-anon-read.md`, A8). Unset, empty, or not the shape
- * of a record id, and this answers `null` and the Worker is exactly what it was.
- *
- * A GET WITH NO AUTHORIZATION HEADER AT ALL, for a route the table says does not write. An empty
- * `Authorization:` is a header, and takes the ordinary path to the ordinary 401: the self-host learnt
- * what reading `''` as nothing costs. `writes` is read from `ROUTES`, not judged from the principal,
- * so a method added to the table as a write is refused here the day it is added. `dryRun` is a read
- * with a caller-supplied rule in front of an unbounded walk, and has no place in a demo (A4).
- *
- * THE RECORD'S OWN GUARDS STILL DECIDE THE REST. The principal is a `read` person, so every ADMIN
- * and VAULT read (`members`, `listTokens`, `listGrants`, `planPack`) is refused inside the record by
- * level, exactly as it is for any colleague invited at `read`.
- *
- * NOTHING HERE MAY BE CACHED. Every `/api` answer carries `no-store` and no `Vary`, and must keep
- * doing so: the URL does not name the record, so `/api/boot` is one address for the demo and for
- * every tenant, and a shared cache keyed on it would hand one's answer to the other (A12). There is
- * no per-visitor rate limit yet, and `loop/BACKLOG.md` says what one needs.
- */
-const DEMO_READS: ReadonlySet<string> = new Set(ROUTES.filter((r) => !r.writes && r.name !== 'dryRun').map((r) => r.name));
-
-/** The record an anonymous request reads, or `null` when it takes the ordinary path. */
-export function demoRecord(request: Request, pinned: string | undefined): string | null {
-  if (request.headers.get('authorization') !== null || request.method !== 'GET') return null;
-  if (!pinned || !REC_ID.test(pinned)) return null;
-  const name = new URL(request.url).pathname.replace(/^\/+api\/+/, '').replace(/\/+$/, '');
-  return DEMO_READS.has(name) ? pinned : null;
-}
-
-/**
- * Who an anonymous reader is: `p_demo`, at `read`, and not credentialed.
- *
- * `credentialed: false` IS SAID, NOT LEFT OUT. `createToken` refuses on `=== false` and `undefined`
- * is not `false`. Nothing at `read` reaches it; the day something does, this is still the answer.
- */
-export const DEMO_CONTEXT: CallContext = {
-  principal: { kind: 'person', id: 'p_demo', level: 'read' },
-  credentialed: false,
-};
 
 /**
  * The request the record sees: the caller's, carrying the context this Worker decided and no bearer.

@@ -1,34 +1,34 @@
 /**
- * `/search`, read from the record, with the sample when there is no record here.
+ * `/search`, read from the record, and only from the record.
  *
  * A ROUTE-ONLY MODULE, for the reason `lib/data/record.ts` gives: the client carries the route table
  * as a value, so only the search route imports this and the entry chunk stays where it was.
  *
- * LIVE OR THE SAMPLE IS THE ANSWER'S TO SAY. `UNREACHABLE` and `UNAUTHORIZED` mean there is no record
- * (a static host's fallback page, a non-JSON 404, a Worker with nothing behind it), and the screen
- * draws the sample's search. That is kept for the tab, so a static host is not asked again on every
- * query. Any other refusal is a record that answered no, and its sentence is what is drawn.
+ * A REFUSAL IS THE RECORD'S SENTENCE, WHATEVER ITS CODE. `UNREACHABLE` and `UNAUTHORIZED` drew the
+ * in-browser sample's search and kept it for the tab, so a lapsed session searched a fictional studio's
+ * rows under a real record's address and never asked again (DIRECTION 26 removed the sample). Now
+ * they are said like any other refusal, and the next query asks again, because a record that turned
+ * one away may answer the next once somebody has signed in.
  *
  * EVERY LIST, EVERY DECISION, AND EVERY PAGE, which is what the screen's own sentence promises. The
  * record's `search` is its full-text index over rows and nothing else, so a live answer covered list
- * rows only while the sample also found questions and pages. The pages the caller may open and the
+ * rows only while the old in-browser search also found questions and pages. The pages the caller may open and the
  * questions waiting on them are both in `boot`, and the decisions are one `governance` read; all
  * three are asked once for the tab, the first time a query finds the record there, and matched here
- * with the same tokens the sample uses.
+ * with the same tokens the record's own index folds with.
  */
 
 import { createClient, type ClientOptions } from '@braindog/client';
 
 import { copy } from '../copy.ts';
-import { iconFor, REGISTERS, search as sampleSearch, type SearchHit, type SearchResult } from './api.ts';
-import { noRecord } from './device.ts';
+import { iconFor, REGISTERS, type SearchHit, type SearchResult } from './api.ts';
 import { everyGovernance } from './governance.ts';
 import { terms, tokensOf } from './find.ts';
 import { learn } from './remote.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 
-export type Found = { from: 'live' | 'sample'; value: SearchResult } | { from: 'refused'; fix: string };
+export type Found = { from: 'live'; value: SearchResult } | { from: 'refused'; fix: string };
 
 /** One hit as the record's `search` sends it, and only the keys read here. */
 type Hit = { register: string; seq: number; title: string };
@@ -71,7 +71,7 @@ const LIMIT = 100;
 
 const NOTHING: SearchResult = { hits: [], total: 0, groups: [] };
 
-/** Every word typed starts some word of the text, or the whole id was typed: the sample's rule for a question or a page. */
+/** Every word typed starts some word of the text, or the whole id was typed: the rule for a question or a page. */
 function said(q: string, text: string, id?: string): boolean {
   const want = terms(q);
   if (!want) return false;
@@ -81,7 +81,7 @@ function said(q: string, text: string, id?: string): boolean {
 
 /**
  * The record's hits as the page's groups: the questions first, one group per register in the order its
- * best hit arrived, then the pages. The sample's `search` orders its groups the same way.
+ * best hit arrived, then the pages.
  *
  * The record says the register, the number and the title, and nothing else. So a live row has no
  * state beside it and no reason it matched.
@@ -152,7 +152,7 @@ const text = (v: unknown): string => (typeof v === 'string' ? v : '');
 /**
  * `boot` and the decisions, as what a search reaches besides rows.
  *
- * A PAGE WITH NO PLACE IN THE RAIL IS LEFT OUT, as the sample leaves out an unplaced one. A read that
+ * A PAGE WITH NO PLACE IN THE RAIL IS LEFT OUT, because a hit is somewhere to go and it is nowhere. A read that
  * failed is nothing found rather than a refusal of the whole search: the rows already answered.
  */
 export function othersOf(booted: Wire, decisions: Wire, open?: Wire): Others {
@@ -200,14 +200,12 @@ export type Searcher = { find(q: string): Promise<Found> };
 /** A search for one tab. `base` is the page's own origin; the app never holds a token. */
 export function searcher(base: string, io?: Fetch): Searcher {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
-  let absent = false;
   let others: Promise<Others> | null = null;
   const asked = new Map<string, Promise<void>>();
   return {
     async find(q) {
       /* NOTHING TO ASK, SO NOTHING IS SENT. The same folding the record's index uses decides it. */
-      if (!terms(q)) return { from: absent ? 'sample' : 'live', value: NOTHING };
-      if (absent) return { from: 'sample', value: sampleSearch(q, Number.MAX_SAFE_INTEGER) };
+      if (!terms(q)) return { from: 'live', value: NOTHING };
       const out = await client.search(q, LIMIT);
       if (out.ok) {
         const answer = answered(out.value);
@@ -220,10 +218,6 @@ export function searcher(base: string, io?: Fetch): Searcher {
         /* A LIST THIS BUILD DOES NOT SHIP IS NAMED BY THE RECORD, so a course is grouped under Courses and not its id. */
         await Promise.all([...new Set(answer.hits.map((h) => h.register))].map((r) => learn(client.schema, r, asked)));
         return { from: 'live', value: groupsOf(q, answer.hits, await others, answer.matched) };
-      }
-      if ('refusal' in out && noRecord(out.refusal.code)) {
-        absent = true;
-        return { from: 'sample', value: sampleSearch(q, Number.MAX_SAFE_INTEGER) };
       }
       return { from: 'refused', fix: 'refusal' in out ? out.refusal.fix : 'The record changed while it was being read.' };
     },

@@ -153,7 +153,7 @@ test('METHODS, THE LOCKOUT WITH Retry-After, AND THE WINDOW THAT FORGETS IT', as
   const s = await stack();
   try {
     const methods = await s.call('/auth/methods');
-    assert.deepEqual(methods.body, { ok: true, value: { passkey: true, magic: false, key: true, open: false, demo: false, me: null, firstRun: true } });
+    assert.deepEqual(methods.body, { ok: true, value: { passkey: true, magic: false, key: true, open: false, me: null, firstRun: true } });
 
     for (let i = 0; i < 10; i++) {
       const wrong = await s.call('/auth/token', { body: { serverKey: `wrong-${i}` } });
@@ -292,7 +292,7 @@ test('A PASSKEY: MADE BEHIND A SESSION, SIGNED OUT, SIGNED IN WITH, ROTATED AFTE
 test('A BAD COOKIE ON AN OPEN SELF-HOST IS A 401 AND IS CLEARED, never the owner', async () => {
   const s = await stack({ token: null });
   try {
-    assert.deepEqual((await s.call('/auth/methods')).body?.value, { passkey: false, magic: false, key: false, open: true, demo: false, me: null });
+    assert.deepEqual((await s.call('/auth/methods')).body?.value, { passkey: false, magic: false, key: false, open: true, me: null });
     const bad = await s.call('/api/boot', { sid: 'A'.repeat(43) });
     assert.equal(bad.status, 401);
     assert.deepEqual(bad.body?.refusal, NOT_YOU);

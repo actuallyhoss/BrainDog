@@ -2,9 +2,9 @@
  * `ssr = false`: a static shell. Both hosts serve one `build/` directory unchanged and no request is
  * ever rendered on a server (50 §13 D1).
  *
- * BOTH MODULES ARE LOADED DYNAMICALLY, and that is not a trick to make a budget pass. The sample is
- * the whole synthetic record, and `boot-live.ts` carries the client's route table; either one in the
- * entry chunk pushes it over its budget, which the bundle gate would be right to report.
+ * EVERY MODULE IS LOADED DYNAMICALLY, and that is not a trick to make a budget pass. `boot-live.ts`
+ * carries the client's route table, and in the entry chunk it pushes it over its budget, which the
+ * bundle gate would be right to report.
  *
  * ONE REQUEST EACH, AND BOTH ARE KEPT. The three imports are fetched together; the record's `boot`
  * and the account's list of records are the only calls the shell waits on, and each is kept for the
@@ -49,8 +49,7 @@ const askModel = (origin: string, fetch: typeof globalThis.fetch): Promise<boole
     );
 
 export async function load({ url, fetch }): Promise<Shell & { spark: boolean }> {
-  const [{ boot, INBOX }, live, { readRecordsForSwitcher }, voice] = await Promise.all([
-    import('$lib/record/api.ts'),
+  const [live, { readRecordsForSwitcher }, voice] = await Promise.all([
     import('$lib/record/boot-live.ts'),
     import('$lib/record/switcher.ts'),
     import('$lib/voice.svelte.ts'),
@@ -63,8 +62,9 @@ export async function load({ url, fetch }): Promise<Shell & { spark: boolean }> 
   const spared = inner === '/start' || inner === '/signin' || inner === '/invite' || inner.startsWith('/s/');
   const booted = await live.readBoot(api);
 
-  /* A SLUG THAT WILL NOT OPEN FOR A STRANGER ASKS FOR SIGN-IN, and never draws the sample (`signInFirst`). `readBoot`
-     answers the sample only where the address names no record (`research-one-domain.md` §2.4). */
+  /* AN ADDRESS THAT WILL NOT OPEN FOR A STRANGER ASKS FOR SIGN-IN (`signInFirst`), the bare `/app/` as much as
+     `/app/acme/`, and `/start` with them: it is spared the redirect below and not this one. The bare address drew the
+     sample business until DIRECTION 26 took it away. */
   const signIn = booted.from === 'refused' ? signInFirst(booted.code, url) : null;
   if (signIn) redirect(307, signIn);
 
@@ -72,19 +72,17 @@ export async function load({ url, fetch }): Promise<Shell & { spark: boolean }> 
      `boot` answer and never awaited past a refusal: a record that cannot say speaks in the house voice. */
   await voice.listen(booted.from === 'live' ? booted.boot : null, api).catch(() => undefined);
 
-  /* NO RECORD HERE, AND THE SAMPLE IS DRAWN EXACTLY AS BEFORE. A refusal of any other kind is the
-     record's answer, so the shell draws nothing of the sample and the screen says what it said. */
+  /* ANY OTHER REFUSAL IS THE RECORD'S ANSWER, a host nobody reached among them (a static host's fallback page, a
+     preview with no record behind it): the shell draws nothing and the screen says what it said. */
   const shell =
     booted.from === 'live'
       ? live.layoutOf(booted.boot)
-      : booted.from === 'sample'
-        ? live.sampleShell(boot(), INBOX.length)
-        : /* THE REFUSAL IS HANDED OVER RATHER THAN REMEMBERED. `refusedShell` keeps the last one as a
-             module fallback, and this call sits one `await` after `readBoot`: any `forget()` landing
-             in that window (`decide-write.ts`, `inbox-write.ts`, `news-live.ts`, which Home's own
-             mark reaches) nulls it, and a colleague who may not read the record would be told the
-             record is empty instead. The answer is right here, so it is passed. */
-          live.refusedShell(booted.from === 'refused' ? { code: booted.code, fix: booted.fix } : null);
+      : /* THE REFUSAL IS HANDED OVER RATHER THAN REMEMBERED. `refusedShell` keeps the last one as a
+           module fallback, and this call sits one `await` after `readBoot`: any `forget()` landing
+           in that window (`decide-write.ts`, `inbox-write.ts`, `news-live.ts`, which Home's own
+           mark reaches) nulls it, and a colleague who may not read the record would be told the
+           record is empty instead. The answer is right here, so it is passed. */
+        live.refusedShell({ code: booted.code, fix: booted.fix });
   /* THE RAIL SAYS THE RECORD'S NAME FOR EACH LIST, where its use case gives one (`loop/research-spark.md` S8). */
   if (booted.from === 'live') {
     const words = voice.labels();
@@ -108,14 +106,13 @@ export async function load({ url, fetch }): Promise<Shell & { spark: boolean }> 
      in front of them is not the one they want, and an empty record is the likeliest moment to
      want another: sending it to onboarding answers a question nobody asked and takes away the one
      control that could have fixed it. */
-  const declared =
-    booted.from === 'live' ? booted.boot.registers.length : booted.from === 'sample' ? shell.index.registers.length : null;
+  const declared = booted.from === 'live' ? booted.boot.registers.length : null;
   if (declared === 0 && !spared) redirect(307, at('/start', url.pathname));
 
   /* AND THE RECORDS THIS PERSON CAN REACH, WHICH `boot` CANNOT ANSWER: it names the record you are
-     in and no other, so the account is the only thing with the list. Asked on a live record only.
-     The sample's switcher already carries the sample's rows, and a static host answers this with its
-     404 page, which would put a sentence about signing in under a record nobody signed in to.
+     in and no other, so the account is the only thing with the list. Asked on a live record only:
+     a static host answers this with its 404 page, which would put a sentence about signing in under
+     a record nobody signed in to.
 
      A REFUSAL IS CARRIED RATHER THAN SWALLOWED. The switcher keeps the row `boot` named and says why
      the rest are absent, in the host's own words. Saying nothing leaves a menu one row long, which
@@ -137,8 +134,8 @@ export async function load({ url, fetch }): Promise<Shell & { spark: boolean }> 
     } else if (listed.value.length > 0) shell.me = { ...shell.me, records: listed.value };
   }
 
-  /* A SAMPLE RECORD IS NEVER `true`, and neither is a refused one. The sample has no host behind it to ask, so a palette
-     over the sample never offers Spark, whatever the host serving the shell has configured. */
+  /* A REFUSED RECORD IS NEVER `true`: there is nobody signed in to it to ask Spark anything, so a palette over a refusal
+     never offers it, whatever the host serving the shell has configured. */
   const spark = booted.from === 'live' ? await (modelHere ??= askModel(api, fetch)) : false;
 
   return { ...shell, spark };

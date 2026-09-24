@@ -161,13 +161,17 @@ test('a public host nothing reaches is refused before anything is asked, and the
   assert.throws(() => checks(staged('B2'), 'production', crossed), /binds APP to braindog-alpha/);
 });
 
-test('the pinned demo turns the anonymous boot into a 200, and the check follows the file', () => {
+/* THE PUBLIC DEMO IS GONE (`loop/research-no-sample.md` A1), and with it the one var that turned the anonymous boot into
+   a 200. A file that still carries a well-formed `DEMO_RECORD` deploys a Worker that reads it nowhere, so the check has
+   to expect the 401 whatever the file says: a 200 there is a Worker older than the removal, or a door nobody meant. */
+test('the anonymous boot is 401 JSON whatever the file says, a leftover DEMO_RECORD included', () => {
   const pinned = structuredClone(staged('B2'));
   pinned.env.production.vars.DEMO_RECORD = 'rec_01J8ZK3Q7M0000000000000000';
   const boot = checks(pinned, 'production', BOTH_BOUND).find((c) => c.url.endsWith('/api/boot'));
   assert.ok(boot);
-  assert.equal(judge(boot, answer(200, json)), null);
-  assert.ok(judge(boot, answer(401, json)), 'a pinned demo that answers 401 is a deploy that lost its --var');
+  assert.equal(boot.expects, '401 JSON');
+  assert.equal(judge(boot, answer(401, json)), null);
+  assert.ok(judge(boot, answer(200, json)), 'an anonymous boot answered 200 and the check passed it');
 });
 
 test('the real files: the deploy step reads the site by default, and asks a site name exactly when that site binds its own environment\'s app', () => {

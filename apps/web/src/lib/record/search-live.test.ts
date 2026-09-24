@@ -1,13 +1,13 @@
 /**
- * `/search` against the record: the live answer drawn, the sample when there is no record, the
- * record's sentence for any other refusal, and nothing sent for a query with no words in it.
+ * `/search` against the record: the live answer drawn, the record's sentence for any refusal including
+ * no record at all, and nothing sent for a query with no words in it.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { iconFor, REGISTERS, search } from './api.ts';
+import { iconFor, REGISTERS } from './api.ts';
 import { groupsOf, othersOf, searcher, type Fetch } from './search-live.ts';
 
 const BASE = 'http://record.test';
@@ -59,22 +59,36 @@ test('the record answers, and its hits are drawn grouped by register, best first
   assert.equal(url.searchParams.get('q'), 'fenwick');
 });
 
-for (const [what, answer] of [
-  ['nothing answers', null],
-  ['the record says UNAUTHORIZED', () => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } })],
-  ['a static host answers a 404 page', () => new Response('<!doctype html><title>Not found</title>', { status: 404 })],
+/**
+ * NO RECORD IS A REFUSAL, AND THE SEEDED STUDIO'S HITS ARE NOT AN ANSWER (DIRECTION 26). This drew the in-browser
+ * sample's search for a 401, an unreachable host and a static host's 404 page, and remembered that for the tab, so a
+ * person whose session had lapsed searched a fictional studio's rows under their own record's address and was never
+ * asked again. Each case is now the refusal the record or the client gave, with its sentence, and the next query asks
+ * again the way any other refusal does.
+ */
+for (const [what, answer, fix] of [
+  ['nothing answers', null, /^The record could not be reached: /u],
+  ['the record says UNAUTHORIZED', () => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } }), /^Sign in again\.$/u],
+  ['a static host answers a 404 page', () => new Response('<!doctype html><title>Not found</title>', { status: 404 }), /^The record could not be reached: /u],
 ] as const)
-  test(`the sample's search is drawn when ${what}, and the tab does not ask again`, async () => {
+  test(`a search is refused when ${what}, never answered with the sample's hits`, async () => {
     const { io, sent } = host(answer);
     const find = searcher(BASE, io);
     const first = await find.find('a');
-    assert.equal(first.from, 'sample');
-    assert.deepEqual(first.value, search('a', Number.MAX_SAFE_INTEGER));
-    assert.ok(first.value.total > 0, 'the sample found nothing, so this proves nothing');
-    const second = await find.find('re');
-    assert.equal(second.from, 'sample');
-    assert.equal(sent.length, 1);
+    assert.equal(first.from, 'refused', `answered ${JSON.stringify(first).slice(0, 120)}`);
+    if (first.from !== 'refused') return;
+    assert.match(first.fix, fix);
+    assert.equal((await find.find('re')).from, 'refused');
+    assert.equal(sent.length, 2, 'the tab stopped asking the record after one refusal');
+    /* A QUERY WITH NO WORDS IS STILL NOTHING SENT AND NOTHING FOUND, on a record that refused the last one too. */
+    assert.deepEqual(await find.find('  '), { from: 'live', value: { hits: [], total: 0, groups: [] } });
   });
+
+test('the search reader reads nothing from the sample', () => {
+  const src = readFileSync(new URL('./search-live.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /\bsampleSearch\b|\bsearch as\b|'sample'/u);
+  assert.doesNotMatch(src, /\bnoRecord\b/u);
+});
 
 test('any other refusal is the record\'s own sentence, and the next query asks again', async () => {
   const fix = 'This key may not read that register.';

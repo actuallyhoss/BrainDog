@@ -197,12 +197,15 @@ for (const [what, answer] of [
   ['the record says UNAUTHORIZED', () => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } })],
   ['a static host answers a 404 page', () => new Response('<!doctype html><title>Not found</title>', { status: 404 })],
 ] as const)
-  test(`there is nothing to read when ${what}, and no sample under it`, async () => {
+  test(`the refusal is said in its own words when ${what}, and no sample under it`, async () => {
     const { io } = host(answer);
-    /* NOT `from: 'sample'`, WHICH IS WHAT EVERY OTHER LIVE READER ANSWERS HERE. The sample's pages
-       are the fictional studio's, and a body is the one thing that must never come from them. */
-    assert.deepEqual(await pagesReader(BASE, io).read(), { from: 'absent' });
-    assert.deepEqual(await pagesReader(BASE, io).readOne('money'), { from: 'absent' });
+    /* NOT `from: 'absent'` ANY MORE, WHICH EVERY CALLER TURNED INTO "the record could not be reached". That was
+       wrong for a 401: the record was reached and said to sign in. With no sample anywhere (DIRECTION 26) there is no
+       second meaning for these codes to carry, so they are the record's or the client's sentence like any other. */
+    for (const out of [await pagesReader(BASE, io).read(), await pagesReader(BASE, io).readOne('money')]) {
+      assert.equal(out.from, 'refused', `answered ${JSON.stringify(out)}`);
+      if (out.from === 'refused') assert.match(out.fix, /^(Sign in again\.|The record could not be reached: .+)$/u);
+    }
   });
 
 test("any other refusal is the record's own sentence, on the list and on a page", async () => {

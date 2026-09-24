@@ -1,9 +1,9 @@
 /**
- * The Worker's doors, in order: a bearer, the session cookie, the public demo, and nothing.
+ * The Worker's doors, in order: a bearer, the session cookie, and nothing.
  *
  * THE ONE PROPERTY THAT MATTERS MOST IS THE NEGATIVE ONE. A cookie that names no session is a 401 that clears
- * it, even on the one request the demo would otherwise answer: somebody who thinks they are signed in and is
- * shown the sample is being shown somebody else's numbers as their own.
+ * it: somebody who thinks they are signed in is never let through on a session that is gone. And a request that
+ * presents nothing is a 401 as well, at the root and under a slug, because there is no public record behind it.
  */
 
 import { test } from 'node:test';
@@ -16,7 +16,6 @@ import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts'
 import { bearerOf, doorOf, withCookie, type BearerDeps, type Deps, type Held } from '../src/session.ts';
 
 const ORIGIN = 'https://app.brain.dog';
-const PINNED = 'rec_01J8ZC0000000000000000000A';
 const MINE = 'rec_01J8ZC0000000000000000000B';
 const SID = 'S'.repeat(43);
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -28,7 +27,6 @@ function deps(o: { session?: AuthResult<Who>; held?: Held | null } = {}) {
   const asked: string[] = [];
   const d: Deps = {
     origin: ORIGIN,
-    demo: PINNED,
     session: async () => (asked.push('session'), o.session ?? { status: 200, body: WHO }),
     access: async (record) => (asked.push(`access ${record}`), o.held === undefined ? OWNER : o.held),
   };
@@ -57,7 +55,7 @@ test('A LIVE COOKIE IS THE PERSON, on the record their session names, with the p
   assert.deepEqual(asked, ['session', `access ${MINE}`]);
 });
 
-test('A COOKIE THAT NAMES NO SESSION IS A 401 THAT CLEARS IT, NEVER THE DEMO, even for the read the demo serves', async () => {
+test('A COOKIE THAT NAMES NO SESSION IS A 401 THAT CLEARS IT, even for a read', async () => {
   const dead = deps({ session: { status: 401, refusal: { code: 'UNAUTHORIZED', fix: 'That did not sign you in.' }, session: 'clear' } });
   assert.deepEqual(await doorOf(at('/api/boot', { headers: cookie }), dead.d), {
     door: 'refused',
@@ -94,13 +92,10 @@ test('somebody signed in and no longer on the record is 403, and so is somebody 
   assert.equal(none.door === 'refused' ? none.status : 0, 403);
 });
 
-test('NOTHING PRESENTED: the demo for a read, and the ordinary 401 for anything else', async () => {
+test('NOTHING PRESENTED IS THE ORDINARY 401, for a read and for anything else', async () => {
   const { d, asked } = deps();
-  const demo = await doorOf(at('/api/boot'), d);
-  assert.equal(demo.door, 'demo');
-  assert.equal(demo.door === 'demo' ? demo.record : '', PINNED);
+  assert.deepEqual(await doorOf(at('/api/boot'), d), { door: 'refused', status: 401 });
   assert.deepEqual(await doorOf(at('/api/create', { method: 'POST', body: '{}' }), d), { door: 'refused', status: 401 });
-  assert.deepEqual(await doorOf(at('/api/boot'), { ...d, demo: undefined }), { door: 'refused', status: 401 });
   assert.deepEqual(asked, [], 'the Directory was asked about a request with no cookie');
 });
 
@@ -129,7 +124,6 @@ async function named() {
   const accessed: string[] = [];
   const deps: Deps = {
     origin: ORIGIN,
-    demo: PINNED,
     session: (sid, slug) => d.auth({ flow: 'session', sid, ...(slug === undefined ? {} : { slug }) }) as Promise<AuthResult<Who>>,
     access: async (record) => (accessed.push(record), OWNER),
   };
@@ -160,12 +154,11 @@ test('A SLUG THAT IS NOT THEIRS AND ONE NOBODY HOLDS ARE THE SAME 403, AND THE R
   assert.deepEqual(accessed, [], 'a record was addressed for a slug the Directory refused');
 });
 
-test('UNDER A SLUG THE DEMO NEVER ANSWERS, because the sample dressed as acme is somebody else’s numbers as acme’s', async () => {
+test('NOTHING PRESENTED IS 401 AT THE ROOT AND UNDER A SLUG, and the Directory is not asked either way', async () => {
   const { d, asked } = deps();
   assert.deepEqual(await doorOf(at('/api/boot'), d, 'acme'), { door: 'refused', status: 401 });
+  assert.deepEqual(await doorOf(at('/api/boot'), d, null), { door: 'refused', status: 401 });
   assert.deepEqual(asked, [], 'the Directory was asked about a request with no cookie');
-  /* AND WITHOUT A SLUG IT STILL DOES, which is `brain.dog/app` for a stranger. */
-  assert.equal((await doorOf(at('/api/boot'), d, null)).door, 'demo');
 });
 
 test('A BEARER FOR ONE RECORD UNDER ANOTHER RECORD’S SLUG IS 403, AND NOTHING IS PICKED FOR IT', async () => {

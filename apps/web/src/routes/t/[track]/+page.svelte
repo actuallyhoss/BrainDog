@@ -24,15 +24,12 @@
   import { copy } from '$lib/copy.ts';
   import {
     DOM_CAP,
-    NOW,
     REGISTERS,
-    ROWS,
     actorOf,
     display,
     healthLabel,
     healthTone,
     healthOf,
-    jobOf,
     labelOf,
     runsIn,
     updatesIn,
@@ -51,35 +48,32 @@
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
+  import { closed, opened } from '../../../lib/ui/screen.svelte.ts';
   import { healthChoices, healthSaid } from './health.ts';
 
   /**
-   * ON A LIVE RECORD THIS THREAD IS THE RECORD'S, and nothing of the sample is mixed into it.
+   * THIS THREAD IS THE RECORD'S, and nothing of the sample is mixed into it.
    *
    * Every block on this screen used to come from the built-in sample whatever record was open, so
    * somebody signed into their own record read another business's updates under their own thread's
    * name, with nothing on the page to doubt. The five registers it draws from are all readable
    * already: `tracks`, `updates`, `tasks` and `things` are declared, and `session` is the kernel's.
    *
-   * `sample` IS A LIVE SHELL WHOSE READ FOUND NO RECORD, which draws the sample as before. A refusal
-   * is the record's own sentence, and the sample is not drawn under it: a record that said no is
-   * still a record, so the sample would be a lie about it.
+   * A REFUSAL IS THE RECORD'S OWN SENTENCE, whichever it is. A read that found no record drew the
+   * sample's thread here until DIRECTION 26 took the sample away; it is a refusal like any other now.
    *
    * THE READ IS FOR THE WHOLE RECORD RATHER THAN FOR ONE THREAD, so moving between threads on one
    * record costs nothing and the component is not re-read when the address changes.
    */
   let got = $state<Opened | null>(null);
-  const fromRecord = $derived(route.data.live && got?.from === 'live');
+  const fromRecord = $derived(got?.from === 'live');
   const refused = $derived(got?.from === 'refused' ? got.fix : null);
-  /** Nothing is drawn until the record has answered, or the sample would flash over a live thread. */
-  const answered = $derived(!route.data.live || got !== null);
-  const rows: Record<string, Entry[] | undefined> = $derived(
-    fromRecord && got?.from === 'live' ? got.thread : ROWS,
-  );
-  /* THE CLOCK THE AGES ARE READ AGAINST: the reader's on a live record, the sample's frozen one
-     otherwise. An update's staleness and whether a run is working now are both measured from it. */
-  const clock = $derived(fromRecord && got?.from === 'live' ? got.now : NOW);
+  /** Nothing is drawn until the record has answered. */
+  const answered = $derived(got !== null);
+  const rows: Record<string, Entry[] | undefined> = $derived(got?.from === 'live' ? got.thread : {});
+  /* THE CLOCK THE AGES ARE READ AGAINST: the reader's, as of the read. An update's staleness and
+     whether a run is working now are both measured from it. */
+  const clock = $derived(got?.from === 'live' ? got.now : Date.now());
 
   const seq = $derived(Number(route.params.track ?? 0));
   const track = $derived((rows.tracks ?? []).find((t) => t.seq === seq));
@@ -109,16 +103,11 @@
    * THE SCREEN SAYING IT HAS SETTLED, and on a live record that is the read coming back.
    *
    * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
-   * from a shell that has fetched nothing. On the sample this screen still computes its content
-   * synchronously, so it says so as it always did. On a record it now fetches, and the claim is
-   * bracketed by `opened()` and `closed()` instead: a call still out takes the attribute away, which
-   * is the line the old comment here promised would be honoured the day this screen started asking.
+   * from a shell that has fetched nothing. The claim is bracketed by `opened()` and `closed()`: a
+   * call still out takes the attribute away, which is the line the old comment here promised would be
+   * honoured the day this screen started asking. The sample's synchronous claim went with it.
    */
   $effect(() => {
-    if (!route.data.live) {
-      drew('ready');
-      return;
-    }
     /* UNTRACKED, or the effect reads the pending count it writes, and every answer opens the read again. */
     const at = untrack(opened);
     let ok = false;
@@ -134,9 +123,9 @@
   /**
    * POSTING AN UPDATE, THE ONE WRITE THIS SCREEN HAS.
    *
-   * ON A RECORD IT WRITES, AND ON THE SAMPLE IT SAYS SO. The branch is `fromRecord`, the same one
-   * the rows and the clock above are chosen by: the built-in thread belongs to a studio nobody
-   * signed into, so the button there keeps the sentence it has always shown.
+   * IT WRITES, OR IT DOES NOTHING. The thread is drawn only once the record has answered, so the
+   * button is only ever pressed over a record's thread; the sample's "would be posted" toast went
+   * with the sample.
    *
    * THE READER STAYS READ-ONLY. `track-live.ts` is a `TrackReader` by design, so this goes through
    * `rows-write.ts`, the module the list and the row already write through, rather than widening a
@@ -156,11 +145,7 @@
   let writer: RowWriter | null = null;
 
   function startPost() {
-    if (!fromRecord) {
-      toasts.push(copy.notWritten(copy.updateWouldBePosted));
-      return;
-    }
-    composing = true;
+    if (fromRecord) composing = true;
   }
 
   async function post(e: SubmitEvent) {
@@ -214,14 +199,12 @@
 
 {#if refused !== null}
   <div class="page">
-    <!-- THE RECORD'S OWN SENTENCE, AND THE SAMPLE IS NOT DRAWN UNDER IT. A record that answered with
-         a refusal is still a record, so falling back to the built-in thread here would be inventing
-         one for somebody who has their own. A record without the work pack has no `tracks` at all,
-         and being told so is the honest answer to an address that names one. -->
+    <!-- THE RECORD'S OWN SENTENCE. A record without the work pack has no `tracks` at all, and being
+         told so is the honest answer to an address that names one. -->
     <Empty kind="error" heading title={refused} />
   </div>
 {:else if !answered}
-  <!-- Bars until the record has answered, so the sample never flashes over a live thread. -->
+  <!-- Bars until the record has answered. -->
   <Waiting head />
 {:else if !track}
   <div class="page">
@@ -248,9 +231,6 @@
       <!-- The health, and it is a CLAIM SOMEBODY MADE rather than a computed status: the chip says
            what the newest update said, and the thread below it says who said so and when. -->
       <Chip label={healthLabel(health, REGISTERS.updates)} tone={healthTone(health.health)} />
-      <!-- ON A RECORD THIS OPENS THE BOX, AND ON THE SAMPLE IT SAYS WHAT WOULD HAPPEN. Both halves
-           are in `startPost`, so the branch is stated once rather than in the markup and again in
-           the handler. -->
       <Button weight="primary" onclick={startPost}>
         <Icon name="plus" size="s" />
         {copy.postUpdate}
@@ -322,10 +302,8 @@
       {:else}
         <ul class="rows">
           {#each runs.slice(0, DOM_CAP) as s (s.seq)}
-            <!-- A JOB IS THE SAMPLE'S AND ONLY THE SAMPLE'S. Nothing answers with a run's tool calls,
-                 so a run on a live record has no transcript to open, and the door is not drawn rather
-                 than opening somebody else's worked example under this record's run. -->
-            {@const job = fromRecord ? null : jobOf(s)}
+            <!-- NO DOOR TO A RUN'S JOB. Nothing answers with a run's tool calls, so a run on a record
+                 has no transcript to open; the door was drawn only on the sample's worked examples. -->
             <li>
               <a class="row" href={at(`/r/session/${s.seq}`)}>
                 <span class="dot" data-live={workingAt(s, clock)}></span>
@@ -334,12 +312,6 @@
                   <span class="row-sub">{s.fields.agent} · {since(String(s.fields.last_seen), clock)}</span>
                 </span>
               </a>
-              <!-- A RUN SAYS WHAT IT IS DOING; ITS JOB IS WHAT IT IS DOING IT WITH, the tool calls in
-                   order with what each one answered. This link is the job screen's door. Only on a run
-                   a job names. -->
-              {#if job}
-                <a class="row-run tap" href={at(`/jobs/${job.id}`)}>{copy.watchRun}</a>
-              {/if}
             </li>
           {/each}
         </ul>
@@ -495,14 +467,6 @@
 
   .row-sub {
     color: var(--dim);
-    font-size: var(--t-xs);
-  }
-
-  /* Its own line under the row rather than inside it: the row is a link to the session and a link
-     inside a link is not a thing HTML has. */
-  .row-run {
-    display: block;
-    padding: 0 var(--sp-3) var(--sp-2) var(--sp-6);
     font-size: var(--t-xs);
   }
 

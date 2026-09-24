@@ -4,16 +4,15 @@
  * A ROUTE-ONLY MODULE, loaded by the one screen that reads it, like `news-live.ts`: the client carries the route table
  * as a value.
  *
- * `UNREACHABLE` and `UNAUTHORIZED` mean there is no record here, and the screen draws the sample as it always did.
- * `ROUTE_UNKNOWN` is a record whose host is older than this read: there is a record, so nothing of the sample is drawn,
- * and there is no list of its own to draw either. Any other refusal is the record's own sentence. A live answer is drawn
- * from the answer and nothing else.
+ * `ROUTE_UNKNOWN` is a record whose host is older than this read: there is a record, and no list of its own to draw.
+ * Any other refusal is the record's own sentence, `UNREACHABLE` and `UNAUTHORIZED` included: with no slug those two
+ * drew the sample's arrivals, and there is no sample now (DIRECTION 26). A live answer is drawn from the answer and
+ * nothing else.
  */
 
 import { createClient, type InboxLine } from '@braindog/client';
 
 import type { Fetch } from './boot-live.ts';
-import { noRecord } from './device.ts';
 import type { InboxItem } from './schema.ts';
 
 /** How many arrivals the Inbox asks for at once: the record's largest page. */
@@ -21,7 +20,6 @@ export const INBOX_PAGE = 200;
 
 export type InboxRead =
   | { from: 'live'; items: InboxItem[]; cursor: number | null }
-  | { from: 'sample' }
   | { from: 'unrouted' }
   | { from: 'refused'; fix: string };
 
@@ -49,7 +47,6 @@ export async function readInbox(base: string, io?: Fetch, cursor?: number): Prom
   const out = await client.inbox({ limit: INBOX_PAGE, ...(cursor === undefined ? {} : { cursor }) });
   if (!out.ok) {
     const refusal = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'The record changed while it was being read.' };
-    if (noRecord(refusal.code)) return { from: 'sample' };
     if (refusal.code === 'ROUTE_UNKNOWN') return { from: 'unrouted' };
     return { from: 'refused', fix: refusal.fix };
   }

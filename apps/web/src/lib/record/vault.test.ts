@@ -12,10 +12,10 @@ import assert from 'node:assert/strict';
 import type { DeviceRow } from '@braindog/client';
 
 import { copy } from '../copy.ts';
-import { VAULT, VAULT_GRANTS, VAULT_OPENED } from './data.ts';
+import * as vault from './vault.ts';
 import {
   GLOBAL, VAULT_ALL_DAYS, VAULT_DAYS, answerLine, approve, asks, daysFor, holders, keysOf, namesOf, planOf, reprove, revoke,
-  reconnectOf, sampleGrants, sampleKeys, sampleNames, scopeName, words,
+  reconnectOf, scopeName, words,
 } from './vault.ts';
 
 const row = (over: Partial<DeviceRow>): DeviceRow => ({
@@ -43,9 +43,22 @@ test('a malformed code is refused before anything is sent', async () => {
   assert.equal(sent, 0);
 });
 
-test('with no record the demo says it cannot approve, and sends nothing', async () => {
-  assert.deepEqual(await approve('123456', null), { kind: 'demo' });
-  assert.equal(answerLine({ kind: 'demo' })?.line, copy.notOnDemo);
+/*
+ * WITH NO CLIENT THERE IS NOBODY SIGNED IN TO APPROVE AS, and signing in is the way forward. This answered
+ * `{ kind: 'demo' }` and drew "The demo has no account", which was true only while `/app` with no session was
+ * the sample record; with the sample gone (DIRECTION 26) the same state is a person who has to sign in.
+ */
+test('with no client the answer is to sign in, and nothing is sent', async () => {
+  const answer = await approve('123456', null);
+  assert.deepEqual(answer, { kind: 'signin' });
+  assert.equal(answerLine(answer)?.line, copy.signInAgainWhy);
+  assert.notEqual(answerLine(answer)?.line, copy.notOnDemo);
+  /* A MALFORMED ENTRY IS STILL SAID FIRST, because it is the mistake the person can fix on this screen. */
+  assert.equal((await approve('12', null)).kind, 'malformed');
+});
+
+test('the sample is gone from this module: nothing here builds a vault that is not the record', () => {
+  assert.deepEqual(Object.keys(vault).filter((k) => /^sample/i.test(k)), []);
 });
 
 test('the code is sent without its separators, and each answer is read the way Settings reads it', async () => {
@@ -96,6 +109,9 @@ test('a revoke replaces the one row, or says why not', async () => {
   assert.deepEqual(done.rows.map((r) => r.status), ['active', 'revoked']);
   const refused = await revoke({ revokeDevice: async () => ({ ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again.' } }) }, rows, 'b');
   assert.deepEqual(refused, { ok: false, fix: 'Sign in again.' });
+  /* A CONFLICT CARRIES NO SENTENCE, and the one it borrowed was the demo's, drawn over a live record. */
+  const raced = await revoke({ revokeDevice: async () => ({ ok: false, conflict: {} }) }, rows, 'b');
+  assert.deepEqual(raced, { ok: false, fix: copy.writeRaced });
 });
 
 /* ── the machines ── */
@@ -160,33 +176,6 @@ test('NOTHING A PERSON READS CARRIES A VALUE, A CODE OR A HANDLE', () => {
   for (const line of drawn) assert.ok(!line.includes(dash), 'no em dash on screen');
   assert.match(words.noKeysHow, /braindog keys exec <label> -- <command>/, 'the one way the CLI reads a key is the one named');
   assert.doesNotMatch(words.noKeysHow, /keys get/);
-});
-
-/* ── the sample ── */
-
-test('the sample draws one request, machines for a project and for global, and sealed and index keys', () => {
-  const machines = sampleGrants(VAULT_GRANTS);
-  const names = sampleNames(VAULT_GRANTS, VAULT_OPENED);
-  if (VAULT_GRANTS.length === 0) return;
-  assert.equal(asks(machines).length, 1);
-  assert.ok(holders(machines).some((m) => m.scope === GLOBAL));
-  assert.ok(holders(machines).some((m) => scopeName(m.scope, names) === 'Kiln'));
-  const keys = sampleKeys(VAULT, VAULT_OPENED);
-  assert.equal(keys.length, VAULT.length);
-  assert.ok(keys.some((k) => k.sealed) && keys.some((k) => !k.sealed));
-  assert.ok(keys.some((k) => k.project === null) && keys.some((k) => k.project !== null));
-  for (const id of Object.keys(VAULT_OPENED)) assert.ok(VAULT.some((c) => c.id === id), `${id} is not a sample key`);
-});
-
-test('an active sample grant ends when its scope says, and a pending one in ten minutes', () => {
-  const [pending, project, global] = sampleGrants([
-    { id: 'a', name: 'A', state: 'pending', project: 'Kiln', at: '2026-09-15T12:00:00.000Z', lastSeen: null },
-    { id: 'b', name: 'B', state: 'active', project: 'Kiln', at: '2026-09-01T12:00:00.000Z', lastSeen: null },
-    { id: 'c', name: 'C', state: 'active', project: null, at: '2026-09-01T12:00:00.000Z', lastSeen: null },
-  ]);
-  assert.equal(pending?.expires, '2026-09-15T12:10:00.000Z');
-  assert.equal(project?.expires, '2026-10-01T12:00:00.000Z');
-  assert.equal(global?.expires, '2026-09-08T12:00:00.000Z');
 });
 
 /* ── the pack offered on connect ── */

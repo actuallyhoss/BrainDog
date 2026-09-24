@@ -1,7 +1,7 @@
 /**
  * The build id's door: one public path, answered by the Worker rather than by the shell.
  *
- * THE DECISION IS IN `route.ts` SO IT CAN BE TESTED AT ALL, for the reason `demo.test.ts` gives:
+ * THE DECISION IS IN `route.ts` SO IT CAN BE TESTED AT ALL, for the reason `route.ts` is free of `cloudflare:`:
  * `src/index.ts` imports `cloudflare:workers` and cannot be loaded by `node --test`, so the two
  * lines in it that matter here are read as text.
  */
@@ -26,7 +26,7 @@ test('the Worker answers it before any door is asked, and through the helper tha
   const src = readFileSync(fileURLToPath(new URL('../src/index.ts', import.meta.url)), 'utf8');
   const at = src.indexOf('servesBuild(url.pathname)');
   assert.ok(at > 0, 'route() does not branch on the build id, so the app shell answers it with a 200');
-  assert.ok(at < src.indexOf('doorOf(request'), 'a cookie or the demo is read for a path that needs neither');
+  assert.ok(at < src.indexOf('doorOf(request'), 'a cookie is read for a path that needs none');
 
   /* AN UNSET BUILD SAYS SO RATHER THAN SAYING `""`. A deploy that forgot `--var` leaves the empty
      string, and a gate comparing against it reads a tuple that is merely unequal instead of a

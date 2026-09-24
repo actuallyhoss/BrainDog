@@ -5,12 +5,14 @@
   BrainDog is used. Each suggestion says whether it is new, waiting on Decide or answered, and links there once asked. The
   press puts the new ones on Decide and changes nothing else: accepting is Decide's, and only the owner's.
 
-  THE SAMPLE HAS NO USE TO READ, so it says what Spark would do on a real record rather than inventing a reading.
+  THE RECORD IS ASKED WHATEVER THE SHELL SAYS. This screen used to look at `page.data.live` first and, on a shell that was
+  not live, say "This is the sample" without asking anything. With no sample (DIRECTION 26) a shell that is not live is a
+  record that refused or could not be reached, and `readSpark` hands back that refusal in the record's own words, which
+  is the sentence this screen already draws for any other refusal.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
   import { onMount } from 'svelte';
-  import { page } from '$app/state';
   import { createClient } from '@braindog/client';
   import { titleOf } from '$lib/title.ts';
   import { read } from '$lib/data/record.ts';
@@ -24,7 +26,7 @@
   import { drew } from '../../lib/ui/screen.svelte.ts';
 
   let client: SparkClient | null = null;
-  let phase = $state<'reading' | 'ready' | 'sample' | 'refused'>('reading');
+  let phase = $state<'reading' | 'ready' | 'refused'>('reading');
   let reading = $state<Reading | null>(null);
   let fix = $state('');
   let busy = $state(false);
@@ -46,16 +48,12 @@
   }
 
   onMount(() => {
-    if (!page.data.live) {
-      phase = 'sample';
-      return;
-    }
     client = createClient({ base: apiBase() }) as unknown as SparkClient;
     void read(load);
   });
 
   $effect(() => {
-    if (phase === 'ready' || phase === 'sample') drew('ready');
+    if (phase === 'ready') drew('ready');
   });
 
   async function ask() {
@@ -80,9 +78,7 @@
 
 <PageHead icon="star" title={words.title} />
 <div class="page">
-  {#if phase === 'sample'}
-    <Empty kind="no-data-yet" title={words.sample} body={words.sampleBody} />
-  {:else if phase === 'refused'}
+  {#if phase === 'refused'}
     <Empty kind="no-permission" title={fix} />
   {:else if phase === 'ready' && reading}
     <div class="spark-intro">

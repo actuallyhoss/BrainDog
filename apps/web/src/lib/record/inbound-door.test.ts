@@ -68,19 +68,19 @@ test('and the Worker, which has the door, says so without being signed in to', a
   assert.equal(await mintsMail(BASE, wrongMethod.io), true);
 
   /* AND EVERY OTHER REFUSAL IS ABOUT THE CALLER, NOT ABOUT THE HOST, so none of them takes a
-     control away. A session that ended, and the public demo, both say something about who is
-     asking; hiding the mint on either would teach a signed-out owner that their host cannot
-     forward mail. */
+     control away. A session that ended, and a sign-in too old for this door, both say something
+     about who is asking; hiding the mint on either would teach a signed-out owner that their host
+     cannot forward mail. */
   const signedOut = host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in.' } }));
   assert.equal(await mintsMail(BASE, signedOut.io), true);
-  const demo = host(() => json(403, { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open the app and sign in as an owner of this record to change where its mail arrives.' } }));
-  assert.equal(await mintsMail(BASE, demo.io), true);
+  const stale = host(() => json(403, { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open the app and sign in as an owner of this record to change where its mail arrives.' } }));
+  assert.equal(await mintsMail(BASE, stale.io), true);
 });
 
 test('a host that answered nothing this screen can read is not a host that said no', async () => {
   /* A static host answers the SPA shell to a path it does not route, so the body is HTML. `press` in
-     `inbound-write.ts` reads that as the sample, and the sample's answer to a press is `notOnDemo` —
-     which is a sentence about there being no record here, and it needs the button to reach it. */
+     `inbound-write.ts` reads that as a record not reached and says so, and that sentence is only
+     said to somebody who could press the button. */
   const shell = host(() => new Response('<!doctype html>', { status: 200, headers: { 'content-type': 'text/html' } }));
   assert.equal(await mintsMail(BASE, shell.io), true);
   /* And no answer at all: a host that could not be reached has said nothing about what it serves. */

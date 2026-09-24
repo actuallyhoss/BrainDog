@@ -1,12 +1,13 @@
 /**
- * The shell's one read: the record's `boot`, or the sample when there is no record here.
+ * The shell's one read: the record's `boot`, or the refusal it answered instead.
  *
  * LOADED DYNAMICALLY, beside `api.ts`, and never from the root layout's entry chunk. `@braindog/client` carries the
  * route table as a value, and the entry chunk has half a kilobyte of room.
  *
- * `UNREACHABLE` and `UNAUTHORIZED` mean there is no record here (a static host's fallback page, or a Worker with no
- * demo record), and the shell draws the sample exactly as it did. Any other refusal is the record's own answer, and the
- * shell draws itself empty so the screen under it can say what the record said.
+ * EVERY REFUSAL IS THE RECORD'S ANSWER, AND THERE IS NO SAMPLE BEHIND ANY OF THEM. `UNREACHABLE` and `UNAUTHORIZED` at
+ * an address with no slug used to draw the sample business in the browser; the app only ever shows a real record now
+ * (DIRECTION 26). The root layout sends a 401 to sign-in, and for anything else the shell draws itself empty so the
+ * screen under it can say what the record said, or that no record answered at all.
  *
  * KEPT FOR THE TAB once decided, the way `lib/data/record.ts` always kept its probe: the layout's `load` runs on every
  * navigation, and the shell must not cost a request each time. A refusal is not kept, because it is about the record's
@@ -17,24 +18,23 @@ import { createClient, type Boot, type ClientOptions, type Cursor, type EventLin
 import { railRoom } from '@braindog/kernel';
 import { useCaseName } from '@braindog/seed/usecases/names';
 
-import { iconFor, NOW, PACKS, REGISTERS, setupSaid, whoDid, type boot, type NavEntry } from './api.ts';
+import { iconFor, PACKS, REGISTERS, setupSaid, whoDid, type boot, type NavEntry } from './api.ts';
 import { copy } from '../copy.ts';
 import type { SwitcherRow } from './switcher.ts';
-import { noRecord } from './device.ts';
-import { QUEUE } from './data.ts';
 import { noteOf } from './history-live.ts';
 import type { NewsItem } from './schema.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 
-export type Booted = { from: 'live'; boot: Boot } | { from: 'sample' } | { from: 'refused'; code: string; fix: string };
+export type Booted = { from: 'live'; boot: Boot } | { from: 'refused'; code: string; fix: string };
 
+/* THE SHAPE IS STILL `api.ts` `boot`'s, as a type and nothing else: wave B2 of `loop/research-no-sample.md` moves it. */
 type Sample = ReturnType<typeof boot>;
 
 /**
- * What the root layout hands every screen: the sample's shape, whichever source drew it.
+ * What the root layout hands every screen: the record's `boot`, or an empty shell over a refusal.
  *
- * `live` says which, `now` is the clock a screen reads ages against (the record's, or the sample's frozen one), and
+ * `now` is the clock a screen reads ages against (the record's, or this browser's over a refusal), and
  * `upTo` is the newest line of what is new, which is what marking it all read sends.
  */
 export type Shell = Omit<Sample, 'me'> & {
@@ -54,7 +54,7 @@ export type Shell = Omit<Sample, 'me'> & {
      * them for the owner of an empty record. This is the fact the fallback threw away.
      */
     lists: string[] | null;
-    /** A person's own rail on this record (`nav-prefs.svelte.ts`). Absent on the sample and for a token. */
+    /** A person's own rail on this record (`nav-prefs.svelte.ts`). Absent for a token. */
     prefs?: { 'nav.order'?: string[]; 'nav.hidden'?: string[] };
   };
   /**
@@ -69,7 +69,7 @@ export type Shell = Omit<Sample, 'me'> & {
   /**
    * Which host answered `boot`, when it said: Billing reads it before it falls back to asking the mail door.
    *
-   * ABSENT ON THE SAMPLE AND ON A HOST OLDER THAN THE FIELD. `DEPLOYMENT.kind` is the sample's variant and reads
+   * ABSENT ON A HOST OLDER THAN THE FIELD. `DEPLOYMENT.kind` is the test fixture's variant and reads
    * `self-host` on the Cloud build, so it is not a stand-in for this (`routes/settings/billing.ts`).
    */
   host?: 'cloud' | 'self-host' | undefined;
@@ -86,7 +86,7 @@ export type Shell = Omit<Sample, 'me'> & {
    * this reader cannot open: 50 words and one control, beside the owner's 489 and 27 on that same
    * record in the same minute.
    *
-   * Absent on every shell drawn over a record that answered, and on the sample.
+   * Absent on every shell drawn over a record that answered.
    */
   refused?: { code: string; fix: string } | undefined;
   /**
@@ -99,12 +99,12 @@ export type Shell = Omit<Sample, 'me'> & {
   lists: { id: string; name: string }[];
   /**
    * THE SLUG OF EVERY PAGE THIS CALLER MAY OPEN, in the rail or not, from `boot`. Home asks for its use case's page only when
-   * the record holds it, so a use case with no Home page is not asked for one on every load. Empty for the sample.
+   * the record holds it, so a use case with no Home page is not asked for one on every load.
    */
   pages: string[];
   /**
    * EACH PERSON ON THE RECORD BY NAME, by id, when `boot` sent them: to the owner and to a member who may read People. Empty
-   * for anybody else and for the sample, and a person it does not name is Someone on this record.
+   * for anybody else, and a person it does not name is Someone on this record.
    */
   names: Record<string, string>;
   inbox: number;
@@ -132,15 +132,6 @@ let keptFor = '';
  */
 let refusal: { code: string; fix: string } | null = null;
 
-/** The path of a base, `https://brain.dog/app/acme` read as `/app/acme`; a base with no origin is taken as a path. */
-const pathOf = (base: string): string => {
-  try {
-    return new URL(base).pathname;
-  } catch {
-    return base;
-  }
-};
-
 export function readBoot(base: string, io?: Fetch): Promise<Booted> {
   if (keptFor !== base) kept = null;
   keptFor = base;
@@ -150,9 +141,9 @@ export function readBoot(base: string, io?: Fetch): Promise<Booted> {
     refusal = null;
     if (out.ok) return { from: 'live', boot: out.value };
     const said = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'The record changed while it was being read.' };
-    /* UNDER A SLUG NEITHER REFUSAL IS THE SAMPLE (`noRecord`), so a 401 there is handed to the layout, which asks for
-       sign-in rather than drawing the sample business dressed as the record in the address. */
-    if (noRecord(said.code, pathOf(base))) return { from: 'sample' };
+    /* NOT KEPT, THE 401 LEAST OF ALL. This line used to keep a 401 or an unreached host at the bare `/app` as the
+       sample, for the tab, and so the first load after signing in was handed The Studio with no request made
+       (`loop/research-first-sign-in.md` friction 1). A refusal kept nothing then either; now it is every such answer. */
     kept = null;
     refusal = { code: said.code, fix: said.fix };
     return { from: 'refused', code: said.code, fix: said.fix };
@@ -571,19 +562,4 @@ export function layoutOf(b: Boot): Shell {
 export const refusedShell = (said: { code: string; fix: string } | null = refusal): Shell => ({
   ...layoutOf({ registers: [], now: new Date().toISOString() }),
   ...(said ? { refused: said } : {}),
-});
-
-/** The sample's shell, with what only a shell carries. */
-export const sampleShell = (sample: Sample, inbox: number): Shell => ({
-  ...sample,
-  /* THE SAMPLE IS AN OWNER'S RECORD, so nobody reading it holds lists instead of the record. */
-  me: { ...sample.me, lists: null },
-  lists: Object.entries(REGISTERS).map(([id, r]) => ({ id, name: r.name })),
-  pages: [],
-  names: {},
-  inbox,
-  open: QUEUE.length,
-  now: NOW,
-  live: false,
-  upTo: null,
 });

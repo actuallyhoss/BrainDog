@@ -1,16 +1,17 @@
 /**
- * A declared page on `/p/<slug>`, read from the record, with the sample when there is no record.
+ * A declared page on `/p/<slug>`, read from the record, and only from the record.
  *
  * A ROUTE-ONLY MODULE, like `row-live.ts`: the client carries the route table as a value.
  *
- * `UNREACHABLE` and `UNAUTHORIZED` mean there is no record here, and the page reads the sample as it
- * always did. That is kept for the tab, so a static host is not asked again on every page. A page the
- * record does not have is `missing`, with the titles of the pages it does have. Any other refusal is
- * the record's own sentence.
+ * A REFUSAL IS THE RECORD'S SENTENCE, `UNREACHABLE` AND `UNAUTHORIZED` INCLUDED. Those two drew the
+ * in-browser sample's page and kept that for the tab, so a person whose session lapsed read the seeded
+ * studio's Desk under their own record's address until they reloaded (DIRECTION 26 removed the sample).
+ * Every page now asks, and the next one asks again. A page the record does not have is `missing`, with
+ * the addresses of the pages it does have.
  *
  * A LIVE PAGE IS DRAWN FROM THE ANSWER AND NOTHING ELSE. Each block the record sent becomes the shape
  * the page's drawing already reads. A block this build cannot draw from that answer carries one plain
- * sentence instead, and is never filled from the sample.
+ * sentence instead, and is never filled from anything the record did not send.
  *
  * THE DECLARATIONS ARE THE SEED'S COPY, as they are for the list and the row (`remote.ts` says why):
  * a register's labels, a metric's format and target line.
@@ -41,7 +42,6 @@ import {
 import { linkOf } from './blocks.ts';
 import { METRICS } from './declared.ts';
 import { readBoot } from './boot-live.ts';
-import { noRecord } from './device.ts';
 import { format, fxNote, hrefFor, noteOf, partsShown, partsText, targetSaid, walksNote, withParam, type MetricDecl } from './metrics.ts';
 import { entryOf, learn, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
 import { REDUCES, SUMS, type PageBlock, type PageDecl } from './schema.ts';
@@ -186,7 +186,6 @@ export type LivePage = { page: LivePageDecl; blocks: LiveBlock[] };
 
 export type Opened =
   | { from: 'live'; page: LivePage; now: number }
-  | { from: 'sample' }
   | { from: 'missing'; held: { address: string; title?: string }[] }
   | { from: 'refused'; fix: string };
 
@@ -875,7 +874,6 @@ export type PageReader = { read(slug: string): Promise<Opened> };
 export function pageReader(base: string, io?: Fetch, clock: () => number = () => Date.now()): PageReader {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   const maps = new Map<string, RefMap>();
-  let absent = false;
 
   /* A REF ARRIVES AS THE TARGET ROW'S ULID, so each register a ref points at is walked once and kept,
      as the row reader does. A register this reader may not list is left out, and its refs draw as ids. */
@@ -909,14 +907,9 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
 
   return {
     async read(slug) {
-      if (absent) return { from: 'sample' };
       const out = await client.page(slug);
       if (!out.ok) {
         if (!('refusal' in out)) return { from: 'refused', fix: liveWords.changed };
-        if (noRecord(out.refusal.code)) {
-          absent = true;
-          return { from: 'sample' };
-        }
         if (out.refusal.code === 'PAGE_UNKNOWN') {
           const listed = await client.pages();
           return { from: 'missing', held: listed.ok ? heldOf(listed.value) : [] };

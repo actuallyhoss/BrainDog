@@ -1,10 +1,11 @@
 /**
- * The Inbox's read against the record: a live page, the sample when there is no record, no list from a host that has
- * no such read, and the record's own sentence for anything else.
+ * The Inbox's read against the record: a live page, no list from a host that has no such read, and the record's own
+ * sentence for anything else, including the two answers that used to draw the sample.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import type { Fetch } from './boot-live.ts';
 import { INBOX } from './data.ts';
@@ -61,12 +62,23 @@ test("a live inbox is the record's page and nothing of the sample", async () => 
   assert.equal(sent[1]!.searchParams.get('cursor'), '3', 'the page below is asked for by the cursor the page above gave');
 });
 
-test('no record here draws the sample: nothing answering, a sign-in wall, and a 404 that is not JSON', async () => {
-  assert.deepEqual(await readInbox(BASE, host(null).io), { from: 'sample' });
-  assert.deepEqual(await readInbox(BASE, host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in.' } })).io), { from: 'sample' });
-  assert.deepEqual(await readInbox(BASE, host(() => new Response('<h1>Not found</h1>', { status: 404, headers: { 'content-type': 'text/html' } })).io), {
-    from: 'sample',
-  });
+/* NO RECORD IS A REFUSAL NOW, NOT THE SAMPLE (DIRECTION 26). These three drew the studio's nine arrivals, with a rule
+   offer under each and two buttons that could only say nothing was saved. */
+test('no record here is a refusal: nothing answering, a sign-in wall, and a 404 that is not JSON', async () => {
+  assert.deepEqual(await readInbox(BASE, host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in.' } })).io), { from: 'refused', fix: 'Sign in.' });
+  for (const answer of [null, () => new Response('<h1>Not found</h1>', { status: 404, headers: { 'content-type': 'text/html' } })]) {
+    const out = await readInbox(BASE, host(answer).io);
+    assert.equal(out.from, 'refused');
+    assert.ok(out.from === 'refused' && out.fix.trim() !== '', 'a refusal with no sentence says nothing to the reader');
+  }
+});
+
+test('the Inbox screen draws the record or its refusal, and no control that cannot write', () => {
+  const page = readFileSync(new URL('../../routes/inbox/+page.svelte', import.meta.url), 'utf8');
+  /* THE SAMPLE'S ARRIVALS, ITS CLOCK AND ITS SOURCES were the screen's fallback. */
+  assert.doesNotMatch(page, /INBOX as SAMPLE|\bSOURCES\b|\bNOW\b|from === 'sample'/u, 'the Inbox reads the sample again');
+  /* A RULE OFFER HAS NO WRITE ON THE RECORD, so it is not drawn rather than drawn to toast that nothing was saved. */
+  assert.doesNotMatch(page, /notWritten|copy\.makeRule|copy\.notThisOne/u, 'a control with no write is drawn again');
 });
 
 test('a host with no inbox read draws no list, and any other refusal is the record sentence', async () => {

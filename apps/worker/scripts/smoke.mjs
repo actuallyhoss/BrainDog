@@ -28,13 +28,6 @@
 
 import { hostOf, siteBinding, siteConfig, wranglerConfig } from './provision-check.mjs';
 
-/**
- * `src/route.ts`'s record id shape, copied because this is plain JavaScript and cannot import it.
- * `demoRecord` there opens nothing for a value of any other shape, so a malformed `DEMO_RECORD` is
- * still the 401, and this check has to agree with it or it reports a correct deploy as broken.
- */
-const REC_ID = /^rec_[0-9A-HJKMNP-TV-Z]{26}$/;
-
 const typeOf = (answer) => answer.headers.get('content-type') ?? '';
 const isJson = (answer) => /application\/json/i.test(typeOf(answer));
 const isHtml = (answer) => /text\/html/i.test(typeOf(answer));
@@ -78,7 +71,6 @@ export function checks(config, name, site = siteConfig()) {
     );
   const legacy = String(vars.LEGACY_HOSTS ?? '').split(/[\s,]+/).map((h) => h.toLowerCase()).filter((h) => h.length > 0)[0] ?? null;
   const old = legacy ?? (own.has(host) ? host : null);
-  const demo = REC_ID.test(String(vars.DEMO_RECORD ?? ''));
 
   const list = [];
   for (const on of new Set([host, ...handed])) {
@@ -106,16 +98,17 @@ export function checks(config, name, site = siteConfig()) {
       {
         method: 'GET',
         url: `https://${on}/api/boot`,
-        expects: demo ? '200 JSON, the pinned demo' : '401 JSON',
+        /* ALWAYS 401. The public demo was the one var that made this a 200, and it is gone (`loop/research-no-sample.md`
+           A1): a file that still sets it deploys a Worker that reads it nowhere, so a 200 here is a Worker older than that. */
+        expects: '401 JSON',
         judge: (a) => {
-          const want = demo ? 200 : 401;
-          if (a.status === want && isJson(a)) return null;
+          if (a.status === 401 && isJson(a)) return null;
           if (a.status === 404 && !isJson(a))
             return shared ? `answered a 404 page, which is the site answering an API call: the deployed site on ${on} does not hand /api/* to this Worker`
             : `answered a 404 page on this Worker's own Custom Domain, which is something other than this Worker answering ${on}`;
           if (a.status === 401 && !isJson(a)) return 'answered 401 without JSON, which is something in front of the Worker refusing rather than the Worker';
-          if (demo && a.status === 401) return 'answered 401 where the file pins a demo record, which is a deploy that did not carry DEMO_RECORD';
-          return `answered ${a.status} where ${want} JSON was expected`;
+          if (a.status === 200 && isJson(a)) return 'answered 200 JSON with no credential, which is a record served to a stranger: a Worker older than the demo removal, or a door nobody meant';
+          return `answered ${a.status} where 401 JSON was expected`;
         },
       },
     );

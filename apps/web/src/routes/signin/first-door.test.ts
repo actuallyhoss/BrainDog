@@ -13,11 +13,10 @@
  * passkeys."* The browser was fine. Changing it would have changed nothing. That sentence is the
  * first thing the owner of a new record meets and it sends him somewhere that cannot help.
  *
- * AND THE ONE BUTTON LEFT ON THAT SCREEN IS FINE, WHICH WAS WORTH MEASURING TO FIND OUT. The demo
- * pill never reads `methods.demo`, which is false live, so it read as a button naming a record that
- * does not exist. `GET https://app.brain.dog/api/boot` answers 401 `UNAUTHORIZED`, `noRecord`
- * (`lib/record/device.ts:143`) counts that as no record, and `readBoot` answers `{ from: 'sample' }`:
- * `/` draws the shipped sample business, which is what the pill promises. It is left alone.
+ * THE ONE BUTTON THAT WAS LEFT ON THAT SCREEN IS GONE. It was the demo pill, which opened the sample
+ * business at `/app/`, and it was measured to work when this file was written. There is no sample now
+ * (DIRECTION 26): `/app/` with no session is sent back here, so the pill is removed and the claim link
+ * sentence is the whole of the first run's screen, which is true, since it is the only way in.
  */
 
 import { test } from 'node:test';
@@ -28,8 +27,8 @@ import type { Methods, Said } from '../../lib/auth.ts';
 import { stateOf, type Seen, type Ways } from '../../lib/signin.ts';
 import { actable, noDoorYet } from './first-door.ts';
 
-/** Exactly what `https://app.brain.dog/auth/methods` answered, field for field. */
-const LIVE: Methods = { passkey: true, magic: false, key: false, open: false, demo: false, me: null, firstRun: true };
+/** What `https://app.brain.dog/auth/methods` answered, field for field, less `demo`: there is no demo left to read. */
+const LIVE: Methods = { passkey: true, magic: false, key: false, open: false, me: null, firstRun: true };
 
 const said = (m: Methods): Said<Methods> => ({ ok: true, value: m });
 
@@ -126,4 +125,16 @@ test('the screen has a branch for a record with no door yet', () => {
 test('the door block is drawn from ways that can act, not from a Ways object that exists', () => {
   assert.match(PAGE, /return actable\(view\.ways\)/);
   assert.match(PAGE, /actable\(\{ \.\.\.view\.ways, magic: false \}\)/);
+});
+
+/**
+ * THE DEMO PILL IS GONE, AND WITH IT THE ONE BUTTON THE FIRST RUN HAD LEFT.
+ *
+ * It opened `/app/`, which drew the sample business for anybody not signed in. There is no sample now (DIRECTION 26):
+ * `/app/` with no session is this screen, so the pill would have sent a stranger back here. On the first run the claim
+ * link sentence is what is left to read, which is the only way in there is.
+ */
+test('the screen draws no way into a demo, since there is none to open', () => {
+  assert.doesNotMatch(PAGE, /copy\.openTheDemo|copy\.demoNeedsNothing/);
+  assert.doesNotMatch(PAGE, /class="demo"/);
 });

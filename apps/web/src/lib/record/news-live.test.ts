@@ -4,6 +4,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { MISSING, money } from 'braindog-render';
 
 import { copy } from '../copy.ts';
@@ -165,8 +166,13 @@ test('A RECORD WITHOUT MONEY IS NOT ASKED FOR MONEY FIGURES, and a declared Home
   assert.equal(sent.length, 1, 'only what is new was asked for');
 });
 
-test('Home with no record draws the sample, and a refusal is the record sentence', async () => {
-  assert.deepEqual(await readHome(BASE, null, host(null).io), { from: 'sample' });
+/* NO RECORD IS A REFUSAL NOW, NOT THE SAMPLE (DIRECTION 26): Home drew the studio's figures and its "since you were
+   away" under a host that did not answer or asked for sign-in. */
+test('Home with no record is a refusal, and so is any other refusal, in the record sentence', async () => {
+  const away = await readHome(BASE, null, host(null).io);
+  assert.equal(away.from, 'refused');
+  assert.ok(away.from === 'refused' && away.fix.trim() !== '', 'a refusal with no sentence says nothing to the reader');
+  assert.deepEqual(await readHome(BASE, null, host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in.' } })).io), { from: 'refused', fix: 'Sign in.' });
   const said = await readHome(BASE, null, host(() => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Ask the owner.' } })).io);
   assert.deepEqual(said, { from: 'refused', fix: 'Ask the owner.' });
 });
@@ -262,7 +268,7 @@ test("the log is the record's newest page, named by what the record called each 
   assert.equal(new URL(sent[0]!.url).searchParams.get('limit'), String(LOG_PAGE));
   assert.equal(new URL(sent[0]!.url).searchParams.get('cursor'), null, 'the first page asked for a page below something');
 
-  assert.deepEqual(await readLog(BASE, null, host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in.' } })).io), { from: 'sample' });
+  assert.deepEqual(await readLog(BASE, null, host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in.' } })).io), { from: 'refused', fix: 'Sign in.' });
 });
 
 test('the page below is asked for with the cursor the page above answered, and the last page has none', async () => {
@@ -272,4 +278,21 @@ test('the page below is asked for with the cursor the page above answered, and t
   if (out.from !== 'live') return;
   assert.equal(new URL(sent[0]!.url).searchParams.get('cursor'), '8');
   assert.deepEqual([out.events.map((e) => e.seq), out.more, out.cursor], [[7], false, null]);
+});
+
+/* HOME DREW THE SAMPLE WHEREVER THE SHELL WAS NOT LIVE: the studio's figures through `metric`, its obligations due this
+   week and its lapsing services out of `ROWS` against the frozen `NOW`, and its feed filtered by a mark kept on this
+   device. With no sample (DIRECTION 26) a shell is a record or a refusal, and Home draws the record's answers or the
+   refusal's sentence. */
+test("Home reads the record's answers and nothing of the sample", () => {
+  const page = readFileSync(new URL('../../routes/+page.svelte', import.meta.url), 'utf8');
+  const script = page.slice(0, page.indexOf('</script>'));
+  for (const [said, why] of [
+    [/\bROWS\b/u, 'the sample rows'],
+    [/\bNOW\b/u, "the sample's frozen day"],
+    [/\bmetric\(/u, "the sample's figures"],
+    [/pref\.read\(\)\.seen/u, "a read mark kept for the sample's feed"],
+  ] as const)
+    assert.doesNotMatch(script, said, `Home reads ${why} again`);
+  assert.doesNotMatch(page, /\bROWS\b|\bNOW\b/u, 'the markup reads the sample again');
 });

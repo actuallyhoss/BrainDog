@@ -4,9 +4,12 @@
  * A ROUTE-ONLY MODULE, like `news-live.ts`: the client carries the route table as a value, so only the screen that
  * writes loads it.
  *
- * EVERY ANSWER IS ONE OF THREE. `ok` is the record's value. `sample` is a host with no record behind it
- * (`UNREACHABLE`, `UNAUTHORIZED`), where the screen keeps the toast it always had. `refused` carries the record's own
- * sentence, and `raced` says the record moved underneath, so the screen reads it again before anybody presses twice.
+ * EVERY ANSWER IS ONE OF TWO. `ok` is the record's value. `refused` carries the record's own sentence, and `raced` says
+ * the record moved underneath, so the screen reads it again before anybody presses twice.
+ *
+ * THERE WAS A THIRD, `sample`, for a host with no record behind it (`UNREACHABLE`, `UNAUTHORIZED`), and the screen
+ * answered it with the demo's "nothing was saved yet". There is no sample now (DIRECTION 26), so those are refusals like
+ * any other, carrying the sentence the client wrote for them: "The record could not be reached: ..." or the host's own.
  *
  * These are ADMIN methods, so a browser session. A token, or somebody who is not an owner, is refused
  * `NEEDS_BROWSER_SESSION` or `FORBIDDEN`, and that refusal's `fix` is what the person reads.
@@ -17,21 +20,18 @@ import { createClient, type EraseReport, type Invitation, type Invited, type Lev
 import { BASE } from '../at.ts';
 import { copy } from '../copy.ts';
 import type { Fetch } from './boot-live.ts';
-import { noRecord } from './device.ts';
 import type { Person } from './schema.ts';
 
 type Wire<T> = { ok: true; value: T } | { ok: false; refusal: { code: string; fix: string } } | { ok: false; conflict: unknown };
 
 export type Wrote<T> =
   | { ok: true; value: T }
-  | { ok: false; from: 'sample'; fix: string }
   | { ok: false; from: 'refused'; code: string; fix: string; raced: boolean };
 
-/** The client's three arms as the screen's three. */
+/** The client's three arms as the screen's two: a conflict is a refusal that says it raced. */
 export function wrote<T>(out: Wire<T>): Wrote<T> {
   if (out.ok) return out;
   if (!('refusal' in out)) return { ok: false, from: 'refused', code: 'VERSION_STALE', fix: copy.writeRaced, raced: true };
-  if (noRecord(out.refusal.code)) return { ok: false, from: 'sample', fix: out.refusal.fix };
   return { ok: false, from: 'refused', code: out.refusal.code, fix: out.refusal.fix, raced: out.refusal.code === 'VERSION_STALE' };
 }
 
@@ -71,7 +71,6 @@ export const alsoKnown = (p: Person): string => {
 
 export type PeopleRead =
   | { from: 'live'; people: Person[] }
-  | { from: 'sample' }
   | { from: 'unrouted' }
   | { from: 'refused'; fix: string };
 
@@ -80,7 +79,6 @@ export async function readPeople(base: string, io?: Fetch): Promise<PeopleRead> 
   const out = await clientOf(base, io).call<Member[]>('members');
   if (out.ok) return { from: 'live', people: out.value.map(personOf) };
   const refusal = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: copy.writeRaced };
-  if (noRecord(refusal.code)) return { from: 'sample' };
   if (refusal.code === 'ROUTE_UNKNOWN') return { from: 'unrouted' };
   return { from: 'refused', fix: refusal.fix };
 }
@@ -135,13 +133,18 @@ export async function inviteEmail(base: string, email: string, level: Level, io?
   return wrote(await clientOf(base, io).inviteByEmail({ email: email.trim(), level }));
 }
 
-export type InvitesRead = { from: 'live'; invites: Invitation[] } | { from: 'sample' } | { from: 'refused'; fix: string };
+export type InvitesRead = { from: 'live'; invites: Invitation[] } | { from: 'unrouted' } | { from: 'refused'; fix: string };
 
-/** Every invitation still waiting, newest first. A host older than invitations lists none. */
+/**
+ * Every invitation still waiting, newest first. A host older than invitations is `unrouted`, as it is for `readPeople`.
+ *
+ * IT AND A HOST WITH NO RECORD BOTH READ `sample`, so a signed-out reader and a record too old for the method were told
+ * the same thing. The screen draws neither as a list, and the second one now says why.
+ */
 export async function readInvites(base: string, io?: Fetch): Promise<InvitesRead> {
   const out = wrote(await clientOf(base, io).invitations());
   if (out.ok) return { from: 'live', invites: out.value };
-  if (out.from === 'sample' || out.code === 'ROUTE_UNKNOWN') return { from: 'sample' };
+  if (out.code === 'ROUTE_UNKNOWN') return { from: 'unrouted' };
   return { from: 'refused', fix: out.fix };
 }
 
@@ -176,16 +179,15 @@ export async function exportFile(base: string, kind: ExportKind, slug: string, i
 
 /* ── backups, erasure and deletion ──────────────────────────────────────── */
 
-export type SnapshotsRead = { from: 'live'; snapshots: Snapshot[] } | { from: 'sample' } | { from: 'refused'; code: string; fix: string };
+export type SnapshotsRead = { from: 'live'; snapshots: Snapshot[] } | { from: 'refused'; code: string; fix: string };
 
 /**
  * The copies the host keeps. A host that keeps none (the Worker today) is `refused`, with its sentence, and the screen
- * draws that instead of the sample's list: a live record is never shown copies it does not have.
+ * draws that instead of a list: a record is never shown copies it does not have.
  */
 export async function readSnapshots(base: string, io?: Fetch): Promise<SnapshotsRead> {
   const out = wrote(await clientOf(base, io).snapshots());
   if (out.ok) return { from: 'live', snapshots: out.value };
-  if (out.from === 'sample') return { from: 'sample' };
   return { from: 'refused', code: out.code, fix: out.fix };
 }
 
@@ -213,14 +215,17 @@ export async function deleteRecordNow(base: string, slug: string, io?: Fetch): P
  * One kept copy as the file a browser saves (`GET /api/snapshots/<id>`, `49 §5.13`).
  *
  * NOT THROUGH THE CLIENT, which reads JSON: the answer is the SQLite file itself. A refusal is still JSON and still read
- * the one way. No answer at all, or one that is not the record's, is the sample's: there is no record to fetch from.
+ * the one way. No answer at all, or one that is not the record's, is `UNREACHABLE` with `recordNotReached`.
+ *
+ * THAT SENTENCE WAS EMPTY. Both arms handed the screen `fix: ''`, which only the sample's toast ever covered, so with
+ * the sample gone a download from a host that answered HTML would have toasted nothing at all.
  */
 export async function downloadSnapshot(base: string, id: string, io?: Fetch): Promise<Wrote<{ name: string; blob: Blob }>> {
   let res: Response;
   try {
     res = await (io ?? fetch)(`${base}/api/snapshots/${encodeURIComponent(id)}`, { credentials: 'same-origin' });
   } catch {
-    return { ok: false, from: 'sample', fix: '' };
+    return wrote({ ok: false, refusal: { code: 'UNREACHABLE', fix: copy.recordNotReached } });
   }
   if (res.ok) {
     const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1] ?? `${id}.dog`;
@@ -232,5 +237,5 @@ export async function downloadSnapshot(base: string, id: string, io?: Fetch): Pr
   } catch {
     said = null;
   }
-  return wrote({ ok: false, refusal: said?.refusal ?? { code: 'UNREACHABLE', fix: '' } });
+  return wrote({ ok: false, refusal: said?.refusal ?? { code: 'UNREACHABLE', fix: copy.recordNotReached } });
 }

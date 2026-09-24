@@ -52,7 +52,7 @@ function host(routes: Record<string, () => Response | Promise<Response>>, creden
 }
 
 const WHO = { person: 'p_01', email: 'ada@example.com', record: 'studio', provedAt: 1_757_000_000_000 };
-const METHODS = { passkey: true, magic: false, key: true, open: false, demo: false, me: null, firstRun: false };
+const METHODS = { passkey: true, magic: false, key: true, open: false, me: null, firstRun: false };
 
 /** Bytes as the authenticator hands them back. */
 const buf = (...b: number[]) => new Uint8Array(b).buffer;
@@ -79,6 +79,14 @@ test('methods reads the host and keeps only the fields the screen uses', async (
   /* `why` is a code the screen turns into its own sentence, so a word it does not know is dropped. */
   const odd = await methods(host({ '/auth/methods': () => ok({ ...METHODS, why: 'Sign-in is off.' }) }).io);
   assert.ok(odd.ok && !('why' in odd.value));
+});
+
+/* THERE IS NO DEMO TO OPEN (DIRECTION 26), so a host older than the change that still says `demo` is read past rather
+   than carried into a screen that has nothing left to draw with it. */
+test('methods drops `demo`, even from a host that still sends it as true', async () => {
+  const out = await methods(host({ '/auth/methods': () => ok({ ...METHODS, demo: true }) }).io);
+  assert.ok(out.ok, JSON.stringify(out));
+  assert.ok(!('demo' in out.value), JSON.stringify(out.value));
 });
 
 test('A HOST THAT DOES NOT KNOW /auth IS NO HOST, NOT A REFUSAL: the SPA fallback and a 404 both', async () => {

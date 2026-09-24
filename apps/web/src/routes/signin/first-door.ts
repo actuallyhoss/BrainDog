@@ -54,20 +54,12 @@ export const actable = (ways: Ways | null): Ways | null => (ways && (ways.passke
 export const noDoorYet = (it: Methods, ways: Ways | null, note: Note): boolean =>
   it.me === null && it.firstRun === true && ways === null && note !== 'out';
 
-/* THE DEMO PILL WAS THE SECOND FINDING AND IT WAS WRONG, recorded here so nobody spends the hour
- * again. The pill is drawn for every state but `loading`, `signed-in` and `open` and it never reads
- * `methods.demo`, which live is false, so it looked like a primary button naming a record that does
- * not exist. Measured instead of read: `GET https://app.brain.dog/api/boot` answers 401
- * `UNAUTHORIZED`, `noRecord` in `lib/record/device.ts:143` counts `UNAUTHORIZED` as no record, and
- * `readBoot` therefore answers `{ from: 'sample' }`. So `/` draws the shipped sample business, which
- * is exactly what the pill promises and what the marketing site links to. `methods.demo` is a
- * narrower fact than the button: it says the host PINNED a public record for anonymous reads, and
- * the sample needs no host at all. Gating the pill on it would have deleted a working way forward
- * from the one screen that has no other.
- *
- * ONLY WHERE THE ADDRESS NAMES NO RECORD, since the app moved under `brain.dog/app`. `/app` with no one signed in is
- * the sample, as above; `/app/acme/…` answering 401 is sent here with `?next=`, because the sample drawn there would be
- * dressed as acme (`noRecord` in `lib/record/device.ts`, and the root layout's redirect). So the pill opens `/app/`.
+/* THE DEMO PILL IS GONE, AND SO IS THE REASON IT WAS KEPT. The second finding on this screen was that
+ * the pill never read `methods.demo`, and measuring showed it did not need to: a 401 at the bare `/app`
+ * drew the shipped sample business, which is what the pill promised. There is no sample now
+ * (DIRECTION 26). `/app/` with nobody signed in is sent here like every other address that answers
+ * 401 (`signInFirst` in `lib/at.ts`), so the pill would have been a button back to this screen, and
+ * on the first run the claim link sentence is the one way in there is. `methods.demo` went with it.
  */
 
 /** The two sentences for `noDoorYet`. See the header: these belong in `lib/copy.ts`. */

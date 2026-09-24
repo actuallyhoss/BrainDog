@@ -23,7 +23,7 @@
  */
 
 import type { Fetch } from './boot-live.ts';
-import { noRecord } from './device.ts';
+import { copy } from '../copy.ts';
 
 /**
  * Where a forwarded message is posted, built from the token the door answered.
@@ -42,21 +42,25 @@ export const mailUrl = (origin: string, token: string): string => `${origin.repl
  *
  * `signin` IS ITS OWN KIND, for the reason `device.ts` gives it one: the door wants an owner whose last sign-in is
  * under fifteen minutes old, and that is the single refusal on this screen whose remedy is an action rather than a
- * correction. A toast would take the way forward off the screen before the person had read it.
+ * correction. A toast would take the way forward off the screen before the person had read it. A 401 is the same
+ * state with no sign-in at all behind it.
  *
  * `unrouted` IS A HOST WITHOUT THE DOOR, which today is every self-host: there the token is a file and no HTTP
  * route mints one. Reported as a refusal it would read as forwarding being broken rather than spelled differently.
  *
- * `sample` IS A SCREEN WITH NO RECORD BEHIND IT, the public demo and a static host's SPA fallback, where the caller
- * shows the same sentence it shows for every other act that needs an account.
+ * THERE WAS A `sample` KIND, for a screen with no record behind it, and the caller answered it with the demo's sentence
+ * about having no account. There is no sample now (`DIRECTION.md` §26): a 401 is `signin`, and a host that answered
+ * nothing a record says is `refused` with `recordNotReached`, the sentence every other Settings write says for it.
  */
 export type Said =
   | { kind: 'minted'; token: string }
   | { kind: 'revoked' }
   | { kind: 'signin'; fix: string }
   | { kind: 'unrouted' }
-  | { kind: 'sample' }
   | { kind: 'refused'; fix: string };
+
+/** No record answered, however the host failed to: a thrown fetch, the static shell, or JSON with no refusal in it. */
+const notReached: Said = { kind: 'refused', fix: copy.recordNotReached };
 
 type Refusal = { code: string; fix: string };
 
@@ -78,20 +82,21 @@ async function press(which: 'mint' | 'revoke', base: string, io?: Fetch): Promis
   try {
     res = await (io ?? fetch)(`${base.replace(/\/+$/, '')}/api/inbound/${which}`, { method: 'POST', credentials: 'same-origin' });
   } catch {
-    /* A HOST THAT COULD NOT BE REACHED IS NOT A REFUSAL. There is no record here to mint on, which is what the
-       sample arm means everywhere else in this directory. */
-    return { kind: 'sample' };
+    return notReached;
   }
 
-  let body: Answered;
+  /* `null` IS JSON TOO, and `body.ok` on it threw out of `press`, so the button stayed pressed and no sentence came:
+     measured against a host answering the four bytes `null` with a 200. It is a record not reached like any other. */
+  let body: Answered | null;
   try {
-    body = (await res.json()) as Answered;
+    body = (await res.json()) as Answered | null;
   } catch {
-    /* A STATIC HOST ANSWERS THE SHELL, not JSON, to a POST it does not route. That is the same "no record here". */
-    return { kind: 'sample' };
+    /* A STATIC HOST ANSWERS THE SHELL, not JSON, to a POST it does not route. No record read the press, so nothing
+       was saved, which is what `recordNotReached` says. */
+    return notReached;
   }
 
-  if (body.ok === true) {
+  if (body?.ok === true) {
     if (which === 'revoke') return { kind: 'revoked' };
     const token = (body.value as { token?: unknown } | null)?.token;
     /* THE TOKEN IS ANSWERED ONLY WHERE THE DIGEST REACHED THE INDEX, so a success with nothing in it is a host
@@ -99,12 +104,12 @@ async function press(which: 'mint' | 'revoke', base: string, io?: Fetch): Promis
     return typeof token === 'string' && token !== '' ? { kind: 'minted', token } : { kind: 'refused', fix: NO_TOKEN };
   }
 
-  const refusal = body.refusal ?? { code: 'UNREACHABLE', fix: NO_TOKEN };
-  if (noRecord(refusal.code)) return { kind: 'sample' };
+  const refusal = body?.refusal;
+  if (!refusal) return notReached;
   if (refusal.code === 'ROUTE_UNKNOWN') return { kind: 'unrouted' };
   /* THE DOOR'S OWN SENTENCE, VERBATIM (`13 §6`), for the proof as well as for everything else: it says whether the
      sign-in is stale or missing, and this screen would only paraphrase it worse. */
-  if (refusal.code === 'NEEDS_BROWSER_SESSION') return { kind: 'signin', fix: refusal.fix };
+  if (refusal.code === 'UNAUTHORIZED' || refusal.code === 'NEEDS_BROWSER_SESSION') return { kind: 'signin', fix: refusal.fix };
   return { kind: 'refused', fix: refusal.fix };
 }
 

@@ -4,8 +4,8 @@
  * A ROUTE-ONLY MODULE, loaded by the two screens that read it, like `page-live.ts`: the client carries the route table
  * as a value.
  *
- * `UNREACHABLE` and `UNAUTHORIZED` mean there is no record here, and the screen draws the sample as it always did. Any
- * other refusal is the record's own sentence. A live answer is drawn from the answer and nothing else.
+ * EVERY REFUSAL IS THE RECORD'S OWN SENTENCE. `UNREACHABLE` and `UNAUTHORIZED` with no slug used to draw the sample's
+ * figures, feed and log; there is no sample now (DIRECTION 26). A live answer is drawn from the answer and nothing else.
  */
 
 import { createClient, type Cursor, type EventLine } from '@braindog/client';
@@ -16,7 +16,6 @@ import { copy } from '../copy.ts';
 import { NO_ROW_SAID, unsaidFigure, type Metric } from './api.ts';
 import { actorFor, forget, newsOf, readBoot, type Fetch } from './boot-live.ts';
 import { METRICS } from './declared.ts';
-import { noRecord } from './device.ts';
 import { noteOf } from './history-live.ts';
 import { format, fxNote, hrefFor, offTarget, partsText, targetLine } from './metrics.ts';
 import type { AuditEvent, NewsItem } from './schema.ts';
@@ -109,7 +108,7 @@ export function tileOf(id: string, r: Reading | null): Metric {
 /** `upTo` is the record's cursor for the newest line: a rowid for the owner, `e.<id>` for a member held to named lists. */
 export type News = { items: NewsItem[]; upTo: Cursor | null; sinceCapped: boolean };
 
-export type HomeRead = { from: 'live'; tiles: Metric[]; news: News } | { from: 'sample' } | { from: 'refused'; fix: string };
+export type HomeRead = { from: 'live'; tiles: Metric[]; news: News } | { from: 'refused'; fix: string };
 
 /**
  * Home's figures and what is new, asked together.
@@ -120,10 +119,7 @@ export type HomeRead = { from: 'live'; tiles: Metric[]; news: News } | { from: '
 export async function readHome(base: string, me: string | null, io?: Fetch, asked: readonly string[] = HOME_FIGURES): Promise<HomeRead> {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   const [news, ...figures] = await Promise.all([client.whatsNew(), ...asked.map((id) => client.metric(id))]);
-  if (!news.ok) {
-    const refusal = refusalOf(news);
-    return noRecord(refusal.code) ? { from: 'sample' } : { from: 'refused', fix: refusal.fix };
-  }
+  if (!news.ok) return { from: 'refused', fix: refusalOf(news).fix };
   return {
     from: 'live',
     tiles: figures.flatMap((out, i) => (out.ok ? [tileOf(asked[i]!, out.value as Reading)] : [])),
@@ -150,7 +146,6 @@ export const LOG_PAGE = 200;
 
 export type LogRead =
   | { from: 'live'; events: AuditEvent[]; names: Map<string, string>; more: boolean; cursor: Cursor | null }
-  | { from: 'sample' }
   | { from: 'refused'; fix: string };
 
 /** Where a line points, in the sample's spelling: `obligations#3`, `suggestion:SG1`, or what the record wrote. */
@@ -170,10 +165,7 @@ function targetOf(e: EventLine): string | undefined {
 export async function readLog(base: string, me: string | null, io?: Fetch, before: Cursor | null = null): Promise<LogRead> {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   const out = await client.recentHistory({ limit: LOG_PAGE, ...(before === null ? {} : { cursor: before }) });
-  if (!out.ok) {
-    const refusal = refusalOf(out);
-    return noRecord(refusal.code) ? { from: 'sample' } : { from: 'refused', fix: refusal.fix };
-  }
+  if (!out.ok) return { from: 'refused', fix: refusalOf(out).fix };
   const names = new Map<string, string>();
   const events: AuditEvent[] = [];
   for (const e of out.value.events) {

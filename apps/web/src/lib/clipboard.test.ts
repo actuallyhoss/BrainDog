@@ -131,9 +131,9 @@ test('and a long value is quoted by its label rather than in full', async () => 
 test('and a surface with its own sentence keeps it', async () => {
   clipboard('writes');
 
-  await put('age1ql3z7hjy', 'the public key', copy.keyCopied);
+  await put('bd_tok_1a2b3c', 'the token', copy.tokenCopied);
 
-  assert.equal(said().text, copy.keyCopied, 'a caller that supplied its own sentence got the default one instead');
+  assert.equal(said().text, copy.tokenCopied, 'a caller that supplied its own sentence got the default one instead');
 });
 
 /* ── 2. the three ways it does not work ──────────────────────────────────── */
@@ -151,9 +151,9 @@ test('A REFUSED WRITE SAYS SO, rather than reporting a copy that did not happen'
 test('and a surface with its own sentence does not get to claim success over a refusal', async () => {
   clipboard('rejects');
 
-  await put('age1ql3z7hjy', 'the public key', copy.keyCopied);
+  await put('bd_tok_1a2b3c', 'the token', copy.tokenCopied);
 
-  assert.equal(said().text, copy.copyRefused, '"Public key copied" was shown for a key that never reached the clipboard');
+  assert.equal(said().text, copy.copyRefused, '"Token copied" was shown for a token that never reached the clipboard');
 });
 
 test('NO CLIPBOARD AT ALL IS REPORTED AND NOT THROWN, which is the plain-HTTP and sandboxed case', async () => {

@@ -32,9 +32,8 @@
   let bad = $state(false);
   let busy = $state(false);
 
-  /* THE SAMPLE'S SENTENCE IS `copy`'S, the one every act that needs an account says on the demo. */
-  const lineOf = (s: Said): string =>
-    s.kind === 'on' || s.kind === 'off' ? '' : s.kind === 'sample' ? copy.notOnDemo : 'line' in s ? s.line : s.fix;
+  /* EVERY ARM BUT `on` AND `off` IS ONE SENTENCE: the browser's, which `push.ts` words, or the record's own `fix`. */
+  const lineOf = (s: Said): string => (s.kind === 'on' || s.kind === 'off' ? '' : 'line' in s ? s.line : s.fix);
 
   async function manager(): Promise<Manager> {
     /* DEVELOPMENT SERVES THE WORKER UNBUNDLED, AS A MODULE. Kit's dev server answers `service-worker.js` with one

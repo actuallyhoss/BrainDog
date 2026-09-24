@@ -18,8 +18,7 @@
   THIS IS NO LONGER THE ONLY WAY TO ANSWER, AND IT IS BETTER FOR IT. `/decide` used to print a
   question's options as a sentence inside the card's own link, so every answer in the queue came
   through here: open the question, choose, write prose, commit. The cards press now. One press
-  records an answer, the reason is asked for after it and never blocks it, the card keeps saying it
-  is not saved, and the way back is on the row.
+  picks an answer, the reason that sends it is asked for after it, and the way back is on the row.
 
   So the two screens are two different acts rather than one act and its detour. The card answers a
   question you have already thought about. THIS screen is where one gets EXAMINED: the cost of
@@ -36,10 +35,9 @@
   import { day, queueCost, since, symbolText } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
-  import { DECIDED, NOW, QUESTIONS, REGISTERS, ROWS, display, whoDid } from '$lib/record/api.ts';
+  import { whoDid } from '$lib/record/api.ts';
   import { installWords } from '$lib/record/actions.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
-  import { ARRANGING, PROPOSALS, QUEUE, ROWSETS } from '$lib/record/data.ts';
   import Changes from './Changes.svelte';
   import { spoken } from '../spoken.ts';
   import Proposed from './Proposed.svelte';
@@ -50,7 +48,7 @@
   import { proposedOf } from './proposed.ts';
   import { updatesOf, words as changeWords } from './changes.ts';
   import { pickableOf, rowsToSend, words as pickWords } from './picked.ts';
-  import { answerFor, wouldRecord, type Answer } from '$lib/record/answer.ts';
+  import { answerFor, type Answer } from '$lib/record/answer.ts';
   import { everyGovernance, plainOf, readOne, words as governed, type One } from '$lib/record/governance.ts';
   import { answerQuestion, parkQuestion, type Written } from '$lib/record/decide-write.ts';
   import { mayAnswer, whyNotAnswering } from '../answering.ts';
@@ -64,7 +62,6 @@
   import { page } from '$app/state';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
-  import Chip from '$lib/ui/Chip.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -72,10 +69,11 @@
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
 
   /**
-   * WHERE THE QUESTION CAME FROM, as `/decide` decides it: the record through `governance`, the sample
-   * when there is no record here, or the record's own sentence when it refuses.
+   * WHERE THE QUESTION CAME FROM, as `/decide` decides it: the record through `governance`, or the
+   * host's own sentence when it refuses. The sample that stood in for a host with no record is gone
+   * (DIRECTION 26), and with it every press on this screen that wrote nothing.
    */
-  let from = $state<'reading' | 'live' | 'sample' | 'refused'>('reading');
+  let from = $state<'reading' | 'live' | 'refused'>('reading');
   let live = $state<One | null>(null);
   let refusal = $state('');
   let client: ReturnType<typeof createClient> | null = null;
@@ -105,21 +103,21 @@
    * decision, so the one just decided keeps its place and the next is the one after it.
    */
   let queue = $state<string[]>([]);
-  /* THE SAMPLE'S QUEUE ONLY ON THE SAMPLE. It was every state but `live`, so a record that refused this
-     one question offered `Next question` to a sample id it never held, once the refused state drew the
-     way on. A refusal keeps the record's own queue, and an empty one when that read was refused too. */
-  const openIds = $derived(from === 'sample' ? QUEUE.map((q) => q.id) : queue);
-  const here = $derived(openIds.indexOf(String(page.params.id)));
-  const nextId = $derived(here >= 0 ? openIds[here + 1] : openIds[0]);
-  const prevId = $derived(here > 0 ? openIds[here - 1] : undefined);
+  /* THE RECORD'S OWN QUEUE, AND AN EMPTY ONE WHEN THAT READ WAS REFUSED TOO. A refused screen once offered
+     `Next question` to a sample id the record never held, because the sample's queue stood in for every
+     state but `live`. */
+  const here = $derived(queue.indexOf(String(page.params.id)));
+  const nextId = $derived(here >= 0 ? queue[here + 1] : queue[0]);
+  const prevId = $derived(here > 0 ? queue[here - 1] : undefined);
   /* AND THE WAY ON ONCE THIS QUESTION IS NO LONGER OPEN, which is not `nextId`: that one stops at the
      end of the queue for `j`, and a screen that has just settled a question must not stop anywhere.
      See `onward.ts` for the two cases `nextId` got wrong. */
-  const onwardTo = $derived(nextOpen(openIds, String(page.params.id)));
-  const waiting = $derived(stillWaiting(openIds, String(page.params.id)));
+  const onwardTo = $derived(nextOpen(queue, String(page.params.id)));
+  const waiting = $derived(stillWaiting(queue, String(page.params.id)));
 
-  /** The clock a band is read against: the reader's on a live record, the sample's own otherwise. */
-  const now = $derived(from === 'live' ? Date.now() : NOW);
+  /* THE CLOCK A BAND IS READ AGAINST, taken when the read answers. Nothing reads it before then: the
+     question and every press on it are drawn only once `from` is `live`. */
+  const now = $derived(from === 'live' ? Date.now() : 0);
 
   /**
    * WHETHER THIS READER MAY ANSWER, WHICH THIS SCREEN NEVER ASKED EITHER.
@@ -131,7 +129,7 @@
    * a REQUIRED reason box, the commit stays off while the box is empty, "required" is said twice
    * above it, and the reason is the whole ceremony somebody came here for. Then the record answers.
    *
-   * COUNTED FROM THIS FILE for the sample's three-option question, before: four controls inside the
+   * COUNTED FROM THIS FILE for a three-option question, before: four controls inside the
    * decision, being three `Choose this` buttons and `Defer`, NOT ONE of them disabled, and no word
    * anywhere on the page about access. Two ways in and neither asked: the buttons, and the keyboard,
    * where `Enter` on a highlighted option calls `choose` and `d` calls `defer`.
@@ -140,32 +138,23 @@
    * is the one the queue already reads. `answering.ts` exists so that this screen is not a fourth
    * spelling of one rule, and a colleague who reads the hint here, reads it on the queue, or presses
    * through to the refusal meets the same words three times over.
-   *
-   * THE SAMPLE IS UNTOUCHED, and that is the shell's doing rather than a special case here: `api.ts`
-   * gives the sample reader `owner`, so a host with no record behind it draws what it drew.
    */
   const me = $derived((page.data as unknown as Shell).me);
   const answerable = $derived(mayAnswer(me.level, me.owner));
   const whyNot = $derived(whyNotAnswering(me.level, me.lists));
 
-  const question = $derived(
-    from === 'live'
-      ? (live?.question ?? undefined)
-      : from === 'sample'
-        ? [...QUESTIONS, ...ARRANGING, ...DECIDED].find((q) => q.id === page.params.id)
-        : undefined,
-  );
+  const question = $derived(from === 'live' ? (live?.question ?? undefined) : undefined);
 
   /* WHAT A PAGE, A LIST, A RULE OR A LOOK WOULD PUT ON THE SCREEN, for a proposal that arranges the record. */
   const preview = $derived(from === 'live' && live?.about ? proposedOf(live.about.kind, live.about.body) : null);
 
   /* A PACK, A SETTINGS CHANGE OR A WHOLE ARRANGEMENT, drawn whole: why, the calls out, the packs, what appears, the words. */
-  const about = $derived(from === 'live' ? live?.about : from === 'sample' ? PROPOSALS[String(page.params.id)] : undefined);
+  const about = $derived(from === 'live' ? live?.about : undefined);
   const lists = $derived(
     new Map<string, string>(((page.data.lists ?? page.data.index?.registers ?? []) as { id: string; name: string }[]).map((l) => [l.id, l.name])),
   );
   const story = $derived(
-    about ? arrangedOf(about.kind, about.body, { lists, labels: heard(), pagesNow: from === 'live' ? live?.pagesNow : PROPOSALS[String(page.params.id)]?.pagesNow }) : null,
+    about ? arrangedOf(about.kind, about.body, { lists, labels: heard(), pagesNow: live?.pagesNow }) : null,
   );
 
   /** What an accepted arrangement did, and how far one got when the record stopped part way. */
@@ -177,19 +166,11 @@
     new Map(((page.data.nav ?? []) as { href: string; title: string }[]).map((n) => [n.href, n.title]));
 
   /* A `rowset` that updates rows: each changed field, as a diff for prose and before and after for the rest. */
-  const updates = $derived(
-    !question
-      ? []
-      : from === 'live' && live
-        ? updatesOf(live.rowset, live.registers, live.rows, plainOf(live.registers))
-        : updatesOf(ROWSETS[question.id], REGISTERS, ROWS, (r, f, v) => display(r, f, v)),
-  );
+  const updates = $derived(question && live ? updatesOf(live.rowset, live.registers, live.rows, plainOf(live.registers)) : []);
 
   /** Sent and waiting, and what the record refused, in its own sentence. */
   let sending = $state(false);
   let fix = $state('');
-  /** A decision the record took on this screen, which has no way back. */
-  let saved = $state(false);
 
   /** Highlighted, not chosen. The two are different states and the interface says so. */
   let highlighted = $state<string | null>(null);
@@ -323,22 +304,12 @@
   }
 
   /**
-   * The mock-up stops here — and it says what it would have written.
-   *
-   * IT ANSWERED THE PRODUCT'S CENTRAL ACT WITH THE GENERIC NOTICE. Every other terminal action in
-   * this app names the change it would make: the rule that would be written and tested against the
-   * last thirty days, the pack whose install plan would be shown first, the row that would be
-   * created from an arrival. This one — the immutable row, with a person's name and their reason on
-   * it, that the whole gate exists to slow down — said "nothing writes" and stopped. The one act
-   * worth describing described itself least.
-   *
-   * AND THE SENTENCE IS NOT TYPED HERE ANY MORE. `/decide` answers the same question with one press
-   * on the card and owes its reader the same receipt; this screen assembled its own copy of the
-   * words out of `question.options.find(…)` and a template literal, which is two spellings of one
-   * act sitting a refactor away from disagreeing. Both read it out of `record/answer.ts` now, and
-   * `answerFor` is what refuses a key the question does not offer rather than printing `undefined`
-   * into the middle of a receipt, which is what the old `?? committing` fallback did with a blank
-   * question id beside it.
+   * THE ANSWER IS BUILT BY `record/answer.ts`, NOT TYPED HERE. `/decide` answers the same question with
+   * one press on the card; this screen assembled its own copy of the words out of `question.options.find(…)`
+   * and a template literal, which is two spellings of one act sitting a refactor away from disagreeing.
+   * `answerFor` is what refuses a key the question does not offer rather than printing `undefined` into
+   * the middle of a receipt, which is what the old `?? committing` fallback did with a blank question id
+   * beside it.
    */
   /**
    * AND COMMITTING CHANGED NOTHING BUT A BOOLEAN, on the central act of this product.
@@ -359,14 +330,8 @@
     const a = committing ? answerFor(question, committing, new Date(now).toISOString()) : null;
     if (!a) return;
     const said: Answer = { ...a, reason };
-    if (from !== 'live' || !client) {
-      committed = said;
-      toasts.push(copy.notWritten(wouldRecord(said)), { intent: 'warn' });
-      setTimeout(() => document.getElementById('way-on')?.focus());
-      return;
-    }
-    /* ON A LIVE RECORD IT IS SENT, with the reason `decide` requires, and only a yes settles it. */
-    if (sending) return;
+    /* IT IS SENT, with the reason `decide` requires, and only a yes settles it. */
+    if (from !== 'live' || !client || sending) return;
     sending = true;
     const accepting = a.option === 'accept' && about !== undefined && isArranging(about.kind) ? about : null;
     const had = accepting ? sidebarNow() : null;
@@ -385,7 +350,6 @@
     if (await unsent(out, a.question)) return;
     fix = '';
     part = null;
-    saved = true;
     committed = said;
     toasts.push(copy.decisionRecorded(a.title, a.question), { intent: 'good' });
     if (accepting && out.from === 'written' && had) {
@@ -410,24 +374,17 @@
     return true;
   }
 
-  /** Parking it: said on the sample, sent to `decide` with the day and the why on a live record. */
+  /** Parking it: sent to `decide` with the day and the why. */
   async function deferIt() {
-    if (from !== 'live' || !client) {
-      deferring = false;
-      /* THE DAY, SPELLED. Every other date in the product reads "17 Sep 2026"; this one printed
-         `2026-09-17`, the storage spelling, in a sentence about when somebody will next look at a
-         decision. `day()` is the one formatter and it was one call away. */
-      toasts.push(copy.deferred(day(wake)), { intent: 'warn' });
-      void goto(at(onwardTo ? `/decide/${onwardTo}` : '/decide'));
-      return;
-    }
-    if (!question || sending) return;
+    if (from !== 'live' || !client || !question || sending) return;
     sending = true;
     const out = await parkQuestion(apiBase(), question.id, wake, reason);
     sending = false;
     if (await unsent(out, question.id)) return;
     fix = '';
     deferring = false;
+    /* THE DAY, SPELLED. Every other date in the product reads "17 Sep 2026"; the parked toast once printed
+       `2026-09-17`, the storage spelling, in a sentence about when somebody will next look at a decision. */
     toasts.push(copy.parkedUntil(day(wake)), { intent: 'good' });
     void invalidateAll();
     /* PARKED, SO IT HAS LEFT THE QUEUE: the next question, as a decision takes you to it, and the
@@ -459,23 +416,11 @@
   );
 
   /**
-   * The inverse of the press, and it puts the reason back where it was typed.
-   *
-   * `loop/REWORK.md` §4 is why it exists at all: nothing was written, and a person who has just
-   * watched a receipt appear needs a way to check they pressed the right thing that is not
-   * pressing it again. Focus follows, because the field it goes back to is the one they were in.
-   */
-  function takeBack() {
-    committed = null;
-    queueMicrotask(() => field?.focus());
-  }
-
-  /**
-   * DRAWN ONCE THE READ HAS ANSWERED, live or the sample. The read is bracketed by `opened()` and
-   * `closed()`, so a call still out takes `data-screen` away whatever this says.
+   * DRAWN ONCE THE READ HAS ANSWERED LIVE. The read is bracketed by `opened()` and `closed()`, so a call
+   * still out takes `data-screen` away whatever this says.
    */
   $effect(() => {
-    if (from === 'live' || from === 'sample') drew('ready');
+    if (from === 'live') drew('ready');
   });
 
   /* `d` ON THE QUEUE LANDS HERE WITH `?defer`, and opens the defer step it asked for, once per question. */
@@ -632,21 +577,9 @@
         <p class="settled-note">{copy.immutable}</p>
         {#if applied.length}<div class="settled-applied"><Applied lines={applied} /></div>
         {:else if kept.length}<div class="settled-applied"><Applied lines={kept} /></div>{/if}
-        <!-- NOT SAVED, ON THE RECEIPT, and the way back beside it. `Chip` draws it because the tone
-             carries its own glyph and nothing in this app renders an intent without one (13 §5.1):
-             a receipt that only went amber says nothing to a screen reader. Only for a decision
-             made in this session, because one the record carries IS saved. -->
-        {#if committed && !saved}
-          <div class="settled-mock">
-            <Chip label={copy.markNotWritten} tone="warn" />
-            <Button weight="bare" aria-label={copy.takeItBackOf(question.title)} onclick={takeBack}>
-              {copy.takeItBack}
-            </Button>
-          </div>
-        {/if}
-        <!-- WHERE IT WENT, AND ONLY WHEN IT WENT THERE: a press on the sample wrote nothing, and the chip
-             above already says so. What still waits is said either way. -->
-        <p class="settled-where">{#if !committed || saved}{onwardWords.where} {/if}{onwardWords.left(waiting)}</p>
+        <!-- WHERE IT WENT, and what still waits. A receipt here is always a written decision: the sample's
+             unsaved one, with its chip and its way back, went with the sample. -->
+        <p class="settled-where">{onwardWords.where} {onwardWords.left(waiting)}</p>
         <div class="settled-next">{@render onward()}</div>
       </div>
     {:else if from === 'live' && live?.closed}
@@ -1191,13 +1124,6 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--sp-3);
-  }
-
-  .settled-mock {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    margin-block-start: var(--sp-3);
   }
 
   @media (width < 900px) {

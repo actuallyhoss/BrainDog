@@ -266,7 +266,7 @@ test('methods, fresh: every way this host has, nobody signed in, and it is the f
   assert.equal(out.status, 200);
   assert.equal(out.headers.get('cache-control'), 'no-store');
   assert.equal(out.headers.get('access-control-allow-origin'), null);
-  assert.deepEqual(out.body, { ok: true, value: { passkey: true, magic: true, key: true, open: false, demo: false, me: null, firstRun: true } });
+  assert.deepEqual(out.body, { ok: true, value: { passkey: true, magic: true, key: true, open: false, me: null, firstRun: true } });
 });
 
 test('THE SERVER KEY FOR A SESSION: the exact cookie, the person in the body, and the id nowhere in it', async () => {
@@ -373,15 +373,15 @@ test('THE LINK IS MAILED AS A FRAGMENT, NEVER ANSWERED, and an unknown address l
 
 test('an open self-host offers nothing and says so; an insecure origin and an unconfigured one say why', async () => {
   const open = setup({ door: { open: true } });
-  assert.deepEqual((await open.call('/auth/methods')).body.value, { passkey: false, magic: false, key: false, open: true, demo: false, me: null });
+  assert.deepEqual((await open.call('/auth/methods')).body.value, { passkey: false, magic: false, key: false, open: true, me: null });
   assert.equal((await open.call('/auth/token', { body: { serverKey: KEY } })).status, 404);
 
   const lan = setup({ door: { origin: 'http://studio.lan:8080' } });
-  assert.deepEqual((await lan.call('/auth/methods')).body.value, { passkey: false, magic: false, key: false, open: false, demo: false, why: 'insecure', me: null });
+  assert.deepEqual((await lan.call('/auth/methods')).body.value, { passkey: false, magic: false, key: false, open: false, why: 'insecure', me: null });
 
   const bare = setup({ auth: null });
   const said = await bare.call('/auth/methods', { headers: { cookie: `__Host-bd_s=${SID}` } });
-  assert.deepEqual(said.body.value, { passkey: false, magic: false, key: false, open: false, demo: false, why: 'not-configured', me: null });
+  assert.deepEqual(said.body.value, { passkey: false, magic: false, key: false, open: false, why: 'not-configured', me: null });
   assert.deepEqual(said.headers.getSetCookie(), [clearCookie('secure')], 'a cookie this host cannot have issued was kept');
   assert.equal((await bare.call('/auth/session', { headers: { cookie: `__Host-bd_s=${SID}` } })).status, 404);
 });

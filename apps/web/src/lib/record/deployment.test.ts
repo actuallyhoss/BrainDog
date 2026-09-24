@@ -1,8 +1,8 @@
 /**
  * The two hosts, and the half of every branch a single-record seed can never draw.
  *
- * `/settings/backups`, `/settings/billing` and the retention sentence all branch on
- * `DEPLOYMENT.kind`. The seed is one record on one host, so exactly one side of each branch renders
+ * `/settings/backups`, `/settings/billing` and the retention sentence all branched on
+ * `DEPLOYMENT.kind`, and branch on the host `boot` names (`shell.host`) now. The seed is one record on one host, so exactly one side of each branch renders
  * — and `DEPLOYMENT.kind` was `'self-host' as const`, which pinned the LITERAL TYPE and made the
  * other side statically unreachable. `svelte-check` says nothing about a branch that cannot be
  * taken, and `dead-copy` is a grep for `copy.<key>` across `src`, so a sentence inside a dead `{#if}`
@@ -70,10 +70,11 @@ test('every branch on the host has two sides, and they say different things', ()
    * the two sides are not two wordings of one fact — they are two different products, and a screen
    * that showed one on both hosts would be lying to one of them.
    */
+  /* ONE PAIR NOW, NOT THREE. Going back is no longer said per host: the screen says what the record's own answer
+     allows (`restoreLive` or `restoreNotHere`). Billing's Cloud half is the sentence true on both hosts, `billing.ts`'s
+     `notChargedYet`, which `billing.test.ts` pins. */
   const pairs: [string, string, string][] = [
     ['retention', copy.keptSelfHost(SNAPSHOTS_KEPT), copy.keptCloud(SNAPSHOTS_KEPT)],
-    ['going back', copy.restoreSelfHost, copy.restoreCloud],
-    ['billing', copy.billingSelfHost, copy.billingCloud],
   ];
   for (const [what, mine, theirs] of pairs) {
     assert.ok(mine.length > 20, `${what}: the self-host sentence is missing`);
@@ -83,16 +84,8 @@ test('every branch on the host has two sides, and they say different things', ()
 });
 
 test('AND THE CLOUD HALF SAYS WHAT THE CLOUD DOES', () => {
-  /* Unrendered on this seed, so nothing else can check it. Each of these is a sentence a person
-     would read before pressing the most destructive control on the screen. */
-  assert.match(copy.restoreTo, /restore/iu);
-  assert.match(copy.findTheMoment, /moment|time/iu);
-  /* `53 §5.5`: a restore rewinds the record, and what it held is kept first, so going back is
-     itself something to go back from. Both halves, because a control that says only the first is a
-     control nobody presses and a control that says only the second is one they press too readily. */
-  assert.match(copy.restoreLosesWhat, /after the moment you pick/iu);
-  assert.match(copy.restoreBackHow, /kept as a copy/iu);
-  /* And Cloud keeps thirty PLUS `latest` — `53 §4` — which the shared sentence used to hide. */
+  /* The "restore to a time" sentences were drawn only over the sample and went with it (DIRECTION 26). What is left
+     for the Cloud is retention: thirty PLUS `latest`, `53 §4`, which the shared sentence used to hide. */
   assert.match(copy.keptCloud(SNAPSHOTS_KEPT), /latest/iu);
 });
 
@@ -131,48 +124,45 @@ test('and the Cloud half promises nothing the Worker cannot do', () => {
   assert.doesNotMatch(COPIES.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gmu, ''), /getBookmarkForTime\s*\(/u, 'the Cloud goes back to any instant now: the sentences below say nights only');
 
   for (const [key, line] of [
-    ['restoreCloud', copy.restoreCloud],
-    ['restoreBackHow', copy.restoreBackHow],
+    ['restoreLive', copy.restoreLive],
     ['restoreNotHere', copy.restoreNotHere],
   ] as const) {
     assert.equal(typeof line, 'string', `${key} is gone`);
     assert.doesNotMatch(line, /thirty days|30 days|any point/iu, `${key} promises a window this build does not serve`);
   }
-  /* WHAT IS TRUE INSTEAD, in each of the two places. The nightly copy is real and the restore is
-     not, so the Cloud sentence is about nights, and a record whose own answer was a refusal is told
-     that going back is asked for rather than pressed. */
-  assert.match(copy.restoreCloud, /night/iu, 'the Cloud sentence no longer says what a copy is');
+  /* WHAT IS TRUE INSTEAD, in each of the two places. A record that listed its copies goes back to one of them, and a
+     record whose own answer was a refusal is told that going back is asked for rather than pressed. */
+  assert.match(copy.restoreLive, /one of the copies/iu, 'the live sentence no longer says what going back is to');
   assert.match(copy.restoreNotHere, /cannot reach|asked for/iu, 'the refused sentence does not say where the copies are or what to do');
 
   /**
-   * AND THE CONTROL IS NOT DRAWN OVER A REFUSAL, which is what the Kept section immediately above
-   * already does. `restoreToTime` calls `restore` with an empty bookmark; on a hosted record that
-   * comes back `NOT_IN_THIS_BUILD` as a toast, so the button's whole act was an apology. The guard
-   * is the sample alone rather than `!== 'live'`, because `reading` is the state the screen is in
-   * before the record has answered and a control that flashes is one somebody presses.
+   * AND THERE IS NO "RESTORE TO A TIME" CONTROL AT ALL. `restoreToTime` called `restore` with an empty bookmark, and it
+   * was drawn only over the sample on the Cloud build, which is gone (DIRECTION 26). Going back is `Restore this` on a
+   * copy the record listed.
    */
   const at = AREA.indexOf('<Section title={copy.restore}>');
   assert.ok(at > 0, 'the going-back section is gone');
-  const section = AREA.slice(at, AREA.indexOf('</Section>', at));
+  const section = AREA.slice(at, AREA.indexOf('</Section>', at)).replaceAll(/<!--[\s\S]*?-->/gu, '');
   assert.match(section, /copy\.restoreNotHere/u, 'a record that keeps no copies is told nothing about going back');
-  assert.match(section, /DEPLOYMENT\.kind !== 'self-host' && copiesFrom === 'sample'/u, 'the restore control is drawn where the record refused it');
+  assert.doesNotMatch(section, /restoreToTime|copy\.restoreTo\b|'sample'/u, 'a restore to a time is drawn again');
 });
 
 test('and the self-host half says what the record it is on actually does', () => {
-  assert.match(copy.restoreSelfHost, /by hand|import/iu);
   assert.match(copy.keptSelfHost(SNAPSHOTS_KEPT), /this machine/iu);
-  /* `49 §5.13`'s `GET /api/snapshots/:id`. A self-host's only way back is putting a copy back, so
-     the copy has to be reachable — and Cloud's R2 prefix is not served to a browser, so the control
-     belongs to one host and not the other. */
+  /* `49 §5.13`'s `GET /api/snapshots/:id`. The copy has to be reachable to be put back by hand, so the download is
+     drawn wherever the record listed its copies, on either host, and never before it has answered. */
   assert.ok(copy.download.length > 2);
-  assert.match(AREA, /DEPLOYMENT\.kind === 'self-host'[\s\S]{0,400}?copy\.download/u, 'the download is not on the self-host branch');
+  assert.match(AREA, /copiesFrom === 'live'[\s\S]{0,400}?copy\.download/u, 'the download is not drawn over the record’s own list');
 });
 
-test('the screen branches on the host in every place the documents do', () => {
-  /* Three: what is kept, going back, and billing. A fourth appearing without a sentence for the
-     other side is the shape this file exists to catch. */
-  const branches = [...AREA.matchAll(/DEPLOYMENT\.kind/gu)].length;
-  assert.ok(branches >= 3, `only ${branches} host branches on a screen the documents split three ways`);
+test('the screen branches on the host the record named, and never on the build', () => {
+  /* TWO PLACES NOW: what is kept, and billing. Going back follows the record's own answer instead (above). Both read
+     `shell.host`, what `boot` said, because `DEPLOYMENT.kind` follows the build's variant and read `self-host` in every
+     shipped bundle. Comments are stripped, so a comment naming either cannot pass or fail this. */
+  const code = AREA.replaceAll(/<!--[\s\S]*?-->/gu, '').replaceAll(/\/\*[\s\S]*?\*\//gu, '');
+  assert.doesNotMatch(code, /DEPLOYMENT/u, 'the screen reads the build’s idea of its host again');
+  assert.match(code, /shell\.host === 'cloud' \? copy\.keptCloud\([^)]*\) : copy\.keptSelfHost\(/u, 'what is kept no longer follows the host');
+  assert.match(code, /billingLine\(\{ host: shell\.host\b/u, 'billing no longer follows the host');
 });
 
 test('a night that kept nothing is not counted as a copy that is kept', () => {

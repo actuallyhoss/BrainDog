@@ -1,6 +1,6 @@
 /**
- * The shell's read: the record's `boot` drawn in the sample's shape, the sample when there is no record, the record's
- * sentence for any other refusal, and one request for the tab.
+ * The shell's read: the record's `boot` drawn in the shell's shape, and one request for the tab; any refusal, a 401 or
+ * no record at all among them, is the record's own sentence and is asked again.
  */
 
 import { test } from 'node:test';
@@ -228,21 +228,48 @@ test('a pack install names the list it brought, not the bare verb', () => {
   assert.equal(at({ kind: 'uninstall', target: 'pack:usecase-new-project' }), 'Removed the New project use case');
 });
 
-for (const [what, answer] of [
-  ['nothing answers', null],
-  ['the record says UNAUTHORIZED', () => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } })],
-  ['a static host answers a 404 page', () => new Response('<!doctype html><title>Not found</title>', { status: 404 })],
+/**
+ * NO RECORD HERE IS A REFUSAL LIKE ANY OTHER, and the sample it used to answer is gone (DIRECTION 26).
+ *
+ * THESE THREE WERE THE SAMPLE'S DOOR. A 401, a socket that failed and a static host's 404 page at an address with no
+ * slug all answered `{ from: 'sample' }`, kept for the tab, and the shell drew The Studio over them. Now each is the
+ * refusal it was: the layout sends the 401 to sign-in and draws the other two as a record that could not be reached.
+ * NOT KEPT, like every refusal, so the first load after somebody signs in asks the record rather than being handed the
+ * answer from before; the kept sample was exactly that bug (`signin-onward.test.ts`).
+ */
+for (const [what, answer, code] of [
+  ['nothing answers', null, 'UNREACHABLE'],
+  ['the record says UNAUTHORIZED', () => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } }), 'UNAUTHORIZED'],
+  ['a static host answers a 404 page', () => new Response('<!doctype html><title>Not found</title>', { status: 404 }), 'UNREACHABLE'],
 ] as const) {
-  test(`${what}: the shell draws the sample, and asks once for the tab`, async () => {
+  test(`${what} at the bare /app: the answer is a refusal, ${code}, and it is asked again`, async () => {
     forget();
     const { io, sent } = host(answer);
-    assert.deepEqual(await readBoot(BASE, io), { from: 'sample' });
-    assert.deepEqual(await readBoot(BASE, io), { from: 'sample' });
-    assert.equal(sent.length, 1);
-    assert.equal(new URL(sent[0]!).pathname, '/api/boot');
+    const first = await readBoot(`${BASE}/app`, io);
+    assert.equal(first.from, 'refused', JSON.stringify(first));
+    assert.equal(first.from === 'refused' ? first.code : null, code);
+    await readBoot(`${BASE}/app`, io);
+    assert.equal(sent.length, 2, 'a refusal about whether anybody is signed in was kept for the tab');
+    assert.equal(new URL(sent[0]!).pathname, '/app/api/boot');
     forget();
   });
 }
+
+test('A 401 AT /app ANSWERS THE RECORD\'S OWN REFUSAL, word for word, and the shell drawn over it carries it', async () => {
+  forget();
+  const { io } = host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } }));
+  assert.deepEqual(await readBoot(`${BASE}/app`, io), { from: 'refused', code: 'UNAUTHORIZED', fix: 'Sign in again.' });
+  const shell = refusedShell();
+  assert.equal(shell.live, true, 'nothing drawn over a refusal is the in-browser sample');
+  assert.equal(shell.index.registers.length, 0);
+  assert.deepEqual(shell.refused, { code: 'UNAUTHORIZED', fix: 'Sign in again.' });
+  forget();
+});
+
+test('THE SHELL MODULE NO LONGER CARRIES A SAMPLE SHELL', async () => {
+  const mod: Record<string, unknown> = await import('./boot-live.ts');
+  assert.equal(mod.sampleShell, undefined);
+});
 
 test('UNDER A SLUG A 401 ASKS FOR SIGN-IN AND IS NEVER THE SAMPLE, which would be drawn dressed as that record', async () => {
   forget();
@@ -289,18 +316,6 @@ test('A RECORD SETTING ITSELF UP IS ONE LINE: the use case and how many example 
   assert.equal(at({ target: 'pack:usecase-personal', target_kind: 'pack', to: 40 }), 'Set up Personal with 40 example rows');
   assert.equal(at({ target: null, target_kind: null, to: 1 }), 'Added 1 example row');
   assert.equal(at({ target: null, target_kind: null, to: 0 }), 'Linked the example rows to each other');
-});
-
-test('THE SAMPLE SAYS ONE COUNT OF OPEN QUESTIONS: the rail and Home, the Decide figure and the queue Decide draws', async () => {
-  const { sampleShell } = await import('./boot-live.ts');
-  const { boot, metric } = await import('./api.ts');
-  const { ARRANGING, QUEUE } = await import('./data.ts');
-  const shell = sampleShell(boot() as never, 0);
-  /* BY ID AND NOT BY IDENTITY. `QUEUE` bands each question as it composes the list, so its entries are
-     copies of these rather than these; what the count needs is that every arrangement is in it. */
-  assert.ok(ARRANGING.every((q) => QUEUE.some((x) => x.id === q.id)), 'Decide draws the arranging proposals, so the count holds them');
-  assert.equal(shell.open, QUEUE.length);
-  assert.equal(metric('open-questions').value, String(QUEUE.length));
 });
 
 test('A SAVED VIEW ON A RECORD SITS UNDER ITS LIST in the rail and at its page, and holds its list there even with no rows in it yet', () => {
@@ -495,14 +510,15 @@ test('and a shell over a record that answered, or over no record at all, carries
   assert.equal(layoutOf(BOOT as never).refused, undefined);
   assert.equal(refusedShell().refused, undefined, 'a refusal from a read that came back was still being carried');
 
-  /* AND OVER NO RECORD AT ALL. A tab can go from a record that refused to a host that has none, and
-     the sample's shell is drawn there; nothing should be holding the other host's sentence. */
+  /* AND OVER A HOST WHERE NOBODY IS SIGNED IN. A tab can go from a record that refused to a host that
+     answers 401; that host's own sentence is the one carried, never the first host's. It was the
+     sample's shell here, with no sentence at all, until the sample went (DIRECTION 26). */
   forget();
   const again = host(() => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Ask the owner.' } }));
   assert.equal((await readBoot(BASE, again.io)).from, 'refused');
   const none = host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in.' } }));
-  assert.equal((await readBoot(BASE, none.io)).from, 'sample');
-  assert.equal(refusedShell().refused, undefined, 'a refusal from another host was still being carried');
+  assert.equal((await readBoot(BASE, none.io)).from, 'refused');
+  assert.deepEqual(refusedShell().refused, { code: 'UNAUTHORIZED', fix: 'Sign in.' }, 'a refusal from another host was still being carried');
   forget();
 });
 

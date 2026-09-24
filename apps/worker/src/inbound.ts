@@ -91,8 +91,8 @@ const refusal = (status: number, refused: Refusal, extra: readonly Header[] = []
  * The one sentence every caller that is not a browser session gets at `/api/inbound/*`.
  *
  * ONE COPY, AND IT IS EXPORTED FOR THE OTHER PLACE THAT REFUSES. This door refuses the
- * `Authorization` header it can see; `index.ts` refuses the bearer and the demo doors, which reach
- * the router without one and never reach this function. Two spellings of one refusal is how a caller
+ * `Authorization` header it can see; `index.ts` refuses the bearer door, which reaches the router
+ * without one and never reaches this function. Two spellings of one refusal is how a caller
  * learns which branch refused them, and the answer to "which branch" is none of their business.
  */
 export const NO_MINT_SESSION: Refusal = {
@@ -167,8 +167,8 @@ const digest = async (token: string): Promise<string> =>
  * self-host with no `BRAINDOG_TOKEN` makes an unauthenticated request the owner, which is right for
  * one person on loopback and stops being right the moment the call mints something that works from
  * anywhere. A forwarding address is exactly that, and it is handed to third parties on purpose. This
- * Worker's one uncredentialed principal is the public demo's, which is `read` and is refused a line
- * above; the check is here because the rule belongs to the door and not to the deployment.
+ * Worker has no uncredentialed principal now its public demo is gone (`loop/research-no-sample.md` A1);
+ * the check is here because the rule belongs to the door and not to the deployment.
  */
 export async function serveInbound(request: Request, door: InboundDoor, ctx: CallContext): Promise<Response> {
   const which = servesInbound(new URL(request.url).pathname);
