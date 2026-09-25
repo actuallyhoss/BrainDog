@@ -532,12 +532,19 @@ export function layoutOf(b: Boot): Shell {
    * because that is the one package both rails can read; `pages.ts` there carries the argument,
    * the numbers behind it and why the budget is keyed on the pair rather than on the register.
    */
+  /* THE FIVE KEPT ARE THE ROWS TOUCHED LAST, DRAWN IN THE RECORD'S ORDER. A template's pages come in a stable order, the
+     order the rows were written in, so that a strip of tabs does not move when a row is edited. The first five of that
+     are the five oldest, where before they were the five edited last. So the cap is spent in order of `about.updated_at`,
+     newest first, and the pages it keeps are then drawn where the record put them. A host that sends no time spends
+     it in the record's order, which is the rail it drew before. */
   const room = railRoom();
+  const newest = [...(b.pages ?? [])].sort((x, y) => (y.about?.updated_at ?? '').localeCompare(x.about?.updated_at ?? ''));
+  const kept = new Set(newest.filter((p) => p.nav && room(p.about ? { register: p.about.register, section: p.nav.section } : null)));
   /* AND WHETHER ITS SECTION IS DRAWN AS TABS (`$lib/page/tabs.ts`). This entry named its five keys and so dropped every
      other one `boot` sent: with `tabs: true` on the page, `tabsOf` over this list answered no strip on every page of the
      section (`tabs.test.ts`, five of its cases). Only `true` is carried, and a page that did not say it carries no key. */
   const nav: ShellBase['nav'] = (b.pages ?? []).flatMap((p) =>
-    p.nav && room(p.about ? { register: p.about.register, section: p.nav.section } : null)
+    p.nav && kept.has(p)
       ? [
           {
             id: p.slug,

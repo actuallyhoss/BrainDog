@@ -624,6 +624,7 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     types: typed,
     done_now: doneNow,
     next: nextAt,
+    open: openSteps,
     ...rest
   } = b;
 
@@ -868,6 +869,8 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
   const marks = kind === 'steps' && Array.isArray(doneNow) && doneNow.length === got.length && doneNow.every((d) => typeof d === 'boolean') ? (doneNow as boolean[]) : null;
   const path = marks ? { done_now: marks, next: typeof nextAt === 'number' && Number.isInteger(nextAt) && nextAt >= 0 && nextAt < marks.length ? nextAt : null } : {};
   const short = marks !== null && typeof rest.first === 'number';
+  /* AND HOW MANY STEPS ARE OPEN, which the short view's "N more" is counted from: `matched` holds the done ones too. */
+  const open = short && typeof openSteps === 'number' && Number.isInteger(openSteps) && openSteps >= 0 ? { open: openSteps } : {};
   return {
     ...shell,
     register,
@@ -877,6 +880,7 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     shown: reduces || short ? matched : entries.length,
     total: matched,
     ...path,
+    ...open,
     ...(spentBy === undefined ? {} : { spentBy }),
     names: namesOf(refs),
     ...(inherited === undefined ? {} : { inherited }),

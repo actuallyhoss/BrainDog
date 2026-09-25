@@ -5581,7 +5581,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
            somebody wrote. The rail is what needs it: a cap of the form "at most five pages per
            list under one heading" cannot be written against entries that carry no list, so the
            one the sample applies could not be applied to the rail a real record draws. */
-        about: p.row ? { register: p.row.register, seq: p.row.seq } : null,
+        /* AND WHEN THAT ROW LAST CHANGED, because a template's pages now come in a stable order (the order written) and the
+           rail's five are the rows touched last, which it can only choose with the time beside each (`boot-live.ts`). */
+        about: p.row ? { register: p.row.register, seq: p.row.seq, updated_at: p.row.updated_at } : null,
         icon: typeof p.decl.icon === 'string' ? p.decl.icon : null,
       })),
 

@@ -1107,15 +1107,19 @@ function formOf(block: BlockResult): string {
  * was the list's free text, so a path whose third column was a stage drew "sample" where the record knew the step was
  * done; on a path the third cell is the one fact the form exists to say.
  *
- * `N` IS WHAT THE SHORT VIEW DID NOT DRAW, the list's `matched` less the stones, which is the kernel's own arithmetic
- * ("1 of 3" is what the drawer's "2 more" is counted from, `pages.ts`). It is written only under `first:`, because a
- * path cut by `limit:` is a slice, and the page's slice line under it already says so with a door to the rest.
+ * `N` IS HOW MANY OPEN STEPS THE SHORT VIEW DID NOT DRAW, the record's `open` less the stones, which is what the drawer
+ * says it is (`render/src/path.ts`). It was `matched` less the stones, and `matched` counts the done steps too: 5 steps
+ * with 2 done under `first: 2` drew 2 and said "3 more" where 1 was left out, and a path with every step done said
+ * "2 more" of nothing. Nothing is written when none is left out, nor when the record did not say how many are open. It
+ * is written only under `first:`, because a path cut by `limit:` is a slice, and the page's slice line under it already
+ * says so with a door to the rest.
  */
 function pathRows(block: BlockResult, cells: number): string[] {
   const marks = marksOf(block) ?? [];
   const next = keyOf(block, 'next');
   const stones = projectRows(block, cells, (i) => (marks[i] ? 'done' : next === i ? 'next' : ''));
-  const more = typeof keyOf(block, 'first') === 'number' ? Math.max(0, block.total - stones.length) : 0;
+  const open = keyOf(block, 'open');
+  const more = typeof keyOf(block, 'first') === 'number' && typeof open === 'number' ? Math.max(0, open - stones.length) : 0;
   return more > 0 ? [...stones, `more | ${more}`] : stones;
 }
 

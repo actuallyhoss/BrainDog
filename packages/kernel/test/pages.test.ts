@@ -544,11 +544,12 @@ test('A PAGE OUT OF A TEMPLATE SAYS WHICH ROW OF WHICH REGISTER IT IS ABOUT, and
   const pages = k.pages() as { slug: string; about: { register: string; seq: number | null } | null }[];
   assert.deepEqual(
     pages.filter((p) => p.about).map((p) => [p.slug, p.about?.register, p.about?.seq]),
-    /* The record's own order, which for these is newest first, and the order the rail draws them in. */
+    /* The order the rows were written in, which the rail and a strip of tabs draw them in. It was the list's default,
+       the row changed last first, so editing a row moved its page (`template-fill.test.ts`). */
     [
-      ['anvil', 'things', 3],
-      ['loom', 'things', 2],
       ['kiln', 'things', 1],
+      ['loom', 'things', 2],
+      ['anvil', 'things', 3],
     ],
     'a page per project did not say which project it is a page of',
   );

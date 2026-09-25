@@ -695,7 +695,8 @@ export type Boot = {
     nav: { section: string; order: number; tabs?: true } | null;
     icon: string | null;
     list: string | null;
-    about: { register: string; seq: number | null } | null;
+    /** `updated_at` is when that row last changed, so the rail can draw the rows touched last while tabs keep their order. */
+    about: { register: string; seq: number | null; updated_at: string } | null;
   }[];
   /**
    * How many questions wait on a person, and how many arrivals wait in the inbox.

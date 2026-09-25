@@ -18,7 +18,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 
-import { openRecord, type Kernel } from '@braindog/kernel';
+import { fill, openRecord, type Kernel } from '@braindog/kernel';
 import { installSeed } from '@braindog/seed';
 
 import './fixtures/fill.ts';
@@ -365,4 +365,56 @@ test('AN ORDERED CLAUSE OPENS THE REGISTER WIDE, because no chip can carry it ba
   assert.equal(registerHref('obligations', 'amount at least GBP 2400'), '/r/obligations');
   assert.equal(registerHref('obligations', 'what contains rent, state is open'), '/r/obligations');
   assert.equal(registerHref('obligations', 'due at least today'), '/r/obligations');
+});
+
+/* ── a quoted value ──────────────────────────────────────────────────────── */
+
+test('A FILTER THE RECORD PRINTS WITH A QUOTED VALUE READS THE SAME HERE, commas and all', async () => {
+  /* A TEMPLATE FILLS A ROW'S VALUE INTO ITS `where` THROUGH `quoteValue` (`fill` in `packages/kernel/src/pages.ts`), and
+     quotes it where the bare words would not read back as that one value. Thirty of the seed's obligations hold a comma in
+     `what`. This engine cut a sentence on every comma, so `what is "Studio rent, June"` was the clause `what is "Studio
+     rent` and a second clause asking for a field called `June"`; it is cut by the record's own `clausesOf` now, and a
+     quoted value is read whole by the record's own `unquoted`. */
+  const k = await record;
+  const all = k.list({ register: 'obligations', limit: 500 });
+  assert.ok(all.ok);
+  let quoted = 0;
+  for (const row of all.value.rows.filter((r) => String(r.fields.what ?? '').includes(','))) {
+    const { where } = fill({ where: 'what is {{what}}' }, row) as { where: string };
+    assert.equal(where, `what is "${String(row.fields.what)}"`);
+    quoted += 1;
+    const said = await agree('obligations', where);
+    assert.equal(said.refused, null, where);
+    assert.ok(said.seqs.includes(row.seq!), `"${where}" did not find the row it was printed from`);
+    const not = await agree('obligations', (fill({ where: 'what is not {{what}}, what contains {{it}}' }, row, ', ') as { where: string }).where);
+    assert.equal(not.refused, null);
+  }
+  assert.ok(quoted >= 20, `only ${quoted} rows were quoted, so this proves little`);
+  /* AND THE REST OF THE RULES, over both engines: `or` and `not` inside the marks, `has` and `lacks`, a comma inside a
+     quoted `contains`, and a mark that never closes, which opens nothing and leaves the comma after it to end the clause. */
+  for (const [register, sentence] of [
+    ['obligations', 'what is "Studio rent, June", state is open'],
+    ['obligations', 'what is not ‘Studio rent, June’'],
+    ['obligations', 'what is "rent or bills"'],
+    ['obligations', 'what is "not here"'],
+    ['obligations', 'what is "empty"'],
+    ['obligations', 'what contains ", annual"'],
+    ['obligations', 'what contains "rent, June", or what contains "fee, J"'],
+    ['things', 'repos has "a, b"'],
+    ['things', 'repos lacks "x or y"'],
+    ['things', 'repos has not "a, b"'],
+    ['obligations', "what is 'tis, state is open"],
+  ] as const)
+    assert.equal((await agree(register, sentence)).refused, null, `${register}: ${sentence}`);
+  /* AND A QUOTE WITH NOTHING IN IT IS REFUSED BY BOTH, in the record's words. */
+  for (const [register, sentence] of [
+    ['obligations', 'what is ""'],
+    ['things', 'repos has ""'],
+    ['obligations', "what is 'tis, June' is here"],
+  ] as const) {
+    const theirs = await askRecord(register, sentence);
+    const ours = askBrowser(register, sentence);
+    assert.ok(theirs.refused, `the record answered "${sentence}"`);
+    assert.equal(ours.refused === null, false, `the browser answered "${sentence}", the record refused: ${theirs.refused}`);
+  }
 });

@@ -287,12 +287,15 @@ test('ONE TAB SECTION HOLDS THE DESK, ONE PAGE PER PART AND THE NUMBERS, in that
     .pages()
     .filter((p) => p.nav?.section === 'Launch')
     .sort((a, b) => a.nav!.order - b.nav!.order);
-  /* THE PARTS AMONG THEMSELVES ARE NOT HELD TO AN ORDER HERE. They share the template's one `nav.order`, and measured on
-     September 25th the kernel lists a template's pages in its list's default order, the row updated last first: written
-     candle, box, shop page, word, they came back word, shop page, box, candle. The pack has no word for it. */
-  assert.equal(launchPages[0]!.title, 'Desk');
-  assert.equal(launchPages.at(-1)!.title, 'Numbers');
-  assert.deepEqual(launchPages.slice(1, -1).map((p) => p.title).sort(), ['The box', 'The candle', 'The shop page', 'Word of it']);
+  /* THE PARTS COME IN THE ORDER THEY WERE WRITTEN, and stay there. They share the template's one `nav.order`, and on
+     September 25th the kernel listed a template's pages in its list's default order, the row updated last first: written
+     candle, box, shop page, word, they came back word, shop page, box, candle, and a part's tab moved whenever its row
+     was edited. A template's pages now keep the list's declared order, or the order the rows were written in. */
+  const titles = () => api.kernel.pages().filter((p) => p.nav?.section === 'Launch').sort((a, b) => a.nav!.order - b.nav!.order).map((p) => p.title);
+  assert.deepEqual(launchPages.map((p) => p.title), ['Desk', 'The candle', 'The box', 'The shop page', 'Word of it', 'Numbers']);
+  const candle = api.kernel.pages().find((p) => p.title === 'The candle')!;
+  said(api.kernel.update('parts', `parts#${candle.about!.seq}`, { what: 'Edited last.' } as never, { actor: 'p_1' }));
+  assert.deepEqual(titles(), ['Desk', 'The candle', 'The box', 'The shop page', 'Word of it', 'Numbers'], 'editing a part moved its tab');
   assert.ok(launchPages.every((p) => p.nav?.tabs === true), 'a page in the section does not carry tabs, so its strip could disagree');
   sql.close();
 });
@@ -311,6 +314,7 @@ test('A PART\'S PAGE ANSWERS EVERY BLOCK: its path, its calls, its pad and its h
     { id: 'cedar', label: 'Cedar', because: 'Burns cleanest' },
   ] } } as never, 'slash'));
   make(api, 'notes', { text: 'A ribbon on the box, or not?', about: box.id });
+  make(api, 'notes', { text: 'Launch in the spring?' });
 
   const slug = api.kernel.pages().find((p) => p.title === 'The box')!.slug;
   const page = await pageOf(api, slug);
@@ -327,23 +331,29 @@ test('A PART\'S PAGE ANSWERS EVERY BLOCK: its path, its calls, its pad and its h
   assert.deepEqual(calls.queue?.map((q) => q.question), ['Which card stock for the box?']);
   assert.deepEqual(page.blocks.find((b) => b.heading === 'Who helps')!.rows.map((r) => r.fields.name), ['The box printer']);
   assert.deepEqual(page.blocks.find((b) => b.heading === 'Learned on the way' && b.kind === 'table')!.rows.map((r) => r.fields.lesson), ['Samples take a week']);
-  /* THE PAD IN THE RAIL IS THE WHOLE PAD, and the next test says why it is not this part's alone. */
+  /* THE PAD IN THE RAIL IS THIS PART'S, and a thought typed there is preset to be about it (the next test). */
   const pad = page.blocks.filter((b) => b.area === 'rail' && b.kind === 'cards');
   assert.deepEqual(pad.map((b) => b.rows.map((r) => r.fields.text)), [['A ribbon on the box, or not?']]);
+  assert.deepEqual(page.blocks.find((b) => b.kind === 'capture')!.fills, { about: box.id });
   sql.close();
 });
 
-test('MEASURED: a capture cannot yet preset which part a note is about, so the part page\'s pad is not filtered to the part', async () => {
+test('A CAPTURE PRESETS WHICH PART A NOTE IS ABOUT, so the pad on the page of a part is filtered to the part and keeps what is typed there', async () => {
   /* SECTION 7 SAYS "the pad preset by capture's where". On September 25th, `where: about is {{spoken}}` (the one spelling
-     a template fills with the row's own id) answered `fills: {}` on the capture, because a capture presets an enum or a
-     text field and never a link (`captureFills` in `packages/kernel/src/pages.ts`). A cards block filtered the same way
-     then hid every thought typed beside it, so the page shows the whole pad instead. When the capture learns to preset a
-     link this test goes red, and the pack can filter both blocks. */
+     a template fills with the row's own id) answered `fills: {}` on the capture, because a capture preset an enum or a
+     text field and never a link, and a cards block filtered the same way would have hidden every thought typed beside it.
+     The capture now presets a link named by its spoken id or row id (`captureFills` in `packages/kernel/src/pages.ts`),
+     so the pack filters both blocks. */
   const { api, sql } = await desked();
   const { box } = await launch(api);
   const capture = api.kernel.block({ kind: 'capture', register: 'notes', where: `about is parts#${box.seq}` } as never) as unknown as Block;
   assert.deepEqual(capture.refusals, []);
-  assert.deepEqual(capture.fills, {});
+  assert.deepEqual(capture.fills, { about: box.id });
+  /* WHAT THE HOST WRITES WITH THOSE FILLS IS WHAT THE PAD BESIDE IT DRAWS. */
+  make(api, 'notes', { text: 'Kraft looks warmer.', ...capture.fills });
+  const slug = api.kernel.pages().find((p) => p.title === 'The box')!.slug;
+  const pad = (await pageOf(api, slug)).blocks.find((b) => b.area === 'rail' && b.kind === 'cards')!;
+  assert.deepEqual(pad.rows.map((r) => r.fields.text), ['Kraft looks warmer.']);
   sql.close();
 });
 

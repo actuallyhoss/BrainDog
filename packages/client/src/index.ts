@@ -90,7 +90,8 @@ export type Boot = {
     nav: { section: string; order: number; tabs?: true } | null;
     icon: string | null;
     list?: string | null;
-    about?: { register: string; seq: number | null } | null;
+    /** `updated_at`, when that row last changed, picks the rail's five; absent from a host older than it. */
+    about?: { register: string; seq: number | null; updated_at?: string } | null;
   }[];
   /** How many questions wait on a person, and how many arrivals wait in the inbox: `null` when the caller may not see it. */
   counts?: { decide: number; inbox: number | null; decided?: number };

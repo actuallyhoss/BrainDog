@@ -20,7 +20,7 @@
 import type { Refusal, Result } from '@braindog/ports';
 import { no, ok, refused } from '@braindog/ports';
 import type { Leaf, Predicate, Schema } from '@braindog/where';
-import { evaluate } from '@braindog/where';
+import { clausesOf, evaluate, quoteValue } from '@braindog/where';
 
 import type { ActionRow } from './actions.ts';
 import { BLOCK_READS, KEY_KINDS, wrongKindKey } from './block-keys.ts';
@@ -230,6 +230,12 @@ export type BlockResult = PageBlock & {
   done_now?: boolean[];
   /** And the index in `rows` of the first row not done, `null` when every row is. */
   next?: number | null;
+  /**
+   * A `steps` block's under `first:`: how many of the steps `matched` are open. `matched` counts the done ones too, so the
+   * short view's "more" is this less the open steps it drew, and never `matched` less them (5 steps, 2 done, `first: 2`
+   * drew 2 and said 3 more where 1 was left out).
+   */
+  open?: number;
   /** An `inputs` block's: the type of each field it draws, by field id, which a host picks its control by. */
   types?: Record<string, string>;
   /** A `feed` block's rows, newest first, a burst being one row. */
@@ -559,7 +565,27 @@ export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; ro
        `review-pr` and `review-pr-1`, which says nothing about which is which, and which of them took the bare
        name turned on the order the rows were listed in. So the row that applies everywhere keeps the name, and a
        row scoped to a place is named for it too: `review-pr-kiln`. */
-    const rows = listed.value.rows;
+    /* A TEMPLATE'S PAGES KEEP ONE ORDER. They share the template's one `nav.order`, so the order they were listed in was
+       the order a rail and a strip of tabs drew them in, and that was the list's default, the row changed last first:
+       editing a part moved its tab (measured on a pack with a page per part, September 25th). So they come in the list's
+       declared order, which is its `steps:` order where it is a list of steps, a row with none after the rest, and
+       otherwise, and between equals, the order the rows were written in. */
+    const order = ownSteps(deps, decl.for.register, schema)?.order;
+    const rank = (row: Entry): number | string | null => {
+      const v = order === undefined ? null : row.fields[order];
+      return typeof v === 'number' || typeof v === 'string' ? v : null;
+    };
+    const rows = [...listed.value.rows].sort((x, y) => {
+      const a = rank(x);
+      const b = rank(y);
+      if (a !== b) {
+        if (a === null) return 1;
+        if (b === null) return -1;
+        if (a < b) return -1;
+        if (a > b) return 1;
+      }
+      return (x.seq ?? 0) - (y.seq ?? 0);
+    });
     const counts = new Map<string, number>();
     for (const row of rows) {
       const base = slugify(String(row.fields[title] ?? ''));
@@ -1078,7 +1104,8 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
         });
   /* THE SHORT VIEW OF A PATH ASKS FOR ITS OPEN ROWS, so the done ones never take the room `limit` gives. Cut after the
      read, a path of [done, open, open, open] with `first: 2, limit: 1` answered no rows while three steps were open.
-     `matched` is still the whole list's, asked apart: "1 of 3" is what the drawer's "2 more" is counted from. */
+     `matched` is still the whole list's, asked apart, and `open` is this read's own count: the drawer's "more" is the
+     open steps it did not draw, so it is counted from `open` and not from `matched`, which holds the done ones too. */
   const short = path && block.first !== undefined ? path : null;
   const listed = short ? ask(openOf(said.predicate, short.done), Math.min(limit, Math.max(1, Math.floor(block.first!)))) : ask(said.predicate, limit);
   if (!listed.ok) return { ...base, refusals: refused(listed) ? also(listed.refusal) : also() };
@@ -1189,6 +1216,8 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
     ...(asksChanged ? { changes: changesOf(deps, register, rows) } : {}),
     ...(block.working === true ? { working_now: workingOf(deps, register, rows) } : {}),
     matched: whole.value.matched,
+    /* THE OPEN STEPS, which the short view's read already counted: it asked for the open rows alone. */
+    ...(short ? { open: listed.value.matched } : {}),
     ...(inherit ? { inherited: listed.value.inherited ?? 0 } : {}),
     ...(scope ? { scopes: scopesOf(deps, rows, scope) } : {}),
     ...ringsOf(deps, block, register, rows),
@@ -1832,7 +1861,10 @@ function captureBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also:
   if (!schema) return { ...base, refusals: also({ code: 'REGISTER_UNKNOWN', fix: `There is no register called ${register}, so a capture has nowhere to add to.`, at: 'register' }) };
   const said = predicateOf(block.where, schema, deps.ctx);
   if (said.bad.length) return { ...base, refusals: also(...said.bad) };
-  return { ...base, fills: captureFills(said.predicate, schema, deps.titleOf(register)) };
+  /* THE SAME SENTENCE READ AGAIN WITH NO TITLE LOOKUP, where a title names no row, so the links left standing are the
+     ones it named by a spoken id or a row id (`captureFills` says why only those). */
+  const byId = predicateOf(block.where, schema, { ...deps.ctx, refByTitle: undefined, absent: 'no-row' });
+  return { ...base, fills: captureFills(said.predicate, schema, deps.titleOf(register), byId.bad.length ? undefined : byId.predicate) };
 }
 
 /** The field types an `inputs` block can offer a control for. A ref, a list, a file or a document is not typed into a box. */
@@ -1897,25 +1929,31 @@ function inputsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: 
  *   set, and picking one member for somebody is a guess stored as if they had said it. Anything under `any` or
  *   `none` is the same guess one level down.
  *
- *   ENUM AND TEXT ONLY. A day filter is usually a moving word (`by before today`), and a link is resolved from a
- *   title to a row id here but not by the sample engine, which reads the reader's prose; filling one on this side
- *   alone would make the two engines draw different rows for one line typed on one page.
+ *   ENUM AND TEXT, AND A LINK NAMED BY ITS ID. A day filter is usually a moving word (`by before today`). A link named
+ *   by a title is resolved to a row id here but not by the sample engine, which reads the reader's prose, and a title
+ *   is a guess at a row besides, so it is not preset. A link named by its spoken id (`about is parts#2`, which is what a
+ *   template's `{{spoken}}` writes) or its row id names exactly one row in any engine, and is preset: without it a
+ *   pad filtered to one part hid every note typed beside it (measured on a pack with a page per part, September 25th).
+ *   `byId` is the sentence read with no title lookup, and a link is preset only where it reads the same row there.
  *
  *   NEVER THE TITLE, because the title is what the person is typing.
  *
  * THE VALUE IS THE STORED ONE. The parse has already turned `Later` into `backlog`, so the host writes what the
  * record keeps rather than what the page prints.
  */
-function captureFills(predicate: Predicate | undefined, schema: Schema, title: string | null): Record<string, string> {
+function captureFills(predicate: Predicate | undefined, schema: Schema, title: string | null, byId: Predicate | undefined): Record<string, string> {
   if (predicate === undefined) return {};
-  const leaves: Predicate[] = 'all' in predicate && Array.isArray(predicate.all) ? predicate.all : [predicate];
+  const leavesOf = (p: Predicate): Predicate[] => ('all' in p && Array.isArray(p.all) ? p.all : [p]);
+  /* ONE ROW, BY ID: the `is` leaves of the sentence read with no title lookup. A title there named no row. */
+  const named = new Set(byId === undefined ? [] : leavesOf(byId).flatMap((l) => ('field' in l && typeof (l as Leaf).is === 'string' ? [JSON.stringify([l.field, (l as Leaf).is])] : [])));
   const out: Record<string, string> = {};
-  for (const leaf of leaves) {
+  for (const leaf of leavesOf(predicate)) {
     if (!('field' in leaf) || typeof leaf.field !== 'string' || leaf.via !== undefined) continue;
     const said = (leaf as Leaf).is;
     if (typeof said !== 'string' || Object.keys(leaf).length !== 2) continue;
     const type = Object.hasOwn(schema.fields, leaf.field) ? schema.fields[leaf.field]?.type : undefined;
-    if (leaf.field === title || (type !== 'enum' && type !== 'text')) continue;
+    if (leaf.field === title) continue;
+    if (type === 'ref' ? !named.has(JSON.stringify([leaf.field, said])) : type !== 'enum' && type !== 'text') continue;
     out[leaf.field] = said;
   }
   return out;
@@ -2169,7 +2207,7 @@ const PARAM = '{{it}}';
  * fills a parameter goes through `fill`, so `packages/record`'s `metric` call gets the same answer the
  * page runner does without a second copy of this rule.
  *
- * A COMMA IS WHAT SEPARATES A SENTENCE'S CLAUSES, exactly as `parseWhere` splits it, so the clauses
+ * A COMMA IS WHAT SEPARATES A SENTENCE'S CLAUSES, cut by the grammar's own `clausesOf` as `parseWhere` cuts them, so the clauses
  * kept here are the clauses that grammar would have built. A JSON predicate is the same idea one
  * level down: the conjuncts of a top-level `all`, or a lone leaf.
  *
@@ -2187,9 +2225,9 @@ const PARAM = '{{it}}';
  */
 function scopeOf(where: unknown): Predicate | string | undefined {
   if (typeof where === 'string') {
-    const conditions = where.split(',').map((clause) => clause.trim()).filter(Boolean);
+    const conditions = clausesOf(where).map((clause) => clause.trim()).filter(Boolean);
     if (conditions.slice(1).some((clause) => /^or(?:\s|$)/i.test(clause))) return undefined;
-    const kept = where.split(',').filter((clause) => clause.includes(PARAM));
+    const kept = clausesOf(where).filter((clause) => clause.includes(PARAM));
     return kept.length === 0 ? undefined : kept.join(',');
   }
   if (where === null || typeof where !== 'object' || Array.isArray(where)) return undefined;
@@ -2203,39 +2241,63 @@ function scopeOf(where: unknown): Predicate | string | undefined {
 }
 
 /**
+ * The keys whose string is a `where:` sentence, where a filled value has to stay one value: a block's filter, a ring's
+ * `of:`, and the scope a parameter sets.
+ */
+const SENTENCES = new Set(['where', 'of', 'within']);
+
+/**
  * `{{field}}` filled from one row, everywhere in the document.
  *
- * A STRING PASS OVER THE WHOLE DOCUMENT, deliberately: the placeholder appears in a title, in a
+ * EVERY STRING IN THE WHOLE DOCUMENT, deliberately: the placeholder appears in a title, in a
  * predicate, in a heading, in an empty state and in a metric id, and a substitution that walked only
  * the fields somebody remembered is a substitution that leaves `{{name}}` on a screen.
  *
+ * A VALUE FILLED INTO A SENTENCE IS ONE VALUE THERE. A part called `Wax, wick and scent` made
+ * `part is {{name}}` the two clauses `part is Wax` and `wick and scent`, and every block filtered by the
+ * part on its page was refused `FIELD_UNKNOWN`, "parts has no field called wick" (measured on
+ * a pack with a page per part, September 25th). So under a key in `SENTENCES` the value is written by the grammar's
+ * own `quoteValue`: bare where the bare words read back as that one value, which is every name a page
+ * printed before, and quoted where they would not, a comma, an `or`, a quote mark or a leading `not`.
+ * A heading, a title and a body get the value as it stands.
+ *
  * A PARAMETER ALSO SETS `within` ON WHAT IT FILLS, and only a parameter: the clauses it landed in are
  * the figure's scope rather than its filter, and `evaluateMetric` counts `held` inside them. It is
- * written before the substitution runs so the name inside it is escaped by the same pass as the name
+ * written before the substitution runs so the name inside it is written by the same rule as the name
  * inside `where`, which is the only way the two can be guaranteed to compile to the same rows.
+ *
+ * A WALK OVER THE VALUES AND NOT A PASS OVER THE JSON TEXT. The text pass had to escape every value the way
+ * JSON escapes (a title `C:\Repos` made `JSON.parse` throw out of `resolvePages`, and every page in the
+ * record went unlistable), and it could not tell a sentence from a heading. A walk hands each string its own
+ * value, and a key is never filled.
  */
 export function fill(doc: unknown, row: Entry | null, param?: string): unknown {
-  /* ESCAPED THE WAY JSON ESCAPES, not by replacing the one character somebody remembered. A title
-     with a backslash, a newline or a tab in it made `JSON.parse` throw — out of `resolvePages`,
-     which every page listing calls, so ONE row called `C:\Repos` made every page in the record
-     unlistable. `JSON.stringify` of the value, minus its quotes, is the escaping the format already
-     has, and it covers the ones nobody thinks of. */
-  const escaped = (value: string): string => JSON.stringify(value).slice(1, -1);
   /* A DOCUMENT WITH A PARAMETERISED `where` IS A METRIC TEMPLATE, which is the only document a
      parameter is ever handed: a page template is filled from a ROW and carries no top-level `where`
      of its own. So the key is added on that shape and nowhere else. */
   const scope = param === undefined || doc === null || typeof doc !== 'object' || Array.isArray(doc) ? undefined : scopeOf((doc as { where?: unknown }).where);
-  const text = JSON.stringify(scope === undefined ? doc : { ...(doc as object), within: scope }).replace(/\{\{(\w+)\}\}/g, (whole, key: string) => {
-    if (key === 'it') return param === undefined ? whole : escaped(param);
+  const valueOf = (key: string): string | null => {
+    if (key === 'it') return param ?? null;
     /* A ROW'S SPOKEN ID, spelled as the ladder writes a run's `project` (`things#1`), so a template page
        finds its runs by `project is {{spoken}}`. A register with its own prefix would need its
        declaration here; the projects register has none. */
-    if (key === 'spoken') return row ? escaped(row.register + '#' + String(row.seq)) : whole;
+    if (key === 'spoken') return row ? row.register + '#' + String(row.seq) : null;
     /* OWN PROPERTIES ONLY. `{{constructor}}` read the prototype and filled a heading with source code. */
     const value = row && Object.hasOwn(row.fields, key) ? row.fields[key] : undefined;
-    return value === null || value === undefined ? whole : escaped(String(value));
-  });
-  return JSON.parse(text);
+    return value === null || value === undefined ? null : String(value);
+  };
+  const text = (s: string, sentence: boolean): string =>
+    s.replace(/\{\{(\w+)\}\}/g, (whole, key: string) => {
+      const value = valueOf(key);
+      return value === null ? whole : sentence ? quoteValue(value) : value;
+    });
+  const walk = (node: unknown, sentence: boolean): unknown => {
+    if (typeof node === 'string') return text(node, sentence);
+    if (Array.isArray(node)) return node.map((n) => walk(n, false));
+    if (node === null || typeof node !== 'object') return node;
+    return Object.fromEntries(Object.entries(node).map(([k, v]) => [k, walk(v, SENTENCES.has(k))]));
+  };
+  return walk(scope === undefined ? doc : { ...(doc as object), within: scope }, false);
 }
 
 /**

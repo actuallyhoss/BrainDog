@@ -44,6 +44,8 @@
  *     n between 1 and 5                 both ends kept
  *     amount at least GBP 960.00        money carries its currency, in the currency's own units
  *     due between today and +30d        a range of days, both ends kept
+ *     part is "Wax, wick and scent"     a QUOTED value is one value after is, is not, has and lacks: a comma,
+ *                                       an `or` or a `not` inside the marks is its own, and ends nothing
  *     state is live, cycle is monthly   clauses are ANDed on the comma
  *     state is open, or due before today   and ORed on a comma and `or`, into `any`; never both at once
  *
@@ -56,6 +58,7 @@
  * The temporal literals are the set `02-DATA-MODEL` §6 already settled on, not a set invented here.
  */
 
+import { clausesOf, unquoted } from '@braindog/where';
 import { exponentOf } from 'braindog-render';
 
 import { display, labelOf } from './api.ts';
@@ -468,7 +471,7 @@ export const declaredValue = (register: string, field: string, value: string): s
  * A label as the record folds it before comparing: every run of spaces and underscores is one space, then case.
  *
  * COPIED FROM `resolve` IN `packages/where/src/sentence.ts` AND NOT IMPORTED, because it is not exported: the kernel
- * writes it inline on both sides of the comparison, and `@braindog/where` is not a dependency of this app either. It is
+ * writes it inline on both sides of the comparison. It is
  * NOT `norm`, and the difference was measured: `norm` folds one underscore at a time and collapses nothing, so
  * `state is To  check` and `state is to__check` were refused here as *"state has no value"* while the kernel filled
  * `review` for both. `norm` stays as it is for a value's own words, because the kernel does not collapse runs there
@@ -778,7 +781,7 @@ const refuseElement = (text: string, register: string, field: string, of: string
 
 /**
  * The record's `RANKED`, `OTHER_SIDE`, `ORDERED` and exponent table, copied because `@braindog/where`
- * is not a dependency of this app, and held to it by `where-compare.test.ts` driving both engines over
+ * does not export them, and held to it by `where-compare.test.ts` driving both engines over
  * the seed, refusal for refusal and word for word.
  *
  * THE EXPONENT IS `braindog-render`'S, which is the table `money()` prints every amount on this screen
@@ -917,7 +920,7 @@ function needleOf(text: string, field: string, type: string, said: string): { ne
   } else {
     if (QUOTES.some(([open]) => said.startsWith(open)))
       return {
-        fix: `${text}: the quote is not closed. A comma ends a clause, so text holding one cannot be written here; ask in the structured form, as {"field": "${field}", "contains": "..."}.`,
+        fix: `${text}: the quote is not closed. Close it with the mark it opened with, and a comma inside the marks is part of the text; or ask in the structured form, as {"field": "${field}", "contains": "..."}.`,
       };
     needle = said.trim();
     if (!needle) return { fix: `${text}: contains what?` };
@@ -1151,8 +1154,8 @@ export function compile(register: string, where: string | undefined, now: number
       /**
        * AND THE FIELD HAS TO BE A LIST, which is the whole of the record's `operatorAllowed` row for
        * these two: `has` and `lacks` on any other type are a refusal rather than a comparison. The
-       * table cannot be imported — `@braindog/where` is not a dependency of this app and the kernel
-       * does not re-export it — so it is written here and held against the record by driving both
+       * table was written here while `@braindog/where` was not a dependency of this app, and is held
+       * against the record by driving both
        * engines over every field of every register in `where.test.ts`, which is the only way a copy
        * of a relation stays a copy.
        */
@@ -1165,7 +1168,13 @@ export function compile(register: string, where: string | undefined, now: number
          trailing bare `not` is not a search for the word. It inverts both ways: a clause answering
          the opposite of the question is worse than one that refuses. */
       const no = rest === 'not' || rest.startsWith('not ');
-      const wanted = (no ? rest.slice(3) : rest).trim();
+      /* A QUOTED VALUE IS THE ONE VALUE LOOKED FOR, commas and `or` included, as the record reads it (`unquoted`). */
+      const quoted = unquoted((no ? rest.slice(3) : rest).trim());
+      if (quoted === '') {
+        bad.push(`${text}: ${op}${no ? ' not' : ''} what? The quotes hold nothing.`);
+        continue;
+      }
+      const wanted = quoted ?? (no ? rest.slice(3) : rest).trim();
       if (!wanted) {
         bad.push(`${text}: ${op}${no ? ' not' : ''} what?`);
         continue;
@@ -1175,7 +1184,7 @@ export function compile(register: string, where: string | undefined, now: number
          or soon` would otherwise look for a tag literally called `urgent or soon`: a clause that
          parses, compiles and matches nothing, for ever, which is the failure this whole file is
          written against. Two questions are two clauses, and the refusal says so. */
-      if (/\s+or\s+/i.test(wanted)) {
+      if (quoted === null && /\s+or\s+/i.test(wanted)) {
         bad.push(`${text}: ${op} takes one value to look for in the list. Write a clause for each`);
         continue;
       }
@@ -1217,6 +1226,15 @@ export function compile(register: string, where: string | undefined, now: number
      * whose value is literally the word `today` is untouched.
      */
     const one = rest.trim();
+    /* ONE QUOTED VALUE, TAKEN AS WRITTEN, as the record reads it (`unquoted` in `@braindog/where`): inside the marks a
+       comma, an `or`, a leading `not` and the words `empty` and `set` are the value's own, and the value is then asked
+       what the field holds exactly as a bare one is. A template writes a row's name this way when the bare words would
+       not read back as that name (`quoteValue`), so `part is "Wax, wick and scent"` filters the part's own page. */
+    const quoted = unquoted(one);
+    if (quoted === '') {
+      bad.push(`${text}: ${op} what? The quotes hold nothing.`);
+      continue;
+    }
 
     /**
      * `is not` WITH NOTHING AFTER IT IS NOT A SEARCH FOR THE WORD `not`.
@@ -1257,8 +1275,8 @@ export function compile(register: string, where: string | undefined, now: number
      * different answers over the same rows: `{ due, not: 'today' }` returned three and
      * `due is not today` returned thirty-nine. Same defect, same week, one engine along.
      */
-    if ((op === 'is' || op === 'is not') && dated && !/\s+or\s+/i.test(rest) && resolveDay(one, Date.now()) !== null) {
-      clauses.push({ field, op: op === 'is' ? 'on' : 'not on', day: one });
+    if ((op === 'is' || op === 'is not') && dated && (quoted !== null || !/\s+or\s+/i.test(rest)) && resolveDay(quoted ?? one, Date.now()) !== null) {
+      clauses.push({ field, op: op === 'is' ? 'on' : 'not on', day: quoted ?? one });
       continue;
     }
 
@@ -1266,9 +1284,7 @@ export function compile(register: string, where: string | undefined, now: number
     /* AN ENUM'S LABEL IS TURNED INTO ITS VALUE HERE, before `allowed` and `formsOf` compare it through `norm`, which
        folds one underscore at a time and collapses no run: `state is To  check` was refused as a value tasks do not
        hold, and the kernel answered it with the two tasks in review. */
-    const values = rest
-      .split(/\s+or\s+/i)
-      .map((v) => v.trim())
+    const values = (quoted !== null ? [quoted] : rest.split(/\s+or\s+/i).map((v) => v.trim()))
       .filter(Boolean)
       .map((v) => (decl?.type === 'enum' ? (labelledValue(decl, v) ?? v) : v));
 
@@ -1323,7 +1339,7 @@ export function compile(register: string, where: string | undefined, now: number
      * the record's own sentence parser leaves it too.
      */
     const only = values.length === 1 ? norm(values[0] ?? '') : '';
-    const absence = ABSENCE[only];
+    const absence = quoted === null ? ABSENCE[only] : undefined;
     if (absence && !(set ?? []).includes(only)) {
       /* THE NEGATION INVERTS. `is not empty` is `present` and `is not set` is `empty`, which is the
          one thing that must not be got wrong here: a negation compiled as its own positive is a
@@ -1375,7 +1391,7 @@ export function compile(register: string, where: string | undefined, now: number
        sentence — which is the one state `blocks.ts` exists to keep separate from a filter that was
        not understood. These are the operators `21-AUTHORING` §4.2 publishes and this build does not
        read, so an agent writing from the docs is told so instead of being handed an empty block. */
-    const reach = (closed ? unknown : values).find((v) =>
+    const reach = (quoted !== null ? [] : closed ? unknown : values).find((v) =>
       UNIMPLEMENTED.some((w) => v.toLowerCase().startsWith(`${w} `) || v.toLowerCase() === w),
     );
     if (reach) {
@@ -1422,7 +1438,8 @@ type Condition = { text: string; or: boolean };
  */
 function conditionsOf(where: string): { conditions: Condition[]; any: boolean } | { fix: string } {
   const conditions: Condition[] = [];
-  for (const raw of where.split(',')) {
+  /* CUT BY THE RECORD'S OWN `clausesOf`, so a comma inside a quoted value is the value's and not the sentence's. */
+  for (const raw of clausesOf(where)) {
     const text = raw.trim();
     if (!text) continue;
     const joined = conditions.length > 0 ? /^or(?:\s+|$)/i.exec(text) : null;

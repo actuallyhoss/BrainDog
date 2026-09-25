@@ -19,6 +19,7 @@
     "@braindog/pack-rates-poll": "workspace:*",
     "@braindog/seed": "workspace:*",
     "@braindog/theme": "workspace:*",
+    "@braindog/where": "workspace:*",
     "svelte": "5.57.0"
   },
   "devDependencies": {

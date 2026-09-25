@@ -25,7 +25,7 @@ import {
   type Reading,
 } from '../src/index.ts';
 import { attempt } from '../src/tx.ts';
-import { parseWhere, type Schema } from '@braindog/where';
+import { parseWhere, quoteValue, type Schema } from '@braindog/where';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -194,11 +194,12 @@ test('ONE ROW WITH A BACKSLASH IN ITS TITLE DOES NOT MAKE EVERY PAGE UNLISTABLE'
       where: string;
     };
     assert.equal(out.title, `Page ${title}`);
-    assert.equal(out.where, `thing is ${title}`);
+    /* AND IN A SENTENCE IT IS ONE VALUE THERE, written by the grammar's own `quoteValue` (`template-fill.test.ts`). */
+    assert.equal(out.where, `thing is ${quoteValue(title)}`);
   }
   // And the `{{it}}` parameter is escaped the same way, which it was not at all.
   const param = fill({ where: 'thing is {{it}}' }, null, 'say "hi"') as { where: string };
-  assert.equal(param.where, 'thing is say "hi"');
+  assert.equal(param.where, `thing is 'say "hi"'`);
 });
 
 /* ── 10 · two rows, one slug ─────────────────────────────────────────────── */

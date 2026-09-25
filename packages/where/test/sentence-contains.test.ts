@@ -185,11 +185,13 @@ test('A BARE `not` AND A BARE `or` ARE REFUSED RATHER THAN SEARCHED FOR', () => 
   assert.match(or.fix, /quote/i);
 });
 
-test('A QUOTE THE COMMA CUT OPEN IS REFUSED, not searched for with its quote mark', () => {
-  const cut = parse('what contains "Smith, J"');
+test('A COMMA INSIDE THE QUOTES BELONGS TO THE TEXT, and a quote nobody closed is refused, not searched for with its mark', () => {
+  /* THE COMMA CUT THE QUOTE OPEN until a quoted value was read whole (`clausesOf`, `sentence-quoted.test.ts`). */
+  assert.deepEqual(parse('what contains "Smith, J"').predicate, { field: 'what', contains: 'Smith, J' });
+  const cut = parse('what contains "Smith');
   assert.equal(cut.predicate, undefined);
   assert.equal(cut.bad[0]?.code, 'VALUE_MALFORMED');
-  assert.match(cut.bad[0]!.fix, /comma/);
+  assert.match(cut.bad[0]!.fix, /not closed/);
 });
 
 /* ── audit fifty-eight, §8 and §9 ────────────────────────────────────────── */

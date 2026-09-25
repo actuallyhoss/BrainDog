@@ -146,8 +146,39 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "c0df7023f070e57578bf2bfddf3488f30a8c69b8e524bfbd4e6317fe25a33d32",
+          "bytes": 20735,
+          "published_at": "2026-09-25T09:02:49.261Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "pad"
+            ],
+            "lists": [
+              "Parts",
+              "Steps",
+              "Helpers",
+              "Budget lines",
+              "Price check",
+              "Lessons"
+            ],
+            "pages": [
+              "Desk",
+              "{{name}}",
+              "Numbers"
+            ],
+            "rules": [
+              "Add the three costs of the price check together"
+            ],
+            "examples": 1,
+            "skills": [],
+            "calls_out": []
+          }
+        },
         {
           "version": "1.0.0",
           "checksum": "cf04a5277f4fbe119a89acf7e7a54e12530d16972fda5bd5257d7bf07551d5c7",

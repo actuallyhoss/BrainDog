@@ -227,12 +227,50 @@ test('A PATH MARKS ITS STEPS DONE AND NEXT from the record, and its short view c
     ['Box quote', '', ''],
   ]);
   const short = named(blocks, 'Short');
+  /* ONE OF THE THREE IS DONE, SO ONE OPEN STEP IS LEFT OUT. It said 2, the whole list less the one drawn, which counted
+     the done step as a step still to come. */
   assert.deepEqual(cells(fence(short)), [
     ['Sample the fit', '', 'next'],
-    ['more', '2'],
+    ['more', '1'],
   ]);
   /* THE COUNT IS THE PATH'S OWN, so the page's "Showing 1 of 3" is not said under it a second time. */
   assert.equal(short.shown, short.total, 'the path says how many more itself');
+});
+
+test('THE SHORT VIEW\'S "more" COUNTS THE OPEN STEPS IT LEFT OUT, and a done step is never one of them', async () => {
+  /* MEASURED ON THE TREE BEFORE THIS: 5 steps with 2 done under `first: 2` drew S3 and S4 and `more | 3`, where only S5
+     was left out, and 2 steps all done under `first: 1` drew only `more | 2`. The renderer says the number is how many
+     open steps the short view left out (`render/src/path.ts`), so the record now says how many are open (`open`). */
+  const path = async (done: boolean[], first: number): Promise<LiveBlock> => {
+    const k = await openRecord(openSqlite(), { now: () => NOW });
+    const page: Declaration = {
+      id: 'page.path',
+      kind: 'page',
+      body: { page: 'path', title: 'Path', requires: ['register.areas', 'register.steps'], blocks: [{ kind: 'steps', heading: 'Short', source: 'register.steps', first, columns: [{ field: 'what' }], empty: 'No steps left.' }] } as never,
+    };
+    const out = await k.install([register(AREAS), register(STEPS), page]);
+    assert.ok(out.ok, JSON.stringify(out));
+    const area = k.create('areas', { name: 'Product' }, OWNER);
+    assert.ok(area.ok);
+    done.forEach((d, i) => assert.ok(k.create('steps', { what: `S${i + 1}`, area: (area.value as { id: string }).id, done: d, rank: i + 1 }, OWNER).ok));
+    for (const decl of [AREAS, STEPS]) REGISTERS[decl.id] = decl as never;
+    const read = k.page('path') as { ok: boolean; value: { blocks: Record<string, unknown>[] } };
+    assert.ok(read.ok, JSON.stringify(read));
+    return named(read.value.blocks.map((b) => blockOf(b as never, new Map(), NOW)), 'Short');
+  };
+  assert.deepEqual(cells(fence(await path([true, true, false, false, false], 2))), [
+    ['S3', '', 'next'],
+    ['S4', '', ''],
+    ['more', '1'],
+  ]);
+  /* NONE LEFT OUT, NO COUNT. */
+  assert.deepEqual(cells(fence(await path([true, false, false], 2))), [
+    ['S2', '', 'next'],
+    ['S3', '', ''],
+  ]);
+  /* EVERY STEP DONE: nothing open, so nothing more, and no count of done steps standing alone. */
+  const all = draw(await path([true, true], 1));
+  assert.doesNotMatch(JSON.stringify(all.segments), /more/u);
 });
 
 /* ── P6: an option shown as what it is ──────────────────────────────────── */

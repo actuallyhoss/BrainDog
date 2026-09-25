@@ -146,6 +146,9 @@ importers:
       '@braindog/theme':
         specifier: workspace:*
         version: link:../../packages/theme
+      '@braindog/where':
+        specifier: workspace:*
+        version: link:../../packages/where
       svelte:
         specifier: 5.57.0
         version: 5.57.0

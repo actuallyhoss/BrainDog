@@ -340,6 +340,110 @@ const QUOTES: readonly (readonly [string, string])[] = [
 ];
 
 /**
+ * Where a quote opening at `at` closes, the index just past its closing mark, or `-1` when nothing opens there.
+ *
+ * A MARK OPENS A QUOTE ONLY AT THE START OF A WORD, after a space, a comma or nothing, so the apostrophe in `McDonald's`
+ * opens nothing. It closes at the first matching mark followed by nothing but spaces before a comma or the end: that is
+ * the one place a quoted value can end, so a comma inside the marks is the value's and not the sentence's. A mark that
+ * never closes that way opens nothing either, and the comma after it ends the clause as it always did.
+ */
+function quoteEnd(text: string, at: number): number {
+  const pair = QUOTES.find(([open]) => text.startsWith(open, at));
+  if (!pair || (at > 0 && !/[\s,]/.test(text[at - 1]!))) return -1;
+  const [open, close] = pair;
+  for (let shut = text.indexOf(close, at + open.length); shut !== -1; shut = text.indexOf(close, shut + 1))
+    if (/^\s*(?:,|$)/.test(text.slice(shut + close.length))) return shut + close.length;
+  return -1;
+}
+
+/**
+ * A sentence cut on its commas, and not on a comma inside a quoted value.
+ *
+ * EXPORTED BECAUSE THE KERNEL CUTS SENTENCES TOO: a figure's scope is the clauses its parameter fills (`scopeOf` in
+ * `packages/kernel/src/pages.ts`), and a cut made there on every comma would be a second reading of this grammar.
+ */
+export function clausesOf(text: string): string[] {
+  const out: string[] = [];
+  let from = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === ',') {
+      out.push(text.slice(from, i));
+      from = i + 1;
+      continue;
+    }
+    const end = quoteEnd(text, i);
+    if (end > 0) i = end - 1;
+  }
+  out.push(text.slice(from));
+  return out;
+}
+
+/**
+ * The words after a clause's verb, as typed, and what is inside them when they are one quoted value.
+ *
+ * AS TYPED, as `contains` reads its text: the words re-joined with one space would lose a run of spaces the value holds.
+ * WHOLLY QUOTED means the marks open at the first character and close at the last, by the rule `quoteEnd` cuts clauses
+ * with, so `"a" or "b"` is not one value between its outer marks. Anything else is `null`, and the value is read as
+ * bare words exactly as it was before quoting was read here.
+ */
+function quotedAfter(sentence: string, after: number, negated: boolean): string | null {
+  const typed = sentence
+    .split(/(\s+)/)
+    .slice(2 * (after + 1))
+    .join('');
+  return unquoted((negated ? typed.replace(/^not/i, '') : typed).trim());
+}
+
+/**
+ * What is inside a value that is one quoted value, or `null` when it is not one: the marks open at its first character
+ * and close at its last, and no closing mark inside is followed by a space.
+ *
+ * EXPORTED FOR THE BROWSER'S ENGINE (`apps/web/src/lib/record/where.ts`), which reads the same sentences over its own
+ * rows and would otherwise hold a second copy of where a quote closes.
+ */
+export function unquoted(value: string): string | null {
+  const pair = QUOTES.find(([open, close]) => value.length >= open.length + close.length && value.startsWith(open) && value.endsWith(close));
+  if (!pair) return null;
+  const inside = value.slice(pair[0].length, value.length - pair[1].length);
+  for (let shut = inside.indexOf(pair[1]); shut !== -1; shut = inside.indexOf(pair[1], shut + 1))
+    if (/^\s/.test(inside.slice(shut + pair[1].length))) return null;
+  return inside;
+}
+
+/** The words the grammar reads for itself at the start of a value: a negation, an absence, an order. */
+const GRAMMAR_START = /^(?:not|empty|set|present|between|(?:more|less)\s+than|at\s+(?:least|most))(?:\s|$)/i;
+
+/**
+ * A value written into a sentence so the grammar reads it back as exactly that one value.
+ *
+ * BARE WHERE THE BARE WORDS ALREADY DO: no comma, no quote mark, no word `or`, no space but single ones (the bare words are re-joined with one), no space at either end,
+ * and no word the grammar reads for itself at the start. Everything a page prints today is one of those, so a filter
+ * that was `part is The box` stays that. Anything else is quoted, in the first pair of marks whose closing mark the value
+ * never follows with a space, a comma or its end, since that is the one place a quote can close (`quoteEnd`,
+ * `quotedAfter`). A value holding every closing mark in such a place has no pair that holds it, and is quoted in the
+ * straight pair, which is the one value this cannot write whole.
+ *
+ * FOR A TEMPLATE: `fill` in `packages/kernel/src/pages.ts` writes a row's field into a block's `where` through this, so a
+ * part called `Wax, wick and scent` filters its own page rather than refusing it.
+ */
+export function quoteValue(value: string): string {
+  const bare =
+    value !== '' &&
+    value === value.trim() &&
+    !/\s\s|[^\S ]/.test(value) &&
+    !/[,"'“”‘’]/.test(value.replace(/(\w)[’'](\w)/g, '$1$2')) &&
+    !/(?:^|\s)or(?:\s|$)/i.test(value) &&
+    !GRAMMAR_START.test(value);
+  if (bare) return value;
+  const fits = ([, close]: readonly [string, string]): boolean => {
+    for (let at = value.indexOf(close); at !== -1; at = value.indexOf(close, at + 1)) if (/^(?:[\s,]|$)/.test(value.slice(at + close.length))) return false;
+    return true;
+  };
+  const [open, close] = QUOTES.find(fits) ?? QUOTES[0]!;
+  return open + value + close;
+}
+
+/**
  * The types `contains` is refused on in a sentence though `operatorAllowed` admits it.
  *
  * THE STRUCTURED TABLE SAYS YES AND THE COLUMN SAYS NO. `38 §4.3` puts `enum` and `ref` among the
@@ -810,7 +914,13 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
       /* FOLDED AS THE `is` BRANCH'S `not` IS, since the verb before it is folded: without it
          `tags HAS NOT x` became `has "NOT x"` and `tags HAS NOT` a search for a tag called `NOT`. */
       const no = /^not(?:\s|$)/i.test(rest);
-      const wanted = (no ? rest.slice(3) : rest).trim();
+      /* A QUOTED VALUE IS THE ONE VALUE LOOKED FOR, commas and `or` included (`quotedAfter`). */
+      const quoted = quotedAfter(sentence, after, no);
+      if (quoted === '') {
+        bad.push({ code: 'REQUIRED_MISSING', fix: `${sentence}: ${verb}${no ? ' not' : ''} what? The quotes hold nothing.`, at: field });
+        continue;
+      }
+      const wanted = quoted ?? (no ? rest.slice(3) : rest).trim();
       if (!wanted) {
         bad.push({ code: 'REQUIRED_MISSING', fix: `${sentence}: ${verb}${no ? ' not' : ''} what?`, at: field });
         continue;
@@ -820,7 +930,7 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
          urgent or soon` would otherwise look for a tag literally called `urgent or soon`: a clause
          that parses, compiles and matches nothing, for ever, which is the failure this whole module
          is written against. Two questions are two clauses, and the refusal says so. */
-      if (/ or /i.test(wanted)) {
+      if (quoted === null && / or /i.test(wanted)) {
         bad.push({
           code: 'VALUE_MALFORMED',
           fix: `${sentence}: ${verb} takes one value to look for in the list. Write a clause for each.`,
@@ -962,14 +1072,14 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
         continue;
       }
 
-      /* A QUOTE THAT OPENS AND NEVER CLOSES IS A COMMA'S WORK. The clauses were split on every comma
-         before this line ran, so `what contains "Smith, J"` arrives here as `"Smith` and would have
-         searched for the quote mark. A straight apostrophe is left alone, because `McDonald's` is
-         bare text and `'` opens nothing in it; only a text that STARTS with a mark is read as quoted. */
+      /* A QUOTE THAT OPENS AND NEVER CLOSES is refused rather than searched for with its mark. A comma inside closed
+         marks no longer cuts the clause (`clausesOf`), so `what contains "Smith, J"` arrives whole; what arrives here
+         is a mark nobody closed. A straight apostrophe is left alone, because `McDonald's` is bare text and `'` opens
+         nothing in it; only a text that STARTS with a mark is read as quoted. */
       if (QUOTES.some(([open]) => text.startsWith(open))) {
         bad.push({
           code: 'VALUE_MALFORMED',
-          fix: `${sentence}: the quote is not closed. A comma ends a clause, so text holding one cannot be written here; ask in the structured form, as {"field": "${field}", "contains": "..."}.`,
+          fix: `${sentence}: the quote is not closed. Close it with the mark it opened with, and a comma inside the marks is part of the text; or ask in the structured form, as {"field": "${field}", "contains": "..."}.`,
           at: field,
         });
         continue;
@@ -1038,6 +1148,31 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
     const said = (negated ? rest.slice(3) : rest).trim();
     if (!said) {
       bad.push({ code: 'REQUIRED_MISSING', fix: `${sentence}: is${negated ? ' not' : ''} what?`, at: field });
+      continue;
+    }
+
+    /* ── is "a quoted value" ─────────────────────────────────────────────── */
+    /* ONE VALUE, TAKEN AS WRITTEN AND THEN RESOLVED. Inside the marks a comma, an `or`, a leading `not` and the words
+       `empty` and `set` are the value's own, which is what quoting says (`quotedAfter`). An enum is still asked what it
+       declares and a ref still finds its row, so a quoted name filters exactly as the bare one does. */
+    const quoted = quotedAfter(sentence, after, negated);
+    if (quoted !== null) {
+      if (quoted === '') {
+        bad.push({ code: 'REQUIRED_MISSING', fix: `${sentence}: is${negated ? ' not' : ''} what? The quotes hold nothing.`, at: field });
+        continue;
+      }
+      const resolved = resolve(schema, field, decl, quoted, deps);
+      if (resolved === null) {
+        bad.push(refuseValue(sentence, schema, field, decl, quoted, deps));
+        continue;
+      }
+      clauses.push(
+        !Array.isArray(resolved)
+          ? ({ field, [negated ? 'not' : 'is']: resolved } as Predicate)
+          : resolved.length === 1
+            ? ({ field, [negated ? 'not' : 'is']: resolved[0] } as Predicate)
+            : ({ field, [negated ? 'not_in' : 'in']: resolved } as Predicate),
+      );
       continue;
     }
 
@@ -1155,7 +1290,7 @@ type Condition = { text: string; or: boolean };
  */
 function conditionsOf(filter: string): { conditions: Condition[]; any: boolean } | { fix: string } {
   const conditions: Condition[] = [];
-  for (const raw of filter.split(',')) {
+  for (const raw of clausesOf(filter)) {
     const text = raw.trim();
     if (!text) continue;
     const joined = conditions.length > 0 ? /^or(?:\s+|$)/i.exec(text) : null;

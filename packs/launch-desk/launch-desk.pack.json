@@ -1,6 +1,6 @@
 {
   "pack": "launch-desk",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "title": "Launch desk",
   "summary": "A desk for launching a thing in parts: where it stands in one sentence, each part with its next step, the calls waiting on you, a pad beside it, and a price check.",
   "author": "BrainDog",
@@ -714,12 +714,14 @@
           "kind": "capture",
           "area": "rail",
           "heading": "A thought",
-          "register": "notes"
+          "register": "notes",
+          "where": "about is {{spoken}}"
         },
         {
           "kind": "cards",
           "area": "rail",
           "source": "register.notes",
+          "where": "about is {{spoken}}",
           "columns": [
             {
               "field": "text",
@@ -737,7 +739,7 @@
             }
           ],
           "limit": 6,
-          "empty": "Nothing on the pad yet."
+          "empty": "Nothing on the pad about this part yet."
         },
         {
           "kind": "table",

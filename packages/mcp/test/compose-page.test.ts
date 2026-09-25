@@ -170,18 +170,16 @@ test('THE GRAMMAR AN AGENT READS FIRST NAMES inputs AMONG THE KINDS, so the one 
 });
 
 /**
- * AND THE REST OF WAVE ONE'S WORDS ARE LEARNT ONLY BY BEING REFUSED. `braindog:grammar/page` (`packages/record/src/
- * grammar.ts`) lists the kinds from the renderer, so `inputs` arrived with it, and its page, block and card-role lines
- * were written before wave one and say none of the words the desk uses: measured on September 25th, split into words,
- * the grammar holds `inputs` and none of `layout`, `sticky`, `area`, `tabs`, `lead`, `first`, `next`, `reply`, `range`,
- * `tiles` or `box`, nor the steps list's `order` or an option's `shows` and `about`, which no grammar says. A model
- * that reads the grammar and not the survey writes none of them. Left as a todo for whoever owns that file, so the gap
- * shows in this run rather than only in a report.
+ * AND THE REST OF WAVE ONE'S WORDS, SAID BEFORE ANY REFUSAL. `braindog:grammar/page` (`packages/record/src/grammar.ts`)
+ * lists the kinds from the renderer, so `inputs` arrived with it, and its page, block and card-role lines were written
+ * before wave one: measured on September 25th, split into words, it held `inputs` and none of `layout`, `sticky`,
+ * `area`, `tabs`, `lead`, `first`, `next`, `reply`, `range`, `tiles` or `box`, nor an option's `shows` and
+ * `about`. A model that reads the grammar and not the survey wrote none of them.
  */
-test('THE GRAMMAR SAYS EVERY WORD THE DESK USES, so a model can write it before its first refusal', { todo: "packages/record/src/grammar.ts says none of wave one's page, block or card-role words" }, async () => {
+test('THE GRAMMAR SAYS EVERY WORD THE DESK USES, so a model can write it before its first refusal', async () => {
   const { sql, mcp } = await record();
   const words = new Set(JSON.stringify(said(await mcp.read('braindog:grammar/page', agent))).split(/[^A-Za-z_]+/));
-  const missing = ['layout', 'sticky', 'area', 'tabs', 'lead', 'first', 'next', 'reply', 'range', 'tiles', 'box'].filter((w) => !words.has(w));
+  const missing = ['layout', 'sticky', 'area', 'tabs', 'lead', 'first', 'next', 'reply', 'range', 'tiles', 'box', 'shows', 'about', 'inputs'].filter((w) => !words.has(w));
   sql.close();
   assert.deepEqual(missing, []);
 });
@@ -258,14 +256,14 @@ test('AN AGENT TRIES THE DESK, IS TOLD ITS LISTS ARE MISSING, FILES THEM, AND EV
     assert.ok(literal[i]!.refusals[0]!.fix.startsWith(`${String((PART.blocks as Decl[])[i]!.where)}: there is no `), literal[i]!.refusals[0]!.fix);
   }
 
-  /* SO THE AGENT TRIES IT OVER ONE PART IT READ. `list` hands the agent a row's spoken id and never its ULID, so the
-     pad's `about is {{id}}` is filled with `parts#1`; the install fills it with the ULID, and both find the row. */
+  /* SO THE AGENT TRIES IT OVER ONE PART IT READ. `list` hands the agent a row's spoken id, which is what the pad's
+     `about is {{spoken}}` is filled with, by the agent here and by the install's `fill` alike. */
   const parts = said<{ rows: { spoken: string; fields: Record<string, unknown> }[] }>(await mcp.call('list', { register: 'parts' }, agent)).rows;
   const product = parts.find((r) => r.fields.name === 'Product')!;
 
   /* EVERY PAGE TRIED, EVERY BLOCK ANSWERED, NOTHING FILED. */
   const previews = new Map<string, Drawn[]>();
-  for (const page of [DESK, overRow(PART, { ...product.fields, id: product.spoken }), NUMBERS]) {
+  for (const page of [DESK, overRow(PART, { ...product.fields, spoken: product.spoken }), NUMBERS]) {
     const out = said<{ page_preview: { blocks: Drawn[] }; proposed: boolean }>(await mcp.call('propose', tried(page), agent));
     assert.equal(out.proposed, false);
     assert.equal(out.page_preview.blocks.length, (page.blocks as unknown[]).length, String(page.page));

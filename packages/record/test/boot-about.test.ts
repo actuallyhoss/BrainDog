@@ -44,7 +44,7 @@ const DECLS = [
   decl('page', 'desk', { page: 'desk', title: 'Desk', nav: { section: 'Work', order: 1 }, requires: ['register.notes'], blocks: [{ kind: 'table', source: 'register.notes' }] }),
 ];
 
-type Page = { slug: string; title: string; about?: { register: string; seq: number | null } | null };
+type Page = { slug: string; title: string; about?: { register: string; seq: number | null; updated_at?: string } | null };
 
 const value = <T>(r: unknown): T => {
   const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string } };
@@ -67,13 +67,13 @@ async function record() {
 test('A PAGE EXPANDED ACROSS TWO PROJECTS IS TWO PAGES IN boot, EACH SAYING WHICH PROJECT IT IS ABOUT', async () => {
   const { sql, api } = await record();
   const pages = value<{ pages: Page[] }>(await api.boot(owner)).pages;
-  /* THE LIST'S OWN ORDER IS NEWEST FIRST, so the pages are matched by title rather than by position. */
+  /* MATCHED BY TITLE RATHER THAN BY POSITION, and each carries when its row last changed, which picks the rail's five. */
   const projects = pages.filter((p) => p.slug !== 'desk').sort((a, b) => a.title.localeCompare(b.title));
   assert.deepEqual(
     projects.map((p) => [p.title, p.about]),
     [
-      ['Kiln', { register: 'projects', seq: 1 }],
-      ['Portage', { register: 'projects', seq: 2 }],
+      ['Kiln', { register: 'projects', seq: 1, updated_at: new Date(NOW).toISOString() }],
+      ['Portage', { register: 'projects', seq: 2, updated_at: new Date(NOW).toISOString() }],
     ],
   );
   /* A PAGE SOMEBODY WROTE IS ABOUT NO ROW, and says so with `null` rather than leaving the key off, so the shell can tell

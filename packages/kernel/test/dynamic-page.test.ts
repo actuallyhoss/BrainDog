@@ -237,6 +237,9 @@ test('A PATH ANSWERS WHICH ROWS ARE DONE AND WHICH IS NEXT, and first: n is the 
   assert.deepEqual(short.refusals, []);
   assert.deepEqual(short.rows.map((r) => r.fields.what), ['Sample the fit']);
   assert.equal(short.matched, 3);
+  /* AND HOW MANY OF THOSE ARE OPEN, which the short view's "more" is counted from: `matched` holds the done step too. */
+  assert.equal(short.open, 2);
+  assert.equal(long.open, undefined, 'a path drawn whole leaves nothing out, and is not asked');
   assert.deepEqual(short.done_now, [false]);
   assert.equal(short.next, 0);
   /* THE OPEN ROWS ARE ASKED FOR BEFORE THE LIMIT CUTS THE READ. Cut after it, `limit: 1` read the done step alone and
@@ -245,6 +248,7 @@ test('A PATH ANSWERS WHICH ROWS ARE DONE AND WHICH IS NEXT, and first: n is the 
   assert.deepEqual(cut.refusals, []);
   assert.deepEqual(cut.rows.map((r) => r.fields.what), ['Sample the fit']);
   assert.equal(cut.matched, 3);
+  assert.equal(cut.open, 2, 'the limit cuts the rows read and not the count of the open ones');
   assert.equal(cut.next, 0);
   assert.deepEqual(k.block({ ...path, first: 2 } as never).rows.map((r) => r.fields.what), ['Sample the fit', 'Box quote']);
   /* A LIST THAT SAYS NOTHING IS DONE HAS NO OPEN ROWS TO CUT, so the short view is refused rather than drawn long. */

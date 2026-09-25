@@ -1620,7 +1620,7 @@ const truth = (v: unknown): boolean | null =>
 
 /* ── the sentence form ───────────────────────────────────────────────────── */
 
-export { lookupRef, NO_ROW, parseWhere, resolveDay } from './sentence.ts';
+export { clausesOf, lookupRef, NO_ROW, parseWhere, quoteValue, resolveDay, unquoted } from './sentence.ts';
 export type { Parsed, RefFound, SentenceDeps } from './sentence.ts';
 
 /* One path into a body a stranger sent — `47 §4.3`'s grammar, read by connect, extract and the
