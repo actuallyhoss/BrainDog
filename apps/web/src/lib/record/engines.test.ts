@@ -13,10 +13,11 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 
 import { costOf, fill, isStale, openRecord, ratesFrom, readBlock as kernelBlock, type Kernel, type PageBlock as KernelBlock, type PageDeps } from '@braindog/kernel';
-import { AGENTS_PAGES, NOW, RUNS_ON, installSeed } from '@braindog/seed';
+import { AGENTS_PAGES, NOW, PAGES, RUNS_ON, installSeed } from '@braindog/seed';
 
 import { page, pages, readBlock as webBlock, ROWS } from './api.ts';
 import { METRICS } from './declared.ts';
+import { runway as webRunway, type Leg } from './forecast.ts';
 import { read as webRead, withFx, withParam, type MetricDecl as WebMetric } from './metrics.ts';
 import { tileOf } from './news-live.ts';
 import { tileOf as pageTile } from './page-live.ts';
@@ -121,6 +122,13 @@ function depsOf(k: Kernel): PageDeps {
     },
   };
 }
+
+/** A walk as both engines hand it over, with the two step keys the forecast's controls read. */
+type WalkShape = {
+  currency: string | null;
+  from: number;
+  steps: readonly { day: string; label: string; delta: number; balance: number; from?: string; of?: string }[];
+};
 
 let opened: Kernel | null = null;
 
@@ -502,8 +510,12 @@ test('A WALK WHOSE OPENING CONVERTS AND A BILL WITH NO RATE is the same walks in
     const kb = kernel.value.blocks.find((b) => b.heading === 'Cash ahead');
     const wb = page('money')?.blocks.find((b) => b.heading === 'Cash ahead');
     assert.ok(kb && wb, 'the Cash ahead forecast is gone; this test is about it');
-    const shape = (walks: readonly { currency: string | null; from: number; steps: readonly { day: string; label: string; delta: number; balance: number }[] }[] | undefined) =>
-      walks?.map((w) => ({ currency: w.currency, from: w.from, steps: w.steps.map((s) => [s.day, s.label, s.delta, s.balance]) }));
+    /* AND WHAT A STEP WAS WRITTEN IN AND WHAT IT IS PART OF, because the forecast's drift and plan controls move exactly
+       the steps that carry them. Held on day, label, delta and balance alone, this passed while the kernel marked every
+       sterling bill `from: GBP` and the browser marked none, so a drift on GBP to EGP would have moved the live page and
+       left the demo standing still. */
+    const shape = (walks: readonly WalkShape[] | undefined) =>
+      walks?.map((w) => ({ currency: w.currency, from: w.from, steps: w.steps.map((s) => [s.day, s.label, s.delta, s.balance, s.from ?? null, s.of ?? null]) }));
     assert.deepEqual(kb.refusals, [], JSON.stringify(kb.refusals));
     assert.deepEqual(wb.refusals, []);
     assert.deepEqual(kb.walks?.map((w) => w.currency), ['EGP', 'JPY'], 'the home walk, then the bill with no rate');
@@ -515,6 +527,46 @@ test('A WALK WHOSE OPENING CONVERTS AND A BILL WITH NO RATE is the same walks in
     put();
     ROWS.accounts = accounts;
     ROWS.obligations = obligations;
+    ROWS.fx = rates;
+  }
+});
+
+/** Cash ahead's legs as the seed declares them, with the plan an instalment belongs to named on the instalments leg. */
+function cashLegs(): Leg[] {
+  const blocks = (PAGES.money?.blocks ?? []) as readonly { heading?: string; from?: Leg[] }[];
+  const legs = blocks.find((b) => b.heading === 'Cash ahead')?.from;
+  assert.ok(legs?.length, 'the seed has no Cash ahead walk; this test is about its legs');
+  return legs.map((leg) => (leg.register === 'installments' ? { ...leg, group: 'plan' } : leg));
+}
+
+test('A PLAN’S PARTS NAME THEIR PLAN AND A CONVERTED STEP NAMES ITS CURRENCY, step for step in both engines', async () => {
+  /* WALKED DIRECTLY AND NOT THROUGH THE PAGE, because the seed's instalments leg does not name `group` yet, so a page
+     comparison of `of` is two engines agreeing on nothing. The legs are the seed's own with that one key added, over the
+     seed's rows, with sterling converted into pounds the way the test above converts it. */
+  const k = await openRecord(openSqlite(), { now: () => NOW });
+  assert.ok((await installSeed(k)).ok);
+  k.rememberPack({ id: 'money-core', version: '1.0.0', source: 'local', ref: null, manifest: JSON.stringify({ pack: 'money-core', version: '1.0.0', config: { home_currency: { type: 'text' } } }), checksum: 'not-a-real-checksum' });
+  const today = new Date(NOW).toISOString().slice(0, 10);
+  const quote = { currency: 'GBP', base: 'EGP', rate: 64.2, as_of: today };
+  assert.ok(k.create('fx', quote, { actor: 'p_1' }).ok);
+  assert.ok(k.setPackConfig('money-core', { home_currency: 'EGP' }, { actor: 'p_1' }).ok);
+  const rates = ROWS.fx ?? [];
+  ROWS.fx = [{ ...ROWS.accounts![0]!, seq: 1, fields: quote }];
+  const put = withFx(() => ({ home: 'EGP', rates: ratesFrom((ROWS.fx ?? []).map((e) => e.fields)) }));
+  try {
+    const legs = cashLegs();
+    const kernel = k.runway(5_000_000, legs, 365);
+    assert.ok(kernel.ok, JSON.stringify(kernel));
+    const web = webRunway(5_000_000, legs, 365);
+    const each = (w: WalkShape) => w.steps.map((s) => [s.day, s.label, s.delta, s.balance, s.from ?? null, s.of ?? null]);
+    assert.equal(kernel.value.currency, 'EGP');
+    assert.equal(web.currency, 'EGP');
+    /* BOTH HALVES MUST BE PRESENT FOR THE EQUALITY BELOW TO MEAN ANYTHING: two walks that each carry neither key are equal. */
+    assert.ok(kernel.value.steps.some((s) => s.of === 'Proofing press'), 'the kernel names no plan, so this compares nothing');
+    assert.ok(kernel.value.steps.some((s) => s.from === 'GBP'), 'the kernel converted nothing, so this compares nothing');
+    assert.deepEqual(each(web), each(kernel.value));
+  } finally {
+    put();
     ROWS.fx = rates;
   }
 });

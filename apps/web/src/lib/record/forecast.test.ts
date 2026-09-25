@@ -467,6 +467,30 @@ test('a typed opening is still a number, and a figure nobody declared is said ra
   assert.match(unknown.refusal ?? '', /no metric called cash-later/);
 });
 
+test('A PLAN IS A NAME: a number, a blank or a padded field in the group names what the kernel names', () => {
+  /* THE KERNEL HOLDS THIS RULE IN ITS OWN TEST AND THE SEED NEVER EXERCISES IT, so a twin reading `String(part)` for any
+     filled field passed every comparison in `engines.test.ts`: the seed's plans are all clean text. Walked that way, a
+     blank plan became one plan called nothing, which the plan control counts in or out as one, and a `parts` field of 8
+     put every instalment into a plan called 8. */
+  const rows = ROWS.installments ?? [];
+  const open = rows.filter((e) => e.fields.state === 'open');
+  assert.ok(open.length >= 2, 'the seed needs two open instalments for this to mean anything');
+  const [padded, blank] = open;
+  ROWS.installments = rows.map((e) =>
+    e === padded ? { ...e, fields: { ...e.fields, plan: '  Proofing press  ' } } : e === blank ? { ...e, fields: { ...e.fields, plan: '   ' } } : e,
+  );
+  try {
+    const leg = LEGS.find((l) => l.register === 'installments')!;
+    const ofs = (group: string) => new Map(runway(0, [{ ...leg, group }], 365).steps.map((s) => [s.href, s.of ?? null]));
+    const byPlan = ofs('plan');
+    assert.equal(byPlan.get(`/r/installments/${padded!.seq}`), 'Proofing press', 'a padded plan is its name, trimmed');
+    assert.equal(byPlan.get(`/r/installments/${blank!.seq}`), null, 'a blank plan was walked as a plan');
+    assert.ok([...ofs('parts').values()].every((of) => of === null), 'a number was walked as the name of a plan');
+  } finally {
+    ROWS.installments = rows;
+  }
+});
+
 /* ── how cash has moved ──────────────────────────────────────────────────── */
 
 test('THE SAMPLE HAS NINETY DAYS OF CASH, and the trend reads them as the record would', () => {

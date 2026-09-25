@@ -294,6 +294,16 @@ function bridgeRows(block: BlockResult): string[] {
 }
 
 /**
+ * A step with the two marks the forecast's controls read, which both walks set (`Step.from` and `Step.of` in
+ * `forecast.ts` and in the kernel's) and `api.ts`'s `WalkStep` does not yet declare. Read through this rather than
+ * declared there because that type is not this file's; it names nothing either walk does not already carry.
+ */
+type ControlledStep = { of?: string; from?: string };
+
+/** A holding the sell control may count as sold, in the walk's currency and in minor units. */
+type ForecastSell = { label: string; value: number };
+
+/**
  * A forecast as the dialect writes it: the opening, the balance remembered before today, every movement
  * of the walk, the horizon, the knobs a reader may move, how late money comes in, and how near a crossing is said.
  *
@@ -310,7 +320,18 @@ function forecastRows(block: BlockResult): string[] {
   return [
     `opening | ${today} | ${escapeCell(copy.bridgeStart)} | ${said(walk.from)}`,
     ...(block.past ?? []).map((p) => `past | ${p.at} |  | ${said(p.value)}`),
-    ...walk.steps.map((s) => `step | ${s.day} | ${escapeCell(s.label)} | ${said(s.delta)}`),
+    /* WHAT A STEP IS PART OF AND THE PAIR IT WAS CONVERTED THROUGH GO ON AN `of` ROW DIRECTLY UNDER IT, which is what the
+       plan and drift controls act on. A fifth cell on the `step` row was the obvious place and is refused: `forecast`
+       takes four cells, and a five-cell row degrades the whole block to its source text. The pair is written only when
+       the walk has a currency to name, because `GBP to` is not a pair the renderer can drift. */
+    ...walk.steps.flatMap((s) => {
+      const { of, from } = s as ControlledStep;
+      const pair = from && walk.currency ? `${from} to ${walk.currency}` : '';
+      return [`step | ${s.day} | ${escapeCell(s.label)} | ${said(s.delta)}`, ...(of || pair ? [`of | ${escapeCell(of ?? '')} | ${pair} | `] : [])];
+    }),
+    /* WHAT THE SELL CONTROL MAY COUNT AS SOLD, in the walk's own money. The renderer leaves out a figure in any other,
+       so a holding the host could not convert is not offered rather than added as the wrong amount. */
+    ...((block as BlockResult & { sells?: readonly ForecastSell[] }).sells ?? []).map((s) => `sell |  | ${escapeCell(s.label)} | ${said(s.value)}`),
     `horizon | ${block.horizon ?? 180} |  | `,
     ...(block.knobs?.length ? [`knobs | ${block.knobs.join(' ')} |  | `] : []),
     /* ONE WALK OF SEVERAL, which moves with the others under the knobs the last of them draws. */

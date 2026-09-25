@@ -46,6 +46,16 @@ export type Step = {
   /** The register the movement came from. It is the leg's own name, not a word from a fixed pair. */
   source: string;
   href: string;
+  /**
+   * The currency the movement was written in, set only when it was converted into the walk's, as the kernel's `Step.from`.
+   *
+   * THE FORECAST'S RATE DRIFT MOVES EXACTLY THESE STEPS, and this walk used to convert without saying so: over the seed in
+   * pounds the kernel marked every sterling bill `from: GBP` and this walk marked none, so the drift control on the demo
+   * had nothing to move. `engines.test.ts` holds the two walks to the same marks.
+   */
+  from?: string;
+  /** What the movement is part of, from the leg's `group` field, set only when the leg names one and the row fills it. */
+  of?: string;
 };
 
 export type Runway = {
@@ -191,6 +201,12 @@ export type Leg = {
    * file walks the same ended rows through both engines.
    */
   ends?: string;
+  /**
+   * The field naming what a row's movement is part of: the plan an instalment belongs to, said on each step as `Step.of`.
+   * A label could not do it, because the seed titles each part `Proofing press, 3 of 8`. Only a non-empty text value is a
+   * name, exactly as the kernel's `Leg.group` reads it.
+   */
+  group?: string;
 };
 
 /**
@@ -314,6 +330,10 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180, onl
          which is what a subscription is, and what made the second leg readable as a declaration. */
       const incoming = leg.incoming ? row.fields[leg.incoming.field] === leg.incoming.is : false;
       const label = String(row.fields[decl?.title ?? leg.on] ?? '');
+      /* A NUMBER OR AN EMPTY FIELD GROUPS NOTHING, as in the kernel, rather than putting every such row into one plan
+         called nothing, which the plan control would then count in or out as one. */
+      const part = leg.group ? row.fields[leg.group] : undefined;
+      const of = typeof part === 'string' && part.trim() !== '' ? part.trim() : null;
 
       /* COUNTED WHERE THE KERNEL COUNTS IT: a row that reached the walk with money, a date and a
          step inside the window. A row with no amount, or one whose first day is past the horizon,
@@ -338,6 +358,7 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180, onl
             delta: incoming ? amount : -amount,
             source: leg.register,
             href: `/r/${leg.register}/${row.seq}`,
+            ...(of !== null ? { of } : {}),
           },
         });
       }
@@ -392,7 +413,7 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180, onl
       if (m.currency === home) continue;
       const r = rateFor(held.rates, m.currency, home, m.step.day);
       if (!r) missing.add(m.currency);
-      else m.step = { ...m.step, delta: convertMinor(m.step.delta, m.currency, home, r.rate) };
+      else m.step = { ...m.step, delta: convertMinor(m.step.delta, m.currency, home, r.rate), from: m.currency };
     }
     if (missing.size)
       return {
