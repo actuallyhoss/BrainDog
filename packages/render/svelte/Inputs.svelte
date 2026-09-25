@@ -6,9 +6,14 @@
   `inputs` in `src/html.ts` draws and `src/dynamic-forms.test.ts` holds this file to. A field that cannot write is
   absent rather than disabled, the rule `Capture` keeps (`19 §6`).
 
-  THE VALUE IS AN ATTRIBUTE THE RECORD HANDED BACK, never state held here: the host writes a change, reads the page
+  THE VALUE IS AN ATTRIBUTE THE RECORD HANDED BACK, never a draft held here: the host writes a change, reads the page
   again, and the next value arrives as a prop. A draft held in the component would be a second copy of the row that
   the verdict under it does not read.
+
+  EXCEPT THE TEXT OF A BOX BEING TYPED INTO, which is the person's and not a copy of the row. With the value as the
+  attribute alone, the re-read after a write reformatted a box under somebody's cursor, and the re-read after a
+  conflict put the other person's figure over what they typed (`shownIn` in `src/input-hold.ts` says when it is kept). The
+  hold only decides what the box shows; the host has already been handed every keystroke.
 
   EVERY CONTROL IS INSIDE ITS LABEL, so its name is the words beside it with no id to keep unique across a page that
   may carry the same field twice, and the hit area is the whole line.
@@ -16,11 +21,14 @@
 <script lang="ts">
   import { MISSING, inline, type Block, type RenderOptions } from '../src/index.ts';
   import { inputsPlan, isTicked, type OnInput } from '../src/inputs.ts';
+  import { leftHold, shownIn, typedHold, type InputHold } from '../src/input-hold.ts';
   import Text from './Text.svelte';
 
   let { block, opts = {}, oninput }: { block: Block; opts?: RenderOptions; oninput?: OnInput | undefined } = $props();
 
   const plan = $derived(inputsPlan(block.rows));
+  /* WHAT WAS TYPED, by field, while it is still the person's rather than the record's. */
+  let holds = $state<Record<string, InputHold>>({});
 </script>
 
 {#if plan.fields.length === 0}
@@ -58,8 +66,15 @@
             name={f.field}
             inputmode={f.control.inputmode}
             autocomplete="off"
-            value={f.value}
-            oninput={(e) => oninput?.(f.row, e.currentTarget.value)}
+            value={shownIn(f.value, holds[f.field])}
+            oninput={(e) => {
+              holds[f.field] = typedHold(e.currentTarget.value, f.value);
+              oninput?.(f.row, e.currentTarget.value);
+            }}
+            onblur={() => {
+              const hold = holds[f.field];
+              if (hold) holds[f.field] = leftHold(hold, f.value);
+            }}
           />
         {/if}
       </label>

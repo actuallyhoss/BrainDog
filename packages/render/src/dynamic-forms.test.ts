@@ -312,6 +312,27 @@ test('A CHOICE THE RECORD DOES NOT HOLD IS NEVER SHOWN AS THE ONE IT DOES, blank
   assert.deepEqual(selected('retired'), ['retired'], 'a value off the list is shown as it stands');
 });
 
+/**
+ * WHAT A PERSON TYPED STAYS IN THE BOX until the record hands it a value it did not hold when they stopped.
+ *
+ * THE RED (audit of September 25th, §17): the box's value was the record's value and nothing else, so the page read
+ * again after a write pushed `EGP 1,250.00` into a box the person was still typing `1250.7` into, and after a conflict
+ * it pushed the other person's figure over theirs. The rule is a pure function so the test does not need a browser:
+ * Svelte's `set_value` writes whatever the attribute answers, and leaves the box alone when the answer is what it holds.
+ */
+test('A BOX BEING TYPED INTO KEEPS ITS TEXT through a re-read, and takes the record\'s next value once it is left', async () => {
+  const { shownIn, typedHold, leftHold } = await import('./input-hold.ts');
+  assert.equal(shownIn('EGP 1,200.00', undefined), 'EGP 1,200.00', 'untouched, the box is the record');
+  const typing = typedHold('1250', 'EGP 1,200.00');
+  assert.equal(shownIn('EGP 1,200.00', typing), '1250');
+  assert.equal(shownIn('EGP 1,250.00', typing), '1250', 'a write read back does not reformat a box still being typed into');
+  assert.equal(shownIn('EGP 1,300.00', typing), '1250', 'nor does a conflict put somebody else\'s figure over it');
+  /* LEFT, THE TEXT STAYS until the record answers something new: after a conflict the sentence beside it is about it. */
+  const left = leftHold(typing, 'EGP 1,300.00');
+  assert.equal(shownIn('EGP 1,300.00', left), '1250');
+  assert.equal(shownIn('EGP 1,400.00', left), 'EGP 1,400.00', 'and the next value the record hands it is shown');
+});
+
 /* ── the two drawers, one tree ────────────────────────────────────────────── */
 
 const PARITY: Record<string, string> = {

@@ -246,3 +246,132 @@ test('THROUGH THE RECORD: the typed price is the row\'s, and the sentence over i
   /* AND THE SENTENCE OVER THE SAME LIST READS THE NEW FIGURE, which is the whole of what the inputs are for. */
   assert.equal(resolverOf(blocks[1]!.values)('price-now'), 'GBP 1,250.00');
 });
+
+/* ── the audit of September 25th (`loop/research-audit-2026-09-25-layouts.md` §2, §11, §17) ───────────────── */
+
+const DINARS = {
+  id: 'checks',
+  name: 'Checks',
+  one: 'check',
+  title: 'name',
+  fields: [
+    { id: 'name', type: 'text', required: true },
+    { id: 'price', type: 'money' },
+    { id: 'cost', type: 'money' },
+    { id: 'count', type: 'int' },
+  ],
+};
+
+/**
+ * An Egyptian record with one check on it, priced EGP 1,200.00 with no cost yet, and a writer that goes through the
+ * kernel's own `update` and answers a stale write the way `rows-write.ts` `failed` does: a conflict carrying the row as
+ * it now stands.
+ */
+async function egyptian(home: string | null) {
+  const NOW = Date.UTC(2026, 8, 25, 12);
+  const k = await openRecord(openSqlite(), { now: () => NOW });
+  const installed = await k.install([
+    { id: 'register.checks', kind: 'register', body: DINARS as never },
+    {
+      id: 'page.check',
+      kind: 'page',
+      body: { page: 'check', title: 'Check', requires: ['register.checks'], blocks: [{ kind: 'inputs', heading: 'Check', register: 'checks', columns: [{ field: 'price' }, { field: 'cost' }, { field: 'count' }] }] } as never,
+    },
+  ]);
+  assert.ok(installed.ok, JSON.stringify(installed));
+  assert.ok(k.create('checks', { name: 'Kiln', price: { amount: 120000, currency: 'EGP' }, count: 3 }, { actor: 'p_1' }).ok);
+  REGISTERS.checks = DINARS as never;
+  const read = (): LiveBlock[] => (k.page('check') as { value: { blocks: Record<string, unknown>[] } }).value.blocks.map((b) => blockOf(b as never, new Map(), NOW));
+  let blocks = read();
+  let said: ReadonlyMap<string, string> = new Map();
+  const w = inputsWriter({
+    write: async (register, seq, patch, version) => {
+      const out = k.update(register, `${register}#${seq}`, patch as never, { actor: 'p_1', ...(version === undefined ? {} : { version }) }) as
+        | { ok: true; value: { version: number } }
+        | { ok: false; refusal?: { fix: string }; conflict?: { current: { seq: number; version: number; fields: Fields } } };
+      if (out.ok) return { ok: true, entry: { seq, version: out.value.version, fields: {} } as unknown as Entry };
+      if (out.conflict) return { ok: false, why: 'conflict', fix: `${register}#${seq} was changed somewhere else first.`, entry: out.conflict.current as unknown as Entry };
+      return { ok: false, why: 'refused', fix: out.refusal?.fix ?? '' };
+    },
+    held: (_ref, field) => blocks[0]!.entries[0]?.fields[field],
+    reread: async () => void (blocks = read()),
+    said: (s) => void (said = s),
+    home: () => home,
+  });
+  const box = (field: string): Row => draw(blocks[0]!).segments.find((s): s is Block => s.type === 'block')!.rows.find((r) => r.cells[0]!.trim() === field)!;
+  const stored = () => (k.list({ register: 'checks' }) as { value: { rows: { fields: Fields; version: number }[] } }).value.rows[0]!;
+  return { k, w, box, stored, said: () => said };
+}
+
+test('AN EMPTY MONEY BOX TAKES THE RECORD\'S HOME CURRENCY, and with none known it refuses rather than writing pounds', async () => {
+  /* THE RED (audit §2): on an EGP record a cost typed `1200` into its empty box was stored as GBP 1,200.00 beside a
+     price in EGP. The chain ended `homeCurrency() ?? 'GBP'`, and the web's `homeCurrency()` reads `ROWS`, which nothing
+     fills in a shipped build, so every empty money box on every record wrote pounds. */
+  const egp = await egyptian('EGP');
+  const cost = egp.box('cost');
+  assert.equal(cost.cells[3]?.trim(), '', 'the box opens empty, so nothing on screen named a currency');
+  egp.w.input(cost, '1200');
+  await egp.w.flush();
+  assert.deepEqual(egp.stored().fields.cost, { amount: 120000, currency: 'EGP' });
+
+  /* NO CURRENCY KNOWN AT ALL IS A SENTENCE BESIDE THE BOX and nothing written: a guessed currency is a wrong figure. */
+  const unknown = await egyptian(null);
+  unknown.w.input(unknown.box('cost'), '1200');
+  await unknown.w.flush();
+  assert.equal(unknown.stored().fields.cost, undefined, 'nothing was written');
+  assert.match(unknown.said().get(keyOf({ register: 'checks', seq: 1 }, 'cost')) ?? '', /USD 1200/u, 'the sentence says how to name the currency');
+
+  const COST: FieldDecl = { id: 'cost', type: 'money' };
+  /* THE ORDER: a code typed, then the row's own, then the field's declared currency, then the record's home. */
+  assert.deepEqual(inputPatch(COST, '12', null, 'EGP'), { ok: true, patch: { cost: { amount: 1200, currency: 'EGP' } } });
+  assert.deepEqual(inputPatch(COST, '12', { amount: 5, currency: 'USD' }, 'EGP'), { ok: true, patch: { cost: { amount: 1200, currency: 'USD' } } });
+  assert.deepEqual(inputPatch({ ...COST, default: { amount: 0, currency: 'KWD' } }, '1.25', null, 'EGP'), { ok: true, patch: { cost: { amount: 1250, currency: 'KWD' } } });
+  assert.deepEqual(inputPatch(COST, 'JPY 12', null, null), { ok: true, patch: { cost: { amount: 12, currency: 'JPY' } } });
+  assert.equal(inputPatch(COST, '12', null, null).ok, false);
+});
+
+test('A COMMA ONLY GROUPS THOUSANDS, and any other comma is refused beside the box rather than read as a hundredfold figure', () => {
+  /* THE RED (audit §11): the money pattern took `[\d,]*` and then dropped every comma, so a decimal comma was read as a
+     thousands separator: `1,20` was 120.00 where the person meant 1.20, and `,5` was 5.00. The rule now is the one the
+     add-on settings' money box already keeps (`packs.ts` `valueOf`): commas in groups of three are the grouping the box
+     opens on, `EGP 1,200.00`, and every other comma is a figure this cannot read without guessing. */
+  const EGP = { amount: 100, currency: 'EGP' };
+  for (const typed of ['1,20', '12,5', ',5', '1,2,3,4', '1.200,50', '1,2345', '12,34.5', '1,']) {
+    const out = inputPatch(PRICE, typed, EGP);
+    assert.equal(out.ok, false, `${typed} is refused`);
+  }
+  assert.deepEqual(inputPatch(PRICE, '1,250', EGP), { ok: true, patch: { price: { amount: 125000, currency: 'EGP' } } });
+  assert.deepEqual(inputPatch(PRICE, 'EGP 1,234,567.50', EGP), { ok: true, patch: { price: { amount: 123456750, currency: 'EGP' } } });
+  assert.deepEqual(inputPatch(PRICE, '12.5', EGP), { ok: true, patch: { price: { amount: 1250, currency: 'EGP' } } });
+  assert.deepEqual(inputPatch(PRICE, '-1,000', EGP), { ok: true, patch: { price: { amount: -100000, currency: 'EGP' } } });
+});
+
+test('A CONFLICT KEEPS WHAT WAS TYPED: written at the new version when the field did not move, said beside it when it did', async () => {
+  /* THE RED (audit §17): the record refused the stale write correctly, and nothing sent the typed price again. Somebody
+     else changed the row's count; the price typed at the old version was dropped, the box went on showing 1,250 and the
+     record went on holding 1,200. */
+  const moved = await egyptian('EGP');
+  const price = moved.box('price');
+  assert.ok(moved.k.update('checks', 'checks#1', { count: 9 } as never, { actor: 'p_2', version: 1 }).ok);
+  moved.w.input(price, 'EGP 1,250.00');
+  await moved.w.flush();
+  assert.deepEqual(moved.stored().fields.price, { amount: 125000, currency: 'EGP' }, 'the price is written over the count somebody else changed');
+  assert.equal(moved.stored().fields.count, 9, 'and their count is kept');
+  assert.equal(moved.said().size, 0, 'nothing went wrong, so nothing is said');
+
+  /* THE SAME FIELD CHANGED UNDERNEATH is two people's figures for one thing, and neither is thrown away in silence. */
+  const both = await egyptian('EGP');
+  const again = both.box('price');
+  assert.ok(both.k.update('checks', 'checks#1', { price: { amount: 130000, currency: 'EGP' } } as never, { actor: 'p_2', version: 1 }).ok);
+  both.w.input(again, 'EGP 1,250.00');
+  await both.w.flush();
+  assert.deepEqual(both.stored().fields.price, { amount: 130000, currency: 'EGP' }, 'the other figure is not written over');
+  const sentence = both.said().get(keyOf({ register: 'checks', seq: 1 }, 'price')) ?? '';
+  assert.match(sentence, /EGP 1,300\.00/u, 'the sentence says what the row holds now');
+  assert.match(sentence, /EGP 1,250\.00/u, 'and what was typed, which is still the person\'s');
+  /* AND IT DOES NOT SAY WHERE THE TYPED FIGURE IS NOW, because that depends on when the box was left, which this writer
+     cannot see. Typed and left with Tab inside the pause, the box is pinned to the value it held when left, the conflict
+     read back is a different value, and `shownIn` then shows the record's figure: the sentence said the typed one was
+     "still in the box" while the box held the other person's (checked on 25 September against `input-hold.ts`). */
+  assert.doesNotMatch(sentence, /in the box/u, 'the sentence names the typed figure rather than claiming the box holds it');
+});
