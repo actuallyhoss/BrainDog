@@ -1849,6 +1849,10 @@ const CASH_LEGS = [
        already moved and Cash now is standing on the far side of it. */
     where: 'state is open',
     incoming: { field: 'direction', is: 'in' },
+    /* EACH PART SAYS WHICH PLAN IT IS IN, so Cash ahead can count a plan in or out whole. Its parts are titled
+       `Proofing press, 3 of 8`, a different label every part, and the count control offers only what moves more than
+       once (`streamsOf` in `packages/render/src/forecast.ts`), so without this no plan was offered at all. */
+    group: 'plan',
     /* NO `every:`, AND THAT IS THE WHOLE TRAP OF THIS REGISTER. An instalment row is already one
        dated part, so a frequency over the top of it would charge the proofing press eight times
        eight. `INSTALLMENTS` in this file is `[1..8].map`, one row a payment, for exactly this
@@ -1967,7 +1971,11 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
          */
         from: CASH_LEGS,
         horizon: 365,
-        knobs: ['horizon', 'late', 'spend', 'leave'],
+        /* GROWTH, RATE DRIFT AND COUNTING A PLAN OR A STREAM, as well as the first four. Drift draws a slider only for a pair
+           some step was converted through, so a record in one currency sees none. `sell` is not here, because the
+           figure it would offer is what somebody holds, and that list is the holdings pack's: money-core names no
+           other pack (`test/money-core-names-no-pack.test.ts`), and a sell knob with no `sell:` figure draws nothing. */
+        knobs: ['horizon', 'late', 'spend', 'leave', 'grow', 'drift', 'count'],
         /* THE LATE KNOB MARKS HOW LATE MONEY HAS COME IN, and the chart says how many days are left when the
            walk goes under inside a month. */
         late: 'days-late-in',

@@ -1285,6 +1285,12 @@ export type BlockResult = PageBlock & {
   lateness?: number | null;
   /** That figure's name as the record declares it, which the late knob is called by. */
   late_name?: string;
+  /**
+   * A forecast's `sell:` figure as the record read it, in minor units of the walk's currency: what the sell control may
+   * count as sold. It arrives from the kernel untouched (`blockOf` carries every key it does not name), and
+   * `forecastRows` in `blocks.ts` writes one `sell` row each.
+   */
+  sells?: readonly { label: string; value: number }[];
   /** A `bar` over a list of links: the money each linked row holds, by the row's id, which the bar adds up per row. */
   linked?: Readonly<Record<string, unknown>>;
   /**

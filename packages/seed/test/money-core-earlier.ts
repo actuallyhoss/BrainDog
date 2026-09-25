@@ -115,7 +115,7 @@ function asShipped(doc: unknown): Doc {
  * landed, the value `pack-versions.test.ts` holds for 2.3.0, and the 1.8.0 rebuild still read `8bcd20187c61cf1b`.
  */
 function before240(doc: unknown): Doc {
-  const d = structuredClone(doc) as Doc;
+  const d = before250(doc);
   d.declarations = d.declarations.map((x) => {
     if (x.register === 'obligations' && Array.isArray(x.fields)) return { ...x, fields: (x.fields as Body[]).filter((f) => f.id !== 'ends') };
     if (x.page !== 'money' || !Array.isArray(x.blocks)) return x;
@@ -124,6 +124,29 @@ function before240(doc: unknown): Doc {
       blocks: (x.blocks as Body[]).map((b) =>
         Array.isArray(b.from) ? { ...b, from: (b.from as Body[]).map((leg) => (leg.register === 'obligations' ? (({ ends: _ends, ...rest }) => rest)(leg) : leg)) } : b,
       ),
+    };
+  });
+  return d;
+}
+
+/**
+ * Today's money-core document less what 2.5.0 added: `group: 'plan'` on the installments leg of each walk `page.money`
+ * draws, and Cash ahead's `knobs` back to the four 2.4.0 offered. `before240` is built on top of this.
+ *
+ * TAKEN OFF BY KEY AND SET BACK IN PLACE, NOT BY POSITION, so the leg's keys and the block's keep the order the release
+ * carried them in, which is what the fingerprint hashes.
+ */
+function before250(doc: unknown): Doc {
+  const d = structuredClone(doc) as Doc;
+  d.declarations = d.declarations.map((x) => {
+    if (x.page !== 'money' || !Array.isArray(x.blocks)) return x;
+    return {
+      ...x,
+      blocks: (x.blocks as Body[]).map((b) => {
+        const legs = Array.isArray(b.from) ? { from: (b.from as Body[]).map((leg) => (leg.register === 'installments' ? (({ group: _group, ...rest }) => rest)(leg) : leg)) } : {};
+        const knobs = b.heading === 'Cash ahead' ? { knobs: ['horizon', 'late', 'spend', 'leave'] } : {};
+        return { ...b, ...legs, ...knobs };
+      }),
     };
   });
   return d;

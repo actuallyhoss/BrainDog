@@ -925,7 +925,7 @@ function seriesBlock(b: PageBlock): BlockResult {
 const unitOfFormat = (format: string | undefined): string | null => (format?.startsWith('money.') ? format.slice('money.'.length) : null);
 
 /** The knobs a forecast may offer: the kernel's `KNOBS`. */
-const KNOBS = ['horizon', 'late', 'spend', 'leave'];
+const KNOBS = ['horizon', 'late', 'spend', 'leave', 'grow', 'drift', 'count', 'sell'];
 
 /**
  * A forecast's remembered balance before today, as the record's `recordedOf` reads it, or the sentence that stops it.
@@ -1023,8 +1023,8 @@ const READS = new Set([
   'series', 'back', 'ahead', 'net',
   /* A stat or lines over readings: whether a point is a day or a week. */
   'bucket',
-  /* A forecast's remembered figure and its knobs, its late mark and its warning reach. */
-  'recorded', 'knobs', 'late', 'under',
+  /* A forecast's remembered figure and its knobs, its late mark and its warning reach, and the figure its sell knob offers. */
+  'recorded', 'knobs', 'late', 'under', 'sell',
   /* A bar's or a split's row for what no part holds, and the intent each part is drawn in. */
   'unset', 'tones',
   /* A card grid's out-of-date rule. */

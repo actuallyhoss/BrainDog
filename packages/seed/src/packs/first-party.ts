@@ -143,6 +143,12 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   field added and nothing taken away, so the step is a minor one. A version and not a reset because 2.3.0 is on
  *   `origin/master` (`5dc5a7c6`) and deploy run `36010768543`, for `6da640cc`, carried it out at 14:09 UTC on
  *   24 September.
+ * - money-core 2.5.0: Cash ahead turns on the forecast's later controls, and an instalment says which plan it is in.
+ *   The installments leg both walks on `page.money` read names `group: 'plan'`, so every part of the proofing press
+ *   reaches the chart as one plan and the count control can take it in or out whole, where each part was its own
+ *   one-off; Cash ahead's `knobs` add `grow`, `drift` and `count` to the first four (`test/money-forecast-knobs.test.ts`,
+ *   brief B6 of `loop/research-legacy-parity.md`). No list, field or id moves, so the step is a minor one. A version
+ *   and not a reset because 2.4.0 is on `origin/master` (`7fa92aa4`).
  * - estate 1.2.0: a service carries a note. the old tool's domains carry the reason each name is held and what is
  *   unresolved about it, and Services had no field that holds prose, so the import left every note in the export. One
  *   field added and nothing taken away, so the step is a minor one. It moves the version rather than riding on 1.1.0
@@ -187,7 +193,7 @@ const SUMMARIES: Record<FirstPartyId, string> = {
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.4.0',
   people: '2.0.0',
-  'money-core': '2.4.0',
+  'money-core': '2.5.0',
   estate: '1.2.0',
   work: '1.8.0',
 };

@@ -376,6 +376,29 @@ const DECLARED: Record<string, Version> = {
       '`register.obligations` gains `ends`, the last day a repeating row moves money on, and the obligations leg of both walks on `page.money` names it, so a bill the old tool says ends on 10 November stops walking on the 10th where at 2.3.0 it walked every month to the horizon, because the import writes an end only where the list declares one (`5d4bbf8b`) -> 47e60867f14c18d0',
     ],
   },
+  /**
+   * A VERSION AND NOT A RESET, because 2.4.0 is on `origin/master` (`7fa92aa4`). The ids are 2.4.0's exactly: one key on
+   * a leg and one list of knobs moved, both inside `page.money`, where the ids cannot see.
+   */
+  'money-core@2.5.0': {
+    holds: `
+      ingest.bank-card-in ingest.bank-card-in-sms ingest.bank-card-out ingest.bank-card-out-sms
+      metric.cash-accounts metric.cash-as-of metric.cash-now metric.days-late-in metric.due-30d metric.every-month-by-category
+      metric.every-month-in metric.every-month-out metric.in-30d metric.in-by-month metric.in-due-by-month metric.installments-due-30d
+      metric.installments-left metric.late-in metric.out-30d metric.out-by-month metric.out-due-by-month metric.overdue
+      metric.owed-by-you metric.owed-to-you metric.project-owed metric.received-30d metric.spent-30d metric.txn-uncategorised
+      page.home page.ledger page.money
+      register.accounts register.categories register.fx register.installments register.obligations register.recurring
+      register.snapshots register.transactions
+      rule.cash-stale rule.installment-due-soon rule.invoice-late rule.recurring-ended rule.recurring-missed rule.txn-categorise
+      setting.home_currency setting.most_days_late setting.most_due_30d setting.most_on_one_category setting.most_out_30d
+      setting.most_out_every_month setting.most_owed_to_you
+    `,
+    declares: 'c98b58b3df5eaca1',
+    history: [
+      'The installments leg both walks on `page.money` read names `group: plan`, so each part of a plan reaches the chart as that plan and the count control can take the proofing press in or out whole, where every part was its own one-off; Cash ahead\'s knobs add `grow`, `drift` and `count` to horizon, late, spend and leave (brief B6) -> c98b58b3df5eaca1',
+    ],
+  },
   'work@1.1.0': { declares: 'b49e051fe7c26ac5' },
   'work@1.2.0': { declares: '49a30d2ef8c1d672' },
   'work@1.3.0': { declares: 'fb82e66d80644e3d' },

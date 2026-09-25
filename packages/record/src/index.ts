@@ -1871,9 +1871,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * What a refused block drew, taken back. The empties that were blanked before stay as empties, so a host that reads
    * `readings` of a refused `stat` still finds a list; everything else a block computes goes. `walk` did not, so a cash
    * walk refused for its legs would still have carried every step, and `where` is a filter a person wrote with a field
-   * value in it (`body is Dinner with the auditor`, measured in §6).
+   * value in it (`body is Dinner with the auditor`, measured in §6). `sells` is a forecast's `sell:` figure read, the
+   * total of a list: a walk refused for that list still carried it, so a member not invited to the list was handed its
+   * total to the minor unit (`test/forecast-sell-held.test.ts`).
    */
-  const DRAWN = ['where', 'fx', 'walk', 'walks', 'walkFx', 'past', 'inherited', 'scopes', 'rings', 'history', 'bars', 'changes', 'working_now', 'lateness', 'late_name', 'seen'] as const;
+  const DRAWN = ['where', 'fx', 'walk', 'walks', 'walkFx', 'past', 'inherited', 'scopes', 'rings', 'history', 'bars', 'changes', 'working_now', 'lateness', 'late_name', 'sells', 'seen'] as const;
 
   /**
    * AND WHAT A REFUSED BLOCK WAS WRITTEN TO READ, which is the names of lists and figures she cannot open.
@@ -1881,12 +1883,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * `cells: [{ metric: 'diary-count' }]` off a refused figures block, and `from: [{ register: 'bills' }]` with
    * `opening: 1000000` off a refused cash walk: two list names `boot` hides from her and, on a hand-written page, an
    * opening balance. The legs and the cells are what `blockRegisters` and `alsoReads` judged the block by, so what is
-   * refused is exactly what they name.
+   * refused is exactly what they name. `sell` is the same kind of name, the figure a forecast's sell control offers.
    *
    * `source` IS NOT HERE YET. `register.diary` on a refused table is the same kind of name, and
    * `test/scoped-audit.test.ts` finds that block by it; the test has to find it another way before `source` can go.
    */
-  const WRITTEN = ['from', 'cells', 'opening'] as const;
+  const WRITTEN = ['from', 'cells', 'opening', 'sell'] as const;
 
   /**
    * One drawn block as this caller may see it: whole, or blanked with the one sentence that says why.

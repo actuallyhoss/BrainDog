@@ -120,6 +120,11 @@ export type PageBlock = {
   late?: string;
   /** A `forecast`'s: say under the chart how many days are left when the walk goes under within this many days. */
   under?: number;
+  /**
+   * A `forecast`'s: the figure of what a reader may count as sold on a day they pick, such as what is held in gold. The
+   * record reads it and answers `sells`; the walk itself never counts it, because selling is the reader's what-if.
+   */
+  sell?: { metric: string };
   /** A `bar` or `split`'s: the label of the row that holds what no part does, drawn last and linked to those rows. */
   unset?: string;
   /** A `bar` or `split`'s: the intent a part is drawn in, by the value it groups, such as `{ off_track: bad }`. A part not named is neutral. */
@@ -186,6 +191,8 @@ const READS = new Set([
   'working', 'working_now',
   /* A `forecast`'s late mark and its warning reach, and the lateness it answers with. */
   'late', 'under', 'lateness', 'late_name',
+  /* A `forecast`'s figure of what may be sold, and what it answers with. */
+  'sell', 'sells',
   /* A card grid's out-of-date rule. */
   'stale',
   /* A `progress` budget's figure of what was spent, grouped by the word its rows are, and a goal's of what was logged
@@ -264,6 +271,11 @@ export type BlockResult = PageBlock & {
   lateness?: number | null;
   /** That figure's name as the record declares it, which the late knob is called by, so a use case's words reach it. */
   late_name?: string;
+  /**
+   * A forecast's `sell:` figure, read: what it is called and what it holds, in minor units of the walk's currency. Empty
+   * when the figure reads nothing or reads another currency, and only ever on a block drawn as one walk.
+   */
+  sells?: { label: string; value: number }[];
   /**
    * Every `{{path}}` in the block's heading, body, empty sentence or authored cells that the record
    * holds a value for, by the path as written. A path it holds nothing for is absent, and draws `—`.
@@ -851,6 +863,11 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
           if ('refusal' in recorded) return { ...base, refusals: also(recorded.refusal) };
           const late = latenessOf(deps, block);
           if ('refusal' in late) return { ...base, refusals: also(late.refusal) };
+          /* A SELL FIGURE IS CHECKED HERE AND NOT OFFERED. The host draws each walk with the block's own keys spread over
+             it (`charted` in `apps/web/src/lib/record/blocks.ts`), so one `sells` on this block would be written under
+             the dollar walk and the pound walk alike, each time as that walk's money. */
+          const sold = sellsOf(deps, block, null);
+          if ('refusal' in sold) return { ...base, refusals: also(sold.refusal) };
           const missing = [...new Set([...(opened.missing ?? []), ...(moving?.missing ?? [])])].sort();
           return {
             ...base,
@@ -897,11 +914,15 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
     if ('refusal' in recorded) return { ...base, refusals: also(recorded.refusal) };
     const late = latenessOf(deps, block);
     if ('refusal' in late) return { ...base, refusals: also(late.refusal) };
+    /* A WALK WITH NO MOVEMENT HAS NO CURRENCY OF ITS OWN, and is then in the money its opening figure is. */
+    const sold = sellsOf(deps, block, walk.currency ?? opened.unit);
+    if ('refusal' in sold) return { ...base, refusals: also(sold.refusal) };
     return {
       ...base,
       walk,
       ...(recorded.past ? { past: pastIn(recorded.past, walk.currency) } : {}),
       ...late,
+      ...sold,
       matched: walk.steps.length,
       refusals: also(...walk.refusals),
     };
@@ -1155,8 +1176,14 @@ function openingOf(
   return { value: read.value.value ?? 0, unit: read.value.unit, converted: Boolean(read.value.fx?.asOf) };
 }
 
-/** The knobs a `forecast` may offer. */
-export const KNOBS = ['horizon', 'late', 'spend', 'leave'] as const;
+/**
+ * The knobs a `forecast` may offer, which are `FORECAST_KNOBS` in `packages/render/src/forecast.ts` word for word.
+ *
+ * THE RENDERER DREW EIGHT AND THIS LET A DECLARATION NAME FOUR, so growth, rate drift, counting a plan and selling a
+ * holding were built, tested, and refused on every page that asked for them: `knobs: [grow]` answered
+ * DECLARATION_INVALID and the walk drew nothing at all (`test/pages-forecast-knobs.test.ts`).
+ */
+export const KNOBS = ['horizon', 'late', 'spend', 'leave', 'grow', 'drift', 'count', 'sell'] as const;
 
 /** How far back a forecast draws what was recorded. */
 const RECORDED_DAYS = 90;
@@ -1203,6 +1230,29 @@ function latenessOf(deps: PageDeps, block: PageBlock): { lateness?: number | nul
   if (read.value.refusals.length) return { refusal: read.value.refusals[0]! };
   /* THE KNOB IS CALLED BY THE FIGURE IT MARKS, as the record holds it, so it speaks as the use case installed it. */
   return { lateness: read.value.value, ...(typeof decl.name === 'string' && decl.name.trim() !== '' ? { late_name: decl.name } : {}) };
+}
+
+/**
+ * What a forecast's sell control may count as sold: the figure `sell:` names, read, when it is in the walk's money.
+ *
+ * THE RENDERER ADDS THIS NUMBER TO THE BALANCE ON THE DAY A READER PICKS, as it arrives, so it has to be the walk's own
+ * currency before it leaves here. A figure in dollars under a walk in pounds is left out rather than refused: the walk
+ * is still right without it, and the one wrong answer is USD 1,500.75 walked as GBP 1,500.75. The renderer drops a
+ * figure in another currency too, but only by the code written beside the number, and that is a second guard, not
+ * this one. A figure that reads nothing, or less than nothing, is nothing to sell.
+ */
+function sellsOf(deps: PageDeps, block: PageBlock, currency: string | null): { sells?: { label: string; value: number }[] } | { refusal: Refusal } {
+  if (block.sell === undefined) return {};
+  const id = block.sell !== null && typeof block.sell === 'object' ? block.sell.metric : undefined;
+  if (typeof id !== 'string' || id === '') return { refusal: { code: 'DECLARATION_INVALID', fix: 'sell: names a figure, as sell: { metric: holdings-value }.', at: 'sell' } };
+  const decl = deps.metric(id);
+  if (!decl) return { refusal: { code: 'METRIC_UNKNOWN', fix: `There is no metric called ${id} for the sell knob to offer.`, at: 'sell' } };
+  const read = deps.read(decl);
+  if (!read.ok) return refused(read) ? { refusal: read.refusal } : { sells: [] };
+  if (read.value.refusals.length) return { refusal: read.value.refusals[0]! };
+  const worth = read.value.value;
+  const offered = currency !== null && read.value.unit === currency && typeof worth === 'number' && Number.isFinite(worth) && worth > 0;
+  return { sells: offered ? [{ label: typeof decl.name === 'string' && decl.name.trim() !== '' ? decl.name : id, value: worth }] : [] };
 }
 
 /**
@@ -2038,6 +2088,9 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
     /* A WALK THAT STARTS FROM A FIGURE READS THAT FIGURE'S LIST, and so does the figure its late knob marks. */
     if (block.opening && typeof block.opening === 'object') add(metric?.(block.opening.metric)?.source);
     if (typeof block.late === 'string') add(metric?.(block.late)?.source);
+    /* AND THE FIGURE ITS SELL KNOB OFFERS, which is a total of a list: a member who may not open Holdings is not handed
+       what is in it as the amount a date control would add. */
+    if (block.sell && typeof block.sell === 'object' && typeof block.sell.metric === 'string') add(metric?.(block.sell.metric)?.source);
     /* A BAR OR A SPLIT OVER A FIGURE READS THE FIGURE'S LIST. */
     if (typeof block.source === 'string' && block.source.startsWith('metric.')) add(metric?.(block.source.slice('metric.'.length))?.source);
     /* A `when:` READS A FIGURE TOO, and a block that draws only when a number crosses a line is a

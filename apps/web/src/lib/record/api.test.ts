@@ -1016,12 +1016,113 @@ test('THE MONEY PAGE DRAWS ITS CASH AHEAD as a forecast: the opening, ninety day
   assert.ok(marks.filter((m) => m === 'past').length >= 80, 'the sample remembers ninety days of cash');
   assert.equal(marks.filter((m) => m === 'step').length, forecast.walk!.steps.length, 'every movement, not a slice of them');
   assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'horizon')?.cells.slice(0, 2), ['horizon', '365']);
-  assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'knobs')?.cells.slice(0, 2), ['knobs', 'horizon late spend leave']);
+  assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'knobs')?.cells.slice(0, 2), ['knobs', 'horizon late spend leave grow drift count']);
+  /* AND EACH INSTALMENT'S PLAN ON AN `of` ROW UNDER IT, which is what the count control groups the parts of a plan by. */
+  assert.ok(segment.rows.some((r) => r.cells[0] === 'of' && r.cells[1] === 'Proofing press'), 'no step says it is part of the proofing press');
   /* THE LATE KNOB MARKS HOW LATE MONEY HAS COME IN, the sample's paid invoices averaged, and a crossing inside a month is said. */
   assert.ok(typeof forecast.lateness === 'number' && forecast.lateness > 0, `clients paid ${forecast.lateness} days late`);
   assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'late')?.cells.slice(0, 2), ['late', String(Math.round(forecast.lateness!))]);
   assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'under')?.cells.slice(0, 2), ['under', '30']);
   assert.equal(forecast.shown, forecast.total, 'a forecast is never a slice');
+});
+
+/**
+ * A real record's walk, through the page's own door to the chart's own model: the plan each part is in, and what may be
+ * sold.
+ *
+ * MONEY CROSSES THREE HANDS HERE AND EACH ONE WRITES IT DIFFERENTLY: the kernel answers minor units, `blocks.ts` writes
+ * them as text with a code, and the renderer reads that text back into pounds and adds it to a balance. A figure off by
+ * a hundred, or rounded on the way, is a date control that says the cash lasts longer than it does, so this asks the
+ * last hand for its number and holds it to the first hand's to the penny. The figures are invented.
+ */
+test('A SELL ROW ON A LIVE PAGE IS THE FIGURE THE RECORD READ, to the penny, and selling on a day adds exactly that', async () => {
+  const { DatabaseSync } = await import('node:sqlite');
+  const { openRecord } = await import('@braindog/kernel');
+  const { blockOf } = await import('./page-live.ts');
+  const { draw } = await import('./blocks.ts');
+  const { forecastModel, scenario } = await import('braindog-render');
+
+  const db = new DatabaseSync(':memory:');
+  let depth = 0;
+  const sql = {
+    exec: (text: string, ...params: unknown[]) => (params.length === 0 ? db.exec(text) : db.prepare(text).run(...(params as never[]))),
+    all: (text: string, ...params: unknown[]) => db.prepare(text).all(...(params as never[])),
+    one: (text: string, ...params: unknown[]) => db.prepare(text).get(...(params as never[])),
+    transactionSync<T>(fn: () => T): T {
+      if (depth > 0) return fn();
+      db.exec('BEGIN');
+      depth++;
+      try {
+        const out = fn();
+        db.exec('COMMIT');
+        return out;
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      } finally {
+        depth--;
+      }
+    },
+  };
+  const at = Date.UTC(2026, 8, 17, 12);
+  const k = await openRecord(sql as never, { now: () => at });
+  const figure = (metric: string, name: string, source: string, sum: string) => ({
+    id: `metric.${metric}`,
+    kind: 'metric',
+    body: { metric, name, source, value: { sum }, format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' },
+  });
+  const put = await k.install([
+    { id: 'register.accounts', kind: 'register', body: { id: 'accounts', name: 'Accounts', title: 'name', fields: [{ id: 'name', type: 'text', required: true }, { id: 'balance', type: 'money', required: true }] } },
+    {
+      id: 'register.installments',
+      kind: 'register',
+      body: { id: 'installments', name: 'Instalments', title: 'what', fields: [{ id: 'what', type: 'text', required: true }, { id: 'plan', type: 'text' }, { id: 'amount', type: 'money', required: true }, { id: 'due', type: 'day', required: true }] },
+    },
+    { id: 'register.store', kind: 'register', body: { id: 'store', name: 'Store of value', title: 'what', fields: [{ id: 'what', type: 'text', required: true }, { id: 'worth', type: 'money' }] } },
+    figure('cash-now', 'Cash now', 'register.accounts', 'balance'),
+    figure('store-value', 'Store value', 'register.store', 'worth'),
+  ] as never);
+  assert.ok(put.ok, JSON.stringify(put));
+  const made = (register: string, fields: Record<string, unknown>) => assert.ok(k.create(register, fields, { actor: 'p_1' }).ok);
+  made('accounts', { name: 'Current', balance: { amount: 312_345, currency: 'GBP' } });
+  for (const n of [1, 2, 3]) made('installments', { what: `Kiln, ${n} of 3`, plan: 'Kiln', amount: { amount: 120_033, currency: 'GBP' }, due: `2026-1${n - 1}-04` });
+  made('store', { what: 'Coins', worth: { amount: 150_075, currency: 'GBP' } });
+  made('store', { what: 'Bond', worth: { amount: 99_901, currency: 'GBP' } });
+
+  const answered = k.block({
+    kind: 'forecast',
+    source: 'forecast.runway',
+    opening: { metric: 'cash-now' },
+    from: [{ register: 'installments', on: 'due', amount: 'amount', group: 'plan' }],
+    horizon: 120,
+    knobs: ['horizon', 'count', 'sell'],
+    sell: { metric: 'store-value' },
+  } as never);
+  assert.deepEqual(answered.refusals, []);
+  assert.deepEqual(answered.sells, [{ label: 'Store value', value: 249_976 }]);
+
+  const drawn = draw(blockOf(answered as never, new Map(), at));
+  assert.equal(drawn.refusal, null);
+  const [segment] = drawn.segments;
+  assert.ok(segment?.type === 'block' && segment.kind === 'forecast', JSON.stringify(segment));
+  const model = forecastModel(segment.rows.map((r) => r.cells));
+  assert.ok(model);
+  assert.deepEqual(model.knobs, ['horizon', 'count', 'sell']);
+  /* THE PLAN REACHES THE CHART, every part under its one name, so counting it out moves all three. */
+  assert.deepEqual(model.steps.map((s) => [s.day, s.of, Math.round(s.delta * 100)]), answered.walk!.steps.map((s) => [s.day, 'Kiln', s.delta]));
+
+  const sold = model.sells;
+  assert.deepEqual(sold.map((s) => [s.label, Math.round(s.value * 100)]), [['Store value', answered.sells![0]!.value]]);
+  const knobs = { horizon: 120, late: 0, spend: 0, leave: [] as string[] };
+  const kept = scenario(model, knobs);
+  const selling = scenario(model, { ...knobs, sell: '2026-10-20' });
+  const on = (s: typeof kept, day: string) => s.days.find((d) => d.day === day)!.balance;
+  assert.equal(Math.round((on(selling, '2026-10-19') - on(kept, '2026-10-19')) * 100), 0, 'nothing is sold before the day');
+  assert.equal(Math.round((on(selling, '2026-10-20') - on(kept, '2026-10-20')) * 100), 249_976, 'GBP 2,499.76 arrives on the day, to the penny');
+  assert.equal(Math.round((selling.days.at(-1)!.balance - kept.days.at(-1)!.balance) * 100), 249_976);
+  /* AND THE PLAN COUNTED OUT IS ALL OF IT: GBP 3,600.99 back over the walk. */
+  const without = scenario(model, { ...knobs, leave: ['Kiln'] });
+  assert.equal(Math.round((without.days.at(-1)!.balance - kept.days.at(-1)!.balance) * 100), 360_099);
 });
 
 test('CASH NOW SAYS WHAT IT ADDS UP AND HOW OLD ITS OLDEST BALANCE IS, not its target', () => {
