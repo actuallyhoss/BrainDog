@@ -23,7 +23,7 @@ const QUESTION = 'Keep what you hold in a Holdings list?';
 
 const EMPTY: Plan = { taken: null, rev: null, rows: [], asks: [], polls: [], skipped: [], changed: [] };
 
-const ASSET = { kind: 'gold', label: 'Gold 24c', qty: 5, unit_cost_minor: 500_000, currency: 'EGP', acquired_on: '2025-05-02', matures_on: null, meta_json: null };
+const ASSET = { kind: 'gold', label: 'Gold 24c', qty: 5, unit_cost_minor: 500_000, currency: 'EGP', acquired_on: '2025-02-10', matures_on: null, meta_json: null };
 const exportWith = (assets: unknown[]): Record<string, unknown> => ({ db: { entities: [] }, money: { asOf: '2026-09-22', assets } });
 
 /** A record whose Decide is held in memory, holding the packs given at their versions. */

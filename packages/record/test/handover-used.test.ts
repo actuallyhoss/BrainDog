@@ -52,9 +52,9 @@ test('THE RECORD NAMES WHAT IT USES, SO THE UPDATE HANDS A DOOR THAT FILED A ROW
   for (const id of FIRST_PARTY) await put(id === 'money-core' ? v170() : firstPartyDocument(id));
 
   /* A PATTERN THAT FILED A ROW: the account the line names, so the arrival files one rather than waiting in review. */
-  value(api.kernel.create('accounts', { name: 'Cairo credit card', kind: 'card', balance: { amount: 0, currency: 'EGP' }, as_of: '2026-08-01', liquid: false, last4: '6180' }, { actor: 'p_seed' }));
+  value(api.kernel.create('accounts', { name: 'Cairo credit card', kind: 'card', balance: { amount: 0, currency: 'EGP' }, as_of: '2026-08-01', liquid: false, last4: '9052' }, { actor: 'p_seed' }));
   const out = value<{ ingest: string | null; state: string; reason?: string }>(
-    api.kernel.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example', Subject: 'HSBC' }, body: 'Your Credit Card ending with *** 6180 has been used for EGP 1,284.50 on 14/08/2026 at CEDAR LANE BAKERY. Your available limit is EGP 23,715.50', sha256: 'handover-used-1' }),
+    api.kernel.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example', Subject: 'HSBC' }, body: 'Your Credit Card ending with *** 9052 has been used for EGP 1,284.50 on 14/08/2026 at CEDAR LANE BAKERY. Your available limit is EGP 23,715.50', sha256: 'handover-used-1' }),
   );
   assert.deepEqual([out.ingest, out.state], ['bank-card-used', 'matched'], out.reason);
   /* AND A DOOR HIS SHORTCUT POSTS TO: a webhook twin with a token minted for it. */
@@ -87,9 +87,9 @@ test('A DOOR WHOSE ARRIVALS WAIT IN REVIEW IS A DOOR IN USE, so bank-from-unsure
   };
   for (const id of FIRST_PARTY) await put(id === 'money-core' ? v170() : firstPartyDocument(id));
 
-  value(api.kernel.create('accounts', { name: 'Cairo current account', kind: 'bank', balance: { amount: 0, currency: 'EGP' }, as_of: '2026-08-01', liquid: true, last4: '327' }, { actor: 'p_seed' }));
+  value(api.kernel.create('accounts', { name: 'Cairo current account', kind: 'bank', balance: { amount: 0, currency: 'EGP' }, as_of: '2026-08-01', liquid: true, last4: '846' }, { actor: 'p_seed' }));
   const out = value<{ ingest: string | null; state: string; reason?: string }>(
-    api.kernel.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example', Subject: 'HSBC' }, body: 'From HSBC: 01AUG26 Transfer from NADIA FARID to 042-118***-327 EGP 418.62 - Your available balance is EGP 33,540.25', sha256: 'handover-used-review' }),
+    api.kernel.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example', Subject: 'HSBC' }, body: 'From HSBC: 01AUG26 Transfer from NADIA FARID to 310-527***-846 EGP 418.62 - Your available balance is EGP 33,540.25', sha256: 'handover-used-review' }),
   );
   assert.deepEqual([out.ingest, out.state], ['bank-from-unsure', 'review'], out.reason);
   assert.equal(sql.all('SELECT ingest_id FROM ingest_receipt').length, 0, 'the line filed a row, so this is the case above');

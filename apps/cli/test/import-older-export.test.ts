@@ -30,7 +30,7 @@ import { liveRows, nights } from './import-nights.ts';
 type Obj = Record<string, unknown>;
 
 const txn = (id: string, description: string, day: string, amount_minor: number): Obj => ({ id, account_id: 'main', day, description, amount_minor, category_id: 'C1' });
-const lot = (label: string): Obj => ({ kind: 'gold', label, qty: 5, unit_cost_minor: 691_000, currency: 'EGP', acquired_on: '2026-07-30', matures_on: null, meta_json: null });
+const lot = (label: string): Obj => ({ kind: 'gold', label, qty: 5, unit_cost_minor: 515_000, currency: 'EGP', acquired_on: '2026-06-30', matures_on: null, meta_json: null });
 
 /** 06:00 UTC on the day, 09:00 in Cairo. */
 const at = (day: string) => Date.parse(`${day}T06:00:00.000Z`);

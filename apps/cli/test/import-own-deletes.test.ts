@@ -8,7 +8,7 @@
  *
  * MEASURED BEFORE THIS FILE, through `importCommand` on the record behind `serveApi` (the first test): a gold lot of 5,
  * corrected to 6 in the old tool the next night and back to 5 the night after, left no live lot at all, and the third
- * night's report said "Deleted in this BrainDog, so not added again: Gold 24c 2026-07-30". Before wave fifty-three the
+ * night's report said "Deleted in this BrainDog, so not added again: Gold 24c 2026-06-30". Before wave fifty-three the
  * same three nights left one lot of 5. Only a new export would ever have brought it back, and none could: the key sat
  * in `gone` for the thirty days the bin keeps it.
  *
@@ -34,7 +34,7 @@ import { gatedNights, type Wire } from './import-gated.ts';
 
 type Obj = Record<string, unknown>;
 
-const GOLD = { kind: 'gold', label: 'Gold 24c', qty: 5, unit_cost_minor: 691_000, currency: 'EGP', acquired_on: '2026-07-30', matures_on: null, meta_json: null };
+const GOLD = { kind: 'gold', label: 'Gold 24c', qty: 5, unit_cost_minor: 515_000, currency: 'EGP', acquired_on: '2026-06-30', matures_on: null, meta_json: null };
 
 /** 06:00 UTC on the day, 09:00 in Cairo, a few hours after that night's export was taken. */
 const at = (day: string) => Date.parse(`${day}T06:00:00.000Z`);

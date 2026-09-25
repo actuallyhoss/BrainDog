@@ -98,7 +98,7 @@ async function record() {
   const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 22, 12)) });
   for (const id of FIRST_PARTY) said((await put(api, id === 'money-core' ? asMoneyCore180(firstPartyDocument(id)) : firstPartyDocument(id))).out);
   const k = api.kernel;
-  const row = said<{ id: string }>(k.create('holdings', { label: 'Gold 24c', kind: 'gold', qty: 10, unit_cost: { amount: 5554350, currency: 'EGP' } }, { actor: 'p_1' }));
+  const row = said<{ id: string }>(k.create('holdings', { label: 'Gold 24c', kind: 'gold', qty: 10, unit_cost: { amount: 4120000, currency: 'EGP' } }, { actor: 'p_1' }));
   return { sql, api, k, row };
 }
 

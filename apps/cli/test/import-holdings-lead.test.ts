@@ -30,7 +30,7 @@ const QUESTION = 'Keep what you hold in a Holdings list?';
 function exp(): Record<string, unknown> {
   const e = syntheticExport();
   (e.money as Record<string, unknown>).assets = [
-    { kind: 'gold', label: 'Gold 24c', qty: 5, unit_cost_minor: 500_000, currency: 'EGP', acquired_on: '2025-05-02', matures_on: null, meta_json: null },
+    { kind: 'gold', label: 'Gold 24c', qty: 5, unit_cost_minor: 500_000, currency: 'EGP', acquired_on: '2025-02-10', matures_on: null, meta_json: null },
   ];
   return e;
 }

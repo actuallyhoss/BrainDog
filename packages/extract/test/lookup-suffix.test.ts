@@ -31,9 +31,9 @@ function read(form: Form, text: string, rows: { id: string; value: string }[]) {
 }
 
 test('STARS AND THREE DIGITS ARE THE ONE ROW WHOSE LONGER VALUE ENDS IN THEM', () => {
-  assert.deepEqual(matchLiterals('042-118***518', table(SAVINGS, CURRENT), 'lookup'), ['a_savings']);
+  assert.deepEqual(matchLiterals('310-527***518', table(SAVINGS, CURRENT), 'lookup'), ['a_savings']);
   /* The `From HSBC:` shape, where a hyphen stands between the stars and the digits. */
-  assert.deepEqual(matchLiterals('042-118***-518', table(SAVINGS, CURRENT), 'lookup'), ['a_savings']);
+  assert.deepEqual(matchLiterals('310-527***-518', table(SAVINGS, CURRENT), 'lookup'), ['a_savings']);
 });
 
 test('TWO ROWS ENDING IN THE PRINTED DIGITS IS AMBIGUOUS, and not whichever row came first', () => {
@@ -62,7 +62,7 @@ test('`enum` NEVER PICKS UP THE SUFFIX RULE, with the form named or left out', (
 });
 
 test('THE PACKAGE\'S OWN `lookup` READS A MASK ITS ANCHOR SWALLOWED, because the anchor is where the stars were', () => {
-  const line = 'From HSBC: 03AUG26 ATM Cash Withdrawal from 042-118***-518 EGP 900.00- Your available balance is EGP 4,100.00';
+  const line = 'From HSBC: 03AUG26 ATM Cash Withdrawal from 310-527***-518 EGP 900.00- Your available balance is EGP 4,100.00';
   const form: Form = { lookup: { register: 'accounts', by: 'last4', between: ['***-', ' '] } };
   assert.deepEqual(read(form, line, [SAVINGS, CURRENT]), { values: ['a_savings'], note: 'exact' });
   assert.equal(read(form, line, [SAVINGS, DEPOSIT]), 'ambiguous');
