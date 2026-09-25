@@ -140,6 +140,49 @@
     },
     {
       "kind": "pack",
+      "id": "launch-desk",
+      "title": "Launch desk",
+      "summary": "A desk for launching a thing in parts: where it stands in one sentence, each part with its next step, the calls waiting on you, a pad beside it, and a price check.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "cf04a5277f4fbe119a89acf7e7a54e12530d16972fda5bd5257d7bf07551d5c7",
+          "bytes": 20635,
+          "published_at": "2026-09-25T08:45:43.741Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "pad"
+            ],
+            "lists": [
+              "Parts",
+              "Steps",
+              "Helpers",
+              "Budget lines",
+              "Price check",
+              "Lessons"
+            ],
+            "pages": [
+              "Desk",
+              "{{name}}",
+              "Numbers"
+            ],
+            "rules": [
+              "Add the three costs of the price check together"
+            ],
+            "examples": 1,
+            "skills": [],
+            "calls_out": []
+          }
+        }
+      ]
+    },
+    {
+      "kind": "pack",
       "id": "mercury-company",
       "title": "mercury-company",
       "summary": "Reads the balance of every Mercury account from api.mercury.com every 1h, into Money's accounts, and its last thirty days of transactions into the ledger.",

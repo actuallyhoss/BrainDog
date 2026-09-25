@@ -373,6 +373,8 @@ importers:
 
   packs/legacy-import: {}
 
+  packs/launch-desk: {}
+
   packs/live-feed: {}
 
   packs/mercury: {}
