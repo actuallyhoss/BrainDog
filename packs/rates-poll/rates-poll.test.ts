@@ -93,8 +93,8 @@ test('THE SEED NO LONGER OFFERS THE BUILDER UNDER A SECOND NAME', () => {
 
 test("B7's DIRECTORY: packages/seed/src/packs holds only what a record is built from", () => {
   const here = readdirSync(new URL('../../packages/seed/src/packs/', import.meta.url)).sort();
-  /* `bank-hsbc-eg` AND `holdings` ARE B8's, and leave in the wave after this one. */
-  assert.deepEqual(here, ['agents.ts', 'bank-hsbc-eg.ts', 'first-party.ts', 'holdings.ts']);
+  /* `bank-hsbc-eg` AND `holdings` LEFT TOO, for packs/ (parity B1 step 2, September 25th). */
+  assert.deepEqual(here, ['agents.ts', 'first-party.ts']);
 });
 
 /* ── nothing moved but the file ───────────────────────────────────────────────────────────────── */
