@@ -28,9 +28,7 @@
   import type { Shell } from '$lib/record/boot-live.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
-  /* THE DECLARATION CACHE AND THE PAGE READER, AND NOTHING ELSE OF THE SAMPLE'S. `REGISTERS` is what `learn` fills from
-     a live record (`research-no-sample.md` 1d) and `pages` reads it; both move out of `api.ts` in wave B. */
-  import { pages } from '$lib/record/api.ts';
+  /* THE DECLARATION CACHE, WHICH ONLY THE RECORD FILLS (`held.ts`). */
   import { REGISTERS } from '$lib/record/held.ts';
   import { LEVELS, type Level, type Person } from '$lib/record/schema.ts';
   /* WHETHER THE PERSON READING THIS MAY USE WHAT IS ON IT, which nothing here asked. `../levels.ts`
@@ -713,7 +711,10 @@
   let placedHere = $state(new Set<string>());
   let placing = $state<string | null>(null);
 
-  const pen = $derived(Object.values(pages()).filter((p) => p.placed === false && !placedHere.has(p.page)));
+  /* THE RECORD'S PEN, AS THE SHELL CARRIES IT. It was every page the sample declares with `placed: false`, resolved against
+     the sample's rows, so Settings offered to place the sample's pages into a record's rail. `boot` sends no pen yet, so a
+     live shell's is empty (`layoutOf`). */
+  const pen = $derived(shell.pen.filter((p) => p.placed === false && !placedHere.has(p.page)));
 
   /* AND THE CHARACTER KEYS TOO. It is the one preference that changes what the keyboard DOES, so
      forgetting it is the one somebody notices within a minute. And *Suggest new pages*, which is the

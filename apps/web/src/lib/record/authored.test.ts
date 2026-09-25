@@ -16,7 +16,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { toSegments } from './blocks.ts';
-import { page } from './api.ts';
+import { page } from './fixtures/readers.ts';
 import { ROWS } from './data.ts';
 import type { BlockResult } from './api.ts';
 import type { Fields } from './schema.ts';

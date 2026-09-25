@@ -12,7 +12,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { ROWS, healthOf, runsIn, updatesIn } from './api.ts';
+import { healthOf, runsIn, updatesIn } from './api.ts';
+import { ROWS } from './data.ts';
 import { trackReader, type Fetch } from './track-live.ts';
 
 const BASE = 'http://record.test';

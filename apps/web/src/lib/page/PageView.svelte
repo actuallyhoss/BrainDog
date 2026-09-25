@@ -991,7 +991,7 @@
     {/if}
   </div>
 
-  <AddBlock bind:open={adding} {slug} register={primary} onadd={add} />
+  <AddBlock bind:open={adding} blocks={result?.blocks ?? []} register={primary} onadd={add} />
 {/if}
 
 <style>

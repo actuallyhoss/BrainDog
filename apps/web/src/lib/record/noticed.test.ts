@@ -14,7 +14,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { noticed } from './api.ts';
+import { noticed } from './fixtures/readers.ts';
 
 test('a register whose refusals crossed the threshold says so', () => {
   const seen = noticed('obligations');

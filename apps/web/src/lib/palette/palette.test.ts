@@ -28,7 +28,9 @@ import { BINDINGS, type Binding } from '../a11y/bindings.ts';
 import { copy } from '../copy.ts';
 import { METRICS } from '../record/declared.ts';
 import { isTemplate, unreadable } from '../record/metrics.ts';
-import { AUDIT, QUESTIONS, REGISTERS, VIEWS, entry, metric, search } from '../record/api.ts';
+import { REGISTERS } from '../record/api.ts';
+import { entry, metric, search } from '../record/fixtures/readers.ts';
+import { AUDIT, QUESTIONS, VIEWS } from '../record/data.ts';
 
 const src = (...parts: string[]) => readFileSync(join(fileURLToPath(new URL('../', import.meta.url)), ...parts), 'utf8');
 

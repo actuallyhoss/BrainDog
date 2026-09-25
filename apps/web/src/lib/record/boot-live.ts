@@ -18,19 +18,47 @@ import { createClient, type Boot, type ClientOptions, type Cursor, type EventLin
 import { railRoom } from '@braindog/kernel';
 import { useCaseName } from '@braindog/seed/usecases/names';
 
-import { iconFor, PACKS, setupSaid, whoDid, type boot, type NavEntry } from './api.ts';
+import { iconFor, setupSaid, whoDid, type NavEntry } from './api.ts';
+/* THE BUILT-IN ADD-ONS' NAMES AND LISTS, which the sample's table is still the only list of: a line about an add-on names
+   it from here. Read directly, because `api.ts` no longer hands the sample's tables on; wave C1 moves it with `data.ts`. */
+import { PACKS } from './data.ts';
 import { learnPages, REGISTERS } from './held.ts';
 import { copy } from '../copy.ts';
 import type { SwitcherRow } from './switcher.ts';
 import { noteOf } from './history-live.ts';
-import type { NewsItem } from './schema.ts';
+import type { NewsItem, PageDecl, Person, Question } from './schema.ts';
+import type { IconName } from '../ui/icons.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 
 export type Booted = { from: 'live'; boot: Boot } | { from: 'refused'; code: string; fix: string };
 
-/* THE SHAPE IS STILL `api.ts` `boot`'s, as a type and nothing else: wave B2 of `loop/research-no-sample.md` moves it. */
-type Sample = ReturnType<typeof boot>;
+/**
+ * What every shell carries, whoever answered.
+ *
+ * IT WAS SPELLED `ReturnType<typeof boot>`, THE SAMPLE'S ANSWER, so the shell every live screen reads took its shape
+ * from the mock in `api.ts`, and the mock could not leave without the shell losing its type. It is written out now,
+ * field by field, as the sample's `boot` returned it (`fixtures/readers.ts`), which is what `layoutOf` and
+ * `refusedShell` build.
+ */
+type ShellBase = {
+  index: {
+    slug: string;
+    name: string;
+    locale: string;
+    registers: { id: string; name: string; count: number; icon: IconName; views: { key: string; name: string; href: string }[] }[];
+  };
+  nav: NavEntry[];
+  /** Pages that emerged and were never placed. A holding pen, not a decision (19 §3). */
+  pen: PageDecl[];
+  people: Person[];
+  questions: Question[];
+  whatsNew: NewsItem[];
+  sinceCapped: boolean;
+  version: number;
+  /** Absent means every "Ask BrainDog" affordance is ABSENT, not disabled (23 §8). */
+  assistant: boolean;
+};
 
 /**
  * What the root layout hands every screen: the record's `boot`, or an empty shell over a refusal.
@@ -38,7 +66,7 @@ type Sample = ReturnType<typeof boot>;
  * `now` is the clock a screen reads ages against (the record's, or this browser's over a refusal), and
  * `upTo` is the newest line of what is new, which is what marking it all read sends.
  */
-export type Shell = Omit<Sample, 'me'> & {
+export type Shell = ShellBase & {
   me: {
     person: string;
     level: string;

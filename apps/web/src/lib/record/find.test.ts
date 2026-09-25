@@ -21,7 +21,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { ftsQuery, projectedText } from '@braindog/kernel';
 
 import { answers, projected, searchable, terms, tokensOf, why } from './find.ts';
-import { QUESTIONS, DECIDED, REGISTERS, ROWS, applyFilters, display, search } from './api.ts';
+import { REGISTERS, display } from './api.ts';
+import { applyFilters, search } from './fixtures/readers.ts';
+import { QUESTIONS, DECIDED, ROWS } from './data.ts';
 import type { Entry } from './schema.ts';
 
 const rows = (...fields: Record<string, unknown>[]): Entry[] => fields.map((f, i) => ({ seq: i + 1, fields: f }) as Entry);

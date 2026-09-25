@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import { METRICS } from './declared.ts';
 import { mixedFix } from './money.ts';
 import { BARE, currenciesRead, format, hrefFor, isTemplate, meetsTarget, read as readAt, spokenWindow, targetLine, unreadable, windowMs, withParam, type MetricDecl } from './metrics.ts';
-import { applyFilters, metric } from './api.ts';
+import { applyFilters, metric } from './fixtures/readers.ts';
 import { compile, matches } from './where.ts';
 import { NOW, REGISTERS, ROWS } from './data.ts';
 import { amountOf } from './money.ts';

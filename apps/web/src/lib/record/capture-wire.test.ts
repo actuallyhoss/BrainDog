@@ -19,7 +19,8 @@ import { readFileSync } from 'node:fs';
 
 import { capturePlan, type Block } from 'braindog-render';
 
-import { REGISTERS, readBlock } from './api.ts';
+import { REGISTERS } from './api.ts';
+import { readBlock } from './fixtures/readers.ts';
 import { draw } from './blocks.ts';
 import { blockOf } from './page-live.ts';
 import { capturedFields } from './rows-write.ts';

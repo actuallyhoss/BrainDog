@@ -602,7 +602,8 @@ export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; ro
  *
  * IT IS IN THE KERNEL BECAUSE THE SAMPLE AND THE LIVE SHELL BOTH HAVE TO OBEY IT, and they are in
  * different files with no other package between them. The cap shipped as a local constant inside
- * `apps/web/src/lib/record/api.ts`'s `boot()`, which is the SAMPLE's rail: the sample is four
+ * the sample's `boot()` (then in `apps/web/src/lib/record/api.ts`, now in
+ * `apps/web/src/lib/record/fixtures/readers.ts`), which is the SAMPLE's rail: the sample is four
  * projects forever, so the rule was true where it changed nothing and absent from the rail a real
  * record draws, where the same 26 links were still being offered every morning.
  *

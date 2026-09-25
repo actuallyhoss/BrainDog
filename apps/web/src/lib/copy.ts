@@ -161,20 +161,6 @@ export const copy = {
      indistinguishable from a broken one, so every action that cannot happen here says what it
      would have done and that it did not happen — once, in the toast, not as a disabled state.
      A disabled control tells you a thing exists and refuses to say why it will not work. */
-  /**
-   * TWO SCREENS DRAW WORKED EXAMPLES AND NEITHER OF THEM SAID SO.
-   *
-   * A run's transcript and a shared page are both written into the app rather than read from a
-   * record: there is no method that answers with a run's tool calls, and a share token resolves to
-   * nothing, so the same rows are drawn whichever record the reader is signed in to. Somebody
-   * looking at their own record was shown invented rows with nothing to tell them apart from theirs,
-   * which is worse than an empty screen.
-   *
-   * SO THE SCREEN SAYS WHICH IT IS, in the sample bar's register and no louder. It states the fact
-   * and stops: what the reader needs is to know these rows are not theirs, not an account of why.
-   */
-  exampleRun: 'This is an example run, and not one from your record.',
-  exampleShared: 'This is an example of a shared page, and not data from a record.',
   /** The predicate of an unfiltered list, said as a person would say it. */
   everything: 'everything in it',
   /* WHAT WOULD HAVE HAPPENED, AND THAT IT DID NOT. The second half used to name the build —
@@ -492,25 +478,11 @@ export const copy = {
    * business record. The chip was also the schema's spelling, lower-cased, on the one screen where
    * a person decides who to trust.
    */
-  /**
-   * WHAT A RUN IS DOING, as a sentence rather than an enum.
-   *
-   * The chip beside it printed `running` and `failed` in the schema's own lower case, and the line
-   * under it said "Running" unconditionally — so a failed run described itself as running, on the
-   * screen somebody opens BECAUSE something went wrong.
-   */
   /* WHEN A SCREEN DOES NOT LOAD. What was wrong · where · what to do — and the reassurance is a fact
      about the record rather than an apology: nothing was written, because this screen never got as
      far as writing. */
   screenFailed: 'This screen did not load.',
   screenFailedBody: 'Nothing was changed. Try again, and if it happens twice, quote the request below.',
-
-  jobStatus: {
-    running: 'Running',
-    done: 'Finished',
-    failed: 'Stopped after a step was refused',
-    queued: 'Waiting to start',
-  } as Record<string, string>,
 
   levelMeans: {
     owner: 'Can change everything, and invite people',
@@ -602,7 +574,6 @@ export const copy = {
    * surfaces drew it, so it was three false sentences.
    */
   nothingMatched: 'No row matched, so there is nothing to add up.',
-  nothingDated: 'Nothing dated to walk yet.',
   /* A BRIDGE OVER THE CASH WALK: where the money starts, what comes and goes, and where it lands. */
   bridgeStart: 'Cash now',
   bridgeIn: 'Coming in',
@@ -684,8 +655,6 @@ export const copy = {
   ratesQuestion: (host: string, base: string, codes: string) => `Fetch ${host} every day for what one ${base} is worth in ${codes}?`,
   /* A BALANCE NOBODY HAS UPDATED IN A WHILE says so beside its date, with the watch glyph. */
   outOfDate: (day: string) => `${day}, out of date`,
-  /* A ROUNDED ZERO IS NOT A DIRECTION. "up 0%" gives a reader a way and a distance of nothing. */
-  aboutTheSame: 'about the same',
   /* THE FIVE STATES, ON THE FOUR SCREENS THAT COULD NOT DRAW ANY OF THEM. `grep -c "<Empty"` was
      0 on Home, /audit, /packs and /vault — four surfaces with no way to tell "nothing here yet"
      from "nothing matched", which `19 §6` calls the failure by name. */
@@ -821,7 +790,6 @@ export const copy = {
   clearFilters: 'Clear filters',
   saveAsView: 'Save as a view',
   export: 'Export the record',
-  requestAccess: 'Request access',
   tryAgain: 'Load it again',
   addOne: 'Add the first row',
   /**
@@ -1881,17 +1849,6 @@ export const copy = {
   scopePalette: 'In the palette',
   scopeNav: 'In the sidebar',
 
-  /**
-   * WHAT IT MEANS TO THE READER, not what it is to whoever built it.
-   *
-   * It read *"A frontend mock-up. Nothing writes, and no request leaves the page."* on all twelve
-   * settings areas, on `/jobs/<id>` and on `/decide/<id>` — `19 §9` names `mock-up` as internal
-   * vocabulary reaching a user, and `access.test.ts` was written to forbid exactly this, but forbade
-   * one literal that has since been deleted while the bigger call site stayed. "Nothing writes" is
-   * the schema's word for it; "no request leaves the page" is a fact about the network that no
-   * reader asked for. What they need is whether their typing survives.
-   */
-  mockNotice: 'Nothing you do here is saved yet.',
   /* On a live record the rest of Settings writes to it, so only the device half is said. */
   keptOnDevice: 'The settings above are kept on this device.',
 

@@ -23,7 +23,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { applyFilters, chipsOf, list, whereOf } from './api.ts';
+import { chipsOf, whereOf } from './api.ts';
+import { applyFilters, list } from './fixtures/readers.ts';
 import { REGISTERS, ROWS } from './data.ts';
 import { clausesOf } from './views-live.ts';
 import { compile, registerHref } from './where.ts';

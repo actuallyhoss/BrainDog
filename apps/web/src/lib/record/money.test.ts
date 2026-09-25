@@ -17,7 +17,8 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { openRecord, type Declaration } from '@braindog/kernel';
 
-import { currencyFor, display, metric, page, readBlock, values } from './api.ts';
+import { currencyFor, display } from './api.ts';
+import { metric, page, readBlock, values } from './fixtures/readers.ts';
 import { resolverOf } from './page-live.ts';
 import { PAGES } from './data.ts';
 import { toSegments, walkTables } from './blocks.ts';

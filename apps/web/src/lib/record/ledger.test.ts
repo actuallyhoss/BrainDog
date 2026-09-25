@@ -20,7 +20,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { isEventKind } from '@braindog/kernel';
-import { boot } from './api.ts';
+import { boot } from './fixtures/readers.ts';
 import { AUDIT, DECIDED, PEOPLE_ACCESS, QUESTIONS, SNAPSHOTS } from './data.ts';
 
 test('EVERY EVENT IN THE LEDGER IS A KIND THE DATABASE WOULD ACCEPT', () => {

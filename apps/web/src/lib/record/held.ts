@@ -12,8 +12,8 @@
  * `readBoot` puts each page `boot` lists in `PAGES`, by `learnPages` below. Nothing else writes here in a shipped build
  * but the copy the next paragraph is about.
  *
- * `data.ts` STILL COPIES THE SEED'S DECLARATIONS INTO `REGISTERS` AND `PAGES`, because it is the fixture every mock
- * reader in `api.ts` and some seventy test files are built over, and it still ships until wave C1 moves it under
+ * `data.ts` STILL COPIES THE SEED'S DECLARATIONS INTO `REGISTERS` AND `PAGES`, because it is the fixture every reader
+ * in `fixtures/readers.ts` and some seventy test files are built over, and it still ships until wave C1 moves it under
  * `fixtures/`. Measured on 25 September with that copy removed: 449 of 1,965 tests fail across about seventy files. It
  * does NOT copy the sample's row names into `TITLES`; a test that asks the mirror about a row by its title imports
  * `fixtures/fill.ts`, so no shipped screen can reach a sample row's name through here.

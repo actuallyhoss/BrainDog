@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { page } from './api.ts';
+import { page } from './fixtures/readers.ts';
 import { toSegments } from './blocks.ts';
 
 test('A PROJECT PAGE DRAWS THE PROJECT’S NOTE AS A DOCUMENT, blocks and all, and a placeholder draws nothing', () => {

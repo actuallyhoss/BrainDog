@@ -8,7 +8,8 @@ import assert from 'node:assert/strict';
 
 import { diffRows } from 'braindog-render';
 
-import { REGISTERS, ROWS, display } from '../../../lib/record/api.ts';
+import { REGISTERS, display } from '../../../lib/record/api.ts';
+import { ROWS } from '../../../lib/record/data.ts';
 import { QUESTIONS, ROWSETS } from '../../../lib/record/data.ts';
 import { LONG, isLong, updatesOf } from './changes.ts';
 

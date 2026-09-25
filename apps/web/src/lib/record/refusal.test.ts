@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { draw, saidPlainly, toSegments } from './blocks.ts';
-import { page } from './api.ts';
+import { page } from './fixtures/readers.ts';
 import { PAGES } from './data.ts';
 import { KINDS } from 'braindog-render';
 import type { BlockResult } from './api.ts';

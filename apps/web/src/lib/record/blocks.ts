@@ -38,7 +38,11 @@ import { across, convertMinor, dayFieldOf, rateFor, type Part, type Rate } from 
 import { day as longDay, money, parse, since, workingCell, WORKING_MARK, type Block } from 'braindog-render';
 import { KINDS, isKind, type CardRole } from 'braindog-render';
 import type { Column } from 'braindog-render/svelte';
-import { ROWS, display, feedWho, homeCurrency, walkTable, type BlockResult } from './api.ts';
+import { display, feedWho, homeCurrency, walkTable, type BlockResult } from './api.ts';
+/* THE SAMPLE'S ROWS, READ HERE AND NOT THROUGH `api.ts`, which no longer hands them on: a gauge whose filter matched nothing
+   takes its currency from the list's rows, and a block carries only the rows it matched. Wave C1 needs the record's own
+   answer for this before `data.ts` can leave. */
+import { ROWS } from './data.ts';
 import { REGISTERS } from './held.ts';
 
 /**

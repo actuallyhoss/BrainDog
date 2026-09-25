@@ -22,7 +22,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { DOM_CAP, PAGE, columnsFor, list, search } from './api.ts';
+import { DOM_CAP, PAGE, columnsFor } from './api.ts';
+import { list, search } from './fixtures/readers.ts';
 import { NOW, REGISTERS, ROWS } from './data.ts';
 import type { Entry } from './schema.ts';
 

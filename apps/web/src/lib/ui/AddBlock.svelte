@@ -34,7 +34,7 @@
 
   import { at } from '../at.ts';
   import { copy } from '../copy.ts';
-  import { page as readPage, values } from '../record/api.ts';
+  import { resolverOf, type LiveBlock } from '../record/page-live.ts';
   import { page as route } from '$app/state';
   import { REGISTERS } from '../record/held.ts';
   import { toSegments } from '../record/blocks.ts';
@@ -45,18 +45,30 @@
 
   let {
     open = $bindable(false),
-    slug,
+    blocks,
     register,
     onadd,
   }: {
     open?: boolean;
-    /** The page being added to — the preview binds to its own data, never to a fixture. */
-    slug: string;
+    /**
+     * THE PAGE'S OWN BLOCKS, AS THE RECORD ANSWERED THEM, which a preview binds to. It took the page's slug and read the
+     * sample's page of that name, so every tile on a record previewed the sample's rows under the words "never to a
+     * fixture". A page whose record answered no block of this list previews each kind from its description.
+     */
+    blocks: readonly LiveBlock[];
     register: string;
     onadd: (block: PageBlock) => void;
   } = $props();
 
-  const resolved = values();
+  /* A `{{path}}` IS THE RECORD'S, answered on the block that carries it, and the first block that can answer it answers. */
+  const resolve = (path: string): string | null => {
+    for (const b of blocks) {
+      const said = resolverOf(b.values)(path);
+      if (said !== null) return said;
+    }
+    return null;
+  };
+
   /* NOW IS THE RECORD'S CLOCK, not the browser's. `inline` defaults it to `Date.now()`, so every
      `{{ago:}}` in prose was formatted against the wall clock while every other date on the screen
      came from `NOW` — the Money page said an invoice was 6w overdue and the Home page said 5w, for
@@ -65,7 +77,7 @@
 
      AND THE RECORD'S CLOCK IS THE SHELL'S `now`, which `boot` answered with. It was the seed's `NOW`, so every
      preview's `{{ago:}}` was told against 3 September 2026 on a record read weeks later. */
-  const opts = $derived({ resolve: (path: string) => resolved[path] ?? null, now: route.data.now, href: at });
+  const opts = $derived({ resolve, now: route.data.now, href: at });
 
   const PURPOSES = ['figure', 'list', 'plan', 'say', 'media'] as const;
 
@@ -77,13 +89,12 @@
    * that throws because one kind cannot fill itself is a picker that shows nothing.
    */
   const tiles = $derived.by(() => {
-    const result = readPage(slug);
     const decl = REGISTERS[register];
     return bindableFor(register).map((kind) => {
       const seed = seedBlock(kind, register);
       const preview = (isKind(kind) ? KINDS[kind].rows : undefined) ?? 3;
       let segments: ReturnType<typeof toSegments> = [];
-      const bound = result?.blocks.find((b) => b.register === register);
+      const bound = blocks.find((b) => b.register === register);
       /* An AUTHORED seed previews from its own rows and must not be handed a register — a block
          with both a source and authored rows is refused, so the preview would be the refusal. */
       if (seed?.authored) {

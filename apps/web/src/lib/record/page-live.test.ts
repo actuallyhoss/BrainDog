@@ -14,7 +14,8 @@ import { WORKING_MARK } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import { METRICS } from './declared.ts';
-import { ROWS, feedTable } from './api.ts';
+import { feedTable } from './api.ts';
+import { ROWS } from './data.ts';
 import { toSegments } from './blocks.ts';
 import { blockOf, liveWords, pageReader, resolverOf, type Fetch } from './page-live.ts';
 

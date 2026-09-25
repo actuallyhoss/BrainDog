@@ -15,7 +15,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord, type Kernel } from '@braindog/kernel';
 
 import { copy } from '../copy.ts';
-import { REGISTERS, ROWS } from './api.ts';
+import { REGISTERS } from './api.ts';
+import { ROWS } from './data.ts';
 import { rowReader, type Fetch } from './row-live.ts';
 
 const BASE = 'http://record.test';

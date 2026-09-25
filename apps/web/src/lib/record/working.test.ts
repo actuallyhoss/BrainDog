@@ -12,7 +12,9 @@ import assert from 'node:assert/strict';
 
 import { WORKING_MARK } from 'braindog-render';
 
-import { readBlock as webBlock, ROWS, workingNow, workingNowAt } from './api.ts';
+import { workingNowAt } from './api.ts';
+import { readBlock as webBlock, workingNow } from './fixtures/readers.ts';
+import { ROWS } from './data.ts';
 import { toSegments } from './blocks.ts';
 import type { PageBlock } from './schema.ts';
 

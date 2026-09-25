@@ -10,7 +10,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { ROWS, sortRows } from './api.ts';
+import { sortRows } from './api.ts';
+import { ROWS } from './data.ts';
 import type { Entry } from './schema.ts';
 
 const rows = (...fields: Record<string, unknown>[]): Entry[] => fields.map((f, i) => ({ seq: i + 1, fields: f }) as Entry);

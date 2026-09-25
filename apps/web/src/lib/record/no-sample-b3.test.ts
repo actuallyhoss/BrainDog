@@ -20,6 +20,7 @@ import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import * as api from './api.ts';
+import * as sample from './data.ts';
 import { forget, readBoot, type Fetch } from './boot-live.ts';
 import * as held from './held.ts';
 import { learn, refMapOf, treeOf, type RecordRow } from './remote.ts';
@@ -33,7 +34,7 @@ const LIVE: RecordRow[] = [
 
 test('the declarations `learn` keeps are the table every reader reads, and `held.ts` loads no sample', async () => {
   assert.equal(api.REGISTERS, held.REGISTERS, 'the mock and the live readers hold two tables, so a learnt list is on half the screens');
-  assert.equal(api.PAGES, held.PAGES);
+  assert.equal(sample.PAGES, held.PAGES, "the sample's readers draw pages from a table the record never fills");
   const said = { name: 'Club books', one: 'club book', title: 'title', fields: [{ id: 'title', type: 'text' }] };
   await learn(async () => ({ ok: true, value: said }), 'club_books', new Map());
   assert.equal(held.REGISTERS.club_books?.name, 'Club books');
@@ -76,8 +77,9 @@ function shipped(dir: string): string[] {
     return /\.(ts|svelte)$/u.test(name) && !/\.test\.ts$/u.test(name) ? [path] : [];
   });
 }
-/* THE TWO FIXTURE MODULES THEMSELVES, which wave B2 splits and C1 moves; everything else ships and reads the record. */
-const FIXTURES = new Set(['lib/record/api.ts', 'lib/record/data.ts']);
+/* THE FIXTURE MODULE ITSELF, which C1 moves; everything else ships and reads the record. `api.ts` was the second until
+   wave B2 took its readers to `fixtures/readers.ts`, which `shipped` does not walk, and it is held to the rule now. */
+const FIXTURES = new Set(['lib/record/data.ts']);
 const imported = (source: string, name: string): boolean =>
   new RegExp(`import\\s*\\{[^}]*\\b${name}\\b[^}]*\\}\\s*from\\s*'[^']*/(api|data)\\.ts'`, 'u').test(source);
 

@@ -38,7 +38,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { NOW, installSeed } from '@braindog/seed';
 
-import { chipsOf, list, REGISTERS } from './api.ts';
+import { chipsOf, REGISTERS } from './api.ts';
+import { list } from './fixtures/readers.ts';
 import { entryOf, refMapOf, targetsOf, treeOf, type RecordRow, type Refs } from './remote.ts';
 import { registerHref } from './where.ts';
 

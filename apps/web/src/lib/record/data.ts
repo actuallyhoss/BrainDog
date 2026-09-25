@@ -88,7 +88,7 @@ import { PAGES as HELD_PAGES, REGISTERS as HELD_REGISTERS } from './held.ts';
  *
  * THEY GO INTO `held.ts`'S TABLE AND NOT A TABLE OF THEIR OWN, and so do the pages above. Every shipped reader reads the
  * declarations there, where `learn` writes what the record answers; a second table here would be the sample's copy that
- * no answer ever replaces, which is what the mock readers in `api.ts` would then draw. Wave C1 moves this copy into
+ * no answer ever replaces, which is what the sample's readers in `fixtures/readers.ts` would then draw. Wave C1 moves this copy into
  * `fixtures/fill.ts`, a test-only import, and the table starts empty in a shipped tab.
  */
 export const REGISTERS: Record<string, RegisterDecl> = Object.assign(HELD_REGISTERS, { ...SEED_REGISTERS, ...AGENTS_REGISTERS, session: sessionDeclaration().body } as unknown as Record<string, RegisterDecl>);

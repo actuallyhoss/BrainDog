@@ -18,7 +18,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { applyFilters, backlinks, boot, columnsFor, currencyFor, dirOf, display, identityFor, isProse, labelOf, metric, seqWidth, packDiff, page, pages, readableFields, readBlock, search, spokenRow, toRows, unnamed } from './api.ts';
+import { columnsFor, currencyFor, dirOf, display, identityFor, isProse, labelOf, seqWidth, packDiff, readableFields, spokenRow, toRows, unnamed } from './api.ts';
+import { applyFilters, backlinks, boot, metric, page, pages, readBlock, search } from './fixtures/readers.ts';
 import { amountOf } from './money.ts';
 import { toSegments } from './blocks.ts';
 import { declaredValue } from './where.ts';

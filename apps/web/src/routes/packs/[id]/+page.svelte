@@ -19,7 +19,9 @@
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { PACKS, pages } from '$lib/record/api.ts';
+  /* THE BUILT-IN ADD-ONS, whose names and lists the sample's table is still the only list of. Read directly, since `api.ts`
+     no longer hands the sample's tables on; wave C1 moves it with `data.ts`. */
+  import { PACKS } from '$lib/record/data.ts';
   import { PAGES, REGISTERS } from '$lib/record/held.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import { HOME_CURRENCY_SETTING } from '@braindog/kernel';
@@ -393,7 +395,7 @@
             <li>
               <a class="line" href={at(`/p/${p}`)}>
                 <span class="seq"><Icon name="doc" size="s" /></span>
-                <span class="line-main"><span class="line-title">{pages()[p]?.title ?? PAGES[p]?.title ?? p}</span></span>
+                <span class="line-main"><span class="line-title">{PAGES[p]?.title ?? p}</span></span>
                 <span class="line-amount"></span>
                 <span class="line-when"></span>
               </a>

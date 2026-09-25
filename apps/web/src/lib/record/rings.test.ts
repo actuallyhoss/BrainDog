@@ -13,7 +13,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord } from '@braindog/kernel';
 import { NOW, installSeed } from '@braindog/seed';
 
-import { ROWS, page } from './api.ts';
+import { page } from './fixtures/readers.ts';
+import { ROWS } from './data.ts';
 import { REGISTERS } from './data.ts';
 import { toSegments } from './blocks.ts';
 import { blockOf } from './page-live.ts';

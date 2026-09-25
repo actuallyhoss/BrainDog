@@ -15,7 +15,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { healthLabel, healthTone, jobOf, runName, runsOn, trackHealth, updatesFor, working } from './api.ts';
+import { healthLabel, healthTone, runName } from './api.ts';
+import { jobOf, runsOn, trackHealth, updatesFor, working } from './fixtures/readers.ts';
 import { NOW, REGISTERS, ROWS } from './data.ts';
 
 /* ── the derivation ──────────────────────────────────────────────────────── */

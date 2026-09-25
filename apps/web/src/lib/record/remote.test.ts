@@ -18,7 +18,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { NOW, ORDER, installSeed } from '@braindog/seed';
 
-import { list, REGISTERS, ROWS } from './api.ts';
+import { REGISTERS } from './api.ts';
+import { list } from './fixtures/readers.ts';
+import { ROWS } from './data.ts';
 import { DECIDED, QUESTIONS, ROWSETS } from './data.ts';
 import { questionOf, rowsetOf } from './governance.ts';
 import { projected, terms } from './find.ts';

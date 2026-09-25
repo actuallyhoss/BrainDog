@@ -96,7 +96,8 @@ const fillBlock = (b: PageBlock, row: Entry, spoken: string): PageBlock => ({
  * Recomputed on read rather than cached, because the rows it depends on are the record. In the real
  * client this is the same expansion the kernel does when it answers `pages()`.
  *
- * `now` IS THE CLOCK THE ROWS ARE MATCHED AT, and `api.ts`'s mock passes the sample's with the sample's rows.
+ * `now` IS THE CLOCK THE ROWS ARE MATCHED AT, and the sample's `pages` in `fixtures/readers.ts`
+ * passes the sample's with the sample's rows.
  */
 export function resolvePages(declared: Record<string, PageDecl>, now: number = Date.now()): Record<string, PageDecl> {
   const out: Record<string, PageDecl> = {};

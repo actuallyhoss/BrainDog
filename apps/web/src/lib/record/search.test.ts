@@ -19,7 +19,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { PAGE, list, search } from './api.ts';
+import { PAGE } from './api.ts';
+import { list, search } from './fixtures/readers.ts';
 import { ftsQuery } from '@braindog/kernel';
 import { ROWS } from './data.ts';
 import type { Entry } from './schema.ts';

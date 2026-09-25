@@ -19,7 +19,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { installSeed } from '@braindog/seed';
 
-import { applyFilters, chipsOf, display, labelOf, whereOf } from './api.ts';
+import { chipsOf, display, labelOf, whereOf } from './api.ts';
+import { applyFilters } from './fixtures/readers.ts';
 import { saidPlainly } from './blocks.ts';
 import { NOW, PAGES, REGISTERS, ROWS, VIEWS } from './data.ts';
 import { resolvePages } from './pages.ts';

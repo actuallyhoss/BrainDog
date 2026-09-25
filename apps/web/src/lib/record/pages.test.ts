@@ -10,7 +10,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { applyFilters, page, pages, readBlock, type Filter } from './api.ts';
+import { type Filter } from './api.ts';
+import { applyFilters, page, pages, readBlock } from './fixtures/readers.ts';
 import { NOW, PAGES, REGISTERS, ROWS } from './data.ts';
 import { draw, toSegments } from './blocks.ts';
 import { fill, resolvePages as resolveAt, slugify } from './pages.ts';

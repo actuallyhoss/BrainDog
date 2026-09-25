@@ -26,7 +26,8 @@
   import { goto, invalidateAll } from '$app/navigation';
   import { queueCost, since, symbolText } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
-  import { DOM_CAP, metric } from '$lib/record/api.ts';
+  import { DOM_CAP } from '$lib/record/api.ts';
+  import { targetLine } from '$lib/record/metrics.ts';
   import Changes from './[id]/Changes.svelte';
   import Proposed from './[id]/Proposed.svelte';
   import Arranged from './[id]/Arranged.svelte';
@@ -125,7 +126,9 @@
   const DECIDED = $derived(from === 'live' ? (live?.decided ?? []) : []);
   /* EVERY DECISION ON THE RECORD, read or not yet, so the heading says how many there are and not how many were read. */
   const decidedTotal = $derived(from === 'live' && live?.older ? Math.max(live.older.total, DECIDED.length) : DECIDED.length);
-  const target = metric('open-questions');
+  /* THE AIM IS THE FIGURE'S TARGET, no more than three open, said as every other target is said. It was read off the
+     sample's `metric('open-questions')`, whose note is this same line whenever the sample's queue holds anything. */
+  const aim = targetLine({ format: 'int', target: { lte: 3 } } as Parameters<typeof targetLine>[0]);
 
   /**
    * DECIDED HERE, ON A LIVE RECORD, AND DRAWN WHERE IT WAS.
@@ -138,9 +141,7 @@
   let settledHere = $state(new Map<string, string>());
   const waiting = $derived(open.filter((q) => !settledHere.has(q.id)));
 
-  /* THE AIM'S TONE IS THE RECORD'S OWN COUNT. Its words still come from `metric`, the mock reader in `api.ts`,
-     whose note turns on the fixture queue being empty; the chip is drawn only over live questions, where that
-     note is always the same target line, and wave B moves `metric` out of shipped code. */
+  /* THE AIM'S TONE IS THE RECORD'S OWN COUNT. */
   const aimTone = $derived(waiting.length > 3 ? ('warn' as const) : ('good' as const));
 
   const rowsetOf = (q: Question) => live?.rowsets[q.id];
@@ -692,7 +693,7 @@
               onclick={() => groupBy('about')}>{copy.decideGroupList}</button
             >
           </div>
-          <Chip label={copy.aimFor(target.note)} tone={aimTone} />
+          <Chip label={copy.aimFor(aim)} tone={aimTone} />
           <span class="select-toggle">
             <Button
               weight="bare"

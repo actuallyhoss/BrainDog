@@ -17,7 +17,10 @@
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { PACKS, packDiff, pages } from '$lib/record/api.ts';
+  import { packDiff } from '$lib/record/api.ts';
+  /* THE BUILT-IN ADD-ONS, whose names and lists the sample's table is still the only list of. Read directly, since `api.ts`
+     no longer hands the sample's tables on; wave C1 moves it with `data.ts`. */
+  import { PACKS } from '$lib/record/data.ts';
   import { PAGES, REGISTERS } from '$lib/record/held.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
   import type { Shell } from '$lib/record/boot-live.ts';
@@ -403,7 +406,7 @@
                  to tell somebody what they are about to install. A pack that is NOT installed names
                  things this record does not have yet, so the id is the honest fallback there. -->
             {#each state.registers as r}<li><Icon name="rows" size="s" />{listName(r)}</li>{/each}
-            {#each pack?.pages ?? [] as p}<li><Icon name="doc" size="s" />{pages()[p]?.title ?? PAGES[p]?.title ?? p}</li>{/each}
+            {#each pack?.pages ?? [] as p}<li><Icon name="doc" size="s" />{PAGES[p]?.title ?? p}</li>{/each}
           </ul>
           <!-- WHAT STOPPED THE SWITCH, AND THE ONE THING TO PRESS NEXT. The cascade is that press, never the first. -->
           {#if block}

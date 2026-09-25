@@ -11,7 +11,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord } from '@braindog/kernel';
 import { NOW, installSeed } from '@braindog/seed';
 
-import { page } from './api.ts';
+import { page } from './fixtures/readers.ts';
 import { toSegments } from './blocks.ts';
 /* THE SAMPLE'S ROW NAMES, which a live tab learns from the record and this test asks the mirror about by name. */
 import './fixtures/fill.ts';

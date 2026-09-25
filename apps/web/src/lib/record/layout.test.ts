@@ -15,8 +15,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { COLUMNS, spanOf } from './arrange.ts';
-import { page } from './api.ts';
-import { pages } from './api.ts';
+import { page } from './fixtures/readers.ts';
+import { pages } from './fixtures/readers.ts';
 
 /* `pages()`, NOT `PAGES`. The declared set holds a TEMPLATE, and `page('project')` is null — so the
    moment the project pages became one declaration this whole file iterated four pages and asserted

@@ -24,7 +24,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { NOW, ORDER, installSeed } from '@braindog/seed';
 
-import { chipsOf, joinOf, list, REGISTERS, ROWS } from './api.ts';
+import { chipsOf, joinOf, REGISTERS } from './api.ts';
+import { list } from './fixtures/readers.ts';
+import { ROWS } from './data.ts';
 import { entryOf, refMapOf, treeOf, type RecordRow, type Refs } from './remote.ts';
 import { compile, type Clause } from './where.ts';
 

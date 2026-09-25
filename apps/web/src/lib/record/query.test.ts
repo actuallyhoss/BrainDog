@@ -10,7 +10,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { REGISTERS, ROWS, columnsFor, display, list, sortRows, applyFilters, NOW } from './api.ts';
+import { REGISTERS, columnsFor, display, sortRows } from './api.ts';
+import { list, applyFilters } from './fixtures/readers.ts';
+import { ROWS, NOW } from './data.ts';
 import { compile, explain, matches } from './where.ts';
 import type { Entry } from './schema.ts';
 
