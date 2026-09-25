@@ -176,8 +176,23 @@ export function pageShowsAgents(body: unknown): boolean {
  * How this record is used, read from its own tables: the log, the rows, the observations and the declarations.
  *
  * READ ONLY, and bounded to ninety days of the log, so it is one pass over a quarter rather than over a record's life.
+ *
+ * `reads` IS THE CALLER'S OWN READ, ASKED OF EACH LIST, and a list it refuses is not in the reading at all: not as a list,
+ * not among what a page reads, not among what an agent writes, not in the counts of writes, not as a word the speaking use
+ * case says for it, and Skills' names not when Skills is one of them. `loop/research-audit-2026-09-25-layouts.md` finding
+ * 8: an owner held to `append` on Skills and Payroll, whose own `list` refused both, pressed Slash with a description asking
+ * the model to repeat what it was shown, and read back a question on Decide saying "Skills: acme-bank-reconcile (uses key
+ * BANK_PROD). Rows: payroll=7". The reading was the whole record's whoever asked. Absent, the reading is the whole record's,
+ * which is right for the daily look, where nobody asked (`test/slash-asked.test.ts`).
  */
-export function readUsage(sql: Sql, kernel: Kernel, nowMs: number, titles: ReadonlyMap<string, string> = new Map(), speaking: string | null = null): Usage {
+export function readUsage(
+  sql: Sql,
+  kernel: Kernel,
+  nowMs: number,
+  titles: ReadonlyMap<string, string> = new Map(),
+  speaking: string | null = null,
+  reads: (list: string) => boolean = () => true,
+): Usage {
   const since30 = instantOf(nowMs - 30 * DAY_MS);
   const since90 = instantOf(nowMs - QUIET_DAYS * DAY_MS);
   const day30 = dayOf(nowMs - 30 * DAY_MS);
@@ -235,6 +250,7 @@ export function readUsage(sql: Sql, kernel: Kernel, nowMs: number, titles: Reado
      HAVING list IS NOT NULL`,
     since90,
   )) {
+    if (!reads(r.list)) continue;
     const n = Number(r.n);
     writes90.set(r.list, (writes90.get(r.list) ?? 0) + n);
     if (r.day >= day30) writes.all30 += n;
@@ -266,6 +282,8 @@ export function readUsage(sql: Sql, kernel: Kernel, nowMs: number, titles: Reado
 
   const lists: ListUse[] = [];
   const pages: PageUse[] = [];
+  /** The lists `reads` refused, for the words below that name one. */
+  const held = new Set<string>();
   for (const d of declared) {
     const bare = d.id.slice(d.id.indexOf('.') + 1);
     let body: Record<string, unknown> = {};
@@ -276,6 +294,10 @@ export function readUsage(sql: Sql, kernel: Kernel, nowMs: number, titles: Reado
     }
     if (d.kind === 'register') {
       if (bare === 'session') continue;
+      if (!reads(bare)) {
+        held.add(bare);
+        continue;
+      }
       const a = added.get(bare);
       lists.push({
         id: bare,
@@ -292,12 +314,17 @@ export function readUsage(sql: Sql, kernel: Kernel, nowMs: number, titles: Reado
     } else if (!('for' in body)) {
       /* A PAGE PER ROW is opened under each row's slug, so it is not judged by its template's. */
       const titled = typeof body.title === 'string' && body.title.trim() !== '' && !body.title.includes('{{');
+      /* A PAGE IS IN THE READING WHEN THE CALLER COULD OPEN IT, which is `seesPage`'s rule in `index.ts`: some list it
+         draws from is readable, or it draws from none. What it says it reads is only those she may read. */
+      const drawsFrom = registersIn(body);
+      const readable = drawsFrom.filter(reads);
+      if (drawsFrom.length > 0 && readable.length === 0) continue;
       pages.push({
         slug: bare,
         title: titled ? String(body.title) : bare,
         titled,
         pack: d.pack,
-        registers: registersIn(body),
+        registers: readable,
         opens30: opens30.get(bare)?.n ?? 0,
         openDays30: opens30.get(bare)?.days ?? 0,
         opens90: opens90.get(bare)?.n ?? 0,
@@ -311,6 +338,13 @@ export function readUsage(sql: Sql, kernel: Kernel, nowMs: number, titles: Reado
      with the rail. */
   const tone = speaking === null ? null : toneOf(kernel, speaking);
   for (const l of lists) l.name = tone?.settings[labelSetting(l.id)]?.value ?? l.name;
+  /* A HELD LIST'S OWN WORDS ARE ITS NAME BY ANOTHER ROUTE, `label_payroll` saying "Salaries", so they go with it. A hashed
+     `lk_` setting cannot say which list it is about without its key, and is left out whenever anything is held. */
+  if (tone !== null && held.size > 0)
+    for (const name of Object.keys(tone.settings)) {
+      const about = /^(?:label|one|holds)_(.+)$/u.exec(name)?.[1]?.split('__')[0];
+      if (name.startsWith('lk_') || (about !== undefined && held.has(about))) delete tone.settings[name];
+    }
 
   const packs: PackUse[] = kernel.packStates().map((p) => {
     const mine = declared.filter((d) => d.pack === p.id).map((d) => d.created_at).sort();
@@ -331,7 +365,7 @@ export function readUsage(sql: Sql, kernel: Kernel, nowMs: number, titles: Reado
     speaking,
     writes,
     tone,
-    skills: kernel.register('skills')
+    skills: kernel.register('skills') && reads('skills')
       ? sql
           .all<{ name: string | null }>("SELECT json_extract(fields, '$.name') AS name FROM entry WHERE register = 'skills' AND deleted_at IS NULL")
           .flatMap((r) => (typeof r.name === 'string' ? [r.name] : []))
@@ -388,11 +422,30 @@ function freeSlug(list: string, pages: readonly PageUse[]): string {
 }
 
 /**
+ * What Slash noticed that is a conclusion about the whole record: a pack nothing touched (`untouched`), what agents did
+ * across every list (`agents`), and where most of what was added went (`voice`). Each is true only of a reading that
+ * leaves nothing out.
+ */
+const OF_THE_WHOLE: ReadonlySet<Noticed['kind']> = new Set(['untouched', 'agents', 'voice']);
+
+/**
  * What Slash noticed and what it would propose, from a reading. PURE: the same reading always says the same thing.
  *
  * `nowMs` is the reading's own moment; `offered` is the host's catalogue as Slash needs it.
+ *
+ * `partial` IS A READING WITH LISTS LEFT OUT, the one an owner held from some list is handed (`readUsage`'s `reads`), and
+ * then no rule drafts at all and nothing is said of the whole record. Every rule concludes from a count or an absence, and
+ * over a partial reading the conclusion is false: an owner held to `append` on Tasks, which was written eighteen times,
+ * pressed Slash and was filed "Turn off Work? Nothing in it has been opened or changed in ninety days", since Tasks had
+ * left her reading and what was left of Work was untouched (the checker of audit 2026-09-25 finding 8,
+ * `test/slash.test.ts`). What she reads whole and is said of one list or page she can open stays.
  */
-export function noticeUsage(usage: Usage, offered: readonly Offered[]): { noticed: Noticed[]; drafts: SlashDraft[]; quiet: string | null } {
+export function noticeUsage(usage: Usage, offered: readonly Offered[], partial = false): { noticed: Noticed[]; drafts: SlashDraft[]; quiet: string | null } {
+  const read = noticeWhole(usage, offered);
+  return partial ? { noticed: read.noticed.filter((n) => !OF_THE_WHOLE.has(n.kind)), drafts: [], quiet: read.quiet } : read;
+}
+
+function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noticed[]; drafts: SlashDraft[]; quiet: string | null } {
   const nowMs = Date.parse(usage.at);
   const noticed: Noticed[] = [];
   const drafts: SlashDraft[] = [];
@@ -685,6 +738,12 @@ export type SlashModelInput = {
    * description needed (`test/slash-asked.test.ts`).
    */
   asked?: string;
+  /**
+   * PRESENT WHEN THE ONE ASKING IS HELD FROM SOME LIST, and `usage` leaves those lists out (`readUsage`'s `reads`). Then
+   * `rules` is empty and `noticed` says nothing of the whole record (`noticeUsage`'s `partial`), and the instructions
+   * have the model conclude nothing from a count or an absence, which over a partial reading would be false.
+   */
+  partial?: true;
 };
 
 /**
@@ -693,6 +752,56 @@ export type SlashModelInput = {
  * model's input whole and is billed with it, so the bound is on what one ask may spend as much as on what reads well.
  */
 export const SLASH_ASKED_MOST = 1_000;
+
+/** How many descriptions `describedPresses` remembers what it filed from, oldest let go first. */
+const DESCRIBED_KEPT = 50;
+
+/**
+ * What stops a description reaching the model before anything is spent, and one ask per description at a time.
+ *
+ * NOTHING WAS CHECKED BEFORE THE SPEND. `loop/research-audit-2026-09-25-layouts.md` finding 18: twenty presses of one
+ * description made twenty model calls and twenty ledger rows and filed one question, since every answer after the first
+ * was "asked before"; with three of Slash's questions already waiting, eight presses made eight calls and filed
+ * `[1,1,1,0,0,0,0,0]`, the last five spent on answers the cap then skipped. The ledger held the month's ceiling throughout,
+ * so this is about the asks under it, which are shared with a person's reads at the palette and an automation's questions.
+ *
+ * `held` answers why this description is not sent now, or `null`: Decide full, or the same words already filed and still
+ * waiting there. The words are compared as typed, less case and spacing. `once` makes presses of one description sent
+ * together one ask whose answer they share, since each of them would otherwise pass `held` before the first had filed;
+ * `who` keeps two callers held to different reads from sharing an answer drawn from the other's reading.
+ *
+ * A MAP IN MEMORY AND NOT A ROW, because it saves asks and guards nothing: the ledger is the cap, and a host that forgets
+ * this on a restart spends at most one ask again per description.
+ */
+export function describedPresses<T>() {
+  const said = (asked: string): string => asked.normalize('NFKC').toLowerCase().replace(/\s+/gu, ' ').trim();
+  const pending = new Map<string, Promise<T>>();
+  const filedFrom = new Map<string, readonly string[]>();
+  return {
+    held(asked: string, waiting: number, stillWaiting: (key: string) => boolean): string | null {
+      if (waiting >= SLASH_OPEN_CAP)
+        return `${SLASH_OPEN_CAP} of Slash's questions are already waiting on Decide, so nothing was drafted from what you described. Answer one of them, then ask again.`;
+      const keys = filedFrom.get(said(asked));
+      if (keys !== undefined && keys.length > 0 && keys.every(stillWaiting))
+        return 'You described this already, and what Slash drafted from it is waiting on Decide, so the model was not asked again.';
+      return null;
+    },
+    filed(asked: string, keys: readonly string[]): void {
+      if (keys.length === 0) return;
+      filedFrom.delete(said(asked));
+      filedFrom.set(said(asked), keys);
+      if (filedFrom.size > DESCRIBED_KEPT) filedFrom.delete(filedFrom.keys().next().value as string);
+    },
+    once(asked: string, who: string, press: () => Promise<T>): Promise<T> {
+      const key = `${who}\n${said(asked)}`;
+      const out = pending.get(key);
+      if (out !== undefined) return out;
+      const run = press().finally(() => pending.delete(key));
+      pending.set(key, run);
+      return run;
+    },
+  };
+}
 
 /** What a model may draft: the three that arrange what is installed, and a `change` that builds one declaration. */
 export type SlashKind = 'pack' | 'settings' | 'arrange' | 'change';
@@ -721,6 +830,45 @@ const BUILDS: ReadonlySet<string> = new Set(['register', 'ingest', 'rule', 'metr
 const aKind = (kind: string): string => `${/^[aeiou]/u.test(kind) ? 'an' : 'a'} ${kind}`;
 
 /**
+ * WHAT A DESCRIPTION MAY BUILD: `BUILDS` WITHOUT THE INGEST. `loop/research-audit-2026-09-25-layouts.md` finding 14 filed an
+ * abused model's answer to "A desk for my launch" as one change holding `ingest.launchsync`, a call to
+ * collector.evil.example sending payroll's names and salaries, under the question "Build the launch desk you described?".
+ * `SLASH_INSTRUCTIONS` told the model to answer only lists, figures, pages and rules here, and nothing in the record held
+ * it to that. An ingest is a door to the outside, and one is opened on its own ask, where the question is about the door.
+ */
+const DESCRIBED_BUILDS: ReadonlySet<string> = new Set(['register', 'rule', 'metric', 'page']);
+
+/**
+ * The verbs by which a rule reaches beyond the record, and what each would do, in a dropped line. `run` starts an ingest or
+ * an action that calls out, `call` is a step's own request, and `ask_slash` sends rows to a model. A rule a description
+ * builds acts inside the record or is not filed: the same finding's bundle paired its ingest with a rule that ran it.
+ *
+ * AND `script`, WHICH WAS LEFT OFF: a script fetches from the origins its own `egress` names (`kernel/src/script.ts`) and
+ * `input:` hands it the row, so a rule starting one on each new Payroll row was filed under a description until it was
+ * added here (`test/slash-asked.test.ts`).
+ */
+const REACHES_OUT: Readonly<Record<string, string>> = {
+  run: 'run something beyond the record',
+  call: 'call out beyond the record',
+  ask_slash: "send rows to Slash's model",
+  script: 'start a script that may fetch beyond the record',
+};
+
+/** The first verb in `REACHES_OUT` anywhere in a declaration's body, its steps and branches included. */
+function reachesOut(value: unknown, depth = 0): string | null {
+  if (value === null || typeof value !== 'object' || depth > 32) return null;
+  for (const [k, v] of Object.entries(value)) {
+    if (!Array.isArray(value) && k in REACHES_OUT) return k;
+    const inner = reachesOut(v, depth + 1);
+    if (inner !== null) return inner;
+  }
+  return null;
+}
+
+/** How the owner calls each kind a description builds, in the line the record writes about what exists. */
+const OWNERS_WORD: Readonly<Record<string, string>> = { register: 'list', metric: 'figure', page: 'page', rule: 'rule' };
+
+/**
  * A model's `change` body as the kernel takes it, or why it is dropped. `to` is one declaration or `{ declarations }` of
  * them, and every one must be a kind in `BUILDS`. `declaration_id` is filled from `to` when the model left it out, as the
  * kernel's `namesFault` would otherwise refuse it; a wrong one is left for the kernel to refuse with its own sentence.
@@ -729,20 +877,50 @@ const aKind = (kind: string): string => `${/^[aeiou]/u.test(kind) ? 'an' : 'a'} 
  * proposer wrote and stores its own review of the declarations (`kernel/src/govern.ts`). A second strip here was measured
  * to change nothing: with it removed the gold-rate test still found no trace of the model's host in the filed row, and
  * `stableKey` never reads either field, so a model that varies the egress it writes is still asked once.
+ *
+ * `described` IS A CHANGE DRAFTED FROM WHAT THE OWNER TYPED, held to `DESCRIBED_BUILDS` and to a rule that stays inside the
+ * record, and `says` is what the record itself adds to the question about what already exists: the declarations it would
+ * replace, and the existing list a rule would change rows of. The same finding filed `page.home` at version 1, swapped to
+ * read Payroll, and Decide drew it as a new page; the question was the model's own words and named nothing it replaced.
  */
 function changeBody(
   body: Record<string, unknown>,
   n: number,
   drawn?: (id: string) => number,
-): { ok: true; body: Record<string, unknown> } | { ok: false; why: string } {
+  described = false,
+): { ok: true; body: Record<string, unknown>; says: string[] } | { ok: false; why: string } {
   const to = body.to;
   if (to === null || typeof to !== 'object' || Array.isArray(to)) return { ok: false, why: `Proposal ${n} was a change with no declaration in it.` };
   const bundle = (to as { declarations?: unknown }).declarations;
-  const listed = (Array.isArray(bundle) ? bundle : [to]) as { id?: unknown; kind?: unknown }[];
+  const listed = (Array.isArray(bundle) ? bundle : [to]) as { id?: unknown; kind?: unknown; body?: unknown }[];
   if (listed.length === 0) return { ok: false, why: `Proposal ${n} was a change with no declaration in it.` };
   const stray = listed.find((d) => typeof d?.kind !== 'string' || !BUILDS.has(d.kind));
   if (stray !== undefined)
     return { ok: false, why: `Proposal ${n} was a change to ${aKind(String(stray?.kind ?? 'unnamed kind')).slice(0, 40)}, and Slash changes only a register, an ingest, a rule, a metric or a page.` };
+  const says: string[] = [];
+  if (described) {
+    const door = listed.find((d) => !DESCRIBED_BUILDS.has(String(d.kind)));
+    if (door !== undefined)
+      return { ok: false, why: `Proposal ${n} would open ${String(door.id ?? 'an ingest').slice(0, 80)}, a door to the outside, and Slash never opens one from a description. Ask for it on its own.` };
+    for (const d of listed) {
+      const verb = d.kind === 'rule' ? reachesOut(d.body) : null;
+      if (verb !== null)
+        return {
+          ok: false,
+          why: `Proposal ${n} has ${String(d.id ?? 'a rule').slice(0, 80)}, which would ${REACHES_OUT[verb]}, and Slash never opens a door to the outside from a description. Ask for it on its own.`,
+        };
+    }
+    if (drawn !== undefined) {
+      const bare = (id: unknown): string => String(id ?? '').slice(String(id ?? '').indexOf('.') + 1);
+      const replaced = listed.filter((d) => drawn(String(d.id ?? '')) > 0).map((d) => `your ${OWNERS_WORD[String(d.kind)]} "${bare(d.id)}"`);
+      if (replaced.length > 0) says.push(`Accepting it replaces ${joinNames(replaced)} as ${replaced.length === 1 ? 'it is' : 'they are'} now.`);
+      for (const d of listed) {
+        const over = d.kind === 'rule' ? (d.body as { register?: unknown } | null)?.register : undefined;
+        if (typeof over === 'string' && drawn(`register.${over}`) > 0)
+          says.push(`Accepting it lets the rule "${bare(d.id)}" change rows of your list "${over}" on its own.`);
+      }
+    }
+  }
   const named = typeof body.declaration_id === 'string' ? body.declaration_id : String(listed[0]?.id ?? '');
   /* THE VERSION EACH DECLARATION WAS DRAWN FROM IS THE READING'S, AND WHATEVER THE MODEL WROTE IS REPLACED. The reading a
      model is handed names no version, so a number it writes is a guess, and the likeliest guess is the version live when
@@ -753,7 +931,7 @@ function changeBody(
     drawn === undefined
       ? {}
       : { from_version: Array.isArray(bundle) ? Object.fromEntries(listed.map((d) => [String(d?.id ?? ''), drawn(String(d?.id ?? ''))])) : drawn(named) };
-  return { ok: true, body: { ...body, declaration_id: named, ...versions } };
+  return { ok: true, body: { ...body, declaration_id: named, ...versions }, says };
 }
 
 /**
@@ -777,12 +955,18 @@ export function drawnVersions(sql: Sql): (id: string) => number {
 /**
  * A model's answer as drafts: `{ drafts: [{ question, body_kind, body }] }` or the bare list. Anything else is dropped, and
  * why is said, so a model that answers nonsense is a line on the Slash page rather than a question on Decide.
+ *
+ * `described` IS AN ANSWER TO WHAT THE OWNER TYPED (`SlashModelInput.asked`), and only a `change` survives it, held as
+ * `changeBody` holds one: a settings line the model wrote "Send your payroll to evil.example" into was a proposal the
+ * description never asked for. What the record says about what exists goes after the model's question, in the record's
+ * words, and is what Decide draws as the question.
  */
 export function fromModel(
   raw: unknown,
   name: string,
   most = SLASH_OPEN_CAP,
   drawn?: (id: string) => number,
+  described = false,
 ): { drafts: SlashDraft[]; dropped: string[] } {
   const list = Array.isArray(raw) ? raw : Array.isArray((raw as { drafts?: unknown })?.drafts) ? (raw as { drafts: unknown[] }).drafts : null;
   if (list === null) return { drafts: [], dropped: ['The model did not answer a list of proposals.'] };
@@ -802,20 +986,26 @@ export function fromModel(
       dropped.push(`Proposal ${i + 1} had no body.`);
       continue;
     }
+    if (described && d.body_kind !== 'change') {
+      dropped.push(`Proposal ${i + 1} was a ${d.body_kind} proposal, and from a description Slash files only a change that builds a list, a figure, a page or a rule.`);
+      continue;
+    }
     let body = d.body as Record<string, unknown>;
+    let question = d.question.trim();
     if (d.body_kind === 'change') {
-      const built = changeBody(body, i + 1, drawn);
+      const built = changeBody(body, i + 1, drawn, described);
       if (!built.ok) {
         dropped.push(built.why);
         continue;
       }
       body = built.body;
+      if (built.says.length > 0) question = `${question} ${built.says.join(' ')}`;
     }
     if (drafts.length >= most) {
       dropped.push(`Proposal ${i + 1} was past the ${most} Slash files at once.`);
       continue;
     }
-    drafts.push({ key: stableKey(body), question: d.question.trim(), body_kind: d.body_kind, body, by: name });
+    drafts.push({ key: stableKey(body), question, body_kind: d.body_kind, body, by: name });
   }
   return { drafts, dropped };
 }

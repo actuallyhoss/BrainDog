@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 
 import { normaliseUseCase, useCasePack } from '@braindog/declare';
 
-import { createRecordApi, type CallContext, type CatalogueEntry, type SlashModel } from '../src/index.ts';
+import { createRecordApi, type CallContext, type CatalogueEntry, type SlashModel, type SlashModelInput } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 const DAY = 86_400_000;
@@ -102,7 +102,7 @@ type Reading = {
 type Filed = { by: string; filed: { id: string; question: string; by: string }[]; skipped: { question: string; why: string }[]; dropped: string[] };
 
 /** A record four months old: Work used by an agent, a Logbook filled by hand with no page, Notes left alone. */
-async function used(options: { model?: SlashModel } = {}) {
+async function used(options: { model?: SlashModel; catalogue?: CatalogueEntry[] } = {}) {
   const r = await record(options);
   for (const id of ['work', 'notes', 'log', 'diary']) await r.install({ install: id });
   for (const n of [80, 60, 40]) {
@@ -571,5 +571,59 @@ test('SLASH LOOKS ONCE A DAY ON ITS OWN, keeps to three waiting, never asks a di
   value(await api.slashDaily({ on: true }, owner));
   assert.ok((await api.slashTick()).ran);
   assert.equal(calls, 4);
+  sql.close();
+});
+
+/* ── a press by an owner held from a list (the checker of `loop/research-audit-2026-09-25-layouts.md` finding 8) ── */
+
+/** Work with a second list nobody writes, so what is left of Work once Tasks leaves a reading looks untouched. */
+const WORK_TWO = { ...manifest('work'), declarations: [list('work', 'tasks', 'Tasks'), list('work', 'someday', 'Someday'), page('work', 'Work', 'tasks', 'Work')] };
+const TWO = CATALOGUE.map((e) => (e.id === 'work' ? entry('work', 'Work', WORK_TWO) : e));
+/** The owner, held to `append` on Tasks: she may add to it and not read it. */
+const heldTasks: CallContext = { principal: owner.principal, levels: { tasks: 'append' } };
+
+/**
+ * THE READING WAS HELD AND THE RULES STILL RAN OVER IT. With Slash handed only what she reads, Tasks (written eighteen times
+ * in the quarter, twelve of them by an agent) left the reading, what was left of Work was a list nobody wrote, and the rules
+ * filed "Turn off Work? Nothing in it has been opened or changed in ninety days." for the whole record. The owner's decision:
+ * a press by somebody held from any list drafts nothing from counts or absence, and what the model is handed and what
+ * comes back are held to what she reads.
+ */
+test('AN OWNER HELD FROM A LIST IS FILED NO RULE DRAFT: not the false "Turn off Work?", and nothing said of the whole record', async () => {
+  /* THE CONTROL: pressed whole, Work is in use and is not offered off, while Notes is. */
+  const whole = await used({ catalogue: TWO });
+  const all = value<Filed>(await whole.api.slashPropose({}, owner));
+  assert.ok(!all.filed.some((f) => f.question.startsWith('Turn off Work')), JSON.stringify(all.filed));
+  assert.ok(all.filed.some((f) => f.question.startsWith('Turn off Notes')), JSON.stringify(all.filed));
+  whole.sql.close();
+
+  const heard: SlashModelInput[] = [];
+  const model: SlashModel = { name: 'test model', draft: async (input) => (heard.push(input), { drafts: [] }) };
+  const { api, sql } = await used({ catalogue: TWO, model });
+  assert.equal(((await api.list({ register: 'tasks' }, heldTasks)) as Out).refusal?.code, 'LEVEL_REQUIRED');
+
+  const seen = value<Reading>(await api.slash({}, heldTasks));
+  assert.deepEqual(seen.drafts, [], JSON.stringify(seen.drafts));
+  assert.deepEqual(seen.noticed.filter((n) => ['untouched', 'agents', 'voice'].includes(n.kind)), []);
+  assert.doesNotMatch(JSON.stringify(seen), /Tasks|tasks|Turn off Work/u);
+
+  const out = value<Filed>(await api.slashPropose({}, heldTasks));
+  assert.deepEqual(out.filed, [], JSON.stringify(out.filed));
+  assert.equal(sql.all("SELECT 1 FROM suggestion WHERE opened_by = 'slash'").length, 0);
+  assert.doesNotMatch(JSON.stringify(out), /Tasks|tasks|Turn off/u, JSON.stringify(out));
+
+  /* WHAT THE MODEL IS HANDED IS HER READING, SAID TO BE ONE, with no rule drafts and nothing of the whole record. */
+  const input = heard[0]!;
+  assert.equal(input.partial, true);
+  assert.deepEqual(input.rules, []);
+  assert.deepEqual(input.noticed.filter((n) => ['untouched', 'agents', 'voice'].includes(n.kind)), []);
+  assert.ok(!input.usage.lists.some((l) => l.id === 'tasks'));
+  assert.deepEqual(input.usage.agents, []);
+
+  /* AND AN UNHELD OWNER'S PRESS ON THE SAME RECORD IS AS IT WAS: the rules still file Notes off, and the model is not told partial. */
+  const after = value<Filed>(await api.slashPropose({}, owner));
+  assert.ok(after.filed.some((f) => f.question.startsWith('Turn off Notes')), JSON.stringify(after.filed));
+  assert.equal(heard[1]!.partial, undefined);
+  assert.ok(heard[1]!.rules.length > 0);
   sql.close();
 });

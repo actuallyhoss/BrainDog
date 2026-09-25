@@ -36,6 +36,7 @@ import type { Backlinks } from '@braindog/kernel';
 import type { ViewRow } from '@braindog/kernel';
 import type { MetricDecl } from '@braindog/kernel';
 import {
+  ANSWER_KEYS,
   fill,
   GRANT_KINDS,
   isStale,
@@ -102,7 +103,7 @@ import type { Json as JsonValue } from '@braindog/kernel';
 
 import { arranger, carryUpdate, speakingNow, writeVoice, type CatalogueEntry } from './arrange.ts';
 import { useCases, type ExportArgs } from './usecase.ts';
-import { catalogueDrafts, drawnVersions, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, noticeUsage, pageShowsAgents, readUsage, SLASH_ASKED_MOST, SLASH_OPEN_CAP, stableKey, type CatalogueOffer, type Offered, type SlashDraft, type SlashModel } from './slash.ts';
+import { catalogueDrafts, describedPresses, drawnVersions, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, noticeUsage, pageShowsAgents, readUsage, SLASH_ASKED_MOST, SLASH_OPEN_CAP, stableKey, type CatalogueOffer, type Offered, type SlashDraft, type SlashModel } from './slash.ts';
 import { grammarOf } from './grammar.ts';
 import {
   BODY_DEPTH,
@@ -1626,14 +1627,23 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     host: (actor) => packHost({ principal: { kind: 'person', id: actor, level: 'owner' } }),
   });
 
+  /** The caller's own read of each list, which is all of the record Slash is handed for her (`readUsage`, audit 8). */
+  const readsOf = (ctx: CallContext) => (list: string) => readable(ctx, list) === null;
+
   /**
    * One reading for Slash: how the record is used, what the host offers, what that says, and what Slash has asked already.
    * A catalogue pack is built to see whether its pages show agents only when an agent has written here.
+   *
+   * `ctx` IS WHO ASKED, and the reading is her own read of each list (`readUsage`, audit 8). Held from any list, the reading
+   * is `partial`: no rule drafts and nothing said of the whole record (`noticeUsage`), and `shown` is only the waiting
+   * questions `governance` would show her. `waiting` stays whole, since it counts the slots on Decide. Absent, as on the
+   * daily look, nobody asked and the reading is the whole record's.
    */
-  const slashReading = () => {
+  const slashReading = (ctx?: CallContext) => {
     const catalogue = deps.catalogue ?? [];
     const titled = (e: CatalogueEntry) => (e.title === e.id ? e.id.charAt(0).toUpperCase() + e.id.slice(1) : e.title);
-    const usage = readUsage(sql, kernel, clock.now(), new Map(catalogue.map((e) => [e.id, titled(e)])), speakingNow(kernel));
+    const partial = ctx !== undefined && !readsEveryList(ctx);
+    const usage = readUsage(sql, kernel, clock.now(), new Map(catalogue.map((e) => [e.id, titled(e)])), speakingNow(kernel), ctx === undefined ? undefined : readsOf(ctx));
     const busy = usage.agents.length > 0;
     const offered: Offered[] = catalogue.map((e) => {
       let shows = false;
@@ -1646,7 +1656,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         }
       return { id: e.id, kind: e.kind, title: titled(e), modules: e.modules, showsAgents: shows, skills: e.skills };
     });
-    const seen = noticeUsage(usage, offered);
+    const seen = noticeUsage(usage, offered, partial);
     /* ASKED: anything Slash filed, in any state, and anything anybody filed that is still open. */
     const asked = new Map<string, { id: string; status: string }>();
     const waiting: { id: string; question: string }[] = [];
@@ -1661,7 +1671,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }
       if (row.opened_by === SLASH && row.status === 'open') waiting.push({ id: row.id, question: kernel.question(row.id) ?? row.id });
     }
-    return { usage, offered, ...seen, asked, waiting };
+    const shown = ctx === undefined || !partial ? waiting : waiting.filter((w) => {
+      const row = kernel.governanceRow('suggestion', w.id);
+      return row !== null && !holds(ctx, row as Record<string, unknown>);
+    });
+    return { usage, offered, ...seen, asked, waiting, shown, partial };
   };
 
   /**
@@ -1722,8 +1736,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * only what the model drafted from it is filed, never the rules' drafts, the catalogue's or a use case's growth, which
    * would take the slots on Decide the description was pressed for (`test/slash-asked.test.ts`).
    */
-  const slashFile = async (described?: string) => {
-    const r = slashReading();
+  type SlashFiled = { by: string; filed: { id: string; question: string; by: string }[]; skipped: { question: string; why: string }[]; dropped: string[]; large: boolean };
+  /** A description's asks before the spend: Decide full, the same words still waiting, presses sent together (`slash.ts`). */
+  const presses = describedPresses<SlashFiled>();
+  const slashFile = async (described?: string, ctx?: CallContext): Promise<SlashFiled> => {
+    const r = slashReading(ctx);
     const drawn = drawnVersions(sql);
     let drafts: SlashDraft[] = described === undefined ? r.drafts : [];
     let by = 'rules';
@@ -1732,6 +1749,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const model = deps.slashModel;
     const fell = described === undefined ? "Slash's own rules drafted these." : 'nothing was drafted from what you described.';
     if (!model && described !== undefined) dropped.push('Slash builds from a description only with a model, and this BrainDog has none set up, so nothing was drafted from it.');
+    const waits = model && described !== undefined ? presses.held(described, r.waiting.length, (k) => r.asked.get(k)?.status === 'open') : null;
+    if (waits !== null) return { by, filed: [], skipped: [], dropped: [waits], large };
     if (model && (r.quiet === null || described !== undefined)) {
       try {
         const asked = await slashAsked<Parameters<SlashModel['draft']>[0]>(
@@ -1744,12 +1763,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             kinds: ['pack', 'settings', 'arrange', 'change'],
             most: SLASH_OPEN_CAP,
             ...(described === undefined ? {} : { asked: described }),
+            ...(r.partial ? { partial: true as const } : {}),
           },
           (input) => model.draft(input),
         );
         if ('spent' in asked) dropped.push(`${asked.spent} ${fell.charAt(0).toUpperCase()}${fell.slice(1)}`);
         else {
-          const got = fromModel(asked.raw, model.name, SLASH_OPEN_CAP, drawn);
+          const got = fromModel(asked.raw, model.name, SLASH_OPEN_CAP, drawn, described !== undefined);
           dropped.push(...got.dropped);
           if (got.drafts.length > 0) {
             drafts = got.drafts;
@@ -1778,7 +1798,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* WHAT A USE CASE GROWS INTO, once the figures it names say so: asked whatever the record's age (`growsDrafts`). */
     const usedOn = new Map(r.usage.packs.map((p) => [p.id, p.on]));
     const packsOn = new Set(kernel.packs().filter((p) => usedOn.get(p.id) ?? true).map((p) => p.id));
-    if (described === undefined)
+    /* NOT FOR A PARTIAL READING: a figure is read over the whole record, and what it says grew may be a list she cannot read. */
+    if (described === undefined && !r.partial)
       drafts = [
         ...drafts,
         ...growsDrafts(deps.catalogue ?? [], (id) => packsOn.has(id), (metric) => {
@@ -1788,6 +1809,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         }),
       ];
     const filed: { id: string; question: string; by: string }[] = [];
+    const filedKeys: string[] = [];
     const skipped: { question: string; why: string }[] = [];
     for (const d of drafts) {
       if (r.asked.has(d.key)) {
@@ -1818,7 +1840,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }
       r.asked.set(key, { id: put.value.id, status: 'open' });
       filed.push({ id: put.value.id, question: d.question, by: d.by });
+      filedKeys.push(key);
     }
+    if (described !== undefined) presses.filed(described, filedKeys);
     return { by, filed, skipped, dropped, large };
   };
 
@@ -1882,8 +1906,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /**
    * THE LISTS A BLOCK READS BESIDE ITS SOURCE, named by declarations rather than by the block: the steps under a card
    * grid with `as: next` or `as: ring`, the projects a row's scope or an inherited read is drawn from, and the projects a
-   * live run is named from. `pages.ts` `registersOf` names them when it is handed `ListsBeside`, and
-   * `kernel.blockRegisters` does not hand it one, so the record reads the same declarations here.
+   * live run is named from. `pages.ts` `registersOf` names them when it is handed `ListsBeside`, which `kernel.pages` and
+   * `kernel.blockRegisters` now hand it; the record reads the same declarations here too, over every list of projects.
    *
    * MEASURED BEFORE (`loop/research-audit-2026-09-25-layouts.md` finding 1 and `test/audit-layouts-privacy.test.ts`):
    * Wren, invited to Areas alone, was drawn `GBP 44,500` from a hidden list's `salary` by `{ field: salary, as: next }`,
@@ -1921,16 +1945,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * total of a list: a walk refused for that list still carried it, so a member not invited to the list was handed its
    * total to the minor unit (`test/forecast-sell-held.test.ts`).
    */
-  /* AND EVERY OTHER KEY THE KERNEL ANSWERS (`ANSWER_KEYS` in `packages/kernel/src/block-keys.ts`), which the
-     audit-layouts test holds this list to. Seven were left off it: a held steps block kept `open: 2`, the open
-     steps of a list its reader may not open, with `done_now` and `next` beside it, a held inputs block kept
-     `types`, the schema `schema` refuses her (`loop/research-audit-2026-09-25-layouts.md` finding 7), and a block
-     written with every answer key and held kept `nexts`, `fills` and `drawn` as written. `fills` is what a capture's
-     `where` presets, which is the `where` above in other words. */
-  const DRAWN = [
-    'where', 'fx', 'walk', 'walks', 'walkFx', 'past', 'inherited', 'scopes', 'rings', 'history', 'bars', 'changes', 'working_now', 'lateness', 'late_name',
-    'sells', 'seen', 'open', 'done_now', 'next', 'nexts', 'types', 'fills', 'drawn',
-  ] as const;
+  /* AND EVERY KEY THE KERNEL ANSWERS (`ANSWER_KEYS` in `packages/kernel/src/block-keys.ts`), BUILT FROM THAT LIST AND
+     NOT COPIED FROM IT. Copied, seven were left off: a held steps block kept `open: 2`, the open steps of a list its
+     reader may not open, with `done_now` and `next` beside it, a held inputs block kept `types`, the schema `schema`
+     refuses her (`loop/research-audit-2026-09-25-layouts.md` finding 7), and a block written with every answer key and
+     held kept `nexts`, `fills` and `drawn` as written. `fills` is what a capture's `where` presets, which is the `where`
+     above in other words. The empties among them (`rows`, `matched`, `refusals` and the rest) go too, and `shellOf`
+     puts each back empty. */
+  const DRAWN: readonly string[] = ['where', ...ANSWER_KEYS];
 
   /**
    * AND WHAT A REFUSED BLOCK WAS WRITTEN TO READ, which is the names of lists and figures she cannot open.
@@ -4005,13 +4027,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (stop) return { ok: false as const, refusal: stop };
       const extra = stray((args ?? {}) as Record<string, unknown>, []);
       if (extra) return { ok: false as const, refusal: extra };
-      const r = slashReading();
+      const r = slashReading(ctx);
       return ok({
         model: deps.slashModel?.name ?? null,
         quiet: r.quiet,
         noticed: r.noticed,
         drafts: r.drafts.map((d) => ({ question: d.question, body_kind: d.body_kind, asked: r.asked.get(d.key) ?? null })),
-        waiting: r.waiting,
+        waiting: r.shown,
         cap: SLASH_OPEN_CAP,
         daily: slashDailyState(),
       });
@@ -4031,7 +4053,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const asked = args?.asked;
       if (asked !== undefined && (typeof asked !== 'string' || asked.trim() === '' || asked.trim().length > SLASH_ASKED_MOST))
         return no('VALUE_MALFORMED', `asked is what you want Slash to build, in a sentence or a few, at most ${SLASH_ASKED_MOST} characters.`, { at: 'asked' });
-      return tail(ok(await slashFile(asked?.trim())));
+      const text = asked?.trim();
+      if (text === undefined) return tail(ok(await slashFile(undefined, ctx)));
+      const who = JSON.stringify([ctx.principal.id, ctx.levels ?? null, ctx.registers ?? null]);
+      return tail(ok(await presses.once(text, who, () => slashFile(text, ctx))));
     },
 
     /**
