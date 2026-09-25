@@ -26,6 +26,7 @@
   import Feed from '../Feed.svelte';
   import Queue from '../Queue.svelte';
   import Roadmap from './Roadmap.svelte';
+  import type { RoadmapDrop } from './roadmap-drag.ts';
   import Text from '../Text.svelte';
 
   let {
@@ -33,6 +34,7 @@
     opts = {},
     ontick,
     onact,
+    onreschedule,
   }: {
     block: Block;
     opts?: RenderOptions;
@@ -40,6 +42,8 @@
     ontick?: ((row: Row, done: boolean) => void) | undefined;
     /** The same for a queue: where an answer goes. Its absence is what keeps an option a word. */
     onact?: ((row: Row, option: string) => void) | undefined;
+    /** The same for a roadmap: where a dropped bar goes. Its absence is what keeps every bar a picture. */
+    onreschedule?: ((row: Row, drop: RoadmapDrop) => void) | undefined;
   } = $props();
 
   /* THE STRINGS ARE LOCAL, because `packages/render` depends on nothing and the app's copy file is
@@ -107,7 +111,7 @@
 {:else if block.kind === 'queue'}
 <Queue {block} {opts} {onact} />
 {:else if block.kind === 'roadmap'}
-<Roadmap {block} {opts} />
+<Roadmap {block} {opts} {onreschedule} />
 {:else}
 <svelte:element this={block.kind === 'steps' ? 'ol' : 'ul'} class="list" data-kind={block.kind}>
   {#each block.rows as row, i}

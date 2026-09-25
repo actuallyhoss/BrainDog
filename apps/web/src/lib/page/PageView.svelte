@@ -54,6 +54,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { resolverOf, type LiveBlock, type LivePageDecl, type Opened } from '$lib/record/page-live.ts';
   import type { Declared, Kept } from '$lib/record/page-write.ts';
+  import type { Drop } from '$lib/record/roadmap-write.ts';
   import ActionRows from '../../routes/p/[slug]/ActionRows.svelte';
 
   let {
@@ -250,6 +251,33 @@
       back: async (_m, ref, decl) => (await import('./tick-undo.ts')).tickBackOf(ref, done, decl, held),
       undone: { done: !done },
       said: (w) => w.ticked(title, done),
+    });
+  }
+
+  /**
+   * A roadmap bar dropped on a new day, with a receipt whose undo puts back the fields the row held.
+   *
+   * THE SAME WRITE A TICK AND A MOVED CARD MAKE, and not `rescheduleRow` on its own, which sends the update and nothing
+   * else. `writeRow` is what holds the row where the reader left it, raises the receipt with its undo and reads the page
+   * again, and a drop without those is a bar that jumps back on the re-read with no word said. `reschedule` works the
+   * patch out from the block's `entries`, the row as the record stores it, and answers null for a drop that means no
+   * write, so nothing is sent and no undo is spent.
+   *
+   * THE HOLD WEARS NOTHING. A tick wears its box and a card its column, because the re-read can leave those rows out;
+   * a moved bar is still in the answer, drawn from it at its new day, and the hold only keeps its place in the table.
+   */
+  async function rescheduleBar(block: LiveBlock, row: Row, drop: Drop, at: number, before: readonly Row[]) {
+    if (!live) return;
+    const { reschedule } = await import('$lib/record/roadmap-write.ts');
+    const change = reschedule(block, row, drop);
+    if (!change) return;
+    void writeRow(row.ref, () => change.patch, change.title, {
+      at,
+      before,
+      what: {},
+      back: () => change.back,
+      undone: {},
+      said: () => change.said,
     });
   }
   /* A PAGE IS THE RECORD'S BLOCKS AND NOTHING ELSE. It was the sample's page of the same slug when no record answered,
@@ -906,6 +934,7 @@
                     onmove={(row, to) => moveCard(block, row, to, slot.i, shown.rows)}
                     ontick={(row, done) => tickTask(block, row, done, slot.i, shown.rows)}
                     onact={(row, option) => askGate(row, option)}
+                    onreschedule={(row, drop) => void rescheduleBar(block, row, drop, slot.i, shown.rows)}
                     oncapture={capturable(block) ? captureLine : undefined}
                   />{:else if segment.type === 'degraded'}<Degraded {segment} />{:else if segment.type === 'markdown'}<div class="document"><Markdown {segment} opts={{ href: inApp }} /></div>{/if}
               {/each}

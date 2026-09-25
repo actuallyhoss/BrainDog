@@ -16,7 +16,7 @@
     "svelte": { "optional": true }
   },
   "scripts": {
-    "test": "node --test src/*.test.ts src/glyphs/*.test.ts",
+    "test": "node --test src/*.test.ts src/glyphs/*.test.ts svelte/p/*.test.ts",
     "typecheck": "tsc -p tsconfig.json"
   }
 }

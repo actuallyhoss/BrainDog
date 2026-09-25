@@ -15,6 +15,7 @@
   import Proportional from './p/Proportional.svelte';
   import InlineRun from './p/Inline.svelte';
   import List from './p/List.svelte';
+  import type { RoadmapDrop } from './p/roadmap-drag.ts';
   import Table from './p/Table.svelte';
   import { comparisonPlan } from '../src/table.ts';
   import Media from './p/Media.svelte';
@@ -27,12 +28,13 @@
     ontick,
     onact,
     oncapture,
+    onreschedule,
   }: {
     block: Block;
     opts?: RenderOptions;
     /**
      * THREE PRIMITIVES CAN BE CHANGED AND THE OTHER FIVE CANNOT, so these callbacks cross this component
-     * and reach exactly the ones that take them: one for `grid`, two for `list` and one for `panel`.
+     * and reach exactly the ones that take them: one for `grid`, three for `list` and one for `panel`.
      *
      * THEY ARE NOT ON `RenderOptions`. Every member of that type is a READ: a resolver, a link
      * builder, a clock. Putting a write callback on it would give `toHTML` a key it can never
@@ -52,6 +54,15 @@
      * new row inherits from the block's `where:`, which the host writes as the row's fields beside the title.
      */
     oncapture?: OnCapture | undefined;
+    /**
+     * The list primitive's third write: a `roadmap` bar dropped on a new day. The row, and the drop, which carries the
+     * gesture and `dragPatch` bound to it, because only the host holds the row as the record stores it.
+     *
+     * IT STOPPED HERE ONCE. The drawer took this callback and proved every bar a grip, and no bar in the app could be
+     * dragged, because this component and `List` did not pass it on; `svelte/p/roadmap-reach.test.ts` goes in at this
+     * layer so the two halves cannot come apart again unnoticed.
+     */
+    onreschedule?: ((row: Row, drop: RoadmapDrop) => void) | undefined;
   } = $props();
 
   const PRIMITIVE = { panel: Panel, grid: Grid, rows: Rows, proportional: Proportional, inline: InlineRun, list: List, media: Media };
@@ -97,7 +108,7 @@
          to the union the other six are in, it is a prop none of them declares. -->
     <Grid {block} {opts} {onmove} />
   {:else if spec.primitive === 'list'}
-    <List {block} {opts} {ontick} {onact} />
+    <List {block} {opts} {ontick} {onact} {onreschedule} />
   {:else if spec.primitive === 'panel'}
     <Panel {block} {opts} {oncapture} />
   {:else if Draw}
