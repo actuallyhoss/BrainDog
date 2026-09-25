@@ -220,9 +220,9 @@ const PROJECT_PAGE = {
   id: 'page.project',
   kind: 'page' as const,
   body: {
-    id: 'project',
+    page: 'project',
     title: 'Project {{it}}',
-    for: { register: 'projects', slug: 'name' },
+    for: { register: 'projects' },
     blocks: [{ kind: 'table', source: 'register.projects', span: 12 }],
   } as never,
 };

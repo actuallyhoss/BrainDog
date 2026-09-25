@@ -106,6 +106,7 @@ import {
   reopen,
   keepApplied,
   questionOf,
+  showsOf,
   type Decided,
   type GovernDeps,
   type GovernRegister,
@@ -706,11 +707,17 @@ export const INBOX_WAITING: readonly InboxState[] = ['untriaged', 'review'];
  */
 export type ArrivalSettled = { id: string; state: 'matched' | 'ignored' | 'untriaged' | 'review'; entry: Entry | null; already: boolean };
 
-/** A page's place in the rail, when its declaration gives one in the shape `{ section, order }`. */
-const navOf = (nav: unknown): { section: string; order: number } | null => {
+/**
+ * A page's place in the rail, when its declaration gives one in the shape `{ section, order }`, and `tabs: true` when
+ * the page draws its section as a strip of tabs. Only the literal `true` is carried: dropped here, a declared strip
+ * installed clean and no host ever drew it.
+ */
+const navOf = (nav: unknown): { section: string; order: number; tabs?: true } | null => {
   if (typeof nav !== 'object' || nav === null) return null;
-  const { section, order } = nav as { section?: unknown; order?: unknown };
-  return typeof section === 'string' && section !== '' ? { section, order: typeof order === 'number' ? order : 0 } : null;
+  const { section, order, tabs } = nav as { section?: unknown; order?: unknown; tabs?: unknown };
+  return typeof section === 'string' && section !== ''
+    ? { section, order: typeof order === 'number' ? order : 0, ...(tabs === true ? { tabs: true as const } : {}) }
+    : null;
 };
 
 /**
@@ -4391,7 +4398,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           if (o === null || typeof o !== 'object' || Array.isArray(o)) return [];
           const one = o as Record<string, unknown>;
           if (typeof one.id !== 'string' || typeof one.label !== 'string') return [];
-          return [{ key: one.id, label: one.label, because: typeof one.because === 'string' ? one.because : '', recommended: one.recommended === true }];
+          /* WHAT THE OPTION IS, checked again on the way out: a body filed before `showsOf` existed holds whatever it was
+             sent, and a swatch is the one colour from data a drawer puts on a screen. */
+          const shows = showsOf(one.shows);
+          return [{ key: one.id, label: one.label, because: typeof one.because === 'string' ? one.because : '', recommended: one.recommended === true, ...(shows ? { shows } : {}) }];
         });
         return {
           id: String(r.id),
@@ -4402,6 +4412,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           why: typeof body.context === 'string' ? body.context : '',
           cost: costOf(String(r.body_kind ?? ''), r.body),
           options,
+          ...(typeof body.about === 'string' && body.about !== '' ? { about: body.about } : {}),
         };
       });
       /* A STABLE SORT, and `opened_at` is the tie-break the band needs: two questions in one band

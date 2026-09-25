@@ -409,6 +409,40 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
   return ok({ id });
 }
 
+/**
+ * What an option IS, drawn beside its label: its colours, a figure, or a file the record holds.
+ *
+ * A SWATCH IS THE ONE PLACE A COLOUR FROM DATA REACHES A SCREEN, so it is held to one spelling, six hex digits, which a
+ * drawer can put into a box and nothing else: a value it did not check could close the box and write a style. It is the
+ * option's CONTENT (which lining), drawn only inside that option, never a colour the page is drawn in (`06 §7`). A file
+ * is one the record already holds, named by row and field; a remote image is refused as a page's is (`06 §7`).
+ */
+export type Shows = { swatch: string[] } | { figure: string } | { file: { row: string; field: string } };
+
+const SWATCH = /^#[0-9a-fA-F]{6}$/u;
+const SWATCH_MOST = 8;
+const FIGURE_BYTES = 80;
+const ABOUT_BYTES = 80;
+const SHOWS_SAID = `An option shows one thing: { swatch: ['#rrggbb'] } with one to ${SWATCH_MOST} colours, { figure: 'text' } of at most ${FIGURE_BYTES} bytes, or { file: { row: 'parts#2', field: 'photo' } }.`;
+
+/** The option's `shows`, checked, or `null` when it is not one of the three shapes. Read on filing and again on the way out. */
+export function showsOf(value: unknown): Shows | null {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
+  const v = value as Record<string, unknown>;
+  const keys = Object.keys(v);
+  if (keys.length !== 1) return null;
+  if (Array.isArray(v.swatch)) {
+    const s = v.swatch as unknown[];
+    return s.length >= 1 && s.length <= SWATCH_MOST && s.every((c) => typeof c === 'string' && SWATCH.test(c)) ? { swatch: [...(s as string[])] } : null;
+  }
+  if (typeof v.figure === 'string')
+    return v.figure.trim() !== '' && new TextEncoder().encode(v.figure).length <= FIGURE_BYTES ? { figure: v.figure } : null;
+  const f = v.file as Record<string, unknown> | undefined;
+  if (f !== null && typeof f === 'object' && !Array.isArray(f) && Object.keys(f).length === 2 && typeof f.row === 'string' && typeof f.field === 'string')
+    return /^[a-z][a-z0-9_]*#[1-9][0-9]*$/u.test(f.row) && /^[a-z][a-z0-9_]*$/u.test(f.field) ? { file: { row: f.row, field: f.field } } : null;
+  return null;
+}
+
 function checkBody(deps: GovernDeps, kind: BodyKind, body: Record<string, unknown>): Refusal | null {
   const missing = (key: string): Refusal => ({
     code: 'REQUIRED_MISSING',
@@ -422,13 +456,23 @@ function checkBody(deps: GovernDeps, kind: BodyKind, body: Record<string, unknow
        that accepts one teaches people that answering is a formality. */
     if (!Array.isArray(options) || options.length < 2)
       return { code: 'OUT_OF_BOUNDS', fix: 'A choice is between at least two options.', at: 'body.options' };
-    for (const o of options as Record<string, unknown>[])
+    for (const o of options as Record<string, unknown>[]) {
       if (typeof o?.id !== 'string' || typeof o?.label !== 'string' || typeof o?.because !== 'string')
         return {
           code: 'REQUIRED_MISSING',
           fix: 'Every option carries an id, a label, and the because that is the reason to pick it.',
           at: 'body.options',
         };
+      if (o.shows !== undefined && showsOf(o.shows) === null)
+        return { code: 'VALUE_MALFORMED', fix: `${o.id} shows ${JSON.stringify(o.shows)}. ${SHOWS_SAID}`, at: 'body.options' };
+    }
+    const about = body.about;
+    if (about !== undefined && (typeof about !== 'string' || about.trim() === '' || new TextEncoder().encode(about).length > ABOUT_BYTES))
+      return {
+        code: 'VALUE_MALFORMED',
+        fix: `about is ${JSON.stringify(about)}; it is the thing the question is about, as a page filters by it, in at most ${ABOUT_BYTES} bytes: a name such as Box, or a spoken id such as parts#2.`,
+        at: 'body.about',
+      };
     return null;
   }
 

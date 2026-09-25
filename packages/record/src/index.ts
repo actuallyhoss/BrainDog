@@ -102,7 +102,7 @@ import type { Json as JsonValue } from '@braindog/kernel';
 
 import { arranger, carryUpdate, speakingNow, writeVoice, type CatalogueEntry } from './arrange.ts';
 import { useCases, type ExportArgs } from './usecase.ts';
-import { catalogueDrafts, drawnVersions, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, noticeUsage, pageShowsAgents, readUsage, SLASH_OPEN_CAP, stableKey, type CatalogueOffer, type Offered, type SlashDraft, type SlashModel } from './slash.ts';
+import { catalogueDrafts, drawnVersions, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, noticeUsage, pageShowsAgents, readUsage, SLASH_ASKED_MOST, SLASH_OPEN_CAP, stableKey, type CatalogueOffer, type Offered, type SlashDraft, type SlashModel } from './slash.ts';
 import { grammarOf } from './grammar.ts';
 import {
   BODY_DEPTH,
@@ -123,7 +123,7 @@ import { dropPushSub, readPushSub, savePushSub } from './push.ts';
 import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 
 export type { CatalogueEntry, FigureTest, Grows, RowIo } from './arrange.ts';
-export { formedRows, fromModel, growsDrafts, noticeUsage, readUsage, FORM_SAID_MOST, SLASH_OPEN_CAP, type CatalogueOffer, type FormField, type FormList, type FormSpec, type NextSpec, type Noticed, type SlashDraft, type SlashFormInput, type SlashModel, type SlashModelInput, type Usage } from './slash.ts';
+export { formedRows, fromModel, growsDrafts, noticeUsage, readUsage, FORM_SAID_MOST, SLASH_ASKED_MOST, SLASH_OPEN_CAP, type CatalogueOffer, type FormField, type FormList, type FormSpec, type NextSpec, type Noticed, type SlashDraft, type SlashFormInput, type SlashModel, type SlashModelInput, type Usage } from './slash.ts';
 export type { ExportArgs, PlannedPack } from './usecase.ts';
 export type { Automation, AutomationRow, AutomationRun, Said as AutomationSaid, ScriptRow } from './automations.ts';
 export { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
@@ -691,7 +691,8 @@ export type Boot = {
   pages: {
     slug: string;
     title: string;
-    nav: { section: string; order: number } | null;
+    /** `tabs: true` when the page draws its nav section as a strip of tabs over each of its pages. */
+    nav: { section: string; order: number; tabs?: true } | null;
     icon: string | null;
     list: string | null;
     about: { register: string; seq: number | null } | null;
@@ -1714,16 +1715,23 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * EVERY ARRANGEMENT GOES THROUGH `prepare`, the door a token's proposal goes through, and a row it offers (a skill) through
    * the kernel's own check of a rowset; all are filed as `slash`, which may suggest and write nothing else (`kernel/slash.ts`).
    * A draft already asked, in any state, is not asked again, so a dismissal holds; no more than `SLASH_OPEN_CAP` wait at once.
+   *
+   * `described` IS WHAT THE OWNER TYPED ON THE SLASH PAGE (`slash.ts` `SlashModelInput.asked`, brief D2). It is the owner
+   * asking, so it reaches the model on a record of any age, as `slashForm` does, through the same `slashAsked` hold; and
+   * only what the model drafted from it is filed, never the rules' drafts, the catalogue's or a use case's growth, which
+   * would take the slots on Decide the description was pressed for (`test/slash-asked.test.ts`).
    */
-  const slashFile = async () => {
+  const slashFile = async (described?: string) => {
     const r = slashReading();
     const drawn = drawnVersions(sql);
-    let drafts: SlashDraft[] = r.drafts;
+    let drafts: SlashDraft[] = described === undefined ? r.drafts : [];
     let by = 'rules';
     const dropped: string[] = [];
     let large = false;
     const model = deps.slashModel;
-    if (model && r.quiet === null) {
+    const fell = described === undefined ? "Slash's own rules drafted these." : 'nothing was drafted from what you described.';
+    if (!model && described !== undefined) dropped.push('Slash builds from a description only with a model, and this BrainDog has none set up, so nothing was drafted from it.');
+    if (model && (r.quiet === null || described !== undefined)) {
       try {
         const asked = await slashAsked<Parameters<SlashModel['draft']>[0]>(
           'draft',
@@ -1734,17 +1742,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             offered: r.offered.map(({ id, kind, title }) => ({ id, kind, title })),
             kinds: ['pack', 'settings', 'arrange', 'change'],
             most: SLASH_OPEN_CAP,
+            ...(described === undefined ? {} : { asked: described }),
           },
           (input) => model.draft(input),
         );
-        if ('spent' in asked) dropped.push(`${asked.spent} Slash's own rules drafted these.`);
+        if ('spent' in asked) dropped.push(`${asked.spent} ${fell.charAt(0).toUpperCase()}${fell.slice(1)}`);
         else {
           const got = fromModel(asked.raw, model.name, SLASH_OPEN_CAP, drawn);
           dropped.push(...got.dropped);
           if (got.drafts.length > 0) {
             drafts = got.drafts;
             by = model.name;
-          } else dropped.push("The model proposed nothing Slash could use, so Slash's own rules drafted these.");
+          } else dropped.push(`The model proposed nothing Slash could use, so ${fell}`);
         }
       } catch (e) {
         /* A PRESS THE INCLUDED MODEL'S CEILING TURNED AWAY WAS NEVER ASKED, and said "did not answer" it read as a model
@@ -1754,10 +1763,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
            only what is true for him. `sent: false` alone is not enough: the endpoint's `SlashKeyClosedError` carries it
            too, and a key that would not open is not a record too large (`test/slash-declined.test.ts`). */
         large = model.name === 'included' && typeof e === 'object' && e !== null && (e as { sent?: unknown }).sent === false;
-        dropped.push(large ? "This BrainDog is too large for the included model to read, so Slash's own rules drafted these." : "The model did not answer, so Slash's own rules drafted these.");
+        dropped.push(large ? `This BrainDog is too large for the included model to read, so ${fell}` : `The model did not answer, so ${fell}`);
       }
     }
-    if (deps.catalogueOffers) {
+    if (deps.catalogueOffers && described === undefined) {
       try {
         const on = new Map(r.usage.packs.map((p) => [p.id, p.on]));
         drafts = [...drafts, ...catalogueDrafts(await deps.catalogueOffers(kernel.packs().map((p) => ({ ...p, on: on.get(p.id) ?? true }))))];
@@ -1768,14 +1777,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* WHAT A USE CASE GROWS INTO, once the figures it names say so: asked whatever the record's age (`growsDrafts`). */
     const usedOn = new Map(r.usage.packs.map((p) => [p.id, p.on]));
     const packsOn = new Set(kernel.packs().filter((p) => usedOn.get(p.id) ?? true).map((p) => p.id));
-    drafts = [
-      ...drafts,
-      ...growsDrafts(deps.catalogue ?? [], (id) => packsOn.has(id), (metric) => {
-        const decl = kernel.metricDecl(metric);
-        const read = decl ? kernel.metric(decl) : null;
-        return read?.ok && typeof read.value.value === 'number' ? read.value.value : null;
-      }),
-    ];
+    if (described === undefined)
+      drafts = [
+        ...drafts,
+        ...growsDrafts(deps.catalogue ?? [], (id) => packsOn.has(id), (metric) => {
+          const decl = kernel.metricDecl(metric);
+          const read = decl ? kernel.metric(decl) : null;
+          return read?.ok && typeof read.value.value === 'number' ? read.value.value : null;
+        }),
+      ];
     const filed: { id: string; question: string; by: string }[] = [];
     const skipped: { question: string; why: string }[] = [];
     for (const d of drafts) {
@@ -3946,13 +3956,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /**
      * Put Slash's proposals on Decide now (`slashFile`): the model's, when one is configured and answers something valid,
      * else the rules'. Never one already asked, and never more than `SLASH_OPEN_CAP` waiting.
+     *
+     * `asked` IS THE OWNER'S OWN DESCRIPTION of what they want built, typed on the Slash page, and the model drafts from it.
      */
     async slashPropose(args: Record<string, unknown> | undefined, ctx: CallContext) {
       const stop = admin(ctx, 'ask Slash to put questions on Decide');
       if (stop) return { ok: false as const, refusal: stop };
-      const extra = stray((args ?? {}) as Record<string, unknown>, []);
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['asked']);
       if (extra) return { ok: false as const, refusal: extra };
-      return tail(ok(await slashFile()));
+      const asked = args?.asked;
+      if (asked !== undefined && (typeof asked !== 'string' || asked.trim() === '' || asked.trim().length > SLASH_ASKED_MOST))
+        return no('VALUE_MALFORMED', `asked is what you want Slash to build, in a sentence or a few, at most ${SLASH_ASKED_MOST} characters.`, { at: 'asked' });
+      return tail(ok(await slashFile(asked?.trim())));
     },
 
     /**

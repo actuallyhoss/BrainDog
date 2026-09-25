@@ -5,7 +5,8 @@
  * quarter, and what agents write. From that it says what it noticed, in plain sentences, and drafts at most a few
  * proposals in the kinds an agent already files (`pack`, `settings`, `arrange`, and a `rowset` for a skill a use case names),
  * each with its reason as the question. The words it may change are only those the speaking use case declares (S8). A
- * model may also draft a `change` that builds a register, an ingest, a rule or a page (`fromModel`, Brief D).
+ * model may also draft a `change` that builds a register, an ingest, a rule, a metric or a page (`fromModel`, Brief D), and
+ * when the owner describes what they want (`asked`), that description is what it drafts from.
  *
  * IT RECOMMENDS AND NEVER REARRANGES (§5c, `docs/29` §1). Nothing here writes a row, a pack or a setting. A draft becomes a
  * question only through `arranger().prepare`, the same door and the same validation a token's proposal goes through, or
@@ -674,7 +675,24 @@ export type SlashModelInput = {
   /** The kinds it may answer, and how many at most. */
   kinds: readonly SlashKind[];
   most: number;
+  /**
+   * What the owner typed on the Slash page, trimmed, when they described what they want: "a desk for my launch, in five
+   * parts, with the next step on each". ABSENT ON THE DAILY LOOK AND A PLAIN PRESS, which draft from use alone.
+   *
+   * PRESENT, IT IS THE REQUEST AND USE IS ONLY THE SETTING. The instructions (`SLASH_INSTRUCTIONS` in `@braindog/host`) have
+   * the model answer `change`s that build the lists, figures and pages described, and the record files only what it
+   * drafted from it: a plain press's rules would otherwise fill Decide with questions nobody asked for, in the slots the
+   * description needed (`test/slash-asked.test.ts`).
+   */
+  asked?: string;
 };
+
+/**
+ * The longest description the owner may type. A sentence or a few, which is what the ask field is for: `D2`'s own example
+ * of a launch desk is 124 characters, so a thousand leaves room for a page spelled out part by part. It goes into the
+ * model's input whole and is billed with it, so the bound is on what one ask may spend as much as on what reads well.
+ */
+export const SLASH_ASKED_MOST = 1_000;
 
 /** What a model may draft: the three that arrange what is installed, and a `change` that builds one declaration. */
 export type SlashKind = 'pack' | 'settings' | 'arrange' | 'change';
@@ -683,11 +701,21 @@ const QUESTION_MAX = 280;
 
 /**
  * THE DECLARATIONS A MODEL MAY BUILD WITH A `change` (`loop/research-shell-mcp.md` §4 Brief D, `DIRECTION.md` §22): a list,
- * a door in or out, a rule, a page. A gold rate on a schedule is an `ingest` into a register, and before this Slash dropped
- * it with "Slash files only pack, settings and arrange", so the one use case the owner named could not be built by Slash.
- * A theme, a metric, a digest or a block is left to a person or an agent, because nothing Slash reads says what one should be.
+ * a door in or out, a rule, a figure, a page. A gold rate on a schedule is an `ingest` into a register, and before this Slash
+ * dropped it with "Slash files only pack, settings and arrange", so the one use case the owner named could not be built by
+ * Slash.
+ *
+ * A METRIC JOINED ON 25 SEPTEMBER (`loop/research-dynamic-layouts.md` §6 brief D2). A page that opens on "1 of 2 steps are
+ * done" says a figure, and a figure is a metric: with `metric` left out, a model that drafted the figure beside the page
+ * had it dropped as "Proposal 1 was a change to a metric, and Slash changes only a register, an ingest, a rule or a page",
+ * while the page itself was filed and would have answered nothing where the number goes (`test/slash-asked.test.ts`).
+ * The old reason for leaving it out, that nothing Slash reads says what a figure should be, stopped holding once the owner
+ * can describe the page they want: the description says it.
+ *
+ * A theme, a digest or a block is still left to a person or an agent, because nothing Slash reads or hears says what one
+ * should look like, and `kernel.propose` reviews a metric exactly as it reviews the page beside it.
  */
-const BUILDS: ReadonlySet<string> = new Set(['register', 'ingest', 'rule', 'page']);
+const BUILDS: ReadonlySet<string> = new Set(['register', 'ingest', 'rule', 'metric', 'page']);
 
 /** "a register", "an ingest": the article a kind takes when a dropped line names it. */
 const aKind = (kind: string): string => `${/^[aeiou]/u.test(kind) ? 'an' : 'a'} ${kind}`;
@@ -714,7 +742,7 @@ function changeBody(
   if (listed.length === 0) return { ok: false, why: `Proposal ${n} was a change with no declaration in it.` };
   const stray = listed.find((d) => typeof d?.kind !== 'string' || !BUILDS.has(d.kind));
   if (stray !== undefined)
-    return { ok: false, why: `Proposal ${n} was a change to ${aKind(String(stray?.kind ?? 'unnamed kind')).slice(0, 40)}, and Slash changes only a register, an ingest, a rule or a page.` };
+    return { ok: false, why: `Proposal ${n} was a change to ${aKind(String(stray?.kind ?? 'unnamed kind')).slice(0, 40)}, and Slash changes only a register, an ingest, a rule, a metric or a page.` };
   const named = typeof body.declaration_id === 'string' ? body.declaration_id : String(listed[0]?.id ?? '');
   /* THE VERSION EACH DECLARATION WAS DRAWN FROM IS THE READING'S, AND WHATEVER THE MODEL WROTE IS REPLACED. The reading a
      model is handed names no version, so a number it writes is a guess, and the likeliest guess is the version live when

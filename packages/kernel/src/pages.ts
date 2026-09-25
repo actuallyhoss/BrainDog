@@ -23,7 +23,8 @@ import type { Leaf, Predicate, Schema } from '@braindog/where';
 import { evaluate } from '@braindog/where';
 
 import type { ActionRow } from './actions.ts';
-import { BODY_KINDS } from './govern.ts';
+import { BLOCK_READS, KEY_KINDS, wrongKindKey } from './block-keys.ts';
+import { BODY_KINDS, type Shows } from './govern.ts';
 import type { Json } from './coerce.ts';
 import type { Part, Rate } from './fx.ts';
 import type { Entry } from './index.ts';
@@ -31,7 +32,7 @@ import { predicateOf, windowMs, type EvalContext, type MetricDecl, type Reading 
 import { runway, type Leg, type Only, type Runway } from './forecast.ts';
 import { barsOf, type Bars, type SeriesLine } from './series.ts';
 import { isStale, SESSION_PREFIX, STALE_MS } from './session.ts';
-import { stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
+import { nextSteps, stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
 import { COSTS, type Cost } from './weigh.ts';
 import { MEASURE_BUCKETS, measureBucket, measureSeries, measureWindow, readableZone, type MeasureSeries, type RawReading } from './measures.ts';
 
@@ -49,8 +50,19 @@ export type PageBlock = {
   columns?: { field: string; label?: string; as?: string; sign?: { field: string; minus: string } }[];
   /** A `stat`'s figures. `trend: 12w` draws how the figure moved over that window, from its daily series. */
   cells?: { metric: string; label?: string; trend?: string; note?: string }[];
-  /** A `stat`'s: its first figure is the screen's one hero figure. */
+  /**
+   * A `stat`'s: its first figure is the screen's one hero figure. A `cards` block's: its first card is drawn two tracks
+   * wide. A `note`'s: its body is the page's opening sentence, said with the plural and nought rules a figure's note has.
+   */
   lead?: boolean;
+  /** Which of the page's two columns the block sits in, on a page with a `layout`. `main` when absent. */
+  area?: 'main' | 'rail';
+  /** A `progress` block's: each row a band from its low to its high, columns `label | spent | low | high`. */
+  range?: boolean;
+  /** A `queue`'s: one tile per question, drawn with its recommended option's visual. */
+  tiles?: boolean;
+  /** A `section`'s: the blocks after it, up to the next section, drawn on one surface. */
+  box?: boolean;
   /** A `section`'s: whether it starts shut, and the glyph beside its heading. */
   fold?: boolean;
   icon?: string;
@@ -166,46 +178,11 @@ export type PageBlock = {
  * wrote and TypeScript is not there at the moment it is read. The browser has had this since a
  * agent wrote `06 §1.1`'s own worked example, got `when:` silently dropped, and shipped a block
  * that always drew; the kernel accepted anything at all.
+ *
+ * THE LIST LIVES IN `block-keys.ts` NOW, with which kinds read each key that only some do, because the install check
+ * refuses from the same list (`declare.ts` `pageBody`) and two copies were two answers.
  */
-const READS = new Set([
-  'kind', 'heading', 'span', 'source', 'where', 'columns', 'cells', 'order', 'limit',
-  'target', 'authored', 'empty', 'tone', 'body', 'drawn', 'when', 'opening', 'from', 'horizon',
-  /* AND THE KEYS A RESULT CARRIES, BECAUSE A BLOCK THAT CAME OUT OF HERE CAN GO BACK IN. `block()`
-     is a public call and `BlockResult` is a `PageBlock` with the answer on it, so reading one back
-     - to redraw it with one column changed, which is what a caller adjusting a block actually does
-     - reported `rows`, `matched` and `refusals` as keys this record does not read. That was hidden
-     for as long as every branch below overwrote the refusal list, and it is a false refusal either
-     way: they are keys this file wrote. */
-  'rows', 'matched', 'readings', 'walk', 'refusals',
-  'fold', 'icon', 'inherit', 'since', 'first', 'row', 'field', 'versions', 'lead',
-  'inherited', 'scopes', 'feed', 'seen', 'history', 'values',
-  /* A `series`'s lines and reach, and the bars it answers with. */
-  'series', 'back', 'ahead', 'net', 'bars',
-  /* A `stat` or `lines` over readings: its bucket, and the series it answers with. */
-  'bucket', 'measures',
-  /* A `forecast`'s remembered figure and knobs, and the points it answers with. */
-  'recorded', 'knobs', 'past',
-  /* Who changed each row of a table last, when a column asks, and the row for what no part holds. */
-  'changes', 'unset', 'tones',
-  /* Whether an agent is on each row right now, when the block asks, and the answer it comes back with. */
-  'working', 'working_now',
-  /* A `forecast`'s late mark and its warning reach, and the lateness it answers with. */
-  'late', 'under', 'lateness', 'late_name',
-  /* A `forecast`'s figure of what may be sold, and what it answers with. */
-  'sell', 'sells',
-  /* A card grid's out-of-date rule. */
-  'stale',
-  /* A `progress` budget's figure of what was spent, grouped by the word its rows are, and a goal's of what was logged
-     toward it, grouped by the row. */
-  'spent', 'toward',
-  /* A `note` whose body is a whole document, a row's own plan with its blocks in it; and the rates a bar or a split
-     answers with. */
-  'document', 'fx',
-  /* A `capture`'s list, and what a new row in it is filled with. */
-  'register', 'fills',
-  /* The whole a `ring` over a list is set against, when it is not the block's scope. */
-  'of',
-]);
+const READS = BLOCK_READS;
 
 export type PageDecl = {
   page: string;
@@ -244,6 +221,17 @@ export type BlockResult = PageBlock & {
   scopes?: (string | null)[];
   /** A `cards` block's: how far along each row is from the steps under it, where its ring's own field is empty (`steps.ts`). */
   rings?: (number | null)[];
+  /**
+   * A `cards` block's with a column `as: next`: that field of the first step under each row that is not done, in the
+   * order the steps list declares, aligned with `rows`. `null` for a row with no open step.
+   */
+  nexts?: (string | null)[];
+  /** A `steps` block's over a list that declares `steps:`: whether each row is done, aligned with `rows`. */
+  done_now?: boolean[];
+  /** And the index in `rows` of the first row not done, `null` when every row is. */
+  next?: number | null;
+  /** An `inputs` block's: the type of each field it draws, by field id, which a host picks its control by. */
+  types?: Record<string, string>;
   /** A `feed` block's rows, newest first, a burst being one row. */
   feed?: FeedRow[];
   /** A `queue` block's questions, in the record's own order, cut to `limit`. `matched` is how many are open. */
@@ -305,7 +293,11 @@ export type FeedRow = {
 };
 
 /** One way to answer a question, as a queue draws it. `because` is the reason its author gave for it. */
-export type QueueOption = { key: string; label: string; because: string; recommended: boolean };
+/**
+ * `shows` is what the option IS, drawn beside its label: its colours, a figure, or a file the record holds. It is the
+ * option's content and never a colour the page is drawn in (`govern.ts` `showsOf`).
+ */
+export type QueueOption = { key: string; label: string; because: string; recommended: boolean; shows?: Shows };
 
 /**
  * One open question, as the `governance.open` source reads it.
@@ -319,7 +311,8 @@ export type QueueOption = { key: string; label: string; because: string; recomme
  * recency a ranking by cost would be a number nobody computed. That was true, and the answer was to
  * compute one rather than to keep saying so (`19 §6`, risk 6, the fourth countermeasure).
  */
-export type QueueQuestion = { id: string; who: string; at: string; kind: string; question: string; why: string; cost: Cost; options: QueueOption[] };
+/** `about` is what the question is about, as its body says it (`body.about`), which a queue's `where` filters on. */
+export type QueueQuestion = { id: string; who: string; at: string; kind: string; question: string; why: string; cost: Cost; options: QueueOption[]; about?: string };
 
 /** One event, as the activity source reads it. */
 export type ActivityEvent = { ts: string; actor: string; kind: string; target: string | null; note: string | null; thing?: string | null; rows?: number };
@@ -733,6 +726,28 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
   const unread = Object.keys(block)
     .filter((key) => !READS.has(key))
     .map((key): Refusal => ({ code: 'DECLARATION_INVALID', fix: `${key}: is not a key this record reads.`, at: key }));
+  /* AND A KEY ANOTHER KIND READS IS SAID HERE AS THE INSTALL SAYS IT (`block-keys.ts`). A page installed before the install
+     check closed carries `lead: true` on its cards or `since: seen` on a table, and each read clean and was drawn
+     without. A key written as `undefined` is no key: a caller spreading a block to clear one should not be told of it.
+     `of` has its own sentence below. OWN KEYS ONLY: looked up by bracket, `toString` on a block found
+     `Object.prototype.toString` and the read threw where it had refused; the name is refused above as unread. */
+  for (const [key, value] of Object.entries(block)) {
+    const kinds = Object.hasOwn(KEY_KINDS, key) ? KEY_KINDS[key] : undefined;
+    if (value === undefined || key === 'of' || !kinds || kinds.includes(block.kind)) continue;
+    unread.push({ code: 'DECLARATION_INVALID', fix: wrongKindKey(key, block.kind), at: key });
+  }
+  /* A PACK'S OWN KIND DRAWS NOTHING IN THIS BUILD, so it reads nothing: it answered its rows with no refusal, and a host
+     handed rows under a kind it has no drawer for draws a hole where the block should be. */
+  if (/^block\./u.test(block.kind))
+    return {
+      ...block,
+      rows: [],
+      matched: 0,
+      refusals: [
+        ...unread,
+        { code: 'NOT_IN_THIS_BUILD', fix: `${block.kind} is a block kind the documents publish and this build draws nowhere. The repair is a deploy, not an edit; until then use a kind this build draws.`, at: 'kind' },
+      ],
+    };
   /* `of:` IS READ BY ONE KIND OVER ONE KIND OF SOURCE, and anywhere else it would be a sentence the block drew
      without, which is the misspelt key above by another route. */
   if (block.of !== undefined && !(block.kind === 'ring' && typeof block.source === 'string' && block.source.startsWith('register.')))
@@ -810,6 +825,8 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
 
   /* A CAPTURE READS NO ROWS, and it is answered before the source checks because it has no source. */
   if (block.kind === 'capture') return captureBlock(deps, block, base, also);
+  /* INPUTS READ ONE ROW BY `register:` AND NOT BY `source:`, for the reason a capture does: they name the list they write. */
+  if (block.kind === 'inputs') return inputsBlock(deps, block, base, also);
 
   /* A BLOCK WITH NO SOURCE IS A WRITTEN BLOCK, and the record has nothing to add to it. `05` §1 makes
      `table` the page-only kind that takes `source:` and `columns:`; every other kind draws the rows
@@ -1031,19 +1048,42 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
      the jobs that apply everywhere are 3 of 6), one over a list with no scope field drew the list instead of
      saying so, and `limit: 0` drew the dial. */
   if (block.kind === 'ring') return ringOf(deps, block, register, schema, said.predicate, inherit ? scope : null, base, also);
+
+  /* A PATH IS A LIST THAT SAYS WHICH OF ITS ROWS ARE DONE, which only a list declaring `steps:` does. `first:` is its
+     short view, the first open rows, so over a list that says nothing is done there are no open rows to cut, and the
+     block is refused rather than drawn long under a promise to be short. */
+  const path = block.kind === 'steps' ? ownSteps(deps, register, schema) : null;
+  if (block.kind === 'steps' && block.first !== undefined && !path)
+    return {
+      ...base,
+      refusals: also({
+        code: 'DECLARATION_INVALID',
+        fix: `first: draws the first open steps, and ${register} does not say which of its rows are done. Declare steps: { of, done } on ${register}, or write limit: instead.`,
+        at: 'first',
+      }),
+    };
   /* THE ORDER GOES TO THE QUERY, not to the page after it. Sorting the rows that came back is
      sorting a page that was already chosen: "the five largest" would be five arbitrary rows put in
-     order, which is a different answer and an invisible one. */
-  const listed: Result<Listed> =
+     order, which is a different answer and an invisible one. A path with no `order:` of its own reads in the
+     order its list declares for its steps, which is the order a card's next step is picked in. */
+  const order = block.order?.length ? block.order : path?.order ? [{ field: path.order, dir: 'asc' as const }] : undefined;
+  const ask = (where: Predicate | undefined, most: number): Result<Listed> =>
     inherit && scope
-      ? listInherited(deps, register, scope, said.predicate, limit, block.order)
+      ? listInherited(deps, register, scope, where, most, order)
       : deps.list({
           register,
-          where: said.predicate,
-          limit,
-          ...(block.order?.length ? { order: block.order } : {}),
+          where,
+          limit: most,
+          ...(order ? { order } : {}),
         });
+  /* THE SHORT VIEW OF A PATH ASKS FOR ITS OPEN ROWS, so the done ones never take the room `limit` gives. Cut after the
+     read, a path of [done, open, open, open] with `first: 2, limit: 1` answered no rows while three steps were open.
+     `matched` is still the whole list's, asked apart: "1 of 3" is what the drawer's "2 more" is counted from. */
+  const short = path && block.first !== undefined ? path : null;
+  const listed = short ? ask(openOf(said.predicate, short.done), Math.min(limit, Math.max(1, Math.floor(block.first!)))) : ask(said.predicate, limit);
   if (!listed.ok) return { ...base, refusals: refused(listed) ? also(listed.refusal) : also() };
+  const whole = short ? ask(said.predicate, 1) : listed;
+  if (!whole.ok) return { ...base, refusals: refused(whole) ? also(whole.refusal) : also() };
 
   /* AND A REGISTER PAST THAT ONE READ SAYS SO, which is what the comment over `SUMS` had been
      promising while this line was missing. The read above asked for 200 and `list` answers how many
@@ -1070,8 +1110,12 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
      an empty cell under a heading that promises one, which reads as "no value" rather than as "no
      such thing" — and the difference is whether anybody investigates. */
   const unknown = (block.columns ?? [])
+    .filter((c) => !(block.kind === 'cards' && c.as === 'next'))
     .map((c) => c.field)
     .filter((f) => f !== 'seq' && f !== CHANGED && !Object.hasOwn(schema.fields, f));
+  /* A CARD'S NEXT STEP IS A FIELD OF THE STEPS LIST, not of the list the cards are over, so it is checked there. */
+  const nextFault = nextColumnFault(deps, block, register);
+  if (nextFault) return { ...base, refusals: also(nextFault) };
 
   /* A REFUSAL MEANS THE BLOCK DREW NOTHING, which is what `BlockResult` says and what it was not
      doing: it returned the rows AND the refusal, so a renderer that drew the rows and ignored the
@@ -1112,7 +1156,11 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
   if (block.working === true && !(deps.history && deps.sessionsLive))
     return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read whether an agent is on a row onto a page yet.', at: 'working' }) };
 
-  const rows = listed.value.rows;
+  const read = listed.value.rows;
+  const ranged = block.kind === 'progress' && block.range === true ? rangeFault(block, register, schema, read) : null;
+  if (ranged) return { ...base, refusals: also(ranged) };
+  const rows = read;
+  const marks = path ? rows.map((r) => r.fields[path.done] === true) : null;
   /* A BUDGET SETS ITS ROWS AGAINST A FIGURE, read here beside them, so a limit and what was spent come from one answer.
      A GOAL IS SET AGAINST WHAT WAS LOGGED TOWARD IT the same way, the figure grouped by the row it points at. */
   const figure = block.kind !== 'progress' ? undefined : block.spent !== undefined ? { id: block.spent, at: 'spent' } : block.toward !== undefined ? { id: block.toward, at: 'toward' } : undefined;
@@ -1140,11 +1188,130 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
     ...(held && (held.home !== null || held.rates.length > 0) ? { fx: { home: held.home, rates: [...held.rates] } } : {}),
     ...(asksChanged ? { changes: changesOf(deps, register, rows) } : {}),
     ...(block.working === true ? { working_now: workingOf(deps, register, rows) } : {}),
-    matched: listed.value.matched,
+    matched: whole.value.matched,
     ...(inherit ? { inherited: listed.value.inherited ?? 0 } : {}),
     ...(scope ? { scopes: scopesOf(deps, rows, scope) } : {}),
     ...ringsOf(deps, block, register, rows),
+    ...nextsOf(deps, block, register, rows),
+    ...(marks ? { done_now: marks, next: marks.indexOf(false) < 0 ? null : marks.indexOf(false) } : {}),
   };
+}
+
+/**
+ * The steps declaration of the list a block reads, when it is a list of steps.
+ *
+ * READ THROUGH `stepsOf` OF THE LIST ITS `of` FIELD POINTS AT, because that is the one read of a list's `steps:` a host
+ * wires: every ref field of the list is a place the steps could belong to, and the one whose target names this list
+ * among its steps is the answer.
+ */
+/**
+ * A block's `where` and "not done" together, one `all` so an inherited read still finds its project among the clauses.
+ * `none` of `is: true` and not `is: false`, because a step nobody has ticked holds no value and is open.
+ */
+function openOf(where: Predicate | undefined, done: string): Predicate {
+  const open: Predicate = { none: [{ field: done, is: true }] };
+  if (where === undefined) return open;
+  const all = (where as { all?: unknown }).all;
+  return { all: [...(Array.isArray(all) ? (all as Predicate[]) : [where]), open] };
+}
+
+function ownSteps(deps: PageDeps, register: string, schema: Schema): StepsDecl | null {
+  if (!deps.stepsOf) return null;
+  for (const spec of Object.values(schema.fields)) {
+    const to = (spec as { to?: unknown }).to;
+    if (spec.type !== 'ref' || typeof to !== 'string') continue;
+    const mine = deps.stepsOf(to).find((l) => l.register === register);
+    if (mine) return { of: mine.of, done: mine.done, ...(mine.order === undefined ? {} : { order: mine.order }) };
+  }
+  return null;
+}
+
+/** The list whose rows are steps of `register` and hold `field`, or why there is none. */
+function stepsHolding(deps: PageDeps, register: string, field: string): { register: string; steps: StepsDecl } | Refusal {
+  const lists = deps.stepsOf?.(register) ?? [];
+  if (lists.length === 0)
+    return {
+      code: 'DECLARATION_INVALID',
+      fix: `as: next draws the first open step under each card, and no list says its rows are steps of ${register}. Declare steps: { of, done } on the list of steps, or give the column another role.`,
+      at: 'columns',
+    };
+  const holding = lists.find((l) => Object.hasOwn(deps.schemaOf(l.register)?.fields ?? {}, field));
+  if (!holding)
+    return {
+      code: 'FIELD_UNKNOWN',
+      fix: `${lists.map((l) => l.register).join(' and ')} ${lists.length > 1 ? 'have' : 'has'} no field called ${field}, and as: next names a field of the steps under each card.`,
+      at: 'columns',
+      allowed: lists.flatMap((l) => Object.keys(deps.schemaOf(l.register)?.fields ?? {})),
+    };
+  return { register: holding.register, steps: holding };
+}
+
+/** Why a `cards` block's `as: next` column cannot be answered, or `null`. */
+function nextColumnFault(deps: PageDeps, block: PageBlock, register: string): Refusal | null {
+  const col = block.kind === 'cards' ? block.columns?.find((c) => c.as === 'next') : undefined;
+  if (!col) return null;
+  const found = stepsHolding(deps, register, col.field);
+  return 'code' in found ? found : null;
+}
+
+/**
+ * EACH CARD'S NEXT STEP: that field of the first step under the card that is not done, in the order its list declares.
+ *
+ * THE WHOLE STEPS LIST IS READ, as `ringsOf` reads it, because the next step under a card is not in any page of the
+ * list a card could ask for: it is the lowest open rank among the card's own, wherever it sits.
+ */
+function nextsOf(deps: PageDeps, block: PageBlock, register: string, rows: readonly Entry[]): { nexts?: (string | null)[] } {
+  const col = block.kind === 'cards' ? block.columns?.find((c) => c.as === 'next') : undefined;
+  if (!col) return {};
+  const found = stepsHolding(deps, register, col.field);
+  if ('code' in found) return {};
+  const read = everyRow(deps, found.register, undefined);
+  if (!read.ok) return {};
+  const first = nextSteps(read.value.rows, found.steps);
+  return {
+    nexts: rows.map((r) => {
+      const v = first.get(r.id)?.fields[col.field];
+      return typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' ? String(v) : null;
+    }),
+  };
+}
+
+/** The field types a range's low, high and spent may be: figures, money among them. */
+const RANGE_TYPES = new Set(['int', 'number', 'decimal', 'money']);
+
+/**
+ * Why a `progress` block drawn as ranges cannot be, or `null`.
+ *
+ * FOUR COLUMNS, THE LAST THREE FIGURES, AND ONE CURRENCY. The drawer puts every row on one scale, the largest high, and
+ * adds the three columns into a total line, so a text where a low should be is a band from nothing, and pounds beside
+ * dollars on one scale is the sum the record never makes.
+ */
+function rangeFault(block: PageBlock, register: string, schema: Schema, rows: readonly Entry[]): Refusal | null {
+  const cols = block.columns ?? [];
+  if (cols.length !== 4)
+    return { code: 'DECLARATION_INVALID', fix: 'A progress drawn as ranges names four columns: the label, what was spent, the low and the high.', at: 'columns' };
+  const figures = cols.slice(1).map((c) => c.field);
+  const wrong = figures.find((f) => !RANGE_TYPES.has(schema.fields[f]?.type ?? ''));
+  if (wrong !== undefined)
+    return {
+      code: 'DECLARATION_INVALID',
+      fix: `A range is drawn from figures, and ${register}'s ${wrong} is ${schema.fields[wrong]?.type ?? 'not a field'}. Name a number or money field for what was spent, the low and the high.`,
+      at: 'columns',
+      allowed: Object.entries(schema.fields).filter(([, s]) => RANGE_TYPES.has(s.type)).map(([f]) => f),
+    };
+  const currencies = new Set<string>();
+  for (const r of rows)
+    for (const f of figures) {
+      const v = r.fields[f];
+      if (v !== null && typeof v === 'object' && typeof (v as { currency?: unknown }).currency === 'string') currencies.add((v as { currency: string }).currency);
+    }
+  if (currencies.size > 1)
+    return {
+      code: 'MIXED_CURRENCY',
+      fix: `${register}'s ranges are in ${[...currencies].sort().join(' and ')}, and one scale and one total are one currency. Narrow it with where: to one currency, or give the rows one.`,
+      at: 'columns',
+    };
+  return null;
 }
 
 /**
@@ -1668,6 +1835,58 @@ function captureBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also:
   return { ...base, fills: captureFills(said.predicate, schema, deps.titleOf(register)) };
 }
 
+/** The field types an `inputs` block can offer a control for. A ref, a list, a file or a document is not typed into a box. */
+const TYPABLE = new Set(['text', 'url', 'email', 'enum', 'int', 'number', 'decimal', 'money', 'pct', 'day', 'instant', 'bool', 'boolean', 'duration']);
+
+/**
+ * An `inputs` block over `register:`: one row of the list, and the type of each field it draws.
+ *
+ * ONE ROW, THE ONE `row:` NAMES OR THE LIST'S FIRST, because a what-if a person types into is a single set of numbers:
+ * a price and three costs. Every other block over the list reads the same row after a write, which is how a verdict
+ * under `when:` answers the figures as they are typed, and nothing is held in memory that the record does not hold.
+ * The write is the host's, through the row writer, as a capture's is.
+ */
+function inputsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
+  const register = block.register;
+  if (typeof register !== 'string' || register === '')
+    return { ...base, refusals: also({ code: 'REQUIRED_MISSING', fix: 'Inputs name the list whose row they edit, as register: checks.', at: 'register' }) };
+  const schema = deps.schemaOf(register);
+  if (!schema) return { ...base, refusals: also({ code: 'REGISTER_UNKNOWN', fix: `There is no register called ${register}, so the inputs have no row to edit.`, at: 'register' }) };
+  const fields = (block.columns ?? []).map((c) => c.field);
+  /* WITH NO `columns:` THE ROW'S TYPABLE FIELDS ARE DRAWN, and a ref, a list or a file is left out as it is refused when
+     named: answering its type handed the host a box to type a row id or a document into. */
+  const named = fields.length ? fields : Object.keys(schema.fields).filter((f) => TYPABLE.has(schema.fields[f]!.type));
+  const unknown = named.filter((f) => !Object.hasOwn(schema.fields, f));
+  if (unknown.length)
+    return { ...base, refusals: also({ code: 'FIELD_UNKNOWN', fix: `${register} has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(schema.fields) }) };
+  const untypable = fields.find((f) => !TYPABLE.has(schema.fields[f]!.type));
+  if (untypable !== undefined)
+    return {
+      ...base,
+      refusals: also({
+        code: 'DECLARATION_INVALID',
+        fix: `${register}'s ${untypable} is a ${schema.fields[untypable]!.type}, and an input is typed text, a number, money, a day, a yes or no, or a choice. Take the column off, or edit it on the row.`,
+        at: 'columns',
+        allowed: Object.entries(schema.fields).filter(([, s]) => TYPABLE.has(s.type)).map(([f]) => f),
+      }),
+    };
+  let where: Predicate | undefined;
+  if (block.row !== undefined) {
+    const m = typeof block.row === 'string' ? SPOKEN.exec(block.row) : null;
+    if (!m || m[1] !== register)
+      return { ...base, refusals: also({ code: 'VALUE_MALFORMED', fix: `row: names a row of ${register} by its spoken id, such as ${register}#1.`, at: 'row' }) };
+    where = { field: 'seq', is: Number(m[2]) };
+  }
+  const got = deps.list({ register, ...(where ? { where } : {}), limit: 1, order: [{ field: 'seq', dir: 'asc' }] });
+  if (!got.ok) return { ...base, refusals: refused(got) ? also(got.refusal) : also() };
+  return {
+    ...base,
+    rows: got.value.rows,
+    matched: got.value.rows.length,
+    types: Object.fromEntries(named.map((f) => [f, schema.fields[f]!.type])),
+  };
+}
+
 /**
  * The equalities a predicate pins, which a row added under it inherits: `apps/web`'s `inheritedFrom`, read off the
  * record's own parse of the sentence rather than off the browser's.
@@ -1717,9 +1936,11 @@ function captureFills(predicate: Predicate | undefined, schema: Schema, title: s
  * without it the only way to filter to the same set is to name the body kinds one by one and keep
  * that list in step with `weigh.ts` by hand.
  */
+/* AND WHAT IT IS ABOUT, when whoever opened it said (`body.about`), so a page per area draws that area's calls with
+   `about is {{name}}`. It is the one word of a body read here, and it is a word the proposer chose to be filtered by. */
 const OPEN: Schema = {
   register: 'governance',
-  fields: { who: { type: 'text' }, kind: { type: 'enum', values: BODY_KINDS }, cost: { type: 'enum', values: COSTS } },
+  fields: { who: { type: 'text' }, kind: { type: 'enum', values: BODY_KINDS }, cost: { type: 'enum', values: COSTS }, about: { type: 'text' } },
 };
 
 /** How many questions a queue draws when a page names no `limit:`. Past this, the rest is the count. */
@@ -1744,7 +1965,7 @@ function openBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (.
   /* READ MORE THAN WILL BE DRAWN, because a predicate over who asked can leave a page short otherwise, and
      ask for the ceiling's worth at most: the count of what is open comes back with them either way. */
   const read = deps.openQuestions(Math.max(limit, QUEUE_CEILING));
-  const kept = read.questions.filter((q) => evaluate(said.predicate, { who: q.who, kind: q.kind, cost: q.cost }, OPEN));
+  const kept = read.questions.filter((q) => evaluate(said.predicate, { who: q.who, kind: q.kind, cost: q.cost, about: q.about ?? null }, OPEN));
   /* NO PREDICATE MEANS THE RECORD'S OWN COUNT, which is every open question rather than the page the read
      answered with. With one, the count is of what this page could see, and it says so by being smaller. */
   const matched = said.predicate === undefined && read.questions.length < read.open ? read.open : kept.length;
@@ -2059,6 +2280,9 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
   if (decl.for?.register) named.add(decl.for.register);
   for (const block of decl.blocks ?? []) {
     add(block.source);
+    /* INPUTS READ A ROW OF `register:` AND DRAW ITS FIGURES, so the list is the block's as a source's is. A capture's is
+       not: it reads nothing. */
+    if (block.kind === 'inputs' && typeof block.register === 'string') named.add(block.register);
     /* A CASH WALK READS EVERY LIST ITS LEGS WALK, and this read only the list its opening figure counts. So a
        walk over Bills was a block about Accounts, and `loop/research-scoped-audit.md` §2 measured a member invited
        to Obligations alone reading *Severance for Sam*, -1,250,000, off the Desk page while `list('bills')` refused

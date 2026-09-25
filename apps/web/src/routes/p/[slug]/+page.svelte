@@ -12,6 +12,10 @@
   import { page as route } from '$app/state';
   import { untrack } from 'svelte';
   import PageView from '$lib/page/PageView.svelte';
+  import PageTabs from '$lib/page/PageTabs.svelte';
+  import { tabsOf } from '$lib/page/tabs.ts';
+  import { navPrefs } from '$lib/nav-prefs.svelte.ts';
+  import type { Shell } from '$lib/record/boot-live.ts';
   import { pageReader, type Opened } from '$lib/record/page-live.ts';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
 
@@ -56,6 +60,17 @@
   $effect(() => {
     if (got && got.from !== 'refused') drew('ready');
   });
+
+  /**
+   * THE SECTION'S TABS, WHEN IT HAS THEM, READ FROM THE SHELL AND NOT FROM THE PAGE'S OWN ANSWER. Which pages share a
+   * section is a fact about the record's nav, which the root layout already holds, so the strip is drawn before the
+   * page's read answers and stays put while the next tab's read is out. It is also why it lives in the route: the
+   * address is the route's, and a tab is an address.
+   */
+  const strip = $derived(
+    tabsOf((route.data as unknown as Shell).nav ?? [], `/p/${slug}`, { order: navPrefs.order, hidden: navPrefs.hidden }),
+  );
 </script>
 
+{#if strip}<PageTabs {strip} />{/if}
 <PageView {slug} {showSource} {got} {reread} />

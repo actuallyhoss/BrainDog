@@ -34,6 +34,49 @@
 
   const suggestions = $derived(reading ? suggestionsOf(reading) : []);
 
+  /**
+   * THE ASK FIELD (`loop/research-dynamic-layouts.md` §6 brief D2): the owner says what they want built, and the press
+   * hands it to Slash's model as `asked`. Only what the model drafts from it is filed, on Decide, where a page is drawn
+   * before anybody accepts it.
+   *
+   * SHOWN ONLY WHEN A MODEL DRAFTS, because Slash's own rules read use and cannot read a sentence: with no model the record
+   * says so in a line of its own and files nothing, which a field that could never work would only lead the owner into.
+   * NOT HELD BACK ON A YOUNG RECORD, as the plain press is: a description is the owner asking, and the record reaches the
+   * model for it on any day, held to the month's asks like every other press.
+   *
+   * `ASKED_MOST` IS THE RECORD'S `SLASH_ASKED_MOST`, WRITTEN OUT, because the record is server code and this is the
+   * browser's bundle. The record refuses past it by name (`asked` at `VALUE_MALFORMED`), so a drift is a refusal the
+   * owner reads, not a description cut short.
+   */
+  const ASKED_MOST = 1_000;
+  const describe = {
+    title: 'Describe what you want',
+    hint: 'Say in your own words what you want this BrainDog to hold and show. Slash drafts the lists, figures and pages for it and puts them on Decide, where you see the page before anything is made.',
+    placeholder: 'A desk for my launch, in five parts, with the next step on each and a sentence saying how far along I am',
+    ask: 'Draft it',
+    asking: 'Drafting',
+  } as const;
+  let described = $state('');
+
+  async function draftDescribed() {
+    const text = described.trim();
+    if (!client || busy || text === '') return;
+    busy = true;
+    try {
+      const out = await askSlash(client, text);
+      if (!out.ok) {
+        toasts.push(out.fix, { intent: 'bad' });
+        return;
+      }
+      asked = out.asked;
+      toasts.push(out.said, out.asked.filed.length > 0 ? { intent: 'good' } : {});
+      if (out.asked.filed.length > 0) described = '';
+      await load();
+    } finally {
+      busy = false;
+    }
+  }
+
   async function load(): Promise<boolean> {
     if (!client) return false;
     const out = await readSlash(client);
@@ -85,6 +128,32 @@
       <p class="slash-lede">{words.lede}</p>
       <p class="slash-by">{draftedBy(reading, asked)}</p>
     </div>
+
+    {#if reading.model !== null}
+      <Section title={describe.title}>
+        <form
+          class="slash-describe"
+          onsubmit={(e) => {
+            e.preventDefault();
+            void draftDescribed();
+          }}
+        >
+          <label class="slash-said" for="slash-asked">{describe.hint}</label>
+          <textarea
+            id="slash-asked"
+            class="slash-field"
+            rows="3"
+            maxlength={ASKED_MOST}
+            placeholder={describe.placeholder}
+            spellcheck="true"
+            bind:value={described}
+          ></textarea>
+          <div>
+            <Button weight="primary" type="submit" disabled={busy || described.trim() === ''}>{busy ? describe.asking : describe.ask}</Button>
+          </div>
+        </form>
+      </Section>
+    {/if}
 
     {#if nothingYet(reading)}
       <!-- A NEW RECORD HAS NOTHING UNDER EITHER HEADING, so it gets one sentence of what Slash will do, and the reason it is
@@ -218,6 +287,26 @@
 
   .slash-actions {
     margin-block-start: var(--sp-4);
+  }
+
+  .slash-describe {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+  }
+
+  /* DECIDE'S REASON FIELD, `.commit-field` in `decide/[id]`, where the owner goes next to answer what this drafted, so the
+     sentence typed here and the reason typed there sit in the same kind of box. */
+  .slash-field {
+    inline-size: 100%;
+    padding: var(--sp-3);
+    background: var(--bg);
+    border: 1px solid var(--edge);
+    border-radius: var(--r-sm);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: var(--t-ui);
+    resize: vertical;
   }
 
   @media (width < 900px) {

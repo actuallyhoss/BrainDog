@@ -103,9 +103,12 @@ export async function readSlash(client: SlashClient): Promise<{ ok: true; readin
   return { ok: false, fix: code === 'FORBIDDEN' ? words.notOwner : fixOf(out), owner: code !== 'FORBIDDEN' };
 }
 
-/** The press: Slash's suggestions filed, and one sentence to say what happened. */
-export async function askSlash(client: SlashClient): Promise<{ ok: true; asked: Asked; said: string } | { ok: false; fix: string }> {
-  const out = await client.call<Asked>('slashPropose', {});
+/**
+ * The press: Slash's suggestions filed, and one sentence to say what happened. With `asked`, the owner's own description
+ * of what to build, Slash's model drafts from it instead, and the same sentence says how many reached Decide.
+ */
+export async function askSlash(client: SlashClient, asked?: string): Promise<{ ok: true; asked: Asked; said: string } | { ok: false; fix: string }> {
+  const out = await client.call<Asked>('slashPropose', asked === undefined ? {} : { asked });
   if (!out.ok) return { ok: false, fix: fixOf(out) };
   /* THE TOAST SAYS HOW MANY AND NOT WHY THE RULES DREW THEM. The why is the record's dropped line, which the screen draws
      under "Not put on Decide"; repeating it here put the same too-large sentence on one screen twice after one press. */

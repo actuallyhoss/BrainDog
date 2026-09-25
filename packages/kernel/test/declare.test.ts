@@ -908,9 +908,9 @@ test('A BLOCK KIND IS ONE OF THE TWENTY, and the closure is what the security ar
   assert.ok((said?.allowed?.length ?? 0) > 20, 'the refusal offers every kind, not a handful');
   assert.match(validateDeclaration(block({ kind: 'prose' }))?.fix ?? '', /not a kind this build draws/);
 
-  /* AND A SEVENTEENTH ARRIVES AS A DECLARATION, which is the whole reason the primitive layer
-     exists (05 §2) — admitted by prefix, and checked as a document of its own. */
-  assert.equal(refusedWith(block({ kind: 'block.invoice_card' })), null);
+  /* A PACK'S OWN KIND DRAWS NOTHING IN THIS BUILD, so a page naming one is refused NOT_IN_THIS_BUILD at install rather
+     than installed to draw a hole. The prefix is still what tells it from a misspelt kind. */
+  assert.equal(refusedWith(block({ kind: 'block.invoice_card' })), 'NOT_IN_THIS_BUILD');
   assert.equal(refusedWith(block({ kind: 'block.Invoice Card' })), 'KIND_UNKNOWN');
 });
 

@@ -26,7 +26,7 @@ const PAGE = {
     blocks: '1 to 24 blocks, drawn in order',
   },
   block: {
-    kind: [...Object.keys(KINDS), 'block.<id> a pack declares'],
+    kind: Object.keys(KINDS),
     span: 'width in twelfths, 1 to 12',
     heading: 'the words over it; on a section, the section itself',
     empty: 'the sentence drawn when it has no rows',

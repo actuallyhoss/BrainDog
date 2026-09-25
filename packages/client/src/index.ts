@@ -87,7 +87,7 @@ export type Boot = {
   pages?: {
     slug: string;
     title: string;
-    nav: { section: string; order: number } | null;
+    nav: { section: string; order: number; tabs?: true } | null;
     icon: string | null;
     list?: string | null;
     about?: { register: string; seq: number | null } | null;

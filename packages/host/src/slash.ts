@@ -14,7 +14,7 @@
  *
  * THEY ARE TWO FEATURES THAT SHARE A NAME, AND NEITHER IS A NEWER VERSION OF THE OTHER, so neither is deleted. This file is
  * the model behind the RECORD's Slash, which reads how a BrainDog is used and drafts `pack`, `settings` and `arrange`
- * proposals about its arrangement, and a `change` that builds a register, an ingest, a rule or a page
+ * proposals about its arrangement, and a `change` that builds a register, an ingest, a rule, a metric or a page
  * (`packages/record/src/slash.ts`, `loop/research-spark.md` S15, `loop/research-shell-mcp.md` §4 Brief D). `@braindog/slash` is
  * `docs/46`'s assistant engine: a person's typed question turned into a predicate, their own rows, and one cited proposal
  * with verbs, plus the ingest-pattern proposer, the meter and the tiers.
@@ -76,7 +76,8 @@ export const SLASH_INSTRUCTIONS = [
   'Propose at most `most` changes that would make this BrainDog fit how it is really used. Each is one question the owner answers on Decide, with the reason in the question.',
   'Answer only JSON: {"drafts":[{"question":"...","body_kind":"pack"|"settings"|"arrange"|"change","body":{...}}]}. The rules\' drafts show the body shapes.',
   'pack bodies: {"install":"<offered id>"}, {"enable":"<id>"}, {"disable":"<id>"}. settings: {"pack":"<id>","values":{...}} or {"voice":{"home":"..."}}. arrange: {"why":["..."],"usecase"?,"packs"?,"pages"?,"settings"?,"voice"?}.',
-  'change builds what the record does not have yet, such as a rate fetched on a schedule into a list: {"to":{"id":"ingest.<id>","kind":"ingest","body":{...}}} for one register, ingest, rule or page, or {"to":{"declarations":[...]}} for several that belong together, like a list and the door that fills it. Write each body whole, in the record\'s grammar for its kind (grammar/register, grammar/ingest, grammar/rule, grammar/page). Never write what it calls out to: the record works that out and shows the owner.',
+  'change builds what the record does not have yet, such as a rate fetched on a schedule into a list: {"to":{"id":"ingest.<id>","kind":"ingest","body":{...}}} for one register, ingest, rule, metric or page, or {"to":{"declarations":[...]}} for several that belong together, like a list and the door that fills it, or a figure and the page that says it. Write each body whole, in the record\'s grammar for its kind (grammar/register, grammar/ingest, grammar/rule, grammar/metric, grammar/page). Never write what it calls out to: the record works that out and shows the owner.',
+  'When `asked` is present, it is the owner describing, in their own words, what they want built, and it comes before how the record is used. Then answer only change drafts that build the lists, figures and pages it describes, in grammar/register, grammar/metric, grammar/page and grammar/rule, reusing the lists in usage where they fit, with the pieces that belong together as one {"declarations":[...]} change. Ask in the question whether to build what they described, in their words. Build nothing they did not describe.',
   'Tone is settings too: the words the speaking use case declares are in usage.tone.settings (voice_* lines, label_* words), and only those names may be set, as {"pack":"<usage.tone.pack>","values":{"label_tickets":"Issues"}}, with the reason drawn from how the record is used.',
   'Never name a figure that is not in the reading. Write plainly and warmly, with no dashes used as punctuation. If nothing would help, answer {"drafts":[]}.',
 ].join('\n');

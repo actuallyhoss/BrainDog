@@ -124,10 +124,11 @@ test('and a `when:` the record cannot answer does not draw either', () => {
 test('A KEY THIS RECORD DOES NOT READ IS SAID, and it used to be ignored', () => {
   /* A declaration arrives as JSON from a pack somebody else wrote, so the type is not there at the
      moment it is read. A misspelling was accepted in silence and the block quietly did something
-     else than what it said. */
-  return record(pageOf({ kind: 'note', heading: 'Typo', body: 'x', wehn: { metric: 'open-count', gt: 0 } })).then(
+     else than what it said. The install refuses the key now too, so the read is asked through `k.block`, as a page
+     installed before the install closed its keys is still read. */
+  return record().then(
     ({ k, sql }) => {
-      const said = (blocks(k.page('invoicing'))[0]?.refusals ?? []) as { fix: string; at?: string }[];
+      const said = (k.block({ kind: 'note', heading: 'Typo', body: 'x', wehn: { metric: 'open-count', gt: 0 } } as never).refusals ?? []) as { fix: string; at?: string }[];
       assert.equal(said.length, 1, 'the unreadable key was not named');
       assert.match(said[0]?.fix ?? '', /wehn: is not a key this record reads/u);
       assert.equal(said[0]?.at, 'wehn', 'the refusal does not point at the key');
@@ -141,9 +142,9 @@ test('and it survives a block that is wrong about a second thing as well', () =>
      base wrote their own `refusals:`, so a block that both misspelt a key and named a source nobody
      publishes reported only the source: the author fixed that, redeployed, and met the second
      sentence they could have had the first time. */
-  return record(pageOf({ kind: 'table', source: 'forecast.runway', limti: 5 })).then(
+  return record().then(
     ({ k, sql }) => {
-      const said = (blocks(k.page('invoicing'))[0]?.refusals ?? []) as { code: string; fix: string; at?: string }[];
+      const said = (k.block({ kind: 'table', source: 'forecast.runway', limti: 5 } as never).refusals ?? []) as { code: string; fix: string; at?: string }[];
       assert.equal(said.length, 2, 'both mistakes were not reported at once');
       assert.ok(
         said.some((r) => /limti: is not a key this record reads/u.test(r.fix)),
@@ -161,8 +162,8 @@ test('and it survives a block that is wrong about a second thing as well', () =>
 test('and it is said on a stat block too, which returns before every other check', () => {
   /* The `cells` arm returns early, so a misspelling on a stat block was the one shape that could
      not be reported however the check was written after it. */
-  return record(pageOf({ kind: 'stat', cells: [{ metric: 'open-count' }], hedaing: 'Typo' })).then(({ k, sql }) => {
-    const said = (blocks(k.page('invoicing'))[0]?.refusals ?? []) as { fix: string }[];
+  return record().then(({ k, sql }) => {
+    const said = (k.block({ kind: 'stat', cells: [{ metric: 'open-count' }], hedaing: 'Typo' } as never).refusals ?? []) as { fix: string }[];
     assert.match(said[0]?.fix ?? '', /hedaing: is not a key this record reads/u);
     sql.close();
   });

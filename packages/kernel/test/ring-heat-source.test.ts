@@ -165,9 +165,10 @@ test('a ring over a register takes no columns of its own, and says so rather tha
 test('and a ring an author wrote out is still the rows of its own fence', async () => {
   /* THE AUTHORED PATH IS UNTOUCHED: a ring with no `source:` never reaches `ringOf`, so the record adds no counted
      row and no `label | value | target` columns to it. This held before the change as well; it is here so that
-     moving the ring branch above the source check goes red rather than drawing a dial over a fence. */
+     moving the ring branch above the source check goes red rather than drawing a dial over a fence. The rows are
+     written out with `authored:`, the key a page writes rows with; `rows:` is what a read answers and is refused at install. */
   const { k, sql } = await record(
-    pageOf({ kind: 'ring', heading: 'Split', rows: [['Rent', '600', ''], ['Food', '300', '']] }),
+    pageOf({ kind: 'ring', heading: 'Split', authored: [{ cells: ['Rent', '600', ''] }, { cells: ['Food', '300', ''] }] }),
     [],
   );
   const ring = first(k);
@@ -261,21 +262,23 @@ test('an of: that is not a sentence is refused at of:, and not at the where it n
 });
 
 test('an of: on a ring an author wrote out says the ring is not over a list, not that a ring has no whole', async () => {
-  const { k, sql } = await chores({ kind: 'ring', heading: 'Split', rows: [['Rent', '600', ''], ['Food', '300', '']], of: 'list is work' });
-  const ring = first(k);
+  /* READ THROUGH `k.block`, because `rows` is what a read answers and the install now refuses it on a declaration; a
+     ring that came back from a read with its rows on it is the written-out ring this sentence is about. */
+  const { k, sql } = await chores({ kind: 'ring', heading: 'Work done', source: 'register.chores', where: 'state is done' });
+  const ring = k.block({ kind: 'ring', heading: 'Split', rows: [['Rent', '600', ''], ['Food', '300', '']], of: 'list is work' } as never) as Answered;
   assert.equal(ring.refusals?.[0]?.at, 'of');
   assert.match(String(ring.refusals?.[0]?.fix), /not over a list/u);
   sql.close();
 });
 
 test('an of: the list cannot read is refused at of:, and so is an of: on a kind with no whole', async () => {
-  const { k, sql } = await chores(
-    { kind: 'ring', heading: 'Bad', source: 'register.chores', where: 'state is done', of: 'colour is red' },
-    { kind: 'table', heading: 'Stray', source: 'register.chores', of: 'list is work', columns: [{ field: 'what' }] },
-  );
+  /* THE STRAY `of:` IS READ THROUGH `k.block`: the install refuses `of:` on a table now, and a page installed before
+     it did is still read, so the read's own sentence is what this holds. */
+  const { k, sql } = await chores({ kind: 'ring', heading: 'Bad', source: 'register.chores', where: 'state is done', of: 'colour is red' });
   const r = k.page('work') as { ok: boolean; value?: { blocks?: Answered[] } };
   assert.ok(r.ok, JSON.stringify(r));
-  const [bad, stray] = r.value?.blocks ?? [];
+  const [bad] = r.value?.blocks ?? [];
+  const stray = k.block({ kind: 'table', heading: 'Stray', source: 'register.chores', of: 'list is work', columns: [{ field: 'what' }] } as never) as Answered;
   assert.equal(bad?.refusals?.[0]?.at, 'of', JSON.stringify(bad?.refusals));
   assert.deepEqual(bad?.rows ?? [], []);
   assert.equal(stray?.refusals?.[0]?.code, 'DECLARATION_INVALID', JSON.stringify(stray?.refusals));

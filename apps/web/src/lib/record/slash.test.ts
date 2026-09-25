@@ -126,3 +126,17 @@ test('a new record with nothing noticed and nothing suggested gets one friendly 
   assert.doesNotMatch(rail, /\['\/slash', 'Slash', 'star', '\/slash'\]/u);
   assert.match(rail, /slashRail/u);
 });
+
+test('a description goes to the same press as asked, and is said in the same sentence', async () => {
+  const sent: Record<string, unknown>[] = [];
+  const c: SlashClient = {
+    call: async (_name, args) => (sent.push(args ?? {}), { ok: true, value: { by: 'model', filed: [{ id: 'SG6', question: 'x', by: 'model' }], skipped: [], dropped: [] } } as never),
+  };
+  const out = await askSlash(c, 'A desk for my launch');
+  assert.ok(out.ok);
+  assert.equal(out.said, 'One suggestion is on Decide.');
+  await askSlash(c);
+  assert.deepEqual(sent, [{ asked: 'A desk for my launch' }, {}]);
+  const refused: SlashClient = { call: async () => ({ ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'asked: is at most 1000 characters.' } }) as never };
+  assert.deepEqual(await askSlash(refused, 'x'), { ok: false, fix: 'asked: is at most 1000 characters.' });
+});

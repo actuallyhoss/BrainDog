@@ -43,6 +43,7 @@ import { FREQ, shiftFrom } from './schedule.ts';
 import { pairsFault } from './pairs.ts';
 import { spanMs } from './vault.ts';
 import { actionsOf, callFault, flowFault, sealedAs, subjectOf } from './flow-lint.ts';
+import { BLOCK_INSTALLS, NAV_KEYS, PAGE_KEYS, PAGE_UNBUILT, keysFor, kindsReading, unreadBlockKey, unreadPageKey, wrongKindKey } from './block-keys.ts';
 import type { FlowDecl } from './rules.ts';
 
 /**
@@ -550,15 +551,18 @@ function metricFieldFault(id: string, source: unknown, value: unknown, groupBy: 
  * A COPY THAT DRIFTS IS WORSE THAN NO COPY, AND A COUNT IN PROSE IS THE FIRST THING TO DRIFT. This
  * list said "the twenty" in two refusals and in this paragraph while holding twenty-eight, because
  * every kind added since was added to the array and not to the sentence. So neither says a number now,
- * and the test walks the array rather than a list typed out beside it. A PACK'S OWN KIND NEEDS NO EDIT
- * HERE: `05 §2` says it arrives as a `block.<id>` declaration, which this list admits by prefix and
- * checks as a document of its own. A kind added to the renderer's table does, which is how `cards`,
- * `section`, `feed`, `diff`, `queue` and `capture` arrived.
+ * and the test walks the array rather than a list typed out beside it. A kind added to the renderer's
+ * table is added here, which is how `cards`, `section`, `feed`, `diff`, `queue`, `capture` and `inputs`
+ * arrived. A PACK'S OWN KIND, `block.<id>`, WAS ADMITTED HERE BY PREFIX and is refused now: `05 §2` says
+ * one arrives as a `block` declaration, this build refuses every such declaration `NOT_IN_THIS_BUILD`,
+ * and a page naming one installed and read its rows with nothing anywhere to draw them
+ * (`loop/research-dynamic-layouts.md` §3, finding 2).
  */
 const BLOCK_KINDS = [
   'note', 'quote', 'stat', 'bar', 'gauge', 'chips', 'spec', 'params',
   'todo', 'steps', 'timeline', 'board', 'code', 'tree', 'comparison', 'table', 'cards', 'section', 'feed', 'diff',
   'sparkline', 'split', 'bridge', 'series', 'forecast', 'agents', 'lines', 'progress', 'queue', 'capture', 'roadmap', 'ring', 'heat',
+  'inputs',
 ] as const;
 
 /** A register id as a block names one on its own, with no `register.` in front: the half `SOURCE` checks after the dot. */
@@ -568,8 +572,13 @@ const REGISTER_ID = /^[a-z][a-z0-9_-]{0,31}$/u;
  * What a column is on a card, `packages/render/src/cards.ts`'s `CARD_ROLES`, copied for the reason
  * `BLOCK_KINDS` is. A card takes one of each role and up to three facts, as `cardFault` there says.
  */
-const CARD_ROLES = ['title', 'figure', 'fact', 'trend', 'ring', 'who', 'when', 'mark'] as const;
+/* `next` IS THE FIRST OPEN STEP UNDER THE CARD, a field of the list whose rows are its steps (`pages.ts` `nextsOf`), and
+   `reply` is a field drawn under the card's title in a quieter voice, the second opinion under a note. */
+const CARD_ROLES = ['title', 'figure', 'fact', 'trend', 'ring', 'who', 'when', 'mark', 'next', 'reply'] as const;
 const CARD_FACTS = 3;
+
+/** The field types a list of steps may be put in order by: lowest first. */
+const ORDERS_STEPS: readonly string[] = ['int', 'number', 'decimal', 'day', 'instant', 'text'];
 
 /** `42 §4.2`'s `Glyph`: a `section`'s icon names one. */
 const GLYPH = /^[a-z][a-z0-9-]{0,31}$/u;
@@ -578,6 +587,10 @@ const GLYPH = /^[a-z][a-z0-9-]{0,31}$/u;
 const BLOCK_CEILING = 24;
 const REQUIRES_CEILING = 16;
 const SPAN_MAX = 12;
+const RAIL_MIN = 3;
+const RAIL_MAX = 5;
+/** `06 §1.1`: a `feed`'s `first` is 1 to 50, and a `steps` block's short view is held to the same. */
+const FIRST_MAX = 50;
 const LIMIT_MAX = 500;
 const CELL_CEILING = 6;
 const COLUMN_CEILING = 16;
@@ -694,8 +707,23 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
     requires?: unknown;
     blocks?: unknown;
     tone?: unknown;
+    layout?: unknown;
   };
   const id = decl.id;
+
+  /* THE PAGE'S OWN KEYS ARE A CLOSED LIST, as `06 §1.1` always said they were: *"the install-time check refuses a key
+     that is not in it, by name"*. Nothing did. Measured through a pack on a fresh record, `layout` and `tabs` installed,
+     came back on the page's answer and were read by no host, so an author who wrote `tabs:` saw no tabs and no
+     sentence saying why. The list is `block-keys.ts`'s, walked against every page `packages/seed` and `packs/` ship. */
+  for (const key of Object.keys(body)) {
+    if (PAGE_UNBUILT.has(key))
+      return bad(
+        'NOT_IN_THIS_BUILD',
+        `${id} declares ${key}:, which the documents publish and this build draws nowhere. Take it off; a filter is a where: on each block for now.`,
+        key,
+      );
+    if (!PAGE_KEYS.has(key)) return bad('DECLARATION_INVALID', `${id}: ${unreadPageKey(key)}`, key, [...PAGE_KEYS]);
+  }
 
   if (typeof body.title !== 'string' || body.title.trim() === '')
     return bad('DECLARATION_INVALID', `${id} has no title, and a page is named on the screen before it is drawn.`, 'title');
@@ -704,13 +732,42 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
      an item in no menu, and one with no order sorts against whatever the reader last wrote. Both
      install cleanly and both produce a page you can only reach by typing its slug. */
   if (body.nav !== undefined) {
-    const nav = body.nav as { section?: unknown; order?: unknown };
+    const nav = body.nav as { section?: unknown; order?: unknown; tabs?: unknown };
     if (nav === null || typeof nav !== 'object')
       return bad('DECLARATION_INVALID', `${id}'s nav is a section and an order.`, 'nav');
     if (typeof nav.section !== 'string' || nav.section.trim() === '' || byteLength(nav.section) > 40)
       return bad('DECLARATION_INVALID', `${id} names ${JSON.stringify(nav.section ?? null)} as its nav section; a section is text of at most 40 bytes.`, 'nav');
     if (!isInt(nav.order, 0, 9999))
       return bad('DECLARATION_INVALID', `${id} sits at nav order ${JSON.stringify(nav.order ?? null)}; an order is a whole number from 0 to 9999.`, 'nav');
+    /* `tabs: true` DRAWS THE SECTION'S PAGES AS A STRIP OF TABS over each of them. It installed before it was read, as
+       any word under `nav` did, so a misspelt `tab: true` was a strip nobody would ever see. */
+    const stray = Object.keys(nav).find((k) => !NAV_KEYS.has(k));
+    if (stray !== undefined)
+      return bad('DECLARATION_INVALID', `${id}'s nav has ${stray}:, and nav is { section, order, icon, tabs }. Tabs are tabs: true.`, 'nav', [...NAV_KEYS]);
+    if (nav.tabs !== undefined && typeof nav.tabs !== 'boolean')
+      return bad('DECLARATION_INVALID', `${id}'s nav tabs is ${JSON.stringify(nav.tabs)}; it is true, to draw the pages of ${String(nav.section)} as tabs, or false.`, 'nav');
+  }
+
+  /* A MAIN COLUMN AND A SIDE RAIL, THE RAIL'S WIDTH IN TWELFTHS. Three to five, because a rail narrower than a quarter
+     of the page holds no card and one wider than it is a second main column. `sticky` keeps the rail in view while the
+     main column scrolls. A layout is not a page in a page (`06 §7`): the blocks are still one list in one order, and
+     each says which of the two it sits in. */
+  const layout = body.layout;
+  if (layout !== undefined) {
+    if (layout === null || typeof layout !== 'object' || Array.isArray(layout))
+      return bad('DECLARATION_INVALID', `${id}'s layout is { rail: 4 }, the side rail's width in twelfths, and sticky: true to keep it in view.`, 'layout');
+    const l = layout as { rail?: unknown; sticky?: unknown };
+    const stray = Object.keys(l).find((k) => k !== 'rail' && k !== 'sticky');
+    if (stray !== undefined)
+      return bad('DECLARATION_INVALID', `${id}'s layout has ${stray}:, and a layout is { rail, sticky }. A block's width is its span:.`, 'layout', ['rail', 'sticky']);
+    if (!isInt(l.rail, RAIL_MIN, RAIL_MAX))
+      return bad(
+        'OUT_OF_BOUNDS',
+        `${id}'s layout rail is ${JSON.stringify(l.rail ?? null)}. The rail is ${RAIL_MIN}, 4 or ${RAIL_MAX} twelfths of the page, and the main column is the rest.`,
+        'layout',
+      );
+    if (l.sticky !== undefined && typeof l.sticky !== 'boolean')
+      return bad('DECLARATION_INVALID', `${id}'s layout sticky is ${JSON.stringify(l.sticky)}; it is true, to keep the rail in view, or false.`, 'layout');
   }
 
   if (body.tone !== undefined && !(TONES as readonly unknown[]).includes(body.tone))
@@ -795,14 +852,61 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
         at,
         BLOCK_KINDS as unknown as string[],
       );
-    const declaredKind = typeof kind === 'string' && /^block\.[a-z][a-z0-9_-]{0,31}$/u.test(kind);
-    if (!declaredKind && !(BLOCK_KINDS as readonly unknown[]).includes(kind))
+    /* A PACK'S OWN KIND IS REFUSED IN THE SENTENCE ITS DECLARATION GETS, below, because nothing draws either. Admitted
+       here by prefix, a page naming `block.pad` installed and read its rows clean while `block.pad` itself could not be
+       installed: the "no rows, no refusal, no mark on the page" hole by another door. */
+    if (typeof kind === 'string' && /^block\.[a-z][a-z0-9_-]{0,31}$/u.test(kind))
+      return bad(
+        'NOT_IN_THIS_BUILD',
+        `${id}.${at} draws ${kind}, a block kind the documents publish and this build draws nowhere. The repair is a deploy, not an edit; until then use a kind this build draws.`,
+        at,
+        BLOCK_KINDS as unknown as string[],
+      );
+    if (!(BLOCK_KINDS as readonly unknown[]).includes(kind))
       return bad(
         'KIND_UNKNOWN',
         `${id}.${at}: kind ${JSON.stringify(kind ?? null)} is not a kind this build draws, and no block declares it.`,
         at,
         BLOCK_KINDS as unknown as string[],
       );
+
+    /* THE BLOCK'S KEYS ARE CLOSED HERE WHERE THE READ CLOSES THEM (`block-keys.ts`), so an author hears at install what
+       a reader would otherwise be the first to hear. Before this, `size: 2` installed and was refused only when the page
+       was opened, and `lead: true` on cards or `first: 3` on steps installed and read clean, read by nothing. A key only a
+       read answers (`rows`, `next`, `types`) is refused here too: `{ kind: cards, next: what }` installed and drew
+       nothing. The read still takes them, because a block that came out of a read may be read again. */
+    for (const [key, value] of Object.entries(block)) {
+      if (value === undefined) continue;
+      if (!BLOCK_INSTALLS.has(key)) return bad('DECLARATION_INVALID', `${id}.${at}: ${unreadBlockKey(key)}`, `${at}.${key}`, keysFor(kind as string));
+      const kinds = kindsReading(key);
+      if (kinds && !kinds.includes(kind as string))
+        return bad('DECLARATION_INVALID', `${id}.${at}: ${wrongKindKey(key, kind as string)}`, `${at}.${key}`, keysFor(kind as string));
+    }
+
+    /* WHICH OF THE PAGE'S TWO COLUMNS THE BLOCK SITS IN. A page with no `layout` has one column, so a block placed in its
+       rail would be drawn where nothing says there is a rail. */
+    const area = (raw as { area?: unknown }).area;
+    if (area !== undefined) {
+      if (area !== 'main' && area !== 'rail')
+        return bad('DECLARATION_INVALID', `${id}.${at}'s area is ${JSON.stringify(area)}; a block sits in main or in rail.`, at, ['main', 'rail']);
+      if (area === 'rail' && body.layout === undefined)
+        return bad('DECLARATION_INVALID', `${id}.${at} sits in the rail, and ${id} declares no layout. Give the page layout: { rail: 4 }, or take area: off.`, at);
+    }
+
+    /* THE FLAGS THE NEW FORMS ARE TOLD BY, each a yes or a no, because a string here is a form drawn by accident:
+       `lead: 'no'` is truthy wherever it is read. */
+    for (const flag of ['lead', 'range', 'tiles', 'box'] as const) {
+      const value = (raw as Record<string, unknown>)[flag];
+      if (value !== undefined && typeof value !== 'boolean')
+        return bad('DECLARATION_INVALID', `${id}.${at}'s ${flag} is ${JSON.stringify(value)}; it is true or false.`, at);
+    }
+    const first = (raw as { first?: unknown }).first;
+    if (first !== undefined && !isInt(first, 1, FIRST_MAX))
+      return bad('OUT_OF_BOUNDS', `${id}.${at}: first ${JSON.stringify(first)} is not a count of rows from 1 to ${FIRST_MAX}.`, at);
+    /* A RANGE IS A BAND FROM A LOW TO A HIGH WITH WHAT WAS SPENT ON IT, so it names those four columns in that order: the
+       drawer cannot tell which of three numbers is the low from anything but their places. */
+    if ((raw as { range?: unknown }).range === true && (!Array.isArray(block.columns) || block.columns.length !== 4))
+      return bad('DECLARATION_INVALID', `${id}.${at} draws its rows as ranges, so it names four columns: the label, what was spent, the low and the high.`, at);
 
     /* TWELFTHS, AND ONLY TWELFTHS. `06 §1.1` gives a block an order in the list and a width, and
        nothing else — no x, no y, no height. A span of 0 is a block with no width and a span of 13 is
@@ -896,8 +1000,8 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
         );
     }
 
-    /* A `section`'s two keys. The block keys are not a closed list, so nothing refuses them on another
-       kind; only their shape is checked, because `fold: 'yes'` would draw a section shut by accident. */
+    /* A `section`'s keys. Another kind carrying one is refused above by `KEY_KINDS`; here only the shape is checked,
+       because `fold: 'yes'` would draw a section shut by accident. */
     if (block.fold !== undefined && typeof block.fold !== 'boolean')
       return bad('DECLARATION_INVALID', `${id}.${at}'s fold is true or false: whether the section starts shut.`, at);
     if (block.icon !== undefined && (typeof block.icon !== 'string' || !GLYPH.test(block.icon)))
@@ -917,15 +1021,19 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
      * in this function, for the reason the three texts below give, and `declare.test.ts` holds that by
      * installing every kind bare: refusing it here went red there on the first run.
      */
+    /* AN `inputs` BLOCK IS BOUND THE SAME WAY, for the same reason: it edits one row of `register:` and names its list by
+       that key, so a `source:` beside it would be a second list. */
     if (kind === 'capture' && block.source !== undefined)
       return bad('DECLARATION_INVALID', `${id}.${at} is a capture and reads ${String(block.source)} as well. A capture writes into register: and reads nothing, so take the source off.`, at);
-    if (kind === 'capture' && block.register !== undefined) {
+    if (kind === 'inputs' && block.source !== undefined)
+      return bad('DECLARATION_INVALID', `${id}.${at} is inputs and reads ${String(block.source)} as well. Inputs edit one row of register:, so write register: ${String(block.source).replace(/^register\./u, '')} and take the source off.`, at);
+    if ((kind === 'capture' || kind === 'inputs') && block.register !== undefined) {
       if (typeof block.register !== 'string' || !REGISTER_ID.test(block.register))
         return bad('DECLARATION_INVALID', `${id}.${at}'s register is ${JSON.stringify(block.register)}; it is a register's id, such as tasks.`, at);
       if (declared.size > 0 && !declared.has(`register.${block.register}`))
         return bad(
           'DEPENDENCY_UNRESOLVED',
-          `${id}.${at} adds rows to ${block.register}, and ${id} does not require register.${block.register}. Every register a block writes to is named in requires, or the page outlives its list.`,
+          `${id}.${at} ${kind === 'inputs' ? 'edits a row of' : 'adds rows to'} ${block.register}, and ${id} does not require register.${block.register}. Every register a block writes to is named in requires, or the page outlives its list.`,
           at,
           [...declared],
         );
@@ -4002,13 +4110,25 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
     const said = steps !== null && typeof steps === 'object' && !Array.isArray(steps) ? (steps as Record<string, unknown>) : {};
     const of = own.find((x) => x.id === said.of);
     const done = own.find((x) => x.id === said.done);
-    if (Object.keys(said).some((k) => k !== 'of' && k !== 'done') || of?.type !== 'ref' || done?.type !== 'bool')
+    if (Object.keys(said).some((k) => k !== 'of' && k !== 'done' && k !== 'order') || of?.type !== 'ref' || done?.type !== 'bool')
       return bad(
         'DECLARATION_INVALID',
         `${id} says its rows are steps. Say which ref field names the row each belongs to and which bool field says it is done, as { of: thing, done: done }.`,
         'steps',
         own.filter((x) => x.type === 'ref' || x.type === 'bool').map((x) => String(x.id)),
       );
+    /* AND WHICH ONE COMES NEXT, from a field that sorts: a card's next step is the first open step in this order
+       (`steps.ts` `nextSteps`), so an order over a field that does not sort would pick one by accident. */
+    if (said.order !== undefined) {
+      const sorts = own.filter((x) => ORDERS_STEPS.includes(String(x.type)));
+      if (!sorts.some((x) => x.id === said.order))
+        return bad(
+          'DECLARATION_INVALID',
+          `${id}'s steps are put in order by ${JSON.stringify(said.order)}, and the order is a number, a day or a text field of ${id}, lowest first, such as { of: thing, done: done, order: rank }.`,
+          'steps',
+          sorts.map((x) => String(x.id)),
+        );
+    }
   }
 
   /* PAIRS NAME FIELDS OF THIS LIST OF THE TYPES THE MATCHING READS, or the write path would set `true` into a text and

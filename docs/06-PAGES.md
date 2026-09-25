@@ -103,7 +103,17 @@ email, never a page over HTTP ([36-SPEC-RENDER](36-SPEC-RENDER.md) §12, [50-SPE
 ### 1.1 · The keys
 
 Every key, typed, with its default. A form is generated from this table ([21-AUTHORING](21-AUTHORING.md)
-A7), and the install-time check refuses a key that is not in it, by name.
+A7), and the install-time check refuses a key that is not in it, by name, with what to write instead
+(`size:` is told that a block is made wider with `span:`; `tabs:` on a page, that tabs are said in `nav`).
+*Until September 25th 2026 that sentence was not true: a block key nobody reads installed and was refused
+only when the page was opened, a page key nobody reads installed and was handed to the host unread, and
+a page naming a `block.<id>` kind installed and read its rows.* The two lists are one list now,
+`packages/kernel/src/block-keys.ts`, read by the install check and by the read, and a key only some kinds
+read (the kinds its row below names, "On a `feed`") is refused on any other kind at both, naming the
+kinds that read it. Before the page list was closed,
+every page declaration `packages/seed` and `packs/` ship was walked, thirty-four of them, and they use
+`page`, `title`, `nav`, `icon`, `requires`, `blocks`, `for`, `pack`, `origin` and `placed`, so each is in
+the table.
 
 **On the page**
 
@@ -111,28 +121,33 @@ A7), and the install-time check refuses a key that is not in it, by name.
 |---|---|---|---|
 | `page` | the page id — `^[a-z][a-z0-9_]{0,31}$` | — | yes |
 | `title` | text | — | yes |
-| `nav` | `{ section: text, order: int, icon: glyph }` | absent — not in nav | no |
+| `nav` | `{ section: text, order: int, icon: glyph, tabs?: bool }`. `tabs: true` draws every page in that section, a template's pages included, as a strip of tabs at the top of each of them, in nav order, each tab its own address. Any other key under `nav` is refused | absent: not in nav | no |
+| `icon` | a glyph name, drawn beside the page's entry in the rail | — | no |
+| `for` | `{ register, where? }`: the page is a template, one page per row that `where` admits, `{{field}}` filled from the row and the slug made from its title | — | no |
+| `pack` | the id of the pack that ships the page, as the pack's file writes it. Who owns a declaration is the record's own column, not this key | — | no |
+| `layout` | `{ rail: 3 \| 4 \| 5, sticky?: bool }`: a main column and a side rail `rail` twelfths wide, the rail kept in view while the main column scrolls when `sticky`. The main column is its own twelve-column flow, so a `span` keeps its meaning inside it; the rail is one stack, and falls under the main column on a narrow screen. Any other width is refused `OUT_OF_BOUNDS` | one column | no |
 | `requires` | `[register.<id>, …]` — a list; the manifest's `requires` is a different key on a different object ([04-PACKS](04-PACKS.md) §2) | — | yes |
 | `origin` | `derived \| person \| pack` | set by whoever writes the row: `pack` by the installer, `derived` by a trigger ([29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §3), `person` otherwise | no |
 | `derived_from` | a declaration id — `register.domains` | — | when `origin: derived` |
 | `placed` | bool — in nav, or in the holding pen | `true` | no |
 | `tone` | intent — `good \| warn \| bad \| info` | — | no |
-| `filters` | `[{ field, control }]` — reader filters every block honours ([21-AUTHORING](21-AUTHORING.md) §3.5) | `[]` | no |
-| `header` | `{ count, action, filters, search, state }` — [29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §5 | derived from the register | no |
+| `filters` | `[{ field, control }]`: reader filters every block honours ([21-AUTHORING](21-AUTHORING.md) §3.5). **Specified and not built**: nothing draws it, so it is refused `NOT_IN_THIS_BUILD` rather than installed and ignored | `[]` | no |
+| `header` | `{ count, action, filters, search, state }`, [29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §5. **Specified and not built**, and refused `NOT_IN_THIS_BUILD` for the same reason | derived from the register | no |
 | `blocks` | `[block]`, at most 24 | — | yes |
 
 **On a block**
 
 | Key | Type | Default | Required |
 |---|---|---|---|
-| `kind` | a kind this build draws — [05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §2 — or a `block.<id>` this pack declares or the record has installed. A pack kind is **page-only** at stage 0: a write-up's fence takes the kinds that are not page-only ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.5) | — | yes |
+| `kind` | a kind this build draws, [05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §2. A `block.<id>` a pack declares is **refused `NOT_IN_THIS_BUILD`**, on the page and as a declaration, because nothing in this build draws one: admitted by prefix, it installed and read its rows with nowhere to draw them | — | yes |
+| `area` | `main \| rail`: which of the page's two columns the block sits in. Refused on a page with no `layout` | `main` | no |
 | `heading` | text. On a `section` it is the section, drawn as a heading | — | `section` |
 | `span` | int, 1–12 | 12 | no |
 | `source` | `register.<id>` · `metric.<id>` (on a `bar` or `split`, a figure grouped by a word, whose parts it draws; any other kind refuses it) · `block.<n>` (another block on this page) · `activity` (what was done in the record, with the kind of actor; a `feed`'s) · `sessions.live` (the runs working now) · `actions` (the record's scheduled actions, one row each). On a `section` it is what the count counts; on a `diff`, the register whose row it reads | — | `table`, `cards`, `feed`, `diff` |
 | `where` | a predicate — [02-DATA-MODEL](02-DATA-MODEL.md) §6. On a `capture`, what a new row is filled with: each `is` of one value on an enum or a text field, at the top of the predicate or under a top-level `all`, other than the title. A set (`is open or doing`), a date and a link are never filled in, because each would be a value nobody chose | every row | no |
-| `register` | a register id, which the page `requires`. On a `capture`, the list a new row is added to; a `capture` takes no `source`, because it reads no row | — | `capture` |
+| `register` | a register id, which the page `requires`. On a `capture`, the list a new row is added to; a `capture` takes no `source`, because it reads no row. On `inputs`, the list whose one row it edits, and it takes no `source` either | — | `capture`, `inputs` |
 | `when` | `{ metric: <id>, <op>: v }` — evaluated at render, never compiled | always drawn | no |
-| `columns` | `[{ field, label?, width?, align?: start \| end, link?: bool (**specified and not built**: no evaluator reads it, and a row that has somewhere to go is already a link in whole), tone_when? (**specified and not built**: no evaluator reads it, and a row's tone comes from its register's state field, not from its block), as? }]`. `as` is the column's role on a `cards` block: `title \| figure \| fact \| trend \| ring \| who \| when \| mark`, one figure and at most three facts. Absent, the first text column is the title, the first figure that never truncates is the figure, and the rest are facts. On a `table` or a `cards` block, `as: scope` on the register's scope field draws where the row applies instead: the project's name, or Everywhere `sign: { field, minus }` on a money column writes each figure with `+` or `−`, `−` where the enum `field` holds `minus`: a word on the figure, never a colour. A column whose `field` is `changed`, on a register with no field of that name, says who changed the row last and the day, from its history. | — | `table`, `cards` |
+| `columns` | `[{ field, label?, width?, align?: start \| end, link?: bool (**specified and not built**: no evaluator reads it, and a row that has somewhere to go is already a link in whole), tone_when? (**specified and not built**: no evaluator reads it, and a row's tone comes from its register's state field, not from its block), as? }]`. `as` is the column's role on a `cards` block: `title \| figure \| fact \| trend \| ring \| who \| when \| mark \| next \| reply`, one figure and at most three facts. `next` names a field of the list whose rows are steps of the cards' rows (`steps:` on that list), and the block answers `nexts`, aligned with `rows`: that field of the first step under each card that is not done, in the order the steps declare, `null` for a card with no open step. `reply` is a field drawn under the card's title in a quieter voice, the second opinion under a note. Absent, the first text column is the title, the first figure that never truncates is the figure, and the rest are facts. On a `table` or a `cards` block, `as: scope` on the register's scope field draws where the row applies instead: the project's name, or Everywhere `sign: { field, minus }` on a money column writes each figure with `+` or `−`, `−` where the enum `field` holds `minus`: a word on the figure, never a colour. A column whose `field` is `changed`, on a register with no field of that name, says who changed the row last and the day, from its history. | — | `table`, `cards` |
 | `inherit` | bool. On a block over a register with a scope field ([02-DATA-MODEL](02-DATA-MODEL.md) §5), the rows of the project its `where` names, then the rows that apply everywhere. A project's row hides a global row of the same title where the field says `same: nearer`; otherwise both show. The project is named in `where` as `project is {{name}}` | `false` | no |
 | `order` | `[{ field, dir: asc \| desc }]` | the first indexed date descending, else `seq` descending ([29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §5) | no |
 | `limit` | int | 50, at most 500 | no |
@@ -153,8 +168,12 @@ A7), and the install-time check refuses a key that is not in it, by name.
 | `icon` | a glyph name, drawn beside a `section`'s heading | — | no |
 | `fold` | bool. A `section` that starts shut, folding the blocks after it up to the next section; one press opens it | `false` | no |
 | `since` | `seen`, the reader's read mark. On a `feed`, the rows after it are new; the evaluator writes the `seen` row where it falls, with an empty time when the reader has no mark yet | absent: nothing is new | no |
-| `first` | int, 1–50. On a `feed`, the most rows it draws, newest first, a collapsed burst being one row; what is past it goes in one last row per group, so no count loses anything | every row | no |
-| `row` | a spoken id, interpolatable: `'{{spoken}}'` on a template. On a `diff`, the row whose history it reads | — | `diff` |
+| `first` | int, 1–50. On a `feed` or `agents`, the most rows it draws, newest first, a collapsed burst being one row; what is past it goes in one last row per group, so no count loses anything. On a `steps` block, the short view: the first `n` rows not done, with `matched` still the whole count, so "N more" is `matched` less the rows; refused over a list that does not declare `steps:`, where no row is known to be done | every row | no |
+| `row` | a spoken id, interpolatable: `'{{spoken}}'` on a template. On a `diff`, the row whose history it reads. On `inputs`, the row it edits | on `inputs`, the list's first row | `diff` |
+| `lead` | bool. On a `stat`, its first figure is the screen's one hero figure; on `cards`, the first card is drawn two tracks wide; on a `note`, its body is the page's opening sentence, said with the plural and nought rules a figure's note has | `false` | no |
+| `range` | bool. On a `progress` over a register, each row is a band from its low to its high on one scale shared by the rows (the largest high), what was spent marked on it, and a total line. It names four columns in order: the label, what was spent, the low and the high, the last three number or money fields in one currency | `false` | no |
+| `tiles` | bool. On a `queue`, one tile per question, showing its recommended option as what it is | `false` | no |
+| `box` | bool. On a `section`, the blocks after it, up to the next section, are drawn on one surface | `false` | no |
 | `field` | a field id on that row, `document` or `text`. On a `diff`, the field whose versions it compares | — | `diff` |
 | `versions` | int, 2–10. On a `diff`, how many versions it shows, newest first; each is compared with the one before it, one `diff` fence each | `2` | no |
 | *`accepts` names* | on a pack-declared `kind`, the keys its `accepts:` names are legal here, typed `register · metric · number · text` ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.6) | per the block declaration | as the declaration says |
@@ -171,6 +190,20 @@ A `cards` block lays one card per row in a grid that fills its container at 17re
 on a narrow one; the title opens the row. A `section` is a full-width heading with a count aside, and
 the blocks after it sit under it. Neither is a box: a card is one surface, and a section is a heading
 and air.
+
+**A path, an option shown as what it is, and one row to type into.** A `steps` block over a list that
+declares `steps: { of, done, order? }` answers `done_now`, whether each row is done, aligned with `rows`,
+and `next`, the index of the first row not done (`null` when every row is); with no `order:` of its own it
+reads in the order the list declares for its steps. A question's options body may give an option `shows`,
+exactly one of `{ swatch: ['#rrggbb', …] }` (one to eight colours, six hex digits each), `{ figure: text }`
+or `{ file: { row, field } }` (a file the record already holds), and may say what the question is `about`:
+the queue carries each on `QueueOption.shows` and `QueueQuestion.about`, and `governance.open`'s `where`
+reads `about` beside `who`, `kind` and `cost`, so `where: about is {{name}}` on a template draws one area's
+calls. A swatch is the option's content, drawn only inside that option's box. An `inputs` block,
+`{ kind: inputs, register, row?, columns? }`, reads one row, the one `row:` names or the list's first, and
+answers `rows: [that row]` and `types`, each drawn field's type; a ref, a list, a file or a document cannot
+be typed into, so named in `columns` it is refused, and with no `columns` it is left out. The write is the host's, through the row writer, and every block over the list
+answers the new figures on the next read.
 
 A `feed` reads `{ source: activity, where: "actor is agent", since: seen, first: 20, empty: … }`: the
 rows are grouped as agents, rules and you, with counts, and a burst is one row, "Claude: 14 saves on
@@ -397,8 +430,9 @@ authored one is provably as good**, judged by a person using it, not by a diff o
 | Contain a script, a style, an iframe or a remote image | see [04-PACKS](04-PACKS.md) §7 |
 | Query outside its `requires` | a page cannot read a register it did not declare |
 | Write | pages are read surfaces; writes are forms, rules and the API |
-| Nest a page in a page | a layout engine is a different product |
-| Set a colour, a font or a spacing value | intent only |
+| Nest a page in a page | a layout engine is a different product. A `layout` is not one: the blocks are still one list in one order, each saying whether it sits in the main column or the rail, and a `section` with `box: true` draws the blocks under it on one surface without holding them |
+| Set a colour, a font or a spacing value | intent only. A swatch in an option's `shows` is not a colour the page sets: it is the option's content (which lining), six hex digits drawn only inside that option |
+| Carry a key nobody reads | refused at install by name, with what to write instead, because a word that installs and is drawn by nothing is a mistake nobody hears about until a reader meets it |
 | Bind a block to a metric across mixed currencies | refused at install, not at render |
 
 ---

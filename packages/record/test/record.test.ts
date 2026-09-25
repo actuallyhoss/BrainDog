@@ -665,14 +665,14 @@ test('AND A PACK DOES NOT TAKE OVER A DECLARATION SOMEBODY WROTE IN THE APP', as
   const { api, sql } = await record();
   value(
     await api.setDeclaration(
-      { body: { page: 'home', title: 'MY HAND-WRITTEN PAGE', blocks: [{ kind: 'note', text: 'Mine.' }] } },
+      { body: { page: 'home', title: 'MY HAND-WRITTEN PAGE', blocks: [{ kind: 'note', body: 'Mine.' }] } },
       owner,
     ),
   );
   assert.equal(api.kernel.declarations().find((d) => d.id === 'page.home')?.pack_id, null);
 
   const intruder = PACK({
-    declarations: [{ page: 'home', title: 'THE PACK OWNS IT NOW', blocks: [{ kind: 'note', text: 'Theirs.' }] }],
+    declarations: [{ page: 'home', title: 'THE PACK OWNS IT NOW', blocks: [{ kind: 'note', body: 'Theirs.' }] }],
     seeds: [],
   });
   const planned = value<{ diff: { planHash: string; conflicts: { id: string; pack: string }[]; changes: unknown[] } }>(
@@ -1651,7 +1651,7 @@ test('A PAGE LIST IS SCOPED, because a title is a sentence about what the record
     await api.kernel.install([
       { id: 'page.money', kind: 'page', body: { page: 'money', title: 'Money', blocks: [{ kind: 'table', source: 'register.obligations' }] } },
       { id: 'page.jotted', kind: 'page', body: { page: 'jotted', title: 'Jotted', blocks: [{ kind: 'table', source: 'register.notes' }] } },
-      { id: 'page.about', kind: 'page', body: { page: 'about', title: 'About', blocks: [{ kind: 'note', text: 'Nothing but words.' }] } },
+      { id: 'page.about', kind: 'page', body: { page: 'about', title: 'About', blocks: [{ kind: 'note', body: 'Nothing but words.' }] } },
     ] as never),
   );
 

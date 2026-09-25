@@ -48,7 +48,8 @@ type ShellBase = {
     locale: string;
     registers: { id: string; name: string; count: number; icon: IconName; views: { key: string; name: string; href: string }[] }[];
   };
-  nav: NavEntry[];
+  /** The rail's pages; `tabs` when the page's declaration asked for its nav section to be drawn as tabs. */
+  nav: (NavEntry & { tabs?: true })[];
   /** Pages that emerged and were never placed. A holding pen, not a decision (19 §3). */
   pen: PageDecl[];
   people: Person[];
@@ -532,9 +533,22 @@ export function layoutOf(b: Boot): Shell {
    * the numbers behind it and why the budget is keyed on the pair rather than on the register.
    */
   const room = railRoom();
-  const nav: NavEntry[] = (b.pages ?? []).flatMap((p) =>
+  /* AND WHETHER ITS SECTION IS DRAWN AS TABS (`$lib/page/tabs.ts`). This entry named its five keys and so dropped every
+     other one `boot` sent: with `tabs: true` on the page, `tabsOf` over this list answered no strip on every page of the
+     section (`tabs.test.ts`, five of its cases). Only `true` is carried, and a page that did not say it carries no key. */
+  const nav: ShellBase['nav'] = (b.pages ?? []).flatMap((p) =>
     p.nav && room(p.about ? { register: p.about.register, section: p.nav.section } : null)
-      ? [{ id: p.slug, title: p.title, href: `/p/${p.slug}`, section: p.nav.section, order: p.nav.order, icon: iconFor(p.icon ?? undefined, 'doc') }]
+      ? [
+          {
+            id: p.slug,
+            title: p.title,
+            href: `/p/${p.slug}`,
+            section: p.nav.section,
+            order: p.nav.order,
+            icon: iconFor(p.icon ?? undefined, 'doc'),
+            ...((p.nav as { tabs?: unknown }).tabs === true ? { tabs: true as const } : {}),
+          },
+        ]
       : [],
   );
   return {
