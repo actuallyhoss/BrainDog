@@ -813,7 +813,7 @@ Dispatch by kind — ten, the `CHECK`'s count:
 `say ≤ 120` — as the `note` event above plus the urgent branch's two outbox rows; dedupe is the `schedule` key
 (`UNIQUE (kind, key)`), which is `once_per` (09 §5 rule 1).
 
-**Time helpers**, `Intl` only (31 §1): `localParts(ms, tz)` via `Intl.DateTimeFormat(…, { timeZone: tz, hourCycle: 'h23' }).formatToParts`; `nextOccurrence({ day?, at, tz }, fromMs)` — walk forward ≤ 8 days, build the local `at`, convert by the offset `localParts` reports; `inQuietHours(ms, tz)` — local hour `≥ 22 || < 8`; `nextOpening(ms, tz)` — the next local `08:00`.
+**Time helpers**, `Intl` only (31 §1): `localParts(ms, tz)` via `Intl.DateTimeFormat(…, { timeZone: tz, hourCycle: 'h23' }).formatToParts`; `nextOccurrence({ day?, at, tz }, fromMs)` — walk up to 8 local dates from today in tz (today and the 7 after it), and turn each date's `at` into an instant through `clock.ts`'s `nextCalendar`, so a skipped or repeated time reads as the monthly clock reads it (the skipped one as the same distance past the gap, the repeated one as its first); `inQuietHours(ms, tz)` — local hour `≥ 22 || < 8`; `nextOpening(ms, tz)` — the next local `08:00`.
 
 ### 5.10 · The outbox (`outbox.ts`) — 30 §8
 

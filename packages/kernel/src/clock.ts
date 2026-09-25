@@ -102,9 +102,10 @@ export function nextCalendar(cal: Calendar, fromMs: number, tz: string): number 
  * night New York leaves EDT) is its first. A time the zone skips (02:30 on the night it enters EDT) reads back as
  * neither, and the answer is the one read with the offset in force before the change, which the wall shows as the
  * same distance past the gap: 03:30.
- * THAT IS NOT THE READING `digest.ts`'s `nextOccurrence` GIVES, measured on 25 September in New York: asked for 02:30
- * on 14 March 2027 it answers 01:30 EST, before the gap, and for 01:30 on 7 November 2027 it answers the second one,
- * in EST. So a digest and a monthly rule at the same skipped or repeated time do not run together on those two nights.
+ * `digest.ts`'s `nextOccurrence` READS A TIME THROUGH THIS TOO, by way of `nextCalendar`. It kept its own offset
+ * arithmetic until 25 September and disagreed on both nights, measured in New York: 02:30 on 14 March 2027 came out
+ * 01:30 EST, and 01:30 on 7 November 2027 the second one. Now a digest and a monthly rule at the same skipped or
+ * repeated time run together (`test/digest-dst.test.ts`).
  */
 function instantOf(year: number, month: number, day: number, hh: number, mm: number, tz: string): number {
   const asUtc = Date.UTC(year, month, day, hh, mm);

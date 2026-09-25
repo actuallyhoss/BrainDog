@@ -22,6 +22,7 @@ import type { Refusal, Result, Sql } from '@braindog/ports';
 import { refused } from '@braindog/ports';
 import type { Predicate, Schema } from '@braindog/where';
 
+import { nextCalendar, timeOf } from './clock.ts';
 import { moneyText } from './ingest.ts';
 import { instant } from './migrate.ts';
 import type { EvalContext, MetricDecl, Reading } from './metrics.ts';
@@ -477,52 +478,67 @@ const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
  * The next time a schedule lands, in a timezone, using `Intl` and nothing else.
  *
  * A TABLE OF OFFSETS IS A TABLE THAT IS WRONG THE NEXT TIME A GOVERNMENT MOVES ONE. The runtime
- * already carries the zone data; the walk asks it what the local parts of a candidate instant are
- * and steps a day at a time, which is at most eight steps and always right across a transition.
+ * already carries the zone data, and `clock.ts` is where a wall-clock time on a date becomes an
+ * instant, so this walks local dates and hands each one to it.
+ *
+ * ONE READING OF A SKIPPED OR REPEATED TIME, SHARED WITH THE CALENDAR CLOCK. This walk used to do
+ * its own offset arithmetic, and measured on 25 September in New York it disagreed with
+ * `nextCalendar` on both nights a year that matter: 02:30 on 14 March 2027, which the zone skips,
+ * came out 01:30 EST where the clock says 03:30 EDT, and 01:30 on 7 November, which the zone says
+ * twice, came out the second where the clock takes the first. So a daily digest and a monthly rule
+ * both written `at: 02:30` ran an hour apart. London did the same on its own two nights
+ * (`test/digest-dst.test.ts`).
  */
 export function nextOccurrence(schedule: { day?: string; at: string }, fromMs: number, tz: string): number | null {
   /* THE TIME IS CHECKED, not defaulted. `Number('8am')` is `NaN` and `NaN ?? 8` is `NaN`, so a
-     malformed `at` silently became "twenty-four hours from now" — a weekly digest arriving at a
-     different hour every week, with nothing anywhere saying why. */
-  const m = /^(\d{1,2}):(\d{2})$/.exec(schedule.at.trim());
-  const hh = m ? Number(m[1]) : NaN;
-  const mm = m ? Number(m[2]) : NaN;
-  if (!Number.isInteger(hh) || hh > 23 || !Number.isInteger(mm) || mm > 59) return null;
+     malformed `at` silently became "twenty-four hours from now", a weekly digest arriving at a
+     different hour every week with nothing anywhere saying why. `timeOf` is the calendar clock's
+     reading of the same `HH:MM`, so the two cannot disagree about what a time is either. */
+  const time = timeOf(schedule.at);
+  if (time === null) return null;
 
   const wanted = schedule.day === undefined ? -1 : DAYS.indexOf(schedule.day.toLowerCase());
   if (schedule.day !== undefined && wanted < 0) return null;
 
-  for (let step = 0; step <= 8; step++) {
-    const probe = fromMs + step * 86_400_000;
-    const parts = localParts(probe, tz);
-    if (wanted >= 0 && parts.weekday !== wanted) continue;
-
-    /* THE OFFSET IS RE-READ AT THE ANSWER, not only at the probe. The arithmetic converts a local
-       wall-clock time using the offset in force at the PROBE, and a transition between the two moves
-       the result by an hour — in both directions, so a Sunday digest landed at 07:00 in October and
-       09:00 in March. One correction is enough: the residual is the difference between the two
-       offsets, and two transitions cannot fall inside one day. */
-    let at = probe + (hh - parts.hour) * 3_600_000 + (mm - parts.minute) * 60_000 - parts.second * 1000;
-    const landed = localParts(at, tz);
-    const drift = (hh - landed.hour) * 3_600_000 + (mm - landed.minute) * 60_000 - landed.second * 1000;
-    /* A SPRING-FORWARD HOUR DOES NOT EXIST, and correcting into it would loop. When the corrected
-       instant still does not read as the wanted time, the hour was skipped and the first one that
-       does exist is the honest answer — which is what the uncorrected value already is. */
-    if (drift !== 0) {
-      const corrected = at + drift;
-      const after = localParts(corrected, tz);
-      if (after.hour === hh && after.minute === mm && (wanted < 0 || after.weekday === wanted)) at = corrected;
-    }
-    if (at > fromMs) return at;
+  /* THE WALK STEPS THE LOCAL DATE, NEVER 24 HOURS OF INSTANT. It added a day's milliseconds to
+     `fromMs` and read the date there, and 24 hours from 23:30 EST on 13 March 2027 is 00:30 EDT on
+     the 15th, because the 14th is 23 hours long: a digest re-armed that evening answered the 15th,
+     at 09:00 as much as at 02:30. Dates counted in `Date.UTC` have no zone and no short days, and
+     today plus seven always reaches the weekday a weekly digest wants. */
+  const today = localParts(fromMs, tz);
+  for (let step = 0; step <= 7; step++) {
+    const date = new Date(Date.UTC(today.year, today.month, today.day + step));
+    if (wanted >= 0 && date.getUTCDay() !== wanted) continue;
+    const at = wallInstant(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), time.hh, time.mm, tz);
+    if (at !== null && at > fromMs) return at;
   }
   return null;
 }
 
-/** The local parts of an instant, from the runtime's own zone data. */
-export function localParts(ms: number, tz: string): { weekday: number; hour: number; minute: number; second: number } {
+/**
+ * The instant a wall-clock time on a local date names in a zone, as `clock.ts` reads it.
+ *
+ * THROUGH `nextCalendar` BECAUSE ITS `instantOf` IS NOT EXPORTED, and a second copy of it here is
+ * the disagreement this replaced. A yearly clock pinned to this date and asked from two days before
+ * it can only land on this date: two days back is still the same month or the one before, the clock
+ * steps forward to the month it names, and the answer on the date is always later than two days
+ * before it, so the first candidate is the one returned.
+ */
+function wallInstant(year: number, month: number, day: number, hh: number, mm: number, tz: string): number | null {
+  return nextCalendar({ months: 12, month, day, hh, mm }, Date.UTC(year, month, day) - 2 * 86_400_000, tz);
+}
+
+/** The local parts of an instant, from the runtime's own zone data, month from 0. */
+export function localParts(
+  ms: number,
+  tz: string,
+): { year: number; month: number; day: number; weekday: number; hour: number; minute: number; second: number } {
   const fmt = new Intl.DateTimeFormat('en-GB', {
     timeZone: tz,
     hourCycle: 'h23',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
     weekday: 'short',
     hour: '2-digit',
     minute: '2-digit',
@@ -530,6 +546,9 @@ export function localParts(ms: number, tz: string): { weekday: number; hour: num
   });
   const parts = Object.fromEntries(fmt.formatToParts(new Date(ms)).map((p) => [p.type, p.value]));
   return {
+    year: Number(parts.year ?? 0),
+    month: Number(parts.month ?? 1) - 1,
+    day: Number(parts.day ?? 1),
     weekday: DAYS.indexOf(String(parts.weekday ?? '').slice(0, 3).toLowerCase()),
     hour: Number(parts.hour ?? 0),
     minute: Number(parts.minute ?? 0),
