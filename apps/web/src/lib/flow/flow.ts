@@ -719,7 +719,7 @@ const NAME_IT = 'Name the answer, so later steps can use it.';
  * less than, at most and between, and an example that never showed one taught that the "A number" builder was the only
  * way to ask. One constant, so the two fields cannot drift apart again.
  */
-export const CONDITION_HINT = 'amount is more than EGP 500, due before today';
+export const CONDITION_HINT = 'amount is more than USD 500, due before today';
 
 export const ARGS: Record<Verb, readonly Arg[]> = {
   if: [{ path: ['if'], label: 'Only when', kind: 'condition', required: true, missing: 'Write what has to be true for this branch.', hint: CONDITION_HINT }],
@@ -763,7 +763,7 @@ export const ARGS: Record<Verb, readonly Arg[]> = {
     { path: ['ask_slash', 'as'], label: 'Keep the answer as', kind: 'name', required: true, missing: NAME_IT },
   ],
   call: [
-    { path: ['call', 'ingest'], label: 'The declared call', kind: 'text', required: true, missing: 'Say which call to make.', hint: 'gold_rate' },
+    { path: ['call', 'ingest'], label: 'The declared call', kind: 'text', required: true, missing: 'Say which call to make.', hint: 'exchange_rate' },
     { path: ['call', 'as'], label: 'Keep the answer as', kind: 'name' },
   ],
   run: [{ path: ['run'], label: 'The declared call', kind: 'text', required: true, missing: 'Say which call to run on this row.' }],

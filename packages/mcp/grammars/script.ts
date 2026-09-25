@@ -53,18 +53,18 @@ export const SCRIPT_GRAMMAR = {
   },
   examples: [
     {
-      id: 'script.gold-rate',
+      id: 'script.usd-eur',
       kind: 'script',
       body: {
-        script: 'gold-rate',
-        title: 'Gold price, 24k, per gram in EGP',
+        script: 'usd-eur',
+        title: 'The US dollar in euros, every hour',
         runs: { every: '1h' },
-        egress: ['https://api.goldapi.io'],
-        keys: ['goldapi'],
+        egress: ['https://api.example.com'],
+        keys: ['rates-api'],
         reads: [],
-        writes: ['gold'],
+        writes: ['rates'],
         source:
-          "export default async function run(ctx) {\n  const r = await ctx.fetch('https://api.goldapi.io/api/XAU/EGP', { key: 'goldapi' });\n  const { price_gram_24k } = await r.json();\n  ctx.write('gold', { at: ctx.now(), price: Math.round(price_gram_24k * 100) });\n}",
+          "export default async function run(ctx) {\n  const r = await ctx.fetch('https://api.example.com/rates?base=USD&symbols=EUR', { key: 'rates-api' });\n  const { rates } = await r.json();\n  ctx.write('rates', { at: ctx.now(), base: 'USD', quote: 'EUR', rate: rates.EUR });\n}",
       },
     },
     {
@@ -79,7 +79,7 @@ export const SCRIPT_GRAMMAR = {
         reads: [],
         writes: ['transactions'],
         source:
-          "export default async function run(ctx) {\n  const text = String(ctx.input?.body ?? '');\n  const m = /debited EGP ([0-9.,]+) at (.+)/i.exec(text);\n  if (!m) return ctx.log('not a debit:', text.slice(0, 80));\n  ctx.write('transactions', { amount: -Math.round(Number(m[1].replace(/,/g, '')) * 100), merchant: m[2].trim() });\n}",
+          "export default async function run(ctx) {\n  const text = String(ctx.input?.body ?? '');\n  const m = /debited USD ([0-9.,]+) at (.+)/i.exec(text);\n  if (!m) return ctx.log('not a debit:', text.slice(0, 80));\n  ctx.write('transactions', { amount: -Math.round(Number(m[1].replace(/,/g, '')) * 100), merchant: m[2].trim() });\n}",
       },
     },
   ],

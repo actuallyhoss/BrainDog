@@ -386,7 +386,7 @@ export const SNAPSHOTS: Fields[] = snapshotRows();
  * WHAT THE BANK SAID WAS LEFT AFTER THIS MOVED, as its alert printed it: a card's available limit, an account's
  * available balance. Optional, because most ways a row arrives never say, and nothing sums it.
  *
- * IT IS THE ONE THING THAT TELLS A SECOND CHARGE FROM A RESEND. Two card alerts in a hundred of his real texts
+ * IT IS THE ONE THING THAT TELLS A SECOND CHARGE FROM A RESEND. Two card alerts in a hundred real bank texts
  * carried the same amount, merchant and day a few minutes apart, and the near rule skipped the second as already
  * said, although the limits they print differ by exactly the charge (`loop/research-bank-real.md`). The same alert
  * sent again prints the same figure, so a pattern that reads this and names it in its `dedupe:` files two charges
@@ -637,9 +637,9 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
     /**
      * THE TWO LEGS OF A TRANSFER ARE FOUND BY THE RECORD (`packages/kernel/src/pairs.ts`, `02 §5`): the same amount in the
      * same currency, one leg out and one in, two different accounts, within four days. Both are marked `transfer` and
-     * each names the other in `_pair`, so a person sees why a row stopped counting and can undo it. His import writes a
-     * move between his accounts as two ordinary rows, and until this a person marked both or every Ledger figure counted
-     * the move once as spend and once as income (`test/money-pairs.test.ts`: GBP 4,000.00 spent, before).
+     * each names the other in `_pair`, so a person sees why a row stopped counting and can undo it. An import writes a
+     * move between one person's accounts as two ordinary rows, and until this a person marked both or every Ledger
+     * figure counted the move once as spend and once as income (`test/money-pairs.test.ts`: GBP 4,000.00 spent, before).
      *
      * `abs(amount)` AND NO `currency` ENTRY, because the currency is inside the money and this register has no field of
      * that name: `abs()` on a money compares its size and its currency together.
@@ -653,17 +653,17 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
      * is looked at again and it pairs then.
      *
      * `party is empty` AND `settles is empty`, BECAUSE A MOVE BETWEEN YOUR OWN ACCOUNTS HAS NOBODY ON THE OTHER SIDE AND
-     * DISCHARGES NO PROMISE. Without them a coincidence of amount was a transfer: rent out of CIB and a client paying the
-     * same EGP 15,000.00 into HSBC a day later both left Spent and Received, and so did a friend's InstaPay repaying a
-     * dinner and a refund landing on another account (`loop/research-batch-sixty-one-audit.md` findings 1 and 6, M4 and
-     * M5). A row that names who it was with, or the obligation it paid, is a payment to or from somebody, and one such leg
-     * keeps the pair apart. Both are fields the kernel reads again on an update, so naming Omar on a repayment the record
-     * had paired undoes the pair (`test/money-pairs.test.ts`).
+     * DISCHARGES NO PROMISE. Without them a coincidence of amount was a transfer: rent out of one account and a client
+     * paying the same 15,000.00 into another a day later both left Spent and Received, and so did a friend's instant
+     * transfer repaying a dinner and a refund landing on another account (`loop/research-batch-sixty-one-audit.md`
+     * findings 1 and 6, M4 and M5). A row that names who it was with, or the obligation it paid, is a payment to or from
+     * somebody, and one such leg keeps the pair apart. Both are fields the kernel reads again on an update, so naming
+     * Omar on a repayment the record had paired undoes the pair (`test/money-pairs.test.ts`).
      *
      * `settles is empty` OR `transfer is true`, SINCE 2.3.0, BECAUSE A CARD BILL IS A PROMISE AND A MOVE AT ONCE. A founder
      * keeps the bill in Obligations so the forecast holds it, the import writes its two legs bare and the record pairs
      * them, and then Reconcile sets `settles` on the bank leg. At 2.2.0 that one field parted the pair: Spent and
-     * Received each read EGP 9,500.00 high, on top of the purchases the bill paid, already in Spent on the card
+     * Received each read 9,500.00 high, on top of the purchases the bill paid, already in Spent on the card
      * (`loop/research-batch-sixty-three-audit.md` finding 3, F4; `test/money-card-bill.test.ts`). So a leg that settles
      * something is still a leg while the record holds it as one. `transfer` is read on the stored row, the mark the
      * pairing itself wrote, so the clause keeps a pair and never starts one.
@@ -682,26 +682,25 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
      * the record paired by coincidence, rent and a client's payment of the same sum, no longer part when the rent is
      * reconciled; naming the client still parts them, as it parts the dinner and the repayment in M5.
      *
-     * NOT `category is empty`, which the audit proposed. the old tool's ledger, read on 24 September through the route his
-     * import reads, files both legs of both his real moves since 13 July under a category called Transfers (EGP 63,313.46
-     * on 2 August, EGP 48,000.27 on 24 and 25 August), and the import carries the category over, so that clause would
-     * have unpaired every move he has. "A category whose direction is `both`" is what a category could say, and it needs
-     * a hop through the ref that `where` refuses (`via`, `packages/where/src/index.ts`). On that ledger the declaration
-     * as it was paired those two moves and nothing else, so what this adds is a way for a person to say no, not a change
-     * to what his import pairs tonight.
+     * NOT `category is empty`, which the audit proposed. A real ledger, read on 24 September through the route the
+     * import reads, files both legs of both its moves since 13 July under a category called Transfers, and the import
+     * carries the category over, so that clause would have unpaired every move in it. "A category whose direction is
+     * `both`" is what a category could say, and it needs a hop through the ref that `where` refuses (`via`,
+     * `packages/where/src/index.ts`). On that ledger the declaration as it was paired those two moves and nothing else,
+     * so what this adds is a way for a person to say no, not a change to what an import pairs tonight.
      *
-     * WHAT STILL PAIRS WRONGLY: two rows that name nobody, whose amounts agree. His import never writes `party` (the payee
-     * goes into the note) and a bank text never does, and his real moves read "Internet Banking Transfer" and "IPN
-     * outward transfer to ..." while a friend's repayment reads "IPN inward transfer from ...", so no field this register
-     * holds, the description included, tells the rent and the client from a move until a person names one side. That
-     * is the M4 and M5 rows as the audit wrote them, and the M5 test holds the bare dinner and repayment paired on
-     * purpose, so the day that changes is seen. `within` stays 4d: the coincidences measured sit one and two days apart, his card is paid off with the
-     * card's leg a day before the bank's, and a window short enough to part M4 would lose that move and any sent before
-     * a weekend.
+     * WHAT STILL PAIRS WRONGLY: two rows that name nobody, whose amounts agree. The import never writes `party` (the payee
+     * goes into the note) and a bank text never does, and on that ledger a move between two of one's own accounts and a
+     * friend's repayment carry descriptions that differ only in the word for which way the money went, so no field this
+     * register holds, the description included, tells the rent and the client from a move until a person names one
+     * side. That is the M4 and M5 rows as the audit wrote them, and the M5 test holds the bare dinner and repayment
+     * paired on purpose, so the day that changes is seen. `within` stays 4d: the coincidences measured sit one and two
+     * days apart, the card on that ledger is paid off with the card's leg a day before the bank's, and a window short
+     * enough to part M4 would lose that move and any sent before a weekend.
      *
-     * WHAT CANNOT PAIR: a move between currencies, his most common one (dollars out of Payoneer, pounds into CIB, finding
-     * 5, M3). `abs(amount)` compares the currency as well as the size, and nothing in `pairs:` can say "the same value at
-     * the day's rate", so both legs are counted until a person marks them.
+     * WHAT CANNOT PAIR: a move between currencies, the most common one on that ledger (dollars out of one account and
+     * another currency into a second, finding 5, M3). `abs(amount)` compares the currency as well as the size, and
+     * nothing in `pairs:` can say "the same value at the day's rate", so both legs are counted until a person marks them.
      */
     pairs: {
       on: ['abs(amount)'],
@@ -928,7 +927,7 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
  * asserts that Cash now reads `null` until somebody chooses; with sterling defaulted in, the same
  * record answered 2808560. That is the whole argument: an unanswered question must read as
  * unanswered, because a figure converted at a rate nobody asked for looks exactly like a figure a
- * person chose, and this one is the number he decides against. Sterling being the pack's own
+ * person chose, and this one is the number the owner decides against. Sterling being the pack's own
  * spelling of money, the shipped sample's currency and the app installer's chosen value does not
  * make it this record's answer.
  */
@@ -944,7 +943,7 @@ export const MONEY_HOME_SETTING = {
  * money at all. It is a FALLBACK either way, never an override: wherever `@braindog/record` has
  * wired `scanMoney`, a code the bank prints beside the figure wins over this one, so what this
  * decides is only what an alert that prints a bare number is read as. Sterling, because the bank
- * these two patterns are written against is his British one and prints one.
+ * these two patterns are written against is a British one and prints one.
  */
 export const HOME_CURRENCY = 'GBP';
 
@@ -974,11 +973,11 @@ export const HOME_CURRENCY = 'GBP';
  * `value` is `null` (`packages/kernel/src/index.ts:3538`). The Ledger's night-by-night history
  * therefore never starts on a record whose one currency is not this one.
  *
- * AND THE VERDICT GOES THE SAME WAY, ZERO INCLUDED. On his two currencies with a home currency of
- * EGP and a USD rate, `cash-now` converted to EGP −56,311.23 both ways, and `met` was `null` with
+ * AND THE VERDICT GOES THE SAME WAY, ZERO INCLUDED. On a record holding two currencies, with a home
+ * currency set and a rate for the other, `cash-now` converted to the same figure both ways, and `met` was `null` with
  * sterling declared against `false` without it: a target is in the declared currency, and with no
  * rate from sterling there is nothing to carry the bound across, so the one figure that says whether
- * he is in the red says nothing about it.
+ * the owner is in the red says nothing about it.
  *
  * NONE OF THAT IS REACHABLE FROM THIS FILE, which is why the currency stays. The record refuses a
  * money figure whose format names no currency (`DECLARATION_INVALID`, *"A metric is money.<CUR>"*,
@@ -988,7 +987,7 @@ export const HOME_CURRENCY = 'GBP';
 const SAMPLE_MONEY = `money.${gbp(0).currency}`;
 
 /**
- * THE WAY THE BANK HE FORWARDS FROM WRITES A DAY, and it is a declaration rather than a sniff.
+ * THE WAY THE BANK A PERSON FORWARDS FROM WRITES A DAY, and it is a declaration rather than a sniff.
  *
  * `29/08/26` AND `08/29/26` ARE BOTH REAL DAYS and nothing in either string says which, so `43 §4.3`
  * makes the format part of the pattern: an extractor that decided by looking at the numbers would be
@@ -996,7 +995,7 @@ const SAMPLE_MONEY = `money.${gbp(0).currency}`;
  * months out is a row that still looks ordinary, which is why there is no guessing arm.
  *
  * AND IT BELONGS IN A SETTING RATHER THAN HERE, because which way a bank writes a date is a fact
- * about his bank and not about the record: he banks in three currencies and more than one country.
+ * about the bank and not about the record: one person may bank in three currencies and more than one country.
  * The form for that is `{{config:bank_day_format}}` beside `home_currency` above, and it is not
  * reachable this batch: a setting is filled only where a PACK is planned and installed
  * (`declare`'s `filledWith`), and `installSeed` hands its ingest declarations to `kernel.install`
@@ -1613,7 +1612,7 @@ export const MONEY_RULES: Record<string, SeedRule> = {
  *
  * Every `ingest:` in this tree was a poll — `packs/rates-poll.ts` and `usecases/founder-poll.ts`, both
  * of them a URL the runner fetches on a clock. Nothing declared how to read a message somebody
- * FORWARDS, so once the inbound route lands, every bank alert he sends arrives, is hashed, is stored,
+ * FORWARDS, so once the inbound route lands, every bank alert a person sends arrives, is hashed, is stored,
  * and sits `untriaged` for ever: correct behaviour, and an empty ledger beside a full inbox.
  *
  * AN ARRIVAL NOBODY UNDERSTANDS IS STILL STORED, and nothing here weakens that. `arrive` stores the
@@ -1651,9 +1650,9 @@ const MERCHANT_IN = { text: { between: ['from ', ' on '] } } as const;
  * AND IT WAS THE LITERAL `GBP`, ON A PACK WHOSE HOME CURRENCY IS A SETTING. Measured on a record:
  * an alert reading *"debited EGP 42.99 at FENWICK CLOUD on 2026-08-29"* came back
  * `review — bank-card-out could not read amount, on out of this one`, because an anchor that is
- * nowhere in the text yields no slices at all and `DD/MM/YY` reads no ISO day. He banks in EGP, USD
- * and GBP, so two of the three currencies he holds were unreadable and the third was only readable
- * by accident of the pack having been written in it.
+ * nowhere in the text yields no slices at all and `DD/MM/YY` reads no ISO day. A person who banks in
+ * three currencies had two of them unreadable, and the third was only readable by accident of the
+ * pack having been written in it.
  *
  * SO THE ANCHOR IS THE VERB, which each pattern's `match:` has already guaranteed is in the body,
  * and the declared code is a FALLBACK and never an override. `scanMoney` takes the code the bank
@@ -1783,9 +1782,9 @@ export const smsTwins = (mail: Record<string, SeedIngest>): Record<string, SmsIn
   );
 
 /**
- * THE SAME WORDINGS, ARRIVING AS WHAT THEY ARE: TEXT MESSAGES HIS SHORTCUT POSTS. The bodies
- * `loop/research-bank-real.md` measured are the ones his iOS Shortcut posts to the old tool, and every pattern
- * above is `channel: email`, so the only way any of them reached a record was a mail forwarder his phone
+ * THE SAME WORDINGS, ARRIVING AS WHAT THEY ARE: TEXT MESSAGES A PHONE SHORTCUT POSTS. The bodies
+ * `loop/research-bank-real.md` measured are text messages an iOS Shortcut posts on, and every pattern
+ * above is `channel: email`, so the only way any of them reached a record was a mail forwarder the phone
  * does not have. Measured on
  * 22 September through the Worker-shaped door in `packages/host/test/ingest-shortcut.test.ts`: the SMS
  * posted at a `bank-*` id answered 404, because `ingestVerify` answers `null` for a mail pattern.

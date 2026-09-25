@@ -63,7 +63,7 @@
 
   /* AN AGENT SETS THESE UP AS READILY AS A PERSON (DIRECTION §22), so the empty list says what to ask one, in the form
      every other empty state's prompt takes. An example a person reads and replaces, not a feature the code ships. */
-  const agentPrompt = 'read my record, then propose an automation that fetches the gold price every hour and tells me when it is over 70 a gram';
+  const agentPrompt = 'read my record, then propose an automation that fetches the US dollar in euros from api.example.com every hour and tells me when it is over 0.95';
 
   /** The one row state worth a dot. Off first: a turned-off automation's last run is history, and its line says "Turned off." */
   const dotOf = (r: AutomationRow): 'off' | 'failed' | null => (!r.enabled ? 'off' : r.last?.state === 'failed' ? 'failed' : null);

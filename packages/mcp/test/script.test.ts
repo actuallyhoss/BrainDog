@@ -40,14 +40,14 @@ async function record() {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   const installed = await api.kernel.install([
-    register('gold', [{ id: 'at', type: 'text', required: true }, { id: 'price', type: 'int' }]),
+    register('rates', [{ id: 'at', type: 'text', required: true }, { id: 'base', type: 'text' }, { id: 'quote', type: 'text' }, { id: 'rate', type: 'decimal' }]),
     register('transactions', [{ id: 'merchant', type: 'text' }, { id: 'amount', type: 'int' }]),
   ]);
   assert.ok(installed.ok, JSON.stringify(installed));
   return { sql, api, mcp: tools(api) };
 }
 
-const GOLD = SCRIPT_GRAMMAR.examples[0]!;
+const RATE = SCRIPT_GRAMMAR.examples[0]!;
 
 test('braindog:grammar/script IS LISTED AND READS, and answers the grammar', async () => {
   const { sql, mcp } = await record();
@@ -58,6 +58,24 @@ test('braindog:grammar/script IS LISTED AND READS, and answers the grammar', asy
   const read = await mcp.read('braindog:grammar/script', agent);
   assert.ok(read.ok, JSON.stringify(read));
   assert.deepEqual(read.value, SCRIPT_GRAMMAR);
+  sql.close();
+});
+
+test('ITS EXAMPLES ARE NOBODY\'S USE CASE, a rate fetch against api.example.com in USD and EUR', async () => {
+  /* EVERY AGENT THAT WRITES A SCRIPT READS THIS FIRST, so its examples are what agents copy. Until B10 of
+     `loop/research-legacy-parity.md` the first one fetched the owner's gold price from `api.goldapi.io` in Egyptian
+     pounds under a `goldapi` key, and the second read a bank message that said `debited EGP`: his use case, shipped as
+     the core's idea of a script (DIRECTION section 22). Read over the wire, because that is what an agent is served. */
+  const { sql, mcp } = await record();
+  const read = await mcp.read('braindog:grammar/script', agent);
+  assert.ok(read.ok, JSON.stringify(read));
+  const served = JSON.stringify(read.value);
+  for (const word of ['goldapi', 'gold', 'xau', 'egp', 'egypt'])
+    assert.ok(!served.toLowerCase().includes(word), `the grammar still says ${word}`);
+  const [rate] = (read.value as typeof SCRIPT_GRAMMAR).examples;
+  assert.deepEqual(rate!.body.egress, ['https://api.example.com']);
+  assert.match(rate!.body.source, /USD/);
+  assert.match(rate!.body.source, /EUR/);
   sql.close();
 });
 
@@ -83,7 +101,7 @@ test('ITS HEADER IS THE ONE THE KERNEL READS, and both examples install', async 
   const { sql, api } = await record();
   /* THE KERNEL'S OWN LIST, READ OUT OF ITS REFUSAL, because `scriptBody`'s header is not exported and a key the grammar
      teaches that the kernel refuses is a key every agent would send once. */
-  const stray = await api.kernel.install([{ ...GOLD, body: { ...GOLD.body, network: 'none' } } as never]);
+  const stray = await api.kernel.install([{ ...RATE, body: { ...RATE.body, network: 'none' } } as never]);
   assert.equal(stray.ok, false);
   const fix = (stray as { refusal: { fix: string } }).refusal.fix;
   const header = /a script's header is ([a-z, ]+)\./.exec(fix)?.[1]?.split(', ') ?? assert.fail(fix);
@@ -105,9 +123,9 @@ test('A SCRIPT FILED THROUGH propose CARRIES THE RECORD\'S OWN CALLS OUT LINE, a
   const filed = await mcp.call(
     'propose',
     {
-      question: 'Fetch the gold price every hour?',
+      question: 'Fetch the dollar in euros every hour?',
       body_kind: 'change',
-      body: { declaration_id: GOLD.id, to: GOLD, egress: [{ line: 'CALLS OUT nowhere' }], approve: ['nothing at all'] },
+      body: { declaration_id: RATE.id, to: RATE, egress: [{ line: 'CALLS OUT nowhere' }], approve: ['nothing at all'] },
     },
     agent,
   );
@@ -117,7 +135,7 @@ test('A SCRIPT FILED THROUGH propose CARRIES THE RECORD\'S OWN CALLS OUT LINE, a
     egress: { line: string }[];
     approve: string[];
   };
-  assert.deepEqual(body.egress.map((e) => e.line), ['CALLS OUT api.goldapi.io · every 1h · key "goldapi" to the host its vault entry opens']);
+  assert.deepEqual(body.egress.map((e) => e.line), ['CALLS OUT api.example.com · every 1h · key "rates-api" to the host its vault entry opens']);
   assert.ok(!JSON.stringify(body).includes('nothing at all'), 'the proposer wrote its own approval line');
 
   const accepted = (await api.decide({ id, decide: { option: 'accept', reason: 'it is useful' } }, owner)) as {
@@ -126,6 +144,6 @@ test('A SCRIPT FILED THROUGH propose CARRIES THE RECORD\'S OWN CALLS OUT LINE, a
   };
   assert.equal(accepted.ok, false);
   assert.equal(accepted.refusal?.code, 'REQUIRED_MISSING');
-  assert.match(accepted.refusal?.fix ?? '', /"goldapi"/);
+  assert.match(accepted.refusal?.fix ?? '', /"rates-api"/);
   sql.close();
 });

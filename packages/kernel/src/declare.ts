@@ -2333,7 +2333,7 @@ function extractorFault(form: unknown, at: string, depth: number): Refusal | nul
     if (only === 'money' && 'currency' in args && !isCur(args.currency))
       return bad(
         'EXTRACTOR_UNKNOWN',
-        `${at}.money's currency is ${JSON.stringify(args.currency ?? null)}, and it is the code to fall back on when the text names none: an ISO 4217 code in upper case, EGP or USD.`,
+        `${at}.money's currency is ${JSON.stringify(args.currency ?? null)}, and it is the code to fall back on when the text names none: an ISO 4217 code in upper case, USD or EUR.`,
         `${at}.money.currency`,
       );
 

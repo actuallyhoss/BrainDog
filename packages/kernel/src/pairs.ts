@@ -2,7 +2,7 @@
  * THE TWO LEGS OF A TRANSFER, FOUND AND MARKED, AND UNMARKED WHEN THEY STOP BEING ONE.
  *
  * Money moved between two of one person's own accounts is written as two rows, one leaving and one arriving, and a ledger
- * that reads each as it stands counts the move twice: once as spend and once as income. His import writes every such move
+ * that reads each as it stands counts the move twice: once as spend and once as income. An import writes every such move
  * that way (`loop/research-living-in-it.md` section 4.1), and every Ledger figure says `transfer is false`, so until both
  * legs were marked by hand the month's spend held money that was only moved.
  *
@@ -73,9 +73,9 @@ const isCode = (v: unknown): v is string => typeof v === 'string' && CODE.test(v
  *
  * NOT A FIELD NAME, because the kernel is a shell and one ledger's `currency` is another's `ccy`. AND NOT ANY TEXT, ENUM
  * OR REF, which is what this was: audit sixty's X1 put `state` in `on`, an enum of pending and cleared that every counted
- * row holds alike, and EGP -1000 paired with USD +1000. An enum says its values at install, so it is checked there. A text
- * can hold anything, so it is taken at its word here and each row is held to it in `currencyOf`. A `ref` holds a row id,
- * and nothing here can read the row it names, so it is refused rather than trusted.
+ * row holds alike, and -1000 in one currency paired with +1000 in another. An enum says its values at install, so it is
+ * checked there. A text can hold anything, so it is taken at its word here and each row is held to it in `currencyOf`.
+ * A `ref` holds a row id, and nothing here can read the row it names, so it is refused rather than trusted.
  */
 const holdsCurrency = (f: FieldShape): boolean =>
   f.type === 'text' || (f.type === 'enum' && Array.isArray(f.values) && f.values.length > 0 && f.values.every(isCode));
@@ -221,8 +221,9 @@ export function pairsFault(id: string, fields: readonly FieldShape[], pairs: unk
 
   /* A BARE NUMBER CARRIES NO CURRENCY, so the declaration has to compare the field that does. A money is compared by the
      currency inside it (`amountOf`); an `int` is not, and the audit's P7 installed `on: [abs(amount)]` over an `int` and
-     paired EGP -1000 out of one bank with USD +1000 into another, and audit sixty's X1 did the same with `state` named
-     beside it, so the field named has to be one that can hold a currency (`holdsCurrency`). */
+     paired -1000 in one currency out of one bank with +1000 in another currency into a second, and audit sixty's X1 did
+     the same with `state` named beside it, so the field named has to be one that can hold a currency
+     (`holdsCurrency`). */
   const sized = field(entries.find((e) => e.abs)?.field ?? opposite.id)!;
   if (sized.type !== 'money' && !entries.some((e) => !e.abs && holdsCurrency(field(e.field)!)))
     return bad(
@@ -328,8 +329,8 @@ export type Leg = {
  * `state` AND `done` ARE THE REGISTER'S OWN, and every `Pairing` says them, `undefined` where the register has none: they
  * tell a row `where` refuses for good from one it refuses until the bank clears it (`waiting`). They were optional in
  * the first attempt at audit sixty-three's finding 2, the kernel built its `Pairing` without them, and every refused row
- * was taken for one that may clear: a client's cleared EGP 20,000.00 that names its party held a split move back, and
- * Spent and Received each read EGP 40,000.00 high. Required, a caller that leaves them out does not compile.
+ * was taken for one that may clear: a client's cleared 20,000.00 that names its party held a split move back, and
+ * Spent and Received each read 40,000.00 high. Required, a caller that leaves them out does not compile.
  */
 export type Pairing = { sql: Sql; register: string; pairs: PairsDecl; fields: readonly FieldShape[]; state: string | undefined; done: readonly string[] | undefined };
 
@@ -392,7 +393,7 @@ export function pinnedBy(p: Pairing, id: string): string | null {
  * The currency a row's `on` says its bare number is in, or `null` when no field it names holds one on this row.
  *
  * THE ROW IS HELD TO WHAT THE DECLARATION CLAIMED. A text in `on` was let through at install on its word, and a text
- * holding `cleared` on both legs agrees exactly as a text holding `EGP` does, so the value itself has to be a code.
+ * holding `cleared` on both legs agrees exactly as a text holding `USD` does, so the value itself has to be a code.
  */
 function currencyOf(p: Pairing, leg: Leg): string | null {
   for (const said of p.pairs.on) {
@@ -486,23 +487,23 @@ function matchesWhere(p: Pairing, leg: Leg): boolean {
  *
  * AUDIT SIXTY-THREE'S FINDING 2. A bank alert writes a credit pending before it clears, and a pending half left the set
  * around it two outs and two ins with a client's payment of the same size as the second in: day order matched the
- * client with the second out, EGP 20,000.00 read as received 0.00, and once the half cleared all five unpaired. A row
+ * client with the second out, 20,000.00 read as received 0.00, and once the half cleared all five unpaired. A row
  * like this one is not in the set, so the set cannot say which of its legs this row's partner is, and it is matched
  * leg by leg until it can be (`matchedOf`).
  *
- * A ROW WHOSE MARK A PERSON PINNED IS NOT ONE, WHICHEVER WAY HE PINNED IT. His `false` says the row is not a transfer,
- * so no leg is waiting for it, and held back like a pending row his unticking a client's payment left the halves beside
- * it counted, Spent EGP 40,000.00 high, measured. His `true` waited once, on the reading that it says a move landed and
- * not which row is the other leg, and held66's checker measured what that cost: he typed EGP 20,000.00 out of CIB and
- * ticked it, the bank then sent the real CIB out and HSBC in the same day, and the bank's two legs stayed apart for good,
- * Spent and Received 20,000.00 each where they read 0. A pinned row is never a partner (`pairable`), so a wait on it
- * never ends. The owner's call (DIRECTION 25): only a row that clears on its own holds a pair back
- * (`pairs-followups.test.ts`, FOUR).
+ * A ROW WHOSE MARK A PERSON PINNED IS NOT ONE, WHICHEVER WAY IT WAS PINNED. A pinned `false` says the row is not a
+ * transfer, so no leg is waiting for it, and held back like a pending row, unticking a client's payment left the halves
+ * beside it counted, Spent 40,000.00 high, measured. A pinned `true` waited once, on the reading that it says a move
+ * landed and not which row is the other leg, and held66's checker measured what that cost: a person typed 20,000.00 out
+ * of account A and ticked it, the bank then sent the real out of A and in to B the same day, and the bank's two legs
+ * stayed apart for good, Spent and Received 20,000.00 each where they read 0. A pinned row is never a partner
+ * (`pairable`), so a wait on it never ends. The owner's call (DIRECTION 25): only a row that clears on its own holds a
+ * pair back (`pairs-followups.test.ts`, FOUR).
  *
  * A ROW NO FINAL STATE WOULD LET THROUGH IS NOT ONE EITHER, and neither is a row already in one. The first attempt
  * took every row `where` refuses for one that may clear, and the kernel handed it no `done`, so under Money's clause a
- * client's cleared EGP 20,000.00 that names Nile Design held a split move back, and so did a void half that bounced:
- * Spent and Received each EGP 40,000.00 high, for good, measured. A row whose `state` is one of the register's `done:`
+ * client's cleared 20,000.00 that names Nile Design held a split move back, and so did a void half that bounced:
+ * Spent and Received each 40,000.00 high, for good, measured. A row whose `state` is one of the register's `done:`
  * values is where it will stay. Any other is asked what `where` would say were it in each of them, since that is the
  * move a bank makes to it, and waits only if one lets it through: a bare pending half does, and a pending payment that
  * names its party does not.
@@ -517,7 +518,7 @@ function matchesWhere(p: Pairing, leg: Leg): boolean {
  * void is final or the row goes.
  *
  * AN UNRELATED PENDING ROW OF THE SAME SIZE IN THE WINDOW HOLDS A SET BACK TOO, until it clears: measured, a pending
- * credit three days after a split move left all four halves counted, EGP 40,000.00 each way. Nothing in the rows says
+ * credit three days after a split move left all four halves counted, 40,000.00 each way. Nothing in the rows says
  * whose leg a pending credit is, and the side this falls on is the counted one.
  */
 function waiting(p: Pairing, leg: Leg): boolean {
@@ -705,8 +706,8 @@ function nearestIn(near: readonly { leg: Leg; gap: number }[]): Leg | null {
  * least as near.
  *
  * THE CHECK FOR A LEG STILL TO COME GUARDED ONLY A TIED SET (`matchedOf`), and a leg nothing ties never reached it. The
- * checker of `56b35c41` measured it: EGP 20,000.00 out of CIB, its in to HSBC still pending, and a client's 20,000.00
- * into HSBC the next day. The client was the out's one candidate, so the two paired, Spent 0.00 and Received 0.00
+ * checker of `56b35c41` measured it: 20,000.00 out of account A, its in to account B still pending, and a client's
+ * 20,000.00 into B the next day. The client was the out's one candidate, so the two paired, Spent 0.00 and Received 0.00
  * against 20,000.00 each until the bank cleared the in (`pairs-followups.test.ts`, THREE, and audit sixty-five's
  * finding 1). NEARER OR AS NEAR, NOT ANYWHERE IN THE WINDOW: cleared, a waiting row farther off than the nearest
  * candidate would still be the farther, so the pair made now is the one that would be made then, and holding it back
@@ -771,7 +772,7 @@ function setOf(p: Pairing, leg: Leg, windows: Windows): { set: Map<string, Near>
  * A whole set's legs matched in day order, each to one of the other way or left over, or `null` when that is a guess
  * or not needed.
  *
- * AUDIT SIXTY-ONE'S FINDING 2. The tie rule refused M1, one EGP 100,000.00 move sent as two halves of 50,000.00 on one day,
+ * AUDIT SIXTY-ONE'S FINDING 2. The tie rule refused M1, one 100,000.00 move sent as two halves of 50,000.00 on one day,
  * and M2, two top-ups of 5,000.00 each landing the next day, and both figures counted money that only moved: every
  * candidate was tied, though any way of matching those legs hides exactly the same money. The legs of a set agree on
  * every `on` entry and so on size and currency (`mirrors`), so when as many go one way as the other every leg is one
@@ -779,8 +780,8 @@ function setOf(p: Pairing, leg: Leg, windows: Windows): { set: Map<string, Near>
  * the days are as near as any matching can make them in total, which is what the nearest rule asks one leg at a time.
  *
  * WHEN THE COUNTS DIFFER, THE LEGS LEFT OVER ARE THE ONES THAT COST THE FEWEST DAYS, AND ONLY WHEN NO OTHER CHOICE COSTS
- * AS FEW. Audit sixty-three's F1 put a client's EGP 20,000.00 into HSBC two days after a move split in two halves of that
- * size, and refusing the set whole left both halves counted: Spent and Received each EGP 40,000.00 high. Leaving the
+ * AS FEW. Audit sixty-three's F1 put a client's 20,000.00 into account B two days after a move split in two halves of
+ * that size, and refusing the set whole left both halves counted: Spent and Received each 40,000.00 high. Leaving the
  * client over costs no day and leaving either half over costs two, so which leg is spare is in the ledger. Three alike
  * outs against two ins on one day cost the same whichever out is spare, so that stays refused, as a tie of one does.
  * Every matching the accounts allow is counted, and the rest are matched in day order, so it stays one answer in every
@@ -798,10 +799,11 @@ function setOf(p: Pairing, leg: Leg, windows: Windows): { set: Map<string, Near>
  *
  * LEGS ON ONE DAY GO IN `across` ORDER, AND ONLY THEN IN `seq` ORDER. `seq` is the order the bank listed them, the
  * arrival order the tie rule refused to break by, and ordering one day by it alone let that order decide whether a set
- * paired at all: a CIB out and an NBE out against an HSBC in and a CIB in, all one day, paired all four when the HSBC in
- * was listed first and none when the CIB in was, since first with first then put the CIB legs together and the matching
- * was refused (`pairs-ties.test.ts`, ONE ANSWER IN EVERY ORDER). With the account first, `seq` only says which of two
- * legs alike in everything names which, and the rows paired and the figures are the same in every order (M1).
+ * paired at all: an out of account A and an out of B against an in to C and an in to A, all one day, paired all four
+ * when the in to C was listed first and none when the in to A was, since first with first then put A's legs together and
+ * the matching was refused (`pairs-ties.test.ts`, ONE ANSWER IN EVERY ORDER). With the account first, `seq` only says
+ * which of two legs alike in everything names which, and the rows paired and the figures are the same in every order
+ * (M1).
  */
 function matchedOf(p: Pairing, set: Map<string, Near>): Map<string, string> | null {
   const members = [...set.values()];

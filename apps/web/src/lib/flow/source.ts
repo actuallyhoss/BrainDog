@@ -50,7 +50,7 @@ export type RunRow = { id: string; state: RunState; started: string; finished: s
  * (`GET /api/automations?rule=<id>`) carries the body and its last ten runs. So `body` is `null` on a listed row and
  * the editor asks for the one before it opens anything, and the list draws from the summary alone.
  *
- * `id` IS THE BARE ID, `gold-rate`, which the record calls `rule`; `rule.gold-rate` is what a change names and what the
+ * `id` IS THE BARE ID, `usd-eur`, which the record calls `rule`; `rule.usd-eur` is what a change names and what the
  * record calls `id`. `version` is what an edit is drawn from.
  */
 export type AutomationRow = {
