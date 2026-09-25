@@ -1,6 +1,6 @@
 {
   "pack": "launch-desk",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "title": "Launch desk",
   "summary": "A desk for launching a thing in parts: where it stands in one sentence, each part with its next step, the calls waiting on you, a pad beside it, and a price check.",
   "author": "BrainDog",
@@ -193,7 +193,7 @@
       "register": "checks",
       "name": "Price check",
       "one": "check",
-      "holds": "one price and what making, packing and sending one costs, to see whether the price holds",
+      "holds": "one price and what making, packing and sending one costs, to see whether the costs are at most two fifths of the price",
       "title": "what",
       "fields": [
         {
@@ -229,6 +229,11 @@
         {
           "id": "cost",
           "label": "Costs together",
+          "type": "decimal"
+        },
+        {
+          "id": "least",
+          "label": "Least price that holds",
           "type": "decimal"
         },
         {
@@ -269,7 +274,7 @@
     },
     {
       "rule": "launch_desk_cost",
-      "name": "Add the three costs of the price check together",
+      "name": "Add the three costs of the price check together, and the least price they allow",
       "on": {
         "written": {
           "register": "checks",
@@ -295,7 +300,7 @@
     },
     {
       "script": "launch_desk_cost",
-      "title": "Add what making, packing and sending one costs, whenever any of the three is written",
+      "title": "Add what making, packing and sending one costs, and the least price at which that is two fifths of it, whenever a cost is written",
       "runs": {
         "rule": true
       },
@@ -307,7 +312,7 @@
       "writes": [
         "checks"
       ],
-      "source": "export default async function run(ctx) {\n  const id = ctx.input && ctx.input.id;\n  const rows = id ? [await ctx.record.get(id)] : await ctx.record.list('checks', {});\n  for (const row of rows) {\n    if (!row) continue;\n    const parts = [row.fields.making, row.fields.packing, row.fields.sending].filter((n) => typeof n === 'number');\n    const cost = parts.length === 0 ? null : Math.round(parts.reduce((sum, n) => sum + n, 0) * 100) / 100;\n    if ((row.fields.cost ?? null) === cost) continue;\n    ctx.update('checks#' + row.seq, { cost }, row.version);\n  }\n}\n"
+      "source": "/* A typed decimal as a whole number of units and how many places those units are, read off its shortest spelling. A\n   decimal field holds at most fifteen significant digits, so that spelling is the one that was typed: 4.004 is 4004 in\n   thousandths, never 4.00399999999999955946. */\nfunction exact(n) {\n  const [mantissa, power = '0'] = String(n).split('e');\n  const [whole, fraction = ''] = mantissa.split('.');\n  return { units: BigInt(whole + fraction), places: fraction.length - Number(power) };\n}\n\n/* Several decimals brought to the finest places any of them has, so they add as whole numbers. */\nfunction inCommon(list) {\n  const read = list.map(exact);\n  const places = Math.max(0, ...read.map((r) => r.places));\n  return { places, units: read.map((r) => r.units * 10n ** BigInt(places - r.places)) };\n}\n\n/* Whole units back to a number, through its decimal spelling, which Number reads to the nearest double; or null when the\n   spelling has more than the fifteen significant digits a decimal field holds, which the record would refuse. */\nfunction decimal(units, places) {\n  const digits = units.toString().padStart(places + 1, '0');\n  if (digits.replace(/^0+/, '').replace(/0+$/, '').length > 15) return null;\n  return Number(places === 0 ? digits : digits.slice(0, -places) + '.' + digits.slice(-places));\n}\n\n/* WHAT MAKING, PACKING AND SENDING ONE COST, ADDED EXACTLY, AND THE LEAST PRICE THEY ALLOW. The least price is five\n   halves of the costs, the price at which they are exactly two fifths of it, worked out in whole numbers here. The page\n   judges the price live against it, as the figure price less least price, so a price typed a moment ago is judged at\n   once and never against a verdict stored before it. */\nexport default async function run(ctx) {\n  const id = ctx.input && ctx.input.id;\n  const rows = id ? [await ctx.record.get(id)] : await ctx.record.list('checks', {});\n  for (const row of rows) {\n    if (!row) continue;\n    const costs = [row.fields.making, row.fields.packing, row.fields.sending];\n    let cost = null;\n    let least = null;\n    /* ALL THREE OR NOTHING: a sum of some of the costs was read as the cost, and passed. */\n    if (costs.every((n) => typeof n === 'number')) {\n      const common = inCommon(costs);\n      const sum = common.units.reduce((total, n) => total + n, 0n);\n      cost = decimal(sum, common.places);\n      least = cost === null ? null : decimal(sum * 25n, common.places + 1);\n      if (least === null) cost = null;\n    }\n    if ((row.fields.cost ?? null) === cost && (row.fields.least ?? null) === least) continue;\n    ctx.update('checks#' + row.seq, { cost, least }, row.version);\n  }\n}\n"
     },
     {
       "metric": "essentials",
@@ -358,8 +363,9 @@
       "metric": "price",
       "name": "Price",
       "source": "register.checks",
+      "where": "seq is 1",
       "value": {
-        "sum": "price"
+        "max": "price"
       },
       "format": "decimal",
       "target": {
@@ -372,8 +378,9 @@
       "metric": "costs",
       "name": "Costs",
       "source": "register.checks",
+      "where": "seq is 1, making is set, packing is set, sending is set",
       "value": {
-        "sum": "cost"
+        "max": "cost"
       },
       "format": "decimal",
       "target": {
@@ -384,9 +391,9 @@
     },
     {
       "metric": "priced",
-      "name": "Checks priced",
+      "name": "Price check filled in",
       "source": "register.checks",
-      "where": "price is set, cost is set",
+      "where": "seq is 1, price is set, making is set, packing is set, sending is set",
       "value": {
         "count": "id"
       },
@@ -401,18 +408,85 @@
       "metric": "cost-share",
       "name": "Cost share",
       "source": "register.checks",
-      "where": "price is set, cost is set",
+      "where": "seq is 1, price more than 0, making is set, packing is set, sending is set",
       "value": {
         "ratio": {
           "of": {
-            "sum": "cost"
+            "max": "cost"
           },
           "per": {
-            "sum": "price"
+            "max": "price"
           }
         }
       },
       "format": "pct",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "least-price",
+      "name": "Least price that holds",
+      "source": "register.checks",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none",
+      "where": "seq is 1, making is set, packing is set, sending is set",
+      "value": {
+        "max": "least"
+      },
+      "format": "decimal"
+    },
+    {
+      "metric": "price-room",
+      "name": "Price over the least that holds",
+      "source": "register.checks",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none",
+      "where": "seq is 1, price more than 0, making is set, packing is set, sending is set, least is set",
+      "value": {
+        "diff": {
+          "of": {
+            "max": "price"
+          },
+          "per": {
+            "max": "least"
+          }
+        }
+      },
+      "format": "decimal"
+    },
+    {
+      "metric": "price-free",
+      "name": "Price check at a price of 0",
+      "source": "register.checks",
+      "where": "seq is 1, price is 0, making is set, packing is set, sending is set",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "price-unjudged",
+      "name": "Price check costs not added yet",
+      "source": "register.checks",
+      "where": "seq is 1, price more than 0, making is set, packing is set, sending is set, least is not set",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
       "target": {
         "gte": 0
       },
@@ -801,7 +875,8 @@
             {
               "field": "sending"
             }
-          ]
+          ],
+          "row": "checks#1"
         },
         {
           "kind": "note",
@@ -814,18 +889,34 @@
         {
           "kind": "note",
           "when": {
-            "metric": "cost-share",
-            "lte": 0.4
+            "metric": "price-free",
+            "is": 1
+          },
+          "body": "At a price of 0 there is nothing for the costs to be a share of, and every one sold loses what it cost to make, pack and send. Type the price it sells for."
+        },
+        {
+          "kind": "note",
+          "when": {
+            "metric": "price-unjudged",
+            "is": 1
+          },
+          "body": "The costs are not added up yet. They are added whenever a cost is typed, so type one of them again to see the verdict."
+        },
+        {
+          "kind": "note",
+          "when": {
+            "metric": "price-room",
+            "gte": 0
           },
           "body": "It passes: the costs are {{cost-share}} of the price."
         },
         {
           "kind": "note",
           "when": {
-            "metric": "cost-share",
-            "gt": 0.4
+            "metric": "price-room",
+            "lt": 0
           },
-          "body": "Too thin: the costs are {{cost-share}} of the price. Raise the price or bring a cost down until they are under two fifths of it."
+          "body": "Too thin: the costs are {{cost-share}} of the price. Raise the price or bring a cost down until they are at most two fifths of it."
         },
         {
           "kind": "stat",
@@ -842,6 +933,10 @@
             {
               "metric": "cost-share",
               "label": "Cost share"
+            },
+            {
+              "metric": "least-price",
+              "label": "Least price that holds"
             }
           ]
         },

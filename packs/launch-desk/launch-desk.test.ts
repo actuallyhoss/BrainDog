@@ -359,6 +359,33 @@ test('A CAPTURE PRESETS WHICH PART A NOTE IS ABOUT, so the pad on the page of a 
 
 /* ── the numbers ──────────────────────────────────────────────────────── */
 
+const TYPE_THEM = 'Type a price and the three costs above, and the verdict is said here.';
+const PASSES = 'It passes: the costs are {{cost-share}} of the price.';
+const THIN = 'Too thin: the costs are {{cost-share}} of the price. Raise the price or bring a cost down until they are at most two fifths of it.';
+const UNJUDGED = 'The costs are not added up yet. They are added whenever a cost is typed, so type one of them again to see the verdict.';
+const FREE = 'At a price of 0 there is nothing for the costs to be a share of, and every one sold loses what it cost to make, pack and send. Type the price it sells for.';
+
+/** Every note the numbers page draws now, which is the verdict and nothing else on that page. */
+const verdict = (p: Page): string[] => p.blocks.filter((b) => b.kind === 'note' && b.drawn !== false).map((b) => String((b as Decl).body));
+/** The figures under the verdict, as the tiles read them. */
+const tilesOf = (p: Page): [string, unknown][] => p.blocks.find((b) => b.kind === 'stat')!.readings!.map((r) => [r.metric, r.reading?.value ?? null]);
+
+/**
+ * WHAT THE INPUTS WRITE, AS THE APP WRITES IT: one field at a time through the row writer, with the row's version, into
+ * the row the inputs block answers. Then the cost script is run to the end, the way a host runs it after a write, unless
+ * `settled` is false, which is the page as it reads before the host has run anything: on the Worker, until the Durable
+ * Object's alarm.
+ */
+async function typeIn(api: Api, figures: Record<string, number | null>, settled = true): Promise<Page> {
+  const id = (await pageOf(api, 'numbers')).blocks.find((b) => b.kind === 'inputs')!.rows[0]!.id;
+  for (const [field, value] of Object.entries(figures)) {
+    const row = rowOf(api, id);
+    said(api.kernel.update('checks', row.id, { [field]: value } as never, { actor: 'p_1', version: row.version }));
+  }
+  if (settled) await settle(api);
+  return pageOf(api, 'numbers');
+}
+
 test('THE NUMBERS: the inputs edit the one check row, and the verdict flips when a price moves the cost share past two fifths', async () => {
   const { api, sql } = await desked();
   await launch(api);
@@ -367,36 +394,128 @@ test('THE NUMBERS: the inputs edit the one check row, and the verdict flips when
   const inputs = page.blocks.find((b) => b.kind === 'inputs')!;
   assert.equal(inputs.rows.length, 1, 'the pack seeds the one row the inputs type into');
   assert.deepEqual(inputs.types, { price: 'decimal', making: 'decimal', packing: 'decimal', sending: 'decimal' });
-  const verdict = (p: Page): string[] => p.blocks.filter((b) => b.kind === 'note' && b.drawn !== false).map((b) => String((b as Decl).body));
-  assert.deepEqual(verdict(page), ['Type a price and the three costs above, and the verdict is said here.']);
+  assert.deepEqual(verdict(page), [TYPE_THEM]);
 
-  /* WHAT THE INPUTS WRITE, AS THE APP WRITES IT: one field at a time through the row writer, with the row's version. */
-  const type = (field: string, value: number): void => {
-    const row = rowOf(api, inputs.rows[0]!.id);
-    said(api.kernel.update('checks', row.id, { [field]: value } as never, { actor: 'p_1', version: row.version }));
-  };
-  type('price', 30);
-  await settle(api);
   /* A PRICE ALONE IS NOT A VERDICT: with no cost written the share would read nothing as 0 and pass. */
-  assert.deepEqual(verdict(await pageOf(api, 'numbers')), ['Type a price and the three costs above, and the verdict is said here.']);
-  type('making', 6);
-  type('packing', 2.5);
-  type('sending', 1.5);
-  await settle(api);
+  assert.deepEqual(verdict(await typeIn(api, { price: 30 })), [TYPE_THEM]);
+  page = await typeIn(api, { making: 6, packing: 2.5, sending: 1.5 });
   assert.equal(rowOf(api, inputs.rows[0]!.id).fields.cost, 10, 'the script did not add the three costs');
-  page = await pageOf(api, 'numbers');
-  assert.deepEqual(verdict(page), ['It passes: the costs are {{cost-share}} of the price.']);
-  const tiles = page.blocks.find((b) => b.kind === 'stat')!;
-  assert.deepEqual(tiles.readings?.map((r) => [r.metric, r.reading?.value]), [['price', 30], ['costs', 10], ['cost-share', 1 / 3]]);
+  assert.deepEqual(verdict(page), [PASSES]);
+  assert.deepEqual(tilesOf(page), [['price', 30], ['costs', 10], ['cost-share', 1 / 3], ['least-price', 25]]);
 
-  type('price', 20);
-  page = await pageOf(api, 'numbers');
-  assert.deepEqual(verdict(page), ['Too thin: the costs are {{cost-share}} of the price. Raise the price or bring a cost down until they are under two fifths of it.']);
+  page = await typeIn(api, { price: 20 });
+  assert.deepEqual(verdict(page), [THIN]);
 
   /* THE BUDGET AS RANGES, one band a line and the spend on it, over every line of the launch. */
   const range = page.blocks.find((b) => b.kind === 'progress')!;
   assert.equal((range as Decl).range, true);
   assert.deepEqual(range.rows.map((r) => r.fields.item), ['Wax and wicks', 'Printed boxes']);
+  sql.close();
+});
+
+test('THE VERDICT READS THE ONE ROW THE INPUTS TYPE INTO, whatever other checks the list holds', async () => {
+  /* MEASURED ON 1.0.1 (`loop/research-audit-2026-09-25-layouts.md` finding 5): the figures summed every check while the
+     inputs edited only the first, so a first check at 20 and 10, which is half and too thin, beside a second at 100 and
+     10 read as 120 and 20, a sixth, and "It passes". The inputs now name their row, `row: checks#1`, and every figure
+     under them reads `seq is 1`, so the row typed into and the row judged are the same one by what the file says, not
+     by which row happens to sort first. */
+  const { api, sql } = await desked();
+  assert.deepEqual(verdict(await typeIn(api, { price: 20, making: 6, packing: 2.5, sending: 1.5 })), [THIN]);
+  make(api, 'checks', { what: 'A dearer candle', price: 100, making: 6, packing: 2.5, sending: 1.5 });
+  await settle(api);
+  const page = await pageOf(api, 'numbers');
+  assert.deepEqual(verdict(page), [THIN], 'a second check changed the verdict on the first');
+  assert.deepEqual(tilesOf(page), [['price', 20], ['costs', 10], ['cost-share', 0.5], ['least-price', 25]]);
+  sql.close();
+});
+
+/**
+ * THE VERDICT IS READ LIVE FROM THE FIGURES BESIDE IT, NEVER FROM A FLAG A SCRIPT STORED. The rework before this one stored
+ * `passes` from the cost script, and the script runs after a write (on the Worker, only at the Durable Object's alarm), so
+ * between a price typed and that run the page said "It passes" beside a live share of 0.5. The page is read here with no
+ * script run after the price is typed, and the verdict is already the one the figures on it say.
+ */
+test('A PRICE TYPED IS JUDGED AT ONCE, before any script has run: the verdict never disagrees with the share beside it', async () => {
+  const { api, sql } = await desked();
+  assert.deepEqual(verdict(await typeIn(api, { price: 30, making: 6, packing: 2.5, sending: 1.5 })), [PASSES]);
+  assert.ok(!desk().declarations.some((d) => d.register === 'checks' && (d.fields as { type: string }[]).some((f) => f.type === 'bool')), 'the check stores a verdict');
+
+  let page = await typeIn(api, { price: 20 }, false);
+  assert.deepEqual(tilesOf(page), [['price', 20], ['costs', 10], ['cost-share', 0.5], ['least-price', 25]]);
+  assert.deepEqual(verdict(page), [THIN]);
+  page = await typeIn(api, { price: 25 }, false);
+  assert.deepEqual(verdict(page), [PASSES], 'two fifths exactly, typed and not yet settled');
+  page = await typeIn(api, { price: 24.99 }, false);
+  assert.deepEqual(verdict(page), [THIN]);
+  /* AND A PRICE OF 0, TYPED AND NOT SETTLED, IS SAID SO AT ONCE. */
+  assert.deepEqual(verdict(await typeIn(api, { price: 0 }, false)), [FREE]);
+  sql.close();
+});
+
+test('NO VERDICT WHILE A COST IS MISSING, and none either when one is cleared after the verdict was given', async () => {
+  /* MEASURED ON 1.0.1: with only making typed, 6 on a price of 30, the cost was 6 and the verdict "It passes", and with
+     making cleared again the cost kept packing and sending, 4, and still passed. A share of some of the costs is not
+     the share of the costs. */
+  const { api, sql } = await desked();
+  assert.deepEqual(verdict(await typeIn(api, { price: 30, making: 6 })), [TYPE_THEM]);
+  const row = (await pageOf(api, 'numbers')).blocks.find((b) => b.kind === 'inputs')!.rows[0]!;
+  assert.equal(rowOf(api, row.id).fields.cost ?? null, null, 'one cost of three was added up as if it were all of them');
+  assert.deepEqual(verdict(await typeIn(api, { packing: 2.5, sending: 1.5 })), [PASSES]);
+  const page = await typeIn(api, { making: null });
+  assert.deepEqual(verdict(page), [TYPE_THEM]);
+  /* THE TILES READ THE ONE ROW WITH max AND NOT sum. Measured with sum: a row whose cost was cleared drew "Costs
+     together 0", since a sum over nothing is 0, and a cost nobody knows is not a cost of nothing. */
+  assert.deepEqual(tilesOf(page), [['price', 30], ['costs', null], ['cost-share', null], ['least-price', null]]);
+  sql.close();
+});
+
+test('A PRICE OF 0 IS SAID SO, rather than leaving the verdict blank and the prompt to type a price hidden', async () => {
+  /* MEASURED ON 1.0.1: price 0 with all three costs gave a share of nothing, no verdict, and a count of priced checks of
+     1, so the page said nothing at all under the inputs. */
+  const { api, sql } = await desked();
+  assert.deepEqual(verdict(await typeIn(api, { price: 0, making: 6, packing: 2.5, sending: 1.5 })), [FREE]);
+  /* AND AT 0 WITH A COST STILL MISSING, the one thing to say is what to type. */
+  assert.deepEqual(verdict(await typeIn(api, { sending: null })), [TYPE_THEM]);
+  sql.close();
+});
+
+test('TWO FIFTHS EXACTLY PASSES, and a thousandth of a pound over it does not', async () => {
+  /* MEASURED ON 1.0.1: making 4.004 on a price of 10 was rounded to a cost of 4 by the script, the share read exactly
+     0.4, and it passed. And the share itself is a division of two doubles: 0.14 of 0.35 is two fifths, and divided it
+     reads 0.4000000000000001, which a comparison with 0.4 calls too thin (a sweep of every price to 200.00 in pence,
+     with the costs just under, at and just over two fifths, found 141 of 59998 judged the wrong way, every one of them
+     a share of exactly two fifths). So the script adds the costs in whole numbers and works out the least price, five
+     halves of them, the same way, and the verdict is the sign of the price less that least price: two numbers of at most
+     fifteen significant digits, which doubles hold apart, so the sign is never a rounding. */
+  const { api, sql } = await desked();
+  assert.deepEqual(verdict(await typeIn(api, { price: 10, making: 4.004, packing: 0, sending: 0 })), [THIN]);
+  const row = (await pageOf(api, 'numbers')).blocks.find((b) => b.kind === 'inputs')!.rows[0]!;
+  assert.equal(rowOf(api, row.id).fields.cost, 4.004, 'the costs were rounded before they were compared');
+  assert.deepEqual(verdict(await typeIn(api, { making: 4 })), [PASSES]);
+  assert.deepEqual(verdict(await typeIn(api, { price: 0.35, making: 0.1, packing: 0.04 })), [PASSES]);
+  assert.deepEqual(verdict(await typeIn(api, { packing: 0.041 })), [THIN]);
+  /* AND THE THREE ADDED UP EXACTLY, where 0.1 and 0.2 and 0.1 added as doubles are 0.4000000000000001. */
+  assert.deepEqual(verdict(await typeIn(api, { price: 1, making: 0.1, packing: 0.2, sending: 0.1 })), [PASSES]);
+  assert.equal(rowOf(api, row.id).fields.cost, 0.4);
+  assert.equal(rowOf(api, row.id).fields.least, 1);
+  sql.close();
+});
+
+test('A RECORD ON 1.0.1 TAKES THIS VERSION, and a check it already filled says so until a cost is typed again', async () => {
+  /* The published 1.0.1, as the catalogue serves it, with its check filled in and costed by the 1.0.1 script. */
+  const { api, sql } = await record();
+  said(await put(api, PAD()));
+  said(await put(api, JSON.parse(readFileSync(new URL('../../apps/web/static/catalogue/packs/launch-desk/1.0.1.pack.json', import.meta.url), 'utf8'))));
+  await typeIn(api, { price: 20, making: 6, packing: 2.5, sending: 1.5 });
+  const diff = said<{ diff: Diff }>(await planOf(api, desk())).diff;
+  assert.deepEqual(diff.conflicts, []);
+  said(await put(api, desk()));
+  assert.equal(api.kernel.packs().find((p) => p.id === 'launch-desk')?.version, desk().version);
+  /* THE SCRIPT RUNS ON A WRITE AND NOT ON AN UPGRADE, so the row 1.0.1 filled has no least price from it yet, and a price
+     is not a cost: the script runs on the three costs alone, so a price typed says the same until a cost is typed. */
+  assert.deepEqual(verdict(await pageOf(api, 'numbers')), [UNJUDGED]);
+  assert.deepEqual(verdict(await typeIn(api, { price: 25 })), [UNJUDGED]);
+  assert.deepEqual(verdict(await typeIn(api, { making: 5 })), [PASSES]);
   sql.close();
 });
 
@@ -423,6 +542,6 @@ test('NOTHING IN packages/ OR apps/ NAMES THE DESK: not the page this was modell
   /* THE SAME CALL FINDS A WORD THE SHELL DOES SAY, so an empty answer below is a search that ran and found nothing,
      not one that never looked. */
   assert.notEqual(grep(['planPack']), '');
-  const found = grep(['tima', 'trunk', "tima's", 'trunk', 'launch-desk', 'essentials-done', 'essentials-share', 'cost-share']);
+  const found = grep(['tima', 'trunk', "tima's", 'trunk', 'launch-desk', 'essentials-done', 'essentials-share', 'cost-share', 'price-room', 'least-price', 'price-free', 'price-unjudged']);
   assert.equal(found, '', `the shell names the desk:\n${found}`);
 });
