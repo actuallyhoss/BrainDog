@@ -1,0 +1,1901 @@
+{
+  "pack": "bank-hsbc-eg",
+  "version": "1.3.0",
+  "summary": "Reads HSBC Egypt alert mails and text messages into Money as transactions.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "money-core": ">=1.8.0 <3.0.0"
+    }
+  },
+  "declarations": [
+    {
+      "ingest": "bank-card-used",
+      "pack": "bank-hsbc-eg",
+      "channel": "email",
+      "match": {
+        "all": [
+          {
+            "field": "body",
+            "contains": "credit card ending"
+          },
+          {
+            "field": "body",
+            "contains": "has been used for"
+          },
+          {
+            "none": [
+              {
+                "field": "body",
+                "contains": "debited"
+              },
+              {
+                "field": "body",
+                "contains": "credited"
+              }
+            ]
+          }
+        ]
+      },
+      "skip": [
+        {
+          "when": {
+            "field": "body",
+            "contains": "refund"
+          },
+          "reason": "A refund is money coming back, and this pattern reads a charge."
+        },
+        {
+          "when": {
+            "field": "body",
+            "contains": "your pin"
+          },
+          "reason": "A PIN reminder carries the card digits and moves no money."
+        },
+        {
+          "when": {
+            "field": "body",
+            "contains": "balance is"
+          },
+          "reason": "A balance alert is a position, not a movement."
+        }
+      ],
+      "extract": {
+        "what": {
+          "text": {
+            "between": [
+              " at ",
+              ". Your available"
+            ]
+          }
+        },
+        "direction": {
+          "enum": {
+            "map": {
+              "used": "out"
+            }
+          }
+        },
+        "on": {
+          "date": {
+            "format": "DD/MM/YYYY",
+            "after": " on "
+          }
+        },
+        "amount": {
+          "money": {
+            "after": "used for ",
+            "currency": "GBP"
+          }
+        },
+        "account": {
+          "lookup": {
+            "register": "accounts",
+            "by": "last4",
+            "between": [
+              "*** ",
+              " has been"
+            ]
+          }
+        },
+        "available": {
+          "money": {
+            "after": "available limit is ",
+            "currency": "GBP"
+          }
+        }
+      },
+      "writes": {
+        "register": "transactions",
+        "confidence": "exact"
+      },
+      "dedupe": {
+        "near": {
+          "on": [
+            "amount",
+            "account",
+            "available"
+          ],
+          "day": "on",
+          "prefix": {
+            "field": "what",
+            "chars": 12
+          }
+        }
+      },
+      "on_conflict": "skip"
+    },
+    {
+      "ingest": "bank-ipn-out",
+      "pack": "bank-hsbc-eg",
+      "channel": "email",
+      "match": {
+        "all": [
+          {
+            "field": "body",
+            "contains": "hsbc account"
+          },
+          {
+            "field": "body",
+            "contains": "debited with ipn"
+          },
+          {
+            "none": [
+              {
+                "field": "body",
+                "contains": "credited"
+              }
+            ]
+          }
+        ]
+      },
+      "skip": [
+        {
+          "when": {
+            "field": "body",
+            "contains": "refund"
+          },
+          "reason": "A refund is money coming back, and this pattern reads a charge."
+        },
+        {
+          "when": {
+            "field": "body",
+            "contains": "your pin"
+          },
+          "reason": "A PIN reminder carries the card digits and moves no money."
+        },
+        {
+          "when": {
+            "field": "body",
+            "contains": "balance is"
+          },
+          "reason": "A balance alert is a position, not a movement."
+        }
+      ],
+      "extract": {
+        "what": {
+          "first": [
+            {
+              "text": {
+                "between": [
+                  " to ",
+                  " with reference"
+                ]
+              }
+            },
+            {
+              "text": {
+                "between": [
+                  " from ",
+                  " with reference"
+                ]
+              }
+            }
+          ]
+        },
+        "direction": {
+          "enum": {
+            "map": {
+              "debited": "out"
+            }
+          }
+        },
+        "on": {
+          "date": {
+            "format": "DD-MM-YYYY",
+            "after": " on "
+          }
+        },
+        "amount": {
+          "money": {
+            "after": " for ",
+            "currency": "GBP"
+          }
+        },
+        "account": {
+          "lookup": {
+            "register": "accounts",
+            "by": "last4",
+            "between": [
+              "Account ***",
+              " was "
+            ]
+          }
+        }
+      },
+      "writes": {
+        "register": "transactions",
+        "confidence": "exact"
+      },
+      "dedupe": {
+        "near": {
+          "on": [
+            "amount",
+            "account"
+          ],
+          "day": "on",
+          "prefix": {
+            "field": "what",
+            "chars": 12
+          }
+        }
+      },
+      "on_conflict": "skip"
+    },
+    {
+      "ingest": "bank-ipn-in",
+      "pack": "bank-hsbc-eg",
+      "channel": "email",
+      "match": {
+        "all": [
+          {
+            "field": "body",
+            "contains": "hsbc account"
+          },
+          {
+            "field": "body",
+            "contains": "credited with ipn"
+          },
+          {
+            "none": [
+              {
+                "field": "body",
+                "contains": "debited"
+              }
+            ]
+          }
+        ]
+      },
+      "skip": [
+        {
+          "when": {
+            "field": "body",
+            "contains": "refund"
+          },
+          "reason": "A refund is money coming back, and this pattern reads a charge."
+        },
+        {
+          "when": {
+            "field": "body",
+            "contains": "your pin"
+          },
+          "reason": "A PIN reminder carries the card digits and moves no money."
+        },
+        {
+          "when": {
+            "field": "body",
+            "contains": "balance is"
+          },
+          "reason": "A balance alert is a position, not a movement."
+        }
+      ],
+      "extract": {
+        "what": {
+          "text": {
+            "between": [
+              " from ",
+              " with reference"
+            ]
+          }
+        },
+        "direction": {
+          "enum": {
+            "map": {
+              "credited": "in"
+            }
+          }
+        },
+        "on": {
+          "date": {
+            "format": "DD-MM-YYYY",
+            "after": " on "
+          }
+        },
+        "amount": {
+          "money": {
+            "after": " for ",
+            "currency": "GBP"
+          }
+        },
+        "account": {
+          "lookup": {
+            "register": "accounts",
+            "by": "last4",
+            "between": [
+              "Account ***",
+              " was "
+            ]
+          }
+        }
+      },
+      "writes": {
+        "register": "transactions",
+        "confidence": "exact"
+      },
+      "dedupe": {
+        "near": {
+          "on": [
+            "amount",
+            "account"
+          ],
+          "day": "on",
+          "prefix": {
+            "field": "what",
+            "chars": 12
+          }
+        }
+      },
+      "on_conflict": "skip"
+    },
+    {
+      "ingest": "bank-from-out",
+      "pack": "bank-hsbc-eg",
+      "channel": "email",
+      "match": {
+        "all": [
+          {
+            "field": "body",
+            "contains": "from hsbc:"
+          },
+          {
+            "any": [
+              {
+                "field": "body",
+                "contains": "0- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "1- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "2- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "3- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "4- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "5- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "6- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "7- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "8- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "9- your available balance"
+              }
+            ]
+          },
+          {
+            "none": [
+              {
+                "field": "body",
+                "contains": "0+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "1+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "2+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "3+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "4+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "5+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "6+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "7+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "8+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "9+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "debited"
+              },
+              {
+                "field": "body",
+                "contains": "credited"
+              }
+            ]
+          }
+        ]
+      },
+      "skip": [
+        {
+          "when": {
+            "field": "body",
+            "contains": "refund"
+          },
+          "reason": "A refund is money coming back, and this pattern reads a charge."
+        },
+        {
+          "when": {
+            "field": "body",
+            "contains": "your pin"
+          },
+          "reason": "A PIN reminder carries the card digits and moves no money."
+        }
+      ],
+      "extract": {
+        "what": {
+          "text": {
+            "between": [
+              "From HSBC: ",
+              " from "
+            ]
+          }
+        },
+        "direction": {
+          "enum": {
+            "map": {
+              "your available balance": "out"
+            }
+          }
+        },
+        "on": {
+          "date": {
+            "format": "DDMONYY",
+            "after": "From HSBC: "
+          }
+        },
+        "amount": {
+          "nth": {
+            "n": 2,
+            "of": {
+              "money": {
+                "between": [
+                  "***-",
+                  "- Your available balance"
+                ],
+                "currency": "GBP"
+              }
+            }
+          }
+        },
+        "account": {
+          "lookup": {
+            "register": "accounts",
+            "by": "last4",
+            "between": [
+              "***-",
+              " "
+            ]
+          }
+        }
+      },
+      "writes": {
+        "register": "transactions",
+        "confidence": "exact"
+      },
+      "dedupe": {
+        "near": {
+          "on": [
+            "amount",
+            "account"
+          ],
+          "day": "on",
+          "prefix": {
+            "field": "what",
+            "chars": 12
+          }
+        }
+      },
+      "on_conflict": "skip"
+    },
+    {
+      "ingest": "bank-from-in",
+      "pack": "bank-hsbc-eg",
+      "channel": "email",
+      "match": {
+        "all": [
+          {
+            "field": "body",
+            "contains": "from hsbc:"
+          },
+          {
+            "any": [
+              {
+                "field": "body",
+                "contains": "0+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "1+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "2+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "3+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "4+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "5+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "6+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "7+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "8+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "9+ your available balance"
+              }
+            ]
+          },
+          {
+            "none": [
+              {
+                "field": "body",
+                "contains": "0- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "1- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "2- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "3- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "4- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "5- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "6- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "7- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "8- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "9- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "debited"
+              },
+              {
+                "field": "body",
+                "contains": "credited"
+              }
+            ]
+          }
+        ]
+      },
+      "skip": [
+        {
+          "when": {
+            "field": "body",
+            "contains": "your pin"
+          },
+          "reason": "A PIN reminder carries the card digits and moves no money."
+        }
+      ],
+      "extract": {
+        "what": {
+          "text": {
+            "between": [
+              "From HSBC: ",
+              "***-"
+            ]
+          }
+        },
+        "direction": {
+          "enum": {
+            "map": {
+              "your available balance": "in"
+            }
+          }
+        },
+        "on": {
+          "date": {
+            "format": "DDMONYY",
+            "after": "From HSBC: "
+          }
+        },
+        "amount": {
+          "nth": {
+            "n": 2,
+            "of": {
+              "money": {
+                "between": [
+                  "***-",
+                  "+ Your available balance"
+                ],
+                "currency": "GBP"
+              }
+            }
+          }
+        },
+        "account": {
+          "lookup": {
+            "register": "accounts",
+            "by": "last4",
+            "between": [
+              "***-",
+              " "
+            ]
+          }
+        }
+      },
+      "writes": {
+        "register": "transactions",
+        "confidence": "exact"
+      },
+      "dedupe": {
+        "near": {
+          "on": [
+            "amount",
+            "account"
+          ],
+          "day": "on",
+          "prefix": {
+            "field": "what",
+            "chars": 12
+          }
+        }
+      },
+      "on_conflict": "skip"
+    },
+    {
+      "ingest": "bank-from-unsure",
+      "pack": "bank-hsbc-eg",
+      "channel": "email",
+      "match": {
+        "all": [
+          {
+            "field": "body",
+            "contains": "from hsbc:"
+          },
+          {
+            "any": [
+              {
+                "field": "body",
+                "contains": " - your available balance"
+              },
+              {
+                "field": "body",
+                "contains": " -your available balance"
+              }
+            ]
+          },
+          {
+            "none": [
+              {
+                "field": "body",
+                "contains": "0- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "1- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "2- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "3- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "4- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "5- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "6- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "7- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "8- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "9- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "0+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "1+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "2+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "3+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "4+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "5+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "6+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "7+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "8+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "9+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "debited"
+              },
+              {
+                "field": "body",
+                "contains": "credited"
+              }
+            ]
+          }
+        ]
+      },
+      "skip": [
+        {
+          "when": {
+            "field": "body",
+            "contains": "refund"
+          },
+          "reason": "A refund is money coming back, and this pattern reads a charge."
+        },
+        {
+          "when": {
+            "field": "body",
+            "contains": "your pin"
+          },
+          "reason": "A PIN reminder carries the card digits and moves no money."
+        }
+      ],
+      "extract": {
+        "what": {
+          "text": {
+            "between": [
+              "From HSBC: ",
+              " from "
+            ]
+          }
+        },
+        "on": {
+          "date": {
+            "format": "DDMONYY",
+            "after": "From HSBC: "
+          }
+        },
+        "amount": {
+          "nth": {
+            "n": 2,
+            "of": {
+              "money": {
+                "between": [
+                  "***-",
+                  "Your available balance"
+                ],
+                "currency": "GBP"
+              }
+            }
+          }
+        },
+        "account": {
+          "lookup": {
+            "register": "accounts",
+            "by": "last4",
+            "between": [
+              "***-",
+              " "
+            ]
+          }
+        }
+      },
+      "writes": {
+        "register": "transactions",
+        "confidence": "needs-review"
+      },
+      "dedupe": {
+        "near": {
+          "on": [
+            "amount",
+            "account"
+          ],
+          "day": "on",
+          "prefix": {
+            "field": "what",
+            "chars": 12
+          }
+        }
+      },
+      "on_conflict": "skip"
+    },
+    {
+      "ingest": "bank-card-used-sms",
+      "pack": "bank-hsbc-eg",
+      "channel": "webhook",
+      "match": {
+        "all": [
+          {
+            "field": "body",
+            "contains": "credit card ending"
+          },
+          {
+            "field": "body",
+            "contains": "has been used for"
+          },
+          {
+            "none": [
+              {
+                "field": "body",
+                "contains": "debited"
+              },
+              {
+                "field": "body",
+                "contains": "credited"
+              }
+            ]
+          }
+        ]
+      },
+      "skip": [
+        {
+          "when": {
+            "field": "body",
+            "contains": "refund"
+          },
+          "reason": "A refund is money coming back, and this pattern reads a charge."
+        },
+        {
+          "when": {
+            "field": "body",
+            "contains": "your pin"
+          },
+          "reason": "A PIN reminder carries the card digits and moves no money."
+        },
+        {
+          "when": {
+            "field": "body",
+            "contains": "balance is"
+          },
+          "reason": "A balance alert is a position, not a movement."
+        }
+      ],
+      "extract": {
+        "what": {
+          "text": {
+            "between": [
+              " at ",
+              ". Your available"
+            ]
+          }
+        },
+        "direction": {
+          "enum": {
+            "map": {
+              "used": "out"
+            }
+          }
+        },
+        "on": {
+          "date": {
+            "format": "DD/MM/YYYY",
+            "after": " on "
+          }
+        },
+        "amount": {
+          "money": {
+            "after": "used for ",
+            "currency": "GBP"
+          }
+        },
+        "account": {
+          "lookup": {
+            "register": "accounts",
+            "by": "last4",
+            "between": [
+              "*** ",
+              " has been"
+            ]
+          }
+        },
+        "available": {
+          "money": {
+            "after": "available limit is ",
+            "currency": "GBP"
+          }
+        }
+      },
+      "writes": {
+        "register": "transactions",
+        "confidence": "exact"
+      },
+      "dedupe": {
+        "near": {
+          "on": [
+            "amount",
+            "account",
+            "available"
+          ],
+          "day": "on",
+          "prefix": {
+            "field": "what",
+            "chars": 12
+          }
+        }
+      },
+      "on_conflict": "skip",
+      "verify": {
+        "kind": "path"
+      },
+      "door": "bank-from-out-sms"
+    },
+    {
+      "ingest": "bank-ipn-out-sms",
+      "pack": "bank-hsbc-eg",
+      "channel": "webhook",
+      "match": {
+        "all": [
+          {
+            "field": "body",
+            "contains": "hsbc account"
+          },
+          {
+            "field": "body",
+            "contains": "debited with ipn"
+          },
+          {
+            "none": [
+              {
+                "field": "body",
+                "contains": "credited"
+              }
+            ]
+          }
+        ]
+      },
+      "skip": [
+        {
+          "when": {
+            "field": "body",
+            "contains": "refund"
+          },
+          "reason": "A refund is money coming back, and this pattern reads a charge."
+        },
+        {
+          "when": {
+            "field": "body",
+            "contains": "your pin"
+          },
+          "reason": "A PIN reminder carries the card digits and moves no money."
+        },
+        {
+          "when": {
+            "field": "body",
+            "contains": "balance is"
+          },
+          "reason": "A balance alert is a position, not a movement."
+        }
+      ],
+      "extract": {
+        "what": {
+          "first": [
+            {
+              "text": {
+                "between": [
+                  " to ",
+                  " with reference"
+                ]
+              }
+            },
+            {
+              "text": {
+                "between": [
+                  " from ",
+                  " with reference"
+                ]
+              }
+            }
+          ]
+        },
+        "direction": {
+          "enum": {
+            "map": {
+              "debited": "out"
+            }
+          }
+        },
+        "on": {
+          "date": {
+            "format": "DD-MM-YYYY",
+            "after": " on "
+          }
+        },
+        "amount": {
+          "money": {
+            "after": " for ",
+            "currency": "GBP"
+          }
+        },
+        "account": {
+          "lookup": {
+            "register": "accounts",
+            "by": "last4",
+            "between": [
+              "Account ***",
+              " was "
+            ]
+          }
+        }
+      },
+      "writes": {
+        "register": "transactions",
+        "confidence": "exact"
+      },
+      "dedupe": {
+        "near": {
+          "on": [
+            "amount",
+            "account"
+          ],
+          "day": "on",
+          "prefix": {
+            "field": "what",
+            "chars": 12
+          }
+        }
+      },
+      "on_conflict": "skip",
+      "verify": {
+        "kind": "path"
+      },
+      "door": "bank-from-out-sms"
+    },
+    {
+      "ingest": "bank-ipn-in-sms",
+      "pack": "bank-hsbc-eg",
+      "channel": "webhook",
+      "match": {
+        "all": [
+          {
+            "field": "body",
+            "contains": "hsbc account"
+          },
+          {
+            "field": "body",
+            "contains": "credited with ipn"
+          },
+          {
+            "none": [
+              {
+                "field": "body",
+                "contains": "debited"
+              }
+            ]
+          }
+        ]
+      },
+      "skip": [
+        {
+          "when": {
+            "field": "body",
+            "contains": "refund"
+          },
+          "reason": "A refund is money coming back, and this pattern reads a charge."
+        },
+        {
+          "when": {
+            "field": "body",
+            "contains": "your pin"
+          },
+          "reason": "A PIN reminder carries the card digits and moves no money."
+        },
+        {
+          "when": {
+            "field": "body",
+            "contains": "balance is"
+          },
+          "reason": "A balance alert is a position, not a movement."
+        }
+      ],
+      "extract": {
+        "what": {
+          "text": {
+            "between": [
+              " from ",
+              " with reference"
+            ]
+          }
+        },
+        "direction": {
+          "enum": {
+            "map": {
+              "credited": "in"
+            }
+          }
+        },
+        "on": {
+          "date": {
+            "format": "DD-MM-YYYY",
+            "after": " on "
+          }
+        },
+        "amount": {
+          "money": {
+            "after": " for ",
+            "currency": "GBP"
+          }
+        },
+        "account": {
+          "lookup": {
+            "register": "accounts",
+            "by": "last4",
+            "between": [
+              "Account ***",
+              " was "
+            ]
+          }
+        }
+      },
+      "writes": {
+        "register": "transactions",
+        "confidence": "exact"
+      },
+      "dedupe": {
+        "near": {
+          "on": [
+            "amount",
+            "account"
+          ],
+          "day": "on",
+          "prefix": {
+            "field": "what",
+            "chars": 12
+          }
+        }
+      },
+      "on_conflict": "skip",
+      "verify": {
+        "kind": "path"
+      },
+      "door": "bank-from-out-sms"
+    },
+    {
+      "ingest": "bank-from-out-sms",
+      "pack": "bank-hsbc-eg",
+      "channel": "webhook",
+      "match": {
+        "all": [
+          {
+            "field": "body",
+            "contains": "from hsbc:"
+          },
+          {
+            "any": [
+              {
+                "field": "body",
+                "contains": "0- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "1- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "2- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "3- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "4- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "5- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "6- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "7- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "8- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "9- your available balance"
+              }
+            ]
+          },
+          {
+            "none": [
+              {
+                "field": "body",
+                "contains": "0+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "1+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "2+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "3+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "4+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "5+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "6+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "7+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "8+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "9+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "debited"
+              },
+              {
+                "field": "body",
+                "contains": "credited"
+              }
+            ]
+          }
+        ]
+      },
+      "skip": [
+        {
+          "when": {
+            "field": "body",
+            "contains": "refund"
+          },
+          "reason": "A refund is money coming back, and this pattern reads a charge."
+        },
+        {
+          "when": {
+            "field": "body",
+            "contains": "your pin"
+          },
+          "reason": "A PIN reminder carries the card digits and moves no money."
+        }
+      ],
+      "extract": {
+        "what": {
+          "text": {
+            "between": [
+              "From HSBC: ",
+              " from "
+            ]
+          }
+        },
+        "direction": {
+          "enum": {
+            "map": {
+              "your available balance": "out"
+            }
+          }
+        },
+        "on": {
+          "date": {
+            "format": "DDMONYY",
+            "after": "From HSBC: "
+          }
+        },
+        "amount": {
+          "nth": {
+            "n": 2,
+            "of": {
+              "money": {
+                "between": [
+                  "***-",
+                  "- Your available balance"
+                ],
+                "currency": "GBP"
+              }
+            }
+          }
+        },
+        "account": {
+          "lookup": {
+            "register": "accounts",
+            "by": "last4",
+            "between": [
+              "***-",
+              " "
+            ]
+          }
+        }
+      },
+      "writes": {
+        "register": "transactions",
+        "confidence": "exact"
+      },
+      "dedupe": {
+        "near": {
+          "on": [
+            "amount",
+            "account"
+          ],
+          "day": "on",
+          "prefix": {
+            "field": "what",
+            "chars": 12
+          }
+        }
+      },
+      "on_conflict": "skip",
+      "verify": {
+        "kind": "path"
+      }
+    },
+    {
+      "ingest": "bank-from-in-sms",
+      "pack": "bank-hsbc-eg",
+      "channel": "webhook",
+      "match": {
+        "all": [
+          {
+            "field": "body",
+            "contains": "from hsbc:"
+          },
+          {
+            "any": [
+              {
+                "field": "body",
+                "contains": "0+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "1+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "2+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "3+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "4+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "5+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "6+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "7+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "8+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "9+ your available balance"
+              }
+            ]
+          },
+          {
+            "none": [
+              {
+                "field": "body",
+                "contains": "0- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "1- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "2- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "3- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "4- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "5- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "6- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "7- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "8- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "9- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "debited"
+              },
+              {
+                "field": "body",
+                "contains": "credited"
+              }
+            ]
+          }
+        ]
+      },
+      "skip": [
+        {
+          "when": {
+            "field": "body",
+            "contains": "your pin"
+          },
+          "reason": "A PIN reminder carries the card digits and moves no money."
+        }
+      ],
+      "extract": {
+        "what": {
+          "text": {
+            "between": [
+              "From HSBC: ",
+              "***-"
+            ]
+          }
+        },
+        "direction": {
+          "enum": {
+            "map": {
+              "your available balance": "in"
+            }
+          }
+        },
+        "on": {
+          "date": {
+            "format": "DDMONYY",
+            "after": "From HSBC: "
+          }
+        },
+        "amount": {
+          "nth": {
+            "n": 2,
+            "of": {
+              "money": {
+                "between": [
+                  "***-",
+                  "+ Your available balance"
+                ],
+                "currency": "GBP"
+              }
+            }
+          }
+        },
+        "account": {
+          "lookup": {
+            "register": "accounts",
+            "by": "last4",
+            "between": [
+              "***-",
+              " "
+            ]
+          }
+        }
+      },
+      "writes": {
+        "register": "transactions",
+        "confidence": "exact"
+      },
+      "dedupe": {
+        "near": {
+          "on": [
+            "amount",
+            "account"
+          ],
+          "day": "on",
+          "prefix": {
+            "field": "what",
+            "chars": 12
+          }
+        }
+      },
+      "on_conflict": "skip",
+      "verify": {
+        "kind": "path"
+      },
+      "door": "bank-from-out-sms"
+    },
+    {
+      "ingest": "bank-from-unsure-sms",
+      "pack": "bank-hsbc-eg",
+      "channel": "webhook",
+      "match": {
+        "all": [
+          {
+            "field": "body",
+            "contains": "from hsbc:"
+          },
+          {
+            "any": [
+              {
+                "field": "body",
+                "contains": " - your available balance"
+              },
+              {
+                "field": "body",
+                "contains": " -your available balance"
+              }
+            ]
+          },
+          {
+            "none": [
+              {
+                "field": "body",
+                "contains": "0- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "1- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "2- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "3- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "4- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "5- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "6- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "7- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "8- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "9- your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "0+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "1+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "2+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "3+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "4+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "5+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "6+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "7+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "8+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "9+ your available balance"
+              },
+              {
+                "field": "body",
+                "contains": "debited"
+              },
+              {
+                "field": "body",
+                "contains": "credited"
+              }
+            ]
+          }
+        ]
+      },
+      "skip": [
+        {
+          "when": {
+            "field": "body",
+            "contains": "refund"
+          },
+          "reason": "A refund is money coming back, and this pattern reads a charge."
+        },
+        {
+          "when": {
+            "field": "body",
+            "contains": "your pin"
+          },
+          "reason": "A PIN reminder carries the card digits and moves no money."
+        }
+      ],
+      "extract": {
+        "what": {
+          "text": {
+            "between": [
+              "From HSBC: ",
+              " from "
+            ]
+          }
+        },
+        "on": {
+          "date": {
+            "format": "DDMONYY",
+            "after": "From HSBC: "
+          }
+        },
+        "amount": {
+          "nth": {
+            "n": 2,
+            "of": {
+              "money": {
+                "between": [
+                  "***-",
+                  "Your available balance"
+                ],
+                "currency": "GBP"
+              }
+            }
+          }
+        },
+        "account": {
+          "lookup": {
+            "register": "accounts",
+            "by": "last4",
+            "between": [
+              "***-",
+              " "
+            ]
+          }
+        }
+      },
+      "writes": {
+        "register": "transactions",
+        "confidence": "needs-review"
+      },
+      "dedupe": {
+        "near": {
+          "on": [
+            "amount",
+            "account"
+          ],
+          "day": "on",
+          "prefix": {
+            "field": "what",
+            "chars": 12
+          }
+        }
+      },
+      "on_conflict": "skip",
+      "verify": {
+        "kind": "path"
+      },
+      "door": "bank-from-out-sms"
+    },
+    {
+      "ingest": "bank-not-mine-sms",
+      "pack": "bank-hsbc-eg",
+      "channel": "webhook",
+      "verify": {
+        "kind": "path"
+      },
+      "door": "bank-from-out-sms",
+      "match": {
+        "none": [
+          {
+            "field": "body",
+            "contains": "from hsbc:"
+          },
+          {
+            "field": "body",
+            "contains": "debited with ipn"
+          },
+          {
+            "field": "body",
+            "contains": "credited with ipn"
+          },
+          {
+            "field": "body",
+            "contains": "has been used for"
+          }
+        ]
+      },
+      "skip": [
+        {
+          "when": {
+            "none": [
+              {
+                "field": "body",
+                "contains": "from hsbc:"
+              },
+              {
+                "field": "body",
+                "contains": "debited with ipn"
+              },
+              {
+                "field": "body",
+                "contains": "credited with ipn"
+              },
+              {
+                "field": "body",
+                "contains": "has been used for"
+              }
+            ]
+          },
+          "reason": "Not a message from the bank"
+        }
+      ],
+      "writes": {
+        "register": "transactions",
+        "confidence": "needs-review"
+      }
+    }
+  ]
+}

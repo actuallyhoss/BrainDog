@@ -30,8 +30,8 @@ import { start } from '../src/server.ts';
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
 const OWNER: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 'owner' } };
 
-/** A withdrawal of EGP 2,500.00 from the account ending 327, in `bank-from-out`'s wording. Invented. */
-const SMS = 'From HSBC: 16AUG26 ATM Cash Withdrawal from 042-118***-327 EGP 2500.00- Your available balance is EGP 31,040.25';
+/** A withdrawal of EGP 2,500.00 from the account ending 846, in `bank-from-out`'s wording. Invented. */
+const SMS = 'From HSBC: 16AUG26 ATM Cash Withdrawal from 310-527***-846 EGP 2500.00- Your available balance is EGP 31,040.25';
 
 /**
  * `bank-from-out`'s webhook twin, built the way `HSBC_EG_SMS_INGESTS` in `packages/seed/src/packs/bank-hsbc-eg.ts`
@@ -51,7 +51,7 @@ async function host(): Promise<{ running: Running; port: number; dir: string }> 
   assert.ok((await k.install([{ id: 'ingest.bank-from-out-sms', kind: 'ingest', body: TWIN as never }])).ok);
   const made = k.create(
     'accounts',
-    { name: 'Cairo current account', kind: 'bank', balance: { amount: 0, currency: 'EGP' }, as_of: day(0), liquid: true, last4: '327' },
+    { name: 'Cairo current account', kind: 'bank', balance: { amount: 0, currency: 'EGP' }, as_of: day(0), liquid: true, last4: '846' },
     { actor: 'p_seed' },
   );
   assert.ok(made.ok, JSON.stringify(made));

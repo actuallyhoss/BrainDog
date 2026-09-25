@@ -45,8 +45,8 @@ async function record(): Promise<{ k: Kernel; sql: Sql; card: string; current: s
     assert.ok(got.ok, JSON.stringify(got));
     return got.value.id;
   };
-  const card = made({ name: 'Cairo credit card', kind: 'card', balance: { amount: 0, currency: 'EGP' }, as_of: day(0), liquid: false, last4: '6180' });
-  const current = made({ name: 'Cairo current account', kind: 'bank', balance: { amount: 0, currency: 'EGP' }, as_of: day(0), liquid: true, last4: '327' });
+  const card = made({ name: 'Cairo credit card', kind: 'card', balance: { amount: 0, currency: 'EGP' }, as_of: day(0), liquid: false, last4: '9052' });
+  const current = made({ name: 'Cairo current account', kind: 'bank', balance: { amount: 0, currency: 'EGP' }, as_of: day(0), liquid: true, last4: '846' });
   /* The seed's own card, whose digits the two older sterling alerts name. */
   const seedCard = k.get('accounts#3');
   assert.equal(seedCard?.fields.last4, '4471', 'the seed\'s third account is no longer the card ending 4471');
@@ -92,12 +92,12 @@ const WORDINGS: Want[] = [
   },
   {
     ingest: 'bank-card-used',
-    body: 'Your Credit Card ending with *** 6180 has been used for EGP 1,284.50 on 14/08/2026 at CEDAR LANE BAKERY. Your available limit is EGP 23,715.50',
+    body: 'Your Credit Card ending with *** 9052 has been used for EGP 1,284.50 on 14/08/2026 at CEDAR LANE BAKERY. Your available limit is EGP 23,715.50',
     direction: 'out', amount: 128_450, currency: 'EGP', what: 'CEDAR LANE BAKERY', on: '2026-08-14', account: 'card',
   },
   {
     ingest: 'bank-ipn-out',
-    body: 'Your HSBC Account ***327 was debited with IPN outward transfer for EGP 3,250.00 on 07-08-2026 16:42 to MARLOW JOINERY with reference 9c4e1f7a2b',
+    body: 'Your HSBC Account ***846 was debited with IPN outward transfer for EGP 3,250.00 on 07-08-2026 16:42 to MARLOW JOINERY with reference 9c4e1f7a2b',
     direction: 'out', amount: 325_000, currency: 'EGP', what: 'MARLOW JOINERY', on: '2026-08-07', account: 'current',
   },
   /* THE PURCHASE NAMES ITS PAYEE AFTER `from`, and this fixture said `to`, which is the transfer's word.
@@ -106,17 +106,17 @@ const WORDINGS: Want[] = [
      moved: `review`, `bank-ipn-out could not read what out of this one.` */
   {
     ingest: 'bank-ipn-out',
-    body: 'Your HSBC Account ***327 was debited with IPN purchase for EGP 615.75 on 19-08-2026 21:10 from GRANARY MARKET with reference 0f7d2c91e4',
+    body: 'Your HSBC Account ***846 was debited with IPN purchase for EGP 615.75 on 19-08-2026 21:10 from GRANARY MARKET with reference 0f7d2c91e4',
     direction: 'out', amount: 61_575, currency: 'EGP', what: 'GRANARY MARKET', on: '2026-08-19', account: 'current',
   },
   {
     ingest: 'bank-ipn-in',
-    body: 'Your HSBC Account ***327 was credited with IPN inward transfer for EGP 12,400.00 on 11-08-2026 08:05 from quill.harbour@instapay with reference 5d0b33e8aa',
+    body: 'Your HSBC Account ***846 was credited with IPN inward transfer for EGP 12,400.00 on 11-08-2026 08:05 from quill.harbour@instapay with reference 5d0b33e8aa',
     direction: 'in', amount: 1_240_000, currency: 'EGP', what: 'quill.harbour@instapay', on: '2026-08-11', account: 'current',
   },
   {
     ingest: 'bank-from-out',
-    body: 'From HSBC: 16AUG26 ATM Cash Withdrawal from 042-118***-327 EGP 2500.00- Your available balance is EGP 31,040.25',
+    body: 'From HSBC: 16AUG26 ATM Cash Withdrawal from 310-527***-846 EGP 2500.00- Your available balance is EGP 31,040.25',
     direction: 'out', amount: 250_000, currency: 'EGP', what: '16AUG26 ATM Cash Withdrawal', on: '2026-08-16', account: 'current',
   },
   /* THE CODE AGAINST THE FIGURE. `loop/research-batch-eighteen-audit.md` section 2 filed this line `matched`,
@@ -124,15 +124,15 @@ const WORDINGS: Want[] = [
      fallback currency. Nothing measured says HSBC Egypt glues the code; the reader was wrong either way. */
   {
     ingest: 'bank-from-out',
-    body: 'From HSBC: 16AUG26 ATM Cash Withdrawal from 042-118***-327 EGP2500.00- Your available balance is EGP 31,040.25',
+    body: 'From HSBC: 16AUG26 ATM Cash Withdrawal from 310-527***-846 EGP2500.00- Your available balance is EGP 31,040.25',
     direction: 'out', amount: 250_000, currency: 'EGP', what: '16AUG26 ATM Cash Withdrawal', on: '2026-08-16', account: 'current',
   },
   /* THE CREDIT HAS ITS OWN PATTERN, claimed off the `+` the bank glues to the figure. Until `bank-from-in` existed
      this line was nobody's, so a deposit printed this way never reached the ledger at all. */
   {
     ingest: 'bank-from-in',
-    body: 'From HSBC: 01AUG26 Deposit Interest 042-118***-327 EGP 418.62+ Your available balance is EGP 33,540.25',
-    direction: 'in', amount: 41_862, currency: 'EGP', what: '01AUG26 Deposit Interest 042-118', on: '2026-08-01', account: 'current',
+    body: 'From HSBC: 01AUG26 Deposit Interest 310-527***-846 EGP 418.62+ Your available balance is EGP 33,540.25',
+    direction: 'in', amount: 41_862, currency: 'EGP', what: '01AUG26 Deposit Interest 310-527', on: '2026-08-01', account: 'current',
   },
 ];
 
@@ -152,13 +152,13 @@ const HELD: Held[] = [
   {
     ingest: 'bank-from-unsure',
     why: 'a hyphen with a space either side',
-    body: 'From HSBC: 01AUG26 Transfer from NADIA FARID to 042-118***-327 EGP 418.62 - Your available balance is EGP 33,540.25',
+    body: 'From HSBC: 01AUG26 Transfer from NADIA FARID to 310-527***-846 EGP 418.62 - Your available balance is EGP 33,540.25',
     amount: 41_862, currency: 'EGP', what: '01AUG26 Transfer', on: '2026-08-01', account: 'current',
   },
   {
     ingest: 'bank-from-unsure',
     why: 'a hyphen touching the word and not the figure',
-    body: 'From HSBC: 16AUG26 ATM Cash Withdrawal from 042-118***-327 EGP 2500.00 -Your available balance is EGP 31,040.25',
+    body: 'From HSBC: 16AUG26 ATM Cash Withdrawal from 310-527***-846 EGP 2500.00 -Your available balance is EGP 31,040.25',
     amount: 250_000, currency: 'EGP', what: '16AUG26 ATM Cash Withdrawal', on: '2026-08-16', account: 'current',
   },
 ];
@@ -221,7 +221,7 @@ for (const held of HELD)
 test('THE `From HSBC:` CREDIT IS STORED AND CLAIMED BY NOTHING, because its only sign is a hyphen that is not there', async () => {
   const { k } = await record();
   const before = k.count('transactions');
-  const out = forward(k, 'From HSBC: 01AUG26 Deposit Interest to 042-118***-327 EGP 418.62 Your available balance is EGP 33,540.25', 'money-ipn-from-in');
+  const out = forward(k, 'From HSBC: 01AUG26 Deposit Interest to 310-527***-846 EGP 418.62 Your available balance is EGP 33,540.25', 'money-ipn-from-in');
   assert.equal(out.state, 'untriaged', `claimed by ${out.ingest}: ${out.reason}`);
   assert.equal(out.ingest, null);
   assert.equal(k.count('transactions'), before, 'a line with no pattern wrote a row');
@@ -243,7 +243,7 @@ test('A `last4` OF FOUR DIGITS IS THE ACCOUNT A LINE PRINTING ITS LAST THREE BEH
   const four = r.k.create('accounts', { name: 'Cairo savings', kind: 'bank', balance: { amount: 0, currency: 'EGP' }, as_of: day(0), liquid: true, last4: '6518' }, { actor: 'p_seed' });
   assert.ok(four.ok, JSON.stringify(four));
 
-  const out = forward(r.k, 'From HSBC: 03AUG26 ATM Cash Withdrawal from 042-118***-518 EGP 900.00- Your available balance is EGP 4,100.00', 'money-ipn-suffix');
+  const out = forward(r.k, 'From HSBC: 03AUG26 ATM Cash Withdrawal from 310-527***-518 EGP 900.00- Your available balance is EGP 4,100.00', 'money-ipn-suffix');
   assert.equal(out.state, 'matched', out.reason ?? '');
   const row = r.k.get(out.wrote[0]!)!;
   assert.equal(row.fields.direction, 'out');
@@ -258,6 +258,6 @@ test('A `last4` OF FOUR DIGITS IS THE ACCOUNT A LINE PRINTING ITS LAST THREE BEH
   /* AND TWO ACCOUNTS ENDING IN THE SAME THREE IS A PERSON'S QUESTION, never the first one found. */
   const twin = r.k.create('accounts', { name: 'Cairo deposit', kind: 'bank', balance: { amount: 0, currency: 'EGP' }, as_of: day(0), liquid: false, last4: '7518' }, { actor: 'p_seed' });
   assert.ok(twin.ok, JSON.stringify(twin));
-  const again = forward(r.k, 'From HSBC: 04AUG26 ATM Cash Withdrawal from 042-118***-518 EGP 50.00- Your available balance is EGP 4,050.00', 'money-ipn-suffix-twin');
+  const again = forward(r.k, 'From HSBC: 04AUG26 ATM Cash Withdrawal from 310-527***-518 EGP 50.00- Your available balance is EGP 4,050.00', 'money-ipn-suffix-twin');
   assert.equal(again.state, 'review', 'three digits two accounts end in were filed against one of them');
 });

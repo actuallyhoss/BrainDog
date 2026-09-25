@@ -13,8 +13,26 @@
  * never by another field, so no declared figure says "how many times what one cost". `portfolio-bands` met the same
  * wall and answered it with a script, which is the shell's own answer (section 22) to a sum nobody can declare. So the
  * list gains `cost`, a rule starts `cost.js` whenever `qty` or `unit_cost` is written, the script writes the product
- * into `cost`, and `Holdings value` is a plain sum over it. A field, a rule, a script, two figures and a page are added
+ * into `cost`, and `Holdings value` is a plain sum over it. A field, a rule, a script, three figures and a page are added
  * and nothing is taken away, so the step is a minor one by `first-party.ts`'s rule.
+ *
+ * AND WHY THE SCRIPT ALSO RUNS ONCE A DAY. The rule only hears a write to `qty` or `unit_cost`, and updating from 1.0.0
+ * writes neither, so every row a record already held stayed uncosted until somebody edited it. Measured on September
+ * 25th: 1.0.0, three rows, then this file, then the rule and the outbox drained. `cost` stayed undefined on all three,
+ * and the figure read value 0 over rows 3 under the note "what was paid for 3 holding(s)", a wrong amount stated as a fact.
+ * Every real record gets here that way, because the the old tool import still installs the builder's 1.0.0. The pack
+ * grammar has no trigger for "installed", so the script also runs on `every: 1d`, whose first run the kernel spreads
+ * inside fifteen minutes of the install, and with no row to work on it costs every row whose `cost` is empty. A script
+ * reads one page of fifty (`bands.js` says the same), so a record with more uncosted rows than that is costed fifty a
+ * day. Daily rather than hourly because every sweep filters on an unindexed field, and the Mercury ledger measured what
+ * an hourly scan does to the index analyser: about 720 observations a month against its threshold of 200.
+ *
+ * AND THE FIGURE ADDS UP ONLY ROWS THAT HAVE A COST (`cost is set`), so an uncosted row is left out rather than added as
+ * nothing, and the note says how many of how many holdings the sum covers, through a third figure, `holdings-costed`.
+ * With none costed yet the reading is `rows: 0` over three held, and the tile reads "0 of 3". That note is what carries
+ * it on a screen today. The web's `unsaidFigure`, which turns exactly this reading into a sentence, answered `false` for
+ * this figure when probed on September 25th: it resolves the register and the figure from the build's own seed tables,
+ * and a pack's list is in neither.
  *
  * WHAT IT IS NOT, said here because the tile cannot say it at length: a valuation. What gold or a policy is worth today
  * is a rate away, and a rate is `fx`'s or a person's script's. This is what was paid.
@@ -24,6 +42,10 @@
  * page. With the file and a script that writes nothing, four failed: the costing, the figure, the page and the byte
  * comparison with `cost.js`, so the figure is the script's arithmetic and not a sum that happened to agree. The fixture
  * rows are invented; none is anybody's.
+ *
+ * RED AGAIN THE SAME DAY, for the upgrade: the three tests under "a record that had the list at 1.0.0" were written
+ * against the rule-only file and all three failed, 11 of 14 passing: every cost undefined after the sweep's due time,
+ * the tile at `rows: 3` rather than 0 with nothing costed, and 0 rows costed where fifty were expected.
  */
 
 import { test } from 'node:test';
@@ -59,11 +81,12 @@ const file = (): Body & { version: string; declarations: Body[] } => JSON.parse(
 const SOURCE = readFileSync(new URL('./cost.js', import.meta.url), 'utf8');
 
 /** A fresh record holding every first-party pack, which is where a person stands when they add this one. */
-async function money(): Promise<{ api: Api; close: () => void }> {
+async function money(): Promise<{ api: Api; clock: ReturnType<typeof fixedClock>; close: () => void }> {
   const sql = openSqlite();
-  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const clock = fixedClock(NOW);
+  const api = await createRecordApi({ sql, clock });
   for (const id of FIRST_PARTY) said(await put(api, firstPartyDocument(id)));
-  return { api, close: () => sql.close() };
+  return { api, clock, close: () => sql.close() };
 }
 
 const planOf = async (api: Api, doc: unknown): Promise<Diff> =>
@@ -129,13 +152,13 @@ test('THE SCRIPT IN THE FILE IS cost.js, byte for byte, and it can reach nothing
   assert.deepEqual([script.egress, script.keys, script.reads, script.writes], [[], [], ['holdings'], ['holdings']]);
 });
 
-test('INSTALLED FROM THE FILE: one list, one rule, one script, two figures and a page, and nothing refused', async () => {
+test('INSTALLED FROM THE FILE: one list, one rule, one script, three figures and a page, and nothing refused', async () => {
   const { api, close } = await money();
   const diff = await planOf(api, file());
   assert.deepEqual(diff.conflicts, []);
   assert.deepEqual(
     diff.adds.map((a) => a.id).sort(),
-    ['metric.holdings-count', 'metric.holdings-value', 'page.holdings', 'register.holdings', 'rule.holdings_cost', 'script.holdings_cost'],
+    ['metric.holdings-costed', 'metric.holdings-count', 'metric.holdings-value', 'page.holdings', 'register.holdings', 'rule.holdings_cost', 'script.holdings_cost'],
   );
   said(await put(api, file()));
   assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '1.1.0');
@@ -201,6 +224,90 @@ test('THE HOLDINGS PAGE DRAWS THE FIGURE AND EVERY ROW, with nothing refused', a
   assert.deepEqual((value?.parts ?? []).map((p) => [p.currency, p.amount]).sort(), [['EUR', 600_000], ['USD', 54_000]]);
   const table = page.blocks.find((b) => b.heading === 'Everything you hold')!;
   assert.deepEqual((table.rows ?? []).map((r) => r.fields.label), ['Silver bar', 'Term deposit', 'Life cover']);
+  close();
+});
+
+/* ── a record that had the list at 1.0.0 ─────────────────────────────────────────────────────────────────────────── */
+
+/** The tile's reading of `holdings-value` and the counts its note names, read the way the page reads them. */
+async function tile(api: Api): Promise<{ rows: number; held: number | undefined; parts: [string, number][]; values: Body }> {
+  type Reading = { metric: string; reading: { rows: number; held?: number; value: number | null; unit?: string | null; parts?: Money[] } };
+  const page = said<{ blocks: { heading: string; values?: Body; readings?: Reading[] }[] }>(await api.page({ slug: 'holdings' }, owner));
+  const block = page.blocks.find((b) => b.heading === 'What you hold')!;
+  const r = block.readings!.find((x) => x.metric === 'holdings-value')!.reading;
+  const parts = r.parts ?? (r.value !== null && r.unit ? [{ currency: r.unit, amount: r.value }] : []);
+  return { rows: r.rows, held: r.held, parts: parts.map((p) => [p.currency, p.amount] as [string, number]).sort(), values: block.values ?? {} };
+}
+
+/** A record where the builder's 1.0.0 went in first and the rows were written under it, then the file on top. */
+async function upgraded(rows: readonly Body[] = HELD): Promise<{ api: Api; clock: ReturnType<typeof fixedClock>; ids: string[]; close: () => void }> {
+  const { api, clock, close } = await money();
+  said(await put(api, holdingsPack()));
+  const ids = rows.map((row) => hold(api, row));
+  said(await put(api, file()));
+  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '1.1.0');
+  return { api, clock, ids, close };
+}
+
+/* FIFTEEN MINUTES IS THE WIDEST A FIRST RUN IS SPREAD: `jitterMs` in `packages/kernel/src/pull.ts` caps the window there
+   for any interval of two and a half hours or more, so a daily script is first due inside a quarter of an hour. */
+const SPREAD_MS = 15 * 60_000;
+
+test('A RECORD ON 1.0.0 UPDATES TO 1.1.0 AND EVERY HOLDING IT HELD IS COSTED, with nobody writing a row again', async () => {
+  const { api, clock, ids, close } = await upgraded();
+  const cost = (id: string): Money | undefined => api.kernel.get(id)!.fields.cost as Money | undefined;
+  /* THE RULE IS NO HELP HERE. It listens for a write to `qty` or `unit_cost`, and the update writes neither, so every
+     row 1.0.0 held stays uncosted until somebody edits it, which for a certificate bought once may be never. */
+  clock.advance(SPREAD_MS + 1);
+  await settle(api);
+  assert.deepEqual(ids.map(cost), [
+    { amount: 100_000, currency: 'EUR' },
+    { amount: 500_000, currency: 'EUR' },
+    { amount: 54_000, currency: 'USD' },
+  ]);
+  assert.deepEqual((await tile(api)).parts, [['EUR', 600_000], ['USD', 54_000]]);
+  close();
+});
+
+test('UNTIL A HOLDING IS COSTED THE FIGURE LEAVES IT OUT AND SAYS SO, and never reads its missing cost as zero', async () => {
+  const { api, clock, ids, close } = await upgraded();
+  /* BEFORE THE SWEEP HAS RUN, NOT ONE ROW HAS A COST. The reading the web's `unsaidFigure` keys on is exactly this:
+     no row counted over rows that exist, on a figure whose `where` asks for the field it adds up. It was `rows: 3` and
+     a value of 0, under a note that said the 0 was what 3 holdings cost. */
+  const before = await tile(api);
+  assert.deepEqual([before.rows, before.held, before.parts], [0, 3, []]);
+  assert.deepEqual([before.values['holdings-costed'], before.values['holdings-count']], [0, 3]);
+
+  /* ONE ROW EDITED IS ONE ROW COSTED BY THE RULE, and the note counts it as one of three rather than the sum as all. */
+  said(api.kernel.update('holdings', ids[0]!, { qty: 3 } as never, { actor: 'p_1' }));
+  await settle(api);
+  const one = await tile(api);
+  assert.deepEqual([one.rows, one.parts], [1, [['EUR', 120_000]]]);
+  assert.deepEqual([one.values['holdings-costed'], one.values['holdings-count']], [1, 3]);
+
+  clock.advance(SPREAD_MS + 1);
+  await settle(api);
+  const all = await tile(api);
+  assert.deepEqual([all.rows, all.parts], [3, [['EUR', 620_000], ['USD', 54_000]]]);
+  assert.deepEqual([all.values['holdings-costed'], all.values['holdings-count']], [3, 3]);
+  close();
+});
+
+test('THE SWEEP TAKES FIFTY A RUN, the one page a script can read, and the rest the next day', async () => {
+  const lots = Array.from({ length: 60 }, (_, i): Body => ({ label: `Lot ${i + 1}`, kind: 'commodity', qty: 2, unit_cost: { amount: 1_000 + i, currency: 'EUR' } }));
+  const { api, clock, ids, close } = await upgraded(lots);
+  const costed = (): number => ids.filter((id) => api.kernel.get(id)!.fields.cost !== undefined).length;
+  clock.advance(SPREAD_MS + 1);
+  await settle(api);
+  assert.equal(costed(), 50);
+  /* AND THE SAME RUN AGAIN BEFORE THE DAY IS OUT IS NOT DUE, so the ten wait for tomorrow's. */
+  await settle(api);
+  assert.equal(costed(), 50);
+  /* A DAY FROM THE RUN BEFORE, PLUS ITS SPREAD AGAIN: `fireScript` arms the next one at the run's own time plus a day plus the same jitter. */
+  clock.advance(24 * 60 * 60_000 + SPREAD_MS);
+  await settle(api);
+  assert.equal(costed(), 60);
+  for (const [i, id] of ids.entries()) assert.deepEqual(api.kernel.get(id)!.fields.cost, { amount: 2 * (1_000 + i), currency: 'EUR' });
   close();
 });
 

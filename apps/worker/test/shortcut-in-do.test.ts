@@ -38,7 +38,7 @@
  * So every case is red under one of the two, and none is green only because the door refuses everything.
  *
  * WHAT IT FOUND AT HEAD: NOTHING WRONG. Every request answered below 500, the minted token filed EGP 2,500.00 as one
- * row on the account ending 327, and the wrong and rotated tokens were stored `untriaged` with the record's reason
+ * row on the account ending 846, and the wrong and rotated tokens were stored `untriaged` with the record's reason
  * "nothing verified this arrival, so no pattern was offered it". The text posted twice left one row and an empty inbox.
  *
  * ABOUT TWO SECONDS, 2.1 and 2.3 across two runs on 23 September: workerd starting once, and four records set up.
@@ -67,10 +67,10 @@ const PROVISION_KEY = 'shortcut-in-do-operator-key-not-a-secret';
 const SESSION_SECRET = 'shortcut-in-do-session-secret-not-a-secret-0123456789';
 const INGEST = 'bank-from-out-sms';
 
-/** `ingest-shortcut.test.ts`'s invented withdrawal: EGP 2,500.00 from the account ending 327. */
-const SMS = 'From HSBC: 16AUG26 ATM Cash Withdrawal from 042-118***-327 EGP 2500.00- Your available balance is EGP 31,040.25';
+/** `ingest-shortcut.test.ts`'s invented withdrawal: EGP 2,500.00 from the account ending 846. */
+const SMS = 'From HSBC: 16AUG26 ATM Cash Withdrawal from 310-527***-846 EGP 2500.00- Your available balance is EGP 31,040.25';
 /** A second withdrawal in the same wording, so the rotation case posts two texts that are not one arrival twice. */
-const SMS_AGAIN = 'From HSBC: 17AUG26 ATM Cash Withdrawal from 042-118***-327 EGP 1200.00- Your available balance is EGP 29,840.25';
+const SMS_AGAIN = 'From HSBC: 17AUG26 ATM Cash Withdrawal from 310-527***-846 EGP 1200.00- Your available balance is EGP 29,840.25';
 
 /**
  * The scratch rewrites the red was measured with, each one line of `arrivals()`: see the header.
@@ -101,7 +101,7 @@ async function counted(input: string | URL | Request, init?: RequestInit): Promi
   return res;
 }
 
-/** One record, provisioned, claimed, set up with Solo founder and the HSBC pack, and holding the account ending 327. */
+/** One record, provisioned, claimed, set up with Solo founder and the HSBC pack, and holding the account ending 846. */
 type Held = { rec: string; owner: Client; account: string; mint(): Promise<string>; post(token: string, body: string): Promise<Response> };
 
 let made = 0;
@@ -141,7 +141,7 @@ async function record(): Promise<Held> {
   /* THE ACCOUNT THE TEXT NAMES. `last4` is text and the bank prints three digits (`bank-hsbc-eg.ts`). */
   const account = await owner.create({
     register: 'accounts',
-    fields: { name: 'Cairo current account', kind: 'bank', balance: { amount: 0, currency: 'EGP' }, as_of: '2026-08-01', liquid: true, last4: '327' },
+    fields: { name: 'Cairo current account', kind: 'bank', balance: { amount: 0, currency: 'EGP' }, as_of: '2026-08-01', liquid: true, last4: '846' },
   });
   assert.ok(account.ok, JSON.stringify(account));
 

@@ -44,14 +44,14 @@ const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
 
 const OWNER: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 'owner' } };
 
-/** `money-ipn.test.ts`'s own `bank-from-out` wording: a withdrawal of EGP 2,500.00 from the account ending 327. */
-const SMS = 'From HSBC: 16AUG26 ATM Cash Withdrawal from 042-118***-327 EGP 2500.00- Your available balance is EGP 31,040.25';
+/** `money-ipn.test.ts`'s own `bank-from-out` wording: a withdrawal of EGP 2,500.00 from the account ending 846. */
+const SMS = 'From HSBC: 16AUG26 ATM Cash Withdrawal from 310-527***-846 EGP 2500.00- Your available balance is EGP 31,040.25';
 
 /** A second withdrawal in the same wording, so a test can post two debits that are not one arrival twice. */
-const SMS_AGAIN = 'From HSBC: 17AUG26 ATM Cash Withdrawal from 042-118***-327 EGP 1200.00- Your available balance is EGP 29,840.25';
+const SMS_AGAIN = 'From HSBC: 17AUG26 ATM Cash Withdrawal from 310-527***-846 EGP 1200.00- Your available balance is EGP 29,840.25';
 
 /** And its `bank-from-in` wording: EGP 418.62 of interest into the same account. */
-const CREDIT = 'From HSBC: 01AUG26 Deposit Interest 042-118***-327 EGP 418.62+ Your available balance is EGP 33,540.25';
+const CREDIT = 'From HSBC: 01AUG26 Deposit Interest 310-527***-846 EGP 418.62+ Your available balance is EGP 33,540.25';
 
 /**
  * The pack's webhook twins, as declarations. The seed installs them since money-core 1.7.0, so installing them again
@@ -69,7 +69,7 @@ async function record(): Promise<{ k: Kernel; sql: ReturnType<typeof openSqlite>
   assert.ok((await installSeed(k)).ok);
   const made = k.create(
     'accounts',
-    { name: 'Cairo current account', kind: 'bank', balance: { amount: 0, currency: 'EGP' }, as_of: day(0), liquid: true, last4: '327' },
+    { name: 'Cairo current account', kind: 'bank', balance: { amount: 0, currency: 'EGP' }, as_of: day(0), liquid: true, last4: '846' },
     { actor: 'p_seed' },
   );
   assert.ok(made.ok, JSON.stringify(made));

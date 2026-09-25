@@ -176,11 +176,11 @@ test('HSBC EGYPT\'S SIX TEXT TWINS SHARE ONE DOOR: a card text posted to bank-fr
   const k = await openRecord(sql, fixedClock(NOW));
   const seeded = await installSeed(k);
   assert.ok(seeded.ok, why(seeded));
-  const card = k.create('accounts', { name: 'Cairo credit card', kind: 'card', balance: { amount: 0, currency: 'EGP' }, as_of: day(0), liquid: false, last4: '6180' }, { actor: 'p_seed' });
+  const card = k.create('accounts', { name: 'Cairo credit card', kind: 'card', balance: { amount: 0, currency: 'EGP' }, as_of: day(0), liquid: false, last4: '9052' }, { actor: 'p_seed' });
   assert.ok(card.ok, why(card));
 
   /* INVENTED VALUES IN THE BANK'S OWN WORDS, the card wording `packages/seed/test/money-bank.test.ts` forwards by mail. */
-  const text = 'Your Credit Card ending with *** 6180 has been used for EGP 1,284.50 on 14/08/2026 at CEDAR LANE BAKERY. Your available limit is EGP 23,715.50';
+  const text = 'Your Credit Card ending with *** 9052 has been used for EGP 1,284.50 on 14/08/2026 at CEDAR LANE BAKERY. Your available limit is EGP 23,715.50';
   const out = arrived(k.arrive({ channel: 'webhook', ingest: 'bank-from-out-sms', body: text, sha256: 'hsbc-card-door', verified: true }));
   assert.deepEqual([out.state, out.ingest, out.confidence], ['matched', 'bank-card-used-sms', 'exact'], out.reason);
   sql.close();

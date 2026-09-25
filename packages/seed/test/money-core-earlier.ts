@@ -60,28 +60,30 @@ const egp = (minor: number): { amount: number; currency: string } => ({ amount: 
 const usd = (minor: number): { amount: number; currency: string } => ({ amount: minor, currency: 'USD' });
 
 /**
- * THE FOURTEEN ROWS THE OLD TOOL'S `money.assets` HOLDS, as a record on money-core 1.8.0 took them: eleven lots of gold
- * under the kind `gold`, a certificate and two policies. Read live on 2026-09-21 through `money_overview`.
+ * FOURTEEN ROWS OF THE SHAPE AN IMPORTED RECORD'S `holdings` TAKES ON money-core 1.8.0: eleven lots of gold under the
+ * kind `gold`, a certificate and two policies. EVERY VALUE IS INVENTED. The first version of this list copied a real
+ * record's holdings, lots, costs, dates, policy numbers and cover included, into a tree anybody can read, and it was
+ * replaced on September 25th with rows of the same kinds, count and currencies, which is all the tests beside it read.
  *
- * ONE ROW A LOT AND NOT ONE ROW A METAL, because that is what the source says and because the lots were bought at nine
- * different prices between May 2025 and July 2026: EGP 5,373.00 a unit on the first and EGP 8,336.00 on the dearest.
- * Adding them into "80 units of gold" loses the only thing that makes a cost a cost, which is the day it was paid.
+ * ONE ROW A LOT AND NOT ONE ROW A METAL, because that is what an import writes and because lots are bought at different
+ * prices on different days. Adding them into one "units of gold" row loses the only thing that makes a cost a cost,
+ * which is the day it was paid.
  */
 export const HELD_AT_1_8_0: readonly Held[] = [
-  { kind: 'certificate', label: 'Saving Certificate', qty: 1, unit_cost: egp(10_000_000), acquired_on: '2025-11-05', matures_on: '2028-11-05', note: 'Three years.' },
-  { kind: 'gold', label: 'Gold 24c', qty: 5, unit_cost: egp(537_300), acquired_on: '2025-05-02' },
-  { kind: 'gold', label: 'Gold 24c', qty: 5, unit_cost: egp(529_000), acquired_on: '2025-05-14' },
-  { kind: 'gold', label: 'Gold 24c', qty: 5, unit_cost: egp(558_000), acquired_on: '2025-06-18' },
-  { kind: 'gold', label: 'Gold 24c', qty: 10, unit_cost: egp(558_500), acquired_on: '2025-06-18' },
-  { kind: 'gold', label: 'Gold 24c', qty: 10, unit_cost: egp(794_800), acquired_on: '2026-03-27' },
-  { kind: 'gold', label: 'Gold 24c', qty: 10, unit_cost: egp(827_800), acquired_on: '2026-04-02' },
-  { kind: 'gold', label: 'Gold 24c', qty: 10, unit_cost: egp(833_600), acquired_on: '2026-04-08' },
-  { kind: 'gold', label: 'Gold 24c', qty: 10, unit_cost: egp(691_000), acquired_on: '2026-07-30' },
-  { kind: 'gold', label: 'Gold 24c', qty: 5, unit_cost: egp(691_000), acquired_on: '2026-07-30' },
-  { kind: 'gold', label: 'Gold 24c', qty: 5, unit_cost: egp(691_000), acquired_on: '2026-07-30' },
-  { kind: 'gold', label: 'Gold 24c', qty: 5, unit_cost: egp(691_000), acquired_on: '2026-07-30' },
-  { kind: 'policy', label: 'Northwind 5820614', qty: 1, unit_cost: usd(20_210), acquired_on: '2025-11-25', matures_on: '2052-11-25', note: 'Your Way For Protection Investment. USD 48,000.00 sum assured.' },
-  { kind: 'policy', label: 'Northwind 5836271', qty: 1, unit_cost: usd(10_105), acquired_on: '2025-12-07', matures_on: '2062-12-07', note: 'Your Way For Protection Investment. USD 24,000.00 sum assured.' },
+  { kind: 'certificate', label: 'Term deposit certificate', qty: 1, unit_cost: egp(2_500_000), acquired_on: '2025-10-12', matures_on: '2027-10-12', note: 'Two years.' },
+  { kind: 'gold', label: 'Gold 21c', qty: 2, unit_cost: egp(412_000), acquired_on: '2025-02-10' },
+  { kind: 'gold', label: 'Gold 21c', qty: 3, unit_cost: egp(418_500), acquired_on: '2025-03-21' },
+  { kind: 'gold', label: 'Gold 21c', qty: 1, unit_cost: egp(421_000), acquired_on: '2025-04-03' },
+  { kind: 'gold', label: 'Gold 21c', qty: 4, unit_cost: egp(430_200), acquired_on: '2025-06-09' },
+  { kind: 'gold', label: 'Gold 21c', qty: 2, unit_cost: egp(452_700), acquired_on: '2025-08-15' },
+  { kind: 'gold', label: 'Gold 21c', qty: 6, unit_cost: egp(468_000), acquired_on: '2025-09-30' },
+  { kind: 'gold', label: 'Gold 21c', qty: 2, unit_cost: egp(471_300), acquired_on: '2025-12-01' },
+  { kind: 'gold', label: 'Gold 21c', qty: 3, unit_cost: egp(489_900), acquired_on: '2026-01-19' },
+  { kind: 'gold', label: 'Gold 21c', qty: 1, unit_cost: egp(503_400), acquired_on: '2026-03-05' },
+  { kind: 'gold', label: 'Gold 21c', qty: 2, unit_cost: egp(497_600), acquired_on: '2026-05-22' },
+  { kind: 'gold', label: 'Gold 21c', qty: 4, unit_cost: egp(515_000), acquired_on: '2026-06-30' },
+  { kind: 'policy', label: 'Life policy LP-40217', qty: 1, unit_cost: usd(15_000), acquired_on: '2025-08-01', matures_on: '2050-08-01', note: 'Whole-life cover. USD 30,000.00 sum assured.' },
+  { kind: 'policy', label: 'Life policy LP-40388', qty: 1, unit_cost: usd(8_500), acquired_on: '2026-02-14', matures_on: '2046-02-14', note: 'Term cover. USD 20,000.00 sum assured.' },
 ];
 
 /**

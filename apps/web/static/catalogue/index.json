@@ -4,14 +4,179 @@
   "entries": [
     {
       "kind": "pack",
-      "id": "mercury-company",
-      "title": "mercury-company",
-      "summary": "Reads the balance of every Mercury account from api.mercury.com every 1h, into Money's accounts.",
+      "id": "bank-hsbc-eg",
+      "title": "bank-hsbc-eg",
+      "summary": "Reads HSBC Egypt alert mails and text messages into Money as transactions.",
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.1",
+      "latest": "1.3.0",
       "versions": [
+        {
+          "version": "1.3.0",
+          "checksum": "96d409feeaa352bb2ac76a3997d8becbb19378e6b9c9575c99fb5fff64d07cc2",
+          "bytes": 45254,
+          "published_at": "2026-09-24T23:19:27.433Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          }
+        }
+      ]
+    },
+    {
+      "kind": "pack",
+      "id": "count-cash",
+      "title": "Count the cash",
+      "summary": "Write down what is actually in a cash box or an account, and the record writes the difference into the ledger and sets the balance to what was counted.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "1b85ac1e3cb5ba1f67b279de2be2b70297749068b1f571bdeed7104da9667fab",
+          "bytes": 6444,
+          "published_at": "2026-09-24T23:19:27.433Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Cash counts"
+            ],
+            "pages": [
+              "Cash counts"
+            ],
+            "rules": [
+              "Write the difference of each count"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          }
+        }
+      ]
+    },
+    {
+      "kind": "pack",
+      "id": "feed-example",
+      "title": "feed-example",
+      "summary": "Polls stats.example.com every 1h for Monthly recurring revenue, Active users.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "9b6376f575569f68eab2049b28dd8ef781aebc31d2fc0599d305d83caa203e42",
+          "bytes": 2412,
+          "published_at": "2026-09-24T23:19:27.433Z",
+          "bump": null,
+          "reach": {
+            "modules": [],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "stats.example.com",
+                "line": "CALLS OUT stats.example.com · every 1h · grant \"Example stats (read only)\"",
+                "key": "Example stats (read only)"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "kind": "pack",
+      "id": "holdings",
+      "title": "holdings",
+      "summary": "What you hold rather than spend: certificates, policies and commodities, with what each one cost, and what they cost together.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "addon",
+      "latest": "1.1.0",
+      "versions": [
+        {
+          "version": "1.1.0",
+          "checksum": "75d5f011a508a43c50355a830bafbac5fdab81820b6ea73eed4a12b277c57195",
+          "bytes": 6223,
+          "published_at": "2026-09-24T23:19:27.433Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Holdings"
+            ],
+            "pages": [
+              "Holdings"
+            ],
+            "rules": [
+              "holdings_cost"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          }
+        }
+      ]
+    },
+    {
+      "kind": "pack",
+      "id": "mercury-company",
+      "title": "mercury-company",
+      "summary": "Reads the balance of every Mercury account from api.mercury.com every 1h, into Money's accounts, and its last thirty days of transactions into the ledger.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "addon",
+      "latest": "1.1.0",
+      "versions": [
+        {
+          "version": "1.1.0",
+          "checksum": "22bd5b192f079ae4e44dc6535b170edb1f655c0cba3804b1c07ff35f5fe68512",
+          "bytes": 11033,
+          "published_at": "2026-09-24T23:19:27.433Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "api.mercury.com",
+                "line": "CALLS OUT api.mercury.com · every 1h · grant \"none\"",
+                "key": null
+              },
+              {
+                "host": "api.mercury.com",
+                "line": "CALLS OUT api.mercury.com · every 1h · key \"Mercury (read only)\" to the host its vault entry opens",
+                "key": "Mercury (read only)"
+              }
+            ]
+          }
+        },
         {
           "version": "1.0.1",
           "checksum": "3d377d9a05c479bc893786ef5c45a26ebac8ce66ec3ef4e2a5b28b477967c155",
@@ -34,6 +199,40 @@
                 "key": null
               }
             ]
+          }
+        }
+      ]
+    },
+    {
+      "kind": "pack",
+      "id": "portfolio-bands",
+      "title": "Revenue bands",
+      "summary": "What your projects take a month now, and the room left in their forecasts next and later, worked out every day and drawn as one bar.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "34d12a976b6f3f96a2f9c842c2e902e2d5d60eb7f0eb30d940af40212d956040",
+          "bytes": 10865,
+          "published_at": "2026-09-24T23:19:27.433Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "portfolio"
+            ],
+            "lists": [
+              "Revenue bands"
+            ],
+            "pages": [
+              "Revenue bands"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
           }
         }
       ]
@@ -132,6 +331,74 @@
             "examples": 0,
             "skills": [],
             "calls_out": []
+          }
+        }
+      ]
+    },
+    {
+      "kind": "pack",
+      "id": "roadmap",
+      "title": "Roadmap",
+      "summary": "Your dated tasks on one time axis: work with an effort as a window, a due day as a line, and either dragged to a new date.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "0905fd621cdb8cc1d5338f0caec869a77c19b68e4d2b3ed6b8e85c6efed28f68",
+          "bytes": 1333,
+          "published_at": "2026-09-24T23:19:27.433Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "work"
+            ],
+            "lists": [],
+            "pages": [
+              "Roadmap"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          }
+        }
+      ]
+    },
+    {
+      "kind": "pack",
+      "id": "stripe",
+      "title": "Stripe",
+      "summary": "Reads the Stripe balance, available and pending, and the payouts on their way to the bank from api.stripe.com every hour, into Money's accounts.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "e9bb842bba2d4c80ea6e67ceed4dcbb716e5df0f51c86ca21dae3429de4882f5",
+          "bytes": 6537,
+          "published_at": "2026-09-24T23:19:27.433Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "api.stripe.com",
+                "line": "CALLS OUT api.stripe.com · every 1h · key \"stripe\" to the host its vault entry opens",
+                "key": "stripe"
+              }
+            ]
           }
         }
       ]

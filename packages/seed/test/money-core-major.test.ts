@@ -93,15 +93,18 @@ test('bank-hsbc-eg AND MERCURY PLAN CLEAN AND INSTALL on money-core 1.8.0 and on
 });
 
 test('EACH RANGE MOVED WITH A VERSION OF ITS OWN, and neither admits a money-core 3.0.0 nobody has read them against', () => {
-  /* MERCURY'S IS A PATCH STEP, AND THE REASON IS WHAT A RECORD HOLDS. Not one of its declarations moved: the bytes a
-     record stages are the bytes it staged, and only which Money they may sit beside is wider. `first-party.ts`'s rule
-     asks a minor step for something added and a major one for something taken away, and this is neither.
-     bank-hsbc-eg is a minor step instead, 1.1.0, because its five twin doors gained `door:` on top of the wider range
-     (one door, several patterns; wave forty-two), and 1.2.0 since `bank-card-used` reads and compares the limit its
-     alert prints; the range did not move with it. */
+  /* MERCURY'S WIDER RANGE WAS A PATCH STEP, 1.0.1, AND THE REASON IS WHAT A RECORD HOLDS. Not one of its declarations
+     moved: the bytes a record stages are the bytes it staged, and only which Money they may sit beside is wider.
+     `first-party.ts`'s rule asks a minor step for something added and a major one for something taken away, and this
+     is neither. It is 1.1.0 now by that same rule, because parity B4 (`e6d73bbd`) added to it: a ledger script that
+     files Mercury's transactions, and a `mercury_id` field it `extends` transactions with. That is something added, so
+     minor, and the range did not move with it, which is what the loop below still holds. bank-hsbc-eg is a minor step
+     instead, 1.1.0, because its five twin doors gained `door:` on top of the wider range (one door, several patterns;
+     wave forty-two), and 1.2.0 since `bank-card-used` reads and compares the limit its alert prints; the range did not
+     move with it. */
   assert.equal(BANK_HSBC_EG_VERSION, '1.3.0');
   assert.equal(bankHsbcEgPack().version, '1.3.0');
-  assert.equal(mercuryFile().version, '1.0.1');
+  assert.equal(mercuryFile().version, '1.1.0');
   for (const [name, doc] of [['bank-hsbc-eg', bankHsbcEgPack()], ['mercury', mercuryFile()]] as const) {
     const range = (doc.requires as { packs: Record<string, string> }).packs['money-core']!;
     assert.deepEqual(['1.7.0', '1.8.0', '2.0.0', '2.9.0', '3.0.0'].filter((v) => satisfies(v, range)), name === 'mercury' ? ['1.7.0', '1.8.0', '2.0.0', '2.9.0'] : ['1.8.0', '2.0.0', '2.9.0'], name);
