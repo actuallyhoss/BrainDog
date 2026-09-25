@@ -20,7 +20,8 @@
   import { page as state } from '$app/state';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { NOW, REGISTERS, heldBy, page as readPage, values } from '$lib/record/api.ts';
+  import { heldBy, page as readPage, values } from '$lib/record/api.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
   import { draw } from '$lib/record/blocks.ts';
   import Mark from '$lib/ui/Mark.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -50,8 +51,11 @@
      `{{ago:}}` in prose was formatted against the wall clock while every other date on the screen
      came from `NOW` — the Money page said an invoice was 6w overdue and the Home page said 5w, for
      the same row, two clicks apart. In production that reads differently on two devices and drifts
-     a day further every day. */
-  const opts = { resolve: (path: string) => resolved[path] ?? null, now: NOW, href: at };
+     a day further every day.
+
+     AND THE RECORD'S CLOCK IS THE SHELL'S `now`, which `boot` answered with. It was the seed's `NOW`, so every
+     `{{ago:}}` on a shared page was told against 3 September 2026. */
+  const opts = $derived({ resolve: (path: string) => resolved[path] ?? null, now: state.data.now, href: at });
 
   /**
    * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.

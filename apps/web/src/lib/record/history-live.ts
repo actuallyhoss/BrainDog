@@ -10,7 +10,8 @@
 
 import { createClient, type ClientOptions } from '@braindog/client';
 
-import { display, labelOf, REGISTERS } from './api.ts';
+import { display, labelOf } from './api.ts';
+import { REGISTERS } from './held.ts';
 import { readBoot } from './boot-live.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;

@@ -23,8 +23,12 @@ import { installSeed } from '@braindog/seed';
 
 import { NOW, ROWS } from './data.ts';
 import { saidPlainly } from './blocks.ts';
-import { read, withParam } from './metrics.ts';
+import { read as readAt, withParam } from './metrics.ts';
 import { compile, matches, registerHref } from './where.ts';
+/* THE SAMPLE'S ROW NAMES, which a live tab learns from the record and this test asks the mirror about by name. */
+import './fixtures/fill.ts';
+/* THE SAMPLE'S ROWS READ AT THE SAMPLE'S CLOCK, which `read` took for granted and now takes from its caller. */
+const read: typeof readAt = (decl, now = NOW) => readAt(decl, now);
 
 function openSqlite(): Parameters<typeof openRecord>[0] {
   const db = new DatabaseSync(':memory:');

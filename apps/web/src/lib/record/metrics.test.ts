@@ -15,11 +15,15 @@ import assert from 'node:assert/strict';
 
 import { METRICS } from './declared.ts';
 import { mixedFix } from './money.ts';
-import { BARE, currenciesRead, format, hrefFor, isTemplate, meetsTarget, read, spokenWindow, targetLine, unreadable, windowMs, withParam, type MetricDecl } from './metrics.ts';
+import { BARE, currenciesRead, format, hrefFor, isTemplate, meetsTarget, read as readAt, spokenWindow, targetLine, unreadable, windowMs, withParam, type MetricDecl } from './metrics.ts';
 import { applyFilters, metric } from './api.ts';
 import { compile, matches } from './where.ts';
 import { NOW, REGISTERS, ROWS } from './data.ts';
 import { amountOf } from './money.ts';
+/* THE SAMPLE'S ROW NAMES, which a live tab learns from the record and this test asks the mirror about by name. */
+import './fixtures/fill.ts';
+/* THE SAMPLE'S ROWS READ AT THE SAMPLE'S CLOCK, which `read` took for granted and now takes from its caller. */
+const read: typeof readAt = (decl, now = NOW) => readAt(decl, now);
 
 /** The documents that are metrics as they stand. A template is one until it has its parameter. */
 const CONCRETE = Object.entries(METRICS).filter(([, d]) => !isTemplate(d));
@@ -103,6 +107,19 @@ test('a predicate the evaluator cannot read is refused by the metric, not silent
   const r = read({ ...METRICS.overdue!, where: 'state is nonsense' });
   assert.ok(r.refusals.length);
   assert.match(r.refusals[0] ?? '', /no value nonsense/);
+});
+
+/**
+ * A RANGE IS PUT IN ORDER AT THE CLOCK THE ROWS ARE COUNTED AT, and `read` has one clock, its caller's.
+ *
+ * Measured on 25 September, with `read` handed the sample's 3 September: the rows were matched at the 3rd and the
+ * refusal was decided at the wall clock, so `due between today and 2026-09-20` was "today is past 2026-09-20" on a
+ * figure whose rows were read on a day it was not.
+ */
+test('a range of one day and one relative word is read at the clock the figure is read at', () => {
+  const where = 'due between today and 2026-09-20';
+  assert.deepEqual(read({ ...METRICS.overdue!, where }, NOW).refusals, []);
+  assert.match(read({ ...METRICS.overdue!, where }, Date.parse('2026-09-25T12:00:00Z')).refusals[0] ?? '', /today is past 2026-09-20/);
 });
 
 /* ── the link is derived ─────────────────────────────────────────────────── */

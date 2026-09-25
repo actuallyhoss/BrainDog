@@ -32,7 +32,7 @@
  * that catches the next drift rather than the last one.
  */
 
-import { REGISTERS } from './data.ts';
+import { REGISTERS } from './held.ts';
 import { display } from './api.ts';
 import type { Entry, FieldDecl } from './schema.ts';
 

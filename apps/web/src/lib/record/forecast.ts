@@ -22,7 +22,8 @@
  * off by a penny is a balance nobody trusts again.
  */
 
-import { NOW, REGISTERS, ROWS } from './data.ts';
+import { ROWS } from './data.ts';
+import { REGISTERS } from './held.ts';
 /* THE SAME MARKER `metrics.ts` PUTS IN ITS OWN CURRENCY SET, imported rather than retyped: two
    copies of the word a screen prints are two words that drift, and this one is printed by
    `mixedFix` on both sides of the product. */
@@ -121,7 +122,7 @@ function unreadCycle(row: Entry, leg: Leg): string | null {
  * renewed last month. Reading only the stored date would count each once and make every horizon
  * beyond a month wrong in the same direction: too cheap.
  */
-function occurrences(row: Entry, leg: Leg, first: string, until: number, last: string | null): { day: string; at: number }[] {
+function occurrences(row: Entry, leg: Leg, first: string, until: number, last: string | null, now: number): { day: string; at: number }[] {
   const start = noon(first);
   if (!Number.isFinite(start)) return [];
   /* A ROW ENDED BEFORE ITS FIRST DAY WALKS NOTHING, one-off or not, as the kernel's (`Leg.ends` there). */
@@ -141,7 +142,7 @@ function occurrences(row: Entry, leg: Leg, first: string, until: number, last: s
   /* A CYCLE BEFORE TODAY HAS ALREADY BEEN CHARGED. `renews` is an anchor nobody moves on, and every
      past cycle was clamped to today as overdue, so a monthly service anchored three months back
      charged four times on day one. Skipped cycles do not count toward the 64, as in the kernel. */
-  const today = iso(NOW);
+  const today = iso(now);
   /* A FIRST DAY THAT IS ITS MONTH'S LAST DAY STAYS ON THE LAST DAY, as the kernel's walk does since W57-2
      (`packages/kernel/src/forecast.ts`, `f732179d`). The clamp alone stepped a bill due 30 September to 30 October
      and 30 December, and `engines.test.ts` holds the two engines to the same walk, so CI went red on the push that
@@ -239,7 +240,12 @@ const HORIZON_CAP = 3650;
 /** Which movements a walk reads: one currency's, unconverted, or every one but those in `except`, converted as usual. */
 export type Only = string | { except: readonly string[] };
 
-export function runway(opening: number, legs: readonly Leg[], horizon = 180, only?: Only): Runway {
+/**
+ * `now` IS THE DAY THE WALK STARTS FROM, and the caller's. It was the seed's frozen `NOW` read here, which is right for
+ * the sample's rows and for nothing else: the rows this walks are `api.ts`'s mock, which passes its own clock, and any
+ * other caller gets the wall clock rather than 3 September 2026.
+ */
+export function runway(opening: number, legs: readonly Leg[], horizon = 180, only?: Only, now: number = Date.now()): Runway {
   /* THE HORIZON IS A NUMBER SOMEBODY TYPED IN A DECLARATION, and it was multiplied into a timestamp
      with nothing checked at all. A refusal is a value here as everywhere else, so a horizon this
      walk cannot carry is a sentence rather than a table drawn over a window that is not a window. */
@@ -257,7 +263,7 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180, onl
       ],
     };
 
-  const until = NOW + horizon * DAY_MS;
+  const until = now + horizon * DAY_MS;
   const refusals: string[] = [];
   const movements: { at: number; currency: string; step: Omit<Step, 'balance'> }[] = [];
   const seen = new Set<string>();
@@ -290,7 +296,7 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180, onl
     for (const row of ROWS[leg.register] ?? []) {
       /* THE SAME PREDICATE EVERY OTHER READ USES, compiled from the leg's own sentence — so a leg
          saying `state is open or part` means what the same words mean on a page. */
-      if (leg.where && !matches(row, compile(leg.register, leg.where), NOW)) continue;
+      if (leg.where && !matches(row, compile(leg.register, leg.where, now), now)) continue;
 
       /* A BARE NUMBER IS NOT MONEY, AND ADDING ONE IS MIXING. `amountOf` coerces any scalar, and
          `currencyOf` answers `null` for it — so a leg pointing at a `duration` or an `int` field
@@ -338,7 +344,7 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180, onl
       /* COUNTED WHERE THE KERNEL COUNTS IT: a row that reached the walk with money, a date and a
          step inside the window. A row with no amount, or one whose first day is past the horizon,
          is missing nothing from this walk whatever its cycle. */
-      const walked = occurrences(row, leg, on, until, last || null);
+      const walked = occurrences(row, leg, on, until, last || null, now);
       const cycle = unreadCycle(row, leg);
       if (cycle !== null && walked.length) unread.set(cycle, (unread.get(cycle) ?? 0) + 1);
 
@@ -348,12 +354,12 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180, onl
            says which rows those are. Dropping them read 116 days where the truth was 93. */
         /* BY THE DAY, as the kernel: noon UTC against the clock made a bill due today overdue in the
            afternoon, while `due before today` still excluded it. */
-        const late = r.day < iso(NOW);
+        const late = r.day < iso(now);
         movements.push({
-          at: late ? NOW : r.at,
+          at: late ? now : r.at,
           currency: currency ?? '',
           step: {
-            day: late ? new Date(NOW).toISOString().slice(0, 10) : r.day,
+            day: late ? new Date(now).toISOString().slice(0, 10) : r.day,
             label: `${label}${late ? ' \u00b7 overdue' : ''}`,
             delta: incoming ? amount : -amount,
             source: leg.register,
@@ -461,7 +467,7 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180, onl
     mixed,
     steps,
     crossed,
-    days: crossed ? Math.round((noon(crossed.day) - NOW) / DAY_MS) : null,
+    days: crossed ? Math.round((noon(crossed.day) - now) / DAY_MS) : null,
     horizon,
     refusals,
   };

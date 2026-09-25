@@ -13,9 +13,13 @@ import assert from 'node:assert/strict';
 import { applyFilters, page, pages, readBlock, type Filter } from './api.ts';
 import { NOW, PAGES, REGISTERS, ROWS } from './data.ts';
 import { draw, toSegments } from './blocks.ts';
-import { fill, resolvePages, slugify } from './pages.ts';
+import { fill, resolvePages as resolveAt, slugify } from './pages.ts';
 import { compile, matches, registerHref } from './where.ts';
 import type { PageDecl } from './schema.ts';
+/* THE SAMPLE'S ROW NAMES, which a live tab learns from the record and this test asks the mirror about by name. */
+import './fixtures/fill.ts';
+/* THE SAMPLE'S TEMPLATES EXPANDED AT THE SAMPLE'S CLOCK, which `resolvePages` took for granted and now takes from its caller. */
+const resolvePages: typeof resolveAt = (declared, now = NOW) => resolveAt(declared, now);
 
 const projects = () => Object.values(pages()).filter((p) => p.param?.register === 'things');
 

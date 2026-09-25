@@ -24,7 +24,6 @@
   import { copy } from '$lib/copy.ts';
   import {
     DOM_CAP,
-    REGISTERS,
     actorOf,
     display,
     healthLabel,
@@ -35,6 +34,7 @@
     updatesIn,
     workingAt,
   } from '$lib/record/api.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
   import type { Entry } from '$lib/record/schema.ts';
   /* Type only, so the client's route table stays out of this chunk. */
   import type { Opened } from '$lib/record/track-live.ts';

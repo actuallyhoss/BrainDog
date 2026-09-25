@@ -26,8 +26,7 @@
   import { page } from '$app/state';
   import { since } from 'braindog-render';
   import { titleOf } from '$lib/title.ts';
-  import { NOW } from '$lib/record/api.ts';
-  import { REGISTERS } from '$lib/record/data.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
   import { compile, explain } from '$lib/record/where.ts';
   import { openActions, type ActionRow, type CallOut } from '$lib/record/actions.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
@@ -80,7 +79,7 @@
 
   async function load(want: string) {
     const at = opened();
-    const out = await openAutomations((url, init) => fetch(url, init), apiBase(), () => NOW);
+    const out = await openAutomations((url, init) => fetch(url, init), apiBase());
     source = out.source;
     const rows = out.first.ok ? out.first.value : [];
     taken = rows.map((r) => r.id);
@@ -114,7 +113,7 @@
   }
 
   async function readDeclared() {
-    const out = await openActions((url, init) => fetch(url, init), apiBase(), () => NOW);
+    const out = await openActions((url, init) => fetch(url, init), apiBase());
     declared = out.first.ok ? out.first.value : [];
   }
 
@@ -130,7 +129,8 @@
   });
 
   const sample = $derived(source?.sample ?? false);
-  const now = $derived(sample ? NOW : Date.now());
+  /* THIS BROWSER'S CLOCK. It was the seed's 3 September 2026 whenever `sample` was set, and `sample` is `false` on every source now. */
+  const now = Date.now();
   const faults = $derived(flow.faults);
   const drawn = $derived(JSON.stringify(flow.body));
   /**

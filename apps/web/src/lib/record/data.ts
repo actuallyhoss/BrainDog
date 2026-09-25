@@ -71,12 +71,13 @@ import { cashSeries, openTasksSeries } from '@braindog/seed';
  * project template with "Runs on" after its own blocks, taken from the seed as a record holding the
  * pack installs them.
  */
-export const PAGES = { ...SEED_PAGES, project: projectWithRunsOn(), ...AGENTS_PAGES } as unknown as Record<string, PageDecl>;
+export const PAGES: Record<string, PageDecl> = Object.assign(HELD_PAGES, { ...SEED_PAGES, project: projectWithRunsOn(), ...AGENTS_PAGES } as unknown as Record<string, PageDecl>);
 import { NOW, TODAY } from '@braindog/seed';
 import { sessionDeclaration, stampFinished, type Counted } from '@braindog/kernel';
 /* `find.ts` reads `REGISTERS` from this module; the cycle is fine in ESM because `answers` is only
    called at render time, and it is the point — the receipts count the way the record counts. */
 import { answers } from './find.ts';
+import { PAGES as HELD_PAGES, REGISTERS as HELD_REGISTERS } from './held.ts';
 
 /**
  * The seed's registers, the agents pack's, and the kernel's `session`, as this app types them. The
@@ -84,8 +85,13 @@ import { answers } from './find.ts';
  *
  * AGENT RUNS COME FROM THE KERNEL'S OWN DECLARATION, the body migration 0002 seats, because that is
  * what a real record's `boot` lists. A copy written here would be the second "Agent runs" again.
+ *
+ * THEY GO INTO `held.ts`'S TABLE AND NOT A TABLE OF THEIR OWN, and so do the pages above. Every shipped reader reads the
+ * declarations there, where `learn` writes what the record answers; a second table here would be the sample's copy that
+ * no answer ever replaces, which is what the mock readers in `api.ts` would then draw. Wave C1 moves this copy into
+ * `fixtures/fill.ts`, a test-only import, and the table starts empty in a shipped tab.
  */
-export const REGISTERS = { ...SEED_REGISTERS, ...AGENTS_REGISTERS, session: sessionDeclaration().body } as unknown as Record<string, RegisterDecl>;
+export const REGISTERS: Record<string, RegisterDecl> = Object.assign(HELD_REGISTERS, { ...SEED_REGISTERS, ...AGENTS_REGISTERS, session: sessionDeclaration().body } as unknown as Record<string, RegisterDecl>);
 
 /**
  * WHICH RECORD THIS BUILD SHOWS, and the only place in the app that asks.

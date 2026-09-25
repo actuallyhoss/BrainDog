@@ -38,7 +38,21 @@ import { across, convertMinor, dayFieldOf, rateFor, type Part, type Rate } from 
 import { day as longDay, money, parse, since, workingCell, WORKING_MARK, type Block } from 'braindog-render';
 import { KINDS, isKind, type CardRole } from 'braindog-render';
 import type { Column } from 'braindog-render/svelte';
-import { NOW, REGISTERS, ROWS, display, feedWho, homeCurrency, walkTable, type BlockResult } from './api.ts';
+import { ROWS, display, feedWho, homeCurrency, walkTable, type BlockResult } from './api.ts';
+import { REGISTERS } from './held.ts';
+
+/**
+ * The instant a block was read at, which is the clock everything drawn from it is told against.
+ *
+ * IT WAS THE SEED'S `NOW`, 3 September 2026 at noon, for every block, so a live page converted its money at the rate
+ * of that day and banded its instants against it however late in the month the record was read. `stale_at` is the
+ * clock the reader matched the rows at (`page-live.ts` writes the record's `read_at`, the mock its own `NOW`), so a
+ * block and what it draws agree on what today is.
+ */
+const clockOf = (block: BlockResult): number => {
+  const at = Date.parse(block.stale_at);
+  return Number.isFinite(at) ? at : Date.now();
+};
 import { copy } from '../copy.ts';
 import type { Entry } from './schema.ts';
 import { declaredValue, registerHref } from './where.ts';
@@ -111,7 +125,7 @@ function barRows(block: BlockResult): string[] {
        holds such rows is left out, so a bar with nothing sized says its empty line. */
     const bare = e.fields[of];
     if (!link && (bare === undefined || bare === null || bare === '')) continue;
-    const said = display(block.register ?? '', by, e.fields[by], NOW, block.names);
+    const said = display(block.register ?? '', by, e.fields[by], clockOf(block), block.names);
     /* WHAT NO PART HOLDS IS ITS OWN ROW, LAST, where the block names it, and it opens those rows. */
     if (said === null && block.unset) {
       unset.push(...valuesOf(e.fields[of]));
@@ -160,7 +174,7 @@ function progressRows(block: BlockResult): string[] {
   const register = block.register ?? '';
   const [label, value, target, note] = block.columns.map((c) => c.field);
   if (!label || !value) return [];
-  const said = (field: string | undefined, v: unknown): string => (field ? (display(register, field, v, NOW, block.names) ?? '') : '');
+  const said = (field: string | undefined, v: unknown): string => (field ? (display(register, field, v, clockOf(block), block.names) ?? '') : '');
   const cap = (rows: string[]) => (block.limit === undefined ? rows : rows.slice(0, Math.max(0, block.limit)));
 
   /* A GOAL (`toward:`) sets each row's target, its second column, against what was logged toward that row. */
@@ -196,7 +210,7 @@ function progressRows(block: BlockResult): string[] {
   if (doneStates || decl?.fields.find((f) => f.id === value)?.type === 'bool') {
     const groups = new Map<string, { done: number; all: number }>();
     for (const e of block.matched) {
-      const key = display(register, label, e.fields[label], NOW, block.names) ?? REST;
+      const key = display(register, label, e.fields[label], clockOf(block), block.names) ?? REST;
       const g = groups.get(key) ?? { done: 0, all: 0 };
       g.all += 1;
       if (doneStates ? doneStates.has(String(e.fields[value])) : e.fields[value] === true) g.done += 1;
@@ -830,7 +844,7 @@ function charted(block: BlockResult): { charts: Charted; converted: string | nul
   const day = dayFieldOf(REGISTERS[register]?.fields ?? []);
   const dayOf = (e: BlockResult['matched'][number]): string => {
     const v = day ? e.fields[day] : null;
-    return typeof v === 'string' ? v.slice(0, 10) : new Date(NOW).toISOString().slice(0, 10);
+    return typeof v === 'string' ? v.slice(0, 10) : new Date(clockOf(block)).toISOString().slice(0, 10);
   };
   if (home !== null) {
     const amounts = block.matched.flatMap((e) => {
@@ -838,7 +852,7 @@ function charted(block: BlockResult): { charts: Charted; converted: string | nul
       const c = currencyOf(v);
       return c === null ? [] : [{ currency: c, amount: (v as { amount: number }).amount, day: dayOf(e) }];
     });
-    const got = across(amounts, home, fx.rates, new Date(NOW).toISOString().slice(0, 10));
+    const got = across(amounts, home, fx.rates, new Date(clockOf(block)).toISOString().slice(0, 10));
     if (got.kind === 'converted') {
       const matched = block.matched.map((e) => {
         const v = e.fields[of];
@@ -886,7 +900,7 @@ function linkedCharted(block: BlockResult, of: string): { charts: Charted; conve
   const fx = block.fx ?? fxNow();
   const home = fx.home;
   if (seen.size === 0 || (seen.size === 1 && (home === null || seen.has(home)))) return null;
-  const today = new Date(NOW).toISOString().slice(0, 10);
+  const today = new Date(clockOf(block)).toISOString().slice(0, 10);
   if (home !== null) {
     const got = across(held.map((h) => ({ currency: h.currency, amount: h.amount, day: today })), home, fx.rates, today);
     if (got.kind === 'converted') {

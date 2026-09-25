@@ -22,6 +22,8 @@ import assert from 'node:assert/strict';
 import { chipsOf, whereOf } from './api.ts';
 import { NOW, REGISTERS, ROWS } from './data.ts';
 import { compile, matches, registerHref } from './where.ts';
+/* THE SAMPLE'S ROW NAMES, which a live tab learns from the record and this test asks the mirror about by name. */
+import './fixtures/fill.ts';
 
 /** The seqs of the rows of `register` a sentence admits, in order. */
 const rowsFor = (register: string, sentence: string): number[] => {

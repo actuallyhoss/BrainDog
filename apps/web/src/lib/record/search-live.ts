@@ -21,7 +21,8 @@
 import { createClient, type ClientOptions } from '@braindog/client';
 
 import { copy } from '../copy.ts';
-import { iconFor, REGISTERS, type SearchHit, type SearchResult } from './api.ts';
+import { iconFor, type SearchHit, type SearchResult } from './api.ts';
+import { REGISTERS } from './held.ts';
 import { everyGovernance } from './governance.ts';
 import { terms, tokensOf } from './find.ts';
 import { learn } from './remote.ts';

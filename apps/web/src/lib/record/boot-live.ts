@@ -18,7 +18,8 @@ import { createClient, type Boot, type ClientOptions, type Cursor, type EventLin
 import { railRoom } from '@braindog/kernel';
 import { useCaseName } from '@braindog/seed/usecases/names';
 
-import { iconFor, PACKS, REGISTERS, setupSaid, whoDid, type boot, type NavEntry } from './api.ts';
+import { iconFor, PACKS, setupSaid, whoDid, type boot, type NavEntry } from './api.ts';
+import { learnPages, REGISTERS } from './held.ts';
 import { copy } from '../copy.ts';
 import type { SwitcherRow } from './switcher.ts';
 import { noteOf } from './history-live.ts';
@@ -139,7 +140,11 @@ export function readBoot(base: string, io?: Fetch): Promise<Booted> {
     const client = createClient({ base, ...(io ? { fetch: io } : {}) });
     const out = await client.boot();
     refusal = null;
-    if (out.ok) return { from: 'live', boot: out.value };
+    if (out.ok) {
+      /* THE PAGES' TITLES ARE KEPT WHERE A SCREEN LOOKS A PAGE UP BY SLUG (`held.ts`), which was the sample's copy alone. */
+      learnPages(out.value.pages ?? []);
+      return { from: 'live', boot: out.value };
+    }
     const said = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'The record changed while it was being read.' };
     /* NOT KEPT, THE 401 LEAST OF ALL. This line used to keep a 401 or an unreached host at the bare `/app` as the
        sample, for the tab, and so the first load after signing in was handed The Studio with no request made

@@ -22,7 +22,7 @@ import { createClient } from '@braindog/client';
 
 import { copy } from '../copy.ts';
 import { currencyFor, display, labelOf } from './api.ts';
-import { REGISTERS } from './data.ts';
+import { REGISTERS } from './held.ts';
 import { currencyOf } from './money.ts';
 import { entryOf, orderOf, refMapOf, targetsOf, treeOf, type RecordRow, type RefMap, type Refs } from './remote.ts';
 import type { Fetch } from './row-live.ts';

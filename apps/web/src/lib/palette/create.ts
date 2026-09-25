@@ -22,7 +22,7 @@
  * imports are the fixture declarations the palette already loads, and types.
  */
 
-import { REGISTERS } from '../record/api.ts';
+import { REGISTERS } from '../record/held.ts';
 import type { List } from '../record/palette.ts';
 import type { Fetch } from '../record/row-live.ts';
 import type { Captured, Wrote } from '../record/rows-write.ts';

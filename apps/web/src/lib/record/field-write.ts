@@ -30,7 +30,7 @@ import { createClient } from '@braindog/client';
 import { valueSaid } from '../voice.ts';
 import { labelOf } from './api.ts';
 import { forget, type Fetch } from './boot-live.ts';
-import { REGISTERS } from './data.ts';
+import { REGISTERS } from './held.ts';
 import { noRecord } from './device.ts';
 import { fieldWords } from './field-words.ts';
 import { learn } from './remote.ts';

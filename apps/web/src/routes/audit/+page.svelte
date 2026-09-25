@@ -17,7 +17,8 @@
   import Button from '$lib/ui/Button.svelte';
   import { day as fmtDay, since, stamp } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
-  import { AUDIT, DECIDED, DOM_CAP, NOW, PAGES, QUESTIONS, REGISTERS, entry } from '$lib/record/api.ts';
+  import { DOM_CAP } from '$lib/record/api.ts';
+  import { PAGES } from '$lib/record/held.ts';
   import { CapLine } from 'braindog-render/svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
@@ -127,8 +128,10 @@
    */
   let live = $state<{ events: AuditEvent[]; names: Map<string, string>; cursor: Cursor | null } | null>(null);
   let refused = $state<string | null>(null);
-  const LOG = $derived(route.data.live ? (live?.events ?? []) : AUDIT);
-  const clock = $derived(route.data.live ? Date.now() : NOW);
+  /* THE SAMPLE'S LOG AND ITS 3 SEPTEMBER CLOCK WERE THE OTHER HALF OF THESE TWO LINES, behind `route.data.live`, which
+     every shell sets `true` since wave A (`no-sample-b4.test.ts` says why it is no witness). */
+  const LOG = $derived(live?.events ?? []);
+  const clock = Date.now();
 
   /**
    * WHO THE READER IS, AND WHAT THE RECORD TOLD THEM THE OTHERS ARE CALLED.
@@ -219,18 +222,7 @@
    * `null` when nothing is known by that id any more, and the line prints the id alone, which is
    * what it did before rather than an empty name.
    */
-  const nameOf = (target: string): string | null => {
-    if (route.data.live) return live?.names.get(target) ?? null;
-    const row = /^([a-z0-9_-]+)#(\d+)$/.exec(target);
-    if (row) {
-      const reg = REGISTERS[row[1]!];
-      const found = reg ? entry(row[1]!, Number(row[2])) : undefined;
-      const title = reg && found ? String(found.fields[reg.title] ?? '') : '';
-      return title || null;
-    }
-    const id = spoken(target);
-    return [...QUESTIONS, ...DECIDED].find((q) => q.id === id)?.title ?? null;
-  };
+  const nameOf = (target: string): string | null => live?.names.get(target) ?? null;
 
   /**
    * Where a target goes when you click it.

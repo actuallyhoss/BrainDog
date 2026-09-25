@@ -29,7 +29,8 @@
   import { leadingCode, symbolFigure, TONES } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { valueSaid } from '$lib/voice.ts';
-  import { NOW, REGISTERS, dirOf, display, identityFor, toneOf } from '$lib/record/api.ts';
+  import { dirOf, display, identityFor, toneOf } from '$lib/record/api.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
   import type { Entry } from '$lib/record/schema.ts';
   import type { Names } from '$lib/record/remote.ts';
 
@@ -40,7 +41,7 @@
     picked,
     action,
     note,
-    now = NOW,
+    now = Date.now(),
     names,
   }: {
     register: string;
@@ -59,7 +60,7 @@
      * carries, and on a card the only place that shape fits is its own row.
      */
     note?: Snippet<[Entry]>;
-    /** The record's instant, which dates each card's tone and bands. The seed's, where nobody says. */
+    /** The record's instant, which dates each card's tone and bands. This browser's where nobody says; it was the seed's 3 September 2026, so under an unsaid clock a live invoice due on the 10th was still not overdue on the 25th. */
     now?: number;
     /** The record's own names and marks for the refs on these rows. Absent on the sample, which names them from its own rows. */
     names?: Names | undefined;

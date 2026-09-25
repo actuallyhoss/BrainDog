@@ -17,6 +17,8 @@ import { PAGES } from './data.ts';
 import { KINDS } from 'braindog-render';
 import type { BlockResult } from './api.ts';
 import type { PageBlock } from './schema.ts';
+/* THE SAMPLE'S ROW NAMES, which a live tab learns from the record and this test asks the mirror about by name. */
+import './fixtures/fill.ts';
 
 /**
  * A block bound to a register, with whatever the test wants to change about it.

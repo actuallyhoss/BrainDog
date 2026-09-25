@@ -46,7 +46,8 @@
   import { page } from '$app/state';
   import { CapLine, Table } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
-  import { DOM_CAP, iconFor, REGISTERS, columnsFor, seqWidth, display, labelOf, toRows, whereOf, type Filter } from '$lib/record/api.ts';
+  import { DOM_CAP, iconFor, columnsFor, seqWidth, display, labelOf, toRows, whereOf, type Filter } from '$lib/record/api.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';

@@ -20,7 +20,8 @@ import { withOrder } from '../../lib/nav.ts';
 import { SPEAKS, speaking, voiceBatch, voiceWrites, withSpeaks, type SpeakingState } from '../../lib/voice.ts';
 import { callsOutOf, type CallOut } from '../../lib/record/actions.ts';
 import type { PackState, Refusal } from '../../lib/record/packs.ts';
-import { PACKS, REGISTERS } from '../../lib/record/data.ts';
+import { PACKS } from '../../lib/record/data.ts';
+import { REGISTERS } from '../../lib/record/held.ts';
 
 type Body = Record<string, unknown>;
 type Wire<T> = { ok: true; value: T } | { ok: false; refusal: Refusal } | { ok: false; conflict: unknown };

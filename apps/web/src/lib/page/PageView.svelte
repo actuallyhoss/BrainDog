@@ -33,7 +33,8 @@
   import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
-  import { REGISTERS, homeCurrency, hueOf, iconFor, type BlockResult } from '$lib/record/api.ts';
+  import { homeCurrency, hueOf, iconFor, type BlockResult } from '$lib/record/api.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
   import { symbolText } from '$lib/record/money.ts';
   import { draw, saidPlainly, walkTables } from '$lib/record/blocks.ts';
   import { joinsWithOr, registerHref } from '$lib/record/where.ts';

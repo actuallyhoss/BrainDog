@@ -25,6 +25,8 @@ import { NOW, PAGES, REGISTERS, ROWS, VIEWS } from './data.ts';
 import { resolvePages } from './pages.ts';
 import type { Fields, Filter, PageDecl } from './schema.ts';
 import { compile, explain, matches, registerHref, resolveDay } from './where.ts';
+/* THE SAMPLE'S ROW NAMES, which a live tab learns from the record and this test asks the mirror about by name. */
+import './fixtures/fill.ts';
 
 const keep = (register: string, where: string) => {
   const w = compile(register, where);

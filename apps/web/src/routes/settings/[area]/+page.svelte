@@ -30,7 +30,8 @@
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
   /* THE DECLARATION CACHE AND THE PAGE READER, AND NOTHING ELSE OF THE SAMPLE'S. `REGISTERS` is what `learn` fills from
      a live record (`research-no-sample.md` 1d) and `pages` reads it; both move out of `api.ts` in wave B. */
-  import { REGISTERS, pages } from '$lib/record/api.ts';
+  import { pages } from '$lib/record/api.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
   import { LEVELS, type Level, type Person } from '$lib/record/schema.ts';
   /* WHETHER THE PERSON READING THIS MAY USE WHAT IS ON IT, which nothing here asked. `../levels.ts`
      carries what was measured: seven colleagues, every area, the owner's controls in all of them. */

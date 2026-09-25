@@ -59,7 +59,8 @@
   import { BINDINGS, overlays } from '../a11y/keys.svelte.ts';
   /* `REGISTERS` IS THE DECLARATION CACHE, not the sample: it names a list the rail has not, and `learn` fills it from the
      record (it still starts with the seed's declarations, which wave B's `held.ts` brief takes away). */
-  import { REGISTERS, type NavEntry } from '../record/api.ts';
+  import { type NavEntry } from '../record/api.ts';
+  import { REGISTERS } from '../record/held.ts';
   import { toasts } from '../ui/toast.svelte.ts';
   import Kbd from '../ui/Kbd.svelte';
   import Icon from '../ui/Icon.svelte';

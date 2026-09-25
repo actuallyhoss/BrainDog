@@ -22,7 +22,8 @@
  * that quietly matches everything.
  */
 
-import { NOW, REGISTERS, ROWS } from './data.ts';
+import { ROWS } from './data.ts';
+import { REGISTERS } from './held.ts';
 import { compile, matches } from './where.ts';
 import type { Entry, PageBlock, PageDecl } from './schema.ts';
 
@@ -94,8 +95,10 @@ const fillBlock = (b: PageBlock, row: Entry, spoken: string): PageBlock => ({
  *
  * Recomputed on read rather than cached, because the rows it depends on are the record. In the real
  * client this is the same expansion the kernel does when it answers `pages()`.
+ *
+ * `now` IS THE CLOCK THE ROWS ARE MATCHED AT, and `api.ts`'s mock passes the sample's with the sample's rows.
  */
-export function resolvePages(declared: Record<string, PageDecl>): Record<string, PageDecl> {
+export function resolvePages(declared: Record<string, PageDecl>, now: number = Date.now()): Record<string, PageDecl> {
   const out: Record<string, PageDecl> = {};
   const taken = new Set<string>();
 
@@ -135,7 +138,7 @@ export function resolvePages(declared: Record<string, PageDecl>): Record<string,
     const reg = REGISTERS[register];
     if (!reg) continue;
 
-    const w = compile(register, decl.for.where);
+    const w = compile(register, decl.for.where, now);
     /* A template whose own `for:` predicate cannot be read produces NO pages rather than one per
        row of the register. The same rule as everywhere else: an unreadable filter matches nothing. */
     if (w.bad.length) continue;
@@ -143,9 +146,9 @@ export function resolvePages(declared: Record<string, PageDecl>): Record<string,
     /**
      * THE RECORD'S CLOCK, WHICH THIS ONE LINE ALONE DID NOT USE.
      *
-     * It read `Date.now()`. Every other date in the browser resolves against `NOW`. `filterForBlock`
-     * passes it, `metrics.read` defaults to it, `forecast.runway` walks from it. Only this line
-     * did not, so a template whose `for:` said `state is open, due before today` expanded against
+     * It read `Date.now()` while every other date in the browser resolved against the mock's clock:
+     * `filterForBlock` passed it, and `metrics.read` and `forecast.runway` defaulted to it. Only this
+     * line did not, so a template whose `for:` said `state is open, due before today` expanded against
      * the wall clock while its blocks then filtered against the record's. Four pages existed
      * where the record has three: the extra one is an obligation falling between the two clocks,
      * it drew a heading and no rows, and the set drifted by a day every day while nothing else
@@ -155,7 +158,7 @@ export function resolvePages(declared: Record<string, PageDecl>): Record<string,
      * makes it a typo rather than a judgement. The shipped project template is undated, so this was
      * latent, and latent is not fixed.
      */
-    const rows = (ROWS[register] ?? []).filter((e) => matches(e, w, NOW));
+    const rows = (ROWS[register] ?? []).filter((e) => matches(e, w, now));
     rows.forEach((row, n) => {
       const title = String(row.fields[reg.title] ?? `${register}#${row.seq}`);
       /* A collision keeps the row's number, so two projects called the same thing are still two

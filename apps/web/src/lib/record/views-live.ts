@@ -35,7 +35,8 @@
 
 import { createClient, type ClientOptions } from '@braindog/client';
 
-import { DOM_CAP, PAGE, REGISTERS } from './api.ts';
+import { DOM_CAP, PAGE } from './api.ts';
+import { REGISTERS } from './held.ts';
 import {
   entryOf,
   learn,

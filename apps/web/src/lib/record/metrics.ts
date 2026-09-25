@@ -52,7 +52,8 @@ import {
 import { day as longDay, integer, money, shortDay } from 'braindog-render';
 
 import { copy } from '../copy.ts';
-import { LOOKUPS, NOW, REGISTERS, ROWS } from './data.ts';
+import { LOOKUPS, ROWS } from './data.ts';
+import { REGISTERS } from './held.ts';
 import { BARE, amountOf, currencyOf, mixedFix } from './money.ts';
 import { compile, everyClause, explain, joinsWithOr, matches, registerHref, resolveDay } from './where.ts';
 import type { Clause, Where } from './where.ts';
@@ -958,7 +959,11 @@ export function withParam(decl: MetricDecl, it: string): MetricDecl {
   };
 }
 
-export function read(decl: MetricDecl, now: number = NOW): Reading {
+/**
+ * `now` IS THE CALLER'S CLOCK, and `api.ts`'s mock passes the sample's with the sample's rows. The default was the seed's
+ * frozen `NOW`, so a caller that said nothing counted "overdue" as of 3 September 2026 whatever the day was.
+ */
+export function read(decl: MetricDecl, now: number = Date.now()): Reading {
   const refusals: string[] = [];
   if (!decl.target) refusals.push(`${decl.metric}: a number with no target is decoration`);
   if (!decl.window)
@@ -995,7 +1000,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
     refusals.push(`${decl.metric}: ${decl.window} is not a window. Write 30d, 4w or 3m`);
 
   if (register && REGISTERS[register])
-    refusals.push(...explain(compile(register, decl.where)).map((r) => `${decl.metric}: ${r}`));
+    refusals.push(...explain(compile(register, decl.where, now)).map((r) => `${decl.metric}: ${r}`));
 
   refusals.push(...groupingFaults(decl, register).map((r) => `${decl.metric}: ${r}`));
 
@@ -1007,7 +1012,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
     return { value: null, shown: '—', rows: 0, held: 0, delta: null, why: refusals[0] ?? '', unmeasured: null, refusals, ...(door ? { href: door } : {}) };
   }
 
-  const w = compile(register, decl.where);
+  const w = compile(register, decl.where, now);
   const all = ROWS[register] ?? [];
   const rows = all.filter((e) => matches(e, w, now));
   /* PAST THE REFUSAL ABOVE THE FIGURE HAS A LIST, so this is `hrefFor`'s answer with the `null` it can no longer give. */
@@ -1024,7 +1029,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
    * rather than a hole. The clock is the same one `rows` was matched at, because the parameter's
    * clauses resolve their dates exactly as the whole sentence does.
    */
-  const scope = decl.within === undefined ? null : compile(register, decl.within);
+  const scope = decl.within === undefined ? null : compile(register, decl.within, now);
   const heldRows = scope === null ? all : all.filter((e) => matches(e, scope, now));
 
   /* TWO CURRENCIES ARE NEVER ADDED, and this is the line that would have added them. A tile is one

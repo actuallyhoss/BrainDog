@@ -16,6 +16,8 @@ import { NOW, installSeed } from '@braindog/seed';
 
 import { readBlock } from './api.ts';
 import type { PageBlock } from './schema.ts';
+/* THE SAMPLE'S ROW NAMES, which a live tab learns from the record and this test asks the mirror about by name. */
+import './fixtures/fill.ts';
 
 type Sql = Parameters<typeof openRecord>[0];
 
@@ -67,6 +69,11 @@ const WHERES: (string | undefined)[] = [
   'by before +7d',
   'what is Rent',
   'thing is Kiln',
+  /* ONE WRITTEN-OUT DAY AND ONE RELATIVE WORD, which `compile` puts in order at a clock. The sample's engine matches at
+     the seed's 3 September and the kernel here is opened there too; `captureBlock` compiled at the wall clock once
+     `compile` stopped reading `NOW`, and on 25 September refused this as "today is past 2026-09-20" while the kernel
+     filled the task. */
+  'by between today and 2026-09-20',
 ];
 
 for (const where of WHERES)

@@ -11,7 +11,8 @@
   import { Block, Degraded, Markdown, Table } from 'braindog-render/svelte';
   import '$lib/blocks-charts.css';
   import { copy } from '$lib/copy.ts';
-  import { REGISTERS, homeCurrency } from '$lib/record/api.ts';
+  import { homeCurrency } from '$lib/record/api.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
   import { draw } from '$lib/record/blocks.ts';
   import { symbolText } from '$lib/record/money.ts';
   import { resolverOf, type LiveBlock } from '$lib/record/page-live.ts';

@@ -11,10 +11,14 @@
  * `schema`, for the lists this build ships as well as for the ones it does not. The seed's copy was
  * the source here, pinned equal to the record's by `packages/seed/test/declarations.test.ts`, and
  * that pin holds for a fresh seed and for no record in which somebody has added a field since.
+ *
+ * TWO WRITES, BOTH TO `held.ts`, AND NOTHING ELSE HERE KEEPS STATE: `learn` keeps a list's declaration
+ * and `refMapOf` keeps a walked list's row names, because the readers of those facts are spread over
+ * the app and none of them is handed the answer they came from.
  */
 
 import { identityOfRow, whereOf, type Identity } from './api.ts';
-import { REGISTERS, ROWS } from './data.ts';
+import { REGISTERS, seqTitled, TITLES } from './held.ts';
 import { searchable, terms } from './find.ts';
 import type { Entry, Fields, Filter, RegisterDecl } from './schema.ts';
 import { compile, declaredValue } from './where.ts';
@@ -112,6 +116,13 @@ export function targetsOf(register: string): string[] {
  *
  * A ROW WITH NO TITLE IS LEFT OUT rather than mapped to an empty string, and `display` then draws
  * `<list>#<number>`: a row somebody can go and open, instead of a blank where a name should be.
+ *
+ * AND THE NAMES ARE KEPT FOR THE TAB, in `held.ts`'s `TITLES`, because three readers of a ref by name have no map to be
+ * handed: `where.ts` compiling `thing is Harbour Lane`, `declares` below, and the new-row form's picker. All three
+ * read the sample's `ROWS`, so on a record they refused its own projects and offered the sample's (`no-sample-b3.test.ts`).
+ * The list is replaced whole, because every caller walks it to the end of its cursor; the one exception,
+ * `decide/[id]/proposed.ts`, keeps what it had when a page is refused, and a name missing from a list cut short is a
+ * ref drawn by its number until the next walk, never the sample's name.
  */
 export function refMapOf(register: string, rows: readonly Pick<RecordRow, 'id' | 'seq' | 'fields'>[]): RefMap {
   const seqOf = new Map<string, number>();
@@ -128,6 +139,7 @@ export function refMapOf(register: string, rows: readonly Pick<RecordRow, 'id' |
     const mark = identityOfRow(register, r.fields ?? {});
     if (mark) markOf.set(r.seq, mark);
   }
+  TITLES.set(register, new Map([...idOf.keys()].map((seq) => [seq, titleOf.get(seq) ?? ''])));
   return { seqOf, idOf, titleOf, markOf };
 }
 
@@ -168,12 +180,17 @@ const norm = (v: string): string => v.toLowerCase().replace(/_/g, ' ').trim();
 const ABSENCE: Readonly<Record<string, 'empty' | 'present'>> = { empty: 'empty', set: 'present', present: 'present' };
 const INVERSE = { empty: 'present', present: 'empty' } as const;
 
-/** The row of `register` a person named by its title, as the seed's copy has it. */
-function titled(register: string, said: string): number | null {
-  const title = REGISTERS[register]?.title;
-  if (!title) return null;
-  const hit = (ROWS[register] ?? []).find((e) => norm(String(e.fields[title] ?? '')) === norm(said));
-  return hit ? hit.seq : null;
+/**
+ * The row of `register` a person named by its title, as the record named it when this tab last walked that list.
+ *
+ * IT READ THE SAMPLE'S ROWS, so `thing is Kiln` found the sample's project #1 and `valueOf` sent the record the ULID of
+ * the record's own row #1, whatever that was called: a chip naming a project the record never held opened a real one.
+ * `refs` is the walk this answer is being built from, and is read first; `TITLES` is every walk this tab has made.
+ */
+function titled(register: string, said: string, refs?: Refs): number | null {
+  const same = (a: string, b: string): boolean => norm(a) === norm(b);
+  for (const [seq, title] of refs?.get(register)?.titleOf ?? []) if (same(title, said)) return seq;
+  return seqTitled(register, said, same);
 }
 
 /**
@@ -199,7 +216,7 @@ function valueOf(register: string, field: string, said: string, refs: Refs): str
   const type = f?.type === 'list' ? f.of : f?.type;
   if (type === 'enum') return declaredValue(register, field, said);
   if (type === 'ref' && f?.to) {
-    const seq = /^\d+$/u.test(said) ? Number(said) : titled(f.to, said);
+    const seq = /^\d+$/u.test(said) ? Number(said) : titled(f.to, said, refs);
     return (seq === null ? undefined : refs.get(f.to)?.idOf.get(seq)) ?? said;
   }
   return said;

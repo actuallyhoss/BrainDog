@@ -150,10 +150,9 @@ export type Opened = { source: Source; first: Answer<ActionRow[]>; absent: boole
 /**
  * The record's actions, and whether it has the read at all.
  *
- * `_at` WAS THE SAMPLE'S CLOCK. `Inspector.svelte` and `/automations/<id>` still pass `() => NOW` and are other briefs'
- * files; it can go once neither does.
+ * IT TOOK THE SAMPLE'S CLOCK AS A THIRD ARGUMENT, which nothing read once the sample went, and no caller passes it now.
  */
-export async function openActions(io: Fetch, base = '', _at?: () => number): Promise<Opened> {
+export async function openActions(io: Fetch, base = ''): Promise<Opened> {
   const source = live(io, base);
   const first = await source.actions();
   return { source, first, absent: !first.ok && first.refusal.code === 'ROUTE_UNKNOWN' };

@@ -22,7 +22,8 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
-  import { currencyFor, dirOf, display, iconFor, identityOf, labelOf, readableFields, REGISTERS, spokenRow, toneOf, whoDid } from '$lib/record/api.ts';
+  import { currencyFor, dirOf, display, iconFor, identityOf, labelOf, readableFields, spokenRow, toneOf, whoDid } from '$lib/record/api.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import Face from '$lib/ui/Face.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';

@@ -23,6 +23,8 @@ import { tileOf } from './news-live.ts';
 import { tileOf as pageTile } from './page-live.ts';
 import type { PageBlock } from './schema.ts';
 import { copy } from '../copy.ts';
+/* THE SAMPLE'S ROW NAMES, which a live tab learns from the record and this test asks the mirror about by name. */
+import './fixtures/fill.ts';
 
 type Sql = Parameters<typeof openRecord>[0];
 
@@ -346,7 +348,7 @@ test('A FIGURE GROUPED BY MONTH, BY WEEK AND BY A WORD HAS THE SAME PARTS IN BOT
   for (const decl of cases) {
     const kernel = k.metric(decl as never);
     assert.ok(kernel.ok, `${decl.metric}, the kernel: ${JSON.stringify(kernel)}`);
-    const web = webRead(decl);
+    const web = webRead(decl, NOW);
     assert.deepEqual(web.refusals, [], `${decl.metric}, the app: ${web.refusals.join('; ')}`);
     assert.ok((kernel.value.groups ?? []).length > 1, `${decl.metric} grouped into nothing`);
     assert.equal(web.value, kernel.value.value, `${decl.metric}: the whole`);
@@ -413,7 +415,7 @@ test('MONEY IN EGP AND USD READS THE SAME IN BOTH ENGINES: parts with no home cu
     for (const decl of decls) {
       const kernel = k.metric(decl as never);
       assert.ok(kernel.ok, JSON.stringify(kernel));
-      const web = webRead(decl);
+      const web = webRead(decl, NOW);
       assert.deepEqual(web.refusals, [], web.refusals.join('; '));
       assert.equal(web.value, kernel.value.value, `${label}, ${decl.metric}: the value`);
       assert.deepEqual(web.parts, kernel.value.parts, `${label}, ${decl.metric}: the parts`);
@@ -444,7 +446,7 @@ test('MONEY IN EGP AND USD READS THE SAME IN BOTH ENGINES: parts with no home cu
       'each account is drawn in its own currency',
     );
     for (const id of ['cash-avg', 'cash-min', 'cash-max', 'cash-spread', 'cash-each']) {
-      const r = webRead(decls.find((d) => d.metric === id)!);
+      const r = webRead(decls.find((d) => d.metric === id)!, NOW);
       assert.equal(r.parts?.length, 3, `${id} with no home currency is one amount per currency`);
     }
 
@@ -467,7 +469,7 @@ test('MONEY IN EGP AND USD READS THE SAME IN BOTH ENGINES: parts with no home cu
     assert.equal(typeof converted.value.value, 'number');
     assert.equal(Number.isInteger(converted.value.value), true, 'minor units are whole');
     for (const id of ['cash-avg', 'cash-min', 'cash-max', 'cash-spread', 'cash-each']) {
-      const r = webRead(decls.find((d) => d.metric === id)!);
+      const r = webRead(decls.find((d) => d.metric === id)!, NOW);
       assert.equal(r.parts, undefined, `${id} converted is one amount`);
       assert.equal(typeof r.value, 'number', `${id} converted is a number`);
       assert.equal(r.unit, 'EGP', `${id} converted is in pounds, never under the sterling format`);
@@ -557,7 +559,7 @@ test('A PLAN’S PARTS NAME THEIR PLAN AND A CONVERTED STEP NAMES ITS CURRENCY, 
     const legs = cashLegs();
     const kernel = k.runway(5_000_000, legs, 365);
     assert.ok(kernel.ok, JSON.stringify(kernel));
-    const web = webRunway(5_000_000, legs, 365);
+    const web = webRunway(5_000_000, legs, 365, undefined, NOW);
     const each = (w: WalkShape) => w.steps.map((s) => [s.day, s.label, s.delta, s.balance, s.from ?? null, s.of ?? null]);
     assert.equal(kernel.value.currency, 'EGP');
     assert.equal(web.currency, 'EGP');
@@ -691,7 +693,7 @@ test('A FIGURE WITH A PARAMETER HOLDS THE SAME `held` IN BOTH ENGINES, which is 
     const template = METRICS[id]!;
     const kernel = k.metric(fill(template, null, it) as never);
     assert.ok(kernel.ok, `${id}:${it}, the kernel: ${JSON.stringify(kernel)}`);
-    const web = webRead(withParam(template as WebMetric, it));
+    const web = webRead(withParam(template as WebMetric, it), NOW);
     assert.deepEqual(web.refusals, [], `${id}:${it}, the app: ${web.refusals.join('; ')}`);
     assert.equal(web.rows, kernel.value.rows, `${id}:${it}: what the predicate matched`);
     assert.equal(web.value, kernel.value.value, `${id}:${it}: the figure`);

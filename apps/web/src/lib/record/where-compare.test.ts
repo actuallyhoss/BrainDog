@@ -75,7 +75,7 @@ const askRecord = async (register: string, where: unknown): Promise<Answer> => {
 };
 
 const askBrowser = (register: string, sentence: string): Answer => {
-  const w = compile(register, sentence);
+  const w = compile(register, sentence, NOW);
   return w.bad.length
     ? { refused: w.bad[0] ?? '', seqs: [] }
     : { refused: null, seqs: (ROWS[register] ?? []).filter((e) => matches(e, w, NOW)).map((e) => e.seq).sort((a, b) => a - b) };

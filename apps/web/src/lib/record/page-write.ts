@@ -18,7 +18,7 @@ import { createClient } from '@braindog/client';
 import type { Row, RowRef } from 'braindog-render';
 
 import { copy } from '../copy.ts';
-import { REGISTERS } from './data.ts';
+import { REGISTERS } from './held.ts';
 import { pagesReader, type BlockBody, type Fetch as ClientFetch, type PageBody } from './pages-live.ts';
 import { declaredValue } from './where.ts';
 

@@ -321,10 +321,10 @@ export type Opened = { source: Source; first: Answer<AutomationRow[]>; absent: b
 /**
  * The record's automations, and whether it has the read at all.
  *
- * `_at` WAS THE SAMPLE'S CLOCK, and a sample was kept for the tab so the list and the editor agreed about a flow that had
- * been filed nowhere. Both routes still pass `() => NOW` and are other briefs' files; it can go once neither does.
+ * IT TOOK THE SAMPLE'S CLOCK AS A THIRD ARGUMENT, and a sample was kept for the tab so the list and the editor agreed
+ * about a flow that had been filed nowhere. Nothing read it once the sample went, and no caller passes it now.
  */
-export async function openAutomations(io: Fetch, base = '', _at?: () => number): Promise<Opened> {
+export async function openAutomations(io: Fetch, base = ''): Promise<Opened> {
   const source = live(io, base);
   const first = await source.automations();
   return { source, first, absent: !first.ok && first.refusal.code === 'ROUTE_UNKNOWN' };

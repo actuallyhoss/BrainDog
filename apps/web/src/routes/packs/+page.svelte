@@ -17,7 +17,8 @@
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { PAGES, REGISTERS, PACKS, packDiff, pages } from '$lib/record/api.ts';
+  import { PACKS, packDiff, pages } from '$lib/record/api.ts';
+  import { PAGES, REGISTERS } from '$lib/record/held.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { hostedHere } from '../settings/billing.ts';

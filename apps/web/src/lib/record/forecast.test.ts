@@ -10,10 +10,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { runway, trend, type Leg } from './forecast.ts';
+import { runway as walkAt, trend, type Leg } from './forecast.ts';
 import { NOW, PAGES, ROWS } from './data.ts';
 import { openingOf, page, readBlock, trendOf } from './api.ts';
 import { magnitudeOf } from 'braindog-render';
+/* THE SAMPLE'S ROWS WALKED AT THE SAMPLE'S CLOCK, which `runway` took for granted and now takes from its caller. */
+const runway: typeof walkAt = (opening, legs, horizon, only, now = NOW) => walkAt(opening, legs, horizon, only, now);
 
 /**
  * The legs the record declares, read from the shipped page rather than retyped.

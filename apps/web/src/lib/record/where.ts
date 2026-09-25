@@ -59,7 +59,7 @@
 import { exponentOf } from 'braindog-render';
 
 import { display, labelOf } from './api.ts';
-import { NOW, REGISTERS, ROWS } from './data.ts';
+import { REGISTERS, seqTitled, TITLES } from './held.ts';
 import { isMoney, type Entry, type FieldDecl } from './schema.ts';
 
 export type Clause =
@@ -547,8 +547,12 @@ function allowed(register: string, field: string): string[] | null {
     /* Titles AND sequence numbers. A declaration says `thing is Kiln` because that is what a person
        reads, but a URL says `thing:is:1` because a link should not break when a row is renamed —
        and `matches` already accepts either spelling. Allowing only one of them here refused the
-       other at compile time, which turned every Kiln metric's link into an empty grid. */
-    return (ROWS[f.to] ?? []).flatMap((e) => [norm(String(e.fields[title] ?? '')), String(e.seq)]).filter(Boolean);
+       other at compile time, which turned every Kiln metric's link into an empty grid.
+
+       AND BOTH ARE THE RECORD'S, as this tab last walked the list (`held.ts`). They were the sample's
+       rows, so on a record whose projects are Harbour Lane and Tidewater `thing is Harbour Lane` was
+       refused and `thing is Kiln` compiled (`no-sample-b3.test.ts`). */
+    return [...(TITLES.get(f.to) ?? [])].flatMap(([seq, name]) => [norm(name), String(seq)]).filter(Boolean);
   }
   return null;
 }
@@ -707,11 +711,15 @@ function elementValue(register: string, field: string, of: string, said: string,
 
        AND THE NUMBER STILL HAS TO NAME A ROW. `because has 999` is a refusal rather than a comparison
        against the characters `999`, which is exactly what `allowed` does with a `seq` on the scalar
-       path: an operand that resolves to nothing is this file's whole subject. */
-    const rows = ROWS[to] ?? [];
-    const numbered = /^\d+$/.test(said) ? rows.find((e) => e.seq === Number(said)) : undefined;
-    const row = numbered ?? rows.find((e) => String(e.fields[title] ?? '') === said);
-    return row ? String(row.seq) : null;
+       path: an operand that resolves to nothing is this file's whole subject.
+
+       AND THE ROWS ARE THE RECORD'S, AS THIS TAB LAST WALKED THEM (`held.ts`). They were the sample's,
+       so a live `because has <a learning the record holds>` was refused by name while a sample
+       learning's name compiled. */
+    const names = TITLES.get(to);
+    const numbered = /^\d+$/.test(said) && names?.has(Number(said)) ? Number(said) : null;
+    const seq = numbered ?? seqTitled(to, said);
+    return seq === null ? null : String(seq);
   }
 
   /* A BOOLEAN ELEMENT IS A BOOLEAN AND NOT THE WORD, which is why `matches` compares `String(v)`:
@@ -719,7 +727,7 @@ function elementValue(register: string, field: string, of: string, said: string,
   if (of === 'bool') return { true: 'true', yes: 'true', false: 'false', no: 'false' }[said.toLowerCase()] ?? null;
 
   /* A DAY IS CHECKED HERE AND RESOLVED IN `matches`, which is what `before` and `on` already do: this
-     function is called from `compile`, and `compile` has no clock of its own. Handing back an absolute
+     function is called from `compile`, whose clock orders a range and resolves nothing. Handing back an absolute
      day resolved on the wall clock made `days has today` answer nothing on a record whose rows were
      being matched against `NOW`. */
   if (of === 'day' || of === 'instant') return resolveDay(said, now) === null ? null : said;
@@ -927,7 +935,13 @@ function needleOf(text: string, field: string, type: string, said: string): { ne
 /** ASCII case folding, which is SQLite's `lower()` and the record's `evaluate`, and nothing wider. */
 const asciiFold = (s: string): string => s.replace(/[A-Z]/g, (c) => c.toLowerCase());
 
-export function compile(register: string, where: string | undefined): Where {
+/**
+ * `now` IS THE CLOCK THE ROWS WILL BE MATCHED AT, and the only thing it decides here is the order of a range whose ends
+ * are one written-out day and one relative word. It was the seed's frozen `NOW` for every caller, the live ones too, so
+ * on a record read on 25 September `due between today and 2026-09-20` was put in order as if today were the 3rd and
+ * sent to a record that refuses it. A caller matching at another clock, the mirror's, says so.
+ */
+export function compile(register: string, where: string | undefined, now: number = Date.now()): Where {
   const clauses: Clause[] = [];
   const bad: string[] = [];
 
@@ -1054,16 +1068,14 @@ export function compile(register: string, where: string | undefined): Where {
         bad.push(`${text}: between takes one unit, and this range has two.`);
         continue;
       }
-      /* THE DAYS PUT IN ORDER AT THE MIRROR'S CLOCK, `NOW`, which `api.ts`, `forecast.ts` and
-         `metrics.ts` hand `matches`. The first version used the wall clock, reasoning that two relative
-         words move together, and one written-out day with one relative word does not: with `NOW` on
-         3 September and the wall clock on the 24th, `due between today and 2026-09-20` was refused
-         here and answered by the record, and the reverse the other way round (`where-compare.test.ts`
-         holds both). The flow canvas's sample matches at the wall clock by default, so on that one
-         surface a mixed range can still be put in order at one clock and matched at another; the
-         whole cure is a clock handed to `compile`, which is a wider change than this branch. */
+      /* THE DAYS PUT IN ORDER AT THE CLOCK THE ROWS ARE MATCHED AT, `now`. The first version used the wall
+         clock, reasoning that two relative words move together, and one written-out day with one relative
+         word does not: with the mirror's clock on 3 September and the wall clock on the 24th,
+         `due between today and 2026-09-20` was refused here and answered by the record, and the reverse
+         the other way round (`where-compare.test.ts` holds both). The second version used the mirror's
+         clock for everybody, which is the same defect on a live record; the clock is now the caller's. */
       const rankOf = (b: { bound: Bound | null; day: string | null }): string | number =>
-        b.day !== null ? (resolveDay(b.day, NOW) ?? b.day) : (b.bound?.n ?? 0);
+        b.day !== null ? (resolveDay(b.day, now) ?? b.day) : (b.bound?.n ?? 0);
       if (rankOf(lo) > rankOf(hi)) {
         bad.push(`${text}: between takes the low value first, and ${low} is past ${high}.`);
         continue;
@@ -1625,8 +1637,9 @@ export const explain = (w: Where): string[] => w.bad;
 const spokenElement = (register: string, field: string, held: string): string => {
   const decl = REGISTERS[register]?.fields.find((f) => f.id === field);
   if (decl?.of !== 'ref' || !decl.to) return held;
-  const title = REGISTERS[decl.to]?.title;
-  const said = title ? (ROWS[decl.to] ?? []).find((e) => String(e.seq) === held)?.fields[title] : undefined;
+  /* THE RECORD'S NAME FOR THE ROW, as this tab last walked the list. It was the sample's, so a chip minted on a record
+     spelled that record's learnings#4 with the name of the sample's fourth learning. */
+  const said = [...(TITLES.get(decl.to) ?? [])].find(([seq]) => String(seq) === held)?.[1];
   return typeof said === 'string' && said && !said.includes(',') ? said : held;
 };
 

@@ -19,7 +19,8 @@
   says so.
 -->
 <script lang="ts">
-  import { NOW, REGISTERS, ROWS, currencyFor, labelOf, readableFields } from '../record/api.ts';
+  import { currencyFor, labelOf, readableFields } from '../record/api.ts';
+  import { REGISTERS, refOptions } from '../record/held.ts';
   import type { FieldDecl, Fields } from '../record/schema.ts';
   import { exponentOf } from 'braindog-render';
   import { copy } from '../copy.ts';
@@ -92,8 +93,9 @@
 
   const decl = $derived(REGISTERS[register]);
 
-  /** Four weeks out, from the record's clock. */
-  const soon = new Date(NOW + 28 * 86_400_000).toISOString().slice(0, 10);
+  /** Four weeks out, from today. It was four weeks from the sample's 3 September 2026, which is 1 October whatever the
+      day: six days out on the 25th, and a due date in the past from October on. */
+  const soon = new Date(Date.now() + 28 * 86_400_000).toISOString().slice(0, 10);
 
   /**
    * `secret` never appears. Not disabled, not greyed — absent, with the reason said once.
@@ -118,15 +120,12 @@
    */
   const fields = $derived(first ? firstAsks(readableFields(register), decl?.title, given) : readableFields(register));
 
-  /** The rows a `ref` can point at, titled the way a person says them. */
-  function options(f: FieldDecl): { value: number; label: string }[] {
-    const target = f.to ? REGISTERS[f.to] : undefined;
-    if (!target) return [];
-    return (ROWS[target.id] ?? []).map((e) => ({
-      value: e.seq,
-      label: String(e.fields[target.title] ?? `${target.id}#${e.seq}`),
-    }));
-  }
+  /**
+   * The rows a `ref` can point at, titled the way a person says them: the record's rows, as this tab last walked them.
+   *
+   * THEY WERE THE SAMPLE'S, on every record. `held.ts` says what was offered and what the number then pointed at.
+   */
+  const options = (f: FieldDecl): { value: number; label: string }[] => (f.to ? refOptions(f.to) : []);
 
   const id = (f: FieldDecl) => `new-${register}-${f.id}`;
   /* The label needs an id of its own now that the segmented control points at it rather than at an

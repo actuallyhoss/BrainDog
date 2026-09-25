@@ -19,7 +19,8 @@
 
 import { createClient, type ClientOptions } from '@braindog/client';
 
-import { columnsFor, iconFor, labelOf, REGISTERS, toRows, type Backlink } from './api.ts';
+import { columnsFor, iconFor, labelOf, toRows, type Backlink } from './api.ts';
+import { REGISTERS } from './held.ts';
 import { entryOf, learn, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;

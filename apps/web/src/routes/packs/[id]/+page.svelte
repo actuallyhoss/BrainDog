@@ -19,7 +19,8 @@
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { PACKS, PAGES, REGISTERS, pages } from '$lib/record/api.ts';
+  import { PACKS, pages } from '$lib/record/api.ts';
+  import { PAGES, REGISTERS } from '$lib/record/held.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import { HOME_CURRENCY_SETTING } from '@braindog/kernel';
   import { currencyChoices } from '$lib/record/currencies.ts';

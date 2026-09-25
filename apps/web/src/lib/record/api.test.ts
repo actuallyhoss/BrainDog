@@ -28,6 +28,8 @@ import { AUDIT, JOB, NEWS, NOW, PACKS, PAGES, REGISTERS, ROWS, VAULT } from './d
 import type { Entry } from './schema.ts';
 import type { Column } from 'braindog-render/svelte';
 import { magnitudeOf } from 'braindog-render';
+/* THE SAMPLE'S ROW NAMES, which a live tab learns from the record and this test asks the mirror about by name. */
+import './fixtures/fill.ts';
 
 /* ── money ───────────────────────────────────────────────────────────────── */
 

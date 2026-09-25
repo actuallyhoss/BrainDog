@@ -17,7 +17,7 @@
 
 import type { RowRef } from 'braindog-render';
 
-import { REGISTERS } from '../record/data.ts';
+import { REGISTERS } from '../record/held.ts';
 import { tickPatch, type Declared } from '../record/page-write.ts';
 import { inverseOf } from '../record/rows-write.ts';
 import type { Entry } from '../record/schema.ts';

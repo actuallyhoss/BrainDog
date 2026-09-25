@@ -36,7 +36,6 @@
   import Sheet from '$lib/ui/Sheet.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
-  import { NOW } from '$lib/record/api.ts';
   import { schemaOf } from '$lib/record/page-write.ts';
   import { callerAt, listDoors, type Door } from '$lib/ui/webhook-doors.ts';
   import {
@@ -120,7 +119,7 @@
   $effect(() => {
     if (!open || calls !== null || (verb !== 'call' && verb !== 'run')) return;
     calls = [];
-    void openActions((url, init) => fetch(url, init), apiBase(), () => NOW).then((out) => {
+    void openActions((url, init) => fetch(url, init), apiBase()).then((out) => {
       calls = out.first.ok ? out.first.value.filter((a) => a.channel === 'call') : [];
     });
   });

@@ -21,7 +21,7 @@ import { createClient } from '@braindog/client';
 
 import { labelOf } from './api.ts';
 import { forget, type Fetch } from './boot-live.ts';
-import { REGISTERS } from './data.ts';
+import { REGISTERS } from './held.ts';
 import { noRecord } from './device.ts';
 
 /**

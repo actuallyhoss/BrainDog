@@ -27,6 +27,8 @@ import { applyFilters, chipsOf, list, whereOf } from './api.ts';
 import { REGISTERS, ROWS } from './data.ts';
 import { clausesOf } from './views-live.ts';
 import { compile, registerHref } from './where.ts';
+/* THE SAMPLE'S ROW NAMES, which a live tab learns from the record and this test asks the mirror about by name. */
+import './fixtures/fill.ts';
 
 const route = readFileSync(new URL('../../routes/r/[register]/+page.svelte', import.meta.url), 'utf8');
 

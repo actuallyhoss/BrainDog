@@ -20,8 +20,10 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord, type Declaration } from '@braindog/kernel';
 
 import { NOW, ROWS } from './data.ts';
-import { runway, type Leg } from './forecast.ts';
+import { runway as walkAt, type Leg } from './forecast.ts';
 import type { Entry } from './schema.ts';
+/* THE SAMPLE'S ROWS WALKED AT THE SAMPLE'S CLOCK, which `runway` took for granted and now takes from its caller. */
+const runway: typeof walkAt = (opening, legs, horizon, only, now = NOW) => walkAt(opening, legs, horizon, only, now);
 
 const DAY = 86_400_000;
 const day = (offset: number) => new Date(NOW + offset * DAY).toISOString().slice(0, 10);

@@ -24,7 +24,6 @@
   import { apiBase, at } from '$lib/at.ts';
   import { untrack } from 'svelte';
   import { titleOf } from '$lib/title.ts';
-  import { NOW } from '$lib/record/api.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -39,7 +38,7 @@
 
   async function load() {
     const at = opened();
-    const out = await openAutomations((url, init) => fetch(url, init), apiBase(), () => NOW);
+    const out = await openAutomations((url, init) => fetch(url, init), apiBase());
     closed(out.first.ok || out.absent, at);
     sample = out.source.sample;
     if (out.first.ok) {
@@ -59,7 +58,8 @@
     if (from === 'ready' && rows.length > 0) drew('ready');
   });
 
-  const now = $derived(sample ? NOW : Date.now());
+  /* THIS BROWSER'S CLOCK. It was the seed's 3 September 2026 whenever `sample` was set, and `sample` is `false` on every source now. */
+  const now = Date.now();
 
   /* AN AGENT SETS THESE UP AS READILY AS A PERSON (DIRECTION §22), so the empty list says what to ask one, in the form
      every other empty state's prompt takes. An example a person reads and replaces, not a feature the code ships. */

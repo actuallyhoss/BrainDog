@@ -34,7 +34,9 @@
 
   import { at } from '../at.ts';
   import { copy } from '../copy.ts';
-  import { NOW, REGISTERS, page as readPage, values } from '../record/api.ts';
+  import { page as readPage, values } from '../record/api.ts';
+  import { page as route } from '$app/state';
+  import { REGISTERS } from '../record/held.ts';
   import { toSegments } from '../record/blocks.ts';
   import { bindableFor, seedBlock } from '../record/seed.ts';
   import type { PageBlock } from '../record/schema.ts';
@@ -59,8 +61,11 @@
      `{{ago:}}` in prose was formatted against the wall clock while every other date on the screen
      came from `NOW` — the Money page said an invoice was 6w overdue and the Home page said 5w, for
      the same row, two clicks apart. In production that reads differently on two devices and drifts
-     a day further every day. */
-  const opts = { resolve: (path: string) => resolved[path] ?? null, now: NOW, href: at };
+     a day further every day.
+
+     AND THE RECORD'S CLOCK IS THE SHELL'S `now`, which `boot` answered with. It was the seed's `NOW`, so every
+     preview's `{{ago:}}` was told against 3 September 2026 on a record read weeks later. */
+  const opts = $derived({ resolve: (path: string) => resolved[path] ?? null, now: route.data.now, href: at });
 
   const PURPOSES = ['figure', 'list', 'plan', 'say', 'media'] as const;
 

@@ -24,7 +24,6 @@ import { MISSING, integer, money, quantity } from 'braindog-render';
 import { copy } from '../copy.ts';
 import type { ActionRow, Outcome } from './actions.ts';
 import {
-  REGISTERS,
   agentsTable,
   columnHeading,
   decl as fieldOf,
@@ -39,6 +38,7 @@ import {
   type Walk,
   type WalkStep,
 } from './api.ts';
+import { REGISTERS } from './held.ts';
 import { linkOf } from './blocks.ts';
 import { METRICS } from './declared.ts';
 import { readBoot } from './boot-live.ts';

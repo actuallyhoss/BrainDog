@@ -21,7 +21,8 @@
 
 import { KINDS, isKind } from 'braindog-render';
 
-import { REGISTERS, ROWS } from './data.ts';
+import { ROWS } from './data.ts';
+import { REGISTERS } from './held.ts';
 import { amountOf } from './money.ts';
 
 /**

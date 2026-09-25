@@ -117,7 +117,7 @@ export function openingOf(
   if (!opening || typeof opening !== 'object' || typeof opening.metric !== 'string') return { value: null, unit: null };
   const decl = METRICS[opening.metric];
   if (!decl) return { value: null, unit: null, refusal: `There is no metric called ${opening.metric} for the walk to start from.` };
-  const reading = read(decl);
+  const reading = read(decl, NOW);
   if (reading.refusals.length) return { value: null, unit: null, refusal: reading.refusals[0]! };
   /* A BALANCE IN SEVERAL CURRENCIES WITH NO RATE BETWEEN THEM IS NOT ONE AMOUNT TO START FROM: its parts are, one walk a
      currency, as the record says. */
@@ -354,14 +354,16 @@ const moneyOr = (minor: number, currency: string | null): string => (currency ==
 const SECONDS: Record<string, number> = { s: 1, m: 60, h: 3_600, d: 86_400, w: 604_800 };
 
 /**
- * `now` IS THE RECORD'S INSTANT, and it defaults to the seed's. A screen reading a real record passes
- * the one `boot` answered with, so an `instant` is banded against the day the record thinks it is.
+ * `now` IS THE RECORD'S INSTANT, and it defaults to this browser's. A screen reading a real record passes
+ * the one `boot` answered with, so an `instant` is banded against the day the record thinks it is. The default was
+ * the seed's frozen 3 September 2026, so a live screen that passed nothing banded a record's instants against the
+ * sample's day; the mock readers below pass the sample's clock themselves.
  */
 export function display(
   register: string,
   field: string,
   value: unknown,
-  now: number = NOW,
+  now: number = Date.now(),
   names?: Names,
 ): string | null {
   if (value === null || value === undefined || value === '') return null;
@@ -646,7 +648,7 @@ export function columnsFor(register: string, declared?: RegisterDecl): Column[] 
  * and a paid one were the same card, on the surface where somebody is most likely to be looking for
  * exactly that difference.
  */
-export function toneOf(register: string, e: Entry, now: number = NOW): TableRow['tone'] {
+export function toneOf(register: string, e: Entry, now: number = Date.now()): TableRow['tone'] {
   const r = REGISTERS[register];
   if (!r) return undefined;
   const state = r.state ? String(e.fields[r.state] ?? '') : '';
@@ -663,7 +665,7 @@ export function toneOf(register: string, e: Entry, now: number = NOW): TableRow[
   return undefined;
 }
 
-export function toRows(register: string, entries: Entry[], columns: Column[], now: number = NOW, names?: Names): TableRow[] {
+export function toRows(register: string, entries: Entry[], columns: Column[], now: number = Date.now(), names?: Names): TableRow[] {
   /* AN ENUM IN SENTENCE CASE, as the register's own grid draws it. The list says "Owed by me" through
      a first-letter rule on its own markup; a page block or a backlink table drawing the same row said
      "owed by me", so one row read two ways a click apart. */
@@ -882,7 +884,7 @@ export const whereOf = (filters: Filter[], join?: 'any'): string =>
     .join(join === 'any' ? ', or ' : ', ');
 
 export function applyFilters(register: string, entries: Entry[], filters: Filter[], q?: string, join?: 'any'): Entry[] {
-  const w = compile(register, whereOf(filters, join));
+  const w = compile(register, whereOf(filters, join), NOW);
   let out = filters.length ? entries.filter((e) => matches(e, w, NOW)) : entries;
 
   /**
@@ -1170,7 +1172,7 @@ export function backlinks(register: string, seq: number, show = 5): Backlink[] {
         label: labelOf(f),
         icon: iconFor(r.icon, 'rows'),
         total: hits.length,
-        rows: toRows(id, hits.slice(0, show), columns),
+        rows: toRows(id, hits.slice(0, show), columns, NOW),
         columns,
         href: `/r/${id}?f=${f.id}:is:${seq}`,
       });
@@ -1268,7 +1270,7 @@ function overUnsaidField(decl: MetricDecl): boolean {
   if (register === null) return false;
   const reduced = reducedFields(decl.value);
   if (reduced.length === 0) return false;
-  return compile(register, decl.where).clauses.some((c) => c.op === 'present' && reduced.includes(c.field));
+  return compile(register, decl.where, NOW).clauses.some((c) => c.op === 'present' && reduced.includes(c.field));
 }
 
 /**
@@ -1339,7 +1341,7 @@ export function metric(id: string): Metric {
      the note says the figure it starts from. */
   if (id === 'runway') {
     const block = declaredWalk();
-    const walk = runway(openingOf(block?.opening).value ?? 0, block?.from ?? []);
+    const walk = runway(openingOf(block?.opening).value ?? 0, block?.from ?? [], undefined, undefined, NOW);
     /* AND A WALK OVER NOTHING IS NOT A RUNWAY OF OVER 180 DAYS. `tone: 'good'` is hard-coded on this
        branch, so a record with no money in it and nothing dated to spend reported the one figure in
        the product that is about the future as fine — out of an opening balance of zero and an empty
@@ -1407,7 +1409,7 @@ export function metric(id: string): Metric {
   if (!template)
     return { id, label: id, value: MISSING, note: 'no metric is declared under that name', tone: 'warn', href: '/p/money' };
   const decl = at === -1 ? template : withParam(template, id.slice(at + 1));
-  return figureTile(id, decl, read(decl));
+  return figureTile(id, decl, read(decl, NOW));
 }
 
 /**
@@ -1615,7 +1617,7 @@ export const hueOf = (id: { register: string; seq: number } | undefined): number
  * projects over one `project` declaration, where before there was a `kiln` page and no way to have
  * a second. Resolved on read rather than cached, because the rows it depends on are the record.
  */
-export const pages = (): Record<string, PageDecl> => resolvePages(PAGES);
+export const pages = (): Record<string, PageDecl> => resolvePages(PAGES, NOW);
 
 export function boot() {
   /* ONE RESOLUTION, READ TWICE. The rail below and the pen at the bottom of this function each
@@ -2020,7 +2022,7 @@ function splitWalks(opened: ReturnType<typeof openingOf>, b: PageBlock): { walks
   const legs = b.from ?? [];
   if (!Array.isArray(b.from) || (!opened.parts && opened.value === null)) return null;
   const home = fxNow().home;
-  const whole = opened.parts ? null : runway(opened.value!, legs, b.horizon);
+  const whole = opened.parts ? null : runway(opened.value!, legs, b.horizon, undefined, NOW);
   /* AN OPENING IN THE HOME CURRENCY AND A MOVEMENT WITH NO RATE INTO IT, as the record's `pages.ts` draws it: the home walk
      of everything that converts, and each currency with no rate on its own beside it, from nothing. */
   const lacking =
@@ -2028,20 +2030,20 @@ function splitWalks(opened: ReturnType<typeof openingOf>, b: PageBlock): { walks
       ? [...new Set(whole.missing.map((pair) => pair.split(' to ')[0]!))].sort()
       : [];
   if (lacking.length) {
-    const main = runway(opened.value!, legs, b.horizon, { except: lacking });
-    const walks = [{ ...main, currency: main.currency ?? home }, ...lacking.map((c) => runway(0, legs, b.horizon, c))];
+    const main = runway(opened.value!, legs, b.horizon, { except: lacking }, NOW);
+    const walks = [{ ...main, currency: main.currency ?? home }, ...lacking.map((c) => runway(0, legs, b.horizon, c, NOW))];
     return { walks: remembered(b, walks), note: walksNote(home, whole!.missing!, walks.length) };
   }
   const apart =
     opened.parts !== undefined ||
     (whole !== null && !opened.converted && !whole.mixed.includes(BARE) && ((whole.mixed.length > 0 && whole.steps.length === 0) || (opened.unit !== null && whole.currency !== null && opened.unit !== whole.currency)));
   if (!apart) return null;
-  const moving = whole ?? runway(0, legs, b.horizon);
+  const moving = whole ?? runway(0, legs, b.horizon, undefined, NOW);
   if (moving.mixed.includes(BARE)) return null;
   const currencies = [...new Set([...(opened.parts?.map((p) => p.currency) ?? (opened.unit ? [opened.unit] : [])), ...moving.mixed, ...(moving.currency ? [moving.currency] : [])])]
     .filter((c) => /^[A-Z]{3}$/u.test(c))
     .sort();
-  const walks = currencies.map((c) => runway(opened.parts ? (opened.parts.find((p) => p.currency === c)?.amount ?? 0) : opened.unit === c ? opened.value! : 0, legs, b.horizon, c));
+  const walks = currencies.map((c) => runway(opened.parts ? (opened.parts.find((p) => p.currency === c)?.amount ?? 0) : opened.unit === c ? opened.value! : 0, legs, b.horizon, c, NOW));
   if (walks.length === 0) return null;
   const missing = [...new Set([...(opened.missing ?? []), ...(moving.missing ?? [])])].sort();
   return { walks: remembered(b, walks), note: walksNote(home, missing, walks.length) };
@@ -2097,7 +2099,7 @@ function runwayBlock(b: PageBlock): BlockResult {
       metrics: undefined,
     };
   }
-  const walk = runway(opened.value ?? 0, b.from ?? [], b.horizon);
+  const walk = runway(opened.value ?? 0, b.from ?? [], b.horizon, undefined, NOW);
   /* A WALK THE RECORD CANNOT MAKE IS A SENTENCE, not an empty table. A cash walk over two currencies
      produces a crossing day that looks real and is invented.
 
@@ -2149,7 +2151,7 @@ function seriesBlock(b: PageBlock): BlockResult {
     b.ahead,
     (id) => (METRICS[id] ?? null) as never,
     (decl) => {
-      const r = read(decl as never);
+      const r = read(decl as never, NOW);
       return r.refusals.length
         ? { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: r.refusals[0]! } }
         : {
@@ -2228,7 +2230,7 @@ function latenessOf(b: PageBlock): number | null | string | undefined {
   if (b.late === undefined) return undefined;
   const decl = typeof b.late === 'string' ? METRICS[b.late] : undefined;
   if (!decl) return `There is no metric called ${String(b.late)} for the late knob to mark.`;
-  const reading = read(decl);
+  const reading = read(decl, NOW);
   return reading.refusals.length ? reading.refusals[0]! : reading.value;
 }
 
@@ -2332,7 +2334,7 @@ function drawnWhen(b: PageBlock): boolean {
      an unknown is guessing. */
   const decl = METRICS[b.when.metric];
   if (!decl) return false;
-  const reading = read(withParam(decl, b.when.metric));
+  const reading = read(withParam(decl, b.when.metric), NOW);
   /* A FIGURE IN SEVERAL CURRENCIES MEETS THE CONDITION WHEN ONE OF ITS AMOUNTS DOES, as the record reads it: money late
      in pounds is late whatever is late in dollars. */
   const said = reading.parts ? reading.parts.map((p) => p.amount) : reading.value === null ? [] : [reading.value];
@@ -2437,7 +2439,7 @@ function progressFigure(b: PageBlock, rows: readonly Entry[]): { spentBy?: NonNu
   const decl = METRICS[id];
   if (!decl) return { refusal: `${at}: there is no metric called ${id}` };
   if (typeof decl.group_by !== 'string' || decl.bucket !== undefined) return { refusal: `${at}: ${id} groups by a word, and a date cut into buckets is a series` };
-  const r = read(decl as never);
+  const r = read(decl as never, NOW);
   if (r.refusals.length) return { refusal: r.refusals[0]! };
   const unit = r.rows === 0 ? null : unitOfFormat(decl.format);
   const limit = b.columns?.[1]?.field;
@@ -2541,7 +2543,7 @@ export function readBlock(b: PageBlock): BlockResult {
           ...(c.as === undefined || (c.as === 'scope' && b.kind !== 'cards') ? {} : { as: c.as === 'scope' ? ('fact' as const) : c.as }),
         }))
       : [];
-    const rows = toRows(register ?? '', ringed(register, b, entries), columns);
+    const rows = toRows(register ?? '', ringed(register, b, entries), columns, NOW);
     (b.columns ?? []).forEach((c, i) => {
       if (c.as !== 'scope') return;
       entries.forEach((e, n) => {
@@ -2642,7 +2644,7 @@ function filterForBlock(register: string, entries: Entry[], b: PageBlock): { ent
      declarations is an agent and an agent cannot see it. See `where.ts`. */
   /* Compiled ONCE, not per row: resolving fields, dates and enum values against the register is
      work that does not change between rows, and doing it inside the filter made it O(rows). */
-  const predicate = b.where ? compile(register, b.where) : null;
+  const predicate = b.where ? compile(register, b.where, NOW) : null;
   let out = predicate ? entries.filter((e) => matches(e, predicate, NOW)) : entries;
 
   /* THERE WERE TWO HIDDEN WINDOWS HERE, keyed on register-and-kind: a `timeline` over services
@@ -2713,7 +2715,7 @@ function inheritFor(register: string, all: Entry[], b: PageBlock): { entries: En
   const decl = REGISTERS[register];
   const scope = scopeFieldOf(register);
   if (!decl || !scope) return none(`inherit: ${register} has no field that says where its rows apply, so there is nothing to inherit`);
-  const w = compile(register, b.where);
+  const w = compile(register, b.where, NOW);
   if (w.bad.length) return { entries: [], refusals: explain(w), own: 0 };
   const home = w.clauses.find((c): c is Extract<typeof c, { values: string[] }> => c.field === scope.id && c.op === 'is' && c.values.length === 1);
   if (!home) return none(`where: a block that inherits names its project, as ${scope.id} is <project>`);
@@ -2763,7 +2765,7 @@ function partsBlock(b: PageBlock, id: string): BlockResult {
   if (!decl) return computed(b, [`source: there is no metric called ${id}`]);
   if (typeof decl.group_by !== 'string' || decl.bucket !== undefined)
     return computed(b, [`source: a ${b.kind} over a figure draws its parts, so ${id} groups by a word, and a date cut into buckets is a series`]);
-  const r = read(decl);
+  const r = read(decl, NOW);
   if (r.refusals.length) return computed(b, r.refusals);
   const groups = (r.groups ?? []).map((g) => ({ key: g.key, value: g.value, ...(g.parts ? { parts: g.parts } : {}) }));
   return { ...computed(b, []), parts: { metric: id, value: r.value, groups, more: r.more ?? 0, unit: r.unit ?? null }, shown: groups.length, total: groups.length };
@@ -2800,7 +2802,10 @@ function captureBlock(b: PageBlock): BlockResult {
   const register = (b as PageBlock & { register?: unknown }).register;
   if (typeof register !== 'string' || register === '') return computed(b, ['register: a capture names the list it adds to, as register: tasks']);
   if (!REGISTERS[register]) return computed(b, [`register: there is no register called ${register}, so a capture has nowhere to add to`]);
-  const where = compile(register, b.where);
+  /* AT THE SAMPLE'S CLOCK, as every other read in this file: a range of one written-out day and one relative word is put
+     in order at the clock it is given, and the wall clock refused `by between today and 2026-09-20` here on the 25th
+     while the kernel, opened at the same 3 September as these rows, filled the task (`capture-block.test.ts`). */
+  const where = compile(register, b.where, NOW);
   const said = explain(where);
   if (said.length) return { ...computed(b, said), register };
   const filters: Filter[] = where.clauses.flatMap((c) => (c.op === 'is' && 'values' in c ? [{ field: c.field, op: c.op, values: c.values }] : []));
@@ -3455,7 +3460,7 @@ export function search(q: string, limit = 24): SearchResult {
         title,
         /* The register's own name is the GROUP heading these rows sit under, so repeating it on
            every row said the same word twice, eight times down the list. */
-        detail: display(id, r.state ?? '', e.fields[r.state ?? '']) ?? '',
+        detail: display(id, r.state ?? '', e.fields[r.state ?? ''], NOW) ?? '',
         /* AND WHY IT IS HERE, when the title does not contain what was typed. Broadening the match
            past the title means rows arrive under a name that does not answer the query, and a result
            somebody cannot connect to their own typing is one they stop trusting. */

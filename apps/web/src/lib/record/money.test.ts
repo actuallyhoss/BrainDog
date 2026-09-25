@@ -23,11 +23,16 @@ import { PAGES } from './data.ts';
 import { toSegments, walkTables } from './blocks.ts';
 import { NOW, ROWS } from './data.ts';
 import { BARE, amountOf, currencyOf, drawn, homeOf, merge, mixedFix, symbolText, total } from './money.ts';
-import { BARE as METRICS_BARE, currenciesRead, fxNote, read, targetSaid, withFx, type MetricDecl } from './metrics.ts';
+import { BARE as METRICS_BARE, currenciesRead, fxNote, read as readAt, targetSaid, withFx, type MetricDecl } from './metrics.ts';
 import { copy } from '../copy.ts';
 import { METRICS } from './declared.ts';
-import { runway } from './forecast.ts';
+import { runway as walkAt } from './forecast.ts';
 import type { Entry } from './schema.ts';
+/* THE SAMPLE'S ROWS WALKED AT THE SAMPLE'S CLOCK, which `runway` took for granted and now takes from its caller. */
+const runway: typeof walkAt = (opening, legs, horizon, only, now = NOW) => walkAt(opening, legs, horizon, only, now);
+
+/* THE SAMPLE'S ROWS READ AT THE SAMPLE'S CLOCK, which `read` took for granted and now takes from its caller. */
+const read: typeof readAt = (decl, now = NOW) => readAt(decl, now);
 
 const gbp = (amount: number) => ({ amount, currency: 'GBP' });
 const eur = (amount: number) => ({ amount, currency: 'EUR' });

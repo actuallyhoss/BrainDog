@@ -38,7 +38,7 @@
   import { carriedDocument, claimedBy, dayOf, formedFor, forms, moduleDocument, moduleManifest, plantedRows, withoutRows } from '@braindog/seed/usecases/install';
   import { linkExamples } from '@braindog/seed/usecases/links';
   import { PACKS } from '$lib/record/data.ts';
-  import { REGISTERS } from '$lib/record/api.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
   import { choose as readPacks } from '$lib/record/packs.ts';
   import { methods } from '$lib/auth.ts';
   import { addKey } from '$lib/start.ts';

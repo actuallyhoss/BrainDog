@@ -14,7 +14,7 @@
  * there, as it is on the grid, rather than written.
  */
 
-import { REGISTERS } from '../record/api.ts';
+import { REGISTERS } from '../record/held.ts';
 import { capturedFields, type Captured } from '../record/rows-write.ts';
 import type { Filter } from '../record/schema.ts';
 
