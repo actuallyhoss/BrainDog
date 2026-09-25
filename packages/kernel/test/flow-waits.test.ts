@@ -1,5 +1,5 @@
 /**
- * The steps that wait on somebody else: a person asked through Decide, and Spark asked through the outbox
+ * The steps that wait on somebody else: a person asked through Decide, and Slash asked through the outbox
  * (`loop/research-shell-automations.md` §4.3, Brief C).
  *
  * WHAT WAS MEASURED BEFORE THE RUNNER TOOK THEM. Both steps installed, and a run that reached either failed on the
@@ -7,11 +7,11 @@
  * `failed` where it expects `waiting`. The brief's red was that deciding the suggestion resolves it and the run never
  * moves; there was no suggestion to decide.
  *
- * ASKING SPARK IS THE HOST'S SWITCH, `answersSpark`, AND IT IS OFF UNLESS A HOST SAYS IT SERVES THE JOB. Off, the install
+ * ASKING SLASH IS THE HOST'S SWITCH, `answersSlash`, AND IT IS OFF UNLESS A HOST SAYS IT SERVES THE JOB. Off, the install
  * refuses the step with `NOT_IN_THIS_BUILD` and the runner fails a rule an earlier build installed with one, which is
- * what every host does today. The Spark half below opens its record with the switch on (`sparked`). These tests were
+ * what every host does today. The Slash half below opens its record with the switch on (`slashed`). These tests were
  * skipped until Brief A of `loop/research-infer-ask-next.md`: run against the build before it, each failed at install,
- * and the ack of a refusal ended the run on "Spark answered job ... with no text" and not on the refusal's own sentence.
+ * and the ack of a refusal ended the run on "Slash answered job ... with no text" and not on the refusal's own sentence.
  */
 
 import { test } from 'node:test';
@@ -59,7 +59,7 @@ const RATE = {
   on: { written: { register: 'obligations', op: ['create'] } },
   once_per: ['entry'],
   steps: [
-    { ask_spark: { question: 'What rate applies to {{what}}?', about: ['what', 'note'], as: 'rate', shape: 'number' } },
+    { ask_slash: { question: 'What rate applies to {{what}}?', about: ['what', 'note'], as: 'rate', shape: 'number' } },
     { notify: { say: 'Rate for {{what}}: {{vars.rate}}' } },
   ],
 };
@@ -70,17 +70,17 @@ const value = <T>(r: Result<T>): T => {
 };
 const codeOf = (r: Result<unknown>): string | null => (r.ok ? null : 'refusal' in r ? r.refusal.code : 'conflict');
 
-async function opened(answersSpark: boolean, decls: Declaration[]): Promise<{ k: Kernel; sql: NodeSql; clock: ReturnType<typeof fixedClock> }> {
+async function opened(answersSlash: boolean, decls: Declaration[]): Promise<{ k: Kernel; sql: NodeSql; clock: ReturnType<typeof fixedClock> }> {
   const sql = openSqlite();
   const clock = fixedClock(NOW);
-  const k = await openRecord(sql, clock, answersSpark ? { answersSpark: true } : {});
+  const k = await openRecord(sql, clock, answersSlash ? { answersSlash: true } : {});
   value(await k.install([OBLIGATIONS, ...decls]));
   return { k, sql, clock };
 }
 /** A record on a host that serves no `infer.ask`, which is every host until one says otherwise. */
 const record = (...decls: Declaration[]) => opened(false, decls);
-/** A record on a host that says it answers an automation's question to Spark. */
-const sparked = (...decls: Declaration[]) => opened(true, decls);
+/** A record on a host that says it answers an automation's question to Slash. */
+const slashed = (...decls: Declaration[]) => opened(true, decls);
 
 type Run = { id: string; state: string; step: number; vars: string; say: string | null };
 const run = (sql: NodeSql, of: string): Run | undefined =>
@@ -212,31 +212,31 @@ test('A SUGGESTION THE RUN DID NOT OPEN DOES NOT ANSWER IT, even when its body n
   sql.close();
 });
 
-/* ── asking Spark ──────────────────────────────────────────────────────── */
+/* ── asking Slash ──────────────────────────────────────────────────────── */
 
-test('THE SWITCH DECIDES WHETHER ask_spark INSTALLS: on, RATE installs; off, it is refused NOT_IN_THIS_BUILD at the step', async () => {
-  const on = await sparked();
+test('THE SWITCH DECIDES WHETHER ask_slash INSTALLS: on, RATE installs; off, it is refused NOT_IN_THIS_BUILD at the step', async () => {
+  const on = await slashed();
   assert.equal(codeOf((await on.k.install([rule(RATE)])) as Result<unknown>), null);
   on.sql.close();
   const off = await record();
   const refused = (await off.k.install([rule(RATE)])) as Result<unknown>;
   assert.equal(codeOf(refused), 'NOT_IN_THIS_BUILD');
-  assert.equal(!refused.ok && 'refusal' in refused ? refused.refusal.at : null, 'steps[0].ask_spark');
-  /* AN ASK IN EITHER ARM OF A BRANCH IS AN ASK. `sparkAskAt` walks both, and the checker measured that a walk of the
+  assert.equal(!refused.ok && 'refusal' in refused ? refused.refusal.at : null, 'steps[0].ask_slash');
+  /* AN ASK IN EITHER ARM OF A BRANCH IS AN ASK. `slashAskAt` walks both, and the checker measured that a walk of the
      top list alone left this body installing on a host that answers nothing, all the rest of this file still green. */
   const branched = (await off.k.install([
-    rule({ rule: 'fork', on: { manual: true }, steps: [{ set_var: { name: 'k', to: 'a' } }, { if: 'k is a', then: [{ notify: { say: 'A.' } }], else: [{ ask_spark: { question: 'Which?', as: 'which' } }] }] }),
+    rule({ rule: 'fork', on: { manual: true }, steps: [{ set_var: { name: 'k', to: 'a' } }, { if: 'k is a', then: [{ notify: { say: 'A.' } }], else: [{ ask_slash: { question: 'Which?', as: 'which' } }] }] }),
   ])) as Result<unknown>;
   assert.equal(codeOf(branched), 'NOT_IN_THIS_BUILD');
-  assert.equal(!branched.ok && 'refusal' in branched ? branched.refusal.at : null, 'steps[1].else[0].ask_spark');
+  assert.equal(!branched.ok && 'refusal' in branched ? branched.refusal.at : null, 'steps[1].else[0].ask_slash');
   off.sql.close();
 });
 
-test('A RULE AN EARLIER BUILD INSTALLED WITH ask_spark FAILS AT THE STEP, NOT_IN_THIS_BUILD, and queues nothing', async () => {
+test('A RULE AN EARLIER BUILD INSTALLED WITH ask_slash FAILS AT THE STEP, NOT_IN_THIS_BUILD, and queues nothing', async () => {
   /* INSTALL REFUSES THE STEP ON A HOST THAT DOES NOT ANSWER IT, and the build before the lint let one install, so a
      record can hold such a rule. Written into the table as that build left it, and read by a record opened over it. */
   const { sql, clock } = await record(rule({ rule: 'pick', on: { manual: true }, steps: [{ notify: { say: 'Before.' } }, { set_var: { name: 'which', to: 'x' } }] }));
-  const body = { rule: 'pick', on: { manual: true }, steps: [{ notify: { say: 'Before.' } }, { ask_spark: { question: 'Which?', as: 'which' } }] };
+  const body = { rule: 'pick', on: { manual: true }, steps: [{ notify: { say: 'Before.' } }, { ask_slash: { question: 'Which?', as: 'which' } }] };
   sql.exec("UPDATE declaration SET body = ? WHERE id = 'rule.pick' AND superseded_at IS NULL", JSON.stringify(body));
   const k = await openRecord(sql, clock);
   value(k.automationRun('pick', 'p_1'));
@@ -249,13 +249,13 @@ test('A RULE AN EARLIER BUILD INSTALLED WITH ask_spark FAILS AT THE STEP, NOT_IN
   sql.close();
 });
 
-test('A RUN THAT ASKS SPARK QUEUES ONE infer.ask AND WAITS; the ack writes the answer and the run carries on', async () => {
-  const { k, sql } = await sparked(rule(RATE));
+test('A RUN THAT ASKS SLASH QUEUES ONE infer.ask AND WAITS; the ack writes the answer and the run carries on', async () => {
+  const { k, sql } = await slashed(rule(RATE));
   value(k.create('obligations', { what: 'Gold' }, { actor: 'p_1' }));
   await k.drain();
 
   const r = run(sql, 'rate')!;
-  assert.equal(r.state, 'waiting', `the run did not wait for Spark: ${r.say ?? ''}`);
+  assert.equal(r.state, 'waiting', `the run did not wait for Slash: ${r.say ?? ''}`);
   const [job] = k.leaseOutbox(['infer.ask'], 10);
   assert.ok(job, 'no infer.ask row was queued');
   assert.deepEqual(JSON.parse(job.payload), {
@@ -277,9 +277,9 @@ test('A RUN THAT ASKS SPARK QUEUES ONE infer.ask AND WAITS; the ack writes the a
   sql.close();
 });
 
-test('AN ANSWER FROM SPARK THAT IS NOT THE SHAPE ASKED FOR FAILS THE RUN, and the job is still done', async () => {
-  const { k, sql } = await sparked(
-    rule({ rule: 'pick', on: { manual: true }, steps: [{ ask_spark: { question: 'Which?', as: 'which', shape: 'choice', choices: ['gold', 'silver'] } }, { notify: { say: '{{vars.which}}' } }] }),
+test('AN ANSWER FROM SLASH THAT IS NOT THE SHAPE ASKED FOR FAILS THE RUN, and the job is still done', async () => {
+  const { k, sql } = await slashed(
+    rule({ rule: 'pick', on: { manual: true }, steps: [{ ask_slash: { question: 'Which?', as: 'which', shape: 'choice', choices: ['gold', 'silver'] } }, { notify: { say: '{{vars.which}}' } }] }),
   );
   value(k.automationRun('pick', 'p_1'));
   await k.drain();
@@ -293,8 +293,8 @@ test('AN ANSWER FROM SPARK THAT IS NOT THE SHAPE ASKED FOR FAILS THE RUN, and th
   sql.close();
 });
 
-test('SPARK UNREACHABLE TO THE END OF THE LADDER FAILS THE RUN, and opens no retry question a retry could not answer', async () => {
-  const { k, sql } = await sparked(rule({ rule: 'pick', on: { manual: true }, steps: [{ ask_spark: { question: 'Which?', as: 'which' } }] }));
+test('SLASH UNREACHABLE TO THE END OF THE LADDER FAILS THE RUN, and opens no retry question a retry could not answer', async () => {
+  const { k, sql } = await slashed(rule({ rule: 'pick', on: { manual: true }, steps: [{ ask_slash: { question: 'Which?', as: 'which' } }] }));
   value(k.automationRun('pick', 'p_1'));
   await k.drain();
   const [job] = k.leaseOutbox(['infer.ask'], 10);
@@ -307,8 +307,8 @@ test('SPARK UNREACHABLE TO THE END OF THE LADDER FAILS THE RUN, and opens no ret
   sql.close();
 });
 
-test('AN ANSWER FROM SPARK TO A RUN ALREADY OVER CHANGES NOTHING, and the ask is taken off the queue when the run ends', async () => {
-  const { k, sql } = await sparked(rule({ rule: 'pick', on: { manual: true }, steps: [{ ask_spark: { question: 'Which?', as: 'which' } }, { notify: { say: '{{vars.which}}' } }] }));
+test('AN ANSWER FROM SLASH TO A RUN ALREADY OVER CHANGES NOTHING, and the ask is taken off the queue when the run ends', async () => {
+  const { k, sql } = await slashed(rule({ rule: 'pick', on: { manual: true }, steps: [{ ask_slash: { question: 'Which?', as: 'which' } }, { notify: { say: '{{vars.which}}' } }] }));
   /* A JOB A HOST ALREADY HOLDS IS ACKED AS DONE, and the run it answers stays as it ended. */
   const { run: first } = value(k.automationRun('pick', 'p_1'));
   await k.drain();
@@ -327,24 +327,24 @@ test('AN ANSWER FROM SPARK TO A RUN ALREADY OVER CHANGES NOTHING, and the ask is
   sql.close();
 });
 
-test('SPARK NOT ANSWERING WITHIN A DAY FAILS THE RUN at its wake', async () => {
-  const { k, sql, clock } = await sparked(rule({ rule: 'pick', on: { manual: true }, steps: [{ ask_spark: { question: 'Which?', as: 'which' } }] }));
+test('SLASH NOT ANSWERING WITHIN A DAY FAILS THE RUN at its wake', async () => {
+  const { k, sql, clock } = await slashed(rule({ rule: 'pick', on: { manual: true }, steps: [{ ask_slash: { question: 'Which?', as: 'which' } }] }));
   value(k.automationRun('pick', 'p_1'));
   await k.drain();
   clock.advance(DAY + HOUR);
   await k.drain();
   const r = run(sql, 'pick')!;
   assert.equal(r.state, 'failed');
-  assert.match(r.say ?? '', /Spark did not answer/);
+  assert.match(r.say ?? '', /Slash did not answer/);
   sql.close();
 });
 
 test('A REFUSAL ACKED AS result.failed ENDS THE RUN ON ITS OWN SENTENCE, not on "no text"', async () => {
   /* MEASUREMENT A OF `loop/research-infer-ask-next.md` §1.3, AS A TEST. The host's pass acks a refusal `done` with the
      package's sentence under `result.failed`, and `ack` read `result.text` alone, so the month's sentence was thrown
-     away and the run said "Spark answered job ... with no text". */
-  const spent = "rule.pick asked Spark at step 1, and this month's asks are spent until 1 October. Raise the monthly limit, or wait.";
-  const { k, sql } = await sparked(rule({ rule: 'pick', on: { manual: true }, steps: [{ ask_spark: { question: 'Which?', as: 'which' } }, { notify: { say: '{{vars.which}}' } }] }));
+     away and the run said "Slash answered job ... with no text". */
+  const spent = "rule.pick asked Slash at step 1, and this month's asks are spent until 1 October. Raise the monthly limit, or wait.";
+  const { k, sql } = await slashed(rule({ rule: 'pick', on: { manual: true }, steps: [{ ask_slash: { question: 'Which?', as: 'which' } }, { notify: { say: '{{vars.which}}' } }] }));
   value(k.automationRun('pick', 'p_1'));
   await k.drain();
   const [job] = k.leaseOutbox(['infer.ask'], 10);
@@ -356,13 +356,13 @@ test('A REFUSAL ACKED AS result.failed ENDS THE RUN ON ITS OWN SENTENCE, not on 
   sql.close();
 });
 
-test('A SECRET NAMED IN THE QUESTION TO SPARK IS REFUSED AT INSTALL, in every spelling that reaches its value', async () => {
+test('A SECRET NAMED IN THE QUESTION TO SLASH IS REFUSED AT INSTALL, in every spelling that reaches its value', async () => {
   /* FOUR SPELLINGS REACH `pin`: the row's own `{{pin}}` and `{{text:pin}}` through `rules.ts`'s `fill`, and the run's
      `{{trigger.row.pin}}`, spaces allowed, through `flow.ts`'s `PATH`. `{{trigger.row}}` names no field and is written
      as the JSON of the whole row, `pin` included, which the checker measured through `ask_person` on 23 September. */
-  const { k, sql } = await sparked();
+  const { k, sql } = await slashed();
   const asks = (question: string) =>
-    rule({ rule: 'rate', on: { written: { register: 'obligations', op: ['create'] } }, once_per: ['entry'], steps: [{ ask_spark: { question, as: 'rate' } }] });
+    rule({ rule: 'rate', on: { written: { register: 'obligations', op: ['create'] } }, once_per: ['entry'], steps: [{ ask_slash: { question, as: 'rate' } }] });
   for (const question of ['Rate for {{pin}}?', 'Rate for {{text:pin}}?', 'Rate for {{trigger.row.pin}}?', 'Rate for {{ trigger.row.pin }}?', 'Rate for {{trigger.row}}?'])
     assert.equal(codeOf((await k.install([asks(question)])) as Result<unknown>), 'DECLARATION_INVALID', question);
   /* A FIELD THAT IS NOT SECRET IS ASKED ABOUT AS ALWAYS. */
@@ -370,10 +370,10 @@ test('A SECRET NAMED IN THE QUESTION TO SPARK IS REFUSED AT INSTALL, in every sp
   sql.close();
 
   /* AND THE WHOLE ROW, WHERE THE LIST HOLDS NOTHING SECRET. */
-  const plain = await openRecord(openSqlite(), fixedClock(NOW), { answersSpark: true });
+  const plain = await openRecord(openSqlite(), fixedClock(NOW), { answersSlash: true });
   const JOBS: Declaration = { id: 'register.jobs', kind: 'register', body: { id: 'jobs', name: 'Jobs', title: 'what', fields: [{ id: 'what', type: 'text', required: true }] } as never };
   value(await plain.install([JOBS]));
-  const row = rule({ rule: 'rate', on: { written: { register: 'jobs', op: ['create'] } }, once_per: ['entry'], steps: [{ ask_spark: { question: 'Rate for {{trigger.row}}?', as: 'rate' } }] });
+  const row = rule({ rule: 'rate', on: { written: { register: 'jobs', op: ['create'] } }, once_per: ['entry'], steps: [{ ask_slash: { question: 'Rate for {{trigger.row}}?', as: 'rate' } }] });
   assert.equal(codeOf((await plain.install([row])) as Result<unknown>), null);
 });
 
@@ -383,9 +383,9 @@ test("THE LINT'S COPY OF THE ROW'S PATTERN REFUSES EVERY SPELLING rules.ts's fil
      digits must be refused at install. A spelling `fill` leaves as typed, such as `{{ pin }}`, may install. */
   const { fill } = await import('../src/rules.ts');
   const row = { id: 'e1', register: 'obligations', seq: 1, fields: { what: 'Rent', pin: '4321' }, state: null, version: 1, created_at: '', updated_at: '', deleted_at: null } as unknown as Entry;
-  const { k, sql } = await sparked();
+  const { k, sql } = await slashed();
   const asks = (question: string) =>
-    rule({ rule: 'rate', on: { written: { register: 'obligations', op: ['create'] } }, once_per: ['entry'], steps: [{ ask_spark: { question, as: 'rate' } }] });
+    rule({ rule: 'rate', on: { written: { register: 'obligations', op: ['create'] } }, once_per: ['entry'], steps: [{ ask_slash: { question, as: 'rate' } }] });
   for (const spelled of ['{{pin}}', '{{text:pin}}', '{{money:pin}}', '{{quantity:pin}}', '{{until:pin}}', '{{pct:pin}}', '{{ pin }}', '{{pin:text}}']) {
     const leaks = /4|3|2|1/.test(fill(`Rate ${spelled}?`, row, NOW));
     const code = codeOf((await k.install([asks(`Rate ${spelled}?`)])) as Result<unknown>);
@@ -397,15 +397,15 @@ test("THE LINT'S COPY OF THE ROW'S PATTERN REFUSES EVERY SPELLING rules.ts's fil
 test('A RULE STORED WITH A SECRET IN ITS QUESTION SENDS THE QUESTION WITHOUT IT', async () => {
   /* THE SECOND LINE, as `about:` has one: a rule an earlier build let install, or written into the table, fills its
      question from a row and a trigger context with every secret and file field taken out. */
-  const { sql, clock } = await sparked(rule({ rule: 'rate', on: { written: { register: 'obligations', op: ['create'] } }, once_per: ['entry'], steps: [{ set_var: { name: 'x', to: 'y' } }] }));
+  const { sql, clock } = await slashed(rule({ rule: 'rate', on: { written: { register: 'obligations', op: ['create'] } }, once_per: ['entry'], steps: [{ set_var: { name: 'x', to: 'y' } }] }));
   const body = {
     rule: 'rate',
     on: { written: { register: 'obligations', op: ['create'] } },
     once_per: ['entry'],
-    steps: [{ ask_spark: { question: 'Rate for {{what}}, {{pin}}, {{text:pin}}, {{ trigger.row.pin }}, {{trigger.row}}, {{trigger.row.note}}, {{old}}?', as: 'rate' } }],
+    steps: [{ ask_slash: { question: 'Rate for {{what}}, {{pin}}, {{text:pin}}, {{ trigger.row.pin }}, {{trigger.row}}, {{trigger.row.note}}, {{old}}?', as: 'rate' } }],
   };
   sql.exec("UPDATE declaration SET body = ? WHERE id = 'rule.rate' AND superseded_at IS NULL", JSON.stringify(body));
-  const k = await openRecord(sql, clock, { answersSpark: true });
+  const k = await openRecord(sql, clock, { answersSlash: true });
   /* ONLY THE VAULT WRITES A SECRET FIELD, so `pin` is put in the row as the vault would leave a value there, before the
      drain takes the run. `note` holds the words `{{pin}}`, which a question filled twice would read a second time. */
   const made = value<Entry>(k.create('obligations', { what: 'Rent', note: '{{pin}}' }, { actor: 'p_1' }));
@@ -448,13 +448,13 @@ test('THE LINT REFUSES WHAT THE RUNNER COULD NOT DO WITH AN ASK', async () => {
   /* A QUESTION GOES TO THE RECORD'S QUEUE, and nothing in this build addresses one to a person. */
   assert.equal(await one({ ask_person: { question: 'Pay?', options: ['yes', 'no'], as: 'a', to: 'p_2' } }), 'NOT_IN_THIS_BUILD');
   /* `about` IS FIELDS OF THE ROW, so a clock has none, a field the list lacks is named, and a secret never goes. Those
-     are told first, and a well-made ask of Spark is then refused as not in this build, since this record's host has not
+     are told first, and a well-made ask of Slash is then refused as not in this build, since this record's host has not
      said it answers one. */
-  assert.equal(await one({ ask_spark: { question: 'Rate?', as: 'r', about: ['what'] } }), 'DECLARATION_INVALID');
-  assert.equal(await one({ ask_spark: { question: 'Rate?', as: 'r', about: ['nosuch'] } }, written), 'FIELD_UNKNOWN');
-  assert.equal(await one({ ask_spark: { question: 'Rate?', as: 'r', about: ['pin'] } }, written), 'DECLARATION_INVALID');
-  assert.equal(await one({ ask_spark: { question: 'Rate?', as: 'r', about: ['what'] } }, written), 'NOT_IN_THIS_BUILD');
-  assert.equal(await one({ ask_spark: { question: 'Rate?', as: 'r' } }), 'NOT_IN_THIS_BUILD');
+  assert.equal(await one({ ask_slash: { question: 'Rate?', as: 'r', about: ['what'] } }), 'DECLARATION_INVALID');
+  assert.equal(await one({ ask_slash: { question: 'Rate?', as: 'r', about: ['nosuch'] } }, written), 'FIELD_UNKNOWN');
+  assert.equal(await one({ ask_slash: { question: 'Rate?', as: 'r', about: ['pin'] } }, written), 'DECLARATION_INVALID');
+  assert.equal(await one({ ask_slash: { question: 'Rate?', as: 'r', about: ['what'] } }, written), 'NOT_IN_THIS_BUILD');
+  assert.equal(await one({ ask_slash: { question: 'Rate?', as: 'r' } }), 'NOT_IN_THIS_BUILD');
   assert.equal(await one({ ask_person: { question: 'Pay?', options: ['yes', 'no'], as: 'a', wait: '2d' } }), null);
   sql.close();
 });

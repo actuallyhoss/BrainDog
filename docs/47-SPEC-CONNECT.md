@@ -725,4 +725,4 @@ Twenty-one, counted. Each amendment lands in the same revision loop iteration as
 
 ---
 
-*Previous: [46-SPEC-SPARK](46-SPEC-SPARK.md). Next: [48-SPEC-CLI](48-SPEC-CLI.md).*
+*Previous: [46-SPEC-SLASH](46-SPEC-SLASH.md). Next: [48-SPEC-CLI](48-SPEC-CLI.md).*

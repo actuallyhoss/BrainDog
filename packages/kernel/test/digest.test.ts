@@ -284,8 +284,8 @@ test('A PUSH CARRIES NO CONTENT, only which phone it rings', async () => {
   sql.close();
 });
 
-test('`prose: spark` QUEUES ONE INFERENCE AND STOPS, so a slow model never holds the alarm', async () => {
-  const { k, sql, clock } = await record(WEEKLY({ prose: 'spark' }));
+test('`prose: slash` QUEUES ONE INFERENCE AND STOPS, so a slow model never holds the alarm', async () => {
+  const { k, sql, clock } = await record(WEEKLY({ prose: 'slash' }));
   arm(sql, NOW);
   clock.set(NOW + 1000);
   await k.drain();
@@ -298,7 +298,7 @@ test('`prose: spark` QUEUES ONE INFERENCE AND STOPS, so a slow model never holds
   assert.deepEqual(payload.channels, ['email', 'in-app'], 'the ack has no idea where to send it');
 
   /* AND THE ACK IS WHERE IT LEAVES. This half was never written: the row was queued, nothing
-     consumed it, and every digest declaring `prose: spark` sent nothing on any channel, ever, with
+     consumed it, and every digest declaring `prose: slash` sent nothing on any channel, ever, with
      no error to say so. */
   const leased = k.leaseOutbox(['infer.prose'], 10);
   assert.equal(leased.length, 1);
@@ -314,7 +314,7 @@ test('`prose: spark` QUEUES ONE INFERENCE AND STOPS, so a slow model never holds
   const sent = outbox(sql).filter((r) => r.kind === 'notify.email');
   assert.equal(sent.length, 1, 'the ack sent no email');
   const mail = JSON.parse(sent[0]!.payload) as { text: string; subject: string };
-  assert.match(mail.text, /^Two invoices are open\. One is over a month late\.\n\n— Spark\n\n# Money, weekly/);
+  assert.match(mail.text, /^Two invoices are open\. One is over a month late\.\n\n— Slash\n\n# Money, weekly/);
   assert.ok(!mail.text.includes('third sentence'), 'the two-sentence cap is the record’s, and it did not apply it');
 
   /* AND THE IN-APP NOTE WENT TOO, from the headline decided when the alarm fired. */
@@ -332,7 +332,7 @@ test('A PROSE CALL THAT COULD NOT BE MADE IS RETRIED, and the digest goes at the
      request that never REACHED one is not: `pump` acks `failed` for a twenty-second timeout, a 502
      or a DNS blip, and nothing bills twice for a call that did not happen. So the ladder runs, and
      the ladder ending is the right moment to stop waiting for two sentences. */
-  const { k, sql, clock } = await record(WEEKLY({ prose: 'spark' }));
+  const { k, sql, clock } = await record(WEEKLY({ prose: 'slash' }));
   arm(sql, NOW);
   clock.set(NOW + 1000);
   await k.drain();
@@ -374,8 +374,8 @@ test('AND ON A HOST WITH NO MODEL IT SHIPS AS FIGURES NOW, rather than never', a
   /* A kind no host delivers waits `pending` for ever, which is right for a notification and wrong
      for the row that is HOLDING a digest: it parks everything behind it. A self-host with no model
      would have gone quiet the morning somebody added two sentences to a declaration, and stayed
-     quiet, with nothing anywhere saying why. 11 §3: Spark is an accelerant, never a dependency. */
-  const { k, sql, clock } = await record(WEEKLY({ prose: 'spark' }), true, ['notify.email']);
+     quiet, with nothing anywhere saying why. 11 §3: Slash is an accelerant, never a dependency. */
+  const { k, sql, clock } = await record(WEEKLY({ prose: 'slash' }), true, ['notify.email']);
   arm(sql, NOW);
   clock.set(NOW + 1000);
   await k.drain();
@@ -513,7 +513,7 @@ test('AND A DIGEST THAT NAMES A CHANNEL NOBODY DELIVERS DOES NOT INSTALL', async
   assert.equal((await refusal({ channels: ['webhook'], webhook: { url: 'http://plain.example' } })).at, 'webhook');
   assert.ok((await k.install([WEEKLY({ channels: ['webhook'], webhook: { url: 'https://hooks.example/x' } })])).ok);
 
-  /* AND `prose` IS WRITTEN BY SPARK OR BY NOBODY (42 §4.11). Anything else waits behind a model that
+  /* AND `prose` IS WRITTEN BY SLASH OR BY NOBODY (42 §4.11). Anything else waits behind a model that
      was never going to answer. */
   assert.equal((await refusal({ prose: 'gpt' })).at, 'prose');
   sql.close();

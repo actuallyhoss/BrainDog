@@ -14,7 +14,7 @@
     "@braindog/record": "workspace:*",
     "@braindog/script": "workspace:*",
     "@braindog/seed": "workspace:*",
-    "@braindog/spark": "workspace:*"
+    "@braindog/slash": "workspace:*"
   },
   "scripts": {
     "start": "node src/main.ts",

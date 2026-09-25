@@ -246,7 +246,7 @@ export type Version = {
   kernel: number;
   primitives: number;
   app: string | null;
-  spark: boolean;
+  slash: boolean;
 };
 
 /** `listDevices` and `revokeDevice`: one device grant, by its handle and never its poll id. See `DeviceRow` in `@braindog/kernel`. */
@@ -568,42 +568,42 @@ export type KeyPut = { credential: string; label: string; version: number; rotat
 export type KeyOpened = { credential: string; label: string; value: string };
 
 /**
- * `sparkRead`'s answer, WRITTEN OUT HERE BECAUSE THIS PACKAGE MAY NOT IMPORT `@braindog/spark`. It is `Reading` in
- * `packages/spark/src/types.ts`, key for key, and NOT the `46 §5.4` step 8 shape, which carries a `version` the built engine
+ * `slashRead`'s answer, WRITTEN OUT HERE BECAUSE THIS PACKAGE MAY NOT IMPORT `@braindog/slash`. It is `Reading` in
+ * `packages/slash/src/types.ts`, key for key, and NOT the `46 §5.4` step 8 shape, which carries a `version` the built engine
  * never sends: a client written to the specification would read `undefined` there. `predicate` is `34 §1`'s `where` tree,
- * or `null` when the model's draft did not fit and `q` is the keyword search Spark ran instead.
+ * or `null` when the model's draft did not fit and `q` is the keyword search Slash ran instead.
  */
-export type SparkWhere =
-  | { all: SparkWhere[] }
-  | { any: SparkWhere[] }
-  | { none: SparkWhere[] }
+export type SlashWhere =
+  | { all: SlashWhere[] }
+  | { any: SlashWhere[] }
+  | { none: SlashWhere[] }
   | ({ field: string; via?: string } & Record<string, unknown>)
   | { matches: string };
 
-/** One line of the fold, *What Spark read*: a register, how many rows, and the predicate as JSON or `all`. Never a value. */
-export type SparkTrace = { register: string; rows: number; predicate: string };
+/** One line of the fold, *What Slash read*: a register, how many rows, and the predicate as JSON or `all`. Never a value. */
+export type SlashTrace = { register: string; rows: number; predicate: string };
 
-/** One row Spark found, with the spoken id `tasks#3` a link is built from. */
-export type SparkRow = { id: string; register: string; seq: number; spoken: string; summary: string; fields: Record<string, unknown> };
+/** One row Slash found, with the spoken id `tasks#3` a link is built from. */
+export type SlashRow = { id: string; register: string; seq: number; spoken: string; summary: string; fields: Record<string, unknown> };
 
-export type Reading = { ask_id: string; predicate: SparkWhere | null; q: string | null; read: SparkTrace[]; rows: SparkRow[] };
+export type Reading = { ask_id: string; predicate: SlashWhere | null; q: string | null; read: SlashTrace[]; rows: SlashRow[] };
 
 /**
- * `sparkStatus`'s answer, `Status` in `packages/spark/src/types.ts` key for key, and written by hand for `Reading`'s reason.
+ * `slashStatus`'s answer, `Status` in `packages/slash/src/types.ts` key for key, and written by hand for `Reading`'s reason.
  * `model` is the package's short name on tier `a` today and not the model that answers, which is F2 of
  * `loop/research-spark-routes.md` and the host's to fix, so a page drawing it is drawing what the host said.
  */
-export type SparkTier = 'a' | 'b' | 'byo';
-export type SparkStatus = { tier: SparkTier; model: string; asks: { used: number; cap: number; resets: string } };
+export type SlashTier = 'a' | 'b' | 'byo';
+export type SlashStatus = { tier: SlashTier; model: string; asks: { used: number; cap: number; resets: string } };
 
-/** `sparkSettings`'s answer, `Settings` in the same file. `model` is `null` on tier `a`, which has none of its own. */
-export type SparkSettings = { tier: SparkTier; model: string | null; grant_id: string | null; ask_cap: number; updated_at: string };
+/** `slashSettings`'s answer, `Settings` in the same file. `model` is `null` on tier `a`, which has none of its own. */
+export type SlashSettings = { tier: SlashTier; model: string | null; grant_id: string | null; ask_cap: number; updated_at: string };
 
 /** The four keys a settings patch may carry. The door refuses any other with `FIELD_UNKNOWN`. */
-export type SparkSettingsPatch = Partial<Pick<SparkSettings, 'tier' | 'model' | 'grant_id' | 'ask_cap'>>;
+export type SlashSettingsPatch = Partial<Pick<SlashSettings, 'tier' | 'model' | 'grant_id' | 'ask_cap'>>;
 
-/** `sparkPropose`'s answer, `Proposal` in the same file. `filed` is the `SG<n>` it put on Decide, or `null` for a `query`. */
-export type SparkProposal = {
+/** `slashPropose`'s answer, `Proposal` in the same file. `filed` is the `SG<n>` it put on Decide, or `null` for a `query`. */
+export type SlashProposal = {
   text: string;
   citations: string[];
   verbs: ('decide' | 'defer' | 'dismiss' | 'edit' | 'save' | 'open')[];
@@ -611,7 +611,7 @@ export type SparkProposal = {
   body: Record<string, unknown>;
   model: string;
   filed: string | null;
-  read: SparkTrace[];
+  read: SlashTrace[];
 };
 
 /**
@@ -687,20 +687,20 @@ export function createClient(options: ClientOptions) {
   }
 
   /**
-   * The host's own doors: the app's key doors, `POST /api/keys/put` and `POST /api/keys/open`, and Spark's,
-   * `POST /api/spark/read`, `/api/spark/settings` and `/api/spark/propose` (and its one GET, in `hostGet` below).
+   * The host's own doors: the app's key doors, `POST /api/keys/put` and `POST /api/keys/open`, and Slash's,
+   * `POST /api/slash/read`, `/api/slash/settings` and `/api/slash/propose` (and its one GET, in `hostGet` below).
    *
    * NOT THROUGH `call`, BECAUSE THEY ARE NOT METHODS. `ROUTES` is the record's surface; these are a host step in
    * front of it at a fixed path, and a name in `NAMES` would be a name `handlersFor` had to route. The key doors
    * hand the record sealed bytes, which is why a browser may send a value at all, and the ask is answered by an
-   * engine the host builds and `packages/record` cannot import (`packages/host/test/spark-ask.test.ts` holds it out).
+   * engine the host builds and `packages/record` cannot import (`packages/host/test/slash-ask.test.ts` holds it out).
    *
    * AND NO BEARER IS SENT, EVER, even where this client holds one. A bearer is the thing these doors refuse, so
    * sending the caller's would turn every call into `NEEDS_BROWSER_SESSION`. The cookie and the `Origin` are the
    * browser's own and it sends both by itself.
    */
   async function hostDoor<T>(
-    path: 'keys/put' | 'keys/open' | 'spark/read' | 'spark/settings' | 'spark/propose',
+    path: 'keys/put' | 'keys/open' | 'slash/read' | 'slash/settings' | 'slash/propose',
     args: Record<string, unknown>,
   ): Promise<Result<T>> {
     return hostAnswer<T>(() =>
@@ -713,13 +713,13 @@ export function createClient(options: ClientOptions) {
   }
 
   /**
-   * The one host door that is a GET, `GET /api/spark/status`, under the same no-bearer rule.
+   * The one host door that is a GET, `GET /api/slash/status`, under the same no-bearer rule.
    *
    * A GET AND NOT `hostDoor` WITH AN EMPTY BODY, because `46 §5.2` has it as a GET and the door holds it to one:
    * a browser sends no `Origin` on a same-origin GET, and the door's origin rule for status is written for exactly
    * that request. A POST here would be answered 405.
    */
-  async function hostGet<T>(path: 'spark/status'): Promise<Result<T>> {
+  async function hostGet<T>(path: 'slash/status'): Promise<Result<T>> {
     return hostAnswer<T>(() => doFetch(`${base}/api/${path}`, { method: 'GET' }));
   }
 
@@ -749,27 +749,27 @@ export function createClient(options: ClientOptions) {
     /** Read one key back, once, by its label or by its spoken id. */
     openKey: (args: { label?: string; credential?: string }) => hostDoor<KeyOpened>('keys/open', args as unknown as Record<string, unknown>),
     /**
-     * Ask Spark one question, pass 1 of `46 §5.4`: the predicate it drafted, the rows that answered it, and what it read.
+     * Ask Slash one question, pass 1 of `46 §5.4`: the predicate it drafted, the rows that answered it, and what it read.
      * A browser session and this origin, like the key doors. 501 `NOT_IN_THIS_BUILD` on a host with no model behind it,
-     * which `version().spark` already says as `false`, and 422 `SPARK_BUDGET_SPENT` once the month's asks are used.
+     * which `version().slash` already says as `false`, and 422 `SLASH_BUDGET_SPENT` once the month's asks are used.
      */
-    sparkRead: (question: string) => hostDoor<Reading>('spark/read', { question }),
+    slashRead: (question: string) => hostDoor<Reading>('slash/read', { question }),
     /**
-     * Spark's tier, the model it names, and this month's asks against the cap. Any signed-in person may ask; the palette
+     * Slash's tier, the model it names, and this month's asks against the cap. Any signed-in person may ask; the palette
      * asks on open, which also builds the engine so the first question of the day finds it built. 501 with no model.
      */
-    sparkStatus: () => hostGet<SparkStatus>('spark/status'),
+    slashStatus: () => hostGet<SlashStatus>('slash/status'),
     /**
-     * Change how Spark is set up. The owner only, which the engine decides and answers 403 `FORBIDDEN` to anyone else;
+     * Change how Slash is set up. The owner only, which the engine decides and answers 403 `FORBIDDEN` to anyone else;
      * a key the door does not know is 422 `FIELD_UNKNOWN`, and tier `b` on a host that cannot open a key is 501.
      */
-    sparkSettings: (patch: SparkSettingsPatch) => hostDoor<SparkSettings>('spark/settings', patch as Record<string, unknown>),
+    slashSettings: (patch: SlashSettingsPatch) => hostDoor<SlashSettings>('slash/settings', patch as Record<string, unknown>),
     /**
-     * Pass 2 of `46 §5.5`: what Spark proposes about the rows pass 1 found. `askId` is `Reading.ask_id`, and with it the
+     * Pass 2 of `46 §5.5`: what Slash proposes about the rows pass 1 found. `askId` is `Reading.ask_id`, and with it the
      * engine re-projects the predicate it already drafted rather than asking the model for a second one.
      */
-    sparkPropose: (question: string, askId?: string) =>
-      hostDoor<SparkProposal>('spark/propose', askId === undefined ? { question } : { question, ask_id: askId }),
+    slashPropose: (question: string, askId?: string) =>
+      hostDoor<SlashProposal>('slash/propose', askId === undefined ? { question } : { question, ask_id: askId }),
     boot: () => call<Boot>('boot'),
     version: () => call<Version>('version'),
     schema: (register: string) => call<unknown>('schema', { register }),

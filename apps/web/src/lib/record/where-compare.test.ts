@@ -21,7 +21,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { installSeed } from '@braindog/seed';
 
-import { whereWords } from '../palette/spark.ts';
+import { whereWords } from '../palette/slash.ts';
 import { NOW, REGISTERS, ROWS } from './data.ts';
 import { compile, matches, registerHref } from './where.ts';
 

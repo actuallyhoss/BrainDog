@@ -420,7 +420,7 @@ const WHOLE: ReadonlySet<string> = new Set(['activity', 'actions', 'governance.o
  * differently about `section`, with nothing in either name to say they disagreed. Two names now,
  * one question each, and `apps/web`'s `block-kinds.test.ts` holds the two packages together.
  */
-/* `ReadonlySet` BECAUSE IT LEAVES THE PACKAGE, which `SPARK_KINDS` in `spark.ts` is declared as for
+/* `ReadonlySet` BECAUSE IT LEAVES THE PACKAGE, which `SLASH_KINDS` in `slash.ts` is declared as for
    the same reason: a bare `new Set` exported hands every caller `add` and `delete` on the set the
    kernel refuses by. */
 /* `heat` IS ONE OF THEM BECAUSE IT ADDS THE ROWS ON ONE DAY TOGETHER (`render/src/heat.ts`), and it was left out
@@ -1495,11 +1495,11 @@ const ACTIVITY: Schema = {
 /**
  * The kind of actor behind an event, by `30 §3`'s grammar.
  *
- * A run and a token are agents, and so is `spark`; a rule, an ingest and the record's own work are
+ * A run and a token are agents, and so is `slash`; a rule, an ingest and the record's own work are
  * rules, because nobody chose them at that moment. Anything else is a person.
  */
 export function byOf(actor: string): FeedBy {
-  if (/^S\d+$/.test(actor) || actor.startsWith('agent:') || actor === 'spark') return 'agent';
+  if (/^S\d+$/.test(actor) || actor.startsWith('agent:') || actor === 'slash') return 'agent';
   if (actor.startsWith('rule:') || actor.startsWith('ingest:') || actor === 'system') return 'rule';
   return 'you';
 }

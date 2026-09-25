@@ -1,0 +1,19 @@
+{
+  "name": "@braindog/slash",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "exports": {
+    ".": "./src/index.ts",
+    "./prompts": "./src/prompts.ts"
+  },
+  "dependencies": {
+    "@braindog/ports": "workspace:*",
+    "@braindog/where": "workspace:*"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

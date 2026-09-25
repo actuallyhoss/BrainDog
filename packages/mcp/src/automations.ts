@@ -8,11 +8,11 @@
  * any `src/`. So the numbers below are copies, and `test/automations.test.ts` holds each one to `STEP_CEILING`,
  * `DEPTH_CEILING`, `RUNS_PER_DAY_CEILING`, `VARS_CEILING` and `FLOOR_MS`, and installs both examples on a real record.
  *
- * IT SAYS WHAT DOES NOT RUN YET. A `metric` or `decided` trigger is refused at install, and so is an `ask_spark` step on
- * a host that does not answer Spark, and a `call` step installs so the canvas can draw it and fails the run that reaches
+ * IT SAYS WHAT DOES NOT RUN YET. A `metric` or `decided` trigger is refused at install, and so is an `ask_slash` step on
+ * a host that does not answer Slash, and a `call` step installs so the canvas can draw it and fails the run that reaches
  * it. An agent told only the grammar would file a rule with a call in it, and the owner would accept a run that stops
  * there. The same test holds that list to what a real run of the runner does. `ask_person` runs: its question opens in
- * Decide and the answer wakes the run. On a host that answers Spark, `ask_spark` runs too, and that host is served
+ * Decide and the answer wakes the run. On a host that answers Slash, `ask_slash` runs too, and that host is served
  * `ANSWERED_GRAMMAR` below.
  *
  * `script` LEFT THAT LIST WITH `e6010208`, which made `flow.ts`'s `startScript` queue the script's run and go on, and
@@ -53,7 +53,7 @@ export const AUTOMATION_GRAMMAR = {
     call: '{"call":{"ingest":"<declared call>","as":"<answer>"}}: a declared call, never an address',
     script:
       '{"script":{"id":"<script>","input":{"<name>":"<text>"},"as":"<answer>"}}: starts the script and goes on without waiting for it; what it writes lands when this host runs it. as keeps the id of its queued run, never what the script answers. The run stops here if the script is not installed, does not say runs: { rule: true }, or is paused',
-    ask_spark: '{"ask_spark":{"question":"<text>","as":"<answer>","shape":"text"}}: shape is text, number or choice, and choice needs choices',
+    ask_slash: '{"ask_slash":{"question":"<text>","as":"<answer>","shape":"text"}}: shape is text, number or choice, and choice needs choices',
     ask_person: '{"ask_person":{"question":"<text>","options":["yes","no"],"as":"<answer>","wait":"2d"}}: two options or more, each once. The question opens in Decide, where anyone who decides answers it; the run waits 7d when wait is left out, and stops if nobody answers',
     actions:
       'every action a rule has: {"tag":"x"} {"untag":"x"} {"set":{"field":"f","to":"v"}} {"move":"<state>"} {"link":{"field":"f","to":{"register":"r","by":"f","value":"v"}}} {"note":"text"} {"notify":{"say":"text"}} {"schedule":{"in":"14d","note":"text"}} {"create":{"register":"r","bound":10,"fields":{}}} {"suggest":{"question":"q","options":["a","b"]}} {"run":"<declared call>"} {"stop":true}. tag, untag, set, move, link, note, schedule and run act on a row, so a clock or a button cannot use them',
@@ -61,10 +61,10 @@ export const AUTOMATION_GRAMMAR = {
   context: 'any text in a step may read {{trigger.row.<field>}}, {{trigger.body.<path>}} of a JSON arrival, {{trigger.kind}} and {{vars.<answer>}}',
   not_in_this_build: {
     triggers: ['metric', 'decided'],
-    steps: ['call', 'ask_spark'],
+    steps: ['call', 'ask_slash'],
   },
   not_in_this_build_says:
-    'a metric or decided trigger, and an ask_spark step, are refused at install. A call step installs, and a run that reaches it fails there with a sentence, after taking every step before it',
+    'a metric or decided trigger, and an ask_slash step, are refused at install. A call step installs, and a run that reaches it fails there with a sentence, after taking every step before it',
   limits: {
     steps: 50,
     depth: 3,
@@ -99,25 +99,25 @@ export const AUTOMATION_GRAMMAR = {
 } as const;
 
 /**
- * The same grammar on a host that answers Spark, which `version` says as `spark: true`: `ask_spark` is taken out of what
+ * The same grammar on a host that answers Slash, which `version` says as `slash: true`: `ask_slash` is taken out of what
  * does not run, and the sentence about it goes with it.
  *
- * MEASURED BEFORE THIS, ON A RECORD OPENED WITH `answersSpark: true`: a rule asking Spark installed and parked on its
- * question, and this resource still listed `ask_spark` under `not_in_this_build` and said it "is refused at install". An
+ * MEASURED BEFORE THIS, ON A RECORD OPENED WITH `answersSlash: true`: a rule asking Slash installed and parked on its
+ * question, and this resource still listed `ask_slash` under `not_in_this_build` and said it "is refused at install". An
  * agent reading that would not file the one step the host serves (`test/automations.test.ts`, "ON A HOST THAT ANSWERS").
  *
  * AND THE STEP ITSELF IS SAID IN FULL HERE, because the flag-off entry above was all this host served of it: question,
  * as and shape, with no word of `about:`, which is the only way a field of the row goes with the question unless the
  * question's braces name it, and no word of the wait, where `ask_person`'s entry states its week. The day is
- * `flow.ts`'s `ASK_SPARK_WAIT_MS`, copied for the reason the limits are and held by the same test, which also installs
+ * `flow.ts`'s `ASK_SLASH_WAIT_MS`, copied for the reason the limits are and held by the same test, which also installs
  * the step as written.
  */
 export const ANSWERED_GRAMMAR = {
   ...AUTOMATION_GRAMMAR,
   steps: {
     ...AUTOMATION_GRAMMAR.steps,
-    ask_spark:
-      '{"ask_spark":{"question":"<text>","about":["<field>"],"as":"<answer>","shape":"text"}}: shape is text, number or choice, and choice needs choices. about is optional: the fields of the run\'s row that go with the question, so it needs a trigger with a row, and a secret or file field is refused in about and in the question alike. The run waits 1d for this host\'s model to answer, and stops if none comes',
+    ask_slash:
+      '{"ask_slash":{"question":"<text>","about":["<field>"],"as":"<answer>","shape":"text"}}: shape is text, number or choice, and choice needs choices. about is optional: the fields of the run\'s row that go with the question, so it needs a trigger with a row, and a secret or file field is refused in about and in the question alike. The run waits 1d for this host\'s model to answer, and stops if none comes',
   },
   not_in_this_build: { triggers: AUTOMATION_GRAMMAR.not_in_this_build.triggers, steps: ['call'] },
   not_in_this_build_says:

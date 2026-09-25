@@ -27,7 +27,7 @@
  * IT MOVED IN HERE BECAUSE THE CALLERS WERE CARRYING IT AND ONE OF ELEVEN ACTUALLY DID.
  * `+layout.svelte:165` writes `untrack(() => toasts.push(...))` and `accent.test.ts:214` asserts that
  * it does. The other ten sites that push, in `clipboard.ts`, `Palette.svelte`, `ClearExamples.svelte`,
- * `Sidebar.svelte` and `SparkDaily.svelte`, wrap nothing, and today none of them is inside a tracked
+ * `Sidebar.svelte` and `SlashDaily.svelte`, wrap nothing, and today none of them is inside a tracked
  * effect. The shell is not the last caller this stack will have: a rule a caller has to remember at
  * eleven sites is a rule the twelfth site breaks, and the twelfth site is the one inside an effect. A
  * wrapper still at a call site is now belt over braces and costs nothing.

@@ -91,7 +91,7 @@ test("C: A PATTERN WHOSE INGEST POLLS IS FILED WITH ITS LINE AND ITS KEY, worked
   assert.ok(filed.approve?.some((l) => l.includes('api.goldapi.io') && l.includes('goldapi')), `the approval lines were ${JSON.stringify(filed.approve ?? null)}`);
   assert.equal(filed.approve?.includes('CALLS OUT nowhere'), false, "the proposer's own line was kept");
 
-  /* AND THE BARE BODY SPARK FILES, which has no id to look an installed copy up by, says what it would send too. */
+  /* AND THE BARE BODY SLASH FILES, which has no id to look an installed copy up by, says what it would send too. */
   const bare = filedBody(sql, file(k, 'pattern', { ingest: POLL.body, samples: ['raw_1'] }));
   assert.ok(bare.approve?.some((l) => l.includes('api.goldapi.io')), `a bare poll was filed with ${JSON.stringify(bare.approve ?? null)}`);
 

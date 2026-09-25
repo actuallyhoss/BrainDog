@@ -34,7 +34,7 @@ cross-customer reporting becoming a product requirement.
 ## ADR-002 · The record object makes no outbound network calls
 
 **Decided.** Inference, email out, webhooks out and pack fetching happen in the Worker or in
-Spark's object. The record can be asked for data and can store data. It cannot speak.
+Slash's object. The record can be asked for data and can store data. It cannot speak.
 
 **Amended by [ADR-021](16-DECISIONS.md):** the one exception is the outbox doorbell —
 `Scheduler.wake()`, a queue `send()` carrying a record id, the last statement after every write.
@@ -128,7 +128,7 @@ can express — and the answer would still be a ninth kind before a sandbox.
 **Amended September 22nd 2026, by the owner's answer "both" ([DIRECTION §22](../loop/DIRECTION.md)).**
 Never a script in the core; a person's or an agent's script is record content, run in a sandbox
 BrainDog hosts (metered, per account) or anywhere outside that pushes in through a door or the
-API. A person, Claude or Spark writes one and attaches it to a schedule or a door, and its writes
+API. A person, Claude or Slash writes one and attaches it to a schedule or a door, and its writes
 arrive through the same API anything else uses, under its own actor. What survives of this ADR is
 the part that was load-bearing: a pack is data, nothing a pack declares executes inside the record,
 and no user code runs in the record's own object. What it no longer says is "no sandbox": the
@@ -237,7 +237,7 @@ that moves.
 
 ---
 
-## ADR-010 · Spark has no write capability, and no tool that returns a secret
+## ADR-010 · Slash has no write capability, and no tool that returns a secret
 
 **Decided.** The assistant runs in a separate object with no write RPC. It proposes. There is no
 tool that decrypts a grant — absent, not gated.
@@ -398,39 +398,16 @@ knowingly.
 
 ---
 
-## ADR-017 · The assistant is called Spark, over the name this document recommended
+## ADR-017 · The assistant's first name (superseded by ADR-070)
 
-**Decided.** **Spark** — reaffirmed by the owner, twice, over **Pointer**, which an earlier version
-of this ADR recommended and which had the better argument.
+**Superseded** on September 25th 2026 by [ADR-070](16-DECISIONS.md): the assistant is called Slash
+([DIRECTION 31](../loop/DIRECTION.md)).
 
-**The argument that lost.** *"Spark" cannot travel*: GitHub Spark is Microsoft's and Google shipped
-Gemini Spark in 2026. *Pointer* is a breed, a programming term, and a description of the one
-constraint that matters — a pointer points, it does not dereference itself and it does not decide.
-
-**Why the loss is affordable.** The cost is **discoverability, and only discoverability**: nobody
-finds BrainDog by searching "Spark AI". It is a *feature* name inside a product, which is the level
-at which coexistence is normal, and the expensive register check was already done for **BrainDog**
-itself — empty in every class at USPTO, EUIPO and UK IPO.
-
-**What is kept.** The better half of the rename was never the word. It was compressing the
-governance thesis into the name, and that sentence survives intact:
-**Spark never decides. It points at what does.**
-
-**The rule that makes it survivable:** always **"BrainDog Spark"** on first use in any public
-surface. Never *Spark* alone in a repository, a package or a domain.
-
-**Runners-up:** *Fetch* (the dog verb and `fetch()`; too generic to defend), *Scout* (warm; taken
-several times in developer tooling).
-
-**Open:** [Q8](17-OPEN-QUESTIONS.md) — a register check across classes 9 and 42.
-
-**Would reverse it:** a live registration in class 9 or 42 by somebody who enforces — which is what
-the Q8 search is for.
-
-> *A note on this ADR's own history, because it is the exact failure it now records: a global
-> find-and-replace of Pointer→Spark left this decision asserting that Spark was unavailable and then
-> choosing it, with Pointer's rationale attached. **A rename is not a text substitution in the one
-> document whose subject is the name.***
+This ADR chose the assistant's earlier name over *Pointer*, which a draft of it had recommended. Its
+argument was about that word, and an argument about one word does not survive being find-and-replaced
+onto another, so the body is not carried forward here. It reads as it stood in
+`git show 62fabc69:docs/16-DECISIONS.md`. Two things it decided were never about the word, and both
+moved to ADR-070 whole: the sentence the governance model rests on, and the first-use rule.
 
 ---
 
@@ -775,12 +752,12 @@ shorten before anything was dropped unread.
 **Decided.** The §1b shape of [15-ROADMAP](15-ROADMAP.md) ships **no intelligence at all**. Phase A
 ships **tier A-minimal**: triage, extraction, digest prose and embeddings on small models
 (`llama-3.2-1b` for triage and digest prose), with no conversational surface; the ingest-pattern
-proposal is the one model-backed in-app job, and the record's own agent can do it over MCP. Spark's
+proposal is the one model-backed in-app job, and the record's own agent can do it over MCP. Slash's
 conversational mode arrives with **tier B** (bring your own key), on `glm-5.3-flash`; **tier C**
 (your machine) comes last. A chat surface is added only when a Cloud customer with MCP configured
 asks for one — and that ask is instrumented.
 
-**Rejected:** shipping Spark as a conversational assistant in the first version (B7 as first
+**Rejected:** shipping Slash as a conversational assistant in the first version (B7 as first
 written). Five documents disagreed on what ships, and the roadmap funded eight days that
 [23-ASSISTANT-UI](23-ASSISTANT-UI.md) says serve no line in the value proposition; the buyer already
 owns a better assistant in a terminal, and GitHub retired its own Spark for exactly that reason
@@ -897,7 +874,7 @@ a small table under the same rule.
 
 **Decided.** `Sql · Scheduler · Clock · Blobs · Inference · Dispatch · Http · KeyStore · Snapshots`,
 plus `Ingress` as an entrypoint contract. The record's ports are exactly `{ Sql, Scheduler, Clock }`;
-Spark's are `{ Sql, Clock, Inference }`. `Sql` is synchronous — `exec`, `execScript`,
+Slash's are `{ Sql, Clock, Inference }`. `Sql` is synchronous — `exec`, `execScript`,
 `transactionSync` with `NotPromise<T>`, `readonly caps` — and `Param` excludes `boolean` and
 `undefined`. Conformance cases are a plain array run under every host against a committed Durable
 Object reference trace, and CI asserts equal case counts. Full signatures:
@@ -1041,7 +1018,7 @@ and doing the same for every hashed file would make this hygiene rather than loa
 
 **Decided.** Live updates are a **hibernatable WebSocket on the `Record` object** carrying
 `{ version, registers }`, with 15-second polling of `GET /api/version` as the fallback; the tier-C
-runner's socket terminates on `Spark`. Non-hibernating sockets and SSE are refused on cost — a held
+runner's socket terminates on `Slash`. Non-hibernating sockets and SSE are refused on cost — a held
 object is 0.125 GB × 2,592,000 s = **324,000 GB-s ≈ $4.05 per customer-month, 81 % of the included
 allowance**; Queues are refused on scope (an account-wide token, no per-queue scope); Cloudflare
 Tunnel on footprint. Outgoing change notifications are free.
@@ -1049,7 +1026,7 @@ Tunnel on footprint. Outgoing change notifications are free.
 **The runner's transport, settled in iteration 2:** the claim is always the record's
 `claimJob { wait }` — a long-poll — and v1 ships the long-poll alone; the socket, where a host exposes
 it, is a doorbell that wakes the claim and never carries the job. The self-host serves no `/ws` in its
-first phase and the client polls ([46-SPEC-SPARK](46-SPEC-SPARK.md) §4.7; [48-SPEC-CLI](48-SPEC-CLI.md)
+first phase and the client polls ([46-SPEC-SLASH](46-SPEC-SLASH.md) §4.7; [48-SPEC-CLI](48-SPEC-CLI.md)
 §13 D8; [51-SPEC-WORKER](51-SPEC-WORKER.md) §13 D13).
 
 **Rejected:** SSE. An open SSE response is an active request, so the object cannot hibernate and
@@ -1166,12 +1143,12 @@ feature, a redacted projection, and is named as such.
 
 ---
 
-## ADR-051 · Spark has no panel; it is a mode of the palette and rows in existing queues
+## ADR-051 · Slash has no panel; it is a mode of the palette and rows in existing queues
 
-**Decided.** No chat panel, widget or page. The command surface is **the palette** (`⌘K`); Spark is
+**Decided.** No chat panel, widget or page. The command surface is **the palette** (`⌘K`); Slash is
 its fallback row when a model is configured — one proposal with its verbs, never a transcript — plus
-rows in Decide and Inbox. Every deterministic feature is byte-identical with Spark absent, and CI
-proves it with `SPARK_ENDPOINT` unset. Spark may not type a number — figures are `{{path}}`
+rows in Decide and Inbox. Every deterministic feature is byte-identical with Slash absent, and CI
+proves it with `SLASH_ENDPOINT` unset. Slash may not type a number — figures are `{{path}}`
 interpolations. Open proposals are capped at 3 per register; a fourth displaces the lowest-ranked,
 which closes with a recorded reason. This settles [Q5](17-OPEN-QUESTIONS.md).
 
@@ -1276,7 +1253,7 @@ primitive layer is wrong, not the count.
 
 **Decided.** Every refusal has a code from the one table in [30-BLUEPRINT](30-BLUEPRINT.md) §6 —
 **a hundred and twelve codes in nine families**: pack and declaration (47), grammar (14), write path
-(18), auth and vault (7), format and lifecycle (8), dialect (2), spark (5), connector (7) and host
+(18), auth and vault (7), format and lifecycle (8), dialect (2), slash (5), connector (7) and host
 and client (4) — plus the adapter's separate closed vocabulary of thirteen. *An earlier draft said
 ninety-nine in eight, which was true when nothing enforced it: the `refusals` gate then compared the
 table against the code and found twenty-six codes the tree emitted and the registry did not have,
@@ -1284,7 +1261,7 @@ including one — a record whose owners are all suspended — whose absence from
 out of `httpStatus`'s exception list, so a 503 condition answered 422. A closed list nothing closes
 is a list that is already open.* JSON-RPC `-32602` and the `Http` adapter's error
 names are vocabularies, not codes. A code with no fixture fails CI — the rule reaches every family,
-the Spark and connector codes through their own `via` runners
+the Slash and connector codes through their own `via` runners
 ([40-SPEC-FIXTURES](40-SPEC-FIXTURES.md) §6); a refusal path with no code fails review. Adding a code
 is a diff to that table. *(Iteration 2 accepted twenty-four proposed codes and two new families at
 once; the six specs that each counted from seventy-five had reached six different totals.)*
@@ -1365,7 +1342,7 @@ be a grant per operation, approved somewhere a person is, never a scope.
 
 ## ADR-061 · Identity lives in a `Directory` object; three DO classes
 
-**Decided.** `Record`, `Spark`, `Directory`. The Directory is one instance holding email → person,
+**Decided.** `Record`, `Slash`, `Directory`. The Directory is one instance holding email → person,
 credential → passkey, person → records, slug → `rec_id`, browser sessions, magic links and the login
 lockout; the record keeps what a `.brain` must resolve offline and what is scoped to one record —
 `person` (a mirror), `token`, `auth_fail`, `counter`, `vault_key`, `job`, `job_event` — for
@@ -1450,7 +1427,7 @@ lookups — `serveApi(api, req, ctx)` over standard `Request`/`Response`, and th
 wiring. Platform-neutral, about three hundred lines, and they must never drift between
 [49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) and [51-SPEC-WORKER](51-SPEC-WORKER.md). It is last in the
 package order, and the order gains a swap: **`record` before `mcp`** — `render → ports → where →
-theme → fixtures → kernel → declare → extract → record → mcp → spark → connect → host` — because
+theme → fixtures → kernel → declare → extract → record → mcp → slash → connect → host` — because
 `mcp` wraps the `RecordApi` type, a type import is still an edge, and the wrapper sits above the
 thing it wraps. `mcp` is testable with a stub `RecordApi`, no Durable Object needed
 ([31-STACK](31-STACK.md) §2).
@@ -1475,12 +1452,12 @@ because `ports` is the lowest shared package and `where` needs the type while si
 [30-BLUEPRINT](30-BLUEPRINT.md) §6 stays the list's home. `CallContext` and `Result<T>` are
 `@braindog/kernel`'s. `RecordApi` is `@braindog/record`'s, as `export type`. Every consumer imports
 the type; **no structural re-declaration anywhere**. `CallContext.principal.kind` is
-`person | token | runner | share | system | spark` — `runner` and `share` are principal kinds, never
+`person | token | runner | share | system | slash` — `runner` and `share` are principal kinds, never
 top-level fields.
 
 **Rejected:** `Refusal` in `where` (its first spec), in `kernel` (the kernel's) or in `declare` (the
 MCP spec's) — three specs had three owners, and each consumer would have carried its own copy of the
-shape; a `RecordApi` re-declared structurally by each of `mcp`, `spark`, `connect` and the hosts,
+shape; a `RecordApi` re-declared structurally by each of `mcp`, `slash`, `connect` and the hosts,
 which is one type five times.
 
 **Would reverse it:** a package below `ports` needing `Refusal` — none can exist, because `ports`
@@ -1564,6 +1541,53 @@ provider exists (research-scheduled-actions §4.8).
 
 **Would reverse it:** a price per run rather than per record, which would move the allowance from the plan
 to an invoice line; or the owner choosing a different allowance, which changes `ALLOWANCE` and nothing else.
+
+---
+
+## ADR-070 · The assistant is called Slash, on the owner's word
+
+**Decided.** The assistant is **Slash**. It was called Spark until September 25th 2026, when the
+owner asked for the change ([DIRECTION 31](../loop/DIRECTION.md)):
+
+> "hey, i want you to rename Spark to Slash. update ALL references please"
+
+**Every reference, not only the words on screen.** The package (`packages/slash`), the routes
+(`/api/slash/*`), the flow step (`ask_slash`), the vault key label, the host settings (`SLASH_*`),
+the spec ([46-SPEC-SLASH](46-SPEC-SLASH.md)), and the types, functions, tests and file names under
+them. What a record already holds under the old name (an event's actor, a suggestion's opener, a
+person's prefs, a key's label, a parked step, a declaration's step) is renamed by a migration that
+runs when the record opens, so nothing is left answering to the old name.
+`loop/research-slash-rename.md` is the map, measured at `5c332af4`.
+
+**What it costs a self-hoster.** An environment that sets `SPARK_ENDPOINT`, `SPARK_MODEL` or
+`SPARK_KEY` has to rename them to `SLASH_ENDPOINT`, `SLASH_MODEL` and `SLASH_KEY` by hand. The host
+reads only the new names, and a host with none of them set runs with no model, which refuses rather
+than fails.
+
+**Not renamed.** `sparkline`, which is a kind of chart and not the name. The uses of "slash" that
+mean the `/` character: an identifier that means the character takes a `-key` or `Key` suffix, so
+`slash` alone only ever means the assistant. Other companies' products:
+GitHub Spark and Gemini Spark. His words where they are quoted. And history: the loop's reports and
+the earlier sections of DIRECTION record what was true on their day.
+
+**Kept from ADR-017, because they were never about the word.** The governance sentence:
+**Slash never decides. It points at what does.** And the first-use rule: always **"BrainDog Slash"**
+on first use in any public surface, never *Slash* alone in a repository, a package or a domain. The
+rule weighs more on this name than it did on the last, because "slash" is already a plain word in
+the same category: chat and agent tools call the commands a person types after `/` slash commands.
+
+**Rejected:** keeping the old names as aliases beside the new ones, because an alias is a second
+name somebody has to keep answering to, and nothing outside this repository depends on the old
+ones: the owner's `sam` record is the only record on the Cloud. And a text substitution on its own,
+because ADR-017's history shows what one does to a document whose subject is the name: the three
+passages that argue about the name (ADR-017, [11-ASSISTANT](11-ASSISTANT.md) §1 and
+[Q8](17-OPEN-QUESTIONS.md)) were rewritten by hand.
+
+**Open:** [Q8](17-OPEN-QUESTIONS.md). Whether Slash is clear of a register in classes 9 and 42 has
+not been checked. It does not block the rename.
+
+**Would reverse it:** the owner's word again, or a live registration in class 9 or 42 by somebody
+who enforces.
 
 ---
 

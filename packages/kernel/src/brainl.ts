@@ -37,6 +37,7 @@ import type { Refusal, Sql } from '@braindog/ports';
 
 import { FORMAT_VERSION, execScript } from './migrate.ts';
 import { SEAT_SESSION } from './migrations/0002_session.ts';
+import { RENAME_SLASH } from './migrations/0016_slash.ts';
 
 export type Section = 'header' | 'data' | 'origin' | 'governance' | 'local';
 
@@ -836,6 +837,11 @@ export function importBrainl(
       )
     )
       execScript(sql, SEAT_SESSION);
+
+    /* AND A FILE WRITTEN BEFORE MIGRATION 16 CARRIES THE ASSISTANT'S OLD NAME in the rows it brings, for the same
+       reason: this record's ledger says the rename ran, so nothing else would rename them. The declaration bodies need
+       SHA-256 and are renamed by the caller once this transaction commits (`renameDeclarations`). */
+    execScript(sql, RENAME_SLASH);
 
     /**
      * AND `dog_meta.keys` IS RECOMPUTED, because it is the one header row that is not identity.

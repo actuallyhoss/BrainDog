@@ -41,7 +41,7 @@ Three consequences, and the first is worth a lot:
 2. **A share link and a logged-in read are the same mechanism** — a share link is a projection with
    an *empty* ceiling. One code path, not two: the recipient is the `share` kind of the one
    `CallContext`, whose principal has six kinds — `person` · `token` · `runner` · `share` · `system` ·
-   `spark` — and `runner` and `share` are kinds, never fields beside it ([41-SPEC-KERNEL](41-SPEC-KERNEL.md) §2).
+   `slash` — and `runner` and `share` are kinds, never fields beside it ([41-SPEC-KERNEL](41-SPEC-KERNEL.md) §2).
 3. **The projection is type-level, not a policy engine.** `pick + where` is checkable. An
    interpreted rule set is not.
 

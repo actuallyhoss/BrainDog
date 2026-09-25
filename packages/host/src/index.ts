@@ -23,17 +23,17 @@ import { crashed } from './crash.ts';
 export { HINTS, hintsOf, sessionOf, withSession, type SessionHints } from './session.ts';
 export { serveVault, servesVault, VAULT_HEADERS, vaultReply, type VaultAsk, type VaultDoor, type VaultGrantSeen } from './vault.ts';
 export { keysReply, serveKeys, servesKeys, type KeysAsk, type KeysDoor } from './keys.ts';
-/* `POST /api/spark/read` IS A DOOR AND NOT A ROW IN `ROUTES`, and `spark-ask.ts` carries the measurement: `ROUTES` is the
+/* `POST /api/slash/read` IS A DOOR AND NOT A ROW IN `ROUTES`, and `slash-ask.ts` carries the measurement: `ROUTES` is the
    record's surface, `tools/gates/guards.mjs` looks for every routed name as a method of `packages/record/src/index.ts`, and
    this answer comes out of the engine the HOST built. It is exported from here for the reason the vault, key, session and
    ingest doors are: both hosts import one module to get the whole surface, and a door one host can find and the other cannot
    is the drift this file's header is about. */
-export { serveSpark, servesSpark, sparkAskDoor, sparkReply, type SparkAskDoor, type SparkAskEngine } from './spark-ask.ts';
-/* `sparkRecordMeter` IS HERE FOR THE SAME REASON, AND IT WAS MISSING FROM HERE FOR A BATCH. `d16d9d35` built the meter
-   that holds the record's press and first plan in Spark's ledger and exported it from `spark-ask.ts` alone, which no
+export { serveSlash, servesSlash, slashAskDoor, slashReply, type SlashAskDoor, type SlashAskEngine } from './slash-ask.ts';
+/* `slashRecordMeter` IS HERE FOR THE SAME REASON, AND IT WAS MISSING FROM HERE FOR A BATCH. `d16d9d35` built the meter
+   that holds the record's press and first plan in Slash's ledger and exported it from `slash-ask.ts` alone, which no
    app imports, so both hosts built the record without it and every press stayed unmetered (`loop/research-batch-sixty-audit.md`
-   finding 2). `apps/worker/test/spark-press-metered.test.ts` is the press on the Worker that shows it wired. */
-export { sparkRecordMeter, type SparkLedgerDeps } from './spark-ask.ts';
+   finding 2). `apps/worker/test/slash-press-metered.test.ts` is the press on the Worker that shows it wired. */
+export { slashRecordMeter, type SlashLedgerDeps } from './slash-ask.ts';
 /* `/in/*` IS NOT IN `ROUTES` AND BELONGS HERE ANYWAY. The table below is the record's methods, every one
    of them behind the auth gate at `/api/<name>`; an arrival is above that gate by design (`33 §4`), takes
    no principal, and answers 202 rather than a `Result`. It is exported from this file for the same reason
@@ -211,10 +211,10 @@ export const ROUTES: readonly Route[] = [
   { name: 'scripts', group: 'READ+', writes: false, what: 'Every installed script: what it may read, write and fetch, whether it is paused, its last run and its refused runs in a row.' },
   { name: 'planPack', group: 'ADMIN', writes: false, what: 'What installing a pack would do to this record. It writes nothing.',
     takes: { doc: 'json', source: 'json' } },
-  { name: 'spark', group: 'ADMIN', writes: false, what: 'What Spark noticed about how this BrainDog is used, and the arrangement proposals it would file. It writes nothing.' },
-  { name: 'sparkPropose', group: 'ADMIN', writes: true, what: "Put Spark's proposals on Decide, through propose's checks. It changes nothing until the owner accepts one." },
-  { name: 'sparkDaily', group: 'ADMIN', writes: true, what: 'Whether Spark looks once a day on its own and puts what it finds on Decide. On unless the owner turns it off.' },
-  { name: 'sparkForm', group: 'ADMIN', writes: true, what: "Ask Spark's model for a first plan from what the owner said a project is, and put it on Decide as rows. Nothing is made until the owner accepts it.",
+  { name: 'slash', group: 'ADMIN', writes: false, what: 'What Slash noticed about how this BrainDog is used, and the arrangement proposals it would file. It writes nothing.' },
+  { name: 'slashPropose', group: 'ADMIN', writes: true, what: "Put Slash's proposals on Decide, through propose's checks. It changes nothing until the owner accepts one." },
+  { name: 'slashDaily', group: 'ADMIN', writes: true, what: 'Whether Slash looks once a day on its own and puts what it finds on Decide. On unless the owner turns it off.' },
+  { name: 'slashForm', group: 'ADMIN', writes: true, what: "Ask Slash's model for a first plan from what the owner said a project is, and put it on Decide as rows. Nothing is made until the owner accepts it.",
     takes: { usecase: 'text', said: 'text' } },
   { name: 'planUseCase', group: 'ADMIN', writes: false, what: 'What installing a shared use-case file would do, pack by pack. It writes nothing.',
     takes: { doc: 'json', text: 'text', source: 'json', modules: 'json' } },
@@ -377,7 +377,7 @@ const NOT_422: Readonly<Record<string, number>> = {
      are a strict refinement, so they take `FORBIDDEN`'s status.
 
      THE INSTRUCTION IS RIGHT AND THE REMEDY WAS WRONG, and `PERSON_REQUIRED` has gone because of it.
-     `30 §6`'s `FORBIDDEN` row already carries three separate facts — a `spark` principal writing a
+     `30 §6`'s `FORBIDDEN` row already carries three separate facts — a `slash` principal writing a
      row, a runner posting out of `seq` order, the scope case — each told apart by its SENTENCE. A
      code is what a caller branches on; "ask a person to sign in" is what it acts on, and minting a
      code per remedy grows the vocabulary at the speed of the copywriting (`10 §7`).
@@ -488,10 +488,10 @@ export type RecordSurface = {
   archiveArrival(args: never, ctx: never): Promise<Result<unknown>>;
   packConfig(args: never, ctx: never): Promise<Result<unknown>>;
   arrangement(args: never, ctx: never): Promise<Result<unknown>>;
-  spark(args: never, ctx: never): Promise<Result<unknown>>;
-  sparkPropose(args: never, ctx: never): Promise<Result<unknown>>;
-  sparkDaily(args: never, ctx: never): Promise<Result<unknown>>;
-  sparkForm(args: never, ctx: never): Promise<Result<unknown>>;
+  slash(args: never, ctx: never): Promise<Result<unknown>>;
+  slashPropose(args: never, ctx: never): Promise<Result<unknown>>;
+  slashDaily(args: never, ctx: never): Promise<Result<unknown>>;
+  slashForm(args: never, ctx: never): Promise<Result<unknown>>;
   actions(ctx: never): Promise<Result<unknown>>;
   automations(args: never, ctx: never): Promise<Result<unknown>>;
   scripts(args: never, ctx: never): Promise<Result<unknown>>;
@@ -589,10 +589,10 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     archiveArrival: (a, ctx) => api.archiveArrival(a as never, ctx as never),
     packConfig: (a, ctx) => api.packConfig(a as never, ctx as never),
     arrangement: (a, ctx) => api.arrangement(a as never, ctx as never),
-    spark: (a, ctx) => api.spark(a as never, ctx as never),
-    sparkPropose: (a, ctx) => api.sparkPropose(a as never, ctx as never),
-    sparkDaily: (a, ctx) => api.sparkDaily(a as never, ctx as never),
-    sparkForm: (a, ctx) => api.sparkForm(a as never, ctx as never),
+    slash: (a, ctx) => api.slash(a as never, ctx as never),
+    slashPropose: (a, ctx) => api.slashPropose(a as never, ctx as never),
+    slashDaily: (a, ctx) => api.slashDaily(a as never, ctx as never),
+    slashForm: (a, ctx) => api.slashForm(a as never, ctx as never),
     actions: (_a, ctx) => api.actions(ctx as never),
     automations: (a, ctx) => api.automations(a as never, ctx as never),
     scripts: (a, ctx) => api.scripts(a as never, ctx as never),

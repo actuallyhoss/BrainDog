@@ -341,7 +341,7 @@ const DRIVERS = {
   pull: 'driven in two halves by the file each fixture\'s `raises:` names: the five raised in `packages/connect` by `packages/connect/test/refusals-pull.test.ts` through `runPull`, and the two raised in `packages/host/src/actions.ts` by `packages/host/test/refusals-pull.test.ts` through `sendAction`. Run: node --test --experimental-strip-types "packages/connect/test/refusals-pull.test.ts" "packages/host/test/refusals-pull.test.ts"',
   /* FIVE SINCE SEPTEMBER 23RD 2026, when `ANSWER_UNREADABLE` joined the family with its fixture and its runner learned
      `answer:`; this sentence kept saying four, through the palette alone, for the fifth nobody drives that way. */
-  ask: 'driven by `packages/spark/test/refusals-ask.test.ts`: all 5, four through the palette\'s two passes and `ANSWER_UNREADABLE` through an automation\'s `answer`, against `packages/spark/test/double.ts`. Run: node --test --experimental-strip-types "packages/spark/test/refusals-ask.test.ts"',
+  ask: 'driven by `packages/slash/test/refusals-ask.test.ts`: all 5, four through the palette\'s two passes and `ANSWER_UNREADABLE` through an automation\'s `answer`, against `packages/slash/test/double.ts`. Run: node --test --experimental-strip-types "packages/slash/test/refusals-ask.test.ts"',
 };
 
 /* ── comparing a claim to an answer ─────────────────────────────────────────────────────────── */

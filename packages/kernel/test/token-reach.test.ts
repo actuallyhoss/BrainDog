@@ -60,7 +60,7 @@ test('MIGRATION 15 IS THE ONE THAT ADDS reach TO token, and it is registered whe
   /* THE FILE ALONE IS NOT A MIGRATION. `migrate.ts` imports each one by name, so a file in `migrations/` that nothing
      lists is never applied, and every read of `reach` below would throw "no such column" on a real record. */
   assert.deepEqual(
-    MIGRATIONS.map((m) => [m.version, m.slug]).at(-1),
+    MIGRATIONS.map((m) => [m.version, m.slug]).find(([version]) => version === 15),
     [15, 'token_reach'],
   );
 });

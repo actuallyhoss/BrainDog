@@ -17,7 +17,7 @@ Object.** Everything else in this document is a consequence of it.
                   └───────┬──────────────────────┬─────────────────────┬─────────────┘
                           │ RPC                  │                     │
               ┌───────────▼──────────┐   ┌───────▼──────────┐   ┌──────▼───────────┐
-              │  RECORD DO (per      │   │  SPARK DO        │   │  DIRECTORY DO    │
+              │  RECORD DO (per      │   │  SLASH DO        │   │  DIRECTORY DO    │
               │  customer)           │   │  (per customer)  │   │  (one instance)  │
               │  ─────────────────   │   │  ────────────    │   │  ──────────────  │
               │  SQLite 10 GB        │   │  settings · call │   │  email → person  │
@@ -36,7 +36,7 @@ Object.** Everything else in this document is a consequence of it.
 ```
 
 Eight moving parts, counted: one Worker deployment for every customer; **three Durable Object
-classes** — a `Record` and a `Spark` instance per customer, and one `Directory` for the whole
+classes** — a `Record` and a `Slash` instance per customer, and one `Directory` for the whole
 deployment ([ADR-061](16-DECISIONS.md)); and the four platform services beneath them. No per-customer
 provisioning step at all. *An earlier draft said five parts and two classes; the Directory is what
 holds identity outside the record — §3.*
@@ -101,7 +101,7 @@ its consequence rather than listed.
 | Throughput per object | **soft limit** ~1,000 req/s | Documented as a *soft* limit, and the Rules page says 500–1,000 for simple operations. Irrelevant for one customer; it is also a natural per-tenant rate limit |
 | Memory per object | 128 MB | Embeddings are streamed and scored in batches, never all loaded |
 | CPU per request | 30 s default, 300 s max | A long import is paged — the host streams the body and the record's `importBrainl` batches internally ([48-SPEC-CLI](48-SPEC-CLI.md) §13 D3). No Workflow in v1 |
-| DO classes | 500 | We use **three** — `Record`, `Spark`, `Directory` ([ADR-061](16-DECISIONS.md)). Never a class per customer. *An earlier draft said two* |
+| DO classes | 500 | We use **three** — `Record`, `Slash`, `Directory` ([ADR-061](16-DECISIONS.md)). Never a class per customer. *An earlier draft said two* |
 | JS number precision | 53-bit | Any id that could exceed 2^53 is stored as `TEXT` |
 | **Compound `SELECT` terms** | **5** | **undocumented by Cloudflare** — read from workerd's source. A `UNION ALL` chain of six fails |
 | **Expression depth** | **100** | **undocumented.** A deeply nested `any:`/`all:` predicate reaches it, which is why [30-BLUEPRINT](30-BLUEPRINT.md) §7 caps nesting at 3 and the property test asserts depth |
@@ -118,7 +118,7 @@ gap. The clean way to never think about this again:
 
 > **The record object makes no outbound network calls. Ever.**
 
-Inference, webhooks out, email out and pack fetching all happen in the Worker or in the Spark
+Inference, webhooks out, email out and pack fetching all happen in the Worker or in the Slash
 object, which then writes back through a normal RPC call. This is a correctness rule that
 happens to be identical to the security rule in [12-SECURITY](12-SECURITY.md) §4 — the record
 cannot exfiltrate because the record cannot speak. Two problems, one line.
@@ -184,10 +184,10 @@ the outbox is a kernel table rather than a Cloud detail.
 
 ---
 
-## 3 · The second object: Spark
+## 3 · The second object: Slash
 
 Model calls and the projection reader live in a **separate** Durable Object per customer. Its own
-storage is two tables — `settings` and `call` ([46-SPEC-SPARK](46-SPEC-SPARK.md) §4.1) — no
+storage is two tables — `settings` and `call` ([46-SPEC-SLASH](46-SPEC-SLASH.md) §4.1) — no
 conversation table and no retrieval cache: the drafted predicate is stored on the `call` row and
 re-projected on the second pass; nothing accumulates.
 
@@ -195,15 +195,15 @@ Why separate rather than a method on the record:
 
 1. The record may not call out (above). Inference is an outbound call.
 2. A 300-second CPU limit spent on a model call must not block the record's writes.
-3. Spark holds **no write capability**. It reads through a narrow projection and returns
+3. Slash holds **no write capability**. It reads through a narrow projection and returns
    *proposals*. A compromised prompt cannot become a write, because there is no write path to
    compromise. See [12-SECURITY](12-SECURITY.md) §5.
-4. Spark's `call` rows are disposable and separately deletable; the record is not.
+4. Slash's `call` rows are disposable and separately deletable; the record is not.
 5. It is also the **tier-C dispatcher**: the connected machine's hibernatable WebSocket terminates on
-   Spark ([26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §2.2) — as a doorbell. The claim is always
+   Slash ([26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §2.2) — as a doorbell. The claim is always
    the record's `claimJob()`, which mints the job-scoped bearer; `job` and `job_event` are kernel
-   tables, and Spark holds no lease state and no alarm in v1 ([46-SPEC-SPARK](46-SPEC-SPARK.md)
-   §4.7; [51-SPEC-WORKER](51-SPEC-WORKER.md) §13 D13). *(An earlier draft had Spark holding the
+   tables, and Slash holds no lease state and no alarm in v1 ([46-SPEC-SLASH](46-SPEC-SLASH.md)
+   §4.7; [51-SPEC-WORKER](51-SPEC-WORKER.md) §13 D13). *(An earlier draft had Slash holding the
    leases.)*
 
 ### The third object: Directory
@@ -326,7 +326,7 @@ made to crash by a stranger.
 **An ingest triage.** Queue consumer → the record's `arrive`: store → match the declared patterns →
 extract → write rows with `confidence: exact` → outbox, in one transaction and with no model in it.
 An unmatched shape earns an `infer.draft` outbox row at its third arrival in 30 days — never a
-model call per payload — and Spark's draft opens a suggestion. Never a write from an unmatched
+model call per payload — and Slash's draft opens a suggestion. Never a write from an unmatched
 payload. See [07-INGEST](07-INGEST-AND-RULES.md).
 
 **A scheduled digest.** The record's single alarm fires → drains every row in `schedule` that is

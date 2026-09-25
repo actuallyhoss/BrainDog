@@ -150,7 +150,7 @@ the record had to have. Recounted September 16th 2026, when the sentence still c
 
 | Group | Reachable by (`principal.kind`, then §5.1's checks) | Where the gate runs |
 |---|---|---|
-| DATA | `person` · `token` — never `share`; `spark` on `propose` only; `markRead` is `person` only | `auth.ts`, step 1 of every method |
+| DATA | `person` · `token` — never `share`; `slash` on `propose` only; `markRead` is `person` only | `auth.ts`, step 1 of every method |
 | READ+ | `person` · `token`; `share` reaches `page` for its one slug and nothing else | `auth.ts` |
 | VAULT | `person` with level `owner`, no `op`; a bearer of any kind is `NEEDS_BROWSER_SESSION` | `auth.ts` |
 | JOBS | `createJob` `cancelJob` `listJobs`: `person` `owner`; `claimJob` `postJobEvent` `readCancel`: `runner` | `auth.ts` |
@@ -206,7 +206,7 @@ type CallContext = {
     | { kind: 'runner'; id: string }                                     // a device grant with reach 'runner' — 12 §6.1
     | { kind: 'share';  slug: string; rows?: Predicate }                 // a share link — page(slug) only, empty ceiling
     | { kind: 'system' }
-    | { kind: 'spark' };
+    | { kind: 'slash' };
   session?: { spoken?: string; client_id?: string; host?: string; repo?: string };
   op?: Exclude<Reach, 'login' | 'runner'>;                               // an operation grant: 'export' | 'import' | 'pack' | 'token' — 48 §13 D1
   now: number;
@@ -226,7 +226,7 @@ Invariants a test checks:
 - The record trusts only `member`, never `principal.level`: `levels` is `SELECT register, level FROM member WHERE person_id = ?`; the `'*'` row applies to every register without a row of its own.
 - `scope.registers` for a `person` or `token` is every register whose effective level is `≥ read`; `append` is not `≥ read` (§13 #8), so an `append`-only register is absent.
 - A `token`'s effective level on a register is `min(scopeLevel, memberLevel)` with `read → read`, `propose → append`, `write → write`; a token never reaches `decide` or `owner` (30 §10).
-- `share`: `registers` = the page's `requires:`; `rows` = the link's predicate; `levels` empty. `system`, `spark`: `registers = '*'`.
+- `share`: `registers` = the page's `requires:`; `rows` = the link's predicate; `levels` empty. `system`, `slash`: `registers = '*'`.
 - The actor is the kernel's: `kernel.write` derives it at step 1 (41 §5.4); for events this package appends itself it calls `kernel.actor(ctx)` (§4.7). A `person` actor is `person.id` (§13 #7).
 
 ### 4.2 · `Result<T>`, `Refusal`, and the HTTP mapping
@@ -413,7 +413,7 @@ call(method, args, ctx):
  4. VERB     the level the method needs on the register the args name — table below; a token also needs the scope
              word. Failure → FORBIDDEN at 'register' (or 'principal'), fix: "You hold <held>; this needs <needed>."
  5. SCOPE    derived.scope = { registers: every register with effective level ≥ read, rows: share.rows }
-             — '*' for system and spark; the page's requires: for share.
+             — '*' for system and slash; the page's requires: for share.
  6. DISPATCH the method. The actor is the kernel's: write() derives it; events appended here use kernel.actor(ctx).
 ```
 
@@ -486,7 +486,7 @@ Steps 4–6 are `tail()`; every method that writes through the kernel ends with 
 
 **`propose`**
 
-1. Verb `propose`; `spark` is allowed here and nowhere else in DATA (30 §3).
+1. Verb `propose`; `slash` is allowed here and nowhere else in DATA (30 §3).
 2. `op_id` given → `kernel.replay(op_id)` → defined → return `{ id: target's SG }` (26 §2.4: a suggestion is written idempotently on the job id).
 3. Body by kind (33 §2): `options { question, options: [{ id, label, because }] (≥ 2), requires_reason: true }` · `pattern { ingest, samples: [raw_id…] }` (`ingest` passes `declare.lint` as a one-declaration pack) · `rowset { register, rows: [{ fields }] }` (register ∈ scope, ≤ 200 rows) · `change { declaration_id, from, to }` (an active declaration). Shape faults → `REQUIRED_MISSING` · `FIELD_UNKNOWN` · `ENUM_VALUE_UNKNOWN` at `body.<key>`.
 4. tx: `actor = kernel.actor(ctx)`; `'SG' + kernel.allocate('suggestion')`; `INSERT INTO suggestion(id, body_kind, body, status, opened_by, opened_at) VALUES (?, ?, ?, 'open', ?, ?)`; `appendEvent({ kind: 'suggest', actor, target: 'suggestion:SG<n>', target_kind: 'suggestion', to_v: question, op_id })`.
@@ -799,13 +799,13 @@ Dispatch by kind — ten, the `CHECK`'s count:
 | Kind | Payload | Does | Next |
 |---|---|---|---|
 | `reminder` | `{ entry, field, offset }` — written by the kernel at step 10 | row live and field present, else drop; `say = fill('{{title}} · <field> {{until:<field>}}')`, `because = 'register.<r>.<f>.remind'`, `to = spoken`, `tone 'warn'`, `urgent false`, `key` = the row's key → **notify** | one-shot |
-| `digest` | `{ declaration }` | **a.** per section: `metric.<id>` → `evaluateMetric`; `register.<id>` → `compile` + `kernel.list` with `columns`, `limit 50`; **b.** `omit_when_empty` drops empty sections; nothing left → not sent (09 §5 rule 4); **c.** `prose: spark` → `kernel.outbox({ kind: 'infer.prose', payload: { digest, sections, channels } })` and stop — §5.10 finishes on the ack; else **d.** per `channels`: `email` → `kernel.outbox({ kind: 'notify.email', payload: { to: <owner emails: person ⋈ member('*', 'owner')>, subject: name, text, html? } })`; `in-app` → `appendEvent` `note` by `digest:<id>` (the headings with counts, ≤ 280); `push` → `notify.push` `{ title: '<name>: <n> items', url: '/digest/<id>' }` — no content (09 §3); `webhook` → `notify.webhook` `{ url: decl.url, body: jcs(sections) }` | `nextOccurrence(decl.schedule, now, tz)` |
+| `digest` | `{ declaration }` | **a.** per section: `metric.<id>` → `evaluateMetric`; `register.<id>` → `compile` + `kernel.list` with `columns`, `limit 50`; **b.** `omit_when_empty` drops empty sections; nothing left → not sent (09 §5 rule 4); **c.** `prose: slash` → `kernel.outbox({ kind: 'infer.prose', payload: { digest, sections, channels } })` and stop — §5.10 finishes on the ack; else **d.** per `channels`: `email` → `kernel.outbox({ kind: 'notify.email', payload: { to: <owner emails: person ⋈ member('*', 'owner')>, subject: name, text, html? } })`; `in-app` → `appendEvent` `note` by `digest:<id>` (the headings with counts, ≤ 280); `push` → `notify.push` `{ title: '<name>: <n> items', url: '/digest/<id>' }` — no content (09 §3); `webhook` → `notify.webhook` `{ url: decl.url, body: jcs(sections) }` | `nextOccurrence(decl.schedule, now, tz)` |
 | `rule` | `{ rule, entry, batch, notify?, note? }` (§5.7 step 4) | `notify`: non-urgent inside quiet hours 22:00–08:00 in `record.tz` → `UPDATE schedule SET state = 'pending', due_at = <next 08:00> WHERE id = ?` and return; else `appendEvent({ kind: 'note', actor: 'rule:' + rule, target: 'entry:' + entry, target_kind: 'entry', note: say, to_v: jcs({ tone, urgent, key, because }), batch })`; urgent → one interrupt per hour per record: `SELECT COUNT(*) FROM outbox WHERE kind = 'notify.push' AND created > ?` (now − 1 h) `= 0` → `notify.push { title: 'Something needs attention', url: '/' + spoken }` and `notify.email { to, subject: say, text: say + '\n' + because + '\n' + url }`, else downgraded to the digest (09 §7). `note` (a `schedule:` action) → `note` event by the rule on the row; nothing re-evaluates (§10 #16) | one-shot |
 | `retry` | `{ outbox }` | `UPDATE outbox SET state = 'pending' WHERE id = ? AND state = 'failed'` — leased again by the host (30 §8) | one-shot |
 | `purge` | `{}` — the hourly sweep, key `'sweep'`, created by `createRecord` | `kernel.purge(now − 30 d, { limit: 100 })`; sessions: `SELECT id FROM entry WHERE register = 'session' AND deleted_at IS NULL AND state IN ('active', 'idle') AND json_extract(fields, '$.last_seen') < ?` (now − 12 h) → each `kernel.write('session', id, { state: 'abandoned' }, { ctx: system, cascade: false })`; jobs: `UPDATE job SET status = 'cancelled' WHERE status = 'queued' AND expires < ? RETURNING id` → one `note` event by `system` per id; `UPDATE device_grant SET status = 'expired' WHERE (status = 'pending' AND expires < ?) OR (status = 'active' AND reach IN ('login', 'runner') AND last_used < ?)` (now − 14 d); `DELETE FROM observation WHERE day < ?` (today − 400 d); embeddings: `SELECT e.id FROM entry e LEFT JOIN entry_vec v ON v.id = e.id WHERE e.deleted_at IS NULL AND (v.id IS NULL OR v.built_at < e.updated_at) LIMIT 100` → one `kernel.outbox({ kind: 'infer.embed', payload: { ids, texts } })` with each row's `searchText` (§13 #9) | `+ 1 h` |
 | `rotate` | `{ grant, urgent? }` | grant live (`revoked_at IS NULL`) else drop; `say = 'credential <id> (<kind>) is due for rotation'` — never the label (12 §8), `target 'grant:' + id`, `to = '/vault/' + id`, actor `system`, `urgent` from the payload → **notify** | `rotate_every` → `due_at + rotate_every`; the expiry row one-shot |
 | `pull` | `{ ingest, cursor, slot? }` | declaration active (else drop) → `kernel.outbox({ kind: 'pull.fetch', payload: { ingest, cursor, slot, record: { id, tz } } })`. A paused connector is this row with `state = 'paused'` — never claimed (25 §9) | `every + jitter`, `jitter = fnv1a(record.id + ingest) mod min(every / 4, 15 min)` — deterministic (25 §9) |
-| `analyse` | `{}` — weekly, key `'weekly'` | governors: activity floor (`> 20` live rows, `> 3` distinct `event` days, record ≥ 14 d old), `≤ 3` open `system` suggestions, `≤ 1` proposal per 7 d, the brake (`SELECT AVG(met) FROM (SELECT met FROM prediction WHERE scored_at IS NOT NULL ORDER BY scored_at DESC LIMIT 20)` with 20 rows and `< 0.6` → suspended: a `note` by `system` naming the precision). Detectors — deterministic SQL over `observation` with 24 §4.3's numbers: `ingest.unmatched` (`SUM(n) ≥ 3` per subject, 30 d), `search.empty` (`SUM(n) ≥ 5` on `≥ 3` distinct days, 90 d), `write.refused` (`SUM(n) ≥ 10` on `≥ 3` days, 30 d), `query.scan` (`SUM(n) ≥ 200`, 30 d). The best candidate → `kernel.outbox({ kind: 'infer.draft', payload: { signal, subject, n, window } })` — Spark drafts, the ack proposes (§5.10) | `+ 7 d` |
+| `analyse` | `{}` — weekly, key `'weekly'` | governors: activity floor (`> 20` live rows, `> 3` distinct `event` days, record ≥ 14 d old), `≤ 3` open `system` suggestions, `≤ 1` proposal per 7 d, the brake (`SELECT AVG(met) FROM (SELECT met FROM prediction WHERE scored_at IS NOT NULL ORDER BY scored_at DESC LIMIT 20)` with 20 rows and `< 0.6` → suspended: a `note` by `system` naming the precision). Detectors — deterministic SQL over `observation` with 24 §4.3's numbers: `ingest.unmatched` (`SUM(n) ≥ 3` per subject, 30 d), `search.empty` (`SUM(n) ≥ 5` on `≥ 3` distinct days, 90 d), `write.refused` (`SUM(n) ≥ 10` on `≥ 3` days, 30 d), `query.scan` (`SUM(n) ≥ 200`, 30 d). The best candidate → `kernel.outbox({ kind: 'infer.draft', payload: { signal, subject, n, window } })` — Slash drafts, the ack proposes (§5.10) | `+ 7 d` |
 | `score` | `{ prediction }` | `SELECT * FROM prediction WHERE id = ? AND scored_at IS NULL`; `observed = evaluateMetric({ ...measure, window }, { now, tz, scope: '*' }).value`; `met = compare(observed, target)`; `UPDATE prediction SET scored_at = ?, observed = ?, met = ? WHERE id = ?`; event `score` (`target 'prediction:' + id`, `to_v = jcs({ observed, met })`); `met = 0 AND on_miss = 'suggest'` → suggestion `options { question: '<claim> — predicted <target>, observed <observed>. Supersede it, or say why you are keeping it.', options: [{ id: 'supersede' }, { id: 'keep' }], requires_reason: true }` by `system`, event `suggest` (24 §4.6) | one-shot |
 | `snapshot` | `{ metric }` | `y = yesterday in tz`; `v = evaluateMetric(decl, { asOf: end of y })`; `INSERT INTO metric_point(series, grain, at, value, unit, n, source, wrote_at) VALUES (?, 'day', ?, ?, ?, ?, ?, ?) ON CONFLICT(series, grain, at) DO UPDATE SET value = excluded.value, unit = excluded.unit, n = excluded.n, wrote_at = excluded.wrote_at` (overwrite yesterday); backfill: for each of the 30 days before `y` without a point, evaluate at that day's end and `INSERT … ON CONFLICT DO NOTHING`; a null value → `missing + 1`, no row; today is never written — appended live and flagged by the reader (08 §2.6) | next `00:05` in tz |
 
@@ -838,8 +838,8 @@ The three `?` are `now + 60 s` · `+ 120 s` · `+ 300 s` as RFC 3339; the `LIKE`
 | Kind | `result` | Persisted in the ack's transaction (51 §13 D9; 47 §2) |
 |---|---|---|
 | `infer.embed` | `{ model, dims, vectors: Int8Array[] }` | per `payload.ids[i]`: `INSERT OR REPLACE INTO entry_vec(id, register, dims, vec, model, built_at) VALUES (?, ?, ?, ?, ?, ?)` |
-| `infer.prose` | `{ text }` | `prose = first two sentences of text`; the digest's outbox rows of §5.9 step d, `text` prefixed by `prose`, attributed `— Spark` |
-| `infer.draft` | `{ body: { question, body_kind, body } }` | the suggestion (`opened_by 'spark'`) and its event — `propose` when `payload.raw` names an arrival (an ingest pattern), else `suggest`; actor `spark` (30 §3) |
+| `infer.prose` | `{ text }` | `prose = first two sentences of text`; the digest's outbox rows of §5.9 step d, `text` prefixed by `prose`, attributed `— Slash` |
+| `infer.draft` | `{ body: { question, body_kind, body } }` | the suggestion (`opened_by 'slash'`) and its event — `propose` when `payload.raw` names an arrival (an ingest pattern), else `suggest`; actor `slash` (30 §3) |
 | `pull.fetch` | `PullFinish { outcome, points, cursor, due_at, slot }` | `points` → the `metric_point` upsert of §5.9 `snapshot` with `source = 'ingest.' + id`; `UPDATE schedule SET payload = json_set(payload, '$.cursor', ?, '$.slot', ?), due_at = COALESCE(?, due_at) WHERE kind = 'pull' AND key = ?`; `outcome = 'paused'` → `UPDATE schedule SET state = 'paused' WHERE …`, `UPDATE grant SET stale_at = ? WHERE id = ?`, an urgent **notify** by `ingest:<id>` (25 §9); event `pull` (actor `ingest:<id>`, `note` = the finish's one line) |
 | `export.r2` | `{ key, bytes }` | event `export`, `note = 'snapshot ' + key + ' ' + bytes + ' bytes'` |
 | `erase.r2` · `notify.*` | — | nothing |
@@ -887,7 +887,7 @@ same `Result`; this table is what **this layer** raises, with the `fix` a person
 
 | Code | Raised here when | `at` | `fix` |
 |---|---|---|---|
-| `FORBIDDEN` | the principal's kind, level, scope or `op` reach does not reach the method or register (§5.1 steps 1–4); `spark` outside `propose`; `share` outside its slug; a runner on another runner's job; a wrong device code (first four) | `principal` · `register` · `user_code` | `You hold <held>; this needs <needed>.` |
+| `FORBIDDEN` | the principal's kind, level, scope or `op` reach does not reach the method or register (§5.1 steps 1–4); `slash` outside `propose`; `share` outside its slug; a runner on another runner's job; a wrong device code (first four) | `principal` · `register` · `user_code` | `You hold <held>; this needs <needed>.` |
 | `NEEDS_BROWSER_SESSION` | a `token` or `runner` at VAULT, ADMIN or the JOBS session half; an `op` grant at VAULT | `principal` | `Open this from the app; a token cannot reach it.` |
 | `WRONG_KEY` | `openGrant` / `ingestVerify`: `vault_key.kek_id ≠ args.kek_id` | `kek_id` | `The vault was wrapped by another key — rotate the KEK forward; the data is intact.` |
 | `GRANT_REVOKED` | `openGrant` / `bindGrant` / `revokeGrant` on a row with `revoked_at` | `id` | `This credential was revoked on <date>; bind a new one.` |
@@ -957,8 +957,8 @@ the record has no key to open either (ADR-062); a `secret` field's grant id in a
 replaces it with the label before a row object exists; a grant's `label` or `opens` in a `grant.*` event `note`
 (12 §8; the kernel enforces the shape); content in a `notify.push` payload — a title and a URL (09 §3); a token's
 or device bearer's value after the one reply that mints it; a `local` table in an export (03 §3); a row a `share`
-link's predicate excludes (20 §1). What never happens: `spark` writing a row — refused at §5.1 and asserted by the
-`spark-actor` gate; a token reaching VAULT, ADMIN or a job's session half; a `system` method from a routable
+link's predicate excludes (20 §1). What never happens: `slash` writing a row — refused at §5.1 and asserted by the
+`slash-actor` gate; a token reaching VAULT, ADMIN or a job's session half; a `system` method from a routable
 principal — INTERNAL has no route and refuses every other kind; a device approving itself — `deviceApprove` is a
 browser session.
 
@@ -992,7 +992,7 @@ through `createRecord` + `installPack` + `create`. One case per method's happy p
 | token `write` (person `read`) | `create` → `FORBIDDEN` — the person caps the token | ok | — | — | — | — | — |
 | runner | `FORBIDDEN` | `FORBIDDEN` | `NEEDS_BROWSER_SESSION` | `NEEDS_BROWSER_SESSION` | ok | `NEEDS_BROWSER_SESSION` | `FORBIDDEN` |
 | share | `FORBIDDEN` | `page(its slug)` ok; another slug → `FORBIDDEN`; `metric` → `FORBIDDEN` | `FORBIDDEN` | `FORBIDDEN` | `FORBIDDEN` | `FORBIDDEN` | `FORBIDDEN` |
-| spark | `propose` ok; `create` → `FORBIDDEN` | ok | `FORBIDDEN` | `FORBIDDEN` | `FORBIDDEN` | `FORBIDDEN` | `FORBIDDEN` |
+| slash | `propose` ok; `create` → `FORBIDDEN` | ok | `FORBIDDEN` | `FORBIDDEN` | `FORBIDDEN` | `FORBIDDEN` | `FORBIDDEN` |
 | system | — | — | — | — | — | `export` ok; `invite` ok | ok |
 
 Plus: a person with `member(obligations, read)` and no `'*'` row → `list(services)` → `FORBIDDEN`, `list(obligations)`
@@ -1076,7 +1076,7 @@ ok; `httpStatus` over one `Result` per row of §4.2; `kernel.refused()` set → 
 | arm in finally | every dispatch throws → `scheduler.set` still called |
 | quiet hours | a non-urgent `rule` notify due 23:30 record tz → re-armed to 08:00, no event; urgent → the event and a `notify.push` row at 23:30 |
 | one interrupt per hour | two urgent notifications in 10 min → one `notify.push`, two `note` events |
-| digest | `omit_when_empty` drops a section; all empty → no outbox row; email + in-app → one `notify.email`, one `note` by `digest:<id>`; `prose: spark` → one `infer.prose` row and no email until its ack; re-armed to the next Monday 08:00 in `Africa/Cairo` |
+| digest | `omit_when_empty` drops a section; all empty → no outbox row; email + in-app → one `notify.email`, one `note` by `digest:<id>`; `prose: slash` → one `infer.prose` row and no email until its ack; re-armed to the next Monday 08:00 in `Africa/Cairo` |
 | `purge` sweep | a session `last_seen` 13 h ago → `abandoned` by `system`; a `queued` job past `expires` → `cancelled` + a `note`; observations over 400 d gone; changed rows → one `infer.embed` row with ≤ 100 ids |
 | `score` | `baseline 11, target lte 1, observed 7` → `met 0`, an `options` suggestion by `system` |
 | `pull` jitter | the same `record.id + ingest` → the same `due_at` twice |
@@ -1088,7 +1088,7 @@ ok; `httpStatus` over one `Result` per row of §4.2; `kernel.refused()` set → 
 |---|---|
 | lease | 3 pending + 1 expired lease → `leaseOutbox(['notify.email'], 10)` returns 4; again → 0; `leased_until` per kind `+60 s` / `+120 s` / `+300 s` |
 | retry ladder to `dead` | `ackOutbox(failed)` → outbox `failed, attempts 1`, a `retry` row due `+2 min`; drain it → `pending`; repeat to the 8th failure → `dead`, one `change` suggestion by `system` naming the kind and the error; no ninth retry row |
-| write-backs | `infer.embed` done → `entry_vec` rows for `payload.ids`; `infer.draft` done → a suggestion by `spark` and a `suggest` event; `pull.fetch` done with `points` → `metric_point` rows and the `pull` row's `cursor`; `outcome 'paused'` → the row `paused`, `grant.stale_at` set |
+| write-backs | `infer.embed` done → `entry_vec` rows for `payload.ids`; `infer.draft` done → a suggestion by `slash` and a `suggest` event; `pull.fetch` done with `points` → `metric_point` rows and the `pull` row's `cursor`; `outcome 'paused'` → the row `paused`, `grant.stale_at` set |
 | `export.r2` failure | also an `export` event with `note: 'failed: <error>'` |
 | ack unknown or unleased | `ackOutbox` on an unknown or `pending` id → `OUT_OF_BOUNDS` |
 
@@ -1100,7 +1100,7 @@ ok; `httpStatus` over one `Result` per row of §4.2; `kernel.refused()` set → 
 
 **`test/perf.test.ts`** — §7's table, p50 of 20, asserting `≤ 3 ×`.
 
-**CI rows** (33 §8): `ci.yml` runs this suite; `router-groups` reads `GROUPS`; `refusal-fixtures` maps §6's codes to fixtures the cases produce; `spark-actor` runs over the fixture record after `test/data.test.ts`; `brain-roundtrip` is `test/admin.test.ts`'s case; `closed-lists` diffs `DIALECT` against `packages/render/kinds/*.json`; `secret-grep` includes `packages/record/src`.
+**CI rows** (33 §8): `ci.yml` runs this suite; `router-groups` reads `GROUPS`; `refusal-fixtures` maps §6's codes to fixtures the cases produce; `slash-actor` runs over the fixture record after `test/data.test.ts`; `brain-roundtrip` is `test/admin.test.ts`'s case; `closed-lists` diffs `DIALECT` against `packages/render/kinds/*.json`; `secret-grep` includes `packages/record/src`.
 
 ---
 
@@ -1166,9 +1166,9 @@ of §13 #4 and #11 (`kernel.actor`, `device_grant.reach`); 46 §4.6 and 47 §2 a
 carries `budget` inside `args`, `ackOutbox` takes one object with `state` (§13 #1).
 
 **This unblocks:** `apps/selfhost` (49) and `apps/worker` (51), which host `RecordApi` one line per method;
-`packages/spark` (46), whose reads are `project()` and whose runner protocol is the JOBS group; `packages/connect`
+`packages/slash` (46), whose reads are `project()` and whose runner protocol is the JOBS group; `packages/connect`
 (47), which writes back through `applyPull` and `ackOutbox`; `packages/mcp`'s integration tests over a real
-`RecordApi` on `:memory:`; the `router-groups`, `spark-actor` and `brain-roundtrip` gates (52).
+`RecordApi` on `:memory:`; the `router-groups`, `slash-actor` and `brain-roundtrip` gates (52).
 
 ---
 
@@ -1194,7 +1194,7 @@ Each amends the named document in the same revision (35 §1).
 | 14 | **`Projection.budget` counts ≈ tokens as `ceil(utf8 bytes / 4)`**; `series: true` rows are never projected (no spoken id); no document body in v1 | 30 §9; 11 §6 |
 | 15 | **Mixed currencies at runtime without a lookup** yield `value: null` and per-currency `mixed` partials — refuse to guess, keep the parts | 08 §2.5 |
 | 16 | **`setDeclaration.mode ∈ set · retire · test · apply`** carries `braindog rule test` and `rule apply --dry`; an in-app declaration is a one-declaration pack `_inapp` through `declare.lint` | 30 §5; 33 §5 |
-| 17 | **A notification's in-app form is the `note` event** by `rule:<id>`, `digest:<id>` or `system` on the row, `to_v` = JCS `{ tone, urgent, key, because }`; no inbox table. Urgent adds `notify.push` (title + URL) and `notify.email`; one interrupt per hour per record; `prose: spark` routes the digest through `infer.prose` and finishes on the ack | 09 §3, §4, §6, §7 |
+| 17 | **A notification's in-app form is the `note` event** by `rule:<id>`, `digest:<id>` or `system` on the row, `to_v` = JCS `{ tone, urgent, key, because }`; no inbox table. Urgent adds `notify.push` (title + URL) and `notify.email`; one interrupt per hour per record; `prose: slash` routes the digest through `infer.prose` and finishes on the ack | 09 §3, §4, §6, §7 |
 | 18 | **`arrive` is deterministic and one transaction**: store → first matching ingest → extract → exact rows written with `mechanism: 'ingest:<id>'`, else a `rowset` suggestion; an unmatched shape earns an `infer.draft` row at its third arrival in 30 days, never a model call per payload | 07 §7 ("is a Workflow" → "may become one"); 24 §4.3; 51 §13 D12 |
 | 19 | **`openGrant` takes `kek_id`** and `SealedGrant` carries the wrapped DEK's `nonce`, `wrapped_by`, `salt`; `WRONG_KEY` compares against `vault_key(record).kek_id`; `ingestVerify` returns the same sealed shape to `system` with a `grant.read` event | 12 §6; 30 §5 |
 | 20 | **The job bearer is a `token` row** with `scope 'propose'`, `label 'job:<id>'`, `person_id` = the `'*'` owner, `expires_at = job.expires`, minted by `claimJob` (46 §4.7's `Claim.bearer`); a token row holds one scope word and the host expands the ladder `read ⊂ propose ⊂ write` | 12 §3; 30 §1 (`token.scope`) |
@@ -1222,4 +1222,4 @@ Each amends the named document in the same revision (35 §1).
 
 ---
 
-*Previous: [44-SPEC-MCP](44-SPEC-MCP.md). Next: [46-SPEC-SPARK](46-SPEC-SPARK.md).*
+*Previous: [44-SPEC-MCP](44-SPEC-MCP.md). Next: [46-SPEC-SLASH](46-SPEC-SLASH.md).*

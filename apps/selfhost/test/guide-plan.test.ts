@@ -2,7 +2,7 @@
  * The New project guide's first plan from a model, and its next milestone, on a record made with this host's own catalogue.
  *
  * A PLAN IS ASKED FOR, NEVER MADE. With a model, what the owner said goes to it and the plan comes back as rows on Decide
- * (`sparkForm`); nothing is written until the owner accepts, and then every row lands with its milestone linked. With no
+ * (`slashForm`); nothing is written until the owner accepts, and then every row lands with its milestone linked. With no
  * model, a model that throws, or an answer outside the guide's limits, nothing is filed and the caller keeps the templates.
  * The model is always a fake here; nothing leaves the machine and no key is used.
  *
@@ -13,7 +13,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createRecordApi, type CallContext, type SparkModel } from '@braindog/record';
+import { createRecordApi, type CallContext, type SlashModel } from '@braindog/record';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 import { useCaseDocument } from '@braindog/seed/usecases';
 
@@ -48,9 +48,9 @@ const PLAN = {
 type Row = { seq: number; fields: Record<string, unknown> };
 
 /** A record with the guide installed as onboarding installs it where a model is configured: its lists, and no rows. */
-async function guideRecord(model?: SparkModel) {
+async function guideRecord(model?: SlashModel) {
   const sql = openSqlite();
-  const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 17, 12)), catalogue: seedCatalogue(), ...(model ? { sparkModel: model } : {}) });
+  const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 17, 12)), catalogue: seedCatalogue(), ...(model ? { slashModel: model } : {}) });
   const doc = { ...useCaseDocument('guide', '2026-09-17')! };
   delete doc.seeds;
   const planned = value<{ diff: { planHash: string } }>(await api.planPack({ doc }, owner));
@@ -59,7 +59,7 @@ async function guideRecord(model?: SparkModel) {
   return { sql, api, rows };
 }
 
-const fake = (answer: () => unknown): SparkModel & { asked: unknown[] } => {
+const fake = (answer: () => unknown): SlashModel & { asked: unknown[] } => {
   const asked: unknown[] = [];
   return { name: 'endpoint', asked, draft: async () => ({ drafts: [] }), form: async (input) => (asked.push(input), answer()) };
 };
@@ -67,7 +67,7 @@ const fake = (answer: () => unknown): SparkModel & { asked: unknown[] } => {
 test('A MODEL FORMS A FIRST PLAN FROM WHAT WAS SAID, filed on Decide as rows, made only when the owner accepts, and asked once', async () => {
   const model = fake(() => structuredClone(PLAN));
   const { sql, api, rows } = await guideRecord(model);
-  const out = value<{ formed: boolean; id: string; question: string; counts: Record<string, number> }>(await api.sparkForm({ usecase: 'guide', said: SAID }, owner));
+  const out = value<{ formed: boolean; id: string; question: string; counts: Record<string, number> }>(await api.slashForm({ usecase: 'guide', said: SAID }, owner));
   assert.equal(out.formed, true);
   assert.deepEqual(out.counts, { milestones: 3, steps: 3, choices: 1, resources: 1 });
   /* THE MODEL WAS HANDED THE SENTENCE AND THE LISTS' LIMITS, and nothing of the record. */
@@ -78,7 +78,7 @@ test('A MODEL FORMS A FIRST PLAN FROM WHAT WAS SAID, filed on Decide as rows, ma
 
   for (const register of ['milestones', 'steps', 'choices', 'resources']) assert.equal((await rows(register)).length, 0, `${register} has nothing before the owner accepts`);
   const suggestion = sql.one<{ body_kind: string; opened_by: string; status: string }>('SELECT body_kind, opened_by, status FROM suggestion WHERE id = ?', out.id)!;
-  assert.deepEqual({ ...suggestion }, { body_kind: 'arrange', opened_by: 'spark', status: 'open' });
+  assert.deepEqual({ ...suggestion }, { body_kind: 'arrange', opened_by: 'slash', status: 'open' });
 
   value(await api.decide({ id: out.id, decide: { option: 'accept', reason: 'Looks right.' } } as never, owner));
   const milestones = await rows('milestones');
@@ -108,17 +108,17 @@ test('A MODEL FORMS A FIRST PLAN FROM WHAT WAS SAID, filed on Decide as rows, ma
   assert.equal((await rows('choices'))[0]!.fields.options, 'Alone\nWith a co-host');
   assert.equal((await rows('resources')).length, 1);
 
-  const again = value<{ formed: boolean; why: string }>(await api.sparkForm({ usecase: 'guide', said: SAID }, owner));
+  const again = value<{ formed: boolean; why: string }>(await api.slashForm({ usecase: 'guide', said: SAID }, owner));
   assert.deepEqual({ ...again }, { formed: false, why: 'asked' });
   assert.equal(model.asked.length, 1, 'the model is not asked twice');
 });
 
 test('NO MODEL, A MODEL THAT FAILS, OR AN ANSWER OUTSIDE THE GUIDE\'S LIMITS FILES NOTHING, so the templates stand', async () => {
   const none = await guideRecord();
-  assert.deepEqual({ ...value<object>(await none.api.sparkForm({ usecase: 'guide', said: SAID }, owner)) }, { formed: false, why: 'no-model' });
+  assert.deepEqual({ ...value<object>(await none.api.slashForm({ usecase: 'guide', said: SAID }, owner)) }, { formed: false, why: 'no-model' });
 
   const thrown = await guideRecord(fake(() => { throw new Error('down'); }));
-  assert.deepEqual({ ...value<object>(await thrown.api.sparkForm({ usecase: 'guide', said: SAID }, owner)) }, { formed: false, why: 'failed' });
+  assert.deepEqual({ ...value<object>(await thrown.api.slashForm({ usecase: 'guide', said: SAID }, owner)) }, { formed: false, why: 'failed' });
 
   const bad = (change: (p: typeof PLAN.plan & Record<string, unknown>) => void) => {
     const p = structuredClone(PLAN);
@@ -143,7 +143,7 @@ test('NO MODEL, A MODEL THAT FAILS, OR AN ANSWER OUTSIDE THE GUIDE\'S LIMITS FIL
   ];
   for (const [what, answer] of table) {
     const { sql, api } = await guideRecord(fake(() => answer));
-    const out = value<{ formed: boolean; why: string; detail?: string }>(await api.sparkForm({ usecase: 'guide', said: SAID }, owner));
+    const out = value<{ formed: boolean; why: string; detail?: string }>(await api.slashForm({ usecase: 'guide', said: SAID }, owner));
     assert.equal(out.formed, false, what);
     assert.equal(out.why, 'invalid', `${what}: ${out.detail}`);
     assert.equal(sql.all('SELECT id FROM suggestion').length, 0, `${what}: nothing is filed`);
@@ -151,7 +151,7 @@ test('NO MODEL, A MODEL THAT FAILS, OR AN ANSWER OUTSIDE THE GUIDE\'S LIMITS FIL
   }
 });
 
-test('ROWS IN AN ARRANGEMENT ARE SPARK\'S ALONE: anybody else proposes rows as a rowset', async () => {
+test('ROWS IN AN ARRANGEMENT ARE SLASH\'S ALONE: anybody else proposes rows as a rowset', async () => {
   const { api } = await guideRecord();
   const put = (await api.propose({ question: 'Add a plan?', body_kind: 'arrange', body: { why: ['A plan.'], rows: [{ register: 'milestones', fields: { what: 'Start' } }] } } as never, owner)) as { ok: boolean; refusal?: { code: string; at?: string } };
   assert.equal(put.ok, false);
@@ -165,7 +165,7 @@ test('A MILESTONE REACHED ASKS ONCE WHETHER TO START THE NEXT ONE, and the guide
   value(await api.decide({ id: asked.id, decide: { option: 'accept', reason: 'yes' } } as never, owner));
   const milestones = async () =>
     value<{ rows: Row[] }>(await api.list({ register: 'milestones', limit: 50 }, owner)).rows.sort((a, b) => Number(a.fields.order) - Number(b.fields.order));
-  const next = () => sql.all<{ id: string; body: string; status: string }>("SELECT id, body, status FROM suggestion WHERE opened_by = 'spark' AND body_kind = 'rowset'");
+  const next = () => sql.all<{ id: string; body: string; status: string }>("SELECT id, body, status FROM suggestion WHERE opened_by = 'slash' AND body_kind = 'rowset'");
 
   const [first, second, third, fourth] = await milestones();
   assert.equal(first!.fields.state, 'underway');
@@ -237,7 +237,7 @@ test('WHEN NO MODEL FORMS A PLAN, THE TEMPLATES WRITTEN AFTER THE LISTS ARE THE 
 
     /* WITH A MODEL THAT FORMED NOTHING: the lists empty, then the same rows written, then the same links. */
     const { sql, api } = await guideRecord(fake(() => 'nothing'));
-    assert.equal(value<{ formed: boolean }>(await api.sparkForm({ usecase: 'guide', said }, owner)).formed, false);
+    assert.equal(value<{ formed: boolean }>(await api.slashForm({ usecase: 'guide', said }, owner)).formed, false);
     for (const row of plan.rows) value(await api.create({ register: row.register, fields: row.fields as never }, owner));
     await linkExamples(io(api), 'guide', plan.links ? { links: plan.links } : undefined);
 

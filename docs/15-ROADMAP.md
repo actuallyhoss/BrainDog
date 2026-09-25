@@ -138,7 +138,7 @@ authoring tier, no assistant.
 > the first table below and 19–30 in the second — more than the base it was being subtracted from,
 > which is the arithmetic tell. *(A still earlier draft said 177–234; the rows never added to that,
 > and the argument survives at 155 > 135.)* The cause: **most of the list is already excluded from
-> the 105–135 above.** That base has no authoring tier, no Spark, no
+> the 105–135 above.** That base has no authoring tier, no Slash, no
 > themes-as-data, no collaboration, no declared metric or digest kinds, and magic-link rather than
 > passkeys. Cutting them again is subtracting them twice.
 >
@@ -157,7 +157,7 @@ The cut list, split into what is already gone and what can still go:
 | Already gone | Would have saved | What is lost |
 |---|---|---|
 | **The entire authoring tier.** Declarations are edited as **text** — the error-recovering parser plus the visible fence, which is [21-AUTHORING](21-AUTHORING.md) §7's own Tier 1 and [22-FRONTEND](22-FRONTEND.md) §8's own recommendation (*"Ship the textarea"*) | **80–100** | the R2–R4 ladder, *"why an amateur cannot produce something ugly"*, and gate 5's plausibility |
-| **Spark entirely.** Per [ADR-030](16-DECISIONS.md) the §1b shape ships no intelligence at all; Phase A ships tier A-minimal (triage, extraction, digest prose, embeddings — no conversation) and the conversational surface waits for tier B. The ingest proposal loop is the *hardest* AI job in the product (structured YAML synthesis from three untrusted samples), and the record's own agent can do it over MCP | **20–26** | *"'Write a parser' becomes 'forward three texts and approve a suggestion'"* — the best sentence in the pitch |
+| **Slash entirely.** Per [ADR-030](16-DECISIONS.md) the §1b shape ships no intelligence at all; Phase A ships tier A-minimal (triage, extraction, digest prose, embeddings — no conversation) and the conversational surface waits for tier B. The ingest proposal loop is the *hardest* AI job in the product (structured YAML synthesis from three untrusted samples), and the record's own agent can do it over MCP | **20–26** | *"'Write a parser' becomes 'forward three texts and approve a suggestion'"* — the best sentence in the pitch |
 | **Themes as a pack kind**, the sixteen-check install gate, the theme editor, the runtime token sanitiser. Ship two first-party themes in both schemes, gated once in CI. **Keep** the 3-layer token ladder and the four CI colour gates | **14–18** | the cheapest Kennel artefact |
 | **Collaboration in full.** One person, one record. **Keep per-field audit redaction** — it changes what a backup contains | **12–15** | the $29 tier, shared pages as a distribution instrument, and the `decide` level |
 | **Declared `metric` and `digest` kinds.** Hard-code three metrics and one digest. **Keep `target` and `window` as required arguments** — the rule is right and free | **10–14** | pack-shipped analytics |
@@ -182,7 +182,7 @@ mechanisms in [19-INTERFACE](19-INTERFACE.md) §6 need **no pack format at all**
 row per register, the dismissible Home preview, and the one that is almost free:
 
 *(An earlier draft counted four of five and led with "a capture as the first screen." That mechanism
-has since been deleted at source: it depended on Spark, which this same plan cuts.)*
+has since been deleted at source: it depended on Slash, which this same plan cuts.)*
 
 > *"Or from any session: `read my brain, then add every domain I own with its renewal date`"*
 
@@ -294,7 +294,7 @@ Phase A's ≈122.*
 | B4 | The page engine | 10 | pages as rows, nav as rows, onboarding as pack selection, every empty state |
 | B5 | Ingest + rules | 9 | the raw inbox, declared patterns, the proposal loop |
 | B6 | Metrics + digests | 7 | declarative, on the same `where:` |
-| B7 | Spark, conversational (tier B first) | 8 | gated on [ADR-030](16-DECISIONS.md)'s instrumented ask; last of the engine work, because everything it proposes must already exist |
+| B7 | Slash, conversational (tier B first) | 8 | gated on [ADR-030](16-DECISIONS.md)'s instrumented ask; last of the engine work, because everything it proposes must already exist |
 | B8 | Collaboration 1–3 | 8–9 | shared links, a second login, comments on decisions — [20-COLLABORATION](20-COLLABORATION.md) §10 costs it at ~8.25; the audit-redaction half-day is already in §1b's kernel |
 | B9 | The Kennel | 3 | **last, and never before gate 2 — with gates 1a–1d not all missed ([ADR-031](16-DECISIONS.md))** |
 

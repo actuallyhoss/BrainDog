@@ -84,9 +84,9 @@ importers:
       '@braindog/seed':
         specifier: workspace:*
         version: link:../../packages/seed
-      '@braindog/spark':
+      '@braindog/slash':
         specifier: workspace:*
-        version: link:../../packages/spark
+        version: link:../../packages/slash
     devDependencies:
       '@braindog/client':
         specifier: workspace:*
@@ -198,9 +198,9 @@ importers:
       '@braindog/seed':
         specifier: workspace:*
         version: link:../../packages/seed
-      '@braindog/spark':
+      '@braindog/slash':
         specifier: workspace:*
-        version: link:../../packages/spark
+        version: link:../../packages/slash
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 5.20260907.1
@@ -348,7 +348,7 @@ importers:
         specifier: workspace:*
         version: link:../theme
 
-  packages/spark:
+  packages/slash:
     dependencies:
       '@braindog/ports':
         specifier: workspace:*

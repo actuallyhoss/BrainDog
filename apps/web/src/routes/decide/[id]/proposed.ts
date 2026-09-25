@@ -5,7 +5,7 @@
  * sidebar and its blocks, a list with its fields, a rule for what comes in, a look, an automation with its
  * trigger and steps, a script with where it calls out and its source, a summary with where it posts. A `pattern`
  * carries the rule an arrival suggested. Both were drawn as Accept and Reject under a title and nothing else,
- * so the one question Spark asks most, "shall I arrange this for you", was the one a person could not
+ * so the one question Slash asks most, "shall I arrange this for you", was the one a person could not
  * see the answer to before saying yes (DIRECTION §11, DESIGN-SYSTEM D4).
  *
  * THE WORDS ARE THE PERSON'S, NOT THE SCHEMA'S. `page`, `register`, `ingest` and `theme` are what the
@@ -222,7 +222,7 @@ export function appearsOf(decl: unknown, filed: readonly unknown[] = []): Appear
  * buttons, and `rowset` is `changes.ts`.
  */
 export function proposedOf(kind: string, body: Row): Proposed | null {
-  /* A PATTERN'S INGEST IS A BARE BODY OR A DECLARATION. Spark files the body (`spark/src/jobs.ts`) and an agent files the
+  /* A PATTERN'S INGEST IS A BARE BODY OR A DECLARATION. Slash files the body (`slash/src/jobs.ts`) and an agent files the
      declaration; drawn as a body, the declaration was read for `ingest`, `channel` and `writes` on its wrapper, and came
      out as a heading with no title and no lines. A declaration of another kind, queued before the kernel held a pattern
      to an ingest, is drawn as what it is, since that is what accepting it would have installed. */

@@ -41,7 +41,7 @@ Nothing else in this document may break those two keystrokes.
 | Screen | Address | Job |
 |---|---|---|
 | Record home | `/` | What needs you, and what changed while you were away |
-| **Palette** | overlay, `⌘K` | The one command surface. Never a page. **Spark** is its fallback row when a model is configured — Spark names the assistant, never the palette |
+| **Palette** | overlay, `⌘K` | The one command surface. Never a page. **Slash** is its fallback row when a model is configured — Slash names the assistant, never the palette |
 | Decide | `/decide` | Every open question, ranked by cost of being wrong (§8 risk 6), dearest first, with the band named on each card and on its gate. On a live record the list is the record's open suggestions, read through the client's `governance` call, and an answer is sent with `decide` once its reason is written; with no record behind the host (`UNREACHABLE` or `UNAUTHORIZED`) it draws the sample questions, and any other refusal draws the record's own fix. A `rowset` proposal that updates rows shows each changed field on its card: the render package's diff for a document or long text, and before and after for the rest, drawn the same way from the record's rows or the sample's, whether the proposal names a row by its spoken id or by its internal id. A row it would create is drawn as it was. **Decided** names each decision's option by its label, from the suggestion it settled |
 | The gate | `/decide/SG23` | One question, its options, one decider, a mandatory reason. On a live record the question is read by its id through `governance`, and choosing or parking it calls `decide` with the reason; a refusal stays under the button in the record's own words. A `rowset` proposal that updates rows draws **What changes** above the options, field by field, as its card does. A `change` that calls out draws **Calls other services** above the options, the same lines as the Packs diff and the estimate, with one sentence saying accepting approves them and declining runs none; Accept and Decline are that approval. A suggestion no longer open is drawn settled: the option chosen, who decided, when, and the reason, from the decision that settled it. The record keeps no link between the two rows, so the decision is found as the one that recorded an option the suggestion offers, after it opened, oldest first |
 | Inbox | `/inbox` | Raw arrivals that matched no pattern, with arrival times |
@@ -283,14 +283,14 @@ machine's answer with a reason typed under its influence.
 ### The palette — one surface, two modes, one grammar
 
 `⌘K` opens the palette in *filter* mode. A query matching nothing falls through to a **fallback
-row** — *"Ask Spark: <your text>"*, present only when a model is configured — which swaps the body for
+row** — *"Ask Slash: <your text>"*, present only when a model is configured — which swaps the body for
 **one proposal with its verbs** — never a transcript ([23-ASSISTANT-UI](23-ASSISTANT-UI.md) §3;
 nothing accumulates) — while the header, footer, focus trap and every keystroke stay identical. A tier-C
 *job* opened from the palette is the one body that is a transcript — of a run, never of a conversation
 ([23-ASSISTANT-UI](23-ASSISTANT-UI.md) §3.1).
 Raycast's *fallback command* mechanism, and the right way to give an assistant an escape hatch. An
-earlier draft called the whole surface *Spark* and gave the fallback a transcript; the palette is the
-surface, Spark is the row.
+earlier draft called the whole surface *Slash* and gave the fallback a transcript; the palette is the
+surface, Slash is the row.
 
 Prefixes, and **they work in every mode**: `>` commands · `#` records · `@` people · `/` pages and
 registers · none = everything, ranked. And **a bare spoken id resolves directly** — `D41`, `SG23`,
@@ -340,7 +340,7 @@ and no screen implements its own.
 And on the command palette, which the predecessor's own inventory marks as its **highest bloat
 risk**: keep the destinations, the verbs and the objects; the recent-history group, the measured
 pill-to-bar bloom and the wide multi-column layout are the first things to leave out for a new
-user. Spark's fallback row is absent entirely without a model; **the palette itself is present
+user. Slash's fallback row is absent entirely without a model; **the palette itself is present
 whenever the record has one register** — it is how the keyboard reaches everything, not a model
 feature.
 
@@ -443,7 +443,7 @@ destination — **not on the skeleton**, which is decorative — and `aria-busy`
 
 | State | When | The one action |
 |---|---|---|
-| `no-data-yet` | first run | **Add one** · **Ask Spark** (absent without a model) · *Show me an example* |
+| `no-data-yet` | first run | **Add one** · **Ask Slash** (absent without a model) · *Show me an example* |
 | `no-results` | a filter matched nothing — **quote the query verbatim** | Clear filters |
 | `cleared` | everything is done. State it positively | **none — do not manufacture work** |
 | `no-permission` | a collaborator lacks access | **Request access** |
@@ -458,7 +458,7 @@ flippant language, especially in an error.
 **An earlier draft specified the first screen three incompatible ways** across this file,
 [06-PAGES](06-PAGES.md) §4 and [13-UI](13-UI.md) §5.1 — one of them putting an autofocused text
 field on the same screen as a checkbox list, and one of them making *"the product's core loop"* a
-capture field whose typed rows come from **Spark, which [23-ASSISTANT-UI](23-ASSISTANT-UI.md) §2
+capture field whose typed rows come from **Slash, which [23-ASSISTANT-UI](23-ASSISTANT-UI.md) §2
 cuts from v1 and §3 makes absent on every self-host.** A first run that depends on an absent
 component is not a first run. This section is now the only specification of it.
 
@@ -492,7 +492,7 @@ every first-party list already, so it is unchanged.)*
 
 > **Where this goes (September 22nd 2026, [DIRECTION §22](../loop/DIRECTION.md)).** Onboarding
 > proposes lists and fields from the person's own words, with no fixed kinds: the sentence goes to
-> Spark, or to a rule set a pack brings, and what comes back is a proposed list with the fields it
+> Slash, or to a rule set a pack brings, and what comes back is a proposed list with the fields it
 > heard, which the person accepts. The three notes above describe the build as it stands and are
 > the thing to replace, not the design. Measured at `da9326d6`, `apps/web/src/lib/shape.ts:65` is a
 > `LEXICON` of fixed word lists mapped to the first-party packs (domains and subscriptions turn on
@@ -540,7 +540,7 @@ record with zero registers has no legal screen — a defect an earlier draft lef
 
 **Then, the four mechanisms that survive** — and *survive* is literal: a fifth was written here and
 is now deleted, because it was the capture-first onboarding this section's own preamble rejects.
-It read *"the first screen after pack selection is a capture… Spark proposes typed rows"*, which is
+It read *"the first screen after pack selection is a capture… Slash proposes typed rows"*, which is
 the mechanism that **depends on a component v1 does not ship and self-host does not have.** It was
 listed as surviving in the same section that deleted it:
 
@@ -568,13 +568,13 @@ listed as surviving in the same section that deleted it:
    Domains hold a renewal date, a registrar and a cost, so the record can tell you
    what's due in October.
 
-     [ Add one ]   [ Ask Spark to find them ]
+     [ Add one ]   [ Ask Slash to find them ]
 
      Or from any session:  "read my brain, then add every domain I own with its renewal date"
    ```
 
    That third line is the unlock: it turns an empty register into a one-sentence prompt for a tool
-   the customer is already running. The middle button, *Ask Spark to find them*, is **absent without a
+   the customer is already running. The middle button, *Ask Slash to find them*, is **absent without a
    model** ([23-ASSISTANT-UI](23-ASSISTANT-UI.md) §8); the other two lines are what a fresh self-host
    shows.
 4. **Home, in an empty record, shows what it becomes — once**, dimmed, labelled *"This is what Home
@@ -687,11 +687,11 @@ Ranked by probability × cost. Each with its countermeasure.
 |---|---|---|
 | **1** | **The record stays empty** and the app reads as a filing cabinet with no files — an empty *typed* register is less legible than an empty notes app, because the columns advertise what you have not done | all four mechanisms in §6: pack selection as onboarding, one `example` row per register counted by its page's metrics and by nothing scheduled, the paste-ready agent prompt, the dismissible preview |
 | **2** | **Packs turn the sidebar into a junk drawer** | the native spine; `nav` read once at install and never re-read; position in a per-user store; updates land hidden in a holding pen; re-showing restores stored order; `g 1`–`g 9` target positions |
-| **3** | **Spark becomes the only way to do anything** | every Spark output has a deterministic route to the same result and shows it ([23-ASSISTANT-UI](23-ASSISTANT-UI.md) §13); palette rows print their bindings; the `?` sheet reads the registry so it cannot drift; **no mode is reachable only by keystroke** |
+| **3** | **Slash becomes the only way to do anything** | every Slash output has a deterministic route to the same result and shows it ([23-ASSISTANT-UI](23-ASSISTANT-UI.md) §13); palette rows print their bindings; the `?` sheet reads the registry so it cannot drift; **no mode is reachable only by keystroke** |
 | **4** | **Thirty-three block kinds become thirty-three ways to look bad**, and agents write prose into drawn blocks | the eight-primitive layer; the visible-fence degradation rule at render (never a write refusal — [13-UI](13-UI.md) §4.1); fixed column positions per kind ([34-GRAMMARS](34-GRAMMARS.md) §2.2) |
 | **5** | **Single letters collide with screen readers and speech input** | bare letters only inside a focused grid; `Character keys: off`; per-binding remap; no destructive verb on a bare letter |
 | **6** | **The gate becomes a rubber stamp** and the differentiator evaporates | two deliberate acts plus a mandatory reason in an empty field; the recommendation never pre-selected; the third verb (`Defer` with a reason and a date) kept; the queue ranked by cost of being wrong — a band the record **computes** from what accepting the proposal would do (`packages/kernel/src/weigh.ts`), never a field its proposer fills in, because a queue ranked by self-declared importance is a queue in which everything is urgent by the second week. Four bands, worst first: `undo` (changes rows somebody has, replaces a declaration, turns a pack off), `shape` (a pack, its settings, a page), `rows` (adds rows, or a rule that will), `call` (a judgement with nothing attached). Within a band, oldest first |
-| **7** | **Spark proposes so much that Decide and Inbox become spam folders** | a hard cap on open suggestions per register, new ones **displacing the lowest-ranked rather than appending**; suggestions expire and self-close with a recorded reason; every proposal must attach the rows it read, and one with none is refused at write time; the count of open questions is a metric on Home **with a target** |
+| **7** | **Slash proposes so much that Decide and Inbox become spam folders** | a hard cap on open suggestions per register, new ones **displacing the lowest-ranked rather than appending**; suggestions expire and self-close with a recorded reason; every proposal must attach the rows it read, and one with none is refused at write time; the count of open questions is a metric on Home **with a target** |
 | **8** | **Density fights the phone** | density switches on **pointer, not width**. Targets are designed at 44 × 44 CSS px (SC 2.5.5 AAA, by choice — SC 2.5.8 AA's 24 × 24 is the legal floor) through an invisible hit box; CI measures every control under a coarse pointer, counting `::before`/`::after`, and fails below 43.5 × 43.5 on either axis. A register collapses to the `rows` primitive with its three declared `mobile:` fields — **a declaration, not a media query** |
 | **9** | **The URL stops being the state**, killing the tier-1 growth mechanism | Linear's split, enforced; a 2 KB budget past which a view is persisted; one catch-all route and no path list in two files |
 | **10** | **A pack update and a user's edits fight, and one silently loses** | **fork per block, never per page** — Grafana's library-panel model is the only *granular* answer found: blocks are linked by default and propagate; editing one unlinks just that block, badges it, and keeps the pack's newer version available as a visible diff. Whole-page take-control is reserved for Home, with Home Assistant's honesty that it is irreversible |

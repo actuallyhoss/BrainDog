@@ -11,8 +11,8 @@
   reason sit on the line beside the name instead of being cut at an ellipsis, and the height is
   what lets the groups be read rather than scrolled. The remaining third still shows the page you
   came from, which is what makes it read as a panel on the app rather than a modal over it.
-  `C:\Tools\legacy`'s Spark is the reference and its own comment makes the same argument in the
-  same words.
+  the old tool's command palette (`C:\Tools\legacy`, `loop/research-brain-study.md`) is the reference
+  and its own comment makes the same argument in the same words.
 
   AND THE OBJECTS COME FIRST IN IT. The groups used to be ranked commands, destinations, pages,
   figures, decisions, with everything the record answered with underneath all of them, so typing
@@ -70,8 +70,8 @@
   import type { Hits, Reader } from '../record/palette-live.ts';
   import type { Metric } from '../record/api.ts';
   import { latest } from './latest.ts';
-  import { capLine, drawProposal, drawReading, offersSpark, pass2Refused, secondPass, sparkWords, type Drawn, type DrawnProposal } from './spark.ts';
-  import type { SparkStatus } from '@braindog/client';
+  import { capLine, drawProposal, drawReading, offersSlash, pass2Refused, secondPass, slashWords, type Drawn, type DrawnProposal } from './slash.ts';
+  import type { SlashStatus } from '@braindog/client';
 
   let { open = $bindable(false), nav }: { open?: boolean; nav: NavEntry[] } = $props();
 
@@ -104,7 +104,7 @@
      * losing a half-typed query as the failure it is copied to avoid.
      */
     complete?: string | undefined;
-    /** The question Spark's row asks. Only that row carries it, and running it keeps the panel open. */
+    /** The question Slash's row asks. Only that row carries it, and running it keeps the panel open. */
     ask?: string | undefined;
     /** The row the add row writes, read out of the query. Only that row carries it. */
     creation?: Creation | undefined;
@@ -136,15 +136,15 @@
       lists?: { id: string; name: string }[];
       me?: { level: string; lists: string[] | null };
       questions?: { id: string; title: string }[];
-      spark?: boolean;
+      slash?: boolean;
     },
   );
   const isLive = $derived(shell.live === true);
-  /** Whether a model is behind Spark on this host, which the shell asked `/api/version` once. A refused shell's never is. */
-  const sparkHere = $derived(isLive && shell.spark === true);
+  /** Whether a model is behind Slash on this host, which the shell asked `/api/version` once. A refused shell's never is. */
+  const slashHere = $derived(isLive && shell.slash === true);
 
   /**
-   * SPARK'S MODE: the question asked, for the text that was in the box when it was asked, and what came back.
+   * SLASH'S MODE: the question asked, for the text that was in the box when it was asked, and what came back.
    *
    * KEYED ON THE TEXT, SO NOTHING ACCUMULATES (`50 §5.5` step 5). Typing anything else puts the palette back to its list at
    * once, with no effect to clear it, and `latest` drops an answer to a question the box has moved on from, so a slow read
@@ -152,60 +152,60 @@
    */
   /** Pass 2 under the rows: `null` while it is being written, then the proposal or the refusal, never both. */
   type Second = { drawn: DrawnProposal | null; refused: { fix: string; without: string | null } | null };
-  let spark = $state<{ q: string; question: string; drawn: Drawn | null; fix: string | null; second: Second | null } | null>(null);
-  const sparkShown = $derived(spark !== null && spark.q === q ? spark : null);
+  let slash = $state<{ q: string; question: string; drawn: Drawn | null; fix: string | null; second: Second | null } | null>(null);
+  const slashShown = $derived(slash !== null && slash.q === q ? slash : null);
   const unreached = (e: unknown) => ({ ok: false as const, refusal: { code: 'UNREACHABLE', fix: e instanceof Error ? e.message : String(e) } });
   const client = () => import('@braindog/client').then(({ createClient }) => createClient({ base: page.url.origin }));
-  const sparkAsk = latest((question: string) =>
+  const slashAsk = latest((question: string) =>
     client()
-      .then((c) => c.sparkRead(question))
+      .then((c) => c.slashRead(question))
       .catch(unreached),
   );
   /* PASS 2 THROUGH ITS OWN `latest`, so a proposal written for an older question is dropped exactly as pass 1's rows are.
      THE REQUEST ITSELF IS NEVER ABORTED, which is `46 §5.5` step 11: Escape during pass 2 goes back to the list, and the
      proposal the engine was already writing is still filed on Decide. `latest` only decides whether the answer is drawn. */
-  const sparkPropose = latest((a: { question: string; askId: string }) =>
+  const slashPropose = latest((a: { question: string; askId: string }) =>
     client()
-      .then((c) => c.sparkPropose(a.question, a.askId))
+      .then((c) => c.slashPropose(a.question, a.askId))
       .catch(unreached),
   );
 
-  function askSpark(question: string) {
+  function askSlash(question: string) {
     const asked = q;
-    spark = { q: asked, question, drawn: null, fix: null, second: null };
+    slash = { q: asked, question, drawn: null, fix: null, second: null };
     cursor = 0;
-    sparkAsk.ask(question, (out) => {
-      if (spark?.q !== asked) return;
+    slashAsk.ask(question, (out) => {
+      if (slash?.q !== asked) return;
       if (!out.ok) {
-        spark = { q: asked, question, drawn: null, fix: 'refusal' in out ? out.refusal.fix : copy.sparkNothing, second: null };
+        slash = { q: asked, question, drawn: null, fix: 'refusal' in out ? out.refusal.fix : copy.slashNothing, second: null };
         return;
       }
       /* THE ASK ID GOES BACK WITH PASS 2, so the engine re-runs the predicate it already drafted instead of asking the model
          for a second one, which would be a second draft and a second ask for the same question. */
       const more = secondPass(out.value);
-      spark = { q: asked, question, drawn: drawReading(out.value), fix: null, second: more ? { drawn: null, refused: null } : null };
+      slash = { q: asked, question, drawn: drawReading(out.value), fix: null, second: more ? { drawn: null, refused: null } : null };
       if (!more) return;
-      sparkPropose.ask({ question, askId: out.value.ask_id }, (said) => {
-        if (spark?.q !== asked || spark.second === null) return;
-        spark.second = said.ok
+      slashPropose.ask({ question, askId: out.value.ask_id }, (said) => {
+        if (slash?.q !== asked || slash.second === null) return;
+        slash.second = said.ok
           ? { drawn: drawProposal(said.value), refused: null }
-          : { drawn: null, refused: pass2Refused('refusal' in said ? said.refusal : { code: 'VALUE_MALFORMED', fix: copy.sparkNothing }) };
+          : { drawn: null, refused: pass2Refused('refusal' in said ? said.refusal : { code: 'VALUE_MALFORMED', fix: copy.slashNothing }) };
       });
     });
   }
 
   /**
    * THE WARM-UP, AND THE ONE NUMBER IT BRINGS BACK (`46 §5.2`, `23 §8`). Opening the palette on a host with a model asks
-   * `sparkStatus()` once, which builds the engine so the first question finds it built, and answers this month's asks, which
+   * `slashStatus()` once, which builds the engine so the first question finds it built, and answers this month's asks, which
    * is all the 80 % line needs. A refused status is not drawn here: Settings shows it, and a palette opened to go somewhere
    * else is the wrong place for it.
    */
-  let sparkStatus = $state<SparkStatus | null>(null);
-  const CAP_LINE_KEY = 'braindog.palette.sparkCapLine';
+  let slashStatus = $state<SlashStatus | null>(null);
+  const CAP_LINE_KEY = 'braindog.palette.slashCapLine';
   /* PER BROWSER, AND ALLOWED TO BE LOST. A private window forgets it and shows the line once more that month, which is the
      cheap way to be wrong; storage that throws is treated the same as storage that is empty. */
   let capDismissed = $state<string | null>(null);
-  const capShown = $derived(sparkHere && sparkStatus !== null && capLine(sparkStatus, capDismissed));
+  const capShown = $derived(slashHere && slashStatus !== null && capLine(slashStatus, capDismissed));
   function warm() {
     try {
       capDismissed = localStorage.getItem(CAP_LINE_KEY);
@@ -213,17 +213,17 @@
       capDismissed = null;
     }
     void client()
-      .then((c) => c.sparkStatus())
+      .then((c) => c.slashStatus())
       .then(
         (out) => {
-          if (out.ok) sparkStatus = out.value;
+          if (out.ok) slashStatus = out.value;
         },
         () => {},
       );
   }
   function dismissCapLine() {
-    if (!sparkStatus) return;
-    capDismissed = sparkStatus.asks.resets;
+    if (!slashStatus) return;
+    capDismissed = slashStatus.asks.resets;
     try {
       localStorage.setItem(CAP_LINE_KEY, capDismissed);
     } catch {
@@ -438,15 +438,15 @@
     const { prefix, text } = parsed;
     total = 0;
     drawn = 0;
-    /* IN SPARK'S MODE THE LIST IS WHAT SPARK FOUND, AND NOTHING ELSE. They are rows like any other here, so the arrow keys,
+    /* IN SLASH'S MODE THE LIST IS WHAT SLASH FOUND, AND NOTHING ELSE. They are rows like any other here, so the arrow keys,
        `↵` and the pointer walk them with no second mechanism, and each one is an address on the record. */
-    if (sparkShown)
-      return (sparkShown.drawn?.rows ?? []).map((r) => ({
+    if (slashShown)
+      return (slashShown.drawn?.rows ?? []).map((r) => ({
         id: `s-${r.id}`,
         title: r.title,
         detail: listNamed.get(r.register)?.name ?? REGISTERS[r.register]?.name ?? r.register,
         href: r.href,
-        group: copy.sparkFound,
+        group: copy.slashFound,
         spoken: r.spoken,
         icon: listNamed.get(r.register)?.icon ?? 'rows',
       }));
@@ -509,7 +509,7 @@
       /* THE ADD ROW IS NOT FOUND BY ITS TITLE, it is made out of the query. `commands(live)` holds it only while
          `live.creation` does, so asking for it is asking the standing rule, and it is drawn as the sentence it will
          write rather than as its declaration's name. No `complete`: the box already says exactly what `⇥` would.
-         IT IS A PLACE TO SPARK'S ROW, and so no question is offered under it, because a sentence that names a list
+         IT IS A PLACE TO SLASH'S ROW, and so no question is offered under it, because a sentence that names a list
          and a title is a thing to write rather than a thing to ask about. */
       const adding = every.find((c) => c.act === 'add');
       if (adding && live.creation) {
@@ -698,15 +698,15 @@
     }
 
     /**
-     * AND SPARK'S ROW, LAST, WHEN NOTHING ELSE WAS A PLACE (`50 §5.5` step 5).
+     * AND SLASH'S ROW, LAST, WHEN NOTHING ELSE WAS A PLACE (`50 §5.5` step 5).
      *
-     * A place is anything but an action: a page, a list, a figure, a row. With a model behind Spark and none of those
-     * matched, the last row asks the record in words. Without a model `offersSpark` answers `null` and the row does not
-     * exist, which is `23 §8`'s absent rather than disabled, and the only way the word Spark reaches this panel.
+     * A place is anything but an action: a page, a list, a figure, a row. With a model behind Slash and none of those
+     * matched, the last row asks the record in words. Without a model `offersSlash` answers `null` and the row does not
+     * exist, which is `23 §8`'s absent rather than disabled, and the only way the word Slash reaches this panel.
      */
     const kept = out.slice(0, CAP);
-    const question = offersSpark({ spark: sparkHere, prefix, text, pending, places: kept.filter((r) => r.group !== copy.commands).length });
-    if (question !== null) kept.push({ id: 'spark', title: copy.askSpark(question), href: null, group: '', icon: 'search', ask: question });
+    const question = offersSlash({ slash: slashHere, prefix, text, pending, places: kept.filter((r) => r.group !== copy.commands).length });
+    if (question !== null) kept.push({ id: 'slash', title: copy.askSlash(question), href: null, group: '', icon: 'search', ask: question });
     return kept;
   });
 
@@ -744,19 +744,19 @@
   });
 
   /**
-   * The overflow row is held out of the groups, so it can be drawn last and headingless, and so is Spark's row, for the
+   * The overflow row is held out of the groups, so it can be drawn last and headingless, and so is Slash's row, for the
    * same reason: it is not one more result but the door out of the list. The two never meet, because the overflow needs
-   * hits and Spark's row needs none.
+   * hits and Slash's row needs none.
    *
    * It stays in `flat`, which is what the arrow keys and Enter walk, so holding it out of the
    * headings costs it nothing a reader can feel.
    */
-  const overflow = $derived(rows.find((r) => r.id === 'all' || r.id === 'spark'));
+  const overflow = $derived(rows.find((r) => r.id === 'all' || r.id === 'slash'));
 
   const groups = $derived.by(() => {
     const out = new Map<string, Row[]>();
     for (const r of rows) {
-      if (r.id === 'all' || r.id === 'spark') continue;
+      if (r.id === 'all' || r.id === 'slash') continue;
       if (!out.has(r.group)) out.set(r.group, []);
       out.get(r.group)!.push(r);
     }
@@ -833,8 +833,8 @@
       overlays.open();
       q = '';
       cursor = 0;
-      spark = null;
-      if (sparkHere) warm();
+      slash = null;
+      if (slashHere) warm();
       queueMicrotask(() => input?.focus());
     } else if (!open && el.open) {
       el.close();
@@ -857,8 +857,8 @@
 
   function run(row: Row | undefined) {
     if (!row) return;
-    /* SPARK'S ROW ANSWERS IN THE PANEL, so it is the one row that leaves it open. */
-    if (row.ask !== undefined) return askSpark(row.ask);
+    /* SLASH'S ROW ANSWERS IN THE PANEL, so it is the one row that leaves it open. */
+    if (row.ask !== undefined) return askSlash(row.ask);
     open = false;
     /* THE ONE ROW THAT DOES SOMETHING RATHER THAN GO SOMEWHERE. It is checked on the act rather
        than on a flag, so no row's behaviour is described in two places. The standing rule means it
@@ -968,7 +968,7 @@
   }
 </script>
 
-<dialog bind:this={el} class="palette" onclick={onbackdrop} oncancel={(e) => (e.preventDefault(), sparkShown ? (spark = null) : (open = false))} onclose={() => (open = false)}>
+<dialog bind:this={el} class="palette" onclick={onbackdrop} oncancel={(e) => (e.preventDefault(), slashShown ? (slash = null) : (open = false))} onclose={() => (open = false)}>
   <div class="p-head">
     <Icon name="search" size="m" />
     <input
@@ -1025,14 +1025,14 @@
     reader who heard both would hear every heading twice.
   -->
   <div class="p-body">
-    <!-- WHAT SPARK LOOKED FOR, BEFORE WHAT IT FOUND (`50 §5.5` step 5), so the rows are read against the question the record
+    <!-- WHAT SLASH LOOKED FOR, BEFORE WHAT IT FOUND (`50 §5.5` step 5), so the rows are read against the question the record
          was actually asked. A draft that did not fit is a keyword search, and the line says that instead. -->
-    {#if sparkShown?.drawn}
-      <p class="p-spark-where">
-        {#if sparkShown.drawn.where !== null}<span class="p-spark-label">{copy.sparkWhere}</span> {sparkShown.drawn.where}{:else if sparkShown.drawn.q !== null}{copy.sparkSearched(sparkShown.drawn.q)}{/if}
+    {#if slashShown?.drawn}
+      <p class="p-slash-where">
+        {#if slashShown.drawn.where !== null}<span class="p-slash-label">{copy.slashWhere}</span> {slashShown.drawn.where}{:else if slashShown.drawn.q !== null}{copy.slashSearched(slashShown.drawn.q)}{/if}
       </p>
     {/if}
-    <div id="palette-list" role="listbox" aria-label={copy.paletteLabel} aria-busy={pending || (sparkShown !== null && sparkShown.drawn === null && sparkShown.fix === null)}>
+    <div id="palette-list" role="listbox" aria-label={copy.paletteLabel} aria-busy={pending || (slashShown !== null && slashShown.drawn === null && slashShown.fix === null)}>
       {#each groups as [group, items]}
         <div role="group" aria-label={group}>
           <p class="p-group" aria-hidden="true">{group}</p>
@@ -1043,39 +1043,39 @@
       {/each}
       {#if overflow}{@render result(overflow)}{/if}
     </div>
-    {#if sparkShown}
+    {#if slashShown}
       <!-- OUTSIDE THE LISTBOX, like the sentence below: the state of the ask and the fold are prose about the list. -->
-      {#if sparkShown.fix !== null}
-        <p class="p-none">{sparkShown.fix}</p>
-      {:else if sparkShown.drawn === null}
-        <p class="p-none" role="status">{copy.sparkAsking}</p>
+      {#if slashShown.fix !== null}
+        <p class="p-none">{slashShown.fix}</p>
+      {:else if slashShown.drawn === null}
+        <p class="p-none" role="status">{copy.slashAsking}</p>
       {:else}
-        {#if sparkShown.drawn.rows.length === 0}<p class="p-none">{copy.sparkNothing}</p>{/if}
+        {#if slashShown.drawn.rows.length === 0}<p class="p-none">{copy.slashNothing}</p>{/if}
         <!-- PASS 2, UNDER THE ROWS AND NEVER INSTEAD OF THEM (`23 §7`): the rows were drawn by code before any of this was
              written, which is the only reason the budget sentence below can be true. -->
-        {#if sparkShown.second}
-          <section class="p-spark-second" aria-label={sparkWords.proposed}>
-            {#if sparkShown.second.refused}
-              <p class="p-spark-said">{sparkShown.second.refused.fix}</p>
-              {#if sparkShown.second.refused.without}<p class="p-spark-said">{sparkShown.second.refused.without}</p>{/if}
-            {:else if sparkShown.second.drawn}
-              {#if sparkShown.second.drawn.text}<p class="p-spark-text">{sparkShown.second.drawn.text}</p>{/if}
-              {#if sparkShown.second.drawn.decide}
-                <a class="p-spark-decide" href={at(sparkShown.second.drawn.decide)} onclick={() => (open = false)}
-                  >{sparkWords.decide(sparkShown.second.drawn.decide.slice('/decide/'.length))}</a
+        {#if slashShown.second}
+          <section class="p-slash-second" aria-label={slashWords.proposed}>
+            {#if slashShown.second.refused}
+              <p class="p-slash-said">{slashShown.second.refused.fix}</p>
+              {#if slashShown.second.refused.without}<p class="p-slash-said">{slashShown.second.refused.without}</p>{/if}
+            {:else if slashShown.second.drawn}
+              {#if slashShown.second.drawn.text}<p class="p-slash-text">{slashShown.second.drawn.text}</p>{/if}
+              {#if slashShown.second.drawn.decide}
+                <a class="p-slash-decide" href={at(slashShown.second.drawn.decide)} onclick={() => (open = false)}
+                  >{slashWords.decide(slashShown.second.drawn.decide.slice('/decide/'.length))}</a
                 >
               {/if}
-              <!-- `23 §8`: EVERY SPARK OUTPUT CARRIES THE MODEL IN ITS FOOTER, ALWAYS. `drawProposal` never leaves it empty. -->
-              <p class="p-spark-model">{sparkShown.second.drawn.footer}</p>
+              <!-- `23 §8`: EVERY ANSWER Slash GIVES CARRIES THE MODEL IN ITS FOOTER, ALWAYS. `drawProposal` never leaves it empty. -->
+              <p class="p-slash-model">{slashShown.second.drawn.footer}</p>
             {:else}
-              <p class="p-spark-said" role="status">{sparkWords.proposing}</p>
+              <p class="p-slash-said" role="status">{slashWords.proposing}</p>
             {/if}
           </section>
         {/if}
-        <details class="p-spark-fold">
-          <summary>{copy.sparkFold}</summary>
+        <details class="p-slash-fold">
+          <summary>{copy.slashFold}</summary>
           <ul>
-            {#each sparkShown.drawn.fold as line}<li>{line}</li>{/each}
+            {#each slashShown.drawn.fold as line}<li>{line}</li>{/each}
           </ul>
         </details>
       {/if}
@@ -1095,9 +1095,9 @@
        list this record does not hold is an instruction that cannot be followed. -->
   <footer class="p-foot">
     <!-- `23 §8` AT 80 %: ONE LINE, HERE, ONCE A MONTH. Not a chip, not a modal, and gone for the month once hidden. -->
-    {#if capShown && sparkStatus}
-      <span class="p-cap">{sparkWords.capLine(sparkStatus.asks.used, sparkStatus.asks.cap, sparkStatus.asks.resets)}</span>
-      <button type="button" class="p-cap-hide tap" onclick={dismissCapLine}>{sparkWords.capDismiss}</button>
+    {#if capShown && slashStatus}
+      <span class="p-cap">{slashWords.capLine(slashStatus.asks.used, slashStatus.asks.cap, slashStatus.asks.resets)}</span>
+      <button type="button" class="p-cap-hide tap" onclick={dismissCapLine}>{slashWords.capDismiss}</button>
     {/if}
     <span class="p-hint">&gt; commands · # rows{listNamed.has(PEOPLE) ? ' · @ people' : ''} · / pages</span>
   </footer>
@@ -1207,7 +1207,7 @@
    * height buys the groups. And the third of the page still showing is what makes it read as a
    * panel on the app rather than a modal over it.
    *
-   * COLUMNS ARE NOT TAKEN, and the reason is the keyboard. Spark flows its groups into CSS columns,
+   * COLUMNS ARE NOT TAKEN, and the reason is the keyboard. Slash flows its groups into CSS columns,
    * which the browser decides and the DOM does not record, so its arrow keys have to measure every
    * row's bounding box on every press to work out what is above what. That is a real mechanism and
    * it is not this change; a column layout without it would put `↓` on the row to the right.
@@ -1455,24 +1455,24 @@
     color: var(--dim);
   }
 
-  .p-spark-where {
+  .p-slash-where {
     margin: 0;
     padding: var(--sp-3) var(--sp-4) 0;
     color: var(--ink2);
   }
 
-  .p-spark-label {
+  .p-slash-label {
     color: var(--dim);
   }
 
   /* THE FOLD IS FOLDED, AND IT IS THERE ON EVERY ASK. `23 §6`: its last line is the vault, refused, drawn every time. */
-  .p-spark-fold {
+  .p-slash-fold {
     padding: var(--sp-2) var(--sp-4) var(--sp-3);
     color: var(--dim);
     font-size: var(--t-sm);
   }
 
-  .p-spark-fold ul {
+  .p-slash-fold ul {
     margin: var(--sp-2) 0 0;
     padding: 0;
     list-style: none;
@@ -1480,7 +1480,7 @@
     font-size: var(--t-xs);
   }
 
-  .p-spark-second {
+  .p-slash-second {
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
@@ -1488,21 +1488,21 @@
     border-block-start: 1px solid var(--line);
   }
 
-  .p-spark-text,
-  .p-spark-said {
+  .p-slash-text,
+  .p-slash-said {
     margin: 0;
     max-inline-size: var(--measure);
     color: var(--ink2);
     line-height: var(--lh-body);
   }
 
-  .p-spark-decide {
+  .p-slash-decide {
     align-self: flex-start;
     color: var(--accent);
   }
 
   /* RECEDED, SMALL, MONO (`23 §8`), and still there on every proposal. */
-  .p-spark-model {
+  .p-slash-model {
     margin: 0;
     color: var(--dim);
     font-family: var(--font-id);

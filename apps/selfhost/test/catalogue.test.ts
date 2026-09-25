@@ -70,7 +70,7 @@ test('a host with no catalogue says so under /app/catalogue/, and answers everyt
   assert.equal((await fetch(`${base}/.well-known/braindog-build`)).status, 200);
 });
 
-test('the folder offers Spark a newer version of an installed add-on, verified, and nothing for one current or off', async (t) => {
+test('the folder offers Slash a newer version of an installed add-on, verified, and nothing for one current or off', async (t) => {
   const { catalogueOffersFrom } = await import('../src/catalogue.ts');
   const { emptyCatalogue, publishTo, newAuthorKey } = await import('@braindog/declare/catalogue');
   const dir = mkdtempSync(join(tmpdir(), 'bd-offers-'));

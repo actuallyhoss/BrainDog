@@ -225,7 +225,7 @@ a `section` over its keys, tools and skills, each with `inherit: true`, `where: 
 and the retired rows left out by state. `{{spoken}}` does not match a ref, which matches by title.
 
 The feed's evaluator reads the newest 500 events. An actor is an agent (a run, `agent:<name>` or
-`spark`), a rule (`rule:`, `ingest:` or `system`) or you (a person), and a feed's `where` asks about
+`slash`), a rule (`rule:`, `ingest:` or `system`) or you (a person), and a feed's `where` asks about
 `actor`, `kind` and `target`. Consecutive events by one actor, of one kind, on one row are one row
 with a count. A diff's versions are the values its field held, newest first: the value it was
 created with, then each edit to that field.
@@ -329,7 +329,7 @@ job, with its diffs.)*
 `LEXICON` in `apps/web/src/lib/shape.ts:65-73`, that maps words to the six first-party packs
 (domains and subscriptions turn on `estate`, invoices and VAT turn on `money-core`). A fixed keyword
 table is a list of use cases compiled into the app. The direction is that the sentence goes to
-Spark, or to a rule set a pack brings, and comes back as proposed lists, fields and pages the person
+Slash, or to a rule set a pack brings, and comes back as proposed lists, fields and pages the person
 accepts. The code ships the primitives; the use cases are added at run time or brought by a pack.)*
 
 Three things that arrive with a pack, and the third is the one that matters:
@@ -348,7 +348,7 @@ somebody fills in and a record somebody abandons.
 
 *(Revised September 22nd 2026 under DIRECTION §22: packs are one source against the cold start,
 and optional. The others are the record proposing its own shape from the first rows
-([29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §3, T1) and Spark proposing lists and fields from what the person
+([29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §3, T1) and Slash proposing lists and fields from what the person
 says. The pack format is still built first, because it is the mechanism every one of those writes
 through; what is no longer true is that a new record needs a shipped pack to be useful.)*
 

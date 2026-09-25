@@ -55,7 +55,7 @@ Two conclusions, and the second is strategic rather than practical:
 | A5 app | `ui-ux-pro-max`, `web-design-guidelines`, `frontend-design`, `dataviz` | the interface. See §4 for the honest assessment of each |
 | A6 cloud | `cloudflare-email-service`, `turnstile-spin` | inbound email and the signup form's bot problem |
 | B5 ingest | `cloudflare` → `references/queues` | the front door. No Workflow in v1 — `arrive` is one transaction ([01-ARCHITECTURE](01-ARCHITECTURE.md) §6) |
-| B7 Spark | `agents-sdk`, `claude-api`, `cloudflare` → `references/ai-gateway`, `references/workers-ai` | model routing and cost. **Read the live gateway docs, not the reference file** — see §3 |
+| B7 Slash | `agents-sdk`, `claude-api`, `cloudflare` → `references/ai-gateway`, `references/workers-ai` | model routing and cost. **Read the live gateway docs, not the reference file** — see §3 |
 | throughout | `web-perf` | measuring LCP/INP/CLS rather than asserting them |
 | throughout | `code-review`, `simplify` | the diff, before it is committed |
 
@@ -192,7 +192,7 @@ D1, D4).
 | Header and body cell widths equal, exactly | [22-FRONTEND](22-FRONTEND.md) §10 — a 4 px stagger invisible in source |
 | Every rendered gate runs over 8 page fixtures × 4 widths (390 / 768 / 1024 / 1440) × 2 schemes × 2 directions; direction comes from the record, materialised `locale: 'ar'`, never from the harness; the ninth fixture record, `corpus`, serves the whole-corpus gates | [22-FRONTEND](22-FRONTEND.md) §10 — 128 configurations ([40-SPEC-FIXTURES](40-SPEC-FIXTURES.md) §13 D4; 52 §13 D7, D13) |
 | Every plot's list twin holds every event the plot draws | [19-INTERFACE](19-INTERFACE.md) §4 — the list is the essential, the plot is the view |
-| The no-model build passes every e2e suite (`SPARK_ENDPOINT` unset) | [23-ASSISTANT-UI](23-ASSISTANT-UI.md) §8 — Spark is absent, not disabled |
+| The no-model build passes every e2e suite (`SLASH_ENDPOINT` unset) | [23-ASSISTANT-UI](23-ASSISTANT-UI.md) §8 — Slash is absent, not disabled |
 | The shipped high-contrast theme passes all sixteen checks — zero refusals, zero corrections, zero M; N is advisory and not counted | [28-THEMING](28-THEMING.md) §4.5 — if it fails, the validator is wrong ([39-SPEC-THEME](39-SPEC-THEME.md) §13 D6) |
 | Every refusal code has a fixture that produces it — one fixture per code, keyed by the `via` that raises each (the count lives in 30 §6 and nowhere else) | [30-BLUEPRINT](30-BLUEPRINT.md) §6 — a code with no fixture fails CI ([40-SPEC-FIXTURES](40-SPEC-FIXTURES.md) §6; [ADR-057](16-DECISIONS.md)) |
 | **A decorative enhancement is never the only thing drawing a state** | `requestAnimationFrame` does not run in a hidden tab, so anything measured in one — a sliding pill, a nav offset — never happens while occluded. The selected control paints its own background until the pill is in place, and the worst case degrades to the previous design rather than to nothing |

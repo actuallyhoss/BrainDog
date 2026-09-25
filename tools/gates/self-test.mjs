@@ -198,17 +198,17 @@ const CASES = [
      the record enforces moved away from `budgets.json`'s `report.rowsPerMinute`. One each, so both halves are proved. */
   { gate: 'guards-report', run: 'guards', expect: /spends no reportBudget/, findings: 1 },
   { gate: 'guards-report-budget', run: 'guards', expect: /report.rowsPerMinute is/, findings: 1 },
-  { gate: 'closed-lists', expect: /the migration admits/, findings: 1 },
+  { gate: 'closed-lists', expect: /the migration admits/, findings: 1, total: 1 },
   /* AND THE OTHER HALF OF THAT GATE: a `CHECK` a later migration widened, over a document that
      never says which migration did it. `30 §1` is migration 0001 verbatim and cannot be corrected
      to the running schema, so this is the only thing standing between a member the database
      enforces and nobody being able to learn it exists by reading. */
-  { gate: 'closed-lists-widened', run: 'closed-lists', expect: /widened outbox\.kind/, findings: 1 },
+  { gate: 'closed-lists-widened', run: 'closed-lists', expect: /widened outbox\.kind/, findings: 1, total: 1 },
   /* THE LIST, NOT THE COUNT. The fixture swaps `lookup` for `regex` and leaves the ten at ten, so
      every check that counts agrees and the vocabulary a declaration may use to read a stranger's
      message has quietly gained a member nobody reviewed. That is the whole argument for reading a
      closed list rather than counting it, and it is the one the render kinds table lost first. */
-  { gate: 'closed-lists-extractors', run: 'closed-lists', expect: /not the same list in the same order/, findings: 1 },
+  { gate: 'closed-lists-extractors', run: 'closed-lists', expect: /not the same list in the same order/, findings: 1, total: 1 },
   /* THE SHELL CHECK, WHICH READS EVERY `apps/*\/src/app.html` IN THE WORKSPACE. It is in `bundle`
      because that gate already reads a built shell, and until now it read only the built one, only
      for `apps/web`, and only when there was a build. The source form needs neither, and it reaches
@@ -242,13 +242,18 @@ const CASES = [
      token*, not *findings the gate made*, and conflating them is how a fixture ends up asserting a
      number that means something else. */
   /* ONE BYPASS, AND THE FIXTURE'S KERNEL IS OTHERWISE HONEST: three of its four writers call
-     `sparkMayWrite`, and the fourth appends the event itself. That is `spark.ts`'s own "a sixth
+     `slashMayWrite`, and the fourth appends the event itself. That is `slash.ts`'s own "a sixth
      writer would be a sixth call" written as a tree. One finding, because the other three still
-     refuse and the query returns exactly the row the bypass wrote. */
-  { gate: 'spark-actor', expect: /spark wrote \w+, in the seed record/, findings: 1 },
+     refuse and the query returns exactly the row the bypass wrote.
+
+     AND ONE IN TOTAL, WHICH IT WAS NOT. From September 11th (`d92523ec`) to the 25th this
+     fixture's `log` took a bare actor where the gate passes `{ actor }`, so the note offer died in
+     SQLite and the gate printed a second finding, a crash, on every run. This case stayed green
+     through it, because one line still named the bypass. `total` makes that second line a failure. */
+  { gate: 'slash-actor', expect: /slash wrote \w+, in the seed record/, findings: 1, total: 1 },
 
   /* THE ONE GATE THAT STANDS A HOST UP, and the fixture is a miniature of the whole arrangement for
-     the reason `spark-actor`'s is: what is under test is the gate as CI runs it, which here means an
+     the reason `slash-actor`'s is: what is under test is the gate as CI runs it, which here means an
      onboarding, an install, a command that talks over a socket and a record that can say no. The
      seeded violation is that last part and only that part: `things.name` is at most eight characters
      on the fixture's record, and the planner emits `Lanternly`, which is nine.
@@ -259,19 +264,24 @@ const CASES = [
      before it writes, as the real one does, so running it twice adds nothing and the idempotency
      check does not fire a second finding nobody seeded. */
   { gate: 'import', expect: /record refused/, findings: 1 },
-  { gate: 'refusals', expect: /and REFUSAL_CODES does not/, findings: 1 },
+  /* TWO IN TOTAL, the missing code and its family's size, and the second number is the one a rename
+     breaks. Renaming the assistant's family in the gate and not in this fixture's `30 §6` copy made
+     the gate print 22 findings here (no Slash family, no SLASH array, and every one of the family's
+     codes unaccounted for) while this case still read "red on its seeded violation", because
+     WOULD_ORPHAN was still named on exactly one line. Measured, September 25th. */
+  { gate: 'refusals', expect: /and REFUSAL_CODES does not/, findings: 1, total: 2 },
 
   /* TWO CODES NAMED IN ONE SOURCE FILE AND ONE OF THEM FIXTURED, and the seeded violation is the
      second, which is the rule that matters, because a code the tree already hands to callers with
      no fixture is the enumeration rotting in the direction that costs something. The file names two
      codes on purpose: a gate counting fixtures rather than finding gaps would report zero or two
      here, and only "one" is the right answer. */
-  { gate: 'refusal-fixtures', expect: /and has no fixture/, findings: 1 },
+  { gate: 'refusal-fixtures', expect: /and has no fixture/, findings: 1, total: 1 },
   /* `derived:` SAYS A CODE IS READ OFF AN ENVELOPE, and the one thing it must never become is a way
      to quieten a fixture that never needed it. So the tree seeded for it claims the key on a code
      whose own site constructs it, which is the branch that keeps the key narrow. The other four
      branches are proved by mutation in the gate's own header. */
-  { gate: 'refusal-fixtures-derived', run: 'refusal-fixtures', expect: /derived from .*itself/, findings: 1 },
+  { gate: 'refusal-fixtures-derived', run: 'refusal-fixtures', expect: /derived from .*itself/, findings: 1, total: 1 },
   /* ONE, and the fixture holds two flags so the count means something: one declared and never
      read, one declared and read. A gate that reported both would be counting flags rather than
      finding dead ones. */
@@ -330,6 +340,22 @@ const CASES = [
 
 /** How many lines of a gate's output name the seeded file. One per seeded violation. */
 const named = (said, seeded) => said.split('\n').filter((l) => l.includes(seeded)).length;
+
+/**
+ * How many findings the gate says it made, off its own `N finding(s)` line, for a case with `total`.
+ *
+ * `findings` COUNTS LINES NAMING THE SEED, AND THAT CANNOT SEE A SECOND REASON FOR THE RED. The
+ * assistant's rename to Slash measured it on September 25th: the refusals gate renamed and its
+ * fixture not printed 22 findings, 21 about the fixture's stale family name, and the case still
+ * passed because one line named WOULD_ORPHAN. The `slash-actor` fixture had carried a crash as its
+ * second finding the same way since September 11th, when `d92523ec` changed the gate's `log` call
+ * and not the fixture. A case that states `total` says its fixture is red for its seed and for
+ * nothing else. Undefined when no such line is printed, which fails any `total`.
+ */
+const reported = (said) => {
+  const m = /\b(\d+) finding\(s\)/u.exec(said);
+  return m ? Number(m[1]) : undefined;
+};
 
 /**
  * THE SENTENCE IS THE WORDS AND NOT THEIR CAPITALISATION, so every `expect` above is matched
@@ -495,7 +521,7 @@ function seededBrowser({ gate, seed, names, blind, red }) {
 
 let ran = 0;
 
-for (const { gate, expect, findings, run, skip } of CASES) {
+for (const { gate, expect, findings, total, run, skip } of CASES) {
   const fixture = join(negatives, gate);
   if (!existsSync(fixture)) {
     console.error(`  ${gate}: no negative fixture at tools/gates/negative/${gate}/`);
@@ -546,6 +572,20 @@ for (const { gate, expect, findings, run, skip } of CASES) {
        the work. A fixture that proves "something here is caught" is not a fixture; it has to
        prove that THIS is caught, which means one violation per fixture and the count asserted. */
     console.error(`  ${gate}: named ${seeded} on ${named(said, seeded)} line(s), and the fixture seeds ${findings}.`);
+    failed.push(gate);
+  } else if (total !== undefined && reported(said) !== total) {
+    /* AND NOTHING ELSE BESIDE IT, where a case says how many findings the whole run makes. The
+       count above is of lines naming the seed, so a gate that also goes red about the fixture's
+       own scaffolding still passes it. */
+    console.error(`  ${gate}: red with ${reported(said) ?? 'an uncounted number of'} finding(s), and the fixture accounts for ${total}. What it said:`);
+    console.error(
+      said
+        .split('\n')
+        .filter((l) => l.trim())
+        .slice(0, 8)
+        .map((l) => `      ${l}`)
+        .join('\n'),
+    );
     failed.push(gate);
   } else {
     ran++;

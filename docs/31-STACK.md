@@ -27,7 +27,7 @@ leaks into a component, self-host is broken and you learn it from a user."*
 consequence of the boundaries — it *is* the boundary. Permitted surface: ES2023, WebCrypto,
 `TextEncoder`, `structuredClone`, `URL`, `Intl`. Banned under `packages/**`: `node:*` — save the two
 paths above — `cloudflare:*`, `process`, `Buffer`, `__dirname`, and bare `fetch`, under
-`packages/record/**` and `packages/spark/**` alike; `RegExp` is banned under `packages/extract/**`
+`packages/record/**` and `packages/slash/**` alike; `RegExp` is banned under `packages/extract/**`
 ([43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §13 D4).
 
 ---
@@ -43,7 +43,7 @@ paths above — `cloudflare:*`, `process`, `Buffer`, `__dirname`, and bare `fetc
                 ROUTES · httpStatus             │                   │
                 resolveContext · serveApi       │                   │
             ┌─────┼─────────┐                   │                   │
-          mcp   spark    connect                │                   │
+          mcp   slash    connect                │                   │
           types                                 │                   │
             └─────┼─────────┘                   │                   │
                 record ─────────────────────────┴── (types) ────────┤
@@ -86,20 +86,20 @@ devDependency is an edge — a build-time import is an import.
 | 11 | `record` | 1, 2, 3, 7, 8, 9 — `./directory` is a subpath, not a package. **1 is the other edge the boundary table forbids**. `9` is `scanMoney`, `scanInts`, `scanDecimals`, `matchLiterals` and `scanDates`, handed down into `openRecord`: `43 §4.3`'s three number forms are read by `extract` at rank 9 and the reader of an arrival is the kernel at rank 7, neither may import the other, and this row may reach both. The three number readers travel under one key, all or nothing, because a record reading its amounts by one grammar and its integers by another would answer two ways about the same digits; `matchLiterals` is the fourth, and it is what lets `enum` and `lookup` say `ambiguous`; `scanDates` is the fifth, and it is what took the build's own date grammar out of the kernel — six of the ten forms are read here now, and the four that are not are the anchors. `isDuplicate` is the sixth value and the only one that is not a reader: it answers `43 §5.7`'s *are these two rows one event*, which SQL can narrow and cannot decide, because folding accents and case off a merchant string is the grammar's. It is the same seam `readRows` uses one rank up, and it is `43 §14`'s last box arriving as a dependency rather than as a move |
 | 12 | `script` | none: the sandbox a person's or an agent's script runs in (`loop/research-shell-scripts.md` Brief 1, DIRECTION 22), `quickjs-emscripten` (quickjs-ng) only. RANKED HERE, JUST BELOW `mcp`, because it depends on nothing and the packages that will run or describe a script sit above it: `mcp` (a `script_try` tool), `host`, `worker` and `selfhost` (the hosted sandbox). At 23 every one of those edges pointed up the order. It stays above `record` and `kernel` on purpose: the record's half of a run (`kernel/src/script-run.ts`) never runs anything and holds the answer's shape structurally, and a sandbox is not a thing the core may reach for |
 | 13 | `mcp` | 2, 11 (types) — the wrapper sits above what it wraps |
-| 14 | `spark` | 2, 3, 11 *(unbuilt)* — Phase B7; ports `{ Sql, Clock, Inference }`, hosted by `apps/worker/src/do/spark.ts` |
+| 14 | `slash` | 2, 3, 11 *(unbuilt)* — Phase B7; ports `{ Sql, Clock, Inference }`, hosted by `apps/worker/src/do/slash.ts` |
 | 15 | `connect` | 2, 3, 9 — the `Http`, `KeyStore` and `Clock` types, `readPath` for a response path, and `42 §4.7`'s `Read` from `extract`, which is the one shape `fetch.read` has. `9` is types only and the reading is not done here: a JSON page keeps `readPath`, because `extract`'s `select` is a second grammar and routing today's JSON through it would re-decide what every installed declaration points at. The other four formats have no document at all, so `expect:`, the `on_error` body paths, `more:` and the two body-reading paginators are refused beside them at install and the page's rows come back from the extractor. `11` was in this row and is not an edge: the record's surface is declared structurally here as `RecordApi` (47 §1), which is how connect calls it without importing it |
 | 16 | `host` | 2, 7, 9, 11, 12, 15 — platform-neutral ([ADR-064](16-DECISIONS.md)). `15` and `7` are `./connector`: the mapping between a leased `pull.fetch` row and a `runPull` call is the same on both runtimes, and only the socket, the key store and the clock differ, so it is an argument list rather than a copy in each app. Both edges point down the order and neither weakens the neutrality — `connect` names no `node:` or `cloudflare:` either, and `7` is types only (`Paged`, `PagedReport`, `PagedRun`), already reachable through `11` Also `sealing.ts`, `47 §13` D9's key hierarchy: HKDF-SHA-256 to AES-256-GCM, held once rather than written out in both hosts, because a credential deposited in one has to open in the other. It carries no `Plaintext` brand on purpose (52 §5.2 rule 4) and it never names `CryptoKey`, which is ambient under the Worker's types and not under Node's. `9` is `readRows`, handed down into the record's extractor beside the row budget: `42 §4.7`'s four non-JSON formats are read by `extract` at rank 9 and the extractor that reads them is the record's at rank 7, neither may import the other, and 16 can reach both. `12` is types only, in `./script`: `CtxHost`, `ScriptDecl` and the sandbox's answer, so the runner both hosts build (a script's `ctx.fetch` sent through `sendAction`, and `holdingScript` on the shared admissions) is written against the sandbox's own contract rather than a copy of it. The sandbox itself is handed in, because running one is a runtime's business |
 | 17 | `client` | 2, 16 — the typed client, and the third way into the route table |
 | 18 | `dog` | — the printed form of a page, and the parser that reads one back. It depends on nothing, so the app that prints a page and the command line that reads one can each hold it without holding the other |
 | 19 | `web` | 1, 4, 5, 7, 10 — `render` and `skin` at build time, `seed` for the demonstration record |
 | 20 | `site` | 5 — the marketing site is the same design system with fewer screens, and imports nothing else |
-| 21 | `cli` | 1, 2, 3, 7, 8, 13, 14, 17. The manifest holds 2, 13 and 17 today: `braindog mcp` runs the MCP core (`13`) over stdio and reaches the record through the typed client (`17`). The others arrive with the commands that need them, and `14` is for `@braindog/spark/prompts` and nothing else of it. Every edge is a devDependency, because what ships is one bundled file |
+| 21 | `cli` | 1, 2, 3, 7, 8, 13, 14, 17. The manifest holds 2, 13 and 17 today: `braindog mcp` runs the MCP core (`13`) over stdio and reaches the record through the typed client (`17`). The others arrive with the commands that need them, and `14` is for `@braindog/slash/prompts` and nothing else of it. Every edge is a devDependency, because what ships is one bundled file |
 | 22 | `worker` | 2, 7, 10, 11, 13, 16. `10` is the catalogue, so an update carries progress forward as it does on the self-host. `13` serves `POST /mcp` from the same core the command line runs over stdio; `web`'s `build/` is the asset directory, never an import |
 | 23 | `selfhost` | 2, 7, 8, 10, 11, 12, 13, 16, 17. `12` is `./quickjs`, the sandbox a scheduled script runs in on this host (`src/script.ts`). `13` serves `POST /mcp`, as on the Worker. `17` is a devDependency: the client's integration test runs against this server, because the test needs a runtime and only an app may name one |
 
 **Eighteen workspaces in the tree today, twenty-two at platform.** The
 order is also the build order, so `pnpm -r run build` reproduces it for free. *(An earlier draft had
-no `spark` package, then no `connect` row and no `host`; and it placed `mcp` below `record`, which
+no `slash` package, then no `connect` row and no `host`; and it placed `mcp` below `record`, which
 put the wrapper under the thing it wraps — iteration 2 swapped them, [ADR-064](16-DECISIONS.md).)*
 
 ### Each boundary, by what it prevents
@@ -195,7 +195,7 @@ entirely. Use `publicHoistPattern` for a specific broken package instead.
 | **1 · pnpm's isolated layout** | an undeclared package import → `ERR_MODULE_NOT_FOUND`. Workspace packages live outside `node_modules`, so the hoisting leak does not reach them |
 | **2 · an `exports` map per package** | a deep import into internals → `ERR_PACKAGE_PATH_NOT_EXPORTED`. Three lines each |
 | **3 · `import-x/no-relative-packages`** — `graph.mjs` until ESLint lands | **the hole layer 1 cannot see.** `import '../../where/src/index.js'` from inside `packages/render/src/` **works fine** under pnpm — and it is exactly the import that would break the MIT boundary. *The dangerous form is the one nothing blocks by default* |
-| **4 · path-scoped `no-restricted-imports`** — `graph.mjs` until ESLint lands | `node:*` and `cloudflare:*` under `packages/**`, save §1's two `node:*` paths; bare `fetch` under `packages/record/**` and `packages/spark/**`; `RegExp` under `packages/extract/**` |
+| **4 · path-scoped `no-restricted-imports`** — `graph.mjs` until ESLint lands | `node:*` and `cloudflare:*` under `packages/**`, save §1's two `node:*` paths; bare `fetch` under `packages/record/**` and `packages/slash/**`; `RegExp` under `packages/extract/**` |
 | **5 · `tools/gates/graph.mjs`** | the seventeen-row edge table of §2, in its order, and acyclicity. ~40 lines, zero deps |
 
 *Plus a sixth for free: per-package `tsconfig` `references` mirror the graph, and `tsc -b` fails on a
@@ -424,7 +424,7 @@ braindog/
 │   ├── cli/          braindog-cli · PUBLISHED · esbuild → one file, no deps
 │   ├── selfhost/     Node 24.13+ · node:sqlite · the "free and complete" artefact · Dockerfile
 │   ├── web/          Svelte 5 + SvelteKit · adapter-static · one build/ both hosts serve · no SSR entry
-│   └── worker/       the single Cloudflare deployment · three DO classes — Record, Spark, Directory — ~60 lines each
+│   └── worker/       the single Cloudflare deployment · three DO classes — Record, Slash, Directory — ~60 lines each
 ├── packages/
 │   ├── connect/      ingest with fetch: · placeholders · formats · expect: · probe: · metric_point
 │   ├── declare/      8 kinds · 16 field types · one schemas.ts · ./yaml — the one YAML parser (ADR-063)
@@ -436,7 +436,7 @@ braindog/
 │   ├── ports/        ★ the linchpin: 9 interfaces · the Refusal type · ./node-sqlite · the conformance cases · no fakes
 │   ├── record/       the RPC surface, 64 methods · ./directory · Ports = { Sql, Scheduler, Clock }. Nothing else
 │   ├── render/       ★★ MIT · PUBLISHED · in-degree 0 · its own LICENSE
-│   ├── spark/        the assistant. Ports = { Sql, Clock, Inference }. Phase B7 · ./prompts is data
+│   ├── slash/        the assistant. Ports = { Sql, Clock, Inference }. Phase B7 · ./prompts is data
 │   ├── theme/        OKLCH generator · Brettel 1997 · the 16 checks · nextAccentHue · DTCG 2025.10
 │   └── where/        ./ = parse·print·validate (browser)   ./sql = compile (server)   no ./text
 ├── docs/             the fifty-four documents
@@ -448,7 +448,7 @@ braindog/
                       test typecheck gates test:browser test:do release
 ```
 
-**`apps/worker/src/do/record.ts`, `spark.ts` and `directory.ts` are ~60 lines each. If any passes
+**`apps/worker/src/do/record.ts`, `slash.ts` and `directory.ts` are ~60 lines each. If any passes
 100, logic has leaked out of a package and into a runtime** — and that is a review comment, not a
 refactor to schedule. *(An earlier draft said two DO classes; identity — email → person, slug →
 record, sessions, magic links, the lockout — needed a home outside every record, and it is the third

@@ -152,7 +152,7 @@
   );
 
   /* WHAT A PAGE, A LIST, A RULE OR A LOOK WOULD PUT ON THE SCREEN, for a proposal that arranges the
-     record rather than a row in it (DIRECTION §11: this is where Spark's proposals land). */
+     record rather than a row in it (DIRECTION §11: this is where Slash's proposals land). */
   const previews = $derived(
     new Map(
       open.map((q) => {
@@ -552,7 +552,7 @@
               {:else if about && grouping === 'none'}
                 <span class="q-entity">{about}</span>
               {/if}
-              {#if aboutFor(q)?.by === 'spark'}<span class="q-entity">{copy.fromSpark}</span>{/if}
+              {#if aboutFor(q)?.by === 'slash'}<span class="q-entity">{copy.fromSlash}</span>{/if}
               <span class="q-age">opened {since(q.opened, now)}</span>
               <!-- What it would cost to get this one wrong, which is why it sits where it sits. The
                    word is `braindog-render`'s, the same one the `queue` block draws. -->

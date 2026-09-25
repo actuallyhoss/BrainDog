@@ -40,7 +40,7 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 
 import type { ActionRequest, Execute } from '@braindog/host/actions';
-import { keyRefused, sparkDeclared, type ScriptGrant, type ScriptReads } from '@braindog/host/script';
+import { keyRefused, slashDeclared, type ScriptGrant, type ScriptReads } from '@braindog/host/script';
 import type { ScriptAnswer, Scripted } from '@braindog/kernel';
 import {
   checkDecl,
@@ -272,7 +272,7 @@ export class ScriptRuns {
        it was revoked since, the script gets an error it may catch, and nothing is sent without it. */
     const grant = call.key === null ? null : turn.grant(call.key);
     if (call.key !== null && grant === null) return { error: `The key "${call.key}" is not in the vault any more, so nothing was sent.` };
-    /* AND A KEY GOES ONLY TO THE HOST ITS VAULT ENTRY OPENS, never the vault's `spark` key: `keyRefused`, which the
+    /* AND A KEY GOES ONLY TO THE HOST ITS VAULT ENTRY OPENS, never the vault's `slash` key: `keyRefused`, which the
        self-host's runner asks too, and a rule broken like the four above. Judged on `url`, the request being sent. */
     const broken = grant === null ? null : keyRefused(decl.id, grant, url);
     if (broken !== null) return refuse(broken);
@@ -444,11 +444,11 @@ export async function runScript(wiring: ScriptWiring, s: Scripted): Promise<Scri
   const full: ScriptDecl = { id: script, version, ...decl };
   const usage = (turn?: Turn) => ({ fetches: turn?.fetches ?? 0, bytes: turn?.bytes ?? 0, wall_ms: Math.max(0, wiring.now() - started), cpu_ms: 0 });
 
-  /* THE `spark` KEY BEFORE THE DECLARATION'S SHAPE, in `scriptRunner`'s order, because on the self-host the shape is
-     checked inside the sandbox and `sparkDeclared` runs before it: a declaration that is both malformed and names the
+  /* THE `slash` KEY BEFORE THE DECLARATION'S SHAPE, in `scriptRunner`'s order, because on the self-host the shape is
+     checked inside the sandbox and `slashDeclared` runs before it: a declaration that is both malformed and names the
      key is `FORBIDDEN` on either host, not `DECLARATION_INVALID` on one of them. */
-  const sparked = sparkDeclared(script, decl.keys);
-  if (sparked !== null) return { refused: sparked, log: '', usage: usage() };
+  const slashed = slashDeclared(script, decl.keys);
+  if (slashed !== null) return { refused: slashed, log: '', usage: usage() };
   const limits = checkDecl(full);
   if (isRefusal(limits)) return { refused: limits, log: '', usage: usage() };
 

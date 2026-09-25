@@ -1,10 +1,10 @@
 /**
- * The hosted app's catalogue, read by the Worker for Spark: the folder bundled with the web shell (`apps/web/static/catalogue`)
+ * The hosted app's catalogue, read by the Worker for Slash: the folder bundled with the web shell (`apps/web/static/catalogue`)
  * and served by the static assets at `/app/catalogue/` (at `/catalogue/` before the app had a base path), the same one
  * `/packs` reads in the tab.
  *
  * THE SAME OFFERS A SELF-HOST GIVES (`@braindog/record/catalogue-offers`): a newer version of what a record holds, held to its
- * checksum and signature and read through its door, which Spark asks about once on Decide. Nothing installs from here.
+ * checksum and signature and read through its door, which Slash asks about once on Decide. Nothing installs from here.
  *
  * THE ASSETS ANSWER THE SHELL FOR A PATH THEY DO NOT HOLD (`not_found_handling: single-page-application`), with a 200. So a
  * reply that is not JSON is a file that is not there, and only the two shapes a catalogue lists are ever asked for.
@@ -22,7 +22,7 @@ const PATH = /^(?:index\.json|usecases\/[a-z][a-z0-9-]{0,62}\/\d{1,6}\.\d{1,6}\.
  *
  * BOTH, WHILE THE BUILD MOVES (`loop/research-one-domain.md` §3.1 and §3.2). `paths.base: '/app'` puts
  * `apps/web/static/catalogue` at `build/app/catalogue`, and this Worker and that build deploy as separate commits, so a
- * reader that knew only one place offered nothing from Spark for as long as the other was live: the shell, or a 404,
+ * reader that knew only one place offered nothing from Slash for as long as the other was live: the shell, or a 404,
  * is read as no file. The root is asked first because it is where every deployed build holds it today, and it costs
  * one local asset read once it is gone; it leaves this list when no deployed build has it.
  */
@@ -44,5 +44,5 @@ export function assetsReader(assets: Assets): CatalogueReader {
   };
 }
 
-/** Spark's catalogue offers on the Worker, or none when no assets are bound. */
+/** Slash's catalogue offers on the Worker, or none when no assets are bound. */
 export const workerCatalogueOffers = (assets: Assets | undefined) => (assets === undefined ? undefined : offersFromCatalogue(assetsReader(assets)));

@@ -4,16 +4,16 @@
  *
  * A TRIAL HAS AN ASKER AND A SCHEDULED RUN HAS NONE, AND THE SELF-HOST OPENED BOTH AS `system`. `server.ts` handed the
  * trial the opener it builds for the scheduled pass, `keyOpener(api, options.keys)`, whose actor defaults to `system`,
- * so the owner trying her own draft left a `grant.read` the vault's log could not tell from the nightly run's. Spark's
+ * so the owner trying her own draft left a `grant.read` the vault's log could not tell from the nightly run's. Slash's
  * included key had the same fault and was fixed by threading the asker's id to `keyOpener`
- * (`packages/host/src/spark.ts`, `sparkAskerEngine`, and `spark-byok-guard.test.ts`, "signed by her and not by system").
+ * (`packages/host/src/slash.ts`, `slashAskerEngine`, and `slash-byok-guard.test.ts`, "signed by her and not by system").
  *
  * THE WHOLE JOIN, BECAUSE THE FAULT IS IN THE JOIN. A key put in through `/api/keys/put` from the owner's fresh session,
  * sealed by this host's real key store, the draft passed through the record's own `scriptTry` with its guard and body
  * check, run in QuickJS, the key opened by `keyOpener` and sent by the `send` double below. The double stands for the
  * socket only, so the `grant.read` read back at the end is the row the kernel wrote.
  *
- * NO KEY IS PRINTED, for `spark-byok-guard.test.ts`'s reason: a comparison that touches it is `assert.ok(x === y)`.
+ * NO KEY IS PRINTED, for `slash-byok-guard.test.ts`'s reason: a comparison that touches it is `assert.ok(x === y)`.
  */
 
 import { test } from 'node:test';
@@ -103,7 +103,7 @@ async function stack() {
   assert.ok(running.directory.provision({ slug: 'the-studio', email: 'ada@example.com', record: REC }).ok);
   assert.ok((await running.api.kernel.install([KEYS, GOLD_LIST])).ok);
 
-  /* A SESSION FOR ADA, planted as `spark-byok-guard.test.ts` plants one, proved at `authedAt`. The vault door takes a key
+  /* A SESSION FOR ADA, planted as `slash-byok-guard.test.ts` plants one, proved at `authedAt`. The vault door takes a key
      only from an owner whose proof is under fifteen minutes old, so the key goes in through a fresh one. */
   const plant = (authedAt: number): string => {
     const sid = randomBytes(32).toString('base64url');

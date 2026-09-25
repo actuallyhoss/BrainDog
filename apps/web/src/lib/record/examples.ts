@@ -1,7 +1,7 @@
 /**
  * Clearing the example rows setting up planted (`examples`, `clearExamples` on the record).
  *
- * PURE, SO `node --test` CAN IMPORT IT: the client is handed in, as `spark.ts` takes it.
+ * PURE, SO `node --test` CAN IMPORT IT: the client is handed in, as `slash.ts` takes it.
  *
  * WHICH ROWS ARE EXAMPLES IS THE RECORD'S. Only a row that arrived as an example and that nobody has edited, noted, or
  * pointed a row of their own at is cleared; this file only words the offer. On a new record the offer is quiet. Once rows of

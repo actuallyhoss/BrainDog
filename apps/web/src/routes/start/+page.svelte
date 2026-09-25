@@ -418,8 +418,8 @@
       const chosen = await readPacks(client, false);
       const installed = chosen.first.ok ? chosen.first.value : [];
       const out: Outcome = { made: [], onward: null, on: [], added: [], absent: [], refused: [], plan: null, as: u?.title ?? null };
-      /* WHETHER A MODEL IS BEHIND SPARK HERE, so a use case that forms a plan asks it before planting its own (`sparkForm`). */
-      const modelHere = await client.version().then((v) => v.ok && v.value.spark).catch(() => false);
+      /* WHETHER A MODEL IS BEHIND SLASH HERE, so a use case that forms a plan asks it before planting its own (`slashForm`). */
+      const modelHere = await client.version().then((v) => v.ok && v.value.slash).catch(() => false);
 
       /* The lists this record holds with their pack on, so a pack is added only after what it points at. */
       const held = new Set(installed.filter((p) => p.disabled_at === null).flatMap((p) => p.registers));
@@ -506,7 +506,7 @@
           else {
             if (one === u) ownHeld = true;
             if (asksModel) {
-              const asked = await client.call<{ formed: boolean; id?: string }>('sparkForm', { usecase: one.usecase, said: String(said).slice(0, 600) });
+              const asked = await client.call<{ formed: boolean; id?: string }>('slashForm', { usecase: one.usecase, said: String(said).slice(0, 600) });
               if (asked.ok && asked.value.formed && asked.value.id) {
                 out.plan = asked.value.id;
                 /* THE LISTS WENT IN WITH NOTHING IN THEM, and the plan they will hold is waiting on Decide:

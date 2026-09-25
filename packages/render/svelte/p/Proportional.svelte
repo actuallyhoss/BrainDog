@@ -78,18 +78,18 @@
 <div class="prop">
   {#if block.kind === 'sparkline'}
     {#each block.rows as row}
-      <div class="spark-row" data-intent={row.tone}>
-        <span class="spark-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
-        <Trend cls="spark-line" label={row.cells[0] ?? ''} value={row.cells[1] ?? ''} {opts} />
-        <span class="spark-figure num"><Text nodes={inline(row.cells[2] || MISSING, opts)} {opts} /></span>
+      <div class="sparkline-row" data-intent={row.tone}>
+        <span class="sparkline-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
+        <Trend cls="sparkline-line" label={row.cells[0] ?? ''} value={row.cells[1] ?? ''} {opts} />
+        <span class="sparkline-figure num"><Text nodes={inline(row.cells[2] || MISSING, opts)} {opts} /></span>
         {#if row.tone}
           <span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>
         {/if}
       </div>
     {/each}
     {#if runs.length}
-      <div class="spark-numbers">
-        <table class="spark-table">
+      <div class="sparkline-numbers">
+        <table class="sparkline-table">
           <thead>
             <tr><th scope="col">{SPARKLINE_POINT}</th>{#each runs as run}<th scope="col">{run.label}</th>{/each}</tr>
           </thead>

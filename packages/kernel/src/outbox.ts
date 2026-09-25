@@ -29,7 +29,7 @@ import { actionJitterMs } from './actions.ts';
  *
  * `script.run` IS MIGRATION 12'S: one run of a `script` declaration, leased by a host that runs it in a sandbox.
  *
- * `infer.ask` IS AN AUTOMATION'S QUESTION TO SPARK (`flow.ts`, Brief C): `{ run, rule, step, question, shape, choices?,
+ * `infer.ask` IS AN AUTOMATION'S QUESTION TO SLASH (`flow.ts`, Brief C): `{ run, rule, step, question, shape, choices?,
  * about? }`, answered by an ack whose `result.text` is the answer, or whose `result.failed` is the sentence the run
  * ends on when the host refused to ask. The `CHECK` that admits it is a migration of its own.
  */
@@ -101,7 +101,7 @@ export function lease(sql: Sql, deps: AckDeps, kinds: readonly OutboxKind[], n: 
   const marks = wanted.map(() => '?').join(', ');
 
   /* AN EXPIRED LEASE ON A QUESTION NO RUN IS WAITING ON IS FINISHED, AND NOT HANDED OUT AGAIN. `release()` leaves a leased
-     Spark job to its ack, and wave fifty taught the ack's failed branch to read the run; a host that never acked came
+     Slash job to its ack, and wave fifty taught the ack's failed branch to read the run; a host that never acked came
      through here instead, where only the clock was read. Wave fifty's checker measured it and
      `lease-cancelled-run.test.ts` counts it: a job leased, its run cancelled and never acked was handed out seven more
      times over 24 minutes of clock, each a post on the owner's key in the name of a rule that is gone, and ended `dead`
@@ -192,7 +192,7 @@ export const backoffMs = (attempts: number): number => Math.min(2 ** attempts * 
  * the middle of running, and two hosts would fetch one window from one provider.
  *
  * A QUESTION NO RUN IS WAITING ON IS FINISHED INSTEAD, with its attempt count as it was. `release()` deletes a pending
- * Spark job only at the moment its run ends, so one handed back to `pending` after that was a job nothing would ever
+ * Slash job only at the moment its run ends, so one handed back to `pending` after that was a job nothing would ever
  * delete, and the next lease posted it: one more question asked for a run already `cancelled` (wave fifty's checker).
  */
 export function unlease(sql: Sql, args: { id: string; leasedUntil: string }): void {
@@ -271,7 +271,7 @@ export type AckDeps = {
    */
   sendDigest?: (assembled: unknown, prose: string) => void;
   /**
-   * Hand an automation the answer to the question it asked Spark, or the reason there is none.
+   * Hand an automation the answer to the question it asked Slash, or the reason there is none.
    *
    * INJECTED FOR THE SAME REASON AGAIN. Where the answer goes, and what shape it must have to go there, is the run's
    * business (`flow.ts`'s `answerStep`), and this file only knows that a job came back.
@@ -337,9 +337,9 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
     );
 
   /* THE SAME FOR A QUESTION A RUN IS WAITING ON. Marked done with nowhere to put the answer, the run would wait out its
-     day and fail as though Spark had never answered. */
+     day and fail as though Slash had never answered. */
   if (row.kind === 'infer.ask' && !deps.answerRun)
-    return no<null>('NOT_IN_THIS_BUILD', `Job ${args.id} is an automation waiting on Spark's answer, and this host wired no way to hand it back.`, {
+    return no<null>('NOT_IN_THIS_BUILD', `Job ${args.id} is an automation waiting on Slash's answer, and this host wired no way to hand it back.`, {
       at: 'kind',
     });
 
@@ -351,8 +351,8 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
        answer and stops with that sentence, rather than the job walking a ladder that would ask the same model again.
 
        `result.failed` FIRST, AS THE RUN'S OWN SENTENCE. It is how the host's pass acks a refusal that no retry mends, a
-       month's asks spent or a job with no rule to ask in the name of (`spark-answers.ts`), and this branch read `text` alone: put
-       through the real kernel, a spent month ended the run on "Spark answered job ... with no text", and the sentence
+       month's asks spent or a job with no rule to ask in the name of (`slash-answers.ts`), and this branch read `text` alone: put
+       through the real kernel, a spent month ended the run on "Slash answered job ... with no text", and the sentence
        that says what to do was thrown away (`loop/research-infer-ask-next.md` §1.3, A). */
     if (row.kind === 'infer.ask') {
       const asked = JSON.parse(row.payload) as { run?: unknown; step?: unknown };
@@ -363,7 +363,7 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
             ? { run: asked.run, step: asked.step, by: args.id, failed: said.failed }
             : typeof said?.text === 'string'
               ? { run: asked.run, step: asked.step, by: args.id, answer: said.text }
-              : { run: asked.run, step: asked.step, by: args.id, failed: `Spark answered job ${args.id} with no text, so the run stopped at step ${asked.step + 1}.` },
+              : { run: asked.run, step: asked.step, by: args.id, failed: `Slash answered job ${args.id} with no text, so the run stopped at step ${asked.step + 1}.` },
         );
       return ok(null);
     }
@@ -385,15 +385,15 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
         });
       const filed = deps.propose(
         { question: drafted.question, body_kind: drafted.body_kind, body: (drafted.body ?? {}) as Record<string, unknown> },
-        'spark',
+        'slash',
       );
       if (!filed.ok) return filed as Result<null>;
     }
 
-    /* AND THE DIGEST THAT WAS WAITING FOR IT GOES OUT. `prose: spark` stops `runDigest` after one
+    /* AND THE DIGEST THAT WAS WAITING FOR IT GOES OUT. `prose: slash` stops `runDigest` after one
        `infer.prose` row, because a model that takes a minute must not be a minute the alarm is
        holding — and this branch, the half that starts it again, was never written. Every digest
-       declaring `prose: spark` queued a row nothing consumed and sent nothing on any channel, ever,
+       declaring `prose: slash` queued a row nothing consumed and sent nothing on any channel, ever,
        with no error to say so. The feature was one missing `if` from existing.
 
        THE PROSE IS OPTIONAL AND THE DIGEST IS NOT. A result the host could not produce, or one that
@@ -410,7 +410,7 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
   }
 
   /* A QUESTION WHOSE RUN IS NO LONGER WAITING ON IT IS FINISHED HERE, AND NOT RETRIED. `release()` in `flow.ts` takes a
-     run's Spark job out of the outbox when the run ends, but only while nobody holds it: a job a host had leased is left
+     run's Slash job out of the outbox when the run ends, but only while nobody holds it: a job a host had leased is left
      to this ack. The failed branch read the job and never the run, so a rule retired, switched off or its pack turned off
      while its question was out armed a `retry` like any other, and the audit's Worker probe (audit forty-nine §1) walked
      all eight rungs on the owner's key, eight posts and eight `grant.read` events for a run already `cancelled`, and a
@@ -550,7 +550,7 @@ function deadLetter(
         run: asked.run,
         step: asked.step,
         by: job.id,
-        failed: `Spark could not be reached after ${job.attempts} attempts (${job.error}), so the run stopped at step ${asked.step + 1}.`,
+        failed: `Slash could not be reached after ${job.attempts} attempts (${job.error}), so the run stopped at step ${asked.step + 1}.`,
       });
       return;
     }

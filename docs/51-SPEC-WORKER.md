@@ -18,7 +18,7 @@ implementation of the nine ports, and the `wrangler.jsonc` that binds them. Deri
 **Does.** Terminates every Cloud surface of 33 §4 — `/api/*`, `/mcp`, `/in/webhook/*`, inbound email, `/a/*`,
 `/s/*`, `/ws`, `/auth/*`, `PUT /a` — builds the pre-context the record turns into a `CallContext`, and forwards
 one RPC to the right Durable Object. Hosts the three classes of 33 §7 as thin shells over `packages/record`,
-`packages/spark` and the Directory flows. Implements the DO `Sql` adapter over `ctx.storage.sql` and the Cloud
+`packages/slash` and the Directory flows. Implements the DO `Sql` adapter over `ctx.storage.sql` and the Cloud
 side of the other eight ports. Drains the outbox from a queue, fires the alarm, takes the nightly `.brainl.age`,
 deletes a customer, restores a bookmark.
 
@@ -35,7 +35,7 @@ deletes a customer, restores a bookmark.
 | import another app | 35 §2 |
 
 **Imports.** `@braindog/ports` (types, `blobKey`, `preflight`, `mapSqlError` hooks), `@braindog/record`
-(`createRecord`, `Method`, `GROUPS`, `./directory`), `@braindog/spark` (`createSpark`), `@braindog/mcp`
+(`createRecord`, `Method`, `GROUPS`, `./directory`), `@braindog/slash` (`createSlash`), `@braindog/mcp`
 (`serveMcp`, `gate` and `unauthorized` from `./http`), `@braindog/connect` (`ingest`), `cloudflare:workers`, `age-encryption`, `@pushforge/builder`.
 `apps/web/build` is an asset directory, never an import. Rows 1–4 and 7–11 of 31 §2 are reachable; nothing else.
 
@@ -55,7 +55,7 @@ export default {
   scheduled(ev: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void>;
 } satisfies ExportedHandler<Env>;
 export { Record } from './do/record.ts';
-export { Spark } from './do/spark.ts';
+export { Slash } from './do/slash.ts';
 export { Directory } from './do/directory.ts';
 ```
 
@@ -74,9 +74,9 @@ export class Record extends DurableObject<Env> {
 ```
 
 ```ts
-// apps/worker/src/do/spark.ts — ≤ 100 lines
-export class Spark extends DurableObject<Env> {
-  dispatch(args: SparkArgs, pre: PreContext): Promise<Result<SparkResult>>;   // packages/spark's one entry (46)
+// apps/worker/src/do/slash.ts — ≤ 100 lines
+export class Slash extends DurableObject<Env> {
+  dispatch(args: SlashArgs, pre: PreContext): Promise<Result<SlashResult>>;   // packages/slash's one entry (46)
   wake(jobId: string): Promise<void>;                      // push { t: 'job', id } to every runner socket
   fetch(req: Request): Promise<Response>;                  // the /ws/runner upgrade only
   webSocketMessage(ws: WebSocket, m: string | ArrayBuffer): void;
@@ -131,7 +131,7 @@ Eight source files and one config, counted. Tests under `apps/worker/test/`.
 | `src/sql-do.ts` | `doSql`, `mapWorkerdError`, `measureCaps` | ~80 |
 | `src/ports-cf.ts` | eight port implementations | ~150 |
 | `src/do/record.ts` | the `Record` class — shell, socket, push | ≤ 100 |
-| `src/do/spark.ts` | the `Spark` class — shell, runner socket | ≤ 100 |
+| `src/do/slash.ts` | the `Slash` class — shell, runner socket | ≤ 100 |
 | `src/do/directory.ts` | the `Directory` class — shell | ≤ 60 |
 | `wrangler.jsonc` | §4.6 in full | 40 |
 | `vitest.config.ts` · `test/*.test.ts` | §9 | — |
@@ -147,7 +147,7 @@ about *what* to do is in a package.
 
 ```ts
 interface Env {
-  RECORD: DurableObjectNamespace<Record>; SPARK: DurableObjectNamespace<Spark>; DIRECTORY: DurableObjectNamespace<Directory>;
+  RECORD: DurableObjectNamespace<Record>; SLASH: DurableObjectNamespace<Slash>; DIRECTORY: DurableObjectNamespace<Directory>;
   OUTBOX_Q: Queue<OutboxMessage>; BLOBS: R2Bucket; AI: Ai; ASSETS: Fetcher;
   KEK?: string | SecretsStoreSecret; KEK_PREV?: SecretsStoreSecret;   // one key, never one per customer (12 §6); unset is no key store (§8 rule 3)
   EMAIL: SendEmail; TELEMETRY: AnalyticsEngineDataset; RL_READ: RateLimit; RL_WRITE: RateLimit;
@@ -165,7 +165,7 @@ type PreContext = {
     | { kind: 'person'; id: PersonId }                 // the Directory verified the cookie; the record reads `member`
     | { kind: 'bearer'; hash: string }                 // SHA-256 hex of the secret half; the record reads `token` / `device_grant`
     | { kind: 'share'; id: string; slug: string }      // the Worker verified the MAC; the record checks `share.close`
-    | { kind: 'system' } | { kind: 'spark' };
+    | { kind: 'system' } | { kind: 'slash' };
   session?: { spoken?: string; client_id?: string; host?: string; repo?: string };   // 33 §2
   now: number;
   surface: 'web' | 'mcp' | 'cli' | 'email' | 'webhook' | 'alarm';
@@ -207,9 +207,9 @@ request's record; a `bearer` auth carries a hash, never the secret; `system` is 
   "routes": [{ "pattern": "brain.dog", "custom_domain": true }],
   "durable_objects": { "bindings": [
     { "name": "RECORD",    "class_name": "Record" },
-    { "name": "SPARK",     "class_name": "Spark" },
+    { "name": "SLASH",     "class_name": "Slash" },
     { "name": "DIRECTORY", "class_name": "Directory" } ] },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Record", "Spark", "Directory"] }],
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Record", "Slash", "Directory"] }],
   "queues": {
     "producers": [{ "binding": "OUTBOX_Q", "queue": "braindog-outbox" }],
     "consumers": [{ "queue": "braindog-outbox", "max_batch_size": 10, "max_batch_timeout": 5, "max_retries": 3 }] },
@@ -551,7 +551,7 @@ queue(batch):
 | `erase.r2` | `for sha of payload.sha256s: BLOBS.delete(blobKey(rec, sha))`; a prefix with no keys is `done` | 300 s |
 | `infer.embed` | `aiInference.embed(payload.texts)` → `result = { model, dims, vectors }` — the record writes `entry_vec` **on ack** | 120 s |
 | `infer.prose` | `aiInference.complete(payload)` → `result = { text, usage }` — the digest row is written on ack | 120 s |
-| `infer.draft` | `aiInference.complete(payload)` → `result = { body, usage }` — `propose` by actor `spark` on ack | 120 s |
+| `infer.draft` | `aiInference.complete(payload)` → `result = { body, usage }` — `propose` by actor `slash` on ack | 120 s |
 
 3. The three `infer.*` write-backs ride `ackOutbox.result` (§13 D9): the Worker holds no record-writing call but
    `arrive`, `leaseOutbox`, `ackOutbox` and `observe`. Retry is the schedule's ladder (30 §8, 09 §1); the consumer
@@ -592,7 +592,7 @@ queue(batch):
 
 1. `deleteCustomer(env, rec)` — called by operations (53), no public route: `stub = RECORD.get(idFromName(rec))`.
 2. `await stub.destroy()`: `deleteAlarm()` then `deleteAll()` — belt and braces; the `compat-date` gate is the
-   load-bearing half (09 §1). Spark holds no durable state in phase 5, so it has no `destroy()`; one arrives with
+   load-bearing half (09 §1). Slash holds no durable state in phase 5, so it has no `destroy()`; one arrives with
    conversation storage (46, §10).
 3. Page `BLOBS.list({ prefix: 'rec_<id>/', cursor })` and `BLOBS.delete(keys)` in batches of 1,000 until empty —
    attachments and snapshots both.
@@ -607,31 +607,31 @@ queue(batch):
    which writes the `restore.pitr` event into the restored storage. Two steps because an event written before the
    restore would be rewound with everything else (§13 D15).
 
-### 5.15 · Spark — the runner socket (26 §2, 33 §11)
+### 5.15 · Slash — the runner socket (26 §2, 33 §11)
 
 1. `GET /ws/runner` with a device-grant bearer: `preContext`; `w = await stub.call('whoami', {}, pre)` must be a
-   runner principal → else **403**. Then `SPARK.get(idFromName(rec)).fetch(new Request('https://do/ws/runner',
+   runner principal → else **403**. Then `SLASH.get(idFromName(rec)).fetch(new Request('https://do/ws/runner',
    { headers: { Upgrade: 'websocket', 'X-Runner': w.id } }))`.
-2. `Spark.fetch`: accept as §5.7 step 3 with `acceptWebSocket(server, ['runner'])`;
+2. `Slash.fetch`: accept as §5.7 step 3 with `acceptWebSocket(server, ['runner'])`;
    `server.serializeAttachment({ runner_id, record_id })` (≤ 16,384 bytes — 26 §2.3). Auto-response ping/pong is set
    in the constructor.
-3. After a successful `createJob` (a JOBS method on the record), the Worker calls `SPARK.wake(jobId)`:
+3. After a successful `createJob` (a JOBS method on the record), the Worker calls `SLASH.wake(jobId)`:
    `for (ws of ctx.getWebSockets('runner')) ws.send(JSON.stringify({ t: 'job', id }))`. The runner then calls
    `POST /api/claimJob` over HTTP — one claim path for the socket, the long-poll and the plain poll.
 4. `webSocketMessage` → the runner sends nothing but pings, which never arrive here → `close(1003)`.
    `webSocketClose` → nothing: a claimed job past `lease_until` is *shown* as lost by the list, and `claimJob` may
-   reclaim it — no lease state in Spark, no Spark alarm (§13 D13).
-5. `dispatch(args, pre)` → `this.#spark.dispatch(args, pre)` over ports `{ sql: doSql(ctx.storage), clock,
+   reclaim it — no lease state in Slash, no Slash alarm (§13 D13).
+5. `dispatch(args, pre)` → `this.#slash.dispatch(args, pre)` over ports `{ sql: doSql(ctx.storage), clock,
    inference: aiInference(env) }` — tier A jobs and, later, conversation. Every write it wants is a `propose` or
-   `suggest` the Worker relays to the record with `auth: { kind: 'spark' }`; the `spark-actor` gate proves nothing else.
+   `suggest` the Worker relays to the record with `auth: { kind: 'slash' }`; the `slash-actor` gate proves nothing else.
 
-*As built, September 22nd 2026: `apps/worker/src/do/spark.ts` does not exist. The palette's engine is built inside the
-record's own object on the first ask (`workerSparkDoor`, `apps/worker/src/spark.ts`), with Spark's `settings` and
-`call` tables in that object's storage, and it is reached through `/api/spark/*` rather than a `Spark` class. The
-Worker reads no operator key for Spark (`sparkFromEnv(env, { operatorKey: false })`), so wherever the vault holds a
-`spark` grant every ask, on every tier, goes through the record's vault gate and opens that grant in the asker's
-name ([46-SPEC-SPARK](46-SPEC-SPARK.md) §5.9). With no `KEK` bound no key can be opened, no engine is built, and
-`/api/version` says `spark: false`. The runner socket above is not built.*
+*As built, September 22nd 2026: `apps/worker/src/do/slash.ts` does not exist. The palette's engine is built inside the
+record's own object on the first ask (`workerSlashDoor`, `apps/worker/src/slash.ts`), with Slash's `settings` and
+`call` tables in that object's storage, and it is reached through `/api/slash/*` rather than a `Slash` class. The
+Worker reads no operator key for Slash (`slashFromEnv(env, { operatorKey: false })`), so wherever the vault holds a
+`slash` grant every ask, on every tier, goes through the record's vault gate and opens that grant in the asker's
+name ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.9). With no `KEK` bound no key can be opened, no engine is built, and
+`/api/version` says `slash: false`. The runner socket above is not built.*
 
 ### 5.16 · The conformance job (33 §3, 30 §13)
 
@@ -708,8 +708,8 @@ three refusals) is the same code on both hosts and is written there once.*
    (workerd drops `me:pw@` before the request reaches the gateway, so a check on the sent URL alone never fired), the
    fetch count, the key label declared, and then `keyRefused` (`@braindog/host/script`, the self-host's function):
    the key goes only to the host the grant's `opens` names, compared exactly with no subdomain let in, and never when
-   the grant is the one labelled `spark`. A declaration naming the `spark` key is refused `FORBIDDEN` before the
-   loader is asked (`sparkDeclared`), ahead of the declaration's shape, so a script that is both malformed and names
+   the grant is the one labelled `slash`. A declaration naming the `slash` key is refused `FORBIDDEN` before the
+   loader is asked (`slashDeclared`), ahead of the declaration's shape, so a script that is both malformed and names
    it is refused the same way on both hosts. A broken rule is sticky: every later call of that run is refused, and the run
    answers `refused` with no writes, whatever the script did after. The key is resolved by `grantNamed` and the
    request sent by `actionExecutor(() => egress, { openKey })`, the send loop of §5.10 step 4 over the script's own
@@ -825,7 +825,7 @@ Only codes from 30 §6 appear in a body; the Worker mints none. The adapter's th
 | Runner attachment | ≤ 16,384 bytes; ours is two ids | 26 §2.3 |
 | Worker startup | ≤ 200 ms; zero top-level work — validators compile at module top (30 §4) but the ports and DOs bind lazily | 22 §9 · `wrangler deploy` startup report |
 | Cold start of an evicted object | 50–200 ms; the constructor runs migrations only under `blockConcurrencyWhile` and loads nothing else | 01 §8 · first-request latency after eviction in staging |
-| DO file size | `record.ts`, `spark.ts` ≤ 100 lines; `directory.ts` ≤ 60 | 31 §8 · `wc -l` in CI |
+| DO file size | `record.ts`, `slash.ts` ≤ 100 lines; `directory.ts` ≤ 60 | 31 §8 · `wc -l` in CI |
 
 ---
 
@@ -838,7 +838,7 @@ Workers AI, Email, Secrets Store. Each control, where it sits, and what never tr
    still under the gate; `OUTBOX_Q.send({ record })` is the last statement after commit (30 §4 steps 11–12b). The
    test in §9 serialises two overlapping writes.
 2. **No outbound call from `Record` except `wake()`.** `Record`'s ports are `{ Sql, Scheduler, Clock }`; `fetch`,
-   `Inference`, `Dispatch` are not in scope — structurally, not by review (ADR-002, 31 §2). `Spark` speaks only to
+   `Inference`, `Dispatch` are not in scope — structurally, not by review (ADR-002, 31 §2). `Slash` speaks only to
    the configured model; the Worker does everything else.
 3. **The KEK never leaves the Worker.** `keyStoreOf` in `src/keys.ts` imports it as a non-extractable `CryptoKey`; the record
    receives and returns sealed material only (`openGrant`/`bindGrant`); AES-GCM, HKDF and Ed25519 run in the
@@ -914,16 +914,16 @@ used (31 §3). Files `apps/worker/test/*.test.ts`. Input → expected:
 | 18 | share link | a valid token → page; the same token after `share.close`; a token with one flipped MAC byte | 200; 404; 404 |
 | 19 | snapshot | `export.r2` row on a 2,000-row record | one dated key and `latest.brainl.age` in R2 with `customMetadata.rows === 2000`; decrypting with the test identity yields a `.brainl` whose manifest verifies |
 | 20 | snapshot ceiling | a dump over 40 MiB | `ackOutbox(…, 'failed', 'snapshot over 40 MiB…')` |
-| 21 | DO size | `wc -l src/do/*.ts` | `record.ts`, `spark.ts` ≤ 100; `directory.ts` ≤ 60 |
+| 21 | DO size | `wc -l src/do/*.ts` | `record.ts`, `slash.ts` ≤ 100; `directory.ts` ≤ 60 |
 
 *As built, the Worker's tests run under `node --test`, and the ones that need workerd start it through wrangler's
 miniflare from inside the test; `apps/worker/test/script.test.ts` is one, with nineteen cases on §5.19 (a bare fetch,
 the key scrubbed before the script reads the answer, a second run getting a Worker of its own, a caught refusal
 still refusing the run, user info in the URL, a swapped global `fetch`, an undeclared key, the fetch count, the
 method as asked, a write outside `writes:`, an update with and without a version, a throw, no default export,
-`wall_ms`, reads, a key sent away and then a late answer, a malformed declaration naming the `spark` key, and a
+`wall_ms`, reads, a key sent away and then a late answer, a malformed declaration naming the `slash` key, and a
 trial's fetch for a caller given no keys), and `apps/worker/test/script-isolation.test.ts` another, with five
-(each run starting fresh, a late answer refused, and through the gateway the key held to its host, the `spark` key
+(each run starting fresh, a late answer refused, and through the gateway the key held to its host, the `slash` key
 refused and the key scrubbed in each spelling).*
 
 CI rows this app owns in 33 §8: `conformance-count`, `boot-probe` (the FTS5 refusal message), `compat-date`,
@@ -944,7 +944,7 @@ with `deploy-parity`.
   Directory cursor when the 901st record signs up.
 - `ponytail:` no Workflow; triage is synchronous inside `arrive` and the model-backed proposal is an `infer.draft`
   row; add a Workflow when a step needs durable multi-step retry across a deploy (01 §6's argument, deferred).
-- `ponytail:` Spark keeps no lease state and no alarm; a stale claim is visible in the list and reclaimable at
+- `ponytail:` Slash keeps no lease state and no alarm; a stale claim is visible in the list and reclaimable at
   `claimJob`; add the 60 s renewal alarm when a runner fleet exceeds one machine per record (26 §2.4).
 - `ponytail:` the spoken-id redirect `/<ID>` → canonical is done by the shell, not a 302; `run_worker_first`
   cannot name uppercase prefixes without invoking the Worker for every asset (§13 D19).
@@ -955,7 +955,7 @@ with `deploy-parity`.
 - `ponytail:` KEK rotation is one previous key (`KEK_PREV`); a rotation ladder longer than two keys is 53's.
 - `ponytail:` no billing gate — ADR-059's read-only mode is a Directory column and a router check added when
   Stripe lands (53).
-- `ponytail:` `Spark.destroy()` does not exist until Spark stores conversation state (46).
+- `ponytail:` `Slash.destroy()` does not exist until Slash stores conversation state (46).
 - `ponytail:` telemetry is one point per request and one per queue dispatch; sampling arrives with the first bill
   that shows it.
 - `ponytail:` one loaded Worker per script run (§5.19), so every run is a unique Dynamic Worker on the bill. A cache
@@ -970,7 +970,7 @@ with `deploy-parity`.
 |---|---|---|---|
 | runtime | `@pushforge/builder` | 2.0.5 | VAPID for Web Push; zero dependencies (ADR-046, 09 §3) |
 | runtime | `age-encryption` | 0.3.1 (+ five `@noble`/`@scure` transitive) | `.brainl.age` (ADR-046, 03 §5) |
-| workspace | `@braindog/ports` `where` `theme` `render` `declare` `mcp` `record` `spark` `connect` | `workspace:*` | 31 §2 row 14 |
+| workspace | `@braindog/ports` `where` `theme` `render` `declare` `mcp` `record` `slash` `connect` | `workspace:*` | 31 §2 row 14 |
 | workspace | `@braindog/script`, its root only (`PRELUDE`, `checkDecl`, `LOG_BYTES`, the types), never `./quickjs` | `workspace:*` | §5.19: the prelude the loaded Worker evaluates, and the ceilings it is held to |
 | dev | `wrangler` | 4.128.0 | 31 §3 |
 | dev | `vitest` | 4.1.11 | 31 §3 |
@@ -985,7 +985,7 @@ A third runtime package is a new ADR.
 
 **Before this:** `packages/ports` with `preflight`, the case array and the Node reference run (37); `packages/record`
 with `createRecord`, `Method`/`GROUPS` and the methods of §13 D11 (45); `packages/mcp`'s `serveMcp` (44);
-`packages/connect`'s `ingest` (47); `packages/spark`'s `createSpark` (46 — a stub that refuses is enough for phase 5);
+`packages/connect`'s `ingest` (47); `packages/slash`'s `createSlash` (46 — a stub that refuses is enough for phase 5);
 `apps/web/build` (50) for `ASSETS`; the Directory flows (§13 D10). Phases 0–4 of BUILD.md.
 
 **This unblocks:** the DO half of Q12 and the committed `reference.json` (30 §14 #1); every Cloud-only feature — PITR,
@@ -1000,8 +1000,8 @@ and 53's runbooks (restore, key rotation, erasure, deletion).
 
 | # | Decision | Amend |
 |---|---|---|
-| D1 | Each DO class exposes **one RPC dispatcher** — `Record.call(method, args, pre)`, `Spark.dispatch`, `Directory.auth` — plus the platform methods of §2. Forty-five named RPC methods in a ≤ 100-line file is not possible, and the method name is data the gate walks | 33 §7: *"expose their methods as RPC"* → *"one `call` dispatcher over the groups"* |
-| D2 | The Worker builds a **`PreContext`** (verified person id, bearer hash, share, system, spark) and the **record builds `CallContext`** — scope, level, name and actor are the record's tables. A bearer cannot be resolved anywhere else | 33 §2 first paragraph after the code block |
+| D1 | Each DO class exposes **one RPC dispatcher** — `Record.call(method, args, pre)`, `Slash.dispatch`, `Directory.auth` — plus the platform methods of §2. Forty-five named RPC methods in a ≤ 100-line file is not possible, and the method name is data the gate walks | 33 §7: *"expose their methods as RPC"* → *"one `call` dispatcher over the groups"* |
+| D2 | The Worker builds a **`PreContext`** (verified person id, bearer hash, share, system, slash) and the **record builds `CallContext`** — scope, level, name and actor are the record's tables. A bearer cannot be resolved anywhere else | 33 §2 first paragraph after the code block |
 | D3 | **Bearer wire format** `<rec_id>.<secret>`; `token.hash` and `device_grant.token_hash` hold `sha256(secret)`. The record id must be in the bearer or the Worker cannot find the table that verifies it | 33 §10 *Agent token* row; 12 §3 |
 | D4 | Browser requests name their record **on the session row**, not in a second cookie: sign-in opens a record the person owns (else the first they joined), `POST /auth/switch` moves it, and the record's own `member` table says what the person may do. *Amended from a `rec` cookie: one opaque cookie is one thing to protect.* A person holds several records and the shell is static | 33 §4 (`/auth/switch`), 33 §10 |
 | D5 | **Share token** = `<rec_id>.<b64url payload>.<b64url HMAC-SHA-256>` under `HKDF(KEK, 'braindog/share')` with `kek_id` in the payload; the Worker verifies the MAC, the record checks `share.close`. An invalid token is 404 | 20 §2 tier 1; 33 §4 `/s/<token>` |
@@ -1012,7 +1012,7 @@ and 53's runbooks (restore, key rotation, erasure, deletion).
 | D10 | The **Directory's schema and flows are a package** — assumed `@braindog/record/directory` exporting `createDirectory(sql, clock)` — because two apps host it and apps never import each other. If 45 or 49 places it elsewhere, one import line changes here | 31 §2 row 10 and §8; 45; 49 |
 | D11 | **Record methods the routes need that 30 §5 does not list**: `arrive` (INTERNAL), `ingestVerify` (INTERNAL), `join` (INTERNAL, invitation acceptance), `whoami` (READ+), `snapshot` (ADMIN), `deviceStart · devicePoll · deviceApprove`, `createToken · listTokens · revokeToken`. Names assumed; 45 owns the signatures | 30 §5 — a counted row per group |
 | D12 | **No Workflow in v1**: `arrive` does store → match → extract → write → outbox in one transaction (pure, no model); the unmatched case is an `infer.draft` row. The contracts already omit a Workflow binding | 01 §6; 07 §7 — *"is a Workflow"* → *"may become one"* |
-| D13 | The **runner socket is a doorbell**; the claim is always `claimJob()`; Spark holds no lease state and no alarm in v1 | 26 §2.4 *Job half-done*; 33 §7 *Spark* row (*"job leases"*) |
+| D13 | The **runner socket is a doorbell**; the claim is always `claimJob()`; Slash holds no lease state and no alarm in v1 | 26 §2.4 *Job half-done*; 33 §7 *Slash* row (*"job leases"*) |
 | D14 | **Customer deletion** is `Record.destroy()` + `deleteCustomer()` in the Worker, invoked by operations; no public route | 02 §9 *A customer* row → *"by 53's runbook"* |
 | D15 | **Restore is two calls**: `pitr(at)` (host, aborts) then `call('restore', { bookmark, at })` writes `restore.pitr` into the restored storage | 33 §9 *Restore* |
 | D16 | The queue message stays **`{ record }`**; `Ingress.queue`'s element is renamed from `recordId` to `record` | 33 §1 `Ingress` |
@@ -1032,7 +1032,7 @@ and 53's runbooks (restore, key rotation, erasure, deletion).
 | I3 | `export(cursor)` returns `{ chunk, cursor, manifest? }` in pages of ≤ 1,000 rows | 45 |
 | I4 | `preflight(query, params, caps)`, the case array, `Assert`, `SqlError` | 37 |
 | I5 | `ingest(decl, { http, secret })` → the fetched pages; throws on `expect:` | 47 |
-| I6 | `createSpark(ports).dispatch(args, pre)` | 46 |
+| I6 | `createSlash(ports).dispatch(args, pre)` | 46 |
 | I7 | `createDirectory(sql, clock)` with `AuthCall`/`AuthResult` | D10 |
 
 ### Platform assumptions to verify
@@ -1069,7 +1069,7 @@ and 53's runbooks (restore, key rotation, erasure, deletion).
 - [ ] `doSql` passes the conformance array; `reference.json` is committed from this host; counts match the Node host.
 - [ ] `caps.fts5 === true` and `caps.expressionIndexUsed === true` on the live DO — Q12 closed.
 - [ ] Tests #1–#21 green under `@cloudflare/vitest-plugin`.
-- [ ] `record.ts` and `spark.ts` ≤ 100 lines, `directory.ts` ≤ 60, enforced in CI.
+- [ ] `record.ts` and `slash.ts` ≤ 100 lines, `directory.ts` ≤ 60, enforced in CI.
 - [ ] Every route in `index.ts` declares its group; `router-groups` passes; a bearer at `openGrant` is 403 before any RPC.
 - [ ] A browser holds `/ws` for an hour in staging and the object's GB-s stay under 100; a write reaches the tab as `{ version, registers }`.
 - [ ] A redelivered queue message leaves the `EMAIL` mock at one call.

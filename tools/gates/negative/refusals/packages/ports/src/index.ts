@@ -63,9 +63,9 @@ const DIALECT = [
   'DIALECT_ARITY', 'DIALECT_KIND_UNKNOWN',
 ] as const;
 
-/** Spark — 5. */
-const SPARK = [
-  'PROPOSAL_UNCITED', 'PROPOSAL_NO_ROWS', 'PROPOSAL_SCHEMA', 'PREDICTION_UNMEASURABLE', 'SPARK_BUDGET_SPENT',
+/** Slash — 5. */
+const SLASH = [
+  'PROPOSAL_UNCITED', 'PROPOSAL_NO_ROWS', 'PROPOSAL_SCHEMA', 'PREDICTION_UNMEASURABLE', 'SLASH_BUDGET_SPENT',
 ] as const;
 
 /** Connector — 7. */
@@ -90,5 +90,5 @@ const HOST = [
 ] as const;
 /** The hundred and twelve, in `30 §6`'s order. */
 export const REFUSAL_CODES = [
-  ...PACK, ...GRAMMAR, ...WRITE, ...AUTH, ...LIFECYCLE, ...DIALECT, ...SPARK, ...CONNECTOR, ...HOST,
+  ...PACK, ...GRAMMAR, ...WRITE, ...AUTH, ...LIFECYCLE, ...DIALECT, ...SLASH, ...CONNECTOR, ...HOST,
 ] as const;

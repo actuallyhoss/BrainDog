@@ -217,18 +217,18 @@
 
      THE CLASS NAMES ARE THE CODE'S, NOT 51 §4.6'S. `src/index.ts` exports `Record$` and
      `Directory$`; the `$` is there because `Record` is a TypeScript utility type and the class
-     would shadow it. 51 §4.6 writes `Record`, `Spark`, `Directory`. A config naming a class the
+     would shadow it. 51 §4.6 writes `Record`, `Slash`, `Directory`. A config naming a class the
      script does not export does not deploy, so this file follows the code and 51 §4.6 is the thing
      to amend. THIS IS FREE TO DECIDE EXACTLY ONCE — before the first production deploy. Afterwards
      the two names cost a `renamed_classes` tag (see REPORT.md §8, risk R2).
 
-     `Spark$` IS NOT HERE BECAUSE THE CLASS IS NOT WRITTEN. 33 §7 lists three classes; the code has
+     `Slash$` IS NOT HERE BECAUSE THE CLASS IS NOT WRITTEN. 33 §7 lists three classes; the code has
      two. Its rung is drafted below so the shape is settled before it is needed. */
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["Record$", "Directory$"] }
 
-    /* THE NEXT RUNG, WHEN `src/do/spark.ts` LANDS (51 §2, §3). Append; do not edit v1.
-       { "tag": "v2", "new_sqlite_classes": ["Spark$"] } */
+    /* THE NEXT RUNG, WHEN `src/do/slash.ts` LANDS (51 §2, §3). Append; do not edit v1.
+       { "tag": "v2", "new_sqlite_classes": ["Slash$"] } */
 
     /* AND IF 51 §4.6'S NAMES WIN AFTER A PRODUCTION DEPLOY, this is the shape — a rename, never
        an edit of v1, and never a delete:
@@ -358,17 +358,17 @@
         "RP_ID": "alpha.brain.dog",
         "AI_GATEWAY": "braindog-alpha",
         "AGE_RECIPIENT": "age1f6rykmshc4zf5y3lf0ecuyzyqr8a4ek29wlmp688gydyxckwjq3s75n58r",
-        "SPARK_ENDPOINT": "",
-        /* THE INCLUDED MODEL IS ON, AT HIS WORD ("turn on spark yeah", 24 September). `apps/worker/src/spark.ts` answers
+        "SLASH_ENDPOINT": "",
+        /* THE INCLUDED MODEL IS ON, AT HIS WORD ("turn on spark yeah", 24 September). `apps/worker/src/slash.ts` answers
            with Workers AI only when this is `yes`; the binding alone never switched it on. One call may spend about 2,500
            neurons (about $0.03) before it is stopped, and one record's asks at most the ceiling below in a month. */
-        "SPARK_INCLUDED": "yes",
-        /* THE OPERATOR'S CEILING ON ONE RECORD'S SPARK ASKS, IN NEURONS A UTC MONTH: 900,000 is $9.90 at $0.011 a thousand.
+        "SLASH_INCLUDED": "yes",
+        /* THE OPERATOR'S CEILING ON ONE RECORD'S ASKS OF Slash, IN NEURONS A UTC MONTH: 900,000 is $9.90 at $0.011 a thousand.
            It was the record owner's `ask_cap` alone, with no upper limit, and an owner saved a billion
            (`loop/research-batch-sixty-audit.md` finding 1); `ask_cap` can now only lower this. It is per record and
-           not per account. `INCLUDED_MONTH_NEURONS` in `apps/worker/src/spark.ts` argues the number and is what an
+           not per account. `INCLUDED_MONTH_NEURONS` in `apps/worker/src/slash.ts` argues the number and is what an
            unset or mistyped value falls back to; `0` turns every ask away. */
-        "SPARK_INCLUDED_MONTH_NEURONS": "900000",
+        "SLASH_INCLUDED_MONTH_NEURONS": "900000",
         "BRAINDOG_BUILD": "",
         /* EMPTY IS NO SIGN-IN LINKS. The sender, on a domain Email Service sends for, switches them on
            with the `EMAIL` binding below (51 §5.8). */
@@ -541,14 +541,14 @@
         "RP_ID": "brain.dog",
         "AI_GATEWAY": "braindog",
         "AGE_RECIPIENT": "age1av0654ll7t2ghrzr7ekervs5hjc9sm0he0569z45cvu92dd43aqql9gm3t",
-        "SPARK_ENDPOINT": "",
-        /* THE INCLUDED MODEL IS ON, AT HIS WORD ("turn on spark yeah", 24 September). `apps/worker/src/spark.ts` answers
+        "SLASH_ENDPOINT": "",
+        /* THE INCLUDED MODEL IS ON, AT HIS WORD ("turn on spark yeah", 24 September). `apps/worker/src/slash.ts` answers
            with Workers AI only when this is `yes`; the binding alone never switched it on. One call may spend about 2,500
            neurons (about $0.03) before it is stopped, and one record's asks at most the ceiling below in a month. */
-        "SPARK_INCLUDED": "yes",
-        /* THE OPERATOR'S CEILING ON ONE RECORD'S SPARK ASKS, as alpha's comment says: 900,000 neurons, $9.90 a record a
+        "SLASH_INCLUDED": "yes",
+        /* THE OPERATOR'S CEILING ON ONE RECORD'S ASKS OF Slash, as alpha's comment says: 900,000 neurons, $9.90 a record a
            month, which `ask_cap` can only lower. */
-        "SPARK_INCLUDED_MONTH_NEURONS": "900000",
+        "SLASH_INCLUDED_MONTH_NEURONS": "900000",
         "BRAINDOG_BUILD": "",
         /* EMPTY IS NO SIGN-IN LINKS. The sender, on a domain Email Service sends for, switches them on
            with the `EMAIL` binding below (51 §5.8). */
@@ -598,7 +598,7 @@
 
       /* REPEATED IN FULL, for the reason `r2_buckets` above is: `ai` is not inheritable, and an
          omitted non-inheritable key is empty rather than inherited. Production without this line
-         deploys, comes up, and answers `ModelUnavailable` to the first ask Spark makes. The
+         deploys, comes up, and answers `ModelUnavailable` to the first ask Slash makes. The
          argument for uncommenting it is in `alpha` above; there is no account resource to create
          for it, unlike every block still commented below. */
       "ai": { "binding": "AI" },

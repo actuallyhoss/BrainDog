@@ -113,7 +113,7 @@ type Row = { state?: string | null; fields: Record<string, unknown> };
  */
 export type McpSurface<C> = {
   boot(ctx: C): Answer<{ registers: { id: string; name: string }[] }>;
-  version(ctx: C): Answer<{ version: number; spark?: boolean }>;
+  version(ctx: C): Answer<{ version: number; slash?: boolean }>;
   whoami(ctx: C): Answer;
   schema(args: { register: string }, ctx: C): Answer;
   get(args: { register: string; seq: number } | { spoken: string }, ctx: C): Answer;
@@ -780,7 +780,7 @@ export function tools<C>(surface: McpSurface<C>) {
    *
    * EACH READ IS A `register.read` OF THE LIST IT NAMES, AND THAT IS MEANT. Audit fifty-five, finding 2 asked whether
    * these should count as the host's own. Both readers of the signal ask whether a list was read at all in ninety days,
-   * the kernel's `dormant` and Spark's untouched pack, and a list whose rows name the refs on an agent's pages is in use:
+   * the kernel's `dormant` and Slash's untouched pack, and a list whose rows name the refs on an agent's pages is in use:
    * retiring it would turn every one of those names back into a row id. What these reads must not count as is a scan,
    * and `id` is the primary key, so the kernel's `observe` leaves a scan of any of its own columns out.
    */
@@ -1337,12 +1337,12 @@ export function tools<C>(surface: McpSurface<C>) {
     }
     /* THE AUTOMATION GRAMMAR IS THIS PACKAGE'S TOO, FOR THE SAME REASON (`automations.ts`), and asked of `version` the same
        way, so every surface serves it. The list and one automation are the record's `automations`, one method for both.
-       `version`'s `spark` PICKS WHICH, because it is the one fact about the host this package can read, and the hosts
-       set it and the record's `answersSpark` from the same model. A surface whose `version` carries no `spark`, as
-       `test/stub.ts`'s does not, is served the grammar that lists `ask_spark` as not running. */
+       `version`'s `slash` PICKS WHICH, because it is the one fact about the host this package can read, and the hosts
+       set it and the record's `answersSlash` from the same model. A surface whose `version` carries no `slash`, as
+       `test/stub.ts`'s does not, is served the grammar that lists `ask_slash` as not running. */
     if (head === 'grammar' && rest === 'automations') {
       const may = await surface.version(ctx);
-      return may.ok ? { ok: true, value: may.value.spark === true ? ANSWERED_GRAMMAR : AUTOMATION_GRAMMAR } : may;
+      return may.ok ? { ok: true, value: may.value.slash === true ? ANSWERED_GRAMMAR : AUTOMATION_GRAMMAR } : may;
     }
     if ((head === 'automations' && !rest) || (head === 'automation' && NAMED.test(rest)))
       return surface.automations

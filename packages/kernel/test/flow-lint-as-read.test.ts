@@ -75,7 +75,7 @@ test('A READ OF A NAME NO EARLIER STEP KEEPS IS REFUSED, for every kind that kee
   assert.match(said(manual([{ ask_person: { question: 'Which?', options: ['a', 'b'], as: 'pick' } }, { notify: { say: '{{ vars.picked }}' } }])) ?? '', /reads \{\{ vars\.picked \}\} at steps\[1\]/u);
   /* A STEP READING THE NAME IT IS ABOUT TO KEEP reads it before it is kept, and the run fills the dash. */
   assert.match(said(manual([{ set_var: { name: 'p', to: 'again {{vars.p}}' } }])) ?? '', /^rule\.m reads \{\{vars\.p\}\} at steps\[0\], and p is kept only by a step that does not certainly run before it/u);
-  assert.match(said(manual([{ ask_spark: { question: 'Rate for {{vars.r}}?', as: 'r' } }])) ?? '', /reads \{\{vars\.r\}\} at steps\[0\]/u);
+  assert.match(said(manual([{ ask_slash: { question: 'Rate for {{vars.r}}?', as: 'r' } }])) ?? '', /reads \{\{vars\.r\}\} at steps\[0\]/u);
   /* A CONDITION IS FILLED FROM THE RUN TOO (`fill(step.if, ...)`), so its braces are reads. */
   assert.match(said(manual([{ if: 'what is {{vars.w}}', then: [{ stop: true }] }])) ?? '', /reads \{\{vars\.w\}\} at steps\[0\]/u);
   /* A LATER STEP'S NAME IS NOT AN EARLIER ONE'S. */
@@ -105,7 +105,7 @@ test('A BRANCH KEEPS A NAME FOR WHAT FOLLOWS IT ONLY WHEN BOTH ARMS DO', () => {
 test('WHAT KEEPS A NAME STILL LETS IT BE READ: every kind, and a deeper path into it', () => {
   assert.equal(said(rule([{ script: { id: 'tidy', as: 'job' } }, { set: { field: 'note', to: 'queued as {{vars.job}}' } }])), null);
   assert.equal(said(manual([{ call: { ingest: 'gold_rate', as: 'rate' } }, reads('rate')])), null);
-  assert.equal(said(manual([{ ask_spark: { question: 'Rate?', as: 'r' } }, { notify: { say: '{{vars.r.value}}' } }])), null);
+  assert.equal(said(manual([{ ask_slash: { question: 'Rate?', as: 'r' } }, { notify: { say: '{{vars.r.value}}' } }])), null);
   assert.equal(said(manual([{ ask_person: { question: 'Which?', options: ['a', 'b'], as: 'pick' } }, reads('pick')])), null);
   assert.equal(said(manual([{ set_var: { name: 'p', to: 'one' } }, { set_var: { name: 'p', to: 'again {{vars.p}}' } }])), null);
   /* THE TRIGGER'S OWN PATHS ARE NOT ANSWERS, and are left alone. */

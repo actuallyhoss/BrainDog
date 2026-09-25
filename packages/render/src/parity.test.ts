@@ -140,7 +140,7 @@ const SHAPES: Record<string, string> = {
   'a queue ranked by what each question would cost to get wrong':
     '```queue\nq | s1 | Claude | 3h ago | Turn the Estate pack off? |  | undo\n' +
     'opt | s1 | accept | Turn it off |  | \n' +
-    'q | s2 | Spark | 1d ago | Install Money? |  | shape\nopt | s2 | accept | Install it |  | \n' +
+    'q | s2 | Slash | 1d ago | Install Money? |  | shape\nopt | s2 | accept | Install it |  | \n' +
     'q | s3 | Codex | 2d ago | Add 12 tasks from the plan? |  | rows\nopt | s3 | accept | Add them |  | \n' +
     'q | s4 | Claude | 3d ago | Raise the retainer? |  | call\nopt | s4 | raise | Raise it |  | \n```',
   /* A QUESTION WITH NO BAND DRAWS NO CHIP, on both surfaces. A host building a `Block` by hand has

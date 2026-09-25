@@ -333,7 +333,7 @@ export function asPage(out: Response): Response {
 /**
  * The same request at the root path the record reads: `/app/acme/api/create` becomes `/api/create`, query and all.
  *
- * BECAUSE THE RECORD ROUTES ON ITS OWN URL. `Record$.fetch` reads `/mcp`, `/api/snapshots/<id>` and `/api/spark/*` from
+ * BECAUSE THE RECORD ROUTES ON ITS OWN URL. `Record$.fetch` reads `/mcp`, `/api/snapshots/<id>` and `/api/slash/*` from
  * the pathname and `serveApi` takes the method from it, so a request forwarded with the slug still in front answered
  * `ROUTE_UNKNOWN` for every method. The slug has done its work by then: `doorOf` has turned it into a record id.
  */
@@ -374,7 +374,7 @@ export function atRoot(request: Request, rest: string): Request {
  * same-origin fetch cannot follow.
  *
  * AND A SLUG'S `/api` IS A DOOR TOO, WHICH THE ROOT'S LIST DOES NOT SEE. `/app/<slug>/api/<method>` is none of the six
- * prefixes, so on the old host it was a 308 whatever the `Accept`, and `hostGet`'s `GET /api/spark/status`, which
+ * prefixes, so on the old host it was a 308 whatever the `Accept`, and `hostGet`'s `GET /api/slash/status`, which
  * `apiBase()` sends under the slug, would have failed in every tab left open across push B. The public host never
  * showed it only because it spares all of `/app`.
  */

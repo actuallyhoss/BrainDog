@@ -66,7 +66,7 @@ export function catalogueFolder(named: string | undefined, shell: string | undef
   return undefined;
 }
 
-/** Newer versions of what a record holds, from the same folder, for Spark to ask about (`@braindog/record/catalogue-offers`). */
+/** Newer versions of what a record holds, from the same folder, for Slash to ask about (`@braindog/record/catalogue-offers`). */
 export function catalogueOffersFrom(dir: string): (held: readonly { id: string; version: string; on: boolean }[]) => Promise<CatalogueOffer[]> {
   return offersFromCatalogue((path) => {
     try {

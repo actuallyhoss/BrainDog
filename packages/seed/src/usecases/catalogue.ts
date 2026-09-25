@@ -35,9 +35,9 @@ export type SeedCatalogueEntry = {
   doc: (options: { holds: readonly string[]; usecase?: string | null }) => Record<string, unknown> | null;
   afterInstall?: (io: LinkIo) => Promise<unknown>;
   carry?: (io: CarryIo, from: string) => Promise<number>;
-  /** The skills a use case names for agents, which Spark offers once it is on. */
+  /** The skills a use case names for agents, which Slash offers once it is on. */
   skills?: readonly { name: string; trigger: string }[];
-  /** What a use case grows into once the figures it names say so, which Spark asks about on Decide (`@braindog/record` `Grows`). */
+  /** What a use case grows into once the figures it names say so, which Slash asks about on Decide (`@braindog/record` `Grows`). */
   grows?: { when: readonly { metric: string; gt?: number; gte?: number; lt?: number; lte?: number; is?: number }[]; install: readonly string[]; question: string; why: string };
   /** The first plan a model may form for what the owner said (`@braindog/record` `FormSpec`). */
   forms?: {

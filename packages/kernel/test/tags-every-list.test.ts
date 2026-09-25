@@ -2,7 +2,7 @@
  * Every list takes `tags`, declared or not, the way every row takes an id.
  *
  * MEASURED IN `loop/research-shell-seed-next.md` N3. `tags` is the record's own marker field: the `example` marker, `formed`,
- * the `tag` and `untag` rule actions and Spark's "not an example" count all read or write it, and none of them names a
+ * the `tag` and `untag` rule actions and Slash's "not an example" count all read or write it, and none of them names a
  * field. It existed only because the seed appends it to its own lists (`packages/seed/src/index.ts` `withTags`), so a list
  * declared any other way had none. Driven through `openRecord`, a list `jobs` without `tags` and a rule
  * `then: [{ tag: late }, { note: 'late one' }]`: the rule installed, fired, and its patch was refused `FIELD_UNKNOWN`,

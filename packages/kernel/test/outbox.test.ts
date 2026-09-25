@@ -613,7 +613,7 @@ test('AN `infer.draft` THAT COMES BACK FILES ITS QUESTION', async () => {
     }),
   );
 
-  const filed = sql.one<{ id: string; opened_by: string }>("SELECT id, opened_by FROM suggestion WHERE opened_by = 'spark'");
+  const filed = sql.one<{ id: string; opened_by: string }>("SELECT id, opened_by FROM suggestion WHERE opened_by = 'slash'");
   assert.ok(filed, 'the draft was delivered and the question was thrown away');
   assert.equal(
     sql.one<{ to_v: string }>("SELECT to_v FROM event WHERE kind = 'suggest'")?.to_v,

@@ -31,7 +31,7 @@ the WebSocket (22 §5). Committing a decision in one keystroke (19 §4). Explain
 stage 3 and **this spec specifies** (§2.7) — `@braindog/where` (the root: parse · print · validate · evaluate — never
 `@braindog/where/sql`), `@braindog/declare` (declaration schemas for generated forms and the YAML text lens). Dev:
 `@braindog/fixtures`, and `@braindog/theme` for one build script (§5.7). Never `ports`, `kernel`, `record`, `mcp`,
-`spark`, or another app — the total order of 31 §2 puts `web` at 13 with runtime edges to 1, 3 and 7 only.
+`slash`, or another app — the total order of 31 §2 puts `web` at 13 with runtime edges to 1, 3 and 7 only.
 
 **Runs.** SvelteKit 2.70.3 / Svelte 5.57.0 as a **static shell**: `adapter-static` with `fallback: 'index.html'` and
 `ssr = false`. One `build/` directory is the Worker's `ASSETS` binding (51 §7, `not_found_handling:
@@ -113,7 +113,7 @@ Twenty-one route files, counted. The hosts enumerate none of them; an unknown pa
 | the sixteen kinds | `KINDS` from `braindog-render` | a `KindSpec` table, not components; a page block becomes a `Block` segment through `toBlock()` (§5.1) | 36 §4 |
 | `Page` | `lib/page/Page.svelte` | `page(slug)` → header → blocks in declaration order, one boundary each, `empty` iff zero rows | 06 §1, 19 §6 |
 | `Grid` | `lib/grid/Grid.svelte` | the register screen: header · filters · keyset pages · selection · inline edit; draws rows only through `Table` | 13 §4.2, 22 §4 |
-| `Palette` | `lib/palette/Palette.svelte` | `<dialog>` combobox; filter mode; the Spark row; the job body | 19 §4, 23 §3 |
+| `Palette` | `lib/palette/Palette.svelte` | `<dialog>` combobox; filter mode; the Slash row; the job body | 19 §4, 23 §3 |
 | `JobView` | `lib/job/JobView.svelte` | one row per tool call; folds name both lengths; leave-and-return | 23 §3.1 |
 | `Sheet` | `lib/ui/Sheet.svelte` | `<dialog>` drawer 480 px / full-screen sheet on a phone; `88dvh − var(--kb)` | 19 §2, §4 |
 | `Toast` | `lib/ui/Toast.svelte` | armed at 380 ms; undo after the write lands; cap sixty; `role="status"` | 19 §4 |
@@ -129,8 +129,8 @@ Twenty-one route files, counted. The hosts enumerate none of them; an unknown pa
 |---|---|---|
 | `version` | `{ record: number }` | only ever rises: `record = max(record, r.version)` on every `Result` and every socket frame |
 | `overlay` | `Map<RowKey, Pending>` — `Pending = { patch, op_id, base: number }` | a key is present from send until `applied` or `conflict`; a `refused` keeps it |
-| `live` | `{ state: 'open' \| 'polling' \| 'offline'; since: number; spark: boolean }` | `offline` only after a failed write or a failed poll, never from `navigator.onLine` alone (19 §6); `spark` is `GET /api/version`'s word (46 §5.1), `false` until read |
-| `palette` | `{ open, mode: 'filter' \| 'spark' \| 'job', q, cursor, job?: JobId, ask?: string }` | `mode: 'spark'` is unreachable while `live.spark === false` |
+| `live` | `{ state: 'open' \| 'polling' \| 'offline'; since: number; slash: boolean }` | `offline` only after a failed write or a failed poll, never from `navigator.onLine` alone (19 §6); `slash` is `GET /api/version`'s word (46 §5.1), `false` until read |
+| `palette` | `{ open, mode: 'filter' \| 'slash' \| 'job', q, cursor, job?: JobId, ask?: string }` | `mode: 'slash'` is unreachable while `live.slash === false` |
 | `jobs` | `Map<JobId, { job: Job; events: JobEvent[]; after: number }>` | module state owned by no component, so closing the palette stops nothing; `after` is monotonic |
 | `overlays.depth` | `number` | a counter, never a boolean; `covered()` silences every *unmodified* key and locks scroll. A modified chord still runs under an open layer, and `Esc` is the `<dialog>`’s own |
 | `prefs` | `Prefs` (§4.7) | mirrored to the `bd_pref` cookie on every change |
@@ -182,16 +182,16 @@ evaluate(leaf: Leaf, value: Value, ctx: { now: number; tz: string }): boolean   
 toYaml(decl: Declaration): string · fromYaml(text: string): Declaration | Refusal[] · schemas: Record<DeclKind, StandardSchema>
 
 // the record over HTTP (33 §2)                              spec 45 — the shapes this app renders
-GET  /api/version → { version, spark: boolean }             // 46 §5.1; the polling fallback and the Spark switch
+GET  /api/version → { version, slash: boolean }             // 46 §5.1; the polling fallback and the Slash switch
 boot() → { index, sessions, suggestions, whatsNew, sinceCapped, theme: { id, version, css },
            me: { kind, person, name, level }, signIn: boolean }  // the switcher's rows: GET /account/records, then POST /auth/switch (§5.13, 51 D4)
 page(slug) → { page: PageDecl, blocks: { rows: Entry[], total: number, drawn: boolean, stale_at: string }[],
                kinds: KindTable, values: Record<Path, Value | null> }               // `when:` and every {{path}} resolved server-side
 listJobs({ id?, after? }) → { jobs: Job[], events: JobEvent[] }                     // events with seq > after; [] when job.seq ≤ after; owner (46 §5.2)
 
-// Spark, registered only when SPARK_ENDPOINT is set (46 §5.2)
-GET  /api/spark/status · POST /api/spark/read { question } → Reading · POST /api/spark/propose { question, ask_id } → Proposal
-POST /api/spark/pattern { samples }                          // the raw-inbox row's one affordance (23 §3)
+// Slash, registered only when SLASH_ENDPOINT is set (46 §5.2)
+GET  /api/slash/status · POST /api/slash/read { question } → Reading · POST /api/slash/propose { question, ask_id } → Proposal
+POST /api/slash/pattern { samples }                          // the raw-inbox row's one affordance (23 §3)
 ```
 
 ### 2.7 · The `braindog-render/svelte` subpath — specified here, built in `packages/render`
@@ -548,15 +548,15 @@ mechanism 2, amended in §13 D1). Per device — §10.
    from `boot.index` (`/`) · everything, ranked, with no prefix. Every row prints its binding on the trailing edge
    through `Kbd`. No recent-history group, no multi-column layout (19 §4).
 4. `⇥` completes the top row's label into the input. `↵` runs the row: `goto`, a command's `run`, or a write.
-5. **The Spark row.** Opening the palette while `live.spark` fires `GET /api/spark/status` — the warm-up, free
-   (46 §5.2). When `live.spark` and the query matches no place, the last row reads *Ask Spark: {text}*. Running it
-   sets `mode: 'spark'` and draws 23 §7's two passes: `POST /api/spark/read { question }` → a `Reading` — the drafted
+5. **The Slash row.** Opening the palette while `live.slash` fires `GET /api/slash/status` — the warm-up, free
+   (46 §5.2). When `live.slash` and the query matches no place, the last row reads *Ask Slash: {text}*. Running it
+   sets `mode: 'slash'` and draws 23 §7's two passes: `POST /api/slash/read { question }` → a `Reading` — the drafted
    predicate shown **before** the rows, editable and saveable as a view (23 §10), the rows drawn by code through
-   `Table`, then the silhouette of a proposal; then `POST /api/spark/propose { question, ask_id }` → one `Proposal`:
-   `text` through `Document`, its `verbs` at its foot, `model` in the footer, the *What Spark read* fold from `read`
+   `Table`, then the silhouette of a proposal; then `POST /api/slash/propose { question, ask_id }` → one `Proposal`:
+   `text` through `Document`, its `verbs` at its foot, `model` in the footer, the *What Slash read* fold from `read`
    whose last line is always *grant — refused* (23 §6). A `PROPOSAL_*` refusal leaves pass 1 on screen with the `fix`
    beneath it. Nothing accumulates; `Esc` stops and keeps the text; a closed panel is not a cancellation. Without a
-   model the row, the status call and every *Ask Spark* button do not exist — **absent, not disabled** (23 §8).
+   model the row, the status call and every *Ask Slash* button do not exist — **absent, not disabled** (23 §8).
 6. Below 640 px the palette is full-screen; the launcher is a header button, not a tab (13 §10).
 
 ### 5.6 · The job view — `JobView.svelte` and the `jobs` store
@@ -667,7 +667,7 @@ mechanism 2, amended in §13 D1). Per device — §10.
 1. `export const ssr = false`; the shell mounts its silhouette (`<main aria-busy="true">`) before any call returns.
 2. Fire `boot()`, `GET /api/version` and the route's own call **in parallel**; a page therefore costs one round trip
    after the shell. `UNAUTHORIZED` from any of them → `location.assign('/app/signin?next=' + path)`. `/app/signin` goes on to `next` only when it is a path on this origin (`safeNext` in `packages/host/src/auth.ts`: no `//`, no backslash, no scheme, nothing that decodes to one), else to `/app/`. *(Since push A, September 23rd 2026, `signInFirst` and `onward` in `lib/at.ts`: `next` must also be an address under `/app`. With nobody signed in, bare `/app` draws the sample as before, and only a 401 under `/app/<slug>/` is sent to sign-in, because the sample there would be dressed as that record.)*
-3. `live.spark = version.spark`; `version.record = max(boot.version, version.version)`; `aria-busy` is set back.
+3. `live.slash = version.slash`; `version.record = max(boot.version, version.version)`; `aria-busy` is set back.
 4. The record switcher's rows come from `GET /account/records` (33 §4), read only when `boot.signIn` is not `false`: a host
    where nobody signs in answers that route 401, the answer an ended session gets, and the switcher would offer a
    sign-in with nowhere to sign in. A host older than the field says nothing and is asked as before. Pressing another
@@ -706,7 +706,7 @@ The app raises no refusal code of its own; it renders the server's. The one thin
 
 | Kind | Title | Body | Actions |
 |---|---|---|---|
-| `no-data-yet` | *Nothing in {Name} yet.* | *{Name} holds {a}, {b} and {c}.* · *An agent with your token can add them.* · *From any session: “read my record, then add every {Name} you find.”* (copyable) | **Add {one}** · **Ask Spark to find them** (only when `live.spark`) · **Show me an example** (only for a `/start` register) |
+| `no-data-yet` | *Nothing in {Name} yet.* | *{Name} holds {a}, {b} and {c}.* · *An agent with your token can add them.* · *From any session: “read my record, then add every {Name} you find.”* (copyable) | **Add {one}** · **Ask Slash to find them** (only when `live.slash`) · **Show me an example** (only for a `/start` register) |
 | `no-results` | *{N} rows, none matching “{query}”.* | — | **Clear filters** |
 | `cleared` | the block's `empty:`; a view or register: *Nothing outstanding.* | *The last one was {ago}.* when the register has a terminal state and a row | none |
 | `no-permission` | *You can't see {Name}.* | *{owner} holds access.* | **Request access** → `propose({ question: 'Grant {me} access to {Name}?', body_kind: 'options', … })` |
@@ -800,7 +800,7 @@ pack kind · a deliberately unknown primitive — × widths 390 · 768 · 1024 �
 | `grid-contract` | the §4.2 checklist; `aria-rowcount` = N or −1 by rule; DOM rows = `min(rows, 2,000)`; the cap line at 2,000; header cell widths === body cell widths exactly; no phantom tracks and an empty tail < 2 px on every grid and flex container (22 §10's assertion) |
 | `page-render` | every declared block appears once, in order; each `empty:` string appears **iff** its query returned zero rows; a failed block renders `role="status"` and the page one `role="alert"`; the unknown-primitive fixture renders *Block "…" needs a newer client.* |
 | `draft-survives-load` | type into a Sheet, then release the gated `schema` load → the typed text is still there; removing the seed guard makes it fail |
-| `no-model` | with `SPARK_ENDPOINT` unset every spec passes and no element's text contains *Spark* |
+| `no-model` | with `SLASH_ENDPOINT` unset every spec passes and no element's text contains *Slash* |
 | `job-view` | one row per tool call; a fold names both lengths; a one-line result is unfolded; `after=` is monotonic and reaches a non-zero value; events received after the panel closes > before; no request while no job is live |
 | `keys-sheet` | the `?` sheet lists exactly the registry; every palette row's printed `<kbd>` matches its binding; nav destinations equal the drawn nav |
 
@@ -894,7 +894,7 @@ spec's §9), and 36 §9's stage-3 parity row.
 | 4 | **The allow-list build.** `scripts/allow.mjs` = `copy.ts` values ∪ template `Text` nodes ∪ `Kbd` names → committed `allow.json`, gated for exactness, loaded on first toggle, outside the entry budget; plating is a transparent-text plate on an inline span | 19 §6 and 32 §9.1 state the build step |
 | 5 | **Socket policy.** Reconnect at 5–30 s jitter; two failures → 15 s `/api/version` polling plus one socket attempt per 5 min; a hidden tab pauses both; the frame is 51's `{ version, registers }` and nothing else; job events are **polled** every 700 ms while a job is live | 22 §5 (the fallback's cadence); 23 §3.1 (*over the WebSocket* → polled; `GET /api/jobEvents` → `listJobs({ id, after })`) |
 | 6 | **Preferences are the `bd_pref` cookie**, applied by a hashed one-statement inline script before first paint; per device | 28 §5 *preference row* → *preference cookie*; 19 §5's store row names it |
-| 7 | **The shapes this app renders.** `boot()` carries `theme { id, version, css }` and `me { person, level, owner, records }`; `page()` returns `blocks[].{ rows, total, drawn, stale_at }`, `kinds` and pre-resolved `values`; `listJobs` takes `after`; Spark presence is `GET /api/version`'s `spark` (46 §5.1), not a `boot` field | 33 §2 and spec 45; 22 §5's `{ page, rows, version, etag }` shape |
+| 7 | **The shapes this app renders.** `boot()` carries `theme { id, version, css }` and `me { person, level, owner, records }`; `page()` returns `blocks[].{ rows, total, drawn, stale_at }`, `kinds` and pre-resolved `values`; `listJobs` takes `after`; Slash presence is `GET /api/version`'s `slash` (46 §5.1), not a `boot` field | 33 §2 and spec 45; 22 §5's `{ page, rows, version, etag }` shape |
 | 8 | **A saved view is a named predicate**; `order` is URL state; `⌥V`/`⌥B` write through `setDeclaration`, so they exist for `owner` only | 19 §1 and 02 §5 say so; 34 §1.7 unchanged |
 | 9 | **409 re-apply rule.** One automatic resend with the same `op_id` when the other actor's change is disjoint from the patch; otherwise re-present both values | 22 §5's *re-read, re-apply* row states the condition |
 | 10 | **`braindog-render/svelte` is specified here** (§2.7): fourteen files under `packages/render/svelte/`, MIT, mirroring 36 §5.9's markup so the parity gate holds by construction; `Table` is the one component with behaviour | 36 §1 and §13 point their stage-3 rows at this spec; 31 §2 unchanged |
@@ -918,7 +918,7 @@ spec's §9), and 36 §9's stage-3 parity row.
 - [ ] Pulling the socket produces polling within 60 s; a frame naming a page's register refetches exactly one `page()`.
 - [ ] `?` lists the registry; every palette row prints its key; `Character keys: off` silences every bare letter and no chord; `Space` scrolls in a 500-row grid.
 - [ ] Screenshot mode: boxes and page height identical off → on; digits `0` and `8` pixel-identical; `/vault` absent.
-- [ ] `SPARK_ENDPOINT` unset: every spec green, the word *Spark* nowhere in the DOM.
+- [ ] `SLASH_ENDPOINT` unset: every spec green, the word *Slash* nowhere in the DOM.
 - [ ] Leaving Home advances `member.seen_at`; opening it does not.
 - [ ] Both hosts serve `build/` unchanged: `/app/r/obligations` and `/app/<slug>/r/obligations` on either answer `app/index.html` and render the grid, and a page load of `/r/obligations` is a `308` to `/app/r/obligations`; `deploy-parity` matches `/app/` and `/app/_app/version.json` (`/` and `/_app/version.json` before push A).
 - [ ] The `a11y-tree` parity gate is green for all sixteen kinds and the degraded fence — 36 §9's stage-3 row.

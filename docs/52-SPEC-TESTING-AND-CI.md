@@ -73,7 +73,7 @@ installs with `--frozen-lockfile`, and carries `timeout-minutes` equal to its §
 | 5 | `pnpm test` | any test in §5.3 or §5.5 |
 | 6 | `pnpm --filter ./apps/web build` | the build fails |
 | 7 | `pnpm --filter ./apps/web exec playwright install --with-deps chromium` | — |
-| 8 | `pnpm test:browser` | any spec in §5.4 — `bundle` included, over the step-6 build; `SPARK_ENDPOINT` is unset, so this is the no-model build ([23-ASSISTANT-UI](23-ASSISTANT-UI.md) §8) |
+| 8 | `pnpm test:browser` | any spec in §5.4 — `bundle` included, over the step-6 build; `SLASH_ENDPOINT` is unset, so this is the no-model build ([23-ASSISTANT-UI](23-ASSISTANT-UI.md) §8) |
 | 9 | `actions/upload-artifact@v4` of `apps/web/test-results/`, `if: failure()` | — (screenshots are artefacts, never assertions) |
 | 10 | `pnpm test:do` — phase 5 onward | a trace differs from `reference.json`; a host ran a different case count |
 
@@ -135,7 +135,7 @@ tools/
 │   ├── negative/<gate>/…       fifty-nine seeded violations, several per grep gate (§9)
 │   ├── test/needs.test.mjs     the runner's prerequisite check, driven against a tree with no build
 │   ├── clean-room.mjs   stack.mjs       nul-bytes.mjs         graph.mjs        secret-grep.mjs
-│   ├── event-kinds.mjs  router-groups.mjs  guards.mjs         closed-lists.mjs spark-actor.mjs
+│   ├── event-kinds.mjs  router-groups.mjs  guards.mjs         closed-lists.mjs slash-actor.mjs
 │   ├── import.mjs       refusals.mjs    refusal-fixtures.mjs  flags.mjs        em-dash.mjs
 │   ├── no-declarations-in-kernel.mjs    css-rules.mjs         colour-grep.mjs  dead-copy.mjs
 │   └── bundle.mjs       prefs.mjs       keys.mjs              layout.mjs       a11y.mjs
@@ -212,7 +212,7 @@ rather than this table's.
 | `router-groups` | each host's route table; `METHOD_GROUPS`; 30 §5's groups; 44 §2's `REFUSED` | every route declares a group; no INTERNAL method is routed; VAULT is cookie-only; ADMIN admits no token principal | — |
 | `guards` | `ROUTES` in `packages/host`; the guard each handler in `packages/record` actually calls | the group the table publishes and the check the record applies agree. It found `members` routed ADMIN and guarded `read`, on an answer carrying every colleague's email | — |
 | `closed-lists` | 34 §6's table; 30 §1's SQL block; `migrations/0001_kernel.ts`; each owner's `as const` array | counts and member sets agree across every source, for the twenty-three lists the DDL refuses in a `CHECK` | — |
-| `spark-actor` | the seed, materialised through the real write path, then offered the four writes a model may not make | 30 §3's query returns zero rows. It makes the writes before it queries, because the seed writes no `spark` event and the filter would otherwise filter nothing | — |
+| `slash-actor` | the seed, materialised through the real write path, then offered the four writes a model may not make | 30 §3's query returns zero rows. It makes the writes before it queries, because the seed writes no `slash` event and the filter would otherwise filter nothing | — |
 | `import` | a self-host, onboarded, with the founder, agents and estate packs installed | `braindog import legacy` over HTTP lands every planned row in the record. The command's own tests drive an in-memory fake door and a stub server answering ok to everything | — |
 | `refusals` | the refusal registry, the `RefusalCode` union, and every `raises:` in the tree | the registry, the type and the code say the same list, and a registered code no code path emits is named | — |
 | `refusal-fixtures` | 30 §6's code tables; `fixtures/refusals/*.yaml`; the code list `declare` exports (42 §2) | one fixture per code, one code per fixture, kebab name equals code, and every `via` is one of 40 §6's nine. It owns the enumeration; the runners of §5.3 own the behaviour | — |
@@ -284,16 +284,16 @@ PAGES[i].id        // 'empty' | 'twelve' | 'five-hundred' | 'five-thousand' | 'c
                    // | 'third-party-kind' | 'unknown-primitive' — 22 §10's order; FIXTURES in matrix.ts is PAGES.map(p => p.id)
 PAGES[i].record    // a key of SEED.records — the record a page is rendered from
 PAGES[i].expect    // { blocks, rows, cap, degraded, empty[] } — the non-vacuous assertions of §5.4
-SEED.records.corpus   // every pack, two seeded grants — the record spark-actor, grant-note and brain-roundtrip run over (40 §9)
+SEED.records.corpus   // every pack, two seeded grants — the record slash-actor, grant-note and brain-roundtrip run over (40 §9)
 REFUSALS           // kebab code → path; a hundred and nineteen files (`ls fixtures/refusals/*.yaml | wc -l`)
 ```
 
 A refusal fixture (40 §6) carries `code`, `via` (one of the values 40 §6's table names, which is the
 closed list), `at`, optional `found`, and the input keys its `via` names; its runner is the test file
-40 §6's table assigns (`declare/test`, `record/test`, `apps/web/test`, `connect/test`, `spark/test`).
+40 §6's table assigns (`declare/test`, `record/test`, `apps/web/test`, `connect/test`, `slash/test`).
 
 **There are nine `via` values, not eight.** `ask` is the ninth, minted on September 21st 2026 for the
-four codes `packages/spark` arrived with, and its row is in 40 §6; `pull` was the eighth, the day
+four codes `packages/slash` arrived with, and its row is in 40 §6; `pull` was the eighth, the day
 before. Counted from the corpus rather than from either document:
 `grep -rhoE '^via: *[a-z]+' fixtures/refusals/*.yaml | sed 's/via: *//' | sort -u` prints
 `ask import install lint pull render rpc where write`, and the same pipe into `wc -l` prints 9. The
@@ -411,7 +411,7 @@ The twenty-two called: `nul-bytes` `graph` `secret-grep` `event-kinds` `router-g
 | `stack` | on purpose. `test/dialect.test.mjs`, `test/durations.test.mjs` and `test/needs.test.mjs` overwrite it with a script-shaped stub and rely on one real spawned entry. It moves when they pick another stand-in. |
 | `clean-room` | a script: its whole body runs at module top level and it exports nothing. |
 | `no-declarations-in-kernel` | the same. |
-| `spark-actor` | the same, and it calls `process.exit(3)` and `process.exit(process.exitCode ?? 0)` at top level. |
+| `slash-actor` | the same, and it calls `process.exit(3)` and `process.exit(process.exitCode ?? 0)` at top level. |
 | `import` | the same, and it calls `process.exit(3)` at top level. |
 
 **The last four cannot be called without editing the gate file, and a wrapper is not a way round that.**
@@ -421,7 +421,7 @@ process that is the runner's own first flag, so `run.mjs --only clean-room` made
 'C:\Repos\braindog\--only'` and throw `ENOENT`. `no-declarations-in-kernel` ran and printed its line, and a
 second import in the same process printed nothing, because the module is cached: an adapter only works once
 per process, and only by treating the importing as the call, which is the exact trap `run.mjs`'s `IMPORTED OR
-SPAWNED` paragraph refuses. `spark-actor` and `import` would end the runner at their `process.exit`. Each of
+SPAWNED` paragraph refuses. `slash-actor` and `import` would end the runner at their `process.exit`. Each of
 the four moves to `call(...)` the way `em-dash` did: the body inside `export default async function
 gate(root = process.env.BRAINDOG_GATE_ROOT ?? <its current default>)`, where the default is kept as it
 is (`process.cwd()` for `clean-room`, the repository root two directories up for the other three, so that
@@ -515,12 +515,12 @@ sentence must all say the same number; `EVENT_KINDS` in `packages/kernel` must e
    method appears in exactly one `POST /api/<method>` route.
 5. Every method in a browser-only group is a key of 44 §2's `REFUSED` (twenty-one) — 10 §8's *every route has a verdict*.
 
-**`spark-actor`** (30 §3) and **`grant-note`** (12 §8) — the two gates that need a live record
+**`slash-actor`** (30 §3) and **`grant-note`** (12 §8) — the two gates that need a live record
 
 1. `materialise(SEED.records.corpus, openNodeSqlite(':memory:'))` — the materialiser of 40 §5.3
    (`packages/kernel/test/materialise.ts`), the adapter of 37 §2.5 (`@braindog/ports/node-sqlite`). The `corpus`
    record installs every pack and seeds two grants (40 §4.1, §9).
-2. `spark-actor`: `SELECT kind FROM event WHERE actor = 'spark' AND kind NOT IN ('suggest','propose','predict')` → zero rows.
+2. `slash-actor`: `SELECT kind FROM event WHERE actor = 'slash' AND kind NOT IN ('suggest','propose','predict')` → zero rows.
 3. `grant-note`: `SELECT e.id FROM event e JOIN grant g ON e.target = 'grant:' || g.id WHERE e.kind LIKE 'grant.%'
    AND (instr(e.note, g.label) > 0 OR instr(e.note, g.opens) > 0)` → zero rows.
 4. `where` names the record and the event id.
@@ -688,7 +688,7 @@ widths inside a spec, and `playwright.config.ts` declares four projects `{ color
 **128 configurations** per spec (50 §9). Direction comes from the record: `setup.ts` materialises every page's record
 twice, `locale: 'en'` and `locale: 'ar'`, into the scratch data dir `braindog dev` serves (33 §5), and the shell
 derives `dir` from `record.locale` (30 §1) — the DOM is never poked. `targets` and `field-height` add
-`test.use({ hasTouch: true })` for the coarse pointer. Chromium only. `SPARK_ENDPOINT` is unset. Every spec asserts
+`test.use({ hasTouch: true })` for the coarse pointer. Chromium only. `SLASH_ENDPOINT` is unset. Every spec asserts
 on the accessibility tree and computed geometry, never on markup or pixels (22 §10). The names below are 50 §9's
 sixteen plus `vault-screen`; 50 owns the spec files, this spec owns their place in the workflows and their negatives.
 
@@ -710,7 +710,7 @@ sixteen plus `vault-screen`; 50 owns the spec files, this spec owns their place 
 | `shell` | `/app/r/obligations` requested directly answers `app/index.html` and the grid renders; `/app/_app/version.json` exists and equals the build's | 50 §9 |
 | `grid-contract` | 1 · the APG checklist: roving `tabindex` on the row; ←→↑↓, `Home`/`End`, `⌘Home`/`⌘End`, `PageUp`/`PageDown`; `aria-sort`; `aria-rowcount`/`aria-rowindex` when windowed; the labelled `role=region` with `tabindex=0`; 2 · DOM rows = `min(rows, 2,000)` and the cap line at 2,000; 3 · every grid and flex container: tracks not `0px` equal `children.length`; container width − (children widths + gaps) < `budgets.layout.emptyTailPx`; header cell widths `===` body cell widths, exactly | 13 §7; 22 §10; 50 §9 |
 | `page-render` | every declared block once, in order; each `expect.empty` string present iff zero rows; `aria-rowcount === page.expect.rows`; degraded blocks `=== page.expect.degraded`; a failed block renders `role="status"` and the page one `role="alert"`; the unknown-primitive page renders *Block "…" needs a newer client.* | 22 §10; 40 §9; 50 §9 |
-| `no-model` | with `SPARK_ENDPOINT` unset every spec passes and no element's text contains *Spark* | 23 §8; 50 §9 |
+| `no-model` | with `SLASH_ENDPOINT` unset every spec passes and no element's text contains *Slash* | 23 §8; 50 §9 |
 | `keys-sheet` | the `?` sheet lists exactly the registry; every palette row's printed `<kbd>` matches its binding; nav destinations equal the drawn nav | 19 §4; 50 §9 |
 | `vault-screen` | 1 · a closed row draws no `opens`; 2 · opening a row expands exactly one; 3 · no value control exists when nothing is expanded; 4 · under `data-shot` the screen is absent — not in the DOM, not blurred | 12 §8 |
 | `job-view` | over a fixture job stream: 1 · one row per tool call; 2 · a result over `budgets.jobView.foldBytes` is folded and the fold names both lengths — `2,000 of 41,812 characters`; 3 · a one-line result is not folded; 4 · with the socket held closed, one poll per `budgets.jobView.pollMs`, `after=` monotonic and reaching non-zero; 5 · events received after the panel closes > before; 6 · zero requests when no job is live | 23 §3.1 |
@@ -857,7 +857,7 @@ it locally.
 | `event-kinds` | thirty-nine kinds in the CHECK, forty in the table |
 | `refusal-fixtures` | `refusals/version-stale.yaml` deleted; `refusals/not-a-code.yaml` added |
 | `router-groups` | a `POST /api/openGrant` route with `auth: 'bearer-or-cookie'` |
-| `spark-actor` | a materialised record given one `event` row `actor = 'spark', kind = 'edit'` |
+| `slash-actor` | a materialised record given one `event` row `actor = 'slash', kind = 'edit'` |
 | `mcp-budget` | a tool description of 1,200 bytes |
 | `secret-grep` | `console.log(plaintext)` |
 | `telemetry-allowlist` | a second `writeDataPoint(` whose blob tuple carries `register` |
@@ -923,12 +923,12 @@ Runtime: **none.** Nothing in this spec ships.
 | Phase ([BUILD.md](../BUILD.md)) | This spec delivers | Unblocks |
 |---|---|---|
 | 0 · Foundations | `run.mjs`, `lib.mjs`, `budgets.json`, `self-test.mjs`; `graph`, `licence-closure`, `clean-room`, `conformance-count`, `compat-date`; `gates.yml`; the Node conformance host and the first `reference.json`; `where-property` with `test/seeds/`; `dialect-fuzz` | every later package has a green `pnpm test` and `pnpm gates` to land into |
-| 1 · Kernel | `closed-lists`, `event-kinds`, `refusal-fixtures`, `no-declarations-in-kernel`, `spark-actor`, `grant-note`; the `lint`, `where`, `write` and `import` refusal runners, `roundtrip.test.ts`, `determinism`, `money-sum`, `boot-probe`, `theme-sixteen` | a record that refuses every code with a fixture |
+| 1 · Kernel | `closed-lists`, `event-kinds`, `refusal-fixtures`, `no-declarations-in-kernel`, `slash-actor`, `grant-note`; the `lint`, `where`, `write` and `import` refusal runners, `roundtrip.test.ts`, `determinism`, `money-sum`, `boot-probe`, `theme-sixteen` | a record that refuses every code with a fixture |
 | 2 · Self-host + CLI | `router-groups`; the `install` and `rpc` refusal runners; `pack-uninstall`; `tools/release.mjs`; `release.yml`; the hand publish of `0.0.1` ×2 | `braindog-cli` on npm |
 | 3 · Web | `env.ts`, `e2e/matrix.ts`, `e2e/setup.ts`, the seventeen specs, `negative/web/`; `css-rules`, `shot-allowlist`, `harness-constants`; `ci.yml` steps 6–9 | the eight fixture pages pass the rendered-box gates |
 | 4 · Ingest, rules, metrics | `reminder-cancel`; `job-view` against a fixture stream | — |
 | 5 · Cloud | `apps/worker/test/` under Vitest; `reference.json` regenerated from the Durable Object; `deploy.yml`; `deploy-parity`; `telemetry-allowlist`; `ci.yml` step 10 | a deploy that passes parity |
-| 6 · Packs, MCP, Spark A | `mcp-budget`; `secret-grep`; `vault-screen` | — |
+| 6 · Packs, MCP, Slash A | `mcp-budget`; `secret-grep`; `vault-screen` | — |
 | after the first publish | `gate1.yml` | the four numbers of 15 §5 |
 
 Nothing in this spec waits on [53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md); 53 consumes `deploy.yml`, the version

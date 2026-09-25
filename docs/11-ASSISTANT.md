@@ -1,46 +1,58 @@
-# 11 · Spark — the assistant
+# 11 · Slash — the assistant
 
 This document covers the **engine**: the name, what it may do, model routing, retrieval, and cost.
 Its **interface** is in [13-UI](13-UI.md).
 
 ---
 
-## 1 · The name, and the decision that overrode a recommendation
+## 1 · The name, and what it costs
 
-> ### **Spark**
+> ### **Slash**
 
-**An earlier draft renamed this to Pointer, and the owner has since reaffirmed Spark twice.**
-That is the decision, and this section records the trade honestly rather than re-arguing it.
+**The owner named it Slash on September 25th 2026** ([ADR-070](16-DECISIONS.md),
+[DIRECTION 31](../loop/DIRECTION.md)). It had carried an earlier name since the first drafts, kept
+twice at his word over *Pointer*, which a draft of this section recommended. This section records
+what a name costs here, and leaves the register question open rather than settled.
 
-**What the rename was for.** GitHub Spark is Microsoft's; Google shipped Gemini Spark in 2026. The
-prior record's note was *"the assistant gets a dog's name. 'Spark' cannot travel."* The cost is
-real and it is entirely in **discoverability**: nobody will ever find BrainDog by searching for
-"Spark AI", and the phrase in a changelog or a support thread resolves to somebody else's product.
+**The precedent for the cost.** The earlier name sat in a crowded field: GitHub Spark is
+Microsoft's, and Google shipped Gemini Spark in 2026. The prior record's note on it was that the
+assistant should get a dog's name, because that one could not travel. The same question applies to
+Slash, in the same category: chat and agent tools already call the commands a person types after
+`/` slash commands, and Claude Code's own `--disable-slash-commands` is in the runner's invocation
+([26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §5). The cost is in **discoverability**: nobody will
+find BrainDog by searching for "Slash AI", and the word in a support thread may resolve to a
+feature of somebody else's product.
 
-**Why that cost is affordable.** It is a *feature* name inside a product, not the product name —
+**Why that cost is affordable.** It is a *feature* name inside a product, not the product name,
 which is the level at which coexistence is the norm rather than the exception. The expensive
 register check was already done for **BrainDog** itself and came back empty in every class at
 USPTO, EUIPO and UK IPO. Nobody types a feature name into a search engine to find the product it
 lives in; they type the product name, which is clear.
 
-**What is kept from the rename, because it was the better half of the idea.** The Pointer argument
-was never really about the word — it was about compressing the governance thesis into the name.
-That sentence survives intact and is worth more than the word was:
+**Whether Slash itself is clear is open.** No register search has been run for it. That is
+[Q8](17-OPEN-QUESTIONS.md), a cheap check across classes 9 and 42, and it does not block the name.
 
-> **Spark never decides. It points at what does.**
+The name also sits on the key that opens the palette, `/`, which is where Slash answers
+([ADR-051](16-DECISIONS.md)).
 
-**What must not happen:** *"Spark"* used alone in a title, a repository name, an npm package or a
-domain. It is always **BrainDog Spark** on first use in any public surface, which is the standard
-way a colliding feature name is made unambiguous. Recorded as
-[Q8](17-OPEN-QUESTIONS.md) with a cheap register check across classes 9 and 42 still outstanding.
+**What is kept from the Pointer argument, because it was the better half of the idea.** It was
+never really about the word. It was about compressing the governance thesis into the name, and that
+sentence survives intact and is worth more than any word:
+
+> **Slash never decides. It points at what does.**
+
+**What must not happen:** *"Slash"* used alone in a title, a repository name, an npm package or a
+domain. It is always **BrainDog Slash** on first use in any public surface, which is the standard
+way a colliding feature name is made unambiguous, and it matters more for a word that is already an
+ordinary one in this category.
 
 ---
 
-## 1b · What Spark is *for*, which is narrower than "an assistant"
+## 1b · What Slash is *for*, which is narrower than "an assistant"
 
 This is the sentence the whole design now follows from:
 
-> **Spark is what manages the record when you are on the go. Claude is the better tool, and the
+> **Slash is what manages the record when you are on the go. Claude is the better tool, and the
 > product's job is to get out of its way.**
 
 That is a positioning, not a limitation, and it resolves an argument the documents were having
@@ -50,9 +62,9 @@ there are three sources of intelligence behind one interface, and they ship at d
 
 | | Runs | Model | Ships |
 |---|---|---|---|
-| **Spark, on the record's own hands** | Workers AI, in the Worker | small, fast, cheap | **first** — the record must work unattended at 3am |
-| **Spark, on your key** | Workers AI *or* your Anthropic key, in the Worker | whatever you pay for | **second** — and this is the phone |
-| **Spark, on your machine** | your own Claude Code, on your own subscription | the best available | **third** — and this is the desk |
+| **Slash, on the record's own hands** | Workers AI, in the Worker | small, fast, cheap | **first** — the record must work unattended at 3am |
+| **Slash, on your key** | Workers AI *or* your Anthropic key, in the Worker | whatever you pay for | **second** — and this is the phone |
+| **Slash, on your machine** | your own Claude Code, on your own subscription | the best available | **third** — and this is the desk |
 
 **The staging is [ADR-030](16-DECISIONS.md), and it is narrower than the table reads.** The §1b base
 in [15-ROADMAP](15-ROADMAP.md) ships **no** in-app model call — the ingest-pattern proposal there is
@@ -73,7 +85,7 @@ Full architecture, costs, the terms-of-service position and the runner protocol:
 
 ---
 
-## 2 · What Spark may and may not do
+## 2 · What Slash may and may not do
 
 | May | May not |
 |---|---|
@@ -84,17 +96,17 @@ Full architecture, costs, the terms-of-service position and the runner protocol:
 | Draft prose and blocks | send an email, move money, or delete |
 | Explain a figure by naming its source rows | act on a schedule without a human having approved the rule |
 
-The enforcement is architectural, not a prompt instruction: **Spark runs in a separate Durable
+The enforcement is architectural, not a prompt instruction: **Slash runs in a separate Durable
 Object with no write RPC.** There is no write path to compromise. A perfect jailbreak of the model
 yields a proposal, and a proposal is a row in `suggestion` that a human has to accept — filed once,
 by `record.propose`; an `infer.*` ack carries a tier-A result back and files nothing itself
-([46-SPEC-SPARK](46-SPEC-SPARK.md) §5; [45-SPEC-RECORD](45-SPEC-RECORD.md) §5). A write from a
-`spark` principal is `FORBIDDEN` at the record's first step ([30-BLUEPRINT](30-BLUEPRINT.md) §3).
-Spark's own storage is two tables, `settings` and `call` — no conversation table, no retrieval
+([46-SPEC-SLASH](46-SPEC-SLASH.md) §5; [45-SPEC-RECORD](45-SPEC-RECORD.md) §5). A write from a
+`slash` principal is `FORBIDDEN` at the record's first step ([30-BLUEPRINT](30-BLUEPRINT.md) §3).
+Slash's own storage is two tables, `settings` and `call` — no conversation table, no retrieval
 cache; the drafted predicate sits on the `call` row and nothing accumulates
-([46-SPEC-SPARK](46-SPEC-SPARK.md) §4.1). Its refusals are one family of five codes —
+([46-SPEC-SLASH](46-SPEC-SLASH.md) §4.1). Its refusals are one family of five codes —
 `PROPOSAL_UNCITED` `PROPOSAL_NO_ROWS` `PROPOSAL_SCHEMA` `PREDICTION_UNMEASURABLE`
-`SPARK_BUDGET_SPENT` — each with a fixture ([30-BLUEPRINT](30-BLUEPRINT.md) §6).
+`SLASH_BUDGET_SPENT` — each with a fixture ([30-BLUEPRINT](30-BLUEPRINT.md) §6).
 
 This is the single most important design decision about the assistant, and it is worth the
 inconvenience it causes.
@@ -108,7 +120,7 @@ too weak for conversation. Prices from Workers AI, read 2026-08-31, at $0.011 pe
 
 | Job | Model | Why | $/M in | $/M out |
 |---|---|---|---|---|
-| Triage: is this raw payload a known shape? | `llama-3.2-1b` | binary-ish classification with a 1.5k prompt; the `shape` itself is deterministic (channel, sender domain, digit-blanked subject), and the model contributes only which of the record's own lists it belongs to, or none, and `actionable`: never a fixed set of business kinds, since the lists are whatever this record holds ([46-SPEC-SPARK](46-SPEC-SPARK.md) §5, DIRECTION §22) | 0.027 | 0.201 |
+| Triage: is this raw payload a known shape? | `llama-3.2-1b` | binary-ish classification with a 1.5k prompt; the `shape` itself is deterministic (channel, sender domain, digit-blanked subject), and the model contributes only which of the record's own lists it belongs to, or none, and `actionable`: never a fixed set of business kinds, since the lists are whatever this record holds ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5, DIRECTION §22) | 0.027 | 0.201 |
 | Extraction proposal from 3 examples | **`glm-5.3-flash`** | needs to reason over structure and emit YAML | **0.150** | **0.500** |
 | Conversation and proposals | **`glm-5.3-flash`** | schema-constrained structured output over a projection, and the cheapest model that is good enough to talk to | **0.150** | **0.500** |
 | Long write-up drafting | `glm-5.3` *(opt-in)* | quality where the output is read many times | 1.400 | 4.400 |
@@ -127,7 +139,7 @@ too weak for conversation. Prices from Workers AI, read 2026-08-31, at $0.011 pe
 > accuracy, and the eval suite in §9 is what decides it — not this table.
 
 Function calling is supported across the current Workers AI catalogue including all of the above —
-moot here, because **no Spark call passes `tools`** (§6): what the routing needs is schema-constrained
+moot here, because **no Slash call passes `tools`** (§6): what the routing needs is schema-constrained
 structured output, which every model above supports.
 
 ### Everything goes through AI Gateway
@@ -157,14 +169,14 @@ second tier a config row rather than a project.
 > passthrough. Same caching, same rate limiting, same cost tracking, no ceiling.
 
 Per ask, the host opens that grant under the asker's browser session, decrypts in the Worker, hands
-Spark a per-call `Inference` adapter and writes one `grant.read` event — the package never holds the
-key ([46-SPEC-SPARK](46-SPEC-SPARK.md) §5.9; [12-SECURITY](12-SECURITY.md) §6).
+Slash a per-call `Inference` adapter and writes one `grant.read` event — the package never holds the
+key ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.9; [12-SECURITY](12-SECURITY.md) §6).
 
 **With no model configured the product still works.** Every deterministic feature — registers,
 pages, metrics, declared ingests, rules, digests, search, the decision gate, MCP — runs with zero
-inference. `SPARK_ENDPOINT` unset means the host never imports the package and registers no Spark
-route; `GET /api/version` answers `spark: false` and the client draws nothing
-([46-SPEC-SPARK](46-SPEC-SPARK.md) §5.1). Spark is an accelerant, never a dependency. A record that
+inference. `SLASH_ENDPOINT` unset means the host never imports the package and registers no Slash
+route; `GET /api/version` answers `slash: false` and the client draws nothing
+([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.1). Slash is an accelerant, never a dependency. A record that
 stops working because a model endpoint is down is not a record.
 
 ---
@@ -182,9 +194,9 @@ Modelled per active record per month (full table in [08-METRICS](08-METRICS-AND-
 The risk is the tail, not the average. Four mitigations in order of effectiveness: gateway rate
 limiting, gateway caching, model routing, and a **visible monthly neuron budget per record**.
 
-The budget is metered in **asks** — `ask_cap` per record per month, refused `SPARK_BUDGET_SPENT`
-past it ([46-SPEC-SPARK](46-SPEC-SPARK.md) §6), and the UI counts the same unit
-([23-ASSISTANT-UI](23-ASSISTANT-UI.md) §8). When it is spent, Spark says so and everything
+The budget is metered in **asks** — `ask_cap` per record per month, refused `SLASH_BUDGET_SPENT`
+past it ([46-SPEC-SLASH](46-SPEC-SLASH.md) §6), and the UI counts the same unit
+([23-ASSISTANT-UI](23-ASSISTANT-UI.md) §8). When it is spent, Slash says so and everything
 deterministic keeps working. **Degrade, never bill by surprise** — and never silently downgrade the
 model, because a quietly worse answer is worse than a refusal.
 
@@ -256,16 +268,16 @@ counted in a total it can see.
 
 ## 6 · Context assembly
 
-Spark's prompt is assembled from four parts, in this order, with a hard token budget:
+Slash's prompt is assembled from four parts, in this order, with a hard token budget:
 
 | Part | Budget | Contents |
 |---|---|---|
-| Instruction | 600 | who Spark is, that it proposes and never decides, the block dialect in one line each |
+| Instruction | 600 | who Slash is, that it proposes and never decides, the block dialect in one line each |
 | Record shape | 400 | the index: registers, counts, open questions. Never the schemas in full |
 | Retrieved rows | 6,000 | projected, not whole documents. Each carries its id so it can be cited |
 | Conversation | 4,000 | rolling, summarised past that |
 
-~11,000 tokens of prompt plus the output schema — modelled as 12k in / 1.5k out, the shape §4 prices — so at `glm-5.3-flash` a turn is **$0.00255**, which is the conversation line in [08-METRICS](08-METRICS-AND-ANALYTICS.md) §6. **No Spark inference passes `tools`**: every call is schema-constrained structured output, and retrieval is `project()` — the budget counts ≈ tokens as `ceil(utf8 bytes / 4)` ([46-SPEC-SPARK](46-SPEC-SPARK.md) §5; [45-SPEC-RECORD](45-SPEC-RECORD.md) §4.4). Three rules:
+~11,000 tokens of prompt plus the output schema — modelled as 12k in / 1.5k out, the shape §4 prices — so at `glm-5.3-flash` a turn is **$0.00255**, which is the conversation line in [08-METRICS](08-METRICS-AND-ANALYTICS.md) §6. **No Slash inference passes `tools`**: every call is schema-constrained structured output, and retrieval is `project()` — the budget counts ≈ tokens as `ceil(utf8 bytes / 4)` ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5; [45-SPEC-RECORD](45-SPEC-RECORD.md) §4.4). Three rules:
 
 **1 · Rows are projected, never dumped.** A retrieved obligation is `obligations#7 | Cloudflare
 Workers Paid | USD 5.00 | due 2026-09-01 | open`, not its JSON — the id carries its register, because
@@ -274,7 +286,7 @@ projected — it has no spoken id — and in v1 no document body is either
 ([45-SPEC-RECORD](45-SPEC-RECORD.md) §4.4).
 
 **2 · Every row in context carries its spoken id**, so every claim can be cited back to a row and
-the UI can link it. A figure Spark states without a citable id is rendered as *uncited* — see
+the UI can link it. A figure Slash states without a citable id is rendered as *uncited* — see
 [13-UI](13-UI.md).
 
 **3 · Untrusted content is fenced and labelled**, and it never shares a turn with a tool
@@ -291,11 +303,11 @@ the third and weaken the second.
 
 | Layer | Mechanism |
 |---|---|
-| **No external communication** | Spark's only outbound call is to the configured model. No `http` tool, no browsing, no email, no webhook. The record object makes no outbound calls at all |
+| **No external communication** | Slash's only outbound call is to the configured model. No `http` tool, no browsing, no email, no webhook. The record object makes no outbound calls at all |
 | **No write capability** | a compromised prompt yields a *proposal*. The gate is a separate, human-driven code path |
 | **No credential access** | there is no tool that returns a secret. Not gated — absent |
 | **Quarantine** | raw ingested content lives in `inbox_raw` marked untrusted. It is fenced in the prompt, and the instruction says content inside the fence is data to describe, never instructions to follow |
-| **Dual-context** | the model that *reads untrusted content* can only emit a structured proposal; the model that drafts against the projection never sees raw untrusted text — only the structured output of the first. Neither holds a tool: no Spark inference passes `tools` (§6) |
+| **Dual-context** | the model that *reads untrusted content* can only emit a structured proposal; the model that drafts against the projection never sees raw untrusted text — only the structured output of the first. Neither holds a tool: no Slash inference passes `tools` (§6) |
 | **Egress filtering** | Two layers, because the gateway cannot do it alone. **Ours:** a redaction pass over every projection before it enters a prompt — grant ciphertext never leaves the record, and `secret`-typed fields are replaced by their label. **Theirs:** AI Gateway DLP blocks a request whose prompt trips a sensitive-data profile. DLP offers only *flag* and *block*, never redact, so it is a tripwire and not the control |
 | **Human gate on anything derived from untrusted input** | a write whose provenance chain touches `inbox_raw` cannot be applied without approval. Enforced by provenance, not by a heuristic |
 | **Audit** | every proposal records what it read. A suspicious proposal is traceable to the payload that produced it |
@@ -310,15 +322,15 @@ classifier would be a flag in the audit log.
 
 ---
 
-## 8 · What Spark is proactively allowed to notice
+## 8 · What Slash is proactively allowed to notice
 
-Spark may compose the two-sentence `prose:` on a digest, may raise a suggestion when a declared
+Slash may compose the two-sentence `prose:` on a digest, may raise a suggestion when a declared
 rule tells it to, and — **third, and added by [24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md)** — may
 **draft a proposed change to a declaration** when the deterministic analyser has already decided
 that a threshold was crossed. That is all.
 
 > **The third one needs its constraints stated in the same breath, because it is the only case where
-> the assistant touches the record's own shape.** The *detection* is SQL, not a model — Spark writes
+> the assistant touches the record's own shape.** The *detection* is SQL, not a model — Slash writes
 > the diff, never the decision to propose one. It may draft a change to an ingest pattern, an index,
 > an empty-state string, a tool description, a nav order, a page column or an optional field. It may
 > **never** draft a new named metric, a theme token, a rule with a side effect, or anything about the
@@ -337,7 +349,7 @@ It specifically may **not**:
 
 A proactive assistant on a record of financial obligations is a product that eventually tells
 somebody something wrong about their money at 3am. The scheduler is deterministic and declared;
-Spark writes the sentence, not the trigger.
+Slash writes the sentence, not the trigger.
 
 ---
 

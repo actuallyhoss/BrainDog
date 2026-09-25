@@ -165,7 +165,7 @@ export async function packDocument(id: string, installed?: readonly PackState[],
  * The modules this build ships at a later version than the record holds, each on: `{ id, from, to }`.
  *
  * A MODULE TURNED ON BY ITSELF WAS NEVER OFFERED ITS NEWER VERSION. /packs hid an installed pack from Install and had no
- * Update, browse offers updates only through a use case, and Spark reads only a shared catalogue, so a record that took
+ * Update, browse offers updates only through a use case, and Slash reads only a shared catalogue, so a record that took
  * Work alone stayed on the version it started with. /packs offers these through the same plan an install gets.
  */
 export async function moduleUpdates(states: readonly PackState[]): Promise<{ id: string; from: string; to: string }[]> {

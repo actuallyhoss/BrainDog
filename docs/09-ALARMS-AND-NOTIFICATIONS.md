@@ -153,7 +153,7 @@ rather than necessity, and the enforcement moves:
 > and braces rather than the load-bearing thing.
 
 The order is fixed and it is the runbook's: a `final` snapshot inside the record's prefix → `destroy()`
-on `Record` (alarm, then storage) → `Spark`, when it has storage → the R2 prefix → `record.forget` in the
+on `Record` (alarm, then storage) → `Slash`, when it has storage → the R2 prefix → `record.forget` in the
 Directory. It runs at day 90 of a lapse, or when the owner asks — `deleteRecord` is an ADMIN method,
 browser session, re-authenticated, the slug typed to confirm ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md)
 §13 #17; [30-BLUEPRINT](30-BLUEPRINT.md) §5).
@@ -311,7 +311,7 @@ sections:
   - { heading: Renewals in 30 days, source: register.services,
       where: { field: renews, before: "+30d" },
       as: table, columns: [{ field: name }, { field: renews }, { field: cost }], omit_when_empty: true }
-prose: spark            # optional: one sentence of context. omit for a figures-only digest
+prose: slash            # optional: one sentence of context. omit for a figures-only digest
 ```
 
 `omit_when_empty: true` drops a section with no rows rather than printing a heading over nothing. A
@@ -323,12 +323,12 @@ interpolatable string — and `as: list`, which is a primitive, not a kind.)*
 
 The keys are typed and closed: `schedule: { day?, at, tz? }` — weekly with `day`, daily without;
 `channels`, one to five of `in-app · email · push · webhook · mcp`; `sections`, at most twelve; `prose`,
-only ever `spark` ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.11). A `webhook` channel names where it posts —
+only ever `slash` ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.11). A `webhook` channel names where it posts —
 `webhook: { url, grant? }`, an `https:` URL printed in the install diff's `CALLS OUT` line and the vault
 label of the secret that signs the POST — because a URL a digest posts to is egress, and egress is declared
 or it does not happen ([04-PACKS](04-PACKS.md) §7).
 
-`prose: spark` is the one place the assistant writes into a scheduled output, and it is capped
+`prose: slash` is the one place the assistant writes into a scheduled output, and it is capped
 at two sentences, generated from the sections that are actually present, and clearly attributed.
 It is opt-in. A digest that is all figures is a perfectly good digest, and it costs no neurons.
 Mechanically it is one `infer.prose` outbox row, and the digest finishes on the ack — a slow model never

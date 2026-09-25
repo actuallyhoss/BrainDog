@@ -41,7 +41,7 @@ import { jsonPath, evaluate, INBOX_RAW, type Predicate, type Schema } from '@bra
 import type { Entry, Json } from './index.ts';
 import { instant } from './migrate.ts';
 import { attempt } from './tx.ts';
-import { sparkMayWrite } from './spark.ts';
+import { slashMayWrite } from './slash.ts';
 import { parseAnswer, readRow, type Mapping } from './map.ts';
 
 export const CHANNELS = ['email', 'webhook', 'pull', 'paste', 'api'] as const;
@@ -775,7 +775,7 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
     };
 
     const note = (kind: string, actor: string, target: string, targetKind: string, to: string | null): void => {
-      sparkMayWrite(actor, kind);
+      slashMayWrite(actor, kind);
       deps.sql.exec(
         'INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v) VALUES (?, ?, ?, ?, ?, ?, ?)',
         deps.mint(),

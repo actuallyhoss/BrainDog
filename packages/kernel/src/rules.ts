@@ -109,7 +109,7 @@ export type Step =
   | { set_var: { name: string; to: string } }
   | { script: { id: string; input?: Record<string, string>; as: string } }
   | { call: { ingest: string; as?: string } }
-  | { ask_spark: { question: string; about?: string[]; as: string; shape?: 'text' | 'number' | 'choice'; choices?: string[] } }
+  | { ask_slash: { question: string; about?: string[]; as: string; shape?: 'text' | 'number' | 'choice'; choices?: string[] } }
   | { ask_person: { question: string; options: string[]; as: string; to?: string; wait?: string } }
   | { wait: string }
   | RuleAction;

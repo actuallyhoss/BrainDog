@@ -358,9 +358,10 @@ export const site = {
      * THE SENTENCE THIS REPLACES WAS FALSE, AND IT WAS IN THE `Not built yet` COLUMN.
      *
      * It read: *Spark arranges by reading what you type. A language model does not do it yet.*
-     * `loop/research-site-copy.md` falsifies it twice over. `packages/host/src/spark.ts:52`
+     * That was the assistant's old name; it is Slash now (`loop/DIRECTION.md` section 31).
+     * `loop/research-site-copy.md` falsifies it twice over. `packages/host/src/slash.ts:52`
      * defines `endpointModel()`, a real model behind a chat-completions port, and BOTH hosts wire
-     * it in (`apps/worker/src/spark.ts:22`, `apps/selfhost/src/spark.ts:29`). What is true is
+     * it in (`apps/worker/src/slash.ts:22`, `apps/selfhost/src/slash.ts:29`). What is true is
      * narrower and is what `loop/STATUS.md` §5 actually says: with none configured, the rules
      * draft. So the claim moves out of the not-built column, where it was a lie about our own
      * software, and becomes the limit it always was, stated beside the thing it limits.
@@ -795,9 +796,9 @@ export const site = {
          *
          * The comment on that line keeps it in this column on purpose and defines the column as what
          * a visitor can do nothing with, which is right. A stranger reads the head and not the
-         * comment, and the head said the opposite of the comment: both hosts wire `@braindog/spark`
-         * (`apps/worker/src/spark.ts`, `apps/selfhost/src/spark.ts`), the palette asks it, and
-         * `SPARK_ENDPOINT` is `""` in both of `apps/worker/wrangler.jsonc`'s environments. Built and
+         * comment, and the head said the opposite of the comment: both hosts wire `@braindog/slash`
+         * (`apps/worker/src/slash.ts`, `apps/selfhost/src/slash.ts`), the palette asks it, and
+         * `SLASH_ENDPOINT` is `""` in both of `apps/worker/wrangler.jsonc`'s environments. Built and
          * switched off is not unbuilt. `Not switched on yet`, the survey's suggestion, fits that line
          * and the third, and misreads the second: nothing is built that reaches into an inbox, so a
          * head saying it is only switched off would overstate the product the other way. What is true
@@ -812,21 +813,22 @@ export const site = {
            * a marketing page that cites a grep is for.
            *
            * It said *the engine is written; no host reaches it yet*, on the strength of
-           * `grep -rl "@braindog/spark" apps/worker/src apps/selfhost/src` returning nothing. Run
-           * again, it returns `apps/worker/src/spark.ts` and `apps/selfhost/src/spark.ts`: the
-           * engine landed as a package of its own on 2026-09-20 and both hosts were wired to it in
-           * the same day's work.
+           * `grep -rl "@braindog/spark" apps/worker/src apps/selfhost/src` returning nothing, the
+           * package's name before it was renamed `@braindog/slash`. Run again for the new name, it
+           * returns `apps/worker/src/slash.ts` and `apps/selfhost/src/slash.ts`: the engine landed
+           * as a package of its own on 2026-09-20 and both hosts were wired to it in the same day's
+           * work.
            *
            * WHAT IS STILL TRUE IS NARROWER AND IS WHY THE LINE STAYS IN THIS COLUMN. Both wirings
-           * refuse before they import: `workerSparkEngine` returns `undefined` when no endpoint is
-           * configured, and `SPARK_ENDPOINT` is `""` in both of `apps/worker/wrangler.jsonc`'s
+           * refuse before they import: `workerSlashEngine` returns `undefined` when no endpoint is
+           * configured, and `SLASH_ENDPOINT` is `""` in both of `apps/worker/wrangler.jsonc`'s
            * environments. So a visitor can still do nothing with it, which is this column's own
            * definition.
            *
            * AND THE SENTENCE SAID "BOTH HOSTS REACH THE ENGINE", WHICH IS NOT TRUE AND WAS BACKED
            * BY A GREP FOR THE PACKAGE NAME. Finding 3 of `loop/research-batch-five-audit.md`, and
-           * the finding under it is worse than the wording: `workerSparkEngine`
-           * (`apps/worker/src/spark.ts:83`) and `sparkEngineFor` (`apps/selfhost/src/spark.ts:73`)
+           * the finding under it is worse than the wording: `workerSlashEngine`
+           * (`apps/worker/src/slash.ts:83`) and `slashEngineFor` (`apps/selfhost/src/slash.ts:73`)
            * are called from their own test files and from nowhere else. Driven by the audit: with
            * both builders throwing on every call, 172 of 172 tests pass in `apps/worker` and 199 of
            * 199 in `apps/selfhost`. An import edge is not a path. Configuring a model would change
@@ -836,10 +838,10 @@ export const site = {
            * screen and no door reaches it.
            *
            * AND A DOOR REACHES IT NOW, SO THE SENTENCE MOVED RATHER THAN THE COLUMN. Both hosts
-           * mounted `POST /api/spark/read` on 2026-09-21, and a real self-host over a real socket
+           * mounted `POST /api/slash/read` on 2026-09-21, and a real self-host over a real socket
            * answers it 200 on exactly one model call. Two things are still true and they are what
            * the new sentence says: nothing in `apps/web` calls that address, which
-           * `grep -rn "spark/read" apps/web/src` returns nothing for, and `SPARK_ENDPOINT` is `""`
+           * `grep -rn "slash/read" apps/web/src` returns nothing for, and `SLASH_ENDPOINT` is `""`
            * in both of `apps/worker/wrangler.jsonc`'s environments, so no host this project deploys
            * has a model behind it. A visitor can still do nothing with it, which is this column's
            * own definition.
@@ -851,12 +853,12 @@ export const site = {
            * about what they can use.
            *
            * AND A SCREEN ASKS IT NOW, SO THE SENTENCE MOVED AGAIN AND THE COLUMN STILL DID NOT.
-           * Since a331fe8c the palette offers a Spark row for a plain query of two characters or
-           * more that matched no place (`apps/web/src/lib/palette/spark.ts`, `offersSpark`), and
-           * asks through the client's `sparkRead` (`Palette.svelte`), which is why the grep above
+           * Since a331fe8c the palette offers a Slash row for a plain query of two characters or
+           * more that matched no place (`apps/web/src/lib/palette/slash.ts`, `offersSlash`), and
+           * asks through the client's `slashRead` (`Palette.svelte`), which is why the grep above
            * stopped measuring the screen: the address lives in `packages/client`, not in
            * `apps/web`. The row appears only when `/api/version` reports a model and the record is
-           * live (`apps/web/src/routes/+layout.ts`); a stranger has no live record, and `SPARK_ENDPOINT`
+           * live (`apps/web/src/routes/+layout.ts`); a stranger has no live record, and `SLASH_ENDPOINT`
            * is still `""` in both environments. So a stranger still cannot ask, and the line says
            * why in terms that stay true the day a model is configured somewhere.
            * `src/lib/claims.test.ts` fails if the palette asks and this line says no screen does.

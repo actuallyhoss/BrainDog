@@ -457,7 +457,7 @@ test('A QUEUE THE RECORD ANSWERED becomes questions with the ways to answer them
   const now = Date.UTC(2026, 8, 16, 12);
   const asked = (id: string, kind: string, options: { key: string; label: string; because: string; recommended: boolean }[], cost = 'call') => ({
     id,
-    who: 'spark',
+    who: 'slash',
     at: '2026-09-16T09:00:00.000Z',
     kind,
     question: `Question ${id}?`,
@@ -500,7 +500,7 @@ test('A QUEUE THE RECORD ANSWERED becomes questions with the ways to answer them
 
   /* A QUEUE THE RECORD SENT IN A SHAPE THIS CANNOT READ says so, rather than drawing "nothing is waiting". */
   assert.equal(
-    blockOf({ kind: 'queue', source: 'governance.open', rows: [], matched: 1, refusals: [], queue: [{ id: 'SG1', who: 'spark' }] }, new Map(), now).cannot,
+    blockOf({ kind: 'queue', source: 'governance.open', rows: [], matched: 1, refusals: [], queue: [{ id: 'SG1', who: 'slash' }] }, new Map(), now).cannot,
     liveWords.cannot,
   );
 });

@@ -290,10 +290,11 @@ documents, and this page is for what a reader can see.
 
 Reading the commits also falsified a line on the home page. `copy.ts` justified *the engine is
 written; no host reaches it yet* by citing
-`grep -rl "@braindog/spark" apps/worker/src apps/selfhost/src` returning nothing. Run again it
-returns two files: `packages/spark` landed on the 20th and both hosts were wired to it the same
-day. The line now says what is still true, which is that both hosts reach the engine and neither
-has a model configured, and `SPARK_ENDPOINT` is `""` in both environments is the check for it.
+`grep -rl "@braindog/spark" apps/worker/src apps/selfhost/src` returning nothing (the package's
+name then; it is `@braindog/slash` now). Run again it returned two files: the package landed on
+the 20th and both hosts were wired to it the same day. The line now says what is still true,
+which is that both hosts reach the engine and neither has a model configured, and
+`SLASH_ENDPOINT` is `""` in both environments is the check for it.
 
 ## 4. Legal and 404 were not left alone
 

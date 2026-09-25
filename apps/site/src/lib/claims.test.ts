@@ -67,14 +67,14 @@ test('the 404 page and the sitemap name every page the site prerenders', () => {
   }
 });
 
-test('the Spark line does not say no screen asks while the palette asks', () => {
-  /* THE PALETTE ASKS THROUGH THE CLIENT, `sparkRead`, since a331fe8c. The old comment measured the
-     screen with `grep spark/read apps/web/src`, which the client's own door hid from. */
+test('the Slash line does not say no screen asks while the palette asks', () => {
+  /* THE PALETTE ASKS THROUGH THE CLIENT, `slashRead`, since a331fe8c. The old comment measured the
+     screen with `grep slash/read apps/web/src`, which the client's own door hid from. */
   const palette = readFileSync(new URL('apps/web/src/lib/palette/Palette.svelte', REPO), 'utf8');
   const line = strings(site).find((s) => s.startsWith('Asking your record a question in words'));
-  assert.ok(line, 'the Spark line is gone from copy.ts; this check should go with it');
-  if (palette.includes('.sparkRead(')) {
-    assert.doesNotMatch(line, /nothing on a screen asks/i, 'the palette asks Spark, and the line says no screen does');
+  assert.ok(line, 'the Slash line is gone from copy.ts; this check should go with it');
+  if (palette.includes('.slashRead(')) {
+    assert.doesNotMatch(line, /nothing on a screen asks/i, 'the palette asks Slash, and the line says no screen does');
   }
 });
 
@@ -113,7 +113,7 @@ test('the hosted backup cell does not still wait on a sealing key once productio
   }
 });
 
-test('the column over the Spark line does not call it unbuilt while both hosts wire the engine', () => {
+test('the column over the Slash line does not call it unbuilt while both hosts wire the engine', () => {
   /* `loop/research-site-now.md`, claim 3. The line under the head was careful; the head was not, and
      the head is what a stranger reads. Both files are read rather than trusted, so the day one host
      drops the engine this check stands down instead of defending a head that has become true.
@@ -122,13 +122,13 @@ test('the column over the Spark line does not call it unbuilt while both hosts w
      refuses a workspace package name anywhere under `src/` outside an import or a comment, because a
      package name in a sentence is an install command with the verb left off, and it measured this
      file doing exactly that on the first draft. */
-  const engine = (JSON.parse(readFileSync(new URL('packages/spark/package.json', REPO), 'utf8')) as { name: string }).name;
-  const wired = ['apps/worker/src/spark.ts', 'apps/selfhost/src/spark.ts'].every((path) => {
+  const engine = (JSON.parse(readFileSync(new URL('packages/slash/package.json', REPO), 'utf8')) as { name: string }).name;
+  const wired = ['apps/worker/src/slash.ts', 'apps/selfhost/src/slash.ts'].every((path) => {
     const at = new URL(path, REPO);
     return existsSync(at) && readFileSync(at, 'utf8').includes(`'${engine}'`);
   });
   const column = site.plain.columns.find((c) => c.lines.some((l: string) => l.startsWith('Asking your record a question in words')));
-  assert.ok(column, 'no column holds the Spark line; this check should go with it');
+  assert.ok(column, 'no column holds the Slash line; this check should go with it');
   if (wired) {
     assert.doesNotMatch(column.head, /\bbuilt\b/i, `both hosts wire ${engine}, and the column over it is headed "${column.head}"`);
   }

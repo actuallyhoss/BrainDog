@@ -7,9 +7,9 @@
  * colleague filing a rule as a pattern's `ingest`, accepting it, and the rule installing.
  *
  * TWO SHAPES ARE AN INGEST, AND WAVE FIFTY-ONE'S CHECK KNEW ONE. It refused every `ingest` without `id` and `kind`, and
- * its checker found that broke Spark: `spark/src/prompts.ts` asks the model for ONE ingest declaration BODY, and
- * `spark/src/jobs.ts` files it bare, `{ match, extract, writes, on_conflict }`, which `spark/test/pattern.test.ts` drives.
- * Held to the declaration alone, every pattern Spark proposed was refused at filing. So a bare body is an ingest unless it
+ * its checker found that broke Slash: `slash/src/prompts.ts` asks the model for ONE ingest declaration BODY, and
+ * `slash/src/jobs.ts` files it bare, `{ match, extract, writes, on_conflict }`, which `slash/test/pattern.test.ts` drives.
+ * Held to the declaration alone, every pattern Slash proposed was refused at filing. So a bare body is an ingest unless it
  * carries another kind's name or a rule's steps, and a declaration is one when its `kind` says `ingest`.
  */
 
@@ -53,8 +53,8 @@ const INGEST = {
   },
 };
 
-/** What `spark/src/jobs.ts` files, after it overwrites `confidence` and `on_conflict`: a body, with no id and no kind. */
-const SPARK_BODY = {
+/** What `slash/src/jobs.ts` files, after it overwrites `confidence` and `on_conflict`: a body, with no id and no kind. */
+const SLASH_BODY = {
   match: { from: { is: 'alerts@bank.test' } },
   extract: { what: { after: 'Paid ' } },
   writes: { register: 'obligations', confidence: 'needs-review' },
@@ -118,9 +118,9 @@ test('and so is every other kind, a bundle, and a bare body in any other shape t
   sql.close();
 });
 
-test('SPARK’S BARE BODY IS STILL FILED, and so is an ingest declaration', async () => {
+test('SLASH’S BARE BODY IS STILL FILED, and so is an ingest declaration', async () => {
   const { k, sql } = await record();
-  const bare = k.propose(pattern(SPARK_BODY), 'p_1');
+  const bare = k.propose(pattern(SLASH_BODY), 'p_1');
   assert.ok(bare.ok, bare.ok ? '' : JSON.stringify(bare));
   const decl = k.propose(pattern(INGEST), 'p_1');
   assert.ok(decl.ok, decl.ok ? '' : JSON.stringify(decl));
@@ -145,13 +145,13 @@ test('AND A RULE ALREADY IN THE QUEUE AS A PATTERN IS REFUSED AT THE ACCEPT, wit
   sql.close();
 });
 
-/* A BARE BODY HAS NO ID TO INSTALL UNDER. Measured on this tree before the accept asked: Spark's body was accepted as
+/* A BARE BODY HAS NO ID TO INSTALL UNDER. Measured on this tree before the accept asked: Slash's body was accepted as
    D1, and `install([ingest])` threw `Cannot read properties of undefined (reading 'writes')`, which the record's `land`
    turns into a reopen saying "Propose it again as {"id":"register.<id>",...}", a register, after a decision nobody can
    take back. It is refused here instead, before anything is decided, in words about the ingest it is. */
 test('A BARE BODY IS REFUSED AT THE ACCEPT, before a decision is written, saying what it needs to install', async () => {
   const { k, sql } = await record();
-  const made = k.propose(pattern(SPARK_BODY), 'p_1');
+  const made = k.propose(pattern(SLASH_BODY), 'p_1');
   assert.ok(made.ok, made.ok ? '' : JSON.stringify(made));
   const out = k.decide(made.value.id, { decide: { option: 'accept', reason: 'it is the bank' } }, 'p_2');
   assert.equal(out.ok, false, 'a body with no id was handed back to install');

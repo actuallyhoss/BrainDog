@@ -135,7 +135,7 @@ const ASK: PlannedAsk = {
   },
 };
 
-/** Somebody else's question, the kind Spark and the packs file all year. */
+/** Somebody else's question, the kind Slash and the packs file all year. */
 const other = (n: number) => ({
   question: `Question ${String(n)}?`,
   body_kind: 'options' as const,
@@ -156,7 +156,7 @@ test('A QUESTION ALREADY ANSWERED IS NOT ASKED AGAIN once Decide holds more rows
   assert.equal(onDecide(kernel).length, 1);
 
   /* THE LIFETIME OF A SUGGESTION TABLE, which is what the ceiling is counted against: every draft
-     Spark filed, every pack offered and every question answered is still a row. Half share an
+     Slash filed, every pack offered and every question answered is still a row. Half share an
      instant, so the order past the time is the order they were written in, which is the tie-break
      the cursor has to carry. */
   for (let i = 0; i < 250; i++) {

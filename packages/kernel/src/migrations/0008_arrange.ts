@@ -1,7 +1,7 @@
 /**
  * The kernel schema, migration 8: `suggestion` rebuilt with three more bodies, `pack`, `settings` and `arrange`.
  *
- * They are how an agent, or Spark, asks to change what a record is (`loop/research-spark.md` S12): install,
+ * They are how an agent, or Slash, asks to change what a record is (`loop/research-spark.md` S12): install,
  * turn on or turn off a pack, change a pack's settings such as its voice, or several of those and pages as
  * one arrangement. Each is applied only when the owner accepts it (`govern.ts`).
  *

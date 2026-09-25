@@ -33,7 +33,7 @@ reading: a spec traces the whole flow before it picks the smallest shape.
 |---|---|
 | Language | TypeScript 6.0.3, type-check only. Node 24.13 runs the `.ts` sources directly, so there is no build step until a package is published (`braindog-render`, `braindog-cli`). Every local import carries its `.ts` extension |
 | Syntax | `erasableSyntaxOnly`: no `enum`, no `namespace`, no parameter properties, no `const enum`. Types are `type` aliases and `interface`s; closed lists are `as const` arrays with a derived union |
-| Modules | ESM only. A package's public surface is its `exports` map; nothing else is importable. Packages import only *down* the total order (`render → ports → where → theme → fixtures → kernel → declare → extract → mcp → record → spark → connect`); apps import packages, never each other |
+| Modules | ESM only. A package's public surface is its `exports` map; nothing else is importable. Packages import only *down* the total order (`render → ports → where → theme → fixtures → kernel → declare → extract → mcp → record → slash → connect`); apps import packages, never each other |
 | Tests | `node:test` and `node:assert/strict`, files `test/**/*.test.ts`, run with `node --test`. Property tests use `fast-check` 4.9.0 and commit every failing `{ seed, path }` under `test/seeds/`. The Worker's Durable Object tests alone use Vitest + `@cloudflare/vitest-plugin` (phase 5) |
 | Dependencies | runtime: zero in every package except the two the Worker needs (`@pushforge/builder`, `age-encryption`) and Svelte in `apps/web`. A new runtime dependency is a new ADR. Dev: the pins in [31-STACK](31-STACK.md) §3 |
 | Naming | files kebab-case; types `PascalCase`; functions and fields `camelCase`; SQL and JSON keys `snake_case`; refusal codes `UPPER_SNAKE` from [30-BLUEPRINT](30-BLUEPRINT.md) §6; identifiers per [34-GRAMMARS](34-GRAMMARS.md) §4 |
@@ -85,7 +85,7 @@ wire shapes — never prose.
 | 43 | `packages/extract` — the ten extractors and three combinators, the money and date parsers | 07 §3–§4 · 25 | eighth; phase B |
 | 44 | `packages/mcp` — the sixteen tools, resources, `instructions`, one JSON-RPC core over stdio and streamable HTTP, budgets | 10 · 33 §2, §4 | ninth |
 | 45 | `packages/record` — the RPC surface in six groups, `CallContext`, `Result`, pagination, projection, the outbox and schedule protocols | 30 §5, §8–§10 · 33 §2 · 09 | tenth |
-| 46 | `packages/spark` — tier A jobs, the projection reader, proposals, the tier-C dispatcher | 11 · 23 · 26 · 33 §11 | eleventh |
+| 46 | `packages/slash` — tier A jobs, the projection reader, proposals, the tier-C dispatcher | 11 · 23 · 26 · 33 §11 | eleventh |
 | 47 | `packages/connect` — `ingest` with `fetch:`, placeholders, formats, `expect:`, `probe:`, `metric_point` | 25 · 08 §3 | twelfth |
 | 48 | `apps/cli` — `braindog` | 33 §5 · 03 · 04 §4 | after `record` |
 | 49 | `apps/selfhost` — one Node process, the Directory file, the HTTP surface | 33 §4, §6, §10 · 12 §3 | after `cli` |

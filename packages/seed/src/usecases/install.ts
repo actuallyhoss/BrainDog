@@ -152,7 +152,7 @@ export function carriedDocument(u: UseCase, today: string, said?: string | null)
 
 /**
  * THE SAME PLAN, WRITTEN AFTER THE PACK IS IN. Where a model is configured, onboarding installs the use case's lists with no
- * rows and asks the model for a plan (`sparkForm`). When it forms nothing, these are the rows the pack's seeds would have
+ * rows and asks the model for a plan (`slashForm`). When it forms nothing, these are the rows the pack's seeds would have
  * been, tagged as the install tags them, with the links to make once they are in, so the templates stand exactly as before.
  */
 export function plantedRows(u: UseCase, today: string, said?: string | null): { rows: { register: string; fields: Body }[]; links: ExampleLink[] | undefined } {

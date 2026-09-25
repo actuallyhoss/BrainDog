@@ -1,11 +1,11 @@
 /**
  * What somebody invited to one list is told when they reach for the record itself.
  *
- * `loop/research-invite-landing.md` finding 6 measured nine methods (`inbox`, `packs`, `whoami`, `members`, `spark`,
+ * `loop/research-invite-landing.md` finding 6 measured nine methods (`inbox`, `packs`, `whoami`, `members`, `slash`,
  * `listGrants`, `actions`, `planPack`, `decide`) answering a one-list colleague with "Name one of those, or ask the
  * owner for a record-wide token." That sentence is right for an agent's token, which is what it was written for. The
  * colleague is a person who signed in from an invitation, holds no token and was never offered one, and it is the
- * sentence on `/inbox`, `/spark`, `/packs` and every `/start` tile. A person is told about their invitation; a token
+ * sentence on `/inbox`, `/slash`, `/packs` and every `/start` tile. A person is told about their invitation; a token
  * is still told about tokens.
  */
 

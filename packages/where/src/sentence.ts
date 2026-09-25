@@ -380,7 +380,7 @@ const HELD_INSTEAD: Record<string, string> = {
  * question a number is asked most, was the one a page, a rule's `when:` and a step's `if` could not
  * put, and `kernel/src/figure.ts` records a flow step failing on exactly this.
  *
- * THE WORDS ARE THE ONES THE APP ALREADY PRINTS the tree in: `sparkOps` in the app's copy and the flow
+ * THE WORDS ARE THE ONES THE APP ALREADY PRINTS the tree in: `slashOps` in the app's copy and the flow
  * canvas's `COMPARE` write `gte` as "is at least" and `between` as "is between X and Y". A clause a
  * screen prints from the tree has to read back as that tree, so `is` is taken before each word as
  * well as left out.

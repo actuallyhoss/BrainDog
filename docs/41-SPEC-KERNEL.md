@@ -231,7 +231,7 @@ export type CallContext = {
   principal:
     | { kind: 'person'; id: string; level: Level }
     | { kind: 'token'; id: string; scope: ('read' | 'propose' | 'write')[]; name: string }
-    | { kind: 'system' } | { kind: 'spark' };
+    | { kind: 'system' } | { kind: 'slash' };
   session?: { spoken?: string; client_id?: string; host?: string; repo?: string };
   now: number; surface: 'web' | 'mcp' | 'cli' | 'email' | 'webhook' | 'alarm';
 };
@@ -315,7 +315,7 @@ The stored shapes are the DDL of [30-BLUEPRINT](30-BLUEPRINT.md) §1 and the can
 
 **Events**
 
-- K11 · Every `event.kind` is one of the forty; `event WHERE actor = 'spark' AND kind NOT IN ('suggest','propose','predict')` is empty.
+- K11 · Every `event.kind` is one of the forty; `event WHERE actor = 'slash' AND kind NOT IN ('suggest','propose','predict')` is empty.
 - K12 · An `event.op_id` value appears at most once, and only on the first row a write produces; every other row of the same write carries the same `batch` and a `NULL` `op_id`.
 - K13 · A write's event rows share one `batch`; a re-entrant rule write shares its trigger's `batch`.
 - K14 · A redacted value is the literal `--redacted--`; an erased value is the literal `--erased--`; `from_v IS NULL` means only that the field had no prior value. `to_v` on an `edit`, `state`, `tag`, `untag` or `link` row is never `NULL` — a cleared field is the four characters `null`.
@@ -461,7 +461,7 @@ nothing to roll back — and step R runs.
 4. The actor, by principal:
    - `person` → `ctx.principal.id` (`p_…`, resolved to a name through the `person` mirror at read — §13 #4).
    - `system` → `w.mechanism ?? 'system'`.
-   - `spark` → `FORBIDDEN` (30 §3: Spark never writes a row).
+   - `slash` → `FORBIDDEN` (30 §3: Slash never writes a row).
    - `token` → the ladder of [32-PARITY](32-PARITY.md) §2.1, in `session.ts`. `WriteContext` carries it as `principal: { kind: 'token', token }` and `session: SessionHints`; the hints are `spoken` and any of the register's `client_id agent doing repo remote cwd host branch head`. Each reading rung is one indexed read on `register = 'session' AND deleted_at IS NULL`, and the first that answers wins:
      1. `spoken` names a row, `WHERE seq = ?`, whose state is not `done` or `abandoned`: that run gets the heartbeat.
      2. A name that matches nothing, or names a finished run, is dropped and never recorded, and the next rung is tried.
@@ -841,7 +841,7 @@ rather than an address, and `declare.ts` likewise roots a declaration's own JSON
 |---|---|---|---|
 | `REGISTER_UNKNOWN` | 1 · `get` | no active `register.<reg>`; a bare `#7` | "Install a pack that declares register.<reg>, or check the id." · "Say which register: tasks#7." |
 | `FIELD_UNKNOWN` | 1 | a key the declaration lacks; a reserved or `_` id from the boundary | "register.<reg> declares <a, b, c>; remove '<f>' or add it to the declaration." · "'<f>' is the kernel's; leave it out." |
-| `FORBIDDEN` | 1 | `principal.kind = 'spark'` on a write | "Spark proposes; it never writes a row. Use propose." |
+| `FORBIDDEN` | 1 | `principal.kind = 'slash'` on a write | "Slash proposes; it never writes a row. Use propose." |
 | `ROW_LOCKED` | 2 | `immutable_when:` matches the current row, or the create | "This row matches immutable_when — <clause>. Change what the clause reads, or write a new row." |
 | `HUMAN_ONLY` | 2b | a `rule:`/`ingest:` actor on a field a person last set | "A person set <f> on <ts>; a rule or ingest may not overwrite it. Leave it, or ask them." |
 | `TEXT_JSON_QUOTED` | 3 | a string wrapped in its own JSON quotes | "Send the string itself, not its JSON encoding: strip the outer quotes." |
@@ -986,8 +986,8 @@ code in `KERNEL_REFUSAL_CODES` has a file and every file a code.
 **Counters, events, replay** — `test/events.test.ts`: `allocate` returns 1, 2, 3; purge the row with `seq 3`;
 the next create is `seq 4` (never reissues). `op_id` replay: the same `opId` twice returns the same `id`, `seq`
 and `version`, and `SELECT count(*) FROM event WHERE op_id = ?` is 1. A three-field update writes three rows with
-one `batch` and `op_id` on the first only. `event WHERE actor='spark'` is empty over every fixture (the `spark-actor`
-gate); a `spark` principal on `write` is `FORBIDDEN`. The `event.kind` CHECK has forty members and `EVENT_KINDS.length === 40`
+one `batch` and `op_id` on the first only. `event WHERE actor='slash'` is empty over every fixture (the `slash-actor`
+gate); a `slash` principal on `write` is `FORBIDDEN`. The `event.kind` CHECK has forty members and `EVENT_KINDS.length === 40`
 (the `event-kinds` gate); every `CHECK (… IN (…))` in `0001_kernel.ts` matches its `as const` list (`closed-lists`).
 
 **Erase** — `test/erase.test.ts`: a person named in a task title, an event note, a decision reason, an inbox body,
@@ -1113,7 +1113,7 @@ Twenty, counted. Each amends the named document in the same revision loop ([35-S
 | 15 | **Erase**: subjects match as ASCII-folded substrings; nineteen stores — the sixteen plus `person`, `job`, `job_event`; a cancelled `schedule`/`outbox` row is `state = 'done'` with payload `--erased--` (there is no `cancelled` state); the `erase` event carries `sha256:<16 hex>` of the subject, never the subject; `entry.fields` values are tombstoned in place so every row keeps its existence and sequence | 02 §10 · 30 §1 |
 | 16 | **Grant ids are `g_` + ULID**, minted by `bindGrant`; a `secret` field's value must match and exist. The grammar table gains the row | 12 §6 · 34 §4 |
 | 17 | **`installDeclarations` is a batch with a `planVersion` CAS**, and the kernel raises `PLAN_STALE` — only the transaction that writes can check it atomically; the kernel also writes the `pack` row and the `install`/`upgrade`/`declare`/`retire`/`uninstall` events; uninstall deletes the `pack` row (the table has no `uninstalled_at`) | 30 §5 · 04 §3–§4 |
-| 18 | **A write from a `spark` principal is `FORBIDDEN` at step 1**; a bare `#7` to `get` is `REGISTER_UNKNOWN`; a derived, retired or kernel-written field in a patch is `IMMUTABLE_FIELD`; a `_`-prefixed or reserved key from the boundary is `FIELD_UNKNOWN` — the mapping of four unnamed refusals onto existing codes | 30 §3 · 30 §6 · 34 §4 |
+| 18 | **A write from a `slash` principal is `FORBIDDEN` at step 1**; a bare `#7` to `get` is `REGISTER_UNKNOWN`; a derived, retired or kernel-written field in a patch is `IMMUTABLE_FIELD`; a `_`-prefixed or reserved key from the boundary is `FIELD_UNKNOWN` — the mapping of four unnamed refusals onto existing codes | 30 §3 · 30 §6 · 34 §4 |
 | 19 | **A create may set any declared `state` value; `transitions:` govern moves.** A person's actor string is the person id `p_<ULID>`, resolved to a name through the `person` mirror at read — that is what the mirror is for. An auto-opened session's `create` event is authored by its own `S<n>` with `note: 'opened: auto'`, since the register has no `source` field | 02 §5 · 30 §3 · 32 §2.1 |
 | 20 | **Reminders**: key `<id>:<field>:<at>:<offset>` under the `(kind, key)` unique index — `ON CONFLICT DO NOTHING` is `once_per`; cancel is a key-range delete of `pending` rows; a `day` reminder is due at noon UTC; `repeat:` without `remind:` means offset `0`; horizon 400 days, ≤ 100 rows per field per write. Purge is one transaction per run over ≤ 100 rows with one event, and prunes `observation` past 400 days | 09 §2 · 02 §4 · 30 §1 (purge) · 24 §4.2 |
 
@@ -1124,7 +1124,7 @@ Twenty, counted. Each amends the named document in the same revision loop ([35-S
 - [ ] `applyMigrations` on an empty `:memory:` database creates 31 tables, 31 `dog_section` rows, three counters and `register.session`; `kernel = 1`, `format = 1`; a second run is a no-op.
 - [ ] The twenty-seven refusal fixtures pass and the `refusal-fixtures` gate is green for `KERNEL_REFUSAL_CODES`.
 - [ ] Every row of the §9 write-path table passes; K1–K26 each have a test that fails when the invariant is broken.
-- [ ] `event-kinds` (40), `closed-lists`, `no-declarations-in-kernel`, `spark-actor`, `secret-grep` gates are green.
+- [ ] `event-kinds` (40), `closed-lists`, `no-declarations-in-kernel`, `slash-actor`, `secret-grep` gates are green.
 - [ ] `brain-roundtrip`: export → import → export is byte-identical apart from `dog_sig`; every manifest hash re-computes with `sha256sum` over the row lines.
 - [ ] A checksum-mismatched ledger makes every `Result`-returning method return `SCHEMA_MISMATCH`.
 - [ ] `test/bench.test.ts` passes its CI column and prints the budget column's numbers for the log.

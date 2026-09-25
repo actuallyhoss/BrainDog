@@ -56,7 +56,7 @@ under `test/` only.
 | `declare` 42 | `parse` · `validate` · `flatten` · `print` (the stored body, 30 §1 `declaration.body`) · `jcs` (`declaration.checksum`, `pack.checksum`, 34 §5) · the `Refusal` type |
 | `extract` 43 | `evaluate` over an `inbox_raw` arrival for `match:` (07 §3); `compile` when a `match:` runs in SQL |
 | `record` 45 | `compile` · `evaluate` · `resolveTemporal` |
-| `spark` 46 | `validate` on a drafted predicate; the `Where` type |
+| `slash` 46 | `validate` on a drafted predicate; the `Where` type |
 | `apps/web` 50 | the browser entry only: `parse` · `print` · `validate` · `flatten` · `evaluate` (21 §4.5) |
 
 ---

@@ -11,8 +11,8 @@
     "./limits": "./src/limits.ts",
     "./script": "./src/script.ts",
     "./script-try": "./src/script-try.ts",
-    "./spark": "./src/spark.ts",
-    "./spark-answers": "./src/spark-answers.ts"
+    "./slash": "./src/slash.ts",
+    "./slash-answers": "./src/slash-answers.ts"
   },
   "dependencies": {
     "@braindog/connect": "workspace:*",

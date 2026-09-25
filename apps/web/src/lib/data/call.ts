@@ -8,7 +8,7 @@
  *
  * `50 §1` settles the import question the repository currently answers two ways: the web app's
  * runtime imports are `svelte`, `braindog-render`, `@braindog/where` and `@braindog/declare`, and
- * "never `ports`, `kernel`, `record`, `mcp`, `spark`, or another app". The seam is a FILE INSIDE THE
+ * "never `ports`, `kernel`, `record`, `mcp`, `slash`, or another app". The seam is a FILE INSIDE THE
  * APP, not a package — so `packages/client`, which exists in this tree and is imported by nothing,
  * is an unspecified addition and not the thing that belongs here.
  */

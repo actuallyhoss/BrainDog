@@ -158,12 +158,12 @@ isolation should be a platform invariant rather than a human's carefulness. Tunn
 structurally: it needs a daemon **and** a listening service on the customer's machine, and it has
 no self-hosted equivalent.
 
-**Where it lives: on the Spark object.** Spark already makes outbound calls, already holds no write
+**Where it lives: on the Slash object.** Slash already makes outbound calls, already holds no write
 RPC, and already returns proposals. It becomes the dispatcher for both tier A and tier C — named
-methods, dispatched by name over `/api/spark/<method>`, not a generic `dispatch`
-([46-SPEC-SPARK](46-SPEC-SPARK.md) §2) — and the record object still makes no outbound calls. The
+methods, dispatched by name over `/api/slash/<method>`, not a generic `dispatch`
+([46-SPEC-SLASH](46-SPEC-SLASH.md) §2) — and the record object still makes no outbound calls. The
 socket it holds is a **doorbell**: one frame, `{ t: 'job', id }`, that ends a runner's wait early;
-every claim is `claimJob` over HTTP, and Spark holds no lease state and no alarm
+every claim is `claimJob` over HTTP, and Slash holds no lease state and no alarm
 ([51-SPEC-WORKER](51-SPEC-WORKER.md) §5.15). The third Durable Object class, `Directory`, holds
 identity — people, passkeys, sessions, the slug → `rec_id` map — never a job
 ([ADR-061](16-DECISIONS.md), [01-ARCHITECTURE](01-ARCHITECTURE.md) §3). *An earlier draft said "not a
@@ -211,7 +211,7 @@ discover:**
 |---|---|
 | **Laptop closed** | Socket drops. The job stays queued and unleased. The UI says *your machine is offline* and offers tier A or B **now**. Queued beyond 24 h → cancelled **with a notice**, never silently |
 | **Two machines connected** | A **job** locks to one runner, not the reverse — the claim is one statement, and the loser is told it got nothing. No `preferred` machine is built |
-| **Job half-done** | The lease is **separate from the result upload** — the GitLab lesson. `readCancel` renews it: 60 s, called every 20 s while a child runs. A lost job is re-claimed **once**, inside the claim statement, and expiry is swept inside `claimJob` too; Spark holds no lease state and no alarm ([46-SPEC-SPARK](46-SPEC-SPARK.md) §4.7; [45-SPEC-RECORD](45-SPEC-RECORD.md) §5.5). Liveness rides on auto-response, so the check is free |
+| **Job half-done** | The lease is **separate from the result upload** — the GitLab lesson. `readCancel` renews it: 60 s, called every 20 s while a child runs. A lost job is re-claimed **once**, inside the claim statement, and expiry is swept inside `claimJob` too; Slash holds no lease state and no alarm ([46-SPEC-SLASH](46-SPEC-SLASH.md) §4.7; [45-SPEC-RECORD](45-SPEC-RECORD.md) §5.5). Liveness rides on auto-response, so the check is free |
 | **Duplicate delivery** | Every job carries a stable `job_id` that a requeue keeps — **the idempotency key all four CI vendors omitted.** First result wins; the rest are discarded, and the `suggestion` row is written idempotently on `job_id` |
 | **Network breaks WebSockets** | A 20-second long poll — `claimJob { wait: 20 }` — on a **plain Worker**, where wall time is not billed. Degraded, and labelled as such |
 | **Runner silent 14 days** | Auto-deregistered, and the customer is told. A stale machine should not sit in a token list forever |
@@ -270,7 +270,7 @@ individual usage"* survives a product that generates the jobs.
 ### 4.1 · The controls that already existed
 
 Tier C inherits the load-bearing property for free, and this is why it is affordable at all:
-**Spark holds no write RPC**, so the job-scoped token carries `read` + `propose` and the eight-tool
+**Slash holds no write RPC**, so the job-scoped token carries `read` + `propose` and the eight-tool
 MCP surface exposes nothing else at those scopes. A perfect compromise of the local agent yields a
 row in `suggestion` that a human still has to accept.
 
@@ -303,7 +303,7 @@ So the job is **not free-form text the server may set to anything.**
 
 | Control | Effect |
 |---|---|
-| The runner ships the templates — data at `@braindog/spark/prompts`, zero imports, the one thing the CLI takes from the package ([31-STACK](31-STACK.md) §2) — and refuses an unknown `kind` | a compromised server cannot invent a fifth job |
+| The runner ships the templates — data at `@braindog/slash/prompts`, zero imports, the one thing the CLI takes from the package ([31-STACK](31-STACK.md) §2) — and refuses an unknown `kind` | a compromised server cannot invent a fifth job |
 | Arguments are ids and enums, never prose | there is no field to smuggle an instruction into |
 | First use of each kind is shown to the customer before it runs | four approvals, once, forever |
 | Every job appears in the activity feed with its id, kind and runner | *"what did my machine do last night"* is one query |
@@ -436,7 +436,7 @@ Three details worth writing down:
 1. **A decision must never be answered locally.** The gate returns `input_required`; in `dontAsk`
    the local agent cannot answer a question, which is **correct** — the human is not at the laptop.
    The runner returns `needs_decision` and BrainDog surfaces the choice in its own UI.
-   *Spark never decides, and neither does the laptop.*
+   *Slash never decides, and neither does the laptop.*
 2. **The cost figures Claude Code returns are client-side estimates**, and on a subscription they
    are meaningless as money. Display them as **effort**, never as a bill.
 3. **Stream the progress.** The event stream lets the UI say *your machine is working* with a turn
@@ -469,15 +469,15 @@ assistant so much as a chat assistant that runs out.
 | | Ships | When — [ADR-030](16-DECISIONS.md) | Role |
 |---|---|---|---|
 | **A-minimal** | **1st** | Phase A. The §1b base of [15-ROADMAP](15-ROADMAP.md) ships no intelligence at all | Triage, extraction, digest prose, embeddings. Small models, no conversation. The record works unattended |
-| **B — your key** | **2nd** | with the conversational surface — Spark's palette mode arrives with tier B, not before | The default conversation, **and the phone.** Claude quality, BrainDog pays nothing |
+| **B — your key** | **2nd** | with the conversational surface — Slash's palette mode arrives with tier B, not before | The default conversation, **and the phone.** Claude quality, BrainDog pays nothing |
 | **C — your machine** | **3rd** | last | The desk. Heavy work, best model, no per-token cost anywhere |
 | A-conversational | fallback | with tier B | Labelled honestly: *this is the small model — add a key or connect your machine.* Never silently substituted |
 
 **Why B before C, and it is not close.** B is days: the vault exists, the inference adapter already
 takes any OpenAI-compatible endpoint, and Anthropic is a config row and a request shape — per ask,
-the host opens the grant under the asker's browser session, decrypts in the Worker, hands Spark a
+the host opens the grant under the asker's browser session, decrypts in the Worker, hands Slash a
 per-call `Inference` adapter and writes one `grant.read` event; the package never holds the key
-([46-SPEC-SPARK](46-SPEC-SPARK.md) §5.9). C is
+([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.9). C is
 weeks: enrolment over the device grant, a WebSocket dispatcher with leases and requeue, a
 cross-platform runner, an installer, an offline UX, a revocation UI, and a distributed-systems test
 suite. **Prove people want Claude-grade answers before building the tier that makes them free.**
@@ -491,7 +491,7 @@ suite. **Prove people want Claude-grade answers before building the tier that ma
 | **Cloudflare Tunnel** | a daemon *and* a listener on the customer's machine, no self-host equivalent, and it solves a problem an outbound socket already solved |
 | **Long-poll as the Cloud primary** | ≈$4.05/customer/month held in a DO — a third of the price of the product. On a self-host it is the only transport, and free |
 | `--bare` | silently breaks subscription auth |
-| A Durable Object class for the runner | Spark already has the shape and the right prohibitions; the three classes are `Record`, `Spark` and `Directory` ([ADR-061](16-DECISIONS.md)), and the runner is not a fourth |
+| A Durable Object class for the runner | Slash already has the shape and the right prohibitions; the three classes are `Record`, `Slash` and `Directory` ([ADR-061](16-DECISIONS.md)), and the runner is not a fourth |
 | **Any path where BrainDog holds a Claude credential** | explicitly prohibited, enforceable *"without prior notice"*, and independently the worst security decision on the table |
 
 ---

@@ -6,8 +6,8 @@
  * made each one. The same words always give the same ranking. It never installs anything: it answers a
  * proposal, and the person accepts it or picks another.
  *
- * IT IS SPARK'S FIRST TIER, NOT SPARK'S MODEL. `@braindog/spark` is the model engine of `docs/46` and is
- * loaded only when `SPARK_ENDPOINT` is set. Tiers B and C file the same proposal this answers.
+ * IT IS SLASH'S FIRST TIER, NOT SLASH'S MODEL. `@braindog/slash` is the model engine of `docs/46` and is
+ * loaded only when `SLASH_ENDPOINT` is set. Tiers B and C file the same proposal this answers.
  */
 
 import { normaliseUseCase, useCasePack, type UseCase } from '@braindog/declare';

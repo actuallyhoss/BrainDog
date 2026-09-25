@@ -69,7 +69,7 @@ function holding(sql: NodeSql, needle: string): string[] {
  */
 async function recordWith(type: string, later: Field[][], first?: Declaration): Promise<{ sql: NodeSql; k: Kernel; made: Entry }> {
   const sql = openSqlite();
-  const k = await openRecord(sql, fixedClock(NOW), { answersSpark: true });
+  const k = await openRecord(sql, fixedClock(NOW), { answersSlash: true });
   value(await k.install([obligations([])]));
   const made = value<Entry>(k.create('obligations', { what: 'Rent' }, { actor: 'p_1' }));
   if (first !== undefined) value(await k.install([first]));
@@ -186,7 +186,7 @@ test('THE NEW FIELD THAT REFUSAL NAMES IS TEXT, beside a dropped secret declared
      field that was secret and no other. `code` is declared as text after `pin` came back as text, and is copied, and
      the rule naming it installs past the lint. */
   const sql = openSqlite();
-  const k = await openRecord(sql, fixedClock(NOW), { answersSpark: true });
+  const k = await openRecord(sql, fixedClock(NOW), { answersSlash: true });
   value(await k.install([obligations([{ id: 'pin', type: 'secret' }])]));
   value(await k.install([obligations([{ id: 'pin', type: 'secret', retired: true }])]));
   value(await k.install([obligations([])]));

@@ -18,7 +18,7 @@ and the Directory (§10), and the tier-C job protocol (§11).
 `packages/ports` exports nine interfaces, the `Refusal` and `RefusalCode` types (type-only — `where` refuses and sits
 below `kernel`, so the lowest shared package declares the shape; [30-BLUEPRINT](30-BLUEPRINT.md) §6 stays the list's
 home), two `Sql` adapters and the conformance cases (§3). No port imports another. `packages/record` uses exactly
-`{ Sql, Scheduler, Clock }`; `packages/spark` uses `{ Sql, Clock, Inference }`; `packages/connect` uses
+`{ Sql, Scheduler, Clock }`; `packages/slash` uses `{ Sql, Clock, Inference }`; `packages/connect` uses
 `{ Http, KeyStore, Clock }`; everything else is a host's. There are no fakes: `:memory:` is the memory adapter, and a
 `Clock` or `Scheduler` stand-in is an object literal in the test that needs it (37 §13 D9).
 
@@ -171,7 +171,7 @@ type CallContext = {
     | { kind: 'runner'; id: string; name: string }                                       // the tier-C runner's device grant (§11)
     | { kind: 'share';  id: string; slug: string }                                       // a share token: one projected page (§4)
     | { kind: 'system' }
-    | { kind: 'spark' };
+    | { kind: 'slash' };
   session?: { spoken?: string; client_id?: string; host?: string; repo?: string };   // the actor ladder's inputs
   op?: OperationGrantId;                // set when a bearer reaches one ADMIN method under an operation grant (§4, §10)
   now: number;
@@ -216,7 +216,7 @@ them. `ROUTES` in `@braindog/host` routes 68 of the ninety at `/api/<method>`, 3
 | DATA | `list` | `{ register, where?, order?, limit?, cursor?, fields? }` — default `order: [{ field: updated_at, dir: desc }]`, `limit` 50, max 500; a `limit` below 1 is `OUT_OF_BOUNDS` at `limit` rather than read as the default *(September 16th 2026; this row said 25 and 200, which the kernel never did)* | rows + `cursor` |
 | DATA | `create` | `{ register, fields, op_id }`; `fields` carrying `deleted_at` is `FIELD_UNKNOWN` at `deleted_at`, because a row does not arrive deleted | the row, `version` |
 | DATA | `update` | `{ register, seq \| id, patch, version, op_id }` — `version` is compare-and-set | the row, or `conflict` |
-| DATA | `propose` | `{ question, body_kind, body, op_id? }` — `body_kind ∈ options \| pattern \| rowset \| change` | `SG<n>`; Spark files a tier-A proposal here, once (46 §5) |
+| DATA | `propose` | `{ question, body_kind, body, op_id? }` — `body_kind ∈ options \| pattern \| rowset \| change` | `SG<n>`; Slash files a tier-A proposal here, once (46 §5) |
 | DATA | `log` | `{ note, target? }` — `note` ≤ 280 chars | the event |
 | DATA | `markRead` | `{ upTo? }`, person principals only; `upTo` is a cursor as `whatsNew` answers it: an `event.rowid` from a caller who reads the whole record, and from anybody else the `e.<id>` they were handed, a number being `VALUE_MALFORMED` at `upTo`. Absent means the newest event | `{ upTo, seen_at }`: the line the mark landed on, the newest at or below `upTo` the caller may see, as the same kind of cursor (`0` for nothing to mark); not an event |
 | DATA | `attach` | `{ source, client_id?, doing?, branch?, head? }`, `source` one of `startup` `resume` `clear` `compact` `cli`; a token only, needing `propose` | `{ session, spoken, resumed, project, context }`: the run the ladder found or opened, `project` its spoken id or `null`, and `context` the briefing READ+'s `context` gives for that run, so the start hook prints it from one answer. Re-attaching refreshes where the run is and what it is doing, and never `next`, `tried` or `notes` |
@@ -314,7 +314,7 @@ widened from four by migration `0008_arrange`): `options { question, options: [{
 installing is asynchronous (`ARRANGING`): `pack { install | enable | disable: <pack id>, doc? }`, exactly one verb
 naming one pack · `settings { pack, values, before? }` · `arrange { why: […], packs?, pages?, settings?, rows? }`,
 several of the others as one reviewable question, which says why in words and must change something.
-Spark's palette answer has a further shape, `query`, which is never filed (23 §4).
+Slash's palette answer has a further shape, `query`, which is never filed (23 §4).
 
 **What it would cost to get each one wrong** is computed from the body, never declared in it
 (`packages/kernel/src/weigh.ts`), and is what `governance.open` ranks the queue by — `undo`, `shape`, `rows`,
@@ -338,8 +338,8 @@ share a name is two update rows on `people`: the older row takes the union of bo
 deterministic, `accent` the theme's hue chooser (`nextAccentHue`, [ADR-028](16-DECISIONS.md); 13 §2.1b) — and
 `applyMigrations` runs before any cache load. `createRecordApi(deps): RecordApi` returns the eighty as named
 methods; a host routes `POST /api/<method>` by property lookup on that object — a two-line lookup in
-`@braindog/host`, never a `call` dispatcher in the record. `createSpark(deps): Spark` is the same shape for Spark's
-named methods (46 §2), served at `/api/spark/<method>`. `@braindog/mcp` reaches the same methods for an agent:
+`@braindog/host`, never a `call` dispatcher in the record. `createSlash(deps): Slash` is the same shape for Slash's
+named methods (46 §2), served at `/api/slash/<method>`. `@braindog/mcp` reaches the same methods for an agent:
 `handle(message, surface, ctx)` is the JSON-RPC core its stdio and HTTP transports share, and
 `serveMcp(request, surface, ctx, { maxBodyBytes?, session? })` is `POST /mcp`. Its `surface` is `McpSurface<C>`, a
 structural type naming only the methods the tools call, so a host passes the `RecordApi` itself once it has checked
@@ -413,9 +413,9 @@ Every route declares its group; a CI gate walks the router and fails on a route 
 | `/api/snapshot` · `/api/snapshots[/:id]` | POST · GET | cookie | ADMIN; the list reads R2 (Cloud) or `<slug>/snapshots/` (self-host) |
 | `/api/vault/deposit` · `/api/vault/open` | POST | **a vault grant's bearer**, checked by `vaultGrant`, which never accepts a login token; any `Origin` is refused | an agent's keys from a terminal (12 §6 rule 9). The host seals and opens with its `KeyStore` and the record binds sealed bytes only. Not record methods, so not in `ROUTES` |
 | `/api/keys/put` · `/api/keys/open` | POST | **cookie only**, on an origin this host answers for; every bearer is **403 `NEEDS_BROWSER_SESSION`**, the self-host's server key included, and a request carrying no `Origin` is refused | the owner's own keys from the Keys screen, through the same host step: `put` seals a new value or replaces the value of the row it names, `open` answers one key once with `no-store` and counts it as a `grant.read`. The VAULT gate decides, not the door (12 §6 rule 9, added September 16th 2026) |
-| `/api/spark/<method>` | POST | cookie only | Spark's named methods (46 §2), registered only when `SPARK_ENDPOINT` is set; otherwise no route |
+| `/api/slash/<method>` | POST | cookie only | Slash's named methods (46 §2), registered only when `SLASH_ENDPOINT` is set; otherwise no route |
 | `/api/boot` · `/api/pages/:slug` · `/api/schema/:register` | GET | bearer or cookie | aliases of `boot page schema` |
-| `/api/version` | GET | bearer or cookie | `{ version, format, kernel, primitives, app, spark: boolean }`. The polling fallback reads `version`, and what it is depends on who asks: `MAX(event.rowid)` to an owner who reads every list (the record's `holdsRowids`), and to anybody else a 53-bit hash, from two FNV-1a passes, of the id of the newest event line they are shown, or `0` when they are shown none. That second number is not ordered: a non-owner may compare it for change and nothing else, never read it as a count or scan from it, because the rowid gap it replaced counted the events they were not shown (`83875130`). The `app` tuple is here for a client that already has this record open, and `deploy-parity` reads the deployment's own copy at `/.well-known/braindog-build` instead, because this route is `READ+` and a deploy check carries no bearer (§8) |
+| `/api/version` | GET | bearer or cookie | `{ version, format, kernel, primitives, app, slash: boolean }`. The polling fallback reads `version`, and what it is depends on who asks: `MAX(event.rowid)` to an owner who reads every list (the record's `holdsRowids`), and to anybody else a 53-bit hash, from two FNV-1a passes, of the id of the newest event line they are shown, or `0` when they are shown none. That second number is not ordered: a non-owner may compare it for change and nothing else, never read it as a count or scan from it, because the rowid gap it replaced counted the events they were not shown (`83875130`). The `app` tuple is here for a client that already has this record open, and `deploy-parity` reads the deployment's own copy at `/.well-known/braindog-build` instead, because this route is `READ+` and a deploy check carries no bearer (§8) |
 | `/mcp` | POST | **bearer only**: an agent token, or the self-host's server key, by the path `/api` takes; never a cookie, never open mode | streamable HTTP, stateless, the 2026-07-28 shape: `serveMcp` in `@braindog/mcp/http` over the core's `handle`, called by both hosts; sixteen tools, resources, `instructions` with every `tools/list`. In order: 405 with `Allow: POST` for any other method, GET and DELETE included; 403 for any `Origin`; 415 for a body that is not `application/json`; 401 with `WWW-Authenticate: Bearer` before a byte of the body is read; 413 above 1 MB, on `Content-Length` and on the bytes; 400 `-32700` for a body that is not JSON. `MCP-Protocol-Version`, `Mcp-Method` and `Mcp-Name` are held to the body when sent, and required of a 2026-07-28 request: 400 with `-32022` for an unsupported version, `-32020` for a mismatch. A notification is 202 with no body; a method the server lacks is 404 `-32601`. No session id is minted or echoed. The token's `last_surface` is `mcp` |
 | `/in/webhook/<rec_id>/<ingest-id>/<token>` | POST | the ingest's `verify:` (HMAC header or the URL's random path segment) | above the auth gate; store raw, enqueue, return — an ingest id is per record, so the record is in the path |
 | `<slug>@in.brain.dog` | email | DKIM/SPF pass, else quarantined | Cloud: above the auth gate; store raw, enqueue |
@@ -558,11 +558,11 @@ a byte-for-byte copy of that, and an export is the same content with `local` str
 | Class | Instance | Holds |
 |---|---|---|
 | `Record` | `idFromName(rec_id)` | the record — 27 tables + 4 header tables; the named methods of `createRecordApi(deps)` (§2); the hibernatable WebSocket |
-| `Spark` | `idFromName(rec_id)` | the `settings` and `call` tables of 46 §4.1 — no conversation table, no retrieval cache; the runner's doorbell socket. **No lease state and no alarm**: job leases are the record's (`claimJob`, §11) |
+| `Slash` | `idFromName(rec_id)` | the `settings` and `call` tables of 46 §4.1 — no conversation table, no retrieval cache; the runner's doorbell socket. **No lease state and no alarm**: job leases are the record's (`claimJob`, §11) |
 | `Directory` | `idFromName('directory')` | persons, passkeys, sessions, magic links, invitations, `slug → rec_id`, the login lockout — the tables and flows of `@braindog/record/directory` (§10) |
 
-Classes extend `DurableObject`; `Record` exposes `createRecordApi(deps)`'s methods and `Spark` exposes
-`createSpark(deps)`'s, by name. Everything both hosts would otherwise write twice lives in **`@braindog/host`**: the
+Classes extend `DurableObject`; `Record` exposes `createRecordApi(deps)`'s methods and `Slash` exposes
+`createSlash(deps)`'s, by name. Everything both hosts would otherwise write twice lives in **`@braindog/host`**: the
 route table as data (`ROUTES`), `httpStatus(result)`, `resolveContext(req, lookups)`, `serveApi(api, req, ctx)` over
 standard `Request`/`Response`, and the session hints `/api` and `/mcp` both read, `sessionOf` for the headers and
 `hintsOf` for `_meta.session`. It is platform-neutral, about three hundred lines, and imported by the Worker and the
@@ -578,9 +578,9 @@ stateless.
   "compatibility_date": "2026-08-01",          // ≥ 2026-02-24 is the floor CI asserts: deleteAll() must delete the alarm. No compatibility_flags
   "durable_objects": { "bindings": [
     { "name": "RECORD",    "class_name": "Record" },
-    { "name": "SPARK",     "class_name": "Spark" },
+    { "name": "SLASH",     "class_name": "Slash" },
     { "name": "DIRECTORY", "class_name": "Directory" } ] },
-  "migrations": [ { "tag": "v1", "new_sqlite_classes": ["Record", "Spark", "Directory"] } ],
+  "migrations": [ { "tag": "v1", "new_sqlite_classes": ["Record", "Slash", "Directory"] } ],
   "queues":   { "producers": [ { "binding": "OUTBOX_Q", "queue": "braindog-outbox" } ],
                 "consumers": [ { "queue": "braindog-outbox", "max_batch_size": 10 } ] },
   "r2_buckets":     [ { "binding": "BLOBS", "bucket_name": "braindog-blobs" } ],
@@ -589,7 +589,7 @@ stateless.
   "analytics_engine_datasets": [ { "binding": "TELEMETRY", "dataset": "…" } ],
   "ratelimits":     [ /* the two bindings of 51 §5 */ ],
   "triggers":       { "crons": ["17 3 * * *"] },                 // the nightly walk: snapshot, re-wrap, reconcile, the ladder
-  "vars":           { "SPARK_ENDPOINT": "" },                    // unset = no Spark routes, `spark: false`
+  "vars":           { "SLASH_ENDPOINT": "" },                    // unset = no Slash routes, `slash: false`
   "secrets_store_secrets": [ { "binding": "KEK",      "store_id": "…", "secret_name": "braindog-kek" },
                              { "binding": "KEK_PREV", "store_id": "…", "secret_name": "braindog-kek-prev" } ],
   // Worker secrets: SESSION_SECRET · TOKENS_VALID_FROM · AGE_RECIPIENT — the only age material the Worker holds
@@ -630,7 +630,7 @@ the one home; a count is never a budget — it is read from the owning enumerati
 
 | Gate | Where | Asserts |
 |---|---|---|
-| `graph` | script | the package graph is acyclic and every import points down the thirteen-package order `render → ports → where → theme → fixtures → kernel → declare → extract → record → mcp → spark → connect → host` (31 §2); `mcp` imports `record`'s type only; apps import packages and never each other |
+| `graph` | script | the package graph is acyclic and every import points down the thirteen-package order `render → ports → where → theme → fixtures → kernel → declare → extract → record → mcp → slash → connect → host` (31 §2); `mcp` imports `record`'s type only; apps import packages and never each other |
 | `licence-closure` | script | `npm pack --dry-run --json` of both packages: no `@braindog/`, no `../../`, both LICENSE files start with the right words (31 §4) |
 | `clean-room` | script | no identifier from `clean-room.txt` in any tracked text file outside `docs/` — the predecessor tripwire (BUILD.md) |
 | `no-declarations-in-kernel` | script | the kernel declares nothing of the eight kinds except `register.session` |
@@ -638,7 +638,7 @@ the one home; a count is never a budget — it is read from the owning enumerati
 | `event-kinds` | script | the `event.kind` CHECK has forty members and the prose says forty |
 | `refusal-fixtures` | script | every code in 30 §6 has a fixture that produces it, and no fixture lacks a code; the script checks the names, the `via`-keyed runners of 40 §6 check production |
 | `router-groups` | script | every route declares its group; INTERNAL has no route; VAULT accepts no bearer; ADMIN accepts a bearer only with an operation grant, at exactly one ADMIN method |
-| `spark-actor` | script | `event WHERE actor = 'spark' AND kind NOT IN ('suggest','propose','predict')` is empty over the `corpus` record |
+| `slash-actor` | script | `event WHERE actor = 'slash' AND kind NOT IN ('suggest','propose','predict')` is empty over the `corpus` record |
 | `grant-note` | script | no `grant.*` event note contains its grant's `label` or `opens`, over the `corpus` record (12 §8) |
 | `mcp-budget` | test | not a gate script: `packages/mcp/test/budget.test.ts` holds `tools/list` at or under 2,600 tokens by `tokenBudget` (44 §5.8), measured at 2,311, each description under 200 and the instructions at or under 400 (44 §7) |
 | `secret-grep` | script | no write path, log line, push payload or prompt template can carry a `grant` plaintext |

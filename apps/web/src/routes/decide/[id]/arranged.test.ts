@@ -295,7 +295,7 @@ test('WHAT AN UPDATE TAKES AWAY is said on its own, with the rows each list keep
 
 test('A PLAN OF ROWS reads list by list, each row with the row it belongs with, counted on the queue and said once accepted', () => {
   const body = {
-    why: ['Drafted by Spark from what you said the project is.'],
+    why: ['Drafted by Slash from what you said the project is.'],
     packs: {},
     rows: [
       { register: 'milestones', fields: { what: 'Say what the show is about', stage: 'idea', state: 'underway', order: 1 } },

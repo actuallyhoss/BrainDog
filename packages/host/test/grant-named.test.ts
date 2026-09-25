@@ -1,11 +1,11 @@
 /**
- * The same vault answers the same key to Spark, to a scheduled action and to a script. SPK-3's guard against drift.
+ * The same vault answers the same key to Slash, to a scheduled action and to a script. SPK-3's guard against drift.
  *
  * THREE CALLERS, ONE ORDER. A scheduled action's `grant:` opens what `keyNamed` (`packages/kernel/src/actions.ts`) finds,
  * and the approval line names what `opensNamed` finds. A script's key is what `grantNamed` (`src/script.ts`) finds. The
- * host's own Spark key is what `sparkGrantOf` (`src/spark.ts`) finds. At `afb3b1b2` each of the four wrote the newest-first
- * order out for itself, and the audit of wave forty-nine found a fifth, Spark's `grants().find(...)`, opening the OLDEST
- * `spark` key while every action named `spark` sent the newest (`spark-grant-chooser.test.ts` case 1). Nothing but four
+ * host's own Slash key is what `slashGrantOf` (`src/slash.ts`) finds. At `afb3b1b2` each of the four wrote the newest-first
+ * order out for itself, and the audit of wave forty-nine found a fifth, Slash's `grants().find(...)`, opening the OLDEST
+ * `slash` key while every action named `slash` sent the newest (`slash-grant-chooser.test.ts` case 1). Nothing but four
  * authors copying the same clause kept the rest in step.
  *
  * SO EVERY CASE ASKS ALL OF THEM ABOUT ONE REAL VAULT and asserts one answer. A real kernel, because the order the rows come
@@ -16,15 +16,15 @@
  * included, made two of them disagree, so this file is the guard for the move to one chooser and not the proof of a wrong
  * winner. Copies were then broken by hand to see that the guard holds them. `grantNamed`'s sort turned oldest-first: 6 of
  * 8 fail, every case but the two revoke cases. Its id tie-break alone reversed: the two case 2s fail. `grantChosen`'s id
- * tie-break reversed, which `keyNamed` now reads: the two case 2s fail. `sparkGrantOf` was not broken by hand, because
- * `src/spark.ts` was not this change's file to edit; it answers in every case and case 2 is the one that holds its tie.
+ * tie-break reversed, which `keyNamed` now reads: the two case 2s fail. `slashGrantOf` was not broken by hand, because
+ * `src/slash.ts` was not this change's file to edit; it answers in every case and case 2 is the one that holds its tie.
  *
  * AND IT IS STILL NEEDED AFTER THE MOVE, because the move is half made. `keyNamed` and `opensNamed` hand their rows to the
- * kernel's `grantChosen`; `grantNamed` and `sparkGrantOf` keep their own copies until `@braindog/kernel`'s index exports
+ * kernel's `grantChosen`; `grantNamed` and `slashGrantOf` keep their own copies until `@braindog/kernel`'s index exports
  * it, which is one name in a file that was not this change's. Until then this file is all that holds the three together.
  *
- * WHAT THIS FILE DOES NOT ASSERT IS EQUALITY ACROSS KINDS. Spark passes over a `password`, a `note`, an `ssh_key` or
- * `recovery_codes` under `spark`, because its key goes out as a bearer; an action and a script take the newest entry of any
+ * WHAT THIS FILE DOES NOT ASSERT IS EQUALITY ACROSS KINDS. Slash passes over a `password`, a `note`, an `ssh_key` or
+ * `recovery_codes` under `slash`, because its key goes out as a bearer; an action and a script take the newest entry of any
  * kind. Case 5 holds both halves of that as they stand, so a change to either is a test edited on purpose.
  */
 
@@ -35,7 +35,7 @@ import { fixOf } from '@braindog/ports';
 import { openRecord, type GrantKind, type GrantRow, type Kernel } from '@braindog/kernel';
 
 import { grantNamed } from '../src/script.ts';
-import { SPARK_KEY_LABEL, sparkGrantOf } from '../src/spark.ts';
+import { SLASH_KEY_LABEL, slashGrantOf } from '../src/slash.ts';
 import { keyNamed } from '../../kernel/src/actions.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
@@ -71,11 +71,11 @@ async function vault() {
     return (made.value as GrantRow).id;
   };
   const script = grantNamed(() => k.grants());
-  /** What each caller opens under `name`. Spark is asked only about its own label, which is the only one it reads. */
+  /** What each caller opens under `name`. Slash is asked only about its own label, which is the only one it reads. */
   const opened = (name: string) => ({
     action: keyNamed(sql, name)?.id ?? null,
     script: script(name)?.id ?? null,
-    ...(name === SPARK_KEY_LABEL ? { spark: sparkGrantOf(k.grants())?.id ?? null } : {}),
+    ...(name === SLASH_KEY_LABEL ? { slash: slashGrantOf(k.grants())?.id ?? null } : {}),
   });
   /** Every caller opens `want` under `name`, and the approval line names what that entry opens. */
   const agree = (name: string, want: string | null) => {
@@ -89,7 +89,7 @@ async function vault() {
   return { k, bind, opened, agree, close: () => sql.close() };
 }
 
-for (const label of [SPARK_KEY_LABEL, 'goldapi']) {
+for (const label of [SLASH_KEY_LABEL, 'goldapi']) {
   test(`(1) ${label}: TWO LIVE TOKENS A DAY APART, and every caller opens the newer`, async () => {
     const v = await vault();
     try {
@@ -127,25 +127,25 @@ for (const label of [SPARK_KEY_LABEL, 'goldapi']) {
   });
 }
 
-test('(4) THREE TOKENS UNDER spark, THE LAST BOUND NOT THE NEWEST: the order is the instant, not the order of the binds', async () => {
+test('(4) THREE TOKENS UNDER `slash`, THE LAST BOUND NOT THE NEWEST: the order is the instant, not the order of the binds', async () => {
   const v = await vault();
   try {
-    v.bind(SPARK_KEY_LABEL);
-    const newest = v.bind(SPARK_KEY_LABEL, { after: 2 * DAY });
+    v.bind(SLASH_KEY_LABEL);
+    const newest = v.bind(SLASH_KEY_LABEL, { after: 2 * DAY });
     /* THE CLOCK STEPS BACK A DAY, as a host whose clock was corrected does, so the row bound last sits between the two. */
-    v.bind(SPARK_KEY_LABEL, { after: -DAY });
-    v.agree(SPARK_KEY_LABEL, newest);
+    v.bind(SLASH_KEY_LABEL, { after: -DAY });
+    v.agree(SLASH_KEY_LABEL, newest);
   } finally {
     v.close();
   }
 });
 
-test('(5) ACROSS KINDS SPARK KEEPS ITS OWN RULE: a password bound after the token is what an action sends and not what Spark does', async () => {
+test('(5) ACROSS KINDS SLASH KEEPS ITS OWN RULE: a password bound after the token is what an action sends and not what Slash does', async () => {
   const v = await vault();
   try {
-    const token = v.bind(SPARK_KEY_LABEL);
-    const password = v.bind(SPARK_KEY_LABEL, { kind: 'password' });
-    assert.deepEqual(v.opened(SPARK_KEY_LABEL), { action: password, script: password, spark: token });
+    const token = v.bind(SLASH_KEY_LABEL);
+    const password = v.bind(SLASH_KEY_LABEL, { kind: 'password' });
+    assert.deepEqual(v.opened(SLASH_KEY_LABEL), { action: password, script: password, slash: token });
   } finally {
     v.close();
   }

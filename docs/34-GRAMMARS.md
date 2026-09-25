@@ -453,7 +453,7 @@ checked-in fixtures LF so the same hash comes out on Windows and Linux CI ([31-S
 | Notification fields | 6 | `tone say because to key urgent` | 09 §4 |
 | Series kinds | 5 | `gauge flow cumulative unique fact` | 08 §3 |
 | Suggestion body kinds | 4 (+ `query`, never filed) | `options pattern rowset change` · `query` is the palette's unfiled answer | 23 §4 |
-| Refusal codes | 125, in 9 families | pack and declaration 54 · grammar 14 · write path 18 · auth and vault 8 · format and lifecycle 8 · dialect 2 · spark 5 · connector 12 · host and client 4 | 30 §6 |
+| Refusal codes | 125, in 9 families | pack and declaration 54 · grammar 14 · write path 18 · auth and vault 8 · format and lifecycle 8 · dialect 2 · slash 5 · connector 12 · host and client 4 | 30 §6 |
 | `SqlErrorCode` | 13 | 33 §3 — the adapter vocabulary, not refusal codes | 30 §13 |
 | `Http` error names | 4 | `PrivateRange TooLarge Timeout Network` — a vocabulary, not refusal codes | 33 §1 |
 | Event kinds | 40 | 30 §2 | 30 §2 |
@@ -465,7 +465,7 @@ checked-in fixtures LF so the same hash comes out on Windows and Linux CI ([31-S
 | `inbox_raw.state` | 7 | `untriaged matched skipped review proposed ignored erased` | 30 §1 |
 | Member levels | 5 | `read append write decide owner` | 20 §1 |
 | Token scopes | 3 | `read propose write` | 10 §2 |
-| Principal kinds | 6 | `person token runner share system spark` | 33 §2 |
+| Principal kinds | 6 | `person token runner share system slash` | 33 §2 |
 | Device-grant statuses | 6 | `pending approved active expired denied revoked` | 12 §6.1 |
 | `device_grant.reach` | 6 | `login runner export import pack token` — the last four are operation grants | 30 §1 |
 | Job kinds | 4 | `triage explain propose draft` | 26 §4 |
@@ -484,8 +484,8 @@ checked-in fixtures LF so the same hash comes out on Windows and Linux CI ([31-S
 | Record methods | 77 | 12 DATA · 13 READ+ · 4 VAULT · 7 JOBS · 22 ADMIN · 19 INTERNAL — 33 §2 | 30 §5 |
 | RPC groups | 6 | `DATA READ+ VAULT JOBS ADMIN INTERNAL` | 30 §5 |
 | `/auth/*` routes | 10 | 33 §4 | 33 §4 |
-| DO classes | 3 | `Record Spark Directory` | 01 §1 |
-| Packages | 13 | `render ports where theme fixtures kernel declare extract record mcp spark connect host`, in build order | 31 §2 |
+| DO classes | 3 | `Record Slash Directory` | 01 §1 |
+| Packages | 13 | `render ports where theme fixtures kernel declare extract record mcp slash connect host`, in build order | 31 §2 |
 | Ports | 9 + `Ingress` | `Sql Scheduler Clock Blobs Inference Dispatch Http KeyStore Snapshots` | 31 §5 |
 | Guarded SQL keywords | 6 | `BEGIN COMMIT END ROLLBACK SAVEPOINT RELEASE` | 33 §1 |
 | `Assert` methods | 4 | `ok equal deepEqual fail` | 33 §3 |

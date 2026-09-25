@@ -56,7 +56,7 @@
 # ── The agent surface ─────────────────────────────────────────────────────────────────────────────
 # Every register, to every agent, over one protocol. Eight tools, fixed.
 /packages/mcp/                      @actuallyhoss
-/packages/spark/                    @actuallyhoss
+/packages/slash/                    @actuallyhoss
 
 # ── The published packages, which carry a different licence ───────────────────────────────────────
 # MIT, no BrainDog imports, an SPDX header on every source file.

@@ -204,8 +204,8 @@ add-on.
 - **Group reach over the transport.** Every route has a group; no INTERNAL method is routable; VAULT
   is cookie-only; ADMIN admits no token principal. `router-groups` asserts this — a route it cannot
   see is a finding.
-- **Spark writing.** Spark has no write RPC by construction. Any path by which the assistant's object
-  produces an `event` with `actor = 'spark'` and a writing kind is a serious defect.
+- **Slash writing.** Slash has no write RPC by construction. Any path by which the assistant's object
+  produces an `event` with `actor = 'slash'` and a writing kind is a serious defect.
 - The **decision gate**. A proposal that becomes a decision without a person, a decision written
   without its mandatory reason, or a `decision` row that can be edited after the fact.
 - **Prompt injection**, with a boundary. In scope: a path where untrusted content reaches the

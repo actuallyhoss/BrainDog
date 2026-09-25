@@ -53,10 +53,10 @@ export function subjectOf(body: Body): string | null {
 
 /**
  * The steps that hand off to somebody else and do not come back in this build. `flow.ts` fails a run that reaches a
- * `call` with `NOT_IN_THIS_BUILD`, after taking every step before it, and on a host that does not answer Spark the lint
- * refuses `ask_spark` at install, because nothing there serves the question it would queue. `ask_person` is not here: it
- * opens its question in Decide and the decision wakes the run (Brief C). Nor is `ask_spark` where the host answers it
- * (`said`'s `answersSpark`): the run parks on the step and the model's answer wakes it.
+ * `call` with `NOT_IN_THIS_BUILD`, after taking every step before it, and on a host that does not answer Slash the lint
+ * refuses `ask_slash` at install, because nothing there serves the question it would queue. `ask_person` is not here: it
+ * opens its question in Decide and the decision wakes the run (Brief C). Nor is `ask_slash` where the host answers it
+ * (`said`'s `answersSlash`): the run parks on the step and the model's answer wakes it.
  *
  * NOR IS `script`, SINCE 24 SEPTEMBER. `flow.ts`'s `startScript` queues the script's run and the run goes on, and this
  * list still named it after the runner stopped failing it: the dry run of Work's `rule.close_follow_ups` ended its one
@@ -68,14 +68,14 @@ export function subjectOf(body: Body): string | null {
  * told only "would call" files the rule, the owner accepts it, and the first run fails at that step while its author
  * reads the dry run as a promise. The test that holds this list runs a real one.
  */
-export const WAITS_ON_OTHERS: readonly string[] = ['call', 'ask_spark'];
+export const WAITS_ON_OTHERS: readonly string[] = ['call', 'ask_slash'];
 
 const NOT_BUILT = ' Not in this build: a run stops here, after the steps before it.';
 const NOT_INSTALLED = ' Not in this build: a rule with this step is refused at install.';
 /** `flow.ts`'s `ASK_PERSON_WAIT`, copied for the reason the three above are and held by the same test. */
 const ASK_PERSON_WAIT = '7d';
-/** `flow.ts`'s `ASK_SPARK_WAIT_MS` as a span, copied likewise and held by `automations-spark.test.ts`. */
-const ASK_SPARK_WAIT = '1d';
+/** `flow.ts`'s `ASK_SLASH_WAIT_MS` as a span, copied likewise and held by `automations-slash.test.ts`. */
+const ASK_SLASH_WAIT = '1d';
 
 export type Said = {
   path: 'inline' | 'run';
@@ -222,7 +222,7 @@ export function nestedPast(list: unknown, limit: number = SAID_DEPTH, depth = 0)
 }
 
 /** One step, or a branch and its arms, as lines. */
-function stepLines(step: unknown, depth: number, out: string[], spark: boolean): void {
+function stepLines(step: unknown, depth: number, out: string[], slash: boolean): void {
   const pad = '  '.repeat(depth);
   if (depth > SAID_DEPTH) {
     out.push(`${pad}Nested deeper than ${SAID_DEPTH} branches, so not said.`);
@@ -235,10 +235,10 @@ function stepLines(step: unknown, depth: number, out: string[], spark: boolean):
   const s = step;
   if ('if' in s) {
     line(`If ${words(s.if)}:`);
-    for (const inner of Array.isArray(s.then) ? s.then : []) stepLines(inner, depth + 1, out, spark);
+    for (const inner of Array.isArray(s.then) ? s.then : []) stepLines(inner, depth + 1, out, slash);
     if (s.else !== undefined) {
       line('Otherwise:');
-      for (const inner of Array.isArray(s.else) ? s.else : []) stepLines(inner, depth + 1, out, spark);
+      for (const inner of Array.isArray(s.else) ? s.else : []) stepLines(inner, depth + 1, out, slash);
     }
     return;
   }
@@ -259,10 +259,10 @@ function stepLines(step: unknown, depth: number, out: string[], spark: boolean):
       `Start script.${words(run.id)}${as} and go on without waiting for it: what it writes lands when this host runs it. The run stops here if the script is not installed, does not say runs: { rule: true }, or is paused, or if its input hands on what a secret or file field holds.`,
     );
   }
-  if ('ask_spark' in s) {
-    const ask = spec('ask_spark');
-    const asked = `Ask Spark ${JSON.stringify(words(ask.question))}, and keep the answer as ${words(ask.as)}.`;
-    if (!spark) return line(`${asked}${NOT_INSTALLED}`);
+  if ('ask_slash' in s) {
+    const ask = spec('ask_slash');
+    const asked = `Ask Slash ${JSON.stringify(words(ask.question))}, and keep the answer as ${words(ask.as)}.`;
+    if (!slash) return line(`${asked}${NOT_INSTALLED}`);
     /* WHERE THE HOST ANSWERS, WHAT LEAVES THE RECORD, because that is the question the owner accepting it is asked. The
        run sends `about:`'s fields, and the question as `flow.ts`'s `ask` fills it from the row, so a field the braces
        name goes out in the question's own words. Less any secret or file field in both, which this line cannot see
@@ -272,7 +272,7 @@ function stepLines(step: unknown, depth: number, out: string[], spark: boolean):
     const sent = Array.isArray(ask.about) ? ask.about.map(words) : [];
     const about = sent.length === 0 ? 'no field of the row' : `the row's ${sent.length === 1 ? sent[0] : `${sent.slice(0, -1).join(', ')} and ${sent.at(-1)}`}`;
     const goes = words(ask.question).includes('{{') ? `what its braces name filled in, and with ${about === 'no field of the row' ? 'no other field of the row' : about}` : about;
-    return line(`${asked} The run waits up to ${ASK_SPARK_WAIT} for this host's model to answer, and stops here without one. The question goes with ${goes}.`);
+    return line(`${asked} The run waits up to ${ASK_SLASH_WAIT} for this host's model to answer, and stops here without one. The question goes with ${goes}.`);
   }
   if ('ask_person' in s) {
     /* IN DECIDE, WHERE ANYONE WHO DECIDES ANSWERS IT: nothing addresses a question to one person, and the lint refuses
@@ -307,14 +307,14 @@ function stepLines(step: unknown, depth: number, out: string[], spark: boolean):
  * not been written yet, a clock that has not ticked or a button nobody has pressed, so what can be said before it is
  * installed is the sentence and the steps, which is what Decide and the agent that filed it both read.
  *
- * `answersSpark` IS THE HOST'S SWITCH, THE ONE THE KERNEL'S LINT READS (`RecordDeps.answersSpark`). Without it every
- * `ask_spark` step read "refused at install", and on a self-host with a model the same rule installed and ran to
- * `waiting` with its question queued (`automations-spark.test.ts`). Absent is no, which is what the lint says too.
+ * `answersSlash` IS THE HOST'S SWITCH, THE ONE THE KERNEL'S LINT READS (`RecordDeps.answersSlash`). Without it every
+ * `ask_slash` step read "refused at install", and on a self-host with a model the same rule installed and ran to
+ * `waiting` with its question queued (`automations-slash.test.ts`). Absent is no, which is what the lint says too.
  */
-export function said(body: Body, { answersSpark = false }: { answersSpark?: boolean } = {}): Said {
+export function said(body: Body, { answersSlash = false }: { answersSlash?: boolean } = {}): Said {
   const out: string[] = [];
   const list = body.steps ?? body.then;
-  for (const step of Array.isArray(list) ? list : []) stepLines(step, 0, out, answersSpark);
+  for (const step of Array.isArray(list) ? list : []) stepLines(step, 0, out, answersSlash);
   return { path: pathOf(body), trigger: started(body), steps: out };
 }
 

@@ -59,7 +59,7 @@ test('A SLUG AFTER /app/ IS THE RECORD, A WORD THE APP ROUTES IS ITS PAGE, AND T
    take a parameter as their second segment (`apps/web/src/routes/<word>/[param]/`, counted), and `/app/r/api` is the
    register page for a register called `api`. */
 test('AN API PATH UNDER THE UPPER-CASE SPELLING OF A NAME, OR UNDER A RESERVED WORD THE APP DOES NOT ROUTE, IS NO APP PATH', () => {
-  for (const path of ['/app/Acme/api/boot', '/app/ACME/api', '/app/Acme/api/', '/app/Ada-At-Home/api/spark/status', '/app/admin/api/boot', '/app/www/api/boot', '/app/mcp/api/boot', '/app/auth//api/boot'])
+  for (const path of ['/app/Acme/api/boot', '/app/ACME/api', '/app/Acme/api/', '/app/Ada-At-Home/api/slash/status', '/app/admin/api/boot', '/app/www/api/boot', '/app/mcp/api/boot', '/app/auth//api/boot'])
     assert.equal(appPath(path), null, path);
   /* THE SAME WORDS WITHOUT `/api` ARE STILL PAGES, which is what the app's root `[id]` route and its 404 page draw. */
   assert.deepEqual(appPath('/app/Acme'), { slug: null, rest: '/Acme' });
@@ -118,10 +118,10 @@ test('A PAGE LOAD ON THE OLD HOST IS A 308 TO THE SAME PAGE UNDER /app ON THE NE
    and with `text/html`, and so were `/app/_app/version.json` and `/app/fonts/geist.woff2` under a wildcard. The public
    host's branch already asked both questions below; the legacy branch asked neither. */
 test('§2.5: "/api/*, /mcp AND /in/* ARE SERVED, NEVER REDIRECTED" ON THE OLD HOST, AND THAT INCLUDES A SLUG’S /api', () => {
-  /* THE WEB'S ONE GET, `hostGet`'s Spark status, is sent under the slug by `apiBase()`. A 308 to another origin carries
-     no CORS header, so a stale tab's same-origin fetch cannot follow it and the palette's Spark line fails. */
+  /* THE WEB'S ONE GET, `hostGet`'s Slash status, is sent under the slug by `apiBase()`. A 308 to another origin carries
+     no CORS header, so a stale tab's same-origin fetch cannot follow it and the palette's Slash line fails. */
   for (const accept of [undefined, '*/*', 'text/html,application/xhtml+xml'])
-    for (const path of ['/app/acme/api/boot', '/app/acme/api/spark/status', '/app/acme//api/boot'])
+    for (const path of ['/app/acme/api/boot', '/app/acme/api/slash/status', '/app/acme//api/boot'])
       assert.equal(legacyRedirect(on(path, accept === undefined ? {} : { headers: { accept } }), LEGACY, PUBLIC), null, `${path} ${accept ?? '(no accept)'}`);
 });
 
@@ -263,7 +263,7 @@ test('A ROTATION RIDES ON THE 302, AND A DEAD COOKIE IS THE SHELL WITH THE COOKI
 
 test('THE CATALOGUE IS READ UNDER /app/catalogue/, WHERE THE BUILD PUTS IT ONCE THE APP HAS A BASE PATH', async () => {
   /* `paths.base: '/app'` moves `apps/web/static/catalogue` to `build/app/catalogue` (`loop/research-one-domain.md` §3.2),
-     so a reader that asked only `/catalogue/` would find the shell, read it as no file, and Spark would offer nothing. */
+     so a reader that asked only `/catalogue/` would find the shell, read it as no file, and Slash would offer nothing. */
   const asked: string[] = [];
   const moved: Assets = {
     fetch: async (request) => {

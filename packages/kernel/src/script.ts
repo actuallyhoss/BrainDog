@@ -55,8 +55,8 @@ const NAME = /^[a-z][a-z0-9_-]{0,31}$/u;
 const TARGET = /^(?:series\.)?[a-z][a-z0-9_-]{0,31}$/u;
 /** A vault label's length, as `ingestBody` holds a `grant:` to it. */
 const LABEL_BYTES = 40;
-/** The vault label of the included model's key, `SPARK_KEY_LABEL` in `@braindog/host/spark`, which no script may name. */
-const SPARK_KEY = 'spark';
+/** The vault label of the included model's key, `SLASH_KEY_LABEL` in `@braindog/host/slash`, which no script may name. */
+const SLASH_KEY = 'slash';
 
 const bad = (code: string, fix: string, at: string): Refusal => ({ code, fix, at });
 
@@ -125,17 +125,17 @@ export function scriptBody(decl: { id: string; body: Record<string, unknown> }):
       return bad('DECLARATION_INVALID', `${id}'s key ${i + 1} is the label of a key in the vault, at most ${LABEL_BYTES} characters.`, `keys[${i}]`);
   if (body.keys.length > 0 && body.egress.length === 0)
     return bad('DECLARATION_INVALID', `${id} names a key and fetches from nowhere, so the key would be opened for nothing. Write the origin it is for.`, 'keys');
-  /* THE VAULT'S `spark` KEY, REFUSED HERE AND NOT ONLY AT RUN TIME. Both hosts refuse a run that declares it
-     (`sparkDeclared` in `@braindog/host/script`), because on a host with no `SPARK_KEY` it is the key the included model
+  /* THE VAULT'S `slash` KEY, REFUSED HERE AND NOT ONLY AT RUN TIME. Both hosts refuse a run that declares it
+     (`slashDeclared` in `@braindog/host/script`), because on a host with no `SLASH_KEY` it is the key the included model
      answers everybody with. Refused only there, the owner was still asked in Decide to approve a script that could never
-     run, and accepting it installed a clock that failed every hour. The label is the host's `SPARK_KEY_LABEL`, written
+     run, and accepting it installed a clock that failed every hour. The label is the host's `SLASH_KEY_LABEL`, written
      out because the kernel may not import the host; install, a proposal's check and a trial all come through here. */
-  const sparked = body.keys.indexOf(SPARK_KEY);
-  if (sparked >= 0)
+  const slashed = body.keys.indexOf(SLASH_KEY);
+  if (slashed >= 0)
     return bad(
       'FORBIDDEN',
-      `${id} names the vault's "${SPARK_KEY}" key, which is the key this host's included model answers with, and a script may not send it anywhere. Put the provider's own key in the vault under another label.`,
-      `keys[${sparked}]`,
+      `${id} names the vault's "${SLASH_KEY}" key, which is the key this host's included model answers with, and a script may not send it anywhere. Put the provider's own key in the vault under another label.`,
+      `keys[${slashed}]`,
     );
 
   for (const side of ['reads', 'writes'] as const) {

@@ -496,7 +496,7 @@ colour *value* is parsed, re-serialised and contrast-checked by `theme` (28 §4.
 | `schedule` | `{ day?, at: Clock, tz? }` — weekly with `day`, daily without | yes | `tz: record` | `day ∈ mon tue wed thu fri sat sun` |
 | `channels` | 1–5, unique | yes | — | `in-app email push webhook mcp` (09 §3) |
 | `sections` | 1–12 of `{ heading: text ≤ 60, source: register.<Id> \| metric.<Id>, where?, as, columns?, limit?: 1–50, omit_when_empty?: bool }` | yes | `omit_when_empty: false` | `as ∈ KINDS` except `section`; `table` and `cards` need `columns` |
-| `prose` | — | no | — | `spark` |
+| `prose` | — | no | — | `slash` |
 
 ### 4.12 · `Diff` — 04 §3
 
@@ -942,7 +942,7 @@ seventy-five fixtures and gains D4's five.
 
 **Unblocks:** `packages/mcp` (#9 — a `pattern` suggestion body carries an ingest declaration, validated with `schemas.ingest`);
 `packages/record` (#10 — `planPack` = `normalise` + `plan`, `installPack` = `plan` + `install`, `uninstallPack` = `uninstall`,
-`setDeclaration` through the same schemas); `packages/spark` (#11 — proposes ingest declarations); `apps/cli` (#12 — `pack lint |
+`setDeclaration` through the same schemas); `packages/slash` (#11 — proposes ingest declarations); `apps/cli` (#12 — `pack lint |
 plan | install | uninstall`, importing `./yaml`); `apps/web` (#13 — the paste installer through `./yaml` by `import()`, generated
 forms from `schemas`). BUILD.md places it in phase 1 beside the kernel.
 
@@ -964,7 +964,7 @@ forms from `schemas`). BUILD.md places it in phase 1 beside the kernel.
 | D10 | Block ids follow `Id`; 22 §3's `burnRate` reads `burn_rate`. For 36: the fence regex `^[a-z]+` admits no pack kind with a digit or `_` — widen it or keep pack kinds page-only | 22 §3 · 34 §2.1 |
 | D11 | A pack kind's `accepts` names are legal keys on a page block of that kind, typed as §4.6 (`register metric number text`) | 06 §1.1 · 22 §3 |
 | D12 | `install(diff, host, approved)` builds the kernel's `InstallBatch` and calls `installDeclarations`; `uninstall` calls `retireDeclarations`; `Host` is the structural slice of `Kernel` (41 §2) with the `CallContext` bound by the record's `installPack(pack, planHash)`, which re-plans first. No SQL lives in this package | 45 (record) · 41 (`InstallBatch` gains `retire` and `seeds`) |
-| D13 | Digest keys typed: `schedule { day?, at, tz? }`, `channels ⊆ in-app email push webhook mcp`, `sections` ≤ 12, `prose: spark` | 09 §6 |
+| D13 | Digest keys typed: `schedule { day?, at, tz? }`, `channels ⊆ in-app email push webhook mcp`, `sections` ≤ 12, `prose: slash` | 09 §6 |
 | D14 | Form and `map` shapes follow 43 §4.3–§4.5 exactly (`anchor` inside the form, `lookup: { register, by }`, `first` 2–8, `nth` ≤ 64, `default: { value, of }`); `fetch` follows 47 §4.1 key for key, including 47 D7's four keys that are not v1 | 07 §3 · 25 §3.2 |
 | D15 | `metric.name` optional (the id); `note` legal on every declaration, field, block, section and action (21 §11) | 08 §2 · 04 §2 |
 | D16 | Uninstall retires every `declaration` row, deletes the `pack` row and drops the pack's index families (41 §5.6); "DELETES nothing" reads "nothing of yours" | 04 §4 |

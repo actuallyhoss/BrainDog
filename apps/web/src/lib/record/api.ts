@@ -2818,7 +2818,7 @@ function captureBlock(b: PageBlock): BlockResult {
  * it, and a page that drew nothing without one would make the kind unreviewable. The two are held
  * against each other in `engines.test.ts`.
  *
- * `spark` IS WHO OPENED THEM, because the sample's proposals are all Spark's (`PROPOSALS`), and the
+ * `slash` IS WHO OPENED THEM, because the sample's proposals are all Slash's (`PROPOSALS`), and the
  * `Question` it keeps carries no author of its own.
  */
 function openBlock(b: PageBlock): BlockResult {
@@ -2837,7 +2837,7 @@ function openBlock(b: PageBlock): BlockResult {
     .slice(0, limit)
     .map((q) => ({
       id: q.id,
-      who: 'spark',
+      who: 'slash',
       at: q.opened,
       kind: PROPOSALS[q.id]?.kind ?? 'options',
       question: q.title,
@@ -3364,7 +3364,7 @@ export const actorOf = (by: string): string => {
   const rule = /^rule\.(.+)$/.exec(by);
   if (rule) return ruleName(rule[1]!) ?? `${rule[1]!.replace(/[._-]/g, ' ')} rule`;
   /* THE TWO ACTORS THAT ARE NEITHER PEOPLE NOR RULES. `30 §3` closes the grammar at five shapes and
-     two of them are bare words: `spark` is the assistant — *"only ever on `suggest`, `propose` or
+     two of them are bare words: `slash` is the assistant — *"only ever on `suggest`, `propose` or
      `predict`, never on a row write"* — and `system` is *"migrations, purges, the scheduler itself,
      the dead-letter suggestion"*.
 
@@ -3373,7 +3373,7 @@ export const actorOf = (by: string): string => {
      about exactly that — the schema's word on a surface a person reads — and *who backed up my
      record* is answered by "the record itself", not by a principal name. */
   if (by === 'system') return 'the record itself';
-  if (by === 'spark') return 'the assistant';
+  if (by === 'slash') return 'the assistant';
   /* AN AGENT BY ITS NAME: a token's write with no run is signed `agent:claude` (`30 §3`), and Home said "Agent:claude". */
   const agent = /^agent:(.+)$/u.exec(by);
   if (agent) return agent[1]!;

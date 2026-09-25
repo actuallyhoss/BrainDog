@@ -1,5 +1,5 @@
 /**
- * Spark's catalogue offers on the Worker: read from the catalogue bundled with the shell through the static assets, the same
+ * Slash's catalogue offers on the Worker: read from the catalogue bundled with the shell through the static assets, the same
  * offers a self-host gives from its folder, and nothing for a file the assets answer with the shell instead.
  */
 

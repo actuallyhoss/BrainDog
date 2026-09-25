@@ -150,7 +150,7 @@ narrowing, never starting.
 ## What is deliberately absent
 
 - **No write path.** Nothing saves, and no request leaves the page.
-- **No Spark.** The record has no model configured, so every *Ask Spark* affordance is **absent, not
+- **No Slash.** The record has no model configured, so every *Ask Slash* affordance is **absent, not
   disabled** — which is also the correct behaviour on any self-host.
 - **No service worker, no outbox, no dialect editor.** Named in `50-SPEC-WEB` and not built here.
 - **No page-generation wizard.** `Bind as a block` puts one saved view on one page you already have,

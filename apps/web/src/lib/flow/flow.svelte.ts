@@ -69,18 +69,18 @@ export class FlowDraft {
   /** The version it was opened at, or `null` for a new one. What a save is drawn from. */
   version: number | null = null;
   /**
-   * Whether this host answers Spark, which decides whether an `ask_spark` card is a fault (`faultsOf`).
+   * Whether this host answers Slash, which decides whether an `ask_slash` card is a fault (`faultsOf`).
    *
    * READ EACH TIME, NOT KEPT, because it was kept and the menu beside it is not. The layout forgets a refused
    * `/api/version` and asks again on the next navigation, a move from one automation to another keeps the page, and
-   * `StepMenu`'s `$derived` follows the new answer: kept from the first load, the draft faulted every Ask Spark card the
+   * `StepMenu`'s `$derived` follows the new answer: kept from the first load, the draft faulted every Ask Slash card the
    * menu had just offered (`flow.svelte.test.ts`). A function read inside `faults` is also what a `$derived` over the
    * faults tracks, so the two cannot disagree. A plain boolean is still taken, for a caller with nothing to follow.
    */
-  get spark(): boolean {
-    return this.#spark();
+  get slash(): boolean {
+    return this.#slash();
   }
-  #spark: () => boolean;
+  #slash: () => boolean;
   /** State, so that `sent` quietens the button: `dirty` reads it, and a plain field would not tell anything it moved. */
   #opened = $state('');
   #undo = $state.raw<Draft[]>([]);
@@ -94,8 +94,8 @@ export class FlowDraft {
    */
   #held = $state.raw<ReadonlySet<string>>(new Set());
 
-  constructor({ spark }: { spark: boolean | (() => boolean) }) {
-    this.#spark = typeof spark === 'function' ? spark : () => spark;
+  constructor({ slash }: { slash: boolean | (() => boolean) }) {
+    this.#slash = typeof slash === 'function' ? slash : () => slash;
   }
 
   /** Open a body. `null` is a new automation, which has no version and nothing to compare against. */
@@ -121,7 +121,7 @@ export class FlowDraft {
   }
 
   get faults() {
-    return faultsOf(this.draft, { spark: this.spark });
+    return faultsOf(this.draft, { slash: this.slash });
   }
 
   get path() {

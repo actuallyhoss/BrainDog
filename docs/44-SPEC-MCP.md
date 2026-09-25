@@ -538,7 +538,7 @@ Row 4's description carries the sentence the start hook prints: *"Two sessions i
 other. Coordinate or stop."* (32 §2.1). Row 17's description is the skill's `trigger`, because when to use a thing is
 the headline. Row 7 names each action's key by its vault label and never reads anything sealed to build the list.
 Rows 12 and 13 say what does not run yet as well as what does: a script started by a door or a rule, a `metric` or
-`decided` trigger, and `call`, `script` and `ask_spark` steps. Row 3 replaces the `learnings/for/{repo}` of an earlier revision:
+`decided` trigger, and `call`, `script` and `ask_slash` steps. Row 3 replaces the `learnings/for/{repo}` of an earlier revision:
 `context` carries the learnings for where the session stands. `dialect` and `whats-new` are not built, and wait for
 their methods.
 
@@ -824,7 +824,7 @@ the call.
 | `FORBIDDEN` | JOBS, runner half | `claimJob` `postJobEvent` `readCancel` | *A job is code execution on a machine. Only the enrolled runner's device grant claims it, over /api, never over MCP.* |
 | `NEEDS_BROWSER_SESSION` | ADMIN | `planPack` `installPack` `uninstallPack` `setDeclaration` `invite` `export` `import` `erase` `restore` | *Installing a pack or erasing a record is the owner's act, from a browser session. No admin token exists.* |
 | `FORBIDDEN` | DATA | `markRead` | *The read mark belongs to a person; a token has none. Use whats-new with your own cursor.* |
-| `FORBIDDEN` | READ+ | `project` | *The projection is Spark's read. Read through search, list and get.* |
+| `FORBIDDEN` | READ+ | `project` | *The projection is Slash's read. Read through search, list and get.* |
 | `LEVEL_REQUIRED` | none | `propose` carrying `inputResponses` (§5.7) | *Deciding is a person's act and no token holds it; the suggestion waits in the Decide queue of the app.* |
 
 Twenty-one names in `REFUSED` (4 + 3 + 3 + 9 + 1 + 1), plus one shape. The codes are 30 §6's rows

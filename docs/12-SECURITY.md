@@ -52,7 +52,7 @@ rather than by an incident, which is the only good way to find it.
 | An MCP client | an agent token (Phase A ships tokens only); OAuth 2.1 (RFC 9728 metadata, RFC 9207 `iss`, CIMD) when BrainDog is its own authorization server — deferred, [33-CONTRACTS](33-CONTRACTS.md) §4 |
 | A shared link recipient | a signed, scoped, expiring token — the `share` principal kind of the one `CallContext`. Read-only, one page — `page(slug)` for one slug; `ctx.scope` is the link's projection, an empty ceiling ([20-COLLABORATION](20-COLLABORATION.md) §1); nothing else |
 | A person, invited | the owner mints a single-use invitation link (24 h, bound to one address) — `invite`, an ADMIN method. The record stores only `sha256(secret)` and answers the link once; no host mails it, and the owner sends it. The link is `<origin>/app/invite#<token>` (under `/app` since push A of the one-domain move, and with no slug, because the token names its record), the fragment keeping the token out of logs, proxies and `Referer`; the page posts it to `POST /auth/invite`, which signs the invitee in — an address that can already sign in here signs in first — and calls `acceptInvite` — INTERNAL — with the Directory's verified person, and that writes the `member` rows and one `access.grant` event per register, as `system` ([20-COLLABORATION](20-COLLABORATION.md) §1) |
-| **A machine the customer connected** — the tier-C runner | **the device grant of §6.1** with `reach = runner` (RFC 8628): six-digit code, owner approves in the browser, a 90-day bearer stored as `token_hash`, auto-deregistered after 14 silent days; the `runner` principal kind. It reaches the JOBS group's three runner methods — `claimJob` · `postJobEvent` · `readCancel` ([30-BLUEPRINT](30-BLUEPRINT.md) §5) — and, per job, a job bearer that `claimJob` mints as a `token` row: scope `propose` (which reads), labelled `job:<id>`, audience one job, expiring with the job ([46-SPEC-SPARK](46-SPEC-SPARK.md) §4.7). Never `write`. See [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §2.3 |
+| **A machine the customer connected** — the tier-C runner | **the device grant of §6.1** with `reach = runner` (RFC 8628): six-digit code, owner approves in the browser, a 90-day bearer stored as `token_hash`, auto-deregistered after 14 silent days; the `runner` principal kind. It reaches the JOBS group's three runner methods — `claimJob` · `postJobEvent` · `readCancel` ([30-BLUEPRINT](30-BLUEPRINT.md) §5) — and, per job, a job bearer that `claimJob` mints as a `token` row: scope `propose` (which reads), labelled `job:<id>`, audience one job, expiring with the job ([46-SPEC-SLASH](46-SPEC-SLASH.md) §4.7). Never `write`. See [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §2.3 |
 | Inbound webhook | the URL is `/in/webhook/<rec_id>/<ingest-id>/<token>` — a random path token per ingest — and a declared `verify: { kind: hmac_sha256, header: X-Signature, grant: <label> }` ([25-CONNECTORS](25-CONNECTORS.md) §3.2) is checked in the host through the record's `ingestVerify`, since the record never decrypts ([51-SPEC-WORKER](51-SPEC-WORKER.md) §5.4); an unverified payload is stored `untriaged` and never matched |
 | Inbound email | the per-record address is the capability; a DKIM/SPF pass is required to match, else the payload is quarantined `untriaged` |
 | Self-host, single user | `BRAINDOG_TOKEN` for a private instance — owner level, everything; self-host single-user only — exchanged at `POST /auth/token` for a session, behind which passkeys are registered (ES256 and RS256, no attestation); the magic link waits for a mail transport on this host ([49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §5.10) |
@@ -90,7 +90,7 @@ a revoke button. A credential you cannot see being used is a credential you cann
 
 Restated here because it is a security control and not only a correctness one.
 
-Inference, webhooks out, email out and pack fetching happen in the Worker or in Spark's object.
+Inference, webhooks out, email out and pack fetching happen in the Worker or in Slash's object.
 The record object can be asked for data and can store data. It cannot speak.
 
 Two problems solved by one line: `fetch()` inside a Durable Object breaks the input/output gates
@@ -119,15 +119,15 @@ communication.** BrainDog has the first two structurally. The full design is in
 
 | Control | Kind |
 |---|---|
-| Spark has no write RPC | architectural |
-| Spark has no tool that returns a secret | architectural |
-| Spark's only outbound call is the model | architectural |
+| Slash has no write RPC | architectural |
+| Slash has no tool that returns a secret | architectural |
+| Slash's only outbound call is the model | architectural |
 | Untrusted content is read by a **tool-less** model; only its structured output reaches the tool-bearing one | architectural |
 | A write whose provenance touches `inbox_raw` requires human approval | enforced by provenance, not heuristics |
 | A redaction pass over every projection before it enters a prompt | **ours.** `secret` fields become their label; ciphertext never leaves the record |
 | AI Gateway DLP as a tripwire on prompts and responses | defence in depth. **Flag and block only — it cannot redact**, so it catches a mistake rather than preventing one |
 | Every proposal records what it read | audit |
-| A model key kept in the vault opens only for the owner on a proof under fifteen minutes old, and each opening names who asked | procedural, the vault's own gate, in the host ([46-SPEC-SPARK](46-SPEC-SPARK.md) §5.9, §6.2 below) |
+| A model key kept in the vault opens only for the owner on a proof under fifteen minutes old, and each opening names who asked | procedural, the vault's own gate, in the host ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.9, §6.2 below) |
 
 **No injection classifier is a control here.** ~95% accuracy at ~65 ms is a fine signal and a
 useless gate on a record holding credentials. It goes in the audit log as a flag.
@@ -387,9 +387,9 @@ in §7 says so.
 
 ### 6.2 · Where a key may go, and who may open it
 
-*Added September 22nd 2026, for Spark's three tiers and for scripts, and revised the same day for wave thirty-seven,
+*Added September 22nd 2026, for Slash's three tiers and for scripts, and revised the same day for wave thirty-seven,
 checked against `packages/host/src/actions.ts`, `packages/host/src/script.ts`, `packages/host/src/script-try.ts`,
-`packages/host/src/spark.ts`, `packages/kernel/src/script.ts` and both apps' `keyOpener` at `d23ac77d`.*
+`packages/host/src/slash.ts`, `packages/kernel/src/script.ts` and both apps' `keyOpener` at `d23ac77d`.*
 
 A key the vault holds leaves the host in one form only: an `authorization: Bearer` header on one request the host
 makes, opened for that request after every check on it has passed, and dropped when the answer is back. Four paths
@@ -400,18 +400,18 @@ open one:
 | a scheduled `call`, `poll` or `pull` ([25-CONNECTORS](25-CONNECTORS.md) §9) | the host's `keyOpener`, as `system`: nobody asked | the origin its declaration names | `sendAction`: `https:`, an origin an active declaration names, a host written as a literal private or local address refused, and on the self-host `pin` resolving the name and refusing a private address before the socket opens |
 | a script's `ctx.fetch` | the same opener, as `system` | an origin in the script's `egress:`, and only the host the key's vault entry says it opens | in the sandbox, the origin, `https:`, no user name or password in the URL, the fetch count and a declared label; then `keyRefused`, the URL's host against the grant's `opens`; then `sendAction`'s checks again, over the script's own origins |
 | a trial of a draft script (`script_try`, [25-CONNECTORS](25-CONNECTORS.md) §12) | the same opener, as `system`, and only when the caller is the owner signed in as a person | as a script's | as a script's. For any other caller, a token included, the record hands the host no vault, and a fetch naming a key is refused unsent |
-| Spark ([46-SPEC-SPARK](46-SPEC-SPARK.md) §5.9) | the app's `keyOpener`, as the person who asked | `SPARK_ENDPOINT` | the vault's gate on the asker's own session: an owner, never a token, a proof under fifteen minutes old; for tier `b`, a live `api_token` grant that is not the one labelled `spark` |
+| Slash ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.9) | the app's `keyOpener`, as the person who asked | `SLASH_ENDPOINT` | the vault's gate on the asker's own session: an owner, never a token, a proof under fifteen minutes old; for tier `b`, a live `api_token` grant that is not the one labelled `slash` |
 
 1. **Neither the sandbox nor the model ever holds a key.** A script names a label and the host resolves it, by
-   label or id, never a revoked grant, the newest first; Spark's package is handed an adapter whose key is asked
+   label or id, never a revoked grant, the newest first; Slash's package is handed an adapter whose key is asked
    for on the call.
-2. **Every opening is rule 1's `grant.read`, and it names who caused it.** Before September 22nd every Spark opening
+2. **Every opening is rule 1's `grant.read`, and it names who caused it.** Before September 22nd every Slash opening
    was signed `system`, because both hosts' opener defaulted to it, so an owner reading the log could not tell her
-   own asks from anybody else's. Spark's openings now carry the asker; `system` is what a run with nobody at the
+   own asks from anybody else's. Slash's openings now carry the asker; `system` is what a run with nobody at the
    keyboard gets. A trial of a draft script is the one exception left: the owner asked for it, and its opening is
    still signed `system`, because both hosts hand it the scheduled runs' opener, which takes no actor.
-3. **A key other people's asks would open goes through the vault's own gate.** Where Spark's included model is
-   keyed from the vault (no operator key, and a live grant labelled `spark`, which on the Cloud is the only way it
+3. **A key other people's asks would open goes through the vault's own gate.** Where Slash's included model is
+   keyed from the vault (no operator key, and a live grant labelled `slash`, which on the Cloud is the only way it
    is keyed), a colleague is refused before any model is called, on a read as well as a propose. Measured before the
    gate: a colleague at `read` with a proof fifty minutes old read and proposed with 200, on three model calls on the
    owner's key.
@@ -424,10 +424,10 @@ open one:
    on the self-host runner: `goldapi`, whose row opens `api.gold.test`, was sent as a bearer to `collector.test`,
    because that origin was also in the script's `egress:` (`loop/research-batch-thirty-five-audit.md` §2;
    `apps/selfhost/test/script-key-egress.test.ts`).
-5. **No script may name the vault's `spark` key**, whatever it opens, because on a host with no `SPARK_KEY` it is
-   the key the included model answers everybody with, the same reason Spark refuses it as a tier `b` key. The kernel
+5. **No script may name the vault's `slash` key**, whatever it opens, because on a host with no `SLASH_KEY` it is
+   the key the included model answers everybody with, the same reason Slash refuses it as a tier `b` key. The kernel
    refuses it at install and before a trial (`scriptBody`, `FORBIDDEN` at `keys[i]`), and both hosts refuse a run
-   that declares it before the sandbox starts (`sparkDeclared`) or fetches with it under its grant id (`keyRefused`
+   that declares it before the sandbox starts (`slashDeclared`) or fetches with it under its grant id (`keyRefused`
    matches the label the lookup found).
 6. **The answer is scrubbed of the key** before the sandbox or the record sees it, in the body and in every refusal
    sentence, and no response header is passed on, because a header is where a provider could echo the key and only
@@ -456,7 +456,7 @@ open one:
 - **The scrub catches the spellings above and no others.** A key re-encoded another way (hex, `\u` escapes of
   ordinary characters, a hash of it) is not caught, and neither is a derived spelling shorter than eight characters,
   which only a key of five bytes or fewer has; the bytes as sent are always scrubbed, however short.
-- **Spark's tier `b` key is sent to `SPARK_ENDPOINT`**, the endpoint the host's operator configured, whatever
+- **Slash's tier `b` key is sent to `SLASH_ENDPOINT`**, the endpoint the host's operator configured, whatever
   provider issued the key, and its `opens` is not read on that path. Choosing a host is trusting its operator with
   that address, and nothing in the tree checks it.
 
@@ -472,7 +472,7 @@ implied.
 | Your rows | **we can read them** — the object runs on our account | no |
 | Your credentials, vault passphrase **off** | **we could decrypt them** | no |
 | Your credentials, vault passphrase **on** | no | no |
-| Your prompts | payload retention off at the gateway — prompts and responses are not stored. Token counts and cost are, in Spark's `call` table ([46-SPEC-SPARK](46-SPEC-SPARK.md) §4.1), which holds no prompt text, because the budget needs them | no provider at all |
+| Your prompts | payload retention off at the gateway — prompts and responses are not stored. Token counts and cost are, in Slash's `call` table ([46-SPEC-SLASH](46-SPEC-SLASH.md) §4.1), which holds no prompt text, because the budget needs them | no provider at all |
 | Telemetry | counts and durations only; record id hashed with a monthly-rotating salt | none |
 
 Operationally: access to a customer's record requires a named reason recorded in our own audit, follows
@@ -582,7 +582,7 @@ refused `OUT_OF_BOUNDS` when the run starts. What else is held:
   the caller's own reads instead of `system`'s, since nobody approved the draft's `reads:`, and with no vault for any
   caller but the owner signed in as a person (§6.2). It is metered as a run on the plan's allowance.
 
-The findings of `loop/research-batch-thirty-five-audit.md` about scripts (the log, the key's host, the `spark` key,
+The findings of `loop/research-batch-thirty-five-audit.md` about scripts (the log, the key's host, the `slash` key,
 the scrub, module state and `wall_ms`) are closed as above and in §6.2. **What is still open** is §6.2's *What is
 not built*: the install line does not say which host each key goes to, and a key whose `opens` is not among the
 script's origins is refused only when the script runs. The Cloud's memory ceiling is the platform's, and no deploy

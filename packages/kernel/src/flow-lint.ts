@@ -14,10 +14,10 @@
  *
  * THE RUNNER IS `flow.ts`, AND THIS FILE REFUSES WHAT IT WOULD NOT DO. `ask_person` runs (Brief C), so its shape is
  * held here to what the runner and the gate accept: two options or more, each once, since `propose` refuses a choice
- * of one, and no `to:`, since nothing addresses a question to one person. `ask_spark` is held to its shape and to what
+ * of one, and no `to:`, since nothing addresses a question to one person. `ask_slash` is held to its shape and to what
  * its question may carry, and no further: whether THIS host answers the `infer.ask` job it queues is a fact about the
  * host, which a context-free lint cannot know, so that refusal is `unserved` in `index.ts`, beside `stranded`, and
- * `sparkAskAt` below is what it asks. A `script` step runs since 24 September: `flow.ts`'s `startScript` queues the
+ * `slashAskAt` below is what it asks. A `script` step runs since 24 September: `flow.ts`'s `startScript` queues the
  * script's run and the run goes on, and whether the script is installed, says `runs: { rule: true }` and is not paused
  * is asked there, when a run reaches the step, because a pause is a fact of the moment and no install can know it. A
  * `call` step still installs and fails at the run with a sentence, which is why the lint is strict about everything it
@@ -56,7 +56,7 @@ const SHAPES = ['text', 'number', 'choice'] as const;
 /** Every action a rule had before steps, closed. The inline pass's dispatch has one arm for each. */
 export const ACTIONS = ['tag', 'untag', 'set', 'move', 'link', 'note', 'notify', 'schedule', 'create', 'suggest', 'run', 'stop'] as const;
 /** The verbs only a step has. */
-const FLOW = ['if', 'set_var', 'script', 'call', 'ask_spark', 'ask_person', 'wait'] as const;
+const FLOW = ['if', 'set_var', 'script', 'call', 'ask_slash', 'ask_person', 'wait'] as const;
 /**
  * Every verb a rule or a step may name. Exported so that `flow-secret-verbs.test.ts` asks each one what it does with a
  * secret, and a verb added here without an answer there fails that test.
@@ -74,10 +74,10 @@ const ROW_VERBS: readonly string[] = ['tag', 'untag', 'set', 'move', 'link', 'no
 const ROWLESS: readonly string[] = ['every', 'metric', 'manual'];
 
 /** The verbs §3 says need `once_per` on a trigger about a row: notifies, creates, calls or asks. */
-const ONCE: readonly string[] = ['notify', 'create', 'suggest', 'run', 'call', 'ask_spark', 'ask_person'];
+const ONCE: readonly string[] = ['notify', 'create', 'suggest', 'run', 'call', 'ask_slash', 'ask_person'];
 
 /**
- * Field types whose value never leaves the record with a question: `ask_spark`'s `about:` is refused them here, and
+ * Field types whose value never leaves the record with a question: `ask_slash`'s `about:` is refused them here, and
  * the runner leaves them out of the `infer.ask` payload again, as `queueCall` leaves them out of what a call sends.
  */
 export const UNSENDABLE: readonly string[] = ['secret', 'file'];
@@ -417,7 +417,7 @@ export function passFilled(path: readonly string[]): boolean {
  * The verbs that put text somewhere other than a field of the run's own row, which `writeFault` holds. The rest put
  * none: `untag` writes back words the row already has, less one; `run` and `call` send the call's declared fields,
  * which `queueCall` holds to the ones that may leave; `if` is read and not written; `set_var` is carried, and followed
- * into every verb here that writes it out; `ask_spark` has its own checks below; `stop` and `wait` carry nothing.
+ * into every verb here that writes it out; `ask_slash` has its own checks below; `stop` and `wait` carry nothing.
  */
 const COPIERS: readonly string[] = ['move', 'link', 'note', 'notify', 'schedule', 'create', 'suggest', 'script', 'ask_person'];
 
@@ -442,7 +442,7 @@ function placeOf(path: readonly string[], spec: Record<string, unknown>): string
 /**
  * What a step or an item of `then:` may not copy, as the refusal, or `null`: a secret or file field reached by any
  * spelling that fills it, put into any place its verb puts text, unless that place is a field of another list that
- * never leaves either. `set` and `tag` are `writeFault`'s, and a question to Spark has its own checks in the walk.
+ * never leaves either. `set` and `tag` are `writeFault`'s, and a question to Slash has its own checks in the walk.
  *
  * THE CHECK FOLLOWED `set` AND `tag` AND NOTHING ELSE, measured on 23 September at HEAD `afb3b1b2` over a list whose
  * `pin` is secret (`flow-secret-verbs.test.ts`): `note`, `notify`, `schedule`, `create` into another list's text field,
@@ -453,7 +453,7 @@ function placeOf(path: readonly string[], spec: Record<string, unknown>): string
  * `run: false` IS THE INLINE PATH, where only the texts the pass fills are filled, from the row alone, and no variable
  * exists. On the run path every string of the step is filled from the run first, so every one is read.
  *
- * A QUESTION TO A PERSON IS REFUSED WITH THE REST. `spark-vars-hidden.test.ts` let one read a variable set from `pin`,
+ * A QUESTION TO A PERSON IS REFUSED WITH THE REST. `slash-vars-hidden.test.ts` let one read a variable set from `pin`,
  * "which stays in the record"; it stays in the record's one queue, where a `suggest` beside it was the same leak, and
  * everyone who decides reads it.
  */
@@ -524,7 +524,7 @@ function copyFault(
 function keptBy(verb: string, step: Record<string, unknown>): string | null {
   const spec = step[verb];
   if (!isObject(spec)) return null;
-  const name = verb === 'set_var' ? spec.name : verb === 'script' || verb === 'call' || verb === 'ask_spark' || verb === 'ask_person' ? spec.as : undefined;
+  const name = verb === 'set_var' ? spec.name : verb === 'script' || verb === 'call' || verb === 'ask_slash' || verb === 'ask_person' ? spec.as : undefined;
   return typeof name === 'string' ? name : null;
 }
 
@@ -575,19 +575,19 @@ function unkeptIn(id: string, verb: string, step: Record<string, unknown>, here:
 }
 
 /**
- * Where the first `ask_spark` step of a body sits, as `steps[1]` or `steps[0].then[2]`, or `null` when it asks nothing.
+ * Where the first `ask_slash` step of a body sits, as `steps[1]` or `steps[0].then[2]`, or `null` when it asks nothing.
  *
- * ITS OWN WALK, BOTH ARMS OF EVERY BRANCH, because `actionsOf` returns only `ACTIONS` and `ask_spark` is a step's verb.
+ * ITS OWN WALK, BOTH ARMS OF EVERY BRANCH, because `actionsOf` returns only `ACTIONS` and `ask_slash` is a step's verb.
  * `index.ts`'s `unserved` asks this at every install path, and refuses the step at this place on a host that has not said
  * it answers one.
  */
-export function sparkAskAt(decl: FlowDecl): string | null {
+export function slashAskAt(decl: FlowDecl): string | null {
   const walk = (list: unknown, at: string): string | null => {
     if (!Array.isArray(list)) return null;
     for (const [i, step] of list.entries()) {
       if (!isObject(step)) continue;
       const here = `${at}[${i}]`;
-      if ('ask_spark' in step) return here;
+      if ('ask_slash' in step) return here;
       if ('if' in step) {
         const inner = walk(step.then, `${here}.then`) ?? walk(step.else, `${here}.else`);
         if (inner !== null) return inner;
@@ -787,7 +787,7 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
 
      A `set_var` OF THE SAME NAME THAT CARRIES NOTHING TAKES IT OFF, on the way it is on. A run's `vars` holds the last
      write, and the runner drops what it kept for a name whose second fill matches its first (`flow.ts`'s `set_var`), so
-     the question reads the plain value: `spark-vars-hidden.test.ts` has `r` set from `pin` then `note` asked about as
+     the question reads the plain value: `slash-vars-hidden.test.ts` has `r` set from `pin` then `note` asked about as
      `plain`.
      Taken off inside one arm, it is still carried out of the other, so a question after the branch is refused unless
      both arms set it plainly. A write that reads the name it writes, `to: 'again {{vars.p}}'`, carries it, so it is not
@@ -838,15 +838,15 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
          from the row it holds and would send `null` for a field the list does not have, which is a question with its
          facts missing and no sentence to say so. A field the lint cannot place, on an arrival at no named door, is
          left to the runner. */
-      if (verb === 'ask_spark' && (step.ask_spark as { about?: unknown }).about !== undefined) {
-        const about = (step.ask_spark as { about: string[] }).about;
-        if (rowless) return bad('DECLARATION_INVALID', `${id} is started by ${trigger}, which has no row, and ${here} sends fields of one with about:.`, `${here}.ask_spark.about`);
+      if (verb === 'ask_slash' && (step.ask_slash as { about?: unknown }).about !== undefined) {
+        const about = (step.ask_slash as { about: string[] }).about;
+        if (rowless) return bad('DECLARATION_INVALID', `${id} is started by ${trigger}, which has no row, and ${here} sends fields of one with about:.`, `${here}.ask_slash.about`);
         if (fields !== undefined)
           for (const name of about) {
             const field = fields.find((f) => f.id === name);
-            if (!field) return bad('FIELD_UNKNOWN', `${id} sends ${name} to Spark at ${here}, and ${row} has no field called ${name}.`, `${here}.ask_spark.about`);
+            if (!field) return bad('FIELD_UNKNOWN', `${id} sends ${name} to Slash at ${here}, and ${row} has no field called ${name}.`, `${here}.ask_slash.about`);
             const sealed = sealedAs(field);
-            if (sealed !== null) return bad('DECLARATION_INVALID', `${id} sends ${name} to Spark at ${here}, and a ${sealed} field never leaves the record.`, `${here}.ask_spark.about`);
+            if (sealed !== null) return bad('DECLARATION_INVALID', `${id} sends ${name} to Slash at ${here}, and a ${sealed} field never leaves the record.`, `${here}.ask_slash.about`);
           }
       }
       /* A VARIABLE CARRIES WHAT IT WAS SET FROM. `set_var` fills `to` from the whole row, before `sendable` is anywhere
@@ -874,14 +874,14 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
       /* AND A STEP THAT PUTS TEXT ANYWHERE ELSE MAY NOT COPY ONE THERE EITHER (`copyFault`). */
       const copied = copyFault(id, verb, step, here, { row, hidden, carried, run: true, installed });
       if (copied) return copied;
-      if (verb === 'ask_spark') {
-        const via = carriedIn(String((step.ask_spark as { question: unknown }).question), carried);
+      if (verb === 'ask_slash') {
+        const via = carriedIn(String((step.ask_slash as { question: unknown }).question), carried);
         if (via) {
           const held = via.from.spelled.replace(/\s/g, '') === '{{trigger.row}}' ? `the whole ${row ?? 'trigger'} row, ${via.from.field} in it` : via.from.field;
           return bad(
             'DECLARATION_INVALID',
-            `${id} puts ${via.spelled} in its question to Spark at ${here}, and ${via.name} holds ${held}${via.from.name === via.name ? '' : `, by way of ${via.from.name}`}: ${via.from.at} put it there with ${via.from.spelled}, and a ${via.from.type} field never leaves the record. Take ${via.spelled} out of the question, or set ${via.name} from fields that may leave.`,
-            `${here}.ask_spark.question`,
+            `${id} puts ${via.spelled} in its question to Slash at ${here}, and ${via.name} holds ${held}${via.from.name === via.name ? '' : `, by way of ${via.from.name}`}: ${via.from.at} put it there with ${via.from.spelled}, and a ${via.from.type} field never leaves the record. Take ${via.spelled} out of the question, or set ${via.name} from fields that may leave.`,
+            `${here}.ask_slash.question`,
           );
         }
       }
@@ -890,15 +890,15 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
          the checker measured on 23 September, through `ask_person`, whose question is filled the same way, that
          `{{trigger.row.pin}}` and `{{ trigger.row.pin }}` were asked as `hunter2` and `{{trigger.row}}` as the JSON of
          the whole row, `pin` in it. Each spelling is read with the pattern that fills it (`ROW_FILL`, `RUN_PATH`). */
-      if (verb === 'ask_spark' && !rowless) {
-        const found = hidden.size === 0 ? null : hiddenIn(String((step.ask_spark as { question: unknown }).question), hidden);
+      if (verb === 'ask_slash' && !rowless) {
+        const found = hidden.size === 0 ? null : hiddenIn(String((step.ask_slash as { question: unknown }).question), hidden);
         if (found)
           return bad(
             'DECLARATION_INVALID',
             found.spelled.replace(/\s/g, '') === '{{trigger.row}}'
-              ? `${id} puts the whole ${row} row in its question to Spark at ${here} with ${found.spelled}, and ${found.field} is a ${found.type} field, which never leaves the record. Name the fields the question needs instead.`
-              : `${id} puts ${found.field} in its question to Spark at ${here} with ${found.spelled}, and a ${found.type} field never leaves the record. Take it out of the question.`,
-            `${here}.ask_spark.question`,
+              ? `${id} puts the whole ${row} row in its question to Slash at ${here} with ${found.spelled}, and ${found.field} is a ${found.type} field, which never leaves the record. Name the fields the question needs instead.`
+              : `${id} puts ${found.field} in its question to Slash at ${here} with ${found.spelled}, and a ${found.type} field never leaves the record. Take it out of the question.`,
+            `${here}.ask_slash.question`,
           );
       }
       /* A CALL THAT SENDS A ROW NEEDS ONE, AS A STEP OR AS `run:`. `run:` was refused on a clock by `ROW_VERBS` and the
@@ -918,7 +918,7 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
       }
       /* A READ OF A NAME NOTHING KEPT YET, asked before this step's own name is added, since a step reads before it keeps.
          AFTER THE SECRET CHECKS AT THE SAME STEP, so that a question reading a variable set from `pin` in one arm is
-         told about `pin`, which is the refusal that matters more, and `spark-vars-hidden.test.ts` holds that sentence. */
+         told about `pin`, which is the refusal that matters more, and `slash-vars-hidden.test.ts` holds that sentence. */
       const unkept = unkeptIn(id, verb, step, here, kept, anywhere);
       if (unkept) return unkept;
       const keeps = keptBy(verb, step);
@@ -1348,21 +1348,21 @@ function stepFault(
       if (fault) return fault;
       return spec.as === undefined ? null : named(spec.as, `${at}.call.as`);
     }
-    case 'ask_spark': {
-      if (!isObject(spec)) return bad('DECLARATION_INVALID', `${id}'s ${at}.ask_spark is { question, as }.`, `${at}.ask_spark`);
-      const fault = text(spec.question, `${at}.ask_spark.question`, 'a question') ?? named(spec.as, `${at}.ask_spark.as`);
+    case 'ask_slash': {
+      if (!isObject(spec)) return bad('DECLARATION_INVALID', `${id}'s ${at}.ask_slash is { question, as }.`, `${at}.ask_slash`);
+      const fault = text(spec.question, `${at}.ask_slash.question`, 'a question') ?? named(spec.as, `${at}.ask_slash.as`);
       if (fault) return fault;
       if (spec.shape !== undefined && !(SHAPES as readonly unknown[]).includes(spec.shape))
-        return bad('DECLARATION_INVALID', `${id}'s ${at}.ask_spark.shape is text, number or choice.`, `${at}.ask_spark.shape`, SHAPES);
+        return bad('DECLARATION_INVALID', `${id}'s ${at}.ask_slash.shape is text, number or choice.`, `${at}.ask_slash.shape`, SHAPES);
       const choices = spec.choices;
       const listed = Array.isArray(choices) && choices.length > 0 && choices.every((c) => typeof c === 'string' && c !== '');
       if (spec.shape === 'choice' && !listed)
-        return bad('REQUIRED_MISSING', `${id} asks Spark to choose at ${at} and lists nothing to choose from. Give it choices:.`, `${at}.ask_spark.choices`);
+        return bad('REQUIRED_MISSING', `${id} asks Slash to choose at ${at} and lists nothing to choose from. Give it choices:.`, `${at}.ask_slash.choices`);
       if (choices !== undefined && spec.shape !== 'choice')
-        return bad('DECLARATION_INVALID', `${id} lists choices at ${at} for an answer that is not a choice. Write shape: choice.`, `${at}.ask_spark.choices`);
+        return bad('DECLARATION_INVALID', `${id} lists choices at ${at} for an answer that is not a choice. Write shape: choice.`, `${at}.ask_slash.choices`);
       const about = spec.about;
       if (about !== undefined && (!Array.isArray(about) || about.length === 0 || about.some((f) => typeof f !== 'string' || !NAME.test(f))))
-        return bad('DECLARATION_INVALID', `${id}'s ${at}.ask_spark.about is a list of the row's field ids.`, `${at}.ask_spark.about`);
+        return bad('DECLARATION_INVALID', `${id}'s ${at}.ask_slash.about is a list of the row's field ids.`, `${at}.ask_slash.about`);
       return null;
     }
     case 'ask_person': {

@@ -166,8 +166,8 @@ export default function refusalFixtures(
    * there. A count is read from the enumeration that owns it (`34 §6`), and a `via` list copied into
    * a gate is a list that stops agreeing with the runners the day somebody adds another. Somebody has now
    * done it twice: `pull` on September 20th 2026, for the seven `PULL_` codes a scheduled connector run
-   * raises, and `ask` on the 21st, for the four codes `packages/spark` arrived with, which no runner above
-   * it drives because a spark refusal happens when a model answers. This gate needed no edit for either,
+   * raises, and `ask` on the 21st, for the four codes `packages/slash` arrived with, which no runner above
+   * it drives because a Slash refusal happens when a model answers. This gate needed no edit for either,
    * which is the whole argument for reading the table.
    *
    * THE INPUT KEYS COME OFF THE SAME ROW. `40 §6`'s table gives each `via` the keys its fixtures may

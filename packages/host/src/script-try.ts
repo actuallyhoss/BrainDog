@@ -95,8 +95,8 @@ export type TrialSandbox = (s: Scripted, trial: { grantOf: GrantOf; reads: Scrip
  * A TRIAL HAS AN ASKER AND BOTH HOSTS OPENED ITS KEY AS NOBODY. Each handed the trial the opener it builds for the
  * scheduled pass, whose actor is `system` because a scheduled run has no person behind it, so the owner trying her own
  * draft left a `grant.read` the vault's log could not tell from the nightly run's: measured in
- * `apps/selfhost/test/script-try-asker.test.ts`, one key sent and `grant.read ["system"]`. Spark's included key had the
- * same fault and the same repair (`sparkAskerEngine` in `spark.ts`), the asker's id handed to `keyOpener` per ask.
+ * `apps/selfhost/test/script-try-asker.test.ts`, one key sent and `grant.read ["system"]`. Slash's included key had the
+ * same fault and the same repair (`slashAskerEngine` in `slash.ts`), the asker's id handed to `keyOpener` per ask.
  *
  * THE RECORD HANDS `asker` AND BOTH HOSTS PASS IT ON. `RecordDeps['tryScript']` in `packages/record` sends the person
  * behind a token, or the person, and the self-host's `tryScript` and the Worker's `Record$` each build `keyOpener` with
@@ -112,8 +112,8 @@ const NO_KEYS = (label: string): string =>
   `A trial opens no key for an agent, so the fetch naming "${label}" was not sent. Once the owner accepts the script, its runs send the key.`;
 
 /**
- * The sentence for the owner whose last proof is too old for the vault, in Spark's words for the same gate
- * (`SPARK_HOST_KEY_CLOSED` in `spark.ts`), because "for an agent" would tell her she is one and leave her nothing to do.
+ * The sentence for the owner whose last proof is too old for the vault, in Slash's words for the same gate
+ * (`SLASH_HOST_KEY_CLOSED` in `slash.ts`), because "for an agent" would tell her she is one and leave her nothing to do.
  */
 const STALE = (label: string): string =>
   `A trial opens the owner's key only for the owner signed in within the last fifteen minutes, so the fetch naming "${label}" was not sent. Sign in again to try it with the key.`;

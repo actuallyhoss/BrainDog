@@ -184,7 +184,7 @@ test('A LIST AN EARLIER UPDATE IN THE ARRANGEMENT RETIRES IS NOT HELD AGAINST TH
        jobsy 2.0.0 narrowing tags under a live rule.late       filed   accept FIELD_TYPE_CHANGED at register.jobs.fields.tags.type
        jobsy (tags: int), then later's rule.late tagging it     filed   accept FIELD_TYPE_CHANGED ... Already applied, and kept: jobsy.
        one's Things, then two's page filtering it on nosuch     filed   accept FIELD_UNKNOWN ... Already applied, and kept: one.
-       a rule asking Spark, on a host that answers none         filed   accept NOT_IN_THIS_BUILD at steps[0].ask_spark
+       a rule asking Slash, on a host that answers none         filed   accept NOT_IN_THIS_BUILD at steps[0].ask_slash
        fxer 2.0.0 and rater, with a page over rates on nosuch   filed   accept FIELD_UNKNOWN ... Already applied, and kept: fxer, rater.
 
    The last is the page half: the lists a page read were linted alone against the live record, which still held the `fx`
@@ -242,9 +242,9 @@ test('A PACK\'S PAGE FILTERING A LIST THE PACK BEFORE IT DECLARES, ON A FIELD IT
   assert.deepEqual(after, []);
 });
 
-test('A PACK WHOSE RULE ASKS SPARK, ON A HOST THAT ANSWERS NONE, IS REFUSED AT THE PROPOSAL', async () => {
-  const ask_spark = { question: 'What rate applies to {{what}}?', about: ['what'], as: 'rate', shape: 'number' };
-  const rule = { rule: 'rate', pack: 'one', on: { written: { register: 'jobs', op: ['create'] } }, once_per: ['entry'], steps: [{ ask_spark }, { notify: { say: 'Rate: {{vars.rate}}' } }] };
+test('A PACK WHOSE RULE ASKS SLASH, ON A HOST THAT ANSWERS NONE, IS REFUSED AT THE PROPOSAL', async () => {
+  const ask_slash = { question: 'What rate applies to {{what}}?', about: ['what'], as: 'rate', shape: 'number' };
+  const rule = { rule: 'rate', pack: 'one', on: { written: { register: 'jobs', op: ['create'] } }, once_per: ['entry'], steps: [{ ask_slash }, { notify: { say: 'Rate: {{vars.rate}}' } }] };
   const { sql, ask } = await recordOf({ one: { ...head('one', '1.0.0'), declarations: [JOBS('one'), rule] } });
   const out = await ask({ why: ['x'], packs: { install: ['one'] } }, 'arrange');
   sql.close();

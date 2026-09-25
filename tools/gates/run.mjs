@@ -100,19 +100,19 @@ const GATES = [
      the one part of a refusal a caller can branch on, and `10 §7` builds the agent contract on it:
      the refusal teaches, and it teaches from a code stable across versions. Beside `event-kinds`
      because it is the same shape over the corpus's other large vocabulary. */
-  /* THE ONE INVARIANT `30` STATES AS SQL, ASKED OF A REAL RECORD. `30 §3` closes the `spark` actor
+  /* THE ONE INVARIANT `30` STATES AS SQL, ASKED OF A REAL RECORD. `30 §3` closes the `slash` actor
      to suggest, propose and predict and calls it "an invariant with a test": the assistant proposes
      and a person decides. This materialises the seed through the real write path, offers the record
      the four writes a model may not make, and runs `30 §3`'s query over what came back.
 
      IT MAKES THE WRITES BEFORE IT QUERIES, and that is the whole reason it is worth having.
      `52 §5.2` says to materialise the record and run the query, and in this tree that is green off
-     an empty table: the seed writes no `spark` event at all, so the filter filters nothing. A gate
+     an empty table: the seed writes no `slash` event at all, so the filter filters nothing. A gate
      that passes because its subject is absent is the failure this directory exists to catch, and it
      was specified that way. The only gate here that builds a record, and at about 150ms it is still
      a grep's price. */
-  ['spark-actor', ['node', [join(here, 'spark-actor.mjs')]]],
-  /* BESIDE `spark-actor` BECAUSE IT IS THE OTHER GATE THAT BUILDS A RECORD RATHER THAN READING
+  ['slash-actor', ['node', [join(here, 'slash-actor.mjs')]]],
+  /* BESIDE `slash-actor` BECAUSE IT IS THE OTHER GATE THAT BUILDS A RECORD RATHER THAN READING
      SOURCE, and it is the only one that stands a whole host up. The the old tool import is the switch
      out of the tool the owner runs his work from today, and its own 499 lines of test drive an
      in-memory fake door and a stub server answering ok to every method, so nothing in them asserts
@@ -479,7 +479,7 @@ function declaredNeeds(name, file) {
  * testing the refusal rather than the spawned path. It moves the day those tests pick another
  * stand-in, and not before.
  * Of the other four, `clean-room` and `no-declarations-in-kernel` are greps over source that nobody
- * has migrated yet, and `spark-actor` and `import` are the two that build a record, which their own
+ * has migrated yet, and `slash-actor` and `import` are the two that build a record, which their own
  * entries above say plainly, so calling them "greps" here would be this file disagreeing with itself
  * two hundred lines apart. Nothing goes red for any of the eight: a script gate is a supported
  * dialect, not a gate waiting to be fixed.
@@ -488,7 +488,7 @@ function declaredNeeds(name, file) {
  * September by importing each one from a stand-in for this file: `clean-room` reads its root from
  * `process.argv[2]`, which in this process is this runner's first flag, so `--only clean-room` made it
  * scan `C:\Repos\braindog\--only` and throw `ENOENT`; `no-declarations-in-kernel` ran on the first
- * import and printed nothing on the second, because the module is cached; and `spark-actor` and
+ * import and printed nothing on the second, because the module is cached; and `slash-actor` and
  * `import` each call `process.exit` at top level, which would end this run. A wrapper that imports a
  * script is the trap described above with an extra file around it. `52 §5.1` has the exact shape each
  * one takes, which is the one `em-dash` took.

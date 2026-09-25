@@ -1,9 +1,9 @@
 /**
  * A secret carried out to a call's endpoint by way of a field of the row: the other road out that wave fifty's checker
- * found beside the question to Spark (`spark-launder-row.test.ts`).
+ * found beside the question to Slash (`slash-launder-row.test.ts`).
  *
  * WHAT WAS MEASURED BEFORE THE REPAIR. `queueCall` left a field out of what a call sends by its live type alone, and
- * the lint followed a secret written into the row only as far as a question to Spark. So `set: { field: party, to:
+ * the lint followed a secret written into the row only as far as a question to Slash. So `set: { field: party, to:
  * '{{token}}' }` beside `run: paid_hook`, a call whose `sends:` names `party`, installed clean on both paths and queued
  * `party: 'hunter2'` for the host to post: inline, where the pass holds every `run` until the patch is written, so the
  * order of the two did not matter; and as a run, through `set_var`, through another field, through `tags` and inside a
@@ -21,7 +21,7 @@
  * secret, and `queueCall`'s second line is measured over a row that already holds a copy, put in by SQL as an earlier
  * build's write left it.
  *
- * `hunter2` IS PUT IN BY SQL AFTER THE ROW IS MADE, as the Spark tests put their pin, because in use a secret field
+ * `hunter2` IS PUT IN BY SQL AFTER THE ROW IS MADE, as the Slash tests put their pin, because in use a secret field
  * holds a vault grant's id and a plaintext is the plainest way to see whether it left.
  */
 
@@ -91,7 +91,7 @@ const value = <T>(r: Result<T>): T => {
 const refusal = (r: Result<unknown>): { code: string; fix: string } | null => (r.ok ? null : 'refusal' in r ? { code: r.refusal.code, fix: r.refusal.fix } : { code: 'conflict', fix: '' });
 
 async function opened(sql: NodeSql, clock: ReturnType<typeof fixedClock>): Promise<Kernel> {
-  return openRecord(sql, clock, { answersSpark: true });
+  return openRecord(sql, clock, { answersSlash: true });
 }
 
 async function record(...decls: Declaration[]): Promise<{ k: Kernel; sql: NodeSql; clock: ReturnType<typeof fixedClock> }> {
@@ -205,13 +205,13 @@ test('WHAT COPIES NO SECRET INSTALLS: a word nothing fills, and fields that may 
   sql.close();
 });
 
-test('A TAG OF {{token}} BEFORE A QUESTION TO SPARK INSTALLS, since the run tags the braces as typed', async () => {
+test('A TAG OF {{token}} BEFORE A QUESTION TO SLASH INSTALLS, since the run tags the braces as typed', async () => {
   /* THE SAME BRANCH FOR THE QUESTION, which wave fifty added and no case reached: `tags` read by `{{tags}}` after a
      `tag` step whose word only the pass's fill would have read. */
   const { k, sql } = await record();
   for (const steps of [
-    [{ tag: '{{token}}' }, { ask_spark: { question: 'Rate for {{tags}}?', as: 'rate' } }],
-    [{ tag: '{{token}}' }, { ask_spark: { question: 'Rate?', about: ['tags'], as: 'rate' } }],
+    [{ tag: '{{token}}' }, { ask_slash: { question: 'Rate for {{tags}}?', as: 'rate' } }],
+    [{ tag: '{{token}}' }, { ask_slash: { question: 'Rate?', about: ['tags'], as: 'rate' } }],
   ]) {
     const out = refusal((await k.install([run(steps)])) as Result<unknown>);
     assert.equal(out, null, `${JSON.stringify(steps)}: ${out?.fix}`);

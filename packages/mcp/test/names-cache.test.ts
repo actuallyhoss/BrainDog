@@ -215,7 +215,7 @@ test('ten lists of tasks and ten of learnings count no scan of a primary key', a
   assert.deepEqual(observed(sql, 'query.scan'), []);
   /* A NAMING READ STILL COUNTS AS A READ OF THE LIST IT NAMES, and that is kept on purpose. Both readers of
      `register.read` ask whether a list was read at all in ninety days (`dormant` in the kernel's observe loop, and
-     Spark's untouched pack), and a list whose rows name every ref on an agent's pages is in use: retiring it would
+     Slash's untouched pack), and a list whose rows name every ref on an agent's pages is in use: retiring it would
      turn those names back into row ids. `people`, `things` and `tracks` are reached here only through refs. */
   assert.deepEqual(observed(sql, 'register.read'), ['learnings 20', 'people 10', 'tasks 20', 'things 20', 'tracks 10']);
 });

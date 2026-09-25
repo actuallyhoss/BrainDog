@@ -45,7 +45,7 @@ the loop's log is [BUILD.md](../BUILD.md).
 | 08 | [Metrics and analytics](08-METRICS-AND-ANALYTICS.md) | Declarative metrics for the customer, telemetry for us, and why they never mix |
 | 09 | [Alarms and notifications](09-ALARMS-AND-NOTIFICATIONS.md) | One alarm per object, and how a schedule of hundreds fits inside it |
 | 10 | [MCP](10-MCP.md) | The per-customer tool surface, the 2026-07-28 spec, and the token budget |
-| 11 | [The assistant](11-ASSISTANT.md) | Spark: model routing, retrieval, cost per customer, and what it may never do |
+| 11 | [The assistant](11-ASSISTANT.md) | Slash: model routing, retrieval, cost per customer, and what it may never do |
 | 12 | [Security](12-SECURITY.md) | Auth, the credential vault, envelope encryption, and the lethal trifecta |
 | 13 | [The visual system](13-UI.md) | Typography, colour, density, motion, accessibility, RTL |
 | 14 | [The Kennel and community](14-KENNEL-AND-COMMUNITY.md) | Distribution. A marketplace that is an index over files |
@@ -57,7 +57,7 @@ the loop's log is [BUILD.md](../BUILD.md).
 | 20 | [Collaboration](20-COLLABORATION.md) | The five tiers, the decision gate UI, permissions, presence |
 | 21 | [Authoring](21-AUTHORING.md) | The creative tools: page builder, query builder, theme editor, pack builder |
 | 22 | [Frontend](22-FRONTEND.md) | The stack, the runtime renderer, dense tables, feasibility |
-| 23 | [The assistant's surfaces](23-ASSISTANT-UI.md) | Where Spark lives, proposal review, citations, trust |
+| 23 | [The assistant's surfaces](23-ASSISTANT-UI.md) | Where Slash lives, proposal review, citations, trust |
 | 24 | [Self-improvement](24-SELF-IMPROVEMENT.md) | What the record learns from its own use, and where the loop stops |
 | 25 | [Connectors](25-CONNECTORS.md) | Attaching to your projects: pull-based analytics, credentials, time series |
 | 26 | [Your account, your key, your machine](26-BYO-INTELLIGENCE.md) | Three tiers of intelligence, the costs, the terms, and the runner |
@@ -80,7 +80,7 @@ the loop's log is [BUILD.md](../BUILD.md).
 | 43 | [Spec · extract](43-SPEC-EXTRACT.md) | `packages/extract`: the ten extractors, three combinators, money and date parsing |
 | 44 | [Spec · mcp](44-SPEC-MCP.md) | `packages/mcp`: the sixteen tools, resources, `instructions`, one JSON-RPC core over stdio and streamable HTTP, budgets |
 | 45 | [Spec · record](45-SPEC-RECORD.md) | `packages/record`: the six RPC groups, `CallContext`, `Result`, metrics, rules, schedule and outbox |
-| 46 | [Spec · spark](46-SPEC-SPARK.md) | `packages/spark`: tier A jobs, the projection reader, proposals, the tier-C dispatcher |
+| 46 | [Spec · slash](46-SPEC-SLASH.md) | `packages/slash`: tier A jobs, the projection reader, proposals, the tier-C dispatcher |
 | 47 | [Spec · connect](47-SPEC-CONNECT.md) | `packages/connect`: `ingest` with `fetch:`, placeholders, formats, `expect:`, `probe:`, `metric_point` |
 | 48 | [Spec · cli](48-SPEC-CLI.md) | `apps/cli`: the `braindog` command tree, the device-flow login, export/import/verify |
 | 49 | [Spec · selfhost](49-SPEC-SELFHOST.md) | `apps/selfhost`: one Node process, the Directory file, the HTTP surface, the timer and poller |
@@ -125,20 +125,22 @@ The clean room is more expensive to start and cheaper to finish.
 `brain`'s **lessons** are still evidence, and they are cited throughout. Its **code** is not
 present.
 
-### 2 · The assistant is called Spark, and the collision is accepted.
+### 2 · The assistant is called Slash, and whether the name collides is still open.
 
-The prior record argued against it — *"'Spark' cannot travel: GitHub Spark is Microsoft's and
-Google shipped Gemini Spark in 2026"* — and a draft of these documents renamed it to Pointer on
-that basis. **Sam has since reaffirmed Spark twice.** That is the decision.
+Sam renamed it on September 25th 2026, from the name it had carried since the first drafts
+([ADR-070](16-DECISIONS.md), [DIRECTION 31](../loop/DIRECTION.md)). The old name had been kept over
+a crowded field (GitHub Spark is Microsoft's, and Google shipped Gemini Spark in 2026) and over a
+draft of these documents that renamed it Pointer. The new one has had no register check, which is
+[Q8](17-OPEN-QUESTIONS.md), and it does not block anything.
 
-The cost is real and it is entirely discoverability: nobody finds BrainDog by searching "Spark
-AI". It is affordable because this is a *feature* name inside a product, and the expensive
-register check was done for **BrainDog** itself — empty in every class at USPTO, EUIPO and UK IPO.
-**Always "BrainDog Spark" on first use in any public surface**, never "Spark" alone in a repo
-name, a package or a domain. See [11-ASSISTANT](11-ASSISTANT.md) §1.
+Whatever the name, its cost is discoverability: nobody finds BrainDog by searching "Slash AI". It is
+affordable because this is a *feature* name inside a product, and the expensive register check was
+done for **BrainDog** itself, empty in every class at USPTO, EUIPO and UK IPO. **Always "BrainDog
+Slash" on first use in any public surface**, never "Slash" alone in a repo name, a package or a
+domain. See [11-ASSISTANT](11-ASSISTANT.md) §1.
 
-The better half of the rename survives as the sentence the governance model rests on:
-**Spark never decides. It points at what does.**
+The better half of the Pointer argument survives as the sentence the governance model rests on:
+**Slash never decides. It points at what does.**
 
 ### And one note on wording
 

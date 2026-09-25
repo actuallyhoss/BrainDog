@@ -4,8 +4,8 @@
  *
  * `Record$` OPENED A TRIAL'S KEY WITH THE ALARM'S OPENER. `#openKey(api)` is `keyOpener(api, env.KEK)`, whose actor is
  * `system` because the alarm has nobody behind it, and `tryScript` called it the same way, so the owner trying her draft
- * signed nothing. The Spark door fixed the same fault on this host with `sparkAskerEngine` (`spark.test.ts`, "opens the
- * spark key for the asker").
+ * signed nothing. The Slash door fixed the same fault on this host with `slashAskerEngine` (`slash.test.ts`, "opens the
+ * `slash` key for the asker").
  *
  * THE OBJECT IS REAL AND SO IS THE KEY. `src/index.ts` bundled by `wrangler`'s esbuild (`bundled-worker.ts`), its record
  * over `node:sqlite`, the key put through `serveWorkerKeys` with this Worker's own sealing under a bound `KEK`, and the
@@ -87,7 +87,7 @@ test("THE OWNER'S TRIAL ON THE CLOUD OPENS HER KEY IN HER NAME, and the grant.re
     return { status: res.status, body: (await res.json()) as { ok: boolean; value?: { id?: string } } };
   };
 
-  /* THE KEYS LIST COMES WITH THE AGENTS PACK, offered and accepted the way `spark-in-do.test.ts` installs one. */
+  /* THE KEYS LIST COMES WITH THE AGENTS PACK, offered and accepted the way `slash-in-do.test.ts` installs one. */
   const filed = await call('propose', { question: 'Install agents?', body_kind: 'pack', body: { install: 'agents' } });
   assert.ok(filed.body.ok, JSON.stringify(filed));
   const accepted = await call('decide', { id: filed.body.value?.id, decide: { option: 'accept', reason: 'the vault needs its list' } });

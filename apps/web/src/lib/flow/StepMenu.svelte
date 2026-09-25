@@ -15,7 +15,7 @@
   "Nothing yet" box gone the pill is the only thing there to light up, so it takes the accent edge the landing line
   between two cards is drawn in.
 
-  ASK SPARK IS OFFERED WHERE A MODEL IS, read from the layout's `spark` here rather than passed down through `FlowList`,
+  ASK SLASH IS OFFERED WHERE A MODEL IS, read from the layout's `slash` here rather than passed down through `FlowList`,
   because every menu on the canvas asks the same question of the same tab and none of the lists between has a use for it.
 -->
 <script lang="ts">
@@ -32,7 +32,7 @@
   }: { label?: string; compact?: boolean; landing?: boolean; onpick: (verb: Verb) => void } = $props();
 
   let open = $state(false);
-  const groups = $derived(stepGroups(page.data.spark === true));
+  const groups = $derived(stepGroups(page.data.slash === true));
 </script>
 
 <div class="step-menu" data-compact={compact ? '' : undefined} data-landing={landing ? '' : undefined}>

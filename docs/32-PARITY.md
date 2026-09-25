@@ -192,7 +192,7 @@ placed; nothing in them needed a new mechanism, and four of them carried a lesso
 | Commit | What landed in the brain | Where it lives here |
 |---|---|---|
 | `f32ffb6` | `.secrets` retired: 72 credentials into the vault, verified byte-identical before deletion; three things moved *out* because the vault cannot hold its own key; an audit-note leak found by the harness (`opens` prose on the activity screen); seven harness assertions rewritten to where the property now lives; the runner live under a hardened systemd unit | [12-SECURITY](12-SECURITY.md) §6 and §8 · [20-COLLABORATION](20-COLLABORATION.md) §8 · [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §5 · [18-BUILD-TOOLKIT](18-BUILD-TOOLKIT.md) §6 |
-| `46334fd` | Spark's second mode — a live job transcript with five properties that beat the terminal, `jobEvents({ id, after })` high-water polling — the job view's poll — leave-and-return, `Esc` back-then-out | [23-ASSISTANT-UI](23-ASSISTANT-UI.md) §3.1 · [19-INTERFACE](19-INTERFACE.md) §4 |
+| `46334fd` | Slash's second mode — a live job transcript with five properties that beat the terminal, `jobEvents({ id, after })` high-water polling — the job view's poll — leave-and-return, `Esc` back-then-out | [23-ASSISTANT-UI](23-ASSISTANT-UI.md) §3.1 · [19-INTERFACE](19-INTERFACE.md) §4 |
 | `d75939a` | the claim long-polls: 15.4 s → under 1.5 s *and* 43,200 → ≈4,300 requests a day; twenty seconds not thirty; an abort at wait + 10; `idle_ms` kept for a runner that cannot hold a connection | [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §5 · [33-CONTRACTS](33-CONTRACTS.md) §11 |
 | `04c714b` | two money-audit findings: the forecast joined net worth to liquid cash and was right by coincidence; a draft wiped by its own screen finishing loading; and *assert on the code shape, never on the file* | [08-METRICS](08-METRICS-AND-ANALYTICS.md) §3 · [22-FRONTEND](22-FRONTEND.md) §7 · §10 below |
 | `2451e4f` | an e2e file defaulted to a dev-server port copied from a scratch file | [22-FRONTEND](22-FRONTEND.md) §7 · 18 §6 |
@@ -557,7 +557,7 @@ them**, and the design already has the mechanism — [29-EMERGENT-PAGES](29-EMER
 | The `agents` pack | **is proposed when the first agent token is minted**, and installs when the person accepts. Learnings, skills and keys are one way of using agents, and an install nobody accepted contradicts "the person accepts" ([DIRECTION](../loop/DIRECTION.md) §11, §5c, §22). *(An earlier revision had it install itself.)* |
 | Money, estate, portfolio | each one screen when its pack is installed, and its emergent pages after that |
 | Themes | one. The picker appears at the second theme |
-| Spark | absent without a model; present as a palette row with one line otherwise |
+| Slash | absent without a model; present as a palette row with one line otherwise |
 
 **The rule that makes this hold:** a capability appears when its *trigger* fires, not when the
 product could support it. The brain grew to 190 features because one person needed them; BrainDog

@@ -1,5 +1,5 @@
 /**
- * Arranging a BrainDog by proposal: what an agent or Spark reads first, what it may ask for, and what
+ * Arranging a BrainDog by proposal: what an agent or Slash reads first, what it may ask for, and what
  * the owner's press applies (`loop/research-spark.md` S12, `loop/DIRECTION.md` §11).
  *
  * THE RECORD HAD NO WAY TO BE ARRANGED BY ANYBODY BUT ITS OWNER IN A BROWSER. Installing a pack, turning
@@ -21,7 +21,7 @@ import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
 import { conflictFault, installFault, installOrder, labelsOf, laterVersion, normalise, packIdOf, plan, plannedState, readShared, install, stagedBatch, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
 import { configValue, ulids, type ConfigDecl, type Declaration, type Json, type Kernel, type PlannedRecord } from '@braindog/kernel';
-import type { FormSpec, NextSpec } from './spark.ts';
+import type { FormSpec, NextSpec } from './slash.ts';
 
 /**
  * The record `plannedState` leaves, as `kernel.lint` reads one: each body parsed, and the pack that put it there.
@@ -79,16 +79,16 @@ export type CatalogueEntry = {
    * proposal or any other caller, after the install and before its examples are linked. OPTIONAL, and never a reason to fail.
    */
   carry?: (io: CarryIo, from: string) => Promise<number>;
-  /** The skills a use case names for agents working in it, which Spark offers once it is on (`loop/research-spark.md` S9). */
+  /** The skills a use case names for agents working in it, which Slash offers once it is on (`loop/research-spark.md` S9). */
   skills?: readonly { name: string; trigger: string }[] | undefined;
   /**
-   * WHAT A USE CASE GROWS INTO, and when: once every figure test holds, Spark asks on Decide to install these packs beside it
-   * (`spark.ts` `growsDrafts`). A guide whose idea stage is over grows into Projects and Work. Nothing is taken away.
+   * WHAT A USE CASE GROWS INTO, and when: once every figure test holds, Slash asks on Decide to install these packs beside it
+   * (`slash.ts` `growsDrafts`). A guide whose idea stage is over grows into Projects and Work. Nothing is taken away.
    */
   grows?: Grows | undefined;
   /**
    * WHAT A USE CASE FORMS AROUND WHAT THE PERSON SAID, when a model is configured: the lists and limits of a first plan, which
-   * Spark asks the model for and files on Decide as rows (`spark.ts` `formedRows`, the record's `sparkForm`).
+   * Slash asks the model for and files on Decide as rows (`slash.ts` `formedRows`, the record's `slashForm`).
    */
   forms?: FormSpec | undefined;
   /** What moves on when a row of a use case's list is reached, asked once on Decide or done as its setting says (`NextSpec`). */
@@ -424,7 +424,7 @@ export function arranger(d: ArrangeDeps) {
          `kernel.lint` WITH THE PLANNED RECORD, AND NOT `declare`'s `stagedFault`, which wave forty-eight used and which
          asks `validate` alone. The rest of what `stageInstall` asks read the table, and five arrangements were filed that
          the accept refused: a narrowed `tags` under a live rule, a rule tagging a list the pack before it types `int`, a
-         page filtering a list the pack before it declares on a field it lacks, a rule asking Spark on a host that answers
+         page filtering a list the pack before it declares on a field it lacks, a rule asking Slash on a host that answers
          none, and (for the pages, below) a `where:` over `rates` beside an update retiring `fx`. */
       const staging = kernel.lint(stagedBatch(pack, diff) as Declaration[], ...plannedOf(state));
       if (staging) return { ok: false, refusal: { ...staging, at: 'body.packs' } };
@@ -796,7 +796,7 @@ export function arranger(d: ArrangeDeps) {
   }
 
   /**
-   * THE ROWS A PLAN IS MADE OF (`spark.ts` `formedRows`), checked against the lists as they are: each list is here, each field
+   * THE ROWS A PLAN IS MADE OF (`slash.ts` `formedRows`), checked against the lists as they are: each list is here, each field
    * is one it declares, and a link is a ref field pointing at the list of the earlier row it names. Whether a value is valid
    * is the write path's, when the arrangement is accepted, as it is for a rowset.
    */

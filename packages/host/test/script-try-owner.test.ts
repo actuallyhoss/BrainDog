@@ -5,8 +5,8 @@
  * ONE SENTENCE WAS SAID TO EVERY CALLER WITHOUT A KEY, AND IT NAMED AN AGENT. The record gives a trial the vault only
  * when the vault itself would open for the caller: an owner, in a browser, proved within fifteen minutes. The owner whose
  * proof is two hours old is refused for that reason alone, and "a trial opens no key for an agent" tells her she is
- * something she is not and leaves her nothing to do. Spark's included key, gated the same way, says what opens it
- * (`SPARK_HOST_KEY_CLOSED` in `src/spark.ts`), and so does this, once the record says the proof is the reason.
+ * something she is not and leaves her nothing to do. Slash's included key, gated the same way, says what opens it
+ * (`SLASH_HOST_KEY_CLOSED` in `src/slash.ts`), and so does this, once the record says the proof is the reason.
  *
  * THE SANDBOX IS A DOUBLE THAT ASKS FOR THE KEY AND ANSWERS WHAT IT WAS TOLD, which is what `scriptRunner` does with a
  * rejected `grantOf` inside QuickJS: the script sees the error, and the caller sees its words. The self-host's whole join

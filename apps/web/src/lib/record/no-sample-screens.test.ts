@@ -3,7 +3,7 @@
  * from their source, because this app has no DOM to open them in.
  *
  * WHAT EACH ONE DID (DIRECTION 26). The bind sheet offered the studio's pages under a `sampleSide` and toasted "nothing
- * was saved" for a block on one of them. Spark answered a shell that was not live with "This is the sample". The
+ * was saved" for a block on one of them. Slash answered a shell that was not live with "This is the sample". The
  * spoken-id resolver sent `/SG5` and `/tasks#3` to the studio's question and row when the record said 401. The saved
  * view drew the studio's `VIEWS` over rows from `list`. None of them asked whether anybody was looking at a real record.
  */
@@ -31,11 +31,11 @@ test('the saved view never hands the bind sheet a sample answer', () => {
   assert.doesNotMatch(view, /\bVIEWS\b|\bPAGES\b|\bNOW\b|'sample'/u);
 });
 
-test('Spark reads the record whatever the shell says, and has no sample phase', () => {
-  const spark = code('../../routes/spark/+page.svelte');
-  assert.doesNotMatch(spark, /'sample'|words\.sample/u);
-  assert.doesNotMatch(spark, /page\.data\.live/u, 'Spark decides from the shell again instead of asking the record');
-  assert.match(spark, /readSpark\(client\)/u);
+test('Slash reads the record whatever the shell says, and has no sample phase', () => {
+  const slash = code('../../routes/slash/+page.svelte');
+  assert.doesNotMatch(slash, /'sample'|words\.sample/u);
+  assert.doesNotMatch(slash, /page\.data\.live/u, 'Slash decides from the shell again instead of asking the record');
+  assert.match(slash, /readSlash\(client\)/u);
 });
 
 test('a spoken id is resolved on the record or not at all, never in the sample', () => {

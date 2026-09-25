@@ -61,10 +61,10 @@ test('THE READER IS YOU, whichever spelling the ledger wrote them in', () => {
 
 test('AN ACTOR THAT IS NOT A PERSON KEEPS ITS WORDS, and still leads with a capital', () => {
   assert.equal(actorSaid('system', null, NO_NAMES).name, 'The record itself');
-  assert.equal(actorSaid('spark', null, NO_NAMES).name, 'The assistant');
+  assert.equal(actorSaid('slash', null, NO_NAMES).name, 'The assistant');
   assert.equal(actorSaid('rule.renewal', null, NO_NAMES).name, 'Renewal rule');
   assert.equal(actorSaid('agent:claude', null, NO_NAMES).name, 'Claude');
-  for (const by of ['system', 'spark', 'rule.renewal', 'agent:claude'])
+  for (const by of ['system', 'slash', 'rule.renewal', 'agent:claude'])
     assert.equal(actorSaid(by, null, NO_NAMES).person, false, `${by} was read as a person`);
 });
 
@@ -85,8 +85,8 @@ test('A CHIP THAT CANNOT SAY WHICH PERSON IT MEANS IS NOT OFFERED', () => {
   /* Seven colleagues the record has no name for are seven chips reading the same four words, and
      each one would filter to one of them. The record itself and the assistant keep theirs, because
      their words pick out exactly one actor. */
-  const nameless = ['you', 'system', 'spark', DECIDER, OWNER, 'p_01M1KJ7RG0WRITE000000000W'];
-  assert.deepEqual(offeredActors(nameless, null, NO_NAMES), ['you', 'system', 'spark']);
+  const nameless = ['you', 'system', 'slash', DECIDER, OWNER, 'p_01M1KJ7RG0WRITE000000000W'];
+  assert.deepEqual(offeredActors(nameless, null, NO_NAMES), ['you', 'system', 'slash']);
 });
 
 test('AND IT COMES BACK THE DAY SOMEBODY SETS A NAME, with nothing else changing', () => {

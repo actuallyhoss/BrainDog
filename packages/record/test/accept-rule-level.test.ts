@@ -10,7 +10,7 @@
  *     P4 accept at decide: ok
  *     P4 filed 1 posts 1 owner key true reads ["rule:rate"]
  *
- * The rule a colleague proposed and then accepted herself asked Spark on the owner's key, which `workerSparkAnswers`
+ * The rule a colleague proposed and then accepted herself asked Slash on the owner's key, which `workerSlashAnswers`
  * and `docs/07` rest on installing being the owner's consent. Here the post is the `infer.ask` job the run queues: the
  * Worker sends one post for each, so no job is no post.
  */
@@ -38,7 +38,7 @@ const RATE = {
     rule: 'rate',
     on: { written: { register: 'obligations', op: ['create'] } },
     once_per: ['entry'],
-    steps: [{ ask_spark: { question: 'What rate applies to {{what}}?', about: ['what'], as: 'rate', shape: 'number' } }],
+    steps: [{ ask_slash: { question: 'What rate applies to {{what}}?', about: ['what'], as: 'rate', shape: 'number' } }],
   },
 };
 const WITH_DUE = { ...OBLIGATIONS, body: { ...OBLIGATIONS.body, fields: [...OBLIGATIONS.body.fields, { id: 'due', type: 'day' }] } };
@@ -52,13 +52,13 @@ const value = <T>(r: unknown): T => {
 
 async function record() {
   const sql = openSqlite();
-  const api = await createRecordApi({ sql, clock: fixedClock(NOW), answersSpark: true });
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW), answersSlash: true });
   value(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_owner' } }));
   value(await api.kernel.install([OBLIGATIONS] as never));
   const file = async (by: CallContext, declaration_id: string, to: unknown) =>
     value<{ id: string }>(await api.propose({ question: 'Ask the rate?', body_kind: 'change', body: { declaration_id, to } } as never, by)).id;
   const accept = async (id: string, by: CallContext) => (await api.decide({ id, decide: { option: 'accept', reason: 'Fine.' } } as never, by)) as Out;
-  /* How many questions to Spark a new Obligations row queues, which is how many posts the Worker makes for it. */
+  /* How many questions to Slash a new Obligations row queues, which is how many posts the Worker makes for it. */
   const asks = async (): Promise<number> => {
     value(await api.create({ register: 'obligations', fields: { what: `Rent ${Math.random()}` } }, owner));
     await api.kernel.drain();
@@ -81,7 +81,7 @@ test('P4: A COLLEAGUE AT DECIDE WHO MAY NOT SET A RULE MAY NOT ACCEPT ONE EITHER
   assert.equal(out.refusal?.code, 'LEVEL_REQUIRED', JSON.stringify(out));
   assert.equal(installed(), false);
   assert.equal(open(id), 'open', 'the question was decided though nothing was installed');
-  assert.equal(await asks(), 0, 'the rule asked Spark on the owner’s key');
+  assert.equal(await asks(), 0, 'the rule asked Slash on the owner’s key');
 
   /* AND THE OWNER'S PRESS ON THE SAME QUESTION INSTALLS IT, so the refusal above is about who pressed. */
   value(await accept(id, owner));
@@ -110,7 +110,7 @@ test('A RULE INSIDE A BUNDLE IS HELD THE SAME, and a bundle with no rule is not'
    being an ingest when it is filed (`kernel/test/pattern-kind.test.ts`), so there is no such question for anybody to
    accept: the colleague's is refused, the owner's is refused the same, and the refusal says to file a rule as a change,
    which the tests above hold to the owner. */
-test('A RULE FILED AS A PATTERN IS NOT FILED AT ALL, by the colleague or the owner, and nothing asks Spark', async () => {
+test('A RULE FILED AS A PATTERN IS NOT FILED AT ALL, by the colleague or the owner, and nothing asks Slash', async () => {
   const { sql, api, asks, installed } = await record();
   for (const by of [colleague, owner]) {
     const out = (await api.propose({ question: 'Ask the rate?', body_kind: 'pattern', body: { ingest: RATE, samples: ['raw_1'] } } as never, by)) as Out;
@@ -120,6 +120,6 @@ test('A RULE FILED AS A PATTERN IS NOT FILED AT ALL, by the colleague or the own
   }
   assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM suggestion')?.n, 0);
   assert.equal(installed(), false);
-  assert.equal(await asks(), 0, 'the rule asked Spark on the owner’s key');
+  assert.equal(await asks(), 0, 'the rule asked Slash on the owner’s key');
   sql.close();
 });

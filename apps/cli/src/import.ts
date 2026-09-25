@@ -365,7 +365,7 @@ const WRITES_AT_ONCE = 8;
 /**
  * Everything on Decide, A PAGE AT A TIME, because the question this read answers is "has he already been asked this".
  *
- * ONE READ OF 200 WAS THE WHOLE OF IT, AND THE CEILING IS A LIFETIME ONE: every draft Spark filed, every pack offered
+ * ONE READ OF 200 WAS THE WHOLE OF IT, AND THE CEILING IS A LIFETIME ONE: every draft Slash filed, every pack offered
  * and every question answered is still a row in the suggestion table, and the read is `status: 'all'` because a
  * question he has ANSWERED is exactly the one that must not come back. His record holds 49 today. Measured against
  * the kernel (`test/import-at-scale.test.ts`): with 200 suggestions in the table a re-import asks nothing, and with

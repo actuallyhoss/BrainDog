@@ -1,4 +1,4 @@
-# 23 · Spark's surfaces
+# 23 · Slash's surfaces
 
 Where the assistant lives, how a proposal is reviewed, and how a claim is traced to a row. The
 engine is [11-ASSISTANT](11-ASSISTANT.md).
@@ -21,7 +21,7 @@ engine is [11-ASSISTANT](11-ASSISTANT.md).
 
 ## 2 · Does it ship in v1? The record answers, not taste
 
-[15-ROADMAP](15-ROADMAP.md) funds Spark explicitly — **B7, 8 days**, now gated on
+[15-ROADMAP](15-ROADMAP.md) funds Slash explicitly — **B7, 8 days**, now gated on
 [ADR-030](16-DECISIONS.md)'s counter. *(An earlier draft of this section claimed the roadmap had
 "eleven stages and nine tracks" and no assistant track. That was a misreading of the **prior
 product's** record rather than of this roadmap, and it is withdrawn.)*
@@ -55,7 +55,7 @@ Honestly: **four things, and they are all narrow.**
 > conversation and a better model. On any task involving code, iteration, or more than one register,
 > it wins outright. **A design that forgets this builds a worse Claude Code inside a web app.**
 
-**The scoping rule that follows: Spark only gets jobs where at least one of those four applies.**
+**The scoping rule that follows: Slash only gets jobs where at least one of those four applies.**
 *"Summarise my week"* fails all four and must not ship.
 
 And the external precedent is decisive — GitHub retired **GitHub Spark** because *"builders can now
@@ -77,7 +77,7 @@ name on the marketing page and one honest narrow feature behind it* — not for 
 | Full page | **No** | a page is a destination, and a destination has to be worth walking to. A proposal queue that is usually empty is not |
 | Inline command bar | **Already exists** | it is the palette. Do not build a second one |
 | Inline-in-context | **Yes, for one thing** | the raw inbox row gets one affordance: `Propose a pattern` |
-| **A row in an existing queue** | **Yes — the primary surface** | the Decide queue already holds suggestion rows and the three verbs. A Spark proposal *is* one. **Zero new surface** |
+| **A row in an existing queue** | **Yes — the primary surface** | the Decide queue already holds suggestion rows and the three verbs. A Slash proposal *is* one. **Zero new surface** |
 
 The palette's shape is already the right one — *a header that owns the input, a body that renders a
 result, a footer* — and the second mode changes one word: **not a transcript, a proposal.** The body
@@ -122,7 +122,7 @@ one press to leave a mode, a second to leave the panel — and not while the cur
 
 | State | On screen |
 |---|---|
-| `absent` | no model configured. Spark is **not there** — not greyed out. *A row that cannot run is not there* |
+| `absent` | no model configured. Slash is **not there** — not greyed out. *A row that cannot run is not there* |
 | `idle` | the palette as normal. One extra row appears only once the input stops matching a place |
 | `waking` | 1–3 s cold start. The **silhouette** of a proposal. No spinner — see §7 |
 | `reading` | `Searched money · 412 rows · 0.4s`. True, and it *is* the retrieval trace |
@@ -131,8 +131,8 @@ one press to leave a mode, a second to leave the panel — and not while the cur
 | `stopped` | Escape. Input intact, nothing filed |
 | `out` | budget exhausted. Deterministic rows still answer |
 
-**Two marks, because Spark is one agent among four.** A generic machine mark means *a machine
-wrote this row* — any agent. A **paw** means *Spark specifically*.
+**Two marks, because Slash is one agent among four.** A generic machine mark means *a machine
+wrote this row* — any agent. A **paw** means *Slash specifically*.
 
 ---
 
@@ -140,7 +140,7 @@ wrote this row* — any agent. A **paw** means *Spark specifically*.
 
 ### One object, five bodies — four filed, one not
 
-Spark produces exactly one kind of thing: **a suggestion**, which the decision gate already
+Slash produces exactly one kind of thing: **a suggestion**, which the decision gate already
 consumes and which already becomes an immutable decision with a mandatory reason. The gate is one
 mechanism in two clients: here, the review below; over MCP, the protocol's MRTR round trip
 ([10-MCP](10-MCP.md) §5) — the same row, the same mandatory reason.
@@ -148,10 +148,10 @@ mechanism in two clients: here, the review below; over MCP, the protocol's MRTR 
 | Body | Case |
 |---|---|
 | `options` | two or more paths, one recommended |
-| `pattern` | an `ingest:` document derived from raw-inbox examples. **The v1 case.** A Spark-derived pattern always files `confidence: needs-review`; a person raises it at review ([07-INGEST-AND-RULES](07-INGEST-AND-RULES.md) §4) |
+| `pattern` | an `ingest:` document derived from raw-inbox examples. **The v1 case.** A Slash-derived pattern always files `confidence: needs-review`; a person raises it at review ([07-INGEST-AND-RULES](07-INGEST-AND-RULES.md) §4) |
 | `rowset` | *n* rows to write. Partial acceptance matters most here |
 | **`change`** | **a declaration diff, and the falsifiable prediction that comes with it** — [24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md) §4.6. Phase C |
-| `query` | the palette's answer — a drafted predicate and the rows it selects (§10). **Unfiled**: it reaches the queue only if the person saves it ([46-SPEC-SPARK](46-SPEC-SPARK.md) §4.2) |
+| `query` | the palette's answer — a drafted predicate and the rows it selects (§10). **Unfiled**: it reaches the queue only if the person saves it ([46-SPEC-SLASH](46-SPEC-SLASH.md) §4.2) |
 
 **`change` is the one that needed a fourth body rather than reusing `options`,** and the reason is
 the prediction. A `change` review shows three things no other body has: the diff, the observation
@@ -174,10 +174,10 @@ for the diff, which is why this is a fourth body and not a fourth screen.
 ```
 ┌────────────────────────────────────────────────────────────────────────────────┐
 │ ?  Which November renewals move to the new card before it expires?       SG27   │
-│    ★ Spark · 3 options · 11 rows behind them              2 tasks · bake      │
+│    ★ Slash · 3 options · 11 rows behind them              2 tasks · bake      │
 ├────────────────────────────────────────────────────────────────────────────────┤
 │ ?  A pattern for the three HSBC texts nothing has parsed                SG31   │
-│    ★ Spark · from 3 messages · derived from untrusted content    ⚠  money     │
+│    ★ Slash · from 3 messages · derived from untrusted content    ⚠  money     │
 └────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -229,14 +229,14 @@ place the argument is readable, and folding it here would leave it folded everyw
 
 - **Every line is clickable and lands on the app's own screen.** No bespoke evidence viewer.
 - **Every figure is a `{{path}}`**, so the fold cannot go stale.
-- **A line Spark cannot address is not in the fold.** If it cannot name the row, it did not use
+- **A line Slash cannot address is not in the fold.** If it cannot name the row, it did not use
   the row.
 
 ### The `pattern` review — the v1 case
 
 ```
   A pattern for the three HSBC texts nothing has parsed                    SG31
-  ★ Spark · 2026-08-31 14:07 · glm-5.3-flash
+  ★ Slash · 2026-08-31 14:07 · glm-5.3-flash
 
   ┌─ THE SOURCE, AS IT ARRIVED ─────────────────────────────────── untrusted ─┐
   │ +20 100 ••• ••••          2026-08-29 14:02          inbox_raw #212        │
@@ -334,9 +334,9 @@ the default is blur, and the exceptions have to be **proven** — by provenance,
 
 ### The one hard rule
 
-> **Spark may not type a number. It may only name a path.**
+> **Slash may not type a number. It may only name a path.**
 
-| Spark emits | Renders as | Status |
+| Slash emits | Renders as | Status |
 |---|---|---|
 | `{{revenue-monthly}}` — a metric id | `USD 3,988.00`, live, re-read every paint | **cited** |
 | `{{money:500500 EGP}}` — minor units and a currency | `EGP 5,005.00` — a value the source stated | **quoted**, tied to its source row |
@@ -354,7 +354,7 @@ Press an uncited span and get the honest answer:
 ```
   ┌───────────────────────────────────────────────────────────┐
   │  about 40%                                                │
-  │  Spark typed this figure. There is no path behind it.   │
+  │  Slash typed this figure. There is no path behind it.   │
   │  [ Show me the rows it would come from ]                  │
   └───────────────────────────────────────────────────────────┘
 ```
@@ -364,7 +364,7 @@ Press an uncited span and get the honest answer:
 The gap: a figure derived from *many* rows. `{{money-owed}}` gives the number; nothing gives the
 fourteen rows. An earlier draft added a ninth typed interpolation, `{{rows:14|/r/txn?cat=owed}}`. It
 is **not in the dialect** — the typed forms are closed at eight ([34-GRAMMARS](34-GRAMMARS.md) §2.3)
-and a typed argument is a literal or a path, never an address. Spark cites the rows themselves:
+and a typed argument is a literal or a path, never an address. Slash cites the rows themselves:
 
 ```
 {{ref:txn#12}} {{ref:txn#15}} … {{ref:txn#41}}      →   "14 rows ▸", linked
@@ -402,12 +402,12 @@ facts.
 ### What was searched — and the line that is drawn every time
 
 ```
-  What Spark read                                                    folded ▸
+  What Slash read                                                    folded ▸
   ─────────────────────────────────────────────────────────────────────────────
   transactions    412 rows      predicate: cat=owed, due<90d
   obligations      24 rows      all
   domains          31 rows      renews<60d
-  grant             — refused   Spark has no tool that reads this register
+  grant             — refused   Slash has no tool that reads this register
   ─────────────────────────────────────────────────────────────────────────────
   0.4s · glm-5.3-flash · 2 asks
 ```
@@ -426,7 +426,7 @@ not exist.**
 The same gate applies to filing: a proposal with zero addressable rows behind it is **never
 written** (`PROPOSAL_NO_ROWS`), one that cites nothing is refused (`PROPOSAL_UNCITED`), and a
 proposal is filed exactly once, by `record.propose` — the palette's second call files it and nothing
-else does ([46-SPEC-SPARK](46-SPEC-SPARK.md) §5.5).
+else does ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.5).
 
 And guessing is not a tone — it is an absence of citation. A proposal whose *recommendation* rests
 on an uncited figure **cannot be marked recommended**; it files with no recommendation and the
@@ -498,7 +498,7 @@ The body renders in two passes, and **the first needs no model.**
   │  Nile Realty ········ {{money:34794000 EGP}}   12 rows                │
   │                                             [ Open in Money ]         │
   ├─ 2 ─ arriving ────────────────────────────────────────────────────────┤
-  │  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓  Spark is reading these rows                   │
+  │  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓  Slash is reading these rows                   │
   └───────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -507,9 +507,9 @@ The body renders in two passes, and **the first needs no model.**
 > came for — which is also the graceful-degradation design and the no-model design, for free.
 
 The palette is two calls — `read`, then `propose` — so pass 1 renders without a stream and Escape
-between them cancels for free. Both are named methods on the Spark object, dispatched over
-`/api/spark/<method>` (`status` · `read` · `propose` · `pattern` · `settings`), a browser session only —
-a bearer gets `403 NEEDS_BROWSER_SESSION` ([46-SPEC-SPARK](46-SPEC-SPARK.md) §5).
+between them cancels for free. Both are named methods on the Slash object, dispatched over
+`/api/slash/<method>` (`status` · `read` · `propose` · `pattern` · `settings`), a browser session only —
+a bearer gets `403 NEEDS_BROWSER_SESSION` ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5).
 
 ### Cancel
 
@@ -538,7 +538,7 @@ against $12 is 1.6% of revenue, and the buyer did not come here to think about t
 **One row in Settings. Nothing anywhere else.**
 
 ```
-  Spark
+  Slash
   ─────────────────────────────────────────────────────────────────────────────
   Asks this month            41 of 80
   Model                     glm-5.3-flash
@@ -556,7 +556,7 @@ against $12 is 1.6% of revenue, and the buyer did not come here to think about t
 |---|---|
 | 0–79% | **nothing.** No indicator anywhere |
 | 80% | one dismissible line in the palette footer, **once per month** |
-| 100% | a `warn` chip on the Settings row, and Spark's own rows say so |
+| 100% | a `warn` chip on the Settings row, and Slash's own rows say so |
 
 Never a modal. Never an upsell in the flow.
 
@@ -566,19 +566,19 @@ Never a modal. Never an upsell in the flow.
   │  14 rows match. EGP 1,171,940.00 due before {{date:2027-02-01}}.        │
   │                                              [ Open in Money ]          │
   │  ───────────────────────────────────────────────────────────────────── │
-  │  Spark is out of asks until {{date:2026-10-01}}.                      │
+  │  Slash is out of asks until {{date:2026-10-01}}.                      │
   │  Everything above this line was drawn without it.                       │
   │                          [ Use your own endpoint ]   [ Settings ]       │
 ```
 
 That last sentence is the whole product argument in eleven words, and it is **only true because of
-the two-pass layout in §7.** The line above it is the `SPARK_BUDGET_SPENT` refusal's own `fix`
+the two-pass layout in §7.** The line above it is the `SLASH_BUDGET_SPENT` refusal's own `fix`
 sentence, shown verbatim — a refusal is never rewritten client-side ([13-UI](13-UI.md) §6); the
-number behind it is `ask_cap`, per record per month ([46-SPEC-SPARK](46-SPEC-SPARK.md) §6).
+number behind it is `ask_cap`, per record per month ([46-SPEC-SLASH](46-SPEC-SLASH.md) §6).
 
 > **The model is never silently downgraded.**
 
-**Mechanism, not policy: every Spark output carries the model name in its footer, always** —
+**Mechanism, not policy: every Slash output carries the model name in its footer, always** —
 receded, small, mono. A downgrade is then physically impossible to hide, because the row that changed
 says so, and the audit log records it.
 
@@ -591,12 +591,12 @@ have.**
 With a self-hosted endpoint configured, **the meter disappears entirely** — not zeroed, not greyed,
 gone. It is not our money. The model name still ships with every output.
 
-With **no** model, Spark is **absent**: no palette row, no `Propose a pattern` action, no **Ask
-Spark** button on any empty state, one line in Settings. `SPARK_ENDPOINT` unset means the host never
-imports the package and registers no Spark route; `GET /api/version` answers `spark: false`, and the
-client draws a Spark affordance on nothing but `spark: true` ([46-SPEC-SPARK](46-SPEC-SPARK.md) §5.1;
+With **no** model, Slash is **absent**: no palette row, no `Propose a pattern` action, no **Ask
+Slash** button on any empty state, one line in Settings. `SLASH_ENDPOINT` unset means the host never
+imports the package and registers no Slash route; `GET /api/version` answers `slash: false`, and the
+client draws a Slash affordance on nothing but `slash: true` ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.1;
 [50-SPEC-WEB](50-SPEC-WEB.md) §5.5). **Every deterministic feature is byte-identical, and CI proves
-it** — `SPARK_ENDPOINT` unset must pass every e2e suite (an earlier draft named the variable for the
+it** — `SLASH_ENDPOINT` unset must pass every e2e suite (an earlier draft named the variable for the
 withdrawn *Pointer* rename; the row is in [18-BUILD-TOOLKIT](18-BUILD-TOOLKIT.md) §6).
 
 ---
@@ -609,7 +609,7 @@ The **Agents Rule of Two**: an agent may satisfy **no more than two** of — **[
 untrustworthy input, **[B]** has access to private data, **[C]** can change state or communicate
 externally. If all three are needed, it *"requires supervision — via human-in-the-loop approval."*
 
-| Property | Spark |
+| Property | Slash |
 |---|---|
 | **A** untrusted input | **yes** — the raw inbox is the whole point |
 | **B** private data | **yes** — a narrow projection |
@@ -662,18 +662,18 @@ mode worse than a missed highlight.
 
 ### Credentials: nothing to add
 
-Spark gets **no** Vault affordance. No *"ask about this key"*, no summary. The register is not in
-its projection, and the `What Spark read` fold says so on every run. Compare MCP's own elicitation
+Slash gets **no** Vault affordance. No *"ask about this key"*, no summary. The register is not in
+its projection, and the `What Slash read` fold says so on every run. Compare MCP's own elicitation
 rule: servers *"**MUST NOT** use elicitation to request sensitive information."*
 
 ### The residual risk, stated
 
-**Spark cannot exfiltrate. The human can.** An injected instruction that persuades a person to
+**Slash cannot exfiltrate. The human can.** An injected instruction that persuades a person to
 write a row is the remaining path, and no UI closes it completely. What the UI can do is make the
 persuasion visible: quarantined, unrendered, marked, above the verbs, with instruction-shaped spans
 highlighted, and the reason field asking what in *that* made this right.
 
-Also: **Spark emits no raw markdown links.** Links come only from validated typed interpolations.
+Also: **Slash emits no raw markdown links.** Links come only from validated typed interpolations.
 
 ---
 
@@ -696,7 +696,7 @@ November"*, one in five is not a feature. It is a liability with a decision gate
   ┌──────────────────────────────────────────────────────────────────────────┐
   │  what's due before the card expires                                      │
   ├──────────────────────────────────────────────────────────────────────────┤
-  │  Spark read that as:                                                   │
+  │  Slash read that as:                                                   │
   │    source  obligations, domains, services                                │
   │    where   due < 2026-11-04  and  paid_with = card ••4471                │
   │                                                    [ Edit ]  [ Save ]    │
@@ -751,7 +751,7 @@ and `field:` the field on its far side — [34-GRAMMARS](34-GRAMMARS.md) §1.6. 
 `domains.paid_with.expires < domains.renews`: a two-hop path, arithmetic on a literal and a
 field-to-field comparison, three constructs the grammar refuses.)*
 
-**Spark's only role is to have proposed that rule once, from an observation.** After that it is
+**Slash's only role is to have proposed that rule once, from an observation.** After that it is
 free, deterministic, testable and shareable as a pack file.
 
 ### The etiquette rules, each with a source
@@ -788,9 +788,9 @@ per-app off switch, a *"may contain errors"* warning, and the worst category dis
 
 ## 12 · Multi-agent reality
 
-### Spark is a peer, and the weakest one
+### Slash is a peer, and the weakest one
 
-1. **A coordinator needs authority. Spark has none** — no write path, by design. An actor that
+1. **A coordinator needs authority. Slash has none** — no write path, by design. An actor that
    cannot write cannot arbitrate between actors that can.
 2. **The coordinator already exists and is not an agent.** It is the record: one object, one version,
    compare-and-set, an append-only log. **Better than a model because it cannot be persuaded.**
@@ -806,9 +806,9 @@ per-app off switch, a *"may contain errors"* warning, and the worst category dis
   ★ codex      S24   task.add        #241  Rotate the Porkbun key      14:02
   ★ claude     S25   suggestion.add  SG31  A pattern for HSBC texts    14:06
     sam             decide          D44 ← SG27                        14:11
-  ★ spark            suggestion.add  SG32  Three renewals, one card    07:30
+  ★ slash            suggestion.add  SG32  Three renewals, one card    07:30
   ─────────────────────────────────────────────────────────────────────────────
-  [ everyone ]  [ machines ]  [ sam ]  [ spark ]
+  [ everyone ]  [ machines ]  [ sam ]  [ slash ]
 ```
 
 Three mechanisms, all borrowed:
@@ -885,18 +885,18 @@ Ranked by probability × damage to the thing being sold.
 
 | # | Anti-pattern | Countermeasure |
 |---|---|---|
-| **1** | **The confident wrong figure.** Spark writes "£14,200 owed"; it is £11,800; a decision is taken; the decision is immutable — and it poisons every decision that cites it | **Spark may not type a number.** Figures are `{{path}}` or refused. `{{ref:…}}` citations resolve at paint and a stale one flags itself. Two currencies never sum |
-| **2** | **The assistant becomes the only way to do anything** — it inverts the value proposition and breaks the self-host promise in spirit while honouring it in letter | **Every Spark output has a deterministic route to the same result, and Spark's own UI shows it.** Ship the no-model build in CI — make it a test, not a value |
+| **1** | **The confident wrong figure.** Slash writes "£14,200 owed"; it is £11,800; a decision is taken; the decision is immutable — and it poisons every decision that cites it | **Slash may not type a number.** Figures are `{{path}}` or refused. `{{ref:…}}` citations resolve at paint and a stale one flags itself. Two currencies never sum |
+| **2** | **The assistant becomes the only way to do anything** — it inverts the value proposition and breaks the self-host promise in spirit while honouring it in letter | **Every Slash output has a deterministic route to the same result, and Slash's own UI shows it.** Ship the no-model build in CI — make it a test, not a value |
 | **3** | **Approval fatigue turns the gate into a rubber stamp** — the gate *is* the differentiator, and a rubber-stamped gate manufactures false provenance | cap proposals; compulsory non-trivial reasons with true-sentence chips; one gate, rarely; **instrument the accept-unchanged rate and treat >80% as a defect** |
 | **4** | **Injection via the raw inbox, laundered through a human** | Rule of Two by architecture; quarantine rendering; source above the verbs; no bulk accept; the reason label asks about the source |
-| **5** | **Proposal spam.** The Decide lane goes from 8 to 80 and is abandoned — and the queue is the product | **A hard cap of 3 open Spark proposals per register.** A fourth displaces the lowest-ranked, which closes with a recorded reason ([19-INTERFACE](19-INTERFACE.md) §8). Every proposal states a deadline or is not filed |
+| **5** | **Proposal spam.** The Decide lane goes from 8 to 80 and is abandoned — and the queue is the product | **A hard cap of 3 open Slash proposals per register.** A fourth displaces the lowest-ranked, which closes with a recorded reason ([19-INTERFACE](19-INTERFACE.md) §8). Every proposal states a deadline or is not filed |
 | **6** | **Silent model downgrade** | the model name in every output footer, always. A routing change writes an audit line. Exhaustion is a hard stop |
 | **7** | **A chat panel eats the design** — a permanent panel taxes the only screen that matters, forever, for a feature used minutes a day | no panel. A second *mode* of the palette, occupying zero pixels when closed |
 | **8** | **Proactive becomes noise, then is muted, then rots** — and a quietly stale surface is worse than none, because it gets believed | deterministic rules only; batch; tier by consequence; dismissal writes a suppression with a reason; measure the override rate |
 | **9** | **The evidence fold is decoration** — "11 rows behind this" reads as verification and is not one | make it **cheap to be right**: the count re-checks at paint, so a stale citation flags itself with no human in the loop. **The check is the verification; the fold is for the curious** |
 | **10** | **Streaming makes the proposal unreviewable** | nothing that lands in the record streams |
 | **11** | **The cost meter chills use, or invites it** — both failures are silent | one row in Settings, counted in asks. Nothing near the input |
-| **12** | **The self-hoster gets a second-class app** — which breaks both the distribution engine and the trust proof | Spark is **absent**, not disabled. BYO endpoint is first-class and unmetered. Every deterministic feature byte-identical, **and CI proves it** |
+| **12** | **The self-hoster gets a second-class app** — which breaks both the distribution engine and the trust proof | Slash is **absent**, not disabled. BYO endpoint is first-class and unmetered. Every deterministic feature byte-identical, **and CI proves it** |
 
 ---
 
@@ -909,7 +909,7 @@ Ranked by probability × damage to the thing being sold.
 | Is the reason field actually filled with real sentences? | ship compulsory reasons for two weeks; measure the length distribution and how often a chip was tapped rather than typed | free |
 | Does anyone open the evidence fold? | one event on expand. Under 10% means the fold is decoration and the paint-time check is doing all the work — which is fine, but stop investing in the fold | free |
 | Do two agents ever actually collide on one object? | log collisions only. Build `Compare` if it fires | half a day |
-| Is a ninth typed interpolation for row sets worth adding? The dialect is closed at eight, and §5 cites rows with `{{ref:…}}` instead | count how many Spark figures are aggregates rather than single paths | free |
+| Is a ninth typed interpolation for row sets worth adding? The dialect is closed at eight, and §5 cites rows with `{{ref:…}}` instead | count how many Slash figures are aggregates rather than single paths | free |
 | Does an 80-ask cap hold? | meter for one month against the $0.20 budget. If a real month is 90 asks, the meter is theatre and can come out | free |
 
 ---

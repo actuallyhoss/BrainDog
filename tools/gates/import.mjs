@@ -46,14 +46,14 @@
  *      this command's header makes and only the fake had ever been asked to keep.
  *
  * THE EXPORT IS `apps/cli/test/legacy-export.ts`'s, deliberately. `52 §1` lets a gate import a
- * package's source directly and `spark-actor` already imports `packages/kernel/test/sqlite.ts` for
+ * package's source directly and `slash-actor` already imports `packages/kernel/test/sqlite.ts` for
  * the same kind of reason: the synthetic export is the fixture those 499 lines of test drive, so
  * running THAT one through a real record is what turns them from assertions about a fake into
  * assertions about this product. A second export written here would make this gate assert its own
  * fixture, and the day the planner changed, the two would drift apart quietly.
  *
- * IT IS RED WHEN THE PLAN IS EMPTY, which is the same vacuity `spark-actor` guards against by
- * writing a `spark` event before running the query. "Every planned row was accepted" is true of a
+ * IT IS RED WHEN THE PLAN IS EMPTY, which is the same vacuity `slash-actor` guards against by
+ * writing a `slash` event before running the query. "Every planned row was accepted" is true of a
  * plan with no rows in it, and a planner that stopped emitting anything would read here as a clean
  * bill of health.
  *
@@ -280,7 +280,7 @@ rehearsal: {
   polls = plan.polls.length;
 
   /* A PLAN WITH NO ROWS SATISFIES "EVERY ROW WAS ACCEPTED" THE WAY AN EMPTY LIST SATISFIES ANYTHING,
-     which is the silence `self-test.mjs` exists to break. `spark-actor` guards the same hole by
+     which is the silence `self-test.mjs` exists to break. `slash-actor` guards the same hole by
      writing the one event its query is about before running the query. */
   if (planned === 0) {
     findings.push('the export planned no rows at all, so this gate offered the record nothing and asserts nothing about it');
@@ -445,7 +445,7 @@ function said(r) {
 /**
  * One line, and the census is on it.
  *
- * `graph` and `spark-actor` both argue this and it is the same argument here: "every planned row was
+ * `graph` and `slash-actor` both argue this and it is the same argument here: "every planned row was
  * accepted" is the same sentence whether the plan held forty-two rows or none, and a run whose
  * onboarding quietly collapsed would look exactly like a clean bill of health. The two numbers that
  * tell them apart are the rows planned and the rows found, and both are 0 on a gate that has stopped

@@ -281,10 +281,10 @@ function digestBody(decl: Declaration): Refusal | null {
   if (body.sections !== undefined && (!Array.isArray(body.sections) || body.sections.length > SECTION_CEILING))
     return bad('DECLARATION_INVALID', `A digest carries at most ${SECTION_CEILING} sections.`, 'sections');
 
-  /* `prose` IS ONLY EVER `spark` (42 §4.11). Anything else is a host nobody has, and the digest
+  /* `prose` IS ONLY EVER `slash` (42 §4.11). Anything else is a host nobody has, and the digest
      would wait behind a model that was never going to answer. */
-  if (body.prose !== undefined && body.prose !== 'spark')
-    return bad('DECLARATION_INVALID', `A digest's prose is written by spark or by nobody.`, 'prose', ['spark']);
+  if (body.prose !== undefined && body.prose !== 'slash')
+    return bad('DECLARATION_INVALID', `A digest's prose is written by Slash or by nobody.`, 'prose', ['slash']);
 
   return null;
 }

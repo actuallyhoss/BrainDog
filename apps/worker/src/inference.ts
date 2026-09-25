@@ -2,7 +2,7 @@
  * The `Inference` port on the Worker: Workers AI, through AI Gateway. `33 §1` port 3, `51 §5.11` step 4.
  *
  * THE MODEL IS PICKED HERE AND NOWHERE ELSE, AND THAT IS `46 §4.3`'s ARRANGEMENT, not a convenience.
- * Spark names a job's model by a short name out of the routing table (`llama-3.2-1b`), and this
+ * Slash names a job's model by a short name out of the routing table (`llama-3.2-1b`), and this
  * adapter is the only place that knows the short name is spelled `@cf/meta/llama-3.2-1b-instruct`
  * on this platform and something else on a laptop running Ollama. A package that named a provider
  * id would be a package that cannot be self-hosted.
@@ -68,7 +68,7 @@ export interface Inference {
 /** The port's closed vocabulary for the ways a model can fail to be there. */
 export type Missing = 'no adapter on this host' | 'the provider did not answer' | 'the provider does not serve it';
 
-const refuse = <T>(code: 'NOT_IN_THIS_BUILD' | 'PROPOSAL_SCHEMA' | 'SPARK_BUDGET_SPENT', fix: string, at: string): Result<T> => no<T>(code, fix, { at });
+const refuse = <T>(code: 'NOT_IN_THIS_BUILD' | 'PROPOSAL_SCHEMA' | 'SLASH_BUDGET_SPENT', fix: string, at: string): Result<T> => no<T>(code, fix, { at });
 
 /** No model answered for this call. `NOT_IN_THIS_BUILD` is borrowed; the port's header argues for it. */
 export const modelMissing = <T>(model: string, why: Missing): Result<T> =>
@@ -89,7 +89,7 @@ export const schemaFailed = <T>(model: string, why: string): Result<T> =>
 /** This call would cost more than it may spend. Both figures ride the sentence, because the two repairs differ. */
 export const budgetSpent = <T>(neurons: number, cap: number): Result<T> =>
   refuse<T>(
-    'SPARK_BUDGET_SPENT',
+    'SLASH_BUDGET_SPENT',
     `This call would spend about ${neurons} neurons and its ceiling is ${cap}. Raise the ceiling for this job, or send fewer rows.`,
     'budget',
   );
@@ -305,7 +305,7 @@ const int8 = (row: number[]): Int8Array => {
  * Workers AI as the `Inference` port. `51 §2`'s signature.
  *
  * AN UNBOUND `AI` IS A REFUSAL AT THE CALL AND NOT A THROW AT WIRING. Construction is total, so a
- * deployment without the binding still boots and still serves every route that is not Spark; the
+ * deployment without the binding still boots and still serves every route that is not Slash; the
  * first ask is answered `no adapter on this host`, which is a `Missing` the port declares for
  * exactly this case. The alternative is a cold-start crash that takes the whole record down over a
  * feature the deployment may never use.

@@ -1,5 +1,5 @@
 /**
- * The Worker's `keyOpener` (`../src/actions.ts`), and the one argument `apps/selfhost/test/spark-byok-guard.test.ts`
+ * The Worker's `keyOpener` (`../src/actions.ts`), and the one argument `apps/selfhost/test/slash-byok-guard.test.ts`
  * measures on the other host: the id that reaches `kernel.openGrant`, which is the id `packages/kernel/src/vault.ts`
  * signs the `grant.read` event with.
  *
@@ -65,7 +65,7 @@ test('THE WORKER keyOpener SIGNS grant.read WITH THE ACTOR IT IS GIVEN, and with
   /* THE SCHEDULED PATH FIRST, which names nobody: `keyOpener`'s own default is `system`, the same as the alarm
      that calls it with no third argument at all. */
   const scheduled = await (keyOpener(api, kek) ?? assert.fail('bound, and no opener'))({ id: 'g_1', label: 'OpenAI' });
-  /* AND THE ASKER'S ID, PASSED THROUGH: `sparkByokFor`'s `wire` now hands `wireOf` the asker's id and `wireOf` hands
+  /* AND THE ASKER'S ID, PASSED THROUGH: `slashByokFor`'s `wire` now hands `wireOf` the asker's id and `wireOf` hands
      it straight to this opener, so the row a real `openGrant` writes for her ask is signed with it and not `system`. */
   const asker = 'p_01JZ8QK3F7R2M9V4XN6TCB5HAF';
   const asked = await (keyOpener(api, kek, asker) ?? assert.fail('bound, and no opener'))({ id: 'g_1', label: 'OpenAI' });

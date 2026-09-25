@@ -21,7 +21,7 @@ Second in the build order; the first of the three artefacts of 30 §14.
 | **Does** | declares the nine ports and `Ingress`; ships `openNodeSqlite`; ships `guard`, `guardScript`, `mapDriverMessage`, `measureCaps` and `bootProbe`, which both `Sql` adapters call so they refuse identically, and `guarded`, the wrapper that calls them (§2.4.1); ships `DO_LIMITS`, `SqlError`, `blobKey`; ships the conformance corpus, its runner and the committed reference trace |
 | **Refuses to do** | know the kernel's schema; parse SQL; cache statements; fake the other eight ports; implement `better-sqlite3`; import `cloudflare:*`; host the Durable Object adapter (that is `apps/worker`, spec 51) |
 | **Imports** | nothing at runtime. `node:sqlite` appears in exactly one file, behind the `./node-sqlite` subpath, so the main entry runs in workerd, in Node and in a bare test process (31 §1) |
-| **Consumers** | `kernel` and `record` use `{ Sql, Scheduler, Clock }`; `spark` uses `{ Sql, Clock, Inference }`; `apps/selfhost` and `apps/cli` call `openNodeSqlite`; `apps/worker` calls the shared functions from its own adapter (33 §1) |
+| **Consumers** | `kernel` and `record` use `{ Sql, Scheduler, Clock }`; `slash` uses `{ Sql, Clock, Inference }`; `apps/selfhost` and `apps/cli` call `openNodeSqlite`; `apps/worker` calls the shared functions from its own adapter (33 §1) |
 
 The `Sql` port is synchronous, and the types make the input-gate hazard of 01 §2 unrepresentable: `exec` returns a
 `Cursor`, not a Promise, and `transactionSync` takes `() => NotPromise<T>`.
@@ -118,7 +118,7 @@ interface Inference {
   embed(texts: string[]): Promise<{ model: string; dims: number; vectors: Int8Array[] }>;
 }
 ```
-Spark's model calls. Workers AI through the gateway; a BYO key is the same adapter with a different base URL
+Slash's model calls. Workers AI through the gateway; a BYO key is the same adapter with a different base URL
 (31 §5). The record has no `Inference` port (ADR-002).
 
 ```ts
@@ -830,7 +830,7 @@ No `fast-check` here. A new runtime dependency is a new ADR (35 §2).
 the two build in parallel.
 
 **Unblocks:** `kernel` (6) — migrations and the write path run on `openNodeSqlite(':memory:')` in tests; `mcp`
-(9); `record` (10); `spark` (11); `cli` (12); `selfhost` and `worker`. Spec 38's property test needs a SQLite to
+(9); `record` (10); `slash` (11); `cli` (12); `selfhost` and `worker`. Spec 38's property test needs a SQLite to
 run compiled SQL against (30 §14 #2); this adapter as a devDependency is the lazy answer, and spec 38 decides.
 Spec 51 builds the second `Sql` implementation against §5.6 and regenerates the reference trace (§9.3 step 3).
 

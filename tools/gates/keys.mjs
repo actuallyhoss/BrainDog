@@ -232,7 +232,7 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
      * print that nothing binds"*. A row that advertises seven letters is checked on seven letters.
      */
     const RECIPES = {
-      'palette-slash': { route: '/', press: ['/'] },
+      'palette-slash-key': { route: '/', press: ['/'] },
       /**
        * Every destination the row names, from a route that is none of them AND HAS NO BARE BINDINGS OF
        * ITS OWN.

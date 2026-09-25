@@ -213,7 +213,7 @@ type Key = { id: string; label: string; sealed_under: 'record' | 'connector' };
 /**
  * A vault row as far as choosing among several needs it: `kernel.grants()` hands every one of these columns.
  *
- * `created_at` IS OPTIONAL HERE AND NEVER ABSENT ON A REAL ROW, for the reason `SparkVaultRow` gives in `@braindog/host`:
+ * `created_at` IS OPTIONAL HERE AND NEVER ABSENT ON A REAL ROW, for the reason `SlashVaultRow` gives in `@braindog/host`:
  * a test's double that only needed a label would otherwise be a compile error. A row that states none sorts as oldest.
  */
 export type GrantChoosable = { id: string; label: string; revoked_at: string | null; created_at?: string | undefined };
@@ -223,14 +223,14 @@ export type GrantChoosable = { id: string; label: string; revoked_at: string | n
  *
  * ONE ORDER, WRITTEN ONCE, BECAUSE FOUR COPIES OF IT HAD ALREADY LET A FIFTH GO WRONG. The vault admits two live grants
  * under one label, and at `afb3b1b2` the newest-first clause was spelled out in `keyNamed` and `opensNamed` here, in
- * `grantNamed` (`@braindog/host/script`) and in `sparkGrantOf` (`@braindog/host/spark`). The audit of wave forty-nine
- * found Spark's own path taking `grants().find(...)`, which is `listGrants` order and so the OLDEST key, while every action
- * named `spark` sent the newest. The four that agreed agreed because each author copied the same words; measured on
+ * `grantNamed` (`@braindog/host/script`) and in `slashGrantOf` (`@braindog/host/slash`). The audit of wave forty-nine
+ * found Slash's own path taking `grants().find(...)`, which is `listGrants` order and so the OLDEST key, while every action
+ * named `slash` sent the newest. The four that agreed agreed because each author copied the same words; measured on
  * 23 September, no state `test/grant-chooser.test.ts` or `packages/host/test/grant-named.test.ts` builds made two of them
  * disagree, so nothing about which key wins moved here. It lives in the kernel beside `opensNamed` for the reason
  * `hostOpened` below does: the host imports the rule rather than keeping a copy that can drift.
  *
- * `fits` IS THE CALLER'S OWN RULE ABOUT WHAT IT CAN SEND, and the order is applied to what it keeps. Spark's key goes out
+ * `fits` IS THE CALLER'S OWN RULE ABOUT WHAT IT CAN SEND, and the order is applied to what it keeps. Slash's key goes out
  * as a bearer, so it passes over a password or a note; an action and a script take the newest entry of any kind, as they
  * did before this function existed. The rows are not reordered, and a name that is absent or empty opens nothing.
  */

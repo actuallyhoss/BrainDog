@@ -14,9 +14,9 @@
  * `test/inference.ts` beside this file is the canned adapter, and it is not a `.test.ts` so the
  * runner's glob leaves it alone. The reason it lives here rather than in `src/` is `37 §10` D9:
  * *"no memory fakes for the eight other ports"* and *"the first spec that needs a fake ships it in
- * its own `test/`"*. This is the first spec that needs one. The canned adapter that `spark` will
+ * its own `test/`"*. This is the first spec that needs one. The canned adapter that `slash` will
  * want is a DIFFERENT object with golden job outputs in it (`46 §9`), and it ships under
- * `packages/spark/test/` when that package arrives; this one exists to exercise the port's own
+ * `packages/slash/test/` when that package arrives; this one exists to exercise the port's own
  * refusals and knows nothing about jobs.
  */
 
@@ -137,7 +137,7 @@ test('a call over its ceiling refuses BEFORE the provider is touched', async () 
   const answer = await ai.complete(ask({ budget: { neurons: 4 } }));
 
   const refusal = refusalOf(answer);
-  assert.equal(refusal.code, 'SPARK_BUDGET_SPENT');
+  assert.equal(refusal.code, 'SLASH_BUDGET_SPENT');
   assert.equal(refusal.at, 'budget');
   /* BOTH FIGURES, because a ceiling refusal with one number in it cannot be acted on: the reader
      has to know how far over the call was to decide between raising the ceiling and sending less. */
@@ -179,7 +179,7 @@ test('a request carrying a key the port does not define is refused by the adapte
   const ai = one();
 
   /* TWO BANS IN ONE GUARD, and both of them are type bans that a cast walks straight through.
-     `tools` is the one the audits settle (`46 #9`, `11 §6`): every Spark call is schema-constrained
+     `tools` is the one the audits settle (`46 #9`, `11 §6`): every Slash call is schema-constrained
      structured output, retrieval is `project()`, and the ban is meant to be structural rather than
      a rule somebody remembers at review. A credential is the other (`46 §2` #3): the adapter is
      built by the host with the key already closed over, so a key arriving in a REQUEST is a key
@@ -212,7 +212,7 @@ test('a null prose is a success, and only the three codes are this port refusing
   assert.ok(isInferenceRefusal(missing));
   /* THE LIST IS THREE AND THE COUNT IS ASSERTED, because a fourth added without a test is a fourth
      status a host maps by accident. */
-  assert.deepEqual([...INFERENCE_CODES], ['NOT_IN_THIS_BUILD', 'PROPOSAL_SCHEMA', 'SPARK_BUDGET_SPENT']);
+  assert.deepEqual([...INFERENCE_CODES], ['NOT_IN_THIS_BUILD', 'PROPOSAL_SCHEMA', 'SLASH_BUDGET_SPENT']);
   /* AND A REFUSAL FROM SOMEWHERE ELSE IS NOT THIS PORT'S, which is what the predicate is for: a
      host mapping a code onto a status must not send every 422 through the model's own branch. */
   assert.equal(isInferenceRefusal({ code: 'REGISTER_UNKNOWN', fix: 'There is no register called that.' }), false);

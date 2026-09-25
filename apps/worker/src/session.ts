@@ -12,7 +12,7 @@
  * THERE WAS A FOURTH DOOR, THE PUBLIC DEMO, AND IT IS GONE (`loop/DIRECTION.md` 26, `loop/research-no-sample.md` A1).
  * A request with nothing on it read one record the deployment pinned in its `vars`, as `p_demo` at `read`. The app
  * now shows only a real record, so no variable names one any more, and a deploy that still sets it opens nothing
- * (`test/spark-demo.test.ts`, which answered 200 from the pinned record before this).
+ * (`test/slash-demo.test.ts`, which answered 200 from the pinned record before this).
  *
  * AND A REQUEST MAY NOW NAME ITS RECORD IN THE PATH, `/app/<slug>/api/…` (`loop/research-one-domain.md` §2.4).
  * The slug is a claim like a bearer's record id: the Directory says whether it is this person's before anything

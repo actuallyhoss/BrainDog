@@ -16,9 +16,9 @@
  * *"'modelMissing' cannot be used as a value because it was exported using 'export type'"*, three
  * times, and Node answers `SyntaxError: The requested module './index.ts' does not provide an
  * export named 'INFERENCE_CODES'`. Neither failure lands on whoever adds the line. Both land on
- * the first consumer in `spark`, reading a barrel that appears to export the port and does not.
+ * the first consumer in `slash`, reading a barrel that appears to export the port and does not.
  *
- * WHY IT EXISTS NOW RATHER THAN WITH `spark`. Measured against the live Cloudflare account on
+ * WHY IT EXISTS NOW RATHER THAN WITH `slash`. Measured against the live Cloudflare account on
  * 2026-09-20: the token carries `ai (write)`, `/accounts/{id}/ai/models/search` answers 200, and
  * the account's usage is zero neurons, so nothing has ever run. `apps/worker/wrangler.jsonc` holds
  * `"ai": { "binding": "AI" }` in both environment blocks, because Cloudflare fails a deploy on a
@@ -38,7 +38,7 @@
  *
  * NO CALL PASSES `tools`, AND THE BAN IS THE TYPE RATHER THAN A RULE. `37 §10` sketched
  * `complete(req: { …; tools?: ToolDef[]; … })` returning `{ text; toolCalls?; usage }`, and the
- * iteration-1 audits settle against it: *"No Spark inference passes `tools`. Every call is
+ * iteration-1 audits settle against it: *"No Slash inference passes `tools`. Every call is
  * schema-constrained structured output; retrieval is `project()`"* (`46 #9`, amending `11 §6`'s
  * "tool-call headroom"). So `tools` and `toolCalls` are gone from the port, and `schema` is
  * REQUIRED where the sketch had it optional. A field that exists and must never be set is a field
@@ -158,10 +158,10 @@ export type Draft = {
 };
 
 /**
- * Spark's model calls, and the whole of what a package may do to a model.
+ * Slash's model calls, and the whole of what a package may do to a model.
  *
  * `33 §1` port 3, `46 §2` #1: the ports are `{ Sql, Clock, Inference }` and there is no `Http`, so
- * this interface is the only way out of `packages/spark/**`. The record has no `Inference` port at
+ * this interface is the only way out of `packages/slash/**`. The record has no `Inference` port at
  * all (`ADR-002`).
  */
 export interface Inference {
@@ -195,10 +195,10 @@ export interface Inference {
  * `Missing` below is the vocabulary it would take.
  *
  * The other two are exact. `PROPOSAL_SCHEMA` is `30 §6`'s *"structured output that fails its kind's
- * schema"*, and `SPARK_BUDGET_SPENT` is the meter of `11 §4`, read here per call rather than per
+ * schema"*, and `SLASH_BUDGET_SPENT` is the meter of `11 §4`, read here per call rather than per
  * month.
  */
-export const INFERENCE_CODES = ['NOT_IN_THIS_BUILD', 'PROPOSAL_SCHEMA', 'SPARK_BUDGET_SPENT'] as const;
+export const INFERENCE_CODES = ['NOT_IN_THIS_BUILD', 'PROPOSAL_SCHEMA', 'SLASH_BUDGET_SPENT'] as const;
 
 export type InferenceCode = (typeof INFERENCE_CODES)[number];
 
@@ -263,7 +263,7 @@ export const schemaFailed = <T>(model: string, why: string): Result<T> =>
  */
 export const budgetSpent = <T>(neurons: number, cap: number): Result<T> =>
   refuse<T>(
-    'SPARK_BUDGET_SPENT',
+    'SLASH_BUDGET_SPENT',
     `This call would spend about ${neurons} neurons and its ceiling is ${cap}. Raise the ceiling for this job, or send fewer rows.`,
     'budget',
   );
@@ -273,7 +273,7 @@ export const budgetSpent = <T>(neurons: number, cap: number): Result<T> =>
  *
  * IT IS NOT A NARROWING PREDICATE, because two of the three codes are raised elsewhere for other
  * subjects: `NOT_IN_THIS_BUILD` by a host with no key store and by the kernel over an aggregation
- * it does not compute, and `SPARK_BUDGET_SPENT` by the month's meter in `46 §5.4`. This answers
+ * it does not compute, and `SLASH_BUDGET_SPENT` by the month's meter in `46 §5.4`. This answers
  * whether the code is one a model call can produce, which is all a status map needs.
  */
 export const isInferenceRefusal = (r: Refusal): boolean =>

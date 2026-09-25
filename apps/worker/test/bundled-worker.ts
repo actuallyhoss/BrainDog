@@ -1,11 +1,11 @@
 /**
  * `src/index.ts` as it ships, loadable under `node --test`, and a Durable Object's `storage` for its `Record$`.
  *
- * THE SAME TWO HELPERS `spark.test.ts` DEFINES FOR ITSELF, and there for the reason it gives: `src/index.ts` imports
+ * THE SAME TWO HELPERS `slash.test.ts` DEFINES FOR ITSELF, and there for the reason it gives: `src/index.ts` imports
  * `cloudflare:workers`, which Node cannot load, and reading the file as text cannot tell a refusal that runs from one
  * written after the `return` that forwards. So the file is bundled by `wrangler`'s own esbuild with that one import
  * answered by a two-line base class, which is all `Record$` and `Directory$` take from it. They are a module here so the
- * suites written after `spark.test.ts` share one copy; that file keeps its own until somebody who owns it moves it over.
+ * suites written after `slash.test.ts` share one copy; that file keeps its own until somebody who owns it moves it over.
  */
 
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -70,7 +70,7 @@ export const bundled = async (): Promise<Bundle> => {
  * A Durable Object's `storage` over `node:sqlite`: `sql.exec`, `transactionSync` and the alarm, which is all `Record$` calls.
  *
  * `prepare` ON A SCRIPT RUNS ITS FIRST STATEMENT AND DROPS THE REST without a word, measured on Node 24.13 in
- * `spark.test.ts`, so a statement that reads nothing and takes no parameters goes through `exec`, which runs all of it.
+ * `slash.test.ts`, so a statement that reads nothing and takes no parameters goes through `exec`, which runs all of it.
  */
 export const objectStorage = () => {
   const db = new DatabaseSync(':memory:');

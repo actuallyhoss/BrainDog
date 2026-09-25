@@ -421,7 +421,7 @@ test('A RUN’S PROJECT IS NAMED, not left as the spoken id the ladder wrote', a
 test('an actor is an agent, a rule or you, and each is its own group', () => {
   const at = '2026-09-15T12:00:00Z';
   const event = (actor: string): ActivityEvent => ({ ts: at, actor, kind: 'edit', target: actor, note: null });
-  const rows = feedRows(['S4', 'agent:claude', 'spark', 'rule:renewal', 'ingest:mail', 'system', 'p_1'].map(event));
+  const rows = feedRows(['S4', 'agent:claude', 'slash', 'rule:renewal', 'ingest:mail', 'system', 'p_1'].map(event));
   assert.deepEqual(rows.map((r) => r.by), ['agent', 'agent', 'agent', 'rule', 'rule', 'rule', 'you']);
 });
 
@@ -497,11 +497,11 @@ test('GOVERNANCE.OPEN IS THE QUESTIONS STILL OPEN, newest first as the register 
         body_kind: 'options',
         body: { context: 'Kiln has run over for two months.', options: [opt('raise', 'Raise it', 'Covers the overrun', true), opt('leave', 'Leave it', 'Keeps the price it was quoted at')] },
       },
-      'spark',
+      'slash',
     ),
   );
   const second = value<{ id: string }>(
-    k.propose({ question: 'Add the Portage deploy key?', body_kind: 'rowset', body: { register: 'credentials', rows: [{ label: 'Portage deploy key' }] } }, 'spark'),
+    k.propose({ question: 'Add the Portage deploy key?', body_kind: 'rowset', body: { register: 'credentials', rows: [{ label: 'Portage deploy key' }] } }, 'slash'),
   );
 
   const drawn = k.block({ kind: 'queue', source: 'governance.open' } as PageBlock);
@@ -509,8 +509,8 @@ test('GOVERNANCE.OPEN IS THE QUESTIONS STILL OPEN, newest first as the register 
   assert.deepEqual(
     (drawn.queue ?? []).map((q) => [q.id, q.who, q.kind, q.question, q.why]),
     [
-      [second.id, 'spark', 'rowset', 'Add the Portage deploy key?', ''],
-      [first.id, 'spark', 'options', 'Raise the retainer on Kiln?', 'Kiln has run over for two months.'],
+      [second.id, 'slash', 'rowset', 'Add the Portage deploy key?', ''],
+      [first.id, 'slash', 'options', 'Raise the retainer on Kiln?', 'Kiln has run over for two months.'],
     ],
   );
   assert.equal(drawn.matched, 2);
@@ -541,7 +541,7 @@ test('A QUEUE SAYS HOW MANY ARE WAITING PAST THE ONES IT DRAWS, and a where: nar
     { id: 'yes', label: 'Yes', because: 'It is due' },
     { id: 'no', label: 'No', because: 'It is not' },
   ];
-  for (let i = 0; i < 5; i += 1) value(k.propose({ question: `Question ${i}?`, body_kind: 'options', body: { options } }, i < 2 ? 'spark' : 'p_1'));
+  for (let i = 0; i < 5; i += 1) value(k.propose({ question: `Question ${i}?`, body_kind: 'options', body: { options } }, i < 2 ? 'slash' : 'p_1'));
 
   /* THREE IS WHAT A QUEUE DRAWS UNASKED, and the count is of everything open rather than of the page read. */
   const three = k.block({ kind: 'queue', source: 'governance.open' } as PageBlock);
@@ -550,9 +550,9 @@ test('A QUEUE SAYS HOW MANY ARE WAITING PAST THE ONES IT DRAWS, and a where: nar
   assert.equal(k.block({ kind: 'queue', source: 'governance.open', limit: 2 } as PageBlock).queue?.length, 2);
 
   /* WITH A PREDICATE THE COUNT IS OF WHAT THE PAGE COULD SEE, and says so by being smaller. */
-  const mine = k.block({ kind: 'queue', source: 'governance.open', where: 'who is spark' } as PageBlock);
+  const mine = k.block({ kind: 'queue', source: 'governance.open', where: 'who is slash' } as PageBlock);
   assert.equal(mine.matched, 2);
-  assert.deepEqual(mine.queue?.map((q) => q.who), ['spark', 'spark']);
+  assert.deepEqual(mine.queue?.map((q) => q.who), ['slash', 'slash']);
 
   /* AND THE RECORD'S ORDER IS THE ONLY ORDER, because a source that settles it would be answering twice. */
   assert.equal(k.block({ kind: 'queue', source: 'governance.open', order: [{ field: 'who' }] } as PageBlock).refusals[0]?.code, 'DECLARATION_INVALID');

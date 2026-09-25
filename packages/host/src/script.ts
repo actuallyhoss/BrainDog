@@ -32,7 +32,7 @@ import type { CallContext, RecordApi } from '@braindog/record';
 import type { CtxHost, HostRequest, HostResponse, Json, ScriptAnswer, ScriptDecl, ScriptRefusal } from '@braindog/script';
 
 import { pass, sendAction, type Admissions, type Ledger, type OpenKey, type Pin, type Send } from './actions.ts';
-import { SPARK_KEY_LABEL } from './spark.ts';
+import { SLASH_KEY_LABEL } from './slash.ts';
 
 /** One run of one script in a sandbox: `runInQuickJs` on the self-host, a Dynamic Worker on Cloud. */
 export type RunSandbox = (decl: ScriptDecl, host: CtxHost) => Promise<ScriptAnswer>;
@@ -178,13 +178,13 @@ export function grantNamed(grants: () => ReturnType<RecordApi['kernel']['grants'
  * exactly, with no subdomain let in: `opens: stripe.com` does not open `api.stripe.com`, because a vault entry that names
  * a parent would otherwise open every name under it, whoever holds them.
  *
- * AND NEVER THE VAULT'S `spark` KEY, WHATEVER IT OPENS. On a host with no `SPARK_KEY` it is the key the included model
- * answers everybody with (`hostKeyedFromVault`), which `sparkGuardedEngine` already refuses as a tier `b` key for the
+ * AND NEVER THE VAULT'S `slash` KEY, WHATEVER IT OPENS. On a host with no `SLASH_KEY` it is the key the included model
+ * answers everybody with (`hostKeyedFromVault`), which `slashGuardedEngine` already refuses as a tier `b` key for the
  * same reason. It is matched on the label the lookup found, so naming it by its grant id is refused too.
  */
 export function keyRefused(script: string, grant: ScriptGrant, at: URL): ScriptRefusal | null {
-  if (grant.label === SPARK_KEY_LABEL)
-    return { code: 'FORBIDDEN', why: `${script} named the vault's "${SPARK_KEY_LABEL}" key, which is the key this host's included model answers with, and a script may not send it anywhere.` };
+  if (grant.label === SLASH_KEY_LABEL)
+    return { code: 'FORBIDDEN', why: `${script} named the vault's "${SLASH_KEY_LABEL}" key, which is the key this host's included model answers with, and a script may not send it anywhere.` };
   const host = at.hostname.replace(/\.$/, '');
   if (hostOpened(grant.opens) === host) return null;
   return {
@@ -194,15 +194,15 @@ export function keyRefused(script: string, grant: ScriptGrant, at: URL): ScriptR
 }
 
 /**
- * The refusal for a script that declares the vault's `spark` key, asked before its sandbox starts, or `null`.
+ * The refusal for a script that declares the vault's `slash` key, asked before its sandbox starts, or `null`.
  *
  * BEFORE THE SANDBOX AND NOT ONLY AT THE FETCH, so a script that names the key and never uses it is refused all the
  * same: a declaration that names the included model's key is one the owner should not have been asked to approve.
  * Refusing it at install is the kernel's (`declare.ts`), which this file does not reach.
  */
-export function sparkDeclared(script: string, keys: readonly string[]): ScriptRefusal | null {
-  if (!keys.includes(SPARK_KEY_LABEL)) return null;
-  return { code: 'FORBIDDEN', why: `${script} declares the vault's "${SPARK_KEY_LABEL}" key, which is the key this host's included model answers with, and a script may not name it.` };
+export function slashDeclared(script: string, keys: readonly string[]): ScriptRefusal | null {
+  if (!keys.includes(SLASH_KEY_LABEL)) return null;
+  return { code: 'FORBIDDEN', why: `${script} declares the vault's "${SLASH_KEY_LABEL}" key, which is the key this host's included model answers with, and a script may not name it.` };
 }
 
 /**
@@ -215,8 +215,8 @@ export function scriptRunner<P extends object | undefined = undefined>(options: 
   const now = options.now ?? (() => Date.now());
   return async (s) => {
     const { scripted } = s;
-    const sparked = sparkDeclared(scripted.script, scripted.decl.keys);
-    if (sparked !== null) return { refused: sparked, log: '', usage: { fetches: 0, bytes: 0, wall_ms: 0, cpu_ms: 0 } };
+    const slashed = slashDeclared(scripted.script, scripted.decl.keys);
+    if (slashed !== null) return { refused: slashed, log: '', usage: { fetches: 0, bytes: 0, wall_ms: 0, cpu_ms: 0 } };
     const execute = sendAction<P>({ origins: () => scripted.decl.egress, openKey: options.openKey, send: options.send, pin: options.pin });
 
     /* A KEY SENT WHERE IT DOES NOT OPEN IS A RULE BROKEN, AND IT STAYS BROKEN. `CtxHost` can only reject the one fetch,

@@ -6,8 +6,8 @@
  * launcher rots: nothing in it is wrong on its own, and after a year it is a menu of the screens
  * whoever added them happened to be working on.
  *
- * `C:\Tools\legacy`'s Spark writes its rule at the top of the file and this is the same rule, stated
- * the same way. A command belongs here when it can be STARTED WITHOUT FIRST CHOOSING WHERE, and
+ * the old tool's command palette (`C:\Tools\legacy`, `loop/research-brain-study.md`) writes its rule
+ * at the top of the file and this is the same rule, stated the same way. A command belongs here when it can be STARTED WITHOUT FIRST CHOOSING WHERE, and
  * three tests decide it. All three have to pass:
  *
  *   1. NO OBJECT IS REQUIRED BEFORE IT. "Open the vault" always makes sense. "File this row under
@@ -176,8 +176,8 @@ export const COMMANDS: readonly Command[] = [
   { id: 'c-inbox', title: copy.inbox, href: '/inbox', group: copy.destinations, icon: 'inbox' },
   { id: 'c-vault', title: copy.vault, href: '/vault', group: copy.destinations, icon: 'vault' },
   { id: 'c-packs', title: copy.packs, href: '/packs', group: copy.destinations, icon: 'packs' },
-  /* SPARK'S PAGE, what it noticed and suggests; its title is its name, which is why it is not a copy key. */
-  { id: 'c-spark', title: 'Spark', href: '/spark', group: copy.destinations, icon: 'star' },
+  /* SLASH'S PAGE, what it noticed and suggests; its title is its name, which is why it is not a copy key. */
+  { id: 'c-slash', title: 'Slash', href: '/slash', group: copy.destinations, icon: 'star' },
   /* AUTOMATIONS, the canvas an owner and an agent both edit (`loop/DIRECTION.md` section 22). Reachable only by its address
      until it was here and in the rail. */
   { id: 'c-automations', title: copy.automations, href: '/automations', group: copy.destinations, icon: 'refresh' },
@@ -200,7 +200,7 @@ export const COMMANDS: readonly Command[] = [
    * work out what the app thinks they last did. It comes back the moment a toast offers an undo,
    * and it goes when that offer expires.
    *
-   * NAMED FROM THE REGISTRY, NOT FROM THE TOAST. Spark names the row after the toast's own word so
+   * NAMED FROM THE REGISTRY, NOT FROM THE TOAST. Slash names the row after the toast's own word so
    * the two agree about what is being reversed. This one cannot yet: nothing in this build writes,
    * so every offer on the stack is a mock-up's. The registry's label is the honest one until a
    * write exists to name.

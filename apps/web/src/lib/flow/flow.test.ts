@@ -338,22 +338,22 @@ test('A NUMBER IS COMPARED AS A LEAF, because the sentence grammar has no word f
 
 /*
  * ON BOTH KINDS OF HOST, because what the menu leaves out is now a fact about the host. With the flag fixed at false
- * this was the whole test, and it could not see a host with a model, where the record installs `ask_spark` and the
+ * this was the whole test, and it could not see a host with a model, where the record installs `ask_slash` and the
  * menu still did not offer it (`research-worker-spark.md` Brief F).
  */
 test('THE MENU OFFERS EVERY VERB THE RECORD READS AND INSTALLS, ONCE, in the five groups', () => {
-  for (const spark of [false, true]) {
-    const offered = stepGroups(spark).flatMap((g) => g.verbs);
-    assert.deepEqual([...offered, ...notYet(spark)].sort(), [...VERBS].sort(), `spark: ${spark}`);
-    assert.ok(!offered.some((v) => notYet(spark).includes(v)), 'a verb the record refuses at install is not offered');
+  for (const slash of [false, true]) {
+    const offered = stepGroups(slash).flatMap((g) => g.verbs);
+    assert.deepEqual([...offered, ...notYet(slash)].sort(), [...VERBS].sort(), `slash: ${slash}`);
+    assert.ok(!offered.some((v) => notYet(slash).includes(v)), 'a verb the record refuses at install is not offered');
     assert.equal(new Set(offered).size, offered.length);
-    assert.deepEqual(stepGroups(spark).map((g) => g.label), ['Check', 'Change', 'Ask', 'Call out', 'Wait']);
+    assert.deepEqual(stepGroups(slash).map((g) => g.label), ['Check', 'Change', 'Ask', 'Call out', 'Wait']);
   }
 });
 
-test('WHERE A MODEL IS, THE ASK GROUP OFFERS SPARK AFTER A PERSON, and where there is none it does not', () => {
-  const ask = (spark: boolean) => stepGroups(spark).find((g) => g.label === 'Ask')!.verbs;
-  assert.deepEqual(ask(true), ['notify', 'suggest', 'ask_person', 'ask_spark']);
+test('WHERE A MODEL IS, THE ASK GROUP OFFERS SLASH AFTER A PERSON, and where there is none it does not', () => {
+  const ask = (slash: boolean) => stepGroups(slash).find((g) => g.label === 'Ask')!.verbs;
+  assert.deepEqual(ask(true), ['notify', 'suggest', 'ask_person', 'ask_slash']);
   assert.deepEqual(ask(false), ['notify', 'suggest', 'ask_person']);
 });
 
@@ -364,7 +364,7 @@ test('A STEP READS THE ANSWERS OF THE STEPS BEFORE IT, and not of the ones after
   const branch = d.steps[2]!;
   assert.deepEqual(varsBefore(d.steps, branch.then![0]!.key), ['vars.rate', 'vars.shown']);
   assert.deepEqual(varsBefore(d.steps, d.steps[0]!.key), []);
-  const asked = insertAt(d.steps, `${branch.key}/then`, 0, { key: 'ask', step: { ask_spark: { question: 'Why?', as: 'why' } } });
+  const asked = insertAt(d.steps, `${branch.key}/then`, 0, { key: 'ask', step: { ask_slash: { question: 'Why?', as: 'why' } } });
   assert.deepEqual(varsBefore(asked, d.steps[3]!.key), ['vars.rate', 'vars.shown'], 'an answer inside one arm is not certain after it');
 });
 
@@ -375,29 +375,29 @@ test('what the record would refuse is said before saving, in its own terms', () 
   assert.ok(faultsOf(tagOnClock).some((f) => /no row/.test(f.say)));
   const fast = draftOf('z', { rule: 'z', on: { every: '5m' }, steps: [{ note: 'x' }] });
   assert.ok(faultsOf(fast).some((f) => /15 minutes/.test(f.say)));
-  const blank = draftOf('w', { rule: 'w', on: { manual: true }, steps: [{ ask_spark: { question: '', as: '' } }] });
+  const blank = draftOf('w', { rule: 'w', on: { manual: true }, steps: [{ ask_slash: { question: '', as: '' } }] });
   assert.ok(faultsOf(blank).length >= 1);
-  const spark = draftOf('s', { rule: 's', on: { manual: true }, steps: [{ ask_spark: { question: 'Why?', as: 'why' } }] });
+  const slash = draftOf('s', { rule: 's', on: { manual: true }, steps: [{ ask_slash: { question: 'Why?', as: 'why' } }] });
   assert.deepEqual(faultsOf(branched()), []);
 });
 
 /*
- * THE SAME STEP IS RIGHT ON ONE HOST AND REFUSED ON ANOTHER. The record's `unserved` refuses `ask_spark` at install only
+ * THE SAME STEP IS RIGHT ON ONE HOST AND REFUSED ON ANOTHER. The record's `unserved` refuses `ask_slash` at install only
  * where the host has not said it answers one, so the canvas asks the same question of the same flag. Before, every
- * `ask_spark` read "not in this build", which was false on a self-host with a model since `eb1a131b`.
+ * `ask_slash` read "not in this build", which was false on a self-host with a model since `eb1a131b`.
  */
-const asksSpark = () => draftOf('s', { rule: 's', on: { manual: true }, steps: [{ ask_spark: { question: 'Why?', as: 'why' } }] });
+const asksSlash = () => draftOf('s', { rule: 's', on: { manual: true }, steps: [{ ask_slash: { question: 'Why?', as: 'why' } }] });
 
-test('WHERE A MODEL IS, NOTHING IS SAID ABOUT AN ASK_SPARK STEP, because the record installs it', () => {
-  assert.deepEqual(faultsOf(asksSpark(), { spark: true }), []);
+test('WHERE A MODEL IS, NOTHING IS SAID ABOUT AN ASK_SLASH STEP, because the record installs it', () => {
+  assert.deepEqual(faultsOf(asksSlash(), { slash: true }), []);
 });
 
-test('WHERE THERE IS NO MODEL, AN ASK_SPARK STEP SAYS SO, and not that the build lacks it', () => {
-  const spark = asksSpark();
-  const key = spark.steps[0]!.key;
-  const none = 'This BrainDog has no model for Spark to answer with. Ask a person instead.';
-  assert.deepEqual(faultsOf(spark, { spark: false }), [{ key, say: none }], 'an ask_spark an agent wrote is named before Send');
-  assert.deepEqual(faultsOf(spark), faultsOf(spark, { spark: false }), 'the default is the host with no model');
+test('WHERE THERE IS NO MODEL, AN ASK_SLASH STEP SAYS SO, and not that the build lacks it', () => {
+  const slash = asksSlash();
+  const key = slash.steps[0]!.key;
+  const none = 'This BrainDog has no model for Slash to answer with. Ask a person instead.';
+  assert.deepEqual(faultsOf(slash, { slash: false }), [{ key, say: none }], 'an ask_slash an agent wrote is named before Send');
+  assert.deepEqual(faultsOf(slash), faultsOf(slash, { slash: false }), 'the default is the host with no model');
 });
 
 /*
@@ -480,7 +480,7 @@ test('the calls a flow makes are found in both arms, once each, by call step or 
 
 /*
  * THE FAULT WAS A TEMPLATE, AND HALF OF WHAT IT MADE WAS NOT ENGLISH. Worked from `ARGS` on 22 September, a freshly
- * added card said "Tell you needs say.", "Add a note needs note." and "Ask Spark needs keep the answer as.": a verb's
+ * added card said "Tell you needs say.", "Add a note needs note." and "Ask Slash needs keep the answer as.": a verb's
  * label, the word "needs", and a field label lower-cased. Each required argument now carries its own sentence.
  */
 test('EVERY REQUIRED ARGUMENT LEFT BLANK FAULTS WITH A WHOLE SENTENCE OF ITS OWN, never "<label> needs <label>."', () => {

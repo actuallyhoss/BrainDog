@@ -195,7 +195,7 @@ export default async function queue(root = join(import.meta.dirname, '..', '..')
 
     const ready = readiness('queue', budget('ready').settleTimeoutMs, ROOT);
 
-    /* THE RECORD'S OWN RANKING, loaded from source the way `spark-actor.mjs` loads its module: the gate
+    /* THE RECORD'S OWN RANKING, loaded from source the way `slash-actor.mjs` loads its module: the gate
        asserts the ORDER a person sees matches the function that decided it, so it must be that function
        and not a transcription of it. `weigh.ts` imports nothing, so this costs one file. */
     const { COSTS, costRank } = await import(pathToFileURL(join(root, 'packages', 'kernel', 'src', 'weigh.ts')).href);

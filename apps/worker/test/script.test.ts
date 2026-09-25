@@ -439,10 +439,10 @@ export default async function run(ctx) {
   assert.deepEqual(sent, []);
 });
 
-test('A DECLARATION THAT IS MALFORMED AND NAMES THE spark KEY IS FORBIDDEN, as on the self-host, not DECLARATION_INVALID', async () => {
-  const { answer, sent } = await run(`export default async function run(ctx) { ctx.log('never'); }`, { keys: ['spark'], limits: { wall_ms: 0 } });
+test('A DECLARATION THAT IS MALFORMED AND NAMES THE `slash` KEY IS FORBIDDEN, as on the self-host, not DECLARATION_INVALID', async () => {
+  const { answer, sent } = await run(`export default async function run(ctx) { ctx.log('never'); }`, { keys: ['slash'], limits: { wall_ms: 0 } });
   assert.equal(answer.refused?.code, 'FORBIDDEN', JSON.stringify(answer));
-  assert.match(answer.refused?.why ?? '', /"spark" key/);
+  assert.match(answer.refused?.why ?? '', /"slash" key/);
   assert.deepEqual(sent, []);
 });
 

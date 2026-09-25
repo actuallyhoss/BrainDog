@@ -19,7 +19,7 @@
  * whether to start the next one in order; the setting `start_next_milestone` starts it instead (`GUIDE_NEXT`). Where a model
  * is configured, onboarding asks it for a first plan made for what was said, which waits on Decide as rows (`GUIDE_FORMS`).
  *
- * IT GROWS INTO A RUNNING PROJECT. Once every milestone of the idea stage is reached, Spark asks on Decide whether to add
+ * IT GROWS INTO A RUNNING PROJECT. Once every milestone of the idea stage is reached, Slash asks on Decide whether to add
  * Projects and Work beside the guide (`GUIDE_GROWS`). Nothing is taken away and no row moves.
  */
 
@@ -555,8 +555,8 @@ const STAGES = ['idea', 'plan', 'build', 'launch', 'grow'] as const;
  */
 export const GUIDE_FORMS = {
   what: 'A first plan for a new project: the milestones it passes in order from the idea to keeping it going (each at a stage: idea, plan, build, launch or grow), the first small steps toward them, the choices it has to make, and what helps along the way.',
-  question: 'Spark drafted a first plan for your project from what you said. Add its milestones, steps, choices and what helps?',
-  why: 'Drafted by Spark from what you said the project is.',
+  question: 'Slash drafted a first plan for your project from what you said. Add its milestones, steps, choices and what helps?',
+  why: 'Drafted by Slash from what you said the project is.',
   lists: [
     {
       register: 'milestones',
@@ -595,7 +595,7 @@ export const GUIDE_FORMS = {
 
 /**
  * WHAT THE GUIDE GROWS INTO: once the idea stage is over, Projects and Work, so the project can be run as well as guided.
- * Spark reads the two figures and asks on Decide; accepting installs the two modules beside the guide and keeps every row.
+ * Slash reads the two figures and asks on Decide; accepting installs the two modules beside the guide and keeps every row.
  */
 export const GUIDE_GROWS = {
   when: [

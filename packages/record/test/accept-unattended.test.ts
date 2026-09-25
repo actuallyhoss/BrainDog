@@ -7,10 +7,10 @@
  * on `63f9535a` with the audit's probe (`probe-wave50-accept.test.ts`):
  *
  *     A change -> script every 1h, key goldapi                accept by colleague "ok"   armed [script gold-rate]
- *     B change -> digest prose: spark                         accept by colleague "ok"   armed [digest notes-weekly]
+ *     B change -> digest prose: slash                         accept by colleague "ok"   armed [digest notes-weekly]
  *     C pattern -> poll ingest, grant goldapi                 accept by colleague "ok"   armed [poll gold]
  *     D change -> ingest poll, grant goldapi                  accept by colleague "ok"   armed [poll gold]
- *     E change bundle -> register + digest spark              accept by colleague "ok"   armed [digest notes-weekly]
+ *     E change bundle -> register + digest slash              accept by colleague "ok"   armed [digest notes-weekly]
  *     F change -> the owner's installed script, new source    accept by colleague "ok"   version 1 -> 2
  *     H change -> digest to https://collector.example.com/in  accept by colleague "ok"   fired carrying the owner's row
  *
@@ -48,7 +48,7 @@ const POLL = {
 const DIGEST = {
   id: 'digest.notes-weekly',
   kind: 'digest',
-  body: { digest: 'notes-weekly', schedule: { day: 'mon', at: '08:00' }, channels: ['in-app'], prose: 'spark', sections: [{ heading: 'Rows', source: 'register.notes', as: 'table', columns: [{ field: 'what' }] }] },
+  body: { digest: 'notes-weekly', schedule: { day: 'mon', at: '08:00' }, channels: ['in-app'], prose: 'slash', sections: [{ heading: 'Rows', source: 'register.notes', as: 'table', columns: [{ field: 'what' }] }] },
 };
 const HOOK = {
   id: 'digest.out',
@@ -58,12 +58,12 @@ const HOOK = {
 const RULE = {
   id: 'rule.rate',
   kind: 'rule',
-  body: { rule: 'rate', on: { written: { register: 'notes', op: ['create'] } }, once_per: ['entry'], steps: [{ ask_spark: { question: 'What rate applies to {{what}}?', about: ['what'], as: 'rate', shape: 'number' } }] },
+  body: { rule: 'rate', on: { written: { register: 'notes', op: ['create'] } }, once_per: ['entry'], steps: [{ ask_slash: { question: 'What rate applies to {{what}}?', about: ['what'], as: 'rate', shape: 'number' } }] },
 };
 
 async function record() {
   const sql = openSqlite();
-  const api = await createRecordApi({ sql, clock: fixedClock(NOW), answersSpark: true, delivers: ['infer.prose', 'infer.ask', 'notify.email', 'notify.webhook'] as never });
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW), answersSlash: true, delivers: ['infer.prose', 'infer.ask', 'notify.email', 'notify.webhook'] as never });
   assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_owner' } }).ok);
   assert.ok((await api.kernel.install([NOTES] as never)).ok);
   assert.ok(api.kernel.bindGrant(KEY, 'p_owner').ok);
@@ -83,10 +83,10 @@ async function record() {
 
 const ROADS = [
   ['A: a change to a script every hour on key goldapi', 'change', { declaration_id: 'script.gold-rate', to: SCRIPT() }, 'script.gold-rate'],
-  ['B: a change to a digest with prose: spark', 'change', { declaration_id: 'digest.notes-weekly', to: DIGEST }, 'digest.notes-weekly'],
+  ['B: a change to a digest with prose: slash', 'change', { declaration_id: 'digest.notes-weekly', to: DIGEST }, 'digest.notes-weekly'],
   ['C: a pattern whose ingest polls on goldapi', 'pattern', { ingest: POLL, samples: ['raw_1'] }, 'ingest.gold'],
   ['D: a change to an ingest that polls on goldapi', 'change', { declaration_id: 'ingest.gold', to: POLL }, 'ingest.gold'],
-  ['E: a bundle of a register and a spark digest', 'change', { declaration_id: 'register.notes', to: { declarations: [NOTES, DIGEST] } }, 'digest.notes-weekly'],
+  ['E: a bundle of a register and a Slash digest', 'change', { declaration_id: 'register.notes', to: { declarations: [NOTES, DIGEST] } }, 'digest.notes-weekly'],
   ['H: a change to a digest posting to her own webhook', 'change', { declaration_id: 'digest.out', to: HOOK }, 'digest.out'],
 ] as const;
 

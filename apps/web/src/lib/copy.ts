@@ -942,21 +942,21 @@ export const copy = {
      detail is there to say what pressing Enter does, in the reader's word for the thing: a number. */
   openById: 'Open by number',
   askBrainDog: 'Ask BrainDog',
-  /* SPARK'S ROW AND WHAT IT DRAWS (`50 §5.5` step 5). Every one of these is on screen only when `/api/version` says a model
-     is behind Spark on this host, because the row is the only way into the mode and without a model the row does not exist
+  /* SLASH'S ROW AND WHAT IT DRAWS (`50 §5.5` step 5). Every one of these is on screen only when `/api/version` says a model
+     is behind Slash on this host, because the row is the only way into the mode and without a model the row does not exist
      (`loop/research-spark.md` §0 decision 6). The fold's last line is `23 §6`'s, with a colon for the dash. */
-  askSpark: (text: string) => `Ask Spark: ${text}`,
-  sparkAsking: 'Spark is reading the record.',
-  sparkWhere: 'Spark looked for',
-  sparkSearched: (q: string) => `Spark searched the record for “${q}”`,
-  sparkFound: 'What Spark found',
-  sparkNothing: 'Nothing in the record answers that.',
-  sparkFold: 'What Spark read',
-  sparkFoldLine: (register: string, rows: number, predicate: string) => `${register}: ${rows === 1 ? '1 row' : `${rows.toLocaleString('en')} rows`}, ${predicate}`,
-  sparkAll: 'all',
-  sparkGrantRefused: 'grant: refused',
+  askSlash: (text: string) => `Ask Slash: ${text}`,
+  slashAsking: 'Slash is reading the record.',
+  slashWhere: 'Slash looked for',
+  slashSearched: (q: string) => `Slash searched the record for “${q}”`,
+  slashFound: 'What Slash found',
+  slashNothing: 'Nothing in the record answers that.',
+  slashFold: 'What Slash read',
+  slashFoldLine: (register: string, rows: number, predicate: string) => `${register}: ${rows === 1 ? '1 row' : `${rows.toLocaleString('en')} rows`}, ${predicate}`,
+  slashAll: 'all',
+  slashGrantRefused: 'grant: refused',
   /* A PREDICATE IN WORDS, one phrase per test of `34 §1.1`. `empty` and `present` take no operand. */
-  sparkOps: {
+  slashOps: {
     is: 'is',
     not: 'is not',
     in: 'is one of',
@@ -977,7 +977,7 @@ export const copy = {
     lacks: 'lacks',
     near: 'is near',
   } as Readonly<Record<string, string>>,
-  sparkMatches: (text: string) => `the text matches “${text}”`,
+  slashMatches: (text: string) => `the text matches “${text}”`,
   /* The Vault's words are in `record/vault.ts`, which only its two routes load. */
 
   /* packs */
@@ -1138,7 +1138,7 @@ export const copy = {
   catalogueSigned: (keyId: string) => `Signed by key ${keyId}`,
   catalogueUnsigned: 'Unsigned',
   /* THE RAIL'S STAR, said in plain words beside its name (`lib/ui/Sidebar.svelte`). */
-  sparkRail: 'Spark: suggestions to fit this BrainDog to how you use it',
+  slashRail: 'Slash: suggestions to fit this BrainDog to how you use it',
   catalogueTrustUnsigned: 'Nobody signed this version, so nothing but the catalogue says who published it.',
   catalogueTrustStripped: (author: string, before: string[]) =>
     `Nobody signed this version, and ${author}'s earlier versions were signed by key ${before.join(', ')}. A catalogue does not publish an unsigned version after a signed one, so this may not be from ${author}. It cannot be asked for.`,
@@ -2153,7 +2153,7 @@ export const copy = {
   /* DECIDE AND THE INBOX AS QUEUES (DESIGN-SYSTEM appendix D): the cursor, a selection, and what a
      proposal would put on the screen. No sentence here assumes what kind of record it is. */
   proposalWillAppear: 'What will appear',
-  fromSpark: 'From Spark',
+  fromSlash: 'From Slash',
   proposalKind: (kind: string): string =>
     ({ page: 'Page', register: 'List', ingest: 'Rule for what comes in', theme: 'Look', metric: 'Measure', digest: 'Summary', rule: 'Rule', block: 'Block' })[kind] ??
     kind.charAt(0).toUpperCase() + kind.slice(1),

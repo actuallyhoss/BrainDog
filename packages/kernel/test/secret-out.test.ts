@@ -86,12 +86,12 @@ const SEALED = (label: string) => ({ label, opens: 'the provider', kind: 'api_to
 async function record(copy: Declaration | null, ...clean: Declaration[]): Promise<{ k: Kernel; sql: NodeSql; clock: ReturnType<typeof fixedClock> }> {
   const sql = openSqlite();
   const clock = fixedClock(NOW);
-  const first = await openRecord(sql, clock, { answersSpark: true });
+  const first = await openRecord(sql, clock, { answersSlash: true });
   assert.ok(first.createRecord({ id: ID, slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1', email: 'ada@example.test', name: 'Ada' } }).ok);
   value(first.bindGrant({ label: 'hook key', opens: 'hooks.example.test', kind: 'api_token', ciphertext: b(1), nonce: b(9), kdf: 'hkdf', wrapped_by: 'kek', kek_id: 'kek_2f' }, 'p_1') as Result<GrantRow>);
   value(await first.install([INVOICES, HOOK, ...(copy === null ? [] : [inline('copy', 'state is open', [{ tag: 'placeholder' }])]), ...clean]));
   if (copy !== null) sql.exec("UPDATE declaration SET body = ? WHERE id = 'rule.copy' AND superseded_at IS NULL", JSON.stringify(copy.body));
-  return { k: await openRecord(sql, clock, { answersSpark: true }), sql, clock };
+  return { k: await openRecord(sql, clock, { answersSlash: true }), sql, clock };
 }
 
 const sent = (sql: NodeSql) =>
@@ -306,9 +306,9 @@ test('AND ONE THAT DECLARES NONE NAMES NONE, so a host cannot sign it with a key
 });
 
 test('AND THE PROSE PATH CARRIES THE GRANT THROUGH TO THE POST, since it sends from what the alarm assembled', async () => {
-  /* `prose: spark` QUEUES `infer.prose` WITH THE ASSEMBLED DIGEST, and the post is sent from that payload on the ack.
+  /* `prose: slash` QUEUES `infer.prose` WITH THE ASSEMBLED DIGEST, and the post is sent from that payload on the ack.
      A grant the alarm read off the declaration and did not put on the assembly would be lost there. */
-  const { k, sql, rows } = await digested(DIGEST({ url: 'https://collector.example.com/in', grant: 'collector' }, { prose: 'spark' }), ['notify.webhook', 'infer.prose']);
+  const { k, sql, rows } = await digested(DIGEST({ url: 'https://collector.example.com/in', grant: 'collector' }, { prose: 'slash' }), ['notify.webhook', 'infer.prose']);
   assert.deepEqual(rows.map((r) => r.kind), ['infer.prose']);
   assert.equal(rows[0]!.payload.webhook_grant, 'collector', JSON.stringify(Object.keys(rows[0]!.payload)));
 

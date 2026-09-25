@@ -17,7 +17,7 @@
   /* ── sparkline: a label, a small line, the figure it ends at ─────────────
      The line is 120 by 28 in a fixed column, so the lines of several rows share a left edge and a
      row with fewer than two points keeps its figure in the figure's column. */
-  .spark-row {
+  .sparkline-row {
     display: grid;
     grid-template-columns: minmax(9ch, 20ch) 120px minmax(0, 1fr) auto;
     gap: var(--sp-3);
@@ -26,19 +26,19 @@
     min-block-size: var(--row-h);
   }
 
-  .spark-label {
+  .sparkline-label {
     color: var(--ink2);
     font-size: var(--t-sm);
   }
 
-  .spark-line {
+  .sparkline-line {
     grid-column: 2;
     inline-size: 120px;
     block-size: 28px;
     overflow: visible;
   }
 
-  .spark-figure {
+  .sparkline-figure {
     grid-column: 3;
     justify-self: end;
     color: var(--ink);
@@ -47,7 +47,7 @@
     font-weight: 500;
   }
 
-  .spark-row > .glyph {
+  .sparkline-row > .glyph {
     grid-column: 4;
   }
 
@@ -644,7 +644,7 @@
   .series-numbers,
   .split-numbers,
   .bridge-numbers,
-  .spark-numbers {
+  .sparkline-numbers {
     position: absolute;
     inline-size: 1px;
     block-size: 1px;
@@ -700,7 +700,7 @@
   .forecast-table,
   .bridge-table,
   .split-table,
-  .spark-table {
+  .sparkline-table {
     inline-size: 100%;
     border-collapse: collapse;
     font-size: var(--t-sm);
@@ -716,8 +716,8 @@
   .bridge-table td,
   .split-table th,
   .split-table td,
-  .spark-table th,
-  .spark-table td {
+  .sparkline-table th,
+  .sparkline-table td {
     padding: var(--sp-1) var(--sp-2);
     border-block-end: 1px solid var(--line-soft);
     color: var(--ink);
@@ -730,7 +730,7 @@
   .forecast-table thead th,
   .bridge-table thead th,
   .split-table thead th,
-  .spark-table thead th {
+  .sparkline-table thead th {
     color: var(--dim);
     font-size: var(--t-xs);
   }
@@ -740,7 +740,7 @@
   .forecast-table th:first-child,
   .bridge-table th:first-child,
   .split-table th:first-child,
-  .spark-table th:first-child,
+  .sparkline-table th:first-child,
   .forecast-table td:nth-child(2) {
     text-align: start;
   }

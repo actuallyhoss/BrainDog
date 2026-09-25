@@ -174,7 +174,7 @@ export type Conflict = {
  *
  * GROUPED AND COUNTED AS `30 §6` GROUPS AND COUNTS THEM: *"One hundred and twenty-seven, counted, in nine
  * families — 54 pack and declaration · 14 grammar · 19 write path · 8 auth and vault · 8 format and
- * lifecycle · 2 dialect · 6 spark · 12 connector · 4 host and client."* A sentence that counts is a
+ * lifecycle · 2 dialect · 6 slash · 12 connector · 4 host and client."* A sentence that counts is a
  * sentence that can be wrong, so the shape is kept and `refusals.mjs` checks both the total and the
  * nine sizes against the document — the same gate shape `event-kinds` uses for the one other list
  * that has to say the same thing in two places.
@@ -271,12 +271,12 @@ const DIALECT = [
   'DIALECT_ARITY', 'DIALECT_KIND_UNKNOWN',
 ] as const;
 
-/** Spark — 6. */
-const SPARK = [
-  'PROPOSAL_UNCITED', 'PROPOSAL_NO_ROWS', 'PROPOSAL_SCHEMA', 'PREDICTION_UNMEASURABLE', 'SPARK_BUDGET_SPENT',
+/** Slash — 6. */
+const SLASH = [
+  'PROPOSAL_UNCITED', 'PROPOSAL_NO_ROWS', 'PROPOSAL_SCHEMA', 'PREDICTION_UNMEASURABLE', 'SLASH_BUDGET_SPENT',
   /* 2026-09-23: a model that answered an automation's question with a 200 the host could not read, too large, not
      JSON or broken off, or that ran out the clock. Wave 47 raised `PROPOSAL_SCHEMA` for it, which is output read and
-     failing its schema; here nothing was read, and the ask was still paid for (`packages/spark/src/answer.ts`). */
+     failing its schema; here nothing was read, and the ask was still paid for (`packages/slash/src/answer.ts`). */
   'ANSWER_UNREADABLE',
 ] as const;
 
@@ -307,7 +307,7 @@ const HOST = [
 ] as const;
 /** The hundred and twenty-seven, in `30 §6`'s order. */
 export const REFUSAL_CODES = [
-  ...PACK, ...GRAMMAR, ...WRITE, ...AUTH, ...LIFECYCLE, ...DIALECT, ...SPARK, ...CONNECTOR, ...HOST,
+  ...PACK, ...GRAMMAR, ...WRITE, ...AUTH, ...LIFECYCLE, ...DIALECT, ...SLASH, ...CONNECTOR, ...HOST,
 ] as const;
 
 export type RefusalCode = (typeof REFUSAL_CODES)[number];

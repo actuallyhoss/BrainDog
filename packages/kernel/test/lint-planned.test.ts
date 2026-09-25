@@ -8,7 +8,7 @@
  * and `taggingRefused` read the table and the live list cache. Measured on the wave forty-eight tree through the record
  * (`packages/record/test/arrange-kernel-lint.test.ts`), five arrangements the accept refuses were filed: a pack
  * narrowing Jobs' `tags` under a live `rule.late`, a pack's rule tagging a Jobs whose `tags` is `int` from the pack
- * before it, a pack's page filtering a list the pack before it declares on a field it lacks, a rule asking Spark on a
+ * before it, a pack's page filtering a list the pack before it declares on a field it lacks, a rule asking Slash on a
  * host that answers none, and a page over `rates` beside an update retiring a keyless `fx`.
  *
  * EACH CASE BELOW PUTS WHAT DECIDES IT IN `known` AND NOWHERE ELSE, so a lint that reads the table instead gives the
@@ -121,12 +121,12 @@ test('A DOOR A PATTERN IN THE PLAN NAMES is held to verify: { kind: path }, as d
   assert.equal(k.lint([door]), null, said(k.lint([door])));
 });
 
-test('A RULE ASKING SPARK IS REFUSED ON A HOST THAT ANSWERS NONE, whatever record it is read against', async () => {
+test('A RULE ASKING SLASH IS REFUSED ON A HOST THAT ANSWERS NONE, whatever record it is read against', async () => {
   const k = await kernel(register('jobs', [WHAT]));
   const ask: Declaration = {
     id: 'rule.rate',
     kind: 'rule',
-    body: { rule: 'rate', on: { written: { register: 'jobs', op: ['create'] } }, once_per: ['entry'], steps: [{ ask_spark: { question: 'What rate for {{what}}?', about: ['what'], as: 'rate', shape: 'number' } }] } as never,
+    body: { rule: 'rate', on: { written: { register: 'jobs', op: ['create'] } }, once_per: ['entry'], steps: [{ ask_slash: { question: 'What rate for {{what}}?', about: ['what'], as: 'rate', shape: 'number' } }] } as never,
   };
   const { known, owners } = planned(k, []);
   assert.equal(k.lint([ask], known, owners)?.code, 'NOT_IN_THIS_BUILD');

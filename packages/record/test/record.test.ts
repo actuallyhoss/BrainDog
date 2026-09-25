@@ -441,7 +441,7 @@ test('the record’s version moves with a write and not with a read', async () =
   const { api, sql } = await record();
   /* `.version`, BECAUSE `version` ANSWERS `33 §4`'s OBJECT. It returned a bare number, so the route
      carried the polling cursor and nothing else the contract names: `deploy-parity` reads `app` and
-     `50 §5.13` step 3 reads `spark`, and both read a number. */
+     `50 §5.13` step 3 reads `slash`, and both read a number. */
   const at = async (): Promise<number> => value<{ version: number }>(await api.version(owner)).version;
 
   const before = await at();
@@ -453,7 +453,7 @@ test('the record’s version moves with a write and not with a read', async () =
 });
 
 test('and it says what this build is and what is serving it, which nothing asked before', async () => {
-  /* `33 §4` line 356: `{ version, format, kernel, primitives, app, spark: boolean }`. A record cannot
+  /* `33 §4` line 356: `{ version, format, kernel, primitives, app, slash: boolean }`. A record cannot
      know its own build — it is the same code under a Worker, a test and the CLI — so the host tells
      it, and a host that was not told says `null` rather than the empty string it was handed. */
   const sql = openSqlite();
@@ -461,19 +461,19 @@ test('and it says what this build is and what is serving it, which nothing asked
     sql,
     clock: fixedClock(NOW),
     sign: SIGNER,
-    build: { app: '2026-09-09+abc1234', spark: true },
+    build: { app: '2026-09-09+abc1234', slash: true },
   });
   const v = value<Record<string, unknown>>(await api.version(owner));
-  assert.deepEqual(Object.keys(v).sort(), ['app', 'format', 'kernel', 'primitives', 'spark', 'version']);
+  assert.deepEqual(Object.keys(v).sort(), ['app', 'format', 'kernel', 'primitives', 'slash', 'version']);
   assert.equal(v.app, '2026-09-09+abc1234');
-  assert.equal(v.spark, true);
+  assert.equal(v.slash, true);
   assert.equal(v.format, 1);
   assert.equal(v.primitives, 1);
   assert.ok(typeof v.kernel === 'number' && v.kernel >= 1);
   sql.close();
 
   const bare = openSqlite();
-  const untold = await createRecordApi({ sql: bare, clock: fixedClock(NOW), sign: SIGNER, build: { app: '', spark: false } });
+  const untold = await createRecordApi({ sql: bare, clock: fixedClock(NOW), sign: SIGNER, build: { app: '', slash: false } });
   assert.equal(value<{ app: string | null }>(await untold.version(owner)).app, null, 'an empty build is a name, not a silence');
   bare.close();
 });
@@ -485,12 +485,12 @@ test('AND `boot` SAYS WHICH HOST IS SERVING IT, when the host said, and nothing 
      than a value it never gave: `version` answers its six keys exactly, and this is not one of them. */
   for (const host of ['self-host', 'cloud'] as const) {
     const sql = openSqlite();
-    const api = await createRecordApi({ sql, clock: fixedClock(NOW), sign: SIGNER, build: { app: '', spark: false, host } });
+    const api = await createRecordApi({ sql, clock: fixedClock(NOW), sign: SIGNER, build: { app: '', slash: false, host } });
     assert.equal(value<{ host?: string }>(await api.boot(owner)).host, host);
-    assert.deepEqual(Object.keys(value<Record<string, unknown>>(await api.version(owner))).sort(), ['app', 'format', 'kernel', 'primitives', 'spark', 'version']);
+    assert.deepEqual(Object.keys(value<Record<string, unknown>>(await api.version(owner))).sort(), ['app', 'format', 'kernel', 'primitives', 'slash', 'version']);
     sql.close();
   }
-  for (const build of [{ app: '', spark: false }, undefined]) {
+  for (const build of [{ app: '', slash: false }, undefined]) {
     const sql = openSqlite();
     const api = await createRecordApi({ sql, clock: fixedClock(NOW), sign: SIGNER, ...(build ? { build } : {}) });
     assert.ok(!('host' in value<object>(await api.boot(owner))), `a host that never said is not a host, build ${JSON.stringify(build)}`);

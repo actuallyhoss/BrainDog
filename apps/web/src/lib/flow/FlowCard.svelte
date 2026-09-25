@@ -61,7 +61,7 @@
     notify: 'bell',
     suggest: 'decide',
     ask_person: 'ask',
-    ask_spark: 'star',
+    ask_slash: 'star',
     call: 'globe',
     run: 'plug',
     script: 'code',

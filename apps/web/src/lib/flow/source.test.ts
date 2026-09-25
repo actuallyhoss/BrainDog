@@ -26,8 +26,8 @@ import { copy } from '../copy.ts';
  * TEST DATA, AND ONLY HERE. They were the sample's four automations, drawn on the list when no record answered; the
  * sample is gone (DIRECTION 26) and they stay as the bodies the round trip and the wire are tested on.
  *
- * `friday-review` ASKS A PERSON AND NOT SPARK, because `ask_spark` is a fault on a host with no model (`flow-lint.ts`
- * `sparkAskAt`), and a starter body that opened with a fault on its first card failed the round trip below until it
+ * `friday-review` ASKS A PERSON AND NOT SLASH, because `ask_slash` is a fault on a host with no model (`flow-lint.ts`
+ * `slashAskAt`), and a starter body that opened with a fault on its first card failed the round trip below until it
  * was changed.
  */
 const BODIES: Record<'chase' | 'gold' | 'phone' | 'friday', Body> = {
@@ -193,9 +193,9 @@ test('EVERY STARTER BODY ROUND-TRIPS UNCHANGED AND HAS NOTHING TO FIX, so openin
     const id = String(body.rule);
     const d = draftOf(id, body);
     assert.deepEqual(bodyOf(d), body, id);
-    /* ON A HOST WITH NO MODEL, said out loud rather than left to the default: an Ask Spark card would be a fault on
+    /* ON A HOST WITH NO MODEL, said out loud rather than left to the default: an Ask Slash card would be a fault on
        every host that has none. */
-    assert.deepEqual(faultsOf(d, { spark: false }), [], id);
+    assert.deepEqual(faultsOf(d, { slash: false }), [], id);
   }
 });
 

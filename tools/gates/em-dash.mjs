@@ -13,7 +13,7 @@
  * judgement here. Written ` — ` inside a sentence it is punctuation, and it is standing in for a
  * full stop, a colon or a semicolon that the writer did not choose between. Written anywhere else
  * it is typography: `'—'` alone is the empty cell in a table, `` `${heading} —` `` is a rule drawn
- * after a heading, `\n\n— Spark` is a signature. Rewriting those changes a rendered layout and
+ * after a heading, `\n\n— Slash` is a signature. Rewriting those changes a rendered layout and
  * fixes nothing, because nobody reads them as prose.
  *
  * SO THE RULE IS A SPACE ON EACH SIDE, and it is stated as a property of the character rather than

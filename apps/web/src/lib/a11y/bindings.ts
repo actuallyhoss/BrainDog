@@ -75,7 +75,7 @@ export const SCROLL_KEYS = ['Space', 'PageDown', 'PageUp'] as const;
 
 export const BINDINGS: Binding[] = [
   { id: 'palette', scope: 'document', key: '⌘K', label: 'Open the palette', bare: false },
-  { id: 'palette-slash', scope: 'document', key: '/', label: 'Open the palette, caret in the query', bare: true },
+  { id: 'palette-slash-key', scope: 'document', key: '/', label: 'Open the palette, caret in the query', bare: true },
   /* `g s` IS BACK, BECAUSE SEARCH BECAME A PLACE YOU GO. This row printed it while nothing bound
      it, and the fix at the time was to delete the key: *"search is not a place you go, it is the
      thing under the launcher"* — which was true while the palette was the only search, and which

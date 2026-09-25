@@ -94,7 +94,7 @@ test('A GOOD ANSWER COMES BACK AS TEXT AND A USAGE, and the call it made is the 
   assert.deepEqual(call.inputs['messages'], [{ role: 'user', content: 'Is this an invoice?' }]);
   assert.equal(call.inputs['max_tokens'], 64);
   assert.deepEqual(call.inputs['response_format'], { type: 'json_schema', json_schema: TRIAGE });
-  assert.equal('tools' in call.inputs, false, 'no Spark call passes tools (11 §3, 46 #9)');
+  assert.equal('tools' in call.inputs, false, 'no Slash call passes tools (11 §3, 46 #9)');
 });
 
 test('THE NEURON FIGURE IS THE PLATFORM’S OR IT IS NULL, and the platform reports none', async () => {
@@ -195,7 +195,7 @@ test('A CALL THAT WOULD COST MORE THAN ITS CEILING IS REFUSED BEFORE THE MONEY I
 
   const got = await aiInference(env).complete({ ...ask, budget: { neurons: 1 } });
 
-  assert.equal(codeOf(got), 'SPARK_BUDGET_SPENT');
+  assert.equal(codeOf(got), 'SLASH_BUDGET_SPENT');
   assert.match(fixOf(got), /about 2 neurons and its ceiling is 1/u, 'both figures, because the two repairs are not interchangeable');
   assert.equal(seen.length, 0, 'a ceiling checked after the call is a report and not a refusal');
 });

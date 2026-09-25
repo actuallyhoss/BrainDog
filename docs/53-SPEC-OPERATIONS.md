@@ -486,8 +486,8 @@ been told three times that export is available.
 2. `destroy()` on the `Record` object: `deleteAlarm()` first — belt and braces; at `compatibility_date ≥ 2026-02-24`
    `deleteAll()` deletes the alarm too, and the `compat-date` gate holds the date (09 §1) — then `deleteAll()`. Alarm
    before storage, so a timer never wakes a dead record.
-3. `Spark`: nothing in phase 5 — it holds no durable state (51 §5.13). When it gains storage (46), the same two calls,
-   after `Record`, so Spark cannot write back into an emptied record.
+3. `Slash`: nothing in phase 5 — it holds no durable state (51 §5.13). When it gains storage (46), the same two calls,
+   after `Record`, so Slash cannot write back into an emptied record.
 4. The R2 prefix `rec_<id>/`, paged — attachments and snapshots alike (02 §9).
 5. Directory: `record.forget` removes `record_dir` and `person_record` (51 §5.13). The fact that a record existed under
    that slug, and when, is the ops record's note — not a Directory row.
@@ -818,7 +818,7 @@ that answer.
 | 14 | No staging environment: the ops record (slug `ops`) in production is canary, drill target and the operator's audit ledger — the "staging record" 51 §14 already restores | 33 §7; 31 §8 |
 | 15 | A deploy carrying a kernel migration is never rolled back and never percentage-rolled; the canary is the ops record; recovery is fix-forward | 33 §9 Migrations; 12 §8 Migrations |
 | 16 | `schedule.state` has five values — `pending firing done failed paused`; 25 §9 and 30 §1 already use `paused` | 09 §1 (DDL comment and *four states*) |
-| 17 | Customer deletion is 51 §5.13's `deleteCustomer`, run by the ladder at day 90 or by the owner through one cookie route, `POST /api/deleteRecord` (ADMIN, the slug typed to confirm); order: a `final` snapshot inside the prefix → `destroy()` on `Record` (alarm, then storage) → `Spark` when it has storage → the R2 prefix → `record.forget`; the fact of the deletion is the ops record's note | 02 §9; 09 §1 *Deleting a record*; 33 §4 (the route); 33 §10 |
+| 17 | Customer deletion is 51 §5.13's `deleteCustomer`, run by the ladder at day 90 or by the owner through one cookie route, `POST /api/deleteRecord` (ADMIN, the slug typed to confirm); order: a `final` snapshot inside the prefix → `destroy()` on `Record` (alarm, then storage) → `Slash` when it has storage → the R2 prefix → `record.forget`; the fact of the deletion is the ops record's note | 02 §9; 09 §1 *Deleting a record*; 33 §4 (the route); 33 §10 |
 
 Seventeen, counted. Each amendment lands in the same revision-loop iteration (35 §5).
 

@@ -16,12 +16,12 @@
  *
  * A STEP THAT ASKS HANDS OFF AND PARKS, AND THE ANSWER IS WHAT WAKES IT (Brief C). `ask_person` opens an `options`
  * suggestion whose body names the run and the step, and the kernel's `decide` hands the pick to `answerStep` in the
- * decision's own transaction. `ask_spark` queues one `infer.ask` outbox row, and the outbox's `ack` hands the model's
+ * decision's own transaction. `ask_slash` queues one `infer.ask` outbox row, and the outbox's `ack` hands the model's
  * text to `answerStep` in the ack's transaction. Either way the step row says `waiting` and holds what it is waiting on,
  * the suggestion or the job, and the run's schedule row is armed for the end of the wait: a wake that finds the step
  * still `waiting` is the wait running out, and fails the run with a sentence.
  *
- * ASKING SPARK IS SERVED ONLY WHERE THE HOST SAYS SO (`FlowDeps.answersSpark`, the record's `answersSpark` option). A
+ * ASKING SLASH IS SERVED ONLY WHERE THE HOST SAYS SO (`FlowDeps.answersSlash`, the record's `answersSlash` option). A
  * host that leases no `infer.ask` job leaves the question `pending` for its day and the run fails having asked nobody,
  * so on such a host `advance` fails a run that reaches the step with `NOT_IN_THIS_BUILD` before anything is queued, and
  * install refuses the step (`unserved` in `index.ts`). A host that serves the job admits both, and its pass acks with
@@ -86,13 +86,13 @@ const DAY_MS = 86_400_000;
 /** §4.3: a question put to a person waits a week unless its step says `wait:`. */
 export const ASK_PERSON_WAIT = '7d';
 /**
- * How long a run waits on Spark before it stops.
+ * How long a run waits on Slash before it stops.
  *
  * A DAY, BECAUSE THE OUTBOX'S OWN LADDER IS OVER LONG BEFORE IT. Eight failed attempts end in about four hours, and that
  * path fails the run at once; this is for the other one, a host that serves no `infer.ask` at all and leaves the row
  * `pending`, which without a bound would park the run for the ninety days a run is kept.
  */
-export const ASK_SPARK_WAIT_MS = DAY_MS;
+export const ASK_SLASH_WAIT_MS = DAY_MS;
 
 /** The keys of the two kinds of `rule` schedule row this file owns. A rule's own reminders are `<rule>:<row>`. */
 export const runKey = (run: string): string => `flow.run:${run}`;
@@ -120,13 +120,13 @@ export type FlowDeps = {
   withdraw: (suggestion: string, actor: string, why: string) => void;
   /**
    * Whether this host leases `infer.ask` and answers it, as the record was opened with. False fails a run at an
-   * `ask_spark` step before anything is queued.
+   * `ask_slash` step before anything is queued.
    *
    * HERE AS WELL AS AT INSTALL, because install is not the only way a rule becomes live: `enablePack` restores a
    * retired rule through `stageDeclarations` alone, which asks no host question, and a rule an earlier build let
    * install is still in the table.
    */
-  answersSpark: boolean;
+  answersSlash: boolean;
 };
 
 /** A run-path rule as installed: its bare id, the version a run pins, and its body. */
@@ -258,7 +258,7 @@ type RunRow = {
 type Vars = Record<string, string | number | boolean | null>;
 
 /**
- * What a question to Spark reads for each variable a `set_var` filled from a field that never leaves the record: the
+ * What a question to Slash reads for each variable a `set_var` filled from a field that never leaves the record: the
  * same `to` filled again from the row `sendable` leaves, so `{{trigger.row.pin}}` is the dash a missing field is
  * written as and `{{trigger.row}}` is the row's JSON without `pin`. A variable not here was the same either way.
  *
@@ -272,12 +272,12 @@ type Kept = Record<string, string>;
 const KEPT = '-sendable';
 
 /**
- * The fields of the run's own row that a step wrote from a value a question to Spark may not carry, which the question
+ * The fields of the run's own row that a step wrote from a value a question to Slash may not carry, which the question
  * then reads as if the list did not have them: `sendable` takes them out with the secret fields themselves.
  *
  * BESIDE `-sendable`, UNDER A KEY NO VARIABLE CAN HAVE, for the same reason: a run parks between the `set` and the
  * question, and what it holds has to be in its row. Audit forty-nine §7 measured, with the lint's check off, a `set` of
- * `note` from `{{pin}}` then `{{note}}`, `{{trigger.row.note}}` and `about: [note]` each queueing `hunter2` for Spark.
+ * `note` from `{{pin}}` then `{{note}}`, `{{trigger.row.note}}` and `about: [note]` each queueing `hunter2` for Slash.
  * Written whenever `-sendable` is, empty when nothing is held, so a column with `-sendable` and without this is one a
  * build before it parked, and `advance` rebuilds it.
  */
@@ -287,7 +287,7 @@ const UNSENT = '-unsent';
  * The variables a `set_var` filled from a secret or file field, or from another such variable, which a step that
  * writes may not copy anywhere but into another such field (`sealedPaths`).
  *
- * NOT `-sendable`, WHICH IS WIDER ON PURPOSE. What a question to Spark reads in a variable's place is filled from
+ * NOT `-sendable`, WHICH IS WIDER ON PURPOSE. What a question to Slash reads in a variable's place is filled from
  * `sendable`'s row, which also drops every field the live list does not declare, so a variable set from
  * `{{trigger.row}}` is kept there whenever the row holds one. Refusing a write on that would refuse a note on a list
  * with no secret field. This key holds only what came from a field declared secret or file. Kept beside the other two
@@ -296,7 +296,7 @@ const UNSENT = '-unsent';
 const SEALED = '-sealed';
 
 /**
- * A run's stored `vars`, split into the variables, what a question to Spark reads in their place, the fields it reads
+ * A run's stored `vars`, split into the variables, what a question to Slash reads in their place, the fields it reads
  * as absent, and the variables set from a secret. `kept` is `null` when the column has no `-sendable`, which is a run a
  * build before the key parked, or one no step has saved yet, and `unsent` and `sealed` are `null` when the column has
  * no key of theirs, for the same two reasons.
@@ -318,7 +318,7 @@ function unpack(stored: string): { vars: Vars; kept: Kept | null; unsent: string
  * what was kept under its name as `answerStep` does.
  *
  * FOR A RUN A BUILD BEFORE `-sendable` PARKED. That build wrote `vars` alone, so a run it parked on a wait or an ask
- * between the `set_var` and the question woke under this build with nothing kept, and its question to Spark was filled
+ * between the `set_var` and the question woke under this build with nothing kept, and its question to Slash was filled
  * from `vars`: measured on 23 September, `Given hunter2, plain, r hunter2?`. This build writes the key on every save,
  * empty when nothing is kept (`pack`), so a column with none is that build's or a run not yet saved, which has no
  * step rows and rebuilds to nothing.
@@ -341,7 +341,7 @@ function rebuilt(deps: FlowDeps, run: string, program: Op[], started: Record<str
   const metric = figures(deps, () => landsOf(program, row));
   const clean = (): Entry | null => (row ? sendable(deps, row, unsent) : null);
   for (const done of deps.sql.all<{ n: number; kind: string; answer: string | null }>(
-    "SELECT n, kind, answer FROM automation_step WHERE run = ? AND state = 'done' AND kind IN ('set_var', 'ask_person', 'ask_spark', 'set', 'tag') ORDER BY n",
+    "SELECT n, kind, answer FROM automation_step WHERE run = ? AND state = 'done' AND kind IN ('set_var', 'ask_person', 'ask_slash', 'set', 'tag') ORDER BY n",
     run,
   )) {
     const cleaned = clean();
@@ -377,7 +377,7 @@ function rebuilt(deps: FlowDeps, run: string, program: Op[], started: Record<str
 
 /**
  * The field a `set` or a `tag` writes on the run's row, and whether what it writes differs from what the same step
- * would write from the row a question to Spark may carry and the variables as they were kept (`-sendable`). `null`
+ * would write from the row a question to Slash may carry and the variables as they were kept (`-sendable`). `null`
  * for a step whose shape names no field, which the pass refuses on its own.
  *
  * FILLED AS THE STEP IS: the pass fills a `set`'s `to` from the run and the row in one pass (`rules.ts`'s `filling`),
@@ -428,7 +428,7 @@ function mark(unsent: Set<string>, verb: 'set' | 'tag', w: { field: string; carr
  *
  * WITH NOTHING KEPT THE KEY IS STILL WRITTEN, EMPTY. The key's presence is the only sign this build parked the run.
  * Leaving it off when nothing was kept made every such run read as an earlier build's and rebuilt from the row as it
- * is now: measured on 23 September, `p` set from `note` while it said `plain`, `note` edited during the wait, and Spark
+ * is now: measured on 23 September, `p` set from `note` while it said `plain`, `note` edited during the wait, and Slash
  * asked `Given changed?` about a variable holding `plain`, in a rule with no secret in it.
  */
 function pack(vars: Vars, kept: Kept | null, unsent: Iterable<string> | null, sealed: Iterable<string> | null): string {
@@ -446,7 +446,7 @@ function sealedAgain(deps: FlowDeps, run: string, program: Op[], scope: Record<s
   const out = new Set<string>();
   const fields = row ? sealedOf(deps.sql, row.register) : new Set<string>();
   for (const done of deps.sql.all<{ n: number; kind: string }>(
-    "SELECT n, kind FROM automation_step WHERE run = ? AND state = 'done' AND kind IN ('set_var', 'ask_person', 'ask_spark') ORDER BY n",
+    "SELECT n, kind FROM automation_step WHERE run = ? AND state = 'done' AND kind IN ('set_var', 'ask_person', 'ask_slash') ORDER BY n",
     run,
   )) {
     const spec = program[done.n]?.step[done.kind] as { name?: unknown; to?: unknown; as?: unknown } | undefined;
@@ -561,7 +561,7 @@ export function cancelRunsOf(deps: FlowDeps, rule: string, because?: string): nu
 /* ── the plan ───────────────────────────────────────────────────────── */
 
 const VERBS = [
-  'if', 'set_var', 'script', 'call', 'ask_spark', 'ask_person', 'wait',
+  'if', 'set_var', 'script', 'call', 'ask_slash', 'ask_person', 'wait',
   'tag', 'untag', 'set', 'move', 'link', 'note', 'notify', 'schedule', 'create', 'suggest', 'run', 'stop',
 ] as const;
 
@@ -825,12 +825,12 @@ export function advance(deps: FlowDeps, id: string): number | null {
      may keep something of its own, and then the question finds the run keeping something and has no sign that `p`,
      set before the wake, is missing from it: with the rebuild moved to the question and done only for a run keeping
      nothing, a run that set `s` from `pin` after the wait asked `Given hunter2, plain, r hunter2, —?`. Only a run with a
-     question to Spark still ahead pays for the replay, since nothing else reads what is kept.
+     question to Slash still ahead pays for the replay, since nothing else reads what is kept.
 
      A COLUMN WITH `-sendable` AND NO `-unsent` IS REPLAYED FOR THE FIELDS ALONE, and what it kept is read as it was
      kept, since that build kept it correctly and knew nothing of the row. */
   const again =
-    (stored === null || marked === null) && program.slice(run.step).some((o) => o.verb === 'ask_spark') ? rebuilt(deps, id, program, context(deps, trigger, read()), read()) : null;
+    (stored === null || marked === null) && program.slice(run.step).some((o) => o.verb === 'ask_slash') ? rebuilt(deps, id, program, context(deps, trigger, read()), read()) : null;
   const kept = stored ?? again?.kept ?? {};
   const unsent = new Set(marked ?? again?.unsent ?? []);
   const sealedVars = new Set(tainted ?? sealedAgain(deps, id, program, context(deps, trigger, read()), read()));
@@ -901,7 +901,7 @@ export function advance(deps: FlowDeps, id: string): number | null {
         const spec = step.set_var as { name: string; to: string };
         const value = String(fill(spec.to, scope()));
         if (value.length > VAR_BYTES) return fail(i, 'set_var', `rule.${run.rule} sets ${spec.name} to ${value.length} characters, and one answer holds ${VAR_BYTES}.`);
-        /* AND FILLED A SECOND TIME, FROM WHAT A QUESTION TO SPARK MAY CARRY: the row `sendable` leaves, and every
+        /* AND FILLED A SECOND TIME, FROM WHAT A QUESTION TO SLASH MAY CARRY: the row `sendable` leaves, and every
            variable already kept here read as it was kept, so one set from another carries the cleaning with it. The
            first fill alone is what audit forty-six measured leaving through a real self-host: `set_var: { to:
            '{{trigger.row.pin}}' }` then `{{vars.p}}` put "given hunter2" in the model's request body, and `to:
@@ -909,7 +909,7 @@ export function advance(deps: FlowDeps, id: string): number | null {
            second line, for a rule an earlier build let install.
 
            BOTH FILLS READ `vars` AS IT WAS BEFORE THIS STEP. The second was taken after the new value went in, so
-           `to: '{{vars.p}} more'` read its own result, the fills differed, and Spark was asked `plain more more` about
+           `to: '{{vars.p}} more'` read its own result, the fills differed, and Slash was asked `plain more more` about
            a variable holding `plain more`. */
         const row = read();
         const now = scope();
@@ -928,16 +928,16 @@ export function advance(deps: FlowDeps, id: string): number | null {
         continue;
       }
 
-      /* SPARK IS NOT ASKED ON A HOST THAT WOULD NOT ANSWER: a question queued for nobody waits its day and fails, having
+      /* SLASH IS NOT ASKED ON A HOST THAT WOULD NOT ANSWER: a question queued for nobody waits its day and fails, having
          asked nobody. Checked before anything is queued, for a rule that became live without meeting `unserved`. */
-      if (op.verb === 'ask_spark' && !deps.answersSpark)
+      if (op.verb === 'ask_slash' && !deps.answersSlash)
         return fail(
           i,
           op.verb,
-          `rule.${run.rule} reached an ask_spark step, and no host in this build answers an automation's question to Spark (NOT_IN_THIS_BUILD). The steps before it were taken.`,
+          `rule.${run.rule} reached an ask_slash step, and no host in this build answers an automation's question to Slash (NOT_IN_THIS_BUILD). The steps before it were taken.`,
         );
 
-      if (op.verb === 'ask_person' || op.verb === 'ask_spark') {
+      if (op.verb === 'ask_person' || op.verb === 'ask_slash') {
         /* THE SECOND TIME AN ASK IS REACHED IS THE END OF ITS WAIT, as for `wait`. An answer moves the run past the
            step before the drain comes back (`answerStep`), so a wake that lands here with the row still `waiting` is
            a wake nobody answered before. */
@@ -953,7 +953,7 @@ export function advance(deps: FlowDeps, id: string): number | null {
             op.verb,
             op.verb === 'ask_person'
               ? `rule.${run.rule} asked ${was.answer ?? 'a question'} at step ${i + 1}, and nobody answered it within ${spec.wait ?? ASK_PERSON_WAIT}, so the run stopped there.`
-              : `rule.${run.rule} asked Spark at step ${i + 1}, and Spark did not answer within a day, so the run stopped there.`,
+              : `rule.${run.rule} asked Slash at step ${i + 1}, and Slash did not answer within a day, so the run stopped there.`,
           );
         }
         const asked = ask(deps, run.rule, op.verb, step, i, id, scope(), kept, unsent, sealedVars, read(), actor);
@@ -984,10 +984,10 @@ export function advance(deps: FlowDeps, id: string): number | null {
       }
 
       /* A WRITE TO THE ROW IS FILLED BOTH WAYS TOO, before it is taken, since the row it is filled from is the row as it
-         stands now. The field it writes is held back from every question to Spark after it when the two differ, and
+         stands now. The field it writes is held back from every question to Slash after it when the two differ, and
          given back by a plain `set` of it: a question reads the row as the step left it, and audit forty-nine §7
          measured `set: { field: note, to: '{{pin}}' }` then `{{note}}`, `{{trigger.row.note}}`, `about: [note]` and a
-         `set_var` from `note` each queueing `hunter2` for Spark. The lint refuses those at install, and since wave
+         `set_var` from `note` each queueing `hunter2` for Slash. The lint refuses those at install, and since wave
          fifty-five the step below is refused at run time as well, so for a secret this now marks only a copy into a
          field that never leaves either; what it still guards is a run an earlier build took past such a write, whose
          `-unsent` this column carries on or `rebuilt` replays. */
@@ -1190,7 +1190,7 @@ function startScript(
 }
 
 /**
- * Put an ask's question where it will be answered: the suggestion queue for a person, the outbox for Spark. What it
+ * Put an ask's question where it will be answered: the suggestion queue for a person, the outbox for Slash. What it
  * hands back is the id the step row holds while it waits, and how long it waits.
  *
  * THE QUESTION IS FILLED FROM THE RUN AND THE ROW, as a `notify` is: `{{vars.…}}` and `{{trigger.…}}`, and the row's
@@ -1200,7 +1200,7 @@ function startScript(
 function ask(
   deps: FlowDeps,
   rule: string,
-  verb: 'ask_person' | 'ask_spark',
+  verb: 'ask_person' | 'ask_slash',
   step: Record<string, unknown>,
   n: number,
   run: string,
@@ -1212,7 +1212,7 @@ function ask(
   actor: string,
 ): { ok: true; holds: string; waitMs: number } | { ok: false; say: string } {
   const spec = step[verb] as { question: string; options?: string[]; wait?: string; about?: string[]; shape?: string; choices?: string[] };
-  /* A QUESTION TO SPARK IS FILLED FROM THE ROW WITH ITS SECRET AND FILE FIELDS TAKEN OUT, both fills, since the
+  /* A QUESTION TO SLASH IS FILLED FROM THE ROW WITH ITS SECRET AND FILE FIELDS TAKEN OUT, both fills, since the
      question leaves the record as surely as `about:` does. The lint refuses a question that names one, and this is the
      second line, for a rule an earlier build let install or one written into the table. Measured with the switch on
      and this line off (`flow-waits.test.ts`, "A RULE STORED WITH A SECRET"): the question went out as `Rate for Rent,
@@ -1227,16 +1227,16 @@ function ask(
      `x k hunter2`, and `x {{trigger.row}}` with `"pin":"hunter2"` in it. The lint refuses that question at install
      now; this is the second line. Only fields declared secret or file are taken out here, so a list with none asks as
      it did. */
-  const facts = row === null ? null : verb === 'ask_spark' ? sendable(deps, row, unsent) : withoutSealed(deps, row);
+  const facts = row === null ? null : verb === 'ask_slash' ? sendable(deps, row, unsent) : withoutSealed(deps, row);
   /* AND EACH VARIABLE SET FROM A FIELD THAT NEVER LEAVES IS READ AS IT WAS KEPT (`advance`'s `set_var`), so a question
-     to Spark gets the dash where `{{vars.p}}` held `pin`. */
+     to Slash gets the dash where `{{vars.p}}` held `pin`. */
   const vars = scope.vars as Vars;
-  const cleanVars = verb === 'ask_spark' ? { ...vars, ...kept } : { ...vars, ...Object.fromEntries([...tainted].filter((n) => n in vars).map((n) => [n, '—'])) };
+  const cleanVars = verb === 'ask_slash' ? { ...vars, ...kept } : { ...vars, ...Object.fromEntries([...tainted].filter((n) => n in vars).map((n) => [n, '—'])) };
   const scoped = { vars: cleanVars, trigger: facts ? { ...(scope.trigger as Record<string, unknown>), row: facts.fields } : scope.trigger, metric: scope.metric };
   /* FILLED ONCE (`rules.ts`'s `filling`), the run's paths and the row's fields in one pass. It was the run's fill and
      then the row's over what it had made, so a text field holding the words `{{pin}}`, put in by
      `{{trigger.row.note}}`, was read a second time as a field of the row. Both fills read the cleaned row, so for
-     Spark the second reached nothing the first could not and wrote the dash; for a person, at HEAD `afb3b1b2`, `is
+     Slash the second reached nothing the first could not and wrote the dash; for a person, at HEAD `afb3b1b2`, `is
      {{trigger.row.note}}` was asked as `is hunter2`. */
   const question = facts ? filling(spec.question, facts, deps.nowMs, { run: pathsOf(scoped) }).text : String(fill(spec.question, scoped));
   if (question.length > VAR_BYTES) return { ok: false, say: `rule.${rule}'s question at step ${n + 1} runs to ${question.length} characters, and a question holds ${VAR_BYTES}.` };
@@ -1258,8 +1258,8 @@ function ask(
     if (sealedAs(types?.[field]) !== null || unsent.has(field)) continue;
     about[field] = row?.fields[field] ?? null;
   }
-  /* `rule` IS WHO ASKS. The host's pass refuses a job without it and never calls Spark (`spark-answers.ts` `askOf`),
-     because Spark's ledger row is written as `rule.<id> step <n>` and the owner's key is opened as `rule:<id>`: a job
+  /* `rule` IS WHO ASKS. The host's pass refuses a job without it and never calls Slash (`slash-answers.ts` `askOf`),
+     because Slash's ledger row is written as `rule.<id> step <n>` and the owner's key is opened as `rule:<id>`: a job
      queued without it ended its run on "no text", measured through the real kernel (`loop/research-infer-ask-next.md`
      §1.3, B). */
   const job = enqueue(deps.sql, deps.mint, deps.nowMs, 'infer.ask', {
@@ -1271,15 +1271,15 @@ function ask(
     ...(spec.choices === undefined ? {} : { choices: spec.choices }),
     ...(spec.about === undefined ? {} : { about }),
   });
-  return { ok: true, holds: job, waitMs: ASK_SPARK_WAIT_MS };
+  return { ok: true, holds: job, waitMs: ASK_SLASH_WAIT_MS };
 }
 
 /**
- * An answer to a step that asked: from `decide` for a person, from the outbox's `ack` for Spark. Called in the
+ * An answer to a step that asked: from `decide` for a person, from the outbox's `ack` for Slash. Called in the
  * transaction that carries the answer, so a decision that rolls back never moved the run.
  *
  * AN ANSWER TO A RUN THAT IS NOT WAITING ON THAT STEP CHANGES NOTHING. A run cancelled, switched off or timed out lets
- * go of its question when it ends, but a host may still be holding a Spark job it leased before then, and its ack is not
+ * go of its question when it ends, but a host may still be holding a Slash job it leased before then, and its ack is not
  * the host's fault; the job is done and the run stays as it ended.
  *
  * `by` IS THE SUGGESTION OR THE JOB THE ANSWER CAME THROUGH, AND IT HAS TO BE THE ONE THE STEP ROW HOLDS. The run and
@@ -1296,7 +1296,7 @@ export function answerStep(deps: FlowDeps, a: { run: string; step: number; by: s
   const run = deps.sql.one<RunRow>('SELECT id, rule, version, trigger, state, step, vars, depth, project, actor FROM automation_run WHERE id = ?', a.run);
   if (!run || run.state !== 'waiting' || run.step !== a.step) return ok(null);
   const row = deps.sql.one<{ kind: string; state: string; answer: string | null }>('SELECT kind, state, answer FROM automation_step WHERE run = ? AND n = ?', a.run, a.step);
-  if (!row || row.state !== 'waiting' || row.answer !== a.by || (row.kind !== 'ask_person' && row.kind !== 'ask_spark')) return ok(null);
+  if (!row || row.state !== 'waiting' || row.answer !== a.by || (row.kind !== 'ask_person' && row.kind !== 'ask_slash')) return ok(null);
 
   const stop = (say: string): Result<null> => {
     finish(deps, run, 'failed', say);
@@ -1309,25 +1309,25 @@ export function answerStep(deps: FlowDeps, a: { run: string; step: number; by: s
   const spec = (decl ? plan(decl.steps ?? decl.then)[a.step]?.step[row.kind] : undefined) as { as?: string; shape?: string; choices?: string[] } | undefined;
   if (!spec || typeof spec.as !== 'string') return stop(`rule.${run.rule} version ${run.version} has no ask at step ${a.step + 1} to answer.`);
 
-  /* SPARK'S TEXT IS HELD TO THE SHAPE THE STEP ASKED FOR. A person picks from the options, which `decide` has already
+  /* SLASH'S TEXT IS HELD TO THE SHAPE THE STEP ASKED FOR. A person picks from the options, which `decide` has already
      held them to; a model writes whatever it writes, and a `number` that arrives as "about four" would reach an `if`
      that compares it as text and quietly takes the wrong arm. */
   const said = a.answer.trim();
   let value: string | number = said;
-  if (row.kind === 'ask_spark' && spec.shape === 'number') {
+  if (row.kind === 'ask_slash' && spec.shape === 'number') {
     const n = Number(said.replace(/,/g, ''));
-    if (said === '' || !Number.isFinite(n)) return stop(`Spark answered ${JSON.stringify(said.slice(0, 80))} at step ${a.step + 1} of rule.${run.rule}, which asked for a number.`);
+    if (said === '' || !Number.isFinite(n)) return stop(`Slash answered ${JSON.stringify(said.slice(0, 80))} at step ${a.step + 1} of rule.${run.rule}, which asked for a number.`);
     value = n;
   }
-  if (row.kind === 'ask_spark' && spec.shape === 'choice') {
+  if (row.kind === 'ask_slash' && spec.shape === 'choice') {
     const hit = (spec.choices ?? []).find((c) => c.toLowerCase() === said.toLowerCase());
     if (hit === undefined)
-      return stop(`Spark answered ${JSON.stringify(said.slice(0, 80))} at step ${a.step + 1} of rule.${run.rule}, which asked it to choose one of ${(spec.choices ?? []).join(', ')}.`);
+      return stop(`Slash answered ${JSON.stringify(said.slice(0, 80))} at step ${a.step + 1} of rule.${run.rule}, which asked it to choose one of ${(spec.choices ?? []).join(', ')}.`);
     value = hit;
   }
   if (String(value).length > VAR_BYTES) return stop(`The answer at step ${a.step + 1} of rule.${run.rule} runs to ${String(value).length} characters, and one answer holds ${VAR_BYTES}.`);
   /* AN ANSWER OVERWRITES WHAT WAS KEPT UNDER ITS NAME, since the variable now holds the answer and not the field it was
-     set from, and a later question to Spark reading the kept dash would be asking about a value the run no longer has.
+     set from, and a later question to Slash reading the kept dash would be asking about a value the run no longer has.
      A column with no `-sendable` is left with none, and `advance` rebuilds it with this answer's own step row in it. */
   const stored = unpack(run.vars);
   const vars = { ...stored.vars, [spec.as]: value };
@@ -1342,7 +1342,7 @@ export function answerStep(deps: FlowDeps, a: { run: string; step: number; by: s
 }
 
 /**
- * Let go of what a run's waiting ask still holds, as the run ends: the question comes out of the queue, and a Spark
+ * Let go of what a run's waiting ask still holds, as the run ends: the question comes out of the queue, and a Slash
  * job nobody has leased yet comes out of the outbox.
  *
  * WITHOUT THIS A CANCELLED RUN LEFT ITS QUESTION OPEN, and the person who answered it a day later was answering nothing:
@@ -1350,12 +1350,12 @@ export function answerStep(deps: FlowDeps, a: { run: string; step: number; by: s
  * reason `answerStep` gives, and the ack finishes it: `outbox.ts`'s failed branch reads this run and its step row, and a
  * job whose run is no longer waiting on it is marked `done` with no `retry`, so a question out when its rule stopped is
  * asked once and not eight times (audit forty-nine section 1). The step row is left `waiting` here, so the ack reads the
- * run's own state as well. The Spark job is deleted rather than marked `done`, because nothing was delivered, and its
+ * run's own state as well. The Slash job is deleted rather than marked `done`, because nothing was delivered, and its
  * `retry` row goes with it.
  */
 function release(deps: FlowDeps, run: RunRow, say: string | null): void {
   const held = deps.sql.all<{ kind: string; answer: string | null }>(
-    "SELECT kind, answer FROM automation_step WHERE run = ? AND state = 'waiting' AND kind IN ('ask_person', 'ask_spark')",
+    "SELECT kind, answer FROM automation_step WHERE run = ? AND state = 'waiting' AND kind IN ('ask_person', 'ask_slash')",
     run.id,
   );
   for (const h of held) {
@@ -1475,7 +1475,7 @@ function context(deps: FlowDeps, trigger: RunTrigger, subject: Entry | null): Re
 }
 
 /**
- * The row as a question to Spark may carry it: every field the live list types `secret` or `file` taken out, a list of
+ * The row as a question to Slash may carry it: every field the live list types `secret` or `file` taken out, a list of
  * either with it (`sealedAs`), and every field the live list does not declare, since a value with no live type has
  * none to ask whether it may leave. `unsent` is the fields a step of the run wrote from one of those (`-unsent`), which
  * go the same way.
@@ -1526,7 +1526,7 @@ const figures = (deps: FlowDeps, lands: () => ReadonlySet<string>) => {
  * The lists a run's fills may land in: its own row's list, and every list one of its `create` steps writes into.
  *
  * EVERY STEP OF THE RUN, NOT THE ONE BEING FILLED, because a figure kept by a `set_var` is written into the row by a
- * later step, and a question answered by a person or by Spark comes back as a variable the same way. So a figure is
+ * later step, and a question answered by a person or by Slash comes back as a variable the same way. So a figure is
  * withheld wherever this run fills it, a `notify` included, unless every one of these lists is the list it adds up:
  * with the row, a `notify` is also a note on the row's history, which its readers see. A run with no row and nothing to
  * create writes nowhere anybody but the owner reads, and reads every figure.
@@ -1624,7 +1624,7 @@ const pathsOf = (scope: Record<string, unknown>): RunFill => ({ value: (head, pa
  * live list does not declare. Measured on 23 September with that diff applied to `afb3b1b2`: on Jobs, a list declaring
  * no secret field, a `note` of `x {{trigger.row.what}} {{vars.v}}` failed "would copy what old holds", because `v` was
  * set from `{{trigger.row}}` and the row carried a value under `old`, a field the list no longer declares. Such a value
- * has no type saying it may not leave, so a question to Spark goes without it, and a note the list's own readers see
+ * has no type saying it may not leave, so a question to Slash goes without it, and a note the list's own readers see
  * may carry it. Comparing words would be no better: a `note` that happens to say what `pin` says is not a copy.
  */
 function sealedPaths(scope: Record<string, unknown>, row: Entry | null, fields: ReadonlySet<string>, tainted: ReadonlySet<string>): RunFill {

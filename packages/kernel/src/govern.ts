@@ -27,7 +27,7 @@ import { instant } from './migrate.ts';
 import { point } from './metrics.ts';
 import { ACROSS, ANY_LIST, touches, type Resolve } from './reach.ts';
 import { egressChanged } from './script.ts';
-import { sparkMayWrite } from './spark.ts';
+import { slashMayWrite } from './slash.ts';
 
 /** The three tables that are read like registers and are not registers. */
 export const GOVERNANCE = ['suggestion', 'decision', 'prediction'] as const;
@@ -36,12 +36,12 @@ export type GovernRegister = (typeof GOVERNANCE)[number];
 /**
  * The bodies a suggestion carries: the four of `33-CONTRACTS` §2, and the three that arrange a BrainDog.
  *
- * `pack`, `settings` AND `arrange` ARE HOW AN AGENT OR SPARK CHANGES WHAT A RECORD IS (`loop/research-spark.md`
+ * `pack`, `settings` AND `arrange` ARE HOW AN AGENT OR SLASH CHANGES WHAT A RECORD IS (`loop/research-spark.md`
  * S12, `DIRECTION.md` §11). Installing a pack and changing a pack's settings are an owner's, in a browser, and
  * no token of any scope reaches them. A proposal is the one way an agent asks for either, and the owner's
  * press is what applies it. `arrange` is several of them, and pages, as one reviewable question.
  *
- * A fifth of the original kind, `query`, is Spark's palette answer and is never filed.
+ * A fifth of the original kind, `query`, is Slash's palette answer and is never filed.
  */
 export const BODY_KINDS = ['options', 'pattern', 'rowset', 'change', 'pack', 'settings', 'arrange'] as const;
 export type BodyKind = (typeof BODY_KINDS)[number];
@@ -54,7 +54,7 @@ const arranging = (kind: string): kind is Arranging => (ARRANGING as readonly st
 /** What a `pack` proposal asks for. Exactly one, naming one pack. */
 export const PACK_VERBS = ['install', 'enable', 'disable'] as const;
 
-/** Spark's own ceiling (`research-spark.md` §3.2, ADR-051): more open arrangements than this is a queue nobody reads. */
+/** Slash's own ceiling (`research-spark.md` §3.2, ADR-051): more open arrangements than this is a queue nobody reads. */
 export const OPEN_ARRANGEMENTS = 3;
 
 /** A pack id as `normalise` takes one. */
@@ -518,10 +518,10 @@ const NAMED_BODIES = ['rule', 'script', 'digest', 'metric'] as const;
 /**
  * What a pattern's `ingest` is when it is not an ingest, in the words the refusal names it by, or `null` when it is one.
  *
- * AN INGEST IN EITHER OF ITS TWO SHAPES. Spark's prompt (`spark/src/prompts.ts`) asks for ONE ingest declaration BODY
- * and `spark/src/jobs.ts` files it bare, `{ match, extract, writes, on_conflict }`; an agent or a person files the whole
+ * AN INGEST IN EITHER OF ITS TWO SHAPES. Slash's prompt (`slash/src/prompts.ts`) asks for ONE ingest declaration BODY
+ * and `slash/src/jobs.ts` files it bare, `{ match, extract, writes, on_conflict }`; an agent or a person files the whole
  * declaration, as the probe of audit fifty-one did. Wave fifty-one's check knew only the second, and was held because it
- * refused every pattern Spark proposes. A bare body is told apart by carrying neither `id` nor `kind`, and no ingest
+ * refused every pattern Slash proposes. A bare body is told apart by carrying neither `id` nor `kind`, and no ingest
  * body carries either: `IngestDecl` and `ActionDecl` have no such key, and name themselves in `ingest`.
  *
  * AND A BARE BODY IN A RULE'S SHAPE IS A RULE. Its own name says so, or its steps: `accept-rule-level.test.ts` filed a
@@ -580,7 +580,7 @@ const declared = (to: unknown): { id?: unknown; kind: string; body: unknown }[] 
  * What each declaration sends out that the one installed under its id did not, as `review` answers it for a change.
  *
  * AGAINST THE LIVE BODY UNDER THE SAME ID, so an ingest or a digest filed again as it is installed asks the owner nothing
- * new, and a new host, key or source does. A body with no id (Spark's bare ingest) has nothing installed to compare with,
+ * new, and a new host, key or source does. A body with no id (Slash's bare ingest) has nothing installed to compare with,
  * and says all it sends. `nameOf` and `opensOf` are the kernel's and this file has neither: an ingest says a project by
  * its row id, and only a script's line reads the vault, which `review` works out.
  */
@@ -1558,7 +1558,7 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
       if (row.body_kind === 'pattern') {
         const wrong = ingestFault(install);
         if (wrong) return { ok: false, refusal: wrong };
-        /* AND A BARE BODY HAS NO ID TO INSTALL UNDER. Handed back as it is, Spark's body was decided as D1 and then
+        /* AND A BARE BODY HAS NO ID TO INSTALL UNDER. Handed back as it is, Slash's body was decided as D1 and then
            `install` threw `Cannot read properties of undefined (reading 'writes')`, which the record turns into a reopen
            naming a register, after a decision that cannot be taken back (`pattern-kind.test.ts`). Asked here, nothing is
            decided. It is not wrapped into a declaration: it names no channel, and the record's hold on what a colleague
@@ -1857,7 +1857,7 @@ function event(
   to: string,
   note?: string,
 ): void {
-  sparkMayWrite(actor, kind);
+  slashMayWrite(actor, kind);
   deps.sql.exec(
     'INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     deps.mint(),

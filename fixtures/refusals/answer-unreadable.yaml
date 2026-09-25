@@ -1,32 +1,32 @@
 code:   ANSWER_UNREADABLE
 via:    ask
-raises: packages/spark/src/answer.ts
+raises: packages/slash/src/answer.ts
 at:     answer
 fix:    The run stopped there rather than ask it again.
 answer: { "rule": "rate", "step": 0, "question": "What rate applies to Gold?", "shape": "number" }
 replies: [
-    { "answered": "The Spark endpoint answered with a body that is not JSON." }
+    { "answered": "The Slash endpoint answered with a body that is not JSON." }
   ]
 
 # THE FIFTH `via: ask` AND THE FIRST THAT IS NOT THE PALETTE'S. The other four are a person's
 # question, driven through `propose`; this one is an automation's, raised by `answer` when a rule's
-# `ask_spark` step reaches a model and the host cannot read what came back. Admitted to `30 §6` on
+# `ask_slash` step reaches a model and the host cannot read what came back. Admitted to `30 §6` on
 # September 23rd 2026 where wave 47 had borrowed `PROPOSAL_SCHEMA`. It is still an `ask`, because
 # the input is still a question plus the model's reply, and `40 §6` gives the row the one key this
 # needs: `answer:`, the `Ask` the kernel's `infer.ask` row carries, in place of `ask:`.
 #
 # THE REPLY IS A THROW, BECAUSE THAT IS WHAT THE HOST HANDS THIS PACKAGE. A reply that is not JSON,
-# said as text, is read by `core.run` and refused as `PROPOSAL_SCHEMA`: Spark read it and it failed.
+# said as text, is read by `core.run` and refused as `PROPOSAL_SCHEMA`: Slash read it and it failed.
 # This code is the host failing to read it first, and `endpointInference` says so by throwing a
-# `SparkAnsweredError` (`packages/host/src/spark.ts`) marked `answered: true`. The package may not
+# `SlashAnsweredError` (`packages/host/src/slash.ts`) marked `answered: true`. The package may not
 # import the host (`46 §5.1`) and reads the mark structurally, so a reply of the form
-# `{ "answered": "<sentence>" }` is how `packages/spark/test/refusals-ask.test.ts` throws it: an
+# `{ "answered": "<sentence>" }` is how `packages/slash/test/refusals-ask.test.ts` throws it: an
 # `Error` carrying that sentence and the mark. The sentence is the host's own, verbatim, for a 200
 # whose body is not JSON. The same throw without the mark is a model not reached, `UNREACHABLE`
-# under `-` and counted by nothing, which is case 4 of `spark-answered-counted.test.ts`.
+# under `-` and counted by nothing, which is case 4 of `slash-answered-counted.test.ts`.
 #
-# `at: answer` AND ONLY THE LAST SENTENCE AS THE `fix`. `answer.ts` answers "rule.rate asked Spark
-# at step 1, and the model answered with something Spark could not read: <the host's sentence> The
+# `at: answer` AND ONLY THE LAST SENTENCE AS THE `fix`. `answer.ts` answers "rule.rate asked Slash
+# at step 1, and the model answered with something Slash could not read: <the host's sentence> The
 # run stopped there rather than ask it again.", and the first half carries the rule, the step and
 # the host's words, which are this fixture's `answer:` and `replies:` written out again. The last
 # sentence is not an imperative, because there is nothing for the owner to do on this row: the code

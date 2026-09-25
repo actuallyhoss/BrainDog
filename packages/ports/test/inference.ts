@@ -9,7 +9,7 @@
  * This is the first thing in the tree that needs one, so it ships here rather than in `src/`, where
  * it would be a fake every consumer could import and therefore a second implementation of the port
  * with nobody's name on it. `46 §9`'s canned `Inference`, the one that returns golden job outputs,
- * is a DIFFERENT object and belongs under `packages/spark/test/` when that package exists: it
+ * is a DIFFERENT object and belongs under `packages/slash/test/` when that package exists: it
  * knows about jobs, and this one knows only about the three refusals.
  *
  * IT REFUSES LIKE AN ADAPTER RATHER THAN LIKE A STUB. A double that always answers `ok` tests the

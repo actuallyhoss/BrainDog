@@ -34,7 +34,7 @@ function client(over: Partial<Governor> = {}, calls: Calls = []): Governor {
           id: 'SG4',
           body_kind: 'rowset',
           status: 'open',
-          opened_by: 'spark',
+          opened_by: 'slash',
           opened_at: '2026-09-14T09:00:00Z',
           body: {
             register: 'things',
@@ -137,7 +137,7 @@ test('what an accepted arrangement did is read back from its decision, for a rel
   const governance: Governor['governance'] = async (args) => {
     if (args.register === 'decision')
       return { ok: true, value: { id: 'D7', question: 'Add Personal?', answer: 'accept', reason: 'Yes.', decided_by: 'sam', ts: '2026-09-17T10:00:00Z', suggestion: 'SG7', applied: { installed: ['usecase-personal'] } } };
-    return { ok: true, value: { id: 'SG7', body_kind: 'pack', status: 'resolved', opened_by: 'spark', opened_at: '2026-09-17T09:00:00Z', body, decision: 'D7' } };
+    return { ok: true, value: { id: 'SG7', body_kind: 'pack', status: 'resolved', opened_by: 'slash', opened_at: '2026-09-17T09:00:00Z', body, decision: 'D7' } };
   };
   for (const id of ['SG7', 'D7']) {
     const out = await readOne(client({ governance }), id);

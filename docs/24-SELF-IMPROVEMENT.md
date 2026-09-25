@@ -46,7 +46,7 @@ being used. So today BrainDog is a runtime model that is causally connected in *
 | **K** — Knowledge | **Better than the literature's own examples.** IBM's list is *"topology information, historical logs, metrics, symptoms and policies."* All five exist as first-class typed tables: `declaration` (including every `metric`, with mandatory target and window — `metric` is a declaration kind, not a table), `event`, `metric_point`, `suggestion`, `decision` |
 | **M** — Monitor | **Absent, and it is the biggest gap.** `event` is a *write* log. Every read-side signal — pages never rendered, searches returning nothing, validator refusals, retried tool calls — is unrecorded. Analytics Engine cannot help: it is unreachable by [ADR-002](16-DECISIONS.md) and useless for this by [ADR-014](16-DECISIONS.md) |
 | **A** — Analyse | **Absent.** No scheduled job, no thresholds |
-| **P** — Plan | **One case.** Spark proposes an `ingest:` pattern. The suggestion bodies were `options`, `pattern` and `rowset` — **none of them a change to a declaration.** This document adds the fourth, `change`, and [23-ASSISTANT-UI](23-ASSISTANT-UI.md) §4 specifies its review |
+| **P** — Plan | **One case.** Slash proposes an `ingest:` pattern. The suggestion bodies were `options`, `pattern` and `rowset` — **none of them a change to a declaration.** This document adds the fourth, `change`, and [23-ASSISTANT-UI](23-ASSISTANT-UI.md) §4 specifies its review |
 | **E** — Execute | **Excellent.** MRTR makes the gate server-enforced regardless of client |
 | **Score** | **Absent, and this is the part everyone skips.** Not one mechanism asks whether an accepted proposal helped |
 
@@ -188,7 +188,7 @@ needs n ≥ 30; 50% needs n ≥ 6. Every number below is derived from that, not 
 
 | Signal | Window | n_min | Fires when |
 |---|---|---|---|
-| Unmatched ingest shape | 30d | **3** | same shape, ≥80% field agreement — already the number in [07-INGEST](07-INGEST-AND-RULES.md) §4, and `3/3 · 2/3 · 0/3` *is* the review UI. The shape is deterministic — channel, sender domain, digit-blanked subject; the model contributes nothing to it — and the third arrival in 30 days earns one `infer.draft` row, never a model call per payload ([46-SPEC-SPARK](46-SPEC-SPARK.md) §13 #15; [45-SPEC-RECORD](45-SPEC-RECORD.md) §13 #18) |
+| Unmatched ingest shape | 30d | **3** | same shape, ≥80% field agreement — already the number in [07-INGEST](07-INGEST-AND-RULES.md) §4, and `3/3 · 2/3 · 0/3` *is* the review UI. The shape is deterministic — channel, sender domain, digit-blanked subject; the model contributes nothing to it — and the third arrival in 30 days earns one `infer.draft` row, never a model call per payload ([46-SPEC-SLASH](46-SPEC-SLASH.md) §13 #15; [45-SPEC-RECORD](45-SPEC-RECORD.md) §13 #18) |
 | Search returns zero | 90d | **5, on ≥3 distinct days** | 5/90 clears the 3/90 rule-of-three floor; distinct days kills the burst |
 | Field always null | 90d | **20 creates** | ≥95% null. Proposes **retire**, never delete |
 | Register never read | **180d** | ≥90d old, ≥1 row | Azure uses 90 days to *drop an index* — free and invisible. This is user-visible, so double it. Proposes **hide from nav**, never uninstall |
@@ -269,7 +269,7 @@ window is a number you cannot act on."* Apply the product's own law to itself.
 
 Every accepted proposal writes a `prediction`, atomically with the declaration change — the record
 does this when a `change` proposal is accepted, not the client ([45-SPEC-RECORD](45-SPEC-RECORD.md);
-[46-SPEC-SPARK](46-SPEC-SPARK.md) §13):
+[46-SPEC-SLASH](46-SPEC-SLASH.md) §13):
 
 ```yaml
 prediction:
@@ -294,7 +294,7 @@ prediction:
 | **The measure reuses the `where:` grammar** | it is one of the seven consumers in [02-DATA-MODEL](02-DATA-MODEL.md) §6 — [ADR-013](16-DECISIONS.md)'s canonical list already counts predictions as the sixth. No new machinery — this is why the loop is affordable in *this* architecture and would not be in another. *An earlier draft said "five to six"* |
 | **`score_at` is a row in `schedule`** | the single alarm already drains hundreds of due rows. Zero new infrastructure |
 | **A prediction whose baseline already meets its target is refused at write time** | one validator line, and it is the reward-hacking control. Otherwise the loop learns to predict things that are already true |
-| **A prediction with no measurable form is refused** — `PREDICTION_UNMEASURABLE`, a code in [30-BLUEPRINT](30-BLUEPRINT.md) §6's spark family | ADR-007 one level up. This kills the entire class of "improvements" that are vibes |
+| **A prediction with no measurable form is refused** — `PREDICTION_UNMEASURABLE`, a code in [30-BLUEPRINT](30-BLUEPRINT.md) §6's slash family | ADR-007 one level up. This kills the entire class of "improvements" that are vibes |
 | **The score is written either way, and a miss is visible** | *"The CIB pattern you approved on 1 Sep predicted unmatched payloads would fall to ≤1. They are at 7. Supersede it, or say why you are keeping it."* |
 
 **The window is derived, not chosen.** Three constraints intersect: Azure scales validation with

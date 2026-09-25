@@ -13,7 +13,7 @@
  *
  * IT NEVER LEAVES THE RECORD. Every channel is an outbox row: the digest is assembled inside the
  * alarm's transaction and delivered by something else, so a slow SMTP server cannot hold a
- * customer's schedule. `prose: spark` is the same shape one step further out — one `infer.prose`
+ * customer's schedule. `prose: slash` is the same shape one step further out — one `infer.prose`
  * row, and the digest finishes on the ack, because a model that takes a minute must not be a minute
  * the alarm is holding.
  */
@@ -28,7 +28,7 @@ import type { EvalContext, MetricDecl, Reading } from './metrics.ts';
 import { predicateOf } from './metrics.ts';
 import type { Entry } from './index.ts';
 import type { OutboxKind } from './outbox.ts';
-import { sparkMayWrite } from './spark.ts';
+import { slashMayWrite } from './slash.ts';
 
 export const CHANNELS = ['in-app', 'email', 'push', 'webhook', 'mcp'] as const;
 export type Channel = (typeof CHANNELS)[number];
@@ -51,8 +51,8 @@ export type DigestDecl = {
   schedule: { day?: string; at: string; tz?: string };
   channels: Channel[];
   sections: DigestSection[];
-  /** Only ever `spark`. Omit for a figures-only digest, which costs no neurons and is a good one. */
-  prose?: 'spark';
+  /** Only ever `slash`. Omit for a figures-only digest, which costs no neurons and is a good one. */
+  prose?: 'slash';
   webhook?: { url: string; grant?: string };
 };
 
@@ -86,7 +86,7 @@ export type DigestDeps = {
   /**
    * What this deployment can actually deliver.
    *
-   * IT DECIDES WHETHER `prose: spark` WAITS OR IS SKIPPED. A kind no host here serves sits `pending`
+   * IT DECIDES WHETHER `prose: slash` WAITS OR IS SKIPPED. A kind no host here serves sits `pending`
    * for ever, which is the right answer for a notification — it is still there the day a transport
    * appears — and the wrong one for this, because the `infer.prose` row is not the digest, it is the
    * thing HOLDING the digest. Parking it parks everything behind it, so a self-host with no model
@@ -245,20 +245,20 @@ export function runDigest(deps: DigestDeps, decl: DigestDecl): Sent {
     ...(decl.webhook?.url && decl.webhook.grant ? { webhook_grant: decl.webhook.grant } : {}),
   };
 
-  /* `prose: spark` STOPS HERE. One `infer.prose` row carrying the assembled digest, and the sending
+  /* `prose: slash` STOPS HERE. One `infer.prose` row carrying the assembled digest, and the sending
      happens on the ack — a model that takes a minute must not be a minute the alarm holds.
 
      THE ACK WAS NEVER WRITTEN, so this stopped and never started again: every digest declaring
-     `prose: spark` queued one row that nothing consumed, and sent nothing, ever, on any channel,
+     `prose: slash` queued one row that nothing consumed, and sent nothing, ever, on any channel,
      with no error anywhere. The whole feature was one `return` short of existing. */
-  if (decl.prose === 'spark' && deps.delivers.includes('infer.prose')) {
+  if (decl.prose === 'slash' && deps.delivers.includes('infer.prose')) {
     deps.outbox('infer.prose', assembled);
     return { sections: carrying.length, channels, skipped: false };
   }
 
   /* AND ON A HOST WITH NO MODEL IT SHIPS AS FIGURES, now rather than never. 46 §5 already says that
      is what a prose call that comes back unusable does; a prose call nobody can make is the same
-     fact one step earlier. Two sentences are an accelerant and a digest is not — 11 §3: "Spark is an
+     fact one step earlier. Two sentences are an accelerant and a digest is not — 11 §3: "Slash is an
      accelerant, never a dependency." */
   /* AND THE RECEIPT NAMES THE CHANNELS IT ACTUALLY USED. This returned the DECLARED list, so a
      digest that sent nothing — `mcp` alone, or `email` on a record whose owners have no address —
@@ -271,7 +271,7 @@ export function runDigest(deps: DigestDeps, decl: DigestDecl): Sent {
 /**
  * A digest, assembled and ready to leave — the whole of what step d needs and nothing else.
  *
- * IT IS A PAYLOAD BEFORE IT IS A TYPE. With `prose: spark` this is what rides the `infer.prose`
+ * IT IS A PAYLOAD BEFORE IT IS A TYPE. With `prose: slash` this is what rides the `infer.prose`
  * outbox row, so every field here survives `JSON.stringify` and back, and nothing in it is a
  * reference to something the record would have to look up again later.
  */
@@ -315,7 +315,7 @@ export function sendDigest(deps: DigestDeps, sent: Assembled, prose?: string): C
      saying which is which, is the one place this product would be lying about who said something. */
   const text = prose ? `${prose}
 
-— Spark
+— Slash
 
 ${sent.text}` : sent.text;
 
@@ -545,10 +545,10 @@ export const inQuietHours = (ms: number, tz: string): boolean => {
 
 /** An in-app note, as the event that IS the notification. */
 export function noteEvent(sql: Sql, mint: () => string, nowMs: number, actor: string, text: string): void {
-  /* A DIGEST'S PROSE IS WRITTEN BY SPARK and its note is not a `note` a model may sign. `prose:
-     spark` is the one declaration that puts a model's sentences into a digest, and if the actor of
+  /* A DIGEST'S PROSE IS WRITTEN BY SLASH and its note is not a `note` a model may sign. `prose:
+     slash` is the one declaration that puts a model's sentences into a digest, and if the actor of
      that note were ever the model rather than the record, this is where it would land. */
-  sparkMayWrite(actor, 'note');
+  slashMayWrite(actor, 'note');
   sql.exec(
     "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, ?, 'note', NULL, NULL, ?)",
     mint(),

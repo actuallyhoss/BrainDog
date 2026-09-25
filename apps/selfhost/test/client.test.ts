@@ -223,18 +223,18 @@ test('A RECORD STARTED ON A PINNED CLOCK SAYS THAT INSTANT, which is how the app
 
 test("and `version` answers 33 §4's six keys, where it answered one number", async () => {
   /* `deploy-parity` (33 §8) reads `app` to prove the host is serving the build that was deployed
-     and `50 §5.13` step 3 reads `spark` to decide whether the Spark surface exists at all. Both
+     and `50 §5.13` step 3 reads `slash` to decide whether the Slash surface exists at all. Both
      read a bare `MAX(event.rowid)`, which has neither. */
   const c = await connected('sekret', '2026-09-09+abc1234');
   try {
     const v = value<Record<string, unknown>>(await c.client.version());
-    assert.deepEqual(Object.keys(v).sort(), ['app', 'format', 'kernel', 'primitives', 'spark', 'version']);
+    assert.deepEqual(Object.keys(v).sort(), ['app', 'format', 'kernel', 'primitives', 'slash', 'version']);
     assert.equal(typeof v.version, 'number');
     assert.equal(v.format, 1);
     assert.ok(typeof v.kernel === 'number' && v.kernel >= 1, 'the kernel migration count is not a count');
     assert.equal(v.primitives, 1);
     assert.equal(v.app, '2026-09-09+abc1234', 'the host was told what it is running and did not say');
-    assert.equal(v.spark, false, 'a host with no Spark endpoint claimed a Spark');
+    assert.equal(v.slash, false, 'a host with no Slash endpoint claimed a Slash');
   } finally {
     await c.close();
   }

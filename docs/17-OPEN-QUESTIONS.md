@@ -51,12 +51,12 @@ behaviour, and re-deriving them is 20 days of rediscovering things already known
 **Answered by [ADR-030](16-DECISIONS.md).** The §1b shape ships no intelligence at all. Phase A
 ships tier A-minimal — triage, extraction, digest prose and embeddings on small models, no
 conversational surface — with the ingest-pattern proposal as the one model-backed in-app job.
-Spark's conversational mode arrives with tier B, tier C last, and a chat surface is added only when
+Slash's conversational mode arrives with tier B, tier C last, and a chat surface is added only when
 a Cloud customer with MCP configured asks for one, with that ask instrumented. The reasoning below
 is what the ADR rests on, and it stays here as the evidence.
 
 **The question.** The buyer already has Claude Code in a terminal, with MCP access to this record.
-Spark costs 8 days as first estimated (20–26 re-costed, [15-ROADMAP](15-ROADMAP.md) §1b),
+Slash costs 8 days as first estimated (20–26 re-costed, [15-ROADMAP](15-ROADMAP.md) §1b),
 ~$0.20/record/month, and a permanent prompt-injection surface. What does the in-app assistant do
 that the terminal one does not?
 
@@ -67,7 +67,7 @@ pattern) is genuinely in-app because it is bound to the raw inbox and the approv
 Everything else — "what's due", "draft this write-up", "what did I decide about X" — the terminal
 agent already does, better, with more context.
 
-**What would settle it:** ship Phase A **without** Spark, keep the two in-app jobs as narrow
+**What would settle it:** ship Phase A **without** Slash, keep the two in-app jobs as narrow
 non-conversational features, and instrument how often a Cloud customer with MCP configured asks
 for a chat panel. If nobody asks, 8 days and an attack surface were saved.
 
@@ -112,7 +112,7 @@ Two more data points on the same side:
 > refine these experiences through GitHub Copilot in the environments where they already work."*
 
 A bespoke AI surface was killed **because the general-purpose agent in the user's existing
-environment absorbed it.** That is precisely the Spark-versus-Claude-Code-in-a-terminal argument,
+environment absorbed it.** That is precisely the Slash-versus-Claude-Code-in-a-terminal argument,
 run as an experiment by a company with more distribution than this product will ever have, and
 answered in the negative.
 
@@ -120,8 +120,9 @@ GitHub also deprecated **Copilot Workspace** — *"officially deprecated and no 
 staff or public"* — which was the most elaborate proposal-review UI anybody has shipped. Its
 successor collapsed research, planning and iteration into one conversation.
 
-*(Incidental confirmation for [ADR-017](16-DECISIONS.md): "Spark" is not merely taken, it is a
-**retired** product name.)*
+*(This was once read as incidental confirmation for [ADR-017](16-DECISIONS.md), because the name
+that ADR chose was not merely taken but a **retired** product's. The assistant has been Slash since
+[ADR-070](16-DECISIONS.md), and whether that name is clear is Q8.)*
 
 **Revised recommendation, now the decision.** Ship Phase A with **narrow, non-conversational** AI
 jobs and no chat panel — the ingest proposal loop and the digest sentence among them. Both are bound
@@ -175,7 +176,7 @@ chat-as-default, and this record is *typed* — which means most useful question
 answer that needs no model at all.
 
 **Answered in [23-ASSISTANT-UI](23-ASSISTANT-UI.md) §1**, recorded as [ADR-051](16-DECISIONS.md):
-not chat. Spark is the palette's fallback row when a model is configured — one proposal with its
+not chat. Slash is the palette's fallback row when a model is configured — one proposal with its
 verbs, never a transcript — plus rows in Decide and Inbox. No panel, no widget, no page. The
 20-question test — list the 20 questions a user most plausibly asks and count how many a metric or a
 saved query answers — remains a useful instrument and belongs in 23 §14; if it is more than 12, the
@@ -225,24 +226,32 @@ date — the exception [10-MCP](10-MCP.md) §1 points at, recorded in [ADR-054](
 
 ---
 
-## Q8 · Is "Spark" clear of a register, and how much does the collision cost?
+## Q8 · Is "Slash" clear of a register, and how much does the collision cost?
 
-**The question changed.** An earlier draft asked whether *Pointer* was clear. Sam has reaffirmed
-**Spark**, twice, so the question is no longer "which name" — it is "what does this one cost, and
-is anything about it actually blocking?"
+**The question changed twice.** An earlier draft asked whether *Pointer* was clear. Sam then
+reaffirmed the assistant's earlier name, twice, and the question became what that name cost. On
+September 25th 2026 he renamed it Slash ([ADR-070](16-DECISIONS.md)), so the question is the same
+one asked of a new word: what does this one cost, and is anything about it actually blocking? It is
+open. It does not block the rename.
 
-**What is known.** GitHub Spark is Microsoft's. Google shipped Gemini Spark in 2026. Neither is a
-registration search; both are enough to establish that the term is crowded in exactly this
-category.
+**What is known about the earlier name, which is the precedent.** GitHub Spark is Microsoft's.
+Google shipped Gemini Spark in 2026. Neither was a registration search; both were enough to
+establish that the term was crowded in exactly this category.
 
-**What would settle it:** a TMview / USPTO / EUIPO / UK IPO search across classes 9 and 42 — the
+**What is known about Slash.** No registration search has been run. The word is already ordinary in
+this category in a different sense: chat and agent tools call the commands a person types after `/`
+slash commands, Claude Code among them ([26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §5 passes it
+`--disable-slash-commands`). That is a generic use rather than a mark, and it is a discoverability
+cost whatever a search finds.
+
+**What would settle it:** a TMview / USPTO / EUIPO / UK IPO search across classes 9 and 42, the
 same check that cleared BrainDog itself, which came back empty in every class. Cheap, and the bar
 is lower here because it is a *feature* name inside a product rather than the product name, where
 coexistence is the norm.
 
 **The cost, if it clears:** discoverability, and only discoverability. Nobody will find BrainDog by
-searching "Spark AI". Mitigated by the naming rule in [11-ASSISTANT](11-ASSISTANT.md) §1 —
-**always "BrainDog Spark" on first use**, never "Spark" alone in a repository, a package or a
+searching "Slash AI". Mitigated by the naming rule in [11-ASSISTANT](11-ASSISTANT.md) §1:
+**always "BrainDog Slash" on first use**, never "Slash" alone in a repository, a package or a
 domain.
 
 **The one thing that would force a change:** a live registration in class 9 or 42 by somebody who

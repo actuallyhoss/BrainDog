@@ -1,5 +1,5 @@
 /**
- * Spark's catalogue update questions said truthfully (`catalogue-offers.ts`, `spark.ts` `catalogueDrafts`): the key note is
+ * Slash's catalogue update questions said truthfully (`catalogue-offers.ts`, `slash.ts` `catalogueDrafts`): the key note is
  * held to the key that signed the version installed, the warnings about new hosts and removed lists survive the length cut
  * ahead of the title, and a diff that cannot be made is said rather than left out. Keys are made at runtime and thrown away.
  */
@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { addKeyStatement, emptyCatalogue, newAuthorKey, publishTo, rotateKey, type AuthorKey, type CatalogueIndex } from '@braindog/declare/catalogue';
 
 import { offersFromCatalogue } from '../src/catalogue-offers.ts';
-import { catalogueDrafts } from '../src/spark.ts';
+import { catalogueDrafts } from '../src/slash.ts';
 
 const BOOKS = { register: 'books', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
 const LOANS = { register: 'loans', name: 'Loans', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };

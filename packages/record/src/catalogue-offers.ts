@@ -1,6 +1,6 @@
 /**
- * Newer versions of what a record holds, read from a catalogue through whatever reads its files, for Spark to ask about
- * (`RecordDeps.catalogueOffers`, `spark.ts` `catalogueDrafts`).
+ * Newer versions of what a record holds, read from a catalogue through whatever reads its files, for Slash to ask about
+ * (`RecordDeps.catalogueOffers`, `slash.ts` `catalogueDrafts`).
  *
  * ONE READER, TWO HOSTS. The self-host reads a folder on disk; the Worker reads the folder bundled with its shell through its
  * static assets. Both hand in `read(path)`, answering a file's text or `null`, and get the same offers.
@@ -11,7 +11,7 @@
 
 import { CATALOGUE_INDEX, catalogueUpdates, readCatalogue, rotatedFrom, verifiedStatements, verifySignature } from '@braindog/declare/catalogue';
 
-import type { CatalogueOffer } from './spark.ts';
+import type { CatalogueOffer } from './slash.ts';
 
 export type CatalogueReader = (path: string) => string | null | Promise<string | null>;
 

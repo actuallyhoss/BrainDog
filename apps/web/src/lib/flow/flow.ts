@@ -41,7 +41,7 @@ export type Body = Record<string, unknown>;
 /** The twelve actions a rule had before steps. The inline pass has one arm for each. */
 export const ACTIONS = ['tag', 'untag', 'set', 'move', 'link', 'note', 'notify', 'schedule', 'create', 'suggest', 'run', 'stop'] as const;
 /** The seven verbs only a step has. */
-export const FLOW_VERBS = ['if', 'set_var', 'script', 'call', 'ask_spark', 'ask_person', 'wait'] as const;
+export const FLOW_VERBS = ['if', 'set_var', 'script', 'call', 'ask_slash', 'ask_person', 'wait'] as const;
 export const VERBS = [...FLOW_VERBS, ...ACTIONS] as const;
 export type Verb = (typeof VERBS)[number];
 
@@ -56,7 +56,7 @@ const ROW_VERBS: readonly string[] = ['tag', 'untag', 'set', 'move', 'link', 'no
 /** Triggers with no row. `flow-lint.ts` `ROWLESS`. */
 const ROWLESS: readonly string[] = ['every', 'metric', 'manual'];
 /** Verbs that need `once_per` on a trigger about a row. `flow-lint.ts` `ONCE`. */
-const ONCE: readonly string[] = ['notify', 'create', 'suggest', 'run', 'call', 'ask_spark', 'ask_person'];
+const ONCE: readonly string[] = ['notify', 'create', 'suggest', 'run', 'call', 'ask_slash', 'ask_person'];
 /** An answer's name. `flow-lint.ts` `NAME`, and `trigger` and `vars` are the run's own. */
 const NAME = /^[a-z][a-z0-9_]{0,31}$/u;
 const RESERVED: readonly string[] = ['trigger', 'vars'];
@@ -612,7 +612,7 @@ export const VERB_LABELS: Record<Verb, string> = {
   notify: 'Tell you',
   suggest: 'Suggest on Decide',
   ask_person: 'Ask a person',
-  ask_spark: 'Ask Spark',
+  ask_slash: 'Ask Slash',
   call: 'Call a service',
   run: 'Run a call on this row',
   script: 'Run a script',
@@ -623,25 +623,25 @@ export const VERB_LABELS: Record<Verb, string> = {
 /**
  * Verbs the record reads but refuses at install on this host, so the menu does not offer them.
  *
- * A FACT ABOUT THE HOST, NOT THE BUILD. `ask_spark` was a constant here, "not in this build", and since `eb1a131b` a
+ * A FACT ABOUT THE HOST, NOT THE BUILD. `ask_slash` was a constant here, "not in this build", and since `eb1a131b` a
  * self-host with a model installs it: the record's `unserved` refuses the step only where the host has not said it
- * answers `infer.ask` (`sparkAskAt` in `packages/kernel/src/flow-lint.ts`). So the canvas asks the flag the record
- * asks, `/api/version`'s `spark`, which the layout reads once for the tab. A body an agent wrote with one on a host
+ * answers `infer.ask` (`slashAskAt` in `packages/kernel/src/flow-lint.ts`). So the canvas asks the flag the record
+ * asks, `/api/version`'s `slash`, which the layout reads once for the tab. A body an agent wrote with one on a host
  * with no model still says so before Send.
  */
-export const notYet = (spark: boolean): readonly Verb[] => (spark ? [] : ['ask_spark']);
+export const notYet = (slash: boolean): readonly Verb[] => (slash ? [] : ['ask_slash']);
 
 /**
  * §6's five groups, in the order the menu draws them. Every verb the menu offers is in exactly one.
  *
- * SPARK AFTER A PERSON in the Ask group, where a model is: a person is the answer that works on every host, and the
+ * SLASH AFTER A PERSON in the Ask group, where a model is: a person is the answer that works on every host, and the
  * fault on a host with none sends somebody there.
  */
-export function stepGroups(spark: boolean): readonly { label: string; verbs: readonly Verb[] }[] {
+export function stepGroups(slash: boolean): readonly { label: string; verbs: readonly Verb[] }[] {
   return [
     { label: 'Check', verbs: ['if', 'set_var', 'stop'] },
     { label: 'Change', verbs: ['tag', 'untag', 'set', 'move', 'link', 'note', 'create'] },
-    { label: 'Ask', verbs: spark ? ['notify', 'suggest', 'ask_person', 'ask_spark'] : ['notify', 'suggest', 'ask_person'] },
+    { label: 'Ask', verbs: slash ? ['notify', 'suggest', 'ask_person', 'ask_slash'] : ['notify', 'suggest', 'ask_person'] },
     { label: 'Call out', verbs: ['call', 'run', 'script'] },
     { label: 'Wait', verbs: ['wait', 'schedule'] },
   ];
@@ -674,8 +674,8 @@ export function blankStep(verb: Verb): Step {
       return { suggest: { question: '', options: ['Yes', 'No'] } };
     case 'ask_person':
       return { ask_person: { question: '', options: ['Yes', 'No'], as: '' } };
-    case 'ask_spark':
-      return { ask_spark: { question: '', as: '' } };
+    case 'ask_slash':
+      return { ask_slash: { question: '', as: '' } };
     case 'call':
       return { call: { ingest: '' } };
     case 'script':
@@ -702,7 +702,7 @@ type ArgBase = { path: readonly string[]; label: string; kind: ArgKind; template
 /**
  * A REQUIRED ARGUMENT CARRIES THE SENTENCE ITS ABSENCE SAYS, and the type will not take one without it. The fault was
  * assembled, `${verb} needs ${label}.`, and worked through `ARGS` it said "Tell you needs say.", "Add a note needs
- * note." and "Ask Spark needs keep the answer as." (`loop/research-canvas-ux.md` 1.7). A label names a field; it does
+ * note." and "Ask Slash needs keep the answer as." (`loop/research-canvas-ux.md` 1.7). A label names a field; it does
  * not also make a sentence with a verb's name in front of it.
  */
 export type Arg = (ArgBase & { required?: false }) | (ArgBase & { required: true; missing: string });
@@ -758,9 +758,9 @@ export const ARGS: Record<Verb, readonly Arg[]> = {
     { path: ['ask_person', 'as'], label: 'Keep the answer as', kind: 'name', required: true, missing: NAME_IT },
     { path: ['ask_person', 'wait'], label: 'Wait at most', kind: 'span', hint: '7d' },
   ],
-  ask_spark: [
-    { path: ['ask_spark', 'question'], label: 'Question', kind: 'long', required: true, missing: 'Write the question for Spark.', template: true },
-    { path: ['ask_spark', 'as'], label: 'Keep the answer as', kind: 'name', required: true, missing: NAME_IT },
+  ask_slash: [
+    { path: ['ask_slash', 'question'], label: 'Question', kind: 'long', required: true, missing: 'Write the question for Slash.', template: true },
+    { path: ['ask_slash', 'as'], label: 'Keep the answer as', kind: 'name', required: true, missing: NAME_IT },
   ],
   call: [
     { path: ['call', 'ingest'], label: 'The declared call', kind: 'text', required: true, missing: 'Say which call to make.', hint: 'gold_rate' },
@@ -1070,8 +1070,8 @@ function saying(step: Step): string {
        question as a suggestion on Decide (`packages/kernel/src/flow.ts`), which is the owner's to answer. */
     case 'ask_person':
       return withText(`Ask ${at('to') || 'the owner'}`, at('question'));
-    case 'ask_spark':
-      return withText('Ask Spark', at('question'));
+    case 'ask_slash':
+      return withText('Ask Slash', at('question'));
     case 'call':
       return at('ingest') === '' ? 'Call a service' : `Call ${at('ingest')}${at('as') ? `, keeping the answer as ${at('as')}` : ''}`;
     case 'run':
@@ -1095,7 +1095,7 @@ function saying(step: Step): string {
 function keeps(step: Step): string | null {
   const verb = verbOf(step);
   if (verb === 'set_var') return str(getAt(step, ['set_var', 'name'])) || null;
-  if (verb === 'call' || verb === 'script' || verb === 'ask_spark' || verb === 'ask_person') return str(getAt(step, [verb, 'as'])) || null;
+  if (verb === 'call' || verb === 'script' || verb === 'ask_slash' || verb === 'ask_person') return str(getAt(step, [verb, 'as'])) || null;
   return null;
 }
 
@@ -1165,10 +1165,10 @@ const blank = (v: unknown): boolean =>
  * button, in the lint's terms, so that the first time they hear "a clock is fifteen minutes or longer" is not on Decide.
  * Anything the canvas cannot know (whether a call is declared, whether a register exists) is left to the record.
  *
- * `spark` IS WHETHER THIS HOST ANSWERS SPARK, and it defaults to no. The default is the answer this list gave before it
- * knew, and it is the one that keeps `source.test.ts`'s starter samples, none of which asks Spark, saying nothing.
+ * `slash` IS WHETHER THIS HOST ANSWERS SLASH, and it defaults to no. The default is the answer this list gave before it
+ * knew, and it is the one that keeps `source.test.ts`'s starter samples, none of which asks Slash, saying nothing.
  */
-export function faultsOf(d: Draft, { spark }: { spark: boolean } = { spark: false }): Fault[] {
+export function faultsOf(d: Draft, { slash }: { slash: boolean } = { slash: false }): Fault[] {
   const out: Fault[] = [];
   const t = d.trigger;
   const kind = Object.keys(t)[0] ?? 'manual';
@@ -1210,7 +1210,7 @@ export function faultsOf(d: Draft, { spark }: { spark: boolean } = { spark: fals
         out.push({ key: n.key, say: 'This step names no verb this build reads.' });
         continue;
       }
-      if (notYet(spark).includes(verb)) out.push({ key: n.key, say: 'This BrainDog has no model for Spark to answer with. Ask a person instead.' });
+      if (notYet(slash).includes(verb)) out.push({ key: n.key, say: 'This BrainDog has no model for Slash to answer with. Ask a person instead.' });
       if (rowless && ROW_VERBS.includes(verb)) out.push({ key: n.key, say: `${sayTrigger(t)} brings no row, and "${sayStep(n.step)}" acts on one.` });
       for (const arg of ARGS[verb]) {
         const v = getAt(n.step, arg.path);

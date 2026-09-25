@@ -46,7 +46,7 @@ the caller's bug; refusing names it.
 ### The codes
 
 One hundred and twelve, counted, in nine families — 47 pack and declaration · 14 grammar · 18 write path · 7 auth and
-vault · 8 format and lifecycle · 2 dialect · 5 spark · 7 connector · 4 host and client. Every fixture lives at
+vault · 8 format and lifecycle · 2 dialect · 5 slash · 7 connector · 4 host and client. Every fixture lives at
 `fixtures/refusals/<name>.yaml`; the
 name is the code in kebab-case, and each fixture is keyed by the `via` that raises it — `install`, `lint`, `where`,
 `write`, `rpc` and the rest; the split per `via` is the fixtures spec's to count (40 §6), not this table's. *An
@@ -222,7 +222,7 @@ any row is written".*
 | Code | Raised where | Fixture |
 |---|---|---|
 | `UNAUTHORIZED` | no credential, or a bad one — 401, and the body says only this | `unauthorized` |
-| `FORBIDDEN` | a credential outside its scope, level or ceiling — 403, §10; a row write from a `spark` principal (41); a runner posting out of `seq` order (46) | `forbidden` |
+| `FORBIDDEN` | a credential outside its scope, level or ceiling — 403, §10; a row write from a `slash` principal (41); a runner posting out of `seq` order (46) | `forbidden` |
 | `NEEDS_BROWSER_SESSION` | a bearer at VAULT, the session half of JOBS, or ADMIN without an operation grant whose reach names the method — 403, §5 | `needs-browser-session` |
 | `WRONG_KEY` | `kek_id` mismatch on open — 409, never "corrupt", 12 §6.1 | `wrong-key` |
 | `GRANT_REVOKED` | `openGrant` on a row with `revoked_at` | `grant-revoked` |
@@ -249,7 +249,7 @@ any row is written".*
 | `DIALECT_ARITY` | a row with more cells than its kind takes; names kind and row — a block over its row cap too, `at: "rows"` (36) | `dialect-arity` |
 | `DIALECT_KIND_UNKNOWN` | an info string naming no installed kind — `table` inside a write-up included (36) | `dialect-kind-unknown` |
 
-**Spark** — the assistant's own refusals, raised by `spark` before anything is filed ([11-ASSISTANT](11-ASSISTANT.md)
+**Slash** — the assistant's own refusals, raised by `slash` before anything is filed ([11-ASSISTANT](11-ASSISTANT.md)
 §4; [23-ASSISTANT-UI](23-ASSISTANT-UI.md) §5–§6; [24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md) §4.6):
 
 | Code | Raised where | Fixture |
@@ -258,7 +258,7 @@ any row is written".*
 | `PROPOSAL_NO_ROWS` | a proposal over an empty projection, or a body with no citation at all — never filed, 23 §6 | `proposal-no-rows` |
 | `PROPOSAL_SCHEMA` | structured output that fails its kind's schema — a tier-C `end.result` included | `proposal-schema` |
 | `PREDICTION_UNMEASURABLE` | a `change` body whose prediction names no measurable, or one twelve observations cannot settle in thirty days, 24 §4.6 | `prediction-unmeasurable` |
-| `SPARK_BUDGET_SPENT` | an ask past `ask_cap` this month — the meter, 11 §4 | `spark-budget-spent` |
+| `SLASH_BUDGET_SPENT` | an ask past `ask_cap` this month — the meter, 11 §4 | `slash-budget-spent` |
 
 **Connector** — a pull run's refusals, raised by `connect` and acked to the outbox; every one ends the run with a reason
 a person reads ([25-CONNECTORS](25-CONNECTORS.md) §5, §7, §9):

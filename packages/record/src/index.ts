@@ -86,7 +86,7 @@ import {
   setupCollapser,
   isUlid,
   slugify,
-  SPARK,
+  SLASH,
   looksLikeCredential,
   rowRegisterOf,
   runPlan,
@@ -102,7 +102,7 @@ import type { Json as JsonValue } from '@braindog/kernel';
 
 import { arranger, carryUpdate, speakingNow, writeVoice, type CatalogueEntry } from './arrange.ts';
 import { useCases, type ExportArgs } from './usecase.ts';
-import { catalogueDrafts, drawnVersions, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, noticeUsage, pageShowsAgents, readUsage, SPARK_OPEN_CAP, stableKey, type CatalogueOffer, type Offered, type SparkDraft, type SparkModel } from './spark.ts';
+import { catalogueDrafts, drawnVersions, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, noticeUsage, pageShowsAgents, readUsage, SLASH_OPEN_CAP, stableKey, type CatalogueOffer, type Offered, type SlashDraft, type SlashModel } from './slash.ts';
 import { grammarOf } from './grammar.ts';
 import {
   BODY_DEPTH,
@@ -123,7 +123,7 @@ import { dropPushSub, readPushSub, savePushSub } from './push.ts';
 import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 
 export type { CatalogueEntry, FigureTest, Grows, RowIo } from './arrange.ts';
-export { formedRows, fromModel, growsDrafts, noticeUsage, readUsage, FORM_SAID_MOST, SPARK_OPEN_CAP, type CatalogueOffer, type FormField, type FormList, type FormSpec, type NextSpec, type Noticed, type SparkDraft, type SparkFormInput, type SparkModel, type SparkModelInput, type Usage } from './spark.ts';
+export { formedRows, fromModel, growsDrafts, noticeUsage, readUsage, FORM_SAID_MOST, SLASH_OPEN_CAP, type CatalogueOffer, type FormField, type FormList, type FormSpec, type NextSpec, type Noticed, type SlashDraft, type SlashFormInput, type SlashModel, type SlashModelInput, type Usage } from './slash.ts';
 export type { ExportArgs, PlannedPack } from './usecase.ts';
 export type { Automation, AutomationRow, AutomationRun, Said as AutomationSaid, ScriptRow } from './automations.ts';
 export { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
@@ -540,7 +540,7 @@ export function allows(ctx: CallContext, need: Need, nameOf: (list: string) => s
      AND A PERSON IS TOLD ABOUT THEIR INVITATION, NOT ABOUT A TOKEN. The sentence was written for an agent, and
      `loop/research-invite-landing.md` finding 6 measured nine methods (`inbox`, `packs`, `planPack`, `decide`
      among them) saying it to a colleague invited to one list, who signed in from a link, holds no token and was
-     never offered one. It was the sentence on `/inbox`, `/spark`, `/packs` and every `/start` tile. The token's
+     never offered one. It was the sentence on `/inbox`, `/slash`, `/packs` and every `/start` tile. The token's
      wording stays, because a wider token is exactly what its owner can mint.
 
      AND THE PERSON IS TOLD THE LISTS' NAMES. This joined the ids, so a member of the seed's Money list read "invited to
@@ -585,7 +585,7 @@ export function allows(ctx: CallContext, need: Need, nameOf: (list: string) => s
    * This carried `PERSON_REQUIRED` — a code in no registry — on the argument that a caller must be
    * able to tell "your token is too small" from "no token reaches this". The argument is right and
    * the remedy was wrong. `30 §6` writes `FORBIDDEN` as *"a credential outside its scope, level or
-   * ceiling — 403"* and then lists three separate facts under it: a row write from a `spark`
+   * ceiling — 403"* and then lists three separate facts under it: a row write from a `slash`
    * principal, a runner posting out of `seq` order, and the scope case. One code, several
    * sentences, is how that registry already works — because a code is what a caller BRANCHES on and
    * a `fix` is what it ACTS on, and "ask a person to sign in" is an act, not a branch. A refusal
@@ -851,12 +851,12 @@ export type Context = {
 };
 
 /**
- * `33 §4`, line 356, verbatim: `{ version, format, kernel, primitives, app, spark: boolean }`.
+ * `33 §4`, line 356, verbatim: `{ version, format, kernel, primitives, app, slash: boolean }`.
  *
  * IT WAS A BARE NUMBER. `version()` returned `MAX(event.rowid)` and nothing else, so the polling
  * fallback worked and everything else the route is specified to carry was missing: `deploy-parity`
  * (`33 §8`) reads `app` to prove the host is serving the build that was deployed, and `50 §5.13`
- * step 3 reads `spark` to decide whether the Spark surface exists at all. Both read a number.
+ * step 3 reads `slash` to decide whether the Slash surface exists at all. Both read a number.
  */
 export type Version = {
   /**
@@ -879,8 +879,8 @@ export type Version = {
    * host that has no idea what it is running, which is the one thing that check exists to catch.
    */
   app: string | null;
-  /** Whether `SPARK_ENDPOINT` is set, so `/api/spark/*` is routed at all (`33 §4`). */
-  spark: boolean;
+  /** Whether `SLASH_ENDPOINT` is set, so `/api/slash/*` is routed at all (`33 §4`). */
+  slash: boolean;
 };
 
 /**
@@ -891,7 +891,7 @@ export type Version = {
  */
 export type Build = {
   app: string;
-  spark: boolean;
+  slash: boolean;
   /**
    * Which host this is, for `boot` and not for `version`: `33 §4` names `version`'s six keys and a test holds it to them.
    * Optional, so a build that does not name its host is a record whose `boot` carries no `host` key at all.
@@ -900,19 +900,19 @@ export type Build = {
 };
 
 /**
- * One ask of `sparkModel`, held in Spark's ledger before the model is asked and settled once it answered or threw.
+ * One ask of `slashModel`, held in Slash's ledger before the model is asked and settled once it answered or threw.
  *
- * A HOLD AND NOT A CHECK, because a check and a count with a model between them is no cap: `packages/spark/src/call.ts`
+ * A HOLD AND NOT A CHECK, because a check and a count with a model between them is no cap: `packages/slash/src/call.ts`
  * `reserve` records ten asks at `ask_cap: 2` making ten calls before its hold was a row. The host writes the row in the
  * step that checks the count, so a press in flight is already counted by the next one.
  */
-export type SparkMeter = {
+export type SlashMeter = {
   /** `draft` for a press or the daily look, `form` for a first plan. A refusal's `fix` is the sentence the owner is shown. */
-  hold(kind: 'draft' | 'form'): Promise<{ ok: true; value: SparkHeld } | { ok: false; refusal: Refusal }>;
+  hold(kind: 'draft' | 'form'): Promise<{ ok: true; value: SlashHeld } | { ok: false; refusal: Refusal }>;
 };
 
 /** A held ask. Exactly one of the two is called: `settle` for a call that left this host, `release` for one that never did. */
-export type SparkHeld = {
+export type SlashHeld = {
   /** `code` is absent for an answer, `UNREACHABLE` for a model that threw, `PROPOSAL_SCHEMA` for one that answered unreadably. */
   settle(outcome: { usage: { in: number; out: number }; code?: string | undefined }): void;
   release(): void;
@@ -929,14 +929,14 @@ export type RecordDeps = {
   /** The outbox kinds this deployment can deliver. The doorbell rings for those and no others. */
   delivers?: readonly OutboxKind[] | undefined;
   /**
-   * Whether this host answers an automation's question to Spark, passed to the kernel's `RecordOptions.answersSpark`.
-   * Absent is no, and install then refuses an `ask_spark` step with `NOT_IN_THIS_BUILD`.
+   * Whether this host answers an automation's question to Slash, passed to the kernel's `RecordOptions.answersSlash`.
+   * Absent is no, and install then refuses an `ask_slash` step with `NOT_IN_THIS_BUILD`.
    *
-   * THE HOST SETS IT FROM THE SAME MODEL IT REPORTS AS `Build.spark`, beside the pass that leases the job; a host that
+   * THE HOST SETS IT FROM THE SAME MODEL IT REPORTS AS `Build.slash`, beside the pass that leases the job; a host that
    * set one and not the other would admit a step nothing answers, or offer one the record refuses. It is in `api`'s
    * `Pick` so the record's own sentences about a step can read it.
    */
-  answersSpark?: boolean | undefined;
+  answersSlash?: boolean | undefined;
   /**
    * What signs an exported `.brain`, when this host holds the record's signing key.
    *
@@ -985,21 +985,21 @@ export type RecordDeps = {
    */
   readAddress?: ((address: string) => Promise<{ ok: true; text: string; bytes: number } | { ok: false; fix: string }>) | undefined;
   /**
-   * A model Spark may ask to draft arrangement proposals: a person's own key or a self-host's endpoint, built by the host
-   * (`spark.ts` `SparkModel`). Absent, Spark's own rules draft them. Either way a draft is filed only through `propose`'s
+   * A model Slash may ask to draft arrangement proposals: a person's own key or a self-host's endpoint, built by the host
+   * (`slash.ts` `SlashModel`). Absent, Slash's own rules draft them. Either way a draft is filed only through `propose`'s
    * validation, and only an owner's press applies it.
    */
-  sparkModel?: SparkModel | undefined;
+  slashModel?: SlashModel | undefined;
   /**
-   * The ledger `sparkModel`'s asks are held and settled in: Spark's own monthly cap and `call` rows, the ones a person's read
-   * at the palette and an automation's question are spent from (`packages/host/src/spark-ask.ts` `sparkRecordMeter`).
+   * The ledger `slashModel`'s asks are held and settled in: Slash's own monthly cap and `call` rows, the ones a person's read
+   * at the palette and an automation's question are spent from (`packages/host/src/slash-ask.ts` `slashRecordMeter`).
    * Asked before every press's draft and every first plan; a refusal means the model is not asked. Absent, the model is
    * asked unmetered, as it was on every host before `loop/research-batch-sixty-audit.md` finding 2.
    */
-  sparkMeter?: SparkMeter | undefined;
+  slashMeter?: SlashMeter | undefined;
   /**
-   * Newer versions of what this record holds, found in the host's catalogue, verified and read there (`spark.ts`
-   * `catalogueDrafts`). Spark asks about each on Decide through the same `prepare`; absent, it asks about none.
+   * Newer versions of what this record holds, found in the host's catalogue, verified and read there (`slash.ts`
+   * `catalogueDrafts`). Slash asks about each on Decide through the same `prepare`; absent, it asks about none.
    */
   catalogueOffers?: ((held: readonly { id: string; version: string; on: boolean }[]) => Promise<readonly CatalogueOffer[]>) | undefined;
   /**
@@ -1058,7 +1058,7 @@ const readDay = (text: string, format: string): string | null => {
 export async function createRecordApi(deps: RecordDeps) {
   const opened = await openRecord(deps.sql, deps.clock, {
     ...(deps.delivers === undefined ? {} : { delivers: deps.delivers }),
-    ...(deps.answersSpark === undefined ? {} : { answersSpark: deps.answersSpark }),
+    ...(deps.answersSlash === undefined ? {} : { answersSlash: deps.answersSlash }),
     ...(deps.sign === undefined ? {} : { sign: deps.sign }),
     /* `43 §4.3`'s three number forms, wired where both halves can be reached: the readers are
        rank 9, the record that reads an arrival is rank 7, and this package is 11. Without these
@@ -1098,7 +1098,7 @@ export async function createRecordApi(deps: RecordDeps) {
   return { ...api(kernel, deps, cursors), kernel };
 }
 
-function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'sparkModel' | 'sparkMeter' | 'catalogueOffers' | 'tryScript' | 'answersSpark'>, cursors: HistoryCursors) {
+function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'catalogueOffers' | 'tryScript' | 'answersSlash'>, cursors: HistoryCursors) {
   const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
   /**
    * The page declaration served at a slug, and its version: the one named exactly, or else the one whose name slugs to it
@@ -1132,7 +1132,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /**
    * THE NEXT MILESTONE, NEVER BY ITSELF (`CatalogueEntry.next`). After a write, for each use case on that names what moves on:
    * when a row of its list is in a done state, none is in `to`, and a row waits in `from`, the first of those by order is the
-   * next. It is asked once on Decide, as Spark's rowset that updates that one row, or, when the owner turned the use case's
+   * next. It is asked once on Decide, as Slash's rowset that updates that one row, or, when the owner turned the use case's
    * setting on, marked `to` directly, signed by whoever last changed the row that was reached. Each next row is moved on at most
    * once, so a person who sets it back is not overruled.
    */
@@ -1161,21 +1161,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         const next = rows.filter((r) => r.f[n.field] === n.from).sort((a, b) => orderOf(a) - orderOf(b) || a.seq - b.seq)[0];
         if (!reached || !next) continue;
         const key = `${n.register}:${next.id}`;
-        const prefs = kernel.prefsOf(SPARK);
+        const prefs = kernel.prefsOf(SLASH);
         const moved = Array.isArray(prefs[NEXT_DONE]) ? (prefs[NEXT_DONE] as unknown[]).map(String) : [];
         if (moved.includes(key)) continue;
-        kernel.setPref(SPARK, NEXT_DONE, [...moved, key].slice(-200));
+        kernel.setPref(SLASH, NEXT_DONE, [...moved, key].slice(-200));
         const title = (r: { f: Record<string, unknown> }) => String(r.f[decl.title] ?? '').slice(0, 100);
         const config = kernel.packConfig(e.id);
         if (config.ok && config.value.values[n.setting] === true) {
-          const by = sql.one<{ actor: string }>("SELECT actor FROM event WHERE target = ? AND actor != 'spark' ORDER BY rowid DESC LIMIT 1", `entry:${reached.id}`)?.actor;
+          const by = sql.one<{ actor: string }>("SELECT actor FROM event WHERE target = ? AND actor != 'slash' ORDER BY rowid DESC LIMIT 1", `entry:${reached.id}`)?.actor;
           if (by) kernel.update(n.register, `${n.register}#${next.seq}`, { [n.field]: n.to }, { actor: by, version: next.version, cascade: false, note: n.note });
           continue;
         }
         const question = n.question.replaceAll('{reached}', title(reached)).replaceAll('{next}', title(next)).slice(0, 280);
         kernel.propose(
           { question, body_kind: 'rowset', body: { register: n.register, rows: [{ at: `${n.register}#${next.seq}`, version: next.version, patch: { [n.field]: n.to } }] } },
-          SPARK,
+          SLASH,
         );
       }
     } catch {
@@ -1616,7 +1616,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     keyReady: (name, paged) => kernel.keyReady(name, paged),
   });
 
-  /* WHAT AN AGENT OR SPARK MAY ASK TO CHANGE ABOUT THIS RECORD, and how the owner's press applies it (`arrange.ts`). */
+  /* WHAT AN AGENT OR SLASH MAY ASK TO CHANGE ABOUT THIS RECORD, and how the owner's press applies it (`arrange.ts`). */
   const arrangement = arranger({
     kernel,
     catalogue: deps.catalogue ?? [],
@@ -1625,10 +1625,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   });
 
   /**
-   * One reading for Spark: how the record is used, what the host offers, what that says, and what Spark has asked already.
+   * One reading for Slash: how the record is used, what the host offers, what that says, and what Slash has asked already.
    * A catalogue pack is built to see whether its pages show agents only when an agent has written here.
    */
-  const sparkReading = () => {
+  const slashReading = () => {
     const catalogue = deps.catalogue ?? [];
     const titled = (e: CatalogueEntry) => (e.title === e.id ? e.id.charAt(0).toUpperCase() + e.id.slice(1) : e.title);
     const usage = readUsage(sql, kernel, clock.now(), new Map(catalogue.map((e) => [e.id, titled(e)])), speakingNow(kernel));
@@ -1645,52 +1645,52 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       return { id: e.id, kind: e.kind, title: titled(e), modules: e.modules, showsAgents: shows, skills: e.skills };
     });
     const seen = noticeUsage(usage, offered);
-    /* ASKED: anything Spark filed, in any state, and anything anybody filed that is still open. */
+    /* ASKED: anything Slash filed, in any state, and anything anybody filed that is still open. */
     const asked = new Map<string, { id: string; status: string }>();
     const waiting: { id: string; question: string }[] = [];
     for (const row of sql.all<{ id: string; body: string; status: string; opened_by: string }>(
       "SELECT id, body, status, opened_by FROM suggestion WHERE body_kind IN ('pack', 'settings', 'arrange', 'rowset', 'change') AND (opened_by = ? OR status = 'open') ORDER BY opened_at",
-      SPARK,
+      SLASH,
     )) {
       try {
         asked.set(stableKey(JSON.parse(row.body) as Record<string, unknown>), { id: row.id, status: row.status });
       } catch {
         /* a body that will not parse asks nothing */
       }
-      if (row.opened_by === SPARK && row.status === 'open') waiting.push({ id: row.id, question: kernel.question(row.id) ?? row.id });
+      if (row.opened_by === SLASH && row.status === 'open') waiting.push({ id: row.id, question: kernel.question(row.id) ?? row.id });
     }
     return { usage, offered, ...seen, asked, waiting };
   };
 
   /**
-   * `sparkModel` asked once, held and settled in Spark's ledger when the host gave one (`deps.sparkMeter`). The press and
+   * `slashModel` asked once, held and settled in Slash's ledger when the host gave one (`deps.slashMeter`). The press and
    * the first plan both ask through this and nothing else asks the record's model.
    *
    * THEY WERE THE TWO UNMETERED ASKS ON THE OPERATOR'S ACCOUNT. `loop/research-batch-sixty-audit.md` finding 2, the S2
    * probe: a record 20 days old over the Worker's included model, 25 presses, 25 model calls, and no `call` row or look at
    * `ask_cap` anywhere, while a person's read at the palette was held to both. A plan that answered something unusable
-   * was asked again on every try. `test/spark-press-cap.test.ts` drives both at a cap: 3 calls of 25 presses, 2 of 5 plans.
+   * was asked again on every try. `test/slash-press-cap.test.ts` drives both at a cap: 3 calls of 25 presses, 2 of 5 plans.
    *
    * `spent` IS THE METER'S REFUSAL, and the model is not asked. A throw is settled and thrown on, so each caller keeps its
    * own sentence for a model that did not answer: `UNREACHABLE` with the reading's estimate, as the package bills a model
    * it did not hear from; `PROPOSAL_SCHEMA` with the host's count where the host marked the throw as coming after an answer
-   * (`SparkAnsweredError`); and released, nothing written, where the host marked the call as never sent (`sent: false`).
+   * (`SlashAnsweredError`); and released, nothing written, where the host marked the call as never sent (`sent: false`).
    *
-   * THE COUNTS ARE BYTES OVER THREE, the package's own `tokens`, because a `SparkModel` answers the plan it parsed and not
+   * THE COUNTS ARE BYTES OVER THREE, the package's own `tokens`, because a `SlashModel` answers the plan it parsed and not
    * the provider's usage. The instructions are the host's and not in `input`, so this counts low: 176 in and 5 out for a
-   * call the Worker's binding reported as 700 and 60, measured in `packages/host/src/spark-ask.ts` `sparkRecordMeter`'s
-   * note. The ask is counted exactly; its price is an estimate until `SparkModel` answers usage too.
+   * call the Worker's binding reported as 700 and 60, measured in `packages/host/src/slash-ask.ts` `slashRecordMeter`'s
+   * note. The ask is counted exactly; its price is an estimate until `SlashModel` answers usage too.
    */
-  const sparkTokens = (value: unknown): number => Math.ceil(new TextEncoder().encode(JSON.stringify(value) ?? '').length / 3);
-  const sparkAsked = async <I>(kind: 'draft' | 'form', input: I, ask: (input: I) => Promise<unknown>): Promise<{ raw: unknown } | { spent: string }> => {
-    let held: SparkHeld | undefined;
-    if (deps.sparkMeter) {
+  const slashTokens = (value: unknown): number => Math.ceil(new TextEncoder().encode(JSON.stringify(value) ?? '').length / 3);
+  const slashAsked = async <I>(kind: 'draft' | 'form', input: I, ask: (input: I) => Promise<unknown>): Promise<{ raw: unknown } | { spent: string }> => {
+    let held: SlashHeld | undefined;
+    if (deps.slashMeter) {
       /* A LEDGER THAT CANNOT BE READ IS A CAP THAT CANNOT BE CHECKED, so the model is not asked: the side a spend errs on. */
-      const hold = await deps.sparkMeter.hold(kind).catch(() => ({ ok: false as const, refusal: { code: 'INTERNAL', fix: "Spark's ledger could not be read, so its model was not asked." } }));
+      const hold = await deps.slashMeter.hold(kind).catch(() => ({ ok: false as const, refusal: { code: 'INTERNAL', fix: "Slash's ledger could not be read, so its model was not asked." } }));
       if (!hold.ok) return { spent: hold.refusal.fix };
       held = hold.value;
     }
-    const sent = sparkTokens(input);
+    const sent = slashTokens(input);
     let raw: unknown;
     try {
       raw = await ask(input);
@@ -1703,29 +1703,29 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       else held?.settle({ usage: { in: sent, out: 0 }, code: 'UNREACHABLE' });
       throw e;
     }
-    held?.settle({ usage: { in: sent, out: sparkTokens(raw) } });
+    held?.settle({ usage: { in: sent, out: slashTokens(raw) } });
     return { raw };
   };
 
   /**
-   * Spark's proposals filed on Decide: the model's, when one is configured and answers something valid, else the rules'.
+   * Slash's proposals filed on Decide: the model's, when one is configured and answers something valid, else the rules'.
    * The one filing path, for the owner's press and for the daily run alike.
    *
    * EVERY ARRANGEMENT GOES THROUGH `prepare`, the door a token's proposal goes through, and a row it offers (a skill) through
-   * the kernel's own check of a rowset; all are filed as `spark`, which may suggest and write nothing else (`kernel/spark.ts`).
-   * A draft already asked, in any state, is not asked again, so a dismissal holds; no more than `SPARK_OPEN_CAP` wait at once.
+   * the kernel's own check of a rowset; all are filed as `slash`, which may suggest and write nothing else (`kernel/slash.ts`).
+   * A draft already asked, in any state, is not asked again, so a dismissal holds; no more than `SLASH_OPEN_CAP` wait at once.
    */
-  const sparkFile = async () => {
-    const r = sparkReading();
+  const slashFile = async () => {
+    const r = slashReading();
     const drawn = drawnVersions(sql);
-    let drafts: SparkDraft[] = r.drafts;
+    let drafts: SlashDraft[] = r.drafts;
     let by = 'rules';
     const dropped: string[] = [];
     let large = false;
-    const model = deps.sparkModel;
+    const model = deps.slashModel;
     if (model && r.quiet === null) {
       try {
-        const asked = await sparkAsked<Parameters<SparkModel['draft']>[0]>(
+        const asked = await slashAsked<Parameters<SlashModel['draft']>[0]>(
           'draft',
           {
             usage: r.usage,
@@ -1733,28 +1733,28 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             rules: r.drafts.map(({ question, body_kind, body }) => ({ question, body_kind, body })),
             offered: r.offered.map(({ id, kind, title }) => ({ id, kind, title })),
             kinds: ['pack', 'settings', 'arrange', 'change'],
-            most: SPARK_OPEN_CAP,
+            most: SLASH_OPEN_CAP,
           },
           (input) => model.draft(input),
         );
-        if ('spent' in asked) dropped.push(`${asked.spent} Spark's own rules drafted these.`);
+        if ('spent' in asked) dropped.push(`${asked.spent} Slash's own rules drafted these.`);
         else {
-          const got = fromModel(asked.raw, model.name, SPARK_OPEN_CAP, drawn);
+          const got = fromModel(asked.raw, model.name, SLASH_OPEN_CAP, drawn);
           dropped.push(...got.dropped);
           if (got.drafts.length > 0) {
             drafts = got.drafts;
             by = model.name;
-          } else dropped.push("The model proposed nothing Spark could use, so Spark's own rules drafted these.");
+          } else dropped.push("The model proposed nothing Slash could use, so Slash's own rules drafted these.");
         }
       } catch (e) {
         /* A PRESS THE INCLUDED MODEL'S CEILING TURNED AWAY WAS NEVER ASKED, and said "did not answer" it read as a model
            that might answer next time. `loop/research-batch-sixty-four-audit.md` finding 5: at 300 lists the prompt is
            51,152 bytes and the Worker's `NotSent` refuses it before the binding, on this press and every one after, until
            the record shrinks. The refusal's own fix is the operator's ceiling, which the owner cannot raise, so he is told
-           only what is true for him. `sent: false` alone is not enough: the endpoint's `SparkKeyClosedError` carries it
-           too, and a key that would not open is not a record too large (`test/spark-declined.test.ts`). */
+           only what is true for him. `sent: false` alone is not enough: the endpoint's `SlashKeyClosedError` carries it
+           too, and a key that would not open is not a record too large (`test/slash-declined.test.ts`). */
         large = model.name === 'included' && typeof e === 'object' && e !== null && (e as { sent?: unknown }).sent === false;
-        dropped.push(large ? "This BrainDog is too large for the included model to read, so Spark's own rules drafted these." : "The model did not answer, so Spark's own rules drafted these.");
+        dropped.push(large ? "This BrainDog is too large for the included model to read, so Slash's own rules drafted these." : "The model did not answer, so Slash's own rules drafted these.");
       }
     }
     if (deps.catalogueOffers) {
@@ -1780,16 +1780,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const skipped: { question: string; why: string }[] = [];
     for (const d of drafts) {
       if (r.asked.has(d.key)) {
-        skipped.push({ question: d.question, why: 'Spark has asked this before.' });
+        skipped.push({ question: d.question, why: 'Slash has asked this before.' });
         continue;
       }
-      if (r.waiting.length + filed.length >= SPARK_OPEN_CAP) {
-        skipped.push({ question: d.question, why: `${SPARK_OPEN_CAP} of Spark's questions are already waiting on Decide.` });
+      if (r.waiting.length + filed.length >= SLASH_OPEN_CAP) {
+        skipped.push({ question: d.question, why: `${SLASH_OPEN_CAP} of Slash's questions are already waiting on Decide.` });
         continue;
       }
       /* A CHANGE GOES STRAIGHT TO `kernel.propose`, NOT THROUGH `prepare`. It builds a declaration rather than arranging
          packs, and the kernel's review is what works out what it sends out; `prepare` knows only pack, settings and
-         arrange and refused it, so a gold rate a model drafted never reached Decide (`test/spark-change.test.ts`). */
+         arrange and refused it, so a gold rate a model drafted never reached Decide (`test/slash-change.test.ts`). */
       const prepared = d.body_kind === 'rowset' || d.body_kind === 'change' ? ok(d.body) : await arrangement.prepare(d.body_kind, d.body);
       if (!prepared.ok) {
         skipped.push({ question: d.question, why: 'refusal' in prepared ? prepared.refusal.fix : 'It would not apply.' });
@@ -1797,10 +1797,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }
       const key = stableKey(prepared.value);
       if (r.asked.has(key)) {
-        skipped.push({ question: d.question, why: 'Spark has asked this before.' });
+        skipped.push({ question: d.question, why: 'Slash has asked this before.' });
         continue;
       }
-      const put = kernel.propose({ question: d.question, body_kind: d.body_kind, body: prepared.value }, SPARK);
+      const put = kernel.propose({ question: d.question, body_kind: d.body_kind, body: prepared.value }, SLASH);
       if (!put.ok) {
         skipped.push({ question: d.question, why: 'refusal' in put ? put.refusal.fix : 'It would not file.' });
         continue;
@@ -1812,14 +1812,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * WHETHER SPARK RUNS ON ITS OWN, and the day it last did. Kept as Spark's own two prefs (`pref`, person `spark`): the
+   * WHETHER SLASH RUNS ON ITS OWN, and the day it last did. Kept as Slash's own two prefs (`pref`, person `slash`): the
    * record's, not a person's, local to this copy as every pref is, and no migration. On unless the owner turned it off.
    */
-  const SPARK_DAILY = 'spark.daily';
-  const SPARK_LAST = 'spark.last';
-  const sparkDailyState = () => {
-    const prefs = kernel.prefsOf(SPARK);
-    return { on: prefs[SPARK_DAILY] !== false, last: typeof prefs[SPARK_LAST] === 'string' ? (prefs[SPARK_LAST] as string) : null };
+  const SLASH_DAILY = 'slash.daily';
+  const SLASH_LAST = 'slash.last';
+  const slashDailyState = () => {
+    const prefs = kernel.prefsOf(SLASH);
+    return { on: prefs[SLASH_DAILY] !== false, last: typeof prefs[SLASH_LAST] === 'string' ? (prefs[SLASH_LAST] as string) : null };
   };
 
   /* A USE CASE SHARED AS A FILE, and one planned here (`usecase.ts`). */
@@ -3021,7 +3021,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    *
    * EVERY KIND THAT RUNS UNATTENDED, AND NOT ONLY THE ONE ITS AUDIT NAMED. Held to `rule` alone, audit fifty-one
    * (finding 1) had the same colleague at `decide` file and accept, herself, a script every hour on the owner's key
-   * `goldapi`, a poll on that key as a `change` and as a `pattern`, a digest with `prose: spark`, a digest to her own
+   * `goldapi`, a poll on that key as a `change` and as a `pattern`, a digest with `prose: slash`, a digest to her own
    * webhook that fired carrying the owner's row, and a new `source` for the script the owner had installed: 7 roads of
    * 7 installed and armed (`test/accept-unattended.test.ts`). A `script`, a `digest` and an `ingest` each arm a clock at
    * install, and `setDeclaration` asks `admin` for every kind, so the accept is held for all four.
@@ -3194,7 +3194,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * already handed as an `e.` cursor, so it tells her nothing she could not read off her own history.
    *
    * IT IS NOT ORDERED FOR HER, AND NOTHING READS IT AS ORDERED. Nothing in `apps/web` compares the number: `+layout.ts`
-   * and `start` read `spark` off this call and nothing else, and `recentHistory` refuses a whole number as a cursor from
+   * and `start` read `slash` off this call and nothing else, and `recentHistory` refuses a whole number as a cursor from
    * anybody `holdsRowids` refuses, so "a range scan from here" was never hers to make. A poller asks whether it changed.
    *
    * THE WALK IS NOT CAPPED AT `WALK`, because a cap that gave up would answer 0 once her newest line sank past it, and the
@@ -3919,67 +3919,67 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /**
-     * What Spark noticed about how this BrainDog is used, and what it would propose (`spark.ts`, `loop/research-spark.md` S15).
+     * What Slash noticed about how this BrainDog is used, and what it would propose (`slash.ts`, `loop/research-spark.md` S15).
      *
      * AN OWNER'S, IN A BROWSER, because it reads the use of every list, and a token has `arrangement` for what it may propose.
      * It writes nothing and asks no model: each draft says whether it is already a question, and which.
      */
-    async spark(args: Record<string, unknown> | undefined, ctx: CallContext) {
+    async slash(args: Record<string, unknown> | undefined, ctx: CallContext) {
       const stop = admin(ctx, 'read how the whole record is used');
       if (stop) return { ok: false as const, refusal: stop };
       const extra = stray((args ?? {}) as Record<string, unknown>, []);
       if (extra) return { ok: false as const, refusal: extra };
-      const r = sparkReading();
+      const r = slashReading();
       return ok({
-        model: deps.sparkModel?.name ?? null,
+        model: deps.slashModel?.name ?? null,
         quiet: r.quiet,
         noticed: r.noticed,
         drafts: r.drafts.map((d) => ({ question: d.question, body_kind: d.body_kind, asked: r.asked.get(d.key) ?? null })),
         waiting: r.waiting,
-        cap: SPARK_OPEN_CAP,
-        daily: sparkDailyState(),
+        cap: SLASH_OPEN_CAP,
+        daily: slashDailyState(),
       });
     },
 
     /**
-     * Put Spark's proposals on Decide now (`sparkFile`): the model's, when one is configured and answers something valid,
-     * else the rules'. Never one already asked, and never more than `SPARK_OPEN_CAP` waiting.
+     * Put Slash's proposals on Decide now (`slashFile`): the model's, when one is configured and answers something valid,
+     * else the rules'. Never one already asked, and never more than `SLASH_OPEN_CAP` waiting.
      */
-    async sparkPropose(args: Record<string, unknown> | undefined, ctx: CallContext) {
-      const stop = admin(ctx, 'ask Spark to put questions on Decide');
+    async slashPropose(args: Record<string, unknown> | undefined, ctx: CallContext) {
+      const stop = admin(ctx, 'ask Slash to put questions on Decide');
       if (stop) return { ok: false as const, refusal: stop };
       const extra = stray((args ?? {}) as Record<string, unknown>, []);
       if (extra) return { ok: false as const, refusal: extra };
-      return tail(ok(await sparkFile()));
+      return tail(ok(await slashFile()));
     },
 
     /**
-     * Whether Spark looks once a day on its own and puts what it finds on Decide. On by default; the owner's to turn off.
+     * Whether Slash looks once a day on its own and puts what it finds on Decide. On by default; the owner's to turn off.
      *
-     * AN OWNER'S, IN A BROWSER, as the press is: turning it on is asking Spark to file questions without a press each time.
-     * It is not an event, for the reason a pref is not: it changes when Spark asks, and nothing in the record's history.
+     * AN OWNER'S, IN A BROWSER, as the press is: turning it on is asking Slash to file questions without a press each time.
+     * It is not an event, for the reason a pref is not: it changes when Slash asks, and nothing in the record's history.
      */
-    async sparkDaily(args: { on?: unknown } | undefined, ctx: CallContext) {
-      const stop = admin(ctx, 'choose whether Spark looks on its own');
+    async slashDaily(args: { on?: unknown } | undefined, ctx: CallContext) {
+      const stop = admin(ctx, 'choose whether Slash looks on its own');
       if (stop) return { ok: false as const, refusal: stop };
       const extra = stray((args ?? {}) as Record<string, unknown>, ['on']);
       if (extra) return { ok: false as const, refusal: extra };
-      if (typeof args?.on !== 'boolean') return no('VALUE_MALFORMED', 'on is true to let Spark look once a day on its own, or false to wait for your press.', { at: 'on' });
-      kernel.setPref(SPARK, SPARK_DAILY, args.on ? null : false);
-      return ok(sparkDailyState());
+      if (typeof args?.on !== 'boolean') return no('VALUE_MALFORMED', 'on is true to let Slash look once a day on its own, or false to wait for your press.', { at: 'on' });
+      kernel.setPref(SLASH, SLASH_DAILY, args.on ? null : false);
+      return ok(slashDailyState());
     },
 
     /**
      * A FIRST PLAN FROM WHAT THE OWNER SAID, formed by the model and put on Decide as rows (`CatalogueEntry.forms`).
      *
-     * A SEPARATE PATH FROM SPARK'S LOOK AT USE. That waits two weeks before it reads habits; this is the owner asking, at the
+     * A SEPARATE PATH FROM SLASH'S LOOK AT USE. That waits two weeks before it reads habits; this is the owner asking, at the
      * moment they say what the project is, so it runs on a record of any age. It is asked once per record. Nothing is made: the
      * plan is an arrangement the owner accepts or dismisses. With no model, a model that fails, or an answer that is not a
      * plan inside the use case's limits, nothing is filed and `formed` is false, so the caller keeps the use case's own plan.
      * The model is handed the sentence and the lists' limits, never the record.
      */
-    async sparkForm(args: { usecase?: unknown; said?: unknown } | undefined, ctx: CallContext) {
-      const stop = admin(ctx, 'ask Spark to form a plan');
+    async slashForm(args: { usecase?: unknown; said?: unknown } | undefined, ctx: CallContext) {
+      const stop = admin(ctx, 'ask Slash to form a plan');
       if (stop) return { ok: false as const, refusal: stop };
       const extra = stray((args ?? {}) as Record<string, unknown>, ['usecase', 'said']);
       if (extra) return { ok: false as const, refusal: extra };
@@ -3991,12 +3991,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (!spec) return no('DECLARATION_UNKNOWN', `${args.usecase} forms no plan here.`, { at: 'usecase' });
       const not = (why: 'no-model' | 'off' | 'asked' | 'failed' | 'invalid' | 'spent', detail?: string) =>
         ok({ formed: false as const, why, ...(detail === undefined ? {} : { detail }) });
-      const model = deps.sparkModel;
+      const model = deps.slashModel;
       if (!model?.form) return not('no-model');
       const form = model.form.bind(model);
       if (!kernel.packStates().some((p) => p.id === id && p.disabled_at === null) || spec.lists.some((l) => !kernel.register(l.register))) return not('off');
       const key = stableKey({ rows: spec.lists.map((l) => ({ register: l.register })) });
-      const asked = sql.all<{ body: string }>("SELECT body FROM suggestion WHERE body_kind = 'arrange' AND opened_by = ?", SPARK).some((r) => {
+      const asked = sql.all<{ body: string }>("SELECT body FROM suggestion WHERE body_kind = 'arrange' AND opened_by = ?", SLASH).some((r) => {
         try {
           return stableKey(JSON.parse(r.body) as Record<string, unknown>) === key;
         } catch {
@@ -4010,7 +4010,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          asks gone, and the caller keeps the use case's own plan as it does for `failed`. */
       let raw: unknown;
       try {
-        const asked = await sparkAsked('form', { what: spec.what, said: args.said.trim(), today, lists: spec.lists }, form);
+        const asked = await slashAsked('form', { what: spec.what, said: args.said.trim(), today, lists: spec.lists }, form);
         if ('spent' in asked) return not('spent', asked.spent);
         raw = asked.raw;
       } catch {
@@ -4020,7 +4020,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (!formed.ok) return not('invalid', formed.why);
       const prepared = await arrangement.prepare('arrange', { why: [spec.why], rows: formed.rows });
       if (!prepared.ok) return not('invalid', 'refusal' in prepared ? prepared.refusal.fix : undefined);
-      const put = kernel.propose({ question: spec.question.slice(0, 280), body_kind: 'arrange', body: prepared.value }, SPARK);
+      const put = kernel.propose({ question: spec.question.slice(0, 280), body_kind: 'arrange', body: prepared.value }, SLASH);
       if (!put.ok) return not('invalid', 'refusal' in put ? put.refusal.fix : undefined);
       const counts: Record<string, number> = {};
       for (const r of formed.rows) counts[r.register] = (counts[r.register] ?? 0) + 1;
@@ -4028,18 +4028,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /**
-     * SPARK'S DAILY RUN, for a host's tick and never routed: once a UTC day at most, unless the owner turned it off. The day
+     * SLASH'S DAILY RUN, for a host's tick and never routed: once a UTC day at most, unless the owner turned it off. The day
      * is kept before the work, so a run that throws or a model that hangs is not retried until tomorrow. Everything after is
      * the press's own path, so the cap of three and a dismissal holding are the same here.
      */
-    async sparkTick(): Promise<{ ran: false; why: 'off' | 'today' | 'unopened' } | { ran: true; by: string; filed: { id: string; question: string; by: string }[]; skipped: { question: string; why: string }[]; dropped: string[] }> {
+    async slashTick(): Promise<{ ran: false; why: 'off' | 'today' | 'unopened' } | { ran: true; by: string; filed: { id: string; question: string; by: string }[]; skipped: { question: string; why: string }[]; dropped: string[] }> {
       if (kernel.refused()) return { ran: false, why: 'unopened' };
-      const state = sparkDailyState();
+      const state = slashDailyState();
       if (!state.on) return { ran: false, why: 'off' };
       const today = new Date(clock.now()).toISOString().slice(0, 10);
       if (state.last === today) return { ran: false, why: 'today' };
-      kernel.setPref(SPARK, SPARK_LAST, today);
-      const out = await sparkFile();
+      kernel.setPref(SLASH, SLASH_LAST, today);
+      const out = await slashFile();
       if (out.filed.length > 0 && scheduler) await kernel.tail(scheduler);
       return { ran: true, ...out };
     },
@@ -4519,7 +4519,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }
       if (flowPath(body) === 'run') {
         if (!Array.isArray(body.steps ?? body.then)) return no('REQUIRED_MISSING', 'An automation says what starts it and the steps it then takes.', { at: 'rule.steps' });
-        return ok(saidOf(body, { answersSpark: deps.answersSpark === true }));
+        return ok(saidOf(body, { answersSlash: deps.answersSlash === true }));
       }
       if (!body.register || !Array.isArray(body.then))
         return no('VALUE_MALFORMED', 'A rule names a register and what it would then do.', { at: 'rule' });
@@ -4527,7 +4527,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          finding 1). The guard above cannot see the list a `ref` points at, and the kernel resolved `client is Acme
          Holdings` in Clients for a member refused Clients: `matches 1 of 1`, where a client no row names said `0 of 1`. */
       const rows = kernel.dryRun(body as RuleDecl, args.limit, { reads: (register) => readable(ctx, register) === null });
-      return rows.ok ? ok({ ...rows.value, ...saidOf(body, { answersSpark: deps.answersSpark === true }) }) : rows;
+      return rows.ok ? ok({ ...rows.value, ...saidOf(body, { answersSlash: deps.answersSlash === true }) }) : rows;
     },
 
     /**
@@ -5096,7 +5096,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (args?.body_kind === 'pack' || args?.body_kind === 'settings' || args?.body_kind === 'arrange') {
         const body = args.body as Record<string, unknown> | undefined;
         if (body !== null && typeof body === 'object' && !Array.isArray(body)) {
-          /* ROWS IN AN ARRANGEMENT ARE SPARK'S PLAN, formed from what the owner said (`sparkForm`). Anybody else proposes rows
+          /* ROWS IN AN ARRANGEMENT ARE SLASH'S PLAN, formed from what the owner said (`slashForm`). Anybody else proposes rows
              as a rowset, which is held to the lists the caller reaches. */
           if (args.body_kind === 'arrange' && body.rows !== undefined)
             return no('FIELD_UNKNOWN', 'An arrangement you propose carries no rows. Propose rows as body_kind rowset, one list at a time.', { at: 'body.rows' });
@@ -5164,7 +5164,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         }
         /* AND A CHANGE OR A PATTERN THAT INSTALLS WHAT RUNS UNATTENDED, ALONE OR IN A BUNDLE, IS HELD TO THE DOOR
            `setDeclaration` IS. A rule, a script, a digest or an ingest is what runs while nobody is looking, and installing
-           one that asks Spark or calls out is the owner's consent to it going out on the owner's key. Audit forty-nine
+           one that asks Slash or calls out is the owner's consent to it going out on the owner's key. Audit forty-nine
            (finding 3) had a colleague at `decide` refused `setDeclaration` `LEVEL_REQUIRED`, propose the same rule, accept
            it herself, and the next row's question went out keyed (`test/accept-rule-level.test.ts`); audit fifty-one
            (finding 1) did the same with the other three kinds once rules were held (`test/accept-unattended.test.ts`).
@@ -6844,7 +6844,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
                `""`, and answering `app: ""` says "this build is called nothing" rather than "I was
                not told what I am". `deploy-parity` reads the second and cannot read the first. */
             app: build?.app || null,
-            spark: build?.spark ?? false,
+            slash: build?.slash ?? false,
           });
     },
   };

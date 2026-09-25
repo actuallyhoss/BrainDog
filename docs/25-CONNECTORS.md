@@ -511,7 +511,7 @@ which grant — and not *how*. On schedule it opens a suggestion:
 ```
 
 The user's own agent fetches it and calls `propose`. **Every invariant survives**: the record still
-makes no outbound call, Spark still has no write path, the human still approves, and BrainDog's
+makes no outbound call, Slash still has no write path, the human still approves, and BrainDog's
 egress surface does not grow by one byte. This is *"where data is not enough, the extension is an
 agent"* taken literally — and it is the only version that costs nothing architecturally. `mode: agent` is
 a key on the ingest, not a convention: it forbids `fetch:` and `map:`, requires `schedule` and `writes`,
@@ -773,7 +773,7 @@ of being code:
 | Is | a declaration: substitution, never evaluation (§3.1) | JavaScript whose default export is `run(ctx)`, 64 KB at most |
 | Runs | on the host, the record never making the call | on the host in a sandbox, the record never running it: a fire writes one `script.run` outbox row and a host leases it |
 | Calls out to | one literal `base:` origin | the literal `https://` origins in `egress:`, each written out in full; a path, a port the parser would drop or a placeholder is `ACTION_HOST_COMPUTED`, anything not `https://` is `ACTION_NOT_HTTPS` |
-| Sends | one grant, by label | the vault labels in `keys:`, each only to the host its vault entry says it opens, checked at every fetch (`keyRefused`; a fetch elsewhere is `FORBIDDEN` and refuses the run). A key with no `egress:` to go to is refused at install, and so is the vault's `spark` key (`FORBIDDEN` at `keys[i]`) |
+| Sends | one grant, by label | the vault labels in `keys:`, each only to the host its vault entry says it opens, checked at every fetch (`keyRefused`; a fetch elsewhere is `FORBIDDEN` and refuses the run). A key with no `egress:` to go to is refused at install, and so is the vault's `slash` key (`FORBIDDEN` at `keys[i]`) |
 | Reads the record | no | the registers in `reads:`, with every secret field taken off and a filter on one refused |
 | Writes | the rows its mapping makes, into one register or series | creates and updates into the registers in `writes:`, applied together after the run, all or none |
 | Starts | on its schedule | on `runs.every`, no more often than every fifteen minutes (`ACTION_INTERVAL_TOO_SHORT`), first due at a jitter and not at once. `runs.door` and `runs.rule` are declared and **not wired**: nothing but the schedule queues a run |

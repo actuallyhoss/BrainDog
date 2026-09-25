@@ -20,7 +20,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 
-import { handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveSpark, servesSpark, withSession, type SessionHints, type SparkAskDoor, type VaultGrantSeen } from '@braindog/host';
+import { handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveSlash, servesSlash, withSession, type SessionHints, type SlashAskDoor, type VaultGrantSeen } from '@braindog/host';
 import { deriveSessionKey, relyingParty, serveAccount, serveAuth, type DeviceDoor, type InviteDoor, type Provisioned } from '@braindog/host/auth';
 import { gate, serveMcp as answerMcp, unauthorized as unknownAgent } from '@braindog/mcp/http';
 import { INVITE_GONE, ulids, type Arrival, type Arrived, type CreateRecordArgs, type DeviceCode, type Exchanged, type LeasedSeal, type OperationGrant, type OutboxRow, type VaultGrant, type Waiting } from '@braindog/kernel';
@@ -36,11 +36,11 @@ import { runScript, ScriptRuns, type ScriptCall, type ScriptExports, type Script
 import { grantNamed, holdingScript, scriptReads } from '@braindog/host/script';
 import { askerOf, scriptTrial } from '@braindog/host/script-try';
 import { pagedRunner } from '@braindog/host/connector';
-import { serveAsks, type SparkAnswer } from '@braindog/host/spark-answers';
+import { serveAsks, type SlashAnswer } from '@braindog/host/slash-answers';
 
 import { alarmScheduler } from './alarm.ts';
-import { sparkLook, workerSparkAnswers, workerSparkDoor, workerSparkModel } from './spark.ts';
-import { workerSparkMeter } from './spark-meter.ts';
+import { slashLook, workerSlashAnswers, workerSlashDoor, workerSlashModel } from './slash.ts';
+import { workerSlashMeter } from './slash-meter.ts';
 import { workerCatalogueOffers } from './catalogue.ts';
 import { cloudSnapshots, type Pitr } from './copies.ts';
 import { DELETED, destroyRecord, expireFinal } from './destroy.ts';
@@ -110,7 +110,7 @@ const actorOf = (ctx: CallContext): string => (ctx.principal.kind === 'token' ? 
 const INVITES_OFF = 'Sign-in is off on this host until SESSION_SECRET is set, so an invitation link would lead nowhere.';
 
 /**
- * How many questions to Spark one alarm asks: `serveAsks`'s own default, written here because `#ask` compares against it.
+ * How many questions to Slash one alarm asks: `serveAsks`'s own default, written here because `#ask` compares against it.
  * A pass that leased this many may have left more behind, and `alarm()` then sets the next alarm for now.
  */
 const ASKS_PER_PASS = 5;
@@ -140,10 +140,10 @@ type Env = {
    * (`52 §13 #17`), which is a red gate rather than a dead record.
    */
   BRAINDOG_BUILD?: string;
-  /** Empty when no Spark is wired, so `/api/spark/*` is not routed at all (`33 §4`). */
-  SPARK_ENDPOINT?: string;
-  /** The model name the Spark endpoint expects, when it expects one. The key is the person's own, from the vault (`spark.ts`). */
-  SPARK_MODEL?: string;
+  /** Empty when no Slash is wired, so `/api/slash/*` is not routed at all (`33 §4`). */
+  SLASH_ENDPOINT?: string;
+  /** The model name the Slash endpoint expects, when it expects one. The key is the person's own, from the vault (`slash.ts`). */
+  SLASH_MODEL?: string;
   /**
    * The Directory's MAC key: a secret, `wrangler secret put SESSION_SECRET --env <environment>`, 32 random
    * bytes or more and a different value per environment. Unset or shorter, and sign-in is off:
@@ -197,7 +197,7 @@ type Env = {
    * host, which is exactly the Worker before the move.
    */
   LEGACY_HOSTS?: string;
-  /** The built web shell, `wrangler.jsonc`'s `assets`, which holds the bundled catalogue Spark reads (`catalogue.ts`). */
+  /** The built web shell, `wrangler.jsonc`'s `assets`, which holds the bundled catalogue Slash reads (`catalogue.ts`). */
   ASSETS?: Fetcher;
   /**
    * Where the nightly copies go: `<record>/snapshots/nightly-<date>.brainl` and `latest.brainl` (`51 §5.12`).
@@ -379,17 +379,17 @@ export class Record$ extends DurableObject<Env> {
    * is answered until this finishes". A record that answers a read while its schema is half applied
    * is a record that returns rows nobody can interpret.
    */
-  /** Spark's door, built on the first ask and kept, because the engine it holds writes its own tables. */
-  #spark: SparkAskDoor<CallContext> | undefined;
+  /** Slash's door, built on the first ask and kept, because the engine it holds writes its own tables. */
+  #slash: SlashAskDoor<CallContext> | undefined;
 
   /**
-   * What answers an automation's question to Spark from this object's alarm, or `undefined` where there is no model.
+   * What answers an automation's question to Slash from this object's alarm, or `undefined` where there is no model.
    *
-   * SET IN `#open` AND NOT LAZILY, unlike `#spark` above, because the record's `answersSpark` is decided when
-   * `createRecordApi` runs and a rule that asks Spark is filed or refused on it. What is lazy is the engine inside
-   * (`workerSparkAnswers`).
+   * SET IN `#open` AND NOT LAZILY, unlike `#slash` above, because the record's `answersSlash` is decided when
+   * `createRecordApi` runs and a rule that asks Slash is filed or refused on it. What is lazy is the engine inside
+   * (`workerSlashAnswers`).
    */
-  #answers: SparkAnswer | undefined;
+  #answers: SlashAnswer | undefined;
 
   /** The scripts running from this object's alarm, and the rules each is held to (`script.ts`). */
   #scripts = new ScriptRuns();
@@ -422,14 +422,14 @@ export class Record$ extends DurableObject<Env> {
   /** Migrate, then arm. Both before any request is answered, which is what the block is for. */
   async #open(): Promise<RecordApi> {
     let api!: RecordApi;
-    /* SPARK'S MODEL: the endpoint the deployment names, called with the person's own vault key, or none (`spark.ts`). */
-    const sparkModel = workerSparkModel(this.env, () => api);
+    /* SLASH'S MODEL: the endpoint the deployment names, called with the person's own vault key, or none (`slash.ts`). */
+    const slashModel = workerSlashModel(this.env, () => api);
     const sql = storageSql(this.ctx.storage);
-    /* WHAT ANSWERS AN AUTOMATION'S QUESTION TO SPARK, off the same endpoint and the same key path as `sparkModel`, so
-       `answersSpark` below and `/api/version`'s `spark` are one fact. The storage is this object's own, the one the door's
-       engine is handed, so the two engines count one `ask_cap`. Before this line a Worker with a model said `spark: true`
-       and refused `ask_spark` at propose as if it had none (`test/spark-answers.test.ts`). */
-    this.#answers = workerSparkAnswers(this.env, () => api, { sql, clock: { now: () => Date.now() } });
+    /* WHAT ANSWERS AN AUTOMATION'S QUESTION TO SLASH, off the same endpoint and the same key path as `slashModel`, so
+       `answersSlash` below and `/api/version`'s `slash` are one fact. The storage is this object's own, the one the door's
+       engine is handed, so the two engines count one `ask_cap`. Before this line a Worker with a model said `slash: true`
+       and refused `ask_slash` at propose as if it had none (`test/slash-answers.test.ts`). */
+    this.#answers = workerSlashAnswers(this.env, () => api, { sql, clock: { now: () => Date.now() } });
     /* THE RECORD'S COPIES, IN THE BUCKET THE NIGHT WRITES TO (`copies.ts`). Taken, listed and gone back to from inside
        this object, because `onNextSessionRestoreBookmark` is this storage's and nothing outside the object can call it.
        No `BLOBS` and there is no port, so the record answers `NOT_IN_THIS_BUILD` as it always did. */
@@ -460,31 +460,31 @@ export class Record$ extends DurableObject<Env> {
         sign: workerSigner(sql, () => keyStoreOf(this.env.KEK), () => api.kernel.identity()?.id ?? null),
         /* WHAT THIS DEPLOYMENT IS, because the record cannot know. `/api/version` answers `33 §4`'s
            six keys and two of them are facts about the host: which build is serving, and whether
-           there is a Spark behind it. An empty `BRAINDOG_BUILD` becomes `null` rather than `""` —
+           there is a Slash behind it. An empty `BRAINDOG_BUILD` becomes `null` rather than `""` —
            the record says "I was not told" and `deploy-parity` reads a missing build instead of
            comparing against the empty string and finding it merely unequal. */
         build: {
           app: this.env.BRAINDOG_BUILD ?? '',
-          spark: sparkModel !== undefined,
+          slash: slashModel !== undefined,
           /* `boot` SAYS WHICH HOST THIS IS, because billing told the Cloud from a self-host by whether
              `/api/inbound/mint` answered 404 (`loop/research-held-landing.md` friction 5). This Worker is
              the Cloud and nothing else, so it is a constant and not a binding. */
           host: 'cloud',
         },
-        sparkModel,
+        slashModel,
         /* AND THE LEDGER ITS PRESS AND FIRST PLAN ARE SPENT FROM, the one a read at the palette and an automation's question
-           are, under the owner's `ask_cap` and the operator's ceiling alike (`spark-meter.ts`). Without it the record asks
-           `sparkModel` unmetered: 5 presses and the daily look were 6 binding calls under a ceiling of three, and no row. */
-        sparkMeter: workerSparkMeter(this.env, () => api, { sql, clock: { now: () => Date.now() } }),
+           are, under the owner's `ask_cap` and the operator's ceiling alike (`slash-meter.ts`). Without it the record asks
+           `slashModel` unmetered: 5 presses and the daily look were 6 binding calls under a ceiling of three, and no row. */
+        slashMeter: workerSlashMeter(this.env, () => api, { sql, clock: { now: () => Date.now() } }),
         /* WHAT THIS DEPLOYMENT CAN ACTUALLY DELIVER, so the doorbell rings for work somebody can
            do. A kind with no deliverer sits `pending` for ever — which is honest — and without
            this every write afterwards rang the queue about it. `notify.push` is among them only where both VAPID halves
            are set, so a record on an unkeyed deployment rings for a push no more than it did before push existed. */
         delivers: delivers(this.env),
-        /* THE SWITCH THAT FILES `ask_spark`, ON WHERE `alarm()` HAS A PASS TO ASK IT. `infer.ask` is not among what
-           `delivers` answers: `makeDeliver` has no branch that asks Spark, so a question the pump leased would come back
+        /* THE SWITCH THAT FILES `ask_slash`, ON WHERE `alarm()` HAS A PASS TO ASK IT. `infer.ask` is not among what
+           `delivers` answers: `makeDeliver` has no branch that asks Slash, so a question the pump leased would come back
            "nothing in this deployment delivers a infer.ask" and every run would end on that. */
-        answersSpark: this.#answers !== undefined,
+        answersSlash: this.#answers !== undefined,
         /* A SHARED FILE AT AN ADDRESS IS READ HERE, not in the tab, so a site with no CORS header still installs. */
         readAddress: sharedReader(),
         /* A DRAFT SCRIPT RUN NOW, WRITING NOTHING (`@braindog/host/script-try`), in the sandbox a scheduled run gets:
@@ -519,7 +519,7 @@ export class Record$ extends DurableObject<Env> {
            self-host hands in (`@braindog/seed/usecases/catalogue`): without it a hosted Personal 1.0.0 record updated and
            left what it kept typed where nothing reads it. */
         catalogue: CATALOGUE,
-        /* NEWER VERSIONS IN THE CATALOGUE BUNDLED WITH THE SHELL, for Spark to ask about on Decide, as a self-host's folder gives. */
+        /* NEWER VERSIONS IN THE CATALOGUE BUNDLED WITH THE SHELL, for Slash to ask about on Decide, as a self-host's folder gives. */
         catalogueOffers: workerCatalogueOffers(this.env.ASSETS),
         /* AN INVITATION IS SPENT BY SIGNING IN, and nobody signs in here without the Directory's key. */
         invitations: () => ((this.env.SESSION_SECRET ?? '').length >= 32 ? null : INVITES_OFF),
@@ -579,7 +579,7 @@ export class Record$ extends DurableObject<Env> {
     await api.kernel.drain(this.#alarm);
     const more = await this.#act(api);
     const asked = await this.#ask(api);
-    await sparkLook(api);
+    await slashLook(api);
     /* WORK LEFT FOR THE NEXT INVOCATION SETS THE ALARM FOR NOW, AND IT IS SET LAST. `kernel.tail` sets the alarm from the
        `schedule` table alone, and both the ask pass and the daily look tail it, so a `set(now)` made inside `#act`
        before either of them could be moved out to the next schedule row, or cleared, by a pass that answered one
@@ -589,12 +589,12 @@ export class Record$ extends DurableObject<Env> {
   }
 
   /**
-   * The questions to Spark this record's rules have queued, answered after `#act` (the self-host's `poll` order).
+   * The questions to Slash this record's rules have queued, answered after `#act` (the self-host's `poll` order).
    *
    * NO DOORBELL IS NEEDED FOR THE FIRST FIVE AND NOTHING RINGS FOR THE SIXTH. Every `infer.ask` row is queued by a drain,
    * and the only drain on this host is the alarm's own, just above, so a question is asked in the invocation that
    * queued it. But `serveAsks` leases five, `infer.ask` is not in `delivers` so the tail rings nobody, and its tail arms
-   * the alarm from `schedule` alone. Seven questions and a one-shot pass, measured in `test/spark-answers.test.ts`
+   * the alarm from `schedule` alone. Seven questions and a one-shot pass, measured in `test/slash-answers.test.ts`
    * case 10: five runs ended, two questions left `pending`, and the alarm armed an hour out for the record's `purge`
    * sweep, the next row in `schedule`, and not for them; with no such row it is the parked runs' day. So a pass that
    * leased its full five answers `true`, and `alarm()` sets the next alarm for now. That, and not a loop here, because
@@ -610,7 +610,7 @@ export class Record$ extends DurableObject<Env> {
       const out = await serveAsks(api.kernel, this.#answers, this.#alarm, ASKS_PER_PASS);
       return out.answered + out.failed + out.refused + out.unacked >= ASKS_PER_PASS;
     } catch (e) {
-      console.error('spark answers:', e instanceof Error ? e.message : String(e));
+      console.error('slash answers:', e instanceof Error ? e.message : String(e));
       return false;
     }
   }
@@ -1095,38 +1095,38 @@ export class Record$ extends DurableObject<Env> {
     }
 
     /**
-     * SPARK'S ASK, AND THIS BRANCH IS THE WHOLE OF WHAT WAS MISSING. Three passes added the dependency, then
+     * SLASH'S ASK, AND THIS BRANCH IS THE WHOLE OF WHAT WAS MISSING. Three passes added the dependency, then
      * the builder, then the door, and each reported that the thirteenth package was reached; an audit drove it
-     * each time and found the only callers were the tests naming them. `spark.ts` says where the mount belongs
+     * each time and found the only callers were the tests naming them. `slash.ts` says where the mount belongs
      * in its own words, and this is that place: beside `servesMcp`'s branch and before `serveApi`, because
-     * `servesApi` is a prefix test and `/api/spark/read` reaches this object already, where `serveApi` would
-     * answer it `ROUTE_UNKNOWN: There is no method called spark/read.`
+     * `servesApi` is a prefix test and `/api/slash/read` reaches this object already, where `serveApi` would
+     * answer it `ROUTE_UNKNOWN: There is no method called slash/read.`
      *
-     * A FIELD AND NOT A LOCAL, for the reason `sparkAskDoor` caches on the door it returns: a door built per
-     * request runs `createSpark`'s two `CREATE TABLE IF NOT EXISTS` and its settings insert on every question.
+     * A FIELD AND NOT A LOCAL, for the reason `slashAskDoor` caches on the door it returns: a door built per
+     * request runs `createSlash`'s two `CREATE TABLE IF NOT EXISTS` and its settings insert on every question.
      */
-    if (servesSpark(new URL(request.url).pathname)) {
+    if (servesSlash(new URL(request.url).pathname)) {
       /* A PERSON AND NOBODY ELSE, AS THE SECOND LOCK. The router refuses a bearer at this path, but the context is
          the only thing this object is told about the caller, and `inward()` has already taken the header the door
          would look for, so a token context forwarded here by any other branch would be answered as a person. */
-      if (ctx.principal.kind !== 'person') return json({ ok: false, refusal: NO_SPARK_TOKEN }, 403);
+      if (ctx.principal.kind !== 'person') return json({ ok: false, refusal: NO_SLASH_TOKEN }, 403);
       /* AND A SIGNED-IN PERSON, NOT MERELY A PERSON. The public demo's context was a person too, `p_demo` at `read`,
-         and this lock answered it 200 with one model call, which on a live host opens the owner's `spark` key and
+         and this lock answered it 200 with one model call, which on a live host opens the owner's `slash` key and
          spends the record's `ask_cap` for somebody who never signed in (`loop/research-batch-seventeen-audit.md`
-         finding 5, `test/spark-demo.test.ts`). The demo is gone and the lock stays: the object is where the record
+         finding 5, `test/slash-demo.test.ts`). The demo is gone and the lock stays: the object is where the record
          decides who is asking, and a session's context says `credentialed: true`, so anything short of it is not one. */
-      if (ctx.credentialed !== true) return json({ ok: false, refusal: NO_SPARK_UNSIGNED }, 403);
-      this.#spark ??= workerSparkDoor(
+      if (ctx.credentialed !== true) return json({ ok: false, refusal: NO_SLASH_UNSIGNED }, 403);
+      this.#slash ??= workerSlashDoor(
         this.env,
         () => api,
         { sql: storageSql(this.ctx.storage), clock: { now: () => Date.now() } },
         new Set([`https://${this.env.PUBLIC_HOST ?? ''}`]),
       );
-      return serveSpark(request, this.#spark, ctx);
+      return serveSlash(request, this.#slash, ctx);
     }
 
-    /* SPARK'S DAILY LOOK, beside the answer and not in its way: the record says whether it is due, at most once a UTC day. */
-    this.ctx.waitUntil(sparkLook(api));
+    /* SLASH'S DAILY LOOK, beside the answer and not in its way: the record says whether it is due, at most once a UTC day. */
+    this.ctx.waitUntil(slashLook(api));
     /* A RESTORE THE PORT HAS ARMED ENDS THIS OBJECT, and nothing is written here from the arm on: `#arming` sets `#armed`
        as the bookmark is armed, which is before `restore` answers, and the Worker's `reopen` ends the object after. */
     if (!restoreAsked(request.method, new URL(request.url).pathname)) return serveApi(request, handlersFor(api), ctx);
@@ -1865,12 +1865,12 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
     /* AND WHAT IS LEFT AT `/api/keys/*` IS A BEARER OR NOTHING, which is the one thing those doors do not take. */
     if (keysAsked) return noSession();
 
-    /* NOR SPARK'S ASK, FOR THE SAME REASON AND BECAUSE THE DOOR CANNOT SAY IT HERE. `serveSpark` refuses any
+    /* NOR SLASH'S ASK, FOR THE SAME REASON AND BECAUSE THE DOOR CANNOT SAY IT HERE. `serveSlash` refuses any
        `authorization` header, but `inward()` below deletes that header, so on this host the door never saw one and
        the `Origin` check was all that stood: a read token sending the app's own origin by hand was answered 200 with a
        Reading, and each ask opened the person's own vault key and spent the month's `ask_cap` (`46 §5.2`, measured
-       in `test/spark.test.ts`). A cookie reaches it above; a bearer is refused here, in the door's own words. */
-    if (servesSpark(url.pathname) !== null) return json({ ok: false, refusal: NO_SPARK_TOKEN }, 403);
+       in `test/slash.test.ts`). A cookie reaches it above; a bearer is refused here, in the door's own words. */
+    if (servesSlash(url.pathname) !== null) return json({ ok: false, refusal: NO_SLASH_TOKEN }, 403);
 
     /* NOR MAY AN AGENT MOVE A RECORD'S MAIL. A bearer works from anywhere for thirty days, so a token that could
        rotate the forwarding address could take over a record's incoming statements without anybody signing in,
@@ -2058,10 +2058,10 @@ const recordKeyHalf = (env: Env) => ({
 const noSession = (): Response =>
   json({ ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; a token cannot reach the vault.', at: 'principal' } }, 403);
 
-/** What a token gets at `/api/spark/read`, from the router and from the object. The sentence is `serveSpark`'s own. */
-const NO_SPARK_TOKEN: Refusal = { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this in the app; a token cannot ask Spark about this record.', at: 'principal' };
-/** What any context that is not a signed-in session gets at `/api/spark/*` from the object. */
-const NO_SPARK_UNSIGNED: Refusal = { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in to ask Spark about a record.', at: 'principal' };
+/** What a token gets at `/api/slash/read`, from the router and from the object. The sentence is `serveSlash`'s own. */
+const NO_SLASH_TOKEN: Refusal = { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this in the app; a token cannot ask Slash about this record.', at: 'principal' };
+/** What any context that is not a signed-in session gets at `/api/slash/*` from the object. */
+const NO_SLASH_UNSIGNED: Refusal = { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in to ask Slash about a record.', at: 'principal' };
 
 /**
  * `/api/keys/*`: the app's own key doors, for the browser session `doorOf` has already resolved.

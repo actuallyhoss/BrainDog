@@ -982,7 +982,7 @@ Every write carries:
 
 | Column | Example |
 |---|---|
-| `actor` | `sam` · `agent:claude` · `ingest:hsbc-sms` · `rule:renewal-30d` · `spark` — a pull connector is an `ingest` declaration, so its actor is `ingest:<id>`, never `pull:<id>` |
+| `actor` | `sam` · `agent:claude` · `ingest:hsbc-sms` · `rule:renewal-30d` · `slash` — a pull connector is an `ingest` declaration, so its actor is `ingest:<id>`, never `pull:<id>` |
 | `kind` | `create` · `edit` · `state` · `delete` · `decide` · `install` · `grant.read` · `note` — one of the **forty** kinds the `CHECK` in [30-BLUEPRINT](30-BLUEPRINT.md) §2 admits |
 | `target` | `entry:01J…` · `decision:D41` · `pack:money-core` |
 | `from_v` / `to_v` | the old and new value, when something changed (`from` is a SQL keyword). `--redacted--` when the redaction list withheld it at write ([20-COLLABORATION](20-COLLABORATION.md) §8); `--erased--` after an erasure (§10); `NULL` only when there was no prior value |
@@ -1013,7 +1013,7 @@ Two consequences worth stating:
 | A row, really | the `purge` schedule kind, after 30 days | via PITR for 30 days |
 | A pack | declarations retired (`retired = 1`), rows kept | yes |
 | A credential | ciphertext zeroed, `grant` row kept with `revoked_at` | no, by design |
-| **A customer** | **`deleteRecord`** — an ADMIN method, browser session, re-authenticated, the slug typed: a final snapshot into the record's prefix, then `destroy()` on the record (the alarm, then the storage), Spark's object, the R2 prefix, and the Directory forgets the slug ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.9, [51-SPEC-WORKER](51-SPEC-WORKER.md) §5.13). Self-service, because deletion is table stakes | no |
+| **A customer** | **`deleteRecord`** — an ADMIN method, browser session, re-authenticated, the slug typed: a final snapshot into the record's prefix, then `destroy()` on the record (the alarm, then the storage), Slash's object, the R2 prefix, and the Directory forgets the slug ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.9, [51-SPEC-WORKER](51-SPEC-WORKER.md) §5.13). Self-service, because deletion is table stakes | no |
 | **A person inside a customer's record** | §10. It is a different mechanism and this table used to omit it | no |
 
 **Purge is one transaction, and every step is explicit** because nothing cascades by foreign key:

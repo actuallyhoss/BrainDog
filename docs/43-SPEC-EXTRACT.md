@@ -22,7 +22,7 @@ writes into `ingest_receipt`.
 | read the five response formats a pull connector returns (§4.4) | fetch, page, or assert `expect:` — that is `connect` ([35-SPEC-OVERVIEW](35-SPEC-OVERVIEW.md) §4 row 47) |
 | parse money and dates without a float and without a guess | guess a date format, a currency, or a decimal separator it was not told |
 | derive `exact · proposed · needs-review` and say why in field ids | write a row, write a receipt, or log a byte of payload |
-| test a declaration against samples for the dry run and the proposal loop | call a model — the proposal is Spark's (11 §3); this package only scores it |
+| test a declaration against samples for the dry run and the proposal loop | call a model — the proposal is Slash's (11 §3); this package only scores it |
 | decide whether two rows are the same movement (fuzzy dedupe) | query for the candidates — the record does (§5.7) |
 | scan every input in one advancing pass | contain a `RegExp` — there is none, and a lint rule proves it (§8) |
 
@@ -30,7 +30,7 @@ writes into `ingest_receipt`.
 (31 §2 row 8). No `node:*` import anywhere under `src/` (31 §3, layer 4). Licence `Apache-2.0`; private,
 never published.
 
-**Callers:** `record` (the pipeline), `spark` (the proposal loop's scoring), `connect` (`readRows`, `select`,
+**Callers:** `record` (the pipeline), `slash` (the proposal loop's scoring), `connect` (`readRows`, `select`,
 the `map:` coercion), `cli` (`braindog ingest test`, §13 D15).
 
 ---
@@ -790,7 +790,7 @@ that throws `EXTRACTOR_UNKNOWN`. No YAML: `declare` is the one package with a YA
 **Needs first:** `packages/where` with `Predicate` and `evaluate(predicate, subject, ctx)` over the `inbox_raw`
 subject (phase 0, BUILD.md); `tsconfig.base.json` and the repo lint config for the no-`RegExp` rule.
 
-**Unblocks:** `record` (45) — steps 2–3 of the pipeline, `isDuplicate` in step 5, the receipt row; `spark` (46) —
+**Unblocks:** `record` (45) — steps 2–3 of the pipeline, `isDuplicate` in step 5, the receipt row; `slash` (46) —
 `testAgainst` scores a proposed `pattern` body (33 §2's `pattern { ingest, samples }`) before it is filed;
 `connect` (47) — `readRows`, `select` and the `map:` coercion, so `expect:` paths and `page.from` paths are the
 one grammar; `cli` (48) — `braindog ingest test` (§13 D15); `declare` (42) agrees on §4.2–§4.5 by schema, not by

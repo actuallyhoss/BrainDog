@@ -24,7 +24,7 @@ import { ROUTES, handlersFor, serveApi } from '../../host/src/index.ts';
 import { createClient } from '../../client/src/index.ts';
 import { DEPTH_CEILING, RUNS_PER_DAY_CEILING, STEP_CEILING, VARS_CEILING, pathOf, triggerOf } from '../../kernel/src/flow-lint.ts';
 import { FLOOR_MS } from '../../kernel/src/pull.ts';
-import { ASK_PERSON_WAIT, ASK_SPARK_WAIT_MS } from '../../kernel/src/flow.ts';
+import { ASK_PERSON_WAIT, ASK_SLASH_WAIT_MS } from '../../kernel/src/flow.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { stub } from './stub.ts';
 
@@ -221,7 +221,7 @@ test('WHAT THE DRY RUN SAYS OF A STEP THAT WAITS ON SOMEBODY ELSE IS WHAT A REAL
   /* THE RECORD'S SENTENCE IS A COPY OF A FACT IN `flow.ts`, so it is held to a run of the real runner here. It went red
      the day Brief C built `ask_person`, as it said it would: the run read `waiting` where `failed` was expected. So an
      ask of a person is said as the question Decide shows and the wait the runner arms, and the grammar no longer lists
-     it; a `call` still stops the run, and an ask of Spark, which no host answers yet, is refused at install. */
+     it; a `call` still stops the run, and an ask of Slash, which no host answers yet, is refused at install. */
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   const asks = { rule: 'asks', on: { manual: true }, steps: [{ ask_person: { question: 'Go?', options: ['yes', 'no'], as: 'go' } }] };
@@ -234,13 +234,13 @@ test('WHAT THE DRY RUN SAYS OF A STEP THAT WAITS ON SOMEBODY ELSE IS WHAT A REAL
   assert.equal(row.state, 'waiting', row.say ?? '');
   assert.equal(sql.one<{ n: number }>("SELECT count(*) AS n FROM suggestion WHERE status = 'open' AND opened_by = 'rule:asks'")?.n, 1, 'no question was opened in Decide');
 
-  const spark = { rule: 'spark', on: { manual: true }, steps: [{ ask_spark: { question: 'Go?', as: 'go' } }] };
-  assert.match(value<{ steps: string[] }>(await api.dryRun({ rule: spark as never }, owner)).steps[0]!, /Not in this build: a rule with this step is refused at install/);
-  assert.equal(refusal(await api.kernel.install([rule(spark)])).code, 'NOT_IN_THIS_BUILD');
+  const slash = { rule: 'slash', on: { manual: true }, steps: [{ ask_slash: { question: 'Go?', as: 'go' } }] };
+  assert.match(value<{ steps: string[] }>(await api.dryRun({ rule: slash as never }, owner)).steps[0]!, /Not in this build: a rule with this step is refused at install/);
+  assert.equal(refusal(await api.kernel.install([rule(slash)])).code, 'NOT_IN_THIS_BUILD');
 
   const grammar = value<{ not_in_this_build: { steps: string[] } }>(await tools(api).read('braindog:grammar/automations', owner));
   assert.equal(grammar.not_in_this_build.steps.includes('ask_person'), false);
-  assert.ok(grammar.not_in_this_build.steps.includes('ask_spark'));
+  assert.ok(grammar.not_in_this_build.steps.includes('ask_slash'));
   sql.close();
 });
 
@@ -249,7 +249,7 @@ test('A script STEP RUNS ON IN THIS BUILD, so the grammar no longer lists it wit
      `startScript`) and the record's dry run say so. This resource still listed `script` under `not_in_this_build` and
      said a run that reaches one "fails there", so an agent reading it would not file the step a pack ships (Work's
      `rule.close_follow_ups`). Measured red first: the run below reached `done` with one `script.run` queued, and the
-     grammar's list read ["call","script","ask_spark"]. A `call` stays listed: `flow.ts` still fails a run that
+     grammar's list read ["call","script","ask_slash"]. A `call` stays listed: `flow.ts` still fails a run that
      reaches one with NOT_IN_THIS_BUILD. */
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
@@ -265,7 +265,7 @@ test('A script STEP RUNS ON IN THIS BUILD, so the grammar no longer lists it wit
   const grammar = value<{ steps: Record<string, string>; not_in_this_build: { steps: string[] }; not_in_this_build_says: string }>(
     await tools(api).read('braindog:grammar/automations', owner),
   );
-  assert.deepEqual(grammar.not_in_this_build.steps, ['call', 'ask_spark']);
+  assert.deepEqual(grammar.not_in_this_build.steps, ['call', 'ask_slash']);
   assert.doesNotMatch(grammar.not_in_this_build_says, /script/u, grammar.not_in_this_build_says);
   assert.match(grammar.not_in_this_build_says, /A call step installs, and a run that reaches it fails there/u);
   /* WHAT THE STEP DOES, IN THE DRY RUN'S TERMS: it goes on without waiting, `as:` holds the queued run's id and not the
@@ -282,37 +282,37 @@ test('A script STEP RUNS ON IN THIS BUILD, so the grammar no longer lists it wit
   sql.close();
 });
 
-test('ON A HOST THAT ANSWERS SPARK, NEITHER THE DRY RUN NOR THE GRAMMAR SAYS ask_spark IS REFUSED, and it installs', async () => {
+test('ON A HOST THAT ANSWERS SLASH, NEITHER THE DRY RUN NOR THE GRAMMAR SAYS ask_slash IS REFUSED, and it installs', async () => {
   /* THE FLAG-OFF CASE ABOVE, WITH THE HOST'S TWO SWITCHES ON, as `apps/selfhost` sets them from one model: the record's
-     `answersSpark` and `version`'s `spark`. Measured before this: the rule installed, and the dry run still ended the
-     step "refused at install" while the grammar listed `ask_spark` under `not_in_this_build`. */
+     `answersSlash` and `version`'s `slash`. Measured before this: the rule installed, and the dry run still ended the
+     step "refused at install" while the grammar listed `ask_slash` under `not_in_this_build`. */
   const sql = openSqlite();
-  const api = await createRecordApi({ sql, clock: fixedClock(NOW), answersSpark: true, build: { app: '2026-09-23+test', spark: true } });
-  const spark = { rule: 'spark', on: { manual: true }, steps: [{ ask_spark: { question: 'Go?', as: 'go' } }] };
-  const step = value<{ steps: string[] }>(await api.dryRun({ rule: spark as never }, owner)).steps[0]!;
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW), answersSlash: true, build: { app: '2026-09-23+test', slash: true } });
+  const slash = { rule: 'slash', on: { manual: true }, steps: [{ ask_slash: { question: 'Go?', as: 'go' } }] };
+  const step = value<{ steps: string[] }>(await api.dryRun({ rule: slash as never }, owner)).steps[0]!;
   assert.doesNotMatch(step, /Not in this build/u, step);
   assert.match(step, /waits up to 1d for this host's model/u);
-  value(await api.kernel.install([rule(spark)]));
+  value(await api.kernel.install([rule(slash)]));
 
   const grammar = value<{ not_in_this_build: { triggers: string[]; steps: string[] }; not_in_this_build_says: string }>(
     await tools(api).read('braindog:grammar/automations', owner),
   );
   assert.deepEqual(grammar.not_in_this_build, { triggers: ['metric', 'decided'], steps: ['call'] });
-  assert.doesNotMatch(grammar.not_in_this_build_says, /ask_spark/u, grammar.not_in_this_build_says);
+  assert.doesNotMatch(grammar.not_in_this_build_says, /ask_slash/u, grammar.not_in_this_build_says);
   sql.close();
 });
 
-test('ON A HOST THAT ANSWERS SPARK, THE GRAMMAR SAYS HOW A STEP SENDS FIELDS OF THE ROW AND HOW LONG THE RUN WAITS, and the step installs as written', async () => {
+test('ON A HOST THAT ANSWERS SLASH, THE GRAMMAR SAYS HOW A STEP SENDS FIELDS OF THE ROW AND HOW LONG THE RUN WAITS, and the step installs as written', async () => {
   /* `ANSWERED_GRAMMAR` KEPT THE FLAG-OFF TEXT FOR THE STEP, which names question, as and shape and nothing else. So the
      one host that runs it told an agent neither that `about:` is how fields of the row go with the question nor that the
      run parks a day and stops without an answer, where `ask_person`'s entry says its week. Measured red first: the
-     entry matched neither /about/ nor the runner's `ASK_SPARK_WAIT_MS` as a span. */
+     entry matched neither /about/ nor the runner's `ASK_SLASH_WAIT_MS` as a span. */
   const sql = openSqlite();
-  const api = await createRecordApi({ sql, clock: fixedClock(NOW), answersSpark: true, build: { app: '2026-09-23+test', spark: true } });
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW), answersSlash: true, build: { app: '2026-09-23+test', slash: true } });
   const grammar = value<{ steps: Record<string, string> }>(await tools(api).read('braindog:grammar/automations', owner));
-  const written = grammar.steps.ask_spark!;
+  const written = grammar.steps.ask_slash!;
   assert.match(written, /"about":\[/u, written);
-  assert.match(written, new RegExp(`\\b${ASK_SPARK_WAIT_MS / 86_400_000}d\\b`, 'u'), written);
+  assert.match(written, new RegExp(`\\b${ASK_SLASH_WAIT_MS / 86_400_000}d\\b`, 'u'), written);
   /* AND WHAT IT SAYS INSTALLS: the step as written, placeholders filled, on a rule about a row that has the field. */
   const step = JSON.parse(written.slice(0, written.lastIndexOf('}}') + 2).replace(/<[a-z]+>/g, 'x')) as Record<string, unknown>;
   const put = await api.kernel.install([
@@ -488,7 +488,7 @@ test('braindog:grammar/automations IS LISTED FOR ANY CALLER WHO READS, and its n
     answers: VARS_CEILING,
     shortest_clock: `${FLOOR_MS / 60_000}m`,
   });
-  assert.deepEqual(grammar.not_in_this_build, { triggers: ['metric', 'decided'], steps: ['call', 'ask_spark'] });
+  assert.deepEqual(grammar.not_in_this_build, { triggers: ['metric', 'decided'], steps: ['call', 'ask_slash'] });
 
   /* A STUB ANSWERS IT TOO, since it is this package's own text asked of `version`, which every surface has. */
   assert.ok((await tools(stub().surface).resources({ who: 'agent' })).some((r) => r.uri === 'braindog:grammar/automations'));

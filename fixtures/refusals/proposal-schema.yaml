@@ -1,6 +1,6 @@
 code:   PROPOSAL_SCHEMA
 via:    ask
-raises: packages/spark/src/project.ts
+raises: packages/slash/src/project.ts
 at:     body_kind
 fix:    Nothing was filed; ask again.
 ask:    what is still open
@@ -14,12 +14,12 @@ replies: [
     }
   ]
 
-# `via: ask` IS THE NINTH SURFACE, MINTED FOR THESE FOUR ON SEPTEMBER 21ST 2026, because a spark
+# `via: ask` IS THE NINTH SURFACE, MINTED FOR THESE FOUR ON SEPTEMBER 21ST 2026, because a Slash
 # refusal happens when a model answers and the input is a projection plus that reply, which none of
 # the eight runners drives. `40 §6` holds the row and the argument.
 #
 # `at: body_kind` IS A PATH INTO THE JSON THE CALL PINNED, and it is the key the propose template
-# fails on: `PROPOSE_SCHEMA` at `packages/spark/src/prompts.ts:127` requires `text`, `body_kind`,
+# fails on: `PROPOSE_SCHEMA` at `packages/slash/src/prompts.ts:127` requires `text`, `body_kind`,
 # `body` and `flagged` and pins `body_kind` to three values, and `checkSchema` answers a missing key
 # or a value outside that enum with `schemaFault(join(at, key))`, which at the top level is the bare
 # key. That is the same convention the kernel and the rpc path settled on, per `40 §6`: the path the
@@ -27,7 +27,7 @@ replies: [
 #
 # THE `fix` IS THE SECOND HALF OF THE EMITTER'S SENTENCE, VERBATIM, and the first half is left out
 # because `30 §6`'s shape for a fix is one sentence. `schemaFix` at
-# `packages/spark/src/project.ts:329` reads "The model's answer did not match the schema at <at>.
+# `packages/slash/src/project.ts:329` reads "The model's answer did not match the schema at <at>.
 # Nothing was filed; ask again.", and its first sentence is this fixture's `code` and `at` written
 # out in words. `checksum-mismatch.yaml` carries its emitter's trailing imperative for the same
 # reason. `46 §6` states the fix differently again, as "The output did not match the <kind> schema at
@@ -35,7 +35,7 @@ replies: [
 # the one that ships.
 #
 # AND THE SITE IS THE CONSTRUCTOR RATHER THAN A CALLER. Six sources outside the registry name this
-# code, four of them in `packages/spark/src`: `project.ts` builds every schema refusal that carries
+# code, four of them in `packages/slash/src`: `project.ts` builds every schema refusal that carries
 # an address, `call.ts` answers the two ways a reply is not JSON at all, `propose.ts` covers a body
 # kind the palette will not file, `jobs.ts` a pattern job whose answer carried no `ingest` body, and
 # `packages/ports/src/inference.ts` and `apps/worker/src/inference.ts` raise it from the adapter with
@@ -44,5 +44,5 @@ replies: [
 # THE SECOND REPLY NAMES `memo`, WHICH IS OUTSIDE THE PINNED ENUM, and every other key matches the
 # schema so the first fault `checkSchema` meets is this one. The palette's own arm for an unfiled
 # body kind would answer the same code and address with a different sentence, and the runner in
-# `packages/spark/test/refusals-ask.test.ts` compares the sentence as well, so it tells the two
+# `packages/slash/test/refusals-ask.test.ts` compares the sentence as well, so it tells the two
 # sites apart.

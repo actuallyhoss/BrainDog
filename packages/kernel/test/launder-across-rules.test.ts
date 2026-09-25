@@ -4,7 +4,7 @@
  * WHAT THE AUDIT MEASURED. The lint followed a secret into the row within one rule's steps and no further: it held a
  * set of what each step list wrote from `pin`, and refused a question or a call later in THE SAME list that read one
  * of those fields. A record has more than one rule. `rule.write` (on create, `set: { field: note, to: '{{pin}}' }`)
- * and `rule.ask` (on an ordinary edit of `what`, `ask_spark: 'Rate for {{note}}?', about: [note]`) each installed
+ * and `rule.ask` (on an ordinary edit of `what`, `ask_slash: 'Rate for {{note}}?', about: [note]`) each installed
  * clean, since neither body says both, and the edit queued `Rate for hunter2?` with `about: { note: 'hunter2' }`. The
  * runner's `-unsent` is one run's too, so it held nothing back. And `set: { field: '{{vars.f}}', to: '{{pin}}' }`
  * with `f` set to `note` passed the lint and the runner alike, because both read the field as written, braces and all,
@@ -23,7 +23,7 @@
  * `declare.ts` refuses such a field at install, so only a list stored past that lint holds one; the lint and the
  * runner read it by its element type now, as `redacts` does.
  *
- * `hunter2` IS PUT IN BY SQL AFTER THE ROW IS MADE AND BEFORE THE DRAIN, as `spark-launder-row.test.ts` puts it.
+ * `hunter2` IS PUT IN BY SQL AFTER THE ROW IS MADE AND BEFORE THE DRAIN, as `slash-launder-row.test.ts` puts it.
  */
 
 import { test } from 'node:test';
@@ -70,7 +70,7 @@ const refusal = (r: Result<unknown>): Said =>
 async function opened(): Promise<{ k: Kernel; sql: NodeSql; clock: ReturnType<typeof fixedClock> }> {
   const sql = openSqlite();
   const clock = fixedClock(NOW);
-  const k = await openRecord(sql, clock, { answersSpark: true });
+  const k = await openRecord(sql, clock, { answersSlash: true });
   value(await k.install([OBLIGATIONS]));
   return { k, sql, clock };
 }
@@ -83,7 +83,7 @@ test('THE PROBE\'S TWO RULES: the one that writes note from pin is refused, whic
   const ask = rule('ask', {
     on: { written: { register: 'obligations', op: ['update'], fields: ['what'] } },
     once_per: ['entry'],
-    steps: [{ ask_spark: { question: 'Rate for {{note}}?', about: ['note'], as: 'rate' } }],
+    steps: [{ ask_slash: { question: 'Rate for {{note}}?', about: ['note'], as: 'rate' } }],
   });
   const out = refusal((await k.install([write, ask])) as Result<unknown>);
   assert.equal(out?.code, 'DECLARATION_INVALID', out?.fix ?? 'the pair installed');
@@ -153,7 +153,7 @@ test('A SET NAMES THE FIELD IT WRITES AS ONE OF ITS LIST\'S FIELD IDS, on both p
   const { k, sql } = await opened();
   /* THE PROBE'S L4. `f` is `note`, the pass writes `note`, and the lint and the runner both read `{{vars.f}}`. */
   const templated = refusal(
-    (await k.install([steps([{ set_var: { name: 'f', to: 'note' } }, { set: { field: '{{vars.f}}', to: '{{pin}}' } }, { ask_spark: { question: 'Rate for {{note}}?', about: ['note'], as: 'rate' } }])])) as Result<unknown>,
+    (await k.install([steps([{ set_var: { name: 'f', to: 'note' } }, { set: { field: '{{vars.f}}', to: '{{pin}}' } }, { ask_slash: { question: 'Rate for {{note}}?', about: ['note'], as: 'rate' } }])])) as Result<unknown>,
   );
   assert.equal(templated?.code, 'DECLARATION_INVALID', templated?.fix ?? 'installed');
   assert.equal(templated?.at, 'steps[1].set.field');
@@ -176,16 +176,16 @@ test('A SET NAMES THE FIELD IT WRITES AS ONE OF ITS LIST\'S FIELD IDS, on both p
 const BRACED = [
   { set_var: { name: 'f', to: 'note' } },
   { set: { field: '{{vars.f}}', to: '{{pin}}' } },
-  { ask_spark: { question: 'Rate for {{note}} {{trigger.row.note}}?', about: ['note', 'what'], as: 'rate' } },
+  { ask_slash: { question: 'Rate for {{note}} {{trigger.row.note}}?', about: ['note', 'what'], as: 'rate' } },
 ];
 
 /** `rule.rate` written into the table past the lint as `list`, and a row made, with `pin` put in by SQL after it. */
 async function storedRate(list: unknown[]): Promise<{ k: Kernel; sql: NodeSql; made: Entry; run: string }> {
   const { sql, clock } = await opened();
-  let k = await openRecord(sql, clock, { answersSpark: true });
+  let k = await openRecord(sql, clock, { answersSlash: true });
   value(await k.install([steps([{ set_var: { name: 'x', to: 'y' } }])]));
   sql.exec("UPDATE declaration SET body = ? WHERE id = 'rule.rate' AND superseded_at IS NULL", JSON.stringify({ rule: 'rate', on: CREATED, once_per: ['entry'], steps: list }));
-  k = await openRecord(sql, clock, { answersSpark: true });
+  k = await openRecord(sql, clock, { answersSlash: true });
   const made = value<Entry>(k.create('obligations', { what: 'Rent', note: 'plain' }, { actor: 'p_1' }));
   sql.exec("UPDATE entry SET fields = json_set(fields, '$.pin', 'hunter2') WHERE id = ?", made.id);
   const run = sql.one<{ id: string }>("SELECT id FROM automation_run WHERE rule = 'rate'")!.id;
@@ -209,7 +209,7 @@ test('A RULE STORED PAST THE LINT WITH ITS FIELD IN BRACES IS REFUSED AT THE FIE
   sql.close();
 });
 
-test('A RUN A BUILD BEFORE -unsent TOOK PAST THAT WRITE HOLDS THE FIELD THE BRACES FILLED TO BACK FROM SPARK', async () => {
+test('A RUN A BUILD BEFORE -unsent TOOK PAST THAT WRITE HOLDS THE FIELD THE BRACES FILLED TO BACK FROM SLASH', async () => {
   /* THE SECOND LINE, for L4: `writes()` read the step's `field` as written, so `-unsent` held `{{vars.f}}` and the
      question read `note` as the step left it. Measured before the repair through this harness: `Rate for hunter2
      hunter2?` with `about: { note: 'hunter2', what: 'Rent' }`.
@@ -241,7 +241,7 @@ async function sealedList(): Promise<{ k: Kernel; sql: NodeSql; clock: ReturnTyp
     "UPDATE declaration SET body = ? WHERE id = 'register.obligations' AND superseded_at IS NULL",
     JSON.stringify({ ...body, fields: [...body.fields, { id: 'keys', type: 'list', of: 'secret' }] }),
   );
-  return { k: await openRecord(sql, clock, { answersSpark: true }), sql, clock };
+  return { k: await openRecord(sql, clock, { answersSlash: true }), sql, clock };
 }
 
 test('A LIST<SECRET> IS A SECRET TO THE LINT: not sent, not asked about, not copied', async () => {
@@ -250,8 +250,8 @@ test('A LIST<SECRET> IS A SECRET TO THE LINT: not sent, not asked about, not cop
   const made = k.create('obligations', { what: 'Rent', keys: ['g_1'] }, { actor: 'p_1' });
   assert.equal(refusal(made as Result<unknown>)?.code, 'IMMUTABLE_FIELD');
   for (const [what, list, said] of [
-    ['about', [{ ask_spark: { question: 'Rate?', about: ['keys'], as: 'rate' } }], /sends keys to Spark at steps\[0\], and a secret field never leaves the record/],
-    ['the question', [{ ask_spark: { question: 'Rate for {{keys}}?', as: 'rate' } }], /puts keys in its question to Spark at steps\[0\] with \{\{keys\}\}, and a secret field never leaves the record/],
+    ['about', [{ ask_slash: { question: 'Rate?', about: ['keys'], as: 'rate' } }], /sends keys to Slash at steps\[0\], and a secret field never leaves the record/],
+    ['the question', [{ ask_slash: { question: 'Rate for {{keys}}?', as: 'rate' } }], /puts keys in its question to Slash at steps\[0\] with \{\{keys\}\}, and a secret field never leaves the record/],
     ['a set', [{ set: { field: 'note', to: '{{trigger.row.keys}}' } }], /writes note from \{\{trigger\.row\.keys\}\} at steps\[0\]/],
   ] as const) {
     const out = refusal((await k.install([steps([...list])])) as Result<unknown>);
@@ -263,15 +263,15 @@ test('A LIST<SECRET> IS A SECRET TO THE LINT: not sent, not asked about, not cop
   sql.close();
 });
 
-test('A LIST<SECRET> IS LEFT OUT OF A QUESTION TO SPARK BY THE RUNNER, for a rule stored past the lint', async () => {
+test('A LIST<SECRET> IS LEFT OUT OF A QUESTION TO SLASH BY THE RUNNER, for a rule stored past the lint', async () => {
   /* `sendable` ASKED THE FIELD'S OWN TYPE, which is `list`. Measured before the repair: `Rate for hunter2 ["hunter2"]?`
      with `about: { keys: ['hunter2'], what: 'Rent' }`. */
   const { sql, clock } = await sealedList();
-  let k = await openRecord(sql, clock, { answersSpark: true });
+  let k = await openRecord(sql, clock, { answersSlash: true });
   value(await k.install([steps([{ set_var: { name: 'x', to: 'y' } }])]));
-  const list = [{ ask_spark: { question: 'Rate for {{keys}} {{trigger.row.keys}}?', about: ['keys', 'what'], as: 'rate' } }];
+  const list = [{ ask_slash: { question: 'Rate for {{keys}} {{trigger.row.keys}}?', about: ['keys', 'what'], as: 'rate' } }];
   sql.exec("UPDATE declaration SET body = ? WHERE id = 'rule.rate' AND superseded_at IS NULL", JSON.stringify({ rule: 'rate', on: CREATED, once_per: ['entry'], steps: list }));
-  k = await openRecord(sql, clock, { answersSpark: true });
+  k = await openRecord(sql, clock, { answersSlash: true });
   const made = value<Entry>(k.create('obligations', { what: 'Rent' }, { actor: 'p_1' }));
   sql.exec("UPDATE entry SET fields = json_set(fields, '$.keys', json('[\"hunter2\"]')) WHERE id = ?", made.id);
   await k.drain();

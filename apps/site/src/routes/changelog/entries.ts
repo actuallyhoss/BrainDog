@@ -87,6 +87,26 @@ export type Entry = {
  */
 export const ENTRIES: Entry[] = [
   {
+    date: '2026-09-25',
+    kind: 'changed',
+    /* THE ONE ENTRY THAT NAMES SPARK, AND IT HAS TO. The two entries below that said Spark were
+       renamed with everything else, because the page describes the product as it is. A self-hoster
+       whose environment still sets `SPARK_ENDPOINT` would get no model after the rename and no error
+       either, since the host reads only `SLASH_*`, so this entry is the only place he is told.
+       `test/slash.test.ts` fails if any other sentence on any page names Spark.
+
+       ANCHORED ON THE DECISION, BECAUSE THE RENAME HAD NOT BEEN COMMITTED WHEN THIS WAS WRITTEN: it
+       ran as one wave across five lanes and was committed after. `bb960c22` is DIRECTION 31, his word
+       and the list of what moves, and `62fabc69` is the survey that mapped it. The wave's own commits
+       belong after them as evidence. */
+    title: 'Spark is now called Slash, and a self-host’s settings are renamed with it',
+    body:
+      'The assistant is called Slash in the app, the command line and the documents. ' +
+      'A self-host reads its model from SLASH_ENDPOINT, SLASH_MODEL and SLASH_KEY, and ignores the SPARK_ names it read before. ' +
+      'Rename them by hand, or the host runs as if no model were configured.',
+    commits: ['bb960c22', '62fabc69'],
+  },
+  {
     date: '2026-09-23',
     kind: 'changed',
     title: 'This site draws the app instead of photographing it',
@@ -114,12 +134,12 @@ export const ENTRIES: Entry[] = [
     date: '2026-09-23',
     kind: 'shipped',
     /* THE SWITCH IS THE HOST'S, whatever `82eae966`'s subject says about the record's: the kernel's
-       `answersSpark` is off unless the host says it serves the question, and each host says so only
-       where a model stands behind Spark (`apps/selfhost/src/server.ts`, `apps/worker/src/index.ts`,
+       `answersSlash` is off unless the host says it serves the question, and each host says so only
+       where a model stands behind Slash (`apps/selfhost/src/server.ts`, `apps/worker/src/index.ts`,
        from `eb1a131b` and `6d78d936` later the same day). */
-    title: 'An automation can put a question to Spark, where a model is there to answer it',
+    title: 'An automation can put a question to Slash, where a model is there to answer it',
     body:
-      'A step can ask Spark a question, and a host with no model behind Spark refuses it at install. ' +
+      'A step can ask Slash a question, and a host with no model behind Slash refuses it at install. ' +
       'The Cloud answers with the owner’s key from the vault and refuses at once where there is ' +
       'none. A question never carries a secret or a file field.',
     commits: ['82eae966', 'ee317fa3', 'eb1a131b', '6d78d936', '3d299358', 'eae8aff6'],
@@ -251,7 +271,7 @@ export const ENTRIES: Entry[] = [
   {
     date: '2026-09-20',
     kind: 'shipped',
-    title: 'Spark asks a model, accounts for what it spent, and cites what it read',
+    title: 'Slash asks a model, accounts for what it spent, and cites what it read',
     body:
       'The engine behind it is a package of its own: the triage shapes, the pattern draft and ' +
       'the proposal door. Every ask is written down as a row, the refused ones included. A ' +

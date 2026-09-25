@@ -587,8 +587,8 @@ async function serve(): Promise<void> {
     trustProxy: env.BRAINDOG_TRUST_PROXY === '1',
     /* THE SCHEDULED ACTIONS RUN ON THIS PROCESS'S TIMER, sending only to the origins their declarations name. */
     actions: {},
-    /* SPARK LOOKS ONCE A DAY on its own unless the owner turned that off; asking hourly is how a day is noticed. */
-    sparkTickMs: 3_600_000,
+    /* SLASH LOOKS ONCE A DAY on its own unless the owner turned that off; asking hourly is how a day is noticed. */
+    slashTickMs: 3_600_000,
     /* A SIGNED WEBHOOK LEAVES THROUGH THE PINNED POST, and it is the one kind this process delivers. Nothing was passed
        here before, so a `notify.webhook` an automation queued sat `pending` for the life of the process (measured,
        `test/webhook-wired.test.ts`). `pull.fetch` is the scheduled actions' own, above. */

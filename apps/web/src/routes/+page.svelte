@@ -177,7 +177,7 @@
         owner to raise your access.", the shell carries it (`boot-live.ts` `refused`), and until it
         did this screen took its "never started" branch: "Nothing in the record yet." over 230 rows,
         with one control, `Start here`, which leads to the four tiles that set up a brand new
-        record. The record's own sentence stands here instead, the way `/spark` already says what
+        record. The record's own sentence stands here instead, the way `/slash` already says what
         the record said, and there is no action, because the reader cannot do anything about it from
         this screen and the sentence names the person who can.
       -->

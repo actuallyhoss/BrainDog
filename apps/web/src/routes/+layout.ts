@@ -25,11 +25,11 @@ export const prerender = false;
 let reach: Promise<Answer<SwitcherRow[]>> | null = null;
 
 /**
- * WHETHER A MODEL IS BEHIND SPARK ON THIS HOST, asked of `/api/version` once for the tab.
+ * WHETHER A MODEL IS BEHIND SLASH ON THIS HOST, asked of `/api/version` once for the tab.
  *
- * THE PALETTE'S SPARK ROW HANGS ON THIS AND ON NOTHING ELSE (`50 §5.5` step 5). The only place the app read the flag was
+ * THE PALETTE'S ROW FOR Slash HANGS ON THIS AND ON NOTHING ELSE (`50 §5.5` step 5). The only place the app read the flag was
  * `/start`, asked at the moment of making a record, so a person on a host with a model had no way to ask it a question: the
- * palette had no `spark` to read. The flag is a fact about the deployment rather than about the screen, so it is kept for the
+ * palette had no `slash` to read. The flag is a fact about the deployment rather than about the screen, so it is kept for the
  * tab like the switcher, and a refusal is forgotten rather than kept, so the next navigation asks again.
  *
  * `@braindog/client` IS LOADED HERE, NOT IMPORTED, for the budget reason at the top of this file: `boot-live.ts` already
@@ -43,12 +43,12 @@ const askModel = (origin: string, fetch: typeof globalThis.fetch): Promise<boole
     .then(
       (v) => {
         if (!v.ok) modelHere = null;
-        return v.ok && v.value.spark === true;
+        return v.ok && v.value.slash === true;
       },
       () => ((modelHere = null), false),
     );
 
-export async function load({ url, fetch }): Promise<Shell & { spark: boolean }> {
+export async function load({ url, fetch }): Promise<Shell & { slash: boolean }> {
   const [live, { readRecordsForSwitcher }, voice] = await Promise.all([
     import('$lib/record/boot-live.ts'),
     import('$lib/record/switcher.ts'),
@@ -134,9 +134,9 @@ export async function load({ url, fetch }): Promise<Shell & { spark: boolean }> 
     } else if (listed.value.length > 0) shell.me = { ...shell.me, records: listed.value };
   }
 
-  /* A REFUSED RECORD IS NEVER `true`: there is nobody signed in to it to ask Spark anything, so a palette over a refusal
+  /* A REFUSED RECORD IS NEVER `true`: there is nobody signed in to it to ask Slash anything, so a palette over a refusal
      never offers it, whatever the host serving the shell has configured. */
-  const spark = booted.from === 'live' ? await (modelHere ??= askModel(api, fetch)) : false;
+  const slash = booted.from === 'live' ? await (modelHere ??= askModel(api, fetch)) : false;
 
-  return { ...shell, spark };
+  return { ...shell, slash };
 }

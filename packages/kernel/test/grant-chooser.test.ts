@@ -2,11 +2,11 @@
  * Which live vault entry a name opens, when the vault holds more than one under it: `grantChosen`, and the two SQL
  * readers that now hand their rows to it.
  *
- * SPK-3, THE HALF THE SPARK PASS COULD NOT REACH. The vault admits two live grants under one label (`bindGrant` checks no
+ * SPK-3, THE HALF THE SLASH PASS COULD NOT REACH. The vault admits two live grants under one label (`bindGrant` checks no
  * label for uniqueness), and at `afb3b1b2` four places each wrote the newest-first order out for themselves: `keyNamed`
  * and `opensNamed` here as `ORDER BY created_at DESC, id DESC`, `grantNamed` in `@braindog/host/script` as a `sort`, and
- * `sparkGrantOf` in `@braindog/host/spark` as a loop over `newerThan`. The audit of wave forty-nine found the fifth,
- * Spark's `grants().find(...)`, answering the OLDEST key while every action named `spark` sent the newest, and the only
+ * `slashGrantOf` in `@braindog/host/slash` as a loop over `newerThan`. The audit of wave forty-nine found the fifth,
+ * Slash's `grants().find(...)`, answering the OLDEST key while every action named `slash` sent the newest, and the only
  * thing that had kept the other four agreeing was that each author copied the same clause. This file holds the kernel's
  * half of one chooser: the two SQL readers filter and `grantChosen` orders. One more copy of the clause, `sealedGrant`'s for a
  * signed post, was found by the audit of wave fifty-five (§7) and asks the chooser now too; `vault-webhook-grant.test.ts`
@@ -102,7 +102,7 @@ test('(2) BOUND IN THE SAME INSTANT, THE LARGER ID WINS, and the row bound secon
   const v = await vault();
   try {
     /* THE IDS ARE CHOSEN AGAINST THE ORDER OF THE BINDS, so a chooser that fell back to the order the rows came back in
-       (what Spark's `find` did) would open `SMALLER` here, and the tie-break is what decides. */
+       (what Slash's `find` did) would open `SMALLER` here, and the tie-break is what decides. */
     const larger = v.bind('goldapi', 'first.example.test', { id: 'g_01JZ8QK3F7R2M9V4XN6TCB5ZZZ' });
     const smaller = v.bind('goldapi', 'second.example.test', { id: 'g_01JZ8QK3F7R2M9V4XN6TCB5AAA', after: 0 });
     assert.notEqual(larger, smaller);
@@ -141,15 +141,15 @@ test('(4) A NAME THAT IS AN ID OPENS THAT ENTRY, whatever is newer under its lab
 test('(5) WHAT A CALLER PASSES OVER IS ITS OWN RULE, and among what it keeps the order is still this one', async () => {
   const v = await vault();
   try {
-    /* SPARK'S RULE, stated as `sparkGrantOf` states it: a row of a kind the vault holds that is not a token is not a
-       bearer. With a password bound after the token, the kind-blind readers take the password and Spark's the token. */
-    const token = v.bind('spark', 'gateway.example.test');
-    const password = v.bind('spark', 'gateway.example.test', { kind: 'password' });
+    /* SLASH'S RULE, stated as `slashGrantOf` states it: a row of a kind the vault holds that is not a token is not a
+       bearer. With a password bound after the token, the kind-blind readers take the password and Slash's the token. */
+    const token = v.bind('slash', 'gateway.example.test');
+    const password = v.bind('slash', 'gateway.example.test', { kind: 'password' });
     const tokens = (g: { kind?: string | undefined }) => g.kind === undefined || g.kind === 'api_token';
-    v.agree('spark', password);
-    assert.equal(grantChosen(v.k.grants(), 'spark', tokens)?.id, token);
-    const later = v.bind('spark', 'gateway.example.test');
-    assert.equal(grantChosen(v.k.grants(), 'spark', tokens)?.id, later);
+    v.agree('slash', password);
+    assert.equal(grantChosen(v.k.grants(), 'slash', tokens)?.id, token);
+    const later = v.bind('slash', 'gateway.example.test');
+    assert.equal(grantChosen(v.k.grants(), 'slash', tokens)?.id, later);
   } finally {
     v.close();
   }

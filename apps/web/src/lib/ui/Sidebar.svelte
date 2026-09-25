@@ -641,9 +641,9 @@
     </ul>
 
     <div class="utils">
-      <!-- SPARK SITS WITH THE TOOLS THAT SHAPE THE RECORD, beside Packs. Its label is its name, and its tooltip and spoken
-           name say what it is, since Spark is not a word a person uses about their business. -->
-      {#each [['/audit', copy.audit, 'clock', '/audit', copy.audit], ['/spark', 'Spark', 'star', '/spark', copy.sparkRail], ['/packs', copy.packs, 'packs', '/packs', copy.packs], ['/automations', copy.automations, 'refresh', '/automations', copy.automations], ['/vault', copy.vault, 'vault', '/vault', copy.vault], ['/settings/appearance', copy.settings, 'settings', '/settings', copy.settings]] as const as [href, label, glyph, area, said]}
+      <!-- SLASH SITS WITH THE TOOLS THAT SHAPE THE RECORD, beside Packs. Its label is its name, and its tooltip and spoken
+           name say what it is, since Slash is not a word a person uses about their business. -->
+      {#each [['/audit', copy.audit, 'clock', '/audit', copy.audit], ['/slash', 'Slash', 'star', '/slash', copy.slashRail], ['/packs', copy.packs, 'packs', '/packs', copy.packs], ['/automations', copy.automations, 'refresh', '/automations', copy.automations], ['/vault', copy.vault, 'vault', '/vault', copy.vault], ['/settings/appearance', copy.settings, 'settings', '/settings', copy.settings]] as const as [href, label, glyph, area, said]}
         <a class="util tap" href={at(href)} data-label={label} aria-label={said} title={said} aria-current={under(area) ? 'page' : undefined}>
           <Icon name={glyph} size="m" />
         </a>

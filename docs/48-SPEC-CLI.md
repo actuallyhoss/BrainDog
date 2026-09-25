@@ -13,7 +13,7 @@ way down.
 of the two containers of [03-DOG-FORMAT](03-DOG-FORMAT.md) §2 (`.brainl` ↔ `.brain`); verifies either offline;
 lints, plans, installs and uninstalls packs ([04-PACKS](04-PACKS.md) §3–§4); dry-runs rules
 ([07-INGEST-AND-RULES](07-INGEST-AND-RULES.md) §6); mints, lists and revokes agent tokens; enrols and runs the
-tier-C runner ([33-CONTRACTS](33-CONTRACTS.md) §11, [46-SPEC-SPARK](46-SPEC-SPARK.md) §4.7); starts a self-host
+tier-C runner ([33-CONTRACTS](33-CONTRACTS.md) §11, [46-SPEC-SLASH](46-SPEC-SLASH.md) §4.7); starts a self-host
 for development.
 
 **What it refuses to do.** It never holds the record: every row read or written goes over HTTP to a record
@@ -25,8 +25,8 @@ the self-host (§13 D5). It never runs `claude` with `--dangerously-skip-permiss
 **What it may import.** `render` for `PRIMITIVES_VERSION` (36); `ports` for the envelope types and the
 `node:sqlite` adapter (37; the one [40-SPEC-FIXTURES](40-SPEC-FIXTURES.md) §5.3 uses); `kernel` for
 `FORMAT_VERSION`, `KERNEL_MIGRATION` and `applyMigrations` (41); `declare` for the offline lint (42);
-`spark/prompts` for the runner's templates (46 §2, "data only, so the CLI's runner can bundle it alone");
-`where` only transitively. Row 12 of [31-STACK](31-STACK.md) §2 plus one edge, `spark` (§13 D9). Everything
+`slash/prompts` for the runner's templates (46 §2, "data only, so the CLI's runner can bundle it alone");
+`where` only transitively. Row 12 of [31-STACK](31-STACK.md) §2 plus one edge, `slash` (§13 D9). Everything
 else is `node:*`.
 
 ---
@@ -222,7 +222,7 @@ apps/cli/
 │   ├── http.ts           ~220 lines  host resolution, hosts.json (0600, atomic), call() and stream(), the device flow, admin()
 │   ├── brain.ts          ~360 lines  the .brainl reader, the canonical projection, hashing, verify, materialise, toBrainl, mirror
 │   ├── pack.ts           ~180 lines  source resolution (path · url · git · Kennel), lint, plan, install (--with-deps), uninstall, the diff screen
-│   ├── runner.ts         ~240 lines  enrol, the claim loop, the claude spawn, distil(), PROMPTS from @braindog/spark/prompts
+│   ├── runner.ts         ~240 lines  enrol, the claim loop, the claude spawn, distil(), PROMPTS from @braindog/slash/prompts
 │   └── print.ts          ~120 lines  the refusal sentence, conflict and unreachable lines, tables, the verify block; the --json envelope is json.ts's (§4.5)
 └── test/
     ├── mock-host.ts      a node:http server answering canned Result envelopes and a .brainl body
@@ -810,13 +810,13 @@ Eighteen, counted.
 | workspace | `@braindog/where` | `workspace:*` | transitively, through `declare` (38) |
 | workspace | `@braindog/kernel` | `workspace:*` | `FORMAT_VERSION`, `KERNEL_MIGRATION`, `applyMigrations(sql)` (41 §2) |
 | workspace | `@braindog/declare` | `workspace:*` | `parsePack(files: { path: string; text: string }[]): { pack?: Pack; refusals: Refusal[] }` · `lintPack(pack: Pack): Refusal[]` · `packChecksum(pack: Pack): string` (42) |
-| workspace | `@braindog/spark` | `workspace:*` | `PROMPTS` from the `./prompts` subpath — data only, no imports (46 §2, §3) |
+| workspace | `@braindog/slash` | `workspace:*` | `PROMPTS` from the `./prompts` subpath — data only, no imports (46 §2, §3) |
 | dev | `typescript` | 6.0.3 | `tsc --noEmit` (31 §3) |
 | dev | `esbuild` | pinned in `pnpm-workspace.yaml`'s catalog at first add — read from the registry, not from memory (31 §3's rule) | the one-file bundle (31 §8) |
 | dev | `fast-check` | 4.9.0 | T14 (35 §2) |
 
 Workspace packages are bundled into `dist/braindog.mjs` at build; esbuild tree-shakes `kernel` to its constants
-and `applyMigrations`, and `spark` to `prompts.ts`. A runtime import is a new ADR ([ADR-046](16-DECISIONS.md)).
+and `applyMigrations`, and `slash` to `prompts.ts`. A runtime import is a new ADR ([ADR-046](16-DECISIONS.md)).
 
 ---
 
@@ -831,7 +831,7 @@ Position 12 of [31-STACK](31-STACK.md) §2, after `record` ([35-SPEC-OVERVIEW](3
 | 40 `fixtures` · 41 `kernel` | the materialiser of 40 §5.3 and `exportBrainl` produce the test `.brainl`; `applyMigrations` builds the `.brain`; 41 §5.10 owns the grammar |
 | 42 `declare` | `parsePack`, `lintPack`, `packChecksum` |
 | 45 `record` | the methods of §2; `export` and `import` as the routes carry them |
-| 46 `spark` | `PROMPTS`; the `Claim` · `Ack` · `EndBody` protocol the runner speaks |
+| 46 `slash` | `PROMPTS`; the `Claim` · `Ack` · `EndBody` protocol the runner speaks |
 
 | Unblocks | How |
 |---|---|
@@ -904,7 +904,7 @@ value rendering; verbatim `document` fields; live rows only; no `braindog-render
 **D8 · The runner, v1.** Long-poll only — 33 §11's fallback one, the socket a §10 ceiling. The protocol is
 46 §4.7's verbatim: `claimJob { wait }` in the body (33 §11 wrote it as a query string), `Claim` with `bearer`
 and `mcp.tools`, `Ack`, `EndBody` carrying `claude_session`, `readCancel` every 20 s as the lease's heartbeat.
-The templates and result schema come from `@braindog/spark/prompts` (46 §2), so the runner refuses a fifth kind
+The templates and result schema come from `@braindog/slash/prompts` (46 §2), so the runner refuses a fifth kind
 by construction; `mcp.tools` is filtered to `mcp__braindog__*` before it reaches `--allowedTools`.
 `--no-session-persistence` is dropped from 26 §5's invocation because it defeats `--resume <claude_session>`,
 which the same section calls the most valuable column; sessions persist in the runner's own unix user's home.
@@ -914,7 +914,7 @@ which the same section calls the most valuable column; sessions persist in the r
 **D9 · Methods and edges the corpus does not list.** `ruleTest({ id, against })` READ+ · `ruleApply({ id, dry })`
 DATA, `write` scope unless `dry` · `createToken({ scope, name })`, `listTokens()`, `revokeToken({ id })` ADMIN.
 Forty-nine methods, then — 10 · 11 · 4 · 6 · 12 · 6 — against 30 §5's forty-four. And one package edge:
-`cli → spark` (12 → 11, down the order) for `prompts`. *Amend:* 30 §5 (the counts and rows), 33 §2 (the
+`cli → slash` (12 → 11, down the order) for `prompts`. *Amend:* 30 §5 (the counts and rows), 33 §2 (the
 argument objects), 33 §4 (the routes exist by the `/api/<method>` rule), 31 §2 (row 12: `1, 2, 3, 6, 7, 11`).
 
 **D10 · `verify --key` is optional, and the key has a path.** Without `--key`, the file's own public key

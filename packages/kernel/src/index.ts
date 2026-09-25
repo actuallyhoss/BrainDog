@@ -24,6 +24,7 @@ import { attempt } from './tx.ts';
 import { misread, sentencesOver, widens } from './widen.ts';
 import { ulids, type Mint } from './ids.ts';
 import { FORMAT_VERSION, applyMigrations, schemaRefusal, type SchemaState } from './migrate.ts';
+import { renameDeclarations } from './migrations/0016_slash.ts';
 import { jsonPath, compile, fieldSqlIn, addressable, isColumn, type Predicate, type Schema } from '@braindog/where';
 import {
   disablePack as disableDeclaredPack,
@@ -150,7 +151,7 @@ import {
   startRun,
   type FlowDeps,
 } from './flow.ts';
-import { pathOf, rowRegisterOf, sparkAskAt, subjectOf, tagsRefusal, tagsRefusing, tagsShape, triggerOf } from './flow-lint.ts';
+import { pathOf, rowRegisterOf, slashAskAt, subjectOf, tagsRefusal, tagsRefusing, tagsShape, triggerOf } from './flow-lint.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
 import { arrive, day, exponentOf, propose, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps, type NumberReaders } from './ingest.ts';
 import { analyse, observe, type Analysis, type Observation } from './observe.ts';
@@ -200,7 +201,7 @@ import {
   type SealedGrant,
   type VaultDeps,
 } from './vault.ts';
-import { sparkMayWrite } from './spark.ts';
+import { slashMayWrite } from './slash.ts';
 import { meet as meetPerson, type MeetArgs, type Met } from './people.ts';
 import { meetsRole, ratesRole, type MeetsFields } from './roles.ts';
 import { FINISHED, KERNEL_WRITTEN, REVIVED, SESSION, findSession, opening, owned, provisionalTitle, type Found, type SessionHints } from './session.ts';
@@ -233,7 +234,7 @@ import {
 
 export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statements } from './migrate.ts';
 export { checkBrainl, keyIdOf, b64url, manifestBytes, signBrainl, type Signature, type Signer } from './brainl.ts';
-export { SPARK, SPARK_KINDS, sparkMayWrite } from './spark.ts';
+export { SLASH, SLASH_KINDS, slashMayWrite } from './slash.ts';
 export { KERNEL_WRITTEN, STALE_MS, isStale, provisionalTitle, sessionDeclaration } from './session.ts';
 export { OPERATION_METHOD, REACHES, type Approved, type DeviceCode, type DeviceRow, type Exchanged, type Operation, type OperationGrant, type Reach, type VaultGrant, type Waiting } from './device.ts';
 export type { SessionHints } from './session.ts';
@@ -631,7 +632,7 @@ const RESERVED = new Set(['id', 'seq', 'register', 'created_at', 'updated_at', '
  * `tags`, which every list takes whether or not it declared it.
  *
  * THE RECORD'S OWN MARKER FIELD, AND IT DEPENDED ON A SEED. The `example` marker, `formed`, the `tag` and `untag` rule
- * actions and Spark's "not an example" count all read or write `tags` and name no field, and the field existed only
+ * actions and Slash's "not an example" count all read or write `tags` and name no field, and the field existed only
  * because `packages/seed` appends it to its own lists. `loop/research-shell-seed-next.md` N3 drove a list `jobs` declared
  * without it and a rule `then: [{ tag: late }, { note: 'late one' }]`: the rule installed and fired, its patch was
  * refused `FIELD_UNKNOWN`, the note in the same rule went with it, and the only trace was a `write.refused` counter.
@@ -741,20 +742,20 @@ export type RecordOptions = {
    * The outbox kinds this deployment can deliver. Absent is all of them.
    *
    * THE DOORBELL RINGS FOR WORK SOMEBODY CAN DO. Without it, one `infer.draft` on a deployment with
-   * no Spark made every subsequent write for the life of the record ring the queue and buy a lease
+   * no Slash made every subsequent write for the life of the record ring the queue and buy a lease
    * pass that claimed nothing.
    */
   delivers?: readonly OutboxKind[] | undefined;
   /**
-   * Whether this host answers an automation's question to Spark: it leases `infer.ask` jobs and runs the pass that
-   * answers them (`@braindog/host/spark-answers`). Absent is no.
+   * Whether this host answers an automation's question to Slash: it leases `infer.ask` jobs and runs the pass that
+   * answers them (`@braindog/host/slash-answers`). Absent is no.
    *
    * THE HOST'S TO SAY, BECAUSE ONLY THE HOST KNOWS. Whether a model is configured and whether anything leases the job
    * are facts about the deployment, and a record that guessed would install a step whose question waits its day
-   * unasked and fails. Off, install refuses `ask_spark` with `NOT_IN_THIS_BUILD` (`unserved`) and the runner fails a
+   * unasked and fails. Off, install refuses `ask_slash` with `NOT_IN_THIS_BUILD` (`unserved`) and the runner fails a
    * run that reaches one before anything is queued.
    */
-  answersSpark?: boolean | undefined;
+  answersSlash?: boolean | undefined;
   /**
    * What signs an exported file, when this deployment holds a signing key.
    *
@@ -1027,6 +1028,9 @@ function requiresOf(manifest: string): Record<string, string> {
 
 export async function openRecord(sql: Sql, clock: Clock, opts: RecordOptions = {}): Promise<Kernel> {
   const { state } = await applyMigrations(sql, clock);
+  /* MIGRATION 16'S OTHER HALF, the declaration bodies SQL cannot re-checksum. Before `makeKernel`, so the first reload
+     already reads them renamed; never over a refused schema, whose tables this build cannot vouch for. */
+  if (!state.refusal) await renameDeclarations(sql);
   return makeKernel(sql, clock, state, opts);
 }
 
@@ -2324,7 +2328,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   }
 
   /**
-   * A rule in the batch that asks Spark, on a host that has not said it answers one (`RecordOptions.answersSpark`).
+   * A rule in the batch that asks Slash, on a host that has not said it answers one (`RecordOptions.answersSlash`).
    *
    * HERE AND NOT IN THE LINT, for the reason `stranded` is here: `flowFault` is reached only through `declare.ts`'s
    * `validate`, which is context-free, and `stageDeclarations(batch)` stages a pack with no context at all, so a flag
@@ -2333,15 +2337,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * first, and only a well-formed one hears that nothing here would answer it.
    */
   function unserved(batch: readonly Declaration[]): Refusal | null {
-    if (opts.answersSpark === true) return null;
+    if (opts.answersSlash === true) return null;
     for (const d of batch) {
       if (d.kind !== 'rule') continue;
-      const at = sparkAskAt(d.body as unknown as FlowDecl);
+      const at = slashAskAt(d.body as unknown as FlowDecl);
       if (at !== null)
         return {
           code: 'NOT_IN_THIS_BUILD',
-          fix: `${d.id} asks Spark at ${at}, and no host in this build answers an automation's question to Spark. Ask a person with ask_person instead.`,
-          at: `${at}.ask_spark`,
+          fix: `${d.id} asks Slash at ${at}, and no host in this build answers an automation's question to Slash. Ask a person with ask_person instead.`,
+          at: `${at}.ask_slash`,
         };
     }
     return null;
@@ -2438,7 +2442,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         if (step === null || typeof step !== 'object') continue;
         const here = `${at}[${i}]`;
         const s = step as Record<string, unknown>;
-        for (const verb of ['set_var', 'ask_spark', 'ask_person', 'call', 'script']) {
+        for (const verb of ['set_var', 'ask_slash', 'ask_person', 'call', 'script']) {
           const spec = s[verb] as { name?: unknown; as?: unknown } | undefined;
           const named = verb === 'set_var' ? spec?.name : spec?.as;
           if (typeof named === 'string') answers.add(named);
@@ -4118,7 +4122,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   }): string {
     const id = mint();
     /* `30 §3`: a model suggests, proposes and predicts, and writes nothing else into the log. */
-    sparkMayWrite(e.actor, e.kind);
+    slashMayWrite(e.actor, e.kind);
     /* `target` carries its KIND — `entry:01J…` — because an event is about a row, a decision, a pack
        or a declaration, and a bare id would make "everything about this" a search of four tables. */
     sql.exec(
@@ -4659,7 +4663,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         },
       }),
     withdraw: (suggestion, actor, why) => void decide(governDeps(), suggestion, { resolved_as: 'wont-fix', reason: why }, actor),
-    answersSpark: opts.answersSpark === true,
+    answersSlash: opts.answersSlash === true,
   });
 
   /**
@@ -4954,13 +4958,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     recordId: recordIdentity(sql)?.id ?? 'self',
     /* THE GATE, HANDED IN. An `infer.draft` that came back with a question files it through the same
        `propose` a person or a rule uses — one place that decides what a body must contain, one place
-       that writes the `suggest` event, and `spark` as the actor because that is who drafted it. */
+       that writes the `suggest` event, and `slash` as the actor because that is who drafted it. */
     propose: (p, actor) => openSuggestion(governDeps(), actor, p as never),
-    /* AND THE OTHER HALF OF `prose: spark`. The digest was assembled inside the alarm's transaction
+    /* AND THE OTHER HALF OF `prose: slash`. The digest was assembled inside the alarm's transaction
        and parked on this row; the ack is where it leaves. Two sentences at most, capped here rather
        than trusted from the wire — 45 §5.10. */
     sendDigest: (assembled, prose) => sendDigest(digestDeps(), assembled as Assembled, twoSentences(prose)),
-    /* AND AN AUTOMATION'S QUESTION TO SPARK, answered into its run in the ack's transaction. */
+    /* AND AN AUTOMATION'S QUESTION TO SLASH, answered into its run in the ack's transaction. */
     answerRun: (a) => void answerStep(flowDeps(), a),
   });
 
@@ -5445,7 +5449,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * ingest's `match` and `extract` events do.
    */
   const settleArrival = (id: string, from: string, to: ArrivalSettled['state'], actor: string, note: string, batch: string): void => {
-    sparkMayWrite(actor, 'state');
+    slashMayWrite(actor, 'state');
     sql.exec('UPDATE inbox_raw SET state = ? WHERE id = ?', to, id);
     sql.exec(
       "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, from_v, to_v, note, batch) VALUES (?, ?, ?, 'state', ?, 'inbox_raw', 'state', ?, ?, ?, ?)",
@@ -6752,6 +6756,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (opts.replace !== true) {
         const out = importBrainl(sql, transaction, all);
         if (out.ok) {
+          await renameDeclarations(sql);
           reload();
           rebuildFts();
         }
@@ -6826,6 +6831,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         if (e !== REPLACE_REFUSED || refusal === null) throw e;
         return { ok: false as const, refusal: refusal as Refusal };
       }
+      await renameDeclarations(sql);
       reload();
       rebuildFts();
       return out;
@@ -6892,7 +6898,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)));
         hashes.push([...bytes].map((b) => b.toString(16).padStart(2, '0')).join(''));
       }
-      sparkMayWrite(actor, 'erase');
+      slashMayWrite(actor, 'erase');
       const at = instant(clock.now());
       return ok(
         transaction(() =>
@@ -6907,7 +6913,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * NOT ABOUT A ROW, so no target: the record as a whole is what was copied or put back.
      */
     lifecycle(kind: 'export' | 'restore.pitr', actor: string, note: string, to?: string): string {
-      sparkMayWrite(actor, kind);
+      slashMayWrite(actor, kind);
       const id = mint();
       sql.exec(
         'INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note) VALUES (?, ?, ?, ?, NULL, NULL, ?, ?)',

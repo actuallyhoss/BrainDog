@@ -189,7 +189,7 @@ test('a digest that posts out says where, when and what, in the line the record 
   assert.deepEqual(quiet?.appears[0]?.lines, [{ label: 'Calls out', value: 'Nothing outside this record' }]);
 });
 
-/* A PATTERN'S INGEST COMES IN TWO SHAPES, and Decide drew one. `spark/src/jobs.ts` files the bare body; an agent files the
+/* A PATTERN'S INGEST COMES IN TWO SHAPES, and Decide drew one. `slash/src/jobs.ts` files the bare body; an agent files the
    declaration, and drawn as a body the declaration read its `ingest`, `channel` and `writes` off the wrapper, where there
    are none, so the probe's poll was a title-less "Rule for what comes in" with no host and no key. */
 test('a pattern draws its ingest as a bare body or as a declaration, with the line the record filed and its key', () => {

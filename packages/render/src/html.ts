@@ -326,7 +326,7 @@ function proportional(b: Block, o: RenderOptions): string {
     const depth = Math.max(0, ...runs.map((r) => r.said.length));
     const numbers = runs.length
       ? numbersFold(
-          'spark',
+          'sparkline',
           [SPARKLINE_POINT, ...runs.map((r) => r.label)],
           Array.from({ length: depth }, (_, i) => [String(i + 1), ...runs.map((r) => r.said[i] ?? MISSING)]),
         )
@@ -334,7 +334,7 @@ function proportional(b: Block, o: RenderOptions): string {
     return `<div class="prop">${b.rows
       .map(
         (r) =>
-          `<div class="spark-row"${toneAttrs(r.tone)}>${cell('spark-label', r.cells[0], o)}${trendSvg('spark-line', r.cells[0] ?? '', r.cells[1] ?? '', o)}<span class="spark-figure num">${drawn(r.cells[2] || MISSING)}</span>${toneGlyph(r.tone)}</div>`,
+          `<div class="sparkline-row"${toneAttrs(r.tone)}>${cell('sparkline-label', r.cells[0], o)}${trendSvg('sparkline-line', r.cells[0] ?? '', r.cells[1] ?? '', o)}<span class="sparkline-figure num">${drawn(r.cells[2] || MISSING)}</span>${toneGlyph(r.tone)}</div>`,
       )
       .join('')}${numbers}</div>`;
   }

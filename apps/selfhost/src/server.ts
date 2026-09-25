@@ -19,8 +19,8 @@ import { env } from 'node:process';
 
 import {
   grantAad, grantKey, openSealed,
-  handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveKeys, serveSpark, serveVault, servesKeys, servesSpark, servesVault, sessionOf, sparkRecordMeter, withSession,
-  type Handler, type IngestDoor, type KeysDoor, type SparkAskDoor, type VaultDoor,
+  handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveKeys, serveSlash, serveVault, servesKeys, servesSlash, servesVault, sessionOf, slashRecordMeter, withSession,
+  type Handler, type IngestDoor, type KeysDoor, type SlashAskDoor, type VaultDoor,
 } from '@braindog/host';
 import {
   clearCookie,
@@ -40,7 +40,7 @@ import {
 import { gate, serveMcp, unauthorized } from '@braindog/mcp/http';
 import { OPERATION_METHOD, type Execute, type OutboxKind, type OutboxRow, type PagedRun, type ScriptRunner, type Signer } from '@braindog/kernel';
 import { createRecordApi, type CallContext } from '@braindog/record';
-import { readFileSync as readWhole, existsSync as present, rmSync as removeTree } from 'node:fs';
+import { readFileSync as readWhole, existsSync as present, renameSync as moveFile, rmSync as removeTree } from 'node:fs';
 import { basename as baseOf, dirname as dirOf, join as joinPath } from 'node:path';
 import { catalogueAnswer, catalogueFolder, catalogueOffersFrom } from './catalogue.ts';
 import { certificateNames, originFor } from './reach.ts';
@@ -68,13 +68,13 @@ import {
   type Send,
 } from './actions.ts';
 import { pagedRunner } from '@braindog/host/connector';
-import { serveAsks } from '@braindog/host/spark-answers';
+import { serveAsks } from '@braindog/host/slash-answers';
 import { grantNamed, holdingScript } from '@braindog/host/script';
 import { askerOf, scriptTrial, trialSandbox } from '@braindog/host/script-try';
 import { runInQuickJs } from '@braindog/script/quickjs';
 import { scriptSandbox } from './script.ts';
 import { httpFor } from './http.ts';
-import { sparkAnswersFor, sparkDoor, sparkEngineFor, sparkFromEnv, sparkModelFor, type SparkConfig } from './spark.ts';
+import { slashAnswersFor, slashDoor, slashEngineFor, slashFromEnv, slashModelFor, type SlashConfig } from './slash.ts';
 import { unwrap, type KeyStore } from './keys.ts';
 import { shellOf } from './shell.ts';
 import { signerFor } from './sign.ts';
@@ -115,6 +115,37 @@ export function openSqlite(path: string): Sql & { close(): void } {
       }
     },
   };
+}
+
+/**
+ * THE NAME SLASH'S LEDGER HAD BEFORE DIRECTION 31, the one place this app still spells it. A self-host that ran the old
+ * build has its `settings` row and its month's `call` rows in this file, and they are the only copy (`46 §4.1`).
+ */
+const LEDGER_BEFORE = 'spark.sqlite';
+
+/**
+ * `<dir>/slash.sqlite`, moved from `LEDGER_BEFORE` the first time a build after the rename opens the directory.
+ *
+ * CHECKPOINTED BEFORE IT MOVES, because `openSqlite` runs every file in WAL mode and a process that stopped between
+ * checkpoints left its newest rows in the `-wal` file alone. `test/slash-file.test.ts` plants the owner's cap there and
+ * nowhere else: a rename of the main file by itself opened a database with no `settings` table. Whatever `-wal` and
+ * `-shm` are left after the close move with it, empty once `TRUNCATE` has run, so no name of the old file stays behind.
+ *
+ * NOT MOVED OVER A NEWER FILE. Where both exist the old build ran again after the new one, and the new file's month is
+ * the one being metered; the old file stays until `destroy` takes it with the record.
+ */
+function slashLedger(dir: string): string {
+  const now = joinPath(dir, 'slash.sqlite');
+  const before = joinPath(dir, LEDGER_BEFORE);
+  if (present(now) || !present(before)) return now;
+  const old = new DatabaseSync(before);
+  try {
+    old.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+  } finally {
+    old.close();
+  }
+  for (const tail of ['', '-wal', '-shm']) if (present(before + tail)) moveFile(before + tail, now + tail);
+  return now;
 }
 
 /**
@@ -217,8 +248,8 @@ type Site = {
   vault: VaultDoor;
   /** The app's own key doors: a browser session on one of this host's origins, and the same key store. */
   keys: KeysDoor<CallContext>;
-  /** Spark's ask, `POST /api/spark/read`, built on the first question and kept (`46 §5.2`). */
-  spark: SparkAskDoor<CallContext>;
+  /** Slash's ask, `POST /api/slash/read`, built on the first question and kept (`46 §5.2`). */
+  slash: SlashAskDoor<CallContext>;
   /** `/in/*`: the arrival door (`49 §5.16`), one record and one process. Its mail half is the half that can be absent. */
   arrivals: IngestDoor;
   /** `/account/*`: the Directory's usage ledger, and the switcher's rows, for a signed-in person. */
@@ -923,17 +954,17 @@ export async function start(options: {
    */
   shared?: { send?: Send | undefined; resolve?: Resolve | undefined } | undefined;
   /**
-   * A model for Spark to draft with (`@braindog/host/spark`): `SPARK_ENDPOINT`, `SPARK_MODEL` and `SPARK_KEY` in the environment
-   * when not given. Absent, Spark's own rules draft. The key is the environment's, else the person's own key in the vault
-   * labelled `spark`; it is opened on each call and never kept (`spark.ts`). `send` is for tests.
+   * A model for Slash to draft with (`@braindog/host/slash`): `SLASH_ENDPOINT`, `SLASH_MODEL` and `SLASH_KEY` in the environment
+   * when not given. Absent, Slash's own rules draft. The key is the environment's, else the person's own key in the vault
+   * labelled `slash`; it is opened on each call and never kept (`slash.ts`). `send` is for tests.
    */
-  spark?: SparkConfig | undefined;
+  slash?: SlashConfig | undefined;
   /**
-   * How often to ask whether Spark is due its daily look (`sparkTick`, at most once a UTC day, unless the owner turned it off).
+   * How often to ask whether Slash is due its daily look (`slashTick`, at most once a UTC day, unless the owner turned it off).
    * OFF UNLESS ASKED, as the actions are, so a test that fills a record does not find questions it did not file. `main.ts`
    * asks hourly.
    */
-  sparkTickMs?: number | undefined;
+  slashTickMs?: number | undefined;
   /**
    * Told once, the first time a pass finds `notify.email` jobs waiting on a host that does not deliver them, with how many.
    *
@@ -1022,12 +1053,12 @@ export async function start(options: {
     gone = true;
     scheduler.stop();
     if (ticker) clearInterval(ticker);
-    if (sparkTicker) clearInterval(sparkTicker);
+    if (slashTicker) clearInterval(slashTicker);
     const record = sql.one<{ id: string }>('SELECT id FROM record WHERE singleton = 1')?.id;
     sql.close();
-    /* SPARK'S FILE IS CLOSED BEFORE ITS DIRECTORY GOES. On Windows an open SQLite handle holds the file, and
+    /* SLASH'S FILE IS CLOSED BEFORE ITS DIRECTORY GOES. On Windows an open SQLite handle holds the file, and
        `rmSync` with `force` then leaves the directory behind without a word. */
-    sparkSql.close();
+    slashSql.close();
     if (record && ledger) ledger.close(record);
     const at = dirOf(options.file);
     /* EITHER NAME IS THE RECORD'S OWN. `record.dog` is what an installation made before the
@@ -1040,7 +1071,7 @@ export async function start(options: {
       !present(joinPath(at, 'kek'));
     if (own) removeTree(at, { recursive: true, force: true });
     else
-      for (const p of [options.file, `${options.file}-wal`, `${options.file}-shm`, joinPath(at, 'snapshots'), ...(sparkFile ? [sparkFile, `${sparkFile}-wal`, `${sparkFile}-shm`] : [])])
+      for (const p of [options.file, `${options.file}-wal`, `${options.file}-shm`, joinPath(at, 'snapshots'), ...(slashFile ? [slashFile, joinPath(at, LEDGER_BEFORE)].flatMap((f) => [f, `${f}-wal`, `${f}-shm`]) : [])])
         removeTree(p, { recursive: true, force: true });
   };
 
@@ -1048,42 +1079,42 @@ export async function start(options: {
      the alarm drains the record when it fires. The scheduler is built first and the record is what
      it drains, which is why this one binding is written before the thing it names exists. */
   let api!: Awaited<ReturnType<typeof createRecordApi>>;
-  /* SPARK'S MODEL, when this host points at one; the record files what it drafts through the proposal door or not at all. */
+  /* SLASH'S MODEL, when this host points at one; the record files what it drafts through the proposal door or not at all. */
   /* LIFTED OUT OF THE CALL BELOW BECAUSE BOTH PORTS MUST READ ONE CONFIG: the model that drafts an
      arrangement and the engine that answers a question are two features sharing a name (`1f85a49a`), and two
      reads of the environment are two hosts that come to disagree about which one is configured. */
-  const sparkConfig = options.spark ?? sparkFromEnv(env);
-  const sparkModel = sparkModelFor(sparkConfig, () => api, options.keys);
-  /* SPARK'S OWN SQLITE AND NOT THE RECORD'S (`46 §2`): the engine writes its `settings` and `call` tables into
+  const slashConfig = options.slash ?? slashFromEnv(env);
+  const slashModel = slashModelFor(slashConfig, () => api, options.keys);
+  /* SLASH'S OWN SQLITE AND NOT THE RECORD'S (`46 §2`): the engine writes its `settings` and `call` tables into
      its own database, beside the record's rather than inside it. */
-  /* BESIDE THE RECORD FILE, `<dir>/spark.sqlite`, AS `inbound.token` IS, AND IN MEMORY ONLY WHERE THE RECORD IS.
+  /* BESIDE THE RECORD FILE, `<dir>/slash.sqlite`, AS `inbound.token` IS, AND IN MEMORY ONLY WHERE THE RECORD IS.
      This was `:memory:` everywhere, under a comment calling the tables a cache, and they are not one: `call` is
-     the only account of what Spark was asked, and `asksUsed` counts the month's meter out of it (`46 §4.1`).
+     the only account of what Slash was asked, and `asksUsed` counts the month's meter out of it (`46 §4.1`).
      `loop/research-spark-seam.md` measured the cost: every restart began the month again, so the tier `a` cap was
-     a cap per uptime, and the `settings` row an owner chose went back to the defaults. `test/spark-meter-persists`
+     a cap per uptime, and the `settings` row an owner chose went back to the defaults. `test/slash-meter-persists`
      asks twice across a restart and reads both rows back.
      THE SNAPSHOTS DO NOT CARRY IT, and that is deliberate: `VACUUM INTO` copies the record, and a restored record
      with no ledger beside it meters from zero, which is the old behaviour on the one path that already loses
      time. `destroy` removes it with the record. */
-  const sparkFile = options.file === ':memory:' ? null : joinPath(dirOf(options.file), 'spark.sqlite');
-  const sparkSql = openSqlite(sparkFile ?? ':memory:');
-  /* WHAT ANSWERS AN AUTOMATION'S QUESTION TO SPARK, from the same config and the same key path as `sparkModel`, so the
-     record's `answersSpark` below and `/api/version`'s `spark` are one fact. Before this, a self-host with a model
-     refused `ask_spark` at install as if it had none (`test/spark-answers.test.ts`). */
-  const answers = sparkAnswersFor(sparkConfig, () => api, options.keys, { sql: sparkSql, clock });
-  /* AND THE LEDGER THE RECORD'S OWN TWO ASKS ARE SPENT FROM, the press and the first plan, in the same Spark SQLite and
-     under the same `ask_cap` a read and an automation's question are (`@braindog/host` `sparkRecordMeter`). Without it
-     the record asks `sparkModel` unmetered, which it did on both hosts until `loop/research-batch-sixty-audit.md` finding 2
-     was wired. The engine is `sparkEngineFor`'s, the guarded one `answers` builds, built on the first press and kept;
+  const slashFile = options.file === ':memory:' ? null : slashLedger(dirOf(options.file));
+  const slashSql = openSqlite(slashFile ?? ':memory:');
+  /* WHAT ANSWERS AN AUTOMATION'S QUESTION TO SLASH, from the same config and the same key path as `slashModel`, so the
+     record's `answersSlash` below and `/api/version`'s `slash` are one fact. Before this, a self-host with a model
+     refused `ask_slash` at install as if it had none (`test/slash-answers.test.ts`). */
+  const answers = slashAnswersFor(slashConfig, () => api, options.keys, { sql: slashSql, clock });
+  /* AND THE LEDGER THE RECORD'S OWN TWO ASKS ARE SPENT FROM, the press and the first plan, in the same Slash SQLite and
+     under the same `ask_cap` a read and an automation's question are (`@braindog/host` `slashRecordMeter`). Without it
+     the record asks `slashModel` unmetered, which it did on both hosts until `loop/research-batch-sixty-audit.md` finding 2
+     was wired. The engine is `slashEngineFor`'s, the guarded one `answers` builds, built on the first press and kept;
      a build that throws is let go, and the record reads that hold as a ledger it could not read and lets its rules draft.
      NO RATE, because this host's endpoint is its owner's and not an account this host pays neurons on: the row is
      counted against the cap and priced 0. The name is the package's routing name, the one its own tier `a` rows carry. */
-  let meterEngine: ReturnType<typeof sparkEngineFor> | null = null;
-  const sparkMeter = sparkRecordMeter({
-    sql: sparkSql,
+  let meterEngine: ReturnType<typeof slashEngineFor> | null = null;
+  const slashMeter = slashRecordMeter({
+    sql: slashSql,
     clock,
     engine: () =>
-      (meterEngine ??= sparkEngineFor(sparkConfig, () => api, options.keys, { sql: sparkSql, clock }).catch((e: unknown) => {
+      (meterEngine ??= slashEngineFor(slashConfig, () => api, options.keys, { sql: slashSql, clock }).catch((e: unknown) => {
         meterEngine = null;
         throw e;
       })),
@@ -1110,8 +1141,8 @@ export async function start(options: {
   /* `pull.fetch` IS THE RUNNER'S WHEN THE RUNNER IS ON. A deliverer handed the same kind would lease a scheduled
      action's job and send it without the origin check, the redirect rule or the cap. */
   /* AND `infer.ask` IS NEVER A DELIVERER'S, WITH A MODEL OR WITHOUT ONE. A `Deliver` returns `void`, so the pump acks the
-     job `done` with no `result`, and the run it answers ends on "Spark answered job ... with no text": measured in
-     `test/spark-answers.test.ts`, a deliverer handed every kind was handed the question. Only `serveAsks` in `poll` leases
+     job `done` with no `result`, and the run it answers ends on "Slash answered job ... with no text": measured in
+     `test/slash-answers.test.ts`, a deliverer handed every kind was handed the question. Only `serveAsks` in `poll` leases
      it, and only where there is a model to ask. */
   const delivers: readonly OutboxKind[] = (options.delivers ?? []).filter((k) => k !== 'infer.ask' && (!options.actions || k !== 'pull.fetch'));
 
@@ -1208,7 +1239,7 @@ export async function start(options: {
     /* NOTHING IS LEASED OR SENT FROM A RECORD THIS BUILD REFUSES, for the reason the doors above refuse it. */
     if (api.kernel.refused()) return;
     await act();
-    /* THE QUESTIONS TO SPARK, HERE AND NOT IN `act()`, which returns on its first line when `options.actions` is absent,
+    /* THE QUESTIONS TO SLASH, HERE AND NOT IN `act()`, which returns on its first line when `options.actions` is absent,
        as it is for every embedder and every test that does not pass it; a pass there left a record admitting the step and
        a host that never asked it (`loop/research-infer-ask-next.md` §5). And before the line below, because production's
        `start()` passes no `deliver` (`main.ts`). `serveAsks` catches what `answer` throws; this `try` is for the lease. */
@@ -1216,7 +1247,7 @@ export async function start(options: {
       try {
         await serveAsks(api.kernel, answers, scheduler);
       } catch (e) {
-        console.error('spark answers:', e instanceof Error ? e.message : String(e));
+        console.error('slash answers:', e instanceof Error ? e.message : String(e));
       }
     }
     tellUnsentMail();
@@ -1299,9 +1330,9 @@ export async function start(options: {
        pass runs; without it a queued question waited for the fifteen-second belt, which a test passing `pollMs: 0` has not
        got. The pump's own list leaves it out, above. */
     delivers: [...delivers, ...(options.actions ? (['pull.fetch'] as const) : []), ...(answers ? (['infer.ask'] as const) : [])],
-    /* THE RECORD'S SWITCH FOR `ask_spark`, ON EXACTLY WHERE THE PASS ABOVE HAS SOMETHING TO ASK WITH. Off, install refuses
+    /* THE RECORD'S SWITCH FOR `ask_slash`, ON EXACTLY WHERE THE PASS ABOVE HAS SOMETHING TO ASK WITH. Off, install refuses
        the step with `NOT_IN_THIS_BUILD` (Brief A's `unserved`), which is the honest answer on a host with no model. */
-    answersSpark: answers !== undefined,
+    answersSlash: answers !== undefined,
     sign,
     invitations: () => invitesOff,
     /* WHAT AN AGENT MAY PROPOSE INSTALLING: the first-party packs and the starter use cases (`catalogue.ts`). */
@@ -1340,19 +1371,19 @@ export async function start(options: {
               stale: d.stale,
             });
           },
-    /* SPARK'S MODEL, when this host points at one; the record files what it drafts through the proposal door or not at all. */
-    sparkModel,
-    sparkMeter,
-    /* NEWER VERSIONS IN THIS HOST'S CATALOGUE, for Spark to ask about on Decide. */
+    /* SLASH'S MODEL, when this host points at one; the record files what it drafts through the proposal door or not at all. */
+    slashModel,
+    slashMeter,
+    /* NEWER VERSIONS IN THIS HOST'S CATALOGUE, for Slash to ask about on Decide. */
     ...(catalogueDir === undefined ? {} : { catalogueOffers: catalogueOffersFrom(catalogueDir) }),
     snapshots: kept,
     destroy,
     /* WHAT THIS HOST IS, for `/api/version` (`33 §4`). `BRAINDOG_BUILD` is the same variable name
        the Worker's deploy sets, so the answer has the same shape on both hosts; a self-host started
        from a checkout has none, and the record then says `app: null` rather than inventing one.
-       `spark` is whether a model is behind Spark here: an endpoint, and a key to call it with or none needed.
+       `slash` is whether a model is behind Slash here: an endpoint, and a key to call it with or none needed.
        `host` is for `boot`, so Billing reads that this is a self-host rather than inferring it from the mail door's 404. */
-    build: { app: buildApp, spark: sparkModel !== undefined, host: 'self-host' },
+    build: { app: buildApp, slash: slashModel !== undefined, host: 'self-host' },
   });
 
   /* A MODULE-LEVEL REFUSAL NO LONGER ENDS THE PROCESS. This called `process.exit(1)` from inside a library function, so a
@@ -1377,19 +1408,19 @@ export async function start(options: {
   const ticker = options.pollMs === 0 ? null : setInterval(() => void poll(), options.pollMs ?? 15_000);
   ticker?.unref?.();
 
-  /* SPARK'S DAILY LOOK. The record decides whether it is due; this only asks, now and then every `sparkTickMs`. A look that
+  /* SLASH'S DAILY LOOK. The record decides whether it is due; this only asks, now and then every `slashTickMs`. A look that
      throws is logged and waits for tomorrow, because the day was kept before the work. */
-  const spark = async (): Promise<void> => {
+  const slash = async (): Promise<void> => {
     if (gone) return;
     try {
-      await api.sparkTick();
+      await api.slashTick();
     } catch (e) {
-      console.error('spark:', e instanceof Error ? e.message : String(e));
+      console.error('slash:', e instanceof Error ? e.message : String(e));
     }
   };
-  const sparkTicker = options.sparkTickMs ? setInterval(() => void spark(), options.sparkTickMs) : null;
-  sparkTicker?.unref?.();
-  if (sparkTicker) void spark();
+  const slashTicker = options.slashTickMs ? setInterval(() => void slash(), options.slashTickMs) : null;
+  slashTicker?.unref?.();
+  if (slashTicker) void slash();
 
   /* Arm from what the record already holds. A record reopened after a week has reminders whose time
      came while nothing was running, and an alarm nobody set is a schedule that never restarts. */
@@ -1587,7 +1618,7 @@ export async function start(options: {
     origins,
     vault: vaultDoor(api, options.keys),
     keys: keysDoor(api, options.keys, origins),
-    spark: sparkDoor(sparkConfig, () => api, options.keys, { sql: sparkSql, clock }, origins),
+    slash: slashDoor(slashConfig, () => api, options.keys, { sql: slashSql, clock }, origins),
     /* ONE BUDGET PER PROCESS, built here so it outlives a request and is shared by every ingest. */
     arrivals: arrivalDoor(api, ingestBudget(clock.now), inboundMail),
     snapshots: kept,
@@ -1655,8 +1686,8 @@ export async function start(options: {
       new Promise<void>((r) => {
         scheduler.stop();
         if (ticker) clearInterval(ticker);
-        if (sparkTicker) clearInterval(sparkTicker);
-        server.close(() => (gone || (sql.close(), sparkSql.close()), dirSql.close(), r()));
+        if (slashTicker) clearInterval(slashTicker);
+        server.close(() => (gone || (sql.close(), slashSql.close()), dirSql.close(), r()));
       }),
   };
 }
@@ -1829,10 +1860,10 @@ async function answer(
      stays the record's question. */
   if ('ctx' in seen) {
     const ctx = withSession(seen.ctx, sessionOf(request.headers));
-    /* SPARK AHEAD OF THE KEY DOORS AND BOTH AHEAD OF `serveApi`, because `serveApi` answers anything it does
-       not know as `ROUTE_UNKNOWN`, which is what `POST /api/spark/read` got until this line existed. */
-    const out = servesSpark(path)
-      ? await serveSpark(request, site.spark, ctx)
+    /* Slash's DOOR AHEAD OF THE KEY DOORS AND BOTH AHEAD OF `serveApi`, because `serveApi` answers anything it does
+       not know as `ROUTE_UNKNOWN`, which is what `POST /api/slash/read` got until this line existed. */
+    const out = servesSlash(path)
+      ? await serveSlash(request, site.slash, ctx)
       : servesKeys(path)
         ? await serveKeys(request, site.keys, ctx)
         : await serveApi(request, handlers, ctx);

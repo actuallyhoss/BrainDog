@@ -210,7 +210,7 @@ test('AN AGENT TAKES A STEP, RECORDS A CHOICE WITH ITS REASON AND ADDS WHAT HELP
   assert.ok(block(blocks, 'What helps').rows?.some((r) => r.fields.name === 'A guide to recording remote interviews'));
 });
 
-test('ONCE THE IDEA STAGE IS DONE THE GUIDE SAYS SO, by the figures Spark reads to ask about running the project', async () => {
+test('ONCE THE IDEA STAGE IS DONE THE GUIDE SAYS SO, by the figures Slash reads to ask about running the project', async () => {
   const k = await guideFor('I want to build an app for dog walkers');
   const holds = () => GUIDE_GROWS.when.every((w) => {
     const v = figure(k, w.metric) ?? 0;

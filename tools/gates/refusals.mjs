@@ -85,7 +85,7 @@ export default function refusals(
     ['Auth and vault', 'AUTH'],
     ['Format and lifecycle', 'LIFECYCLE'],
     ['Dialect', 'DIALECT'],
-    ['Spark', 'SPARK'],
+    ['Slash', 'SLASH'],
     ['Connector', 'CONNECTOR'],
     ['Host and client', 'HOST'],
   ];
@@ -217,7 +217,7 @@ export default function refusals(
      sounds like a defect in their change and is not. A gate that manufactures work is a gate people
      route around. `words()` below reads the range this sentence can plausibly occupy, it is tested
      by `spelled()` beneath it on every run, and it costs nothing per code from here on. */
-  const counted = /([A-Z][a-z-]+(?: [a-z-]+)*), counted, in nine families\s+\S\s+(\d+) pack and declaration · (\d+) grammar · (\d+) write path · (\d+) auth and vault · (\d+) format and lifecycle · (\d+) dialect · (\d+) spark · (\d+) connector · (\d+) host and client/.exec(flat);
+  const counted = /([A-Z][a-z-]+(?: [a-z-]+)*), counted, in nine families\s+\S\s+(\d+) pack and declaration · (\d+) grammar · (\d+) write path · (\d+) auth and vault · (\d+) format and lifecycle · (\d+) dialect · (\d+) slash · (\d+) connector · (\d+) host and client/.exec(flat);
   if (!counted) {
     findings.push("30 §6's counting sentence is not where this gate looks for it");
   } else {

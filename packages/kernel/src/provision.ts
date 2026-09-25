@@ -276,7 +276,7 @@ export function purge(
       sql.exec('DELETE FROM entry_fts WHERE rowid = ?', row.rowid);
       sql.exec('DELETE FROM entry WHERE id = ?', row.id);
       /* THE LIST IT WAS IN STAYS IN ITS HISTORY: a row event carries no list, so once the row is gone this is the only
-         place that says which list its writes were to, and counts read from the log (Spark's ninety days) still add up. */
+         place that says which list its writes were to, and counts read from the log (Slash's ninety days) still add up. */
       sql.exec(
         "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, from_v, to_v) VALUES (?, ?, 'system', 'purge', ?, 'entry', 'register', ?, NULL)",
         mint(),

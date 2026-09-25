@@ -59,7 +59,7 @@ test('A SQLITE WITHOUT FTS5 OPENS AS A REFUSAL, NOT A THROW', async () => {
   const blind = refusing(existing, /\bentry_fts\b/, 'no such module: fts5');
   const again = await applyMigrations(blind, clock);
   assert.equal(again.state.refusal?.code, 'RECORD_UNAVAILABLE');
-  assert.equal(again.state.applied.length, 15, 'the ledger it read is still reported');
+  assert.equal(again.state.applied.length, 16, 'the ledger it read is still reported');
 
   const kernel = await openRecord(blind, clock);
   const created = kernel.createRecord({

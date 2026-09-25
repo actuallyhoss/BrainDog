@@ -10,7 +10,7 @@
  * the sentence form, so the one question a number is asked most, is it past a line, could not be
  * asked there at all.
  *
- * THE WORDS ARE THE ONES THE APP ALREADY PRINTS. `apps/web/src/lib/copy.ts` `sparkOps` and the flow
+ * THE WORDS ARE THE ONES THE APP ALREADY PRINTS. `apps/web/src/lib/copy.ts` `slashOps` and the flow
  * canvas's `COMPARE` write `gte` as "is at least" and `between` as "is between X and Y", so a clause
  * printed from the tree has to read back as the tree it was printed from. Both spellings, with and
  * without the `is`, are held here.

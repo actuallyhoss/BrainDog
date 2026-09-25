@@ -46,9 +46,9 @@ export { ScriptOutbound, ScriptRecord };
 const at = '2026-09-22T00:00:00.000Z';
 const VAULT = [
   { id: 'g_gold', label: 'goldapi', opens: 'api.gold.test', revoked_at: null, created_at: at },
-  { id: 'g_spark', label: 'spark', opens: 'collector.test', revoked_at: null, created_at: at },
+  { id: 'g_slash', label: 'slash', opens: 'collector.test', revoked_at: null, created_at: at },
 ];
-const BYTES = { goldapi: ${JSON.stringify(KEY)}, spark: 'SECRET-OF-spark' };
+const BYTES = { goldapi: ${JSON.stringify(KEY)}, slash: 'SECRET-OF-slash' };
 
 export class Rec extends DurableObject {
   runs = new ScriptRuns();
@@ -228,10 +228,10 @@ export default async function run(ctx) {
   assert.deepEqual(away.sent, [], 'a request left after the key was sent where it does not open');
 });
 
-test("THROUGH THE GATEWAY, a script naming the vault's spark key is refused before it runs, and nothing is sent", async () => {
-  const { answer, sent } = await run(`export default async function run(ctx) { await ctx.fetch('${COLLECTOR}/in', { key: 'spark' }); }`, { egress: [COLLECTOR], keys: ['spark'] });
+test("THROUGH THE GATEWAY, a script naming the vault's `slash` key is refused before it runs, and nothing is sent", async () => {
+  const { answer, sent } = await run(`export default async function run(ctx) { await ctx.fetch('${COLLECTOR}/in', { key: 'slash' }); }`, { egress: [COLLECTOR], keys: ['slash'] });
   assert.equal(answer.refused?.code, 'FORBIDDEN', JSON.stringify(answer));
-  assert.match(answer.refused?.why ?? '', /spark/);
+  assert.match(answer.refused?.why ?? '', /slash/);
   assert.deepEqual(sent, []);
 });
 

@@ -4,7 +4,7 @@
  *
  * WHAT WAS MEASURED AT HEAD `afb3b1b2`, BEFORE THE REPAIR, over a list whose `pin` is secret:
  *
- *   - At install, the lint followed a secret into a `set`, a `tag` and a question to Spark and into nothing else.
+ *   - At install, the lint followed a secret into a `set`, a `tag` and a question to Slash and into nothing else.
  *     `note`, `notify`, `schedule`, `create` into another list's text field, `suggest`, `link` and a question to a
  *     person each installed holding `{{pin}}` or `{{trigger.row.pin}}`, on both paths, and a step crossing `each: [pin]`
  *     installed too. That is SEC-1, and the recorded finding named only the `create`; measuring found all of them.
@@ -28,7 +28,7 @@
  * declared secret or file, or from a variable set from one, has to leave that list alone, and has to leave alone a
  * text field that merely holds the same words as the secret.
  *
- * `hunter2` IS PUT IN BY SQL AFTER THE ROW IS MADE AND BEFORE THE DRAIN, as `spark-launder-row.test.ts` puts it: in
+ * `hunter2` IS PUT IN BY SQL AFTER THE ROW IS MADE AND BEFORE THE DRAIN, as `slash-launder-row.test.ts` puts it: in
  * use a secret field holds a vault grant's id, and a plaintext is the plainest way to see where it went.
  */
 
@@ -113,7 +113,7 @@ type Step = Record<string, unknown>;
  * row too, so the row's own `{{pin}}` reaches the secret there as well as the run's `{{trigger.row.pin}}`; `runOnly`
  * names the copies it does not. `atRun` is what the runner does with a rule stored past the lint: `refuses` fails the
  * run at the step, a `set` and a `tag` of the run's own row included; `cleans` asks the question with the dash where
- * the secret was; `asks` is a question to Spark, which `spark-vars-hidden.test.ts` and `flow-waits.test.ts` hold; and
+ * the secret was; `asks` is a question to Slash, which `slash-vars-hidden.test.ts` and `flow-waits.test.ts` hold; and
  * `unbuilt` is a step whose runtime is not in this build.
  * `plain` is the same verb writing into a field that never leaves either. `none` is a verb that copies no text, and why.
  */
@@ -148,7 +148,7 @@ const FIXTURES: Record<string, Fixture> = {
   set_var: { none: 'a variable is carried, not written: the check follows it into every verb above that writes it out' },
   script: { copies: [(t) => ({ script: { id: 'rates', input: { key: t }, as: 'out' } })], rowFilled: false, atRun: 'unbuilt' },
   call: { none: "a call step names a declared call and sends that call's declared fields, as run: does" },
-  ask_spark: { copies: [(t) => ({ ask_spark: { question: t, as: 'rate' } })], rowFilled: true, atRun: 'asks' },
+  ask_slash: { copies: [(t) => ({ ask_slash: { question: t, as: 'rate' } })], rowFilled: true, atRun: 'asks' },
   ask_person: { copies: [(t) => ({ ask_person: { question: t, options: ['yes', 'no'], as: 'a' } })], rowFilled: true, atRun: 'cleans' },
   wait: { none: 'a wait holds a span and no text' },
 };
@@ -166,7 +166,7 @@ const ROW_SPELLINGS = ['x {{pin}}', 'x {{money:pin}}'];
 async function opened(...more: Declaration[]): Promise<{ k: Kernel; sql: NodeSql; clock: ReturnType<typeof fixedClock> }> {
   const sql = openSqlite();
   const clock = fixedClock(NOW);
-  const k = await openRecord(sql, clock, { answersSpark: true });
+  const k = await openRecord(sql, clock, { answersSlash: true });
   value(await k.install([OBLIGATIONS, PAYMENTS, JOBS, ...more]));
   return { k, sql, clock };
 }
@@ -204,7 +204,7 @@ async function stored(body: Record<string, unknown>, fields: Record<string, unkn
   const { k: first, sql, clock } = await opened();
   value(await first.install([steps([{ set_var: { name: 'x', to: 'y' } }])]));
   sql.exec("UPDATE declaration SET body = ? WHERE id = 'rule.copy' AND superseded_at IS NULL", JSON.stringify({ rule: 'copy', ...body }));
-  const k = await openRecord(sql, clock, { answersSpark: true });
+  const k = await openRecord(sql, clock, { answersSlash: true });
   const before = holding(sql, needle);
   const made = value<Entry>(k.create(register, { what: 'Rent', ...fields }, { actor: 'p_1' }));
   if (register === 'obligations') sql.exec("UPDATE entry SET fields = json_set(fields, '$.pin', 'hunter2') WHERE id = ?", made.id);
@@ -237,7 +237,7 @@ test('NO FALSE POSITIVE: a list with no secret field, and a text field holding t
         for (const text of register === 'jobs' ? texts : ['x {{note}} {{trigger.row.note}} {{vars.v}}']) {
           const set = { set_var: { name: 'v', to: register === 'jobs' ? '{{trigger.row}}' : '{{trigger.row.note}}' } };
           const sql = openSqlite();
-          const k = await openRecord(sql, fixedClock(NOW), { answersSpark: true });
+          const k = await openRecord(sql, fixedClock(NOW), { answersSlash: true });
           const installed = await k.install([OBLIGATIONS, PAYMENTS, JOBS, rule({ on: on(register), once_per: ['entry'], steps: [set, copy(text)] })]);
           if (!installed.ok) {
             failed.push(`${register} ${verb} ${text}: install refused ${fixOf(installed)}`);
@@ -260,7 +260,7 @@ test('NO FALSE POSITIVE: a list with no secret field, and a text field holding t
       const f = FIXTURES[verb];
       if (f === undefined || 'none' in f || !f.rowFilled) continue;
       const sql = openSqlite();
-      const k = await openRecord(sql, fixedClock(NOW), { answersSpark: true });
+      const k = await openRecord(sql, fixedClock(NOW), { answersSlash: true });
       value(await k.install([OBLIGATIONS, PAYMENTS, JOBS, rule({ register, once_per: ['entry'], then: [f.copies[0]!('x {{note}} {{old}}')] })]));
       const made = value<Entry>(k.create(register, { what: 'Rent', note: 'plain' }, { actor: 'p_1' }));
       sql.exec(`UPDATE entry SET fields = json_set(fields, '$.${register === 'jobs' ? 'old' : 'pin'}', ?) WHERE id = ?`, register === 'jobs' ? 'put away' : 'plain', made.id);
@@ -364,7 +364,7 @@ test('A RULE ON THE INLINE PATH STORED PAST THE LINT WRITES THE SECRET NOWHERE, 
     const { sql, went, made } = await stored({ register: 'obligations', once_per: ['entry', 'memo'], then: [f.copies[0]!('x {{pin}}')] }, { note: 'plain' });
     /* THE PASS RAN INSIDE THE CREATE, before `pin` was put in, so the edit here is what reaches the secret; `once_per`
        names `memo`, which the edit changes, so the rule fires again for it. */
-    const { k } = await (async () => ({ k: await openRecord(sql, fixedClock(NOW), { answersSpark: true }) }))();
+    const { k } = await (async () => ({ k: await openRecord(sql, fixedClock(NOW), { answersSlash: true }) }))();
     value(k.update('obligations', made.id, { memo: 'again' }, { actor: 'p_1' }) as Result<unknown>);
     const after = [...holding(sql, 'hunter2')].filter((r) => !went.includes(r));
     if (after.length) leaked.push(`${verb}: ${after.join(' | ')}`);
@@ -445,7 +445,7 @@ test('SEC-3, rules.ts: A LIST ITEM THAT SPELLS {{pin}} IS CROSSED AS THOSE WORDS
   ]) {
     const { k: first, sql, clock } = await opened();
     value(await first.install([rule(body)]));
-    const k = await openRecord(sql, clock, { answersSpark: true });
+    const k = await openRecord(sql, clock, { answersSlash: true });
     /* THE PIN IS IN THE ROW WHEN THE PASS READS IT, so the create is made by an edit after the pin is put in. */
     const made = value<Entry>(k.create('obligations', { what: 'Rent' }, { actor: 'p_1' }));
     sql.exec("UPDATE entry SET fields = json_set(fields, '$.pin', 'hunter2') WHERE id = ?", made.id);
@@ -483,7 +483,7 @@ test('SEC-3, flow.ts: A TEXT FIELD THAT SPELLS {{pin}} IS COPIED AS THOSE WORDS,
 
 test('WHERE A VARIABLE CAME FROM OUTLIVES A WAIT, is rebuilt for a column with no -sealed, and goes when an answer takes the name', async () => {
   /* THREE LINES THE TESTS ABOVE LEFT UNTESTED, found by the checker on 23 September by taking each out and watching
-     this file, `spark-vars-hidden.test.ts`, `flow-waits.test.ts` and `spark-launder-row.test.ts` stay green: the
+     this file, `slash-vars-hidden.test.ts`, `flow-waits.test.ts` and `slash-launder-row.test.ts` stay green: the
      replay for a column a build before `-sealed` parked (`sealedAgain`), the filter in `answerStep` that takes an
      answered name off `-sealed`, and the `present` that keeps an empty secret field from counting. With the replay
      taken out, the run below finished and wrote `x k hunter2` into the note event after the wait. With the filter taken out, `p`
@@ -518,7 +518,7 @@ test('WHERE A VARIABLE CAME FROM OUTLIVES A WAIT, is rebuilt for a column with n
   const { sql, k: first, clock } = await opened();
   value(await first.install([steps([{ set_var: { name: 'x', to: 'y' } }])]));
   sql.exec("UPDATE declaration SET body = ? WHERE id = 'rule.copy' AND superseded_at IS NULL", JSON.stringify({ rule: 'copy', on: on('obligations'), once_per: ['entry'], steps: [{ note: 'x {{pin}} {{trigger.row.pin}} {{trigger.row}}' }] }));
-  const k = await openRecord(sql, clock, { answersSpark: true });
+  const k = await openRecord(sql, clock, { answersSlash: true });
   value<Entry>(k.create('obligations', { what: 'Rent', note: 'plain' }, { actor: 'p_1' }));
   await k.drain();
   const empty = sql.one<{ state: string; say: string | null }>("SELECT state, say FROM automation_run WHERE rule = 'copy'");

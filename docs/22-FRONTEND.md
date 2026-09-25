@@ -371,7 +371,7 @@ fine for a register list, not for data), and `setWebSocketAutoResponse()` so kee
 the object. Reconnect with 5–30 s jitter; after two failures fall back to polling `GET /api/version`
 every 15 s with one socket attempt per five minutes, and a hidden tab pauses both
 ([50-SPEC-WEB](50-SPEC-WEB.md) §5.4). The frame is `{ version, registers }` and nothing else; the
-route answers `{ version, format, kernel, primitives, app, spark }` ([33-CONTRACTS](33-CONTRACTS.md)
+route answers `{ version, format, kernel, primitives, app, slash }` ([33-CONTRACTS](33-CONTRACTS.md)
 §4). Job events are never pushed — the job view polls `jobEvents({ id, after })`
 ([23-ASSISTANT-UI](23-ASSISTANT-UI.md) §3.1). A phase-2 self-host has no `/ws`: the route is 404 and
 the client polls ([49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §4).
@@ -745,7 +745,7 @@ screen.** The assertion: **header cell widths === body cell widths, exactly.** T
 pass is one declared track list in a custom property, shared.
 
 **Nine fixture records** — one per reference page, eight, plus `corpus`, the whole-corpus record the
-`brain-roundtrip` and `spark-actor` gates read — checked in as text: pack YAML, row JSON
+`brain-roundtrip` and `slash-actor` gates read — checked in as text: pack YAML, row JSON
 per register, a `seed.json` manifest. Rows are committed for ≤ 60 and generated beyond that by
 `rows/gen.mjs` from the seed's RNG, output committed and `--check`ed in CI; the data is synthetic by
 rule — generated names, `.example` hosts, 2030–2031 dates, refs as `register#seq`, no ULID or hash on

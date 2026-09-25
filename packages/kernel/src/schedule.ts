@@ -312,7 +312,7 @@ export const pendingWork = (
    * The kinds this deployment can actually deliver. Absent is all of them.
    *
    * THE DOORBELL RINGS FOR WORK SOMEBODY CAN DO. A kind no host on this deployment delivers —
-   * `infer.draft` without a Spark, `pull.fetch` without a runner — sits `pending` for ever, and
+   * `infer.draft` without a Slash, `pull.fetch` without a runner — sits `pending` for ever, and
    * without this filter `outboxPending` was then true for ever: every write for the life of the
    * record sent a queue message and bought a lease pass that claimed nothing. The row is still
    * there and still visible; what stops is the bell.

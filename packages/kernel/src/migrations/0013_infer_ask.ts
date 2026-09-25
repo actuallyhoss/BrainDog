@@ -1,7 +1,7 @@
 /**
- * The kernel schema, migration 13: `infer.ask`, an automation's question to Spark, on the outbox's `CHECK`.
+ * The kernel schema, migration 13: `infer.ask`, an automation's question to Slash, on the outbox's `CHECK`.
  *
- * `loop/research-shell-automations.md` section 4.3, Brief C. A run that reaches `ask_spark` queues one `infer.ask` row,
+ * `loop/research-shell-automations.md` section 4.3, Brief C. A run that reaches `ask_slash` queues one `infer.ask` row,
  * `{ run, step, question, shape, choices?, about? }`, and the ack's `result.text` is the answer (`flow.ts`,
  * `outbox.ts`). Without this the insert failed on SQLite's own CHECK text, which listed every outbox kind to the owner
  * as the reason the run stopped.

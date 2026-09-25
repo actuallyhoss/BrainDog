@@ -67,7 +67,7 @@ test('the canvas says it exactly where the record refuses it', () => {
     ['in a condition', manual([{ if: 'what is {{vars.w}}', then: [{ stop: true }] }])],
     ['both arms', manual([{ if: 'what is Rent', then: [keep('x')], else: [keep('x')] }, reads('x')])],
     ['kept first', manual([keep('x'), { if: 'what is Rent', then: [reads('x')] }, reads('x')])],
-    ['a deeper path', manual([{ ask_spark: { question: 'Rate?', as: 'r' } }, { notify: { say: '{{ vars.r.value }}' } }])],
+    ['a deeper path', manual([{ ask_slash: { question: 'Rate?', as: 'r' } }, { notify: { say: '{{ vars.r.value }}' } }])],
     ['the script named', manual([{ script: { id: 'tidy', as: 'job' } }, reads('job')])],
     /* THE INLINE PASS HAS NO RUN, and the record does not ask this of it: the braces stay as typed (`rules.ts`'s
        `filling`). Without the run-path gate in `faultsOf` the canvas stopped this body and the record took it. */

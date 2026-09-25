@@ -516,15 +516,15 @@ export const DECIDED: Question[] = [
   /**
    * THE PROPOSAL THAT PUT TWO ROWS IN THE RECORD, and the ledger recorded the rows without it.
    *
-   * `45 §5` — `infer.draft` opens a suggestion by `spark` and writes `propose` *"when `payload.raw`
+   * `45 §5` — `infer.draft` opens a suggestion by `slash` and writes `propose` *"when `payload.raw`
    * names an arrival"*; an accepted `rowset` body *"writes its rows"*. The two `create` events three
    * hours ago are those rows, and until now they arrived out of nowhere: an invoice landed in the
    * inbox, two services appeared, and nothing in between was written down. The one chain in this
    * record that runs arrival → assistant → person → rows had its middle two links missing.
    *
-   * It also makes `30 §3`'s invariant testable at all. That section closes the `spark` actor to
-   * three kinds and calls it *"an invariant with a test"* — `event WHERE actor='spark' AND kind NOT
-   * IN ('suggest','propose','predict')` must always be empty — and a ledger with no `spark` row
+   * It also makes `30 §3`'s invariant testable at all. That section closes the `slash` actor to
+   * three kinds and calls it *"an invariant with a test"* — `event WHERE actor='slash' AND kind NOT
+   * IN ('suggest','propose','predict')` must always be empty — and a ledger with no `slash` row
    * satisfies it the way an empty list satisfies anything.
    */
   {
@@ -590,7 +590,7 @@ export const ROWSETS: Record<string, RowsetBody> = {
 };
 
 /* ── proposals that arrange the record ────────────────────────────────────
-   One of each body an agent or Spark files to change what this BrainDog is (`packages/record/src/arrange.ts`): a
+   One of each body an agent or Slash files to change what this BrainDog is (`packages/record/src/arrange.ts`): a
    pack with its plan and the calls it would make, a settings change to the voice and the labels, and a whole
    arrangement with its reasons. Each body is as `prepare` files it, the plan and the calls worked out by the record.
 
@@ -639,7 +639,7 @@ export const ARRANGING: Question[] = [
 export const PROPOSALS: Record<string, Proposal> = {
   SG40: {
     kind: 'pack',
-    by: 'spark',
+    by: 'slash',
     body: {
       install: 'work',
       kind: 'pack',
@@ -660,7 +660,7 @@ export const PROPOSALS: Record<string, Proposal> = {
   },
   SG41: {
     kind: 'settings',
-    by: 'spark',
+    by: 'slash',
     body: {
       pack: 'usecase-founder',
       values: { voice_home: 'Studio', voice_needs_you: 'Waiting on you', label_obligations: 'Bills', label_things__lane__earning: 'Paying' },
@@ -669,7 +669,7 @@ export const PROPOSALS: Record<string, Proposal> = {
   },
   SG42: {
     kind: 'arrange',
-    by: 'spark',
+    by: 'slash',
     body: {
       usecase: 'founder',
       why: [
@@ -998,10 +998,10 @@ const WRITTEN: AuditEvent[] = [
   { seq: 4191, at: stamp(-3), by: 'claude', kind: 'create', target: 'services#7', note: 'Workers plan, from the Fenwick invoice', version: 4191 },
   /* THE ARRIVAL THAT CAUSED THE TWO ROWS ABOVE, and it was the missing half of the story. `45 §5`:
      `infer.draft` opens the suggestion and writes `propose` *"when `payload.raw` names an arrival"*,
-     actor `spark`. `30 §3` closes that actor to three kinds and calls the closure *"an invariant
-     with a test"* — `event WHERE actor='spark' AND kind NOT IN ('suggest','propose','predict')` must
-     always be empty. The ledger had no `spark` row at all, so the invariant held over nothing. */
-  { seq: 4190, at: stamp(-3), by: 'spark', kind: 'propose', target: 'suggestion:SG33', note: 'Two services on the Fenwick invoice, from in_8f21', version: 4190 },
+     actor `slash`. `30 §3` closes that actor to three kinds and calls the closure *"an invariant
+     with a test"* — `event WHERE actor='slash' AND kind NOT IN ('suggest','propose','predict')` must
+     always be empty. The ledger had no `slash` row at all, so the invariant held over nothing. */
+  { seq: 4190, at: stamp(-3), by: 'slash', kind: 'propose', target: 'suggestion:SG33', note: 'Two services on the Fenwick invoice, from in_8f21', version: 4190 },
   { seq: 4188, at: stamp(-9), by: 'rule.reply', kind: 'edit', target: 'obligations#1', note: 'added a note: “Chased twice. 45-day terms expired 3 August.”', version: 4188 },
   /* `state`, NOT `edit`. `30 §2` keeps them apart in the Rows group deliberately: a state move is
      the change a transition rule can refuse, and it was one word inside a free-text note. */

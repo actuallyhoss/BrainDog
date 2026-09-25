@@ -30,19 +30,19 @@ test('EVERY EVENT IN THE LEDGER IS A KIND THE DATABASE WOULD ACCEPT', () => {
   assert.ok(AUDIT.length > 8, 'the ledger lost rows');
 });
 
-test('and the actor grammar closes `spark` to three of them', () => {
-  /* `30 §3`, in as many words: "an invariant with a test — `event WHERE actor='spark' AND kind NOT
+test('and the actor grammar closes `slash` to three of them', () => {
+  /* `30 §3`, in as many words: "an invariant with a test — `event WHERE actor='slash' AND kind NOT
      IN ('suggest','propose','predict')` must always be empty." It is `11 §2`'s architectural claim
      written as a query anybody can run against a real record: the assistant proposes and never
      writes. */
-  const sparkKinds = new Set(['suggest', 'propose', 'predict']);
+  const slashKinds = new Set(['suggest', 'propose', 'predict']);
   for (const e of AUDIT)
-    if (e.by === 'spark') assert.ok(sparkKinds.has(e.kind), `spark wrote a ${e.kind}, which 30 §3 forbids`);
+    if (e.by === 'slash') assert.ok(slashKinds.has(e.kind), `slash wrote a ${e.kind}, which 30 §3 forbids`);
 
-  /* AND IT IS NOT VACUOUS. A ledger with no `spark` row satisfies the invariant the way an empty
+  /* AND IT IS NOT VACUOUS. A ledger with no `slash` row satisfies the invariant the way an empty
      list satisfies anything — which is what it did until the proposal behind the two Fenwick
      services was written down. */
-  assert.ok(AUDIT.some((e) => e.by === 'spark'), 'no spark row, so the assertion above proves nothing');
+  assert.ok(AUDIT.some((e) => e.by === 'slash'), 'no Slash row, so the assertion above proves nothing');
 });
 
 test('A SEQ IS A PLACE IN THE LIST, so the ledger reads in one order', () => {

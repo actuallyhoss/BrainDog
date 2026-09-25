@@ -503,9 +503,9 @@
 
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
-  import SparkAsks from '$lib/ui/SparkAsks.svelte';
-  import SparkModel from '$lib/ui/SparkModel.svelte';
-  import SparkDaily from '$lib/ui/SparkDaily.svelte';
+  import SlashAsks from '$lib/ui/SlashAsks.svelte';
+  import SlashModel from '$lib/ui/SlashModel.svelte';
+  import SlashDaily from '$lib/ui/SlashDaily.svelte';
   import WebhookDoors from '$lib/ui/WebhookDoors.svelte';
   import PushToggle from '$lib/ui/PushToggle.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -1273,7 +1273,7 @@
    * placed without a person asking, because the system never writes nav order after first install (06 §3).
    *
    * THE SECTION IS THE ONE THE PAGE DECLARES, and a derived page declares none, so it takes the name of the list it
-   * was built from, which is the heading Spark files its own drafted pages under and the words this row already says.
+   * was built from, which is the heading Slash files its own drafted pages under and the words this row already says.
    *
    * IT ONCE SAID SO IN THE COMPLETED PAST TENSE AND WROTE NOTHING. The row vanished from the pen because this
    * filtered a local array; the rail reads `boot()`, which filters on the declaration's own `placed` and `nav`,
@@ -2280,7 +2280,7 @@
           CONNECT AN AGENT. The bearer is drawn once, from `minted`, which Done and leaving the area both
           empty; nothing else on this screen holds it. The two lines carry no token (`48 §2`).
         -->
-        <!-- AND MINTING ONE IS THE OWNER'S TOO. `createToken` needs `owner`, and `SparkDaily` below
+        <!-- AND MINTING ONE IS THE OWNER'S TOO. `createToken` needs `owner`, and `SlashDaily` below
              already draws nothing on a record the caller does not own: this is that rule, applied to
              the control above it rather than only to the one under it. The section keeps its heading
              and its count, because what is in the list is still a fact about this record. -->
@@ -2376,10 +2376,10 @@
         {/if}
         {/if}
       </Section>
-      <SparkAsks owner={anOwner} />
-      <SparkModel owner={anOwner} />
-      <!-- SPARK LOOKING ON ITS OWN is the owner's choice, beside the agents they let in (`loop/research-spark.md` S15). -->
-      <SparkDaily link />
+      <SlashAsks owner={anOwner} />
+      <SlashModel owner={anOwner} />
+      <!-- SLASH LOOKING ON ITS OWN is the owner's choice, beside the agents they let in (`loop/research-spark.md` S15). -->
+      <SlashDaily link />
     {:else if area === 'ingest'}
       <!--
         `25 §9` DRAWS THIS SCREEN, which makes it the one settings area where inventing a control is

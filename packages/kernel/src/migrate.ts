@@ -32,6 +32,7 @@ import script0012 from './migrations/0012_script.ts';
 import inferAsk0013 from './migrations/0013_infer_ask.ts';
 import push0014 from './migrations/0014_push.ts';
 import tokenReach0015 from './migrations/0015_token_reach.ts';
+import slash0016 from './migrations/0016_slash.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -52,6 +53,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 13, slug: 'infer_ask', sql: inferAsk0013 },
   { version: 14, slug: 'push', sql: push0014 },
   { version: 15, slug: 'token_reach', sql: tokenReach0015 },
+  { version: 16, slug: 'slash', sql: slash0016 },
 ];
 
 /**
@@ -70,6 +72,7 @@ export const MIGRATIONS: readonly Migration[] = [
  * Migration 13 rebuilds `outbox` with one more kind; an older file carries only the ten it still takes.
  * Migration 14 adds `push_sub`, `local`, so no file carries it.
  * Migration 15 adds one nullable column to `token`, which is `local`, so no file carries it either.
+ * Migration 16 renames the assistant to Slash in the values of rows and changes no table or column.
  */
 export const FORMAT_VERSION = 1 as const;
 

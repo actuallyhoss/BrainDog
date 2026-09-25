@@ -1,6 +1,6 @@
 code:   PROPOSAL_NO_ROWS
 via:    ask
-raises: packages/spark/src/propose.ts
+raises: packages/slash/src/propose.ts
 fix:    A proposal names the rows behind it, or it is not filed.
 ask:    what is still open
 replies: [
@@ -13,11 +13,11 @@ replies: [
     }
   ]
 
-# `via: ask` IS THE NINTH SURFACE, MINTED FOR THESE FOUR ON SEPTEMBER 21ST 2026, because a spark
+# `via: ask` IS THE NINTH SURFACE, MINTED FOR THESE FOUR ON SEPTEMBER 21ST 2026, because a Slash
 # refusal happens when a model answers and the input is a projection plus that reply, which none of
 # the eight runners drives. `40 §6` holds the row and the argument.
 #
-# NO `at:`, AND THE SITE IS WHY. `packages/spark/src/propose.ts:434` answers this code with a
+# NO `at:`, AND THE SITE IS WHY. `packages/slash/src/propose.ts:434` answers this code with a
 # sentence and nothing else: the fault is that a filed body cites no row at all, so there is no
 # field, no span and no path to point at. `40 §6` has admitted a blank `at` since September 20th
 # 2026, and an invented address here would send a reader hunting for one bad figure in a proposal
@@ -28,4 +28,4 @@ replies: [
 #
 # THE TWO REPLIES ARE PASS 1 AND PASS 2. The second carries no digit and no braces anywhere, so the
 # citation check passes it and the palette refuses it one step later for citing nothing, which is
-# the step this code belongs to. `packages/spark/test/refusals-ask.test.ts` drives it.
+# the step this code belongs to. `packages/slash/test/refusals-ask.test.ts` drives it.

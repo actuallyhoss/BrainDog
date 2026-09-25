@@ -1,10 +1,10 @@
 /**
- * The canvas's draft, held to the one fact it reads from outside itself: whether this host answers Spark.
+ * The canvas's draft, held to the one fact it reads from outside itself: whether this host answers Slash.
  *
- * THE MENU AND THE FAULTS READ THE SAME FLAG AT DIFFERENT TIMES. `StepMenu.svelte` offers Ask Spark from a `$derived`
- * over `page.data.spark`, which follows every layout load. `FlowDraft` took the flag as a boolean when the page was
+ * THE MENU AND THE FAULTS READ THE SAME FLAG AT DIFFERENT TIMES. `StepMenu.svelte` offers Ask Slash from a `$derived`
+ * over `page.data.slash`, which follows every layout load. `FlowDraft` took the flag as a boolean when the page was
  * built. The layout forgets a refused `/api/version` and asks again on the next navigation, and a move from one
- * automation to another keeps the same page instance, so after one failed first ask the menu offered Ask Spark while
+ * automation to another keeps the same page instance, so after one failed first ask the menu offered Ask Slash while
  * every card of it was a fault saying this BrainDog has no model. So the draft now takes a function and reads it each
  * time the faults are asked for.
  *
@@ -34,20 +34,20 @@ registerHooks({
 /* AFTER THE HOOK, so the module loads through it. */
 const { FlowDraft } = await import('./flow.svelte.ts');
 
-const ASKS = { rule: 'asks', on: { manual: true }, steps: [{ ask_spark: { question: 'Go?', as: 'go' } }] };
+const ASKS = { rule: 'asks', on: { manual: true }, steps: [{ ask_slash: { question: 'Go?', as: 'go' } }] };
 
-test('THE DRAFT READS WHETHER THE HOST ANSWERS SPARK WHEN IT IS ASKED, not when the page was built', () => {
+test('THE DRAFT READS WHETHER THE HOST ANSWERS SLASH WHEN IT IS ASKED, not when the page was built', () => {
   /* MEASURED RED FIRST, with the boolean field: the function was kept as the flag, a function is truthy, and the card
      had no fault on a host with no model. Before that, with a boolean, a later `true` never reached the draft. */
-  let spark = false;
-  const flow = new FlowDraft({ spark: () => spark });
+  let slash = false;
+  const flow = new FlowDraft({ slash: () => slash });
   flow.open('asks', ASKS as never, 1);
-  assert.equal(flow.spark, false);
+  assert.equal(flow.slash, false);
   assert.equal(flow.faults.length, 1, JSON.stringify(flow.faults));
-  assert.match(flow.faults[0]!.say, /no model for Spark/u);
+  assert.match(flow.faults[0]!.say, /no model for Slash/u);
 
   /* THE SECOND `/api/version` ANSWERS, and the same draft now agrees with the menu that offered the step. */
-  spark = true;
-  assert.equal(flow.spark, true);
+  slash = true;
+  assert.equal(flow.slash, true);
   assert.deepEqual(flow.faults, []);
 });
