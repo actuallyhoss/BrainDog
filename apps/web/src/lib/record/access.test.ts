@@ -13,9 +13,10 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import './fixtures/fill.ts';
 import { copy } from '../copy.ts';
 import { bytes } from 'braindog-render';
-import { AUTH_METHODS, DEPLOYMENT, DEVICES, INBOX, JOB, JOBS, NOW, PASSKEYS, PEOPLE_ACCESS, ROWS, SIGNING_KEY, SNAPSHOTS, SNAPSHOTS_KEPT, SOURCES, VAULT } from './data.ts';
+import { AUTH_METHODS, DEPLOYMENT, DEVICES, INBOX, JOB, JOBS, NOW, PASSKEYS, PEOPLE_ACCESS, ROWS, SIGNING_KEY, SNAPSHOTS, SNAPSHOTS_KEPT, SOURCES, VAULT } from './fixtures/sample.ts';
 import { LEVELS, type Level } from './schema.ts';
 import { REGISTERS } from './api.ts';
 

@@ -34,6 +34,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { bridgePlan, moveOf, signedOf, type Row } from 'braindog-render';
 import { openRecord, type Declaration } from '@braindog/kernel';
+import './fixtures/fill.ts';
 import { REGISTERS } from './api.ts';
 import { page } from './fixtures/readers.ts';
 import { blockOf as liveBlockOf } from './page-live.ts';

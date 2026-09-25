@@ -156,13 +156,13 @@ test('A RECORD WITHOUT THE READ DRAWS NO LIST, and no record at all draws why', 
   const unknown: Fetch = async () => answer(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'no such method' } });
   const absent = await openAutomations(unknown);
   assert.equal(absent.absent, true);
-  assert.equal(absent.source.sample, false, 'a real record, so a save still goes to it');
+  /* NO `sample` FLAG ON A SOURCE AT ALL, since wave C3: it was `false` on every one, and two screens still branched on it. */
+  assert.equal('sample' in absent.source, false, 'a source still says whether it is the sample');
 
   const nobody: Fetch = async () => {
     throw new TypeError('offline');
   };
   const drawn = await openAutomations(nobody);
-  assert.equal(drawn.source.sample, false);
   assert.equal(drawn.absent, false);
   assert.deepEqual(drawn.first, { ok: false, refusal: { code: 'UNREACHABLE', fix: copy.recordNotReached } });
 
@@ -172,7 +172,6 @@ test('A RECORD WITHOUT THE READ DRAWS NO LIST, and no record at all draws why', 
 
   const refused: Fetch = async () => answer(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'An owner reads this.' } });
   const said = await openAutomations(refused);
-  assert.equal(said.source.sample, false, "any other refusal is the record's own sentence, not a sample");
   assert.equal(said.first.ok, false);
 
   const source: Record<string, unknown> = await import('./source.ts');

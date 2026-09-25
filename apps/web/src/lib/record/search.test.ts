@@ -19,10 +19,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import './fixtures/fill.ts';
 import { PAGE } from './api.ts';
 import { list, search } from './fixtures/readers.ts';
 import { ftsQuery } from '@braindog/kernel';
-import { ROWS } from './data.ts';
+import { ROWS } from './fixtures/sample.ts';
 import type { Entry } from './schema.ts';
 
 const src = (...parts: string[]) => readFileSync(join(fileURLToPath(new URL('../../', import.meta.url)), ...parts), 'utf8');

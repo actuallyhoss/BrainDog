@@ -15,7 +15,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isDeepStrictEqual } from 'node:util';
 
-import { PAGES } from './data.ts';
+import { PAGES } from './fixtures/sample.ts';
 import { declWords, pagesReader, type Fetch } from './pages-live.ts';
 
 const BASE = 'http://record.test';

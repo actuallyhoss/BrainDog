@@ -5,6 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import './fixtures/fill.ts';
 import { page } from './fixtures/readers.ts';
 import { toSegments } from './blocks.ts';
 

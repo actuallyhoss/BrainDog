@@ -17,6 +17,7 @@ import { registerHooks, stripTypeScriptTypes } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { compileModule } from 'svelte/compiler';
 
+import '../record/fixtures/fill.ts';
 import { readableFields, REGISTERS } from '../record/api.ts';
 import { forget, type Fetch } from '../record/boot-live.ts';
 import { addField } from '../record/field-write.ts';

@@ -20,10 +20,11 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { ftsQuery, projectedText } from '@braindog/kernel';
 
+import './fixtures/fill.ts';
 import { answers, projected, searchable, terms, tokensOf, why } from './find.ts';
 import { REGISTERS, display } from './api.ts';
 import { applyFilters, search } from './fixtures/readers.ts';
-import { QUESTIONS, DECIDED, ROWS } from './data.ts';
+import { QUESTIONS, DECIDED, ROWS } from './fixtures/sample.ts';
 import type { Entry } from './schema.ts';
 
 const rows = (...fields: Record<string, unknown>[]): Entry[] => fields.map((f, i) => ({ seq: i + 1, fields: f }) as Entry);

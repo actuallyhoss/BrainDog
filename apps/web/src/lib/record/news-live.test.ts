@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { MISSING, money } from 'braindog-render';
 
+import './fixtures/fill.ts';
 import { copy } from '../copy.ts';
 import { figureTile } from './fixtures/readers.ts';
 import { forget, readBoot, type Fetch } from './boot-live.ts';

@@ -34,8 +34,8 @@ export const heard = (): Labels => state.labels;
 async function hear(labels: Labels): Promise<void> {
   heardLabels(labels);
   state.labels = labels;
-  /* THE TABLE `learn` KEEPS, in `held.ts`: `data.ts` only copies the seed into it while the fixture still ships, and
-     asking the fixture for it named the sample as the place a record's lists are kept. */
+  /* THE TABLE `learn` KEEPS, in `held.ts`: only a test copies the seed into it (`fixtures/fill.ts`), and asking the
+     fixture for it named the sample as the place a record's lists are kept. */
   const { REGISTERS } = await import('./record/held.ts');
   relabelAll(REGISTERS, labels);
 }

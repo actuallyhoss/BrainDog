@@ -6,6 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import './fixtures/fill.ts';
 import { forget, layoutOf, newsOf, readBoot, refusedShell, signsIn, type Fetch } from './boot-live.ts';
 
 const BASE = 'http://record.test';

@@ -34,6 +34,7 @@ import { openRecord, type Kernel } from '@braindog/kernel';
 
 /* A NAMESPACE AND NOT A NAMED IMPORT, so a missing export is one failing test rather than a file that will not load
    and takes the two sweeps below down with it. */
+import './fixtures/fill.ts';
 import * as rows from './rows-write.ts';
 import { outbound } from './rows-write.ts';
 import type { Entry, Fields } from './schema.ts';

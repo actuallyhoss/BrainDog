@@ -19,9 +19,11 @@ import assert from 'node:assert/strict';
 
 import { openRecord } from '@braindog/kernel';
 
+import './fixtures/fill.ts';
 import { METRICS } from './declared.ts';
 import { read, type MetricDecl } from './metrics.ts';
-import { NOW, ROWS } from './data.ts';
+import { NOW } from './fixtures/sample.ts';
+import { ROWS } from './held.ts';
 import type { Entry } from './schema.ts';
 
 const DAY = 86_400_000;

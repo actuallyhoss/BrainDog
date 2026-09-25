@@ -1,15 +1,18 @@
 /**
- * The record this app shows, as the app needs it.
+ * The sample record, as tests read it: the seed's lists and rows numbered as a record numbers them, and the questions,
+ * inbox, vault, add-ons, news, audit trail and runs the sample's readers answer with.
  *
- * THE REGISTERS AND THE ROWS ARE NOT HERE ANY MORE. They are `@braindog/seed`, which the kernel
- * installs and writes through the real write path — so the figures below are assertions about a
- * record that exists rather than sums over a literal. What stays here is everything the interface
- * has and the record does not yet: the declared pages, the open questions, the inbox, the vault
- * index, the packs, the news, the audit trail and the job.
+ * A TEST IMPORTS THIS AND NOTHING SHIPPED MAY. It was `lib/record/data.ts`, the mock the app was drawn against before a
+ * record could answer, and it shipped for as long as a live screen read one of its tables (DIRECTION 26, wave C1 of
+ * `loop/research-no-sample.md`). `tools/gates/no-fixtures.mjs` refuses any file under `apps/web/src` outside a test that
+ * imports this directory.
  *
- * THE ROWS ARRIVE AS THE RECORD HOLDS THEM. Money is `{ amount, currency }` and a duration is
- * integer seconds, both the way the write path stores them — so what this file hands the app is the
- * shape the client will hand it later, and swapping one for the other changes no reader.
+ * IMPORTING IT FILLS NOTHING. Its `REGISTERS` and `PAGES` are its own tables; the helpers read `held.ts`'s, which only a
+ * record fills in a shipped tab. A test that wants the helpers to answer about the sample imports `fill.ts` as well,
+ * which copies these tables there.
+ *
+ * THE ROWS ARRIVE AS THE RECORD HOLDS THEM. Money is `{ amount, currency }` and a duration is integer seconds, both the
+ * way the write path stores them, so a reader tested over these rows is tested over the shape the client hands it.
  */
 
 import {
@@ -52,7 +55,7 @@ import type {
   Source,
   Question,
   RegisterDecl,
-} from './schema.ts';
+} from '../schema.ts';
 
 export { LOOKUPS, NOW, TODAY } from '@braindog/seed';
 
@@ -71,13 +74,12 @@ import { cashSeries, openTasksSeries } from '@braindog/seed';
  * project template with "Runs on" after its own blocks, taken from the seed as a record holding the
  * pack installs them.
  */
-export const PAGES: Record<string, PageDecl> = Object.assign(HELD_PAGES, { ...SEED_PAGES, project: projectWithRunsOn(), ...AGENTS_PAGES } as unknown as Record<string, PageDecl>);
+export const PAGES: Record<string, PageDecl> = { ...SEED_PAGES, project: projectWithRunsOn(), ...AGENTS_PAGES } as unknown as Record<string, PageDecl>;
 import { NOW, TODAY } from '@braindog/seed';
 import { sessionDeclaration, stampFinished, type Counted } from '@braindog/kernel';
-/* `find.ts` reads `REGISTERS` from this module; the cycle is fine in ESM because `answers` is only
-   called at render time, and it is the point — the receipts count the way the record counts. */
-import { answers } from './find.ts';
-import { PAGES as HELD_PAGES, REGISTERS as HELD_REGISTERS } from './held.ts';
+/* `find.ts` reads the declarations `fill.ts` puts in `held.ts`; `answers` is only called when a receipt is counted, so
+   the receipts count the way the record counts once a test has filled them. */
+import { answers } from '../find.ts';
 
 /**
  * The seed's registers, the agents pack's, and the kernel's `session`, as this app types them. The
@@ -86,31 +88,12 @@ import { PAGES as HELD_PAGES, REGISTERS as HELD_REGISTERS } from './held.ts';
  * AGENT RUNS COME FROM THE KERNEL'S OWN DECLARATION, the body migration 0002 seats, because that is
  * what a real record's `boot` lists. A copy written here would be the second "Agent runs" again.
  *
- * THEY GO INTO `held.ts`'S TABLE AND NOT A TABLE OF THEIR OWN, and so do the pages above. Every shipped reader reads the
- * declarations there, where `learn` writes what the record answers; a second table here would be the sample's copy that
- * no answer ever replaces, which is what the sample's readers in `fixtures/readers.ts` would then draw. Wave C1 moves this copy into
- * `fixtures/fill.ts`, a test-only import, and the table starts empty in a shipped tab.
+ * THE SAMPLE'S OWN TABLE, NOT `held.ts`'S. Until wave C1 this was `Object.assign` into the table every shipped reader
+ * reads, so importing the fixture for any reason put the seed's declarations where a live tab keeps the record's, and a
+ * list the record had not been asked about yet drew the seed's fields. `fill.ts` makes that copy now, and only a test
+ * asks it to.
  */
-export const REGISTERS: Record<string, RegisterDecl> = Object.assign(HELD_REGISTERS, { ...SEED_REGISTERS, ...AGENTS_REGISTERS, session: sessionDeclaration().body } as unknown as Record<string, RegisterDecl>);
-
-/**
- * WHICH RECORD THIS BUILD SHOWS, and the only place in the app that asks.
- *
- * `vite.config.ts` substitutes a literal, so in the shipped build this is `''`, every `VARIANT ===`
- * below folds to `false`, and the variant rows are not in the bundle. There is no runtime switch:
- * the flag is gone by the time anything runs.
- *
- * IT EXISTS BECAUSE A SCREEN THAT BRANCHES ON THE RECORD HAS A HALF NO GATE CAN REACH. Three
- * findings, all the same shape: `/search`'s disclosure for a group with no door needs eleven
- * decisions and the seed has four; the two designed empty states on `/settings/agents` need a record
- * with no machines and no keys; and every Cloud sentence needs a record that is not self-hosted —
- * which shipped eight sentences that drew nowhere while `dead-copy`, a grep over source, counted
- * them as rendered.
- *
- * A VARIANT IS A REAL RECORD, not a mock of one. It changes what the record HOLDS and nothing about
- * how the screens read it, which is the only way the gate's answer is evidence about the product.
- */
-const VARIANT = typeof __BRAINDOG_VARIANT__ === 'string' ? __BRAINDOG_VARIANT__ : '';
+export const REGISTERS: Record<string, RegisterDecl> = { ...SEED_REGISTERS, ...AGENTS_REGISTERS, session: sessionDeclaration().body } as unknown as Record<string, RegisterDecl>;
 
 /**
  * The seed's rows, given the numbers, versions and authors a record would have given them.
@@ -266,14 +249,13 @@ export const ROWS: Record<string, Entry[]> = {
  * The seed can only be one of them, so the other half is exercised by `deployment.test.ts` rather
  * than by a browser gate — which is the shape the seed-variant harness in the backlog is for.
  *
- * IT IS THE SAMPLE'S HOST AND NO OTHER RECORD'S. `VARIANT` is `''` in every shipped bundle, so this
- * reads `self-host` on the Cloud build too, and a screen that branches on it over a live record is
- * branching on the build. Billing did, and told a record provisioned on the Worker "This record runs
+ * IT IS THE SAMPLE'S HOST AND NO OTHER RECORD'S. It read `self-host` on the Cloud build too, so a screen that
+ * branched on it over a live record was branching on the build. Billing did, and told a record provisioned on the Worker "This record runs
  * on your own machine." (`loop/research-first-sign-in.md` friction 5). A live record's host is asked:
  * `routes/settings/billing.ts` and `inbound-door.ts` say how, and what `boot` does not yet carry.
  */
 export const DEPLOYMENT: { kind: 'self-host' | 'cloud'; since: string } = {
-  kind: VARIANT === 'cloud' ? 'cloud' : 'self-host',
+  kind: 'self-host',
   since: day(-612),
 };
 
@@ -475,31 +457,6 @@ export const QUESTIONS: Question[] = [
    */
   .sort((a, b) => a.rank - b.rank);
 
-/**
- * `busy` IS A RECORD WITH ENOUGH HISTORY TO OVERFLOW A GROUP.
- *
- * `/search` draws ten rows per list and says so when there are more — and for a group with no door,
- * which is what the questions are, it says the count in a sentence instead of a link. That branch
- * needs eleven matching decisions and the record holds four, so the disclosure written to close
- * *"the exact defect this route exists to fix, one door along"* had never been drawn.
- *
- * They are the same decision, taken repeatedly, which is what a real record accumulates: a renewal
- * question every year, answered the same way each time.
- */
-const OLD_RENEWALS: Question[] = Array.from({ length: 12 }, (_, i) => ({
-  id: `D${20 - i}`,
-  title: `Renewal terms for the ${2025 - i} licence year`,
-  cost: 'The invoice goes out on the anniversary either way.',
-  rank: 0,
-  opened: stamp(-24 * 400 * (i + 1)),
-  entity: 'Kiln',
-  options: [
-    { key: 'same', title: 'Same terms', body: 'Nothing has changed on either side.' },
-    { key: 'raise', title: 'Raise it', body: 'Costs have moved and the licence has not.' },
-  ],
-  decided: { option: 'same', reason: 'Nothing had changed on either side.', by: 'you', at: stamp(-24 * 399 * (i + 1)) },
-}));
-
 export const DECIDED: Question[] = [
   {
     id: 'D41',
@@ -546,7 +503,6 @@ export const DECIDED: Question[] = [
     ],
     decided: { option: 'accept', reason: 'Both are live and both renew; an invoice line nobody has a row for is the thing this record exists to stop.', by: 'you', at: stamp(-3) },
   },
-  ...(VARIANT === 'busy' ? OLD_RENEWALS : []),
 ]
   /**
    * NEWEST FIRST, because `/decide` reads `DECIDED[0]` as *the last one decided*.
@@ -577,7 +533,8 @@ export const INBOX: InboxItem[] = [
    A `rowset` body, as `propose` files it (`packages/kernel/src/govern.ts`), by the question it asks.
    A row with `at` updates that row at the version it was read at; a row without one creates. */
 
-export type RowsetBody = { register: string; rows: readonly Record<string, unknown>[] };
+import type { RowsetBody } from '../governance.ts';
+import { MODULES } from '../modules.ts';
 
 const KILN = THINGS.find((t) => t.fields.name === 'Kiln');
 const PORTAGE = THINGS.find((t) => t.fields.name === 'Portage');
@@ -744,7 +701,7 @@ export const VAULT_OPENED: Record<string, { project: string | null; sealed: bool
 
 /**
  * The sample's vault grants: one waiting for its six digits, and two machines that may open keys, one
- * for a project and one global. `quiet` has connected nothing, as `DEVICES` below.
+ * for a project and one global.
  */
 const ALL_VAULT_GRANTS: { id: string; name: string; state: 'pending' | 'active'; project: string | null; at: string; lastSeen: string | null }[] = [
   { id: 'vg_01', name: 'Codex, studio desktop', state: 'pending', project: 'Portage', at: stamp(-0.03), lastSeen: null },
@@ -752,22 +709,14 @@ const ALL_VAULT_GRANTS: { id: string; name: string; state: 'pending' | 'active';
   { id: 'vg_03', name: 'Claude Code, this laptop', state: 'active', project: null, at: stamp(-24 * 2), lastSeen: stamp(-26) },
 ];
 
-export const VAULT_GRANTS = VARIANT === 'quiet' ? [] : ALL_VAULT_GRANTS;
+export const VAULT_GRANTS = ALL_VAULT_GRANTS;
 
 /* ── packs ───────────────────────────────────────────────────────────────── */
 
+/* THE SIX THIS BUILD SHIPS ARE `modules.ts`'S, which live screens read, and the sample holds every one of them. The
+   two after them are the sample's picture of a catalogue: nobody wrote them and nothing ships a document for either. */
 export const PACKS: PackInfo[] = [
-  { id: 'money-core', name: 'Money', blurb: 'What you owe, what you are owed, and installments.', version: '1.4.0', installed: true, registers: ['obligations'], pages: ['money'], author: 'braindog' },
-  /* `Services`, AND THE PACK'S DISPLAY NAME WAS `Estate`. It was the fourth name for one area of
-     the record, beside the first run's card, the rail's section heading and the register itself,
-     and this is the copy of it a stranger reads on the trust screen before letting the file in.
-     The pack id stays `estate`, which is the `pack:` key on the register and the page, and what
-     `04 §3`'s format writes. */
-  { id: 'estate', name: 'Services', blurb: 'Domains, hosting, subscriptions, renewals.', version: '1.2.1', installed: true, registers: ['services'], pages: ['estate'], author: 'braindog' },
-  { id: 'people', name: 'People', blurb: 'Collaborators, contractors, accountants.', version: '1.0.3', installed: true, registers: ['people'], pages: [], author: 'braindog' },
-  { id: 'work', name: 'Work', blurb: 'Tasks, tracks, dates.', version: '1.1.0', installed: true, registers: ['tasks'], pages: ['work'], author: 'braindog' },
-  { id: 'portfolio', name: 'Portfolio', blurb: 'The things you run, and the plan for each.', version: '1.0.0', installed: true, registers: ['things'], pages: [], author: 'braindog' },
-  { id: 'agents', name: 'Agents', blurb: 'What your agents learn, the skills they use, the keys they are handed and the tools they run, each for one project or for all.', version: '1.1.1', installed: true, registers: ['learnings', 'skills', 'credentials', 'tools'], pages: ['agents'], author: 'braindog', titles: { learnings: 'Learnings', skills: 'Skills', credentials: 'Keys', tools: 'Tools', agents: 'Agents' } },
+  ...MODULES.map((m) => ({ ...m, installed: true })),
   /* IT WANTS TO SIT ABOVE YOUR MONEY PAGE, AND IT DOES NOT GET TO. `04 §4`'s worked example is this
      pack, and the record had no way to hold the fact — so the diff's `CHANGES` section was behind a
      condition that could never be true and the three sentences about it rendered nowhere. A trust
@@ -797,7 +746,7 @@ export const PACK_SETTINGS: Readonly<Record<string, Record<string, { type: 'text
 
 /* ── scheduled actions ───────────────────────────────────────────────────── */
 
-import type { ActionRow } from './actions.ts';
+import type { ActionRow } from '../actions.ts';
 
 /**
  * The sample's scheduled actions: three for Kiln, one for Portage, one for every project.
@@ -1396,9 +1345,7 @@ const ALL_DEVICES: Device[] = [
   { id: 'dg_05', name: 'braindog export, studio desktop', surface: 'cli', state: 'expired', reach: 'export', ua: 'the whole record', tries: 0, codeHash: '', at: stamp(-3), lastSeen: null },
 ];
 
-/* `quiet` is the record on the day it is installed. `.filter()` on the literal would widen every
-   `'mcp'` to `string`, so the list is typed first and narrowed after. */
-export const DEVICES: Device[] = VARIANT === 'quiet' ? [] : ALL_DEVICES;
+export const DEVICES: Device[] = ALL_DEVICES;
 
 /**
  * The tokens this record has minted — `12 §3`'s list, which no screen had.
@@ -1417,15 +1364,6 @@ const ALL_TOKENS: Token[] = [
      stolen" — and the inverse is this row, a live key nothing has ever presented, which is the one
      worth revoking and the one no screen was showing. */
   { id: 'tk_03', label: 'Reporting, read only', scope: 'read', surface: 'mcp', created: day(-12), lastUsed: null, expires: day(78) },
-  /**
-   * `quiet` IS A RECORD NOBODY HAS CONNECTED ANYTHING TO, which is what the two designed empty states
-   * on `/settings/agents` are for and what no gate could reach.
-   *
-   * `13 §5.2` gives `no-data-yet` a content contract — what this is for, and the copyable prompt —
-   * and both states were statically unreachable on a record that ships five machines and three keys.
-   * A review called them dead code; they are not dead, they are the state a person is in on the day
-   * they install this, and nothing had ever drawn them.
-   */
 ];
 
-export const TOKENS: Token[] = VARIANT === 'quiet' ? [] : ALL_TOKENS;
+export const TOKENS: Token[] = ALL_TOKENS;

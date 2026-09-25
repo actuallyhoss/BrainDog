@@ -48,7 +48,7 @@ import { extname, join, normalize } from 'node:path';
 import { chromium } from '@playwright/test';
 
 import { APP_BASE, appShell, budget, readiness } from './lib.mjs';
-import { answers, forward, forwards, recordFor, startRecord } from './record.mjs';
+import { answers, forward, forwards, startRecord, VARIANTS as RECORDS } from './record.mjs';
 import { routesOf } from './routes.mjs';
 
 /**
@@ -145,19 +145,21 @@ export async function surfaces(root = join(import.meta.dirname, '..', '..')) {
   const APPS = [
     { name: 'web', tree: 'web', root: join(root, 'apps', 'web', 'build'), routes: null, spa: true, states: true },
     /**
-     * THE OTHER RECORD, for the half of every host branch the shipped seed cannot draw.
+     * THE OTHER RECORDS, for the half of every branch the gates' own record cannot draw.
      *
-     * `BRAINDOG_VARIANT=cloud` writes `build-cloud/`, and only the two routes that branch are worth
-     * running: the point is that the Cloud side is drawn at all and passes the same rules, not a second
-     * sweep of a build that differs by one constant. Skipped with a line when it is not built, because
-     * "we did not check this" must not look like "there was nothing here".
+     * The same build, with `/api` forwarded to one of `record.mjs`'s `VARIANTS` for the length of the pass, and only
+     * the routes where that record differs: the point is that the other side is drawn at all and passes the same
+     * rules, not a second sweep of the same screens. They were three builds, `build-cloud/`, `build-quiet/` and
+     * `build-busy/`, that differed only in the sample's constants, so once no screen read those they audited the main
+     * build's screens again (wave C2 of `loop/research-no-sample.md`). A record is always there to be asked, so
+     * a variant is never skipped for want of a build.
      */
     /* `states` IS NOT `spa`, AND THEY WERE ONE FLAG. `spa` says *serve the shell for a route with no
        file*, which every variant needs; running the state scenarios is a different question, and
        every variant answered yes to it because the two facts shared a boolean.
 
        EVERY SCENARIO STANDS ON `/r/obligations`, `/`, `/p/kiln` OR `/r/nope`, routes no variant
-       changes. A variant differs in `DEPLOYMENT`, `DEVICES`, `TOKENS` and `DECIDED`, which is why each
+       changes. A variant differs in its host, its machines and keys, or its decisions, which is why each
        one names the two or three routes where that shows. So the three variants contributed
        **156 audits of 156 identical pages**: 13 scenarios x 4 passes x 3 variants, 44% of this
        gate's run, spent proving that opening the palette on a record with no machines connected draws
@@ -170,9 +172,7 @@ export async function surfaces(root = join(import.meta.dirname, '..', '..')) {
        can fall behind.
 
        A variant earns `states: true` the day a scenario lands on a route it changes. */
-    { name: 'cloud', tree: 'web', root: join(root, 'apps', 'web', 'build-cloud'), routes: ['/settings/backups', '/settings/billing'], spa: true, optional: true },
-    { name: 'quiet', tree: 'web', root: join(root, 'apps', 'web', 'build-quiet'), routes: ['/settings/agents'], spa: true, optional: true },
-    { name: 'busy', tree: 'web', root: join(root, 'apps', 'web', 'build-busy'), routes: ['/search?q=renewal', '/decide'], spa: true, optional: true },
+    ...RECORDS.map((v) => ({ name: v.name, tree: 'web', root: join(root, 'apps', 'web', 'build'), routes: v.routes, spa: true, record: v.name })),
     { name: 'site', tree: 'site', root: join(root, 'apps', 'site', 'build'), routes: null, spa: false },
   ];
 
@@ -351,12 +351,13 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
   let server = null;
   let browser = null;
   try {
-    /* THE RECORD THE REGISTER LIST READS, forwarded to from this gate's own port. See `record.mjs`. */
-    record = await startRecord();
+    /* THE RECORD THE REGISTER LIST READS, forwarded to from this gate's own port, and its variants under the same
+       handle, so the one `record.close()` below gives all of them back. See `record.mjs`. */
+    record = await startRecord(0, { variants: true });
 
     server = createServer(async (req, res) => {
       const url = new URL(req.url ?? '/', 'http://x');
-      if (forwards(url.pathname)) return forward(req, res, record.base);
+      if (forwards(url.pathname)) return forward(req, res, current.record === undefined ? record.base : record.variants[current.record]);
       const rel = normalize(decodeURIComponent(url.pathname)).replace(/^([/\\])+/, '');
       if (rel.includes('..')) return res.writeHead(400).end();
       for (const candidate of [rel, `${rel}.html`, join(rel, 'index.html')]) {
@@ -372,7 +373,7 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
          document fails `html-has-lang`, `landmark-one-main` and `page-has-heading-one`. That is
          sixty-four findings that say nothing about the app. Serve what production serves.
 
-         A ROUTE SEGMENT MAY CONTAIN A DOT. `/v/obligations.overdue` is a view id, not a file, so the
+         A ROUTE SEGMENT MAY CONTAIN A DOT. `/v/obligations.open` is a view id, not a file, so the
          test cannot be "has an extension". That 404s a real page and blames the app for having no
          `lang`. It is "has an extension WE SERVE": anything in `TYPES` that is missing stays a 404, so
          a genuinely broken asset still fails loudly, and everything else gets the shell. Worth knowing
@@ -460,19 +461,17 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
         /* NOT A PASS. Skipping one app silently dropped the marketing site from every run that did not
            build it, and the gate still printed its own green line.
 
-           AN `optional` APP IS A VARIANT RECORD, not a missing build. It is written only when somebody
-           asks for it, so its absence is a smaller sentence and not a skip that shows up beside the
-           marketing site's. It still says what was not measured. */
-        console.log(
-          app.optional
-            ? `  a11y: no ${app.name} record built. \`pnpm --filter @braindog/web build\` draws the other half of every host branch.`
-            : `  a11y: no ${app.name} build to check. \`pnpm build\` first, and CI does.`,
-        );
-        if (!app.optional) skipped.push(app.name);
+           A VARIANT RECORD IS SERVED FROM THE MAIN BUILD, so it is missing exactly when the record app is, and
+           that is already the skip above it in `APPS`. */
+        console.log(`  a11y: no ${app.name} build to check. \`pnpm build\` first, and CI does.`);
+        skipped.push(app.name);
         per.get(app.name).built = false;
         continue;
       }
       current = app;
+      /* THE PORT ANSWERS FOR THE VARIANT BEFORE ANYTHING IS AUDITED ON IT, as `answers` proved of the gates' own record
+         above: a pass whose forward still pointed at that record would audit it a second time under another name. */
+      if (app.record !== undefined) await answers(`http://localhost:${PORT}`);
 
       for (const scheme of SCHEMES) {
         for (const width of WIDTHS) {
@@ -494,9 +493,8 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
 
           /** Loads a route, waits for it to be real, injects axe, and RETURNS what the screen settled into. */
           const open = async (route) => {
-            await recordFor(page, route);
-            /* UNDER `/app` FOR THE RECORD APP, and the route itself as the tree names it, because `recordFor` and
-               `MAY_REFUSE` are written in those words. The site is prerendered at the root. */
+            /* UNDER `/app` FOR THE RECORD APP, and the route itself as the tree names it, because `MAY_REFUSE` is
+               written in those words. The site is prerendered at the root. */
             await page.goto(`http://localhost:${PORT}${app.spa ? APP_BASE : ''}${route}`, { waitUntil: 'networkidle' });
             /* The one readiness site in this gate, because every load goes through here. The `5000` that
                used to be written on this line was a bare literal in a directory whose shared file opens by

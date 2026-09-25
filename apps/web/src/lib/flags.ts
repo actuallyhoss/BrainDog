@@ -23,8 +23,7 @@
  * WHERE A FLAG LIVES: THE BUILD, AND ONLY THE BUILD, TODAY.
  *
  * `vite.config.ts` reads `FLAGS` below and `define`s the resolved set as a literal, exactly as it
- * does for `BRAINDOG_VARIANT` - "the shipped bundle contains one record and the constant folds
- * away". Three homes were considered and two are refused, with the reasons written down because a
+ * does for `BRAINDOG_ENV`, so the constant folds away. Three homes were considered and two are refused, with the reasons written down because a
  * refusal nobody recorded gets re-proposed every quarter:
  *
  *   - A RECORD DECLARATION. This product's thesis is that everything is a declaration in a versioned
@@ -118,7 +117,7 @@ export type FlagName = keyof typeof FLAGS;
 /**
  * The set this build was compiled with, as a literal `vite.config.ts` substituted.
  *
- * A SPACE-SEPARATED STRING AND NOT A JSON ARRAY, for the same reason `__BRAINDOG_VARIANT__` is a
+ * A SPACE-SEPARATED STRING AND NOT A JSON ARRAY, for the same reason `__BRAINDOG_ENV__` is a
  * string: `define` replaces an identifier with source text, and a string literal is the one shape
  * that cannot be pulled apart into something that allocates on every read. It is split once, at
  * module load, into a `Set` - never matched as a substring, because `newImporter` contains

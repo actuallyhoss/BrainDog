@@ -15,9 +15,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+import './record/fixtures/fill.ts';
 import { firstAsks, firstRun } from './first-run.ts';
 import { readableFields } from './record/api.ts';
-import { REGISTERS } from './record/data.ts';
+import { REGISTERS } from './record/fixtures/sample.ts';
 import type { FieldDecl } from './record/schema.ts';
 
 const asks = (key: string): string[] =>

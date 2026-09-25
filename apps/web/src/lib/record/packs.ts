@@ -40,11 +40,6 @@ export type PackConfig = { id: string; version: string | null; config: Record<st
 export type ConfigSaved = PackConfig & { changed: string[]; said: string };
 
 export type Source = {
-  /**
-   * ALWAYS `false`, AND KEPT ONLY FOR THE SCREENS THAT STILL ASK. `/start` and the catalogue under `/packs/browse` read
-   * it and are other briefs' to change (`loop/research-no-sample.md` section 5); drop it when neither does.
-   */
-  sample: false;
   packs(): Promise<Answer<PackState[]>>;
   disable(id: string, alsoDisable?: readonly string[]): Promise<Answer<PackToggle>>;
   enable(id: string): Promise<Answer<PackToggle>>;
@@ -111,7 +106,6 @@ const said = <T>(r: Wire<T>): Answer<T> =>
 
 export function live(client: Caller): Source {
   return {
-    sample: false,
     packs: async () => said(await client.packs()),
     disable: async (id, alsoDisable = []) =>
       said(await client.disablePack(alsoDisable.length > 0 ? { id, alsoDisable: [...alsoDisable] } : { id })),

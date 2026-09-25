@@ -10,10 +10,10 @@
  * pen in Settings and the shell's own type (DIRECTION 26, `loop/research-no-sample.md` wave B2). The readers are in
  * `fixtures/readers.ts` now, which only a test may import, and `no-sample-b2.test.ts` holds both halves of that.
  *
- * WHAT IS LEFT HERE STILL READS TWO OF THE SAMPLE'S TABLES, and it says where. `ROWS` is the fallback of `display`,
- * `identityOf` and `spokenRow` when a caller hands no `names`, and all of `currencyFor`, `homeCurrency` and `hueOf`;
- * `PACKS` names an add-on in `setupSaid` and `packDiff`. Those go when wave C1 moves `data.ts` under `fixtures/`, and
- * each needs a source on the record first. The declarations are `held.ts`'s, which only the record fills.
+ * AND NOTHING HERE READS THE SAMPLE NOW. Until wave C1 `ROWS` was the fallback of `display`, `identityOf` and
+ * `spokenRow` when a caller handed no `names`, and all of `currencyFor`, `homeCurrency` and `hueOf`, and the
+ * sample's `PACKS` named an add-on in `setupSaid` and `packDiff`. The rows, the row names and the declarations are
+ * `held.ts`'s, which only the record fills in a shipped tab, and a module's name is `modules.ts`'s.
  */
 
 import { agentDoing, day as fmtDay, diffRows, money, relative, shortDay, since, integer, MISSING } from 'braindog-render';
@@ -24,8 +24,8 @@ import { STALE_MS, type Bars, type MeasureSeries, type Part, type QueueQuestion,
 import { amountOf, currencyOf, homeOf } from './money.ts';
 import { isGlyph, type IconName } from '../ui/icons.ts';
 import { copy } from '../copy.ts';
-import { PACKS, ROWS } from './data.ts';
-import { PAGES, REGISTERS } from './held.ts';
+import { PAGES, REGISTERS, ROWS, TITLES } from './held.ts';
+import { MODULES, moduleOf } from './modules.ts';
 /* Type only, and there is no cycle: `remote.ts` reads the declaration and the sample, never this file. */
 import type { Names } from './remote.ts';
 import { compile, declaredValue } from './where.ts';
@@ -161,7 +161,7 @@ const SPOKEN_ID = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/;
 /**
  * WHAT A SPOKEN ID HELD AS TEXT READS AS, AND WHERE IT OPENS. A run holds its project as `things#1` and
  * a tool call reads `tracks#1`; both drew the id. The name comes from `names` when the screen is
- * drawing a record, and from the sample otherwise, and a row with no name reads as `unnamed`.
+ * drawing a record, and from the names this tab has learnt otherwise, and a row with no name reads as `unnamed`.
  */
 export function spokenRow(value: unknown, names?: Names): { label: string; href: string } | null {
   const m = typeof value === 'string' ? SPOKEN_ID.exec(value) : null;
@@ -171,7 +171,7 @@ export function spokenRow(value: unknown, names?: Names): { label: string; href:
   const said = names
     ? names.get(value as string)
     : titleField
-      ? (ROWS[register] ?? []).find((e) => e.seq === Number(seq))?.fields[titleField]
+      ? TITLES.get(register)?.get(Number(seq))
       : undefined;
   const label = typeof said === 'string' && said.trim() !== '' ? said : unnamed(register, seq);
   return { label, href: `/r/${register}/${seq}` };
@@ -268,11 +268,10 @@ export function display(
        * somebody can open, rather than as whatever the built-in sample happens to call that number.
        */
       if (names) return names.get(`${f.to}#${value}`) || unnamed(f.to ?? register, String(value), f.label);
-      const target = f.to ? ROWS[f.to] : undefined;
-      const hit = target?.find((e) => e.seq === Number(value));
-      const titleField = f.to ? REGISTERS[f.to]?.title : undefined;
-      const said = hit && titleField ? hit.fields[titleField] : undefined;
-      return said === undefined || said === null || said === '' ? unnamed(f.to ?? register, String(value), f.label) : String(said);
+      /* AND WITHOUT `names`, THE NAMES THIS TAB HAS LEARNT (`held.ts` `TITLES`). This read the sample's rows, so a
+         caller that handed none drew the sample's name for whatever number the record's ref held. */
+      const said = f.to ? TITLES.get(f.to)?.get(Number(value)) : undefined;
+      return said === undefined || said === '' ? unnamed(f.to ?? register, String(value), f.label) : said;
     }
     case 'secret':
       return '••••••••';
@@ -576,7 +575,7 @@ export function unansweredBy(register: string, held: Fields): { id: string; labe
 /* ── filters and order ────────────────────────────────────────────────────── */
 
 /* `Filter` LIVES IN `schema.ts` NOW, and is re-exported here so every existing caller is unchanged.
-   It is a SHAPE rather than a reader, and `data.ts` needs it to declare a saved view — which it
+   It is a SHAPE rather than a reader, and `fixtures/sample.ts` needs it to declare a saved view — which it
    cannot import from this file, because this file imports it. */
 export type { Filter };
 
@@ -1133,7 +1132,7 @@ export type PackDiff = {
   calls: readonly CallOut[];
 };
 
-export function packDiff(pack: PackInfo): PackDiff {
+export function packDiff(pack: PackInfo, installed: boolean = pack.installed === true): PackDiff {
   const adds: PackDiff['adds'] = [];
 
   for (const id of pack.registers) {
@@ -1188,7 +1187,7 @@ export function packDiff(pack: PackInfo): PackDiff {
      the screen that means "you cannot have this", not "here is what would happen". */
   const conflicts = (pack.conflicts ?? []).map((id) => {
     const decl = REGISTERS[id];
-    const owner = PACKS.find((p) => p.installed && p.registers.includes(id));
+    const owner = MODULES.find((p) => p.registers.includes(id));
     return `${decl?.name ?? id} already exists${owner ? `, from ${owner.name}` : ''}`;
   });
 
@@ -1202,7 +1201,7 @@ export function packDiff(pack: PackInfo): PackDiff {
     /* AND THIS ONE IS A GUARANTEE, not a measurement. `04 §3.2`: "A pack physically cannot read a
        row at install time, so \"0 rows read\" is a guarantee." */
     touches: 'nothing you have written: 0 rows read, 0 of your rows changed',
-    unread: !pack.installed,
+    unread: !installed,
     calls: pack.calls ?? [],
   };
 }
@@ -1475,7 +1474,7 @@ export function setupSaid(target: string | null, rows: number): string {
   const id = (target ?? '').replace(/^pack:/u, '');
   const usecase = /^usecase-([a-z][a-z0-9-]*)$/u.exec(id)?.[1];
   if (usecase) return copy.setUpWith(useCaseName(usecase), rows);
-  const names = (PACKS.find((p) => p.id === id)?.registers ?? []).map((r) => REGISTERS[r]?.name ?? r);
+  const names = (moduleOf(id)?.registers ?? []).map((r) => REGISTERS[r]?.name ?? r);
   return names.length > 0 ? copy.setUpWith(names.join(', '), rows) : copy.setUpRows(rows);
 }
 

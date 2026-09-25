@@ -12,10 +12,11 @@ import { MISSING } from 'braindog-render';
 
 import { WORKING_MARK } from 'braindog-render';
 
+import './fixtures/fill.ts';
 import { copy } from '../copy.ts';
 import { METRICS } from './declared.ts';
 import { feedTable } from './api.ts';
-import { ROWS } from './data.ts';
+import { ROWS } from './fixtures/sample.ts';
 import { toSegments } from './blocks.ts';
 import { blockOf, liveWords, pageReader, resolverOf, type Fetch } from './page-live.ts';
 

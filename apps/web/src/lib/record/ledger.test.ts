@@ -21,7 +21,7 @@ import assert from 'node:assert/strict';
 
 import { isEventKind } from '@braindog/kernel';
 import { boot } from './fixtures/readers.ts';
-import { AUDIT, DECIDED, PEOPLE_ACCESS, QUESTIONS, SNAPSHOTS } from './data.ts';
+import { AUDIT, DECIDED, PEOPLE_ACCESS, QUESTIONS, SNAPSHOTS } from './fixtures/sample.ts';
 
 test('EVERY EVENT IN THE LEDGER IS A KIND THE DATABASE WOULD ACCEPT', () => {
   /* `30 §2` rule 1: "A new kind is a kernel migration, not a string somebody passes." The seed

@@ -1522,12 +1522,13 @@ function doorFault(id: string, channel: string, door: unknown, installed?: Known
  *
  * SO THE TREE IS FOLDED, AND NOT ONLY WHEN IT NAMES NO FIELD. The first version asked `evaluate` only of a tree with no
  * leaf in it, and `{ any: [{ all: [] }, { field: body, contains: paid }] }` compiled clean, answered true for an empty
- * arrival and for `You withdrew 5 EGP` alike, and installed with a twin naming it, measured by this batch's checker on 23
- * September. A group whose answer its constant children already settle is folded to that answer, the way `evaluate`
- * reads an empty group (`all` and `none` true, `any` false), and a leaf is unknown. Only a tree whose phrase decides
- * is the wider-phrase case `doorFault` leaves to the author. Fuzzed against `evaluate` over twenty thousand trees that
- * compile clean, the fold settled 7683 of them and disagreed with `evaluate` on none; the 51 it left open and `evaluate`
- * answered true for every sample text were a phrase beside its own `none`, which is logic over leaves and not a fold.
+ * arrival and for a text saying five of some currency were withdrawn alike, and installed with a twin naming it,
+ * measured by this batch's checker on 23 September. A group whose answer its constant children already settle is
+ * folded to that answer, the way `evaluate` reads an empty group (`all` and `none` true, `any` false), and a leaf is
+ * unknown. Only a tree whose phrase decides is the wider-phrase case `doorFault` leaves to the author. Fuzzed against
+ * `evaluate` over twenty thousand trees that compile clean, the fold settled 7683 of them and disagreed with
+ * `evaluate` on none; the 51 it left open and `evaluate` answered true for every sample text were a phrase beside its
+ * own `none`, which is logic over leaves and not a fold.
  */
 function takesEvery(match: unknown): boolean {
   if (match === undefined) return true;
@@ -3374,11 +3375,11 @@ const UNREAD: Readonly<Record<RoleKey, string>> = { rates: 'rates no figure conv
  *
  * WITHOUT THIS THE RULE HELD IN ONE INSTALL ORDER. `roleBody` runs only for a list declaring the key, so a list declaring
  * `rates:` and then a keyless `fx` of money-core's shape both installed (`research-batch-forty-seven-audit.md` finding 2,
- * driven in `test/roles-keyless-second.test.ts`). A rate written into `fx` was then read by nothing, and cash said
- * `USD to EGP` was missing; and the declaring list's next update was refused by `roleBody`, telling its owner to declare
- * `rates:` on a list another pack owns. `meets:` then a People-shaped `people` did the same. Refused here, the keyless
- * list is the one told, which is the list that caused it. `legacyShaped` decides whether it would hold the role, so an
- * `fx` of sound effects still installs beside the rates.
+ * driven in `test/roles-keyless-second.test.ts`). A rate written into `fx` was then read by nothing, and cash said the
+ * dollar rate it needed was missing; and the declaring list's next update was refused by `roleBody`, telling its owner
+ * to declare `rates:` on a list another pack owns. `meets:` then a People-shaped `people` did the same. Refused here,
+ * the keyless list is the one told, which is the list that caused it. `legacyShaped` decides whether it would hold the
+ * role, so an `fx` of sound effects still installs beside the rates.
  */
 function keylessBeside(key: RoleKey, decl: Declaration, installed?: Known, owners?: Owners, held?: ReadonlySet<string>): Refusal | null {
   if (decl.kind !== 'register' || decl.body[key] !== undefined) return null;

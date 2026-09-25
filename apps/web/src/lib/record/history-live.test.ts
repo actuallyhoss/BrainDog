@@ -8,6 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
+import './fixtures/fill.ts';
 import { display, REGISTERS, whoDid } from './api.ts';
 import * as history from './history-live.ts';
 import { noteOf, readHistory, readNames, type Fetch } from './history-live.ts';

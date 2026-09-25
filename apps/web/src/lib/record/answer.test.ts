@@ -24,7 +24,7 @@ import {
   withdraw,
   type Answer,
 } from './answer.ts';
-import { DECIDED, QUESTIONS } from './data.ts';
+import { DECIDED, QUESTIONS } from './fixtures/sample.ts';
 import type { Question } from './schema.ts';
 
 const AT = '2026-09-09T09:00:00.000Z';

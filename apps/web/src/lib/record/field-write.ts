@@ -31,7 +31,6 @@ import { valueSaid } from '../voice.ts';
 import { labelOf } from './api.ts';
 import { forget, type Fetch } from './boot-live.ts';
 import { REGISTERS } from './held.ts';
-import { noRecord } from './device.ts';
 import { fieldWords } from './field-words.ts';
 import { learn } from './remote.ts';
 import { inverseOf } from './rows-write.ts';
@@ -93,8 +92,7 @@ export type Added =
   | { from: 'added' }
   /** On Decide, waiting on an owner. `fix` is set when an owner's own accept did not land, and says why. */
   | { from: 'filed'; id: string; fix?: string }
-  | { from: 'refused'; fix: string }
-  | { from: 'gone'; fix: string };
+  | { from: 'refused'; fix: string };
 
 /**
  * File one field, and accept it at once when the person filing owns the record.
@@ -116,7 +114,7 @@ async function fileAddition(base: string, register: string, question: string, bo
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   const filed = await client.call<{ id?: unknown }>('propose', { question, body_kind: 'change', body });
   if (!filed.ok) {
-    if ('refusal' in filed) return noRecord(filed.refusal.code) ? { from: 'gone', fix: filed.refusal.fix } : { from: 'refused', fix: filed.refusal.fix };
+    if ('refusal' in filed) return { from: 'refused', fix: filed.refusal.fix };
     return { from: 'refused', fix: fieldWords.changed };
   }
   const id = String(filed.value?.id ?? '');

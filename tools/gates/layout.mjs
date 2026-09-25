@@ -33,7 +33,7 @@ import { extname, join } from 'node:path';
 import { chromium } from '@playwright/test';
 
 import { APP_BASE, appShell, budget, readiness, skipDir } from './lib.mjs';
-import { answers, forward, forwards, recordFor, startRecord } from './record.mjs';
+import { answers, forward, forwards, startRecord, VARIANTS as RECORDS } from './record.mjs';
 import { routesOf } from './routes.mjs';
 
 /**
@@ -77,16 +77,17 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
   const ROOT = join(root, 'apps', 'web', 'build');
 
   /**
-   * A SECOND RECORD, FOR THE HALF OF EVERY BRANCH THE FIRST ONE CANNOT DRAW.
+   * OTHER RECORDS, FOR THE HALF OF EVERY BRANCH THE FIRST ONE CANNOT DRAW.
    *
-   * The app renders one seed, so a screen that branches on a fact about the record has a side no gate
+   * The gates' record is one record, so a screen that branches on a fact about the record has a side no gate
    * can reach. `/settings/backups` and `/settings/billing` branch on the host, and the Cloud side
    * shipped **eight sentences that drew nowhere**: invisible to `svelte-check`, which says nothing
    * about a branch that cannot be taken, and counted as rendered by `dead-copy`, which greps source.
    *
-   * `pnpm --filter @braindog/web build` writes `build-cloud/`. If it is there,
-   * the routes that branch are measured on it too; if it is not, the run says so rather than quietly
-   * covering less. It is the same rule as `unsampled`: "we did not check this" must not look like
+   * THE SAME BUILD, SERVED OVER ANOTHER RECORD (`record.mjs` `VARIANTS`). They were three builds of the app,
+   * `build-cloud/`, `build-quiet/` and `build-busy/`, which differed only in the sample's constants, and once no
+   * screen read those they drew what the main build drew. A record variant is always there, so only the site can
+   * be missing, and the run says so rather than quietly covering less: "we did not check this" must not look like
    * "there was nothing here".
    */
   const VARIANTS = [
@@ -106,13 +107,9 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
        be six ten-second timeouts on three pages that were finished when the document loaded. Every
        other root here is the record app with a different record inside it. */
     { name: 'site', root: join(root, 'apps', 'site', 'build'), routes: ['/', '/pricing', '/changelog'], prerendered: true },
-    { name: 'cloud', root: join(root, 'apps', 'web', 'build-cloud'), routes: ['/settings/backups', '/settings/billing'] },
-    /* A record nobody has connected anything to: the two designed empty states on `/settings/agents`,
-       which `13 §5.2` gives a content contract and which no gate could reach. */
-    { name: 'quiet', root: join(root, 'apps', 'web', 'build-quiet'), routes: ['/settings/agents'] },
-    /* Enough decided questions for `/search` to have to cut a group that has no door: the disclosure
-       written to close *"the exact defect this route exists to fix, one door along"*. */
-    { name: 'busy', root: join(root, 'apps', 'web', 'build-busy'), routes: ['/search?q=renewal', '/decide'] },
+    /* `record` NAMES WHICH OF `record.mjs`'s VARIANTS THE PORT FORWARDS TO for the length of the pass, over the one
+       build. Why each exists, and why `connected` took `quiet`'s place, is written beside `VARIANTS` there. */
+    ...RECORDS.map((v) => ({ name: v.name, root: ROOT, routes: v.routes, record: v.name })),
   ];
   const L = budget('layout');
 
@@ -249,8 +246,9 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
   let server = null;
   let browser = null;
   try {
-    /* THE RECORD THE REGISTER LIST READS, forwarded to from this gate's own port. See `record.mjs`. */
-    record = await startRecord();
+    /* THE RECORD THE REGISTER LIST READS, forwarded to from this gate's own port, and its variants under the same
+       handle, so the one `record.close()` below gives all of them back. See `record.mjs`. */
+    record = await startRecord(0, { variants: true });
 
     /**
      * WHAT THIS GATE IS ALLOWED TO CALL A MEASUREMENT.
@@ -273,13 +271,15 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
     let serving = ROOT;
     /* AND THE ADDRESS IT IS OPENED UNDER. The record app is `/app` (`svelte.config.js`), so its routes are opened as
        `/app<route>` and its fallback is `build/app/index.html`; the marketing site is prerendered at the root. The
-       route itself stays as the tree names it, because `recordFor` and `MAY_REFUSE` are written in those words. */
+       route itself stays as the tree names it, because `MAY_REFUSE` is written in those words. */
     let base = APP_BASE;
+    /* AND WHICH RECORD `/api` REACHES: the gates' own, or the variant a pass names. */
+    let asking = null;
     const shellOf = () => (base === APP_BASE ? appShell(serving) : join(serving, 'index.html'));
 
     server = createServer(async (req, res) => {
       const url = new URL(req.url ?? '/', 'http://x');
-      if (forwards(url.pathname)) return forward(req, res, record.base);
+      if (forwards(url.pathname)) return forward(req, res, asking === null ? record.base : record.variants[asking]);
       const rel = decodeURIComponent(url.pathname).slice(1);
       if (rel.includes('..')) return res.writeHead(400).end();
       for (const candidate of [rel, `${rel}.html`, join(rel, 'index.html')]) {
@@ -312,7 +312,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
     if (present.length < VARIANTS.length)
       console.log(
         `  layout: ${VARIANTS.length - present.length} variant(s) not built. ` +
-          `\`BRAINDOG_VARIANT=cloud pnpm --filter @braindog/web build\` measures the other half of every host branch.`,
+          `\`pnpm --filter @braindog/site build\` measures the page a stranger sees first.`,
       );
 
     browser = await chromium.launch();
@@ -493,7 +493,6 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
       process.stdout.write(`    ${String(width).padStart(4)}px `);
 
       for (const route of ROUTES) {
-        await recordFor(page, route);
         await page.goto(`http://localhost:${PORT}${base}${route}`, { waitUntil: 'domcontentloaded' });
         /* `domcontentloaded` IS WORTH NOTHING ON ITS OWN HERE and never was: `ssr = false`, so the shell
            served off disk is a script tag that imports the client, and `#main` does not exist until it
@@ -571,6 +570,10 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
     for (const v of present) {
       serving = v.root;
       base = v.prerendered ? '' : APP_BASE;
+      asking = v.record ?? null;
+      /* THE PORT ANSWERS FOR THE VARIANT BEFORE ANYTHING IS MEASURED ON IT, which is what `answers` proves of the main
+         record above: a pass over a forward that still pointed at the first record would be the first record again. */
+      if (asking !== null) await answers(`http://localhost:${PORT}`);
       for (const width of variantWidths) {
         const context = await browser.newContext({
           viewport: { width, height: L.viewportHeightPx },
@@ -613,6 +616,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
       }
     }
     serving = ROOT;
+    asking = null;
 
     console.log(
       `  layout: ${checked} page-runs over ${widths.length} widths ` +

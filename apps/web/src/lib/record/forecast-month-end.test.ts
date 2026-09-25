@@ -18,7 +18,9 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { openRecord, type Declaration } from '@braindog/kernel';
 
-import { NOW, ROWS } from './data.ts';
+import './fixtures/fill.ts';
+import { NOW } from './fixtures/sample.ts';
+import { ROWS } from './held.ts';
 import { runway, type Leg } from './forecast.ts';
 import type { Entry } from './schema.ts';
 

@@ -3,9 +3,9 @@
  *
  * ON THE CLOUD IT SAID "This record runs on your own machine." `loop/research-first-sign-in.md`
  * friction 5, read off a record provisioned and claimed on the Worker run the way production runs
- * it. The branch was `DEPLOYMENT.kind`, and `DEPLOYMENT` in `lib/record/data.ts` follows
- * `__BRAINDOG_VARIANT__`, which `vite.config.ts` substitutes as `''` in every shipped bundle: it
- * reads `self-host` on the Cloud build, so every production record was told it was on his laptop.
+ * it. The branch was `DEPLOYMENT.kind`, the sample's host (now `lib/record/fixtures/sample.ts`), which followed a
+ * build flag that every shipped bundle set to nothing: it read `self-host` on the Cloud build, so every production
+ * record was told it was on his laptop.
  * `inbound-door.ts` records the same trap for the mail door.
  *
  * `billingCloud` WAS NOT THE ANSWER EITHER. It says "Payment is up to date", and nothing on the

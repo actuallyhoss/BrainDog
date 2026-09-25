@@ -14,7 +14,8 @@
 
   EITHER KIND IS ASKED FOR ON DECIDE, as an update is: the file is fetched and verified again, read, and filed as a
   proposal (a use case as its file, an add-on as its id and document) the owner accepts there, where the record's own plan
-  says what it adds and every line it calls out with. The sample says what it would ask and files nothing.
+  says what it adds and every line it calls out with. Until the record has answered there is nothing to ask, and the
+  button waits for it.
 -->
 <script lang="ts">
   import { at } from '$lib/at.ts';
@@ -50,7 +51,6 @@
   const said = $derived(trust ? trustWords(trust, entry.author) : null);
   /** A version asked for: the proposal id, empty when the record named none. */
   let filed = $state<string | null>(null);
-  let would = $state<string | null>(null);
 
   $effect(() => {
     const held = states;
@@ -81,7 +81,6 @@
     if (!latest || busy || trust?.kind === 'revoked' || trust?.kind === 'stripped') return;
     refused = null;
     if (!live || !client) {
-      would = copy.catalogueWouldAsk(entry.title, latest.version);
       return;
     }
     const c = client;
@@ -121,11 +120,10 @@
       {#if filed !== null}
         <p class="said" role="status">{copy.catalogueAsked}{#if filed}{' '}<a class="tap" href={at(`/decide/${filed}`)}>{copy.pollOpenDecide}</a>{/if}</p>
       {:else}
-        <Button weight="primary" disabled={busy} onclick={() => void ask()}>
+        <Button weight="primary" disabled={busy || !live} onclick={() => void ask()}>
           {standing.kind === 'update' ? copy.catalogueAskUpdate(entry.latest) : copy.catalogueAsk}
         </Button>
       {/if}
-      {#if would}<p class="said" role="status">{would}</p>{/if}
     {/if}
     {#if refused}<p class="said" role="status">{refused.fix}{#if refused.code}<span class="code">{copy.refusalCode(refused.code)}</span>{/if}</p>{/if}
   </div>

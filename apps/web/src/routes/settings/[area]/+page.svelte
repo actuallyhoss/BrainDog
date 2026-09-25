@@ -13,7 +13,7 @@
   found across eleven precedents (19 §4).
 -->
 <script lang="ts">
-  import { apiBase, at, signinFor } from '$lib/at.ts';
+  import { BASE, apiBase, at, signinFor } from '$lib/at.ts';
   import { titleOf } from '$lib/title.ts';
   import { page } from '$app/state';
   import { invalidateAll } from '$app/navigation';
@@ -59,7 +59,7 @@
   import type { Snapshot as KeptCopy } from '@braindog/client';
   /* Lane G: inviting somebody by address, with a link the owner sends and nobody mails. */
   import { inviteEmail, inviteLink, readInvites, withdrawInvite } from '$lib/record/settings-write.ts';
-  import { levelWord } from '$lib/record/switcher.ts';
+  import { levelWord, openRecord } from '$lib/record/switcher.ts';
   import type { Invitation } from '@braindog/client';
   import { AGENTS_PACK, agentsPackDocument } from '@braindog/seed';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
@@ -1250,6 +1250,22 @@
     else toasts.push(copy.passkeyNotRemoved, { intent: 'warn' });
   }
 
+  /**
+   * ANOTHER RECORD IN "RECORDS YOU CAN OPEN" OPENS IT, AS THE RAIL'S SWITCHER DOES. The row toasted the sample's "Kiln
+   * would open, with its own lists and pages, but nothing was saved yet." after the rail had learnt to move the session
+   * (`Sidebar.svelte` `openOther`), so one act was answered two ways and this one opened nothing. A whole navigation,
+   * for the rail's reason: everything this tab kept was read from the record being left.
+   */
+  let openingOther = false;
+  async function openOther(r: { slug: string }) {
+    if (openingOther) return;
+    openingOther = true;
+    const out = await openRecord((url, init) => fetch(url, init), r.slug, location.origin);
+    openingOther = false;
+    if (out.from === 'opened') return location.assign(out.to);
+    toasts.push(out.from === 'absent' ? copy.recordNotOpened : out.fix, { intent: 'warn' });
+  }
+
   async function signOutHere() {
     if (signingOutNow) return;
     signingOutNow = true;
@@ -2128,12 +2144,11 @@
            above a list that does not offer it is the plainest kind of lie a screen can tell, and
            this one told it about the one thing the section exists for.
 
-           THE ROW IS THE CONTROL, AND IT REPORTS THE SAME THING THE RAIL'S SWITCHER DOES. That menu
-           had already solved this honestly: `href="/"` so it is a real link with a real address for
-           the keyboard and the middle button, and a handler that says what would happen rather than
-           silently doing nothing, because the record this build draws is a fixture. Two surfaces
-           offering one act must not answer it two ways, so this is that answer and not a second
-           one. The record you are already in is not a link at all: you are in it. -->
+           THE ROW IS THE CONTROL, AND IT DOES WHAT THE RAIL'S SWITCHER DOES: the session moves to that
+           record and the app starts again at its Home (`openOther`). The address is the one the move
+           lands on, so the keyboard and the middle button have a real place to go. Two surfaces
+           offering one act must not answer it two ways. The record you are already in is not a link
+           at all: you are in it. -->
       <Section title={copy.yourRecords} count={me.records.length}>
         <ul class="ledger ledger-glyph">
           {#each me.records as r}
@@ -2142,13 +2157,13 @@
               <svelte:element
                 this={here ? 'div' : 'a'}
                 class="line"
-                href={here ? undefined : at('/')}
+                href={here ? undefined : at('/', `${BASE}/${r.slug}/`)}
                 role={here ? undefined : 'link'}
                 onclick={here
                   ? undefined
                   : (e: MouseEvent) => {
                       e.preventDefault();
-                      toasts.push(copy.notWritten(copy.otherRecord(r.name)));
+                      void openOther(r);
                     }}
               >
                 <span class="seq"><Icon name="rows" size="s" /></span>
@@ -2654,7 +2669,7 @@
             </div>
           </div>
         {/if}
-        <!-- AND NO "RESTORE TO A TIME". It was drawn only where `copiesFrom === 'sample'` on the Cloud
+        <!-- AND NO "RESTORE TO A TIME". It was drawn only over the sample's copies on the Cloud
              build, because every record that answered, on either host, either listed its copies above
              or refused, and no host serves a restore to an instant: `apps/worker/src/copies.ts` goes
              back to a copy by the bookmark that copy recorded and leaves `getBookmarkForTime` out on

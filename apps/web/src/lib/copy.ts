@@ -157,17 +157,8 @@ export const copy = {
      screen, once per device, for ever. A button is the wrong place to introduce a vocabulary. */
   bindBlock: 'Put this on a page',
 
-  /* THE ONE SENTENCE A MOCK-UP OWES ITS READER. A control that does nothing at all is
-     indistinguishable from a broken one, so every action that cannot happen here says what it
-     would have done and that it did not happen — once, in the toast, not as a disabled state.
-     A disabled control tells you a thing exists and refuses to say why it will not work. */
   /** The predicate of an unfiltered list, said as a person would say it. */
   everything: 'everything in it',
-  /* WHAT WOULD HAVE HAPPENED, AND THAT IT DID NOT. The second half used to name the build —
-     "This is a mock-up of the record" — which `19 §9` bans and which answers a question nobody
-     asked: the reader wants to know whether their action stuck, not what stage the software is at.
-     Three sentences said it three ways; they say one thing one way now. */
-  notWritten: (what: string) => `${what}, but nothing was saved yet.`,
   promoted: (title: string) => `${title} is in your nav, at the end of its section.`,
   showMe: 'Show me',
   asA: 'Draw it as',
@@ -270,18 +261,6 @@ export const copy = {
   switchRecord: 'Switch record',
   recordSettings: 'Record settings',
   newRecord: 'New record',
-  /**
-   * WHAT THE OTHER RECORD WOULD OPEN WITH, AND IT SAID `registers`.
-   *
-   * The rail's switcher and the Settings list of records are two surfaces offering one act, so
-   * they were already typed as one sentence — twice, once in each file, neither of them here.
-   * `lists` is the word the rail's own heading uses and the word this file has settled on; the
-   * sentence behind the press kept the schema's word because a rename can only reach text that
-   * exists before somebody presses something, and this text does not.
-   *
-   * It is one key now, so the next rename reaches both call sites or neither.
-   */
-  otherRecord: (name: string) => `${name} would open, with its own lists and pages`,
   recordNotOpened: 'That record could not be opened just now. Try again in a moment.',
   recordOpenSignIn: 'Sign in again to open another record.',
 
@@ -1121,7 +1100,6 @@ export const copy = {
   catalogueQuestion: (title: string, to: string, from: string | null, keyId: string | null) =>
     `${from ? `Update ${title} from ${from} to ${to}` : `Install ${title} ${to}`} from this BrainDog's catalogue? ${keyId ? `It is signed by key ${keyId}.` : 'Nobody signed it.'}`,
   catalogueAsked: 'Asked. It installs only when you approve it on Decide.',
-  catalogueWouldAsk: (title: string, version: string) => `On a record this would ask on Decide for ${title} ${version}. This sample files nothing.`,
   catalogueUpdatesHeading: "Updates from this BrainDog's catalogue",
   catalogueFromTo: (from: string, to: string) => `${from} to ${to}`,
   catalogueChangedGone: 'The catalogue no longer holds the version installed here, so only the plan on Decide can say what changes.',
@@ -1704,11 +1682,10 @@ export const copy = {
   /* the signing key — `53 §4` puts the public half on the export screen, and `03 §4` says why */
   theSignature: 'How anybody checks a copy is yours',
   /* AND ON A RECORD THERE IS NO KEY TO SHOW YET. The value under this heading is the sample's, kept
-     in `data.ts` with the rest of the synthetic record, and it was drawn on every record: an
+     in `fixtures/sample.ts` with the rest of the synthetic record, and it was drawn on every record: an
      invented key presented as that record's own, which no reader could tell by looking. `boot` does
      not carry the real one and `03 §4`'s well-known URL is served by none of the three apps, so a
-     record gets the fact that its files are signed and the absence said plainly, which is the
-     register `notWritten` uses everywhere else on this screen. */
+     record gets the fact that its files are signed and the absence said plainly. */
   /* THE CHECK, RUN IN THIS BROWSER over a file somebody picks: the same `checkBrainl` an import runs before it writes
      a row. It proves the file is whole and signed by the key inside it, and not whose key that is, so it says no more. */
   fileChecked: (name: string) =>

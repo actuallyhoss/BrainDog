@@ -265,11 +265,6 @@ async function send<T>(io: Fetch, url: string, body?: Record<string, unknown>): 
 export type Proposal = { question: string; body_kind: 'change'; body: Record<string, unknown> };
 
 export type Source = {
-  /**
-   * ALWAYS `false`, AND KEPT ONLY FOR THE SCREENS THAT STILL ASK. `/automations` and `/automations/<id>` read it and are
-   * other briefs' to change (`loop/research-no-sample.md` section 5); drop it when neither does.
-   */
-  sample: false;
   /** Every automation, summarised, with no bodies. */
   automations(): Promise<Answer<AutomationRow[]>>;
   /** One, with its body and its last ten runs. What the editor opens. */
@@ -283,7 +278,6 @@ export type Source = {
 
 export function live(io: Fetch, base = ''): Source {
   return {
-    sample: false,
     automations: async () => {
       const out = await send<unknown>(io, `${base}/api/automations`);
       return out.ok ? { ok: true, value: rowsOf(out.value) } : out;

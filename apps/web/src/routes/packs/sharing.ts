@@ -20,7 +20,7 @@ import { withOrder } from '../../lib/nav.ts';
 import { SPEAKS, speaking, voiceBatch, voiceWrites, withSpeaks, type SpeakingState } from '../../lib/voice.ts';
 import { callsOutOf, type CallOut } from '../../lib/record/actions.ts';
 import type { PackState, Refusal } from '../../lib/record/packs.ts';
-import { PACKS } from '../../lib/record/data.ts';
+import { moduleOf } from '../../lib/record/modules.ts';
 import { REGISTERS } from '../../lib/record/held.ts';
 
 type Body = Record<string, unknown>;
@@ -128,7 +128,7 @@ export const oneOf = (list: string): string => {
 };
 
 /** A pack by the name a person knows it by: this build's name for a module, else its id in words. */
-export const moduleTitle = (id: string): string => PACKS.find((p) => p.id === id)?.name ?? moduleName(id);
+export const moduleTitle = (id: string): string => moduleOf(id)?.name ?? moduleName(id);
 
 /** A declaration id as a person reads it, from the document that declares it: a list's name, a page's title. */
 function namesIn(doc: Body, others: readonly Body[] = []): (id: string) => { kind: 'list' | 'page' | 'other'; name: string } {

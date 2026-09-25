@@ -90,11 +90,12 @@
    */
   const tiles = $derived.by(() => {
     const decl = REGISTERS[register];
+    /* THE ROWS A SEED IS PROPOSED FROM ARE THE ONES THIS PAGE DREW, and not the sample's rows of the list (`seed.ts`). */
+    const bound = blocks.find((b) => b.register === register);
     return bindableFor(register).map((kind) => {
-      const seed = seedBlock(kind, register);
+      const seed = seedBlock(kind, register, bound?.entries ?? []);
       const preview = (isKind(kind) ? KINDS[kind].rows : undefined) ?? 3;
       let segments: ReturnType<typeof toSegments> = [];
-      const bound = blocks.find((b) => b.register === register);
       /* An AUTHORED seed previews from its own rows and must not be handed a register — a block
          with both a source and authored rows is refused, so the preview would be the refusal. */
       if (seed?.authored) {

@@ -25,7 +25,7 @@ import { readFileSync } from 'node:fs';
 
 import { chipsOf, whereOf } from './api.ts';
 import { applyFilters, list } from './fixtures/readers.ts';
-import { REGISTERS, ROWS } from './data.ts';
+import { REGISTERS, ROWS } from './fixtures/sample.ts';
 import { clausesOf } from './views-live.ts';
 import { compile, registerHref } from './where.ts';
 /* THE SAMPLE'S ROW NAMES, which a live tab learns from the record and this test asks the mirror about by name. */

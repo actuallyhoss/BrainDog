@@ -14,6 +14,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import './fixtures/fill.ts';
 import { noticed } from './fixtures/readers.ts';
 
 test('a register whose refusals crossed the threshold says so', () => {

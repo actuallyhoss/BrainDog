@@ -15,9 +15,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import './fixtures/fill.ts';
 import { toSegments } from './blocks.ts';
 import { page } from './fixtures/readers.ts';
-import { ROWS } from './data.ts';
+import { ROWS } from './fixtures/sample.ts';
 import type { BlockResult } from './api.ts';
 import type { Fields } from './schema.ts';
 

@@ -19,9 +19,9 @@
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  /* THE BUILT-IN ADD-ONS, whose names and lists the sample's table is still the only list of. Read directly, since `api.ts`
-     no longer hands the sample's tables on; wave C1 moves it with `data.ts`. */
-  import { PACKS } from '$lib/record/data.ts';
+  /* THE MODULES THIS BUILD SHIPS, for their names, blurbs and lists. It was the sample's `PACKS`, which carried the same
+     six and two add-ons nobody wrote (wave C1, `modules.ts`). */
+  import { MODULES } from '$lib/record/modules.ts';
   import { PAGES, REGISTERS } from '$lib/record/held.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import { HOME_CURRENCY_SETTING } from '@braindog/kernel';
@@ -57,7 +57,7 @@
   import { SPEAKS } from '$lib/voice.ts';
 
   const id = $derived(String(page.params.id));
-  const pack = $derived(PACKS.find((p) => p.id === id));
+  const pack = $derived(MODULES.find((p) => p.id === id));
   /* A use case's pack by its use case, never `usecase-founder`. */
   const name = $derived(pack?.name ?? moduleName(id));
 

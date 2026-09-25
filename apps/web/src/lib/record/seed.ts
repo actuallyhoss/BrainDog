@@ -21,8 +21,7 @@
 
 import { KINDS, isKind } from 'braindog-render';
 
-import { ROWS } from './data.ts';
-import { REGISTERS } from './held.ts';
+import { REGISTERS, ROWS } from './held.ts';
 import { amountOf } from './money.ts';
 
 /**
@@ -32,7 +31,7 @@ import { amountOf } from './money.ts';
  * and did. `bar` groups and sums, `gauge` sums against a target, `stat` reads a figure.
  */
 const AGGREGATES = new Set(['bar', 'gauge', 'stat']);
-import type { FieldDecl, PageBlock, RegisterDecl } from './schema.ts';
+import type { Entry, FieldDecl, PageBlock, RegisterDecl } from './schema.ts';
 
 /** What each cell of a kind wants, in order. `any` takes the first field left. */
 type Want = 'title' | 'number' | 'date' | 'enum' | 'ref' | 'text' | 'any';
@@ -169,8 +168,13 @@ export const bindableFor = (register: string): string[] =>
  * shopping list across a 1180px page, and the first thing anybody would do is narrow it. Starting
  * narrow makes the common correction "make it wider", which is the direction the control is
  * better at.
+ *
+ * `rows` ARE THE ROWS THE PREVIEW WILL DRAW, and the first filter and a gauge's target are proposed from them. They were
+ * the sample's rows of the list whatever the record held, so the Add a block sheet proposed a gauge's target from the
+ * sample's sum on any record. The sheet hands in the rows its page's own block of that list drew, and a page with none
+ * is proposed no filter and no target. The default is `held.ts`'s table, which only a test fills.
  */
-export function seedBlock(kind: string, register: string): PageBlock | null {
+export function seedBlock(kind: string, register: string, rows: readonly Entry[] = ROWS[register] ?? []): PageBlock | null {
   if (!isKind(kind)) return null;
   const spec = KINDS[kind];
 
@@ -207,7 +211,6 @@ export function seedBlock(kind: string, register: string): PageBlock | null {
    */
   const partition = ((): { field: string; value: string } | null => {
     if (!AGGREGATES.has(kind)) return null;
-    const rows = ROWS[register] ?? [];
     for (const f of decl.fields)
       if (f.type === 'enum' && (f.values?.length ?? 0) > 1 && !columns.some((c) => c.field === f.id)) {
         const counted = new Map<string, number>();
@@ -235,7 +238,7 @@ export function seedBlock(kind: string, register: string): PageBlock | null {
       ? (() => {
           const of = columns[1]?.field;
           if (!of) return undefined;
-          const sum = (ROWS[register] ?? [])
+          const sum = rows
             .filter((e) => !partition || String(e.fields[partition.field] ?? '') === partition.value)
             .reduce((a, e) => a + (amountOf(e.fields[of]) ?? (Number(e.fields[of]) || 0)), 0);
           return sum > 0 ? Math.round(sum * 2) : undefined;

@@ -17,6 +17,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { openRecord, type Kernel } from '@braindog/kernel';
 
+import './fixtures/fill.ts';
 import { labelOf, REGISTERS } from './api.ts';
 import { retirable, retireField, retireOf, retireWords } from './field-retire.ts';
 import type { Fetch } from './row-live.ts';

@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 
 import type { Block } from 'braindog-render';
 
+import './fixtures/fill.ts';
 import { REGISTERS } from './api.ts';
 import { toSegments } from './blocks.ts';
 import { blockOf } from './page-live.ts';
@@ -135,7 +136,7 @@ test('A GOAL IS SET AGAINST WHAT WAS LOGGED TOWARD IT, keyed by the row, in the 
 
 test('A BUDGET IN ONE CURRENCY AND A FIGURE IN ANOTHER ARE NEVER SET AGAINST EACH OTHER in the sample', async () => {
   const { readBlock } = await import('./fixtures/readers.ts');
-  const { ROWS } = await import('./data.ts');
+  const { ROWS } = await import('./held.ts');
   const { METRICS } = await import('./declared.ts');
   REGISTERS.budgets_x = register('budgets_x', [
     { id: 'category', type: 'enum', values: ['groceries'] },

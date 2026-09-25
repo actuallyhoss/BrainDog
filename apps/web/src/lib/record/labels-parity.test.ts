@@ -17,8 +17,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord } from '@braindog/kernel';
 import { NOW, installSeed } from '@braindog/seed';
 
+import './fixtures/fill.ts';
 import { readBlock } from './fixtures/readers.ts';
-import { ROWS } from './data.ts';
+import { ROWS } from './fixtures/sample.ts';
 import type { PageBlock } from './schema.ts';
 import { compile, declaredValue, matches } from './where.ts';
 

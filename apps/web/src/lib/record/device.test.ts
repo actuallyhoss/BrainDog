@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  reportKeyOf, CODE_DIGITS, LABEL_MAX, TOKEN_DAYS, answerOf, codeOf, connectLines, noRecord, normalise, reachKey, revocable,
+  reportKeyOf, CODE_DIGITS, LABEL_MAX, TOKEN_DAYS, answerOf, codeOf, connectLines, normalise, reachKey, revocable,
   standing, type DeviceRow, type TokenRow,
 } from './device.ts';
 import * as device from './device.ts';
@@ -86,16 +86,11 @@ test('the sentences for the refusals say what to do, and none prints a count of 
   assert.match(copy.codeLong(7), /7 digits/);
 });
 
-/* `noRecord` STAYS UNTIL ITS LAST CALLER GOES (wave C of `loop/research-no-sample.md`), and it answers what it always did. */
-test('no-record refusals are 401 and UNREACHABLE with no slug, and a record that refuses for a reason is not one', () => {
-  assert.equal(noRecord('UNREACHABLE'), true);
-  assert.equal(noRecord('UNAUTHORIZED'), true);
-  assert.equal(noRecord('FORBIDDEN'), false);
-  assert.equal(noRecord('NEEDS_BROWSER_SESSION'), false);
-  /* UNDER A SLUG THERE IS ALWAYS A RECORD MEANT, so neither refusal means there is none. */
-  assert.equal(noRecord('UNAUTHORIZED', '/app/acme/r/tasks'), false);
-  assert.equal(noRecord('UNREACHABLE', '/app/acme/'), false);
-  assert.equal(noRecord('UNAUTHORIZED', '/app/r/tasks'), true);
+/* `noRecord` WENT WITH ITS LAST CALLER (wave C3 of `loop/research-no-sample.md`). It told a 401 or an unreachable host at
+   an address with no slug from any other refusal, which was the one place the sample was drawn; three writers still
+   asked it on 25 September and answered `gone`, which no screen drew differently from `refused`. */
+test('there is no longer a refusal that means no record is here', async () => {
+  assert.equal('noRecord' in (await import('./device.ts')), false);
 });
 
 /* ── what a grant reaches ── */

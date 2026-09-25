@@ -28,6 +28,7 @@ import { registerHooks, stripTypeScriptTypes } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { compileModule } from 'svelte/compiler';
 
+import '../record/fixtures/fill.ts';
 import { REGISTERS } from '../record/api.ts';
 import { forget } from '../record/boot-live.ts';
 import type { Ask, Refusal, Said } from './record.ts';

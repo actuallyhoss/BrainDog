@@ -9,19 +9,19 @@
  *
  * WHO FILLS WHAT. `learn` in `remote.ts` puts each list's declaration in `REGISTERS` as the record answers `schema`;
  * `refMapOf` there puts a list's row names in `TITLES` each time a reader walks that list to resolve its refs; and
- * `readBoot` puts each page `boot` lists in `PAGES`, by `learnPages` below. Nothing else writes here in a shipped build
- * but the copy the next paragraph is about.
+ * `readBoot` puts each page `boot` lists in `PAGES`, by `learnPages` below. Nothing else writes here in a shipped build.
  *
- * `data.ts` STILL COPIES THE SEED'S DECLARATIONS INTO `REGISTERS` AND `PAGES`, because it is the fixture every reader
- * in `fixtures/readers.ts` and some seventy test files are built over, and it still ships until wave C1 moves it under
- * `fixtures/`. Measured on 25 September with that copy removed: 449 of 1,965 tests fail across about seventy files. It
- * does NOT copy the sample's row names into `TITLES`; a test that asks the mirror about a row by its title imports
- * `fixtures/fill.ts`, so no shipped screen can reach a sample row's name through here.
+ * A TEST FILLS IT WITH THE SAMPLE BY IMPORTING `fixtures/fill.ts`, and only a test may. Until wave C1 the fixture
+ * itself copied the seed's declarations here the moment anything imported it, and eleven shipped files did, so a list
+ * a live tab had not learnt yet drew the seed's fields. Measured on 25 September with that copy gone and no test
+ * changed: 277 of 1,984 tests failed across 66 files. 61 of them import `fill.ts` now; four already did and had grown a
+ * list through the fixture's own tables, which they grow through these now; the last held the build variants to the
+ * fixture (`deployment.test.ts`).
  *
  * NO IMPORT BUT TYPES, so loading this file loads no sample.
  */
 
-import type { PageDecl, RegisterDecl } from './schema.ts';
+import type { Entry, PageDecl, RegisterDecl } from './schema.ts';
 
 /** Each list's declaration, by id, as the record last answered `schema` for it. */
 export const REGISTERS: Record<string, RegisterDecl> = {};
@@ -66,3 +66,23 @@ export function seqTitled(register: string, said: string, same: (a: string, b: s
  */
 export const refOptions = (register: string): { value: number; label: string }[] =>
   [...(TITLES.get(register) ?? [])].map(([seq, title]) => ({ value: seq, label: title || `${register}#${seq}` }));
+
+/**
+ * Each list's rows as this tab holds them past the screen that read them, by list: none, in a shipped build.
+ *
+ * EMPTY, AND EVERY HELPER THAT READS IT ANSWERS AS IT DOES FOR A LIST WITH NO ROWS. It was the sample's `ROWS`, read by
+ * `currencyFor`, `homeCurrency`, a gauge's currency, a seeded block's first filter and target, and the browser's own
+ * figure, page and cash-walk engines, so on a live record each of those answered from the sample's rows: a money field
+ * on a new row was offered the currency of the sample's rows in that list, and a seeded gauge proposed a target of twice
+ * the sample's sum whatever the record held. No live reader keeps a list's rows beyond its screen yet, so nothing writes here but
+ * `fixtures/fill.ts`, which puts the sample's rows here for the tests that hold those engines to the kernel's.
+ */
+export const ROWS: Record<string, Entry[]> = {};
+
+/**
+ * The factor tables a figure multiplies by, by name: none, in a shipped build, and filled by `fixtures/fill.ts`.
+ *
+ * A RECORD CARRIES ITS FACTORS ON EACH FIGURE'S DECLARATION (`lookups`), and the kernel reads them there. Only the
+ * browser's own figure engine reads this table, and only a test runs that engine, over the sample it fills in here.
+ */
+export const LOOKUPS: Record<string, Record<string, number>> = {};

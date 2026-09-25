@@ -17,12 +17,14 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { openRecord, type Declaration } from '@braindog/kernel';
 
+import './fixtures/fill.ts';
 import { currencyFor, display } from './api.ts';
 import { metric, page, readBlock, values } from './fixtures/readers.ts';
 import { resolverOf } from './page-live.ts';
-import { PAGES } from './data.ts';
+import { PAGES } from './fixtures/sample.ts';
 import { toSegments, walkTables } from './blocks.ts';
-import { NOW, ROWS } from './data.ts';
+import { NOW } from './fixtures/sample.ts';
+import { ROWS } from './held.ts';
 import { BARE, amountOf, currencyOf, drawn, homeOf, merge, mixedFix, symbolText, total } from './money.ts';
 import { BARE as METRICS_BARE, currenciesRead, fxNote, read as readAt, targetSaid, withFx, type MetricDecl } from './metrics.ts';
 import { copy } from '../copy.ts';

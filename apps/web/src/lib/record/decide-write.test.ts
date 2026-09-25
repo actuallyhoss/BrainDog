@@ -69,16 +69,19 @@ test('a conflict says a row changed since it was proposed', async () => {
   assert.deepEqual(await answerQuestion(BASE, 'SG4', 'accept', 'Both are right.', io), { from: 'conflict', fix: copy.decideConflict });
 });
 
-test('no record behind the screen is gone, with a sentence: nothing answering, a sign-in wall, a 404 that is not JSON', async () => {
+/* NO SAMPLE, SO NO `gone`. A host that does not answer, a sign-in wall and a 404 that is not JSON were `gone` at an
+   address with no slug, the one place the sample used to be drawn instead of the record (wave C3). They are the refusal
+   they are, with its sentence, wherever the screen is. */
+test('no record behind the screen is refused, with a sentence: nothing answering, a sign-in wall, a 404 that is not JSON', async () => {
   const down = await answerQuestion(BASE, 'SG2', 'seat', 'Because.', host(null).io);
-  assert.equal(down.from, 'gone');
-  assert.ok(down.from === 'gone' && down.fix.length > 0);
+  assert.equal(down.from, 'refused');
+  assert.ok(down.from === 'refused' && down.fix.length > 0);
 
   const wall = host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in.' } }));
-  assert.deepEqual(await answerQuestion(BASE, 'SG2', 'seat', 'Because.', wall.io), { from: 'gone', fix: 'Sign in.' });
+  assert.deepEqual(await answerQuestion(BASE, 'SG2', 'seat', 'Because.', wall.io), { from: 'refused', fix: 'Sign in.' });
 
   const page = host(() => new Response('<h1>Not found</h1>', { status: 404, headers: { 'content-type': 'text/html' } }));
-  assert.equal((await parkQuestion(BASE, 'SG2', '2026-10-01', 'Later.', page.io)).from, 'gone');
+  assert.equal((await parkQuestion(BASE, 'SG2', '2026-10-01', 'Later.', page.io)).from, 'refused');
 });
 
 test('accepting some rows of several sends their places beside the option, and accepting all sends none', async () => {

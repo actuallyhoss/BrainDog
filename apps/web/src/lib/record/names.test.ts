@@ -6,8 +6,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import './fixtures/fill.ts';
 import { display, identityFor, identityOf, REGISTERS } from './api.ts';
-import { ROWS } from './data.ts';
+import { ROWS } from './fixtures/sample.ts';
 import { joinNames, namesOf, refMapOf } from './remote.ts';
 
 /* A register the seed declares with an identity, and a list with a ref pointing at it. */

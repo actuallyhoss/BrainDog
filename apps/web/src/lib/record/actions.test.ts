@@ -36,7 +36,7 @@ import {
   type ActionRow,
   type Fetch,
 } from './actions.ts';
-import { PACKS } from './data.ts';
+import { PACKS } from './fixtures/sample.ts';
 import { packDiff } from './api.ts';
 import { signInFor } from './packs.ts';
 import { copy } from '../copy.ts';

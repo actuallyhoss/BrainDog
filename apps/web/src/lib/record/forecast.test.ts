@@ -10,8 +10,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import './fixtures/fill.ts';
 import { runway as walkAt, trend, type Leg } from './forecast.ts';
-import { NOW, PAGES, ROWS } from './data.ts';
+import { NOW, PAGES } from './fixtures/sample.ts';
+import { ROWS } from './held.ts';
 import { openingOf, page, readBlock, trendOf } from './fixtures/readers.ts';
 import { magnitudeOf } from 'braindog-render';
 /* THE SAMPLE'S ROWS WALKED AT THE SAMPLE'S CLOCK, which `runway` took for granted and now takes from its caller. */

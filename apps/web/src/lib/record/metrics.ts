@@ -39,7 +39,6 @@ import {
   largestFirst,
   pairParts,
   rateUnit,
-  ratesFrom,
   targetFor,
   type Bucket,
   type FxRead,
@@ -52,8 +51,7 @@ import {
 import { day as longDay, integer, money, shortDay } from 'braindog-render';
 
 import { copy } from '../copy.ts';
-import { LOOKUPS, ROWS } from './data.ts';
-import { REGISTERS } from './held.ts';
+import { LOOKUPS, REGISTERS, ROWS } from './held.ts';
 import { BARE, amountOf, currencyOf, mixedFix } from './money.ts';
 import { compile, everyClause, explain, joinsWithOr, matches, registerHref, resolveDay } from './where.ts';
 import type { Clause, Where } from './where.ts';
@@ -204,14 +202,18 @@ const DAY_MS = 86_400_000;
 /* ── money across currencies ─────────────────────────────────────────────── */
 
 /**
- * The home currency and the dated rates this build's figures read: the sample's `fx` rows, and no home currency.
+ * The home currency and the dated rates this build's figures read: none of either until something hands them in.
  *
  * THE ARITHMETIC IS THE RECORD'S (`fx.ts`, imported), so a figure over the same rows at the same rates is the same
  * minor unit in both engines. A test hands in a home currency with `withFx`, which is how the engines are held equal.
+ *
+ * IT WAS THE SAMPLE'S `fx` ROWS, and `blocks.ts` converts with this whenever a block arrives without rates of its own,
+ * so a live bar the record sent no rates for was converted at the sample's. `fixtures/fill.ts` hands those rows in for
+ * the tests that read the sample.
  */
-let fxSource: () => { home: string | null; rates: readonly Rate[] } = () => ({ home: null, rates: ratesFrom((ROWS.fx ?? []).map((e) => e.fields)) });
+let fxSource: () => { home: string | null; rates: readonly Rate[] } = () => ({ home: null, rates: [] });
 
-/** Read every figure with this home currency and these rates until the returned function puts the sample's back. */
+/** Read every figure with this home currency and these rates until the returned function puts the last ones back. */
 export function withFx(source: () => { home: string | null; rates: readonly Rate[] }): () => void {
   const before = fxSource;
   fxSource = source;

@@ -18,6 +18,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { openRecord, type Kernel } from '@braindog/kernel';
 
+import './fixtures/fill.ts';
 import { display, readableFields, REGISTERS } from './api.ts';
 import { ADDABLE, addField, additionOf, addValue, fieldOf, idOf, putBackOf, valueAdditionOf, valueOf } from './field-write.ts';
 import { pageReader } from './page-live.ts';

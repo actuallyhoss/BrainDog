@@ -691,7 +691,7 @@ function elementValue(register: string, field: string, of: string, said: string,
     const to = decl?.to;
     const title = to ? REGISTERS[to]?.title : undefined;
     if (!to || !title) return null;
-    /* THE ELEMENT THE COLUMN HOLDS, which on this side is the row's `seq`: `data.ts` numbers the seed
+    /* THE ELEMENT THE COLUMN HOLDS, which on this side is the row's `seq`: the fixture (`fixtures/sample.ts`) numbers the seed
        by position, so a ref in the mirror is a number where the record keeps a ULID.
 
        THE DIGITS ARE TRIED FIRST BECAUSE THE LIVE READER TRIES THEM FIRST. `valueOf` in `remote.ts`

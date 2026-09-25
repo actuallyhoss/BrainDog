@@ -21,7 +21,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { fill, openRecord, type Kernel } from '@braindog/kernel';
 import { installSeed } from '@braindog/seed';
 
-import { NOW, ROWS } from './data.ts';
+import { NOW, ROWS } from './fixtures/sample.ts';
 import { saidPlainly } from './blocks.ts';
 import { read as readAt, withParam } from './metrics.ts';
 import { compile, matches, registerHref } from './where.ts';

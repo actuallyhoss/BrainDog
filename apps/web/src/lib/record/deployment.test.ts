@@ -27,7 +27,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { copy } from '../copy.ts';
-import { DEPLOYMENT, SNAPSHOTS, SNAPSHOTS_KEPT } from './data.ts';
+import { DEPLOYMENT, SNAPSHOTS, SNAPSHOTS_KEPT } from './fixtures/sample.ts';
 
 const AREA = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'routes', 'settings', '[area]', '+page.svelte'),
@@ -52,15 +52,15 @@ test('THE HOST IS A FACT ABOUT THE RECORD, NOT A COMPILE-TIME CONSTANT', () => {
    * multi-line in the same pass, so `as const` could go back on line two and this stayed green.
    * The check is the statement, from `export const DEPLOYMENT` to the `;` that ends it.
    */
-  const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'data.ts'), 'utf8');
+  const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'sample.ts'), 'utf8');
   const at = src.indexOf('export const DEPLOYMENT');
   assert.ok(at > 0, 'DEPLOYMENT is gone');
   const decl = src.slice(at, src.indexOf('};', at) + 2);
   assert.doesNotMatch(decl, /as const/u, 'the host is pinned to a literal again');
   assert.match(decl, /'self-host' \| 'cloud'/u);
-  /* AND IT IS DERIVED FROM THE VARIANT, not hardcoded to either host — which is the mutation that
-     silently kills the whole harness while every gate goes on printing "over four records". */
-  assert.match(decl, /VARIANT === 'cloud' \? 'cloud' : 'self-host'/u, 'the host no longer follows the variant');
+  /* AND IT IS THE SAMPLE'S HOST ALONE. It followed a build flag so a Cloud build of the sample could draw the Cloud's
+     branches; the gates draw those over a record that says it is on the Cloud now (`tools/gates/record.mjs`). */
+  assert.equal(DEPLOYMENT.kind, 'self-host');
 });
 
 test('every branch on the host has two sides, and they say different things', () => {
@@ -197,28 +197,35 @@ test('and the delete field does not put the answer in the box', () => {
 
 /* ── the other records ────────────────────────────────────────────────── */
 
-test('EVERY VARIANT IS BUILT AND MEASURED, OR IT IS A FILE NOBODY RUNS', () => {
+test('EVERY VARIANT IS A RECORD BOTH BROWSER GATES MEASURE, AND NONE OF THEM IS A BUILD', () => {
   /**
-   * Three findings needed three records: the Cloud half of every host branch, a record with nothing
-   * connected (the two designed empty states on `/settings/agents`), and one with enough decided
-   * questions for `/search` to cut a group that has no door.
+   * Three findings needed three records: the Cloud half of every host branch, the half of
+   * `/settings/agents` the gates' own record cannot draw, and enough decided questions for `/search`
+   * to cut a group that has no door.
    *
-   * A variant that `data.ts` narrows on and no gate loads is worse than no variant — it looks like
-   * coverage in a diff. So the three lists are held together: what the record branches on, what the
-   * build script writes, and what the browser gates measure.
+   * THEY WERE THREE BUILDS, AND THE BUILDS HAD STOPPED DIFFERING. `BRAINDOG_VARIANT` swapped the sample's
+   * constants and `build:variants` wrote `build-cloud`, `build-quiet` and `build-busy`; once the screens
+   * read the record, no screen read those constants, and each variant build drew the main build's
+   * screens. They are records now (wave C2 of `loop/research-no-sample.md`), so what is held together
+   * is what `tools/gates/record.mjs` starts and what the two browser gates measure, and that nothing
+   * builds the app twice.
    */
-  const data = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'data.ts'), 'utf8');
-  const pkg = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'package.json'), 'utf8');
-  const gates = ['layout', 'a11y'].map((g) =>
-    readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..', 'tools', 'gates', `${g}.mjs`), 'utf8'),
-  );
+  const up = (...p: string[]) => join(dirname(fileURLToPath(import.meta.url)), ...p);
+  const records = readFileSync(up('..', '..', '..', '..', '..', 'tools', 'gates', 'record.mjs'), 'utf8');
+  const pkg = readFileSync(up('..', '..', '..', 'package.json'), 'utf8');
+  const vite = readFileSync(up('..', '..', '..', 'vite.config.ts'), 'utf8');
+  const gates = ['layout', 'a11y'].map((g) => [g, readFileSync(up('..', '..', '..', '..', '..', 'tools', 'gates', `${g}.mjs`), 'utf8')] as const);
 
-  const named = [...data.matchAll(/VARIANT === '([a-z]+)'/gu)].map((m) => m[1]!);
-  assert.ok(named.length >= 3, `the record branches on ${named.length} variants`);
-  for (const v of new Set(named)) {
-    assert.ok(pkg.includes(`'${v}'`), `\`${v}\` is a record nothing builds`);
-    for (const [i, src] of gates.entries()) assert.ok(src.includes(`build-${v}`), `\`${v}\` is built and ${['layout', 'a11y'][i]} does not measure it`);
+  const block = records.slice(records.indexOf('export const VARIANTS'), records.indexOf('];', records.indexOf('export const VARIANTS')));
+  const named = [...block.matchAll(/name: '([a-z]+)'/gu)].map((m) => m[1]!);
+  assert.ok(named.length >= 3, `the gates start ${named.length} variant records`);
+  for (const [g, src] of gates) {
+    assert.match(src, /VARIANTS as RECORDS/u, `${g} does not read the variant records`);
+    assert.match(src, /startRecord\(0, \{ variants: true \}\)/u, `${g} starts no variant record`);
+    assert.doesNotMatch(src, /'build-(cloud|quiet|busy)'/u, `${g} measures a variant build again`);
   }
+  assert.doesNotMatch(pkg, /build:variants|BRAINDOG_VARIANT/u, 'the app is built once per variant again');
+  assert.doesNotMatch(vite, /__BRAINDOG_VARIANT__/u, 'the build substitutes a record variant again');
 });
 
 test('and a variant build is a build, so no grep gate reads it as source', () => {

@@ -227,7 +227,12 @@
     const now = live.now;
     const [{ captureRow }, { rowWriter }] = await Promise.all([import('./capture.ts'), import('$lib/record/rows-write.ts')]);
     const row = captureRow(register, text, inherited, now);
-    if (!row) return void toasts.push(copy.notWritten(text), { intent: 'warn' });
+    /* NO ROW IS A LIST WHOSE TITLE LEFT BETWEEN THE READ AND THE PRESS, because the page hands a capture a write only when
+       the list declares one. It toasted the sample's "but nothing was saved yet"; it is the race it is now, read again. */
+    if (!row) {
+      toasts.push(copy.writeRaced, { intent: 'warn' });
+      return void (await reread());
+    }
     const out = await rowWriter(apiBase()).create(register, row.fields);
     if (!out.ok) return void toasts.push(out.fix, { intent: 'warn' });
     toasts.push(row.filled.length > 0 ? copy.markAddedFilled(row.filled) : copy.writeMarkAdded, { intent: 'good' });

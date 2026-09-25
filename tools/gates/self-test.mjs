@@ -287,8 +287,16 @@ const CASES = [
      finding dead ones. */
   { gate: 'flags', expect: /a branch nobody takes/, findings: 1 },
   { gate: 'no-declarations-in-kernel', expect: /declaration written in the kernel/, findings: 1 },
-  /* FIVE SINCE 25 SEPTEMBER: the importer left `apps/cli` for `packs/legacy-import` (brief B2), and its two exemptions and their two seeded files went with it. */
-  { gate: 'shell-words', expect: /a use case named in the core/, findings: 5 },
+  /* FIVE SINCE 25 SEPTEMBER: the importer left `apps/cli` for `packs/legacy-import` (brief B2), and its two exemptions and their two seeded files went with it.
+
+     AND TEN SINCE BRIEF B10 STEP 2, the same day, each new one a place the gate did not look or a word
+     it did not know: his host in the kernel, `api.goldapi.io` in a grammar, `acme.example` in an app script,
+     `EGP` in `packages/seed` and `legacyTool` in `apps/web`, the last two once exempted whole. Measured
+     against the gate before the step: it named the first five, and said `packages/seed` was an
+     exemption holding nothing, which is a sixth finding this case did not seed. `total` is what turns
+     that sixth line into a failure rather than a pass that happened to count five. */
+  { gate: 'shell-words', expect: /a use case named in the core/, findings: 10, total: 10 },
+  { gate: 'no-fixtures', expect: /imports the test fixtures/, findings: 1, total: 1 },
   /* THE SEEDED FIXTURE HOLDS TWO SENTENCES AND RENDERS ONE, so a gate that named both (or neither)
      is a gate that is counting keys rather than finding dead ones. */
   { gate: 'dead-copy', expect: /nobody reads/, findings: 1 },

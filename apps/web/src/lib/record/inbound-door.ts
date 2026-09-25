@@ -13,11 +13,10 @@
  * buttons back. Two of the eight controls that survey counted as unable to act on a fresh record
  * were these two.
  *
- * WHY THIS IS A REQUEST AND NOT `DEPLOYMENT.kind`. `DEPLOYMENT` in `data.ts` follows
- * `__BRAINDOG_VARIANT__`, which `vite.config.ts` substitutes at build time and which is `''` in
- * every shipped bundle — so `DEPLOYMENT.kind` is `'self-host'` on the Cloud build too, and hiding
- * the mint behind it would take the feature away from the one host that has it. The seed knows
- * which record it is showing; it does not know which host is answering.
+ * WHY THIS IS A REQUEST AND NOT `DEPLOYMENT.kind`. The sample's `DEPLOYMENT` followed a build flag that every shipped
+ * bundle set to nothing, so `DEPLOYMENT.kind` was `'self-host'` on the Cloud build too, and hiding the mint behind it
+ * would have taken the feature away from the one host that has it. The seed knew which record it was showing; it did
+ * not know which host was answering.
  *
  * WHY A GET, AND WHY IT COSTS NOTHING. `serveInbound` (`apps/worker/src/inbound.ts:177`) refuses a
  * non-POST at its second line with 405 and an `allow: POST` header, ABOVE the bearer, the origin,

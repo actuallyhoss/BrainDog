@@ -1,18 +1,34 @@
 /**
- * The sample's row names put where a live tab keeps the record's, for a test that asks the mirror about a row by name.
+ * The sample put where a live tab keeps what the record has said: its declarations, its pages, its rows, its factor
+ * tables, the name each row goes by, and its exchange rates.
  *
- * A TEST IMPORTS THIS FOR ITS SIDE EFFECT AND NOTHING SHIPPED MAY. `where.ts`, `remote.ts` and the new-row form read a
- * ref's names from `held.ts`'s `TITLES`, which only a walk of the record fills, so `thing is Kiln` is a question about
- * the record's projects and never about the sample's. The mirror's tests ask about the sample's projects on purpose, and
- * this is how they say so: before this file the same answer came from `ROWS` in every tab, the live ones included.
+ * A TEST IMPORTS THIS FOR ITS SIDE EFFECT AND NOTHING SHIPPED MAY. Every helper a live screen draws with reads
+ * `held.ts`, which only the record fills in a shipped tab, so `thing is Kiln` is a question about the record's projects
+ * and a list not learnt yet has no fields rather than the seed's. The tests that hold those helpers and the browser's
+ * engines to the sample ask about the sample on purpose, and this is how they say so. `tools/gates/no-fixtures.mjs`
+ * refuses a shipped file that imports it.
  *
- * `data.ts` still fills `REGISTERS` and `PAGES` itself while it ships; wave C1 moves that copy here too.
+ * IT WAS THE FIXTURE'S OWN SIDE EFFECT UNTIL WAVE C1, and not only a test's. `data.ts` wrote the declarations and pages
+ * into `held.ts` when it loaded, and eleven shipped files imported it for a table or two, so every tab carried the
+ * seed's declarations from its first line.
  */
 
-import { REGISTERS, ROWS } from '../data.ts';
-import { TITLES } from '../held.ts';
+import { ratesFrom } from '@braindog/kernel';
+
+import { LOOKUPS, PAGES, REGISTERS, ROWS } from './sample.ts';
+import * as held from '../held.ts';
+import { withFx } from '../metrics.ts';
+
+Object.assign(held.REGISTERS, REGISTERS);
+Object.assign(held.PAGES, PAGES);
+Object.assign(held.ROWS, ROWS);
+Object.assign(held.LOOKUPS, LOOKUPS);
 
 for (const [register, rows] of Object.entries(ROWS)) {
   const title = REGISTERS[register]?.title;
-  TITLES.set(register, new Map(rows.map((e) => [e.seq, title === undefined ? '' : String(e.fields[title] ?? '')])));
+  held.TITLES.set(register, new Map(rows.map((e) => [e.seq, title === undefined ? '' : String(e.fields[title] ?? '')])));
 }
+
+/* THE SAMPLE'S `fx` ROWS AS THE RATES FIGURES CONVERT AT, AND NO HOME CURRENCY, which is what a figure read in a test
+   was always read with. Never put back: a test that hands in its own with `withFx` restores this one when it is done. */
+withFx(() => ({ home: null, rates: ratesFrom((held.ROWS.fx ?? []).map((e) => e.fields)) }));

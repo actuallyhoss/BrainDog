@@ -133,12 +133,14 @@ jobs:
       - if: steps.browser-cache.outputs.cache-hit == 'true'
         run: pnpm exec playwright install-deps chromium
 
-      # THE BUILD IS A PREREQUISITE, NOT A STEP, AND ALL FIVE ROOTS MATTER. `bundle` refuses a build
-      # older than the newest source; `layout` and `a11y` measure `apps/web/build`, the three
-      # variant records (`build-cloud`, `build-quiet`, `build-busy` — the halves of every host
-      # branch the shipped seed cannot draw), and `apps/site/build`, which is the first page a
-      # stranger sees. `pnpm --filter @braindog/web build` writes the first four; the site is its
-      # own app and its own build.
+      # THE BUILD IS A PREREQUISITE, NOT A STEP, AND BOTH ROOTS MATTER. `bundle` refuses a build
+      # older than the newest source; `layout` and `a11y` measure `apps/web/build` over the gates'
+      # seeded record and over its variant records (`tools/gates/record.mjs`: the Cloud's half of
+      # every host branch, a record with machines and keys connected, and one with enough decisions
+      # to overflow a search group), and `apps/site/build`, which is the first page a stranger sees.
+      # The variants were three more Vite builds until wave C2 of `loop/research-no-sample.md`; they
+      # differed only in the sample's constants, which no live screen reads, so they drew the same
+      # screens as the main build and the branches they were for went unmeasured.
       #
       # A missing root is not a quiet loss of coverage: the gate exits 3, `run.mjs` calls that a
       # skip, and a skip under CI is red.

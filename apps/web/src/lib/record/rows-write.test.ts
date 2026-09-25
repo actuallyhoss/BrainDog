@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
+import './fixtures/fill.ts';
 import { copy } from '../copy.ts';
 import { capturedFields, holdInPlace, outbound, rowWriter } from './rows-write.ts';
 import type { Fetch } from './row-live.ts';

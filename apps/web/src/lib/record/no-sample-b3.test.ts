@@ -19,8 +19,9 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+/* THE SAMPLE'S DECLARATIONS PUT WHERE A LIVE TAB KEEPS THE RECORD'S, which the fixture did by itself until wave C1. */
+import './fixtures/fill.ts';
 import * as api from './api.ts';
-import * as sample from './data.ts';
 import { forget, readBoot, type Fetch } from './boot-live.ts';
 import * as held from './held.ts';
 import { learn, refMapOf, treeOf, type RecordRow } from './remote.ts';
@@ -34,7 +35,6 @@ const LIVE: RecordRow[] = [
 
 test('the declarations `learn` keeps are the table every reader reads, and `held.ts` loads no sample', async () => {
   assert.equal(api.REGISTERS, held.REGISTERS, 'the mock and the live readers hold two tables, so a learnt list is on half the screens');
-  assert.equal(sample.PAGES, held.PAGES, "the sample's readers draw pages from a table the record never fills");
   const said = { name: 'Club books', one: 'club book', title: 'title', fields: [{ id: 'title', type: 'text' }] };
   await learn(async () => ({ ok: true, value: said }), 'club_books', new Map());
   assert.equal(held.REGISTERS.club_books?.name, 'Club books');
@@ -77,9 +77,8 @@ function shipped(dir: string): string[] {
     return /\.(ts|svelte)$/u.test(name) && !/\.test\.ts$/u.test(name) ? [path] : [];
   });
 }
-/* THE FIXTURE MODULE ITSELF, which C1 moves; everything else ships and reads the record. `api.ts` was the second until
-   wave B2 took its readers to `fixtures/readers.ts`, which `shipped` does not walk, and it is held to the rule now. */
-const FIXTURES = new Set(['lib/record/data.ts']);
+/* EVERYTHING `shipped` WALKS SHIPS AND READS THE RECORD. The fixture module was the one exemption until wave C1 moved
+   it under `fixtures/`, which `shipped` does not walk; `api.ts` was the second until wave B2. */
 const imported = (source: string, name: string): boolean =>
   new RegExp(`import\\s*\\{[^}]*\\b${name}\\b[^}]*\\}\\s*from\\s*'[^']*/(api|data)\\.ts'`, 'u').test(source);
 
@@ -87,7 +86,6 @@ test("no shipped file reads the sample's clock, its declarations or its row name
   const offenders: string[] = [];
   for (const path of shipped(SRC)) {
     const at = relative(SRC, path).replaceAll('\\', '/');
-    if (FIXTURES.has(at)) continue;
     const source = code(path);
     for (const name of ['NOW', 'TODAY', 'REGISTERS', 'PAGES']) if (imported(source, name)) offenders.push(`${at} ${name}`);
   }

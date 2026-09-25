@@ -24,7 +24,7 @@ import { readFileSync } from 'node:fs';
 
 import type { Member } from '@braindog/client';
 import { copy } from '../../lib/copy.ts';
-import { PEOPLE_ACCESS } from '../../lib/record/data.ts';
+import { PEOPLE_ACCESS } from '../../lib/record/fixtures/sample.ts';
 import { personOf } from '../../lib/record/settings-write.ts';
 
 /** The page without its comments, so a comment quoting the defect cannot fail or pass a check. */

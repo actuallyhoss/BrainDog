@@ -22,7 +22,6 @@ import { createClient } from '@braindog/client';
 import { labelOf } from './api.ts';
 import { forget, type Fetch } from './boot-live.ts';
 import { REGISTERS } from './held.ts';
-import { noRecord } from './device.ts';
 
 /**
  * The words for retiring a field, kept beside the call they describe, as `fieldWords` is, because nobody owns `copy.ts`
@@ -71,8 +70,7 @@ export function retirable(register: string, field: string): { ok: true } | { ok:
 export type Retired =
   /** On Decide, waiting for an answer. `said` is the sentence the row page shows. */
   | { from: 'filed'; id: string; said: string }
-  | { from: 'refused'; fix: string }
-  | { from: 'gone'; fix: string };
+  | { from: 'refused'; fix: string };
 
 /**
  * File the retiring of one field as a question on Decide, and stop there.
@@ -94,7 +92,7 @@ export async function retireField(base: string, register: string, field: string,
     body: retireOf(register, [field]),
   });
   if (!filed.ok) {
-    if ('refusal' in filed) return noRecord(filed.refusal.code) ? { from: 'gone', fix: filed.refusal.fix } : { from: 'refused', fix: filed.refusal.fix };
+    if ('refusal' in filed) return { from: 'refused', fix: filed.refusal.fix };
     return { from: 'refused', fix: retireWords.changed };
   }
   /* THE RAIL'S DECIDE COUNT IS THE KEPT BOOT'S, and it is one higher now. */

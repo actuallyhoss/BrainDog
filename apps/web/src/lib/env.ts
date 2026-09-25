@@ -4,17 +4,12 @@
  * `vite.config.ts` substitutes a literal, so in the shipped build this is `''`, every `ENV ===`
  * below folds to `false`, and the alpha chrome is not in the bundle. There is no runtime switch:
  * the answer is gone by the time anything runs, and there is nothing to reach because there is
- * nothing there. That is the same argument `data.ts` makes for `BRAINDOG_VARIANT`, and the same
- * refusal - a `?env=` parameter would be a product surface nobody asked for, and one that lies.
+ * nothing there. A `?env=` parameter would be a product surface nobody asked for, and one that lies.
  *
- * IT IS NOT `BRAINDOG_VARIANT`, AND THE TWO MUST NOT MERGE. A variant answers *which record this
- * build shows* and exists so a gate can reach the half of a screen the shipped seed cannot draw;
- * `svelte.config.js` sends every variant to `build-<variant>/` precisely so it never overwrites the
- * artefact that ships. An environment answers *which deployment this build is for*, and its output
- * has to be `build/`, because `build/` is the one directory both hosts serve (50 section 2.1).
- * Riding one on the other would make eight builds out of four, deploy alpha out of a directory
- * `tools/gates/lib.mjs` deliberately skips (`name.startsWith('build-')`), and put a deployment's
- * palette behind a flag whose whole documented purpose is a gate fixture.
+ * IT IS NOT A RECORD VARIANT. There was a second build flag, `BRAINDOG_VARIANT`, for which record a build showed, so a
+ * gate could reach the half of a screen the sample could not draw; it went with the sample (wave C2 of
+ * `loop/research-no-sample.md`), and the gates reach those halves with a record instead (`tools/gates/record.mjs`).
+ * An environment answers *which deployment this build is for*, and nothing else.
  *
  * WHAT IT IS FOR. Two windows, one on the alpha record and one on the real one, look identical,
  * and the cost of confusing them is a row deleted from the wrong record. The palette says so in

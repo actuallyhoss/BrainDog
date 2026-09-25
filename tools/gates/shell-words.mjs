@@ -48,6 +48,12 @@
  * `salaries` IS NOT A HIT. `salary` is the word, and `salari...` does not start with it. The brief
  * offered the stem `salar` as an option; the tree has no `salaries` in scope today, so it is not
  * added on speculation.
+ *
+ * HIS OWN NAMES CAME SECOND, and the gate passed his host until they did. `loop/research-legacy-parity.md`
+ * brief B10 measured it on 25 September: ten words and not one of them `sam`, so a kernel file holding
+ * `const HOST = 'brain.example.com'` read green, and so did `EGP`, `acme.example` and the rest of what his
+ * record is about. `tools/gates/test/shell-words.test.mjs` holds each of those as a case that failed
+ * against the gate before the words went in, and `negative/shell-words` seeds one per new place.
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -61,7 +67,22 @@ import { skipDir } from './lib.mjs';
  * Each is the start of a part, case-folded: see the header for why a match must begin at a part
  * boundary and why it may run on past one.
  */
-export const WORDS = ['gold', 'hsbc', 'instapay', 'egypt', 'salary', 'payroll', 'mercury', 'registrar', 'acme', 'legacy'];
+export const WORDS = [
+  'gold', 'hsbc', 'instapay', 'egypt', 'salary', 'payroll', 'mercury', 'registrar', 'acme', 'legacy',
+  'sam', 'egp', 'bake', 'quartz', 'acme', 'acme', 'trunk', 'Delta', 'nile', 'payday', 'goldapi',
+];
+
+/**
+ * THE WORDS THAT MUST END WHERE A PART ENDS, because what starts with them is ordinary English.
+ *
+ * `bake` IS THE ONE, AND IT WAS MEASURED BEFORE IT WAS MADE ONE. On 25 September, with `bake` matched
+ * the way every other word is, its one hit over the scope this gate reads was `'bakery'`, a signal the
+ * guide reads to know a person runs a shop (`packages/seed/src/usecases/guide-kinds.ts:268`). That is
+ * the `loadingOlder` mistake again, a word found inside a longer one it has nothing to do with. Whole,
+ * `acme.example`, `acme-web`, `acmeweb` and `ACME_WEB` are still hits, and `bakery`, `baker` and `baked` are not.
+ * The other new words were read the same way and have no such neighbour in the tree.
+ */
+const WHOLE = new Set(['bake']);
 
 /**
  * Every package and every app is in scope by default, so a new core package is watched the day it exists.
@@ -78,6 +99,14 @@ export const WORDS = ['gold', 'hsbc', 'instapay', 'egypt', 'salary', 'payroll', 
  * line in a core package is red.
  */
 const WORKSPACES = ['packages', 'apps'];
+
+/**
+ * THE DIRECTORIES OF EACH MEMBER THAT ARE READ, per workspace. `src` everywhere, and beside it the one
+ * other directory each workspace ships code from: a package's `grammars`, which the MCP server serves
+ * to every agent, and an app's `scripts`, which its operator runs. See `SOURCE` below for what the
+ * first two held when they were not read.
+ */
+const READ = { packages: ['src', 'grammars'], apps: ['src', 'scripts'] };
 
 /**
  * WHAT IS OUT, AND WHY. Every entry is a path under the root, a directory or a file, and every
@@ -99,29 +128,67 @@ const WORKSPACES = ['packages', 'apps'];
  * An exempted word that exempts no hit is a finding for the same reason an idle entry is: it is the
  * hole the next leak of that word walks through.
  *
- * TWO ENTRIES STAY OUT WHOLE, ON PURPOSE. `packages/seed` is where a use case is allowed to be
- * named, so narrowed it would fail the first new pack it ships, which is its job. `apps/web` is
- * waiting for its own gate, and a list of its words here would be a second reading of the web
- * disagreeing with the first.
+ * NO ENTRY STAYS OUT WHOLE SINCE BRIEF B10 STEP 2. `packages/seed` was exempted whole while it held
+ * the use-case packs, a bank's wordings and a person's holdings among them, and a pack is where a use
+ * case is allowed to be named. Those are under `packs/` now (briefs B1 and B2), which this gate leaves
+ * out by `WORKSPACES`, and what stays in `packages/seed` is the generic modules, the guide and the
+ * sample, which is core and is read as core. `apps/web` was exempted whole while it waited for a gate
+ * of its own. Measured on 25 September with the twenty-one words, the two held 5 and 2 hits, against
+ * 82 and 11 on 23 September with ten; a sixth in the seed was `bakery`, which `WHOLE` explains. Each
+ * is an entry below naming its file and its words: an exemption the size of a tree is how a leak the
+ * size of the kernel's in either would have read green.
  *
  * `*.test.ts` and any `test` directory are out by rule rather than by entry, because a test asserts
  * on what a record was handed: `packages/record/test/ask-person-reach.test.ts` arrives
  * `'Payroll: Omar 91000'` to prove the owner keeps her own question, and it cannot say so in any
  * other words.
  *
- * The hit counts are 23 September's, from this gate's own reading.
+ * The hit counts are 25 September's, from this gate's own reading.
  */
 const OUT = {
-  'packages/seed': {
-    why: 'the first-party packs, the use cases and the sample record (82 hits). The words are its content: it is where a use case is allowed to be named.',
+  /* THE SAMPLE RECORD, a studio called Kiln whose domains are renewed through a registrar. It is sample
+     content rather than a branch the core takes, and `loop/research-legacy-parity.md` has it leave
+     with section 26's sample removal, when these two entries and the web's `fixtures/sample.ts` go idle and the
+     gate says so. */
+  'packages/seed/src/index.ts': {
+    why: 'the sample record (1 hit).',
+    words: { registrar: 'the sample decision `D41` asks which registrar holds the Kiln names.' },
   },
-  'apps/web': {
-    why: 'the sample engine, an example prompt and copy name the sample record (11 hits). It is the next gate, with its own reading of what the web may say, and not this one.',
+  'packages/seed/src/modules/portfolio.ts': {
+    why: 'the sample record (2 hits).',
+    words: { registrar: 'the Kiln sample write-up names its domains, their registrar email, and the decision `D41`.' },
+  },
+  'packages/seed/src/modules/estate.ts': {
+    why: 'Estate, a first-party module still in the core (1 hit).',
+    words: { registrar: 'the Services list says what a row holds, a renewal date, a registrar and a cost, which is what a domain is.' },
+  },
+  /* A WORD A STRANGER TYPES, read to tell which kind of record they want, and not a use case the core
+     runs: the guide hears `payday` and offers Personal. */
+  'packages/seed/src/usecases/personal.ts': {
+    why: 'the guide signals for Personal (1 hit).',
+    words: { payday: 'a word a person says about their own money, in the list the guide matches what they type against.' },
+  },
+  /* TO BE CLEARED. `apps/web` is being rewritten by another brief, and these are its two hits on
+     25 September; they are named here so the gate is green meanwhile and so neither file exempts any
+     other word. Each goes idle when its file is reworded, and the gate then asks for the entry out.
+     `currencies.ts` lists `EGP` among twelve common currencies, which the parity survey judged
+     legitimate and which is also the one Middle Eastern bias in the list; `fixtures/sample.ts` is the
+     web's copy of the sample's `D41`. It was `record/data.ts` when this entry was written, and the
+     move to `fixtures/` the same morning turned the gate red on that one line: an entry names a file,
+     so a file that moves takes its exemption with it only if the entry moves too. */
+  'apps/web/src/lib/record/currencies.ts': {
+    why: 'the currency picker, to be cleared (1 hit).',
+    words: { egp: 'one of the twelve codes offered before the rest.' },
+  },
+  'apps/web/src/lib/record/fixtures/sample.ts': {
+    why: 'the sample engine, to be cleared (1 hit).',
+    words: { registrar: 'the web copy of the sample decision `D41`.' },
   },
   'apps/site': {
-    why: 'the public site is prose about the product, not code that runs a record (1 hit).',
+    why: 'the public site is prose about the product, not code that runs a record (3 hits).',
     words: {
-      egypt: 'the changelog entry at `routes/changelog/entries.ts:297` says `Egyptian pounds` about a currency fix that shipped.',
+      egypt: 'the changelog entry at `routes/changelog/entries.ts:317` says `Egyptian pounds` about a currency fix that shipped.',
+      sam: 'two changelog titles, at `routes/changelog/entries.ts:200` and `:354`, name the the old tool import as history.',
     },
   },
 };
@@ -134,7 +201,13 @@ const OUT = {
  * AND `src` IS NOT ALL A PACKAGE SHIPS. Measured on 23 September: `packages/render/svelte` holds the
  * renderer's 32 components (0 hits), and `packages/mcp/grammars/script.ts`, which
  * `packages/mcp/src/index.ts` imports and serves as `braindog:grammar/script`, holds 9, all `gold`,
- * in its `script.gold-rate` example. Neither directory is read here.
+ * in its `script.gold-rate` example. Neither directory was read here.
+ *
+ * `grammars` AND `scripts` ARE READ SINCE BRIEF B10 STEP 2, on 25 September, after step 1 had rewritten
+ * that example as a rate fetch against `api.example.com`: read then, the four `apps/*\/scripts`
+ * directories and `packages/mcp/grammars` held 0 hits between them, so the scope widened on a clean
+ * tree and the first example that names a use case there is the first red. `packages/render/svelte`
+ * is still not read; the brief did not name it, and it held 0 hits on 23 September.
  */
 const SOURCE = /\.(ts|mts|js|mjs|svelte)$/;
 const TEST = /\.test\.(ts|mts|js|mjs)$/;
@@ -302,13 +375,39 @@ export const partsOf = (token) =>
     .filter(Boolean)
     .map((p) => p.toLowerCase());
 
-/** The words one token holds: each one that a part, or a run of parts joined from there, starts with. */
+/**
+ * Whether the parts from `i` on, joined, equal `word` at some part boundary: how a `WHOLE` word matches.
+ *
+ * IT JOINS PARTS ONLY UNTIL THE WORD'S LENGTH IS REACHED. The first version built every run of parts
+ * from every part, which is n cubed in the parts of one token: a 2000-part token, the shape of an SVG
+ * path in a string, took 31851 ms on 25 September. Parts are never empty, so the joined length grows
+ * at every step and there is one place it can equal the word.
+ */
+const endsAt = (parts, i, word) => {
+  let run = '';
+  for (let j = i; j < parts.length && run.length < word.length; j++) run += parts[j];
+  return run === word;
+};
+
+/**
+ * The words one token holds: each one that a part, or a run of parts joined from there, starts with,
+ * and for a word in `WHOLE`, each one that such a run equals.
+ *
+ * THE LONGEST WORD AT ONE PLACE, AND NOT EVERY WORD THAT FITS THERE. `sam` is a prefix of `legacy`
+ * and `gold` of `goldapi`, so with both lists matched in full `legacyTool` was two hits and
+ * `api.goldapi.io` two more, and every seeded count in `self-test` would have been a count of words
+ * rather than of places a word was written. Measured on 25 September with this rule taken out: the
+ * seeded tree in `negative/shell-words` read 13 findings for its 10 places. A shorter word is dropped
+ * only when a longer one starts at the same part; `goldHsbc` still names both, because they start at
+ * different parts.
+ */
 export function wordsIn(token) {
   const parts = partsOf(token);
   const found = new Set();
   for (let i = 0; i < parts.length; i++) {
     const run = parts.slice(i).join('');
-    for (const word of WORDS) if (run.startsWith(word)) found.add(word);
+    const here = WORDS.filter((word) => (WHOLE.has(word) ? endsAt(parts, i, word) : run.startsWith(word)));
+    for (const word of here) if (!here.some((other) => other !== word && other.startsWith(word))) found.add(word);
   }
   return [...found];
 }
@@ -361,12 +460,13 @@ export default function shellWords(
     } catch {
       continue;
     }
-    for (const m of members) if (m.isDirectory() && !skipDir(m.name)) walk(join(ROOT, workspace, m.name, 'src'), files);
+    for (const m of members)
+      if (m.isDirectory() && !skipDir(m.name)) for (const dir of READ[workspace]) walk(join(ROOT, workspace, m.name, dir), files);
   }
 
   /* A GATE THAT READ NOTHING HAS NOT PASSED. Exit 3 is this directory's word for "could not run". */
   if (files.length === 0) {
-    console.log(`  shell-words: no packages/*/src or apps/*/src under ${ROOT}, so no code was read`);
+    console.log(`  shell-words: no packages/*/{src,grammars} or apps/*/{src,scripts} under ${ROOT}, so no code was read`);
     return 3;
   }
 

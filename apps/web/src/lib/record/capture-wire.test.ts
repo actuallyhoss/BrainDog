@@ -19,6 +19,7 @@ import { readFileSync } from 'node:fs';
 
 import { capturePlan, type Block } from 'braindog-render';
 
+import './fixtures/fill.ts';
 import { REGISTERS } from './api.ts';
 import { readBlock } from './fixtures/readers.ts';
 import { draw } from './blocks.ts';

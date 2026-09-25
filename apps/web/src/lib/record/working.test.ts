@@ -12,9 +12,10 @@ import assert from 'node:assert/strict';
 
 import { WORKING_MARK } from 'braindog-render';
 
+import './fixtures/fill.ts';
 import { workingNowAt } from './api.ts';
 import { readBlock as webBlock, workingNow } from './fixtures/readers.ts';
-import { ROWS } from './data.ts';
+import { ROWS } from './fixtures/sample.ts';
 import { toSegments } from './blocks.ts';
 import type { PageBlock } from './schema.ts';
 

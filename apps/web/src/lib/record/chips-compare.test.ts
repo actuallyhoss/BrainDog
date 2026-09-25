@@ -25,9 +25,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import './fixtures/fill.ts';
 import { chipsOf, joinOf, whereOf } from './api.ts';
 import { list } from './fixtures/readers.ts';
-import { NOW, REGISTERS, ROWS } from './data.ts';
+import { NOW, REGISTERS, ROWS } from './fixtures/sample.ts';
 import { treeOf } from './remote.ts';
 import { compile, matches, registerHref, type Clause } from './where.ts';
 

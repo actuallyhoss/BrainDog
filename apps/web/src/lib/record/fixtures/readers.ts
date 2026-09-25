@@ -55,7 +55,12 @@ import {
   type SearchResult,
   type TrackHealth,
 } from '../api.ts';
-import { AUDIT, DECIDED, JOBS, NEWS, NOW, OBSERVED, PAGES, PEOPLE_ACCESS, PROPOSALS, QUESTIONS, QUEUE, REGISTERS, ROWS, SERIES, SUSPENDED, VIEWS } from '../data.ts';
+/* THE SAMPLE'S READERS READ THE TABLES THE HELPERS READ, which `fill.ts` fills with the sample. They read the fixture's
+   own until wave C1, when the fixture's tables and `held.ts`'s were one object for the declarations and two for the
+   rows, so a test that grew a list for a reader and a helper had to know which of the two each one looked in. */
+import './fill.ts';
+import { PAGES, REGISTERS, ROWS } from '../held.ts';
+import { AUDIT, DECIDED, JOBS, NEWS, NOW, OBSERVED, PEOPLE_ACCESS, PROPOSALS, QUESTIONS, QUEUE, SERIES, SUSPENDED, VIEWS } from './sample.ts';
 import { copy } from '../../copy.ts';
 import { answers, terms, tokensOf, why } from '../find.ts';
 import { runway } from '../forecast.ts';

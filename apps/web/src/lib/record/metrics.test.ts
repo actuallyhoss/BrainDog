@@ -18,7 +18,8 @@ import { mixedFix } from './money.ts';
 import { BARE, currenciesRead, format, hrefFor, isTemplate, meetsTarget, read as readAt, spokenWindow, targetLine, unreadable, windowMs, withParam, type MetricDecl } from './metrics.ts';
 import { applyFilters, metric } from './fixtures/readers.ts';
 import { compile, matches } from './where.ts';
-import { NOW, REGISTERS, ROWS } from './data.ts';
+import { NOW } from './fixtures/sample.ts';
+import { REGISTERS, ROWS } from './held.ts';
 import { amountOf } from './money.ts';
 /* THE SAMPLE'S ROW NAMES, which a live tab learns from the record and this test asks the mirror about by name. */
 import './fixtures/fill.ts';

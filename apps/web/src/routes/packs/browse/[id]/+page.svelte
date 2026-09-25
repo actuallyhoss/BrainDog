@@ -66,7 +66,7 @@
       client = createClient({ base: apiBase() });
       const chosen = await choose(client, !page.data.live);
       source = chosen.source;
-      live = !chosen.source.sample;
+      live = true;
       if (!chosen.first.ok) {
         refused = chosen.first.refusal.fix;
         return false;

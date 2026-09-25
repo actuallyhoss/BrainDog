@@ -16,6 +16,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import './fixtures/fill.ts';
 import { REGISTERS } from './api.ts';
 import { answered, groupsOf, searcher, type Fetch } from './search-live.ts';
 

@@ -1648,7 +1648,7 @@ const MERCHANT_IN = { text: { between: ['from ', ' on '] } } as const;
  * is the right one.
  *
  * AND IT WAS THE LITERAL `GBP`, ON A PACK WHOSE HOME CURRENCY IS A SETTING. Measured on a record:
- * an alert reading *"debited EGP 42.99 at FENWICK CLOUD on 2026-08-29"* came back
+ * an alert debiting 42.99 in a currency other than sterling, at FENWICK CLOUD on 2026-08-29, came back
  * `review — bank-card-out could not read amount, on out of this one`, because an anchor that is
  * nowhere in the text yields no slices at all and `DD/MM/YY` reads no ISO day. A person who banks in
  * three currencies had two of them unreadable, and the third was only readable by accident of the
@@ -1658,7 +1658,7 @@ const MERCHANT_IN = { text: { between: ['from ', ' on '] } } as const;
  * and the declared code is a FALLBACK and never an override. `scanMoney` takes the code the bank
  * prints beside the figure whenever there is one, *because it is the one that moved the money*, and
  * falls back to the declared code only when the text names none. So the same alert now comes back
- * `matched` at `exact` with `EGP 42.99` on it, and a sterling alert reads sterling.
+ * `matched` at `exact` with its own code and 42.99 on it, and a sterling alert reads sterling.
  *
  * AND THE FALLBACK IS THE ONE NAMED CONSTANT `HOME_CURRENCY` ABOVE, shared by both patterns rather
  * than typed once in each, so the two cannot drift apart. It is NOT read off `MONEY_HOME_SETTING`,

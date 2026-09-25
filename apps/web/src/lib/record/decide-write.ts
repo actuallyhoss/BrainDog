@@ -10,24 +10,25 @@
  * filed, and the kernel copies them from the suggestion onto the decision event word for word. Sending them back would
  * let a browser say it approved lines the record never showed.
  *
- * FOUR ANSWERS. `written` drops the shell's kept `boot`, so the rail's count follows once the layout reads again.
- * `gone` is no record behind the screen any more (`UNREACHABLE`, `UNAUTHORIZED`, a 404 that is not JSON), with the
- * sentence to say. `refused` is the record's own sentence. `conflict` is a row the proposal would change that moved
- * since it was filed: the screen reads again and says so.
+ * THREE ANSWERS. `written` drops the shell's kept `boot`, so the rail's count follows once the layout reads again.
+ * `refused` is the record's own sentence, and that includes a host that did not answer and a session that ran out.
+ * `conflict` is a row the proposal would change that moved since it was filed: the screen reads again and says so.
+ *
+ * THERE WAS A FOURTH, `gone`, for a 401 or an unreachable host at an address with no slug, which is where the sample
+ * was drawn. Neither Decide screen told it from `refused`, both print the `fix`, and with no sample an address with
+ * no slug is a record like any other (wave C3 of `loop/research-no-sample.md`).
  */
 
 import { createClient } from '@braindog/client';
 
 import { copy } from '../copy.ts';
 import { forget, type Fetch } from './boot-live.ts';
-import { noRecord } from './device.ts';
 
 /** `rows`: on accepting a proposal that adds several rows, the places of the ones ticked; the rest are declined. */
 export type Verdict = { decide: { option: string; reason: string; rows?: number[] } } | { defer: { until: string; why: string } };
 
 export type Written =
   | { from: 'written'; decision: string | null; applied?: Record<string, string[]> }
-  | { from: 'gone'; fix: string }
   | { from: 'refused'; fix: string }
   | { from: 'conflict'; fix: string };
 
@@ -56,7 +57,6 @@ export async function writeDecision(base: string, id: string, verdict: Verdict, 
     return { from: 'written', decision, ...(applied ? { applied } : {}) };
   }
   if ('conflict' in out) return { from: 'conflict', fix: copy.decideConflict };
-  if (noRecord(out.refusal.code)) return { from: 'gone', fix: out.refusal.fix };
   return { from: 'refused', fix: out.refusal.fix };
 }
 

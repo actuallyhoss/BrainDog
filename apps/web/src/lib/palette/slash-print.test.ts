@@ -26,7 +26,8 @@ import { openRecord, type Kernel } from '@braindog/kernel';
 import { installSeed } from '@braindog/seed';
 import type { SlashWhere } from '@braindog/client';
 
-import { NOW, ROWS } from '../record/data.ts';
+import '../record/fixtures/fill.ts';
+import { NOW, ROWS } from '../record/fixtures/sample.ts';
 import { compile, matches } from '../record/where.ts';
 import { whereWords } from './slash.ts';
 

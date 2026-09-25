@@ -20,7 +20,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { chipsOf, whereOf } from './api.ts';
-import { NOW, REGISTERS, ROWS } from './data.ts';
+import { NOW, REGISTERS, ROWS } from './fixtures/sample.ts';
 import { compile, matches, registerHref } from './where.ts';
 /* THE SAMPLE'S ROW NAMES, which a live tab learns from the record and this test asks the mirror about by name. */
 import './fixtures/fill.ts';

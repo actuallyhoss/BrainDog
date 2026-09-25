@@ -23,6 +23,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import '../record/fixtures/fill.ts';
 import { ACTS, COMMANDS, UNDO_LAST, admits, commands, type Command } from './admit.ts';
 import { BINDINGS, type Binding } from '../a11y/bindings.ts';
 import { copy } from '../copy.ts';
@@ -30,7 +31,7 @@ import { METRICS } from '../record/declared.ts';
 import { isTemplate, unreadable } from '../record/metrics.ts';
 import { REGISTERS } from '../record/api.ts';
 import { entry, metric, search } from '../record/fixtures/readers.ts';
-import { AUDIT, QUESTIONS, VIEWS } from '../record/data.ts';
+import { AUDIT, QUESTIONS, VIEWS } from '../record/fixtures/sample.ts';
 
 const src = (...parts: string[]) => readFileSync(join(fileURLToPath(new URL('../', import.meta.url)), ...parts), 'utf8');
 

@@ -18,6 +18,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+import './fixtures/fill.ts';
 import { COMMON_CURRENCIES, OFFERED_CURRENCIES, OTHER_CURRENCIES, currencyChoices } from './currencies.ts';
 import { METRICS } from './declared.ts';
 import { hrefFor, read, type MetricDecl } from './metrics.ts';

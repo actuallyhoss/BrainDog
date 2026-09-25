@@ -21,8 +21,14 @@ import { costOf, costRank } from '@braindog/kernel';
 import { copy } from '../copy.ts';
 import { labels, relabel } from '../voice.ts';
 import { callsOutOf, type CallOut } from './actions.ts';
-import type { RowsetBody } from './data.ts';
 import type { Question } from './schema.ts';
+
+/**
+ * A `rowset` body, as `propose` files it (`packages/kernel/src/govern.ts`): a row with `at` updates that row at the
+ * version it was read at, and a row without one creates. It is here and not beside the sample's rowsets, because a
+ * shipped reader may not import the fixture to name a type.
+ */
+export type RowsetBody = { register: string; rows: readonly Record<string, unknown>[] };
 
 type Refusal = { code: string; fix: string };
 type Wire<T> = { ok: true; value: T } | { ok: false; refusal: Refusal } | { ok: false; conflict: unknown };

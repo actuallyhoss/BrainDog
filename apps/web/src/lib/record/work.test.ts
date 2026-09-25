@@ -11,9 +11,10 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord } from '@braindog/kernel';
 import { NOW, TODAY, installSeed } from '@braindog/seed';
 
+import './fixtures/fill.ts';
 import { REGISTERS, columnHeading } from './api.ts';
 import { page } from './fixtures/readers.ts';
-import { TASKS } from './data.ts';
+import { TASKS } from './fixtures/sample.ts';
 import { toSegments } from './blocks.ts';
 import { relabelAll } from '../voice.ts';
 

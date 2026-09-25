@@ -15,7 +15,7 @@
 
 import type { DeviceApproved, DeviceRow } from '@braindog/client';
 
-import { BASE, slugOf } from '../at.ts';
+import { BASE } from '../at.ts';
 
 export type { DeviceRow };
 
@@ -135,19 +135,6 @@ export const revocable = (row: DeviceRow): boolean => row.status === 'pending' |
 
 /** Tokens still working. A revoked one can do nothing, so it is not something to look after. */
 export const standing = (rows: readonly TokenRow[]): TokenRow[] => rows.filter((t) => t.revoked_at === null);
-
-/**
- * The two refusals that meant there was no record here to read, as `lib/data/record.ts` decides it: a
- * static host's SPA fallback, or a Worker with no record behind it. Screens drew the sample on it.
- *
- * NEVER UNDER A SLUG. `/app/acme/…` names a record, so a 401 there is a person who must sign in and an unreachable host
- * is a host that did not answer (`research-one-domain.md` §2.4).
- *
- * KEPT ONLY WHILE SOMETHING STILL CALLS IT. The sample is going screen by screen (`loop/research-no-sample.md`), and
- * other shipped files still asked this on 25 September; wave C deletes it with the last of them.
- */
-export const noRecord = (code: string, pathname: string = globalThis.location?.pathname ?? ''): boolean =>
-  (code === 'UNREACHABLE' || code === 'UNAUTHORIZED') && slugOf(pathname) === null;
 
 /**
  * The two lines a person copies after connecting an agent. NEITHER CARRIES THE BEARER: `braindog login`

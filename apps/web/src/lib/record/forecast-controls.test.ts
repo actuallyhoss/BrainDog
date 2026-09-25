@@ -20,9 +20,10 @@ import { forecastModel, type ForecastModel } from 'braindog-render';
 import { openRecord, ratesFrom, type Kernel } from '@braindog/kernel';
 import { NOW, PAGES, installSeed } from '@braindog/seed';
 
+import './fixtures/fill.ts';
 import { type BlockResult } from './api.ts';
 import { page } from './fixtures/readers.ts';
-import { ROWS } from './data.ts';
+import { ROWS } from './fixtures/sample.ts';
 import { toSegments } from './blocks.ts';
 import { runway, type Leg } from './forecast.ts';
 import { withFx } from './metrics.ts';

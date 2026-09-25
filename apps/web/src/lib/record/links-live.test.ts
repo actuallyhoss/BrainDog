@@ -7,8 +7,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
+import './fixtures/fill.ts';
 import { iconFor, REGISTERS } from './api.ts';
-import { ROWS } from './data.ts';
+import { ROWS } from './fixtures/sample.ts';
 import { linkReader, type Fetch } from './links-live.ts';
 
 const BASE = 'http://record.test';

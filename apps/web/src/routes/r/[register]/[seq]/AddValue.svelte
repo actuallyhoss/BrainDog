@@ -49,7 +49,7 @@
     busy = false;
     /* A REFUSAL KEEPS WHAT WAS TYPED, under the record's sentence. Anything else closes the form, because pressing again
        would file the same value twice. */
-    if (out.from === 'refused' || out.from === 'gone') {
+    if (out.from === 'refused') {
       problem = out.fix;
       return;
     }

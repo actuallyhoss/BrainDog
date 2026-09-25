@@ -19,9 +19,9 @@ import { railRoom } from '@braindog/kernel';
 import { useCaseName } from '@braindog/seed/usecases/names';
 
 import { iconFor, setupSaid, whoDid, type NavEntry } from './api.ts';
-/* THE BUILT-IN ADD-ONS' NAMES AND LISTS, which the sample's table is still the only list of: a line about an add-on names
-   it from here. Read directly, because `api.ts` no longer hands the sample's tables on; wave C1 moves it with `data.ts`. */
-import { PACKS } from './data.ts';
+/* THE BUILT-IN ADD-ONS' NAMES AND LISTS: a line about an add-on names it from here. It read the sample's `PACKS`, which
+   carried the same six and the sample's two made-up add-ons, until wave C1 (`modules.ts`). */
+import { moduleOf } from './modules.ts';
 import { learnPages, REGISTERS } from './held.ts';
 import { copy } from '../copy.ts';
 import type { SwitcherRow } from './switcher.ts';
@@ -235,7 +235,7 @@ function packText(e: EventLine): string | null {
      "Added the Team use case" for Team board. */
   const usecase = /^usecase-([a-z][a-z0-9-]*)$/u.exec(id)?.[1];
   if (usecase) return copy.useCaseEvent(verb, useCaseName(usecase));
-  const names = (PACKS.find((p) => p.id === id)?.registers ?? []).map((r) => REGISTERS[r]?.name ?? r);
+  const names = (moduleOf(id)?.registers ?? []).map((r) => REGISTERS[r]?.name ?? r);
   if (names.length === 0) return `${verb} the ${id} add-on`;
   if (names.length === 1) return `${verb} the ${names[0]} list`;
   return `${verb} ${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
@@ -243,7 +243,7 @@ function packText(e: EventLine): string | null {
 
 const nameOfPack = (id: string): string => {
   const usecase = /^usecase-([a-z][a-z0-9-]*)$/u.exec(id)?.[1];
-  return usecase ? useCaseName(usecase) : (PACKS.find((p) => p.id === id)?.name ?? id);
+  return usecase ? useCaseName(usecase) : (moduleOf(id)?.name ?? id);
 };
 
 /** A use case's `speaks` setting saved, alone, as `{ id, from, to }`; `null` for any other line. */

@@ -6,6 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import '../../lib/record/fixtures/fill.ts';
 import { copy } from '../../lib/copy.ts';
 import type { PackState } from '../../lib/record/packs.ts';
 import { afterInstall, drawnOrder, installShared, moduleTitle, movesOf, nothingElse, oneOf, relabelled, keepVoice, offerFor, olderThan, offeredVersion, planShared, readOnHost, rowTitle, sharedPlanOf, speakingStates, switchTo, voiceQuestion, type SharingClient } from './sharing.ts';

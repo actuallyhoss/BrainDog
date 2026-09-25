@@ -47,10 +47,9 @@
 
   async function offerInstall() {
     if (busy) return;
-    if (!live || !client) {
-      toasts.push(copy.notWritten(copy.shareInstall(u.title)), { intent: 'warn' });
-      return;
-    }
+    /* NOTHING TO SEND TO UNTIL THE RECORD HAS ANSWERED, and the buttons wait for it. This toasted the sample's "but nothing
+       was saved yet" for a press that had no record to reach. */
+    if (!live || !client) return;
     busy = true;
     refused = null;
     try {
@@ -91,10 +90,7 @@
 
   async function switchOver() {
     if (busy) return;
-    if (!live || !client) {
-      toasts.push(copy.notWritten(copy.switchTo(u.title)), { intent: 'warn' });
-      return;
-    }
+    if (!live || !client) return;
     busy = true;
     try {
       const out = await switchTo(client, u.usecase, states, carries);
@@ -111,13 +107,13 @@
     {#if offer === 'in-use'}
       <span class="in-use"><Icon name="check" size="s" />{copy.inUse}</span>
     {:else if offer === 'update'}
-      <Button weight="quiet" disabled={busy || plan !== null} onclick={() => void offerInstall()}>
+      <Button weight="quiet" disabled={busy || !live || plan !== null} onclick={() => void offerInstall()}>
         {busy && plan === null ? copy.packPlanning : copy.updateTo(u.version)}
       </Button>
     {:else if offer === 'switch'}
-      <Button weight="quiet" disabled={busy} onclick={() => void switchOver()}>{copy.switchTo(u.title)}</Button>
+      <Button weight="quiet" disabled={busy || !live} onclick={() => void switchOver()}>{copy.switchTo(u.title)}</Button>
     {:else}
-      <Button weight="quiet" disabled={busy || plan !== null} onclick={() => void offerInstall()}>
+      <Button weight="quiet" disabled={busy || !live || plan !== null} onclick={() => void offerInstall()}>
         {busy && plan === null ? copy.packPlanning : copy.shareInstall(u.title)}
       </Button>
     {/if}

@@ -26,8 +26,6 @@
   import { page } from '$app/state';
   import { since } from 'braindog-render';
   import { titleOf } from '$lib/title.ts';
-  import { REGISTERS } from '$lib/record/held.ts';
-  import { compile, explain } from '$lib/record/where.ts';
   import { openActions, type ActionRow, type CallOut } from '$lib/record/actions.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
   import type { Shell } from '$lib/record/boot-live.ts';
@@ -128,8 +126,7 @@
     if (from === 'ready') drew('ready');
   });
 
-  const sample = $derived(source?.sample ?? false);
-  /* THIS BROWSER'S CLOCK. It was the seed's 3 September 2026 whenever `sample` was set, and `sample` is `false` on every source now. */
+  /* THIS BROWSER'S CLOCK. It was the seed's 3 September 2026 whenever the editor was drawn over the sample. */
   const now = Date.now();
   const faults = $derived(flow.faults);
   const drawn = $derived(JSON.stringify(flow.body));
@@ -164,9 +161,6 @@
     }),
   );
 
-  /* THE SAMPLE ONLY, for `Inspector.svelte`'s reason: `where.ts` compiles against the sample record's lists. */
-  const fieldsOf = (register: string): string[] => (sample ? (REGISTERS[register]?.fields.map((f) => f.id) ?? []) : []);
-  const check = $derived(sample ? (register: string, when: string) => (REGISTERS[register] ? explain(compile(register, when)) : []) : undefined);
 
   async function send() {
     if (!source || busy || faults.length > 0) return;
@@ -181,7 +175,7 @@
     }
     filed = out.value;
     flow.sent();
-    toasts.push(source.sample ? words.notFiled : words.filed, source.sample ? { intent: 'warn' } : {});
+    toasts.push(words.filed);
   }
 
   /** The record's own dry run of what is drawn now. It writes nothing, so it needs no fault-free body and no Decide. */
@@ -248,7 +242,6 @@
     {#snippet actions()}<Button onclick={() => flow.select('trigger')}>{say.rename}</Button>{/snippet}
   </PageHead>
   <div class="page">
-    {#if sample}<p class="note">{words.sample}</p>{/if}
 
     <div class="segmented tabs" role="group" aria-label={title}>
       <button type="button" class="segment" aria-pressed={tab === 'steps'} data-on={tab === 'steps' ? '' : undefined} onclick={() => (tab = 'steps')}>{words.steps}</button>
@@ -280,7 +273,7 @@
              not, and hid the fault line that said why the button had gone grey. -->
         {#if filed && !flow.dirty}
           <p class="said" role="status">
-            {sample ? words.notFiled : words.filed}
+            {words.filed}
             {#if filed.id}<a class="tap" href={at(`/decide/${filed.id}`)}>{words.openDecide}</a>{/if}
           </p>
         {:else if refusal}
@@ -348,7 +341,7 @@
     <p class="vh" role="status" aria-live="polite">{flow.said}</p>
   </div>
 
-  <Inspector {flow} {fieldsOf} {check} />
+  <Inspector {flow} />
 {/if}
 
 <style>
@@ -358,12 +351,6 @@
     gap: var(--sp-4);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
     max-inline-size: 960px;
-  }
-
-  .note {
-    margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
   }
 
   .tabs {

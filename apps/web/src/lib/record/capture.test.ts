@@ -14,6 +14,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import './fixtures/fill.ts';
 import { inheritedFrom, unansweredBy } from './api.ts';
 import type { Filter } from './schema.ts';
 

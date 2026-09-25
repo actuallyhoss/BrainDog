@@ -3,8 +3,7 @@ import { join } from 'node:path';
 
 import adapter from '@sveltejs/adapter-static';
 
-const SUFFIX = [process.env.BRAINDOG_VARIANT, process.env.BRAINDOG_ENV].filter(Boolean).join('-');
-const OUT = SUFFIX ? `build-${SUFFIX}` : 'build';
+const OUT = process.env.BRAINDOG_ENV ? `build-${process.env.BRAINDOG_ENV}` : 'build';
 
 /* THE APP LIVES AT `brain.dog/app`, AND ITS FILES LIVE AT `build/app` (`loop/research-one-domain.md` §2.2). The Worker's
    asset directory stays `build/`, so `/app/_app/x.js` is `build/app/_app/x.js` and the marketing site's own `/_app/*`
@@ -50,11 +49,11 @@ const atBase = {
  */
 export default {
   kit: {
-    /* A VARIANT BUILD GOES SOMEWHERE ELSE. `adapter-static` writes the pages, not Vite's `outDir`, so
-       `BRAINDOG_VARIANT=cloud` would otherwise overwrite the shipped record's build — and the next
-       gate to run would measure the wrong one silently. The default is unchanged.
-       `BRAINDOG_ENV=alpha` goes to `build-alpha` for the same reason: `env.alpha` in the Worker's
-       wrangler file serves that directory, so an alpha build can never replace production's. */
+    /* AN ALPHA BUILD GOES SOMEWHERE ELSE. `adapter-static` writes the pages, not Vite's `outDir`, so
+       `BRAINDOG_ENV=alpha` goes to `build-alpha`: `env.alpha` in the Worker's wrangler file serves that
+       directory, so an alpha build can never replace production's. The record variants the browser gates
+       measure were builds here too until wave C2 of `loop/research-no-sample.md`; they are records now
+       (`tools/gates/record.mjs`), served beside the one build. */
     adapter: atBase,
     paths: { base: BASE },
     alias: { $lib: 'src/lib' },

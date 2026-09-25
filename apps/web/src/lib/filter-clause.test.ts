@@ -19,6 +19,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import './record/fixtures/fill.ts';
 import { copy } from './copy.ts';
 import { compile } from './record/where.ts';
 

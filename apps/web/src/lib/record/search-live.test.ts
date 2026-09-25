@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
+import './fixtures/fill.ts';
 import { iconFor, REGISTERS } from './api.ts';
 import { groupsOf, othersOf, searcher, type Fetch } from './search-live.ts';
 

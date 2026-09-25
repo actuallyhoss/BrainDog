@@ -565,7 +565,11 @@ export type PackInfo = {
   name: string;
   blurb: string;
   version: string;
-  installed: boolean;
+  /**
+   * Whether the sample holds it, and only the sample. A live record's answer to that is its `PackState`s, which the
+   * screen reads and hands to `packDiff`; a module this build ships (`modules.ts`) says nothing about any record.
+   */
+  installed?: boolean;
   registers: readonly string[];
   pages: readonly string[];
   author: string;

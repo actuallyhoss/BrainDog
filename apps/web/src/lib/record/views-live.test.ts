@@ -8,8 +8,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 
+import './fixtures/fill.ts';
 import { REGISTERS, columnsFor } from './api.ts';
-import { ROWS, VIEWS } from './data.ts';
+import { ROWS, VIEWS } from './fixtures/sample.ts';
 import { addressOf, clausesOf, keptColumns, viewReader, type Fetch } from './views-live.ts';
 
 const BASE = 'http://record.test';

@@ -21,7 +21,7 @@
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { DOM_CAP } from '$lib/record/api.ts';
-  import { AGENTS_REGISTERS } from '@braindog/seed';
+  import { moduleOf } from '$lib/record/modules.ts';
   import type { InboxItem } from '$lib/record/schema.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { CapLine } from 'braindog-render/svelte';
@@ -109,8 +109,9 @@
       return '';
     }
   }));
-  /* AN AGENT'S OWN LISTS ARE NOT WHERE AN EMAIL GOES, so the first list is the first of anybody else's. */
-  const AGENTS = new Set(['session', ...Object.keys(AGENTS_REGISTERS)]);
+  /* AN AGENT'S OWN LISTS ARE NOT WHERE AN EMAIL GOES, so the first list is the first of anybody else's. They were read off
+     the seed's root, which is the whole sample, for four names the Agents module carries (`modules.ts`). */
+  const AGENTS = new Set(['session', ...(moduleOf('agents')?.registers ?? [])]);
   const target = $derived(lists.some((l) => l.id === into) ? into : (lists.find((l) => !AGENTS.has(l.id)) ?? lists[0])?.id ?? '');
   function choose(id: string) {
     into = id;

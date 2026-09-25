@@ -19,6 +19,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord, type Kernel } from '@braindog/kernel';
 
 /* A NAMESPACE, so a missing export fails one test and not the file. */
+import '../record/fixtures/fill.ts';
 import * as create from './create.ts';
 import { REGISTERS } from '../record/api.ts';
 import { layoutOf } from '../record/boot-live.ts';

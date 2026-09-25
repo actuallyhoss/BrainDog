@@ -33,14 +33,12 @@
 
   let from = $state<'reading' | 'ready' | 'absent' | 'refused'>('reading');
   let rows = $state<AutomationRow[]>([]);
-  let sample = $state(false);
   let fix = $state('');
 
   async function load() {
     const at = opened();
     const out = await openAutomations((url, init) => fetch(url, init), apiBase());
     closed(out.first.ok || out.absent, at);
-    sample = out.source.sample;
     if (out.first.ok) {
       rows = out.first.value;
       from = 'ready';
@@ -58,7 +56,7 @@
     if (from === 'ready' && rows.length > 0) drew('ready');
   });
 
-  /* THIS BROWSER'S CLOCK. It was the seed's 3 September 2026 whenever `sample` was set, and `sample` is `false` on every source now. */
+  /* THIS BROWSER'S CLOCK. It was the seed's 3 September 2026 whenever the list was drawn from the sample. */
   const now = Date.now();
 
   /* AN AGENT SETS THESE UP AS READILY AS A PERSON (DIRECTION §22), so the empty list says what to ask one, in the form
@@ -82,7 +80,6 @@
     {/snippet}
   </PageHead>
   <div class="page">
-    {#if sample}<p class="note">{words.sample}</p>{/if}
     {#if from === 'absent'}
       <Empty kind="no-data-yet" title={words.absent} />
     {:else if rows.length === 0}
@@ -116,12 +113,6 @@
     gap: var(--sp-4);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
     max-inline-size: 820px;
-  }
-
-  .note {
-    margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
   }
 
   .rows {

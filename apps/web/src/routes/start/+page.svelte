@@ -37,7 +37,7 @@
   import { clearExamples, offerOf, readExamples, type Examples, type ExamplesClient } from '$lib/record/examples.ts';
   import { carriedDocument, claimedBy, dayOf, formedFor, forms, moduleDocument, moduleManifest, plantedRows, withoutRows } from '@braindog/seed/usecases/install';
   import { linkExamples } from '@braindog/seed/usecases/links';
-  import { PACKS } from '$lib/record/data.ts';
+  import { MODULES } from '$lib/record/modules.ts';
   import { REGISTERS } from '$lib/record/held.ts';
   import { choose as readPacks } from '$lib/record/packs.ts';
   import { methods } from '$lib/auth.ts';
@@ -292,7 +292,7 @@
     });
   }
 
-  const packOf = (id: string) => PACKS.find((p) => p.id === id);
+  const packOf = (id: string) => MODULES.find((p) => p.id === id);
 
   /** A pack as the rail names it: its page's title, else its first list's name. */
   function packName(id: string): string {
@@ -566,7 +566,7 @@
       const seqs: (number | null)[] = [];
       for (const [i, row] of (now.declined === null ? now.rows : []).entries()) {
         seqs[i] = null;
-        const pack = PACKS.find((p) => p.registers.includes(row.register))?.id ?? '';
+        const pack = MODULES.find((p) => p.registers.includes(row.register))?.id ?? '';
         if (row.missing.length > 0 || !usable.has(pack)) continue;
         const title = titleOfRow(row);
         const list = REGISTERS[row.register]?.name ?? row.register;
@@ -662,7 +662,7 @@
     if (held.has(register)) return null;
     const ready = async (reg: string, depth: number): Promise<string | null> => {
       if (held.has(reg)) return null;
-      const id = PACKS.find((p) => p.registers.includes(reg))?.id;
+      const id = MODULES.find((p) => p.registers.includes(reg))?.id;
       if (!id || depth > 4) return firstRun.shapeAbsent(REGISTERS[reg]?.name ?? reg);
       const state = installed.find((p) => p.id === id);
       if (state) {

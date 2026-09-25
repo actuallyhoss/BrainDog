@@ -25,8 +25,9 @@ import {
   stepsFor,
   type Slot,
 } from './arrange.ts';
+import './fixtures/fill.ts';
 import { BINDABLE, bindableFor, seedBlock } from './seed.ts';
-import { REGISTERS } from './data.ts';
+import { REGISTERS } from './fixtures/sample.ts';
 
 const slots = (...spans: number[]): Slot[] => spans.map((span, i) => ({ i, span }));
 const order = (s: Slot[]) => s.map((x) => x.i);

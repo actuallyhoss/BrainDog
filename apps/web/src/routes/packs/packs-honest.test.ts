@@ -2,7 +2,7 @@
  * `/packs` lists only add-ons this build can install.
  *
  * TWO ADD-ONS NOBODY WROTE WERE OFFERED ON HIS RECORD. `Freelancer UK` by `k.marsh`, 214 stars, and `Type foundry` by
- * `a.brandt`, 37 stars, are the sample's picture of a catalogue (`lib/record/data.ts`), and Browse drew them on every
+ * `a.brandt`, 37 stars, are the sample's picture of a catalogue (`lib/record/fixtures/sample.ts`), and Browse drew them on every
  * live record too, beside the real modules and under the same Install button (the direction survey of 23 September).
  * Nothing ships a document for either, so Install could only toast that it was not installable, and the star counts
  * are counts of nothing: no install or rating is recorded anywhere. The sample kept them as its picture until it went
@@ -12,7 +12,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { PACKS } from '../../lib/record/data.ts';
+import { PACKS } from '../../lib/record/fixtures/sample.ts';
 import { packDocument, type PackState } from '../../lib/record/packs.ts';
 import { browseable } from './browseable.ts';
 

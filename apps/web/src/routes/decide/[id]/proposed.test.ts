@@ -10,6 +10,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { egressOf, openRecord } from '@braindog/kernel';
 
+import '../../../lib/record/fixtures/fill.ts';
 import { sayStep, sayTrigger, words } from '../../../lib/flow/flow.ts';
 import { REGISTERS } from '../../../lib/record/api.ts';
 import type { Fetch } from '../../../lib/record/page-live.ts';

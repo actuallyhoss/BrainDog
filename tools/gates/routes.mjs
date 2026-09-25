@@ -52,7 +52,10 @@ const SAMPLES = {
     'export',
   ],
   '[track]': '2',
-  '[view]': 'obligations.overdue',
+  /* THE VIEW THE GATES' RECORD SAVES (`record.mjs` `VIEW`). It was `obligations.overdue`, the sample's view, which the
+     gates reached by taking the record away so the app fell back to the sample; with the sample gone that address is
+     the refusal "the record was not reached", and a refusal on a route outside `MAY_REFUSE` is a finding. */
+  '[view]': 'obligations.open',
   /* ANY TOKEN, AND ON PURPOSE. `9f2a7c41d8b3` was the one token that opened the sample's Money page; the sample is
      gone (DIRECTION 26) and every token now draws the same card, "This link does not open a page". That card is still
      measured and not dropped: it is the whole of what `/s/[token]` draws, it is the one screen a stranger arrives at,

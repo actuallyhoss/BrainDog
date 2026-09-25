@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import type { Fetch } from './boot-live.ts';
-import { INBOX } from './data.ts';
+import { INBOX } from './fixtures/sample.ts';
 import { INBOX_PAGE, itemOf, readInbox } from './inbox-live.ts';
 
 const BASE = 'http://record.test';

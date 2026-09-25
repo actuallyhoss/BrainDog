@@ -15,9 +15,9 @@ import { useCase } from '@braindog/seed/usecases';
 import { carriedDocument, dayOf, formedFor } from '@braindog/seed/usecases/install';
 import { linkExamples } from '@braindog/seed/usecases/links';
 
+import './fixtures/fill.ts';
 import { page, pages } from './fixtures/readers.ts';
-import { ROWS } from './data.ts';
-import { PAGES, REGISTERS } from './data.ts';
+import { PAGES, REGISTERS, ROWS } from './held.ts';
 import { METRICS } from './declared.ts';
 import { toSegments } from './blocks.ts';
 import { blockOf } from './page-live.ts';

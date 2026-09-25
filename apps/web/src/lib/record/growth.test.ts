@@ -22,9 +22,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import './fixtures/fill.ts';
 import { DOM_CAP, PAGE, columnsFor } from './api.ts';
 import { list, search } from './fixtures/readers.ts';
-import { NOW, REGISTERS, ROWS } from './data.ts';
+import { NOW, REGISTERS } from './fixtures/sample.ts';
+import { ROWS } from './held.ts';
 import type { Entry } from './schema.ts';
 
 /** The sizes, each one either a documented threshold or the far side of one. */

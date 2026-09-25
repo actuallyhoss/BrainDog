@@ -124,10 +124,11 @@ export function terms(q: string): string[] | null {
  * NFD FIRST, because `ü` is one codepoint until it is decomposed into `u` + U+0308. The pairs that
  * are kept stay decomposed, which is harmless: both sides of every comparison come through here.
  *
- * A `function` AND NOT A `const`, and `tokensOf` too. `data.ts` calls `answers()` while its own
- * module body is still evaluating — the run-log receipts count the way the record counts — and
- * `data.ts` and `find.ts` import each other, so a `const` arrow here is in its temporal dead zone
- * when that call lands. A hoisted declaration is not. The cycle is deliberate and this is its cost.
+ * A `function` AND NOT A `const`, and `tokensOf` too. The fixture (then `data.ts`) called `answers()`
+ * while its own module body was still evaluating, so its run-log receipts counted the way the record
+ * counts, and the two files imported each other, so a `const` arrow here was in its temporal dead zone
+ * when that call landed. The cycle is gone since wave C1 (this file reads `held.ts`, and the fixture's
+ * receipts count when they are read), and a hoisted declaration costs nothing, so it stays one.
  */
 function fold(text: string): string {
   return text

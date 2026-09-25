@@ -22,8 +22,7 @@
  * that quietly matches everything.
  */
 
-import { ROWS } from './data.ts';
-import { REGISTERS } from './held.ts';
+import { REGISTERS, ROWS } from './held.ts';
 import { compile, matches } from './where.ts';
 import type { Entry, PageBlock, PageDecl } from './schema.ts';
 

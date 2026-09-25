@@ -50,8 +50,9 @@ import { fileURLToPath } from 'node:url';
 
 import { useCase } from '@braindog/seed/usecases';
 
+import '../record/fixtures/fill.ts';
 import { saidPlainly } from '../record/blocks.ts';
-import { REGISTERS } from '../record/data.ts';
+import { REGISTERS } from '../record/held.ts';
 import { heldBy, plainOf, type Governor } from '../record/governance.ts';
 import { heardLabels, relabelAll } from '../voice.ts';
 import { updatesOf } from '../../routes/decide/[id]/changes.ts';

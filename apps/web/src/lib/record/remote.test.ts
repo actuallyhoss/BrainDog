@@ -18,10 +18,11 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { NOW, ORDER, installSeed } from '@braindog/seed';
 
+import './fixtures/fill.ts';
 import { REGISTERS } from './api.ts';
 import { list } from './fixtures/readers.ts';
-import { ROWS } from './data.ts';
-import { DECIDED, QUESTIONS, ROWSETS } from './data.ts';
+import { ROWS } from './fixtures/sample.ts';
+import { DECIDED, QUESTIONS, ROWSETS } from './fixtures/sample.ts';
 import { questionOf, rowsetOf } from './governance.ts';
 import { projected, terms } from './find.ts';
 import { declOf, entryOf, orderOf, refMapOf, targetsOf, treeOf, type RecordRow, type Refs } from './remote.ts';

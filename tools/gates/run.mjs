@@ -142,6 +142,10 @@ const GATES = [
      and nothing held it there. Beside the kernel rule because a `'bank-hsbc-eg'` in the record is
      that rule broken without a single declaration written. */
   ['shell-words', call(join(here, 'shell-words.mjs'))],
+  /* AND THE SAME KIND OF RULE ABOUT THE SAMPLE (DIRECTION 26). The app's test data lives in `fixtures/` and in the seed's
+     root, and a shipped file that imports either draws the sample on a real record. Beside `shell-words` because both
+     are a grep over what the core ships for something it must not name. */
+  ['no-fixtures', call(join(here, 'no-fixtures.mjs'))],
   ['css-rules', call(join(here, 'css-rules.mjs'))],
   ['colour-grep', call(join(here, 'colour-grep.mjs'))],
   /* `50 §3` says one file holds every sentence so the copy is reviewable in one place. That is true

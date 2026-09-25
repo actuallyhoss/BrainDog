@@ -71,6 +71,7 @@ import { readFileSync } from 'node:fs';
 import { chromium, type Page } from '@playwright/test';
 import { toHTML } from 'braindog-render';
 
+import './fixtures/fill.ts';
 import { spanOf } from './arrange.ts';
 import { page, pages } from './fixtures/readers.ts';
 import { toSegments } from './blocks.ts';

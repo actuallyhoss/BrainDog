@@ -157,7 +157,7 @@ test('WITH NO RECORD THE SCREEN DRAWS THE RECORD’S OWN REFUSAL, and there is n
   const signIn = { ok: false as const, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } };
   const nobody = await choose(recordOf({ packs: signIn }), true);
   assert.deepEqual(nobody.first, signIn);
-  assert.equal(nobody.source.sample, false);
+  assert.equal('sample' in nobody.source, false, 'a source still says whether it is the sample, which it never is');
   const settings = await openSettings(recordOf({ packs: signIn, packConfig: signIn }), 'money-core');
   assert.deepEqual(settings.first, signIn, 'the settings of a pack nobody installed were drawn from the sample');
   const packs: Record<string, unknown> = await import('./packs.ts');

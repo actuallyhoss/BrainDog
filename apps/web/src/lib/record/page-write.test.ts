@@ -10,8 +10,9 @@ import { fileURLToPath } from 'node:url';
 
 import type { Row } from 'braindog-render';
 
+import './fixtures/fill.ts';
 import { copy } from '../copy.ts';
-import { REGISTERS } from './data.ts';
+import { REGISTERS } from './fixtures/sample.ts';
 import type { Fetch as ClientFetch } from './pages-live.ts';
 import { arrangedBody, keepInPlace, movePatch, rowKey, saveArrangement, schemaOf, tickPatch, updateRow, type Fetch } from './page-write.ts';
 

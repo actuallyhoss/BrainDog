@@ -10,7 +10,7 @@ import { AGENTS_PACK, FIRST_PARTY, firstPartyManifest } from '@braindog/seed';
 import { arrange } from '@braindog/seed/usecases';
 
 import { firstRun } from './first-run.ts';
-import { PACKS } from './record/data.ts';
+import { PACKS } from './record/fixtures/sample.ts';
 import { heardFor, INSTALL_ORDER, LEANS_ON, shape, titleOfRow, toTurnOn, writable, type PackId, type Shape } from './shape.ts';
 
 const TODAY = '2026-09-15';

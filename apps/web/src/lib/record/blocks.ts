@@ -39,11 +39,10 @@ import { day as longDay, money, parse, since, workingCell, WORKING_MARK, type Bl
 import { KINDS, isKind, type CardRole } from 'braindog-render';
 import type { Column } from 'braindog-render/svelte';
 import { display, feedWho, homeCurrency, walkTable, type BlockResult } from './api.ts';
-/* THE SAMPLE'S ROWS, READ HERE AND NOT THROUGH `api.ts`, which no longer hands them on: a gauge whose filter matched nothing
-   takes its currency from the list's rows, and a block carries only the rows it matched. Wave C1 needs the record's own
-   answer for this before `data.ts` can leave. */
-import { ROWS } from './data.ts';
-import { REGISTERS } from './held.ts';
+/* `ROWS` IS `held.ts`'S, EMPTY IN A SHIPPED TAB: a gauge whose filter matched nothing took its currency from the sample's
+   rows of the list, on any record. With no rows held it is the block's own sum or none, and a test over the sample fills
+   the table (`fixtures/fill.ts`). */
+import { REGISTERS, ROWS } from './held.ts';
 
 /**
  * The instant a block was read at, which is the clock everything drawn from it is told against.

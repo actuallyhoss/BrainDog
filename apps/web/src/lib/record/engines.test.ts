@@ -16,7 +16,7 @@ import { costOf, fill, isStale, openRecord, ratesFrom, readBlock as kernelBlock,
 import { AGENTS_PAGES, NOW, PAGES, RUNS_ON, installSeed } from '@braindog/seed';
 
 import { page, pages, readBlock as webBlock } from './fixtures/readers.ts';
-import { ROWS } from './data.ts';
+import { ROWS } from './held.ts';
 import { METRICS } from './declared.ts';
 import { runway as webRunway, type Leg } from './forecast.ts';
 import { read as webRead, withFx, withParam, type MetricDecl as WebMetric } from './metrics.ts';

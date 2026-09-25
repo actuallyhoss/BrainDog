@@ -22,8 +22,7 @@
  * off by a penny is a balance nobody trusts again.
  */
 
-import { ROWS } from './data.ts';
-import { REGISTERS } from './held.ts';
+import { REGISTERS, ROWS } from './held.ts';
 /* THE SAME MARKER `metrics.ts` PUTS IN ITS OWN CURRENCY SET, imported rather than retyped: two
    copies of the word a screen prints are two words that drift, and this one is printed by
    `mixedFix` on both sides of the product. */

@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 
 import { parse, type Block } from 'braindog-render';
 
+import './fixtures/fill.ts';
 import { REGISTERS } from './api.ts';
 import { toSegments } from './blocks.ts';
 import { changeLine, figureOf, linesText, measuresOf, periodOf, tileRows } from './measures.ts';

@@ -31,7 +31,7 @@ import assert from 'node:assert/strict';
 
 import { FIELD_TYPES as RECORD_TYPES } from '@braindog/kernel';
 
-import { REGISTERS } from './data.ts';
+import { REGISTERS } from './fixtures/sample.ts';
 import { FIELD_TYPES, type FieldDecl } from './schema.ts';
 
 /** The declaration as the literal in `@braindog/seed` writes it, which is what the mirror holds. */

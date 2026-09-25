@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 
 import { type Filter } from './api.ts';
 import { applyFilters, page, pages, readBlock } from './fixtures/readers.ts';
-import { NOW, PAGES, REGISTERS, ROWS } from './data.ts';
+import { NOW, PAGES, REGISTERS, ROWS } from './fixtures/sample.ts';
 import { draw, toSegments } from './blocks.ts';
 import { fill, resolvePages as resolveAt, slugify } from './pages.ts';
 import { compile, matches, registerHref } from './where.ts';

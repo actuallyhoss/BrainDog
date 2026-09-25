@@ -18,9 +18,9 @@
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { packDiff } from '$lib/record/api.ts';
-  /* THE BUILT-IN ADD-ONS, whose names and lists the sample's table is still the only list of. Read directly, since `api.ts`
-     no longer hands the sample's tables on; wave C1 moves it with `data.ts`. */
-  import { PACKS } from '$lib/record/data.ts';
+  /* THE MODULES THIS BUILD SHIPS, for their names, blurbs and lists. It was the sample's `PACKS`, which carried the same
+     six and two add-ons nobody wrote (wave C1, `modules.ts`). */
+  import { MODULES } from '$lib/record/modules.ts';
   import { PAGES, REGISTERS } from '$lib/record/held.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
   import type { Shell } from '$lib/record/boot-live.ts';
@@ -43,8 +43,8 @@
   import { moduleName } from '@braindog/seed/usecases/names';
 
   /* THE CATALOGUE CARRIES NAMES AND BLURBS; the record carries which packs there are and whether each is on. */
-  const byId = new Map(PACKS.map((p) => [p.id, p]));
-  /* AN ADD-ON FROM THIS BRAINDOG'S CATALOGUE is not in `PACKS`, so its catalogue title names it, and its id only when neither knows it. */
+  const byId = new Map(MODULES.map((p) => [p.id, p]));
+  /* AN ADD-ON FROM THIS BRAINDOG'S CATALOGUE is not in `MODULES`, so its catalogue title names it, and its id only when neither knows it. */
   let catalogueNames = $state.raw<Map<string, string>>(new Map());
   /* A USE CASE'S PACK BY ITS USE CASE, "Solo founder", and a module by the name it goes by, never `usecase-founder`. */
   const nameOf = (id: string) => byId.get(id)?.name ?? catalogueNames.get(id) ?? moduleName(id);
@@ -69,7 +69,7 @@
 
   const installed = $derived(states ?? []);
   /* ONLY WHAT THIS BUILD SHIPS, and only once the record has said what it holds (`browseable.ts`). */
-  const available = $derived(states ? browseable(PACKS, states) : []);
+  const available = $derived(states ? browseable(MODULES, states) : []);
 
   let diff = $state<string | null>(null);
 
@@ -279,7 +279,7 @@
   `04 §3`: "The diff is shown before it applies … this is the entire trust model."
 -->
 {#snippet plan(pack: PackInfo)}
-  {@const d = packDiff(pack)}
+  {@const d = packDiff(pack, installed.some((s) => s.id === pack.id))}
   <dl class="diff">
     <dt>{copy.diffAdds}</dt>
     <dd>

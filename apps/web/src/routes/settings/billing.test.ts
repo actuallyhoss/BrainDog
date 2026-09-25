@@ -2,9 +2,8 @@
  * What Settings > Billing says, held to the host that answered rather than to the build.
  *
  * `loop/research-first-sign-in.md` friction 5: on a live Cloud record Billing said "This record
- * runs on your own machine." `DEPLOYMENT.kind` in `data.ts` follows `__BRAINDOG_VARIANT__`, which is
- * `''` in every shipped bundle, so it reads `self-host` on the Cloud build and on every production
- * screen. It was a fact about the sample, and since DIRECTION 26 there is no sample for it to speak for.
+ * runs on your own machine." `DEPLOYMENT.kind`, the sample's, followed a build flag that was empty in every shipped
+ * bundle, so it read `self-host` on the Cloud build and on every production screen. It was a fact about the sample, and since DIRECTION 26 there is no sample for it to speak for.
  */
 
 import { test } from 'node:test';
@@ -71,7 +70,8 @@ test('and Billing asks the mail door itself, or a self-host reached straight at 
 
 test('billing.ts reads nothing from the fixture module, which is the sample and nothing else', () => {
   /* `DEPLOYMENT` WAS THE LAST THING IT READ THERE, and it is the sample's variant. `research-no-sample.md` 1d lists this
-     file among the thirty shipped importers of `data.ts`; wave C moves that module under tests, where no route reaches it. */
+     file among the thirty shipped importers of `data.ts`; wave C1 moved that module to `fixtures/sample.ts`, which the
+     `no-fixtures` gate keeps out of every route. */
   const source = readFileSync(new URL('./billing.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /from '[^']*record\/data\.ts'/u, 'billing.ts still imports the sample');
   assert.doesNotMatch(source.replaceAll(/\/\*[\s\S]*?\*\//gu, ''), /\bDEPLOYMENT\b/u);
